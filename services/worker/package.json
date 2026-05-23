@@ -1,0 +1,6 @@
+{
+  "name": "@ai-job-print/worker",
+  "version": "0.0.1",
+  "private": true,
+  "description": "打印/AI/同步任务队列 - 待第 7 阶段开发"
+}
