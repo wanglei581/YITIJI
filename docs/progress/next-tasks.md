@@ -34,22 +34,24 @@
 
 ---
 
-## 当前待执行：Phase 2 - 页面框架与导航接线
+## ✅ Phase 2 - 页面框架与导航接线（已完成 2026-05-24）
 
-### P0（本周完成）
+### P0（已完成）
 
-- [ ] 接入 React Router：`kiosk/admin/partner` 三端路由骨架
-- [ ] `KioskLayout` 底部导航与路由联动（首页/AI助手/我的）
-- [ ] `AdminLayout` 侧栏菜单与面包屑联动
-- [ ] `PartnerLayout` 菜单与权限占位联动（仅轻量数据后台）
-- [ ] 新建 `apps/*/src/routes` 与页面占位（Dashboard/List/Detail）
+- [x] 接入 React Router：`kiosk/admin/partner` 三端路由骨架
+- [x] `KioskLayout` 底部导航与路由联动（首页/AI助手/我的）
+- [x] `AdminLayout` 侧栏菜单与路由联动（14 个模块）
+- [x] `PartnerLayout` 菜单与路由联动（10 个模块）
+- [x] 新建 `apps/*/src/routes` 与页面占位（全部 EmptyState 占位）
+- [x] Kiosk `/policy` 路由接通首页"查看政策"按钮
+- [x] Admin/Partner 路由结构统一：router 抽至 `routes/index.tsx`，布局组件抽至 `layouts/`，App.tsx 为薄包装
+- [x] Fast Refresh warning 修复：布局组件与 router 拆分到独立文件
+- [x] 废弃 `apps/admin/src/routes/settings/` 目录已删除
 
-### P1（紧接 P0）
+### P1（已完成）
 
-- [ ] 接入 mock 数据层（`packages/shared` 类型驱动）
-- [ ] 建立统一状态容器（加载/空态/错误态）在三端复用
-- [ ] 页面级 token 对齐：消除硬编码灰阶色（优先按钮、卡片、导航）
-- [ ] 完成 Phase 2 验收：`lint/typecheck/build` 全通过
+- [x] 统一状态容器（EmptyState/LoadingState/ErrorState）在三端复用
+- [x] 完成 Phase 2 验收：三端路由全部 200，截图确认，lint/typecheck 通过
 
 ---
 

@@ -18,6 +18,7 @@ export function HomePage() {
         title="AI求职打印服务终端"
         subtitle="请选择您需要的服务"
         actions={<StatusBadge status="success" label="设备正常" />}
+        size="large"
       />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -35,7 +36,7 @@ export function HomePage() {
           <Button
             className="mt-6 w-full"
             size="lg"
-            onClick={() => navigate('/resume/upload')}
+            onClick={() => navigate('/resume/source')}
           >
             开始使用
           </Button>
@@ -77,7 +78,7 @@ export function HomePage() {
             className="mt-6 w-full"
             size="lg"
             variant="secondary"
-            onClick={() => navigate('/print/upload')}
+            onClick={() => navigate('/scan/start')}
           >
             开始扫描
           </Button>
@@ -140,6 +141,7 @@ export function HomePage() {
             className="mt-6 w-full"
             size="lg"
             variant="ghost"
+            onClick={() => navigate('/policy')}
           >
             查看政策
           </Button>

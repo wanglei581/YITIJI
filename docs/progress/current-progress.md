@@ -76,11 +76,11 @@ Phase 0 修复（2026-05-23 完成）：
 
 ### P0（MVP 核心，立即开发）
 
-- [ ] 新建正式项目（monorepo 结构）
-- [ ] 建立设计系统（颜色/字体/按钮/卡片/状态标签规范）
-- [ ] 完成一体机首页
-- [ ] 完成打印扫描核心流程
-- [ ] 完成管理员后台基础框架
+- [x] 新建正式项目（monorepo 结构）
+- [x] 建立设计系统（颜色/字体/按钮/卡片/状态标签规范）
+- [x] 完成一体机首页
+- [x] 完成打印扫描核心流程（打印 5 页 + 扫描 4 页，含失败路径和重试）
+- [x] 完成管理员后台基础框架
 - [ ] 完成岗位/招聘会外部来源展示逻辑（合规展示）
 
 ### P1（重要功能，第二批）
@@ -107,8 +107,8 @@ Phase 0 修复（2026-05-23 完成）：
 |------|------|------|
 | 第 0 阶段 | 项目初始化 | ✅ 完成 |
 | 第 1 阶段 | 设计系统 | ✅ 基建完成（可进入 Phase 2） |
-| 第 2 阶段 | 公共组件 | 未开始 |
-| 第 3 阶段 | 一体机前台 | 未开始 |
+| 第 2 阶段 | 公共组件 | ✅ 完成 |
+| 第 3 阶段 | 一体机前台 | 进行中（打印流程 ✅，扫描流程 ✅） |
 | 第 4 阶段 | 岗位和招聘会信息 | 未开始 |
 | 第 5 阶段 | 管理员后台 | 未开始 |
 | 第 6 阶段 | 合作机构后台 | 未开始 |
@@ -142,6 +142,9 @@ Phase 0 修复（2026-05-23 完成）：
 | 2026-05-23 | 提交前清理：移除 .DS_Store 和 zip 出 git 索引，补 *.zip gitignore 规则，全部检查通过，Phase 0 正式封板 | Claude Code |
 | 2026-05-23 | Phase 1 设计系统基建：tokens.css(@theme)、cn()工具、cva重构Button/Card/StatusBadge、Spinner/EmptyState/LoadingState/ErrorState、KioskLayout/AdminLayout/PartnerLayout，lint/typecheck/build全通过 | Claude Code |
 | 2026-05-24 | Phase 1 视觉验证修复：三端 index.css 补 `@source "../../../packages/ui/src"` 指令，修复 Tailwind v4 不扫描 workspace 包导致样式全部缺失的问题，截图确认三端布局/颜色/组件均正常 | Claude Code |
+| 2026-05-24 | Phase 2 完成：Admin 14路由、Partner 10路由、Kiosk /policy 路由及首页按钮接线；路由结构统一（router→routes/index.tsx，布局→layouts/），App.tsx 薄包装；Fast Refresh warning 修复；废弃 settings 路由删除；Playwright 截图验收全部通过 | Claude Code |
+| 2026-05-24 | Phase 3 打印流程完成：PrintUploadPage→PreviewPage→ConfirmPage→ProgressPage→DonePage，含成功/失败/重试路径；DEV 模拟失败按钮；CONTROL_FIELDS 黑名单重试；Mavis 视觉修复（费用 text-2xl，PageHeader text-xl）；lint/typecheck/build 全通过 | Claude Code |
+| 2026-05-24 | Phase 3 扫描流程完成：ScanStartPage→SettingsPage→ProgressPage→ResultPage，4 页扫描流程，含类型选择/参数配置/进度/结果；DEV 模拟失败；黑名单重试；首页扫描按钮修正至 /scan/start；lint/typecheck/build 全通过 | Claude Code |
 
 ---
 
