@@ -80,7 +80,7 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：第 0 阶段（项目初始化），尚未开始。
+当前阶段：第 0 阶段（项目初始化）已完成，准备进入第 1 阶段（设计系统）。
 
 ---
 

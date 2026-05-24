@@ -1,0 +1,63 @@
+/*
+ * Design Tokens — AI求职打印服务终端
+ *
+ * Single source of truth for all visual decisions.
+ * Import this file in each app's index.css BEFORE @import "tailwindcss".
+ *
+ * Tailwind v4 @theme: every --color-* entry automatically generates
+ * bg-*, text-*, border-* utility classes. Radius overrides built-in
+ * Tailwind defaults so rounded-sm/md/lg map to our system values.
+ */
+
+@theme {
+  /* ── Brand: Primary (科技蓝) ──────────────────────────────── */
+  --color-primary-50:  #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;  /* main brand color */
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+  --color-primary-950: #172554;
+
+  /* ── Semantic: Success ────────────────────────────────────── */
+  --color-success:     #16a34a;
+  --color-success-bg:  #f0fdf4;
+  --color-success-fg:  #15803d;
+
+  /* ── Semantic: Warning ────────────────────────────────────── */
+  --color-warning:     #ea580c;
+  --color-warning-bg:  #fff7ed;
+  --color-warning-fg:  #c2410c;
+
+  /* ── Semantic: Error ──────────────────────────────────────── */
+  --color-error:       #dc2626;
+  --color-error-bg:    #fef2f2;
+  --color-error-fg:    #b91c1c;
+
+  /* ── Semantic: Info ───────────────────────────────────────── */
+  --color-info:        #2563eb;
+  --color-info-bg:     #eff6ff;
+  --color-info-fg:     #1d4ed8;
+
+  /* ── Surface / Background ─────────────────────────────────── */
+  --color-canvas:  #f9fafb;   /* page-level background */
+  --color-surface: #ffffff;   /* card / panel background */
+
+  /* ── Typography ───────────────────────────────────────────── */
+  /*
+   * Inter for Latin; PingFang SC for macOS/iOS Chinese;
+   * Noto Sans SC as cross-platform fallback for Chinese.
+   */
+  --font-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Border Radius (overrides Tailwind defaults) ──────────── */
+  --radius-sm:   0.375rem;   /*  6px — badges, tags, small inputs   */
+  --radius-md:   0.5rem;     /*  8px — buttons, standard inputs     */
+  --radius-lg:   0.75rem;    /* 12px — cards, panels                */
+  --radius-xl:   1rem;       /* 16px — large panels, modals         */
+  --radius-full: 9999px;     /* pill — status badges, chip labels   */
+}

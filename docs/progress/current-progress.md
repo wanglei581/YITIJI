@@ -24,9 +24,9 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：第 0 阶段 - 项目初始化（未开始）**
+**当前阶段：第 0 阶段 - 项目初始化（✅ 完成）**
 
-文档体系已建立（2026-05-23 完成）：
+文档体系（2026-05-23 完成）：
 - [x] CLAUDE.md
 - [x] AGENTS.md（Codex 项目说明）
 - [x] README.md
@@ -37,16 +37,38 @@
 - [x] docs/progress/current-progress.md
 - [x] docs/progress/next-tasks.md
 
-项目初始化任务（待开始）：
-- [ ] 创建 monorepo 项目结构（ai-job-print-terminal/）
-- [ ] 初始化 apps/kiosk（React + Vite + TypeScript）
-- [ ] 初始化 apps/admin
-- [ ] 初始化 apps/partner
-- [ ] 初始化 Tailwind CSS
-- [ ] 初始化 shadcn/ui
-- [ ] 初始化 ESLint / Prettier
-- [ ] 创建 .env.example
-- [ ] 验证项目可以启动
+代码工程（2026-05-23 完成）：
+- [x] pnpm monorepo 结构（pnpm-workspace.yaml）
+- [x] 根目录配置：package.json、tsconfig.base.json、eslint.config.mjs、.prettierrc.json、.editorconfig、.gitignore
+- [x] apps/kiosk 初始化（React + Vite + TypeScript + Tailwind v4），Port 5173
+- [x] apps/admin 初始化，Port 5174
+- [x] apps/partner 初始化，Port 5175
+- [x] packages/ui：Button、Card、StatusBadge、PageHeader 组件
+- [x] packages/shared：UserRole、DeviceStatus、JobSourceStatus、PrintTaskStatus 类型
+- [x] services/api、services/worker 占位
+- [x] pnpm install 成功（216 个包）
+- [x] pnpm lint 通过（零报错）
+- [x] pnpm typecheck 通过（零错误）
+- [x] pnpm dev 三端均成功启动
+
+Phase 0 修复（2026-05-23 完成）：
+- [x] Button 组件：sm/md h-12(48px)，lg h-14(56px)，满足触控要求；forwardRef；type="button" 默认值
+- [x] .env.example 创建（含 PANTUM_APP_KEY/SECRET 仅服务端注释）
+- [x] 三端 app 添加 @ai-job-print/ui 和 @ai-job-print/shared workspace 依赖
+- [x] 三端 App.tsx 实际引用 Button/Card/StatusBadge/PageHeader 及对应 shared 类型
+- [x] tsconfig.node.json 修复：移除 allowImportingTsExtensions（TS5096），添加 outDir 重定向构建产物
+- [x] 清理失败构建产物（apps/*/vite.config.js、*.d.ts、*.tsbuildinfo）
+- [x] @types/node ^22 加入根 devDependencies
+- [x] Agency 审查结果另存为 docs/reviews/claude-agency-phase0-review.md
+- [x] pnpm lint / typecheck / build 全部通过（零报错）
+- [x] Codex 复审收尾：新增 .gitattributes、三端 @ 路径别名、StatusBadge 无障碍语义、同步 Phase 1 任务文档
+- [x] Vite 升级到 6.4.2，Esbuild 升级到 0.25.12，pnpm audit 无已知漏洞
+
+提交前清理（2026-05-23 完成）：
+- [x] .DS_Store 从 git 索引移除（本地文件保留）
+- [x] 项目源码及需求文档.zip 从 git 索引移除（本地文件保留）
+- [x] .gitignore 补充 *.zip 规则，防止后续再次入库
+- [x] pnpm lint / typecheck / build / audit 全部通过（audit: No known vulnerabilities found）
 
 ---
 
@@ -83,8 +105,8 @@
 
 | 阶段 | 名称 | 状态 |
 |------|------|------|
-| 第 0 阶段 | 项目初始化 | 未开始 |
-| 第 1 阶段 | 设计系统 | 未开始 |
+| 第 0 阶段 | 项目初始化 | ✅ 完成 |
+| 第 1 阶段 | 设计系统 | ✅ 基建完成（可进入 Phase 2） |
 | 第 2 阶段 | 公共组件 | 未开始 |
 | 第 3 阶段 | 一体机前台 | 未开始 |
 | 第 4 阶段 | 岗位和招聘会信息 | 未开始 |
@@ -113,6 +135,13 @@
 |------|---------|--------|
 | 2026-05-23 | 建立项目文档体系（CLAUDE.md + 4 个文档） | Claude Code |
 | 2026-05-23 | 整理目录结构，新增 AGENTS.md、README.md、ai-collaboration-rules.md、next-tasks.md，compliance 文档移至独立目录 | Claude Code |
+| 2026-05-23 | 补充跨平台运行要求：CLAUDE.md 新增第 17 节、README.md 新增平台说明、新建 terminal-agent-windows.md | Claude Code |
+| 2026-05-23 | 第 0 阶段完成：pnpm monorepo 初始化，三端 app 可运行，packages/ui 和 packages/shared 已创建，lint/typecheck/dev 全部通过 | Claude Code |
+| 2026-05-23 | Phase 0 修复：Button 触控尺寸修正、forwardRef、.env.example、三端引用 ui/shared、tsconfig.node.json 修复、构建产物清理、pnpm build 通过 | Claude Code |
+| 2026-05-23 | Codex Phase 0 复审收尾：补 .gitattributes、路径别名、StatusBadge 无障碍语义、Vite/Esbuild 安全升级，lint/typecheck/build/audit 均通过 | Codex |
+| 2026-05-23 | 提交前清理：移除 .DS_Store 和 zip 出 git 索引，补 *.zip gitignore 规则，全部检查通过，Phase 0 正式封板 | Claude Code |
+| 2026-05-23 | Phase 1 设计系统基建：tokens.css(@theme)、cn()工具、cva重构Button/Card/StatusBadge、Spinner/EmptyState/LoadingState/ErrorState、KioskLayout/AdminLayout/PartnerLayout，lint/typecheck/build全通过 | Claude Code |
+| 2026-05-24 | Phase 1 视觉验证修复：三端 index.css 补 `@source "../../../packages/ui/src"` 指令，修复 Tailwind v4 不扫描 workspace 包导致样式全部缺失的问题，截图确认三端布局/颜色/组件均正常 | Claude Code |
 
 ---
 

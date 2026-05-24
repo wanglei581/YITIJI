@@ -120,6 +120,13 @@ AI求职打印服务终端 = AI简历服务 + 打印扫描 + 求职材料服务 
 - Windows Terminal Agent
 - 可用 Node.js / .NET / Python 开发
 - 负责打印机、扫描仪、U盘、扫码器、摄像头等硬件交互
+- **必须在 Windows 10/11 x64 上独立运行，不依赖 macOS 环境**
+
+跨平台工具（第 0 阶段必须引入）：
+
+- `rimraf`：跨平台删除目录（替代 `rm -rf`）
+- `cross-env`：跨平台环境变量设置（替代 `export VAR=xxx`）
+- `concurrently` 或 `turbo`：跨平台并行启动多应用
 
 ## 6. 推荐项目结构
 
@@ -402,7 +409,7 @@ ai-job-print-terminal/
 
 任务：
 
-- 创建 monorepo 项目结构
+- 创建 monorepo 项目结构（pnpm workspace 或 Turborepo）
 - 初始化 React + Vite + TypeScript
 - 初始化 Tailwind CSS
 - 初始化 shadcn/ui
@@ -410,12 +417,23 @@ ai-job-print-terminal/
 - 建立 docs 文档目录
 - 创建 CLAUDE.md
 - 创建 .env.example
+- 引入跨平台工具：rimraf、cross-env、concurrently
+
+跨平台要求（第 0 阶段强制）：
+
+- `package.json` scripts 不能包含 `rm -rf`、`cp -r`、`export VAR=xxx` 等 Unix 专用命令
+- 删除目录使用 `rimraf`
+- 设置环境变量使用 `cross-env`
+- 并行启动多个应用使用 `concurrently` 或 `turbo`
+- 所有文件路径处理使用 `path.join` / `path.resolve`，不硬编码 `/Users/...` 或 `C:\...` 绝对路径
+- 环境变量必须通过 `.env` / `.env.example` 管理，不写死本机路径
 
 验收：
 
-- 项目可以启动
+- 项目可以在 macOS 和 Windows 上同样启动
 - 页面能正常访问
 - 基础布局可用
+- `npm run dev`（或 pnpm）命令在 Windows 上不报错
 
 ### 第 1 阶段：设计系统
 
@@ -634,7 +652,47 @@ Claude Code 每次开发前必须：
 - 告警中心
 - 数据统计
 
-## 17. 重要提醒
+## 17. 跨平台运行要求
+
+### 运行环境说明
+
+| 环境 | 用途 |
+|------|------|
+| macOS | 开发环境（VS Code / Claude Code / Codex） |
+| Windows（服务器/云） | 前端应用和后台管理系统的运行和访问 |
+| Windows 一体机 | 一体机前台页面 + Terminal Agent 硬件交互 |
+
+### 代码层面要求
+
+1. **路径处理**：所有文件路径必须使用 `path.join()` / `path.resolve()`，不允许硬编码 `/Users/...`、`C:\...` 等绝对路径。
+2. **环境变量**：使用 `.env` 和 `.env.example`，不写死本机路径或密钥。
+3. **npm scripts**：禁止使用以下 Unix 专用命令：
+   - `rm -rf` → 改用 `rimraf`
+   - `cp -r` → 改用 `cpx` 或 Node.js 脚本
+   - `export VAR=xxx` → 改用 `cross-env`
+   - `&&` 连接命令时注意 Windows 兼容性
+4. **并行启动**：多应用并行启动使用 `concurrently` 或 `turbo`。
+5. **换行符**：配置 `.gitattributes`，统一使用 LF（`* text=auto eol=lf`）。
+
+### 一体机前台 Kiosk 模式
+
+一体机前台页面必须支持在 Windows Edge / Chrome 全屏 Kiosk 模式下运行：
+
+- 不依赖系统通知、系统剪贴板等需要权限的浏览器 API
+- 触控事件优先于鼠标事件
+- 不出现系统级弹窗（如浏览器文件选择框）阻断流程
+- 必要时通过 Terminal Agent 中转文件操作
+
+### Terminal Agent 要求
+
+Windows Terminal Agent 后续单独开发（第 8 阶段），须遵守：
+
+- 不依赖任何 macOS 专有 API 或命令
+- 可以在 Windows 10/11 x64 上独立运行和自启动
+- 与后端 API 通过 HTTP/WebSocket 通信，不直接访问数据库
+- 详见：[docs/device/terminal-agent-windows.md](docs/device/terminal-agent-windows.md)
+
+## 18. 重要提醒
 
 不要追求一次性做完全部功能。
 
