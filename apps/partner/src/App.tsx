@@ -1,14 +1,6 @@
+import { createBrowserRouter, RouterProvider, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { PartnerLayout, type NavItem } from '@ai-job-print/ui'
 import { useState } from 'react'
-import {
-  Button,
-  Card,
-  EmptyState,
-  PageHeader,
-  PartnerLayout,
-  StatusBadge,
-  type NavItem,
-} from '@ai-job-print/ui'
-import type { JobReviewStatus } from '@ai-job-print/shared'
 import {
   BarChart2Icon,
   BriefcaseIcon,
@@ -18,59 +10,79 @@ import {
   LayoutDashboardIcon,
 } from 'lucide-react'
 
+// Pages
+import DashboardPage from './routes/dashboard'
+import JobsPage from './routes/jobs'
+import FairsPage from './routes/fairs'
+import PolicyPage from './routes/policy'
+import SourcesPage from './routes/sources'
+import StatsPage from './routes/stats'
+
 const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', label: '工作台',     icon: LayoutDashboardIcon },
-  { key: 'jobs',      label: '岗位信息管理', icon: BriefcaseIcon },
-  { key: 'fairs',     label: '招聘会管理',  icon: CalendarIcon },
-  { key: 'policy',    label: '政策公告',   icon: FileTextIcon },
-  { key: 'sources',   label: '数据源管理',  icon: DatabaseIcon },
-  { key: 'stats',     label: '数据统计',   icon: BarChart2Icon },
+  { key: 'dashboard', label: '工作台', icon: LayoutDashboardIcon },
+  { key: 'jobs', label: '岗位信息管理', icon: BriefcaseIcon },
+  { key: 'fairs', label: '招聘会管理', icon: CalendarIcon },
+  { key: 'policy', label: '政策公告', icon: FileTextIcon },
+  { key: 'sources', label: '数据源管理', icon: DatabaseIcon },
+  { key: 'stats', label: '数据统计', icon: BarChart2Icon },
 ]
 
-export default function App() {
-  const [activeKey, setActiveKey] = useState('dashboard')
+const ROUTE_KEY_MAP: Record<string, string> = {
+  '/': 'dashboard',
+  '/jobs': 'jobs',
+  '/fairs': 'fairs',
+  '/policy': 'policy',
+  '/sources': 'sources',
+  '/stats': 'stats',
+}
+
+function PartnerLayoutWrapper() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
-  const [reviewStatus] = useState<JobReviewStatus>('pending')
+  const activeKey = ROUTE_KEY_MAP[location.pathname] ?? 'dashboard'
+
+  const handleNavChange = (key: string) => {
+    const routeMap: Record<string, string> = {
+      dashboard: '/',
+      jobs: '/jobs',
+      fairs: '/fairs',
+      policy: '/policy',
+      sources: '/sources',
+      stats: '/stats',
+    }
+    navigate(routeMap[key] ?? '/')
+  }
 
   return (
     <PartnerLayout
       orgName="合作机构"
       navItems={NAV_ITEMS}
       activeKey={activeKey}
-      onNavChange={setActiveKey}
+      onNavChange={handleNavChange}
       collapsed={collapsed}
       onCollapseChange={setCollapsed}
-      headerActions={
-        <>
-          <StatusBadge
-            status={reviewStatus === 'published' ? 'success' : reviewStatus === 'rejected' ? 'error' : 'warning'}
-            label={reviewStatus}
-          />
-          <Button size="sm" variant="outline">机构账号</Button>
-        </>
-      }
     >
-      <PageHeader
-        title="工作台"
-        subtitle="Partner Portal · Port 5175"
-        actions={<Button size="sm">同步数据</Button>}
-      />
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Card>
-          <h2 className="text-lg font-semibold text-gray-900">招聘会信息</h2>
-          <p className="mt-2 text-sm text-gray-500">发布招聘会活动信息</p>
-          <Button className="mt-4" size="md">发布活动</Button>
-        </Card>
-        <Card padding="none">
-          <EmptyState
-            icon={BriefcaseIcon}
-            title="暂无岗位数据"
-            description="从数据源同步或手动上传岗位信息"
-            action={<Button size="md" variant="outline">去来源平台</Button>}
-          />
-        </Card>
-      </div>
+      <Outlet />
     </PartnerLayout>
   )
+}
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <PartnerLayoutWrapper />,
+    children: [
+      { index: true, element: <DashboardPage /> },
+      { path: 'jobs', element: <JobsPage /> },
+      { path: 'fairs', element: <FairsPage /> },
+      { path: 'policy', element: <PolicyPage /> },
+      { path: 'sources', element: <SourcesPage /> },
+      { path: 'stats', element: <StatsPage /> },
+    ],
+  },
+])
+
+export default function App() {
+  return <RouterProvider router={router} />
 }
