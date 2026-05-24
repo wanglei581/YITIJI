@@ -1,13 +1,13 @@
 # 下一步任务
 
-> 最后更新：2026-05-23  
+> 最后更新：2026-05-24  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## ✅ Phase 0 封板确认
+## ✅ 已完成阶段
 
-Phase 0 已完成全部验收项：
+### Phase 0 - 项目初始化（已封板）
 
 | 验收项 | 状态 |
 |--------|------|
@@ -20,65 +20,51 @@ Phase 0 已完成全部验收项：
 | 合规边界干净（无禁用文案/密钥泄漏） | ✅ 审查通过 |
 | 三端 app 引用 ui/shared 公共包 | ✅ 已验证 |
 
-**结论：Phase 0 正式封板。可以进入 Phase 1：设计系统。**
+### Phase 1 - 设计系统基建（已完成）
+
+| 交付项 | 状态 |
+|--------|------|
+| tokens.css（@theme 变量） | ✅ |
+| cn 工具（clsx + twMerge） | ✅ |
+| Button/Card/StatusBadge/PageHeader cva 重构 | ✅ |
+| Spinner/EmptyState/LoadingState/ErrorState | ✅ |
+| KioskLayout/AdminLayout/PartnerLayout | ✅ |
+| 三端 `@source` 样式扫描修复 | ✅ |
+| pnpm lint/typecheck/build/audit 复核通过 | ✅ |
 
 ---
 
-## 当前待执行：第 1 阶段 - 设计系统
+## 当前待执行：Phase 2 - 页面框架与导航接线
 
-### 前置步骤（进入 Phase 1 前做一次）
+### P0（本周完成）
 
-- [ ] 执行首次 git commit（staged 内容已干净，可直接提交）
-- [ ] 初始化 shadcn/ui（`pnpm dlx shadcn@latest init`）到 packages/ui
+- [ ] 接入 React Router：`kiosk/admin/partner` 三端路由骨架
+- [ ] `KioskLayout` 底部导航与路由联动（首页/AI助手/我的）
+- [ ] `AdminLayout` 侧栏菜单与面包屑联动
+- [ ] `PartnerLayout` 菜单与权限占位联动（仅轻量数据后台）
+- [ ] 新建 `apps/*/src/routes` 与页面占位（Dashboard/List/Detail）
 
-### 设计 Token 定义
+### P1（紧接 P0）
 
-- [ ] 颜色 token（主色科技蓝 #2563EB、成功绿、警告橙、错误红、背景浅灰 #F9FAFB）
-- [ ] 字体规范（字号阶梯 xs/sm/base/lg/xl/2xl/3xl，行高，字重）
-- [ ] 间距系统（基于 4px 基准，Tailwind spacing 复用）
-- [ ] 圆角系统（卡片 8~12px，按钮 8px，标签 4px/full）
-- [ ] 阴影系统（轻阴影 shadow-sm，卡片 shadow）
-
-### 组件规范文档
-
-- [ ] 按钮规范（已有 Button 组件，补充使用指南）
-- [ ] 卡片规范（白底 + 1px border-gray-200 + shadow-sm）
-- [ ] 状态标签规范（5 种状态配色已定义，补充使用场景）
-- [ ] 表格规范（列对齐、行高、操作列位置）
-- [ ] 表单规范（标签位置、错误提示样式）
-
-### 状态组件
-
-- [ ] EmptyState 组件（图标 + 标题 + 描述 + 可选操作按钮）
-- [ ] LoadingState 组件（Spinner + 提示文字）
-- [ ] ErrorState 组件（错误图标 + 错误信息 + 重试按钮）
-
-### 布局组件
-
-- [ ] KioskLayout（一体机全屏布局，底部导航：首页/AI助手/我的）
-- [ ] AdminLayout（左侧菜单 + 顶部 header + 内容区）
-- [ ] PartnerLayout（与 Admin 相近，权限范围不同）
-
-### 暗黑模式
-
-- [ ] Tailwind dark: 变体基础配置
-- [ ] 颜色 token 区分 light/dark 值
+- [ ] 接入 mock 数据层（`packages/shared` 类型驱动）
+- [ ] 建立统一状态容器（加载/空态/错误态）在三端复用
+- [ ] 页面级 token 对齐：消除硬编码灰阶色（优先按钮、卡片、导航）
+- [ ] 完成 Phase 2 验收：`lint/typecheck/build` 全通过
 
 ---
 
-## 决策待定项
+## 决策待定项（Phase 7 前确定）
 
 | 待定事项 | 说明 |
 |---------|------|
-| 后端语言 | NestJS 还是 FastAPI？当前阶段只做前端，Phase 7 前决定 |
-| 部署方案 | 云服务器还是本地？Phase 7 前决定 |
+| 后端语言 | NestJS 还是 FastAPI |
+| 部署方案 | 云服务器还是本地 |
 
 ---
 
-## 近期不需要做的事
+## 近期不做
 
 - 后端 API（第 7 阶段）
 - Windows Terminal Agent（第 8 阶段）
 - 奔图打印机接口对接（第 8 阶段）
-- 数据统计报表（P2）
 - 企业招聘端（已确认删除，不开发）

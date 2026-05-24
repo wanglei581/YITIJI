@@ -1,6 +1,7 @@
 @import "@ai-job-print/ui/styles/tokens.css";
 @import "tailwindcss";
 @source "../../../packages/ui/src";
+@source "../../../packages/shared/src";
 
 @layer base {
   html {

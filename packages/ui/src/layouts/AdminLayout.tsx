@@ -46,18 +46,18 @@ export function AdminLayout({
   return (
     <div className={cn('flex h-screen overflow-hidden bg-canvas', className)}>
 
-      {/* ── Sidebar ─────────────────────────────────────── */}
+      {/* ── Sidebar (dark, Gray 900) ────────────────────── */}
       <aside
         className={cn(
-          'flex shrink-0 flex-col border-r border-gray-200 bg-surface transition-all duration-200',
-          collapsed ? 'w-16' : 'w-60',
+          'flex shrink-0 flex-col bg-gray-900 transition-all duration-200',
+          collapsed ? 'w-16' : 'w-64',
         )}
       >
         {/* Brand */}
-        <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-4">
+        <div className="flex h-14 items-center gap-3 border-b border-gray-800 px-4">
           {appLogo && <div className="shrink-0">{appLogo}</div>}
           {!collapsed && (
-            <span className="truncate text-sm font-semibold text-gray-900">{appName}</span>
+            <span className="truncate text-sm font-semibold text-white">{appName}</span>
           )}
         </div>
 
@@ -76,15 +76,15 @@ export function AdminLayout({
                     className={cn(
                       'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                       active
-                        ? 'bg-primary-50 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+                        ? 'bg-gray-800 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-white',
                       collapsed && 'justify-center px-2',
                     )}
                   >
                     <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                     {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
                     {!collapsed && item.badge != null && (
-                      <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-xs font-medium text-gray-700">
+                      <span className="rounded-full bg-gray-700 px-1.5 py-0.5 text-xs font-medium text-gray-300">
                         {item.badge}
                       </span>
                     )}
@@ -97,12 +97,12 @@ export function AdminLayout({
 
         {/* Collapse toggle */}
         {onCollapseChange && (
-          <div className="border-t border-gray-200 p-2">
+          <div className="border-t border-gray-800 p-2">
             <button
               type="button"
               aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
               onClick={() => onCollapseChange(!collapsed)}
-              className="flex w-full items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="flex w-full items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
             >
               {collapsed
                 ? <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -116,8 +116,8 @@ export function AdminLayout({
       {/* ── Main area ──────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
 
-        {/* Top header */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-surface px-6">
+        {/* Top header — h-14 (56px) per spec */}
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-surface px-6">
           <div />
           {headerActions && (
             <div className="flex items-center gap-3">{headerActions}</div>
