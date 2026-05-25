@@ -113,7 +113,7 @@ export function ResumeReportPage() {
                 <span className="text-3xl font-bold text-gray-900">{totalScore}</span>
                 <span className="text-xl text-gray-400">/{totalMax}</span>
               </div>
-              <p className="mt-1 text-xs text-gray-400">参考评分，不代表真实录用率</p>
+              <p className="mt-1 text-xs text-gray-400">参考评分，不代表真实招聘结果</p>
             </div>
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
               <CheckCircleIcon className="h-8 w-8 text-primary-600" />

@@ -8,9 +8,11 @@ import {
   InfoIcon,
   MapPinIcon,
   QrCodeIcon,
+  SmartphoneIcon,
   TagIcon,
   XIcon,
 } from 'lucide-react'
+import { MOCK_JOBS } from '../../data/externalSources'
 
 const TAG_STYLES: Record<string, string> = {
   全职: 'bg-blue-50 text-blue-600',
@@ -24,16 +26,24 @@ function formatSync(iso: string) {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 }
 
-// ─── QR placeholder overlay ───────────────────────────────────────────────────
+// ─── QR overlay ───────────────────────────────────────────────────────────────
 
-function QrOverlay({ onClose }: { onClose: () => void }) {
+function QrOverlay({
+  sourceName,
+  externalId,
+  onClose,
+}: {
+  sourceName: string
+  externalId: string
+  onClose: () => void
+}) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
-        className="relative w-72 rounded-2xl bg-white p-8 shadow-xl"
+        className="relative w-80 rounded-2xl bg-white p-8 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -42,17 +52,36 @@ function QrOverlay({ onClose }: { onClose: () => void }) {
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="mb-6 text-center text-sm font-medium text-gray-700">扫码前往来源平台投递</p>
+
+        <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台投递</p>
+
         {/* QR placeholder */}
-        <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
+        <div className="mx-auto mt-5 flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
           <div className="flex flex-col items-center gap-2 text-gray-300">
             <QrCodeIcon className="h-16 w-16" />
             <span className="text-xs">二维码由来源平台生成</span>
           </div>
         </div>
-        <p className="mt-4 text-center text-xs text-gray-400">
-          扫描后将跳转至来源平台，投递结果由对方平台管理
-        </p>
+
+        {/* 来源信息 */}
+        <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
+          <div className="flex justify-between">
+            <span className="text-gray-400">来源机构</span>
+            <span className="font-medium">{sourceName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">外部编号</span>
+            <span className="font-mono">{externalId}</span>
+          </div>
+        </div>
+
+        {/* 操作说明 */}
+        <div className="mt-4 flex items-start gap-2">
+          <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+          <p className="text-xs leading-relaxed text-gray-500">
+            请使用手机前往来源平台办理，投递结果由对方平台管理，本系统不参与招聘流程。
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -64,11 +93,14 @@ export function JobDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
-  const job = (location.state as { job?: ExternalJob } | null)?.job
+
+  // 优先 location.state，state 缺失时从 mock 数据查找（刷新/直接访问场景）
+  const stateJob = (location.state as { job?: ExternalJob } | null)?.job
+  const job = (stateJob?.id === id ? stateJob : null) ?? MOCK_JOBS.find((j) => j.id === id)
 
   const [showQr, setShowQr] = useState(false)
 
-  if (!job || job.id !== id) {
+  if (!job) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
         <InfoIcon className="h-12 w-12 text-gray-300" />
@@ -80,17 +112,15 @@ export function JobDetailPage() {
     )
   }
 
-  const handleExternalLink = () => {
-    // 记录外部跳转行为（mock），实际连接后端时写入日志
-    setShowQr(false)
-    // 在真实环境中通过 window.open(job.sourceUrl) 跳转
-    // Kiosk 模式下使用二维码替代
-    setShowQr(true)
-  }
-
   return (
     <div className="flex h-full flex-col">
-      {showQr && <QrOverlay onClose={() => setShowQr(false)} />}
+      {showQr && (
+        <QrOverlay
+          sourceName={job.sourceName}
+          externalId={job.externalId}
+          onClose={() => setShowQr(false)}
+        />
+      )}
 
       <div className="px-6 pt-6">
         <PageHeader
@@ -186,7 +216,7 @@ export function JobDetailPage() {
           <Button
             size="lg"
             className="flex items-center gap-2"
-            onClick={handleExternalLink}
+            onClick={() => setShowQr(true)}
           >
             <ExternalLinkIcon className="h-4 w-4" />
             去来源平台投递

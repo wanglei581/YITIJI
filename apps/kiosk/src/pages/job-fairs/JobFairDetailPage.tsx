@@ -9,9 +9,11 @@ import {
   MapPinIcon,
   PrinterIcon,
   QrCodeIcon,
+  SmartphoneIcon,
   UsersIcon,
   XIcon,
 } from 'lucide-react'
+import { MOCK_FAIRS } from '../../data/externalSources'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-blue-50', text: 'text-blue-600' },
@@ -29,16 +31,24 @@ function formatSync(iso: string) {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 }
 
-// ─── QR placeholder overlay ───────────────────────────────────────────────────
+// ─── QR overlay ───────────────────────────────────────────────────────────────
 
-function QrOverlay({ label, onClose }: { label: string; onClose: () => void }) {
+function QrOverlay({
+  sourceName,
+  externalId,
+  onClose,
+}: {
+  sourceName: string
+  externalId: string
+  onClose: () => void
+}) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
-        className="relative w-72 rounded-2xl bg-white p-8 shadow-xl"
+        className="relative w-80 rounded-2xl bg-white p-8 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -47,16 +57,36 @@ function QrOverlay({ label, onClose }: { label: string; onClose: () => void }) {
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="mb-6 text-center text-sm font-medium text-gray-700">{label}</p>
-        <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
+
+        <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台预约</p>
+
+        {/* QR placeholder */}
+        <div className="mx-auto mt-5 flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
           <div className="flex flex-col items-center gap-2 text-gray-300">
             <QrCodeIcon className="h-16 w-16" />
             <span className="text-xs">二维码由来源平台生成</span>
           </div>
         </div>
-        <p className="mt-4 text-center text-xs text-gray-400">
-          扫描后将跳转至来源平台，预约结果由对方平台管理
-        </p>
+
+        {/* 来源信息 */}
+        <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
+          <div className="flex justify-between">
+            <span className="text-gray-400">来源机构</span>
+            <span className="font-medium">{sourceName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">外部编号</span>
+            <span className="font-mono">{externalId}</span>
+          </div>
+        </div>
+
+        {/* 操作说明 */}
+        <div className="mt-4 flex items-start gap-2">
+          <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+          <p className="text-xs leading-relaxed text-gray-500">
+            请使用手机前往来源平台办理，预约结果由对方平台管理，本系统不参与活动报名流程。
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -68,11 +98,14 @@ export function JobFairDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
-  const fair = (location.state as { fair?: ExternalJobFair } | null)?.fair
+
+  // 优先 location.state，state 缺失时从 mock 数据查找（刷新/直接访问场景）
+  const stateFair = (location.state as { fair?: ExternalJobFair } | null)?.fair
+  const fair = (stateFair?.id === id ? stateFair : null) ?? MOCK_FAIRS.find((f) => f.id === id)
 
   const [showQr, setShowQr] = useState(false)
 
-  if (!fair || fair.id !== id) {
+  if (!fair) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
         <InfoIcon className="h-12 w-12 text-gray-300" />
@@ -105,7 +138,11 @@ export function JobFairDetailPage() {
   return (
     <div className="flex h-full flex-col">
       {showQr && (
-        <QrOverlay label="扫码前往来源平台预约" onClose={() => setShowQr(false)} />
+        <QrOverlay
+          sourceName={fair.sourceName}
+          externalId={fair.externalId}
+          onClose={() => setShowQr(false)}
+        />
       )}
 
       <div className="px-6 pt-6">

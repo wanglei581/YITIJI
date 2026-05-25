@@ -166,6 +166,7 @@
 | 2026-05-24 | Phase 3 AI简历服务完成：ResumeSourcePage→ParsePage→ReportPage→OptimizePage→ExportPage，5 页流程；合规说明；DEV 模拟失败；ProfilePage 整合承接；lint/typecheck/build 全通过 | Claude Code |
 | 2026-05-25 | Phase 3 封板：P1白屏修复（ResumeReportPage return null → ErrorState），lint/typecheck/build 全通过，合规词审查通过，推送 GitHub main | Claude Code |
 | 2026-05-25 | Phase 4 完成：JobsPage+JobDetailPage+JobFairsPage+JobFairDetailPage，ExternalJob/ExternalJobFair 类型扩展，合规边界执行，lint/typecheck/build 全通过 | Claude Code |
+| 2026-05-25 | Phase 4 加固：mock 数据抽离至 data/externalSources.ts；详情页刷新/直接访问 fallback 到 mock 查找；QR overlay 增加来源机构/外部编号/"请使用手机前往来源平台办理"；ResumeReportPage "录用率"→"招聘结果"合规修正；lint/typecheck/build 全通过 | Claude Code |
 
 ---
 

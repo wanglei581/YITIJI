@@ -1,67 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJobFair } from '@ai-job-print/shared'
 import { CalendarIcon, MapPinIcon, UsersIcon } from 'lucide-react'
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_FAIRS: ExternalJobFair[] = [
-  {
-    id: 'f1',
-    name: '2026春季高校毕业生双选会',
-    organizer: '市人力资源和社会保障局',
-    startTime: '2026-05-28T09:00:00Z',
-    endTime: '2026-05-28T17:00:00Z',
-    venue: '市人才交流中心 A 展厅（XX大道 88 号）',
-    status: 'upcoming',
-    description: '面向2026届本科及以上应届毕业生，汇聚150余家用人单位，涵盖互联网、金融、制造、政府等行业。',
-    boothCount: 152,
-    sourceOrgId: 'org-002',
-    externalId: 'GOV-FAIR-2026-0312',
-    sourceName: '市人社局官网',
-    sourceUrl: 'https://example-hrss.gov.cn/fairs/GOV-FAIR-2026-0312',
-    syncTime: '2026-05-24T08:00:00Z',
-    reviewStatus: 'published',
-    publishStatus: 'published',
-  },
-  {
-    id: 'f2',
-    name: '互联网行业专场招聘会',
-    organizer: '市就业服务中心',
-    startTime: '2026-05-25T10:00:00Z',
-    endTime: '2026-05-25T16:00:00Z',
-    venue: '科技园区创新中心 B 厅（高新路 12 号）',
-    status: 'ongoing',
-    description: '聚焦互联网、大数据、人工智能领域，面向应届生及3年内社招人员，提供岗位200余个。',
-    boothCount: 68,
-    sourceOrgId: 'org-002',
-    externalId: 'GOV-FAIR-2026-0289',
-    sourceName: '市就业网',
-    sourceUrl: 'https://example-employment.gov.cn/fairs/GOV-FAIR-2026-0289',
-    syncTime: '2026-05-23T12:00:00Z',
-    reviewStatus: 'published',
-    publishStatus: 'published',
-  },
-  {
-    id: 'f3',
-    name: '2026届研究生专项招聘会',
-    organizer: '市高校联合就业服务联盟',
-    startTime: '2026-05-10T09:00:00Z',
-    endTime: '2026-05-10T17:00:00Z',
-    venue: '大学路展览馆（大学路 256 号）',
-    status: 'ended',
-    description: '针对硕士、博士应届毕业生，提供科研机构、高校、大型企业等高端岗位。',
-    boothCount: 95,
-    sourceOrgId: 'org-002',
-    externalId: 'GOV-FAIR-2026-0201',
-    sourceName: '市人社局官网',
-    sourceUrl: 'https://example-hrss.gov.cn/fairs/GOV-FAIR-2026-0201',
-    syncTime: '2026-05-11T08:00:00Z',
-    reviewStatus: 'published',
-    publishStatus: 'published',
-  },
-]
+import { MOCK_FAIRS } from '../../data/externalSources'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-blue-50', text: 'text-blue-600' },
