@@ -2,7 +2,9 @@ import { createBrowserRouter } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
+import { JobFairDetailPage } from '../pages/job-fairs/JobFairDetailPage'
 import { JobsPage } from '../pages/jobs/JobsPage'
+import { JobDetailPage } from '../pages/jobs/JobDetailPage'
 import { PolicyPage } from '../pages/policy/PolicyPage'
 import { ScanStartPage } from '../pages/scan/ScanStartPage'
 import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
@@ -51,7 +53,9 @@ export const kioskRouter = createBrowserRouter([
       { path: 'scan/result',       element: <ScanResultPage /> },
       // 岗位 / 招聘会（Phase 4）
       { path: 'jobs',              element: <JobsPage /> },
+      { path: 'jobs/:id',          element: <JobDetailPage /> },
       { path: 'job-fairs',         element: <JobFairsPage /> },
+      { path: 'job-fairs/:id',     element: <JobFairDetailPage /> },
     ],
   },
 ])
