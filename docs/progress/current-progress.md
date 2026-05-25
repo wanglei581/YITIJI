@@ -70,6 +70,7 @@
 | 第 6 阶段 | 合作机构后台 | 骨架完成，内容待填充 |
 | 第 7 阶段 | 后端 API | 未开始 |
 | 第 8 阶段 | Windows Terminal Agent | 未开始 |
+| 第 9 阶段 | UI Polish / Kiosk 视觉升级 | 📋 已规划，Phase 8 完成后启动 |
 
 ---
 
