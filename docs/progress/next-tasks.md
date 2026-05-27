@@ -379,12 +379,20 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 
 ---
 
-## ✅ Phase 8 - Windows Terminal Agent（设计文档 + API/文档对齐已完成 2026-05-27）
+## ✅ Phase 8 - Windows Terminal Agent（设计文档 + API/文档对齐 + 设备名称/Provider分层修正 已完成 2026-05-27）
 
 > 完整设计文档：[windows-terminal-agent-design.md](../device/windows-terminal-agent-design.md)  
-> 本地打印 Spike：[local-print-spike.md](../device/local-print-spike.md)
+> 本地打印 Spike：[local-print-spike.md](../device/local-print-spike.md)  
+> Pantum API 设计：[pantum-api-design.md](../device/pantum-api-design.md)
 
 ✅ **API/文档对齐已完成（2026-05-27）**：PrintJobParams 字段统一（pageRange?）、PrintTaskCreate DTO、/tasks/claim 完整 9 字段 params、§5.1 打印机状态检测、V12–V15 WMI 状态检测验证项
+
+✅ **设备名称/Provider分层修正（2026-05-27）**：
+- 打印机名称统一为 `Pantum CM2800ADN Series`（Windows 真机确认），禁止硬编码 CM2820ADN
+- `PrintJobParams` 新增可选字段 `collate?` / `paperType?` / `feeder?`（开放 API 预留，驱动待验证）
+- `colorMode: 'color'` 的 Pantum 开放 API `mode` 取值标注 TODO（待厂家确认）
+- `windows-terminal-agent-design.md` 新增 **§12 Provider/Executor 分层**（LocalAgentDispatchProvider / PantumCloudDispatchProvider / 三种本地 Executor）
+- 新建 `docs/device/pantum-api-design.md`（签名算法/PrintJobParams 映射/预留接口/7项未解决问题清单）
 
 ### Phase 8.0 技术验证（先于编码，在真机完成）
 
