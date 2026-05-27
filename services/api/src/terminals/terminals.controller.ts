@@ -23,7 +23,7 @@ import {
   HttpStatus,
 } from '@nestjs/common'
 import type { Response } from 'express'
-import { TerminalsService, SAMPLE_PNG } from './terminals.service'
+import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
 import { RegisterTerminalDto } from './dto/register-terminal.dto'
 import { HeartbeatDto } from './dto/heartbeat.dto'
 import { ClaimTasksDto } from './dto/claim-tasks.dto'
@@ -85,5 +85,13 @@ export class TerminalsController {
     res.setHeader('Content-Type', 'image/png')
     res.setHeader('Content-Length', SAMPLE_PNG.length)
     res.send(SAMPLE_PNG)
+  }
+
+  // GET /api/v1/test/sample-visible.pdf
+  @Get('test/sample-visible.pdf')
+  getSampleVisiblePdf(@Res() res: Response) {
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Length', SAMPLE_VISIBLE_PDF.length)
+    res.send(SAMPLE_VISIBLE_PDF)
   }
 }

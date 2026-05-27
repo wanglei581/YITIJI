@@ -81,6 +81,20 @@ function extFromUrl(fileUrl: string): string {
   return path.extname(noQuery).toLowerCase() || '.pdf'
 }
 
+/** Resolve relative task file URLs against the configured backend API base URL. */
+function resolveFileUrl(fileUrl: string, apiBaseUrl: string): string {
+  try {
+    return new URL(fileUrl).toString()
+  } catch {
+    const apiUrl = new URL(apiBaseUrl)
+    if (fileUrl.startsWith('/')) {
+      return `${apiUrl.origin}${fileUrl}`
+    }
+    const base = apiBaseUrl.endsWith('/') ? apiBaseUrl : `${apiBaseUrl}/`
+    return new URL(fileUrl, base).toString()
+  }
+}
+
 // ── Status PATCH ──────────────────────────────────────────────────────────────
 
 /**
@@ -139,7 +153,7 @@ async function executeTask(task: ClaimTask, config: AgentConfig): Promise<void> 
     // ── Step 1: Download ────────────────────────────────────────────────────
     log(`task ${task.taskId}: downloading...`)
     try {
-      await downloadFile(task.fileUrl, tempFilePath)
+      await downloadFile(resolveFileUrl(task.fileUrl, apiBaseUrl), tempFilePath)
     } catch (e) {
       err(`task ${task.taskId}: download failed — ${e instanceof Error ? e.message : String(e)}`)
       await patch('failed', 'PRINT_COMMAND_FAILED', `Download failed: ${e instanceof Error ? e.message : String(e)}`)

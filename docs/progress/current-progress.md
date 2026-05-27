@@ -33,6 +33,7 @@
 
 > Agent 侧 + 后端接口全部实现，联调冒烟全部通过。  
 > 链路：register → heartbeat → claim → download → MD5 → print → PATCH completed ✅
+> 2026-05-27 Codex 补充：`ptask_seed_001` 已改为可见 PDF 样本 `/api/v1/test/sample-visible.pdf`；服务层 register/heartbeat/claim/PATCH 冒烟通过，Windows 真机 Agent 出纸联调待沙箱外执行。
 
 **Agent 侧（`apps/terminal-agent/src/agent/`）：**
 
@@ -60,9 +61,9 @@
 | PUT /terminals/:id/heartbeat（Bearer 鉴权） | `terminals.service.ts` | ✅ |
 | POST /terminals/:id/tasks/claim（原子 claim，5 min expire） | `terminals.service.ts` | ✅ |
 | PATCH /print-tasks/:id/status（状态机 + 幂等） | `terminals.service.ts` | ✅ |
-| GET /test/sample.png（1×1 PNG mock 文件端点） | `terminals.controller.ts` | ✅ |
-| 种子任务 ptask_seed_001（fileUrl→sample.png，fileMd5 匹配） | `terminals.service.ts` | ✅ |
-| Claim 过期自动重置（setInterval 30s） | `terminals.service.ts` | ✅ |
+| GET /test/sample.png（1×1 PNG mock 文件端点）+ GET /test/sample-visible.pdf（可见 PDF 样本） | `terminals.controller.ts` | ✅ |
+| 种子任务 ptask_seed_001（fileUrl→`/api/v1/test/sample-visible.pdf`，fileMd5 匹配） | `terminals.service.ts` | ✅ |
+| Claim 过期自动重置（setInterval 30s + unref） | `terminals.service.ts` | ✅ |
 | DTOs（register/heartbeat/claim/patchStatus） | `dto/` | ✅ |
 | TerminalsModule 注册 + AppModule 接入 | `terminals.module.ts` | ✅ |
 | typecheck 0 errors | — | ✅ |
@@ -279,6 +280,7 @@
 | 2026-05-27 | Phase 8 打印链路 API/文档对齐：① PrintJobParams.pageRange 从 `'all'\|string` 改为 `pageRange?: string`（缺省=全部，4 处对齐：shared/types/print.ts / PrintPreviewPage / PrintConfirmPage / terminal-agent/types）；② api-v1-design.md 新增 §5.3（POST /api/v1/print-tasks PrintTaskCreateDto + GET /api/v1/print-tasks/:taskId）、§4.3 /tasks/claim 响应完整 params: PrintJobParams（9 字段，替代旧 4 字段 options）、标注旧 POST /print/orders 字段 colorMode:"bw\|color"/duplexMode 为过时命名；③ windows-terminal-agent-design.md §4.3 claim 响应 options→params（9 字段）、新增 §5.1 打印机状态检测（Phase 8.0 WMI Spike 目标表 + Phase 8.1 打印任务状态机）；④ local-print-spike.md 新增 V12–V15（Get-PrintJob/Win32_Printer 离线缺纸/UNKNOWN_PRINTER_STATUS）、Phase 8.1 状态机说明 | Claude Code |
 | 2026-05-27 | Phase 8.1B 后端联调全部完成：新建 TerminalsModule（terminals.service.ts + terminals.controller.ts + terminals.module.ts + 4 个 DTO），实现 POST /auth/terminal/register、PUT /terminals/:id/heartbeat、POST /terminals/:id/tasks/claim（原子 claim + 5min 过期自动重置）、PATCH /print-tasks/:id/status（状态机 + 幂等），GET /test/sample.png（1×1 PNG 种子文件）；种子任务 ptask_seed_001 在服务启动时写入；app.module.ts 接入 TerminalsModule；冒烟测试全部通过（register→heartbeat→claim→PATCH printing/completed 幂等 PATCH 均返回 200）；typecheck 0 errors；修复 import type 导致 whitelist: true 剥离 DTO 字段的 bug（改为 value import） | Claude Code |
 | 2026-05-27 | Phase 8 设备名称/Provider分层修正：① CLAUDE.md §3 打印机型号更新为奔图 CM2800/CM2820 系列（Windows 识别名 `Pantum CM2800ADN Series`），新增硬件能力 vs 开放 API 能力对比表、Pantum 签名算法（MD5）、云打印架构说明；② PrintJobParams 新增可选字段 collate/paperType/feeder（共享类型+Agent类型同步），colorMode cloud TODO 注释；③ windows-terminal-agent-design.md 全文 CM2820ADN→CM2800ADN/CM2820ADN系列，新增 §12 Provider/Executor 分层（LocalAgentDispatchProvider/PantumCloudDispatchProvider/LocalPrintExecutor/三种 Executor）；④ 新建 docs/device/pantum-api-design.md（签名算法/PrintJobParams映射/预留接口/7项未解决问题）；⑤ current-progress.md 打印机型号记录更新 | Claude Code |
+| 2026-05-27 | Phase 8.1B 真机联调前置修正：新增 `GET /api/v1/test/sample-visible.pdf` 可见 PDF 样本，`ptask_seed_001` 改指向该样本并重新以同一 Buffer 计算 `fileMd5`；Agent 下载相对 `fileUrl` 时按 `apiBaseUrl` 补全服务端 origin，避免 Windows 访问本机 localhost；claim 过期清理定时器增加 `unref()`；`@ai-job-print/api` 与 `terminal-agent` typecheck 通过，服务层 register→heartbeat→claim→PATCH completed 冒烟通过；Windows 真机出纸待沙箱外执行 | Codex |
 
 ---
 

@@ -108,6 +108,62 @@ export const SAMPLE_PNG = Buffer.from(
 )
 export const SAMPLE_PNG_MD5 = crypto.createHash('md5').update(SAMPLE_PNG).digest('hex')
 
+function createVisibleSamplePdf(): Buffer {
+  const stream = [
+    'q',
+    '0.90 0.96 1 rg',
+    '50 520 495 190 re f',
+    '0 0 0 RG',
+    '2 w',
+    '50 520 495 190 re S',
+    'BT',
+    '/F1 28 Tf',
+    '0 0 0 rg',
+    '72 660 Td',
+    '(AI Job Print Terminal) Tj',
+    '0 -42 Td',
+    '/F1 18 Tf',
+    '(Phase 8.1B visible end-to-end test) Tj',
+    '0 -34 Td',
+    '(Task: ptask_seed_001) Tj',
+    '0 -34 Td',
+    '(If this page prints, download, MD5 and print worked.) Tj',
+    'ET',
+    '0.05 0.42 0.75 rg',
+    '72 560 420 18 re f',
+    'Q',
+  ].join('\n')
+
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n',
+    `4 0 obj\n<< /Length ${Buffer.byteLength(stream, 'ascii')} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    '5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+  ]
+
+  let pdf = '%PDF-1.4\n'
+  const offsets = objects.map((object) => {
+    const offset = Buffer.byteLength(pdf, 'ascii')
+    pdf += object
+    return offset
+  })
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii')
+  pdf += 'xref\n0 6\n0000000000 65535 f \n'
+  for (const offset of offsets) {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  }
+  pdf += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+
+  return Buffer.from(pdf, 'ascii')
+}
+
+export const SAMPLE_VISIBLE_PDF = createVisibleSamplePdf()
+export const SAMPLE_VISIBLE_PDF_MD5 = crypto
+  .createHash('md5')
+  .update(SAMPLE_VISIBLE_PDF)
+  .digest('hex')
+
 // ── Admin secret ─────────────────────────────────────────────────────────────
 
 const ADMIN_SECRET =
@@ -125,8 +181,8 @@ export class TerminalsService {
     this.printTasks.push({
       taskId: 'ptask_seed_001',
       status: 'pending',
-      fileUrl: 'http://localhost:3000/api/v1/test/sample.png',
-      fileMd5: SAMPLE_PNG_MD5,
+      fileUrl: '/api/v1/test/sample-visible.pdf',
+      fileMd5: SAMPLE_VISIBLE_PDF_MD5,
       params: {
         copies: 1,
         colorMode: 'black_white',
@@ -143,7 +199,7 @@ export class TerminalsService {
 
     // ── Periodically reset expired claims (every 30s) ───────────────────────
     // Node.js is single-threaded; no lock needed.
-    setInterval(() => {
+    const resetExpiredClaimsTimer = setInterval(() => {
       const now = new Date()
       for (const task of this.printTasks) {
         if (
@@ -158,6 +214,7 @@ export class TerminalsService {
         }
       }
     }, 30_000)
+    resetExpiredClaimsTimer.unref()
   }
 
   // ── 1. Register ──────────────────────────────────────────────────────────
