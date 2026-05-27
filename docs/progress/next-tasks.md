@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-05-27（Phase 8.1B 后端联调完成）  
+> 最后更新：2026-05-27（Phase 8.1C Terminal Agent 长期运行加固完成）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
@@ -296,13 +296,73 @@
 
 ---
 
+## ✅ Phase 8.1B 已完成（2026-05-27）
+
+| 项 | 状态 |
+|----|------|
+| 后端 TerminalsModule（4 接口 + sample-visible.pdf）| ✅ |
+| Windows 真机端到端联调（670ms 打印，Pantum CM2800ADN Series） | ✅ |
+
+## ✅ Phase 8.1C 已完成（2026-05-27）
+
+| 能力 | 文件 | 状态 |
+|------|------|------|
+| DPAPI 加密 agentToken（PowerShell stdin，LocalMachine scope） | dpapi.ts | ✅ |
+| SQLite 任务幂等（restart 不重打；markTaskDone before PATCH） | db.ts | ✅ |
+| 单实例 PID 锁（ESRCH 僵尸锁接管，DUPLICATE_INSTANCE exit 1） | instance-lock.ts | ✅ |
+| 断网 PATCH 重试队列（60s 轮询，指数退避，max 10，4xx 放弃） | offline-queue.ts | ✅ |
+| Windows 服务（install-service / uninstall-service 子命令） | index.ts | ✅ |
+| adminSecret 注册后清除；Phase 8.1B token 自动迁移 | config-manager.ts | ✅ |
+| typecheck 0 errors / build 通过 / macOS 冒烟验证 | — | ✅ |
+
+---
+
+## 📋 Phase 8.1C 后：下一步方向
+
+| 选项 | 内容 | 说明 |
+|------|------|------|
+| **A — Phase 8.1D** | Windows 真机验证 8.1C | 重启不重打、断网恢复、服务自启动三项验收 |
+| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 | 动效、响应式、暗色模式等 |
+| **C — Phase 8.2** | Prisma 持久化 | 服务端 PostgreSQL 持久化打印任务 |
+
+### Phase 8.1C → Phase 8.1D Windows 真机验收步骤
+
+```powershell
+# 1. 拉取最新代码
+git pull
+
+# 2. 安装依赖（better-sqlite3 会在 Windows 本地编译）
+pnpm install
+
+# 3. 启动 Mac API 服务（192.168.x.x:3000）
+#    确保 apiBaseUrl 在 agent-config.json 中已更新
+
+# 4. 首次 8.1C 启动（迁移明文 agentToken → DPAPI 加密）
+node dist/index.js agent
+# 期望日志：
+#   config: agentToken 已迁移至加密存储 agent.token，已从 config.json 移除
+#   instance-lock: acquired (pid=xxx)
+#   db: opened C:\ProgramData\AIJobPrintAgent\agent.db
+
+# 5. 完成一次打印任务后，重启 agent
+# 期望日志：
+#   task ptask_seed_001: already done in local DB, skipping (restart-idempotency)
+
+# 6. 断网测试：拔网线 → 触发 PATCH → 重连 → 看 offline-queue 重试日志
+
+# 7. 安装 Windows 服务
+node dist/index.js install-service
+# 开始菜单 → 服务 → AIJobPrintAgent → 状态：正在运行
+```
+
+---
+
 ## 📋 Phase 7.10 后：下一步方向
 
 | 选项 | 内容 | 说明 |
 |------|------|------|
 | **A — Phase 7.11** | Partner Sources R4 对齐 | DisplaySource → DataSourceConfig；Partner 数据源页面重写 |
 | **B — Phase 5/6 填充** | Admin/Partner 剩余页面补齐 | Admin：日志审计、权限管理；Partner：数据统计、账号权限 |
-| **C — Phase 8 文档** | Windows Terminal Agent 设计文档 | 先出设计文档和接口规范，不写实现代码 |
 
 ### pnpm audit 补跑（网络可用时）
 

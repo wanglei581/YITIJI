@@ -1,8 +1,8 @@
 {
   "name": "terminal-agent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Windows Terminal Agent — Phase 8.1B: register / heartbeat / claim / print / status",
+  "description": "Windows Terminal Agent — Phase 8.1C: DPAPI token encryption / SQLite idempotency / single-instance lock / Windows service / offline PATCH queue",
   "scripts": {
     "agent": "ts-node src/index.ts agent",
     "print": "ts-node src/index.ts print",
@@ -13,11 +13,14 @@
   },
   "dependencies": {
     "axios": "^1.7.0",
+    "better-sqlite3": "^12.10.0",
     "commander": "^12.1.0",
+    "node-windows": "1.0.0-beta.8",
     "pdf-to-printer": "^5.4.0",
     "pdfkit": "^0.15.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.14.0",
     "@types/pdfkit": "^0.13.6",
     "ts-node": "^10.9.2",

@@ -1,5 +1,5 @@
 /**
- * agent/registration.ts — Phase 8.1B
+ * agent/registration.ts — Phase 8.1C
  *
  * Handles terminal registration with the backend:
  *   POST /auth/terminal/register
@@ -9,14 +9,13 @@
  *   2. POST /auth/terminal/register with terminalCode + deviceFingerprint + adminSecret
  *   3. Persist terminalId + agentToken (= terminalToken) to config file
  *
- * On subsequent startups (terminalId/agentToken already in config):
- *   - Skip registration, use persisted credentials.
- *   - If heartbeat returns 401, the caller should re-register (not handled here in 8.1B).
+ * On subsequent startups (terminalId/agentToken already available):
+ *   - agentToken is loaded from DPAPI-encrypted agent.token by loadConfig().
+ *   - If both terminalId and agentToken are present, registration is skipped.
  *
- * Security note:
- *   - adminSecret is only used once, but stays in the config file.
- *     Production hardening: clear adminSecret after successful registration (Phase 8.1C).
- *   - agentToken stored plain text in Phase 8.1B. Phase 8.1C: DPAPI encryption.
+ * Security note (Phase 8.1C):
+ *   - adminSecret is now optional; it is cleared from config.json after registration.
+ *   - agentToken is stored DPAPI-encrypted in agent.token (not in config.json).
  *   - deviceFingerprint is a non-reversible hash; no PII.
  */
 
@@ -68,6 +67,13 @@ export async function registerOrLoad(config: AgentConfig): Promise<AgentConfig> 
   log(`registration: first-time registration — terminalCode="${config.terminalCode}"`)
 
   const client = createApiClient(config.apiBaseUrl)
+
+  // adminSecret is required for first-time registration but cleared afterwards
+  if (!config.adminSecret) {
+    throw new Error(
+      'registration: adminSecret 缺失，请在 config.json 中填写 adminSecret 后重试',
+    )
+  }
 
   const body: RegistrationRequest = {
     terminalCode: config.terminalCode,

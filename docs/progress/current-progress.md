@@ -25,7 +25,37 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.1B Windows 真机端到端联调全部通过（2026-05-27）** 🎉
+**当前阶段：Phase 8.1C Windows Terminal Agent 现场长期运行加固（2026-05-27）** 🎉
+
+---
+
+### ✅ Phase 8.1C 已完成（2026-05-27）
+
+> Agent 从"手动运行可用"升级为"现场可长期运行"。  
+> typecheck 0 errors / build 通过。macOS 上所有功能路径已验证。
+
+**新增能力（`apps/terminal-agent/src/agent/`）：**
+
+| 能力 | 文件 | 状态 |
+|------|------|------|
+| DPAPI 加密 agentToken（LocalMachine scope，stdin 传参，macOS 明文降级） | `src/agent/dpapi.ts` | ✅ |
+| SQLite 任务状态持久化（restart 幂等，重启不重复打印） | `src/agent/db.ts` | ✅ |
+| 单实例 PID 文件锁（ESRCH 僵尸锁检测，DUPLICATE_INSTANCE exit 1） | `src/agent/instance-lock.ts` | ✅ |
+| 断网 PATCH 重试队列（60s 轮询，指数退避，max 10 次，4xx 放弃） | `src/agent/offline-queue.ts` | ✅ |
+| Windows 服务安装/卸载（`node install-service` / `uninstall-service`） | `src/index.ts` | ✅ |
+| adminSecret 注册后从 config.json 清除 | `src/agent/config-manager.ts` | ✅ |
+| Phase 8.1B plaintext agentToken 自动迁移到 DPAPI 加密文件 | `src/agent/config-manager.ts` | ✅ |
+| patchStatus() 返回 boolean（失败时入离线队列） | `src/agent/task-runner.ts` | ✅ |
+| 重启幂等检查（isTaskDone + markTaskDone before PATCH） | `src/agent/task-runner.ts` | ✅ |
+| version 0.2.0 → 0.3.0；依赖新增 better-sqlite3 + node-windows | `package.json` | ✅ |
+
+**macOS 冒烟测试结果：**
+- `instance-lock: acquired` ✓  
+- `db: opened $TMPDIR/AIJobPrintAgent/agent.db` ✓  
+- `dpapi: 非 Windows 环境，agentToken 以明文存储（仅用于开发）` ✓  
+- DUPLICATE_INSTANCE exit(1) 正确触发 ✓  
+- SQLite 幂等检查 isTaskDone/markTaskDone 往返 ✓  
+- 离线队列 enqueuePatch/getPendingPatches/markPatchAttempt 往返 ✓  
 
 ---
 
@@ -68,12 +98,11 @@
 | TerminalsModule 注册 + AppModule 接入 | `terminals.module.ts` | ✅ |
 | typecheck 0 errors | — | ✅ |
 
-**Phase 8.1B 未做（Phase 8.1C）：**
-- Windows 单实例 Mutex
-- DPAPI 加密 agentToken
-- printerStatus / diskFreeGB 真实 WMI 查询
+**Phase 8.1C 未做（Phase 8.1D）：**
+- actionToken HMAC 签名（当前 base64 占位）
 - lease 续租（`PATCH /terminal-tasks/:id/lease`）
-- SQLite 任务幂等记录
+- printerStatus / diskFreeGB 真实 WMI 查询
+- Prisma 持久化（服务端任务状态落库）
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * agent/types.ts — Phase 8.1B
+ * agent/types.ts — Phase 8.1C
  *
  * Types for the Agent runtime:
  *   - AgentConfig   : persisted to config/agent-config.json
@@ -17,10 +17,12 @@ export type { PrintJobParams } from '../printer/types'
 
 /**
  * Persisted agent configuration (config/agent-config.json).
- * Fields with ? are written on first registration and must not be manually set.
+ * Fields with ? are optional or written on first registration.
  *
- * Security note (Phase 8.1B):
- *   agentToken is stored in plain text. Phase 8.1C will encrypt it with DPAPI.
+ * Security note (Phase 8.1C):
+ *   agentToken is no longer stored in config.json — it is DPAPI-encrypted
+ *   and stored in %ProgramData%\AIJobPrintAgent\agent.token (Windows) or
+ *   $TMPDIR/AIJobPrintAgent/agent.token (macOS dev fallback).
  *   Never commit a filled-in agent-config.json to version control.
  */
 export interface AgentConfig {
@@ -30,9 +32,10 @@ export interface AgentConfig {
   terminalCode: string
   /**
    * One-time admin secret for first-time registration.
-   * After registration completes, this field is still present but ignored.
+   * Phase 8.1C: cleared from config.json after successful registration.
+   * Not required during normal operation (only needed on first run / re-registration).
    */
-  adminSecret: string
+  adminSecret?: string
   /**
    * Printer name. Must be configurable; never hard-code model string.
    * Default: "Pantum CM2800ADN Series" (Windows driver name, confirmed on real machine).
@@ -45,12 +48,13 @@ export interface AgentConfig {
   /** Claim poll interval in ms. Default: 5000. May be overridden by server response. */
   claimIntervalMs?: number
 
-  // ── Written on first registration ─────────────────────────────────────────
-  /** Assigned by backend on registration. Persisted to config file. */
+  // ── Written on first registration / loaded from encrypted file at startup ──
+  /** Assigned by backend on registration. Persisted to config.json. */
   terminalId?: string
   /**
    * Bearer token for all backend API calls (Authorization: Bearer <agentToken>).
-   * Phase 8.1B: stored plain text. Phase 8.1C: DPAPI-encrypted.
+   * Phase 8.1C: loaded at runtime from dpapi.ts loadAgentToken(); never written
+   * to config.json. Only present as an in-memory field on the AgentConfig object.
    */
   agentToken?: string
 }

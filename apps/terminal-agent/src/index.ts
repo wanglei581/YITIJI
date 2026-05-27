@@ -14,25 +14,38 @@ import { registerOrLoad } from './agent/registration'
 import { startHeartbeat } from './agent/heartbeat'
 import { startTaskRunner } from './agent/task-runner'
 import type { AgentConfig } from './agent/types'
+// Phase 8.1C additions
+import { acquireLock, releaseLock } from './agent/instance-lock'
+import { openDatabase, type AgentDatabase } from './agent/db'
+import { startOfflineRetry } from './agent/offline-queue'
 
 const program = new Command()
 
 program
   .name('terminal-agent')
-  .description('Phase 8.1B agent — register / heartbeat / claim / print / status')
-  .version('0.2.0')
+  .description('Phase 8.1C agent — register / heartbeat / claim / print / status / service')
+  .version('0.3.0')
 
-// ── agent (Phase 8.1B) ────────────────────────────────────────────────────────
+// ── agent (Phase 8.1C) ────────────────────────────────────────────────────────
 
 program
   .command('agent')
   .description(
-    'Phase 8.1B: load config → register → heartbeat loop → claim loop → print → report status',
+    'Phase 8.1C: single-instance lock → SQLite → load config → register → heartbeat + claim loops',
   )
   .action(async () => {
-    section(`Agent — Phase 8.1B — ${new Date().toISOString()}`)
+    section(`Agent — Phase 8.1C — ${new Date().toISOString()}`)
 
-    // ── Load config ──────────────────────────────────────────────────────────
+    // ── Safety-net: release lock on any exit (including process.exit()) ───
+    process.on('exit', releaseLock)
+
+    // ── Step 1: Single-instance lock ──────────────────────────────────────
+    acquireLock()
+
+    // ── Step 2: Open SQLite (task state + offline PATCH queue) ────────────
+    const db: AgentDatabase = openDatabase()
+
+    // ── Step 3: Load config (includes Phase 8.1B → 8.1C migration) ───────
     let config: AgentConfig
     try {
       config = loadConfig()
@@ -42,7 +55,7 @@ program
     }
     log(`config loaded — terminal="${config.terminalCode}"  api=${config.apiBaseUrl}`)
 
-    // ── Register or load existing credentials ────────────────────────────────
+    // ── Step 4: Register or load existing credentials ─────────────────────
     try {
       config = await registerOrLoad(config)
     } catch (e) {
@@ -52,7 +65,7 @@ program
     }
     log(`agent ready — terminalId=${config.terminalId!}`)
 
-    // ── Start heartbeat ──────────────────────────────────────────────────────
+    // ── Step 5: Start heartbeat ───────────────────────────────────────────
     const heartbeatTimer = startHeartbeat({
       config,
       onConfigUpdate: (patch) => {
@@ -61,16 +74,21 @@ program
       },
     })
 
-    // ── Start claim / print loop ─────────────────────────────────────────────
-    const claimTimer = startTaskRunner({ config })
+    // ── Step 6: Start claim / print loop ──────────────────────────────────
+    const claimTimer = startTaskRunner({ config, db })
+
+    // ── Step 7: Start offline PATCH retry loop ────────────────────────────
+    const offlineRetryTimer = startOfflineRetry(config, db)
 
     log('Agent running. Press Ctrl+C to stop.')
 
-    // ── Graceful shutdown ────────────────────────────────────────────────────
+    // ── Graceful shutdown ─────────────────────────────────────────────────
     const shutdown = (signal: string) => {
       log(`Agent: received ${signal}, shutting down...`)
       clearInterval(heartbeatTimer)
       clearInterval(claimTimer)
+      clearInterval(offlineRetryTimer)
+      releaseLock()
       process.exit(0)
     }
     process.on('SIGINT', () => shutdown('SIGINT'))
@@ -85,7 +103,79 @@ program
     })
   })
 
-// ── list-printers ────────────────────────────────────────────────────────────
+// ── install-service (Windows only) ───────────────────────────────────────────
+
+program
+  .command('install-service')
+  .description('Install AIJobPrintAgent as a Windows service (auto-start on boot)')
+  .action(() => {
+    if (process.platform !== 'win32') {
+      err('install-service is only supported on Windows.')
+      process.exit(1)
+    }
+    try {
+      // Dynamically require node-windows to avoid import errors on non-Windows
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+      const { Service } = require('node-windows') as { Service: any }
+      const svc = new Service({
+        name: 'AIJobPrintAgent',
+        description: 'AI求职打印服务终端 — Windows Terminal Agent',
+        script: __filename, // absolute path to this compiled JS file
+        args: ['agent'],
+      })
+      svc.on('install', () => {
+        log('Service installed — starting AIJobPrintAgent...')
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        svc.start()
+        log('AIJobPrintAgent service started. View in Services (services.msc).')
+        process.exit(0)
+      })
+      svc.on('error', (e: unknown) => {
+        err(`install-service error: ${String(e)}`)
+        process.exit(1)
+      })
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      svc.install()
+    } catch (e) {
+      err(`install-service failed: ${e instanceof Error ? e.message : String(e)}`)
+      process.exit(1)
+    }
+  })
+
+// ── uninstall-service (Windows only) ─────────────────────────────────────────
+
+program
+  .command('uninstall-service')
+  .description('Uninstall the AIJobPrintAgent Windows service')
+  .action(() => {
+    if (process.platform !== 'win32') {
+      err('uninstall-service is only supported on Windows.')
+      process.exit(1)
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+      const { Service } = require('node-windows') as { Service: any }
+      const svc = new Service({
+        name: 'AIJobPrintAgent',
+        script: __filename,
+      })
+      svc.on('uninstall', () => {
+        log('AIJobPrintAgent service uninstalled.')
+        process.exit(0)
+      })
+      svc.on('error', (e: unknown) => {
+        err(`uninstall-service error: ${String(e)}`)
+        process.exit(1)
+      })
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      svc.uninstall()
+    } catch (e) {
+      err(`uninstall-service failed: ${e instanceof Error ? e.message : String(e)}`)
+      process.exit(1)
+    }
+  })
+
+// ── list-printers ─────────────────────────────────────────────────────────────
 
 program
   .command('list-printers')
@@ -103,7 +193,7 @@ program
     log(`Total: ${printers.length} printer(s)`)
   })
 
-// ── print ────────────────────────────────────────────────────────────────────
+// ── print ─────────────────────────────────────────────────────────────────────
 
 program
   .command('print')
@@ -127,8 +217,6 @@ program
       warn('   Use only for spike verification. Do NOT use as default in production.')
     }
 
-    // ── Pre-flight checks ─────────────────────────────────────────────────
-
     if (!fs.existsSync(file)) {
       err(`FILE_NOT_FOUND: ${file}`)
       process.exit(1)
@@ -151,9 +239,6 @@ program
 
     log(`Printer "${printer}" found ✓`)
 
-    // ── Run method(s) ─────────────────────────────────────────────────────
-
-    // auto：Phase 8.1A 生产路径（统一 print()）
     if (method === 'auto') {
       section('Print [auto] — unified print() (Phase 8.1A)')
       const r = await printUnified(file, printer)
@@ -168,7 +253,6 @@ program
       return
     }
 
-    // a / b / both：Spike 调试路径（保留用于验证）
     const results: PrintResult[] = []
 
     if (method === 'a' || method === 'both') {
@@ -185,8 +269,6 @@ program
       printResultSummary(r)
     }
 
-    // ── Overall verdict ───────────────────────────────────────────────────
-
     section('Spike Result')
     const passed = results.filter((r) => r.success)
     const failed = results.filter((r) => !r.success)
@@ -198,7 +280,7 @@ program
     if (failed.length > 0) {
       warn(`FAILED (${failed.length}/${results.length} method(s)):`)
       failed.forEach((r) =>
-        warn(`  ✗  ${r.method}  — ${r.errorCode ?? 'UNKNOWN'}  ${r.errorMessage ?? ''}`)
+        warn(`  ✗  ${r.method}  — ${r.errorCode ?? 'UNKNOWN'}  ${r.errorMessage ?? ''}`),
       )
     }
 
