@@ -441,7 +441,7 @@ pnpm --filter terminal-agent print `
 | 3 | QA-4：出纸打印机为 `Pantum CM2800ADN Series`，非其他默认打印机 | | ❌ 未确认 |
 
 > 条件 1+3 为硬性要求（PDF 是主要打印内容）。  
-> 条件 2 若图片打印触发了应用窗口且不自动关闭，则 Method A 图片打印列为已知限制，不阻塞 Phase 8.1，但须在 §5 中更新。
+> 条件 2 若图片打印触发了应用窗口但能出纸，不阻塞 Phase 8.1；但 Phase 8.1 须将 JPG/PNG 先转换为 PDF，再使用 pdf-to-printer/SumatraPDF 统一打印，避免长期依赖系统图片应用窗口。
 
 ---
 
@@ -465,7 +465,7 @@ pnpm --filter terminal-agent print `
 
 ### Method B 限制
 
-- 不支持图片格式（需 Method A 补充）
+- 不直接支持图片格式；Phase 8.1 计划先将图片转换为 PDF，再走 Method B 统一打印。
 - SumatraPDF 在某些 Windows Server 环境需额外 Visual C++ Redistributable
 
 ### 推荐组合策略（供 Phase 8.1 参考）
@@ -473,7 +473,7 @@ pnpm --filter terminal-agent print `
 | 文件类型 | 推荐方式 |
 |---------|---------|
 | `.pdf` | Method B（pdf-to-printer / SumatraPDF）优先，失败降级 Method A |
-| `.jpg` `.jpeg` `.png` `.bmp` `.tiff` | Method A（PowerShell PrintTo）|
+| `.jpg` `.jpeg` `.png` `.bmp` `.tiff` | 先 image-to-pdf 转换 → Method B（pdf-to-printer/SumatraPDF）|
 
 ### Phase 8.1 候选任务（基于 Spike 结果）
 
