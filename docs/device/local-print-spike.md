@@ -749,3 +749,86 @@ Get-ChildItem $env:TEMP | Where-Object { $_.Name -like "*agent*" -or $_.Name -li
 
 *Phase 8.0 — 仅用于本地打印 Spike 验证，不接云端 API，不接 Kiosk 前端，不做扫描。*  
 *未完成 V01–V15 真机验证前不进入 Phase 8.1。*
+
+---
+
+## 6. Phase 8.0.1 物理出纸确认结果（2026-05-27）
+
+### 结论
+
+| QA | 验证项 | 命令结果 | 物理出纸 | 结论 |
+|----|--------|:-------:|:-------:|------|
+| QA-1 | Method B 打印 PDF | ✅ SUCCESS 557ms | ✅ **真实出纸** | **通过** |
+| QA-2 | Method A 打印 JPG | ✅ SUCCESS 768ms | ❌ 未出纸 | **假成功** |
+| QA-3 | Method A 打印 PNG | ✅ SUCCESS 850ms | ❌ 未出纸 | **假成功** |
+| QA-4 | 出纸来源确认 | — | ✅ 仅 Pantum 出纸 | QA-1 确认 |
+
+### Method A 假成功根因
+
+Windows 11 Photos app 对 `PrintTo` verb 返回 exitCode=0 但不发送打印任务到 spooler。  
+`print-with-powershell.ts` 仅判断 `result.status !== 0`，无法识别此类假成功。  
+**Method A 对图片文件不可靠，不能作为 Phase 8.1 图片打印主路径。**
+
+---
+
+## 7. Phase 8.0.2 图片打印补充验证（2026-05-27）
+
+### 目标
+
+验证 `mspaint /pt` 是否可作为图片打印替代路径。
+
+### 验证结果
+
+| 验证项 | 命令 | 结果 | 说明 |
+|--------|------|:----:|------|
+| mspaint.exe 是否存在 | `Test-Path C:\Windows\System32\mspaint.exe` | ❌ 不存在 | Windows 11 已将 Paint 迁移为 Microsoft Store 应用，无可执行文件 |
+| mspaint SysWOW64 | `Test-Path C:\Windows\SysWOW64\mspaint.exe` | ❌ 不存在 | 同上 |
+| Get-Command mspaint | — | ❌ 无输出 | PATH 中无 mspaint |
+
+**结论：mspaint /pt 方案不可用，直接排除。PNG 无需测试。**
+
+### Phase 8.1 图片打印路径决策
+
+根据 Phase 8.0.1 + Phase 8.0.2 验证结果，**确定 Phase 8.1 图片打印路径为**：
+
+```
+.jpg / .png / .bmp / .tiff
+       │
+       ▼
+  pdfkit 生成临时 PDF
+  路径：%ProgramData%\AIJobPrintAgent\temp\print_<uuid>.pdf
+       │
+       ▼
+  Method B（pdf-to-printer / SumatraPDF）
+  [已验证可靠出纸 ✅]
+       │
+       ▼
+  打印完成 → 立即删除临时文件
+```
+
+### 库选型
+
+| 库 | 选型理由 |
+|----|---------|
+| **pdfkit**（首选） | 纯 JS，无原生模块，Windows 兼容最佳，可生成含嵌入图片的 PDF |
+| sharp | 仅作图片预处理辅助（resize/convert），不作 PDF 生成主库 |
+| pdf-lib | 备选，API 更现代，但嵌入图片需额外处理 |
+
+### Phase 8.1 图片打印实现要点
+
+1. 文件扩展名在 `SUPPORTED_EXTENSIONS` 中（`.jpg/.jpeg/.png/.bmp/.tiff/.tif`）
+2. 路由逻辑：`.pdf` → Method B 直接打印；其他 → pdfkit 转换 → Method B
+3. 临时文件命名：`print_<uuid>.pdf`，放在 `%ProgramData%\AIJobPrintAgent\temp\`
+4. 临时文件清理：打印完成（成功或失败）后立即删除；启动时兜底清理超过 1 小时的残留
+5. **不修改现有错误码**，转换失败返回 `PRINT_COMMAND_FAILED`
+
+### 进入 Phase 8.1 的条件（最终确认）
+
+| 条件 | 状态 |
+|------|:----:|
+| PDF Method B 真实出纸（QA-1）| ✅ |
+| 图片打印路径已明确（pdfkit→Method B）| ✅ |
+| mspaint 方案已排除 | ✅ |
+| 文档已更新 | ✅ |
+
+**✅ 可进入 Phase 8.1 MVP 开发。**

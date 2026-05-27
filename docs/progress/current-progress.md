@@ -25,7 +25,7 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.0 本地打印 Spike — V01–V15 验证清单已在 Windows 主机执行完成（2026-05-27），可进入 Phase 8.1**
+**当前阶段：Phase 8.0.2 图片打印补充验证已完成（2026-05-27）— ✅ 可进入 Phase 8.1 MVP**
 
 **Phase 4 加固封板确认（2026-05-25，无剩余 M1/M2 阻塞项）：**
 
@@ -80,7 +80,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | 🔬 Phase 8.0 Spike + API/文档对齐 + 设备名称/Provider分层修正完成；命令层 V01–V11 全部 SUCCESS；**Phase 8.0.1 物理出纸确认进行中**（V02–V05/V11 出纸未实物确认，both 模式出纸两张仅验证用）；V14 物理缺纸待测；进入 Phase 8.1 条件：QA-1/QA-2 or QA-3/QA-4 全部确认 |
+| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0/8.0.1/8.0.2 全部完成：PDF Method B 真实出纸✅；Method A 图片假成功已确认；mspaint 已排除（Windows 11 Store 应用无 exe）；**图片路径确定：pdfkit→临时 PDF→Method B**；**✅ 可进入 Phase 8.1 MVP** |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---
@@ -215,6 +215,7 @@
 | 2026-05-26 | Phase 8 设计文档 v1.1：补充双进程架构（Service + User Session Helper，Named Pipe + ACL）；local-api-server 安全重设计（删除无鉴权、localAuthToken 查询类、actionToken 动作类、HMAC+nonce+expiresAt 防重放、403 返回规范）；GET /tasks → POST /tasks/claim（原子 lease，claimedBy+claimExpiresAt，崩溃后超时重新领取）；临时文件路径全文统一为 %ProgramData%\AIJobPrintAgent\temp\（ACL 仅 Agent 服务账号/管理员）；单实例 Windows Mutex；Phase 8.0 技术验证清单 15 项（含 Named Pipe/TWAIN/actionToken/claim lease/打包方案对比/DPAPI/断网幂等/单实例 Mutex）；风险清单扩展至 R12；打包方案对比（pkg/nexe/electron-builder/.NET wrapper）| Claude Code |
 | 2026-05-26 | Phase 8 设计文档 v1.2（审计补充）：新增 §4.8 actionToken 签发接口（POST /api/v1/terminals/:id/action-tokens，body: action/taskId，response: actionToken/expiresAt/nonce）；新增 §4.9 claim lease 续租接口（PATCH /api/v1/terminal-tasks/:id/lease，body: claimedBy/extendSeconds，response: ok/newExpiresAt 或 LEASE_RENEW_FAILED）；Named Pipe ACL 细化（明确禁止 Everyone/Users/Authenticated Users，仅允许 Service SID + Helper SID + BUILTIN\Administrators）；§2.4 claim 补充续租机制（最多 3 次，总 lease 20 分钟，超限 LEASE_RENEW_FAILED） | Mavis |
 | 2026-05-26 | Phase 7.10 收口复查：6 项检查全部通过——① Kiosk 双重过滤（approved+published）✅；② 状态机（approve→approved+draft，PUBLISH_REQUIRES_APPROVAL，publish≠approve）✅；③ Partner 导入硬编码 pending+draft，4 个必填字段均有 @IsNotEmpty 校验✅；④ 所有 DTO 无 apiSecret/accessToken/clientSecret/password✅；⑤ 违规功能词全文扫描 CLEAN（仅出现于合规注释/说明文案）✅；⑥ lint 0 warnings / typecheck 0 errors / build ✅（admin 387KB / partner 338KB / kiosk 418KB）；1 个次要观察：approve 对已发布记录重复调用会将 publishStatus 重置为 draft（边缘场景，正常流程不可达）| Claude Code |
+| 2026-05-27 | Phase 8.0.1/8.0.2 图片打印补充验证完成：QA-1 PDF Method B 真实出纸✅；QA-2/QA-3 Method A JPG/PNG 假成功（exitCode=0 但未出纸，Windows 11 Photos app PrintTo verb 问题）；mspaint /pt 排除（mspaint.exe 不存在）；Phase 8.1 图片路径确定为 pdfkit→临时 PDF→Method B；可进入 Phase 8.1 MVP | Claude Code |
 | 2026-05-27 | Phase 8.0 V01–V15 验证清单执行完成（Windows 11 + Node.js v24 + pnpm 10 + Pantum CM2800ADN Series USB）：V01–V11 全部 PASS；Method A/B 均可用（PDF/JPG/PNG）；错误码 FILE_NOT_FOUND/PRINTER_NOT_FOUND/UNSUPPORTED_FILE_TYPE 均正确；WMI 正常/Unknown 状态可读；V12 PARTIAL（小文件 spooler 过快）；V13 PARTIAL（WorkOffline=True→PrinterStatus=2）；V14 待物理缺纸测试；V15 PASS；config.ts DEFAULT_PRINTER 修正为 `Pantum CM2800ADN Series`；**Phase 8.1 可启动** | Claude Code |
 | 2026-05-27 | Phase 8 打印链路 API/文档对齐：① PrintJobParams.pageRange 从 `'all'\|string` 改为 `pageRange?: string`（缺省=全部，4 处对齐：shared/types/print.ts / PrintPreviewPage / PrintConfirmPage / terminal-agent/types）；② api-v1-design.md 新增 §5.3（POST /api/v1/print-tasks PrintTaskCreateDto + GET /api/v1/print-tasks/:taskId）、§4.3 /tasks/claim 响应完整 params: PrintJobParams（9 字段，替代旧 4 字段 options）、标注旧 POST /print/orders 字段 colorMode:"bw\|color"/duplexMode 为过时命名；③ windows-terminal-agent-design.md §4.3 claim 响应 options→params（9 字段）、新增 §5.1 打印机状态检测（Phase 8.0 WMI Spike 目标表 + Phase 8.1 打印任务状态机）；④ local-print-spike.md 新增 V12–V15（Get-PrintJob/Win32_Printer 离线缺纸/UNKNOWN_PRINTER_STATUS）、Phase 8.1 状态机说明 | Claude Code |
 | 2026-05-27 | Phase 8 设备名称/Provider分层修正：① CLAUDE.md §3 打印机型号更新为奔图 CM2800/CM2820 系列（Windows 识别名 `Pantum CM2800ADN Series`），新增硬件能力 vs 开放 API 能力对比表、Pantum 签名算法（MD5）、云打印架构说明；② PrintJobParams 新增可选字段 collate/paperType/feeder（共享类型+Agent类型同步），colorMode cloud TODO 注释；③ windows-terminal-agent-design.md 全文 CM2820ADN→CM2800ADN/CM2820ADN系列，新增 §12 Provider/Executor 分层（LocalAgentDispatchProvider/PantumCloudDispatchProvider/LocalPrintExecutor/三种 Executor）；④ 新建 docs/device/pantum-api-design.md（签名算法/PrintJobParams映射/预留接口/7项未解决问题）；⑤ current-progress.md 打印机型号记录更新 | Claude Code |
