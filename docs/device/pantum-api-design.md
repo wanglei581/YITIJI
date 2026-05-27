@@ -128,9 +128,9 @@ X-App-Key: <appKey>        ← appKey 放 Header，不参与签名
 当前 Phase 8.1 主方案：
   Kiosk → POST /api/v1/print-tasks（后端）
          → LocalAgentDispatchProvider 写入 print-tasks 表（pending）
-         → Windows Agent 每 5s POST /tasks/claim（主动 claim）
+         → Windows Agent 每 5s POST /api/v1/terminals/:terminalId/tasks/claim（主动 claim）
          → Agent 本地下载文件 + 调用 Windows GDI Print API
-         → Agent PATCH /print-tasks/:id/status（状态回传）
+         → Agent PATCH /api/v1/print-tasks/:taskId/status（状态回传）
 
 未来可能预留的 Pantum 云路径（不替代主方案）：
   后端 PantumCloudDispatchProvider 调用奔图开放打印 API

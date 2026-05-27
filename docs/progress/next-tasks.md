@@ -418,21 +418,21 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 
 | 子阶段 | 名称 | 状态 | 核心内容 |
 |--------|------|------|---------|
-| **Phase 8.1A** | **Local Print MVP** | 🚧 **进行中** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
-| Phase 8.1B | Agent API / Claim / Heartbeat | 📋 | 后端 claim 接口对接；心跳上报；打印任务状态机；`PATCH /print-tasks/:id/status` |
+| Phase 8.1A | Local Print MVP | ✅ **已完成** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
+| **Phase 8.1B** | **Agent API / Claim / Heartbeat** | 🚧 **当前进行** | 终端注册；心跳上报；`POST /api/v1/terminals/:terminalId/tasks/claim`；`PATCH /api/v1/print-tasks/:taskId/status` |
 | Phase 8.1C | Windows Service / DPAPI / Named Pipe | 📋 | 开机自启崩溃重启；DPAPI 加密 token；Service+Helper 双进程架构 |
 | Phase 8.1D | 扫描 | 📋 | TWAIN/WIA（V01/V02 先验证）；SMB 备用方案；扫描→PDF→上传 |
 
-#### Phase 8.1A 详细能力（当前阶段）
+#### Phase 8.1A 详细能力（已完成 2026-05-27）
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
-| 统一 `print()` 函数 | `print(file, printerName, params)` 路由 PDF / 图片 | 🚧 |
-| PDF 打印 | `.pdf` → Method B（pdf-to-printer/SumatraPDF）直接打印 | 🚧 |
-| 图片打印（JPG/PNG）| pdfkit 生成临时 PDF → Method B → 打印后删除临时文件 | 🚧 |
-| 图片打印（BMP/TIFF）| Phase 8.1B（需 sharp 预处理）| 📋 |
-| printerName 配置化 | 从 `DEFAULT_PRINTER`（config.ts）读取，不硬编码 | 🚧 |
-| 临时文件清理 | 打印后立即删除；启动时清理超过 1 小时的残留 | 🚧 |
+| 统一 `print()` 函数 | `print(file, printerName, params)` 路由 PDF / 图片 | ✅ |
+| PDF 打印 | `.pdf` → Method B（pdf-to-printer/SumatraPDF）直接打印 | ✅ |
+| 图片打印（JPG/PNG）| pdfkit 生成临时 PDF → Method B → 打印后删除临时文件 | ✅ |
+| 图片打印（BMP/TIFF）| Phase 8.1B+（需 sharp 预处理）| 📋 |
+| printerName 配置化 | 从 `DEFAULT_PRINTER`（config.ts）读取，不硬编码 | ✅ |
+| 临时文件清理 | 打印后立即删除；启动时清理超过 1 小时的残留 | ✅ |
 
 #### Phase 8.1B 详细能力
 
@@ -441,7 +441,7 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 | 终端注册 | 注册获取 terminalId + agentToken + actionTokenSecret + localAuthToken | 📋 |
 | 单实例 Mutex | 启动时加锁，重复启动自动退出 | 📋 |
 | 心跳上报 | 每 30s，携带打印机基本状态 | 📋 |
-| 打印任务 Claim | POST /tasks/claim，lease 原子防重复 | 📋 |
+| 打印任务 Claim | `POST /api/v1/terminals/:terminalId/tasks/claim`，lease 原子防重复 | 📋 |
 | 打印任务执行 | 下载 → MD5 校验 → 调用统一 print() → 回传状态 | 📋 |
 | 文件上传 | POST /files/upload（multipart） | 📋 |
 
