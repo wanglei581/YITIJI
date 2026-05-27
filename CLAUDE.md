@@ -692,7 +692,45 @@ Windows Terminal Agent 后续单独开发（第 8 阶段），须遵守：
 - 与后端 API 通过 HTTP/WebSocket 通信，不直接访问数据库
 - 详见：[docs/device/terminal-agent-windows.md](docs/device/terminal-agent-windows.md)
 
-## 18. 重要提醒
+## 18. 外部数据源接入架构
+
+详细设计见：`docs/product/external-data-source-design.md`
+
+核心设计原则：
+
+1. **统一数据模型**：所有外部数据源通过 `DataSourceConfig` + 字段映射，标准化为 `ExternalJob` / `ExternalJobFair`
+2. **双维度分类**：`sourceKind`（来源种类）× `accessMode`（接入方式），不再使用扁平的 `DataSourceType`
+3. **审核流程**：所有外部数据默认 `reviewStatus: pending`，需管理员审核（→ reviewing → approved / rejected）后才能展示
+4. **发布状态独立**：`publishStatus` 与审核状态解耦，取值 `draft / published / unpublished / expired`
+5. **合作机构自主管理**：partner 后台提供数据源接入 UI，不需要懂技术也能配置
+6. **服务端保存凭证**：`apiSecret` / `accessToken` 等敏感信息只存服务端，**禁止出现在前端共享类型**；前端只读 `credentialConfigured: boolean` 判断是否已配置
+
+类型约束（`packages/shared/src/types/job.ts`）：
+
+- `ReviewStatus`: `'pending' | 'reviewing' | 'approved' | 'rejected'`
+- `PublishStatus`: `'draft' | 'published' | 'unpublished' | 'expired'`
+- `SourceKind`: `'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'`
+- `AccessMode`: `'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'`
+- `AuthType`: `'bearer' | 'oauth2' | 'api_key' | 'basic' | 'custom'`（禁止写 `key`）
+
+合规边界（所有数据源接入必须遵守）：
+
+- 只接入岗位/招聘会**公开或授权**的展示信息
+- **不接收求职者简历**，不同步候选人数据
+- **不提供**企业筛选、面试邀约、Offer 管理功能
+- 所有导入数据默认 `reviewStatus: pending`，管理员审核通过后才展示
+
+当前优先级：
+
+- [x] DataSourceConfig / SourceKind / AccessMode / ReviewStatus / PublishStatus 类型定义
+- [x] ImportBatch / ImportRecord / FieldMappingRule / MappingValidationError 类型定义
+- [x] 合作机构后台数据源管理页面（Phase 6 P0）
+- [x] 同步日志展示（Phase 6 P0）
+- [ ] Excel 导入 + 字段映射 UI（Phase 6 P1）
+- [ ] 字段映射引擎（服务端）
+- [ ] 管理员后台审核页面
+
+## 19. 重要提醒
 
 不要追求一次性做完全部功能。
 

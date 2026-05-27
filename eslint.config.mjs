@@ -32,4 +32,16 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
+  /* ── Services: Node.js TypeScript (NestJS backend, no browser APIs) ── */
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ['services/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    },
+  },
 )

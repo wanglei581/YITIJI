@@ -3,6 +3,11 @@ import { KioskRoot } from '../layouts/KioskRoot'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
 import { JobFairDetailPage } from '../pages/job-fairs/JobFairDetailPage'
+import { FairCompaniesPage } from '../pages/job-fairs/FairCompaniesPage'
+import { FairCompanyDetailPage } from '../pages/job-fairs/FairCompanyDetailPage'
+import { FairMapPage } from '../pages/job-fairs/FairMapPage'
+import { FairMaterialsPage } from '../pages/job-fairs/FairMaterialsPage'
+import { FairStatsPage } from '../pages/job-fairs/FairStatsPage'
 import { JobsPage } from '../pages/jobs/JobsPage'
 import { JobDetailPage } from '../pages/jobs/JobDetailPage'
 import { PolicyPage } from '../pages/policy/PolicyPage'
@@ -52,10 +57,16 @@ export const kioskRouter = createBrowserRouter([
       { path: 'scan/progress',     element: <ScanProgressPage /> },
       { path: 'scan/result',       element: <ScanResultPage /> },
       // 岗位 / 招聘会（Phase 4）
-      { path: 'jobs',              element: <JobsPage /> },
-      { path: 'jobs/:id',          element: <JobDetailPage /> },
-      { path: 'job-fairs',         element: <JobFairsPage /> },
-      { path: 'job-fairs/:id',     element: <JobFairDetailPage /> },
+      { path: 'jobs',                                  element: <JobsPage /> },
+      { path: 'jobs/:id',                              element: <JobDetailPage /> },
+      { path: 'job-fairs',                             element: <JobFairsPage /> },
+      { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
+      // 招聘会现场服务（Phase 招聘会数字化）
+      { path: 'job-fairs/:id/companies',               element: <FairCompaniesPage /> },
+      { path: 'job-fairs/:id/companies/:companyId',    element: <FairCompanyDetailPage /> },
+      { path: 'job-fairs/:id/map',                     element: <FairMapPage /> },
+      { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
+      { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
     ],
   },
 ])

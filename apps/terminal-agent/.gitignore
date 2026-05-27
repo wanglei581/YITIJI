@@ -1,0 +1,12 @@
+node_modules/
+dist/
+
+# Sample test files — never commit actual documents
+samples/*.pdf
+samples/*.jpg
+samples/*.jpeg
+samples/*.png
+samples/*.bmp
+samples/*.tiff
+samples/*.tif
+samples/*.txt

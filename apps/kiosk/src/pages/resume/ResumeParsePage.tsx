@@ -8,6 +8,7 @@ import {
   SparklesIcon,
   XCircleIcon,
 } from 'lucide-react'
+import { submitResumeParse } from '../../services/api'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
 
@@ -24,36 +25,6 @@ const FAIL_REASONS = [
   '结构提取超时，请稍后重试',
   'AI 诊断服务暂时不可用，请稍后重试',
 ]
-
-interface ResumeSection {
-  key: string
-  label: string
-  score: number
-  maxScore: number
-}
-
-interface ResumeReport {
-  sections: ResumeSection[]
-  suggestions: string[]
-}
-
-function mockReport(): ResumeReport {
-  return {
-    sections: [
-      { key: 'basic',      label: '基础信息完整度',     score: 8, maxScore: 10 },
-      { key: 'education',  label: '教育经历完整度',     score: 9, maxScore: 10 },
-      { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
-      { key: 'skills',     label: '技能关键词覆盖',     score: 5, maxScore: 10 },
-      { key: 'layout',     label: '排版可读性',         score: 7, maxScore: 10 },
-    ],
-    suggestions: [
-      '项目描述建议使用"负责、主导、实现"等动词开头，尽量量化成果',
-      '技能模块建议补充岗位相关技术栈关键词，提升简历匹配度',
-      '个人简介建议精简至 2-3 句，突出核心优势',
-      '工作经历建议每条控制在 3-5 点，避免流水账式描述',
-    ],
-  }
-}
 
 export function ResumeParsePage() {
   const navigate = useNavigate()
@@ -77,10 +48,28 @@ export function ResumeParsePage() {
     [navigate, state],
   )
 
-  const navigateSuccess = useCallback(() => {
-    const report = mockReport()
-    navigate('/resume/report', { state: { ...state, success: true, report } })
-  }, [navigate, state])
+  const navigateSuccess = useCallback(async () => {
+    const file = state?.file as { name?: string; format?: string } | undefined
+    try {
+      const result = await submitResumeParse({
+        fileId:     typeof state?.fileId === 'string' ? state.fileId : `local-${Date.now()}`,
+        fileName:   file?.name   ?? 'resume.pdf',
+        fileFormat: file?.format ?? 'pdf',
+        source:     (typeof state?.source === 'string' ? state.source : 'upload') as 'upload' | 'scan' | 'manual',
+      })
+      if (cancelRef.current) return
+      if (result.status === 'failed') {
+        navigateFail(result.failReason ?? 'AI 服务解析失败，请重试')
+        return
+      }
+      navigate('/resume/report', {
+        state: { ...state, success: true, taskId: result.taskId, report: result.report },
+      })
+    } catch {
+      if (cancelRef.current) return
+      navigateFail('AI 服务暂时不可用，请稍后重试')
+    }
+  }, [navigate, navigateFail, state])
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
@@ -92,7 +81,7 @@ export function ResumeParsePage() {
 
     const advance = (idx: number) => {
       if (idx >= STEPS.length) {
-        if (!cancelRef.current) navigateSuccess()
+        if (!cancelRef.current) { navigateSuccess() }
         return
       }
       const step = STEPS[idx]

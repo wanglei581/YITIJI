@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJob } from '@ai-job-print/shared'
+import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
+  BriefcaseIcon,
   BuildingIcon,
   ExternalLinkIcon,
   InfoIcon,
@@ -12,7 +13,7 @@ import {
   TagIcon,
   XIcon,
 } from 'lucide-react'
-import { MOCK_JOBS } from '../../data/externalSources'
+import { getJobById } from '../../services/api'
 
 const TAG_STYLES: Record<string, string> = {
   全职: 'bg-blue-50 text-blue-600',
@@ -53,9 +54,8 @@ function QrOverlay({
           <XIcon className="h-5 w-5" />
         </button>
 
-        <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台投递</p>
+        <p className="text-center text-base font-semibold text-gray-800">来源平台二维码</p>
 
-        {/* QR placeholder */}
         <div className="mx-auto mt-5 flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
           <div className="flex flex-col items-center gap-2 text-gray-300">
             <QrCodeIcon className="h-16 w-16" />
@@ -63,7 +63,6 @@ function QrOverlay({
           </div>
         </div>
 
-        {/* 来源信息 */}
         <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
           <div className="flex justify-between">
             <span className="text-gray-400">来源机构</span>
@@ -75,11 +74,10 @@ function QrOverlay({
           </div>
         </div>
 
-        {/* 操作说明 */}
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
           <p className="text-xs leading-relaxed text-gray-500">
-            请使用手机前往来源平台办理，投递结果由对方平台管理，本系统不参与招聘流程。
+            请使用手机前往来源平台办理，本系统不接收简历，不参与招聘闭环。
           </p>
         </div>
       </div>
@@ -90,21 +88,45 @@ function QrOverlay({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function JobDetailPage() {
-  const navigate = useNavigate()
-  const { id } = useParams<{ id: string }>()
-  const location = useLocation()
+  const navigate  = useNavigate()
+  const { id }    = useParams<{ id: string }>()
+  const location  = useLocation()
 
-  // 优先 location.state，state 缺失时从 mock 数据查找（刷新/直接访问场景）
-  const stateJob = (location.state as { job?: ExternalJob } | null)?.job
-  const job = (stateJob?.id === id ? stateJob : null) ?? MOCK_JOBS.find((j) => j.id === id)
+  const stateJob      = (location.state as { job?: ExternalJobDTO } | null)?.job
+  const hasStateMatch = stateJob?.id === id
 
-  const [showQr, setShowQr] = useState(false)
+  const [job,     setJob]     = useState<ExternalJobDTO | null>(hasStateMatch ? stateJob! : null)
+  const [loading, setLoading] = useState(!hasStateMatch)
+  const [error,   setError]   = useState(false)
+  const [showQr,  setShowQr]  = useState(false)
 
-  if (!job) {
+  useEffect(() => {
+    if (hasStateMatch) return
+    let cancelled = false
+    getJobById(id!)
+      .then((res) => {
+        if (cancelled) return
+        if (res.data) setJob(res.data)
+        else setError(true)
+      })
+      .catch(() => { if (!cancelled) setError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id, hasStateMatch])
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-sm text-gray-400">加载中...</p>
+      </div>
+    )
+  }
+
+  if (error || !job) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
-        <InfoIcon className="h-12 w-12 text-gray-300" />
-        <p className="mt-4 text-sm text-gray-500">岗位数据未找到，请返回列表重试</p>
+        <BriefcaseIcon className="h-12 w-12 text-gray-200" />
+        <p className="mt-4 text-sm text-gray-400">岗位数据未找到，请返回列表重试</p>
         <Button className="mt-6" onClick={() => navigate('/jobs')}>
           返回岗位列表
         </Button>
@@ -148,9 +170,7 @@ export function JobDetailPage() {
               {job.city}
             </span>
           </div>
-          {job.salary && (
-            <p className="mt-3 text-lg font-semibold text-primary-600">{job.salary}</p>
-          )}
+          <p className="mt-3 text-lg font-semibold text-primary-600">{job.salaryDisplay}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {job.tags.map((t) => (
               <span
@@ -205,7 +225,7 @@ export function JobDetailPage() {
         <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-4 py-3">
           <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
           <p className="text-xs leading-relaxed text-gray-400">
-            本系统仅展示第三方来源岗位信息，不参与招聘流程。系统仅记录外部跳转行为，不保存企业端招聘结果。
+            {job.dataSourceNote}。本系统仅展示岗位信息，不接收简历，不参与招聘闭环。
           </p>
         </div>
       </div>

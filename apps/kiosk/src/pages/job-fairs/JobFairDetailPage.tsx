@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJobFair } from '@ai-job-print/shared'
+import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
+  ActivityIcon,
+  BuildingIcon,
   CalendarIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   InfoIcon,
+  MapIcon,
   MapPinIcon,
   PrinterIcon,
   QrCodeIcon,
@@ -13,10 +17,10 @@ import {
   UsersIcon,
   XIcon,
 } from 'lucide-react'
-import { MOCK_FAIRS } from '../../data/externalSources'
+import { getJobFairById } from '../../services/api'
 
 const STATUS_CONFIG = {
-  upcoming: { label: '未开始', bg: 'bg-blue-50', text: 'text-blue-600' },
+  upcoming: { label: '未开始', bg: 'bg-blue-50',  text: 'text-blue-600' },
   ongoing:  { label: '进行中', bg: 'bg-green-50', text: 'text-green-700' },
   ended:    { label: '已结束', bg: 'bg-gray-100', text: 'text-gray-400' },
 }
@@ -57,18 +61,13 @@ function QrOverlay({
         >
           <XIcon className="h-5 w-5" />
         </button>
-
         <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台预约</p>
-
-        {/* QR placeholder */}
         <div className="mx-auto mt-5 flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
           <div className="flex flex-col items-center gap-2 text-gray-300">
             <QrCodeIcon className="h-16 w-16" />
             <span className="text-xs">二维码由来源平台生成</span>
           </div>
         </div>
-
-        {/* 来源信息 */}
         <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
           <div className="flex justify-between">
             <span className="text-gray-400">来源机构</span>
@@ -79,8 +78,6 @@ function QrOverlay({
             <span className="font-mono">{externalId}</span>
           </div>
         </div>
-
-        {/* 操作说明 */}
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
           <p className="text-xs leading-relaxed text-gray-500">
@@ -96,16 +93,36 @@ function QrOverlay({
 
 export function JobFairDetailPage() {
   const navigate = useNavigate()
-  const { id } = useParams<{ id: string }>()
+  const { id }   = useParams<{ id: string }>()
   const location = useLocation()
 
-  // 优先 location.state，state 缺失时从 mock 数据查找（刷新/直接访问场景）
-  const stateFair = (location.state as { fair?: ExternalJobFair } | null)?.fair
-  const fair = (stateFair?.id === id ? stateFair : null) ?? MOCK_FAIRS.find((f) => f.id === id)
+  const stateFair = (location.state as { fair?: ExternalJobFairDTO } | null)?.fair
+  const hasStateMatch = stateFair?.id === id
 
-  const [showQr, setShowQr] = useState(false)
+  const [fair,    setFair]    = useState<ExternalJobFairDTO | null>(hasStateMatch ? stateFair! : null)
+  const [loading, setLoading] = useState(!hasStateMatch)
+  const [error,   setError]   = useState(false)
+  const [showQr,  setShowQr]  = useState(false)
 
-  if (!fair) {
+  useEffect(() => {
+    if (hasStateMatch) return
+    let cancelled = false
+    getJobFairById(id!)
+      .then((res) => { if (!cancelled) { setFair(res.data); if (!res.data) setError(true) } })
+      .catch(() => { if (!cancelled) setError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id, hasStateMatch])
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-sm text-gray-400">加载中...</p>
+      </div>
+    )
+  }
+
+  if (error || !fair) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
         <InfoIcon className="h-12 w-12 text-gray-300" />
@@ -117,17 +134,14 @@ export function JobFairDetailPage() {
     )
   }
 
-  const sc = STATUS_CONFIG[fair.status]
+  const sc      = STATUS_CONFIG[fair.status]
   const isEnded = fair.status === 'ended'
+  const fairId  = fair.id
 
   const handlePrintMaterial = () => {
     navigate('/print/confirm', {
       state: {
-        file: {
-          name: `${fair.name}_活动资料.pdf`,
-          size: '256 KB',
-          pages: 2,
-        },
+        file: { name: `${fair.name}_活动资料.pdf`, size: '256 KB', pages: 2 },
         copies: 1,
         duplex: 'single',
         color: 'bw',
@@ -167,7 +181,6 @@ export function JobFairDetailPage() {
             </span>
           </div>
           <p className="mt-1 text-sm text-gray-500">主办方：{fair.organizer}</p>
-
           <div className="mt-4 space-y-2 text-sm text-gray-700">
             <div className="flex items-start gap-2">
               <CalendarIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
@@ -190,7 +203,6 @@ export function JobFairDetailPage() {
           </div>
         </Card>
 
-        {/* 活动简介 */}
         {fair.description && (
           <Card className="p-5">
             <p className="mb-2 text-sm font-medium text-gray-700">活动简介</p>
@@ -198,7 +210,7 @@ export function JobFairDetailPage() {
           </Card>
         )}
 
-        {/* 来源信息 */}
+        {/* 来源信息（合规必展示） */}
         <Card className="p-5">
           <p className="mb-3 text-sm font-medium text-gray-700">数据来源</p>
           <div className="space-y-2 text-sm text-gray-600">
@@ -215,9 +227,50 @@ export function JobFairDetailPage() {
               <span className="font-mono text-xs">{fair.externalId}</span>
             </div>
           </div>
+          <p className="mt-3 text-xs text-gray-400">{fair.dataSourceNote}</p>
         </Card>
 
-        {/* 合规说明 */}
+        {/* 现场服务（有数字化数据时显示） */}
+        {fair.hasManagedData && (
+          <Card className="p-5">
+            <p className="mb-3 text-sm font-medium text-gray-700">现场服务</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-gray-50 p-3 text-center transition-colors hover:bg-primary-50"
+                onClick={() => navigate(`/job-fairs/${fairId}/companies`)}
+              >
+                <BuildingIcon className="h-5 w-5 text-primary-500" />
+                <span className="text-xs font-medium text-gray-700">参会企业</span>
+                <span className="text-xs text-gray-400">{fair.managedCompanyCount} 家</span>
+              </button>
+              <button
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-gray-50 p-3 text-center transition-colors hover:bg-primary-50"
+                onClick={() => navigate(`/job-fairs/${fairId}/map`)}
+              >
+                <MapIcon className="h-5 w-5 text-primary-500" />
+                <span className="text-xs font-medium text-gray-700">展馆导览</span>
+                <span className="text-xs text-gray-400">展位分布</span>
+              </button>
+              <button
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-gray-50 p-3 text-center transition-colors hover:bg-primary-50"
+                onClick={() => navigate(`/job-fairs/${fairId}/materials`)}
+              >
+                <FileTextIcon className="h-5 w-5 text-primary-500" />
+                <span className="text-xs font-medium text-gray-700">活动资料</span>
+                <span className="text-xs text-gray-400">{fair.managedMaterialCount} 份</span>
+              </button>
+              <button
+                className="flex flex-col items-center gap-1.5 rounded-xl bg-gray-50 p-3 text-center transition-colors hover:bg-primary-50"
+                onClick={() => navigate(`/job-fairs/${fairId}/stats`)}
+              >
+                <ActivityIcon className="h-5 w-5 text-primary-500" />
+                <span className="text-xs font-medium text-gray-700">现场数据</span>
+                <span className="text-xs text-gray-400">准实时</span>
+              </button>
+            </div>
+          </Card>
+        )}
+
         <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-4 py-3">
           <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
           <p className="text-xs leading-relaxed text-gray-400">
@@ -226,25 +279,15 @@ export function JobFairDetailPage() {
         </div>
       </div>
 
-      {/* 操作按钮 */}
       <div className="px-6 pb-6 pt-2">
         <div className="grid grid-cols-2 gap-3">
           {!isEnded && (
             <>
-              <Button
-                size="lg"
-                className="flex items-center gap-2"
-                onClick={() => setShowQr(true)}
-              >
+              <Button size="lg" className="flex items-center gap-2" onClick={() => setShowQr(true)}>
                 <ExternalLinkIcon className="h-4 w-4" />
                 去来源平台预约
               </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="flex items-center gap-2"
-                onClick={() => setShowQr(true)}
-              >
+              <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={() => setShowQr(true)}>
                 <QrCodeIcon className="h-4 w-4" />
                 扫码预约
               </Button>
@@ -260,12 +303,7 @@ export function JobFairDetailPage() {
             打印活动资料
           </Button>
           {isEnded && (
-            <Button
-              size="lg"
-              variant="secondary"
-              className="col-span-2"
-              onClick={() => navigate('/job-fairs')}
-            >
+            <Button size="lg" variant="secondary" className="col-span-2" onClick={() => navigate('/job-fairs')}>
               返回列表
             </Button>
           )}

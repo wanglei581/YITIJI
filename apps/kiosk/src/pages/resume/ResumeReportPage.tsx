@@ -1,35 +1,45 @@
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import { AlertCircleIcon, CheckCircleIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
-
-interface ResumeSection {
-  key: string
-  label: string
-  score: number
-  maxScore: number
-}
-
-interface ResumeReport {
-  sections: ResumeSection[]
-  suggestions: string[]
-}
+import type { ResumeReport } from '@ai-job-print/shared'
+import { getResumeRecord } from '../../services/api'
 
 interface ReportState {
   source?: string
   file?: { name: string; size: string; format: string }
+  taskId?: string
   success?: boolean
   reason?: string
   report?: ResumeReport
 }
 
-const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report'])
+const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId'])
 
 export function ResumeReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const state = (location.state ?? {}) as ReportState
 
-  const { success = true, reason, report } = state
+  const { success = true, reason, taskId } = state
+  const [report, setReport] = useState<ResumeReport | undefined>(state.report)
+  const [loading, setLoading] = useState(!state.report && !!taskId && success)
+  const [loadError, setLoadError] = useState(false)
+
+  // http 模式：页面刷新后 state.report 为空，但 taskId 可用，从服务端恢复
+  useEffect(() => {
+    if (state.report || !taskId || !success) return
+    let cancelled = false
+    getResumeRecord(taskId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.report) setReport(res.report)
+        else setLoadError(true)
+      })
+      .catch(() => { if (!cancelled) setLoadError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [taskId, success, state.report])
 
   const handleRetry = () => {
     const retryState = Object.fromEntries(
@@ -76,7 +86,18 @@ export function ResumeReportPage() {
     )
   }
 
-  if (!report) {
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-8">
+        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
+          <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
+        </div>
+        <p className="text-base text-gray-500">正在恢复诊断报告…</p>
+      </div>
+    )
+  }
+
+  if (!report || loadError) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
         <AlertCircleIcon className="h-14 w-14 text-red-400" />
@@ -90,13 +111,13 @@ export function ResumeReportPage() {
   }
 
   const totalScore = report.sections.reduce((sum, s) => sum + s.score, 0)
-  const totalMax = report.sections.reduce((sum, s) => sum + s.maxScore, 0)
+  const totalMax   = report.sections.reduce((sum, s) => sum + s.maxScore, 0)
 
   return (
     <div className="flex h-full flex-col p-6">
       <PageHeader
         title="诊断报告"
-        subtitle="基于已有内容的 AI 分析结果"
+        subtitle="基于已有内容的 AI 分析结果（仅供参考）"
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
             返回首页

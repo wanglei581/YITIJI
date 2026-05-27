@@ -1,12 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import type { ExternalJobDTO } from '@ai-job-print/shared'
 import { BriefcaseIcon, BuildingIcon, MapPinIcon, TagIcon } from 'lucide-react'
-import { MOCK_JOBS } from '../../data/externalSources'
+import { getJobs } from '../../services/api'
 
 const ALL_TAGS = ['全部', '全职', '实习', '校招', '兼职']
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function formatSync(iso: string) {
   const d = new Date(iso)
@@ -20,14 +19,44 @@ const TAG_STYLES: Record<string, string> = {
   兼职: 'bg-purple-50 text-purple-600',
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function JobsPage() {
   const navigate = useNavigate()
+  const [jobs,     setJobs]     = useState<ExternalJobDTO[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState(false)
   const [activeTag, setActiveTag] = useState('全部')
 
-  const filtered =
-    activeTag === '全部' ? MOCK_JOBS : MOCK_JOBS.filter((j) => j.tags.includes(activeTag))
+  useEffect(() => {
+    let cancelled = false
+    getJobs()
+      .then((res) => {
+        if (cancelled) return
+        setJobs(res.data)
+      })
+      .catch(() => { if (!cancelled) setError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const filtered = activeTag === '全部' ? jobs : jobs.filter((j) => j.tags.includes(activeTag))
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-sm text-gray-400">加载中...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
+        <BriefcaseIcon className="h-12 w-12 text-gray-200" />
+        <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+        <Button variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -42,12 +71,10 @@ export function JobsPage() {
           }
         />
 
-        {/* 合规提示 */}
         <p className="mt-3 text-xs text-gray-400">
-          本系统仅展示第三方来源岗位信息，不参与招聘流程，请前往来源平台投递
+          本系统仅展示第三方来源岗位信息，不参与招聘流程，请前往来源平台办理
         </p>
 
-        {/* 分类筛选 */}
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
           {ALL_TAGS.map((tag) => (
             <button
@@ -65,7 +92,6 @@ export function JobsPage() {
         </div>
       </div>
 
-      {/* 列表 */}
       <div className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
         {filtered.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center py-16">
@@ -75,7 +101,6 @@ export function JobsPage() {
         ) : (
           filtered.map((job) => (
             <Card key={job.id} className="p-5">
-              {/* 标题行 */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-base font-semibold text-gray-900">{job.title}</p>
@@ -90,12 +115,11 @@ export function JobsPage() {
                     </span>
                   </div>
                 </div>
-                {job.salary && (
-                  <span className="shrink-0 text-sm font-medium text-primary-600">{job.salary}</span>
-                )}
+                <span className="shrink-0 text-sm font-medium text-primary-600">
+                  {job.salaryDisplay}
+                </span>
               </div>
 
-              {/* 标签 */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {job.tags.map((t) => (
                   <span
@@ -111,11 +135,10 @@ export function JobsPage() {
                 </span>
               </div>
 
-              {/* 操作 */}
-              <div className="mt-4 flex gap-3">
+              <div className="mt-4">
                 <Button
                   size="sm"
-                  className="flex-1"
+                  className="w-full"
                   onClick={() => navigate(`/jobs/${job.id}`, { state: { job } })}
                 >
                   查看详情

@@ -15,7 +15,7 @@ export const MOCK_JOBS: ExternalJob[] = [
     sourceName: '招聘网',
     sourceUrl: 'https://example-job-platform.com/jobs/ZH-2026-FE-0312',
     syncTime: '2026-05-24T08:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
   {
@@ -32,7 +32,7 @@ export const MOCK_JOBS: ExternalJob[] = [
     sourceName: '市人社局官网',
     sourceUrl: 'https://example-hrss.gov.cn/jobs/GOV-2026-ADM-0045',
     syncTime: '2026-05-23T10:30:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
   {
@@ -49,7 +49,7 @@ export const MOCK_JOBS: ExternalJob[] = [
     sourceName: '招聘网',
     sourceUrl: 'https://example-job-platform.com/jobs/ZH-2026-BE-0889',
     syncTime: '2026-05-24T08:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
   {
@@ -66,7 +66,7 @@ export const MOCK_JOBS: ExternalJob[] = [
     sourceName: '招聘网',
     sourceUrl: 'https://example-job-platform.com/jobs/ZH-2026-UI-1203',
     syncTime: '2026-05-22T14:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
   {
@@ -83,7 +83,7 @@ export const MOCK_JOBS: ExternalJob[] = [
     sourceName: '本地就业网',
     sourceUrl: 'https://example-local-jobs.com/jobs/HR-2026-CS-0056',
     syncTime: '2026-05-21T09:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
 ]
@@ -104,7 +104,7 @@ export const MOCK_FAIRS: ExternalJobFair[] = [
     sourceName: '市人社局官网',
     sourceUrl: 'https://example-hrss.gov.cn/fairs/GOV-FAIR-2026-0312',
     syncTime: '2026-05-24T08:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
   {
@@ -122,7 +122,7 @@ export const MOCK_FAIRS: ExternalJobFair[] = [
     sourceName: '市就业网',
     sourceUrl: 'https://example-employment.gov.cn/fairs/GOV-FAIR-2026-0289',
     syncTime: '2026-05-23T12:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
   {
@@ -140,7 +140,7 @@ export const MOCK_FAIRS: ExternalJobFair[] = [
     sourceName: '市人社局官网',
     sourceUrl: 'https://example-hrss.gov.cn/fairs/GOV-FAIR-2026-0201',
     syncTime: '2026-05-11T08:00:00Z',
-    reviewStatus: 'published',
+    reviewStatus: 'approved',
     publishStatus: 'published',
   },
 ]
