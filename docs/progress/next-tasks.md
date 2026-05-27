@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-05-27（Phase 8 API/文档对齐完成）  
+> 最后更新：2026-05-27（文档收口：导航约束 + 后续特色功能规划）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
@@ -324,6 +324,24 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 
 ---
 
+## 📋 后续特色功能规划（Phase 8.1B 完成后评估）
+
+> **当前不开发。** Phase 8.1B（Agent Claim/Heartbeat）是当前唯一优先级，特色功能在 8.1B 完成后才进入排期。  
+> 合规边界：所有功能均不得新增招聘闭环功能（一键投递、候选人管理、企业查看简历、面试邀约、Offer 管理）。  
+> 详细需求定义见：[feature-scope.md §六](../product/feature-scope.md)
+
+| 功能 | 优先级 | 前置依赖 | 当前状态 |
+|------|--------|---------|---------|
+| 打印材料包 | P1 | Phase 8.1B + Phase 7 AI | 📋 规划中，未开发 |
+| 求职打印套餐 | P1 | Phase 8.1B | 📋 规划中，未开发 |
+| 招聘会现场模式增强 | P2 | 无（基于 `/job-fairs/:id/*` 扩展） | 📋 规划中，未开发 |
+| 面试练习轻量版 | P2 | Phase 7 AI（非数字人） | 📋 规划中，未开发 |
+| AI求职路线规划 | P3 | 用户画像 + 推荐规则 | 📋 规划中，未开发 |
+
+**命名约束**：打印相关功能文案使用"打印材料包"，**禁止使用"一键打印材料包"**（避免与"一键投递"等合规禁用表达混淆）。
+
+---
+
 ## 📋 Phase 9 - UI Polish / Kiosk 视觉升级（Phase 8 完成后启动）
 
 > **触发条件**：Phase 5 Admin、Phase 6 Partner、Phase 7 API、Phase 8 设备联调全部完成后，统一升级 Kiosk 前台视觉质感。  
@@ -436,6 +454,9 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 
 #### Phase 8.1B 详细能力
 
+> **当前阶段主任务（Phase 8.1B）：** Agent 注册 → 心跳 → Claim → 下载文件 → 调用 `print()` → 状态上报。  
+> 所有特色功能（打印材料包、招聘会现场增强等）均在本阶段完成后才启动，不并行开发。
+
 | 能力 | 说明 | 状态 |
 |------|------|------|
 | 终端注册 | 注册获取 terminalId + agentToken + actionTokenSecret + localAuthToken | 📋 |
@@ -492,4 +513,7 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 - 后端数据库 / Prisma schema 迁移（Phase 7.6 第一步先出骨架和 stub）
 - **Kiosk 视觉打磨（第 9 阶段）** ← Phase 7/8 全部完成前不启动
 - **AI数字人互动（第 9 阶段）** ← Phase 8 完成前不启动；需求规划已在 [ai-avatar-guide.md](../product/ai-avatar-guide.md)，当前阶段不写任何实现代码
+- **底部 Tab 扩展** ← 底部导航固定为"首页 / AI助手 / 我的"三项，不增加第四个 Tab
+- **打印材料包 / 求职打印套餐 / 面试练习 / AI求职路线** ← Phase 8.1B 完成前不启动，不并行开发
 - 企业招聘端（已确认删除，永不开发）
+- 平台内一键投递、候选人管理、企业查看简历、面试邀约、Offer 管理（永不开发）
