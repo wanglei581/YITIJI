@@ -334,7 +334,7 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 |------|--------|---------|---------|
 | 打印材料包 | P1 | Phase 8.1B + Phase 7 AI | 📋 规划中，未开发 |
 | 求职打印套餐 | P1 | Phase 8.1B | 📋 规划中，未开发 |
-| 招聘会现场模式增强 | P2 | 无（基于 `/job-fairs/:id/*` 扩展） | 📋 规划中，未开发 |
+| 招聘会现场模式增强 | P2 | Phase 8.1B + 现有 `/job-fairs/:id/*` 页面 | 📋 规划中，未开发 |
 | 面试练习轻量版 | P2 | Phase 7 AI（非数字人） | 📋 规划中，未开发 |
 | AI求职路线规划 | P3 | 用户画像 + 推荐规则 | 📋 规划中，未开发 |
 
@@ -437,8 +437,9 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 | 子阶段 | 名称 | 状态 | 核心内容 |
 |--------|------|------|---------|
 | Phase 8.1A | Local Print MVP | ✅ **已完成** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
-| **Phase 8.1B** | **Agent API / Claim / Heartbeat** | 🚧 **当前进行** | 终端注册；心跳上报；`POST /api/v1/terminals/:terminalId/tasks/claim`；`PATCH /api/v1/print-tasks/:taskId/status` |
-| Phase 8.1C | Windows Service / DPAPI / Named Pipe | 📋 | 开机自启崩溃重启；DPAPI 加密 token；Service+Helper 双进程架构 |
+| Phase 8.1B | Agent API / Claim / Heartbeat | ✅ **Agent 侧已完成（2026-05-27）** | 注册/心跳/claim/下载/MD5/print()/状态上报；后端接口待联调 |
+| **Phase 8.1B** | **后端接口联调** | 🚧 **当前任务** | 实现 `/auth/terminal/register`、`/terminals/:id/heartbeat`、`/terminals/:id/tasks/claim`、`/print-tasks/:id/status`；Agent 端对接验证 |
+| Phase 8.1C | Windows Service / DPAPI / Named Pipe | 📋 | 开机自启崩溃重启；DPAPI 加密 token；单实例 Mutex；Service+Helper 双进程架构 |
 | Phase 8.1D | 扫描 | 📋 | TWAIN/WIA（V01/V02 先验证）；SMB 备用方案；扫描→PDF→上传 |
 
 #### Phase 8.1A 详细能力（已完成 2026-05-27）

@@ -25,7 +25,45 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.1B 开发准备中（2026-05-27）**
+**当前阶段：Phase 8.1B Agent API / Claim / Heartbeat — 编码完成（2026-05-27）**
+
+---
+
+### ✅ Phase 8.1B 已完成（2026-05-27）
+
+> Agent 侧代码全部实现，TypeScript typecheck 0 errors，build 通过。  
+> 后端对应接口（`/auth/terminal/register`、`/terminals/:id/heartbeat`、`/terminals/:id/tasks/claim`、`/print-tasks/:id/status`）待 Phase 8.1B 后端实现后联调。
+
+| 能力 | 文件 | 状态 |
+|------|------|------|
+| Agent 配置加载 | `src/agent/config-manager.ts` | ✅ |
+| 类型定义（AgentConfig/ClaimTask/HeartbeatPayload 等） | `src/agent/types.ts` | ✅ |
+| HTTP 客户端（axios + 5xx 重试 + 脱敏日志） | `src/agent/api-client.ts` | ✅ |
+| 终端注册（POST /auth/terminal/register） | `src/agent/registration.ts` | ✅ |
+| 心跳上报（PUT /terminals/:id/heartbeat，每 30s） | `src/agent/heartbeat.ts` | ✅ |
+| Claim 循环（POST /terminals/:id/tasks/claim，每 5s） | `src/agent/task-runner.ts` | ✅ |
+| 文件下载 + MD5 校验 | `src/agent/task-runner.ts` | ✅ |
+| 调用统一 print()（Phase 8.1A） | `src/agent/task-runner.ts` | ✅ |
+| PATCH /print-tasks/:id/status（printing/completed/failed） | `src/agent/task-runner.ts` | ✅ |
+| 临时文件 try/finally 清理 | `src/agent/task-runner.ts` | ✅ |
+| `agent` CLI 命令（src/index.ts） | `src/index.ts` | ✅ |
+| config/agent-config.json 排除 git | `.gitignore` | ✅ |
+| typecheck 0 errors / build 通过 | — | ✅ |
+
+**待联调（需后端接口实现）：**
+- `POST /api/v1/auth/terminal/register` — 返回 terminalId + terminalToken
+- `PUT /api/v1/terminals/:terminalId/heartbeat` — 返回 acknowledged
+- `POST /api/v1/terminals/:terminalId/tasks/claim` — 原子 claim，返回任务列表
+- `PATCH /api/v1/print-tasks/:taskId/status` — 幂等状态上报
+
+**Phase 8.1B 未做（Phase 8.1C）：**
+- Windows 单实例 Mutex
+- DPAPI 加密 agentToken
+- printerStatus / diskFreeGB 真实 WMI 查询
+- lease 续租（`PATCH /terminal-tasks/:id/lease`）
+- SQLite 任务幂等记录
+
+---
 
 **Phase 8.1A 收口确认（2026-05-27）：**
 

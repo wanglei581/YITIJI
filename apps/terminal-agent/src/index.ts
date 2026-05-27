@@ -8,13 +8,82 @@ import { printWithPowerShell } from './printer/print-with-powershell'
 import { printWithPdfToPrinter } from './printer/print-with-pdf-to-printer'
 import { print as printUnified } from './printer/print'
 import { PrintResult } from './printer/types'
+// Phase 8.1B agent modules
+import { loadConfig } from './agent/config-manager'
+import { registerOrLoad } from './agent/registration'
+import { startHeartbeat } from './agent/heartbeat'
+import { startTaskRunner } from './agent/task-runner'
+import type { AgentConfig } from './agent/types'
 
 const program = new Command()
 
 program
   .name('terminal-agent')
-  .description('Phase 8.1A local print MVP — unified print() with pdfkit image-to-pdf routing')
-  .version('0.1.0')
+  .description('Phase 8.1B agent — register / heartbeat / claim / print / status')
+  .version('0.2.0')
+
+// ── agent (Phase 8.1B) ────────────────────────────────────────────────────────
+
+program
+  .command('agent')
+  .description(
+    'Phase 8.1B: load config → register → heartbeat loop → claim loop → print → report status',
+  )
+  .action(async () => {
+    section(`Agent — Phase 8.1B — ${new Date().toISOString()}`)
+
+    // ── Load config ──────────────────────────────────────────────────────────
+    let config: AgentConfig
+    try {
+      config = loadConfig()
+    } catch (e) {
+      err(`Failed to load agent config: ${e instanceof Error ? e.message : String(e)}`)
+      process.exit(1)
+    }
+    log(`config loaded — terminal="${config.terminalCode}"  api=${config.apiBaseUrl}`)
+
+    // ── Register or load existing credentials ────────────────────────────────
+    try {
+      config = await registerOrLoad(config)
+    } catch (e) {
+      err(`${e instanceof Error ? e.message : String(e)}`)
+      err('Cannot continue without terminalId and agentToken. Fix config and restart.')
+      process.exit(1)
+    }
+    log(`agent ready — terminalId=${config.terminalId!}`)
+
+    // ── Start heartbeat ──────────────────────────────────────────────────────
+    const heartbeatTimer = startHeartbeat({
+      config,
+      onConfigUpdate: (patch) => {
+        if (patch.heartbeatIntervalMs) config.heartbeatIntervalMs = patch.heartbeatIntervalMs
+        if (patch.claimIntervalMs) config.claimIntervalMs = patch.claimIntervalMs
+      },
+    })
+
+    // ── Start claim / print loop ─────────────────────────────────────────────
+    const claimTimer = startTaskRunner({ config })
+
+    log('Agent running. Press Ctrl+C to stop.')
+
+    // ── Graceful shutdown ────────────────────────────────────────────────────
+    const shutdown = (signal: string) => {
+      log(`Agent: received ${signal}, shutting down...`)
+      clearInterval(heartbeatTimer)
+      clearInterval(claimTimer)
+      process.exit(0)
+    }
+    process.on('SIGINT', () => shutdown('SIGINT'))
+    process.on('SIGTERM', () => shutdown('SIGTERM'))
+    process.on('uncaughtException', (e) => {
+      err(`uncaughtException: ${e.message}\n${e.stack ?? ''}`)
+      process.exit(1)
+    })
+    process.on('unhandledRejection', (reason) => {
+      err(`unhandledRejection: ${String(reason)}`)
+      process.exit(1)
+    })
+  })
 
 // ── list-printers ────────────────────────────────────────────────────────────
 

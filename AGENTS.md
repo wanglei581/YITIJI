@@ -80,13 +80,15 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：Phase 8.1B — Agent API / Claim / Heartbeat（进行中）
+当前阶段：Phase 8.1B — 后端接口联调（Agent 侧已完成 2026-05-27）
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
 - Phase 8.0.1/8.0.2 已完成（2026-05-27）：PDF/JPG/PNG Method B 真实出纸 ✅
 - Phase 8.1A 已完成（2026-05-27）：统一 print() + image-to-pdf(pdfkit) + 临时 PDF 清理 ✅
+- Phase 8.1B Agent 侧已完成（2026-05-27）：注册/心跳/claim/下载/MD5/print()/状态上报 ✅
 - 图片打印路径：pdfkit 临时 PDF → Method B（pdf-to-printer/SumatraPDF）
-- Phase 8.1B 目标：终端注册、心跳上报、`POST /api/v1/terminals/:terminalId/tasks/claim`、`PATCH /api/v1/print-tasks/:taskId/status`
+- 当前任务：实现后端接口（register/heartbeat/claim/PATCH status），联调验证
+- 新命令：`pnpm --filter terminal-agent agent`（读 config/agent-config.json → 注册 → 心跳 → claim 循环）
 
 ---
 

@@ -1,6 +1,11 @@
 node_modules/
 dist/
 
+# Agent config contains agentToken (plain text in Phase 8.1B) — NEVER commit
+config/agent-config.json
+# SQLite state DB (Phase 8.1C+)
+data/*.db
+
 # Sample test files — never commit actual documents
 samples/*.pdf
 samples/*.jpg
