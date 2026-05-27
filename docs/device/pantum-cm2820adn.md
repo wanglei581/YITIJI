@@ -1,7 +1,7 @@
 # 奔图 Pantum CM2800ADN Series 设备文档
 
 > 最后更新：2026-05-27
-> 关联文档：[CLAUDE.md](../../CLAUDE.md) | [pantum-open-print-api.md](./pantum-open-print-api.md)
+> 关联文档：[CLAUDE.md](../../CLAUDE.md) | [pantum-api-design.md](./pantum-api-design.md)
 
 ---
 
@@ -58,7 +58,7 @@
 | 打印状态回调 | 预留 | 100 完成 / 101 创建 / 102 打印中 / 103 取消 / 104 错误 |
 | 设备解绑回调 | 预留 | |
 
-详细 API 规范见 [pantum-open-print-api.md](./pantum-open-print-api.md)。
+详细 API 规范见 [pantum-api-design.md](./pantum-api-design.md)。
 
 ---
 

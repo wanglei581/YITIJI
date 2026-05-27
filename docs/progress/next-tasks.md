@@ -388,7 +388,7 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 ✅ **API/文档对齐已完成（2026-05-27）**：PrintJobParams 字段统一（pageRange?）、PrintTaskCreate DTO、/tasks/claim 完整 9 字段 params、§5.1 打印机状态检测、V12–V15 WMI 状态检测验证项
 
 ✅ **设备名称/Provider分层修正（2026-05-27）**：
-- 打印机名称统一为 `Pantum CM2800ADN Series`（Windows 真机确认），禁止硬编码 CM2820ADN
+- 打印机名称统一为 `Pantum CM2800ADN Series`（Windows 真机确认），禁止在代码中硬编码具体型号字符串，必须通过 `printerName` 配置项传入
 - `PrintJobParams` 新增可选字段 `collate?` / `paperType?` / `feeder?`（开放 API 预留，驱动待验证）
 - `colorMode: 'color'` 的 Pantum 开放 API `mode` 取值标注 TODO（待厂家确认）
 - `windows-terminal-agent-design.md` 新增 **§12 Provider/Executor 分层**（LocalAgentDispatchProvider / PantumCloudDispatchProvider / 三种本地 Executor）
