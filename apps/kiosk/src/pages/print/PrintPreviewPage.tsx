@@ -32,7 +32,8 @@ interface LocationState {
   file: PrintFile
 }
 
-const PRINTER_NAME = 'Pantum CM2820ADN'
+// Phase 8.1: must come from agent config / Terminal Agent heartbeat, never hardcoded
+const PRINTER_NAME = 'Pantum CM2800ADN Series'
 
 // Phase 8.1: replace with real data from Terminal Agent heartbeat (/api/v1/terminals/:id/status)
 const MOCK_PRINTER_STATUS: PrinterStatus = {

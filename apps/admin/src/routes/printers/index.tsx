@@ -26,56 +26,56 @@ interface Printer {
 
 const MOCK_PRINTERS: Printer[] = [
   {
-    id: 'p1', name: 'KSK-001 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-001',
+    id: 'p1', name: 'KSK-001 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-001',
     terminal: 'KSK-001', location: 'A区大厅服务台',
     status: 'online', currentTask: '任务 #2847（打印中）',
     toner: { level: 78, status: 'normal' }, paper: { tray1: 350, status: 'normal' },
     fault: null, lastSync: '刚刚',
   },
   {
-    id: 'p2', name: 'KSK-002 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-002',
+    id: 'p2', name: 'KSK-002 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-002',
     terminal: 'KSK-002', location: 'B区一楼入口',
     status: 'online', currentTask: null,
     toner: { level: 45, status: 'normal' }, paper: { tray1: 120, status: 'low' },
     fault: null, lastSync: '2分钟前',
   },
   {
-    id: 'p3', name: 'KSK-003 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-003',
+    id: 'p3', name: 'KSK-003 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-003',
     terminal: 'KSK-003', location: 'B区服务台旁',
     status: 'online', currentTask: null,
     toner: { level: 8, status: 'critical' }, paper: { tray1: 200, status: 'normal' },
     fault: '碳粉余量严重不足，请及时更换', lastSync: '1分钟前',
   },
   {
-    id: 'p4', name: 'KSK-004 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-004',
+    id: 'p4', name: 'KSK-004 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-004',
     terminal: 'KSK-004', location: 'C区高校就业中心',
     status: 'online', currentTask: null,
     toner: { level: 92, status: 'normal' }, paper: { tray1: 500, status: 'normal' },
     fault: null, lastSync: '刚刚',
   },
   {
-    id: 'p5', name: 'KSK-005 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-005',
+    id: 'p5', name: 'KSK-005 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-005',
     terminal: 'KSK-005', location: 'D区社区服务站',
     status: 'online', currentTask: null,
     toner: { level: 61, status: 'normal' }, paper: { tray1: 0, status: 'empty' },
     fault: '纸盒已空，请补充 A4 纸张', lastSync: '3分钟前',
   },
   {
-    id: 'p6', name: 'KSK-006 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-006',
+    id: 'p6', name: 'KSK-006 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-006',
     terminal: 'KSK-006', location: 'E区政务大厅',
     status: 'online', currentTask: null,
     toner: { level: 33, status: 'normal' }, paper: { tray1: 280, status: 'normal' },
     fault: null, lastSync: '刚刚',
   },
   {
-    id: 'p7', name: 'KSK-007 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-007',
+    id: 'p7', name: 'KSK-007 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-007',
     terminal: 'KSK-007', location: 'C区入口处',
     status: 'offline', currentTask: null,
     toner: { level: 55, status: 'normal' }, paper: { tray1: 300, status: 'normal' },
     fault: '终端离线，打印机状态未知', lastSync: '2小时前',
   },
   {
-    id: 'p8', name: 'KSK-008 打印机', model: 'Pantum CM2820ADN', sn: 'PT-CM2820-008',
+    id: 'p8', name: 'KSK-008 打印机', model: 'Pantum CM2800ADN Series', sn: 'PT-CM2820-008',
     terminal: 'KSK-008', location: 'F区科技园服务站',
     status: 'error', currentTask: null,
     toner: { level: 70, status: 'normal' }, paper: { tray1: 150, status: 'normal' },
@@ -125,7 +125,7 @@ export default function PrintersPage() {
   }
 
   return (
-    <Page title="打印机管理" subtitle="奔图 CM2820ADN — 状态监控">
+    <Page title="打印机管理" subtitle="奔图 CM2800ADN/CM2820ADN 系列 — 状态监控">
       {/* 筛选标签 */}
       <div className="mb-4 flex gap-2">
         {FILTERS.map((f) => (

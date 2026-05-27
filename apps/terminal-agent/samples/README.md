@@ -35,20 +35,20 @@ Start-Process -FilePath samples\test.txt -Verb PrintTo -ArgumentList "Microsoft 
 pnpm --filter terminal-agent list-printers
 
 # 2. 打印 PDF（同时测试两种方法）
-pnpm --filter terminal-agent print --file "C:\path\to\samples\sample.pdf" --printer "Pantum CM2820ADN"
+pnpm --filter terminal-agent print --file "C:\path\to\samples\sample.pdf" --printer "Pantum CM2800ADN Series"
 
 # 3. 只用 Method A
-pnpm --filter terminal-agent print --file "C:\path\to\samples\sample.jpg" --printer "Pantum CM2820ADN" --method a
+pnpm --filter terminal-agent print --file "C:\path\to\samples\sample.jpg" --printer "Pantum CM2800ADN Series" --method a
 
 # 4. 只用 Method B
-pnpm --filter terminal-agent print --file "C:\path\to\samples\sample.pdf" --printer "Pantum CM2820ADN" --method b
+pnpm --filter terminal-agent print --file "C:\path\to\samples\sample.pdf" --printer "Pantum CM2800ADN Series" --method b
 ```
 
 ## 验收检查
 
 运行每个命令后，对照以下验证清单记录结果：
 
-- [ ] `list-printers` 输出中能看到 `Pantum CM2820ADN`
+- [ ] `list-printers` 输出中能看到 `Pantum CM2800ADN Series`
 - [ ] Method A 打印 PDF — 纸张正常出纸
 - [ ] Method A 打印 JPG — 纸张正常出纸
 - [ ] Method B 打印 PDF — 纸张正常出纸

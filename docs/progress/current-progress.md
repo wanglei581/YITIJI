@@ -229,7 +229,7 @@
 
 ### 目标
 
-在 Windows 主机上验证 Terminal Agent 能否稳定把本地文件打印到奔图 CM2820ADN，不接云端、不接 Kiosk。
+在 Windows 主机上验证 Terminal Agent 能否稳定把本地文件打印到奔图 CM2800ADN/CM2820ADN 系列（Windows 识别名：`Pantum CM2800ADN Series`），不接云端、不接 Kiosk。
 
 ### 创建内容
 
