@@ -10,7 +10,8 @@ import { PRINT_TIMEOUT_MS } from '../config'
  * giving us reliable per-printer routing without needing a system PDF reader.
  *
  * Supported file types: PDF, XPS, CBZ, CBR, DjVu (SumatraPDF native formats).
- * Images (JPG/PNG) are NOT supported by this method — use Method A for those.
+ * Images (JPG/PNG/BMP/TIFF) should be pre-converted to PDF via image-to-pdf.ts before calling
+ * this function. See print.ts for the unified routing logic (Phase 8.1A production entry point).
  *
  * Advantages over Method A:
  *  - Printer name is passed directly to SumatraPDF, not through shell verbs

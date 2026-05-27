@@ -6,13 +6,14 @@ import { log, err, warn, section } from './logger'
 import { listPrinters, checkPrinterExists } from './printer/printer-status'
 import { printWithPowerShell } from './printer/print-with-powershell'
 import { printWithPdfToPrinter } from './printer/print-with-pdf-to-printer'
+import { print as printUnified } from './printer/print'
 import { PrintResult } from './printer/types'
 
 const program = new Command()
 
 program
   .name('terminal-agent')
-  .description('Phase 8.0 local print spike — configurable printer via --printer or DEFAULT_PRINTER in config.ts')
+  .description('Phase 8.1A local print MVP — unified print() with pdfkit image-to-pdf routing')
   .version('0.1.0')
 
 // ── list-printers ────────────────────────────────────────────────────────────
@@ -41,14 +42,14 @@ program
   .requiredOption('--file <path>', 'Absolute path to the file to print')
   .option('--printer <name>', 'Printer name', DEFAULT_PRINTER)
   .option(
-    '--method <a|b|both>',
-    'a = PowerShell, b = pdf-to-printer, both = try A then B',
-    'both',
+    '--method <auto|a|b|both>',
+    'auto = production path (unified print() via pdfkit+Method B); a = PowerShell; b = pdf-to-printer; both = spike A+B',
+    'auto',
   )
   .action(async (opts: { file: string; printer: string; method: string }) => {
     const { file, printer, method } = opts
 
-    section(`Print Spike — ${new Date().toISOString()}`)
+    section(`Print — ${new Date().toISOString()}`)
     log(`File    : ${file}`)
     log(`Printer : ${printer}`)
     log(`Method  : ${method}`)
@@ -83,6 +84,22 @@ program
 
     // ── Run method(s) ─────────────────────────────────────────────────────
 
+    // auto：Phase 8.1A 生产路径（统一 print()）
+    if (method === 'auto') {
+      section('Print [auto] — unified print() (Phase 8.1A)')
+      const r = await printUnified(file, printer)
+      printResultSummary(r)
+      section('Result')
+      if (r.success) {
+        log(`✓ PRINT SUCCESS [auto]  printer=${r.printer}  file=${r.file}  duration=${r.durationMs}ms`)
+      } else {
+        err(`✗ PRINT FAILED [auto]  errorCode=${r.errorCode ?? 'UNKNOWN'}  ${r.errorMessage ?? ''}`)
+        process.exit(2)
+      }
+      return
+    }
+
+    // a / b / both：Spike 调试路径（保留用于验证）
     const results: PrintResult[] = []
 
     if (method === 'a' || method === 'both') {
@@ -92,7 +109,7 @@ program
       printResultSummary(r)
     }
 
-    if (method === 'b' || (method === 'both')) {
+    if (method === 'b' || method === 'both') {
       section('Method B — pdf-to-printer (SumatraPDF)')
       const r = await printWithPdfToPrinter(file, printer)
       results.push(r)

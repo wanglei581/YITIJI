@@ -414,7 +414,27 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 | V14 | **Win32_Printer 缺纸状态可识别（WMI）** | ⚠️ 必验 | local-print-spike.md §5.1 |
 | V15 | **不可识别状态 → UNKNOWN_PRINTER_STATUS** | ⚠️ 必验 | local-print-spike.md §5.1 |
 
-### Phase 8.1 MVP（技术验证通过后实现）
+### Phase 8.1 子阶段拆分
+
+| 子阶段 | 名称 | 状态 | 核心内容 |
+|--------|------|------|---------|
+| **Phase 8.1A** | **Local Print MVP** | 🚧 **进行中** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
+| Phase 8.1B | Agent API / Claim / Heartbeat | 📋 | 后端 claim 接口对接；心跳上报；打印任务状态机；`PATCH /print-tasks/:id/status` |
+| Phase 8.1C | Windows Service / DPAPI / Named Pipe | 📋 | 开机自启崩溃重启；DPAPI 加密 token；Service+Helper 双进程架构 |
+| Phase 8.1D | 扫描 | 📋 | TWAIN/WIA（V01/V02 先验证）；SMB 备用方案；扫描→PDF→上传 |
+
+#### Phase 8.1A 详细能力（当前阶段）
+
+| 能力 | 说明 | 状态 |
+|------|------|------|
+| 统一 `print()` 函数 | `print(file, printerName, params)` 路由 PDF / 图片 | 🚧 |
+| PDF 打印 | `.pdf` → Method B（pdf-to-printer/SumatraPDF）直接打印 | 🚧 |
+| 图片打印（JPG/PNG）| pdfkit 生成临时 PDF → Method B → 打印后删除临时文件 | 🚧 |
+| 图片打印（BMP/TIFF）| Phase 8.1B（需 sharp 预处理）| 📋 |
+| printerName 配置化 | 从 `DEFAULT_PRINTER`（config.ts）读取，不硬编码 | 🚧 |
+| 临时文件清理 | 打印后立即删除；启动时清理超过 1 小时的残留 | 🚧 |
+
+#### Phase 8.1B 详细能力
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
@@ -422,13 +442,24 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 | 单实例 Mutex | 启动时加锁，重复启动自动退出 | 📋 |
 | 心跳上报 | 每 30s，携带打印机基本状态 | 📋 |
 | 打印任务 Claim | POST /tasks/claim，lease 原子防重复 | 📋 |
-| 打印任务执行 | 下载 → MD5 校验 → GDI 打印 → 回传状态 | 📋 |
-| 扫描任务执行 | Named Pipe 触发 Helper → TWAIN → PDF 合并 → 上传 → 回传 | 📋 |
+| 打印任务执行 | 下载 → MD5 校验 → 调用统一 print() → 回传状态 | 📋 |
 | 文件上传 | POST /files/upload（multipart） | 📋 |
-| 临时文件清理 | 任务结束立即删除 + 每小时兜底；目录 ACL 保护 | 📋 |
+
+#### Phase 8.1C 详细能力
+
+| 能力 | 说明 | 状态 |
+|------|------|------|
+| 临时文件安全清理 | 任务结束立即删除 + 每小时兜底；目录 ACL 保护 | 📋 |
 | Windows 服务 + Helper | Service 开机自启崩溃重启；Helper 用户登录后由 Service 启动 | 📋 |
 | local-api-server | 127.0.0.1:9527；localAuthToken（查询）+ actionToken（动作）全鉴权 | 📋 |
 | DPAPI 加密 | agentToken / actionTokenSecret / localAuthToken DPAPI 加密存储 | 📋 |
+
+#### Phase 8.1D 详细能力
+
+| 能力 | 说明 | 状态 |
+|------|------|------|
+| 扫描任务执行 | Named Pipe 触发 Helper → TWAIN → PDF 合并 → 上传 → 回传 | 📋 |
+| SMB 备用方案 | TWAIN 不可用时监听 SMB 共享目录 | 📋 |
 
 ### Phase 8.2 扩展（Phase 8.1 完成后）
 

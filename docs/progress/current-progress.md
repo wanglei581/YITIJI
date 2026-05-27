@@ -25,7 +25,7 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.0.2 图片打印补充验证已完成（2026-05-27）— ✅ 可进入 Phase 8.1 MVP**
+**当前阶段：Phase 8.1A Local Print MVP 开发中（2026-05-27）**
 
 **Phase 4 加固封板确认（2026-05-25，无剩余 M1/M2 阻塞项）：**
 
@@ -258,12 +258,22 @@
 | | Method A | Method B |
 |---|---|---|
 | 机制 | PowerShell Start-Process -Verb PrintTo | pdf-to-printer / SumatraPDF |
-| PDF | 需系统有 PDF 阅读器 | 始终可用 |
-| 图片 | ✓ | ✗ |
+| PDF | 待确认（Windows 11 未物理测试）| ✅ 真实出纸（QA-1 确认）|
+| 图片 | ❌ 假成功（exitCode=0 但不打印）| N/A（不支持；用 pdfkit 转 PDF 后再 Method B）|
 
-### 状态
+### Phase 8.0.1/8.0.2 实机验证收口（2026-05-27）✅
 
-**Spike 代码完成 + API/文档对齐完成 + V01–V15 验证清单已执行（2026-05-27）✅。可进入 Phase 8.1。**
+- **QA-1 Method B PDF 真实出纸 ✅**（557ms，`Pantum CM2800ADN Series`）
+- **QA-2/3 Method A JPG/PNG 假成功 ❌**（exitCode=0 但纸未出，根因：Windows 11 Photos app PrintTo verb 不触发打印）
+- **mspaint /pt 方案排除 ❌**（Windows 11 无 mspaint.exe）
+- **图片打印路径已确定**：pdfkit 生成临时 PDF → Method B → 打印完成删除临时文件
 
-V01–V11 全部 PASS（11/11）；V12 PARTIAL（小文件过 spooler 太快，生产大文件可用）；V13 PARTIAL（WorkOffline 触发 PrinterStatus=2，物理拔线待补）；V14 待测（物理缺纸）；V15 PASS（PrinterStatus=2 → UNKNOWN_PRINTER_STATUS）。
-打印机实际名称已修正为 `Pantum CM2800ADN Series`（config.ts 已更新）。
+V01–V11 全部 PASS（11/11）；V05 真实出纸 ✅；V03/V04 假成功 ❌；V12 PARTIAL；V13 PARTIAL；V14 待测；V15 PASS。
+
+### Phase 8.1A Local Print MVP 进行中（2026-05-27）🚧
+
+- 目标：统一 `print(file, printerName, params)` 函数
+- PDF → Method B 直接打印
+- 图片（.jpg/.png）→ pdfkit 临时 PDF → Method B → 删除临时文件
+- BMP/TIFF → Phase 8.1B（需 sharp 预处理）
+- printerName 从 `DEFAULT_PRINTER` 配置读取，不硬编码

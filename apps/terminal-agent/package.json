@@ -7,14 +7,17 @@
     "print": "ts-node src/index.ts print",
     "list-printers": "ts-node src/index.ts list-printers",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "pdf-to-printer": "^5.4.0"
+    "pdf-to-printer": "^5.4.0",
+    "pdfkit": "^0.15.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "@types/pdfkit": "^0.13.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.0"
   },
