@@ -25,14 +25,16 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.1B Agent API / Claim / Heartbeat — 编码完成（2026-05-27）**
+**当前阶段：Phase 8.1B 全链路联调完成（2026-05-27）**
 
 ---
 
 ### ✅ Phase 8.1B 已完成（2026-05-27）
 
-> Agent 侧代码全部实现，TypeScript typecheck 0 errors，build 通过。  
-> 后端对应接口（`/auth/terminal/register`、`/terminals/:id/heartbeat`、`/terminals/:id/tasks/claim`、`/print-tasks/:id/status`）待 Phase 8.1B 后端实现后联调。
+> Agent 侧 + 后端接口全部实现，联调冒烟全部通过。  
+> 链路：register → heartbeat → claim → download → MD5 → print → PATCH completed ✅
+
+**Agent 侧（`apps/terminal-agent/src/agent/`）：**
 
 | 能力 | 文件 | 状态 |
 |------|------|------|
@@ -50,11 +52,20 @@
 | config/agent-config.json 排除 git | `.gitignore` | ✅ |
 | typecheck 0 errors / build 通过 | — | ✅ |
 
-**待联调（需后端接口实现）：**
-- `POST /api/v1/auth/terminal/register` — 返回 terminalId + terminalToken
-- `PUT /api/v1/terminals/:terminalId/heartbeat` — 返回 acknowledged
-- `POST /api/v1/terminals/:terminalId/tasks/claim` — 原子 claim，返回任务列表
-- `PATCH /api/v1/print-tasks/:taskId/status` — 幂等状态上报
+**后端（`services/api/src/terminals/`）：**
+
+| 能力 | 文件 | 状态 |
+|------|------|------|
+| POST /auth/terminal/register（in-memory + agentToken） | `terminals.service.ts` | ✅ |
+| PUT /terminals/:id/heartbeat（Bearer 鉴权） | `terminals.service.ts` | ✅ |
+| POST /terminals/:id/tasks/claim（原子 claim，5 min expire） | `terminals.service.ts` | ✅ |
+| PATCH /print-tasks/:id/status（状态机 + 幂等） | `terminals.service.ts` | ✅ |
+| GET /test/sample.png（1×1 PNG mock 文件端点） | `terminals.controller.ts` | ✅ |
+| 种子任务 ptask_seed_001（fileUrl→sample.png，fileMd5 匹配） | `terminals.service.ts` | ✅ |
+| Claim 过期自动重置（setInterval 30s） | `terminals.service.ts` | ✅ |
+| DTOs（register/heartbeat/claim/patchStatus） | `dto/` | ✅ |
+| TerminalsModule 注册 + AppModule 接入 | `terminals.module.ts` | ✅ |
+| typecheck 0 errors | — | ✅ |
 
 **Phase 8.1B 未做（Phase 8.1C）：**
 - Windows 单实例 Mutex
@@ -128,7 +139,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0/8.0.1/8.0.2/8.1A 全部完成：PDF Method B 真实出纸✅；JPG/PNG pdfkit→Method B 真实出纸✅；临时 PDF 自动清理✅；错误处理正确✅；**🚀 当前进行中：Phase 8.1B** |
+| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0/8.0.1/8.0.2/8.1A/8.1B 全部完成：PDF/图片打印✅；Agent 注册/心跳/Claim/PATCH 全链路✅；后端 4 接口联调通过✅；**下一步：Windows 真机端到端联调** |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---
@@ -266,6 +277,7 @@
 | 2026-05-27 | Phase 8.0.1/8.0.2 图片打印补充验证完成：QA-1 PDF Method B 真实出纸✅；QA-2/QA-3 Method A JPG/PNG 假成功（exitCode=0 但未出纸，Windows 11 Photos app PrintTo verb 问题）；mspaint /pt 排除（mspaint.exe 不存在）；Phase 8.1 图片路径确定为 pdfkit→临时 PDF→Method B；可进入 Phase 8.1 MVP | Claude Code |
 | 2026-05-27 | Phase 8.0 V01–V15 验证清单执行完成（Windows 11 + Node.js v24 + pnpm 10 + Pantum CM2800ADN Series USB）：V01–V11 全部 PASS；Method A/B 均可用（PDF/JPG/PNG）；错误码 FILE_NOT_FOUND/PRINTER_NOT_FOUND/UNSUPPORTED_FILE_TYPE 均正确；WMI 正常/Unknown 状态可读；V12 PARTIAL（小文件 spooler 过快）；V13 PARTIAL（WorkOffline=True→PrinterStatus=2）；V14 待物理缺纸测试；V15 PASS；config.ts DEFAULT_PRINTER 修正为 `Pantum CM2800ADN Series`；**Phase 8.1 可启动** | Claude Code |
 | 2026-05-27 | Phase 8 打印链路 API/文档对齐：① PrintJobParams.pageRange 从 `'all'\|string` 改为 `pageRange?: string`（缺省=全部，4 处对齐：shared/types/print.ts / PrintPreviewPage / PrintConfirmPage / terminal-agent/types）；② api-v1-design.md 新增 §5.3（POST /api/v1/print-tasks PrintTaskCreateDto + GET /api/v1/print-tasks/:taskId）、§4.3 /tasks/claim 响应完整 params: PrintJobParams（9 字段，替代旧 4 字段 options）、标注旧 POST /print/orders 字段 colorMode:"bw\|color"/duplexMode 为过时命名；③ windows-terminal-agent-design.md §4.3 claim 响应 options→params（9 字段）、新增 §5.1 打印机状态检测（Phase 8.0 WMI Spike 目标表 + Phase 8.1 打印任务状态机）；④ local-print-spike.md 新增 V12–V15（Get-PrintJob/Win32_Printer 离线缺纸/UNKNOWN_PRINTER_STATUS）、Phase 8.1 状态机说明 | Claude Code |
+| 2026-05-27 | Phase 8.1B 后端联调全部完成：新建 TerminalsModule（terminals.service.ts + terminals.controller.ts + terminals.module.ts + 4 个 DTO），实现 POST /auth/terminal/register、PUT /terminals/:id/heartbeat、POST /terminals/:id/tasks/claim（原子 claim + 5min 过期自动重置）、PATCH /print-tasks/:id/status（状态机 + 幂等），GET /test/sample.png（1×1 PNG 种子文件）；种子任务 ptask_seed_001 在服务启动时写入；app.module.ts 接入 TerminalsModule；冒烟测试全部通过（register→heartbeat→claim→PATCH printing/completed 幂等 PATCH 均返回 200）；typecheck 0 errors；修复 import type 导致 whitelist: true 剥离 DTO 字段的 bug（改为 value import） | Claude Code |
 | 2026-05-27 | Phase 8 设备名称/Provider分层修正：① CLAUDE.md §3 打印机型号更新为奔图 CM2800/CM2820 系列（Windows 识别名 `Pantum CM2800ADN Series`），新增硬件能力 vs 开放 API 能力对比表、Pantum 签名算法（MD5）、云打印架构说明；② PrintJobParams 新增可选字段 collate/paperType/feeder（共享类型+Agent类型同步），colorMode cloud TODO 注释；③ windows-terminal-agent-design.md 全文 CM2820ADN→CM2800ADN/CM2820ADN系列，新增 §12 Provider/Executor 分层（LocalAgentDispatchProvider/PantumCloudDispatchProvider/LocalPrintExecutor/三种 Executor）；④ 新建 docs/device/pantum-api-design.md（签名算法/PrintJobParams映射/预留接口/7项未解决问题）；⑤ current-progress.md 打印机型号记录更新 | Claude Code |
 
 ---

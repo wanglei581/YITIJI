@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-05-27（文档收口：导航约束 + 后续特色功能规划）  
+> 最后更新：2026-05-27（Phase 8.1B 后端联调完成）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
@@ -324,9 +324,9 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 
 ---
 
-## 📋 后续特色功能规划（Phase 8.1B 完成后评估）
+## 📋 后续特色功能规划（Phase 8.1B 已完成，可进入排期）
 
-> **当前不开发。** Phase 8.1B（Agent Claim/Heartbeat）是当前唯一优先级，特色功能在 8.1B 完成后才进入排期。  
+> **Phase 8.1B 已完成（2026-05-27）**：后端 4 接口全部实现，Agent + 后端冒烟联调通过。下一步：Windows 真机端到端联调（`pnpm --filter terminal-agent agent`），然后根据结果决定是否进入特色功能排期。  
 > 合规边界：所有功能均不得新增招聘闭环功能（一键投递、候选人管理、企业查看简历、面试邀约、Offer 管理）。  
 > 详细需求定义见：[feature-scope.md §六](../product/feature-scope.md)
 
