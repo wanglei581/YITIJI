@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-05-26  
+> 最后更新：2026-05-27  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
@@ -25,7 +25,17 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.1A Local Print MVP 开发中（2026-05-27）**
+**当前阶段：Phase 8.1B 开发准备中（2026-05-27）**
+
+**Phase 8.1A 收口确认（2026-05-27）：**
+
+| 验收项 | 状态 |
+|--------|------|
+| JPG → pdfkit → Method B → 真实出纸（882ms） | ✅ |
+| PNG → pdfkit → Method B → 真实出纸（553ms） | ✅ |
+| 临时 PDF 打印后自动删除 | ✅ |
+| DOCX / BMP 正确拒绝（UNSUPPORTED_FILE_TYPE） | ✅ |
+| TypeScript typecheck 0 错误 | ✅ |
 
 **Phase 4 加固封板确认（2026-05-25，无剩余 M1/M2 阻塞项）：**
 
@@ -80,7 +90,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0/8.0.1/8.0.2 全部完成：PDF Method B 真实出纸✅；Method A 图片假成功已确认；mspaint 已排除（Windows 11 Store 应用无 exe）；**图片路径确定：pdfkit→临时 PDF→Method B**；**✅ 可进入 Phase 8.1 MVP** |
+| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0/8.0.1/8.0.2/8.1A 全部完成：PDF Method B 真实出纸✅；JPG/PNG pdfkit→Method B 真实出纸✅；临时 PDF 自动清理✅；错误处理正确✅；**🚀 当前进行中：Phase 8.1B** |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---

@@ -836,3 +836,65 @@ Windows 11 Photos app 对 `PrintTo` verb 返回 exitCode=0 但不发送打印任
 | 文档已更新 | ✅ |
 
 **✅ 可进入 Phase 8.1 MVP 开发。**
+
+---
+
+## 8. Phase 8.1A Local Print MVP 实机验证（2026-05-27）
+
+### 目标
+
+在 Windows 真机上验证 Phase 8.1A 的统一 `print()` 函数：
+- `.jpg / .png` → pdfkit 生成临时 PDF → Method B → 真实出纸
+- `.docx / .bmp` → 正确返回 `UNSUPPORTED_FILE_TYPE`，不出纸
+
+### 环境
+
+| 项目 | 值 |
+|------|-----|
+| 测试日期 | 2026-05-27 |
+| Windows 版本 | Windows 11 Pro for Workstations 10.0.22621 |
+| Node.js | v24.15.0 |
+| pnpm | 10.33.2 |
+| pdfkit | 0.15.x（Phase 8.1A 新增依赖） |
+| 打印机 | `Pantum CM2800ADN Series`（USB001） |
+
+### 验证结果
+
+#### 打印验证（QA-A1 / QA-A2）
+
+| QA | 文件 | 大小 | 路由 | 命令时长 | 物理出纸 | 临时文件清理 | 结论 |
+|----|------|------|------|---------|:-------:|:-----------:|------|
+| QA-A1 | sample.jpg | 676.8 KB | jpg → pdfkit → Method B | 882ms | ✅ **真实出纸** | ✅ 自动删除 | **PASS** |
+| QA-A2 | sample.png | 131.7 KB | png → pdfkit → Method B | 553ms | ✅ **真实出纸** | ✅ 自动删除 | **PASS** |
+
+临时文件路径：`C:\ProgramData\AIJobPrintAgent\temp\print_<uuid>.pdf`（打印后自动删除）
+
+#### 错误处理验证（QA-A3 / QA-A4）
+
+| QA | 文件 | 期望 errorCode | 实际结果 | 出纸 | 结论 |
+|----|------|--------------|---------|:----:|------|
+| QA-A3 | sample.docx | `UNSUPPORTED_FILE_TYPE` | ✅ `UNSUPPORTED_FILE_TYPE`（进程退出码 1） | ❌ 无 | **PASS** |
+| QA-A4 | sample.bmp | `UNSUPPORTED_FILE_TYPE` + Phase 8.1B+ 提示 | ✅ `.bmp 需要 sharp 预处理（Phase 8.1B+ 实现）` | ❌ 无 | **PASS** |
+
+### Phase 8.1A 收口结论
+
+| 验收条件 | 状态 |
+|---------|:----:|
+| JPG → pdfkit → Method B → 真实出纸 | ✅ |
+| PNG → pdfkit → Method B → 真实出纸 | ✅ |
+| 临时 PDF 打印后自动删除 | ✅ |
+| DOCX 正确拒绝（UNSUPPORTED_FILE_TYPE） | ✅ |
+| BMP 正确提示 Phase 8.1B+（UNSUPPORTED_FILE_TYPE） | ✅ |
+| TypeScript typecheck 0 错误 | ✅ |
+| pdfkit 依赖安装正常 | ✅ |
+
+**✅ Phase 8.1A Local Print MVP 验证完成（2026-05-27）。可进入 Phase 8.1B。**
+
+### Phase 8.1B 待开发项
+
+- [ ] BMP / TIFF → sharp 预处理 → pdfkit → Method B
+- [ ] 打印参数支持（copies / colorMode / duplex / orientation）via SumatraPDF `-print-settings`
+- [ ] 打印任务 claim 接口（POST /api/v1/tasks/claim）
+- [ ] 任务状态上报（printing → completed / failed）
+- [ ] Terminal 注册与心跳上报
+- [ ] Windows 单实例 Mutex + 开机自启动
