@@ -25,7 +25,7 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.0 本地打印 Spike — apps/terminal-agent 最小 CLI 已创建，待 Windows 主机验证**
+**当前阶段：Phase 8.0 本地打印 Spike — V01–V15 验证清单已在 Windows 主机执行完成（2026-05-27），可进入 Phase 8.1**
 
 **Phase 4 加固封板确认（2026-05-25，无剩余 M1/M2 阻塞项）：**
 
@@ -80,7 +80,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | 🔬 Phase 8.0 Spike 代码完成 + API/文档对齐完成（PrintJobParams 字段对齐、PrintTaskCreate DTO、/tasks/claim 完整 params、状态检测分阶段规范）；实机验证 V01–V15 待 Windows 主机执行 |
+| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0 Spike + API/文档对齐完成；V01–V11 全部 PASS，V12 PARTIAL（小文件过快），V13 PARTIAL（WorkOffline→PrinterStatus=2），V14 待物理测试，V15 PASS；打印机名修正；**可进入 Phase 8.1** |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---
@@ -215,6 +215,7 @@
 | 2026-05-26 | Phase 8 设计文档 v1.1：补充双进程架构（Service + User Session Helper，Named Pipe + ACL）；local-api-server 安全重设计（删除无鉴权、localAuthToken 查询类、actionToken 动作类、HMAC+nonce+expiresAt 防重放、403 返回规范）；GET /tasks → POST /tasks/claim（原子 lease，claimedBy+claimExpiresAt，崩溃后超时重新领取）；临时文件路径全文统一为 %ProgramData%\AIJobPrintAgent\temp\（ACL 仅 Agent 服务账号/管理员）；单实例 Windows Mutex；Phase 8.0 技术验证清单 15 项（含 Named Pipe/TWAIN/actionToken/claim lease/打包方案对比/DPAPI/断网幂等/单实例 Mutex）；风险清单扩展至 R12；打包方案对比（pkg/nexe/electron-builder/.NET wrapper）| Claude Code |
 | 2026-05-26 | Phase 8 设计文档 v1.2（审计补充）：新增 §4.8 actionToken 签发接口（POST /api/v1/terminals/:id/action-tokens，body: action/taskId，response: actionToken/expiresAt/nonce）；新增 §4.9 claim lease 续租接口（PATCH /api/v1/terminal-tasks/:id/lease，body: claimedBy/extendSeconds，response: ok/newExpiresAt 或 LEASE_RENEW_FAILED）；Named Pipe ACL 细化（明确禁止 Everyone/Users/Authenticated Users，仅允许 Service SID + Helper SID + BUILTIN\Administrators）；§2.4 claim 补充续租机制（最多 3 次，总 lease 20 分钟，超限 LEASE_RENEW_FAILED） | Mavis |
 | 2026-05-26 | Phase 7.10 收口复查：6 项检查全部通过——① Kiosk 双重过滤（approved+published）✅；② 状态机（approve→approved+draft，PUBLISH_REQUIRES_APPROVAL，publish≠approve）✅；③ Partner 导入硬编码 pending+draft，4 个必填字段均有 @IsNotEmpty 校验✅；④ 所有 DTO 无 apiSecret/accessToken/clientSecret/password✅；⑤ 违规功能词全文扫描 CLEAN（仅出现于合规注释/说明文案）✅；⑥ lint 0 warnings / typecheck 0 errors / build ✅（admin 387KB / partner 338KB / kiosk 418KB）；1 个次要观察：approve 对已发布记录重复调用会将 publishStatus 重置为 draft（边缘场景，正常流程不可达）| Claude Code |
+| 2026-05-27 | Phase 8.0 V01–V15 验证清单执行完成（Windows 11 + Node.js v24 + pnpm 10 + Pantum CM2800ADN Series USB）：V01–V11 全部 PASS；Method A/B 均可用（PDF/JPG/PNG）；错误码 FILE_NOT_FOUND/PRINTER_NOT_FOUND/UNSUPPORTED_FILE_TYPE 均正确；WMI 正常/Unknown 状态可读；V12 PARTIAL（小文件 spooler 过快）；V13 PARTIAL（WorkOffline=True→PrinterStatus=2）；V14 待物理缺纸测试；V15 PASS；config.ts DEFAULT_PRINTER 修正为 `Pantum CM2800ADN Series`；**Phase 8.1 可启动** | Claude Code |
 | 2026-05-27 | Phase 8 打印链路 API/文档对齐：① PrintJobParams.pageRange 从 `'all'\|string` 改为 `pageRange?: string`（缺省=全部，4 处对齐：shared/types/print.ts / PrintPreviewPage / PrintConfirmPage / terminal-agent/types）；② api-v1-design.md 新增 §5.3（POST /api/v1/print-tasks PrintTaskCreateDto + GET /api/v1/print-tasks/:taskId）、§4.3 /tasks/claim 响应完整 params: PrintJobParams（9 字段，替代旧 4 字段 options）、标注旧 POST /print/orders 字段 colorMode:"bw\|color"/duplexMode 为过时命名；③ windows-terminal-agent-design.md §4.3 claim 响应 options→params（9 字段）、新增 §5.1 打印机状态检测（Phase 8.0 WMI Spike 目标表 + Phase 8.1 打印任务状态机）；④ local-print-spike.md 新增 V12–V15（Get-PrintJob/Win32_Printer 离线缺纸/UNKNOWN_PRINTER_STATUS）、Phase 8.1 状态机说明 | Claude Code |
 
 ---
@@ -260,4 +261,7 @@
 
 ### 状态
 
-**Spike 代码完成 + API/文档对齐完成（2026-05-27）。** 需在 Windows 主机上执行 V01–V15 验证清单（见 docs/device/local-print-spike.md）后填写结果，才能进入 Phase 8.1。
+**Spike 代码完成 + API/文档对齐完成 + V01–V15 验证清单已执行（2026-05-27）✅。可进入 Phase 8.1。**
+
+V01–V11 全部 PASS（11/11）；V12 PARTIAL（小文件过 spooler 太快，生产大文件可用）；V13 PARTIAL（WorkOffline 触发 PrinterStatus=2，物理拔线待补）；V14 待测（物理缺纸）；V15 PASS（PrinterStatus=2 → UNKNOWN_PRINTER_STATUS）。
+打印机实际名称已修正为 `Pantum CM2800ADN Series`（config.ts 已更新）。

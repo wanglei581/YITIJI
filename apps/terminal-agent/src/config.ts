@@ -1,4 +1,4 @@
-export const DEFAULT_PRINTER = 'Pantum CM2820ADN'
+export const DEFAULT_PRINTER = 'Pantum CM2800ADN Series'
 
 export const SUPPORTED_EXTENSIONS = new Set([
   '.pdf',

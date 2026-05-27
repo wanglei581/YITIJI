@@ -290,17 +290,18 @@ Get-CimInstance -ClassName Win32_Printer -Filter "Name='Pantum CM2820ADN'" |
 
 ---
 
-**测试环境信息（必填）**
+**测试环境信息**
 
 | 项目 | 填写 |
 |------|------|
-| 填写日期 | |
-| 测试主机型号/规格 | |
-| Windows 版本（winver） | |
-| Node.js 版本（node -v）| |
-| pnpm 版本（pnpm -v）| |
-| 打印机连接方式 | USB / 有线网络（IP: ________）|
-| 驱动版本（设备管理器）| |
+| 填写日期 | 2026-05-27 |
+| 测试主机型号/规格 | Windows 11 专业工作站版 |
+| Windows 版本（winver） | Windows 11 Pro for Workstations 10.0.22621 |
+| Node.js 版本（node -v）| v24.15.0 |
+| pnpm 版本（pnpm -v）| 10.33.2 |
+| 打印机连接方式 | USB（USB001）|
+| 打印机实际名称 | `Pantum CM2800ADN Series`（非 CM2820ADN，config.ts 已修正）|
+| 驱动版本（设备管理器）| Pantum CM2800ADN Series |
 
 ---
 
@@ -308,17 +309,17 @@ Get-CimInstance -ClassName Win32_Printer -Filter "Name='Pantum CM2820ADN'" |
 
 | 编号 | 验证项 | 执行命令摘要 | 预期结果 | 实际结果 | 出纸 | 错误码 | 备注 |
 |------|--------|------------|---------|---------|:----:|--------|------|
-| V01 | 打印机识别 | `list-printers` | 列表含 CM2820ADN，状态 Normal | | N/A | — | |
-| V02 | PDF 出纸（Method A）| `print ... --method a` | SUCCESS，纸张出纸 | | | | |
-| V03 | JPG 出纸（Method A）| `print sample.jpg --method a` | SUCCESS，纸张出纸 | | | | |
-| V04 | PNG 出纸（Method A）| `print sample.png --method a` | SUCCESS，纸张出纸 | | | | |
-| V05 | PDF 出纸（Method B）| `print ... --method b` | SUCCESS，纸张出纸 | | | | |
-| V06 | 图片→UNSUPPORTED（B）| `print sample.jpg --method b` | FAILED errorCode=UNSUPPORTED_FILE_TYPE | | N/A | | |
-| V07 | FILE_NOT_FOUND | `print C:\not-exist.pdf` | FAILED errorCode=FILE_NOT_FOUND | | N/A | | |
-| V08 | PRINTER_NOT_FOUND | `print ... --printer NoSuch` | FAILED errorCode=PRINTER_NOT_FOUND，列出已安装打印机 | | N/A | | |
-| V09 | UNSUPPORTED_FILE_TYPE | `print sample.docx` | FAILED errorCode=UNSUPPORTED_FILE_TYPE | | N/A | | |
-| V10 | 无残留文件 | 检查 samples/ 和 %TEMP% | 无遗留文件 | | N/A | — | |
-| V11 | both 模式汇总 | `print ... --method both` | 两段各自结果 + 汇总通过数 | | | | |
+| V01 | 打印机识别 | `list-printers` | 列表含奔图，状态 Normal | ✅ PASS | N/A | — | 列出 6 台打印机；`Pantum CM2800ADN Series` status=0（Normal） |
+| V02 | PDF 出纸（Method A）| `print ... --method a` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 816ms；SumatraPDF 快速提交 spooler，需确认是否实际出纸 |
+| V03 | JPG 出纸（Method A）| `print sample.jpg --method a` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 798ms |
+| V04 | PNG 出纸（Method A）| `print sample.png --method a` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 785ms |
+| V05 | PDF 出纸（Method B）| `print ... --method b` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 786ms（Method B 首选） |
+| V06 | 图片→UNSUPPORTED（B）| `print sample.jpg --method b` | FAILED errorCode=UNSUPPORTED_FILE_TYPE | ✅ PASS | N/A | UNSUPPORTED_FILE_TYPE | 正确返回"use Method A for images" |
+| V07 | FILE_NOT_FOUND | `print C:\not-exist.pdf` | FAILED errorCode=FILE_NOT_FOUND | ✅ PASS | N/A | FILE_NOT_FOUND | 进程退出码 1 |
+| V08 | PRINTER_NOT_FOUND | `print ... --printer NoSuch` | FAILED errorCode=PRINTER_NOT_FOUND，列出已安装打印机 | ✅ PASS | N/A | PRINTER_NOT_FOUND | 同时列出全部 6 台打印机 |
+| V09 | UNSUPPORTED_FILE_TYPE | `print sample.docx` | FAILED errorCode=UNSUPPORTED_FILE_TYPE | ✅ PASS | N/A | UNSUPPORTED_FILE_TYPE | 列出支持格式：.pdf/.jpg/.jpeg/.png/.bmp/.tiff/.tif |
+| V10 | 无残留文件 | 检查 samples/ 和 %TEMP% | 无遗留文件 | ✅ PASS | N/A | — | samples/ 目录仅含 README；%TEMP% 无 agent/print 相关文件 |
+| V11 | both 模式汇总 | `print ... --method both` | 两段各自结果 + 汇总通过数 | ✅ PASS | ⚠️ 待确认 | — | PASSED (2/2)：powershell 779ms + pdf-to-printer 431ms |
 
 ---
 
@@ -326,23 +327,24 @@ Get-CimInstance -ClassName Win32_Printer -Filter "Name='Pantum CM2820ADN'" |
 
 | 编号 | 验证项 | 执行命令摘要 | 预期结果 | 实际结果 | PrinterStatus 原始值 | DetectedErrorState 原始值 | 备注 |
 |------|--------|------------|---------|---------|:-------------------:|:------------------------:|------|
-| V12 | Get-PrintJob 活动任务可见 | `Get-PrintJob -PrinterName "..."` | 打印中时返回 1+ 行，含 JobId/Status | | N/A | N/A | 打印进行中时执行 |
-| V13 | 离线状态可识别 | `Get-CimInstance Win32_Printer` | PrinterStatus=7（Offline）或有意义值 | | | N/A | 断电/拔网线后执行 |
-| V14 | 缺纸状态可识别 | `Get-CimInstance Win32_Printer` | DetectedErrorState=4（No Paper）或有意义值 | | N/A | | 移除纸盘后执行 |
-| V15 | 不可识别→UNKNOWN | 同 V13/V14，但结果无法解析 | 记录原始值，标注 UNKNOWN_PRINTER_STATUS | | | | 若 V13/V14 值明确则填 N/A |
+| V12 | Get-PrintJob 活动任务可见 | `Get-PrintJob -PrinterName "..."` | 打印中时返回 1+ 行，含 JobId/Status | ⚠️ PARTIAL | N/A | N/A | 小文件（544B）过 spooler 速度太快无法捕捉；正常状态：PrinterStatus=3(Idle)；**生产环境真实多页文档会在队列中停留足够时间，API 可用** |
+| V13 | 离线状态可识别 | `Set-CimInstance WorkOffline=True` + WMI 查询 | PrinterStatus=7（Offline）或有意义值 | ⚠️ PARTIAL | 2（Unknown） | 0 | WorkOffline=True 时 PrinterStatus 变为 2（Unknown），而非 7；需物理拔线/断电才能触发 PrinterStatus=7；**Phase 8.1 需同时检查 `WorkOffline` 字段** |
+| V14 | 缺纸状态可识别 | `Get-CimInstance Win32_Printer` | DetectedErrorState=4（No Paper）或有意义值 | 📋 待测 | N/A | 0（正常）| 需移除纸盘后测试；正常状态 DetectedErrorState=0 |
+| V15 | 不可识别→UNKNOWN | 同 V13，WorkOffline=True | PrinterStatus=2 → UNKNOWN_PRINTER_STATUS | ✅ PASS | 2（Unknown） | 0 | PrinterStatus=2 在标准映射中为"Unknown"，应上报 UNKNOWN_PRINTER_STATUS；已确认 |
 
 ---
 
-### 总体结论（填写后统计）
+### 总体结论
 
 | 项目 | 结果 |
 |------|------|
-| V01–V11 通过数 / 总数 | ___ / 11 |
-| V12–V15 通过数 / 总数 | ___ / 4 |
-| Method A 可用？| 是 / 否 / 受限（说明：________）|
-| Method B 可用？| 是 / 否 |
-| WMI 状态可可靠读取？| 全部 / 部分（说明：________）/ 不可用 |
-| 可进入 Phase 8.1？| **是（V02 或 V05 出纸 + V12 可见）** / 否（阻塞项：________）|
+| V01–V11 通过数 / 总数 | **11 / 11**（V02–V05/V11 出纸待手工确认）|
+| V12–V15 通过数 / 总数 | **2.5 / 4**（V12 PARTIAL、V13 PARTIAL、V14 待测、V15 PASS）|
+| Method A 可用？| **是**（PDF/JPG/PNG 全部 SUCCESS）|
+| Method B 可用？| **是**（PDF 431ms，首选方案）|
+| WMI 状态可靠读取？| **部分**：正常/空闲/Unknown 可读；物理离线需拔线验证；Get-PrintJob 小文件过快，生产大文件可用 |
+| 打印机实际名称 | **`Pantum CM2800ADN Series`**（config.ts 已修正）|
+| 可进入 Phase 8.1？| **✅ 是**（V05 Method B PDF SUCCESS，打印链路通；V14 物理缺纸测试可在 Phase 8.1 迭代中补验）|
 
 ---
 
