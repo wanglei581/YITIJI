@@ -80,14 +80,25 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：第 0 阶段（项目初始化）已完成，准备进入第 1 阶段（设计系统）。
+当前阶段：Phase 8 — Windows Terminal Agent（打印链路实现）
+
+- Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
+- Phase 8.0 Spike 代码完成；Phase 8.0.1 物理出纸确认（QA-1~QA-4）**待 Windows 主机实机执行**
+- Phase 8.1 MVP 在出纸确认通过后启动
 
 ---
 
 ## 硬件
 
-打印机：奔图 Pantum CM2820ADN（A4、彩色激光、双面、ADF 50页、有线网络）  
-详见：[docs/device/pantum-cm2820adn.md](docs/device/pantum-cm2820adn.md)
+**打印机：奔图 CM2800/CM2820 系列彩色激光多功能一体机**
+
+- Windows 驱动识别名称（真机确认）：`Pantum CM2800ADN Series`
+- **代码中必须通过 `printerName` 配置项指定，禁止硬编码任何型号字符串**
+- 硬件支持彩色打印；但奔图开放打印 API 的彩色 mode 取值 **TODO**（待厂家确认，不得假设为 `"color"`）
+
+详见：[docs/device/pantum-cm2820adn.md](docs/device/pantum-cm2820adn.md)  
+Agent 设计：[docs/device/windows-terminal-agent-design.md](docs/device/windows-terminal-agent-design.md)  
+奔图 API 规范（预留）：[docs/device/pantum-api-design.md](docs/device/pantum-api-design.md)
 
 ---
 
