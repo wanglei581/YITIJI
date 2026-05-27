@@ -310,16 +310,16 @@ Get-CimInstance -ClassName Win32_Printer -Filter "Name='Pantum CM2820ADN'" |
 | 编号 | 验证项 | 执行命令摘要 | 预期结果 | 实际结果 | 出纸 | 错误码 | 备注 |
 |------|--------|------------|---------|---------|:----:|--------|------|
 | V01 | 打印机识别 | `list-printers` | 列表含奔图，状态 Normal | ✅ PASS | N/A | — | 列出 6 台打印机；`Pantum CM2800ADN Series` status=0（Normal） |
-| V02 | PDF 出纸（Method A）| `print ... --method a` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 816ms；SumatraPDF 快速提交 spooler，需确认是否实际出纸 |
-| V03 | JPG 出纸（Method A）| `print sample.jpg --method a` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 798ms |
-| V04 | PNG 出纸（Method A）| `print sample.png --method a` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 785ms |
-| V05 | PDF 出纸（Method B）| `print ... --method b` | SUCCESS，纸张出纸 | ✅ PASS | ⚠️ 待确认 | — | SUCCESS 786ms（Method B 首选） |
+| V02 | PDF 出纸（Method A）| `print ... --method a` | SUCCESS，纸张出纸 | ✅ 命令成功 | ❓ 未实物确认 | — | SUCCESS 816ms；命令成功≠物理出纸；需目视纸张出纸后填写"已出纸/未出纸" |
+| V03 | JPG 出纸（Method A）| `print sample.jpg --method a` | SUCCESS，纸张出纸 | ✅ 命令成功 | ❓ 未实物确认 | — | SUCCESS 798ms；同上 |
+| V04 | PNG 出纸（Method A）| `print sample.png --method a` | SUCCESS，纸张出纸 | ✅ 命令成功 | ❓ 未实物确认 | — | SUCCESS 785ms；同上 |
+| V05 | PDF 出纸（Method B）| `print ... --method b` | SUCCESS，纸张出纸 | ✅ 命令成功 | ❓ 未实物确认 | — | SUCCESS 786ms（Method B 首选）；命令成功≠物理出纸 |
 | V06 | 图片→UNSUPPORTED（B）| `print sample.jpg --method b` | FAILED errorCode=UNSUPPORTED_FILE_TYPE | ✅ PASS | N/A | UNSUPPORTED_FILE_TYPE | 正确返回"use Method A for images" |
 | V07 | FILE_NOT_FOUND | `print C:\not-exist.pdf` | FAILED errorCode=FILE_NOT_FOUND | ✅ PASS | N/A | FILE_NOT_FOUND | 进程退出码 1 |
 | V08 | PRINTER_NOT_FOUND | `print ... --printer NoSuch` | FAILED errorCode=PRINTER_NOT_FOUND，列出已安装打印机 | ✅ PASS | N/A | PRINTER_NOT_FOUND | 同时列出全部 6 台打印机 |
 | V09 | UNSUPPORTED_FILE_TYPE | `print sample.docx` | FAILED errorCode=UNSUPPORTED_FILE_TYPE | ✅ PASS | N/A | UNSUPPORTED_FILE_TYPE | 列出支持格式：.pdf/.jpg/.jpeg/.png/.bmp/.tiff/.tif |
 | V10 | 无残留文件 | 检查 samples/ 和 %TEMP% | 无遗留文件 | ✅ PASS | N/A | — | samples/ 目录仅含 README；%TEMP% 无 agent/print 相关文件 |
-| V11 | both 模式汇总 | `print ... --method both` | 两段各自结果 + 汇总通过数 | ✅ PASS | ⚠️ 待确认 | — | PASSED (2/2)：powershell 779ms + pdf-to-printer 431ms |
+| V11 | both 模式汇总 | `print ... --method both` | 两段各自结果 + 汇总通过数 | ✅ 命令成功 | ❓ 未实物确认 | — | PASSED (2/2)：powershell 779ms + pdf-to-printer 431ms；⚠️ both 模式会出纸两张，仅验证用，不作生产默认 |
 
 ---
 
@@ -338,13 +338,120 @@ Get-CimInstance -ClassName Win32_Printer -Filter "Name='Pantum CM2820ADN'" |
 
 | 项目 | 结果 |
 |------|------|
-| V01–V11 通过数 / 总数 | **11 / 11**（V02–V05/V11 出纸待手工确认）|
+| V01–V11 命令层面通过数 | **11 / 11**（命令均返回 SUCCESS） |
+| V02–V05/V11 物理出纸确认 | **❓ 未确认**（见 Phase 8.0.1 收口章节）|
 | V12–V15 通过数 / 总数 | **2.5 / 4**（V12 PARTIAL、V13 PARTIAL、V14 待测、V15 PASS）|
-| Method A 可用？| **是**（PDF/JPG/PNG 全部 SUCCESS）|
-| Method B 可用？| **是**（PDF 431ms，首选方案）|
-| WMI 状态可靠读取？| **部分**：正常/空闲/Unknown 可读；物理离线需拔线验证；Get-PrintJob 小文件过快，生产大文件可用 |
-| 打印机实际名称 | **`Pantum CM2800ADN Series`**（config.ts 已修正）|
-| 可进入 Phase 8.1？| **✅ 是**（V05 Method B PDF SUCCESS，打印链路通；V14 物理缺纸测试可在 Phase 8.1 迭代中补验）|
+| Method A 命令可用？| **是**（PDF/JPG/PNG 均返回 SUCCESS） |
+| Method B 命令可用？| **是**（PDF 431ms，首选方案） |
+| WMI 状态可靠读取？| **部分**：正常/空闲/Unknown 可读；物理离线需拔线验证 |
+| 打印机实际名称 | **`Pantum CM2800ADN Series`**（config.ts 已修正，Phase 8.1 必须通过配置项传入）|
+| both 模式 | **仅验证用**，会出纸两张，不作生产默认方式 |
+| **可进入 Phase 8.1？** | **❌ 否 — 等待 Phase 8.0.1 物理出纸确认完成** |
+
+---
+
+## 4.1 Phase 8.0.1 出纸确认收口
+
+> **背景**：V02–V05 命令均返回 SUCCESS，但命令成功只代表文件已提交到 Windows 打印队列（spooler），  
+> 不代表打印机实际出纸。必须目视确认纸张从 `Pantum CM2800ADN Series` 物理出纸后，才能标注 PASS。
+
+---
+
+### 确认前提
+
+1. 打印机已开机、纸盘有纸、USB/网线已接好
+2. 打印机驱动名称为 `Pantum CM2800ADN Series`（通过 V01 已确认）
+3. Windows "打印机和扫描仪"中 `Pantum CM2800ADN Series` 为**默认打印机**或明确在命令中指定
+
+---
+
+### 待确认清单（在 Windows 主机逐项执行并填写）
+
+#### QA-1 — Method B 打印 PDF 是否真实出纸
+
+```powershell
+pnpm --filter terminal-agent print `
+  --file "C:\test\sample.pdf" `
+  --printer "Pantum CM2800ADN Series" `
+  --method b
+```
+
+| 确认项 | 填写 |
+|--------|------|
+| 命令输出是否 `✓ SUCCESS`？ | |
+| 打印机指示灯是否亮起/闪烁？ | |
+| 是否有纸张从 `Pantum CM2800ADN Series` 物理出纸？ | **已出纸 / 未出纸** |
+| 出纸是否打印在 `Pantum CM2800ADN Series`（非其他打印机）？ | |
+| 打印内容是否正确（非空白页、非乱码）？ | |
+| 是否弹出应用窗口或 SumatraPDF 卡住？ | |
+
+---
+
+#### QA-2 — Method A 打印 JPG 是否真实出纸
+
+```powershell
+pnpm --filter terminal-agent print `
+  --file "C:\test\sample.jpg" `
+  --printer "Pantum CM2800ADN Series" `
+  --method a
+```
+
+| 确认项 | 填写 |
+|--------|------|
+| 命令输出是否 `✓ SUCCESS`？ | |
+| 是否有纸张从 `Pantum CM2800ADN Series` 物理出纸？ | **已出纸 / 未出纸** |
+| 是否弹出 Windows 照片查看器或其他应用窗口？ | |
+| 应用窗口是否自动关闭（-Wait 依赖宿主进程退出）？ | |
+
+---
+
+#### QA-3 — Method A 打印 PNG 是否真实出纸
+
+```powershell
+pnpm --filter terminal-agent print `
+  --file "C:\test\sample.png" `
+  --printer "Pantum CM2800ADN Series" `
+  --method a
+```
+
+| 确认项 | 填写 |
+|--------|------|
+| 命令输出是否 `✓ SUCCESS`？ | |
+| 是否有纸张从 `Pantum CM2800ADN Series` 物理出纸？ | **已出纸 / 未出纸** |
+
+---
+
+#### QA-4 — 打印目标确认（防误打）
+
+执行任意上述命令后：
+- [ ] 打印队列（`Get-PrintJob -PrinterName "Pantum CM2800ADN Series"`）出现作业
+- [ ] 其他打印机无意外作业（检查 Windows 任务栏打印机图标）
+- [ ] 纸张不是从其他设备出纸（如果机器上安装了多台打印机）
+
+---
+
+### Phase 8.0.1 收口判定
+
+**进入 Phase 8.1 的最低条件（三项必须全部满足）**：
+
+| # | 条件 | 填写结果 | 是否满足 |
+|---|------|---------|---------|
+| 1 | QA-1：Method B 打印 PDF → `Pantum CM2800ADN Series` 实际出纸 | | ❌ 未确认 |
+| 2 | QA-2 或 QA-3：Method A 打印图片 → 实际出纸（至少一种图片格式）| | ❌ 未确认 |
+| 3 | QA-4：出纸打印机为 `Pantum CM2800ADN Series`，非其他默认打印机 | | ❌ 未确认 |
+
+> 条件 1+3 为硬性要求（PDF 是主要打印内容）。  
+> 条件 2 若图片打印触发了应用窗口且不自动关闭，则 Method A 图片打印列为已知限制，不阻塞 Phase 8.1，但须在 §5 中更新。
+
+---
+
+### 填写完成后操作
+
+1. 将上方三个确认表中每项"已出纸/未出纸"填写完整
+2. 更新 §4 V02–V05/V11 "出纸"列：将 `❓ 未实物确认` 改为 `已出纸` 或 `未出纸`
+3. 更新 §4.1 收口判定三项结果列
+4. 若三项全部满足：将 §4 总体结论"可进入 Phase 8.1？"改为 `✅ 是`
+5. 同步更新 `docs/progress/current-progress.md` Phase 8 行
 
 ---
 

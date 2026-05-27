@@ -80,7 +80,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | ✅ Phase 8.0 Spike + API/文档对齐完成；V01–V11 全部 PASS，V12 PARTIAL（小文件过快），V13 PARTIAL（WorkOffline→PrinterStatus=2），V14 待物理测试，V15 PASS；打印机名修正；**可进入 Phase 8.1** |
+| 第 8 阶段 | Windows Terminal Agent | 🔬 Phase 8.0 Spike + API/文档对齐完成；命令层 V01–V11 全部 SUCCESS；**Phase 8.0.1 物理出纸确认进行中**（V02–V05/V11 出纸未实物确认，both 模式出纸两张仅验证用）；V14 物理缺纸待测；进入 Phase 8.1 条件：QA-1/QA-2 or QA-3/QA-4 全部确认 |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---

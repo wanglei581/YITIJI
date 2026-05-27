@@ -12,7 +12,7 @@ const program = new Command()
 
 program
   .name('terminal-agent')
-  .description('Phase 8.0 local print spike — Pantum CM2820ADN')
+  .description('Phase 8.0 local print spike — configurable printer via --printer or DEFAULT_PRINTER in config.ts')
   .version('0.1.0')
 
 // ── list-printers ────────────────────────────────────────────────────────────
@@ -52,6 +52,10 @@ program
     log(`File    : ${file}`)
     log(`Printer : ${printer}`)
     log(`Method  : ${method}`)
+    if (method === 'both') {
+      warn('⚠️  both mode sends the file to the printer TWICE (once per method).')
+      warn('   Use only for spike verification. Do NOT use as default in production.')
+    }
 
     // ── Pre-flight checks ─────────────────────────────────────────────────
 
