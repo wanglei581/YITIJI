@@ -394,8 +394,8 @@
 | install-service：args→scriptOptions 修复 | ✅ |
 | **V8.1C-3 断网重试** | ✅ 2026-05-28 通过（pending_patches 注入 → 60s 自动重试 → 清空） |
 | **Windows 服务 reboot 自启动** | ✅ 2026-05-28 通过（重启后 STATE:4 RUNNING，心跳恢复，SQLite 幂等跳过已完成任务） |
-| actionToken HMAC | 代码待实现 |
-| lease 续租 | 代码待实现 |
+| actionToken HMAC | 后端 claim 响应 HMAC 签发已实现；local-api-server 消费校验后续实现 |
+| lease 续租 | 代码待实现；当前打印主链路未阻塞，长任务/扫描任务前补齐 |
 
 ---
 

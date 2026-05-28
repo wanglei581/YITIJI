@@ -133,12 +133,12 @@
 | TerminalsModule 注册 + AppModule 接入 | `terminals.module.ts` | ✅ |
 | typecheck 0 errors | — | ✅ |
 
-**Phase 8.1C/D 未做（Phase 8.2 分阶段补完）：**
-- Prisma 持久化（服务端任务状态落库）→ **Phase 8.2A**
-- printerStatus / diskFreeGB 真实 WMI 查询 → Phase 8.2B
-- actionToken HMAC 签名（当前 base64 占位）→ Phase 8.2C
-- lease 续租（`PATCH /terminal-tasks/:id/lease`）→ Phase 8.2C
-- 断网重试/单实例/服务安装专项真机验证 → Phase 8.2C
+**Phase 8.2 补完状态（从 Phase 8.1C/D 延续）：**
+- Prisma 持久化（服务端任务状态落库）→ Phase 8.2A 已完成
+- printerStatus / diskFreeGB 真实 WMI 查询 → Phase 8.2B 已完成；`diskFreeGB` 已落库到 `TerminalHeartbeat.diskFreeGb`
+- actionToken HMAC 签发 → 已在 claim 响应实现；local-api-server 消费校验后续补齐
+- lease 续租（`PATCH /terminal-tasks/:id/lease`）→ 未实现，长任务/扫描任务前补齐
+- 断网重试/单实例/服务安装专项真机验证 → Windows 已推进，通过结果以 `next-tasks.md` 最新记录为准
 
 ---
 
@@ -205,7 +205,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` ✅ 已完成，0 vulnerabilities |
-| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.1D E2E 打印链路封板✅（2026-05-28）；DPAPI/SQLite/PID 锁/断网重试/服务安装代码完成；**当前：Phase 8.2A Prisma 持久化** 🚧 |
+| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.2C 主线完成；Prisma 持久化、WMI 心跳、断网重试、单实例、Windows 服务验证均已推进；actionToken 签发已实现，local-api-server 校验/lease 续租后续补齐 |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---

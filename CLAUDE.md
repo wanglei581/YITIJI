@@ -185,7 +185,21 @@ ai-job-print-terminal/
     exported-code/
 ```
 
-## 7. 页面风格要求
+## 7. 跨模型接力规则
+
+不要新增独立的 handoff / 交接记录文件。本项目的进度、需求和合规边界只写入现有正式文档，避免 Claude、Codex、Mavis 或 Windows 端读取到互相矛盾的临时文档。
+
+每次换设备、换模型或恢复上下文时，先读取：
+
+1. `CLAUDE.md` 或 `AGENTS.md`
+2. `docs/progress/current-progress.md`
+3. `docs/progress/next-tasks.md`
+4. `docs/product/feature-scope.md`
+5. `docs/compliance/compliance-boundary.md`
+
+聊天记录、截图、临时总结只能作为辅助背景，不作为需求来源。若文档状态和代码实现不一致，先执行审查与验证，更新正式进度文档后再继续开发。
+
+## 8. 页面风格要求
 
 整体风格：
 
@@ -229,7 +243,7 @@ ai-job-print-terminal/
 - 上传、同步、审核、外部链接管理
 - 不做企业招聘端视觉
 
-## 8. 设计系统要求
+## 9. 设计系统要求
 
 开发前先建立 design system，不要直接写页面。
 

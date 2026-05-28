@@ -75,6 +75,22 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 
 ---
 
+## 跨模型接力规则
+
+本项目不新增独立的 handoff / 交接记录文件，避免多模型读取时把临时记录误当成正式需求。
+
+任意模型、任意设备接手前，必须先读取以下正式入口文档：
+
+1. `AGENTS.md` 或 `CLAUDE.md`
+2. `docs/progress/current-progress.md`
+3. `docs/progress/next-tasks.md`
+4. `docs/product/feature-scope.md`
+5. `docs/compliance/compliance-boundary.md`
+
+聊天记录、截图、临时总结只能作为辅助背景，不是项目事实来源。若文档之间存在冲突，以当前 Git 最新提交、`current-progress.md` 的当前阶段、以及实际代码验证结果为准；无法判断时先做审查报告，不直接写功能代码。
+
+---
+
 ## 当前进度
 
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
@@ -88,7 +104,7 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 - Phase 8.1C/D 已封板（2026-05-28）：DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务；Windows 真机 E2E 全链路通过（783ms 出纸）✅
 - 图片打印路径：pdfkit 临时 PDF → Method B（pdf-to-printer/SumatraPDF）
 - 命令：`node dist/index.js agent` / `install-service` / `uninstall-service`
-- **下一步**：Phase 8.2（Prisma 持久化/actionToken HMAC/printerStatus WMI）或 Phase 9 UI Polish
+- **下一步**：先完成 Phase 8.2C 剩余验证/文档收口；Mac 侧优先 Phase 7.11 类型清债，Phase 9 UI Polish 等 Phase 8.2C 正式封板后启动
 
 ---
 

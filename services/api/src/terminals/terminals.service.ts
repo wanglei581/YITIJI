@@ -187,7 +187,12 @@ export class TerminalsService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit(): Promise<void> {
-    await this.seedPrintTask()
+    // Only seed test data in non-production environments.
+    // In production this would reset ptask_seed_001 to pending on every deploy,
+    // triggering a real print job on the connected kiosk.
+    if (process.env['NODE_ENV'] !== 'production') {
+      await this.seedPrintTask()
+    }
 
     // Periodically reset expired claims (every 30s)
     const timer = setInterval(() => void this.resetExpiredClaims(), 30_000)
@@ -241,6 +246,7 @@ export class TerminalsService implements OnModuleInit {
       data: {
         terminalId,
         printerStatus: dto.printerStatus ?? null,
+        diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
       },

@@ -21,7 +21,7 @@ datasource db {
 model Terminal {
   id                String   @id
   terminalCode      String   @unique
-  agentToken        String
+  agentToken        String   @unique
   deviceFingerprint String
   registeredAt      DateTime @default(now())
   lastSeenAt        DateTime @updatedAt
