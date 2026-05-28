@@ -46,10 +46,7 @@ const PS_PROTECT = [
   'Add-Type -AssemblyName System.Security',
   '$token = [Console]::In.ReadLine()',
   '$bytes = [System.Text.Encoding]::UTF8.GetBytes($token)',
-  '$encrypted = [System.Security.Cryptography.ProtectedData]::Protect(',
-  '  $bytes, $null,',
-  '  [System.Security.Cryptography.DataProtectionScope]::LocalMachine',
-  ')',
+  '$encrypted = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, [System.Security.Cryptography.DataProtectionScope]::LocalMachine)',
   'Write-Output ([Convert]::ToBase64String($encrypted))',
 ].join('; ')
 
@@ -61,10 +58,7 @@ const PS_UNPROTECT = [
   'Add-Type -AssemblyName System.Security',
   '$b64 = [Console]::In.ReadLine()',
   '$encrypted = [Convert]::FromBase64String($b64)',
-  '$decrypted = [System.Security.Cryptography.ProtectedData]::Unprotect(',
-  '  $encrypted, $null,',
-  '  [System.Security.Cryptography.DataProtectionScope]::LocalMachine',
-  ')',
+  '$decrypted = [System.Security.Cryptography.ProtectedData]::Unprotect($encrypted, $null, [System.Security.Cryptography.DataProtectionScope]::LocalMachine)',
   'Write-Output ([System.Text.Encoding]::UTF8.GetString($decrypted))',
 ].join('; ')
 
