@@ -2,6 +2,9 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'services/*'
+overrides:
+  '@hono/node-server': 1.19.13
+  qs: 6.15.2
 allowBuilds:
   '@nestjs/core': true
   '@prisma/engines': true

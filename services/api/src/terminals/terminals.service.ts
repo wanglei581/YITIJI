@@ -146,8 +146,37 @@ export const SAMPLE_VISIBLE_PDF_MD5 = crypto
 
 // ── Admin secret ──────────────────────────────────────────────────────────────
 
-const ADMIN_SECRET =
-  process.env['TERMINAL_ADMIN_SECRET'] ?? 'change-me-before-deploy'
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`${name} environment variable is required`)
+  }
+  return value
+}
+
+const ADMIN_SECRET = requireEnv('TERMINAL_ADMIN_SECRET')
+const ACTION_TOKEN_SECRET = requireEnv('TERMINAL_ACTION_TOKEN_SECRET')
+
+function base64UrlJson(value: unknown): string {
+  return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+}
+
+function createActionToken(taskId: string, terminalId: string, expiresAt: Date): string {
+  const payload = {
+    taskId,
+    terminalId,
+    action: 'print',
+    expiresAt: expiresAt.toISOString(),
+    nonce: crypto.randomBytes(16).toString('hex'),
+  }
+  const encodedPayload = base64UrlJson(payload)
+  const signature = crypto
+    .createHmac('sha256', ACTION_TOKEN_SECRET)
+    .update(encodedPayload)
+    .digest('base64url')
+
+  return `${encodedPayload}.${signature}`
+}
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
@@ -262,7 +291,7 @@ export class TerminalsService implements OnModuleInit {
         type: 'print',
         fileUrl: claimed.fileUrl,
         fileMd5: claimed.fileMd5,
-        actionToken: Buffer.from(`${claimed.id}:${terminalId}`).toString('base64'),
+        actionToken: createActionToken(claimed.id, terminalId, claimExpiry),
         claimedBy: terminalId,
         claimExpiresAt: claimExpiry.toISOString(),
         params,

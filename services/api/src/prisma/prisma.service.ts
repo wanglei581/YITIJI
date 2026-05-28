@@ -35,7 +35,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     await this.client.$connect()
-    this.logger.log(`DB connected — ${process.env['DATABASE_URL']}`)
+    // Do not log credentials embedded in DATABASE_URL.
+    const safeUrl = (process.env['DATABASE_URL'] ?? '').replace(
+      /\/\/[^:]+:[^@]+@/,
+      '//<redacted>@',
+    )
+    this.logger.log(`DB connected — ${safeUrl}`)
   }
 
   async onModuleDestroy(): Promise<void> {
