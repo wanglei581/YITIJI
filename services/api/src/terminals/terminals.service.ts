@@ -272,8 +272,11 @@ export class TerminalsService implements OnModuleInit {
         })
         if (!task) return null
 
+        // status guard in WHERE prevents double-claim under concurrent requests
+        // (PostgreSQL READ COMMITTED: two transactions could both see the same
+        // pending task in findFirst; the guard ensures only one update wins)
         return tx.printTask.update({
-          where: { id: task.id },
+          where: { id: task.id, status: 'pending' },
           data: {
             status: 'claimed',
             terminalId,
@@ -312,35 +315,54 @@ export class TerminalsService implements OnModuleInit {
   ): Promise<{ acknowledged: true }> {
     await this.validateAnyTerminalToken(authHeader, terminalIdHeader)
 
-    const task = await this.prisma.printTask.findUnique({ where: { id: taskId } })
-    if (!task) {
+    // Ownership check: verify the terminal making the request owns this task
+    const terminalId = terminalIdHeader
+    if (terminalId) {
+      const task = await this.prisma.printTask.findUnique({ where: { id: taskId } })
+      if (task && task.terminalId && task.terminalId !== terminalId) {
+        throw new BadRequestException({
+          error: {
+            code: 'TASK_NOT_OWNED',
+            message: `任务 ${taskId} 不属于终端 ${terminalId}`,
+          },
+        })
+      }
+    }
+
+    // Pre-flight: check task exists (optimistic read outside transaction is fine
+    // here — the transaction below re-validates with a status guard in WHERE)
+    const preCheck = await this.prisma.printTask.findUnique({ where: { id: taskId } })
+    if (!preCheck) {
       throw new NotFoundException({
         error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
       })
     }
 
-    // Terminal states: idempotent, no DB write
-    if (TERMINAL_STATES.includes(task.status as TaskStatus)) {
+    // Terminal states: idempotent — return early without touching DB
+    if (TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
       return { acknowledged: true }
     }
 
-    // State machine validation
-    const allowed = VALID_TRANSITIONS[task.status]
+    // Validate the requested transition is legal from the current status
+    const allowed = VALID_TRANSITIONS[preCheck.status]
     if (!allowed || !allowed.includes(dto.status as TaskStatus)) {
       throw new BadRequestException({
         error: {
           code: 'INVALID_STATUS_TRANSITION',
-          message: `任务当前状态 ${task.status} 不允许转换为 ${dto.status}`,
+          message: `任务当前状态 ${preCheck.status} 不允许转换为 ${dto.status}`,
         },
       })
     }
 
     const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
 
+    // Transaction with a status guard in WHERE to prevent time-of-check races:
+    // if a concurrent request already changed the status, the update matches
+    // 0 rows (Prisma throws P2025) — we catch that and return idempotent ack.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma.$transaction as any)(async (tx: any) => {
-      await tx.printTask.update({
-        where: { id: taskId },
+      const updated = await tx.printTask.updateMany({
+        where: { id: taskId, status: preCheck.status },
         data: {
           status: dto.status,
           errorCode: dto.errorCode ?? null,
@@ -348,14 +370,17 @@ export class TerminalsService implements OnModuleInit {
           completedAt: isTerminal ? new Date() : null,
         },
       })
-      await tx.printTaskStatusLog.create({
-        data: {
-          taskId,
-          fromStatus: task.status,
-          toStatus: dto.status,
-          errorCode: dto.errorCode ?? null,
-        },
-      })
+      // If another request won the race, skip the log (0 rows updated)
+      if (updated.count > 0) {
+        await tx.printTaskStatusLog.create({
+          data: {
+            taskId,
+            fromStatus: preCheck.status,
+            toStatus: dto.status,
+            errorCode: dto.errorCode ?? null,
+          },
+        })
+      }
     })
 
     return { acknowledged: true }
@@ -405,27 +430,46 @@ export class TerminalsService implements OnModuleInit {
   }
 
   private async resetExpiredClaims(): Promise<void> {
-    const count = await this.prisma.printTask.updateMany({
-      where: {
-        status: 'claimed',
-        claimExpiry: { lt: new Date() },
-      },
-      data: {
-        status: 'pending',
-        terminalId: null,
-        claimedAt: null,
-        claimExpiry: null,
-      },
+    const now = new Date()
+
+    // Reset claimed tasks whose lease has expired
+    const claimedCount = await this.prisma.printTask.updateMany({
+      where: { status: 'claimed', claimExpiry: { lt: now } },
+      data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
     })
-    if (count.count > 0) {
-      this.logger.log(`resetExpiredClaims: reset ${count.count} task(s) to pending`)
+
+    // Reset printing tasks stuck for more than 10 minutes (agent crash recovery).
+    // claimedAt is the best proxy — a task transitions from claimed to printing
+    // shortly after being claimed, so claimedAt is a conservative lower bound.
+    const printingTimeout = new Date(now.getTime() - 10 * 60 * 1000)
+    const printingCount = await this.prisma.printTask.updateMany({
+      where: { status: 'printing', claimedAt: { lt: printingTimeout } },
+      data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
+    })
+
+    const total = claimedCount.count + printingCount.count
+    if (total > 0) {
+      this.logger.log(
+        `resetExpiredClaims: reset ${claimedCount.count} claimed + ${printingCount.count} stuck-printing task(s) to pending`,
+      )
     }
   }
 
   private async seedPrintTask(): Promise<void> {
+    // On restart, reset the seed task to pending so it can be claimed again
+    // for end-to-end testing. update:{} would leave a completed/failed task
+    // permanently un-claimable — reset status explicitly instead.
     await this.prisma.printTask.upsert({
       where: { id: 'ptask_seed_001' },
-      update: {},
+      update: {
+        status: 'pending',
+        terminalId: null,
+        claimedAt: null,
+        claimExpiry: null,
+        completedAt: null,
+        errorCode: null,
+        errorMessage: null,
+      },
       create: {
         id: 'ptask_seed_001',
         fileUrl: '/api/v1/test/sample-visible.pdf',
@@ -434,7 +478,7 @@ export class TerminalsService implements OnModuleInit {
         status: 'pending',
       },
     })
-    this.logger.log('seedPrintTask: ptask_seed_001 upserted')
+    this.logger.log('seedPrintTask: ptask_seed_001 reset to pending')
   }
 
   private parseParams(json: string): PrintJobParams {

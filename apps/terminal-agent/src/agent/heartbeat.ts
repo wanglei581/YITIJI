@@ -67,8 +67,10 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
-  const printerStatus = getPrinterStatus(config.printerName)
-  const diskFreeGB = getDiskFreeGB()
+  const [printerStatus, diskFreeGB] = await Promise.all([
+    getPrinterStatus(config.printerName),
+    getDiskFreeGB(),
+  ])
 
   const payload: HeartbeatPayload = {
     status: 'online',

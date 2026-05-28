@@ -217,8 +217,19 @@ async function executeTask(
     // ── Step 5+6: Record outcome + PATCH terminal status ──────────────────
     if (result.success) {
       log(`task ${task.taskId}: print success in ${result.durationMs}ms ✓`)
-      // Write to local DB BEFORE PATCH — crash between here and PATCH → queued retry, no reprint
-      markTaskDone(db, task.taskId, 'completed')
+      // Write to local DB BEFORE PATCH — crash between here and PATCH → queued retry, no reprint.
+      // Wrapped in try/catch: if DB write fails (disk full / I/O error) we still
+      // send the PATCH so the backend reflects the real outcome, and log a warning
+      // that the task may be re-printed after restart.
+      try {
+        markTaskDone(db, task.taskId, 'completed')
+      } catch (dbErr) {
+        err(
+          `task ${task.taskId}: failed to record completed in local DB — ` +
+            `${dbErr instanceof Error ? dbErr.message : String(dbErr)}; ` +
+            `task may be re-printed after restart`,
+        )
+      }
       const ok = await patch('completed')
       if (!ok) {
         enqueuePatch(db, task.taskId, { status: 'completed' })
@@ -228,7 +239,14 @@ async function executeTask(
         `task ${task.taskId}: print failed — errorCode=${result.errorCode ?? 'UNKNOWN'}` +
           `  msg=${result.errorMessage ?? ''}`,
       )
-      markTaskDone(db, task.taskId, 'failed')
+      try {
+        markTaskDone(db, task.taskId, 'failed')
+      } catch (dbErr) {
+        err(
+          `task ${task.taskId}: failed to record failed in local DB — ` +
+            `${dbErr instanceof Error ? dbErr.message : String(dbErr)}`,
+        )
+      }
       const ok = await patch(
         'failed',
         result.errorCode ?? 'PRINT_COMMAND_FAILED',

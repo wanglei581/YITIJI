@@ -25,7 +25,7 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.2A — Prisma 持久化任务闭环（2026-05-28）**
+**当前阶段：Phase 8.2C — Prisma持久化 + HMAC actionToken + WMI心跳 + 安全加固（2026-05-28）**
 
 ---
 
@@ -189,7 +189,7 @@
 | 第 4 阶段 | 岗位和招聘会信息 | ✅ 完成 |
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
-| 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
+| 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` ✅ 已完成，0 vulnerabilities |
 | 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.1D E2E 打印链路封板✅（2026-05-28）；DPAPI/SQLite/PID 锁/断网重试/服务安装代码完成；**当前：Phase 8.2A Prisma 持久化** 🚧 |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 

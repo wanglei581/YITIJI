@@ -266,7 +266,7 @@
 | 真实 Provider（OpenAI/Claude/Qwen/Zhipu） | 配置 API Key 后替换 stub |
 | Provider 切换 UI | Admin 界面配置，不含 Key 明文 |
 | 用量告警配置 | 日调用量超限触发告警 |
-| `pnpm audit` 补跑 | 网络可用时执行，当前因网络失败未完成 |
+| `pnpm audit` 补跑 | ✅ 已完成，0 vulnerabilities |
 
 ---
 
@@ -407,7 +407,7 @@
 ### pnpm audit 补跑（网络可用时）
 
 ```bash
-pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
+pnpm audit   # ✅ 已完成，0 vulnerabilities
 ```
 
 ---

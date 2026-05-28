@@ -53,16 +53,36 @@ export function acquireLock(): void {
       let processAlive = false
       try {
         process.kill(existingPid, 0)
-        // No error → process exists
+        // No error → process is running
         processAlive = true
       } catch (e: unknown) {
         const nodeErr = e as NodeJS.ErrnoException
         if (nodeErr.code === 'ESRCH') {
-          // Process does not exist → stale lock, safe to take over
+          // POSIX: process does not exist → stale lock, safe to take over
           log(`instance-lock: stale lock detected (pid=${existingPid} is gone), taking over`)
           processAlive = false
+        } else if (nodeErr.code === 'EPERM') {
+          // EPERM is ambiguous on Windows: it can mean the PID belongs to a
+          // privileged process (stale, recycled PID) OR the process is alive.
+          // Use PID file mtime as a secondary signal: if the file is older than
+          // 5 minutes and the current process just started, it is almost
+          // certainly stale. For safety, default to alive if file is recent.
+          try {
+            const stat = fs.statSync(pidFile)
+            const ageMs = Date.now() - stat.mtimeMs
+            if (ageMs > 5 * 60 * 1000) {
+              log(
+                `instance-lock: EPERM on pid=${existingPid} but lock file is ${Math.round(ageMs / 1000)}s old — treating as stale, taking over`,
+              )
+              processAlive = false
+            } else {
+              processAlive = true
+            }
+          } catch {
+            processAlive = true
+          }
         } else {
-          // EPERM or any other error → assume process is alive
+          // Unknown error code → assume alive to be safe
           processAlive = true
         }
       }
