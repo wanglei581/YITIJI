@@ -1,59 +1,48 @@
 // ============================================================
-// Terminals Service — Phase 8.1B
+// Terminals Service — Phase 8.2A
 //
-// In-memory store (placeholder until Prisma persistence in Phase 8.1C+).
-// Provides the four endpoints the Terminal Agent calls:
+// Migrated from in-memory store to Prisma + SQLite/PostgreSQL.
+// Endpoints:
 //   1. register        — POST /auth/terminal/register
 //   2. heartbeat       — PUT  /terminals/:terminalId/heartbeat
 //   3. claimTasks      — POST /terminals/:terminalId/tasks/claim
 //   4. patchTaskStatus — PATCH /print-tasks/:taskId/status
 //
-// Security notes (Phase 8.1B simplifications):
-//   - agentToken stored plain text in memory. Phase 8.1C: DB + DPAPI on Agent.
-//   - actionToken = base64(taskId:terminalId), no HMAC. Phase 8.1C: HMAC-SHA256.
-//   - TERMINAL_ADMIN_SECRET defaults to 'change-me-before-deploy' for local dev.
-//   - Token never logged; only first 8 chars echoed for debug.
+// Key invariants:
+//   - claim uses $transaction for atomic pending→claimed transition
+//   - completed/failed are terminal states: PATCH is idempotent, DB not rewritten
+//   - seed task uses upsert so API restart never duplicates it
+//   - All timestamps are ISO-8601 strings at the API boundary
 // ============================================================
 
 import crypto from 'crypto'
 import {
   Injectable,
+  OnModuleInit,
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common'
+import { PrismaService } from '../prisma/prisma.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function nowIso(): string {
-  return new Date().toISOString()
-}
-
-// ── Internal types ───────────────────────────────────────────────────────────
-
-interface TerminalRecord {
-  terminalId: string
-  terminalCode: string
-  agentToken: string
-  deviceFingerprint: string
-  status: 'online' | 'offline'
-  printerStatus: string
-  agentVersion: string
-  ipAddress: string
-  lastHeartbeatAt?: string
-  registeredAt: string
-}
+// ── Task status type ──────────────────────────────────────────────────────────
 
 type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
 
-/**
- * PrintJobParams (inline mirror of packages/shared — avoids ESM/CJS issues).
- * Keep in sync with packages/shared/src/types/print.ts.
- */
+const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed']
+
+const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
+  claimed: ['printing'],
+  printing: ['completed', 'failed'],
+}
+
+// ── PrintJobParams ────────────────────────────────────────────────────────────
+
 interface PrintJobParams {
   copies: number
   colorMode: 'black_white' | 'color'
@@ -66,31 +55,24 @@ interface PrintJobParams {
   pageRange?: string
 }
 
-interface PrintTaskRecord {
-  taskId: string
-  status: TaskStatus
-  fileUrl: string
-  fileMd5: string
-  claimedBy?: string
-  claimExpiresAt?: string
-  errorCode?: string
-  errorMessage?: string
-  params: PrintJobParams
-  createdAt: string
-  updatedAt: string
+const DEFAULT_PARAMS: PrintJobParams = {
+  copies: 1,
+  colorMode: 'black_white',
+  duplex: 'simplex',
+  paperSize: 'A4',
+  orientation: 'auto',
+  quality: 'standard',
+  scale: 'fit',
+  pagesPerSheet: 1,
 }
 
-// ── ClaimTask response shape (matches Agent-side ClaimTask type) ─────────────
+// ── ClaimTask response (matches Agent-side ClaimTask type) ────────────────────
 
 export interface ClaimTaskResponse {
   taskId: string
   type: 'print'
   fileUrl: string
   fileMd5: string
-  /**
-   * Phase 8.1B: base64(taskId:terminalId) — no cryptographic signature.
-   * Phase 8.1C: HMAC-SHA256 signed JWT with action/taskId/terminalId/expiresAt/nonce.
-   */
   actionToken: string
   claimedBy: string
   claimExpiresAt: string
@@ -98,9 +80,7 @@ export interface ClaimTaskResponse {
   createdAt: string
 }
 
-// ── Test file (1×1 white PNG, 67 bytes) ─────────────────────────────────────
-// pdfkit natively supports PNG → Agent routes via pdfkit → Method B → real paper.
-// MD5 is computed from the same buffer so it always matches.
+// ── Sample files ──────────────────────────────────────────────────────────────
 
 export const SAMPLE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg==',
@@ -123,11 +103,11 @@ function createVisibleSamplePdf(): Buffer {
     '(AI Job Print Terminal) Tj',
     '0 -42 Td',
     '/F1 18 Tf',
-    '(Phase 8.1B visible end-to-end test) Tj',
+    '(Phase 8.2A Prisma persistence test) Tj',
     '0 -34 Td',
     '(Task: ptask_seed_001) Tj',
     '0 -34 Td',
-    '(If this page prints, download, MD5 and print worked.) Tj',
+    '(If this page prints, the full chain works.) Tj',
     'ET',
     '0.05 0.42 0.75 rg',
     '72 560 420 18 re f',
@@ -164,195 +144,159 @@ export const SAMPLE_VISIBLE_PDF_MD5 = crypto
   .update(SAMPLE_VISIBLE_PDF)
   .digest('hex')
 
-// ── Admin secret ─────────────────────────────────────────────────────────────
+// ── Admin secret ──────────────────────────────────────────────────────────────
 
 const ADMIN_SECRET =
   process.env['TERMINAL_ADMIN_SECRET'] ?? 'change-me-before-deploy'
 
-// ── Service ──────────────────────────────────────────────────────────────────
+// ── Service ───────────────────────────────────────────────────────────────────
 
 @Injectable()
-export class TerminalsService {
-  private readonly terminals: TerminalRecord[] = []
-  private readonly printTasks: PrintTaskRecord[] = []
+export class TerminalsService implements OnModuleInit {
+  private readonly logger = new Logger(TerminalsService.name)
 
-  constructor() {
-    // ── Seed a pending print task for local testing ─────────────────────────
-    this.printTasks.push({
-      taskId: 'ptask_seed_001',
-      status: 'pending',
-      fileUrl: '/api/v1/test/sample-visible.pdf',
-      fileMd5: SAMPLE_VISIBLE_PDF_MD5,
-      params: {
-        copies: 1,
-        colorMode: 'black_white',
-        duplex: 'simplex',
-        paperSize: 'A4',
-        orientation: 'auto',
-        quality: 'standard',
-        scale: 'fit',
-        pagesPerSheet: 1,
-      },
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    })
+  constructor(private readonly prisma: PrismaService) {}
 
-    // ── Periodically reset expired claims (every 30s) ───────────────────────
-    // Node.js is single-threaded; no lock needed.
-    const resetExpiredClaimsTimer = setInterval(() => {
-      const now = new Date()
-      for (const task of this.printTasks) {
-        if (
-          task.status === 'claimed' &&
-          task.claimExpiresAt &&
-          new Date(task.claimExpiresAt) < now
-        ) {
-          task.status = 'pending'
-          task.claimedBy = undefined
-          task.claimExpiresAt = undefined
-          task.updatedAt = now.toISOString()
-        }
-      }
-    }, 30_000)
-    resetExpiredClaimsTimer.unref()
+  async onModuleInit(): Promise<void> {
+    await this.seedPrintTask()
+
+    // Periodically reset expired claims (every 30s)
+    const timer = setInterval(() => void this.resetExpiredClaims(), 30_000)
+    timer.unref()
   }
 
-  // ── 1. Register ──────────────────────────────────────────────────────────
+  // ── 1. Register ─────────────────────────────────────────────────────────────
 
-  register(dto: RegisterTerminalDto): {
+  async register(dto: RegisterTerminalDto): Promise<{
     terminalId: string
     terminalToken: string
     expiresAt: string
-  } {
-    // Validate admin secret
+  }> {
     if (dto.adminSecret !== ADMIN_SECRET) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_INVALID_CREDENTIALS', message: 'adminSecret 无效' },
       })
     }
 
-    // If the same terminalCode already registered, return a new token
-    // (allows re-registration after restart without manual cleanup)
-    const existing = this.terminals.find((t) => t.terminalCode === dto.terminalCode)
     const agentToken = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
 
-    if (existing) {
-      existing.agentToken = agentToken
-      existing.deviceFingerprint = dto.deviceFingerprint
-      existing.status = 'online'
-      return {
-        terminalId: existing.terminalId,
-        terminalToken: agentToken,
-        expiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-      }
-    }
-
-    const terminalId = `t_${crypto.randomBytes(8).toString('hex')}`
-    this.terminals.push({
-      terminalId,
-      terminalCode: dto.terminalCode,
-      agentToken,
-      deviceFingerprint: dto.deviceFingerprint,
-      status: 'online',
-      printerStatus: 'unknown',
-      agentVersion: 'unknown',
-      ipAddress: 'unknown',
-      registeredAt: nowIso(),
+    const terminal = await this.prisma.terminal.upsert({
+      where: { terminalCode: dto.terminalCode },
+      update: {
+        agentToken,
+        deviceFingerprint: dto.deviceFingerprint,
+      },
+      create: {
+        id: `t_${crypto.randomBytes(8).toString('hex')}`,
+        terminalCode: dto.terminalCode,
+        agentToken,
+        deviceFingerprint: dto.deviceFingerprint,
+      },
     })
 
-    return {
-      terminalId,
-      terminalToken: agentToken,
-      expiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
-    }
+    this.logger.log(`register: terminalId=${terminal.id} code=${dto.terminalCode}`)
+    return { terminalId: terminal.id, terminalToken: agentToken, expiresAt }
   }
 
-  // ── 2. Heartbeat ─────────────────────────────────────────────────────────
+  // ── 2. Heartbeat ─────────────────────────────────────────────────────────────
 
-  heartbeat(
+  async heartbeat(
     terminalId: string,
     dto: HeartbeatDto,
     authHeader: string | undefined,
-  ): { acknowledged: true } {
-    const terminal = this.findAndValidate(terminalId, authHeader)
+  ): Promise<{ acknowledged: true }> {
+    await this.findAndValidate(terminalId, authHeader)
 
-    terminal.status = 'online'
-    terminal.printerStatus = dto.printerStatus ?? terminal.printerStatus
-    terminal.agentVersion = dto.agentVersion ?? terminal.agentVersion
-    terminal.ipAddress = dto.ipAddress ?? terminal.ipAddress
-    terminal.lastHeartbeatAt = nowIso()
+    await this.prisma.terminalHeartbeat.create({
+      data: {
+        terminalId,
+        printerStatus: dto.printerStatus ?? null,
+        agentVersion: dto.agentVersion ?? null,
+        ipAddress: dto.ipAddress ?? null,
+      },
+    })
 
     return { acknowledged: true }
   }
 
-  // ── 3. Claim tasks ───────────────────────────────────────────────────────
+  // ── 3. Claim tasks ───────────────────────────────────────────────────────────
 
-  claimTasks(
+  async claimTasks(
     terminalId: string,
     dto: ClaimTasksDto,
     authHeader: string | undefined,
-  ): ClaimTaskResponse[] {
-    this.findAndValidate(terminalId, authHeader)
+  ): Promise<ClaimTaskResponse[]> {
+    await this.findAndValidate(terminalId, authHeader)
 
-    const claimExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    const claimExpiry = new Date(Date.now() + 5 * 60 * 1000)
+    const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
+
     const results: ClaimTaskResponse[] = []
-    const limit = Math.min(dto.maxTasks, 1) // Phase 8.1B: max 1 per cycle
 
-    for (const task of this.printTasks) {
-      if (results.length >= limit) break
-      if (task.status !== 'pending') continue
+    // Atomic claim: find first pending task and claim it in a transaction
+    for (let i = 0; i < limit; i++) {
+      const claimed = await this.prisma.$transaction(async (tx) => {
+        const task = await tx.printTask.findFirst({
+          where: { status: 'pending' },
+          orderBy: { createdAt: 'asc' },
+        })
+        if (!task) return null
 
-      // Atomically claim (Node.js single-threaded — no race)
-      task.status = 'claimed'
-      task.claimedBy = terminalId
-      task.claimExpiresAt = claimExpiresAt
-      task.updatedAt = nowIso()
+        return tx.printTask.update({
+          where: { id: task.id },
+          data: {
+            status: 'claimed',
+            terminalId,
+            claimedAt: new Date(),
+            claimExpiry,
+          },
+        })
+      })
 
+      if (!claimed) break
+
+      const params = this.parseParams(claimed.paramsJson)
       results.push({
-        taskId: task.taskId,
+        taskId: claimed.id,
         type: 'print',
-        fileUrl: task.fileUrl,
-        fileMd5: task.fileMd5,
-        actionToken: Buffer.from(`${task.taskId}:${terminalId}`).toString('base64'),
+        fileUrl: claimed.fileUrl,
+        fileMd5: claimed.fileMd5,
+        actionToken: Buffer.from(`${claimed.id}:${terminalId}`).toString('base64'),
         claimedBy: terminalId,
-        claimExpiresAt,
-        params: task.params,
-        createdAt: task.createdAt,
+        claimExpiresAt: claimExpiry.toISOString(),
+        params,
+        createdAt: claimed.createdAt.toISOString(),
       })
     }
 
     return results
   }
 
-  // ── 4. Patch task status ─────────────────────────────────────────────────
+  // ── 4. Patch task status ─────────────────────────────────────────────────────
 
-  patchTaskStatus(
+  async patchTaskStatus(
     taskId: string,
     dto: PatchTaskStatusDto,
     authHeader: string | undefined,
     terminalIdHeader: string | undefined,
-  ): { acknowledged: true } {
-    // Validate token against any registered terminal (simplified: just find by token)
-    this.validateAnyTerminalToken(authHeader, terminalIdHeader)
+  ): Promise<{ acknowledged: true }> {
+    await this.validateAnyTerminalToken(authHeader, terminalIdHeader)
 
-    const task = this.printTasks.find((t) => t.taskId === taskId)
+    const task = await this.prisma.printTask.findUnique({ where: { id: taskId } })
     if (!task) {
       throw new NotFoundException({
         error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
       })
     }
 
-    // Terminal states: completed / failed are terminal — ignore duplicate PATCHes (idempotent)
-    if (task.status === 'completed' || task.status === 'failed') {
+    // Terminal states: idempotent, no DB write
+    if (TERMINAL_STATES.includes(task.status as TaskStatus)) {
       return { acknowledged: true }
     }
 
     // State machine validation
-    const validTransitions: Record<string, TaskStatus[]> = {
-      claimed: ['printing'],
-      printing: ['completed', 'failed'],
-    }
-    const allowed = validTransitions[task.status]
+    const allowed = VALID_TRANSITIONS[task.status]
     if (!allowed || !allowed.includes(dto.status as TaskStatus)) {
       throw new BadRequestException({
         error: {
@@ -362,21 +306,39 @@ export class TerminalsService {
       })
     }
 
-    task.status = dto.status as TaskStatus
-    task.errorCode = dto.errorCode
-    task.errorMessage = dto.errorMessage
-    task.updatedAt = nowIso()
+    const isTerminal = TERMINAL_STATES.includes(dto.status as TaskStatus)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (this.prisma.$transaction as any)(async (tx: any) => {
+      await tx.printTask.update({
+        where: { id: taskId },
+        data: {
+          status: dto.status,
+          errorCode: dto.errorCode ?? null,
+          errorMessage: dto.errorMessage ?? null,
+          completedAt: isTerminal ? new Date() : null,
+        },
+      })
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId,
+          fromStatus: task.status,
+          toStatus: dto.status,
+          errorCode: dto.errorCode ?? null,
+        },
+      })
+    })
 
     return { acknowledged: true }
   }
 
-  // ── Private helpers ──────────────────────────────────────────────────────
+  // ── Private helpers ──────────────────────────────────────────────────────────
 
-  private findAndValidate(
+  private async findAndValidate(
     terminalId: string,
     authHeader: string | undefined,
-  ): TerminalRecord {
-    const terminal = this.terminals.find((t) => t.terminalId === terminalId)
+  ): Promise<void> {
+    const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId } })
     if (!terminal) {
       throw new NotFoundException({
         error: { code: 'TERMINAL_NOT_REGISTERED', message: '终端未注册' },
@@ -388,47 +350,79 @@ export class TerminalsService {
         error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
       })
     }
-    return terminal
   }
 
-  /**
-   * For PATCH /print-tasks/:taskId/status:
-   * The Agent sends X-Terminal-Id + Authorization.
-   * Validate that a terminal with that ID exists and the token matches.
-   */
-  private validateAnyTerminalToken(
+  private async validateAnyTerminalToken(
     authHeader: string | undefined,
     terminalIdHeader: string | undefined,
-  ): void {
-    if (!terminalIdHeader) {
-      // Fallback: allow if any terminal has this token (Phase 8.1B tolerance)
-      const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
-      if (!token) {
-        throw new UnauthorizedException({
-          error: { code: 'AUTH_TOKEN_INVALID', message: '缺少 Authorization header' },
-        })
-      }
-      const found = this.terminals.find((t) => t.agentToken === token)
-      if (!found) {
-        throw new UnauthorizedException({
-          error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
-        })
-      }
+  ): Promise<void> {
+    const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
+    if (!token) {
+      throw new UnauthorizedException({
+        error: { code: 'AUTH_TOKEN_INVALID', message: '缺少 Authorization header' },
+      })
+    }
+    if (terminalIdHeader) {
+      await this.findAndValidate(terminalIdHeader, authHeader)
       return
     }
-    this.findAndValidate(terminalIdHeader, authHeader)
+    // Fallback: find any terminal with matching token
+    const found = await this.prisma.terminal.findFirst({ where: { agentToken: token } })
+    if (!found) {
+      throw new UnauthorizedException({
+        error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
+      })
+    }
   }
 
-  // ── Admin helpers (for future admin endpoints) ───────────────────────────
-
-  /** List all terminals (admin use). */
-  listTerminals(): TerminalRecord[] {
-    return this.terminals
+  private async resetExpiredClaims(): Promise<void> {
+    const count = await this.prisma.printTask.updateMany({
+      where: {
+        status: 'claimed',
+        claimExpiry: { lt: new Date() },
+      },
+      data: {
+        status: 'pending',
+        terminalId: null,
+        claimedAt: null,
+        claimExpiry: null,
+      },
+    })
+    if (count.count > 0) {
+      this.logger.log(`resetExpiredClaims: reset ${count.count} task(s) to pending`)
+    }
   }
 
-  /** List all print tasks (admin use). */
-  listPrintTasks(): PrintTaskRecord[] {
-    return this.printTasks
+  private async seedPrintTask(): Promise<void> {
+    await this.prisma.printTask.upsert({
+      where: { id: 'ptask_seed_001' },
+      update: {},
+      create: {
+        id: 'ptask_seed_001',
+        fileUrl: '/api/v1/test/sample-visible.pdf',
+        fileMd5: SAMPLE_VISIBLE_PDF_MD5,
+        paramsJson: JSON.stringify(DEFAULT_PARAMS),
+        status: 'pending',
+      },
+    })
+    this.logger.log('seedPrintTask: ptask_seed_001 upserted')
   }
 
+  private parseParams(json: string): PrintJobParams {
+    try {
+      return JSON.parse(json) as PrintJobParams
+    } catch {
+      return DEFAULT_PARAMS
+    }
+  }
+
+  // ── Admin helpers ────────────────────────────────────────────────────────────
+
+  listTerminals() {
+    return this.prisma.terminal.findMany({ orderBy: { registeredAt: 'desc' } })
+  }
+
+  listPrintTasks() {
+    return this.prisma.printTask.findMany({ orderBy: { createdAt: 'desc' } })
+  }
 }

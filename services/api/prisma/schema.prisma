@@ -1,0 +1,79 @@
+// Prisma schema — Phase 8.2A (Prisma v7 format)
+//
+// Database URL is configured in prisma.config.ts, not here.
+// Local dev:  DATABASE_URL="file:./prisma/dev.db"  (SQLite)
+// Production: DATABASE_URL="postgresql://..."       (PostgreSQL, change provider)
+//
+// Generated client is at: src/generated/prisma/
+// Import as: import { PrismaClient } from '../generated/prisma'
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ── Terminal ──────────────────────────────────────────────────────────────────
+
+model Terminal {
+  id                String   @id
+  terminalCode      String   @unique
+  agentToken        String
+  deviceFingerprint String
+  registeredAt      DateTime @default(now())
+  lastSeenAt        DateTime @updatedAt
+
+  heartbeats TerminalHeartbeat[]
+  printTasks PrintTask[]
+}
+
+// ── PrintTask ─────────────────────────────────────────────────────────────────
+// status values: "pending" | "claimed" | "printing" | "completed" | "failed"
+// Terminal states (completed / failed) must never be overwritten.
+
+model PrintTask {
+  id           String    @id
+  terminalId   String?
+  terminal     Terminal? @relation(fields: [terminalId], references: [id])
+  fileUrl      String
+  fileMd5      String
+  paramsJson   String    @default("{}")
+  status       String    @default("pending")
+  claimedAt    DateTime?
+  claimExpiry  DateTime?
+  completedAt  DateTime?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  statusLogs PrintTaskStatusLog[]
+}
+
+// ── TerminalHeartbeat ─────────────────────────────────────────────────────────
+
+model TerminalHeartbeat {
+  id            String   @id @default(cuid())
+  terminalId    String
+  terminal      Terminal @relation(fields: [terminalId], references: [id])
+  printerStatus String?
+  agentVersion  String?
+  ipAddress     String?
+  diskFreeGb    Float?
+  createdAt     DateTime @default(now())
+}
+
+// ── PrintTaskStatusLog ────────────────────────────────────────────────────────
+
+model PrintTaskStatusLog {
+  id         String    @id @default(cuid())
+  taskId     String
+  task       PrintTask @relation(fields: [taskId], references: [id])
+  fromStatus String
+  toStatus   String
+  errorCode  String?
+  createdAt  DateTime  @default(now())
+}
