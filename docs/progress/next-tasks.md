@@ -392,8 +392,8 @@
 | **V8.1C-5 服务安装 scriptOptions Bug 修复** | ✅ 2026-05-28 验证通过 |
 | instance-lock：tasklist 替代 mtime 5分钟阈值 | ✅ |
 | install-service：args→scriptOptions 修复 | ✅ |
-| V8.1C-3 断网重试专项验证 | ⏳ 待 Prisma 后端部署后验证 |
-| Windows 服务重启自启动验证 | ⏳ 待真机 reboot 验证 |
+| **V8.1C-3 断网重试** | ✅ 2026-05-28 通过（pending_patches 注入 → 60s 自动重试 → 清空） |
+| **Windows 服务 reboot 自启动** | ✅ 2026-05-28 通过（重启后 STATE:4 RUNNING，心跳恢复，SQLite 幂等跳过已完成任务） |
 | actionToken HMAC | 代码待实现 |
 | lease 续租 | 代码待实现 |
 

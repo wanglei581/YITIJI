@@ -25,14 +25,18 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.2 代码封板 — V8.1C-4/5 通过，两个 Bug 修复（2026-05-28）**
+**当前阶段：Phase 8.2 全部封板 — V8.1C-3/4/5 + reboot 全部通过（2026-05-28）**
 
 **V8.1C-4/5 Windows 验证结果（2026-05-28）：**
 
 | 验收项 | 结果 | 说明 |
 |--------|:----:|------|
+| V8.1C-3 断网重试（offline queue 注入→重试→清空） | ✅ | Prisma 本地后端验证 |
 | V8.1C-4 单实例双进程（DUPLICATE_INSTANCE） | ✅ | 发现并修复 Windows EPERM Bug |
 | V8.1C-5 服务安装/启动/卸载 | ✅ | 发现并修复 node-windows scriptOptions Bug |
+| V8.1C-5 reboot 自启动（STATE:4 RUNNING 开机自动拉起） | ✅ | 真机重启验证 |
+| V8.2B WMI（printerStatus=ready, diskFreeGB=158.98） | ✅ | 真实 Win32_Printer WMI 查询 |
+| Prisma E2E（注册→心跳→claim→下载→MD5→打印→PATCH） | ✅ | 本机 Prisma SQLite 后端 |
 
 **发现 Bug（已修复并提交）：**
 - `instance-lock.ts`：EPERM 分支用 mtime 5分钟阈值 → 长运行 Agent 被误判为过期锁，允许双实例。修复：改用 `tasklist /FO CSV` 精确判断进程存活。
