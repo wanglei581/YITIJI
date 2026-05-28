@@ -558,11 +558,10 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 
 | 子阶段 | 名称 | 状态 | 核心内容 |
 |--------|------|------|---------|
-| Phase 8.1A | Local Print MVP | ✅ **已完成** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
-| Phase 8.1B | Agent API / Claim / Heartbeat | ✅ **Agent 侧已完成（2026-05-27）** | 注册/心跳/claim/下载/MD5/print()/状态上报；后端接口待联调 |
-| **Phase 8.1B** | **后端接口联调** | 🚧 **当前任务** | 实现 `/auth/terminal/register`、`/terminals/:id/heartbeat`、`/terminals/:id/tasks/claim`、`/print-tasks/:id/status`；Agent 端对接验证 |
-| Phase 8.1C | Windows Service / DPAPI / Named Pipe | 📋 | 开机自启崩溃重启；DPAPI 加密 token；单实例 Mutex；Service+Helper 双进程架构 |
-| Phase 8.1D | 扫描 | 📋 | TWAIN/WIA（V01/V02 先验证）；SMB 备用方案；扫描→PDF→上传 |
+| Phase 8.1A | Local Print MVP | ✅ **已完成（2026-05-27）** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
+| Phase 8.1B | Agent 全链路 + 后端 4 接口 | ✅ **已完成（2026-05-27）** | 注册/心跳/claim/下载/MD5/print()/状态上报；Windows 真机 670ms 出纸 |
+| Phase 8.1C | 现场长期运行加固 | ⏳ **代码完成，待 Phase 8.1D 封板** | DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务安装 |
+| Phase 8.1D | **Windows 真机验证** | 📋 **待执行** | 见上方 Phase 8.1D 验收步骤（5 项：DPAPI/SQLite/断网/单实例/服务） |
 
 #### Phase 8.1A 详细能力（已完成 2026-05-27）
 
@@ -571,48 +570,41 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 | 统一 `print()` 函数 | `print(file, printerName, params)` 路由 PDF / 图片 | ✅ |
 | PDF 打印 | `.pdf` → Method B（pdf-to-printer/SumatraPDF）直接打印 | ✅ |
 | 图片打印（JPG/PNG）| pdfkit 生成临时 PDF → Method B → 打印后删除临时文件 | ✅ |
-| 图片打印（BMP/TIFF）| Phase 8.1B+（需 sharp 预处理）| 📋 |
+| 图片打印（BMP/TIFF）| Phase 8.2+（需 sharp 预处理）| 📋 |
 | printerName 配置化 | 从 `DEFAULT_PRINTER`（config.ts）读取，不硬编码 | ✅ |
 | 临时文件清理 | 打印后立即删除；启动时清理超过 1 小时的残留 | ✅ |
 
-#### Phase 8.1B 详细能力
-
-> **当前阶段主任务（Phase 8.1B）：** Agent 注册 → 心跳 → Claim → 下载文件 → 调用 `print()` → 状态上报。  
-> 所有特色功能（打印材料包、招聘会现场增强等）均在本阶段完成后才启动，不并行开发。
+#### Phase 8.1B 详细能力（已完成 2026-05-27）
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
-| 终端注册 | 注册获取 terminalId + agentToken + actionTokenSecret + localAuthToken | 📋 |
-| 单实例 Mutex | 启动时加锁，重复启动自动退出 | 📋 |
-| 心跳上报 | 每 30s，携带打印机基本状态 | 📋 |
-| 打印任务 Claim | `POST /api/v1/terminals/:terminalId/tasks/claim`，lease 原子防重复 | 📋 |
-| 打印任务执行 | 下载 → MD5 校验 → 调用统一 print() → 回传状态 | 📋 |
-| 文件上传 | POST /files/upload（multipart） | 📋 |
+| 终端注册 | `POST /auth/terminal/register`，设备指纹，持久化 terminalId | ✅ |
+| 心跳上报 | 每 30s（`PUT /terminals/:id/heartbeat`） | ✅ |
+| 打印任务 Claim | `POST /terminals/:id/tasks/claim`，5s 轮询，5 分钟 lease | ✅ |
+| 打印任务执行 | 下载 → MD5 校验 → 统一 print() → 状态回传 | ✅ |
+| 临时文件 try/finally 清理 | 任务结束立即删除临时 PDF | ✅ |
 
-#### Phase 8.1C 详细能力
-
-| 能力 | 说明 | 状态 |
-|------|------|------|
-| 临时文件安全清理 | 任务结束立即删除 + 每小时兜底；目录 ACL 保护 | 📋 |
-| Windows 服务 + Helper | Service 开机自启崩溃重启；Helper 用户登录后由 Service 启动 | 📋 |
-| local-api-server | 127.0.0.1:9527；localAuthToken（查询）+ actionToken（动作）全鉴权 | 📋 |
-| DPAPI 加密 | agentToken / actionTokenSecret / localAuthToken DPAPI 加密存储 | 📋 |
-
-#### Phase 8.1D 详细能力
+#### Phase 8.1C 详细能力（代码完成 2026-05-27，待 Phase 8.1D 封板）
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
-| 扫描任务执行 | Named Pipe 触发 Helper → TWAIN → PDF 合并 → 上传 → 回传 | 📋 |
-| SMB 备用方案 | TWAIN 不可用时监听 SMB 共享目录 | 📋 |
+| DPAPI 加密 | agentToken PowerShell stdin LocalMachine scope，base64 存 agent.token | ✅ 代码完成 |
+| SQLite 重启幂等 | `print_tasks` 表，markTaskDone before PATCH，防重复打印 | ✅ 代码完成 |
+| PID 文件单实例锁 | ESRCH 僵尸锁检测，DUPLICATE_INSTANCE exit 1 | ✅ 代码完成 |
+| 断网 PATCH 重试 | `pending_patches` 队列，60s 轮询，指数退避，max 10，4xx 放弃 | ✅ 代码完成 |
+| Windows 服务安装 | install-service / uninstall-service（node-windows） | ✅ 代码完成 |
+| adminSecret 注册后清除 | 注册成功后从 config.json 移除 adminSecret | ✅ 代码完成 |
 
-### Phase 8.2 扩展（Phase 8.1 完成后）
+### Phase 8.2 扩展（Phase 8.1D 真机验收通过后）
 
 | 能力 | 说明 |
 |------|------|
+| 扫描任务执行 | Named Pipe 触发 Helper → TWAIN → PDF 合并 → 上传 → 回传（原 Phase 8.1D 设计） |
+| SMB 扫描备用方案 | TWAIN 不可用时监听 SMB 共享目录 |
+| BMP/TIFF 打印 | sharp 预处理 → pdfkit → Method B |
 | U 盘监听 | USB 存储挂载检测，文件列表推送 Kiosk |
 | 设备事件告警 | 缺纸、墨粉不足、卡纸主动上报 |
-| 离线任务队列 | 断网缓存，恢复后自动补发（幂等） |
-| SMB 扫描备用方案 | TWAIN 不可用时监听 SMB 共享目录 |
+| Prisma 持久化 | 服务端打印任务状态落库（PostgreSQL） |
 
 ### Phase 8.3 扩展（更后期）
 
