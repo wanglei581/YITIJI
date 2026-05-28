@@ -1,3 +1,6 @@
+# Codex temp
+.codex-tmp/
+
 # Dependencies
 node_modules
 .pnpm-store
