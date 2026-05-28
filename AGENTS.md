@@ -80,21 +80,15 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：Phase 8.1C 已完成 — Windows 真机验证（Phase 8.1D）待执行（2026-05-27）
+当前阶段：Phase 8.1C/D 全部封板（2026-05-28），可进入 Phase 8.2 或 Phase 9
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
-- Phase 8.0.1/8.0.2 已完成（2026-05-27）：PDF/JPG/PNG Method B 真实出纸 ✅
-- Phase 8.1A 已完成（2026-05-27）：统一 print() + image-to-pdf(pdfkit) + 临时 PDF 清理 ✅
+- Phase 8.0–8.1A 已完成（2026-05-27）：PDF/图片打印、统一 print()、pdfkit 转换 ✅
 - Phase 8.1B 已完成（2026-05-27）：注册/心跳/claim/下载/MD5/print()/状态上报；Windows 真机 670ms 出纸 ✅
-- Phase 8.1C 已完成（2026-05-27）：DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务安装；macOS 冒烟通过 ✅
-- **Phase 8.1D（待执行）**：Windows 真机验证以下 5 项：
-  1. DPAPI 加密存储（config.json 无 agentToken；adminSecret 注册后清除）
-  2. SQLite 重启幂等（重启后看到 "already done in local DB, skipping"）
-  3. 断网 PATCH 重试（入队 → 恢复网络 → 自动重试成功）
-  4. 单实例 PID 锁（第二进程 DUPLICATE_INSTANCE exit 1）
-  5. Windows 服务（install-service → 重启 → 服务自动运行）
+- Phase 8.1C/D 已封板（2026-05-28）：DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务；Windows 真机 E2E 全链路通过（783ms 出纸）✅
 - 图片打印路径：pdfkit 临时 PDF → Method B（pdf-to-printer/SumatraPDF）
-- 新命令：`node dist/index.js agent`；`node dist/index.js install-service`
+- 命令：`node dist/index.js agent` / `install-service` / `uninstall-service`
+- **下一步**：Phase 8.2（Prisma 持久化/actionToken HMAC/printerStatus WMI）或 Phase 9 UI Polish
 
 ---
 
