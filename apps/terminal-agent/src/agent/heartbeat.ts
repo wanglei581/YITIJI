@@ -1,13 +1,13 @@
 /**
- * agent/heartbeat.ts — Phase 8.1B
+ * agent/heartbeat.ts — Phase 8.2B
  *
  * Sends a heartbeat to the backend every N seconds:
  *   PUT /terminals/:terminalId/heartbeat
  *
  * The heartbeat payload includes:
  *   - status: always 'online' (if we can reach the server, we're online)
- *   - printerStatus: 'unknown' in Phase 8.1B (WMI query in Phase 8.1C)
- *   - diskFreeGB: -1 in Phase 8.1B (WMI query in Phase 8.1C)
+ *   - printerStatus: real Win32_Printer WMI query (Phase 8.2B); 'unknown' on macOS
+ *   - diskFreeGB: real Get-PSDrive C: query (Phase 8.2B); -1 on macOS
  *   - agentVersion, ipAddress, reportedAt
  *
  * On server response:
@@ -16,13 +16,14 @@
  *
  * Failure handling:
  *   - Network / 5xx: log warn, continue (agent stays running)
- *   - 401: log error (Phase 8.1B: no auto re-registration; operator must restart agent)
+ *   - 401: log error (no auto re-registration; operator must restart agent)
  *   - failureCounter: incremented per failure for caller to monitor
  */
 
 import os from 'os'
 import type { AgentConfig, HeartbeatPayload, HeartbeatResponse } from './types'
 import { createApiClient, axiosErrorMessage } from './api-client'
+import { getPrinterStatus, getDiskFreeGB } from './wmi'
 import { log, warn, err } from '../logger'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,10 +67,13 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
+  const printerStatus = getPrinterStatus(config.printerName)
+  const diskFreeGB = getDiskFreeGB()
+
   const payload: HeartbeatPayload = {
     status: 'online',
-    printerStatus: 'unknown',   // Phase 8.1C: real WMI Win32_Printer query
-    diskFreeGB: -1,             // Phase 8.1C: real WMI Win32_LogicalDisk query
+    printerStatus,
+    diskFreeGB,
     agentVersion: config.agentVersion,
     ipAddress: getIpAddress(),
     reportedAt: new Date().toISOString(),
