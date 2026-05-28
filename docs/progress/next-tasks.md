@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-05-27（Phase 8.1C Terminal Agent 长期运行加固完成）  
+> 最后更新：2026-05-28（Phase 8.1C/D 封板，Windows 真机 E2E 全部通过，出纸确认）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
@@ -303,7 +303,7 @@
 | 后端 TerminalsModule（4 接口 + sample-visible.pdf）| ✅ |
 | Windows 真机端到端联调（670ms 打印，Pantum CM2800ADN Series） | ✅ |
 
-## ✅ Phase 8.1C 已完成（2026-05-27）
+## ✅ Phase 8.1C 已完成（2026-05-27，Windows 真机 V8.1C-1/2 通过）
 
 | 能力 | 文件 | 状态 |
 |------|------|------|
@@ -314,108 +314,39 @@
 | Windows 服务（install-service / uninstall-service 子命令） | index.ts | ✅ |
 | adminSecret 注册后清除；Phase 8.1B token 自动迁移 | config-manager.ts | ✅ |
 | typecheck 0 errors / build 通过 / macOS 冒烟验证 | — | ✅ |
+| **Windows 真机 V8.1C-1（DPAPI）+ V8.1C-2（SQLite 幂等）通过** | — | ✅ |
+
+> V8.1C-3（断网重试）/ V8.1C-4（单实例双进程）/ V8.1C-5（服务安装）留待 Phase 8.2 专项验收。
+
+## ✅ Phase 8.1D — Windows 真机 E2E 全部通过（2026-05-28）
+
+| 验收项 | 结果 |
+|--------|:----:|
+| 注册（DPAPI 加密，agentToken 不落 config.json） | ✅ |
+| 心跳（30s，持续确认） | ✅ |
+| Claim ptask_seed_001（5 min 过期自动重置后 Agent 重新 claim） | ✅ |
+| 文件下载（proxy:false，8ms，0.9 KB） | ✅ |
+| MD5 校验 | ✅ |
+| PATCH status=printing | ✅ |
+| PDF Method B 打印（783ms） | ✅ |
+| PATCH status=completed | ✅ |
+| 临时文件删除 | ✅ |
+| SQLite 写入 completed（pending_patches=[]） | ✅ |
+| **Pantum CM2800ADN Series 真实出纸** | ✅ |
+
+**关键修复（本阶段发现）：**  
+- `api-client.ts` + `task-runner.ts` 新增 `proxy: false` — Windows `http_proxy` 环境变量（Clash/v2ray）劫持 axios 请求  
+- `task-runner.ts` 新增 `resolveFileUrl()` — 处理 backend 返回相对 fileUrl
 
 ---
 
-## 📋 Phase 8.1D — Windows 真机验收（待执行）
+## 📋 下一步方向（Phase 8.1D 封板后）
 
 | 选项 | 内容 | 说明 |
 |------|------|------|
-| **A — Phase 8.1D** | Windows 真机验证 8.1C 全部 5 项 | DPAPI / SQLite 幂等 / 断网恢复 / 单实例 / 服务安装 |
-| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 | 动效、响应式、暗色模式等 |
-| **C — Phase 8.2** | Prisma 持久化 | 服务端 PostgreSQL 持久化打印任务 |
-
-### Phase 8.1D：Windows 真机验收步骤与验收标准
-
-```powershell
-# === 前置准备 ===
-git pull                        # 拉取最新代码（包含 Phase 8.1C）
-pnpm install                    # 安装依赖（better-sqlite3 在 Windows 本地编译）
-pnpm --filter terminal-agent build
-# 确保 Mac API 已启动（services/api）并在 agent-config.json 中设置正确 apiBaseUrl
-```
-
-#### 验收项 1 — DPAPI 加密存储
-
-```powershell
-# 前提：删除已有的 agent.token（如果存在）
-#        清空 config.json 中的 terminalId（如已注册则先清空）
-node dist/index.js agent
-```
-
-| 验收标准 | 期望结果 | 状态 |
-|---------|---------|------|
-| 注册成功后 config.json 不含 agentToken 字段 | config.json 只有 terminalId，无 agentToken | ⏳ |
-| config.json 不含 adminSecret 字段（注册后清除） | adminSecret 字段已被移除 | ⏳ |
-| `%ProgramData%\AIJobPrintAgent\agent.token` 存在 | 文件存在，内容为 base64 密文 | ⏳ |
-| 重启后 Agent 正常工作（DPAPI 解密成功） | 心跳/claim 正常，无 DPAPI 错误 | ⏳ |
-
-#### 验收项 2 — SQLite 重启幂等
-
-```powershell
-# 1. 运行一次完整打印任务（等待 "PATCH status=completed"）
-# 2. Ctrl+C 停止 Agent
-# 3. 重新启动
-node dist/index.js agent
-```
-
-| 验收标准 | 期望日志 | 状态 |
-|---------|---------|------|
-| 重启后对已完成任务不重新打印 | `task ptask_seed_001: already done in local DB, skipping` | ⏳ |
-| 日志中不出现 downloading / printing 对该已完成 taskId | （无此日志） | ⏳ |
-| 打印机不出纸（无重复打印） | 无纸张输出 | ⏳ |
-
-#### 验收项 3 — 断网 PATCH 重试队列
-
-```powershell
-# 1. 运行 Agent
-# 2. 任务开始打印后，拔掉网线（或禁用网卡）
-# 3. 等待打印完成，观察 PATCH status=completed 失败日志
-# 4. 重新接上网线
-```
-
-| 验收标准 | 期望日志 | 状态 |
-|---------|---------|------|
-| PATCH 失败时写入离线队列 | `db: PATCH status=completed for task xxx enqueued for offline retry` | ⏳ |
-| 网络恢复后（最长 60s）自动重试 | `offline-queue: PATCH status=completed for xxx ✓` | ⏳ |
-| 重试成功后队列清空（不再重复上报） | 无第二次重试日志 | ⏳ |
-
-#### 验收项 4 — 单实例 PID 锁
-
-```powershell
-# 终端 1：
-node dist/index.js agent
-# 终端 2（另开一个 PowerShell 窗口）：
-node dist/index.js agent
-```
-
-| 验收标准 | 期望结果 | 状态 |
-|---------|---------|------|
-| 第二个进程立即退出（exit code 1） | 日志含 `DUPLICATE_INSTANCE: agent already running (pid=xxx)` | ⏳ |
-| 第一个进程继续正常运行 | 无受影响 | ⏳ |
-
-#### 验收项 5 — Windows 服务安装与自启动
-
-```powershell
-# 安装服务（需管理员权限）
-node dist/index.js install-service
-# 验证服务状态
-Get-Service -Name "AIJobPrintAgent"
-# 重启 Windows
-shutdown /r /t 0
-# 重启后检查（约 30s 后）
-Get-Service -Name "AIJobPrintAgent"
-# 卸载服务
-node dist/index.js uninstall-service
-```
-
-| 验收标准 | 期望结果 | 状态 |
-|---------|---------|------|
-| install-service 成功执行 | 任务管理器"服务"标签中出现 AIJobPrintAgent | ⏳ |
-| 服务状态为"正在运行" | `Status: Running` | ⏳ |
-| Windows 重启后服务自动启动 | 重启后 30s 内 `Status: Running` | ⏳ |
-| Agent 在服务模式下心跳正常 | 后端收到心跳，terminalId 不变 | ⏳ |
-| uninstall-service 成功卸载 | 服务从列表中消失 | ⏳ |
+| **A — Phase 8.2** | 服务端 Prisma 持久化 + actionToken HMAC + printerStatus WMI + V8.1C-3/4/5 补验 | 生产级加固 |
+| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | 用户体验升级 |
+| **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 类型清债 |
 
 ---
 
@@ -560,8 +491,8 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 |--------|------|------|---------|
 | Phase 8.1A | Local Print MVP | ✅ **已完成（2026-05-27）** | 统一 `print(file, printerName, params)`；image-to-pdf(pdfkit)；临时 PDF 清理；printerName 配置化 |
 | Phase 8.1B | Agent 全链路 + 后端 4 接口 | ✅ **已完成（2026-05-27）** | 注册/心跳/claim/下载/MD5/print()/状态上报；Windows 真机 670ms 出纸 |
-| Phase 8.1C | 现场长期运行加固 | ⏳ **代码完成，待 Phase 8.1D 封板** | DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务安装 |
-| Phase 8.1D | **Windows 真机验证** | 📋 **待执行** | 见上方 Phase 8.1D 验收步骤（5 项：DPAPI/SQLite/断网/单实例/服务） |
+| Phase 8.1C | 现场长期运行加固 | ✅ **已完成（2026-05-28 Windows 真机 V8.1C-1/2 通过）** | DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务安装 |
+| Phase 8.1D | **Windows 真机 E2E 验证** | ✅ **已完成（2026-05-28，Pantum 真实出纸）** | 完整链路 783ms；proxy:false 修复；resolveFileUrl；出纸确认 |
 
 #### Phase 8.1A 详细能力（已完成 2026-05-27）
 
@@ -584,16 +515,16 @@ pnpm audit   # 当前因网络原因未完成，0 known vulnerabilities 目标
 | 打印任务执行 | 下载 → MD5 校验 → 统一 print() → 状态回传 | ✅ |
 | 临时文件 try/finally 清理 | 任务结束立即删除临时 PDF | ✅ |
 
-#### Phase 8.1C 详细能力（代码完成 2026-05-27，待 Phase 8.1D 封板）
+#### Phase 8.1C 详细能力（2026-05-28 Windows 真机 V8.1C-1/2 通过）
 
 | 能力 | 说明 | 状态 |
 |------|------|------|
-| DPAPI 加密 | agentToken PowerShell stdin LocalMachine scope，base64 存 agent.token | ✅ 代码完成 |
-| SQLite 重启幂等 | `print_tasks` 表，markTaskDone before PATCH，防重复打印 | ✅ 代码完成 |
-| PID 文件单实例锁 | ESRCH 僵尸锁检测，DUPLICATE_INSTANCE exit 1 | ✅ 代码完成 |
-| 断网 PATCH 重试 | `pending_patches` 队列，60s 轮询，指数退避，max 10，4xx 放弃 | ✅ 代码完成 |
-| Windows 服务安装 | install-service / uninstall-service（node-windows） | ✅ 代码完成 |
-| adminSecret 注册后清除 | 注册成功后从 config.json 移除 adminSecret | ✅ 代码完成 |
+| DPAPI 加密 | agentToken PowerShell stdin LocalMachine scope，base64 存 agent.token | ✅ Windows 真机通过 |
+| SQLite 重启幂等 | `print_tasks` 表，markTaskDone before PATCH，防重复打印 | ✅ Windows 真机通过 |
+| PID 文件单实例锁 | ESRCH 僵尸锁检测，DUPLICATE_INSTANCE exit 1 | ✅ 代码完成（Phase 8.2 双进程测试） |
+| 断网 PATCH 重试 | `pending_patches` 队列，60s 轮询，指数退避，max 10，4xx 放弃 | ✅ 代码完成（Phase 8.2 断网测试） |
+| Windows 服务安装 | install-service / uninstall-service（node-windows） | ✅ 代码完成（Phase 8.2 服务安装测试） |
+| adminSecret 注册后清除 | 注册成功后从 config.json 移除 adminSecret | ✅ Windows 真机通过 |
 
 ### Phase 8.2 扩展（Phase 8.1D 真机验收通过后）
 

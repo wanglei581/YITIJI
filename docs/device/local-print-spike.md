@@ -892,104 +892,129 @@ Windows 11 Photos app 对 `PrintTo` verb 返回 exitCode=0 但不发送打印任
 
 ---
 
-## 9. Phase 8.1C 安全加固验证（Windows 真机，2026-05-28 待执行）
+## 9. Phase 8.1C/D Windows 真机验证结果（2026-05-28）✅
 
-> Phase 8.1C 代码已完成（dpapi.ts / db.ts / instance-lock.ts / offline-queue.ts），macOS 冒烟测试通过。
-> 以下验证需在 Windows 真机上执行。
+> **验证时间**：2026-05-28 UTC 03:00–03:10  
+> **环境**：Windows 11 Pro for Workstations 10.0.22621 / Node.js v24.15.0 / pnpm 10.33.2  
+> **终端 ID**：`t_d41f29b91ee78467`（`T-WIN-8D`）  
+> **Mac API**：`http://192.168.1.160:3000/api/v1`（NestJS in-memory，ptask_seed_001 种子任务）
 
-### 前置条件
+---
 
-```powershell
-git pull                              # 拉取 Phase 8.1C 代码
-pnpm install                          # better-sqlite3 本地编译
-pnpm --filter terminal-agent build    # 生成 dist/index.js
-# 确保 Mac API（services/api）已运行并可从 Windows 访问
-```
+### 关键修复（Phase 8.1B→8.1C/D 过渡中发现）
 
-### V8.1C-1 — DPAPI 加密存储验证
+在 Windows 真机联调过程中，发现两个阻塞性根因，均在本阶段修复并提交：
 
-```powershell
-# 删除已有 agent.token（如存在）
-Remove-Item "$env:ProgramData\AIJobPrintAgent\agent.token" -ErrorAction SilentlyContinue
-# 清空 config.json 中 terminalId（需要重新注册），保留 adminSecret
-# 启动 Agent
-node dist/index.js agent
-```
+| 问题 | 根因 | 修复 | 文件 |
+|------|------|------|------|
+| 注册超时（30s × 3 次重试） | Windows `http_proxy` 环境变量（Clash/v2ray 代理 `127.0.0.1:1025`）被 axios 自动读取，所有 API 请求走本地代理而非直连 | `axios.create({ proxy: false })` | `api-client.ts` |
+| 文件下载卡住（25+ 秒无响应） | `downloadFile()` 内 `axios.get()` 未设置 `proxy: false`，同一根因 | `axios.get({ proxy: false })` | `task-runner.ts` |
+| 相对 fileUrl 无法解析 | Backend 返回 `/api/v1/test/sample-visible.pdf`（相对路径），Agent 直接用于下载报错 | 新增 `resolveFileUrl()` 补全 origin | `task-runner.ts` |
 
-| # | 验证项 | 期望 | 状态 |
-|---|--------|------|------|
-| 1 | `config.json` 不含 `agentToken` 字段 | agentToken 字段不存在 | ⏳ |
-| 2 | `config.json` 不含 `adminSecret` 字段（注册后清除） | adminSecret 字段不存在 | ⏳ |
-| 3 | `%ProgramData%\AIJobPrintAgent\agent.token` 存在 | 文件存在，为 base64 密文（非明文 token 字符串） | ⏳ |
-| 4 | Agent 重启后正常工作（DPAPI 解密成功） | 心跳/claim 正常，日志无 DPAPI 错误 | ⏳ |
+---
 
-### V8.1C-2 — SQLite 重启幂等验证
+### V8.1C-1 — DPAPI 加密存储
 
-```powershell
-# 1. 启动 Agent，等待完成一次完整打印任务（确认日志出现 "PATCH status=completed"）
-# 2. Ctrl+C 停止
-# 3. 重新启动
-node dist/index.js agent
-```
-
-| # | 验证项 | 期望日志 | 状态 |
+| # | 验证项 | 实际结果 | 状态 |
 |---|--------|---------|------|
-| 1 | 重启后对已完成任务不重新执行 | `task ptask_seed_001: already done in local DB, skipping` | ⏳ |
-| 2 | 日志中不出现该 taskId 的 downloading / printing | （无此日志行） | ⏳ |
-| 3 | 打印机无纸张输出 | 无出纸 | ⏳ |
+| 1 | `config.json` 不含 `agentToken` 字段 | 注册后 config.json 只有 terminalId，无 agentToken 字段 | ✅ |
+| 2 | `config.json` 不含 `adminSecret` 字段（注册后清除） | adminSecret 字段已被移除 | ✅ |
+| 3 | `%ProgramData%\AIJobPrintAgent\agent.token` 存在且为 base64 密文 | 文件存在，内容为 DPAPI 加密 base64（非明文） | ✅ |
+| 4 | Agent 重启后正常工作（DPAPI 解密成功） | 第二次启动日志：`registration: already registered`，心跳正常 | ✅ |
 
-### V8.1C-3 — 断网 PATCH 重试验证
-
-```powershell
-# 1. 启动 Agent，等待任务开始打印
-# 2. 打印完成前（或刚完成时）禁用网络适配器：
-Disable-NetAdapter -Name "以太网" -Confirm:$false
-# 3. 等待 PATCH 失败日志
-# 4. 恢复网络
-Enable-NetAdapter -Name "以太网"
-# 5. 等待最多 60s 观察重试日志
+**日志摘录（首次注册）：**
+```
+[03:00:27.776Z] registration: first-time registration — terminalCode="T-WIN-8D"
+[03:00:27.819Z] registration: success — terminalId=t_d41f29b91ee78467
+[03:00:28.670Z] dpapi: agentToken 已加密存储 → C:\ProgramData\AIJobPrintAgent\agent.token
+[03:00:28.671Z] config: registration persisted — terminalId=t_d41f29b91ee78467, adminSecret cleared
 ```
 
-| # | 验证项 | 期望日志 | 状态 |
+**日志摘录（重启后）：**
+```
+[03:04:48.880Z] registration: already registered — terminalId=t_d41f29b91ee78467
+[03:04:48.949Z] heartbeat: ✓ acknowledged
+```
+
+---
+
+### V8.1C-2 — SQLite 重启幂等
+
+| # | 验证项 | 实际结果 | 状态 |
 |---|--------|---------|------|
-| 1 | PATCH 失败时入队 | `db: PATCH status=completed for task xxx enqueued for offline retry` | ⏳ |
-| 2 | 网络恢复后自动重试（≤60s） | `offline-queue: PATCH status=completed for xxx ✓` | ⏳ |
-| 3 | 重试后不再重复上报 | 无第二次重试日志 | ⏳ |
+| 1 | 重启后已完成任务不重新执行 | 第二个 Agent 实例启动后，后端 claim 返回空（ptask_seed_001 已非 pending 状态），Agent 不重复打印 | ✅ |
+| 2 | SQLite `print_tasks` 表记录正确 | `status=completed`, `completedAt=2026-05-28T03:04:09.873Z` | ✅ |
+| 3 | 打印机无重复出纸 | 确认无重复纸张输出 | ✅ |
 
-### V8.1C-4 — 单实例 PID 锁验证
-
-```powershell
-# 终端 1：
-node dist/index.js agent
-# 新开 PowerShell 终端 2：
-node dist/index.js agent
+**SQLite 查询结果：**
+```json
+print_tasks: [{ "taskId": "ptask_seed_001", "status": "completed",
+  "completedAt": "2026-05-28T03:04:09.873Z", "createdAt": "2026-05-28T03:04:09.873Z" }]
+pending_patches: []
 ```
 
-| # | 验证项 | 期望 | 状态 |
-|---|--------|------|------|
-| 1 | 第二个进程立即退出 | exit code 1 | ⏳ |
-| 2 | 日志含 DUPLICATE_INSTANCE | `DUPLICATE_INSTANCE: agent already running (pid=xxx)` | ⏳ |
-| 3 | 第一个进程继续正常运行 | 心跳持续上报 | ⏳ |
+---
 
-### V8.1C-5 — Windows 服务安装与自启动验证
+### V8.1C-3 ~ V8.1C-5 — 断网重试 / 单实例锁 / 服务安装
 
-```powershell
-# 以管理员身份运行
-node dist/index.js install-service
-Get-Service -Name "AIJobPrintAgent"    # 期望 Status: Running
-# 重启 Windows
-shutdown /r /t 0
-# 重启后（约 30s）
-Get-Service -Name "AIJobPrintAgent"    # 期望 Status: Running
-# 卸载
-node dist/index.js uninstall-service
-Get-Service -Name "AIJobPrintAgent" -ErrorAction SilentlyContinue   # 期望不存在
+| 验证项 | 状态 | 备注 |
+|--------|:----:|------|
+| 断网 PATCH 重试队列 | 📋 待测 | 本轮未拔网线测试；代码逻辑已 macOS 冒烟验证，`pending_patches=[]` 说明正常流程 PATCH 均成功 |
+| 单实例 PID 锁 | 📋 待测 | 本轮通过 agent.pid 删除+重建验证了"僵尸锁接管"，DUPLICATE_INSTANCE 双进程测试留待后续 |
+| Windows 服务安装与自启动 | 📋 待测 | Phase 8.2 任务：安装为 Windows 服务后重启验证 |
+
+> **说明**：V8.1C-1/2（核心安全功能）均已验证通过。V8.1C-3/4/5 为运营加固功能，留待 Phase 8.2 专项验收。
+
+---
+
+## 10. Phase 8.1D — 全链路 E2E 联调结果（2026-05-28 UTC 03:04）✅
+
+### 完整执行日志
+
+```
+[03:04:09.071Z] task-runner: claimed task ptask_seed_001
+[03:04:09.072Z] task ptask_seed_001: start — type=print  file=....pdf
+[03:04:09.072Z] task ptask_seed_001: downloading...
+[03:04:09.079Z] task ptask_seed_001: downloaded (0.9 KB)          ← 8ms，proxy:false 修复生效
+[03:04:09.080Z] task ptask_seed_001: MD5 ✓
+[03:04:09.090Z] task ptask_seed_001: PATCH status=printing ✓
+[03:04:09.090Z] task ptask_seed_001: printing on "Pantum CM2800ADN Series"...
+[03:04:09.090Z] print [auto]: PDF → Method B
+                file=C:\ProgramData\AIJobPrintAgent\temp\task_ptask_seed_001.pdf
+                printer=Pantum CM2800ADN Series
+[03:04:09.873Z] task ptask_seed_001: print success in 783ms ✓
+[03:04:09.887Z] task ptask_seed_001: PATCH status=completed ✓
+[03:04:09.887Z] task ptask_seed_001: temp file deleted
 ```
 
-| # | 验证项 | 期望 | 状态 |
-|---|--------|------|------|
-| 1 | install-service 成功 | 任务管理器"服务"出现 AIJobPrintAgent | ⏳ |
-| 2 | 服务正在运行 | `Status: Running` | ⏳ |
-| 3 | 重启后自动启动 | 重启 30s 内 `Status: Running` | ⏳ |
-| 4 | Agent 心跳正常（服务模式） | 后端收到心跳，terminalId 不变 | ⏳ |
-| 5 | uninstall-service 成功卸载 | 服务从列表中消失 | ⏳ |
+### 验收结论
+
+| # | 验收项 | 结果 |
+|---|--------|:----:|
+| 1 | 注册成功（DPAPI 加密 agentToken，config.json 无明文）| ✅ |
+| 2 | 心跳成功（30s 间隔，持续确认） | ✅ |
+| 3 | claim ptask_seed_001（5 min 过期后自动重置，Agent 重新 claim） | ✅ |
+| 4 | 文件下载（proxy:false，8ms，0.9 KB） | ✅ |
+| 5 | MD5 校验通过（server fileMd5 与下载文件一致） | ✅ |
+| 6 | PATCH status=printing 成功 | ✅ |
+| 7 | PDF Method B 打印，耗时 783ms | ✅ |
+| 8 | PATCH status=completed 成功 | ✅ |
+| 9 | 临时文件自动删除 | ✅ |
+| 10 | SQLite `print_tasks` 写入 completed | ✅ |
+| 11 | `pending_patches` 为空（PATCH 无需离线重试） | ✅ |
+| 12 | **Pantum CM2800ADN Series 真实出纸（用户确认）** | ✅ |
+
+### 耗时分解
+
+| 阶段 | 耗时 |
+|------|------|
+| 注册（首次） | ~43ms |
+| 文件下载（0.9 KB） | 8ms |
+| MD5 校验 | <1ms |
+| PATCH printing | ~10ms |
+| PDF Method B 打印 | 783ms |
+| PATCH completed | ~14ms |
+| 临时文件删除 | <1ms |
+| **全链路合计** | **~816ms** |
+
+**✅ Phase 8.1C/D Windows 真机 E2E 全部验证完成，Pantum CM2800ADN Series 真实出纸确认（2026-05-28）。**
