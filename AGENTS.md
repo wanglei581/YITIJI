@@ -80,7 +80,7 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：Phase 8.1C/D 全部封板（2026-05-28），可进入 Phase 8.2 或 Phase 9
+当前阶段：Phase 8.2C — Prisma持久化 + HMAC actionToken + WMI心跳 + 安全加固（2026-05-28）
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
 - Phase 8.0–8.1A 已完成（2026-05-27）：PDF/图片打印、统一 print()、pdfkit 转换 ✅

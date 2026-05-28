@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-05-28（Phase 8.1C/D 封板，Windows 真机 E2E 全部通过，出纸确认）  
+> 最后更新：2026-05-28（Phase 8.2C 代码封板）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
