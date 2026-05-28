@@ -64,6 +64,10 @@ async function downloadFile(fileUrl: string, destPath: string): Promise<void> {
   const resp = await axios.get<ArrayBuffer>(fileUrl, {
     responseType: 'arraybuffer',
     timeout: 60_000,
+    // Must bypass system proxy (same reason as api-client.ts proxy:false):
+    // Windows http_proxy env var would route this request through a local proxy
+    // (e.g. Clash/v2ray at 127.0.0.1:xxxx), causing download timeouts.
+    proxy: false,
   })
   fs.mkdirSync(path.dirname(destPath), { recursive: true })
   fs.writeFileSync(destPath, Buffer.from(resp.data))

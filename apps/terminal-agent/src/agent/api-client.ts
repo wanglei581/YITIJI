@@ -36,6 +36,11 @@ export function createApiClient(
   const instance = axios.create({
     baseURL,
     timeout: 30_000,
+    // Disable axios proxy auto-detection: agent always connects directly to the
+    // backend (LAN or localhost). Without this, axios on Windows picks up the
+    // system http_proxy env variable (e.g. Clash / v2ray local proxy at
+    // 127.0.0.1:xxxx) and routes all API requests through it, causing timeouts.
+    proxy: false,
     headers: {
       'Content-Type': 'application/json',
       ...headers,

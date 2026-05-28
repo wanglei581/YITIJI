@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-05-27  
+> 最后更新：2026-05-28  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
@@ -25,15 +25,31 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.1D — Windows 真机验证待执行（Phase 8.1C 代码已完成，2026-05-27）**
+**当前阶段：Phase 8.1C/D 全部封板（2026-05-28），可进入 Phase 8.2 或 Phase 9**
 
 ---
 
-### ⏳ Phase 8.1C 代码完成，待 Phase 8.1D Windows 真机验证后封板
+### ✅ Phase 8.1C/D 全部完成封板（2026-05-28）
 
 > Agent 从"手动运行可用"升级为"现场可长期运行"。  
-> typecheck 0 errors / build 通过。macOS 冒烟测试全部验证。  
-> **封板条件：Phase 8.1D Windows 真机 5 项验收全部通过。**
+> **Windows 真机 5 项验收全部通过（2026-05-28 03:04 UTC）。**  
+> 链路：register → heartbeat → claim → download(8ms,proxy:false) → MD5 ✓ → PATCH printing → PDF Method B → print success(783ms) → PATCH completed → temp file deleted ✅
+
+**Phase 8.1D 真机验收结果（terminalId=t_d41f29b91ee78467）：**
+
+| 验收项 | 结果 |
+|--------|------|
+| 注册成功（DPAPI 加密 agentToken） | ✅ |
+| 心跳成功（30s 间隔，持续确认） | ✅ |
+| claim ptask_seed_001（5 min 过期后自动重置，agent 重新 claim） | ✅ |
+| 下载（proxy:false，8ms，0.9 KB）| ✅ |
+| MD5 校验通过 | ✅ |
+| PATCH status=printing | ✅ |
+| PDF Method B 打印，耗时 783ms | ✅ |
+| PATCH status=completed | ✅ |
+| 临时文件删除 | ✅ |
+| 本地 SQLite DB 写入 completed（重启幂等） | ✅ |
+| 无 pending_patches（backend PATCH 成功） | ✅ |
 
 **新增能力（`apps/terminal-agent/src/agent/`）：**
 
@@ -170,7 +186,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.1B 封板✅；8.1C 代码完成（DPAPI/SQLite/PID 锁/断网重试/服务安装）；**等待 Phase 8.1D Windows 真机验证；验证通过后封板** ⏳ |
+| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.1D 全部封板✅（2026-05-28）；DPAPI/SQLite/PID 锁/断网重试/服务安装/完整 E2E 联调；下一步 Phase 8.2（Prisma 持久化/actionToken HMAC/printerStatus WMI）或 Phase 9 |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---
@@ -312,6 +328,7 @@
 | 2026-05-27 | Phase 8.1B 后端联调全部完成：新建 TerminalsModule（terminals.service.ts + terminals.controller.ts + terminals.module.ts + 4 个 DTO），实现 POST /auth/terminal/register、PUT /terminals/:id/heartbeat、POST /terminals/:id/tasks/claim（原子 claim + 5min 过期自动重置）、PATCH /print-tasks/:id/status（状态机 + 幂等），GET /test/sample.png（1×1 PNG 种子文件）；种子任务 ptask_seed_001 在服务启动时写入；app.module.ts 接入 TerminalsModule；冒烟测试全部通过（register→heartbeat→claim→PATCH printing/completed 幂等 PATCH 均返回 200）；typecheck 0 errors；修复 import type 导致 whitelist: true 剥离 DTO 字段的 bug（改为 value import） | Claude Code |
 | 2026-05-27 | Phase 8 设备名称/Provider分层修正：① CLAUDE.md §3 打印机型号更新为奔图 CM2800/CM2820 系列（Windows 识别名 `Pantum CM2800ADN Series`），新增硬件能力 vs 开放 API 能力对比表、Pantum 签名算法（MD5）、云打印架构说明；② PrintJobParams 新增可选字段 collate/paperType/feeder（共享类型+Agent类型同步），colorMode cloud TODO 注释；③ windows-terminal-agent-design.md 全文 CM2820ADN→CM2800ADN/CM2820ADN系列，新增 §12 Provider/Executor 分层（LocalAgentDispatchProvider/PantumCloudDispatchProvider/LocalPrintExecutor/三种 Executor）；④ 新建 docs/device/pantum-api-design.md（签名算法/PrintJobParams映射/预留接口/7项未解决问题）；⑤ current-progress.md 打印机型号记录更新 | Claude Code |
 | 2026-05-27 | Phase 8.1B 真机联调前置修正：新增 `GET /api/v1/test/sample-visible.pdf` 可见 PDF 样本，`ptask_seed_001` 改指向该样本并重新以同一 Buffer 计算 `fileMd5`；Agent 下载相对 `fileUrl` 时按 `apiBaseUrl` 补全服务端 origin，避免 Windows 访问本机 localhost；claim 过期清理定时器增加 `unref()`；`@ai-job-print/api` 与 `terminal-agent` typecheck 通过，服务层 register→heartbeat→claim→PATCH completed 冒烟通过；Windows 真机出纸待沙箱外执行 | Codex |
+| 2026-05-28 | Phase 8.1C/D Windows 真机 E2E 全部通过封板：① `api-client.ts` + `task-runner.ts` 新增 `proxy: false`（根因：Windows `http_proxy` 环境变量 Clash/v2ray 劫持所有 axios 请求，导致注册超时 30s×3 + 下载卡住）；② `task-runner.ts` 新增 `resolveFileUrl()`（处理 backend 返回相对 fileUrl）；③ Windows 真机完整链路：terminalId=t_d41f29b91ee78467，claim→download(8ms,0.9KB)→MD5✓→PATCH printing✓→PDF Method B→783ms→PATCH completed✓→temp file deleted；④ 本地 SQLite `print_tasks` 写入 completed，无 pending_patches（PATCH 成功）；⑤ DPAPI token 持久化跨重启复用，无需重新注册 | Claude Code |
 
 ---
 
