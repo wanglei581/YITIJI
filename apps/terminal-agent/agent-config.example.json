@@ -1,0 +1,10 @@
+{
+  "_comment": "Copy this file to config/agent-config.json and fill in real values before starting the agent.",
+  "apiBaseUrl": "http://192.168.1.160:3000/api/v1",
+  "terminalCode": "T-WIN-001",
+  "adminSecret": "change-me-before-deploy",
+  "printerName": "Pantum CM2800ADN Series",
+  "agentVersion": "0.3.0",
+  "heartbeatIntervalMs": 30000,
+  "claimIntervalMs": 5000
+}

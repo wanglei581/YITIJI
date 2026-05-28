@@ -1,8 +1,9 @@
 node_modules/
 dist/
 
-# Agent config contains agentToken (plain text in Phase 8.1B) — NEVER commit
+# Agent config contains agentToken/terminalId — NEVER commit
 config/agent-config.json
+agent-config.json
 # SQLite state DB (Phase 8.1C+)
 data/*.db
 
