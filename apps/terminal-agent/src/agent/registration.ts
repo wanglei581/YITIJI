@@ -88,7 +88,17 @@ export async function registerOrLoad(config: AgentConfig): Promise<AgentConfig> 
     log(`registration: success — terminalId=${terminalId}`)
     return persistRegistration(config, terminalId, terminalToken)
   } catch (e) {
-    // Re-throw with a clear message so the caller can decide whether to exit
-    throw new Error(`Registration failed: ${axiosErrorMessage(e)}`)
+    // Scrub sensitive values before re-throwing so they never appear in logs
+    const rawMsg = axiosErrorMessage(e)
+    const safeMsg = redactSensitive(rawMsg, [config.adminSecret, config.agentToken])
+    throw new Error(`Registration failed: ${safeMsg}`)
   }
+}
+
+/** Replace each secret value in `message` with '[redacted]'. */
+function redactSensitive(message: string, secrets: Array<string | undefined>): string {
+  return secrets.reduce<string>((acc, secret) => {
+    if (!secret) return acc
+    return acc.split(secret).join('[redacted]')
+  }, message)
 }

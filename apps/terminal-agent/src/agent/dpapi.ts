@@ -102,6 +102,7 @@ function psDecrypt(b64: string): string {
  * Encrypt and persist agentToken to disk.
  *
  * Windows: DPAPI LocalMachine scope → base64 ciphertext written to agent.token.
+ *   Throws if DPAPI encryption fails — plaintext fallback is never used on Windows.
  * Non-Windows (dev): plaintext fallback with a log warning.
  */
 export function saveAgentToken(token: string): void {
@@ -114,14 +115,9 @@ export function saveAgentToken(token: string): void {
     return
   }
 
-  try {
-    const encrypted = psEncrypt(token)
-    fs.writeFileSync(tokenPath, encrypted, 'utf-8')
-    log(`dpapi: agentToken 已加密存储 → ${tokenPath}`)
-  } catch (e) {
-    err(`dpapi: DPAPI 加密失败，回退到明文存储 — ${e instanceof Error ? e.message : String(e)}`)
-    fs.writeFileSync(tokenPath, token, 'utf-8')
-  }
+  const encrypted = psEncrypt(token)
+  fs.writeFileSync(tokenPath, encrypted, 'utf-8')
+  log(`dpapi: agentToken 已加密存储 → ${tokenPath}`)
 }
 
 /**
