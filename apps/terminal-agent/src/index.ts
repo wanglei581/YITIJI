@@ -121,7 +121,10 @@ program
         name: 'AIJobPrintAgent',
         description: 'AI求职打印服务终端 — Windows Terminal Agent',
         script: __filename, // absolute path to this compiled JS file
-        args: ['agent'],
+        // node-windows passes scriptOptions as the argument string to the script.
+        // Use 'agent' so the service launches: node index.js agent
+        // (not args:[], which sets node.exe options, not script subcommands)
+        scriptOptions: 'agent',
       })
       svc.on('install', () => {
         log('Service installed — starting AIJobPrintAgent...')
