@@ -340,13 +340,60 @@
 
 ---
 
-## 📋 下一步方向（Phase 8.1D 封板后）
+## 🚧 Phase 8.2A — Prisma 持久化任务闭环（当前任务）
+
+### 目标
+
+将后端 TerminalsService 从 in-memory 存储迁移至 Prisma + PostgreSQL，确保 API 重启后 terminal 和 print task 状态不丢失。
+
+### 实现要点
+
+| 要点 | 说明 |
+|------|------|
+| Prisma schema | Terminal / PrintTask / TerminalHeartbeat / PrintTaskStatusLog 四张表 |
+| claim 原子性 | `prisma.$transaction` 查 pending → 改 claimed，防并发双领 |
+| 终态不可覆盖 | completed/failed 状态下 PATCH 返回 200（幂等），不写 DB |
+| 种子任务 | 改为 `prisma.printTask.upsert`，API 重启不重复插入 |
+| in-memory → DB | TerminalsService 全部 Map 替换为 Prisma 查询 |
+| 心跳历史 | 每次心跳写 TerminalHeartbeat 记录 |
+
+### 验收标准
+
+- `pnpm --filter @ai-job-print/api prisma migrate dev` 无报错
+- typecheck + build 全通过
+- API 重启后：terminal + ptask_seed_001 不丢失，Agent 重连 claim 成功
+
+---
+
+## 📋 Phase 8.2B — WMI 真实状态查询（Phase 8.2A 完成后）
+
+| 能力 | 说明 |
+|------|------|
+| printerStatus 真实查询 | Agent heartbeat Win32_Printer WMI 查询替换 hardcoded 值 |
+| diskFreeGB 真实查询 | PowerShell Get-PSDrive 或 WMI 查磁盘剩余 |
+| 设备告警上报 | 缺纸/墨粉不足/卡纸 → 后端 alert 记录 |
+
+---
+
+## 📋 Phase 8.2C — 安全加固 + 专项补验（Phase 8.2A 完成后）
+
+| 能力 | 说明 |
+|------|------|
+| 断网重试专项验证 | 真机断网，pending_patches 入队/重试/清空 |
+| 单实例锁专项验证 | 双进程并发，DUPLICATE_INSTANCE exit 1 |
+| Windows 服务专项验证 | install→重启自启→心跳→uninstall 全流程 |
+| actionToken HMAC | HMAC-SHA256 签名校验替换 base64 占位 |
+| lease 续租 | PATCH /terminal-tasks/:id/lease 防长任务超时 |
+| local-api-server | 127.0.0.1:9527，localAuthToken + actionToken 全鉴权 |
+
+---
+
+## 📋 后续方向
 
 | 选项 | 内容 | 说明 |
 |------|------|------|
-| **A — Phase 8.2** | 服务端 Prisma 持久化 + actionToken HMAC + printerStatus WMI + V8.1C-3/4/5 补验 | 生产级加固 |
-| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | 用户体验升级 |
-| **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 类型清债 |
+| **Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | 用户体验升级 |
+| **Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 类型清债 |
 
 ---
 

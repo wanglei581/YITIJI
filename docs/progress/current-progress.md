@@ -25,32 +25,34 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.1C/D 全部封板（2026-05-28），可进入 Phase 8.2 或 Phase 9**
+**当前阶段：Phase 8.2A — Prisma 持久化任务闭环（2026-05-28）**
 
 ---
 
-### ✅ Phase 8.1C/D 全部完成封板（2026-05-28）
+### ✅ Phase 8.1D E2E 打印链路封板（2026-05-28）
 
-> Agent 从"手动运行可用"升级为"现场可长期运行"。  
-> **Windows 真机 5 项验收全部通过（2026-05-28 03:04 UTC）。**  
-> 链路：register → heartbeat → claim → download(8ms,proxy:false) → MD5 ✓ → PATCH printing → PDF Method B → print success(783ms) → PATCH completed → temp file deleted ✅
+> Phase 8.1C 新增能力（DPAPI/SQLite/PID锁/断网重试/服务安装）代码完成，macOS 冒烟通过。  
+> **Phase 8.1D E2E 验证：register→claim→download→MD5→print→PATCH→出纸完整链路通过；DPAPI 加密和 SQLite 幂等在正常流程中得到确认。**  
+> 断网重试专项测试、单实例双进程测试、Windows 服务专项测试（安装/重启自启/卸载）→ Phase 8.2C。
 
-**Phase 8.1D 真机验收结果（terminalId=t_d41f29b91ee78467）：**
+**Phase 8.1D E2E 打印链路验证结果（terminalId=t_d41f29b91ee78467）：**
 
 | 验收项 | 结果 |
 |--------|------|
-| 注册成功（DPAPI 加密 agentToken） | ✅ |
+| 注册成功（DPAPI 加密 agentToken，config.json 无明文 token） | ✅ |
 | 心跳成功（30s 间隔，持续确认） | ✅ |
-| claim ptask_seed_001（5 min 过期后自动重置，agent 重新 claim） | ✅ |
-| 下载（proxy:false，8ms，0.9 KB）| ✅ |
+| Claim ptask_seed_001（5 min 过期自动重置，Agent 重新 claim） | ✅ |
+| 文件下载（proxy:false，8ms，0.9 KB） | ✅ |
 | MD5 校验通过 | ✅ |
 | PATCH status=printing | ✅ |
 | PDF Method B 打印，耗时 783ms | ✅ |
 | PATCH status=completed | ✅ |
 | 临时文件删除 | ✅ |
-| 本地 SQLite DB 写入 completed（重启幂等） | ✅ |
-| 无 pending_patches（backend PATCH 成功） | ✅ |
+| SQLite 写入 completed，无 pending_patches | ✅ |
 | **Pantum CM2800ADN Series 真实出纸（用户确认）** | ✅ |
+| 断网重试专项验证 | ⏳ Phase 8.2C |
+| 单实例双进程专项验证 | ⏳ Phase 8.2C |
+| Windows 服务安装/重启/卸载专项验证 | ⏳ Phase 8.2C |
 
 **新增能力（`apps/terminal-agent/src/agent/`）：**
 
@@ -116,11 +118,12 @@
 | TerminalsModule 注册 + AppModule 接入 | `terminals.module.ts` | ✅ |
 | typecheck 0 errors | — | ✅ |
 
-**Phase 8.1C 未做（Phase 8.1D）：**
-- actionToken HMAC 签名（当前 base64 占位）
-- lease 续租（`PATCH /terminal-tasks/:id/lease`）
-- printerStatus / diskFreeGB 真实 WMI 查询
-- Prisma 持久化（服务端任务状态落库）
+**Phase 8.1C/D 未做（Phase 8.2 分阶段补完）：**
+- Prisma 持久化（服务端任务状态落库）→ **Phase 8.2A**
+- printerStatus / diskFreeGB 真实 WMI 查询 → Phase 8.2B
+- actionToken HMAC 签名（当前 base64 占位）→ Phase 8.2C
+- lease 续租（`PATCH /terminal-tasks/:id/lease`）→ Phase 8.2C
+- 断网重试/单实例/服务安装专项真机验证 → Phase 8.2C
 
 ---
 
@@ -187,7 +190,7 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` 因网络原因未完成，网络可用时补跑 |
-| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.1D 全部封板✅（2026-05-28）；DPAPI/SQLite/PID 锁/断网重试/服务安装/完整 E2E 联调；下一步 Phase 8.2（Prisma 持久化/actionToken HMAC/printerStatus WMI）或 Phase 9 |
+| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.1D E2E 打印链路封板✅（2026-05-28）；DPAPI/SQLite/PID 锁/断网重试/服务安装代码完成；**当前：Phase 8.2A Prisma 持久化** 🚧 |
 | 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
 
 ---
