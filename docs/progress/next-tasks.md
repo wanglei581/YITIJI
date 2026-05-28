@@ -316,7 +316,12 @@
 | typecheck 0 errors / build 通过 / macOS 冒烟验证 | — | ✅ |
 | **Windows 真机 V8.1C-1（DPAPI）+ V8.1C-2（SQLite 幂等）通过** | — | ✅ |
 
-> V8.1C-3（断网重试）/ V8.1C-4（单实例双进程）/ V8.1C-5（服务安装）留待 Phase 8.2 专项验收。
+> V8.1C-3（断网重试）留待 Prisma 后端部署后专项验收。  
+> **V8.1C-4（单实例双进程）✅ 2026-05-28 通过**：发现并修复 Windows EPERM Bug（tasklist 替代 mtime 阈值）。  
+> **V8.1C-5（服务安装）✅ 2026-05-28 通过**：发现并修复 node-windows args→scriptOptions Bug。  
+> - instance-lock.ts：EPERM 分支改用 `tasklist /FO CSV` 可靠检测存活进程，5分钟mtime阈值已废弃  
+> - index.ts：`args:['agent']` 改为 `scriptOptions:'agent'`，服务正确以 agent 子命令启动  
+> - 心跳 404（TERMINAL_NOT_REGISTERED）因 in-memory 后端重启丢失注册 → Prisma 后端部署后解决
 
 ## ✅ Phase 8.1D — Windows 真机 E2E 全部通过（2026-05-28）
 
@@ -340,60 +345,67 @@
 
 ---
 
-## 🚧 Phase 8.2A — Prisma 持久化任务闭环（当前任务）
+## ✅ Phase 8.2A — Prisma 持久化任务闭环（代码已完成，待后端部署验证）
 
-### 目标
+代码由 Codex 完成（2026-05-28），已合并 main。包含：
 
-将后端 TerminalsService 从 in-memory 存储迁移至 Prisma + PostgreSQL，确保 API 重启后 terminal 和 print task 状态不丢失。
-
-### 实现要点
-
-| 要点 | 说明 |
+| 要点 | 状态 |
 |------|------|
-| Prisma schema | Terminal / PrintTask / TerminalHeartbeat / PrintTaskStatusLog 四张表 |
-| claim 原子性 | `prisma.$transaction` 查 pending → 改 claimed，防并发双领 |
-| 终态不可覆盖 | completed/failed 状态下 PATCH 返回 200（幂等），不写 DB |
-| 种子任务 | 改为 `prisma.printTask.upsert`，API 重启不重复插入 |
-| in-memory → DB | TerminalsService 全部 Map 替换为 Prisma 查询 |
-| 心跳历史 | 每次心跳写 TerminalHeartbeat 记录 |
+| Prisma schema（4张表：Terminal/PrintTask/TerminalHeartbeat/PrintTaskStatusLog） | ✅ |
+| `prisma.$transaction` claim 原子性 | ✅ |
+| 终态不可覆盖（completed/failed 幂等） | ✅ |
+| `prisma.printTask.upsert` 种子任务（API 重启不重复插入） | ✅ |
+| TerminalsService 全部 Map → Prisma 查询 | ✅ |
+| PrismaService NestJS DI（@prisma/adapter-libsql，SQLite dev） | ✅ |
+| 迁移文件（20260528032954_init_terminals） | ✅ |
+| typecheck + build 通过 | ✅ |
 
-### 验收标准
-
-- `pnpm --filter @ai-job-print/api prisma migrate dev` 无报错
-- typecheck + build 全通过
-- API 重启后：terminal + ptask_seed_001 不丢失，Agent 重连 claim 成功
+待验证：
+- [ ] 后端部署到 192.168.1.160，运行 `prisma migrate deploy`，重启 API
+- [ ] Agent 重连后 terminal 不丢失，心跳 200（非 404）
+- [ ] ptask_seed_001 持久化，重启后 Agent 可 claim
 
 ---
 
-## 📋 Phase 8.2B — WMI 真实状态查询（Phase 8.2A 完成后）
+## ✅ Phase 8.2B — WMI 真实状态查询（代码已完成）
 
-| 能力 | 说明 |
+代码由 Codex 完成（2026-05-28），已合并 main。
+
+| 能力 | 状态 |
 |------|------|
-| printerStatus 真实查询 | Agent heartbeat Win32_Printer WMI 查询替换 hardcoded 值 |
-| diskFreeGB 真实查询 | PowerShell Get-PSDrive 或 WMI 查磁盘剩余 |
-| 设备告警上报 | 缺纸/墨粉不足/卡纸 → 后端 alert 记录 |
+| wmi.ts：Win32_Printer WMI 查询（printerStatus） | ✅ |
+| wmi.ts：Get-PSDrive 查磁盘（diskFreeGB） | ✅ |
+| heartbeat.ts 接入 WMI 查询（Promise.all 并行） | ✅ |
+| macOS 降级（返回 'unknown' / -1） | ✅ |
+
+待验证：
+- [ ] Windows 真机心跳包含真实 printerStatus（ready/offline/error/low_paper）
+- [ ] 缺纸/断电时 WMI 状态变化验证
 
 ---
 
-## 📋 Phase 8.2C — 安全加固 + 专项补验（Phase 8.2A 完成后）
+## ✅ Phase 8.2C — 安全加固（代码已完成）+ V8.1C-4/5 通过
 
-| 能力 | 说明 |
+| 能力 | 状态 |
 |------|------|
-| 断网重试专项验证 | 真机断网，pending_patches 入队/重试/清空 |
-| 单实例锁专项验证 | 双进程并发，DUPLICATE_INSTANCE exit 1 |
-| Windows 服务专项验证 | install→重启自启→心跳→uninstall 全流程 |
-| actionToken HMAC | HMAC-SHA256 签名校验替换 base64 占位 |
-| lease 续租 | PATCH /terminal-tasks/:id/lease 防长任务超时 |
-| local-api-server | 127.0.0.1:9527，localAuthToken + actionToken 全鉴权 |
+| **V8.1C-4 单实例锁 Windows EPERM Bug 修复** | ✅ 2026-05-28 验证通过 |
+| **V8.1C-5 服务安装 scriptOptions Bug 修复** | ✅ 2026-05-28 验证通过 |
+| instance-lock：tasklist 替代 mtime 5分钟阈值 | ✅ |
+| install-service：args→scriptOptions 修复 | ✅ |
+| V8.1C-3 断网重试专项验证 | ⏳ 待 Prisma 后端部署后验证 |
+| Windows 服务重启自启动验证 | ⏳ 待真机 reboot 验证 |
+| actionToken HMAC | 代码待实现 |
+| lease 续租 | 代码待实现 |
 
 ---
 
-## 📋 后续方向
+## 📋 后续方向（当前阶段：所有 8.2 代码封板）
 
 | 选项 | 内容 | 说明 |
 |------|------|------|
-| **Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | 用户体验升级 |
-| **Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 类型清债 |
+| **A — Prisma 后端部署验证** | 将 Prisma 后端部署到 192.168.1.160，验证心跳/claim 持久化 | V8.1C-3/断网重试/reboot也在此完成 |
+| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | Mac 上开发，无需 Windows |
+| **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | Mac 上开发，类型清债 |
 
 ---
 

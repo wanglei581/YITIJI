@@ -25,7 +25,18 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.2C — Prisma持久化 + HMAC actionToken + WMI心跳 + 安全加固（2026-05-28）**
+**当前阶段：Phase 8.2 代码封板 — V8.1C-4/5 通过，两个 Bug 修复（2026-05-28）**
+
+**V8.1C-4/5 Windows 验证结果（2026-05-28）：**
+
+| 验收项 | 结果 | 说明 |
+|--------|:----:|------|
+| V8.1C-4 单实例双进程（DUPLICATE_INSTANCE） | ✅ | 发现并修复 Windows EPERM Bug |
+| V8.1C-5 服务安装/启动/卸载 | ✅ | 发现并修复 node-windows scriptOptions Bug |
+
+**发现 Bug（已修复并提交）：**
+- `instance-lock.ts`：EPERM 分支用 mtime 5分钟阈值 → 长运行 Agent 被误判为过期锁，允许双实例。修复：改用 `tasklist /FO CSV` 精确判断进程存活。
+- `index.ts`：`args:['agent']` 设置 node.exe flags 而非脚本参数 → 服务启动时显示 help 退出。修复：改为 `scriptOptions:'agent'`。
 
 ---
 
