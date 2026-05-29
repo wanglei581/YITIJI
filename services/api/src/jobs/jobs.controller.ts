@@ -26,11 +26,15 @@
 //   PATCH /partner/fairs/:id/publish    — 下架招聘会
 // ============================================================
 
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
 import { JobsService } from './jobs.service'
 import { ReviewActionDto } from './dto/review.dto'
 import { PublishActionDto } from './dto/publish.dto'
 import { ImportJobsDto } from './dto/import-jobs.dto'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
+import { Roles } from '../common/decorators/roles.decorator'
+import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { ImportFairsDto } from './dto/import-fairs.dto'
 
 @Controller()
@@ -123,9 +127,23 @@ export class JobsController {
     return this.jobsService.getPartnerJobs(sourceOrgId)
   }
 
+  /**
+   * Phase #5 — Partner 导入岗位(只能写入自己机构,默认 pending+draft)。
+   *
+   * 安全约束:
+   *  - JwtAuthGuard:必须带有效 JWT
+   *  - @Roles('partner'):admin / kiosk token 一律 403
+   *  - forbidNonWhitelisted:body 出现任何超出白名单的字段
+   *    (候选人姓名 / 邮箱 / 电话 / 简历 / Offer 等)直接 400 拒绝
+   *  - sourceOrgId 不读 body,强制取 req.user.orgId,杜绝跨机构污染
+   *
+   * 合规边界:本接口仅接收"岗位展示信息",不接收求职者数据。
+   */
   @Post('partner/jobs/import')
-  importJobs(@Body() dto: ImportJobsDto) {
-    return this.jobsService.importJobs(dto)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  async importJobs(@Body() dto: ImportJobsDto, @CurrentUser() user: AuthedUser) {
+    return this.jobsService.importJobs(dto.items, user)
   }
 
   @Patch('partner/jobs/:id/publish')

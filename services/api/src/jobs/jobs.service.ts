@@ -11,11 +11,13 @@
 // - 不返回 apiSecret / accessToken / 凭证字段
 // ============================================================
 
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common'
 import type { ReviewAction } from './dto/review.dto'
 import type { PublishAction } from './dto/publish.dto'
-import type { ImportJobsDto } from './dto/import-jobs.dto'
+import type { ImportJobItemDto } from './dto/import-jobs.dto'
 import type { ImportFairsDto } from './dto/import-fairs.dto'
+import { PrismaService } from '../prisma/prisma.service'
+import type { AuthedUser } from '../common/decorators/current-user.decorator'
 
 // ─── Internal types (not imported from shared — ESM/CJS incompatibility) ──────
 
@@ -313,6 +315,42 @@ function toPartnerJobDto(r: JobRecord): PartnerJobDto {
   }
 }
 
+/**
+ * Phase #5 — 把 Prisma Job 模型映射为前端通用的 PartnerJobDto。
+ * 与 toPartnerJobDto(in-memory JobRecord 版本)并存,等所有路径迁
+ * 到 Prisma 后再统一删除内存版本。
+ */
+function prismaJobToPartnerDto(j: {
+  id: string; externalId: string; title: string; company: string; city: string
+  sourceUrl: string; syncTime: Date
+  reviewStatus: string; publishStatus: string
+  sourceOrgId: string; sourceName: string
+}): PartnerJobDto {
+  return {
+    id: j.id, externalId: j.externalId, title: j.title, company: j.company, city: j.city,
+    sourceUrl: j.sourceUrl,
+    syncTime: j.syncTime.toISOString().replace('T', ' ').slice(0, 16),
+    reviewStatus:  j.reviewStatus  as ReviewStatus,
+    publishStatus: j.publishStatus as PublishStatus,
+    sourceOrgId: j.sourceOrgId, sourceName: j.sourceName,
+  }
+}
+
+/**
+ * Import DTO 的 workType('full_time' / 'part_time' / 'internship' / 'contract')
+ * 映射到 Prisma Job.category('fulltime' / 'parttime' / 'intern' / 'campus')。
+ * 'contract' 暂归 'fulltime'(雇佣形式上接近全职合同制,后续可独立分类)。
+ */
+function mapWorkTypeToCategory(workType: string): string {
+  switch (workType) {
+    case 'full_time':  return 'fulltime'
+    case 'part_time':  return 'parttime'
+    case 'internship': return 'intern'
+    case 'contract':   return 'fulltime'
+    default:           return 'fulltime'
+  }
+}
+
 function toPartnerFairDto(r: FairRecord): PartnerFairDto {
   return {
     id: r.id, externalId: r.externalId, name: r.name, organizer: r.organizer,
@@ -341,8 +379,11 @@ function genId(): string { return `gen-${Date.now()}-${Math.random().toString(36
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name)
   private jobs:  JobRecord[]  = [...SEED_JOBS]
   private fairs: FairRecord[] = [...SEED_FAIRS]
+
+  constructor(private readonly prisma: PrismaService) {}
 
   // ── Kiosk: published data only ──────────────────────────────────────────────
 
@@ -456,25 +497,74 @@ export class JobsService {
     return data.reverse().map(toPartnerJobDto)
   }
 
-  importJobs(dto: ImportJobsDto): ImportResult<PartnerJobDto> {
-    const now    = nowIso()
-    const sync   = new Date().toISOString().replace('T', ' ').slice(0, 16)
-    const added: JobRecord[] = dto.items.map((item) => ({
-      id: genId(),
-      title: item.title, company: item.company, city: item.city,
-      salary: item.salary, tags: item.tags ?? [], industry: item.industry,
-      workType: item.workType as WorkType | undefined,
-      headcount: item.headcount,
-      description: item.description, requirements: item.requirements,
-      sourceOrgId: dto.sourceOrgId, externalId: item.externalId,
-      sourceName: dto.sourceName, sourceUrl: item.sourceUrl,
-      syncTime: sync,
-      reviewStatus: 'pending',   // Partner 导入默认 pending
-      publishStatus: 'draft',    // Partner 导入默认 draft
-      createdAt: now, updatedAt: now,
-    }))
-    this.jobs.push(...added)
-    return { imported: added.length, items: added.map(toPartnerJobDto) }
+  /**
+   * Phase #5 — Partner 导入岗位,落 Job 表(替代 0a/0b 之前的内存数组)。
+   *
+   * 关键约束:
+   *  - sourceOrgId 强制取自 JWT 的 user.orgId,不读 body
+   *  - sourceName 来自 DB 中机构当前名,不读 body
+   *  - 默认 reviewStatus='pending' / publishStatus='draft'
+   *  - 重复(sourceOrgId, externalId)走 upsert 幂等(只更新展示字段,
+   *    不改审核/发布状态,避免"刷字段绕过审核"攻击面)
+   */
+  async importJobs(items: ImportJobItemDto[], user: AuthedUser): Promise<ImportResult<PartnerJobDto>> {
+    if (user.role !== 'partner' || !user.orgId) {
+      // RolesGuard 已挡掉非 partner;orgId 缺失是数据异常
+      throw new BadRequestException({
+        error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' },
+      })
+    }
+
+    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({
+        error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' },
+      })
+    }
+
+    const sourceOrgId = org.id
+    const sourceName  = org.name
+    const sync        = new Date()
+
+    const out: PartnerJobDto[] = []
+    for (const item of items) {
+      try {
+        const job = await this.prisma.job.upsert({
+          where: { sourceOrgId_externalId: { sourceOrgId, externalId: item.externalId } },
+          create: {
+            sourceOrgId, externalId: item.externalId, sourceName,
+            sourceUrl: item.sourceUrl,
+            title: item.title, company: item.company, city: item.city,
+            category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
+            salary: item.salary,
+            description: item.description, requirements: item.requirements,
+            tagsJson: JSON.stringify(item.tags ?? []),
+            // 强制 pending + draft — 合规红线,不允许 body 覆盖
+            reviewStatus: 'pending', publishStatus: 'draft',
+            syncTime: sync,
+          },
+          update: {
+            // 重复导入只刷新展示字段 + 来源,审核/发布状态保留
+            sourceName, sourceUrl: item.sourceUrl,
+            title: item.title, company: item.company, city: item.city,
+            category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
+            salary: item.salary,
+            description: item.description, requirements: item.requirements,
+            tagsJson: JSON.stringify(item.tags ?? []),
+            syncTime: sync,
+          },
+        })
+        out.push(prismaJobToPartnerDto(job))
+      } catch (e) {
+        this.logger.error(`importJobs upsert failed: orgId=${sourceOrgId} extId=${item.externalId}`, e as Error)
+        throw new InternalServerErrorException({
+          error: { code: 'IMPORT_FAILED', message: '岗位导入失败,请稍后重试' },
+        })
+      }
+    }
+
+    this.logger.log(`importJobs: orgId=${sourceOrgId} count=${out.length}`)
+    return { imported: out.length, items: out }
   }
 
   unpublishPartnerJob(id: string, sourceOrgId?: string): PartnerJobDto {
