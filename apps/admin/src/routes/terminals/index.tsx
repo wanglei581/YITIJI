@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Card, StatusBadge } from '@ai-job-print/ui'
-import { Page } from '../Page'
 import { MonitorIcon } from 'lucide-react'
 
 // ─── Types & mock ─────────────────────────────────────────────────────────────
@@ -64,10 +63,9 @@ export default function TerminalsPage() {
   }
 
   return (
-    <Page
-      title="终端管理"
-      subtitle={`共 ${terminals.length} 台终端`}
-    >
+    <>
+      <p className="mb-4 text-sm text-gray-500">共 {terminals.length} 台终端</p>
+
       {/* 筛选标签 */}
       <div className="mb-4 flex gap-2">
         {FILTERS.map((f) => (
@@ -153,6 +151,6 @@ export default function TerminalsPage() {
       <p className="mt-3 text-xs text-gray-400">
         终端数据由 Windows Terminal Agent 实时上报，当前为 mock 数据
       </p>
-    </Page>
+    </>
   )
 }

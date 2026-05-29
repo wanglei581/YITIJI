@@ -6,14 +6,12 @@ import {
   BotIcon,
   BriefcaseIcon,
   Building2Icon,
-  CableIcon,
   CalendarIcon,
   ConciergeBellIcon,
   FileTextIcon,
   FolderIcon,
   LayoutDashboardIcon,
   MonitorIcon,
-  PrinterIcon,
   ScrollTextIcon,
   ShieldIcon,
   UsersIcon,
@@ -21,9 +19,8 @@ import {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
-  { key: 'terminals',    label: '终端管理',     icon: MonitorIcon,         group: '设备管理' },
-  { key: 'printers',     label: '打印机管理',   icon: PrinterIcon },
-  { key: 'peripherals',  label: '外设管理',     icon: CableIcon },
+  { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维' },
+  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon,   badge: 3 },
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理' },
   { key: 'files',        label: '文件管理',     icon: FolderIcon },
   { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon },
@@ -32,16 +29,18 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'fairs',        label: '招聘会管理',   icon: ConciergeBellIcon },
   { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户' },
   { key: 'users',        label: '用户管理',     icon: UsersIcon },
-  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon,   group: '系统管理', badge: 3 },
-  { key: 'permissions',  label: '权限管理',     icon: ShieldIcon },
+  { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理' },
   { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon },
 ]
 
+// 历史路径(/terminals 等)在 routes 层重定向到 /devices?tab=…,
+// 这里把它们一并映射到 devices 菜单 key,保证侧栏高亮一致。
 const PATH_TO_KEY: Record<string, string> = {
   '/':             'dashboard',
-  '/terminals':    'terminals',
-  '/printers':     'printers',
-  '/peripherals':  'peripherals',
+  '/devices':      'devices',
+  '/terminals':    'devices',
+  '/printers':     'devices',
+  '/peripherals':  'devices',
   '/orders':       'orders',
   '/files':        'files',
   '/ai-services':  'ai-services',
@@ -55,9 +54,18 @@ const PATH_TO_KEY: Record<string, string> = {
   '/audit':        'audit',
 }
 
-const KEY_TO_PATH: Record<string, string> = Object.fromEntries(
-  Object.entries(PATH_TO_KEY).map(([path, key]) => [key, path])
-)
+// 反向映射:菜单 key → 落地路径。
+// 多对一时(/devices /terminals /printers /peripherals → 'devices')
+// 必须显式选 canonical 路径,否则 Object.fromEntries 取最后一个会把
+// "设备管理" 菜单跳到 /peripherals(空 Tab)。
+const KEY_TO_PATH: Record<string, string> = (() => {
+  const out: Record<string, string> = {}
+  for (const [path, key] of Object.entries(PATH_TO_KEY)) {
+    // 首次写入即胜出 → /devices 是第一个,所以 devices key 落到 /devices
+    if (!(key in out)) out[key] = path
+  }
+  return out
+})()
 
 export function AdminLayoutWrapper() {
   const navigate = useNavigate()

@@ -1,16 +1,32 @@
-import type { ReviewStatus, PublishStatus, JobFairStatus } from '@ai-job-print/shared'
+import type {
+  ReviewStatus,
+  PublishStatus,
+  JobFairStatus,
+  SourceKind,
+  AccessMode,
+} from '@ai-job-print/shared'
 
-export type { ReviewStatus, PublishStatus, JobFairStatus }
+export type { ReviewStatus, PublishStatus, JobFairStatus, SourceKind, AccessMode }
 
 // ─── Data Sources ─────────────────────────────────────────────────────────────
 
 export type ConnStatus = 'connected' | 'error' | 'disabled'
 export type SyncFreq   = 'manual' | 'hourly' | 'daily' | 'weekly'
 
+/**
+ * Partner 端数据源。
+ *
+ * 数据源用 `sourceKind × accessMode` 双维度刻画:
+ * - sourceKind:数据由谁提供(招聘平台 / 高校 / 人社局 / 招聘会主办方 / 聚合平台 / 手动)
+ * - accessMode:用什么方式拉取(api / excel / csv / json / webhook / manual)
+ *
+ * 旧字段 `sourceType: 'excel'|'api'|'webhook'` 已在 B0 阶段废弃。
+ */
 export interface PartnerDataSource {
   id: string
   name: string
-  sourceType: 'excel' | 'api' | 'webhook'
+  sourceKind: SourceKind
+  accessMode: AccessMode
   syncFreq: SyncFreq
   lastSyncTime: string
   connStatus: ConnStatus

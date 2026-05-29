@@ -10,15 +10,20 @@ import {
   PlusIcon,
   XIcon,
 } from 'lucide-react'
-import type { PartnerDataSource, ConnStatus, SyncFreq } from '../../services/api'
+import type { AccessMode, PartnerDataSource, ConnStatus, SyncFreq } from '../../services/api'
 import { getDataSources, toggleDataSource, createDataSource } from '../../services/api'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
-const TYPE_STYLE: Record<PartnerDataSource['sourceType'], { label: string; style: string }> = {
-  excel:   { label: 'Excel',   style: 'bg-green-50 text-green-600'   },
+// 接入方式(AccessMode):描述"用什么方式拉取数据"。
+// sourceKind(数据由谁提供)留待 B1 阶段加入列与筛选。
+const ACCESS_MODE_STYLE: Record<AccessMode, { label: string; style: string }> = {
   api:     { label: 'API',     style: 'bg-blue-50 text-blue-600'     },
+  excel:   { label: 'Excel',   style: 'bg-green-50 text-green-600'   },
+  csv:     { label: 'CSV',     style: 'bg-green-50 text-green-600'   },
+  json:    { label: 'JSON',    style: 'bg-green-50 text-green-600'   },
   webhook: { label: 'Webhook', style: 'bg-purple-50 text-purple-600' },
+  manual:  { label: '手动',    style: 'bg-gray-100 text-gray-600'    },
 }
 const CONN_MAP: Record<ConnStatus, { badge: 'success' | 'error' | 'default'; label: string }> = {
   connected: { badge: 'success', label: '已连接'  },
@@ -544,14 +549,14 @@ export default function SourcesPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
-                {['数据源名称', '类型', '说明', '同步频率', '最近同步', '连接状态', '成功数', '失败数', '操作'].map((h) => (
+                {['数据源名称', '接入方式', '说明', '同步频率', '最近同步', '连接状态', '成功数', '失败数', '操作'].map((h) => (
                   <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sources.map((s) => {
-                const st   = TYPE_STYLE[s.sourceType]
+                const st   = ACCESS_MODE_STYLE[s.accessMode]
                 const conn = CONN_MAP[s.connStatus]
                 return (
                   <tr key={s.id} className={`hover:bg-gray-50 ${s.connStatus === 'disabled' ? 'opacity-60' : ''}`}>

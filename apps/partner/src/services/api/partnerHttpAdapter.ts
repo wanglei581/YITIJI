@@ -81,7 +81,12 @@ export const partnerHttpAdapter = {
   toggleDataSource: (id: string) =>
     patch<PartnerDataSource>(`/partner/data-sources/${id}/toggle`, {}),
   createDataSource: (name: string) =>
-    post<PartnerDataSource>('/partner/data-sources', { name, sourceType: 'excel', syncFreq: 'manual' }),
+    post<PartnerDataSource>('/partner/data-sources', {
+      name,
+      sourceKind: 'manual',
+      accessMode: 'excel',
+      syncFreq: 'manual',
+    }),
 
   // Jobs
   getPartnerJobs: () =>

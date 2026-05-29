@@ -1,9 +1,15 @@
 import { API_MODE } from './client'
 import { partnerMockAdapter } from './partnerMockAdapter'
 import { partnerHttpAdapter } from './partnerHttpAdapter'
-import type { PartnerDataSource, ConnStatus, SyncFreq } from './types'
+import type {
+  PartnerDataSource,
+  ConnStatus,
+  SyncFreq,
+  SourceKind,
+  AccessMode,
+} from './types'
 
-export type { PartnerDataSource, ConnStatus, SyncFreq }
+export type { PartnerDataSource, ConnStatus, SyncFreq, SourceKind, AccessMode }
 
 export interface PartnerDataSourceServiceInterface {
   getDataSources(): Promise<PartnerDataSource[]>

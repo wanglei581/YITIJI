@@ -15,11 +15,11 @@ function delay(): Promise<void> {
 // ─── Data Sources ─────────────────────────────────────────────────────────────
 
 let DATA_SOURCES: PartnerDataSource[] = [
-  { id: 'ds1', name: '市人才网 API',       sourceType: 'api',     syncFreq: 'hourly',  lastSyncTime: '2026-05-25 09:00', connStatus: 'connected', successCount: 158, failCount: 3,  description: 'RESTful API，每小时自动拉取岗位和招聘会数据' },
-  { id: 'ds2', name: '高校就业信息 Excel', sourceType: 'excel',   syncFreq: 'manual',  lastSyncTime: '2026-05-24 18:00', connStatus: 'connected', successCount: 42,  failCount: 8,  description: '手动上传 Excel 模板，自动解析岗位字段' },
-  { id: 'ds3', name: '市人社局 Webhook',   sourceType: 'webhook', syncFreq: 'manual',  lastSyncTime: '2026-05-24 12:00', connStatus: 'connected', successCount: 26,  failCount: 0,  description: '接收市人社局推送的招聘会通知数据' },
-  { id: 'ds4', name: '第三方招聘平台 API', sourceType: 'api',     syncFreq: 'daily',   lastSyncTime: '2026-05-24 06:00', connStatus: 'error',     successCount: 91,  failCount: 12, description: 'API Token 已过期，请重新配置连接参数' },
-  { id: 'ds5', name: '校园兼职平台导入',   sourceType: 'excel',   syncFreq: 'weekly',  lastSyncTime: '2026-05-20 10:00', connStatus: 'disabled',  successCount: 15,  failCount: 2,  description: '已停用，如需恢复请联系管理员' },
+  { id: 'ds1', name: '市人才网 API',       sourceKind: 'aggregator', accessMode: 'api',     syncFreq: 'hourly',  lastSyncTime: '2026-05-25 09:00', connStatus: 'connected', successCount: 158, failCount: 3,  description: 'RESTful API，每小时自动拉取岗位和招聘会数据' },
+  { id: 'ds2', name: '高校就业信息 Excel', sourceKind: 'school',     accessMode: 'excel',   syncFreq: 'manual',  lastSyncTime: '2026-05-24 18:00', connStatus: 'connected', successCount: 42,  failCount: 8,  description: '手动上传 Excel 模板，自动解析岗位字段' },
+  { id: 'ds3', name: '市人社局 Webhook',   sourceKind: 'aggregator', accessMode: 'webhook', syncFreq: 'manual',  lastSyncTime: '2026-05-24 12:00', connStatus: 'connected', successCount: 26,  failCount: 0,  description: '接收市人社局推送的招聘会通知数据' },
+  { id: 'ds4', name: '第三方招聘平台 API', sourceKind: 'job_platform', accessMode: 'api',   syncFreq: 'daily',   lastSyncTime: '2026-05-24 06:00', connStatus: 'error',     successCount: 91,  failCount: 12, description: 'API Token 已过期，请重新配置连接参数' },
+  { id: 'ds5', name: '校园兼职平台导入',   sourceKind: 'school',     accessMode: 'excel',   syncFreq: 'weekly',  lastSyncTime: '2026-05-20 10:00', connStatus: 'disabled',  successCount: 15,  failCount: 2,  description: '已停用，如需恢复请联系管理员' },
 ]
 
 // ─── Jobs (R2: added sourceName) ──────────────────────────────────────────────
@@ -82,7 +82,7 @@ export const partnerMockAdapter = {
   async createDataSource(name: string): Promise<PartnerDataSource> {
     await delay()
     const newSource: PartnerDataSource = {
-      id: `ds${Date.now()}`, name, sourceType: 'excel', syncFreq: 'manual',
+      id: `ds${Date.now()}`, name, sourceKind: 'manual', accessMode: 'excel', syncFreq: 'manual',
       lastSyncTime: '刚刚', connStatus: 'connected', successCount: 0, failCount: 0,
       description: '新建 Excel 数据源，导入批次待管理员审核',
     }

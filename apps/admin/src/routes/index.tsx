@@ -1,10 +1,8 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AdminLayoutWrapper } from '../layouts/AdminLayoutWrapper'
 
 import DashboardPage from './dashboard'
-import TerminalsPage from './terminals'
-import PrintersPage from './printers'
-import PeripheralsPage from './peripherals'
+import DevicesPage from './devices'
 import OrdersPage from './orders'
 import FilesPage from './files'
 import AiServicesPage from './ai-services'
@@ -23,9 +21,11 @@ export const adminRouter = createBrowserRouter([
     element: <AdminLayoutWrapper />,
     children: [
       { index: true,          element: <DashboardPage /> },
-      { path: 'terminals',    element: <TerminalsPage /> },
-      { path: 'printers',     element: <PrintersPage /> },
-      { path: 'peripherals',  element: <PeripheralsPage /> },
+      { path: 'devices',      element: <DevicesPage /> },
+      // 历史路径重定向到合并后的设备管理 Tab
+      { path: 'terminals',    element: <Navigate to="/devices?tab=terminals"   replace /> },
+      { path: 'printers',     element: <Navigate to="/devices?tab=printers"    replace /> },
+      { path: 'peripherals',  element: <Navigate to="/devices?tab=peripherals" replace /> },
       { path: 'orders',       element: <OrdersPage /> },
       { path: 'files',        element: <FilesPage /> },
       { path: 'ai-services',  element: <AiServicesPage /> },
