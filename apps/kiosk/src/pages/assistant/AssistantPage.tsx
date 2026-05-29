@@ -23,7 +23,7 @@ const ALLOWED_ROUTE_PREFIXES = [
   '/scan/',
   '/jobs',
   '/job-fairs',
-  '/policy',
+  '/renshi',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
@@ -72,7 +72,7 @@ const WELCOME_MESSAGE: Message = {
     { label: '查看简历服务', route: '/resume/source' },
     { label: '浏览岗位信息', route: '/jobs' },
     { label: '查看招聘会',   route: '/job-fairs' },
-    { label: '政策服务',     route: '/policy' },
+    { label: '人社专区',     route: '/renshi' },
   ],
 }
 

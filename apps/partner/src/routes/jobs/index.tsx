@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { BriefcaseIcon, DownloadIcon, PlusIcon } from 'lucide-react'
+import { BriefcaseIcon, PlusIcon } from 'lucide-react'
 import type {
   PartnerJobRecord,
   JobCategory,
@@ -26,11 +26,11 @@ const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' |
   rejected:  { badge: 'error',   label: '已拒绝' },
 }
 
-const PUBLISH_MAP: Record<PublishStatus, { badge: 'success' | 'warning' | 'default'; label: string }> = {
-  draft:       { badge: 'warning', label: '待发布' },
-  published:   { badge: 'success', label: '已发布' },
-  unpublished: { badge: 'default', label: '已下架' },
-  expired:     { badge: 'default', label: '已过期' },
+const PUBLISH_MAP: Record<PublishStatus, { dot: string; label: string }> = {
+  draft:       { dot: 'bg-orange-400', label: '待发布' },
+  published:   { dot: 'bg-green-500',  label: '已发布' },
+  unpublished: { dot: 'bg-gray-300',   label: '已下架' },
+  expired:     { dot: 'bg-gray-300',   label: '已过期' },
 }
 
 const CATEGORY_FILTERS = ['全部', '全职', '实习', '校招', '兼职'] as const
@@ -102,16 +102,10 @@ export default function JobsPage() {
       title="岗位信息管理"
       subtitle={`共 ${jobs.length} 条岗位`}
       actions={
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="flex items-center gap-1.5">
-            <DownloadIcon className="h-4 w-4" />
-            导入岗位
-          </Button>
-          <Button size="sm" variant="primary" className="flex items-center gap-1.5">
-            <PlusIcon className="h-4 w-4" />
-            新增岗位
-          </Button>
-        </div>
+        <Button size="sm" variant="primary" className="flex items-center gap-1.5">
+          <PlusIcon className="h-4 w-4" />
+          新增岗位
+        </Button>
       }
     >
       {/* 双行筛选 */}
@@ -193,7 +187,12 @@ export default function JobsPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{j.syncTime}</td>
                       <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
-                      <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                          <span className={`h-1.5 w-1.5 rounded-full ${publish.dot}`} aria-hidden="true" />
+                          {publish.label}
+                        </span>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">
                           <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">编辑</button>

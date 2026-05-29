@@ -10,7 +10,6 @@ import { FairMaterialsPage } from '../pages/job-fairs/FairMaterialsPage'
 import { FairStatsPage } from '../pages/job-fairs/FairStatsPage'
 import { JobsPage } from '../pages/jobs/JobsPage'
 import { JobDetailPage } from '../pages/jobs/JobDetailPage'
-import { PolicyPage } from '../pages/policy/PolicyPage'
 import { ScanStartPage } from '../pages/scan/ScanStartPage'
 import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
 import { ScanProgressPage } from '../pages/scan/ScanProgressPage'
@@ -38,7 +37,6 @@ export const kioskRouter = createBrowserRouter([
       { index: true,               element: <HomePage /> },
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
-      { path: 'policy',            element: <PolicyPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
