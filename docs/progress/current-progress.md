@@ -25,9 +25,9 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.2 全部封板 — V8.1C-3/4/5 + reboot 全部通过（2026-05-28）**
+**当前阶段：Phase 8.2 全部封板 + Mac 真实后端 E2E 验证通过（2026-05-29）**
 
-**V8.1C-4/5 Windows 验证结果（2026-05-28）：**
+**V8.1C-4/5 + Mac 真实后端验证结果：**
 
 | 验收项 | 结果 | 说明 |
 |--------|:----:|------|
@@ -37,6 +37,9 @@
 | V8.1C-5 reboot 自启动（STATE:4 RUNNING 开机自动拉起） | ✅ | 真机重启验证 |
 | V8.2B WMI（printerStatus=ready, diskFreeGB=158.98） | ✅ | 真实 Win32_Printer WMI 查询 |
 | Prisma E2E（注册→心跳→claim→下载→MD5→打印→PATCH） | ✅ | 本机 Prisma SQLite 后端 |
+| Mac 真实后端注册（terminalId=t_f77d716786118f78，DPAPI 加密） | ✅ | Windows→Mac 192.168.1.164:3000 跨机验证 |
+| Mac API 重启后心跳持续 200（注册不丢失） | ✅ | Prisma 持久化确认，terminalId 跨重启有效 |
+| Mac 离线期间 task-claim 自动重试（retry 1→2→3→恢复） | ✅ | 离线重试机制跨机验证 |
 
 **发现 Bug（已修复并提交）：**
 - `instance-lock.ts`：EPERM 分支用 mtime 5分钟阈值 → 长运行 Agent 被误判为过期锁，允许双实例。修复：改用 `tasklist /FO CSV` 精确判断进程存活。
