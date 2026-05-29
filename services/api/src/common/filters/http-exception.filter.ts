@@ -1,5 +1,5 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
 import type { ErrorResponseBody } from '../dto/api-response.dto'
 
 @Catch()
@@ -7,6 +7,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
+    const request  = ctx.getRequest<Request & { requestId?: string }>()
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR
     let code = 'INTERNAL_SERVER_ERROR'
@@ -41,6 +42,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const errorBody: ErrorResponseBody = {
       success: false,
       error: { code, message },
+      requestId: request.requestId,
     }
     response.status(status).json(errorBody)
   }
