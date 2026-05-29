@@ -1,76 +1,45 @@
 // ============================================================
-// Jobs Service — Phase 7.10
+// Jobs Service — Phase #4 + #2
 //
-// In-memory store (placeholder until Prisma persistence).
-// Implements all CRUD operations for jobs and fairs.
+// 全部读写走 Prisma(0b/#5 起的方向)。in-memory SEED_JOBS / SEED_FAIRS 已删除,
+// 测试种子数据走 prisma/seed.ts。
 //
-// 合规约束：
-// - Kiosk 只能查询 approved + published 数据
-// - Partner 导入默认 pending + draft，必须经 Admin 审核
-// - Admin approve → approved + draft（不直接发布）
-// - 不返回 apiSecret / accessToken / 凭证字段
+// 合规约束:
+//   - Kiosk 只能查询 reviewStatus=approved + publishStatus=published
+//   - Partner 导入默认 pending + draft,必须经 Admin 审核
+//   - Admin approve → approved + draft(不直接发布);独立 publish 动作发布
+//   - publish 操作前必须断言 reviewStatus === 'approved'(合规红线)
+//   - reject 必须把 publishStatus 强制置回 draft,防"已发布的还挂在 Kiosk"
+//   - 终态(approved / rejected)不可回退到 pending(需 reopen,本阶段未实现)
+//   - 不返回 apiSecret / accessToken / 凭证字段
+//
+// Fair 模型暂未落 Prisma(留待 Phase #3):
+//   读端点(getPublishedFairs / getAllFairSources / getPartnerFairs)返回空,
+//   写端点(reviewFairSource / publishFairSource / importFairs / unpublishPartnerFair)
+//   抛 FAIR_NOT_IMPLEMENTED。
 // ============================================================
 
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common'
 import type { ReviewAction } from './dto/review.dto'
 import type { PublishAction } from './dto/publish.dto'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
-import type { ImportFairsDto } from './dto/import-fairs.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 
-// ─── Internal types (not imported from shared — ESM/CJS incompatibility) ──────
+// ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
 
 type ReviewStatus  = 'pending' | 'reviewing' | 'approved' | 'rejected'
 type PublishStatus = 'draft' | 'published' | 'unpublished' | 'expired'
 type FairStatus    = 'upcoming' | 'ongoing' | 'ended'
 type WorkType      = 'full_time' | 'part_time' | 'internship' | 'contract'
 
-export interface JobRecord {
-  id: string
-  title: string
-  company: string
-  city: string
-  salary?: string
-  tags: string[]
-  description?: string
-  requirements?: string
-  industry?: string
-  workType?: WorkType
-  headcount?: number
-  sourceOrgId: string
-  externalId: string
-  sourceName: string
-  sourceUrl: string
-  syncTime: string
-  reviewStatus: ReviewStatus
-  publishStatus: PublishStatus
-  createdAt: string
-  updatedAt: string
-}
-
-export interface FairRecord {
-  id: string
-  name: string
-  organizer: string
-  startTime: string
-  endTime: string
-  venue: string
-  status: FairStatus
-  description?: string
-  boothCount?: number
-  sourceOrgId: string
-  externalId: string
-  sourceName: string
-  sourceUrl: string
-  syncTime: string
-  reviewStatus: ReviewStatus
-  publishStatus: PublishStatus
-  createdAt: string
-  updatedAt: string
-}
-
-// ─── DTO shapes returned to callers (subset of record, no internal status for kiosk) ─
+// ─── DTO shapes returned to callers ──────────────────────────────────────────
 
 export interface JobListItemDto {
   id: string; title: string; company: string; city: string
@@ -90,8 +59,26 @@ export interface FairListItemDto {
   dataSourceNote: string
 }
 
-export type AdminJobDto  = Omit<JobRecord,  'createdAt' | 'updatedAt'>
-export type AdminFairDto = Omit<FairRecord, 'createdAt' | 'updatedAt'>
+export interface AdminJobDto {
+  id: string
+  title: string; company: string; city: string
+  salary?: string; tags: string[]; description?: string; requirements?: string
+  industry?: string; workType?: WorkType; headcount?: number
+  sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
+  reviewStatus: ReviewStatus; publishStatus: PublishStatus
+  reviewedBy: string | null
+  reviewedAt: string | null
+  rejectReason: string | null
+}
+
+/** Fair admin DTO 形状保留供 Phase #3 落库后使用 */
+export interface AdminFairDto {
+  id: string
+  name: string; organizer: string; startTime: string; endTime: string; venue: string
+  status: FairStatus; description?: string; boothCount?: number
+  sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
+  reviewStatus: ReviewStatus; publishStatus: PublishStatus
+}
 
 export interface PartnerJobDto {
   id: string; externalId: string; title: string; company: string; city: string
@@ -121,215 +108,89 @@ export interface ImportResult<T> {
   items: T[]
 }
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const NOW = '2026-05-26'
-
-const SEED_JOBS: JobRecord[] = [
-  {
-    id: 'j1', title: '前端开发工程师', company: '上海某科技有限公司', city: '上海',
-    salary: '15-25K', tags: ['全职', '前端', 'React'], industry: '互联网/软件',
-    workType: 'full_time', headcount: 2,
-    description: '负责公司 Web 前端开发，需熟悉 React、TypeScript、Tailwind CSS。',
-    requirements: '本科及以上学历，2 年以上前端开发经验，熟悉主流前端框架。',
-    sourceOrgId: 'org-zhilian-001', externalId: 'ZL-2026-884521',
-    sourceName: '智联招聘', sourceUrl: 'https://jobs.zhaopin.com/j/884521',
-    syncTime: `${NOW} 08:00`, reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T08:00:00.000Z`,
-  },
-  {
-    id: 'j2', title: 'Java 后端开发', company: '北京某互联网公司', city: '北京',
-    salary: '20-30K', tags: ['全职', '后端', 'Java', 'Spring'], industry: '互联网/软件',
-    workType: 'full_time', headcount: 3,
-    description: '负责后台服务开发，使用 Spring Boot + MySQL + Redis 技术栈。',
-    requirements: '本科及以上学历，3 年以上 Java 开发经验，熟悉分布式架构。',
-    sourceOrgId: 'org-51job-001', externalId: '51J-20260525-0021',
-    sourceName: '前程无忧', sourceUrl: 'https://www.51job.com/j/20260525-0021',
-    syncTime: `${NOW} 08:00`, reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T08:00:00.000Z`,
-  },
-  {
-    id: 'j3', title: '护士', company: '某三甲医院', city: '本市',
-    salary: '6-10K', tags: ['全职', '医疗', '护理'], industry: '医疗/卫生',
-    workType: 'full_time', headcount: 5,
-    description: '临床护理工作，参与病房护理及患者健康管理。',
-    requirements: '护理专业大专及以上学历，具备护士执业资格证。',
-    sourceOrgId: 'org-city-talent-001', externalId: 'RC-2026-330106',
-    sourceName: '市人才网', sourceUrl: 'https://rcw.city.gov.cn/j/330106',
-    syncTime: `${NOW} 07:30`, reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T07:30:00.000Z`,
-  },
-  {
-    id: 'j4', title: '应届生储备干部', company: '某大型国企', city: '全国',
-    salary: '面议', tags: ['校招', '管培', '全职'], industry: '国有企业',
-    workType: 'full_time', headcount: 20,
-    description: '面向应届毕业生的管理培训生项目，培养未来核心管理人才。',
-    requirements: '2026 届毕业生，本科及以上学历，有良好的沟通和学习能力。',
-    sourceOrgId: 'org-uni-001', externalId: 'GX-2026-CG-0042',
-    sourceName: '高校就业信息网', sourceUrl: 'https://job.uni.edu.cn/j/42',
-    syncTime: `${NOW} 16:00`, reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T16:00:00.000Z`,
-  },
-  {
-    id: 'j5', title: 'UI 设计师', company: '深圳某设计公司', city: '深圳',
-    salary: '12-20K', tags: ['全职', '设计', 'UI/UX'], industry: '设计/创意',
-    workType: 'full_time',
-    description: '负责产品界面设计，需具备扎实的视觉设计能力和用户体验思维。',
-    requirements: '本科及以上学历，3 年以上 UI 设计经验，熟练使用 Figma。',
-    sourceOrgId: 'org-boss-001', externalId: 'BP-M9234712',
-    sourceName: 'Boss 直聘', sourceUrl: 'https://www.zhipin.com/j/M9234712',
-    syncTime: `${NOW} 09:00`, reviewStatus: 'approved', publishStatus: 'draft',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T09:00:00.000Z`,
-  },
-  {
-    id: 'j6', title: '数据分析师', company: '杭州某电商平台', city: '杭州',
-    salary: '18-28K', tags: ['全职', '数据', 'Python', 'SQL'], industry: '电子商务',
-    workType: 'full_time',
-    description: '负责业务数据分析，建立分析模型，输出数据洞察报告。',
-    requirements: '本科及以上学历，2 年以上数据分析经验，熟悉 Python/SQL。',
-    sourceOrgId: 'org-zhilian-001', externalId: 'ZL-2026-892204',
-    sourceName: '智联招聘', sourceUrl: 'https://jobs.zhaopin.com/j/892204',
-    syncTime: `${NOW} 09:00`, reviewStatus: 'reviewing', publishStatus: 'draft',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T09:00:00.000Z`,
-  },
-  {
-    id: 'j7', title: '软件开发实习生', company: '某科技有限公司', city: '上海',
-    salary: '3-5K', tags: ['实习', '前端', 'React'], industry: '互联网/软件',
-    workType: 'internship',
-    description: '协助团队完成前端开发工作，参与产品迭代。',
-    requirements: '在读本科或研究生，熟悉 HTML/CSS/JavaScript，了解 React 优先。',
-    sourceOrgId: 'org-uni-001', externalId: 'UNI-2026-JOB-0041',
-    sourceName: '高校就业信息网', sourceUrl: 'https://job.uni.edu.cn/j/41',
-    syncTime: `${NOW} 08:00`, reviewStatus: 'pending', publishStatus: 'draft',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T08:00:00.000Z`,
-  },
-  {
-    id: 'j8', title: '产品经理', company: '广州某科技公司', city: '广州',
-    salary: '25-40K', tags: ['全职', '产品', 'PM'], industry: '互联网/软件',
-    workType: 'full_time',
-    description: '负责产品规划与设计，协调研发、设计、运营协作推进产品迭代。',
-    requirements: '本科及以上学历，5 年以上产品经理经验，有 ToB 产品经验优先。',
-    sourceOrgId: 'org-boss-001', externalId: 'BP-M9251003',
-    sourceName: 'Boss 直聘', sourceUrl: 'https://www.zhipin.com/j/M9251003',
-    syncTime: `${NOW} 09:00`, reviewStatus: 'rejected', publishStatus: 'draft',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T09:00:00.000Z`,
-  },
-]
-
-const SEED_FAIRS: FairRecord[] = [
-  {
-    id: 'f1', name: '2026 年春季大型招聘会', organizer: '市人力资源和社会保障局',
-    startTime: '2026-06-01 09:00', endTime: '2026-06-01 17:00', venue: '市会展中心 A 馆',
-    status: 'upcoming', boothCount: 120,
-    description: '本市规模最大的春季综合招聘会，汇聚 200 余家企业，提供万余个岗位。',
-    sourceOrgId: 'org-city-hr-001', externalId: 'RSJ-2026-FAIR-001',
-    sourceName: '市人社局', sourceUrl: 'https://hrss.city.gov.cn/fair/2026-spring',
-    syncTime: `${NOW} 10:00`, reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T10:00:00.000Z`,
-  },
-  {
-    id: 'f2', name: '高校双选会（春）', organizer: '某大学就业指导中心',
-    startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',
-    status: 'upcoming', boothCount: 60,
-    description: '面向应届毕业生举办的校园专场招聘会，聚焦互联网、金融、制造业岗位。',
-    sourceOrgId: 'org-uni-001', externalId: 'UNI-2026-FAIR-023',
-    sourceName: '高校就业信息网', sourceUrl: 'https://job.uni.edu.cn/fair/23',
-    syncTime: '2026-05-23 09:00', reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: '2026-05-23T09:00:00.000Z',
-  },
-  {
-    id: 'f3', name: '制造业专场招聘会', organizer: '市人才交流中心',
-    startTime: '2026-05-25 09:00', endTime: '2026-05-25 15:00', venue: 'B 区大厅',
-    status: 'ongoing', boothCount: 45,
-    description: '聚焦制造业、机械、电气工程岗位，提供 500 余个就业机会。',
-    sourceOrgId: 'org-city-talent-001', externalId: 'RC-2026-FAIR-055',
-    sourceName: '市人才网', sourceUrl: 'https://rcw.city.gov.cn/fair/055',
-    syncTime: '2026-05-22 14:00', reviewStatus: 'approved', publishStatus: 'published',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: '2026-05-22T14:00:00.000Z',
-  },
-  {
-    id: 'f4', name: '退役军人专场招聘会', organizer: '市退役军人事务局',
-    startTime: '2026-06-05 09:00', endTime: '2026-06-05 16:00', venue: '市人力资源中心',
-    status: 'upcoming', boothCount: 30,
-    sourceOrgId: 'org-city-hr-001', externalId: 'RSJ-2026-FAIR-002',
-    sourceName: '市人社局', sourceUrl: 'https://hrss.city.gov.cn/fair/military-2026',
-    syncTime: `${NOW} 08:00`, reviewStatus: 'approved', publishStatus: 'draft',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T08:00:00.000Z`,
-  },
-  {
-    id: 'f5', name: '互联网行业专场招聘', organizer: '某大学就业指导中心',
-    startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅',
-    status: 'upcoming', boothCount: 20,
-    sourceOrgId: 'org-uni-001', externalId: 'UNI-2026-FAIR-024',
-    sourceName: '高校就业信息网', sourceUrl: 'https://job.uni.edu.cn/fair/24',
-    syncTime: `${NOW} 09:00`, reviewStatus: 'pending', publishStatus: 'draft',
-    createdAt: `${NOW}T00:00:00.000Z`, updatedAt: `${NOW}T09:00:00.000Z`,
-  },
-]
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function toJobListItem(r: JobRecord): JobListItemDto {
-  return {
-    id: r.id, title: r.title, company: r.company, city: r.city,
-    salary: r.salary, tags: r.tags, industry: r.industry,
-    workType: r.workType, headcount: r.headcount,
-    description: r.description, requirements: r.requirements,
-    sourceOrgId: r.sourceOrgId, externalId: r.externalId,
-    sourceName: r.sourceName, sourceUrl: r.sourceUrl, syncTime: r.syncTime,
-    salaryDisplay: r.salary ?? '薪资面议',
-    dataSourceNote: `数据来源：${r.sourceName} · 同步于 ${r.syncTime.slice(0, 10)} · 仅供参考`,
+function safeJsonArr(s: string): string[] {
+  try {
+    const v = JSON.parse(s)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
   }
 }
 
-function toFairListItem(r: FairRecord): FairListItemDto {
+function fmtSyncTime(d: Date): string {
+  return d.toISOString().replace('T', ' ').slice(0, 16)
+}
+
+/** Prisma Job 行的最小形状(避免在源文件深度依赖 Prisma 命名空间类型) */
+interface PrismaJobRow {
+  id:            string
+  sourceOrgId:   string
+  externalId:    string
+  sourceName:    string
+  sourceUrl:     string
+  title:         string
+  company:       string
+  city:          string
+  category:      string | null
+  salary:        string | null
+  description:   string | null
+  requirements:  string | null
+  tagsJson:      string
+  reviewStatus:  string
+  publishStatus: string
+  reviewedBy:    string | null
+  reviewedAt:    Date   | null
+  rejectReason:  string | null
+  syncTime:      Date
+}
+
+function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
+  const tags = safeJsonArr(j.tagsJson)
   return {
-    id: r.id, name: r.name, organizer: r.organizer,
-    startTime: r.startTime, endTime: r.endTime, venue: r.venue, status: r.status,
-    description: r.description, boothCount: r.boothCount,
-    sourceOrgId: r.sourceOrgId, externalId: r.externalId,
-    sourceName: r.sourceName, sourceUrl: r.sourceUrl, syncTime: r.syncTime,
-    hasManagedData: false, managedCompanyCount: 0, managedMaterialCount: 0,
-    dataSourceNote: `数据来源：${r.sourceName} · 同步于 ${r.syncTime.slice(0, 10)} · 仅供参考`,
+    id: j.id, title: j.title, company: j.company, city: j.city,
+    salary: j.salary ?? undefined, tags,
+    industry: undefined,
+    workType: undefined,
+    headcount: undefined,
+    sourceOrgId: j.sourceOrgId, externalId: j.externalId,
+    sourceName: j.sourceName, sourceUrl: j.sourceUrl,
+    syncTime: fmtSyncTime(j.syncTime),
+    description: j.description ?? undefined,
+    requirements: j.requirements ?? undefined,
+    salaryDisplay: j.salary ?? '薪资面议',
+    dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${j.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
   }
 }
 
-function toAdminJobDto(r: JobRecord): AdminJobDto {
-  return Object.fromEntries(
-    Object.entries(r).filter(([k]) => k !== 'createdAt' && k !== 'updatedAt'),
-  ) as AdminJobDto
-}
-
-function toAdminFairDto(r: FairRecord): AdminFairDto {
-  return Object.fromEntries(
-    Object.entries(r).filter(([k]) => k !== 'createdAt' && k !== 'updatedAt'),
-  ) as AdminFairDto
-}
-
-function toPartnerJobDto(r: JobRecord): PartnerJobDto {
+function prismaJobToAdminDto(j: PrismaJobRow): AdminJobDto {
   return {
-    id: r.id, externalId: r.externalId, title: r.title, company: r.company, city: r.city,
-    sourceUrl: r.sourceUrl, syncTime: r.syncTime,
-    reviewStatus: r.reviewStatus, publishStatus: r.publishStatus,
-    sourceOrgId: r.sourceOrgId, sourceName: r.sourceName,
+    id: j.id,
+    title: j.title, company: j.company, city: j.city,
+    salary: j.salary ?? undefined,
+    tags: safeJsonArr(j.tagsJson),
+    description: j.description ?? undefined,
+    requirements: j.requirements ?? undefined,
+    industry: undefined,
+    workType: undefined,
+    headcount: undefined,
+    sourceOrgId: j.sourceOrgId, externalId: j.externalId,
+    sourceName: j.sourceName, sourceUrl: j.sourceUrl,
+    syncTime: fmtSyncTime(j.syncTime),
+    reviewStatus:  j.reviewStatus  as ReviewStatus,
+    publishStatus: j.publishStatus as PublishStatus,
+    reviewedBy: j.reviewedBy,
+    reviewedAt: j.reviewedAt ? j.reviewedAt.toISOString() : null,
+    rejectReason: j.rejectReason,
   }
 }
 
-/**
- * Phase #5 — 把 Prisma Job 模型映射为前端通用的 PartnerJobDto。
- * 与 toPartnerJobDto(in-memory JobRecord 版本)并存,等所有路径迁
- * 到 Prisma 后再统一删除内存版本。
- */
-function prismaJobToPartnerDto(j: {
-  id: string; externalId: string; title: string; company: string; city: string
-  sourceUrl: string; syncTime: Date
-  reviewStatus: string; publishStatus: string
-  sourceOrgId: string; sourceName: string
-}): PartnerJobDto {
+function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
   return {
     id: j.id, externalId: j.externalId, title: j.title, company: j.company, city: j.city,
     sourceUrl: j.sourceUrl,
-    syncTime: j.syncTime.toISOString().replace('T', ' ').slice(0, 16),
+    syncTime: fmtSyncTime(j.syncTime),
     reviewStatus:  j.reviewStatus  as ReviewStatus,
     publishStatus: j.publishStatus as PublishStatus,
     sourceOrgId: j.sourceOrgId, sourceName: j.sourceName,
@@ -339,7 +200,7 @@ function prismaJobToPartnerDto(j: {
 /**
  * Import DTO 的 workType('full_time' / 'part_time' / 'internship' / 'contract')
  * 映射到 Prisma Job.category('fulltime' / 'parttime' / 'intern' / 'campus')。
- * 'contract' 暂归 'fulltime'(雇佣形式上接近全职合同制,后续可独立分类)。
+ * 'contract' 暂归 'fulltime'(接近全职合同制,后续可独立分类)。
  */
 function mapWorkTypeToCategory(workType: string): string {
   switch (workType) {
@@ -351,165 +212,191 @@ function mapWorkTypeToCategory(workType: string): string {
   }
 }
 
-function toPartnerFairDto(r: FairRecord): PartnerFairDto {
-  return {
-    id: r.id, externalId: r.externalId, name: r.name, organizer: r.organizer,
-    startTime: r.startTime, endTime: r.endTime, venue: r.venue, status: r.status,
-    sourceUrl: r.sourceUrl, syncTime: r.syncTime,
-    reviewStatus: r.reviewStatus, publishStatus: r.publishStatus,
-    sourceOrgId: r.sourceOrgId, sourceName: r.sourceName,
-  }
+const FAIR_NOT_IMPLEMENTED = {
+  error: {
+    code: 'FAIR_NOT_IMPLEMENTED',
+    message: '招聘会模块尚未接入数据库,见 docs/progress/next-tasks.md Phase #3',
+  },
+} as const
+
+function emptyPaginated<T>(page = 1, pageSize = 20): PaginatedResult<T> {
+  return { data: [], pagination: { page, pageSize, total: 0, totalPages: 1 } }
 }
-
-function paginate<T>(data: T[], page = 1, pageSize = 20): PaginatedResult<T> {
-  const total      = data.length
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const safePage   = Math.max(1, Math.min(page, totalPages))
-  return {
-    data: data.slice((safePage - 1) * pageSize, safePage * pageSize),
-    pagination: { page: safePage, pageSize, total, totalPages },
-  }
-}
-
-function nowIso(): string { return new Date().toISOString() }
-
-function genId(): string { return `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable()
 export class JobsService {
   private readonly logger = new Logger(JobsService.name)
-  private jobs:  JobRecord[]  = [...SEED_JOBS]
-  private fairs: FairRecord[] = [...SEED_FAIRS]
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Kiosk: published data only ──────────────────────────────────────────────
+  // ── Kiosk:只读 approved+published ───────────────────────────────────────────
 
-  getPublishedJobs(params?: { tag?: string; city?: string; page?: number; pageSize?: number }): PaginatedResult<JobListItemDto> {
-    let data = this.jobs.filter(
-      (j) => j.reviewStatus === 'approved' && j.publishStatus === 'published',
-    )
-    if (params?.tag)  data = data.filter((j) => j.tags.includes(params.tag!))
-    if (params?.city) data = data.filter((j) => j.city === params.city)
-    return paginate(data.map(toJobListItem), params?.page, params?.pageSize)
-  }
-
-  getPublishedJobById(id: string): SingleResult<JobListItemDto> {
-    const job = this.jobs.find(
-      (j) => j.id === id && j.reviewStatus === 'approved' && j.publishStatus === 'published',
-    )
-    return { data: job ? toJobListItem(job) : null, success: true }
-  }
-
-  getPublishedFairs(params?: { status?: string; page?: number; pageSize?: number }): PaginatedResult<FairListItemDto> {
-    let data = this.fairs.filter(
-      (f) => f.reviewStatus === 'approved' && f.publishStatus === 'published',
-    )
-    if (params?.status) data = data.filter((f) => f.status === params.status)
-    return paginate(data.map(toFairListItem), params?.page, params?.pageSize)
-  }
-
-  getPublishedFairById(id: string): SingleResult<FairListItemDto> {
-    const fair = this.fairs.find(
-      (f) => f.id === id && f.reviewStatus === 'approved' && f.publishStatus === 'published',
-    )
-    return { data: fair ? toFairListItem(fair) : null, success: true }
-  }
-
-  // ── Admin: all records ──────────────────────────────────────────────────────
-
-  getAllJobSources(): AdminJobDto[] {
-    return [...this.jobs].reverse().map(toAdminJobDto)
-  }
-
-  reviewJobSource(id: string, action: ReviewAction, _reason?: string): AdminJobDto {
-    const idx = this.jobs.findIndex((j) => j.id === id)
-    if (idx === -1) throw new NotFoundException(`Job ${id} not found`)
-    const now = nowIso()
-    const reviewStatus: ReviewStatus =
-      action === 'approve' ? 'approved' :
-      action === 'reject'  ? 'rejected' : 'reviewing'
-    this.jobs[idx] = {
-      ...this.jobs[idx]!,
-      reviewStatus,
-      publishStatus: action === 'approve' ? 'draft' : this.jobs[idx]!.publishStatus,
-      updatedAt: now,
+  async getPublishedJobs(params?: { tag?: string; city?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<JobListItemDto>> {
+    const page     = Math.max(1, params?.page ?? 1)
+    const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
+    const where = {
+      reviewStatus:  'approved',
+      publishStatus: 'published',
+      ...(params?.city ? { city: params.city } : {}),
     }
-    return toAdminJobDto(this.jobs[idx]!)
+    const [rows, total] = await Promise.all([
+      this.prisma.job.findMany({
+        where,
+        orderBy: { syncTime: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.job.count({ where }),
+    ])
+    // tag 过滤:SQLite tagsJson 是字符串,在应用层 filter。Postgres 切 String[] 后改 DB 层。
+    const filtered = params?.tag
+      ? rows.filter((j) => safeJsonArr(j.tagsJson).includes(params.tag!))
+      : rows
+    return {
+      data: filtered.map(prismaJobToListItem),
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    }
   }
 
-  publishJobSource(id: string, action: PublishAction): AdminJobDto {
-    const idx = this.jobs.findIndex((j) => j.id === id)
-    if (idx === -1) throw new NotFoundException(`Job ${id} not found`)
-    if (action === 'publish' && this.jobs[idx]!.reviewStatus !== 'approved') {
-      throw new BadRequestException('PUBLISH_REQUIRES_APPROVAL')
-    }
-    this.jobs[idx] = {
-      ...this.jobs[idx]!,
-      publishStatus: action === 'publish' ? 'published' : 'unpublished',
-      updatedAt: nowIso(),
-    }
-    return toAdminJobDto(this.jobs[idx]!)
+  async getPublishedJobById(id: string): Promise<SingleResult<JobListItemDto>> {
+    const j = await this.prisma.job.findFirst({
+      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+    })
+    return { data: j ? prismaJobToListItem(j) : null, success: true }
   }
 
-  getAllFairSources(): AdminFairDto[] {
-    return [...this.fairs].reverse().map(toAdminFairDto)
+  async getPublishedFairs(_params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<FairListItemDto>> {
+    // TODO Phase #3:Fair Prisma model 落地后改 prisma.fair.findMany
+    return emptyPaginated<FairListItemDto>(_params?.page ?? 1, _params?.pageSize ?? 20)
   }
 
-  reviewFairSource(id: string, action: ReviewAction, _reason?: string): AdminFairDto {
-    const idx = this.fairs.findIndex((f) => f.id === id)
-    if (idx === -1) throw new NotFoundException(`Fair ${id} not found`)
-    const now = nowIso()
-    const reviewStatus: ReviewStatus =
-      action === 'approve' ? 'approved' :
-      action === 'reject'  ? 'rejected' : 'reviewing'
-    this.fairs[idx] = {
-      ...this.fairs[idx]!,
-      reviewStatus,
-      publishStatus: action === 'approve' ? 'draft' : this.fairs[idx]!.publishStatus,
-      updatedAt: now,
-    }
-    return toAdminFairDto(this.fairs[idx]!)
+  async getPublishedFairById(_id: string): Promise<SingleResult<FairListItemDto>> {
+    return { data: null, success: true }
   }
 
-  publishFairSource(id: string, action: PublishAction): AdminFairDto {
-    const idx = this.fairs.findIndex((f) => f.id === id)
-    if (idx === -1) throw new NotFoundException(`Fair ${id} not found`)
-    if (action === 'publish' && this.fairs[idx]!.reviewStatus !== 'approved') {
-      throw new BadRequestException('PUBLISH_REQUIRES_APPROVAL')
-    }
-    this.fairs[idx] = {
-      ...this.fairs[idx]!,
-      publishStatus: action === 'publish' ? 'published' : 'unpublished',
-      updatedAt: nowIso(),
-    }
-    return toAdminFairDto(this.fairs[idx]!)
-  }
+  // ── Admin:全集合 + 审核/发布(状态机)─────────────────────────────────────
 
-  // ── Partner: org-scoped ──────────────────────────────────────────────────────
-
-  getPartnerJobs(sourceOrgId?: string): PartnerJobDto[] {
-    const data = sourceOrgId
-      ? this.jobs.filter((j) => j.sourceOrgId === sourceOrgId)
-      : [...this.jobs]
-    return data.reverse().map(toPartnerJobDto)
+  async getAllJobSources(): Promise<AdminJobDto[]> {
+    const rows = await this.prisma.job.findMany({ orderBy: { createdAt: 'desc' } })
+    return rows.map(prismaJobToAdminDto)
   }
 
   /**
-   * Phase #5 — Partner 导入岗位,落 Job 表(替代 0a/0b 之前的内存数组)。
+   * 状态机:
+   *   - 终态 approved / rejected 不可回退到 pending(需独立 reopen 接口,未实现)
+   *   - approve   → reviewStatus=approved,publishStatus 重置为 draft(等下一步 publish 动作)
+   *                rejectReason 清空
+   *   - reject    → reviewStatus=rejected,publishStatus 强制 draft(防"已发布的还挂在 Kiosk")
+   *                reason 必填
+   *   - reviewing → 只把状态标记为 reviewing,其他不动
+   */
+  async reviewJobSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<AdminJobDto> {
+    const job = await this.prisma.job.findUnique({ where: { id } })
+    if (!job) {
+      throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
+    }
+    if (job.reviewStatus === 'approved' || job.reviewStatus === 'rejected') {
+      throw new BadRequestException({
+        error: {
+          code: 'INVALID_STATE_TRANSITION',
+          message: `审核终态 ${job.reviewStatus} 不可回退,需走 reopen 流程`,
+        },
+      })
+    }
+
+    let data: {
+      reviewStatus:  string
+      publishStatus?: string
+      rejectReason?:  string | null
+    }
+    if (action === 'reviewing') {
+      data = { reviewStatus: 'reviewing' }
+    } else if (action === 'approve') {
+      data = { reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null }
+    } else {
+      // reject:reason 必填
+      const trimmed = (reason ?? '').trim()
+      if (trimmed.length === 0) {
+        throw new BadRequestException({
+          error: { code: 'REJECT_REASON_REQUIRED', message: 'reject 必须提供 reason' },
+        })
+      }
+      data = { reviewStatus: 'rejected', publishStatus: 'draft', rejectReason: trimmed }
+    }
+
+    try {
+      const updated = await this.prisma.job.update({
+        where: { id },
+        data: { ...data, reviewedBy: user.userId, reviewedAt: new Date() },
+      })
+      this.logger.log(`reviewJobSource: id=${id} action=${action} by=${user.userId}`)
+      return prismaJobToAdminDto(updated)
+    } catch (e) {
+      this.logger.error(`reviewJobSource failed: id=${id}`, e as Error)
+      throw new InternalServerErrorException({ error: { code: 'REVIEW_FAILED', message: '审核动作失败' } })
+    }
+  }
+
+  async publishJobSource(id: string, action: PublishAction, _user: AuthedUser): Promise<AdminJobDto> {
+    const job = await this.prisma.job.findUnique({ where: { id } })
+    if (!job) {
+      throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
+    }
+
+    if (action === 'publish') {
+      // 合规红线:必须通过审核才能发布
+      if (job.reviewStatus !== 'approved') {
+        throw new BadRequestException({
+          error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的岗位不得发布' },
+        })
+      }
+    }
+
+    const updated = await this.prisma.job.update({
+      where: { id },
+      data: { publishStatus: action === 'publish' ? 'published' : 'unpublished' },
+    })
+    this.logger.log(`publishJobSource: id=${id} action=${action}`)
+    return prismaJobToAdminDto(updated)
+  }
+
+  async getAllFairSources(): Promise<AdminFairDto[]> {
+    return [] // TODO Phase #3
+  }
+
+  async reviewFairSource(_id: string, _action: ReviewAction, _reason: string | undefined, _user: AuthedUser): Promise<AdminFairDto> {
+    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  }
+
+  async publishFairSource(_id: string, _action: PublishAction, _user: AuthedUser): Promise<AdminFairDto> {
+    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  }
+
+  // ── Partner:本机构数据 ─────────────────────────────────────────────────────
+
+  async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]> {
+    if (!user.orgId) return []
+    const rows = await this.prisma.job.findMany({
+      where: { sourceOrgId: user.orgId },
+      orderBy: { createdAt: 'desc' },
+    })
+    return rows.map(prismaJobToPartnerDto)
+  }
+
+  /**
+   * Phase #5 — Partner 导入岗位,落 Job 表。
    *
-   * 关键约束:
+   * 安全约束:
    *  - sourceOrgId 强制取自 JWT 的 user.orgId,不读 body
    *  - sourceName 来自 DB 中机构当前名,不读 body
    *  - 默认 reviewStatus='pending' / publishStatus='draft'
-   *  - 重复(sourceOrgId, externalId)走 upsert 幂等(只更新展示字段,
-   *    不改审核/发布状态,避免"刷字段绕过审核"攻击面)
+   *  - 重复(sourceOrgId, externalId)走 upsert 幂等:只刷新展示字段,
+   *    审核/发布状态不动(防"刷字段绕审核")
    */
   async importJobs(items: ImportJobItemDto[], user: AuthedUser): Promise<ImportResult<PartnerJobDto>> {
     if (user.role !== 'partner' || !user.orgId) {
-      // RolesGuard 已挡掉非 partner;orgId 缺失是数据异常
       throw new BadRequestException({
         error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' },
       })
@@ -539,12 +426,10 @@ export class JobsService {
             salary: item.salary,
             description: item.description, requirements: item.requirements,
             tagsJson: JSON.stringify(item.tags ?? []),
-            // 强制 pending + draft — 合规红线,不允许 body 覆盖
             reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
           update: {
-            // 重复导入只刷新展示字段 + 来源,审核/发布状态保留
             sourceName, sourceUrl: item.sourceUrl,
             title: item.title, company: item.company, city: item.city,
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
@@ -567,53 +452,31 @@ export class JobsService {
     return { imported: out.length, items: out }
   }
 
-  unpublishPartnerJob(id: string, sourceOrgId?: string): PartnerJobDto {
-    const idx = this.jobs.findIndex(
-      (j) => j.id === id && (!sourceOrgId || j.sourceOrgId === sourceOrgId),
-    )
-    if (idx === -1) throw new NotFoundException(`Job ${id} not found`)
-    this.jobs[idx] = { ...this.jobs[idx]!, publishStatus: 'unpublished', updatedAt: nowIso() }
-    return toPartnerJobDto(this.jobs[idx]!)
-  }
-
-  getPartnerFairs(sourceOrgId?: string): PartnerFairDto[] {
-    const data = sourceOrgId
-      ? this.fairs.filter((f) => f.sourceOrgId === sourceOrgId)
-      : [...this.fairs]
-    return data.reverse().map(toPartnerFairDto)
-  }
-
-  importFairs(dto: ImportFairsDto): ImportResult<PartnerFairDto> {
-    const now  = nowIso()
-    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
-    const added: FairRecord[] = dto.items.map((item) => {
-      const start = new Date(item.startTime)
-      const end   = new Date(item.endTime)
-      const now2  = new Date()
-      const status: FairStatus =
-        now2 < start ? 'upcoming' : now2 > end ? 'ended' : 'ongoing'
-      return {
-        id: genId(), name: item.name, organizer: item.organizer,
-        startTime: item.startTime, endTime: item.endTime, venue: item.venue, status,
-        description: item.description, boothCount: item.boothCount,
-        sourceOrgId: dto.sourceOrgId, externalId: item.externalId,
-        sourceName: dto.sourceName, sourceUrl: item.sourceUrl,
-        syncTime: sync,
-        reviewStatus: 'pending',  // Partner 导入默认 pending
-        publishStatus: 'draft',   // Partner 导入默认 draft
-        createdAt: now, updatedAt: now,
-      }
+  async unpublishPartnerJob(id: string, user: AuthedUser): Promise<PartnerJobDto> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const job = await this.prisma.job.findUnique({ where: { id } })
+    // 找不到 OR 不属于本机构 — 不区分原因,防机构枚举
+    if (!job || job.sourceOrgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
+    }
+    const updated = await this.prisma.job.update({
+      where: { id },
+      data: { publishStatus: 'unpublished' },
     })
-    this.fairs.push(...added)
-    return { imported: added.length, items: added.map(toPartnerFairDto) }
+    return prismaJobToPartnerDto(updated)
   }
 
-  unpublishPartnerFair(id: string, sourceOrgId?: string): PartnerFairDto {
-    const idx = this.fairs.findIndex(
-      (f) => f.id === id && (!sourceOrgId || f.sourceOrgId === sourceOrgId),
-    )
-    if (idx === -1) throw new NotFoundException(`Fair ${id} not found`)
-    this.fairs[idx] = { ...this.fairs[idx]!, publishStatus: 'unpublished', updatedAt: nowIso() }
-    return toPartnerFairDto(this.fairs[idx]!)
+  async getPartnerFairs(_user: AuthedUser): Promise<PartnerFairDto[]> {
+    return [] // TODO Phase #3
+  }
+
+  async importFairs(_dto: unknown, _user: AuthedUser): Promise<ImportResult<PartnerFairDto>> {
+    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  }
+
+  async unpublishPartnerFair(_id: string, _user: AuthedUser): Promise<PartnerFairDto> {
+    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
   }
 }

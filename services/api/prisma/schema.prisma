@@ -189,6 +189,14 @@ model Job {
   reviewStatus  String @default("pending")
   publishStatus String @default("draft")
 
+  // 审计字段(Phase #4):
+  //   - reviewedBy:执行 approve/reject 的 admin User.id
+  //   - reviewedAt:审核动作发生时间
+  //   - rejectReason:被拒原因(reject 时必填,approve 时清空)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  rejectReason String?
+
   syncTime  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

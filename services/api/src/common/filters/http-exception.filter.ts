@@ -12,6 +12,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR
     let code = 'INTERNAL_SERVER_ERROR'
     let message = '服务器内部错误'
+    let details: string[] | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -22,12 +23,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
       } else if (typeof body === 'object' && body !== null) {
         const b = body as Record<string, unknown>
 
-        // Priority: body.error.code / body.error.message (our convention)
+        // Priority: body.error.code / body.error.message / body.error.details
         const errField = b['error']
         if (typeof errField === 'object' && errField !== null) {
           const err = errField as Record<string, unknown>
           if (typeof err['code'] === 'string')    code    = err['code']
           if (typeof err['message'] === 'string') message = err['message']
+          if (Array.isArray(err['details'])) {
+            details = (err['details'] as unknown[]).filter((d): d is string => typeof d === 'string')
+          }
         } else if (typeof errField === 'string') {
           code = errField
         }
@@ -41,7 +45,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     const errorBody: ErrorResponseBody = {
       success: false,
-      error: { code, message },
+      error: details ? { code, message, details } : { code, message },
       requestId: request.requestId,
     }
     response.status(status).json(errorBody)

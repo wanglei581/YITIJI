@@ -20,6 +20,8 @@ export interface ErrorResponseBody {
   error: {
     code: string
     message: string
+    /** 校验类错误的详细分项,例如 ["items[0].externalId: should not be empty"] */
+    details?: string[]
   }
   requestId?: string
 }

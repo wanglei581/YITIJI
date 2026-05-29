@@ -76,55 +76,73 @@ export class JobsController {
     return this.jobsService.getPublishedFairById(id)
   }
 
-  // ── Admin ───────────────────────────────────────────────────────────────────
+  // ── Admin(全部受 @Roles('admin') 保护)─────────────────────────────────────
 
   @Get('admin/job-sources')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   getJobSources() {
     return this.jobsService.getAllJobSources()
   }
 
   @Patch('admin/job-sources/:id/review')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   reviewJobSource(
     @Param('id') id: string,
     @Body() dto: ReviewActionDto,
+    @CurrentUser() user: AuthedUser,
   ) {
-    return this.jobsService.reviewJobSource(id, dto.action, dto.reason)
+    return this.jobsService.reviewJobSource(id, dto.action, dto.reason, user)
   }
 
   @Patch('admin/job-sources/:id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   publishJobSource(
     @Param('id') id: string,
     @Body() dto: PublishActionDto,
+    @CurrentUser() user: AuthedUser,
   ) {
-    return this.jobsService.publishJobSource(id, dto.action)
+    return this.jobsService.publishJobSource(id, dto.action, user)
   }
 
   @Get('admin/fair-sources')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   getFairSources() {
     return this.jobsService.getAllFairSources()
   }
 
   @Patch('admin/fair-sources/:id/review')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   reviewFairSource(
     @Param('id') id: string,
     @Body() dto: ReviewActionDto,
+    @CurrentUser() user: AuthedUser,
   ) {
-    return this.jobsService.reviewFairSource(id, dto.action, dto.reason)
+    return this.jobsService.reviewFairSource(id, dto.action, dto.reason, user)
   }
 
   @Patch('admin/fair-sources/:id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   publishFairSource(
     @Param('id') id: string,
     @Body() dto: PublishActionDto,
+    @CurrentUser() user: AuthedUser,
   ) {
-    return this.jobsService.publishFairSource(id, dto.action)
+    return this.jobsService.publishFairSource(id, dto.action, user)
   }
 
-  // ── Partner ─────────────────────────────────────────────────────────────────
+  // ── Partner(全部受 @Roles('partner') 保护,sourceOrgId 强制 from JWT)─────
 
   @Get('partner/jobs')
-  getPartnerJobs(@Query('sourceOrgId') sourceOrgId?: string) {
-    return this.jobsService.getPartnerJobs(sourceOrgId)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerJobs(@CurrentUser() user: AuthedUser) {
+    return this.jobsService.getPartnerJobs(user)
   }
 
   /**
@@ -147,30 +165,38 @@ export class JobsController {
   }
 
   @Patch('partner/jobs/:id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
   unpublishPartnerJob(
     @Param('id') id: string,
     @Body() _dto: PublishActionDto,
-    @Query('sourceOrgId') sourceOrgId?: string,
+    @CurrentUser() user: AuthedUser,
   ) {
-    return this.jobsService.unpublishPartnerJob(id, sourceOrgId)
+    return this.jobsService.unpublishPartnerJob(id, user)
   }
 
   @Get('partner/fairs')
-  getPartnerFairs(@Query('sourceOrgId') sourceOrgId?: string) {
-    return this.jobsService.getPartnerFairs(sourceOrgId)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerFairs(@CurrentUser() user: AuthedUser) {
+    return this.jobsService.getPartnerFairs(user)
   }
 
   @Post('partner/fairs/import')
-  importFairs(@Body() dto: ImportFairsDto) {
-    return this.jobsService.importFairs(dto)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  importFairs(@Body() dto: ImportFairsDto, @CurrentUser() user: AuthedUser) {
+    return this.jobsService.importFairs(dto, user)
   }
 
   @Patch('partner/fairs/:id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
   unpublishPartnerFair(
     @Param('id') id: string,
     @Body() _dto: PublishActionDto,
-    @Query('sourceOrgId') sourceOrgId?: string,
+    @CurrentUser() user: AuthedUser,
   ) {
-    return this.jobsService.unpublishPartnerFair(id, sourceOrgId)
+    return this.jobsService.unpublishPartnerFair(id, user)
   }
 }
