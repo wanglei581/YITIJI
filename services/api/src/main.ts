@@ -33,6 +33,14 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule)
   app.setGlobalPrefix('api/v1')
 
+  // CORS:dev 允许任意 origin(本机三端 Vite 端口浮动),
+  // 生产应改为显式白名单。`credentials: true` 让浏览器允许
+  // 后续可能的 Cookie/Authorization 头携带。
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  })
+
   // forbidNonWhitelisted:任何超出 DTO 白名单的字段直接 400 拒绝(不静默剥离),
   // 防 body 注入"候选人/邮箱/电话/简历"等合规边界外字段。
   //
