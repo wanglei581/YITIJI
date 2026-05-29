@@ -38,3 +38,4 @@ pnpm-debug.log*
 .tmp
 mavis-workspace/
 .mavis/
+.opencode/
