@@ -16,14 +16,14 @@ import {
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',  label: '工作台',        icon: LayoutDashboardIcon },
-  { key: 'profile',    label: '机构资料',       icon: Building2Icon },
-  { key: 'jobs',       label: '岗位信息管理',   icon: BriefcaseIcon },
+  { key: 'profile',    label: '机构资料',       icon: Building2Icon,   group: '机构信息' },
+  { key: 'jobs',       label: '岗位信息管理',   icon: BriefcaseIcon,   group: '数据管理' },
   { key: 'fairs',      label: '招聘会信息管理', icon: CalendarIcon },
   { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon },
-  { key: 'terminals',  label: '终端数据',       icon: MonitorIcon },
-  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon },
   { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon },
   { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon },
+  { key: 'terminals',  label: '终端数据',       icon: MonitorIcon,     group: '数据与账号' },
+  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon },
   { key: 'account',    label: '账号权限',       icon: UserCogIcon },
 ]
 
@@ -52,12 +52,15 @@ export function PartnerLayoutWrapper() {
 
   return (
     <PartnerLayout
-      orgName="合作机构"
+      orgName="合作机构后台"
       navItems={NAV_ITEMS}
       activeKey={activeKey}
       onNavChange={(key) => navigate(KEY_TO_PATH[key] ?? '/')}
       collapsed={collapsed}
       onCollapseChange={setCollapsed}
+      userName="机构管理员"
+      userRole="数据管理员"
+      notificationCount={1}
     >
       <Outlet />
     </PartnerLayout>

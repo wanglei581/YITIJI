@@ -28,6 +28,7 @@ import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
 import { HomePage } from '../pages/home/HomePage'
+import { RenshiPage } from '../pages/renshi/RenshiPage'
 
 export const kioskRouter = createBrowserRouter([
   {
@@ -38,6 +39,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
       { path: 'policy',            element: <PolicyPage /> },
+      { path: 'renshi',            element: <RenshiPage /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },
