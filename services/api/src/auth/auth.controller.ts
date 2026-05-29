@@ -10,8 +10,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  login(@Body() dto: LoginDto): ApiResponse<LoginResult> {
-    return ApiResponse.ok(this.authService.login(dto.username, dto.password))
+  async login(@Body() dto: LoginDto): Promise<ApiResponse<LoginResult>> {
+    return ApiResponse.ok(await this.authService.login(dto.username, dto.password))
   }
 
   /** 校验 token 是否有效并回显当前用户(前端 boot 时常用) */

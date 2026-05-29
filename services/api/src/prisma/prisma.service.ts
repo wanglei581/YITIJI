@@ -65,6 +65,24 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.printTaskStatusLog
   }
 
+  // ── Phase 0b ───────────────────────────────────────────────────────────────
+
+  get organization() {
+    return this.client.organization
+  }
+
+  get user() {
+    return this.client.user
+  }
+
+  get jobSource() {
+    return this.client.jobSource
+  }
+
+  get job() {
+    return this.client.job
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

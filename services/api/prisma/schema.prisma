@@ -77,3 +77,124 @@ model PrintTaskStatusLog {
   errorCode  String?
   createdAt  DateTime  @default(now())
 }
+
+// ── Organization ──────────────────────────────────────────────────────────────
+// Phase 0b: 合作机构主体。Partner 账号(User.role='partner')必须挂在某个 org 下,
+// 上传的 Job/JobSource 也以 orgId 做硬隔离。
+//
+// type 取值同 packages/shared PartnerType:
+//   'school_employment_center' | 'public_employment_service' |
+//   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source'
+
+model Organization {
+  id         String   @id
+  name       String
+  type       String
+  contact    String?
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users      User[]
+  jobs       Job[]      @relation("JobOrg")
+  jobSources JobSource[]
+}
+
+// ── User ──────────────────────────────────────────────────────────────────────
+// Phase 0b: 后台登录账号,替换 0a 的 DEV_USERS 硬编码。
+// role 取值见 packages/shared/UserRole:
+//   'admin' | 'partner' | 'kiosk'
+// admin/kiosk 角色 orgId 为 null;partner 必须有 orgId。
+
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  passwordHash String
+  name         String
+  role         String        // 见 UserRole
+  orgId        String?
+  org          Organization? @relation(fields: [orgId], references: [id])
+  enabled      Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([orgId])
+}
+
+// ── JobSource ─────────────────────────────────────────────────────────────────
+// Phase 0b: 一个机构可配多个数据源,按 sourceKind × accessMode 双维度刻画。
+//
+// sourceKind:'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'
+// accessMode:'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
+//
+// 敏感凭证(apiSecret / accessToken / clientSecret)绝不存在此表,
+// 走独立的服务端 secret store(后续阶段引入)。
+
+model JobSource {
+  id             String        @id @default(cuid())
+  orgId          String
+  org            Organization  @relation(fields: [orgId], references: [id])
+  name           String
+  sourceKind     String
+  accessMode     String
+  syncFreq       String        @default("manual")
+  enabled        Boolean       @default(true)
+  description    String?
+  lastSyncAt     DateTime?
+  lastSyncStatus String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  jobs Job[]
+
+  @@index([orgId])
+}
+
+// ── Job ───────────────────────────────────────────────────────────────────────
+// Phase 0b: 外部同步的岗位信息(信息入口,非招聘闭环)。
+//
+// 合规硬约束(CLAUDE.md §10):
+//   sourceOrgId / externalId / sourceUrl / sourceName 必填
+//   reviewStatus 默认 'pending',通过审核(approved)+ publishStatus='published' 才在 C 端可见
+//   @@unique(sourceOrgId, externalId) 防同一机构重复导入
+//
+// reviewStatus:  'pending' | 'reviewing' | 'approved' | 'rejected'
+// publishStatus: 'draft' | 'published' | 'unpublished' | 'expired'
+// tagsJson:      JSON 字符串,SQLite 无原生 array;读取时 JSON.parse,
+//                Postgres 切换后可改 String[]。
+
+model Job {
+  id   String @id @default(cuid())
+
+  // 来源(合规必填)
+  sourceOrgId String
+  org         Organization @relation("JobOrg", fields: [sourceOrgId], references: [id])
+  sourceId    String?
+  source      JobSource?   @relation(fields: [sourceId], references: [id])
+  externalId  String
+  sourceName  String
+  sourceUrl   String
+
+  // 岗位信息
+  title        String
+  company      String
+  city         String
+  category     String?  // 'fulltime' | 'intern' | 'campus' | 'parttime'
+  salary       String?
+  description  String?
+  requirements String?
+  tagsJson     String   @default("[]")
+
+  // 审核/发布
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceOrgId, externalId])
+  @@index([sourceOrgId])
+  @@index([sourceId])
+  @@index([reviewStatus, publishStatus])
+}

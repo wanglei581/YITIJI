@@ -1,26 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
+import * as bcrypt from 'bcryptjs'
+import { PrismaService } from '../prisma/prisma.service'
 import type { UserRole } from '../common/decorators/roles.decorator'
-
-interface DevUser {
-  userId:   string
-  username: string
-  password: string
-  role:     UserRole
-  orgId:    string | null
-  name:     string
-}
-
-/**
- * 0a 阶段:登录账户用硬编码。
- * 0b 阶段会替换为 prisma.user.findUnique + bcrypt 比对,
- * 这里保持同样的 LoginResult 形状,前端 adapter 不用改。
- */
-const DEV_USERS: DevUser[] = [
-  { userId: 'u-admin',    username: 'admin',    password: 'admin',    role: 'admin',   orgId: null,          name: '系统管理员' },
-  { userId: 'u-partner1', username: 'partner1', password: 'partner1', role: 'partner', orgId: 'org-uni-001', name: '高校就业指导中心' },
-  { userId: 'u-partner2', username: 'partner2', password: 'partner2', role: 'partner', orgId: 'org-hr-002',  name: '市人才交流中心' },
-]
 
 export interface LoginResult {
   token: string
@@ -32,32 +14,54 @@ export interface LoginResult {
   }
 }
 
+/**
+ * 0b 起改为 prisma.user.findUnique + bcryptjs.compare。
+ * 失败原因(用户不存在 / 密码错 / 账号停用 / role 非法)对外统一返回同一个错误码,
+ * 避免攻击者通过错误信息探测账号是否存在。
+ */
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  login(username: string, password: string): LoginResult {
-    const user = DEV_USERS.find((u) => u.username === username && u.password === password)
-    if (!user) {
-      throw new UnauthorizedException({
-        error: { code: 'AUTH_LOGIN_FAILED', message: '用户名或密码不正确' },
-      })
+  async login(username: string, password: string): Promise<LoginResult> {
+    const user = await this.prisma.user.findUnique({ where: { username } })
+    if (!user || !user.enabled) {
+      throw this.loginFailed()
+    }
+
+    const ok = await bcrypt.compare(password, user.passwordHash)
+    if (!ok) {
+      throw this.loginFailed()
+    }
+
+    const role = user.role as UserRole
+    if (role !== 'admin' && role !== 'partner' && role !== 'kiosk') {
+      throw this.loginFailed()
     }
 
     const token = this.jwtService.sign({
-      sub:   user.userId,
-      role:  user.role,
+      sub:   user.id,
+      role,
       orgId: user.orgId,
     })
 
     return {
       token,
       user: {
-        id:    user.userId,
+        id:    user.id,
         name:  user.name,
-        role:  user.role,
+        role,
         orgId: user.orgId,
       },
     }
+  }
+
+  private loginFailed(): UnauthorizedException {
+    return new UnauthorizedException({
+      error: { code: 'AUTH_LOGIN_FAILED', message: '用户名或密码不正确' },
+    })
   }
 }
