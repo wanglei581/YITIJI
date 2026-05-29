@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Card, StatusBadge } from '@ai-job-print/ui'
+import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FolderIcon, ShieldAlertIcon } from 'lucide-react'
+import { Pagination, useTableState } from '../components/DataTable'
 
 // ─── Types & mock ─────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ export default function FilesPage() {
   const [typeFilter,      setTypeFilter]      = useState('全部')
   const [sensitiveFilter, setSensitiveFilter] = useState('全部')
   const [cleanFilter,     setCleanFilter]     = useState('全部')
+  const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   const filtered = files.filter((f) => {
     const matchType      = typeFilter      === '全部' || f.fileType       === TYPE_FILTER_MAP[typeFilter]
@@ -79,6 +81,16 @@ export default function FilesPage() {
     const matchClean     = cleanFilter     === '全部' || f.cleanStatus    === CLEAN_FILTER_MAP[cleanFilter]
     return matchType && matchSensitive && matchClean
   })
+
+  const searched = search.trim()
+    ? filtered.filter((f) =>
+        f.name.includes(search) ||
+        f.user.includes(search)
+      )
+    : filtered
+
+  const total = searched.length
+  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const handleDelete = (id: string) => {
     setFiles((prev) => prev.map((f) =>
@@ -119,7 +131,7 @@ export default function FilesPage() {
             {TYPE_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setTypeFilter(f)}
+                onClick={() => { setTypeFilter(f); setPage(1) }}
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                   typeFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -135,7 +147,7 @@ export default function FilesPage() {
             {SENSITIVE_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setSensitiveFilter(f)}
+                onClick={() => { setSensitiveFilter(f); setPage(1) }}
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                   sensitiveFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -151,7 +163,7 @@ export default function FilesPage() {
             {CLEAN_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setCleanFilter(f)}
+                onClick={() => { setCleanFilter(f); setPage(1) }}
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                   cleanFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -160,6 +172,10 @@ export default function FilesPage() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="relative mt-2">
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索文件名、用户..." className="h-8 w-64 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
         </div>
       </div>
 
@@ -175,15 +191,14 @@ export default function FilesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-sm text-gray-400">
-                    <FolderIcon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
-                    当前筛选条件下无文件
+                  <td colSpan={11}>
+                    <EmptyState title={search ? '未找到匹配的文件' : '当前筛选条件下无文件'} description={search ? '请尝试其他关键词' : undefined} icon={FolderIcon} className="py-12" />
                   </td>
                 </tr>
               ) : (
-                filtered.map((f) => {
+                paginated.map((f) => {
                   const ft    = FILE_TYPE_MAP[f.fileType]
                   const sens  = SENSITIVE_MAP[f.sensitiveLevel]
                   const clean = CLEAN_MAP[f.cleanStatus]
@@ -232,6 +247,7 @@ export default function FilesPage() {
             </tbody>
           </table>
         </div>
+        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
       {/* 合规说明 */}

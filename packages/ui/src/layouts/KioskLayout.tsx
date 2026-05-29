@@ -42,8 +42,8 @@ export function KioskLayout({
 
       {/* ── Top status bar (optional) ───────────────────── */}
       {!hideHeader && (
-        <header className="flex h-10 shrink-0 items-center justify-between border-b border-gray-200 bg-surface px-4">
-          <span className="text-xs font-medium text-gray-500">AI求职打印服务终端</span>
+        <header className="flex h-10 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-4">
+          <span className="text-xs font-medium text-neutral-500">AI求职打印服务终端</span>
           {headerRight && <div className="flex items-center gap-2">{headerRight}</div>}
         </header>
       )}
@@ -56,7 +56,7 @@ export function KioskLayout({
       {/* ── Bottom navigation ────────────────────────────── */}
       <nav
         aria-label="主导航"
-        className="flex h-20 shrink-0 items-center border-t border-gray-200 bg-surface"
+        className="flex h-20 shrink-0 items-center border-t border-neutral-200 bg-surface"
       >
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = activeTab === key
@@ -72,7 +72,7 @@ export function KioskLayout({
                 'flex flex-1 flex-col items-center justify-center gap-1 py-2 transition-colors',
                 active
                   ? 'text-primary-600'
-                  : 'text-gray-400 hover:text-gray-600 active:text-gray-700',
+                  : 'text-neutral-400 hover:text-neutral-600 active:text-neutral-700',
               )}
             >
               <Icon className="h-6 w-6" aria-hidden="true" />

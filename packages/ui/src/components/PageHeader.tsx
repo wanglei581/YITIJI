@@ -12,15 +12,15 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, className, size = 'default' }: PageHeaderProps) {
   return (
-    <div className={cn('flex items-center justify-between border-b border-gray-200 pb-4', className)}>
+    <div className={cn('flex items-center justify-between border-b border-neutral-200 pb-4', className)}>
       <div>
         <h1 className={cn(
-          'font-semibold text-gray-900',
+          'font-semibold text-neutral-900',
           size === 'large' ? 'text-2xl' : 'text-xl',
         )}>
           {title}
         </h1>
-        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+        {subtitle && <p className="mt-1 text-sm text-neutral-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

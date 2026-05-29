@@ -21,8 +21,8 @@ export function ErrorState({
         <AlertCircleIcon className="h-7 w-7 text-error" aria-hidden="true" />
       </div>
       <div className="space-y-1">
-        <p className="text-base font-medium text-gray-900">{title}</p>
-        {message && <p className="text-sm text-gray-500">{message}</p>}
+        <p className="text-base font-medium text-neutral-900">{title}</p>
+        {message && <p className="text-sm text-neutral-500">{message}</p>}
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry} className="mt-2">

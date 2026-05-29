@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Card, StatusBadge } from '@ai-job-print/ui'
+import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon } from 'lucide-react'
 import type { AdminJobSourceRecord, ReviewStatus, PublishStatus } from '../../services/api'
@@ -9,6 +9,7 @@ import {
   publishJobSource,
   unpublishJobSource,
 } from '../../services/api'
+import { Pagination, useTableState } from '../components/DataTable'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export default function JobSourcesPage() {
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
+  const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
     let cancelled = false
@@ -51,6 +53,17 @@ export default function JobSourcesPage() {
   const filtered = reviewFilter === '全部'
     ? sources
     : sources.filter((s) => s.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
+
+  const searched = search.trim()
+    ? filtered.filter((s) =>
+        s.title.includes(search) ||
+        s.company.includes(search) ||
+        s.sourceName.includes(search)
+      )
+    : filtered
+
+  const total = searched.length
+  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts = {
     全部:   sources.length,
@@ -102,19 +115,25 @@ export default function JobSourcesPage() {
   return (
     <Page title="岗位信息源" subtitle="第三方平台同步岗位数据管理">
       {/* 筛选标签 */}
-      <div className="mb-4 flex gap-2">
-        {REVIEW_FILTERS.map((f) => (
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="flex gap-2">
+          {REVIEW_FILTERS.map((f) => (
           <button
             key={f}
-            onClick={() => setReviewFilter(f)}
+            onClick={() => { setReviewFilter(f); setPage(1) }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            {f}
-            <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-          </button>
-        ))}
+{f}
+              <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="relative">
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索岗位、公司..." className="h-8 w-56 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+        </div>
       </div>
 
       {/* 表格 */}
@@ -129,15 +148,14 @@ export default function JobSourcesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-sm text-gray-400">
-                    <BriefcaseIcon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
-                    该分类暂无岗位数据
+                  <td colSpan={10}>
+                    <EmptyState title={search ? '未找到匹配的岗位' : '该分类暂无岗位数据'} description={search ? '请尝试其他关键词' : undefined} icon={BriefcaseIcon} className="py-12" />
                   </td>
                 </tr>
               ) : (
-                filtered.map((s) => {
+                paginated.map((s) => {
                   const review  = REVIEW_MAP[s.reviewStatus]
                   const publish = PUBLISH_MAP[s.publishStatus]
                   return (
@@ -187,6 +205,7 @@ export default function JobSourcesPage() {
             </tbody>
           </table>
         </div>
+        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
       <p className="mt-3 text-xs text-gray-400">

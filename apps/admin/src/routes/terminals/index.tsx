@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Card, StatusBadge } from '@ai-job-print/ui'
+import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { MonitorIcon } from 'lucide-react'
+import { Pagination, useTableState } from '../components/DataTable'
 
 // ─── Types & mock ─────────────────────────────────────────────────────────────
 
@@ -46,10 +47,22 @@ const FILTER_STATUS: Record<string, OnlineStatus | null> = { 全部: null, 在�
 export default function TerminalsPage() {
   const [terminals, setTerminals] = useState(MOCK_TERMINALS)
   const [filter, setFilter] = useState<string>('全部')
+  const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   const filtered = filter === '全部'
     ? terminals
     : terminals.filter((t) => t.status === FILTER_STATUS[filter])
+
+  const searched = search.trim()
+    ? filtered.filter((t) =>
+        t.sn.toLowerCase().includes(search.toLowerCase()) ||
+        t.location.includes(search) ||
+        t.org.includes(search)
+      )
+    : filtered
+
+  const total = searched.length
+  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts = {
     全部: terminals.length,
@@ -64,14 +77,20 @@ export default function TerminalsPage() {
 
   return (
     <>
-      <p className="mb-4 text-sm text-gray-500">共 {terminals.length} 台终端</p>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-gray-500">共 {total} 台终端</p>
+        <div className="relative">
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索终端编号、地点、机构..." className="h-8 w-72 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+        </div>
+      </div>
 
       {/* 筛选标签 */}
       <div className="mb-4 flex gap-2">
         {FILTERS.map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => { setFilter(f); setPage(1) }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               filter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
@@ -94,15 +113,14 @@ export default function TerminalsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-sm text-gray-400">
-                    <MonitorIcon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
-                    该分类暂无终端
+                  <td colSpan={10}>
+                    <EmptyState title={search ? '未找到匹配的终端' : '该分类暂无终端'} description={search ? '请尝试其他关键词' : undefined} icon={MonitorIcon} className="py-12" />
                   </td>
                 </tr>
               ) : (
-                filtered.map((t) => {
+                paginated.map((t) => {
                   const s = STATUS_MAP[t.status]
                   return (
                     <tr key={t.id} className="hover:bg-gray-50">
@@ -146,6 +164,7 @@ export default function TerminalsPage() {
             </tbody>
           </table>
         </div>
+        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
       <p className="mt-3 text-xs text-gray-400">

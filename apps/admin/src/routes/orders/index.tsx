@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Button, Card, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { DownloadIcon } from 'lucide-react'
+import { DownloadIcon, PackageIcon } from 'lucide-react'
+import { Pagination, useTableState } from '../components/DataTable'
 
 // ─── Types & mock ─────────────────────────────────────────────────────────────
 
@@ -64,18 +65,27 @@ const TYPE_FILTER_MAP: Record<string, OrderType | null> = { 全部: null, 打印
 export default function OrdersPage() {
   const [orders, setOrders] = useState(MOCK_ORDERS)
   const [typeFilter, setTypeFilter] = useState('全部')
+  const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   const filtered = typeFilter === '全部'
     ? orders
     : orders.filter((o) => o.type === TYPE_FILTER_MAP[typeFilter])
+
+  const searched = search.trim()
+    ? filtered.filter((o) =>
+        o.no.toLowerCase().includes(search.toLowerCase()) ||
+        o.user.includes(search)
+      )
+    : filtered
+
+  const total = searched.length
+  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const handleRefund = (id: string) => {
     setOrders((prev) => prev.map((o) =>
       o.id === id ? { ...o, payStatus: 'refunded' as const, taskStatus: 'cancelled' as const } : o
     ))
   }
-
-  const totalAmount = filtered.reduce((s, o) => o.payStatus === 'paid' ? s + o.amount : s, 0)
 
   return (
     <Page
@@ -94,7 +104,7 @@ export default function OrdersPage() {
           {TYPE_FILTERS.map((f) => (
             <button
               key={f}
-              onClick={() => setTypeFilter(f)}
+              onClick={() => { setTypeFilter(f); setPage(1) }}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                 typeFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -103,9 +113,12 @@ export default function OrdersPage() {
             </button>
           ))}
         </div>
-        <span className="text-sm text-gray-500">
-          已付款合计：<span className="font-semibold text-gray-900">¥{totalAmount.toFixed(2)}</span>
-        </span>
+        <div className="flex items-center gap-3">
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索订单号、用户..." className="h-8 w-56 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <span className="text-sm text-gray-500">
+            已付款合计：<span className="font-semibold text-gray-900">¥{paginated.filter((o) => o.payStatus === 'paid').reduce((s, o) => s + o.amount, 0).toFixed(2)}</span>
+          </span>
+        </div>
       </div>
 
       {/* 表格 */}
@@ -120,7 +133,14 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((o) => {
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>
+                    <EmptyState title={search ? '未找到匹配的订单' : '暂无订单数据'} description={search ? '请尝试其他关键词' : undefined} icon={PackageIcon} className="py-12" />
+                  </td>
+                </tr>
+              ) : (
+                paginated.map((o) => {
                 const pay = PAY_MAP[o.payStatus]
                 const task = TASK_MAP[o.taskStatus]
                 return (
@@ -152,10 +172,12 @@ export default function OrdersPage() {
                     </td>
                   </tr>
                 )
-              })}
+                })
+              )}
             </tbody>
           </table>
         </div>
+        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
       <p className="mt-3 text-xs text-gray-400">当前为 mock 数据，接入后端后实时显示</p>
     </Page>

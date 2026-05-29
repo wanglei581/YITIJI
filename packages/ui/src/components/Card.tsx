@@ -3,7 +3,7 @@ import type { HTMLAttributes } from 'react'
 import { cn } from '../lib/cn'
 
 const cardVariants = cva(
-  'rounded-lg border border-gray-200 bg-surface shadow-sm',
+  'rounded-lg border border-neutral-200 bg-surface shadow-sm',
   {
     variants: {
       padding: {

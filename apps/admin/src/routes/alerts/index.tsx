@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Card, StatusBadge } from '@ai-job-print/ui'
+import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { AlertTriangleIcon } from 'lucide-react'
+import { Pagination, useTableState } from '../components/DataTable'
 
 // ─── Types & mock ─────────────────────────────────────────────────────────────
 
@@ -79,12 +80,24 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState(MOCK_ALERTS)
   const [levelFilter,  setLevelFilter]  = useState('全部')
   const [statusFilter, setStatusFilter] = useState('全部')
+  const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   const filtered = alerts.filter((a) => {
     const matchLevel  = levelFilter  === '全部' || a.level  === LEVEL_FILTER_MAP[levelFilter]
     const matchStatus = statusFilter === '全部' || a.status === STATUS_FILTER_MAP[statusFilter]
     return matchLevel && matchStatus
   })
+
+  const searched = search.trim()
+    ? filtered.filter((a) =>
+        a.no.includes(search) ||
+        a.message.includes(search) ||
+        a.device.includes(search)
+      )
+    : filtered
+
+  const total = searched.length
+  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const levelCounts = {
     全部: alerts.length,
@@ -127,7 +140,7 @@ export default function AlertsPage() {
             {LEVEL_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setLevelFilter(f)}
+                onClick={() => { setLevelFilter(f); setPage(1) }}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   levelFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -144,7 +157,7 @@ export default function AlertsPage() {
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setStatusFilter(f)}
+                onClick={() => { setStatusFilter(f); setPage(1) }}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   statusFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -154,6 +167,10 @@ export default function AlertsPage() {
               </button>
             ))}
           </div>
+        </div>
+        <div className="relative">
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索告警编号..." className="h-8 w-48 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
         </div>
       </div>
 
@@ -169,15 +186,14 @@ export default function AlertsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-sm text-gray-400">
-                    <AlertTriangleIcon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
-                    当前筛选条件下无告警
+                  <td colSpan={11}>
+                    <EmptyState title={search ? '未找到匹配的告警' : '当前筛选条件下无告警'} description={search ? '请尝试其他关键词' : undefined} icon={AlertTriangleIcon} className="py-12" />
                   </td>
                 </tr>
               ) : (
-                filtered.map((a) => {
+                paginated.map((a) => {
                   const lv = LEVEL_MAP[a.level]
                   const st = STATUS_MAP[a.status]
                   return (
@@ -226,6 +242,7 @@ export default function AlertsPage() {
             </tbody>
           </table>
         </div>
+        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
       <p className="mt-3 text-xs text-gray-400">当前为 mock 数据，接入 Terminal Agent 后实时推送告警</p>

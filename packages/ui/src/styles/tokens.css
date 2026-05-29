@@ -43,6 +43,29 @@
   --color-info-bg:     #eff6ff;
   --color-info-fg:     #1d4ed8;
 
+  /* ── Semantic: Neutral (中性灰) ────────────────────────────── */
+  /*
+   * Muted text for secondary copy (descriptions, timestamps, placeholders).
+   * Surface for nested cards / subtle background regions.
+   * Border for subtle dividers and input outlines.
+   */
+  --color-neutral-50:  #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+
+  /* ── Dark Surface (侧边栏/深色模式) ───────────────────────── */
+  --color-dark:        #111827;
+  --color-dark-hover:  #1f2937;
+  --color-dark-active: #374151;
+  --color-dark-border: #1f2937;
+
   /* ── Surface / Background ─────────────────────────────────── */
   --color-canvas:  #f9fafb;   /* page-level background */
   --color-surface: #ffffff;   /* card / panel background */

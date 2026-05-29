@@ -632,6 +632,22 @@ pnpm audit   # ✅ 已完成，0 vulnerabilities
 
 ---
 
+## Phase 9.1 UI Polish 收尾(carry-over)
+
+Phase 9.1 Admin 后台 Polish 已主体完成(commit 见 feat/ui-polish-9.1-fix),以下条目延后单独补:
+
+| # | 条目 | 来源 | 备注 |
+|---|------|------|------|
+| 1 | **Partner 后台 Polish** | Mavis | worker 交付问题未跑完;同 DataTable.tsx 模式复制即可 |
+| 2 | **Kiosk 视觉打磨** | Mavis | 同上 |
+| 3 | **printers Tab 漏补分页/搜索/EmptyState** | 0a Verifier | `apps/admin/src/routes/printers/index.tsx` 219 行表格页与 terminals 同等规模,Mavis 漏算(误以为已废弃,实为 /devices?tab=printers 的 Tab 内容) |
+| 4 | **Tab + URL 状态冲突** | 0a Verifier | `/devices?tab=X` 与 `useTableState` 共用 URL search params。在终端 Tab 翻页/搜索后切到打印机 Tab,page/search 会被带过去。修法:Tab 切换时清掉 page/pageSize/search,或给 `useTableState` 加 keyPrefix |
+| 5 | **DataTable.tsx 自身 gray-* 残留** | 0a Verifier | 文件位于 `apps/admin/src/routes/components/`,Mavis 自己新建,但内部 14 处 gray-* 未走 neutral token;不在 line 358 的 "packages/ui 内" 范围,故 Verifier 未报。建议下次 Polish 一起换 |
+
+**优先级**:这 5 条都属于 UI 微调,不阻塞 0b/#5 后端真数据接入。等后端真数据进来,admin 这些页本来也要回去改字段映射,届时顺手处理。
+
+---
+
 ## 近期不做
 
 - 后端数据库 / Prisma schema 迁移（Phase 7.6 第一步先出骨架和 stub）

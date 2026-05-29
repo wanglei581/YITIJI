@@ -10,7 +10,7 @@ const badgeVariants = cva(
         warning: 'bg-warning-bg text-warning-fg',
         error:   'bg-error-bg text-error-fg',
         info:    'bg-info-bg text-info-fg',
-        default: 'bg-gray-100 text-gray-600',
+        default: 'bg-neutral-100 text-neutral-600',
       },
     },
     defaultVariants: {

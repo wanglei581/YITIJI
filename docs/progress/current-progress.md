@@ -354,7 +354,30 @@
 | 2026-05-28 | Phase 8.2C 安全加固：修复 10 个 bug（P0: 3 个，P1: 4 个，P2: 3 个）— wmi.ts PowerShell 注入、claim 竞态、TOCTOU、权限校验、printing 超时、spawnSync 阻塞、EPERM 僵尸锁、seed 任务重置、timeout 注释、markTaskDone 异常 | Mavis |
 | 2026-05-29 | Phase 8 封板 — Mac 真实后端跨机 E2E 验证全部通过：① Windows Agent 向 Mac 192.168.1.164:3000 注册成功（terminalId=t_f77d716786118f78），DPAPI 加密 agentToken，adminSecret 自动清除；② Prisma 持久化确认：Mac API 重启后心跳持续 200，terminalId 不丢失；③ 离线期间 task-claim 自动重试（retry 1→2→3→恢复），ptask_seed_001 幂等跳过（restart-idempotency）；④ 全部 Phase 8 Windows 真机验收项完成（V8.1C-3 断网重试 / V8.1C-4 单实例 EPERM Bug 修复 / V8.1C-5 服务安装 scriptOptions Bug 修复 / reboot 自启动 / WMI printerStatus=ready,diskFreeGB=158.98）；Phase 8 正式封板，下一步 Phase 9 | Claude Code |
 
+| 2026-05-29 | Admin 后台 UI Polish：新增 DataTable.tsx 组件（Pagination/useTableState/FilterPills）；7 个 Admin 页面（Terminals/Orders/JobSources/FairSources/Partners/Alerts/Files）全部添加分页器+全局搜索+EmptyState；URL params 支持（?page=1&pageSize=20）；lint/typecheck/build 全通过 | Claude Code |
+| 2026-05-29 | Design System 补充修复：packages/ui 内 gray-* 残留（Button.tsx/PageHeader.tsx/KioskLayout.tsx/Spinner.tsx/StatusBadge.tsx/Card.tsx/AdminLayout.tsx）全部替换为 neutral-*，保留 tokens.css 中已有 neutral-* 映射；lint/typecheck/build 全通过 | Mavis |
+
 ---
+
+## 十二、Design System 修复记录（2026-05-29）
+
+### gray-* → neutral-* 补充替换
+
+**问题**：packages/ui 内部分组件残留 gray-* 未替换，违反 tokens.css 中 neutral-* 统一色板规范。
+
+**替换文件（共 7 个文件，14 处）：**
+
+| 文件 | 替换内容 | 替换值 |
+|------|---------|--------|
+| `Button.tsx` | secondary / ghost / outline variants | gray-* → neutral-* |
+| `PageHeader.tsx` | border / title / subtitle | gray-* → neutral-* |
+| `KioskLayout.tsx` | header border / nav border / icon color | gray-* → neutral-* |
+| `Spinner.tsx` | border color | gray-200 → neutral-200 |
+| `StatusBadge.tsx` | default status | gray-100 / gray-600 → neutral-* |
+| `Card.tsx` | border | gray-200 → neutral-200 |
+| `AdminLayout.tsx` | icon color / hover states | gray-* → neutral-* |
+
+**验证结果**：pnpm lint 0 errors / typecheck 0 errors / build 全通过
 
 > 每次完成开发任务后，请更新本文档的任务清单和更新记录。
 

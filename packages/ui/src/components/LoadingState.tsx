@@ -11,7 +11,7 @@ export function LoadingState({ text = '加载中…', size = 'lg', className }: 
   return (
     <div className={cn('flex flex-col items-center justify-center gap-4 py-16', className)}>
       <Spinner size={size} />
-      {text && <p className="text-sm text-gray-500">{text}</p>}
+      {text && <p className="text-sm text-neutral-500">{text}</p>}
     </div>
   )
 }

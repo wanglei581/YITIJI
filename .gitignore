@@ -37,3 +37,4 @@ pnpm-debug.log*
 # Temp
 .tmp
 mavis-workspace/
+.mavis/

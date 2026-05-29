@@ -69,14 +69,14 @@ export function AdminLayout({
       {/* ── Sidebar ────────────────────────────────────────── */}
       <aside
         className={cn(
-          'flex shrink-0 flex-col bg-gray-900 transition-all duration-200',
+          'flex shrink-0 flex-col bg-neutral-900 transition-all duration-200',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
         {/* Brand */}
         <div
           className={cn(
-            'flex h-14 shrink-0 items-center gap-3 border-b border-gray-800',
+            'flex h-14 shrink-0 items-center gap-3 border-b border-neutral-800',
             collapsed ? 'justify-center px-3' : 'px-4',
           )}
         >
@@ -91,7 +91,7 @@ export function AdminLayout({
           {!collapsed && (
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{appName}</p>
-              <p className="truncate text-[10px] text-gray-500">AI求职打印服务终端</p>
+              <p className="truncate text-[10px] text-neutral-500">AI求职打印服务终端</p>
             </div>
           )}
         </div>
@@ -110,7 +110,7 @@ export function AdminLayout({
                   {/* Group label */}
                   {showGroup && (
                     <div className={cn('px-3 pb-1', index === 0 ? 'pt-1' : 'pt-4')}>
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                      <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
                         {item.group}
                       </span>
                     </div>
@@ -123,8 +123,8 @@ export function AdminLayout({
                     className={cn(
                       'relative flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                       active
-                        ? 'bg-gray-800 text-white'
-                        : 'text-gray-400 hover:bg-gray-800/60 hover:text-gray-200',
+                        ? 'bg-neutral-800 text-white'
+                        : 'text-neutral-400 hover:bg-dark-hover/60 hover:text-neutral-200',
                       collapsed && 'justify-center px-2',
                     )}
                   >
@@ -147,8 +147,8 @@ export function AdminLayout({
                         className={cn(
                           'rounded-full px-1.5 py-px text-[10px] font-semibold leading-tight',
                           typeof item.badge === 'number' && item.badge > 0
-                            ? 'bg-red-500 text-white'
-                            : 'bg-gray-700 text-gray-300',
+                            ? 'bg-error text-white'
+                            : 'bg-neutral-700 text-neutral-300',
                         )}
                       >
                         {item.badge}
@@ -163,12 +163,12 @@ export function AdminLayout({
 
         {/* Collapse toggle */}
         {onCollapseChange && (
-          <div className="border-t border-gray-800 p-2">
+          <div className="border-t border-neutral-800 p-2">
             <button
               type="button"
               aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
               onClick={() => onCollapseChange(!collapsed)}
-              className="flex w-full items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-300"
+              className="flex w-full items-center justify-center rounded-md p-2 text-neutral-500 hover:bg-dark-hover hover:text-neutral-300"
             >
               {collapsed
                 ? <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -183,7 +183,7 @@ export function AdminLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-surface px-6">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-6">
           {/* Left placeholder (can be used for breadcrumbs) */}
           <div />
 
@@ -195,7 +195,7 @@ export function AdminLayout({
                 <button
                   type="button"
                   aria-label="搜索"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
                 >
                   <SearchIcon className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -204,13 +204,13 @@ export function AdminLayout({
                 <button
                   type="button"
                   aria-label={`通知${notificationCount > 0 ? `（${notificationCount}条）` : ''}`}
-                  className="relative flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                  className="relative flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
                 >
                   <BellIcon className="h-4 w-4" aria-hidden="true" />
                   {notificationCount > 0 && (
                     <span
                       aria-hidden="true"
-                      className="absolute right-1 top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold leading-none text-white"
+                      className="absolute right-1 top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-error px-0.5 text-[9px] font-bold leading-none text-white"
                     >
                       {notificationCount > 9 ? '9+' : notificationCount}
                     </span>
@@ -220,10 +220,10 @@ export function AdminLayout({
                 {/* Divider + user info */}
                 {(userName ?? userRole) && (
                   <>
-                    <div className="mx-1.5 h-5 w-px bg-gray-200" aria-hidden="true" />
+                    <div className="mx-1.5 h-5 w-px bg-neutral-200" aria-hidden="true" />
                     <button
                       type="button"
-                      className="flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-gray-100"
+                      className="flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-neutral-100"
                     >
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-600">
                         <span className="text-[11px] font-semibold text-white">
@@ -232,12 +232,12 @@ export function AdminLayout({
                       </div>
                       <div className="text-left">
                         {userName && (
-                          <p className="text-xs font-medium leading-none text-gray-800">
+                          <p className="text-xs font-medium leading-none text-neutral-800">
                             {userName}
                           </p>
                         )}
                         {userRole && (
-                          <p className="mt-0.5 text-[10px] leading-none text-gray-400">
+                          <p className="mt-0.5 text-[10px] leading-none text-neutral-400">
                             {userRole}
                           </p>
                         )}
