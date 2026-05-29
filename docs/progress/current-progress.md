@@ -25,7 +25,7 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8.2 全部封板 + Mac 真实后端 E2E 验证通过（2026-05-29）**
+**当前阶段：Phase 8 全部封板 ✅ — Windows Agent 全链路（Prisma 跨机持久化 + WMI + 断网重试 + 单实例 + 服务安装）验证完成（2026-05-29）**
 
 **V8.1C-4/5 + Mac 真实后端验证结果：**
 
@@ -208,8 +208,8 @@
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` ✅ 已完成，0 vulnerabilities |
-| 第 8 阶段 | Windows Terminal Agent | Phase 8.0–8.2C 主线完成；Prisma 持久化、WMI 心跳、断网重试、单实例、Windows 服务验证均已推进；actionToken 签发已实现，local-api-server 校验/lease 续租后续补齐 |
-| 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | 📋 已规划，Phase 8 完成后启动 |
+| 第 8 阶段 | Windows Terminal Agent | ✅ **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D 出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固 + 全部 Windows 真机验收通过；actionToken local 校验/lease 续租长任务前补齐 |
+| 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | **📋 当前下一步** — Phase 8 封板后启动 |
 
 ---
 
@@ -352,6 +352,7 @@
 | 2026-05-27 | Phase 8.1B 真机联调前置修正：新增 `GET /api/v1/test/sample-visible.pdf` 可见 PDF 样本，`ptask_seed_001` 改指向该样本并重新以同一 Buffer 计算 `fileMd5`；Agent 下载相对 `fileUrl` 时按 `apiBaseUrl` 补全服务端 origin，避免 Windows 访问本机 localhost；claim 过期清理定时器增加 `unref()`；`@ai-job-print/api` 与 `terminal-agent` typecheck 通过，服务层 register→heartbeat→claim→PATCH completed 冒烟通过；Windows 真机出纸待沙箱外执行 | Codex |
 | 2026-05-28 | Phase 8.1C/D Windows 真机 E2E 全部通过封板（含物理出纸确认）：① `api-client.ts` + `task-runner.ts` 新增 `proxy: false`（根因：Windows `http_proxy` 环境变量 Clash/v2ray 劫持所有 axios 请求，导致注册超时 30s×3 + 下载卡住）；② `task-runner.ts` 新增 `resolveFileUrl()`（处理 backend 返回相对 fileUrl）；③ Windows 真机完整链路：terminalId=t_d41f29b91ee78467，claim→download(8ms,0.9KB)→MD5✓→PATCH printing✓→PDF Method B→783ms→PATCH completed✓→temp file deleted；④ 本地 SQLite `print_tasks` 写入 completed，无 pending_patches（PATCH 成功）；⑤ DPAPI token 持久化跨重启复用，无需重新注册；**⑥ Pantum CM2800ADN Series 真实出纸（用户确认）✅** | Claude Code |
 | 2026-05-28 | Phase 8.2C 安全加固：修复 10 个 bug（P0: 3 个，P1: 4 个，P2: 3 个）— wmi.ts PowerShell 注入、claim 竞态、TOCTOU、权限校验、printing 超时、spawnSync 阻塞、EPERM 僵尸锁、seed 任务重置、timeout 注释、markTaskDone 异常 | Mavis |
+| 2026-05-29 | Phase 8 封板 — Mac 真实后端跨机 E2E 验证全部通过：① Windows Agent 向 Mac 192.168.1.164:3000 注册成功（terminalId=t_f77d716786118f78），DPAPI 加密 agentToken，adminSecret 自动清除；② Prisma 持久化确认：Mac API 重启后心跳持续 200，terminalId 不丢失；③ 离线期间 task-claim 自动重试（retry 1→2→3→恢复），ptask_seed_001 幂等跳过（restart-idempotency）；④ 全部 Phase 8 Windows 真机验收项完成（V8.1C-3 断网重试 / V8.1C-4 单实例 EPERM Bug 修复 / V8.1C-5 服务安装 scriptOptions Bug 修复 / reboot 自启动 / WMI printerStatus=ready,diskFreeGB=158.98）；Phase 8 正式封板，下一步 Phase 9 | Claude Code |
 
 ---
 

@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-05-28（Phase 8.2C 代码封板）  
+> 最后更新：2026-05-29（Phase 8 全部封板，Mac 真实后端跨机 E2E 验证通过）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
@@ -345,9 +345,9 @@
 
 ---
 
-## ✅ Phase 8.2A — Prisma 持久化任务闭环（代码已完成，待后端部署验证）
+## ✅ Phase 8.2A — Prisma 持久化任务闭环（代码完成 + 跨机真机验证通过 2026-05-29）
 
-代码由 Codex 完成（2026-05-28），已合并 main。包含：
+代码由 Codex 完成（2026-05-28），已合并 main。Mac 真实后端跨机 E2E 验证通过（2026-05-29）。
 
 | 要点 | 状态 |
 |------|------|
@@ -357,17 +357,18 @@
 | `prisma.printTask.upsert` 种子任务（API 重启不重复插入） | ✅ |
 | TerminalsService 全部 Map → Prisma 查询 | ✅ |
 | PrismaService NestJS DI（@prisma/adapter-libsql，SQLite dev） | ✅ |
-| 迁移文件（20260528032954_init_terminals） | ✅ |
+| 迁移文件（20260528032954_init_terminals + 20260528_add_agent_token_unique） | ✅ |
 | typecheck + build 通过 | ✅ |
 
-待验证：
-- [ ] 后端部署到 192.168.1.160，运行 `prisma migrate deploy`，重启 API
-- [ ] Agent 重连后 terminal 不丢失，心跳 200（非 404）
-- [ ] ptask_seed_001 持久化，重启后 Agent 可 claim
+**真机验证结果（2026-05-29，Windows → Mac 192.168.1.164:3000）：**
+- ✅ 后端部署 Mac，`prisma migrate deploy` 全部迁移应用，API 启动正常
+- ✅ Agent 注册成功：terminalId=t_f77d716786118f78，DPAPI 加密 agentToken，adminSecret 自动清除
+- ✅ Mac API 重启后 terminal 不丢失，心跳持续 200（Prisma 持久化确认）
+- ✅ ptask_seed_001 持久化，重启后 Agent claim 正常（restart-idempotency 跳过）
 
 ---
 
-## ✅ Phase 8.2B — WMI 真实状态查询（代码已完成）
+## ✅ Phase 8.2B — WMI 真实状态查询（代码完成 + Windows 真机验证通过 2026-05-28）
 
 代码由 Codex 完成（2026-05-28），已合并 main。
 
@@ -378,9 +379,9 @@
 | heartbeat.ts 接入 WMI 查询（Promise.all 并行） | ✅ |
 | macOS 降级（返回 'unknown' / -1） | ✅ |
 
-待验证：
-- [ ] Windows 真机心跳包含真实 printerStatus（ready/offline/error/low_paper）
-- [ ] 缺纸/断电时 WMI 状态变化验证
+**真机验证结果（2026-05-28）：**
+- ✅ Windows 真机心跳包含真实 printerStatus=ready，diskFreeGB=158.98
+- 📋 缺纸/断电时 WMI 状态变化验证（待物理触发，非阻塞后续）
 
 ---
 
@@ -399,13 +400,31 @@
 
 ---
 
-## 📋 后续方向（当前阶段：所有 8.2 代码封板）
+## ✅ Phase 8 全部封板（2026-05-29）
 
-| 选项 | 内容 | 说明 |
+**当前状态：Phase 8 所有主线任务完成，可进入 Phase 9。**
+
+| 选项 | 内容 | 状态 |
 |------|------|------|
-| **A — Prisma 后端部署验证** | 将 Prisma 后端部署到 192.168.1.160，验证心跳/claim 持久化 | V8.1C-3/断网重试/reboot也在此完成 |
-| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | Mac 上开发，无需 Windows |
-| **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | Mac 上开发，类型清债 |
+| ~~A — Prisma 后端部署验证~~ | ~~将 Prisma 后端部署，验证心跳/claim 持久化~~ | ✅ 已完成（2026-05-29，Mac 跨机验证通过） |
+| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | 📋 **当前下一步** |
+| **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 📋 可与 Phase 9 并行 |
+
+## 📋 Phase 9 — UI Polish + AI数字人引导员（当前优先级 P0）
+
+详细规划见：[current-progress.md §Phase 9](./current-progress.md)
+
+**Phase 9.1 静态 3D 引导员（首个交付）：**
+- AvatarGuide 组件、Three.js/VRM 模型加载
+- idle 动画、文字气泡
+- 关闭/静音、WebGL 降级
+
+**Phase 9 Kiosk 视觉升级范围：**
+- 首页业务入口层级增强
+- 打印/扫描/AI简历流程步骤进度感
+- 岗位/招聘会卡片信息层级
+- 二维码弹层美化
+- 失败态/空状态引导升级
 
 ---
 
