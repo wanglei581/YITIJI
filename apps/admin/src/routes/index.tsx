@@ -1,5 +1,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AdminLayoutWrapper } from '../layouts/AdminLayoutWrapper'
+import LoginPage from './login'
 
 import DashboardPage from './dashboard'
 import DevicesPage from './devices'
@@ -16,6 +17,9 @@ import PermissionsPage from './permissions'
 import AuditPage from './audit'
 
 export const adminRouter = createBrowserRouter([
+  // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
+  // 自身在已登录时会自动跳 /
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
     element: <AdminLayoutWrapper />,

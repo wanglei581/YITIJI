@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { PartnerLayout, type NavItem } from '@ai-job-print/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart2Icon,
   BriefcaseIcon,
@@ -9,10 +9,12 @@ import {
   DatabaseIcon,
   FileTextIcon,
   LayoutDashboardIcon,
+  LogOutIcon,
   MonitorIcon,
   RefreshCwIcon,
   UserCogIcon,
 } from 'lucide-react'
+import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',  label: '工作台',        icon: LayoutDashboardIcon },
@@ -44,23 +46,77 @@ const KEY_TO_PATH: Record<string, string> = Object.fromEntries(
   Object.entries(PATH_TO_KEY).map(([path, key]) => [key, path])
 )
 
+const ROLE_LABEL: Record<AuthedUser['role'], string> = {
+  admin:   '管理员',
+  partner: '机构管理员',
+  kiosk:   '终端用户',
+}
+
 export function PartnerLayoutWrapper() {
   const navigate = useNavigate()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
+  const [user, setUser] = useState<AuthedUser | null>(() => getUser())
+  const [authChecked, setAuthChecked] = useState(false)
   const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
+
+  useEffect(() => {
+    let cancelled = false
+    verifyToken().then((u) => {
+      if (cancelled) return
+      if (!u) {
+        navigate('/login', { replace: true })
+        return
+      }
+      if (u.role !== 'partner') {
+        // 角色不符强制下线
+        navigate('/login', { replace: true })
+        return
+      }
+      setUser(u)
+      setAuthChecked(true)
+    })
+    return () => { cancelled = true }
+  }, [navigate])
+
+  if (!authChecked) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-gray-400">
+        正在验证身份…
+      </div>
+    )
+  }
+
+  const orgName = user?.name ?? '合作机构后台'
 
   return (
     <PartnerLayout
-      orgName="合作机构后台"
+      orgName={orgName}
       navItems={NAV_ITEMS}
       activeKey={activeKey}
       onNavChange={(key) => navigate(KEY_TO_PATH[key] ?? '/')}
       collapsed={collapsed}
       onCollapseChange={setCollapsed}
-      userName="机构管理员"
-      userRole="数据管理员"
+      userName={user?.name ?? '当前用户'}
+      userRole={user ? ROLE_LABEL[user.role] : ''}
       notificationCount={1}
+      headerActions={
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm font-medium text-gray-800">{user?.name ?? '当前用户'}</p>
+            <p className="text-xs text-gray-500">{user ? ROLE_LABEL[user.role] : ''}</p>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100 active:bg-gray-200"
+            aria-label="退出登录"
+          >
+            <LogOutIcon className="h-4 w-4" aria-hidden="true" />
+            退出
+          </button>
+        </div>
+      }
     >
       <Outlet />
     </PartnerLayout>

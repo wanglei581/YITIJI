@@ -1,4 +1,5 @@
 import { API_BASE_URL, ApiHttpError } from './client'
+import { authHeader, redirectToLogin } from '../auth'
 import type {
   PartnerDataSource,
   PartnerJobRecord,
@@ -16,7 +17,7 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
   const res = await fetch(url.toString(), {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', ...authHeader() },
     credentials: 'include',
   })
   if (!res.ok) {
@@ -27,6 +28,7 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
       if (body.error?.code) code = body.error.code
       if (body.error?.message) message = body.error.message
     } catch { /* keep defaults */ }
+    if (res.status === 401) redirectToLogin()
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>
@@ -35,7 +37,7 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 async function patch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
     credentials: 'include',
     body: JSON.stringify(body),
   })
@@ -47,6 +49,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
       if (errBody.error?.code) code = errBody.error.code
       if (errBody.error?.message) message = errBody.error.message
     } catch { /* keep defaults */ }
+    if (res.status === 401) redirectToLogin()
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>
@@ -55,7 +58,7 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
     credentials: 'include',
     body: JSON.stringify(body),
   })
@@ -67,6 +70,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       if (errBody.error?.code) code = errBody.error.code
       if (errBody.error?.message) message = errBody.error.message
     } catch { /* keep defaults */ }
+    if (res.status === 401) redirectToLogin()
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>

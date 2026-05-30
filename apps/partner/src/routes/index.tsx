@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { PartnerLayoutWrapper } from '../layouts/PartnerLayoutWrapper'
+import LoginPage from './login'
 
 import DashboardPage from './dashboard'
 import ProfilePage from './profile'
@@ -13,6 +14,7 @@ import SyncLogsPage from './sync-logs'
 import AccountPage from './account'
 
 export const partnerRouter = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
     element: <PartnerLayoutWrapper />,

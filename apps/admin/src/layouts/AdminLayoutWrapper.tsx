@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { AdminLayout, type NavItem } from '@ai-job-print/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangleIcon,
   BotIcon,
@@ -11,11 +11,13 @@ import {
   FileTextIcon,
   FolderIcon,
   LayoutDashboardIcon,
+  LogOutIcon,
   MonitorIcon,
   ScrollTextIcon,
   ShieldIcon,
   UsersIcon,
 } from 'lucide-react'
+import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
@@ -67,11 +69,43 @@ const KEY_TO_PATH: Record<string, string> = (() => {
   return out
 })()
 
+const ROLE_LABEL: Record<AuthedUser['role'], string> = {
+  admin:   '超级管理员',
+  partner: '合作机构',
+  kiosk:   '终端用户',
+}
+
 export function AdminLayoutWrapper() {
   const navigate = useNavigate()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
+  const [user, setUser] = useState<AuthedUser | null>(() => getUser())
+  const [authChecked, setAuthChecked] = useState(false)
   const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
+
+  // Boot 时调 /auth/me 校验 token;失败 (verifyToken 返回 null) 跳 /login。
+  useEffect(() => {
+    let cancelled = false
+    verifyToken().then((u) => {
+      if (cancelled) return
+      if (!u) {
+        navigate('/login', { replace: true })
+        return
+      }
+      setUser(u)
+      setAuthChecked(true)
+    })
+    return () => { cancelled = true }
+  }, [navigate])
+
+  // 等 /auth/me 回应再渲染,防 401 时先闪一帧后台 UI
+  if (!authChecked) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-gray-400">
+        正在验证身份…
+      </div>
+    )
+  }
 
   return (
     <AdminLayout
@@ -81,9 +115,26 @@ export function AdminLayoutWrapper() {
       collapsed={collapsed}
       onCollapseChange={setCollapsed}
       appName="管理后台"
-      userName="系统管理员"
-      userRole="超级管理员"
+      userName={user?.name ?? '当前用户'}
+      userRole={user ? ROLE_LABEL[user.role] : ''}
       notificationCount={3}
+      headerActions={
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm font-medium text-gray-800">{user?.name ?? '当前用户'}</p>
+            <p className="text-xs text-gray-500">{user ? ROLE_LABEL[user.role] : ''}</p>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100 active:bg-gray-200"
+            aria-label="退出登录"
+          >
+            <LogOutIcon className="h-4 w-4" aria-hidden="true" />
+            退出
+          </button>
+        </div>
+      }
     >
       <Outlet />
     </AdminLayout>
