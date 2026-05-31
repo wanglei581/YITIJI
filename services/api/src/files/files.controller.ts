@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -20,9 +21,11 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { Throttle } from '@nestjs/throttler'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from './files.service'
 import { UploadOptionsDto } from './dto/upload-options.dto'
+import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { verifyFileSignature } from './signing'
 import type {
   FilePurpose,
@@ -64,7 +67,7 @@ export class FilesController {
     @CurrentUser() user: AuthedUser,
   ): Promise<ApiResponse<FileUploadResponse>> {
     if (!file) {
-      throw new UnauthorizedException({
+      throw new BadRequestException({
         error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' },
       })
     }
@@ -75,6 +78,50 @@ export class FilesController {
       purpose: options.purpose as FilePurpose,
       sensitiveLevel: options.sensitiveLevel as FileSensitiveLevel | undefined,
       uploaderId: user.userId,
+    })
+    return ApiResponse.ok(res)
+  }
+
+  /**
+   * Kiosk 一体机匿名上传(无登录态)。
+   *
+   * 设计理由(CLAUDE.md §9 Kiosk 无登录 + §11 文件安全):
+   *   - 求职者在公共终端不应被强制注册
+   *   - 但匿名上传必须靠时效兜底:purpose 严格白名单 + 强制由后端按 purpose
+   *     推断 sensitiveLevel(简历类 1h 过期)
+   *   - 限流比默认更严:20 次 / 60 秒 / 每 IP,防滥用
+   *   - uploaderId 落 null;ip + ua 写 audit 留痕
+   */
+  @Post('kiosk-upload')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  @UseInterceptors(FileInterceptor('file'))
+  async kioskUpload(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() options: KioskUploadOptionsDto,
+    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
+  ): Promise<ApiResponse<FileUploadResponse>> {
+    if (!file) {
+      throw new BadRequestException({
+        error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' },
+      })
+    }
+    const res = await this.files.upload({
+      buffer: file.buffer,
+      filename: file.originalname,
+      mimeType: file.mimetype,
+      purpose: options.purpose as FilePurpose,
+      uploaderId: null,
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'kiosk',
+      action: 'file.upload',
+      targetType: 'file',
+      targetId: res.fileId,
+      payload: { purpose: options.purpose, filename: res.filename, sizeBytes: res.sizeBytes, source: 'kiosk_anonymous' },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
     })
     return ApiResponse.ok(res)
   }
