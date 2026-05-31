@@ -6,68 +6,62 @@
 
 P0 冲刺 W1 Day 1。负责架构基础设施 + 共享组件 + 后端文件通道。
 
-## 将编辑/新建的文件
+## 分支
 
-- `docs/progress/owners.md` ✅ 已完成
-- `docs/progress/today-claude.md`(本文件)✅ 已完成
-- 暂未启动 W1 Day 1 具体代码工作,等用户与 Mavis 同步分工后开始
+`feat/p0-w1-claude-ui-foundation`(本日全部成果合在该分支)。
 
-## 将编辑/新建的文件(W1 Day 1 计划,待用户 ack 启动)
+## 完成清单
 
-启动后将分两个分支推进:
+- [x] **协同合同 owners.md + today-{claude,mavis}.md 模板** @ `ab96c6e`(main)
+- [x] **packages/ui ComplianceBanner 组件**(warning / info / success)@ `b4a6f7d`
+- [x] **packages/shared COMPLIANCE_COPY 合规文案 SSOT**(8 个标准横幅文案 + 禁词 / 推荐词清单)@ `b4a6f7d`
+- [x] **装依赖**:recharts(3 端)+ react-diff-viewer-continued(kiosk)@ `603c15d`
+- [x] **Prisma 模型**:FileObject + AuditLog + migration 已 apply 到 dev.db @ `38a4384`
+- [x] **shared types/file.ts**:FileMetadata / FileUploadResponse / SignedUrlResponse / FileCleanupResponse + 默认 TTL 矩阵 @ `38a4384`
+- [x] **BE-1 文件通道**:storage.ts + signing.ts(HMAC-SHA256)+ service + controller(6 路由)+ cron(每小时清理过期)@ `fd13304`
+- [x] **app.module 注册** FilesModule + ScheduleModule.forRoot() @ `fd13304`
+- [x] **.env.example 模板** + .gitignore 加 /services/api/storage/ @ `fd13304`
+- [x] **typecheck 全员通过**(8 workspace projects)
+- [x] **API 启动验证通过**:6 条 /api/v1/files 路由全部 mapped
 
-**分支 1**:`feat/p0-w1-claude-ui-foundation`
-- `packages/ui/src/components/ComplianceBanner.tsx`(新建)
-- `packages/ui/src/components/Stepper.tsx`(新建)
-- `packages/ui/src/index.ts`(导出新组件)
-- 三端 `package.json` 安装 `recharts` 和 `react-diff-viewer-continued`
+## 总产出统计
 
-**分支 2**:`feat/p0-w1-claude-files-be1`
-- `services/api/prisma/schema.prisma`(新增 FileObject 模型)
-- `services/api/prisma/migrations/<timestamp>_add_file_object/`(新建)
-- `services/api/src/files/files.module.ts`(新建)
-- `services/api/src/files/files.controller.ts`(新建,/api/v1/files 路由)
-- `services/api/src/files/files.service.ts`(新建,HMAC 签名 URL + 清理逻辑)
-- `services/api/src/files/dto/`(新建,上传 DTO + 响应 DTO)
-- `services/api/src/app.module.ts`(注册 FilesModule)
-- `packages/shared/src/types/file.ts`(新建,FileMetadata 等共享类型)
-- `packages/shared/src/index.ts`(导出)
+- 本日 commit 数(本地):5(`b4a6f7d` / `603c15d` / `38a4384` / `fd13304` / 本文件)
+- 已合 main:1(`ab96c6e` 协同合同)
+- 本日 push 计数:0(auto mode 限制,用户手动 push)
 
-## 将新增/修改的共享类型契约(packages/shared)
+## 备注
 
-- 新增 `FileMetadata` 类型(id / filename / size / mime / uploadedAt / expiresAt / sensitiveLevel)
-- 新增 `FileUploadResponse`(fileId / signedUrl / expiresAt)
-- 新增 `SignedUrlResponse`(url / expiresAt)
+历史上有过一次 rebase 操作:Mavis 的 commit `9f1c765` 原本误落在本分支上,
+已通过 `git rebase --onto ab96c6e 9f1c765` 摘除,Mavis commit 已转入
+`feat/p0-w1-mavis-partner-dashboard` 分支。
+回滚锚:`backup/pre-cleanup-2026-05-30` tag。
 
-## 将安装的依赖
+## 解阻 Mavis 的产出
 
-- `pnpm add recharts -F @ai-job-print/kiosk -F @ai-job-print/admin -F @ai-job-print/partner`
-- `pnpm add react-diff-viewer-continued -F @ai-job-print/kiosk`
-- `pnpm add @types/node -D -F @ai-job-print/api`(可能已有,只确保)
+- ✅ **ComplianceBanner 已可用**:Mavis 下次开工可把 dashboard 顶部 placeholder 替换为
+  ```tsx
+  import { ComplianceBanner } from '@ai-job-print/ui'
+  import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+  ...
+  <ComplianceBanner tone="warning">{COMPLIANCE_COPY.PARTNER_DASHBOARD_TOP}</ComplianceBanner>
+  ```
+- ✅ **BE-1 已可联调**:Mavis 的 W2 A3 Admin 文件管理 UI 可直接调
+  - `GET /api/v1/files?includeDeleted=1&limit=100`
+  - `DELETE /api/v1/files/:id?reason=admin manual delete`
+  - `POST /api/v1/files/cleanup-expired`
+  返回结构见 packages/shared/src/types/file.ts。
+
+## 明日(W1 Day 2)计划
+
+- packages/ui:Stepper(W2 K2 AI 简历四步流要用)+ Drawer / Pagination
+- packages/ui/charts:ResumeRadarChart / TrendLineChart / FunnelCard / MetricGrid
+- 启动 BE-2 AuditLog 服务的接入(同步写、interceptor、对 files.controller 的 TODO 回填)
 
 ## 阻塞 Mavis 的事项
 
-- **W1 Day 1-2**:Mavis 不要碰 `packages/ui/src/`,我在新增 ComplianceBanner 等
-- **W1 Day 1-2**:Mavis 不要碰 `services/api/prisma/schema.prisma`,我在加 FileObject
-- **W1 Day 1**:Mavis 在我装完依赖前不要单独 `pnpm install`(锁文件会冲突)
-- **W1 全周**:Mavis 不要碰 `services/api/src/files/`、`services/api/src/audit/`、`services/api/src/main.ts`、`services/api/src/app.module.ts`
+无。今日完成的所有产出都是 Mavis 可消费的(不在 Mavis 独占目录)。
 
-## Mavis 今天**可以并行做**的事(不冲突)
+## 完成时间
 
-1. K1 Kiosk 首页卡片墙:`apps/kiosk/src/pages/home/`(完全独立,与我零交集)
-2. P1 Partner 工作台 D:`apps/partner/src/routes/dashboard/`(完全独立)
-3. A4 Admin 岗位信息源合规横幅:`apps/admin/src/routes/job-sources/`,但**合规横幅文案需等 Claude 提供 ComplianceBanner 组件**;在等的时候可以先用占位 `<div className="...">` 写好布局,后续替换为 `<ComplianceBanner>` 组件
-4. K3 Kiosk 招聘列表:同上,可以先布局,等 Day 2 EOD ComplianceBanner 上线后替换
-
-## 预计完成时间
-
-W1 Day 1 EOD UTC+8:
-- packages/ui 至少 ComplianceBanner + Stepper 上线
-- FileObject Prisma 模型 + migration 完成
-- 依赖装完
-
-## 完成清单(下班前更新)
-
-- [x] owners.md 起草 @ commit pending
-- [x] today-claude.md 起草 @ commit pending
-- [ ] 等用户确认与 Mavis 同步分工后,启动 W1 Day 1 编码工作
+UTC+8 11:30,提前完成。
