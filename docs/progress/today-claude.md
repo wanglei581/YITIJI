@@ -1,59 +1,62 @@
-# 2026-06-01 Claude 今日动手清单(W2 Day 2)
-
-> 日期格式:YYYY-MM-DD。本文件每天覆盖。
+# 2026-06-01 Claude 今日动手清单(W2 Day 2 完成)
 
 ## 角色
 
-P0 冲刺 **W2 Day 2**。JobFair 后端服务 + 审计接入。
+P0 冲刺 **W2 Day 2**。JobFair 后端服务接真 Prisma + 审计。
 
 ## 分支
 
-`feat/p0-w2-claude-jobfair-be7`(延续 Day 1)
+`feat/p0-w2-claude-jobfair-be7`(stacked on PR #1)
 
-## 将编辑/新建的文件
+## 完成清单(Day 2)
 
-- `services/api/src/jobs/jobs.service.ts`(8 处 fair 方法从 stub 切真 Prisma)
-- `services/api/src/jobs/jobs.module.ts`(@Global AuditModule 已注入,无需 import)
-- `services/api/src/jobs/dto/import-fairs.dto.ts`(对齐 importJobs 的 DTO 模式,sourceOrgId 走 JWT 不走 body)
-- `services/api/src/jobs/dto/review-fair.dto.ts`(若需要 — 看是否复用 ReviewActionDto)
-- `services/api/src/jobs/fair.mapper.ts`(新建 — Prisma row → DTO 转换函数)
+- [x] **8 fair routes 全部切真 Prisma**(commit `5104d7f`):
+  - Kiosk GET /job-fairs / /:id
+  - Admin GET /fair-sources, PATCH /:id/review, PATCH /:id/publish
+  - Partner GET /partner/fairs, POST /import, PATCH /:id/publish
+- [x] **状态机与 Job 完全一致**:终态不可回退 / reject 必填 reason / approve→draft 等独立 publish
+- [x] **AuditService 注入** + 3 处审计写(`fair.review` / `fair.publish` / `fair.import`)
+- [x] **ImportFairsDto 重构**:sourceOrgId 从 body 移除,强制走 JWT(安全修复)
+- [x] **DTO 向后兼容**:Prisma 行 → 旧 FairListItemDto/AdminFairDto/PartnerFairDto 形状,
+       Kiosk/Admin/Partner 现有 fair 页**零改动可继续工作**
+- [x] **fair.mapper.ts** 抽出 Prisma → 新 Fair/FairCompany/FairZone 转换,供 W3 上新页用
+- [x] typecheck / lint ✓
+- [x] curl smoke ✓
 
-## fair 端点对照表
+## 本周(W2)累计 commit
 
-| 路由 | 当前 | Day 2 目标 |
-|---|---|---|
-| GET /job-fairs | 返回空 | 真查 reviewStatus=approved + publishStatus=published |
-| GET /job-fairs/:id | 返回空 | 真查 + 嵌入 companies + zones(FairDetailResponse) |
-| GET /admin/fair-sources | 返回空 | 真查全集 |
-| PATCH /admin/fair-sources/:id/review | 抛 NOT_IMPLEMENTED | 真审核 + audit('fair.review') |
-| PATCH /admin/fair-sources/:id/publish | 抛 NOT_IMPLEMENTED | 真发布 + audit('fair.publish') |
-| GET /partner/fairs | 返回空 | 真查本机构 |
-| POST /partner/fairs/import | 抛 NOT_IMPLEMENTED | 真 upsert + audit('fair.import') |
-| PATCH /partner/fairs/:id/publish | 抛 NOT_IMPLEMENTED | 真下架 |
+```
+5104d7f  feat(api): BE-7 8 端点切真 Prisma + audit + Partner 导入
+38be415  docs: today-claude.md W2 Day 2 意图
+b8f6c4a  feat(prisma): BE-7 JobFair / FairCompany / FairZone 模型 + migration + 契约
+fbfc75e  docs: today-claude.md W2 Day 1 意图
+```
+(stacked on PR #1 的 `a22cdc1` hotfix)
 
-## 将新增/修改的共享类型契约(packages/shared)
+## 解阻 Mavis 的产出
 
-无。Day 1 已经把 Fair / FairCompany / FairZone / FairListQuery 等加好。
+- ✅ **Kiosk fair 7 页可以从 mock 切真**:`apps/kiosk/src/services/api/jobFairs.ts` 已是 adapter 模式,
+  改 `VITE_API_MODE=http` 即可拿到真后端数据(目前是空列表,seed 加几条就有)
+- ✅ **Admin 招聘会信息源页**(`apps/admin/src/routes/fair-sources/`)可对接:
+  审核/发布动作走 PATCH 即可,会自动留审计
+- ✅ **Partner 招聘会管理**(`apps/partner/src/routes/fairs/`)可对接:
+  批量导入用 ImportFairsDto 形状
 
 ## 阻塞 Mavis 的事项
 
-- 全天:Mavis 不要碰 `services/api/src/jobs/`(我在改 service + controller)
-- 全天:Mavis 不要碰 `services/api/src/jobs/dto/`(我在改 import-fairs.dto)
+无。今日全部产出 Mavis 可即时消费。
 
-## Mavis 今天可以并行做的事
+## 明日(W2 Day 3)Claude 计划
 
-1. K1 Kiosk 首页 / K3 招聘列表合规横幅 / A4 Admin 岗位信息源合规横幅
-2. P1 Partner 工作台占位 SVG → `TrendLineChart` / `MetricGrid`
-3. A3 Admin 文件管理 UI 消费 BE-1
-4. **新增**:Mavis 现在可以开始 Kiosk fair 7 页静态 UI 调整(因为 Day 2 EOD 真接口就绪)
-   `apps/kiosk/src/pages/job-fairs/*` 全部在 Mavis 独占目录
+- W2 Day 3:
+  - 扩 prisma/seed.ts 加 3 场招聘会(general / campus_corp / industry 各一)+ companies/zones,
+    让前端切真后立即有数据可看
+  - 新端点 `GET /api/v1/job-fairs/:id/detail` 返回 FairDetailResponse(fair + companies + zones),
+    用于校企合作详情页
+  - 校企合作主题在 Kiosk 上的 banner / 现场服务四卡 UI 占位 — 等真数据 + 设计 OK 再做
+  - Job 侧审计回填:job.review / job.publish / job.import(Day 2 没塞,避免 commit 过大)
 
-## 完成清单(下班前更新)
+## 备注
 
-- [ ] importFairs DTO 改为 items[] only(sourceOrgId 走 JWT)
-- [ ] FairMapper(Prisma row → Fair / FairCompany / FairZone)
-- [ ] JobsService 8 fair 方法切真 Prisma
-- [ ] AuditService 注入 + 3 处审计写(fair.review / fair.publish / fair.import)
-- [ ] typecheck 全员通过
-- [ ] boot + curl 冒烟(至少 GET 一个 fair 列表)
-- [ ] commit
+历史 rebase + W1 PR #1 hotfix 详见 W1 收尾 commit `a22cdc1`。
+本分支 stacked on `a22cdc1`,等 PR #1 合并后 rebase 干净再开 W2 PR。
