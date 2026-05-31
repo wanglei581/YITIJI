@@ -1,98 +1,50 @@
-# 2026-05-31 Claude 今日动手清单(Day 3)
+# 2026-06-01 Claude 今日动手清单(Day 4)
 
 > 日期格式:YYYY-MM-DD。本文件每天覆盖。
 
 ## 角色
 
-P0 冲刺 W1 Day 3。Kiosk K2 AI 简历四步流接入真实后端。
-
-**范围调整**:Day 2 inspection 发现 AI 模块(`services/api/src/ai`)已经搭好骨架
-(provider 抽象 + 6 stub + parse/optimize/chat 路由 + ai-log)。Day 3 改为
-**集成 BE-1 文件 + 利用已有 AI 接口 + Kiosk K2 UI 补全 + 合规故事落 UI**。
+P0 冲刺 W1 Day 4。K2d 简历优化对比页 + W1 收尾(开 PR 合 main)。
 
 ## 分支
 
-`feat/p0-w1-claude-ui-foundation`(延续 Day 1+2 同一分支)。
+`feat/p0-w1-claude-ui-foundation`(延续整周分支)。
 
-## 完成清单
+## 将编辑/新建的文件
 
-后端 BE-1 扩展(commit `ef7f642`):
-- [x] **POST /api/v1/files/kiosk-upload** 匿名上传(无 JWT)
-  - 限流 20 次 / 60 秒 / IP(比默认 60/60 严格)
-  - KioskUploadOptionsDto 严格 purpose 白名单
-  - sensitiveLevel 由后端按 purpose 推断(防恶意调用方拉长 TTL)
-  - 写 AuditLog action='file.upload' actorRole='kiosk' actorId=null
-  - 沿用现有 FilesService:简历类自动 1h 过期 / 身份证类 1h / 其余 24h
-- [x] **curl smoke 通过**:`fileId / signedUrl / fileExpiresAt=+1h` 一次到位
+- `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx`(改写优化对比 UI:
+  从"两段彩色盒子"升级为 `ReactDiffViewer` 字符级 diff + split-view + 整体评分提升卡)
 
-前端 Kiosk K2(commit 下一条):
-- [x] **ResumeSourcePage** 真实文件上传(替换 MOCK_FILE)
-  - 顶部 ComplianceBanner(success)+ KIOSK_RESUME_UPLOAD_PRIVACY 文案
-  - 点"上传电子简历"→ 触发原生文件选择 → kioskUploadFile 上传 BE-1
-  - 客户端 10MB 上限校验 + 错误条 + 上传中 disabled
-  - 成功 navigate 到 /resume/parse 带真实 fileId
-- [x] **ResumeReportPage** 集成 ResumeRadarChart
-  - report.sections 归一化到 0-100 → 雷达维度
-  - 原"分项评估"条形图保留(细节)
-  - 与秒哒 kiosk/13 截图布局一致
-- [x] **kiosk/src/services/api**:files.ts + filesHttpAdapter.ts + filesMockAdapter.ts
-  - kioskUploadFile(file, purpose):http 真上传 / mock 假数据
-  - 沿用 ai.ts / jobs.ts adapter 模式
+## 将新增/修改的共享类型契约(packages/shared)
 
-## 总产出统计
+无。沿用 `ResumeOptimizeModule { title, before, after }` 形状。
+**专家报告强调的"语义 diff with reason/dimension"** 涉及 prompt schema 改动 +
+provider 全部同步 + 桩数据,**不在 Day 4 scope**,留到 W2 整周做 K2d 升级版。
 
-- 本日 commit 数(本地):3(`7939a98` 意图 / `ef7f642` BE-1 / Kiosk K2 / 本文件)
-- 已 push:0(等用户手动 push)
+## 将安装的依赖
 
-## 解阻 Mavis 的产出
-
-- ✅ **K2 简历核心**:Kiosk 上传 → BE-1 → AI 解析 → 雷达诊断 端到端真实数据闭环
-- ✅ **隐私文案前置**:首次满足专家报告对"上传页可见隐私声明"的硬要求
-- ✅ **kiosk-upload 路由**:Mavis 的 K3 招聘列表附件、K8 求职材料模板等场景
-  可复用 kioskUploadFile(只需换 purpose 字段)
-
-## 端到端验证(curl)
-
-```
-$ echo "dummy resume pdf" > /tmp/test.pdf
-$ curl -X POST -F file=@/tmp/test.pdf -F purpose=resume_upload \
-       http://localhost:3010/api/v1/files/kiosk-upload
-{
-  "data": {
-    "fileId": "9b77f4b6...",
-    "filename": "test.pdf",
-    "sizeBytes": 17,
-    "mimeType": "application/pdf",
-    "sha256": "b8d1756...",
-    "signedUrl": "/api/v1/files/9b77f4b6.../content?expires=...&sig=...",
-    "signedUrlExpiresAt": "2026-05-31T04:24:28.812Z",
-    "fileExpiresAt": "2026-05-31T05:19:28.807Z"
-  },
-  "success": true
-}
-```
-
-签名 URL 5 分钟过期、文件本身 1 小时过期(highly_sensitive 自动推断),
-audit 已写入 action='file.upload' actorRole='kiosk' actorId=null。
-
-## 明日(W1 Day 4)Claude 计划
-
-- W2 K2d AI 简历优化对比页面(`ResumeOptimizePage`):接现有 getResumeOptimize
-- 简化版 before/after diff(用 react-diff-viewer-continued 渲染优化前后段落 +
-  AI 解释面板)
-- 完成 W1 收尾:开 PR 合 main
+无。`react-diff-viewer-continued@4.2.2` 已在 Day 1 装好(`603c15d`)。
 
 ## 阻塞 Mavis 的事项
 
-无。今日全部产出 Mavis 可即时消费。
+无。今日只动 Kiosk resume(我的独占目录)+ docs。
 
-## 完成时间
+## Mavis 今天可以并行做的事(零冲突)
 
-UTC+8 14:00。
+1. K1 Kiosk 首页卡片墙
+2. K3 Kiosk 招聘列表 + 合规横幅
+3. A4 Admin 岗位信息源蓝色横幅
+4. P1 Partner 工作台:占位 SVG → `TrendLineChart` / `MetricGrid`
+5. **新增**:可消费 BE-2 audit 接口,做 A5 Admin 审计 UI 骨架
 
-## 备注
+## 预计完成时间
 
-历史上有过一次 rebase 操作:Mavis 的 commit `9f1c765` 原本误落在本分支上,
-已通过 `git rebase --onto ab96c6e 9f1c765` 摘除,Mavis commit 已转入
-`feat/p0-w1-mavis-partner-dashboard` 分支。
-回滚锚:`backup/pre-cleanup-2026-05-30` tag。
+UTC+8 EOD。
+
+## 完成清单(下班前更新)
+
+- [ ] ResumeOptimizePage diff view 改写
+- [ ] 评分提升卡片(优化前/后 + "估算,仅供参考"免责)
+- [ ] typecheck 全员通过
+- [ ] commit
+- [ ] 开 PR `feat/p0-w1-claude-ui-foundation` → `main`,标题 P0 W1 周收尾
