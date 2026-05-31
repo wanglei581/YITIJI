@@ -2,8 +2,30 @@ import 'reflect-metadata'
 import 'dotenv/config'
 import { NestFactory } from '@nestjs/core'
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
+import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { Request, Response } from 'express'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
+
+/**
+ * 保留 webhook 路由的 raw body 供 HMAC 校验。
+ *
+ * Express body-parser 默认 parse 完就丢 raw,但 sync.controller 必须用 raw bytes
+ * 重算 HMAC 才能与企业的签名对齐(对 parsed object 重新 JSON.stringify 字段顺序
+ * 可能不同,字符级会变,签名失败)。
+ *
+ * 只对 /api/v1/sync/* 启用,其他路由不背成本。
+ */
+interface RawBodyRequest extends Request {
+  rawBody?: Buffer
+}
+function rawBodyCaptureFor(prefix: string) {
+  return (req: RawBodyRequest, _res: Response, buf: Buffer): void => {
+    if (req.url.startsWith(prefix)) {
+      req.rawBody = Buffer.from(buf)
+    }
+  }
+}
 
 /**
  * 把 class-validator 的嵌套 ValidationError[] 扁平为路径化字符串数组。
@@ -30,7 +52,16 @@ function flattenValidationErrors(errors: ValidationError[], parent = ''): string
 }
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // express 接管 json body parser,带 verify 回调写入 req.rawBody
+    bodyParser: false,
+  })
+  // 手动装 json parser:对 sync webhook 路径保留 rawBody;其他路由忽略。
+  // path-prefix 包含 api/v1 因为这是 setGlobalPrefix 之前的原始 url。
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const express = require('express') as typeof import('express')
+  app.use(express.json({ verify: rawBodyCaptureFor('/api/v1/sync/') }))
+  app.use(express.urlencoded({ extended: true }))
   app.setGlobalPrefix('api/v1')
 
   // CORS:dev 允许任意 origin(本机三端 Vite 端口浮动),

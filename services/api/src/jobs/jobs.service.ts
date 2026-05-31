@@ -30,9 +30,11 @@ import type { ReviewAction } from './dto/review.dto'
 import type { PublishAction } from './dto/publish.dto'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
 import type { ImportFairsDto } from './dto/import-fairs.dto'
+import type { CreateDataSourceDto } from './dto/data-source.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse } from './fair.types'
 
@@ -42,6 +44,7 @@ type ReviewStatus  = 'pending' | 'reviewing' | 'approved' | 'rejected'
 type PublishStatus = 'draft' | 'published' | 'unpublished' | 'expired'
 type FairStatus    = 'upcoming' | 'ongoing' | 'ended'
 type WorkType      = 'full_time' | 'part_time' | 'internship' | 'contract'
+type ConnStatus    = 'connected' | 'error' | 'disabled'
 
 // ─── DTO shapes returned to callers ──────────────────────────────────────────
 
@@ -112,6 +115,23 @@ export interface ImportResult<T> {
   items: T[]
 }
 
+export interface PartnerDataSourceDto {
+  id: string
+  name: string
+  sourceKind: string
+  accessMode: string
+  syncFreq: string
+  lastSyncTime: string
+  connStatus: ConnStatus
+  successCount: number
+  failCount: number
+  description: string
+  credentialConfigured: boolean
+  endpoint?: string
+  webhookUrl?: string
+  webhookSecretOnce?: string
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function safeJsonArr(s: string): string[] {
@@ -125,6 +145,43 @@ function safeJsonArr(s: string): string[] {
 
 function fmtSyncTime(d: Date): string {
   return d.toISOString().replace('T', ' ').slice(0, 16)
+}
+
+interface PrismaJobSourceRow {
+  id: string
+  name: string
+  sourceKind: string
+  accessMode: string
+  syncFreq: string
+  enabled: boolean
+  description: string | null
+  lastSyncAt: Date | null
+  lastSyncStatus: string | null
+  endpoint: string | null
+  encryptedCredential: string | null
+  webhookSecret: string | null
+}
+
+function prismaJobSourceToPartnerDto(source: PrismaJobSourceRow): PartnerDataSourceDto {
+  const connStatus: ConnStatus = !source.enabled
+    ? 'disabled'
+    : source.lastSyncStatus === 'failed'
+      ? 'error'
+      : 'connected'
+  return {
+    id: source.id,
+    name: source.name,
+    sourceKind: source.sourceKind,
+    accessMode: source.accessMode,
+    syncFreq: source.syncFreq,
+    lastSyncTime: source.lastSyncAt ? fmtSyncTime(source.lastSyncAt) : '从未同步',
+    connStatus,
+    successCount: 0,
+    failCount: source.lastSyncStatus === 'failed' ? 1 : 0,
+    description: source.description ?? '',
+    credentialConfigured: Boolean(source.encryptedCredential || source.webhookSecret),
+    endpoint: source.endpoint ?? undefined,
+  }
 }
 
 /** Prisma Job 行的最小形状(避免在源文件深度依赖 Prisma 命名空间类型) */
@@ -615,6 +672,100 @@ export class JobsService {
 
   // ── Partner:本机构数据 ─────────────────────────────────────────────────────
 
+  async getPartnerDataSources(user: AuthedUser): Promise<PartnerDataSourceDto[]> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const sources = await this.prisma.jobSource.findMany({
+      where: { orgId: user.orgId },
+      orderBy: { updatedAt: 'desc' },
+    })
+    return sources.map(prismaJobSourceToPartnerDto)
+  }
+
+  /**
+   * Partner 新增数据源。
+   *
+   * 敏感字段只在服务端处理：
+   * - API credential → encryptedCredential
+   * - Webhook credential / 自动生成 secret → webhookSecret（AES-GCM 加密）
+   * Webhook 原始 secret 仅在创建响应中返回一次，前端不得持久化展示。
+   */
+  async createPartnerDataSource(
+    dto: CreateDataSourceDto,
+    user: AuthedUser,
+  ): Promise<PartnerDataSourceDto> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+
+    const accessMode = dto.accessMode ?? 'excel'
+    const sourceKind = dto.sourceKind ?? 'manual'
+    const syncFreq = dto.syncFreq ?? 'manual'
+
+    if (accessMode === 'api' && !dto.endpoint) {
+      throw new BadRequestException({ error: { code: 'API_ENDPOINT_REQUIRED', message: 'API 数据源必须填写 endpoint' } })
+    }
+
+    const webhookSecretOnce = accessMode === 'webhook'
+      ? (dto.credential ?? generateWebhookSecret())
+      : undefined
+
+    const source = await this.prisma.jobSource.create({
+      data: {
+        orgId: user.orgId,
+        name: dto.name.trim(),
+        sourceKind,
+        accessMode,
+        syncFreq,
+        description: dto.description,
+        endpoint: dto.endpoint,
+        authType: dto.authType,
+        encryptedCredential: accessMode === 'api' && dto.credential ? encryptSecret(dto.credential) : undefined,
+        webhookSecret: webhookSecretOnce ? encryptSecret(webhookSecretOnce) : undefined,
+        webhookSecretRotatedAt: webhookSecretOnce ? new Date() : undefined,
+      },
+    })
+
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'data_source.create',
+      targetType: 'job_source',
+      targetId: source.id,
+      payload: { accessMode, sourceKind, credentialConfigured: Boolean(dto.credential || webhookSecretOnce) },
+    })
+
+    return {
+      ...prismaJobSourceToPartnerDto(source),
+      webhookUrl: accessMode === 'webhook' ? `/api/v1/sync/webhook?source=${source.id}` : undefined,
+      webhookSecretOnce,
+    }
+  }
+
+  async togglePartnerDataSource(id: string, user: AuthedUser): Promise<PartnerDataSourceDto> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const source = await this.prisma.jobSource.findUnique({ where: { id } })
+    if (!source || source.orgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+    const updated = await this.prisma.jobSource.update({
+      where: { id },
+      data: { enabled: !source.enabled },
+    })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'data_source.toggle',
+      targetType: 'job_source',
+      targetId: id,
+      payload: { enabled: updated.enabled },
+    })
+    return prismaJobSourceToPartnerDto(updated)
+  }
+
   async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]> {
     if (!user.orgId) return []
     const rows = await this.prisma.job.findMany({
@@ -697,6 +848,65 @@ export class JobsService {
     })
 
     this.logger.log(`importJobs: orgId=${sourceOrgId} count=${out.length}`)
+    return { imported: out.length, items: out }
+  }
+
+  /**
+   * Webhook 入口的导入(BE-8 W3)。
+   *
+   * 与 importJobs 共用同一套 upsert 状态机,但:
+   *   - 不读 JWT,sourceOrgId 由调用方(SyncService)从 JobSource 取
+   *   - 不写自己的 audit(由 SyncService 统一写 webhook 上下文的 audit)
+   *   - 不做 partner 角色 / orgId 校验(已在 SyncService 验签阶段完成)
+   *
+   * 字段集 = WebhookJobItemDto,与 ImportJobItemDto 字段高度重叠,
+   * 故内部转换后调用 importJobs 的内部 upsert 路径。
+   */
+  async importJobsFromWebhook(
+    orgId: string,
+    sourceId: string,
+    items: ImportJobItemDto[],
+  ): Promise<ImportResult<PartnerJobDto>> {
+    const org = await this.prisma.organization.findUnique({ where: { id: orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
+    }
+    const sourceName = org.name
+    const sync = new Date()
+    const out: PartnerJobDto[] = []
+
+    for (const item of items) {
+      try {
+        const job = await this.prisma.job.upsert({
+          where: { sourceOrgId_externalId: { sourceOrgId: orgId, externalId: item.externalId } },
+          create: {
+            sourceOrgId: orgId, sourceId, externalId: item.externalId, sourceName,
+            sourceUrl: item.sourceUrl,
+            title: item.title, company: item.company, city: item.city,
+            category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
+            salary: item.salary,
+            description: item.description, requirements: item.requirements,
+            tagsJson: JSON.stringify(item.tags ?? []),
+            reviewStatus: 'pending', publishStatus: 'draft',
+            syncTime: sync,
+          },
+          update: {
+            sourceId,
+            sourceName, sourceUrl: item.sourceUrl,
+            title: item.title, company: item.company, city: item.city,
+            category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
+            salary: item.salary,
+            description: item.description, requirements: item.requirements,
+            tagsJson: JSON.stringify(item.tags ?? []),
+            syncTime: sync,
+          },
+        })
+        out.push(prismaJobToPartnerDto(job))
+      } catch (e) {
+        this.logger.error(`importJobsFromWebhook upsert failed: orgId=${orgId} extId=${item.externalId}`, e as Error)
+        throw new InternalServerErrorException({ error: { code: 'IMPORT_FAILED', message: 'Webhook 导入失败,请稍后重试' } })
+      }
+    }
     return { imported: out.length, items: out }
   }
 

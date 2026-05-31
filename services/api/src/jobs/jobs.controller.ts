@@ -24,6 +24,9 @@
 //   GET   /partner/fairs                — 本机构招聘会列表
 //   POST  /partner/fairs/import         — 批量导入招聘会（默认 pending + draft）
 //   PATCH /partner/fairs/:id/publish    — 下架招聘会
+//   GET   /partner/data-sources         — 本机构数据源列表
+//   POST  /partner/data-sources         — 新增数据源(API/Excel/Webhook)
+//   PATCH /partner/data-sources/:id/toggle — 启停数据源
 // ============================================================
 
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
@@ -36,6 +39,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { ImportFairsDto } from './dto/import-fairs.dto'
+import { CreateDataSourceDto } from './dto/data-source.dto'
 
 @Controller()
 export class JobsController {
@@ -146,6 +150,33 @@ export class JobsController {
   }
 
   // ── Partner(全部受 @Roles('partner') 保护,sourceOrgId 强制 from JWT)─────
+
+  @Get('partner/data-sources')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerDataSources(@CurrentUser() user: AuthedUser) {
+    return this.jobsService.getPartnerDataSources(user)
+  }
+
+  @Post('partner/data-sources')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  createPartnerDataSource(
+    @Body() dto: CreateDataSourceDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsService.createPartnerDataSource(dto, user)
+  }
+
+  @Patch('partner/data-sources/:id/toggle')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  togglePartnerDataSource(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsService.togglePartnerDataSource(id, user)
+  }
 
   @Get('partner/jobs')
   @UseGuards(JwtAuthGuard, RolesGuard)

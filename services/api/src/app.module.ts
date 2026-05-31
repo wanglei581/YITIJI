@@ -7,6 +7,7 @@ import { AuditModule } from './audit/audit.module'
 import { AuthModule } from './auth/auth.module'
 import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
+import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
@@ -28,6 +29,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
     AiModule,
     FilesModule,
     JobsModule,
+    SyncModule,
     TerminalsModule,
   ],
   providers: [

@@ -146,6 +146,23 @@ model JobSource {
   description    String?
   lastSyncAt     DateTime?
   lastSyncStatus String?
+
+  // ── W3 BE-8 同步接入(P0)──────────────────────────────────
+  // accessMode='api' 时:endpoint + authType + encryptedCredential 三件必填
+  // accessMode='webhook' 时:webhookSecret 必填(企业用解密后的原文 HMAC 签名 payload)
+  // 任一字段都不返回前端原文,前端只见 credentialConfigured: boolean。
+
+  /** API 模式的接入地址,例 "https://api.zhilian.com/v2/jobs" */
+  endpoint            String?
+  /** 'bearer' | 'oauth2' | 'api_key' | 'basic' | 'custom' */
+  authType            String?
+  /** AES-256-GCM 加密后的凭证字符串。详见 src/common/crypto/secret-cipher.ts */
+  encryptedCredential String?
+  /** AES-256-GCM 加密后的 Webhook 签名密钥。只在服务端解密用于 HMAC 校验。 */
+  webhookSecret       String?
+  /** Webhook 密钥上次轮换时间,审计用 */
+  webhookSecretRotatedAt DateTime?
+
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
