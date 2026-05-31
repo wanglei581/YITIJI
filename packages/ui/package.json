@@ -16,7 +16,11 @@
     "typescript": "^5.7.0"
   },
   "peerDependencies": {
-    "react": "^18.0.0"
+    "react": "^18.0.0",
+    "recharts": "^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "recharts": { "optional": true }
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
