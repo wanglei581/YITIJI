@@ -483,6 +483,14 @@ export class JobsService {
         where: { id },
         data: { ...data, reviewedBy: user.userId, reviewedAt: new Date() },
       })
+      await this.audit.write({
+        actorId: user.userId,
+        actorRole: 'admin',
+        action: 'job.review',
+        targetType: 'job',
+        targetId: id,
+        payload: { action, reason: data.rejectReason ?? null, fromReviewStatus: job.reviewStatus, toReviewStatus: data.reviewStatus },
+      })
       this.logger.log(`reviewJobSource: id=${id} action=${action} by=${user.userId}`)
       return prismaJobToAdminDto(updated)
     } catch (e) {
@@ -491,7 +499,7 @@ export class JobsService {
     }
   }
 
-  async publishJobSource(id: string, action: PublishAction, _user: AuthedUser): Promise<AdminJobDto> {
+  async publishJobSource(id: string, action: PublishAction, user: AuthedUser): Promise<AdminJobDto> {
     const job = await this.prisma.job.findUnique({ where: { id } })
     if (!job) {
       throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
@@ -506,9 +514,18 @@ export class JobsService {
       }
     }
 
+    const toStatus = action === 'publish' ? 'published' : 'unpublished'
     const updated = await this.prisma.job.update({
       where: { id },
-      data: { publishStatus: action === 'publish' ? 'published' : 'unpublished' },
+      data: { publishStatus: toStatus },
+    })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'admin',
+      action: 'job.publish',
+      targetType: 'job',
+      targetId: id,
+      payload: { action, fromPublishStatus: job.publishStatus, toPublishStatus: toStatus },
     })
     this.logger.log(`publishJobSource: id=${id} action=${action}`)
     return prismaJobToAdminDto(updated)
@@ -669,6 +686,15 @@ export class JobsService {
         })
       }
     }
+
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'partner',
+      action: 'job.import',
+      targetType: 'job',
+      targetId: null,
+      payload: { count: out.length, externalIds: out.map((o) => o.externalId).slice(0, 20) },
+    })
 
     this.logger.log(`importJobs: orgId=${sourceOrgId} count=${out.length}`)
     return { imported: out.length, items: out }
