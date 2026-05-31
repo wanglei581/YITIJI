@@ -33,6 +33,8 @@ import type { ImportFairsDto } from './dto/import-fairs.dto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
+import type { FairDetailResponse } from './fair.types'
 
 // ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
 
@@ -400,6 +402,30 @@ export class JobsService {
       where: { id, reviewStatus: 'approved', publishStatus: 'published' },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
+  }
+
+  /**
+   * 招聘会详情(供校企合作详情页 / 普通招聘会详情页一并使用)。
+   *
+   * 返回 FairDetailResponse:{ fair, companies, zones } 一次拉到位,
+   * 前端首屏不再二次请求 companies 和 zones。
+   *
+   * Kiosk 公开访问,只放出 approved+published。
+   */
+  async getPublishedFairDetail(id: string): Promise<FairDetailResponse | null> {
+    const f = await this.prisma.jobFair.findFirst({
+      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      include: {
+        companies: { orderBy: { jobsCount: 'desc' } },
+        zones: { orderBy: { sortOrder: 'asc' } },
+      },
+    })
+    if (!f) return null
+    return {
+      fair: mapFair(f),
+      companies: f.companies.map(mapFairCompany),
+      zones: f.zones.map(mapFairZone),
+    }
   }
 
   // ── Admin:全集合 + 审核/发布(状态机)─────────────────────────────────────

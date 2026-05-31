@@ -10,7 +10,8 @@
     "dev": "prisma generate && ts-node -r tsconfig-paths/register src/main.ts",
     "lint": "eslint src/",
     "typecheck": "prisma generate && tsc --noEmit",
-    "db:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
+    "db:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+    "db:seed:fairs": "ts-node -r tsconfig-paths/register prisma/seed-fairs.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

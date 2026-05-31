@@ -76,6 +76,15 @@ export class JobsController {
     return this.jobsService.getPublishedFairById(id)
   }
 
+  /**
+   * 招聘会详情(含 companies + zones),供 Kiosk 详情页一次拉到位。
+   * 校企合作详情页(theme=campus_corp)也走这条。
+   */
+  @Get('job-fairs/:id/detail')
+  getJobFairDetail(@Param('id') id: string) {
+    return this.jobsService.getPublishedFairDetail(id)
+  }
+
   // ── Admin(全部受 @Roles('admin') 保护)─────────────────────────────────────
 
   @Get('admin/job-sources')
