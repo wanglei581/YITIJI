@@ -20,6 +20,7 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { AuditService } from '../audit/audit.service'
 import { FilesService } from './files.service'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { verifyFileSignature } from './signing'
@@ -48,7 +49,10 @@ import type {
  */
 @Controller('files')
 export class FilesController {
-  constructor(private readonly files: FilesService) {}
+  constructor(
+    private readonly files: FilesService,
+    private readonly audit: AuditService,
+  ) {}
 
   /** Kiosk / Partner / Admin 均可上传,文件归属由 uploaderId 标记。 */
   @Post()
@@ -128,13 +132,21 @@ export class FilesController {
     @Param('id') id: string,
     @Query('reason') reason: string,
     @CurrentUser() user: AuthedUser,
-    @Req() req: Express.Request & { requestId?: string },
+    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
   ): Promise<ApiResponse<FileMetadata>> {
-    const result = await this.files.forceDelete(id, user.userId, reason || 'admin manual delete')
-    // TODO(BE-2 W2):写 AuditLog
-    //   action='file.force_delete', targetType='file', targetId=id,
-    //   actorId=user.userId, actorRole='admin', payloadJson={reason}, requestId
-    void req
+    const finalReason = reason || 'admin manual delete'
+    const result = await this.files.forceDelete(id, user.userId, finalReason)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'admin',
+      action: 'file.force_delete',
+      targetType: 'file',
+      targetId: id,
+      payload: { reason: finalReason, filename: result.filename, sensitiveLevel: result.sensitiveLevel },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
     return ApiResponse.ok(result)
   }
 
@@ -143,14 +155,36 @@ export class FilesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async cleanupExpired(
-    @CurrentUser() _user: AuthedUser,
-    @Req() req: Express.Request & { requestId?: string },
+    @CurrentUser() user: AuthedUser,
+    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
   ): Promise<ApiResponse<FileCleanupResponse>> {
     const result = await this.files.cleanupExpired('manual')
-    // TODO(BE-2 W2):写 AuditLog
-    //   action='file.cleanup_expired', targetType='system', targetId=null,
-    //   payloadJson={deletedCount, fileIds}, requestId
-    void req
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'admin',
+      action: 'file.cleanup_expired',
+      targetType: 'system',
+      targetId: null,
+      payload: { deletedCount: result.deletedCount, fileIds: result.deletedFileIds.slice(0, 50) },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
     return ApiResponse.ok(result)
   }
+}
+
+/** Helper:从请求里取 IP(支持 X-Forwarded-For,生产应配 trust proxy)。 */
+function extractIp(req: { headers: Record<string, string | string[] | undefined>; ip?: string; socket?: { remoteAddress?: string } }): string | null {
+  const fwd = req.headers['x-forwarded-for']
+  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? null
+  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0] ?? null
+  return req.ip ?? req.socket?.remoteAddress ?? null
+}
+
+function extractUa(req: { headers: Record<string, string | string[] | undefined> }): string | null {
+  const ua = req.headers['user-agent']
+  if (typeof ua === 'string') return ua.slice(0, 256)
+  if (Array.isArray(ua) && ua[0]) return ua[0].slice(0, 256)
+  return null
 }

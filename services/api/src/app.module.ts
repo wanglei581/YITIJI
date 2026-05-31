@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AiModule } from './ai/ai.module'
+import { AuditModule } from './audit/audit.module'
 import { AuthModule } from './auth/auth.module'
 import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
@@ -20,6 +21,9 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
     // BE-1 文件清理 cron 依赖 ScheduleModule 在根模块初始化。
     ScheduleModule.forRoot(),
     PrismaModule,
+    // AuditModule 必须在 FilesModule / JobsModule 之前,
+    // @Global() 让 AuditService 被任意业务模块自动注入。
+    AuditModule,
     AuthModule,
     AiModule,
     FilesModule,
