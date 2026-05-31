@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
+import type { ResumeRadarDimension } from '@ai-job-print/ui'
 import { AlertCircleIcon, CheckCircleIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
 import type { ResumeReport } from '@ai-job-print/shared'
 import { getResumeRecord } from '../../services/api'
@@ -112,6 +113,10 @@ export function ResumeReportPage() {
 
   const totalScore = report.sections.reduce((sum, s) => sum + s.score, 0)
   const totalMax   = report.sections.reduce((sum, s) => sum + s.maxScore, 0)
+  const radarDimensions: ResumeRadarDimension[] = report.sections.map((s) => ({
+    name: s.label,
+    score: s.maxScore > 0 ? Math.round((s.score / s.maxScore) * 100) : 0,
+  }))
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -140,6 +145,12 @@ export function ResumeReportPage() {
               <CheckCircleIcon className="h-8 w-8 text-primary-600" />
             </div>
           </div>
+        </Card>
+
+        {/* 能力雷达图 */}
+        <Card className="p-5">
+          <p className="mb-2 text-sm font-medium text-gray-700">能力雷达图</p>
+          <ResumeRadarChart dimensions={radarDimensions} height={280} />
         </Card>
 
         {/* 分项得分 */}
