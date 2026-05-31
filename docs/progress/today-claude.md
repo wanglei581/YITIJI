@@ -1,4 +1,4 @@
-# 2026-06-01 Claude 今日动手清单(Day 4)
+# 2026-06-01 Claude 今日动手清单(Day 4 — W1 收尾)
 
 > 日期格式:YYYY-MM-DD。本文件每天覆盖。
 
@@ -8,43 +8,70 @@ P0 冲刺 W1 Day 4。K2d 简历优化对比页 + W1 收尾(开 PR 合 main)。
 
 ## 分支
 
-`feat/p0-w1-claude-ui-foundation`(延续整周分支)。
+`feat/p0-w1-claude-ui-foundation`(W1 全周分支)。
 
-## 将编辑/新建的文件
+## 完成清单(Day 4)
 
-- `apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx`(改写优化对比 UI:
-  从"两段彩色盒子"升级为 `ReactDiffViewer` 字符级 diff + split-view + 整体评分提升卡)
+- [x] **K2d ResumeOptimizePage diff view**(commit `7653ea7`)
+  - ReactDiffViewer split-view 字符级 diff
+  - 替换原"两段彩色盒子"为真实 diff
+  - "评分提升(估算)"Card + 免责文案
+- [x] typecheck / lint / build ✓
+- [ ] **W1 收尾 — 开 PR `feat/p0-w1-claude-ui-foundation` → `main`**
 
-## 将新增/修改的共享类型契约(packages/shared)
+## W1 整周(Day 1-4)产出汇总
 
-无。沿用 `ResumeOptimizeModule { title, before, after }` 形状。
-**专家报告强调的"语义 diff with reason/dimension"** 涉及 prompt schema 改动 +
-provider 全部同步 + 桩数据,**不在 Day 4 scope**,留到 W2 整周做 K2d 升级版。
+后端:
+1. Prisma:FileObject + AuditLog 模型 + migration
+2. BE-1:文件通道(7 路由,HMAC 签名 URL 5min,cron 每小时清理过期)
+3. BE-1 扩展:`POST /files/kiosk-upload` 匿名(限流 20/60s/IP,purpose 白名单)
+4. BE-2:AuditLog 服务(@Global,同步写,失败不阻塞业务)+ admin 列表
+5. files.controller 回填两处 audit('file.force_delete' / 'file.cleanup_expired')
+6. files.controller `file.upload` 审计(actorRole='kiosk' actorId=null)
 
-## 将安装的依赖
+共享契约 packages/shared:
+1. types/file.ts(FileMetadata / FileUploadResponse / SignedUrlResponse / FileCleanupResponse / FILE_DEFAULT_TTL_HOURS)
+2. types/audit.ts(AuditAction / AuditTargetType / AuditLogRecord / AuditLogListQuery / AuditLogListResponse)
+3. types/complianceCopy.ts(COMPLIANCE_COPY SSOT,8 个标准横幅文案 + 禁词 + 推荐词)
 
-无。`react-diff-viewer-continued@4.2.2` 已在 Day 1 装好(`603c15d`)。
+前端 packages/ui(11 个新组件 + 4 个图表):
+1. ComplianceBanner(warning / info / success)
+2. Stepper / Drawer / Pagination
+3. charts/ResumeRadarChart / TrendLineChart / FunnelCard / MetricGrid
+4. peer recharts ^3 + 装 recharts(3 端)+ react-diff-viewer-continued(kiosk)
+
+前端 apps/kiosk K2(AI 简历四步流):
+1. ResumeSourcePage:真上传 + KIOSK_RESUME_UPLOAD_PRIVACY 隐私横幅
+2. ResumeReportPage:ResumeRadarChart 雷达 + 条形分项评估
+3. ResumeOptimizePage:ReactDiffViewer diff view + 评分提升估算卡
+4. services/api/files.ts + filesHttpAdapter + filesMockAdapter:kioskUploadFile
+
+合规故事落 UI:
+- ✅ Kiosk 上传页绿色"隐私保护"横幅(KIOSK_RESUME_UPLOAD_PRIVACY)
+- ✅ Kiosk 优化对比页"估算,不代表真实招聘结果"免责
+- ✅ Admin 文件管理 / 岗位信息源 / 审计 UI 蓝色合规声明就绪(组件 + 文案 ready,Mavis 接 UI)
+- ✅ 匿名上传严格限流 + AuditLog 留痕(IP / UA / requestId)
+- ✅ 强制清理 audit('file.force_delete')+ cron 清理审计无遗漏
+
+## 总产出统计
+
+- W1 本地 commit 数:**约 14**(从 `b4a6f7d` ComplianceBanner 起到 Day 4 收尾)
+- 已 push 远端:Day 1-2-3 已推
+- 待 push:Day 4 `7653ea7` + 本文件
 
 ## 阻塞 Mavis 的事项
 
-无。今日只动 Kiosk resume(我的独占目录)+ docs。
+无。W1 全部产出可即时消费。
 
-## Mavis 今天可以并行做的事(零冲突)
+## 明日(W2 Day 1)Claude 计划
 
-1. K1 Kiosk 首页卡片墙
-2. K3 Kiosk 招聘列表 + 合规横幅
-3. A4 Admin 岗位信息源蓝色横幅
-4. P1 Partner 工作台:占位 SVG → `TrendLineChart` / `MetricGrid`
-5. **新增**:可消费 BE-2 audit 接口,做 A5 Admin 审计 UI 骨架
+- W2 开 `feat/p0-w2-claude-jobfair-be7`:JobFair / FairCompany / FairZone Prisma + 迁移
+- AI 网关脱敏 helper(在调 provider 前 mask 简历手机/邮箱/身份证)
+- AI 网关审计调用('resume.parse_submitted' / 'resume.optimize_requested')
 
-## 预计完成时间
+## 备注
 
-UTC+8 EOD。
-
-## 完成清单(下班前更新)
-
-- [ ] ResumeOptimizePage diff view 改写
-- [ ] 评分提升卡片(优化前/后 + "估算,仅供参考"免责)
-- [ ] typecheck 全员通过
-- [ ] commit
-- [ ] 开 PR `feat/p0-w1-claude-ui-foundation` → `main`,标题 P0 W1 周收尾
+历史上有过一次 rebase 操作:Mavis 的 commit `9f1c765` 原本误落在本分支上,
+已通过 `git rebase --onto ab96c6e 9f1c765` 摘除,Mavis commit 已转入
+`feat/p0-w1-mavis-partner-dashboard` 分支。
+回滚锚:`backup/pre-cleanup-2026-05-30` tag。
