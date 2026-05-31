@@ -1,8 +1,10 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
+import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 import { AiModule } from './ai/ai.module'
 import { AuthModule } from './auth/auth.module'
+import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
 import { TerminalsModule } from './terminals/terminals.module'
 import { PrismaModule } from './prisma/prisma.module'
@@ -15,9 +17,12 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
     ThrottlerModule.forRoot([
       { name: 'default', ttl: 60_000, limit: 60 },
     ]),
+    // BE-1 文件清理 cron 依赖 ScheduleModule 在根模块初始化。
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     AiModule,
+    FilesModule,
     JobsModule,
     TerminalsModule,
   ],
