@@ -1,72 +1,64 @@
-# 2026-05-31 Claude 今日动手清单
+# 2026-05-31 Claude 今日动手清单(Day 3)
 
 > 日期格式:YYYY-MM-DD。本文件每天覆盖。
 
 ## 角色
 
-P0 冲刺 W1 Day 2。后端基础设施 + UI 组件库扩张。
+P0 冲刺 W1 Day 3。Kiosk K2 AI 简历四步流接入真实后端。
+
+**范围调整**:Day 2 inspection 发现 AI 模块(`services/api/src/ai`)已经搭好骨架
+(provider 抽象 + mock/openai/claude/local/qwen/zhipu 6 stub + parse/optimize/chat 路由
++ ai-log)。Day 3 不需要新建 AI 网关,改为**集成 BE-1 文件 + AI 已有接口 + Kiosk K2 UI 补全**。
 
 ## 分支
 
-`feat/p0-w1-claude-ui-foundation`(延续 Day 1 同一分支)。
+`feat/p0-w1-claude-ui-foundation`(延续 Day 1+2 同一分支)。
 
-## 完成清单
+## 将编辑/新建的文件
 
-后端 BE-2:
-- [x] **AuditLog 服务**(同步写,失败不阻塞)+ admin 列表 @ commit BE-2
-- [x] **files.controller 回填**:DELETE → 'file.force_delete';POST cleanup-expired → 'file.cleanup_expired'
-- [x] **@Global() AuditModule**:其他业务模块免 imports 直接注入
+**后端**(BE-1 扩展 — 匿名 Kiosk 上传):
+- `services/api/src/files/files.controller.ts`(新增 `POST /files/kiosk-upload` 路由)
+- `services/api/src/files/dto/kiosk-upload-options.dto.ts`(新建,限制 purpose 白名单)
 
-前端 packages/ui 7 个组件(全部 export):
-- [x] **Stepper**:水平四态(completed/active/pending)— W2 K2 AI 简历四步流主用
-- [x] **Drawer**:右侧抽屉(Esc / 遮罩 / 锁滚动)— Admin 审计/文件/终端详情通用
-- [x] **Pagination**:标准分页器(7 页码 + 省略号)— 后台表格通用
-- [x] **ResumeRadarChart**:5 维度雷达 — W2 K2c 简历诊断主图(支持多系列做 K2d 对比)
-- [x] **TrendLineChart**:多系列折线 — Admin/Partner 工作台趋势
-- [x] **FunnelCard**:横条 + 百分比 — Partner 数据统计漏斗
-- [x] **MetricGrid**:8 卡数据面板 — Admin/Partner 工作台核心指标
-- [x] **packages/ui index.ts** 全部 export
+**前端 Kiosk**:
+- `apps/kiosk/src/pages/resume/ResumeSourcePage.tsx`(真实文件上传 + ComplianceBanner 隐私横幅 + 接 BE-1)
+- `apps/kiosk/src/pages/resume/ResumeReportPage.tsx`(集成 ResumeRadarChart 替换条形评分图)
+- `apps/kiosk/src/services/api/files.ts`(新建 — `kioskUploadFile()` 封装,mock + http 双模式)
+- `apps/kiosk/src/services/api/filesHttpAdapter.ts`(新建)
+- `apps/kiosk/src/services/api/filesMockAdapter.ts`(新建)
+- `apps/kiosk/src/services/api/index.ts`(导出 files)
 
-契约 / 配置:
-- [x] **packages/shared/types/audit.ts**:AuditAction / AuditTargetType / AuditLogRecord / AuditLogListQuery / AuditLogListResponse
-- [x] **services/api/src/audit/audit.types.ts**(本地副本,SSOT 标注)
-- [x] **packages/ui peer recharts ^3**(可选)
+## 将新增/修改的共享类型契约(packages/shared)
 
-## 总产出统计
+无。Kiosk 上传走 file.ts 已有的 FileUploadResponse 形状。
 
-- 本日 commit 数(本地):3(`7de7991` 意图 / `b523c70` BE-2 / 本批 UI 7 组件)
-- 已 push:0(等用户手动 push)
+## 将安装的依赖
 
-## 解阻 Mavis 的产出
-
-- ✅ **W2 A3 Admin 文件管理 UI**:可调 BE-1 + BE-2 全套接口
-  - `DELETE /api/v1/files/:id?reason=...` 会自动落 `file.force_delete` 审计
-  - `POST /api/v1/files/cleanup-expired` 会自动落 `file.cleanup_expired` 审计
-- ✅ **W4 A5 Admin 审计日志 UI**:可直接调
-  - `GET /api/v1/admin/audit-logs?action=&actorId=&targetType=&targetId=&startAt=&endAt=&limit=&offset=`
-- ✅ **Admin/Partner 工作台**:可用 `MetricGrid` + `TrendLineChart` 替换占位 SVG
-- ✅ **Partner 数据统计页**:可用 `FunnelCard`
-- ✅ **任何 Admin/Partner 详情场景**:可用 `Drawer`
-- ✅ **任何 Admin/Partner 表格**:可用 `Pagination`
-- ✅ **W2 K2 AI 简历四步流**:虽然 Claude 自己做,但有了 `Stepper`,Mavis 帮忙看也很容易
-
-## 明日(W1 Day 3-4)Claude 计划
-
-- W2 K2 AI 简历四步流页面(`apps/kiosk/src/pages/resume/`):上传 → 解析 → 诊断 → 优化骨架
-- AI 网关服务:`services/api/src/ai/` 接入真实 LLM 调用(脱敏处理)
-- W2 K2c 简历诊断报告页(用 ResumeRadarChart)
+无。
 
 ## 阻塞 Mavis 的事项
 
-无。今日全部产出 Mavis 可即时消费。
+- **W1 Day 3 中段**:Mavis 不要碰 `services/api/src/files/`(在加 kiosk-upload 路由)、
+  `apps/kiosk/src/pages/resume/`(Claude 独占区,owners.md §1)、
+  `apps/kiosk/src/services/api/`(改 index.ts + 加 files.ts)。
 
-## 完成时间
+## Mavis 今天可以并行做的事(零冲突)
 
-UTC+8 13:00,提前完成。
+1. K1 Kiosk 首页卡片墙(`apps/kiosk/src/pages/home/`)— 完全独立
+2. K3 Kiosk 招聘列表 + 合规横幅(`apps/kiosk/src/pages/jobs/JobsPage.tsx`)— ComplianceBanner 已可用
+3. A4 Admin 岗位信息源蓝色横幅(`apps/admin/src/routes/job-sources/`)
+4. P1 Partner 工作台:把昨日做的占位 SVG 趋势图换成 `TrendLineChart`,把内联 8 卡换成 `MetricGrid`
 
-## 备注
+## 预计完成时间
 
-历史上有过一次 rebase 操作:Mavis 的 commit `9f1c765` 原本误落在本分支上,
-已通过 `git rebase --onto ab96c6e 9f1c765` 摘除,Mavis commit 已转入
-`feat/p0-w1-mavis-partner-dashboard` 分支。
-回滚锚:`backup/pre-cleanup-2026-05-30` tag。
+UTC+8 EOD。
+
+## 完成清单(下班前更新)
+
+- [ ] BE-1 新增 POST /files/kiosk-upload(匿名,purpose 白名单)
+- [ ] Kiosk filesHttpAdapter + filesMockAdapter + files.ts 暴露 `kioskUploadFile`
+- [ ] ResumeSourcePage 真实上传 + ComplianceBanner 隐私横幅
+- [ ] ResumeReportPage 集成 ResumeRadarChart
+- [ ] typecheck 全员通过
+- [ ] boot + 端到端冒烟(mock + http 至少一遍)
+- [ ] commit 分批
