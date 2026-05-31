@@ -5,3 +5,15 @@ node_modules
 /src/generated/prisma
 /prisma/dev.db
 /prisma/dev.db-journal
+
+# BE-1 文件物理落盘目录,绝不入库
+/storage/
+
+# 历史泄漏兜底:storage.ts 早期版本因 FILE_STORAGE_DIR="" 落到 cwd,
+# 这些 purpose 顶级目录绝不入库
+/resume_upload/
+/resume_scan/
+/id_scan/
+/print_doc/
+/fair_material/
+/cover_letter/

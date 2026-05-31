@@ -18,7 +18,14 @@ export class LocalFileStorage {
   private readonly root: string
 
   constructor(rootDir?: string) {
-    this.root = rootDir ?? process.env['FILE_STORAGE_DIR'] ?? path.resolve(process.cwd(), 'storage')
+    // .env 里 FILE_STORAGE_DIR="" 是常见"占位空"写法,空串必须当作"未配置"处理,
+    // 否则 path.resolve("", "<purpose>/...") 会落到 cwd 根,泄漏成 services/api/<purpose>/。
+    const fromArg = rootDir?.trim()
+    const fromEnv = process.env['FILE_STORAGE_DIR']?.trim()
+    this.root =
+      (fromArg && fromArg.length > 0 && fromArg) ||
+      (fromEnv && fromEnv.length > 0 && fromEnv) ||
+      path.resolve(process.cwd(), 'storage')
   }
 
   /**
