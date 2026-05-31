@@ -1,67 +1,72 @@
-# 2026-05-30 Claude 今日动手清单
+# 2026-05-31 Claude 今日动手清单
 
 > 日期格式:YYYY-MM-DD。本文件每天覆盖。
 
 ## 角色
 
-P0 冲刺 W1 Day 1。负责架构基础设施 + 共享组件 + 后端文件通道。
+P0 冲刺 W1 Day 2。继续后端基础设施 + UI 组件库扩张。
 
 ## 分支
 
-`feat/p0-w1-claude-ui-foundation`(本日全部成果合在该分支)。
+`feat/p0-w1-claude-ui-foundation`(延续 Day 1 同一分支)。
 
-## 完成清单
+## 将编辑/新建的文件
 
-- [x] **协同合同 owners.md + today-{claude,mavis}.md 模板** @ `ab96c6e`(main)
-- [x] **packages/ui ComplianceBanner 组件**(warning / info / success)@ `b4a6f7d`
-- [x] **packages/shared COMPLIANCE_COPY 合规文案 SSOT**(8 个标准横幅文案 + 禁词 / 推荐词清单)@ `b4a6f7d`
-- [x] **装依赖**:recharts(3 端)+ react-diff-viewer-continued(kiosk)@ `603c15d`
-- [x] **Prisma 模型**:FileObject + AuditLog + migration 已 apply 到 dev.db @ `38a4384`
-- [x] **shared types/file.ts**:FileMetadata / FileUploadResponse / SignedUrlResponse / FileCleanupResponse + 默认 TTL 矩阵 @ `38a4384`
-- [x] **BE-1 文件通道**:storage.ts + signing.ts(HMAC-SHA256)+ service + controller(6 路由)+ cron(每小时清理过期)@ `fd13304`
-- [x] **app.module 注册** FilesModule + ScheduleModule.forRoot() @ `fd13304`
-- [x] **.env.example 模板** + .gitignore 加 /services/api/storage/ @ `fd13304`
-- [x] **typecheck 全员通过**(8 workspace projects)
-- [x] **API 启动验证通过**:6 条 /api/v1/files 路由全部 mapped
+**后端 BE-2 AuditLog**:
+- `services/api/src/audit/audit.module.ts`(新建)
+- `services/api/src/audit/audit.service.ts`(新建)— **同步写**(BE-2 核心要求)
+- `services/api/src/audit/audit.controller.ts`(新建)— admin 列表 + 过滤
+- `services/api/src/audit/audit.types.ts`(新建)— 契约源
+- `services/api/src/files/files.controller.ts`(回填 TODO,注入 AuditService)
+- `services/api/src/app.module.ts`(注册 AuditModule)
+- `packages/shared/src/types/audit.ts`(新建,前端契约)
+- `packages/shared/src/index.ts`(导出)
 
-## 总产出统计
+**前端 packages/ui 扩张**:
+- `packages/ui/src/components/Stepper.tsx`(W2 K2 AI 简历四步流)
+- `packages/ui/src/components/Drawer.tsx`(通用抽屉)
+- `packages/ui/src/components/Pagination.tsx`(标准分页器)
+- `packages/ui/src/charts/ResumeRadarChart.tsx`(W2 K2c 简历诊断雷达图)
+- `packages/ui/src/charts/TrendLineChart.tsx`(Admin/Partner 工作台趋势)
+- `packages/ui/src/charts/FunnelCard.tsx`(Partner 漏斗转化)
+- `packages/ui/src/charts/MetricGrid.tsx`(8 卡数据面板,Admin/Partner 共用)
+- `packages/ui/src/index.ts`(导出)
 
-- 本日 commit 数(本地):5(`b4a6f7d` / `603c15d` / `38a4384` / `fd13304` / 本文件)
-- 已合 main:1(`ab96c6e` 协同合同)
-- 本日 push 计数:0(auto mode 限制,用户手动 push)
+## 将新增/修改的共享类型契约(packages/shared)
 
-## 备注
+- 新增 `packages/shared/src/types/audit.ts`:
+  - `AuditAction`(action 字符串字面量并集)
+  - `AuditTargetType`
+  - `AuditLogRecord`(单条审计返回)
+  - `AuditLogListQuery`(过滤参数)
 
-历史上有过一次 rebase 操作:Mavis 的 commit `9f1c765` 原本误落在本分支上,
-已通过 `git rebase --onto ab96c6e 9f1c765` 摘除,Mavis commit 已转入
-`feat/p0-w1-mavis-partner-dashboard` 分支。
-回滚锚:`backup/pre-cleanup-2026-05-30` tag。
+## 将安装的依赖
 
-## 解阻 Mavis 的产出
-
-- ✅ **ComplianceBanner 已可用**:Mavis 下次开工可把 dashboard 顶部 placeholder 替换为
-  ```tsx
-  import { ComplianceBanner } from '@ai-job-print/ui'
-  import { COMPLIANCE_COPY } from '@ai-job-print/shared'
-  ...
-  <ComplianceBanner tone="warning">{COMPLIANCE_COPY.PARTNER_DASHBOARD_TOP}</ComplianceBanner>
-  ```
-- ✅ **BE-1 已可联调**:Mavis 的 W2 A3 Admin 文件管理 UI 可直接调
-  - `GET /api/v1/files?includeDeleted=1&limit=100`
-  - `DELETE /api/v1/files/:id?reason=admin manual delete`
-  - `POST /api/v1/files/cleanup-expired`
-  返回结构见 packages/shared/src/types/file.ts。
-
-## 明日(W1 Day 2)计划
-
-- packages/ui:Stepper(W2 K2 AI 简历四步流要用)+ Drawer / Pagination
-- packages/ui/charts:ResumeRadarChart / TrendLineChart / FunnelCard / MetricGrid
-- 启动 BE-2 AuditLog 服务的接入(同步写、interceptor、对 files.controller 的 TODO 回填)
+无(recharts / lucide-react 已装)。
 
 ## 阻塞 Mavis 的事项
 
-无。今日完成的所有产出都是 Mavis 可消费的(不在 Mavis 独占目录)。
+- **W1 Day 2 中段**:Mavis 不要碰 `services/api/src/audit/`、`services/api/src/files/files.controller.ts`、`services/api/src/app.module.ts`、`packages/ui/src/components/`、`packages/ui/src/charts/`、`packages/ui/src/index.ts`、`packages/shared/src/types/audit.ts`、`packages/shared/src/index.ts`。
+- 若 Mavis 今天想动 admin/audit UI、admin/files UI、admin/dashboard 8 卡 / 趋势图,**等我下班前 commit 完图表组件再动**(否则会 import 不到 MetricGrid / TrendLineChart)。
+- 若 Mavis 想跑 Partner D 的真实趋势图(把现有 SVG 替换成 TrendLineChart),也等我今天 commit 后再换。
 
-## 完成时间
+## Mavis 今天**可以并行做**的事(零冲突)
 
-UTC+8 11:30,提前完成。
+1. K1 Kiosk 首页卡片墙(`apps/kiosk/src/pages/home/`)— 不依赖任何 W1 D2 新组件,可独立做
+2. K3 Kiosk 招聘列表 + 合规横幅(`apps/kiosk/src/pages/jobs/JobsPage.tsx`)— ComplianceBanner 已可用(`b4a6f7d`)
+3. A4 Admin 岗位信息源蓝色横幅(`apps/admin/src/routes/job-sources/`)— 同样可用 ComplianceBanner
+
+## 预计完成时间
+
+UTC+8 EOD。
+
+## 完成清单(下班前更新)
+
+- [ ] BE-2 AuditLog 服务 + 控制器 + 同步写入
+- [ ] files.controller 回填 audit TODO
+- [ ] shared types/audit.ts
+- [ ] Stepper / Drawer / Pagination
+- [ ] ResumeRadarChart / TrendLineChart / FunnelCard / MetricGrid
+- [ ] packages/ui index.ts 全部 export
+- [ ] typecheck 全员通过
+- [ ] commit 分批
