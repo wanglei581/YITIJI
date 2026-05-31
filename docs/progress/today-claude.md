@@ -1,98 +1,77 @@
-# 2026-06-02 Claude 今日动手清单(W2 Day 4 完成)
+# 2026-06-02 Claude 今日动手清单(W3 起步 — C 方案)
 
 ## 角色
 
-P0 冲刺 **W2 Day 4**。Job 审计补齐 + AI 服务审计接入 + handoff 校企合作 UI 给 Mavis。
+P0 冲刺 **W3 Day 1+2 合并**(用户选 C 方案:JobSource 加凭证 + Webhook 接收端,
+跳过 BullMQ 拉取与 Excel 字段映射,把"我方可接企业推送"作为最强 demo 信号)。
 
 ## 分支
 
-`feat/p0-w2-claude-jobfair-be7`(延续)
+`feat/p0-w3-claude-webhook-sync`(stacked on `feat/p0-w2-claude-jobfair-be7` @ `6ca2121`)
 
-## 完成清单(Day 4)
+## 将编辑/新建的文件
 
-后端 audit 全链路打通 — 6 处新增(commit `ca1ee41`):
+**后端 Day 1 — JobSource 字段扩 + 加密层**:
+- `services/api/prisma/schema.prisma`(JobSource 加 endpoint / authType / encryptedCredential / webhookSecret 等)
+- `services/api/prisma/migrations/<ts>_extend_job_source_for_sync/`(新建)
+- `services/api/src/common/crypto/secret-cipher.ts`(新建,AES-256-GCM 加解密层)
+- `services/api/.env.example`(添加 `SECRET_ENCRYPTION_KEY`)
 
-| Action | 触发处 | actorRole |
-|---|---|---|
-| `job.review` | Admin 审核岗位 | admin |
-| `job.publish` | Admin 发布/下架岗位 | admin |
-| `job.import` | Partner 导入岗位 | partner |
-| `resume.parse_submitted` | AI 简历解析提交 | kiosk |
-| `resume.optimize_requested` | AI 简历优化请求 | kiosk |
-| `assistant.chat_message` | AI 助手对话 | kiosk |
+**后端 Day 2 — Webhook 接收端**:
+- `services/api/src/sync/`(新建模块)
+  - `sync.module.ts` / `sync.controller.ts` / `sync.service.ts`
+  - `dto/webhook-payload.dto.ts`
+  - `replay-guard.ts`(in-memory nonce LRU,5min TTL)
+- `services/api/src/app.module.ts`(注册 SyncModule)
+- `services/api/src/jobs/jobs.service.ts`(暴露 `importJobsFromWebhook(sourceId, items)`)
 
-加上 W1/W2 已有的 6 处审计,共 **12 处审计动作覆盖全链路**:
-- `file.upload` / `file.force_delete` / `file.cleanup_expired`(W1)
-- `fair.review` / `fair.publish` / `fair.import`(W2 Day 2)
-- 今日 Day 4 新增 6 处
-
-合规故事 demo 时:
-> 任何用户上传文件 / 提交 AI 解析 / 与 AI 对话 / partner 导入 / admin 审核与发布 —
-> 全部在审计页可追溯。所有动作同步落库不可篡改,demo 现场点动作 → 审计日志页 →
-> 立即看到该记录(W1 Day 2 已规约 AuditService 同步写)。
-
-handoff(commit `ca1ee41`):
-- `docs/progress/handoff-to-mavis.md`
-  - **M-001**(⭐⭐⭐⭐):Kiosk 招聘会详情页校企合作主题 banner + 现场服务四卡
-  - **M-002**(⭐⭐⭐):Kiosk fair 7 页接真 API
-  完整代码示例 + 合规自查 + 验证步骤,Mavis 自取节奏做。
-
-## 关键代码细节
-
-Job 审计与 Fair 完全对称:
-```ts
-await this.audit.write({
-  actorId: user.userId,
-  actorRole: 'admin',
-  action: 'job.review',
-  targetType: 'job',
-  targetId: id,
-  payload: { action, reason, fromReviewStatus, toReviewStatus },
-})
-```
-
-AI 控制器内引用 `AuditService`(via @Global AuditModule):
-```ts
-constructor(
-  private readonly aiService: AiService,
-  private readonly logService: AiLogService,
-  private readonly audit: AuditService,
-) {}
-```
-
-合规细节:
-- AI audit payload **故意不写**简历正文 / 聊天原文
-- 只记元数据(taskId / providerName / sessionId / intent / moduleCount)
-- 与 ai-log.service.ts 现有的"AI 调用日志"互补:ai-log 记延迟 / 失败率,audit 记动作链路
-
-## 总产出统计(W2)
+## 路由
 
 ```
-ca1ee41  feat(api): W2 Day 4 — Job audit 补齐 + AI 服务 audit 接入 + handoff Mavis
-0a84956  docs: today-claude.md W2 Day 4 意图
-e0baaf5  docs: today-claude.md W2 Day 3 完成
-1151f1e  feat(api): BE-7 fair seed 3 场 + 校企合作详情端点
-039d3ea  docs: today-claude.md W2 Day 3 意图
-9f903be  docs: today-claude.md W2 Day 2 完成
-5104d7f  feat(api): BE-7 8 端点切真 + audit + Partner 导入
-38be415  docs: today-claude.md W2 Day 2 意图
-b8f6c4a  feat(prisma): BE-7 JobFair + FairCompany + FairZone 模型 + migration
-fbfc75e  docs: today-claude.md W2 Day 1 意图
+POST /api/v1/sync/webhook?source=<jobSourceId>
+  Headers:
+    X-Webhook-Signature: hex(HMAC-SHA256(webhookSecret, timestamp + '.' + body))
+    X-Webhook-Timestamp: unix seconds(±5min 窗口)
+    X-Webhook-Nonce: uuid(5min 内不可重复)
+  Body: { items: [ {externalId, title, company, city, salary?, sourceUrl, ...} ] }
+  → 200 { imported: N, taskId? }
+  → 401 SIG_INVALID / SIG_EXPIRED / SIG_REPLAY(全部同一错误码,防探测)
+  → 400 字段不合规
 ```
 
-W2 整周到此基本收尾,**后端 audit + JobFair 完整闭环**。
+## 合规边界检查(每条都过)
+
+- ✅ HMAC-SHA256 签名,timingSafeEqual 防侧信道
+- ✅ 5min 时间窗口防过期重放
+- ✅ Nonce LRU 防同一请求二次提交
+- ✅ webhookSecret AES-256-GCM 加密落库
+- ✅ ImportJobsDto 字段白名单 → 企业塞"候选人邮箱"等触红线字段直接 400
+- ✅ 写入默认 `pending` + `draft`,必须 admin 审核后才上 Kiosk
+- ✅ Audit:`action='job.import'`,`payload={source:'webhook', sourceId, count}`
+- ✅ 401 不区分原因(防 sig/timestamp/replay/source 哪个错的探测)
 
 ## 阻塞 Mavis 的事项
 
-无。
+- W3 Day 1+2 全程:Mavis 不要碰 `services/api/src/sync/`、`services/api/src/common/crypto/`、`services/api/prisma/`
 
-## 明日(W2 Day 5)Claude 计划
+## Mavis 可并行
 
-1. 等 PR #1 合并到 main → 把 W2 分支 `feat/p0-w2-claude-jobfair-be7` rebase 到 main → 开 W2 PR
-2. 若 Mavis 完成 M-001 校企合作 banner,联合验证一次"打开 campus_corp 招聘会详情 → 看到合规 banner + 四卡"
-3. 启动 W3 准备:K2d 升级版规划(语义 diff with reason/dimension,涉及 ResumeOptimizeModule 扩展)
+- 接 `handoff-to-mavis.md` M-001 校企合作 banner
+- Kiosk fair 7 页接真 API(M-002)
+- A3 Admin 文件管理 UI
+- A5 Admin 审计 UI
 
-## 备注
+## 预计完成时间
 
-W1 PR #1 hotfix `a22cdc1` 仍在 stacked 链上,W2 PR 等 PR #1 合 main 再开。
-Mavis Day 5 4 件视觉活已 push 到 `feat/p0-w1-mavis-day5-ui-polish`(commit `3839a94`)。
+UTC+8 EOD。Day 1 + Day 2 合并到一天完成(两块代码量都不大)。
+
+## 完成清单
+
+- [ ] JobSource 字段扩 + migration
+- [ ] secret-cipher.ts AES-256-GCM 加解密
+- [ ] .env.example 添加 SECRET_ENCRYPTION_KEY
+- [ ] SyncModule + Controller + Service + ReplayGuard
+- [ ] jobsService.importJobsFromWebhook
+- [ ] app.module 注册
+- [ ] curl smoke:伪造请求 + 真请求两种
+- [ ] typecheck + lint + commit
