@@ -98,6 +98,7 @@ model Organization {
   users      User[]
   jobs       Job[]      @relation("JobOrg")
   jobSources JobSource[]
+  jobFairs   JobFair[]  @relation("FairOrg")
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -278,6 +279,121 @@ model FileObject {
 //
 // targetType:'file' | 'job' | 'job_source' | 'organization' | 'user' | 'fair' | 'system'
 // targetId:被操作资源的主键(可选,系统级动作为 null)
+
+// ── JobFair ───────────────────────────────────────────────────────────────────
+// BE-7(P0 W2):招聘会 + 校企合作(主题变体)。
+//
+// 合规约束:
+//   - sourceOrgId / externalId / sourceUrl / sourceName 必填(同 Job)
+//   - reviewStatus 默认 'pending',approve + publish 才在 C 端可见
+//   - 不存"预约人列表"等候选人数据(预约走第三方,我方只跳转)
+//
+// theme:
+//   'general'      普通校招/社招招聘会
+//   'campus'       高校校园招聘会
+//   'campus_corp'  校企合作主题展(秒哒 kiosk/30-32,catalog Q1 结论)
+//   'industry'     行业专场(秒哒 partner/12 的 AI 人工智能专场)
+//
+// reviewStatus  / publishStatus 取值与 Job 完全一致(详见 Job model 上方注释)。
+
+model JobFair {
+  id   String @id @default(cuid())
+
+  // 来源(合规必填)
+  sourceOrgId String
+  org         Organization @relation("FairOrg", fields: [sourceOrgId], references: [id])
+  externalId  String
+  sourceName  String
+  sourceUrl   String
+
+  // 招聘会信息
+  title       String
+  theme       String   @default("general")
+  startAt     DateTime
+  endAt       DateTime
+  venue       String
+  city        String
+  address     String?
+  mapImageUrl String?
+  description String?
+  coverImageUrl String?
+
+  // 数据快照(由同步任务定期回填,只是展示用,非真相之源)
+  companyCount Int @default(0)
+  jobCount     Int @default(0)
+  viewCount    Int @default(0)
+
+  // 审核/发布
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  rejectReason  String?
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies FairCompany[]
+  zones     FairZone[]
+
+  @@unique([sourceOrgId, externalId])
+  @@index([sourceOrgId])
+  @@index([theme])
+  @@index([reviewStatus, publishStatus])
+  @@index([startAt])
+}
+
+// ── FairCompany ───────────────────────────────────────────────────────────────
+// 参展企业。仅作"招聘会的子卡片"展示,不与 Job 表强关联
+// (Job 是岗位级别,FairCompany 是公司级别;招聘会场景下两表通过 sourceUrl
+// 链接,不强 FK,因为外部数据源未必同步给我们企业-岗位的映射)。
+
+model FairCompany {
+  id        String   @id @default(cuid())
+  jobFairId String
+  jobFair   JobFair  @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  name        String
+  logoUrl     String?
+  industry    String?  // 例 'tech' / 'finance' / 'manufacturing'
+  scale       String?  // '<50' / '50-500' / '500-2000' / '>2000'
+  description String?
+  sourceUrl   String?  // 跳走的对方平台企业页
+
+  // 招聘类型标签(逗号分隔字符串,SQLite 无原生 array)
+  hiringTags  String   @default("")
+
+  jobsCount   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobFairId])
+}
+
+// ── FairZone ──────────────────────────────────────────────────────────────────
+// 创新展区 / 主题展区,对应秒哒 kiosk/22 的 6 卡(广州市 AI 智能网联汽车 等)。
+// 校企合作场景下也用此表挂"现场服务入口" / "创新展区"。
+
+model FairZone {
+  id        String   @id @default(cuid())
+  jobFairId String
+  jobFair   JobFair  @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  name          String
+  category      String?  // 'innovation' / 'service' / 'campus_corp_topic'
+  city          String?  // 城市/区,例 '广州市'(展区分布按地市)
+  description   String?
+  coverImageUrl String?
+  sortOrder     Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobFairId])
+  @@index([category])
+}
 
 model AuditLog {
   id         String  @id @default(cuid())
