@@ -29,7 +29,9 @@ import {
 import type { ReviewAction } from './dto/review.dto'
 import type { PublishAction } from './dto/publish.dto'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
+import type { ImportFairsDto } from './dto/import-fairs.dto'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 
 // ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
@@ -212,15 +214,110 @@ function mapWorkTypeToCategory(workType: string): string {
   }
 }
 
-const FAIR_NOT_IMPLEMENTED = {
-  error: {
-    code: 'FAIR_NOT_IMPLEMENTED',
-    message: '招聘会模块尚未接入数据库,见 docs/progress/next-tasks.md Phase #3',
-  },
-} as const
+// ─── Fair Prisma → 旧 DTO 形状(保持现有前端契约) ──────────────────────────
+//
+// Day 1 我们建立了 packages/shared/src/types/fair.ts 的新形状(Fair / startAt / endAt /
+// title 等,Prisma 列对齐)。但 Kiosk/Admin 现有页面消费的是
+// FairListItemDto / AdminFairDto / PartnerFairDto(legacy 字段名 name / startTime
+// / endTime / organizer / boothCount 等)。
+//
+// Day 2 不动既有前端契约,把 Prisma 行映射回旧 DTO 形状。后续(Day 3 校企合作
+// 详情页 + W3 Kiosk fair 升级)再走新形状走 FairDetailResponse。
 
-function emptyPaginated<T>(page = 1, pageSize = 20): PaginatedResult<T> {
-  return { data: [], pagination: { page, pageSize, total: 0, totalPages: 1 } }
+interface PrismaJobFairRow {
+  id: string
+  sourceOrgId: string
+  externalId: string
+  sourceName: string
+  sourceUrl: string
+  title: string
+  theme: string
+  startAt: Date
+  endAt: Date
+  venue: string
+  city: string
+  address: string | null
+  mapImageUrl: string | null
+  description: string | null
+  coverImageUrl: string | null
+  companyCount: number
+  jobCount: number
+  viewCount: number
+  reviewStatus: string
+  publishStatus: string
+  reviewedBy: string | null
+  reviewedAt: Date | null
+  rejectReason: string | null
+  syncTime: Date
+}
+
+function deriveFairStatus(startAt: Date, endAt: Date, now = new Date()): FairStatus {
+  if (now < startAt) return 'upcoming'
+  if (now > endAt) return 'ended'
+  return 'ongoing'
+}
+
+function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
+  return {
+    id: f.id,
+    name: f.title,
+    organizer: f.sourceName,
+    startTime: f.startAt.toISOString(),
+    endTime: f.endAt.toISOString(),
+    venue: f.venue,
+    status: deriveFairStatus(f.startAt, f.endAt),
+    description: f.description ?? undefined,
+    boothCount: f.companyCount,
+    sourceOrgId: f.sourceOrgId,
+    externalId: f.externalId,
+    sourceName: f.sourceName,
+    sourceUrl: f.sourceUrl,
+    syncTime: fmtSyncTime(f.syncTime),
+    hasManagedData: false,
+    managedCompanyCount: 0,
+    managedMaterialCount: 0,
+    dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${f.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+  }
+}
+
+function prismaFairToAdminDto(f: PrismaJobFairRow): AdminFairDto {
+  return {
+    id: f.id,
+    name: f.title,
+    organizer: f.sourceName,
+    startTime: f.startAt.toISOString(),
+    endTime: f.endAt.toISOString(),
+    venue: f.venue,
+    status: deriveFairStatus(f.startAt, f.endAt),
+    description: f.description ?? undefined,
+    boothCount: f.companyCount,
+    sourceOrgId: f.sourceOrgId,
+    externalId: f.externalId,
+    sourceName: f.sourceName,
+    sourceUrl: f.sourceUrl,
+    syncTime: fmtSyncTime(f.syncTime),
+    reviewStatus: f.reviewStatus as ReviewStatus,
+    publishStatus: f.publishStatus as PublishStatus,
+  }
+}
+
+function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
+  return {
+    id: f.id,
+    externalId: f.externalId,
+    name: f.title,
+    organizer: f.sourceName,
+    startTime: f.startAt.toISOString(),
+    endTime: f.endAt.toISOString(),
+    venue: f.venue,
+    status: deriveFairStatus(f.startAt, f.endAt),
+    sourceUrl: f.sourceUrl,
+    syncTime: fmtSyncTime(f.syncTime),
+    reviewStatus: f.reviewStatus as ReviewStatus,
+    publishStatus: f.publishStatus as PublishStatus,
+    sourceOrgId: f.sourceOrgId,
+    sourceName: f.sourceName,
+  }
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -229,7 +326,10 @@ function emptyPaginated<T>(page = 1, pageSize = 20): PaginatedResult<T> {
 export class JobsService {
   private readonly logger = new Logger(JobsService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   // ── Kiosk:只读 approved+published ───────────────────────────────────────────
 
@@ -267,13 +367,39 @@ export class JobsService {
     return { data: j ? prismaJobToListItem(j) : null, success: true }
   }
 
-  async getPublishedFairs(_params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<FairListItemDto>> {
-    // TODO Phase #3:Fair Prisma model 落地后改 prisma.fair.findMany
-    return emptyPaginated<FairListItemDto>(_params?.page ?? 1, _params?.pageSize ?? 20)
+  async getPublishedFairs(params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<FairListItemDto>> {
+    const page     = Math.max(1, params?.page ?? 1)
+    const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
+    const where = {
+      reviewStatus: 'approved',
+      publishStatus: 'published',
+    }
+    const [rows, total] = await Promise.all([
+      this.prisma.jobFair.findMany({
+        where,
+        orderBy: { startAt: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.jobFair.count({ where }),
+    ])
+    let data = rows.map(prismaFairToListItem)
+    // 客户端可选 status 过滤(upcoming / ongoing / ended)
+    if (params?.status && (params.status === 'upcoming' || params.status === 'ongoing' || params.status === 'ended')) {
+      const filterStatus = params.status as FairStatus
+      data = data.filter((d) => d.status === filterStatus)
+    }
+    return {
+      data,
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    }
   }
 
-  async getPublishedFairById(_id: string): Promise<SingleResult<FairListItemDto>> {
-    return { data: null, success: true }
+  async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
+    const f = await this.prisma.jobFair.findFirst({
+      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+    })
+    return { data: f ? prismaFairToListItem(f) : null, success: true }
   }
 
   // ── Admin:全集合 + 审核/发布(状态机)─────────────────────────────────────
@@ -363,15 +489,85 @@ export class JobsService {
   }
 
   async getAllFairSources(): Promise<AdminFairDto[]> {
-    return [] // TODO Phase #3
+    const rows = await this.prisma.jobFair.findMany({ orderBy: { createdAt: 'desc' } })
+    return rows.map(prismaFairToAdminDto)
   }
 
-  async reviewFairSource(_id: string, _action: ReviewAction, _reason: string | undefined, _user: AuthedUser): Promise<AdminFairDto> {
-    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  /**
+   * Fair 审核 — 状态机与 reviewJobSource 完全一致:
+   *   终态 approved / rejected 不可回退;reject 必填 reason 且强制 publishStatus=draft;
+   *   approve 清空 rejectReason 并把 publishStatus 重置为 draft 等下一步 publish。
+   */
+  async reviewFairSource(id: string, action: ReviewAction, reason: string | undefined, user: AuthedUser): Promise<AdminFairDto> {
+    const fair = await this.prisma.jobFair.findUnique({ where: { id } })
+    if (!fair) {
+      throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })
+    }
+    if (fair.reviewStatus === 'approved' || fair.reviewStatus === 'rejected') {
+      throw new BadRequestException({
+        error: { code: 'INVALID_STATE_TRANSITION', message: `审核终态 ${fair.reviewStatus} 不可回退,需走 reopen 流程` },
+      })
+    }
+
+    let data: { reviewStatus: string; publishStatus?: string; rejectReason?: string | null }
+    if (action === 'reviewing') {
+      data = { reviewStatus: 'reviewing' }
+    } else if (action === 'approve') {
+      data = { reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null }
+    } else {
+      const trimmed = (reason ?? '').trim()
+      if (trimmed.length === 0) {
+        throw new BadRequestException({ error: { code: 'REJECT_REASON_REQUIRED', message: 'reject 必须提供 reason' } })
+      }
+      data = { reviewStatus: 'rejected', publishStatus: 'draft', rejectReason: trimmed }
+    }
+
+    try {
+      const updated = await this.prisma.jobFair.update({
+        where: { id },
+        data: { ...data, reviewedBy: user.userId, reviewedAt: new Date() },
+      })
+      await this.audit.write({
+        actorId: user.userId,
+        actorRole: 'admin',
+        action: 'fair.review',
+        targetType: 'fair',
+        targetId: id,
+        payload: { action, reason: data.rejectReason ?? null, fromReviewStatus: fair.reviewStatus, toReviewStatus: data.reviewStatus },
+      })
+      this.logger.log(`reviewFairSource: id=${id} action=${action} by=${user.userId}`)
+      return prismaFairToAdminDto(updated)
+    } catch (e) {
+      this.logger.error(`reviewFairSource failed: id=${id}`, e as Error)
+      throw new InternalServerErrorException({ error: { code: 'REVIEW_FAILED', message: '审核动作失败' } })
+    }
   }
 
-  async publishFairSource(_id: string, _action: PublishAction, _user: AuthedUser): Promise<AdminFairDto> {
-    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  async publishFairSource(id: string, action: PublishAction, user: AuthedUser): Promise<AdminFairDto> {
+    const fair = await this.prisma.jobFair.findUnique({ where: { id } })
+    if (!fair) {
+      throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })
+    }
+    if (action === 'publish' && fair.reviewStatus !== 'approved') {
+      throw new BadRequestException({
+        error: { code: 'PUBLISH_REQUIRES_APPROVAL', message: '未通过审核的招聘会不得发布' },
+      })
+    }
+    const toStatus = action === 'publish' ? 'published' : 'unpublished'
+    const updated = await this.prisma.jobFair.update({
+      where: { id },
+      data: { publishStatus: toStatus },
+    })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'admin',
+      action: 'fair.publish',
+      targetType: 'fair',
+      targetId: id,
+      payload: { action, fromPublishStatus: fair.publishStatus, toPublishStatus: toStatus },
+    })
+    this.logger.log(`publishFairSource: id=${id} action=${action}`)
+    return prismaFairToAdminDto(updated)
   }
 
   // ── Partner:本机构数据 ─────────────────────────────────────────────────────
@@ -468,15 +664,117 @@ export class JobsService {
     return prismaJobToPartnerDto(updated)
   }
 
-  async getPartnerFairs(_user: AuthedUser): Promise<PartnerFairDto[]> {
-    return [] // TODO Phase #3
+  async getPartnerFairs(user: AuthedUser): Promise<PartnerFairDto[]> {
+    if (!user.orgId) return []
+    const rows = await this.prisma.jobFair.findMany({
+      where: { sourceOrgId: user.orgId },
+      orderBy: { createdAt: 'desc' },
+    })
+    return rows.map(prismaFairToPartnerDto)
   }
 
-  async importFairs(_dto: unknown, _user: AuthedUser): Promise<ImportResult<PartnerFairDto>> {
-    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  /**
+   * Partner 批量导入招聘会(BE-7 W2)。
+   *
+   * 同 importJobs:
+   *   sourceOrgId 强制 from JWT,不读 body
+   *   sourceName 从 DB 取当前机构名,不读 body
+   *   默认 pending + draft
+   *   (sourceOrgId, externalId) upsert 幂等;审核/发布状态不刷
+   */
+  async importFairs(dto: ImportFairsDto, user: AuthedUser): Promise<ImportResult<PartnerFairDto>> {
+    if (user.role !== 'partner' || !user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
+    }
+    const sourceOrgId = org.id
+    const sourceName  = org.name
+    const sync        = new Date()
+
+    const out: PartnerFairDto[] = []
+    for (const item of dto.items) {
+      const startAt = new Date(item.startAt)
+      const endAt   = new Date(item.endAt)
+      if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+        throw new BadRequestException({
+          error: { code: 'INVALID_DATETIME', message: `招聘会 ${item.externalId} 的时间格式无效(需 ISO 8601)` },
+        })
+      }
+      if (endAt.getTime() <= startAt.getTime()) {
+        throw new BadRequestException({
+          error: { code: 'INVALID_DATE_RANGE', message: `招聘会 ${item.externalId} 的结束时间必须晚于开始时间` },
+        })
+      }
+      try {
+        const fair = await this.prisma.jobFair.upsert({
+          where: { sourceOrgId_externalId: { sourceOrgId, externalId: item.externalId } },
+          create: {
+            sourceOrgId, externalId: item.externalId, sourceName,
+            sourceUrl: item.sourceUrl,
+            title: item.title,
+            theme: item.theme ?? 'general',
+            startAt, endAt,
+            venue: item.venue, city: item.city,
+            address: item.address,
+            mapImageUrl: item.mapImageUrl,
+            coverImageUrl: item.coverImageUrl,
+            description: item.description,
+            companyCount: item.companyCount ?? 0,
+            jobCount: item.jobCount ?? 0,
+            reviewStatus: 'pending', publishStatus: 'draft',
+            syncTime: sync,
+          },
+          update: {
+            sourceName, sourceUrl: item.sourceUrl,
+            title: item.title,
+            theme: item.theme ?? 'general',
+            startAt, endAt,
+            venue: item.venue, city: item.city,
+            address: item.address,
+            mapImageUrl: item.mapImageUrl,
+            coverImageUrl: item.coverImageUrl,
+            description: item.description,
+            companyCount: item.companyCount ?? undefined,
+            jobCount: item.jobCount ?? undefined,
+            syncTime: sync,
+            // 审核/发布状态故意不更新,防"刷字段绕审核"
+          },
+        })
+        out.push(prismaFairToPartnerDto(fair))
+      } catch (e) {
+        this.logger.error(`importFairs upsert failed: orgId=${sourceOrgId} extId=${item.externalId}`, e as Error)
+        throw new InternalServerErrorException({ error: { code: 'IMPORT_FAILED', message: '招聘会导入失败,请稍后重试' } })
+      }
+    }
+
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'partner',
+      action: 'fair.import',
+      targetType: 'fair',
+      targetId: null,
+      payload: { count: out.length, externalIds: out.map((o) => o.externalId).slice(0, 20) },
+    })
+
+    this.logger.log(`importFairs: orgId=${sourceOrgId} count=${out.length}`)
+    return { imported: out.length, items: out }
   }
 
-  async unpublishPartnerFair(_id: string, _user: AuthedUser): Promise<PartnerFairDto> {
-    throw new BadRequestException(FAIR_NOT_IMPLEMENTED)
+  async unpublishPartnerFair(id: string, user: AuthedUser): Promise<PartnerFairDto> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const fair = await this.prisma.jobFair.findUnique({ where: { id } })
+    if (!fair || fair.sourceOrgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })
+    }
+    const updated = await this.prisma.jobFair.update({
+      where: { id },
+      data: { publishStatus: 'unpublished' },
+    })
+    return prismaFairToPartnerDto(updated)
   }
 }
