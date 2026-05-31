@@ -1,9 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import ReactDiffViewer from 'react-diff-viewer-continued'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
+import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon, TrendingUpIcon } from 'lucide-react'
 import type { ResumeOptimizeModule } from '@ai-job-print/shared'
 import { getResumeOptimize } from '../../services/api'
+
+/**
+ * 由 before / after 估算"评分提升"。
+ *
+ * 真正的评分由 AI provider 算并返回(W2 K2d 升级版会把 reason/dimension/score
+ * 写入 ResumeOptimizeModule)。Day 4 阶段:
+ *   - 没有可靠的"分数提升",只能根据"字符差异比例"做粗略估算
+ *   - UI 上必须配"估算,仅供参考"免责文案,合规上不暗示真实通过率
+ */
+function estimateUplift(modules: ResumeOptimizeModule[]): { before: number; after: number } {
+  if (modules.length === 0) return { before: 70, after: 70 }
+  let totalDelta = 0
+  for (const m of modules) {
+    const beforeLen = m.before.length || 1
+    const afterLen = m.after.length || 1
+    const ratio = Math.min(1, Math.abs(afterLen - beforeLen) / beforeLen + 0.15)
+    totalDelta += ratio * 6
+  }
+  const before = 72
+  const after = Math.min(95, Math.round(before + totalDelta))
+  return { before, after }
+}
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
@@ -35,19 +58,13 @@ export function ResumeOptimizePage() {
     return () => { cancelled = true }
   }, [taskId])
 
+  const uplift = useMemo(() => estimateUplift(modules), [modules])
+
   const handleSaveAdvice = () => {
-    const advice = modules.map((m) => ({
-      title:  m.title,
-      before: m.before,
-      after:  m.after,
-    }))
+    const advice = modules.map((m) => ({ title: m.title, before: m.before, after: m.after }))
     navigate('/profile', {
       state: {
-        savedResumeAdvice: {
-          file,
-          suggestions: advice,
-          savedAt: new Date().toISOString(),
-        },
+        savedResumeAdvice: { file, suggestions: advice, savedAt: new Date().toISOString() },
       },
     })
   }
@@ -55,21 +72,15 @@ export function ResumeOptimizePage() {
   const handlePrintOriginal = () => {
     navigate('/print/confirm', {
       state: {
-        file: {
-          name:  file?.name  ?? '简历.pdf',
-          size:  file?.size  ?? '200 KB',
-          pages: 1,
-        },
+        file: { name: file?.name ?? '简历.pdf', size: file?.size ?? '200 KB', pages: 1 },
         copies: 1,
         duplex: 'single',
-        color:  'bw',
+        color: 'bw',
       },
     })
   }
 
-  const handleViewFile = () => {
-    navigate('/resume/export', { state })
-  }
+  const handleViewFile = () => navigate('/resume/export', { state })
 
   if (loading) {
     return (
@@ -77,11 +88,7 @@ export function ResumeOptimizePage() {
         <PageHeader
           title="优化建议"
           subtitle="基于已有内容优化表达"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
-              返回报告
-            </Button>
-          }
+          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>}
         />
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
@@ -99,18 +106,12 @@ export function ResumeOptimizePage() {
         <PageHeader
           title="优化建议"
           subtitle="基于已有内容优化表达"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
-              返回报告
-            </Button>
-          }
+          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>}
         />
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <AlertCircleIcon className="h-14 w-14 text-gray-300" />
           <p className="text-base text-gray-500">暂无优化建议，请返回重新解析</p>
-          <Button variant="secondary" onClick={() => navigate('/resume/source')}>
-            重新开始
-          </Button>
+          <Button variant="secondary" onClick={() => navigate('/resume/source')}>重新开始</Button>
         </div>
       </div>
     )
@@ -120,60 +121,69 @@ export function ResumeOptimizePage() {
     <div className="flex h-full flex-col p-6">
       <PageHeader
         title="优化建议"
-        subtitle="基于已有内容优化表达（仅供参考）"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
-            返回报告
-          </Button>
-        }
+        subtitle="基于已有内容优化表达(仅供参考)"
+        actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>}
       />
 
-      {/* 合规提示 */}
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
         <InfoIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-        <p className="text-xs text-gray-400">以下建议基于已有内容调整表达，不生成虚假经历，结果仅供参考</p>
+        <p className="text-xs text-gray-400">
+          以下建议基于已有内容调整表达,不生成虚假经历。评分提升为估算值,不代表真实招聘结果。
+        </p>
       </div>
 
       <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {modules.map((mod) => (
-          <Card key={mod.title} className="p-5">
-            <p className="mb-3 text-sm font-semibold text-gray-800">{mod.title}</p>
-
-            {/* 优化前 */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-              <p className="mb-1 text-xs font-medium text-gray-400">优化前</p>
-              <p className="text-sm text-gray-600">{mod.before}</p>
+        {/* 评分提升卡(估算) */}
+        <Card className="p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-700">综合评分提升(估算)</p>
+              <div className="mt-1.5 flex items-baseline gap-3">
+                <span className="text-2xl font-semibold text-gray-400 line-through">{uplift.before}</span>
+                <span className="text-3xl">→</span>
+                <span className="text-3xl font-bold text-primary-600">{uplift.after}</span>
+                <span className="text-sm text-success-fg">
+                  +{uplift.after - uplift.before} 分
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">仅基于改动量估算,真实评分以行业实际通过率为准</p>
             </div>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-success-bg/60">
+              <TrendingUpIcon className="h-7 w-7 text-success-fg" />
+            </div>
+          </div>
+        </Card>
 
-            {/* 建议参考 */}
-            <div className="mt-2 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3">
-              <p className="mb-1 text-xs font-medium text-primary-500">建议参考</p>
-              <p className="text-sm text-gray-700">{mod.after}</p>
+        {/* 逐模块字符级 diff */}
+        {modules.map((mod, idx) => (
+          <Card key={`${mod.title}-${idx}`} className="overflow-hidden p-0">
+            <div className="border-b border-gray-200 px-5 py-3">
+              <p className="text-sm font-semibold text-gray-800">{mod.title}</p>
+            </div>
+            <div className="text-xs">
+              <ReactDiffViewer
+                oldValue={mod.before}
+                newValue={mod.after}
+                splitView={true}
+                disableWordDiff={false}
+                hideLineNumbers={true}
+                leftTitle="优化前"
+                rightTitle="建议参考"
+                useDarkTheme={false}
+              />
             </div>
           </Card>
         ))}
       </div>
 
-      {/* 操作按钮 */}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Button size="lg" onClick={handleSaveAdvice}>
-          保存优化建议
-        </Button>
-        <Button size="lg" variant="secondary" onClick={handleViewFile}>
-          查看简历文件
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          className="flex items-center gap-2"
-          onClick={handlePrintOriginal}
-        >
+        <Button size="lg" onClick={handleSaveAdvice}>保存优化建议</Button>
+        <Button size="lg" variant="secondary" onClick={handleViewFile}>查看简历文件</Button>
+        <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={handlePrintOriginal}>
           <PrinterIcon className="h-4 w-4" />
           打印原简历
         </Button>
-        <Button size="lg" variant="secondary" onClick={() => navigate('/')}>
-          返回首页
-        </Button>
+        <Button size="lg" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
       </div>
     </div>
   )
