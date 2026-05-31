@@ -118,6 +118,9 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  uploadedFiles FileObject[] @relation("FileUploader")
+  auditLogs     AuditLog[]
+
   @@index([orgId])
 }
 
@@ -205,4 +208,93 @@ model Job {
   @@index([sourceOrgId])
   @@index([sourceId])
   @@index([reviewStatus, publishStatus])
+}
+
+// ── FileObject ────────────────────────────────────────────────────────────────
+// BE-1(P0 W1):用户文件元数据 + 隐私自动清理。
+//
+// 合规约束(CLAUDE.md §11):
+//   - 简历 / 身份证 / 证件照 / 求职材料等敏感文件设有效期,过期自动清理
+//   - 文件 URL 走 HMAC 签名 + 短 TTL(5 分钟),严禁公开持久 URL
+//   - 物理文件按 storageKey 落地(本地 FS 起步:./storage/<storageKey>,
+//     上线后可切 MinIO/OSS,storageKey 不变)
+//   - deletedAt 软删 + 物理清理通过 cron 完成,管理员手动清理同样走此路径
+//   - 所有访问 / 清理动作必须经 AuditLog 记录
+//
+// purpose 取值:
+//   'resume_upload'   — 求职者上传的简历(高敏)
+//   'resume_scan'     — Kiosk 扫描的纸质简历(高敏)
+//   'id_scan'         — 身份证 / 证件照(高敏)
+//   'print_doc'       — 通用打印文档(普通)
+//   'fair_material'   — 招聘会资料 / 模板素材(普通)
+//   'cover_letter'    — 求职信 / 推荐信(普通)
+//
+// sensitiveLevel:
+//   'normal'           — 默认 24h 过期
+//   'sensitive'        — 简历类,默认 6h 过期
+//   'highly_sensitive' — 身份证类,默认 1h 过期(分析完即删)
+
+model FileObject {
+  id          String  @id @default(cuid())
+  storageKey  String  @unique
+
+  // 元数据
+  filename    String
+  mimeType    String
+  sizeBytes   Int
+  sha256      String
+
+  // 业务关联
+  uploaderId  String?
+  uploader    User?   @relation("FileUploader", fields: [uploaderId], references: [id])
+  purpose     String
+  sensitiveLevel String @default("normal")
+
+  // 隐私 / 清理
+  expiresAt   DateTime
+  deletedAt   DateTime?
+  deletedBy   String?  // 'auto' | 'admin:<userId>' | 'user'
+  deleteReason String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([uploaderId])
+  @@index([purpose])
+  @@index([expiresAt])
+  @@index([deletedAt])
+}
+
+// ── AuditLog ──────────────────────────────────────────────────────────────────
+// BE-2(P0 W2):管理员操作审计日志。
+//
+// 合规约束(CLAUDE.md §11/§12):
+//   - 任何 admin / partner 写操作必须落审计
+//   - 同步写入(不走异步队列),保证 demo 时点击强制清理立即看到日志
+//   - 不可删除,不可篡改(数据库层无 DELETE / UPDATE 权限,业务层永不暴露)
+//   - 保留期 ≥ 180 天(由独立归档作业搬运,不在业务库删)
+//
+// action 命名规范:'<resource>.<verb>',例:'file.force_delete' / 'job.review'
+//
+// targetType:'file' | 'job' | 'job_source' | 'organization' | 'user' | 'fair' | 'system'
+// targetId:被操作资源的主键(可选,系统级动作为 null)
+
+model AuditLog {
+  id         String  @id @default(cuid())
+  actorId    String?
+  actor      User?   @relation(fields: [actorId], references: [id])
+  actorRole  String  // 冗余记录,actor 被禁用后仍可追溯
+  action     String  // '<resource>.<verb>'
+  targetType String
+  targetId   String?
+  payloadJson String @default("{}")   // 动作上下文(请求 body 摘要 / 旧值 / 新值)
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?  // 关联 RequestIdMiddleware 的 X-Request-Id
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }

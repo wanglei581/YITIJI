@@ -83,6 +83,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.job
   }
 
+  // ── BE-1 / BE-2 ────────────────────────────────────────────────────────────
+
+  get fileObject() {
+    return this.client.fileObject
+  }
+
+  get auditLog() {
+    return this.client.auditLog
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
