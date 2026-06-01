@@ -1,36 +1,52 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W6 打印 API 接入完成）  
+> 最后更新：2026-06-01（W6 + Admin Excel 审核闭环完成，已合入 main）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W6 完成，分支 feat/w6-print-job-api-integration）
+## 📌 当前状态（W7 待开分支：PrintUploadPage 接真实文件上传）
 
-**W6 已完成（2026-06-01）**：
+**W6 已完成并合入 main（2026-06-01）**：
 - ✅ 后端新增 `POST /api/v1/print/jobs` + `GET /api/v1/print/jobs/:taskId`（`PrintJobsModule`）
 - ✅ Kiosk `PrintConfirmPage`：`API_MODE=http` + `file.fileUrl` 存在时提交真实打印任务，获取 `taskId`
 - ✅ Kiosk `PrintProgressPage`：双模式 — real（taskId 轮询真实状态）/ sim（原 setTimeout 动画兜底）
-- ✅ `PrintUploadPage` mock 文件加入 `fileUrl`，http 模式可走完真实打印链路
+- ✅ Admin `ImportBatchesPage`：Excel 导入批次审核页（状态/类型双维度筛选+搜索+分页）
+- ✅ 后端 `GET /admin/import-batches`（`@Roles('admin')` 保护，Prisma 查询）
 - tsc / eslint / build / 合规禁词 全部 ✅
 
 **W5 已完成（2026-06-01）**：
 - ✅ `/job-fairs/:id/companies/:companyId` 企业详情页全面增强（W5 P1）
 - ✅ 打印企业资料 / 打印岗位清单按钮接入 Kiosk 打印 UI 全链路（W5 P2）
 
-**后续 TODO（待开独立任务）**：
+---
+
+## 🔜 W7：PrintUploadPage 接真实文件上传（下一分支）
+
+**分支名**：`feat/w7-kiosk-file-upload`
+
+**目标**：
+- 后端：`POST /files/kiosk-upload` → 接收文件，返回 `{ signedUrl, fileId }`
+- Kiosk `PrintUploadPage`：真实文件选择（通过 Terminal Agent 中转或浏览器 input）+ 调用上传端点 → 得到 `signedUrl` 作为 `file.fileUrl`
+- 打印全链路：上传真实文件 → signedUrl → `POST /api/v1/print/jobs` → Terminal Agent 下载打印
+
+**范围限定**：
+- 只改 `PrintUploadPage` 和后端文件上传端点
+- FairCompanyDetailPage 打印按钮继续走 sim 模式（企业资料 PDF 生成为未来任务）
+- 不改首页入口和底部导航
+- 不混入其他功能
+
+**其他 P0 候选（独立分支）**：
+- BullMQ API 拉取 worker（JobSource 已有 encryptedCredential，待周期性拉取）
+- Phase 9 UI Polish + AI 数字人引导员（静态 3D VRM + Kiosk 视觉升级）
+- AI在青岛数据接真实 API（当前 mock）
+
+**待做（非紧急）**：
 - [ ] 企业宣传视频播放支持（当前为渐变封面占位）
 - [ ] FairStatsPage 数据接真实展会统计
 - [ ] 招聘会详情页增强：展位导览图点击弹出企业预览
-- [ ] PrintUploadPage 接入真实文件上传（`POST /files/kiosk-upload`），取代当前 mock；上传响应的 `signedUrl` 作为 `file.fileUrl`，走 real 模式打印链路
 
-**其他 P0 候选（独立分支）**：
-- BullMQ API 拉取 worker（JobSource 已有 encryptedCredential，待周期性拉取外部数据）
-- Phase 9 UI Polish + AI 数字人引导员（静态 3D VRM + Kiosk 视觉升级）
-- Admin 审核页面对接 ImportBatch
-- AI在青岛数据接真实 API（当前 mock，后续接 partner 审核后数据）
-
-**已合入 main 的历史分支**：W1 / W2 / W3 / W4 / W5 / AI在青岛 / Kiosk 触控优化 均已合入 main，不要再按待合并分支处理。
+**已合入 main 的历史分支**：W1 / W2 / W3 / W4 / W5 / W6 / AI在青岛 / Kiosk 触控优化 均已合入 main，不要再按待合并分支处理。
 
 ---
 

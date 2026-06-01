@@ -264,6 +264,15 @@ export class JobsController {
     return this.jobsService.getPartnerSyncLogs(user)
   }
 
+  // ── Admin import batches ─────────────────────────────────────────────────────
+
+  @Get('admin/import-batches')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  getAdminImportBatches() {
+    return this.jobsService.getAdminImportBatches()
+  }
+
   // ── Partner Excel import ─────────────────────────────────────────────────────
   //
   //   POST /partner/excel/parse    multipart file → columns + sampleRows (stateless)

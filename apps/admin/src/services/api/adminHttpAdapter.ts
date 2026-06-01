@@ -1,6 +1,6 @@
 import { API_BASE_URL, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import type { AdminJobSourceRecord, AdminFairSourceRecord } from './types'
+import type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch } from './types'
 import type { ReviewAction, PublishAction } from './review-types'
 
 /**
@@ -75,4 +75,7 @@ export const adminHttpAdapter = {
 
   publishFairSourceRecord: (id: string, action: PublishAction) =>
     patch<AdminFairSourceRecord>(`/admin/fair-sources/${id}/publish`, { action }),
+
+  getImportBatches: () =>
+    get<AdminImportBatch[]>('/admin/import-batches'),
 }

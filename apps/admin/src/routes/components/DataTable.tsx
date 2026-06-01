@@ -23,21 +23,21 @@ export function Pagination({ total, page, pageSize, onPageChange, onPageSizeChan
     pages.push(totalPages)
   }
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+    <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-100">
       <div className="flex items-center gap-3">
-        <span className="text-sm text-gray-500"> 共 <span className="font-medium text-gray-700">{total}</span> 条</span>
+        <span className="text-sm text-neutral-500"> 共 <span className="font-medium text-neutral-700">{total}</span> 条</span>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-400">每页</span>
-          <select value={pageSize} onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }} className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 focus:border-primary-300 focus:outline-none">
+          <span className="text-xs text-neutral-400">每页</span>
+          <select value={pageSize} onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }} className="rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 focus:border-primary-300 focus:outline-none">
             {[10, 20, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
       </div>
       {totalPages > 1 && (
         <div className="flex items-center gap-1">
-          <button onClick={() => onPageChange(page - 1)} disabled={page === 1} className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40">‹</button>
-          {pages.map((p, i) => p === 'ellipsis' ? <span key={'ellipsis-' + i} className="flex h-7 min-w-[2rem] items-center justify-center text-xs text-gray-300">…</span> : <button key={p} onClick={() => onPageChange(p as number)} className={'flex h-7 min-w-[2rem] items-center justify-center rounded text-xs ' + (p === page ? 'bg-primary-600 text-white font-medium' : 'text-gray-600 hover:bg-gray-100')}>{p}</button>)}
-          <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages} className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40">›</button>
+          <button onClick={() => onPageChange(page - 1)} disabled={page === 1} className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40">‹</button>
+          {pages.map((p, i) => p === 'ellipsis' ? <span key={'ellipsis-' + i} className="flex h-7 min-w-[2rem] items-center justify-center text-xs text-neutral-300">…</span> : <button key={p} onClick={() => onPageChange(p as number)} className={'flex h-7 min-w-[2rem] items-center justify-center rounded text-xs ' + (p === page ? 'bg-primary-600 text-white font-medium' : 'text-neutral-600 hover:bg-neutral-100')}>{p}</button>)}
+          <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages} className="flex h-7 min-w-[2rem] items-center justify-center rounded text-xs text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40">›</button>
         </div>
       )}
     </div>
@@ -52,7 +52,7 @@ export function FilterPills({ filters, active, counts, onChange }: FilterPillsPr
   return (
     <div className="flex flex-wrap gap-2">
       {filters.map((f) => (
-        <button key={f} onClick={() => onChange(f)} className={'rounded-full px-4 py-1.5 text-sm font-medium transition-colors ' + (active === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200')}>
+        <button key={f} onClick={() => onChange(f)} className={'rounded-full px-4 py-1.5 text-sm font-medium transition-colors ' + (active === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200')}>
           {f}{counts && counts[f] !== undefined && <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>}
         </button>
       ))}
@@ -76,7 +76,7 @@ export interface DataTableProps<T> {
 export function DataTable<T>({ items, empty, renderRow, renderHeader, page, pageSize, total, onPageChange, onPageSizeChange, className }: DataTableProps<T>) {
   if (items.length === 0 && empty) return (
     <div>
-      <EmptyState title={empty.title} description={empty.description} action={empty.action} className="border-b border-gray-100" />
+      <EmptyState title={empty.title} description={empty.description} action={empty.action} className="border-b border-neutral-100" />
       <Pagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
     </div>
   )
@@ -84,8 +84,8 @@ export function DataTable<T>({ items, empty, renderRow, renderHeader, page, page
     <div className={className}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-gray-100 bg-gray-50">{renderHeader()}</thead>
-          <tbody className="divide-y divide-gray-100">{items.map((item, index) => renderRow(item, index))}</tbody>
+          <thead className="border-b border-neutral-100 bg-neutral-50">{renderHeader()}</thead>
+          <tbody className="divide-y divide-neutral-100">{items.map((item, index) => renderRow(item, index))}</tbody>
         </table>
       </div>
       <Pagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
@@ -93,6 +93,7 @@ export function DataTable<T>({ items, empty, renderRow, renderHeader, page, page
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTableState(defaultPageSize = 20) {
   const [searchParams, setSearchParams] = useSearchParams()
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))

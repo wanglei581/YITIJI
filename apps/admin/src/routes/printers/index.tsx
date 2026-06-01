@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { Card, StatusBadge } from '@ai-job-print/ui'
-import { PrinterIcon } from 'lucide-react'
+import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
+import { PrinterIcon, SearchIcon } from 'lucide-react'
+import { Pagination } from '../components/DataTable'
+
+const PAGE_SIZE = 10
 
 // ─── Types & mock ─────────────────────────────────────────────────────────────
 
@@ -108,13 +111,27 @@ const FILTER_STATUS: Record<string, PrinterStatus | null> = { 全部: null, 在�
 
 export default function PrintersPage() {
   const [filter, setFilter] = useState<string>('全部')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
-  const filtered = filter === '全部'
+  const byStatus = filter === '全部'
     ? MOCK_PRINTERS
     : MOCK_PRINTERS.filter((p) => {
         if (filter === '故障') return p.status === 'error' || p.fault !== null
         return p.status === FILTER_STATUS[filter]
       })
+
+  const filtered = search.trim()
+    ? byStatus.filter((p) =>
+        p.name.includes(search) ||
+        p.sn.toLowerCase().includes(search.toLowerCase()) ||
+        p.terminal.toLowerCase().includes(search.toLowerCase()) ||
+        p.location.includes(search)
+      )
+    : byStatus
+
+  const total = filtered.length
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const counts = {
     全部: MOCK_PRINTERS.length,
@@ -123,39 +140,59 @@ export default function PrintersPage() {
     故障: MOCK_PRINTERS.filter((p) => p.status === 'error' || p.fault !== null).length,
   }
 
+  const handleFilterChange = (f: string) => { setFilter(f); setPage(1) }
+  const handleSearch = (v: string) => { setSearch(v); setPage(1) }
+
   return (
     <>
-      <p className="mb-4 text-sm text-gray-500">奔图 CM2800ADN/CM2820ADN 系列 — 状态监控</p>
+      <p className="mb-4 text-sm text-neutral-500">奔图 CM2800ADN/CM2820ADN 系列 — 状态监控</p>
 
-      {/* 筛选标签 */}
-      <div className="mb-4 flex gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              filter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {f}
-            <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-          </button>
-        ))}
+      {/* 搜索 + 筛选 */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative">
+          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+          <input
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="搜索名称、SN、终端…"
+            className="h-9 rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20"
+          />
+        </div>
+        <div className="flex gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f}
+              onClick={() => handleFilterChange(f)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                filter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              }`}
+            >
+              {f}
+              <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 表格 */}
       <Card className="overflow-hidden p-0">
+        {paged.length === 0 ? (
+          <EmptyState
+            title="暂无打印机"
+            description={search ? `未找到包含"${search}"的打印机` : '当前筛选条件下没有打印机'}
+          />
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['设备名称', '型号', 'SN', '绑定终端', '状态', '当前任务', '碳粉余量', '纸张状态', '故障信息', '最近同步', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((p) => {
+            <tbody className="divide-y divide-neutral-100">
+              {paged.map((p) => {
                 const s = STATUS_MAP[p.status]
                 const paper = PAPER_MAP[p.paper.status]
                 return (
@@ -212,9 +249,17 @@ export default function PrintersPage() {
             </tbody>
           </table>
         </div>
+        )}
+        <Pagination
+          total={total}
+          page={page}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+          onPageSizeChange={() => { setPage(1) }}
+        />
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">打印机状态由 Windows Terminal Agent 实时上报，当前为 mock 数据</p>
+      <p className="mt-3 text-xs text-neutral-400">打印机状态由 Windows Terminal Agent 实时上报，当前为 mock 数据</p>
     </>
   )
 }

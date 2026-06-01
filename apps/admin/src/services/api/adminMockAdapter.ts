@@ -1,4 +1,4 @@
-import type { AdminJobSourceRecord, AdminFairSourceRecord } from './types'
+import type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch } from './types'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
 
@@ -94,5 +94,16 @@ export const adminMockAdapter = {
         : s
     )
     return FAIR_SOURCES.find((s) => s.id === id)!
+  },
+
+  async getImportBatches(): Promise<AdminImportBatch[]> {
+    await delay()
+    return [
+      { id: 'batch-001', sourceId: 'ds2', sourceName: '高校就业信息 Excel', orgId: 'org-uni-001', orgName: '某大学就业中心', dataType: 'job',  fileName: '岗位数据_2026-05-24.xlsx', totalRows: 12, validRows: 10, invalidRows: 1, dupRows: 1, status: 'confirmed',  createdBy: 'partner1', confirmedAt: '2026-05-24T18:05:00.000Z', createdAt: '2026-05-24T18:00:00.000Z' },
+      { id: 'batch-002', sourceId: 'ds5', sourceName: '校园兼职平台导入',   orgId: 'org-uni-001', orgName: '某大学就业中心', dataType: 'job',  fileName: '兼职岗位_2026-05-20.xlsx', totalRows: 8,  validRows: 6,  invalidRows: 2, dupRows: 0, status: 'confirmed',  createdBy: 'partner1', confirmedAt: '2026-05-20T10:10:00.000Z', createdAt: '2026-05-20T10:00:00.000Z' },
+      { id: 'batch-003', sourceId: 'ds2', sourceName: '高校就业信息 Excel', orgId: 'org-uni-001', orgName: '某大学就业中心', dataType: 'fair', fileName: '招聘会信息_2026-05-25.xlsx', totalRows: 3,  validRows: 3,  invalidRows: 0, dupRows: 0, status: 'pending',    createdBy: 'partner1', confirmedAt: null,                       createdAt: '2026-05-25T09:30:00.000Z' },
+      { id: 'batch-004', sourceId: 'ds2', sourceName: '高校就业信息 Excel', orgId: 'org-uni-002', orgName: '另一所大学就业中心', dataType: 'job', fileName: '春季岗位数据.xlsx',       totalRows: 20, validRows: 18, invalidRows: 2, dupRows: 0, status: 'confirmed',  createdBy: 'partner2', confirmedAt: '2026-05-23T14:10:00.000Z', createdAt: '2026-05-23T14:00:00.000Z' },
+      { id: 'batch-005', sourceId: 'ds2', sourceName: '高校就业信息 Excel', orgId: 'org-uni-001', orgName: '某大学就业中心', dataType: 'job',  fileName: '错误文件_test.xlsx',        totalRows: 5,  validRows: 0,  invalidRows: 5, dupRows: 0, status: 'cancelled',  createdBy: 'partner1', confirmedAt: null,                       createdAt: '2026-05-22T11:00:00.000Z' },
+    ]
   },
 }

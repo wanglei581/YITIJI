@@ -22,9 +22,7 @@ export default function DevicesPage() {
   const active: TabKey = isTabKey(raw) ? raw : 'terminals'
 
   const setActive = (key: TabKey) => {
-    const next = new URLSearchParams(params)
-    next.set('tab', key)
-    setParams(next, { replace: true })
+    setParams({ tab: key }, { replace: true })
   }
 
   return (

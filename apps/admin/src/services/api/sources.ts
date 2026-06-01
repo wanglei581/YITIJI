@@ -1,10 +1,10 @@
 import { API_MODE } from './client'
 import { adminMockAdapter } from './adminMockAdapter'
 import { adminHttpAdapter } from './adminHttpAdapter'
-import type { AdminJobSourceRecord, AdminFairSourceRecord, JobFairStatus } from './types'
+import type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch, JobFairStatus } from './types'
 import type { ReviewAction, PublishAction } from './review-types'
 
-export type { AdminJobSourceRecord, AdminFairSourceRecord, JobFairStatus, ReviewAction, PublishAction }
+export type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch, JobFairStatus, ReviewAction, PublishAction }
 
 // ─── Adapter interface (core methods aligned with backend endpoints) ───────────
 
@@ -16,6 +16,8 @@ export interface AdminSourceServiceInterface {
   getFairSources(): Promise<AdminFairSourceRecord[]>
   reviewFairSource(id: string, action: ReviewAction, reason?: string): Promise<AdminFairSourceRecord>
   publishFairSourceRecord(id: string, action: PublishAction): Promise<AdminFairSourceRecord>
+
+  getImportBatches(): Promise<AdminImportBatch[]>
 }
 
 const adapter: AdminSourceServiceInterface =
@@ -42,3 +44,5 @@ export const approveFairSource   = (id: string) => adapter.reviewFairSource(id, 
 export const rejectFairSource    = (id: string) => adapter.reviewFairSource(id, 'reject')
 export const publishFairSource   = (id: string) => adapter.publishFairSourceRecord(id, 'publish')
 export const unpublishFairSource = (id: string) => adapter.publishFairSourceRecord(id, 'unpublish')
+
+export const getImportBatches = () => adapter.getImportBatches()

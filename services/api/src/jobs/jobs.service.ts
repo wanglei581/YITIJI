@@ -143,6 +143,24 @@ export interface SyncLogDto {
   status: 'success' | 'partial' | 'failed'
 }
 
+export interface AdminImportBatchDto {
+  id: string
+  sourceId: string
+  sourceName: string
+  orgId: string
+  orgName: string
+  dataType: 'job' | 'fair'
+  fileName: string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  dupRows: number
+  status: 'pending' | 'confirmed' | 'cancelled' | 'failed'
+  createdBy: string
+  confirmedAt: string | null
+  createdAt: string
+}
+
 export interface ExcelPreviewDto {
   batchId: string
   totalRows: number
@@ -1489,6 +1507,41 @@ export class JobsService {
 
     this.logger.log(`confirmExcelImport: batchId=${batchId} imported=${imported}`)
     return { imported, syncLogId }
+  }
+
+  // ── Admin: 导入批次列表 ─────────────────────────────────────────────────────
+
+  async getAdminImportBatches(): Promise<AdminImportBatchDto[]> {
+    const batches = await this.prisma.importBatch.findMany({
+      include: { source: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    })
+
+    const orgIds = [...new Set(batches.map((b) => b.orgId))]
+    const orgs = await this.prisma.organization.findMany({
+      where: { id: { in: orgIds } },
+      select: { id: true, name: true },
+    })
+    const orgMap = new Map(orgs.map((o) => [o.id, o.name]))
+
+    return batches.map((b) => ({
+      id: b.id,
+      sourceId: b.sourceId,
+      sourceName: b.source.name,
+      orgId: b.orgId,
+      orgName: orgMap.get(b.orgId) ?? b.orgId,
+      dataType: b.dataType as 'job' | 'fair',
+      fileName: b.fileName,
+      totalRows: b.totalRows,
+      validRows: b.validRows,
+      invalidRows: b.invalidRows,
+      dupRows: b.dupRows,
+      status: b.status as AdminImportBatchDto['status'],
+      createdBy: b.createdBy,
+      confirmedAt: b.confirmedAt ? b.confirmedAt.toISOString() : null,
+      createdAt: b.createdAt.toISOString(),
+    }))
   }
 
   /** 取消待确认批次 */

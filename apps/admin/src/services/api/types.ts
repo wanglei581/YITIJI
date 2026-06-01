@@ -80,3 +80,23 @@ export interface AdminAiLogsResult {
   total: number
   entries: AdminAiLogEntry[]
 }
+
+// ─── Import Batches ────────────────────────────────────────────────────────────
+
+export interface AdminImportBatch {
+  id: string
+  sourceId: string
+  sourceName: string
+  orgId: string
+  orgName: string
+  dataType: 'job' | 'fair'
+  fileName: string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  dupRows: number
+  status: 'pending' | 'confirmed' | 'cancelled' | 'failed'
+  createdBy: string
+  confirmedAt: string | null
+  createdAt: string
+}

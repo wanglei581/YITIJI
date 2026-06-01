@@ -25,13 +25,44 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W6 打印 API 接入（2026-06-01）— 基于 W5 封板基线**
+**当前阶段：W6 打印 API 接入 + Excel 导入审核闭环（2026-06-01，已合入 main）— 下一步 W7：PrintUploadPage 接真实文件上传**
+
+---
+
+### ✅ Excel 导入 → Admin 审核 完整闭环（2026-06-01）
+
+**闭环链路：Partner 上传 Excel → ImportBatch 落库 → Admin 查看批次记录 → 跳转审核**
+
+**后端新增：**
+- `jobs.service.ts`：新增 `AdminImportBatchDto` 类型 + `getAdminImportBatches()` 方法（join JobSource.name + Organization.name）
+- `jobs.controller.ts`：新增 `GET /admin/import-batches`（`@Roles('admin')`）
+
+**Admin 前端新增：**
+- `apps/admin/src/services/api/types.ts`：新增 `AdminImportBatch` 接口
+- `apps/admin/src/services/api/adminMockAdapter.ts`：5 条 mock 批次（pending/confirmed/cancelled）
+- `apps/admin/src/services/api/adminHttpAdapter.ts`：`getImportBatches()` → `GET /admin/import-batches`
+- `apps/admin/src/services/api/sources.ts`：`AdminImportBatch` 导出 + `getImportBatches()` 服务函数
+- `apps/admin/src/routes/import-batches/index.tsx`：新页面（状态/类型双维度筛选 + 搜索 + 分页 + "查看岗位/招聘会"跳转）
+- `apps/admin/src/routes/index.tsx`：注册 `/import-batches` 路由
+- `apps/admin/src/layouts/AdminLayoutWrapper.tsx`：侧栏"数据内容"分组新增"Excel 导入记录"菜单项
+
+**Partner ExcelImportModal 状态说明：**
+- UI 和 service layer 已完整（W4 已实现，HTTP adapter 已有真实 fetch 调用）
+- `API_MODE='http'` 时直接对接后端 4 个端点（parse/preview/confirm/cancel），无需改动
+
+**验收（2026-06-01）：**
+- 后端 `tsc --noEmit` ✅（0 errors）
+- Admin `tsc --noEmit` ✅（0 errors）
+- Admin `lint` ✅（0 warnings，DataTable useTableState eslint-disable 注释修复）
+- Admin `build` ✅（411KB，1.02s）
+
+---
 
 ---
 
 ### ✅ W6：Kiosk 打印流程接入真实后端打印任务 API（2026-06-01）
 
-**Commit：** （待提交）
+**Commit：** `6703e7b` feat(w6): connect kiosk print flow to real backend print job API
 
 **改动范围：**
 
