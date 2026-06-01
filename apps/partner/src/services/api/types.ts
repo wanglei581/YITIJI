@@ -4,49 +4,58 @@ import type {
   JobFairStatus,
   SourceKind,
   AccessMode,
+  AuthType,
+  ConnStatus,
+  SyncFrequency,
+  PartnerDataSourceView,
+  DataSourceConfig,
+  FieldMappingRule,
+  MappingValidationError,
+  ImportBatch,
+  ImportRecord,
 } from '@ai-job-print/shared'
 
-export type { ReviewStatus, PublishStatus, JobFairStatus, SourceKind, AccessMode }
+export type {
+  ReviewStatus,
+  PublishStatus,
+  JobFairStatus,
+  SourceKind,
+  AccessMode,
+  AuthType,
+  ConnStatus,
+  SyncFrequency,
+  DataSourceConfig,
+  FieldMappingRule,
+  MappingValidationError,
+  ImportBatch,
+  ImportRecord,
+}
 
 // ─── Data Sources ─────────────────────────────────────────────────────────────
 
-export type ConnStatus = 'connected' | 'error' | 'disabled'
-export type SyncFreq   = 'manual' | 'hourly' | 'daily' | 'weekly'
-
 /**
- * Partner 端数据源。
+ * Partner 端数据源 UI 形状。
  *
- * 数据源用 `sourceKind × accessMode` 双维度刻画:
- * - sourceKind:数据由谁提供(招聘平台 / 高校 / 人社局 / 招聘会主办方 / 聚合平台 / 手动)
- * - accessMode:用什么方式拉取(api / excel / csv / json / webhook / manual)
+ * Phase 7.11 R4 后契约已对齐 packages/shared/PartnerDataSourceView：
+ *   - sourceKind / accessMode / syncFreq / connStatus / 凭证字段全部来自 shared
+ *   - 不暴露 apiSecret / accessToken / webhookSecret 明文
+ *   - credentialConfigured 是持久标志，webhookSecretOnce 仅创建时一次性返回
  *
- * 旧字段 `sourceType: 'excel'|'api'|'webhook'` 已在 B0 阶段废弃。
+ * 是 {@link DataSourceConfig} 的扁平 UI 投影，不替代后者作为完整配置存储模型。
  */
-export interface PartnerDataSource {
-  id: string
-  name: string
-  sourceKind: SourceKind
-  accessMode: AccessMode
-  syncFreq: SyncFreq
-  lastSyncTime: string
-  connStatus: ConnStatus
-  successCount: number
-  failCount: number
-  description: string
-  credentialConfigured?: boolean
-  endpoint?: string
-  webhookUrl?: string
-  webhookSecretOnce?: string
-}
+export type PartnerDataSource = PartnerDataSourceView
+
+/** @deprecated 使用 SyncFrequency，本别名仅为兼容 Phase 7.10 前的调用点保留 */
+export type SyncFreq = SyncFrequency
 
 export interface CreateDataSourcePayload {
   name: string
   sourceKind?: SourceKind
   accessMode?: AccessMode
-  syncFreq?: SyncFreq
+  syncFreq?: SyncFrequency
   description?: string
   endpoint?: string
-  authType?: 'bearer' | 'oauth2' | 'api_key' | 'basic' | 'custom'
+  authType?: AuthType
   credential?: string
 }
 

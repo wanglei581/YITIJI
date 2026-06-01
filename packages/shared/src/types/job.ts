@@ -84,9 +84,18 @@ export type DataSourceStatus = 'active' | 'inactive' | 'error' | 'syncing'
 /** bearer / oauth2 / api_key / basic / custom — 不允许使用 "key" 缩写 */
 export type AuthType = 'bearer' | 'oauth2' | 'api_key' | 'basic' | 'custom'
 
-export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'manual'
+export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual'
 
 export type SyncStatus = 'success' | 'failed' | 'partial'
+
+/**
+ * 数据源连接状态（UI 表头使用）。
+ * 由 `DataSourceConfig.enabled` × `DataSourceSync.lastSyncStatus` 派生：
+ *   - !enabled                           → 'disabled'
+ *   - enabled && lastSyncStatus==='failed' → 'error'
+ *   - 其它                                → 'connected'
+ */
+export type ConnStatus = 'connected' | 'error' | 'disabled'
 
 export interface SyncLogEntry {
   time: string
@@ -134,6 +143,39 @@ export interface DataSourceConfig {
   fieldMapping: Record<string, string>  // 外部字段名 → 标准字段名
   createdAt: string
   updatedAt: string
+}
+
+/**
+ * 合作机构后台数据源管理页消费的 UI 投影。
+ *
+ * 是 {@link DataSourceConfig} 的扁平、只读、安全展示形态：
+ *   - 不暴露 `apiSecret` / `accessToken` / `webhookSecret` 明文
+ *   - `credentialConfigured` 标志服务端是否已存凭证（持久语义，前端只读）
+ *   - `webhookSecretOnce` 仅在 **创建 webhook 源** 那一次响应里返回，后续 GET 不再回显
+ *   - `connStatus` 由 enabled × lastSyncStatus 派生（见 {@link ConnStatus}）
+ *
+ * 服务端 (services/api) 与前端 (apps/partner) 都消费这同一形状：
+ * 后端 PartnerDataSourceDto 直接以本类型为契约，前端 PartnerDataSource = 本类型。
+ */
+export interface PartnerDataSourceView {
+  id: string
+  name: string
+  sourceKind: SourceKind
+  accessMode: AccessMode
+  syncFreq: SyncFrequency
+  lastSyncTime: string
+  connStatus: ConnStatus
+  successCount: number
+  failCount: number
+  description: string
+  /** 服务端是否已配置 API 凭证 / Webhook 共享密钥（持久标志，只读） */
+  credentialConfigured?: boolean
+  /** API 直连模式的 endpoint（非敏感，可回显） */
+  endpoint?: string
+  /** Webhook 接收地址（相对路径 `/api/v1/sync/webhook?source=…`，前端按 origin 拼接） */
+  webhookUrl?: string
+  /** Webhook 共享密钥 — **只在创建那一刻返回一次**，永不出现在 GET 响应里 */
+  webhookSecretOnce?: string
 }
 
 // ============================================================

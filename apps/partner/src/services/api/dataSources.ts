@@ -5,12 +5,33 @@ import type {
   PartnerDataSource,
   CreateDataSourcePayload,
   ConnStatus,
+  SyncFrequency,
   SyncFreq,
   SourceKind,
   AccessMode,
+  AuthType,
+  DataSourceConfig,
+  FieldMappingRule,
+  MappingValidationError,
+  ImportBatch,
+  ImportRecord,
 } from './types'
 
-export type { PartnerDataSource, CreateDataSourcePayload, ConnStatus, SyncFreq, SourceKind, AccessMode }
+export type {
+  PartnerDataSource,
+  CreateDataSourcePayload,
+  ConnStatus,
+  SyncFrequency,
+  SyncFreq,
+  SourceKind,
+  AccessMode,
+  AuthType,
+  DataSourceConfig,
+  FieldMappingRule,
+  MappingValidationError,
+  ImportBatch,
+  ImportRecord,
+}
 
 export interface PartnerDataSourceServiceInterface {
   getDataSources(): Promise<PartnerDataSource[]>

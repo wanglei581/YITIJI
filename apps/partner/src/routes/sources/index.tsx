@@ -10,7 +10,7 @@ import {
   PlusIcon,
   XIcon,
 } from 'lucide-react'
-import type { AccessMode, PartnerDataSource, ConnStatus, SyncFreq, CreateDataSourcePayload, SourceKind } from '../../services/api'
+import type { AccessMode, PartnerDataSource, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
 import { API_ORIGIN, getDataSources, toggleDataSource, createDataSource } from '../../services/api'
 
 function resolveWebhookUrl(webhookUrl?: string): string {
@@ -36,7 +36,7 @@ const CONN_MAP: Record<ConnStatus, { badge: 'success' | 'error' | 'default'; lab
   error:     { badge: 'error',   label: '连接异常' },
   disabled:  { badge: 'default', label: '已停用'  },
 }
-const FREQ_LABELS: Record<SyncFreq, string> = { manual: '手动', hourly: '每小时', daily: '每天', weekly: '每周' }
+const FREQ_LABELS: Record<SyncFrequency, string> = { realtime: '实时', hourly: '每小时', daily: '每天', weekly: '每周', manual: '手动' }
 
 // ─── Source creation constants ────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
   const [endpoint, setEndpoint] = useState('')
   const [authType, setAuthType] = useState<CreateDataSourcePayload['authType']>('bearer')
   const [credential, setCredential] = useState('')
-  const [syncFreq, setSyncFreq] = useState<SyncFreq>('manual')
+  const [syncFreq, setSyncFrequency] = useState<SyncFrequency>('manual')
   const [created, setCreated] = useState<PartnerDataSource | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -184,7 +184,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">同步频率</label>
-                  <select value={syncFreq} onChange={(e) => setSyncFreq(e.target.value as SyncFreq)} className="h-12 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-primary-500 focus:outline-none">
+                  <select value={syncFreq} onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)} className="h-12 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-primary-500 focus:outline-none">
                     <option value="hourly">每小时</option>
                     <option value="daily">每天</option>
                     <option value="manual">手动</option>

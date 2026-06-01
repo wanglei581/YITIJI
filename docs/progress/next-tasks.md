@@ -5,17 +5,18 @@
 
 ---
 
-## 📌 当前状态（W3 收口）
+## 📌 当前状态（W3 收口 + Phase 7.11 R4 完成）
 
 **已完成**：
 - ✅ W3 后端：JobSource 加凭证 + Webhook 接收端（HMAC + 5min 时间窗 + nonce 防重放 + AES-256-GCM 加密落库）— commit `e3d4629`
 - ✅ W3 前端：Partner /sources 页三轨入口（API / Webhook / Excel）走统一服务层 createDataSource() — commit `868b25d`（API_ORIGIN helper 替换 `:5175→:3000` 硬编码）
-- ✅ E2E smoke：登录 → 创建 webhook 源 → HMAC 签名推送 → 防重放 → 错签名 → audit 链全过
+- ✅ W3 E2E demo（2026-06-01）：12 步链路全过（Partner→Webhook→Admin→Kiosk + 防重放/错签名/字段注入/secret 不回显）
+- ✅ **Phase 7.11 R4**（2026-06-01）：Partner Sources 类型对齐 packages/shared/PartnerDataSourceView；SyncFrequency 加 weekly；ConnStatus 提升到 shared；后端 PartnerDataSourceDto 字面量收紧；UI 零变化；pnpm -r typecheck/lint/build 全过
 
 **下一步候选**：
-- **Phase 7.11 R4** — Partner Sources 类型对齐（DisplaySource → DataSourceConfig 完整迁移）
-- W3 续做：BullMQ API 拉取 + Excel 字段映射 service 层接入
+- W3 续做：BullMQ API 拉取 worker + Excel 字段映射 service 层接入（FieldMappingRule / ImportBatch 已在 partner adapter 暴露）
 - 把 W1 PR #1 / W2 / W3 三条 stacked 分支合掉
+- Phase 9 UI Polish + AI 数字人引导员
 
 ---
 

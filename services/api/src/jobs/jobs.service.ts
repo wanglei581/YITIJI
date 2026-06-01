@@ -39,12 +39,26 @@ import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse } from './fair.types'
 
 // ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
+//
+// 注:services/api 走 commonjs,packages/shared 是 ESM-only(直接指向 .ts)。
+// 互操作复杂,采用"本地副本 + SSOT 注释"约定,与 files/file.types.ts 一致。
+// 任何字段变更必须同步:
+//   1. packages/shared/src/types/job.ts(前端 SSOT,含 PartnerDataSourceView)
+//   2. 本文件 PartnerDataSourceDto / ConnStatus / SyncFrequency 等
+//
+// Phase 7.11 R4 起,本服务返回的 PartnerDataSourceDto 字段集与契约形状
+// **必须**与 shared 的 PartnerDataSourceView 等价 — 不允许出现 apiSecret /
+// accessToken / webhookSecret 明文,credentialConfigured 为持久标志,
+// webhookSecretOnce 只在创建那一次响应里出现。
 
 type ReviewStatus  = 'pending' | 'reviewing' | 'approved' | 'rejected'
 type PublishStatus = 'draft' | 'published' | 'unpublished' | 'expired'
 type FairStatus    = 'upcoming' | 'ongoing' | 'ended'
 type WorkType      = 'full_time' | 'part_time' | 'internship' | 'contract'
 type ConnStatus    = 'connected' | 'error' | 'disabled'
+type SourceKind    = 'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'
+type AccessMode    = 'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
+type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual'
 
 // ─── DTO shapes returned to callers ──────────────────────────────────────────
 
@@ -115,12 +129,21 @@ export interface ImportResult<T> {
   items: T[]
 }
 
+/**
+ * Partner 后台数据源管理 DTO。
+ *
+ * 契约 = packages/shared PartnerDataSourceView(flat UI projection of DataSourceConfig)。
+ * - sourceKind / accessMode / syncFreq 使用收口的字面量联合(不是裸 string)
+ * - 不包含 apiSecret / accessToken / webhookSecret 明文
+ * - credentialConfigured:持久标志(任意 GET 都会返回)
+ * - webhookSecretOnce:**只在创建那一次** 出现,后续 GET 不再回显
+ */
 export interface PartnerDataSourceDto {
   id: string
   name: string
-  sourceKind: string
-  accessMode: string
-  syncFreq: string
+  sourceKind: SourceKind
+  accessMode: AccessMode
+  syncFreq: SyncFrequency
   lastSyncTime: string
   connStatus: ConnStatus
   successCount: number
@@ -168,12 +191,14 @@ function prismaJobSourceToPartnerDto(source: PrismaJobSourceRow): PartnerDataSou
     : source.lastSyncStatus === 'failed'
       ? 'error'
       : 'connected'
+  // Prisma 列是 string;来源是 CreateDataSourceDto 校验过的字面量
+  // (data-source.dto.ts @IsIn(...)),运行时安全。as 仅为类型对齐。
   return {
     id: source.id,
     name: source.name,
-    sourceKind: source.sourceKind,
-    accessMode: source.accessMode,
-    syncFreq: source.syncFreq,
+    sourceKind: source.sourceKind as SourceKind,
+    accessMode: source.accessMode as AccessMode,
+    syncFreq: source.syncFreq as SyncFrequency,
     lastSyncTime: source.lastSyncAt ? fmtSyncTime(source.lastSyncAt) : '从未同步',
     connStatus,
     successCount: 0,
