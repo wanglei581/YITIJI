@@ -1,11 +1,18 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W8-P1 Redis E2E 验证完成，已合入 main）  
+> 最后更新：2026-06-01（Phase 9.1 Kiosk UI Polish 进行中，feat/phase9-kiosk-ui-polish）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W8-P1 已完成，等待下一步指令）
+## 📌 当前状态（Phase 9.1 Kiosk UI Polish 进行中）
+
+**Phase 9.1 feat/phase9-kiosk-ui-polish（2026-06-01，进行中）：**
+- ✅ KioskLayout Tab 激活背景高亮
+- ✅ HomePage section 标题可读性、次级卡片差异化图标、AI助手触控按钮
+- ✅ JobsPage/JobFairsPage 共享 LoadingState/ErrorState/EmptyState + retry + filter pill 高度
+- ✅ 7个详情/子页面内联状态替换为共享组件
+- ✅ typecheck ✅ / lint ✅ / build ✅ / 合规禁词扫描 ✅
 
 **W8-P1 feat/w8-redis-e2e-verification（2026-06-01，✅ 完成 → 合入 main）：**
 - ✅ 修复：`services/api/.env.example` 补全 `REDIS_URL`

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
   ActivityIcon,
@@ -115,22 +115,16 @@ export function JobFairDetailPage() {
   }, [id, hasStateMatch])
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
-      </div>
-    )
+    return <LoadingState className="h-full" />
   }
 
   if (error || !fair) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
-        <InfoIcon className="h-12 w-12 text-gray-300" />
-        <p className="mt-4 text-sm text-gray-500">活动数据未找到，请返回列表重试</p>
-        <Button className="mt-6" onClick={() => navigate('/job-fairs')}>
-          返回招聘会列表
-        </Button>
-      </div>
+      <ErrorState
+        message="活动数据未找到，请返回列表重试"
+        onRetry={() => navigate('/job-fairs')}
+        className="h-full"
+      />
     )
   }
 

@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
-  BriefcaseIcon,
   BuildingIcon,
   ExternalLinkIcon,
   InfoIcon,
@@ -115,22 +114,16 @@ export function JobDetailPage() {
   }, [id, hasStateMatch])
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
-      </div>
-    )
+    return <LoadingState className="h-full" />
   }
 
   if (error || !job) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
-        <BriefcaseIcon className="h-12 w-12 text-gray-200" />
-        <p className="mt-4 text-sm text-gray-400">岗位数据未找到，请返回列表重试</p>
-        <Button className="mt-6" onClick={() => navigate('/jobs')}>
-          返回岗位列表
-        </Button>
-      </div>
+      <ErrorState
+        message="岗位数据未找到，请返回列表重试"
+        onRetry={() => navigate('/jobs')}
+        className="h-full"
+      />
     )
   }
 

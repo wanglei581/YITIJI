@@ -71,8 +71,8 @@ export function KioskLayout({
                 /* touch target: full nav height (80px) × 1/3 width */
                 'flex flex-1 flex-col items-center justify-center gap-1 py-2 transition-colors',
                 active
-                  ? 'text-primary-600'
-                  : 'text-neutral-400 hover:text-neutral-600 active:text-neutral-700',
+                  ? 'bg-primary-50/70 text-primary-600'
+                  : 'text-neutral-400 hover:bg-neutral-50 hover:text-neutral-600 active:text-neutral-700',
               )}
             >
               <Icon className="h-6 w-6" aria-hidden="true" />

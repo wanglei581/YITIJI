@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { COMPANY_SCALE_SHORT } from '../../types/fair'
 import { BuildingIcon, BriefcaseIcon, MapPinIcon, SearchIcon } from 'lucide-react'
@@ -63,23 +63,21 @@ export function FairCompaniesPage() {
   }, [companies, search, zoneFilter])
 
   if (loading) {
+    return <LoadingState className="h-full" />
+  }
+
+  if (error) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
-      </div>
+      <ErrorState
+        message="加载失败，请稍后重试"
+        onRetry={() => navigate(`/job-fairs/${fairId}`)}
+        className="h-full"
+      />
     )
   }
 
-  if (error || companies.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <BuildingIcon className="h-12 w-12 text-gray-200" />
-        <p className="text-sm text-gray-400">{error ? '加载失败，请稍后重试' : '暂无企业数据'}</p>
-        <Button variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
-          返回详情
-        </Button>
-      </div>
-    )
+  if (companies.length === 0) {
+    return <EmptyState icon={BuildingIcon} title="暂无企业数据" className="h-full" />
   }
 
   return (

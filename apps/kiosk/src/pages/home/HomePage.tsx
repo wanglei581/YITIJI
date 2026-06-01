@@ -1,6 +1,7 @@
 import { Button } from '@ai-job-print/ui'
 import {
   BookOpenIcon,
+  BotIcon,
   BriefcaseIcon,
   CalendarIcon,
   ChevronRightIcon,
@@ -107,6 +108,8 @@ function PrimaryServiceCard({
 
 interface SecondaryServiceCardProps {
   icon: typeof BriefcaseIcon
+  iconBg?: string
+  iconColor?: string
   title: string
   description: string
   actionLabel: string
@@ -115,6 +118,8 @@ interface SecondaryServiceCardProps {
 
 function SecondaryServiceCard({
   icon: Icon,
+  iconBg = 'bg-gray-100',
+  iconColor = 'text-gray-600',
   title,
   description,
   actionLabel,
@@ -126,8 +131,8 @@ function SecondaryServiceCard({
       onClick={onAction}
       className="flex min-h-[200px] flex-col rounded-xl border border-gray-200 bg-white p-6 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100">
-        <Icon className="h-6 w-6 text-gray-600" aria-hidden="true" />
+      <div className={['flex h-12 w-12 items-center justify-center rounded-lg', iconBg].join(' ')}>
+        <Icon className={['h-6 w-6', iconColor].join(' ')} aria-hidden="true" />
       </div>
       <h3 className="mt-4 text-lg font-semibold leading-snug text-gray-900">{title}</h3>
       <p className="mt-2 flex-1 text-base leading-relaxed text-gray-500">{description}</p>
@@ -177,9 +182,7 @@ export function HomePage() {
       <div className="relative -mt-6 z-10 flex flex-1 flex-col gap-6 rounded-t-3xl bg-canvas px-6 py-7">
         {/* 主要功能 */}
         <section aria-label="主要功能" className="flex flex-col gap-4">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-            主要功能
-          </h2>
+          <h2 className="text-sm font-medium text-gray-400">主要功能</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <PrimaryServiceCard
               icon={SparklesIcon}
@@ -204,12 +207,12 @@ export function HomePage() {
 
         {/* 更多服务 */}
         <section aria-label="更多服务" className="flex flex-col gap-4">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-            更多服务
-          </h2>
+          <h2 className="text-sm font-medium text-gray-400">更多服务</h2>
           <div className="grid grid-cols-3 gap-4">
             <SecondaryServiceCard
               icon={BriefcaseIcon}
+              iconBg="bg-blue-50"
+              iconColor="text-blue-600"
               title="岗位信息"
               description="查看第三方平台同步岗位"
               actionLabel="查看岗位"
@@ -217,6 +220,8 @@ export function HomePage() {
             />
             <SecondaryServiceCard
               icon={CalendarIcon}
+              iconBg="bg-green-50"
+              iconColor="text-green-600"
               title="招聘会"
               description="招聘会信息与现场导览"
               actionLabel="查看招聘会"
@@ -224,6 +229,8 @@ export function HomePage() {
             />
             <SecondaryServiceCard
               icon={MapPinIcon}
+              iconBg="bg-teal-50"
+              iconColor="text-teal-600"
               title="AI 在青岛"
               description="青岛就业、政策、高校、园区、城市资讯"
               actionLabel="进入专区"
@@ -235,16 +242,21 @@ export function HomePage() {
         {/* 人社专区 — 单行辅助带 */}
         <RenshiEntryBar onAction={() => navigate('/renshi')} />
 
-        {/* 不知道怎么操作 — 文字链 */}
-        <div className="pt-2 text-center">
-          <button
-            type="button"
-            onClick={() => navigate('/assistant')}
-            className="text-base text-gray-500 underline-offset-4 hover:text-primary-600 hover:underline"
-          >
-            不知道怎么操作?问问 AI 助手 →
-          </button>
-        </div>
+        {/* AI 助手入口 — 触控友好 */}
+        <button
+          type="button"
+          onClick={() => navigate('/assistant')}
+          className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 text-left shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 active:bg-primary-100"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50">
+            <BotIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-800">不知道怎么操作？</p>
+            <p className="text-xs text-gray-500">问问 AI 助手，快速找到你需要的服务</p>
+          </div>
+          <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+        </button>
 
         <div className="h-1" />
       </div>

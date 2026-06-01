@@ -25,7 +25,43 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W8 P1 Redis E2E 验证 ✅ 完成（2026-06-01，已合入 main）**
+**当前阶段：Phase 9.1 Kiosk UI Polish（feat/phase9-kiosk-ui-polish，2026-06-01）**
+
+---
+
+### 🔄 Phase 9.1：Kiosk UI Polish（2026-06-01，feat/phase9-kiosk-ui-polish）
+
+**目标：** 优化 Kiosk 前台 UI 一致性、视觉层级和触控友好度。不改业务逻辑，不改合规边界。
+
+**改动清单：**
+
+1. **`packages/ui/src/layouts/KioskLayout.tsx`**
+   - 底部 Tab 激活状态：从纯颜色变更为 `bg-primary-50/70 text-primary-600`（背景高亮），触控屏更易识别
+
+2. **`apps/kiosk/src/pages/home/HomePage.tsx`**
+   - section 标题：`text-xs uppercase tracking-widest` → `text-sm font-medium`，更易在触控屏阅读
+   - 三个次级服务卡片：添加 `iconBg`/`iconColor` props，差异化图标颜色（岗位=蓝、招聘会=绿、AI在青岛=青绿）
+   - AI助手入口：从小文字链改为 `min-h-[56px]` 触控友好按钮卡片（含图标+双行说明+箭头）
+
+3. **`apps/kiosk/src/pages/jobs/JobsPage.tsx`**
+   - 使用 `LoadingState`/`ErrorState`/`EmptyState` 共享组件（统一风格）
+   - 添加 retry 机制（`retryKey` state）
+   - filter pill：`py-2` → `min-h-[48px]`，满足触控最小高度
+
+4. **`apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx`**
+   - 同 JobsPage，使用共享状态组件 + retry + filter pill 高度修复
+
+5. **`apps/kiosk/src/pages/jobs/JobDetailPage.tsx`**
+   - loading/error 替换为 `LoadingState`/`ErrorState`
+
+6. **`apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx`、`FairCompaniesPage.tsx`、`FairMapPage.tsx`、`FairMaterialsPage.tsx`、`FairStatsPage.tsx`**
+   - 全部内联 `加载中...` 文字替换为 `LoadingState`/`ErrorState`/`EmptyState`
+
+**验收（2026-06-01）：**
+- `pnpm --filter ./apps/kiosk typecheck` ✅
+- `pnpm --filter ./apps/kiosk lint` ✅
+- `pnpm --filter ./apps/kiosk build` ✅
+- 合规禁词扫描：无违规（"去来源平台投递"/"不参与招聘闭环"均为合规正向文案）
 
 ---
 

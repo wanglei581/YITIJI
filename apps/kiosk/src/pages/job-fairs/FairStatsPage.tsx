@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { FairLiveStatsDTO } from '@ai-job-print/shared'
 import {
   ActivityIcon,
@@ -64,21 +64,11 @@ export function FairStatsPage() {
   }, [fairId])
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
-      </div>
-    )
+    return <LoadingState className="h-full" />
   }
 
   if (error || !stats) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <ActivityIcon className="h-12 w-12 text-gray-200" />
-        <p className="text-sm text-gray-400">暂无统计数据</p>
-        <Button variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回详情</Button>
-      </div>
-    )
+    return <EmptyState icon={ActivityIcon} title="暂无统计数据" className="h-full" />
   }
 
   const checkinRate = stats.totalCompanies > 0

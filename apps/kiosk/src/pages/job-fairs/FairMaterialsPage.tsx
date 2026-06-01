@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { FairMaterialDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import { FileTextIcon, PrinterIcon } from 'lucide-react'
@@ -55,11 +55,7 @@ export function FairMaterialsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
-      </div>
-    )
+    return <LoadingState className="h-full" />
   }
 
   return (
@@ -85,15 +81,9 @@ export function FairMaterialsPage() {
 
       <div className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
         {error ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
-            <FileTextIcon className="h-12 w-12 text-gray-200" />
-            <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
-          </div>
+          <ErrorState message="加载失败，请稍后重试" className="flex-1" />
         ) : materials.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16">
-            <FileTextIcon className="h-12 w-12 text-gray-200" />
-            <p className="text-sm text-gray-400">暂无可用活动资料</p>
-          </div>
+          <EmptyState icon={FileTextIcon} title="暂无可用活动资料" className="flex-1" />
         ) : (
           materials.map((mat) => (
             <Card key={mat.id} className="p-5">

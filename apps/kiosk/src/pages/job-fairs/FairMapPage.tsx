@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { FairBoothDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { BOOTH_STATUS_LABELS } from '../../types/fair'
 import { BuildingIcon, MapPinIcon, XIcon } from 'lucide-react'
@@ -115,20 +115,16 @@ export function FairMapPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
-      </div>
-    )
+    return <LoadingState className="h-full" />
   }
 
   if (error) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <MapPinIcon className="h-12 w-12 text-gray-200" />
-        <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
-        <Button variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>返回详情</Button>
-      </div>
+      <ErrorState
+        message="加载失败，请稍后重试"
+        onRetry={() => navigate(`/job-fairs/${fairId}`)}
+        className="h-full"
+      />
     )
   }
 
