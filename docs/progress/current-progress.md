@@ -25,7 +25,53 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W7 真实文件上传链路打通（2026-06-01，feat/w7-kiosk-file-upload）— 下一步：合并 main + BullMQ worker**
+**当前阶段：fix/w4-excel-import-integrity — Excel 导入闭环 5 项安全修复（2026-06-01）— 下一步：BullMQ worker**
+
+---
+
+### 🔧 fix/w4-excel-import-integrity：Excel 导入闭环安全修复（2026-06-01）
+
+**背景：** W4 Excel 导入闭环上线后，发现 5 项 P0/P1 安全风险，本次集中修复。
+
+**Fix 1 — rawDataJson 隐私风险（P0）**
+- `previewExcelImport`：不再持久化整行 rawData，`rawDataJson` 固定存 `'{}'`
+- `ImportRecord` 只存已映射的 `mappedJson`，原始列（含未映射字段）不落库
+- 新增一次性清理脚本：`services/api/scripts/clear-import-rawdata.ts`（清空历史记录的 rawDataJson）
+
+**Fix 2 — 敏感列后端强校验（P0）**
+- `excel-import.dto.ts`：新增 `SENSITIVE_COLUMN_PATTERNS`（手机号/邮箱/简历/候选人/姓名/面试/Offer 等）+ `isSensitiveColumn()` 工具函数
+- `parseExcelColumns`：扫描 Excel 表头，命中敏感词 → 400（不落 rawDataJson）
+- `previewExcelImport`：双层检测（原始表头 + fieldMapping 中选中的列名），命中 → 400
+
+**Fix 3 — confirmExcelImport 状态可信（P0）**
+- 走 Option A：整批 `prisma.$transaction()`，任一 upsert 失败 → 事务回滚
+- catch 分支：`batch.status = 'failed'`（不写 SyncLog），抛 500
+- 成功分支：写 SyncLog → `batch.status = 'confirmed'`（顺序有保证）
+
+**Fix 4 — 同批 externalId 去重（P1）**
+- `previewExcelImport`：新增 `seenInBatch = new Set<string>()`，逐行检测批内重复
+- 批内出现第二次相同 externalId → status='dup'，不标记为 ok
+- counts（added/updated/dup/error）已真实反映
+
+**Fix 5 — Admin 批次审核上下文（P1）**
+- `getPartnerSyncLogs`：添加 `include: { source: { select: { name: true } } }`，同步日志显示数据源名称（不再显示 UUID）
+- `AdminJobDto`：新增 `sourceId?: string`，`prismaJobToAdminDto` 透传 Job.sourceId
+- `AdminJobSourceRecord`：新增 `sourceId?: string`
+- `import-batches/index.tsx`：查看按钮改为 `/job-sources?sourceId={b.sourceId}` 和 `/fair-sources?sourceOrgId={b.orgId}&batchLabel={b.fileName}`
+- `job-sources/index.tsx`：读 `?sourceId=` URL 参数，按 `s.sourceId` 过滤 + amber banner
+- `fair-sources/index.tsx`：读 `?sourceOrgId=` URL 参数，按 `s.sourceOrgId` 过滤 + amber banner
+
+**验收（2026-06-01）：**
+- API `tsc --noEmit` ✅（0 errors）
+- Admin `tsc --noEmit` ✅（0 errors）
+- Partner `tsc --noEmit` ✅（0 errors）
+- API `lint` ✅（0 warnings）
+- Admin `lint` ✅（0 warnings）
+- Partner `lint` ✅（0 warnings）
+- Admin `build` ✅（412KB，1.03s）
+- Partner `build` ✅（349KB，924ms）
+- API `build` ✅
+- 合规禁词扫描 ✅（0 violations）
 
 ---
 

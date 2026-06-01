@@ -241,8 +241,8 @@ export default function ImportBatchesPage() {
                           className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
                           onClick={() => navigate(
                             b.dataType === 'job'
-                              ? `/job-sources?search=${encodeURIComponent(b.orgName)}`
-                              : `/fair-sources?search=${encodeURIComponent(b.orgName)}`
+                              ? `/job-sources?sourceId=${encodeURIComponent(b.sourceId)}&batchLabel=${encodeURIComponent(b.fileName)}`
+                              : `/fair-sources?sourceOrgId=${encodeURIComponent(b.orgId)}&batchLabel=${encodeURIComponent(b.fileName)}`
                           )}
                         >
                           查看{DATA_TYPE_LABEL[b.dataType]}

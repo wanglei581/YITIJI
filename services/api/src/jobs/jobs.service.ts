@@ -36,6 +36,7 @@ import {
   JOB_REQUIRED_FIELDS,
   FAIR_STANDARD_FIELDS,
   FAIR_REQUIRED_FIELDS,
+  isSensitiveColumn,
   type FieldMapping,
   type ParsedRow,
 } from './dto/excel-import.dto'
@@ -91,6 +92,7 @@ export interface FairListItemDto {
 
 export interface AdminJobDto {
   id: string
+  sourceId?: string
   title: string; company: string; city: string
   salary?: string; tags: string[]; description?: string; requirements?: string
   industry?: string; workType?: WorkType; headcount?: number
@@ -265,6 +267,7 @@ function prismaJobSourceToPartnerDto(source: PrismaJobSourceRow): PartnerDataSou
 /** Prisma Job 行的最小形状(避免在源文件深度依赖 Prisma 命名空间类型) */
 interface PrismaJobRow {
   id:            string
+  sourceId:      string | null
   sourceOrgId:   string
   externalId:    string
   sourceName:    string
@@ -306,6 +309,7 @@ function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
 function prismaJobToAdminDto(j: PrismaJobRow): AdminJobDto {
   return {
     id: j.id,
+    sourceId: j.sourceId ?? undefined,
     title: j.title, company: j.company, city: j.city,
     salary: j.salary ?? undefined,
     tags: safeJsonArr(j.tagsJson),
@@ -1144,11 +1148,12 @@ export class JobsService {
       where: { orgId: user.orgId },
       orderBy: { createdAt: 'desc' },
       take: 100,
+      include: { source: { select: { name: true } } },
     })
     return rows.map((r, i) => ({
       id: r.id,
       no: `SYNC-${r.createdAt.toISOString().slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
-      source: r.sourceId,
+      source: r.source?.name ?? r.sourceId,   // Fix 5a: display source name, not raw UUID
       dataType: r.dataType as 'job' | 'fair',
       addedCount: r.addedCount,
       updatedCount: r.updatedCount,
@@ -1218,6 +1223,18 @@ export class JobsService {
     }
     const headerRow = rows[0] as unknown[]
     const columns = headerRow.map((c) => String(c ?? '').trim()).filter(Boolean)
+
+    // 敏感列检测：命中任何一个敏感词 → 拒绝，不落 DB
+    const sensitiveHeaders = columns.filter((c) => isSensitiveColumn(c))
+    if (sensitiveHeaders.length > 0) {
+      throw new BadRequestException({
+        error: {
+          code: 'SENSITIVE_COLUMN_DETECTED',
+          message: `Excel 包含敏感列，禁止导入求职者个人信息: ${sensitiveHeaders.join(', ')}`,
+        },
+      })
+    }
+
     const sampleRows = rows.slice(1, 6).map((row) => {
       const obj: Record<string, string> = {}
       columns.forEach((col, i) => { obj[col] = String((row as unknown[])[i] ?? '').trim() })
@@ -1259,6 +1276,28 @@ export class JobsService {
     const headers = (allRows[0] as string[]).map((h) => String(h ?? '').trim())
     const dataRows = allRows.slice(1)
 
+    // Fix 2: 敏感列检测（两层）
+    // 1. Excel 原始表头
+    const sensitiveHeaders = headers.filter((h) => isSensitiveColumn(h))
+    if (sensitiveHeaders.length > 0) {
+      throw new BadRequestException({
+        error: {
+          code: 'SENSITIVE_COLUMN_DETECTED',
+          message: `Excel 包含敏感列，禁止导入求职者个人信息: ${sensitiveHeaders.join(', ')}`,
+        },
+      })
+    }
+    // 2. fieldMapping 中选中的 Excel 列名
+    const sensitiveMapped = Object.values(args.fieldMapping).filter((col) => isSensitiveColumn(col))
+    if (sensitiveMapped.length > 0) {
+      throw new BadRequestException({
+        error: {
+          code: 'SENSITIVE_COLUMN_IN_MAPPING',
+          message: `字段映射中包含敏感列，禁止导入: ${sensitiveMapped.join(', ')}`,
+        },
+      })
+    }
+
     const standardFields = args.dataType === 'job' ? JOB_STANDARD_FIELDS : FAIR_STANDARD_FIELDS
     const requiredFields = args.dataType === 'job' ? JOB_REQUIRED_FIELDS : FAIR_REQUIRED_FIELDS
 
@@ -1272,7 +1311,7 @@ export class JobsService {
       })
     }
 
-    // Collect existing externalIds for dup detection
+    // Collect existing externalIds for dup detection (DB level)
     const orgId = args.user.orgId
     const existingExtIds = new Set<string>()
     if (args.dataType === 'job') {
@@ -1289,8 +1328,12 @@ export class JobsService {
       existing.forEach((f) => existingExtIds.add(f.externalId))
     }
 
+    // Fix 4: intra-batch dup detection
+    const seenInBatch = new Set<string>()
+
     const parsed: ParsedRow[] = dataRows.map((rawRow, idx) => {
       const rawArr = rawRow as unknown[]
+      // Fix 1: never persist raw row data — only extract mapped fields
       const rawData: Record<string, string> = {}
       headers.forEach((h, i) => { rawData[h] = String(rawArr[i] ?? '').trim() })
 
@@ -1322,13 +1365,18 @@ export class JobsService {
       let status: 'ok' | 'invalid' | 'dup' = 'ok'
       if (errors.length > 0) {
         status = 'invalid'
-      } else if (mapped.externalId && existingExtIds.has(mapped.externalId)) {
-        status = 'dup'
+      } else if (mapped.externalId) {
+        // Fix 4: check both intra-batch and DB-level dups
+        if (seenInBatch.has(mapped.externalId) || existingExtIds.has(mapped.externalId)) {
+          status = 'dup'
+        } else {
+          seenInBatch.add(mapped.externalId)
+        }
       }
 
       return {
         rowIndex: idx + 2, // 1-indexed, skipping header
-        rawData,
+        rawData: {},       // Fix 1: discard raw row — never store PII in rawDataJson
         mapped,
         status,
         errors,
@@ -1364,7 +1412,7 @@ export class JobsService {
         data: parsed.slice(i, i + CHUNK).map((r) => ({
           batchId: batch.id,
           rowIndex: r.rowIndex,
-          rawDataJson: JSON.stringify(r.rawData),
+          rawDataJson: '{}',   // Fix 1: never persist raw PII; only mappedJson is stored
           mappedJson: JSON.stringify(r.mapped),
           status: r.status,
           errorsJson: JSON.stringify(r.errors),
@@ -1415,68 +1463,80 @@ export class JobsService {
     const sourceOrgId = org.id
     const sourceName  = org.name
     const sync        = new Date()
-    let imported      = 0
+    const totalValid  = batch.records.length
 
-    for (const record of batch.records) {
-      const mapped = JSON.parse(record.mappedJson) as Record<string, string>
-      try {
-        if (batch.dataType === 'job') {
-          await this.prisma.job.upsert({
-            where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
-            create: {
-              sourceOrgId, sourceId: batch.sourceId, externalId: mapped.externalId, sourceName,
-              sourceUrl: mapped.sourceUrl ?? '',
-              title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
-              salary: mapped.salary || null,
-              description: mapped.description || null, requirements: mapped.requirements || null,
-              tagsJson: '[]',
-              reviewStatus: 'pending', publishStatus: 'draft',
-              syncTime: sync,
-            },
-            update: {
-              sourceName, sourceUrl: mapped.sourceUrl ?? '',
-              title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
-              salary: mapped.salary || null,
-              description: mapped.description || null, requirements: mapped.requirements || null,
-              syncTime: sync,
-            },
-          })
-        } else {
-          const startAt = new Date(mapped.startAt)
-          const endAt   = new Date(mapped.endAt)
-          await this.prisma.jobFair.upsert({
-            where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
-            create: {
-              sourceOrgId, externalId: mapped.externalId, sourceName,
-              sourceUrl: mapped.sourceUrl ?? '',
-              title: mapped.title ?? '',
-              theme: mapped.theme || 'general',
-              startAt, endAt,
-              venue: mapped.venue ?? '', city: mapped.city ?? '',
-              address: mapped.address || null,
-              description: mapped.description || null,
-              companyCount: Number(mapped.companyCount) || 0,
-              jobCount: Number(mapped.jobCount) || 0,
-              reviewStatus: 'pending', publishStatus: 'draft',
-              syncTime: sync,
-            },
-            update: {
-              sourceName, sourceUrl: mapped.sourceUrl ?? '',
-              title: mapped.title ?? '',
-              theme: mapped.theme || 'general',
-              startAt, endAt,
-              venue: mapped.venue ?? '', city: mapped.city ?? '',
-              address: mapped.address || null,
-              description: mapped.description || null,
-              syncTime: sync,
-            },
-          })
+    // Fix 3: 事务化写入 — 任一行失败则整批回滚，状态标记 failed
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        for (const record of batch.records) {
+          const mapped = JSON.parse(record.mappedJson) as Record<string, string>
+          if (batch.dataType === 'job') {
+            await tx.job.upsert({
+              where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
+              create: {
+                sourceOrgId, sourceId: batch.sourceId, externalId: mapped.externalId, sourceName,
+                sourceUrl: mapped.sourceUrl ?? '',
+                title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
+                salary: mapped.salary || null,
+                description: mapped.description || null, requirements: mapped.requirements || null,
+                tagsJson: '[]',
+                reviewStatus: 'pending', publishStatus: 'draft',
+                syncTime: sync,
+              },
+              update: {
+                sourceName, sourceUrl: mapped.sourceUrl ?? '',
+                title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
+                salary: mapped.salary || null,
+                description: mapped.description || null, requirements: mapped.requirements || null,
+                syncTime: sync,
+              },
+            })
+          } else {
+            const startAt = new Date(mapped.startAt)
+            const endAt   = new Date(mapped.endAt)
+            await tx.jobFair.upsert({
+              where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
+              create: {
+                sourceOrgId, externalId: mapped.externalId, sourceName,
+                sourceUrl: mapped.sourceUrl ?? '',
+                title: mapped.title ?? '',
+                theme: mapped.theme || 'general',
+                startAt, endAt,
+                venue: mapped.venue ?? '', city: mapped.city ?? '',
+                address: mapped.address || null,
+                description: mapped.description || null,
+                companyCount: Number(mapped.companyCount) || 0,
+                jobCount: Number(mapped.jobCount) || 0,
+                reviewStatus: 'pending', publishStatus: 'draft',
+                syncTime: sync,
+              },
+              update: {
+                sourceName, sourceUrl: mapped.sourceUrl ?? '',
+                title: mapped.title ?? '',
+                theme: mapped.theme || 'general',
+                startAt, endAt,
+                venue: mapped.venue ?? '', city: mapped.city ?? '',
+                address: mapped.address || null,
+                description: mapped.description || null,
+                syncTime: sync,
+              },
+            })
+          }
         }
-        imported++
-      } catch (e) {
-        this.logger.error(`confirmExcelImport upsert failed: batchId=${batchId} rowIndex=${record.rowIndex}`, e as Error)
-      }
+      })
+    } catch (e) {
+      this.logger.error(`confirmExcelImport transaction failed: batchId=${batchId}`, e as Error)
+      // 整批失败：标记 batch failed，不写 SyncLog
+      await this.prisma.importBatch.update({
+        where: { id: batchId },
+        data: { status: 'failed' },
+      })
+      throw new InternalServerErrorException({
+        error: { code: 'IMPORT_TRANSACTION_FAILED', message: 'Excel 导入事务失败，数据已回滚，请检查数据后重试' },
+      })
     }
+
+    const imported = totalValid
 
     // Write SyncLog
     const syncLogId = await this.writeSyncLog({
@@ -1490,7 +1550,7 @@ export class JobsService {
       errorCount: batch.invalidRows,
     })
 
-    // Update batch status
+    // Update batch status → confirmed
     await this.prisma.importBatch.update({
       where: { id: batchId },
       data: { status: 'confirmed', confirmedAt: new Date() },

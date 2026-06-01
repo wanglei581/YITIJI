@@ -1,11 +1,26 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W7 真实文件上传链路完成，待合入 main）  
+> 最后更新：2026-06-01（fix/w4-excel-import-integrity 完成，待合入 main；BullMQ worker 暂缓）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W7 已完成，待 push + merge main）
+## 📌 当前状态（fix/w4-excel-import-integrity 已完成）
+
+**fix/w4-excel-import-integrity 已完成（2026-06-01）**：
+- ✅ Fix 1：rawDataJson 不再存整行原始数据（固定 `'{}'`）+ 一次性清理脚本
+- ✅ Fix 2：敏感列后端强校验（手机/邮箱/简历/候选人/面试/Offer 等），parseExcel + preview 双层拦截
+- ✅ Fix 3：confirmExcelImport 整批事务化，失败 → batch.status='failed'，数据回滚
+- ✅ Fix 4：previewExcelImport 批内 externalId 去重（seenInBatch set）
+- ✅ Fix 5：同步日志显示数据源名称；Admin ImportBatch→审核跳转改用 sourceId/sourceOrgId；job/fair-sources 支持 URL 参数过滤 + 来源 banner
+
+**W7 之前已完成（见 current-progress.md）**：
+- W7：Kiosk 真实文件上传 + print 链路（A2 桌面验证模式，B1 30-min re-sign）
+- W7 设计备忘：A2 → 生产切 A1；B1 → 长期切 B2
+
+---
+
+## 🔜 下一步优先级
 
 **W7 已完成（2026-06-01，`feat/w7-kiosk-file-upload`）**：
 - ✅ Terminal Agent `print.ts`：`params` 真实传给 `printWithPdfToPrinter`（不再 eslint-disable unused-vars）
@@ -28,9 +43,10 @@
 ## 🔜 下一步优先级
 
 ### P0（立即）
-1. **合并 W7 → main**：push + FF merge，更新 CLAUDE.md 进度摘要
+1. **合并 fix/w4-excel-import-integrity → main**：push + FF merge
+   - 合入前运行一次性清理脚本清空历史 rawDataJson（`npx ts-node scripts/clear-import-rawdata.ts`）
 
-2. **BullMQ API 拉取 worker**（独立分支）
+2. **BullMQ API 拉取 worker**（独立分支，`feat/w8-bullmq-api-worker`）
    - W3 已完成：`JobSource.encryptedCredential` 落库、`GET /partner/sources/:id/endpoint` 可读
    - 待开发：worker 周期性拉取外部岗位/招聘会数据，写入 ExternalJob，触发审核流程
 

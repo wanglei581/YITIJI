@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, FilterIcon, XIcon } from 'lucide-react'
 import type { AdminFairSourceRecord, ReviewStatus, PublishStatus, JobFairStatus } from '../../services/api'
 import {
   getFairSources,
@@ -42,6 +43,10 @@ const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FairSourcesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sourceOrgIdFilter = searchParams.get('sourceOrgId') ?? ''
+  const batchLabel        = searchParams.get('batchLabel') ?? ''
+
   const [sources,      setSources]      = useState<AdminFairSourceRecord[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
@@ -57,9 +62,14 @@ export default function FairSourcesPage() {
     return () => { cancelled = true }
   }, [])
 
+  // sourceOrgId filter: when arriving from import-batches page
+  const byOrg = sourceOrgIdFilter
+    ? sources.filter((s) => s.sourceOrgId === sourceOrgIdFilter)
+    : sources
+
   const filtered = reviewFilter === '全部'
-    ? sources
-    : sources.filter((s) => s.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
+    ? byOrg
+    : byOrg.filter((s) => s.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
 
   const searched = search.trim()
     ? filtered.filter((s) =>
@@ -73,11 +83,11 @@ export default function FairSourcesPage() {
   const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts = {
-    全部:   sources.length,
-    待审核: sources.filter((s) => s.reviewStatus === 'pending').length,
-    审核中: sources.filter((s) => s.reviewStatus === 'reviewing').length,
-    已通过: sources.filter((s) => s.reviewStatus === 'approved').length,
-    已拒绝: sources.filter((s) => s.reviewStatus === 'rejected').length,
+    全部:   byOrg.length,
+    待审核: byOrg.filter((s) => s.reviewStatus === 'pending').length,
+    审核中: byOrg.filter((s) => s.reviewStatus === 'reviewing').length,
+    已通过: byOrg.filter((s) => s.reviewStatus === 'approved').length,
+    已拒绝: byOrg.filter((s) => s.reviewStatus === 'rejected').length,
   }
 
   const handleApprove = (id: string) => {
@@ -121,6 +131,23 @@ export default function FairSourcesPage() {
 
   return (
     <Page title="招聘会信息源" subtitle="第三方平台同步招聘会数据管理">
+      {/* 来自 Excel 导入批次的上下文 banner */}
+      {sourceOrgIdFilter && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
+          <FilterIcon className="h-4 w-4 flex-shrink-0 text-amber-500" />
+          <span className="text-sm text-amber-800">
+            正在显示来自 Excel 导入批次 <strong>{batchLabel || sourceOrgIdFilter}</strong> 的招聘会（机构 ID：{sourceOrgIdFilter}）
+          </span>
+          <button
+            onClick={() => setSearchParams({})}
+            className="ml-auto text-amber-500 hover:text-amber-700"
+            title="清除筛选"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* 筛选标签 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex gap-2">

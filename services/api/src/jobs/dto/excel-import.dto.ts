@@ -1,5 +1,26 @@
 import { IsIn, IsNotEmpty, IsString } from 'class-validator'
 
+/**
+ * 敏感列关键词列表（大小写不敏感、含子串匹配）。
+ * 命中任意一个 → 400，不得导入。
+ *
+ * 规则：只展示公开岗位/招聘会信息，不得导入求职者个人信息。
+ */
+export const SENSITIVE_COLUMN_PATTERNS: string[] = [
+  '手机', '手机号', '电话', 'tel', 'mobile', 'phone',
+  '邮箱', 'email', 'mail',
+  '简历', 'resume', 'cv',
+  '候选人', 'candidate',
+  '姓名',
+  '报名', '投递', '面试', 'offer',
+]
+
+/** 检查列名是否命中敏感词（大小写不敏感，子串匹配） */
+export function isSensitiveColumn(col: string): boolean {
+  const lower = col.toLowerCase().replace(/\s+/g, '')
+  return SENSITIVE_COLUMN_PATTERNS.some((p) => lower.includes(p.toLowerCase().replace(/\s+/g, '')))
+}
+
 /** POST /partner/excel/preview 的 JSON 字段（multipart 里的文本字段） */
 export class ExcelPreviewDto {
   @IsString() @IsNotEmpty()

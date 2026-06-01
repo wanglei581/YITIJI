@@ -6,6 +6,7 @@ export type { ReviewStatus, PublishStatus, JobFairStatus }
 // R1: Added sourceOrgId, sourceUrl, description, tags, requirements
 export interface AdminJobSourceRecord {
   id: string
+  sourceId?: string        // JobSource.id — set when imported via Excel/Webhook
   sourceOrgId: string
   sourceName: string
   externalId: string

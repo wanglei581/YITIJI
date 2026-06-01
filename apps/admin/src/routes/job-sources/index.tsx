@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { BriefcaseIcon } from 'lucide-react'
+import { BriefcaseIcon, FilterIcon, XIcon } from 'lucide-react'
 import type { AdminJobSourceRecord, ReviewStatus, PublishStatus } from '../../services/api'
 import {
   getJobSources,
@@ -35,6 +36,10 @@ const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function JobSourcesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sourceIdFilter = searchParams.get('sourceId') ?? ''
+  const batchLabel     = searchParams.get('batchLabel') ?? ''
+
   const [sources,      setSources]      = useState<AdminJobSourceRecord[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
@@ -50,9 +55,14 @@ export default function JobSourcesPage() {
     return () => { cancelled = true }
   }, [])
 
+  // sourceId filter: when arriving from import-batches page
+  const bySource = sourceIdFilter
+    ? sources.filter((s) => s.sourceId === sourceIdFilter)
+    : sources
+
   const filtered = reviewFilter === '全部'
-    ? sources
-    : sources.filter((s) => s.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
+    ? bySource
+    : bySource.filter((s) => s.reviewStatus === REVIEW_FILTER_MAP[reviewFilter])
 
   const searched = search.trim()
     ? filtered.filter((s) =>
@@ -66,11 +76,11 @@ export default function JobSourcesPage() {
   const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
 
   const counts = {
-    全部:   sources.length,
-    待审核: sources.filter((s) => s.reviewStatus === 'pending').length,
-    审核中: sources.filter((s) => s.reviewStatus === 'reviewing').length,
-    已通过: sources.filter((s) => s.reviewStatus === 'approved').length,
-    已拒绝: sources.filter((s) => s.reviewStatus === 'rejected').length,
+    全部:   bySource.length,
+    待审核: bySource.filter((s) => s.reviewStatus === 'pending').length,
+    审核中: bySource.filter((s) => s.reviewStatus === 'reviewing').length,
+    已通过: bySource.filter((s) => s.reviewStatus === 'approved').length,
+    已拒绝: bySource.filter((s) => s.reviewStatus === 'rejected').length,
   }
 
   const handleApprove = (id: string) => {
@@ -114,6 +124,23 @@ export default function JobSourcesPage() {
 
   return (
     <Page title="岗位信息源" subtitle="第三方平台同步岗位数据管理">
+      {/* 来自 Excel 导入批次的上下文 banner */}
+      {sourceIdFilter && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
+          <FilterIcon className="h-4 w-4 flex-shrink-0 text-amber-500" />
+          <span className="text-sm text-amber-800">
+            正在显示来自 Excel 导入批次 <strong>{batchLabel || sourceIdFilter}</strong> 的岗位（数据源 ID：{sourceIdFilter}）
+          </span>
+          <button
+            onClick={() => setSearchParams({})}
+            className="ml-auto text-amber-500 hover:text-amber-700"
+            title="清除筛选"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* 筛选标签 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex gap-2">
