@@ -25,11 +25,44 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 9.2 轻量 SVG 数字人引导员（feat/phase9-digital-human，2026-06-01）**
+**当前阶段：Phase 9.3 AI 助手快捷操作增强（feat/phase9-assistant-actions，2026-06-01）**
 
 ---
 
-### 🔄 Phase 9.2：轻量 SVG 数字人引导员（2026-06-01，feat/phase9-digital-human）
+### ✅ Phase 9.3：AI 助手快捷操作增强（2026-06-01，feat/phase9-assistant-actions）
+
+**目标：** 在已有数字人基础上，增强 AI 助手的快捷入口引导能力，常驻 7 个服务入口 + 关键词实时高亮。
+
+**合规约束（本阶段必须遵守）：**
+- 不新增语音/TTS/摄像头
+- 不引入 3D/VRM
+- actions 路由仍经过 `isAllowedRoute` 白名单过滤
+- 不出现招聘闭环词；快捷按钮文案符合合规要求
+
+**实现说明：**
+- 7 个常驻快捷入口（始终可见，位于对话历史下方）：简历诊断 / 打印文件 / 扫描材料 / 查看岗位 / 查看招聘会 / AI 在青岛 / 人社专区
+- `KEYWORD_ROUTES` 关键词映射表：输入文本实时匹配，高亮相关快捷按钮（`border-blue-400 bg-blue-50 scale-[1.03]`），无需发送 AI 请求
+- AI 上下文建议（AI 返回 actions 时）：显示在常驻快捷入口上方，带 `ZapIcon` 标签 "AI 建议"，蓝色填充样式区分
+- `/qingdao` 加入 `ALLOWED_ROUTE_PREFIXES` 白名单
+- 布局调整：AI 上下文操作移至底部操作区（对话历史下方），不再夹在数字人和对话历史之间
+
+**修改文件：**
+- `apps/kiosk/src/pages/assistant/AssistantPage.tsx`（commit `04d99d7`）
+
+**bundle 体积：** 915KB raw / 272KB gzip（+22KB，引入 ZapIcon + KEYWORD_ROUTES 关键词表）
+
+**验收（2026-06-01）：**
+- `pnpm --filter ./apps/kiosk typecheck` ✅
+- `pnpm --filter ./apps/kiosk lint` ✅
+- `pnpm --filter ./apps/kiosk build` ✅
+- 合规禁词扫描：仅 line 12 注释（合规约束说明，非渲染内容）✅
+- `isAllowedRoute` 白名单：保留（line 152）✅
+- 合规声明："内容仅供参考"/"不构成正式建议"：保留 ✅
+- 快捷按钮文案合规：无"一键投递/立即投递/平台投递"✅
+
+---
+
+### ✅ Phase 9.2：轻量 SVG 数字人引导员（2026-06-01，feat/phase9-digital-human）
 
 **目标：** 在 AI 助手页集成轻量 2D 数字人引导员，增强一体机引导体验。不做 3D/VRM，不新增语音/摄像头。
 

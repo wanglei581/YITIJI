@@ -1,19 +1,24 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（Phase 9.2 轻量 SVG 数字人引导员，feat/phase9-digital-human）  
+> 最后更新：2026-06-01（Phase 9.3 AI 助手快捷操作增强，feat/phase9-assistant-actions）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（Phase 9.2 轻量 SVG 数字人引导员）
+## 📌 当前状态（Phase 9.3 AI 助手快捷操作增强）
 
-**Phase 9.2 feat/phase9-digital-human（2026-06-01，进行中，待合入 main）：**
-- ✅ `apps/kiosk/src/components/DigitalHuman.tsx`：纯 SVG + CSS 动画，idle/talking/greeting 三状态
-- ✅ `apps/kiosk/src/pages/assistant/AssistantPage.tsx`：上半区数字人+气泡，下半区对话历史
-- ✅ 无新依赖（仅 react），无 WebGL/VRM/three.js，bundle 体积与 Phase 9.1 一致（889KB）
-- ✅ `isAllowedRoute` 白名单保留，合规声明保留，无招聘闭环词
-- ✅ typecheck ✅ / lint ✅ / build ✅ / 合规扫描 ✅
-- ⏳ 待 review 后 FF merge 到 main
+**Phase 9.3 feat/phase9-assistant-actions（2026-06-01，已完成，待合入 main）：**
+- ✅ 7 个常驻快捷入口（始终可见）：简历诊断 / 打印文件 / 扫描材料 / 查看岗位 / 查看招聘会 / AI 在青岛 / 人社专区
+- ✅ `KEYWORD_ROUTES` 关键词实时高亮：输入匹配关键词 → 相关快捷按钮高亮，无需 AI 响应
+- ✅ AI 上下文建议区（带"AI 建议"标签）：仅 AI 返回 actions 时出现
+- ✅ `/qingdao` 加入 `ALLOWED_ROUTE_PREFIXES` 白名单
+- ✅ `isAllowedRoute` 白名单保留（line 152），合规声明保留，无招聘闭环词
+- ✅ typecheck ✅ / lint ✅ / build ✅（915KB/272KB gzip）/ 合规扫描 ✅
+- ⏳ 待 FF merge 到 main
+
+**Phase 9.2 feat/phase9-digital-human（2026-06-01，✅ 已合入 main `f79b4d8`）：**
+- ✅ `DigitalHuman.tsx`：纯 SVG + CSS 动画，idle/talking/greeting 三状态，无 WebGL/VRM
+- ✅ AssistantPage 两区布局（上：数字人+气泡，下：对话历史）
 
 **Phase 9.1 feat/phase9-kiosk-ui-polish（2026-06-01，✅ 已合入 main `b60fd8f`）：**
 - ✅ KioskLayout Tab 激活背景高亮
