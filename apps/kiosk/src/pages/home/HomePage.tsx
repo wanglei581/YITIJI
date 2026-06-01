@@ -4,8 +4,9 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   ChevronRightIcon,
+  MapPinIcon,
+  MonitorCheckIcon,
   PrinterIcon,
-  ScanIcon,
   SparklesIcon,
   WifiIcon,
 } from 'lucide-react'
@@ -21,9 +22,9 @@ interface DeviceItem {
 
 function DeviceStatusStrip() {
   const devices: DeviceItem[] = [
-    { icon: PrinterIcon, label: '打印机正常', ok: true },
-    { icon: ScanIcon,    label: '扫描仪正常', ok: true },
-    { icon: WifiIcon,    label: '网络正常',   ok: true },
+    { icon: PrinterIcon,      label: '打印机正常', ok: true },
+    { icon: MonitorCheckIcon, label: '扫描仪正常', ok: true },
+    { icon: WifiIcon,         label: '网络正常',   ok: true },
   ]
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -42,7 +43,7 @@ function DeviceStatusStrip() {
 
 function HeroSection() {
   return (
-    <div className="px-8 pb-8 pt-10" style={{ backgroundColor: '#0B2A5B' }}>
+    <div className="px-8 pb-14 pt-10" style={{ backgroundColor: '#0B2A5B' }}>
       <h1 className="text-[2.25rem] font-bold leading-tight tracking-tight text-white">
         AI求职打印服务终端
       </h1>
@@ -173,7 +174,7 @@ export function HomePage() {
     <div className="flex flex-col">
       <HeroSection />
 
-      <div className="flex flex-col gap-6 bg-canvas px-6 py-7">
+      <div className="relative -mt-6 z-10 flex flex-col gap-6 rounded-t-3xl bg-canvas px-6 py-7">
         {/* 主要功能 */}
         <section aria-label="主要功能" className="flex flex-col gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
@@ -206,7 +207,7 @@ export function HomePage() {
           <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
             更多服务
           </h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <SecondaryServiceCard
               icon={BriefcaseIcon}
               title="岗位信息"
@@ -220,6 +221,13 @@ export function HomePage() {
               description="招聘会信息与现场导览"
               actionLabel="查看招聘会"
               onAction={() => navigate('/job-fairs')}
+            />
+            <SecondaryServiceCard
+              icon={MapPinIcon}
+              title="AI 在青岛"
+              description="青岛就业、政策、高校、园区、城市资讯"
+              actionLabel="进入专区"
+              onAction={() => navigate('/qingdao')}
             />
           </div>
         </section>

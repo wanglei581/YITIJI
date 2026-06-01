@@ -1,22 +1,32 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W3 Partner 数据源管理页三轨入口收口完成）  
+> 最后更新：2026-06-01（W4 数据源真实导入闭环 + AI在青岛专区完成）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W3 收口 + Phase 7.11 R4 完成）
+## 📌 当前状态（W4 + AI在青岛 完成）
 
-**已完成**：
-- ✅ W3 后端：JobSource 加凭证 + Webhook 接收端（HMAC + 5min 时间窗 + nonce 防重放 + AES-256-GCM 加密落库）— commit `e3d4629`
-- ✅ W3 前端：Partner /sources 页三轨入口（API / Webhook / Excel）走统一服务层 createDataSource() — commit `868b25d`（API_ORIGIN helper 替换 `:5175→:3000` 硬编码）
-- ✅ W3 E2E demo（2026-06-01）：12 步链路全过（Partner→Webhook→Admin→Kiosk + 防重放/错签名/字段注入/secret 不回显）
-- ✅ **Phase 7.11 R4**（2026-06-01）：Partner Sources 类型对齐 packages/shared/PartnerDataSourceView；SyncFrequency 加 weekly；ConnStatus 提升到 shared；后端 PartnerDataSourceDto 字面量收紧；UI 零变化；pnpm -r typecheck/lint/build 全过
+**W4 已完成（2026-06-01）**：
+- ✅ Gap 1：`GET /files/:id/url` 加角色/归属校验 + 访问审计
+- ✅ Gap 2：Prisma 新增 SyncLog + ImportBatch + ImportRecord；`GET /partner/sync-logs` 路由上线
+- ✅ Gap 3：`partnerHttpAdapter.ts` 导入契约修正
+- ✅ Excel 字段映射 service 层接入 + `ExcelImportModal.tsx` 4 步向导
 
-**下一步候选**：
-- W3 续做：BullMQ API 拉取 worker + Excel 字段映射 service 层接入（FieldMappingRule / ImportBatch 已在 partner adapter 暴露）
-- W1 / W2 / W3 stacked 分支已 FF 合入 main（2026-06-01，`3f35caa`），后续不要再按待合并分支处理
-- Phase 9 UI Polish + AI 数字人引导员
+**AI在青岛专区已完成（2026-06-01）**：
+- ✅ `apps/kiosk/src/pages/qingdao/QingdaoPage.tsx`：5 tab 面板（就业 / 政策 / 高校 / 园区 / 资讯）
+- ✅ `/qingdao` 路由已注册
+- ✅ 首页"更多服务"3 列卡片布局，AI在青岛入口已添加
+- ✅ 全部合规要求满足（来源声明、合规按钮文案、免责说明）
+- ✅ Kiosk lint / typecheck / build 全部通过
+
+**下一步候选（P0）**：
+- BullMQ API 拉取 worker（JobSource 已有 encryptedCredential，待周期性拉取外部数据）
+- Phase 9 UI Polish + AI 数字人引导员（静态 3D VRM + Kiosk 视觉升级）
+- Admin 审核页面对接 ImportBatch（显示来自 Excel 导入的批次，审核通过后发布）
+- AI在青岛数据接真实 API（当前为 mock 数据，后续接 partner 审核后的岗位/招聘会数据）
+
+**W1 / W2 / W3 / W4 stacked 分支已合入 main**：后续不要再按待合并分支处理。
 
 ---
 

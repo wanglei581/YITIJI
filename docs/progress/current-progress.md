@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-05-28  
+> 最后更新：2026-06-01  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
@@ -25,9 +25,79 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 8 全部封板 ✅ — Windows Agent 全链路（Prisma 跨机持久化 + WMI + 断网重试 + 单实例 + 服务安装）验证完成（2026-05-29）**
+**当前阶段：W4 数据源真实导入闭环 ✅（2026-06-01）— Phase 8 全部封板基线之上**
 
-**V8.1C-4/5 + Mac 真实后端验证结果：**
+---
+
+### ✅ W4 数据源真实导入闭环（2026-06-01）
+
+**Gap 1 — GET /files/:id/url 安全加固：**
+- `files.controller.ts`：加 `@CurrentUser()` + `@Req()`；每次调用写 `file.get_signed_url` 审计日志
+- `files.service.ts`：`getSignedUrl` 加归属校验（admin 可访问任意文件；partner/kiosk 只能访问自己上传的文件）；返回值补 `purpose` 字段
+- `file.types.ts`：`SignedUrlResponse` 补 `purpose: FilePurpose`
+
+**Gap 2 — /partner/sync-logs 路由（后端）：**
+- `schema.prisma`：新增 `SyncLog`、`ImportBatch`、`ImportRecord` 三个 Prisma 模型
+- `prisma.service.ts`：暴露 `syncLog`、`importBatch`、`importRecord` getter
+- `jobs.service.ts`：`getPartnerSyncLogs`、`writeSyncLog`（私有，import 后自动调用）
+- `jobs.controller.ts`：`GET /partner/sync-logs`（@Roles('partner')）
+
+**Gap 3 — Partner HTTP 导入契约修正：**
+- `partnerHttpAdapter.ts`：`importPartnerJobs` / `importPartnerFairs` 去掉 `sourceOrgId`/`sourceName` 参数，body 只传 `{ items }`
+- `partnerContent.ts`：接口签名同步更新
+- `partnerMockAdapter.ts`：mock 函数同步更新
+
+**Excel 字段映射 service 层接入：**
+- 安装 `xlsx` 包（pnpm add）
+- `dto/excel-import.dto.ts`：标准字段白名单（JOB / FAIR）、必填字段、ParsedRow 类型
+- `jobs.service.ts`：`parseExcelColumns`（无 DB，仅返回列名+样例）、`previewExcelImport`（创建 ImportBatch + ImportRecord + 重复检测 + 白名单校验）、`confirmExcelImport`（upsert valid rows + 写 SyncLog）、`cancelExcelImport`
+- `jobs.controller.ts`：`POST /partner/excel/parse`、`POST /partner/excel/preview`、`POST /partner/excel/:batchId/confirm`、`DELETE /partner/excel/:batchId`
+- `types.ts`（partner）：新增 `ExcelPreviewResult`、`ExcelConfirmResult`、`ExcelPreviewRow`
+- `partnerContent.ts`：新增 `parseExcel`/`previewExcel`/`confirmExcelImport`/`cancelExcelImport`
+- `ExcelImportModal.tsx`：4 步向导（上传文件 → 字段映射 → 预览统计 → 确认导入）
+- `sources/index.tsx`：字段映射按钮接入 ExcelImportModal
+
+**验收（2026-06-01）：**
+- `prisma db push` ✅ → SQLite dev.db 同步 3 个新表
+- `prisma generate` ✅ → client 重新生成
+- 后端 `tsc --noEmit` ✅（0 errors）
+- Partner / Kiosk / Admin `tsc --noEmit` ✅（0 errors）
+- 后端 `npm run lint` ✅（0 errors）
+- Partner `npm run lint` ✅（0 errors）
+- Admin lint 保持既有 1 warning（非本次引入）
+- Partner `npm run build` ✅
+- 后端 `npm run build` ✅
+
+---
+
+### ✅ AI在青岛专区（2026-06-01）
+
+**新增文件：**
+- `apps/kiosk/src/pages/qingdao/QingdaoPage.tsx`：5 tab 面板（青岛就业 / 青岛政策 / 青岛高校 / 青岛园区 / 青岛资讯）
+- `apps/kiosk/src/routes/index.tsx`：注册 `/qingdao` 路由
+- `apps/kiosk/src/pages/home/HomePage.tsx`：更多服务区由 2 列扩展为 3 列，新增 AI在青岛卡片
+
+**页面内容（静态 mock 数据）：**
+- 青岛就业：近期招聘会（3条）+ 重点企业岗位（5家）+ 应届生专属通道入口
+- 青岛政策：就业补贴 / 人才政策 / 社保档案（可展开手风琴）
+- 青岛高校：6所高校就业服务入口（中国海洋大学 / 青岛大学 / 中国石油大学 等）
+- 青岛园区：4个产业园区（高新区 / 崂山软件 / 西海岸新区 / 蓝谷高新区）
+- 青岛资讯：官方就业新闻 + 政策公告（6条带摘要）
+
+**合规要求（全部满足）：**
+- 所有岗位/招聘会按钮只用：查看岗位 / 查看招聘会 / 去来源平台投递 / 扫码预约 / 查看详情
+- 禁止词（一键投递 / 平台投递 / 企业收简历）均未出现
+- 页面顶部展示信息来源声明；页面底部展示合规免责说明
+- 本系统不参与招聘/不接收简历/不代理办理政务
+
+**验收（2026-06-01）：**
+- Kiosk `tsc --noEmit` ✅（0 errors）
+- Kiosk `npm run lint` ✅（0 errors）
+- Kiosk `npm run build` ✅（built in 1.35s）
+
+---
+
+**V8.1C-4/5 + Mac 真实后端验证结果（保留历史基线）：**
 
 | 验收项 | 结果 | 说明 |
 |--------|:----:|------|
