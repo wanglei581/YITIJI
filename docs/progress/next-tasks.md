@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W8 BullMQ API pull worker 完成，待合入 main）  
+> 最后更新：2026-06-01（W8 完成并收尾，feat/w8-bullmq-api-worker 待 FF 合入 main）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
@@ -57,8 +57,7 @@
 
 ### P0（立即）
 1. **合并 feat/w8-bullmq-api-worker → main**：push + FF merge
-   - 合入后在有 Redis 的环境验证一次 end-to-end：Admin 触发 → Partner SyncLog 可见
-   - responseConfig 后续可扩展：为每个 API source 配置字段映射规则
+   - 合入后在有 Redis 的环境验证一次 end-to-end：Admin 触发 → BullMQ queue → Processor → Partner SyncLog 可见
 
 2. **Phase 9 UI Polish + AI 数字人引导员**（独立分支）
    - 静态 3D 就业引导员（VRM + WebGL fallback）
@@ -66,6 +65,11 @@
    - TTS 语音引导（Phase 9.2 择期）
 
 ### P1（择期）
+**W8 后续 TODO（BullMQ API worker 落地后）：**
+- **生产环境 REDIS_URL 必配**：无 Redis 的 inline fallback 仅供 dev 验证；生产部署时必须提供 Redis，否则 Cron 调度仍然工作但缺少 BullMQ 持久化/重试语义
+- **responseConfig 可视化配置**：当前需直接改 DB JSON；Partner 后台应提供字段映射规则 UI（rootPath / fields 编辑器），避免需要技术人员操作
+- **API 拉取字段映射校验增强**：目前缺字段仅 warn 日志；可加 validateBeforeUpsert 选项，缺必填字段整条跳过并入 error 计数
+- **API 同步 E2E 真源联调**：对接一个真实的外部岗位 API 端点，端到端验证 responseConfig auto-detect 和字段映射流程
 - **JobFair 增加 `sourceId`/`importBatchId` 字段**：当前招聘会批次跳转只能按 `sourceOrgId` 粗粒度过滤，无法精确回溯单批次。需在 `JobFair` Prisma model 添加 `sourceId String?`，才能支持 fair-sources 页精确 batchId 过滤（与岗位侧对齐）
 - 生产 Kiosk 文件选择切 A1（Terminal Agent 文件中转）
 - signedUrl 长期方案切 B2（Agent 内网 token）

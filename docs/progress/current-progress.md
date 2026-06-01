@@ -25,11 +25,11 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：feat/w8-bullmq-api-worker — BullMQ API 拉取 worker（2026-06-01）— 下一步：Phase 9 UI Polish**
+**当前阶段：W8 已完成，feat/w8-bullmq-api-worker 待合入 main（2026-06-01）— 下一步：Phase 9 UI Polish**
 
 ---
 
-### 🔄 W8：BullMQ API 拉取 worker（2026-06-01，feat/w8-bullmq-api-worker）
+### ✅ W8：BullMQ API 拉取 worker（2026-06-01，feat/w8-bullmq-api-worker）
 
 **目标：** 让 Partner 配置的 API 类型 JobSource 能按 syncFreq 周期性拉取外部岗位/招聘会数据，复用现有审核/发布/SyncLog 语义。
 
@@ -738,6 +738,7 @@
 | 2026-05-29 | Phase #4+#2 端到端 demo 验证通过 — A：CLI trace 9 步链路（partner1 上传 → admin approve → admin publish → Kiosk 看到）+ 4 条合规红线复测（partner 用 admin 接口 403、未审直接发布 400、candidate 字段注入 400、reject 无 reason 400）；B：API 加 CORS（dev 任意 origin），Kiosk dev server 设 VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3010/api/v1，浏览器访问 http://localhost:5173 → 一体机首页 → 岗位信息列表 → 5 条真后端数据正常渲染（含 demo 注入的 DEMO-2026-001 "AI 算法工程师 @ 某 AI 实验室"），详情页字段映射全部正常 | Claude Code |
 | 2026-06-01 | W3 Partner 数据源管理页三轨入口收口（API / Webhook / Excel）：SourceConnectPanel 走统一服务层 createDataSource()，三种接入方式落同一数据模型；client.ts 新增 API_ORIGIN（基于 VITE_API_BASE_URL 推导），webhookUrl 拼接改为 resolveWebhookUrl() helper，移除 `window.location.origin.replace(':5175', ':3000')` 字符串硬编码；合规边界：只接岗位/招聘会展示字段，Webhook secret 仅一次性显示，credential type=password，导入默认 pending+draft；pnpm --filter partner lint/typecheck/build 全通过（337.16 kB） | Claude Code |
 | 2026-06-01 | W3 端到端 demo 验证（Partner→Webhook→Admin→Kiosk）：12 步链路全过 — partner1 登录 → POST /partner/data-sources(accessMode=webhook, credentialConfigured=true, webhookSecretOnce 一次性返回) → HMAC 签名推送 → admin 登录 → GET /admin/job-sources 见 pending/draft → PATCH review approve(→approved/draft) → PATCH publish(→published) → Kiosk GET /jobs 看到岗位；防重放 401 / 错签名 401 / 候选人字段注入 400 / 后续 GET 不再回显 webhookSecret(credentialConfigured=true 持久标志保留) 全部通过 | Claude Code |
+| 2026-06-01 | W8 BullMQ API pull worker 完成（feat/w8-bullmq-api-worker）：@nestjs/bullmq + bullmq + ioredis 安装；Prisma JobSource 新增 responseConfig String?（migration 20260601110728）；src/job-sync/ 模块 5 文件（types/service/processor/scheduler/controller/module）；Cron 每 30min 调度 due sources（hourly/daily/weekly）；POST /admin/job-sync/sources/:id/trigger（202，JWT+Admin，Throttle 10/min）+ GET 列表；Admin /sync-sources 页面（配置完整性徽章 + 立即同步）；无 REDIS_URL 时 inline setImmediate fallback；BullMQ jobId 去重+inProgress Set 并发保护；$transaction 整批原子；凭证只服务端解密；reviewStatus/publishStatus 更新不覆写；SyncLog 成功/失败记录（api syncMode）；API/Admin/Partner tsc+lint+build ✅，合规禁词 ✅（0 violations） | Claude Code |
 | 2026-06-01 | Phase 7.11 R4 — Partner Sources 类型对齐 packages/shared：①shared/types/job.ts SyncFrequency 加 'weekly'(原 realtime/hourly/daily/manual 不够覆盖 UI 已有 weekly 选项)、新增 ConnStatus / PartnerDataSourceView(DataSourceConfig 的 UI 投影,扁平、只读、不含敏感字段、保留 credentialConfigured + webhookSecretOnce 语义)；②apps/partner types 改为别名 PartnerDataSource = PartnerDataSourceView, CreateDataSourcePayload.authType 用 shared AuthType, 同时把 FieldMappingRule/MappingValidationError/ImportBatch/ImportRecord/DataSourceConfig re-export 出来供 Excel 映射 UI 后续使用；SyncFreq 保留为 @deprecated 别名;③services/api jobs.service.ts PartnerDataSourceDto 对齐 PartnerDataSourceView 字面量(sourceKind/accessMode/syncFreq/connStatus 不再裸 string)，SSOT 注释指向 shared；UI 行为零变化(只是 FREQ_LABELS 增加 realtime 文案兜底)；端到端 demo 复跑通过、forbidden 字段 GET 不回显校验通过；pnpm -r typecheck/lint/build 全通过 | Claude Code |
 
 ---
