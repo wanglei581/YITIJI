@@ -25,43 +25,47 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W8 P1 Redis E2E 验证（feat/w8-redis-e2e-verification，2026-06-01）— 验收后合入 main**
+**当前阶段：W8 P1 Redis E2E 验证 ✅ 完成（2026-06-01，已合入 main）**
 
 ---
 
-### 🔄 W8-P1：Redis E2E 验证（2026-06-01，feat/w8-redis-e2e-verification）
+### ✅ W8-P1：Redis E2E 验证（2026-06-01，feat/w8-redis-e2e-verification → main）
 
 **目标：** 验证 W8 BullMQ API pull worker 在有 REDIS_URL 的真实队列模式下完整可运行。
 
-**问题修复：**
-- `services/api/.env.example` 缺少 `REDIS_URL` 字段（已补全，含说明和 docker 示例命令）
+**真实 Redis 验证结果（2026-06-01 通过）：**
+```
+Redis: redis://localhost:6379
+── Test A: success path
+  ✅ SyncLog.result = success
+  ✅ addedCount = 2
+  ✅ Job records in DB = 2
+  ✅ reviewStatus=pending / publishStatus=draft
+── Test B: failure path (HTTP 503 source)
+  ✅ SyncLog.result = failed
+  ✅ errorDetail set: HTTP_503: Service Unavailable
+  ✅ No Job records written for failed sync
+✅ ALL PASS
+```
 
-**新增文件：**
-- `services/api/scripts/verify-job-sync.ts`：E2E 自动化验证脚本
-  - 启动本地 mock HTTP 服务器（成功源返回 2 条岗位 JSON；失败源返回 503）
-  - 创建测试 Org + 2 个 JobSource（good / bad），指向 mock server
-  - 调用 `JobSyncService.enqueue()` → BullMQ 真实入队（有 Redis）或 inline fallback
-  - 轮询 SyncLog 最长 30s
-  - 验证：`result=success`、`addedCount=2`、`Job.reviewStatus=pending`、`publishStatus=draft`
-  - 验证失败路径：`result=failed`、`errorDetail` 非空、无 Job 写入
-  - 全部清理测试数据
-- `package.json`：新增 `"verify:job-sync"` script
+**Bug 修复（本次 E2E 发现）：**
+1. `services/api/.env.example` 缺少 `REDIS_URL`（已补全）
+2. `JobSyncModule` 未 import `AuthModule`，导致 `JwtAuthGuard`/`RolesGuard` 无法解析（已修复）
+3. BullMQ job ID 不允许包含 `:`，`${sourceId}:manual` → `${sourceId}_manual`（已修复）
+4. ts-node 安装损坏（pnpm store 条目缺 dist/）→ 改用 `@swc-node/register` + `node -r` 方式运行脚本（更快，支持 `emitDecoratorMetadata`）
+5. pnpm-workspace.yaml `@swc/core: set this to true or false` → 改为 `true`
 
-**运行方式（从 `services/api/` 目录）：**
+**脚本运行方式（从 `services/api/` 目录）：**
 ```bash
-# 启动 Redis（本地 docker，一次性）
-docker run -d -p 6379:6379 redis:7-alpine
-
-# 确认 .env 已设置 REDIS_URL=redis://localhost:6379
-# 运行验证
+# 确认 Redis 运行中（本机 brew 已装）：
+brew services start redis
+# 确认 .env 有 REDIS_URL=redis://localhost:6379
 pnpm verify:job-sync
 ```
 
 **验收（2026-06-01）：**
-- API `tsc --noEmit` ✅ / `lint` ✅ / `build` ✅
-- Admin / Partner / Kiosk `tsc` ✅（全局 monorepo）
-- 脚本静态类型正确（ts-node 可执行）
-- 代码审查：success 路径 + failure 路径 + cleanup 全覆盖
+- 真实 Redis `pnpm verify:job-sync` ✅ ALL PASS
+- 全 monorepo `pnpm typecheck` ✅ 无错误
 
 ---
 

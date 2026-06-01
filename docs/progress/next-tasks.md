@@ -1,18 +1,20 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W8-P1 Redis E2E 验证分支 feat/w8-redis-e2e-verification 开发中）  
+> 最后更新：2026-06-01（W8-P1 Redis E2E 验证完成，已合入 main）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W8-P1 Redis E2E 验证进行中）
+## 📌 当前状态（W8-P1 已完成，等待下一步指令）
 
-**W8-P1 feat/w8-redis-e2e-verification（2026-06-01，进行中）：**
-- ✅ 修复：`services/api/.env.example` 补全 `REDIS_URL`（含 docker 启动命令说明）
-- ✅ 新增：`scripts/verify-job-sync.ts` — 自动化 E2E 验证脚本（好源/坏源双路径）
-- ✅ 新增：`package.json` `verify:job-sync` npm script
-- ✅ 全 monorepo typecheck / lint / build 通过
-- ⏳ 真机 Redis 运行验证（需启动 `docker run -d -p 6379:6379 redis:7-alpine` 后执行 `pnpm verify:job-sync`）
+**W8-P1 feat/w8-redis-e2e-verification（2026-06-01，✅ 完成 → 合入 main）：**
+- ✅ 修复：`services/api/.env.example` 补全 `REDIS_URL`
+- ✅ 修复：`JobSyncModule` 缺 `AuthModule` import → `JwtAuthGuard`/`RolesGuard` 无法解析
+- ✅ 修复：BullMQ jobId 不允许冒号 → `${sourceId}:manual` → `${sourceId}_manual`
+- ✅ 修复：ts-node pnpm store 损坏 → 改 `@swc-node/register` + `node -r` 方式（支持 emitDecoratorMetadata）
+- ✅ 修复：`pnpm-workspace.yaml` `@swc/core: true`
+- ✅ 真实 Redis E2E `pnpm verify:job-sync` → ✅ ALL PASS
+- ✅ 全 monorepo `pnpm typecheck` ✅
 
 **W8 feat/w8-bullmq-api-worker 已完成（2026-06-01）**：
 - ✅ `@nestjs/bullmq` + `bullmq` + `ioredis` 安装；REDIS_URL 缺失时 inline fallback，API 正常启动

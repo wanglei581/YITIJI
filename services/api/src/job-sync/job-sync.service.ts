@@ -91,7 +91,7 @@ export class JobSyncService {
    */
   async enqueue(sourceId: string, manual: boolean): Promise<string | null> {
     if (this.queue) {
-      const jobId = manual ? `${sourceId}:manual` : sourceId
+      const jobId = manual ? `${sourceId}_manual` : sourceId
       const bullJob = await this.queue.add(
         JOB_SYNC_JOB_NAME,
         { sourceId, manual } satisfies ApiSyncJobData,

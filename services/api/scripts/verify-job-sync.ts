@@ -166,10 +166,10 @@ async function main() {
       const jobs = await prisma.job.findMany({ where: { sourceId: goodSourceId } })
       const allPending = jobs.every((j) => j.reviewStatus === 'pending' && j.publishStatus === 'draft')
 
-      if (goodLog.result === 'success')            pass(`SyncLog.result = success`)                    else fail(`SyncLog.result = ${goodLog.result} (expected success)`)
-      if (goodLog.addedCount === MOCK_JOBS.length) pass(`addedCount = ${goodLog.addedCount}`)          else fail(`addedCount = ${goodLog.addedCount} (expected ${MOCK_JOBS.length})`)
-      if (jobs.length === MOCK_JOBS.length)        pass(`Job records in DB = ${jobs.length}`)          else fail(`Job records = ${jobs.length} (expected ${MOCK_JOBS.length})`)
-      if (allPending)                              pass(`reviewStatus=pending / publishStatus=draft`)   else fail(`Some jobs NOT in pending/draft state`)
+      if (goodLog.result === 'success') { pass('SyncLog.result = success') } else { fail(`SyncLog.result = ${goodLog.result} (expected success)`) }
+      if (goodLog.addedCount === MOCK_JOBS.length) { pass(`addedCount = ${goodLog.addedCount}`) } else { fail(`addedCount = ${goodLog.addedCount} (expected ${MOCK_JOBS.length})`) }
+      if (jobs.length === MOCK_JOBS.length) { pass(`Job records in DB = ${jobs.length}`) } else { fail(`Job records = ${jobs.length} (expected ${MOCK_JOBS.length})`) }
+      if (allPending) { pass('reviewStatus=pending / publishStatus=draft') } else { fail('Some jobs NOT in pending/draft state') }
     }
 
     // ── 6. Test B: failure path ───────────────────────────────────────────────
@@ -185,11 +185,11 @@ async function main() {
     } else {
       info(`SyncLog: result=${badLog.result} errorDetail=${badLog.errorDetail ?? 'none'}`)
 
-      if (badLog.result === 'failed') pass(`SyncLog.result = failed`)                                   else fail(`SyncLog.result = ${badLog.result} (expected failed)`)
-      if (badLog.errorDetail)        pass(`errorDetail set: ${badLog.errorDetail.slice(0, 60)}`)        else fail(`errorDetail missing for failed sync`)
+      if (badLog.result === 'failed') { pass('SyncLog.result = failed') } else { fail(`SyncLog.result = ${badLog.result} (expected failed)`) }
+      if (badLog.errorDetail) { pass(`errorDetail set: ${badLog.errorDetail.slice(0, 60)}`) } else { fail('errorDetail missing for failed sync') }
 
       const jobs = await prisma.job.findMany({ where: { sourceId: badSourceId } })
-      if (jobs.length === 0) pass(`No Job records written for failed sync`) else fail(`Unexpected Job records: ${jobs.length}`)
+      if (jobs.length === 0) { pass('No Job records written for failed sync') } else { fail(`Unexpected Job records: ${jobs.length}`) }
     }
 
   } finally {

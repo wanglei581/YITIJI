@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { BullModule } from '@nestjs/bullmq'
 import { PrismaModule } from '../prisma/prisma.module'
+import { AuthModule } from '../auth/auth.module'
 import { JOB_SYNC_QUEUE } from './job-sync.types'
 import { JobSyncService } from './job-sync.service'
 import { JobSyncScheduler } from './job-sync.scheduler'
@@ -21,6 +22,7 @@ const redisUrl = process.env['REDIS_URL']
 @Module({
   imports: [
     PrismaModule,
+    AuthModule,
     ...(redisUrl
       ? [BullModule.registerQueue({ name: JOB_SYNC_QUEUE })]
       : []),
