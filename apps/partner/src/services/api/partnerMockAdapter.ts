@@ -1,5 +1,6 @@
 import type {
   PartnerDataSource,
+  CreateDataSourcePayload,
   PartnerJobRecord,
   PartnerFairRecord,
   PartnerSyncLog,
@@ -79,12 +80,22 @@ export const partnerMockAdapter = {
     )
     return DATA_SOURCES.find((s) => s.id === id)!
   },
-  async createDataSource(name: string): Promise<PartnerDataSource> {
+  async createDataSource(payload: CreateDataSourcePayload): Promise<PartnerDataSource> {
     await delay()
+    const accessMode = payload.accessMode ?? 'excel'
+    const id = `ds${Date.now()}`
     const newSource: PartnerDataSource = {
-      id: `ds${Date.now()}`, name, sourceKind: 'manual', accessMode: 'excel', syncFreq: 'manual',
+      id,
+      name: payload.name,
+      sourceKind: payload.sourceKind ?? 'manual',
+      accessMode,
+      syncFreq: payload.syncFreq ?? 'manual',
       lastSyncTime: '刚刚', connStatus: 'connected', successCount: 0, failCount: 0,
-      description: '新建 Excel 数据源，导入批次待管理员审核',
+      description: payload.description ?? (accessMode === 'webhook' ? '等待外部系统推送岗位数据' : accessMode === 'api' ? '等待 API 连接测试' : '新建 Excel 数据源，导入批次待管理员审核'),
+      credentialConfigured: Boolean(payload.credential) || accessMode === 'webhook',
+      endpoint: payload.endpoint,
+      webhookUrl: accessMode === 'webhook' ? `/api/v1/sync/webhook?source=${id}` : undefined,
+      webhookSecretOnce: accessMode === 'webhook' ? 'mock_webhook_secret_only_once' : undefined,
     }
     DATA_SOURCES = [...DATA_SOURCES, newSource]
     return newSource

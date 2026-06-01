@@ -3,18 +3,19 @@ import { partnerMockAdapter } from './partnerMockAdapter'
 import { partnerHttpAdapter } from './partnerHttpAdapter'
 import type {
   PartnerDataSource,
+  CreateDataSourcePayload,
   ConnStatus,
   SyncFreq,
   SourceKind,
   AccessMode,
 } from './types'
 
-export type { PartnerDataSource, ConnStatus, SyncFreq, SourceKind, AccessMode }
+export type { PartnerDataSource, CreateDataSourcePayload, ConnStatus, SyncFreq, SourceKind, AccessMode }
 
 export interface PartnerDataSourceServiceInterface {
   getDataSources(): Promise<PartnerDataSource[]>
   toggleDataSource(id: string): Promise<PartnerDataSource>
-  createDataSource(name: string): Promise<PartnerDataSource>
+  createDataSource(payload: CreateDataSourcePayload): Promise<PartnerDataSource>
 }
 
 const adapter: PartnerDataSourceServiceInterface =
@@ -22,4 +23,4 @@ const adapter: PartnerDataSourceServiceInterface =
 
 export const getDataSources    = ()           => adapter.getDataSources()
 export const toggleDataSource  = (id: string) => adapter.toggleDataSource(id)
-export const createDataSource  = (name: string) => adapter.createDataSource(name)
+export const createDataSource  = (payload: CreateDataSourcePayload) => adapter.createDataSource(payload)

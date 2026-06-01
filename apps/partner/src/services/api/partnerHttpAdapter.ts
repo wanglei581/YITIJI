@@ -8,6 +8,7 @@ import type {
   ImportJobItem,
   ImportFairItem,
   ImportResult,
+  CreateDataSourcePayload,
 } from './types'
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -84,13 +85,8 @@ export const partnerHttpAdapter = {
     get<PartnerDataSource[]>('/partner/data-sources'),
   toggleDataSource: (id: string) =>
     patch<PartnerDataSource>(`/partner/data-sources/${id}/toggle`, {}),
-  createDataSource: (name: string) =>
-    post<PartnerDataSource>('/partner/data-sources', {
-      name,
-      sourceKind: 'manual',
-      accessMode: 'excel',
-      syncFreq: 'manual',
-    }),
+  createDataSource: (payload: CreateDataSourcePayload) =>
+    post<PartnerDataSource>('/partner/data-sources', payload),
 
   // Jobs
   getPartnerJobs: () =>

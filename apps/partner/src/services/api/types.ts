@@ -33,6 +33,21 @@ export interface PartnerDataSource {
   successCount: number
   failCount: number
   description: string
+  credentialConfigured?: boolean
+  endpoint?: string
+  webhookUrl?: string
+  webhookSecretOnce?: string
+}
+
+export interface CreateDataSourcePayload {
+  name: string
+  sourceKind?: SourceKind
+  accessMode?: AccessMode
+  syncFreq?: SyncFreq
+  description?: string
+  endpoint?: string
+  authType?: 'bearer' | 'oauth2' | 'api_key' | 'basic' | 'custom'
+  credential?: string
 }
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────

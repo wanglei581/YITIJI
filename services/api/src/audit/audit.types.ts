@@ -24,6 +24,8 @@ export type AuditAction =
   | 'fair.review'
   | 'fair.publish'
   | 'fair.import'
+  | 'data_source.create'
+  | 'data_source.toggle'
   | 'resume.parse_submitted'
   | 'resume.optimize_requested'
   | 'assistant.chat_message'
