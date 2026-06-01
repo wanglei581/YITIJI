@@ -1,24 +1,21 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W5 企业详情页增强第一阶段完成）  
+> 最后更新：2026-06-01（W5 第二阶段打印接入完成）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W5 第一阶段完成，分支 feat/w5-enterprise-showcase）
+## 📌 当前状态（W5 第二阶段完成，分支 feat/w5-enterprise-showcase）
 
 **W5 第一阶段已完成（2026-06-01）**：
-- ✅ `/job-fairs/:id/companies/:companyId` 企业详情页全面增强
-- ✅ 荣誉标签（中国500强 / 世界500强 / 高新技术企业 / 专精特新）
-- ✅ 企业信息卡（成立年份 / 总部 / 注册资本 / 可展开简介）
-- ✅ 四操作按钮：扫码投递 / 去来源平台投递 / 打印企业资料 / 打印岗位清单
-- ✅ 岗位筛选（城市 / 学历 / 经验 / 岗位类型）+ 清除筛选
-- ✅ 列表 ↔ 海报视图切换
-- ✅ 类型扩展（shared DTO + kiosk 本地类型 + mock 数据）
-- ✅ 合规验收全部通过
+- ✅ `/job-fairs/:id/companies/:companyId` 企业详情页全面增强（荣誉标签 / 信息卡 / 筛选 / 列表↔海报 / 合规按钮）
 
-**W5 第二阶段（进行中）**：
-- [x] **打印企业资料 / 打印岗位清单接入真实打印流程**（2026-06-01 完成，全链路复用现有 Preview→Confirm→Progress→Done）
+**W5 第二阶段已完成（2026-06-01）**：
+- ✅ 打印企业资料 / 打印岗位清单按钮接入 Kiosk 打印 UI 全链路（Preview→Confirm→Progress→Done）
+- ✅ 打印完成后可通过 returnUrl 返回企业详情页
+
+**W5 后续 TODO（待开独立任务）**：
+- [ ] 接入真实打印后端：`/api/v1/print/jobs` 或 Terminal Agent print task（当前 PrintProgressPage 仍为前端模拟）
 - [ ] 企业宣传视频播放支持（当前为渐变封面占位）
 - [ ] FairStatsPage 数据接真实展会统计
 - [ ] 招聘会详情页增强：展位导览图点击弹出企业预览

@@ -29,7 +29,9 @@
 
 ---
 
-### ✅ W5 第二阶段：打印企业资料 / 打印岗位清单接入真实打印流程（2026-06-01）
+### ✅ W5 第二阶段：打印企业资料 / 打印岗位清单按钮接入 Kiosk 打印 UI 流程（2026-06-01）
+
+**Commit：** `ff84d4a` feat(w5): wire print profile/positions buttons to kiosk print flow
 
 **改动文件：**
 - `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx`
@@ -39,8 +41,10 @@
 - `FairCompanyDetailPage` 中 `ActionBar` 新增 `onPrintProfile` / `onPrintPositions` prop
 - 点击"打印企业资料"：构造虚拟 `PrintFile`（名称=`企业名_企业资料.pdf`，页数=`1 + ceil(岗位数/8)`），携带 `returnUrl`/`returnLabel` state，navigate 到 `/print/preview`
 - 点击"打印岗位清单"：构造虚拟 `PrintFile`（名称=`企业名_岗位清单.pdf`，页数=`ceil(岗位数/4)`），携带 `returnUrl`/`returnLabel` state，navigate 到 `/print/preview`
-- `PrintDonePage` 新增 `returnUrl`/`returnLabel` 字段支持：打印成功后显示"返回{企业名}"按钮，替代默认"继续打印"；未携带 returnUrl 时行为不变
-- 全链路复用现有 Preview → Confirm → Progress → Done 打印流程，无新增路由和打印 UI
+- 点击后进入完整打印 UI 链路：`/print/preview` → `/print/confirm` → `/print/progress` → `/print/done`
+- `PrintDonePage` 新增 `returnUrl`/`returnLabel` 字段支持：打印成功后显示"返回{企业名}"按钮，替代默认"继续打印"；无 returnUrl 时行为不变
+
+> **注意：** `PrintProgressPage` 当前仍为前端模拟进度（submitting → queuing → printing 动画），**尚未接入真实后端打印任务 API**（`/api/v1/print/jobs`）或 Terminal Agent print task。接入真实 API 为后续独立任务。
 
 **合规验证（2026-06-01）：**
 - 禁词扫描 ✅（0 violations）
@@ -50,6 +54,7 @@
 - Kiosk `tsc --noEmit` ✅（0 errors）
 - Kiosk `eslint` ✅（0 warnings）
 - Kiosk `build` ✅（1.36s）
+- 合规禁词扫描 ✅（0 violations）
 
 ---
 
