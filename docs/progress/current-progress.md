@@ -25,11 +25,49 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 9.1 Kiosk UI Polish（feat/phase9-kiosk-ui-polish，2026-06-01）**
+**当前阶段：Phase 9.2 轻量 SVG 数字人引导员（feat/phase9-digital-human，2026-06-01）**
 
 ---
 
-### 🔄 Phase 9.1：Kiosk UI Polish（2026-06-01，feat/phase9-kiosk-ui-polish）
+### 🔄 Phase 9.2：轻量 SVG 数字人引导员（2026-06-01，feat/phase9-digital-human）
+
+**目标：** 在 AI 助手页集成轻量 2D 数字人引导员，增强一体机引导体验。不做 3D/VRM，不新增语音/摄像头。
+
+**合规约束（本阶段必须遵守）：**
+- 数字人角色：求职服务引导员，不做招聘官、不做候选人筛选
+- 不新增语音输入/摄像头/生物特征采集
+- 不新增 WebGL / VRM / three.js 等重型依赖
+- actions 路由仍经过 `isAllowedRoute` 白名单过滤
+
+**实现说明：**
+- 实现方式：纯 SVG + CSS `@keyframes` 动画，无第三方依赖（仅 react）
+- 当前为纯 2D 轻量实现，不是 3D/VRM
+- 状态机：`idle`（待机，呼吸动画）/ `talking`（说话嘴型 + 脉冲光晕）/ `greeting`（挥手点头，3 秒后归 idle）
+
+**新增文件：**
+- `apps/kiosk/src/components/DigitalHuman.tsx`（276 行，commit `ed7fdf3`）
+
+**修改文件：**
+- `apps/kiosk/src/pages/assistant/AssistantPage.tsx`（commit `5ea16a7`）
+  - 上半区：数字人 SVG + SpeechBubble 显示最新 AI 回复（截断 80 字）
+  - 中部：最新 AI 消息的快捷操作按钮（`isAllowedRoute` 过滤不变）
+  - 下半区：对话历史（移除逐条 BotAvatar，简化 ChatBubble）
+  - 状态联动：发送→talking；收到→idle；首次进入→greeting
+
+**bundle 体积：** 889KB（与 Phase 9.1 完全一致，SVG 内联，无额外网络请求）
+
+**验收（2026-06-01）：**
+- `pnpm --filter ./apps/kiosk typecheck` ✅
+- `pnpm --filter ./apps/kiosk lint` ✅
+- `pnpm --filter ./apps/kiosk build` ✅
+- 合规禁词扫描：仅 line 11 注释（合规约束说明，非渲染内容）✅
+- `isAllowedRoute` 白名单：保留（line 122）✅
+- 合规声明："内容仅供参考"/"不构成正式建议"：保留（两处）✅
+- 新依赖：无（`DigitalHuman.tsx` 仅 import react）✅
+
+---
+
+### ✅ Phase 9.1：Kiosk UI Polish（2026-06-01，feat/phase9-kiosk-ui-polish）
 
 **目标：** 优化 Kiosk 前台 UI 一致性、视觉层级和触控友好度。不改业务逻辑，不改合规边界。
 

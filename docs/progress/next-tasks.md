@@ -1,13 +1,21 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（Phase 9.1 Kiosk UI Polish 进行中，feat/phase9-kiosk-ui-polish）  
+> 最后更新：2026-06-01（Phase 9.2 轻量 SVG 数字人引导员，feat/phase9-digital-human）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（Phase 9.1 Kiosk UI Polish 进行中）
+## 📌 当前状态（Phase 9.2 轻量 SVG 数字人引导员）
 
-**Phase 9.1 feat/phase9-kiosk-ui-polish（2026-06-01，进行中）：**
+**Phase 9.2 feat/phase9-digital-human（2026-06-01，进行中，待合入 main）：**
+- ✅ `apps/kiosk/src/components/DigitalHuman.tsx`：纯 SVG + CSS 动画，idle/talking/greeting 三状态
+- ✅ `apps/kiosk/src/pages/assistant/AssistantPage.tsx`：上半区数字人+气泡，下半区对话历史
+- ✅ 无新依赖（仅 react），无 WebGL/VRM/three.js，bundle 体积与 Phase 9.1 一致（889KB）
+- ✅ `isAllowedRoute` 白名单保留，合规声明保留，无招聘闭环词
+- ✅ typecheck ✅ / lint ✅ / build ✅ / 合规扫描 ✅
+- ⏳ 待 review 后 FF merge 到 main
+
+**Phase 9.1 feat/phase9-kiosk-ui-polish（2026-06-01，✅ 已合入 main `b60fd8f`）：**
 - ✅ KioskLayout Tab 激活背景高亮
 - ✅ HomePage section 标题可读性、次级卡片差异化图标、AI助手触控按钮
 - ✅ JobsPage/JobFairsPage 共享 LoadingState/ErrorState/EmptyState + retry + filter pill 高度
