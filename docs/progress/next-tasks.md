@@ -1,7 +1,21 @@
 # 下一步任务
 
-> 最后更新：2026-05-29（Phase 8 全部封板，Mac 真实后端跨机 E2E 验证通过）  
+> 最后更新：2026-06-01（W3 Partner 数据源管理页三轨入口收口完成）  
 > 关联文档：[current-progress.md](./current-progress.md)
+
+---
+
+## 📌 当前状态（W3 收口）
+
+**已完成**：
+- ✅ W3 后端：JobSource 加凭证 + Webhook 接收端（HMAC + 5min 时间窗 + nonce 防重放 + AES-256-GCM 加密落库）— commit `e3d4629`
+- ✅ W3 前端：Partner /sources 页三轨入口（API / Webhook / Excel）走统一服务层 createDataSource() — commit `868b25d`（API_ORIGIN helper 替换 `:5175→:3000` 硬编码）
+- ✅ E2E smoke：登录 → 创建 webhook 源 → HMAC 签名推送 → 防重放 → 错签名 → audit 链全过
+
+**下一步候选**：
+- **Phase 7.11 R4** — Partner Sources 类型对齐（DisplaySource → DataSourceConfig 完整迁移）
+- W3 续做：BullMQ API 拉取 + Excel 字段映射 service 层接入
+- 把 W1 PR #1 / W2 / W3 三条 stacked 分支合掉
 
 ---
 
