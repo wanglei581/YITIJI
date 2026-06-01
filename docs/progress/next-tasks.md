@@ -1,11 +1,18 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W8 完成并收尾，feat/w8-bullmq-api-worker 待 FF 合入 main）  
+> 最后更新：2026-06-01（W8-P1 Redis E2E 验证分支 feat/w8-redis-e2e-verification 开发中）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W8 BullMQ API pull worker 已完成）
+## 📌 当前状态（W8-P1 Redis E2E 验证进行中）
+
+**W8-P1 feat/w8-redis-e2e-verification（2026-06-01，进行中）：**
+- ✅ 修复：`services/api/.env.example` 补全 `REDIS_URL`（含 docker 启动命令说明）
+- ✅ 新增：`scripts/verify-job-sync.ts` — 自动化 E2E 验证脚本（好源/坏源双路径）
+- ✅ 新增：`package.json` `verify:job-sync` npm script
+- ✅ 全 monorepo typecheck / lint / build 通过
+- ⏳ 真机 Redis 运行验证（需启动 `docker run -d -p 6379:6379 redis:7-alpine` 后执行 `pnpm verify:job-sync`）
 
 **W8 feat/w8-bullmq-api-worker 已完成（2026-06-01）**：
 - ✅ `@nestjs/bullmq` + `bullmq` + `ioredis` 安装；REDIS_URL 缺失时 inline fallback，API 正常启动
@@ -56,8 +63,9 @@
 ## 🔜 下一步优先级
 
 ### P0（立即）
-1. **合并 feat/w8-bullmq-api-worker → main**：push + FF merge
-   - 合入后在有 Redis 的环境验证一次 end-to-end：Admin 触发 → BullMQ queue → Processor → Partner SyncLog 可见
+1. **W8-P1 完成验证后合入 main**：`pnpm verify:job-sync` 通过后 FF merge
+   - 需要本地 Redis：`docker run -d -p 6379:6379 redis:7-alpine` + `.env` 中设置 `REDIS_URL=redis://localhost:6379`
+   - 验收链：Admin 触发 → BullMQ 入队 → processor 执行 → Job pending/draft 落库 → Partner SyncLog 可见 → 失败源写 failed+errorDetail
 
 2. **Phase 9 UI Polish + AI 数字人引导员**（独立分支）
    - 静态 3D 就业引导员（VRM + WebGL fallback）

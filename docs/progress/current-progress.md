@@ -25,7 +25,43 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W8 已完成，feat/w8-bullmq-api-worker 待合入 main（2026-06-01）— 下一步：Phase 9 UI Polish**
+**当前阶段：W8 P1 Redis E2E 验证（feat/w8-redis-e2e-verification，2026-06-01）— 验收后合入 main**
+
+---
+
+### 🔄 W8-P1：Redis E2E 验证（2026-06-01，feat/w8-redis-e2e-verification）
+
+**目标：** 验证 W8 BullMQ API pull worker 在有 REDIS_URL 的真实队列模式下完整可运行。
+
+**问题修复：**
+- `services/api/.env.example` 缺少 `REDIS_URL` 字段（已补全，含说明和 docker 示例命令）
+
+**新增文件：**
+- `services/api/scripts/verify-job-sync.ts`：E2E 自动化验证脚本
+  - 启动本地 mock HTTP 服务器（成功源返回 2 条岗位 JSON；失败源返回 503）
+  - 创建测试 Org + 2 个 JobSource（good / bad），指向 mock server
+  - 调用 `JobSyncService.enqueue()` → BullMQ 真实入队（有 Redis）或 inline fallback
+  - 轮询 SyncLog 最长 30s
+  - 验证：`result=success`、`addedCount=2`、`Job.reviewStatus=pending`、`publishStatus=draft`
+  - 验证失败路径：`result=failed`、`errorDetail` 非空、无 Job 写入
+  - 全部清理测试数据
+- `package.json`：新增 `"verify:job-sync"` script
+
+**运行方式（从 `services/api/` 目录）：**
+```bash
+# 启动 Redis（本地 docker，一次性）
+docker run -d -p 6379:6379 redis:7-alpine
+
+# 确认 .env 已设置 REDIS_URL=redis://localhost:6379
+# 运行验证
+pnpm verify:job-sync
+```
+
+**验收（2026-06-01）：**
+- API `tsc --noEmit` ✅ / `lint` ✅ / `build` ✅
+- Admin / Partner / Kiosk `tsc` ✅（全局 monorepo）
+- 脚本静态类型正确（ts-node 可执行）
+- 代码审查：success 路径 + failure 路径 + cleanup 全覆盖
 
 ---
 
