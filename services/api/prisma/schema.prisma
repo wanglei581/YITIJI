@@ -162,6 +162,13 @@ model JobSource {
   webhookSecret       String?
   /** Webhook 密钥上次轮换时间,审计用 */
   webhookSecretRotatedAt DateTime?
+  /** W8 API pull worker 响应解析配置(JSON)。
+   *  { dataType:'job'|'fair', rootPath?:string, fields?:Record<string,string> }
+   *  rootPath: 点分路径到数据数组,如 "data.jobs"、"items"，空则 auto-detect。
+   *  fields: 标准字段 → 源字段名映射，如 { "externalId":"id","title":"position" }。
+   *  为 null 时按 auto-detect 逻辑处理(源字段名与标准字段名相同)。
+   */
+  responseConfig String?
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

@@ -25,7 +25,58 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：fix/w4-excel-import-integrity — Excel 导入闭环 5 项安全修复（2026-06-01）— 下一步：BullMQ worker**
+**当前阶段：feat/w8-bullmq-api-worker — BullMQ API 拉取 worker（2026-06-01）— 下一步：Phase 9 UI Polish**
+
+---
+
+### 🔄 W8：BullMQ API 拉取 worker（2026-06-01，feat/w8-bullmq-api-worker）
+
+**目标：** 让 Partner 配置的 API 类型 JobSource 能按 syncFreq 周期性拉取外部岗位/招聘会数据，复用现有审核/发布/SyncLog 语义。
+
+**基础设施：**
+- `@nestjs/bullmq` + `bullmq` + `ioredis` 安装至 `services/api`
+- `REDIS_URL` 已在 `.env.example` 存在；无 Redis 时 API 仍正常启动（fallback inline 模式）
+- Prisma `JobSource` 新增 `responseConfig String?` 字段（migration `20260601110728`）
+- `pnpm-workspace.yaml` 追加 `msgpackr-extract: true`
+
+**新模块 `src/job-sync/`（5 个文件）：**
+- `job-sync.types.ts`：`JOB_SYNC_QUEUE`、`ApiSyncJobData`、`JobSourceResponseConfig`、`SyncStats`、`SYNC_FREQ_THRESHOLD_MS`
+- `job-sync.service.ts`：HTTP fetch + 凭证解密 + 响应解析 + 批内 externalId 去重 + Prisma.$transaction upsert + SyncLog + lastSyncAt 更新；支持 Job/JobFair 双类型
+- `job-sync.processor.ts`：BullMQ Processor（有 Redis 时激活）
+- `job-sync.scheduler.ts`：@Cron('0 */30 * * * *') 每 30 分钟调度 due sources
+- `job-sync.controller.ts`：Admin only — `POST /admin/job-sync/sources/:id/trigger`（202+限流）、`GET /admin/job-sync/sources`
+- `job-sync.module.ts`：条件注册 BullMQ（有 REDIS_URL）；无 Redis 时 service.enqueue() 走 setImmediate 直接执行
+
+**AppModule 变更：**
+- 导入 `BullModule.forRoot(parseRedisConnection(REDIS_URL))` + `JobSyncModule`（均条件注册）
+
+**Admin 前端新页面 `/sync-sources`：**
+- 列出所有 accessMode=api 的数据源：syncFreq、lastSyncAt、lastSyncStatus、配置完整性（URL/凭证/映射）
+- "立即同步"按钮调用 `POST /admin/job-sync/sources/:id/trigger`
+- mock 模式下模拟触发；http 模式下真实调用
+
+**安全与可靠性：**
+- 同一 sourceId：有 Redis 时 BullMQ jobId 去重（非 manual 用 sourceId 为 jobId）；无 Redis 时 inProgress Set 防重入
+- 敏感字段：源 API 响应中出现敏感列名只记 warn 日志不 reject（因 API pull 走白名单字段映射，非敏感列自动忽略）
+- 凭证只在服务端解密，`decryptSecret()` 失败立即 failed SyncLog
+- HTTP 4xx/5xx/timeout 区分错误码写入 SyncLog.errorDetail
+- 整批 $transaction：任一 upsert 失败 → 回滚 + failed SyncLog
+- retry: 非 manual 最多 3 次，exponential backoff 1min/4min
+- `reviewStatus / publishStatus` 更新时不覆写，防绕过审核
+
+**responseConfig 格式：**
+```json
+{ "dataType": "job", "rootPath": "data.jobs", "fields": { "externalId": "id", "title": "position" } }
+```
+- `rootPath` 为空时 auto-detect（jobs/items/data/results/list/records）
+- `fields` 为空时字段名与标准字段名一致（externalId/title/company/city/sourceUrl/salary/description/requirements/tags）
+
+**验收（2026-06-01）：**
+- API `tsc --noEmit` ✅ / `lint` ✅ / `build` ✅
+- Admin `tsc --noEmit` ✅ / `lint` ✅ / `build` ✅（419KB）
+- Partner `tsc --noEmit` ✅ / `lint` ✅ / `build` ✅（349KB）
+- 合规禁词扫描 ✅（0 violations）
+- API 启动时无 REDIS_URL 不 crash（inline fallback）
 
 ---
 

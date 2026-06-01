@@ -2,16 +2,30 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+import { BullModule } from '@nestjs/bullmq'
 import { AiModule } from './ai/ai.module'
 import { AuditModule } from './audit/audit.module'
 import { AuthModule } from './auth/auth.module'
 import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
+import { JobSyncModule } from './job-sync/job-sync.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
+
+function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
+  const u = new URL(url)
+  return {
+    host: u.hostname || 'localhost',
+    port: u.port ? parseInt(u.port, 10) : 6379,
+    password: u.password || undefined,
+    db: u.pathname && u.pathname.length > 1 ? parseInt(u.pathname.slice(1), 10) || 0 : 0,
+  }
+}
+
+const redisUrl = process.env['REDIS_URL']
 
 @Module({
   imports: [
@@ -22,6 +36,10 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
     ]),
     // BE-1 文件清理 cron 依赖 ScheduleModule 在根模块初始化。
     ScheduleModule.forRoot(),
+    // BullMQ root config：有 REDIS_URL 时注册，否则跳过（JobSyncModule 自行处理）。
+    ...(redisUrl
+      ? [BullModule.forRoot({ connection: parseRedisConnection(redisUrl) })]
+      : []),
     PrismaModule,
     // AuditModule 必须在 FilesModule / JobsModule 之前,
     // @Global() 让 AuditService 被任意业务模块自动注入。
@@ -30,6 +48,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
     AiModule,
     FilesModule,
     JobsModule,
+    JobSyncModule,
     SyncModule,
     TerminalsModule,
     PrintJobsModule,

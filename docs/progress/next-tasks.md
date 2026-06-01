@@ -1,11 +1,24 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（fix/w4-excel-import-integrity 完成，待合入 main；BullMQ worker 暂缓）  
+> 最后更新：2026-06-01（W8 BullMQ API pull worker 完成，待合入 main）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（fix/w4-excel-import-integrity 已完成）
+## 📌 当前状态（W8 BullMQ API pull worker 已完成）
+
+**W8 feat/w8-bullmq-api-worker 已完成（2026-06-01）**：
+- ✅ `@nestjs/bullmq` + `bullmq` + `ioredis` 安装；REDIS_URL 缺失时 inline fallback，API 正常启动
+- ✅ Prisma JobSource 新增 `responseConfig String?`（migration applied）
+- ✅ `src/job-sync/` 模块：service/processor/scheduler/controller/module 5 文件
+- ✅ `POST /admin/job-sync/sources/:id/trigger`（Admin only，JWT+Roles，Throttle 10/min）
+- ✅ `GET /admin/job-sync/sources`（Admin only，列出 API 模式源 + 同步状态）
+- ✅ Admin `/sync-sources` 页面：列表 + "立即同步"按钮
+- ✅ Cron 每 30 min 调度 due sources（hourly/daily/weekly）
+- ✅ BullMQ jobId 去重（非 manual 用 sourceId）；$transaction 整批保证原子性
+- ✅ 失败区分：CREDENTIAL_DECRYPT_FAILED / HTTP_4xx / REQUEST_TIMEOUT / NETWORK_ERROR
+- ✅ SyncLog 写入（api syncMode）：Partner 可在同步日志页看到
+- ✅ 凭证只在服务端解密；审核/发布状态更新时不覆写
 
 **fix/w4-excel-import-integrity 已完成（2026-06-01）**：
 - ✅ Fix 1：rawDataJson 不再存整行原始数据（固定 `'{}'`）+ 一次性清理脚本
@@ -43,16 +56,11 @@
 ## 🔜 下一步优先级
 
 ### P0（立即）
-1. **合并 fix/w4-excel-import-integrity → main**：push + FF merge
-   - 清理脚本已修正（libsql adapter，不再依赖旧 `@prisma/client` 导入）
-   - 运行方式：`cd services/api && DATABASE_URL=<prod-url> ts-node scripts/clear-import-rawdata.ts`
-   - dev DB 已执行：0 条记录，生产合入后再执行一次
+1. **合并 feat/w8-bullmq-api-worker → main**：push + FF merge
+   - 合入后在有 Redis 的环境验证一次 end-to-end：Admin 触发 → Partner SyncLog 可见
+   - responseConfig 后续可扩展：为每个 API source 配置字段映射规则
 
-2. **BullMQ API 拉取 worker**（独立分支，`feat/w8-bullmq-api-worker`）
-   - W3 已完成：`JobSource.encryptedCredential` 落库、`GET /partner/sources/:id/endpoint` 可读
-   - 待开发：worker 周期性拉取外部岗位/招聘会数据，写入 ExternalJob，触发审核流程
-
-3. **Phase 9 UI Polish + AI 数字人引导员**（独立分支）
+2. **Phase 9 UI Polish + AI 数字人引导员**（独立分支）
    - 静态 3D 就业引导员（VRM + WebGL fallback）
    - Kiosk 首页视觉升级
    - TTS 语音引导（Phase 9.2 择期）
