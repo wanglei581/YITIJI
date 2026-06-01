@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import type {
   FileMetadata,
@@ -8,6 +8,7 @@ import type {
   SignedUrlResponse,
   FileCleanupResponse,
 } from './file.types'
+import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { FILE_DEFAULT_TTL_HOURS } from './file.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { LocalFileStorage } from './storage'
@@ -117,13 +118,29 @@ export class FilesService {
 
   // ── 二次签名(已有 fileId) ───────────────────────────────────────────────
 
-  async getSignedUrl(fileId: string): Promise<SignedUrlResponse> {
+  /**
+   * 重新签名文件 URL，同时执行归属校验：
+   *   - admin  → 可访问任意文件
+   *   - 其他角色 → uploaderId 必须等于 user.userId（只能访问自己上传的文件）
+   *
+   * 匿名 Kiosk 上传（uploaderId = null）无法通过此端点二次签名；
+   * 应在上传响应的 signedUrl 有效期内直接使用。
+   */
+  async getSignedUrl(fileId: string, user: AuthedUser): Promise<SignedUrlResponse> {
     const record = await this.requireAlive(fileId)
+
+    if (user.role !== 'admin' && record.uploaderId !== user.userId) {
+      throw new ForbiddenException({
+        error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
+      })
+    }
+
     const signed = signFileUrl(record.id)
     return {
       fileId: record.id,
       signedUrl: signed.url,
       expiresAt: signed.expiresAt.toISOString(),
+      purpose: record.purpose as FilePurpose,
     }
   }
 

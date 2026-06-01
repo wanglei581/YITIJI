@@ -29,7 +29,21 @@
 //   PATCH /partner/data-sources/:id/toggle — 启停数据源
 // ============================================================
 
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { JobsService } from './jobs.service'
 import { ReviewActionDto } from './dto/review.dto'
 import { PublishActionDto } from './dto/publish.dto'
@@ -40,6 +54,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { ImportFairsDto } from './dto/import-fairs.dto'
 import { CreateDataSourceDto } from './dto/data-source.dto'
+// ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 @Controller()
 export class JobsController {
@@ -238,5 +253,90 @@ export class JobsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.jobsService.unpublishPartnerFair(id, user)
+  }
+
+  // ── Partner sync logs ────────────────────────────────────────────────────────
+
+  @Get('partner/sync-logs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerSyncLogs(@CurrentUser() user: AuthedUser) {
+    return this.jobsService.getPartnerSyncLogs(user)
+  }
+
+  // ── Partner Excel import ─────────────────────────────────────────────────────
+  //
+  //   POST /partner/excel/parse    multipart file → columns + sampleRows (stateless)
+  //   POST /partner/excel/preview  multipart file + mapping → ImportBatch + preview
+  //   POST /partner/excel/:id/confirm → upsert ok rows + SyncLog
+  //   DELETE /partner/excel/:id   → cancel pending batch
+
+  @Post('partner/excel/parse')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  @UseInterceptors(FileInterceptor('file'))
+  parseExcel(@UploadedFile() file: Express.Multer.File | undefined) {
+    if (!file) {
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel 文件' } })
+    }
+    return this.jobsService.parseExcelColumns(file.buffer)
+  }
+
+  @Post('partner/excel/preview')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  @UseInterceptors(FileInterceptor('file'))
+  previewExcel(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body('sourceId') sourceId: string,
+    @Body('dataType') dataType: string,
+    @Body('fieldMapping') fieldMappingRaw: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel 文件' } })
+    }
+    if (!sourceId?.trim()) {
+      throw new BadRequestException({ error: { code: 'SOURCE_ID_REQUIRED', message: '缺少 sourceId' } })
+    }
+    if (dataType !== 'job' && dataType !== 'fair') {
+      throw new BadRequestException({ error: { code: 'INVALID_DATA_TYPE', message: 'dataType 必须为 job 或 fair' } })
+    }
+    let fieldMapping: Record<string, string>
+    try {
+      fieldMapping = JSON.parse(fieldMappingRaw ?? '{}') as Record<string, string>
+    } catch {
+      throw new BadRequestException({ error: { code: 'INVALID_FIELD_MAPPING', message: 'fieldMapping 必须是合法 JSON' } })
+    }
+
+    return this.jobsService.previewExcelImport({
+      buffer: file.buffer,
+      fileName: file.originalname,
+      sourceId,
+      dataType: dataType as 'job' | 'fair',
+      fieldMapping,
+      user,
+    })
+  }
+
+  @Post('partner/excel/:batchId/confirm')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  confirmExcelImport(
+    @Param('batchId') batchId: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsService.confirmExcelImport(batchId, user)
+  }
+
+  @Delete('partner/excel/:batchId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  async cancelExcelImport(
+    @Param('batchId') batchId: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    await this.jobsService.cancelExcelImport(batchId, user)
+    return { success: true }
   }
 }

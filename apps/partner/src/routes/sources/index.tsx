@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { AccessMode, PartnerDataSource, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
 import { API_ORIGIN, getDataSources, toggleDataSource, createDataSource } from '../../services/api'
+import { ExcelImportModal } from './ExcelImportModal'
 
 function resolveWebhookUrl(webhookUrl?: string): string {
   if (!webhookUrl) return ''
@@ -283,6 +284,7 @@ export default function SourcesPage() {
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(false)
   const [showWizard, setShowWizard] = useState(false)
+  const [excelSource, setExcelSource] = useState<PartnerDataSource | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -393,7 +395,12 @@ export default function SourcesPage() {
                           <button className="rounded px-2 py-1 text-xs font-medium text-blue-500 hover:bg-blue-50">测试连接</button>
                         )}
                         {s.accessMode === 'excel' && (
-                          <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">字段映射</button>
+                          <button
+                            className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                            onClick={() => setExcelSource(s)}
+                          >
+                            字段映射
+                          </button>
                         )}
                         {s.accessMode === 'webhook' && (
                           <button className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50">查看接入</button>
@@ -419,6 +426,19 @@ export default function SourcesPage() {
       </Card>
 
       <p className="mt-3 text-xs text-gray-400">接入后端后实时展示数据源状态</p>
+
+      {excelSource && (
+        <ExcelImportModal
+          sourceId={excelSource.id}
+          sourceName={excelSource.name}
+          onClose={() => setExcelSource(null)}
+          onImported={(count) => {
+            // TODO: refresh partner jobs list / show toast
+            console.info(`Excel 导入完成，共 ${count} 条`)
+            setExcelSource(null)
+          }}
+        />
+      )}
     </Page>
   )
 }

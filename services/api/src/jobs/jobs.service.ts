@@ -31,6 +31,15 @@ import type { PublishAction } from './dto/publish.dto'
 import type { ImportJobItemDto } from './dto/import-jobs.dto'
 import type { ImportFairsDto } from './dto/import-fairs.dto'
 import type { CreateDataSourceDto } from './dto/data-source.dto'
+import {
+  JOB_STANDARD_FIELDS,
+  JOB_REQUIRED_FIELDS,
+  FAIR_STANDARD_FIELDS,
+  FAIR_REQUIRED_FIELDS,
+  type FieldMapping,
+  type ParsedRow,
+} from './dto/excel-import.dto'
+import * as XLSX from 'xlsx'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
@@ -117,6 +126,32 @@ export interface PartnerFairDto {
 export interface PaginatedResult<T> {
   data: T[]
   pagination: { page: number; pageSize: number; total: number; totalPages: number }
+}
+
+export interface SyncLogDto {
+  id: string
+  no: string
+  source: string
+  dataType: 'job' | 'fair'
+  addedCount: number
+  updatedCount: number
+  errorCount: number
+  dupCount: number
+  errorFields: string | null
+  errorDetail: string | null
+  syncTime: string
+  status: 'success' | 'partial' | 'failed'
+}
+
+export interface ExcelPreviewDto {
+  batchId: string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  dupRows: number
+  sampleValid: ExcelPreviewRowDto[]
+  sampleInvalid: ExcelPreviewRowDto[]
+  sampleDup: ExcelPreviewRowDto[]
 }
 
 export interface SingleResult<T> {
@@ -402,6 +437,24 @@ function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
     sourceOrgId: f.sourceOrgId,
     sourceName: f.sourceName,
   }
+}
+
+function toPreviewRow(r: ParsedRow): ExcelPreviewRowDto {
+  return {
+    rowIndex: r.rowIndex,
+    status: r.status,
+    data: r.mapped,
+    errors: r.errors,
+    externalId: r.externalId,
+  }
+}
+
+interface ExcelPreviewRowDto {
+  rowIndex: number
+  status: 'ok' | 'invalid' | 'dup'
+  data: Record<string, string>
+  errors: string[]
+  externalId?: string
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -1063,5 +1116,396 @@ export class JobsService {
       data: { publishStatus: 'unpublished' },
     })
     return prismaFairToPartnerDto(updated)
+  }
+
+  // ── Partner 同步日志 ───────────────────────────────────────────────────────
+
+  async getPartnerSyncLogs(user: AuthedUser): Promise<SyncLogDto[]> {
+    if (!user.orgId) return []
+    const rows = await this.prisma.syncLog.findMany({
+      where: { orgId: user.orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    })
+    return rows.map((r, i) => ({
+      id: r.id,
+      no: `SYNC-${r.createdAt.toISOString().slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
+      source: r.sourceId,
+      dataType: r.dataType as 'job' | 'fair',
+      addedCount: r.addedCount,
+      updatedCount: r.updatedCount,
+      errorCount: r.errorCount,
+      dupCount: r.dupCount,
+      errorFields: r.errorFields === '[]' ? null : r.errorFields,
+      errorDetail: r.errorDetail,
+      syncTime: fmtSyncTime(r.createdAt),
+      status: r.result as 'success' | 'partial' | 'failed',
+    }))
+  }
+
+  /** 内部：写同步日志（import 成功后调用）。不抛错，写失败只记日志。 */
+  private async writeSyncLog(args: {
+    sourceId: string
+    orgId: string
+    dataType: 'job' | 'fair'
+    syncMode: 'manual' | 'webhook' | 'api' | 'excel'
+    addedCount: number
+    updatedCount: number
+    dupCount: number
+    errorCount: number
+    errorFields?: string[]
+    errorDetail?: string
+  }): Promise<string | null> {
+    try {
+      const result: 'success' | 'partial' | 'failed' =
+        args.errorCount === 0 ? 'success' :
+        args.addedCount > 0 || args.updatedCount > 0 ? 'partial' : 'failed'
+      const log = await this.prisma.syncLog.create({
+        data: {
+          sourceId: args.sourceId,
+          orgId: args.orgId,
+          dataType: args.dataType,
+          syncMode: args.syncMode,
+          totalCount: args.addedCount + args.updatedCount + args.dupCount + args.errorCount,
+          addedCount: args.addedCount,
+          updatedCount: args.updatedCount,
+          dupCount: args.dupCount,
+          errorCount: args.errorCount,
+          errorFields: JSON.stringify(args.errorFields ?? []),
+          errorDetail: args.errorDetail ?? null,
+          result,
+        },
+      })
+      return log.id
+    } catch (e) {
+      this.logger.warn(`writeSyncLog failed: ${(e as Error).message}`)
+      return null
+    }
+  }
+
+  // ── Excel 导入 ────────────────────────────────────────────────────────────
+
+  /**
+   * 解析 Excel 文件，返回列名 + 样例行（无 DB 写入，纯内存操作）。
+   */
+  parseExcelColumns(buffer: Buffer): { columns: string[]; sampleRows: Record<string, string>[] } {
+    const wb = XLSX.read(buffer, { type: 'buffer' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    if (!ws) {
+      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空或格式不正确' } })
+    }
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' })
+    if (rows.length < 2) {
+      throw new BadRequestException({ error: { code: 'EXCEL_NO_DATA', message: 'Excel 文件缺少数据行（至少需要表头行 + 1 行数据）' } })
+    }
+    const headerRow = rows[0] as unknown[]
+    const columns = headerRow.map((c) => String(c ?? '').trim()).filter(Boolean)
+    const sampleRows = rows.slice(1, 6).map((row) => {
+      const obj: Record<string, string> = {}
+      columns.forEach((col, i) => { obj[col] = String((row as unknown[])[i] ?? '').trim() })
+      return obj
+    })
+    return { columns, sampleRows }
+  }
+
+  /**
+   * 解析 Excel + 字段映射 → 创建 ImportBatch + ImportRecord，返回预览数据。
+   */
+  async previewExcelImport(args: {
+    buffer: Buffer
+    fileName: string
+    sourceId: string
+    dataType: 'job' | 'fair'
+    fieldMapping: FieldMapping
+    user: AuthedUser
+  }): Promise<ExcelPreviewDto> {
+    if (!args.user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+
+    // Verify source belongs to this org
+    const source = await this.prisma.jobSource.findUnique({ where: { id: args.sourceId } })
+    if (!source || source.orgId !== args.user.orgId) {
+      throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+
+    const wb = XLSX.read(args.buffer, { type: 'buffer' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    if (!ws) {
+      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空' } })
+    }
+    const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' })
+    if (allRows.length < 2) {
+      throw new BadRequestException({ error: { code: 'EXCEL_NO_DATA', message: 'Excel 缺少数据行' } })
+    }
+    const headers = (allRows[0] as string[]).map((h) => String(h ?? '').trim())
+    const dataRows = allRows.slice(1)
+
+    const standardFields = args.dataType === 'job' ? JOB_STANDARD_FIELDS : FAIR_STANDARD_FIELDS
+    const requiredFields = args.dataType === 'job' ? JOB_REQUIRED_FIELDS : FAIR_REQUIRED_FIELDS
+
+    // Validate mapping contains only whitelisted standard fields
+    const illegalFields = Object.keys(args.fieldMapping).filter(
+      (f) => !(standardFields as readonly string[]).includes(f),
+    )
+    if (illegalFields.length > 0) {
+      throw new BadRequestException({
+        error: { code: 'ILLEGAL_FIELD_MAPPING', message: `字段映射包含非法字段: ${illegalFields.join(', ')}` },
+      })
+    }
+
+    // Collect existing externalIds for dup detection
+    const orgId = args.user.orgId
+    const existingExtIds = new Set<string>()
+    if (args.dataType === 'job') {
+      const existing = await this.prisma.job.findMany({
+        where: { sourceOrgId: orgId },
+        select: { externalId: true },
+      })
+      existing.forEach((j) => existingExtIds.add(j.externalId))
+    } else {
+      const existing = await this.prisma.jobFair.findMany({
+        where: { sourceOrgId: orgId },
+        select: { externalId: true },
+      })
+      existing.forEach((f) => existingExtIds.add(f.externalId))
+    }
+
+    const parsed: ParsedRow[] = dataRows.map((rawRow, idx) => {
+      const rawArr = rawRow as unknown[]
+      const rawData: Record<string, string> = {}
+      headers.forEach((h, i) => { rawData[h] = String(rawArr[i] ?? '').trim() })
+
+      const mapped: Record<string, string> = {}
+      for (const [stdField, colName] of Object.entries(args.fieldMapping)) {
+        mapped[stdField] = rawData[colName] ?? ''
+      }
+
+      const errors: string[] = []
+      for (const req of requiredFields) {
+        if (!mapped[req] || mapped[req].trim() === '') {
+          errors.push(`${req} 不能为空`)
+        }
+      }
+      // sourceUrl basic format check
+      if (mapped.sourceUrl && !mapped.sourceUrl.startsWith('http')) {
+        errors.push('sourceUrl 必须以 http 开头')
+      }
+      // date check for fairs
+      if (args.dataType === 'fair') {
+        if (mapped.startAt && Number.isNaN(Date.parse(mapped.startAt))) {
+          errors.push('startAt 日期格式无效')
+        }
+        if (mapped.endAt && Number.isNaN(Date.parse(mapped.endAt))) {
+          errors.push('endAt 日期格式无效')
+        }
+      }
+
+      let status: 'ok' | 'invalid' | 'dup' = 'ok'
+      if (errors.length > 0) {
+        status = 'invalid'
+      } else if (mapped.externalId && existingExtIds.has(mapped.externalId)) {
+        status = 'dup'
+      }
+
+      return {
+        rowIndex: idx + 2, // 1-indexed, skipping header
+        rawData,
+        mapped,
+        status,
+        errors,
+        externalId: mapped.externalId || undefined,
+      }
+    })
+
+    const validRows   = parsed.filter((r) => r.status === 'ok').length
+    const invalidRows = parsed.filter((r) => r.status === 'invalid').length
+    const dupRows     = parsed.filter((r) => r.status === 'dup').length
+
+    // Persist ImportBatch + ImportRecord
+    const batch = await this.prisma.importBatch.create({
+      data: {
+        sourceId: args.sourceId,
+        orgId,
+        dataType: args.dataType,
+        fileName: args.fileName,
+        totalRows: parsed.length,
+        validRows,
+        invalidRows,
+        dupRows,
+        status: 'pending',
+        mappingJson: JSON.stringify(args.fieldMapping),
+        createdBy: args.user.userId,
+      },
+    })
+
+    // Bulk create records (chunked to avoid SQLite limits)
+    const CHUNK = 50
+    for (let i = 0; i < parsed.length; i += CHUNK) {
+      await this.prisma.importRecord.createMany({
+        data: parsed.slice(i, i + CHUNK).map((r) => ({
+          batchId: batch.id,
+          rowIndex: r.rowIndex,
+          rawDataJson: JSON.stringify(r.rawData),
+          mappedJson: JSON.stringify(r.mapped),
+          status: r.status,
+          errorsJson: JSON.stringify(r.errors),
+          externalId: r.externalId ?? null,
+        })),
+      })
+    }
+
+    return {
+      batchId: batch.id,
+      totalRows: parsed.length,
+      validRows,
+      invalidRows,
+      dupRows,
+      sampleValid: parsed.filter((r) => r.status === 'ok').slice(0, 5).map(toPreviewRow),
+      sampleInvalid: parsed.filter((r) => r.status === 'invalid').slice(0, 5).map(toPreviewRow),
+      sampleDup: parsed.filter((r) => r.status === 'dup').slice(0, 5).map(toPreviewRow),
+    }
+  }
+
+  /**
+   * 确认导入：将 ImportBatch 中 status='ok' 的行 upsert 到 Job/JobFair 表，
+   * 写 SyncLog，更新 ImportBatch.status → 'confirmed'。
+   */
+  async confirmExcelImport(batchId: string, user: AuthedUser): Promise<{ imported: number; syncLogId: string | null }> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+
+    const batch = await this.prisma.importBatch.findUnique({
+      where: { id: batchId },
+      include: { records: { where: { status: 'ok' } } },
+    })
+    if (!batch || batch.orgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'BATCH_NOT_FOUND', message: '导入批次不存在' } })
+    }
+    if (batch.status !== 'pending') {
+      throw new BadRequestException({
+        error: { code: 'BATCH_ALREADY_PROCESSED', message: `批次已处于 ${batch.status} 状态，无法重复确认` },
+      })
+    }
+
+    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
+    }
+
+    const sourceOrgId = org.id
+    const sourceName  = org.name
+    const sync        = new Date()
+    let imported      = 0
+
+    for (const record of batch.records) {
+      const mapped = JSON.parse(record.mappedJson) as Record<string, string>
+      try {
+        if (batch.dataType === 'job') {
+          await this.prisma.job.upsert({
+            where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
+            create: {
+              sourceOrgId, sourceId: batch.sourceId, externalId: mapped.externalId, sourceName,
+              sourceUrl: mapped.sourceUrl ?? '',
+              title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
+              salary: mapped.salary || null,
+              description: mapped.description || null, requirements: mapped.requirements || null,
+              tagsJson: '[]',
+              reviewStatus: 'pending', publishStatus: 'draft',
+              syncTime: sync,
+            },
+            update: {
+              sourceName, sourceUrl: mapped.sourceUrl ?? '',
+              title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
+              salary: mapped.salary || null,
+              description: mapped.description || null, requirements: mapped.requirements || null,
+              syncTime: sync,
+            },
+          })
+        } else {
+          const startAt = new Date(mapped.startAt)
+          const endAt   = new Date(mapped.endAt)
+          await this.prisma.jobFair.upsert({
+            where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
+            create: {
+              sourceOrgId, externalId: mapped.externalId, sourceName,
+              sourceUrl: mapped.sourceUrl ?? '',
+              title: mapped.title ?? '',
+              theme: mapped.theme || 'general',
+              startAt, endAt,
+              venue: mapped.venue ?? '', city: mapped.city ?? '',
+              address: mapped.address || null,
+              description: mapped.description || null,
+              companyCount: Number(mapped.companyCount) || 0,
+              jobCount: Number(mapped.jobCount) || 0,
+              reviewStatus: 'pending', publishStatus: 'draft',
+              syncTime: sync,
+            },
+            update: {
+              sourceName, sourceUrl: mapped.sourceUrl ?? '',
+              title: mapped.title ?? '',
+              theme: mapped.theme || 'general',
+              startAt, endAt,
+              venue: mapped.venue ?? '', city: mapped.city ?? '',
+              address: mapped.address || null,
+              description: mapped.description || null,
+              syncTime: sync,
+            },
+          })
+        }
+        imported++
+      } catch (e) {
+        this.logger.error(`confirmExcelImport upsert failed: batchId=${batchId} rowIndex=${record.rowIndex}`, e as Error)
+      }
+    }
+
+    // Write SyncLog
+    const syncLogId = await this.writeSyncLog({
+      sourceId: batch.sourceId,
+      orgId: user.orgId,
+      dataType: batch.dataType as 'job' | 'fair',
+      syncMode: 'excel',
+      addedCount: imported,
+      updatedCount: 0,
+      dupCount: batch.dupRows,
+      errorCount: batch.invalidRows,
+    })
+
+    // Update batch status
+    await this.prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status: 'confirmed', confirmedAt: new Date() },
+    })
+
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'partner',
+      action: 'excel.import.confirm',
+      targetType: 'job_source',
+      targetId: batch.sourceId,
+      payload: { batchId, dataType: batch.dataType, imported, syncLogId },
+    })
+
+    this.logger.log(`confirmExcelImport: batchId=${batchId} imported=${imported}`)
+    return { imported, syncLogId }
+  }
+
+  /** 取消待确认批次 */
+  async cancelExcelImport(batchId: string, user: AuthedUser): Promise<void> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const batch = await this.prisma.importBatch.findUnique({ where: { id: batchId } })
+    if (!batch || batch.orgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'BATCH_NOT_FOUND', message: '导入批次不存在' } })
+    }
+    if (batch.status !== 'pending') {
+      throw new BadRequestException({ error: { code: 'BATCH_ALREADY_PROCESSED', message: '只能取消 pending 状态的批次' } })
+    }
+    await this.prisma.importBatch.update({
+      where: { id: batchId },
+      data: { status: 'cancelled' },
+    })
   }
 }

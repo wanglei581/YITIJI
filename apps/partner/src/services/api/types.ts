@@ -130,6 +130,32 @@ export interface ImportResult<T> {
   items: T[]
 }
 
+// ─── Excel Import ────────────────────────────────────────────────────────────
+
+export interface ExcelPreviewRow {
+  rowIndex: number
+  status: 'ok' | 'invalid' | 'dup'
+  data: Record<string, string>
+  errors: string[]
+  externalId?: string
+}
+
+export interface ExcelPreviewResult {
+  batchId: string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  dupRows: number
+  sampleValid: ExcelPreviewRow[]
+  sampleInvalid: ExcelPreviewRow[]
+  sampleDup: ExcelPreviewRow[]
+}
+
+export interface ExcelConfirmResult {
+  imported: number
+  syncLogId: string
+}
+
 // ─── Sync Logs ────────────────────────────────────────────────────────────────
 
 export type SyncDataType = 'job' | 'fair' | 'policy'

@@ -107,6 +107,20 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.fairZone
   }
 
+  // ── W4 同步日志 + Excel 导入批次 ──────────────────────────────────────────
+
+  get syncLog() {
+    return this.client.syncLog
+  }
+
+  get importBatch() {
+    return this.client.importBatch
+  }
+
+  get importRecord() {
+    return this.client.importRecord
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

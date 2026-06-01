@@ -166,7 +166,9 @@ model JobSource {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  jobs Job[]
+  jobs          Job[]
+  syncLogs      SyncLog[]
+  importBatches ImportBatch[]
 
   @@index([orgId])
 }
@@ -410,6 +412,89 @@ model FairZone {
 
   @@index([jobFairId])
   @@index([category])
+}
+
+// ── SyncLog ───────────────────────────────────────────────────────────────────
+// 每次数据同步（手动导入 / Webhook 接收 / API 拉取）的摘要记录。
+// 供 Partner 后台 /sync-logs 页面展示；Admin 走 AuditLog 详查。
+//
+// dataType:  'job' | 'fair'
+// syncMode:  'manual' | 'webhook' | 'api' | 'excel'
+// result:    'success' | 'partial' | 'failed'
+
+model SyncLog {
+  id           String    @id @default(cuid())
+  sourceId     String
+  source       JobSource @relation(fields: [sourceId], references: [id])
+  orgId        String
+  dataType     String
+  syncMode     String
+  totalCount   Int       @default(0)
+  addedCount   Int       @default(0)
+  updatedCount Int       @default(0)
+  dupCount     Int       @default(0)
+  errorCount   Int       @default(0)
+  errorFields  String    @default("[]")
+  errorDetail  String?
+  result       String
+  createdAt    DateTime  @default(now())
+
+  @@index([orgId])
+  @@index([sourceId])
+  @@index([createdAt])
+}
+
+// ── ImportBatch ───────────────────────────────────────────────────────────────
+// Excel / CSV 文件导入的批次记录。
+//
+// dataType:  'job' | 'fair'
+// status:    'pending' | 'confirmed' | 'cancelled' | 'failed'
+// mappingJson: 字段映射规则 { standardField: columnHeader }
+
+model ImportBatch {
+  id          String    @id @default(cuid())
+  sourceId    String
+  source      JobSource @relation(fields: [sourceId], references: [id])
+  orgId       String
+  dataType    String
+  fileName    String
+  totalRows   Int       @default(0)
+  validRows   Int       @default(0)
+  invalidRows Int       @default(0)
+  dupRows     Int       @default(0)
+  status      String    @default("pending")
+  mappingJson String    @default("{}")
+  createdBy   String
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  records ImportRecord[]
+
+  @@index([orgId])
+  @@index([sourceId])
+  @@index([status])
+}
+
+// ── ImportRecord ──────────────────────────────────────────────────────────────
+// Excel 导入批次中每一行的解析结果。
+//
+// status: 'ok' | 'invalid' | 'dup'
+
+model ImportRecord {
+  id          String      @id @default(cuid())
+  batchId     String
+  batch       ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowIndex    Int
+  rawDataJson String      @default("{}")
+  mappedJson  String      @default("{}")
+  status      String
+  errorsJson  String      @default("[]")
+  externalId  String?
+  createdAt   DateTime    @default(now())
+
+  @@index([batchId])
+  @@index([status])
 }
 
 model AuditLog {

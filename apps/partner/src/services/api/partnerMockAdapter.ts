@@ -7,6 +7,8 @@ import type {
   ImportJobItem,
   ImportFairItem,
   ImportResult,
+  ExcelPreviewResult,
+  ExcelConfirmResult,
 } from './types'
 
 function delay(): Promise<void> {
@@ -113,11 +115,7 @@ export const partnerMockAdapter = {
     )
     return PARTNER_JOBS.find((j) => j.id === id)!
   },
-  async importPartnerJobs(
-    items: ImportJobItem[],
-    sourceOrgId: string,
-    sourceName: string,
-  ): Promise<ImportResult<PartnerJobRecord>> {
+  async importPartnerJobs(items: ImportJobItem[]): Promise<ImportResult<PartnerJobRecord>> {
     await delay()
     const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
     const added: PartnerJobRecord[] = items.map((item) => ({
@@ -125,7 +123,7 @@ export const partnerMockAdapter = {
       company: item.company, city: item.city,
       sourceUrl: item.sourceUrl, syncTime: sync,
       reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
-      sourceOrgId, sourceName,
+      sourceOrgId: 'mock-org', sourceName: '测试机构',
     }))
     PARTNER_JOBS = [...PARTNER_JOBS, ...added]
     return { imported: added.length, items: added }
@@ -143,11 +141,7 @@ export const partnerMockAdapter = {
     )
     return PARTNER_FAIRS.find((f) => f.id === id)!
   },
-  async importPartnerFairs(
-    items: ImportFairItem[],
-    sourceOrgId: string,
-    sourceName: string,
-  ): Promise<ImportResult<PartnerFairRecord>> {
+  async importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>> {
     await delay()
     const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
     const added: PartnerFairRecord[] = items.map((item) => {
@@ -160,7 +154,7 @@ export const partnerMockAdapter = {
         organizer: item.organizer, startTime: item.startTime, endTime: item.endTime,
         venue: item.venue, status, sourceUrl: item.sourceUrl, syncTime: sync,
         reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
-        sourceOrgId, sourceName,
+        sourceOrgId: 'mock-org', sourceName: '测试机构',
       }
     })
     PARTNER_FAIRS = [...PARTNER_FAIRS, ...added]
@@ -171,5 +165,49 @@ export const partnerMockAdapter = {
   async getSyncLogs(): Promise<PartnerSyncLog[]> {
     await delay()
     return [...SYNC_LOGS]
+  },
+
+  // Excel Import (mock)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async parseExcel(_file: File): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }> {
+    await delay()
+    return {
+      columns: ['外部ID', '职位名称', '公司名称', '工作城市', '薪资范围', '来源链接', '职位描述'],
+      sampleRows: [
+        { '外部ID': 'EX-001', '职位名称': '前端工程师', '公司名称': 'ABC科技', '工作城市': '广州', '薪资范围': '15k-20k', '来源链接': 'https://example.com/j/1', '职位描述': '负责前端开发' },
+        { '外部ID': 'EX-002', '职位名称': '后端工程师', '公司名称': 'DEF网络', '工作城市': '深圳', '薪资范围': '20k-30k', '来源链接': 'https://example.com/j/2', '职位描述': '负责后端开发' },
+      ],
+    }
+  },
+  async previewExcel(file: File, sourceId: string, dataType: 'job' | 'fair', fieldMapping: Record<string, string>): Promise<ExcelPreviewResult> {
+    void file; void dataType; void fieldMapping
+    await delay()
+    return {
+      batchId: `batch-${sourceId}-${Date.now()}`,
+      totalRows: 10,
+      validRows: 7,
+      invalidRows: 2,
+      dupRows: 1,
+      sampleValid: [
+        { rowIndex: 1, status: 'ok', data: { externalId: 'EX-001', title: '前端工程师', company: 'ABC科技', city: '广州', sourceUrl: 'https://example.com/j/1' }, errors: [] },
+        { rowIndex: 2, status: 'ok', data: { externalId: 'EX-002', title: '后端工程师', company: 'DEF网络', city: '深圳', sourceUrl: 'https://example.com/j/2' }, errors: [] },
+      ],
+      sampleInvalid: [
+        { rowIndex: 5, status: 'invalid', data: { externalId: 'EX-005', title: '', company: 'GHI公司', city: '', sourceUrl: '' }, errors: ['title 不能为空', 'city 不能为空', 'sourceUrl 不能为空'] },
+      ],
+      sampleDup: [
+        { rowIndex: 8, status: 'dup', data: { externalId: 'EX-001', title: '前端工程师', company: 'ABC科技', city: '广州', sourceUrl: 'https://example.com/j/1' }, errors: [], externalId: 'EX-001' },
+      ],
+    }
+  },
+  async confirmExcelImport(batchId: string): Promise<ExcelConfirmResult> {
+    void batchId
+    await delay()
+    return { imported: 7, syncLogId: `sl-mock-${Date.now()}` }
+  },
+  async cancelExcelImport(batchId: string): Promise<{ success: boolean }> {
+    void batchId
+    await delay()
+    return { success: true }
   },
 }

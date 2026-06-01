@@ -126,10 +126,37 @@ export class FilesController {
     return ApiResponse.ok(res)
   }
 
+  /**
+   * 重发签名 URL。
+   *
+   * 访问控制(CLAUDE.md §11 文件安全):
+   *   - admin 可访问任意文件
+   *   - partner / kiosk 只能访问自己上传的文件(uploaderId === user.userId)
+   *   - 匿名 Kiosk 上传(uploaderId = null)无法通过此端点二次签名;
+   *     应在上传响应的 signedUrl 有效期内直接使用
+   *
+   * 每次调用均写访问审计日志,满足 CLAUDE.md §11"管理员访问文件必须记录日志"要求。
+   */
   @Get(':id/url')
   @UseGuards(JwtAuthGuard)
-  async signedUrl(@Param('id') id: string): Promise<ApiResponse<SignedUrlResponse>> {
-    return ApiResponse.ok(await this.files.getSignedUrl(id))
+  async signedUrl(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
+  ): Promise<ApiResponse<SignedUrlResponse>> {
+    const result = await this.files.getSignedUrl(id, user)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'file.get_signed_url',
+      targetType: 'file',
+      targetId: id,
+      payload: { purpose: result.purpose },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
   }
 
   /**

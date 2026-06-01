@@ -61,6 +61,7 @@ export interface SignedUrlResponse {
   fileId: string
   signedUrl: string
   expiresAt: string
+  purpose: FilePurpose
 }
 
 export interface FileCleanupResponse {
