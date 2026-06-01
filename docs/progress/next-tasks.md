@@ -1,32 +1,35 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W4 数据源真实导入闭环 + AI在青岛专区完成）  
+> 最后更新：2026-06-01（W5 企业详情页增强第一阶段完成）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W4 + AI在青岛 完成）
+## 📌 当前状态（W5 第一阶段完成，分支 feat/w5-enterprise-showcase）
 
-**W4 已完成（2026-06-01）**：
-- ✅ Gap 1：`GET /files/:id/url` 加角色/归属校验 + 访问审计
-- ✅ Gap 2：Prisma 新增 SyncLog + ImportBatch + ImportRecord；`GET /partner/sync-logs` 路由上线
-- ✅ Gap 3：`partnerHttpAdapter.ts` 导入契约修正
-- ✅ Excel 字段映射 service 层接入 + `ExcelImportModal.tsx` 4 步向导
+**W5 第一阶段已完成（2026-06-01）**：
+- ✅ `/job-fairs/:id/companies/:companyId` 企业详情页全面增强
+- ✅ 荣誉标签（中国500强 / 世界500强 / 高新技术企业 / 专精特新）
+- ✅ 企业信息卡（成立年份 / 总部 / 注册资本 / 可展开简介）
+- ✅ 四操作按钮：扫码投递 / 去来源平台投递 / 打印企业资料 / 打印岗位清单
+- ✅ 岗位筛选（城市 / 学历 / 经验 / 岗位类型）+ 清除筛选
+- ✅ 列表 ↔ 海报视图切换
+- ✅ 类型扩展（shared DTO + kiosk 本地类型 + mock 数据）
+- ✅ 合规验收全部通过
 
-**AI在青岛专区已完成（2026-06-01）**：
-- ✅ `apps/kiosk/src/pages/qingdao/QingdaoPage.tsx`：5 tab 面板（就业 / 政策 / 高校 / 园区 / 资讯）
-- ✅ `/qingdao` 路由已注册
-- ✅ 首页"更多服务"3 列卡片布局，AI在青岛入口已添加
-- ✅ 全部合规要求满足（来源声明、合规按钮文案、免责说明）
-- ✅ Kiosk lint / typecheck / build 全部通过
+**W5 第二阶段候选（后续）**：
+- [ ] 招聘会详情页增强：展位导览图增强（企业点击弹出预览）
+- [ ] FairStatsPage 数据接真实展会统计
+- [ ] 打印企业资料 / 打印岗位清单接入真实打印流程（现为 TODO）
+- [ ] 企业宣传视频播放支持（当前为渐变封面占位）
 
-**下一步候选（P0）**：
+**其他 P0 候选（独立分支）**：
 - BullMQ API 拉取 worker（JobSource 已有 encryptedCredential，待周期性拉取外部数据）
 - Phase 9 UI Polish + AI 数字人引导员（静态 3D VRM + Kiosk 视觉升级）
-- Admin 审核页面对接 ImportBatch（显示来自 Excel 导入的批次，审核通过后发布）
-- AI在青岛数据接真实 API（当前为 mock 数据，后续接 partner 审核后的岗位/招聘会数据）
+- Admin 审核页面对接 ImportBatch
+- AI在青岛数据接真实 API（当前 mock，后续接 partner 审核后数据）
 
-**W1 / W2 / W3 / W4 stacked 分支已合入 main**：后续不要再按待合并分支处理。
+**已合入 main 的历史分支**：W1 / W2 / W3 / W4 / AI在青岛 / Kiosk 触控优化 均已合入 main，不要再按待合并分支处理。
 
 ---
 

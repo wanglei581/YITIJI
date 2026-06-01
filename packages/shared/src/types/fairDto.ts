@@ -48,6 +48,8 @@ export interface ExternalJobFairDTO extends ExternalJobFair {
 // FairCompanyDTO
 // ──────────────────────────────────────────────────────────────
 
+export type PositionType = 'full_time' | 'part_time' | 'intern'
+
 export interface FairCompanyPositionDTO {
   id: string
   title: string
@@ -55,6 +57,16 @@ export interface FairCompanyPositionDTO {
   salary?: string
   requirements?: string
   workType?: string
+  /** 学历要求 */
+  education?: string
+  /** 经验要求 */
+  experience?: string
+  /** 工作城市 */
+  location?: string
+  /** 岗位类型 */
+  positionType?: PositionType
+  /** 所属部门 */
+  department?: string
 }
 
 /**
@@ -77,6 +89,16 @@ export interface FairCompanyDTO {
   checkinTime?: string
   /** 合规提示文字（必须在企业详情页展示） */
   applyNote: string
+  /** 企业荣誉标签：中国500强 / 世界500强 / 高新技术企业 / 专精特新 等 */
+  honorTags?: string[]
+  /** 封面图 URL（来源平台提供或上传） */
+  coverImageUrl?: string
+  /** 成立年份 */
+  founded?: string
+  /** 总部城市 */
+  headquarters?: string
+  /** 注册资本 */
+  registeredCapital?: string
 }
 
 // ──────────────────────────────────────────────────────────────

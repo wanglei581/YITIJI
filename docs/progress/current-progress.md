@@ -25,6 +25,44 @@
 
 ## 二、当前开发阶段
 
+**当前阶段：W5 企业展示与现场服务增强 🚧（2026-06-01）— 基于 W4 封板基线**
+
+---
+
+### ✅ W5 第一阶段：招聘会企业详情页增强（2026-06-01）
+
+**路由：** `/job-fairs/:id/companies/:companyId`（未变）  
+**页面：** `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx`（重写）  
+**分支：** `feat/w5-enterprise-showcase`
+
+**新增能力：**
+- 顶部彩色渐变 Cover 区域：企业名 / 行业 / 展位号 / 荣誉标签（AwardIcon） / 岗位数+招聘人数
+- 企业信息卡：成立年份 / 总部城市 / 注册资本 / 简介可展开（超 100 字折叠）/ 来源说明
+- 四个操作按钮：**扫码投递 / 去来源平台投递 / 打印企业资料 / 打印岗位清单**（全部合规）
+- 岗位筛选器：城市 / 学历 / 经验 / 岗位类型（全职/兼职/实习）+ 清除筛选
+- 视图切换：列表模式（Card + 详情） ↔ 海报模式（2 列彩色卡片）
+- 合规底部：applyNote + 不接收简历声明
+
+**类型扩展（最小改动）：**
+- `packages/shared/src/types/fairDto.ts`：`FairCompanyPositionDTO` 新增 `education / experience / location / positionType / department`；`FairCompanyDTO` 新增 `honorTags / coverImageUrl / founded / headquarters / registeredCapital`
+- `apps/kiosk/src/types/fair.ts`：本地 `FairCompanyPosition` / `FairCompany` 同步扩展
+
+**Mock 数据扩展：**
+- `apps/kiosk/src/data/fairData.ts`：f1 全部 7 家企业补全新字段；c1-1（高新技术企业/专精特新）/ c1-2（中国500强/世界500强）荣誉标签
+- `apps/kiosk/src/services/api/mockAdapter.ts`：`toCompanyDTO` 传递全部新字段
+
+**合规验证（2026-06-01）：**
+- 禁词扫描（一键投递 / 立即投递 / 企业收简历 / 候选人管理 / 面试邀约 / Offer 管理）✅ 全部通过
+- 允许文案全部正确：扫码投递 / 去来源平台投递 / 打印企业资料 / 打印岗位清单
+- 合规底部说明展示 ✅
+
+**验收（2026-06-01）：**
+- Kiosk `tsc --noEmit` ✅（0 errors）
+- Kiosk `eslint` ✅（0 warnings）
+- Kiosk `build` ✅（1.35s）
+
+---
+
 **当前阶段：W4 数据源真实导入闭环 ✅（2026-06-01）— Phase 8 全部封板基线之上**
 
 ---

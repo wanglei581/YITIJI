@@ -20,12 +20,19 @@ export type FairMaterialType =
 
 export type CompanyCheckinStatus = 'pending' | 'checked_in' | 'absent'
 
+export type PositionType = 'full_time' | 'part_time' | 'intern'
+
 export interface FairCompanyPosition {
   id: string
   title: string
   headcount: number
   salary?: string
   requirements: string
+  education?: string
+  experience?: string
+  location?: string
+  positionType?: PositionType
+  department?: string
 }
 
 export interface FairCompany {
@@ -42,6 +49,11 @@ export interface FairCompany {
   sourceUrl?: string
   checkinStatus: CompanyCheckinStatus
   checkinTime?: string
+  honorTags?: string[]
+  coverImageUrl?: string
+  founded?: string
+  headquarters?: string
+  registeredCapital?: string
 }
 
 export interface FairZone {
