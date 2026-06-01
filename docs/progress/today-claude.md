@@ -1,5 +1,20 @@
 # 2026-06-02 W3 起步完成(Claude × Codex 协作)
 
+## 跨设备记录规则
+
+本文件只保存 Claude 当日开发摘要、协作收尾、demo 链路和关键验证结果，不保存完整聊天记录。
+
+换设备、换模型或让其他 AI 接手时，先读取：
+
+1. `AGENTS.md` 或 `CLAUDE.md`
+2. `docs/progress/current-progress.md`
+3. `docs/progress/next-tasks.md`
+4. `docs/product/feature-scope.md`
+5. `docs/compliance/compliance-boundary.md`
+6. `docs/progress/today-claude.md`
+
+删除、清理、移除页面或文件的记录应写入 `docs/progress/current-progress.md` 的更新记录，并以 Git commit 作为最终追溯来源。聊天记录只能作为辅助背景，不作为项目事实来源。
+
 ## 分支
 
 `feat/p0-w3-claude-webhook-sync`(stacked on `feat/p0-w2-claude-jobfair-be7`)

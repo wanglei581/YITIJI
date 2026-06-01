@@ -15,7 +15,7 @@
 
 **下一步候选**：
 - W3 续做：BullMQ API 拉取 worker + Excel 字段映射 service 层接入（FieldMappingRule / ImportBatch 已在 partner adapter 暴露）
-- 把 W1 PR #1 / W2 / W3 三条 stacked 分支合掉
+- W1 / W2 / W3 stacked 分支已 FF 合入 main（2026-06-01，`3f35caa`），后续不要再按待合并分支处理
 - Phase 9 UI Polish + AI 数字人引导员
 
 ---

@@ -197,6 +197,14 @@ ai-job-print-terminal/
 4. `docs/product/feature-scope.md`
 5. `docs/compliance/compliance-boundary.md`
 
+记录保存规则：
+
+- 当前阶段、已完成内容、下一步任务：写入 `docs/progress/current-progress.md` 和 `docs/progress/next-tasks.md`
+- Claude 当日开发摘要、协作收尾、demo 链路：写入 `docs/progress/today-claude.md`
+- 删除、清理、移除页面或文件：必须写入 `docs/progress/current-progress.md` 的更新记录，并保留 Git commit
+- 合规边界、角色边界、长期产品约束：写入 `docs/compliance/` 或 `docs/product/`
+- 不把完整聊天记录写入仓库；只沉淀可执行结论、验证结果和关键决策
+
 聊天记录、截图、临时总结只能作为辅助背景，不作为需求来源。若文档状态和代码实现不一致，先执行审查与验证，更新正式进度文档后再继续开发。
 
 ## 8. 页面风格要求
