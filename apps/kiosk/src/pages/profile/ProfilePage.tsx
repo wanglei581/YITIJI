@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, EmptyState, PageHeader } from '@ai-job-print/ui'
+import { Card, EmptyState, PageHeader } from '@ai-job-print/ui'
 import {
   CheckCircleIcon,
+  FileInputIcon,
   FileTextIcon,
   PrinterIcon,
-  ScanIcon,
   SparklesIcon,
   Trash2Icon,
   XIcon,
@@ -181,7 +181,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="relative p-6">
+    <div className="relative flex min-h-full flex-col p-6">
       <PageHeader title="我的记录" subtitle="记录 · 订单 · 文件" />
 
       {/* 游客提示 */}
@@ -205,7 +205,7 @@ export function ProfilePage() {
         </div>
       )}
 
-      <div className="mt-6 flex flex-col gap-6">
+      <div className="mt-6 flex flex-1 flex-col gap-6">
         {/* ── 我的简历 ── */}
         <section>
           <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-2">
@@ -256,12 +256,12 @@ export function ProfilePage() {
         {/* ── 扫描文件 ── */}
         <section>
           <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-2">
-            <ScanIcon className="h-4 w-4 text-gray-400" />
+            <FileInputIcon className="h-4 w-4 text-gray-400" />
             <h2 className="text-sm font-medium text-gray-500">扫描文件</h2>
           </div>
           {scans.length === 0 ? (
             <EmptyState
-              icon={ScanIcon}
+              icon={FileInputIcon}
               title="暂无扫描文件"
               description="扫描保存后的 PDF 将显示在这里"
             />
@@ -270,7 +270,7 @@ export function ProfilePage() {
               {scans.map((s) => (
                 <Card key={s.id} className="flex items-center gap-4 p-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                    <ScanIcon className="h-5 w-5 text-gray-500" />
+                    <FileInputIcon className="h-5 w-5 text-gray-500" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-900">{s.name}</p>
@@ -385,16 +385,9 @@ export function ProfilePage() {
         </section>
 
         {/* 合规说明 */}
-        <p className="pb-4 text-center text-xs text-gray-400">
+        <p className="pb-8 text-center text-xs text-gray-400">
           文件可在本机记录中管理，后续将支持自动清理
         </p>
-      </div>
-
-      {/* 返回首页 */}
-      <div className="mt-2 pb-6">
-        <Button variant="secondary" size="lg" className="w-full" onClick={() => navigate('/')}>
-          返回首页
-        </Button>
       </div>
     </div>
   )

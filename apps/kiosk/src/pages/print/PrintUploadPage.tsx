@@ -54,22 +54,22 @@ export function PrintUploadPage() {
             key={key}
             onClick={() => setTab(key)}
             className={[
-              'flex flex-1 items-center justify-center gap-2 rounded-lg border py-3 text-sm font-medium transition-colors',
+              'flex flex-1 min-h-[56px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
               tab === key
                 ? 'border-primary-600 bg-primary-50 text-primary-600'
                 : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700',
             ].join(' ')}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-5 w-5" />
             {label}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
-      <div className="mt-4 flex-1">
+      <div className="mt-4 flex flex-1 flex-col">
         {tab === 'file' && (
-          <div className="flex h-full flex-col gap-4">
+          <div className="flex flex-1 flex-col gap-4">
             {file ? (
               <Card className="flex items-center gap-4 p-5">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
@@ -81,7 +81,7 @@ export function PrintUploadPage() {
                 </div>
                 <button
                   onClick={() => setFile(null)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
                 >
                   <XIcon className="h-4 w-4 text-gray-400" />
                 </button>
@@ -89,14 +89,14 @@ export function PrintUploadPage() {
             ) : (
               <button
                 onClick={() => setFile(MOCK_FILE)}
-                className="flex h-48 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-300 bg-white hover:border-primary-400 hover:bg-primary-50 transition-colors"
+                className="flex flex-1 w-full flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-gray-300 bg-white hover:border-primary-400 hover:bg-primary-50 transition-colors min-h-[200px]"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                  <FileTextIcon className="h-7 w-7 text-gray-400" />
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                  <FileTextIcon className="h-8 w-8 text-gray-400" />
                 </div>
                 <div className="text-center">
-                  <p className="text-base font-medium text-gray-700">点击选择文件</p>
-                  <p className="mt-1 text-sm text-gray-400">支持 PDF、Word、图片格式</p>
+                  <p className="text-lg font-medium text-gray-700">点击选择文件</p>
+                  <p className="mt-1.5 text-sm text-gray-400">支持 PDF、Word、图片格式</p>
                 </div>
               </button>
             )}

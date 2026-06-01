@@ -171,10 +171,10 @@ export function HomePage() {
   const navigate = useNavigate()
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-full flex-col">
       <HeroSection />
 
-      <div className="relative -mt-6 z-10 flex flex-col gap-6 rounded-t-3xl bg-canvas px-6 py-7">
+      <div className="relative -mt-6 z-10 flex flex-1 flex-col gap-6 rounded-t-3xl bg-canvas px-6 py-7">
         {/* 主要功能 */}
         <section aria-label="主要功能" className="flex flex-col gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
-import { FolderOpenIcon, ScanIcon, UploadIcon } from 'lucide-react'
+import { ChevronRightIcon, FolderOpenIcon, ScanIcon, UploadIcon } from 'lucide-react'
 import { kioskUploadFile } from '../../services/api'
 
 type Source = 'upload' | 'scan' | 'my-docs'
@@ -128,21 +128,22 @@ export function ResumeSourcePage() {
               onClick={() => !disabled && handleSelect(option)}
               disabled={disabled}
               className={[
-                'w-full rounded-xl border-2 p-5 text-left transition-colors',
+                'flex flex-1 flex-col justify-center w-full rounded-xl border-2 px-5 py-6 text-left transition-colors',
                 'disabled:cursor-not-allowed disabled:opacity-60',
                 isSelected
                   ? 'border-primary-600 bg-primary-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50',
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 active:bg-gray-100',
               ].join(' ')}
             >
               <div className="flex items-center gap-4">
-                <div className={['flex h-14 w-14 shrink-0 items-center justify-center rounded-xl', isSelected ? 'bg-primary-100' : 'bg-gray-100'].join(' ')}>
-                  <Icon className={['h-7 w-7', isSelected ? 'text-primary-600' : 'text-gray-500'].join(' ')} />
+                <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-xl', isSelected ? 'bg-primary-100' : 'bg-gray-100'].join(' ')}>
+                  <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-gray-500'].join(' ')} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={['text-lg font-semibold', isSelected ? 'text-primary-700' : 'text-gray-900'].join(' ')}>{option.label}</p>
-                  <p className="mt-0.5 text-sm text-gray-500">{option.description}</p>
+                  <p className={['text-xl font-semibold', isSelected ? 'text-primary-700' : 'text-gray-900'].join(' ')}>{option.label}</p>
+                  <p className="mt-1 text-sm text-gray-500">{option.description}</p>
                 </div>
+                <ChevronRightIcon className={['h-5 w-5 shrink-0', isSelected ? 'text-primary-500' : 'text-gray-300'].join(' ')} />
               </div>
             </button>
           )

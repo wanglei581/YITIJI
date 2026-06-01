@@ -207,16 +207,16 @@ export function AssistantPage() {
             placeholder="输入问题，例如：如何优化我的简历？"
             rows={2}
             disabled={loading}
-            className="min-h-[56px] flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20 disabled:bg-gray-50 disabled:text-gray-400"
+            className="min-h-[60px] flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3.5 text-base leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20 disabled:bg-gray-50 disabled:text-gray-400"
           />
           <Button
             size="lg"
             onClick={() => void handleSend()}
             disabled={!input.trim() || loading}
             aria-label="发送消息"
-            className="shrink-0"
+            className="h-16 w-16 shrink-0 rounded-xl"
           >
-            <SendHorizontalIcon className="h-5 w-5" aria-hidden="true" />
+            <SendHorizontalIcon className="h-6 w-6" aria-hidden="true" />
           </Button>
         </div>
         <p className="mt-2 text-center text-xs text-gray-400">
