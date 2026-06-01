@@ -36,7 +36,9 @@
 **Fix 1 — rawDataJson 隐私风险（P0）**
 - `previewExcelImport`：不再持久化整行 rawData，`rawDataJson` 固定存 `'{}'`
 - `ImportRecord` 只存已映射的 `mappedJson`，原始列（含未映射字段）不落库
-- 新增一次性清理脚本：`services/api/scripts/clear-import-rawdata.ts`（清空历史记录的 rawDataJson）
+- 一次性清理脚本：`services/api/scripts/clear-import-rawdata.ts`（已修正为 libsql adapter 方式，与 PrismaService 一致）
+  - 运行方式：`DATABASE_URL=file:./prisma/dev.db ts-node scripts/clear-import-rawdata.ts`
+  - dev DB 执行结果：已清理 0 条（dev 无历史记录，生产合入后执行清理）
 
 **Fix 2 — 敏感列后端强校验（P0）**
 - `excel-import.dto.ts`：新增 `SENSITIVE_COLUMN_PATTERNS`（手机号/邮箱/简历/候选人/姓名/面试/Offer 等）+ `isSensitiveColumn()` 工具函数

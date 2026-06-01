@@ -44,7 +44,9 @@
 
 ### P0（立即）
 1. **合并 fix/w4-excel-import-integrity → main**：push + FF merge
-   - 合入前运行一次性清理脚本清空历史 rawDataJson（`npx ts-node scripts/clear-import-rawdata.ts`）
+   - 清理脚本已修正（libsql adapter，不再依赖旧 `@prisma/client` 导入）
+   - 运行方式：`cd services/api && DATABASE_URL=<prod-url> ts-node scripts/clear-import-rawdata.ts`
+   - dev DB 已执行：0 条记录，生产合入后再执行一次
 
 2. **BullMQ API 拉取 worker**（独立分支，`feat/w8-bullmq-api-worker`）
    - W3 已完成：`JobSource.encryptedCredential` 落库、`GET /partner/sources/:id/endpoint` 可读
@@ -56,6 +58,7 @@
    - TTS 语音引导（Phase 9.2 择期）
 
 ### P1（择期）
+- **JobFair 增加 `sourceId`/`importBatchId` 字段**：当前招聘会批次跳转只能按 `sourceOrgId` 粗粒度过滤，无法精确回溯单批次。需在 `JobFair` Prisma model 添加 `sourceId String?`，才能支持 fair-sources 页精确 batchId 过滤（与岗位侧对齐）
 - 生产 Kiosk 文件选择切 A1（Terminal Agent 文件中转）
 - signedUrl 长期方案切 B2（Agent 内网 token）
 - 文件自动清理调度
