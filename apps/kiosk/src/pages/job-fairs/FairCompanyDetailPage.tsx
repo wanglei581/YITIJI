@@ -36,6 +36,12 @@ interface Filters {
   positionType: string
 }
 
+interface PrintFile {
+  name:  string
+  size:  string
+  pages: number
+}
+
 // ─── Position type constants ──────────────────────────────────────────────────
 
 const POSITION_TYPE_LABELS: Record<string, string> = {
@@ -214,7 +220,14 @@ function CompanyInfoCard({ company }: { company: FairCompanyDTO }) {
 
 // ─── Action bar ───────────────────────────────────────────────────────────────
 
-function ActionBar({ company, onScanQr }: { company: FairCompanyDTO; onScanQr: () => void }) {
+interface ActionBarProps {
+  company:          FairCompanyDTO
+  onScanQr:         () => void
+  onPrintProfile:   () => void
+  onPrintPositions: () => void
+}
+
+function ActionBar({ company, onScanQr, onPrintProfile, onPrintPositions }: ActionBarProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Button size="lg" onClick={onScanQr} className="flex min-h-[56px] items-center justify-center gap-2">
@@ -235,7 +248,7 @@ function ActionBar({ company, onScanQr }: { company: FairCompanyDTO; onScanQr: (
         size="lg"
         variant="secondary"
         className="flex min-h-[56px] items-center justify-center gap-2"
-        onClick={() => { /* print company profile */ }}
+        onClick={onPrintProfile}
       >
         <PrinterIcon className="h-4 w-4" />
         打印企业资料
@@ -244,7 +257,7 @@ function ActionBar({ company, onScanQr }: { company: FairCompanyDTO; onScanQr: (
         size="lg"
         variant="secondary"
         className="flex min-h-[56px] items-center justify-center gap-2"
-        onClick={() => { /* print positions */ }}
+        onClick={onPrintPositions}
       >
         <PrinterIcon className="h-4 w-4" />
         打印岗位清单
@@ -499,6 +512,30 @@ export function FairCompanyDetailPage() {
   const clearFilters = () => setFilters({ location: '不限', education: '不限', experience: '不限', positionType: '不限' })
   const isFiltered   = Object.values(filters).some((v) => v !== '不限')
 
+  // ── Print handlers ─────────────────────────────────────────────────────────
+  const returnUrl   = company ? `/job-fairs/${fairId}/companies/${companyId}` : undefined
+  const returnLabel = company?.companyName
+
+  const handlePrintProfile = () => {
+    if (!company) return
+    const file: PrintFile = {
+      name:  `${company.companyName}_企业资料.pdf`,
+      size:  '约 120 KB',
+      pages: 1 + Math.ceil(company.positions.length / 8),
+    }
+    navigate('/print/preview', { state: { file, returnUrl, returnLabel } })
+  }
+
+  const handlePrintPositions = () => {
+    if (!company) return
+    const file: PrintFile = {
+      name:  `${company.companyName}_岗位清单.pdf`,
+      size:  `约 ${Math.max(40, company.positions.length * 15)} KB`,
+      pages: Math.max(1, Math.ceil(company.positions.length / 4)),
+    }
+    navigate('/print/preview', { state: { file, returnUrl, returnLabel } })
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -542,7 +579,12 @@ export function FairCompanyDetailPage() {
       {/* Content */}
       <div className="flex flex-1 flex-col gap-4 px-6 py-5 pb-8">
         <CompanyInfoCard company={company} />
-        <ActionBar company={company} onScanQr={() => setShowQr(true)} />
+        <ActionBar
+          company={company}
+          onScanQr={() => setShowQr(true)}
+          onPrintProfile={handlePrintProfile}
+          onPrintPositions={handlePrintPositions}
+        />
 
         <FilterBar
           positions={company.positions}

@@ -14,6 +14,8 @@ interface PrintJobState {
   params?: PrintJobParams
   success?: boolean
   reason?: string
+  returnUrl?: string
+  returnLabel?: string
 }
 
 const DUPLEX_LABEL: Record<string, string> = {
@@ -27,7 +29,7 @@ export function PrintDonePage() {
   const location = useLocation()
   const state = (location.state ?? {}) as PrintJobState
 
-  const { file, params, success = true, reason } = state
+  const { file, params, success = true, reason, returnUrl, returnLabel } = state
 
   const handleRetry = () => {
     const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason'])
@@ -106,14 +108,25 @@ export function PrintDonePage() {
       <div className="mt-8 flex w-full max-w-sm gap-3">
         {success ? (
           <>
-            <Button
-              variant="secondary"
-              size="lg"
-              className="flex-1"
-              onClick={() => navigate('/print/upload')}
-            >
-              继续打印
-            </Button>
+            {returnUrl ? (
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
+                onClick={() => navigate(returnUrl)}
+              >
+                返回{returnLabel ?? '上一页'}
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
+                onClick={() => navigate('/print/upload')}
+              >
+                继续打印
+              </Button>
+            )}
             <Button size="lg" className="flex-1" onClick={() => navigate('/')}>
               返回首页
             </Button>

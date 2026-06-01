@@ -25,7 +25,31 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W5 企业展示与现场服务增强 🚧（2026-06-01）— 基于 W4 封板基线**
+**当前阶段：W5 企业展示与现场服务增强（2026-06-01）— 基于 W4 封板基线**
+
+---
+
+### ✅ W5 第二阶段：打印企业资料 / 打印岗位清单接入真实打印流程（2026-06-01）
+
+**改动文件：**
+- `apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx`
+- `apps/kiosk/src/pages/print/PrintDonePage.tsx`
+
+**实现方式：**
+- `FairCompanyDetailPage` 中 `ActionBar` 新增 `onPrintProfile` / `onPrintPositions` prop
+- 点击"打印企业资料"：构造虚拟 `PrintFile`（名称=`企业名_企业资料.pdf`，页数=`1 + ceil(岗位数/8)`），携带 `returnUrl`/`returnLabel` state，navigate 到 `/print/preview`
+- 点击"打印岗位清单"：构造虚拟 `PrintFile`（名称=`企业名_岗位清单.pdf`，页数=`ceil(岗位数/4)`），携带 `returnUrl`/`returnLabel` state，navigate 到 `/print/preview`
+- `PrintDonePage` 新增 `returnUrl`/`returnLabel` 字段支持：打印成功后显示"返回{企业名}"按钮，替代默认"继续打印"；未携带 returnUrl 时行为不变
+- 全链路复用现有 Preview → Confirm → Progress → Done 打印流程，无新增路由和打印 UI
+
+**合规验证（2026-06-01）：**
+- 禁词扫描 ✅（0 violations）
+- 按钮文案合规：打印企业资料 / 打印岗位清单
+
+**验收（2026-06-01）：**
+- Kiosk `tsc --noEmit` ✅（0 errors）
+- Kiosk `eslint` ✅（0 warnings）
+- Kiosk `build` ✅（1.36s）
 
 ---
 
