@@ -1,85 +1,80 @@
-# 2026-06-02 Claude 今日动手清单(W3 起步 — C 方案)
-
-## 角色
-
-P0 冲刺 **W3 Day 1+2 合并**(用户选 C 方案:JobSource 加凭证 + Webhook 接收端,
-跳过 BullMQ 拉取与 Excel 字段映射,把"我方可接企业推送"作为最强 demo 信号)。
+# 2026-06-02 W3 起步完成(Claude × Codex 协作)
 
 ## 分支
 
-`feat/p0-w3-claude-webhook-sync`(stacked on `feat/p0-w2-claude-jobfair-be7` @ `6ca2121`)
+`feat/p0-w3-claude-webhook-sync`(stacked on `feat/p0-w2-claude-jobfair-be7`)
 
-## 将编辑/新建的文件
+## 协作记录
 
-**后端 Day 1 — JobSource 字段扩 + 加密层**:
-- `services/api/prisma/schema.prisma`(JobSource 加 endpoint / authType / encryptedCredential / webhookSecret 等)
-- `services/api/prisma/migrations/<ts>_extend_job_source_for_sync/`(新建)
-- `services/api/src/common/crypto/secret-cipher.ts`(新建,AES-256-GCM 加解密层)
-- `services/api/.env.example`(添加 `SECRET_ENCRYPTION_KEY`)
+用户在 Claude 写完 W3 起步骨架后让 Codex 接续完成。Codex 的贡献:
+- 安全加固:webhookSecret AES-256-GCM 加密落库(原 plain),
+  rawBody 缺失直接 401(原 fallback 到 JSON.stringify)
+- 补齐"数据源最小闭环":/partner/data-sources GET/POST/PATCH 三个端点
+- 配套 Partner 前端 /sources 页改造(创建弹窗 + Webhook secret 一次性显示)
+- typecheck/lint/build 全过 + smoke 全过
 
-**后端 Day 2 — Webhook 接收端**:
-- `services/api/src/sync/`(新建模块)
-  - `sync.module.ts` / `sync.controller.ts` / `sync.service.ts`
-  - `dto/webhook-payload.dto.ts`
-  - `replay-guard.ts`(in-memory nonce LRU,5min TTL)
-- `services/api/src/app.module.ts`(注册 SyncModule)
-- `services/api/src/jobs/jobs.service.ts`(暴露 `importJobsFromWebhook(sourceId, items)`)
+Claude 接续动作:
+- Review 全部 Codex 改动(参考 commit e3d4629 + 工作区前端 5 文件)
+- 端到端 smoke 自验:登录 → 创建 webhook 源 → HMAC 签名推送 → 防重放 → 错签名 → audit 链
+- 补齐 AuditAction 枚举('data_source.create' / 'data_source.toggle')
 
-**Codex 接续补齐 — 数据源最小闭环**:
-- `services/api/src/jobs/dto/data-source.dto.ts`(新建 Partner 数据源创建 DTO)
-- `services/api/src/jobs/jobs.controller.ts`(补 `/partner/data-sources` 三个接口)
-- `services/api/src/jobs/jobs.service.ts`(数据源列表 / 创建 / 启停;Webhook secret 只返回一次并加密落库)
-
-## 路由
+## 关键端到端验证结果
 
 ```
-POST /api/v1/sync/webhook?source=<jobSourceId>
-  Headers:
-    X-Webhook-Signature: hex(HMAC-SHA256(webhookSecret, timestamp + '.' + body))
-    X-Webhook-Timestamp: unix seconds(±5min 窗口)
-    X-Webhook-Nonce: uuid(5min 内不可重复)
-  Body: { items: [ {externalId, title, company, city, salary?, sourceUrl, ...} ] }
-  → 200 { imported: N, taskId? }
-  → 401 SIG_INVALID / SIG_EXPIRED / SIG_REPLAY(全部同一错误码,防探测)
-  → 400 字段不合规
+1. POST /auth/login {partner1/partner1}              → token ✓
+2. POST /partner/data-sources {name, accessMode:webhook}
+   → { id, webhookUrl: '/api/v1/sync/webhook?source=X',
+       webhookSecretOnce: 'cnpz...E', credentialConfigured: true } ✓
+3. POST /sync/webhook?source=X  + HMAC(timestamp.body)
+   → { imported: 1, receivedRequestId } ✓
+4. POST /sync/webhook same nonce 重放 → 401 同错误码 ✓
+5. POST /sync/webhook 错 sig → 401 同错误码 ✓
+6. Job 落 reviewStatus=pending + publishStatus=draft ✓
+7. Admin 查 audit → 看到 data_source.create + job.import(source='webhook')✓
 ```
 
-## 合规边界检查(每条都过)
+## 合规守住
 
-- ✅ HMAC-SHA256 签名,timingSafeEqual 防侧信道
+- ✅ HMAC-SHA256 timingSafeEqual 防侧信道
 - ✅ 5min 时间窗口防过期重放
-- ✅ Nonce LRU 防同一请求二次提交
-- ✅ webhookSecret AES-256-GCM 加密落库;验签前服务端解密,前端不回显
-- ✅ rawBody 缺失时直接 401,不允许 fallback 到 JSON.stringify(body)
-- ✅ ImportJobsDto 字段白名单 → 企业塞"候选人邮箱"等触红线字段直接 400
-- ✅ 写入默认 `pending` + `draft`,必须 admin 审核后才上 Kiosk
-- ✅ Audit:`action='job.import'`,`payload={source:'webhook', sourceId, count}`
+- ✅ Nonce 5min LRU 防同一请求二次提交
+- ✅ webhookSecret AES-256-GCM 加密落库,前端只见 credentialConfigured
+- ✅ rawBody 缺失直接 401(不允许 JSON.stringify(body) fallback)
+- ✅ ImportJobsDto / WebhookPayloadDto 字段白名单 → 企业塞红线字段直接 400
+- ✅ Webhook 写入默认 pending+draft,必须 admin 审核才能上 Kiosk
+- ✅ Audit:data_source.create + job.import(source=webhook),IP/UA/requestId 留痕
 - ✅ 401 不区分原因(防 sig/timestamp/replay/source 哪个错的探测)
+
+## 总产出 commit(W3)
+
+```
+9b383c1  feat(partner): 数据源创建上接 Codex 后端 + Audit 枚举补齐
+e3d4629  feat(api): W3 webhook sync 接收端与数据源最小闭环  (Codex)
+d1adf67  docs: today-claude.md W3 起步 意图
+```
+
+## 实际可演 demo 故事
+
+> 1. Partner 后台 → 数据来源 → "新增数据源"
+> 2. 选 Webhook → 填名称 "字节跳动 ATS 接入" → 保存
+> 3. 弹出窗口显示 Webhook URL + Secret(只显示一次)
+> 4. 用 Postman / curl / 字节自己 ATS 系统按文档 HMAC 签名推送岗位
+> 5. Admin 后台 → 岗位信息源 → 看到刚推过来的"前端工程师"待审核
+> 6. Admin 点 "通过" → "上架" → Kiosk 看到岗位卡
+> 7. Admin 后台 → 审计日志 → 整链路追溯(data_source.create / job.import / job.review / job.publish)
+> 8. 演示防重放/错签名:重发同 nonce / 改一字节 → 立即 401
 
 ## 阻塞 Mavis 的事项
 
-- W3 Day 1+2 全程:Mavis 不要碰 `services/api/src/sync/`、`services/api/src/common/crypto/`、`services/api/prisma/`
+无。本批改动均在 Claude 独占 + 已结束。
 
-## Mavis 可并行
+## 下一步选择
 
-- 接 `handoff-to-mavis.md` M-001 校企合作 banner
-- Kiosk fair 7 页接真 API(M-002)
-- A3 Admin 文件管理 UI
-- A5 Admin 审计 UI
+- A. push W3 分支让 hook 跑校验 + 开 PR(stacked,等 PR #1 → PR #2 顺序合)
+- B. 继续 W3:做 BullMQ API 拉取 + Excel 字段映射 + 校企合作 banner handoff 跟进
+- C. 暂停 W3,先把 W1 PR #1 + W2 + W3 三条线一次合掉再说
 
-## 预计完成时间
+## 备注
 
-UTC+8 EOD。Day 1 + Day 2 合并到一天完成(两块代码量都不大)。
-
-## 完成清单
-
-- [x] JobSource 字段扩 + migration
-- [x] secret-cipher.ts AES-256-GCM 加解密
-- [x] .env.example 添加 SECRET_ENCRYPTION_KEY
-- [x] SyncModule + Controller + Service + ReplayGuard
-- [x] jobsService.importJobsFromWebhook
-- [x] `/partner/data-sources` 列表 / 创建 / 启停最小闭环
-- [x] app.module 注册
-- [x] curl smoke:伪造请求 + 真请求两种（错签名 401;正确签名 201 imported=1）
-- [x] API typecheck + lint + build
-- [ ] commit
+W1 PR #1 hotfix `a22cdc1` 仍在 stacked 链上。
+demo-w2 临时分支可删除(role-boundary.md 已 cherry-pick 到 W2 主线)。
