@@ -11,7 +11,13 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { AccessMode, PartnerDataSource, ConnStatus, SyncFreq, CreateDataSourcePayload, SourceKind } from '../../services/api'
-import { getDataSources, toggleDataSource, createDataSource } from '../../services/api'
+import { API_ORIGIN, getDataSources, toggleDataSource, createDataSource } from '../../services/api'
+
+function resolveWebhookUrl(webhookUrl?: string): string {
+  if (!webhookUrl) return ''
+  if (/^https?:\/\//i.test(webhookUrl)) return webhookUrl
+  return `${API_ORIGIN}${webhookUrl}`
+}
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -235,15 +241,18 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
                 <div className="text-xs text-gray-400">数据源 ID</div>
                 <div className="mt-1 font-mono text-xs text-gray-700">{created.id}</div>
               </div>
-              {created.webhookUrl && (
-                <div className="rounded-lg bg-white p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-gray-400">Webhook 接收地址</div>
-                    <button type="button" onClick={() => copy(`${window.location.origin.replace(':5175', ':3000')}${created.webhookUrl}`)} className="text-xs text-primary-600">复制</button>
+              {created.webhookUrl && (() => {
+                const fullUrl = resolveWebhookUrl(created.webhookUrl)
+                return (
+                  <div className="rounded-lg bg-white p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-400">Webhook 接收地址</div>
+                      <button type="button" onClick={() => copy(fullUrl)} className="text-xs text-primary-600">复制</button>
+                    </div>
+                    <div className="mt-1 break-all font-mono text-xs text-gray-700">{fullUrl}</div>
                   </div>
-                  <div className="mt-1 break-all font-mono text-xs text-gray-700">{`${window.location.origin.replace(':5175', ':3000')}${created.webhookUrl}`}</div>
-                </div>
-              )}
+                )
+              })()}
               {created.webhookSecretOnce && (
                 <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
                   <div className="flex items-center justify-between">
