@@ -1,13 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { FileTextIcon, InfoIcon } from 'lucide-react'
+import { FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { API_MODE } from '../../services/api/client'
+import { createPrintJob } from '../../services/print/printJobsApi'
 
 interface PrintFile {
-  name: string
-  size: string
-  pages: number
+  name:     string
+  size:     string
+  pages:    number
+  fileUrl?: string
 }
 
 interface LocationState {
@@ -54,6 +57,7 @@ export function PrintConfirmPage() {
   const state = location.state as LocationState | null
   const file = state?.file ?? { name: '未知文件', size: '-', pages: 1 }
   const params = state?.params ?? DEFAULT_PARAMS
+  const [submitting, setSubmitting] = useState(false)
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
     const facesPerCopy = Math.ceil(file.pages / params.pagesPerSheet)
@@ -82,8 +86,27 @@ export function PrintConfirmPage() {
     },
   ]
 
-  const handleConfirm = () => {
-    navigate('/print/progress', { state: { file, params } })
+  const handleConfirm = async () => {
+    // http mode + real fileUrl → submit a real print job, get a taskId for polling
+    if (API_MODE === 'http' && file.fileUrl) {
+      setSubmitting(true)
+      try {
+        const { taskId } = await createPrintJob({
+          fileUrl:  file.fileUrl,
+          fileName: file.name,
+          params,
+        })
+        navigate('/print/progress', { state: { ...location.state, file, params, taskId } })
+      } catch {
+        // API unreachable — fall through to frontend simulation
+        navigate('/print/progress', { state: { ...location.state, file, params } })
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+    // mock mode or no fileUrl → frontend simulation
+    navigate('/print/progress', { state: { ...location.state, file, params } })
   }
 
   return (
@@ -161,11 +184,18 @@ export function PrintConfirmPage() {
 
       {/* Bottom action */}
       <div className="mt-6 flex gap-3">
-        <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
+        <Button variant="secondary" size="lg" className="flex-1" disabled={submitting} onClick={() => navigate(-1)}>
           返回修改
         </Button>
-        <Button size="lg" className="flex-1" onClick={handleConfirm}>
-          按以上设置打印
+        <Button size="lg" className="flex-1" disabled={submitting} onClick={() => void handleConfirm()}>
+          {submitting ? (
+            <span className="flex items-center gap-2">
+              <LoaderIcon className="h-4 w-4 animate-spin" />
+              提交中…
+            </span>
+          ) : (
+            '按以上设置打印'
+          )}
         </Button>
       </div>
     </div>

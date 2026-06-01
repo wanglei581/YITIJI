@@ -9,6 +9,7 @@ import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
+import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
@@ -31,6 +32,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
     JobsModule,
     SyncModule,
     TerminalsModule,
+    PrintJobsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

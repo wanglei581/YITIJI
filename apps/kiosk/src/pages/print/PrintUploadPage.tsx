@@ -12,12 +12,21 @@ import {
 type UploadTab = 'file' | 'qr' | 'usb'
 
 interface MockFile {
-  name: string
-  size: string
-  pages: number
+  name:     string
+  size:     string
+  pages:    number
+  /** Signed or internal file URL. When set, PrintConfirmPage submits a real job via API. */
+  fileUrl?: string
 }
 
-const MOCK_FILE: MockFile = { name: '求职申请材料.pdf', size: '512 KB', pages: 4 }
+// In http mode, point to the backend's test PDF so Terminal Agent can download it.
+// fileMd5 is intentionally omitted — the backend stores '' and the Agent skips verification.
+const MOCK_FILE: MockFile = {
+  name:    '求职申请材料.pdf',
+  size:    '512 KB',
+  pages:   4,
+  fileUrl: '/api/v1/test/sample-visible.pdf',
+}
 
 export function PrintUploadPage() {
   const navigate = useNavigate()

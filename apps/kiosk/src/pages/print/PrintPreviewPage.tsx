@@ -23,9 +23,10 @@ import type {
 } from '@ai-job-print/shared'
 
 interface PrintFile {
-  name: string
-  size: string
-  pages: number
+  name:     string
+  size:     string
+  pages:    number
+  fileUrl?: string
 }
 
 interface LocationState {

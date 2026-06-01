@@ -25,7 +25,48 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W5 企业展示与现场服务增强（2026-06-01）— 基于 W4 封板基线**
+**当前阶段：W6 打印 API 接入（2026-06-01）— 基于 W5 封板基线**
+
+---
+
+### ✅ W6：Kiosk 打印流程接入真实后端打印任务 API（2026-06-01）
+
+**Commit：** （待提交）
+
+**改动范围：**
+
+**后端 `services/api/`：**
+- 新增 `src/print-jobs/` 模块（DTO + service + controller + module）
+- `POST /api/v1/print/jobs` — Kiosk 无鉴权提交打印任务，返回 `{ taskId, status, createdAt }`
+- `GET  /api/v1/print/jobs/:taskId` — Kiosk 轮询任务状态，返回 `{ taskId, status, errorCode?, errorMessage?, completedAt? }`
+- `fileMd5` 缺省时存 `''`（Terminal Agent 已实现：fileMd5 为空字符串则跳过文件完整性校验）
+- `app.module.ts` 注册 `PrintJobsModule`
+
+**Kiosk 前端 `apps/kiosk/`：**
+- 新增 `src/services/print/printJobsApi.ts`：`createPrintJob()` / `getPrintJobStatus()` fetch 封装
+- 所有 5 个打印页面的 `PrintFile` 接口新增可选 `fileUrl?: string` 字段
+- `PrintUploadPage`：mock 文件加入 `fileUrl: '/api/v1/test/sample-visible.pdf'`
+- `PrintConfirmPage`：`API_MODE=http` 且 `file.fileUrl` 存在时，先 `POST /api/v1/print/jobs` 获取 `taskId`，再 navigate 到 `/print/progress`；API 失败则降级为前端模拟；loading 状态 + 按钮禁用
+- `PrintProgressPage`：完整双模式
+  - **real 模式**（`API_MODE=http && taskId` 存在）：每 2s 轮询 `GET /api/v1/print/jobs/:taskId`；`pending/claimed` → 排队等待，`printing` → 打印中，`completed` → navigate done(success)，`failed` → navigate done(failure + errorMessage)；提交任务步骤在到达页面时已标记完成
+  - **sim 模式**（无 taskId 或 mock 模式）：保留原 setTimeout 动画；dev 按钮"[DEV] 模拟失败"仅在 sim 模式出现
+
+**合规验证（2026-06-01）：**
+- 新增文件禁词扫描 ✅（0 violations）
+- 无一键投递 / 一键打印 / 企业收简历等违规文案
+
+**验收（2026-06-01）：**
+- API `tsc --noEmit` ✅（0 errors）
+- API `eslint` ✅（0 warnings）
+- API `build` ✅
+- Kiosk `tsc --noEmit` ✅（0 errors）
+- Kiosk `eslint` ✅（0 warnings）
+- Kiosk `build` ✅
+
+> **W6 范围限定说明：**
+> - 前端 PrintUploadPage 仍为 mock（无真实文件选择器），real 模式使用 `/api/v1/test/sample-visible.pdf` 作为演示文件
+> - FairCompanyDetailPage（W5 企业详情）打印按钮生成虚拟 PrintFile（无 fileUrl），进入 sim 模式 — 真实企业资料 PDF 生成为未来任务
+> - 奔图开放打印 API 对接（云打印彩色 mode）仍在 TODO 等厂家确认
 
 ---
 

@@ -4,18 +4,20 @@ import { AlertCircleIcon, CheckCircleIcon, FileTextIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 
 interface PrintFile {
-  name: string
-  size: string
-  pages: number
+  name:     string
+  size:     string
+  pages:    number
+  fileUrl?: string
 }
 
 interface PrintJobState {
-  file?: PrintFile
-  params?: PrintJobParams
-  success?: boolean
-  reason?: string
-  returnUrl?: string
-  returnLabel?: string
+  file?:         PrintFile
+  params?:       PrintJobParams
+  success?:      boolean
+  reason?:       string
+  returnUrl?:    string
+  returnLabel?:  string
+  taskId?:       string
 }
 
 const DUPLEX_LABEL: Record<string, string> = {
