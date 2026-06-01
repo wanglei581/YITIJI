@@ -29,6 +29,14 @@
 
 ---
 
+### 🔧 开发服务连接修复（2026-06-01）
+
+- `apps/kiosk` / `apps/admin` / `apps/partner` 的 Vite dev server 统一监听 `0.0.0.0`
+- 三端 Vite 配置开启 `strictPort`，避免端口占用时静默漂移导致浏览器 HMR 反复 `Reconnecting`
+- 影响范围：仅开发服务连接稳定性，不改业务代码和页面 UI
+
+---
+
 ### ✅ W5 第一阶段：招聘会企业详情页增强（2026-06-01）
 
 **路由：** `/job-fairs/:id/companies/:companyId`（未变）  
@@ -60,6 +68,15 @@
 - Kiosk `tsc --noEmit` ✅（0 errors）
 - Kiosk `eslint` ✅（0 warnings）
 - Kiosk `build` ✅（1.35s）
+- 合规禁词扫描 ✅（0 violations）
+
+**Commit：** `4880fa8` feat(w5): enhance fair company detail page with filters and poster view
+
+**遗留 TODO（W5 第二阶段）：**
+- 打印企业资料 / 打印岗位清单接入真实打印流程（当前为 `console.log` placeholder）
+- 企业宣传视频播放支持（当前为行业渐变色封面占位）
+- FairStatsPage 接真实展会统计数据
+- 展位导览图点击弹出企业预览
 
 ---
 
