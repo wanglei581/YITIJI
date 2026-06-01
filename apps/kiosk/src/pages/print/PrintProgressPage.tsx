@@ -46,6 +46,7 @@ const FAIL_REASONS = [
 ]
 
 const POLL_INTERVAL_MS = 2000
+const REAL_POLL_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes — guard against Agent never claiming
 
 const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
 
@@ -70,9 +71,10 @@ export function PrintProgressPage() {
   const shouldFail = !useRealApi && state?.simulateFailure === true
   const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS[0]
 
-  const [current, setCurrent] = useState<Step>(useRealApi ? 'queuing' : 'submitting')
-  const [failed, setFailed]   = useState(false)
-  const cancelRef             = useRef(false)
+  const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
+  const [failed, setFailed]     = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
+  const cancelRef               = useRef(false)
 
   // ── Navigation helpers ────────────────────────────────────────────────────
 
@@ -133,9 +135,19 @@ export function PrintProgressPage() {
     // Poll immediately, then on interval
     void tick()
     const timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
+
+    // 5-minute hard timeout — if Agent never claims or backend is unresponsive
+    const timeoutTimer = setTimeout(() => {
+      if (cancelRef.current) return
+      cancelRef.current = true
+      clearInterval(timer)
+      setTimedOut(true)
+    }, REAL_POLL_TIMEOUT_MS)
+
     return () => {
       cancelRef.current = true
       clearInterval(timer)
+      clearTimeout(timeoutTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useRealApi, taskId])
@@ -175,6 +187,34 @@ export function PrintProgressPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const currentIdx = stepIndex(current)
+
+  // Timeout screen — Agent never responded within 5 minutes
+  if (timedOut) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-amber-50">
+          <ClockIcon className="h-12 w-12 text-amber-500" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">处理超时</h1>
+          <p className="mt-3 text-base text-gray-500 max-w-xs">
+            打印终端长时间未响应，任务可能仍在队列中。
+            <br />
+            请联系工作人员确认打印机状态。
+          </p>
+          {taskId && (
+            <p className="mt-3 text-xs text-gray-400">任务编号：{taskId}</p>
+          )}
+        </div>
+        <button
+          onClick={() => navigate('/')}
+          className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
+        >
+          返回首页
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col items-center justify-center p-8">

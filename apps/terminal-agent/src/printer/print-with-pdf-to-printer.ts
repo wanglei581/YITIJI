@@ -1,31 +1,66 @@
 import path from 'path'
-import { PrintResult, PrintErrorCode } from './types'
+import type { PrintOptions } from 'pdf-to-printer'
+import { PrintResult, PrintErrorCode, PrintJobParams } from './types'
 import { PRINT_TIMEOUT_MS } from '../config'
 
 /**
  * Method B — pdf-to-printer (bundles SumatraPDF)
  *
- * Uses the `pdf-to-printer` npm package which ships SumatraPDF.exe as a
- * bundled binary. SumatraPDF accepts the target printer name via -print-to,
- * giving us reliable per-printer routing without needing a system PDF reader.
- *
- * Supported file types: PDF, XPS, CBZ, CBR, DjVu (SumatraPDF native formats).
- * Images (JPG/PNG/BMP/TIFF) should be pre-converted to PDF via image-to-pdf.ts before calling
- * this function. See print.ts for the unified routing logic (Phase 8.1A production entry point).
- *
- * Advantages over Method A:
- *  - Printer name is passed directly to SumatraPDF, not through shell verbs
- *  - Works even if no PDF reader is registered in Windows
- *  - Reproducible across machines (no dependency on installed apps)
- *
- * Limitations:
- *  - Images (.jpg, .png) are not supported; only PDF and SumatraPDF formats
- *  - The pdf-to-printer package must be installed (bundled SumatraPDF ~6 MB)
- *  - SumatraPDF exits after submitting to spooler, not after physical print
+ * W7: PrintJobParams are now mapped to SumatraPDF PrintOptions. Verified fields:
+ *   copies       → PrintOptions.copies
+ *   colorMode    → PrintOptions.monochrome (black_white → true)
+ *   duplex       → PrintOptions.side (simplex/duplexlong/duplexshort)
+ *   orientation  → PrintOptions.orientation (portrait/landscape; auto = omit)
+ *   scale        → PrintOptions.scale (fit/noscale; actual → noscale)
+ *   pageRange    → PrintOptions.pages
+ * Pending Windows true-machine verification:
+ *   pagesPerSheet — no direct SumatraPDF support via pdf-to-printer
+ *   quality       — needs DEVMODE; no SumatraPDF equivalent
  */
+
+function mapParams(params: Partial<PrintJobParams>): Partial<PrintOptions> {
+  const opts: Partial<PrintOptions> = {}
+
+  if (params.copies !== undefined && params.copies > 0) {
+    opts.copies = params.copies
+  }
+
+  if (params.colorMode === 'black_white') {
+    opts.monochrome = true
+  }
+
+  if (params.duplex === 'simplex') {
+    opts.side = 'simplex'
+  } else if (params.duplex === 'duplex_long_edge') {
+    opts.side = 'duplexlong'
+  } else if (params.duplex === 'duplex_short_edge') {
+    opts.side = 'duplexshort'
+  }
+
+  if (params.orientation === 'portrait') {
+    opts.orientation = 'portrait'
+  } else if (params.orientation === 'landscape') {
+    opts.orientation = 'landscape'
+  }
+  // 'auto' → omit (let driver decide)
+
+  if (params.scale === 'fit') {
+    opts.scale = 'fit'
+  } else if (params.scale === 'actual') {
+    opts.scale = 'noscale'
+  }
+
+  if (params.pageRange && params.pageRange !== 'all') {
+    opts.pages = params.pageRange
+  }
+
+  return opts
+}
+
 export async function printWithPdfToPrinter(
   filePath: string,
   printerName: string,
+  params?: Partial<PrintJobParams>,
 ): Promise<PrintResult> {
   const startedAt = new Date().toISOString()
   const t0 = Date.now()
@@ -33,7 +68,6 @@ export async function printWithPdfToPrinter(
 
   const ext = path.extname(filePath).toLowerCase()
 
-  // pdf-to-printer only handles PDF (and other SumatraPDF formats)
   const sumatraFormats = new Set(['.pdf', '.xps', '.cbz', '.cbr', '.djvu'])
   if (!sumatraFormats.has(ext)) {
     return {
@@ -44,17 +78,24 @@ export async function printWithPdfToPrinter(
     }
   }
 
+  const printOptions: PrintOptions = {
+    printer: printerName,
+    ...(params ? mapParams(params) : {}),
+  }
+
   try {
-    // Dynamic import so the module is optional — if not installed, we fall back gracefully
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ptp = require('pdf-to-printer') as {
-      print: (file: string, options?: { printer?: string; timeout?: number }) => Promise<void>
+      print: (file: string, options?: PrintOptions) => Promise<void>
     }
 
-    await ptp.print(filePath, {
-      printer: printerName,
-      timeout: PRINT_TIMEOUT_MS,
-    })
+    // SumatraPDF exits after spooling (not after physical print). Guard against driver hangs.
+    await Promise.race([
+      ptp.print(filePath, printOptions),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('PRINT_TIMEOUT')), PRINT_TIMEOUT_MS),
+      ),
+    ])
 
     return {
       success: true, method, printer: printerName, file: filePath,
@@ -65,18 +106,14 @@ export async function printWithPdfToPrinter(
     const durationMs = Date.now() - t0
     const msg = e instanceof Error ? e.message : String(e)
 
-    let errorCode: PrintErrorCode = 'PRINT_COMMAND_FAILED'
-    if (msg.includes('Cannot find module')) {
-      errorCode = 'PRINT_COMMAND_FAILED'
-    } else if (durationMs >= PRINT_TIMEOUT_MS) {
-      errorCode = 'PRINT_TIMEOUT'
-    }
+    const isTimeout = msg === 'PRINT_TIMEOUT' || durationMs >= PRINT_TIMEOUT_MS
+    const errorCode: PrintErrorCode = isTimeout ? 'PRINT_TIMEOUT' : 'PRINT_COMMAND_FAILED'
 
     return {
       success: false, method, printer: printerName, file: filePath,
       startedAt, finishedAt, durationMs,
       errorCode,
-      errorMessage: msg,
+      errorMessage: isTimeout ? `打印超时（${PRINT_TIMEOUT_MS / 1000}s）` : msg,
     }
   }
 }

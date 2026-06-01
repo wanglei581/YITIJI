@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { signFileUrl } from '../files/signing'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 
 export interface PrintJobCreated {
@@ -29,16 +30,41 @@ const DEFAULT_PARAMS = {
   pagesPerSheet: 1,
 }
 
+// B1: 30-minute TTL for the signedUrl stored in PrintTask.fileUrl.
+// Upload returns a 5-min URL; we re-sign here with a longer TTL so the
+// Terminal Agent can still download the file even if claim is delayed.
+const PRINT_JOB_FILE_URL_TTL_MS = 30 * 60 * 1000
+
+/** Extract fileId from an internal signed content URL: /api/v1/files/<id>/content?... */
+function extractFileIdFromSignedUrl(fileUrl: string): string | null {
+  try {
+    const match = fileUrl.match(/\/files\/([^/]+)\/content/)
+    return match?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
 @Injectable()
 export class PrintJobsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreatePrintJobDto): Promise<PrintJobCreated> {
     const taskId = `ptask_kiosk_${crypto.randomBytes(8).toString('hex')}`
+
+    // B1: If fileUrl is an internal signed URL, re-sign with 30-min TTL so
+    // the Terminal Agent can download even after a claim delay.
+    let storedFileUrl = dto.fileUrl
+    const fileId = extractFileIdFromSignedUrl(dto.fileUrl)
+    if (fileId) {
+      const { url } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+      storedFileUrl = url
+    }
+
     const task = await this.prisma.printTask.create({
       data: {
         id:         taskId,
-        fileUrl:    dto.fileUrl,
+        fileUrl:    storedFileUrl,
         fileMd5:    dto.fileMd5 ?? '',
         paramsJson: JSON.stringify(dto.params ?? DEFAULT_PARAMS),
         status:     'pending',

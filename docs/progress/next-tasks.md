@@ -1,52 +1,57 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（W6 + Admin Excel 审核闭环完成，已合入 main）  
+> 最后更新：2026-06-01（W7 真实文件上传链路完成，待合入 main）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（W7 待开分支：PrintUploadPage 接真实文件上传）
+## 📌 当前状态（W7 已完成，待 push + merge main）
 
-**W6 已完成并合入 main（2026-06-01）**：
-- ✅ 后端新增 `POST /api/v1/print/jobs` + `GET /api/v1/print/jobs/:taskId`（`PrintJobsModule`）
-- ✅ Kiosk `PrintConfirmPage`：`API_MODE=http` + `file.fileUrl` 存在时提交真实打印任务，获取 `taskId`
-- ✅ Kiosk `PrintProgressPage`：双模式 — real（taskId 轮询真实状态）/ sim（原 setTimeout 动画兜底）
-- ✅ Admin `ImportBatchesPage`：Excel 导入批次审核页（状态/类型双维度筛选+搜索+分页）
-- ✅ 后端 `GET /admin/import-batches`（`@Roles('admin')` 保护，Prisma 查询）
+**W7 已完成（2026-06-01，`feat/w7-kiosk-file-upload`）**：
+- ✅ Terminal Agent `print.ts`：`params` 真实传给 `printWithPdfToPrinter`（不再 eslint-disable unused-vars）
+- ✅ Terminal Agent `print-with-pdf-to-printer.ts`：`mapParams()` — PrintJobParams → SumatraPDF PrintOptions（copies/colorMode/duplex/orientation/scale/pageRange）；超时改为 `Promise.race` 真实 guard
+- ✅ 后端 `print-jobs.service.ts`：B1 re-sign signedUrl with 30-min TTL（防 Agent claim 延迟 URL 过期）
+- ✅ 后端 `print-jobs.controller.ts`：`POST /print/jobs` 新增 `@Throttle(10/min)`
+- ✅ Kiosk `services/files/filesApi.ts`（新建）：`kioskUploadFile()` → `POST /api/v1/files/kiosk-upload`
+- ✅ Kiosk `PrintUploadPage`：A2 桌面验证模式真实上传，loading/error 显示，A2 banner
+- ✅ Kiosk `PrintPreviewPage`：`fileMd5?` 字段透传；直接访问 URL 时显示"重新上传"引导
+- ✅ Kiosk `PrintConfirmPage`：`fileMd5` 传给 createPrintJob；API 失败显示 error banner（不再静默降级）
+- ✅ Kiosk `PrintProgressPage`：real 模式 5 分钟超时保护（显示超时页 + 任务编号 + 返回首页）
 - tsc / eslint / build / 合规禁词 全部 ✅
 
-**W5 已完成（2026-06-01）**：
-- ✅ `/job-fairs/:id/companies/:companyId` 企业详情页全面增强（W5 P1）
-- ✅ 打印企业资料 / 打印岗位清单按钮接入 Kiosk 打印 UI 全链路（W5 P2）
+**W7 设计备忘：**
+- A2 只是桌面 Chrome/Edge 验证路径；生产 Kiosk 后续切 A1（Terminal Agent 文件中转）
+- B1 是 30-min signedUrl 过渡方案；长期可切 B2（Agent 内网 token 下载，不依赖 URL TTL）
 
 ---
 
-## 🔜 W7：PrintUploadPage 接真实文件上传（下一分支）
+## 🔜 下一步优先级
 
-**分支名**：`feat/w7-kiosk-file-upload`
+### P0（立即）
+1. **合并 W7 → main**：push + FF merge，更新 CLAUDE.md 进度摘要
 
-**目标**：
-- 后端：`POST /files/kiosk-upload` → 接收文件，返回 `{ signedUrl, fileId }`
-- Kiosk `PrintUploadPage`：真实文件选择（通过 Terminal Agent 中转或浏览器 input）+ 调用上传端点 → 得到 `signedUrl` 作为 `file.fileUrl`
-- 打印全链路：上传真实文件 → signedUrl → `POST /api/v1/print/jobs` → Terminal Agent 下载打印
+2. **BullMQ API 拉取 worker**（独立分支）
+   - W3 已完成：`JobSource.encryptedCredential` 落库、`GET /partner/sources/:id/endpoint` 可读
+   - 待开发：worker 周期性拉取外部岗位/招聘会数据，写入 ExternalJob，触发审核流程
 
-**范围限定**：
-- 只改 `PrintUploadPage` 和后端文件上传端点
-- FairCompanyDetailPage 打印按钮继续走 sim 模式（企业资料 PDF 生成为未来任务）
-- 不改首页入口和底部导航
-- 不混入其他功能
+3. **Phase 9 UI Polish + AI 数字人引导员**（独立分支）
+   - 静态 3D 就业引导员（VRM + WebGL fallback）
+   - Kiosk 首页视觉升级
+   - TTS 语音引导（Phase 9.2 择期）
 
-**其他 P0 候选（独立分支）**：
-- BullMQ API 拉取 worker（JobSource 已有 encryptedCredential，待周期性拉取）
-- Phase 9 UI Polish + AI 数字人引导员（静态 3D VRM + Kiosk 视觉升级）
-- AI在青岛数据接真实 API（当前 mock）
+### P1（择期）
+- 生产 Kiosk 文件选择切 A1（Terminal Agent 文件中转）
+- signedUrl 长期方案切 B2（Agent 内网 token）
+- 文件自动清理调度
+- 打印任务状态实时追踪 UI 优化
 
-**待做（非紧急）**：
-- [ ] 企业宣传视频播放支持（当前为渐变封面占位）
-- [ ] FairStatsPage 数据接真实展会统计
-- [ ] 招聘会详情页增强：展位导览图点击弹出企业预览
+### P2
+- 企业宣传视频播放支持（当前为渐变封面占位）
+- FairStatsPage 数据接真实展会统计
+- 招聘会详情页增强：展位导览图点击弹出企业预览
+- 奔图开放打印 API 彩色 mode（待厂家确认）
 
-**已合入 main 的历史分支**：W1 / W2 / W3 / W4 / W5 / W6 / AI在青岛 / Kiosk 触控优化 均已合入 main，不要再按待合并分支处理。
+**已合入 main 的历史分支**：W1 / W2 / W3 / W4 / W5 / W6 / AI在青岛 / Kiosk 触控优化 均已合入 main。
 
 ---
 

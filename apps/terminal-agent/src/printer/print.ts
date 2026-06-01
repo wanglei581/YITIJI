@@ -36,13 +36,12 @@ const IMAGE_EXTENSIONS_PHASE_NEXT = new Set(['.bmp', '.tiff', '.tif'])
  *
  * @param filePath     待打印文件的绝对路径
  * @param printerName  打印机名称（默认从 config.ts DEFAULT_PRINTER 读取）
- * @param params       打印参数（Phase 8.1A 预留，未传给 SumatraPDF）
+ * @param params       打印参数（W7 起真实传给 SumatraPDF -print-settings）
  */
 export async function print(
   filePath: string,
   printerName: string = DEFAULT_PRINTER,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _params?: Partial<PrintJobParams>,
+  params?: Partial<PrintJobParams>,
 ): Promise<PrintResult> {
   const startedAt = new Date().toISOString()
   const t0 = Date.now()
@@ -99,7 +98,7 @@ export async function print(
   // ── PDF 路径：Method B 直接打印 ──────────────────────────────────────────
   if (PDF_EXTENSIONS.has(ext)) {
     log(`print [auto]: PDF → Method B  file=${filePath}  printer=${printerName}`)
-    return printWithPdfToPrinter(filePath, printerName)
+    return printWithPdfToPrinter(filePath, printerName, params)
   }
 
   // ── 图片路径（JPG/PNG）：pdfkit 转换 → Method B ──────────────────────────
@@ -109,7 +108,7 @@ export async function print(
     let tempPdfPath: string | undefined
     try {
       tempPdfPath = await imageToPdf(filePath)
-      return await printWithPdfToPrinter(tempPdfPath, printerName)
+      return await printWithPdfToPrinter(tempPdfPath, printerName, params)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
       return {

@@ -27,6 +27,7 @@ interface PrintFile {
   size:     string
   pages:    number
   fileUrl?: string
+  fileMd5?: string
 }
 
 interface LocationState {
@@ -116,9 +117,11 @@ function ToggleGroup({
 export function PrintPreviewPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { file } = (location.state as LocationState | null) ?? {
-    file: { name: '未知文件', size: '-', pages: 1 },
-  }
+  const locationState = location.state as LocationState | null
+
+  // Use a placeholder when state is missing — hooks must always run before any early return
+  const EMPTY_FILE: PrintFile = { name: '', size: '', pages: 0 }
+  const file = locationState?.file ?? EMPTY_FILE
 
   const printer = MOCK_PRINTER_STATUS
 
@@ -194,6 +197,24 @@ export function PrintPreviewPage() {
       pagesPerSheet,
     }
     navigate('/print/confirm', { state: { file, params } })
+  }
+
+  // Guard: direct URL access without file state — all hooks have already run above
+  if (!locationState?.file) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
+          <AlertTriangleIcon className="h-10 w-10 text-amber-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
+          <p className="mt-2 text-sm text-gray-500">请重新上传文件后再进行打印设置</p>
+        </div>
+        <Button size="lg" onClick={() => navigate('/print/upload')}>
+          重新上传文件
+        </Button>
+      </div>
+    )
   }
 
   return (

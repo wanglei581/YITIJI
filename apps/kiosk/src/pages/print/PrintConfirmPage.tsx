@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-react'
+import { AlertCircleIcon, FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { createPrintJob } from '../../services/print/printJobsApi'
@@ -11,6 +11,7 @@ interface PrintFile {
   size:     string
   pages:    number
   fileUrl?: string
+  fileMd5?: string
 }
 
 interface LocationState {
@@ -58,6 +59,7 @@ export function PrintConfirmPage() {
   const file = state?.file ?? { name: '未知文件', size: '-', pages: 1 }
   const params = state?.params ?? DEFAULT_PARAMS
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
     const facesPerCopy = Math.ceil(file.pages / params.pagesPerSheet)
@@ -90,17 +92,18 @@ export function PrintConfirmPage() {
     // http mode + real fileUrl → submit a real print job, get a taskId for polling
     if (API_MODE === 'http' && file.fileUrl) {
       setSubmitting(true)
+      setSubmitError(null)
       try {
         const { taskId } = await createPrintJob({
           fileUrl:  file.fileUrl,
+          fileMd5:  file.fileMd5,
           fileName: file.name,
           params,
         })
         navigate('/print/progress', { state: { ...location.state, file, params, taskId } })
-      } catch {
-        // API unreachable — fall through to frontend simulation
-        navigate('/print/progress', { state: { ...location.state, file, params } })
-      } finally {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '提交失败，请重试'
+        setSubmitError(msg)
         setSubmitting(false)
       }
       return
@@ -182,8 +185,16 @@ export function PrintConfirmPage() {
         </Card>
       </div>
 
+      {/* Submit error */}
+      {submitError && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircleIcon className="h-4 w-4 shrink-0" />
+          <span>{submitError}</span>
+        </div>
+      )}
+
       {/* Bottom action */}
-      <div className="mt-6 flex gap-3">
+      <div className="mt-4 flex gap-3">
         <Button variant="secondary" size="lg" className="flex-1" disabled={submitting} onClick={() => navigate(-1)}>
           返回修改
         </Button>

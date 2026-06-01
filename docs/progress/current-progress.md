@@ -25,7 +25,55 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：W6 打印 API 接入 + Excel 导入审核闭环（2026-06-01，已合入 main）— 下一步 W7：PrintUploadPage 接真实文件上传**
+**当前阶段：W7 真实文件上传链路打通（2026-06-01，feat/w7-kiosk-file-upload）— 下一步：合并 main + BullMQ worker**
+
+---
+
+### 🔄 W7：Kiosk 真实文件上传 + 打印链路打通（2026-06-01，feat/w7-kiosk-file-upload）
+
+**目标：** 打通「用户选文件 → /files/kiosk-upload → /print/jobs → Terminal Agent 打印 → Kiosk 轮询完成」完整链路。
+
+**文件选择决策（A2 桌面验证模式）：**
+- 当前 `PrintUploadPage` 使用 `<input type="file">` 仅在桌面 Chrome/Edge 下验证 E2E 链路
+- 生产 Kiosk 切换 A1：Terminal Agent 监听本地/U 盘目录 → 推送文件列表 → Kiosk 轮询选取（后续分支）
+- 页面已明确标注"桌面浏览器验证模式"提示 banner（`API_MODE=http` 时显示）
+
+**signedUrl 策略（B1 过渡方案）：**
+- Upload 返回 5-min 短 TTL signedUrl
+- `POST /print/jobs` 创建时后端重新签发 30-min TTL，存入 PrintTask.fileUrl
+- 避免 Terminal Agent claim 延迟导致下载时 URL 失效
+
+**改动清单：**
+
+**Terminal Agent `apps/terminal-agent/`：**
+- `print-with-pdf-to-printer.ts`：新增 `mapParams()` — 把 `PrintJobParams` 映射到 `pdf-to-printer` `PrintOptions`
+  - `colorMode=black_white` → `monochrome: true`
+  - `duplex` → `side: simplex/duplexlong/duplexshort`
+  - `orientation` → `portrait/landscape`（auto = 省略）
+  - `scale=fit/actual` → `fit/noscale`
+  - `copies`, `pageRange` → 直接传
+  - 超时改为 `Promise.race` + `setTimeout` 真实 guard（之前 `timeout` 字段不在 `PrintOptions` 中无效）
+- `print.ts`：移除 `eslint-disable @typescript-eslint/no-unused-vars`，`params` 真实传给 `printWithPdfToPrinter`
+
+**后端 `services/api/`：**
+- `print-jobs.service.ts`：新增 `extractFileIdFromSignedUrl()` + B1 re-sign 逻辑（30-min TTL）
+- `print-jobs.controller.ts`：`POST /print/jobs` 新增 `@Throttle(10/min per IP)`
+
+**Kiosk `apps/kiosk/`：**
+- `src/services/files/filesApi.ts`（新建）：`kioskUploadFile(file)` → `POST /api/v1/files/kiosk-upload` → `KioskUploadResult`
+- `PrintUploadPage.tsx`：A2 模式真实 `<input type="file">` 上传，上传 loading/error 显示，A2 模式 banner
+- `PrintPreviewPage.tsx`：`PrintFile` 加 `fileMd5?`；缺 state 时（直接访问 URL）在所有 hooks 之后显示"重新上传"引导
+- `PrintConfirmPage.tsx`：`PrintFile` 加 `fileMd5?`；`createPrintJob` 携带 `fileMd5`；API 失败改为显示 error banner（不再静默降级 sim 模式）
+- `PrintProgressPage.tsx`：real 模式新增 5 分钟超时保护，超时显示"处理超时"页 + 任务编号 + 返回首页按钮
+
+**验收（2026-06-01）：**
+- Terminal Agent `tsc --noEmit` ✅（0 errors）
+- API `tsc --noEmit` ✅（0 errors）
+- Kiosk `tsc --noEmit` ✅（0 errors）
+- 全局 `lint` ✅（0 warnings）
+- Kiosk `build` ✅
+- API `build` ✅
+- 合规禁词扫描 ✅（0 violations）
 
 ---
 
