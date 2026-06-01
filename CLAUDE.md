@@ -652,45 +652,48 @@ Claude Code 每次开发前必须：
 
 ## 15. 当前前期开发记录摘要
 
-已经确认：
+已经确认（产品定位与硬件，长期不变）：
 
-- 项目不再定位为大学生就业创业平台。
-- 项目定位调整为 AI求职打印服务终端。
-- 底部导航只保留：首页、AI助手、我的。
-- AI工具箱不作为一级导航。
-- 企业招聘端删除。
-- 合作机构后台保留，但只做数据与运营后台。
-- 管理员后台保留，用于管理整个终端运营体系。
-- 打印机设备确定为奔图 CM2800/CM2820 系列彩色激光多功能一体机，Windows 驱动识别名称为 Pantum CM2800ADN Series，代码中必须通过 printerName 配置项指定，不得硬编码型号。
-- 岗位和招聘会只做第三方/官方来源信息入口。
+- 项目定位为 AI求职打印服务终端，不是招聘平台。
+- 底部导航：首页、AI助手、我的。AI工具箱不作为一级导航。
+- 企业招聘端删除；合作机构后台只做数据与运营后台；管理员后台管理整个终端运营体系。
+- 打印机：奔图 CM2800/CM2820 系列彩色激光多功能一体机，Windows 驱动识别名 `Pantum CM2800ADN Series`，代码必须通过 `printerName` 配置项指定。
+- 岗位/招聘会只做第三方/官方来源信息入口。
 - 秒哒旧项目作为参考库，不作为正式工程继续开发。
+
+当前阶段（2026-06-01，**写完代码改这里 + docs/progress/current-progress.md**）：
+
+- Phase 1–7（设计系统、前台、后台、合作机构、API 设计、AI Provider 骨架、岗位/招聘会真实 API）全部完成
+- **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI 状态 / 8.2C 安全加固，全部 Mac 真实后端跨机 E2E 通过
+- **W1/W2/W3 stacked 分支已 FF 合入 main（2026-06-01，`3f35caa`）**：
+  - W1：BE-1 文件签名 + Kiosk 上传 + K2 简历四步流 + ReactDiffViewer
+  - W2：BE-7 JobFair 8 端点切真 Prisma + audit + 校企合作详情端点
+  - W3：JobSource 凭证加密落库（AES-256-GCM）+ Webhook 接收端（HMAC + 5min 时间窗 + nonce LRU 防重放）+ Partner /sources 三轨入口（API/Webhook/Excel）+ Phase 7.11 R4 类型对齐 `packages/shared/PartnerDataSourceView`
+- E2E demo（Partner → Webhook → Admin 审核 → Kiosk 展示）已跑通；防重放/错签名 401、候选人字段注入 400、webhookSecret 创建后 GET 不再回显 全部通过
 
 ## 16. 当前最高优先级
 
-**P0：**
+**P0（next）：**
 
-- 新建正式项目
-- 建立设计系统
-- 完成一体机首页
-- 完成打印扫描核心流程
-- 完成管理员后台基础框架
-- 完成岗位/招聘会外部来源展示逻辑
+- Excel 字段映射 service 层接入（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export，Sources 页 4 步向导 mock 已存在，下一步是把 mock 切到 service 调用 + 后端落 ImportBatch）
+- BullMQ API 拉取 worker（W3 后端 JobSource 已有 endpoint/encryptedCredential，待 worker 周期性拉取）
+- Phase 9 UI Polish + AI 数字人引导员（Phase 8 封板后启动）
 
-**P1：**
+**已完成（保留作为基线）：**
 
-- AI简历服务
-- 文件自动清理
-- 打印任务状态
-- 合作机构后台
-- 数据源同步
+- 一体机首页 / 打印扫描核心流程 / 管理员后台基础框架 / 岗位/招聘会外部来源展示
+- AI简历服务 / 合作机构后台 P0 / 数据源同步骨架（W3 Webhook 已落地，API/Excel 后续接 worker）
+- Windows Terminal Agent（Phase 8 全部封板，含 DPAPI/SQLite/WMI/单实例/断网重试/Windows 服务）
+
+**P1（择期）：**
+
+- 文件自动清理调度（清理策略骨架已具备）
+- 打印任务状态实时追踪 UI（后端持久化已就绪）
+- 奔图开放打印 API 对接（云打印彩色 mode 取值仍 TODO，待厂家确认）
 
 **P2：**
 
-- Windows Terminal Agent
-- 奔图接口对接
-- 扫描目录监听
-- 告警中心
-- 数据统计
+- 扫描目录监听 / 告警中心 / 数据统计报表
 
 ## 17. 跨平台运行要求
 

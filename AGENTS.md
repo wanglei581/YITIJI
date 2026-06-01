@@ -96,15 +96,18 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：Phase 8.2C — Prisma持久化 + HMAC actionToken + WMI心跳 + 安全加固（2026-05-28）
+当前阶段：W3 三轨数据源入口 + Phase 7.11 R4 类型对齐已合入 main（2026-06-01）
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
-- Phase 8.0–8.1A 已完成（2026-05-27）：PDF/图片打印、统一 print()、pdfkit 转换 ✅
-- Phase 8.1B 已完成（2026-05-27）：注册/心跳/claim/下载/MD5/print()/状态上报；Windows 真机 670ms 出纸 ✅
-- Phase 8.1C/D 已封板（2026-05-28）：DPAPI 加密/SQLite 幂等/PID 单实例/断网重试/Windows 服务；Windows 真机 E2E 全链路通过（783ms 出纸）✅
+- Phase 8 全部封板（2026-05-29，Mac 真实后端跨机 E2E 验证通过）：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固
 - 图片打印路径：pdfkit 临时 PDF → Method B（pdf-to-printer/SumatraPDF）
-- 命令：`node dist/index.js agent` / `install-service` / `uninstall-service`
-- **下一步**：先完成 Phase 8.2C 剩余验证/文档收口；Mac 侧优先 Phase 7.11 类型清债，Phase 9 UI Polish 等 Phase 8.2C 正式封板后启动
+- Agent 命令：`node dist/index.js agent` / `install-service` / `uninstall-service`
+- W1/W2/W3 stacked 分支已 FF 合入 main（2026-06-01，`3f35caa`）：
+  - W1：BE-1 文件签名 + Kiosk 上传 + K2 简历四步流 + Diff View
+  - W2：BE-7 JobFair 8 端点切真 Prisma + audit + 校企合作详情端点
+  - W3：JobSource 凭证加密落库 + Webhook 接收端（HMAC + 5min 时间窗 + nonce 防重放）+ Partner /sources 三轨入口（API/Webhook/Excel）
+- Phase 7.11 R4 完成（2026-06-01）：`packages/shared` 新增 `PartnerDataSourceView`/`ConnStatus`，`SyncFrequency` 加 `weekly`；前后端 Partner 数据源 DTO 收紧为字面量；UI 零变化；E2E demo 复跑通过
+- **下一步**：① Excel 字段映射 service 层接入（FieldMappingRule/ImportBatch/ImportRecord 已暴露）；② BullMQ API 拉取 worker；③ Phase 9 UI Polish + AI 数字人引导员
 
 ---
 
