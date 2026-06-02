@@ -4,15 +4,19 @@ import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-prin
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
   BuildingIcon,
+  BriefcaseIcon,
   ExternalLinkIcon,
+  GraduationCapIcon,
   InfoIcon,
   MapPinIcon,
   QrCodeIcon,
+  ShieldCheckIcon,
   SmartphoneIcon,
   TagIcon,
   XIcon,
 } from 'lucide-react'
 import { getJobById } from '../../services/api'
+import { enrichJob, type JobCardView } from '../../data/jobsMeta'
 
 const TAG_STYLES: Record<string, string> = {
   全职: 'bg-blue-50 text-blue-600',
@@ -84,20 +88,33 @@ function QrOverlay({
   )
 }
 
+// ─── 小信息块 ──────────────────────────────────────────────────────────────────
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 text-sm">
+      <span className="shrink-0 text-gray-400">{label}</span>
+      <span className="text-right text-gray-700">{value}</span>
+    </div>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function JobDetailPage() {
-  const navigate  = useNavigate()
-  const { id }    = useParams<{ id: string }>()
-  const location  = useLocation()
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const location = useLocation()
 
-  const stateJob      = (location.state as { job?: ExternalJobDTO } | null)?.job
+  const stateJob = (location.state as { job?: ExternalJobDTO } | null)?.job
   const hasStateMatch = stateJob?.id === id
 
-  const [job,     setJob]     = useState<ExternalJobDTO | null>(hasStateMatch ? stateJob! : null)
+  const [job, setJob] = useState<JobCardView | null>(
+    hasStateMatch ? enrichJob(stateJob!) : null,
+  )
   const [loading, setLoading] = useState(!hasStateMatch)
-  const [error,   setError]   = useState(false)
-  const [showQr,  setShowQr]  = useState(false)
+  const [error, setError] = useState(false)
+  const [showQr, setShowQr] = useState(false)
 
   useEffect(() => {
     if (hasStateMatch) return
@@ -105,12 +122,18 @@ export function JobDetailPage() {
     getJobById(id!)
       .then((res) => {
         if (cancelled) return
-        if (res.data) setJob(res.data)
+        if (res.data) setJob(enrichJob(res.data))
         else setError(true)
       })
-      .catch(() => { if (!cancelled) setError(true) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .catch(() => {
+        if (!cancelled) setError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [id, hasStateMatch])
 
   if (loading) {
@@ -127,11 +150,13 @@ export function JobDetailPage() {
     )
   }
 
+  const locationText = [job.city, job.district].filter(Boolean).join(' · ')
+
   return (
     <div className="flex h-full flex-col">
       {showQr && (
         <QrOverlay
-          sourceName={job.sourceName}
+          sourceName={job.sourceOrgName ?? job.sourceName}
           externalId={job.externalId}
           onClose={() => setShowQr(false)}
         />
@@ -140,7 +165,7 @@ export function JobDetailPage() {
       <div className="px-6 pt-6">
         <PageHeader
           title="岗位详情"
-          subtitle={job.sourceName}
+          subtitle={job.sourceOrgName ?? job.sourceName}
           actions={
             <Button size="sm" variant="secondary" onClick={() => navigate('/jobs')}>
               返回列表
@@ -160,7 +185,11 @@ export function JobDetailPage() {
             </span>
             <span className="flex items-center gap-1.5">
               <MapPinIcon className="h-4 w-4 text-gray-400" />
-              {job.city}
+              {locationText}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <GraduationCapIcon className="h-4 w-4 text-gray-400" />
+              {job.education ?? '学历不限'} · {job.experience ?? '经验不限'}
             </span>
           </div>
           <p className="mt-3 text-lg font-semibold text-primary-600">{job.salaryDisplay}</p>
@@ -177,7 +206,7 @@ export function JobDetailPage() {
           </div>
         </Card>
 
-        {/* 岗位描述 */}
+        {/* 岗位要求 */}
         {(job.description || job.requirements) && (
           <Card className="p-5">
             {job.description && (
@@ -188,43 +217,55 @@ export function JobDetailPage() {
             )}
             {job.requirements && (
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-700">任职要求</p>
+                <p className="mb-2 text-sm font-medium text-gray-700">岗位要求</p>
                 <p className="text-sm leading-relaxed text-gray-600">{job.requirements}</p>
               </div>
             )}
           </Card>
         )}
 
-        {/* 来源信息 */}
+        {/* 企业信息 */}
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <BriefcaseIcon className="h-4 w-4 text-gray-400" />
+            <p className="text-sm font-medium text-gray-700">企业信息</p>
+          </div>
+          <div className="space-y-2">
+            <InfoRow label="企业名称" value={job.company} />
+            <InfoRow label="工作地点" value={locationText} />
+            {job.industry && <InfoRow label="所属行业" value={job.industry} />}
+            <InfoRow label="学历要求" value={job.education ?? '学历不限'} />
+            <InfoRow label="经验要求" value={job.experience ?? '经验不限'} />
+          </div>
+        </Card>
+
+        {/* 来源说明 */}
         <Card className="p-5">
           <p className="mb-3 text-sm font-medium text-gray-700">数据来源</p>
-          <div className="space-y-2 text-sm text-gray-600">
-            <div className="flex justify-between">
-              <span className="text-gray-400">来源机构</span>
-              <span>{job.sourceName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">同步时间</span>
-              <span>{formatSync(job.syncTime)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">外部编号</span>
-              <span className="font-mono text-xs">{job.externalId}</span>
+          <div className="space-y-2">
+            <InfoRow label="来源机构" value={job.sourceOrgName ?? job.sourceName} />
+            <InfoRow label="同步时间" value={formatSync(job.syncTime)} />
+            <div className="flex justify-between gap-4 text-sm">
+              <span className="shrink-0 text-gray-400">外部编号</span>
+              <span className="text-right font-mono text-xs text-gray-600">{job.externalId}</span>
             </div>
           </div>
         </Card>
 
         {/* 合规说明 */}
-        <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-4 py-3">
-          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
-          <p className="text-xs leading-relaxed text-gray-400">
-            {job.dataSourceNote}。本系统仅展示岗位信息，不接收简历，不参与招聘闭环。
+        <div className="flex items-start gap-2 rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-3">
+          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+          <p className="text-xs leading-relaxed text-gray-500">
+            本岗位来自第三方/官方来源，本系统不接收简历、不参与招聘流程。
+            <span className="mt-1 block text-gray-400">
+              {job.dataSourceNote}
+            </span>
           </p>
         </div>
       </div>
 
       {/* 操作按钮 */}
-      <div className="px-6 pb-6 pt-2">
+      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="grid grid-cols-2 gap-3">
           <Button
             size="lg"
@@ -243,6 +284,10 @@ export function JobDetailPage() {
             <QrCodeIcon className="h-4 w-4" />
             扫码投递
           </Button>
+        </div>
+        <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-neutral-400">
+          <InfoIcon className="h-3 w-3" />
+          投递将跳转至来源平台办理，本系统不收取简历
         </div>
       </div>
     </div>
