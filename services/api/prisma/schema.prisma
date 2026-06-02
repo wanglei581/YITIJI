@@ -176,6 +176,7 @@ model JobSource {
   jobs          Job[]
   syncLogs      SyncLog[]
   importBatches ImportBatch[]
+  fairs         JobFair[]  @relation("FairSource")
 
   @@index([orgId])
 }
@@ -331,6 +332,8 @@ model JobFair {
   externalId  String
   sourceName  String
   sourceUrl   String
+  sourceId    String?
+  source      JobSource? @relation("FairSource", fields: [sourceId], references: [id])
 
   // 招聘会信息
   title       String
@@ -365,6 +368,7 @@ model JobFair {
 
   @@unique([sourceOrgId, externalId])
   @@index([sourceOrgId])
+  @@index([sourceId])
   @@index([theme])
   @@index([reviewStatus, publishStatus])
   @@index([startAt])

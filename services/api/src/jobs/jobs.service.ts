@@ -1498,6 +1498,7 @@ export class JobsService {
               where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
               create: {
                 sourceOrgId, externalId: mapped.externalId, sourceName,
+                sourceId: batch.sourceId,
                 sourceUrl: mapped.sourceUrl ?? '',
                 title: mapped.title ?? '',
                 theme: mapped.theme || 'general',
