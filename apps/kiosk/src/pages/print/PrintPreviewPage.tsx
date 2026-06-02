@@ -168,10 +168,12 @@ export function PrintPreviewPage() {
   const [colorMode, setColorMode] = useState<ColorMode>('black_white')
   const [duplex, setDuplex] = useState<DuplexMode>('simplex')
   const [orientation, setOrientation] = useState<PrintOrientation>('auto')
-  const [quality, setQuality] = useState<PrintQuality>('standard')
   const [scale, setScale] = useState<PrintScale>('fit')
-  const [pagesPerSheet, setPagesPerSheet] = useState<PagesPerSheet>(1)
   const [pageRange, setPageRange] = useState<'all' | 'custom'>('all')
+  // 收口：quality / pagesPerSheet 当前 Terminal Agent 不生效，暂不暴露 UI 控件，
+  // 固定为安全默认值随参数上送（后端仍做枚举校验）。后续真机验证后再决定是否开放。
+  const quality: PrintQuality = 'standard'
+  const pagesPerSheet: PagesPerSheet = 1
   const [customRange, setCustomRange] = useState('')
   const [rangeError, setRangeError] = useState(false)
 
@@ -374,6 +376,11 @@ export function PrintPreviewPage() {
             <p className="mt-2 text-xs text-gray-400">
               黑白 ¥{PRICE_BW.toFixed(1)}/面 · 彩色 ¥{PRICE_COLOR.toFixed(1)}/面
             </p>
+            {colorMode === 'color' && (
+              <p className="mt-1 text-xs text-amber-600">
+                彩色效果以设备支持和当前耗材状态为准
+              </p>
+            )}
           </ParamCard>
 
           {/* Duplex */}
@@ -405,20 +412,6 @@ export function PrintPreviewPage() {
             />
           </ParamCard>
 
-          {/* Quality */}
-          <ParamCard label="打印质量">
-            <ToggleGroup
-              options={[
-                { label: '草稿', value: 'draft' },
-                { label: '标准', value: 'standard' },
-                { label: '高质量', value: 'high' },
-              ]}
-              value={quality}
-              onChange={(v) => setQuality(v as PrintQuality)}
-            />
-            <p className="mt-2 text-xs text-gray-400">草稿省墨粉，高质量图像更清晰</p>
-          </ParamCard>
-
           {/* Scale */}
           <ParamCard label="缩放方式">
             <ToggleGroup
@@ -429,24 +422,6 @@ export function PrintPreviewPage() {
               value={scale}
               onChange={(v) => setScale(v as PrintScale)}
             />
-          </ParamCard>
-
-          {/* Pages per sheet */}
-          <ParamCard label="每张页数">
-            <ToggleGroup
-              options={[
-                { label: '1 页/张', value: '1' },
-                { label: '2 页/张', value: '2' },
-                { label: '4 页/张', value: '4' },
-              ]}
-              value={String(pagesPerSheet)}
-              onChange={(v) => setPagesPerSheet(Number(v) as PagesPerSheet)}
-            />
-            {pagesPerSheet > 1 && (
-              <p className="mt-2 text-xs text-gray-400">
-                每张纸印 {pagesPerSheet} 页，内容缩至约 {Math.round(100 / pagesPerSheet)}%
-              </p>
-            )}
           </ParamCard>
 
           {/* Page range */}
@@ -503,9 +478,6 @@ export function PrintPreviewPage() {
 
               <span className="text-gray-500">打印份数</span>
               <span className="text-right font-medium text-gray-900">{copies} 份</span>
-
-              <span className="text-gray-500">每张页数</span>
-              <span className="text-right font-medium text-gray-900">{pagesPerSheet} 页/张</span>
 
               <span className="text-gray-500">总打印面</span>
               <span className="text-right font-medium text-gray-900">{totalFaces} 面</span>

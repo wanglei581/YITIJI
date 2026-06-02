@@ -92,7 +92,13 @@ export interface ClaimTask {
   taskId: string
   type: 'print'
   fileUrl: string
-  /** Expected MD5 hex digest of the downloaded file. May be empty string if server omits it. */
+  /**
+   * Expected hash hex digest of the downloaded file. May be empty string if server omits it.
+   *
+   * 方案②命名说明：wire 字段名保留为 `fileMd5`（避免跨端 rename + Prisma migration），
+   * 但该字段当前承载的是 **SHA-256**（后端 files 服务计算并通过 sha256 返回 → Kiosk 原样上送）。
+   * Agent 据此用 SHA-256 重算并比对。后续若做 `fileSha256` 命名清理再统一改名。
+   */
   fileMd5: string
   actionToken: string
   claimedBy: string

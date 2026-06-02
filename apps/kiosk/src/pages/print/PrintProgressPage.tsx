@@ -45,6 +45,24 @@ const FAIL_REASONS = [
   '文件解析失败，请重新上传文件',
 ]
 
+// 后端/Agent errorCode → 清晰中文提示。优先按错误码给出可操作文案，
+// 再回退到后端 errorMessage，最后回退到默认。
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+  DOWNLOAD_HASH_MISMATCH: '文件校验未通过（上传可能中断或文件已变化），请返回重新上传后再打印',
+  PRINTER_NOT_FOUND: '未找到打印机，请联系工作人员检查打印机连接',
+  PRINTER_OFFLINE: '打印机离线，请联系工作人员检查电源 / 网线 / USB 后重试',
+  PAPER_EMPTY: '打印机缺纸，请联系工作人员补纸后重试',
+  PRINTER_ERROR: '打印机异常（卡纸 / 缺粉 / 开盖），请联系工作人员处理后重试',
+  PRINT_TIMEOUT: '打印超时，请稍后重试',
+  PRINT_COMMAND_FAILED: '打印执行失败，请稍后重试或联系工作人员',
+  UNSUPPORTED_FILE_TYPE: '该文件格式暂不支持打印，请上传 PDF 或 JPG / PNG',
+  FILE_NOT_FOUND: '打印文件已失效，请返回重新上传',
+}
+
+function errorCodeToMessage(code?: string): string | undefined {
+  return code ? ERROR_CODE_MESSAGES[code] : undefined
+}
+
 const POLL_INTERVAL_MS = 2000
 const REAL_POLL_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes — guard against Agent never claiming
 
@@ -121,7 +139,9 @@ export function PrintProgressPage() {
           return
         }
         if (result.status === 'failed') {
-          navigateFail(result.errorMessage ?? result.errorCode ?? FAIL_REASONS[0])
+          navigateFail(
+            errorCodeToMessage(result.errorCode) ?? result.errorMessage ?? FAIL_REASONS[0],
+          )
           return
         }
         // pending | claimed | printing — update step

@@ -143,6 +143,12 @@ export const SAMPLE_VISIBLE_PDF_MD5 = crypto
   .createHash('md5')
   .update(SAMPLE_VISIBLE_PDF)
   .digest('hex')
+// 方案②：seed 任务的 fileMd5 字段实际承载 SHA-256，与 Agent 的 SHA-256 校验对齐。
+// （此前 Agent 用 md5 比对，seed 用 md5 常量恰好对得上而掩盖了真实上传路径的 sha256/md5 不一致 bug。）
+export const SAMPLE_VISIBLE_PDF_SHA256 = crypto
+  .createHash('sha256')
+  .update(SAMPLE_VISIBLE_PDF)
+  .digest('hex')
 
 // ── Admin secret ──────────────────────────────────────────────────────────────
 
@@ -479,7 +485,8 @@ export class TerminalsService implements OnModuleInit {
       create: {
         id: 'ptask_seed_001',
         fileUrl: '/api/v1/test/sample-visible.pdf',
-        fileMd5: SAMPLE_VISIBLE_PDF_MD5,
+        // 方案②：字段名 fileMd5，内容为 SHA-256（与 Agent 校验一致）。
+        fileMd5: SAMPLE_VISIBLE_PDF_SHA256,
         paramsJson: JSON.stringify(DEFAULT_PARAMS),
         status: 'pending',
       },

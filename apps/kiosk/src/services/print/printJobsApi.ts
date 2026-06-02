@@ -15,6 +15,10 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 
 export interface CreatePrintJobInput {
   fileUrl:   string
+  /**
+   * 文件哈希（hex）。方案②：字段名保留 `fileMd5`，但应传入上传返回的 **SHA-256**
+   * （KioskUploadResult.sha256）。后端原样存储，Terminal Agent 用 SHA-256 比对。
+   */
   fileMd5?:  string
   fileName?: string
   params:    PrintJobParams

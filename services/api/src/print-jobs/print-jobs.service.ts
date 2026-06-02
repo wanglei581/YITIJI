@@ -61,12 +61,21 @@ export class PrintJobsService {
       storedFileUrl = url
     }
 
+    // fileName 持久化：PrintTask 当前无独立 fileName 列（本阶段不做 migration，方案②约定）。
+    // 折中：把 fileName 落进 paramsJson，使任务详情 / 日志 / DB 中可见文件名。
+    // Agent 端 parseParams 会原样带上该字段，print() 忽略未知键，无副作用。
+    const storedParams: Record<string, unknown> = {
+      ...(dto.params ?? DEFAULT_PARAMS),
+      ...(dto.fileName ? { fileName: dto.fileName } : {}),
+    }
+
     const task = await this.prisma.printTask.create({
       data: {
         id:         taskId,
         fileUrl:    storedFileUrl,
+        // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
         fileMd5:    dto.fileMd5 ?? '',
-        paramsJson: JSON.stringify(dto.params ?? DEFAULT_PARAMS),
+        paramsJson: JSON.stringify(storedParams),
         status:     'pending',
       },
     })

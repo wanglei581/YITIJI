@@ -34,12 +34,6 @@ const ORIENTATION_LABEL: Record<string, string> = {
   landscape: '横向',
 }
 
-const QUALITY_LABEL: Record<string, string> = {
-  draft: '草稿',
-  standard: '标准',
-  high: '高质量',
-}
-
 const DEFAULT_PARAMS: PrintJobParams = {
   copies: 1,
   colorMode: 'black_white',
@@ -79,9 +73,7 @@ export function PrintConfirmPage() {
     { label: '色彩模式', value: params.colorMode === 'color' ? '彩色' : '黑白' },
     { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
-    { label: '打印质量', value: QUALITY_LABEL[params.quality] ?? params.quality },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
-    { label: '每张页数', value: `${params.pagesPerSheet} 页/张` },
     {
       label: '页面范围',
       value: params.pageRange ?? '全部页面',
@@ -182,6 +174,10 @@ export function PrintConfirmPage() {
               <p className="mt-0.5 text-xs text-gray-400">实际以机器计费为准</p>
             </div>
           </div>
+
+          {params.colorMode === 'color' && (
+            <p className="mt-3 text-xs text-amber-600">彩色效果以设备支持和当前耗材状态为准</p>
+          )}
         </Card>
       </div>
 

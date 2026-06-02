@@ -117,6 +117,50 @@ export async function getPrinterStatus(printerName: string): Promise<PrinterStat
   return 'unknown'
 }
 
+// ── Printer pre-flight (打印前预检) ─────────────────────────────────────────────
+
+/**
+ * 打印前打印机预检结果。比 getPrinterStatus 多区分 not_found / paper_empty，
+ * 用于在打印前快速拦截明确的故障，给出精确 errorCode（而非等 5min 超时）。
+ *
+ *   'ok'          可打印（含 low_paper / low_toner 等非阻塞警告）
+ *   'not_found'   WMI 查不到该名称的打印机 → PRINTER_NOT_FOUND
+ *   'offline'     PrinterStatus=7 或 DetectedErrorState=9 → PRINTER_OFFLINE
+ *   'paper_empty' DetectedErrorState=4（No Paper）→ PAPER_EMPTY
+ *   'error'       DetectedErrorState=6/7/8（缺粉/开盖/卡纸）→ PRINTER_ERROR
+ *   'unknown'     非 Windows / 查询失败 / 无法识别 → 不阻塞，交由 print() 处理
+ */
+export type PrinterPreflight = 'ok' | 'not_found' | 'offline' | 'paper_empty' | 'error' | 'unknown'
+
+/**
+ * Query Win32_Printer for a pre-print health check.
+ * Best-effort: returns 'unknown' on non-Windows or query failure (caller must NOT block on 'unknown').
+ * Only definitive bad states (not_found/offline/paper_empty/error) should gate printing.
+ */
+export async function getPrinterPreflight(printerName: string): Promise<PrinterPreflight> {
+  if (process.platform !== 'win32') return 'unknown'
+
+  const script =
+    `$name = [Console]::In.ReadLine(); ` +
+    `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace(\"'\", \"''\"))'" -ErrorAction SilentlyContinue; ` +
+    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState)" } else { "not_found" }`
+
+  const output = await runPowerShell(script, printerName)
+  if (!output) return 'unknown'
+  if (output === 'not_found') return 'not_found'
+
+  const [statusStr, errorStr] = output.split(',')
+  const printerStatusCode = parseInt(statusStr ?? '', 10)
+  const detectedError = parseInt(errorStr ?? '', 10)
+  if (isNaN(printerStatusCode) || isNaN(detectedError)) return 'unknown'
+
+  if (printerStatusCode === 7 || detectedError === 9) return 'offline'
+  if (detectedError === 4) return 'paper_empty'
+  if (detectedError === 6 || detectedError === 7 || detectedError === 8) return 'error'
+  // 0/2 normal, 3 low paper, 5 low toner, others → 可打印（非阻塞）
+  return 'ok'
+}
+
 // ── Disk free space ───────────────────────────────────────────────────────────
 
 /**

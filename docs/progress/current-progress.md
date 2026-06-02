@@ -25,7 +25,31 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：打印扫描服务中心 第一阶段（2026-06-02，feat/kiosk-print-scan-service-center）**
+**当前阶段：真实打印能力收口版（2026-06-02，feat/kiosk-print-real-capability-hardening）**
+
+---
+
+### ✅ 真实打印能力收口版（2026-06-02，feat/kiosk-print-real-capability-hardening，分支自 main `5e612b3`）
+
+把打印链路从"能跑"收口为"可稳定承诺"，跨 Kiosk / 后端 API / Terminal Agent 三端。方案②：保留 wire 字段名 `fileMd5`，但全链路注释澄清其当前承载 **SHA-256**；不做 Prisma 改名 migration。
+
+**关键修复：**
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1（致命） | hash 校验不一致：后端 files 算 **SHA-256**（以 `sha256` 返回）→ Kiosk 当作 `fileMd5` 上送 → Agent 却用 **MD5** 重算比对 → 真实上传文件 100% `DOWNLOAD_HASH_MISMATCH` 打印失败（此前仅 seed 任务用 MD5 常量掩盖） | Agent 改用 **SHA-256** 重算比对（`computeFileSha256`）；后端 seed 任务 `fileMd5` 改存 `SAMPLE_VISIBLE_PDF_SHA256`；前端/后端/Agent 全链路注释澄清字段实为 sha256 |
+| 2 | 前端暴露 `quality`/`pagesPerSheet`，但 Agent `mapParams()` 完全忽略 → 过度承诺 | `PrintPreviewPage` 隐藏这两项控件（固定安全默认值随参数上送，后端仍枚举校验）；`PrintConfirmPage` 摘要去掉两行 |
+| 3 | 彩色打印未真机验证 | 保留彩色选项 + 诚实提示「彩色效果以设备支持和当前耗材状态为准」（Preview + Confirm） |
+| 4 | 后端 create print job `params` 仅 `@IsObject()` 松校验 | 新增强类型 `PrintJobParamsDto`（嵌套 `@ValidateNested`）；非法枚举/越界 copies/非法 pageRange/未知字段 → 400 VALIDATION_FAILED（已运行时验证） |
+| 5 | Agent 打印前不预检打印机 | 新增 `getPrinterPreflight`（WMI 区分 not_found/offline/paper_empty/error）；task-runner 打印前预检 → 明确 `PRINTER_NOT_FOUND`/`PRINTER_OFFLINE`/`PAPER_EMPTY`/`PRINTER_ERROR`，避免 5min 超时；非 Windows/查询失败返回 unknown 不阻塞 |
+| 6 | 失败提示不清晰 | `PrintProgressPage` 增 `ERROR_CODE_MESSAGES`：DOWNLOAD_HASH_MISMATCH/PRINTER_NOT_FOUND/PRINTER_OFFLINE/PAPER_EMPTY 等 → 可操作中文提示 |
+| 7 | fileName 不落库 | PrintTask 无独立 fileName 列（本阶段不 migration）；折中：fileName 存入 `paramsJson`，任务详情/日志/DB 可见（Agent 忽略未知键，无副作用） |
+
+**修改文件（仅本阶段，12 代码 + 2 文档）：** `apps/terminal-agent/src/{agent/{task-runner,types,wmi},printer/types}.ts`、`services/api/src/{print-jobs/{dto/create-print-job.dto,print-jobs.service},terminals/terminals.service}.ts`、`apps/kiosk/src/{services/{files/filesApi,print/printJobsApi},pages/print/{PrintPreviewPage,PrintConfirmPage,PrintProgressPage}}` + 本文件 + next-tasks.md。
+
+**明确不做：** 真实扫描 Agent / 格式转换 / 证件照 / 签名盖章 / 支付 / BMP/TIFF / Prisma 改名 migration / 改 AI 简历·岗位·招聘会·后台。
+
+**验证：** 三端 typecheck/build 全过；kiosk+api lint 过（terminal-agent 无 lint script）；后端真机运行时验证 DTO：非法值/未知字段/非法 pageRange/越界 copies → 400（精确字段错误），合法 → 201；sample PDF SHA-256(64hex) 与 seed 一致。**仍需 Windows 真机验证**：份数/双面/方向/缩放/页码/黑白真实出纸、彩色是否真彩、打印机离线/缺纸/未找到预检触发、hash 篡改负向、幂等。
 
 ---
 

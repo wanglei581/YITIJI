@@ -39,6 +39,7 @@ import type { AgentConfig, ClaimTask, PatchStatusPayload, ReportableStatus } fro
 import type { PrintJobParams } from '../printer/types'
 import { createApiClient, axiosErrorMessage } from './api-client'
 import { print } from '../printer/print'
+import { getPrinterPreflight, type PrinterPreflight } from './wmi'
 import { log, warn, err } from '../logger'
 import { DEFAULT_PRINTER } from '../config'
 import {
@@ -73,9 +74,37 @@ async function downloadFile(fileUrl: string, destPath: string): Promise<void> {
   fs.writeFileSync(destPath, Buffer.from(resp.data))
 }
 
-function computeFileMd5(filePath: string): string {
+/**
+ * 计算下载文件的 SHA-256 摘要（hex）。
+ *
+ * 方案②命名说明：服务端 files 服务计算的是 SHA-256，并通过 `sha256` 字段返回，
+ * Kiosk 原样作为 `fileMd5`（wire 字段名未改）上送。因此这里必须用 SHA-256 重算，
+ * 才能与 `task.fileMd5`（实为 sha256）正确比对。
+ * 历史 bug：此前用 md5 重算 → 与 sha256 永不相等 → 真实上传文件 100% DOWNLOAD_HASH_MISMATCH。
+ */
+function computeFileSha256(filePath: string): string {
   const buf = fs.readFileSync(filePath)
-  return crypto.createHash('md5').update(buf).digest('hex')
+  return crypto.createHash('sha256').update(buf).digest('hex')
+}
+
+/** 打印机预检结果 → 明确的 errorCode + 中文消息；返回 null 表示可继续打印。 */
+function preflightToError(
+  pf: PrinterPreflight,
+  printerName: string,
+): { errorCode: string; errorMessage: string } | null {
+  switch (pf) {
+    case 'not_found':
+      return { errorCode: 'PRINTER_NOT_FOUND', errorMessage: `打印机未找到：${printerName}` }
+    case 'offline':
+      return { errorCode: 'PRINTER_OFFLINE', errorMessage: '打印机离线（请检查电源/网线/USB 连接）' }
+    case 'paper_empty':
+      return { errorCode: 'PAPER_EMPTY', errorMessage: '打印机缺纸，请补纸后重试' }
+    case 'error':
+      return { errorCode: 'PRINTER_ERROR', errorMessage: '打印机异常（缺粉/开盖/卡纸），请处理后重试' }
+    // 'ok' | 'unknown'（非 Windows / 查询失败）→ 不阻塞
+    default:
+      return null
+  }
 }
 
 function extFromUrl(fileUrl: string): string {
@@ -182,30 +211,49 @@ async function executeTask(
     }
     log(`task ${task.taskId}: downloaded (${(fs.statSync(tempFilePath).size / 1024).toFixed(1)} KB)`)
 
-    // ── Step 2: MD5 verification ──────────────────────────────────────────
+    // ── Step 2: Hash verification (SHA-256；wire 字段名仍为 fileMd5) ───────
     if (task.fileMd5) {
-      const actual = computeFileMd5(tempFilePath)
+      const actual = computeFileSha256(tempFilePath)
       if (actual !== task.fileMd5) {
-        err(`task ${task.taskId}: MD5 mismatch — expected=${task.fileMd5}  actual=${actual}`)
+        err(`task ${task.taskId}: hash mismatch (SHA-256) — expected=${task.fileMd5}  actual=${actual}`)
         markTaskDone(db, task.taskId, 'failed')
         const ok = await patch(
           'failed',
           'DOWNLOAD_HASH_MISMATCH',
-          `MD5 mismatch: expected=${task.fileMd5}, got=${actual}`,
+          `文件校验失败（SHA-256 不一致）：expected=${task.fileMd5}, got=${actual}`,
         )
         if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'DOWNLOAD_HASH_MISMATCH' })
         return
       }
-      log(`task ${task.taskId}: MD5 ✓`)
+      log(`task ${task.taskId}: 文件哈希校验通过 (SHA-256) ✓`)
     } else {
-      warn(`task ${task.taskId}: server did not provide fileMd5, skipping verification`)
+      warn(`task ${task.taskId}: server did not provide file hash, skipping verification`)
+    }
+
+    // ── Step 2.5: Printer pre-flight ──────────────────────────────────────
+    // 打印前预检：只在 WMI 明确报告故障时拦截，给出精确 errorCode，避免走到 5min 超时。
+    // 非 Windows / 查询失败返回 'unknown' → 不阻塞，交由 print() 自然处理。
+    const resolvedPrinter = printerName || DEFAULT_PRINTER
+    const preflight = await getPrinterPreflight(resolvedPrinter)
+    const preflightErr = preflightToError(preflight, resolvedPrinter)
+    if (preflightErr) {
+      err(`task ${task.taskId}: printer pre-flight failed — ${preflightErr.errorCode} (${preflight})`)
+      markTaskDone(db, task.taskId, 'failed')
+      const ok = await patch('failed', preflightErr.errorCode, preflightErr.errorMessage)
+      if (!ok) {
+        enqueuePatch(db, task.taskId, {
+          status: 'failed',
+          errorCode: preflightErr.errorCode,
+          errorMessage: preflightErr.errorMessage,
+        })
+      }
+      return
     }
 
     // ── Step 3: PATCH printing (informational; failure does not abort) ────
     await patch('printing')
 
     // ── Step 4: Print ─────────────────────────────────────────────────────
-    const resolvedPrinter = printerName || DEFAULT_PRINTER
     log(`task ${task.taskId}: printing on "${resolvedPrinter}"...`)
 
     const result = await print(

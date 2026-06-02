@@ -5,7 +5,29 @@
 
 ---
 
-## 📌 当前状态（打印扫描服务中心 第一阶段，已完成）
+## 📌 当前状态（真实打印能力收口版，已完成代码 + Mac 验证，待 Windows 真机）
+
+**feat/kiosk-print-real-capability-hardening（2026-06-02，分支自 main `5e612b3`）：**
+- ✅ 修复致命 hash 不一致：Agent 改用 SHA-256 校验（方案②保留 `fileMd5` 字段名，内容实为 sha256）；seed 任务同步改 sha256
+- ✅ 前端隐藏 quality/pagesPerSheet（Agent 暂不生效）；彩色加诚实提示
+- ✅ 后端 `PrintJobParamsDto` 强校验（非法值/未知字段 → 400）
+- ✅ Agent 打印前预检（PRINTER_NOT_FOUND/OFFLINE/PAPER_EMPTY/ERROR）；PrintProgressPage 错误码 → 中文提示
+- ✅ fileName 落 paramsJson（无 migration）
+- ✅ 三端 typecheck/build 全过；后端运行时 DTO 验证通过
+- ⏳ **待 Windows 真机验证**（见下），通过后再 review / FF 合入 main
+
+**仍需 Windows 真机验证（Pantum CM2800ADN Series）：**
+- 份数=2/双面长边/方向横向/缩放 fit·actual/页码范围"1-2"/黑白 → 真实出纸一致
+- 彩色 PDF + colorMode=color → 是否真彩（验证或否定，决定彩色文案/开关）
+- 真实 kiosk 上传 PDF → claim → SHA-256 校验 PASS → 出纸（补此前缺口：seed 之外的真实上传路径）
+- 打印机断电/缺纸/名称错 → 预检快速 PRINTER_OFFLINE/PAPER_EMPTY/PRINTER_NOT_FOUND（非 5min 超时）
+- hash 篡改 → DOWNLOAD_HASH_MISMATCH 负向；打印中重启 Agent → 不重打（幂等）
+
+**后续（择期）：** `fileSha256` 命名清理（含 Prisma 列名 migration）；quality/pagesPerSheet 真机可控后再开放；PrintTask 增 `fileName` 列。
+
+---
+
+## 📌 历史状态（打印扫描服务中心 第一阶段，已完成）
 
 **feat/kiosk-print-scan-service-center（2026-06-02，分支自 main `c7f6191`）：**
 - ✅ 新增 `/print-scan`（服务中心首页，6 能力九宫格 + 敏感文件提示 + 非 CA 电子签声明）、`/print-scan/feature/:key`（证件照/格式转换/签名盖章「即将上线」说明页，未知 key 容错不白屏）
