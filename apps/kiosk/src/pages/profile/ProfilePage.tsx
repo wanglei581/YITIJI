@@ -61,21 +61,11 @@ interface IncomingState {
   }
 }
 
-// ─── Mock data (defined outside component for Fast Refresh) ───────────────
-
-const MOCK_RESUMES: ResumeItem[] = [
-  { id: 'm1', name: '我的简历_v2.pdf', size: '312 KB', format: 'PDF', savedAt: '2026-05-20T10:30:00Z' },
-]
-
-const MOCK_SCANS: ScanItem[] = []
-
-const MOCK_ORDERS: PrintOrder[] = [
-  { id: 'o1', fileName: '简历_打印版.pdf', pages: 1, copies: 1, status: 'done', completedAt: '2026-05-20T10:35:00Z' },
-]
-
-const MOCK_AI: AIRecord[] = [
-  { id: 'a1', type: 'diagnosis', label: 'AI 简历诊断', detail: '35/50', fileName: '我的简历_v2.pdf', createdAt: '2026-05-20T10:32:00Z' },
-]
+// 初始列表均为空；实际数据通过页面跳转 location.state 传入（从简历/打印/AI 流程跳回）
+const EMPTY_RESUMES: ResumeItem[] = []
+const EMPTY_SCANS:   ScanItem[]   = []
+const EMPTY_ORDERS:  PrintOrder[] = []
+const EMPTY_AI:      AIRecord[]   = []
 
 // ─── Utilities ────────────────────────────────────────────────────────────
 
@@ -115,9 +105,9 @@ export function ProfilePage() {
         ...incoming.savedResume,
         savedAt: incoming.savedAt ?? new Date().toISOString(),
       }
-      return [item, ...MOCK_RESUMES]
+      return [item, ...EMPTY_RESUMES]
     }
-    return MOCK_RESUMES
+    return EMPTY_RESUMES
   })
 
   const [scans, setScans] = useState<ScanItem[]>(() => {
@@ -131,12 +121,12 @@ export function ProfilePage() {
         format: f.format,
         savedAt: incoming.savedAt ?? new Date().toISOString(),
       }
-      return [item, ...MOCK_SCANS]
+      return [item, ...EMPTY_SCANS]
     }
-    return MOCK_SCANS
+    return EMPTY_SCANS
   })
 
-  const [orders] = useState<PrintOrder[]>(MOCK_ORDERS)
+  const [orders] = useState<PrintOrder[]>(EMPTY_ORDERS)
 
   const [aiRecords, setAiRecords] = useState<AIRecord[]>(() => {
     if (incoming.savedResumeAdvice) {
@@ -149,9 +139,9 @@ export function ProfilePage() {
         fileName: adv.file?.name ?? '简历',
         createdAt: adv.savedAt,
       }
-      return [item, ...MOCK_AI]
+      return [item, ...EMPTY_AI]
     }
-    return MOCK_AI
+    return EMPTY_AI
   })
 
   // ── Toast ────────────────────────────────────────────────────

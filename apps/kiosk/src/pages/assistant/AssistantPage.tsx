@@ -11,7 +11,7 @@
 //   - AI 回复标注"内容仅供参考"
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   MicIcon,
@@ -28,10 +28,17 @@ import {
 import { Button } from '@ai-job-print/ui'
 import type { AssistantAction } from '@ai-job-print/shared'
 import { chatWithAssistant } from '../../services/api'
-import { AiAdvisorCall } from '../../components/AiAdvisorCall'
 
 // 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
 const USE_VOICE_CALL = import.meta.env['VITE_USE_TRTC_CALL'] === 'true'
+
+// 条件式懒加载：VITE_USE_TRTC_CALL=false 时 Vite 完全排除 AiAdvisorCall 及其 trtc-sdk-v5 依赖
+// Vite 在构建时将 import.meta.env.VITE_USE_TRTC_CALL 替换为字面字符串，Rollup 再做死代码消除
+const LazyAiAdvisorCall = USE_VOICE_CALL
+  ? lazy(() =>
+      import('../../components/AiAdvisorCall').then((m) => ({ default: m.AiAdvisorCall })),
+    )
+  : null
 
 // ─── 路由白名单 ────────────────────────────────────────────
 
@@ -122,13 +129,21 @@ export function AssistantPage() {
 
   const [mode, setMode] = useState<'call' | 'text'>(USE_VOICE_CALL ? 'call' : 'text')
 
-  // ── 通话模式：渲染 TRTC 组件 ──────────────────────────────
-  if (mode === 'call') {
+  // ── 通话模式：渲染 TRTC 组件（懒加载，flag 关闭时 trtc chunk 不进构建）──
+  if (mode === 'call' && LazyAiAdvisorCall) {
     return (
-      <AiAdvisorCall
-        onSwitchToText={() => setMode('text')}
-        onExit={() => navigate(-1)}
-      />
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center bg-gray-900">
+            <p className="text-sm text-gray-400">通话模块加载中…</p>
+          </div>
+        }
+      >
+        <LazyAiAdvisorCall
+          onSwitchToText={() => setMode('text')}
+          onExit={() => navigate(-1)}
+        />
+      </Suspense>
     )
   }
 

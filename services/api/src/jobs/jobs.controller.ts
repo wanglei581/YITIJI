@@ -104,6 +104,49 @@ export class JobsController {
     return this.jobsService.getPublishedFairDetail(id)
   }
 
+  // ── 招聘会子资源（Fair 数据模型尚未落 Prisma，暂返回空数据）──────────────────
+  // H-6/H-7 stub：前端已有 EmptyState 兜底，返回 200 + 空比 404 更友好
+
+  @Get('job-fairs/:id/companies')
+  getFairCompanies(
+    @Query('page') pageStr?: string,
+    @Query('pageSize') sizeStr?: string,
+  ) {
+    const page     = pageStr ? Math.max(1, Number(pageStr)) : 1
+    const pageSize = sizeStr ? Math.min(100, Math.max(1, Number(sizeStr))) : 20
+    return { data: [], total: 0, page, pageSize }
+  }
+
+  @Get('job-fairs/:id/companies/:companyId')
+  getFairCompanyById() {
+    return { data: null }
+  }
+
+  @Get('job-fairs/:id/zones')
+  getFairZones() {
+    return { data: [] }
+  }
+
+  @Get('job-fairs/:id/map')
+  getFairMap() {
+    return { data: { zones: [], booths: [] } }
+  }
+
+  @Get('job-fairs/:id/materials')
+  getFairMaterials(
+    @Query('page') pageStr?: string,
+    @Query('pageSize') sizeStr?: string,
+  ) {
+    const page     = pageStr ? Math.max(1, Number(pageStr)) : 1
+    const pageSize = sizeStr ? Math.min(100, Math.max(1, Number(sizeStr))) : 20
+    return { data: [], total: 0, page, pageSize }
+  }
+
+  @Get('job-fairs/:id/stats')
+  getFairStats() {
+    return { data: null }
+  }
+
   // ── Admin(全部受 @Roles('admin') 保护)─────────────────────────────────────
 
   @Get('admin/job-sources')
