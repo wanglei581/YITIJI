@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { RefreshCwIcon, PlayIcon } from 'lucide-react'
+import { RefreshCwIcon, PlayIcon, SettingsIcon } from 'lucide-react'
 import { API_BASE_URL, API_MODE } from '../../services/api/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -20,6 +20,17 @@ interface ApiSyncSourceItem {
 }
 
 type TriggerState = 'idle' | 'loading' | 'ok' | 'error'
+
+interface FieldMapping {
+  std: string
+  src: string
+}
+
+interface ConfigDraft {
+  dataType: 'job' | 'fair'
+  rootPath: string
+  fields: FieldMapping[]
+}
 
 const FREQ_LABELS: Record<string, string> = {
   manual:  '手动',
@@ -79,10 +90,14 @@ async function triggerApiSync(sourceId: string): Promise<void> {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SyncSourcesPage() {
-  const [sources,  setSources]  = useState<ApiSyncSourceItem[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(false)
-  const [triggers, setTriggers] = useState<Record<string, TriggerState>>({})
+  const [sources,      setSources]      = useState<ApiSyncSourceItem[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState(false)
+  const [triggers,     setTriggers]     = useState<Record<string, TriggerState>>({})
+  const [configSrc,    setConfigSrc]    = useState<ApiSyncSourceItem | null>(null)
+  const [configDraft,  setConfigDraft]  = useState<ConfigDraft>({ dataType: 'job', rootPath: '', fields: [] })
+  const [configSaving, setConfigSaving] = useState(false)
+  const [configErr,    setConfigErr]    = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -94,6 +109,60 @@ export default function SyncSourcesPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const openConfig = async (src: ApiSyncSourceItem) => {
+    setConfigErr(null)
+    setConfigSrc(src)
+    if (API_MODE !== 'http') {
+      setConfigDraft({ dataType: 'job', rootPath: '', fields: [] })
+      return
+    }
+    try {
+      const res = await fetch(API_BASE_URL + '/admin/job-sync/sources/' + src.id, { credentials: 'include' })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      const body = (await res.json()) as { data?: { responseConfig?: { dataType?: string; rootPath?: string; fields?: Record<string, string> } } }
+      const rc = body.data?.responseConfig
+      setConfigDraft({
+        dataType: (rc?.dataType === 'fair' ? 'fair' : 'job') as 'job' | 'fair',
+        rootPath: rc?.rootPath ?? '',
+        fields: rc?.fields ? Object.entries(rc.fields).map(([std, src]) => ({ std, src })) : [],
+      })
+    } catch {
+      setConfigDraft({ dataType: 'job', rootPath: '', fields: [] })
+    }
+  }
+
+  const saveConfig = async () => {
+    if (!configSrc) return
+    setConfigSaving(true)
+    setConfigErr(null)
+    const dto = {
+      dataType: configDraft.dataType,
+      rootPath: configDraft.rootPath || undefined,
+      fields: configDraft.fields.length
+        ? Object.fromEntries(configDraft.fields.filter((f) => f.std && f.src).map((f) => [f.std, f.src]))
+        : undefined,
+    }
+    try {
+      if (API_MODE !== 'http') {
+        await new Promise((r) => setTimeout(r, 600))
+      } else {
+        const res = await fetch(API_BASE_URL + '/admin/job-sync/sources/' + configSrc.id + '/response-config', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dto),
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+      }
+      setConfigSrc(null)
+      load()
+    } catch (e) {
+      setConfigErr((e as Error).message || 'Save failed')
+    } finally {
+      setConfigSaving(false)
+    }
+  }
 
   const handleTrigger = async (sourceId: string) => {
     setTriggers((prev) => ({ ...prev, [sourceId]: 'loading' }))
@@ -207,6 +276,13 @@ export default function SyncSourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <button
+                          onClick={() => openConfig(s)}
+                          className="mr-1.5 flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                        >
+                          <SettingsIcon className="h-3 w-3" />
+                          mappings
+                        </button>
+                        <button
                           disabled={trigState === 'loading' || !s.enabled || !s.hasEndpoint}
                           onClick={() => handleTrigger(s.id)}
                           className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
@@ -231,6 +307,90 @@ export default function SyncSourcesPage() {
           </table>
         </div>
       </Card>
+
+      {configSrc && (
+        <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setConfigSrc(null)} />
+      )}
+      {configSrc && (
+        <div className="fixed inset-y-0 right-0 z-50 flex w-[440px] flex-col bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
+            <p className="text-sm font-semibold text-neutral-800">Configure response mapping</p>
+            <button onClick={() => setConfigSrc(null)} className="rounded p-1 hover:bg-neutral-100 text-neutral-400">x</button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Data type</label>
+              <select
+                value={configDraft.dataType}
+                onChange={(e) => setConfigDraft((d) => ({ ...d, dataType: e.target.value as 'job' | 'fair' }))}
+                className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
+              >
+                <option value="job">Job (岗位)</option>
+                <option value="fair">Job fair (招聘会)</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Root path (e.g. data.items)</label>
+              <input
+                value={configDraft.rootPath}
+                onChange={(e) => setConfigDraft((d) => ({ ...d, rootPath: e.target.value }))}
+                placeholder="Leave empty for auto-detect"
+                className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
+              />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-medium text-neutral-600">Field mappings (standard -&gt; source field)</span>
+                <button
+                  onClick={() => setConfigDraft((d) => ({ ...d, fields: [...d.fields, { std: '', src: '' }] }))}
+                  className="rounded px-2 py-1 text-xs text-primary-600 hover:bg-primary-50"
+                >
+                  + Add
+                </button>
+              </div>
+              {configDraft.fields.map((f, i) => (
+                <div key={i} className="mb-2 flex items-center gap-2">
+                  <input
+                    value={f.std}
+                    placeholder="standard field"
+                    onChange={(e) => setConfigDraft((d) => ({ ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, std: e.target.value } : ff) }))}
+                    className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
+                  />
+                  <span className="text-neutral-400">-&gt;</span>
+                  <input
+                    value={f.src}
+                    placeholder="source field"
+                    onChange={(e) => setConfigDraft((d) => ({ ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, src: e.target.value } : ff) }))}
+                    className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
+                  />
+                  <button
+                    onClick={() => setConfigDraft((d) => ({ ...d, fields: d.fields.filter((_, ii) => ii !== i) }))}
+                    className="text-xs text-red-400 hover:text-red-600"
+                  >
+                    Del
+                  </button>
+                </div>
+              ))}
+              {configDraft.fields.length === 0 && (
+                <p className="text-xs text-neutral-400">No mappings - auto-detect mode</p>
+              )}
+            </div>
+            {configErr && <p className="text-xs text-red-500">{configErr}</p>}
+          </div>
+          <div className="border-t border-neutral-100 px-5 py-3 flex justify-end gap-2">
+            <button onClick={() => setConfigSrc(null)} className="rounded px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100">
+              Cancel
+            </button>
+            <button
+              onClick={saveConfig}
+              disabled={configSaving}
+              className="rounded bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              {configSaving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <p className="mt-3 text-xs text-gray-400">
         仅显示 accessMode=api 的数据源。同步结果在合作机构后台 "同步日志" 和 Admin "岗位信息源" 可查看。

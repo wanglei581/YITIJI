@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Body,
   Param,
   UseGuards,
   BadRequestException,
@@ -57,6 +59,52 @@ export class JobSyncController {
   }
 
   /**
+   * 获取单个数据源详情（含 responseConfig）。
+   */
+  @Get('sources/:sourceId')
+  async getSource(
+    @Param('sourceId') sourceId: string,
+  ): Promise<ApiResponse<{
+    id: string
+    name: string
+    orgId: string
+    responseConfig: Record<string, unknown> | null
+  }>> {
+    const s = await this.service['prisma'].jobSource.findUnique({
+      where: { id: sourceId },
+      select: { id: true, name: true, orgId: true, responseConfig: true },
+    })
+    if (!s) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    return ApiResponse.ok({
+      id: s.id,
+      name: s.name,
+      orgId: s.orgId,
+      responseConfig: s.responseConfig ? (JSON.parse(s.responseConfig) as Record<string, unknown>) : null,
+    })
+  }
+
+  /**
+   * 保存数据源的 responseConfig 字段映射配置。
+   */
+  @Put('sources/:sourceId/response-config')
+  @HttpCode(200)
+  async updateResponseConfig(
+    @Param('sourceId') sourceId: string,
+    @Body() dto: Record<string, unknown>,
+  ): Promise<ApiResponse<{ updated: boolean; sourceId: string }>> {
+    if (dto.dataType !== 'job' && dto.dataType !== 'fair') {
+      throw new BadRequestException({ error: { code: 'INVALID_DATA_TYPE', message: 'dataType must be "job" or "fair"' } })
+    }
+    const exists = await this.service['prisma'].jobSource.findUnique({ where: { id: sourceId }, select: { id: true } })
+    if (!exists) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    await this.service['prisma'].jobSource.update({
+      where: { id: sourceId },
+      data: { responseConfig: JSON.stringify(dto) },
+    })
+    return ApiResponse.ok({ updated: true, sourceId })
+  }
+
+  /**
    * 列出所有 accessMode='api' 的数据源及其同步状态，供 Admin 工作台使用。
    */
   @Get('sources')
@@ -83,7 +131,18 @@ export class JobSyncController {
       orderBy: { updatedAt: 'desc' },
     })
     return ApiResponse.ok(
-      sources.map((s) => ({
+      (sources as Array<{
+        id: string
+        name: string
+        orgId: string
+        syncFreq: string
+        enabled: boolean
+        lastSyncAt: Date | null
+        lastSyncStatus: string | null
+        endpoint: string | null
+        encryptedCredential: string | null
+        responseConfig: string | null
+      }>).map((s) => ({
         id: s.id,
         name: s.name,
         orgId: s.orgId,
