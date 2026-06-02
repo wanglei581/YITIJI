@@ -44,6 +44,26 @@ export interface ResumeReport {
   suggestions: string[]
 }
 
+/**
+ * 求职目标方向上下文（用户在 /resume/target 选择）
+ *
+ * 仅用于前端流程内的 location.state 传递与报告/优化页摘要展示，
+ * 暂不随 ResumeParseRequest 发送到后端（避免破坏现有 DTO 校验）。
+ * 后端支持后再接入。合规：仅用于求职准备方向，不做企业匹配/录用预测。
+ */
+export interface ResumeTargetContext {
+  /** 行业方向（如 互联网/科技、制造业、通用） */
+  industry?: string
+  /** 目标岗位（自由文本，可空） */
+  targetJob?: string
+  /** 经验级别（应届/1-3年/3-5年/5年以上） */
+  experience?: string
+  /** 求职场景（校招/社招/转岗/招聘会现场） */
+  scene?: string
+  /** 是否为"暂不指定，通用诊断" */
+  skipped?: boolean
+}
+
 /** 简历解析请求（前端 → 后端） */
 export interface ResumeParseRequest {
   /** 文件上传后的 ID（由后端文件服务颁发） */

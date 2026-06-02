@@ -43,7 +43,7 @@ const LazyAiAdvisorCall = USE_VOICE_CALL
 // ─── 路由白名单 ────────────────────────────────────────────
 
 const ALLOWED_ROUTE_PREFIXES = [
-  '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/renshi', '/qingdao',
+  '/resume', '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/renshi', '/qingdao',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
@@ -53,7 +53,7 @@ function isAllowedRoute(route: string): boolean {
 // ─── 快捷操作 ─────────────────────────────────────────────
 
 const SHORTCUTS: AssistantAction[] = [
-  { label: '简历诊断',  route: '/resume/report' },
+  { label: '简历服务',  route: '/resume'        },
   { label: '打印文件',  route: '/print/upload'  },
   { label: '查看岗位',  route: '/jobs'          },
   { label: '查看招聘会', route: '/job-fairs'    },
@@ -61,7 +61,7 @@ const SHORTCUTS: AssistantAction[] = [
 ]
 
 const SHORTCUT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  '/resume/report': FileTextIcon,
+  '/resume':        FileTextIcon,
   '/print/upload':  PrinterIcon,
   '/jobs':          BriefcaseIcon,
   '/job-fairs':     CalendarDaysIcon,
@@ -69,7 +69,7 @@ const SHORTCUT_ICON_MAP: Record<string, React.ComponentType<{ className?: string
 }
 
 const KEYWORD_ROUTES: Array<{ kw: readonly string[]; route: string }> = [
-  { kw: ['简历', '诊断', '优化', 'resume'],          route: '/resume/report' },
+  { kw: ['简历', '诊断', '优化', 'resume'],          route: '/resume'        },
   { kw: ['打印', '文件', '印刷'],                    route: '/print/upload'  },
   { kw: ['岗位', '工作', '职位', '招聘', '找工作'],  route: '/jobs'          },
   { kw: ['招聘会', '双选会', '人才市场'],             route: '/job-fairs'     },

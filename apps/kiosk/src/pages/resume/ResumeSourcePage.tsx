@@ -71,7 +71,7 @@ export function ResumeSourcePage() {
     setUploading(true)
     try {
       const uploaded = await kioskUploadFile(file, 'resume_upload')
-      navigate('/resume/parse', {
+      navigate('/resume/target', {
         state: {
           source: 'upload',
           file: { name: uploaded.filename, size: formatSize(uploaded.sizeBytes), format: inferFormat(uploaded.mimeType || uploaded.filename) },
@@ -88,7 +88,7 @@ export function ResumeSourcePage() {
 
   const handleMyDocsNext = () => {
     if (selected !== 'my-docs') return
-    navigate('/resume/parse', {
+    navigate('/resume/target', {
       state: { source: 'manual', file: { name: '已选择的文档', size: '—', format: 'pdf' } },
     })
   }
@@ -99,7 +99,7 @@ export function ResumeSourcePage() {
         title="AI 简历服务"
         subtitle="请选择简历来源"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/resume')}>返回服务中心</Button>
         }
       />
 

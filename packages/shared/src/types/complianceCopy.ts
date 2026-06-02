@@ -31,6 +31,21 @@ export const COMPLIANCE_COPY = {
   KIOSK_RESUME_UPLOAD_PRIVACY: '上传的简历仅供本次 AI 分析使用,分析完成后 1 小时内自动删除,不留存、不转发任何第三方。',
 
   /**
+   * Kiosk 诊断报告页免责声明。AI 诊断分数为求职准备参考,不代表企业真实评价或录用结果。
+   */
+  KIOSK_RESUME_REPORT_DISCLAIMER: '诊断报告仅供求职准备参考,不代表真实招聘结果。',
+
+  /**
+   * Kiosk 简历优化页声明。优化仅调整表达,基于用户真实经历,不编造虚假内容。
+   */
+  KIOSK_RESUME_OPTIMIZE_DISCLAIMER: '优化建议基于你的真实经历,不生成虚假经历。',
+
+  /**
+   * Kiosk 简历服务通用隐私声明。系统不向企业反向推送简历或诊断/优化报告。
+   */
+  KIOSK_RESUME_NO_SEND_ENTERPRISE: '系统不会将你的简历或报告发送给企业。',
+
+  /**
    * Kiosk/30 校企合作主页顶部横幅(蓝色 info,严肃合规声明)。
    * 应对客户场景:学校问"我们能不能代收学生简历转给参展企业?"
    */

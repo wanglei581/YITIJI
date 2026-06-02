@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
-import { AlertCircleIcon, CheckCircleIcon, PrinterIcon, SparklesIcon } from 'lucide-react'
-import type { ResumeReport } from '@ai-job-print/shared'
+import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, PrinterIcon, SparklesIcon, TargetIcon } from 'lucide-react'
+import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { getResumeRecord } from '../../services/api'
 
 interface ReportState {
@@ -13,9 +14,18 @@ interface ReportState {
   success?: boolean
   reason?: string
   report?: ResumeReport
+  targetContext?: ResumeTargetContext
 }
 
 const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId'])
+
+// 目标方向摘要文本（无方向时返回 null）
+function targetSummary(tc?: ResumeTargetContext): string | null {
+  if (!tc) return null
+  if (tc.skipped) return '通用诊断（未指定方向）'
+  const parts = [tc.industry, tc.targetJob, tc.experience, tc.scene].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
 
 export function ResumeReportPage() {
   const navigate = useNavigate()
@@ -101,12 +111,21 @@ export function ResumeReportPage() {
   if (!report || loadError) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
-        <AlertCircleIcon className="h-14 w-14 text-red-400" />
-        <h1 className="mt-6 text-xl font-semibold text-gray-900">页面数据丢失</h1>
-        <p className="mt-2 text-sm text-gray-500">请重新从 AI 简历服务进入此页面</p>
-        <Button className="mt-8" onClick={() => navigate('/resume/source')}>
-          重新开始
-        </Button>
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
+          <FileSearchIcon className="h-10 w-10 text-primary-600" />
+        </div>
+        <h1 className="mt-6 text-xl font-semibold text-gray-900">还没有诊断报告</h1>
+        <p className="mt-2 max-w-xs text-center text-sm text-gray-500">
+          请先上传或选择简历，生成 AI 诊断报告后再查看。
+        </p>
+        <div className="mt-8 flex w-full max-w-sm gap-3">
+          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/resume')}>
+            返回 AI 简历服务
+          </Button>
+          <Button size="lg" className="flex-1" onClick={() => navigate('/resume/source')}>
+            开始简历诊断
+          </Button>
+        </div>
       </div>
     )
   }
@@ -117,6 +136,16 @@ export function ResumeReportPage() {
     name: s.label,
     score: s.maxScore > 0 ? Math.round((s.score / s.maxScore) * 100) : 0,
   }))
+
+  // 优先修改项：得分率最低的 2-3 个分项（由真实报告派生，不编造）
+  const priorityItems = [...report.sections]
+    .filter((s) => s.maxScore > 0)
+    .map((s) => ({ ...s, pct: Math.round((s.score / s.maxScore) * 100) }))
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, 3)
+    .filter((s) => s.pct < 100)
+
+  const summary = targetSummary(state.targetContext)
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -131,6 +160,16 @@ export function ResumeReportPage() {
       />
 
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
+        {/* 目标方向摘要 */}
+        {summary && (
+          <div className="flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
+            <TargetIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
+            <p className="text-sm text-gray-700">
+              目标方向：<span className="font-medium text-primary-700">{summary}</span>
+            </p>
+          </div>
+        )}
+
         {/* 总分卡片 */}
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -179,6 +218,28 @@ export function ResumeReportPage() {
           </div>
         </Card>
 
+        {/* 优先修改项 */}
+        {priorityItems.length > 0 && (
+          <Card className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <ArrowUpRightIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />
+              <p className="text-sm font-medium text-gray-700">优先修改项</p>
+            </div>
+            <p className="mb-3 text-xs text-gray-400">得分率偏低的分项，建议优先调整表达与内容结构</p>
+            <div className="space-y-2.5">
+              {priorityItems.map((item, i) => (
+                <div key={item.key} className="flex items-center gap-3 rounded-lg bg-amber-50/60 px-3 py-2.5">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-700">
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 text-sm font-medium text-gray-800">{item.label}</span>
+                  <span className="text-sm font-semibold text-amber-600">{item.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* 优化建议 */}
         <Card className="p-5">
           <p className="mb-4 text-sm font-medium text-gray-700">可执行建议</p>
@@ -193,6 +254,12 @@ export function ResumeReportPage() {
             ))}
           </ol>
         </Card>
+
+        {/* 合规声明 */}
+        <p className="px-1 pb-1 text-center text-xs leading-relaxed text-gray-400">
+          {COMPLIANCE_COPY.KIOSK_RESUME_REPORT_DISCLAIMER}
+          {COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE}
+        </p>
       </div>
 
       {/* 操作按钮 */}

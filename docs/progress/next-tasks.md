@@ -5,7 +5,25 @@
 
 ---
 
-## 📌 当前状态（P0 安全改进 Round 3，已完成）
+## 📌 当前状态（AI 简历服务中心封板第一阶段，已完成）
+
+**feat/kiosk-ai-resume-service-center（2026-06-02，分支自 main `0f41dd1`）：**
+- ✅ 新增 `/resume`（服务中心首页，4 大入口 + 四步流程 + 最近记录空态 + 隐私合规）、`/resume/target`（目标方向）、`/resume/templates`（素材库 MVP）
+- ✅ 首页/AI助手入口改指 `/resume`；`/resume` 入助手路由白名单
+- ✅ 来源页下一步改走 `/resume/target`；报告页死路改友好恢复页 + 目标摘要 + 优先修改项；优化页加"生成优化版"主按钮；导出页区分 原简历/优化版/诊断报告
+- ✅ shared 新增 `ResumeTargetContext` + 3 条简历合规文案
+- ✅ typecheck/lint/build（kiosk + 全 8 项目）全绿；合规扫描仅注释命中
+- ⏳ 待 review 后 FF merge 到 main
+
+**第一阶段未做（按本轮范围约定，后续单独排期）：**
+- 面试准备（仅占位"即将上线"，未做完整模拟面试）
+- `targetContext` 接入后端 `ResumeParseRequest` + DTO（当前仅前端 state 传递）
+- 素材库真实素材 service 接入（当前本地占位）
+- 优化版简历真实生成文件（当前 `optimizedGenerated` 标记 + 占位文件名，不伪造后端）
+
+---
+
+## 📌 历史已完成状态（P0 安全改进 Round 3）
 
 **P0 安全改进 Round 3（2026-06-02，commit 待提交）：**
 - ✅ H-11：`AiAdvisorCall` 改为 `lazy(() => import(...))` + `<Suspense>`；独立 11.7KB chunk；主包减少约 11KB；`trtc-sdk-v5` 仅在用户发起通话时加载

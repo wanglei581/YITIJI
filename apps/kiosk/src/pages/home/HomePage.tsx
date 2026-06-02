@@ -190,8 +190,8 @@ export function HomePage() {
               iconColor="text-primary-600"
               title="AI 简历服务"
               description="上传或扫描简历,获取 AI 诊断报告和优化建议"
-              buttonLabel="开始优化简历"
-              onAction={() => navigate('/resume/source')}
+              buttonLabel="进入简历服务"
+              onAction={() => navigate('/resume')}
             />
             <PrimaryServiceCard
               icon={PrinterIcon}

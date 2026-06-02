@@ -1,11 +1,37 @@
+// ============================================================
+// ResumeExportPage — 简历导出 / 打印（/resume/export）
+//
+// 区分三种输出类型：原简历 / 优化版简历 / 诊断报告。
+//   - 原简历：来源文件（始终可用）
+//   - 优化版简历：仅在用户"采纳建议生成优化版"后出现（state.optimizedGenerated）
+//   - 诊断报告：仅在已生成诊断（state.taskId）后出现
+//
+// 每种输出可：保存到我的简历 / 打印。底部"返回 AI 简历服务"。
+//
+// 合规：无真实优化文件时使用安全前端占位，不伪造后端成功；
+//       不向企业发送任何文件。
+// ============================================================
+
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { FileTextIcon, PrinterIcon, SaveIcon } from 'lucide-react'
+import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { FileTextIcon, PrinterIcon, SaveIcon, SparklesIcon, ClipboardListIcon } from 'lucide-react'
 
 interface ResumeFile {
   name: string
   size: string
   format: string
+}
+
+interface OutputItem {
+  key: 'original' | 'optimized' | 'report'
+  title: string
+  hint: string
+  fileName: string
+  icon: React.ComponentType<{ className?: string }>
+  iconBg: string
+  iconColor: string
+  badge?: string
 }
 
 export function ResumeExportPage() {
@@ -14,22 +40,61 @@ export function ResumeExportPage() {
   const state = location.state as Record<string, unknown> | null
 
   const rawFile = state?.file as ResumeFile | undefined
-  const file: ResumeFile = rawFile ?? {
-    name: '我的简历.pdf',
-    size: '248 KB',
-    format: 'PDF',
-  }
+  const file: ResumeFile = rawFile ?? { name: '我的简历.pdf', size: '248 KB', format: 'PDF' }
 
-  const handleSave = () => {
-    navigate('/profile', {
-      state: { savedResume: file, savedAt: new Date().toISOString() },
+  const baseName = file.name.replace(/\.[^.]+$/, '') || '我的简历'
+  const optimizedGenerated = state?.optimizedGenerated === true
+  const hasReport = typeof state?.taskId === 'string' || Boolean(state?.report)
+
+  const outputs: OutputItem[] = [
+    {
+      key: 'original',
+      title: '原简历',
+      hint: `${file.size} · ${file.format}`,
+      fileName: file.name,
+      icon: FileTextIcon,
+      iconBg: 'bg-primary-50',
+      iconColor: 'text-primary-600',
+    },
+  ]
+  if (optimizedGenerated) {
+    outputs.push({
+      key: 'optimized',
+      title: '优化版简历',
+      hint: '基于你的真实经历优化表达',
+      fileName: `${baseName}_优化版.pdf`,
+      icon: SparklesIcon,
+      iconBg: 'bg-violet-50',
+      iconColor: 'text-violet-600',
+      badge: '已生成',
+    })
+  }
+  if (hasReport) {
+    outputs.push({
+      key: 'report',
+      title: '诊断报告',
+      hint: '参考评分与可执行建议',
+      fileName: `诊断报告_${baseName}.pdf`,
+      icon: ClipboardListIcon,
+      iconBg: 'bg-amber-50',
+      iconColor: 'text-amber-600',
     })
   }
 
-  const handlePrintOriginal = () => {
+  const handleSave = (item: OutputItem) => {
+    navigate('/profile', {
+      state: {
+        savedResume: { name: item.fileName, size: file.size, format: 'PDF' },
+        savedKind: item.key,
+        savedAt: new Date().toISOString(),
+      },
+    })
+  }
+
+  const handlePrint = (item: OutputItem) => {
     navigate('/print/confirm', {
       state: {
-        file: { name: file.name, size: file.size, pages: 1 },
+        file: { name: item.fileName, size: file.size, pages: 1 },
         copies: 1,
         duplex: 'single',
         color: 'bw',
@@ -38,10 +103,10 @@ export function ResumeExportPage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex h-full flex-col overflow-y-auto p-6">
       <PageHeader
-        title="简历文件"
-        subtitle="请选择下一步操作"
+        title="导出与打印"
+        subtitle="选择要保存或打印的内容"
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
             返回
@@ -49,44 +114,57 @@ export function ResumeExportPage() {
         }
       />
 
-      {/* 文件摘要 */}
-      <Card className="mt-6 p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-            <FileTextIcon className="h-6 w-6 text-primary-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-medium text-gray-900">{file.name}</p>
-            <p className="mt-0.5 text-sm text-gray-500">
-              {file.size} · {file.format}
-            </p>
-          </div>
-        </div>
-      </Card>
+      <div className="mt-6 flex flex-1 flex-col gap-4">
+        {outputs.map((item) => {
+          const Icon = item.icon
+          return (
+            <Card key={item.key} className="p-5">
+              <div className="flex items-center gap-4">
+                <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-lg', item.iconBg].join(' ')}>
+                  <Icon className={['h-6 w-6', item.iconColor].join(' ')} aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-900">{item.title}</p>
+                    {item.badge && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-gray-500">{item.hint}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <Button size="lg" className="flex items-center justify-center gap-2" onClick={() => handleSave(item)}>
+                  <SaveIcon className="h-4 w-4" />
+                  保存到我的简历
+                </Button>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="flex items-center justify-center gap-2"
+                  onClick={() => handlePrint(item)}
+                >
+                  <PrinterIcon className="h-4 w-4" />
+                  打印
+                </Button>
+              </div>
+            </Card>
+          )
+        })}
+      </div>
 
-      {/* 操作按钮 */}
-      <div className="mt-8 flex flex-1 flex-col gap-3 content-start">
-        <Button size="lg" className="flex items-center gap-2" onClick={handleSave}>
-          <SaveIcon className="h-4 w-4" />
-          保存到我的简历
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          className="flex items-center gap-2"
-          onClick={handlePrintOriginal}
-        >
-          <PrinterIcon className="h-4 w-4" />
-          打印原简历
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          onClick={() => navigate('/')}
-        >
-          返回首页
+      <p className="mt-4 text-center text-xs text-gray-400">
+        {COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE}
+      </p>
+
+      <div className="mt-4">
+        <Button size="lg" variant="secondary" className="w-full" onClick={() => navigate('/resume')}>
+          返回 AI 简历服务
         </Button>
       </div>
+      <div className="h-2" />
     </div>
   )
 }

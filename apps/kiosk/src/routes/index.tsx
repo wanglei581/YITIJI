@@ -21,11 +21,14 @@ import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { ResumeUploadPage } from '../pages/resume/ResumeUploadPage'
+import { ResumeHomePage } from '../pages/resume/ResumeHomePage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
+import { ResumeTargetPage } from '../pages/resume/ResumeTargetPage'
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
 import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
+import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
 import { HomePage } from '../pages/home/HomePage'
 import { QingdaoPage } from '../pages/qingdao/QingdaoPage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
@@ -46,13 +49,16 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },
       { path: 'print/done',        element: <PrintDonePage /> },
-      // AI简历服务（Phase 3）
+      // AI简历服务（Phase 3 + AI 简历服务中心）
+      { path: 'resume',            element: <ResumeHomePage /> },
       { path: 'resume/upload',     element: <ResumeUploadPage /> },
       { path: 'resume/source',     element: <ResumeSourcePage /> },
+      { path: 'resume/target',     element: <ResumeTargetPage /> },
       { path: 'resume/parse',      element: <ResumeParsePage /> },
       { path: 'resume/report',     element: <ResumeReportPage /> },
       { path: 'resume/optimize',   element: <ResumeOptimizePage /> },
       { path: 'resume/export',     element: <ResumeExportPage /> },
+      { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
       // 扫描流程（Phase 3）
       { path: 'scan/start',        element: <ScanStartPage /> },
       { path: 'scan/settings',     element: <ScanSettingsPage /> },

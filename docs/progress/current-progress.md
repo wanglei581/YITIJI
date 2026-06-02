@@ -25,7 +25,79 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：P0 安全改进 Round 4（2026-06-02）**
+**当前阶段：Kiosk 岗位信息页 UI 改造（2026-06-02，codex/kiosk-jobs-ui-redesign）**
+
+---
+
+### ✅ Kiosk 岗位信息页 UI 改造（2026-06-02，codex/kiosk-jobs-ui-redesign，分支自 main `0f41dd1`）
+
+将一体机 `/jobs` 页面从「单列岗位列表」升级为「地区筛选 + 来源机构卡片区 + 推荐岗位卡片流 + 岗位详情」。
+
+**修改范围（严格限定在 apps/kiosk，未触碰 legacy-miaoda / admin / partner / terminal-agent / services/api 业务能力）：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/data/jobsMeta.ts`（新增） | Kiosk 本地展示元数据：省/市/区县三级 `REGION_TREE`、来源机构分类（官方机构/第三方平台/合作来源）`SOURCE_ORGS`、按岗位 id 的学历/经验/地区 `JOB_META`、`enrichJob()` 叠加、`buildSourceCards()` 来源聚合。不改 packages/shared 类型，仅以 id/sourceOrgId 关联接口 DTO，http 模式缺元数据时优雅降级 |
+| `apps/kiosk/src/data/externalSources.ts` | `MOCK_JOBS` 扩充至 12 条（新增青岛官方/合作/第三方来源岗位），城市与 `REGION_TREE` 对齐；`MOCK_FAIRS` 不变 |
+| `apps/kiosk/src/pages/jobs/JobsPage.tsx`（重写） | 顶部标题+来源说明+合规提示+返回首页；地区三级联动 select + 确定按钮；岗位类型 pill 筛选；「本地信息来源」卡片区（机构名/覆盖区域/岗位数量/来源类型/最近更新，点击筛选该来源）；「推荐岗位」响应式卡片流（岗位名/企业/薪资/地点/学历·经验/来源/更新时间/查看详情）；当前筛选 chips + 重置 |
+| `apps/kiosk/src/pages/jobs/JobDetailPage.tsx`（增强） | 新增学历/经验、企业信息卡；合规说明改为「本岗位来自第三方/官方来源，本系统不接收简历、不参与招聘流程。」；底部仅「去来源平台投递 / 扫码投递」+ 跳转说明；保留二维码弹层 |
+
+**设计要点：**
+- 用户选完地区即可直接看推荐岗位，来源机构卡片是可选筛选入口，不强制先进入人力公司才能看岗位
+- 21.5 寸触控优先：select 高 56px、主按钮/pill 触控区 ≥48px；响应式来源卡片 2/3/4 列、岗位卡片 1/2/3 列；移动端单列堆叠无横向溢出
+- 沿用现有设计系统（Button/Card/PageHeader/EmptyState/Loading/ErrorState + tokens），未引入新 UI 框架
+- 数据：继续走 `getJobs()/getJobById()` service（保留真实 API 接入结构），mock 模式用本地数据；未新增后端接口
+
+**合规检查结果：**
+- 禁用文案扫描（一键投递/立即投递/平台投递/投递简历/企业收简历/候选人管理/面试邀约/Offer管理/简历筛选）→ ✅ 0 命中（"去来源平台投递"为允许文案，其中"平台投递"为子串误报已排除）
+- 仅展示第三方/官方来源岗位入口，无平台内投递/收简历/候选人筛选/招聘闭环能力
+- 详情页明确提示不接收简历、不参与招聘流程；投递仅二维码跳转来源平台
+
+**验证结果：**
+- `pnpm --filter @ai-job-print/kiosk typecheck` → ✅ 0 错误
+- `pnpm --filter @ai-job-print/kiosk lint` → ✅ 0 警告
+- `pnpm --filter @ai-job-print/kiosk build` → ✅ 通过（index 919KB/271KB gzip；chunk 体积告警为既有 trtc 包，非本次引入）
+- 浏览器视觉验证（mock 模式）：一体机 1920×1080 / 移动 390×844 / 详情页 三视口截图均正常，移动端 `scrollWidth===clientWidth` 无横向溢出
+
+---
+
+### ✅ AI 简历服务中心（2026-06-02，feat/kiosk-ai-resume-service-center，分支自 main `0f41dd1`）
+
+将原线性简历流程升级为"AI 简历服务中心"，完整链路：
+`AI简历服务首页 → 选择来源 → 选择目标方向 → AI诊断 → 优化前后对比 → 生成优化版 → 导出/打印`
+
+**新增页面（3）：**
+- `ResumeHomePage`（`/resume`）：4 大入口（AI简历诊断 / AI简历优化 / 简历素材库 / 面试准备「即将上线」占位）+ 四步流程说明 + 最近记录（仅承接 location.state，无记录时空状态，不硬编码假数据）+ 隐私合规提示
+- `ResumeTargetPage`（`/resume/target`）：行业/目标岗位/经验级别/求职场景选择，支持"暂不指定，通用诊断"；写入 `location.state.targetContext`
+- `ResumeTemplateLibraryPage`（`/resume/templates`）：素材库 MVP（简历模板/求职信/感谢信/作品集封面 + 标签筛选 + 查看/用于优化/打印；本地占位，无收费、无投递、无企业端）
+
+**新增路由：** `/resume`、`/resume/target`、`/resume/templates`（保留 `/resume/source|parse|report|optimize|export`）
+
+**改动页面：**
+- `HomePage`：首页"AI 简历服务"入口 `/resume/source` → `/resume`（按钮文案"进入简历服务"）
+- `AssistantPage`：快捷入口"简历诊断"→"简历服务"，路由 `/resume/report` → `/resume`（避免直达失效报告页丢 state）；`/resume` 加入 `ALLOWED_ROUTE_PREFIXES` 白名单；`KEYWORD_ROUTES`/`SHORTCUT_ICON_MAP` 同步对齐 `/resume`
+- `ResumeSourcePage`：上传/我的文档下一步 `/resume/parse` → `/resume/target`（scan 仍走 `/scan/start`）；返回按钮 → `/resume`
+- `ResumeReportPage`：原"页面数据丢失"死路 → 友好恢复页（"还没有诊断报告" + 开始简历诊断/返回AI简历服务）；新增目标方向摘要 + "优先修改项"section（由真实报告最低分项派生，不编造）；合规声明用 `KIOSK_RESUME_REPORT_DISCLAIMER` + `KIOSK_RESUME_NO_SEND_ENTERPRISE`
+- `ResumeOptimizePage`：新增主按钮"采纳建议生成优化版"→ `/resume/export`（`optimizedGenerated` 标记，不伪造后端成功）；目标方向摘要；disclaimer 用 `KIOSK_RESUME_OPTIMIZE_DISCLAIMER`，移除"通过率"措辞
+- `ResumeExportPage`：区分三种输出（原简历/优化版简历「已生成时」/诊断报告「有 taskId 时」），每项可保存到我的简历/打印；底部"返回 AI 简历服务" + 不发送企业声明
+
+**shared 类型：**
+- `packages/shared/src/types/ai.ts`：新增 `ResumeTargetContext`（行业/岗位/经验/场景/skipped；仅前端 state 传递，暂不随 `ResumeParseRequest` 发后端，避免破坏 DTO 校验）
+- `packages/shared/src/types/complianceCopy.ts`：新增 `KIOSK_RESUME_REPORT_DISCLAIMER` / `KIOSK_RESUME_OPTIMIZE_DISCLAIMER` / `KIOSK_RESUME_NO_SEND_ENTERPRISE`
+
+**状态流完整性（子代理审查通过）：** source→target→parse→report 全程透传 source/file/fileId + targetContext，不丢字段；`handleRetry` 只剥 CONTROL_FIELDS，保留 targetContext。所有 resume 路由直达（无 state）均不白屏/不死路。
+
+**合规：** 无招聘闭环禁词（仅 2 处代码注释命中，非渲染）；不接企业端、不收费、不投递；素材库/优化版均为安全占位，不伪造后端。未触碰打印/扫描模块重构、企业端查看报告。
+
+**验收（2026-06-02）：**
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter ./packages/shared typecheck` | ✅ |
+| `pnpm --filter ./apps/kiosk typecheck` | ✅ |
+| `pnpm --filter ./apps/kiosk lint` | ✅ 0 warnings |
+| `pnpm --filter ./apps/kiosk build` | ✅（主包 919KB，未增长；trtc/AiAdvisorCall 为 flag 死代码分块） |
+| `pnpm typecheck`（全 8 项目） | ✅ |
+| 合规禁词扫描（resume/home/assistant） | ✅ 仅注释命中 |
 
 ---
 

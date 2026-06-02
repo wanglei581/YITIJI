@@ -2,9 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactDiffViewer from 'react-diff-viewer-continued'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon, TrendingUpIcon } from 'lucide-react'
-import type { ResumeOptimizeModule } from '@ai-job-print/shared'
+import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon, TargetIcon, TrendingUpIcon } from 'lucide-react'
+import type { ResumeOptimizeModule, ResumeTargetContext } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { getResumeOptimize } from '../../services/api'
+
+// 目标方向摘要文本（无方向时返回 null）
+function targetSummary(tc?: ResumeTargetContext): string | null {
+  if (!tc) return null
+  if (tc.skipped) return '通用诊断（未指定方向）'
+  const parts = [tc.industry, tc.targetJob, tc.experience, tc.scene].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
 
 /**
  * 由 before / after 估算"评分提升"。
@@ -35,6 +44,8 @@ export function ResumeOptimizePage() {
 
   const taskId = typeof state?.taskId === 'string' ? state.taskId : undefined
   const file   = state?.file as { name: string; size: string; format: string } | undefined
+  const targetContext = state?.targetContext as ResumeTargetContext | undefined
+  const summary = targetSummary(targetContext)
 
   const [modules,  setModules]  = useState<ResumeOptimizeModule[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -82,6 +93,11 @@ export function ResumeOptimizePage() {
 
   const handleViewFile = () => navigate('/resume/export', { state })
 
+  // 采纳建议生成优化版：进入导出页（输出类型=优化版）。
+  // 优化版基于用户真实经历调整表达，不编造经历，不伪造后端成功。
+  const handleGenerateOptimized = () =>
+    navigate('/resume/export', { state: { ...state, optimizedGenerated: true } })
+
   if (loading) {
     return (
       <div className="flex h-full flex-col p-6">
@@ -128,9 +144,18 @@ export function ResumeOptimizePage() {
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
         <InfoIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
         <p className="text-xs text-gray-400">
-          以下建议基于已有内容调整表达,不生成虚假经历。评分提升为估算值,不代表真实招聘结果。
+          {COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}评分提升为估算值,不代表真实招聘结果。
         </p>
       </div>
+
+      {summary && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
+          <TargetIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
+          <p className="text-sm text-gray-700">
+            目标方向：<span className="font-medium text-primary-700">{summary}</span>
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
         {/* 评分提升卡(估算) */}
@@ -146,7 +171,7 @@ export function ResumeOptimizePage() {
                   +{uplift.after - uplift.before} 分
                 </span>
               </div>
-              <p className="mt-1 text-xs text-gray-400">仅基于改动量估算,真实评分以行业实际通过率为准</p>
+              <p className="mt-1 text-xs text-gray-400">仅基于改动量估算,不代表真实招聘结果</p>
             </div>
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-success-bg/60">
               <TrendingUpIcon className="h-7 w-7 text-success-fg" />
@@ -176,14 +201,20 @@ export function ResumeOptimizePage() {
         ))}
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <Button size="lg" onClick={handleSaveAdvice}>保存优化建议</Button>
-        <Button size="lg" variant="secondary" onClick={handleViewFile}>查看简历文件</Button>
-        <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={handlePrintOriginal}>
-          <PrinterIcon className="h-4 w-4" />
-          打印原简历
+      <div className="mt-6 flex flex-col gap-3">
+        <Button size="lg" className="flex items-center justify-center gap-2" onClick={handleGenerateOptimized}>
+          <SparklesIcon className="h-5 w-5" />
+          采纳建议生成优化版
         </Button>
-        <Button size="lg" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+        <div className="grid grid-cols-2 gap-3">
+          <Button size="lg" variant="secondary" onClick={handleSaveAdvice}>保存优化建议</Button>
+          <Button size="lg" variant="secondary" onClick={handleViewFile}>查看简历文件</Button>
+          <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={handlePrintOriginal}>
+            <PrinterIcon className="h-4 w-4" />
+            打印原简历
+          </Button>
+          <Button size="lg" variant="secondary" onClick={() => navigate('/resume')}>返回服务中心</Button>
+        </div>
       </div>
     </div>
   )
