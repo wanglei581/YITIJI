@@ -275,29 +275,31 @@ export default function SyncSourcesPage() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <button
-                          onClick={() => openConfig(s)}
-                          className="mr-1.5 flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                        >
-                          <SettingsIcon className="h-3 w-3" />
-                          mappings
-                        </button>
-                        <button
-                          disabled={trigState === 'loading' || !s.enabled || !s.hasEndpoint}
-                          onClick={() => handleTrigger(s.id)}
-                          className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                            trigState === 'ok'    ? 'bg-green-50 text-green-600' :
-                            trigState === 'error' ? 'bg-red-50 text-red-500' :
-                            'bg-primary-50 text-primary-600 hover:bg-primary-100'
-                          }`}
-                          title={!s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
-                        >
-                          <PlayIcon className="h-3 w-3" />
-                          {trigState === 'loading' ? '触发中…' :
-                           trigState === 'ok'      ? '已入队' :
-                           trigState === 'error'   ? '触发失败' :
-                           '立即同步'}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => openConfig(s)}
+                            className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                          >
+                            <SettingsIcon className="h-3 w-3" />
+                            mappings
+                          </button>
+                          <button
+                            disabled={trigState === 'loading' || !s.enabled || !s.hasEndpoint}
+                            onClick={() => handleTrigger(s.id)}
+                            className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                              trigState === 'ok'    ? 'bg-green-50 text-green-600' :
+                              trigState === 'error' ? 'bg-red-50 text-red-500' :
+                              'bg-primary-50 text-primary-600 hover:bg-primary-100'
+                            }`}
+                            title={!s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
+                          >
+                            <PlayIcon className="h-3 w-3" />
+                            {trigState === 'loading' ? '触发中…' :
+                             trigState === 'ok'      ? '已入队' :
+                             trigState === 'error'   ? '触发失败' :
+                             '立即同步'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -312,7 +314,7 @@ export default function SyncSourcesPage() {
         <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setConfigSrc(null)} />
       )}
       {configSrc && (
-        <div className="fixed inset-y-0 right-0 z-50 flex w-[440px] flex-col bg-white shadow-2xl">
+        <div className="fixed inset-y-0 right-0 z-50 flex w-[440px] flex-col bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
             <p className="text-sm font-semibold text-neutral-800">Configure response mapping</p>
             <button onClick={() => setConfigSrc(null)} className="rounded p-1 hover:bg-neutral-100 text-neutral-400">x</button>
