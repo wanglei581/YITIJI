@@ -95,9 +95,9 @@ export function FairStatsPage() {
         <p className="mt-1 text-xs text-gray-400">
           数据更新于 {formatTime(stats.lastUpdated)} · 系统仅记录服务数据，不记录求职者个人信息
         </p>
-        {stats.isMockData && (
+        {stats.isMockData && import.meta.env.DEV && (
           <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            当前为模拟数据，真实数据将在 Phase 7 接入 API 后替换
+            [开发] 当前为模拟数据，生产环境将由真实 API 替换
           </div>
         )}
       </div>

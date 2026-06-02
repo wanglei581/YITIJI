@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core'
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Request, Response } from 'express'
+import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 
@@ -64,11 +65,21 @@ async function bootstrap(): Promise<void> {
   app.use(express.urlencoded({ extended: true }))
   app.setGlobalPrefix('api/v1')
 
-  // CORS:dev 允许任意 origin(本机三端 Vite 端口浮动),
-  // 生产应改为显式白名单。`credentials: true` 让浏览器允许
-  // 后续可能的 Cookie/Authorization 头携带。
+  // Helmet：设置安全响应头（CSP / X-Frame-Options / HSTS 等）。
+  // contentSecurityPolicy 在 dev 会阻断 Vite HMR，故仅生产开启。
+  app.use(helmet({
+    contentSecurityPolicy: process.env['NODE_ENV'] === 'production',
+    crossOriginEmbedderPolicy: false, // kiosk 页面加载第三方资源需要关闭
+  }))
+
+  // CORS：dev 允许本机 Vite 端口浮动，生产改为显式白名单。
+  const isProd = process.env['NODE_ENV'] === 'production'
+  const allowedOrigins = (process.env['CORS_ALLOWED_ORIGINS'] ?? '')
+    .split(',').map(s => s.trim()).filter(Boolean)
   app.enableCors({
-    origin: true,
+    origin: isProd
+      ? (allowedOrigins.length ? allowedOrigins : false)
+      : true,
     credentials: true,
   })
 
@@ -93,7 +104,7 @@ async function bootstrap(): Promise<void> {
     }),
   )
   app.useGlobalFilters(new HttpExceptionFilter())
-  const port = process.env['PORT'] ?? 3000
+  const port = process.env['PORT'] ?? 3010
   await app.listen(port)
   console.log(`AI Job Print API running on http://localhost:${port}/api/v1`)
 }

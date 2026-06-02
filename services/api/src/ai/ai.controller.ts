@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Body, Query, Req } from '@nestjs/common'
+import { Controller, Post, Get, Param, Body, Query, Req, UseGuards } from '@nestjs/common'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
 import { AuditService } from '../audit/audit.service'
@@ -8,6 +8,9 @@ import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
 import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
+import { Roles } from '../common/decorators/roles.decorator'
 
 interface ReqLike {
   requestId?: string
@@ -140,14 +143,18 @@ export class AiController {
   }
 
   // ─── Admin 统计 / 日志接口 ──────────────────────────────────
-  // 返回内容只含元数据，禁止包含简历正文/聊天原文/文件名/fileId
+  // 仅 admin 角色可访问；返回内容只含元数据，禁止包含简历正文/聊天原文/文件名/fileId
 
   @Get('admin/ai/usage')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   getAiUsage(): AdminAiUsage {
     return this.logService.getUsage(this.aiService.getProviderName())
   }
 
   @Get('admin/ai/logs')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   getAiLogs(@Query('limit') limitStr?: string): AdminAiLogsResult {
     const limit = limitStr !== undefined ? Number(limitStr) : 100
     const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : 100
