@@ -17,6 +17,7 @@ import {
   RefreshCwIcon,
   ScrollTextIcon,
   ShieldIcon,
+  SparklesIcon,
   UsersIcon,
 } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
@@ -28,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理' },
   { key: 'files',        label: '文件管理',     icon: FolderIcon },
   { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon },
+  { key: 'ai-config',    label: 'AI模型配置',   icon: SparklesIcon },
   { key: 'job-sources',     label: '岗位信息源',   icon: BriefcaseIcon,         group: '数据内容' },
   { key: 'fair-sources',   label: '招聘会信息源', icon: CalendarIcon },
   { key: 'fairs',          label: '招聘会管理',   icon: ConciergeBellIcon },
@@ -50,6 +52,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/orders':       'orders',
   '/files':        'files',
   '/ai-services':  'ai-services',
+  '/ai-config':    'ai-config',
   '/job-sources':     'job-sources',
   '/fair-sources':    'fair-sources',
   '/fairs':           'fairs',

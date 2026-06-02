@@ -13,7 +13,8 @@ export type AiOperation = 'parseResume' | 'optimizeResume' | 'chatAssistant' | '
 
 export interface AiLogEntry {
   taskId: string
-  provider: AiProviderName
+  // provider 标签：内置 provider 名，或真实大模型 `llm:<vendor>`
+  provider: AiProviderName | string
   operation: AiOperation
   latencyMs: number
   status: 'success' | 'failed'

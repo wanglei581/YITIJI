@@ -7,6 +7,8 @@ import { LocalAiProvider } from './providers/local.provider.stub'
 import { QwenProvider } from './providers/qwen.provider.stub'
 import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { AiLogService } from './ai-log.service'
+import { LlmConfigService } from './llm/llm-config.service'
+import { LlmChatService } from './llm/llm-chat.service'
 
 // ============================================================
 // AiService — 选择 provider 并统一处理日志
@@ -37,6 +39,8 @@ export class AiService {
     private readonly qwenProvider: QwenProvider,
     private readonly zhipuProvider: ZhipuProvider,
     private readonly logService: AiLogService,
+    private readonly llmConfig: LlmConfigService,
+    private readonly llmChat: LlmChatService,
   ) {
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
     if (!(KNOWN_PROVIDERS as readonly string[]).includes(rawName)) {
@@ -140,11 +144,16 @@ export class AiService {
   async chatWithAssistant(input: ChatInput): Promise<ChatOutput> {
     const t0 = Date.now()
     const sessionId = input.sessionId ?? `session-${Date.now()}`
+    // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
+    const useLlm = this.llmConfig.isReady()
+    const providerLabel = useLlm ? `llm:${this.llmConfig.getConfig().vendor}` : this.provider.name
     try {
-      const result = await this.provider.chatAssistant({ ...input, sessionId })
+      const result = useLlm
+        ? await this.llmChat.chat({ ...input, sessionId })
+        : await this.provider.chatAssistant({ ...input, sessionId })
       this.logService.record({
         taskId:    sessionId,
-        provider:  this.provider.name,
+        provider:  providerLabel,
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'success',
@@ -153,7 +162,7 @@ export class AiService {
     } catch (err) {
       this.logService.record({
         taskId:    sessionId,
-        provider:  this.provider.name,
+        provider:  providerLabel,
         operation: 'chatAssistant',
         latencyMs: Date.now() - t0,
         status:    'failed',

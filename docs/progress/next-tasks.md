@@ -1,13 +1,19 @@
 # 下一步任务
 
-> 最后更新：2026-06-02（P0 安全改进 Round 2，feat/phase9-assistant-actions）  
+> 最后更新：2026-06-02（P0 安全改进 Round 3，feat/phase9-assistant-actions）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（P0 安全改进 Round 2，已完成）
+## 📌 当前状态（P0 安全改进 Round 3，已完成）
 
-**P0 安全改进 Round 2（2026-06-02，commit 待提交）：**
+**P0 安全改进 Round 3（2026-06-02，commit 待提交）：**
+- ✅ H-11：`AiAdvisorCall` 改为 `lazy(() => import(...))` + `<Suspense>`；独立 11.7KB chunk；主包减少约 11KB；`trtc-sdk-v5` 仅在用户发起通话时加载
+- ✅ H-9：`POST /api/v1/trtc/session` 增加 `AbortController + setTimeout(30s)`；超时提示"连接超时（30s），请检查网络后重试"
+- ✅ H-5：`ProfilePage` 硬编码假数据清空；`MOCK_RESUMES` / `MOCK_ORDERS` / `MOCK_AI` 改为空数组；`location.state` 流程传入数据保留
+- ✅ H-6/H-7：新增 `GET /job-fairs/:id/companies`
+
+**P0 安全改进 Round 2（2026-06-02，已完成）：**
 - ✅ H-12：xlsx@0.18.5（CVE-2023-30533 CRITICAL RCE）→ exceljs；保持字段校验/去重/事务回滚不变
 - ✅ C-3：AliAvatar 后端接口未实现问题 → VITE_USE_ALI_AVATAR 门控，默认不调用任何后端
 - ✅ H-1：AliAvatar useImperativeHandle 闭包过期 → stateRef 同步读取
@@ -98,19 +104,22 @@
 
 ### P0（立即）
 
-**安全改进 Round 2 已完成（本次）。剩余 P0 安全项：**
-
-1. **H-11 TRTC 动态加载**：`AiAdvisorCall` 仍静态 import trtc-sdk-v5（1026KB chunk 始终打包），即使 `VITE_USE_TRTC_CALL=false`。需改为 `React.lazy + vite manualChunks`，按 flag 条件加载。
-2. **H-9 TRTC 连接超时**：`startSession` 没有客户端超时机制，后端挂起时 Kiosk 永久等待。需 `AbortController + setTimeout`（建议 30s）。
-3. **H-5 ProfilePage 假数据**：简历/记录全部硬编码 mock，需接入真实 API 或明确标注"暂无数据"空状态。
-4. **H-6/H-7 JobFair 子资源 5 端点缺失**：`/companies`/`/zones`/`/map`/`/materials`/`/stats` 前端调用但后端未实现。需实现或降级前端为空状态展示。
+**安全改进 Round 3 已完成（本次）。剩余 P0 安全项：暂无。**
 
 **业务 P0：**
-5. **feat/phase9-assistant-actions FF 合入 main**（含 Round 1 + Round 2 安全修复）
-6. **Excel 字段映射 service 层接入**（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export）
-7. **BullMQ API 拉取 worker 验证**：`pnpm verify:job-sync` 通过后 FF merge
+1. **未提交的 TRTC/LLM 新功能定批**（合入 main 前必做）：工作区有 Round 3 之外的未跟踪新功能 —— `services/api/src/trtc/*`、`services/api/src/ai/llm/*`、`apps/admin/src/routes/ai-config/*`，且 `app.module.ts` 已 import `TrtcModule`（源文件未提交）。必须将依赖文件与 import 同批提交，否则 main 构建缺文件。决定：随 Round 3 一起合，还是独立 feature commit。
+2. **feat/phase9-assistant-actions FF 合入 main**（含 Round 1 + Round 2 + Round 3 安全修复）
+3. **Excel 字段映射 service 层接入**（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export）
+4. **BullMQ API 拉取 worker 验证**：`pnpm verify:job-sync` 通过后 FF merge
 
 ### P1（择期）
+**安全后续：**
+- **H-5 ProfilePage 真实 API 接入**：当前已去除硬编码假数据，后续接简历/订单/AI 服务记录真实 API
+- **M-5 chatWithAssistant AbortController**：给 AI 聊天请求补客户端超时/取消机制
+- **M-6 LLM 会话 Redis 持久化**：把 LLM 会话状态从内存升级到 Redis，支持重启恢复和横向扩展
+- **JobFair 子资源端点落真**：当前 6 个 `/job-fairs/:id/*` 为返回空数据的 stub。Fair 模型落 Prisma 后，必须补 `publishStatus=published` 过滤 + 来源合规字段（source_org_id/external_id/source_url/sync_time），并校验父招聘会已发布，再返回真实数据，避免暴露未发布/未审核内容
+- **TRTC `/session` 匿名计费防护增强**：当前仅靠每 IP 5 次/min 限流保护这个会触发腾讯云计费的匿名端点；后续可加设备指纹/一体机白名单/验证码等二次约束
+
 **W8 后续 TODO（BullMQ API worker 落地后）：**
 - **生产环境 REDIS_URL 必配**：无 Redis 的 inline fallback 仅供 dev 验证；生产部署时必须提供 Redis，否则 Cron 调度仍然工作但缺少 BullMQ 持久化/重试语义
 - **responseConfig 可视化配置**：当前需直接改 DB JSON；Partner 后台应提供字段映射规则 UI（rootPath / fields 编辑器），避免需要技术人员操作
@@ -123,6 +132,9 @@
 - 打印任务状态实时追踪 UI 优化
 
 ### P2
+- **`pnpm audit` 2 项 moderate 传递依赖**（非运行时直连，不阻塞合入）：
+  - `exceljs > uuid <11.1.1`（GHSA-w5hq-g745-h8pq，v3/v5/v6 提供 buf 时缺边界检查；exceljs 实际用 v4 random，影响有限）→ 待 exceljs 升级或 pnpm overrides 锁 uuid≥11.1.1
+  - `prisma(dev) > @hono/node-server <1.19.13`（GHSA-92pp-h63x-v22m，仅 Prisma 开发期工具链，不进生产运行时）→ 随 Prisma 升级消除
 - 企业宣传视频播放支持（当前为渐变封面占位）
 - FairStatsPage 数据接真实展会统计
 - 招聘会详情页增强：展位导览图点击弹出企业预览

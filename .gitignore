@@ -11,6 +11,9 @@ dist
 apps/*/vite.config.js
 apps/*/vite.config.d.ts
 
+# Generated artifacts (manual exports / presentations)
+outputs/
+
 # Environment
 .env
 .env.local

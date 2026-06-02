@@ -7,6 +7,7 @@ import DevicesPage from './devices'
 import OrdersPage from './orders'
 import FilesPage from './files'
 import AiServicesPage from './ai-services'
+import AiConfigPage from './ai-config'
 import JobSourcesPage from './job-sources'
 import FairSourcesPage from './fair-sources'
 import FairsPage from './fairs'
@@ -35,6 +36,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'orders',       element: <OrdersPage /> },
       { path: 'files',        element: <FilesPage /> },
       { path: 'ai-services',  element: <AiServicesPage /> },
+      { path: 'ai-config',    element: <AiConfigPage /> },
       { path: 'job-sources',  element: <JobSourcesPage /> },
       { path: 'fair-sources', element: <FairSourcesPage /> },
       { path: 'fairs',        element: <FairsPage /> },
