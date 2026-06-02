@@ -198,9 +198,9 @@ export function HomePage() {
               iconBg="bg-gray-100"
               iconColor="text-gray-700"
               title="打印扫描"
-              description="打印文件、扫描材料、生成 PDF 存档"
-              buttonLabel="开始打印 / 扫描"
-              onAction={() => navigate('/print/upload')}
+              description="文档打印、材料扫描、照片与证件照、格式转换"
+              buttonLabel="进入打印扫描"
+              onAction={() => navigate('/print-scan')}
             />
           </div>
         </section>

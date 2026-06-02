@@ -5,7 +5,24 @@
 
 ---
 
-## 📌 当前状态（AI 简历服务中心封板第一阶段，已完成）
+## 📌 当前状态（打印扫描服务中心 第一阶段，已完成）
+
+**feat/kiosk-print-scan-service-center（2026-06-02，分支自 main `c7f6191`）：**
+- ✅ 新增 `/print-scan`（服务中心首页，6 能力九宫格 + 敏感文件提示 + 非 CA 电子签声明）、`/print-scan/feature/:key`（证件照/格式转换/签名盖章「即将上线」说明页，未知 key 容错不白屏）
+- ✅ 首页「打印扫描」主卡指向 `/print-scan`；routes 注册两条新路由
+- ✅ 文档打印/照片打印接真实打印链路 `/print/upload`；材料扫描接 `/scan/start` 并加「流程演示」诚实说明（真机需 Terminal Agent）
+- ✅ `complianceCopy.ts`：强化 `KIOSK_PRINT_SCAN_ESIGN_NOTICE`（非 CA 电子签补强版）+ 新增 `KIOSK_SCAN_DEMO_NOTICE`
+- ✅ typecheck/lint/build ✅；合规禁词扫描 ✅；证件照/格式转换/签名盖章无「已完成/成功」假能力文案
+- ⏳ 待 review 后决定是否 commit / FF merge 到 main
+
+**第一阶段未做（按本轮范围约定，后续单独排期）：**
+- 真实证件照排版 / 真实格式转换 / 真实签章合成（当前仅 MVP 说明页 + 备选打印路径）
+- 真实扫描 Agent（TWAIN / 扫描到 SMB，属 Phase 8.2，当前 `/scan/*` 为流程演示）
+- 不做 CA 电子签 / 电子认证 / 电子合同签署（合规红线，永不做）
+
+---
+
+## 📌 历史已完成状态（AI 简历服务中心封板第一阶段，已完成）
 
 **feat/kiosk-ai-resume-service-center（2026-06-02，分支自 main `0f41dd1`）：**
 - ✅ 新增 `/resume`（服务中心首页，4 大入口 + 四步流程 + 最近记录空态 + 隐私合规）、`/resume/target`（目标方向）、`/resume/templates`（素材库 MVP）

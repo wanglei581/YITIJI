@@ -20,6 +20,8 @@ import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
+import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
+import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ResumeUploadPage } from '../pages/resume/ResumeUploadPage'
 import { ResumeHomePage } from '../pages/resume/ResumeHomePage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
@@ -43,6 +45,9 @@ export const kioskRouter = createBrowserRouter([
       { path: 'profile',           element: <ProfilePage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'qingdao',           element: <QingdaoPage /> },
+      // 打印扫描服务中心
+      { path: 'print-scan',              element: <PrintScanHomePage /> },
+      { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },

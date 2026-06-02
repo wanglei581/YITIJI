@@ -25,7 +25,54 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Kiosk 岗位信息页 UI 改造（2026-06-02，codex/kiosk-jobs-ui-redesign）**
+**当前阶段：打印扫描服务中心 第一阶段（2026-06-02，feat/kiosk-print-scan-service-center）**
+
+---
+
+### ✅ 打印扫描服务中心 第一阶段（2026-06-02，feat/kiosk-print-scan-service-center，分支自 main `c7f6191`）
+
+首页第二个大模块「打印扫描服务中心」。本阶段不做真实文件转换、不做真实电子签、不做真实扫描 Agent 大改，只做服务中心入口、真实打印链路接入、MVP 说明页、合规与诚实声明。
+
+**页面 / 路由：**
+
+| 路由 | 页面 | 说明 |
+|------|------|------|
+| `/print-scan` | `PrintScanHomePage` | 服务中心首页，6 能力九宫格 + 敏感文件提示 + 非 CA 电子签声明 |
+| `/print-scan/feature/:key` | `PrintScanFeatureInfoPage` | 证件照 / 格式转换 / 签名盖章 的「即将上线」说明页（`key` 未知有容错，不白屏） |
+
+**入口跳转：**
+
+| 能力 | 跳转 | 类型 |
+|------|------|------|
+| 文档打印 | `/print/upload` | 真实打印链路（W7 上传→建任务→Terminal Agent 出纸） |
+| 照片打印 | `/print/upload`（`state.category='photo'`） | 真实打印链路 |
+| 材料扫描 | `/scan/start` | 现有流程，已加「流程演示」诚实说明（真机需 Agent，Phase 8.2） |
+| 证件照 | `/print-scan/feature/id-photo` → 备选「先用照片打印」 | MVP 说明 |
+| 格式转换 | `/print-scan/feature/convert` → 备选「先去文档打印」 | MVP 说明 |
+| 签名盖章 | `/print-scan/feature/sign` → 备选「先去文档打印」 | MVP 说明 |
+| 首页「打印扫描」主卡 | `/print-scan` | 入口已指向新服务中心 |
+
+**修改文件（严格限定计划范围）：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` | 服务中心首页（6 能力卡 + 合规声明）；材料扫描卡加「流程演示」诚实提示 |
+| `apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx` | 三项 MVP 说明页（计划支持 + 合规声明 + 备选路径 + 未知 key 容错） |
+| `apps/kiosk/src/pages/scan/ScanStartPage.tsx` | 顶部加「流程演示」ComplianceBanner（`KIOSK_SCAN_DEMO_NOTICE`） |
+| `apps/kiosk/src/pages/home/HomePage.tsx` | 「打印扫描」主卡跳转确认指向 `/print-scan` |
+| `apps/kiosk/src/routes/index.tsx` | 注册 `/print-scan`、`/print-scan/feature/:key` |
+| `packages/shared/src/types/complianceCopy.ts` | 强化 `KIOSK_PRINT_SCAN_ESIGN_NOTICE`（非 CA 电子签补强版）；新增 `KIOSK_SCAN_DEMO_NOTICE` |
+
+**合规与诚实声明：**
+- 签名盖章：仅用于个人材料整理与打印辅助，不提供 CA 电子签 / 电子认证 / 合同签署服务；仅图片合成预览，不具备法律认证效力
+- 敏感文件（证件照/身份证）：完成后按隐私策略自动清理，不长期留存、不转发第三方
+- 材料扫描：明确「当前为流程演示，真机扫描需一体机连接 Terminal Agent」
+- 证件照 / 格式转换 / 签名盖章：均标「即将上线」，不出现「已完成/成功」假能力文案；不伪造后端转换/签章成功
+- 禁用词扫描通过（一键投递/立即投递/平台投递 等 0 命中）
+
+**明确不做：** 真实格式转换、真实证件照排版、真实签章合成、真实扫描 Agent、CA 电子签 / 电子认证 / 电子合同签署、企业端；不改 AI 简历服务 / 岗位 UI / 招聘会 / 后台。
+
+**验证：** `typecheck` ✅ / `lint` ✅ / `build` ✅ / 合规禁词扫描 ✅ / 路由与跳转 + 未知 key 容错 + 诚实文案 核查通过。
 
 ---
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, PageHeader } from '@ai-job-print/ui'
+import { Button, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { CreditCardIcon, FileTextIcon, ScanIcon } from 'lucide-react'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -48,6 +49,13 @@ export function ScanStartPage() {
           </Button>
         }
       />
+
+      {/* 流程演示说明：真机扫描需一体机 + Terminal Agent */}
+      <div className="mt-4">
+        <ComplianceBanner tone="warning" title="流程演示">
+          {COMPLIANCE_COPY.KIOSK_SCAN_DEMO_NOTICE}
+        </ComplianceBanner>
+      </div>
 
       <div className="mt-6 flex flex-1 flex-col gap-4">
         {SCAN_TYPES.map(({ type, label, description, icon: Icon }) => {
