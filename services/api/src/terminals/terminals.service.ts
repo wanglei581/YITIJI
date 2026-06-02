@@ -504,4 +504,35 @@ export class TerminalsService implements OnModuleInit {
   listPrintTasks() {
     return this.prisma.printTask.findMany({ orderBy: { createdAt: 'desc' } })
   }
+
+  async getTerminalPrinterStatus(terminalId: string): Promise<{
+    printerStatus: string | null
+    lastSeenAt: string | null
+    isOnline: boolean
+  }> {
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      include: {
+        heartbeats: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { printerStatus: true, createdAt: true },
+        },
+      },
+    })
+    if (!terminal) {
+      return { printerStatus: null, lastSeenAt: null, isOnline: false }
+    }
+    const latest = terminal.heartbeats[0]
+    const lastSeenAt = latest?.createdAt?.toISOString() ?? null
+    // 最近 5 分钟内有心跳视为在线
+    const isOnline = latest
+      ? Date.now() - latest.createdAt.getTime() < 5 * 60 * 1000
+      : false
+    return {
+      printerStatus: latest?.printerStatus ?? null,
+      lastSeenAt,
+      isOnline,
+    }
+  }
 }

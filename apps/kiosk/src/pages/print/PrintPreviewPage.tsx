@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
@@ -34,20 +34,56 @@ interface LocationState {
   file: PrintFile
 }
 
-// Phase 8.1: must come from agent config / Terminal Agent heartbeat, never hardcoded
-const PRINTER_NAME = 'Pantum CM2800ADN Series'
-
-// Phase 8.1: replace with real data from Terminal Agent heartbeat (/api/v1/terminals/:id/status)
-const MOCK_PRINTER_STATUS: PrinterStatus = {
-  isOnline: true,
+// 打印机离线时的默认状态（显示"打印机离线"警告并阻止打印）
+const PRINTER_OFFLINE: PrinterStatus = {
+  isOnline: false,
   hasPaper: true,
-  tonerLevels: {
-    black: 75,
-    cyan: 18,    // low — exercises color-toner warning in UI
-    magenta: 22, // low
-    yellow: 20,  // low
-  },
-  errorCode: undefined,
+  tonerLevels: { black: 0, cyan: 0, magenta: 0, yellow: 0 },
+}
+
+// 从终端 API 心跳状态字符串映射到前端 PrinterStatus
+function mapPrinterStatus(raw: string | null | undefined): PrinterStatus {
+  switch (raw) {
+    case 'ready':     return { isOnline: true,  hasPaper: true,  tonerLevels: { black: 100, cyan: 100, magenta: 100, yellow: 100 } }
+    case 'offline':   return PRINTER_OFFLINE
+    case 'error':     return { isOnline: true,  hasPaper: false, tonerLevels: { black: 0,   cyan: 0,   magenta: 0,   yellow: 0   }, errorCode: 'hardwareError' }
+    case 'low_paper': return { isOnline: true,  hasPaper: true,  tonerLevels: { black: 100, cyan: 100, magenta: 100, yellow: 100 }, errorCode: 'lowPaper' }
+    default:          return { isOnline: true,  hasPaper: true,  tonerLevels: { black: 100, cyan: 100, magenta: 100, yellow: 100 } }
+  }
+}
+
+// 从 VITE_TERMINAL_ID 获取真实打印机状态；未配置或获取失败时返回 PRINTER_OFFLINE
+function usePrinterStatus(): { printerName: string; printer: PrinterStatus; loading: boolean } {
+  const terminalId  = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+  const printerName = (import.meta.env['VITE_PRINTER_NAME'] ?? '').trim() || '已配置打印机'
+  const [printer, setPrinter] = useState<PrinterStatus>(PRINTER_OFFLINE)
+  const [loading, setLoading] = useState(!!terminalId)
+  const cancelledRef = useRef(false)
+
+  useEffect(() => {
+    if (!terminalId) {
+      setLoading(false)
+      return
+    }
+    cancelledRef.current = false
+
+    fetch(`/api/v1/terminals/${terminalId}/printer-status`)
+      .then((r) => r.json())
+      .then((data: { printerStatus?: string | null }) => {
+        if (cancelledRef.current) return
+        setPrinter(mapPrinterStatus(data.printerStatus))
+        setLoading(false)
+      })
+      .catch(() => {
+        if (cancelledRef.current) return
+        setPrinter(PRINTER_OFFLINE)
+        setLoading(false)
+      })
+
+    return () => { cancelledRef.current = true }
+  }, [terminalId])
+
+  return { printerName, printer, loading }
 }
 
 const PRICE_BW = 0.2
@@ -123,7 +159,7 @@ export function PrintPreviewPage() {
   const EMPTY_FILE: PrintFile = { name: '', size: '', pages: 0 }
   const file = locationState?.file ?? EMPTY_FILE
 
-  const printer = MOCK_PRINTER_STATUS
+  const { printerName, printer, loading: printerLoading } = usePrinterStatus()
 
   // ── Parameter state ─────────────────────────────────────────────────────────
   const [copies, setCopies] = useState(1)
@@ -261,12 +297,14 @@ export function PrintPreviewPage() {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-gray-900">{PRINTER_NAME}</p>
+              <p className="truncate text-sm font-medium text-gray-900">
+                {printerLoading ? '检测设备中…' : printerName}
+              </p>
               <p className={['text-xs', printer.isOnline ? 'text-green-600' : 'text-red-500'].join(' ')}>
-                {printer.isOnline ? '在线' : '离线'}
+                {printerLoading ? '请稍候' : printer.isOnline ? '在线' : '离线'}
               </p>
             </div>
-            {printer.isOnline && <CheckCircleIcon className="h-5 w-5 shrink-0 text-green-500" />}
+            {!printerLoading && printer.isOnline && <CheckCircleIcon className="h-5 w-5 shrink-0 text-green-500" />}
           </Card>
 
           {/* Warning / info chips */}
@@ -504,9 +542,9 @@ export function PrintPreviewPage() {
           size="lg"
           className="flex-1"
           onClick={handleNext}
-          disabled={hasBlockingWarning}
+          disabled={printerLoading || hasBlockingWarning}
         >
-          {hasBlockingWarning ? '打印机不可用' : '确认参数'}
+          {printerLoading ? '设备检测中…' : hasBlockingWarning ? '打印机不可用' : '确认参数'}
         </Button>
       </div>
     </div>

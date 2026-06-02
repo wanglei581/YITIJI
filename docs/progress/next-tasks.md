@@ -1,11 +1,23 @@
 # 下一步任务
 
-> 最后更新：2026-06-01（Phase 9.3 AI 助手快捷操作增强，feat/phase9-assistant-actions）  
+> 最后更新：2026-06-02（P0 安全改进 Round 2，feat/phase9-assistant-actions）  
 > 关联文档：[current-progress.md](./current-progress.md)
 
 ---
 
-## 📌 当前状态（Phase 9.3 AI 助手快捷操作增强）
+## 📌 当前状态（P0 安全改进 Round 2，已完成）
+
+**P0 安全改进 Round 2（2026-06-02，commit 待提交）：**
+- ✅ H-12：xlsx@0.18.5（CVE-2023-30533 CRITICAL RCE）→ exceljs；保持字段校验/去重/事务回滚不变
+- ✅ C-3：AliAvatar 后端接口未实现问题 → VITE_USE_ALI_AVATAR 门控，默认不调用任何后端
+- ✅ H-1：AliAvatar useImperativeHandle 闭包过期 → stateRef 同步读取
+- ✅ H-4：PrintPreviewPage 硬编码 `Pantum CM2800ADN Series` → VITE_TERMINAL_ID + API 动态读取
+- ✅ `GET /api/v1/terminals/:id/printer-status` 新端点（无需 auth）
+- ✅ 全量 typecheck/lint/build ✅；pnpm audit: xlsx CVE 已消除
+
+---
+
+## 📌 历史已完成状态（Phase 9.3 AI 助手快捷操作增强）
 
 **Phase 9.3 feat/phase9-assistant-actions（2026-06-01，已完成，待合入 main）：**
 - ✅ 7 个常驻快捷入口（始终可见）：简历诊断 / 打印文件 / 扫描材料 / 查看岗位 / 查看招聘会 / AI 在青岛 / 人社专区
@@ -85,14 +97,18 @@
 ## 🔜 下一步优先级
 
 ### P0（立即）
-1. **W8-P1 完成验证后合入 main**：`pnpm verify:job-sync` 通过后 FF merge
-   - 需要本地 Redis：`docker run -d -p 6379:6379 redis:7-alpine` + `.env` 中设置 `REDIS_URL=redis://localhost:6379`
-   - 验收链：Admin 触发 → BullMQ 入队 → processor 执行 → Job pending/draft 落库 → Partner SyncLog 可见 → 失败源写 failed+errorDetail
 
-2. **Phase 9 UI Polish + AI 数字人引导员**（独立分支）
-   - 静态 3D 就业引导员（VRM + WebGL fallback）
-   - Kiosk 首页视觉升级
-   - TTS 语音引导（Phase 9.2 择期）
+**安全改进 Round 2 已完成（本次）。剩余 P0 安全项：**
+
+1. **H-11 TRTC 动态加载**：`AiAdvisorCall` 仍静态 import trtc-sdk-v5（1026KB chunk 始终打包），即使 `VITE_USE_TRTC_CALL=false`。需改为 `React.lazy + vite manualChunks`，按 flag 条件加载。
+2. **H-9 TRTC 连接超时**：`startSession` 没有客户端超时机制，后端挂起时 Kiosk 永久等待。需 `AbortController + setTimeout`（建议 30s）。
+3. **H-5 ProfilePage 假数据**：简历/记录全部硬编码 mock，需接入真实 API 或明确标注"暂无数据"空状态。
+4. **H-6/H-7 JobFair 子资源 5 端点缺失**：`/companies`/`/zones`/`/map`/`/materials`/`/stats` 前端调用但后端未实现。需实现或降级前端为空状态展示。
+
+**业务 P0：**
+5. **feat/phase9-assistant-actions FF 合入 main**（含 Round 1 + Round 2 安全修复）
+6. **Excel 字段映射 service 层接入**（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export）
+7. **BullMQ API 拉取 worker 验证**：`pnpm verify:job-sync` 通过后 FF merge
 
 ### P1（择期）
 **W8 后续 TODO（BullMQ API worker 落地后）：**

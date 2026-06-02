@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-06-01  
+> 最后更新：2026-06-02  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
@@ -25,7 +25,135 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Phase 9.3 AI 助手快捷操作增强（feat/phase9-assistant-actions，2026-06-01）**
+**当前阶段：P0 安全改进 Round 2（2026-06-02）**
+
+---
+
+### ✅ P0 安全改进 Round 2（2026-06-02，feat/phase9-assistant-actions）
+
+#### H-12: xlsx@0.18.5 → exceljs（CVE-2023-30533，CRITICAL RCE）
+
+- `services/api/package.json`：移除 `xlsx`，新增 `exceljs`
+- `services/api/src/jobs/jobs.service.ts`：
+  - 新增私有方法 `loadExcelRows(buffer)` 封装 exceljs 读取（替换 `XLSX.read` + `XLSX.utils.sheet_to_json`）
+  - `parseExcelColumns` 改为 `async`（exceljs 为异步 API）
+  - `previewExcelImport` 改用 `loadExcelRows`，移除 `rawRow as unknown[]` 强转
+  - `wb.xlsx.load(buffer as unknown as ArrayBuffer)` 处理 TypeScript Buffer 泛型兼容问题
+- 保持不变：敏感列检测、intra-batch 去重、DB 事务回滚语义
+
+#### C-3 + H-1: AliAvatar 隔离 + 闭包修复
+
+- `apps/kiosk/src/components/AliAvatar.tsx`：
+  - 新增模块级常量 `USE_ALI_AVATAR = import.meta.env['VITE_USE_ALI_AVATAR'] === 'true'`
+  - `useEffect` 首行 `if (!USE_ALI_AVATAR) return` — 未启用时零网络请求
+  - 新增 `stateRef = useRef<ReadyState>('idle')` 与 `setState(s)` 同步更新（H-1 修复）
+  - `useImperativeHandle` 用 `stateRef.current` 替代 `state`，消除闭包过期问题
+  - 所有 hook 调用完毕后 `if (!USE_ALI_AVATAR) return null`（符合 React Hooks 规则）
+- `apps/kiosk/.env.example`：新增 `VITE_USE_ALI_AVATAR=false`（带启用前置条件说明）
+- `apps/kiosk/src/vite-env.d.ts`：新增 `VITE_USE_ALI_AVATAR: string` 类型声明
+
+#### H-4: PrintPreviewPage 移除硬编码打印机名
+
+- `services/api/src/terminals/terminals.service.ts`：新增 `getTerminalPrinterStatus(terminalId)` — 查最新心跳的 printerStatus + isOnline（5min 窗口）
+- `services/api/src/terminals/terminals.controller.ts`：新增 `GET /api/v1/terminals/:terminalId/printer-status`（无需 auth，Kiosk 读自身设备状态）
+- `apps/kiosk/src/pages/print/PrintPreviewPage.tsx`：
+  - 删除 `const PRINTER_NAME = 'Pantum CM2800ADN Series'`（CLAUDE.md §3 违规）
+  - 删除 `MOCK_PRINTER_STATUS`（Phase 8.1 遗留 mock）
+  - 新增 `mapPrinterStatus(raw)` 将 heartbeat 状态字符串映射到 `PrinterStatus`
+  - 新增 `usePrinterStatus()` hook：读 `VITE_TERMINAL_ID` 调 API，失败降级 `PRINTER_OFFLINE`
+  - 打印机状态栏使用 hook 返回的 `printerName` 和 `printer`
+  - 确认按钮：`printerLoading` 时显示"设备检测中…"并禁用
+- `apps/kiosk/.env.example`：新增 `VITE_TERMINAL_ID=` 和 `VITE_PRINTER_NAME=`（均注释掉，含说明）
+- `apps/kiosk/src/vite-env.d.ts`：新增 `VITE_TERMINAL_ID` 和 `VITE_PRINTER_NAME` 类型声明
+
+**验收（2026-06-02）：**
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/api lint` ✅（0 errors，1 pre-existing warning in llm-config.service.ts）
+- `pnpm --filter @ai-job-print/api build` ✅
+- `pnpm --filter ./apps/kiosk typecheck` ✅
+- `pnpm --filter ./apps/kiosk lint` ✅
+- `pnpm --filter ./apps/kiosk build` ✅（898KB main bundle，trtc 分块独立）
+- `pnpm audit`：xlsx CVE-2023-30533 已清除；剩余 2 moderate（@hono/node-server 在 @prisma/dev 深层传递、uuid 在 exceljs 内部且使用模式无触发条件）
+
+---
+
+### ✅ W8 并行三任务（2026-06-02，feat/phase9-assistant-actions cherry-pick 合入）
+
+**方式：** 3 个子代理 × 独立 worktree，并行实现，主控 code review 后 cherry-pick 按序合入
+
+#### A. feat(admin): responseConfig 可视化配置（bf8b4c0 + eb07549）
+
+- 后端：`services/api/src/job-sync/job-sync.controller.ts` 新增两个端点
+  - `GET /admin/job-sync/sources/:sourceId` — 返回单个 API 数据源含 responseConfig（解析 JSON）
+  - `PUT /admin/job-sync/sources/:sourceId/response-config` — 保存 dataType/rootPath/fields
+  - 均受 `@JwtAuthGuard + @RolesGuard + @Roles('admin')` 保护
+- 前端：`apps/admin/src/routes/sync-sources/index.tsx` 新增 440px 侧滑配置抽屉
+  - "mappings" 按钮触发，显示 dataType select + rootPath input + 动态字段映射 rows
+  - 抽屉面板 `onClick={stopPropagation}` 防止点击内部关闭（review fixup 修复）
+  - 操作列两按钮用 `flex gap-1.5` 包裹（review fixup 修复）
+
+#### B. fix(api): JobFair sourceId 精确追踪（d1671b3）
+
+- `services/api/prisma/schema.prisma`：
+  - JobFair 模型新增 `sourceId String?` + `source JobSource? @relation("FairSource", ...)`
+  - JobFair 模型新增 `@@index([sourceId])`
+  - JobSource 模型新增 `fairs JobFair[] @relation("FairSource")` 反向关联
+- `services/api/src/jobs/jobs.service.ts` `confirmExcelImport`：
+  - fair 分支的 `tx.jobFair.upsert` create 块补充 `sourceId: batch.sourceId`
+  - update 块不设 sourceId（与 Job 一致，防"刷字段绕审核"）
+- `npx prisma db push && npx prisma generate` 已在 worktree 内验证通过
+
+#### C. feat(kiosk): 助手快捷入口 Polish（c402945，Phase 9.4）
+
+- `apps/kiosk/src/pages/assistant/AssistantPage.tsx`
+  - 新增 5 个图标导入：FileTextIcon/PrinterIcon/BriefcaseIcon/CalendarDaysIcon/LandmarkIcon
+  - 新增 `SHORTCUT_ICON_MAP` 路由 → 图标映射（无需改 SHORTCUTS 类型）
+  - 快捷按钮内嵌图标（`flex items-center gap-1.5`）
+  - ZapIcon 旁新增 "快捷入口" 文字标签
+  - 触控目标已为 `min-h-[48px]`（Phase 9.5 已满足，C 补充图标）
+  - 合规：5 个路由完全合规，无招聘闭环词
+
+**验收（cherry-pick 后）：**
+- `cd services/api && npx tsc --noEmit` ✅
+- `pnpm --filter admin exec tsc --noEmit` ✅
+- `pnpm --filter kiosk exec tsc --noEmit` ✅
+
+---
+
+### ✅ Phase 9.5：AI 数字人语音通话修复（2026-06-02）
+
+**目标：** 修复 TRTC 对话式 AI 数字人“字幕正常显示但无声音”的问题。
+
+**问题判断：**
+- 前端已能收到 AI 字幕/状态消息，但未在 `REMOTE_AUDIO_AVAILABLE` 后主动恢复远端音频订阅与播放。
+- 后端默认 TTS 配置把 TRTC `SDKAppID` 作为 TTS `AppId` fallback，但腾讯 AI 对话文档中的 `tencent` TTS 要求单独配置 TTS `AppId`，容易导致 TTS 配置不正确但前端仍可看到字幕。
+
+**修复内容：**
+- `apps/kiosk/src/components/AiAdvisorCall.tsx`
+  - 监听 `REMOTE_AUDIO_AVAILABLE` 后记录远端用户并调用 `muteRemoteAudio(userId, false)`、`setRemoteAudioVolume(userId, 100)`、`resumePlay()`。
+  - `enterRoom` 显式开启 `autoReceiveAudio: true`，关闭 SDK 默认弹窗，由页面内“点击播放顾问语音”承接自动播放恢复。
+  - 按 TRTC SDK v5 官方方式使用 `AUTOPLAY_FAILED` 事件的 `event.resume()` 恢复播放。
+  - 修复 `resumePlay` 逻辑，自动对已记录的远端音频用户逐个恢复播放。
+  - 增加本地朗读兜底：字幕已到但远端音量持续为 0 时，用浏览器 `speechSynthesis` 朗读字幕，避免现场继续无声。
+  - 兜底朗读只处理数字人 `subtitle`，明确跳过用户语音转写 `transcription/asr/stt/user`，避免把对话人的声音再朗读出来。
+- `services/api/src/trtc/trtc.service.ts`
+  - `tencent` TTS 要求显式配置 `TRTC_TTS_APP_ID` 或 `TENCENT_APP_ID`，不再用 TRTC `SDKAppID` 兜底。
+  - 保留 `TRTC_TTS_CONFIG_JSON` 原始 JSON 覆盖入口，方便后续接其他 TTS 服务商。
+- `services/api/.env.example`
+  - 补全 `tencent` TTS 环境变量示例，明确 TTS `AppId` 与 TRTC `SDKAppID` 不是同一个配置项。
+- `apps/kiosk/vite.config.ts` / `apps/kiosk/.env.example`
+  - Kiosk dev proxy 从写死 `localhost:3000` 改为可配置 `VITE_API_PROXY_TARGET`，默认对齐 API 示例端口 `http://localhost:3010`，确保 `/api/v1/trtc/session` 命中正确后端。
+  - 本地 `.env.local` 调整为局域网友好模式：`VITE_API_BASE_URL=/api/v1` + `VITE_API_PROXY_TARGET=http://localhost:3010`，手机访问 `http://<Mac局域网IP>:5173` 时由 Vite 代理 API 请求。
+- `services/api/src/main.ts`
+  - API 默认端口从 `3000` 改为 `3010`，避免 `.env` 漏配 `PORT` 时与旧服务冲突，并与 Kiosk 代理默认值保持一致。
+
+**验收：**
+- `pnpm --filter ./apps/kiosk typecheck` ✅
+- `pnpm --filter ./apps/kiosk lint` ✅
+- `pnpm --filter ./apps/kiosk build` ✅
+- `pnpm --filter ./services/api typecheck` ✅
+- `pnpm --filter ./services/api lint` ✅
+- `pnpm --filter ./services/api build` ✅
 
 ---
 

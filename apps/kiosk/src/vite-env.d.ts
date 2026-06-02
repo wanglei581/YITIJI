@@ -3,7 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
   readonly VITE_USE_TRTC_CALL: string
-  readonly VITE_USE_ALI_AVATAR: string
+  readonly VITE_TERMINAL_ID: string
+  readonly VITE_PRINTER_NAME: string
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv

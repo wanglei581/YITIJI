@@ -21,6 +21,7 @@ import {
   Res,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common'
 import type { Response } from 'express'
 import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
@@ -78,7 +79,19 @@ export class TerminalsController {
     return this.terminalsService.patchTaskStatus(taskId, dto, auth, terminalIdHeader)
   }
 
-  // ── 5. Test file — mock task download ────────────────────────────────────
+  // ── 5. Printer status for Kiosk ─────────────────────────────────────────
+  // GET /api/v1/terminals/:terminalId/printer-status  (no auth — read-only, non-sensitive)
+  @Get('terminals/:terminalId/printer-status')
+  @HttpCode(HttpStatus.OK)
+  async getTerminalPrinterStatus(@Param('terminalId') terminalId: string) {
+    const result = await this.terminalsService.getTerminalPrinterStatus(terminalId)
+    if (result.printerStatus === null && !result.lastSeenAt) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    return result
+  }
+
+  // ── 6. Test file — mock task download ────────────────────────────────────
   // GET /api/v1/test/sample.png
   @Get('test/sample.png')
   getSamplePng(@Res() res: Response) {

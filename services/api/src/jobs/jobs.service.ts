@@ -40,7 +40,7 @@ import {
   type FieldMapping,
   type ParsedRow,
 } from './dto/excel-import.dto'
-import * as XLSX from 'xlsx'
+import { Workbook } from 'exceljs'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
@@ -1211,18 +1211,12 @@ export class JobsService {
   /**
    * 解析 Excel 文件，返回列名 + 样例行（无 DB 写入，纯内存操作）。
    */
-  parseExcelColumns(buffer: Buffer): { columns: string[]; sampleRows: Record<string, string>[] } {
-    const wb = XLSX.read(buffer, { type: 'buffer' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    if (!ws) {
-      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空或格式不正确' } })
-    }
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' })
+  async parseExcelColumns(buffer: Buffer): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }> {
+    const rows = await this.loadExcelRows(buffer)
     if (rows.length < 2) {
       throw new BadRequestException({ error: { code: 'EXCEL_NO_DATA', message: 'Excel 文件缺少数据行（至少需要表头行 + 1 行数据）' } })
     }
-    const headerRow = rows[0] as unknown[]
-    const columns = headerRow.map((c) => String(c ?? '').trim()).filter(Boolean)
+    const columns = (rows[0] ?? []).map((c) => c.trim()).filter(Boolean)
 
     // 敏感列检测：命中任何一个敏感词 → 拒绝，不落 DB
     const sensitiveHeaders = columns.filter((c) => isSensitiveColumn(c))
@@ -1237,10 +1231,34 @@ export class JobsService {
 
     const sampleRows = rows.slice(1, 6).map((row) => {
       const obj: Record<string, string> = {}
-      columns.forEach((col, i) => { obj[col] = String((row as unknown[])[i] ?? '').trim() })
+      columns.forEach((col, i) => { obj[col] = row[i] ?? '' })
       return obj
     })
     return { columns, sampleRows }
+  }
+
+  /**
+   * 用 exceljs 读取 Excel buffer，返回逐行字符串数组（等价于 xlsx sheet_to_json header:1）。
+   * 替换了有 CVE-2023-30533 的 xlsx@0.18.5。
+   */
+  private async loadExcelRows(buffer: Buffer): Promise<string[][]> {
+    const wb = new Workbook()
+    try {
+      // exceljs types use old-style Buffer; cast via ArrayBuffer to satisfy TS without runtime cost
+      await wb.xlsx.load(buffer as unknown as ArrayBuffer)
+    } catch {
+      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空或格式不正确' } })
+    }
+    const ws = wb.getWorksheet(1)
+    if (!ws) {
+      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空或格式不正确' } })
+    }
+    const colCount = ws.columnCount
+    const rows: string[][] = []
+    ws.eachRow({ includeEmpty: false }, (row) => {
+      rows.push(Array.from({ length: colCount }, (_, i) => row.getCell(i + 1).text))
+    })
+    return rows
   }
 
   /**
@@ -1264,16 +1282,11 @@ export class JobsService {
       throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
     }
 
-    const wb = XLSX.read(args.buffer, { type: 'buffer' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    if (!ws) {
-      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空' } })
-    }
-    const allRows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' })
+    const allRows = await this.loadExcelRows(args.buffer)
     if (allRows.length < 2) {
       throw new BadRequestException({ error: { code: 'EXCEL_NO_DATA', message: 'Excel 缺少数据行' } })
     }
-    const headers = (allRows[0] as string[]).map((h) => String(h ?? '').trim())
+    const headers = (allRows[0] ?? []).map((h) => h.trim())
     const dataRows = allRows.slice(1)
 
     // Fix 2: 敏感列检测（两层）
@@ -1332,10 +1345,9 @@ export class JobsService {
     const seenInBatch = new Set<string>()
 
     const parsed: ParsedRow[] = dataRows.map((rawRow, idx) => {
-      const rawArr = rawRow as unknown[]
       // Fix 1: never persist raw row data — only extract mapped fields
       const rawData: Record<string, string> = {}
-      headers.forEach((h, i) => { rawData[h] = String(rawArr[i] ?? '').trim() })
+      headers.forEach((h, i) => { rawData[h] = (rawRow[i] ?? '').trim() })
 
       const mapped: Record<string, string> = {}
       for (const [stdField, colName] of Object.entries(args.fieldMapping)) {
