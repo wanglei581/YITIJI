@@ -1,4 +1,4 @@
-import { Body, Controller, Post, HttpCode, HttpStatus, Req, ForbiddenException, BadRequestException } from '@nestjs/common'
+import { Body, Controller, Post, HttpCode, HttpStatus, Req, Headers, ForbiddenException, BadRequestException, UnauthorizedException } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import type { Request } from 'express'
 import { TrtcService } from './trtc.service'
@@ -30,8 +30,21 @@ export class TrtcController {
    */
   @Post('session')
   @HttpCode(HttpStatus.OK)
-  async startSession(@Body() body: { userId?: string }, @Req() req: Request) {
-    const userId = body.userId?.trim() || `user_${Date.now()}`
+  async startSession(
+    @Body() body: { userId?: string },
+    @Req() req: Request,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+  ) {
+    // 必须携带终端 ID，防止未配置终端的外部请求触发腾讯云计费
+    if (!terminalId?.trim()) {
+      throw new UnauthorizedException({ error: { code: 'TERMINAL_ID_REQUIRED', message: '需要 X-Terminal-Id 标头' } })
+    }
+    const rawUserId = body.userId?.trim() ?? ''
+    // userId 只允许字母/数字/下划线，防止特殊字符嵌入 HMAC payload
+    if (rawUserId && !/^[\w-]{1,64}$/.test(rawUserId)) {
+      throw new BadRequestException({ error: { code: 'INVALID_USER_ID', message: 'userId 只允许字母、数字、下划线，最长 64 字符' } })
+    }
+    const userId = rawUserId || `user_${Date.now()}`
     const result = await this.trtcService.startSession(userId)
 
     // 记录 taskId → 客户端特征，供 stopSession 校验归属
@@ -48,7 +61,14 @@ export class TrtcController {
    */
   @Post('session/stop')
   @HttpCode(HttpStatus.OK)
-  async stopSession(@Body() body: { taskId: string }, @Req() req: Request) {
+  async stopSession(
+    @Body() body: { taskId: string },
+    @Req() req: Request,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+  ) {
+    if (!terminalId?.trim()) {
+      throw new UnauthorizedException({ error: { code: 'TERMINAL_ID_REQUIRED', message: '需要 X-Terminal-Id 标头' } })
+    }
     if (!body.taskId?.trim()) {
       throw new BadRequestException({ error: { code: 'MISSING_TASK_ID', message: 'taskId 不能为空' } })
     }

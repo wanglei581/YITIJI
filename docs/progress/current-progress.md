@@ -25,7 +25,102 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：P0 安全改进 Round 2（2026-06-02）**
+**当前阶段：P0 安全改进 Round 4（2026-06-02）**
+
+---
+
+### ✅ P0 安全改进 Round 4（2026-06-02，feat/phase9-assistant-actions）
+
+专家团队全面审查（8 agent 并发，7 个文件维度）后修复全部 High + Medium + Low 问题：
+
+| 问题 | 文件 | 修复 |
+|------|------|------|
+| H1: TRTC 无鉴权 | `trtc/trtc.controller.ts` | 要求 `X-Terminal-Id` header；无 Terminal ID 的外部请求返回 401 |
+| H2: tag 过滤 total 错误 | `jobs/jobs.service.ts` | DB 层加 `tagsJson contains` 预过滤；count 和 findMany 使用相同 where 条件 |
+| M1: 分页 NaN 注入 | `jobs/jobs.controller.ts` | `safeInt()` 替换裸 `Number()`；非数字字符串 fallback 到默认值 |
+| M2: 未心跳终端误判 404 | `terminals/terminals.service.ts` + controller | 增加 `found: boolean`；终端存在但无心跳 → 200 `isOnline=false`，而非 404 |
+| M3: AI HTTP 请求无超时 | `aiHttpAdapter.ts` | `get()/post()` 加 `AbortController + 15s 超时`；超时抛 `REQUEST_TIMEOUT` |
+| M4: Waveform style 泄漏 | `AiAdvisorCall.tsx` | `<style>` 移至 AiAdvisorCall 根元素（渲染一次），不再随 300ms 音量事件重复注入 |
+| M4+: TRTC fetch 补 header | `AiAdvisorCall.tsx` | `startCall` 和 `cleanup` 的 fetch 均附加 `X-Terminal-Id` header |
+| M5: 会话上下文跨用户泄漏 | `AssistantPage.tsx` | 移除 `localStorage` 持久化；每次挂载生成新 `sessionId`，防止共享终端用户间上下文泄漏 |
+| M6: PrintTaskStatus 缺 claimed | `shared/types/print.ts` | 增加 `'claimed'` 状态；补充各状态注释 |
+| L1: PrintPreviewPage fetch 泄漏 | `PrintPreviewPage.tsx` | 打印机状态 fetch 增加 `AbortController`；组件卸载时中止请求 |
+| L2: PrintProgressPage deps 压制 | `PrintProgressPage.tsx` | 移除两处 `// eslint-disable-next-line react-hooks/exhaustive-deps`；补全 `navigateFail/navigateSuccess/shouldFail/failReason` deps |
+| L3: ProfilePage printFile 路由错误 | `ProfilePage.tsx` | 跳转改为 `/print/preview`（经过参数设置页），不再跳 `/print/confirm` 绕过参数校验 |
+| L4: TRTC userId 无校验 | `trtc/trtc.controller.ts` | `userId` 正则校验 `^[\w-]{1,64}$`，拦截特殊字符注入 HMAC payload |
+| Audit: 传递依赖漏洞 | `pnpm-workspace.yaml` | 新增 overrides：`@hono/node-server >=1.19.13`、`uuid >=11.1.1`；`pnpm audit` → No known vulnerabilities |
+
+#### 🔍 Round 4 合入前复核（2026-06-02）
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ pass |
+| `pnpm --filter @ai-job-print/api lint` | ✅ pass（1 warning：`llm-config.service.ts` `_omit` 未用，非阻塞） |
+| `pnpm --filter @ai-job-print/api build` | ✅ pass |
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ pass |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ pass |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ pass |
+| `pnpm --filter @ai-job-print/shared typecheck` | ✅ pass |
+| `pnpm audit --audit-level=moderate` | ✅ No known vulnerabilities |
+
+---
+
+### ✅ P0 安全改进 Round 3（2026-06-02，feat/phase9-assistant-actions）
+
+#### H-11: AiAdvisorCall 静态打包
+
+- `apps/kiosk/src/pages/assistant/AssistantPage.tsx`：改用 `lazy(() => import(...))` + `<Suspense>` 按需加载 `AiAdvisorCall`
+- `AiAdvisorCall` 拆为独立 11.7KB chunk
+- Kiosk 主包减少约 11KB
+- `trtc-sdk-v5` 仅在用户发起语音通话时才加载，默认浏览 AI 助手页不拉取 TRTC SDK
+
+#### H-9: TRTC 连接无超时
+
+- `POST /api/v1/trtc/session` 前端调用增加 `AbortController` + `setTimeout(30s)`
+- 超时后显示："连接超时（30s），请检查网络后重试"
+- 避免后端或网络挂起时 Kiosk 一直停留在连接等待状态
+
+#### H-5: ProfilePage 硬编码假数据
+
+- `MOCK_RESUMES` / `MOCK_ORDERS` / `MOCK_AI` 改为空数组
+- 从其他页面流程跳入时携带的 `location.state` 数据仍正常传入和展示
+- 真实 API 接入降级为后续 P1，不再用硬编码记录伪装用户历史
+
+#### H-6/H-7: JobFair 子资源端点缺失
+
+- 新增 6 个 stub GET 端点（`services/api/src/jobs/jobs.controller.ts`）：
+  `/companies`、`/companies/:companyId`、`/zones`、`/map`、`/materials`、`/stats`
+- Fair 数据模型尚未落 Prisma，统一返回 `200 + 空数据`（`{data:[]}` / `{data:null}`），比 404 更友好
+- 前端（`FairCompaniesPage` / `FairMapPage` / `FairMaterialsPage` / `FairStatsPage` / `FairCompanyDetailPage`）已有 `LoadingState / ErrorState / EmptyState` 三态兜底；http 模式下空响应正常落到 EmptyState，company 详情 null 落到 ErrorState
+- 合规说明：这些端点为公开 Kiosk 端点（与 `/jobs`、`/job-fairs` 同级，无需鉴权），当前返回空集，**不暴露任何未发布数据**。后续 Fair 模型落库时必须补 `publishStatus` 过滤与来源合规字段（source_org_id/external_id/source_url/sync_time）后才能返回真实数据 → 见 next-tasks P1
+
+**剩余 P1/P2（不阻塞 main 合入）：**
+- H-5 ProfilePage 真实 API 接入
+- M-5 `chatWithAssistant` 增加 `AbortController`
+- M-6 LLM 会话 Redis 持久化
+
+#### 🔍 合入前复核（2026-06-02，Claude）
+
+全部门禁通过：
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter ./apps/kiosk typecheck` | ✅ pass |
+| `pnpm --filter ./apps/kiosk lint` | ✅ pass |
+| `pnpm --filter ./apps/kiosk build` | ✅ pass（`trtc-sdk-v5` 独立 chunk，不在主包 `index-*.js`；`VITE_USE_TRTC_CALL=false` 时死代码消除，trtc/AiAdvisorCall chunk 完全不产出） |
+| `pnpm --filter ./services/api typecheck` | ✅ pass |
+| `pnpm --filter ./services/api lint` | ✅ pass（1 warning：`llm/llm-config.service.ts` `_omit` 未用，非阻塞，属未提交的 LLM 新代码） |
+| `pnpm --filter ./services/api build` | ✅ pass |
+| `pnpm audit` | ⚠️ 2 moderate（均为传递依赖，非运行时直连）：`exceljs > uuid <11.1.1`、`prisma(dev) > @hono/node-server <1.19.13` → P2 跟踪 |
+
+合规扫描：
+- ✅ 无"一键投递/立即投递/平台投递"违规按钮（命中项均为合规说明/禁词清单/合规按钮"去来源平台投递"/LLM 系统提示红线）
+- ✅ 无新增硬编码打印机型号（terminal-agent 用可覆盖的 `DEFAULT_PRINTER` 默认常量；admin mock 展示数据 + 类型注释为既有内容，非本轮引入）
+- ✅ `xlsx` 依赖已彻底移除，无回归（exceljs 替代）
+- ✅ `AliAvatar` 组件已删除（commit cf945c8），全仓无引用，不请求任何后端
+- ✅ env 文件（`.env.local` / `services/api/.env`）未被 git 跟踪，`.gitignore` 已覆盖；TRTC SecretKey 全程留服务端
+
+**合入注意（重要）：** 工作区存在 Round 3 之外的**未提交新功能** —— TRTC 后端（`services/api/src/trtc/*` 未跟踪）+ LLM 对接（`services/api/src/ai/llm/*` 未跟踪 + `ai.module/ai.service/ai-log.service` 已改）+ admin AI 配置页（`apps/admin/src/routes/ai-config/*` 未跟踪）。`app.module.ts` 已 import `TrtcModule`，但 `trtc/` 源文件未提交 —— **二者必须同批提交**，否则 main 上构建缺文件。建议：要么连同 TRTC/LLM 一起作为独立 feature commit 提交后再合入，要么本轮只合 Round 3 安全提交（cbc45b0）并回退 app.module/ai 改动。
 
 ---
 

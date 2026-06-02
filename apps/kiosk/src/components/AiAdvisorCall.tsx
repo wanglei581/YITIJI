@@ -130,7 +130,10 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
       try {
         res = await fetch('/api/v1/trtc/session', {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Terminal-Id': (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim(),
+          },
           body:    JSON.stringify({}),
           signal:  ac.signal,
         })
@@ -243,7 +246,10 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
     if (taskIdRef.current) {
       fetch('/api/v1/trtc/session/stop', {
         method:    'POST',
-        headers:   { 'Content-Type': 'application/json' },
+        headers:   {
+          'Content-Type': 'application/json',
+          'X-Terminal-Id': (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim(),
+        },
         body:      JSON.stringify({ taskId: taskIdRef.current }),
         keepalive: true,
       }).catch(() => {})
@@ -291,6 +297,8 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200">
+      {/* 声波动画关键帧：放在组件根部渲染一次，避免 Waveform 每次重渲染重复注入 <style> */}
+      <style>{`@keyframes aiWave { 0% { transform: scaleY(0.35) } 100% { transform: scaleY(1) } }`}</style>
 
       {/* 背景照片 */}
       <img
@@ -479,7 +487,6 @@ function Waveform({ state }: { state: AiState }) {
           }}
         />
       ))}
-      <style>{`@keyframes aiWave { 0% { transform: scaleY(0.35) } 100% { transform: scaleY(1) } }`}</style>
     </div>
   )
 }

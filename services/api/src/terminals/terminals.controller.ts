@@ -84,11 +84,12 @@ export class TerminalsController {
   @Get('terminals/:terminalId/printer-status')
   @HttpCode(HttpStatus.OK)
   async getTerminalPrinterStatus(@Param('terminalId') terminalId: string) {
-    const result = await this.terminalsService.getTerminalPrinterStatus(terminalId)
-    if (result.printerStatus === null && !result.lastSeenAt) {
+    const { found, ...rest } = await this.terminalsService.getTerminalPrinterStatus(terminalId)
+    if (!found) {
       throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
     }
-    return result
+    // 终端存在但未上报心跳：返回 isOnline=false（不是 404）
+    return rest
   }
 
   // ── 6. Test file — mock task download ────────────────────────────────────

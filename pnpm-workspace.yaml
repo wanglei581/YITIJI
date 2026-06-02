@@ -4,6 +4,8 @@ packages:
   - 'services/*'
 overrides:
   qs: 6.15.2
+  '@hono/node-server': '>=1.19.13'
+  uuid: '>=11.1.1'
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true

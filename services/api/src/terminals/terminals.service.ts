@@ -506,6 +506,7 @@ export class TerminalsService implements OnModuleInit {
   }
 
   async getTerminalPrinterStatus(terminalId: string): Promise<{
+    found: boolean
     printerStatus: string | null
     lastSeenAt: string | null
     isOnline: boolean
@@ -521,7 +522,7 @@ export class TerminalsService implements OnModuleInit {
       },
     })
     if (!terminal) {
-      return { printerStatus: null, lastSeenAt: null, isOnline: false }
+      return { found: false, printerStatus: null, lastSeenAt: null, isOnline: false }
     }
     const latest = terminal.heartbeats[0]
     const lastSeenAt = latest?.createdAt?.toISOString() ?? null
@@ -530,6 +531,7 @@ export class TerminalsService implements OnModuleInit {
       ? Date.now() - latest.createdAt.getTime() < 5 * 60 * 1000
       : false
     return {
+      found: true,
       printerStatus: latest?.printerStatus ?? null,
       lastSeenAt,
       isOnline,

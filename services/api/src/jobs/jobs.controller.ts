@@ -56,6 +56,12 @@ import { ImportFairsDto } from './dto/import-fairs.dto'
 import { CreateDataSourceDto } from './dto/data-source.dto'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
+/** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
+function safeInt(value: string | undefined, defaultValue: number, min: number, max: number): number {
+  const n = value !== undefined ? Number(value) : defaultValue
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
+}
+
 @Controller()
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
@@ -69,8 +75,8 @@ export class JobsController {
     @Query('page')     pageStr?:  string,
     @Query('pageSize') sizeStr?:  string,
   ) {
-    const page     = pageStr ? Number(pageStr)  : 1
-    const pageSize = sizeStr ? Number(sizeStr)  : 20
+    const page     = safeInt(pageStr, 1, 1, 10_000)
+    const pageSize = safeInt(sizeStr, 20, 1, 100)
     return this.jobsService.getPublishedJobs({ tag, city, page, pageSize })
   }
 
@@ -85,8 +91,8 @@ export class JobsController {
     @Query('page')     pageStr?:  string,
     @Query('pageSize') sizeStr?:  string,
   ) {
-    const page     = pageStr ? Number(pageStr) : 1
-    const pageSize = sizeStr ? Number(sizeStr) : 20
+    const page     = safeInt(pageStr, 1, 1, 10_000)
+    const pageSize = safeInt(sizeStr, 20, 1, 100)
     return this.jobsService.getPublishedFairs({ status, page, pageSize })
   }
 
@@ -112,8 +118,8 @@ export class JobsController {
     @Query('page') pageStr?: string,
     @Query('pageSize') sizeStr?: string,
   ) {
-    const page     = pageStr ? Math.max(1, Number(pageStr)) : 1
-    const pageSize = sizeStr ? Math.min(100, Math.max(1, Number(sizeStr))) : 20
+    const page     = safeInt(pageStr, 1, 1, 10_000)
+    const pageSize = safeInt(sizeStr, 20, 1, 100)
     return { data: [], total: 0, page, pageSize }
   }
 
@@ -137,8 +143,8 @@ export class JobsController {
     @Query('page') pageStr?: string,
     @Query('pageSize') sizeStr?: string,
   ) {
-    const page     = pageStr ? Math.max(1, Number(pageStr)) : 1
-    const pageSize = sizeStr ? Math.min(100, Math.max(1, Number(sizeStr))) : 20
+    const page     = safeInt(pageStr, 1, 1, 10_000)
+    const pageSize = safeInt(sizeStr, 20, 1, 100)
     return { data: [], total: 0, page, pageSize }
   }
 

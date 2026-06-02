@@ -160,12 +160,10 @@ export function ProfilePage() {
 
   // ── Handlers ─────────────────────────────────────────────────
   const printFile = (file: { name: string; size: string; pages?: number }) => {
-    navigate('/print/confirm', {
+    // 跳到打印设置页（/print/preview），让用户自行设置参数，而不是跳到确认页绕过参数设置
+    navigate('/print/preview', {
       state: {
         file: { name: file.name, size: file.size, pages: file.pages ?? 1 },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
       },
     })
   }

@@ -149,8 +149,7 @@ export function PrintProgressPage() {
       clearInterval(timer)
       clearTimeout(timeoutTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useRealApi, taskId])
+  }, [useRealApi, taskId, navigateFail, navigateSuccess])
 
   // ── SIM mode: setTimeout animation ───────────────────────────────────────
 
@@ -181,8 +180,7 @@ export function PrintProgressPage() {
 
     advance(0)
     return () => { cancelRef.current = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useRealApi])
+  }, [useRealApi, navigateFail, navigateSuccess, shouldFail, failReason])
 
   // ── Render ────────────────────────────────────────────────────────────────
 

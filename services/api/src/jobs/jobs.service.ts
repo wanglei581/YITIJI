@@ -499,6 +499,10 @@ export class JobsService {
       reviewStatus:  'approved',
       publishStatus: 'published',
       ...(params?.city ? { city: params.city } : {}),
+      // SQLite 中 tagsJson 是 JSON 字符串，用 contains 做 DB 层预过滤保证 total 准确。
+      // 加引号匹配 JSON 数组元素边界（避免 "Java" 误匹配 "JavaScript"）。
+      // Postgres 切 String[] 后改用 has 操作符，应用层 filter 可删除。
+      ...(params?.tag ? { tagsJson: { contains: `"${params.tag}"` } } : {}),
     }
     const [rows, total] = await Promise.all([
       this.prisma.job.findMany({
@@ -509,7 +513,7 @@ export class JobsService {
       }),
       this.prisma.job.count({ where }),
     ])
-    // tag 过滤:SQLite tagsJson 是字符串,在应用层 filter。Postgres 切 String[] 后改 DB 层。
+    // 应用层精确 filter 消除 LIKE 误判（tagsJson contains 只是预过滤）
     const filtered = params?.tag
       ? rows.filter((j) => safeJsonArr(j.tagsJson).includes(params.tag!))
       : rows

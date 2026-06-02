@@ -1,10 +1,10 @@
 export type PrintTaskStatus =
-  | 'pending'
-  | 'queued'
-  | 'printing'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
+  | 'pending'    // 等待 Terminal Agent 认领
+  | 'claimed'    // Terminal Agent 已认领，准备打印
+  | 'printing'   // 正在打印
+  | 'completed'  // 打印完成
+  | 'failed'     // 打印失败
+  | 'cancelled'  // 已取消（管理员操作或超时）
 
 // ── Print job parameter types ─────────────────────────────────────────────────
 

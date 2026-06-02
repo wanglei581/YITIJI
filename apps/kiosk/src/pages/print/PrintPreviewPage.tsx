@@ -66,21 +66,23 @@ function usePrinterStatus(): { printerName: string; printer: PrinterStatus; load
       return
     }
     cancelledRef.current = false
+    const ac = new AbortController()
 
-    fetch(`/api/v1/terminals/${terminalId}/printer-status`)
+    fetch(`/api/v1/terminals/${terminalId}/printer-status`, { signal: ac.signal })
       .then((r) => r.json())
       .then((data: { printerStatus?: string | null }) => {
         if (cancelledRef.current) return
         setPrinter(mapPrinterStatus(data.printerStatus))
         setLoading(false)
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') return
         if (cancelledRef.current) return
         setPrinter(PRINTER_OFFLINE)
         setLoading(false)
       })
 
-    return () => { cancelledRef.current = true }
+    return () => { cancelledRef.current = true; ac.abort() }
   }, [terminalId])
 
   return { printerName, printer, loading }

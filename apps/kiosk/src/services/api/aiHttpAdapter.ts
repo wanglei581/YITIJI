@@ -20,16 +20,31 @@ import type {
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 
+const TIMEOUT_MS = 15_000
+
 // ──────────────────────────────────────────────────────────────
-// 核心 fetch 封装
+// 核心 fetch 封装（带 15s AbortController 超时）
 // ──────────────────────────────────────────────────────────────
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    credentials: 'include',
-  })
+  const ac = new AbortController()
+  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+      signal: ac.signal,
+    })
+  } catch (err) {
+    clearTimeout(timerId)
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+    }
+    throw err
+  }
+  clearTimeout(timerId)
   if (!res.ok) {
     let code    = 'UNKNOWN_ERROR'
     let message = `HTTP ${res.status}`
@@ -44,12 +59,25 @@ async function get<T>(path: string): Promise<T> {
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  })
+  const ac = new AbortController()
+  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    })
+  } catch (err) {
+    clearTimeout(timerId)
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+    }
+    throw err
+  }
+  clearTimeout(timerId)
   if (!res.ok) {
     let code    = 'UNKNOWN_ERROR'
     let message = `HTTP ${res.status}`

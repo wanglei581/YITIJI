@@ -86,24 +86,11 @@ function getMatchedRoutes(input: string): Set<string> {
   return matched
 }
 
-// ─── sessionId 持久化 ─────────────────────────────────────
-
-const SESSION_KEY = 'kiosk_ai_session_id'
-
-function getOrCreateSessionId(): string {
-  try {
-    const stored = localStorage.getItem(SESSION_KEY)
-    if (stored) return stored
-    const id = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    localStorage.setItem(SESSION_KEY, id)
-    return id
-  } catch {
-    return `session-${Date.now()}`
-  }
-}
-
-function saveSessionId(id: string): void {
-  try { localStorage.setItem(SESSION_KEY, id) } catch { /* ignore */ }
+// 共享触控终端：每次进入助手页面都生成全新 sessionId，
+// 防止上一位用户的对话上下文泄露给下一位用户。
+// 不持久化到 localStorage — 刷新/离开即隔离。
+function newSessionId(): string {
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 // ─── 消息类型 ─────────────────────────────────────────────
@@ -159,7 +146,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
 
-  const sessionIdRef = useRef(getOrCreateSessionId())
+  const sessionIdRef = useRef(newSessionId())
   const cancelledRef = useRef(false)
   const bottomRef    = useRef<HTMLDivElement>(null)
 
@@ -183,7 +170,6 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
       const resp = await chatWithAssistant({ message: text, sessionId: sessionIdRef.current })
       if (cancelledRef.current) return
       sessionIdRef.current = resp.sessionId
-      saveSessionId(resp.sessionId)
 
       const safeActions = resp.actions?.filter((a) => isAllowedRoute(a.route))
       setMessages((prev) => [
