@@ -1,65 +1,72 @@
 // ============================================================
-// AssistantPage — Phase 9.3 快捷操作增强版
+// AssistantPage — Phase 9.5 腾讯 TRTC 实时语音通话版
 //
-// 布局：
-//   上半区  - 2D 数字人 + 最新消息气泡
-//   对话区  - 对话历史（滚动）
-//   操作区  - AI 上下文建议（动态）+ 常驻快捷入口（关键词高亮）
-//   输入区  - 文本框 + 发送按钮
+// 两种模式：
+//   call  - 腾讯 TRTC 对话式 AI（照片背景 + 实时语音）
+//           进入页面自动通话，切换/离开自动挂断（组件卸载即清理）
+//   text  - 文字对话（降级 / 用户主动切换）
 //
 // 合规约束：
-// - actions 只允许跳转本系统内部白名单路由
-// - 不做招聘闭环、不出现一键投递
-// - 所有 AI 回复标注"内容仅供参考"
+//   - 跳转只允许白名单路由，不出现一键投递
+//   - AI 回复标注"内容仅供参考"
 // ============================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  MicIcon,
+  AlertCircleIcon,
+  SendHorizontalIcon,
+  ZapIcon,
+  ArrowLeftIcon,
+  FileTextIcon,
+  PrinterIcon,
+  BriefcaseIcon,
+  CalendarDaysIcon,
+  LandmarkIcon,
+} from 'lucide-react'
 import { Button } from '@ai-job-print/ui'
-import { AlertCircleIcon, SendHorizontalIcon, ZapIcon } from 'lucide-react'
 import type { AssistantAction } from '@ai-job-print/shared'
 import { chatWithAssistant } from '../../services/api'
-import { DigitalHuman, type AvatarState } from '../../components/DigitalHuman'
+import { AiAdvisorCall } from '../../components/AiAdvisorCall'
+
+// 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
+const USE_VOICE_CALL = import.meta.env['VITE_USE_TRTC_CALL'] === 'true'
 
 // ─── 路由白名单 ────────────────────────────────────────────
 
 const ALLOWED_ROUTE_PREFIXES = [
-  '/resume/',
-  '/print/',
-  '/scan/',
-  '/jobs',
-  '/job-fairs',
-  '/renshi',
-  '/qingdao',
+  '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/renshi', '/qingdao',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
-  return ALLOWED_ROUTE_PREFIXES.some(
-    (p) => route === p || route.startsWith(`${p}/`),
-  )
+  return ALLOWED_ROUTE_PREFIXES.some((p) => route === p || route.startsWith(`${p}/`))
 }
 
-// ─── 常驻快捷操作 ─────────────────────────────────────────
+// ─── 快捷操作 ─────────────────────────────────────────────
 
 const SHORTCUTS: AssistantAction[] = [
-  { label: '简历诊断',  route: '/resume/report'  },
-  { label: '打印文件',  route: '/print/upload'   },
-  { label: '扫描材料',  route: '/scan/start'     },
-  { label: '查看岗位',  route: '/jobs'           },
-  { label: '查看招聘会', route: '/job-fairs'     },
-  { label: 'AI 在青岛', route: '/qingdao'        },
-  { label: '人社专区',  route: '/renshi'         },
+  { label: '简历诊断',  route: '/resume/report' },
+  { label: '打印文件',  route: '/print/upload'  },
+  { label: '查看岗位',  route: '/jobs'          },
+  { label: '查看招聘会', route: '/job-fairs'    },
+  { label: '人社专区',  route: '/renshi'        },
 ]
 
-// 关键词 → 路由映射（用于输入实时高亮）
+const SHORTCUT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  '/resume/report': FileTextIcon,
+  '/print/upload':  PrinterIcon,
+  '/jobs':          BriefcaseIcon,
+  '/job-fairs':     CalendarDaysIcon,
+  '/renshi':        LandmarkIcon,
+}
+
 const KEYWORD_ROUTES: Array<{ kw: readonly string[]; route: string }> = [
-  { kw: ['简历', '诊断', '优化', 'cv', 'resume', '简历服务'],       route: '/resume/report'  },
-  { kw: ['打印', '文件', '打文件', '印刷'],                         route: '/print/upload'   },
-  { kw: ['扫描', '扫', '原件', '材料'],                             route: '/scan/start'     },
-  { kw: ['岗位', '工作', '职位', '招聘', '就业', '找工作'],         route: '/jobs'           },
-  { kw: ['招聘会', '双选会', '人才市场', '现场招聘', '招聘活动'],   route: '/job-fairs'      },
-  { kw: ['青岛', '人工智能', 'ai在青岛', '数字经济'],               route: '/qingdao'        },
-  { kw: ['人社', '社保', '政策', '补贴', '就业服务', '人力资源'],   route: '/renshi'         },
+  { kw: ['简历', '诊断', '优化', 'resume'],          route: '/resume/report' },
+  { kw: ['打印', '文件', '印刷'],                    route: '/print/upload'  },
+  { kw: ['岗位', '工作', '职位', '招聘', '找工作'],  route: '/jobs'          },
+  { kw: ['招聘会', '双选会', '人才市场'],             route: '/job-fairs'     },
+  { kw: ['人社', '社保', '政策', '补贴'],             route: '/renshi'        },
 ]
 
 function getMatchedRoutes(input: string): Set<string> {
@@ -102,31 +109,47 @@ interface Message {
   isError?: boolean
 }
 
-const WELCOME_MESSAGE: Message = {
+const WELCOME: Message = {
   id: 'welcome',
   role: 'assistant',
-  text: '您好！我是 AI 就业服务助手，可以帮您进行简历诊断、打印文件，或查看岗位和招聘会信息。请问有什么需要帮忙的？',
+  text: '您好！我是 AI 就业服务助手，可以帮您简历诊断、打印文件或查看岗位信息。请问有什么需要帮忙的？',
 }
 
 // ─── 主组件 ───────────────────────────────────────────────
 
 export function AssistantPage() {
-  const navigate        = useNavigate()
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
+  const navigate = useNavigate()
+
+  const [mode, setMode] = useState<'call' | 'text'>(USE_VOICE_CALL ? 'call' : 'text')
+
+  // ── 通话模式：渲染 TRTC 组件 ──────────────────────────────
+  if (mode === 'call') {
+    return (
+      <AiAdvisorCall
+        onSwitchToText={() => setMode('text')}
+        onExit={() => navigate(-1)}
+      />
+    )
+  }
+
+  // ── 文字模式 ──────────────────────────────────────────────
+  return <TextChat onSwitchToCall={USE_VOICE_CALL ? () => setMode('call') : undefined} />
+}
+
+// ─── 文字对话子组件 ────────────────────────────────────────
+
+function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
+  const navigate = useNavigate()
+  const [messages, setMessages] = useState<Message[]>([WELCOME])
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
-  const [svgState, setSvgState] = useState<AvatarState>('greeting')
 
-  const sessionIdRef = useRef<string>(getOrCreateSessionId())
+  const sessionIdRef = useRef(getOrCreateSessionId())
   const cancelledRef = useRef(false)
   const bottomRef    = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const t = setTimeout(() => setSvgState('idle'), 3500)
-    return () => {
-      clearTimeout(t)
-      cancelledRef.current = true
-    }
+    return () => { cancelledRef.current = true }
   }, [])
 
   useEffect(() => {
@@ -140,24 +163,17 @@ export function AssistantPage() {
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text }])
     setInput('')
     setLoading(true)
-    setSvgState('talking')
 
     try {
       const resp = await chatWithAssistant({ message: text, sessionId: sessionIdRef.current })
       if (cancelledRef.current) return
-
       sessionIdRef.current = resp.sessionId
       saveSessionId(resp.sessionId)
 
       const safeActions = resp.actions?.filter((a) => isAllowedRoute(a.route))
       setMessages((prev) => [
         ...prev,
-        {
-          id:      `a-${Date.now()}`,
-          role:    'assistant',
-          text:    resp.reply,
-          actions: safeActions?.length ? safeActions : undefined,
-        },
+        { id: `a-${Date.now()}`, role: 'assistant', text: resp.reply, actions: safeActions?.length ? safeActions : undefined },
       ])
     } catch {
       if (cancelledRef.current) return
@@ -166,68 +182,57 @@ export function AssistantPage() {
         { id: `err-${Date.now()}`, role: 'assistant', text: 'AI 服务暂不可用，请稍后再试', isError: true },
       ])
     } finally {
-      if (!cancelledRef.current) {
-        setLoading(false)
-        setSvgState('idle')
-      }
+      if (!cancelledRef.current) setLoading(false)
     }
   }, [input, loading])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        void handleSend()
-      }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend() }
     },
     [handleSend],
   )
 
-  // 最新 AI 消息（用于气泡和上下文操作）
-  const latestAssistantMsg = [...messages].reverse().find((m) => m.role === 'assistant')
-  const contextActions = latestAssistantMsg?.actions
-
-  // 根据当前输入词实时高亮快捷按钮
+  const contextActions = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]!.role === 'assistant') return messages[i]!.actions
+    }
+    return undefined
+  }, [messages])
   const matchedRoutes = useMemo(() => getMatchedRoutes(input), [input])
 
   return (
     <div className="flex h-full flex-col bg-gray-50">
 
-      {/* ━━━ 上半区：2D 数字人 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="shrink-0 flex flex-col items-center pt-5 pb-3 px-4 bg-gradient-to-b from-blue-50 to-gray-50">
-        <div className="relative">
-          <div className="w-32 h-40">
-            <DigitalHuman state={svgState} className="w-full h-full" />
-          </div>
-          <div className="mt-1 flex justify-center">
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium
-              ${svgState === 'talking'  ? 'bg-blue-100 text-blue-700'
-              : svgState === 'greeting' ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-gray-100 text-gray-500'}`}>
-              <span className={`h-1.5 w-1.5 rounded-full
-                ${svgState === 'talking' ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'}`} />
-              {svgState === 'talking' ? '正在回复…' : svgState === 'greeting' ? '欢迎您' : '在线'}
-            </span>
-          </div>
-        </div>
-
-        {latestAssistantMsg && (
-          <SpeechBubble
-            text={latestAssistantMsg.text}
-            isError={latestAssistantMsg.isError}
-            isLoading={loading}
-          />
-        )}
+      {/* 顶栏 */}
+      <div className="shrink-0 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 text-sm"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          返回
+        </button>
+        <p className="text-sm font-medium text-gray-700">AI 就业服务助手</p>
+        {onSwitchToCall ? (
+          <button
+            type="button"
+            onClick={onSwitchToCall}
+            className="flex min-h-[48px] items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 active:bg-blue-200 transition-colors"
+          >
+            <MicIcon className="h-4 w-4" />
+            语音通话
+          </button>
+        ) : <span className="w-12" />}
       </div>
 
-      {/* ━━━ 对话历史 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* 对话历史 */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-4">
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} msg={msg} />
-          ))}
+          {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
           {loading && (
-            <div className="flex items-center gap-1.5 w-fit rounded-2xl rounded-bl-sm bg-gray-100 px-4 py-3">
+            <div className="flex items-center gap-1.5 w-fit rounded-2xl bg-gray-100 px-4 py-3">
               <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.3s]" />
               <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.15s]" />
               <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" />
@@ -237,59 +242,48 @@ export function AssistantPage() {
         </div>
       </div>
 
-      {/* ━━━ 操作区：AI 上下文建议 + 常驻快捷入口 ━━━━━━━━━━ */}
-      <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-2 space-y-2">
-
-        {/* AI 上下文建议（仅在 AI 返回时显示） */}
-        {contextActions && !loading && (
-          <div className="flex items-start gap-2">
-            <span className="mt-1.5 shrink-0 flex items-center gap-1 text-xs text-blue-500 font-medium">
-              <ZapIcon className="h-3.5 w-3.5" />
-              AI 建议
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {contextActions.map((action) => (
-                <button
-                  key={action.route}
-                  type="button"
-                  onClick={() => navigate(action.route)}
-                  className="min-h-[40px] rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800"
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
+      {/* 快捷操作 */}
+      <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-2 pb-1">
+        {contextActions && contextActions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {contextActions.map((a) => (
+              <button
+                key={a.route}
+                type="button"
+                onClick={() => navigate(a.route)}
+                className="min-h-[48px] rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                {a.label}
+              </button>
+            ))}
           </div>
         )}
-
-        {/* 常驻快捷入口（始终可见，关键词高亮） */}
-        <div>
-          <p className="mb-1.5 text-xs text-gray-400">快捷入口</p>
-          <div className="flex flex-wrap gap-2">
-            {SHORTCUTS.map((s) => {
-              const isHighlighted = matchedRoutes.has(s.route)
-              return (
-                <button
-                  key={s.route}
-                  type="button"
-                  onClick={() => navigate(s.route)}
-                  disabled={loading}
-                  className={`min-h-[40px] rounded-full border px-4 py-1.5 text-sm font-medium transition-all
-                    ${isHighlighted
-                      ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm scale-[1.03]'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
-                    }
-                    disabled:pointer-events-none disabled:opacity-40`}
-                >
-                  {s.label}
-                </button>
-              )
-            })}
+        <div className="flex flex-wrap items-center gap-1.5 pb-2">
+          <div className="mr-1 flex shrink-0 items-center gap-1">
+            <ZapIcon className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-xs font-medium text-neutral-500">快捷入口</span>
           </div>
+          {SHORTCUTS.map((s) => {
+            const Icon = SHORTCUT_ICON_MAP[s.route]
+            return (
+              <button
+                key={s.route}
+                type="button"
+                onClick={() => navigate(s.route)}
+                className={`flex min-h-[48px] items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors border
+                  ${matchedRoutes.has(s.route)
+                    ? 'border-amber-300 bg-amber-50 text-amber-700'
+                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+              >
+                {Icon && <Icon className="h-3.5 w-3.5" />}
+                {s.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
-      {/* ━━━ 输入区 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* 输入区 */}
       <div className="shrink-0 border-t border-gray-200 bg-white p-4">
         <div className="flex items-end gap-3">
           <textarea
@@ -299,7 +293,7 @@ export function AssistantPage() {
             placeholder="输入问题，例如：如何优化我的简历？"
             rows={2}
             disabled={loading}
-            className="min-h-[60px] flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3.5 text-base leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:bg-gray-50 disabled:text-gray-400"
+            className="min-h-[60px] flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3.5 text-base leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:bg-gray-50"
           />
           <Button
             size="lg"
@@ -308,7 +302,7 @@ export function AssistantPage() {
             aria-label="发送消息"
             className="h-16 w-16 shrink-0 rounded-xl"
           >
-            <SendHorizontalIcon className="h-6 w-6" aria-hidden="true" />
+            <SendHorizontalIcon className="h-6 w-6" />
           </Button>
         </div>
         <p className="mt-2 text-center text-xs text-gray-400">AI 回复内容仅供参考，不构成正式建议</p>
@@ -317,23 +311,7 @@ export function AssistantPage() {
   )
 }
 
-// ─── 子组件 ───────────────────────────────────────────────
-
-function SpeechBubble({ text, isError, isLoading }: { text: string; isError?: boolean; isLoading?: boolean }) {
-  const preview = text.length > 80 ? `${text.slice(0, 80)}…` : text
-  return (
-    <div className={`relative mt-3 max-w-xs rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm
-      ${isError ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-white border border-blue-100 text-gray-800'}
-      ${isLoading ? 'opacity-60' : ''}`}>
-      <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-2 overflow-hidden">
-        <div className={`w-4 h-4 rotate-45 -translate-y-2
-          ${isError ? 'bg-red-50 border-l border-t border-red-200' : 'bg-white border-l border-t border-blue-100'}`} />
-      </div>
-      {isError && <AlertCircleIcon className="inline mr-1 h-4 w-4 text-red-500" />}
-      {preview}
-    </div>
-  )
-}
+// ─── 气泡组件 ─────────────────────────────────────────────
 
 function ChatBubble({ msg }: { msg: Message }) {
   const isUser  = msg.role === 'user'
@@ -342,9 +320,9 @@ function ChatBubble({ msg }: { msg: Message }) {
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div className={`flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={
-          isUser  ? 'rounded-2xl rounded-br-sm bg-blue-600 px-4 py-3 text-sm leading-relaxed text-white'
-          : isError ? 'flex items-start gap-2 rounded-2xl rounded-bl-sm bg-red-50 border border-red-200 px-4 py-3 text-sm leading-relaxed text-red-700'
-          : 'rounded-2xl rounded-bl-sm bg-white border border-gray-200 px-4 py-3 text-sm leading-relaxed text-gray-900'
+          isUser  ? 'rounded-2xl rounded-br-sm bg-blue-600 px-4 py-3 text-sm text-white'
+          : isError ? 'flex items-start gap-2 rounded-2xl rounded-bl-sm bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700'
+          : 'rounded-2xl rounded-bl-sm bg-white border border-gray-200 px-4 py-3 text-sm text-gray-900'
         }>
           {isError && <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />}
           <span>{msg.text}</span>
