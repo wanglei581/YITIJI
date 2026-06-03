@@ -227,6 +227,20 @@ last common migration: 20260603155010_ai_result_persistence
 
 ---
 
+### ✅ AI 助手角色范围与禁用词治理（2026-06-03，Codex）
+
+本次在已接入大模型的 AI 助手链路增加“角色范围 + 禁用词”双层治理：
+
+- 后端新增 `llm-guard`：构造带角色范围的 system prompt，并在模型回复后做确定性禁用词拦截；命中后直接替换为范围内兜底回复，不把原回复下发前端。
+- `LlmConfigService` 配置新增 `roleScope` / `forbiddenWords`，默认范围限定在简历优化、求职指导、就业政策、打印扫描、第三方岗位/招聘会来源入口；支持 `AI_ASSISTANT_ROLE_SCOPE` / `AI_ASSISTANT_FORBIDDEN_WORDS` 环境变量初始化。
+- Admin「AI 大模型配置」页面新增角色范围与禁用词配置项；API Key 仍只加密保存在服务端，不回显。
+- TRTC 语音助手默认提示词改为复用同一套 guard 构造逻辑；可用 `TRTC_ROLE_SCOPE` / `TRTC_FORBIDDEN_WORDS` 单独覆盖，否则复用通用环境变量或默认值。
+- 新增 `pnpm --filter @ai-job-print/api verify:llm-guard` 验证脚本，覆盖默认禁用词命中、角色范围注入、禁用词回复兜底替换。
+
+验证结果：`api typecheck` ✅ / `admin typecheck` ✅ / `api lint` ✅ / `admin lint` ✅ / `verify:llm-guard` ✅ / 相关 AI 源码与 admin 页面禁用词扫描 0 命中 ✅。
+
+---
+
 ### 🟢 待机宣传屏（广告位）一期（2026-06-04，`feature/kiosk-screensaver-ads`，基于 `main`）
 
 一体机闲时变"待机宣传屏"：管理员后台上传图片/视频 → 配置播放方案 → 绑定终端 + 无操作时长 → Kiosk 无操作自动进入全屏轮播 → 触摸唤醒回首页。**仅管理员后台管理素材；AI 文生图为二期，一期 stub（默认 disabled，接口明确返回未启用，不产生外部费用）。** 合规：待机宣传屏属线下一体机运营广告位，非招聘闭环；素材文案禁用"一键投递"等违规词。

@@ -20,7 +20,7 @@ import type {
  * 3. 替换下方每个方法为真实 OpenAI API 调用
  * 4. 将 AI_PROVIDER=openai 写入服务端 .env
  *
- * 合规：不允许在响应中返回企业侧候选人筛选结果
+ * 合规：不允许在响应中返回企业侧筛选或决策结果
  */
 @Injectable()
 export class OpenAiProvider implements AiProvider {

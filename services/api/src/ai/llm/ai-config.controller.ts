@@ -21,6 +21,8 @@ interface UpdateAiConfigDto {
   model?:        string
   baseURL?:      string
   systemPrompt?: string
+  roleScope?:    string
+  forbiddenWords?: string[]
   temperature?:  number
   enabled?:      boolean
   apiKey?:       string
@@ -50,6 +52,8 @@ export class AiConfigController {
     if (body.model !== undefined)        patch.model = body.model
     if (body.baseURL !== undefined)      patch.baseURL = body.baseURL
     if (body.systemPrompt !== undefined) patch.systemPrompt = body.systemPrompt
+    if (body.roleScope !== undefined)    patch.roleScope = body.roleScope
+    if (Array.isArray(body.forbiddenWords)) patch.forbiddenWords = body.forbiddenWords
     if (typeof body.temperature === 'number') patch.temperature = body.temperature
     if (typeof body.enabled === 'boolean')    patch.enabled = body.enabled
     if (body.apiKey !== undefined)       patch.apiKey = body.apiKey

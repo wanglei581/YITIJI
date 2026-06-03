@@ -18,6 +18,8 @@ export interface AiConfigView {
   model:            string
   baseURL:          string
   systemPrompt:     string
+  roleScope:        string
+  forbiddenWords:   string[]
   temperature:      number
   enabled:          boolean
   apiKeyConfigured: boolean
@@ -33,6 +35,8 @@ export interface UpdateAiConfigBody {
   model?:        string
   baseURL?:      string
   systemPrompt?: string
+  roleScope?:    string
+  forbiddenWords?: string[]
   temperature?:  number
   enabled?:      boolean
   apiKey?:       string

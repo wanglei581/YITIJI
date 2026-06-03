@@ -1,7 +1,7 @@
 // ============================================================
 // LlmConfigService — AI 大模型运行时配置（管理员可改）
 //
-// - 配置项：vendor / model / baseURL / systemPrompt / temperature / enabled + apiKey
+// - 配置项：vendor / model / baseURL / systemPrompt / roleScope / forbiddenWords / temperature / enabled + apiKey
 // - apiKey 用 AES-256-GCM 加密后落盘，绝不下发前端（前端只读 apiKeyConfigured）
 // - 持久化到 <dataDir>/ai-model-config.json，重启不丢
 // - 默认值来自 env（首次启动可零配置用上 DeepSeek）
@@ -12,12 +12,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { encryptSecret, decryptSecret } from '../../common/crypto/secret-cipher'
 import { LLM_PRESETS, isLlmVendor, type LlmVendor } from './llm-presets'
+import { DEFAULT_FORBIDDEN_WORDS, DEFAULT_ROLE_SCOPE, normalizeForbiddenWords } from './llm-guard'
 
 export interface LlmConfig {
   vendor:       LlmVendor
   model:        string
   baseURL:      string
   systemPrompt: string
+  roleScope:    string
+  forbiddenWords: string[]
   temperature:  number
   enabled:      boolean
 }
@@ -34,9 +37,28 @@ interface PersistedConfig extends LlmConfig {
 const DEFAULT_SYSTEM_PROMPT =
   '你是「AI 求职打印服务终端」的就业服务助手，名字叫小青，亲切、专业、口语化。' +
   '你为求职者提供简历优化建议、求职指导、就业政策解读、打印扫描帮助，以及岗位/招聘会信息查询引导。' +
-  '回答简洁自然，避免机械式重复，每次控制在 120 字以内。' +
-  '合规红线：你不提供企业招聘、一键投递、简历投递给企业、简历筛选、面试邀约、Offer 管理等服务；' +
-  '遇到此类需求，请引导用户「去来源平台投递」。岗位和招聘会只作为第三方来源信息展示。'
+  '回答简洁自然，避免机械式重复。岗位和招聘会只作为第三方或官方来源信息入口展示。'
+
+const MAX_SYSTEM_PROMPT_CHARS = 4000
+const MAX_ROLE_SCOPE_CHARS = 2000
+const MAX_FORBIDDEN_WORDS = 100
+const MAX_FORBIDDEN_WORD_CHARS = 40
+
+function normalizeConfigText(value: string | undefined, fallback: string, maxChars: number): string {
+  const text = value?.trim() || fallback
+  return text.slice(0, maxChars)
+}
+
+function normalizeConfigForbiddenWords(words: readonly string[] | undefined): string[] {
+  return normalizeForbiddenWords(words)
+    .map((word) => word.slice(0, MAX_FORBIDDEN_WORD_CHARS))
+    .slice(0, MAX_FORBIDDEN_WORDS)
+}
+
+function parseForbiddenWordsFromEnv(value: string | undefined): string[] {
+  if (!value) return DEFAULT_FORBIDDEN_WORDS
+  return normalizeConfigForbiddenWords(value.split(/[,，\n]/))
+}
 
 @Injectable()
 export class LlmConfigService {
@@ -77,7 +99,9 @@ export class LlmConfigService {
       vendor,
       model:           raw.model        ?? preset.defaultModel,
       baseURL:         raw.baseURL      ?? preset.baseURL,
-      systemPrompt:    raw.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+      systemPrompt:    normalizeConfigText(raw.systemPrompt, DEFAULT_SYSTEM_PROMPT, MAX_SYSTEM_PROMPT_CHARS),
+      roleScope:       normalizeConfigText(raw.roleScope, DEFAULT_ROLE_SCOPE, MAX_ROLE_SCOPE_CHARS),
+      forbiddenWords:  normalizeConfigForbiddenWords(raw.forbiddenWords ?? DEFAULT_FORBIDDEN_WORDS),
       temperature:     typeof raw.temperature === 'number' ? raw.temperature : 0.7,
       enabled:         raw.enabled ?? false,
       apiKeyEncrypted: raw.apiKeyEncrypted ?? null,
@@ -94,6 +118,8 @@ export class LlmConfigService {
       model:           preset.defaultModel,
       baseURL:         preset.baseURL,
       systemPrompt:    DEFAULT_SYSTEM_PROMPT,
+      roleScope:       normalizeConfigText(process.env['AI_ASSISTANT_ROLE_SCOPE'], DEFAULT_ROLE_SCOPE, MAX_ROLE_SCOPE_CHARS),
+      forbiddenWords:  parseForbiddenWordsFromEnv(process.env['AI_ASSISTANT_FORBIDDEN_WORDS']),
       temperature:     0.7,
       enabled:         Boolean(envKey),
       apiKeyEncrypted: envKey ? encryptSecret(envKey) : null,
@@ -141,7 +167,15 @@ export class LlmConfigService {
     }
     if (patch.model        !== undefined) next.model = patch.model
     if (patch.baseURL      !== undefined) next.baseURL = patch.baseURL
-    if (patch.systemPrompt !== undefined) next.systemPrompt = patch.systemPrompt
+    if (patch.systemPrompt !== undefined) {
+      next.systemPrompt = normalizeConfigText(patch.systemPrompt, DEFAULT_SYSTEM_PROMPT, MAX_SYSTEM_PROMPT_CHARS)
+    }
+    if (patch.roleScope    !== undefined) {
+      next.roleScope = normalizeConfigText(patch.roleScope, DEFAULT_ROLE_SCOPE, MAX_ROLE_SCOPE_CHARS)
+    }
+    if (patch.forbiddenWords !== undefined) {
+      next.forbiddenWords = normalizeConfigForbiddenWords(patch.forbiddenWords)
+    }
     if (patch.temperature  !== undefined) next.temperature = patch.temperature
     if (patch.enabled      !== undefined) next.enabled = patch.enabled
     // apiKey：只有传了非空值才更新；传空字符串视为「清除」
