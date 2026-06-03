@@ -48,6 +48,8 @@
 
 **P0 未做（留 P1/P2，需加 DTO/schema 字段，禁止硬造 mock）：** 岗位数 `jobCount` 与届别 `audienceType`（应届/实习/社招）字段（待 P1 加可选 DTO 字段，合作机构后台标注）、校招时间线② 横向交互组件、AI 求职路线规划、校招季订阅提醒。
 
+> **依赖说明（本分支基于干净 main 603be2a，不含 jobs board）：** 校招岗位 P0 用 `getJobs()` + 前端关键词过滤（`isCampusJob`）实现；**server-side `getJobs({ category, pageSize })` 筛选属 jobs board(1fdefa4) 能力，本分支不依赖**，待 jobs board 合入 main 后于 P1 切回 server-side 精确筛选。
+
 ---
 
 ### ✅ 真实打印能力收口版（2026-06-02，feat/kiosk-print-real-capability-hardening，分支自 main `5e612b3`）

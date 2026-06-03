@@ -14,6 +14,7 @@
 - ✅ 招聘会列表卡片做厚（**仅用真实字段**）：主办方 `organizer`、参展/已录入企业数（`boothCount` 或 `managedCompanyCount`+`managedMaterialCount`）、`dataSourceNote`、来源+同步；按钮统一「查看招聘会」
 - ✅ 合规：仅「查看岗位 / 查看招聘会」，无一键投递/收简历/候选人；禁词扫描过；typecheck / lint / build 全绿
 - ⏳ **P1 待补（需加 DTO 字段，禁止硬造 mock）**：岗位数 `jobCount`、届别 `audienceType`（应届/实习/社招）；校招时间线② 交互组件
+- ⏳ **依赖补强（P1）**：校招岗位 P0 用 `getJobs()` + 前端关键词过滤（不依赖 jobs board）；server-side `getJobs({ category, pageSize })` 属 jobs board 能力，待其合入 main 后切回 server-side 精确筛选
 - ⏳ 待 review
 
 ---
