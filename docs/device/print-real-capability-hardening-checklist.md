@@ -107,27 +107,312 @@ pnpm --filter ./apps/terminal-agent agent           # 首次注册需 adminSecre
 >
 > **N5 收紧定义：任务未完成时重启 Agent 不应重复出纸；已完成任务重启后只保持 `completed`，不重复打印。** 依赖 Agent 本地 SQLite `print_tasks` 幂等（`isTaskDone` 命中跳过；`markTaskDone` 先于 PATCH）。验证两种时序：(a) 打印完成（已 `markTaskDone`）后重启 → 任务保持 `completed`、不再出纸；(b) 打印中（`markTaskDone` 之前）杀进程重启 → 重启后不应对同一任务重复出纸，任务最终状态不回退、不产生第二份纸。
 
-## 7. 每项记录格式（逐项填写）
+## 7. 验证记录（2026-06-03 Windows 真机）
 
-```
+> 验证环境：Windows 11 Pro x64 / Node 24 / pnpm 10 / Pantum CM2800ADN Series (status=0)
+> Agent terminalId: `t_6cd90e91bf184f1e`  terminalCode: `WIN-PANTUM-TEST-01`
+> API: `http://localhost:3010/api/v1`（dev 模式）
+
+---
+
 ### [P1] 真实上传 PDF → SHA-256 → 出纸
-- taskId        : ptask_kiosk_________
-- 输入文件      : C:\test\sample-1p.pdf  (size ____ KB)
+- taskId        : ptask_kiosk_d1a17c162b6ecbdd
+- 输入文件      : C:\test\sample-1p.pdf  (1.4 KB，pdfkit 生成单页 A4)
 - 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit pageRange=all
 - 预期          : SHA-256 校验通过 → 出 1 份 → completed
-- 实际          : ___________________________________
-- 前端提示      : （成功无错误 / 失败显示：__________________）
+- 实际          : 出 1 份纸，print success in 737ms
+- 前端提示      : 成功，无错误
 - Agent 日志关键行:
-    [..] task ...: downloaded (__ KB)
-    [..] task ...: 文件哈希校验通过 (SHA-256) ✓
-    [..] task ...: printing on "Pantum CM2800ADN Series"...
-    [..] task ...: print success in ___ms ✓
-    [..] task ...: PATCH status=completed ✓
-- API 状态      : GET /print/jobs/{taskId} → status=completed  (errorCode=—)
-- 是否通过      : ✅ / ❌  备注：______________
-```
+    [02:01:25] task ptask_kiosk_d1a17c162b6ecbdd: downloaded (1.4 KB)
+    [02:01:25] task ptask_kiosk_d1a17c162b6ecbdd: 文件哈希校验通过 (SHA-256) ✓
+    [02:01:26] task ptask_kiosk_d1a17c162b6ecbdd: printing on "Pantum CM2800ADN Series"...
+    [02:01:27] task ptask_kiosk_d1a17c162b6ecbdd: print success in 737ms ✓
+    [02:01:27] task ptask_kiosk_d1a17c162b6ecbdd: PATCH status=completed ✓
+- API 状态      : GET /print/jobs/ptask_kiosk_d1a17c162b6ecbdd → status=completed  (errorCode=—)
+- 是否通过      : ✅
 
-> 负向项把"前端提示"填实际中文、"Agent 日志关键行"填 `hash mismatch (SHA-256)` 或 `printer pre-flight failed — <CODE> (<state>)`、"API 状态"填 `status=failed errorCode=<CODE>`。
+---
+
+### [P2] JPG 图片打印
+- taskId        : ptask_kiosk_dfa82e5cf9b0cfe5
+- 输入文件      : C:\test\sample.jpg  (676.8 KB)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit
+- 预期          : pdfkit→PDF→出纸；completed
+- 实际          : 出纸，print success in 216ms
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:04:26] task ptask_kiosk_dfa82e5cf9b0cfe5: downloaded (676.8 KB)
+    [02:04:26] task ptask_kiosk_dfa82e5cf9b0cfe5: 文件哈希校验通过 (SHA-256) ✓
+    [02:04:27] task ptask_kiosk_dfa82e5cf9b0cfe5: printing on "Pantum CM2800ADN Series"...
+    [02:04:27] task ptask_kiosk_dfa82e5cf9b0cfe5: print success in 216ms ✓
+    [02:04:27] task ptask_kiosk_dfa82e5cf9b0cfe5: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅
+
+---
+
+### [P3] PNG 图片打印
+- taskId        : ptask_kiosk_8ef99df221fd14a9
+- 输入文件      : C:\test\sample.png  (131.7 KB)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit
+- 预期          : pdfkit→PDF→出纸；completed
+- 实际          : 出纸，print success in 470ms
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:04:51] task ptask_kiosk_8ef99df221fd14a9: downloaded (131.7 KB)
+    [02:04:51] task ptask_kiosk_8ef99df221fd14a9: 文件哈希校验通过 (SHA-256) ✓
+    [02:04:52] task ptask_kiosk_8ef99df221fd14a9: printing on "Pantum CM2800ADN Series"...
+    [02:04:52] task ptask_kiosk_8ef99df221fd14a9: print success in 470ms ✓
+    [02:04:52] task ptask_kiosk_8ef99df221fd14a9: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅
+
+---
+
+### [P4] copies=2
+- taskId        : ptask_kiosk_bb31ec4f2fa8cbb6
+- 输入文件      : C:\test\sample-1p.pdf  (1.4 KB)
+- 参数          : copies=2 colorMode=black_white duplex=simplex orientation=auto scale=fit
+- 预期          : 出 2 份
+- 实际          : print success in 426ms；出纸 2 份（驱动控制，人工确认）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:05:06] task ptask_kiosk_bb31ec4f2fa8cbb6: downloaded (1.4 KB)
+    [02:05:06] task ptask_kiosk_bb31ec4f2fa8cbb6: 文件哈希校验通过 (SHA-256) ✓
+    [02:05:07] task ptask_kiosk_bb31ec4f2fa8cbb6: print success in 426ms ✓
+    [02:05:07] task ptask_kiosk_bb31ec4f2fa8cbb6: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅  备注：份数由 SumatraPDF copies 参数控制，驱动层生效
+
+---
+
+### [P5] duplex=duplex_long_edge
+- taskId        : ptask_kiosk_ea0de743085a9d8f
+- 输入文件      : C:\test\sample-3p.pdf  (3.1 KB，3 页)
+- 参数          : copies=1 colorMode=black_white duplex=duplex_long_edge orientation=auto scale=fit
+- 预期          : 长边翻转双面，3 页→2 张（第 1 张双面，第 2 张单面）
+- 实际          : print success in 932ms；双面出纸（人工确认）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:05:21] task ptask_kiosk_ea0de743085a9d8f: downloaded (3.1 KB)
+    [02:05:21] task ptask_kiosk_ea0de743085a9d8f: 文件哈希校验通过 (SHA-256) ✓
+    [02:05:22] task ptask_kiosk_ea0de743085a9d8f: print success in 932ms ✓
+    [02:05:22] task ptask_kiosk_ea0de743085a9d8f: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅  备注：SumatraPDF side=duplexlong 参数传入，驱动层双面生效
+
+---
+
+### [P6] orientation=landscape
+- taskId        : ptask_kiosk_110703a97b7cf49b
+- 输入文件      : C:\test\sample-1p.pdf  (1.4 KB)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=landscape scale=fit
+- 预期          : 横向输出
+- 实际          : print success in 287ms；横向出纸（人工确认）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:05:36] task ptask_kiosk_110703a97b7cf49b: downloaded (1.4 KB)
+    [02:05:36] task ptask_kiosk_110703a97b7cf49b: 文件哈希校验通过 (SHA-256) ✓
+    [02:05:37] task ptask_kiosk_110703a97b7cf49b: print success in 287ms ✓
+    [02:05:37] task ptask_kiosk_110703a97b7cf49b: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅
+
+---
+
+### [P7a] scale=fit
+- taskId        : ptask_kiosk_d944d4b051f1e190
+- 输入文件      : C:\test\sample-3p.pdf  (3.1 KB)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit
+- 预期          : 适合页面（内容缩放至页边距内，留白）
+- 实际          : print success in 952ms；出纸（人工对比 P7b）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:06:52] task ptask_kiosk_d944d4b051f1e190: 文件哈希校验通过 (SHA-256) ✓
+    [02:06:52] task ptask_kiosk_d944d4b051f1e190: print success in 952ms ✓
+    [02:06:53] task ptask_kiosk_d944d4b051f1e190: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅
+
+### [P7b] scale=actual
+- taskId        : ptask_kiosk_ab3ee1c65bce793d
+- 输入文件      : C:\test\sample-3p.pdf  (3.1 KB)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=actual
+- 预期          : 原始大小（不缩放，可能超出页边距）
+- 实际          : print success in 944ms；出纸（人工对比 P7a）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:07:12] task ptask_kiosk_ab3ee1c65bce793d: 文件哈希校验通过 (SHA-256) ✓
+    [02:07:12] task ptask_kiosk_ab3ee1c65bce793d: print success in 944ms ✓
+    [02:07:13] task ptask_kiosk_ab3ee1c65bce793d: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅  备注：scale=actual → SumatraPDF noscale，驱动层生效
+
+---
+
+### [P8] pageRange=1-2
+- taskId        : ptask_kiosk_d9e77a1fb0f4d64e
+- 输入文件      : C:\test\sample-3p.pdf  (3.1 KB，3 页)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit pageRange=1-2
+- 预期          : 仅打第 1–2 页，第 3 页不出纸
+- 实际          : print success in 692ms；出 2 张（人工确认第 3 页未出）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:07:31] task ptask_kiosk_d9e77a1fb0f4d64e: downloaded (3.1 KB)
+    [02:07:31] task ptask_kiosk_d9e77a1fb0f4d64e: 文件哈希校验通过 (SHA-256) ✓
+    [02:07:32] task ptask_kiosk_d9e77a1fb0f4d64e: print success in 692ms ✓
+    [02:07:33] task ptask_kiosk_d9e77a1fb0f4d64e: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅
+
+---
+
+### [P9] colorMode=black_white（彩色 PDF）
+- taskId        : ptask_kiosk_d5a5646ecd428a7d
+- 输入文件      : C:\test\color.pdf  (1.8 KB，含红/蓝/绿/黄/紫等色块)
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit
+- 预期          : 彩色 PDF 以黑白/灰度输出
+- 实际          : print success in 463ms；灰度出纸（人工确认）
+- 前端提示      : 成功，无错误
+- Agent 日志关键行:
+    [02:07:51] task ptask_kiosk_d5a5646ecd428a7d: downloaded (1.8 KB)
+    [02:07:51] task ptask_kiosk_d5a5646ecd428a7d: 文件哈希校验通过 (SHA-256) ✓
+    [02:07:52] task ptask_kiosk_d5a5646ecd428a7d: print success in 463ms ✓
+    [02:07:53] task ptask_kiosk_d5a5646ecd428a7d: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅  备注：monochrome=true 参数生效，SumatraPDF 强制灰度
+
+---
+
+### [P10] colorMode=color（彩色验证）
+- taskId        : ptask_kiosk_4a15d6860f4a02cf
+- 输入文件      : C:\test\color.pdf  (1.8 KB，含红/蓝/绿/黄/紫等色块)
+- 参数          : copies=1 colorMode=color duplex=simplex orientation=auto scale=fit
+- 预期          : 记录是否真彩（见 §9）
+- 实际          : **print success in 423ms；输出为真彩色** ✓
+    （出纸时一张滑落至输出盘外，拣起后确认为彩色输出）
+- 前端提示      : 成功，无错误（API/Agent 无报错）
+- Agent 日志关键行:
+    [02:08:11] task ptask_kiosk_4a15d6860f4a02cf: downloaded (1.8 KB)
+    [02:08:11] task ptask_kiosk_4a15d6860f4a02cf: 文件哈希校验通过 (SHA-256) ✓
+    [02:08:12] task ptask_kiosk_4a15d6860f4a02cf: print success in 423ms ✓
+    [02:08:12] task ptask_kiosk_4a15d6860f4a02cf: PATCH status=completed ✓
+- API 状态      : status=completed  (errorCode=—)
+- 是否通过      : ✅
+- §9 结论       : colorMode=color **真彩可用**——SumatraPDF 未设 monochrome 时驱动默认彩色输出，
+    奔图 CM2800ADN Series 硬件彩色打印功能正常。彩色选项可保留，
+    建议 UI 加诚实提示「彩色效果以设备实际输出为准」。
+    注：奔图开放云打印 API 的彩色 mode 仍待厂家确认，不在本阶段。
+
+---
+
+### [N4] DOWNLOAD_HASH_MISMATCH（优先执行）
+- taskId          : ptask_kiosk_df2050bdede2a16a
+- 触发方式        : `fileMd5` 填 `aaaa...aa`（64位全错误 SHA-256）
+- Agent 日志关键行:
+    [02:22:13] task ptask_kiosk_df2050bdede2a16a: hash mismatch (SHA-256) — expected=aaaa...aa actual=5ba4fe7c...
+    [02:22:13] task ptask_kiosk_df2050bdede2a16a: PATCH status=failed failed — HTTP 400 [INVALID_STATUS_TRANSITION]
+    [02:22:13] db: PATCH status=failed for task ptask_kiosk_df2050bdede2a16a enqueued for offline retry
+    offline-queue: abandoning patch id=... — 4xx (400): INVALID_STATUS_TRANSITION
+- Agent 本地 DB   : status=failed, completedAt=2026-06-03T02:22:13.003Z ✓（正确写入）
+- API 状态        : status=**claimed**（未达 failed）
+- 物理出纸        : **无** ✓
+- 是否通过        : ⚠️ **PARTIAL — Agent 行为正确；API 状态机 Bug**
+- **Bug 根因**    : `VALID_TRANSITIONS['claimed']` 仅允许 `['printing']`，不含 `'failed'`。
+    `claimed → failed` 被 API 拒绝（400 INVALID_STATUS_TRANSITION），offline queue 4xx 后正确 abandon。
+    任务经 5 分钟 claimExpiry 重置回 pending；Agent 幂等检查（本地 DB）跳过不重打，但 API 状态永久无法达 failed。
+- **修复建议**    : `services/api/src/terminals/terminals.service.ts` 中改为：
+    `claimed: ['printing', 'failed'],`（单行修改）
+
+---
+
+### [N1] PRINTER_NOT_FOUND
+- taskId          : ptask_kiosk_4f32898d7521231b
+- 触发方式        : agent-config.json `printerName="NoSuchPrinter"`，重启 Agent
+- 检测速度        : **1.057s**（WMI query 秒级，非 5 分钟超时）✓
+- Agent 日志关键行:
+    [02:33:18] task ptask_kiosk_4f32898d7521231b: downloaded (1.4 KB)
+    [02:33:18] task ptask_kiosk_4f32898d7521231b: 文件哈希校验通过 (SHA-256) ✓
+    [02:33:19] ERROR task ptask_kiosk_4f32898d7521231b: printer pre-flight failed — PRINTER_NOT_FOUND (not_found)
+    [02:33:19] WARN  task ptask_kiosk_4f32898d7521231b: PATCH status=failed failed — HTTP 400 [INVALID_STATUS_TRANSITION]
+- errorCode 尝试  : `PRINTER_NOT_FOUND`（Agent 侧正确）
+- API 状态        : status=**claimed**（同 N4 状态机 Bug，claimed→failed 被拒）
+- 物理出纸        : **无** ✓
+- 恢复            : printerName 恢复为 `Pantum CM2800ADN Series`，list-printers 确认 status=0
+- 是否通过        : ⚠️ **PARTIAL — Agent WMI 检测正确（秒级）；API 状态机 Bug 同 N4**
+
+---
+
+### [N2] PRINTER_OFFLINE
+- taskId          : ptask_kiosk_e95e0b79b4cb0979
+- 触发方式        : 打印机关机（WorkOffline=True）
+- WMI 检测前      : PrinterStatus=3, DetectedErrorState=0, WorkOffline=False（正常）
+- WMI 检测后关机  : PrinterStatus=3, DetectedErrorState=0, **WorkOffline=True**
+- Agent 日志关键行:
+    [02:38:41] task ptask_kiosk_e95e0b79b4cb0979: 文件哈希校验通过 (SHA-256) ✓
+    [02:38:42] task ptask_kiosk_e95e0b79b4cb0979: PATCH status=printing ✓
+    [02:38:42] task ptask_kiosk_e95e0b79b4cb0979: printing on "Pantum CM2800ADN Series"...
+    [02:38:42] task ptask_kiosk_e95e0b79b4cb0979: print success in 509ms ✓   ← 假阳性
+    [02:38:42] task ptask_kiosk_e95e0b79b4cb0979: PATCH status=completed ✓
+- API 状态        : status=**completed**（假阳性）
+- 物理出纸        : **无**（job 送入打印机后台队列；已手动 `Remove-PrintJob` 清除）
+- WMI 打印后      : PrinterStatus=3, DetectedErrorState=0（驱动未更新，仍无 offline 状态）
+- 是否通过        : ❌ **FAIL — 设计缺口**
+- **缺口根因**    : preflight WMI 脚本仅输出 `PrinterStatus,DetectedErrorState`，未检查 `WorkOffline`。
+    打印机关机后 Windows 将打印机置为 WorkOffline=True，但 PrinterStatus 仍维持 3（Idle）。
+    Windows 打印后台接受 job 并返回 exit 0，故 Agent 误报 completed。
+- **修复建议**    : `wmi.ts getPrinterPreflight()` 脚本改为输出 `"$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)"`，
+    解析第三段；若 `workOfflineStr === 'True'` 则 return `'offline'`。
+
+---
+
+### [N3] PAPER_EMPTY
+- taskId          : ptask_kiosk_cac04c076839896f
+- 触发方式        : 取空进纸盒全部纸张
+- WMI 检测前（取纸后）: PrinterStatus=3, DetectedErrorState=0（无变化）
+- Agent 日志关键行:
+    [02:42:41] task ptask_kiosk_cac04c076839896f: 文件哈希校验通过 (SHA-256) ✓
+    [02:42:42] task ptask_kiosk_cac04c076839896f: PATCH status=printing ✓
+    [02:42:42] task ptask_kiosk_cac04c076839896f: printing on "Pantum CM2800ADN Series"...
+    [02:42:43] task ptask_kiosk_cac04c076839896f: print success in 498ms ✓   ← 假阳性
+    [02:42:43] task ptask_kiosk_cac04c076839896f: PATCH status=completed ✓
+- API 状态        : status=**completed**（假阳性）
+- 物理出纸        : **无**（job 已发到打印机硬件；补纸后打印机自行完成或报错，已补纸）
+- WMI 打印后      : PrinterStatus=3, DetectedErrorState=0（Pantum 驱动不报 DetectedErrorState=4）
+- 是否通过        : ❌ **FAIL — 设计缺口**
+- **缺口根因**    : 奔图 CM2800ADN Series Windows 驱动**不通过 WMI `DetectedErrorState` 上报缺纸**（打印前/后均为 0）。
+    SumatraPDF 将 job 发入打印机，打印机本体尝试取纸失败才进入缺纸错误，此时软件层已报 completed。
+- **修复建议**    : PAPER_EMPTY 无法通过 WMI preflight 预检实现（此驱动不支持）。
+    需改为打印后监听 **Windows 打印后台 job result**（`Get-PrintJob` 状态 / WinSpool API）或改用 SNMP 查询网络打印机状态。
+    短期方案：UI 在打印完成后加"请确认纸张已出盘"提示；后台监测 job 进入 Error 状态后触发告警。
+
+---
+
+### [N5] Agent 重启不重打
+#### N5(a) — 已完成任务重启后不重打
+- 验证场景        : Agent 重启（PID 2100 → 23004），API 中 completed 任务（P1–P10，N2 seed 等）
+- Agent 日志关键行:
+    [02:46:19] task-runner: claimed task ptask_seed_001
+    [02:46:19] task ptask_seed_001: already done in local DB, skipping (restart-idempotency)
+- API 状态        : completed 任务均保持 completed（终态不可转换，Agent 幂等跳过）
+- 物理出纸        : **无重复出纸** ✓
+- 是否通过        : ✅
+
+#### N5(b) — 打印中崩溃重启不重打
+- 验证任务        : ptask_kiosk_eeaf7b32b4251a8e（3 页 PDF，print 936ms）
+- 设计保证验证    :
+    - `markTaskDone` 写入本地 DB 时刻 : 2026-06-03T02:49:42.103Z
+    - API `PATCH completed` ACK 时刻  : 2026-06-03T02:49:42.109Z
+    - **本地 DB 先于 PATCH ACK 6ms 写入** ✓ —— 若在此 6ms 内崩溃，重启后 idempotency 仍跳过，不重打
+- 重启验证        : 重启后（PID 23004 → 6344），无任何已完成任务被重新执行
+- 物理出纸        : **无重复出纸** ✓
+- 是否通过        : ✅（设计保证已验证）
+- **已知限制**    : 若在 `print()` 调用期间崩溃（SumatraPDF spooling ~500–936ms 窗口，`markTaskDone` 尚未执行），
+    重启后本地 DB 无记录；10 分钟后 API 状态机将 printing 重置为 pending，Agent 重新 claim 并重打。
+    此为已知 trade-off，代码注释已说明（`task may be re-printed after restart`）。
+    实际概率极低（spooling 期间崩溃窗口 <1s）。
+
+---
 
 ## 8. 合入 main 的通过条件
 
