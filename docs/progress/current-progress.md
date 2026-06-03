@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-06-02  
+> 最后更新：2026-06-03  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
@@ -49,7 +49,39 @@
 
 **明确不做：** 真实扫描 Agent / 格式转换 / 证件照 / 签名盖章 / 支付 / BMP/TIFF / Prisma 改名 migration / 改 AI 简历·岗位·招聘会·后台。
 
-**验证：** 三端 typecheck/build 全过；kiosk+api lint 过（terminal-agent 无 lint script）；后端真机运行时验证 DTO：非法值/未知字段/非法 pageRange/越界 copies → 400（精确字段错误），合法 → 201；sample PDF SHA-256(64hex) 与 seed 一致。**仍需 Windows 真机验证**：份数/双面/方向/缩放/页码/黑白真实出纸、彩色是否真彩、打印机离线/缺纸/未找到预检触发、hash 篡改负向、幂等。
+**验证：** 三端 typecheck/build 全过；kiosk+api lint 过（terminal-agent 无 lint script）；后端真机运行时验证 DTO：非法值/未知字段/非法 pageRange/越界 copies → 400（精确字段错误），合法 → 201；sample PDF SHA-256(64hex) 与 seed 一致。**Windows 真机验证已全部完成（2026-06-03）**，详见 checklist。
+
+**Windows 真机验证结果（2026-06-03，Pantum CM2800ADN Series，Windows 11 Pro x64）：**
+
+| # | 项 | 结果 |
+|---|---|---|
+| P1–P10 | 正向打印链路（copies/duplex/orientation/scale/pageRange/black_white/color）| ✅ 全部通过，真实出纸 |
+| P10 彩色 | colorMode=color 真彩验证 | ✅ 真彩可用（SumatraPDF 未设 monochrome 时驱动默认彩色） |
+| N4 原始 | DOWNLOAD_HASH_MISMATCH — Agent 正确检测，API 状态机 Bug（claimed→failed 被拒） | ⚠️ 发现 Bug |
+| N1 原始 | PRINTER_NOT_FOUND — WMI 秒级检测正确，API 状态机 Bug 同 N4 | ⚠️ 发现 Bug |
+| N2 原始 | PRINTER_OFFLINE — WorkOffline 未检查，假阳性 completed | ❌ 发现设计缺口 |
+| N3 | PAPER_EMPTY — Pantum WMI 驱动不上报 DetectedErrorState=4 | ❌ 已知硬件/驱动限制 |
+| N5 | Agent 重启幂等，已完成任务不重打 | ✅ 通过 |
+
+**修复（commit `7221d1e`，2026-06-03）：**
+
+| 修复 | 文件 | 改动 |
+|---|---|---|
+| 状态机修复（N1/N4）| `services/api/src/terminals/terminals.service.ts` | `claimed: ['printing']` → `claimed: ['printing', 'failed']` |
+| WorkOffline 检测（N2）| `apps/terminal-agent/src/agent/wmi.ts` | preflight/status 脚本增加 `$p.WorkOffline` 第三字段；`workOfflineStr === 'True'` → return `'offline'` |
+
+**修复后复测（2026-06-03）：**
+
+| # | taskId | API 最终状态 | 结果 |
+|---|---|---|---|
+| N4 | ptask_kiosk_25c585344567c22a | status=failed, errorCode=DOWNLOAD_HASH_MISMATCH | ✅ 通过 |
+| N1 | ptask_kiosk_efaa1205fe5fd897 | status=failed, errorCode=PRINTER_NOT_FOUND | ✅ 通过 |
+| N2 | ptask_kiosk_3dd4a8e5b5ae7046 | status=failed, errorCode=PRINTER_OFFLINE | ✅ 通过 |
+
+**N3 已知限制（不修复，等待后续方案）：**
+PAPER_EMPTY 无法通过 WMI preflight 预检实现。Pantum CM2800ADN Series Windows 驱动打印前后 `DetectedErrorState` 均为 0，不上报缺纸状态。后续需改用 Windows 打印后台 job result 监控（`Get-PrintJob` 状态）或 SNMP 查询网络打印机状态。
+
+**当前状态：** 仍在 `feat/kiosk-print-real-capability-hardening` 分支，待 push / review / FF 合入 main。
 
 ---
 

@@ -324,6 +324,17 @@ pnpm --filter ./apps/terminal-agent agent           # 首次注册需 adminSecre
 - **修复建议**    : `services/api/src/terminals/terminals.service.ts` 中改为：
     `claimed: ['printing', 'failed'],`（单行修改）
 
+#### [N4] 修复后复测（2026-06-03，fix `7221d1e`）
+- 修复内容      : `terminals.service.ts` `VALID_TRANSITIONS['claimed']` 增加 `'failed'`（单行）
+- taskId        : ptask_kiosk_25c585344567c22a
+- Agent 日志关键行:
+    [03:04:25] task ptask_kiosk_25c585344567c22a: hash mismatch (SHA-256) — expected=0000...0000 actual=5ba4fe7c...
+    [03:04:25] task ptask_kiosk_25c585344567c22a: PATCH status=failed ✓
+- API 状态      : status=**failed**, errorCode=**DOWNLOAD_HASH_MISMATCH** ✓
+    errorMessage: 文件校验失败（SHA-256 不一致）：expected=0000...0000, got=5ba4fe7c...
+- 物理出纸      : **无** ✓
+- 是否通过      : ✅ **修复后复测通过**
+
 ---
 
 ### [N1] PRINTER_NOT_FOUND
@@ -340,6 +351,19 @@ pnpm --filter ./apps/terminal-agent agent           # 首次注册需 adminSecre
 - 物理出纸        : **无** ✓
 - 恢复            : printerName 恢复为 `Pantum CM2800ADN Series`，list-printers 确认 status=0
 - 是否通过        : ⚠️ **PARTIAL — Agent WMI 检测正确（秒级）；API 状态机 Bug 同 N4**
+
+#### [N1] 修复后复测（2026-06-03，fix `7221d1e`）
+- 修复内容      : 同 N4（`VALID_TRANSITIONS['claimed']` 增加 `'failed'`）
+- taskId        : ptask_kiosk_efaa1205fe5fd897（printerName=NoSuchPrinter_N1_Retest）
+- Agent 日志关键行:
+    [03:10:51] task ptask_kiosk_efaa1205fe5fd897: downloaded (1.4 KB)
+    [03:10:51] task ptask_kiosk_efaa1205fe5fd897: 文件哈希校验通过 (SHA-256) ✓
+    [03:10:51] ERROR task ptask_kiosk_efaa1205fe5fd897: printer pre-flight failed — PRINTER_NOT_FOUND (not_found)
+    [03:10:51] task ptask_kiosk_efaa1205fe5fd897: PATCH status=failed ✓
+- API 状态      : status=**failed**, errorCode=**PRINTER_NOT_FOUND** ✓
+    errorMessage: 打印机未找到：NoSuchPrinter_N1_Retest
+- 物理出纸      : **无** ✓
+- 是否通过      : ✅ **修复后复测通过**（WMI 秒级检测 + API 状态正确落 failed）
 
 ---
 
@@ -363,6 +387,21 @@ pnpm --filter ./apps/terminal-agent agent           # 首次注册需 adminSecre
     Windows 打印后台接受 job 并返回 exit 0，故 Agent 误报 completed。
 - **修复建议**    : `wmi.ts getPrinterPreflight()` 脚本改为输出 `"$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)"`，
     解析第三段；若 `workOfflineStr === 'True'` 则 return `'offline'`。
+
+#### [N2] 修复后复测（2026-06-03，fix `7221d1e`）
+- 修复内容      : `wmi.ts getPrinterPreflight()` + `getPrinterStatus()` 均增加 `$p.WorkOffline` 第三字段；
+    `workOfflineStr === 'True'` → return `'offline'`（优先于 PrinterStatus=7 检查）
+- 前置 WMI 确认 : PrinterStatus=3, DetectedErrorState=0, **WorkOffline=True**（打印机关机后实测）
+- taskId        : ptask_kiosk_3dd4a8e5b5ae7046
+- Agent 日志关键行:
+    [03:14:16] task ptask_kiosk_3dd4a8e5b5ae7046: downloaded (1.4 KB)
+    [03:14:16] task ptask_kiosk_3dd4a8e5b5ae7046: 文件哈希校验通过 (SHA-256) ✓
+    [03:14:17] ERROR task ptask_kiosk_3dd4a8e5b5ae7046: printer pre-flight failed — PRINTER_OFFLINE (offline)
+    [03:14:17] task ptask_kiosk_3dd4a8e5b5ae7046: PATCH status=failed ✓
+- API 状态      : status=**failed**, errorCode=**PRINTER_OFFLINE** ✓
+    errorMessage: 打印机离线（请检查电源/网线/USB 连接）
+- 物理出纸      : **无** ✓
+- 是否通过      : ✅ **修复后复测通过**（WorkOffline=True 秒级检测验证通过）
 
 ---
 
