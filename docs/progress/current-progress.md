@@ -330,6 +330,15 @@ last common migration: 20260603155010_ai_result_persistence
 ### ✅ 校园招聘专区 P0（2026-06-03，feat/kiosk-campus-zone-on-main，cherry-pick 自 `42ebd9c`，基于干净 main `603be2a`）
 
 在「招聘会页太空」的反馈下，按已确认方案 A（详见 [campus-recruitment-design.md](../product/campus-recruitment-design.md)）落地 Kiosk 校园招聘专区 **P0：纯前端聚合页**。**未改 Prisma schema / migration，未新增任何后端闭环能力**，全部复用 main 已有的 `/jobs`（category=campus）与 `/job-fairs` 能力。
+**当前阶段：Kiosk 岗位信息板块完整收口（2026-06-03，feat/kiosk-jobs-complete）**
+
+---
+
+### ✅ Kiosk 岗位信息板块完整收口（2026-06-03，feat/kiosk-jobs-complete，分支自 main `603be2a`）
+
+把一体机前台 `/jobs` 与 `/jobs/:id` 从"能展示"收口为"功能完整、数据真实、前后端可互通"。
+**独立 git worktree 开发（`/Users/wanglei/ai-job-kiosk-jobs-wt`），未触碰打印 / 扫描 / AI 数字人 / Terminal Agent / legacy-miaoda，未改 Prisma schema/migration**
+（行业能力用既有 `tagsJson` 列承载，避免与 `feat/data-session-baseline` 的未提交 schema 改动纠缠）。
 
 **已完成项：**
 
@@ -347,6 +356,34 @@ last common migration: 20260603155010_ai_result_persistence
 **P0 未做（留 P1/P2，需加 DTO/schema 字段，禁止硬造 mock）：** 岗位数 `jobCount` 与届别 `audienceType`（应届/实习/社招）字段（待 P1 加可选 DTO 字段，合作机构后台标注）、校招时间线② 横向交互组件、AI 求职路线规划、校招季订阅提醒。
 
 > **依赖说明（本分支基于干净 main 603be2a，不含 jobs board）：** 校招岗位 P0 用 `getJobs()` + 前端关键词过滤（`isCampusJob`）实现；**server-side `getJobs({ category, pageSize })` 筛选属 jobs board(1fdefa4) 能力，本分支不依赖**，待 jobs board 合入 main 后于 P1 切回 server-side 精确筛选。
+| 后端 `GET /api/v1/jobs` | 真实 Prisma 查询，**只返回** `reviewStatus=approved` + `publishStatus=published`；新增 query 参数 `keyword`（title/company/description OR contains）、`city`、`industry`、`category`(=workType 别名归一)、`sourceOrgId`、`tag`、`page`、`pageSize`，全部落 DB 层，分页 `total` 准确 |
+| 后端 `GET /api/v1/jobs/:id` | 只返回已审核已发布岗位，未审核/未发布返回 `data:null`（不暴露） |
+| 返回字段 | title / company / city / salaryDisplay / tags / industry / category / description / requirements / sourceOrgId / sourceName / sourceUrl / externalId / syncTime / dataSourceNote 齐备 |
+| 行业(industry) | 无独立 DB 列：约定以 `行业:` 前缀 tag 存于 `tagsJson`，后端 `prismaJobToListItem` 抽取为 `industry` 字段并从展示 `tags` 剔除；筛选用 `tagsJson contains "行业:<x>"`（带引号边界=精确） |
+| 前端 `/jobs` | 新增关键词搜索框（去抖 300ms）；城市/行业下拉项由真实返回数据聚合；岗位类型 chip 映射 `category`；来源机构卡片→`sourceOrgId`；筛选条件与后端 query 对齐，http 模式走真实接口（无筛选时复用 facet 全量，任一筛选→真实带参请求） |
+| 前端 `/jobs/:id` | "去来源平台投递" / "扫码投递" 均渲染**真实 `sourceUrl` 二维码**（`qrcode.react` `QRCodeSVG`，内容即 sourceUrl，非占位图）；sourceUrl 经 http/https 校验，无效则禁用按钮并提示 |
+| 收藏 | 纯本地 `localStorage`（`useJobFavorites` + `useSyncExternalStore`，列表/详情实时同步），星标切换 + "只看收藏"；**不上传简历、不形成招聘闭环** |
+| 错误态 | 后端不可达显示可操作提示「后端服务未连接，请检查 API 服务」+ 重试 |
+| 合规 | 文案仅"去来源平台投递 / 扫码投递"；页面持续声明"仅展示第三方/官方来源、不接收简历、不参与招聘流程"；未新增 `/jobs/:id/apply`、未做一键投递/收简历 |
+
+**新增 / 删除文件：**
+
+- 新增依赖：`apps/kiosk` → `qrcode.react@^4.2.0`
+- 新增：`apps/kiosk/src/components/SourceUrlQr.tsx`、`apps/kiosk/src/lib/url.ts`、`apps/kiosk/src/lib/useJobFavorites.ts`
+- **删除**：`apps/kiosk/src/data/jobsMeta.ts`（旧 mock-id 耦合的地区树/JOB_META，已被真实数据聚合取代；两个岗位页均已改用 `ExternalJobDTO`）
+- 共享类型：`packages/shared/src/types/job.ts` `ExternalJobDTO` 新增可选 `category`
+
+**验证结果（2026-06-03）：**
+
+- `pnpm --filter ./services/api typecheck`：通过
+- `pnpm --filter ./apps/kiosk typecheck` / `lint` / `build`：全部通过（lint 0 error/0 warning）
+- 真实 Prisma seed 扩充为 13 条（11 approved+published、1 pending、1 approved+draft）后实测：
+  - 列表 `total=11`，仅返回已发布；pending(`job-uni-0044`)、approved-draft(`job-hr-1002`) 均不出现 ✓
+  - `keyword=工程师`(标题)、`keyword=海尔`(公司)、`keyword=党建`(描述) 命中正确 ✓
+  - `city=杭州市` / `industry=金融`(抽取+剥离前缀) / `category=campus` / `workType=internship`(别名归一) / `sourceOrgId=org-hr-002` / 组合(青岛市+parttime) 均生效 ✓
+  - 详情：已发布返回全字段 + 合法 https `sourceUrl`；pending/draft 返回 `null` ✓
+  - 全链路 http：kiosk dev(`VITE_API_MODE=http`)→vite proxy→API→真实数据，列表/行业筛选/详情 sourceUrl 均通 ✓
+- ⚠️ 协作记录：本任务初次在共享工作区的 feature 分支开发，期间另一会话在同一工作区执行 `git reset`/`checkout`/`clean`，清空了本任务尚未提交的改动；已改用**独立 git worktree** `/Users/wanglei/ai-job-kiosk-jobs-wt`（branch `feat/kiosk-jobs-complete`）重建并提交，彻底隔离并发会话。后续多会话并行务必各用独立 worktree。
 
 ---
 

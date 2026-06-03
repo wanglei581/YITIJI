@@ -62,6 +62,25 @@ function safeInt(value: string | undefined, defaultValue: number, min: number, m
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : defaultValue
 }
 
+/**
+ * Kiosk 岗位类型筛选既接受 workType('full_time' 等,前端枚举),
+ * 也接受 category('fulltime' 等,DB 列值)。这里把 workType 归一到 category。
+ * 'campus'(校招)没有对应 workType,前端直接传 category=campus。
+ */
+function mapWorkTypeToCategory(workType: string): string | undefined {
+  switch (workType) {
+    case 'full_time':  return 'fulltime'
+    case 'part_time':  return 'parttime'
+    case 'internship': return 'intern'
+    case 'contract':   return 'fulltime'
+    case 'fulltime':
+    case 'parttime':
+    case 'intern':
+    case 'campus':     return workType
+    default:           return undefined
+  }
+}
+
 @Controller()
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
@@ -70,14 +89,23 @@ export class JobsController {
 
   @Get('jobs')
   getJobs(
-    @Query('tag')      tag?:      string,
-    @Query('city')     city?:     string,
-    @Query('page')     pageStr?:  string,
-    @Query('pageSize') sizeStr?:  string,
+    @Query('keyword')     keyword?:     string,
+    @Query('city')        city?:        string,
+    @Query('industry')    industry?:    string,
+    @Query('category')    category?:    string,
+    @Query('workType')    workType?:    string,
+    @Query('sourceOrgId') sourceOrgId?: string,
+    @Query('tag')         tag?:         string,
+    @Query('page')        pageStr?:     string,
+    @Query('pageSize')    sizeStr?:     string,
   ) {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
-    return this.jobsService.getPublishedJobs({ tag, city, page, pageSize })
+    // workType('full_time' 等)与 category('fulltime' 等)二选一,category 优先
+    const effectiveCategory = category ?? (workType ? mapWorkTypeToCategory(workType) : undefined)
+    return this.jobsService.getPublishedJobs({
+      keyword, city, industry, category: effectiveCategory, sourceOrgId, tag, page, pageSize,
+    })
   }
 
   @Get('jobs/:id')

@@ -13,6 +13,7 @@
 import type { ApiResponse, PaginatedResponse, ExternalJobDTO } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
+import type { JobQueryParams } from './jobs'
 
 // ──────────────────────────────────────────────────────────────
 // 核心 fetch 封装（与 httpAdapter.ts 保持相同模式）
@@ -53,9 +54,16 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 // ──────────────────────────────────────────────────────────────
 
 export const jobHttpAdapter = {
-  async getJobs(params?: { tag?: string }): Promise<PaginatedResponse<ExternalJobDTO>> {
+  async getJobs(params?: JobQueryParams): Promise<PaginatedResponse<ExternalJobDTO>> {
     const query: Record<string, string> = {}
-    if (params?.tag) query.tag = params.tag
+    if (params?.keyword?.trim()) query.keyword = params.keyword.trim()
+    if (params?.city)            query.city = params.city
+    if (params?.industry)        query.industry = params.industry
+    if (params?.category)        query.category = params.category
+    if (params?.sourceOrgId)     query.sourceOrgId = params.sourceOrgId
+    if (params?.tag)             query.tag = params.tag
+    if (params?.page)            query.page = String(params.page)
+    if (params?.pageSize)        query.pageSize = String(params.pageSize)
     return get<PaginatedResponse<ExternalJobDTO>>('/jobs', query)
   },
 
