@@ -60,13 +60,13 @@ export function ResumeExportPage() {
   if (optimizedGenerated) {
     outputs.push({
       key: 'optimized',
-      title: '优化版简历',
-      hint: '基于你的真实经历优化表达',
+      title: '优化版简历（采纳建议）',
+      hint: '已采纳 AI 优化建议整理，打印前请核对最终内容',
       fileName: `${baseName}_优化版.pdf`,
       icon: SparklesIcon,
       iconBg: 'bg-violet-50',
       iconColor: 'text-violet-600',
-      badge: '已生成',
+      badge: '采纳建议',
     })
   }
   if (hasReport) {
