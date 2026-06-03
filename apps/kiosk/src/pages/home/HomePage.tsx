@@ -5,6 +5,7 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   ChevronRightIcon,
+  GraduationCapIcon,
   MapPinIcon,
   MonitorCheckIcon,
   PrinterIcon,
@@ -144,6 +145,32 @@ function SecondaryServiceCard({
   )
 }
 
+// ── CampusEntryBar ────────────────────────────────────────────
+
+function CampusEntryBar({ onAction }: { onAction: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onAction}
+      className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-5 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+    >
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
+          <GraduationCapIcon className="h-6 w-6 text-cyan-700" aria-hidden="true" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">校园招聘专区</h3>
+          <p className="mt-0.5 text-sm text-gray-500">应届校招岗位 · 校园双选会 · 简历与材料</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 text-base font-semibold text-primary-600">
+        <span>进入专区</span>
+        <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+      </div>
+    </button>
+  )
+}
+
 // ── RenshiEntryBar ────────────────────────────────────────────
 
 function RenshiEntryBar({ onAction }: { onAction: () => void }) {
@@ -238,6 +265,9 @@ export function HomePage() {
             />
           </div>
         </section>
+
+        {/* 校园招聘专区 — 单行辅助带 */}
+        <CampusEntryBar onAction={() => navigate('/campus')} />
 
         {/* 人社专区 — 单行辅助带 */}
         <RenshiEntryBar onAction={() => navigate('/renshi')} />

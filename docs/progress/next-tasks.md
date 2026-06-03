@@ -1,11 +1,30 @@
 # 下一步任务
 
-> 最后更新：2026-06-03（Kiosk 岗位信息板块完整收口，feat/kiosk-jobs-complete）
-> 关联文档：[current-progress.md](./current-progress.md)
+> 最后更新：2026-06-03（校园招聘专区 P0，feat/kiosk-campus-zone）
+> 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
 
-## 📌 当前状态（Kiosk 岗位信息板块完整收口，已完成代码 + Mac 真实后端 http 验证）
+## 📌 当前状态（校园招聘专区 P0，已完成代码 + 静态验证）
+
+**feat/kiosk-campus-zone（2026-06-03，主工作区开发）：** 方案见 [campus-recruitment-design.md](../product/campus-recruitment-design.md)（方案 A，纯前端聚合，复用现有 API，无 schema 改动）。
+
+- ✅ `/campus` 聚合页：① 季节横幅卡（按当前月份给秋招/春招/实习季阶段提示，纯展示）+ 校园招聘会（复用 `getJobFairs`，关键词过滤校招）+ 校招岗位（复用 `getJobs({category:'campus'})`）+ 求职材料服务（AI 简历 `/resume`、打印 `/print-scan`）+ 合规说明条（ComplianceBanner）
+- ✅ 入口：首页 `CampusEntryBar` + 招聘会页顶部「校园招聘专区」引导卡 → `/campus`
+- ✅ 招聘会列表卡片做厚（**仅用真实字段**）：主办方 `organizer`、参展/已录入企业数（`boothCount` 或 `managedCompanyCount`+`managedMaterialCount`）、`dataSourceNote`、来源+同步时间；按钮统一「查看招聘会」
+- ✅ 合规：仅「查看岗位 / 查看招聘会」，无一键投递/收简历/候选人；禁词扫描过；typecheck / lint / build 全绿
+- ⏳ 待 review
+
+**P1 待补（本轮明确不做，需加 DTO/schema 字段，禁止硬造 mock）：**
+- **岗位数 `jobCount`** 与 **届别 `audienceType`**（应届/实习/社招）：当前 Fair/Job DTO 无此字段，做厚卡片暂不展示，待 P1 为 DTO 加可选字段（合作机构后台可标注）后再补
+- 校招时间线② 横向交互组件；应届岗位精确过滤（P0 用 `category=campus` 关键词，P1 用 `audienceType`）
+- 校招政策问答跳 AI 助手；季节提醒（本地，不外发）
+
+**协作提醒**：本任务在主工作区开发；Phase A（feat/end-user-account）的代码在 `stash@{0}` + worktree `/Users/wanglei/ai-job-end-user-wt`，**勿混入**；勿在共享工作区互相 `git reset/clean`。
+
+---
+
+## 📌 历史状态（Kiosk 岗位信息板块完整收口，已完成代码 + Mac 真实后端 http 验证）
 
 **feat/kiosk-jobs-complete（2026-06-03，分支自 main `603be2a`，独立 git worktree 开发不混改其它任务）：**
 - ✅ 后端 `GET /jobs` 真实 Prisma + 多维筛选（keyword/city/industry/category/workType 别名/sourceOrgId/tag/分页），只放出 approved+published
@@ -682,6 +701,7 @@ pnpm audit   # ✅ 已完成，0 vulnerabilities
 | 打印材料包 | P1 | Phase 8.1B + Phase 7 AI | 📋 规划中，未开发 |
 | 求职打印套餐 | P1 | Phase 8.1B | 📋 规划中，未开发 |
 | 招聘会现场模式增强 | P2 | Phase 8.1B + 现有 `/job-fairs/:id/*` 页面 | 📋 规划中，未开发 |
+| 校园招聘专区（方案 A） | P1 | 现有 `/jobs`(category=campus) + `/job-fairs` 能力 | ✅ **P0 完成（feat/kiosk-campus-zone，2026-06-03，待 review）**：`/campus` 聚合页（季节横幅 + 校招会/岗位 + 材料服务 + 合规条）+ 首页/招聘会页入口 + 招聘会卡片做厚（真实字段）。**P1 待补**：`jobCount`/`audienceType` DTO 字段、时间线组件。详见 [campus-recruitment-design.md](../product/campus-recruitment-design.md) |
 | 面试练习轻量版 | P2 | Phase 7 AI（非数字人） | 📋 规划中，未开发 |
 | AI求职路线规划 | P3 | 用户画像 + 推荐规则 | 📋 规划中，未开发 |
 
