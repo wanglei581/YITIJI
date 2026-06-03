@@ -37,7 +37,7 @@ type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
 const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed']
 
 const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
-  claimed: ['printing'],
+  claimed: ['printing', 'failed'],
   printing: ['completed', 'failed'],
 }
 

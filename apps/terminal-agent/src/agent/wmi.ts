@@ -13,11 +13,20 @@
  * Win32_Printer.PrinterStatus reference:
  *   3 = Idle (normal)  |  7 = Offline
  *
+ * Win32_Printer.WorkOffline reference:
+ *   True  = printer is set to "Use Printer Offline" in Windows (powered off / disconnected)
+ *   False = normal (online)
+ *   NOTE: When a printer is powered off, Windows sets WorkOffline=True but PrinterStatus
+ *   stays 3 (Idle). WorkOffline must be checked explicitly to detect this state (N2 fix).
+ *
  * Win32_Printer.DetectedErrorState reference:
  *   0 = Unknown  |  2 = No Error  |  3 = Low Paper  |  4 = No Paper
  *   5 = Low Toner  |  6 = No Toner  |  7 = Door Open  |  8 = Jammed  |  9 = Offline
+ *   NOTE: Pantum CM2800ADN Series driver does NOT set DetectedErrorState=4 for paper-empty
+ *   via WMI. PAPER_EMPTY cannot be detected by preflight on this driver (N3 known limit).
  *
  * Mapping to PrinterStatus:
+ *   WorkOffline=True                              → 'offline'  (N2 fix)
  *   PrinterStatus=7 or DetectedErrorState=9       → 'offline'
  *   DetectedErrorState=4,6,7,8 (fatal errors)     → 'error'
  *   DetectedErrorState=3,5 (recoverable warnings)  → 'low_paper'
@@ -96,17 +105,18 @@ export async function getPrinterStatus(printerName: string): Promise<PrinterStat
   const script =
     `$name = [Console]::In.ReadLine(); ` +
     `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace(\"'\", \"''\"))'" -ErrorAction SilentlyContinue; ` +
-    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState)" } else { "not_found" }`
+    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
 
   const output = await runPowerShell(script, printerName)
   if (!output || output === 'not_found') return 'unknown'
 
-  const [statusStr, errorStr] = output.split(',')
+  const [statusStr, errorStr, workOfflineStr] = output.split(',')
   const printerStatusCode = parseInt(statusStr ?? '', 10)
   const detectedError = parseInt(errorStr ?? '', 10)
 
   if (isNaN(printerStatusCode) || isNaN(detectedError)) return 'unknown'
 
+  if (workOfflineStr === 'True') return 'offline'
   if (printerStatusCode === 7 || detectedError === 9) return 'offline'
   if (detectedError === 4 || detectedError === 6 || detectedError === 7 || detectedError === 8) {
     return 'error'
@@ -125,8 +135,9 @@ export async function getPrinterStatus(printerName: string): Promise<PrinterStat
  *
  *   'ok'          可打印（含 low_paper / low_toner 等非阻塞警告）
  *   'not_found'   WMI 查不到该名称的打印机 → PRINTER_NOT_FOUND
- *   'offline'     PrinterStatus=7 或 DetectedErrorState=9 → PRINTER_OFFLINE
+ *   'offline'     WorkOffline=True / PrinterStatus=7 / DetectedErrorState=9 → PRINTER_OFFLINE
  *   'paper_empty' DetectedErrorState=4（No Paper）→ PAPER_EMPTY
+ *                 NOTE: Pantum CM2800ADN driver never sets this via WMI (N3 known limit).
  *   'error'       DetectedErrorState=6/7/8（缺粉/开盖/卡纸）→ PRINTER_ERROR
  *   'unknown'     非 Windows / 查询失败 / 无法识别 → 不阻塞，交由 print() 处理
  */
@@ -143,17 +154,20 @@ export async function getPrinterPreflight(printerName: string): Promise<PrinterP
   const script =
     `$name = [Console]::In.ReadLine(); ` +
     `$p = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$($name.Replace(\"'\", \"''\"))'" -ErrorAction SilentlyContinue; ` +
-    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState)" } else { "not_found" }`
+    `if ($p) { "$($p.PrinterStatus),$($p.DetectedErrorState),$($p.WorkOffline)" } else { "not_found" }`
 
   const output = await runPowerShell(script, printerName)
   if (!output) return 'unknown'
   if (output === 'not_found') return 'not_found'
 
-  const [statusStr, errorStr] = output.split(',')
+  const [statusStr, errorStr, workOfflineStr] = output.split(',')
   const printerStatusCode = parseInt(statusStr ?? '', 10)
   const detectedError = parseInt(errorStr ?? '', 10)
   if (isNaN(printerStatusCode) || isNaN(detectedError)) return 'unknown'
 
+  // WorkOffline=True: printer powered off / set offline in Windows — catches N2 case
+  // where PrinterStatus stays 3 (Idle) despite printer being off.
+  if (workOfflineStr === 'True') return 'offline'
   if (printerStatusCode === 7 || detectedError === 9) return 'offline'
   if (detectedError === 4) return 'paper_empty'
   if (detectedError === 6 || detectedError === 7 || detectedError === 8) return 'error'
