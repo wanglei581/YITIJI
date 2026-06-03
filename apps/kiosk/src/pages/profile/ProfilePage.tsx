@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Card, EmptyState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, PageHeader } from '@ai-job-print/ui'
+import { useMemberAuth } from '../../auth/MemberAuthContext'
 import {
   CheckCircleIcon,
   FileInputIcon,
@@ -96,6 +97,7 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const incoming = (location.state ?? {}) as IncomingState
+  const { isAuthenticated, user, logout } = useMemberAuth()
 
   // ── Lists ────────────────────────────────────────────────────
   const [resumes, setResumes] = useState<ResumeItem[]>(() => {
@@ -172,12 +174,34 @@ export function ProfilePage() {
     <div className="relative flex min-h-full flex-col p-6">
       <PageHeader title="我的记录" subtitle="记录 · 订单 · 文件" />
 
-      {/* 游客提示 */}
-      <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
-        <span className="text-xs text-gray-400">
-          游客模式 · 当前记录仅保存在本设备，登录后可跨设备查看
-        </span>
-      </div>
+      {/* 账号栏 */}
+      {isAuthenticated && user ? (
+        <div className="mt-4 flex items-center justify-between gap-2 rounded-lg bg-primary-50 px-4 py-2.5">
+          <span className="text-sm text-neutral-700">
+            已登录 · <span className="font-medium">{user.phoneMasked}</span>
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              void logout()
+            }}
+          >
+            退出登录
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-4 flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
+          <span className="text-xs text-gray-400">游客模式 · 当前记录仅保存在本设备，登录后可跨设备查看</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/login', { state: { from: '/profile' } })}
+          >
+            登录
+          </Button>
+        </div>
+      )}
 
       {/* 保存成功 toast */}
       {toastMsg && (

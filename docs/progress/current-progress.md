@@ -25,7 +25,44 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：Kiosk 岗位信息板块完整收口（2026-06-03，feat/kiosk-jobs-complete）**
+**当前阶段：C 端求职者账号体系 阶段 A（2026-06-03，feat/end-user-account）**
+
+---
+
+### ✅ C 端求职者账号体系 — 阶段 A（2026-06-03，feat/end-user-account，分支自 main）
+
+为后续"简历云端库 / 使用记录 / 支付"奠基，本轮**只做 C 端求职者账号体系**（手机号 + 短信验证码登录），不做简历库 / 使用记录 / 支付。完整方案见 [end-user-account-and-resume-vault-design.md](../product/end-user-account-and-resume-vault-design.md)。
+
+**合规判定：** 简历只存用户本人账号、本人取用打印，不流向企业 → **不碰招聘红线**；账号体系本身不长期存任何简历/证件 → **不碰** [compliance-boundary.md](../compliance/compliance-boundary.md) 第五条（简历长期存储留到阶段 B 评审签字后再扩展，本轮不改治理文档）。
+
+**后端（services/api，新增 member-auth 模块）：**
+
+| 项 | 说明 |
+|----|------|
+| 数据模型 | 新增 `EndUser`（与内部运营 `User` 完全隔离）；migration `add_end_user` **仅此一张表**（按阶段拆分，不提前建 vault/usage/order） |
+| 手机号隐私 | `phoneHash`=HMAC-SHA256（唯一查找，不可逆）+ `phoneEnc`=AES-256-GCM（复用 secret-cipher，仅服务端解密派生脱敏）；**不存明文列，API 只回 `phoneMasked`（138****1234）** |
+| 登录 | 手机号 + 6 位短信验证码；验证码只存 **Redis（TTL 5min，用后即删）** + 尝试上限 5 次（防爆破） |
+| 多维频控 | 同号冷却 60s / 单号日上限 10 / 单 IP 时上限 20 / 单设备时上限 20（全 Redis 计数） |
+| JWT 隔离 | C 端 token 带 `aud=enduser` + `jti`(=Redis 会话 id)，30min 过期；`EndUserAuthGuard` 校验 aud + Redis 会话存在；内部 `JwtAuthGuard` 反向拒绝 `aud=enduser` → **双向隔离** |
+| 会话失效 | 会话落 Redis `member:session:{jti}`；logout / 前端空闲登出删 key → token 即使未过期也作废 |
+| 短信发送 | `SmsSender` 抽象 + dev 用 `LogSmsSender`（仅服务端日志打码，不回前端）；真实服务商（阿里/腾讯）待选型 |
+| 接口 | `POST /api/v1/member/auth/{sms-code,login,logout}`、`GET /api/v1/member/me` |
+
+**前端（apps/kiosk）：**
+
+- 新增 `/login` 登录页（手机号 + 验证码，56px 大按钮，倒计时重发，合规隐私提示）
+- `MemberAuthProvider` 登录上下文：启动校验会话、login/logout、`useMemberIdleLogout`（**5 分钟空闲自动登出 + 回首页**）
+- token **只放 sessionStorage（关 tab/换人即清），禁止 localStorage**；deviceId 同 sessionStorage（频控设备维度）
+- "我的"页账号栏：未登录显示"登录"入口，已登录显示 `phoneMasked` + "退出登录"
+- 浏览流程仍匿名，登录为可选（为阶段 B 简历库铺路），不强制 gate 现有页面
+
+**新增/修改文件：** 后端 `services/api/src/{member-auth/**, common/redis/**, common/crypto/phone-identity.ts, common/guards/end-user-auth.guard.ts, common/decorators/current-end-user.decorator.ts}` + 改 `{common/guards/jwt-auth.guard.ts, app.module.ts, prisma/{schema.prisma,prisma.service.ts}}` + migration `add_end_user`；前端 `apps/kiosk/src/{auth/MemberAuthContext.tsx, services/auth/**, pages/member/MemberLoginPage.tsx}` + 改 `{layouts/KioskRoot.tsx, routes/index.tsx, pages/profile/ProfilePage.tsx}`。
+
+**验证：** 全 workspace typecheck ✅；api + kiosk build ✅；api + kiosk lint ✅（kiosk 沿用既有 `react-refresh/only-export-components` 局部 disable 先例）。运行期 E2E（短信→登录→会话→登出/空闲失效）需 Redis 在线，本轮未跑真实运行期验证。
+
+**明确不做（阶段 B/C/D）：** 简历云端库、使用记录、支付、ResumeVaultItem/UsageEvent/Order/Refund 表、`compliance-boundary.md` 修改。
+
+> **⚠️ 工作树/DB 提醒（跨模型必读）：** 开本分支前，`feat/kiosk-jobs-complete` 的未提交 jobs 工作（与 main 同提交）已 `git stash -u` 暂存到 **stash@{0}**（"jobs-complete WIP …"），回该分支用 `git stash pop` 恢复。本地 `dev.db` 仍带那批 jobs 的两条 migration（`sync_jobfair_source_id` / `add_session_baseline`，文件在 stash 内），故本分支 `prisma migrate dev` 会报 drift；本轮用 `migrate diff` 生成纯增量 SQL 并 `db execute` 落 EndUser 表，**未 reset dev.db**。该 drift 属 jobs 分支，回该分支 pop 后一并处理。
 
 ---
 

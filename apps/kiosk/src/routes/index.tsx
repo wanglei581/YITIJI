@@ -34,6 +34,7 @@ import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibrary
 import { HomePage } from '../pages/home/HomePage'
 import { QingdaoPage } from '../pages/qingdao/QingdaoPage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
+import { MemberLoginPage } from '../pages/member/MemberLoginPage'
 
 export const kioskRouter = createBrowserRouter([
   {
@@ -42,6 +43,7 @@ export const kioskRouter = createBrowserRouter([
     children: [
       { index: true,               element: <HomePage /> },
       { path: 'assistant',         element: <AssistantPage /> },
+      { path: 'login',             element: <MemberLoginPage /> },
       { path: 'profile',           element: <ProfilePage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'qingdao',           element: <QingdaoPage /> },

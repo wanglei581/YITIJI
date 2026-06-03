@@ -75,6 +75,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.user
   }
 
+  // ── 阶段 A: C 端求职者账号 ───────────────────────────────────────────────────
+
+  get endUser() {
+    return this.client.endUser
+  }
+
   get jobSource() {
     return this.client.jobSource
   }

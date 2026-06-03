@@ -1,7 +1,29 @@
 # 下一步任务
 
-> 最后更新：2026-06-03（Kiosk 岗位信息板块完整收口，feat/kiosk-jobs-complete）
-> 关联文档：[current-progress.md](./current-progress.md)
+> 最后更新：2026-06-03（C 端账号体系 阶段 A，feat/end-user-account）
+> 关联文档：[current-progress.md](./current-progress.md) | [end-user-account-and-resume-vault-design.md](../product/end-user-account-and-resume-vault-design.md)
+
+---
+
+## 📌 当前状态（C 端求职者账号体系 阶段 A，已完成代码 + 静态验证）
+
+**feat/end-user-account（2026-06-03，分支自 main）：**
+- ✅ 后端 member-auth：EndUser 表（phoneHash + phoneEnc，不存明文）、短信验证码登录（Redis TTL 5min + 多维频控）、JWT `aud=enduser`+jti、Redis 会话（logout/idle 失效）、双向 guard 隔离
+- ✅ 前端：`/login` 登录页、`MemberAuthProvider`、5min 空闲自动登出、token 只入 sessionStorage（禁 localStorage）、"我的"账号栏
+- ✅ migration `add_end_user`（仅一张表）；全 workspace typecheck + api/kiosk build + lint 全过
+- ⏳ **未跑运行期 E2E**（需 Redis 在线）：短信→登录→/me→登出/空闲失效、隔离（enduser token 打内部接口应 401）、频控触发 429
+- ⏳ 待 review 后决定 commit / 合入策略
+
+**阶段 A 待验证（建议接入 Redis 后跑）：**
+- 发码频控：同号 60s 内再次发码 → 429 SMS_TOO_FREQUENT；超日/IP/设备上限 → 对应 429
+- 登录：错码累计 5 次 → SMS_CODE_LOCKED；正确码 → 200 + token（响应无明文手机号）
+- 会话：logout 后用旧 token 打 /me → 401 MEMBER_SESSION_EXPIRED；5min 空闲 → 自动登出回首页
+- 隔离：内部 admin token 打 /member/me → 401；enduser token 打 /api/v1/auth/me → 401
+
+**阶段 B/C/D（待评审，本轮不做）：**
+- B 简历云端库：ResumeVaultItem + `FileObject.sensitiveLevel='vault'` + cleanup 改造 + 单独同意 + 续期/删除/导出 + 扫码上传；**评审签字后**更新 `compliance-boundary.md` 第五条
+- C 使用记录：UsageEvent（白名单）+ `PrintTask.endUserId`
+- D 支付：Order/Refund + 商户号扫码付 + 回调验签幂等（不二清）
 
 ---
 

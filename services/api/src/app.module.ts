@@ -9,6 +9,8 @@ import { AuthModule } from './auth/auth.module'
 import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
 import { JobSyncModule } from './job-sync/job-sync.module'
+import { MemberAuthModule } from './member-auth/member-auth.module'
+import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
@@ -42,10 +44,13 @@ const redisUrl = process.env['REDIS_URL']
       ? [BullModule.forRoot({ connection: parseRedisConnection(redisUrl) })]
       : []),
     PrismaModule,
+    // RedisModule(@Global): member-auth 会话/验证码/频控强依赖。
+    RedisModule,
     // AuditModule 必须在 FilesModule / JobsModule 之前,
     // @Global() 让 AuditService 被任意业务模块自动注入。
     AuditModule,
     AuthModule,
+    MemberAuthModule,
     AiModule,
     FilesModule,
     JobsModule,

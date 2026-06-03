@@ -125,6 +125,32 @@ model User {
   @@index([orgId])
 }
 
+// ── EndUser ─────────────────────────────────────────────────────────────────
+// 阶段 A(feat/end-user-account): C 端求职者账号,与内部运营账号 User 完全隔离。
+// 设计见 docs/product/end-user-account-and-resume-vault-design.md。
+//
+// 手机号隐私:
+//   - phoneHash: HMAC-SHA256(规范化手机号, pepper),唯一查找用,不可逆
+//   - phoneEnc:  AES-256-GCM 加密手机号,仅服务端可解,用于派生脱敏展示(138****1234)
+//   - 不存明文手机号列;API 永不返回明文,前端只见 phoneMasked
+//
+// 无 passwordHash — 走短信验证码登录(验证码只存 Redis,TTL 5min,用后删除)。
+// JWT 带 aud='enduser' + jti(=Redis 会话 id),与内部 JwtAuthGuard 互拒。
+//
+// 阶段 A 只建此表;ResumeVaultItem / UsageEvent / Order / Refund 留到 B/C/D
+// 各自的 migration 再加,本表此刻不提前加它们的关系字段。
+
+model EndUser {
+  id          String    @id @default(cuid())
+  phoneHash   String    @unique
+  phoneEnc    String
+  nickname    String?
+  enabled     Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 // ── JobSource ─────────────────────────────────────────────────────────────────
 // Phase 0b: 一个机构可配多个数据源,按 sourceKind × accessMode 双维度刻画。
 //
