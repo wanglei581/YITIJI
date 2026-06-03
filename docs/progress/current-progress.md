@@ -85,7 +85,7 @@ PAPER_EMPTY 无法通过 WMI preflight 预检实现。Pantum CM2800ADN Series Wi
 
 ---
 
-### 🔄 打印作业监控 + 缺纸/卡纸/设备异常处理（2026-06-03，feat/terminal-agent-print-job-monitor，分支自 main）
+### ✅ 打印作业监控 + 缺纸/卡纸/设备异常处理（2026-06-03，feat/terminal-agent-print-job-monitor，分支自 main）
 
 在 Phase 8 基础上补充打印队列监控，对缺纸/卡纸/设备故障/驱动不确定状态统一处理。核心原则：不重复出纸 (N5)、设备异常必须 failed、不伪造 completed。
 
@@ -143,14 +143,21 @@ PAPER_EMPTY 无法通过 WMI preflight 预检实现。Pantum CM2800ADN Series Wi
 
 **typecheck/build：** terminal-agent `tsc --noEmit` ✅ / kiosk `tsc --noEmit` ✅
 
-**待验证（真机）：**
+**真机验证结果（2026-06-03，全部通过）：**
 
-| # | 场景 | 预期结果 |
-|---|---|---|
-| P1/P4/P5 | 正常打印（含快速单页、慢速多页双面） | completed，真实出纸 |
-| N3-new | 缺纸：监控 30s 后 `Printing, Retained` 超时 | failed + PRINT_JOB_UNCONFIRMED；不重打 |
-| spooled restart | Agent 崩溃后重启，发现 spooled 状态 | PATCH failed + PRINT_JOB_UNCONFIRMED；不重打 |
-| N1/N2/N4 | 不回退 | 仍通过 |
+| # | 场景 | taskId | API 终态 | errorCode | 结果 |
+|---|---|---|---|---|---|
+| P1 | 正常单页打印（回归） | ptask_kiosk_5c6bf741c868400f | completed | — | ✅ |
+| P4 | copies=2（回归） | ptask_kiosk_4560ee70d68ab763 | completed | — | ✅ |
+| P5 | duplex_long_edge（回归） | ptask_kiosk_6d2a4da9eece1714 | completed | — | ✅ |
+| N1 | PRINTER_NOT_FOUND（回归） | ptask_kiosk_a0ef494d5417bb2e | failed | PRINTER_NOT_FOUND | ✅ |
+| N2 | PRINTER_OFFLINE（回归） | ptask_kiosk_567e9da95b34da0e | failed | PRINTER_OFFLINE | ✅ |
+| N3-new | 缺纸 Retained 超时 → UNCONFIRMED | ptask_kiosk_46d128fe180a304c | failed | PRINT_JOB_UNCONFIRMED | ✅ |
+| N4 | DOWNLOAD_HASH_MISMATCH（回归） | ptask_kiosk_298aa103ee1b2a04 | failed | DOWNLOAD_HASH_MISMATCH | ✅ |
+| spooled restart | 崩溃重启补偿 → UNCONFIRMED | ptask_kiosk_7554237ac0becd2c | failed | PRINT_JOB_UNCONFIRMED | ✅ |
+
+**N3 结论：** 不再声称自动识别 PAPER_EMPTY；Pantum Retained 场景不误报 completed，30s 超时后转 PRINT_JOB_UNCONFIRMED。  
+**N5 幂等：** 无重复出纸，spooled 重启补偿不重打，API failed 终态稳定。
 
 ---
 

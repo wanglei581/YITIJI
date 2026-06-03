@@ -425,6 +425,30 @@ pnpm --filter ./apps/terminal-agent agent           # 首次注册需 adminSecre
     需改为打印后监听 **Windows 打印后台 job result**（`Get-PrintJob` 状态 / WinSpool API）或改用 SNMP 查询网络打印机状态。
     短期方案：UI 在打印完成后加"请确认纸张已出盘"提示；后台监测 job 进入 Error 状态后触发告警。
 
+#### [N3] 修复后复测（2026-06-03，feat/terminal-agent-print-job-monitor）
+- 修复内容      : 打印后启动 `Get-PrintJob` 30s 轮询；`Printing, Retained` 映射为新增的 `'retained'` 状态（不再直接映射 completed）；
+    监控超时且 `seenRetainedOnce=true` → `{ failed: true, errorCode: 'PRINT_JOB_UNCONFIRMED' }`，不声称 completed，不声称 PAPER_EMPTY
+- taskId        : ptask_kiosk_46d128fe180a304c
+- 触发方式      : 打印机通电、纸盒清空（取出所有 A4 纸）
+- 参数          : copies=1 colorMode=black_white duplex=simplex orientation=auto scale=fit
+- Agent 日志关键行:
+    [07:02:10] task ptask_kiosk_46d128fe180a304c: print success in 603ms ✓
+    [07:02:14] monitor poll [180a304c]: status=retained raw="Printing, Retained"
+    （每 1.5s 持续轮询，作业全程停留在 Printing, Retained 状态）
+    [07:02:42] WARN  task ptask_kiosk_46d128fe180a304c: print queue monitor: print queue monitoring timed out after 30000ms: job remained in 'Printing, Retained' state (Pantum CM2800ADN driver limitation — cannot distinguish completed vs paper-empty via Get-PrintJob); reporting PRINT_JOB_UNCONFIRMED — operator must check device
+    [07:02:42] task ptask_kiosk_46d128fe180a304c: PATCH status=failed ✓
+- API 状态      : status=**failed**, errorCode=**PRINT_JOB_UNCONFIRMED** ✓
+    errorMessage: 打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态
+- 前端展示      : ERROR_CODE_MESSAGES['PRINT_JOB_UNCONFIRMED'] = "打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态" ✓
+- 物理出纸      : **无** ✓（纸盒空，打印机等待纸张，30s 后 Agent 上报 UNCONFIRMED）
+- 是否通过      : ✅ **监控正确识别 Retained 超时 → PRINT_JOB_UNCONFIRMED；不误报 completed；不重打**
+
+**N3 结论（更新）：**
+- Pantum CM2800ADN 缺纸时不触发 WMI `DetectedErrorState=4`（preflight 无法检测，已知驱动限制不变）
+- 打印后 `Get-PrintJob` 监控能识别 `Printing, Retained` 持续超时 → 上报 `PRINT_JOB_UNCONFIRMED`
+- **不声称能自动识别 PAPER_EMPTY**：系统只能上报"未确认完成"，具体是缺纸/卡纸/其他需运营人员人工核查
+- 前端展示正确中文提示，API 终态为 failed（不误报 completed）
+
 ---
 
 ### [N5] Agent 重启不重打
@@ -450,6 +474,48 @@ pnpm --filter ./apps/terminal-agent agent           # 首次注册需 adminSecre
     重启后本地 DB 无记录；10 分钟后 API 状态机将 printing 重置为 pending，Agent 重新 claim 并重打。
     此为已知 trade-off，代码注释已说明（`task may be re-printed after restart`）。
     实际概率极低（spooling 期间崩溃窗口 <1s）。
+
+---
+
+### [spooled restart] 崩溃恢复 → PRINT_JOB_UNCONFIRMED（feat/terminal-agent-print-job-monitor）
+- 验证场景       : Agent 在打印后监控期间被杀（simulate crash），重启后发现 local DB `localStatus=spooled`
+- taskId         : ptask_kiosk_7554237ac0becd2c
+- 流程           :
+    1. 任务进入监控期间 → 手动 Kill Agent（模拟 crash）
+    2. 等待后端 `resetExpiredClaims`（每 30s，10min 超时窗口）将任务重置为 pending
+    3. 重启 Agent → claim → `isTaskDone` 检测 local DB `spooled` → 进入 Step 0 补偿
+- Agent 日志关键行:
+    [06:31:20] WARN  task ptask_kiosk_7554237ac0becd2c: was already submitted to Windows spooler before restart (crashed during monitoring); outcome cannot be confirmed — PATCH failed+PRINT_JOB_UNCONFIRMED, operator must check device
+    [06:31:20] task ptask_kiosk_7554237ac0becd2c: PATCH status=failed ✓
+- API 状态       : status=**failed**, errorCode=**PRINT_JOB_UNCONFIRMED** ✓
+    errorMessage: 打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态
+- 物理出纸       : **无重复出纸** ✓（N5 幂等：spooled 标记阻止重打）
+- 是否通过       : ✅ **spooled 重启补偿正确：failed+PRINT_JOB_UNCONFIRMED，不重打，不误报 completed**
+
+---
+
+## 7.2 feat/terminal-agent-print-job-monitor 完整复测汇总（2026-06-03）
+
+> 验证环境：Windows 11 Pro x64 / Node 24 / Pantum CM2800ADN Series / Agent PID 27740
+> 分支：`feat/terminal-agent-print-job-monitor`（基于 main `3f35caa`）
+
+| # | 场景 | taskId | API 终态 | errorCode | 结果 |
+|---|---|---|---|---|---|
+| P1 | 正常单页打印（回归） | ptask_kiosk_5c6bf741c868400f | completed | — | ✅ |
+| P4 | copies=2（回归） | ptask_kiosk_4560ee70d68ab763 | completed | — | ✅ |
+| P5 | duplex_long_edge（回归） | ptask_kiosk_6d2a4da9eece1714 | completed | — | ✅ |
+| N1 | PRINTER_NOT_FOUND（回归） | ptask_kiosk_a0ef494d5417bb2e | failed | PRINTER_NOT_FOUND | ✅ |
+| N2 | PRINTER_OFFLINE（回归） | ptask_kiosk_567e9da95b34da0e | failed | PRINTER_OFFLINE | ✅ |
+| N3-new | 缺纸 Retained 超时 → UNCONFIRMED | ptask_kiosk_46d128fe180a304c | failed | PRINT_JOB_UNCONFIRMED | ✅ |
+| N4 | DOWNLOAD_HASH_MISMATCH（回归） | ptask_kiosk_298aa103ee1b2a04 | failed | DOWNLOAD_HASH_MISMATCH | ✅ |
+| spooled restart | 崩溃重启补偿 → UNCONFIRMED | ptask_kiosk_7554237ac0becd2c | failed | PRINT_JOB_UNCONFIRMED | ✅ |
+
+**结论：**
+- 正向打印链路（P1/P4/P5）无回归，completed 终态稳定
+- 所有负向场景正确落 failed + 对应 errorCode，无误报 completed
+- N3 缺纸：不再声称自动识别 PAPER_EMPTY；Pantum Retained 持续超时 → PRINT_JOB_UNCONFIRMED（诚实上报）
+- spooled 重启补偿：不重复出纸，API 终态为 failed+PRINT_JOB_UNCONFIRMED
+- 全程无重复出纸（N5 幂等）
 
 ---
 
