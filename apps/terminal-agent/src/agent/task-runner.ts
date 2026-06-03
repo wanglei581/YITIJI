@@ -39,11 +39,12 @@ import type { AgentConfig, ClaimTask, PatchStatusPayload, ReportableStatus } fro
 import type { PrintJobParams } from '../printer/types'
 import { createApiClient, axiosErrorMessage } from './api-client'
 import { print } from '../printer/print'
-import { getPrinterPreflight, type PrinterPreflight } from './wmi'
+import { getPrinterPreflight, getPrintJobStatus, type PrinterPreflight } from './wmi'
 import { log, warn, err } from '../logger'
 import { DEFAULT_PRINTER } from '../config'
 import {
   isTaskDone,
+  getTaskLocalStatus,
   markTaskDone,
   enqueuePatch,
   type AgentDatabase,
@@ -98,9 +99,9 @@ function preflightToError(
     case 'offline':
       return { errorCode: 'PRINTER_OFFLINE', errorMessage: '打印机离线（请检查电源/网线/USB 连接）' }
     case 'paper_empty':
-      return { errorCode: 'PAPER_EMPTY', errorMessage: '打印机缺纸，请补纸后重试' }
+      return { errorCode: 'PAPER_EMPTY', errorMessage: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试' }
     case 'error':
-      return { errorCode: 'PRINTER_ERROR', errorMessage: '打印机异常（缺粉/开盖/卡纸），请处理后重试' }
+      return { errorCode: 'PRINTER_ERROR', errorMessage: '打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理' }
     // 'ok' | 'unknown'（非 Windows / 查询失败）→ 不阻塞
     default:
       return null
@@ -177,15 +178,8 @@ async function executeTask(
     return
   }
 
-  // ── Step 0: Idempotency check ─────────────────────────────────────────────
-  if (isTaskDone(db, task.taskId)) {
-    log(`task ${task.taskId}: already done in local DB, skipping (restart-idempotency)`)
-    return
-  }
-
-  const ext = extFromUrl(task.fileUrl)
-  const tempFilePath = path.join(getTempDir(), `task_${task.taskId}${ext}`)
-
+  // Define patch helper early so it's available in both Step 0 (spooled reconcile)
+  // and the main execution path below.
   const patch = (status: ReportableStatus, errorCode?: string, errorMessage?: string) =>
     patchStatus(
       task.taskId,
@@ -194,6 +188,33 @@ async function executeTask(
       agentToken,
       terminalId,
     )
+
+  // ── Step 0: Idempotency check ─────────────────────────────────────────────
+  if (isTaskDone(db, task.taskId)) {
+    const localStatus = getTaskLocalStatus(db, task.taskId)
+    if (localStatus === 'spooled') {
+      // Agent crashed during post-spooling monitoring (Step 4.5). The job was
+      // already submitted to the Windows spooler before the crash, but we cannot
+      // confirm whether it actually printed (paper may or may not have come out).
+      // Report as failed+PRINT_JOB_UNCONFIRMED — do NOT assert completed, since
+      // that would silently hide a possible no-paper / jam situation.
+      // Operator must check the device physically before re-issuing the task.
+      const msg = '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态'
+      warn(
+        `task ${task.taskId}: was already submitted to Windows spooler before restart (crashed during monitoring); ` +
+        `outcome cannot be confirmed — PATCH failed+PRINT_JOB_UNCONFIRMED, operator must check device`,
+      )
+      markTaskDone(db, task.taskId, 'failed')
+      const ok = await patch('failed', 'PRINT_JOB_UNCONFIRMED', msg)
+      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', errorMessage: msg })
+    } else {
+      log(`task ${task.taskId}: already done in local DB (${localStatus ?? 'unknown'}), skipping (restart-idempotency)`)
+    }
+    return
+  }
+
+  const ext = extFromUrl(task.fileUrl)
+  const tempFilePath = path.join(getTempDir(), `task_${task.taskId}${ext}`)
 
   log(`task ${task.taskId}: start — type=${task.type}  file=...${ext}`)
 
@@ -265,22 +286,70 @@ async function executeTask(
     // ── Step 5+6: Record outcome + PATCH terminal status ──────────────────
     if (result.success) {
       log(`task ${task.taskId}: print success in ${result.durationMs}ms ✓`)
-      // Write to local DB BEFORE PATCH — crash between here and PATCH → queued retry, no reprint.
-      // Wrapped in try/catch: if DB write fails (disk full / I/O error) we still
-      // send the PATCH so the backend reflects the real outcome, and log a warning
-      // that the task may be re-printed after restart.
+
+      // ── Step 4.5: Immediately write 'spooled' to local DB ─────────────
+      // N5 guarantee: if Agent crashes during post-spooling monitoring, restart
+      // will see 'spooled' → skip reprint → reconcile as completed (conservative).
+      // INSERT OR REPLACE so a later markTaskDone('completed'/'failed') can overwrite.
       try {
-        markTaskDone(db, task.taskId, 'completed')
+        markTaskDone(db, task.taskId, 'spooled')
       } catch (dbErr) {
         err(
-          `task ${task.taskId}: failed to record completed in local DB — ` +
+          `task ${task.taskId}: failed to record spooled in local DB — ` +
             `${dbErr instanceof Error ? dbErr.message : String(dbErr)}; ` +
             `task may be re-printed after restart`,
         )
       }
-      const ok = await patch('completed')
-      if (!ok) {
-        enqueuePatch(db, task.taskId, { status: 'completed' })
+
+      // ── Step 4.5: Post-spooling print queue monitoring (N3 detection) ──
+      // Poll Get-PrintJob to detect PaperOut / Jammed / Error after the
+      // Windows spooler accepted the job (SumatraPDF already exited).
+      // PaperOut requires 2 consecutive confirmations to guard against transient
+      // driver state flicker.
+      // On timeout / job not found: conservative completed (no false failures).
+      const monitorOutcome = await monitorPrintJob(
+        resolvedPrinter,
+        task.taskId,
+        30_000,
+        1_500,
+      )
+
+      // Log monitor warn regardless of failed/completed (covers Retained timeout detail).
+      if (monitorOutcome.warn) {
+        warn(`task ${task.taskId}: print queue monitor: ${monitorOutcome.warn}`)
+      }
+
+      if (monitorOutcome.failed) {
+        err(
+          `task ${task.taskId}: print queue monitor detected failure — ` +
+            `${monitorOutcome.errorCode} (${monitorOutcome.rawStatus ?? '?'})`,
+        )
+        try {
+          markTaskDone(db, task.taskId, 'failed')
+        } catch (dbErr) {
+          err(`task ${task.taskId}: failed to record failed in local DB — ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`)
+        }
+        const ok = await patch('failed', monitorOutcome.errorCode, monitorOutcome.errorMessage)
+        if (!ok) {
+          enqueuePatch(db, task.taskId, {
+            status: 'failed',
+            errorCode: monitorOutcome.errorCode,
+            errorMessage: monitorOutcome.errorMessage,
+          })
+        }
+      } else {
+        try {
+          markTaskDone(db, task.taskId, 'completed')
+        } catch (dbErr) {
+          err(
+            `task ${task.taskId}: failed to record completed in local DB — ` +
+              `${dbErr instanceof Error ? dbErr.message : String(dbErr)}`,
+          )
+        }
+        const ok = await patch('completed')
+        if (!ok) {
+          enqueuePatch(db, task.taskId, { status: 'completed' })
+        }
       }
     } else {
       err(
@@ -319,6 +388,168 @@ async function executeTask(
       }
     }
   }
+}
+
+// ── Post-spooling print job monitor ──────────────────────────────────────────
+
+interface MonitorOutcome {
+  failed: boolean
+  errorCode: string
+  errorMessage?: string
+  rawStatus?: string
+  warn?: string
+}
+
+/**
+ * Poll Get-PrintJob until the job completes, errors, or the timeout expires.
+ *
+ * Design invariants:
+ *   - PaperOut must appear on 2 consecutive polls before returning 'paper_empty'
+ *     (guards against transient driver state flicker).
+ *   - If the job never appears (taskId not in DocumentName), return conservative
+ *     completed + warn (no time-window fallback to avoid mismatching other jobs).
+ *   - Timeout → conservative completed + warn (could be large/slow document).
+ *   - Non-Windows → skip monitoring, return conservative completed immediately.
+ *
+ * @param printerName     Windows printer name (from config)
+ * @param taskId          Task ID — matched against DocumentName via "*taskId*"
+ * @param timeoutMs       Maximum monitoring wall time (default 30 000 ms)
+ * @param pollIntervalMs  Time between polls (default 1 500 ms)
+ */
+async function monitorPrintJob(
+  printerName: string,
+  taskId: string,
+  timeoutMs = 30_000,
+  pollIntervalMs = 1_500,
+): Promise<MonitorOutcome> {
+  if (process.platform !== 'win32') {
+    return { failed: false, errorCode: '', warn: 'non-Windows: skipped print queue monitoring' }
+  }
+
+  // How many consecutive 'not_found' polls (without ever seeing the job) before
+  // we give up waiting and return conservative completed.  Fast single-page jobs
+  // complete and leave the spooler queue before the first 1.5s poll fires; 5
+  // consecutive not-found results (≈7.5s after print()) is long enough to catch
+  // any delayed spooler registration without making normal prints wait 30s.
+  const NOT_FOUND_LIMIT = 5
+
+  const deadline = Date.now() + timeoutMs
+  let paperEmptyCount = 0
+  let notFoundCount = 0
+  let jobSeenOnce = false
+  let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
+
+  while (Date.now() < deadline) {
+    await sleep(pollIntervalMs)
+
+    const { status, rawStatus } = await getPrintJobStatus(printerName, taskId)
+
+    switch (status) {
+      case 'paper_empty':
+        paperEmptyCount++
+        notFoundCount = 0
+        jobSeenOnce = true
+        // Require 2 consecutive PaperOut confirmations before declaring failure.
+        if (paperEmptyCount >= 2) {
+          return {
+            failed: true,
+            errorCode: 'PAPER_EMPTY',
+            errorMessage: '打印机缺纸，当前无法打印，请联系工作人员补纸后重试',
+            rawStatus,
+          }
+        }
+        break
+
+      case 'error': {
+        // Covers Jammed / Error / UserIntervention / Deleting — explicit driver error flags.
+        const isJammed = rawStatus?.toLowerCase().includes('jammed') ?? false
+        return {
+          failed: true,
+          errorCode: 'PRINTER_ERROR',
+          errorMessage: isJammed
+            ? `打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理（队列状态: ${rawStatus ?? '?'}）`
+            : `打印机发生设备异常，当前暂时无法继续使用，请联系工作人员处理（队列状态: ${rawStatus ?? '?'}）`,
+          rawStatus,
+        }
+      }
+
+      case 'retained':
+        // Pantum CM2800ADN: job submitted to printer + spooler retained copy.
+        // Indeterminate: cannot distinguish "printed and kept" from "waiting for paper".
+        // Keep polling — in case the driver eventually reports an explicit PaperOut or Error.
+        jobSeenOnce = true
+        seenRetainedOnce = true
+        notFoundCount = 0
+        paperEmptyCount = 0
+        break
+
+      case 'completed':
+        // Job disappeared from queue — normal successful completion (non-Pantum).
+        return { failed: false, errorCode: '' }
+
+      case 'printing':
+        // Job still spooling/rendering (no Retained flag yet).
+        jobSeenOnce = true
+        paperEmptyCount = 0
+        notFoundCount = 0
+        break
+
+      case 'not_found':
+        if (jobSeenOnce) {
+          // Job was visible and then disappeared — completed successfully.
+          return { failed: false, errorCode: '' }
+        }
+        notFoundCount++
+        paperEmptyCount = 0
+        if (notFoundCount >= NOT_FOUND_LIMIT) {
+          // Job never appeared after NOT_FOUND_LIMIT polls. Either it completed
+          // before we could observe it (fast job) or DocumentName didn't match.
+          // Conservative: completed + warn.
+          return {
+            failed: false,
+            errorCode: '',
+            warn: `job not found in queue after ${NOT_FOUND_LIMIT} polls (${(NOT_FOUND_LIMIT * pollIntervalMs / 1000).toFixed(1)}s); treating as completed`,
+          }
+        }
+        break
+
+      case 'unknown':
+        // Query failure — don't penalise; keep waiting.
+        paperEmptyCount = 0
+        break
+    }
+  }
+
+  // Hard timeout reached.
+  if (seenRetainedOnce) {
+    // Pantum driver limitation: job was visible as 'Printing, Retained' throughout
+    // the monitoring window. Cannot distinguish normal completion from waiting-for-paper.
+    // Report as failed+PRINT_JOB_UNCONFIRMED — never assert false completed.
+    // Operator must check the device physically.
+    const retainedMsg = `print queue monitoring timed out after ${timeoutMs}ms: ` +
+      `job remained in 'Printing, Retained' state (Pantum CM2800ADN driver limitation — ` +
+      `cannot distinguish completed vs paper-empty via Get-PrintJob); ` +
+      `reporting PRINT_JOB_UNCONFIRMED — operator must check device`
+    return {
+      failed: true,
+      errorCode: 'PRINT_JOB_UNCONFIRMED',
+      errorMessage: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
+      rawStatus: 'Printing, Retained (timeout)',
+      warn: retainedMsg,
+    }
+  }
+
+  // Job never appeared or was in normal 'printing' state but timed out.
+  // Conservative: treat as completed + warn (large/slow document on non-Pantum printer).
+  const warnMsg = jobSeenOnce
+    ? `print queue monitoring timed out after ${timeoutMs}ms (job visible as 'printing' but did not complete); treating as completed`
+    : `print queue monitoring timed out after ${timeoutMs}ms (job never matched in queue); treating as completed`
+  return { failed: false, errorCode: '', warn: warnMsg }
+}
+
+/** Async sleep helper (avoids blocking the event loop). */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 // ── Claim loop ────────────────────────────────────────────────────────────────

@@ -81,7 +81,76 @@
 **N3 已知限制（不修复，等待后续方案）：**
 PAPER_EMPTY 无法通过 WMI preflight 预检实现。Pantum CM2800ADN Series Windows 驱动打印前后 `DetectedErrorState` 均为 0，不上报缺纸状态。后续需改用 Windows 打印后台 job result 监控（`Get-PrintJob` 状态）或 SNMP 查询网络打印机状态。
 
-**当前状态：** 仍在 `feat/kiosk-print-real-capability-hardening` 分支，待 push / review / FF 合入 main。
+**当前状态：** 已 FF 合入 main（`3f35caa`，2026-06-01）。
+
+---
+
+### 🔄 打印作业监控 + 缺纸/卡纸/设备异常处理（2026-06-03，feat/terminal-agent-print-job-monitor，分支自 main）
+
+在 Phase 8 基础上补充打印队列监控，对缺纸/卡纸/设备故障/驱动不确定状态统一处理。核心原则：不重复出纸 (N5)、设备异常必须 failed、不伪造 completed。
+
+**新增错误码：**
+
+| errorCode | 含义 | 触发场景 |
+|---|---|---|
+| `PRINT_JOB_UNCONFIRMED` | 作业提交到打印队列但未确认完成 | Pantum `Printing, Retained` 监控超时；Agent 在监控期间崩溃重启 |
+
+**`getPrintJobStatus` 映射修正（wmi.ts）：**
+
+| JobStatus (flags) | 旧映射 | 新映射 | 原因 |
+|---|---|---|---|
+| `Printing, Retained` | `completed` ❌ | `retained` | Pantum 驱动对已打印和等待纸张均返回此状态，不可区分 |
+| `PaperOut` | `paper_empty` | `paper_empty` | 不变（Pantum 不上报此标志，其他驱动保留） |
+| `Jammed / Error / UserIntervention / Deleting` | `error` | `error` | 不变 |
+
+**监控逻辑修正（task-runner.ts `monitorPrintJob`）：**
+
+- `retained`：继续轮询（等待可能出现的明确错误），设 `seenRetainedOnce = true`
+- 超时 + `seenRetainedOnce=true` → `{ failed: true, errorCode: 'PRINT_JOB_UNCONFIRMED' }` （不声称 completed）
+- 超时 + `seenRetainedOnce=false`（job 以 `printing` 状态出现但超时）→ 保守 completed（非 Pantum 慢速打印）
+- 超时 + job 从未出现（快速任务）→ 保守 completed（不变）
+
+**Step 0 spooled 重启补偿修正（task-runner.ts）：**
+
+- 旧：spooled → PATCH completed（错误：不知道是否真出纸）
+- 新：spooled → PATCH failed + PRINT_JOB_UNCONFIRMED + 结构化 warn 日志，运营人员人工确认
+
+**错误消息规范化（全链路统一）：**
+
+| errorCode | Agent errorMessage（PATCH body）| Kiosk 展示（ERROR_CODE_MESSAGES） |
+|---|---|---|
+| `PAPER_EMPTY` | `打印机缺纸，当前无法打印，请联系工作人员补纸后重试` | 同左 |
+| `PRINTER_ERROR` | `打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理（队列状态: ...）` | `打印机可能卡纸或发生设备故障，当前暂时无法继续使用，请联系工作人员处理` |
+| `PRINT_JOB_UNCONFIRMED` | `打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态` | 同左（fallback: errorMessage）|
+
+**后台/运维追踪（已有机制复用）：**
+
+- 心跳（heartbeat.ts）每 30s 上报 `printerStatus`（WMI `getPrinterStatus`）→ 管理员后台可见
+- 所有 `PATCH failed` 均带 `errorCode` + `errorMessage` → 后端 print task 记录可查
+- Agent 对异常场景输出结构化 `err()` / `warn()` 日志（含 taskId + rawStatus + 原因）
+- ⚠️ **待补**：设备告警中心前端展示 + 终端自动禁用/锁定机制（admin 后台当前无自动告警 UI），记录为 P1 待做事项
+
+**修改文件（共 4 文件）：**
+
+| 文件 | 改动 |
+|---|---|
+| `apps/terminal-agent/src/printer/types.ts` | 新增 `PRINT_JOB_UNCONFIRMED` 到 `PrintErrorCode` 联合类型 |
+| `apps/terminal-agent/src/agent/wmi.ts` | `PrintJobMonitorStatus` 新增 `'retained'`；`Retained → retained`（不再 → completed）；补充详细注释 |
+| `apps/terminal-agent/src/agent/task-runner.ts` | Step 0 spooled → failed+PRINT_JOB_UNCONFIRMED；`monitorPrintJob` 新增 `seenRetainedOnce`/retained case/timeout 分支；warn 日志移到 failed/completed 判断之前；错误消息规范化 |
+| `apps/kiosk/src/pages/print/PrintProgressPage.tsx` | `ERROR_CODE_MESSAGES`: PAPER_EMPTY/PRINTER_ERROR 文案更新，新增 PRINT_JOB_UNCONFIRMED |
+
+**明确不做（本分支范围）：** 不改 API schema、不做扫描/格式转换/证件照/签名盖章、不合 main、不 push main。
+
+**typecheck/build：** terminal-agent `tsc --noEmit` ✅ / kiosk `tsc --noEmit` ✅
+
+**待验证（真机）：**
+
+| # | 场景 | 预期结果 |
+|---|---|---|
+| P1/P4/P5 | 正常打印（含快速单页、慢速多页双面） | completed，真实出纸 |
+| N3-new | 缺纸：监控 30s 后 `Printing, Retained` 超时 | failed + PRINT_JOB_UNCONFIRMED；不重打 |
+| spooled restart | Agent 崩溃后重启，发现 spooled 状态 | PATCH failed + PRINT_JOB_UNCONFIRMED；不重打 |
+| N1/N2/N4 | 不回退 | 仍通过 |
 
 ---
 
@@ -1285,6 +1354,7 @@ pnpm verify:job-sync
 | 2026-06-01 | W3 端到端 demo 验证（Partner→Webhook→Admin→Kiosk）：12 步链路全过 — partner1 登录 → POST /partner/data-sources(accessMode=webhook, credentialConfigured=true, webhookSecretOnce 一次性返回) → HMAC 签名推送 → admin 登录 → GET /admin/job-sources 见 pending/draft → PATCH review approve(→approved/draft) → PATCH publish(→published) → Kiosk GET /jobs 看到岗位；防重放 401 / 错签名 401 / 候选人字段注入 400 / 后续 GET 不再回显 webhookSecret(credentialConfigured=true 持久标志保留) 全部通过 | Claude Code |
 | 2026-06-01 | W8 BullMQ API pull worker 完成（feat/w8-bullmq-api-worker）：@nestjs/bullmq + bullmq + ioredis 安装；Prisma JobSource 新增 responseConfig String?（migration 20260601110728）；src/job-sync/ 模块 5 文件（types/service/processor/scheduler/controller/module）；Cron 每 30min 调度 due sources（hourly/daily/weekly）；POST /admin/job-sync/sources/:id/trigger（202，JWT+Admin，Throttle 10/min）+ GET 列表；Admin /sync-sources 页面（配置完整性徽章 + 立即同步）；无 REDIS_URL 时 inline setImmediate fallback；BullMQ jobId 去重+inProgress Set 并发保护；$transaction 整批原子；凭证只服务端解密；reviewStatus/publishStatus 更新不覆写；SyncLog 成功/失败记录（api syncMode）；API/Admin/Partner tsc+lint+build ✅，合规禁词 ✅（0 violations） | Claude Code |
 | 2026-06-01 | Phase 7.11 R4 — Partner Sources 类型对齐 packages/shared：①shared/types/job.ts SyncFrequency 加 'weekly'(原 realtime/hourly/daily/manual 不够覆盖 UI 已有 weekly 选项)、新增 ConnStatus / PartnerDataSourceView(DataSourceConfig 的 UI 投影,扁平、只读、不含敏感字段、保留 credentialConfigured + webhookSecretOnce 语义)；②apps/partner types 改为别名 PartnerDataSource = PartnerDataSourceView, CreateDataSourcePayload.authType 用 shared AuthType, 同时把 FieldMappingRule/MappingValidationError/ImportBatch/ImportRecord/DataSourceConfig re-export 出来供 Excel 映射 UI 后续使用；SyncFreq 保留为 @deprecated 别名;③services/api jobs.service.ts PartnerDataSourceDto 对齐 PartnerDataSourceView 字面量(sourceKind/accessMode/syncFreq/connStatus 不再裸 string)，SSOT 注释指向 shared；UI 行为零变化(只是 FREQ_LABELS 增加 realtime 文案兜底)；端到端 demo 复跑通过、forbidden 字段 GET 不回显校验通过；pnpm -r typecheck/lint/build 全通过 | Claude Code |
+| 2026-06-03 | Dev server HMR `Reconnecting` 修复：三端 Vite 配置显式设置 HMR WebSocket 为 `ws://127.0.0.1:{5173,5174,5175}`，避免浏览器推断到 `0.0.0.0` 或错误端口后反复重连；补齐 admin/partner `ImportMeta.env` 类型声明。验证：kiosk/admin/partner typecheck 全通过；kiosk 本地浏览器打开 `http://127.0.0.1:5173`，控制台显示 `[vite] connected.`，无 Reconnecting。 | Codex |
 
 ---
 

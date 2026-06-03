@@ -128,6 +128,17 @@ export function isTaskDone(db: AgentDatabase, taskId: string): boolean {
 }
 
 /**
+ * Returns the locally-recorded status for a task, or undefined if not found.
+ * Used by task-runner to distinguish 'spooled' (crash during monitoring) from
+ * 'completed'/'failed' (fully processed).
+ */
+export function getTaskLocalStatus(db: AgentDatabase, taskId: string): string | undefined {
+  if (!db) return undefined
+  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
+  return row ? (row['status'] as string) : undefined
+}
+
+/**
  * Record a task's terminal status to prevent re-execution after restart.
  * No-op when db is null.
  */

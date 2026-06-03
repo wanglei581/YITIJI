@@ -193,3 +193,100 @@ export async function getDiskFreeGB(): Promise<number> {
   const val = parseFloat(output)
   return isNaN(val) ? -1 : val
 }
+
+// ── Print job queue monitoring (post-spooling N3 detection) ───────────────────
+
+/**
+ * Status returned by a single Get-PrintJob poll.
+ *
+ *   'printing'    - job exists, Normal/Spooling/Printing (no Retained flag) — keep waiting
+ *   'retained'    - JobStatus contains "Retained": job was submitted to the printer hardware
+ *                   and the spooler kept a copy. INDETERMINATE for Pantum CM2800ADN — the driver
+ *                   uses this flag for BOTH normal completion AND waiting-for-paper. Callers must
+ *                   NOT map this to 'completed' or 'paper_empty'; treat as unconfirmed.
+ *   'completed'   - job no longer in queue (non-Pantum normal completion via queue removal)
+ *   'paper_empty' - JobStatus contains "PaperOut" (explicit driver report — NOT Pantum CM2800ADN)
+ *   'error'       - Jammed / Error / UserIntervention / Deleting (explicit driver error flags)
+ *   'not_found'   - printer exists but no job matching taskId
+ *   'unknown'     - non-Windows, query failure, or printer not found
+ */
+export type PrintJobMonitorStatus =
+  | 'printing'
+  | 'retained'
+  | 'completed'
+  | 'paper_empty'
+  | 'error'
+  | 'not_found'
+  | 'unknown'
+
+/**
+ * Single poll of Get-PrintJob for a specific taskId.
+ *
+ * printerName and taskId are passed via a single stdin line ("printer|taskId")
+ * so neither value can inject into the PowerShell parser.
+ *
+ * Matching: DocumentName -like "*<taskId>*"
+ * The temp file is named "task_<taskId>.pdf" so DocumentName will contain the taskId.
+ *
+ * PaperOut confirmation: callers must require 2 consecutive 'paper_empty' results
+ * before acting, to guard against transient driver state flicker.
+ *
+ * Returns 'unknown' on non-Windows or if the query itself fails.
+ * Returns 'not_found' only when the printer is reachable but no matching job exists.
+ */
+export async function getPrintJobStatus(
+  printerName: string,
+  taskId: string,
+): Promise<{ status: PrintJobMonitorStatus; rawStatus?: string }> {
+  if (process.platform !== 'win32') return { status: 'unknown' }
+
+  // Both values come from internal config/DB — sanitise taskId to alphanumeric+_ for safety.
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, '')
+
+  // Script reads one stdin line: "printerName|taskId"
+  const script =
+    `$line = [Console]::In.ReadLine(); ` +
+    `$sep = $line.IndexOf('|'); ` +
+    `if ($sep -lt 0) { 'bad_input'; exit }; ` +
+    `$pName = $line.Substring(0, $sep); ` +
+    `$tId   = $line.Substring($sep + 1); ` +
+    `$jobs  = Get-PrintJob -PrinterName $pName -ErrorAction SilentlyContinue; ` +
+    `if ($null -eq $jobs) { 'not_found'; exit }; ` +
+    `$job = @($jobs) | Where-Object { $_.DocumentName -like "*$tId*" } | Select-Object -First 1; ` +
+    `if ($null -eq $job) { 'not_found'; exit }; ` +
+    `$job.JobStatus`
+
+  const output = await runPowerShell(script, `${printerName}|${safeTaskId}`)
+
+  if (!output || output === 'bad_input') return { status: 'unknown' }
+  if (output === 'not_found') return { status: 'not_found' }
+
+  const raw = output.trim()
+
+  // JobStatus can be a comma-separated list of flags (e.g. "Printing, PaperOut")
+  const flags = raw.toLowerCase()
+
+  // Explicit error flags are checked first — they take priority over 'Retained'.
+  if (flags.includes('paperout')) return { status: 'paper_empty', rawStatus: raw }
+  if (
+    flags.includes('jammed') ||
+    flags.includes('error') ||
+    flags.includes('userintervention') ||
+    flags.includes('deleting')
+  ) {
+    return { status: 'error', rawStatus: raw }
+  }
+
+  // 'Retained' — the Windows spooler kept a copy of the job after submitting it to the
+  // printer hardware (Pantum driver default: "keep printed documents").
+  // IMPORTANT: Pantum CM2800ADN reports 'Printing, Retained' for BOTH:
+  //   (a) jobs that printed successfully and were retained by the spooler, AND
+  //   (b) jobs that are waiting for paper (no-paper state) with no explicit PaperOut flag.
+  // It is IMPOSSIBLE to distinguish these two cases via Get-PrintJob alone.
+  // Return 'retained' so callers can track this indeterminate state and decide how to handle it.
+  // Do NOT map to 'completed' or 'paper_empty' here.
+  if (flags.includes('retained')) return { status: 'retained', rawStatus: raw }
+
+  // Normal / Spooling / Printing without Retained → job still rendering/spooling
+  return { status: 'printing', rawStatus: raw }
+}
