@@ -75,6 +75,8 @@ type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual'
 export interface JobListItemDto {
   id: string; title: string; company: string; city: string
   salary?: string; tags: string[]; industry?: string; workType?: WorkType; headcount?: number
+  /** DB category 列原值('fulltime' | 'intern' | 'campus' | 'parttime'),供前端类型 chip 显示/筛选对齐 */
+  category?: string
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
   description?: string; requirements?: string
   salaryDisplay: string
@@ -221,6 +223,42 @@ function safeJsonArr(s: string): string[] {
   }
 }
 
+/**
+ * 行业(industry)没有独立 DB 列(避免 schema 迁移),约定存放在 tagsJson 里,
+ * 以 `行业:` 前缀命名,例如 "行业:互联网"。
+ * - DTO 映射时抽取为 industry 字段,并从展示 tags 中剔除(前端 tag chip 不显示前缀)
+ * - 筛选时用 tagsJson contains `"行业:<industry>"` 做 DB 层精确预过滤(分页 total 准确)
+ * 后续若切 Postgres / 加 industry 列,只需改这里与 buildJobIndustryTag。
+ */
+const INDUSTRY_TAG_PREFIX = '行业:'
+
+/** 把行业名拼成存储用 tag(供 import / seed 复用) */
+export function buildJobIndustryTag(industry: string): string {
+  return `${INDUSTRY_TAG_PREFIX}${industry.trim()}`
+}
+
+/** 从 tags 中抽取行业名(第一个 `行业:` 前缀 tag);无则 undefined */
+function extractIndustry(tags: string[]): string | undefined {
+  const hit = tags.find((t) => t.startsWith(INDUSTRY_TAG_PREFIX))
+  return hit ? hit.slice(INDUSTRY_TAG_PREFIX.length) : undefined
+}
+
+/** 展示用 tags:剔除行业前缀 tag(行业单独走 industry 字段) */
+function displayTags(tags: string[]): string[] {
+  return tags.filter((t) => !t.startsWith(INDUSTRY_TAG_PREFIX))
+}
+
+/** DB category 列 → 前端 workType 枚举(campus 校招归 full_time 展示) */
+function categoryToWorkType(category: string | null): WorkType | undefined {
+  switch (category) {
+    case 'fulltime': return 'full_time'
+    case 'parttime': return 'part_time'
+    case 'intern':   return 'internship'
+    case 'campus':   return 'full_time'
+    default:         return undefined
+  }
+}
+
 function fmtSyncTime(d: Date): string {
   return d.toISOString().replace('T', ' ').slice(0, 16)
 }
@@ -289,13 +327,15 @@ interface PrismaJobRow {
 }
 
 function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
-  const tags = safeJsonArr(j.tagsJson)
+  const rawTags = safeJsonArr(j.tagsJson)
   return {
     id: j.id, title: j.title, company: j.company, city: j.city,
-    salary: j.salary ?? undefined, tags,
-    industry: undefined,
-    workType: undefined,
+    salary: j.salary ?? undefined,
+    tags: displayTags(rawTags),
+    industry: extractIndustry(rawTags),
+    workType: categoryToWorkType(j.category),
     headcount: undefined,
+    category: j.category ?? undefined,
     sourceOrgId: j.sourceOrgId, externalId: j.externalId,
     sourceName: j.sourceName, sourceUrl: j.sourceUrl,
     syncTime: fmtSyncTime(j.syncTime),
@@ -492,17 +532,49 @@ export class JobsService {
 
   // ── Kiosk:只读 approved+published ───────────────────────────────────────────
 
-  async getPublishedJobs(params?: { tag?: string; city?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<JobListItemDto>> {
+  /**
+   * Kiosk 岗位列表 — 全部筛选都落到 DB 层(分页 total 准确):
+   *   - keyword:  title / company / description 任一 contains(SQLite LIKE,ASCII 大小写不敏感)
+   *   - city:     精确匹配
+   *   - category: 精确匹配('fulltime' | 'intern' | 'campus' | 'parttime')
+   *   - sourceOrgId: 精确匹配(来源机构筛选)
+   *   - tag:      tagsJson contains `"<tag>"`(带引号边界 → 等价精确)
+   *   - industry: tagsJson contains `"行业:<industry>"`(行业以前缀 tag 存储)
+   * tag + industry 同时存在时用 AND 数组(同一 tagsJson 字段不能写两次 key)。
+   */
+  async getPublishedJobs(params?: {
+    keyword?: string
+    city?: string
+    industry?: string
+    category?: string
+    sourceOrgId?: string
+    tag?: string
+    page?: number
+    pageSize?: number
+  }): Promise<PaginatedResult<JobListItemDto>> {
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
+    const kw = params?.keyword?.trim()
+
+    // 带引号边界的 contains:`"运营"` 不会误匹配 `"运营总监"`,等价精确匹配。
+    const tagContains: { tagsJson: { contains: string } }[] = []
+    if (params?.tag)      tagContains.push({ tagsJson: { contains: `"${params.tag}"` } })
+    if (params?.industry) tagContains.push({ tagsJson: { contains: `"${buildJobIndustryTag(params.industry)}"` } })
+
     const where = {
       reviewStatus:  'approved',
       publishStatus: 'published',
-      ...(params?.city ? { city: params.city } : {}),
-      // SQLite 中 tagsJson 是 JSON 字符串，用 contains 做 DB 层预过滤保证 total 准确。
-      // 加引号匹配 JSON 数组元素边界（避免 "Java" 误匹配 "JavaScript"）。
-      // Postgres 切 String[] 后改用 has 操作符，应用层 filter 可删除。
-      ...(params?.tag ? { tagsJson: { contains: `"${params.tag}"` } } : {}),
+      ...(params?.city        ? { city: params.city }                 : {}),
+      ...(params?.category     ? { category: params.category }         : {}),
+      ...(params?.sourceOrgId  ? { sourceOrgId: params.sourceOrgId }   : {}),
+      ...(tagContains.length   ? { AND: tagContains }                  : {}),
+      ...(kw ? {
+        OR: [
+          { title:       { contains: kw } },
+          { company:     { contains: kw } },
+          { description: { contains: kw } },
+        ],
+      } : {}),
     }
     const [rows, total] = await Promise.all([
       this.prisma.job.findMany({
@@ -513,12 +585,8 @@ export class JobsService {
       }),
       this.prisma.job.count({ where }),
     ])
-    // 应用层精确 filter 消除 LIKE 误判（tagsJson contains 只是预过滤）
-    const filtered = params?.tag
-      ? rows.filter((j) => safeJsonArr(j.tagsJson).includes(params.tag!))
-      : rows
     return {
-      data: filtered.map(prismaJobToListItem),
+      data: rows.map(prismaJobToListItem),
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     }
   }
