@@ -25,7 +25,28 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：真实打印能力收口版（2026-06-02，feat/kiosk-print-real-capability-hardening）**
+**当前阶段：校园招聘专区 P0（2026-06-03，feat/kiosk-campus-zone-on-main，cherry-pick 自 `42ebd9c`，基于干净 main `603be2a`）**
+
+---
+
+### ✅ 校园招聘专区 P0（2026-06-03，feat/kiosk-campus-zone-on-main，cherry-pick 自 `42ebd9c`，基于干净 main `603be2a`）
+
+在「招聘会页太空」的反馈下，按已确认方案 A（详见 [campus-recruitment-design.md](../product/campus-recruitment-design.md)）落地 Kiosk 校园招聘专区 **P0：纯前端聚合页**。**未改 Prisma schema / migration，未新增任何后端闭环能力**，全部复用 main 已有的 `/jobs`（category=campus）与 `/job-fairs` 能力。
+
+**已完成项：**
+
+| 模块 | 内容 |
+|------|------|
+| `/campus` 聚合页（新建 `pages/campus/CampusPage.tsx`） | ① **季节横幅卡**（`getCampusSeason` 按当前月份给秋招/春招/实习季阶段提示，纯展示、不外发）；② 校园招聘会（复用 `getJobFairs()` + 前端关键词过滤识别校招会，DTO 暂无 theme；「查看招聘会」跳 `/job-fairs/:id`）；③ 校招岗位（复用 `getJobs({category:'campus'})`，「查看岗位」跳 `/jobs/:id`）；④ 求职材料服务（AI 简历→`/resume`、打印→`/print-scan`）|
+| 合规护栏 | 顶部 `ComplianceBanner`（warning）+ 底部来源说明；投递/预约文案保持「去来源平台投递/扫码投递/去来源平台预约/扫码预约」（实际投递/预约按钮在 `/jobs/:id`、`/job-fairs/:id` 详情页，本页不出现禁词）；不接收/保存/转发简历给企业，无候选人/面试/Offer/推荐 |
+| 首页入口 | `HomePage` 新增「校园招聘专区」单行业务入口带（`CampusEntryBar` → `/campus`）；**底部 Tab 保持固定：首页 / AI助手 / 我的，未新增** |
+| **招聘会页做厚**（`JobFairsPage`）| 顶部新增「校园招聘专区」引导卡 → `/campus`；列表卡片用**真实字段**做厚：主办方 `organizer`、参展/已录入企业数（`boothCount` 或 `managedCompanyCount`+`managedMaterialCount`）、`dataSourceNote`、来源+同步；按钮统一「查看招聘会」。**岗位数 `jobCount`/届别 `audienceType` DTO 暂无 → 留 P1，不硬造 mock** |
+| 路由 | `routes/index.tsx` 注册 `{ path: 'campus' }` |
+| 加载/空/错误态 | 各数据块复用 `LoadingState/ErrorState(可重试)`；无数据时降级为「查看全部岗位/招聘会」入口卡，不留空洞 |
+
+**验证（2026-06-03）：** kiosk typecheck / lint / build 全过；合规禁词扫描无真实违规（命中均为允许文案「去来源平台投递」且非本轮改动文件）。运行期未跑（纯前端聚合，依赖既有 `/jobs`、`/job-fairs` 接口，先前已实测）。
+
+**P0 未做（留 P1/P2，需加 DTO/schema 字段，禁止硬造 mock）：** 岗位数 `jobCount` 与届别 `audienceType`（应届/实习/社招）字段（待 P1 加可选 DTO 字段，合作机构后台标注）、校招时间线② 横向交互组件、AI 求职路线规划、校招季订阅提醒。
 
 ---
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
-import { CalendarIcon, MapPinIcon, UsersIcon } from 'lucide-react'
+import { Building2Icon, CalendarIcon, ChevronRightIcon, GraduationCapIcon, MapPinIcon, UsersIcon } from 'lucide-react'
 import { getJobFairs } from '../../services/api'
 
 const STATUS_CONFIG = {
@@ -58,6 +58,28 @@ export function JobFairsPage() {
         <p className="mt-3 text-xs text-gray-400">
           本系统仅展示第三方来源招聘会信息，不参与活动报名流程，请前往来源平台预约
         </p>
+
+        {/* 校园招聘专区入口（设计 §三：招聘会页顶部引导卡 → /campus） */}
+        <button
+          type="button"
+          onClick={() => navigate('/campus')}
+          className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border border-cyan-200 bg-cyan-50/50 px-5 py-4 text-left transition-colors hover:bg-cyan-50 active:bg-cyan-100"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-100">
+              <GraduationCapIcon className="h-6 w-6 text-cyan-700" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">校园招聘专区</h2>
+              <p className="mt-0.5 text-sm text-gray-500">应届校招 · 校园双选会 · 求职材料打印</p>
+            </div>
+          </div>
+          <span className="flex shrink-0 items-center gap-0.5 text-sm font-semibold text-primary-600">
+            进入专区
+            <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+          </span>
+        </button>
+
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
           {ALL_STATUS.map((s) => (
             <button
@@ -113,14 +135,29 @@ export function JobFairsPage() {
                       <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                       <span>{fair.venue}</span>
                     </div>
-                    {fair.boothCount && (
+                    <div className="flex items-start gap-1.5">
+                      <Building2Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                      <span>主办：{fair.organizer}</span>
+                    </div>
+                    {/* 企业数用真实字段：已录入数字化数据则展示 managedCompanyCount/资料数，
+                        否则展示 boothCount。岗位数(jobCount)与届别(audienceType)DTO 暂无，
+                        留 P1 加字段后再补，本轮不硬造 mock。 */}
+                    {fair.hasManagedData ? (
+                      <div className="flex items-center gap-1.5">
+                        <UsersIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                        <span>已录入 {fair.managedCompanyCount} 家企业 · {fair.managedMaterialCount} 份资料</span>
+                      </div>
+                    ) : fair.boothCount ? (
                       <div className="flex items-center gap-1.5">
                         <UsersIcon className="h-4 w-4 shrink-0 text-gray-400" />
                         <span>{fair.boothCount} 家单位参展</span>
                       </div>
-                    )}
+                    ) : null}
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-3">
+                  {fair.dataSourceNote && (
+                    <p className="mt-2 line-clamp-1 text-xs text-gray-400">{fair.dataSourceNote}</p>
+                  )}
+                  <div className="mt-3 flex items-center justify-between gap-3">
                     <span className="text-xs text-gray-400">
                       {fair.sourceName} · {formatSync(fair.syncTime)}
                     </span>
@@ -129,7 +166,7 @@ export function JobFairsPage() {
                       variant={fair.status === 'ended' ? 'secondary' : 'primary'}
                       onClick={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}
                     >
-                      查看详情
+                      查看招聘会
                     </Button>
                   </div>
                 </Card>

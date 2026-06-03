@@ -1,11 +1,24 @@
 # 下一步任务
 
-> 最后更新：2026-06-02（P0 安全改进 Round 3，feat/phase9-assistant-actions）  
-> 关联文档：[current-progress.md](./current-progress.md)
+> 最后更新：2026-06-03（校园招聘专区 P0，feat/kiosk-campus-zone-on-main）
+> 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
 
-## 📌 当前状态（真实打印能力收口版，已完成代码 + Mac 验证，待 Windows 真机）
+## 📌 当前状态（校园招聘专区 P0，已完成代码 + 静态验证）
+
+**feat/kiosk-campus-zone-on-main（2026-06-03，cherry-pick `42ebd9c` 到干净 main `603be2a` 之上）：** 方案见 [campus-recruitment-design.md](../product/campus-recruitment-design.md)（方案 A，纯前端聚合，复用现有 API，无 schema 改动）。
+
+- ✅ `/campus` 聚合页：① 季节横幅卡（按当前月份给秋招/春招/实习季阶段提示，纯展示）+ 校园招聘会（复用 `getJobFairs`，关键词过滤校招）+ 校招岗位（复用 `getJobs({category:'campus'})`）+ 求职材料服务（AI 简历 `/resume`、打印 `/print-scan`）+ 合规说明条（ComplianceBanner）
+- ✅ 入口：首页 `CampusEntryBar` + 招聘会页顶部「校园招聘专区」引导卡 → `/campus`
+- ✅ 招聘会列表卡片做厚（**仅用真实字段**）：主办方 `organizer`、参展/已录入企业数（`boothCount` 或 `managedCompanyCount`+`managedMaterialCount`）、`dataSourceNote`、来源+同步；按钮统一「查看招聘会」
+- ✅ 合规：仅「查看岗位 / 查看招聘会」，无一键投递/收简历/候选人；禁词扫描过；typecheck / lint / build 全绿
+- ⏳ **P1 待补（需加 DTO 字段，禁止硬造 mock）**：岗位数 `jobCount`、届别 `audienceType`（应届/实习/社招）；校招时间线② 交互组件
+- ⏳ 待 review
+
+---
+
+## 📌 历史状态（真实打印能力收口版，已完成代码 + Mac 验证，待 Windows 真机）
 
 **feat/kiosk-print-real-capability-hardening（2026-06-02，分支自 main `5e612b3`）：**
 - ✅ 修复致命 hash 不一致：Agent 改用 SHA-256 校验（方案②保留 `fileMd5` 字段名，内容实为 sha256）；seed 任务同步改 sha256

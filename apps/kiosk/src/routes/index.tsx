@@ -34,6 +34,7 @@ import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibrary
 import { HomePage } from '../pages/home/HomePage'
 import { QingdaoPage } from '../pages/qingdao/QingdaoPage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
+import { CampusPage } from '../pages/campus/CampusPage'
 
 export const kioskRouter = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'profile',           element: <ProfilePage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'qingdao',           element: <QingdaoPage /> },
+      { path: 'campus',            element: <CampusPage /> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
