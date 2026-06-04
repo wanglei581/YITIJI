@@ -177,6 +177,16 @@ export interface ExcelPreviewDto {
   sampleDup: ExcelPreviewRowDto[]
 }
 
+/** T1: 某数据源 × dataType 已保存的字段映射规则(供导入向导自动回填) */
+export interface FieldMappingRuleDto {
+  sourceId: string
+  dataType: 'job' | 'fair'
+  /** { standardField: excelColumnHeader };未保存过则为空对象 */
+  mapping: Record<string, string>
+  /** 规则上次更新时间;从未保存过则为 null */
+  updatedAt: string | null
+}
+
 export interface SingleResult<T> {
   data: T | null
   success: boolean
@@ -1659,6 +1669,16 @@ export class JobsService {
       data: { status: 'confirmed', confirmedAt: new Date() },
     })
 
+    // T1: 保存/更新该数据源的字段映射规则,供下次导入自动回填。
+    // 用本批次实际使用的 mappingJson;空映射不落库(无可复用内容)。
+    await this.saveMappingRule({
+      sourceId: batch.sourceId,
+      orgId: batch.orgId,
+      dataType: batch.dataType,
+      mappingJson: batch.mappingJson,
+      updatedBy: user.userId,
+    })
+
     await this.audit.write({
       actorId: user.userId,
       actorRole: 'partner',
@@ -1723,5 +1743,90 @@ export class JobsService {
       where: { id: batchId },
       data: { status: 'cancelled' },
     })
+  }
+
+  // ── T1: 字段映射规则复用 ─────────────────────────────────────────────────────
+
+  /**
+   * 读取某数据源 × dataType 上次保存的字段映射规则,供前端导入向导自动回填。
+   * 未保存过则返回空映射(mapping={}, updatedAt=null),前端回退到模糊自动识别。
+   * 校验数据源归属当前 partner 机构,防止越权读取他机构映射。
+   */
+  async getMappingRule(
+    sourceId: string,
+    dataType: 'job' | 'fair',
+    user: AuthedUser,
+  ): Promise<FieldMappingRuleDto> {
+    if (!user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const source = await this.prisma.jobSource.findUnique({ where: { id: sourceId } })
+    if (!source || source.orgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+
+    const rule = await this.prisma.fieldMappingRule.findUnique({
+      where: { sourceId_dataType: { sourceId, dataType } },
+    })
+
+    let mapping: Record<string, string> = {}
+    if (rule) {
+      try {
+        const parsed = JSON.parse(rule.mappingJson) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          mapping = parsed as Record<string, string>
+        }
+      } catch {
+        mapping = {}
+      }
+    }
+
+    return {
+      sourceId,
+      dataType,
+      mapping,
+      updatedAt: rule ? rule.updatedAt.toISOString() : null,
+    }
+  }
+
+  /**
+   * upsert 某数据源 × dataType 的字段映射规则(confirm 导入成功后调用)。
+   * 空映射('{}' 或解析后无键)不落库,避免覆盖已有规则为空。
+   * 失败只 warn 不抛错:映射规则是便利特性,不应阻断已成功的导入。
+   */
+  private async saveMappingRule(args: {
+    sourceId: string
+    orgId: string
+    dataType: string
+    mappingJson: string
+    updatedBy: string
+  }): Promise<void> {
+    let hasKeys = false
+    try {
+      const parsed = JSON.parse(args.mappingJson) as unknown
+      hasKeys = !!parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length > 0
+    } catch {
+      hasKeys = false
+    }
+    if (!hasKeys) return
+
+    try {
+      await this.prisma.fieldMappingRule.upsert({
+        where: { sourceId_dataType: { sourceId: args.sourceId, dataType: args.dataType } },
+        create: {
+          sourceId: args.sourceId,
+          orgId: args.orgId,
+          dataType: args.dataType,
+          mappingJson: args.mappingJson,
+          updatedBy: args.updatedBy,
+        },
+        update: {
+          mappingJson: args.mappingJson,
+          updatedBy: args.updatedBy,
+        },
+      })
+    } catch (e) {
+      this.logger.warn(`saveMappingRule failed (non-fatal): sourceId=${args.sourceId} dataType=${args.dataType} ${(e as Error).message}`)
+    }
   }
 }

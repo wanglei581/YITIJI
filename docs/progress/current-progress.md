@@ -1,7 +1,29 @@
 # 当前开发进度
 
-> 最后更新：2026-06-03  
+> 最后更新：2026-06-04  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 〇、最新进展：T1 Excel 字段映射规则持久化与复用（2026-06-04，`claude/t1-excel-field-mapping`，基于 main `fc0018a`）
+
+**背景：** 勘察发现 CLAUDE.md §16 把 T1 写成「把 Excel 4 步向导 mock 切到 service + 后端落 ImportBatch」，但该主体在 **W4（`fix/w4-excel-import-integrity`）已完成**：前端 [ExcelImportModal](../../apps/partner/src/routes/sources/ExcelImportModal.tsx) 已走 service（http/mock 双 adapter），后端 [jobs.service.ts](../../services/api/src/jobs/jobs.service.ts) `previewExcelImport`/`confirmExcelImport` 已落 `ImportBatch`/`ImportRecord`。**唯一真正未做的增量**是 `FieldMappingRule`——它只存在于类型/Prisma generated client，schema 无对应 model，字段映射每次导入需手工重做。本轮只补这一增量，**不重写已完成的 ImportBatch/ImportRecord/SyncLog 链路**。
+
+**已完成：**
+
+| 改动 | 文件 |
+|------|------|
+| 新增 `model FieldMappingRule`（`@@unique([sourceId, dataType])` + FK→JobSource + orgId/sourceId 索引），按「数据源 × dataType」存一份可复用映射；JobSource 加反向关系 `fieldMappingRules` | [schema.prisma](../../services/api/prisma/schema.prisma) |
+| 手写 migration `20260604130000_add_field_mapping_rule`（CREATE TABLE + unique/index）。**因 dev.db 存在历史 drift（本地迁移与 `_prisma_migrations` 表不一致），沿用 AiResumeResult 先例用 `prisma db execute` 非破坏性建表，未跑破坏性 `migrate dev` reset** | `prisma/migrations/20260604130000_add_field_mapping_rule/` |
+| `getMappingRule(sourceId, dataType, user)`：按机构校验后读回上次保存的映射（无则空映射）；`saveMappingRule`（私有）在 `confirmExcelImport` 成功后 upsert 落地本批次映射，**空映射不落库、失败只 warn 不阻断已成功的导入**；`PrismaService` 加 `fieldMappingRule` 委托 | [jobs.service.ts](../../services/api/src/jobs/jobs.service.ts)、[prisma.service.ts](../../services/api/src/prisma/prisma.service.ts) |
+| `GET /partner/excel/mapping-rule?sourceId=&dataType=`（partner JWT+RolesGuard） | [jobs.controller.ts](../../services/api/src/jobs/jobs.controller.ts) |
+| 前端 service 层加 `getMappingRule`：http adapter 调真端点；mock adapter 用模块级 store **镜像「confirm 才落地」语义**（preview 暂存→confirm 保存）；向导 `handleUpload` 并行拉取已保存规则、在列仍存在时覆盖模糊匹配，映射步显示「已套用上次保存映射」提示 | [ExcelImportModal.tsx](../../apps/partner/src/routes/sources/ExcelImportModal.tsx)、`apps/partner/src/services/api/{partnerHttpAdapter,partnerMockAdapter,partnerContent,types}.ts` |
+
+**验证（三绿 + 运行期断言）：** shared/api/partner `typecheck` ✅；api/partner `lint` ✅（0 warning）；api/partner `build` ✅（partner 350KB/106KB gzip）。运行期断言脚本 [verify-field-mapping-rule.ts](../../services/api/scripts/verify-field-mapping-rule.ts) 直连 dev.db 5 项全过：① 无规则返回空映射；② confirm 落地后可读回；③ 二次 upsert 取最新值且 `(sourceId,job)` 仍 1 行（unique 生效）；④ job/fair 各一行互不覆盖；⑤ 跨机构读取被拒。
+
+**合规：** 仅存「标准字段→Excel 列名」映射结构，不存任何行数据/PII；敏感列在 W4 preview 阶段已拦截（本轮未改该逻辑）；partner 改动文件禁词扫描 0 命中。
+
+**本轮范围外：** 未改 `packages/shared`（沿用 partner 端 `FieldMappingRuleResult` 局部类型，前后端契约简单无需对齐 shared）；未触碰 Kiosk/admin/worker/terminal-agent/legacy/合规边界文档；CLAUDE.md §16 的过时描述本窗口无权改（不在允许目录），仅在此与 next-tasks 标注 T1 主体已由 W4 完成。
 
 ---
 
