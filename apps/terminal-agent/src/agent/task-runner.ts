@@ -108,9 +108,62 @@ function preflightToError(
   }
 }
 
-function extFromUrl(fileUrl: string): string {
+// ── Extension inference (HIGH-1 fix) ──────────────────────────────────────────
+//
+// 历史 bug：extFromUrl 仅看 URL 后缀。签名 URL 形如
+//   /api/v1/files/<id>/content?expires=...&sig=...
+// 去掉 query 后没有任何文件后缀 → path.extname() 为空 → 永远回退 .pdf。
+// 结果：上传 JPEG/PNG 也被当 PDF 喂给 SumatraPDF，必然失败，print.ts 的
+// 图片→pdfkit 分支变成死代码。
+//
+// 修复：契约 C2 让 claim 响应带上 fileName/mimeType，扩展名按优先级推断：
+//   mimeType → fileName 后缀 → URL 后缀 → 最后 .pdf。
+//
+// MIME → 扩展名映射只覆盖 print() / SUPPORTED_EXTENSIONS（config.ts）能打印的类型。
+// 注意：Agent 端 SUPPORTED_EXTENSIONS 与后端 files 服务允许的上传 MIME 白名单
+// 并不完全一致（例如后端可能允许 office 文档，但 Agent print() 仅支持
+// pdf/jpg/jpeg/png，bmp/tiff 仍待 sharp 预处理）。这部分差异由 Agent4 在
+// files 上传侧收口（拒绝 Agent 无法打印的 MIME）；此处仅负责把已落库的任务
+// 推断成 print() 可识别的扩展名，识别不出时回退 .pdf 交给 print() 的
+// UNSUPPORTED_FILE_TYPE 兜底返回明确错误。
+const MIME_TO_EXT: Record<string, string> = {
+  'application/pdf': '.pdf',
+  'image/jpeg':      '.jpg',
+  'image/jpg':       '.jpg',
+  'image/png':       '.png',
+  'image/bmp':       '.bmp',
+  'image/tiff':      '.tiff',
+}
+
+function extFromUrl(fileUrl: string): string | undefined {
   const noQuery = fileUrl.split('?')[0]
-  return path.extname(noQuery ?? '').toLowerCase() || '.pdf'
+  const ext = path.extname(noQuery ?? '').toLowerCase()
+  return ext || undefined
+}
+
+function extFromFileName(fileName: string | undefined): string | undefined {
+  if (!fileName) return undefined
+  const ext = path.extname(fileName).toLowerCase()
+  return ext || undefined
+}
+
+function extFromMime(mimeType: string | undefined): string | undefined {
+  if (!mimeType) return undefined
+  const normalized = mimeType.split(';')[0]?.trim().toLowerCase()
+  return normalized ? MIME_TO_EXT[normalized] : undefined
+}
+
+/**
+ * 推断任务文件的打印扩展名。优先级（契约 C2）：
+ *   mimeType → fileName 后缀 → URL 后缀 → .pdf
+ */
+function inferTaskExt(task: ClaimTask): string {
+  return (
+    extFromMime(task.mimeType) ??
+    extFromFileName(task.fileName) ??
+    extFromUrl(task.fileUrl) ??
+    '.pdf'
+  )
 }
 
 function resolveFileUrl(fileUrl: string, apiBaseUrl: string): string {
@@ -213,10 +266,13 @@ async function executeTask(
     return
   }
 
-  const ext = extFromUrl(task.fileUrl)
+  const ext = inferTaskExt(task)
   const tempFilePath = path.join(getTempDir(), `task_${task.taskId}${ext}`)
 
-  log(`task ${task.taskId}: start — type=${task.type}  file=...${ext}`)
+  log(
+    `task ${task.taskId}: start — type=${task.type}  ext=${ext} ` +
+      `(mime=${task.mimeType ?? '-'}, name=${task.fileName ?? '-'})`,
+  )
 
   try {
     // ── Step 1: Download ──────────────────────────────────────────────────

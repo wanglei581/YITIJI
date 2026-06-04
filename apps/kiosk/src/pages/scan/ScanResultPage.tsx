@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card } from '@ai-job-print/ui'
+import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -50,9 +51,7 @@ export function ScanResultPage() {
     navigate('/print/confirm', {
       state: {
         file: { name: file.name, size: file.size, pages: file.pages },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
+        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }

@@ -11,6 +11,7 @@ import type {
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { FILE_DEFAULT_TTL_HOURS } from './file.types'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 import { LocalFileStorage } from './storage'
 import { signFileUrl } from './signing'
 
@@ -26,7 +27,31 @@ const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   cover_letter: 'normal',
 }
 
-/** 允许的 MIME / 扩展名白名单。防止 .exe / .sh 等被上传。 */
+/**
+ * Terminal Agent 当前可真正打印出纸的 MIME(对齐 apps/terminal-agent/src/config.ts
+ * SUPPORTED_EXTENSIONS 中已验证真机出纸的子集:.pdf / .jpg / .jpeg / .png)。
+ *
+ * 注:.bmp / .tiff 在 agent 端列为 SUPPORTED 但当前返回 UNSUPPORTED_FILE_TYPE(需 sharp 预处理),
+ * 故不计入"可打印"。webp / Word / 纯文本 / JSON agent 都无法直接出纸。
+ *
+ * 任何想直接进打印流程的文件,MIME 必须落在此集合内,否则在上传阶段就拒,
+ * 不要让"能上传但最后打印失败"的格式走完整条流程(MIME 收口,本次修复点)。
+ */
+export const PRINTABLE_MIMES = new Set<string>([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+])
+
+/**
+ * 允许上传的 MIME 白名单。防止 .exe / .sh 等被上传。
+ *
+ * 收口说明:
+ *   - print_doc 用途(走打印流程)只接受 PRINTABLE_MIMES,把 Word / webp / text /
+ *     json 等"agent 打不出纸"的格式在上传阶段就挡掉,避免走完流程到打印才失败。
+ *   - 其它用途(简历上传 / 扫描 / 证件照 / 求职信 / 招聘会素材)是给 AI 解析 /
+ *     展示 / 留存用,不直接进打印机,故仍接受 Word / 图片等更宽的集合。
+ */
 const ALLOWED_MIMES = new Set<string>([
   'application/pdf',
   'application/msword',
@@ -43,15 +68,21 @@ const MAX_BYTES = 10 * 1024 * 1024 // 10 MB,与 Kiosk 上传 UI 限制一致
 /**
  * 文件服务:落库 + 物理写入 + 签名 + 软删 + 物理清理。
  *
- * 跟 AuditLog 解耦:管理员强制清理动作由 controller 在 service 完成后写审计,
- * 避免 service 依赖 AuditService(BE-2 还在路上)。
+ * 审计:
+ *   - 管理员强制删除单文件(forceDelete)由 controller 在动作完成后写审计。
+ *   - cron / 手动清理过期文件(cleanupExpired)在 service 内直接写审计 —— 该路径
+ *     由 @Cron 触发,没有 controller 兜底,必须在此落 AuditLog(合规 CLAUDE.md §11:
+ *     "管理员访问文件必须记录日志 / 文件删除后需要保留删除日志")。
  */
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name)
   private readonly storage = new LocalFileStorage()
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   // ── 上传 ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +107,16 @@ export class FilesService {
     if (!ALLOWED_MIMES.has(args.mimeType)) {
       throw new BadRequestException({
         error: { code: 'FILE_MIME_NOT_ALLOWED', message: `不支持的文件类型: ${args.mimeType}` },
+      })
+    }
+    // MIME 收口:直接进打印流程的 print_doc 必须是 agent 能真正出纸的格式,
+    // 否则上传阶段就拒,杜绝"能上传走完流程、最后打印才失败"。
+    if (args.purpose === 'print_doc' && !PRINTABLE_MIMES.has(args.mimeType)) {
+      throw new BadRequestException({
+        error: {
+          code: 'FILE_NOT_PRINTABLE',
+          message: `该格式无法直接打印,请上传 PDF / JPG / PNG: ${args.mimeType}`,
+        },
       })
     }
 
@@ -103,7 +144,10 @@ export class FilesService {
       },
     })
 
-    const signed = signFileUrl(record.id)
+    // 上传响应的签名 URL TTL 给 30 分钟：覆盖"上传 → 预览 → 确认打印"整段触控操作窗口，
+    // 避免慢速用户停留超过 5 分钟后提交打印时撞 PRINT_INVALID_FILE_URL(过期)。
+    // 匿名 Kiosk 上传无法二次签名，只能依赖此响应 URL 的有效期。
+    const signed = signFileUrl(record.id, 30 * 60 * 1000)
     return {
       fileId: record.id,
       filename: record.filename,
@@ -192,10 +236,13 @@ export class FilesService {
         deletedAt: null,
         expiresAt: { lt: now },
       },
-      select: { id: true, storageKey: true },
+      select: { id: true, storageKey: true, purpose: true, sensitiveLevel: true },
     })
 
     const deletedIds: string[] = []
+    // 审计摘要:按敏感等级 / 用途统计被清理文件数(不含文件名 / 路径等可定位信息)
+    const bySensitiveLevel: Record<string, number> = {}
+    const byPurpose: Record<string, number> = {}
     for (const f of expired) {
       try {
         await this.storage.delete(f.storageKey)
@@ -208,6 +255,8 @@ export class FilesService {
           },
         })
         deletedIds.push(f.id)
+        bySensitiveLevel[f.sensitiveLevel] = (bySensitiveLevel[f.sensitiveLevel] ?? 0) + 1
+        byPurpose[f.purpose] = (byPurpose[f.purpose] ?? 0) + 1
       } catch (err) {
         this.logger.warn(`Failed to cleanup file ${f.id}: ${(err as Error).message}`)
       }
@@ -215,6 +264,29 @@ export class FilesService {
     if (deletedIds.length > 0) {
       this.logger.log(`Cleanup (${triggeredBy}): deleted ${deletedIds.length} expired files`)
     }
+
+    // 合规:清理敏感文件(简历 / 身份证)必须落审计。
+    //   - cron 路径无 controller 兜底,且无 actor → 必须在此落 'system' 审计(本次修复重点)。
+    //   - manual 路径由 FilesController 写带 actor / IP / UA 的审计,此处不再重复写,避免双记。
+    // 仅当确有文件被清理时写(避免每小时 cron 空跑刷日志)。
+    // payload 只放批次摘要 + 文件 id 摘要(cap 50 个),不含文件名 / 物理路径。
+    if (triggeredBy === 'cron' && deletedIds.length > 0) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'file.cleanup_expired',
+        targetType: 'file',
+        targetId: null,
+        payload: {
+          triggeredBy,
+          deletedCount: deletedIds.length,
+          bySensitiveLevel,
+          byPurpose,
+          fileIdDigest: deletedIds.slice(0, 50),
+        },
+      })
+    }
+
     return {
       deletedCount: deletedIds.length,
       deletedFileIds: deletedIds,

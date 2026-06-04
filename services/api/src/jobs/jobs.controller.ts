@@ -110,36 +110,48 @@ export class JobsController {
     return this.jobsService.getPublishedFairDetail(id)
   }
 
-  // ── 招聘会子资源（Fair 数据模型尚未落 Prisma，暂返回空数据）──────────────────
-  // H-6/H-7 stub：前端已有 EmptyState 兜底，返回 200 + 空比 404 更友好
+  // ── 招聘会子资源 ──────────────────────────────────────────────────────────────
+  // companies / companies/:id / zones / map 走真实 Prisma 查询(FairCompany / FairZone)。
+  // 招聘会不存在 / 未发布时返回空集(200 + 空比 404 对前端 EmptyState 更友好)。
+  // materials / stats 暂无对应 Prisma 模型 → 诚实返回空,绝不硬造假数据(见各端点注释)。
 
   @Get('job-fairs/:id/companies')
   getFairCompanies(
+    @Param('id') id: string,
     @Query('page') pageStr?: string,
     @Query('pageSize') sizeStr?: string,
   ) {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
-    return { data: [], total: 0, page, pageSize }
+    return this.jobsService.getFairCompanies(id, page, pageSize)
   }
 
   @Get('job-fairs/:id/companies/:companyId')
-  getFairCompanyById() {
-    return { data: null }
+  getFairCompanyById(
+    @Param('id') id: string,
+    @Param('companyId') companyId: string,
+  ) {
+    return this.jobsService.getFairCompanyById(id, companyId)
   }
 
   @Get('job-fairs/:id/zones')
-  getFairZones() {
-    return { data: [] }
+  getFairZones(@Param('id') id: string) {
+    return this.jobsService.getFairZones(id)
   }
 
   @Get('job-fairs/:id/map')
-  getFairMap() {
-    return { data: { zones: [], booths: [] } }
+  getFairMap(@Param('id') id: string) {
+    return this.jobsService.getFairMap(id)
   }
 
+  /**
+   * 招聘会活动资料。
+   * 模型限制:当前 schema 无 FairMaterial 模型(招聘会资料/模板素材未单独落库),
+   * 故诚实返回空集。落库后再接真实查询,不在此处硬造 mock。
+   */
   @Get('job-fairs/:id/materials')
   getFairMaterials(
+    @Param('id') _id: string,
     @Query('page') pageStr?: string,
     @Query('pageSize') sizeStr?: string,
   ) {
@@ -148,8 +160,14 @@ export class JobsController {
     return { data: [], total: 0, page, pageSize }
   }
 
+  /**
+   * 招聘会统计。
+   * 模型限制:当前仅 JobFair 上有 companyCount / jobCount / viewCount 快照字段,
+   * 无独立统计/明细模型。此端点诚实返回 null;前端需要的总数走 /detail 或 /companies 的 total,
+   * 不在此处硬造统计假数据。
+   */
   @Get('job-fairs/:id/stats')
-  getFairStats() {
+  getFairStats(@Param('id') _id: string) {
     return { data: null }
   }
 

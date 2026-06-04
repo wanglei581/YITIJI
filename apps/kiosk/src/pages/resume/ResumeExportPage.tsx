@@ -14,7 +14,7 @@
 
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { FileTextIcon, PrinterIcon, SaveIcon, SparklesIcon, ClipboardListIcon } from 'lucide-react'
 
 interface ResumeFile {
@@ -95,9 +95,7 @@ export function ResumeExportPage() {
     navigate('/print/confirm', {
       state: {
         file: { name: item.fileName, size: file.size, pages: 1 },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
+        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }

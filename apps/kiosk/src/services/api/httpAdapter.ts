@@ -72,6 +72,89 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 }
 
 // ──────────────────────────────────────────────────────────────
+// 后端 wire 形状 → 展示 DTO 的字段对齐
+//
+// 后端 FairCompany / FairZone 子端点返回的是"精简 Prisma 镜像"
+// （name / industry:null / jobsCount / category ...），而 Kiosk 页面读取的是
+// 富展示 DTO（companyName / industry:string / positions[] / checkinStatus /
+// zoneName / boothCount ...）。早期子端点是空 stub，掩盖了这层差异；接真数据后
+// 必须在适配层做字段对齐，否则页面读 c.companyName / c.industry.toLowerCase()
+// 会拿到 undefined 或对 null 调用方法而崩页。
+//
+// 模型暂无的字段（现场签到 / 展位 / 岗位明细）按合规与诚实原则给安全占位，
+// 不硬造数据：positions=[]、checkinStatus='pending'、boothCount/checkedInCount=0。
+// ──────────────────────────────────────────────────────────────
+
+interface WireFairCompany {
+  id: string
+  jobFairId: string
+  name: string
+  logoUrl?: string | null
+  industry?: string | null
+  scale?: string | null
+  description?: string | null
+  sourceUrl?: string | null
+  hiringTags?: string[]
+  jobsCount?: number
+}
+
+interface WireFairZone {
+  id: string
+  jobFairId: string
+  name: string
+  category?: string | null
+  city?: string | null
+  description?: string | null
+  coverImageUrl?: string | null
+  sortOrder?: number
+}
+
+const VALID_SCALES: ReadonlyArray<FairCompanyDTO['scale']> = [
+  'startup',
+  'small',
+  'medium',
+  'large',
+  'enterprise',
+]
+
+function coerceScale(scale?: string | null): FairCompanyDTO['scale'] {
+  return scale && (VALID_SCALES as readonly string[]).includes(scale)
+    ? (scale as FairCompanyDTO['scale'])
+    : 'medium'
+}
+
+function mapWireCompany(c: WireFairCompany): FairCompanyDTO {
+  return {
+    id:            c.id,
+    fairId:        c.jobFairId,
+    companyName:   c.name,
+    industry:      c.industry ?? '',
+    scale:         coerceScale(c.scale),
+    description:   c.description ?? undefined,
+    sourceUrl:     c.sourceUrl ?? undefined,
+    coverImageUrl: c.logoUrl ?? undefined,
+    // 模型无岗位明细 / 现场签到 → 安全占位，不硬造
+    positions:     [],
+    checkinStatus: 'pending',
+    applyNote:     '如需了解更多，请扫码前往来源平台',
+  }
+}
+
+function mapWireZone(z: WireFairZone, index: number): FairZoneDTO {
+  return {
+    id:             z.id,
+    fairId:         z.jobFairId,
+    zoneName:       z.name,
+    description:    z.description ?? undefined,
+    industry:       z.category ?? undefined,
+    // 模型无展位 / 签到明细 → 0 占位
+    boothCount:     0,
+    checkedInCount: 0,
+    sortOrder:      z.sortOrder ?? index,
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
 // HTTP Adapter 对象
 // ──────────────────────────────────────────────────────────────
 
@@ -89,28 +172,39 @@ export const httpJobFairAdapter = {
   },
 
   async getFairCompanies(fairId: string): Promise<PaginatedResponse<FairCompanyDTO>> {
-    return get<PaginatedResponse<FairCompanyDTO>>(`/job-fairs/${fairId}/companies`)
+    const res = await get<PaginatedResponse<WireFairCompany>>(`/job-fairs/${fairId}/companies`)
+    return { ...res, data: (res.data ?? []).map(mapWireCompany) }
   },
 
   async getFairCompanyById(
     fairId: string,
     companyId: string,
   ): Promise<ApiResponse<FairCompanyDTO | null>> {
-    return get<ApiResponse<FairCompanyDTO | null>>(
+    const res = await get<ApiResponse<WireFairCompany | null>>(
       `/job-fairs/${fairId}/companies/${companyId}`,
     )
+    return { ...res, data: res.data ? mapWireCompany(res.data) : null }
   },
 
   async getFairZones(fairId: string): Promise<ApiResponse<FairZoneDTO[]>> {
-    return get<ApiResponse<FairZoneDTO[]>>(`/job-fairs/${fairId}/zones`)
+    const res = await get<ApiResponse<WireFairZone[]>>(`/job-fairs/${fairId}/zones`)
+    return { ...res, data: (res.data ?? []).map(mapWireZone) }
   },
 
   async getFairMap(
     fairId: string,
   ): Promise<ApiResponse<{ zones: FairZoneDTO[]; booths: FairBoothDTO[] }>> {
-    return get<ApiResponse<{ zones: FairZoneDTO[]; booths: FairBoothDTO[] }>>(
-      `/job-fairs/${fairId}/map`,
-    )
+    const res = await get<
+      ApiResponse<{ zones?: WireFairZone[]; booths?: FairBoothDTO[] } | null>
+    >(`/job-fairs/${fairId}/map`)
+    // 未发布 / 无数据时后端可能返回 data:null → 兜成空集合，页面落空态而非崩页
+    return {
+      ...res,
+      data: {
+        zones:  (res.data?.zones ?? []).map(mapWireZone),
+        booths: res.data?.booths ?? [],
+      },
+    }
   },
 
   async getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>> {

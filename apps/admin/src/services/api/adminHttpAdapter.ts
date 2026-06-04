@@ -1,6 +1,13 @@
 import { API_BASE_URL, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch } from './types'
+import type {
+  AdminJobSourceRecord,
+  AdminFairSourceRecord,
+  AdminImportBatch,
+  AdminTerminalsResponse,
+  AuditLogListResponse,
+  AuditLogListQuery,
+} from './types'
 import type { ReviewAction, PublishAction } from './review-types'
 
 /**
@@ -34,6 +41,16 @@ async function get<T>(path: string): Promise<T> {
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>
+}
+
+/**
+ * 用于后端以 ApiResponse<T>(即 { data: T })包装的端点。
+ * job-sources / fair-sources 等老端点返回裸数组用 get<T>;
+ * audit-logs / terminals 等用 ApiResponse 包装,这里统一拆 .data。
+ */
+async function getData<T>(path: string): Promise<T> {
+  const body = await get<{ data: T }>(path)
+  return body.data
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
@@ -78,4 +95,26 @@ export const adminHttpAdapter = {
 
   getImportBatches: () =>
     get<AdminImportBatch[]>('/admin/import-batches'),
+
+  // ── 设备管理 — 终端心跳(契约 C1)──────────────────────────────────────────
+  getTerminals: () =>
+    getData<AdminTerminalsResponse>('/admin/terminals'),
+
+  // ── 日志审计(HIGH-5)──────────────────────────────────────────────────────
+  getAuditLogs: (query: AuditLogListQuery = {}) =>
+    getData<AuditLogListResponse>(`/admin/audit-logs${buildAuditQuery(query)}`),
+}
+
+function buildAuditQuery(q: AuditLogListQuery): string {
+  const params = new URLSearchParams()
+  if (q.action)     params.set('action', q.action)
+  if (q.actorId)    params.set('actorId', q.actorId)
+  if (q.targetType) params.set('targetType', q.targetType)
+  if (q.targetId)   params.set('targetId', q.targetId)
+  if (q.startAt)    params.set('startAt', q.startAt)
+  if (q.endAt)      params.set('endAt', q.endAt)
+  if (q.limit !== undefined)  params.set('limit', String(q.limit))
+  if (q.offset !== undefined) params.set('offset', String(q.offset))
+  const s = params.toString()
+  return s ? `?${s}` : ''
 }

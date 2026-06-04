@@ -259,7 +259,10 @@ export default function PrintersPage() {
         />
       </Card>
 
-      <p className="mt-3 text-xs text-neutral-400">打印机状态由 Windows Terminal Agent 实时上报，当前为 mock 数据</p>
+      <p className="mt-3 text-xs text-neutral-400">
+        演示数据：碳粉余量、纸张、SN 等明细暂无后端端点，当前为本地示例数据；
+        打印机在线/缺纸/故障状态后续以 Windows Terminal Agent 心跳上报的 printerStatus 为准。
+      </p>
     </>
   )
 }

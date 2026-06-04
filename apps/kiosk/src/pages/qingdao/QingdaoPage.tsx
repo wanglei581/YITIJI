@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@ai-job-print/ui'
+import { useComingSoonNotice } from '../../components/ComingSoonNotice'
 import {
   ArrowUpRightIcon,
   BookOpenIcon,
@@ -332,7 +333,7 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
 
 // ─── Panel: 青岛就业 ──────────────────────────────────────────────────────────
 
-function EmploymentPanel() {
+function EmploymentPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
 
   return (
@@ -378,6 +379,7 @@ function EmploymentPanel() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => onComingSoon('扫码预约')}
                     className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
                   >
                     <QrCodeIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -417,6 +419,7 @@ function EmploymentPanel() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => onComingSoon('去来源平台投递')}
                   className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100"
                 >
                   <ArrowUpRightIcon className="h-3 w-3" aria-hidden="true" />
@@ -440,6 +443,7 @@ function EmploymentPanel() {
           </div>
           <button
             type="button"
+            onClick={() => navigate('/campus')}
             className="flex shrink-0 items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-700 hover:bg-teal-50"
           >
             查看详情
@@ -528,7 +532,7 @@ function PolicyPanel() {
 
 // ─── Panel: 青岛高校 ──────────────────────────────────────────────────────────
 
-function UniversityPanel() {
+function UniversityPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="flex items-center gap-2 text-xs text-gray-400">
@@ -567,6 +571,7 @@ function UniversityPanel() {
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
+                onClick={() => onComingSoon('扫码进入官网')}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 py-2.5 text-sm font-medium text-teal-700 hover:bg-teal-100"
               >
                 <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
@@ -574,6 +579,7 @@ function UniversityPanel() {
               </button>
               <button
                 type="button"
+                onClick={() => onComingSoon('查看校招活动')}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
               >
                 查看校招活动
@@ -602,7 +608,7 @@ function UniversityPanel() {
 
 // ─── Panel: 青岛园区 ──────────────────────────────────────────────────────────
 
-function ParkPanel() {
+function ParkPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
 
   return (
@@ -656,6 +662,7 @@ function ParkPanel() {
             </button>
             <button
               type="button"
+              onClick={() => onComingSoon('查看来源')}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-100"
             >
               <QrCodeIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -670,7 +677,7 @@ function ParkPanel() {
 
 // ─── Panel: 青岛资讯 ──────────────────────────────────────────────────────────
 
-function NewsPanel() {
+function NewsPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
 
   return (
@@ -703,6 +710,7 @@ function NewsPanel() {
             <div className="flex shrink-0 flex-col gap-2">
               <button
                 type="button"
+                onClick={() => onComingSoon('查看详情')}
                 className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
               >
                 查看详情
@@ -730,9 +738,11 @@ export function QingdaoPage() {
   const [searchParams] = useSearchParams()
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'employment'
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  const { notify, overlay } = useComingSoonNotice()
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {overlay}
       <PageHeader
         title="AI 在青岛"
         subtitle="青岛就业 · 政策服务 · 高校资源 · 园区岗位 · 城市资讯"
@@ -751,11 +761,11 @@ export function QingdaoPage() {
       <TabBar active={activeTab} onChange={setActiveTab} />
 
       {/* Tab panels */}
-      {activeTab === 'employment' && <EmploymentPanel />}
+      {activeTab === 'employment' && <EmploymentPanel onComingSoon={notify} />}
       {activeTab === 'policy'     && <PolicyPanel />}
-      {activeTab === 'university' && <UniversityPanel />}
-      {activeTab === 'park'       && <ParkPanel />}
-      {activeTab === 'news'       && <NewsPanel />}
+      {activeTab === 'university' && <UniversityPanel onComingSoon={notify} />}
+      {activeTab === 'park'       && <ParkPanel onComingSoon={notify} />}
+      {activeTab === 'news'       && <NewsPanel onComingSoon={notify} />}
 
       {/* Compliance footer */}
       <p className="pb-2 text-center text-xs text-gray-400">

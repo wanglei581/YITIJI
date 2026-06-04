@@ -4,7 +4,7 @@ import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
 import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, PrinterIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { getResumeRecord } from '../../services/api'
 
 interface ReportState {
@@ -68,9 +68,7 @@ export function ResumeReportPage() {
           size: '128 KB',
           pages: 2,
         },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
+        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }

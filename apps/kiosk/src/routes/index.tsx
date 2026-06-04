@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
@@ -22,7 +22,6 @@ import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
-import { ResumeUploadPage } from '../pages/resume/ResumeUploadPage'
 import { ResumeHomePage } from '../pages/resume/ResumeHomePage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
 import { ResumeTargetPage } from '../pages/resume/ResumeTargetPage'
@@ -58,7 +57,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/done',        element: <PrintDonePage /> },
       // AI简历服务（Phase 3 + AI 简历服务中心）
       { path: 'resume',            element: <ResumeHomePage /> },
-      { path: 'resume/upload',     element: <ResumeUploadPage /> },
+      { path: 'resume/upload',     element: <Navigate to="/resume/source" replace /> },
       { path: 'resume/source',     element: <ResumeSourcePage /> },
       { path: 'resume/target',     element: <ResumeTargetPage /> },
       { path: 'resume/parse',      element: <ResumeParsePage /> },

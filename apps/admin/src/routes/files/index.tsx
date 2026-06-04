@@ -261,7 +261,10 @@ export default function FilesPage() {
         </ul>
       </div>
 
-      <p className="mt-3 text-xs text-gray-400">当前为 mock 数据，接入后端后实时显示文件列表与清理状态</p>
+      <p className="mt-3 text-xs text-gray-400">
+        演示数据：文件管理后端端点尚未接入，本页的删除 / 立即清理仅更新前端演示状态，
+        暂不执行真实文件删除，也暂未写入日志审计；上方合规说明描述的是接入后的目标行为。
+      </p>
     </Page>
   )
 }

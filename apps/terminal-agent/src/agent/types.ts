@@ -105,6 +105,16 @@ export interface ClaimTask {
   claimExpiresAt: string
   params: PrintJobParams
   createdAt: string
+  /**
+   * 原始文件名（契约 C2：后端从 PrintTask.paramsJson.fileName 取出）。
+   * 用于推断打印扩展名 —— 签名 URL 无文件后缀，仅靠 URL 推断会把图片误判为 PDF。
+   */
+  fileName?: string
+  /**
+   * 文件 MIME（契约 C2：后端按 fileName 后缀推断，可能缺省）。
+   * 扩展名推断优先级：mimeType → fileName 后缀 → URL 后缀 → 最后 .pdf。
+   */
+  mimeType?: string
 }
 
 // ── Status PATCH ──────────────────────────────────────────────────────────────

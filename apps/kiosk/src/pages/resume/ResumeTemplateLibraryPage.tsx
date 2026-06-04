@@ -12,6 +12,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, EmptyState, PageHeader } from '@ai-job-print/ui'
+import { makePrintParams } from '@ai-job-print/shared'
 import {
   FileTextIcon,
   LayoutTemplateIcon,
@@ -65,9 +66,7 @@ export function ResumeTemplateLibraryPage() {
     navigate('/print/confirm', {
       state: {
         file: { name: `${m.title}.pdf`, size: '120 KB', pages: 1 },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
+        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }

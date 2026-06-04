@@ -1,4 +1,12 @@
-import type { AdminJobSourceRecord, AdminFairSourceRecord, AdminImportBatch } from './types'
+import type {
+  AdminJobSourceRecord,
+  AdminFairSourceRecord,
+  AdminImportBatch,
+  AdminTerminalsResponse,
+  AuditLogListResponse,
+  AuditLogListQuery,
+  AuditLogRecord,
+} from './types'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
 
@@ -27,6 +35,22 @@ let FAIR_SOURCES: AdminFairSourceRecord[] = [
   { id: 'fs5', sourceOrgId: 'org-uni-001',         sourceName: '某大学就业中心', externalId: 'UNI-2026-JF-024',   sourceUrl: 'https://job.uni.edu.cn/fair/24',              name: '互联网行业专场招聘',     organizer: '某大学就业指导中心',     startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅',   status: 'upcoming',                                                               boothCount: 20,  syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft'     },
   { id: 'fs6', sourceOrgId: 'org-city-talent-001', sourceName: '市人才网',       externalId: 'RC-2026-FAIR-042',  sourceUrl: 'https://rcw.city.gov.cn/fair/042',            name: '护理医疗专场招聘会',     organizer: '市卫生健康委员会',       startTime: '2026-05-20 09:00', endTime: '2026-05-20 15:00', venue: 'C区多功能厅',          status: 'ended',                                                                  boothCount: 25,  syncTime: '2026-05-18 10:00', reviewStatus: 'approved',  publishStatus: 'draft'     },
   { id: 'fs7', sourceOrgId: 'org-city-hr-001',    sourceName: '市人社局',       externalId: 'RSJ-2026-FAIR-099', sourceUrl: 'https://hrss.city.gov.cn/fair/2025-winter',   name: '2025年冬季综合招聘会',   organizer: '市人力资源和社会保障局', startTime: '2025-12-10 09:00', endTime: '2025-12-10 17:00', venue: '市会展中心B馆',        status: 'ended',                                                                  boothCount: 100, syncTime: '2025-12-05 10:00', reviewStatus: 'approved',  publishStatus: 'expired'   },
+]
+
+// ─── Audit logs mock(只含元数据,payloadJson 内不放敏感正文)──────────────
+const MOCK_AUDIT_LOGS: AuditLogRecord[] = [
+  { id: 'al1',  actorId: 'admin',    actorRole: 'admin',   action: 'job.review',           targetType: 'job_source', targetId: 'js4',  payloadJson: '{"action":"approve"}',                ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0001', createdAt: '2026-05-25T09:42:00.000Z' },
+  { id: 'al2',  actorId: 'admin',    actorRole: 'admin',   action: 'job.publish',          targetType: 'job_source', targetId: 'js1',  payloadJson: '{"action":"publish"}',                ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0002', createdAt: '2026-05-25T09:40:00.000Z' },
+  { id: 'al3',  actorId: 'partner1', actorRole: 'partner', action: 'job.import',           targetType: 'job_source', targetId: 'batch-003', payloadJson: '{"rows":3}',                     ipAddress: '10.20.1.5', userAgent: 'Mozilla/5.0', requestId: 'req-0003', createdAt: '2026-05-25T09:30:00.000Z' },
+  { id: 'al4',  actorId: 'admin',    actorRole: 'admin',   action: 'fair.review',          targetType: 'fair_source', targetId: 'fs4', payloadJson: '{"action":"reviewing"}',              ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0004', createdAt: '2026-05-25T08:55:00.000Z' },
+  { id: 'al5',  actorId: 'admin',    actorRole: 'admin',   action: 'file.force_delete',    targetType: 'file', targetId: 'file-7781',  payloadJson: '{"reason":"用户申请删除"}',           ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0005', createdAt: '2026-05-25T08:30:00.000Z' },
+  { id: 'al6',  actorId: 'system',   actorRole: 'system',  action: 'file.cleanup_expired', targetType: 'file', targetId: null,         payloadJson: '{"cleaned":24}',                      ipAddress: null,        userAgent: null,          requestId: 'req-0006', createdAt: '2026-05-25T03:00:00.000Z' },
+  { id: 'al7',  actorId: 'admin',    actorRole: 'admin',   action: 'system.login',         targetType: 'system', targetId: null,       payloadJson: '{"result":"success"}',                ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0007', createdAt: '2026-05-25T08:00:00.000Z' },
+  { id: 'al8',  actorId: 'partner1', actorRole: 'partner', action: 'data_source.create',   targetType: 'job_source', targetId: 'ds5',  payloadJson: '{"accessMode":"webhook"}',            ipAddress: '10.20.1.5', userAgent: 'Mozilla/5.0', requestId: 'req-0008', createdAt: '2026-05-24T18:20:00.000Z' },
+  { id: 'al9',  actorId: 'partner1', actorRole: 'partner', action: 'data_source.toggle',   targetType: 'job_source', targetId: 'ds5',  payloadJson: '{"enabled":true}',                    ipAddress: '10.20.1.5', userAgent: 'Mozilla/5.0', requestId: 'req-0009', createdAt: '2026-05-24T18:25:00.000Z' },
+  { id: 'al10', actorId: 'admin',    actorRole: 'admin',   action: 'organization.update',  targetType: 'organization', targetId: 'org-uni-001', payloadJson: '{"field":"contact"}',          ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0010', createdAt: '2026-05-24T16:10:00.000Z' },
+  { id: 'al11', actorId: 'admin',    actorRole: 'admin',   action: 'user.disable',         targetType: 'user', targetId: 'user-330',   payloadJson: '{"reason":"离职"}',                   ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0011', createdAt: '2026-05-24T15:40:00.000Z' },
+  { id: 'al12', actorId: 'admin',    actorRole: 'admin',   action: 'fair.publish',         targetType: 'fair_source', targetId: 'fs2', payloadJson: '{"action":"publish"}',                ipAddress: '10.20.0.2', userAgent: 'Mozilla/5.0', requestId: 'req-0012', createdAt: '2026-05-23T09:15:00.000Z' },
 ]
 
 function delay(): Promise<void> {
@@ -94,6 +118,41 @@ export const adminMockAdapter = {
         : s
     )
     return FAIR_SOURCES.find((s) => s.id === id)!
+  },
+
+  // ── 设备管理 — 终端心跳(契约 C1 mock)─────────────────────────────────────
+  async getTerminals(): Promise<AdminTerminalsResponse> {
+    await delay()
+    const now = Date.now()
+    const min = (n: number) => new Date(now - n * 60_000).toISOString()
+    return {
+      terminals: [
+        { id: 't1',  terminalCode: 'KSK-001', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
+        { id: 't2',  terminalCode: 'KSK-002', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
+        { id: 't3',  terminalCode: 'KSK-003', registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
+        { id: 't4',  terminalCode: 'KSK-004', registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
+        { id: 't7',  terminalCode: 'KSK-007', registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
+        { id: 't8',  terminalCode: 'KSK-008', registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
+        { id: 't9',  terminalCode: 'KSK-009', registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          agentVersion: null,     ipAddress: null,          diskFreeGb: null },
+        { id: 't10', terminalCode: 'KSK-010', registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
+      ],
+    }
+  },
+
+  // ── 日志审计(HIGH-5 mock,支持 action/时间筛选 + 分页)───────────────────
+  async getAuditLogs(query: AuditLogListQuery = {}): Promise<AuditLogListResponse> {
+    await delay()
+    let items: AuditLogRecord[] = [...MOCK_AUDIT_LOGS]
+    if (query.action)     items = items.filter((r) => r.action === query.action)
+    if (query.actorId)    items = items.filter((r) => r.actorId === query.actorId)
+    if (query.targetType) items = items.filter((r) => r.targetType === query.targetType)
+    if (query.targetId)   items = items.filter((r) => r.targetId === query.targetId)
+    if (query.startAt)    items = items.filter((r) => r.createdAt >= query.startAt!)
+    if (query.endAt)      items = items.filter((r) => r.createdAt < query.endAt!)
+    const total = items.length
+    const limit = query.limit ?? 50
+    const offset = query.offset ?? 0
+    return { items: items.slice(offset, offset + limit), total, limit, offset }
   },
 
   async getImportBatches(): Promise<AdminImportBatch[]> {

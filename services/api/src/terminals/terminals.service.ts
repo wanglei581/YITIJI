@@ -78,6 +78,46 @@ export interface ClaimTaskResponse {
   claimExpiresAt: string
   params: PrintJobParams
   createdAt: string
+  // 契约 C2：原始文件名（create-print-job 时落进 paramsJson.fileName）与推断的 MIME。
+  // Agent 据此推断打印扩展名（mimeType → fileName 后缀 → URL 后缀 → .pdf），
+  // 修复签名 URL 无扩展名导致 JPEG/PNG 被当 PDF 打印必失败的 HIGH-1。
+  fileName?: string
+  mimeType?: string
+}
+
+// fileName 后缀 → MIME（仅覆盖 Agent print() 支持的可打印类型，其余留空）。
+const EXT_TO_MIME: Record<string, string> = {
+  '.pdf':  'application/pdf',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png':  'image/png',
+  '.bmp':  'image/bmp',
+  '.tif':  'image/tiff',
+  '.tiff': 'image/tiff',
+}
+
+/** 由原始文件名后缀推断 MIME（无法判断时返回 undefined，交由 Agent 回退）。 */
+function inferMimeFromFileName(fileName: string | undefined): string | undefined {
+  if (!fileName) return undefined
+  const dot = fileName.lastIndexOf('.')
+  if (dot < 0) return undefined
+  const ext = fileName.slice(dot).toLowerCase()
+  return EXT_TO_MIME[ext]
+}
+
+// ── Admin terminal view (契约 C1) ──────────────────────────────────────────────
+
+export interface AdminTerminalView {
+  id: string
+  terminalCode: string
+  registeredAt: string // ISO
+  lastSeenAt: string // ISO
+  online: boolean // lastSeenAt 距今 < 3 分钟 = true
+  lastHeartbeatAt: string | null
+  printerStatus: string | null // 'ok'|'offline'|'paper_empty'|'error'|'not_found' 或 null
+  agentVersion: string | null
+  ipAddress: string | null
+  diskFreeGb: number | null
 }
 
 // ── Sample files ──────────────────────────────────────────────────────────────
@@ -301,6 +341,9 @@ export class TerminalsService implements OnModuleInit {
       if (!claimed) break
 
       const params = this.parseParams(claimed.paramsJson)
+      // 原始文件名落在 paramsJson.fileName（create-print-job 写入），从这里取出。
+      const fileName = this.extractFileName(claimed.paramsJson)
+      const mimeType = inferMimeFromFileName(fileName)
       results.push({
         taskId: claimed.id,
         type: 'print',
@@ -311,6 +354,8 @@ export class TerminalsService implements OnModuleInit {
         claimExpiresAt: claimExpiry.toISOString(),
         params,
         createdAt: claimed.createdAt.toISOString(),
+        ...(fileName ? { fileName } : {}),
+        ...(mimeType ? { mimeType } : {}),
       })
     }
 
@@ -502,10 +547,70 @@ export class TerminalsService implements OnModuleInit {
     }
   }
 
+  /** 从 paramsJson 取出 create-print-job 落入的原始文件名（不存在/解析失败返回 undefined）。 */
+  private extractFileName(json: string): string | undefined {
+    try {
+      const parsed = JSON.parse(json) as { fileName?: unknown }
+      return typeof parsed.fileName === 'string' && parsed.fileName.length > 0
+        ? parsed.fileName
+        : undefined
+    } catch {
+      return undefined
+    }
+  }
+
   // ── Admin helpers ────────────────────────────────────────────────────────────
 
   listTerminals() {
     return this.prisma.terminal.findMany({ orderBy: { registeredAt: 'desc' } })
+  }
+
+  /**
+   * 契约 C1（Agent3 admin 设备页消费）：列出全部终端 + 最近一条心跳 + 在线判定。
+   * online = lastSeenAt 距今 < 3 分钟。lastSeenAt 取 max(registeredAt, 最近心跳 createdAt)。
+   * printerStatus / agentVersion / ipAddress / diskFreeGb 取最近一条心跳，无心跳为 null。
+   */
+  async listTerminalsForAdmin(): Promise<{ terminals: AdminTerminalView[] }> {
+    const ONLINE_WINDOW_MS = 3 * 60 * 1000
+    const now = Date.now()
+
+    const rows = await this.prisma.terminal.findMany({
+      orderBy: { registeredAt: 'desc' },
+      include: {
+        heartbeats: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            printerStatus: true,
+            agentVersion: true,
+            ipAddress: true,
+            diskFreeGb: true,
+            createdAt: true,
+          },
+        },
+      },
+    })
+
+    const terminals: AdminTerminalView[] = rows.map((t) => {
+      const hb = t.heartbeats[0]
+      const lastHeartbeatAt = hb?.createdAt ?? null
+      // lastSeenAt：以最近心跳为准，从未上报心跳则回退注册时间。
+      const lastSeen = lastHeartbeatAt ?? t.registeredAt
+      return {
+        id: t.id,
+        terminalCode: t.terminalCode,
+        registeredAt: t.registeredAt.toISOString(),
+        lastSeenAt: lastSeen.toISOString(),
+        online: now - lastSeen.getTime() < ONLINE_WINDOW_MS,
+        lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
+        printerStatus: hb?.printerStatus ?? null,
+        agentVersion: hb?.agentVersion ?? null,
+        ipAddress: hb?.ipAddress ?? null,
+        diskFreeGb: hb?.diskFreeGb ?? null,
+      }
+    })
+
+    return { terminals }
   }
 
   listPrintTasks() {

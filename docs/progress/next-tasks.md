@@ -1,11 +1,27 @@
 # 下一步任务
 
-> 最后更新：2026-06-03（校园招聘专区 P0，feat/kiosk-campus-zone-on-main）
+> 最后更新：2026-06-04（P0 Bug 修复 + 后端接线，fix/p0-bugs-and-backend-wiring）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
 
-## 📌 当前状态（校园招聘专区 P0，已完成代码 + 静态验证）
+## 📌 当前状态（P0 Bug 修复 + 后端接线，已完成代码 + 三绿 + 6 路审查）
+
+**fix/p0-bugs-and-backend-wiring（2026-06-04，基于 feat/kiosk-campus-zone-on-main）：** 详见 [current-progress.md](./current-progress.md) 同名段。已修 HIGH-1~6 + 一批 MEDIUM/LOW；typecheck/lint/build 全量三绿；6 路对抗审查通过；招聘会 companies/zones wire→DTO 字段对齐回归已修。
+
+**本轮遗留 / 后续待办（按优先级）：**
+
+- ⏳ **[合规·必做于接真 provider 前] `AiResumeResult` 留存治理**：当前 MockAiProvider 的 optimize before/after 是通用建议文本、无 PII；**一旦接入真实 AI provider，before/after 可能携带简历原文摘录**，必须给 `AiResumeResult` 加 `expiresAt` 列 + 纳入定期清理（参照 `files.cleanupExpired` 模式），落实 CLAUDE.md §11「不长期保存简历」。代码注释已标记（ai.service.ts 顶部）。
+- ⏳ **[基础设施] PostgreSQL 迁移**：上线前硬阻塞；dev.db 现存 `feat/end-user-account` 分支 drift，迁移需重生成 + SQLite 特定查询回归。
+- ⏳ **[凭证] 真实 AI provider 接通**：openai/claude/qwen/zhipu/local 仍为 NotImplemented stub，需外部凭证（持久化层已就绪，接通即可用）。
+- ⏳ **[硬件] 扫描真机链路**：TWAIN/WIA 或扫描到 SMB/U盘 + Agent 中转（当前 Kiosk 扫描全程模拟）。
+- ⏳ **[择期] 打印过期 URL 错误细分**：可把"签名非法"与"已过期"区分为 `PRINT_FILE_URL_EXPIRED` 引导重传（TTL 已延至 30min，实际触发已大幅降低）。
+- ⏳ **[择期] admin orders/files/alerts 真实后端**：当前为本地演示态（已加诚实「演示数据」提示），需后端端点。
+- ⏳ **[择期] 招聘会 materials/stats/展位** 需补 Prisma 模型后接真（当前诚实返回空）。
+
+---
+
+## 📌 历史状态（校园招聘专区 P0，已完成代码 + 静态验证）
 
 **feat/kiosk-campus-zone-on-main（2026-06-03，cherry-pick `42ebd9c` 到干净 main `603be2a` 之上）：** 方案见 [campus-recruitment-design.md](../product/campus-recruitment-design.md)（方案 A，纯前端聚合，复用现有 API，无 schema 改动）。
 

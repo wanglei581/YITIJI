@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
+import { makePrintParams } from '@ai-job-print/shared'
 import {
   ActivityIcon,
   BuildingIcon,
@@ -136,9 +137,7 @@ export function JobFairDetailPage() {
     navigate('/print/confirm', {
       state: {
         file: { name: `${fair.name}_活动资料.pdf`, size: '256 KB', pages: 2 },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
+        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }

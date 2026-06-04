@@ -15,28 +15,33 @@ import {
 import { useNavigate } from 'react-router-dom'
 
 // ── DeviceStatusStrip ─────────────────────────────────────────
+//
+// 首页这条状态带没有 terminalId 上下文（VITE_TERMINAL_ID 仅在打印流程页按需查询），
+// 因此不写死「正常」绿点（打印机离线时仍显示正常会误导用户）。改为中性提示：
+// 设备实际可用性以「打印前检测」为准。真实状态在 /print/preview 通过
+// usePrinterStatus(VITE_TERMINAL_ID) 心跳查询并展示。
 
 interface DeviceItem {
   icon: typeof PrinterIcon
   label: string
-  ok: boolean
 }
 
 function DeviceStatusStrip() {
   const devices: DeviceItem[] = [
-    { icon: PrinterIcon,      label: '打印机正常', ok: true },
-    { icon: MonitorCheckIcon, label: '扫描仪正常', ok: true },
-    { icon: WifiIcon,         label: '网络正常',   ok: true },
+    { icon: PrinterIcon,      label: '打印机' },
+    { icon: MonitorCheckIcon, label: '扫描仪' },
+    { icon: WifiIcon,         label: '网络' },
   ]
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-      {devices.map(({ icon: Icon, label, ok }) => (
+      {devices.map(({ icon: Icon, label }) => (
         <div key={label} className="flex items-center gap-2">
-          <span className={['h-2 w-2 rounded-full', ok ? 'bg-green-400' : 'bg-red-400'].join(' ')} />
+          <span className="h-2 w-2 rounded-full bg-blue-300/60" aria-hidden="true" />
           <Icon className="h-4 w-4 text-blue-200" aria-hidden="true" />
           <span className="text-sm font-medium text-blue-100">{label}</span>
         </div>
       ))}
+      <span className="text-xs text-blue-200/80">设备状态以打印前检测为准</span>
     </div>
   )
 }

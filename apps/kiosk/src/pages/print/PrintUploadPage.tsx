@@ -137,7 +137,7 @@ export function PrintUploadPage() {
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png"
               className="sr-only"
               onChange={handleFileChange}
             />

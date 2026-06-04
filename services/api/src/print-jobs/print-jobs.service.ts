@@ -1,7 +1,8 @@
 import crypto from 'crypto'
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { signFileUrl } from '../files/signing'
+import { AuditService } from '../audit/audit.service'
+import { signFileUrl, verifyFileSignature } from '../files/signing'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 
 export interface PrintJobCreated {
@@ -35,31 +36,68 @@ const DEFAULT_PARAMS = {
 // Terminal Agent can still download the file even if claim is delayed.
 const PRINT_JOB_FILE_URL_TTL_MS = 30 * 60 * 1000
 
-/** Extract fileId from an internal signed content URL: /api/v1/files/<id>/content?... */
-function extractFileIdFromSignedUrl(fileUrl: string): string | null {
+/**
+ * HIGH-3 (SSRF) — 解析并**验签**内部签名 URL。
+ *
+ * 只接受本系统 files 服务签发的签名 content URL，形如：
+ *   /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>
+ * （可带 host，例如 https://host/api/v1/files/...；统一只取 path + query 解析）
+ *
+ * 返回 fileId 仅当：能解析出 fileId + expires + sig，且 verifyFileSignature 通过
+ * （HMAC 正确且未过期）。任何不满足 → 返回 null，由调用方 400 拒绝，
+ * 杜绝把任意外部 URL 落库让 Terminal Agent 下载（SSRF）。
+ */
+function parseAndVerifySignedFileUrl(fileUrl: string): string | null {
+  let pathname: string
+  let searchParams: URLSearchParams
   try {
-    const match = fileUrl.match(/\/files\/([^/]+)\/content/)
-    return match?.[1] ?? null
+    // 相对 URL（/api/v1/...）与绝对 URL（https://host/api/v1/...）都能解析。
+    const u = new URL(fileUrl, 'http://internal.local')
+    pathname = u.pathname
+    searchParams = u.searchParams
   } catch {
     return null
   }
+
+  const match = pathname.match(/\/files\/([^/]+)\/content$/)
+  const fileId = match?.[1]
+  if (!fileId) return null
+
+  const expires = searchParams.get('expires')
+  const sig = searchParams.get('sig')
+  if (!expires || !sig) return null
+
+  return verifyFileSignature(fileId, expires, sig) ? fileId : null
 }
 
 @Injectable()
 export class PrintJobsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
-  async create(dto: CreatePrintJobDto): Promise<PrintJobCreated> {
+  async create(
+    dto: CreatePrintJobDto,
+    ctx: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ): Promise<PrintJobCreated> {
     const taskId = `ptask_kiosk_${crypto.randomBytes(8).toString('hex')}`
 
-    // B1: If fileUrl is an internal signed URL, re-sign with 30-min TTL so
-    // the Terminal Agent can download even after a claim delay.
-    let storedFileUrl = dto.fileUrl
-    const fileId = extractFileIdFromSignedUrl(dto.fileUrl)
-    if (fileId) {
-      const { url } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
-      storedFileUrl = url
+    // HIGH-3 (SSRF)：fileUrl 必须是本系统签名 URL，且签名/有效期校验通过。
+    // 非法 URL（外部地址、无签名、签名错误、已过期）直接 400，绝不落库给 Agent 下载。
+    const fileId = parseAndVerifySignedFileUrl(dto.fileUrl)
+    if (!fileId) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_INVALID_FILE_URL',
+          message: 'fileUrl 必须是本系统签发的有效签名文件链接',
+        },
+      })
     }
+
+    // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
+    // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
+    const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
 
     // fileName 持久化：PrintTask 当前无独立 fileName 列（本阶段不做 migration，方案②约定）。
     // 折中：把 fileName 落进 paramsJson，使任务详情 / 日志 / DB 中可见文件名。
@@ -79,6 +117,25 @@ export class PrintJobsService {
         status:     'pending',
       },
     })
+
+    // HIGH-3 (审计)：记录打印任务创建。actor 为匿名 Kiosk（无登录态），
+    // 只记 fileId / 文件名 / 参数摘要 —— 不写文件正文、不写签名 URL（含 sig）等敏感串。
+    await this.audit.write({
+      actorId:    null,
+      actorRole:  'kiosk',
+      action:     'print_job.create',
+      targetType: 'print_task',
+      targetId:   task.id,
+      payload: {
+        fileId,
+        fileName:    dto.fileName ?? null,
+        hasFileHash: Boolean(dto.fileMd5),
+        params:      dto.params ?? DEFAULT_PARAMS,
+      },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+    })
+
     return {
       taskId:    task.id,
       status:    task.status,

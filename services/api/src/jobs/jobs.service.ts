@@ -13,10 +13,13 @@
 //   - 终态(approved / rejected)不可回退到 pending(需 reopen,本阶段未实现)
 //   - 不返回 apiSecret / accessToken / 凭证字段
 //
-// Fair 模型暂未落 Prisma(留待 Phase #3):
-//   读端点(getPublishedFairs / getAllFairSources / getPartnerFairs)返回空,
+// Fair 模型已落 Prisma(JobFair / FairCompany / FairZone):
+//   读端点(getPublishedFairs / getPublishedFairDetail / getFairCompanies /
+//   getFairZones / getFairMap / getAllFairSources / getPartnerFairs)走真实查询,
 //   写端点(reviewFairSource / publishFairSource / importFairs / unpublishPartnerFair)
-//   抛 FAIR_NOT_IMPLEMENTED。
+//   与 Job 共用同一套审核/发布状态机。
+//   说明:招聘会子资源中 materials(资料) / stats(统计) / booth(展位坐标)
+//   目前无对应 Prisma 模型,controller 诚实返回空数据,不硬造 mock。
 // ============================================================
 
 import {
@@ -46,7 +49,7 @@ import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
-import type { FairDetailResponse } from './fair.types'
+import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 
 // ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
 //
@@ -586,6 +589,89 @@ export class JobsService {
       fair: mapFair(f),
       companies: f.companies.map(mapFairCompany),
       zones: f.zones.map(mapFairZone),
+    }
+  }
+
+  /**
+   * 招聘会子资源 — 参展企业列表(分页)。
+   *
+   * 接真 Prisma:仅放出 approved+published 招聘会下的 FairCompany 真实录入数据。
+   * 招聘会不存在 / 未发布 → 返回空集(前端 EmptyState 兜底,不抛 404)。
+   */
+  async getFairCompanies(
+    fairId: string,
+    page: number,
+    pageSize: number,
+  ): Promise<{ data: FairCompany[]; total: number; page: number; pageSize: number }> {
+    const fair = await this.prisma.jobFair.findFirst({
+      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      select: { id: true },
+    })
+    if (!fair) return { data: [], total: 0, page, pageSize }
+
+    const [rows, total] = await Promise.all([
+      this.prisma.fairCompany.findMany({
+        where: { jobFairId: fairId },
+        orderBy: { jobsCount: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.fairCompany.count({ where: { jobFairId: fairId } }),
+    ])
+    return { data: rows.map(mapFairCompany), total, page, pageSize }
+  }
+
+  /** 招聘会子资源 — 单个参展企业详情。需归属该已发布招聘会。 */
+  async getFairCompanyById(fairId: string, companyId: string): Promise<{ data: FairCompany | null }> {
+    const fair = await this.prisma.jobFair.findFirst({
+      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      select: { id: true },
+    })
+    if (!fair) return { data: null }
+    const company = await this.prisma.fairCompany.findFirst({
+      where: { id: companyId, jobFairId: fairId },
+    })
+    return { data: company ? mapFairCompany(company) : null }
+  }
+
+  /** 招聘会子资源 — 展区列表(sortOrder 升序)。 */
+  async getFairZones(fairId: string): Promise<{ data: FairZone[] }> {
+    const fair = await this.prisma.jobFair.findFirst({
+      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      select: { id: true },
+    })
+    if (!fair) return { data: [] }
+    const zones = await this.prisma.fairZone.findMany({
+      where: { jobFairId: fairId },
+      orderBy: { sortOrder: 'asc' },
+    })
+    return { data: zones.map(mapFairZone) }
+  }
+
+  /**
+   * 招聘会子资源 — 导览图数据。
+   *
+   * 模型限制:当前 schema 无独立"展位(booth)"模型,展位坐标 / 编号未落库。
+   * 因此 booths 诚实返回空数组(绝不硬造假坐标),zones 返回真实展区,
+   * mapImageUrl 返回招聘会录入的导览底图(可空)。
+   */
+  async getFairMap(fairId: string): Promise<{ data: { mapImageUrl: string | null; zones: FairZone[]; booths: [] } | null }> {
+    const fair = await this.prisma.jobFair.findFirst({
+      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      select: { id: true, mapImageUrl: true },
+    })
+    if (!fair) return { data: null }
+    const zones = await this.prisma.fairZone.findMany({
+      where: { jobFairId: fairId },
+      orderBy: { sortOrder: 'asc' },
+    })
+    return {
+      data: {
+        mapImageUrl: fair.mapImageUrl,
+        zones: zones.map(mapFairZone),
+        // 模型限制:无 FairBooth 模型,展位坐标未录入 → 诚实空,不硬造
+        booths: [],
+      },
     }
   }
 

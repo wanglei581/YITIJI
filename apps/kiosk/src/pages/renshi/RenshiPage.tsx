@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@ai-job-print/ui'
+import { useComingSoonNotice } from '../../components/ComingSoonNotice'
 import {
   ArrowUpRightIcon,
   BookOpenIcon,
@@ -360,7 +361,7 @@ function PolicyPanel() {
 
 // ─── Panel: 社保指南 ─────────────────────────────────────────────────────────
 
-function SocialPanel() {
+function SocialPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
 
   return (
@@ -402,6 +403,7 @@ function SocialPanel() {
                 {guide.entryLabel.includes('扫码') ? (
                   <button
                     type="button"
+                    onClick={() => onComingSoon(guide.entryLabel)}
                     className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 py-3 text-sm font-semibold text-primary-700 hover:bg-primary-100"
                   >
                     <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
@@ -428,7 +430,7 @@ function SocialPanel() {
 
 // ─── Panel: 就业登记 ─────────────────────────────────────────────────────────
 
-function RegisterPanel() {
+function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
 
   return (
@@ -485,6 +487,7 @@ function RegisterPanel() {
               </button>
               <button
                 type="button"
+                onClick={() => onComingSoon('扫码预约')}
                 className="flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-medium text-primary-700 hover:bg-primary-100"
               >
                 <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
@@ -500,7 +503,7 @@ function RegisterPanel() {
 
 // ─── Panel: 政策公告 ─────────────────────────────────────────────────────────
 
-function NoticePanel() {
+function NoticePanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
 
   return (
@@ -531,6 +534,7 @@ function NoticePanel() {
           <div className="flex shrink-0 flex-col gap-2">
             <button
               type="button"
+              onClick={() => onComingSoon('查看详情')}
               className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
             >
               查看详情
@@ -592,9 +596,11 @@ export function RenshiPage() {
   const [searchParams] = useSearchParams()
   const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'policy'
   const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  const { notify, overlay } = useComingSoonNotice()
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {overlay}
       <PageHeader
         title="人社专区"
         subtitle="就业政策 · 社保指南 · 就业登记 · 政策公告"
@@ -614,9 +620,9 @@ export function RenshiPage() {
 
       {/* Tab panels */}
       {activeTab === 'policy'   && <PolicyPanel />}
-      {activeTab === 'social'   && <SocialPanel />}
-      {activeTab === 'register' && <RegisterPanel />}
-      {activeTab === 'notice'   && <NoticePanel />}
+      {activeTab === 'social'   && <SocialPanel onComingSoon={notify} />}
+      {activeTab === 'register' && <RegisterPanel onComingSoon={notify} />}
+      {activeTab === 'notice'   && <NoticePanel onComingSoon={notify} />}
 
       {/* Print pack always visible at bottom */}
       <PrintPackBanner />

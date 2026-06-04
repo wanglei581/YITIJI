@@ -70,6 +70,89 @@ export interface PrintJobParams {
   feeder?: 'auto' | 'manual_tray' | 'tray1' | 'tray2'
 }
 
+// ── Print param normalization helper ──────────────────────────────────────────
+
+/** 默认打印参数：黑白、单面、A4、1 份、标准质量。 */
+export const DEFAULT_PRINT_JOB_PARAMS: PrintJobParams = {
+  copies: 1,
+  colorMode: 'black_white',
+  duplex: 'simplex',
+  paperSize: 'A4',
+  pageRange: 'all',
+  orientation: 'auto',
+  quality: 'standard',
+  scale: 'fit',
+  pagesPerSheet: 1,
+}
+
+/**
+ * 旧扁平字段输入（历史遗留 / 简化调用方）。
+ * 允许使用旧字段名 color / 旧 duplex 取值 'single' / 'double'，
+ * 由 makePrintParams 归一化为合法 PrintJobParams。
+ */
+export interface PrintParamsInput extends Partial<Omit<PrintJobParams, 'colorMode' | 'duplex'>> {
+  colorMode?: ColorMode
+  duplex?: DuplexMode | 'single' | 'double'
+  /** 旧字段名：'bw' → black_white，'color' → color。优先级低于 colorMode。 */
+  color?: 'bw' | 'color' | ColorMode
+}
+
+function normalizeColorMode(input: PrintParamsInput): ColorMode {
+  if (input.colorMode === 'color' || input.colorMode === 'black_white') return input.colorMode
+  if (input.color === 'color') return 'color'
+  if (input.color === 'black_white') return 'black_white'
+  if (input.color === 'bw') return 'black_white'
+  return DEFAULT_PRINT_JOB_PARAMS.colorMode
+}
+
+function normalizeDuplex(input: PrintParamsInput): DuplexMode {
+  const d = input.duplex
+  if (d === 'simplex' || d === 'duplex_long_edge' || d === 'duplex_short_edge') return d
+  if (d === 'single') return 'simplex'
+  if (d === 'double') return 'duplex_long_edge'
+  return DEFAULT_PRINT_JOB_PARAMS.duplex
+}
+
+function clampCopies(copies: number | undefined): number {
+  if (typeof copies !== 'number' || !Number.isFinite(copies)) return DEFAULT_PRINT_JOB_PARAMS.copies
+  return Math.min(99, Math.max(1, Math.round(copies)))
+}
+
+/**
+ * 归一化页码范围以匹配后端 DTO 约束（仅数字/逗号/连字符/空格，如 "1-3,5"）。
+ * 后端语义：pageRange 省略(undefined) = 全部页面。因此 'all' / 空串 一律归一为 undefined，
+ * 否则提交真实打印任务时会被后端 @Matches 校验拒绝(400)。
+ */
+function normalizePageRange(pageRange: string | undefined): string | undefined {
+  if (!pageRange) return undefined
+  const trimmed = pageRange.trim()
+  if (trimmed === '' || trimmed.toLowerCase() === 'all') return undefined
+  return trimmed
+}
+
+/**
+ * 构造合法的 PrintJobParams：合并默认值 + 入参，并把旧字段名/旧取值归一化。
+ * 调用方应统一通过本 helper 生成 params，避免扁平字段（copies/duplex:'single'/color:'bw'）
+ * 在 PrintConfirmPage 被静默丢弃回落黑白单面。
+ */
+export function makePrintParams(input: PrintParamsInput = {}): PrintJobParams {
+  return {
+    ...DEFAULT_PRINT_JOB_PARAMS,
+    copies: clampCopies(input.copies),
+    colorMode: normalizeColorMode(input),
+    duplex: normalizeDuplex(input),
+    paperSize: 'A4',
+    pageRange: normalizePageRange(input.pageRange ?? DEFAULT_PRINT_JOB_PARAMS.pageRange),
+    orientation: input.orientation ?? DEFAULT_PRINT_JOB_PARAMS.orientation,
+    quality: input.quality ?? DEFAULT_PRINT_JOB_PARAMS.quality,
+    scale: input.scale ?? DEFAULT_PRINT_JOB_PARAMS.scale,
+    pagesPerSheet: input.pagesPerSheet ?? DEFAULT_PRINT_JOB_PARAMS.pagesPerSheet,
+    ...(input.collate !== undefined ? { collate: input.collate } : {}),
+    ...(input.paperType !== undefined ? { paperType: input.paperType } : {}),
+    ...(input.feeder !== undefined ? { feeder: input.feeder } : {}),
+  }
+}
+
 // ── Print task ────────────────────────────────────────────────────────────────
 
 export interface PrintTask {

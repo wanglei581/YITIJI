@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
 import { ShieldIcon } from 'lucide-react'
@@ -20,10 +20,12 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
 
-  // 已登录直接跳走
-  if (getToken()) {
-    nav('/', { replace: true })
-  }
+  // 已登录直接跳走(渲染期不能有副作用,放进 effect)
+  useEffect(() => {
+    if (getToken()) {
+      nav('/', { replace: true })
+    }
+  }, [nav])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

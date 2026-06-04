@@ -3,6 +3,25 @@ import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon, PlayIcon, SettingsIcon } from 'lucide-react'
 import { API_BASE_URL, API_MODE } from '../../services/api/client'
+import { authHeader, redirectToLogin } from '../../services/auth'
+
+/**
+ * 统一鉴权 fetch:带 Bearer(authHeader)+ credentials,401 走全局 redirectToLogin。
+ * 与其余 adapter 的鉴权机制保持一致(MEDIUM:此前仅 credentials:'include' 不带 Bearer,
+ * 后端校验 Bearer 时会 401)。
+ */
+async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: { Accept: 'application/json', ...authHeader(), ...(init.headers ?? {}) },
+  })
+  if (res.status === 401) {
+    redirectToLogin()
+    throw new Error('登录已过期')
+  }
+  return res
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,9 +83,7 @@ const MOCK_SOURCES: ApiSyncSourceItem[] = [
 
 async function fetchApiSources(): Promise<ApiSyncSourceItem[]> {
   if (API_MODE !== 'http') return MOCK_SOURCES
-  const res = await fetch(`${API_BASE_URL}/admin/job-sync/sources`, {
-    credentials: 'include',
-  })
+  const res = await authFetch('/admin/job-sync/sources')
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const body = (await res.json()) as { data: ApiSyncSourceItem[] }
   return body.data ?? []
@@ -77,9 +94,8 @@ async function triggerApiSync(sourceId: string): Promise<void> {
     await new Promise((r) => setTimeout(r, 800))
     return
   }
-  const res = await fetch(`${API_BASE_URL}/admin/job-sync/sources/${encodeURIComponent(sourceId)}/trigger`, {
+  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/trigger`, {
     method: 'POST',
-    credentials: 'include',
   })
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
@@ -118,7 +134,7 @@ export default function SyncSourcesPage() {
       return
     }
     try {
-      const res = await fetch(API_BASE_URL + '/admin/job-sync/sources/' + src.id, { credentials: 'include' })
+      const res = await authFetch('/admin/job-sync/sources/' + src.id)
       if (!res.ok) throw new Error('HTTP ' + res.status)
       const body = (await res.json()) as { data?: { responseConfig?: { dataType?: string; rootPath?: string; fields?: Record<string, string> } } }
       const rc = body.data?.responseConfig
@@ -147,9 +163,8 @@ export default function SyncSourcesPage() {
       if (API_MODE !== 'http') {
         await new Promise((r) => setTimeout(r, 600))
       } else {
-        const res = await fetch(API_BASE_URL + '/admin/job-sync/sources/' + configSrc.id + '/response-config', {
+        const res = await authFetch('/admin/job-sync/sources/' + configSrc.id + '/response-config', {
           method: 'PUT',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dto),
         })

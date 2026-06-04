@@ -18,8 +18,9 @@ import { FilesCleanupTask } from './files.cleanup.task'
  *   - JwtModule:JwtAuthGuard 验签
  *   - @nestjs/schedule:cron(在 AppModule 顶层 ScheduleModule.forRoot())
  *
- * 不依赖 AuditModule(BE-2 W2),操作日志由 controller 在动作完成后回写,
- * 这样 FilesService 单测无需 stub AuditService。
+ * 操作日志:手动删除等动作由 controller 在动作完成后回写(带 actor/IP);
+ * 定时清理(cleanupExpired cron)无 controller 上下文,故 FilesService 经 @Global 的
+ * AuditService 直接写 system 审计。FilesService 单测需 stub AuditService。
  */
 @Module({
   imports: [

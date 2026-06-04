@@ -107,7 +107,7 @@ export default function AlertsPage() {
   }
 
   const statusCounts = {
-    全部:   alerts.filter((a) => a.status !== 'resolved').length + alerts.filter((a) => a.status === 'resolved').length,
+    全部:   alerts.length,
     待处理: alerts.filter((a) => a.status === 'pending').length,
     处理中: alerts.filter((a) => a.status === 'handling').length,
     已解决: alerts.filter((a) => a.status === 'resolved').length,

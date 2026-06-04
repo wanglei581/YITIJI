@@ -4,7 +4,7 @@ import ReactDiffViewer from 'react-diff-viewer-continued'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon, TargetIcon, TrendingUpIcon } from 'lucide-react'
 import type { ResumeOptimizeModule, ResumeTargetContext } from '@ai-job-print/shared'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { getResumeOptimize } from '../../services/api'
 
 // 目标方向摘要文本（无方向时返回 null）
@@ -84,9 +84,7 @@ export function ResumeOptimizePage() {
     navigate('/print/confirm', {
       state: {
         file: { name: file?.name ?? '简历.pdf', size: file?.size ?? '200 KB', pages: 1 },
-        copies: 1,
-        duplex: 'single',
-        color: 'bw',
+        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }

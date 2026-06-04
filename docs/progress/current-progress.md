@@ -25,7 +25,34 @@
 
 ## 二、当前开发阶段
 
-**当前阶段：校园招聘专区 P0（2026-06-03，feat/kiosk-campus-zone-on-main，cherry-pick 自 `42ebd9c`，基于干净 main `603be2a`）**
+**当前阶段：P0 Bug 修复 + 后端接线（2026-06-04，`fix/p0-bugs-and-backend-wiring`，基于 `feat/kiosk-campus-zone-on-main`）**
+
+---
+
+### ✅ P0 Bug 修复 + 后端接线（2026-06-04，`fix/p0-bugs-and-backend-wiring`）
+
+基于全项目专家评审（多 Agent：各模块进度 + 构建健康 + 合规扫描 + 真假数据审计 + 集成 Bug 猎手），按优先级修复 P0/MEDIUM/LOW 问题；改动后经 6 路对抗式审查复核，typecheck/lint/build 全量三绿。
+
+**已修复（HIGH）：**
+
+| # | 问题 | 修复 |
+|---|------|------|
+| HIGH-1 | 图片打印 100% 失败：Agent `extFromUrl` 对无后缀签名 URL 永远回退 `.pdf`，JPEG/PNG 被当 PDF 喂给 SumatraPDF | claim 响应新增 `fileName`/`mimeType`（从 `PrintTask.paramsJson` 取原始文件名），Agent `inferTaskExt` 按 mimeType→fileName→URL→.pdf 推断，PNG/JPG 正确走 pdfkit 图片分支 |
+| HIGH-2 | 打印参数被静默丢弃：7 处生产端传扁平 `{copies,duplex:'single',color:'bw'}`，PrintConfirmPage 只读 `PrintJobParams`，份数/双面/彩色全回落黑白单面 | `packages/shared` 新增 `makePrintParams()` 归一化 helper（旧字段名/非法值映射，`pageRange:'all'`→undefined 对齐后端 DTO），7 处统一接入 |
+| HIGH-3 | 打印创建端点无鉴权/无审计/SSRF：`fileUrl` 不验签，任意外部 URL 落库给 Agent 下载 | `parseAndVerifySignedFileUrl` 强校验本系统签名 URL（HMAC+有效期），非法 400 `PRINT_INVALID_FILE_URL`；落库重签 30min；创建写 `print_job.create` 审计（payload 无 sig/正文/密钥）；保匿名 Kiosk 流（签名校验+限流+审计，不加 JWT） |
+| HIGH-4 | Admin 设备页 100% 本地 mock，后端心跳能力被浪费 | 后端新增 `GET /admin/terminals`（admin JWT+RolesGuard，列终端+最近心跳+online<3min）；Admin 设备页接真 HttpAdapter |
+| HIGH-5 | Admin 日志审计页空骨架，后端 `/admin/audit-logs` 已就绪却 0 消费 | Admin 审计页接真后端：动作/时间筛选、分页、空/加载/错误态 |
+| HIGH-6 | AI 解析/优化结果存进程内 Map，重启/多实例即 404 | 新增 Prisma 模型 `AiResumeResult`（taskId+kind 唯一）+ 迁移，读写改走 DB（仍用 MockAiProvider 产生内容） |
+
+**已修复（MEDIUM/LOW）：** 招聘会 `companies/zones/map` 子端点接真 Prisma（materials/stats/booths 无模型→诚实空）；上传签名 URL TTL 5min→30min（覆盖触控操作窗口，避免打印时撞过期 400）；`print_doc` 上传 MIME 收口为 pdf/jpeg/png + 文件选择器 `accept` 同步收窄；文件清理 cron 补写审计；sync-sources 统一 Bearer 鉴权；首页设备状态去造假；Qingdao/Renshi 死按钮接「即将上线」/真跳转；删除孤儿页 `ResumeUploadPage`（路由重定向 `/resume/source`）；login 渲染期副作用入 useEffect；filesApi 重复 `kioskUploadFile` 收口。
+
+**集成修复（主程，审查后）：** 招聘会 companies/zones **wire→DTO 字段对齐**（后端精简 Prisma 形状 `name/industry:null` vs Kiosk 富 DTO `companyName/positions/checkinStatus`，httpAdapter 早期空 stub 掩盖、接真数据后 `c.industry.toLowerCase()` 会崩页）——在 Kiosk httpAdapter 新增 `mapWireCompany`/`mapWireZone`，模型缺字段安全占位不硬造。
+
+**删除记录（CLAUDE.md §7）：** `apps/kiosk/src/pages/resume/ResumeUploadPage.tsx`（'Phase 3 开发中' 占位页，真实流程走 `/resume/source`，路由改 `<Navigate>` 重定向）。
+
+**合规复核：** 6 路审查 complianceOk 全 true；无禁词违规（命中均为合规护栏/白名单文案）；前端/shared 无密钥泄露；审计 payload 无敏感正文。
+
+**本轮范围外（需硬件/凭证/基础设施，已记 next-tasks）：** 真实 AI provider（需凭证）、`AiResumeResult` TTL/清理（接真 provider 后必加，§11）、扫描真机链路（TWAIN/SMB，需硬件）、PostgreSQL 迁移、奔图开放打印 API 彩色 mode。
 
 ---
 

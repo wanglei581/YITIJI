@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { FairMaterialDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
+import { makePrintParams } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import { getFairMaterials, getJobFairById } from '../../services/api'
@@ -47,9 +48,11 @@ export function FairMaterialsPage() {
     navigate('/print/confirm', {
       state: {
         file: { name: material.name, size: formatSize(material.fileSizeKB), pages: material.pageCount },
-        copies: 1,
-        duplex: material.pageCount > 1 ? 'double' : 'single',
-        color: 'bw',
+        params: makePrintParams({
+          copies: 1,
+          duplex: material.pageCount > 1 ? 'double' : 'single',
+          color: 'bw',
+        }),
       },
     })
   }

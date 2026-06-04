@@ -148,10 +148,12 @@ export function FairCompaniesPage() {
                     展位 {company.boothNumber}
                   </span>
                 )}
-                <span className="flex items-center gap-1">
-                  <BriefcaseIcon className="h-3.5 w-3.5" />
-                  招聘 {company.positions.reduce((s, p) => s + p.headcount, 0)} 人 · {company.positions.length} 岗
-                </span>
+                {company.positions.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <BriefcaseIcon className="h-3.5 w-3.5" />
+                    招聘 {company.positions.reduce((s, p) => s + p.headcount, 0)} 人 · {company.positions.length} 岗
+                  </span>
+                )}
               </div>
               {company.description && (
                 <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-gray-400">

@@ -121,6 +121,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.importRecord
   }
 
+  // ── HIGH-6 AI 结果持久化 ────────────────────────────────────────────────────
+
+  get aiResumeResult() {
+    return this.client.aiResumeResult
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

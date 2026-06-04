@@ -508,6 +508,34 @@ model ImportRecord {
   @@index([status])
 }
 
+// ── AiResumeResult ─────────────────────────────────────────────────────────────
+// HIGH-6:AI 解析 / 优化结果持久化。
+//
+// 之前 ai.service.ts 用进程内 Map(parseStore / optimizeStore)存结果,
+// API 重启或多实例后 GET /resume/records/:taskId 直接 404。改为落库:
+//   - taskId + kind 唯一(一个 taskId 最多一条 parse + 一条 optimize)
+//   - kind:'parse' | 'optimize'
+//   - status:复用 AiTaskStatus('pending' | 'processing' | 'completed' | 'failed')
+//   - payloadJson:序列化后的 ParseResumeOutput / OptimizeResumeOutput
+//     (只含诊断评分 / 优化模块文本,不含简历原文 / 候选人 PII)
+//
+// 合规约束(CLAUDE.md §11):AI 结果仅服务求职者本人,不推送企业,不做候选人推荐。
+// 注:本表沿用现有命名风格(payloadJson 同 AuditLog;cuid 主键)。
+
+model AiResumeResult {
+  id         String   @id @default(cuid())
+  taskId     String
+  kind       String   // 'parse' | 'optimize'
+  status     String   // AiTaskStatus
+  payloadJson String  @default("{}")
+  provider   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([taskId, kind])
+  @@index([taskId])
+}
+
 model AuditLog {
   id         String  @id @default(cuid())
   actorId    String?
