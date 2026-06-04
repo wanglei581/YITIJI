@@ -1,7 +1,23 @@
 # 下一步任务
 
-> 最后更新：2026-06-04（P0 Bug 修复 + 后端接线，fix/p0-bugs-and-backend-wiring）
+> 最后更新：2026-06-04（T2 BullMQ API 拉取 worker 验证，claude/t2-api-pull-worker）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
+
+---
+
+## 📌 T2 BullMQ API 拉取 worker 验证（2026-06-04，`claude/t2-api-pull-worker`，基于干净 main `fc0018a`）
+
+详见 [current-progress.md](./current-progress.md) §〇。
+
+- ✅ **验证优先，0 运行代码改动**：以干净 main 为基线复验 W8 已实现的 BullMQ API 拉取 worker。
+- ✅ 真实 Redis（`redis://localhost:6379`，PONG）+ BullMQ 路径：`pnpm verify:job-sync` → **ALL PASS**。
+- ✅ 走真实 worker 确认：`enqueue()` 返回 `jobId=<sourceId>_manual`（队列 jobId），非 inline fallback；`JobSyncProcessor` 从队列 claim 并执行 `pullApiSource`。
+- ✅ 成功路径：2 条岗位落库 + `SyncLog.result=success` + `reviewStatus=pending/publishStatus=draft`（合规）。
+- ✅ 失败路径：HTTP 503 → `SyncLog.result=failed` + `errorDetail=HTTP_503` + 0 脏数据。
+- ✅ api typecheck / lint / build 三绿。
+- ⏳ **[待办] 生产 REDIS_URL 必配**：inline fallback 仅供 dev；生产须挂真实 Redis 才有 BullMQ 持久化/重试语义。
+- ⏳ **[待办] 真源 API 联调**：本验证用本地 mock HTTP 源；接一个真实外部岗位 API 端到端验证 responseConfig auto-detect + 字段映射，留待后续。
+- ⏳ **[待办] FF merge**：验证通过，待人工确认后将 worker 能力相关分支 FF 合入 main（本窗口不 push、不 merge）。
 
 ---
 
