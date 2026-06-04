@@ -5,6 +5,31 @@
 
 ---
 
+## L2-4A：Kiosk 前端纯内存会话层 + memberAuthApi（2026-06-04，`claude/l2-4a-kiosk-auth-session`，未提交）
+
+**目标：** 建立 Kiosk 前端会话底座。不改任何页面/路由/UI 组件。
+
+**新增文件（4 个）：**
+
+- `apps/kiosk/src/auth/context.ts`：`AuthUser` / `AuthContextValue` 类型；`deriveDisplayName` 脱敏辅助；`AuthContext` 对象。
+- `apps/kiosk/src/auth/AuthContext.tsx`：`<AuthProvider>`——纯内存 useState 管理 user + token，ready 挂载即 true，logout 先清本地再 fire-and-forget 后端。
+- `apps/kiosk/src/auth/useAuth.ts`：`useAuth()` hook（单独文件，满足 react-refresh 规则）。
+- `apps/kiosk/src/services/auth/memberAuthApi.ts`：`sendSmsCode / memberLogin / fetchMemberMe / memberLogout`——接真实后端 `/api/v1/member/*`，token 全部由参数显式传入，不引入 memberSession，不读任何存储。
+
+**修改文件（1 个）：**
+
+- `apps/kiosk/src/main.tsx`：仅包一层 `<AuthProvider>`。
+
+**合规验证：**
+
+- token 不写 localStorage / sessionStorage / IndexedDB / cookie（已 grep 确认）。
+- `memberSession.ts` 未引入（已确认）。
+- typecheck / lint / build 全部零错误通过。
+
+**下一步（L2-4B）：** /login 顶级路由 + LoginPage UI（KioskNumPad + 真实 API 调用）+ KioskRoot IdentityBlock + IdleLogoutGuard + ProfilePage 登录态改造。
+
+---
+
 ## 〇·Q1、复核：Excel 字段映射 HTTP E2E + dev.db 迁移漂移（2026-06-04，仅复核 + 验证脚本，未改产品代码）
 
 > 本节为 T1（已合入 main `fa99803`）的 HTTP 端到端复核，补齐 T1 遗留的「真实 partner JWT 全链路 HTTP 联调」待办。**未改任何产品代码**；新增内容仅 `services/api/scripts/q1-http-e2e-field-mapping.ts`（自清理验证脚本）+ `package.json` 两个 verify 别名。
