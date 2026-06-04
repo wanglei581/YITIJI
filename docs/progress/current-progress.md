@@ -50,6 +50,29 @@
 
 **本轮范围外（未触碰，与 T1 隔离）：** 未改 `services/api/src/jobs/`、`services/api/prisma/`、`prisma.service.ts`、`schema.prisma`、任何 migration；未碰 Kiosk/admin/partner/terminal-agent/worker/legacy/合规边界文档。生产 `REDIS_URL` 必配、responseConfig 可视化配置、真源 API 联调仍为 next-tasks 待办（W8 已记录，非本验证范围）。
 
+## 〇·B、T3B 文档校正：AI 数字人现状（2026-06-04，仅改 docs）
+
+> 本节为 T3A 现状复核（只读）后的文档校正，**未改任何代码**。用于纠正下文若干"AI数字人仍为下一步/SVG 引导员为主方案"的过期描述。
+
+**结论：AI 数字人语音通话 + 文字对话均已完成并接入 AI 助手页。**
+
+| 项 | 现状 |
+|----|------|
+| 入口 | Kiosk 底部导航「AI助手」Tab → 路由 `/assistant`（`apps/kiosk/src/pages/assistant/AssistantPage.tsx`）；首页亦有卡片入口 |
+| 语音通话 | `apps/kiosk/src/components/AiAdvisorCall.tsx`：腾讯 TRTC（`trtc-sdk-v5`）对话式 AI（ASR+LLM+TTS），由 `VITE_USE_TRTC_CALL` 控制懒加载 |
+| 文字对话 | `AssistantPage.tsx` 内 `TextChat`，走 `chatWithAssistant()` → `POST /assistant/chat`；含路由白名单、会话隔离、"内容仅供参考"免责 |
+| **实际形象方案** | **TRTC 真人照片顾问形象「小青」（`/assets/ai-advisor.png`），不再是 SVG 数字人引导员主方案** |
+
+**待清理死代码（本任务不删除，仅标注）：**
+- `apps/kiosk/src/components/DigitalHuman.tsx`（Phase 9.2 的 2D SVG 数字人引导员）—— 全仓已无任何引用，被「小青」真人照片方案取代后未清理。
+- 配套 `SpeechBubble`（Phase 9.2）同样已无引用。
+- 处置建议：后续单独起一个清理任务删除或归档，**不在 T3B 范围内**。
+
+**Phase 9.5 编号冲突（待后续重命名/重新编号）：**
+- 本文档下方「✅ Phase 9.5：AI 数字人语音通话修复（2026-06-02）」= 已完成的 TRTC 语音通话修复。
+- `next-tasks.md` 旧规划表中「Phase 9.5 = AI模拟面试官」= 尚未开发的面试训练功能。
+- 两者共用「Phase 9.5」编号，含义冲突；后续需把其中之一重命名或重新编号，**本任务不改编号，仅记录**。
+
 ---
 
 ## 一、已确认的项目决策
@@ -66,7 +89,7 @@
 | 岗位/招聘会数据 | 只做第三方/官方来源信息入口 | 2026-05 |
 | 旧秒哒项目 | 仅作参考库，不作为正式工程 | 2026-05 |
 | 技术栈 | React + Vite + TypeScript + Tailwind + shadcn/ui | 2026-05 |
-| AI数字人 | Phase 9 做轻量 3D 就业服务引导员，不做招聘官/候选人筛选官 | 2026-05 |
+| AI数字人 | **已实现（2026-06，见 §〇·B）**：AI 助手页 `/assistant` 语音通话（TRTC 真人照片顾问「小青」）+ 文字对话均已完成；早期"轻量 3D/SVG 引导员"非当前主方案（SVG `DigitalHuman.tsx` 已成待清理死代码）；始终不做招聘官/候选人筛选官 | 2026-05 规划 / 2026-06 落地校正 |
 
 ---
 
@@ -581,6 +604,8 @@ PAPER_EMPTY 无法通过 WMI preflight 预检实现。Pantum CM2800ADN Series Wi
 ---
 
 ### ✅ Phase 9.5：AI 数字人语音通话修复（2026-06-02）
+
+> ⚠️ 编号冲突：此处「Phase 9.5」指**已完成**的 TRTC 语音通话修复；`next-tasks.md` 旧规划中「Phase 9.5 = AI模拟面试官」指**未开发**的功能。后续需重命名/重新编号其一（见 §〇·B）。
 
 **目标：** 修复 TRTC 对话式 AI 数字人“字幕正常显示但无声音”的问题。
 
@@ -1317,7 +1342,7 @@ pnpm verify:job-sync
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
 | 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` ✅ 已完成，0 vulnerabilities |
 | 第 8 阶段 | Windows Terminal Agent | ✅ **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D 出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固 + 全部 Windows 真机验收通过；actionToken local 校验/lease 续租长任务前补齐 |
-| 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人引导员 | **📋 当前下一步** — Phase 8 封板后启动 |
+| 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人 | 🚧 **进行中**：AI 数字人语音通话 + 文字对话已完成（`/assistant`，TRTC「小青」，见 §〇·B）；Kiosk/Admin/Partner 视觉收口仍在推进 |
 
 ---
 

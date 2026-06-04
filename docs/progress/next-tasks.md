@@ -661,10 +661,12 @@
 | 选项 | 内容 | 状态 |
 |------|------|------|
 | ~~A — Prisma 后端部署验证~~ | ~~将 Prisma 后端部署，验证心跳/claim 持久化~~ | ✅ 已完成（2026-05-29，Mac 跨机验证通过） |
-| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人引导员 | 📋 **当前下一步** |
+| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人 | 🚧 进行中：AI 数字人语音通话 + 文字对话**已完成**（`/assistant`，见下）；视觉收口待推进 |
 | **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 📋 可与 Phase 9 并行 |
 
-## 📋 Phase 9 — UI Polish + AI数字人引导员（当前优先级 P0）
+## 🚧 Phase 9 — UI Polish + AI数字人（AI数字人已完成，视觉收口进行中）
+
+> **AI 数字人现状校正（2026-06-04，T3B）**：AI 数字人语音通话（TRTC 真人照片顾问「小青」）+ 文字对话**均已完成并接入** Kiosk「AI助手」Tab → `/assistant`（`apps/kiosk/src/pages/assistant/AssistantPage.tsx` + `components/AiAdvisorCall.tsx`）。早期「轻量 3D / SVG 引导员」非当前主方案，SVG `DigitalHuman.tsx` 与 `SpeechBubble` 已成**待清理死代码**（本任务不删除）。**后续不再重做 AI 数字人功能。** 详见 [current-progress.md §〇·B](./current-progress.md)。
 
 详细规划见：[current-progress.md §Phase 9](./current-progress.md)
 
@@ -753,15 +755,17 @@ pnpm audit   # ✅ 已完成，0 vulnerabilities
 
 定位：数字人是 Kiosk 前台的“AI就业服务引导员”，用于首页、AI助手、简历服务、打印扫描、招聘会导览等场景的操作引导，不进入 Admin/Partner 后台。
 
+> ⚠️ **此表为早期规划，已被实际实现取代（2026-06-04 校正）。** 实际落地走的是 **TRTC 真人照片顾问「小青」+ 文字对话**路线，而非下表的轻量 3D / SVG 引导员。下表保留作历史规划参考；语音/文字对话已完成，**不再按此表重做**。
+
 第一阶段不追求真人级视频数字人，优先做轻量 3D 方案：
 
-| 阶段 | 目标 | 交付 |
-|------|------|------|
-| Phase 9.1 | 静态 3D 引导员 | AvatarGuide 组件、3D 模型加载、idle 动画、文字气泡、关闭/静音、WebGL 降级 |
-| Phase 9.2 | 语音与嘴型 | TTS 播报、简单嘴型同步、重播提示、页面欢迎语 |
-| Phase 9.3 | 功能引导 | 快捷问题、intent router、跳转简历/打印/招聘会/政策页面 |
-| Phase 9.4 | AI助手融合 | 用户提问、AI回答、回答转语音、意图跳转 |
-| Phase 9.5 | AI模拟面试官 | 根据简历/岗位方向生成问题、训练问答、报告保存与打印 |
+| 阶段 | 目标 | 交付 | 现状（2026-06 校正） |
+|------|------|------|------|
+| Phase 9.1 | 静态 3D 引导员 | AvatarGuide 组件、3D 模型加载、idle 动画、文字气泡、关闭/静音、WebGL 降级 | 改走真人照片方案，3D/SVG 未采用为主方案 |
+| Phase 9.2 | 语音与嘴型 | TTS 播报、简单嘴型同步、重播提示、页面欢迎语 | 由 TRTC 实时语音取代；SVG `DigitalHuman.tsx` 已成死代码 |
+| Phase 9.3 | 功能引导 | 快捷问题、intent router、跳转简历/打印/招聘会/政策页面 | ✅ 已实现（AssistantPage 快捷入口 + 路由白名单） |
+| Phase 9.4 | AI助手融合 | 用户提问、AI回答、回答转语音、意图跳转 | ✅ 已实现（语音通话 + 文字对话） |
+| ⚠️ Phase 9.5 | AI模拟面试官 | 根据简历/岗位方向生成问题、训练问答、报告保存与打印 | 📋 未开发。**编号与 current-progress.md 已完成的「Phase 9.5 AI数字人语音通话修复」冲突**，后续需重命名/重新编号 |
 
 必须遵守：
 
