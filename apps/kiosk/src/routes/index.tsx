@@ -35,10 +35,13 @@ import { HomePage } from '../pages/home/HomePage'
 import { QingdaoPage } from '../pages/qingdao/QingdaoPage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
+import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
 
 export const kioskRouter = createBrowserRouter([
   // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
   { path: '/login', element: <LoginPage /> },
+  // 待机宣传屏:顶级路由,全屏渲染(不套 KioskLayout 头部/底部导航)
+  { path: '/screensaver', element: <ScreensaverPage /> },
   {
     path: '/',
     element: <KioskRoot />,

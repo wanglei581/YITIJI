@@ -16,6 +16,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useBusyLock } from '../contexts/KioskBusyContext'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
 
@@ -69,6 +70,8 @@ function extractAssistantSubtitleText(raw: string): string {
 
 export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
   const [phase, setPhase]           = useState<Phase>('gate')
+  // 通话接通/进行中:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(phase === 'connecting' || phase === 'live')
   const [errMsg, setErrMsg]         = useState('')
   const [aiState, setAiState]       = useState<AiState>('idle')
   const [muted, setMuted]           = useState(false)

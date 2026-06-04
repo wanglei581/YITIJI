@@ -18,6 +18,7 @@ import PermissionsPage from './permissions'
 import AuditPage from './audit'
 import ImportBatchesPage from './import-batches'
 import SyncSourcesPage from './sync-sources'
+import ScreensaverPage from './screensaver'
 
 export const adminRouter = createBrowserRouter([
   // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
@@ -47,6 +48,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'audit',           element: <AuditPage /> },
       { path: 'import-batches',  element: <ImportBatchesPage /> },
       { path: 'sync-sources',    element: <SyncSourcesPage /> },
+      { path: 'screensaver',     element: <ScreensaverPage /> },
     ],
   },
 ])

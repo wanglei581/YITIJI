@@ -25,6 +25,7 @@ import {
   PrinterIcon,
   XCircleIcon,
 } from 'lucide-react'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
 
@@ -79,6 +80,9 @@ function backendStatusToStep(status: BackendJobStatus): Step {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PrintProgressPage() {
+  // 打印进行中:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(true)
+
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as Record<string, unknown> | null

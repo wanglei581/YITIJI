@@ -227,6 +227,23 @@ last common migration: 20260603155010_ai_result_persistence
 
 ---
 
+### 🟢 待机宣传屏（广告位）一期（2026-06-04，`feature/kiosk-screensaver-ads`，基于 `main`）
+
+一体机闲时变"待机宣传屏"：管理员后台上传图片/视频 → 配置播放方案 → 绑定终端 + 无操作时长 → Kiosk 无操作自动进入全屏轮播 → 触摸唤醒回首页。**仅管理员后台管理素材；AI 文生图为二期，一期 stub（默认 disabled，接口明确返回未启用，不产生外部费用）。** 合规：待机宣传屏属线下一体机运营广告位，非招聘闭环；素材文案禁用"一键投递"等违规词。
+
+| 层 | 改动 | 文件 |
+|----|------|------|
+| Prisma | 新增 4 表 `AdAsset` / `AdPlaylist` / `AdPlaylistItem` / `TerminalScreensaverConfig` + migration `20260604130000_add_screensaver_ads`（additive，未 reset dev.db）；PrismaService 加 4 个 delegate | `prisma/schema.prisma` + `prisma/migrations/` + `src/prisma/prisma.service.ts` |
+| 后端 | `ContentModule`：素材上传（MIME 白名单 + 魔数校验 + 图片/视频大小上限 + 时长上限）/列表/启停/删除；播放方案 CRUD（排序、整体覆盖、删除解绑终端）；终端配置（未绑定方案强制 `enabled=false`）；Kiosk 拉取 `GET /terminals/:id/screensaver`（无可播素材→`enabled=false` 防黑屏）；素材 HMAC 签名内容流 `GET /ad-assets/:id/content`（1h TTL，缓存 key 用 id/sha256）；管理员写操作全程审计 | `src/content/*` |
+| 后端 | AI 文生图 Provider 抽象 + `DisabledAiPosterProvider`；`AI_IMAGE_PROVIDER=disabled` 时 `POST /admin/ai-posters/generations` 等返回 `400 AI_POSTER_NOT_ENABLED` | `src/content/ai-poster.*` + `.env.example`（`AD_ASSET_MAX_*` / `AI_IMAGE_*`） |
+| shared | `screensaver.ts` 契约类型（后端 `content.types.ts` 为本地副本，SSOT 同步两处） | `packages/shared/src/types/screensaver.ts` |
+| Kiosk | `useIdleTimer` + `KioskBusyContext`（忙碌态豁免：打印/扫描/AI 通话/上传中持锁，idle 暂停）+ `/screensaver` 全屏顶级路由（视频 `muted+playsInline+autoPlay`，播放失败/解码异常自动跳下一个，任意触摸退出回首页，Cache Storage 缓存 + 只预加载下一个）+ adapter（http/mock） | `apps/kiosk/src/hooks/`、`contexts/`、`pages/screensaver/`、`services/`、`layouts/KioskRoot.tsx`、`routes/index.tsx` |
+| Admin | 「宣传屏」模块：素材库（上传/启停/删）/ 播放方案（上移下移排序，非拖拽）/ 终端配置（开关+时长+绑定方案）；AI 文生图入口展示"二期能力，暂未启用"；nav + 路由 | `apps/admin/src/routes/screensaver/`、`services/api/screensaver.ts`、`layouts/AdminLayoutWrapper.tsx`、`routes/index.tsx` |
+
+**验证：** api typecheck/lint 绿；kiosk typecheck/lint/build 绿（2 个 react-refresh fast-refresh 警告，非阻塞）；admin typecheck/lint/build 绿。dev.db 已 additive 建表，未触碰既有表。**二期待办：** 接真实文生图 provider（通义万相/CogView）+ 内容安全 + 草稿确认入库；曝光/唤醒埋点报表；机构端上传 + 审核流。
+
+---
+
 ### ✅ AiResumeResult 留存治理（2026-06-04，`fix/ai-resume-result-retention`，基于 `feat/kiosk-campus-zone-on-main`）
 
 落实 CLAUDE.md §11「不长期保存简历」：给简历派生结果（解析/优化）加留存窗口，到期自动清理。接真实 AI provider（before/after 可能含简历摘录）前的合规硬前提，MockProvider 阶段先行落地，风险最低。
