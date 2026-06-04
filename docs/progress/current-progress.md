@@ -5,6 +5,30 @@
 
 ---
 
+## L2-4B：Kiosk /login 顶级全屏登录页（2026-06-04，`claude/l2-4b-kiosk-login-page`）
+
+**目标：** /login 路由全屏独立，不嵌套 KioskRoot；KioskNumPad 驱动输入，接 memberAuthApi 真实验证码流程。
+
+**新增文件（2 个）：**
+
+- `apps/kiosk/src/components/KioskNumPad.tsx`：触控数字键盘，每键 ≥ 72px，配套 readOnly input，不触发系统软键盘。第 12 格可选「确认」键（蓝色）。
+- `apps/kiosk/src/pages/auth/LoginPage.tsx`：两步全屏登录——Step 1 输入11位手机号 → 发送验证码；Step 2 输入6位验证码 → 调 memberLogin → useAuth().login() 写入内存会话 → 跳 /。含倒计时重发、错误展示、「暂不登录」跳过入口。
+
+**修改文件（1 个）：**
+
+- `apps/kiosk/src/routes/index.tsx`：在最顶层添加 `{ path: '/login', element: <LoginPage /> }`，置于 KioskRoot 路由之前，确保全屏无 header/footer/nav。
+
+**合规验证：**
+
+- 不触发系统软键盘（readOnly + inputMode="none"，不使用 type="tel"/"number"）。
+- 不写任何浏览器存储（login 调用 useAuth().login()，token 只存 React state）。
+- 无全局路由守卫：未登录访问 / 不跳 /login（L2-4B 边界，L2-4C 做守卫）。
+- tsc --noEmit 零错误，lint 零错误。
+
+**下一步（L2-4C，待排）：** KioskRoot IdentityBlock 接 useAuth + ProfilePage 登录态改造 + IdleLogoutGuard。
+
+---
+
 ## L2-4A：Kiosk 前端纯内存会话层 + memberAuthApi（2026-06-04，`claude/l2-4a-kiosk-auth-session`，未提交）
 
 **目标：** 建立 Kiosk 前端会话底座。不改任何页面/路由/UI 组件。
