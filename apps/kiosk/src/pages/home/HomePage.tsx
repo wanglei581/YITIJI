@@ -10,9 +10,11 @@ import {
   MonitorCheckIcon,
   PrinterIcon,
   SparklesIcon,
+  UserIcon,
   WifiIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth'
 
 // ── DeviceStatusStrip ─────────────────────────────────────────
 //
@@ -49,6 +51,9 @@ function DeviceStatusStrip() {
 // ── HeroSection ───────────────────────────────────────────────
 
 function HeroSection() {
+  const navigate = useNavigate()
+  const { isLoggedIn, displayName } = useAuth()
+
   return (
     <div className="px-8 pb-14 pt-10" style={{ backgroundColor: '#0B2A5B' }}>
       <h1 className="text-[2.25rem] font-bold leading-tight tracking-tight text-white">
@@ -60,6 +65,24 @@ function HeroSection() {
       <div className="mt-6 flex items-center rounded-lg border border-white/10 bg-white/[0.06] px-5 py-3">
         <DeviceStatusStrip />
       </div>
+      {/* 登录感知条 */}
+      {isLoggedIn ? (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2.5">
+          <UserIcon className="h-4 w-4 shrink-0 text-blue-300" aria-hidden="true" />
+          <span className="text-sm text-blue-100">欢迎回来，{displayName}</span>
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.06] px-4 py-2.5">
+          <span className="text-sm text-blue-200">登录后可识别身份，后续将接入服务记录</span>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="ml-4 shrink-0 rounded-lg bg-white px-4 py-1.5 text-sm font-semibold text-primary-700 active:bg-gray-100"
+          >
+            立即登录
+          </button>
+        </div>
+      )}
     </div>
   )
 }

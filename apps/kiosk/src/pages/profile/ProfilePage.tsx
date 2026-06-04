@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Card, EmptyState, PageHeader } from '@ai-job-print/ui'
+import { Card, EmptyState } from '@ai-job-print/ui'
 import {
+  BotIcon,
   CheckCircleIcon,
+  ChevronRightIcon,
   FileInputIcon,
   FileTextIcon,
-  LogInIcon,
+  HelpCircleIcon,
   LogOutIcon,
   PrinterIcon,
+  ScanLineIcon,
+  SettingsIcon,
   SparklesIcon,
   Trash2Icon,
   UserIcon,
@@ -65,11 +69,19 @@ interface IncomingState {
   }
 }
 
-// 初始列表均为空；实际数据通过页面跳转 location.state 传入（从简历/打印/AI 流程跳回）
 const EMPTY_RESUMES: ResumeItem[] = []
 const EMPTY_SCANS:   ScanItem[]   = []
 const EMPTY_ORDERS:  PrintOrder[] = []
 const EMPTY_AI:      AIRecord[]   = []
+
+// ─── Quick nav definition ─────────────────────────────────────────────────
+
+const QUICK_NAV = [
+  { icon: FileTextIcon, label: '简历服务', path: '/resume',       bg: 'bg-primary-50', color: 'text-primary-600' },
+  { icon: PrinterIcon,  label: '文档打印', path: '/print/upload', bg: 'bg-gray-100',   color: 'text-gray-700'   },
+  { icon: ScanLineIcon, label: '材料扫描', path: '/scan/start',   bg: 'bg-emerald-50', color: 'text-emerald-600'},
+  { icon: BotIcon,      label: 'AI 助手',  path: '/assistant',    bg: 'bg-violet-50',  color: 'text-violet-600' },
+] as const
 
 // ─── Utilities ────────────────────────────────────────────────────────────
 
@@ -84,7 +96,7 @@ function formatTime(iso: string) {
 
 const STATUS_STYLES = {
   done:      { bg: 'bg-green-100', text: 'text-green-700', label: '已完成' },
-  failed:    { bg: 'bg-red-100',   text: 'text-red-600',   label: '失败' },
+  failed:    { bg: 'bg-red-100',   text: 'text-red-600',   label: '失败'   },
   cancelled: { bg: 'bg-gray-100',  text: 'text-gray-500',  label: '已取消' },
 }
 
@@ -165,51 +177,15 @@ export function ProfilePage() {
 
   // ── Handlers ─────────────────────────────────────────────────
   const printFile = (file: { name: string; size: string; pages?: number }) => {
-    // 跳到打印设置页（/print/preview），让用户自行设置参数，而不是跳到确认页绕过参数设置
     navigate('/print/preview', {
-      state: {
-        file: { name: file.name, size: file.size, pages: file.pages ?? 1 },
-      },
+      state: { file: { name: file.name, size: file.size, pages: file.pages ?? 1 } },
     })
   }
 
   return (
-    <div className="relative flex min-h-full flex-col p-6">
-      <PageHeader title="我的记录" subtitle="记录 · 订单 · 文件" />
+    <div className="flex min-h-full flex-col">
 
-      {/* 身份块：游客态 / 登录态 */}
-      {isLoggedIn ? (
-        <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <UserIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-            <span className="font-medium">{displayName}</span>
-          </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 active:bg-gray-200"
-          >
-            <LogOutIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            退出登录
-          </button>
-        </div>
-      ) : (
-        <div className="mt-4 flex items-center justify-between rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
-          <span className="text-xs text-gray-500">
-            游客模式 · 登录后可跨设备查看记录
-          </span>
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-xs font-medium text-white active:bg-primary-700"
-          >
-            <LogInIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            登录
-          </button>
-        </div>
-      )}
-
-      {/* 保存成功 toast */}
+      {/* Toast — fixed, renders outside layout flow */}
       {toastMsg && (
         <div className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
           <CheckCircleIcon className="h-4 w-4 shrink-0" />
@@ -223,7 +199,69 @@ export function ProfilePage() {
         </div>
       )}
 
-      <div className="mt-6 flex flex-1 flex-col gap-6">
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <div style={{ backgroundColor: '#0B2A5B' }} className="px-6 pb-10 pt-8">
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+            <UserIcon className="h-8 w-8 text-white/80" aria-hidden="true" />
+          </div>
+          <div>
+            {isLoggedIn ? (
+              <>
+                <p className="text-xl font-semibold text-white">{displayName}</p>
+                <p className="mt-0.5 text-sm text-blue-200">已登录 · 本次会话身份已识别</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xl font-semibold text-white">游客模式</p>
+                <p className="mt-0.5 text-sm text-blue-200">登录后可识别身份，后续将接入服务记录</p>
+              </>
+            )}
+          </div>
+        </div>
+        {isLoggedIn ? (
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-4 flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-medium text-white active:bg-white/20"
+          >
+            <LogOutIcon className="h-4 w-4" aria-hidden="true" />
+            退出登录
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="mt-4 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-primary-700 active:bg-gray-100"
+          >
+            立即登录
+          </button>
+        )}
+      </div>
+
+      {/* ── Main content ─────────────────────────────────────── */}
+      <div className="relative z-10 -mt-6 flex flex-1 flex-col gap-6 rounded-t-3xl bg-canvas px-6 pt-7 pb-10">
+
+        {/* 快捷服务 */}
+        <section aria-label="快捷服务">
+          <h2 className="mb-3 text-sm font-medium text-gray-500">快捷服务</h2>
+          <div className="grid grid-cols-4 gap-3">
+            {QUICK_NAV.map(({ icon: Icon, label, path, bg, color }) => (
+              <button
+                key={path}
+                type="button"
+                onClick={() => navigate(path)}
+                className="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white shadow-sm active:bg-gray-50"
+              >
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${bg}`}>
+                  <Icon className={`h-6 w-6 ${color}`} aria-hidden="true" />
+                </div>
+                <span className="text-xs font-medium text-gray-700">{label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* ── 我的简历 ── */}
         <section>
           <div className="mb-3 flex items-center gap-2 border-b border-gray-100 pb-2">
@@ -231,11 +269,7 @@ export function ProfilePage() {
             <h2 className="text-sm font-medium text-gray-500">我的简历</h2>
           </div>
           {resumes.length === 0 ? (
-            <EmptyState
-              icon={FileTextIcon}
-              title="暂无简历"
-              description="上传或扫描后的简历将显示在这里"
-            />
+            <EmptyState icon={FileTextIcon} title="暂无简历" description="上传或扫描后的简历将显示在这里" />
           ) : (
             <div className="flex flex-col gap-3">
               {resumes.map((r) => (
@@ -245,23 +279,13 @@ export function ProfilePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-900">{r.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {r.size} · {r.format} · {formatTime(r.savedAt)}
-                    </p>
+                    <p className="text-xs text-gray-400">{r.size} · {r.format} · {formatTime(r.savedAt)}</p>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    <button
-                      onClick={() => printFile(r)}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
-                      title="打印"
-                    >
+                    <button onClick={() => printFile(r)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50" title="打印">
                       <PrinterIcon className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => setResumes((prev) => prev.filter((x) => x.id !== r.id))}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                      title="删除"
-                    >
+                    <button onClick={() => setResumes((prev) => prev.filter((x) => x.id !== r.id))} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500" title="删除">
                       <Trash2Icon className="h-4 w-4" />
                     </button>
                   </div>
@@ -278,11 +302,7 @@ export function ProfilePage() {
             <h2 className="text-sm font-medium text-gray-500">扫描文件</h2>
           </div>
           {scans.length === 0 ? (
-            <EmptyState
-              icon={FileInputIcon}
-              title="暂无扫描文件"
-              description="扫描保存后的 PDF 将显示在这里"
-            />
+            <EmptyState icon={FileInputIcon} title="暂无扫描文件" description="扫描保存后的 PDF 将显示在这里" />
           ) : (
             <div className="flex flex-col gap-3">
               {scans.map((s) => (
@@ -292,23 +312,13 @@ export function ProfilePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-900">{s.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {s.pages} 页 · {s.size} · {s.format} · {formatTime(s.savedAt)}
-                    </p>
+                    <p className="text-xs text-gray-400">{s.pages} 页 · {s.size} · {s.format} · {formatTime(s.savedAt)}</p>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    <button
-                      onClick={() => printFile(s)}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
-                      title="打印"
-                    >
+                    <button onClick={() => printFile(s)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50" title="打印">
                       <PrinterIcon className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => setScans((prev) => prev.filter((x) => x.id !== s.id))}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                      title="删除"
-                    >
+                    <button onClick={() => setScans((prev) => prev.filter((x) => x.id !== s.id))} className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500" title="删除">
                       <Trash2Icon className="h-4 w-4" />
                     </button>
                   </div>
@@ -325,11 +335,7 @@ export function ProfilePage() {
             <h2 className="text-sm font-medium text-gray-500">打印订单</h2>
           </div>
           {orders.length === 0 ? (
-            <EmptyState
-              icon={PrinterIcon}
-              title="暂无订单"
-              description="打印完成后的记录将显示在这里"
-            />
+            <EmptyState icon={PrinterIcon} title="暂无订单" description="打印完成后的记录将显示在这里" />
           ) : (
             <div className="flex flex-col gap-3">
               {orders.map((o) => {
@@ -341,13 +347,9 @@ export function ProfilePage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900">{o.fileName}</p>
-                      <p className="text-xs text-gray-400">
-                        {o.pages} 页 · {o.copies} 份 · {formatTime(o.completedAt)}
-                      </p>
+                      <p className="text-xs text-gray-400">{o.pages} 页 · {o.copies} 份 · {formatTime(o.completedAt)}</p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}
-                    >
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}>
                       {s.label}
                     </span>
                   </Card>
@@ -364,11 +366,7 @@ export function ProfilePage() {
             <h2 className="text-sm font-medium text-gray-500">AI 服务记录</h2>
           </div>
           {aiRecords.length === 0 ? (
-            <EmptyState
-              icon={SparklesIcon}
-              title="暂无记录"
-              description="AI简历诊断和优化建议记录将显示在这里"
-            />
+            <EmptyState icon={SparklesIcon} title="暂无记录" description="AI简历诊断和优化建议记录将显示在这里" />
           ) : (
             <div className="flex flex-col gap-3">
               {aiRecords.map((a) => (
@@ -378,22 +376,12 @@ export function ProfilePage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {AI_TYPE_LABELS[a.type] ?? a.label}
-                      </p>
-                      <span className="rounded bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-600">
-                        {a.detail}
-                      </span>
+                      <p className="text-sm font-medium text-gray-900">{AI_TYPE_LABELS[a.type] ?? a.label}</p>
+                      <span className="rounded bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-600">{a.detail}</span>
                     </div>
-                    <p className="truncate text-xs text-gray-400">
-                      {a.fileName} · {formatTime(a.createdAt)}
-                    </p>
+                    <p className="truncate text-xs text-gray-400">{a.fileName} · {formatTime(a.createdAt)}</p>
                   </div>
-                  <button
-                    onClick={() => setAiRecords((prev) => prev.filter((x) => x.id !== a.id))}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                    title="删除"
-                  >
+                  <button onClick={() => setAiRecords((prev) => prev.filter((x) => x.id !== a.id))} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500" title="删除">
                     <Trash2Icon className="h-4 w-4" />
                   </button>
                 </Card>
@@ -402,8 +390,28 @@ export function ProfilePage() {
           )}
         </section>
 
-        {/* 合规说明 */}
-        <p className="pb-8 text-center text-xs text-gray-400">
+        {/* ── 账户与服务 ── */}
+        <section aria-label="账户与服务">
+          <h2 className="mb-2 text-sm font-medium text-gray-500">账户与服务</h2>
+          <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <button
+              type="button"
+              onClick={() => navigate('/assistant')}
+              className="flex h-14 w-full items-center gap-3 px-4 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+            >
+              <HelpCircleIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              <span className="flex-1 text-left">帮助中心</span>
+              <ChevronRightIcon className="h-4 w-4 text-gray-300" aria-hidden="true" />
+            </button>
+            <div className="flex h-14 items-center gap-3 px-4">
+              <SettingsIcon className="h-5 w-5 text-gray-300" aria-hidden="true" />
+              <span className="flex-1 text-sm text-gray-400">账号设置</span>
+              <span className="text-xs text-gray-400">即将上线</span>
+            </div>
+          </div>
+        </section>
+
+        <p className="pb-4 text-center text-xs text-gray-400">
           文件可在本机记录中管理，后续将支持自动清理
         </p>
       </div>
