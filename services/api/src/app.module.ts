@@ -15,6 +15,7 @@ import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
+import { ContentModule } from './content/content.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
@@ -59,6 +60,7 @@ const redisUrl = process.env['REDIS_URL']
     TerminalsModule,
     PrintJobsModule,
     TrtcModule,
+    ContentModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

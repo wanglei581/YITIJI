@@ -604,3 +604,99 @@ model AuditLog {
   @@index([targetType, targetId])
   @@index([createdAt])
 }
+
+// ── AdAsset ───────────────────────────────────────────────────────────────────
+// 待机宣传屏素材(一期)。仅管理员后台上传、管理。
+//
+// 合规边界(CLAUDE.md §2/§8):
+//   - 这是"线下一体机运营"广告位,不属招聘闭环,允许做
+//   - 素材文案禁止出现"一键投递 / 立即投递 / 平台投递"等违规词(上传前端 + 审核把关)
+//   - 前台统一称"待机宣传屏",不强调"广告平台"属性
+//
+// 物理文件经 LocalFileStorage 落地(purpose='screensaver_ad'),Kiosk 经
+// HMAC 签名 URL(较长 TTL)拉取;Kiosk 端缓存 key 用 sha256 / id,绝不用签名 URL。
+//
+// type:   'image' | 'video'
+// source: 'uploaded' | 'ai_generated'(二期 AI 文生图产物,管理员确认后才入库)
+// status: 'active' | 'disabled'
+// durationSec:图片停留秒数 / 视频时长(秒)
+model AdAsset {
+  id             String   @id @default(cuid())
+  type           String   // 'image' | 'video'
+  title          String
+  storageKey     String   @unique
+  mimeType       String
+  sizeBytes      Int
+  sha256         String
+  width          Int?
+  height         Int?
+  durationSec    Int      @default(8)
+  source         String   @default("uploaded") // 'uploaded' | 'ai_generated'
+  aiGenerationId String?
+  status         String   @default("active")    // 'active' | 'disabled'
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  playlistItems AdPlaylistItem[]
+
+  @@index([status])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+// ── AdPlaylist ────────────────────────────────────────────────────────────────
+// 播放方案:一组按顺序轮播的素材,可绑定到一个或多个终端。
+// status: 'active' | 'disabled'(禁用后绑定它的终端拉取不到内容,屏保不触发)
+model AdPlaylist {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   @default("active")
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  items   AdPlaylistItem[]
+  configs TerminalScreensaverConfig[]
+
+  @@index([status])
+}
+
+// ── AdPlaylistItem ────────────────────────────────────────────────────────────
+// 播放方案与素材的关联(含排序与单项开关)。一期排序用 order 整数(上移/下移)。
+model AdPlaylistItem {
+  id         String     @id @default(cuid())
+  playlistId String
+  playlist   AdPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  assetId    String
+  asset      AdAsset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  order      Int        @default(0)
+  enabled    Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+
+  @@unique([playlistId, assetId])
+  @@index([playlistId])
+  @@index([assetId])
+}
+
+// ── TerminalScreensaverConfig ─────────────────────────────────────────────────
+// 每个终端的待机配置:是否启用、无操作多少秒进入屏保、绑定哪个播放方案。
+//
+// terminalId 为自由字符串(不强 FK 到 Terminal):配置可在终端注册前预置,
+// 与 printer-status 端点一致按 terminalId 字符串查找。
+// enabled=false 或未绑定 playlist → Kiosk 拉取返回 enabled:false,不进屏保。
+model TerminalScreensaverConfig {
+  id             String      @id @default(cuid())
+  terminalId     String      @unique
+  enabled        Boolean     @default(false)
+  idleTimeoutSec Int         @default(180)
+  playlistId     String?
+  playlist       AdPlaylist? @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  updatedBy      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([playlistId])
+}
