@@ -14,7 +14,7 @@
 - ✅ 后端 `getMappingRule` / `confirmExcelImport` 落地映射；`GET /partner/excel/mapping-rule`。
 - ✅ Partner 向导导入时自动回填上次映射 + 「已套用」提示；http/mock 双 adapter 接入。
 - ✅ shared/api/partner typecheck + api/partner lint/build 三绿；运行期断言 5 项全过；禁词 0 命中。
-- ⏳ **[待办] HTTP 端到端联调**：本轮运行期断言直连 dev.db 验证 service/表层；真实 partner JWT → `GET mapping-rule` / preview / confirm 全链路 HTTP 联调待补（需起 api + partner http 模式）。
+- ✅ **[已完成 2026-06-04，Q1 复核] HTTP 端到端联调**：真实 API:3010 + partner JWT 走通 parse→preview→confirm→GET mapping-rule 读回 + 跨机构 404 + 非法 dataType 400，`pnpm verify:field-mapping:http` → ALL PASS（自清理 dev.db）。详见 [current-progress.md §〇·Q1](./current-progress.md)。复核确认敏感列拦截 / `fieldMapping` 字段名等后端护栏均生效，Q1 范围内无 bug。
 - ⏳ **[待办] CLAUDE.md §16/§18 过时描述校正**：本窗口无权改 CLAUDE.md（不在 T1 允许目录），需在有权限的窗口把「Excel 字段映射 service 接入」标为已完成。
 - ⚠️ **[基础设施依赖] PostgreSQL 迁移时**：本轮 `FieldMappingRule` 迁移随 dev.db drift 一并需在 PG 迁移时重生成规范化（与下方 PostgreSQL 迁移条目合并处理）。
 ## 📌 T2 BullMQ API 拉取 worker 验证（2026-06-04，`claude/t2-api-pull-worker`，基于干净 main `fc0018a`）

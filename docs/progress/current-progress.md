@@ -5,6 +5,35 @@
 
 ---
 
+## 〇·Q1、复核：Excel 字段映射 HTTP E2E + dev.db 迁移漂移（2026-06-04，仅复核 + 验证脚本，未改产品代码）
+
+> 本节为 T1（已合入 main `fa99803`）的 HTTP 端到端复核，补齐 T1 遗留的「真实 partner JWT 全链路 HTTP 联调」待办。**未改任何产品代码**；新增内容仅 `services/api/scripts/q1-http-e2e-field-mapping.ts`（自清理验证脚本）+ `package.json` 两个 verify 别名。
+
+**1. HTTP E2E（真实 API:3010 + 真实 partner JWT，`pnpm verify:field-mapping:http`）→ ALL PASS：**
+登录 partner1/partner2 → GET mapping-rule(空) → parse → preview(validRows=2) → confirm(imported=2) → GET mapping-rule **读回本次映射**（title/externalId/sourceUrl 一致、updatedAt 非空）→ 跨机构 partner2 GET 该源 **404 DATA_SOURCE_NOT_FOUND** → 非法 dataType **400 INVALID_DATA_TYPE**。脚本跑完自动清理（Q1-* 岗位 / excel 批次记录 / 同步日志 / 本源映射规则），dev.db 回到运行前状态。
+
+服务层断言（`pnpm verify:field-mapping`，原 T1 脚本）同样 ALL PASS（空→落地→二次 upsert unique→job/fair 互不覆盖→越权拒绝）。
+
+**复核中发现的两点（均为护栏生效，非 bug）：** ① 列名「投递链接」被 `SENSITIVE_COLUMN_DETECTED` 拦截（命中敏感词「投递」）——合规护栏按预期工作；② multipart 字段名必须是 `fieldMapping`（非 `mapping`），与前端 `partnerHttpAdapter.previewExcel` 一致，传错则 batch.mappingJson=`{}` 致全行 invalid。二者都是测试脚本初版写错触发，修正后通过，**证明后端校验有效**。
+
+**2. Prisma migration / dev.db 漂移风险评估（`prisma migrate status`）：**
+
+```
+last common migration: 20260603155010_ai_result_persistence
+未应用(磁盘有、_prisma_migrations 无): 20260604120000_add_ai_resume_result_expires_at, 20260604130000_add_field_mapping_rule
+仅在库中(磁盘无): 20260603090745_sync_jobfair_source_id, 20260603090824_add_session_baseline
+```
+
+- **对本功能运行期：无风险。** `FieldMappingRule` 表已物理存在于 dev.db，schema 与表结构（列/`@@unique(sourceId,dataType)`/2 索引/FK→JobSource RESTRICT）完全一致，Prisma Client 查询正常（两套验证脚本均过）。`_prisma_migrations` 记账不一致**不影响查询执行**。
+- **对 dev.db 重放 `migrate deploy`：会冲突**——T1 迁移用裸 `CREATE TABLE`（无 IF NOT EXISTS），表已存在会报错；加上 2 条「库有盘无」迁移，属**既有、已记录的漂移**（团队按设计用 `db execute` 非破坏性建表，破坏性 reset 推迟到 PostgreSQL 迁移）。**T1 未引入新漂移。**
+- **对全新空库（生产 PostgreSQL）：T1 迁移本身合法**，按序可建表；但全仓「`sync_jobfair_source_id`/`add_session_baseline` 迁移文件夹未提交」是**项目级既有问题**，须在 PostgreSQL 迁移统一重生成（next-tasks 已记录），与 T1 无关。
+
+**3. Partner 向导复用 FieldMappingRule（前端代码核对 + HTTP 读回验证）：** `ExcelImportModal.handleUpload` 并行 `parseExcel` + `getMappingRule`（失败不阻断）；用已保存映射覆盖模糊匹配（仅当列仍存在且字段属当前 dataType）；映射步显示「已套用该数据源上次保存的字段映射」提示；confirm 成功后端 upsert 更新规则供下次回填。`partnerHttpAdapter.getMappingRule` → `GET /partner/excel/mapping-rule` 契约与后端一致。**链路完整可用。**
+
+**结论：T1 Excel 字段映射在真实 HTTP 链路下可用，迁移漂移对该功能无实际风险，Partner 向导能从后端读取并复用映射。Q1 范围内未发现需修复的 bug。**
+
+---
+
 ## 〇、最新进展：T1 Excel 字段映射规则持久化与复用（2026-06-04，`claude/t1-excel-field-mapping`，基于 main `fc0018a`）
 
 **背景：** 勘察发现 CLAUDE.md §16 把 T1 写成「把 Excel 4 步向导 mock 切到 service + 后端落 ImportBatch」，但该主体在 **W4（`fix/w4-excel-import-integrity`）已完成**：前端 [ExcelImportModal](../../apps/partner/src/routes/sources/ExcelImportModal.tsx) 已走 service（http/mock 双 adapter），后端 [jobs.service.ts](../../services/api/src/jobs/jobs.service.ts) `previewExcelImport`/`confirmExcelImport` 已落 `ImportBatch`/`ImportRecord`。**唯一真正未做的增量**是 `FieldMappingRule`——它只存在于类型/Prisma generated client，schema 无对应 model，字段映射每次导入需手工重做。本轮只补这一增量，**不重写已完成的 ImportBatch/ImportRecord/SyncLog 链路**。

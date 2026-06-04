@@ -12,7 +12,9 @@
     "typecheck": "prisma generate && tsc --noEmit",
     "db:seed": "node -r @swc-node/register prisma/seed.ts",
     "db:seed:fairs": "node -r @swc-node/register prisma/seed-fairs.ts",
-    "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts"
+    "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts",
+    "verify:field-mapping": "node -r @swc-node/register scripts/verify-field-mapping-rule.ts",
+    "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
