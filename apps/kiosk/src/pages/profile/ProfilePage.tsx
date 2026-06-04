@@ -5,11 +5,15 @@ import {
   CheckCircleIcon,
   FileInputIcon,
   FileTextIcon,
+  LogInIcon,
+  LogOutIcon,
   PrinterIcon,
   SparklesIcon,
   Trash2Icon,
+  UserIcon,
   XIcon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
 
 // ─── Data types ────────────────────────────────────────────────────────────
 
@@ -96,6 +100,7 @@ export function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const incoming = (location.state ?? {}) as IncomingState
+  const { isLoggedIn, displayName, logout } = useAuth()
 
   // ── Lists ────────────────────────────────────────────────────
   const [resumes, setResumes] = useState<ResumeItem[]>(() => {
@@ -172,12 +177,37 @@ export function ProfilePage() {
     <div className="relative flex min-h-full flex-col p-6">
       <PageHeader title="我的记录" subtitle="记录 · 订单 · 文件" />
 
-      {/* 游客提示 */}
-      <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
-        <span className="text-xs text-gray-400">
-          游客模式 · 当前记录仅保存在本设备，登录后可跨设备查看
-        </span>
-      </div>
+      {/* 身份块：游客态 / 登录态 */}
+      {isLoggedIn ? (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <UserIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            <span className="font-medium">{displayName}</span>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-100 active:bg-gray-200"
+          >
+            <LogOutIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            退出登录
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3">
+          <span className="text-xs text-gray-500">
+            游客模式 · 登录后可跨设备查看记录
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-xs font-medium text-white active:bg-primary-700"
+          >
+            <LogInIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            登录
+          </button>
+        </div>
+      )}
 
       {/* 保存成功 toast */}
       {toastMsg && (
