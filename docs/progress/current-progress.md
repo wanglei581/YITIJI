@@ -24,6 +24,31 @@
 **合规：** 仅存「标准字段→Excel 列名」映射结构，不存任何行数据/PII；敏感列在 W4 preview 阶段已拦截（本轮未改该逻辑）；partner 改动文件禁词扫描 0 命中。
 
 **本轮范围外：** 未改 `packages/shared`（沿用 partner 端 `FieldMappingRuleResult` 局部类型，前后端契约简单无需对齐 shared）；未触碰 Kiosk/admin/worker/terminal-agent/legacy/合规边界文档；CLAUDE.md §16 的过时描述本窗口无权改（不在允许目录），仅在此与 next-tasks 标注 T1 主体已由 W4 完成。
+## 〇、最新进展：T2 BullMQ API 拉取 worker 验证（2026-06-04，`claude/t2-api-pull-worker`，基于干净 main `fc0018a`）
+
+**背景：** next-tasks / CLAUDE.md §16 P0 列「BullMQ API 拉取 worker 验证：`pnpm verify:job-sync` 通过后 FF merge」。W8（`feat/w8-bullmq-api-worker` + `feat/w8-redis-e2e-verification`）已实现并曾跑通该 worker；本轮以干净 main 为基线**复验**，确认在真实 Redis + BullMQ 路径下行为正确。本任务为**验证优先**，未改任何运行代码。
+
+**验证环境：** 本地 Redis `redis://localhost:6379`（`redis-cli ping → PONG`）；`DATABASE_URL=file:./prisma/dev.db`（SQLite dev）；`.env` 已含 REDIS_URL / DATABASE_URL / JWT_SECRET / SECRET_ENCRYPTION_KEY / FILE_SIGNING_SECRET。
+
+**结果（三绿 + E2E ALL PASS）：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ |
+| `pnpm --filter @ai-job-print/api lint` | ✅（0 warning） |
+| `pnpm --filter @ai-job-print/api build` | ✅ |
+| `pnpm verify:job-sync`（[verify-job-sync.ts](../../services/api/scripts/verify-job-sync.ts)） | ✅ **ALL PASS** |
+
+**E2E 关键断言（真实 BullMQ，非 inline fallback）：**
+
+- **走真实 worker 路径确认**：`enqueue()` 返回 `jobId=<sourceId>_manual`（BullMQ 队列 jobId），而非 inline fallback 的 `jobId=inline` —— 证明 `JobSyncProcessor` 从 Redis 队列 claim 任务并执行 `pullApiSource`。
+- **成功路径**：mock HTTP 源（返回 2 条岗位 JSON）→ worker 拉取 → `Job` 表落 2 条 → `SyncLog.result=success`、`addedCount=2` → **`reviewStatus=pending` / `publishStatus=draft`**（合规：审核前不展示）。
+- **失败路径**：HTTP 503 源 → `SyncLog.result=failed`、`errorDetail=HTTP_503: Service Unavailable`、**0 条 Job 落库**（失败不写脏数据）。
+- 测试数据（临时 Org / JobSource / Job / SyncLog）跑完自动清理，dev.db 无残留。
+
+**合规：** 拉取数据默认 `reviewStatus: pending` + `publishStatus: draft`，管理员审核后才展示；只同步岗位/招聘会公开信息，不接收简历/候选人；凭证仅服务端解密（`decryptSecret`），失败归类 `CREDENTIAL_DECRYPT_FAILED`。
+
+**本轮范围外（未触碰，与 T1 隔离）：** 未改 `services/api/src/jobs/`、`services/api/prisma/`、`prisma.service.ts`、`schema.prisma`、任何 migration；未碰 Kiosk/admin/partner/terminal-agent/worker/legacy/合规边界文档。生产 `REDIS_URL` 必配、responseConfig 可视化配置、真源 API 联调仍为 next-tasks 待办（W8 已记录，非本验证范围）。
 
 ---
 
