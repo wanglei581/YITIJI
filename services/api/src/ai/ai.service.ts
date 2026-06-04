@@ -201,24 +201,31 @@ export class AiService {
 
   /**
    * 清理已过期的简历派生结果（CLAUDE.md §11）。
-   * 硬删 expiresAt < now 的行，并写 system 审计（只放数量 / 按 kind 摘要，不含 taskId / payload）。
+   * 硬删 expiresAt < now 或 expiresAt 为空(迁移前历史行)的行，并写 system 审计
+   * （只放数量 / 按 kind 摘要，不含 taskId / payload）。
    * 由 AiResultCleanupTask 每小时触发；亦可手动调用。
    */
   async cleanupExpiredResults(triggeredBy: 'manual' | 'cron'): Promise<{ deletedCount: number }> {
     const now = new Date()
     // 清理对象:已过期行 + 无 expiresAt 的迁移前历史行（后者按过期处理，不长期留存简历派生数据）。
-    const expired = await this.prisma.aiResumeResult.findMany({
-      where: { OR: [{ expiresAt: null }, { expiresAt: { lt: now } }] },
-      select: { id: true, kind: true },
+    // 统计与删除使用同一过期谓词:groupBy 取 byKind 快照在前,deleteMany 直接按谓词原子删除——
+    // 避免"先 findMany 取 id、再 deleteMany(id in ...)"的 TOCTOU 窗口与 SQLite IN 列表上限。
+    const expiredWhere = { OR: [{ expiresAt: null }, { expiresAt: { lt: now } }] }
+
+    const grouped = await this.prisma.aiResumeResult.groupBy({
+      by: ['kind'],
+      where: expiredWhere,
+      _count: { _all: true },
     })
-    if (expired.length === 0) return { deletedCount: 0 }
+    if (grouped.length === 0) return { deletedCount: 0 }
 
     const byKind: Record<string, number> = {}
-    for (const r of expired) byKind[r.kind] = (byKind[r.kind] ?? 0) + 1
+    for (const g of grouped) byKind[g.kind] = g._count._all
 
-    await this.prisma.aiResumeResult.deleteMany({
-      where: { id: { in: expired.map((r) => r.id) } },
+    const { count: deletedCount } = await this.prisma.aiResumeResult.deleteMany({
+      where: expiredWhere,
     })
+    if (deletedCount === 0) return { deletedCount: 0 }
 
     await this.audit.write({
       actorId: null,
@@ -226,10 +233,10 @@ export class AiService {
       action: 'ai_resume_result.cleanup_expired',
       targetType: 'ai_resume_result',
       targetId: null,
-      payload: { triggeredBy, deletedCount: expired.length, byKind },
+      payload: { triggeredBy, deletedCount, byKind },
     })
 
-    return { deletedCount: expired.length }
+    return { deletedCount }
   }
 
   async chatWithAssistant(input: ChatInput): Promise<ChatOutput> {
