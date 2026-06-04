@@ -29,6 +29,23 @@
 
 ---
 
+### ✅ AiResumeResult 留存治理（2026-06-04，`fix/ai-resume-result-retention`，基于 `feat/kiosk-campus-zone-on-main`）
+
+落实 CLAUDE.md §11「不长期保存简历」：给简历派生结果（解析/优化）加留存窗口，到期自动清理。接真实 AI provider（before/after 可能含简历摘录）前的合规硬前提，MockProvider 阶段先行落地，风险最低。
+
+| 改动 | 文件 |
+|------|------|
+| `AiResumeResult` 加 `expiresAt DateTime?` + `@@index([expiresAt])`；migration `20260604120000_add_ai_resume_result_expires_at`（手写 ALTER，绕开 dev.db 既有 drift 不做破坏性 reset） | `prisma/schema.prisma` + `prisma/migrations/` |
+| `persistResult` 每次写入（含 update）刷新 `expiresAt = now + AI_RESUME_RESULT_TTL_HOURS`（默认 24h，env 可调）；`loadResult` 把已过期行视为不存在（读取路径在到期后也不返回简历派生内容，不等 cron）；新增 `cleanupExpiredResults('manual'\|'cron')` 硬删过期行 + 写 `ai_resume_result.cleanup_expired` system 审计（仅数量/按 kind 摘要，无 taskId/payload） | `src/ai/ai.service.ts` |
+| `AiResultCleanupTask` 每小时 cron（镜像 `FilesCleanupTask`，复用顶层 `ScheduleModule.forRoot()`） | `src/ai/ai-result.cleanup.task.ts`（新建）+ `src/ai/ai.module.ts` |
+| `AI_RESUME_RESULT_TTL_HOURS` 文档化 | `services/api/.env.example` |
+
+**验证：** typecheck / lint / build 三绿；dev.db 运行期三项断言通过 —— ① 过期行被 loadResult guard 视为不存在；② cleanup 只选中过期行（不误删未到期）；③ 删除后过期行消失、未到期行保留。审计/Prisma 模式镜像已验证的 `files.cleanupExpired`。
+
+**本轮范围外：** 未改前端；未触碰真实 provider 接通（仍 stub，需凭证）；dev.db 全量 drift 不在本轮处理（PostgreSQL 迁移单独排期）。
+
+---
+
 ### ✅ P0 Bug 修复 + 后端接线（2026-06-04，`fix/p0-bugs-and-backend-wiring`）
 
 基于全项目专家评审（多 Agent：各模块进度 + 构建健康 + 合规扫描 + 真假数据审计 + 集成 Bug 猎手），按优先级修复 P0/MEDIUM/LOW 问题；改动后经 6 路对抗式审查复核，typecheck/lint/build 全量三绿。

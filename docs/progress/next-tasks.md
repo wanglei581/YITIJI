@@ -11,7 +11,7 @@
 
 **本轮遗留 / 后续待办（按优先级）：**
 
-- ⏳ **[合规·必做于接真 provider 前] `AiResumeResult` 留存治理**：当前 MockAiProvider 的 optimize before/after 是通用建议文本、无 PII；**一旦接入真实 AI provider，before/after 可能携带简历原文摘录**，必须给 `AiResumeResult` 加 `expiresAt` 列 + 纳入定期清理（参照 `files.cleanupExpired` 模式），落实 CLAUDE.md §11「不长期保存简历」。代码注释已标记（ai.service.ts 顶部）。
+- ✅ **[合规] `AiResumeResult` 留存治理（2026-06-04，`fix/ai-resume-result-retention`）**：已加 `expiresAt` 列（migration `20260604120000_add_ai_resume_result_expires_at`）+ `@@index([expiresAt])`；`persistResult` 写入 `expiresAt = now + AI_RESUME_RESULT_TTL_HOURS`（默认 24h，env 可调）；`loadResult` 把已过期行视为不存在（读取路径也不返回简历派生内容）；`AiResultCleanupTask` 每小时 cron 调 `cleanupExpiredResults('cron')` 硬删过期行并写 `ai_resume_result.cleanup_expired` system 审计（仅数量/按 kind 摘要，无 taskId/payload）。接真 provider 后无需再改留存逻辑，仅按需调小 TTL。typecheck/lint/build 三绿；dev.db 运行期三项断言通过（过期视为不存在 / cleanup 只选过期 / 删过期留新鲜）。
 - ⏳ **[基础设施] PostgreSQL 迁移**：上线前硬阻塞；dev.db 现存 `feat/end-user-account` 分支 drift，迁移需重生成 + SQLite 特定查询回归。
 - ⏳ **[凭证] 真实 AI provider 接通**：openai/claude/qwen/zhipu/local 仍为 NotImplemented stub，需外部凭证（持久化层已就绪，接通即可用）。
 - ⏳ **[硬件] 扫描真机链路**：TWAIN/WIA 或扫描到 SMB/U盘 + Agent 中转（当前 Kiosk 扫描全程模拟）。

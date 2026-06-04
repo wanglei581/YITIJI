@@ -10,6 +10,16 @@ import { AiLogService } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
+
+// 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
+// MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
+// before/after 可能含简历原文摘录,到期即清理,不让其长期留存。
+// 可经 env AI_RESUME_RESULT_TTL_HOURS 覆盖,默认 24h(覆盖一次 kiosk 会话 + 当日返回)。
+const AI_RESUME_RESULT_TTL_HOURS = ((): number => {
+  const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
+  return Number.isFinite(raw) && raw > 0 ? raw : 24
+})()
 
 // ============================================================
 // AiService — 选择 provider 并统一处理日志
@@ -23,9 +33,12 @@ import { PrismaService } from '../prisma/prisma.service'
 // - 解析 / 优化结果写入 AiResumeResult 表（taskId + kind 唯一），
 //   替换原进程内 Map。API 重启 / 多实例后 GET /resume/records/:taskId 仍可读。
 // - payloadJson 当前（MockAiProvider）只存诊断评分 / 通用优化建议文本，不含简历原文 / 候选人 PII。
-//   ⚠️ 合规待办：接入真实 AI provider 后，优化模块的 before/after 可能携带简历原文摘录，
-//   届时必须给本表加 expiresAt + 纳入定期清理（CLAUDE.md §11「不长期保存简历」），
-//   不可让简历派生文本长期留存。详见 docs/progress/next-tasks.md。
+//
+// 留存治理（CLAUDE.md §11「不长期保存简历」，已落地）：
+// - persistResult 写入 expiresAt = now + AI_RESUME_RESULT_TTL_HOURS（默认 24h）。
+// - loadResult 把已过期行 + 无 expiresAt 的迁移前历史行都视为不存在（不返回简历派生内容，即便 cron 尚未清扫）。
+// - cleanupExpiredResults + AiResultCleanupTask（每小时 cron）硬删过期行 + NULL 历史行并写 system 审计。
+//   接入真实 AI provider（before/after 可能含简历摘录）后无需再改留存逻辑，仅按需调小 TTL。
 // ============================================================
 
 const KNOWN_PROVIDERS: readonly AiProviderName[] = [
@@ -47,6 +60,7 @@ export class AiService {
     private readonly llmConfig: LlmConfigService,
     private readonly llmChat: LlmChatService,
     private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
   ) {
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
     if (!(KNOWN_PROVIDERS as readonly string[]).includes(rawName)) {
@@ -78,11 +92,13 @@ export class AiService {
   ): Promise<void> {
     const payloadJson = JSON.stringify(payload)
     const provider = this.provider.name
+    // 每次写入(含 update)都刷新留存窗口,避免活跃任务被提前清理。
+    const expiresAt = new Date(Date.now() + AI_RESUME_RESULT_TTL_HOURS * 60 * 60 * 1000)
     try {
       await this.prisma.aiResumeResult.upsert({
         where: { taskId_kind: { taskId, kind } },
-        create: { taskId, kind, status, payloadJson, provider },
-        update: { status, payloadJson, provider },
+        create: { taskId, kind, status, payloadJson, provider, expiresAt },
+        update: { status, payloadJson, provider, expiresAt },
       })
     } catch {
       // 持久化失败不应让用户的解析/优化动作失败（结果仍在本次响应里返回）
@@ -121,6 +137,9 @@ export class AiService {
       where: { taskId_kind: { taskId, kind } },
     })
     if (!row) return null
+    // 留存治理:已过期 或 无 expiresAt（迁移前写入的历史行）一律视为不存在。
+    // 读取路径不得在到期后 / 对无留存窗口的历史行返回简历派生内容（cron 清扫前也不行）。
+    if (!row.expiresAt || row.expiresAt.getTime() < Date.now()) return null
     try {
       return JSON.parse(row.payloadJson) as T
     } catch {
@@ -178,6 +197,39 @@ export class AiService {
 
   getProviderName(): string {
     return this.provider.name
+  }
+
+  /**
+   * 清理已过期的简历派生结果（CLAUDE.md §11）。
+   * 硬删 expiresAt < now 的行，并写 system 审计（只放数量 / 按 kind 摘要，不含 taskId / payload）。
+   * 由 AiResultCleanupTask 每小时触发；亦可手动调用。
+   */
+  async cleanupExpiredResults(triggeredBy: 'manual' | 'cron'): Promise<{ deletedCount: number }> {
+    const now = new Date()
+    // 清理对象:已过期行 + 无 expiresAt 的迁移前历史行（后者按过期处理，不长期留存简历派生数据）。
+    const expired = await this.prisma.aiResumeResult.findMany({
+      where: { OR: [{ expiresAt: null }, { expiresAt: { lt: now } }] },
+      select: { id: true, kind: true },
+    })
+    if (expired.length === 0) return { deletedCount: 0 }
+
+    const byKind: Record<string, number> = {}
+    for (const r of expired) byKind[r.kind] = (byKind[r.kind] ?? 0) + 1
+
+    await this.prisma.aiResumeResult.deleteMany({
+      where: { id: { in: expired.map((r) => r.id) } },
+    })
+
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'ai_resume_result.cleanup_expired',
+      targetType: 'ai_resume_result',
+      targetId: null,
+      payload: { triggeredBy, deletedCount: expired.length, byKind },
+    })
+
+    return { deletedCount: expired.length }
   }
 
   async chatWithAssistant(input: ChatInput): Promise<ChatOutput> {

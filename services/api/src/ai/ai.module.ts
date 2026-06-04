@@ -12,6 +12,7 @@ import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController } from './llm/ai-config.controller'
+import { AiResultCleanupTask } from './ai-result.cleanup.task'
 
 @Module({
   imports: [AuthModule],
@@ -27,6 +28,7 @@ import { AiConfigController } from './llm/ai-config.controller'
     ZhipuProvider,
     LlmConfigService,
     LlmChatService,
+    AiResultCleanupTask,
   ],
   exports: [AiService, AiLogService],
 })

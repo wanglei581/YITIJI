@@ -531,9 +531,14 @@ model AiResumeResult {
   provider   String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  // 留存治理(CLAUDE.md §11「不长期保存简历」):简历派生结果到期即清理。
+  // 迁移前历史行 expiresAt 为 null:读取路径与 cron 清理均按"已过期"处理
+  // (不可读 + 会被删),不让无留存窗口的历史简历派生数据长期留存。
+  expiresAt  DateTime?
 
   @@unique([taskId, kind])
   @@index([taskId])
+  @@index([expiresAt])
 }
 
 model AuditLog {
