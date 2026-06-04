@@ -125,6 +125,23 @@ model User {
   @@index([orgId])
 }
 
+// ── EndUser ─────────────────────────────────────────────────────────────────
+// 阶段 A: C 端求职者账号。手机号验证码登录;不存明文手机号。
+//   phoneHash: HMAC-SHA256(手机号) 唯一查找键
+//   phoneEnc:  AES-256-GCM 加密手机号,仅服务端可解,用于派生脱敏展示
+// 与内部运营 User 表完全独立,不参与企业招聘闭环。
+
+model EndUser {
+  id          String    @id @default(cuid())
+  phoneHash   String    @unique
+  phoneEnc    String
+  nickname    String?
+  enabled     Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 // ── JobSource ─────────────────────────────────────────────────────────────────
 // Phase 0b: 一个机构可配多个数据源,按 sourceKind × accessMode 双维度刻画。
 //

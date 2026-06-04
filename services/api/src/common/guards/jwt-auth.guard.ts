@@ -8,6 +8,8 @@ interface JwtPayload {
   sub:   string
   role:  UserRole
   orgId: string | null
+  /** C 端求职者 token 带 aud='enduser';内部接口必须拒绝(双向隔离)。 */
+  aud?:  string
 }
 
 /**
@@ -38,6 +40,13 @@ export class JwtAuthGuard implements CanActivate {
     try {
       payload = this.jwtService.verify<JwtPayload>(token)
     } catch {
+      throw new UnauthorizedException({
+        error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' },
+      })
+    }
+
+    // 隔离:C 端求职者 token(aud='enduser')不得访问内部运营接口。
+    if (payload.aud === 'enduser') {
       throw new UnauthorizedException({
         error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' },
       })
