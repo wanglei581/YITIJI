@@ -1,3 +1,39 @@
+# 2026-06-04 L2-2 member-auth 后端骨干重建(Claude)
+
+## 分支
+
+`claude/l2-2-member-auth-backend`(从 `main` 9c07385 新开,未 push、未 merge)
+
+## 任务边界
+
+只重建 C 端求职者「手机号验证码登录」后端骨干,不做前端 UI、不做登录中心 mock、
+不碰岗位/收藏/jobsMeta/seed。只读参考 `feat/end-user-account` 的 auth 文件,不整支 cherry-pick。
+
+## 实现要点
+
+- `member-auth` 模块独立 JwtModule,`audience='enduser'` + 30min 过期,与内部 AuthModule 不合并
+- Redis 强前置(REDIS_URL 未配置即抛错,无 inline fallback):验证码(TTL 5min)/
+  多维频控(手机号日 / IP 时 / 设备时)/ 登录会话(member:session:{jti})
+- 手机号不落明文:`phoneHash`=HMAC-SHA256(pepper 复用 SECRET_ENCRYPTION_KEY)唯一查找,
+  `phoneEnc`=AES-256-GCM(复用 secret-cipher);login/me 只回 `phoneMasked`
+- 双向隔离:内部 `JwtAuthGuard` 拒 `aud='enduser'`;`EndUserAuthGuard` verify 强制 aud=enduser 拒内部 token
+- logout 删 Redis 会话即失效(JWT 未过期也作废);DTO 白名单(forbidNonWhitelisted)越界字段 400
+- 新增 `verify:member-auth` E2E 脚本:真实 HTTP 跑通 发码/400/越界/429冷却/错码401/登录/
+  /me/落库隐私/logout失效/双向隔离,共 10 组检查 **ALL PASS**
+
+## dev.db / migration 处理
+
+dev.db 存在历史 drift(本地迁移与 `_prisma_migrations` 不一致,既有问题)。
+**未运行破坏性 `migrate dev reset`**;沿用 AiResumeResult / FieldMappingRule 先例,
+新增 `20260604140000_add_end_user` 迁移文件,通过 `prisma db execute --file` 非破坏性建表,
+不动既有数据与迁移表。
+
+## 验证结果
+
+typecheck / lint / build 全过;redis-cli ping = PONG;`pnpm verify:member-auth` 全绿。
+
+---
+
 # 2026-06-02 W3 起步完成(Claude × Codex 协作)
 
 ## 跨设备记录规则

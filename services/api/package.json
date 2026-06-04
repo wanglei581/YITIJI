@@ -12,7 +12,8 @@
     "typecheck": "prisma generate && tsc --noEmit",
     "db:seed": "node -r @swc-node/register prisma/seed.ts",
     "db:seed:fairs": "node -r @swc-node/register prisma/seed-fairs.ts",
-    "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts"
+    "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts",
+    "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
