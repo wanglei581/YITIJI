@@ -176,6 +176,7 @@ model JobSource {
   jobs          Job[]
   syncLogs      SyncLog[]
   importBatches ImportBatch[]
+  fieldMappingRules FieldMappingRule[]
   fairs         JobFair[]  @relation("FairSource")
 
   @@index([orgId])
@@ -506,6 +507,32 @@ model ImportRecord {
 
   @@index([batchId])
   @@index([status])
+}
+
+// ── FieldMappingRule ────────────────────────────────────────────────────────────
+// T1:每个数据源(sourceId)× dataType 保存一份可复用的字段映射规则,
+// 让合作机构二次 Excel 导入时自动回填上次映射,无需重复手工映射列。
+//
+// mappingJson: { standardField: excelColumnHeader }  与 ImportBatch.mappingJson 同形状。
+// 一个 (sourceId, dataType) 至多一条;confirmExcelImport 成功后 upsert 更新为最近一次映射。
+//
+// 合规(CLAUDE.md §10/§11):只存"标准字段 → Excel 列名"的映射结构,
+// 不存任何行数据 / 求职者 PII;敏感列在 preview 阶段已被拦截,不可能进入此映射。
+
+model FieldMappingRule {
+  id          String    @id @default(cuid())
+  sourceId    String
+  source      JobSource @relation(fields: [sourceId], references: [id])
+  orgId       String
+  dataType    String    // 'job' | 'fair'
+  mappingJson String    @default("{}")
+  updatedBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([sourceId, dataType])
+  @@index([orgId])
+  @@index([sourceId])
 }
 
 // ── AiResumeResult ─────────────────────────────────────────────────────────────

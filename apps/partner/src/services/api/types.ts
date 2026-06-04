@@ -156,6 +156,16 @@ export interface ExcelConfirmResult {
   syncLogId: string
 }
 
+/** T1: 某数据源 × dataType 上次保存的字段映射规则(用于导入向导自动回填) */
+export interface FieldMappingRuleResult {
+  sourceId: string
+  dataType: 'job' | 'fair'
+  /** { standardField: excelColumnHeader };未保存过则为空对象 */
+  mapping: Record<string, string>
+  /** 规则上次更新时间 ISO;从未保存过则为 null */
+  updatedAt: string | null
+}
+
 // ─── Sync Logs ────────────────────────────────────────────────────────────────
 
 export type SyncDataType = 'job' | 'fair' | 'policy'

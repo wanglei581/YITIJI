@@ -9,11 +9,19 @@ import type {
   ImportResult,
   ExcelPreviewResult,
   ExcelConfirmResult,
+  FieldMappingRuleResult,
 } from './types'
 
 function delay(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 120))
 }
+
+// ─── T1: 字段映射规则（mock 持久化，镜像后端「confirm 落地」语义）──────────────
+// SAVED_MAPPINGS: 已确认导入后保存的规则，键为 `${sourceId}:${dataType}`。
+// PENDING_BATCH_MAPPINGS: preview 时按 batchId 暂存映射，confirm 时再落入 SAVED_MAPPINGS，
+// 与真实后端「映射随 ImportBatch，确认导入时才保存为复用规则」一致。
+const SAVED_MAPPINGS = new Map<string, { mapping: Record<string, string>; updatedAt: string }>()
+const PENDING_BATCH_MAPPINGS = new Map<string, { sourceId: string; dataType: 'job' | 'fair'; mapping: Record<string, string> }>()
 
 // ─── Data Sources ─────────────────────────────────────────────────────────────
 
@@ -180,10 +188,13 @@ export const partnerMockAdapter = {
     }
   },
   async previewExcel(file: File, sourceId: string, dataType: 'job' | 'fair', fieldMapping: Record<string, string>): Promise<ExcelPreviewResult> {
-    void file; void dataType; void fieldMapping
+    void file
     await delay()
+    const batchId = `batch-${sourceId}-${Date.now()}`
+    // 暂存本批次映射，confirm 成功后再落入可复用规则（镜像后端语义）
+    PENDING_BATCH_MAPPINGS.set(batchId, { sourceId, dataType, mapping: { ...fieldMapping } })
     return {
-      batchId: `batch-${sourceId}-${Date.now()}`,
+      batchId,
       totalRows: 10,
       validRows: 7,
       invalidRows: 2,
@@ -201,13 +212,31 @@ export const partnerMockAdapter = {
     }
   },
   async confirmExcelImport(batchId: string): Promise<ExcelConfirmResult> {
-    void batchId
     await delay()
+    // 确认成功 → 把本批次映射保存为该数据源的可复用规则
+    const pending = PENDING_BATCH_MAPPINGS.get(batchId)
+    if (pending && Object.keys(pending.mapping).length > 0) {
+      SAVED_MAPPINGS.set(`${pending.sourceId}:${pending.dataType}`, {
+        mapping: pending.mapping,
+        updatedAt: new Date().toISOString(),
+      })
+      PENDING_BATCH_MAPPINGS.delete(batchId)
+    }
     return { imported: 7, syncLogId: `sl-mock-${Date.now()}` }
   },
   async cancelExcelImport(batchId: string): Promise<{ success: boolean }> {
-    void batchId
+    PENDING_BATCH_MAPPINGS.delete(batchId)
     await delay()
     return { success: true }
+  },
+  async getMappingRule(sourceId: string, dataType: 'job' | 'fair'): Promise<FieldMappingRuleResult> {
+    await delay()
+    const saved = SAVED_MAPPINGS.get(`${sourceId}:${dataType}`)
+    return {
+      sourceId,
+      dataType,
+      mapping: saved ? { ...saved.mapping } : {},
+      updatedAt: saved ? saved.updatedAt : null,
+    }
   },
 }

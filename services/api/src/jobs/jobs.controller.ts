@@ -342,10 +342,28 @@ export class JobsController {
 
   // ── Partner Excel import ─────────────────────────────────────────────────────
   //
+  //   GET  /partner/excel/mapping-rule → 上次保存的字段映射(自动回填)
   //   POST /partner/excel/parse    multipart file → columns + sampleRows (stateless)
   //   POST /partner/excel/preview  multipart file + mapping → ImportBatch + preview
-  //   POST /partner/excel/:id/confirm → upsert ok rows + SyncLog
+  //   POST /partner/excel/:id/confirm → upsert ok rows + SyncLog + 保存映射规则
   //   DELETE /partner/excel/:id   → cancel pending batch
+
+  @Get('partner/excel/mapping-rule')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getMappingRule(
+    @Query('sourceId') sourceId: string,
+    @Query('dataType') dataType: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    if (!sourceId?.trim()) {
+      throw new BadRequestException({ error: { code: 'SOURCE_ID_REQUIRED', message: '缺少 sourceId' } })
+    }
+    if (dataType !== 'job' && dataType !== 'fair') {
+      throw new BadRequestException({ error: { code: 'INVALID_DATA_TYPE', message: 'dataType 必须为 job 或 fair' } })
+    }
+    return this.jobsService.getMappingRule(sourceId, dataType, user)
+  }
 
   @Post('partner/excel/parse')
   @UseGuards(JwtAuthGuard, RolesGuard)

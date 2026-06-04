@@ -11,6 +11,7 @@ import type {
   CreateDataSourcePayload,
   ExcelPreviewResult,
   ExcelConfirmResult,
+  FieldMappingRuleResult,
 } from './types'
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -113,6 +114,10 @@ export const partnerHttpAdapter = {
     get<PartnerSyncLog[]>('/partner/sync-logs'),
 
   // Excel Import
+  // T1: 读取上次保存的字段映射规则(自动回填)
+  getMappingRule: (sourceId: string, dataType: 'job' | 'fair') =>
+    get<FieldMappingRuleResult>('/partner/excel/mapping-rule', { sourceId, dataType }),
+
   parseExcel: (file: File) => {
     const form = new FormData()
     form.append('file', file)

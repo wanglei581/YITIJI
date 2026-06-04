@@ -121,6 +121,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.importRecord
   }
 
+  // ── T1 字段映射规则复用 ──────────────────────────────────────────────────────
+
+  get fieldMappingRule() {
+    return this.client.fieldMappingRule
+  }
+
   // ── HIGH-6 AI 结果持久化 ────────────────────────────────────────────────────
 
   get aiResumeResult() {

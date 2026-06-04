@@ -16,6 +16,7 @@ import type {
   SyncResult,
   ExcelPreviewResult,
   ExcelConfirmResult,
+  FieldMappingRuleResult,
 } from './types'
 
 export type {
@@ -33,6 +34,7 @@ export type {
   SyncResult,
   ExcelPreviewResult,
   ExcelConfirmResult,
+  FieldMappingRuleResult,
 }
 
 export interface PartnerContentServiceInterface {
@@ -56,6 +58,7 @@ export interface PartnerContentServiceInterface {
   ): Promise<ExcelPreviewResult>
   confirmExcelImport(batchId: string): Promise<ExcelConfirmResult>
   cancelExcelImport(batchId: string): Promise<{ success: boolean }>
+  getMappingRule(sourceId: string, dataType: 'job' | 'fair'): Promise<FieldMappingRuleResult>
 }
 
 const adapter: PartnerContentServiceInterface =
@@ -82,3 +85,5 @@ export const previewExcel = (
 ) => adapter.previewExcel(file, sourceId, dataType, fieldMapping)
 export const confirmExcelImport = (batchId: string) => adapter.confirmExcelImport(batchId)
 export const cancelExcelImport  = (batchId: string) => adapter.cancelExcelImport(batchId)
+export const getMappingRule = (sourceId: string, dataType: 'job' | 'fair') =>
+  adapter.getMappingRule(sourceId, dataType)

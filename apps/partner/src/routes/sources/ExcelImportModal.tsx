@@ -7,7 +7,7 @@ import {
   UploadIcon,
   XIcon,
 } from 'lucide-react'
-import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport } from '../../services/api'
+import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport, getMappingRule } from '../../services/api'
 import type { ExcelPreviewResult } from '../../services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -101,6 +101,8 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
   const [importedCount, setImportedCount] = useState(0)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
+  // T1: 是否套用了上次保存的字段映射规则（用于映射步提示）
+  const [savedRuleApplied, setSavedRuleApplied] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fields: readonly FieldDef[] = dataType === 'job' ? JOB_FIELDS : FAIR_FIELDS
@@ -110,7 +112,11 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     if (!file) { setError('请选择 Excel 文件'); return }
     setLoading(true); setError('')
     try {
-      const result = await parseExcel(file)
+      // T1: 并行解析文件 + 拉取上次保存的字段映射规则（规则获取失败不阻断导入）
+      const [result, savedRule] = await Promise.all([
+        parseExcel(file),
+        getMappingRule(sourceId, dataType).catch(() => null),
+      ])
       setColumns(result.columns)
       // Auto-detect mapping by fuzzy match
       const auto: Record<string, string> = {}
@@ -120,6 +126,18 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
         )
         if (matched) auto[f.key] = matched
       }
+      // T1: 用上次保存的映射覆盖模糊匹配（仅当列在本次文件中仍存在、字段属于当前 dataType）
+      let applied = false
+      const validKeys = new Set<string>(fields.map((f) => f.key))
+      if (savedRule) {
+        for (const [stdField, col] of Object.entries(savedRule.mapping)) {
+          if (validKeys.has(stdField) && result.columns.includes(col)) {
+            auto[stdField] = col
+            applied = true
+          }
+        }
+      }
+      setSavedRuleApplied(applied)
       setMapping(auto)
       setStep('mapping')
     } catch {
@@ -257,6 +275,11 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               <p className="text-sm text-gray-600">
                 检测到 {columns.length} 列。请将 Excel 列名映射到标准字段。
               </p>
+              {savedRuleApplied && (
+                <div className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-2 text-xs text-primary-700">
+                  已套用该数据源上次保存的字段映射，可直接微调。确认导入后将更新为本次映射。
+                </div>
+              )}
               <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100">
                 <table className="w-full text-sm">
                   <thead className="border-b border-gray-100 bg-gray-50">
