@@ -5,6 +5,36 @@
 
 ---
 
+## Admin 文件管理页切真（2026-06-05，`codex/admin-files-real-api`，基于 main `dcc0b27`）
+
+**背景：** 接口联通性审计（见 [api-connectivity-audit-2026-06-05.md](api-connectivity-audit-2026-06-05.md)）确认 admin 文件管理页 100% 前端 mock，而后端 `/files` 系列端点已就绪并实测通过。本轮把该页从 mock 切到真实后端，**未新增任何后端能力**。
+
+**改动文件（3 个，全部限定在 apps/admin）：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/admin/src/services/api/files.ts`（新增） | 镜像后端 `FileMetadata` 的 `AdminFileRecord` 等类型；http/mock 双 adapter + 选择器（与 sources.ts/aiUsage.ts 同模式）。4 方法：`listFiles`(GET /files)、`deleteFile`(DELETE /files/:id?reason=，`encodeURIComponent`)、`cleanupExpiredFiles`(POST /files/cleanup-expired)、`getFileSignedUrl`(GET /files/:id/url)；http adapter 拆 `ApiResponse.data` + 401 跳登录 |
+| `apps/admin/src/services/api/index.ts` | `export * from './files'` |
+| `apps/admin/src/routes/files/index.tsx`（重写） | 移除本地 MOCK_FILES，改 `useEffect`+`listFiles` 加载；后端字段→展示映射（purpose→类型/来源、normal/sensitive/highly_sensitive→低/中/高敏感、deletedAt/expiresAt→清理状态）；loading 骨架 / error 重试 / empty 三态；「手动删除」走真 DELETE、「清理过期文件」走真 cleanup-expired（均含二次确认，后端写审计）；「查看文件」走 GET /files/:id/url 临时签名 URL（后端写访问审计）；删除演示数据声明 |
+
+**验证（全绿 + 真后端实测）：**
+
+| 检查 | 结果 |
+|------|------|
+| shared + admin `typecheck` | ✅ |
+| admin `lint` | ✅ 0 警告 |
+| admin `build` | ✅（457KB / 130KB gzip，2314 模块） |
+| 真后端实测 4 端点 | ✅ GET /files `{data:[]}` 字段与 AdminFileRecord 完全一致；DELETE 200（ASCII/编码中文/无 reason 均 200，正确写 deletedAt/deletedBy/deleteReason）；cleanup-expired 201；/files/:id/url 返回签名 URL。**0×5xx、无连接错误** |
+| 禁词扫描 | ✅ 0 命中（合规说明含"不做企业招聘闭环传递"为允许文案） |
+
+**合规：** 「查看文件」走后端临时签名 URL（短 TTL）；删除/清理物理删除并由后端写日志审计；文件不长期保存、不做招聘闭环传递。
+
+**本轮范围外（未触碰）：** 未改 .env / 后端 / 其他 admin 页 / kiosk / partner / shared；其余 admin mock 页（dashboard/orders/printers/users/alerts/permissions/peripherals/fairs/partners）需先补后端域，属功能开发，单独排期。
+
+**隔离说明：** 本任务在独立 git worktree（`/Users/wanglei/ai-job-admin-files-wt`，分支 `codex/admin-files-real-api`，基于干净 main）完成，与并发窗口（`codex/cleanup-repo-hygiene`）改动完全隔离。
+
+---
+
 ## 仓库卫生清理（2026-06-05，`codex/cleanup-repo-hygiene`）
 
 **目标：** 仅做仓库卫生与状态标注，不改任何业务功能、不裁剪功能、不重构业务代码。
