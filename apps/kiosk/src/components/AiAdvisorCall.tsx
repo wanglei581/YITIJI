@@ -19,6 +19,21 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBusyLock } from '../contexts/KioskBusyContext'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
+const TERMINAL_ID = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+
+// 通知后端结束腾讯云 AI 会话（StopAIConversation），立即停止按分钟计费。
+//  - keepalive：保证在组件卸载 / 切走页面 / 关闭标签页时请求仍能发出
+//  - X-Terminal-Id：满足后端鉴权（缺失会 401，导致会话停不掉持续计费）
+// 纯函数、模块级：可在 cleanup、startCall 中途离开、pagehide 三处复用。
+function stopBackendTask(taskId: string): void {
+  if (!taskId) return
+  fetch('/api/v1/trtc/session/stop', {
+    method:    'POST',
+    headers:   { 'Content-Type': 'application/json', 'X-Terminal-Id': TERMINAL_ID },
+    body:      JSON.stringify({ taskId }),
+    keepalive: true,
+  }).catch(() => {})
+}
 
 type Phase = 'gate' | 'connecting' | 'live' | 'error'
 type AiState = 'idle' | 'listening' | 'thinking' | 'speaking'
@@ -95,10 +110,19 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
     return () => clearInterval(t)
   }, [phase])
 
-  // 卸载清理
+  // 卸载清理 + 关闭标签页/浏览器兜底
   useEffect(() => {
     destroyedRef.current = false
+    // pagehide：标签页关闭 / 浏览器退出 / 整页跳转时触发（React 卸载 effect 此时不保证执行）。
+    // 用 keepalive fetch 补发 stop，避免关页后机器人留在房间继续计费。
+    // 注意只挂 pagehide，不挂 visibilitychange——切后台 tab 不应结束通话。
+    const onPageHide = () => {
+      stopBackendTask(taskIdRef.current)
+      taskIdRef.current = ''
+    }
+    window.addEventListener('pagehide', onPageHide)
     return () => {
+      window.removeEventListener('pagehide', onPageHide)
       destroyedRef.current = true
       void cleanup()
     }
@@ -154,7 +178,13 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
       }
       const session = await res.json() as SessionResp
       taskIdRef.current = session.taskId
-      if (destroyedRef.current) return
+      // 用户在「连接中」就离开了：cleanup 已先于 fetch 返回跑过（当时 taskId 还为空，
+      // 没发 stop），但后端机器人此刻已进房计费 —— 必须立即补发 stop，防止漏到 60s 超时。
+      if (destroyedRef.current) {
+        stopBackendTask(session.taskId)
+        taskIdRef.current = ''
+        return
+      }
 
       // 2. 加载 TRTC SDK
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -247,24 +277,20 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
   // ── 清理 ─────────────────────────────────────────────────
   const cleanup = useCallback(async () => {
     if (taskIdRef.current) {
-      fetch('/api/v1/trtc/session/stop', {
-        method:    'POST',
-        headers:   {
-          'Content-Type': 'application/json',
-          'X-Terminal-Id': (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim(),
-        },
-        body:      JSON.stringify({ taskId: taskIdRef.current }),
-        keepalive: true,
-      }).catch(() => {})
+      stopBackendTask(taskIdRef.current)
       taskIdRef.current = ''
     }
-    if (trtcRef.current) {
+    // 同步取出并立即置空：handleExit 直接调 cleanup 后又 navigate(-1) 触发卸载再调一次，
+    // 两个并发 cleanup 若都读到非空 trtc，会把 exitRoom/destroy 各跑两遍（SDK 报
+    // “Cannot read properties of null (reading 'sdkAppId')”善后噪音）。先置空让第二次跳过。
+    const trtc = trtcRef.current
+    trtcRef.current = null
+    if (trtc) {
       try {
-        await trtcRef.current.stopLocalAudio?.()
-        await trtcRef.current.exitRoom?.()
-        trtcRef.current.destroy?.()
+        await trtc.stopLocalAudio?.()
+        await trtc.exitRoom?.()
+        trtc.destroy?.()
       } catch { /* ignore */ }
-      trtcRef.current = null
     }
     remoteAudioUsersRef.current.clear()
   }, [])
