@@ -13,6 +13,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
   MicIcon,
   AlertCircleIcon,
@@ -145,6 +146,8 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([WELCOME])
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
+  // AI 正在回复:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(loading)
 
   const sessionIdRef = useRef(newSessionId())
   const cancelledRef = useRef(false)

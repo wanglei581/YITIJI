@@ -19,7 +19,9 @@ import { ApiHttpError } from './httpAdapter'
 // ──────────────────────────────────────────────────────────────
 
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
-  const url = new URL(`${API_BASE_URL}${path}`)
+  // API_BASE_URL 可能是相对路径（如 /api/v1，走 vite 代理）或绝对地址。
+  // new URL() 处理相对路径必须带 base；绝对地址时 base 会被忽略，两种配置都正确。
+  const url = new URL(`${API_BASE_URL}${path}`, window.location.origin)
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
   }

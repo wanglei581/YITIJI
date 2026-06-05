@@ -39,6 +39,7 @@
 
 **本轮遗留 / 后续待办（按优先级）：**
 
+- 🟢 **[新功能] 待机宣传屏（广告位）一期（2026-06-04，`feature/kiosk-screensaver-ads`，基于 `main`）**：一体机闲时全屏轮播宣传海报/视频，触摸唤醒。后端 4 表 + `ContentModule`（素材上传含 MIME+魔数+大小+时长校验 / 播放方案 CRUD / 终端配置 / Kiosk 拉取 / HMAC 签名内容流 / 审计）；Kiosk `useIdleTimer`+忙碌态豁免（打印/扫描/AI/上传）+ `/screensaver` 全屏页（视频 muted+autoplay，失败跳过，Cache Storage 缓存）；Admin「宣传屏」模块（素材库/播放方案/终端配置）。AI 文生图为**二期 stub**（`AI_IMAGE_PROVIDER=disabled` → `400 AI_POSTER_NOT_ENABLED`，零外部费用）。api/kiosk/admin typecheck/lint/build 全绿。**二期待办**：接真实文生图 provider（通义万相/CogView）+ 内容安全 + 草稿确认入库；曝光/唤醒埋点报表；机构端上传 + 审核流。详见 [current-progress.md](./current-progress.md) 同名段。
 - ✅ **[合规] `AiResumeResult` 留存治理（2026-06-04，`fix/ai-resume-result-retention`）**：已加 `expiresAt` 列（migration `20260604120000_add_ai_resume_result_expires_at`）+ `@@index([expiresAt])`；`persistResult` 写入 `expiresAt = now + AI_RESUME_RESULT_TTL_HOURS`（默认 24h，env 可调）；`loadResult` 把已过期行视为不存在（读取路径也不返回简历派生内容）；`AiResultCleanupTask` 每小时 cron 调 `cleanupExpiredResults('cron')` 硬删过期行并写 `ai_resume_result.cleanup_expired` system 审计（仅数量/按 kind 摘要，无 taskId/payload）。接真 provider 后无需再改留存逻辑，仅按需调小 TTL。typecheck/lint/build 三绿；dev.db 运行期三项断言通过（过期视为不存在 / cleanup 只选过期 / 删过期留新鲜）。
 - ⏳ **[基础设施] PostgreSQL 迁移**：上线前硬阻塞；dev.db 现存 `feat/end-user-account` 分支 drift，迁移需重生成 + SQLite 特定查询回归。
 - ⏳ **[凭证] 真实 AI provider 接通**：openai/claude/qwen/zhipu/local 仍为 NotImplemented stub，需外部凭证（持久化层已就绪，接通即可用）。

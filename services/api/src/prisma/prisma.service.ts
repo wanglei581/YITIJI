@@ -139,6 +139,24 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiResumeResult
   }
 
+  // ── 待机宣传屏(Screensaver)──────────────────────────────────────────────
+
+  get adAsset() {
+    return this.client.adAsset
+  }
+
+  get adPlaylist() {
+    return this.client.adPlaylist
+  }
+
+  get adPlaylistItem() {
+    return this.client.adPlaylistItem
+  }
+
+  get terminalScreensaverConfig() {
+    return this.client.terminalScreensaverConfig
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

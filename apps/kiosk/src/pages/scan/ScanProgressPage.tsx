@@ -8,6 +8,7 @@ import {
   ScanIcon,
   XCircleIcon,
 } from 'lucide-react'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 
 type Step = 'init' | 'scanning' | 'generating'
 type ScanType = 'resume' | 'id' | 'document'
@@ -56,6 +57,9 @@ function mockFile(scanType: ScanType) {
 }
 
 export function ScanProgressPage() {
+  // 扫描进行中:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(true)
+
   const navigate = useNavigate()
   const location = useLocation()
   // Keep state as-is (possibly null) so useCallback deps stay stable

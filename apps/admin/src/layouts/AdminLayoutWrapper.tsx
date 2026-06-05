@@ -14,6 +14,7 @@ import {
   LayoutDashboardIcon,
   LogOutIcon,
   MonitorIcon,
+  MonitorPlayIcon,
   RefreshCwIcon,
   ScrollTextIcon,
   ShieldIcon,
@@ -25,6 +26,7 @@ import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
   { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维' },
+  { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon },
   { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon,   badge: 3 },
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理' },
   { key: 'files',        label: '文件管理',     icon: FolderIcon },
@@ -49,6 +51,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/terminals':    'devices',
   '/printers':     'devices',
   '/peripherals':  'devices',
+  '/screensaver':  'screensaver',
   '/orders':       'orders',
   '/files':        'files',
   '/ai-services':  'ai-services',

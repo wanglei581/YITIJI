@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { ChevronRightIcon, FolderOpenIcon, ScanIcon, UploadIcon } from 'lucide-react'
@@ -46,6 +47,8 @@ export function ResumeSourcePage() {
   const [selected, setSelected] = useState<Source | null>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(uploading)
 
   const handleSelect = (option: SourceOption) => {
     setError(null)

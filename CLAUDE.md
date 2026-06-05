@@ -692,6 +692,7 @@ Claude Code 每次开发前必须：
 - 一体机首页 / 打印扫描核心流程 / 管理员后台基础框架 / 岗位/招聘会外部来源展示
 - AI简历服务 / 合作机构后台 P0 / 数据源同步骨架（W3 Webhook 已落地，API/Excel 后续接 worker）
 - Windows Terminal Agent（Phase 8 全部封板，含 DPAPI/SQLite/WMI/单实例/断网重试/Windows 服务）
+- 待机宣传屏一期（`feature/kiosk-screensaver-ads`）：管理员上传图/视频 + 播放方案 + 终端配置；Kiosk 无操作进入全屏轮播、触摸唤醒、忙碌态豁免。AI 文生图为二期（一期 stub，`AI_IMAGE_PROVIDER=disabled`，零外部费用）。详见 docs/progress/current-progress.md
 
 **P1（择期）：**
 

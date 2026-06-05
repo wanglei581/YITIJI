@@ -14,6 +14,7 @@
 
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
@@ -51,6 +52,8 @@ export function PrintUploadPage() {
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  // 上传中:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(uploading)
 
   const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon }[] = [
     { key: 'file', label: '本机上传', icon: MonitorSmartphoneIcon },
