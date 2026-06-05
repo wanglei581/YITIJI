@@ -63,6 +63,9 @@ export class TrtcController {
    * POST /api/v1/trtc/session/stop
    * 结束对话式 AI 会话，校验 taskId 归属防止跨会话终止。
    */
+  // stop 是「止损」操作：绝不能被限流挡掉，否则机器人留在房间持续计费。
+  // 放宽到 60 次/分钟（仍防恶意刷腾讯 StopAIConversation 接口），覆盖 start 的 5/min。
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
   @Post('session/stop')
   @HttpCode(HttpStatus.OK)
   async stopSession(
