@@ -78,6 +78,28 @@
 - ⏳ **P1 待补（需加 DTO 字段，禁止硬造 mock）**：岗位数 `jobCount`、届别 `audienceType`（应届/实习/社招）；校招时间线② 交互组件
 - ⏳ **依赖补强（P1）**：校招岗位 P0 用 `getJobs()` + 前端关键词过滤（不依赖 jobs board）；server-side `getJobs({ category, pageSize })` 属 jobs board 能力，待其合入 main 后切回 server-side 精确筛选
 - ⏳ 待 review
+> 最后更新：2026-06-03（Kiosk 岗位信息板块完整收口，feat/kiosk-jobs-complete）
+> 关联文档：[current-progress.md](./current-progress.md)
+
+---
+
+## 📌 当前状态（Kiosk 岗位信息板块完整收口，已完成代码 + Mac 真实后端 http 验证）
+
+**feat/kiosk-jobs-complete（2026-06-03，分支自 main `603be2a`，独立 git worktree 开发不混改其它任务）：**
+- ✅ 后端 `GET /jobs` 真实 Prisma + 多维筛选（keyword/city/industry/category/workType 别名/sourceOrgId/tag/分页），只放出 approved+published
+- ✅ 后端 `GET /jobs/:id` 未审核/未发布不暴露（返回 null）
+- ✅ 前端 `/jobs` 关键词搜索 + 城市/行业/类型/来源筛选（与后端 query 对齐，http 走真实接口）+ 收藏(localStorage) + 可操作错误态
+- ✅ 前端 `/jobs/:id` 去来源平台投递/扫码投递 = 真实 sourceUrl 二维码（qrcode.react），sourceUrl 校验
+- ✅ 行业无 schema 改动，用 `行业:` 前缀 tag 承载（与 data-session-baseline 的未提交 schema 改动解耦）
+- ✅ seed 扩充 13 条；typecheck/lint/build 全绿；带参 HTTP + vite proxy http 全链路实测通过
+- ⏳ 待 review 后 FF merge 到 main（worktree 路径 `/Users/wanglei/ai-job-kiosk-jobs-wt`）
+
+**本板块未做 / 后续可选（不阻塞验收）：**
+- 岗位 `industry` 升级为独立 Prisma 列（当前用 `行业:` tag 承载；切 Postgres 或与 data-session-baseline 合流后再做 migration）
+- 列表分页"加载更多"UI（后端 page/pageSize 已支持，前端当前一次取 pageSize=100 facet + 带参查询）
+- 来源机构卡片计数随城市/行业/类型联动（当前计数取全量 facet，稳定但不随筛选收缩）
+- 岗位收藏跨设备同步（当前仅本机 localStorage，符合"不形成招聘闭环"边界）
+- ⚠️ 协作提醒：多会话并行时各自使用独立 git worktree，避免在共享工作区互相 `git reset/clean` 清空对方未提交改动（本任务曾因此丢失一次未提交工作，已用 worktree 重建）
 
 ---
 

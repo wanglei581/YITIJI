@@ -244,6 +244,8 @@ export interface ExternalJobDTO extends ExternalJob {
   /** 格式化薪资展示字符串，如 "8,000–12,000 元/月" */
   salaryDisplay: string
   workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
+  /** 岗位类型原值（DB category 列）：fulltime 全职 / intern 实习 / campus 校招 / parttime 兼职 */
+  category?: 'fulltime' | 'intern' | 'campus' | 'parttime'
   headcount?: number
   /** 合规来源说明（必须展示） */
   dataSourceNote: string

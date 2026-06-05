@@ -17,8 +17,23 @@ import { jobHttpAdapter } from './jobHttpAdapter'
 // 服务接口类型（供两种 adapter 共同实现）
 // ──────────────────────────────────────────────────────────────
 
+/** Kiosk 岗位列表查询参数（与后端 GET /api/v1/jobs query 对齐） */
+export interface JobQueryParams {
+  /** 关键词：职位名 / 公司名 / 岗位描述 */
+  keyword?: string
+  city?: string
+  industry?: string
+  /** 岗位类型：fulltime 全职 / intern 实习 / campus 校招 / parttime 兼职 */
+  category?: string
+  sourceOrgId?: string
+  /** 技能/标签精确匹配 */
+  tag?: string
+  page?: number
+  pageSize?: number
+}
+
 export interface JobServiceInterface {
-  getJobs(params?: { tag?: string }): Promise<PaginatedResponse<ExternalJobDTO>>
+  getJobs(params?: JobQueryParams): Promise<PaginatedResponse<ExternalJobDTO>>
   getJobById(id: string): Promise<ApiResponse<ExternalJobDTO | null>>
 }
 
@@ -33,5 +48,5 @@ const adapter: JobServiceInterface =
 // 导出服务函数（页面层不感知 adapter 切换）
 // ──────────────────────────────────────────────────────────────
 
-export const getJobs    = (params?: { tag?: string }) => adapter.getJobs(params)
-export const getJobById = (id: string)                 => adapter.getJobById(id)
+export const getJobs    = (params?: JobQueryParams) => adapter.getJobs(params)
+export const getJobById = (id: string)              => adapter.getJobById(id)
