@@ -906,6 +906,34 @@ Phase 9.1 Admin 后台 Polish 已主体完成(commit 见 feat/ui-polish-9.1-fix)
 
 ---
 
+## 空壳页清单（Phase 9+ 待做 / 规划中）
+
+> 来源：2026-06-05 仓库卫生清理（分支 `codex/cleanup-repo-hygiene`）盘点。
+> 以下页面**已有路由和占位 UI，但无业务逻辑**，统一登记为 Phase 9+ 待做，便于跨窗口/跨模型协作时区分"待做"与"废弃"。
+> 本次清理**不改动这些页面的逻辑**，仅做状态登记。
+
+### Admin 后台（3 个空壳）
+
+| 路由 | 页面 | 当前形态 | 占位文案 | 计划 |
+|------|------|----------|----------|------|
+| `apps/admin/src/routes/peripherals/` | 外设管理 | EmptyState（12 行） | "暂无外设数据 / 连接终端外设后将显示设备列表" | Phase 9+ 待接外设上报 |
+| `apps/admin/src/routes/permissions/` | 权限管理 | 骨架屏（40 行） | "角色权限模型设计中,后续将提供超级管理员/运营/只读等预置角色" | Phase 9+ 规划中（权限模型） |
+| `apps/admin/src/routes/users/` | 用户管理 | 骨架屏（40 行） | "用户数据接入中,接入后将显示真实记录" | Phase 9+ 待接用户数据 |
+
+### Partner 合作机构后台（4 个空壳）
+
+| 路由 | 页面 | 当前形态 | 占位文案 | 计划 |
+|------|------|----------|----------|------|
+| `apps/partner/src/routes/account/` | 账号权限 | EmptyState（15 行） | "暂无账号配置 / 添加子账号后将在此处显示" | Phase 9+ 待做（子账号） |
+| `apps/partner/src/routes/policy/` | 政策公告 | EmptyState（15 行） | "暂无政策公告 / 发布就业政策和补贴申请指南" | Phase 9+ 待做 |
+| `apps/partner/src/routes/stats/` | 数据统计 | EmptyState（15 行） | "暂无统计数据 / 数据积累后自动展示统计报表" | Phase 9+ 待做（依赖数据积累） |
+| `apps/partner/src/routes/terminals/` | 终端数据 | EmptyState（15 行） | "暂无终端数据 / 关联终端后将显示使用统计" | Phase 9+ 待做 |
+
+> 说明：Admin / Partner 其余路由（orders / files / alerts / audit / job-sources / fair-sources / sync-sources / printers / partners / fairs / sources / jobs / sync-logs / dashboard / profile 等）均为已实现页面；其中用到的 `EmptyState` 是**数据为空时的正常空状态**，不属于空壳页。
+> 处置建议（待 owner 拍板）：完成实现，或在确认不在路线图内后删除——**不要长期留作无说明的占位**。
+
+---
+
 ## 近期不做
 
 - 后端数据库 / Prisma schema 迁移（Phase 7.6 第一步先出骨架和 stub）

@@ -1,7 +1,27 @@
 # 当前开发进度
 
-> 最后更新：2026-06-04  
+> 最后更新：2026-06-05  
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 仓库卫生清理（2026-06-05，`codex/cleanup-repo-hygiene`）
+
+**目标：** 仅做仓库卫生与状态标注，不改任何业务功能、不裁剪功能、不重构业务代码。
+
+**改动内容：**
+
+1. **`outputs/`（生成产物）：** 检查发现已在 `.gitignore`（第 15 行），且未被 Git 跟踪（`git ls-files outputs/` 为空）——**无需改动**，本地文件保留。
+2. **`legacy-miaoda/`（秒哒旧项目参考截图）：**
+   - 引用核查：代码中仅 [packages/shared/src/types/complianceCopy.ts](../../packages/shared/src/types/complianceCopy.ts) 有 3 处**注释引用**（指向截图作为合规文案参考），**无任何 import / 代码依赖**。
+   - 移除前打归档 tag `archive/legacy-miaoda-20260605`，52 个文件（22M）可随时从该 tag 恢复。
+   - `git rm -r legacy-miaoda/` 移除 52 个跟踪文件，并清理残留 `.DS_Store`，目录已完全移出主开发分支。
+   - 注：complianceCopy.ts 中 3 处注释仍指向 `legacy-miaoda/screenshots/...`，截图已归档至上述 tag；未改动这些注释（不重构业务代码）。
+3. **空壳页登记：** Admin 3 个（peripherals / permissions / users）+ Partner 4 个（account / policy / stats / terminals）共 7 个空壳页，统一登记到 [next-tasks.md](next-tasks.md#空壳页清单phase-9-待做--规划中) 标为 Phase 9+ 待做 / 规划中。**未改动任何页面逻辑。**
+
+**未纳入本次提交（保留原状）：** 工作树中存在一处与本次无关的未提交改动 `apps/kiosk/src/components/AiAdvisorCall.tsx`（TRTC 相关，TRTC 当前冻结），按要求不触碰、不提交。
+
+**未改动：** QingdaoPage / RenshiPage / CampusPage 三个地方化页面按要求保留，等 owner 拍板。
 
 ---
 
