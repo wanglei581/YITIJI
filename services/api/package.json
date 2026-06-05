@@ -15,7 +15,8 @@
     "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts",
     "verify:field-mapping": "node -r @swc-node/register scripts/verify-field-mapping-rule.ts",
     "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts",
-    "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts"
+    "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts",
+    "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
