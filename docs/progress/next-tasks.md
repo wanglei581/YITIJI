@@ -5,6 +5,14 @@
 
 ---
 
+## 📌 PR-D 诚实化/合规 UI（2026-06-05，`feature/honesty-compliance-ui-clean`，待 GitHub review）
+
+详见 [current-progress.md](./current-progress.md) §PR-D。
+
+- ✅ 从 `feature/kiosk-honesty-admin-dashboard` 精取 `9a82957`（简历诚实文案）+ `b7896c3`（禁用假写按钮 + mock 横幅），共 12 文件。
+- 🚫 已剔除 terminals（main 已接真后端）、旧文档 hunk；范围不含 files 接真 / W0 / 工作台 KPI / LLM guard / TRTC。
+- ⏳ **后续单独 PR**：PR-E 工作台 KPI 接真（`501e5ac`）；`e1c0a8b` 是否纳入待单独判断。
+
 ## 📌 T1 Excel 字段映射规则持久化与复用（2026-06-04，`claude/t1-excel-field-mapping`，已完成代码 + 三绿 + 运行期断言）
 
 详见 [current-progress.md](./current-progress.md) §〇。

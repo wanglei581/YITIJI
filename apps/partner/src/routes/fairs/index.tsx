@@ -98,11 +98,23 @@ export default function FairsPage() {
       subtitle={`共 ${fairs.length} 场招聘会`}
       actions={
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled
+            title="招聘会导入流程未接入，已禁用"
+            className="flex cursor-not-allowed items-center gap-1.5 opacity-60"
+          >
             <DownloadIcon className="h-4 w-4" />
             导入招聘会
           </Button>
-          <Button size="sm" variant="primary" className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="primary"
+            disabled
+            title="手动新增招聘会写入流程未接入，已禁用"
+            className="flex cursor-not-allowed items-center gap-1.5 opacity-60"
+          >
             <PlusIcon className="h-4 w-4" />
             新增招聘会
           </Button>
@@ -172,7 +184,13 @@ export default function FairsPage() {
                       <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">
-                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">编辑</button>
+                          <button
+                            disabled
+                            title="招聘会编辑写入流程未接入，已禁用"
+                            className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
+                          >
+                            编辑
+                          </button>
                           <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">查看预约二维码</button>
                           <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">打印活动资料</button>
                           {f.publishStatus === 'published' && (

@@ -77,7 +77,7 @@ const STATUS_FILTER_MAP: Record<string, AlertStatus | null> = { 全部: null, �
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState(MOCK_ALERTS)
+  const [alerts] = useState(MOCK_ALERTS)
   const [levelFilter,  setLevelFilter]  = useState('全部')
   const [statusFilter, setStatusFilter] = useState('全部')
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
@@ -111,18 +111,6 @@ export default function AlertsPage() {
     待处理: alerts.filter((a) => a.status === 'pending').length,
     处理中: alerts.filter((a) => a.status === 'handling').length,
     已解决: alerts.filter((a) => a.status === 'resolved').length,
-  }
-
-  const markHandling = (id: string) => {
-    setAlerts((prev) => prev.map((a) =>
-      a.id === id ? { ...a, status: 'handling' as const, handler: '当前管理员' } : a
-    ))
-  }
-
-  const markResolved = (id: string) => {
-    setAlerts((prev) => prev.map((a) =>
-      a.id === id ? { ...a, status: 'resolved' as const, handler: a.handler ?? '当前管理员' } : a
-    ))
   }
 
   const pendingCount = alerts.filter((a) => a.status === 'pending').length
@@ -219,16 +207,18 @@ export default function AlertsPage() {
                           <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看详情</button>
                           {a.status === 'pending' && (
                             <button
-                              className="rounded px-2 py-1 text-xs font-medium text-blue-500 hover:bg-blue-50"
-                              onClick={() => markHandling(a.id)}
+                              disabled
+                              title="告警处理写入端点未接入，已禁用，避免误以为操作生效"
+                              className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
                             >
                               标记处理中
                             </button>
                           )}
                           {(a.status === 'pending' || a.status === 'handling') && (
                             <button
-                              className="rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50"
-                              onClick={() => markResolved(a.id)}
+                              disabled
+                              title="告警处理写入端点未接入，已禁用，避免误以为操作生效"
+                              className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
                             >
                               标记已解决
                             </button>
@@ -245,7 +235,7 @@ export default function AlertsPage() {
         <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">当前为 mock 数据，接入 Terminal Agent 后实时推送告警</p>
+      <p className="mt-3 text-xs text-gray-400">当前告警列表为示例数据；告警处理写入端点接入前，处理按钮保持禁用。</p>
     </Page>
   )
 }
