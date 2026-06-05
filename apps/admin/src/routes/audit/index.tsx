@@ -4,6 +4,7 @@ import { ScrollTextIcon, RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { Pagination, useTableState } from '../components/DataTable'
 import { getAuditLogs, type AuditLogRecord } from '../../services/api/audit'
+import { API_MODE } from '../../services/api/client'
 
 // ─── Action 中文标签(覆盖契约枚举,未知动作回退原始字符串)──────────────────
 
@@ -110,7 +111,7 @@ export default function AuditPage() {
   return (
     <Page
       title="日志审计"
-      subtitle="管理员与合作机构操作日志、系统事件"
+      subtitle={`管理员与合作机构操作日志、系统事件${API_MODE !== 'http' ? '（当前为 mock 演示数据）' : ''}`}
       actions={
         <button
           onClick={load}

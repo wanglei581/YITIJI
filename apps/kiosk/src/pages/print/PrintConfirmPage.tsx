@@ -104,6 +104,25 @@ export function PrintConfirmPage() {
     navigate('/print/progress', { state: { ...location.state, file, params } })
   }
 
+  // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
+  // 所有 hook 已在上方执行，此处安全提前返回。
+  if (!state?.file) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
+          <AlertCircleIcon className="h-10 w-10 text-amber-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
+          <p className="mt-2 text-sm text-gray-500">请重新上传文件后再确认打印</p>
+        </div>
+        <Button size="lg" onClick={() => navigate('/print/upload')}>
+          重新上传文件
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full flex-col p-6">
       <PageHeader
