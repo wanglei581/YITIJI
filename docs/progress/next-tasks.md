@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-04（T2 BullMQ API 拉取 worker 验证，claude/t2-api-pull-worker）
+> 最后更新：2026-06-05（L2-4C Kiosk Auth Shell + Kiosk UX/Assistant 快捷咨询 + Terminal Agent 连接策略已推送）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -219,13 +219,17 @@
 
 ### P0（立即）
 
-**安全改进 Round 3 已完成（本次）。剩余 P0 安全项：暂无。**
+**当前分支收口：**
+1. **`claude/l2-4c-kiosk-auth-shell` PR / review / 合入 main**：当前分支已推送，包含 L2-4A/L2-4B/L2-4C、Kiosk UX 第一/二批、Assistant 快捷咨询、Terminal Agent stale socket 修复。合入前复跑 kiosk/terminal-agent typecheck/lint/build，并重点审查合规文案与游客态可用性。
+2. **文档状态清理**：继续清理历史段落中“待提交/待 FF merge/下一步”的过时描述，避免后续模型把已完成任务当新需求重复开发。
 
-**业务 P0：**
-1. **未提交的 TRTC/LLM 新功能定批**（合入 main 前必做）：工作区有 Round 3 之外的未跟踪新功能 —— `services/api/src/trtc/*`、`services/api/src/ai/llm/*`、`apps/admin/src/routes/ai-config/*`，且 `app.module.ts` 已 import `TrtcModule`（源文件未提交）。必须将依赖文件与 import 同批提交，否则 main 构建缺文件。决定：随 Round 3 一起合，还是独立 feature commit。
-2. **feat/phase9-assistant-actions FF 合入 main**（含 Round 1 + Round 2 + Round 3 安全修复）
-3. **Excel 字段映射 service 层接入**（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export）
-4. **BullMQ API 拉取 worker 验证**：`pnpm verify:job-sync` 通过后 FF merge
+**上线前硬阻塞：**
+3. **PostgreSQL 迁移规范化**：dev.db 已有 migration drift；上线前必须重生成 PostgreSQL 迁移并回归 SQLite 特定查询。
+4. **真实 AI provider 接通**：选择并配置 OpenAI/Claude/Qwen/Zhipu/local provider 之一；接通后复核 AiResumeResult 留存、审计与错误兜底。
+5. **生产 Redis / BullMQ 配置**：生产 `REDIS_URL` 必配，确认无 Redis 时不会误用 dev inline fallback。
+6. **Windows 真机打印/扫描验证**：Pantum CM2800/CM2820 打印参数、错误码、真实上传路径；扫描链路需 TWAIN/WIA 或 SMB/U盘方案。
+7. **真源 API 联调**：接一个真实外部岗位/招聘会来源，验证 responseConfig auto-detect、字段映射、审核发布、失败日志。
+8. **Admin orders/files/alerts 后端接线**：当前部分仍是演示态，需补真实端点或继续保持明确演示标识。
 
 ### P1（择期）
 **安全后续：**
