@@ -16,14 +16,15 @@ import { useNavigate } from 'react-router-dom'
 import {
   MicIcon,
   AlertCircleIcon,
-  SendHorizontalIcon,
-  ZapIcon,
-  ArrowLeftIcon,
-  FileTextIcon,
-  PrinterIcon,
   BriefcaseIcon,
   CalendarDaysIcon,
+  ArrowLeftIcon,
+  FileTextIcon,
+  HelpCircleIcon,
   LandmarkIcon,
+  PrinterIcon,
+  SendHorizontalIcon,
+  ZapIcon,
 } from 'lucide-react'
 import { Button } from '@ai-job-print/ui'
 import type { AssistantAction } from '@ai-job-print/shared'
@@ -85,6 +86,75 @@ function getMatchedRoutes(input: string): Set<string> {
   }
   return matched
 }
+
+// ─── 快捷咨询分组 ─────────────────────────────────────────
+// 问题均为中性咨询，不含平台内招聘流程表述。
+// 岗位/招聘会只问查看路径，不引导平台内操作。
+
+const QUICK_GROUPS = [
+  {
+    label: '简历服务',
+    icon: FileTextIcon,
+    bg: 'bg-primary-50',
+    color: 'text-primary-600',
+    questions: [
+      '怎么用 AI 诊断我的简历？',
+      'AI 简历优化能改哪些内容？',
+      '在哪里找简历模板？',
+    ],
+  },
+  {
+    label: '打印扫描',
+    icon: PrinterIcon,
+    bg: 'bg-gray-100',
+    color: 'text-gray-700',
+    questions: [
+      '如何打印一份文件？',
+      '怎么扫描纸质材料存档？',
+      '支持哪些文件格式打印？',
+    ],
+  },
+  {
+    label: '岗位信息',
+    icon: BriefcaseIcon,
+    bg: 'bg-blue-50',
+    color: 'text-blue-600',
+    questions: [
+      '这里能查到什么岗位信息？',
+      '岗位数据来自哪些平台？',
+    ],
+  },
+  {
+    label: '招聘会',
+    icon: CalendarDaysIcon,
+    bg: 'bg-green-50',
+    color: 'text-green-600',
+    questions: [
+      '怎么查看近期招聘会信息？',
+      '招聘会在哪里查看详情？',
+    ],
+  },
+  {
+    label: '政策 / 人社',
+    icon: LandmarkIcon,
+    bg: 'bg-indigo-50',
+    color: 'text-indigo-600',
+    questions: [
+      '有哪些就业补贴政策可以申请？',
+      '怎么办理就业登记手续？',
+    ],
+  },
+  {
+    label: '使用帮助',
+    icon: HelpCircleIcon,
+    bg: 'bg-amber-50',
+    color: 'text-amber-600',
+    questions: [
+      '这台机器能帮我做什么？',
+      '怎么开始使用 AI 助手咨询？',
+    ],
+  },
+] as const
 
 // 共享触控终端：每次进入助手页面都生成全新 sessionId，
 // 防止上一位用户的对话上下文泄露给下一位用户。
@@ -155,22 +225,18 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
   }, [])
 
   useEffect(() => {
+    if (messages.length === 1 && !loading) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
-    if (!text || loading) return
-
+  // 核心发送逻辑，供输入发送和快捷问题共用
+  const sendMessage = useCallback(async (text: string) => {
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text }])
-    setInput('')
     setLoading(true)
-
     try {
       const resp = await chatWithAssistant({ message: text, sessionId: sessionIdRef.current })
       if (cancelledRef.current) return
       sessionIdRef.current = resp.sessionId
-
       const safeActions = resp.actions?.filter((a) => isAllowedRoute(a.route))
       setMessages((prev) => [
         ...prev,
@@ -185,11 +251,24 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
     } finally {
       if (!cancelledRef.current) setLoading(false)
     }
-  }, [input, loading])
+  }, [])
+
+  const handleSend = useCallback(() => {
+    const text = input.trim()
+    if (!text || loading) return
+    setInput('')
+    void sendMessage(text)
+  }, [input, loading, sendMessage])
+
+  // 一点即问：点击快捷问题直接发送，复用 sendMessage，不新增 API
+  const handleQuickQuestion = useCallback((text: string) => {
+    if (loading) return
+    void sendMessage(text)
+  }, [loading, sendMessage])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend() }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
     },
     [handleSend],
   )
@@ -232,6 +311,43 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-4">
           {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
+
+          {/* 快捷咨询面板 — 仅在初始欢迎消息时展示，一点即问 */}
+          {messages.length === 1 && !loading && (
+            <div className="mt-2">
+              <p className="mb-3 text-center text-xs text-gray-400">
+                点击快速咨询，或在下方输入您的问题
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {QUICK_GROUPS.map((group) => {
+                  const Icon = group.icon
+                  return (
+                    <div key={group.label} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                      <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-3 py-2">
+                        <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${group.bg}`}>
+                          <Icon className={`h-3.5 w-3.5 ${group.color}`} aria-hidden="true" />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600">{group.label}</span>
+                      </div>
+                      <div className="space-y-px p-1.5">
+                        {group.questions.map((q) => (
+                          <button
+                            key={q}
+                            type="button"
+                            onClick={() => handleQuickQuestion(q)}
+                            className="flex min-h-[52px] w-full items-center rounded-lg px-3 py-2.5 text-left text-sm leading-snug text-gray-700 active:bg-gray-100"
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {loading && (
             <div className="flex items-center gap-1.5 w-fit rounded-2xl bg-gray-100 px-4 py-3">
               <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.3s]" />
@@ -298,7 +414,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
           />
           <Button
             size="lg"
-            onClick={() => void handleSend()}
+            onClick={handleSend}
             disabled={!input.trim() || loading}
             aria-label="发送消息"
             className="h-16 w-16 shrink-0 rounded-xl"
