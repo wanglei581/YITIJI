@@ -1,9 +1,18 @@
 # 下一步任务
 
-> 最后更新：2026-06-04（T2 BullMQ API 拉取 worker 验证，claude/t2-api-pull-worker）
+> 最后更新：2026-06-05（PR-E Admin 工作台真实 KPI 接入，feature/admin-dashboard-real-kpi-clean）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
+
+## 📌 PR-E Admin 工作台真实 KPI 接入（2026-06-05，`feature/admin-dashboard-real-kpi-clean`，待验证 / PR）
+
+详见 [current-progress.md](./current-progress.md) §PR-E。
+
+- ✅ 基于当前 main service shape 重写工作台，不 cherry-pick 旧 `501e5ac`。
+- ✅ 工作台只展示已有真实后端来源的数据：终端在线、待审核岗位/招聘会、近 100 条内待清理文件、AI 调用、最近审计操作。
+- ✅ 移除今日订单、今日收入、待处理告警、打印任务实时数等无真实端点支撑的编造指标；后续端点完成后再接入。
+- ⏳ 待验证：admin typecheck/lint/build、合规禁词扫描、mock/http/error 三态截图或 Playwright。
 
 ## 📌 PR-D 诚实化/合规 UI（2026-06-05，`feature/honesty-compliance-ui-clean`，待 GitHub review）
 
@@ -11,7 +20,7 @@
 
 - ✅ 从 `feature/kiosk-honesty-admin-dashboard` 精取 `9a82957`（简历诚实文案）+ `b7896c3`（禁用假写按钮 + mock 横幅），共 12 文件。
 - 🚫 已剔除 terminals（main 已接真后端）、旧文档 hunk；范围不含 files 接真 / W0 / 工作台 KPI / LLM guard / TRTC。
-- ⏳ **后续单独 PR**：PR-E 工作台 KPI 接真（`501e5ac`）；`e1c0a8b` 是否纳入待单独判断。
+- ✅ **后续单独 PR**：PR-E 工作台 KPI 接真已进入 `feature/admin-dashboard-real-kpi-clean`；`e1c0a8b` 是否纳入待单独判断。
 
 ## 📌 T1 Excel 字段映射规则持久化与复用（2026-06-04，`claude/t1-excel-field-mapping`，已完成代码 + 三绿 + 运行期断言）
 

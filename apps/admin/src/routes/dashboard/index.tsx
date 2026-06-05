@@ -1,14 +1,31 @@
-import { Card, StatusBadge } from '@ai-job-print/ui'
+import { useCallback, useEffect, useState, type ElementType } from 'react'
+import { Card, ErrorState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
-  AlertTriangleIcon,
   ArrowRightIcon,
-  BanknoteIcon,
+  BotIcon,
   BriefcaseIcon,
   FolderIcon,
   MonitorIcon,
-  PrinterIcon,
 } from 'lucide-react'
+import {
+  getAiUsage,
+  getFairSources,
+  getJobSources,
+  listFiles,
+  type AdminAiUsage,
+  type AdminFairSourceRecord,
+  type AdminFileRecord,
+  type AdminJobSourceRecord,
+} from '../../services/api'
+import {
+  getAuditLogs,
+  type AuditLogRecord,
+} from '../../services/api/audit'
+import {
+  getTerminals,
+  type AdminTerminalRecord,
+} from '../../services/api/devices'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,7 +33,7 @@ interface KpiCard {
   label: string
   value: string
   sub: string
-  icon: React.ElementType
+  icon: ElementType
   /** Show a 2px left accent when value is in alert state. */
   alert?: boolean
 }
@@ -25,85 +42,105 @@ interface ActionItem {
   label: string
   count: number
   hint: string
-  href?: string
 }
 
 interface ActionPanel {
   title: string
-  icon: React.ElementType
+  icon: ElementType
   items: ActionItem[]
   href: string
 }
 
-interface RecentAlert {
-  id: string
-  level: 'error' | 'warning' | 'info'
-  message: string
-  terminal: string
-  time: string
+interface DashboardData {
+  terminals: AdminTerminalRecord[]
+  jobSources: AdminJobSourceRecord[]
+  fairSources: AdminFairSourceRecord[]
+  files: AdminFileRecord[]
+  aiUsage: AdminAiUsage
+  auditLogs: AuditLogRecord[]
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+interface FileStats {
+  expired: number
+  sensitive: number
+}
 
-const KPI_CARDS: KpiCard[] = [
-  { label: '在线终端',     value: '8 / 10',  sub: '2 台当前离线',     icon: MonitorIcon },
-  { label: '待处理告警',   value: '3',       sub: '最新 10 分钟前',   icon: AlertTriangleIcon, alert: true },
-  { label: '今日打印订单', value: '47',      sub: '较昨日 +12%',      icon: PrinterIcon },
-  { label: '今日收入',     value: '¥82.50',  sub: '打印 ¥72 / AI ¥10.50', icon: BanknoteIcon },
-]
+const PENDING_STATUSES = new Set(['pending', 'reviewing'])
 
-const ACTION_PANELS: ActionPanel[] = [
-  {
-    title: '待审核外部数据',
-    icon: BriefcaseIcon,
-    href: '/job-sources',
-    items: [
-      { label: '岗位信息源',   count: 5, hint: '5 条待审核', href: '/job-sources' },
-      { label: '招聘会信息源', count: 2, hint: '2 条待审核', href: '/fair-sources' },
-    ],
-  },
-  {
-    title: '待处理告警',
-    icon: AlertTriangleIcon,
-    href: '/alerts',
-    items: [
-      { label: '严重', count: 1, hint: '打印机离线' },
-      { label: '警告', count: 2, hint: '碳粉低 / 心跳超时' },
-    ],
-  },
-  {
-    title: '文件清理',
-    icon: FolderIcon,
-    href: '/files',
-    items: [
-      { label: '清理失败', count: 1, hint: '需手动处理' },
-      { label: '即将到期', count: 4, hint: '24 小时内' },
-    ],
-  },
-]
+const ACTION_LABELS: Record<string, string> = {
+  'ai_resume_result.cleanup_expired': '清理过期 AI 简历结果',
+  'data_source.create': '创建数据源',
+  'data_source.toggle': '启停数据源',
+  'fair.import': '招聘会导入',
+  'fair.publish': '招聘会发布',
+  'fair.review': '招聘会审核',
+  'file.cleanup_expired': '清理过期文件',
+  'file.force_delete': '文件删除',
+  'file.get_signed_url': '访问文件',
+  'file.upload': '文件上传',
+  'job.import': '岗位导入',
+  'job.publish': '岗位发布',
+  'job.review': '岗位审核',
+  'job_source.create': '创建岗位源',
+  'system.config_change': '配置变更',
+  'system.login': '登录',
+}
 
-const RECENT_ALERTS: RecentAlert[] = [
-  { id: 'a1', level: 'error',   message: '打印机离线,无法响应任务', terminal: 'KSK-001(A区大厅)',   time: '10分钟前' },
-  { id: 'a2', level: 'warning', message: '碳粉余量低于 10%',         terminal: 'KSK-003(B区服务台)', time: '1小时前' },
-  { id: 'a3', level: 'warning', message: '终端心跳超时(>5分钟)',    terminal: 'KSK-007(C区入口)',   time: '2小时前' },
-]
+const ROLE_LABELS: Record<string, string> = {
+  admin: '管理员',
+  kiosk: '一体机',
+  partner: '合作机构',
+  system: '系统',
+}
 
-const ALERT_CONFIG = {
-  error:   { badge: 'error' as const,   dot: 'bg-red-500',    label: '严重' },
-  warning: { badge: 'warning' as const, dot: 'bg-orange-400', label: '警告' },
-  info:    { badge: 'info' as const,    dot: 'bg-blue-400',   label: '提示' },
+function relTime(iso: string): string {
+  const time = Date.parse(iso)
+  if (Number.isNaN(time)) return iso
+
+  const diff = Date.now() - time
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
+  return `${Math.floor(diff / 86_400_000)} 天前`
+}
+
+function isPending(reviewStatus: string): boolean {
+  return PENDING_STATUSES.has(reviewStatus)
+}
+
+function getFileStats(files: AdminFileRecord[]): FileStats {
+  const now = Date.now()
+  const activeFiles = files.filter((file) => file.deletedAt === null)
+  return {
+    expired: activeFiles.filter((file) => Date.parse(file.expiresAt) <= now).length,
+    sensitive: activeFiles.filter((file) => file.sensitiveLevel === 'highly_sensitive').length,
+  }
+}
+
+function getAuditActionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action
+}
+
+function getActorLabel(log: AuditLogRecord): string {
+  const role = ROLE_LABELS[log.actorRole] ?? log.actorRole
+  return log.actorId ? `${role} · ${log.actorId}` : role
+}
+
+function getTargetLabel(log: AuditLogRecord): string {
+  if (!log.targetType) return ''
+  return log.targetId ? `${log.targetType}/${log.targetId}` : log.targetType
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function KpiSection() {
+function KpiSection({ cards }: { cards: KpiCard[] }) {
   return (
     <section aria-label="核心指标">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
         核心指标
       </h2>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {KPI_CARDS.map((card) => {
+        {cards.map((card) => {
           const Icon = card.icon
           return (
             <div
@@ -133,14 +170,14 @@ function KpiSection() {
   )
 }
 
-function ActionPanelsSection() {
+function ActionPanelsSection({ panels }: { panels: ActionPanel[] }) {
   return (
     <section aria-label="待办事项">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
         待办事项
       </h2>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {ACTION_PANELS.map((panel) => {
+        {panels.map((panel) => {
           const Icon = panel.icon
           const total = panel.items.reduce((sum, it) => sum + it.count, 0)
           return (
@@ -181,15 +218,15 @@ function ActionPanelsSection() {
   )
 }
 
-function AlertsSection() {
+function RecentActivitySection({ logs }: { logs: AuditLogRecord[] }) {
   return (
-    <section aria-label="最新告警">
+    <section aria-label="最近操作">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          最新告警
+          最近操作
         </h2>
         <a
-          href="/alerts"
+          href="/audit"
           className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700"
         >
           查看全部
@@ -198,61 +235,185 @@ function AlertsSection() {
       </div>
 
       <Card className="overflow-hidden p-0">
-        <div className="divide-y divide-gray-100">
-          {RECENT_ALERTS.map((alert) => {
-            const cfg = ALERT_CONFIG[alert.level]
-            return (
-              <div
-                key={alert.id}
-                className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50"
-              >
-                <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} />
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-800">{alert.message}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">{alert.terminal}</p>
-                </div>
-
-                <StatusBadge status={cfg.badge} label={cfg.label} />
-
-                <span className="shrink-0 text-xs tabular-nums text-gray-400">{alert.time}</span>
-
-                <button
-                  type="button"
-                  disabled
-                  title="告警处理写入端点未接入，已禁用"
-                  className="shrink-0 cursor-not-allowed rounded px-2.5 py-1 text-xs font-medium text-gray-300"
+        {logs.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-gray-400">暂无审计记录</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {logs.map((log) => {
+              const target = getTargetLabel(log)
+              return (
+                <div
+                  key={log.id}
+                  className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-gray-50"
                 >
-                  处理
-                </button>
-              </div>
-            )
-          })}
-        </div>
+                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-primary-400" />
 
-        <div className="border-t border-gray-100 bg-gray-50 px-5 py-3">
-          <p className="text-xs text-gray-400">
-            共 3 条未处理告警 · 最后检查:2026-05-29 09:20
-          </p>
-        </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800">
+                      {getAuditActionLabel(log.action)}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-gray-400">
+                      {getActorLabel(log)}
+                      {target ? ` · ${target}` : ''}
+                    </p>
+                  </div>
+
+                  <span className="shrink-0 text-xs tabular-nums text-gray-400">
+                    {relTime(log.createdAt)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </Card>
     </section>
   )
 }
 
+// ─── Real data mapping ────────────────────────────────────────────────────────
+
+function buildKpiCards(data: DashboardData): KpiCard[] {
+  const totalTerminals = data.terminals.length
+  const onlineTerminals = data.terminals.filter((terminal) => terminal.online).length
+  const offlineTerminals = totalTerminals - onlineTerminals
+
+  const pendingJobs = data.jobSources.filter((source) => isPending(source.reviewStatus)).length
+  const pendingFairs = data.fairSources.filter((source) => isPending(source.reviewStatus)).length
+  const pendingTotal = pendingJobs + pendingFairs
+
+  const fileStats = getFileStats(data.files)
+
+  return [
+    {
+      label: '在线终端',
+      value: `${onlineTerminals} / ${totalTerminals}`,
+      sub: offlineTerminals > 0 ? `离线 ${offlineTerminals} 台` : '全部在线',
+      icon: MonitorIcon,
+      alert: offlineTerminals > 0,
+    },
+    {
+      label: '待审核数据',
+      value: String(pendingTotal),
+      sub: `岗位 ${pendingJobs} · 招聘会 ${pendingFairs}`,
+      icon: BriefcaseIcon,
+      alert: pendingTotal > 0,
+    },
+    {
+      label: '待清理文件',
+      value: String(fileStats.expired),
+      sub: `近 100 条内 · 高敏 ${fileStats.sensitive}`,
+      icon: FolderIcon,
+      alert: fileStats.expired > 0,
+    },
+    {
+      label: 'AI 调用',
+      value: String(data.aiUsage.totalCalls),
+      sub: `成功率 ${data.aiUsage.successRate}%`,
+      icon: BotIcon,
+      alert: data.aiUsage.failCount > 0,
+    },
+  ]
+}
+
+function buildActionPanels(data: DashboardData): ActionPanel[] {
+  const pendingJobs = data.jobSources.filter((source) => isPending(source.reviewStatus)).length
+  const pendingFairs = data.fairSources.filter((source) => isPending(source.reviewStatus)).length
+  const fileStats = getFileStats(data.files)
+  const offlineTerminals = data.terminals.filter((terminal) => !terminal.online).length
+  const abnormalPrinters = data.terminals.filter((terminal) => {
+    const status = terminal.printerStatus
+    return Boolean(status && status !== 'ok')
+  }).length
+
+  return [
+    {
+      title: '待审核外部数据',
+      icon: BriefcaseIcon,
+      href: '/job-sources',
+      items: [
+        { label: '岗位信息源', count: pendingJobs, hint: '待审核' },
+        { label: '招聘会信息源', count: pendingFairs, hint: '待审核' },
+      ],
+    },
+    {
+      title: '文件清理',
+      icon: FolderIcon,
+      href: '/files',
+      items: [
+        { label: '已过期在库文件', count: fileStats.expired, hint: '近 100 条内' },
+        { label: '高敏文件', count: fileStats.sensitive, hint: '近 100 条内' },
+      ],
+    },
+    {
+      title: '终端状态',
+      icon: MonitorIcon,
+      href: '/devices?tab=terminals',
+      items: [
+        { label: '离线终端', count: offlineTerminals, hint: '心跳超时' },
+        { label: '打印机异常', count: abnormalPrinters, hint: '最近上报' },
+      ],
+    },
+  ]
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(false)
+    Promise.all([
+      getTerminals(),
+      getJobSources(),
+      getFairSources(),
+      listFiles({ limit: 100 }),
+      getAiUsage(),
+      getAuditLogs({ limit: 8, offset: 0 }),
+    ])
+      .then(([terminalRes, jobSources, fairSources, files, aiUsage, auditRes]) => {
+        setData({
+          terminals: terminalRes.terminals,
+          jobSources,
+          fairSources,
+          files,
+          aiUsage,
+          auditLogs: auditRes.items,
+        })
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
   return (
-    <Page title="工作台" subtitle="今日运营概览 · 2026-05-29">
-      <div className="flex flex-col gap-7">
-        <KpiSection />
-        <ActionPanelsSection />
-        <AlertsSection />
-      </div>
+    <Page title="工作台" subtitle="运营概览 · 仅展示已有真实数据来源的指标">
+      {loading ? (
+        <LoadingState text="正在加载工作台数据…" className="py-24" />
+      ) : error || !data ? (
+        <ErrorState
+          title="工作台数据加载失败"
+          message="当前无法获取真实后端数据，请检查服务状态后重试。"
+          onRetry={load}
+          className="py-24"
+        />
+      ) : (
+        <div className="flex flex-col gap-7">
+          <KpiSection cards={buildKpiCards(data)} />
+          <ActionPanelsSection panels={buildActionPanels(data)} />
+          <RecentActivitySection logs={data.auditLogs} />
+        </div>
+      )}
     </Page>
   )
 }
 
-// 设计说明:工作台只做"看 4 个核心数 + 立刻处理 3 件事"。
-// 6 张"今日指标"已下放各自模块页头,工作台不再重复。
+// 工作台只展示已有真实后端来源的数据。
+// 订单、收入、告警、打印任务统计暂无真实统计端点，待端点完成后再接入。
