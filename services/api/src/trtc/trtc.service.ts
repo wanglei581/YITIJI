@@ -1,6 +1,12 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { genUserSig } from './usersig.util'
 import { callTencentApi } from './tencent-api.util'
+import {
+  DEFAULT_FORBIDDEN_WORDS,
+  DEFAULT_ROLE_SCOPE,
+  buildGuardedSystemPrompt,
+  normalizeForbiddenWords,
+} from '../ai/llm/llm-guard'
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -8,6 +14,12 @@ function envNumber(name: string, fallback: number): number {
 
   const value = Number(raw)
   return Number.isFinite(value) ? value : fallback
+}
+
+function envForbiddenWords(primaryName: string, fallbackName: string): string[] {
+  const raw = process.env[primaryName] || process.env[fallbackName]
+  if (!raw) return DEFAULT_FORBIDDEN_WORDS
+  return normalizeForbiddenWords(raw.split(/[,，\n]/))
 }
 
 export interface StartSessionResult {
@@ -98,11 +110,14 @@ export class TrtcService {
       throw new InternalServerErrorException('LLM API Key 未配置（TRTC_LLM_API_KEY）')
     }
 
-    const systemPrompt = process.env['TRTC_SYSTEM_PROMPT'] ||
-      '你是一位专业、亲切的就业政策与求职服务顾问，名字叫小青。' +
-      '你为求职者提供简历优化建议、求职指导、就业政策解读和打印服务帮助。' +
-      '回答简洁口语化，每次回复控制在 100 字以内。' +
-      '你不提供企业招聘、一键投递、简历筛选等服务，遇到这类需求请引导用户到来源平台。'
+    const systemPrompt = buildGuardedSystemPrompt({
+      systemPrompt: process.env['TRTC_SYSTEM_PROMPT'] ||
+        '你是一位专业、亲切的就业政策与求职服务顾问，名字叫小青。' +
+        '你为求职者提供简历优化建议、求职指导、就业政策解读和打印服务帮助。' +
+        '回答简洁口语化，每次回复控制在 100 字以内。',
+      roleScope: process.env['TRTC_ROLE_SCOPE'] || process.env['AI_ASSISTANT_ROLE_SCOPE'] || DEFAULT_ROLE_SCOPE,
+      forbiddenWords: envForbiddenWords('TRTC_FORBIDDEN_WORDS', 'AI_ASSISTANT_FORBIDDEN_WORDS'),
+    })
 
     // LLMConfig（OpenAI 兼容协议，DeepSeek）
     const llmConfig = process.env['TRTC_LLM_CONFIG_JSON'] || JSON.stringify({

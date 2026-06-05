@@ -16,6 +16,7 @@ import type {
   ChatOutput,
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from './llm-config.service'
+import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -87,11 +88,15 @@ export class LlmChatService {
     session.messages.push({ role: 'user', content: input.message })
 
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: cfg.systemPrompt },
+      { role: 'system', content: buildGuardedSystemPrompt(cfg) },
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
-    const reply = await this.callLlm(cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages)
+    const rawReply = await this.callLlm(cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages)
+    const reply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
+    if (reply !== rawReply) {
+      this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
+    }
 
     session.messages.push({ role: 'assistant', content: reply })
     session.updatedAt = now

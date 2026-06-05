@@ -4,7 +4,7 @@
 // 管理员选择/配置对话大模型（DeepSeek / 通义千问 / MiniMax）：
 //   - 选择厂商 → 自动套用 baseURL/默认模型
 //   - 填写 API Key（写入后端加密保存，不回显）
-//   - 设置系统人设提示词、温度、启用开关
+//   - 设置系统人设提示词、角色范围、禁用词、温度、启用开关
 //   - 连通性测试
 //
 // 合规：API Key 只存服务端，前端不回显（仅显示"已配置"）。
@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Card, Button, LoadingState, ErrorState } from '@ai-job-print/ui'
-import { CheckCircle2Icon, XCircleIcon, KeyRoundIcon, SparklesIcon } from 'lucide-react'
+import { CheckCircle2Icon, XCircleIcon, KeyRoundIcon, SparklesIcon, ShieldCheckIcon } from 'lucide-react'
 import { Page } from '../Page'
 import {
   aiConfigApi,
@@ -32,6 +32,8 @@ export default function AiConfigPage() {
   const [model, setModel]               = useState('')
   const [baseURL, setBaseURL]           = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
+  const [roleScope, setRoleScope]       = useState('')
+  const [forbiddenWordsText, setForbiddenWordsText] = useState('')
   const [temperature, setTemperature]   = useState(0.7)
   const [enabled, setEnabled]           = useState(false)
   const [apiKey, setApiKey]             = useState('')   // 留空=不修改
@@ -49,6 +51,8 @@ export default function AiConfigPage() {
     setModel(c.model)
     setBaseURL(c.baseURL)
     setSystemPrompt(c.systemPrompt)
+    setRoleScope(c.roleScope)
+    setForbiddenWordsText(c.forbiddenWords.join('\n'))
     setTemperature(c.temperature)
     setEnabled(c.enabled)
     setApiKey('')
@@ -80,13 +84,28 @@ export default function AiConfigPage() {
     }
   }
 
+  function parseForbiddenWords(): string[] {
+    const seen = new Set<string>()
+    const words: string[] = []
+
+    for (const item of forbiddenWordsText.split(/[\n,，]/)) {
+      const word = item.trim()
+      const key = word.toLocaleLowerCase().replace(/\s+/g, '')
+      if (!word || seen.has(key)) continue
+      seen.add(key)
+      words.push(word)
+    }
+
+    return words
+  }
+
   async function onSave() {
     setSaving(true)
     setSavedTip(false)
     setError(null)
     try {
       const updated = await aiConfigApi.update({
-        vendor, model, baseURL, systemPrompt, temperature, enabled,
+        vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
         ...(apiKey ? { apiKey } : {}),
       })
       applyConfig(updated)
@@ -105,7 +124,7 @@ export default function AiConfigPage() {
     try {
       // 先保存当前配置，再测试，确保测的是最新值
       await aiConfigApi.update({
-        vendor, model, baseURL, systemPrompt, temperature, enabled,
+        vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
         ...(apiKey ? { apiKey } : {}),
       })
       setApiKey('')
@@ -230,7 +249,38 @@ export default function AiConfigPage() {
               rows={5}
               className={`${inputCls} resize-none leading-relaxed`}
             />
-            <p className="mt-1 text-xs text-gray-400">建议保留合规红线说明（不做招聘闭环、不一键投递）。</p>
+            <p className="mt-1 text-xs text-gray-400">建议保留合规红线说明，避免引导用户在本系统内完成招聘闭环。</p>
+          </div>
+
+          {/* 角色范围 */}
+          <div>
+            <label className={labelCls}>
+              <span className="inline-flex items-center gap-1">
+                <ShieldCheckIcon className="h-3.5 w-3.5" />
+                角色范围
+              </span>
+            </label>
+            <textarea
+              value={roleScope}
+              onChange={(e) => setRoleScope(e.target.value)}
+              rows={4}
+              className={`${inputCls} resize-none leading-relaxed`}
+              placeholder="限定 AI 助手只能回答哪些领域的问题"
+            />
+            <p className="mt-1 text-xs text-gray-400">超出该范围的问题，将由系统提示词要求模型拒绝并回到本终端服务范围。</p>
+          </div>
+
+          {/* 禁用词 */}
+          <div>
+            <label className={labelCls}>禁用词</label>
+            <textarea
+              value={forbiddenWordsText}
+              onChange={(e) => setForbiddenWordsText(e.target.value)}
+              rows={4}
+              className={`${inputCls} resize-none leading-relaxed`}
+              placeholder="每行一个词，也支持用逗号分隔"
+            />
+            <p className="mt-1 text-xs text-gray-400">模型回复命中任一禁用词时，后端会直接替换为范围内兜底回复。</p>
           </div>
 
           {/* 温度 + 启用 */}
