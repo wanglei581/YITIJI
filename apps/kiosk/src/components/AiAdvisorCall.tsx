@@ -16,6 +16,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { API_BASE_URL } from '../services/api/client'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
 
@@ -128,7 +129,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
       const timeoutId = setTimeout(() => ac.abort(), 30_000)
       let res: Response
       try {
-        res = await fetch('/api/v1/trtc/session', {
+        res = await fetch(`${API_BASE_URL}/trtc/session`, {
           method:  'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -244,7 +245,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
   // ── 清理 ─────────────────────────────────────────────────
   const cleanup = useCallback(async () => {
     if (taskIdRef.current) {
-      fetch('/api/v1/trtc/session/stop', {
+      fetch(`${API_BASE_URL}/trtc/session/stop`, {
         method:    'POST',
         headers:   {
           'Content-Type': 'application/json',
