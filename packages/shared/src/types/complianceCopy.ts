@@ -46,6 +46,14 @@ export const COMPLIANCE_COPY = {
   KIOSK_RESUME_NO_SEND_ENTERPRISE: '系统不会将你的简历或报告发送给企业。',
 
   /**
+   * Kiosk 简历诊断/优化页演示数据提示(蓝色 info,放在页面顶部)。
+   * 背景:真实 AI Provider 尚未接通(均为 stub),当前分数/建议由演示用 MockAiProvider 生成。
+   * 仅在 mock 模式(API_MODE!=='http')展示——http 模式接真后端后,假数据不再出现,banner 自动隐藏。
+   * 目的:防止用户把演示分数误当作真实 AI 评价结果。
+   */
+  KIOSK_RESUME_DEMO_NOTICE: '当前简历诊断 / 优化结果由演示用 AI 生成,分数与建议仅供体验参考;接入正式 AI 服务后将以真实分析为准。',
+
+  /**
    * Kiosk 打印扫描服务中心敏感文件提示(绿色 success)。
    * 证件照、身份证复印件等属敏感文件,完成后按隐私策略自动清理,不长期留存。
    */
