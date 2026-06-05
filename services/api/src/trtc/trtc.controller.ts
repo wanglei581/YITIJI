@@ -2,11 +2,13 @@ import { Body, Controller, Post, HttpCode, HttpStatus, Req, Headers, ForbiddenEx
 import { Throttle } from '@nestjs/throttler'
 import type { Request } from 'express'
 import { TrtcService } from './trtc.service'
+import { RedisService } from '../common/redis/redis.service'
 
-// taskId → 客户端特征（IP + UA）的运行时归属表。
-// 无持久化：重启后归属清空，stop 请求会被拒绝（等 TRTC MaxIdleTime 自然超时）。
-// 生产可换 Redis；Kiosk 单机场景内存足够。
-const taskOwnerMap = new Map<string, string>()
+// taskId → 客户端特征（IP + UA）的归属记录，落 Redis（全局 RedisModule，REDIS_URL 为硬依赖）。
+// 用 Redis 而非进程内 Map：API 重启后归属仍在（30min TTL 与 TRTC MaxIdleTime 对齐），
+// 避免重启窗口内任意请求方跨会话终止他人会话、触发腾讯云异常计费。
+const OWNER_KEY_PREFIX = 'trtc:owner:'
+const OWNER_TTL_SECONDS = 30 * 60
 
 function makeClientKey(req: Request): string {
   const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
@@ -21,7 +23,10 @@ function makeClientKey(req: Request): string {
 // 全局 Throttler 默认 60次/min；显式覆盖为更严格的 5次/min。
 @Throttle({ default: { ttl: 60_000, limit: 5 } })
 export class TrtcController {
-  constructor(private readonly trtcService: TrtcService) {}
+  constructor(
+    private readonly trtcService: TrtcService,
+    private readonly redis: RedisService,
+  ) {}
 
   /**
    * POST /api/v1/trtc/session
@@ -47,10 +52,9 @@ export class TrtcController {
     const userId = rawUserId || `user_${Date.now()}`
     const result = await this.trtcService.startSession(userId)
 
-    // 记录 taskId → 客户端特征，供 stopSession 校验归属
-    taskOwnerMap.set(result.taskId, makeClientKey(req))
-    // 30 分钟后自动清理（与 TRTC AgentConfig.MaxIdleTime 对齐）
-    setTimeout(() => taskOwnerMap.delete(result.taskId), 30 * 60 * 1000)
+    // 记录 taskId → 客户端特征，供 stopSession 校验归属。
+    // Redis SET EX 30min 自动过期（与 TRTC AgentConfig.MaxIdleTime 对齐），无需手动定时清理。
+    await this.redis.setEx(`${OWNER_KEY_PREFIX}${result.taskId}`, OWNER_TTL_SECONDS, makeClientKey(req))
 
     return result
   }
@@ -73,14 +77,16 @@ export class TrtcController {
       throw new BadRequestException({ error: { code: 'MISSING_TASK_ID', message: 'taskId 不能为空' } })
     }
 
-    const owner = taskOwnerMap.get(body.taskId)
-    // owner 存在但与请求方不匹配时拒绝（重启后 owner 为 undefined，放行）
-    if (owner !== undefined && owner !== makeClientKey(req)) {
+    const ownerKey = `${OWNER_KEY_PREFIX}${body.taskId}`
+    const owner = await this.redis.get(ownerKey)
+    // owner 存在但与请求方不匹配时拒绝。owner 为 null 表示归属已自然过期
+    // （会话大概率已结束），放行幂等清理。Redis 持久化保证重启窗口内仍能正确校验归属。
+    if (owner !== null && owner !== makeClientKey(req)) {
       throw new ForbiddenException({ error: { code: 'TASK_NOT_OWNED', message: '无权终止该会话' } })
     }
 
     await this.trtcService.stopSession(body.taskId)
-    taskOwnerMap.delete(body.taskId)
+    await this.redis.del(ownerKey)
     return { ok: true }
   }
 }
