@@ -233,7 +233,7 @@ last common migration: 20260603155010_ai_result_persistence
 
 | 层 | 改动 | 文件 |
 |----|------|------|
-| Prisma | 新增 4 表 `AdAsset` / `AdPlaylist` / `AdPlaylistItem` / `TerminalScreensaverConfig` + migration `20260604130000_add_screensaver_ads`（additive，未 reset dev.db）；PrismaService 加 4 个 delegate | `prisma/schema.prisma` + `prisma/migrations/` + `src/prisma/prisma.service.ts` |
+| Prisma | 新增 4 表 `AdAsset` / `AdPlaylist` / `AdPlaylistItem` / `TerminalScreensaverConfig` + migration `20260604150000_add_screensaver_ads`（additive，未 reset dev.db；时间戳由 `20260604130000` 重编号至 `20260604150000` 以避免与 `add_field_mapping_rule` 冲突）；PrismaService 加 4 个 delegate | `prisma/schema.prisma` + `prisma/migrations/` + `src/prisma/prisma.service.ts` |
 | 后端 | `ContentModule`：素材上传（MIME 白名单 + 魔数校验 + 图片/视频大小上限 + 时长上限）/列表/启停/删除；播放方案 CRUD（排序、整体覆盖、删除解绑终端）；终端配置（未绑定方案强制 `enabled=false`）；Kiosk 拉取 `GET /terminals/:id/screensaver`（无可播素材→`enabled=false` 防黑屏）；素材 HMAC 签名内容流 `GET /ad-assets/:id/content`（1h TTL，缓存 key 用 id/sha256）；管理员写操作全程审计 | `src/content/*` |
 | 后端 | AI 文生图 Provider 抽象 + `DisabledAiPosterProvider`；`AI_IMAGE_PROVIDER=disabled` 时 `POST /admin/ai-posters/generations` 等返回 `400 AI_POSTER_NOT_ENABLED` | `src/content/ai-poster.*` + `.env.example`（`AD_ASSET_MAX_*` / `AI_IMAGE_*`） |
 | shared | `screensaver.ts` 契约类型（后端 `content.types.ts` 为本地副本，SSOT 同步两处） | `packages/shared/src/types/screensaver.ts` |
