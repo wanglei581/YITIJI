@@ -102,7 +102,13 @@ export default function JobsPage() {
       title="岗位信息管理"
       subtitle={`共 ${jobs.length} 条岗位`}
       actions={
-        <Button size="sm" variant="primary" className="flex items-center gap-1.5">
+        <Button
+          size="sm"
+          variant="primary"
+          disabled
+          title="手动新增岗位写入流程未接入，已禁用"
+          className="flex cursor-not-allowed items-center gap-1.5 opacity-60"
+        >
           <PlusIcon className="h-4 w-4" />
           新增岗位
         </Button>
@@ -195,7 +201,13 @@ export default function JobsPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">
-                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">编辑</button>
+                          <button
+                            disabled
+                            title="岗位编辑写入流程未接入，已禁用"
+                            className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
+                          >
+                            编辑
+                          </button>
                           <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">查看二维码</button>
                           {j.publishStatus === 'published' && (
                             <button

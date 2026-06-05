@@ -219,7 +219,9 @@ function AlertsSection() {
 
                 <button
                   type="button"
-                  className="shrink-0 rounded px-2.5 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                  disabled
+                  title="告警处理写入端点未接入，已禁用"
+                  className="shrink-0 cursor-not-allowed rounded px-2.5 py-1 text-xs font-medium text-gray-300"
                 >
                   处理
                 </button>

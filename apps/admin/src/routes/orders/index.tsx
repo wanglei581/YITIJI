@@ -63,7 +63,7 @@ const TYPE_FILTER_MAP: Record<string, OrderType | null> = { 全部: null, 打印
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState(MOCK_ORDERS)
+  const [orders] = useState(MOCK_ORDERS)
   const [typeFilter, setTypeFilter] = useState('全部')
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
@@ -80,12 +80,6 @@ export default function OrdersPage() {
 
   const total = searched.length
   const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
-
-  const handleRefund = (id: string) => {
-    setOrders((prev) => prev.map((o) =>
-      o.id === id ? { ...o, payStatus: 'refunded' as const, taskStatus: 'cancelled' as const } : o
-    ))
-  }
 
   return (
     <Page
@@ -162,8 +156,9 @@ export default function OrdersPage() {
                         <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看详情</button>
                         {o.payStatus === 'paid' && o.taskStatus !== 'processing' && (
                           <button
-                            className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
-                            onClick={() => handleRefund(o.id)}
+                            disabled
+                            title="退款写入端点未接入，已禁用，避免误以为操作生效"
+                            className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
                           >
                             退款
                           </button>
@@ -179,7 +174,7 @@ export default function OrdersPage() {
         </div>
         <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
-      <p className="mt-3 text-xs text-gray-400">当前为 mock 数据，接入后端后实时显示</p>
+      <p className="mt-3 text-xs text-gray-400">当前订单列表为示例数据；退款写入端点接入前，退款按钮保持禁用。</p>
     </Page>
   )
 }

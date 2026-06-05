@@ -114,7 +114,7 @@ const TYPE_FILTERS: Array<{ label: string; value: PartnerType | null }> = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PartnersPage() {
-  const [partners, setPartners] = useState(MOCK_PARTNERS)
+  const [partners] = useState(MOCK_PARTNERS)
   const [coopFilter, setCoopFilter]   = useState('全部')
   const [typeFilter, setTypeFilter]   = useState<PartnerType | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
@@ -140,14 +140,6 @@ export default function PartnersPage() {
     合作中: partners.filter((p) => p.coopStatus === 'active').length,
     已暂停: partners.filter((p) => p.coopStatus === 'suspended').length,
     审核中: partners.filter((p) => p.coopStatus === 'pending').length,
-  }
-
-  const toggleStatus = (id: string) => {
-    setPartners((prev) => prev.map((p) =>
-      p.id === id
-        ? { ...p, coopStatus: p.coopStatus === 'active' ? ('suspended' as const) : ('active' as const) }
-        : p
-    ))
   }
 
   return (
@@ -245,17 +237,20 @@ export default function PartnersPage() {
                           <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看详情</button>
                           {p.coopStatus !== 'pending' && (
                             <button
-                              className={`rounded px-2 py-1 text-xs font-medium ${
-                                p.coopStatus === 'active'
-                                  ? 'text-orange-500 hover:bg-orange-50'
-                                  : 'text-green-600 hover:bg-green-50'
-                              }`}
-                              onClick={() => toggleStatus(p.id)}
+                              disabled
+                              title="合作状态写入端点未接入，已禁用，避免误以为操作生效"
+                              className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
                             >
                               {p.coopStatus === 'active' ? '停用' : '启用'}
                             </button>
                           )}
-                          <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">配置场景</button>
+                          <button
+                            disabled
+                            title="场景配置写入端点未接入，已禁用"
+                            className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
+                          >
+                            配置场景
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -269,7 +264,7 @@ export default function PartnersPage() {
       </Card>
 
       <p className="mt-3 text-xs text-gray-400">
-        所有合作机构共用同一套系统，通过机构类型 + 场景模板 + 启用模块进行差异化配置。当前为 mock 数据。
+        所有合作机构共用同一套系统，通过机构类型 + 场景模板 + 启用模块进行差异化配置。状态与场景写入端点接入前，相关按钮保持禁用。
       </p>
     </Page>
   )

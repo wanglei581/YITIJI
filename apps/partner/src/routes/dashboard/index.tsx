@@ -180,7 +180,9 @@ function SyncLogSection() {
           </p>
           <button
             type="button"
-            className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+            disabled
+            title="手动同步写入端点未在工作台接入，已禁用"
+            className="flex cursor-not-allowed items-center gap-1.5 text-xs font-medium text-gray-300"
           >
             <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
             立即同步
