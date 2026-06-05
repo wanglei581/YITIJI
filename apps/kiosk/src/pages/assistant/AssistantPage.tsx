@@ -154,6 +154,9 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
   const bottomRef    = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // StrictMode（dev）会 mount→unmount→再 mount：必须在每次 mount 时重置为 false，
+    // 否则上一次卸载 cleanup 置的 true 会残留，导致回复被丢弃且 loading 永不复位。
+    cancelledRef.current = false
     return () => { cancelledRef.current = true }
   }, [])
 
