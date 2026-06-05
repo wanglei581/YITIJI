@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactDiffViewer from 'react-diff-viewer-continued'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon, TargetIcon, TrendingUpIcon } from 'lucide-react'
 import type { ResumeOptimizeModule, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { getResumeOptimize } from '../../services/api'
+import { API_MODE } from '../../services/api/client'
 
 // 目标方向摘要文本（无方向时返回 null）
 function targetSummary(tc?: ResumeTargetContext): string | null {
@@ -138,6 +139,13 @@ export function ResumeOptimizePage() {
         subtitle="基于已有内容优化表达(仅供参考)"
         actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>}
       />
+
+      {/* 演示数据提示：mock 模式下优化结果由演示 AI 生成，接真后端自动隐藏 */}
+      {API_MODE !== 'http' && (
+        <ComplianceBanner tone="info" className="mt-4">
+          {COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}
+        </ComplianceBanner>
+      )}
 
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
         <InfoIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />

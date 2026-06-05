@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
 import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, PrinterIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { getResumeRecord } from '../../services/api'
+import { API_MODE } from '../../services/api/client'
 
 interface ReportState {
   source?: string
@@ -158,6 +159,13 @@ export function ResumeReportPage() {
       />
 
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
+        {/* 演示数据提示：mock 模式下分数由演示 AI 生成，接真后端自动隐藏 */}
+        {API_MODE !== 'http' && (
+          <ComplianceBanner tone="info">
+            {COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}
+          </ComplianceBanner>
+        )}
+
         {/* 目标方向摘要 */}
         {summary && (
           <div className="flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
