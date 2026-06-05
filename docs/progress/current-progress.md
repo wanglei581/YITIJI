@@ -5,6 +5,19 @@
 
 ---
 
+## Terminal Agent 丢弃旧代理连接池（2026-06-05，未提交）
+
+**目标：** 在已设置 `proxy:false` 的基础上，进一步避免 Node/Axios 复用旧 socket，解决本地代理或网络路由变更后仍命中旧连接的问题。
+
+**修改文件（2 个）：**
+
+- `apps/terminal-agent/src/agent/api-client.ts`：新增 `createDirectHttpAgents()`，所有后端 API Axios 实例使用 `http.Agent/https.Agent({ keepAlive:false })`，并显式发送 `Connection: close`。
+- `apps/terminal-agent/src/agent/task-runner.ts`：文件下载 `axios.get()` 同步使用 no-keep-alive agent 与 `Connection: close`，保持 `proxy:false` 直连。
+
+**范围说明：** 不改注册/心跳/claim/status 业务契约，不改打印流程，不触碰 Kiosk/Admin/Partner/后端服务能力；仅收紧终端 Agent 出站 HTTP 连接复用策略。
+
+---
+
 ## L2-4C：Kiosk Auth Shell 接入（2026-06-04，`claude/l2-4c-kiosk-auth-shell`）✅
 
 **目标：** 把 L2-4A 会话层与 L2-4B 登录页接入 Kiosk 应用 shell，完成用户身份可见性与闲置登出。不新增业务功能，不接真实记录 API，不做全局强制登录守卫。

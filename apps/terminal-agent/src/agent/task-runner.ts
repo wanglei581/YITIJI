@@ -37,7 +37,7 @@ import os from 'os'
 import axios from 'axios'
 import type { AgentConfig, ClaimTask, PatchStatusPayload, ReportableStatus } from './types'
 import type { PrintJobParams } from '../printer/types'
-import { createApiClient, axiosErrorMessage } from './api-client'
+import { createApiClient, createDirectHttpAgents, axiosErrorMessage } from './api-client'
 import { print } from '../printer/print'
 import { getPrinterPreflight, getPrintJobStatus, type PrinterPreflight } from './wmi'
 import { log, warn, err } from '../logger'
@@ -70,6 +70,11 @@ async function downloadFile(fileUrl: string, destPath: string): Promise<void> {
     // Windows http_proxy env var would route this request through a local proxy
     // (e.g. Clash/v2ray at 127.0.0.1:xxxx), causing download timeouts.
     proxy: false,
+    // Avoid reusing stale sockets after proxy / network route changes.
+    ...createDirectHttpAgents(),
+    headers: {
+      'Connection': 'close',
+    },
   })
   fs.mkdirSync(path.dirname(destPath), { recursive: true })
   fs.writeFileSync(destPath, Buffer.from(resp.data))
