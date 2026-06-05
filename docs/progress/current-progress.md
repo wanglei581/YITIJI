@@ -5,6 +5,31 @@
 
 ---
 
+## PR-E：Admin 工作台真实 KPI 接入（2026-06-05，`feature/admin-dashboard-real-kpi-clean`）
+
+**目标：** 从 `feature/kiosk-honesty-admin-dashboard` 的 `501e5ac` 救回「工作台不编造指标」的产品意图，但不 cherry-pick 旧实现；基于当前 main service shape 重写 Admin dashboard，只展示已有真实后端来源的数据。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/admin/src/routes/dashboard/index.tsx` | 移除写死 mock KPI / 待办 / 假告警；改为并发读取 `getTerminals`、`getJobSources`、`getFairSources`、`listFiles`、`getAiUsage`、`getAuditLogs`；新增 loading / error / retry 三态；最近操作改用真实审计流 |
+| `docs/progress/current-progress.md`、`docs/progress/next-tasks.md` | 记录 PR-E 当前实况 |
+
+**真实指标口径：**
+
+- 在线终端：`getTerminals().terminals`，按 `online` 统计。
+- 待审核数据：岗位源 + 招聘会源 `reviewStatus in pending/reviewing`。
+- 待清理文件：`listFiles({ limit: 100 })` 返回页内，`deletedAt === null && expiresAt <= now`；文案明确「近 100 条内」，不冒充全量。
+- AI 调用：`getAiUsage().totalCalls` + `successRate`；不写「今日」。
+- 最近操作：`getAuditLogs({ limit: 8 })` 的真实审计记录。
+
+**明确不展示 / 不编造：** 今日订单、今日收入、待处理告警、打印任务实时数等暂无真实统计端点的指标；待对应后端能力完成后再接入。
+
+**范围外：** 未改后端、未改 schema/migration、未碰 terminals/files 页面、未碰 TRTC/LLM guard、未整体合并 `feature/kiosk-honesty-admin-dashboard`。
+
+---
+
 ## Admin 文件管理页切真（2026-06-05，`codex/admin-files-real-api`，基于 main `dcc0b27`）
 
 **背景：** 接口联通性审计（见 [api-connectivity-audit-2026-06-05.md](api-connectivity-audit-2026-06-05.md)）确认 admin 文件管理页 100% 前端 mock，而后端 `/files` 系列端点已就绪并实测通过。本轮把该页从 mock 切到真实后端，**未新增任何后端能力**。
