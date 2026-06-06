@@ -29,6 +29,7 @@ import { ContentService } from './content.service'
 import { getMediaLimits } from './media-validation'
 import { verifyAdAssetSignature } from './content-signing'
 import { UploadAdAssetDto } from './dto/upload-ad-asset.dto'
+import { CreateExternalVideoDto } from './dto/create-external-video.dto'
 import { UpdateAdAssetDto } from './dto/update-ad-asset.dto'
 import { SavePlaylistDto } from './dto/save-playlist.dto'
 import { SaveScreensaverConfigDto } from './dto/save-config.dto'
@@ -43,6 +44,7 @@ const UPLOAD_HARD_LIMIT = getMediaLimits().maxVideoBytes + 4 * 1024 * 1024
  * 路由表(全部含 /api/v1 前缀):
  *   管理员(Bearer + admin):
  *     POST   /admin/ad-assets                              上传素材(multipart)
+ *     POST   /admin/ad-assets/external-video               登记外部视频直链(JSON)
  *     GET    /admin/ad-assets                              素材列表
  *     PATCH  /admin/ad-assets/:id                          改标题/时长/启停
  *     DELETE /admin/ad-assets/:id                          删除素材(物理删 + 软删)
@@ -91,6 +93,28 @@ export class ContentController {
       type: asset.type,
       title: asset.title,
       sizeBytes: asset.sizeBytes,
+    })
+    return asset
+  }
+
+  @Post('admin/ad-assets/external-video')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async createExternalAsset(
+    @Body() dto: CreateExternalVideoDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const asset = await this.content.createExternalAsset({
+      url: dto.url,
+      title: dto.title,
+      durationSec: dto.durationSec,
+      createdBy: user.userId,
+    })
+    await this.writeAudit(req, user, 'ad_asset.create_external', 'ad_asset', asset.id, {
+      type: asset.type,
+      title: asset.title,
+      externalUrl: asset.externalUrl,
     })
     return asset
   }
@@ -249,6 +273,8 @@ export class ContentController {
     const { buffer, mimeType } = await this.content.readAssetContent(id)
     res.setHeader('Content-Type', mimeType)
     res.setHeader('Content-Length', buffer.length)
+    // Admin/Kiosk dev server 与 API 分端口运行,签名素材需要允许跨 origin 作为 <img>/<video> 嵌入。
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
     // 屏保素材可被 Kiosk 长缓存(内容不可变,内容变了会换新 id)
     res.setHeader('Cache-Control', 'public, max-age=3600')
     res.setHeader('Accept-Ranges', 'bytes')

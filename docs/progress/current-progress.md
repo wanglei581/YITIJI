@@ -24,6 +24,64 @@
 
 ---
 
+## 宣传屏支持外部视频直链素材（2026-06-06，Claude）
+
+**背景：** 待机宣传屏一期素材库只支持本地上传图/视频。新增小功能：允许管理员登记「外部视频直链」（如 CDN / 官方公开 mp4），Kiosk 直连播放，避免大视频反复上传占用存储。属线下一体机运营广告位，不触及招聘闭环、TRTC / AI 助手、文件上传敏感流程。
+
+**实现路径：** 早先分支 `feature/screensaver-external-video`（commit `584596f`）已做过一版完整实现，但基于旧 main（COS 合入前）+ 旧存储 API（`this.storage.delete/read`），无法直接合入当前 main。本次**以当前 main 为准**，参考 `584596f` 的功能意图与实现，仅移植「外部视频 URL 素材」能力，并将存储相关代码适配当前 `StorageService`（`putObject/getObject/deleteObject`），保留 Codex 未提交的宣传屏预览修复（CORP 跨 origin + Admin 预览弹窗）。分支 `feature/screensaver-external-video-v2`（基于当前 main `6ac1ac4` + Codex 工作树改动）。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/prisma/schema.prisma` + 迁移 `20260606200000_add_ad_asset_external_url` | `AdAsset` 增加可空 `externalUrl`；`source` 取值新增 `'external_url'`；外链素材无物理文件，`storageKey` 用合成键 `external:<id>` 满足 NOT NULL + UNIQUE（`externalUrl` 列已在本地 dev.db 存在，迁移为非破坏性 additive） |
+| `services/api/src/content/external-video-url.ts`（新增） | 外链 URL 安全校验:仅 https；阻断 localhost / 回环 / `10.* / 172.16-31.* / 192.168.* / 169.254.*` / CGNAT / IPv6 私网 / 单标签内网短名 / `.local/.internal` 等；仅放行 `.mp4/.webm` 直链;可选 `ALLOWED_EXTERNAL_VIDEO_HOSTS` 白名单;拒绝内嵌账号密码；不做服务端探测（无 SSRF） |
+| `services/api/src/content/content.service.ts` | 新增 `createExternalAsset`;`getKioskPlaylist` 对外链素材直接返回 `externalUrl`(不签名)并剔除缺链脏数据;`deleteAsset` 对外链跳过 `deleteObject`;`readAssetContent` 对外链返回 404;`toAssetView` 增 `externalUrl` + 预览回退;新增 `normalizeExternalDuration`——外链 `durationSec` 上限放宽到 **1800s**(默认 15s),**仅对 `external_url` 生效，不改变上传视频的 `normalizeDuration`/`AD_ASSET_MAX_VIDEO_SEC` 限制**。**所有存储调用沿用当前 `StorageService`（`putObject/getObject/deleteObject`），未恢复旧的 `delete/read`** |
+| `services/api/src/content/dto/create-external-video.dto.ts`（新增）+ `content.controller.ts` | `POST /admin/ad-assets/external-video`(admin + 审计 `ad_asset.create_external`)。Codex 的 CORP 跨 origin 头保持不动 |
+| `services/api/src/content/content.types.ts` + `packages/shared/src/types/screensaver.ts` | `AdAssetSource` 加 `external_url`;`AdAssetView` 加 `externalUrl: string \| null`(两处契约同步) |
+| `apps/admin/src/routes/screensaver/index.tsx` + `services/api/screensaver.ts` | 素材库新增「添加外部视频链接」表单 + `createExternalVideo` http/mock 双 adapter;素材卡显示「外链」标签与链接；**预览弹窗(Codex 版)扩展为外链感知**：外链用 `<video controls src={externalUrl}>` 预览，`onError` 提示「外部视频源不允许当前浏览器预览，请在终端或原始链接验证」 |
+| `apps/kiosk/src/services/screensaverCache.ts` | 绝对 http(s) URL 判定为外链:跳过预缓存/Cache Storage,`<video>` 直连拉流(不受 CORS 限制);上传素材仍走相对签名路径 + 缓存 |
+| `services/api/.env.example` | 新增 `ALLOWED_EXTERNAL_VIDEO_HOSTS` 说明(留空=放行通过私网检查的公网直链) |
+
+**合规边界：** 仅支持 HTTPS mp4/webm 直链；明确不支持 iframe、B站 / 抖音 / YouTube 页面链接；只保存视频 URL，不保存任何第三方账号 / cookie / token；链接过期由管理员重新配置。沿用「待机宣传屏属运营广告位」定位，不改动招聘 / 投递 / 候选人相关能力。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| api / admin / kiosk `typecheck` | ✅ 全部通过 |
+| api / admin / kiosk `lint` | ✅（kiosk 2 条 warning 为既有 `KioskBusyContext.tsx` fast-refresh，无新增；未触碰该文件） |
+| `pnpm verify:external-video`（URL 校验纯函数单测） | ✅ 合法直链通过；非 https / 私网内网 / iframe 站点 / 无扩展名 / .mov / 内嵌账号密码 / 超长 全部拒绝;白名单生效与解除均符合预期 |
+| `pnpm verify:external-video:e2e`（service 层打 dev.db，自清理） | ✅ 外链落库 `source=external_url`;私网 host → HTTP 400;`getKioskPlaylist` 对外链返回裸 `externalUrl`(非签名路径);删除软删 `driver=local` 无 putObject/deleteObject 触发 |
+
+**外链时长上限（按需求调整）：** 外链 `durationSec` 上限放宽到 **1800s**（默认 15s，最小 3s）——外链不占 COS 存储、不走上传校验，`durationSec` 在 Kiosk 仅作兜底切换时长，避免较长外部视频被提前切走。**仅对 `source=external_url` 生效**，上传视频仍按 `AD_ASSET_MAX_VIDEO_SEC`（默认 120s）/ 大小上限不变。
+
+**未做（保持小 PR 边界）：** 未做服务端探测对端真实 Content-Type / 可达性(本期由 Kiosk 播放 `onError` 兜底跳过);外链素材不进 Cache Storage,断网时无法离线播放(预期行为)。
+
+---
+
+## Admin 宣传屏素材预览修复（2026-06-06，Codex）
+
+**背景：** Admin「宣传屏」上传图片后素材卡片显示破图，且缺少点击查看素材效果的入口。
+
+**原因：** 后端返回的 `previewUrl` 是 `/api/v1/ad-assets/:id/content?...` 相对签名地址。Admin dev server 运行在 `localhost:5174`，API 运行在 `localhost:3010`，前端直接把相对地址放进 `<img>` 会请求到错误 origin；修正后又被 Helmet 默认 `Cross-Origin-Resource-Policy: same-origin` 拦截跨端口图片嵌入。
+
+**改动：**
+
+- `apps/admin/src/routes/screensaver/index.tsx`：将素材 `previewUrl` 按 `API_BASE_URL` 转成可访问的绝对地址；素材卡片媒体区域改为可点击按钮；新增图片/视频预览弹窗。
+- `services/api/src/content/content.controller.ts`：仅在签名素材内容接口 `/api/v1/ad-assets/:id/content` 覆盖 `Cross-Origin-Resource-Policy: cross-origin`，允许 Admin/Kiosk dev server 通过签名 URL 嵌入图片/视频。
+
+**验证：**
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm --filter ./apps/admin typecheck` / `lint` | ✅ |
+| `pnpm --filter ./services/api typecheck` / `lint` | ✅ |
+| Admin `/screensaver` 浏览器验证 | ✅ 缩略图加载到真实尺寸；点击素材打开预览弹窗；图片在弹窗内正常显示 |
+| API 重启状态 | ✅ `StorageService driver=cos bucket=yitiji-prod-private-1257025684 region=ap-guangzhou cosAvailable=true` |
+
+---
+
 ## 腾讯云 COS 对象存储接入（2026-06-06，Claude）
 
 **背景：** 把云端文件存储从本地 FS 升级为可切换腾讯云 COS（私有桶 `yitiji-prod-private-1257025684` / `ap-guangzhou`），用于上传、下载、预览、持久化。统一私有桶（不按端拆桶），靠 objectKey 前缀 + `FileObject` 记录分类授权。分支 `feature/cos-storage-integration`（基于 main `f807b75`）。详见 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。

@@ -8,7 +8,7 @@
  */
 
 export type AdAssetType = 'image' | 'video'
-export type AdAssetSource = 'uploaded' | 'ai_generated'
+export type AdAssetSource = 'uploaded' | 'ai_generated' | 'external_url'
 export type AdAssetStatus = 'active' | 'disabled'
 export type AdPlaylistStatus = 'active' | 'disabled'
 
@@ -23,6 +23,8 @@ export interface AdAssetView {
   height: number | null
   durationSec: number
   source: AdAssetSource
+  /** source='external_url' 时为 HTTPS 直链;其它来源为 null */
+  externalUrl: string | null
   status: AdAssetStatus
   createdAt: string
   previewUrl: string

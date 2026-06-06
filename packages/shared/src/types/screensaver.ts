@@ -11,7 +11,7 @@
 // ============================================================
 
 export type AdAssetType = 'image' | 'video'
-export type AdAssetSource = 'uploaded' | 'ai_generated'
+export type AdAssetSource = 'uploaded' | 'ai_generated' | 'external_url'
 export type AdAssetStatus = 'active' | 'disabled'
 export type AdPlaylistStatus = 'active' | 'disabled'
 
@@ -30,9 +30,11 @@ export interface AdAssetView {
   /** 图片停留秒数 / 视频时长(秒) */
   durationSec: number
   source: AdAssetSource
+  /** source='external_url' 时为 HTTPS 视频直链;上传 / AI 生成素材为 null */
+  externalUrl: string | null
   status: AdAssetStatus
   createdAt: string
-  /** 管理员预览用签名 URL(短 TTL) */
+  /** 管理员预览 URL:上传素材为短 TTL 签名 URL,外链素材直接是其 externalUrl */
   previewUrl: string
 }
 

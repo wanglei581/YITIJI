@@ -30,6 +30,7 @@ export type {
 export interface ScreensaverServiceInterface {
   listAssets(): Promise<AdAssetView[]>
   uploadAsset(file: File, title: string, durationSec?: number): Promise<AdAssetView>
+  createExternalVideo(url: string, title: string, durationSec?: number): Promise<AdAssetView>
   updateAsset(id: string, patch: { title?: string; durationSec?: number; status?: 'active' | 'disabled' }): Promise<AdAssetView>
   deleteAsset(id: string): Promise<AdAssetView>
 
@@ -95,6 +96,8 @@ const httpAdapter: ScreensaverServiceInterface = {
     if (!res.ok) await parseError(res)
     return res.json() as Promise<AdAssetView>
   },
+  createExternalVideo: (url, title, durationSec) =>
+    req<AdAssetView>('POST', '/admin/ad-assets/external-video', { url, title, durationSec }),
   updateAsset: (id, patch) => req<AdAssetView>('PATCH', `/admin/ad-assets/${id}`, patch),
   deleteAsset: (id) => req<AdAssetView>('DELETE', `/admin/ad-assets/${id}`),
 
@@ -123,13 +126,13 @@ const mockAssets: AdAssetView[] = [
   {
     id: 'demo-asset-1', type: 'image', title: '就业服务宣传海报', mimeType: 'image/png',
     sizeBytes: 245_000, sha256: 'demo1', width: 1080, height: 1920, durationSec: 8,
-    source: 'uploaded', status: 'active', createdAt: new Date(0).toISOString(),
+    source: 'uploaded', externalUrl: null, status: 'active', createdAt: new Date(0).toISOString(),
     previewUrl: DEMO_PREVIEW('海报 1', '#2563eb'),
   },
   {
     id: 'demo-asset-2', type: 'image', title: '校企合作展宣传', mimeType: 'image/png',
     sizeBytes: 318_000, sha256: 'demo2', width: 1080, height: 1920, durationSec: 10,
-    source: 'uploaded', status: 'active', createdAt: new Date(0).toISOString(),
+    source: 'uploaded', externalUrl: null, status: 'active', createdAt: new Date(0).toISOString(),
     previewUrl: DEMO_PREVIEW('海报 2', '#0891b2'),
   },
 ]
@@ -155,8 +158,20 @@ const mockAdapter: ScreensaverServiceInterface = {
       id: genId('asset'), type: isVideo ? 'video' : 'image', title,
       mimeType: file.type || 'image/png', sizeBytes: file.size, sha256: genId('sha'),
       width: null, height: null, durationSec: durationSec ?? (isVideo ? 15 : 8),
-      source: 'uploaded', status: 'active', createdAt: new Date(0).toISOString(),
+      source: 'uploaded', externalUrl: null, status: 'active', createdAt: new Date(0).toISOString(),
       previewUrl: isVideo ? DEMO_PREVIEW('视频', '#7c3aed') : DEMO_PREVIEW(title.slice(0, 6) || '海报', '#2563eb'),
+    }
+    mockAssets.unshift(asset)
+    return asset
+  },
+  async createExternalVideo(url, title, durationSec) {
+    const isWebm = url.toLowerCase().includes('.webm')
+    const asset: AdAssetView = {
+      id: genId('asset'), type: 'video', title,
+      mimeType: isWebm ? 'video/webm' : 'video/mp4', sizeBytes: 0, sha256: genId('sha'),
+      width: null, height: null, durationSec: durationSec ?? 15,
+      source: 'external_url', externalUrl: url, status: 'active', createdAt: new Date(0).toISOString(),
+      previewUrl: DEMO_PREVIEW('外链视频', '#7c3aed'),
     }
     mockAssets.unshift(asset)
     return asset
