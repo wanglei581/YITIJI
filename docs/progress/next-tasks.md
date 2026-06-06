@@ -5,6 +5,32 @@
 
 ---
 
+## 🧭 下一步候选（2026-06-06 阶段收口后）
+
+`main`（`6ac1ac4`）已确认为可开新功能的干净基线（核查见 [current-progress.md](./current-progress.md) §阶段收口基线核查）。三个候选方向，按需取一推进：
+
+### A. 宣传屏真机手验（验证收尾，最轻）
+
+- 自动化已覆盖「上传→存 COS→签名→回源读→删除」字节链路（`verify:cos` 37 + `verify:cos:files` 30）与 Admin 接口 200；**未做**的是浏览器/真机点检。
+- 步骤：Admin 登录 → 宣传屏 → 上传图片/视频（落 COS `screensaver/materials/`）→ 配置播放方案 + 绑定终端 → Kiosk 无操作进入 `/screensaver` 看轮播/播放 → 删除素材确认 COS 对象回收 + 卡片消失。
+- 产出：手验记录 + 截图；如发现回源/缓存/签名问题再开 fix 分支。
+
+### B. 外部视频直链素材（已在分支，待收口合入）
+
+- 分支 `feature/screensaver-external-video-v2`（基于 `6ac1ac4`，+1 commit `99c3711`），允许管理员登记 HTTPS mp4/webm 直链，Kiosk 直连播放，免重复上传大视频。详见 [current-progress.md](./current-progress.md) §宣传屏支持外部视频直链素材。
+- 现状：代码 + URL 安全校验（仅 https、阻断私网/内网/SSRF 面、扩展名白名单）+ `verify:external-video` 纯函数与 service E2E 已绿。
+- 待办：人工 review → 真机播一条外链 → FF 合入 main（合入后 A 的手验可一并覆盖外链路径）。
+
+### C. 新功能开发（在干净 main 上起新分支）
+
+- 从 `6ac1ac4` 起新 `feature/*` 分支。优先级参考下方既有 P0/P1：
+  - AI求职材料中心 Phase A-2（`materials/document-processing`：`DocumentProcessTask`/`PiiFinding` 骨架）→ Phase B Kiosk 上传体检 + PII 检查闭环。
+  - Excel 字段映射 service 接入收尾（注：T1/W4 已大部完成，剩 CLAUDE.md §16/§18 过时描述校正）。
+  - 真实 AI provider 接通（持久化层已就绪，缺外部凭证）。
+- 合规红线不变：不做站内投递 / 企业收简历 / 候选人筛选 / 面试邀约 / Offer。
+
+---
+
 ## 📌 腾讯云 COS 对象存储接入（2026-06-06，`feature/cos-storage-integration`，已完成代码 + 验证）
 
 详见 [current-progress.md](./current-progress.md) §腾讯云 COS 对象存储接入 与 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。
