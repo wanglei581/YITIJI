@@ -3,7 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -31,7 +31,7 @@ export class SavePlaylistDto {
   name!: string
 
   @IsOptional()
-  @IsEnum(['active', 'disabled'])
+  @IsIn(['active', 'disabled'])
   status?: 'active' | 'disabled'
 
   @IsArray()

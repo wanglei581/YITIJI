@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 
 export class UpdateAdAssetDto {
   @IsOptional()
@@ -13,6 +13,6 @@ export class UpdateAdAssetDto {
   durationSec?: number
 
   @IsOptional()
-  @IsEnum(['active', 'disabled'])
+  @IsIn(['active', 'disabled'])
   status?: 'active' | 'disabled'
 }

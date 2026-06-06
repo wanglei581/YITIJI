@@ -120,6 +120,24 @@ export interface AdminTerminalView {
   diskFreeGb: number | null
 }
 
+export interface AdminPrinterView {
+  id: string
+  terminalId: string
+  terminalCode: string
+  name: string
+  model: string | null
+  serialNumber: string | null
+  status: 'online' | 'offline' | 'error'
+  printerStatus: string | null
+  currentTask: string | null
+  tonerLevel: number | null
+  paperTrayLevel: number | null
+  paperStatus: 'normal' | 'low' | 'empty' | 'jam' | 'unknown' | null
+  fault: string | null
+  lastHeartbeatAt: string | null
+  lastSyncAt: string | null
+}
+
 // ── Sample files ──────────────────────────────────────────────────────────────
 
 export const SAMPLE_PNG = Buffer.from(
@@ -613,6 +631,63 @@ export class TerminalsService implements OnModuleInit {
     return { terminals }
   }
 
+  /**
+   * Admin 打印机页真实数据源。
+   *
+   * 当前 Agent 心跳只上报 printerStatus,未上报型号/SN/耗材/纸盒余量,
+   * 因此这些字段保持 null,由前端明确展示"未上报",避免编造硬件明细。
+   */
+  async listPrintersForAdmin(): Promise<{ printers: AdminPrinterView[] }> {
+    const ONLINE_WINDOW_MS = 3 * 60 * 1000
+    const now = Date.now()
+
+    const rows = await this.prisma.terminal.findMany({
+      orderBy: { registeredAt: 'desc' },
+      include: {
+        heartbeats: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { printerStatus: true, createdAt: true },
+        },
+        printTasks: {
+          where: { status: { in: ['claimed', 'printing'] } },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+          select: { id: true, status: true },
+        },
+      },
+    })
+
+    const printers = rows.map((t): AdminPrinterView => {
+      const hb = t.heartbeats[0]
+      const activeTask = t.printTasks[0]
+      const lastHeartbeatAt = hb?.createdAt ?? null
+      const online = lastHeartbeatAt ? now - lastHeartbeatAt.getTime() < ONLINE_WINDOW_MS : false
+      const printerStatus = hb?.printerStatus ?? null
+      const status = toAdminPrinterStatus(online, printerStatus)
+
+      return {
+        id: `printer:${t.terminalCode}`,
+        terminalId: t.id,
+        terminalCode: t.terminalCode,
+        name: `${t.terminalCode} 打印机`,
+        model: null,
+        serialNumber: null,
+        status,
+        printerStatus,
+        currentTask: activeTask ? `${activeTask.id}（${activeTask.status}）` : null,
+        tonerLevel: null,
+        paperTrayLevel: null,
+        paperStatus: printerStatus === 'paper_empty' ? 'empty' : null,
+        fault: describePrinterFault(online, printerStatus),
+        lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
+        lastSyncAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
+      }
+    })
+
+    return { printers }
+  }
+
   listPrintTasks() {
     return this.prisma.printTask.findMany({ orderBy: { createdAt: 'desc' } })
   }
@@ -623,8 +698,8 @@ export class TerminalsService implements OnModuleInit {
     lastSeenAt: string | null
     isOnline: boolean
   }> {
-    const terminal = await this.prisma.terminal.findUnique({
-      where: { id: terminalId },
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
       include: {
         heartbeats: {
           orderBy: { createdAt: 'desc' },
@@ -648,5 +723,32 @@ export class TerminalsService implements OnModuleInit {
       lastSeenAt,
       isOnline,
     }
+  }
+}
+
+function toAdminPrinterStatus(online: boolean, printerStatus: string | null): AdminPrinterView['status'] {
+  if (!online) return 'offline'
+  if (!printerStatus || printerStatus === 'unknown') return 'offline'
+  if (printerStatus === 'ok' || printerStatus === 'ready' || printerStatus === 'idle') return 'online'
+  return 'error'
+}
+
+function describePrinterFault(online: boolean, printerStatus: string | null): string | null {
+  if (!online) return '终端离线，打印机状态未知'
+  switch (printerStatus) {
+    case 'paper_empty':
+      return '纸盒已空，请补充 A4 纸张'
+    case 'offline':
+      return '打印机离线'
+    case 'not_found':
+      return '未检测到配置的打印机'
+    case 'error':
+      return '打印机故障，需人工处理'
+    case null:
+    case undefined:
+    case 'unknown':
+      return '打印机状态未上报'
+    default:
+      return null
   }
 }

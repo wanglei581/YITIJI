@@ -1,9 +1,23 @@
 # 下一步任务
 
-> 最后更新：2026-06-05（PR-E Admin 工作台真实 KPI 接入，feature/admin-dashboard-real-kpi-clean）
+> 最后更新：2026-06-06（QA P0 真机联调修复已完成）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
+
+## 📌 QA P0 真机联调修复（2026-06-06，已完成代码 + 静态验证）
+
+详见 [current-progress.md](./current-progress.md) §QA P0 真机联调修复。
+
+- ✅ `GET /terminals/:terminalId/printer-status` 支持 `terminalCode`，Kiosk `KSK-001` 不再因内部 cuid 查询口径返回 404。
+- ✅ 待机屏配置列表/保存/Kiosk 拉取统一使用 `terminalCode`，同时兼容历史内部 `id` 配置。
+- ✅ 新增 `GET /admin/printers`，Admin 打印机页移除本地 `MOCK_PRINTERS`，改接真实终端心跳聚合数据；未上报的型号/SN/耗材/纸张字段明确显示「未上报」。
+- ✅ `seed.ts` 补 `KSK-001` 终端 + heartbeat，供本地/真机联调默认业务码链路使用。
+- ✅ 已实跑 `pnpm --filter @ai-job-print/api db:seed`，当前 dev.db 已有 `KSK-001` 终端与 heartbeat。
+- ✅ DTO 同类 `@IsEnum([...])` 文案 bug 已改 `@IsIn([...])`。
+- ✅ api/admin `typecheck`、`lint`、`build` 全绿。
+- ✅ 临时 API:3011 HTTP 复验通过：`/terminals/KSK-001/printer-status`、`/admin/printers`、`/terminals/KSK-001/screensaver` 均按预期返回。
+- ⏳ 现有后台服务（api 3010、admin 5174）仍需重启，才能加载本轮新代码。
 
 ## 📌 PR-E Admin 工作台真实 KPI 接入（2026-06-05，`feature/admin-dashboard-real-kpi-clean`，待验证 / PR）
 

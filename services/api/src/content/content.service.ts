@@ -223,13 +223,11 @@ export class ContentService {
   // ── 终端配置 ────────────────────────────────────────────────────────────────
 
   async getTerminalConfig(terminalId: string): Promise<TerminalScreensaverConfigView> {
-    const config = await this.prisma.terminalScreensaverConfig.findUnique({
-      where: { terminalId },
-      include: { playlist: true },
-    })
+    const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
+    const config = await this.findConfigByTerminalRef(terminalId)
     if (!config) {
       return {
-        terminalId,
+        terminalId: publicTerminalId,
         enabled: false,
         idleTimeoutSec: DEFAULT_IDLE_TIMEOUT_SEC,
         playlistId: null,
@@ -245,6 +243,7 @@ export class ContentService {
     input: { enabled: boolean; idleTimeoutSec: number; playlistId: string | null },
     updatedBy: string | null,
   ): Promise<TerminalScreensaverConfigView> {
+    const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
     const idleTimeoutSec = clamp(Math.floor(input.idleTimeoutSec), MIN_IDLE_TIMEOUT_SEC, MAX_IDLE_TIMEOUT_SEC)
 
     let playlistId = input.playlistId
@@ -260,8 +259,8 @@ export class ContentService {
     const enabled = input.enabled && !!playlistId
 
     const saved = await this.prisma.terminalScreensaverConfig.upsert({
-      where: { terminalId },
-      create: { terminalId, enabled, idleTimeoutSec, playlistId, updatedBy },
+      where: { terminalId: publicTerminalId },
+      create: { terminalId: publicTerminalId, enabled, idleTimeoutSec, playlistId, updatedBy },
       update: { enabled, idleTimeoutSec, playlistId, updatedBy },
       include: { playlist: true },
     })
@@ -277,9 +276,9 @@ export class ContentService {
     const now = Date.now()
 
     const rows: ScreensaverTerminalView[] = terminals.map((t) => {
-      const config = configByTerminal.get(t.id)
+      const config = configByTerminal.get(t.terminalCode) ?? configByTerminal.get(t.id)
       return {
-        terminalId: t.id,
+        terminalId: t.terminalCode,
         terminalCode: t.terminalCode,
         isOnline: now - t.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS,
         config: config ? toConfigView(config, config.playlist?.name ?? null) : null,
@@ -287,7 +286,7 @@ export class ContentService {
     })
 
     // 预置但尚未注册的终端配置也展示(terminalCode 未知)
-    const seen = new Set(terminals.map((t) => t.id))
+    const seen = new Set(terminals.flatMap((t) => [t.id, t.terminalCode]))
     for (const c of configs) {
       if (!seen.has(c.terminalId)) {
         rows.push({
@@ -304,14 +303,7 @@ export class ContentService {
   // ── Kiosk 拉取 ──────────────────────────────────────────────────────────────
 
   async getKioskPlaylist(terminalId: string): Promise<KioskScreensaverPlaylist> {
-    const config = await this.prisma.terminalScreensaverConfig.findUnique({
-      where: { terminalId },
-      include: {
-        playlist: {
-          include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
-        },
-      },
-    })
+    const config = await this.findConfigWithPlaylistByTerminalRef(terminalId)
 
     const idleTimeoutSec = config?.idleTimeoutSec ?? DEFAULT_IDLE_TIMEOUT_SEC
 
@@ -389,6 +381,44 @@ export class ContentService {
       throw new NotFoundException({ error: { code: 'AD_ASSET_NOT_FOUND', message: '素材不存在或已删除' } })
     }
     return record
+  }
+
+  private async resolvePublicTerminalId(terminalId: string): Promise<string> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
+      select: { terminalCode: true },
+    })
+    return terminal?.terminalCode ?? terminalId
+  }
+
+  private async terminalLookupKeys(terminalId: string): Promise<string[]> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
+      select: { id: true, terminalCode: true },
+    })
+    return [...new Set([terminalId, terminal?.terminalCode, terminal?.id].filter((v): v is string => !!v))]
+  }
+
+  private async findConfigByTerminalRef(terminalId: string) {
+    const keys = await this.terminalLookupKeys(terminalId)
+    const configs = await this.prisma.terminalScreensaverConfig.findMany({
+      where: { terminalId: { in: keys } },
+      include: { playlist: true },
+    })
+    return configs.sort((a, b) => keys.indexOf(a.terminalId) - keys.indexOf(b.terminalId))[0] ?? null
+  }
+
+  private async findConfigWithPlaylistByTerminalRef(terminalId: string) {
+    const keys = await this.terminalLookupKeys(terminalId)
+    const configs = await this.prisma.terminalScreensaverConfig.findMany({
+      where: { terminalId: { in: keys } },
+      include: {
+        playlist: {
+          include: { items: { include: { asset: true }, orderBy: { order: 'asc' } } },
+        },
+      },
+    })
+    return configs.sort((a, b) => keys.indexOf(a.terminalId) - keys.indexOf(b.terminalId))[0] ?? null
   }
 }
 

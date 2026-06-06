@@ -4,6 +4,7 @@ import type {
   AdminJobSourceRecord,
   AdminFairSourceRecord,
   AdminImportBatch,
+  AdminPrintersResponse,
   AdminTerminalsResponse,
   AuditLogListResponse,
   AuditLogListQuery,
@@ -99,6 +100,9 @@ export const adminHttpAdapter = {
   // ── 设备管理 — 终端心跳(契约 C1)──────────────────────────────────────────
   getTerminals: () =>
     getData<AdminTerminalsResponse>('/admin/terminals'),
+
+  getPrinters: () =>
+    getData<AdminPrintersResponse>('/admin/printers'),
 
   // ── 日志审计(HIGH-5)──────────────────────────────────────────────────────
   getAuditLogs: (query: AuditLogListQuery = {}) =>

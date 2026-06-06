@@ -2,6 +2,8 @@ import type {
   AdminJobSourceRecord,
   AdminFairSourceRecord,
   AdminImportBatch,
+  AdminPrinterRecord,
+  AdminPrintersResponse,
   AdminTerminalsResponse,
   AuditLogListResponse,
   AuditLogListQuery,
@@ -139,6 +141,33 @@ export const adminMockAdapter = {
     }
   },
 
+  async getPrinters(): Promise<AdminPrintersResponse> {
+    await delay()
+    const terminals = (await this.getTerminals()).terminals
+    return {
+      printers: terminals.map((t): AdminPrinterRecord => {
+        const status = toMockPrinterStatus(t.online, t.printerStatus)
+        return {
+          id: `printer:${t.terminalCode}`,
+          terminalId: t.id,
+          terminalCode: t.terminalCode,
+          name: `${t.terminalCode} 打印机`,
+          model: null,
+          serialNumber: null,
+          status,
+          printerStatus: t.printerStatus,
+          currentTask: null,
+          tonerLevel: null,
+          paperTrayLevel: null,
+          paperStatus: t.printerStatus === 'paper_empty' ? 'empty' : null,
+          fault: toMockPrinterFault(t.online, t.printerStatus),
+          lastHeartbeatAt: t.lastHeartbeatAt,
+          lastSyncAt: t.lastHeartbeatAt,
+        }
+      }),
+    }
+  },
+
   // ── 日志审计(HIGH-5 mock,支持 action/时间筛选 + 分页)───────────────────
   async getAuditLogs(query: AuditLogListQuery = {}): Promise<AuditLogListResponse> {
     await delay()
@@ -165,4 +194,29 @@ export const adminMockAdapter = {
       { id: 'batch-005', sourceId: 'ds2', sourceName: '高校就业信息 Excel', orgId: 'org-uni-001', orgName: '某大学就业中心', dataType: 'job',  fileName: '错误文件_test.xlsx',        totalRows: 5,  validRows: 0,  invalidRows: 5, dupRows: 0, status: 'cancelled',  createdBy: 'partner1', confirmedAt: null,                       createdAt: '2026-05-22T11:00:00.000Z' },
     ]
   },
+}
+
+function toMockPrinterStatus(online: boolean, printerStatus: string | null): AdminPrinterRecord['status'] {
+  if (!online) return 'offline'
+  if (!printerStatus || printerStatus === 'unknown') return 'offline'
+  return printerStatus === 'ok' ? 'online' : 'error'
+}
+
+function toMockPrinterFault(online: boolean, printerStatus: string | null): string | null {
+  if (!online) return '终端离线，打印机状态未知'
+  switch (printerStatus) {
+    case 'paper_empty':
+      return '纸盒已空，请补充 A4 纸张'
+    case 'offline':
+      return '打印机离线'
+    case 'not_found':
+      return '未检测到配置的打印机'
+    case 'error':
+      return '打印机故障，需人工处理'
+    case null:
+    case 'unknown':
+      return '打印机状态未上报'
+    default:
+      return null
+  }
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { TerminalsController } from './terminals.controller'
 import { AdminTerminalsController } from './admin-terminals.controller'
+import { AdminPrintersController } from './admin-printers.controller'
 import { TerminalsService } from './terminals.service'
 
 @Module({
@@ -12,7 +13,7 @@ import { TerminalsService } from './terminals.service'
       secret: process.env['JWT_SECRET'] ?? 'dev-only-secret',
     }),
   ],
-  controllers: [TerminalsController, AdminTerminalsController],
+  controllers: [TerminalsController, AdminTerminalsController, AdminPrintersController],
   providers: [TerminalsService],
 })
 export class TerminalsModule {}
