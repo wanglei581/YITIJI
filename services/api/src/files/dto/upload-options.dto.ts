@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional } from 'class-validator'
+import { IsIn, IsOptional } from 'class-validator'
 
 /**
  * 上传时除 multipart file 之外可选的 form fields。
@@ -10,7 +10,7 @@ import { IsEnum, IsOptional } from 'class-validator'
  * 如显式传 sensitiveLevel,会覆盖 purpose 默认值(更严的有效)。
  */
 export class UploadOptionsDto {
-  @IsEnum([
+  @IsIn([
     'resume_upload',
     'resume_scan',
     'id_scan',
@@ -21,6 +21,6 @@ export class UploadOptionsDto {
   purpose!: string
 
   @IsOptional()
-  @IsEnum(['normal', 'sensitive', 'highly_sensitive'])
+  @IsIn(['normal', 'sensitive', 'highly_sensitive'])
   sensitiveLevel?: string
 }

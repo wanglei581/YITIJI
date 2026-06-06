@@ -1,4 +1,4 @@
-import { IsEnum } from 'class-validator'
+import { IsIn } from 'class-validator'
 
 /**
  * Kiosk 匿名上传 DTO。
@@ -9,7 +9,7 @@ import { IsEnum } from 'class-validator'
  *     防止恶意调用方传 'normal' 把简历 TTL 拉成 24h)
  */
 export class KioskUploadOptionsDto {
-  @IsEnum([
+  @IsIn([
     'resume_upload',
     'resume_scan',
     'id_scan',

@@ -1,7 +1,36 @@
 # 当前开发进度
 
-> 最后更新：2026-06-05  
+> 最后更新：2026-06-06
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## QA P0 真机联调修复（2026-06-06，Codex）
+
+**背景：** 基于 `/tmp/qa-report-final.md` 复核结论，修复真机联调前应处理的 3 个 P0：Kiosk 用业务码 `KSK-001` 拉取打印机状态 404、Admin 打印机页纯本地 mock、seed 缺少 `KSK-001` 终端。同时顺手修复同类 DTO 校验文案空列表问题。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/terminals/terminals.service.ts`、`admin-printers.controller.ts`、`terminals.module.ts` | `GET /terminals/:terminalId/printer-status` 支持按内部 `id` 或业务 `terminalCode` 查询；新增 admin-only `GET /admin/printers`，基于终端最新 heartbeat 聚合打印机状态，不编造型号/SN/耗材/纸盒余量 |
+| `services/api/src/content/content.service.ts` | 待机屏终端配置对 Admin/Kiosk 暴露和保存统一使用 `terminalCode`；读取时兼容历史内部 `id` 配置 |
+| `services/api/prisma/seed.ts` | seed 一条 `KSK-001` 终端和一条 `printerStatus='ok'` heartbeat，供本地/真机联调默认业务码链路使用；不硬编码任何打印机型号 |
+| `apps/admin/src/services/api/{types,adminHttpAdapter,adminMockAdapter,devices,index}.ts` | 新增 Admin 打印机契约与 http/mock 双 adapter，http 调 `GET /admin/printers` |
+| `apps/admin/src/routes/printers/index.tsx` | 移除 `MOCK_PRINTERS` 和硬编码 Pantum/SN/碳粉/纸张数据，改为加载真实接口；未上报字段明确显示「未上报」；保留 loading/error/empty/refresh/search/filter/pagination |
+| `services/api/src/files/dto/{kiosk-upload-options,upload-options}.dto.ts`、`services/api/src/content/dto/{save-playlist,update-ad-asset}.dto.ts` | `@IsEnum([...])` 改 `@IsIn([...])`，修复非法值报错可选值列表为空的问题 |
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| api `typecheck` / `lint` / `build` | ✅ |
+| admin `typecheck` / `lint` / `build` | ✅ |
+| 旧 mock/禁用写法扫描 | ✅ `MOCK_PRINTERS`、Admin 硬编码 Pantum 型号、`IsEnum([...])` 均 0 命中 |
+| `pnpm --filter @ai-job-print/api db:seed` | ✅ 已写入/刷新 `KSK-001` 终端与 heartbeat（`dev.db` 为 ignored 文件，未产生 Git 跟踪改动） |
+| 临时 API:3011 HTTP 复验 | ✅ `GET /terminals/KSK-001/printer-status` → 200 `{ printerStatus:"ok", isOnline:true }`；`GET /terminals/KSK-001/screensaver` → 200 disabled 默认配置；admin 登录后 `GET /admin/printers` → 200，列表含 `KSK-001` 聚合记录 |
+
+**注意：** HTTP 复验使用临时 `PORT=3011` API 进程，复验后已停止。用户此前后台服务仍在运行（api 3010、admin 5174 等），本轮代码变更需要重启后端与 Admin dev server 后才会反映到当前页面/端点。
 
 ---
 

@@ -33,6 +33,33 @@ export interface AdminTerminalsResponse {
   terminals: AdminTerminalRecord[]
 }
 
+// ─── Printers (设备管理 — 打印机视图) ───────────────────────────────────────
+
+export type AdminPrinterStatus = 'online' | 'offline' | 'error'
+export type AdminPaperStatus = 'normal' | 'low' | 'empty' | 'jam' | 'unknown'
+
+export interface AdminPrinterRecord {
+  id: string
+  terminalId: string
+  terminalCode: string
+  name: string
+  model: string | null
+  serialNumber: string | null
+  status: AdminPrinterStatus
+  printerStatus: TerminalPrinterStatus | string | null
+  currentTask: string | null
+  tonerLevel: number | null
+  paperTrayLevel: number | null
+  paperStatus: AdminPaperStatus | null
+  fault: string | null
+  lastHeartbeatAt: string | null
+  lastSyncAt: string | null
+}
+
+export interface AdminPrintersResponse {
+  printers: AdminPrinterRecord[]
+}
+
 // R1: Added sourceOrgId, sourceUrl, description, tags, requirements
 export interface AdminJobSourceRecord {
   id: string
