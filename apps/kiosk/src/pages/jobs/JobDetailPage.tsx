@@ -297,7 +297,7 @@ export function JobDetailPage() {
 
       {/* 操作按钮 */}
       <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Button
             size="lg"
             className="flex items-center gap-2"

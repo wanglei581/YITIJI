@@ -115,7 +115,7 @@ export function JobFairsPage() {
             className="flex-1"
           />
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {fairs.map((fair) => {
               const sc = STATUS_CONFIG[fair.status]
               return (
@@ -133,11 +133,11 @@ export function JobFairsPage() {
                     </div>
                     <div className="flex items-start gap-1.5">
                       <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-                      <span>{fair.venue}</span>
+                      <span className="min-w-0 flex-1 line-clamp-1">{fair.venue}</span>
                     </div>
                     <div className="flex items-start gap-1.5">
                       <Building2Icon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-                      <span>主办：{fair.organizer}</span>
+                      <span className="min-w-0 flex-1 line-clamp-1">主办：{fair.organizer}</span>
                     </div>
                     {/* 企业数用真实字段：已录入数字化数据则展示 managedCompanyCount/资料数，
                         否则展示 boothCount。岗位数(jobCount)与届别(audienceType)DTO 暂无，
