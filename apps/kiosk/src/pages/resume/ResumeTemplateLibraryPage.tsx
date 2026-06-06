@@ -120,7 +120,7 @@ export function ResumeTemplateLibraryPage() {
           />
         </div>
       ) : (
-        <div className="mt-5 grid grid-cols-2 gap-4">
+        <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-3">
           {visible.map((m) => {
             const meta = TYPE_META[m.type]
             const Icon = meta.icon
