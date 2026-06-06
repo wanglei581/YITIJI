@@ -664,7 +664,8 @@ model AdAsset {
   width          Int?
   height         Int?
   durationSec    Int      @default(8)
-  source         String   @default("uploaded") // 'uploaded' | 'ai_generated'
+  source         String   @default("uploaded") // 'uploaded' | 'ai_generated' | 'external_url'
+  externalUrl    String?  // source='external_url' 时存 HTTPS 直链(mp4/webm);其它来源为 null
   aiGenerationId String?
   status         String   @default("active")    // 'active' | 'disabled'
   createdBy      String?

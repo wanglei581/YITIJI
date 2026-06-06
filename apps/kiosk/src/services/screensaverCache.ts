@@ -19,9 +19,18 @@ function supported(): boolean {
   return typeof window !== 'undefined' && 'caches' in window
 }
 
+/**
+ * 外链素材判定:上传素材的 url 是相对签名路径(/api/v1/ad-assets/...),
+ * 外部视频直链是绝对 http(s) URL。绝对 URL 一律直连播放、不进缓存——
+ * 跨域 fetch 多半被 CORS 拒绝(缓存无意义),而 <video> 直接拉流不受 CORS 限制。
+ */
+function isExternalUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url)
+}
+
 /** 预缓存单个素材(已缓存则跳过)。失败(离线)静默忽略,播放时再兜底。 */
 export async function prefetchAsset(item: KioskScreensaverItem): Promise<void> {
-  if (!supported()) return
+  if (!supported() || isExternalUrl(item.url)) return
   try {
     const cache = await caches.open(CACHE_NAME)
     const key = cacheKey(item.sha256)
@@ -38,6 +47,8 @@ export async function prefetchAsset(item: KioskScreensaverItem): Promise<void> {
  * 返回 blob: 开头的 URL 时,调用方播放完必须 URL.revokeObjectURL 释放。
  */
 export async function resolveAssetUrl(item: KioskScreensaverItem): Promise<string> {
+  // 外链直连播放,不读缓存(也就不会产生 blob: URL,调用方无需 revoke)
+  if (isExternalUrl(item.url)) return item.url
   if (supported()) {
     try {
       const cache = await caches.open(CACHE_NAME)

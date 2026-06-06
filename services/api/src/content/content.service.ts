@@ -4,13 +4,15 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import { generateObjectKey } from '../storage/object-key'
 import { signAdAssetUrl, signAdAssetPreviewUrl } from './content-signing'
 import { validateMedia, getMediaLimits } from './media-validation'
+import { validateExternalVideoUrl } from './external-video-url'
 import type {
+  AdAssetSource,
   AdAssetStatus,
   AdAssetView,
   AdPlaylistView,
@@ -24,6 +26,11 @@ const DEFAULT_IDLE_TIMEOUT_SEC = 180
 const MIN_IDLE_TIMEOUT_SEC = 30
 const MAX_IDLE_TIMEOUT_SEC = 1800
 const MIN_DURATION_SEC = 3
+// 外链视频时长上限:外链不占 COS 存储、不走上传校验,durationSec 在 Kiosk 仅作
+// 兜底切换时长,放宽到 30 分钟(默认 15s)。仅用于 source='external_url',
+// 不影响上传视频的 getMediaLimits().maxVideoDurationSec(默认 120s)。
+const MAX_EXTERNAL_VIDEO_DURATION_SEC = 1800
+const DEFAULT_EXTERNAL_VIDEO_DURATION_SEC = 15
 
 /**
  * 待机宣传屏内容服务。
@@ -106,6 +113,55 @@ export class ContentService {
     return toAssetView(record)
   }
 
+  /**
+   * 登记一条「外部视频直链」素材(source='external_url')。
+   *
+   * 与上传素材的差异:无物理文件落盘——storageKey 用合成键 'external:<id>'
+   * 满足 NOT NULL + UNIQUE 约束;Kiosk 播放时直接用 externalUrl,不走签名内容端点,
+   * 也不调用 StorageService(putObject/getObject/deleteObject 均跳过)。
+   * sha256 用归一化 URL 的摘要(内容指纹无法获得),仅作稳定标识。
+   */
+  async createExternalAsset(args: {
+    url: string
+    title: string
+    durationSec?: number
+    createdBy: string | null
+  }): Promise<AdAssetView> {
+    const v = validateExternalVideoUrl(args.url)
+    if (!v.ok) {
+      throw new BadRequestException({ error: { code: v.code, message: v.message } })
+    }
+
+    const title = args.title?.trim()
+    if (!title) {
+      throw new BadRequestException({ error: { code: 'AD_ASSET_TITLE_REQUIRED', message: '素材标题不能为空' } })
+    }
+
+    const durationSec = this.normalizeExternalDuration(args.durationSec)
+
+    const id = randomUUID().replace(/-/g, '')
+    const sha256 = createHash('sha256').update(v.normalizedUrl).digest('hex')
+
+    const record = await this.prisma.adAsset.create({
+      data: {
+        id,
+        type: 'video',
+        title,
+        storageKey: `external:${id}`,
+        externalUrl: v.normalizedUrl,
+        mimeType: v.mimeType,
+        sizeBytes: 0,
+        sha256,
+        durationSec,
+        source: 'external_url',
+        status: 'active',
+        createdBy: args.createdBy,
+      },
+    })
+    this.logger.log(`Ad asset (external) created: ${record.id} (${v.mimeType})`)
+    return toAssetView(record)
+  }
+
   async updateAsset(
     id: string,
     patch: { title?: string; durationSec?: number; status?: AdAssetStatus },
@@ -128,8 +184,11 @@ export class ContentService {
 
   async deleteAsset(id: string): Promise<AdAssetView> {
     const record = await this.requireAliveAsset(id)
-    // 物理删除文件 + 软删元数据(保留删除痕迹,审计可追溯)
-    await this.storage.deleteObject(record.storageKey)
+    // 物理删除文件 + 软删元数据(保留删除痕迹,审计可追溯)。
+    // 外链素材无物理文件,跳过对象存储删除(storageKey 为合成键 external:<id>)。
+    if (record.source !== 'external_url') {
+      await this.storage.deleteObject(record.storageKey)
+    }
     const updated = await this.prisma.adAsset.update({
       where: { id },
       data: { deletedAt: new Date(), status: 'disabled' },
@@ -141,6 +200,10 @@ export class ContentService {
   /** 供签名内容端点读取(只读存活素材的物理内容)。 */
   async readAssetContent(id: string): Promise<{ buffer: Buffer; mimeType: string }> {
     const record = await this.requireAliveAsset(id)
+    // 外链素材无本地内容,Kiosk 直接用 externalUrl 播放,不应走签名内容端点。
+    if (record.source === 'external_url') {
+      throw new NotFoundException({ error: { code: 'AD_ASSET_NO_LOCAL_CONTENT', message: '外链素材无本地内容' } })
+    }
     const buffer = await this.storage.getObject(record.storageKey)
     return { buffer, mimeType: record.mimeType }
   }
@@ -323,12 +386,18 @@ export class ContentService {
 
     const items = config.playlist.items
       .filter((it) => it.enabled && it.asset.status === 'active' && it.asset.deletedAt === null)
+      // 外链素材缺 externalUrl 属脏数据,直接剔除,避免给 Kiosk 发空 url
+      .filter((it) => it.asset.source !== 'external_url' || !!it.asset.externalUrl)
       .map((it) => {
-        const signed = signAdAssetUrl(it.asset.id)
+        // 外链素材:Kiosk 直连 HTTPS 直链播放;上传素材:走签名内容端点。
+        const url =
+          it.asset.source === 'external_url' && it.asset.externalUrl
+            ? it.asset.externalUrl
+            : signAdAssetUrl(it.asset.id).url
         return {
           id: it.asset.id,
           type: it.asset.type as 'image' | 'video',
-          url: signed.url,
+          url,
           mimeType: it.asset.mimeType,
           durationSec: it.asset.durationSec,
           sha256: it.asset.sha256,
@@ -358,6 +427,27 @@ export class ContentService {
     if (kind === 'video' && n > limits.maxVideoDurationSec) {
       throw new BadRequestException({
         error: { code: 'AD_ASSET_DURATION_TOO_LONG', message: `视频时长超出 ${limits.maxVideoDurationSec} 秒上限` },
+      })
+    }
+    return n
+  }
+
+  /**
+   * 外链视频时长归一化。与 normalizeDuration('video') 的区别:外链不占 COS 存储、
+   * 不走上传时长校验,durationSec 在 Kiosk 仅作兜底切换时长,上限放宽到
+   * MAX_EXTERNAL_VIDEO_DURATION_SEC(1800s,默认 15s)。仅用于 source='external_url',
+   * 不改变上传视频的时长/大小限制。
+   */
+  private normalizeExternalDuration(input?: number): number {
+    const n = input === undefined || input === null ? DEFAULT_EXTERNAL_VIDEO_DURATION_SEC : Math.floor(input)
+    if (!Number.isFinite(n) || n < MIN_DURATION_SEC) {
+      throw new BadRequestException({
+        error: { code: 'AD_ASSET_DURATION_INVALID', message: `时长至少 ${MIN_DURATION_SEC} 秒` },
+      })
+    }
+    if (n > MAX_EXTERNAL_VIDEO_DURATION_SEC) {
+      throw new BadRequestException({
+        error: { code: 'AD_ASSET_DURATION_TOO_LONG', message: `外链视频时长超出 ${MAX_EXTERNAL_VIDEO_DURATION_SEC} 秒上限` },
       })
     }
     return n
@@ -461,9 +551,11 @@ function toAssetView(r: {
   height: number | null
   durationSec: number
   source: string
+  externalUrl: string | null
   status: string
   createdAt: Date
 }): AdAssetView {
+  const isExternal = r.source === 'external_url'
   return {
     id: r.id,
     type: r.type as 'image' | 'video',
@@ -474,10 +566,12 @@ function toAssetView(r: {
     width: r.width,
     height: r.height,
     durationSec: r.durationSec,
-    source: r.source as 'uploaded' | 'ai_generated',
+    source: r.source as AdAssetSource,
+    externalUrl: r.externalUrl,
     status: r.status as 'active' | 'disabled',
     createdAt: r.createdAt.toISOString(),
-    previewUrl: signAdAssetPreviewUrl(r.id),
+    // 外链素材无本地内容,预览直接用其 externalUrl;上传素材用短 TTL 签名 URL。
+    previewUrl: isExternal && r.externalUrl ? r.externalUrl : signAdAssetPreviewUrl(r.id),
   }
 }
 

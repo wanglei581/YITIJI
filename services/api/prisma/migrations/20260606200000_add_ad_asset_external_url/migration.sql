@@ -1,0 +1,11 @@
+-- 宣传屏外部视频直链素材:AdAsset 增加 externalUrl 列。
+--
+-- Nullable by design:
+--   - source='uploaded' / 'ai_generated' 的既有素材没有外链,保持 NULL。
+--   - source='external_url' 时存 HTTPS mp4/webm 直链;无物理文件,
+--     storageKey 用合成键 'external:<id>' 满足 NOT NULL + UNIQUE 约束。
+--
+-- 沿用本项目既有约定(见 20260606190000_add_file_asset_cos_fields):因 dev.db
+-- 存在历史 migration drift,本 additive 列通过 `prisma db execute --file ...`
+-- 非破坏性执行,不跑破坏性 `migrate reset`。
+ALTER TABLE "AdAsset" ADD COLUMN "externalUrl" TEXT;
