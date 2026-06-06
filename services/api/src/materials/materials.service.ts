@@ -260,9 +260,9 @@ export class MaterialsService {
       return {
         pageCount: null,
         pageCountSource: 'unavailable',
-        canPrint: true,
+        canPrint: false,
         warnings: ['SOURCE_FILE_BYTES_UNAVAILABLE'],
-        messages: [{ code: 'SOURCE_FILE_BYTES_UNAVAILABLE', severity: 'warning', text: '暂未读取到文件内容，以实际打印为准' }],
+        messages: [{ code: 'SOURCE_FILE_BYTES_UNAVAILABLE', severity: 'warning', text: '暂未读取到文件内容，请重新上传文件' }],
       }
     }
   }

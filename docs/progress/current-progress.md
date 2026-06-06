@@ -53,11 +53,12 @@
 
 | 文件 | 改动 |
 |------|------|
-| `services/api/src/materials/materials.service.ts` | `inspection` 接入 `StorageService`：图片 MIME（png/jpeg/webp）直接返回 `pageCount=1`；PDF 走轻量字节扫描统计 `/Type /Page`；无法读取或暂不支持的 MIME 返回明确 `warnings`；新增 `canPrint` 与 `messages` 供前端展示可解释体检摘要，不阻塞当前打印流程 |
+| `services/api/src/materials/materials.service.ts` | `inspection` 接入 `StorageService`：图片 MIME（png/jpeg/webp）直接返回 `pageCount=1`；PDF 走轻量字节扫描统计 `/Type /Page`；无法读取或暂不支持的 MIME 返回明确 `warnings`；新增 `canPrint` 与 `messages` 供前端展示可解释体检摘要，可读图片/PDF 继续放行，不可读源文件引导重传 |
 | `services/api/src/materials/materials.module.ts` | 显式引入 `StorageModule`，确保 materials 模块独立装配时也能解析 `StorageService` |
-| `services/api/scripts/verify-materials-processing.ts` | 构造 `MaterialsService` 时注入 `StorageService`；新增匿名图片文件体检断言，确认 `pageCount=1` / `pageCountSource=image_single_page` / `canPrint=true`，并验证返回用户可读状态消息；新增本地对象存储 PDF 字节链路断言，确认轻量页数扫描返回 `pageCount=2` |
+| `services/api/scripts/verify-materials-processing.ts` | 构造 `MaterialsService` 时注入 `StorageService`；新增匿名图片文件体检断言，确认 `pageCount=1` / `pageCountSource=image_single_page` / `canPrint=true`，并验证返回用户可读状态消息；新增本地对象存储 PDF 字节链路断言，确认轻量页数扫描返回 `pageCount=2`；新增不可读 PDF 负向断言，确认 `SOURCE_FILE_BYTES_UNAVAILABLE` 会标记 `canPrint=false` |
 | `apps/kiosk/src/services/api/materials.ts` | mock 模式下的 `inspection` 也返回安全的 `checks` 摘要，便于离线/演示环境展示文件体检摘要 |
-| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 读取 `inspection.result.checks.pageCount`，仅接受 1–2000 的整数，并写回当前 `printMaterialSession.file.pages`；同一 `fileId` 下让 session 中的新页数覆盖 route state 旧值；材料检查页展示文件体检摘要（页数、可继续状态、安全提示），后续 `/print/preview`、`/print/confirm` 均可显示基础页数 |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 读取 `inspection.result.checks.pageCount`，仅接受 1–2000 的整数，并写回当前 `printMaterialSession.file.pages`；同一 `fileId` 下让 session 中的新页数覆盖 route state 旧值；材料检查页展示文件体检摘要（页数、可继续状态、安全提示），`canPrint=false` 时禁用继续并引导重新上传；轮询窗口从约 4 秒放宽到约 30 秒；后续 `/print/preview`、`/print/confirm` 均可显示基础页数 |
+| `apps/kiosk/src/pages/print/printMaterialSession.ts` | sessionStorage 保存文件名时遮挡手机号、邮箱、身份证样式片段，降低公共终端会话态残留文件名 PII 风险 |
 
 **边界：** 本轮仍不是完整材料处理引擎；真实 OCR、清晰度检查、A4 归一化、PII 实际遮挡文件、材料包合并仍属后续 B-2 子任务。
 
@@ -67,7 +68,7 @@
 |------|------|
 | `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
 | `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
-| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增图片体检 `pageCount=1` / `canPrint=true` / `messages` 断言，以及本地 PDF 字节页数断言 |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增图片体检 `pageCount=1` / `canPrint=true` / `messages` 断言、本地 PDF 字节页数断言、不可读 PDF `canPrint=false` 断言 |
 | `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
 | `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
 | `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |

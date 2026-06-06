@@ -7,7 +7,7 @@
  *   raw text, and cross-user reads / decisions are rejected.
  *
  * Run:
- *   pnpm verify:materials-processing
+ *   pnpm --filter @ai-job-print/api verify:materials-processing
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
@@ -239,6 +239,16 @@ async function main() {
     })
     if (anonymousRead.id === anonymousTask.id) pass('Anonymous material task can be queried by id')
     else fail('Anonymous material task query returned wrong task')
+    const unavailableChecks = (anonymousTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      unavailableChecks['canPrint'] === false &&
+      Array.isArray(unavailableChecks['warnings']) &&
+      unavailableChecks['warnings'].includes('SOURCE_FILE_BYTES_UNAVAILABLE')
+    ) {
+      pass('Unavailable PDF bytes are marked not printable')
+    } else {
+      fail(`Expected unavailable PDF to set canPrint=false, got ${JSON.stringify(unavailableChecks)}`)
+    }
 
     const imageInspectionTask = await materials.createTask(
       { kind: 'inspection', sourceFileId: imageFileId, params: { purpose: 'print_check' } },

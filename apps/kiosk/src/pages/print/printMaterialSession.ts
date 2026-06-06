@@ -93,13 +93,20 @@ function optionalNullableString(value: unknown): string | null | undefined {
 
 function sanitizeFile(file: PrintFileState): PrintFileState {
   return {
-    name: file.name,
+    name: sanitizeFileName(file.name),
     size: file.size,
     pages: file.pages,
     fileId: file.fileId,
     fileUrl: file.fileUrl,
     fileMd5: file.fileMd5,
   }
+}
+
+function sanitizeFileName(name: string): string {
+  return name
+    .replace(/([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})/gi, '$1***@$2')
+    .replace(/(?:\+?86[- ]?)?1[3-9]\d{9}/g, (value) => `${value.slice(0, 3)}****${value.slice(-4)}`)
+    .replace(/\d{6}(?:19|20)\d{2}\d{2}\d{2}\d{3}[\dXx]/g, (value) => `${value.slice(0, 6)}********${value.slice(-4)}`)
 }
 
 function toStoredMaterialTask(task: DocumentProcessTaskView | StoredMaterialTask | undefined): StoredMaterialTask | undefined {

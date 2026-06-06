@@ -37,6 +37,8 @@ interface LocationState {
 
 type Stage = 'idle' | 'inspection' | 'pii_scan' | 'review' | 'submitting' | 'done' | 'error'
 type InspectionMessageSeverity = 'info' | 'warning'
+const TASK_POLL_ATTEMPTS = 30
+const TASK_POLL_INTERVAL_MS = 1_000
 
 interface InspectionSummaryView {
   pageCount: number | null
@@ -65,8 +67,8 @@ async function waitForCompletedTask(
   accessToken = task.accessToken,
 ): Promise<DocumentProcessTaskView> {
   let current = task
-  for (let attempt = 0; attempt < 5 && isPendingStatus(current); attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 800))
+  for (let attempt = 0; attempt < TASK_POLL_ATTEMPTS && isPendingStatus(current); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, TASK_POLL_INTERVAL_MS))
     const next = await getMaterialTask(current.id, { token, accessToken })
     current = { ...next, accessToken: next.accessToken ?? accessToken }
   }
@@ -255,6 +257,8 @@ export function PrintMaterialCheckPage() {
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
   const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
   const inspectionSummary = useMemo(() => inspectionSummaryFromTask(inspectionTask), [inspectionTask])
+  const requiresFormatReview = inspectionSummary?.canPrint === false
+  const canContinue = stage === 'review' && allDecided && !requiresFormatReview
   const isWorking = stage === 'inspection' || stage === 'pii_scan' || stage === 'submitting'
 
   const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
@@ -360,7 +364,7 @@ export function PrintMaterialCheckPage() {
   }
 
   const handleContinue = async () => {
-    if (!file || !inspectionTask || !piiTask || !allDecided) return
+    if (!file || !inspectionTask || !piiTask || !allDecided || requiresFormatReview) return
 
     setStage('submitting')
     setError(null)
@@ -521,10 +525,10 @@ export function PrintMaterialCheckPage() {
                     <span
                       className={[
                         'rounded-full px-3 py-1 text-xs font-semibold',
-                        inspectionSummary.canPrint === false ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700',
+                        requiresFormatReview ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700',
                       ].join(' ')}
                     >
-                      {inspectionSummary.canPrint === false ? '需人工确认' : '可继续打印'}
+                      {requiresFormatReview ? '需重新上传' : '可继续打印'}
                     </span>
                   </div>
                   {inspectionSummary.messages.length > 0 && (
@@ -554,9 +558,13 @@ export function PrintMaterialCheckPage() {
                 <Card className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
                   <ShieldCheckIcon className="h-16 w-16 text-green-500" />
                   <div className="text-center">
-                    <p className="text-xl font-semibold text-gray-900">可以继续设置打印参数</p>
+                    <p className="text-xl font-semibold text-gray-900">
+                      {requiresFormatReview ? '请重新上传文件后继续' : '可以继续设置打印参数'}
+                    </p>
                     <p className="mt-2 text-sm text-gray-500">
-                      本次检查未发现需要确认的隐私片段，后续请继续核对打印参数
+                      {requiresFormatReview
+                        ? '材料体检提示当前文件暂不可继续打印，请返回上传页重新选择文件'
+                        : '本次检查未发现需要确认的隐私片段，后续请继续核对打印参数'}
                     </p>
                   </div>
                 </Card>
@@ -660,7 +668,7 @@ export function PrintMaterialCheckPage() {
         <Button
           size="lg"
           className="min-h-[72px] flex-1"
-          disabled={stage !== 'review' || !allDecided}
+          disabled={!canContinue}
           onClick={() => void handleContinue()}
         >
           {stage === 'submitting' ? (
@@ -668,6 +676,8 @@ export function PrintMaterialCheckPage() {
               <LoaderIcon className="h-5 w-5 animate-spin" />
               保存选择中…
             </span>
+          ) : requiresFormatReview ? (
+            '请重新上传文件'
           ) : findings.length > 0 && !allDecided ? (
             '请先完成全部选择'
           ) : (
