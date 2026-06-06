@@ -14,6 +14,10 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
+// 首页卡片统一表面样式：圆角/边框/底色/阴影的单一来源，避免各卡片 ad-hoc 重复；
+// 边框对齐设计系统 neutral 调色板（与共享 <Card> 一致）。保留 rounded-xl 维持首页卡片视觉层级。
+const cardSurface = 'rounded-xl border border-neutral-200 bg-white shadow-sm'
+
 // ── DeviceStatusStrip ─────────────────────────────────────────
 //
 // 首页这条状态带没有 terminalId 上下文（VITE_TERMINAL_ID 仅在打印流程页按需查询），
@@ -86,7 +90,7 @@ function PrimaryServiceCard({
   onAction,
 }: PrimaryServiceCardProps) {
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white px-7 py-6 shadow-sm">
+    <div className={`flex flex-col ${cardSurface} px-7 py-6`}>
       <div className="flex items-start gap-4">
         <div
           className={[
@@ -135,7 +139,7 @@ function SecondaryServiceCard({
     <button
       type="button"
       onClick={onAction}
-      className="flex min-h-[200px] flex-col rounded-xl border border-gray-200 bg-white p-6 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+      className={`flex min-h-[200px] flex-col ${cardSurface} p-6 text-left transition-colors hover:bg-gray-50 active:bg-gray-100`}
     >
       <div className={['flex h-12 w-12 items-center justify-center rounded-lg', iconBg].join(' ')}>
         <Icon className={['h-6 w-6', iconColor].join(' ')} aria-hidden="true" />
@@ -157,7 +161,7 @@ function CampusEntryBar({ onAction }: { onAction: () => void }) {
     <button
       type="button"
       onClick={onAction}
-      className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-5 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+      className={`flex w-full items-center justify-between ${cardSurface} px-6 py-5 text-left transition-colors hover:bg-gray-50 active:bg-gray-100`}
     >
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-cyan-50">
@@ -183,7 +187,7 @@ function RenshiEntryBar({ onAction }: { onAction: () => void }) {
     <button
       type="button"
       onClick={onAction}
-      className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-5 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+      className={`flex w-full items-center justify-between ${cardSurface} px-6 py-5 text-left transition-colors hover:bg-gray-50 active:bg-gray-100`}
     >
       <div className="flex items-center gap-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
@@ -240,7 +244,7 @@ export function HomePage() {
         {/* 更多服务 */}
         <section aria-label="更多服务" className="flex flex-col gap-4">
           <h2 className="text-sm font-medium text-gray-400">更多服务</h2>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <SecondaryServiceCard
               icon={BriefcaseIcon}
               iconBg="bg-blue-50"
@@ -281,7 +285,7 @@ export function HomePage() {
         <button
           type="button"
           onClick={() => navigate('/assistant')}
-          className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 text-left shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 active:bg-primary-100"
+          className={`flex min-h-[56px] w-full items-center gap-3 ${cardSurface} px-5 text-left transition-colors hover:border-primary-200 hover:bg-primary-50 active:bg-primary-100`}
         >
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50">
             <BotIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
