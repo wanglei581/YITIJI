@@ -134,7 +134,7 @@ export function PrintScanHomePage() {
               key={cap.key}
               type="button"
               onClick={() => navigate(cap.to, cap.state ? { state: cap.state } : undefined)}
-              className="flex min-h-[160px] flex-col rounded-xl border border-gray-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50/40 active:bg-primary-100/40"
+              className="flex min-h-[160px] flex-col rounded-xl border border-neutral-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50/40 active:bg-primary-100/40"
             >
               <div className={['flex h-14 w-14 items-center justify-center rounded-xl', cap.iconBg].join(' ')}>
                 <Icon className={['h-7 w-7', cap.iconColor].join(' ')} aria-hidden="true" />

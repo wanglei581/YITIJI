@@ -148,7 +148,7 @@ export function ResumeHomePage() {
       </Card>
 
       {/* 4 个大入口 */}
-      <div className="mt-6 grid grid-cols-2 gap-4">
+      <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {ENTRIES.map((entry) => {
           const Icon = entry.icon
           return (
@@ -160,8 +160,8 @@ export function ResumeHomePage() {
               className={[
                 'flex min-h-[148px] flex-col rounded-xl border bg-white p-5 text-left shadow-sm transition-colors',
                 entry.comingSoon
-                  ? 'cursor-not-allowed border-gray-200 opacity-70'
-                  : 'border-gray-200 hover:border-primary-200 hover:bg-primary-50/40 active:bg-primary-100/40',
+                  ? 'cursor-not-allowed border-neutral-200 opacity-70'
+                  : 'border-neutral-200 hover:border-primary-200 hover:bg-primary-50/40 active:bg-primary-100/40',
               ].join(' ')}
             >
               <div className={['flex h-14 w-14 items-center justify-center rounded-xl', entry.iconBg].join(' ')}>
