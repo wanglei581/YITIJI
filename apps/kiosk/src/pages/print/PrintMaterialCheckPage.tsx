@@ -394,7 +394,9 @@ export function PrintMaterialCheckPage() {
               </div>
               <div className="min-w-0">
                 <p className="break-all text-sm font-semibold text-gray-900">{file.name}</p>
-                <p className="mt-1 text-sm text-gray-500">{file.size}</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  {file.size} · {file.pages === null ? '页数识别中' : `${file.pages} 页`}
+                </p>
               </div>
             </div>
           </Card>

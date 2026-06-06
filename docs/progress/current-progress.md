@@ -56,7 +56,7 @@
 | `services/api/src/materials/materials.service.ts` | `inspection` 接入 `StorageService`：图片 MIME（png/jpeg/webp）直接返回 `pageCount=1`；PDF 走轻量字节扫描统计 `/Type /Page`；无法读取或暂不支持的 MIME 返回明确 `warnings`，不阻塞当前打印流程 |
 | `services/api/src/materials/materials.module.ts` | 显式引入 `StorageModule`，确保 materials 模块独立装配时也能解析 `StorageService` |
 | `services/api/scripts/verify-materials-processing.ts` | 构造 `MaterialsService` 时注入 `StorageService`；新增匿名图片文件体检断言，确认 `pageCount=1` / `pageCountSource=image_single_page` |
-| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 读取 `inspection.result.checks.pageCount`，仅接受 1–2000 的整数，并写回当前 `printMaterialSession.file.pages`；同一 `fileId` 下让 session 中的新页数覆盖 route state 旧值，后续 `/print/preview`、`/print/confirm` 可显示基础页数 |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 读取 `inspection.result.checks.pageCount`，仅接受 1–2000 的整数，并写回当前 `printMaterialSession.file.pages`；同一 `fileId` 下让 session 中的新页数覆盖 route state 旧值，材料检查页、后续 `/print/preview`、`/print/confirm` 均可显示基础页数 |
 
 **边界：** 本轮仍不是完整材料处理引擎；真实 OCR、清晰度检查、A4 归一化、PII 实际遮挡文件、材料包合并仍属后续 B-2 子任务。
 
