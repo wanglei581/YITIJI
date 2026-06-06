@@ -1,7 +1,10 @@
 import { Controller, Post, Get, Param, Body, Query, Req, UseGuards } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
 import { AuditService } from '../audit/audit.service'
+import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { RedisService } from '../common/redis/redis.service'
 import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
@@ -33,6 +36,13 @@ function uaOf(req: ReqLike): string | null {
   return null
 }
 
+function authOf(req: ReqLike): string | undefined {
+  const auth = req.headers.authorization
+  if (typeof auth === 'string') return auth
+  if (Array.isArray(auth)) return auth[0]
+  return undefined
+}
+
 // ============================================================
 // AI Controller
 //
@@ -52,6 +62,8 @@ export class AiController {
     private readonly aiService: AiService,
     private readonly logService: AiLogService,
     private readonly audit: AuditService,
+    private readonly jwt: JwtService,
+    private readonly redis: RedisService,
   ) {}
 
   /**
@@ -66,7 +78,8 @@ export class AiController {
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
-    const result = await this.aiService.submitResumeParse(dto)
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const result = await this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -79,6 +92,7 @@ export class AiController {
         providerName: this.aiService.getProviderName(),
         taskId: result.taskId,
         status: result.status,
+        hasEndUser: Boolean(endUser),
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),

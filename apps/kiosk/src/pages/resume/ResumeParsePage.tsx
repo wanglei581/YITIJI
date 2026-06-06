@@ -8,6 +8,7 @@ import {
   SparklesIcon,
   XCircleIcon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
 import { submitResumeParse } from '../../services/api'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
@@ -29,6 +30,7 @@ const FAIL_REASONS = [
 export function ResumeParsePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
 
   const shouldFail = state?.simulateFailure === true
@@ -51,12 +53,15 @@ export function ResumeParsePage() {
   const navigateSuccess = useCallback(async () => {
     const file = state?.file as { name?: string; format?: string } | undefined
     try {
-      const result = await submitResumeParse({
-        fileId:     typeof state?.fileId === 'string' ? state.fileId : `local-${Date.now()}`,
-        fileName:   file?.name   ?? 'resume.pdf',
-        fileFormat: file?.format ?? 'pdf',
-        source:     (typeof state?.source === 'string' ? state.source : 'upload') as 'upload' | 'scan' | 'manual',
-      })
+      const result = await submitResumeParse(
+        {
+          fileId:     typeof state?.fileId === 'string' ? state.fileId : `local-${Date.now()}`,
+          fileName:   file?.name   ?? 'resume.pdf',
+          fileFormat: file?.format ?? 'pdf',
+          source:     (typeof state?.source === 'string' ? state.source : 'upload') as 'upload' | 'scan' | 'manual',
+        },
+        getToken(),
+      )
       if (cancelRef.current) return
       if (result.status === 'failed') {
         navigateFail(result.failReason ?? 'AI 服务解析失败，请重试')
@@ -69,7 +74,7 @@ export function ResumeParsePage() {
       if (cancelRef.current) return
       navigateFail('AI 服务暂时不可用，请稍后重试')
     }
-  }, [navigate, navigateFail, state])
+  }, [getToken, navigate, navigateFail, state])
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true

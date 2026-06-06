@@ -29,7 +29,7 @@ import { aiHttpAdapter } from './aiHttpAdapter'
 // ──────────────────────────────────────────────────────────────
 
 export interface AiServiceInterface {
-  submitResumeParse(req: ResumeParseRequest): Promise<ResumeParseResponse>
+  submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string): Promise<ResumeParseResponse>
   getResumeOptimize(taskId: string): Promise<ResumeOptimizeResponse>
   chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
@@ -47,8 +47,8 @@ const adapter: AiServiceInterface =
 // ──────────────────────────────────────────────────────────────
 
 /** 提交简历解析任务，返回 taskId 和（mock 模式下的）即时报告 */
-export const submitResumeParse = (req: ResumeParseRequest) =>
-  adapter.submitResumeParse(req)
+export const submitResumeParse = (req: ResumeParseRequest, token?: string | null) =>
+  adapter.submitResumeParse(req, token)
 
 /** 通过 taskId 查询解析结果（用于 http 模式刷新恢复） */
 export const getResumeRecord = (taskId: string) =>

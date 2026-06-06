@@ -89,6 +89,7 @@ export class AiService {
     kind: 'parse' | 'optimize',
     status: string,
     payload: ParseResumeOutput | OptimizeResumeOutput,
+    endUserId?: string | null,
   ): Promise<void> {
     const payloadJson = JSON.stringify(payload)
     const provider = this.provider.name
@@ -97,19 +98,25 @@ export class AiService {
     try {
       await this.prisma.aiResumeResult.upsert({
         where: { taskId_kind: { taskId, kind } },
-        create: { taskId, kind, status, payloadJson, provider, expiresAt },
-        update: { status, payloadJson, provider, expiresAt },
+        create: { taskId, kind, status, payloadJson, provider, expiresAt, endUserId: endUserId ?? null },
+        update: {
+          status,
+          payloadJson,
+          provider,
+          expiresAt,
+          ...(endUserId !== undefined ? { endUserId } : {}),
+        },
       })
     } catch {
       // 持久化失败不应让用户的解析/优化动作失败（结果仍在本次响应里返回）
     }
   }
 
-  async submitResumeParse(input: ParseResumeInput): Promise<ParseResumeOutput> {
+  async submitResumeParse(input: ParseResumeInput, endUserId?: string | null): Promise<ParseResumeOutput> {
     const t0 = Date.now()
     try {
       const result = await this.provider.parseResume(input)
-      await this.persistResult(result.taskId, 'parse', result.status, result)
+      await this.persistResult(result.taskId, 'parse', result.status, result, endUserId ?? null)
       this.logService.record({
         taskId:    result.taskId,
         provider:  this.provider.name,
@@ -173,7 +180,11 @@ export class AiService {
     const t0 = Date.now()
     try {
       const result = await this.provider.optimizeResume(taskId, parseResult.report)
-      await this.persistResult(taskId, 'optimize', result.status, result)
+      const parseOwner = await this.prisma.aiResumeResult.findUnique({
+        where: { taskId_kind: { taskId, kind: 'parse' } },
+        select: { endUserId: true },
+      })
+      await this.persistResult(taskId, 'optimize', result.status, result, parseOwner?.endUserId ?? null)
       this.logService.record({
         taskId,
         provider:  this.provider.name,

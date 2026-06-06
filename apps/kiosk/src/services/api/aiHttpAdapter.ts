@@ -58,14 +58,18 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, token?: string | null): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       credentials: 'include',
       body: JSON.stringify(body),
       signal: ac.signal,
@@ -96,8 +100,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 // ──────────────────────────────────────────────────────────────
 
 export const aiHttpAdapter = {
-  async submitResumeParse(req: ResumeParseRequest): Promise<ResumeParseResponse> {
-    return post<ResumeParseResponse>('/resume/parse', req)
+  async submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse> {
+    return post<ResumeParseResponse>('/resume/parse', req, token)
   },
 
   async getResumeRecord(taskId: string): Promise<ResumeParseResponse> {

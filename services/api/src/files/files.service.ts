@@ -93,6 +93,7 @@ export class FilesService {
     purpose: FilePurpose
     sensitiveLevel?: FileSensitiveLevel
     uploaderId: string | null
+    endUserId?: string | null
   }): Promise<FileUploadResponse> {
     if (args.buffer.length === 0) {
       throw new BadRequestException({
@@ -138,6 +139,7 @@ export class FilesService {
         sizeBytes: args.buffer.length,
         sha256,
         uploaderId: args.uploaderId,
+        endUserId: args.endUserId ?? null,
         purpose: args.purpose,
         sensitiveLevel,
         expiresAt,
@@ -317,6 +319,7 @@ function toMetadata(r: {
   purpose: string
   sensitiveLevel: string
   uploaderId: string | null
+  endUserId: string | null
   expiresAt: Date
   deletedAt: Date | null
   deletedBy: string | null
@@ -332,6 +335,7 @@ function toMetadata(r: {
     purpose: r.purpose as FilePurpose,
     sensitiveLevel: r.sensitiveLevel as FileSensitiveLevel,
     uploaderId: r.uploaderId,
+    endUserId: r.endUserId,
     expiresAt: r.expiresAt.toISOString(),
     deletedAt: r.deletedAt?.toISOString() ?? null,
     deletedBy: r.deletedBy,

@@ -39,6 +39,7 @@ export interface FileMetadata {
   purpose: FilePurpose
   sensitiveLevel: FileSensitiveLevel
   uploaderId: string | null
+  endUserId: string | null
   expiresAt: string
   deletedAt: string | null
   deletedBy: string | null

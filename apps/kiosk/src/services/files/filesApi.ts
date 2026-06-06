@@ -27,6 +27,6 @@ export type KioskUploadResult = FileUploadResponse
  * Kiosk 打印文档上传（匿名，无 JWT）。purpose 固定为通用打印文档 'print_doc'。
  * 需要其它业务 purpose（如简历/证件）时请直接使用 services/api 的 kioskUploadFile。
  */
-export function kioskUploadFile(file: File): Promise<FileUploadResponse> {
-  return kioskUploadFileWithPurpose(file, 'print_doc')
+export function kioskUploadFile(file: File, token?: string | null): Promise<FileUploadResponse> {
+  return kioskUploadFileWithPurpose(file, 'print_doc', token)
 }

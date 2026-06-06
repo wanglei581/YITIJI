@@ -9,13 +9,14 @@ export const filesHttpAdapter = {
    * Kiosk 匿名上传文件到 BE-1。
    * 走 POST /api/v1/files/kiosk-upload(无 JWT)。
    */
-  async kioskUpload(file: File, purpose: FilePurpose): Promise<FileUploadResponse> {
+  async kioskUpload(file: File, purpose: FilePurpose, token?: string | null): Promise<FileUploadResponse> {
     const form = new FormData()
     form.append('file', file, file.name)
     form.append('purpose', purpose)
 
     const res = await fetch(`${API_BASE_URL}/files/kiosk-upload`, {
       method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       body: form,
       credentials: 'include',
     })
