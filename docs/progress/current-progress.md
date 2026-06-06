@@ -45,6 +45,33 @@
 - 最新浏览器手验：`FILE_STORAGE_DRIVER=local PORT=3010` API + 既有 Kiosk dev server `5173`；Chrome 打开 `/print/upload`，选择 `/private/tmp/ai-advisor-kiosk-test.png` 上传成功；进入 `/print/material-check` 自动完成 `inspection` / `pii_scan` 并显示“流程演示 / 不向第三方发送 / 不展示完整原文”；刷新材料检查页后仍恢复文件和检查结果；进入 `/print/preview` 后显示材料检查摘要，刷新后仍恢复；进入 `/print/confirm` 后显示隐私检查摘要且不展示 PII 明细；点击“按以上设置打印”进入 `/print/progress` 并获得真实 `taskId`；提交后直达 `/print/confirm` 显示“未找到文件信息 / 重新上传文件”，确认当前材料会话已清理。
 - 注意：当前默认本地 API `.env` 仍可能为 `StorageService driver=cos`；完整浏览器/一体机手验下一步需用 local storage 或明确测试 COS 环境执行，避免把本地验证文件写入生产 COS。
 
+## Phase B-2：材料体检基础页数识别最小增量（2026-06-07，Codex）
+
+**目标：** 在不引入完整 OCR / PDF 渲染链的前提下，让 `inspection` 返回可用于打印设置的基础页数信息，先解决上传图片在 Kiosk 预览/确认页显示“未知页数”的问题。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/materials/materials.service.ts` | `inspection` 接入 `StorageService`：图片 MIME（png/jpeg/webp）直接返回 `pageCount=1`；PDF 走轻量字节扫描统计 `/Type /Page`；无法读取或暂不支持的 MIME 返回明确 `warnings`，不阻塞当前打印流程 |
+| `services/api/src/materials/materials.module.ts` | 显式引入 `StorageModule`，确保 materials 模块独立装配时也能解析 `StorageService` |
+| `services/api/scripts/verify-materials-processing.ts` | 构造 `MaterialsService` 时注入 `StorageService`；新增匿名图片文件体检断言，确认 `pageCount=1` / `pageCountSource=image_single_page` |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 读取 `inspection.result.checks.pageCount`，仅接受 1–2000 的整数，并写回当前 `printMaterialSession.file.pages`；同一 `fileId` 下让 session 中的新页数覆盖 route state 旧值，后续 `/print/preview`、`/print/confirm` 可显示基础页数 |
+
+**边界：** 本轮仍不是完整材料处理引擎；真实 OCR、清晰度检查、A4 归一化、PII 实际遮挡文件、材料包合并仍属后续 B-2 子任务。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增图片体检页数断言 |
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |
+| `git diff --check` | ✅ 通过 |
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
+import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
 import type { DecidePiiFindingsDto, PiiDecisionAction } from './dto/decide-pii-findings.dto'
 import type {
@@ -49,6 +50,8 @@ type FindingRecord = {
 
 type SourceFileRecord = {
   id: string
+  storageKey: string
+  bucket: string
   filename: string
   mimeType: string
   sizeBytes: number
@@ -63,7 +66,10 @@ type SourceFileRecord = {
 
 @Injectable()
 export class MaterialsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
     const sourceFile = await this.requireUsableSourceFile(dto.sourceFileId)
@@ -74,7 +80,7 @@ export class MaterialsService {
     const requesterMode = requester.kind === 'member' ? 'member' : 'anonymous'
     const accessToken = requesterMode === 'anonymous' ? randomBytes(24).toString('hex') : undefined
     const paramsJson = JSON.stringify(sanitizeParams(dto.params ?? {}, kind))
-    const result = this.initialResult(kind, sourceFile)
+    const result = await this.initialResult(kind, sourceFile)
     const task = await this.prisma.documentProcessTask.create({
       data: {
         kind,
@@ -168,20 +174,24 @@ export class MaterialsService {
     return { deletedTasks: result.count }
   }
 
-  private initialResult(
+  private async initialResult(
     kind: MaterialTaskKind,
     sourceFile: SourceFileRecord,
-  ): { status: MaterialTaskStatus; result: Record<string, unknown> } {
+  ): Promise<{ status: MaterialTaskStatus; result: Record<string, unknown> }> {
     if (kind === 'inspection') {
+      const inspection = await this.inspectSourceFile(sourceFile)
       return {
         status: 'completed',
         result: {
-          mode: 'skeleton',
+          mode: 'basic_inspection',
           checks: {
             filePresent: true,
             mimeType: sourceFile.mimeType,
             sizeBytes: sourceFile.sizeBytes,
             purpose: sourceFile.purpose,
+            pageCount: inspection.pageCount,
+            pageCountSource: inspection.pageCountSource,
+            warnings: inspection.warnings,
           },
         },
       }
@@ -196,6 +206,30 @@ export class MaterialsService {
       return { status: 'completed', result: { mode: 'simulated', findingCount: 0 } }
     }
     return { status: 'pending', result: { mode: 'skeleton', queued: false } }
+  }
+
+  private async inspectSourceFile(sourceFile: SourceFileRecord): Promise<{
+    pageCount: number | null
+    pageCountSource: 'image_single_page' | 'pdf_lightweight_scan' | 'unsupported' | 'unavailable'
+    warnings: string[]
+  }> {
+    if (isSinglePageImage(sourceFile.mimeType)) {
+      return { pageCount: 1, pageCountSource: 'image_single_page', warnings: [] }
+    }
+    if (sourceFile.mimeType !== 'application/pdf') {
+      return { pageCount: null, pageCountSource: 'unsupported', warnings: ['PAGE_COUNT_UNSUPPORTED_MIME'] }
+    }
+    try {
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
+      const pageCount = countPdfPages(buffer)
+      return {
+        pageCount,
+        pageCountSource: 'pdf_lightweight_scan',
+        warnings: pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : [],
+      }
+    } catch {
+      return { pageCount: null, pageCountSource: 'unavailable', warnings: ['SOURCE_FILE_BYTES_UNAVAILABLE'] }
+    }
   }
 
   private async requireUsableSourceFile(sourceFileId: string): Promise<SourceFileRecord> {
@@ -357,6 +391,17 @@ function allowedParamKeys(kind: MaterialTaskKind): string[] {
 function readStringParam(params: Record<string, unknown> | undefined, key: string): string | undefined {
   const value = params?.[key]
   return typeof value === 'string' ? value : undefined
+}
+
+function isSinglePageImage(mimeType: string): boolean {
+  return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp'
+}
+
+function countPdfPages(buffer: Buffer): number | null {
+  const text = buffer.toString('latin1')
+  const matches = text.match(/\/Type\s*\/Page\b/g)
+  if (!matches?.length) return null
+  return matches.length
 }
 
 function limitSnippet(value: string): string {

@@ -74,6 +74,20 @@ function assertTaskReady(task: DocumentProcessTaskView, label: string): void {
   throw new Error(`${label}仍在处理中，请稍后重试`)
 }
 
+function pageCountFromInspection(task: DocumentProcessTaskView): number | null {
+  const checks = task.result?.['checks']
+  if (!checks || typeof checks !== 'object' || Array.isArray(checks)) return null
+  const pageCount = (checks as Record<string, unknown>)['pageCount']
+  if (typeof pageCount !== 'number' || !Number.isInteger(pageCount)) return null
+  return pageCount > 0 && pageCount <= 2000 ? pageCount : null
+}
+
+function applyDetectedPageCount(file: PrintFileState, inspection: DocumentProcessTaskView): PrintFileState {
+  const pageCount = pageCountFromInspection(inspection)
+  if (!pageCount || file.pages === pageCount) return file
+  return { ...file, pages: pageCount }
+}
+
 function maskSnippet(type: string, snippet: string | null): string {
   if (!snippet) return '未提供片段'
   const value = snippet.trim()
@@ -172,7 +186,11 @@ export function PrintMaterialCheckPage() {
   const { getToken } = useAuth()
   const state = location.state as LocationState | null
   const [session, setSession] = useState<PrintMaterialSession | null>(() => readPrintMaterialSession())
-  const file = state?.file ?? session?.file
+  const stateFile = state?.file
+  const sessionFile = session?.file
+  const file = sessionFile?.fileId && stateFile?.fileId && sessionFile.fileId === stateFile.fileId
+    ? { ...stateFile, ...sessionFile }
+    : stateFile ?? sessionFile
 
   const [stage, setStage] = useState<Stage>('idle')
   const [inspectionTask, setInspectionTask] = useState<DocumentProcessTaskView | null>(null)
@@ -188,8 +206,9 @@ export function PrintMaterialCheckPage() {
   const isWorking = stage === 'inspection' || stage === 'pii_scan' || stage === 'submitting'
 
   const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
-    if (!file) return null
-    const next = patchPrintMaterialSession({ file, ...patch })
+    const nextFile = patch.file ?? file
+    if (!nextFile) return null
+    const next = patchPrintMaterialSession({ ...patch, file: nextFile })
     setSession(next)
     return next
   }
@@ -230,8 +249,9 @@ export function PrintMaterialCheckPage() {
       persistSession({ inspectionTask: inspection })
       const readyInspection = await waitForCompletedTask(inspection, token, inspection.accessToken)
       assertTaskReady(readyInspection, '文件体检')
+      const checkedFile = applyDetectedPageCount(file, readyInspection)
       setInspectionTask(readyInspection)
-      persistSession({ inspectionTask: readyInspection })
+      persistSession({ file: checkedFile, inspectionTask: readyInspection })
 
       setStage('pii_scan')
       const storedPii = storedSession?.piiTask
@@ -246,12 +266,12 @@ export function PrintMaterialCheckPage() {
           params: { scanScope: 'print_preview' },
         }, token)
       }
-      persistSession({ inspectionTask: readyInspection, piiTask: pii })
+      persistSession({ file: checkedFile, inspectionTask: readyInspection, piiTask: pii })
       const readyPii = await waitForCompletedTask(pii, token, pii.accessToken)
       assertTaskReady(readyPii, '隐私检查')
       setPiiTask(readyPii)
       setDecisions(Object.fromEntries((readyPii.piiFindings ?? []).map((finding) => [finding.id, finding.action])))
-      persistSession({ inspectionTask: readyInspection, piiTask: readyPii })
+      persistSession({ file: checkedFile, inspectionTask: readyInspection, piiTask: readyPii })
       setStage('review')
     } catch (err) {
       if (err instanceof ApiHttpError && [403, 404, 410].includes(err.status)) {

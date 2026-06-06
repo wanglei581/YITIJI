@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto'
 import { ForbiddenException, GoneException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MaterialsService } from '../src/materials/materials.service'
+import { StorageService } from '../src/storage/storage.service'
 
 function pass(message: string) {
   console.log(`  PASS ${message}`)
@@ -54,13 +55,16 @@ async function main() {
   console.log('\n=== Phase A-2 materials document-processing verification ===')
   const prisma = new PrismaService()
   await prisma.onModuleInit()
-  const materials = new MaterialsService(prisma)
+  const storage = new StorageService()
+  const materials = new MaterialsService(prisma, storage)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const ownerId = `eu_mat_owner_${suffix}`
   const otherId = `eu_mat_other_${suffix}`
   const ownedFileId = `file_mat_owned_${suffix}`
   const anonymousFileId = `file_mat_anon_${suffix}`
+  const imageFileId = `file_mat_image_${suffix}`
+  const testFileIds = [ownedFileId, anonymousFileId, imageFileId]
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
   const textSample = '请联系 13800138000 或 zhangsan@example.com 领取打印材料。'
@@ -74,9 +78,9 @@ async function main() {
   }
 
   try {
-    await prisma.piiFinding.deleteMany({ where: { task: { sourceFileId: { in: [ownedFileId, anonymousFileId] } } } })
-    await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: [ownedFileId, anonymousFileId] } } })
-    await prisma.fileObject.deleteMany({ where: { id: { in: [ownedFileId, anonymousFileId] } } })
+    await prisma.piiFinding.deleteMany({ where: { task: { sourceFileId: { in: testFileIds } } } })
+    await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: testFileIds } } })
+    await prisma.fileObject.deleteMany({ where: { id: { in: testFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [ownerId, otherId] } } })
 
     await prisma.endUser.createMany({
@@ -111,6 +115,22 @@ async function main() {
         mimeType: 'application/pdf',
         sizeBytes: 128,
         sha256: 'd'.repeat(64),
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    await prisma.fileObject.create({
+      data: {
+        id: imageFileId,
+        storageKey: `verify/materials/${imageFileId}.png`,
+        filename: 'anonymous-print-image.png',
+        mimeType: 'image/png',
+        sizeBytes: 64,
+        sha256: 'e'.repeat(64),
         purpose: 'print_doc',
         sensitiveLevel: 'normal',
         expiresAt,
@@ -197,6 +217,17 @@ async function main() {
     if (anonymousRead.id === anonymousTask.id) pass('Anonymous material task can be queried by id')
     else fail('Anonymous material task query returned wrong task')
 
+    const imageInspectionTask = await materials.createTask(
+      { kind: 'inspection', sourceFileId: imageFileId, params: { purpose: 'print_check' } },
+      { kind: 'anonymous' },
+    )
+    const imageChecks = (imageInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (imageChecks['pageCount'] === 1 && imageChecks['pageCountSource'] === 'image_single_page') {
+      pass('Image inspection infers a single printable page')
+    } else {
+      fail(`Image inspection expected pageCount=1, got ${JSON.stringify(imageChecks)}`)
+    }
+
     await prisma.documentProcessTask.update({
       where: { id: anonymousTask.id },
       data: { expiresAt: new Date(Date.now() - 60_000) },
@@ -208,9 +239,9 @@ async function main() {
     if (cleanup.deletedTasks >= 1) pass('Expired material tasks are cleaned up')
     else fail('Expected cleanup to delete at least one expired material task')
   } finally {
-    await prisma.piiFinding.deleteMany({ where: { task: { sourceFileId: { in: [ownedFileId, anonymousFileId] } } } })
-    await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: [ownedFileId, anonymousFileId] } } })
-    await prisma.fileObject.deleteMany({ where: { id: { in: [ownedFileId, anonymousFileId] } } })
+    await prisma.piiFinding.deleteMany({ where: { task: { sourceFileId: { in: testFileIds } } } })
+    await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: testFileIds } } })
+    await prisma.fileObject.deleteMany({ where: { id: { in: testFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [ownerId, otherId] } } })
     await prisma.onModuleDestroy()
   }
