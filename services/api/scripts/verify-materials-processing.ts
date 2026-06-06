@@ -15,6 +15,7 @@ import { ForbiddenException, GoneException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MaterialsService } from '../src/materials/materials.service'
 import { StorageService } from '../src/storage/storage.service'
+import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/storage.interface'
 
 function pass(message: string) {
   console.log(`  PASS ${message}`)
@@ -64,7 +65,9 @@ async function main() {
   const ownedFileId = `file_mat_owned_${suffix}`
   const anonymousFileId = `file_mat_anon_${suffix}`
   const imageFileId = `file_mat_image_${suffix}`
-  const testFileIds = [ownedFileId, anonymousFileId, imageFileId]
+  const pdfFileId = `file_mat_pdf_${suffix}`
+  const testFileIds = [ownedFileId, anonymousFileId, imageFileId, pdfFileId]
+  const pdfObjectKey = `verify/materials/${pdfFileId}.pdf`
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
   const textSample = '请联系 13800138000 或 zhangsan@example.com 领取打印材料。'
@@ -131,6 +134,26 @@ async function main() {
         mimeType: 'image/png',
         sizeBytes: 64,
         sha256: 'e'.repeat(64),
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n2 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
+    const pdfPut = await storage.putObject(pdfObjectKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: pdfFileId,
+        storageKey: pdfObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'anonymous-print-two-pages.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfPut.sizeBytes,
+        sha256: pdfPut.sha256,
         purpose: 'print_doc',
         sensitiveLevel: 'normal',
         expiresAt,
@@ -237,6 +260,21 @@ async function main() {
       fail(`Image inspection expected status messages, got ${JSON.stringify(imageChecks)}`)
     }
 
+    const pdfInspectionTask = await materials.createTask(
+      { kind: 'inspection', sourceFileId: pdfFileId, params: { purpose: 'print_check' } },
+      { kind: 'anonymous' },
+    )
+    const pdfChecks = (pdfInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      pdfChecks['pageCount'] === 2 &&
+      pdfChecks['pageCountSource'] === 'pdf_lightweight_scan' &&
+      pdfChecks['canPrint'] === true
+    ) {
+      pass('PDF inspection reads local object bytes and infers page count')
+    } else {
+      fail(`PDF inspection expected pageCount=2 and canPrint=true, got ${JSON.stringify(pdfChecks)}`)
+    }
+
     await prisma.documentProcessTask.update({
       where: { id: anonymousTask.id },
       data: { expiresAt: new Date(Date.now() - 60_000) },
@@ -252,6 +290,7 @@ async function main() {
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: testFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: testFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [ownerId, otherId] } } })
+    await storage.deleteObject(pdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 
