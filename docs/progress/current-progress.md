@@ -5,6 +5,25 @@
 
 ---
 
+## 阶段收口基线核查（2026-06-06，Claude）
+
+**结论：当前 `main`（`6ac1ac4`）已是「可开新功能」的干净基线。** 本次为只读核查（未改业务代码），结果如下：
+
+| 维度 | 结果 |
+|------|------|
+| Git 基线 | `local main == origin/main == 6ac1ac4`；`git branch --merged main` 仅 `main`；origin/main 无已合并旧 head 残留。当前工作树停在活跃 WIP 分支 `feature/screensaver-external-video-v2`（+1 additive commit `99c3711`，对应下一步候选 B），工作树干净、与远端同步 |
+| 服务可运行 | API 启动正常（`driver=cos` + 真实 COS 凭证下 `StorageService` 构造通过、DB 连接 `file:./prisma/dev.db`、全路由 mapped）；Kiosk(5173)/Admin(5174) dev server 正常返回应用壳；Redis(6379) 在线。注：本地 DB 为 SQLite dev.db，无需 Postgres(5432) |
+| 接口冒烟 | `GET /api/v1/jobs`、`/job-fairs` → 200 真实数据（含 `sourceOrgId/externalId/sourceName/sourceUrl/syncTime` 第三方来源字段）；`GET /terminals/:id/screensaver` → 200（未配置终端返回 `enabled:false`，符合预期） |
+| 核心冒烟 | Admin 登录 `admin/admin` → 201 + JWT（登录路由有 `@Throttle 5/60s` 防爆破）；带令牌访问 `admin/ad-assets`、`admin/ad-playlists`、`admin/screensaver/terminals`、`admin/terminals`、`admin/printers` 全部 200 |
+| 存储配置一致 | 根 `.env.example` / `services/api/.env.example` / `docs/api/cos-object-storage.md` 三处 `FILE_STORAGE_DRIVER` + `TENCENT_COS_*` 变量名完全一致；bucket/region 填值处均为 `yitiji-prod-private-1257025684` / `ap-guangzhou`；local fallback 明确；`.env` 未入库、追踪文件无真实密钥 |
+| 合规边界 | 代码内无「一键投递 / 平台投递 / 企业收简历 / 候选人管理 / 面试邀约 / Offer 管理」等违规功能（仅出现在禁词清单 / 禁用枚举 / 注释 / 合规横幅）；岗位/招聘会仍为第三方来源入口，按钮用「去来源平台投递 / 扫码投递」+ 外部 `sourceUrl` |
+
+**待人工手验（自动化已覆盖字节链路，浏览器点检需运行栈）：** Admin 浏览器上传宣传屏图/视频、Kiosk `/screensaver` 真机播放。下一步候选见 [next-tasks.md](./next-tasks.md) §下一步候选（A/B/C）。
+
+> ⚠️ 上线前仍需：生产显式 `FILE_STORAGE_DRIVER=cos` + 4 项 COS 变量；**轮换 CAM 子用户密钥**（配置时曾在终端回显）；PostgreSQL 迁移（dev.db 现有 drift）。详见 next-tasks.md 生产部署清单。
+
+---
+
 ## 腾讯云 COS 对象存储接入（2026-06-06，Claude）
 
 **背景：** 把云端文件存储从本地 FS 升级为可切换腾讯云 COS（私有桶 `yitiji-prod-private-1257025684` / `ap-guangzhou`），用于上传、下载、预览、持久化。统一私有桶（不按端拆桶），靠 objectKey 前缀 + `FileObject` 记录分类授权。分支 `feature/cos-storage-integration`（基于 main `f807b75`）。详见 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。
