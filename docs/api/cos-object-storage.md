@@ -42,6 +42,15 @@ TENCENT_COS_SIGN_URL_EXPIRES_SECONDS=1800
 - 即使 `driver=local`，只要四项齐全也会构造 COS 后端，便于读回历史落 COS 的文件。
 - 本地 dev 不配 COS 也能跑（`driver=local`），文件落 `FILE_STORAGE_DIR`。
 
+> ⚠️ **生产部署必做（上线风险点）**
+> 生产环境必须**显式**设置 `FILE_STORAGE_DRIVER=cos`，并同时配置以下 4 个变量：
+> `TENCENT_COS_SECRET_ID`、`TENCENT_COS_SECRET_KEY`、`TENCENT_COS_BUCKET`、`TENCENT_COS_REGION`。
+>
+> **若漏设 `FILE_STORAGE_DRIVER`，API 不会报错,而是按默认 `local` 使用本地 FS——文件不会上传到 COS。**
+> 这是一个**静默回落**的上线风险:服务照常运行、无任何报错,但所有上传只落在那台服务器的本地磁盘,
+> 换机 / 扩容 / 重建即丢失,且不具备 COS 的持久化与签名分发。部署后请用启动日志确认
+> `StorageService driver=cos ... cosAvailable=true`。
+
 ---
 
 ## 3. objectKey 分类规则
