@@ -21,17 +21,18 @@ import type {
   PrintQuality,
   PrintScale,
 } from '@ai-job-print/shared'
+import {
+  patchPrintMaterialSession,
+  readPrintMaterialSession,
+  type MaterialCheckSummary,
+  type PrintFileState,
+} from './printMaterialSession'
 
-interface PrintFile {
-  name:     string
-  size:     string
-  pages:    number
-  fileUrl?: string
-  fileMd5?: string
-}
+type PrintFile = PrintFileState
 
 interface LocationState {
   file: PrintFile
+  materialCheck?: MaterialCheckSummary
 }
 
 // 打印机离线时的默认状态（显示"打印机离线"警告并阻止打印）
@@ -90,6 +91,10 @@ function usePrinterStatus(): { printerName: string; printer: PrinterStatus; load
 
 const PRICE_BW = 0.2
 const PRICE_COLOR = 0.5
+
+function formatPageCount(pages: number | null): string {
+  return pages === null ? '页数待识别' : `共 ${pages} 页`
+}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -156,25 +161,33 @@ export function PrintPreviewPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const locationState = location.state as LocationState | null
+  const restoredSession = useMemo(() => readPrintMaterialSession(), [])
 
   // Use a placeholder when state is missing — hooks must always run before any early return
-  const EMPTY_FILE: PrintFile = { name: '', size: '', pages: 0 }
-  const file = locationState?.file ?? EMPTY_FILE
+  const EMPTY_FILE: PrintFile = { name: '', size: '', pages: null }
+  const file = locationState?.file ?? restoredSession?.file ?? EMPTY_FILE
+  const materialCheck = locationState?.materialCheck ?? restoredSession?.materialCheck
+  const restoredPrintParams = restoredSession?.printParams
+  const effectivePages = file.pages ?? 1
 
   const { printerName, printer, loading: printerLoading } = usePrinterStatus()
 
   // ── Parameter state ─────────────────────────────────────────────────────────
-  const [copies, setCopies] = useState(1)
-  const [colorMode, setColorMode] = useState<ColorMode>('black_white')
-  const [duplex, setDuplex] = useState<DuplexMode>('simplex')
-  const [orientation, setOrientation] = useState<PrintOrientation>('auto')
-  const [scale, setScale] = useState<PrintScale>('fit')
-  const [pageRange, setPageRange] = useState<'all' | 'custom'>('all')
+  const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
+  const [colorMode, setColorMode] = useState<ColorMode>(restoredPrintParams?.colorMode ?? 'black_white')
+  const [duplex, setDuplex] = useState<DuplexMode>(restoredPrintParams?.duplex ?? 'simplex')
+  const [orientation, setOrientation] = useState<PrintOrientation>(restoredPrintParams?.orientation ?? 'auto')
+  const [scale, setScale] = useState<PrintScale>(restoredPrintParams?.scale ?? 'fit')
+  const [pageRange, setPageRange] = useState<'all' | 'custom'>(
+    restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? 'custom' : 'all',
+  )
   // 收口：quality / pagesPerSheet 当前 Terminal Agent 不生效，暂不暴露 UI 控件，
   // 固定为安全默认值随参数上送（后端仍做枚举校验）。后续真机验证后再决定是否开放。
   const quality: PrintQuality = 'standard'
   const pagesPerSheet: PagesPerSheet = 1
-  const [customRange, setCustomRange] = useState('')
+  const [customRange, setCustomRange] = useState(
+    restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? restoredPrintParams.pageRange : '',
+  )
   const [rangeError, setRangeError] = useState(false)
 
   const colorTonerLow =
@@ -197,7 +210,7 @@ export function PrintPreviewPage() {
         level: 'warn',
         text: '彩色墨粉不足，彩印效果可能不理想，建议改用黑白打印',
       })
-    if (file.pages > 8 && duplex === 'simplex')
+    if (file.pages !== null && file.pages > 8 && duplex === 'simplex')
       w.push({
         id: 'duplex-hint',
         level: 'info',
@@ -210,11 +223,11 @@ export function PrintPreviewPage() {
 
   // ── Usage estimate ──────────────────────────────────────────────────────────
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
-    const facesPerCopy = Math.ceil(file.pages / pagesPerSheet)
+    const facesPerCopy = Math.ceil(effectivePages / pagesPerSheet)
     const tf = facesPerCopy * copies
     const su = duplex === 'simplex' ? tf : Math.ceil(tf / 2)
     return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
-  }, [file.pages, pagesPerSheet, copies, duplex])
+  }, [effectivePages, pagesPerSheet, copies, duplex])
 
   const pricePerFace = colorMode === 'color' ? PRICE_COLOR : PRICE_BW
   const totalPrice = (totalFaces * pricePerFace).toFixed(2)
@@ -236,11 +249,12 @@ export function PrintPreviewPage() {
       scale,
       pagesPerSheet,
     }
-    navigate('/print/confirm', { state: { file, params } })
+    patchPrintMaterialSession({ file, materialCheck, printParams: params })
+    navigate('/print/confirm', { state: { file, params, materialCheck } })
   }
 
   // Guard: direct URL access without file state — all hooks have already run above
-  if (!locationState?.file) {
+  if (!locationState?.file && !restoredSession?.file) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
@@ -279,8 +293,13 @@ export function PrintPreviewPage() {
             </div>
           </div>
           <p className="text-center text-sm text-gray-500">
-            共 {file.pages} 页 · {file.size}
+            {formatPageCount(file.pages)} · {file.size}
           </p>
+          {materialCheck && (
+            <div className="rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-center text-xs font-medium text-green-700">
+              {materialCheck.mode === 'demo' ? '材料检查流程演示完成' : '已完成隐私检查'} · 遮挡 {materialCheck.redactedCount} 项
+            </div>
+          )}
         </div>
 
         {/* ── Right: params (scrollable) ──────────────────────────────────── */}
@@ -474,7 +493,9 @@ export function PrintPreviewPage() {
           <Card className="p-5">
             <div className="grid grid-cols-2 gap-y-2.5 text-sm">
               <span className="text-gray-500">文件页数</span>
-              <span className="text-right font-medium text-gray-900">{file.pages} 页</span>
+              <span className="text-right font-medium text-gray-900">
+                {file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`}
+              </span>
 
               <span className="text-gray-500">打印份数</span>
               <span className="text-right font-medium text-gray-900">{copies} 份</span>

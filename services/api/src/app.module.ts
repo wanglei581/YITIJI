@@ -10,6 +10,7 @@ import { FilesModule } from './files/files.module'
 import { JobsModule } from './jobs/jobs.module'
 import { JobSyncModule } from './job-sync/job-sync.module'
 import { MemberAuthModule } from './member-auth/member-auth.module'
+import { MaterialsModule } from './materials/materials.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
@@ -55,6 +56,7 @@ const redisUrl = process.env['REDIS_URL']
     AuditModule,
     AuthModule,
     MemberAuthModule,
+    MaterialsModule,
     AiModule,
     FilesModule,
     JobsModule,

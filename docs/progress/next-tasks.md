@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-06（腾讯云 COS 对象存储接入已完成代码 + 静态/E2E 验证）
+> 最后更新：2026-06-07（AI求职材料中心 B-1 Kiosk session 恢复 + 隐私收紧已补，待 local/test-COS 浏览器 / 真机手验）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -24,7 +24,7 @@
 ### C. 新功能开发（在干净 main 上起新分支）
 
 - 从 `6ac1ac4` 起新 `feature/*` 分支。优先级参考下方既有 P0/P1：
-  - AI求职材料中心 Phase A-2（`materials/document-processing`：`DocumentProcessTask`/`PiiFinding` 骨架）→ Phase B Kiosk 上传体检 + PII 检查闭环。
+  - AI求职材料中心 Phase B-1 Kiosk 上传体检 + PII 检查最小闭环（Phase A-2 `materials/document-processing` 后端骨架 + 匿名 token / 过期清理 / params 白名单安全收口已完成）。
   - Excel 字段映射 service 接入收尾（注：T1/W4 已大部完成，剩 CLAUDE.md §16/§18 过时描述校正）。
   - 真实 AI provider 接通（持久化层已就绪，缺外部凭证）。
 - 合规红线不变：不做站内投递 / 企业收简历 / 候选人筛选 / 面试邀约 / Offer。
@@ -91,11 +91,25 @@
 **推荐执行顺序：**
 
 1. ✅ **Phase A-1 资产归属底座**：`EndUser` 与 `FileObject` / `AiResumeResult` / `PrintTask` 已建立可空关系；Kiosk 登录态上传、AI 解析、打印任务会带内存 token 绑定本人；匿名流程继续可用。详见 [current-progress.md](./current-progress.md) §Phase A-1。
-2. 🔄 **Phase A-2 材料处理任务骨架**：新增 `materials/document-processing` 域，先落 `DocumentProcessTask` / `PiiFinding` 基础模型和状态 API。
-3. ⏳ **Phase B Kiosk 可用闭环**：上传体检 → PII 检查 → 打印参数 → 确认打印；一体机完成真实可用链路。
-4. ⏳ **Phase C Admin 运营闭环**：异常事件时间线、粗粒度终端推荐、任务改派、暂停接单、维护备注。
-5. ⏳ **Phase D 合规后的简历增强**：按岗位方向优化简历 + 模板库；必须使用“目标岗位方向/意向城市/自荐信”等改造文案，不出现站内投递语义。
-6. ⏳ **Phase E 校园支付场景**：学生免费/校园卡/退款/对账；必须先补真实订单域，不能堆在 mock 订单页。
+2. ✅ **Phase A-2 材料处理任务骨架 + 安全收口**：已新增 `materials/document-processing` 域，落 `DocumentProcessTask` / `PiiFinding` 基础模型和状态 API；匿名任务必须携带一次性访问 token；过期任务读取拒绝并支持 cleanup；`paramsJson` 按任务 kind 白名单落库；`verify:materials-processing` 已覆盖。详见 [current-progress.md](./current-progress.md) §Phase A-2。
+3. ✅ **Phase B-1 Kiosk 最小可用闭环（代码接线 + session 恢复 + 隐私收紧完成，待浏览器/真机验证）**：上传体检 → PII 检查 → 打印参数 → 确认打印；一体机完成“上传 / 检查 / 确认 / 打印”的真实可用链路。
+   - Kiosk：在现有 `AI简历服务` / `打印扫描` 流程中插入材料体检页与 PII 检查页，不新增底部 Tab。
+   - API：Kiosk 调 `POST /materials/tasks` 创建 `inspection` 与 `pii_scan` 任务；匿名链路保存一次性 `accessToken` 到当前页面态/会话态，不写入长期本地存储。
+   - Session：`sessionStorage` 只保存文件必要字段、任务 `id/status/accessToken`、隐私检查摘要和打印参数；不保存原文、`params/result`、`piiFindings[].snippet`。
+   - UI：PII 命中项只展示类型、片段和建议动作，用户选择 `保留` / `遮挡`；检查提示必须写明“仅用于本次打印前确认，不向第三方发送”。
+   - 验收：会员文件只能本人访问；匿名任务无 token/错 token 拒绝；刷新或返回后能恢复当前任务；打印确认页不出现投递、推荐企业、候选人等招聘闭环语义。
+4. 🔄 **Phase B-1 验证收尾（下一步优先）**：浏览器 HTTP 模式和一体机真机触控手验。
+   - 当前 `.env` 如为 `FILE_STORAGE_DRIVER=cos`，先切到 local 存储或使用明确的测试 COS 桶/前缀，避免把本地测试文件写入生产 COS。
+   - 跑通 `上传 -> 打印前材料检查 -> 打印设置 -> 确认打印`。
+   - 确认 `/print/material-check` 不被待机宣传屏打断。
+   - 确认真实 API 模式下匿名 `accessToken` 查询 / 决策生效。
+   - 手验刷新 / 返回后的当前任务恢复：不得重复创建 `inspection` / `pii_scan`，不得丢失 `fileId` / `accessToken` / 隐私摘要 / 打印参数。
+   - 手验提交打印或待机进入宣传屏后，`sessionStorage` 中不得残留上一位用户的材料任务上下文。
+   - 发现 UI 拥挤、文案越界或 token 恢复问题后再修。
+5. ⏳ **Phase B-2 真实材料处理**：接入真实 OCR / 文档页数识别 / A4 归一化 / PII 遮挡 / 材料包合并。AI 只输出结构化 JSON 与建议，最终 DOCX/PDF 由模板渲染链生成。
+6. ⏳ **Phase C Admin 运营闭环**：异常事件时间线、粗粒度终端推荐、任务改派、暂停接单、维护备注。
+7. ⏳ **Phase D 合规后的简历增强**：按岗位方向优化简历 + 模板库；必须使用“目标岗位方向/意向城市/自荐信”等改造文案，不出现站内投递语义。
+8. ⏳ **Phase E 校园支付场景**：学生免费/校园卡/退款/对账；必须先补真实订单域，不能堆在 mock 订单页。
 
 **明确暂缓：**
 

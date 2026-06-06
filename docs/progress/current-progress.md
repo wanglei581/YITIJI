@@ -1,7 +1,49 @@
 # 当前开发进度
 
-> 最后更新：2026-06-06
+> 最后更新：2026-06-07
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
+
+**目标：** 在 Kiosk 打印上传后插入最小材料检查闭环：文件体检 `inspection` → 隐私片段检查 `pii_scan` → 用户逐项选择保留/遮挡 → 进入现有打印参数与确认流程。仅做前端接线，不改 `services/api` 后端骨架，不改变核心打印提交逻辑。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/services/api/materials.ts` | 新增 materials API service：`createMaterialTask` / `getMaterialTask` / `decidePiiFindings`；http 模式走真实 `/api/v1/materials/*` + ApiResponse envelope 解析；会员带 Authorization；匿名任务后续请求带 `accessToken` query + `x-material-task-token`；mock 模式仅返回无命中流程演示 |
+| `apps/kiosk/src/pages/print/printMaterialSession.ts` | 新增当前打印材料检查会话态：只保存文件必要字段、材料任务 `id/status/accessToken`、隐私检查摘要和打印参数；不保存原文、`params/result`、`piiFindings[].snippet` |
+| `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | 上传成功后保留 `fileId`，写入当前会话，下一步跳转 `/print/material-check`，不再直接进 `/print/preview`；新文件/删除文件时清理旧会话 |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 新增触控屏材料检查页：大按钮、loading/error/retry；使用 `useBusyLock(true)`；顺序创建 `inspection` 与 `pii_scan`；PII 仅展示类型、遮罩片段、建议；默认 pending 不允许继续；全部选择后提交 decisions；提示“仅用于本次打印前确认，不向第三方发送”；后端返回 `mock` / `skeleton` / `simulated` 时显示为流程演示 |
+| `apps/kiosk/src/pages/print/PrintPreviewPage.tsx` | 透传 `materialCheck` state 到确认页，不改变打印参数逻辑；刷新/返回时从会话恢复文件、隐私检查摘要和打印参数 |
+| `apps/kiosk/src/pages/print/PrintConfirmPage.tsx` | 展示简短“隐私检查摘要”（已检查/流程演示、遮挡 N 项、保留 N 项），不展示 PII 明细表；提交进入打印进度后清理当前材料检查会话 |
+| `apps/kiosk/src/hooks/useScreensaverController.ts` | 待机进入宣传屏前清理已放弃的材料检查会话，避免公共终端残留 |
+| `apps/kiosk/src/routes/index.tsx`、`apps/kiosk/src/services/api/index.ts` | 注册 `/print/material-check` 路由并导出 service |
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| 浏览器点检：`/print/material-check` 直达空态 | ✅ 显示“未找到文件信息 / 重新上传文件”；无招聘闭环禁词 |
+| 浏览器点检：临时 `API:3011(FILE_STORAGE_DRIVER=local)` + `Kiosk:5176` | ✅ 上传测试图片 → 材料检查完成 → 显示“流程演示 / 不展示完整原文 / 不向第三方发送” → 继续进入 `/print/preview`；无招聘闭环禁词 |
+
+**遗留：** 后端 Phase A-2 当前仍是骨架/模拟处理，`pii_scan` 仅基于文件名或后端允许的样例参数产生少量手机号/邮箱命中；真实 OCR、文档页数识别、A4 归一化、实际遮挡产物仍属 Phase B-2。
+
+**Codex 审查纠偏：** 初版前端在 http 模式下只把 `mock` 标为流程演示，可能把后端当前 `skeleton` / `simulated` 结果误展示成完整检查。已修正为三类模式均展示“流程演示”，确认页同步使用诚实文案。
+
+**2026-06-07 补充收口：**
+
+- VS Code Claude 只读复核确认 Kiosk session 恢复主链路已达成：上传后写会话、`material-check` 无 route state 可恢复、刷新后用已存 `taskId/accessToken` 查询既有任务、`preview/confirm` 可恢复摘要和打印参数。
+- Codex 按复核风险完成隐私收紧：`sessionStorage` 不再持久化完整 `DocumentProcessTaskView`，只保存任务元数据；`piiFindings[].snippet` 仅在当前页面内存展示，刷新后从后端重新查询。
+- 公共终端残留收口：提交打印进入 `/print/progress` 前清理当前会话；无操作进入待机宣传屏前也清理已放弃会话。
+- 最新静态验证：`pnpm --filter @ai-job-print/kiosk typecheck` ✅；`pnpm --filter @ai-job-print/kiosk lint` ✅（仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）；`pnpm --filter @ai-job-print/kiosk build` ✅（仅既有 chunk-size warning）；`pnpm --filter @ai-job-print/api verify:materials-processing` ✅；`git diff --check` ✅。
+- 最新 HTTP 验证：本地 API 3010 只读可达 `/api/v1/jobs` → 200；`POST /api/v1/materials/tasks` 使用不存在 `sourceFileId` 返回受控 `SOURCE_FILE_NOT_FOUND`。另用 `FILE_STORAGE_DRIVER=local PORT=3012` 临时启动 API，上传仓库测试图片 `apps/kiosk/public/assets/ai-advisor.png` → `POST /files/kiosk-upload` 成功；基于返回 `fileId` 创建 `inspection` / `pii_scan` 成功；匿名任务无 token 返回 `MATERIAL_TASK_TOKEN_REQUIRED`；携带 `accessToken` 可查询；`pii-findings/decisions` 可更新 `redact/keep`。
+- 最新浏览器手验：`FILE_STORAGE_DRIVER=local PORT=3010` API + 既有 Kiosk dev server `5173`；Chrome 打开 `/print/upload`，选择 `/private/tmp/ai-advisor-kiosk-test.png` 上传成功；进入 `/print/material-check` 自动完成 `inspection` / `pii_scan` 并显示“流程演示 / 不向第三方发送 / 不展示完整原文”；刷新材料检查页后仍恢复文件和检查结果；进入 `/print/preview` 后显示材料检查摘要，刷新后仍恢复；进入 `/print/confirm` 后显示隐私检查摘要且不展示 PII 明细；点击“按以上设置打印”进入 `/print/progress` 并获得真实 `taskId`；提交后直达 `/print/confirm` 显示“未找到文件信息 / 重新上传文件”，确认当前材料会话已清理。
+- 注意：当前默认本地 API `.env` 仍可能为 `StorageService driver=cos`；完整浏览器/一体机手验下一步需用 local storage 或明确测试 COS 环境执行，避免把本地验证文件写入生产 COS。
 
 ---
 
@@ -210,6 +252,94 @@
 | `pnpm --filter @ai-job-print/shared build` | ℹ️ shared 包无 `build` script，非代码失败 |
 
 **注意：** 本地 `dev.db` 已通过 `prisma db execute --file prisma/migrations/20260606170000_add_end_user_asset_ownership/migration.sql` 非破坏性执行新增列。PostgreSQL 上线前仍需统一处理既有 migration drift。
+
+---
+
+## Phase A-2：materials/document-processing 任务骨架 + 安全收口（2026-06-06，Codex）
+
+**目标：** 为 `AI求职材料中心` 的上传体检、A4 归一化、PII 检查、遮挡、材料包渲染建立最小后端任务底座；本期只做数据/API 骨架，不做 Kiosk UI、不做真实 OCR/遮挡/合并。
+
+**改动范围：**
+
+| 文件 / 模块 | 改动 |
+|---|---|
+| `services/api/prisma/schema.prisma`、`20260606210000_add_materials_processing_tasks` | 新增 `DocumentProcessTask` / `PiiFinding`；`sourceFileId/resultFileId` 指向 `FileObject`；`endUserId` 指向 `EndUser`；任务删除级联删除 findings；新增 kind/status/action/requester/accessTokenHash 索引 |
+| `services/api/src/materials/*` | 新增 `MaterialsModule` / controller / service / DTO / types / cleanup task；提供 `POST /materials/tasks`、`GET /materials/tasks/:id`、`POST /materials/tasks/:id/pii-findings/decisions` |
+| `services/api/src/app.module.ts` | 接入 `MaterialsModule` |
+| `services/api/scripts/verify-materials-processing.ts`、`package.json` | 新增运行期验证脚本 `pnpm verify:materials-processing` |
+
+**行为：**
+
+- `inspection` / `normalize_a4` 任务本期同步完成，`resultJson` 写入最小骨架元数据。
+- `pii_scan` 任务本期基于文件名和 `params.textSample` 做固定规则模拟扫描，生成手机号 / 邮箱 findings；`snippet` 最多 32 字。
+- `paramsJson` 按任务类型白名单落库；`params.textSample` 只参与模拟扫描，落库前替换为长度 + SHA-256 摘要，不保存完整原文；手机号、邮箱、地址、身份证等非白名单敏感参数不落库。
+- EndUser 文件只能由本人 member token 创建 / 查询 / 决策；匿名文件允许匿名创建，但创建后返回一次性 `accessToken`，后续查询 / PII 决策必须携带正确 token；后台 User / Partner 文件本期暂不接入材料处理。
+- PII 决策仅允许 `keep` / `redact`，跨用户查询和决策均拒绝。
+- `expiresAt` 已在读取路径生效，过期任务返回 `MATERIAL_TASK_EXPIRED`；新增 `cleanupExpired()` 和每小时 cron 删除过期任务并级联清理 findings。
+
+**专家复审后的安全收口：**
+
+- A-2 初版经技术架构复核后要求返工：匿名任务不能只靠 `taskId` 访问，`expiresAt` 不能只落库不生效，`paramsJson` 不能保存开放 blob。
+- 已完成返工：匿名访问 token 只返回一次，服务端只保存 SHA-256 hash；token 校验使用定长安全比较；过期读取拒绝 + cleanup + 每小时 cron；params 按 kind 白名单和原文摘要化处理。
+- 仍需明确：A-2 是后端任务骨架，不是完整材料处理闭环；真实 OCR、A4 归一化、PII 遮挡、材料包合并、worker 队列接线仍在 Phase B/C 实现。
+
+**验证：**
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ |
+| `pnpm --filter @ai-job-print/api lint` | ✅ |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ EndUser 归属、PII findings、原文不落库、非白名单敏感参数不落库、跨用户拒绝、findings 级联删除、匿名 token 访问控制、过期拒绝和 cleanup 均通过 |
+
+**注意：** 本地 `dev.db` 已通过 `pnpm --filter @ai-job-print/api exec prisma db execute --file prisma/migrations/20260606210000_add_materials_processing_tasks/migration.sql` 非破坏性执行新表，并为安全收口追加执行 `requesterMode` / `accessTokenHash` additive ALTER。PostgreSQL 上线前仍需随既有 migration drift 统一重整。
+
+---
+
+## Phase B-1：Kiosk 打印前材料检查最小闭环（2026-06-07，Codex + Worker）
+
+**目标：** 在现有打印链路中插入“上传体检 -> PII 检查 -> 用户确认 -> 打印设置”，不新增底部 Tab，不做应用广场，不改现有打印任务提交核心逻辑。
+
+**改动范围：**
+
+| 文件 / 模块 | 改动 |
+|---|---|
+| `apps/kiosk/src/services/api/materials.ts`、`services/api/index.ts` | 新增 Kiosk materials API service：`createMaterialTask` / `getMaterialTask` / `decidePiiFindings`；http 模式调用真实 `/materials/*`；mock 模式明确为“流程演示” |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 新增打印前材料检查页；顺序执行 `inspection` -> `pii_scan`；有文件检查时持有 busy lock 防止待机屏打断；PII 命中项只显示掩码片段和建议动作 |
+| `apps/kiosk/src/pages/print/printMaterialSession.ts` | 新增当前打印材料检查 sessionStorage 辅助：仅保存当前会话必要字段、任务视图、匿名 `accessToken`、隐私摘要和打印参数，不保存文件原文 |
+| `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | 上传成功后保留 `fileId`，下一步跳转 `/print/material-check` |
+| `apps/kiosk/src/pages/print/PrintPreviewPage.tsx` | 透传 `materialCheck` 摘要到确认页 |
+| `apps/kiosk/src/pages/print/PrintConfirmPage.tsx` | 新增隐私检查摘要卡：只展示已检查、遮挡/保留数量和“不向第三方发送”提示，不展示 PII 表格 |
+| `apps/kiosk/src/routes/index.tsx` | 注册 `/print/material-check` |
+
+**行为：**
+
+- 打印上传成功后不再直接进入打印设置，而是先进入材料检查页。
+- 上传页禁用未接入的扫码 / U 盘死入口，避免公共终端出现“点进去只有开发中”的空页面。
+- 上传成功后页数显示为“页数待识别”，不再写死 1 页污染费用预估和双面建议。
+- 材料检查页在 http 模式会基于上传返回的 `fileId` 创建后端 `inspection` 与 `pii_scan` 任务。
+- 匿名任务后续查询 / 决策携带后端返回的 `accessToken`；会员流程携带当前 member token。
+- 上传成功后把 `fileId`、文件名、大小、短期签名 URL、SHA-256 和页数状态写入当前 session；刷新或从 preview / confirm 返回时可恢复当前文件、已创建任务、匿名 `accessToken`、隐私摘要和打印参数。
+- `/print/material-check` 在缺少 `location.state` 时优先从 session 恢复；如果 session 内已有 `inspection` / `pii_scan` 任务，则查询已有任务，不重复创建；遇到 403 / 404 / 410 会清理失效 session 并要求重新上传。
+- 材料检查页新增全局步骤条：上传文件 -> 材料检查 -> 打印设置 -> 确认打印。
+- PII 命中项按风险等级展示；支持 `按建议处理` / `全部保留` 批量决策，再逐项微调；必须全部选择 `保留` / `遮挡` 后才能继续；没有命中项时允许继续。
+- 页面只展示掩码后的手机号 / 邮箱 / 片段，不展示完整原文。
+- 打印设置页和确认页贯穿隐私检查摘要，确认页提升为强提示区，明确“本次打印将按你的选择处理”。
+- A-2 后端仍是 skeleton / simulated，因此确认页在演示模式下标注“流程演示”；真实 OCR、真实遮挡产物和材料包合并仍是 Phase B-2。
+
+**验证：**
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅；Vite chunk size warning 为既有大包体积提示 |
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ |
+| `pnpm --filter @ai-job-print/api lint` | ✅ |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 18 项材料处理任务安全 / 权限 / 过期清理验证全 PASS |
+
+**秒哒 UI/UX 参考审查：** 已调用 UI/UX 设计师只读评审。可迁移“上传方式卡 + 步骤说明 + 固定主 CTA、当前会话文件列表、设备状态横幅、模板卡片模式”；禁止迁移企业端 / 候选人 / 投递闭环、公共终端个人资产常驻面板、A3/B5 等高密打印参数。P0 已修：禁用死入口、页数不写死、全局 stepper、批量决策、风险分级、隐私摘要贯穿。
+
+**待验证 / 待补：** 浏览器 HTTP 模式走 `上传 -> material-check -> preview -> confirm` 的完整点击流、一体机真机触控 / 屏保不中断检查页、真实 API 模式下刷新恢复同一匿名任务仍需手验；真实 OCR / 遮挡 / A4 归一化属于 Phase B-2。
 
 ---
 

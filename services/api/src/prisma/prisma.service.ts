@@ -139,6 +139,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiResumeResult
   }
 
+  // ── Phase A-2: 材料处理任务骨架 ─────────────────────────────────────────────
+
+  get documentProcessTask() {
+    return this.client.documentProcessTask
+  }
+
+  get piiFinding() {
+    return this.client.piiFinding
+  }
+
   // ── 待机宣传屏(Screensaver)──────────────────────────────────────────────
 
   get adAsset() {
