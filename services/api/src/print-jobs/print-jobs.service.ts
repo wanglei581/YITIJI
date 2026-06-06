@@ -79,7 +79,7 @@ export class PrintJobsService {
 
   async create(
     dto: CreatePrintJobDto,
-    ctx: { ipAddress?: string | null; userAgent?: string | null } = {},
+    ctx: { ipAddress?: string | null; userAgent?: string | null; endUserId?: string | null } = {},
   ): Promise<PrintJobCreated> {
     const taskId = `ptask_kiosk_${crypto.randomBytes(8).toString('hex')}`
 
@@ -111,6 +111,7 @@ export class PrintJobsService {
       data: {
         id:         taskId,
         fileUrl:    storedFileUrl,
+        endUserId:  ctx.endUserId ?? null,
         // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
         fileMd5:    dto.fileMd5 ?? '',
         paramsJson: JSON.stringify(storedParams),
@@ -131,6 +132,7 @@ export class PrintJobsService {
         fileName:    dto.fileName ?? null,
         hasFileHash: Boolean(dto.fileMd5),
         params:      dto.params ?? DEFAULT_PARAMS,
+        hasEndUser:  Boolean(ctx.endUserId),
       },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,

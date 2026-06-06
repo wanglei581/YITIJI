@@ -38,6 +38,8 @@ model PrintTask {
   id           String    @id
   terminalId   String?
   terminal     Terminal? @relation(fields: [terminalId], references: [id])
+  endUserId    String?
+  endUser      EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
   fileUrl      String
   fileMd5      String
   paramsJson   String    @default("{}")
@@ -51,6 +53,8 @@ model PrintTask {
   updatedAt    DateTime  @updatedAt
 
   statusLogs PrintTaskStatusLog[]
+
+  @@index([endUserId])
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
@@ -140,6 +144,10 @@ model EndUser {
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  files           FileObject[]
+  aiResumeResults AiResumeResult[]
+  printTasks      PrintTask[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -293,6 +301,8 @@ model FileObject {
   // 业务关联
   uploaderId  String?
   uploader    User?   @relation("FileUploader", fields: [uploaderId], references: [id])
+  endUserId   String?
+  endUser     EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
   purpose     String
   sensitiveLevel String @default("normal")
 
@@ -306,6 +316,7 @@ model FileObject {
   updatedAt   DateTime @updatedAt
 
   @@index([uploaderId])
+  @@index([endUserId])
   @@index([purpose])
   @@index([expiresAt])
   @@index([deletedAt])
@@ -573,6 +584,8 @@ model AiResumeResult {
   status     String   // AiTaskStatus
   payloadJson String  @default("{}")
   provider   String
+  endUserId  String?
+  endUser    EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   // 留存治理(CLAUDE.md §11「不长期保存简历」):简历派生结果到期即清理。
@@ -582,6 +595,7 @@ model AiResumeResult {
 
   @@unique([taskId, kind])
   @@index([taskId])
+  @@index([endUserId])
   @@index([expiresAt])
 }
 

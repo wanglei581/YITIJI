@@ -19,6 +19,41 @@
 - ✅ 临时 API:3011 HTTP 复验通过：`/terminals/KSK-001/printer-status`、`/admin/printers`、`/terminals/KSK-001/screensaver` 均按预期返回。
 - ⏳ 现有后台服务（api 3010、admin 5174）仍需重启，才能加载本轮新代码。
 
+## 📌 AI求职材料中心开发路线（2026-06-06，方案已沉淀）
+
+详见 [operation-manual-feature-landing-plan.md](../product/operation-manual-feature-landing-plan.md)、[project-state-audit-2026-06-06.md](./project-state-audit-2026-06-06.md) 与 [current-progress.md](./current-progress.md) §AI求职材料中心开发方向与项目状态审计。
+
+**开发方向：**
+
+- 把截图中的能力收敛成 `AI求职材料中心`，不做应用广场式平铺。
+- 第一层能力：简历体检、结构化解析、字段修正、优化建议、模板打印。
+- 第二层能力：打印材料包、上传体检、A4 归一化、PII 检查。
+- 第三层能力：面试训练、岗位适配参考、职业规划、求职证件照。
+- 明确不做：AI 自动招聘机器人、问答式生成职位、企业侧 JD 生成、企业 ATS / 候选人筛选。
+
+**MVP 范围：**
+
+- `Kiosk` 打印前 PII 检查：识别手机号、邮箱、身份证片段、地址等，用户逐项选择保留/遮挡。
+- `Kiosk` 上传体检 + 统一 A4 + 打印材料包：加密/超大/格式/清晰度检查，多材料排序后合并进入 A4 打印任务。
+- `Kiosk` 简历字段人工修正 + 原文对照：AI 解析后允许逐字段编辑、保存和版本对比。
+- `Admin` 异常事件时间线：打印任务、Agent 上报、失败、重试、改派、人工处理串成可追溯事件流。
+
+**推荐执行顺序：**
+
+1. ✅ **Phase A-1 资产归属底座**：`EndUser` 与 `FileObject` / `AiResumeResult` / `PrintTask` 已建立可空关系；Kiosk 登录态上传、AI 解析、打印任务会带内存 token 绑定本人；匿名流程继续可用。详见 [current-progress.md](./current-progress.md) §Phase A-1。
+2. 🔄 **Phase A-2 材料处理任务骨架**：新增 `materials/document-processing` 域，先落 `DocumentProcessTask` / `PiiFinding` 基础模型和状态 API。
+3. ⏳ **Phase B Kiosk 可用闭环**：上传体检 → PII 检查 → 打印参数 → 确认打印；一体机完成真实可用链路。
+4. ⏳ **Phase C Admin 运营闭环**：异常事件时间线、粗粒度终端推荐、任务改派、暂停接单、维护备注。
+5. ⏳ **Phase D 合规后的简历增强**：按岗位方向优化简历 + 模板库；必须使用“目标岗位方向/意向城市/自荐信”等改造文案，不出现站内投递语义。
+6. ⏳ **Phase E 校园支付场景**：学生免费/校园卡/退款/对账；必须先补真实订单域，不能堆在 mock 订单页。
+
+**明确暂缓：**
+
+- 暂缓把“按岗位方向优化简历”放进第一批 MVP，避免在数据流未收口时滑向招聘闭环。
+- 暂缓学生免费/校园卡，直到 `Order` / `PaymentAttempt` / `Refund` / `BenefitGrant` 等订单支付域就绪。
+- 暂缓精细耗材最优调度，直到 Terminal Agent 真实上报耗材、纸盒、SN 等字段。
+- 不做 Kiosk 首页 KPI、大表格、多维运营筛选。
+
 ## 📌 PR-E Admin 工作台真实 KPI 接入（2026-06-05，`feature/admin-dashboard-real-kpi-clean`，待验证 / PR）
 
 详见 [current-progress.md](./current-progress.md) §PR-E。

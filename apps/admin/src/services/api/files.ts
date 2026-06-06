@@ -25,6 +25,7 @@ export interface AdminFileRecord {
   purpose: AdminFilePurpose
   sensitiveLevel: AdminFileSensitive
   uploaderId: string | null
+  endUserId: string | null
   expiresAt: string
   deletedAt: string | null
   deletedBy: string | null
@@ -127,14 +128,14 @@ export const adminFilesHttpAdapter: AdminFilesServiceInterface = {
 
 function seedMockFiles(): AdminFileRecord[] {
   return [
-    { id: 'mf-01', filename: '王某某_简历_2026.pdf',     mimeType: 'application/pdf', sizeBytes: 319488, sha256: 'a1'.repeat(32), purpose: 'resume_upload', sensitiveLevel: 'highly_sensitive', uploaderId: null,            expiresAt: '2026-06-06T01:12:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T01:12:00.000Z' },
-    { id: 'mf-02', filename: 'scan_20260605_0918.pdf',    mimeType: 'application/pdf', sizeBytes: 1258291, sha256: 'b2'.repeat(32), purpose: 'resume_scan',   sensitiveLevel: 'sensitive',        uploaderId: null,            expiresAt: '2026-06-05T15:18:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T09:18:00.000Z' },
-    { id: 'mf-03', filename: '身份证正面_F2G8.jpg',        mimeType: 'image/jpeg',      sizeBytes: 126976, sha256: 'c3'.repeat(32), purpose: 'id_scan',       sensitiveLevel: 'highly_sensitive', uploaderId: null,            expiresAt: '2026-06-05T08:43:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T00:43:00.000Z' },
-    { id: 'mf-04', filename: '招聘会资料_2026春招.pdf',     mimeType: 'application/pdf', sizeBytes: 2936012, sha256: 'd4'.repeat(32), purpose: 'fair_material',  sensitiveLevel: 'normal',           uploaderId: 'partner-uni-01', expiresAt: '2026-06-08T08:20:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T00:20:00.000Z' },
-    { id: 'mf-05', filename: '李某某_求职信.pdf',          mimeType: 'application/pdf', sizeBytes: 152600, sha256: 'e5'.repeat(32), purpose: 'cover_letter',   sensitiveLevel: 'sensitive',        uploaderId: null,            expiresAt: '2026-06-06T09:08:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T09:08:00.000Z' },
-    { id: 'mf-06', filename: 'print_upload_R8S3.pdf',      mimeType: 'application/pdf', sizeBytes: 466944, sha256: 'f6'.repeat(32), purpose: 'print_doc',      sensitiveLevel: 'normal',           uploaderId: null,            expiresAt: '2026-06-06T16:59:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-04T16:59:00.000Z' },
-    { id: 'mf-07', filename: '身份证反面_L6M9.jpg',        mimeType: 'image/jpeg',      sizeBytes: 120832, sha256: 'a7'.repeat(32), purpose: 'id_scan',       sensitiveLevel: 'highly_sensitive', uploaderId: null,            expiresAt: '2026-06-05T01:45:00.000Z', deletedAt: '2026-06-05T02:00:00.000Z', deletedBy: 'cron', deleteReason: '到期自动清理', createdAt: '2026-06-04T17:45:00.000Z' },
-    { id: 'mf-08', filename: '政策手册_就业补贴.pdf',       mimeType: 'application/pdf', sizeBytes: 3251200, sha256: 'b8'.repeat(32), purpose: 'print_doc',      sensitiveLevel: 'normal',           uploaderId: null,            expiresAt: '2026-06-07T17:18:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-04T17:18:00.000Z' },
+    { id: 'mf-01', filename: '王某某_简历_2026.pdf',     mimeType: 'application/pdf', sizeBytes: 319488, sha256: 'a1'.repeat(32), purpose: 'resume_upload', sensitiveLevel: 'highly_sensitive', uploaderId: null, endUserId: null, expiresAt: '2026-06-06T01:12:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T01:12:00.000Z' },
+    { id: 'mf-02', filename: 'scan_20260605_0918.pdf',    mimeType: 'application/pdf', sizeBytes: 1258291, sha256: 'b2'.repeat(32), purpose: 'resume_scan',   sensitiveLevel: 'sensitive',        uploaderId: null, endUserId: null, expiresAt: '2026-06-05T15:18:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T09:18:00.000Z' },
+    { id: 'mf-03', filename: '身份证正面_F2G8.jpg',        mimeType: 'image/jpeg',      sizeBytes: 126976, sha256: 'c3'.repeat(32), purpose: 'id_scan',       sensitiveLevel: 'highly_sensitive', uploaderId: null, endUserId: null, expiresAt: '2026-06-05T08:43:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T00:43:00.000Z' },
+    { id: 'mf-04', filename: '招聘会资料_2026春招.pdf',     mimeType: 'application/pdf', sizeBytes: 2936012, sha256: 'd4'.repeat(32), purpose: 'fair_material',  sensitiveLevel: 'normal',           uploaderId: 'partner-uni-01', endUserId: null, expiresAt: '2026-06-08T08:20:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T00:20:00.000Z' },
+    { id: 'mf-05', filename: '李某某_求职信.pdf',          mimeType: 'application/pdf', sizeBytes: 152600, sha256: 'e5'.repeat(32), purpose: 'cover_letter',   sensitiveLevel: 'sensitive',        uploaderId: null, endUserId: null, expiresAt: '2026-06-06T09:08:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-05T09:08:00.000Z' },
+    { id: 'mf-06', filename: 'print_upload_R8S3.pdf',      mimeType: 'application/pdf', sizeBytes: 466944, sha256: 'f6'.repeat(32), purpose: 'print_doc',      sensitiveLevel: 'normal',           uploaderId: null, endUserId: null, expiresAt: '2026-06-06T16:59:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-04T16:59:00.000Z' },
+    { id: 'mf-07', filename: '身份证反面_L6M9.jpg',        mimeType: 'image/jpeg',      sizeBytes: 120832, sha256: 'a7'.repeat(32), purpose: 'id_scan',       sensitiveLevel: 'highly_sensitive', uploaderId: null, endUserId: null, expiresAt: '2026-06-05T01:45:00.000Z', deletedAt: '2026-06-05T02:00:00.000Z', deletedBy: 'cron', deleteReason: '到期自动清理', createdAt: '2026-06-04T17:45:00.000Z' },
+    { id: 'mf-08', filename: '政策手册_就业补贴.pdf',       mimeType: 'application/pdf', sizeBytes: 3251200, sha256: 'b8'.repeat(32), purpose: 'print_doc',      sensitiveLevel: 'normal',           uploaderId: null, endUserId: null, expiresAt: '2026-06-07T17:18:00.000Z', deletedAt: null, deletedBy: null, deleteReason: null, createdAt: '2026-06-04T17:18:00.000Z' },
   ]
 }
 

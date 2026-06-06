@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
+import { useAuth } from '../../auth/useAuth'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
@@ -46,6 +47,7 @@ function formatBytes(bytes: number): string {
 
 export function PrintUploadPage() {
   const navigate = useNavigate()
+  const { getToken } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const [tab, setTab] = useState<UploadTab>('file')
@@ -69,7 +71,7 @@ export function PrintUploadPage() {
     setUploadError(null)
     setUploading(true)
     try {
-      const result = await kioskUploadFile(selected)
+      const result = await kioskUploadFile(selected, getToken())
       setFile({
         name:    result.filename,
         size:    formatBytes(result.sizeBytes),

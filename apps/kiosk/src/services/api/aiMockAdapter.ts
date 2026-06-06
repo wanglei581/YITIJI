@@ -73,7 +73,7 @@ const nextTaskId = () => `mock-ai-${Date.now()}-${++taskCounter}`
 
 export const aiMockAdapter = {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async submitResumeParse(_req: ResumeParseRequest): Promise<ResumeParseResponse> {
+  async submitResumeParse(_req: ResumeParseRequest, _token?: string | null): Promise<ResumeParseResponse> {
     // 极短延迟，不干扰页面已有的步骤动画时序
     await delay(80)
     return {

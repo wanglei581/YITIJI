@@ -34,6 +34,70 @@
 
 ---
 
+## AI求职材料中心开发方向与项目状态审计（2026-06-06，Codex）
+
+**背景：** 用户提供 `docs/product/操作手册功能借鉴分析与落地方案.docx` 及阿里百炼「求职招聘专区」截图，要求提炼可增强一体机体验的功能，并审查项目当前状态、分支是否收干净、未完成内容和后续推进方向。Codex 已读取正式入口文档、合规文档、功能范围文档、当前进度，并调用产品策略、Kiosk UI/UX、技术架构、合规现实校验 4 路专家评审。
+
+**新增 / 更新文档：**
+
+- [operation-manual-feature-landing-plan.md](../product/operation-manual-feature-landing-plan.md)：已扩展为 `AI求职材料中心开发方向与落地方案`，覆盖截图能力矩阵。
+- [project-state-audit-2026-06-06.md](project-state-audit-2026-06-06.md)：记录 Git / 分支 / 未提交 / 当前未完善内容 / 后续处理建议。
+
+**核心结论：**
+
+- 项目方向收敛为 `AI求职材料中心`：简历体检、结构化解析、字段修正、优化建议、模板打印、材料包、PII 检查。
+- 第一批 MVP 聚焦 4 件事：Kiosk 打印前 PII 检查、上传体检 + 统一 A4 + 打印材料包、简历字段人工修正 + 原文对照、Admin 异常事件时间线。
+- “按岗位方向优化简历 + 模板库”有价值，但暂不进入第一批 MVP；必须先完成话术、字段、数据流三层合规改造，定位为求职者本人材料优化工具，不能形成投递闭环。
+- 截图中的 AI 自动招聘机器人、问答式生成职位、企业侧 JD 生成、企业 ATS / 候选人筛选能力不进入本项目。
+- 截图中的 HR 知识问答、ATS 智能优化、人岗匹配、简历合规虚假审查等必须改名改流程，只能服务求职者本人。
+- 手册和截图中的 KPI 看板、完整识别结果、大表格多维筛选不得照搬到 Kiosk 首页；运营指标统一下沉 Admin，且延续“不编造指标”口径。
+- 技术前置风险是求职者资产归属层尚未完整打通；历史材料复用、我的材料、订单支付、校园卡/学生免费等能力需先补 `EndUser` 与文件/AI/打印/订单域的关系。
+- Git 状态：`main` 与 `origin/main` 对齐；当前文档分支 `docs/operation-manual-benchmark-plan` 已推送到远端，但本轮新增文档和进度更新尚未提交；多个本地分支未合入 `main`，其中 `fix/expert-audit-stage-b` 远端已删除，需人工确认后再清理。
+
+**专家评审摘要：**
+
+| 评审方向 | 结论 |
+|---|---|
+| 产品策略 | 优先做简历分析 / 结构化抽取 / 优化 / 初稿生成；面试训练、职业规划、证件照后置 |
+| UI/UX | 一体机应是“服务中心式 Kiosk”，首页只放入口和轻状态，不做信息大盘 |
+| 技术架构 | 建议增量扩展 `materials/document-processing` 与 `resume-workspace` 域；短期沿用 `api + BullMQ`，不急于迁到空壳 `services/worker` |
+| 合规现实校验 | 禁止站内投递、代投、收简历给企业、候选人管理、面试邀约、Offer 管理；岗位/招聘会只保留来源平台跳转 |
+
+**下一步建议：** 先做 Phase A 基础补洞（`EndUser` 资产归属、材料处理任务骨架），再做 Phase B Kiosk 可用闭环（上传体检 → PII 检查 → 打印），详见 [next-tasks.md](next-tasks.md) 新增条目。
+
+---
+
+## Phase A-1：EndUser 资产归属底座（2026-06-06，Codex）
+
+**目标：** 为 `AI求职材料中心` 打底，让登录求职者的文件、AI 简历结果、打印任务能够归属到本人账号；匿名 Kiosk 流程继续可用。
+
+**改动范围：**
+
+| 文件 / 模块 | 改动 |
+|---|---|
+| `services/api/prisma/schema.prisma`、`20260606170000_add_end_user_asset_ownership` | `FileObject` / `AiResumeResult` / `PrintTask` 新增可空 `endUserId` + `EndUser` 反向关系 + 索引 |
+| `services/api/src/common/auth/optional-end-user.ts` | 新增可选 C 端会员 token 解析工具；公共 Kiosk 端点无 token 时继续匿名 |
+| `services/api/src/files/*` | `kiosk-upload` 支持有效会员 token 时绑定 `endUserId`；文件元数据契约同步新增 `endUserId` |
+| `services/api/src/ai/*` | 简历解析提交可绑定 `endUserId`；优化结果继承解析任务 owner |
+| `services/api/src/print-jobs/*` | 打印任务创建可绑定 `endUserId`；匿名打印保持不变 |
+| `apps/kiosk/src/services/*`、`PrintUploadPage`、`ResumeSourcePage`、`ResumeParsePage`、`PrintConfirmPage` | 从纯内存登录态读取 token 并随上传、AI 解析、打印任务请求发送 |
+| `services/api/scripts/verify-end-user-asset-ownership.ts` | 新增运行期验证脚本 `pnpm verify:end-user-assets` |
+
+**验证：**
+
+| 检查 | 结果 |
+|---|---|
+| `pnpm --filter @ai-job-print/api typecheck` / `lint` / `build` | ✅ |
+| `pnpm --filter @ai-job-print/kiosk typecheck` / `build` | ✅ |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| `pnpm --filter @ai-job-print/admin typecheck` / `lint` / `build` | ✅ |
+| `pnpm --filter @ai-job-print/api verify:end-user-assets` | ✅ EndUser 可拥有 FileObject / AiResumeResult / PrintTask；匿名 FileObject 仍支持 |
+| `pnpm --filter @ai-job-print/shared build` | ℹ️ shared 包无 `build` script，非代码失败 |
+
+**注意：** 本地 `dev.db` 已通过 `prisma db execute --file prisma/migrations/20260606170000_add_end_user_asset_ownership/migration.sql` 非破坏性执行新增列。PostgreSQL 上线前仍需统一处理既有 migration drift。
+
+---
+
 ## PR-E：Admin 工作台真实 KPI 接入（2026-06-05，`feature/admin-dashboard-real-kpi-clean`）
 
 **目标：** 从 `feature/kiosk-honesty-admin-dashboard` 的 `501e5ac` 救回「工作台不编造指标」的产品意图，但不 cherry-pick 旧实现；基于当前 main service shape 重写 Admin dashboard，只展示已有真实后端来源的数据。

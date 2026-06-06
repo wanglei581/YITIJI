@@ -16,7 +16,8 @@ const TTL_HOURS_BY_PURPOSE: Record<FilePurpose, number> = {
 let nextId = 1
 
 export const filesMockAdapter = {
-  async kioskUpload(file: File, purpose: FilePurpose): Promise<FileUploadResponse> {
+  async kioskUpload(file: File, purpose: FilePurpose, token?: string | null): Promise<FileUploadResponse> {
+    void token
     await new Promise((r) => setTimeout(r, 600))
     const fileId = `mock-file-${Date.now()}-${nextId++}`
     const now = Date.now()
@@ -33,4 +34,3 @@ export const filesMockAdapter = {
     }
   },
 }
-

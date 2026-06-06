@@ -22,6 +22,7 @@ export interface CreatePrintJobInput {
   fileMd5?:  string
   fileName?: string
   params:    PrintJobParams
+  token?:    string | null
 }
 
 export interface PrintJobCreated {
@@ -42,10 +43,14 @@ export interface PrintJobStatusResult {
 }
 
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
+  const { token, ...body } = input
   const res = await fetch(`${API_BASE_URL}/print/jobs`, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(input),
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body:    JSON.stringify(body),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')

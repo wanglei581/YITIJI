@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { useAuth } from '../../auth/useAuth'
 import { Button, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { ChevronRightIcon, FolderOpenIcon, ScanIcon, UploadIcon } from 'lucide-react'
@@ -43,6 +44,7 @@ function formatSize(bytes: number): string {
 
 export function ResumeSourcePage() {
   const navigate = useNavigate()
+  const { getToken } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<Source | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -73,7 +75,7 @@ export function ResumeSourcePage() {
     setError(null)
     setUploading(true)
     try {
-      const uploaded = await kioskUploadFile(file, 'resume_upload')
+      const uploaded = await kioskUploadFile(file, 'resume_upload', getToken())
       navigate('/resume/target', {
         state: {
           source: 'upload',

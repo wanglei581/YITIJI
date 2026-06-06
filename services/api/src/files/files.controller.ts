@@ -15,14 +15,17 @@ import {
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'express'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
+import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { AuditService } from '../audit/audit.service'
+import { RedisService } from '../common/redis/redis.service'
 import { FilesService } from './files.service'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
@@ -55,6 +58,8 @@ export class FilesController {
   constructor(
     private readonly files: FilesService,
     private readonly audit: AuditService,
+    private readonly jwt: JwtService,
+    private readonly redis: RedisService,
   ) {}
 
   /** Kiosk / Partner / Admin 均可上传,文件归属由 uploaderId 标记。 */
@@ -105,12 +110,14 @@ export class FilesController {
         error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' },
       })
     }
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
     const res = await this.files.upload({
       buffer: file.buffer,
       filename: file.originalname,
       mimeType: file.mimetype,
       purpose: options.purpose as FilePurpose,
       uploaderId: null,
+      endUserId: endUser?.endUserId ?? null,
     })
     await this.audit.write({
       actorId: null,
@@ -118,7 +125,13 @@ export class FilesController {
       action: 'file.upload',
       targetType: 'file',
       targetId: res.fileId,
-      payload: { purpose: options.purpose, filename: res.filename, sizeBytes: res.sizeBytes, source: 'kiosk_anonymous' },
+      payload: {
+        purpose: options.purpose,
+        filename: res.filename,
+        sizeBytes: res.sizeBytes,
+        source: endUser ? 'kiosk_member' : 'kiosk_anonymous',
+        hasEndUser: Boolean(endUser),
+      },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
@@ -261,4 +274,11 @@ function extractUa(req: { headers: Record<string, string | string[] | undefined>
   if (typeof ua === 'string') return ua.slice(0, 256)
   if (Array.isArray(ua) && ua[0]) return ua[0].slice(0, 256)
   return null
+}
+
+function extractAuth(req: { headers: Record<string, string | string[] | undefined> }): string | undefined {
+  const auth = req.headers.authorization
+  if (typeof auth === 'string') return auth
+  if (Array.isArray(auth)) return auth[0]
+  return undefined
 }

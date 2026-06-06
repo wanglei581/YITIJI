@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import { AlertCircleIcon, FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
 import { createPrintJob } from '../../services/print/printJobsApi'
 
@@ -49,6 +50,7 @@ const DEFAULT_PARAMS: PrintJobParams = {
 export function PrintConfirmPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = location.state as LocationState | null
   const file = state?.file ?? { name: '未知文件', size: '-', pages: 1 }
   const params = state?.params ?? DEFAULT_PARAMS
@@ -91,6 +93,7 @@ export function PrintConfirmPage() {
           fileMd5:  file.fileMd5,
           fileName: file.name,
           params,
+          token:    getToken(),
         })
         navigate('/print/progress', { state: { ...location.state, file, params, taskId } })
       } catch (err) {
