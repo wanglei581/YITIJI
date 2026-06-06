@@ -64,6 +64,20 @@ type SourceFileRecord = {
   deletedAt: Date | null
 }
 
+type InspectionMessage = {
+  code: string
+  severity: 'info' | 'warning'
+  text: string
+}
+
+type InspectionSummary = {
+  pageCount: number | null
+  pageCountSource: 'image_single_page' | 'pdf_lightweight_scan' | 'unsupported' | 'unavailable'
+  canPrint: boolean
+  warnings: string[]
+  messages: InspectionMessage[]
+}
+
 @Injectable()
 export class MaterialsService {
   constructor(
@@ -191,7 +205,9 @@ export class MaterialsService {
             purpose: sourceFile.purpose,
             pageCount: inspection.pageCount,
             pageCountSource: inspection.pageCountSource,
+            canPrint: inspection.canPrint,
             warnings: inspection.warnings,
+            messages: inspection.messages,
           },
         },
       }
@@ -208,27 +224,46 @@ export class MaterialsService {
     return { status: 'pending', result: { mode: 'skeleton', queued: false } }
   }
 
-  private async inspectSourceFile(sourceFile: SourceFileRecord): Promise<{
-    pageCount: number | null
-    pageCountSource: 'image_single_page' | 'pdf_lightweight_scan' | 'unsupported' | 'unavailable'
-    warnings: string[]
-  }> {
+  private async inspectSourceFile(sourceFile: SourceFileRecord): Promise<InspectionSummary> {
     if (isSinglePageImage(sourceFile.mimeType)) {
-      return { pageCount: 1, pageCountSource: 'image_single_page', warnings: [] }
+      return {
+        pageCount: 1,
+        pageCountSource: 'image_single_page',
+        canPrint: true,
+        warnings: [],
+        messages: [{ code: 'IMAGE_SINGLE_PAGE', severity: 'info', text: '图片将按 1 页参与打印设置' }],
+      }
     }
     if (sourceFile.mimeType !== 'application/pdf') {
-      return { pageCount: null, pageCountSource: 'unsupported', warnings: ['PAGE_COUNT_UNSUPPORTED_MIME'] }
+      return {
+        pageCount: null,
+        pageCountSource: 'unsupported',
+        canPrint: false,
+        warnings: ['PRINT_MIME_UNSUPPORTED'],
+        messages: [{ code: 'PRINT_MIME_UNSUPPORTED', severity: 'warning', text: '当前文件格式暂不支持打印前体检' }],
+      }
     }
     try {
       const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
       const pageCount = countPdfPages(buffer)
+      const warnings = pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : []
       return {
         pageCount,
         pageCountSource: 'pdf_lightweight_scan',
-        warnings: pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : [],
+        canPrint: true,
+        warnings,
+        messages: pageCount === null
+          ? [{ code: 'PDF_PAGE_COUNT_NOT_DETECTED', severity: 'warning', text: '暂未识别 PDF 页数，以实际打印为准' }]
+          : [{ code: 'PDF_PAGE_COUNT_DETECTED', severity: 'info', text: 'PDF 页数已完成基础识别' }],
       }
     } catch {
-      return { pageCount: null, pageCountSource: 'unavailable', warnings: ['SOURCE_FILE_BYTES_UNAVAILABLE'] }
+      return {
+        pageCount: null,
+        pageCountSource: 'unavailable',
+        canPrint: true,
+        warnings: ['SOURCE_FILE_BYTES_UNAVAILABLE'],
+        messages: [{ code: 'SOURCE_FILE_BYTES_UNAVAILABLE', severity: 'warning', text: '暂未读取到文件内容，以实际打印为准' }],
+      }
     }
   }
 

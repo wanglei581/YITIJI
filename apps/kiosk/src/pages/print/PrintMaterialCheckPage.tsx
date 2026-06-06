@@ -36,6 +36,13 @@ interface LocationState {
 }
 
 type Stage = 'idle' | 'inspection' | 'pii_scan' | 'review' | 'submitting' | 'done' | 'error'
+type InspectionMessageSeverity = 'info' | 'warning'
+
+interface InspectionSummaryView {
+  pageCount: number | null
+  canPrint: boolean | null
+  messages: Array<{ code: string; severity: InspectionMessageSeverity; text: string }>
+}
 
 const ACTION_LABEL: Record<PiiFindingDecisionAction, string> = {
   keep: '保留',
@@ -86,6 +93,50 @@ function applyDetectedPageCount(file: PrintFileState, inspection: DocumentProces
   const pageCount = pageCountFromInspection(inspection)
   if (!pageCount || file.pages === pageCount) return file
   return { ...file, pages: pageCount }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function inspectionSummaryFromTask(task: DocumentProcessTaskView | null): InspectionSummaryView | null {
+  const checks = task?.result?.['checks']
+  if (!isRecord(checks)) return null
+  const pageCount = task ? pageCountFromInspection(task) : null
+  const canPrint = typeof checks['canPrint'] === 'boolean' ? checks['canPrint'] : null
+  const messages = normalizeInspectionMessages(checks)
+  return { pageCount, canPrint, messages }
+}
+
+function normalizeInspectionMessages(checks: Record<string, unknown>): InspectionSummaryView['messages'] {
+  const rawMessages = Array.isArray(checks['messages']) ? checks['messages'] : []
+  const messages = rawMessages.flatMap((item) => {
+    if (!isRecord(item) || typeof item['text'] !== 'string') return []
+    const severity: InspectionMessageSeverity = item['severity'] === 'warning' ? 'warning' : 'info'
+    return [{
+      code: typeof item['code'] === 'string' ? item['code'] : 'INSPECTION_MESSAGE',
+      severity,
+      text: item['text'],
+    }]
+  })
+  if (messages.length > 0) return messages.slice(0, 3)
+
+  const warnings = Array.isArray(checks['warnings']) ? checks['warnings'].filter((item): item is string => typeof item === 'string') : []
+  if (warnings.length > 0) {
+    return warnings.slice(0, 3).map((code) => ({
+      code,
+      severity: 'warning',
+      text: inspectionWarningText(code),
+    }))
+  }
+  return []
+}
+
+function inspectionWarningText(code: string): string {
+  if (code === 'PDF_PAGE_COUNT_NOT_DETECTED') return '暂未识别 PDF 页数，以实际打印为准'
+  if (code === 'SOURCE_FILE_BYTES_UNAVAILABLE') return '暂未读取到文件内容，以实际打印为准'
+  if (code === 'PRINT_MIME_UNSUPPORTED') return '当前文件格式暂不支持打印前体检'
+  return '材料体检存在提示，请继续核对打印参数'
 }
 
 function maskSnippet(type: string, snippet: string | null): string {
@@ -203,6 +254,7 @@ export function PrintMaterialCheckPage() {
   const findings = piiTask?.piiFindings ?? []
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
   const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
+  const inspectionSummary = useMemo(() => inspectionSummaryFromTask(inspectionTask), [inspectionTask])
   const isWorking = stage === 'inspection' || stage === 'pii_scan' || stage === 'submitting'
 
   const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
@@ -456,6 +508,47 @@ export function PrintMaterialCheckPage() {
                   </span>
                 )}
               </div>
+
+              {inspectionSummary && (
+                <div className="mb-4 rounded-lg border border-gray-100 bg-white px-5 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-gray-900">文件体检摘要</p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准'}
+                      </p>
+                    </div>
+                    <span
+                      className={[
+                        'rounded-full px-3 py-1 text-xs font-semibold',
+                        inspectionSummary.canPrint === false ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700',
+                      ].join(' ')}
+                    >
+                      {inspectionSummary.canPrint === false ? '需人工确认' : '可继续打印'}
+                    </span>
+                  </div>
+                  {inspectionSummary.messages.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {inspectionSummary.messages.map((message) => (
+                        <div
+                          key={`${message.code}:${message.text}`}
+                          className={[
+                            'flex items-center gap-2 rounded-md px-3 py-2 text-sm',
+                            message.severity === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-gray-50 text-gray-700',
+                          ].join(' ')}
+                        >
+                          {message.severity === 'warning' ? (
+                            <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <CheckCircleIcon className="h-4 w-4 shrink-0" />
+                          )}
+                          <span>{message.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {findings.length === 0 ? (
                 <Card className="flex flex-1 flex-col items-center justify-center gap-4 p-8">

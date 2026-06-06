@@ -222,10 +222,19 @@ async function main() {
       { kind: 'anonymous' },
     )
     const imageChecks = (imageInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
-    if (imageChecks['pageCount'] === 1 && imageChecks['pageCountSource'] === 'image_single_page') {
+    if (
+      imageChecks['pageCount'] === 1 &&
+      imageChecks['pageCountSource'] === 'image_single_page' &&
+      imageChecks['canPrint'] === true
+    ) {
       pass('Image inspection infers a single printable page')
     } else {
-      fail(`Image inspection expected pageCount=1, got ${JSON.stringify(imageChecks)}`)
+      fail(`Image inspection expected pageCount=1 and canPrint=true, got ${JSON.stringify(imageChecks)}`)
+    }
+    if (Array.isArray(imageChecks['messages']) && imageChecks['messages'].length >= 1) {
+      pass('Image inspection returns user-facing status messages')
+    } else {
+      fail(`Image inspection expected status messages, got ${JSON.stringify(imageChecks)}`)
     }
 
     await prisma.documentProcessTask.update({
