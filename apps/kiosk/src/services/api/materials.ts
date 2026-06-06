@@ -146,11 +146,7 @@ function createMockTask(input: CreateMaterialTaskInput, token?: string | null): 
     resultFileId: null,
     endUserId: null,
     params: input.params ?? {},
-    result: {
-      mode: 'mock',
-      note: '流程演示，未连接后端材料检查服务',
-      findingCount: input.kind === 'pii_scan' ? 0 : undefined,
-    },
+    result: createMockTaskResult(input.kind),
     errorCode: null,
     errorMessage: null,
     expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
@@ -160,6 +156,34 @@ function createMockTask(input: CreateMaterialTaskInput, token?: string | null): 
   }
   mockTasks.set(id, task)
   return task
+}
+
+function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
+  if (kind === 'inspection') {
+    return {
+      mode: 'mock',
+      note: '流程演示，未连接后端材料检查服务',
+      checks: {
+        filePresent: true,
+        pageCount: null,
+        pageCountSource: 'mock',
+        canPrint: true,
+        warnings: [],
+        messages: [{ code: 'MOCK_INSPECTION', severity: 'info', text: '流程演示模式，页数以实际打印为准' }],
+      },
+    }
+  }
+  if (kind === 'pii_scan') {
+    return {
+      mode: 'mock',
+      note: '流程演示，未连接后端材料检查服务',
+      findingCount: 0,
+    }
+  }
+  return {
+    mode: 'mock',
+    note: '流程演示，未连接后端材料检查服务',
+  }
 }
 
 export async function createMaterialTask(
