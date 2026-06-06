@@ -104,7 +104,10 @@ function sanitizeFile(file: PrintFileState): PrintFileState {
 
 function sanitizeFileName(name: string): string {
   return name
-    .replace(/([A-Z0-9._%+-]+)@([A-Z0-9.-]+\.[A-Z]{2,})/gi, '$1***@$2')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, (value) => {
+      const [, domain] = value.split('@')
+      return `${value.slice(0, 1)}***@${domain ?? '***'}`
+    })
     .replace(/(?:\+?86[- ]?)?1[3-9]\d{9}/g, (value) => `${value.slice(0, 3)}****${value.slice(-4)}`)
     .replace(/\d{6}(?:19|20)\d{2}\d{2}\d{2}\d{3}[\dXx]/g, (value) => `${value.slice(0, 6)}********${value.slice(-4)}`)
 }
