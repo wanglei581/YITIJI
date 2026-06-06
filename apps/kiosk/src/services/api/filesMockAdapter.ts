@@ -5,12 +5,19 @@ import type { FileUploadResponse, FilePurpose } from '@ai-job-print/shared'
  * 让 mock 行为对齐真后端,UI 在 mock 模式下也能看到"简历 1h 自动清理"的真实呈现。
  */
 const TTL_HOURS_BY_PURPOSE: Record<FilePurpose, number> = {
-  resume_upload:   1,
-  resume_scan:     1,
-  id_scan:         1,
-  print_doc:      24,
-  fair_material:  24,
-  cover_letter:   24,
+  resume_upload:        1,
+  resume_scan:          1,
+  id_scan:              1,
+  print_doc:           24,
+  fair_material:       24,
+  cover_letter:         6,
+  partner_profile:     24,
+  partner_image:       24,
+  partner_video:       24,
+  job_fair_material:   24,
+  screensaver_material: 24,
+  admin_upload:        24,
+  temp:                 6,
 }
 
 let nextId = 1

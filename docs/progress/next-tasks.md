@@ -1,7 +1,24 @@
 # 下一步任务
 
-> 最后更新：2026-06-06（QA P0 真机联调修复已完成）
+> 最后更新：2026-06-06（腾讯云 COS 对象存储接入已完成代码 + 静态/E2E 验证）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
+
+---
+
+## 📌 腾讯云 COS 对象存储接入（2026-06-06，`feature/cos-storage-integration`，已完成代码 + 验证）
+
+详见 [current-progress.md](./current-progress.md) §腾讯云 COS 对象存储接入 与 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。
+
+- ✅ `StorageService` 抽象 + 本地/COS 双后端,`FILE_STORAGE_DRIVER` 切换;COS 手写预签名 URL(复刻官方算法,独立重算单测)。
+- ✅ `FileObject` 扩为统一文件资产表(bucket/region/ownerType/ownerId/visibility/status/createdBy);additive 迁移已 `db execute` 落 dev.db。
+- ✅ 5 新端点:upload-intent / :id/raw / :id/complete / :id/download-url / :id/preview-url;下载预览支持 User + 会员双身份;管理员访问用户文件写审计。
+- ✅ 现有 Kiosk 上传 / 打印 / Admin 文件管理 / Partner 上传 / 宣传屏素材透明切 COS,前端无需改动。
+- ✅ api/shared/kiosk/admin typecheck/lint/build 全绿;`verify:cos`(37)+`verify:cos:files`(30) 全过;启动 + DI + 12 路由 mapped。
+- ⏳ **[凭证]** 真实 COS 端到端:用户在 `services/api/.env` 配 `FILE_STORAGE_DRIVER=cos` + `TENCENT_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION`,跑 `pnpm --filter @ai-job-print/api verify:cos:live`(put→head→get→签名下载→delete)。当前无凭证 SKIPPED。
+- ⏳ **[择期]** 打印 / 宣传屏内容改 Kiosk/Agent 直连 COS 预签名 URL(当前走 `/content` 代理签名,短 TTL,合规可用,只是多一跳)。
+- ⏳ **[择期]** `AdAsset` 加 `bucket/region` 列以支持宣传屏素材跨后端混合环境(当前单 driver 部署足够)。
+- ⏳ **[基础设施]** PostgreSQL 迁移时,本迁移随 dev.db drift 一并重生成规范化(与既有 PG 迁移条目合并处理)。
+- ⏳ **[FF merge]** 验证通过,待人工确认后将本分支 FF 合入 main(本窗口不 push、不 merge)。
 
 ---
 

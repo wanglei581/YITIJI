@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
-import { LocalFileStorage } from '../files/storage'
+import { StorageService } from '../storage/storage.service'
+import { generateObjectKey } from '../storage/object-key'
 import { signAdAssetUrl, signAdAssetPreviewUrl } from './content-signing'
 import { validateMedia, getMediaLimits } from './media-validation'
 import type {
@@ -30,15 +31,17 @@ const MIN_DURATION_SEC = 3
  * 负责:素材上传/落库/软删、播放方案 CRUD、终端配置、Kiosk 播放列表解析。
  * 审计日志由 controller 在动作完成后回写(与 FilesService 同口径)。
  *
- * 物理文件复用 LocalFileStorage(purpose='screensaver_ad'),
+ * 物理文件经 StorageService 落到 COS / 本地后端(objectKey 前缀 screensaver/materials/),
  * 与用户敏感文件(FileObject)隔离:宣传屏素材是长期运营内容,不自动过期。
  */
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name)
-  private readonly storage = new LocalFileStorage()
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   // ── 素材 ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +78,14 @@ export class ContentService {
     const durationSec = this.normalizeDuration(v.kind, args.durationSec)
 
     const id = randomUUID().replace(/-/g, '')
-    const { storageKey, sha256 } = await this.storage.put('screensaver_ad', v.ext, id, args.buffer)
+    const storageKey = generateObjectKey({
+      purpose: 'screensaver_material',
+      ownerType: 'system',
+      ownerId: null,
+      fileId: id,
+      ext: v.ext,
+    })
+    const { sha256 } = await this.storage.putObject(storageKey, args.buffer, args.mimeType)
 
     const record = await this.prisma.adAsset.create({
       data: {
@@ -119,7 +129,7 @@ export class ContentService {
   async deleteAsset(id: string): Promise<AdAssetView> {
     const record = await this.requireAliveAsset(id)
     // 物理删除文件 + 软删元数据(保留删除痕迹,审计可追溯)
-    await this.storage.delete(record.storageKey)
+    await this.storage.deleteObject(record.storageKey)
     const updated = await this.prisma.adAsset.update({
       where: { id },
       data: { deletedAt: new Date(), status: 'disabled' },
@@ -131,7 +141,7 @@ export class ContentService {
   /** 供签名内容端点读取(只读存活素材的物理内容)。 */
   async readAssetContent(id: string): Promise<{ buffer: Buffer; mimeType: string }> {
     const record = await this.requireAliveAsset(id)
-    const buffer = await this.storage.read(record.storageKey)
+    const buffer = await this.storage.getObject(record.storageKey)
     return { buffer, mimeType: record.mimeType }
   }
 
