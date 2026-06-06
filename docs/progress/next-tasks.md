@@ -18,7 +18,14 @@
 - ⏳ **[择期]** 打印 / 宣传屏内容改 Kiosk/Agent 直连 COS 预签名 URL(当前走 `/content` 代理签名,短 TTL,合规可用,只是多一跳)。
 - ⏳ **[择期]** `AdAsset` 加 `bucket/region` 列以支持宣传屏素材跨后端混合环境(当前单 driver 部署足够)。
 - ⏳ **[基础设施]** PostgreSQL 迁移时,本迁移随 dev.db drift 一并重生成规范化(与既有 PG 迁移条目合并处理)。
-- ⏳ **[FF merge]** 验证通过,待人工确认后将本分支 FF 合入 main(本窗口不 push、不 merge)。
+- ✅ **[已合入]** 已通过 [PR #22](https://github.com/wanglei581/YITIJI/pull/22) 合入 main(merge commit `7bafc92`);`feature/cos-storage-integration` 分支已清理(本地 + 远端删除)。
+
+**🚀 生产上线部署清单(COS):**
+
+- [ ] 生产环境显式设置 `FILE_STORAGE_DRIVER=cos`(**漏设会按默认 `local` 静默落本地 FS、不报错、文件不上 COS——上线风险点**)。
+- [ ] 生产环境配置 4 个变量:`TENCENT_COS_SECRET_ID`、`TENCENT_COS_SECRET_KEY`、`TENCENT_COS_BUCKET`、`TENCENT_COS_REGION`(密钥仅注入生产 env,**不入仓库、不回显**)。
+- [ ] **上线前轮换腾讯云 CAM 子用户密钥**(配置过程中真实密钥曾在终端回显,属已暴露;新密钥只填生产服务器)。
+- [ ] 确认生产「上传 / 下载 / 预览」走 COS 临时签名 URL(可看启动日志 `StorageService driver=cos ... cosAvailable=true`,并实际跑一次上传→签名 URL 下载验证)。
 
 ---
 
