@@ -54,3 +54,36 @@ export function verifyFileSignature(fileId: string, expires: string, sig: string
     return false
   }
 }
+
+/**
+ * 原始字节直传签名(本地后端 upload-intent 用)。
+ *
+ * COS 后端的 upload-intent 直接返回 COS 预签名 PUT URL;本地后端没有 COS,
+ * 故返回一个指向 API 自身 `PUT /files/:id/raw` 的短期签名 URL,让"创建意图 →
+ * 客户端直传 → complete"在 dev 与生产保持同一套前端流程。
+ *
+ * 与下载签名隔离 message 命名空间(前缀 'raw-upload.'),避免下载签名被复用为写入。
+ */
+export function signRawUploadUrl(fileId: string, ttlMs: number = DEFAULT_TTL_MS): { url: string; expiresAt: Date } {
+  const expiresAtMs = Date.now() + ttlMs
+  const message = `raw-upload.${fileId}.${expiresAtMs}`
+  const signature = createHmac('sha256', getSecret()).update(message).digest('hex')
+  const url = `/api/v1/files/${fileId}/raw?expires=${expiresAtMs}&sig=${signature}`
+  return { url, expiresAt: new Date(expiresAtMs) }
+}
+
+/** 校验原始直传签名。 */
+export function verifyRawUploadSignature(fileId: string, expires: string, sig: string): boolean {
+  const expiresMs = Number(expires)
+  if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) {
+    return false
+  }
+  const message = `raw-upload.${fileId}.${expiresMs}`
+  const expected = createHmac('sha256', getSecret()).update(message).digest('hex')
+  if (sig.length !== expected.length) return false
+  try {
+    return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))
+  } catch {
+    return false
+  }
+}

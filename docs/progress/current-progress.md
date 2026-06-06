@@ -5,6 +5,44 @@
 
 ---
 
+## 腾讯云 COS 对象存储接入（2026-06-06，Claude）
+
+**背景：** 把云端文件存储从本地 FS 升级为可切换腾讯云 COS（私有桶 `yitiji-prod-private-1257025684` / `ap-guangzhou`），用于上传、下载、预览、持久化。统一私有桶（不按端拆桶），靠 objectKey 前缀 + `FileObject` 记录分类授权。分支 `feature/cos-storage-integration`（基于 main `f807b75`）。详见 [docs/api/cos-object-storage.md](../api/cos-object-storage.md)。
+
+**核心设计：** COS 作为「可插拔存储后端」接到新增的 `StorageService` 抽象后面，本地 FS 为 dev 默认后端，`FILE_STORAGE_DRIVER=local|cos` 切换。切 COS **不改任何业务代码**——现有 Kiosk 上传 / 打印 / Admin 文件管理 / Partner 上传 / 宣传屏素材全部透明落 COS。COS 签名为**手写预签名 URL**（严格复刻官方算法，零新依赖，匹配本仓 HMAC/AES-GCM/MD5 手写惯例,独立重算单测交叉校验）。
+
+**改动范围：**
+
+| 层 | 改动 | 文件 |
+|----|------|------|
+| 存储抽象（新增） | `ObjectStorageBackend` 接口 + `LocalStorageBackend` / `CosStorageBackend` + `StorageService`（按 driver 选默认后端、按文件 bucket 路由读删、TTL clamp ≤1800）+ `@Global StorageModule` + objectKey 生成 + COS 签名 | `src/storage/{storage.interface,local-storage.backend,cos-storage.backend,storage.service,storage.module,object-key,cos-signing}.ts` |
+| Prisma | `FileObject` 扩为统一文件资产表:新增 `bucket/region/ownerType/ownerId/visibility/status/createdBy` + 索引;migration `20260606190000_add_file_asset_cos_fields`（additive,`db execute` 非破坏性,回填既有行 bucket=local-fs/status=active）| `prisma/schema.prisma` + `prisma/migrations/` |
+| Files 服务 | `FilesService` 改走 `StorageService`(不再直接 new LocalFileStorage);新增 `createUploadIntent` / `completeUpload` / `writeRawUpload` / `getAccessUrl`(下载预览) / `ownerDelete`;`canAccessFile`(user/partner/member 隔离) + `deriveOwner`;`upload` 落 owner/bucket/objectKey 全字段 | `src/files/files.service.ts` |
+| Files 校验(新增) | 纯函数 `validateUpload`:per-purpose MIME 白名单 + 扩展名一致 + 大小上限(proxy 15MB / intent 按 purpose,视频 500MB);`DEFAULT_SENSITIVE_BY_PURPOSE` 全量 | `src/files/file-validation.ts` |
+| Files 控制器 | 新增 5 端点 `POST /files/upload-intent`、`PUT /files/:id/raw`、`POST /files/:id/complete`、`GET /files/:id/download-url`、`GET /files/:id/preview-url`;`DELETE /files/:id` 放宽到 owner/会员本人/admin;下载预览同时支持 User JWT 与 member token,管理员访问用户文件写 `file.admin_access` 审计;`/content` 代理改走 StorageService(兼容 COS) | `src/files/files.controller.ts` + `dto/create-upload-intent.dto.ts` + `dto/upload-options.dto.ts`(扩 purpose) |
+| 签名 | `signing.ts` 增 `signRawUploadUrl`/`verifyRawUploadSignature`(本地直传命名空间隔离) | `src/files/signing.ts` |
+| 宣传屏 | `ContentService` 物理读写改走 `StorageService`(objectKey `screensaver/materials/`),素材随之落 COS | `src/content/content.service.ts` |
+| 契约同步 | `packages/shared/src/types/file.ts`(SSOT)+ `src/files/file.types.ts` 同步扩 FilePurpose(+7) / FileMetadata 新字段 / UploadIntent·CompleteUpload·FileAccessUrl 类型 | 两处 |
+| 前端 | kiosk `filesMockAdapter` TTL 表补全 13 purpose;admin 文件页 `AdminFilePurpose`/`PURPOSE_META` 扩 7 项 + 未知 purpose 兜底防崩 | `apps/kiosk/...filesMockAdapter.ts`、`apps/admin/.../files/{index.tsx,services/api/files.ts}` |
+| 配置 | `.env.example` 新增 `FILE_STORAGE_DRIVER` + `TENCENT_COS_*`(占位,无真实密钥) | `services/api/.env.example` |
+
+**合规边界：** SecretId/SecretKey 仅服务端,前端只拿短期签名 URL(≤30min,无永久公开链接);会员只能访问本人文件,合作机构不能访问用户简历,管理员访问用户文件写审计;未新增任何投递/收简历/候选人能力。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| api typecheck / lint / build | ✅ |
+| shared / kiosk / admin typecheck / lint / build | ✅(kiosk 2 条既有 KioskBusyContext fast-refresh warning,非本次) |
+| `verify:cos`(objectKey / COS 签名独立重算 / 校验,纯函数) | ✅ 37 checks |
+| `verify:cos:files`(本地后端打 dev.db E2E,自清理) | ✅ 30 checks:上传落 owner/bucket/objectKey、round-trip、跨用户/跨机构/机构访问用户文件全拒、管理员访问→needsAdminAudit、intent→raw→complete、软删物理回收 |
+| `verify:cos:live`(真实 COS) | ⏳ 无凭证 SKIPPED(用户在 .env 配 TENCENT_COS_* 后可一键跑 put→head→get→签名下载→delete) |
+| 启动 + DI + 路由 | ✅ `StorageService driver=local cosAvailable=false`、12 条 /files 路由(含 5 新端点)全 mapped |
+
+**未做 / 后续：** 真实 COS 端到端需用户凭证(`verify:cos:live`);打印 / 宣传屏内容当前仍走 `/content` 代理签名 URL(短 TTL,合规),未来可改 Kiosk/Agent 直连 COS 预签名 URL 省一跳;`AdAsset` 未加 bucket 列(单 driver 部署足够,混合环境历史素材按默认后端读)。
+
+---
+
 ## QA P0 真机联调修复（2026-06-06，Codex）
 
 **背景：** 基于 `/tmp/qa-report-final.md` 复核结论，修复真机联调前应处理的 3 个 P0：Kiosk 用业务码 `KSK-001` 拉取打印机状态 404、Admin 打印机页纯本地 mock、seed 缺少 `KSK-001` 终端。同时顺手修复同类 DTO 校验文案空列表问题。

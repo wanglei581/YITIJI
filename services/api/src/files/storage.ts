@@ -49,6 +49,29 @@ export class LocalFileStorage {
     return { storageKey, sha256 }
   }
 
+  /**
+   * 按精确 objectKey 写入(StorageService / 直传 complete 用)。
+   * objectKey 由 generateObjectKey 产出,已限制安全字符;resolve 仍做越界防护。
+   */
+  async putAtKey(objectKey: string, buffer: Buffer): Promise<{ sizeBytes: number; sha256: string }> {
+    const fullPath = this.resolve(objectKey)
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+    await fs.writeFile(fullPath, buffer)
+    const sha256 = createHash('sha256').update(buffer).digest('hex')
+    return { sizeBytes: buffer.length, sha256 }
+  }
+
+  /** 读取文件元信息;不存在返回 null。 */
+  async head(objectKey: string): Promise<{ sizeBytes: number } | null> {
+    try {
+      const stat = await fs.stat(this.resolve(objectKey))
+      return { sizeBytes: stat.size }
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw err
+    }
+  }
+
   /** 读取文件 buffer。 */
   async read(storageKey: string): Promise<Buffer> {
     return fs.readFile(this.resolve(storageKey))

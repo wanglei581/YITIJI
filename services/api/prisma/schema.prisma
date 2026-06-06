@@ -290,21 +290,38 @@ model Job {
 
 model FileObject {
   id          String  @id @default(cuid())
+  // storageKey 即对象存储 objectKey(COS:users/.../{id}.{ext};本地:同键落 FS)。
   storageKey  String  @unique
 
+  // ── COS 接入:落库存储位置(provenance + 跨后端路由)─────────────────
+  //   bucket:COS 私有桶名;本地后端用哨兵 'local-fs'。
+  //   region:如 'ap-guangzhou';本地用 'local'。
+  //   读 / 删 / 签名按此 bucket 路由后端,兼容"先本地后切 COS"的历史数据。
+  bucket      String  @default("local-fs")
+  region      String  @default("local")
+
   // 元数据
-  filename    String
+  filename    String   // 原始文件名(originalName);绝不作为 objectKey
   mimeType    String
   sizeBytes   Int
-  sha256      String
+  sha256      String   // 服务端直传路径就 buffer 计算;直传意图未知时为 ''
 
-  // 业务关联
-  uploaderId  String?
+  // 业务关联 / 归属
+  uploaderId  String?  // 后台 User(admin/partner)上传者
   uploader    User?   @relation("FileUploader", fields: [uploaderId], references: [id])
   endUserId   String?
   endUser     EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  // ownerType:'user' | 'partner' | 'admin' | 'system'(授权与 objectKey 前缀维度)
+  ownerType   String?
+  // ownerId:user→endUserId / partner→orgId / admin→userId;匿名 / system 为 null
+  ownerId     String?
   purpose     String
   sensitiveLevel String @default("normal")
+  // visibility:'private' | 'internal' | 'public'(默认 private,合规安全)
+  visibility  String  @default("private")
+  // status:'uploading' | 'active' | 'quarantined' | 'deleted'
+  status      String  @default("active")
+  createdBy   String?
 
   // 隐私 / 清理
   expiresAt   DateTime
@@ -317,7 +334,9 @@ model FileObject {
 
   @@index([uploaderId])
   @@index([endUserId])
+  @@index([ownerType, ownerId])
   @@index([purpose])
+  @@index([status])
   @@index([expiresAt])
   @@index([deletedAt])
 }

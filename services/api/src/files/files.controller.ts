@@ -5,7 +5,9 @@ import {
   Delete,
   Get,
   Param,
+  PayloadTooLargeException,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -19,6 +21,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { Response } from 'express'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
+import type { UserRole } from '../common/decorators/roles.decorator'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -26,10 +29,11 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { AuditService } from '../audit/audit.service'
 import { RedisService } from '../common/redis/redis.service'
-import { FilesService } from './files.service'
+import { FilesService, type FileRequester } from './files.service'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
-import { verifyFileSignature } from './signing'
+import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
+import { verifyFileSignature, verifyRawUploadSignature } from './signing'
 import type {
   FilePurpose,
   FileSensitiveLevel,
@@ -37,21 +41,29 @@ import type {
   SignedUrlResponse,
   FileMetadata,
   FileCleanupResponse,
+  FileAccessUrlResponse,
+  UploadIntentResponse,
+  CompleteUploadResponse,
 } from './file.types'
+
+/** 本地代理直传单文件上限(防内存打爆;COS 直传不经此路径)。 */
+const RAW_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
 
 /**
  * 路由表(全路径加 /api/v1 前缀):
  *
- *   POST   /files                       multipart 上传(任意已登录用户)
- *   GET    /files/:id/url               重发签名 URL(任意已登录用户)
- *   GET    /files/:id/content?expires=...&sig=...  签名校验后流式返回内容(无登录)
+ *   POST   /files                       multipart 服务端代理上传(已登录 User)
+ *   POST   /files/kiosk-upload          Kiosk 匿名 / 会员 multipart 上传
+ *   POST   /files/upload-intent         创建直传意图(User / 会员)→ 预签名 PUT
+ *   PUT    /files/:id/raw?expires&sig   本地后端直传写入(签名授权,无 JWT)
+ *   POST   /files/:id/complete          直传完成确认(User / 会员)
+ *   GET    /files/:id/url               重发签名 URL(已登录 User)
+ *   GET    /files/:id/download-url      短期下载 URL(User / 会员;管理员访问用户文件写审计)
+ *   GET    /files/:id/preview-url       短期预览 URL(同上)
+ *   GET    /files/:id/content?...       签名校验后流式返回(/content 代理,兼容本地 & COS)
  *   GET    /files                       列表(admin)
- *   DELETE /files/:id?reason=xxx        admin 强制删除单文件
+ *   DELETE /files/:id?reason=xxx        删除(owner / 会员本人 / admin)
  *   POST   /files/cleanup-expired       admin 立即清理所有已过期文件
- *
- * 注意:GET /files/:id/content 故意不挂 JwtAuthGuard,
- * 因为 <img src> / <iframe src> 浏览器不会带 Authorization 头,
- * 安全完全依赖 HMAC 签名 + 短 TTL(5 分钟)。
  */
 @Controller('files')
 export class FilesController {
@@ -62,7 +74,8 @@ export class FilesController {
     private readonly redis: RedisService,
   ) {}
 
-  /** Kiosk / Partner / Admin 均可上传,文件归属由 uploaderId 标记。 */
+  // ── 服务端代理上传 ─────────────────────────────────────────────────────────
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
@@ -72,9 +85,7 @@ export class FilesController {
     @CurrentUser() user: AuthedUser,
   ): Promise<ApiResponse<FileUploadResponse>> {
     if (!file) {
-      throw new BadRequestException({
-        error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' },
-      })
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' } })
     }
     const res = await this.files.upload({
       buffer: file.buffer,
@@ -83,20 +94,14 @@ export class FilesController {
       purpose: options.purpose as FilePurpose,
       sensitiveLevel: options.sensitiveLevel as FileSensitiveLevel | undefined,
       uploaderId: user.userId,
+      actorRole: user.role,
+      actorOrgId: user.orgId,
+      createdBy: user.userId,
     })
     return ApiResponse.ok(res)
   }
 
-  /**
-   * Kiosk 一体机匿名上传(无登录态)。
-   *
-   * 设计理由(CLAUDE.md §9 Kiosk 无登录 + §11 文件安全):
-   *   - 求职者在公共终端不应被强制注册
-   *   - 但匿名上传必须靠时效兜底:purpose 严格白名单 + 强制由后端按 purpose
-   *     推断 sensitiveLevel(简历类 1h 过期)
-   *   - 限流比默认更严:20 次 / 60 秒 / 每 IP,防滥用
-   *   - uploaderId 落 null;ip + ua 写 audit 留痕
-   */
+  /** Kiosk 一体机匿名 / 会员上传(无 User 登录态;有会员 token 则绑定 endUserId)。 */
   @Post('kiosk-upload')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   @UseInterceptors(FileInterceptor('file'))
@@ -106,9 +111,7 @@ export class FilesController {
     @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
   ): Promise<ApiResponse<FileUploadResponse>> {
     if (!file) {
-      throw new BadRequestException({
-        error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' },
-      })
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' } })
     }
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
     const res = await this.files.upload({
@@ -139,23 +142,110 @@ export class FilesController {
     return ApiResponse.ok(res)
   }
 
-  /**
-   * 重发签名 URL。
-   *
-   * 访问控制(CLAUDE.md §11 文件安全):
-   *   - admin 可访问任意文件
-   *   - partner / kiosk 只能访问自己上传的文件(uploaderId === user.userId)
-   *   - 匿名 Kiosk 上传(uploaderId = null)无法通过此端点二次签名;
-   *     应在上传响应的 signedUrl 有效期内直接使用
-   *
-   * 每次调用均写访问审计日志,满足 CLAUDE.md §11"管理员访问文件必须记录日志"要求。
-   */
+  // ── 直传意图 + 完成 ──────────────────────────────────────────────────────
+
+  /** 创建上传意图(需 User 或会员身份;匿名走 kiosk-upload)。 */
+  @Post('upload-intent')
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
+  async uploadIntent(
+    @Body() body: CreateUploadIntentDto,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<UploadIntentResponse>> {
+    const requester = await this.resolveRequester(req)
+    if (!requester) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后创建上传意图' } })
+    }
+    const res = await this.files.createUploadIntent({
+      body,
+      uploaderId: requester.kind === 'user' ? requester.userId : null,
+      endUserId: requester.kind === 'member' ? requester.endUserId : null,
+      actorRole: requester.kind === 'user' ? requester.role : null,
+      actorOrgId: requester.kind === 'user' ? requester.orgId : null,
+      createdBy: requester.kind === 'user' ? requester.userId : null,
+    })
+    return ApiResponse.ok(res)
+  }
+
+  /** 本地后端直传写入(签名 URL 即授权,内容类型非 application/json 时 body 为原始字节)。 */
+  @Put(':id/raw')
+  async rawUpload(
+    @Param('id') id: string,
+    @Query('expires') expires: string,
+    @Query('sig') sig: string,
+    @Req() req: ReqLike & AsyncIterable<Buffer>,
+  ): Promise<ApiResponse<{ ok: true }>> {
+    if (!expires || !sig || !verifyRawUploadSignature(id, expires, sig)) {
+      throw new UnauthorizedException({ error: { code: 'FILE_SIGNATURE_INVALID', message: '签名无效或已过期' } })
+    }
+    const chunks: Buffer[] = []
+    let total = 0
+    for await (const chunk of req) {
+      total += chunk.length
+      if (total > RAW_UPLOAD_MAX_BYTES) {
+        throw new PayloadTooLargeException({ error: { code: 'FILE_TOO_LARGE', message: '上传体积超出代理上限' } })
+      }
+      chunks.push(chunk)
+    }
+    await this.files.writeRawUpload(id, Buffer.concat(chunks))
+    return ApiResponse.ok({ ok: true })
+  }
+
+  /** 直传完成确认(headObject 复核;User / 会员本人)。 */
+  @Post(':id/complete')
+  async complete(@Param('id') id: string, @Req() req: ReqLike): Promise<ApiResponse<CompleteUploadResponse>> {
+    const requester = await this.resolveRequester(req)
+    if (!requester) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后确认上传' } })
+    }
+    return ApiResponse.ok(await this.files.completeUpload(id, requester))
+  }
+
+  // ── 下载 / 预览短期 URL ──────────────────────────────────────────────────
+
+  @Get(':id/download-url')
+  async downloadUrl(@Param('id') id: string, @Req() req: ReqLike): Promise<ApiResponse<FileAccessUrlResponse>> {
+    return this.accessUrl(id, req, 'attachment')
+  }
+
+  @Get(':id/preview-url')
+  async previewUrl(@Param('id') id: string, @Req() req: ReqLike): Promise<ApiResponse<FileAccessUrlResponse>> {
+    return this.accessUrl(id, req, 'inline')
+  }
+
+  private async accessUrl(
+    id: string,
+    req: ReqLike,
+    disposition: 'inline' | 'attachment',
+  ): Promise<ApiResponse<FileAccessUrlResponse>> {
+    const requester = await this.resolveRequester(req)
+    if (!requester) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后访问文件' } })
+    }
+    const { response, record, needsAdminAudit } = await this.files.getAccessUrl(id, requester, disposition)
+    // 合规(CLAUDE.md §11):管理员访问用户文件必须记录审计日志。
+    if (needsAdminAudit && requester.kind === 'user') {
+      await this.audit.write({
+        actorId: requester.userId,
+        actorRole: 'admin',
+        action: 'file.admin_access',
+        targetType: 'file',
+        targetId: id,
+        payload: { purpose: record.purpose, ownerType: record.ownerType, disposition },
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      })
+    }
+    return ApiResponse.ok(response)
+  }
+
+  /** 旧端点:重发签名 URL(已登录 User)。 */
   @Get(':id/url')
   @UseGuards(JwtAuthGuard)
   async signedUrl(
     @Param('id') id: string,
     @CurrentUser() user: AuthedUser,
-    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
+    @Req() req: ReqLike,
   ): Promise<ApiResponse<SignedUrlResponse>> {
     const result = await this.files.getSignedUrl(id, user)
     await this.audit.write({
@@ -173,24 +263,25 @@ export class FilesController {
   }
 
   /**
-   * 流式读取文件。签名失败一律返回 401,不区分原因(防探测)。
-   * 不挂 JwtAuthGuard:浏览器 <img>/<iframe> 不带 Authorization,只能靠签名。
+   * 流式读取文件(/content 代理,兼容本地 & COS 后端)。
+   * 签名失败一律 401,不区分原因(防探测)。不挂 JwtAuthGuard:浏览器
+   * <img>/<iframe> 不带 Authorization,只能靠签名。
    */
   @Get(':id/content')
   async content(
     @Param('id') id: string,
     @Query('expires') expires: string,
     @Query('sig') sig: string,
+    @Query('disposition') disposition: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
     if (!expires || !sig || !verifyFileSignature(id, expires, sig)) {
-      throw new UnauthorizedException({
-        error: { code: 'FILE_SIGNATURE_INVALID', message: '签名无效或已过期' },
-      })
+      throw new UnauthorizedException({ error: { code: 'FILE_SIGNATURE_INVALID', message: '签名无效或已过期' } })
     }
     const { buffer, mimeType, filename } = await this.files.readContent(id)
+    const dispType = disposition === 'attachment' ? 'attachment' : 'inline'
     res.setHeader('Content-Type', mimeType)
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`)
+    res.setHeader('Content-Disposition', `${dispType}; filename="${encodeURIComponent(filename)}"`)
     res.setHeader('Cache-Control', 'private, max-age=300')
     res.send(buffer)
   }
@@ -212,21 +303,26 @@ export class FilesController {
     )
   }
 
+  /**
+   * 删除文件(软删数据库 + 物理删 COS / 本地对象)。
+   * 授权:admin 任意;owner(uploader / 本机构 partner)/ 会员本人(endUserId)删自己的。
+   */
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  async forceDelete(
+  async remove(
     @Param('id') id: string,
     @Query('reason') reason: string,
-    @CurrentUser() user: AuthedUser,
-    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
+    @Req() req: ReqLike,
   ): Promise<ApiResponse<FileMetadata>> {
-    const finalReason = reason || 'admin manual delete'
-    const result = await this.files.forceDelete(id, user.userId, finalReason)
+    const requester = await this.resolveRequester(req)
+    if (!requester) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后删除文件' } })
+    }
+    const finalReason = reason || 'manual delete'
+    const result = await this.files.ownerDelete(id, requester, finalReason)
     await this.audit.write({
-      actorId: user.userId,
-      actorRole: 'admin',
-      action: 'file.force_delete',
+      actorId: requester.kind === 'user' ? requester.userId : requester.endUserId,
+      actorRole: requester.kind === 'user' ? requester.role : 'enduser',
+      action: 'file.delete',
       targetType: 'file',
       targetId: id,
       payload: { reason: finalReason, filename: result.filename, sensitiveLevel: result.sensitiveLevel },
@@ -237,14 +333,11 @@ export class FilesController {
     return ApiResponse.ok(result)
   }
 
-  /** 立即清理所有已过期文件(admin 手动触发,等价于 cron 提前跑一次)。 */
+  /** 立即清理所有已过期文件(admin 手动触发)。 */
   @Post('cleanup-expired')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  async cleanupExpired(
-    @CurrentUser() user: AuthedUser,
-    @Req() req: Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
-  ): Promise<ApiResponse<FileCleanupResponse>> {
+  async cleanupExpired(@CurrentUser() user: AuthedUser, @Req() req: ReqLike): Promise<ApiResponse<FileCleanupResponse>> {
     const result = await this.files.cleanupExpired('manual')
     await this.audit.write({
       actorId: user.userId,
@@ -259,6 +352,31 @@ export class FilesController {
     })
     return ApiResponse.ok(result)
   }
+
+  // ── 内部:解析请求者(会员优先,其次 User)───────────────────────────────
+
+  private async resolveRequester(req: ReqLike): Promise<FileRequester | null> {
+    const auth = extractAuth(req)
+    const member = await resolveOptionalEndUser(auth, this.jwt, this.redis)
+    if (member) return { kind: 'member', endUserId: member.endUserId }
+    if (auth && auth.toLowerCase().startsWith('bearer ')) {
+      const token = auth.slice(7).trim()
+      try {
+        const payload = this.jwt.verify<{ sub: string; role: UserRole; orgId: string | null; aud?: string }>(token)
+        if (payload.aud !== 'enduser') {
+          return { kind: 'user', userId: payload.sub, role: payload.role, orgId: payload.orgId }
+        }
+      } catch {
+        // 无效 User token → 视为未登录
+      }
+    }
+    return null
+  }
+}
+
+type ReqLike = Express.Request & {
+  requestId?: string
+  headers: Record<string, string | string[] | undefined>
 }
 
 /** Helper:从请求里取 IP(支持 X-Forwarded-For,生产应配 trust proxy)。 */

@@ -17,13 +17,23 @@ import {
 // ─── 后端字段 → 展示映射 ─────────────────────────────────────────────────────
 
 const PURPOSE_META: Record<AdminFilePurpose, { label: string; style: string; source: string }> = {
-  resume_upload: { label: '简历上传',   style: 'bg-blue-50 text-blue-600',     source: '用户上传' },
-  resume_scan:   { label: '简历扫描',   style: 'bg-purple-50 text-purple-600', source: '扫描仪'   },
-  id_scan:       { label: '身份证',     style: 'bg-red-50 text-red-600',       source: '扫描仪'   },
-  print_doc:     { label: '打印文档',   style: 'bg-gray-100 text-gray-600',    source: '打印上传' },
-  fair_material: { label: '招聘会资料', style: 'bg-green-50 text-green-600',    source: '机构上传' },
-  cover_letter:  { label: '求职信',     style: 'bg-blue-50 text-blue-600',     source: '用户上传' },
+  resume_upload:        { label: '简历上传',   style: 'bg-blue-50 text-blue-600',     source: '用户上传' },
+  resume_scan:          { label: '简历扫描',   style: 'bg-purple-50 text-purple-600', source: '扫描仪'   },
+  id_scan:              { label: '身份证',     style: 'bg-red-50 text-red-600',       source: '扫描仪'   },
+  print_doc:            { label: '打印文档',   style: 'bg-gray-100 text-gray-600',    source: '打印上传' },
+  fair_material:        { label: '招聘会资料', style: 'bg-green-50 text-green-600',    source: '机构上传' },
+  cover_letter:         { label: '求职信',     style: 'bg-blue-50 text-blue-600',     source: '用户上传' },
+  partner_profile:      { label: '机构资料',   style: 'bg-teal-50 text-teal-600',     source: '机构上传' },
+  partner_image:        { label: '岗位图片',   style: 'bg-teal-50 text-teal-600',     source: '机构上传' },
+  partner_video:        { label: '机构视频',   style: 'bg-teal-50 text-teal-600',     source: '机构上传' },
+  job_fair_material:    { label: '招聘会资料', style: 'bg-green-50 text-green-600',    source: '机构上传' },
+  screensaver_material: { label: '宣传屏素材', style: 'bg-amber-50 text-amber-600',   source: '运营上传' },
+  admin_upload:         { label: '管理员上传', style: 'bg-gray-100 text-gray-600',    source: '管理员'   },
+  temp:                 { label: '临时文件',   style: 'bg-gray-100 text-gray-500',    source: '临时'     },
 }
+
+/** 未知 / 未来 purpose 的安全兜底,避免 PURPOSE_META 查不到字段时崩页。 */
+const PURPOSE_FALLBACK = { label: '其他文件', style: 'bg-gray-100 text-gray-500', source: '其他' }
 
 const SENSITIVE_UI: Record<AdminFileSensitive, { key: 'high' | 'medium' | 'low'; badge: 'error' | 'warning' | 'default'; label: string }> = {
   highly_sensitive: { key: 'high',   badge: 'error',   label: '高敏感' },
@@ -85,8 +95,8 @@ interface ViewFile {
 }
 
 function toViewFile(f: AdminFileRecord, now: number): ViewFile {
-  const meta = PURPOSE_META[f.purpose]
-  const sens = SENSITIVE_UI[f.sensitiveLevel]
+  const meta = PURPOSE_META[f.purpose] ?? PURPOSE_FALLBACK
+  const sens = SENSITIVE_UI[f.sensitiveLevel] ?? SENSITIVE_UI.normal
   const clean = cleanStatusOf(f, now)
   return {
     raw: f,

@@ -17,6 +17,14 @@ export class UploadOptionsDto {
     'print_doc',
     'fair_material',
     'cover_letter',
+    // COS 接入新增(机构 / 管理员 / 屏保素材)
+    'partner_profile',
+    'partner_image',
+    'partner_video',
+    'job_fair_material',
+    'screensaver_material',
+    'admin_upload',
+    'temp',
   ])
   purpose!: string
 

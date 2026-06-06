@@ -16,6 +16,7 @@ import { TerminalsModule } from './terminals/terminals.module'
 import { PrintJobsModule } from './print-jobs/print-jobs.module'
 import { TrtcModule } from './trtc/trtc.module'
 import { ContentModule } from './content/content.module'
+import { StorageModule } from './storage/storage.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
@@ -45,6 +46,8 @@ const redisUrl = process.env['REDIS_URL']
       ? [BullModule.forRoot({ connection: parseRedisConnection(redisUrl) })]
       : []),
     PrismaModule,
+    // StorageModule(@Global): COS / 本地对象存储,files / content / print 共用。
+    StorageModule,
     // RedisModule(@Global): member-auth 会话/验证码/频控强依赖。
     RedisModule,
     // AuditModule 必须在 FilesModule / JobsModule 之前,
