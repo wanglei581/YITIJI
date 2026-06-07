@@ -75,10 +75,10 @@ interface ResponseEnvelope<T> {
 const mockTasks = new Map<string, DocumentProcessTaskView>()
 let mockTaskSeq = 1
 
-function makeUrl(path: string, accessToken?: string | null): string {
-  const url = new URL(`${API_BASE_URL}${path}`, window.location.origin)
-  if (accessToken?.trim()) url.searchParams.set('accessToken', accessToken.trim())
-  return url.toString()
+function makeUrl(path: string): string {
+  // L2：匿名材料任务 token 只走 x-material-task-token header（见 authHeaders），
+  // 不再拼入 URL query，避免 token 落入访问日志 / 浏览器历史。
+  return new URL(`${API_BASE_URL}${path}`, window.location.origin).toString()
 }
 
 function authHeaders(access?: MaterialTaskAccess): HeadersInit {
@@ -124,7 +124,7 @@ async function request<T>(
   init: RequestInit,
   access?: MaterialTaskAccess,
 ): Promise<T> {
-  const res = await fetch(makeUrl(path, access?.accessToken), {
+  const res = await fetch(makeUrl(path), {
     ...init,
     headers: authHeaders(access),
     credentials: 'include',

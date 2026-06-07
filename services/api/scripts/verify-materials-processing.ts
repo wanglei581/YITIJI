@@ -223,6 +223,20 @@ async function main() {
     if (task.piiFindings?.every((f) => !f.snippet || f.snippet.length <= 32)) pass('PII snippets are capped at 32 chars')
     else fail('PII finding snippet exceeded 32 chars')
 
+    // M1: snippet 必须在服务端落库前掩码，DB 与 API 都不含完整 PII 原文。
+    const storedFindings = await prisma.piiFinding.findMany({ where: { taskId: task.id }, select: { snippet: true } })
+    const storedSnippets = storedFindings.map((f) => f.snippet ?? '').join('\n')
+    const apiSnippets = (task.piiFindings ?? []).map((f) => f.snippet ?? '').join('\n')
+    const fullPiiValues = ['13800138000', 'zhangsan@example.com', 'zhangsan', '110101199001011234', '测试路', '市南区']
+    const dbLeak = fullPiiValues.filter((v) => storedSnippets.includes(v))
+    const apiLeak = fullPiiValues.filter((v) => apiSnippets.includes(v))
+    if (dbLeak.length === 0) pass('PiiFinding.snippet 落库已掩码，不含完整手机号/邮箱/身份证/地址原文')
+    else fail(`PiiFinding.snippet 落库仍含完整 PII: ${dbLeak.join(', ')}`)
+    if (apiLeak.length === 0) pass('PII findings API 返回 snippet 不含完整 PII 原文')
+    else fail(`PII findings API 返回 snippet 仍含完整 PII: ${apiLeak.join(', ')}`)
+    if (storedSnippets.includes('****')) pass('PiiFinding.snippet 已应用掩码标记')
+    else fail('PiiFinding.snippet 未检测到掩码标记，掩码可能未生效')
+
     const rawTask = await prisma.documentProcessTask.findUnique({ where: { id: task.id } })
     if (rawTask && !rawTask.paramsJson.includes(textSample)) pass('Full textSample is not stored in paramsJson')
     else fail('paramsJson stored the full raw textSample')

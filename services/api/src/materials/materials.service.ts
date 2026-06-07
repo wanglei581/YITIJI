@@ -509,7 +509,7 @@ function buildSimulatedPiiFindings(args: { filename: string; textSample?: string
     type: 'phone',
     label: '手机号',
     pageNumber: null,
-    snippet: limitSnippet(value),
+    snippet: maskPiiSnippet('phone', value),
     confidence: 0.95,
     action: 'pending' as const,
   })).forEach((finding) => {
@@ -524,7 +524,7 @@ function buildSimulatedPiiFindings(args: { filename: string; textSample?: string
     type: 'email',
     label: '邮箱',
     pageNumber: null,
-    snippet: limitSnippet(value),
+    snippet: maskPiiSnippet('email', value),
     confidence: 0.93,
     action: 'pending' as const,
   })).forEach((finding) => {
@@ -539,7 +539,7 @@ function buildSimulatedPiiFindings(args: { filename: string; textSample?: string
     type: 'id_card',
     label: '身份证号',
     pageNumber: null,
-    snippet: limitSnippet(value.toUpperCase()),
+    snippet: maskPiiSnippet('id_card', value),
     confidence: 0.9,
     action: 'pending' as const,
   })).forEach((finding) => {
@@ -554,7 +554,7 @@ function buildSimulatedPiiFindings(args: { filename: string; textSample?: string
     type: 'address',
     label: '地址',
     pageNumber: null,
-    snippet: limitSnippet(value.trim()),
+    snippet: maskPiiSnippet('address', value),
     confidence: 0.78,
     action: 'pending' as const,
   })).forEach((finding) => {
@@ -743,6 +743,56 @@ function countPdfPages(buffer: Buffer): number | null {
 
 function limitSnippet(value: string): string {
   return value.length > MAX_SNIPPET_CHARS ? value.slice(0, MAX_SNIPPET_CHARS) : value
+}
+
+/**
+ * 服务端落库前掩码 PII 片段（M1）。
+ *
+ * DB 与 API 返回的 snippet 不再包含完整手机号 / 邮箱 / 身份证号 / 地址原文，
+ * 仅保留供用户辨识类型的最小片段。前端 maskSnippet 作为二次防护，但不依赖前端。
+ */
+function maskPiiSnippet(type: string, raw: string): string {
+  const value = raw.trim()
+  if (!value) return ''
+  let masked: string
+  if (type === 'phone') masked = maskPhone(value)
+  else if (type === 'email') masked = maskEmail(value)
+  else if (type === 'id_card') masked = maskIdCard(value)
+  else if (type === 'address') masked = maskAddress(value)
+  else masked = maskGeneric(value)
+  return limitSnippet(masked)
+}
+
+function maskPhone(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  const core = digits.length > 11 ? digits.slice(-11) : digits
+  if (core.length < 7) return `${core.slice(0, 1)}****`
+  return `${core.slice(0, 3)}****${core.slice(-4)}`
+}
+
+function maskEmail(value: string): string {
+  const at = value.indexOf('@')
+  if (at <= 0) return maskGeneric(value)
+  const domain = value.slice(at + 1)
+  return `${value.slice(0, 1)}***@${domain}`
+}
+
+function maskIdCard(value: string): string {
+  const v = value.toUpperCase()
+  if (v.length <= 6) return `${v.slice(0, 1)}****`
+  return `${v.slice(0, 3)}****${v.slice(-2)}`
+}
+
+function maskAddress(value: string): string {
+  // 保留到第一个行政级别字（省/市/区/县）为止，遮住后续街道、门牌等详细段。
+  const match = value.match(/[省市区县]/)
+  if (match && match.index !== undefined) return `${value.slice(0, match.index + 1)}****`
+  return `${value.slice(0, 2)}****`
+}
+
+function maskGeneric(value: string): string {
+  if (value.length <= 4) return `${value.slice(0, 1)}**`
+  return `${value.slice(0, 2)}***${value.slice(-2)}`
 }
 
 function toTaskView(task: TaskRecord): DocumentProcessTaskView {
