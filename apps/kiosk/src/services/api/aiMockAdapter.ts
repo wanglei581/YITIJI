@@ -83,7 +83,8 @@ export const aiMockAdapter = {
     }
   },
 
-  async getResumeRecord(taskId: string): Promise<ResumeParseResponse> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getResumeRecord(taskId: string, _token?: string | null): Promise<ResumeParseResponse> {
     await delay(80)
     return {
       taskId,
@@ -92,7 +93,8 @@ export const aiMockAdapter = {
     }
   },
 
-  async getResumeOptimize(taskId: string): Promise<ResumeOptimizeResponse> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getResumeOptimize(taskId: string, _token?: string | null): Promise<ResumeOptimizeResponse> {
     await delay(120)
     return {
       taskId,

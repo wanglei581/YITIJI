@@ -101,9 +101,19 @@ export class AiController {
     return result
   }
 
+  /**
+   * 查询解析结果。
+   *
+   * 归属收口（Phase C-1）：带会员 token 时解析出 endUserId，会员所有的结果
+   * 只能由本人读取；不同会员 / 匿名请求按 AI_TASK_NOT_FOUND 处理（service 层校验）。
+   */
   @Get('resume/records/:taskId')
-  async getResumeRecord(@Param('taskId') taskId: string): Promise<ResumeParseResponseDto> {
-    return this.aiService.getResumeRecord(taskId)
+  async getResumeRecord(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ): Promise<ResumeParseResponseDto> {
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    return this.aiService.getResumeRecord(taskId, endUser?.endUserId ?? null)
   }
 
   @Get('resume/records/:taskId/optimize')
@@ -111,7 +121,8 @@ export class AiController {
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
   ): Promise<ResumeOptimizeResponseDto> {
-    const result = await this.aiService.getResumeOptimize(taskId)
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const result = await this.aiService.getResumeOptimize(taskId, endUser?.endUserId ?? null)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -123,6 +134,7 @@ export class AiController {
         providerName: this.aiService.getProviderName(),
         status: result.status,
         moduleCount: result.modules?.length ?? 0,
+        hasEndUser: Boolean(endUser),
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),

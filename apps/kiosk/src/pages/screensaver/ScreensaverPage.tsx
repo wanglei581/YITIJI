@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { KioskScreensaverItem, KioskScreensaverPlaylist } from '@ai-job-print/shared'
+import { useAuth } from '../../auth/useAuth'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
 
@@ -18,7 +19,14 @@ import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
 export function ScreensaverPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { logout } = useAuth()
   const statePlaylist = (location.state as { playlist?: KioskScreensaverPlaylist } | null)?.playlist
+
+  // 进入待机宣传屏即清理会员登录态（Phase C-1）：屏保意味着用户已离开，
+  // 为下一位用户重置内存会话，避免登录态/敏感记录残留。logout 幂等。
+  useEffect(() => {
+    logout()
+  }, [logout])
 
   const [items, setItems] = useState<KioskScreensaverItem[]>(statePlaylist?.items ?? [])
   const [index, setIndex] = useState(0)

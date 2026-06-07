@@ -5,6 +5,7 @@ import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import { AlertCircleIcon, InfoIcon, PrinterIcon, SparklesIcon, TargetIcon, TrendingUpIcon } from 'lucide-react'
 import type { ResumeOptimizeModule, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
+import { useAuth } from '../../auth/useAuth'
 import { getResumeOptimize } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 
@@ -41,6 +42,7 @@ function estimateUplift(modules: ResumeOptimizeModule[]): { before: number; afte
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
 
   const taskId = typeof state?.taskId === 'string' ? state.taskId : undefined
@@ -59,7 +61,8 @@ export function ResumeOptimizePage() {
       return
     }
     let cancelled = false
-    getResumeOptimize(taskId)
+    // 归属收口（Phase C-1）：登录会员须带 token 才能读回本人优化结果。
+    getResumeOptimize(taskId, getToken())
       .then((res) => {
         if (cancelled) return
         if (res.modules && res.modules.length > 0) setModules(res.modules)
@@ -68,7 +71,7 @@ export function ResumeOptimizePage() {
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId])
+  }, [taskId, getToken])
 
   const uplift = useMemo(() => estimateUplift(modules), [modules])
 

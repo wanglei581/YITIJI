@@ -45,6 +45,13 @@ export interface AuthContextValue {
   /** 展示名：登录态为 phoneMasked；游客态为空串。 */
   displayName: string
   /**
+   * 是否已选择「先使用」（匿名继续）。仅内存，登出后复位。
+   * 首页登录状态栏用它区分「未登录（初始）」与「匿名使用（已选择继续）」。
+   */
+  guestMode: boolean
+  /** 标记用户选择匿名继续使用。 */
+  continueAsGuest: () => void
+  /**
    * 业务繁忙态（打印中 / 扫描中 / AI 生成中）。
    * IdleLogoutGuard 接入后，busy=true 时暂停自动登出计时。
    */

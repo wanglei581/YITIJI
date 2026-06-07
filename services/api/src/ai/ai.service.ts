@@ -138,8 +138,22 @@ export class AiService {
     }
   }
 
-  /** 读取已落库的结果，按 kind 反序列化为对应的 Output 形状。 */
-  private async loadResult<T>(taskId: string, kind: 'parse' | 'optimize'): Promise<T | null> {
+  /**
+   * 读取已落库的结果，按 kind 反序列化为对应的 Output 形状。
+   *
+   * 归属收口（Phase C-1，CLAUDE.md §11）：
+   * - 会员（endUserId 非空）拥有的结果**只能由本人**读取。requesterEndUserId
+   *   与行 endUserId 不一致（含匿名请求、其他会员）一律按「不存在」处理，
+   *   返回 null → 上层抛 AI_TASK_NOT_FOUND，既阻断越权读取，也不泄露结果是否存在。
+   * - 匿名结果（endUserId 为 null）本阶段仍保持可读（短 TTL 兜底）。一次性
+   *   accessToken 的强约束属 Phase C-2，残留风险见 docs/progress/next-tasks.md。
+   * - 留存治理：已过期 / 无 expiresAt（迁移前历史行）一律视为不存在。
+   */
+  private async loadOwnedResult<T>(
+    taskId: string,
+    kind: 'parse' | 'optimize',
+    requesterEndUserId: string | null,
+  ): Promise<T | null> {
     const row = await this.prisma.aiResumeResult.findUnique({
       where: { taskId_kind: { taskId, kind } },
     })
@@ -147,6 +161,8 @@ export class AiService {
     // 留存治理:已过期 或 无 expiresAt（迁移前写入的历史行）一律视为不存在。
     // 读取路径不得在到期后 / 对无留存窗口的历史行返回简历派生内容（cron 清扫前也不行）。
     if (!row.expiresAt || row.expiresAt.getTime() < Date.now()) return null
+    // 归属收口:会员所有的结果只能由本人读取;不同会员/匿名请求视为不存在。
+    if (row.endUserId && row.endUserId !== requesterEndUserId) return null
     try {
       return JSON.parse(row.payloadJson) as T
     } catch {
@@ -154,19 +170,19 @@ export class AiService {
     }
   }
 
-  async getResumeRecord(taskId: string): Promise<ParseResumeOutput> {
-    const stored = await this.loadResult<ParseResumeOutput>(taskId, 'parse')
+  async getResumeRecord(taskId: string, requesterEndUserId: string | null = null): Promise<ParseResumeOutput> {
+    const stored = await this.loadOwnedResult<ParseResumeOutput>(taskId, 'parse', requesterEndUserId)
     if (stored) return stored
     throw new NotFoundException({
       error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新提交简历' },
     })
   }
 
-  async getResumeOptimize(taskId: string): Promise<OptimizeResumeOutput> {
-    const cached = await this.loadResult<OptimizeResumeOutput>(taskId, 'optimize')
+  async getResumeOptimize(taskId: string, requesterEndUserId: string | null = null): Promise<OptimizeResumeOutput> {
+    const cached = await this.loadOwnedResult<OptimizeResumeOutput>(taskId, 'optimize', requesterEndUserId)
     if (cached) return cached
 
-    const parseResult = await this.loadResult<ParseResumeOutput>(taskId, 'parse')
+    const parseResult = await this.loadOwnedResult<ParseResumeOutput>(taskId, 'parse', requesterEndUserId)
     if (!parseResult) {
       throw new NotFoundException({
         error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },

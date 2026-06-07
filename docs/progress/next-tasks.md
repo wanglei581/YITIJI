@@ -1,7 +1,24 @@
 # 下一步任务
 
-> 最后更新：2026-06-07（AI求职材料中心 B-2 基础页数识别 + 图片清晰度预检 + PII 四类扫描 + A4 规范化评估 + PII 遮挡评估最小契约已推进，B-1 浏览器链路已手验）
+> 最后更新：2026-06-07（Phase C-1 会员登录安全收口 + 首页登录状态栏已完成；AI求职材料中心 B-2 各最小契约已推进，B-1 浏览器链路已手验）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
+
+---
+
+## 📌 Phase C-1 会员登录安全收口 + 首页登录状态栏（2026-06-07，Claude，已完成代码 + 静态/脚本/浏览器手验）
+
+详见 [current-progress.md](./current-progress.md) §Phase C-1。
+
+- ✅ Kiosk 空闲自动登出：登录态超时 / 进入待机宣传屏 → 清内存会话；忙碌态（打印/扫描/AI/上传）豁免，沿用 `KioskBusyContext` + `AuthContext.busy`；token 仍仅内存。
+- ✅ AI 简历结果读取归属收口：会员结果只能本人凭 token 读取，越权/匿名一律 `AI_TASK_NOT_FOUND`；`verify:ai-result-ownership` ALL PASS。
+- ✅ 首页登录状态栏（未登录/匿名/已登录三态，跳 `/login`，不改底部 Tab，按钮 ≥56px）；ProfilePage 诚实化（移除「跨设备查看」，资产中心建设中）。
+- ✅ kiosk typecheck/lint/build + api typecheck/lint 全绿；禁词 0 命中；Playwright mock 浏览器手验 13/13。
+
+**Phase C-2 待办（本阶段未做）：**
+
+- ⏳ **匿名 AI 结果一次性 accessToken**：当前匿名结果（`endUserId=null`）仍可凭 taskId 在短 TTL 内读取（mock taskId 可猜测）。需 `AiResumeResult` 加 `accessTokenHash` 列 + `POST /resume/parse` 回传一次性 token + 各读取点透传（对齐 materials 任务 `accessTokenHash` 机制），把匿名读取从「短 TTL 兜底」收紧为「持令牌才可读」。
+- ⏳ **完整用户资产中心**：我的简历 / 我的文档 / AI记录 / 收藏 的跨会话列表 API + 落库归属展示（当前 ProfilePage 仅展示本次会话 location.state，无后端资产列表端点）。
+- ⏳ **登录态运行期手验**：需 API + 会员短信验证码环境，手验已登录状态栏、idle 超时登出、进入屏保登出、忙碌态（打印/AI 中）不误登出。
 
 ---
 
