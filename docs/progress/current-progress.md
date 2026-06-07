@@ -5,6 +5,66 @@
 
 ---
 
+## Kiosk 我的页登录态蓝色个人中心改造（2026-06-07，Codex）
+
+**目标：** 将 Kiosk「我的」页登录后的个人账号区域调整为参考图的蓝色个人中心视觉：顶部蓝色资料区、头像/登录状态、账号信息、默认简历完整度、账号统计，以及蓝区下方的待处理任务横条；保留下方原有功能入口、账号资产真实列表、本次会话记录和底部 Tab。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 登录态 `ProfileHeader` 改为蓝色 Hero：显示昵称/脱敏手机号、已登录标识、账号资料提示、默认简历进度条、AI 记录/收藏记录/文档记录统计；新增 `PendingTaskBanner`，在蓝区下方显示待处理任务状态；游客态仍保留原白色登录提示卡；下方九宫格入口、账号资产读取、本次会话记录逻辑不变 |
+
+**当前边界：**
+
+- ✅ 统计优先使用现有账号资产 API 与本次会话记录，不新增后端接口。
+- ✅ 不新增招聘闭环能力，不出现平台内投递、企业收简历、面试邀约等违规功能。
+- ✅ 登录态仍为纯内存；刷新页面回游客态，符合公共一体机安全要求。
+
+---
+
+## Kiosk 登录页样式改造 + 扫码登录入口预留（2026-06-07，Codex）
+
+**目标：** 将 Kiosk 当前深蓝小卡片登录页调整为参考图的浅灰全屏登录体验：顶部返回、居中 AI 品牌、横向分段 Tab、宽表单、底部回首页与协议区；同时预留邮箱、微信扫码、支付宝扫码登录入口。当前真实可用登录方式仍为手机号验证码，扫码/邮箱只做入口与状态占位，不伪造登录成功。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/pages/auth/LoginPage.tsx` | 重写登录页视觉与交互：`手机号 / 邮箱 / 扫码` 三段 Tab；手机号页使用宽输入框 + 获取验证码 + 立即登录，继续调用现有 `sendSmsCode` / `memberLogin`；手机号 / 验证码输入框 `readOnly` + `inputMode="none"` 禁止系统软键盘，点击后内嵌展开 3×4 虚拟数字键盘（清空 / 0 / 删除 / 下一步或完成），键盘作为页面内容流向下展开、不遮挡输入框，按键触控区对齐既有 `KioskNumPad`（数字 / 0 / 删除 / 清空 ≥72px、确认键 ≥56px，`onPointerDown` + `preventDefault` 即时响应）；邮箱页展示待接入说明；扫码页新增 `微信扫码 / 支付宝扫码` 切换、二维码展示与刷新按钮，并明确提示真实登录需后续接入微信/支付宝开放平台授权回调；页脚「立即注册 / 用户服务协议 / 隐私政策」点击均给诚实提示，无无响应按钮 |
+
+**当前边界：**
+
+- ✅ 手机号验证码登录仍为真实链路，token 仍只写入 `AuthContext` 内存态，不写浏览器持久化存储。
+- ✅ 输入全程走内嵌虚拟数字键盘（`readOnly` + `inputMode="none"`），公共一体机不弹系统软键盘；`returnTo` 仍按 `/` 前缀校验、拒绝 `//` 开放重定向。
+- ✅ 扫码二维码为 UI / 协议占位，不接真实 OAuth，不会伪造“扫码成功”。
+- ⏳ 后续若要真实微信/支付宝扫码登录，需要申请对应开放平台能力，补后端二维码会话、轮询/回调、账号绑定与风控。
+
+---
+
+## C 端会员短信 Provider 预留（2026-06-07，Codex）
+
+**目标：** 当前尚未申请腾讯云短信服务，先把短信发送 Provider 选择层、腾讯云配置位和安全失败策略预留好；保持开发环境现有日志验证码行为不变。后续腾讯云短信签名 / 模板 / SDKAppID / CAM 密钥拿到后，只需补 `TencentSmsSender.sendCode()` 的真实 SendSms API 调用，不需要重写会员登录流程。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/member-auth/sms/sms-sender.ts` | 新增 `SMS_PROVIDER` 选择：`log`（开发日志验证码）/ `tencent`（腾讯云短信预留）。生产环境未显式配置 provider 或配置 `log` 时启动即失败；`tencent` 会校验 `TENCENT_SMS_SECRET_ID/SECRET_KEY/SDK_APP_ID/SIGN_NAME/TEMPLATE_ID`，真实发送暂未接入，调用时 fail-closed，不打印验证码 |
+| `services/api/src/member-auth/member-auth.module.ts` | `SMS_SENDER` 从固定 `LogSmsSender` 改为 `createSmsSender` 工厂注入 |
+| `services/api/src/member-auth/member-auth.service.ts` | 短信发送失败时立即删除本次 Redis 验证码和冷却键，避免「短信未发出但验证码仍可用」的残留状态 |
+| `services/api/.env.example` | 新增 C 端会员短信验证码配置段：`SMS_PROVIDER` 与腾讯云短信 6 个 env 占位 |
+| `services/api/scripts/verify-sms-provider.ts` + `package.json` | 新增 `pnpm verify:sms-provider`，无网络验证 Provider 选择、生产保护和腾讯云配置校验 |
+
+**当前边界：**
+
+- ✅ 开发环境默认仍可用日志验证码（`SMS_PROVIDER` 未配时自动 `log`）。
+- ✅ 生产环境不会误用日志验证码：`NODE_ENV=production` 时必须显式 `SMS_PROVIDER=tencent`。
+- ✅ 腾讯云短信配置项已固定，真实值后续只进服务端 `.env` / secrets manager，不进仓库。
+- ⏳ 真实腾讯云 `SendSms` 调用未实现，等短信服务审核通过、签名和模板 ID 下发后补齐。
+
+---
+
 ## 阶段开发与 UI/UX 节奏原则（2026-06-07，Codex）
 
 后续功能开发采用「功能可用 + 基础 UX 合格 + 合规文案正确」作为单功能交付标准；不要先把所有功能堆完再补体验，也不要在核心链路未跑通前投入大规模视觉精修。

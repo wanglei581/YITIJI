@@ -3,7 +3,7 @@ import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberAuthController } from './member-auth.controller'
 import { MemberAuthService } from './member-auth.service'
-import { LogSmsSender, SMS_SENDER } from './sms/sms-sender'
+import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
 
 /**
  * C 端求职者账号模块(阶段 A)。
@@ -33,7 +33,7 @@ import { LogSmsSender, SMS_SENDER } from './sms/sms-sender'
   providers: [
     MemberAuthService,
     EndUserAuthGuard,
-    { provide: SMS_SENDER, useClass: LogSmsSender },
+    { provide: SMS_SENDER, useFactory: createSmsSender },
   ],
   exports: [EndUserAuthGuard],
 })

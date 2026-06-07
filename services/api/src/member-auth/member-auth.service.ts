@@ -87,11 +87,19 @@ export class MemberAuthService {
 
     // 3) 生成 6 位数字验证码 → Redis(TTL 5min),重置尝试计数。
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0')
-    await this.redis.setEx(this.k.code(phoneHash), CODE_TTL, code)
+    const codeKey = this.k.code(phoneHash)
+    await this.redis.setEx(codeKey, CODE_TTL, code)
     await this.redis.del(this.k.attempt(phoneHash))
 
-    // 4) 下发(dev: 仅服务端日志,不返回明文验证码)。
-    await this.sms.sendCode(phone, code)
+    // 4) 下发(dev: 仅服务端日志,不返回明文验证码)。若真实服务商发送失败,
+    // 立即删除本次验证码,避免出现"短信未发出但验证码仍可用"的残留状态。
+    try {
+      await this.sms.sendCode(phone, code)
+    } catch (error) {
+      await this.redis.del(codeKey)
+      await this.redis.del(this.k.cooldown(phoneHash))
+      throw error
+    }
 
     return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: CODE_TTL }
   }
