@@ -204,6 +204,14 @@
 - 验证：`pnpm --filter @ai-job-print/kiosk typecheck` ✅；`pnpm --filter @ai-job-print/kiosk lint` ✅（仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）；`pnpm --filter @ai-job-print/kiosk build` ✅（仅既有 chunk-size warning）；`git diff --check` ✅。
 - Playwright 本地手验：`VITE_API_MODE=mock` Kiosk 5176，注入测试打印会话后访问 `/print/preview`；1220×768 视口下可滚动到“价格说明”“打印须知”和底部按钮；说明文字全部命中；底部操作区不再 fixed/sticky 覆盖内容。
 
+**2026-06-07 真实 API 链路验证：上传到打印完成页（Codex）**
+
+- 环境：API 3010 使用 `FILE_STORAGE_DRIVER=local` 强制本地文件存储；Kiosk 5177 使用 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_API_PROXY_TARGET=http://localhost:3010`、`VITE_TERMINAL_ID=KSK-001`；测试文件为仓库内 `apps/kiosk/public/assets/ai-advisor.png`。
+- 浏览器真实流程：Playwright 操作 `/print/upload` 文件选择 → `POST /files/kiosk-upload` 成功 → `/print/material-check` 自动完成 `inspection → normalize_a4 → pii_scan → pii_redact` → `/print/preview` 左侧显示图片预览，材料检查摘要显示“遮挡 0 项” → `/print/confirm` → 点击“按以上设置打印”创建真实打印任务 → `/print/progress`。
+- Agent 状态链路：通过本地 dev.db 的 `KSK-001` 测试终端 token 调用 Terminal Agent API，claim 待打印任务并按合法状态流 `claimed → printing → completed` 回写；Kiosk 进度页轮询后跳转 `/print/done`，成功页显示“打印完成”。
+- 验证结果：真实用户打印任务 `ptask_kiosk_63b38641b41fc5aa` 最终状态 `completed`；浏览器 console error 0；截图保存在 `/private/tmp/real-flow-upload.png`、`/private/tmp/real-flow-material-check.png`、`/private/tmp/real-flow-preview.png`、`/private/tmp/real-flow-confirm.png`、`/private/tmp/real-flow-done.png`。
+- 边界：本次验证覆盖真实 API、真实文件上传、材料任务、打印任务创建、Terminal Agent claim/status API 与 Kiosk 进度轮询；未连接 Windows Terminal Agent 和奔图真机，因此不等同于真实出纸验证。真机出纸仍按 Phase 8 待办执行。
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）

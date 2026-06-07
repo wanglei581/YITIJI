@@ -100,7 +100,8 @@
    - 验收：会员文件只能本人访问；匿名任务无 token/错 token 拒绝；刷新或返回后能恢复当前任务；打印确认页不出现投递、推荐企业、候选人等招聘闭环语义。
 4. 🔄 **Phase B-1 验证收尾（下一步优先）**：浏览器 HTTP 模式和一体机真机触控手验。
    - 当前 `.env` 如为 `FILE_STORAGE_DRIVER=cos`，先切到 local 存储或使用明确的测试 COS 桶/前缀，避免把本地测试文件写入生产 COS。
-   - 跑通 `上传 -> 打印前材料检查 -> 打印设置 -> 确认打印`。
+   - ✅ 2026-06-07 已跑通本地真实 API 链路：`上传 -> 打印前材料检查 -> 打印设置 -> 确认打印 -> 进度页 -> 完成页`；API 使用 local 文件存储，Kiosk 走 http 模式，Terminal Agent claim/status 由本地测试终端 API 模拟完成。
+   - ⏳ 仍需 Windows Terminal Agent + 奔图真机出纸验证：真实 Agent 下载文件、SHA-256 校验、调用打印机、回写 `printing/completed/failed`。
    - 确认 `/print/material-check` 不被待机宣传屏打断。
    - 确认真实 API 模式下匿名 `accessToken` 查询 / 决策生效。
    - 手验刷新 / 返回后的当前任务恢复：不得重复创建 `inspection` / `pii_scan`，不得丢失 `fileId` / `accessToken` / 隐私摘要 / 打印参数。
