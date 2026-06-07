@@ -222,7 +222,7 @@ function RenshiEntryBar({ onAction }: { onAction: () => void }) {
 function LoginStatusBar() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn, guestMode, displayName, continueAsGuest } = useAuth()
+  const { isLoggedIn, guestMode, displayName, continueAsGuest, logout } = useAuth()
   // 登录后返回来源页（首页）：把当前路径作为 from 传入 /login
   const goLogin = () => navigate('/login', { state: { from: location.pathname } })
 
@@ -236,16 +236,28 @@ function LoginStatusBar() {
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold text-gray-900">{displayName}</p>
           <p className="mt-0.5 text-sm text-gray-500">可查看我的简历、文档、收藏与 AI 记录</p>
+          <p className="mt-0.5 text-xs text-gray-400">长时间无操作将自动退出，保护个人资料</p>
         </div>
-        <Button
-          size="lg"
-          variant="secondary"
-          onClick={() => navigate('/profile')}
-          className="h-14 shrink-0 px-5 text-base"
-        >
-          进入我的
-          <ChevronRightIcon className="ml-0.5 h-5 w-5" aria-hidden="true" />
-        </Button>
+        <div className="flex shrink-0 items-center gap-3">
+          {/* 退出登录：次级按钮，登出后停留首页（不跳 /login）；触控高度 ≥56px */}
+          <Button
+            size="lg"
+            variant="secondary"
+            onClick={() => logout()}
+            className="h-14 px-5 text-base"
+          >
+            退出登录
+          </Button>
+          {/* 进入我的：主按钮 */}
+          <Button
+            size="lg"
+            onClick={() => navigate('/profile')}
+            className="h-14 px-5 text-base"
+          >
+            进入我的
+            <ChevronRightIcon className="ml-0.5 h-5 w-5" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
     )
   }
