@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
-import type { MemberAiRecordItem, MemberDocumentItem, MemberResumeItem } from '@ai-job-print/shared'
+import type {
+  BenefitStatus,
+  BenefitType,
+  FavoriteTargetType,
+  MemberAiRecordItem,
+  MemberBenefitItem,
+  MemberDocumentItem,
+  MemberFavoriteItem,
+  MemberResumeItem,
+} from '@ai-job-print/shared'
 import {
   BellIcon,
   BotIcon,
@@ -40,6 +49,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { fetchAccessUrl, getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
+import { getMyBenefits, getMyFavorites, removeFavorite } from '../../services/api/memberFavorites'
 
 // 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
 // 诚实化与合规约束：
@@ -77,8 +87,8 @@ const ASSETS: Entry[] = [
   { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', tag: '本次记录' },
   { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', tag: '本次记录' },
   { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', tag: '本次记录' },
-  { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏', tag: '建设中' },
-  { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益', tag: '建设中' },
+  { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏' },
+  { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益' },
 ]
 
 // 2. 常用服务（均跳转既有功能页）
@@ -302,6 +312,42 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+// ── 收藏 / 权益展示元数据（Phase C-2C）─────────────────────────────────────────
+
+// 收藏对象按类型给图标 + 可选详情路由（job/job_fair 可跳既有详情页；policy 暂无详情页，仅展示）。
+const FAVORITE_META: Record<
+  FavoriteTargetType,
+  { icon: LucideIcon; iconBg: string; iconColor: string; label: string; route?: (id: string) => string }
+> = {
+  job: { icon: BriefcaseIcon, iconBg: 'bg-sky-50', iconColor: 'text-sky-600', label: '岗位', route: (id) => `/jobs/${id}` },
+  job_fair: { icon: CalendarIcon, iconBg: 'bg-green-50', iconColor: 'text-green-600', label: '招聘会', route: (id) => `/job-fairs/${id}` },
+  policy: { icon: LandmarkIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '政策' },
+}
+
+const BENEFIT_META: Record<BenefitType, { icon: LucideIcon; iconBg: string; iconColor: string; label: string }> = {
+  coupon: { icon: TicketIcon, iconBg: 'bg-rose-50', iconColor: 'text-rose-600', label: '优惠券' },
+  free_quota: { icon: GiftIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '免费次数' },
+  package_entitlement: { icon: BoxIcon, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', label: '套餐额度' },
+  subsidy_eligibility_hint: { icon: LandmarkIcon, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', label: '补贴资格提示' },
+}
+
+const BENEFIT_STATUS_LABEL: Record<BenefitStatus, string> = {
+  active: '可用',
+  used_up: '已用完',
+  expired: '已过期',
+  revoked: '已失效',
+}
+
+// 权益副文本：状态 + 额度（仅额度类）+ 有效期；不出现任何「到账 / 已发放金额」承诺。
+function benefitMetaText(b: MemberBenefitItem): string {
+  const parts: string[] = [BENEFIT_STATUS_LABEL[b.status] ?? b.status]
+  if (b.quantityRemaining != null) {
+    parts.push(b.quantityTotal != null ? `剩 ${b.quantityRemaining}/${b.quantityTotal} 次` : `剩 ${b.quantityRemaining} 次`)
+  }
+  if (b.validUntil) parts.push(`有效期至 ${formatTime(b.validUntil)}`)
+  return parts.join(' · ')
+}
+
 // 账号资产行：图标 + 名称 + 元信息 + 可选文本操作（触控区 ≥48px）。
 function AssetRow({
   icon: Icon,
@@ -341,6 +387,42 @@ function AssetRow({
           {actionLabel}
         </button>
       )}
+    </div>
+  )
+}
+
+// 收藏行：图标 + 名称 + 类型/时间 + 可选「查看」(job/job_fair 跳详情) + 取消收藏（触控区 ≥48px）。
+function FavoriteRow({
+  fav,
+  onView,
+  onRemove,
+}: {
+  fav: MemberFavoriteItem
+  onView?: () => void
+  onRemove: () => void
+}) {
+  const meta = FAVORITE_META[fav.targetType]
+  const Icon = meta.icon
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', meta.iconBg].join(' ')}>
+        <Icon className={['h-5 w-5', meta.iconColor].join(' ')} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-gray-900">{fav.title || `${meta.label}收藏`}</p>
+        <p className="truncate text-xs text-gray-400">{`${meta.label} · ${formatTime(fav.createdAt)}`}</p>
+      </div>
+      {onView && (
+        <button
+          type="button"
+          onClick={onView}
+          className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-lg border border-gray-200 px-3 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50 active:bg-primary-100"
+        >
+          <ExternalLinkIcon className="h-4 w-4" aria-hidden="true" />
+          查看
+        </button>
+      )}
+      <RowIconButton icon={Trash2Icon} title="取消收藏" tone="danger" onClick={onRemove} />
     </div>
   )
 }
@@ -420,11 +502,13 @@ export function ProfilePage() {
 
   const hasSessionRecords = resumes.length + scans.length + aiRecords.length > 0
 
-  // ── 账号资产（Phase C-2B）：仅登录会员，凭本人 token 拉取后端只读列表 ──────
+  // ── 账号资产（Phase C-2B 简历/文档/AI记录 + C-2C 收藏/权益）：仅登录会员，凭本人 token 拉取后端只读列表 ──
   const [assets, setAssets] = useState<{
     resumes: MemberResumeItem[]
     documents: MemberDocumentItem[]
     aiRecords: MemberAiRecordItem[]
+    favorites: MemberFavoriteItem[]
+    benefits: MemberBenefitItem[]
   } | null>(null)
   const [assetsLoading, setAssetsLoading] = useState(false)
   const [assetsError, setAssetsError] = useState(false)
@@ -434,8 +518,16 @@ export function ProfilePage() {
     if (!token) return
     setAssetsLoading(true)
     setAssetsError(false)
-    Promise.all([getMyResumes(token), getMyDocuments(token), getMyAiRecords(token)])
-      .then(([res, docs, ai]) => setAssets({ resumes: res, documents: docs, aiRecords: ai }))
+    Promise.all([
+      getMyResumes(token),
+      getMyDocuments(token),
+      getMyAiRecords(token),
+      getMyFavorites(token),
+      getMyBenefits(token),
+    ])
+      .then(([res, docs, ai, favorites, benefits]) =>
+        setAssets({ resumes: res, documents: docs, aiRecords: ai, favorites, benefits }),
+      )
       .catch(() => setAssetsError(true))
       .finally(() => setAssetsLoading(false))
   }, [getToken])
@@ -477,6 +569,25 @@ export function ProfilePage() {
     navigate('/resume/report', { state: { success: true, taskId } })
   }
 
+  // 查看收藏：job / job_fair 跳既有详情页（policy 暂无详情页，不提供跳转）。
+  const viewFavorite = (fav: MemberFavoriteItem) => {
+    const route = FAVORITE_META[fav.targetType].route?.(fav.targetId)
+    if (route) navigate(route)
+  }
+
+  // 取消收藏：凭本人 token 调后端（幂等），成功后本地移除该行（不整页重载）。
+  const removeFavoriteItem = async (fav: MemberFavoriteItem) => {
+    const token = getToken()
+    if (!token) return
+    try {
+      await removeFavorite(token, fav.targetType, fav.targetId)
+      setAssets((prev) => (prev ? { ...prev, favorites: prev.favorites.filter((f) => f.id !== fav.id) } : prev))
+      setToastMsg('已取消收藏')
+    } catch {
+      setToastMsg('取消收藏失败，请稍后重试')
+    }
+  }
+
   // 打开文档：凭本人 token 换取 TTL 受控的短期签名 URL，再触发下载（不在列表里直接持 URL）。
   const openDocument = async (doc: MemberDocumentItem) => {
     const token = getToken()
@@ -496,6 +607,11 @@ export function ProfilePage() {
   const handleEntryTap = (entry: Entry) => {
     if (entry.route) {
       navigate(entry.route)
+      return
+    }
+    // 收藏 / 权益已服务端化（Phase C-2C）：登录会员的真实列表在下方「账号资产」展示。
+    if (entry.label === '我的收藏' || entry.label === '我的权益') {
+      setToastMsg(isLoggedIn ? '见下方账号资产' : '登录后可查看本人收藏与权益')
       return
     }
     if (entry.tag === '本次记录') {
@@ -604,6 +720,43 @@ export function ProfilePage() {
                       meta={`${formatTime(a.createdAt)}`}
                     />
                   ))}
+                </AssetGroup>
+
+                {/* 我的收藏（Phase C-2C）：岗位 / 招聘会 / 政策的兴趣标记，仅浏览/收藏，不含投递 */}
+                <AssetGroup
+                  title="我的收藏"
+                  count={assets?.favorites.length ?? 0}
+                  empty="暂无收藏，浏览岗位 / 招聘会 / 政策时点收藏后在此查看"
+                >
+                  {assets?.favorites.map((f) => (
+                    <FavoriteRow
+                      key={f.id}
+                      fav={f}
+                      onView={FAVORITE_META[f.targetType].route ? () => viewFavorite(f) : undefined}
+                      onRemove={() => void removeFavoriteItem(f)}
+                    />
+                  ))}
+                </AssetGroup>
+
+                {/* 我的权益（Phase C-2C 底座）：只读展示；补贴资格提示 info-only，无「到账」承诺 */}
+                <AssetGroup
+                  title="我的权益"
+                  count={assets?.benefits.length ?? 0}
+                  empty="暂无可用权益，参与活动或购买套餐后在此查看"
+                >
+                  {assets?.benefits.map((b) => {
+                    const meta = BENEFIT_META[b.benefitType]
+                    return (
+                      <AssetRow
+                        key={b.id}
+                        icon={meta.icon}
+                        iconBg={meta.iconBg}
+                        iconColor={meta.iconColor}
+                        name={b.title}
+                        meta={`${meta.label} · ${benefitMetaText(b)}`}
+                      />
+                    )
+                  })}
                 </AssetGroup>
               </>
             )}

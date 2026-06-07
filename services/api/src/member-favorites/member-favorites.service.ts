@@ -1,0 +1,80 @@
+import { Injectable } from '@nestjs/common'
+import type { AddFavoriteInput, FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
+import { PrismaService } from '../prisma/prisma.service'
+
+// ============================================================
+// 会员收藏服务（Phase C-2C）。
+//
+// 全部读写都以传入的 endUserId（来自 EndUserAuthGuard 注入的 req.endUser）为唯一过滤维度：
+// 只能操作**本人**收藏；跨用户 / 匿名在 controller 层（guard）就已拒绝，service 永远拿到的是
+// 已认证的 endUserId，绝不接受任意 id 参数 → 天然杜绝越权。
+//
+// 合规（CLAUDE.md §10）：收藏只记录"对外部来源岗位 / 招聘会 / 政策的兴趣标记"，
+// 绝不记录投递结果 / 投递状态 / 面试 / Offer / 候选人数据，不形成招聘闭环。
+// ============================================================
+
+@Injectable()
+export class MemberFavoritesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** 我的收藏列表（本人，可按 targetType 过滤），按收藏时间倒序。 */
+  async list(endUserId: string, targetType?: FavoriteTargetType): Promise<MemberFavoriteItem[]> {
+    const rows = await this.prisma.favorite.findMany({
+      where: { endUserId, ...(targetType ? { targetType } : {}) },
+      select: { id: true, targetType: true, targetId: true, title: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    })
+    return rows.map((r) => ({
+      id: r.id,
+      targetType: r.targetType as FavoriteTargetType,
+      targetId: r.targetId,
+      title: r.title,
+      createdAt: r.createdAt.toISOString(),
+    }))
+  }
+
+  /**
+   * 新增收藏（幂等）：重复收藏同一对象不报错，仅刷新展示标题快照并返回原记录。
+   * 唯一键 (endUserId, targetType, targetId) 保证同一会员对同一对象只有一条。
+   */
+  async add(endUserId: string, input: AddFavoriteInput): Promise<MemberFavoriteItem> {
+    const row = await this.prisma.favorite.upsert({
+      where: {
+        endUserId_targetType_targetId: {
+          endUserId,
+          targetType: input.targetType,
+          targetId: input.targetId,
+        },
+      },
+      // 已存在则只刷新展示标题（来源标题可能更新）；不改 createdAt。
+      update: input.title !== undefined ? { title: input.title } : {},
+      create: {
+        endUserId,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        title: input.title ?? null,
+      },
+      select: { id: true, targetType: true, targetId: true, title: true, createdAt: true },
+    })
+    return {
+      id: row.id,
+      targetType: row.targetType as FavoriteTargetType,
+      targetId: row.targetId,
+      title: row.title,
+      createdAt: row.createdAt.toISOString(),
+    }
+  }
+
+  /**
+   * 取消收藏（幂等）：未收藏时返回 removed:false，不报错。
+   * deleteMany 限定 endUserId → 绝不可能删到他人记录。
+   */
+  async remove(
+    endUserId: string,
+    targetType: FavoriteTargetType,
+    targetId: string,
+  ): Promise<{ removed: boolean }> {
+    const res = await this.prisma.favorite.deleteMany({ where: { endUserId, targetType, targetId } })
+    return { removed: res.count > 0 }
+  }
+}
