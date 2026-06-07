@@ -36,9 +36,11 @@ function KioskShell() {
   const [deviceStatus] = useState<DeviceStatus>('idle')
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
-  useScreensaverController()
-  // 会员登录态空闲自动登出:忙碌态自动暂停,空闲达阈值清内存会话(Phase C-1)。
-  useIdleLogout()
+  // 返回 active(屏保是否已配置且有素材),用于与下面的公共空闲重置按 active 互斥。
+  const { active: screensaverActive } = useScreensaverController()
+  // 公共终端空闲重置(Phase C-1 → C-2A):覆盖登录 + 匿名;忙碌态暂停;空闲达阈值清打印/AI 简历
+  // session(含匿名 accessToken)并回首页。屏保 active 时关闭,由屏保控制器接管 idle(优先 /screensaver)。
+  useIdleLogout(screensaverActive)
 
   const activeTab = getActiveTab(pathname)
   const statusVariant = deviceStatus === 'online' || deviceStatus === 'idle' ? 'success' : 'warning'

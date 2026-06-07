@@ -119,6 +119,35 @@
 - `accessTokenHash` 列随 dev.db drift 经 `db execute` 落地；**PostgreSQL 迁移时需与既有 drift 条目统一重生成规范化**。
 - 未做：完整用户资产中心 / 我的简历·文档·AI记录列表 API / 匿名转会员认领（均属 Phase C-2B 及以后）。
 
+**2026-06-07 补充：匿名 session idle 清理缺口修复（PR #30 合入前）**
+
+**缺口：** `clearAiResumeSession()` 虽已接入 `useIdleLogout` 与 `ScreensaverPage`，但 `useIdleLogout` 原 `enabled` 含 `isLoggedIn`，`useScreensaverController` 仅在屏保已配置且有素材时计时。因此**匿名用户**在屏保未配置 / 未触发时，`aiResumeSession`（sessionStorage 内 taskId + 一次性 accessToken）可能 idle 后不被清理 → 下一位用户刷新即可读回上一位匿名 AI 结果。
+
+**修复：** 把 `useIdleLogout` 从「会员登录态空闲登出」扩为**公共终端空闲重置**，覆盖登录 + 匿名；与待机宣传屏按 `screensaverActive` 互斥，单一 idle 周期内只有一个计时器触发，不破坏现有屏保行为。
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/auth/useIdleLogout.ts` | `enabled` 去掉 `isLoggedIn`、新增 `screensaverActive` 入参 → `!busy && !onScreensaverRoute && !screensaverActive`（覆盖匿名；屏保接管时本守卫关闭）。idle 动作不变：清 `clearPrintMaterialSession()` + `clearAiResumeSession()` + `logout()`（幂等，匿名 no-op）+ replace 回首页。忙碌态（KioskBusyContext 引用计数锁 / AuthContext.busy）任一为真即暂停 |
+| `apps/kiosk/src/hooks/useScreensaverController.ts` | 返回 `{ active }`（屏保是否已配置且有素材）；屏保 idle 逻辑本身**未改**（active 时仍优先 `/screensaver`） |
+| `apps/kiosk/src/layouts/KioskRoot.tsx` | `const { active } = useScreensaverController(); useIdleLogout(active)`，二者按 active 互斥 |
+
+**行为矩阵（修复后）：**
+
+| 场景 | busy | 屏保 active | idle 结果 |
+|------|------|------------|-----------|
+| 匿名 / 会员，屏保未配置 | 否 | 否 | **useIdleLogout 接管**：清 print+AI session + 登出 + 回首页（**修复点：匿名也清**） |
+| 匿名 / 会员，屏保已配置 | 否 | 是 | useScreensaverController 接管：清 session + 进 `/screensaver`（行为不变） |
+| 打印/扫描/AI/上传中 | 是 | 任意 | 两个计时器都暂停，不清理、不打断业务（不变） |
+
+**约束：** 仅清内存态 + sessionStorage；**未新增 localStorage / cookie / IndexedDB**。
+
+**待手验（浏览器 / 一体机，真实 API + `VITE_API_MODE=http`，`VITE_KIOSK_LOGOUT_IDLE_SEC` 可调小如 5s 便于复现）：**
+
+1. 匿名（未登录）走 `AI 简历服务 → 上传/选择简历 → 解析`，到诊断报告页；DevTools → Application → Session Storage 确认存在 `ai-job-print:current-ai-resume`，含 `taskId` + `accessToken`，**不含** report/payload/PII。
+2. **屏保未配置**终端：静置超过 idle 阈值不触碰屏幕 → 自动回首页；确认 Session Storage 中 `ai-job-print:current-ai-resume` 已被清除；手动跳回 `/resume/report`（无 route state）→ 无法恢复上一位结果（报告为空 / `AI_TASK_NOT_FOUND`）。
+3. **屏保已配置**终端：静置 → 进入 `/screensaver`（行为不变）；触摸唤醒回首页后同样确认 session 已清。
+4. 忙碌态验证：在「AI 解析中 / 打印中」静置不应触发清理或跳转（busy 豁免）。
+
 ---
 
 ## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
