@@ -18,7 +18,7 @@ import {
 import { getJobById } from '../../services/api'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { isValidSourceUrl } from '../../lib/url'
-import { toggleFavorite, useJobFavorites } from '../../lib/useJobFavorites'
+import { useFavorites } from '../../favorites/useFavorites'
 
 const CATEGORY_LABEL: Record<string, string> = {
   fulltime: '全职',
@@ -117,7 +117,7 @@ export function JobDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
-  const favorites = useJobFavorites()
+  const { isFavorite, toggle: toggleFavorite } = useFavorites()
 
   const stateJob = (location.state as { job?: ExternalJobDTO } | null)?.job
   const hasStateMatch = stateJob?.id === id
@@ -161,7 +161,7 @@ export function JobDetailPage() {
     )
   }
 
-  const fav = favorites.includes(job.id)
+  const fav = isFavorite(job.id)
   const sourceCanApply = isValidSourceUrl(job.sourceUrl)
 
   return (
@@ -193,7 +193,7 @@ export function JobDetailPage() {
           <div className="flex items-start justify-between gap-3">
             <h2 className="text-xl font-bold text-gray-900">{job.title}</h2>
             <button
-              onClick={() => toggleFavorite(job.id)}
+              onClick={() => toggleFavorite({ id: job.id, title: job.title })}
               aria-pressed={fav}
               aria-label={fav ? '取消收藏' : '收藏岗位'}
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50"

@@ -13,7 +13,7 @@ import {
   StarIcon,
 } from 'lucide-react'
 import { getJobs } from '../../services/api'
-import { toggleFavorite, useJobFavorites } from '../../lib/useJobFavorites'
+import { useFavorites } from '../../favorites/useFavorites'
 
 // 岗位类型 chip → 后端 category 值('' = 全部)
 const TYPE_OPTIONS: { label: string; category: string }[] = [
@@ -82,7 +82,7 @@ function uniqueSorted(values: (string | undefined)[]): string[] {
 
 export function JobsPage() {
   const navigate = useNavigate()
-  const favorites = useJobFavorites()
+  const { ids: favoriteSet, toggle: toggleFavorite } = useFavorites()
 
   // facet 集合：全量已发布岗位，用于构建筛选项 + 来源机构卡片（不随筛选变化）
   const [facetJobs, setFacetJobs] = useState<ExternalJobDTO[]>([])
@@ -168,8 +168,7 @@ export function JobsPage() {
   const industryOptions = useMemo(() => uniqueSorted(facetJobs.map((j) => j.industry)), [facetJobs])
   const sourceCards = useMemo(() => buildSourceCards(facetJobs), [facetJobs])
 
-  // 收藏过滤（纯本地，叠加在后端结果之上）
-  const favoriteSet = useMemo(() => new Set(favorites), [favorites])
+  // 收藏过滤（登录态来自服务端、匿名来自本机；叠加在后端列表结果之上）
   const displayed = useMemo(
     () => (favoritesOnly ? listJobs.filter((j) => favoriteSet.has(j.id)) : listJobs),
     [listJobs, favoritesOnly, favoriteSet],
@@ -302,7 +301,7 @@ export function JobsPage() {
                 >
                   <StarIcon className={`h-4 w-4 ${favoritesOnly ? 'fill-white' : ''}`} />
                   只看收藏
-                  {favorites.length > 0 && <span>({favorites.length})</span>}
+                  {favoriteSet.size > 0 && <span>({favoriteSet.size})</span>}
                 </button>
 
                 {city && <FilterChip text={city} />}
@@ -406,7 +405,7 @@ export function JobsPage() {
                         <div className="flex items-start justify-between gap-3">
                           <p className="min-w-0 flex-1 text-base font-semibold text-neutral-900">{job.title}</p>
                           <button
-                            onClick={() => toggleFavorite(job.id)}
+                            onClick={() => toggleFavorite({ id: job.id, title: job.title })}
                             aria-pressed={fav}
                             aria-label={fav ? '取消收藏' : '收藏岗位'}
                             className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 hover:bg-neutral-100"
