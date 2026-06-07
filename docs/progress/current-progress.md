@@ -242,6 +242,54 @@
 
 ---
 
+## Phase C-2C follow-up：岗位收藏服务端化 + 登录态门控（2026-06-07，Claude，feature/kiosk-job-favorites-server-sync）
+
+**目标：** 把岗位列表 / 详情的本机 localStorage 收藏迁到服务端 `/me/favorites`（登录会员），并保留未登录 / 匿名的本机收藏体验，不破坏匿名浏览。**只做岗位**（招聘会 / 政策收藏入口作为下一小步）；不做投递 / 预约结果 / 企业端 / 候选人管理 / 活动 / 套餐 / 支付 / 权益发放。
+
+**梳理结论：** 现有 `useJobFavorites` / `toggleFavorite` 实际调用点只有 `JobsPage` 与 `JobDetailPage`（HomePage / CampusPage 仅在文案里出现「收藏」字样，无收藏逻辑）。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/favorites/localFavorites.ts`（新增） | 匿名态本机收藏原语：`readLocalJobFavorites` / `toggleLocalJobFavorite`，沿用既有 `STORAGE_KEY='kiosk:jobFavorites:v1'`（历史本机收藏不丢失） |
+| `apps/kiosk/src/favorites/context.ts` / `useFavorites.ts`（新增） | `FavoritesContextValue`（`ids:Set<string>` / `isFavorite` / `toggle` / `loading` / `source`）+ hook，拆分以满足 react-refresh/only-export-components |
+| `apps/kiosk/src/favorites/FavoritesProvider.tsx`（新增） | 登录态门控：登录会员以服务端 `/me/favorites?type=job` 为 SSOT（登录后拉一次，toggle 走 `addFavorite`/`removeFavorite` 乐观更新、失败回滚 + 提示）；未登录 / 匿名沿用本机 localStorage，**新增收藏时提示「已收藏到本机，登录后可同步到账号」**（引导不强制）。并发去抖（pending Set）；服务端不可达时登录态保持空集（不把本机收藏误当本人资产） |
+| `apps/kiosk/src/layouts/KioskRoot.tsx` | `KioskLayout` 内、`Outlet` 外挂 `FavoritesProvider`（处于 AuthProvider 树内，覆盖岗位列表/详情；屏保为顶级路由不受影响） |
+| `apps/kiosk/src/pages/jobs/JobsPage.tsx` / `JobDetailPage.tsx` | 由 `useJobFavorites()`/`toggleFavorite(id)` 改为 `useFavorites()`：`ids`(Set) 驱动星标 + 「只看收藏」过滤与计数；`toggle({ id, title: job.title })` 写收藏（登录→后端带标题快照，匿名→本机） |
+| `apps/kiosk/src/lib/useJobFavorites.ts`（删除） | 旧的纯 localStorage 模块 store hook，已被 `favorites/` 取代 |
+| `services/api/scripts/verify-job-favorites-http.ts`（新增）+ `package.json` | `pnpm verify:job-favorites-http`：进程内起真实 AppModule，按 member-auth 同方案铸会员 JWT + Redis 会话，复刻 Kiosk 实际请求做 11 类 HTTP 端到端断言 |
+
+**登录态门控行为矩阵：**
+
+| 场景 | 收藏来源(SSOT) | 点星标 | 提示 |
+|------|---------------|--------|------|
+| 登录会员 | 服务端 `/me/favorites?type=job` | `addFavorite`/`removeFavorite`（乐观，失败回滚） | 失败时「收藏同步失败，请稍后重试」 |
+| 未登录 / 匿名 | 本机 localStorage | `toggleLocalJobFavorite` | 新增时「已收藏到本机，登录后可同步到账号」 |
+
+**合规：** 收藏只记浏览 / 收藏标记，绝不记投递结果 / 候选人数据（沿用 CLAUDE.md §10）；岗位详情按钮文案仍为「去来源平台投递 / 扫码投递」（未改）。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api verify:job-favorites-http` | ✅ ALL PASS（11 类，复刻 Kiosk 请求 + 真实 JWT/Redis/Guard）：登录入库 POST→201、`?type=job` 读回、幂等新增不重复、type 过滤不返 job_fair、DELETE 幂等 removed:true→false、取消后列表移除、匿名 401 `MEMBER_MISSING_TOKEN`、注入 `applicationStatus`/`candidateId` 等未知字段 → 400、非法 targetType → 400 |
+| 匿名本机收藏运行期校验（shipped `localFavorites.ts` + localStorage 垫片，6 断言） | ✅ 空态 []、新增/持久化、多项、再次 toggle 取消、损坏 JSON 容错返回 [] |
+| `pnpm --filter @ai-job-print/api verify:member-favorites-benefits`（回归） | ✅ ALL PASS |
+| `pnpm --filter @ai-job-print/{api,shared}` typecheck · api lint | ✅ |
+| `pnpm --filter @ai-job-print/kiosk` typecheck / lint / build | ✅（lint 仅既有 `KioskBusyContext` 2 warning；build 仅既有 chunk-size warning） |
+| 合规禁词扫描（改动文件） | ✅ 0 新增命中（仅既有 JobDetailPage「去来源平台投递」合规文案，未改动） |
+| `git diff --check` | ✅ |
+
+**未解决 / 边界（下一小步）：**
+
+- **浏览器交互手验未跑**（本环境无 Playwright JS 包）：建议在浏览器手验 —— 匿名：`/jobs` 点星标 → 填充 + 顶部提示「登录后可同步到账号」+ DevTools localStorage `kiosk:jobFavorites:v1` 含该 id；「只看收藏」过滤与计数正确；刷新后保留。登录态真实同步手验仍需 API + 短信验证码环境（自 C-1 起延后）；本轮以 HTTP e2e + 匿名本机运行期校验 + typecheck/lint/build 覆盖契约与编译。
+- **招聘会 / 政策收藏入口未接服务端**：当前仅岗位（job）。`Favorite` 模型已支持 `job_fair`/`policy`，招聘会列表/详情收藏入口作为下一小步。
+- **跨视图一致性**：FavoritesProvider 在登录切换时拉一次服务端收藏；若用户在 ProfilePage 取消某收藏后未重新登录直接返回岗位页，Provider 状态可能短暂滞后（岗位页内 toggle 即时一致）。正向链路（岗位页收藏 → ProfilePage 挂载时 `getMyFavorites` 拉到）已由 HTTP e2e 的入库→读取覆盖。
+- **本机→账号迁移未做**：匿名收藏不自动推送到账号（登录后以服务端为准）；自动迁移涉及去重 / 标题快照，留后续按需评估。
+
+---
+
 ## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
 
 **目标：** 在 Kiosk 打印上传后插入最小材料检查闭环：文件体检 `inspection` → 隐私片段检查 `pii_scan` → 用户逐项选择保留/遮挡 → 进入现有打印参数与确认流程。仅做前端接线，不改 `services/api` 后端骨架，不改变核心打印提交逻辑。

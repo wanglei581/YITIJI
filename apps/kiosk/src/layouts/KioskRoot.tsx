@@ -3,6 +3,7 @@ import type { DeviceStatus } from '@ai-job-print/shared'
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
+import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useScreensaverController } from '../hooks/useScreensaverController'
 import { useIdleLogout } from '../auth/useIdleLogout'
 
@@ -51,7 +52,11 @@ function KioskShell() {
       onTabChange={(tab) => navigate(tabToPath(tab))}
       headerRight={<StatusBadge status={statusVariant} label={deviceStatus} />}
     >
-      <Outlet />
+      {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
+          为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
+      <FavoritesProvider>
+        <Outlet />
+      </FavoritesProvider>
     </KioskLayout>
   )
 }
