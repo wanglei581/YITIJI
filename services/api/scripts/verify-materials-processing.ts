@@ -86,7 +86,7 @@ async function main() {
   const unknownPdfObjectKey = `verify/materials/${unknownPdfFileId}.pdf`
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
-  const textSample = '请联系 13800138000 或 zhangsan@example.com 领取打印材料。'
+  const textSample = '请联系 13800138000 或 zhangsan@example.com，身份证 110101199001011234，地址 青岛市市南区测试路 1 号。'
   const sensitiveParams = {
     textSample,
     phone: '13900139000',
@@ -212,8 +212,14 @@ async function main() {
     else fail('PII scan task did not inherit EndUser ownership')
     if (task.status === 'completed') pass('PII scan task completes synchronously in skeleton mode')
     else fail(`PII scan task expected completed, got ${task.status}`)
-    if ((task.piiFindings?.length ?? 0) >= 2) pass('PII scan generated simulated findings')
-    else fail(`Expected at least 2 PII findings, got ${task.piiFindings?.length ?? 0}`)
+    const findingTypes = new Set((task.piiFindings ?? []).map((finding) => finding.type))
+    if (
+      findingTypes.has('phone') &&
+      findingTypes.has('email') &&
+      findingTypes.has('id_card') &&
+      findingTypes.has('address')
+    ) pass('PII scan generated simulated phone/email/id-card/address findings')
+    else fail(`Expected phone/email/id-card/address PII findings, got ${JSON.stringify([...findingTypes])}`)
     if (task.piiFindings?.every((f) => !f.snippet || f.snippet.length <= 32)) pass('PII snippets are capped at 32 chars')
     else fail('PII finding snippet exceeded 32 chars')
 

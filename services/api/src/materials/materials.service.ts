@@ -535,6 +535,36 @@ function buildSimulatedPiiFindings(args: { filename: string; textSample?: string
     }
   })
 
+  collectMatches(text, /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g, (value) => ({
+    type: 'id_card',
+    label: '身份证号',
+    pageNumber: null,
+    snippet: limitSnippet(value.toUpperCase()),
+    confidence: 0.9,
+    action: 'pending' as const,
+  })).forEach((finding) => {
+    const key = `${finding.type}:${finding.snippet}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      findings.push(finding)
+    }
+  })
+
+  collectMatches(text, /([\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[\u4e00-\u9fa5A-Za-z0-9\s-]{0,24}号?)/g, (value) => ({
+    type: 'address',
+    label: '地址',
+    pageNumber: null,
+    snippet: limitSnippet(value.trim()),
+    confidence: 0.78,
+    action: 'pending' as const,
+  })).forEach((finding) => {
+    const key = `${finding.type}:${finding.snippet}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      findings.push(finding)
+    }
+  })
+
   return findings
 }
 

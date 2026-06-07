@@ -152,6 +152,27 @@
 | `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
 | `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增图片清晰度预检断言 |
 
+**2026-06-07 补充：PII 扫描规则增强（Codex）**
+
+**目标：** 在真实 OCR 接入前，先扩展当前 `pii_scan` 可处理的文本样本/文件名规则，覆盖简历和打印材料中更常见的高风险隐私类型。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/materials/materials.service.ts` | `pii_scan` 模拟规则从手机号/邮箱扩展到身份证号（`id_card`）和常见中文地址片段（`address`）；snippet 继续受 32 字符上限约束，原始 `textSample` 仍不落库 |
+| `services/api/scripts/verify-materials-processing.ts` | 验证样本加入身份证号和地址，断言 `phone/email/id_card/address` 四类 finding 均可命中，并继续覆盖“完整 textSample 不进入 paramsJson” |
+
+**边界：** 本轮仍不是 OCR；只处理任务参数中传入的文本样本和文件名。后续真实 OCR / 文档解析 provider 接入后，应把 OCR 结果以短文本片段进入扫描规则，仍不得持久化完整原文。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增 `phone/email/id_card/address` 四类 PII finding 断言 |
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）

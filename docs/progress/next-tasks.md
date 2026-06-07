@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-07（AI求职材料中心 B-2 基础页数识别 + 图片清晰度预检 + A4 规范化评估 + PII 遮挡评估最小契约已推进，B-1 浏览器链路已手验）
+> 最后更新：2026-06-07（AI求职材料中心 B-2 基础页数识别 + 图片清晰度预检 + PII 四类扫描 + A4 规范化评估 + PII 遮挡评估最小契约已推进，B-1 浏览器链路已手验）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -106,7 +106,7 @@
    - 手验刷新 / 返回后的当前任务恢复：不得重复创建 `inspection` / `pii_scan`，不得丢失 `fileId` / `accessToken` / 隐私摘要 / 打印参数。
    - 手验提交打印或待机进入宣传屏后，`sessionStorage` 中不得残留上一位用户的材料任务上下文。
    - 发现 UI 拥挤、文案越界或 token 恢复问题后再修。
-5. 🔄 **Phase B-2 真实材料处理**：基础页数识别 + 图片清晰度预检 + 体检摘要 + A4 规范化评估 + PII 遮挡评估最小契约已推进：`inspection` 对图片返回 `pageCount=1` / `canPrint=true`，并可读取 png/jpeg 文件头返回像素尺寸、A4 DPI 估算和低清晰度 warning；PDF 先做轻量 `/Type /Page` 字节扫描；不可读 PDF 源文件会 `canPrint=false` 并在 Kiosk 禁用继续、引导重传；`normalize_a4` 已返回 `targetPaperSize=A4` / `canNormalize` / `normalizedFileId=null` 的诚实评估结果，仅对图片或页数明确识别的 PDF 给 `canNormalize=true`，非 A4 参数受控拒绝，不伪造新文件；`pii_redact` 已能基于 PII 决策任务返回遮挡评估 counts、`redactedFileId=null`、`resultFileCreated=false`，Kiosk 会明确提示“当前版本尚未生成遮挡后文件，打印仍使用原文件”；Kiosk 流程为 `inspection → normalize_a4 → pii_scan → pii_redact(确认选择后)`，会把识别页数写回当前打印会话，并展示文件体检、A4 摘要和遮挡评估反馈。后续仍需接入真实 OCR / PDF 渲染级清晰度检查 / 真实 A4 产物 / 真实 PII 遮挡产物 / 材料包合并。AI 只输出结构化 JSON 与建议，最终 DOCX/PDF 由模板渲染链生成。
+5. 🔄 **Phase B-2 真实材料处理**：基础页数识别 + 图片清晰度预检 + PII 四类扫描 + 体检摘要 + A4 规范化评估 + PII 遮挡评估最小契约已推进：`inspection` 对图片返回 `pageCount=1` / `canPrint=true`，并可读取 png/jpeg 文件头返回像素尺寸、A4 DPI 估算和低清晰度 warning；PDF 先做轻量 `/Type /Page` 字节扫描；不可读 PDF 源文件会 `canPrint=false` 并在 Kiosk 禁用继续、引导重传；`pii_scan` 当前可从文件名/文本样本识别手机号、邮箱、身份证号和常见中文地址片段，且完整原文仍不落库；`normalize_a4` 已返回 `targetPaperSize=A4` / `canNormalize` / `normalizedFileId=null` 的诚实评估结果，仅对图片或页数明确识别的 PDF 给 `canNormalize=true`，非 A4 参数受控拒绝，不伪造新文件；`pii_redact` 已能基于 PII 决策任务返回遮挡评估 counts、`redactedFileId=null`、`resultFileCreated=false`，Kiosk 会明确提示“当前版本尚未生成遮挡后文件，打印仍使用原文件”；Kiosk 流程为 `inspection → normalize_a4 → pii_scan → pii_redact(确认选择后)`，会把识别页数写回当前打印会话，并展示文件体检、A4 摘要和遮挡评估反馈。后续仍需接入真实 OCR / PDF 渲染级清晰度检查 / 真实 A4 产物 / 真实 PII 遮挡产物 / 材料包合并。AI 只输出结构化 JSON 与建议，最终 DOCX/PDF 由模板渲染链生成。
 6. ⏳ **Phase C Admin 运营闭环**：异常事件时间线、粗粒度终端推荐、任务改派、暂停接单、维护备注。
 7. ⏳ **Phase D 合规后的简历增强**：按岗位方向优化简历 + 模板库；必须使用“目标岗位方向/意向城市/自荐信”等改造文案，不出现站内投递语义。
 8. ⏳ **Phase E 校园支付场景**：学生免费/校园卡/退款/对账；必须先补真实订单域，不能堆在 mock 订单页。
