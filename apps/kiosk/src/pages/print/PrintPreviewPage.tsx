@@ -3,8 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
   AlertTriangleIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   CheckCircleIcon,
   EyeIcon,
   FileTextIcon,
@@ -236,31 +234,22 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
   )
 }
 
-function CollapsibleInfoSection({
+function InfoSection({
   title,
   accent,
-  open,
-  onToggle,
   children,
 }: {
   title: string
   accent: 'primary' | 'amber'
-  open: boolean
-  onToggle: () => void
   children: React.ReactNode
 }) {
   return (
     <Card className="overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex min-h-[56px] w-full items-center justify-center gap-2 px-5 text-sm font-semibold text-gray-900"
-      >
+      <div className="flex min-h-[56px] w-full items-center justify-center gap-2 px-5 text-sm font-semibold text-gray-900">
         <span className={['h-4 w-1 rounded-full', accent === 'primary' ? 'bg-primary-600' : 'bg-amber-500'].join(' ')} />
         {title}
-        {open ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
-      </button>
-      {open && <div className="border-t border-gray-100 p-5">{children}</div>}
+      </div>
+      <div className="border-t border-gray-100 p-5">{children}</div>
     </Card>
   )
 }
@@ -299,8 +288,6 @@ export function PrintPreviewPage() {
     restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? restoredPrintParams.pageRange : '',
   )
   const [rangeError, setRangeError] = useState(false)
-  const [priceGuideOpen, setPriceGuideOpen] = useState(false)
-  const [printNoticeOpen, setPrintNoticeOpen] = useState(true)
 
   const colorTonerLow =
     printer.tonerLevels.cyan < 25 ||
@@ -384,7 +371,7 @@ export function PrintPreviewPage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex min-h-full flex-col p-6">
       <PageHeader
         title="打印设置"
         subtitle="设置打印参数后进入确认"
@@ -395,9 +382,9 @@ export function PrintPreviewPage() {
         }
       />
 
-      <div className="mt-6 flex flex-1 gap-6 overflow-hidden">
+      <div className="mt-6 grid grid-cols-[18rem_minmax(0,1fr)] gap-6">
         {/* ── Left: file preview ─────────────────────────────────────────── */}
-        <div className="flex w-72 shrink-0 flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <FilePreviewPanel file={file} />
           <p className="text-center text-sm text-gray-500">
             {formatPageCount(file.pages)} · {file.size}
@@ -418,7 +405,7 @@ export function PrintPreviewPage() {
         </div>
 
         {/* ── Right: params (scrollable) ──────────────────────────────────── */}
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-2">
+        <div className="flex min-w-0 flex-col gap-4 pb-6">
 
           {/* Printer status bar */}
           <Card className="flex items-center gap-3 p-4">
@@ -645,11 +632,9 @@ export function PrintPreviewPage() {
             </div>
           </Card>
 
-          <CollapsibleInfoSection
+          <InfoSection
             title="价格说明"
             accent="primary"
-            open={priceGuideOpen}
-            onToggle={() => setPriceGuideOpen((open) => !open)}
           >
             <div className="overflow-hidden rounded-lg border border-gray-100">
               <div className="grid grid-cols-4 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500">
@@ -672,13 +657,11 @@ export function PrintPreviewPage() {
                 </div>
               ))}
             </div>
-          </CollapsibleInfoSection>
+          </InfoSection>
 
-          <CollapsibleInfoSection
+          <InfoSection
             title="打印须知"
             accent="amber"
-            open={printNoticeOpen}
-            onToggle={() => setPrintNoticeOpen((open) => !open)}
           >
             <ol className="space-y-3 text-sm text-gray-600">
               {[
@@ -695,7 +678,7 @@ export function PrintPreviewPage() {
                 </li>
               ))}
             </ol>
-          </CollapsibleInfoSection>
+          </InfoSection>
 
         </div>
       </div>

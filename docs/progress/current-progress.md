@@ -197,6 +197,13 @@
 | `git diff --check` | ✅ 通过 |
 | Safari 本地页手验：`/print/preview` | ✅ 左侧显示无法预览原因与使用说明；页面下方出现费用明细、价格说明、打印须知；mock 打印机离线时继续禁用打印按钮 |
 
+**2026-06-07 二次修复：打印设置页内容不全 / 说明点击不可见（Codex）**
+
+- 根因：`/print/preview` 右侧参数区此前存在内嵌滚动，同时价格说明是折叠交互；在 Kiosk 根布局已有 `main` 滚动容器和底部导航的情况下，说明内容容易出现在不可见滚动层里，用户点击后误以为没有展开。
+- 修复：移除右侧内嵌滚动，改为单一 `main` 页面滚动；“价格说明”“打印须知”不再折叠，默认直接展示完整内容；底部“返回 / 确认参数”操作区恢复为页面正常内容，避免 fixed/sticky 按钮覆盖打印参数或说明文字。
+- 验证：`pnpm --filter @ai-job-print/kiosk typecheck` ✅；`pnpm --filter @ai-job-print/kiosk lint` ✅（仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）；`pnpm --filter @ai-job-print/kiosk build` ✅（仅既有 chunk-size warning）；`git diff --check` ✅。
+- Playwright 本地手验：`VITE_API_MODE=mock` Kiosk 5176，注入测试打印会话后访问 `/print/preview`；1220×768 视口下可滚动到“价格说明”“打印须知”和底部按钮；说明文字全部命中；底部操作区不再 fixed/sticky 覆盖内容。
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）
