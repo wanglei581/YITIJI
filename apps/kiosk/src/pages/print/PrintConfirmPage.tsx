@@ -175,19 +175,43 @@ export function PrintConfirmPage() {
         </Card>
 
         {materialCheck && (
-          <Card className="border-green-200 bg-green-50 p-5">
+          <Card
+            className={[
+              'p-5',
+              materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-green-200 bg-green-50',
+            ].join(' ')}
+          >
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white">
-                <InfoIcon className="h-5 w-5 text-green-600" />
+                <InfoIcon
+                  className={[
+                    'h-5 w-5',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-600' : 'text-green-600',
+                  ].join(' ')}
+                />
               </div>
               <div className="min-w-0">
-                <p className="font-semibold text-green-950">
+                <p
+                  className={[
+                    'font-semibold',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-950' : 'text-green-950',
+                  ].join(' ')}
+                >
                   隐私检查摘要{materialCheck.mode === 'demo' ? '（流程演示）' : ''}
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-green-800">
+                <p
+                  className={[
+                    'mt-1 text-sm leading-relaxed',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-800' : 'text-green-800',
+                  ].join(' ')}
+                >
                   {materialCheck.mode === 'demo' ? '已完成打印前材料检查流程演示' : '已完成打印前材料检查'}；
                   遮挡 {materialCheck.redactedCount} 项，保留 {materialCheck.keptCount} 项。
-                  本次打印将按你的选择处理，仅用于本次打印前确认，不向第三方发送。
+                  {materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
+                    ? '当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续。'
+                    : '本次打印前选择已记录，仅用于本次确认，不向第三方发送。'}
                 </p>
               </div>
             </div>

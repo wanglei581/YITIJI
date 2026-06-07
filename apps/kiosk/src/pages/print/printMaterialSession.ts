@@ -28,18 +28,28 @@ export interface StoredMaterialTask {
 
 export interface MaterialCheckSummary {
   inspectionTaskId: string
+  normalizeTaskId?: string
   piiTaskId: string
+  piiRedactTaskId?: string
   checkedAt: string
   findingCount: number
   redactedCount: number
   keptCount: number
+  redaction?: {
+    canRedact: boolean
+    redactedFileId: string | null
+    resultFileCreated: boolean
+    message: string
+  }
   mode: 'checked' | 'demo'
 }
 
 export interface PrintMaterialSession {
   file: PrintFileState
   inspectionTask?: StoredMaterialTask
+  normalizeTask?: StoredMaterialTask
   piiTask?: StoredMaterialTask
+  piiRedactTask?: StoredMaterialTask
   materialCheck?: MaterialCheckSummary
   printParams?: PrintJobParams
   updatedAt: string
@@ -136,7 +146,9 @@ function sanitizeSession(next: Omit<PrintMaterialSession, 'updatedAt'>): Omit<Pr
   return {
     file: sanitizeFile(next.file),
     inspectionTask: toStoredMaterialTask(next.inspectionTask),
+    normalizeTask: toStoredMaterialTask(next.normalizeTask),
     piiTask: toStoredMaterialTask(next.piiTask),
+    piiRedactTask: toStoredMaterialTask(next.piiRedactTask),
     materialCheck: next.materialCheck,
     printParams: next.printParams,
   }

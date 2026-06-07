@@ -11,7 +11,7 @@
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
-import { ForbiddenException, GoneException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, GoneException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MaterialsService } from '../src/materials/materials.service'
 import { StorageService } from '../src/storage/storage.service'
@@ -52,6 +52,19 @@ async function expectGone(label: string, fn: () => Promise<unknown>) {
   fail(`${label}: expected GoneException`)
 }
 
+async function expectBadRequest(label: string, fn: () => Promise<unknown>) {
+  try {
+    await fn()
+  } catch (error) {
+    if (error instanceof BadRequestException) {
+      pass(label)
+      return
+    }
+    fail(`${label}: expected BadRequestException, got ${(error as Error).message}`)
+  }
+  fail(`${label}: expected BadRequestException`)
+}
+
 async function main() {
   console.log('\n=== Phase A-2 materials document-processing verification ===')
   const prisma = new PrismaService()
@@ -66,8 +79,10 @@ async function main() {
   const anonymousFileId = `file_mat_anon_${suffix}`
   const imageFileId = `file_mat_image_${suffix}`
   const pdfFileId = `file_mat_pdf_${suffix}`
-  const testFileIds = [ownedFileId, anonymousFileId, imageFileId, pdfFileId]
+  const unknownPdfFileId = `file_mat_pdf_unknown_${suffix}`
+  const testFileIds = [ownedFileId, anonymousFileId, imageFileId, pdfFileId, unknownPdfFileId]
   const pdfObjectKey = `verify/materials/${pdfFileId}.pdf`
+  const unknownPdfObjectKey = `verify/materials/${unknownPdfFileId}.pdf`
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
   const textSample = '请联系 13800138000 或 zhangsan@example.com 领取打印材料。'
@@ -144,6 +159,8 @@ async function main() {
     })
     const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n2 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
     const pdfPut = await storage.putObject(pdfObjectKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    const unknownPdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n')
+    const unknownPdfPut = await storage.putObject(unknownPdfObjectKey, unknownPdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {
         id: pdfFileId,
@@ -154,6 +171,24 @@ async function main() {
         mimeType: 'application/pdf',
         sizeBytes: pdfPut.sizeBytes,
         sha256: pdfPut.sha256,
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    await prisma.fileObject.create({
+      data: {
+        id: unknownPdfFileId,
+        storageKey: unknownPdfObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'anonymous-print-unknown-pages.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: unknownPdfPut.sizeBytes,
+        sha256: unknownPdfPut.sha256,
         purpose: 'print_doc',
         sensitiveLevel: 'normal',
         expiresAt,
@@ -214,6 +249,54 @@ async function main() {
       fail('Owner PII decision was not persisted')
     }
 
+    const settled = await materials.decidePiiFindings(
+      task.id,
+      {
+        decisions: (task.piiFindings ?? []).map((finding) => ({
+          findingId: finding.id,
+          action: finding.id === firstFindingId ? 'redact' : 'keep',
+        })),
+      },
+      { kind: 'member', endUserId: ownerId },
+    )
+    const redactionTask = await materials.createTask(
+      { kind: 'pii_redact', sourceFileId: ownedFileId, params: { decisionTaskId: settled.id } },
+      { kind: 'member', endUserId: ownerId },
+    )
+    const redactionChecks = (redactionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      redactionChecks['canRedact'] === true &&
+      redactionChecks['redactedFileId'] === null &&
+      redactionChecks['resultFileCreated'] === false &&
+      redactionChecks['findingCount'] === settled.piiFindings?.length &&
+      redactionChecks['redactedCount'] === 1 &&
+      redactionChecks['pendingCount'] === 0
+    ) {
+      pass('PII redact evaluation summarizes decisions without creating a fake file')
+    } else {
+      fail(`PII redact evaluation expected settled decisions and no output file, got ${JSON.stringify(redactionChecks)}`)
+    }
+
+    const pendingPiiTask = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: ownedFileId, params: sensitiveParams },
+      { kind: 'member', endUserId: ownerId },
+    )
+    const pendingRedactionTask = await materials.createTask(
+      { kind: 'pii_redact', sourceFileId: ownedFileId, params: { decisionTaskId: pendingPiiTask.id } },
+      { kind: 'member', endUserId: ownerId },
+    )
+    const pendingRedactionChecks = (pendingRedactionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      pendingRedactionChecks['canRedact'] === false &&
+      Number(pendingRedactionChecks['pendingCount'] ?? 0) > 0 &&
+      Array.isArray(pendingRedactionChecks['warnings']) &&
+      pendingRedactionChecks['warnings'].includes('PII_DECISIONS_PENDING')
+    ) {
+      pass('PII redact evaluation is blocked while findings are pending')
+    } else {
+      fail(`Pending PII redact evaluation expected canRedact=false, got ${JSON.stringify(pendingRedactionChecks)}`)
+    }
+
     await prisma.documentProcessTask.delete({ where: { id: task.id } })
     const deletedFinding = await prisma.piiFinding.findUnique({ where: { id: firstFindingId } })
     if (!deletedFinding) pass('Deleting material task cascades PII findings')
@@ -250,6 +333,64 @@ async function main() {
       fail(`Expected unavailable PDF to set canPrint=false, got ${JSON.stringify(unavailableChecks)}`)
     }
 
+    const anonymousPiiTask = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: anonymousFileId, params: { textSample } },
+      { kind: 'anonymous' },
+    )
+    if (!anonymousPiiTask.accessToken) fail('Anonymous PII scan should return access token')
+    const anonymousPiiDecisions = (anonymousPiiTask.piiFindings ?? []).map((finding, index) => ({
+      findingId: finding.id,
+      action: index === 0 ? 'redact' as const : 'keep' as const,
+    }))
+    const anonymousPiiSettled = await materials.decidePiiFindings(
+      anonymousPiiTask.id,
+      { decisions: anonymousPiiDecisions },
+      { kind: 'anonymous', accessToken: anonymousPiiTask.accessToken },
+    )
+    await expectForbidden('Anonymous PII redact without decision task token is rejected', () =>
+      materials.createTask(
+        { kind: 'pii_redact', sourceFileId: anonymousFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+        { kind: 'anonymous' },
+      ),
+    )
+    await expectForbidden('Anonymous PII redact with wrong decision task token is rejected', () =>
+      materials.createTask(
+        { kind: 'pii_redact', sourceFileId: anonymousFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+        { kind: 'anonymous', accessToken: 'wrong-token' },
+      ),
+    )
+    const anonymousRedactionTask = await materials.createTask(
+      { kind: 'pii_redact', sourceFileId: anonymousFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+      { kind: 'anonymous', accessToken: anonymousPiiTask.accessToken },
+    )
+    const anonymousRedactionChecks = (anonymousRedactionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      anonymousRedactionChecks['canRedact'] === true &&
+      anonymousRedactionChecks['redactedFileId'] === null &&
+      anonymousRedactionChecks['redactedCount'] === 1
+    ) {
+      pass('Anonymous PII redact requires the original decision task token')
+    } else {
+      fail(`Anonymous PII redact expected authorized summary, got ${JSON.stringify(anonymousRedactionChecks)}`)
+    }
+
+    const unavailableNormalizeTask = await materials.createTask(
+      { kind: 'normalize_a4', sourceFileId: anonymousFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'anonymous' },
+    )
+    const unavailableNormalizeChecks = (unavailableNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      unavailableNormalizeChecks['targetPaperSize'] === 'A4' &&
+      unavailableNormalizeChecks['canNormalize'] === false &&
+      unavailableNormalizeChecks['normalizedFileId'] === null &&
+      Array.isArray(unavailableNormalizeChecks['warnings']) &&
+      unavailableNormalizeChecks['warnings'].includes('SOURCE_FILE_BYTES_UNAVAILABLE')
+    ) {
+      pass('Unavailable PDF bytes are marked not normalizable')
+    } else {
+      fail(`Expected unavailable PDF normalize_a4 to set canNormalize=false, got ${JSON.stringify(unavailableNormalizeChecks)}`)
+    }
+
     const imageInspectionTask = await materials.createTask(
       { kind: 'inspection', sourceFileId: imageFileId, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
@@ -270,6 +411,29 @@ async function main() {
       fail(`Image inspection expected status messages, got ${JSON.stringify(imageChecks)}`)
     }
 
+    const imageNormalizeTask = await materials.createTask(
+      { kind: 'normalize_a4', sourceFileId: imageFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'anonymous' },
+    )
+    const imageNormalizeChecks = (imageNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      imageNormalizeChecks['targetPaperSize'] === 'A4' &&
+      imageNormalizeChecks['canNormalize'] === true &&
+      imageNormalizeChecks['normalizedFileId'] === null &&
+      imageNormalizeChecks['pageCount'] === 1 &&
+      imageNormalizeChecks['pageCountSource'] === 'image_single_page'
+    ) {
+      pass('Image normalize_a4 returns A4 evaluation without fake output file')
+    } else {
+      fail(`Image normalize_a4 expected canNormalize=true and no result file, got ${JSON.stringify(imageNormalizeChecks)}`)
+    }
+    await expectBadRequest('Non-A4 normalize_a4 target is rejected', () =>
+      materials.createTask(
+        { kind: 'normalize_a4', sourceFileId: imageFileId, params: { targetPaperSize: 'A3' } },
+        { kind: 'anonymous' },
+      ),
+    )
+
     const pdfInspectionTask = await materials.createTask(
       { kind: 'inspection', sourceFileId: pdfFileId, params: { purpose: 'print_check' } },
       { kind: 'anonymous' },
@@ -283,6 +447,41 @@ async function main() {
       pass('PDF inspection reads local object bytes and infers page count')
     } else {
       fail(`PDF inspection expected pageCount=2 and canPrint=true, got ${JSON.stringify(pdfChecks)}`)
+    }
+
+    const pdfNormalizeTask = await materials.createTask(
+      { kind: 'normalize_a4', sourceFileId: pdfFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'anonymous' },
+    )
+    const pdfNormalizeChecks = (pdfNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      pdfNormalizeChecks['targetPaperSize'] === 'A4' &&
+      pdfNormalizeChecks['canNormalize'] === true &&
+      pdfNormalizeChecks['normalizedFileId'] === null &&
+      pdfNormalizeChecks['pageCount'] === 2 &&
+      pdfNormalizeChecks['pageCountSource'] === 'pdf_lightweight_scan'
+    ) {
+      pass('PDF normalize_a4 reads local object bytes and returns A4 evaluation')
+    } else {
+      fail(`PDF normalize_a4 expected pageCount=2 and canNormalize=true, got ${JSON.stringify(pdfNormalizeChecks)}`)
+    }
+
+    const unknownPdfNormalizeTask = await materials.createTask(
+      { kind: 'normalize_a4', sourceFileId: unknownPdfFileId, params: { targetPaperSize: 'A4' } },
+      { kind: 'anonymous' },
+    )
+    const unknownPdfNormalizeChecks = (unknownPdfNormalizeTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    if (
+      unknownPdfNormalizeChecks['targetPaperSize'] === 'A4' &&
+      unknownPdfNormalizeChecks['canNormalize'] === false &&
+      unknownPdfNormalizeChecks['normalizedFileId'] === null &&
+      unknownPdfNormalizeChecks['pageCount'] === null &&
+      Array.isArray(unknownPdfNormalizeChecks['warnings']) &&
+      unknownPdfNormalizeChecks['warnings'].includes('PDF_PAGE_COUNT_NOT_DETECTED')
+    ) {
+      pass('PDF normalize_a4 does not mark unknown page count as normalizable')
+    } else {
+      fail(`Unknown-page PDF normalize_a4 expected canNormalize=false, got ${JSON.stringify(unknownPdfNormalizeChecks)}`)
     }
 
     await prisma.documentProcessTask.update({
@@ -301,6 +500,7 @@ async function main() {
     await prisma.fileObject.deleteMany({ where: { id: { in: testFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [ownerId, otherId] } } })
     await storage.deleteObject(pdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(unknownPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 

@@ -180,6 +180,39 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
       findingCount: 0,
     }
   }
+  if (kind === 'pii_redact') {
+    return {
+      mode: 'mock',
+      note: '流程演示，未连接后端材料检查服务',
+      checks: {
+        canRedact: true,
+        redactedFileId: null,
+        resultFileCreated: false,
+        decisionTaskId: null,
+        findingCount: 0,
+        redactedCount: 0,
+        keptCount: 0,
+        pendingCount: 0,
+        warnings: [],
+        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示模式，当前版本不生成遮挡后文件，打印仍使用原文件' }],
+      },
+    }
+  }
+  if (kind === 'normalize_a4') {
+    return {
+      mode: 'mock',
+      note: '流程演示，未连接后端材料检查服务',
+      checks: {
+        targetPaperSize: 'A4',
+        canNormalize: true,
+        normalizedFileId: null,
+        pageCount: null,
+        pageCountSource: 'mock',
+        warnings: [],
+        messages: [{ code: 'MOCK_A4_NORMALIZE', severity: 'info', text: '流程演示模式，当前版本不生成新文件，打印仍使用原文件' }],
+      },
+    }
+  }
   return {
     mode: 'mock',
     note: '流程演示，未连接后端材料检查服务',
@@ -189,6 +222,7 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
 export async function createMaterialTask(
   input: CreateMaterialTaskInput,
   token?: string | null,
+  accessToken?: string | null,
 ): Promise<DocumentProcessTaskView> {
   if (API_MODE !== 'http') {
     await new Promise((resolve) => setTimeout(resolve, 500))
@@ -198,7 +232,7 @@ export async function createMaterialTask(
   return request<DocumentProcessTaskView>(
     '/materials/tasks',
     { method: 'POST', body: JSON.stringify(input) },
-    { token },
+    { token, accessToken },
   )
 }
 

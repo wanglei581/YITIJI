@@ -296,8 +296,16 @@ export function PrintPreviewPage() {
             {formatPageCount(file.pages)} · {file.size}
           </p>
           {materialCheck && (
-            <div className="rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-center text-xs font-medium text-green-700">
+            <div
+              className={[
+                'rounded-lg border px-3 py-2 text-center text-xs font-medium',
+                materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
+                  ? 'border-amber-100 bg-amber-50 text-amber-700'
+                  : 'border-green-100 bg-green-50 text-green-700',
+              ].join(' ')}
+            >
               {materialCheck.mode === 'demo' ? '材料检查流程演示完成' : '已完成隐私检查'} · 遮挡 {materialCheck.redactedCount} 项
+              {materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? ' · 仍使用原文件' : ''}
             </div>
           )}
         </div>

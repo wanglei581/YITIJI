@@ -35,7 +35,7 @@ interface LocationState {
   file?: PrintFileState
 }
 
-type Stage = 'idle' | 'inspection' | 'pii_scan' | 'review' | 'submitting' | 'done' | 'error'
+type Stage = 'idle' | 'inspection' | 'normalize_a4' | 'pii_scan' | 'review' | 'submitting' | 'done' | 'error'
 type InspectionMessageSeverity = 'info' | 'warning'
 const TASK_POLL_ATTEMPTS = 30
 const TASK_POLL_INTERVAL_MS = 1_000
@@ -44,6 +44,19 @@ interface InspectionSummaryView {
   pageCount: number | null
   canPrint: boolean | null
   messages: Array<{ code: string; severity: InspectionMessageSeverity; text: string }>
+}
+
+interface NormalizeA4SummaryView {
+  targetPaperSize: string
+  canNormalize: boolean | null
+  messages: Array<{ code: string; severity: InspectionMessageSeverity; text: string }>
+}
+
+interface PiiRedactionSummaryView {
+  canRedact: boolean
+  redactedFileId: string | null
+  resultFileCreated: boolean
+  message: string
 }
 
 const ACTION_LABEL: Record<PiiFindingDecisionAction, string> = {
@@ -108,6 +121,27 @@ function inspectionSummaryFromTask(task: DocumentProcessTaskView | null): Inspec
   const canPrint = typeof checks['canPrint'] === 'boolean' ? checks['canPrint'] : null
   const messages = normalizeInspectionMessages(checks)
   return { pageCount, canPrint, messages }
+}
+
+function normalizeA4SummaryFromTask(task: DocumentProcessTaskView | null): NormalizeA4SummaryView | null {
+  const checks = task?.result?.['checks']
+  if (!isRecord(checks)) return null
+  const targetPaperSize = typeof checks['targetPaperSize'] === 'string' ? checks['targetPaperSize'] : 'A4'
+  const canNormalize = typeof checks['canNormalize'] === 'boolean' ? checks['canNormalize'] : null
+  const messages = normalizeInspectionMessages(checks)
+  return { targetPaperSize, canNormalize, messages }
+}
+
+function piiRedactionSummaryFromTask(task: DocumentProcessTaskView | null): PiiRedactionSummaryView | null {
+  const checks = task?.result?.['checks']
+  if (!isRecord(checks)) return null
+  const messages = normalizeInspectionMessages(checks)
+  return {
+    canRedact: checks['canRedact'] === true,
+    redactedFileId: typeof checks['redactedFileId'] === 'string' ? checks['redactedFileId'] : null,
+    resultFileCreated: checks['resultFileCreated'] === true,
+    message: messages[0]?.text ?? '已完成遮挡产物评估，当前版本不生成新文件，打印仍使用原文件',
+  }
 }
 
 function normalizeInspectionMessages(checks: Record<string, unknown>): InspectionSummaryView['messages'] {
@@ -247,6 +281,7 @@ export function PrintMaterialCheckPage() {
 
   const [stage, setStage] = useState<Stage>('idle')
   const [inspectionTask, setInspectionTask] = useState<DocumentProcessTaskView | null>(null)
+  const [normalizeTask, setNormalizeTask] = useState<DocumentProcessTaskView | null>(null)
   const [piiTask, setPiiTask] = useState<DocumentProcessTaskView | null>(null)
   const [decisions, setDecisions] = useState<Record<string, PiiFindingAction>>({})
   const [error, setError] = useState<string | null>(null)
@@ -257,9 +292,16 @@ export function PrintMaterialCheckPage() {
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
   const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
   const inspectionSummary = useMemo(() => inspectionSummaryFromTask(inspectionTask), [inspectionTask])
+  const normalizeSummary = useMemo(() => normalizeA4SummaryFromTask(normalizeTask), [normalizeTask])
+  const normalizeBadgeClass = normalizeSummary?.canNormalize === true ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+  const normalizeBadgeLabel = normalizeSummary?.canNormalize === true
+    ? '已完成评估'
+    : normalizeSummary?.canNormalize === false
+      ? '需核对版式'
+      : '评估信息不完整'
   const requiresFormatReview = inspectionSummary?.canPrint === false
   const canContinue = stage === 'review' && allDecided && !requiresFormatReview
-  const isWorking = stage === 'inspection' || stage === 'pii_scan' || stage === 'submitting'
+  const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
 
   const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
     const nextFile = patch.file ?? file
@@ -284,6 +326,7 @@ export function PrintMaterialCheckPage() {
     setStage('inspection')
     setError(null)
     setInspectionTask(null)
+    setNormalizeTask(null)
     setPiiTask(null)
     setDecisions({})
 
@@ -309,6 +352,25 @@ export function PrintMaterialCheckPage() {
       setInspectionTask(readyInspection)
       persistSession({ file: checkedFile, inspectionTask: readyInspection })
 
+      setStage('normalize_a4')
+      const storedNormalize = storedSession?.normalizeTask
+      let normalize: DocumentProcessTaskView
+      if (storedNormalize?.id) {
+        const queried = await getMaterialTask(storedNormalize.id, { token, accessToken: storedNormalize.accessToken })
+        normalize = { ...queried, accessToken: queried.accessToken ?? storedNormalize.accessToken }
+      } else {
+        normalize = await createMaterialTask({
+          kind: 'normalize_a4',
+          sourceFileId: file.fileId,
+          params: { targetPaperSize: 'A4', source: 'kiosk_print' },
+        }, token)
+      }
+      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: normalize })
+      const readyNormalize = await waitForCompletedTask(normalize, token, normalize.accessToken)
+      assertTaskReady(readyNormalize, 'A4 规范化评估')
+      setNormalizeTask(readyNormalize)
+      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize })
+
       setStage('pii_scan')
       const storedPii = storedSession?.piiTask
       let pii: DocumentProcessTaskView
@@ -322,12 +384,12 @@ export function PrintMaterialCheckPage() {
           params: { scanScope: 'print_preview' },
         }, token)
       }
-      persistSession({ file: checkedFile, inspectionTask: readyInspection, piiTask: pii })
+      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: pii })
       const readyPii = await waitForCompletedTask(pii, token, pii.accessToken)
       assertTaskReady(readyPii, '隐私检查')
       setPiiTask(readyPii)
       setDecisions(Object.fromEntries((readyPii.piiFindings ?? []).map((finding) => [finding.id, finding.action])))
-      persistSession({ file: checkedFile, inspectionTask: readyInspection, piiTask: readyPii })
+      persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: readyPii })
       setStage('review')
     } catch (err) {
       if (err instanceof ApiHttpError && [403, 404, 410].includes(err.status)) {
@@ -364,7 +426,7 @@ export function PrintMaterialCheckPage() {
   }
 
   const handleContinue = async () => {
-    if (!file || !inspectionTask || !piiTask || !allDecided || requiresFormatReview) return
+    if (!file?.fileId || !inspectionTask || !piiTask || !allDecided || requiresFormatReview) return
 
     setStage('submitting')
     setError(null)
@@ -381,17 +443,36 @@ export function PrintMaterialCheckPage() {
       const latestDecisions = Object.fromEntries(latestFindings.map((finding) => [finding.id, finding.action]))
       const { keptCount, redactedCount } = countDecisions(latestDecisions)
 
+      const redactionTask = await createMaterialTask({
+        kind: 'pii_redact',
+        sourceFileId: file.fileId,
+        params: { decisionTaskId: decidedTask.id },
+      }, token, decidedTask.accessToken ?? piiTask.accessToken)
+      persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: redactionTask })
+      const readyRedaction = await waitForCompletedTask(redactionTask, token, redactionTask.accessToken)
+      assertTaskReady(readyRedaction, '遮挡产物评估')
+      const redaction = piiRedactionSummaryFromTask(readyRedaction) ?? undefined
+      if (redaction && !redaction.canRedact) {
+        persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction })
+        setError(redaction.message)
+        setStage('review')
+        return
+      }
+
       const materialCheck: MaterialCheckSummary = {
         inspectionTaskId: inspectionTask.id,
+        normalizeTaskId: normalizeTask?.id,
         piiTaskId: piiTask.id,
+        piiRedactTaskId: readyRedaction.id,
         checkedAt: new Date().toISOString(),
         findingCount: latestFindings.length,
         redactedCount,
         keptCount,
-        mode: isDemoTask(inspectionTask) || isDemoTask(piiTask) ? 'demo' : 'checked',
+        redaction,
+        mode: isDemoTask(inspectionTask) || isDemoTask(normalizeTask) || isDemoTask(piiTask) || isDemoTask(readyRedaction) ? 'demo' : 'checked',
       }
 
-      persistSession({ inspectionTask, piiTask: decidedTask, materialCheck })
+      persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction, materialCheck })
       setStage('done')
       navigate('/print/preview', { state: { file, materialCheck } })
     } catch (err) {
@@ -458,6 +539,7 @@ export function PrintMaterialCheckPage() {
           </Card>
 
           <CheckStep label="文件体检" active={stage === 'inspection'} done={!!inspectionTask} />
+          <CheckStep label="A4 规范化评估" active={stage === 'normalize_a4'} done={!!normalizeTask} />
           <CheckStep label="隐私片段检查" active={stage === 'pii_scan'} done={!!piiTask} />
 
           <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-800">
@@ -471,7 +553,11 @@ export function PrintMaterialCheckPage() {
               <LoaderIcon className="h-12 w-12 animate-spin text-primary-500" />
               <div className="text-center">
                 <p className="text-xl font-semibold text-gray-900">
-                  {stage === 'inspection' ? '正在检查文件格式' : '正在检查隐私片段'}
+                  {stage === 'inspection'
+                    ? '正在检查文件格式'
+                    : stage === 'normalize_a4'
+                      ? '正在评估 A4 规范化'
+                      : '正在检查隐私片段'}
                 </p>
                 <p className="mt-2 text-sm text-gray-500">请稍候，检查完成后需要您确认</p>
               </div>
@@ -551,6 +637,53 @@ export function PrintMaterialCheckPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {normalizeSummary && (
+                <div className="mb-4 rounded-lg border border-gray-100 bg-white px-5 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-gray-900">A4 规范化摘要</p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        目标纸张：{normalizeSummary.targetPaperSize} · 当前版本仍使用原文件打印
+                      </p>
+                    </div>
+                    <span
+                      className={[
+                        'rounded-full px-3 py-1 text-xs font-semibold',
+                        normalizeBadgeClass,
+                      ].join(' ')}
+                    >
+                      {normalizeBadgeLabel}
+                    </span>
+                  </div>
+                  {normalizeSummary.messages.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {normalizeSummary.messages.map((message) => (
+                        <div
+                          key={`${message.code}:${message.text}`}
+                          className={[
+                            'flex items-center gap-2 rounded-md px-3 py-2 text-sm',
+                            message.severity === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-gray-50 text-gray-700',
+                          ].join(' ')}
+                        >
+                          {message.severity === 'warning' ? (
+                            <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <CheckCircleIcon className="h-4 w-4 shrink-0" />
+                          )}
+                          <span>{message.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {findings.length > 0 && (
+                <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-5 py-3 text-sm leading-relaxed text-amber-800">
+                  当前版本会记录你的保留/遮挡选择并完成遮挡评估，但尚不生成遮挡后文件；进入确认页前会再次提示，打印仍使用原文件。
                 </div>
               )}
 

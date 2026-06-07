@@ -74,6 +74,62 @@
 | `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |
 | `git diff --check` | ✅ 通过 |
 
+**2026-06-07 补充：A4 规范化评估最小契约（Codex）**
+
+**目标：** 在不接入真实 PDF 渲染 / 图片转 PDF / 文件合并链路的前提下，先把 `normalize_a4` 任务从 skeleton 收敛为诚实可验证的 A4 评估契约，并让 Kiosk 在材料检查页展示对应摘要。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/materials/materials.service.ts` | `normalize_a4` 复用现有图片/PDF 页数识别能力：图片和页数明确识别的 PDF 返回 `targetPaperSize=A4`、`canNormalize=true`、`normalizedFileId=null`、页数来源与用户提示；非 A4 参数受控拒绝；不可读、不支持 MIME、PDF 页数未识别均返回 `canNormalize=false` 与明确 warnings/messages，不伪造产物文件 |
+| `services/api/scripts/verify-materials-processing.ts` | 新增图片 `normalize_a4` 成功、本地对象存储 PDF `normalize_a4` 成功、不可读源文件 `normalize_a4` 失败、PDF 字节可读但页数未识别失败、非 A4 参数拒绝等断言 |
+| `apps/kiosk/src/pages/print/printMaterialSession.ts` | 当前打印材料检查 session 新增 `normalizeTask` 元数据字段与 `materialCheck.normalizeTaskId`，仍只持久化任务必要字段，不保存完整 result / PII snippet / 原文 |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 材料检查流程调整为 `inspection → normalize_a4 → pii_scan`；刷新/返回后优先查询已存在的 `normalizeTask`，避免重复创建；页面新增“A4 规范化摘要”，提示当前版本仍使用原文件打印，`canNormalize=false` 或未知状态仅提示版式风险/信息不完整，不额外阻断已可打印文件 |
+| `apps/kiosk/src/services/api/materials.ts` | mock 模式同步返回 `normalize_a4` 的 A4 摘要，离线演示不再只显示泛化 skeleton |
+
+**边界：** 本轮只做 A4 评估契约和 UI 反馈；真实 A4 输出文件、图片转 PDF、PDF 重新排版、PII 遮挡后产物、多文件材料包合并仍未实现。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增 `normalize_a4` 图片/PDF/不可读源文件断言 |
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |
+
+**2026-06-07 补充：PII 遮挡产物评估最小契约（Codex）**
+
+**目标：** 在不实现真实 PDF/DOCX 遮挡渲染的前提下，把 `pii_redact` 从空骨架推进为可验证的“遮挡产物评估”任务，并修正 Kiosk 文案，避免用户误以为已经生成遮挡后文件。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/materials/materials.service.ts` | `pii_redact` 读取 `decisionTaskId` 对应的 `pii_scan` 决策任务，并复用原任务访问校验：会员必须本人，匿名必须携带原 `pii_scan` accessToken；只统计 `keep/redact/pending` 数量，不读取或输出 snippet；返回 `canRedact`、`redactedFileId=null`、`resultFileCreated=false`、counts、warnings/messages；决策任务缺失、跨文件、仍有 pending 时返回不可生成评估，不伪造遮挡后文件 |
+| `services/api/scripts/verify-materials-processing.ts` | 新增 PII 决策全部完成后 `pii_redact` 摘要断言、仍有 pending finding 时 `canRedact=false` / `PII_DECISIONS_PENDING` 断言，以及匿名 `pii_redact` 无 token / 错 token 拒绝、正确原任务 token 才可读取摘要的回归断言 |
+| `apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx` | 用户保存保留/遮挡选择后携带原 `pii_scan` accessToken 创建 `pii_redact` 评估任务，并把 `piiRedactTask` 元数据与安全摘要写入当前打印材料 session；遮挡评估每次基于最新选择新建，避免复用旧决策结果；若 `canRedact=false` 会停留在 review 页提示，不继续进入预览 |
+| `apps/kiosk/src/pages/print/printMaterialSession.ts` | `MaterialCheckSummary` 增加 `piiRedactTaskId` 与 `redaction` 安全摘要；session 仍只保存任务元数据和 counts/message，不保存完整 result 或 PII snippet |
+| `apps/kiosk/src/pages/print/PrintPreviewPage.tsx`、`PrintConfirmPage.tsx` | 当用户选择遮挡但未生成遮挡后文件时，用 amber 提示“当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续”，不再暗示已真实遮挡 |
+| `apps/kiosk/src/services/api/materials.ts` | mock `pii_redact` 返回同样的“未生成新文件”摘要，保持演示模式文案诚实 |
+
+**边界：** 本轮只完成遮挡评估契约和 Kiosk 诚实反馈；真实遮挡 PDF/DOCX/图片产物、遮挡后文件预览、遮挡后文件进入打印任务仍未实现。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增 `pii_redact` settled/pending 两类断言 |
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |
+| `git diff --check` | ✅ 通过 |
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）

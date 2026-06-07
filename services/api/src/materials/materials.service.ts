@@ -78,6 +78,25 @@ type InspectionSummary = {
   messages: InspectionMessage[]
 }
 
+type NormalizeA4Summary = InspectionSummary & {
+  targetPaperSize: 'A4'
+  canNormalize: boolean
+  normalizedFileId: string | null
+}
+
+type PiiRedactionSummary = {
+  canRedact: boolean
+  redactedFileId: string | null
+  resultFileCreated: boolean
+  decisionTaskId: string | null
+  findingCount: number
+  redactedCount: number
+  keptCount: number
+  pendingCount: number
+  warnings: string[]
+  messages: InspectionMessage[]
+}
+
 @Injectable()
 export class MaterialsService {
   constructor(
@@ -93,8 +112,10 @@ export class MaterialsService {
     const now = new Date()
     const requesterMode = requester.kind === 'member' ? 'member' : 'anonymous'
     const accessToken = requesterMode === 'anonymous' ? randomBytes(24).toString('hex') : undefined
-    const paramsJson = JSON.stringify(sanitizeParams(dto.params ?? {}, kind))
-    const result = await this.initialResult(kind, sourceFile)
+    const params = sanitizeParams(dto.params ?? {}, kind)
+    assertSupportedTaskParams(kind, params)
+    const paramsJson = JSON.stringify(params)
+    const result = await this.initialResult(kind, sourceFile, params, requester)
     const task = await this.prisma.documentProcessTask.create({
       data: {
         kind,
@@ -191,6 +212,8 @@ export class MaterialsService {
   private async initialResult(
     kind: MaterialTaskKind,
     sourceFile: SourceFileRecord,
+    params: Record<string, unknown>,
+    requester: MaterialsRequester,
   ): Promise<{ status: MaterialTaskStatus; result: Record<string, unknown> }> {
     if (kind === 'inspection') {
       const inspection = await this.inspectSourceFile(sourceFile)
@@ -213,13 +236,37 @@ export class MaterialsService {
       }
     }
     if (kind === 'normalize_a4') {
+      const normalize = await this.evaluateNormalizeA4(sourceFile)
       return {
         status: 'completed',
-        result: { mode: 'skeleton', output: 'a4_ready_placeholder', resultFileCreated: false },
+        result: {
+          mode: 'a4_normalization_evaluation',
+          checks: {
+            targetPaperSize: normalize.targetPaperSize,
+            canNormalize: normalize.canNormalize,
+            normalizedFileId: normalize.normalizedFileId,
+            mimeType: sourceFile.mimeType,
+            sizeBytes: sourceFile.sizeBytes,
+            pageCount: normalize.pageCount,
+            pageCountSource: normalize.pageCountSource,
+            warnings: normalize.warnings,
+            messages: normalize.messages,
+          },
+        },
       }
     }
     if (kind === 'pii_scan') {
       return { status: 'completed', result: { mode: 'simulated', findingCount: 0 } }
+    }
+    if (kind === 'pii_redact') {
+      const redaction = await this.evaluatePiiRedaction(sourceFile, params, requester)
+      return {
+        status: 'completed',
+        result: {
+          mode: 'pii_redaction_evaluation',
+          checks: redaction,
+        },
+      }
     }
     return { status: 'pending', result: { mode: 'skeleton', queued: false } }
   }
@@ -265,6 +312,72 @@ export class MaterialsService {
         messages: [{ code: 'SOURCE_FILE_BYTES_UNAVAILABLE', severity: 'warning', text: '暂未读取到文件内容，请重新上传文件' }],
       }
     }
+  }
+
+  private async evaluateNormalizeA4(sourceFile: SourceFileRecord): Promise<NormalizeA4Summary> {
+    const inspection = await this.inspectSourceFile(sourceFile)
+    const canNormalize = inspection.pageCountSource === 'image_single_page' ||
+      (inspection.pageCountSource === 'pdf_lightweight_scan' && typeof inspection.pageCount === 'number' && inspection.pageCount > 0)
+    const statusMessage: InspectionMessage = canNormalize
+      ? {
+          code: 'A4_NORMALIZE_EVALUATED',
+          severity: 'info',
+          text: '已完成 A4 规范化评估，当前版本不生成新文件，打印仍使用原文件',
+        }
+      : {
+          code: 'A4_NORMALIZE_UNAVAILABLE',
+          severity: 'warning',
+          text: '当前文件暂不支持 A4 规范化评估，请重新上传或继续核对打印参数',
+        }
+    return {
+      ...inspection,
+      targetPaperSize: 'A4',
+      canNormalize,
+      normalizedFileId: null,
+      messages: [statusMessage, ...inspection.messages],
+    }
+  }
+
+  private async evaluatePiiRedaction(
+    sourceFile: SourceFileRecord,
+    params: Record<string, unknown>,
+    requester: MaterialsRequester,
+  ): Promise<PiiRedactionSummary> {
+    const decisionTaskId = typeof params['decisionTaskId'] === 'string' ? params['decisionTaskId'] : null
+    if (!decisionTaskId) {
+      return buildPiiRedactionSummary({
+        decisionTaskId: null,
+        findings: [],
+        warnings: ['PII_DECISION_TASK_REQUIRED'],
+        message: { code: 'PII_DECISION_TASK_REQUIRED', severity: 'warning', text: '缺少隐私检查决策任务，暂不能评估遮挡产物' },
+      })
+    }
+
+    const decisionTask = await this.prisma.documentProcessTask.findUnique({
+      where: { id: decisionTaskId },
+      include: { findings: true },
+    })
+    if (!decisionTask || decisionTask.sourceFileId !== sourceFile.id || decisionTask.kind !== 'pii_scan') {
+      return buildPiiRedactionSummary({
+        decisionTaskId,
+        findings: [],
+        warnings: ['PII_DECISION_TASK_INVALID'],
+        message: { code: 'PII_DECISION_TASK_INVALID', severity: 'warning', text: '隐私检查决策任务不可用，请重新完成隐私检查' },
+      })
+    }
+
+    this.assertNotExpired(decisionTask)
+    this.assertCanAccessTask(decisionTask, requester)
+    return buildPiiRedactionSummary({
+      decisionTaskId,
+      findings: decisionTask.findings,
+      warnings: [],
+      message: {
+        code: 'PII_REDACTION_EVALUATED',
+        severity: 'info',
+        text: '已完成遮挡产物评估，当前版本不生成新文件，打印仍使用原文件',
+      },
+    })
   }
 
   private async requireUsableSourceFile(sourceFileId: string): Promise<SourceFileRecord> {
@@ -356,6 +469,38 @@ function buildSimulatedPiiFindings(args: { filename: string; textSample?: string
   return findings
 }
 
+function buildPiiRedactionSummary(args: {
+  decisionTaskId: string | null
+  findings: Array<{ action: string }>
+  warnings: string[]
+  message: InspectionMessage
+}): PiiRedactionSummary {
+  const findingCount = args.findings.length
+  const redactedCount = args.findings.filter((finding) => finding.action === 'redact').length
+  const keptCount = args.findings.filter((finding) => finding.action === 'keep').length
+  const pendingCount = args.findings.filter((finding) => finding.action === 'pending').length
+  const pendingWarnings = pendingCount > 0 ? ['PII_DECISIONS_PENDING'] : []
+  const warnings = [...args.warnings, ...pendingWarnings]
+  const messages = [
+    args.message,
+    ...(pendingCount > 0
+      ? [{ code: 'PII_DECISIONS_PENDING', severity: 'warning' as const, text: '仍有隐私片段未选择保留或遮挡，暂不能生成遮挡评估' }]
+      : []),
+  ]
+  return {
+    canRedact: warnings.length === 0,
+    redactedFileId: null,
+    resultFileCreated: false,
+    decisionTaskId: args.decisionTaskId,
+    findingCount,
+    redactedCount,
+    keptCount,
+    pendingCount,
+    warnings,
+    messages,
+  }
+}
+
 function collectMatches<T>(text: string, regex: RegExp, toFinding: (value: string) => T): T[] {
   const findings: T[] = []
   let match: RegExpExecArray | null
@@ -421,6 +566,13 @@ function allowedParamKeys(kind: MaterialTaskKind): string[] {
     default:
       return []
   }
+}
+
+function assertSupportedTaskParams(kind: MaterialTaskKind, params: Record<string, unknown>): void {
+  if (kind !== 'normalize_a4') return
+  const targetPaperSize = params['targetPaperSize']
+  if (targetPaperSize === undefined || targetPaperSize === 'A4') return
+  throw new BadRequestException({ error: { code: 'MATERIAL_TARGET_PAPER_UNSUPPORTED', message: '本期仅支持 A4 规范化评估' } })
 }
 
 function readStringParam(params: Record<string, unknown> | undefined, key: string): string | undefined {
