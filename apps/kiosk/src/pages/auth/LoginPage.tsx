@@ -4,6 +4,9 @@
 // 会话：通过 useAuth().login() 写入纯内存 AuthContext，不写任何浏览器存储
 // 已接入：手机号 + 短信验证码
 // 已预留：邮箱登录、微信/支付宝扫码登录（只做 UI 与状态占位，不伪造登录成功）
+//
+// 公共一体机无系统软键盘：手机号 / 验证码输入框 readOnly + inputMode="none"，
+// 全部由页面内嵌虚拟数字键盘驱动（触控区对齐 KioskNumPad 标准）。
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -30,6 +33,7 @@ const CODE_LENGTH = 6
 
 type LoginTab = 'phone' | 'email' | 'scan'
 type ScanProvider = 'wechat' | 'alipay'
+type ActiveNumberInput = 'phone' | 'code' | null
 
 function formatPhone(raw: string): string {
   if (raw.length <= 3) return raw
@@ -76,6 +80,7 @@ export function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [scanProvider, setScanProvider] = useState<ScanProvider>('wechat')
   const [qrNonce, setQrNonce] = useState(() => Date.now())
+  const [activeNumberInput, setActiveNumberInput] = useState<ActiveNumberInput>(null)
 
   const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
 
@@ -87,6 +92,7 @@ export function LoginPage() {
     setTab(next)
     setError(null)
     setNotice(null)
+    setActiveNumberInput(next === 'phone' ? 'phone' : null)
   }, [])
 
   const handleSendCode = useCallback(async () => {
@@ -165,6 +171,8 @@ export function LoginPage() {
               notice={notice}
               onPhoneChange={(value) => setPhone(normalizeDigits(value, PHONE_LENGTH))}
               onCodeChange={(value) => setCode(normalizeDigits(value, CODE_LENGTH))}
+              activeInput={activeNumberInput}
+              onActiveInputChange={setActiveNumberInput}
               onSendCode={handleSendCode}
               onLogin={handleLogin}
             />
@@ -239,6 +247,8 @@ function PhoneLoginPanel({
   notice,
   onPhoneChange,
   onCodeChange,
+  activeInput,
+  onActiveInputChange,
   onSendCode,
   onLogin,
 }: {
@@ -250,47 +260,88 @@ function PhoneLoginPanel({
   notice: string | null
   onPhoneChange: (value: string) => void
   onCodeChange: (value: string) => void
+  activeInput: ActiveNumberInput
+  onActiveInputChange: (input: ActiveNumberInput) => void
   onSendCode: () => void
   onLogin: () => void
 }) {
   const canSend = phone.length === PHONE_LENGTH && countdown === 0 && !loading
   const canLogin = phone.length === PHONE_LENGTH && code.length === CODE_LENGTH && !loading
+  const keyboardTarget = activeInput ?? 'phone'
+
+  const updateActiveValue = (next: string) => {
+    if (keyboardTarget === 'code') {
+      onCodeChange(normalizeDigits(next, CODE_LENGTH))
+      return
+    }
+    onPhoneChange(normalizeDigits(next, PHONE_LENGTH))
+  }
+
+  const handleKeyboardDigit = (digit: string) => {
+    if (keyboardTarget === 'code') {
+      if (code.length < CODE_LENGTH) onCodeChange(code + digit)
+      return
+    }
+    if (phone.length < PHONE_LENGTH) onPhoneChange(phone + digit)
+  }
+
+  const handleKeyboardDelete = () => {
+    if (keyboardTarget === 'code') {
+      onCodeChange(code.slice(0, -1))
+      return
+    }
+    onPhoneChange(phone.slice(0, -1))
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1220px]">
       <label className="block text-sm font-semibold text-[#1e293b]">手机号</label>
-      <div className="mt-3 flex min-h-[56px] items-center rounded-[10px] border border-[#dfe4ec] bg-white px-4 shadow-sm">
+      <div
+        className={`mt-3 flex min-h-[56px] items-center rounded-[10px] border bg-white px-4 shadow-sm transition-colors ${
+          activeInput === 'phone' ? 'border-[#1677ff] ring-2 ring-blue-100' : 'border-[#dfe4ec]'
+        }`}
+      >
         <PhoneIcon className="mr-3 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
         <span className="mr-3 border-r border-[#e1e6ef] pr-3 text-sm font-semibold text-[#8a94a6]">+86</span>
         <input
-          type="tel"
-          inputMode="numeric"
+          type="text"
+          readOnly
+          inputMode="none"
           name="kiosk-member-phone"
           autoComplete="off"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value)}
+          onFocus={() => onActiveInputChange('phone')}
+          onClick={() => onActiveInputChange('phone')}
           placeholder="请输入手机号"
-          className="min-w-0 flex-1 bg-transparent text-base font-semibold text-[#172033] outline-none placeholder:text-[#a1a8b5]"
+          className="min-w-0 flex-1 cursor-pointer bg-transparent text-base font-semibold text-[#172033] outline-none placeholder:text-[#a1a8b5]"
           aria-label="手机号"
         />
       </div>
 
       <label className="mt-6 block text-sm font-semibold text-[#1e293b]">验证码</label>
       <div className="mt-3 flex gap-3">
-        <div className="flex min-h-[56px] flex-1 items-center rounded-[10px] border border-[#dfe4ec] bg-white px-4 shadow-sm">
+        <div
+          className={`flex min-h-[56px] flex-1 items-center rounded-[10px] border bg-white px-4 shadow-sm transition-colors ${
+            activeInput === 'code' ? 'border-[#1677ff] ring-2 ring-blue-100' : 'border-[#dfe4ec]'
+          }`}
+        >
           <ShieldCheckIcon className="mr-3 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
           <input
             type="text"
-            inputMode="numeric"
+            readOnly
+            inputMode="none"
             name="kiosk-member-code"
             autoComplete="off"
             value={code}
             onChange={(e) => onCodeChange(e.target.value)}
+            onFocus={() => onActiveInputChange('code')}
+            onClick={() => onActiveInputChange('code')}
             onKeyDown={(e) => {
               if (e.key === 'Enter') onLogin()
             }}
             placeholder="6位验证码"
-            className="min-w-0 flex-1 bg-transparent text-base font-semibold tracking-[0.18em] text-[#172033] outline-none placeholder:tracking-normal placeholder:text-[#a1a8b5]"
+            className="min-w-0 flex-1 cursor-pointer bg-transparent text-base font-semibold tracking-[0.18em] text-[#172033] outline-none placeholder:tracking-normal placeholder:text-[#a1a8b5]"
             aria-label="验证码"
           />
         </div>
@@ -317,6 +368,24 @@ function PhoneLoginPanel({
         </div>
       )}
 
+      {activeInput && (
+        <VirtualNumberPad
+          label={activeInput === 'phone' ? '输入手机号' : '输入验证码'}
+          value={activeInput === 'phone' ? phone : code}
+          onDigit={handleKeyboardDigit}
+          onDelete={handleKeyboardDelete}
+          onClear={() => updateActiveValue('')}
+          onConfirm={() => {
+            if (activeInput === 'phone') {
+              if (phone.length === PHONE_LENGTH) onActiveInputChange('code')
+              return
+            }
+            if (canLogin) onLogin()
+          }}
+          confirmLabel={activeInput === 'phone' ? '下一步' : '完成'}
+        />
+      )}
+
       <button
         type="button"
         onClick={onLogin}
@@ -324,6 +393,102 @@ function PhoneLoginPanel({
         className="mt-5 min-h-[56px] w-full rounded-[10px] bg-gradient-to-r from-[#1687ff] to-[#12aeea] text-base font-bold text-white shadow-lg shadow-blue-500/20 transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:from-[#a9bdf5] disabled:to-[#a9bdf5]"
       >
         {loading ? '登录中...' : '立即登录'}
+      </button>
+    </div>
+  )
+}
+
+// 内嵌虚拟数字键盘：触控区对齐既有 KioskNumPad 标准——
+// 数字 / 0 / 删除 / 清空键 min-h ≥ 72px，确认键 min-h ≥ 56px；
+// 用 onPointerDown + preventDefault 即时响应，避免触摸时只读输入框失焦闪烁。
+function VirtualNumberPad({
+  label,
+  value,
+  onDigit,
+  onDelete,
+  onClear,
+  onConfirm,
+  confirmLabel,
+}: {
+  label: string
+  value: string
+  onDigit: (digit: string) => void
+  onDelete: () => void
+  onClear: () => void
+  onConfirm: () => void
+  confirmLabel: string
+}) {
+  const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+  const keyBase =
+    'flex min-h-[72px] items-center justify-center rounded-[10px] border border-[#e4e8f0] bg-[#f8fafc] shadow-sm transition-colors active:bg-blue-50 disabled:opacity-40'
+
+  return (
+    <div className="mt-5 rounded-[10px] border border-[#dfe4ec] bg-white p-3 shadow-sm">
+      <div className="mb-3 flex min-h-[28px] items-center justify-between px-1">
+        <span className="text-sm font-bold text-[#172033]">{label}</span>
+        <span className="text-xs font-medium text-[#98a2b3]">触控数字键盘</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {digits.map((digit) => (
+          <button
+            key={digit}
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              onDigit(digit)
+            }}
+            className={`${keyBase} text-xl font-bold text-[#172033]`}
+            aria-label={digit}
+          >
+            {digit}
+          </button>
+        ))}
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            onClear()
+          }}
+          disabled={value.length === 0}
+          className={`${keyBase} text-sm font-bold text-[#667085]`}
+          aria-label="清空"
+        >
+          清空
+        </button>
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            onDigit('0')
+          }}
+          className={`${keyBase} text-xl font-bold text-[#172033]`}
+          aria-label="0"
+        >
+          0
+        </button>
+        <button
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            onDelete()
+          }}
+          disabled={value.length === 0}
+          className={`${keyBase} text-sm font-bold text-[#667085]`}
+          aria-label="删除"
+        >
+          删除
+        </button>
+      </div>
+      <button
+        type="button"
+        onPointerDown={(e) => {
+          e.preventDefault()
+          onConfirm()
+        }}
+        className="mt-3 flex min-h-[56px] w-full items-center justify-center rounded-[10px] bg-[#1677ff] text-base font-bold text-white shadow-sm transition-colors active:bg-[#0d63d9]"
+        aria-label={confirmLabel}
+      >
+        {confirmLabel}
       </button>
     </div>
   )
@@ -399,7 +564,17 @@ function ScanProviderButton({ active, label, onClick }: { active: boolean; label
   )
 }
 
+// 页脚：回首页 + 注册/协议/隐私说明。注册与协议尚无独立页面，点击给诚实提示，
+// 不保留无响应按钮（CLAUDE.md 诚实化原则）。
 function FooterActions({ onHome }: { onHome: () => void }) {
+  const [hint, setHint] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!hint) return
+    const t = window.setTimeout(() => setHint(null), 3200)
+    return () => window.clearTimeout(t)
+  }, [hint])
+
   return (
     <footer className="mt-8">
       <div className="flex min-h-[64px] items-center justify-center rounded-[10px] border border-[#dfe4ec] bg-white shadow-sm">
@@ -419,11 +594,31 @@ function FooterActions({ onHome }: { onHome: () => void }) {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-[#8b95a7]">
-        <button type="button" className="min-h-[36px] px-1 font-semibold text-[#ff6a3d]">立即注册</button>
+        <button
+          type="button"
+          onClick={() => setHint('首次使用手机号验证码登录将自动创建账号，无需单独注册')}
+          className="min-h-[36px] px-1 font-semibold text-[#ff6a3d]"
+        >
+          立即注册
+        </button>
         <span>登录即代表同意</span>
-        <button type="button" className="min-h-[36px] px-1 font-semibold text-[#1677ff]">《用户服务协议》</button>
-        <button type="button" className="min-h-[36px] px-1 font-semibold text-[#1677ff]">《隐私政策》</button>
+        <button
+          type="button"
+          onClick={() => setHint('用户服务协议内容即将上线')}
+          className="min-h-[36px] px-1 font-semibold text-[#1677ff]"
+        >
+          《用户服务协议》
+        </button>
+        <button
+          type="button"
+          onClick={() => setHint('隐私政策内容即将上线')}
+          className="min-h-[36px] px-1 font-semibold text-[#1677ff]"
+        >
+          《隐私政策》
+        </button>
       </div>
+
+      {hint && <p className="mt-2 text-center text-xs font-medium text-[#667085]">{hint}</p>}
     </footer>
   )
 }
