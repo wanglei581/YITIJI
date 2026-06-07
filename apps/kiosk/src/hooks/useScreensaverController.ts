@@ -5,6 +5,7 @@ import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { useIdleTimer } from './useIdleTimer'
 import { getScreensaverPlaylist, getTerminalId } from '../services/api/screensaver'
 import { prefetchAsset, pruneCache } from '../services/screensaverCache'
+import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
 
 /**
  * 屏保控制器(挂在 KioskRoot,全局生效)。
@@ -59,6 +60,7 @@ export function useScreensaverController(): void {
   const handleIdle = useCallback(() => {
     const p = playlistRef.current
     if (!p?.enabled || p.items.length === 0) return
+    clearPrintMaterialSession()
     navigate('/screensaver', { state: { playlist: p } })
   }, [navigate])
 

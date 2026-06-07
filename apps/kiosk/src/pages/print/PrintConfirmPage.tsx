@@ -6,18 +6,19 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
 import { createPrintJob } from '../../services/print/printJobsApi'
+import {
+  clearPrintMaterialSession,
+  readPrintMaterialSession,
+  type MaterialCheckSummary,
+  type PrintFileState,
+} from './printMaterialSession'
 
-interface PrintFile {
-  name:     string
-  size:     string
-  pages:    number
-  fileUrl?: string
-  fileMd5?: string
-}
+type PrintFile = PrintFileState
 
 interface LocationState {
   file: PrintFile
   params: PrintJobParams
+  materialCheck?: MaterialCheckSummary
 }
 
 const PRICE_BW = 0.2
@@ -52,24 +53,27 @@ export function PrintConfirmPage() {
   const location = useLocation()
   const { getToken } = useAuth()
   const state = location.state as LocationState | null
-  const file = state?.file ?? { name: '未知文件', size: '-', pages: 1 }
-  const params = state?.params ?? DEFAULT_PARAMS
+  const restoredSession = useMemo(() => readPrintMaterialSession(), [])
+  const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
+  const params = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
+  const materialCheck = state?.materialCheck ?? restoredSession?.materialCheck
+  const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
-    const facesPerCopy = Math.ceil(file.pages / params.pagesPerSheet)
+    const facesPerCopy = Math.ceil(effectivePages / params.pagesPerSheet)
     const tf = facesPerCopy * params.copies
     const su = params.duplex === 'simplex' ? tf : Math.ceil(tf / 2)
     return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
-  }, [file.pages, params])
+  }, [effectivePages, params])
 
   const pricePerFace = params.colorMode === 'color' ? PRICE_COLOR : PRICE_BW
   const totalPrice = (totalFaces * pricePerFace).toFixed(2)
 
   const summaryRows = [
     { label: '文件名称', value: file.name },
-    { label: '文件页数', value: `${file.pages} 页` },
+    { label: '文件页数', value: file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页` },
     { label: '纸张规格', value: 'A4（210 × 297 mm）' },
     { label: '打印份数', value: `${params.copies} 份` },
     { label: '色彩模式', value: params.colorMode === 'color' ? '彩色' : '黑白' },
@@ -95,6 +99,7 @@ export function PrintConfirmPage() {
           params,
           token:    getToken(),
         })
+        clearPrintMaterialSession()
         navigate('/print/progress', { state: { ...location.state, file, params, taskId } })
       } catch (err) {
         const msg = err instanceof Error ? err.message : '提交失败，请重试'
@@ -104,12 +109,13 @@ export function PrintConfirmPage() {
       return
     }
     // mock mode or no fileUrl → frontend simulation
+    clearPrintMaterialSession()
     navigate('/print/progress', { state: { ...location.state, file, params } })
   }
 
   // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
   // 所有 hook 已在上方执行，此处安全提前返回。
-  if (!state?.file) {
+  if (!state?.file && !restoredSession?.file) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
@@ -167,6 +173,50 @@ export function PrintConfirmPage() {
             </tbody>
           </table>
         </Card>
+
+        {materialCheck && (
+          <Card
+            className={[
+              'p-5',
+              materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-green-200 bg-green-50',
+            ].join(' ')}
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white">
+                <InfoIcon
+                  className={[
+                    'h-5 w-5',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-600' : 'text-green-600',
+                  ].join(' ')}
+                />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className={[
+                    'font-semibold',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-950' : 'text-green-950',
+                  ].join(' ')}
+                >
+                  隐私检查摘要{materialCheck.mode === 'demo' ? '（流程演示）' : ''}
+                </p>
+                <p
+                  className={[
+                    'mt-1 text-sm leading-relaxed',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-800' : 'text-green-800',
+                  ].join(' ')}
+                >
+                  {materialCheck.mode === 'demo' ? '已完成打印前材料检查流程演示' : '已完成打印前材料检查'}；
+                  遮挡 {materialCheck.redactedCount} 项，保留 {materialCheck.keptCount} 项。
+                  {materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
+                    ? '当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续。'
+                    : '本次打印前选择已记录，仅用于本次确认，不向第三方发送。'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Usage + cost */}
         <Card className="p-5">

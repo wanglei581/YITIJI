@@ -28,16 +28,11 @@ import {
 import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { useAuth } from '../../auth/useAuth'
+import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState } from './printMaterialSession'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
-interface UploadedFile {
-  name:    string
-  size:    string
-  pages:   number
-  fileUrl: string
-  fileMd5: string
-}
+type UploadedFile = PrintFileState & { fileId: string; fileUrl: string; fileMd5: string }
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -57,10 +52,10 @@ export function PrintUploadPage() {
   // 上传中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading)
 
-  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon }[] = [
-    { key: 'file', label: '本机上传', icon: MonitorSmartphoneIcon },
-    { key: 'qr',   label: '扫码上传', icon: QrCodeIcon },
-    { key: 'usb',  label: 'U盘导入',  icon: UsbIcon },
+  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = [
+    { key: 'file', label: '选择文件', icon: MonitorSmartphoneIcon, note: '桌面验证' },
+    { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, disabled: true, note: '待接入' },
+    { key: 'usb',  label: 'U盘导入',  icon: UsbIcon, disabled: true, note: '待接入 Agent' },
   ]
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,15 +65,20 @@ export function PrintUploadPage() {
 
     setUploadError(null)
     setUploading(true)
+    clearPrintMaterialSession()
     try {
       const result = await kioskUploadFile(selected, getToken())
-      setFile({
+      const nextFile: UploadedFile = {
         name:    result.filename,
         size:    formatBytes(result.sizeBytes),
-        pages:   1,
+        pages:   null,
+        fileId:  result.fileId,
         fileUrl: result.signedUrl,
         fileMd5: result.sha256,
-      })
+        mimeType: result.mimeType,
+      }
+      setFile(nextFile)
+      savePrintMaterialSession({ file: nextFile })
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
@@ -92,7 +92,7 @@ export function PrintUploadPage() {
 
   const handleNext = () => {
     if (!file) return
-    navigate('/print/preview', { state: { file } })
+    navigate('/print/material-check', { state: { file } })
   }
 
   return (
@@ -109,19 +109,22 @@ export function PrintUploadPage() {
 
       {/* Tab bar */}
       <div className="mt-6 flex gap-2">
-        {tabs.map(({ key, label, icon: Icon }) => (
+        {tabs.map(({ key, label, icon: Icon, disabled, note }) => (
           <button
             key={key}
-            onClick={() => { setTab(key); setFile(null); setUploadError(null) }}
+            disabled={disabled}
+            onClick={() => { if (!disabled) { setTab(key); setFile(null); setUploadError(null) } }}
             className={[
               'flex flex-1 min-h-[56px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
+              disabled ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300' :
               tab === key
                 ? 'border-primary-600 bg-primary-50 text-primary-600'
                 : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700',
             ].join(' ')}
           >
             <Icon className="h-5 w-5" />
-            {label}
+            <span>{label}</span>
+            {note && <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium">{note}</span>}
           </button>
         ))}
       </div>
@@ -162,10 +165,10 @@ export function PrintUploadPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="truncate font-medium text-gray-900">{file.name}</p>
-                  <p className="mt-0.5 text-sm text-gray-500">{file.size}</p>
+                  <p className="mt-0.5 text-sm text-gray-500">{file.size} · 页数待识别</p>
                 </div>
                 <button
-                  onClick={() => { setFile(null); setUploadError(null) }}
+                  onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
                 >
                   <XIcon className="h-4 w-4 text-gray-400" />
@@ -189,7 +192,7 @@ export function PrintUploadPage() {
                     </div>
                     <div className="text-center">
                       <p className="text-lg font-medium text-gray-700">点击选择文件</p>
-                      <p className="mt-1.5 text-sm text-gray-400">支持 PDF、Word、图片格式，最大 10MB</p>
+                      <p className="mt-1.5 text-sm text-gray-400">支持 PDF、图片格式，上传后将先做材料检查</p>
                     </div>
                   </>
                 )}

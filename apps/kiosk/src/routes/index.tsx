@@ -16,6 +16,7 @@ import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
 import { ScanProgressPage } from '../pages/scan/ScanProgressPage'
 import { ScanResultPage } from '../pages/scan/ScanResultPage'
 import { PrintUploadPage } from '../pages/print/PrintUploadPage'
+import { PrintMaterialCheckPage } from '../pages/print/PrintMaterialCheckPage'
 import { PrintPreviewPage } from '../pages/print/PrintPreviewPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
@@ -57,6 +58,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
+      { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },

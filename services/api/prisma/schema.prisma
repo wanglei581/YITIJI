@@ -148,6 +148,7 @@ model EndUser {
   files           FileObject[]
   aiResumeResults AiResumeResult[]
   printTasks      PrintTask[]
+  documentProcessTasks DocumentProcessTask[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -332,6 +333,9 @@ model FileObject {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  sourceDocumentTasks DocumentProcessTask[] @relation("DocumentProcessSourceFile")
+  resultDocumentTasks DocumentProcessTask[] @relation("DocumentProcessResultFile")
+
   @@index([uploaderId])
   @@index([endUserId])
   @@index([ownerType, ownerId])
@@ -339,6 +343,75 @@ model FileObject {
   @@index([status])
   @@index([expiresAt])
   @@index([deletedAt])
+}
+
+// ── Materials / Document Processing ─────────────────────────────────────────
+// Phase A-2: AI求职材料中心后端任务骨架。
+//
+// kind:
+//   'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact' | 'bundle_render'
+// status:
+//   'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+//
+// 合规约束:
+//   - 仅服务求职者本人材料处理与打印前确认。
+//   - 不接企业侧,不记录招聘闭环状态。
+//   - paramsJson 不长期保存完整原文;textSample 仅用于本期模拟扫描后丢弃。
+
+model DocumentProcessTask {
+  id           String   @id @default(cuid())
+  kind         String
+  status       String   @default("pending")
+  requesterMode String  @default("anonymous")
+  accessTokenHash String?
+
+  sourceFileId String
+  sourceFile   FileObject @relation("DocumentProcessSourceFile", fields: [sourceFileId], references: [id])
+  resultFileId String?
+  resultFile   FileObject? @relation("DocumentProcessResultFile", fields: [resultFileId], references: [id], onDelete: SetNull)
+  endUserId    String?
+  endUser      EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+
+  paramsJson   String   @default("{}")
+  resultJson   String?
+  errorCode    String?
+  errorMessage String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  findings PiiFinding[]
+
+  @@index([kind])
+  @@index([status])
+  @@index([requesterMode])
+  @@index([accessTokenHash])
+  @@index([sourceFileId])
+  @@index([resultFileId])
+  @@index([endUserId])
+  @@index([expiresAt])
+}
+
+// PII 命中项仅归属于材料处理任务,任务删除时级联删除。
+//
+// action:
+//   'pending' | 'keep' | 'redact'
+
+model PiiFinding {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       DocumentProcessTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type       String
+  label      String
+  pageNumber Int?
+  snippet    String?
+  confidence Float?
+  action     String   @default("pending")
+  createdAt  DateTime @default(now())
+
+  @@index([taskId])
+  @@index([type])
+  @@index([action])
 }
 
 // ── AuditLog ──────────────────────────────────────────────────────────────────
