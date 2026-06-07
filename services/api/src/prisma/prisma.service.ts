@@ -149,6 +149,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.piiFinding
   }
 
+  // ── Phase C-2C: 会员收藏 + 权益底座 ─────────────────────────────────────────
+
+  get favorite() {
+    return this.client.favorite
+  }
+
+  get benefitGrant() {
+    return this.client.benefitGrant
+  }
+
   // ── 待机宣传屏(Screensaver)──────────────────────────────────────────────
 
   get adAsset() {

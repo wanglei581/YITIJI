@@ -149,6 +149,8 @@ model EndUser {
   aiResumeResults AiResumeResult[]
   printTasks      PrintTask[]
   documentProcessTasks DocumentProcessTask[]
+  favorites       Favorite[]
+  benefitGrants   BenefitGrant[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -694,6 +696,70 @@ model AiResumeResult {
   @@index([taskId])
   @@index([endUserId])
   @@index([expiresAt])
+}
+
+// ── Favorite ──────────────────────────────────────────────────────────────────
+// Phase C-2C: 会员收藏底座（收藏服务端化，替换 Kiosk 端 localStorage）。
+//
+// 合规约束（CLAUDE.md §10「系统只记录:浏览/收藏/外部跳转/打印/AI服务调用」）:
+//   - 收藏只记录"对某个外部来源岗位 / 招聘会 / 政策的兴趣标记",
+//     绝不记录投递结果 / 投递状态 / 面试 / Offer / 候选人数据,不形成任何招聘闭环。
+//   - 归属于会员本人(endUserId);跨用户在 EndUserAuthGuard + service 双重隔离。
+//
+// targetType: 'job' | 'job_fair' | 'policy'(外部来源信息入口的三类对象)
+// targetId:   对应对象的 id(Job.id / JobFair.id / 政策条目 id)
+// title:      收藏时的展示快照标题(可空)。仅最小展示元数据,便于"我的收藏"列表渲染,
+//             不依赖来源对象是否仍在架;绝不存简历 / PII / 投递信息。
+model Favorite {
+  id         String   @id @default(cuid())
+  endUserId  String
+  endUser    EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  targetType String
+  targetId   String
+  title      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([endUserId, targetType, targetId])
+  @@index([endUserId])
+  @@index([targetType, targetId])
+}
+
+// ── BenefitGrant ──────────────────────────────────────────────────────────────
+// Phase C-2C: 会员权益底座（只读展示底座，暂不接发放/核销真实逻辑、不接支付）。
+//
+// 一条 = 发放给某会员的一项权益（优惠券 / 免费次数 / 套餐额度 / 补贴资格提示）。
+// 本阶段只建模 + 只读列表 API；真实发放(活动 C-3 / 套餐 C-4)、核销 / 支付(C-5)后续接入。
+//
+// 合规约束（next-tasks §五 / compliance §八）:
+//   - benefitType='subsidy_eligibility_hint' 只能是 info-only 资格提示:
+//     仅展示政策说明 / 材料清单 / 官方入口,**绝不**出现"补贴已到账 / 已发放金额"等承诺性文案。
+//   - 套餐 / 券类只代表"平台内服务 / 打印额度",不代表录用结果,不承诺面试 / 录用 / 补贴到账。
+//   - 不在前端保存任何支付凭证 / 密钥(本表也不含支付凭证)。
+//
+// benefitType: 'coupon' | 'free_quota' | 'package_entitlement' | 'subsidy_eligibility_hint'
+// status:      'active' | 'used_up' | 'expired' | 'revoked'
+// sourceType:  'platform' | 'campus' | 'gov' | 'fair' | 'partner'(发放来源种类)
+// sourceRef:   关联活动 / 套餐 id(C-3 / C-4 接入后回填,当前可空)
+// quantity*:   额度类(free_quota / 多次券)的总量 / 剩余;不适用时为 null
+model BenefitGrant {
+  id                String    @id @default(cuid())
+  endUserId         String
+  endUser           EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  benefitType       String
+  title             String
+  description       String?
+  quantityTotal     Int?
+  quantityRemaining Int?
+  status            String    @default("active")
+  sourceType        String    @default("platform")
+  sourceRef         String?
+  validFrom         DateTime?
+  validUntil        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([endUserId])
+  @@index([endUserId, status])
 }
 
 model AuditLog {

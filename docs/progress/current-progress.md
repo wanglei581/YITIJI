@@ -194,6 +194,54 @@
 
 ---
 
+## Phase C-2C：会员收藏 + 权益底座（2026-06-07，Claude，feature/member-favorites-benefits-c2c）
+
+**目标：** 建立 C-2C **最小底座**——`Favorite`（收藏服务端化）+ `BenefitGrant`（权益只读底座）的后端模型 / API / verify，并把 ProfilePage 的「我的收藏 / 我的权益」从「建设中」最小接入真实只读列表。**不做**活动页、套餐购买、支付、退款、核销真实逻辑；不迁移 Jobs 页 localStorage 收藏（留后续）。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/prisma/schema.prisma` + 迁移 `20260607130000_add_favorite_benefit_grant` | 新增 `Favorite`（`@@unique([endUserId,targetType,targetId])`，targetType=job/job_fair/policy，含展示标题快照 `title?`）+ `BenefitGrant`（benefitType=coupon/free_quota/package_entitlement/subsidy_eligibility_hint，status/sourceType/额度/有效期）两表，均 `endUserId` FK + `onDelete: Cascade`；EndUser 加 `favorites` / `benefitGrants` 反向关系。Additive 建表，沿用 `prisma db execute` 落 dev.db drift（同 C-2A 先例），未跑破坏性 reset。**PostgreSQL 迁移时随 dev.db drift 统一重整。** |
+| `services/api/src/prisma/prisma.service.ts` | 新增 `favorite` / `benefitGrant` 两个 model delegate getter（本项目 PrismaService 走组合而非继承） |
+| `services/api/src/member-favorites/`（新增 module/controller/service/dto/types） | `@Controller('me/favorites')`，全部 `@UseGuards(EndUserAuthGuard)`：`GET`（本人列表，可选 `?type=` 过滤）/ `POST`（幂等 upsert 新增）/ `DELETE /:targetType/:targetId`（幂等取消）。模块自带 enduser 专用 `JwtModule` + 本地 provide guard（同 C-2B 装配）。service 只按校验后的 `endUserId` 读写 → 跨用户越权天然不可能；非法 targetType → 400 `FAVORITE_INVALID_TARGET_TYPE` |
+| `services/api/src/member-benefits/`（新增 module/controller/service/types） | `@Controller('me/benefits')` `GET`（本人权益只读列表，active 优先排序，只回元数据，无支付凭证）。**只读**，本阶段不接发放 / 核销 / 支付 |
+| `services/api/src/app.module.ts` | 注册 `MemberFavoritesModule` + `MemberBenefitsModule` |
+| `packages/shared/src/types/{memberFavorites,memberBenefits}.ts`（新增）+ `index.ts` | 前端契约 SSOT：`FavoriteTargetType` / `MemberFavoriteItem` / `AddFavoriteInput`；`BenefitType` / `BenefitStatus` / `BenefitSourceType` / `MemberBenefitItem`。API 侧按既有约定（见 `files/file.types.ts`）用**本地类型副本**（`member-*/*.types.ts`），不直接 import shared（ESM/CJS 互操作） |
+| `apps/kiosk/src/services/api/memberFavorites.ts`（新增） | `getMyFavorites` / `addFavorite` / `removeFavorite` / `getMyBenefits`；envelope 解包；token 仅内存态传入；mock / 未登录返回 [] / no-op |
+| `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 「账号资产」白卡（仅登录会员）新增「我的收藏」（按 job/job_fair/policy 给图标，job/job_fair 可「查看」跳既有详情，行内「取消收藏」幂等调后端）+「我的权益」（类型图标 + 状态/额度/有效期副文本，补贴资格提示 info-only）两组，含加载/空态/错误重试；九宫格「我的收藏 / 我的权益」去掉误导性「建设中」标签，点按按登录态提示「见下方账号资产 / 登录后可查看」 |
+| `services/api/scripts/verify-member-favorites-benefits.ts`（新增）+ `package.json` | `pnpm verify:member-favorites-benefits`，14 类断言 |
+
+**安全 / 合规落地：**
+
+- **必须会员登录**：4 个端点全部受 `EndUserAuthGuard`；匿名 / 缺 token / 错 token / 失效会话 / 内部运营 token 一律 **401**。
+- **只操作本人数据**：service 仅以校验后的 endUserId 读写，不接受任何外部传入 id；`DELETE` 用 `deleteMany({ endUserId, ... })` → 绝不可能删到他人收藏（已用「A 删同 targetId、B 不受影响」断言覆盖）。
+- **收藏合规（CLAUDE.md §10）**：只记录「对外部来源岗位 / 招聘会 / 政策的兴趣标记」，绝不记录投递结果 / 投递状态 / 面试 / Offer / 候选人数据；ValidationPipe(whitelist) 自动剥除未知字段，杜绝注入任何投递 / 候选人字段。
+- **权益合规（next-tasks §五）**：`subsidy_eligibility_hint` 仅 info-only 资格提示，**绝不**出现「到账 / 已发放金额」承诺词（verify 断言扫描）；券 / 套餐额度只代表平台内服务 / 打印额度，不代表录用结果；表中不含任何支付凭证 / 密钥。
+- **空列表返回 []**，**不伪造数量**；本阶段不接活动 / 套餐 / 支付。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` / `lint` | ✅ |
+| `pnpm --filter @ai-job-print/api verify:member-favorites-benefits` | ✅ ALL PASS（14 类）：收藏新增/列表/幂等/type 过滤/取消幂等/跨用户删隔离；权益本人可读+active 优先+额度正确/跨用户隔离/空列表 []/补贴提示 info-only 无承诺词；Guard 匿名·错 token·无会话 401 + 有效会员注入本人 endUserId |
+| `pnpm --filter @ai-job-print/api verify:member-assets` / `verify:ai-result-ownership` / `verify:end-user-assets`（回归） | ✅ ALL PASS（PrismaService / schema EndUser 关系 / app.module 改动未影响既有归属底座） |
+| HTTP 真机冒烟（`PORT=3099` 源码起 API + local 存储） | ✅ 4 路由 Mapped（`GET/POST /me/favorites`、`DELETE /me/favorites/:targetType/:targetId`、`GET /me/benefits`）；无 DI 报错（沿用 C-2B 自带 JwtModule 装配，避开 `EndUserAuthGuard(JwtService)` 解析问题）；匿名 GET/POST → 401 `MEMBER_MISSING_TOKEN` |
+| `pnpm --filter @ai-job-print/shared typecheck` | ✅ |
+| `pnpm --filter @ai-job-print/kiosk typecheck` / `lint` / `build` | ✅（lint 仅既有 `KioskBusyContext` 2 warning；build 仅既有 chunk-size warning） |
+| 合规禁词扫描（改动文件） | ✅ 0 实际命中：所有「到账 / 一键投递」字样均为否定式约束注释或 verify 禁词清单，无用户可见违规文案 |
+| `git diff --check` | ✅ |
+
+**未解决 / 边界（已记 next-tasks）：**
+
+- **登录态真实列表端到端手验**未做：需 API + 会员短信验证码环境（自 C-1 起延后）——本轮用 HTTP 401 冒烟覆盖路由/鉴权、service+guard verify 覆盖读写/隔离/合规、typecheck/build 覆盖渲染编译。
+- **Jobs 页 localStorage 收藏未迁移**：`apps/kiosk/src/lib/useJobFavorites.ts` 仍是本机 localStorage（匿名浏览可用）。本轮按「先做后端模型/API/verify + ProfilePage 最小接入」范围，未把 Jobs/JobDetail/Campus/Home 的收藏切到服务端（需登录态门控 UX，留后续增量）。ProfilePage 已展示服务端收藏（登录会员）。
+- **打印订单聚合视图**（`PrintTask` 聚合）本轮未做，留 C-2C 后续 / C-5。
+- 权益数据当前无写入入口（发放属活动 C-3 / 套餐 C-4，核销 / 支付属 C-5）；底座已就绪，verify 直接落库构造数据验证读取路径。
+
+---
+
 ## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
 
 **目标：** 在 Kiosk 打印上传后插入最小材料检查闭环：文件体检 `inspection` → 隐私片段检查 `pii_scan` → 用户逐项选择保留/遮挡 → 进入现有打印参数与确认流程。仅做前端接线，不改 `services/api` 后端骨架，不改变核心打印提交逻辑。
