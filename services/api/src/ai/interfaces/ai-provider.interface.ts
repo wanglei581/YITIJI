@@ -40,6 +40,13 @@ export interface ParseResumeOutput {
   status: AiTaskStatus
   report?: ResumeReport
   failReason?: string
+  /**
+   * 匿名结果一次性访问令牌（Phase C-2A）。
+   *
+   * provider 不产生此字段；由 AiService.submitResumeParse 在匿名 parse 时铸造并注入到响应，
+   * 只在 POST /resume/parse 响应中返回一次（DB 只存 accessTokenHash）。会员 parse 不返回。
+   */
+  accessToken?: string
 }
 
 // ─── 简历优化类型 ────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
@@ -8,18 +8,21 @@ import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
+import { readAiResumeSession } from './aiResumeSession'
 
 interface ReportState {
   source?: string
   file?: { name: string; size: string; format: string }
   taskId?: string
+  /** 匿名结果一次性令牌（Phase C-2A）；登录会员无此值 */
+  accessToken?: string
   success?: boolean
   reason?: string
   report?: ResumeReport
   targetContext?: ResumeTargetContext
 }
 
-const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId'])
+const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken'])
 
 // 目标方向摘要文本（无方向时返回 null）
 function targetSummary(tc?: ResumeTargetContext): string | null {
@@ -35,7 +38,11 @@ export function ResumeReportPage() {
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as ReportState
 
-  const { success = true, reason, taskId } = state
+  const { success = true, reason } = state
+  // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
+  const session = useMemo(() => readAiResumeSession(), [])
+  const taskId = state.taskId ?? session?.taskId
+  const accessToken = state.accessToken ?? session?.accessToken
   const [report, setReport] = useState<ResumeReport | undefined>(state.report)
   const [loading, setLoading] = useState(!state.report && !!taskId && success)
   const [loadError, setLoadError] = useState(false)
@@ -44,8 +51,9 @@ export function ResumeReportPage() {
   useEffect(() => {
     if (state.report || !taskId || !success) return
     let cancelled = false
-    // 归属收口（Phase C-1）：登录会员须带 token 才能读回本人解析结果。
-    getResumeRecord(taskId, getToken())
+    // 归属 / 令牌门禁（Phase C-1 + C-2A）：登录会员传 token，匿名用户传 accessToken，
+    // 才能读回本人解析结果；无凭证后端返回 AI_TASK_NOT_FOUND。
+    getResumeRecord(taskId, { token: getToken(), accessToken })
       .then((res) => {
         if (cancelled) return
         if (res.report) setReport(res.report)
@@ -54,7 +62,7 @@ export function ResumeReportPage() {
       .catch(() => { if (!cancelled) setLoadError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId, success, state.report, getToken])
+  }, [taskId, success, state.report, accessToken, getToken])
 
   const handleRetry = () => {
     const retryState = Object.fromEntries(
@@ -285,7 +293,7 @@ export function ResumeReportPage() {
         <Button
           size="lg"
           className="flex flex-1 items-center gap-2"
-          onClick={() => navigate('/resume/optimize', { state })}
+          onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken } })}
         >
           <SparklesIcon className="h-4 w-4" />
           查看优化建议

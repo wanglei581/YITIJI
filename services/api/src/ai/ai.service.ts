@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common'
+import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
@@ -39,11 +40,47 @@ const AI_RESUME_RESULT_TTL_HOURS = ((): number => {
 // - loadResult 把已过期行 + 无 expiresAt 的迁移前历史行都视为不存在（不返回简历派生内容，即便 cron 尚未清扫）。
 // - cleanupExpiredResults + AiResultCleanupTask（每小时 cron）硬删过期行 + NULL 历史行并写 system 审计。
 //   接入真实 AI provider（before/after 可能含简历摘录）后无需再改留存逻辑，仅按需调小 TTL。
+//
+// 匿名结果一次性 accessToken（Phase C-2A，CLAUDE.md §18）：
+// - 匿名 parse（endUserId 为 null）铸造 192-bit 随机 token，DB 只存 accessTokenHash=SHA-256(token)；
+//   明文 token 只在 POST /resume/parse 响应里返回一次。
+// - loadAuthorizedResult 对匿名行要求 x-resume-access-token 与 hash 匹配（timingSafeEqual）才放行；
+//   无 token / 错 token / 仅会员 token / 迁移前 hash 为 null 的历史匿名行一律 fail-closed → AI_TASK_NOT_FOUND。
+// - optimize 行懒生成时继承 parse 行的 endUserId 与 accessTokenHash，不铸新 token。
 // ============================================================
 
 const KNOWN_PROVIDERS: readonly AiProviderName[] = [
   'mock', 'openai', 'claude', 'local', 'qwen', 'zhipu',
 ] as const
+
+/**
+ * AI 简历结果读取请求方（Phase C-2A）。
+ *
+ * - 会员请求：endUserId 非空，accessToken 为 null（归属按 endUserId 本人校验）。
+ * - 匿名请求：endUserId 为 null，accessToken 为 parse 时铸造的一次性令牌
+ *   （走 x-resume-access-token header，DB 只存其 SHA-256 hash）。
+ *
+ * 二者由 controller 的 resolveAiResultRequester 决定：有效会员 Authorization → 会员；
+ * 否则匿名 + header token。service 层据此对每行结果做归属 / 令牌门禁。
+ */
+export interface AiResultRequester {
+  endUserId: string | null
+  accessToken: string | null
+}
+
+/** SHA-256(token) 的十六进制串（64 hex chars）。DB 只存此 hash，绝不存明文 token。 */
+function hashAccessToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+/** 恒定时间比较 token 与已存 hash，避免计时侧信道（对齐 materials 任务机制）。 */
+function verifyAccessToken(token: string | null, expectedHash: string): boolean {
+  if (!token) return false
+  const actual = Buffer.from(hashAccessToken(token), 'hex')
+  const expected = Buffer.from(expectedHash, 'hex')
+  if (actual.length !== expected.length || actual.length === 0) return false
+  return timingSafeEqual(actual, expected)
+}
 
 @Injectable()
 export class AiService {
@@ -83,28 +120,44 @@ export class AiService {
     this.provider = providerMap[name]
   }
 
-  /** 持久化 AI 结果（parse / optimize）。taskId+kind upsert，失败只记日志不阻塞业务。 */
+  /**
+   * 持久化 AI 结果（parse / optimize）。taskId+kind upsert，失败只记日志不阻塞业务。
+   *
+   * accessTokenHash（Phase C-2A）：仅匿名 parse 铸造的令牌 hash，或 optimize 继承自 parse 行的 hash。
+   * 显式传 string → 写入；传 null → 写 null（会员行）；传 undefined → update 时保持原值不动。
+   * 注意：payload 里绝不含明文 token（response 才返回明文一次），DB 只存 hash。
+   */
   private async persistResult(
     taskId: string,
     kind: 'parse' | 'optimize',
     status: string,
     payload: ParseResumeOutput | OptimizeResumeOutput,
     endUserId?: string | null,
+    accessTokenHash?: string | null,
   ): Promise<void> {
-    const payloadJson = JSON.stringify(payload)
+    // 明文 token 只在 response 返回；落库前从 payload 防御性摘掉 accessToken，
+    // 确保即便未来调整调用顺序，payloadJson 也绝不含明文 token。
+    const persistablePayload: Record<string, unknown> = { ...payload }
+    delete persistablePayload['accessToken']
+    const payloadJson = JSON.stringify(persistablePayload)
     const provider = this.provider.name
     // 每次写入(含 update)都刷新留存窗口,避免活跃任务被提前清理。
     const expiresAt = new Date(Date.now() + AI_RESUME_RESULT_TTL_HOURS * 60 * 60 * 1000)
     try {
       await this.prisma.aiResumeResult.upsert({
         where: { taskId_kind: { taskId, kind } },
-        create: { taskId, kind, status, payloadJson, provider, expiresAt, endUserId: endUserId ?? null },
+        create: {
+          taskId, kind, status, payloadJson, provider, expiresAt,
+          endUserId: endUserId ?? null,
+          accessTokenHash: accessTokenHash ?? null,
+        },
         update: {
           status,
           payloadJson,
           provider,
           expiresAt,
           ...(endUserId !== undefined ? { endUserId } : {}),
+          ...(accessTokenHash !== undefined ? { accessTokenHash } : {}),
         },
       })
     } catch {
@@ -116,7 +169,12 @@ export class AiService {
     const t0 = Date.now()
     try {
       const result = await this.provider.parseResume(input)
-      await this.persistResult(result.taskId, 'parse', result.status, result, endUserId ?? null)
+      // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
+      // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
+      const isAnonymous = !endUserId
+      const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
+      const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
+      await this.persistResult(result.taskId, 'parse', result.status, result, endUserId ?? null, accessTokenHash)
       this.logService.record({
         taskId:    result.taskId,
         provider:  this.provider.name,
@@ -124,7 +182,7 @@ export class AiService {
         latencyMs: Date.now() - t0,
         status:    result.status === 'failed' ? 'failed' : 'success',
       })
-      return result
+      return accessToken ? { ...result, accessToken } : result
     } catch (err) {
       this.logService.record({
         taskId:    `err-${Date.now()}`,
@@ -141,28 +199,28 @@ export class AiService {
   /**
    * 读取已落库的结果，按 kind 反序列化为对应的 Output 形状。
    *
-   * 归属收口（Phase C-1，CLAUDE.md §11）：
-   * - 会员（endUserId 非空）拥有的结果**只能由本人**读取。requesterEndUserId
-   *   与行 endUserId 不一致（含匿名请求、其他会员）一律按「不存在」处理，
-   *   返回 null → 上层抛 AI_TASK_NOT_FOUND，既阻断越权读取，也不泄露结果是否存在。
-   * - 匿名结果（endUserId 为 null）本阶段仍保持可读（短 TTL 兜底）。一次性
-   *   accessToken 的强约束属 Phase C-2，残留风险见 docs/progress/next-tasks.md。
+   * 归属 / 令牌门禁（Phase C-1 + C-2A，CLAUDE.md §11/§18）。命中任一拒绝条件都返回 null
+   * → 上层统一抛 AI_TASK_NOT_FOUND，既阻断越权，也不泄露结果是否存在：
    * - 留存治理：已过期 / 无 expiresAt（迁移前历史行）一律视为不存在。
+   * - 会员行（endUserId 非空）：只能本人（requester.endUserId 一致）读取；
+   *   其他会员、匿名请求一律拒绝。
+   * - 新匿名行（endUserId 为 null 且 accessTokenHash 非空）：须带正确 accessToken
+   *   （x-resume-access-token）才放行；无 token / 错 token / 仅会员 token 一律拒绝。
+   * - 历史匿名行（endUserId 为 null 且 accessTokenHash 为 null，C-2A 迁移前写入）：
+   *   fail-closed，任何请求都拒绝。
    */
-  private async loadOwnedResult<T>(
+  private async loadAuthorizedResult<T>(
     taskId: string,
     kind: 'parse' | 'optimize',
-    requesterEndUserId: string | null,
+    requester: AiResultRequester,
   ): Promise<T | null> {
     const row = await this.prisma.aiResumeResult.findUnique({
       where: { taskId_kind: { taskId, kind } },
     })
     if (!row) return null
     // 留存治理:已过期 或 无 expiresAt（迁移前写入的历史行）一律视为不存在。
-    // 读取路径不得在到期后 / 对无留存窗口的历史行返回简历派生内容（cron 清扫前也不行）。
     if (!row.expiresAt || row.expiresAt.getTime() < Date.now()) return null
-    // 归属收口:会员所有的结果只能由本人读取;不同会员/匿名请求视为不存在。
-    if (row.endUserId && row.endUserId !== requesterEndUserId) return null
+    if (!this.isAuthorized(row, requester)) return null
     try {
       return JSON.parse(row.payloadJson) as T
     } catch {
@@ -170,19 +228,41 @@ export class AiService {
     }
   }
 
-  async getResumeRecord(taskId: string, requesterEndUserId: string | null = null): Promise<ParseResumeOutput> {
-    const stored = await this.loadOwnedResult<ParseResumeOutput>(taskId, 'parse', requesterEndUserId)
+  /** 单行结果的归属 / 令牌门禁判定（见 loadAuthorizedResult 文档）。 */
+  private isAuthorized(
+    row: { endUserId: string | null; accessTokenHash: string | null },
+    requester: AiResultRequester,
+  ): boolean {
+    if (row.endUserId) {
+      // 会员行:只放行本人会员;匿名请求(endUserId null)与其他会员都拒绝。
+      return requester.endUserId !== null && requester.endUserId === row.endUserId
+    }
+    // 匿名行:历史 null-hash 行 fail-closed;否则须 token 匹配。
+    if (!row.accessTokenHash) return false
+    return verifyAccessToken(requester.accessToken, row.accessTokenHash)
+  }
+
+  async getResumeRecord(
+    taskId: string,
+    requester: AiResultRequester = { endUserId: null, accessToken: null },
+  ): Promise<ParseResumeOutput> {
+    const stored = await this.loadAuthorizedResult<ParseResumeOutput>(taskId, 'parse', requester)
     if (stored) return stored
     throw new NotFoundException({
       error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新提交简历' },
     })
   }
 
-  async getResumeOptimize(taskId: string, requesterEndUserId: string | null = null): Promise<OptimizeResumeOutput> {
-    const cached = await this.loadOwnedResult<OptimizeResumeOutput>(taskId, 'optimize', requesterEndUserId)
+  async getResumeOptimize(
+    taskId: string,
+    requester: AiResultRequester = { endUserId: null, accessToken: null },
+  ): Promise<OptimizeResumeOutput> {
+    const cached = await this.loadAuthorizedResult<OptimizeResumeOutput>(taskId, 'optimize', requester)
     if (cached) return cached
 
-    const parseResult = await this.loadOwnedResult<ParseResumeOutput>(taskId, 'parse', requesterEndUserId)
+    // optimize 懒生成前必须先通过 parse 行门禁（会员本人 / 匿名持正确 token），
+    // 否则越权请求无法触达 provider，也拿不到 optimize 结果。
+    const parseResult = await this.loadAuthorizedResult<ParseResumeOutput>(taskId, 'parse', requester)
     if (!parseResult) {
       throw new NotFoundException({
         error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },
@@ -196,11 +276,16 @@ export class AiService {
     const t0 = Date.now()
     try {
       const result = await this.provider.optimizeResume(taskId, parseResult.report)
+      // optimize 行继承 parse 行的 endUserId 与 accessTokenHash（不铸新 token）。
       const parseOwner = await this.prisma.aiResumeResult.findUnique({
         where: { taskId_kind: { taskId, kind: 'parse' } },
-        select: { endUserId: true },
+        select: { endUserId: true, accessTokenHash: true },
       })
-      await this.persistResult(taskId, 'optimize', result.status, result, parseOwner?.endUserId ?? null)
+      await this.persistResult(
+        taskId, 'optimize', result.status, result,
+        parseOwner?.endUserId ?? null,
+        parseOwner?.accessTokenHash ?? null,
+      )
       this.logService.record({
         taskId,
         provider:  this.provider.name,

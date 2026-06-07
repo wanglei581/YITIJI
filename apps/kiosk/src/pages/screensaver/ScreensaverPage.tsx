@@ -4,6 +4,8 @@ import type { KioskScreensaverItem, KioskScreensaverPlaylist } from '@ai-job-pri
 import { useAuth } from '../../auth/useAuth'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
+import { clearAiResumeSession } from '../resume/aiResumeSession'
+import { clearPrintMaterialSession } from '../print/printMaterialSession'
 
 /**
  * 待机宣传屏(全屏路由)。
@@ -22,9 +24,12 @@ export function ScreensaverPage() {
   const { logout } = useAuth()
   const statePlaylist = (location.state as { playlist?: KioskScreensaverPlaylist } | null)?.playlist
 
-  // 进入待机宣传屏即清理会员登录态（Phase C-1）：屏保意味着用户已离开，
-  // 为下一位用户重置内存会话，避免登录态/敏感记录残留。logout 幂等。
+  // 进入待机宣传屏即重置（Phase C-1 + C-2A）：屏保意味着用户已离开，
+  // 清会员登录态 + 打印材料 / AI 简历最小会话（含匿名 accessToken），
+  // 为下一位用户重置内存与 sessionStorage 残留。logout / clear 均幂等。
   useEffect(() => {
+    clearPrintMaterialSession()
+    clearAiResumeSession()
     logout()
   }, [logout])
 

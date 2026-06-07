@@ -6,6 +6,7 @@ import { useIdleTimer } from './useIdleTimer'
 import { getScreensaverPlaylist, getTerminalId } from '../services/api/screensaver'
 import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
+import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 
 /**
  * 屏保控制器(挂在 KioskRoot,全局生效)。
@@ -14,11 +15,15 @@ import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
  *   1. 周期拉取本终端屏保配置(enabled / idleTimeoutSec / items),并预缓存素材
  *   2. 无操作达阈值 → 跳 /screensaver(全屏路由),携带 playlist 避免二次拉取
  *   3. 忙碌态(打印/扫描/AI/上传)或已在屏保页时,暂停 idle 计时(评审 bug #1)
+ *
+ * 返回 active(屏保是否已配置且有素材)。KioskShell 据此让 useIdleLogout
+ * 与本控制器按 active 互斥:屏保 active 时由本控制器接管 idle → /screensaver;
+ * 屏保未配置时由 useIdleLogout 接管 idle 做公共终端重置(覆盖匿名)。
  */
 const REFRESH_MS = 5 * 60 * 1000
 const DEFAULT_TIMEOUT_SEC = 180
 
-export function useScreensaverController(): void {
+export function useScreensaverController(): { active: boolean } {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const busy = useKioskBusy()
@@ -61,6 +66,7 @@ export function useScreensaverController(): void {
     const p = playlistRef.current
     if (!p?.enabled || p.items.length === 0) return
     clearPrintMaterialSession()
+    clearAiResumeSession()
     navigate('/screensaver', { state: { playlist: p } })
   }, [navigate])
 
@@ -69,4 +75,6 @@ export function useScreensaverController(): void {
     enabled: active && !busy && !onScreensaverRoute,
     onIdle: handleIdle,
   })
+
+  return { active }
 }

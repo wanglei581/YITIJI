@@ -5,6 +5,19 @@
 
 ---
 
+## 阶段开发与 UI/UX 节奏原则（2026-06-07，Codex）
+
+后续功能开发采用「功能可用 + 基础 UX 合格 + 合规文案正确」作为单功能交付标准；不要先把所有功能堆完再补体验，也不要在核心链路未跑通前投入大规模视觉精修。
+
+具体执行口径：
+
+- 每个功能开发时同步保证基础体验：流程入口/下一步清晰，触控按钮尺寸足够，加载/失败/空状态可理解，关键返回/重试/继续操作完整。
+- 每个功能完成后先做功能测试、流程测试和必要的真实 API / 浏览器 / 一体机手验；确认功能、流程、数据和合规文案都正常后，再进入该功能的小范围 UX 修正。
+- 阶段内不追求最终视觉精修；多个核心功能稳定后，再集中做 UI/UX 设计收口，包括视觉层级、组件一致性、触控屏布局、动效、AI 数字人引导员和三端体验统一。
+- 招聘相关入口始终优先校验合规文案：只能使用「去来源平台投递 / 扫码投递 / 去来源平台预约 / 扫码预约」等表述，禁止出现「一键投递 / 立即投递 / 平台投递」等闭环暗示。
+
+---
+
 ## Phase C-1：会员登录安全收口 + 首页登录状态栏（2026-06-07，Claude）
 
 **目标：** 不做完整「用户资产中心」，只做登录相关安全收口 + 首页登录状态栏，为后续「我的简历 / 我的文档 / AI记录 / 收藏」打基础。范围限定 Kiosk 登录态安全 + AI 结果读取归属 + 首页/我的页诚实文案，不新增底部 Tab，不动招聘闭环边界。
@@ -53,6 +66,87 @@
 | 浏览器手验（Playwright + Chromium，`VITE_API_MODE=mock`，5188） | ✅ 13/13：首页未登录状态栏文案/按钮、点「先使用」→匿名状态栏、我的页游客诚实文案、无「跨设备查看」、底部「资产中心建设中」、登录跳 `/login`、底部 Tab 仍 首页/AI助手/我的；唯一 console error 为 `/favicon.ico` 404（Vite dev 默认，与本阶段无关）。截图：`/tmp/c1-home-guest.png`、`/tmp/c1-home-anon.png`、`/tmp/c1-profile-guest.png`、`/tmp/c1-login.png` |
 
 **未解决风险：** 匿名 AI 结果在短 TTL 窗口内仍可凭 taskId（mock 形如 `mock-ai-<ts>-<n>`，可猜测）读取——本阶段已把**会员**结果收紧到本人，匿名收紧（一次性 token）留待 Phase C-2。登录态/idle/屏保登出的真实浏览器交互手验需 API + 短信验证码环境。
+
+---
+
+## Phase C-2A：匿名 AI 简历结果一次性 accessToken 安全收口（2026-06-07，Claude，feature/ai-anon-access-token）
+
+**目标：** 把匿名 AI 简历结果读取从「taskId + 短 TTL 即可读」收紧为「taskId + 一次性 accessToken 才可读」，对齐 materials 任务 `accessTokenHash` 机制。**纯安全收口**，不做完整用户资产中心，不做我的简历/文档/AI记录列表 API，不碰活动/套餐/支付，不改岗位/招聘会，不做匿名转会员认领，不涉任何招聘闭环。会员路径不变（仍按 endUserId 本人校验）。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/prisma/schema.prisma` + 迁移 `20260607120000_add_ai_resume_result_access_token_hash` | `AiResumeResult` 新增可空 `accessTokenHash String?`（仅匿名 parse 铸造的令牌 SHA-256 hash）。additive / nullable / 非破坏性：不加索引、不建表、不动其它模型；沿用 `prisma db execute` 落 dev.db drift（同 §COS / §external-url 先例），未跑破坏性 reset。**PostgreSQL 迁移时随 dev.db drift 统一重整。** |
+| `services/api/src/ai/ai.service.ts` | ①匿名 parse（`endUserId` 为 null）铸造 192-bit 随机 token（`randomBytes(24).toString('hex')`），DB 只存 `accessTokenHash=SHA-256(token)`，明文 token 只随 `submitResumeParse` 响应返回一次；②`loadOwnedResult`→`loadAuthorizedResult` + `isAuthorized`：会员行只放行本人；新匿名行须 `x-resume-access-token` 与 hash `timingSafeEqual` 匹配；历史 null-hash 匿名行 **fail-closed**；过期/无 expiresAt 仍按留存治理视为不存在；③optimize 懒生成继承 parse 行 `endUserId` + `accessTokenHash`，不铸新 token；④`persistResult` 落库前防御性剥除 payload 内 accessToken（确保 `payloadJson` 不含明文）。新增 `AiResultRequester { endUserId; accessToken }` 类型 + `hashAccessToken`/`verifyAccessToken` 工具 |
+| `services/api/src/ai/ai.controller.ts` | 新增 `resolveAiResultRequester(req)`：有效会员 Authorization → 会员请求；否则匿名请求，**只从 `x-resume-access-token` header 读取令牌（不读 URL query）**。两个 GET 读取端点改用该 requester；parse 审计补 `accessTokenIssued`（布尔，绝不记录明文 token） |
+| `services/api/src/ai/interfaces/ai-provider.interface.ts` + `packages/shared/src/types/ai.ts` | `ParseResumeOutput` / `ResumeParseResponse` 增加 `accessToken?: string`（仅匿名 parse 返回，会员 parse 不返回） |
+| `apps/kiosk/src/services/api/ai.ts` | `getResumeRecord` / `getResumeOptimize` 第二参从 `token?` 改为 `ResumeReadAccess { token?; accessToken? }`（token→会员，accessToken→匿名） |
+| `apps/kiosk/src/services/api/aiHttpAdapter.ts` | `accessHeaders()`：`token`→`Authorization: Bearer`，`accessToken`→`x-resume-access-token`，**不拼任何 URL query** |
+| `apps/kiosk/src/services/api/aiMockAdapter.ts` | 签名对齐 `ResumeReadAccess`（mock 忽略 accessToken） |
+| `apps/kiosk/src/pages/resume/aiResumeSession.ts`（新增） | 最小匿名会话：**只存 `taskId` + `accessToken`**，绝不存 report/modules/payload/PII/原文；仅 `sessionStorage`，受限模式 try/catch 静默降级 |
+| `apps/kiosk/src/pages/resume/{ResumeParsePage,ResumeReportPage,ResumeOptimizePage}.tsx` | parse 后接收 `res.accessToken` 并 `saveAiResumeSession` + 经 `location.state` 透传；Report/Optimize 读取时 `{ token: getToken(), accessToken }`，刷新后 taskId/accessToken 回退到最小会话 |
+| `apps/kiosk/src/auth/useIdleLogout.ts`、`apps/kiosk/src/hooks/useScreensaverController.ts`、`apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | idle 自动登出 / 进入待机宣传屏时 `clearAiResumeSession()`（与既有 `clearPrintMaterialSession()` 并列），避免下一位用户继承匿名令牌 |
+| `services/api/scripts/verify-ai-result-ownership.ts` | 扩展为 C-1 + C-2A 共 12 类断言（见下） |
+
+**读取规则（最终）：**
+
+- 会员行（`endUserId != null`）：仅本人会员 token 可读；其它会员、匿名一律 `AI_TASK_NOT_FOUND`。
+- 新匿名行（`endUserId == null` 且 `accessTokenHash != null`）：带正确 `x-resume-access-token` 可读；无 token / 错 token / 仅会员 token 一律 `AI_TASK_NOT_FOUND`。
+- 历史匿名行（`endUserId == null` 且 `accessTokenHash == null`）：**fail-closed**，任何请求都 `AI_TASK_NOT_FOUND`。
+- 已过期 / `expiresAt` 为空：继续按留存治理视为不存在。
+- 统一返回 `AI_TASK_NOT_FOUND`，不泄露任务是否存在。token 在 TTL 内可重复用于同一 taskId 的 parse/optimize 读取（不做 burn-after-read）。
+
+**安全约束落地：** 明文 token 只在 `POST /resume/parse` 响应返回一次；DB 只存 SHA-256 hash；token 只走 `x-resume-access-token` header，**不进 URL query**；校验用 `timingSafeEqual`；最小 session 只存 taskId/accessToken，不存任何 AI payload / 原文 / PII。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 0 error / 0 warning |
+| `pnpm --filter @ai-job-print/api verify:ai-result-ownership` | ✅ ALL PASS：12 类断言（匿名铸 token 正确 token 可读 parse / 懒生成读 optimize；无 token、错 token、仅会员 token 读匿名均 NOT_FOUND；会员本人可读、跨会员、匿名读会员均按规则；accessTokenHash 为 64 hex 且 == SHA-256(token)；DB 全列含 payloadJson 不含明文 token；optimize 继承 parse hash；历史 null-hash 行 fail-closed；过期匿名行即使 token 正确仍 NOT_FOUND） |
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条（未触碰） |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；仅既有 chunk-size warning |
+| `git diff --check` | ✅ 无空白错误 |
+| 合规禁词扫描（改动文件） | ✅ 0 新增命中（仅既有 `ai.ts`/`shared/ai.ts` 头部合规约束注释中的「候选人推荐/面试邀约/Offer 管理」否定式声明，非新增） |
+
+**未解决风险 / 边界：**
+
+- 运行期手验（真实 API + 浏览器/一体机）未做：需 API + 会员短信验证码环境验证「匿名 parse 拿 token → 刷新/返回仍能读回；无 token/错 token 被拒；进屏保/idle 后下一位用户读不到上一位结果」。本轮为静态 + verify 脚本断言 + 三端 typecheck/lint/build。
+- 历史匿名行 fail-closed 是**刻意安全取舍**：C-2A 部署后，部署前已生成、持有 taskId 但无 token 的在途匿名会话将无法再读回结果（须重新解析）；此类历史行在 TTL（默认 24h）内自然清理。
+- `accessTokenHash` 列随 dev.db drift 经 `db execute` 落地；**PostgreSQL 迁移时需与既有 drift 条目统一重生成规范化**。
+- 未做：完整用户资产中心 / 我的简历·文档·AI记录列表 API / 匿名转会员认领（均属 Phase C-2B 及以后）。
+
+**2026-06-07 补充：匿名 session idle 清理缺口修复（PR #30 合入前）**
+
+**缺口：** `clearAiResumeSession()` 虽已接入 `useIdleLogout` 与 `ScreensaverPage`，但 `useIdleLogout` 原 `enabled` 含 `isLoggedIn`，`useScreensaverController` 仅在屏保已配置且有素材时计时。因此**匿名用户**在屏保未配置 / 未触发时，`aiResumeSession`（sessionStorage 内 taskId + 一次性 accessToken）可能 idle 后不被清理 → 下一位用户刷新即可读回上一位匿名 AI 结果。
+
+**修复：** 把 `useIdleLogout` 从「会员登录态空闲登出」扩为**公共终端空闲重置**，覆盖登录 + 匿名；与待机宣传屏按 `screensaverActive` 互斥，单一 idle 周期内只有一个计时器触发，不破坏现有屏保行为。
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/auth/useIdleLogout.ts` | `enabled` 去掉 `isLoggedIn`、新增 `screensaverActive` 入参 → `!busy && !onScreensaverRoute && !screensaverActive`（覆盖匿名；屏保接管时本守卫关闭）。idle 动作不变：清 `clearPrintMaterialSession()` + `clearAiResumeSession()` + `logout()`（幂等，匿名 no-op）+ replace 回首页。忙碌态（KioskBusyContext 引用计数锁 / AuthContext.busy）任一为真即暂停 |
+| `apps/kiosk/src/hooks/useScreensaverController.ts` | 返回 `{ active }`（屏保是否已配置且有素材）；屏保 idle 逻辑本身**未改**（active 时仍优先 `/screensaver`） |
+| `apps/kiosk/src/layouts/KioskRoot.tsx` | `const { active } = useScreensaverController(); useIdleLogout(active)`，二者按 active 互斥 |
+
+**行为矩阵（修复后）：**
+
+| 场景 | busy | 屏保 active | idle 结果 |
+|------|------|------------|-----------|
+| 匿名 / 会员，屏保未配置 | 否 | 否 | **useIdleLogout 接管**：清 print+AI session + 登出 + 回首页（**修复点：匿名也清**） |
+| 匿名 / 会员，屏保已配置 | 否 | 是 | useScreensaverController 接管：清 session + 进 `/screensaver`（行为不变） |
+| 打印/扫描/AI/上传中 | 是 | 任意 | 两个计时器都暂停，不清理、不打断业务（不变） |
+
+**约束：** 仅清内存态 + sessionStorage；**未新增 localStorage / cookie / IndexedDB**。
+
+**待手验（浏览器 / 一体机，真实 API + `VITE_API_MODE=http`，`VITE_KIOSK_LOGOUT_IDLE_SEC` 可调小如 5s 便于复现）：**
+
+1. 匿名（未登录）走 `AI 简历服务 → 上传/选择简历 → 解析`，到诊断报告页；DevTools → Application → Session Storage 确认存在 `ai-job-print:current-ai-resume`，含 `taskId` + `accessToken`，**不含** report/payload/PII。
+2. **屏保未配置**终端：静置超过 idle 阈值不触碰屏幕 → 自动回首页；确认 Session Storage 中 `ai-job-print:current-ai-resume` 已被清除；手动跳回 `/resume/report`（无 route state）→ 无法恢复上一位结果（报告为空 / `AI_TASK_NOT_FOUND`）。
+3. **屏保已配置**终端：静置 → 进入 `/screensaver`（行为不变）；触摸唤醒回首页后同样确认 session 已清。
+4. 忙碌态验证：在「AI 解析中 / 打印中」静置不应触发清理或跳转（busy 豁免）。
 
 ---
 
@@ -2278,6 +2372,7 @@ pnpm verify:job-sync
 | 2026-06-01 | W8 BullMQ API pull worker 完成（feat/w8-bullmq-api-worker）：@nestjs/bullmq + bullmq + ioredis 安装；Prisma JobSource 新增 responseConfig String?（migration 20260601110728）；src/job-sync/ 模块 5 文件（types/service/processor/scheduler/controller/module）；Cron 每 30min 调度 due sources（hourly/daily/weekly）；POST /admin/job-sync/sources/:id/trigger（202，JWT+Admin，Throttle 10/min）+ GET 列表；Admin /sync-sources 页面（配置完整性徽章 + 立即同步）；无 REDIS_URL 时 inline setImmediate fallback；BullMQ jobId 去重+inProgress Set 并发保护；$transaction 整批原子；凭证只服务端解密；reviewStatus/publishStatus 更新不覆写；SyncLog 成功/失败记录（api syncMode）；API/Admin/Partner tsc+lint+build ✅，合规禁词 ✅（0 violations） | Claude Code |
 | 2026-06-01 | Phase 7.11 R4 — Partner Sources 类型对齐 packages/shared：①shared/types/job.ts SyncFrequency 加 'weekly'(原 realtime/hourly/daily/manual 不够覆盖 UI 已有 weekly 选项)、新增 ConnStatus / PartnerDataSourceView(DataSourceConfig 的 UI 投影,扁平、只读、不含敏感字段、保留 credentialConfigured + webhookSecretOnce 语义)；②apps/partner types 改为别名 PartnerDataSource = PartnerDataSourceView, CreateDataSourcePayload.authType 用 shared AuthType, 同时把 FieldMappingRule/MappingValidationError/ImportBatch/ImportRecord/DataSourceConfig re-export 出来供 Excel 映射 UI 后续使用；SyncFreq 保留为 @deprecated 别名;③services/api jobs.service.ts PartnerDataSourceDto 对齐 PartnerDataSourceView 字面量(sourceKind/accessMode/syncFreq/connStatus 不再裸 string)，SSOT 注释指向 shared；UI 行为零变化(只是 FREQ_LABELS 增加 realtime 文案兜底)；端到端 demo 复跑通过、forbidden 字段 GET 不回显校验通过；pnpm -r typecheck/lint/build 全通过 | Claude Code |
 | 2026-06-03 | Dev server HMR `Reconnecting` 修复：三端 Vite 配置显式设置 HMR WebSocket 为 `ws://127.0.0.1:{5173,5174,5175}`，避免浏览器推断到 `0.0.0.0` 或错误端口后反复重连；补齐 admin/partner `ImportMeta.env` 类型声明。验证：kiosk/admin/partner typecheck 全通过；kiosk 本地浏览器打开 `http://127.0.0.1:5173`，控制台显示 `[vite] connected.`，无 Reconnecting。 | Codex |
+| 2026-06-07 | 记录阶段开发与 UI/UX 节奏原则：后续功能先做到功能可用、流程跑通、测试通过、合规文案正确；功能稳定后做基础 UX 修正；多个核心功能稳定后再集中做 UI/UX 设计、视觉体验、触控屏布局和 AI 数字人引导收口。同步更新 next-tasks.md。 | Codex |
 
 ---
 
