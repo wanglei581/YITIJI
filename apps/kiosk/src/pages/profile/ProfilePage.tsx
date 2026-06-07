@@ -12,13 +12,14 @@ import type {
   MemberResumeItem,
 } from '@ai-job-print/shared'
 import {
+  BadgeCheckIcon,
   BellIcon,
   BotIcon,
   BoxIcon,
   BriefcaseIcon,
   CalendarIcon,
   CheckCircleIcon,
-  CircleUserRoundIcon,
+  ChevronRightIcon,
   CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
@@ -27,6 +28,7 @@ import {
   FilesIcon,
   FileTextIcon,
   GiftIcon,
+  GraduationCapIcon,
   HeartIcon,
   HelpCircleIcon,
   LandmarkIcon,
@@ -41,6 +43,7 @@ import {
   ScanLineIcon,
   SettingsIcon,
   SparklesIcon,
+  TargetIcon,
   TicketIcon,
   Trash2Icon,
   UserRoundIcon,
@@ -167,60 +170,150 @@ function formatTime(iso: string) {
 function ProfileHeader({
   isLoggedIn,
   displayName,
+  phoneMasked,
+  stats,
   onLogin,
   onLogout,
+  onShortcut,
 }: {
   isLoggedIn: boolean
   displayName: string
+  phoneMasked: string
+  stats: {
+    aiRecords: number
+    favorites: number
+    documents: number
+  }
   onLogin: () => void
   onLogout: () => void
+  onShortcut: (message: string) => void
 }) {
+  if (isLoggedIn) {
+    return (
+      <section className="-mx-6 -mt-6 rounded-b-[28px] bg-gradient-to-br from-[#1677ff] via-[#1687ff] to-[#0f8cff] px-6 pb-16 pt-8 text-white shadow-sm">
+        <div className="flex min-h-[44px] items-center justify-between">
+          <h1 className="text-xl font-bold">我的主页</h1>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onShortcut('账号设置建设中')}
+              aria-label="账号设置"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
+            >
+              <QrCodeIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onShortcut('消息通知建设中')}
+              aria-label="消息通知"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
+            >
+              <BellIcon className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-start gap-4">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-white/35 bg-white/18 text-2xl font-bold shadow-inner">
+            {avatarInitial(displayName)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-2xl font-bold leading-tight">{displayName}</p>
+              <span className="inline-flex min-h-[24px] items-center gap-1 rounded-full bg-white/18 px-2.5 text-xs font-semibold text-white ring-1 ring-white/20">
+                <BadgeCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                已登录
+              </span>
+            </div>
+            <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white/85">
+              <GraduationCapIcon className="h-4 w-4" aria-hidden="true" />
+              会员账号
+              <span className="text-white/45">|</span>
+              {phoneMasked || '手机号已绑定'}
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white/85">
+              <TargetIcon className="h-4 w-4" aria-hidden="true" />
+              账号资料能力逐步开放中
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="hidden min-h-[40px] shrink-0 rounded-full bg-white/15 px-4 text-sm font-semibold text-white ring-1 ring-white/20 active:bg-white/25 sm:inline-flex sm:items-center"
+          >
+            退出登录
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-white/18 bg-white/8 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
+          <div className="grid grid-cols-3 divide-x divide-white/16 text-center">
+            <ProfileStat value={stats.aiRecords} label="AI记录" />
+            <ProfileStat value={stats.favorites} label="收藏记录" />
+            <ProfileStat value={stats.documents} label="文档记录" />
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <div className={`flex items-center gap-4 ${cardSurface} px-6 py-5`}>
-      <div
-        className={[
-          'flex h-16 w-16 shrink-0 items-center justify-center rounded-full',
-          isLoggedIn ? 'bg-primary-50' : 'bg-gray-100',
-        ].join(' ')}
-      >
-        {isLoggedIn ? (
-          <CircleUserRoundIcon className="h-8 w-8 text-primary-600" aria-hidden="true" />
-        ) : (
-          <UserRoundIcon className="h-8 w-8 text-gray-400" aria-hidden="true" />
-        )}
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100">
+        <UserRoundIcon className="h-8 w-8 text-gray-400" aria-hidden="true" />
       </div>
 
       <div className="min-w-0 flex-1">
-        {isLoggedIn ? (
-          <>
-            <div className="flex items-center gap-2">
-              <p className="truncate text-xl font-bold text-gray-900">{displayName}</p>
-              <span className="shrink-0 rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-600">
-                会员
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-gray-500">当前展示本次服务记录与本人账号资产</p>
-            <p className="mt-0.5 text-xs text-gray-400">长时间无操作将自动退出，保护个人资料</p>
-          </>
-        ) : (
-          <>
-            <p className="text-xl font-bold text-gray-900">游客</p>
-            <p className="mt-1 text-sm text-gray-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
-          </>
-        )}
+        <p className="text-xl font-bold text-gray-900">游客</p>
+        <p className="mt-1 text-sm text-gray-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
       </div>
 
-      {isLoggedIn ? (
-        <Button size="lg" variant="secondary" onClick={onLogout} className="h-14 shrink-0 px-5 text-base">
-          退出登录
-        </Button>
-      ) : (
-        <Button size="lg" onClick={onLogin} className="flex h-14 shrink-0 items-center gap-1 px-5 text-base">
-          <LogInIcon className="h-5 w-5" aria-hidden="true" />
-          手机号登录
-        </Button>
-      )}
+      <Button size="lg" onClick={onLogin} className="flex h-14 shrink-0 items-center gap-1 px-5 text-base">
+        <LogInIcon className="h-5 w-5" aria-hidden="true" />
+        手机号登录
+      </Button>
     </div>
+  )
+}
+
+function ProfileStat({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="px-2">
+      <p className="text-2xl font-bold leading-none">{value}</p>
+      <p className="mt-2 text-xs font-semibold text-white/78">{label}</p>
+    </div>
+  )
+}
+
+function PendingTaskBanner({
+  hasTask,
+  onContinue,
+}: {
+  hasTask: boolean
+  onContinue: () => void
+}) {
+  return (
+    <section className="-mt-12 rounded-2xl border border-neutral-100 bg-white px-5 py-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+          <ScanLineIcon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold text-gray-900">本次服务记录</h2>
+          <p className="mt-0.5 truncate text-xs text-gray-500">
+            {hasTask ? '本次服务产生的记录，可继续查看' : '暂无本次服务记录，完成简历或打印服务后在此查看'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!hasTask}
+          className="flex min-h-[40px] shrink-0 items-center gap-1 rounded-full bg-primary-50 px-4 text-sm font-semibold text-primary-600 active:bg-primary-100 disabled:bg-gray-50 disabled:text-gray-300"
+        >
+          查看记录
+          <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -310,6 +403,13 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function avatarInitial(name: string): string {
+  const clean = name.replace(/\s/g, '')
+  if (!clean) return '我'
+  if (/^\d/.test(clean)) return clean.slice(0, 1)
+  return clean.slice(0, 1)
 }
 
 // ── 收藏 / 权益展示元数据（Phase C-2C）─────────────────────────────────────────
@@ -474,7 +574,7 @@ function SessionRow({
 export function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn, displayName, logout, getToken } = useAuth()
+  const { user, isLoggedIn, displayName, logout, getToken } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
 
   // ── 本次会话记录（仅来自 location.state，不伪造数量）──────────────
@@ -512,6 +612,16 @@ export function ProfilePage() {
   } | null>(null)
   const [assetsLoading, setAssetsLoading] = useState(false)
   const [assetsError, setAssetsError] = useState(false)
+
+  const headerDisplayName = user?.nickname?.trim() || displayName || '已登录用户'
+  const headerPhoneMasked = user?.phoneMasked ?? displayName
+  // 头部统计只取真实账号资产计数（来自 /me/* API），不叠加本次会话记录，避免同一文件被双算；
+  // 本次会话记录在下方「本次服务记录」单独展示。不展示「完整度」——无真实完整度计算，不编造数字。
+  const headerStats = {
+    aiRecords: assets?.aiRecords.length ?? 0,
+    favorites: assets?.favorites.length ?? 0,
+    documents: assets?.documents.length ?? 0,
+  }
 
   const loadAssets = useCallback(() => {
     const token = getToken()
@@ -557,6 +667,20 @@ export function ProfilePage() {
 
   // ── Handlers ─────────────────────────────────────────────────
   const goLogin = () => navigate('/login', { state: { from: location.pathname } })
+
+  const continuePendingTask = () => {
+    if (resumes[0]) {
+      navigate('/resume')
+      return
+    }
+    if (scans[0]) {
+      printFile(scans[0])
+      return
+    }
+    if (aiRecords[0]) {
+      navigate('/resume')
+    }
+  }
 
   const printFile = (file: { name: string; size: string; pages?: number }) => {
     navigate('/print/preview', {
@@ -622,14 +746,19 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="relative flex min-h-full flex-col gap-6 p-6 pb-24">
+    <div className="relative flex min-h-full flex-col gap-4 bg-[#eef2f7] p-6 pb-24">
       {/* ── 顶部个人信息区 ── */}
       <ProfileHeader
         isLoggedIn={isLoggedIn}
-        displayName={displayName}
+        displayName={headerDisplayName}
+        phoneMasked={headerPhoneMasked}
+        stats={headerStats}
         onLogin={goLogin}
         onLogout={logout}
+        onShortcut={setToastMsg}
       />
+
+      {isLoggedIn && <PendingTaskBanner hasTask={hasSessionRecords} onContinue={continuePendingTask} />}
 
       {/* 提示 toast */}
       {toastMsg && (
