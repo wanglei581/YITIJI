@@ -18,6 +18,7 @@
     "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts",
     "verify:end-user-assets": "node -r @swc-node/register scripts/verify-end-user-asset-ownership.ts",
     "verify:ai-result-ownership": "node -r @swc-node/register scripts/verify-ai-result-ownership.ts",
+    "verify:member-assets": "node -r @swc-node/register scripts/verify-member-assets.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",
     "verify:llm-guard": "tsx scripts/verify-llm-guard.ts",
