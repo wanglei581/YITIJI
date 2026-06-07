@@ -8,6 +8,7 @@ import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeOptimize } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
+import { readAiResumeSession } from './aiResumeSession'
 
 // 目标方向摘要文本（无方向时返回 null）
 function targetSummary(tc?: ResumeTargetContext): string | null {
@@ -45,7 +46,10 @@ export function ResumeOptimizePage() {
   const { getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
 
-  const taskId = typeof state?.taskId === 'string' ? state.taskId : undefined
+  // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
+  const session = useMemo(() => readAiResumeSession(), [])
+  const taskId = (typeof state?.taskId === 'string' ? state.taskId : undefined) ?? session?.taskId
+  const accessToken = (typeof state?.accessToken === 'string' ? state.accessToken : undefined) ?? session?.accessToken
   const file   = state?.file as { name: string; size: string; format: string } | undefined
   const targetContext = state?.targetContext as ResumeTargetContext | undefined
   const summary = targetSummary(targetContext)
@@ -61,8 +65,9 @@ export function ResumeOptimizePage() {
       return
     }
     let cancelled = false
-    // 归属收口（Phase C-1）：登录会员须带 token 才能读回本人优化结果。
-    getResumeOptimize(taskId, getToken())
+    // 归属 / 令牌门禁（Phase C-1 + C-2A）：登录会员传 token，匿名用户传 accessToken，
+    // 才能读回 / 懒生成本人优化结果；无凭证后端返回 AI_TASK_NOT_FOUND。
+    getResumeOptimize(taskId, { token: getToken(), accessToken })
       .then((res) => {
         if (cancelled) return
         if (res.modules && res.modules.length > 0) setModules(res.modules)
@@ -71,7 +76,7 @@ export function ResumeOptimizePage() {
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId, getToken])
+  }, [taskId, accessToken, getToken])
 
   const uplift = useMemo(() => estimateUplift(modules), [modules])
 

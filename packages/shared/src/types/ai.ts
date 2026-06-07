@@ -84,6 +84,15 @@ export interface ResumeParseResponse {
   report?: ResumeReport
   /** 失败时返回原因 */
   failReason?: string
+  /**
+   * 匿名结果一次性访问令牌（Phase C-2A）。
+   *
+   * 仅匿名 parse（未登录会员）时返回，且只在本次响应中返回一次（DB 只存 SHA-256 hash）。
+   * 后续读取同一 taskId 的 parse/optimize 须凭该 token 走 `x-resume-access-token` header。
+   * 登录会员 parse 不返回此字段（结果仍按 endUserId 本人校验）。
+   * 前端只在内存 / 最小 session 暂存，绝不写入长期本地存储。
+   */
+  accessToken?: string
 }
 
 // ─── 简历优化 ────────────────────────────────────────────────

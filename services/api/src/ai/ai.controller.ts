@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Param, Body, Query, Req, UseGuards } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { AiService } from './ai.service'
+import type { AiResultRequester } from './ai.service'
 import { AiLogService } from './ai-log.service'
 import { AuditService } from '../audit/audit.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
@@ -43,6 +44,19 @@ function authOf(req: ReqLike): string | undefined {
   return undefined
 }
 
+/**
+ * 提取匿名结果一次性访问令牌（Phase C-2A）。
+ *
+ * 只从 `x-resume-access-token` header 读取，**不读 URL query**——避免令牌进入
+ * 访问日志 / Referer / 浏览器历史。空白一律视为未提供。
+ */
+function resumeAccessTokenOf(req: ReqLike): string | null {
+  const header = req.headers['x-resume-access-token']
+  if (typeof header === 'string' && header.trim()) return header.trim()
+  if (Array.isArray(header) && header[0]?.trim()) return header[0].trim()
+  return null
+}
+
 // ============================================================
 // AI Controller
 //
@@ -65,6 +79,18 @@ export class AiController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
   ) {}
+
+  /**
+   * 解析 AI 结果读取请求方（Phase C-2A）。
+   *
+   * - 携带有效会员 Authorization → 会员请求（按 endUserId 本人校验，忽略任何 accessToken）。
+   * - 否则 → 匿名请求，仅从 `x-resume-access-token` header 读取一次性令牌（不读 query）。
+   */
+  private async resolveAiResultRequester(req: ReqLike): Promise<AiResultRequester> {
+    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    if (member) return { endUserId: member.endUserId, accessToken: null }
+    return { endUserId: null, accessToken: resumeAccessTokenOf(req) }
+  }
 
   /**
    * 简历 AI 提交。
@@ -93,6 +119,8 @@ export class AiController {
         taskId: result.taskId,
         status: result.status,
         hasEndUser: Boolean(endUser),
+        // 仅记录"是否为匿名结果铸了令牌"（布尔），绝不记录明文 token（合规）。
+        accessTokenIssued: Boolean(result.accessToken),
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
@@ -104,16 +132,17 @@ export class AiController {
   /**
    * 查询解析结果。
    *
-   * 归属收口（Phase C-1）：带会员 token 时解析出 endUserId，会员所有的结果
-   * 只能由本人读取；不同会员 / 匿名请求按 AI_TASK_NOT_FOUND 处理（service 层校验）。
+   * 归属 / 令牌门禁（Phase C-1 + C-2A）：会员结果只能本人凭会员 token 读取；
+   * 匿名结果须凭 parse 时下发的一次性令牌（x-resume-access-token）读取。
+   * 越权 / 无 token / 错 token 一律 AI_TASK_NOT_FOUND（service 层校验）。
    */
   @Get('resume/records/:taskId')
   async getResumeRecord(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
-    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
-    return this.aiService.getResumeRecord(taskId, endUser?.endUserId ?? null)
+    const requester = await this.resolveAiResultRequester(req)
+    return this.aiService.getResumeRecord(taskId, requester)
   }
 
   @Get('resume/records/:taskId/optimize')
@@ -121,8 +150,8 @@ export class AiController {
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
   ): Promise<ResumeOptimizeResponseDto> {
-    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
-    const result = await this.aiService.getResumeOptimize(taskId, endUser?.endUserId ?? null)
+    const requester = await this.resolveAiResultRequester(req)
+    const result = await this.aiService.getResumeOptimize(taskId, requester)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -134,7 +163,7 @@ export class AiController {
         providerName: this.aiService.getProviderName(),
         status: result.status,
         moduleCount: result.modules?.length ?? 0,
-        hasEndUser: Boolean(endUser),
+        hasEndUser: requester.endUserId !== null,
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),

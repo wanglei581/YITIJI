@@ -678,6 +678,11 @@ model AiResumeResult {
   provider   String
   endUserId  String?
   endUser    EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  // 匿名结果一次性访问令牌的 SHA-256 hash(Phase C-2A,CLAUDE.md §11/§18)。
+  // 仅匿名 parse(endUserId 为 null)时铸造:明文 token 只在 POST /resume/parse 响应里返回一次,
+  // 数据库只存 hash;读取时凭 x-resume-access-token header 校验(timingSafeEqual)。
+  // 会员结果该列为 null(归属仍按 endUserId 本人校验);迁移前历史匿名行为 null → 读取 fail-closed。
+  accessTokenHash String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   // 留存治理(CLAUDE.md §11「不长期保存简历」):简历派生结果到期即清理。

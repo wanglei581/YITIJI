@@ -17,16 +17,29 @@ import type {
   AssistantChatRequest,
   AssistantChatResponse,
 } from '@ai-job-print/shared'
+import type { ResumeReadAccess } from './ai'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 
 const TIMEOUT_MS = 15_000
 
+/**
+ * 读取凭证 → 请求头（Phase C-2A）。
+ * - token（会员 JWT）→ Authorization: Bearer
+ * - accessToken（匿名一次性令牌）→ x-resume-access-token（绝不进 URL query）
+ */
+function accessHeaders(access?: ResumeReadAccess): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (access?.token) headers.Authorization = `Bearer ${access.token}`
+  if (access?.accessToken) headers['x-resume-access-token'] = access.accessToken
+  return headers
+}
+
 // ──────────────────────────────────────────────────────────────
 // 核心 fetch 封装（带 15s AbortController 超时）
 // ──────────────────────────────────────────────────────────────
 
-async function get<T>(path: string, token?: string | null): Promise<T> {
+async function get<T>(path: string, access?: ResumeReadAccess): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
   let res: Response
@@ -35,7 +48,7 @@ async function get<T>(path: string, token?: string | null): Promise<T> {
       method: 'GET',
       headers: {
         Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...accessHeaders(access),
       },
       credentials: 'include',
       signal: ac.signal,
@@ -107,12 +120,12 @@ export const aiHttpAdapter = {
     return post<ResumeParseResponse>('/resume/parse', req, token)
   },
 
-  async getResumeRecord(taskId: string, token?: string | null): Promise<ResumeParseResponse> {
-    return get<ResumeParseResponse>(`/resume/records/${taskId}`, token)
+  async getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse> {
+    return get<ResumeParseResponse>(`/resume/records/${taskId}`, access)
   },
 
-  async getResumeOptimize(taskId: string, token?: string | null): Promise<ResumeOptimizeResponse> {
-    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, token)
+  async getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
+    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, access)
   },
 
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {

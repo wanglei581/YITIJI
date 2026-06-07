@@ -6,6 +6,7 @@ import { useIdleTimer } from './useIdleTimer'
 import { getScreensaverPlaylist, getTerminalId } from '../services/api/screensaver'
 import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
+import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 
 /**
  * 屏保控制器(挂在 KioskRoot,全局生效)。
@@ -61,6 +62,7 @@ export function useScreensaverController(): void {
     const p = playlistRef.current
     if (!p?.enabled || p.items.length === 0) return
     clearPrintMaterialSession()
+    clearAiResumeSession()
     navigate('/screensaver', { state: { playlist: p } })
   }, [navigate])
 

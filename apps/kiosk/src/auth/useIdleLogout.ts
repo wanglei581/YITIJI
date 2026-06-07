@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import { useKioskBusy } from '../contexts/KioskBusyContext'
 import { clearPrintMaterialSession } from '../pages/print/printMaterialSession'
+import { clearAiResumeSession } from '../pages/resume/aiResumeSession'
 import { useAuth } from './useAuth'
 
 /**
@@ -46,9 +47,10 @@ export function useIdleLogout(): void {
   const onScreensaverRoute = pathname === '/screensaver'
 
   const handleIdle = useCallback(() => {
-    // 仅在非忙碌（enabled 已保证）的 idle 触发：先清敏感材料 session，再清内存会话，
-    // 最后 replace 回首页，确保下一位用户从干净首页开始。
+    // 仅在非忙碌（enabled 已保证）的 idle 触发：先清敏感材料 / AI 简历 session，再清内存会话，
+    // 最后 replace 回首页，确保下一位用户从干净首页开始（避免继承匿名 accessToken）。
     clearPrintMaterialSession()
+    clearAiResumeSession()
     logout()
     if (pathname !== '/') navigate('/', { replace: true })
   }, [logout, navigate, pathname])

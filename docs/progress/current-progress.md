@@ -69,6 +69,58 @@
 
 ---
 
+## Phase C-2A：匿名 AI 简历结果一次性 accessToken 安全收口（2026-06-07，Claude，feature/ai-anon-access-token）
+
+**目标：** 把匿名 AI 简历结果读取从「taskId + 短 TTL 即可读」收紧为「taskId + 一次性 accessToken 才可读」，对齐 materials 任务 `accessTokenHash` 机制。**纯安全收口**，不做完整用户资产中心，不做我的简历/文档/AI记录列表 API，不碰活动/套餐/支付，不改岗位/招聘会，不做匿名转会员认领，不涉任何招聘闭环。会员路径不变（仍按 endUserId 本人校验）。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/prisma/schema.prisma` + 迁移 `20260607120000_add_ai_resume_result_access_token_hash` | `AiResumeResult` 新增可空 `accessTokenHash String?`（仅匿名 parse 铸造的令牌 SHA-256 hash）。additive / nullable / 非破坏性：不加索引、不建表、不动其它模型；沿用 `prisma db execute` 落 dev.db drift（同 §COS / §external-url 先例），未跑破坏性 reset。**PostgreSQL 迁移时随 dev.db drift 统一重整。** |
+| `services/api/src/ai/ai.service.ts` | ①匿名 parse（`endUserId` 为 null）铸造 192-bit 随机 token（`randomBytes(24).toString('hex')`），DB 只存 `accessTokenHash=SHA-256(token)`，明文 token 只随 `submitResumeParse` 响应返回一次；②`loadOwnedResult`→`loadAuthorizedResult` + `isAuthorized`：会员行只放行本人；新匿名行须 `x-resume-access-token` 与 hash `timingSafeEqual` 匹配；历史 null-hash 匿名行 **fail-closed**；过期/无 expiresAt 仍按留存治理视为不存在；③optimize 懒生成继承 parse 行 `endUserId` + `accessTokenHash`，不铸新 token；④`persistResult` 落库前防御性剥除 payload 内 accessToken（确保 `payloadJson` 不含明文）。新增 `AiResultRequester { endUserId; accessToken }` 类型 + `hashAccessToken`/`verifyAccessToken` 工具 |
+| `services/api/src/ai/ai.controller.ts` | 新增 `resolveAiResultRequester(req)`：有效会员 Authorization → 会员请求；否则匿名请求，**只从 `x-resume-access-token` header 读取令牌（不读 URL query）**。两个 GET 读取端点改用该 requester；parse 审计补 `accessTokenIssued`（布尔，绝不记录明文 token） |
+| `services/api/src/ai/interfaces/ai-provider.interface.ts` + `packages/shared/src/types/ai.ts` | `ParseResumeOutput` / `ResumeParseResponse` 增加 `accessToken?: string`（仅匿名 parse 返回，会员 parse 不返回） |
+| `apps/kiosk/src/services/api/ai.ts` | `getResumeRecord` / `getResumeOptimize` 第二参从 `token?` 改为 `ResumeReadAccess { token?; accessToken? }`（token→会员，accessToken→匿名） |
+| `apps/kiosk/src/services/api/aiHttpAdapter.ts` | `accessHeaders()`：`token`→`Authorization: Bearer`，`accessToken`→`x-resume-access-token`，**不拼任何 URL query** |
+| `apps/kiosk/src/services/api/aiMockAdapter.ts` | 签名对齐 `ResumeReadAccess`（mock 忽略 accessToken） |
+| `apps/kiosk/src/pages/resume/aiResumeSession.ts`（新增） | 最小匿名会话：**只存 `taskId` + `accessToken`**，绝不存 report/modules/payload/PII/原文；仅 `sessionStorage`，受限模式 try/catch 静默降级 |
+| `apps/kiosk/src/pages/resume/{ResumeParsePage,ResumeReportPage,ResumeOptimizePage}.tsx` | parse 后接收 `res.accessToken` 并 `saveAiResumeSession` + 经 `location.state` 透传；Report/Optimize 读取时 `{ token: getToken(), accessToken }`，刷新后 taskId/accessToken 回退到最小会话 |
+| `apps/kiosk/src/auth/useIdleLogout.ts`、`apps/kiosk/src/hooks/useScreensaverController.ts`、`apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | idle 自动登出 / 进入待机宣传屏时 `clearAiResumeSession()`（与既有 `clearPrintMaterialSession()` 并列），避免下一位用户继承匿名令牌 |
+| `services/api/scripts/verify-ai-result-ownership.ts` | 扩展为 C-1 + C-2A 共 12 类断言（见下） |
+
+**读取规则（最终）：**
+
+- 会员行（`endUserId != null`）：仅本人会员 token 可读；其它会员、匿名一律 `AI_TASK_NOT_FOUND`。
+- 新匿名行（`endUserId == null` 且 `accessTokenHash != null`）：带正确 `x-resume-access-token` 可读；无 token / 错 token / 仅会员 token 一律 `AI_TASK_NOT_FOUND`。
+- 历史匿名行（`endUserId == null` 且 `accessTokenHash == null`）：**fail-closed**，任何请求都 `AI_TASK_NOT_FOUND`。
+- 已过期 / `expiresAt` 为空：继续按留存治理视为不存在。
+- 统一返回 `AI_TASK_NOT_FOUND`，不泄露任务是否存在。token 在 TTL 内可重复用于同一 taskId 的 parse/optimize 读取（不做 burn-after-read）。
+
+**安全约束落地：** 明文 token 只在 `POST /resume/parse` 响应返回一次；DB 只存 SHA-256 hash；token 只走 `x-resume-access-token` header，**不进 URL query**；校验用 `timingSafeEqual`；最小 session 只存 taskId/accessToken，不存任何 AI payload / 原文 / PII。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 0 error / 0 warning |
+| `pnpm --filter @ai-job-print/api verify:ai-result-ownership` | ✅ ALL PASS：12 类断言（匿名铸 token 正确 token 可读 parse / 懒生成读 optimize；无 token、错 token、仅会员 token 读匿名均 NOT_FOUND；会员本人可读、跨会员、匿名读会员均按规则；accessTokenHash 为 64 hex 且 == SHA-256(token)；DB 全列含 payloadJson 不含明文 token；optimize 继承 parse hash；历史 null-hash 行 fail-closed；过期匿名行即使 token 正确仍 NOT_FOUND） |
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条（未触碰） |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；仅既有 chunk-size warning |
+| `git diff --check` | ✅ 无空白错误 |
+| 合规禁词扫描（改动文件） | ✅ 0 新增命中（仅既有 `ai.ts`/`shared/ai.ts` 头部合规约束注释中的「候选人推荐/面试邀约/Offer 管理」否定式声明，非新增） |
+
+**未解决风险 / 边界：**
+
+- 运行期手验（真实 API + 浏览器/一体机）未做：需 API + 会员短信验证码环境验证「匿名 parse 拿 token → 刷新/返回仍能读回；无 token/错 token 被拒；进屏保/idle 后下一位用户读不到上一位结果」。本轮为静态 + verify 脚本断言 + 三端 typecheck/lint/build。
+- 历史匿名行 fail-closed 是**刻意安全取舍**：C-2A 部署后，部署前已生成、持有 taskId 但无 token 的在途匿名会话将无法再读回结果（须重新解析）；此类历史行在 TTL（默认 24h）内自然清理。
+- `accessTokenHash` 列随 dev.db drift 经 `db execute` 落地；**PostgreSQL 迁移时需与既有 drift 条目统一重生成规范化**。
+- 未做：完整用户资产中心 / 我的简历·文档·AI记录列表 API / 匿名转会员认领（均属 Phase C-2B 及以后）。
+
+---
+
 ## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
 
 **目标：** 在 Kiosk 打印上传后插入最小材料检查闭环：文件体检 `inspection` → 隐私片段检查 `pii_scan` → 用户逐项选择保留/遮挡 → 进入现有打印参数与确认流程。仅做前端接线，不改 `services/api` 后端骨架，不改变核心打印提交逻辑。

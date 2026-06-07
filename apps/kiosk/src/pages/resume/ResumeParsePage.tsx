@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { submitResumeParse } from '../../services/api'
+import { saveAiResumeSession } from './aiResumeSession'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
 
@@ -67,8 +68,11 @@ export function ResumeParsePage() {
         navigateFail(result.failReason ?? 'AI 服务解析失败，请重试')
         return
       }
+      // Phase C-2A：匿名 parse 会返回一次性 accessToken；连同 taskId 写入最小会话，
+      // 供刷新 / 返回后读回本人结果（绝不持久化 report / 原文）。会员结果无 accessToken。
+      saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
       navigate('/resume/report', {
-        state: { ...state, success: true, taskId: result.taskId, report: result.report },
+        state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, report: result.report },
       })
     } catch {
       if (cancelRef.current) return

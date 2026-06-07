@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-07（Phase C-1 会员登录安全收口 + 首页登录状态栏已完成；AI求职材料中心 B-2 各最小契约已推进，B-1 浏览器链路已手验；新增「个人资产中心 + 权益活动 + 服务套餐」产品规划 Phase C-2 ~ C-6；明确后续功能先完成测试/流程/功能闭环，再进入集中 UI/UX 设计收口）
+> 最后更新：2026-06-07（Phase C-1 会员登录安全收口 + 首页登录状态栏已完成；**Phase C-2A 匿名 AI 简历结果一次性 accessToken 安全收口已完成**（`feature/ai-anon-access-token`，verify 12 类断言 ALL PASS，待运行期手验）；AI求职材料中心 B-2 各最小契约已推进，B-1 浏览器链路已手验；新增「个人资产中心 + 权益活动 + 服务套餐」产品规划 Phase C-2 ~ C-6；明确后续功能先完成测试/流程/功能闭环，再进入集中 UI/UX 设计收口）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -29,9 +29,9 @@
 - ✅ 首页登录状态栏（未登录/匿名/已登录三态，跳 `/login`，不改底部 Tab，按钮 ≥56px）；ProfilePage 诚实化（移除「跨设备查看」，资产中心建设中）。
 - ✅ kiosk typecheck/lint/build + api typecheck/lint 全绿；禁词 0 命中；Playwright mock 浏览器手验 13/13。
 
-**Phase C-2 待办（本阶段未做）：**
+**Phase C-2 待办（C-2A 已完成，其余未做）：**
 
-- ⏳ **匿名 AI 结果一次性 accessToken**：当前匿名结果（`endUserId=null`）仍可凭 taskId 在短 TTL 内读取（mock taskId 可猜测）。需 `AiResumeResult` 加 `accessTokenHash` 列 + `POST /resume/parse` 回传一次性 token + 各读取点透传（对齐 materials 任务 `accessTokenHash` 机制），把匿名读取从「短 TTL 兜底」收紧为「持令牌才可读」。
+- ✅ **匿名 AI 结果一次性 accessToken（C-2A，2026-06-07，`feature/ai-anon-access-token`）**：`AiResumeResult` 加 `accessTokenHash` 列（additive migration `20260607120000`，dev.db 经 `db execute` 落地，PostgreSQL 迁移时随 drift 统一重整）；`POST /resume/parse` 匿名时铸 192-bit token 并**只回传一次**（DB 只存 SHA-256 hash）；读取改用 `x-resume-access-token` header（**不进 URL query**）+ `timingSafeEqual` 校验；新匿名行须持令牌才可读，历史 null-hash 行 **fail-closed**，会员路径不变（仍按 endUserId 本人校验）；optimize 懒生成继承 parse 行 hash，不铸新 token；Kiosk 加最小 `aiResumeSession`（只存 taskId/accessToken，不存任何 AI payload/原文/PII）+ idle/屏保清理。`verify:ai-result-ownership` 扩展为 12 类断言 ALL PASS；api/kiosk typecheck/lint/build 全绿。详见 [current-progress.md](./current-progress.md) §Phase C-2A。**待运行期手验**（真实 API + 会员短信验证码 + 浏览器/一体机：匿名拿 token→刷新仍可读、无/错 token 被拒、进屏保后下一位读不到）。
 - ⏳ **完整用户资产中心**：我的简历 / 我的文档 / AI记录 / 收藏 的跨会话列表 API + 落库归属展示（当前 ProfilePage 仅展示本次会话 location.state，无后端资产列表端点）。
 - ⏳ **登录态运行期手验**：需 API + 会员短信验证码环境，手验已登录状态栏、idle 超时登出、进入屏保登出、忙碌态（打印/AI 中）不误登出。
 
@@ -147,7 +147,7 @@
 
 | 阶段 | 目标 | 主要范围 | 依赖 | 验收要点 | 合规 |
 |------|------|---------|------|---------|------|
-| **C-2A 匿名 AI accessToken 安全收口** | 把匿名 AI 结果从「短 TTL 兜底」收紧为「持一次性令牌才可读」 | `AiResumeResult` 加 `accessTokenHash` 列；`POST /resume/parse` 回传一次性 token；各读取点透传（对齐 materials 任务机制） | 无（纯安全，无商业域） | verify 脚本：无 token / 错 token 不能读匿名结果；本人 token 可读 | 不涉招聘闭环；纯越权收口 |
+| **✅ C-2A 匿名 AI accessToken 安全收口（已完成 2026-06-07）** | 把匿名 AI 结果从「短 TTL 兜底」收紧为「持一次性令牌才可读」 | `AiResumeResult` 加 `accessTokenHash` 列；`POST /resume/parse` 回传一次性 token（header `x-resume-access-token`，不进 query）；各读取点透传（对齐 materials 任务机制）；optimize 继承 parse hash；历史 null-hash fail-closed | 无（纯安全，无商业域） | ✅ verify:ai-result-ownership 12 类断言 ALL PASS（无/错/仅会员 token 读匿名均 NOT_FOUND；本人 token 可读；hash 64 hex 且不落明文） | 不涉招聘闭环；纯越权收口 |
 | **C-2B 我的简历 / 文档 / AI记录真实列表** | 「我的」从会话态升级为登录会员跨会话真实资产 | `GET /me/resumes` `/me/documents` `/me/ai-records`（endUserId 归属，元数据 + 签名 URL，尊重 TTL）；ProfilePage 切真实列表 | Phase A-1 归属底座（已完成） | 登录跨会话可见本人资产；匿名不可见；文件走签名 URL；不伪造数量 | 不存高敏原文；管理员访问审计 |
 | **C-2C 打印订单 + 用户权益底座** | 收藏服务端化 + 权益底座建模 | 新增 `Favorite`（job / fair / policy）替换 localStorage；新增 `BenefitGrant` 底座（coupon / free_quota / package_entitlement / subsidy_eligibility_hint，只读展示 + 发放 / 核销骨架，暂不接支付）；打印订单先用 `PrintTask` 聚合视图 | C-2B | 收藏跨会话；我的权益空态诚实；补贴资格提示 info-only | 收藏不记投递结果；补贴提示无「到账」 |
 | **C-3 权益活动中心** | 运营可配活动，发权益 / 指向官方渠道 | 新增 `BenefitActivity`；Admin + Partner 配置；Kiosk 活动列表 / 详情 + 领取（发 BenefitGrant）/ 去官方入口 | C-2C（BenefitGrant） | 领券落 BenefitGrant；补贴活动只指引；企业赞助不收简历 | 见 §二合规要点 |

@@ -14,6 +14,7 @@ import type {
   AssistantChatRequest,
   AssistantChatResponse,
 } from '@ai-job-print/shared'
+import type { ResumeReadAccess } from './ai'
 
 // ──────────────────────────────────────────────────────────────
 // Mock 数据（原 ResumeParsePage.mockReport / ResumeOptimizePage.OPTIMIZE_MODULES）
@@ -84,7 +85,7 @@ export const aiMockAdapter = {
   },
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getResumeRecord(taskId: string, _token?: string | null): Promise<ResumeParseResponse> {
+  async getResumeRecord(taskId: string, _access?: ResumeReadAccess): Promise<ResumeParseResponse> {
     await delay(80)
     return {
       taskId,
@@ -94,7 +95,7 @@ export const aiMockAdapter = {
   },
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async getResumeOptimize(taskId: string, _token?: string | null): Promise<ResumeOptimizeResponse> {
+  async getResumeOptimize(taskId: string, _access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
     await delay(120)
     return {
       taskId,

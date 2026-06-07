@@ -1,0 +1,13 @@
+-- 匿名 AI 简历结果一次性 accessToken 安全收口(Phase C-2A,CLAUDE.md §11/§18)。
+--
+-- AiResumeResult 增加可空 accessTokenHash 列:
+--   - 仅匿名 parse(endUserId 为 null)时铸造 192-bit 随机 token,DB 只存其 SHA-256 hash;
+--     明文 token 只在 POST /resume/parse 响应中返回一次,不落库。
+--   - 会员结果该列保持 NULL(归属仍按 endUserId 本人校验)。
+--   - 迁移前历史匿名行该列为 NULL → 读取路径 fail-closed(一律 AI_TASK_NOT_FOUND)。
+--
+-- Additive / nullable / 非破坏性:不加索引、不建表、不动其它模型。
+-- 沿用本项目既有约定(见 20260606200000_add_ad_asset_external_url):因 dev.db 存在历史
+-- migration drift,本 additive 列通过 `prisma db execute --file ...` 非破坏性执行,
+-- 不跑破坏性 `migrate reset`。PostgreSQL 迁移时随 dev.db drift 统一重整。
+ALTER TABLE "AiResumeResult" ADD COLUMN "accessTokenHash" TEXT;
