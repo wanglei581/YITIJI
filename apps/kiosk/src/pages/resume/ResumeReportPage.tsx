@@ -5,6 +5,7 @@ import type { ResumeRadarDimension } from '@ai-job-print/ui'
 import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, PrinterIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
+import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 
@@ -31,6 +32,7 @@ function targetSummary(tc?: ResumeTargetContext): string | null {
 export function ResumeReportPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = (location.state ?? {}) as ReportState
 
   const { success = true, reason, taskId } = state
@@ -42,7 +44,8 @@ export function ResumeReportPage() {
   useEffect(() => {
     if (state.report || !taskId || !success) return
     let cancelled = false
-    getResumeRecord(taskId)
+    // 归属收口（Phase C-1）：登录会员须带 token 才能读回本人解析结果。
+    getResumeRecord(taskId, getToken())
       .then((res) => {
         if (cancelled) return
         if (res.report) setReport(res.report)
@@ -51,7 +54,7 @@ export function ResumeReportPage() {
       .catch(() => { if (!cancelled) setLoadError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [taskId, success, state.report])
+  }, [taskId, success, state.report, getToken])
 
   const handleRetry = () => {
     const retryState = Object.fromEntries(

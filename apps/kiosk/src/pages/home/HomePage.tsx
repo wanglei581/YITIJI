@@ -5,14 +5,18 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   ChevronRightIcon,
+  CircleUserRoundIcon,
   GraduationCapIcon,
+  LogInIcon,
   MapPinIcon,
   MonitorCheckIcon,
   PrinterIcon,
   SparklesIcon,
+  UserRoundIcon,
   WifiIcon,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth'
 
 // 首页卡片统一表面样式：圆角/边框/底色/阴影的单一来源，避免各卡片 ad-hoc 重复；
 // 边框对齐设计系统 neutral 调色板（与共享 <Card> 一致）。保留 rounded-xl 维持首页卡片视觉层级。
@@ -206,6 +210,99 @@ function RenshiEntryBar({ onAction }: { onAction: () => void }) {
   )
 }
 
+// ── LoginStatusBar ────────────────────────────────────────────
+//
+// Hero 与主功能卡之间的独立登录状态栏（Phase C-1）。
+// 三态：未登录 / 匿名使用 / 已登录。它不是功能导航，也不改底部 Tab；
+// 登录动作跳转现有 /login，不在首页内嵌手机号输入。
+// 触控友好：主操作按钮点击区 ≥ 56px 高。
+//
+// 合规：仅引导查看本人简历/文档/收藏/AI记录，无任何岗位投递/招聘闭环语义。
+
+function LoginStatusBar() {
+  const navigate = useNavigate()
+  const { isLoggedIn, guestMode, displayName, continueAsGuest } = useAuth()
+
+  // ── 已登录 ──────────────────────────────────────────────────
+  if (isLoggedIn) {
+    return (
+      <div className={`flex items-center gap-4 ${cardSurface} px-5 py-4`}>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-50">
+          <CircleUserRoundIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold text-gray-900">{displayName}</p>
+          <p className="mt-0.5 text-sm text-gray-500">可查看我的简历、文档、收藏与 AI 记录</p>
+        </div>
+        <Button
+          size="lg"
+          variant="secondary"
+          onClick={() => navigate('/profile')}
+          className="h-14 shrink-0 px-5 text-base"
+        >
+          进入我的
+          <ChevronRightIcon className="ml-0.5 h-5 w-5" aria-hidden="true" />
+        </Button>
+      </div>
+    )
+  }
+
+  // ── 匿名使用（已选择「先使用」）─────────────────────────────
+  if (guestMode) {
+    return (
+      <div className={`flex items-center gap-4 ${cardSurface} px-5 py-4`}>
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-100">
+          <UserRoundIcon className="h-6 w-6 text-gray-500" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-gray-900">当前为匿名使用</p>
+          <p className="mt-0.5 text-sm text-gray-500">当前记录仅用于本次服务，登录后可保存记录</p>
+        </div>
+        <Button
+          size="lg"
+          onClick={() => navigate('/login')}
+          className="h-14 shrink-0 px-5 text-base"
+        >
+          <LogInIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+          手机号登录
+        </Button>
+      </div>
+    )
+  }
+
+  // ── 未登录（初始）──────────────────────────────────────────
+  return (
+    <div className={`flex flex-col gap-4 ${cardSurface} px-5 py-4 sm:flex-row sm:items-center`}>
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-50">
+          <UserRoundIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-gray-900">登录后可查看历史简历与服务记录</p>
+          <p className="mt-0.5 text-sm text-gray-500">手机号验证码登录，仅本次会话有效，离开自动退出</p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-3">
+        <button
+          type="button"
+          onClick={continueAsGuest}
+          className="h-14 rounded-xl px-5 text-base font-medium text-gray-500 transition-colors hover:bg-gray-50 active:bg-gray-100"
+        >
+          先使用
+        </button>
+        <Button
+          size="lg"
+          onClick={() => navigate('/login')}
+          className="h-14 px-6 text-base"
+        >
+          <LogInIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+          手机号登录
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── HomePage ──────────────────────────────────────────────────
 
 export function HomePage() {
@@ -216,6 +313,9 @@ export function HomePage() {
       <HeroSection />
 
       <div className="relative -mt-6 z-10 flex flex-1 flex-col gap-6 rounded-t-3xl bg-canvas px-6 py-7">
+        {/* 登录状态栏：Hero 与主功能卡之间的过渡层（Phase C-1） */}
+        <LoginStatusBar />
+
         {/* 主要功能 */}
         <section aria-label="主要功能" className="flex flex-col gap-4">
           <h2 className="text-sm font-medium text-gray-400">主要功能</h2>

@@ -26,14 +26,17 @@ const TIMEOUT_MS = 15_000
 // 核心 fetch 封装（带 15s AbortController 超时）
 // ──────────────────────────────────────────────────────────────
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, token?: string | null): Promise<T> {
   const ac = new AbortController()
   const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       credentials: 'include',
       signal: ac.signal,
     })
@@ -104,12 +107,12 @@ export const aiHttpAdapter = {
     return post<ResumeParseResponse>('/resume/parse', req, token)
   },
 
-  async getResumeRecord(taskId: string): Promise<ResumeParseResponse> {
-    return get<ResumeParseResponse>(`/resume/records/${taskId}`)
+  async getResumeRecord(taskId: string, token?: string | null): Promise<ResumeParseResponse> {
+    return get<ResumeParseResponse>(`/resume/records/${taskId}`, token)
   },
 
-  async getResumeOptimize(taskId: string): Promise<ResumeOptimizeResponse> {
-    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`)
+  async getResumeOptimize(taskId: string, token?: string | null): Promise<ResumeOptimizeResponse> {
+    return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, token)
   },
 
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {

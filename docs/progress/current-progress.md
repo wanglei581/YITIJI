@@ -5,6 +5,57 @@
 
 ---
 
+## Phase C-1：会员登录安全收口 + 首页登录状态栏（2026-06-07，Claude）
+
+**目标：** 不做完整「用户资产中心」，只做登录相关安全收口 + 首页登录状态栏，为后续「我的简历 / 我的文档 / AI记录 / 收藏」打基础。范围限定 Kiosk 登录态安全 + AI 结果读取归属 + 首页/我的页诚实文案，不新增底部 Tab，不动招聘闭环边界。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/auth/useIdleLogout.ts`（新增） | 空闲自动登出守卫：登录态且非忙碌时启 idle 计时，超时调 `logout()` 清内存会话；忙碌信号优先沿用 `KioskBusyContext`（打印/扫描/AI/上传 各流程 `useBusyLock` 注册的引用计数锁），同时沿用 `AuthContext.busy` 预留位，任一为真即暂停；阈值默认 180s，可经 `VITE_KIOSK_LOGOUT_IDLE_SEC` 覆盖；不读写任何浏览器存储 |
+| `apps/kiosk/src/layouts/KioskRoot.tsx` | KioskShell 挂载 `useIdleLogout()`（与屏保控制器并列，二者均受忙碌态豁免） |
+| `apps/kiosk/src/pages/screensaver/ScreensaverPage.tsx` | 进入待机宣传屏即 `logout()` 兜底清理会员登录态（屏保为顶级路由、KioskShell 已卸载，与 idle 计时互不冲突；logout 幂等） |
+| `apps/kiosk/src/auth/context.ts`、`AuthContext.tsx` | 新增内存态 `guestMode` + `continueAsGuest()`，用于首页状态栏区分「未登录（初始）」与「匿名使用（已选择先使用）」；`login`/`logout` 复位 `guestMode`；仍只存 React state，不写任何浏览器存储 |
+| `apps/kiosk/src/pages/home/HomePage.tsx` | 新增 `LoginStatusBar`（Hero 与主功能卡之间的独立过渡层，非功能导航、不改底部 Tab）：未登录「登录后可查看历史简历与服务记录」+「手机号登录」/「先使用」；匿名「当前记录仅用于本次服务，登录后可保存记录」+「手机号登录」；已登录展示脱敏手机号 +「可查看我的简历、文档、收藏与 AI 记录」+「进入我的」；主操作按钮点击区 ≥56px；登录动作跳现有 `/login`，不在首页内嵌手机号输入 |
+| `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 登录态诚实化：移除「登录后可跨设备查看」超前文案；未登录→游客诚实提示 +「手机号登录」引导；已登录→「{脱敏手机号} · 会员资料已绑定 / 资产中心建设中，当前仅展示本次服务记录」+「退出登录」；底部说明改为「以上为本次服务产生的记录，仅保存在当前会话；账号资产中心（跨会话保存）建设中」；不伪造简历/文档/AI 记录数量（列表仍只来自本次会话 location.state） |
+| `services/api/src/ai/ai.service.ts` | `loadResult` → `loadOwnedResult(taskId, kind, requesterEndUserId)`：会员（`endUserId` 非空）所有的结果**只能本人读取**，不同会员/匿名请求按「不存在」返回 null → 上层 `AI_TASK_NOT_FOUND`（既阻断越权、又不泄露存在性）；匿名结果（`endUserId` 为 null）保持可读（短 TTL 兜底）；过期/无 expiresAt 历史行仍视为不存在；`getResumeRecord`/`getResumeOptimize` 增加 `requesterEndUserId` 参数 |
+| `services/api/src/ai/ai.controller.ts` | `GET /resume/records/:taskId` 与 `.../optimize` 新增 `resolveOptionalEndUser`，把会员 `endUserId` 透传给 service；optimize 审计补 `hasEndUser` |
+| `apps/kiosk/src/services/api/{ai.ts,aiHttpAdapter.ts,aiMockAdapter.ts}` | `getResumeRecord`/`getResumeOptimize` 增加可选 `token`；http GET 带 `Authorization: Bearer`；mock 忽略 token |
+| `apps/kiosk/src/pages/resume/{ResumeReportPage,ResumeOptimizePage}.tsx` | 读取解析/优化结果时带 `getToken()`，保证登录会员能读回本人结果（匿名继续可用） |
+| `services/api/scripts/verify-ai-result-ownership.ts`（新增）+ `package.json` | 新增 `pnpm verify:ai-result-ownership`，运行期断言「用户不能读取他人 AI 结果」 |
+| `apps/kiosk/.env.example` | 记录 `VITE_KIOSK_LOGOUT_IDLE_SEC`（默认 180s） |
+
+**完成的安全收口：**
+
+1. **公共终端登录态生命周期**：会员 token/user 只在内存（沿用既有 `AuthContext`，不写 localStorage/sessionStorage/IndexedDB/cookie）；新增「空闲超时自动登出」+「进入待机宣传屏自动登出」，忙碌态（打印/扫描/AI/上传）全程豁免，不会打断业务。
+2. **AI 简历结果读取归属**：修复「拿到 taskId 即可读他人结果」的越权风险——会员结果只能本人凭 token 读取，越权与匿名请求一律 `AI_TASK_NOT_FOUND`；匿名结果维持短 TTL（默认 24h，已有留存治理 + 每小时 cron 清理），未长期保存简历原文。
+3. **诚实化文案**：首页状态栏 + 我的页不再宣称「已保存 / 跨设备查看」等资产中心未完成能力，明确「仅本次会话 / 资产中心建设中」。
+
+**仍属 Phase C-2（本阶段未做，已记 next-tasks）：**
+
+- 匿名 AI 结果的一次性 `accessToken`（等价 materials 任务的 `accessTokenHash` 机制），把匿名读取从「短 TTL 兜底」收紧为「持有令牌才可读」；需 `AiResumeResult` 加列 + parse 响应回传令牌 + 各读取点透传。
+- 完整「用户资产中心」：跨会话的我的简历/文档/AI记录/收藏列表 API + 落库归属展示。
+- 登录态浏览器交互手验（需 API + 会员短信验证码）与 idle/屏保运行期登出手验。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条（未触碰） |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；仅既有 chunk-size warning |
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api verify:ai-result-ownership` | ✅ ALL PASS：本人可读、他会员/匿名读会员结果均 `AI_TASK_NOT_FOUND`、匿名结果保持可读、过期视为不存在（parse + optimize 双覆盖） |
+| `pnpm --filter @ai-job-print/api verify:end-user-assets`（回归） | ✅ ALL PASS（AiResumeResult 归属底座未受影响） |
+| 合规禁词扫描（一键投递/立即投递/平台投递/投递简历/企业收简历/候选人管理/候选人推荐/面试邀约/Offer 管理） | ✅ 改动文件 0 命中；token 仅内存（localStorage/sessionStorage 仅出现在安全约束注释中） |
+| 浏览器手验（Playwright + Chromium，`VITE_API_MODE=mock`，5188） | ✅ 13/13：首页未登录状态栏文案/按钮、点「先使用」→匿名状态栏、我的页游客诚实文案、无「跨设备查看」、底部「资产中心建设中」、登录跳 `/login`、底部 Tab 仍 首页/AI助手/我的；唯一 console error 为 `/favicon.ico` 404（Vite dev 默认，与本阶段无关）。截图：`/tmp/c1-home-guest.png`、`/tmp/c1-home-anon.png`、`/tmp/c1-profile-guest.png`、`/tmp/c1-login.png` |
+
+**未解决风险：** 匿名 AI 结果在短 TTL 窗口内仍可凭 taskId（mock 形如 `mock-ai-<ts>-<n>`，可猜测）读取——本阶段已把**会员**结果收紧到本人，匿名收紧（一次性 token）留待 Phase C-2。登录态/idle/屏保登出的真实浏览器交互手验需 API + 短信验证码环境。
+
+---
+
 ## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
 
 **目标：** 在 Kiosk 打印上传后插入最小材料检查闭环：文件体检 `inspection` → 隐私片段检查 `pii_scan` → 用户逐项选择保留/遮挡 → 进入现有打印参数与确认流程。仅做前端接线，不改 `services/api` 后端骨架，不改变核心打印提交逻辑。

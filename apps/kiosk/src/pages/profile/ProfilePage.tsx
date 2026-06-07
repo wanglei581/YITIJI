@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Card, EmptyState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, PageHeader } from '@ai-job-print/ui'
 import {
   CheckCircleIcon,
+  CircleUserRoundIcon,
   FileInputIcon,
   FileTextIcon,
+  LogInIcon,
   PrinterIcon,
   SparklesIcon,
   Trash2Icon,
+  UserRoundIcon,
   XIcon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
 
 // ─── Data types ────────────────────────────────────────────────────────────
 
@@ -95,6 +99,7 @@ const AI_TYPE_LABELS = {
 export function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isLoggedIn, displayName, logout } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
 
   // ── Lists ────────────────────────────────────────────────────
@@ -145,10 +150,11 @@ export function ProfilePage() {
   })
 
   // ── Toast ────────────────────────────────────────────────────
+  // 诚实化（Phase C-1）：资产中心未完成前不宣称「已保存」，只说「已加入本次记录」
   const [toastMsg, setToastMsg] = useState<string | null>(() => {
-    if (incoming.savedResume) return '简历已保存'
-    if (incoming.savedFile) return '扫描文件已保存'
-    if (incoming.savedResumeAdvice) return '优化建议已保存'
+    if (incoming.savedResume) return '简历已加入本次记录'
+    if (incoming.savedFile) return '扫描文件已加入本次记录'
+    if (incoming.savedResumeAdvice) return '优化建议已加入本次记录'
     return null
   })
 
@@ -172,12 +178,41 @@ export function ProfilePage() {
     <div className="relative flex min-h-full flex-col p-6">
       <PageHeader title="我的记录" subtitle="记录 · 订单 · 文件" />
 
-      {/* 游客提示 */}
-      <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
-        <span className="text-xs text-gray-400">
-          游客模式 · 当前记录仅保存在本设备，登录后可跨设备查看
-        </span>
-      </div>
+      {/* 登录态 — 诚实化（Phase C-1）：资产中心未完成前不宣称「已保存 / 跨设备」 */}
+      {isLoggedIn ? (
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-4 py-3.5">
+          <CircleUserRoundIcon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-gray-900">{displayName} · 会员资料已绑定</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              资产中心建设中，当前仅展示本次服务记录；后续可在此查看我的简历、文档、收藏与 AI 记录
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="h-12 shrink-0 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 active:bg-gray-100"
+          >
+            退出登录
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 flex items-center gap-3 rounded-xl bg-gray-50 px-4 py-3.5">
+          <UserRoundIcon className="h-5 w-5 shrink-0 text-gray-400" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-700">游客模式 · 当前记录仅保存在本次服务</p>
+            <p className="mt-0.5 text-xs text-gray-400">登录后用于绑定本人服务记录；账号资产中心建设中</p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => navigate('/login')}
+            className="flex h-12 shrink-0 items-center gap-1 px-4 text-sm"
+          >
+            <LogInIcon className="h-4 w-4" aria-hidden="true" />
+            手机号登录
+          </Button>
+        </div>
+      )}
 
       {/* 保存成功 toast */}
       {toastMsg && (
@@ -372,9 +407,9 @@ export function ProfilePage() {
           )}
         </section>
 
-        {/* 合规说明 */}
+        {/* 合规说明 — 诚实化：以上为本次会话产生的记录，跨会话资产中心仍在建设中 */}
         <p className="pb-8 text-center text-xs text-gray-400">
-          文件可在本机记录中管理，后续将支持自动清理
+          以上为本次服务产生的记录，仅保存在当前会话；账号资产中心（跨会话保存）建设中
         </p>
       </div>
     </div>

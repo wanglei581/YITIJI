@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { useScreensaverController } from '../hooks/useScreensaverController'
+import { useIdleLogout } from '../auth/useIdleLogout'
 
 function getActiveTab(pathname: string): KioskTab {
   if (pathname.startsWith('/assistant')) return 'assistant'
@@ -36,6 +37,8 @@ function KioskShell() {
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
   useScreensaverController()
+  // 会员登录态空闲自动登出:忙碌态自动暂停,空闲达阈值清内存会话(Phase C-1)。
+  useIdleLogout()
 
   const activeTab = getActiveTab(pathname)
   const statusVariant = deviceStatus === 'online' || deviceStatus === 'idle' ? 'success' : 'warning'

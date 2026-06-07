@@ -30,8 +30,8 @@ import { aiHttpAdapter } from './aiHttpAdapter'
 
 export interface AiServiceInterface {
   submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
-  getResumeRecord(taskId: string): Promise<ResumeParseResponse>
-  getResumeOptimize(taskId: string): Promise<ResumeOptimizeResponse>
+  getResumeRecord(taskId: string, token?: string | null): Promise<ResumeParseResponse>
+  getResumeOptimize(taskId: string, token?: string | null): Promise<ResumeOptimizeResponse>
   chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
 }
 
@@ -50,13 +50,16 @@ const adapter: AiServiceInterface =
 export const submitResumeParse = (req: ResumeParseRequest, token?: string | null) =>
   adapter.submitResumeParse(req, token)
 
-/** 通过 taskId 查询解析结果（用于 http 模式刷新恢复） */
-export const getResumeRecord = (taskId: string) =>
-  adapter.getResumeRecord(taskId)
+/**
+ * 通过 taskId 查询解析结果（用于 http 模式刷新恢复）。
+ * 归属收口（Phase C-1）：登录会员须带 token，否则后端按 AI_TASK_NOT_FOUND 拒绝本人结果。
+ */
+export const getResumeRecord = (taskId: string, token?: string | null) =>
+  adapter.getResumeRecord(taskId, token)
 
-/** 通过 taskId 获取优化建议 */
-export const getResumeOptimize = (taskId: string) =>
-  adapter.getResumeOptimize(taskId)
+/** 通过 taskId 获取优化建议（登录会员须带 token，见上） */
+export const getResumeOptimize = (taskId: string, token?: string | null) =>
+  adapter.getResumeOptimize(taskId, token)
 
 /** 向 AI 助手发送消息（意图分类 + 引导跳转） */
 export const chatWithAssistant = (req: AssistantChatRequest) =>
