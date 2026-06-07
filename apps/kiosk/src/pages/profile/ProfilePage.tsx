@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
+import type { MemberAiRecordItem, MemberDocumentItem, MemberResumeItem } from '@ai-job-print/shared'
 import {
   BellIcon,
   BotIcon,
@@ -10,6 +11,7 @@ import {
   CheckCircleIcon,
   CircleUserRoundIcon,
   CopyIcon,
+  DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
   FileInputIcon,
@@ -20,6 +22,7 @@ import {
   HelpCircleIcon,
   LandmarkIcon,
   LayoutTemplateIcon,
+  Loader2Icon,
   LogInIcon,
   MessageSquareIcon,
   PackageIcon,
@@ -36,6 +39,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { fetchAccessUrl, getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 
 // 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
 // 诚实化与合规约束：
@@ -281,6 +285,76 @@ function RowIconButton({
   )
 }
 
+const AI_STATUS_LABEL: Record<string, string> = {
+  pending: '处理中',
+  processing: '处理中',
+  completed: '已完成',
+  failed: '未完成',
+}
+
+function aiStatusLabel(s: string): string {
+  return AI_STATUS_LABEL[s] ?? s
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+// 账号资产行：图标 + 名称 + 元信息 + 可选文本操作（触控区 ≥48px）。
+function AssetRow({
+  icon: Icon,
+  iconBg,
+  iconColor,
+  name,
+  meta,
+  actionLabel,
+  actionIcon: ActionIcon,
+  onAction,
+}: {
+  icon: LucideIcon
+  iconBg: string
+  iconColor: string
+  name: string
+  meta: string
+  actionLabel?: string
+  actionIcon?: LucideIcon
+  onAction?: () => void
+}) {
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', iconBg].join(' ')}>
+        <Icon className={['h-5 w-5', iconColor].join(' ')} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-gray-900">{name}</p>
+        <p className="truncate text-xs text-gray-400">{meta}</p>
+      </div>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-lg border border-gray-200 px-3 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50 active:bg-primary-100"
+        >
+          {ActionIcon && <ActionIcon className="h-4 w-4" aria-hidden="true" />}
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// 账号资产分组：小标题 + 行或一行空态（同一张白卡内，不卡片套卡片）。
+function AssetGroup({ title, count, empty, children }: { title: string; count: number; empty: string; children: ReactNode }) {
+  return (
+    <div className="border-t border-gray-100 py-2 first:border-t-0">
+      <p className="px-1 py-1.5 text-xs font-medium text-gray-500">{title}</p>
+      {count === 0 ? <p className="px-1 pb-2 text-xs text-gray-400">{empty}</p> : <div className="divide-y divide-gray-100">{children}</div>}
+    </div>
+  )
+}
+
 function SessionRow({
   icon: Icon,
   iconBg,
@@ -318,7 +392,7 @@ function SessionRow({
 export function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isLoggedIn, displayName, logout } = useAuth()
+  const { isLoggedIn, displayName, logout, getToken } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
 
   // ── 本次会话记录（仅来自 location.state，不伪造数量）──────────────
@@ -346,6 +420,34 @@ export function ProfilePage() {
 
   const hasSessionRecords = resumes.length + scans.length + aiRecords.length > 0
 
+  // ── 账号资产（Phase C-2B）：仅登录会员，凭本人 token 拉取后端只读列表 ──────
+  const [assets, setAssets] = useState<{
+    resumes: MemberResumeItem[]
+    documents: MemberDocumentItem[]
+    aiRecords: MemberAiRecordItem[]
+  } | null>(null)
+  const [assetsLoading, setAssetsLoading] = useState(false)
+  const [assetsError, setAssetsError] = useState(false)
+
+  const loadAssets = useCallback(() => {
+    const token = getToken()
+    if (!token) return
+    setAssetsLoading(true)
+    setAssetsError(false)
+    Promise.all([getMyResumes(token), getMyDocuments(token), getMyAiRecords(token)])
+      .then(([res, docs, ai]) => setAssets({ resumes: res, documents: docs, aiRecords: ai }))
+      .catch(() => setAssetsError(true))
+      .finally(() => setAssetsLoading(false))
+  }, [getToken])
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setAssets(null)
+      return
+    }
+    loadAssets()
+  }, [isLoggedIn, loadAssets])
+
   // ── Toast ────────────────────────────────────────────────────
   // 诚实化：资产中心未完成前不承诺留存，只提示「已加入本次记录」。
   const [toastMsg, setToastMsg] = useState<string | null>(() => {
@@ -368,6 +470,27 @@ export function ProfilePage() {
     navigate('/print/preview', {
       state: { file: { name: file.name, size: file.size, pages: file.pages ?? 1 } },
     })
+  }
+
+  // 查看已登录会员的简历诊断报告：报告页凭本人 token 读回（归属收口 C-1）。
+  const viewResume = (taskId: string) => {
+    navigate('/resume/report', { state: { success: true, taskId } })
+  }
+
+  // 打开文档：凭本人 token 换取 TTL 受控的短期签名 URL，再触发下载（不在列表里直接持 URL）。
+  const openDocument = async (doc: MemberDocumentItem) => {
+    const token = getToken()
+    if (!token) return
+    try {
+      const { url } = await fetchAccessUrl(doc.downloadUrlPath, token)
+      const a = document.createElement('a')
+      a.href = url
+      a.target = '_blank'
+      a.rel = 'noopener'
+      a.click()
+    } catch {
+      setToastMsg('文件访问失败，请稍后重试')
+    }
   }
 
   const handleEntryTap = (entry: Entry) => {
@@ -411,6 +534,82 @@ export function ProfilePage() {
       {SECTIONS.map((section) => (
         <EntrySection key={section.title} section={section} onTap={handleEntryTap} />
       ))}
+
+      {/* ── 账号资产（Phase C-2B，仅登录会员；真实只读列表 / 空态）── */}
+      {isLoggedIn && (
+        <section aria-label="账号资产" className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-medium text-gray-500">账号资产</h2>
+            <span className="text-xs text-gray-400">本人 · 留存期内可见</span>
+          </div>
+          <div className={`${cardSurface} px-4`}>
+            {assetsLoading ? (
+              <div className="flex items-center gap-2 py-5 text-sm text-gray-400">
+                <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
+                正在加载我的资产…
+              </div>
+            ) : assetsError ? (
+              <div className="flex items-center justify-between py-5 text-sm">
+                <span className="text-gray-500">资产加载失败，请重试</span>
+                <button
+                  type="button"
+                  onClick={loadAssets}
+                  className="min-h-[44px] rounded-lg border border-gray-200 px-4 font-medium text-primary-600 hover:bg-primary-50"
+                >
+                  重试
+                </button>
+              </div>
+            ) : (
+              <>
+                <AssetGroup title="我的简历" count={assets?.resumes.length ?? 0} empty="暂无简历记录，完成 AI 简历服务后在此查看">
+                  {assets?.resumes.map((r) => (
+                    <AssetRow
+                      key={r.id}
+                      icon={FileTextIcon}
+                      iconBg="bg-primary-50"
+                      iconColor="text-primary-600"
+                      name={`简历诊断 · ${aiStatusLabel(r.status)}${r.optimized ? ' · 已生成优化版' : ''}`}
+                      meta={`${formatTime(r.createdAt)}`}
+                      actionLabel="查看报告"
+                      actionIcon={EyeIcon}
+                      onAction={() => viewResume(r.taskId)}
+                    />
+                  ))}
+                </AssetGroup>
+
+                <AssetGroup title="我的文档" count={assets?.documents.length ?? 0} empty="暂无文档，上传或打印的文件将在此查看">
+                  {assets?.documents.map((d) => (
+                    <AssetRow
+                      key={d.id}
+                      icon={FilesIcon}
+                      iconBg="bg-blue-50"
+                      iconColor="text-blue-600"
+                      name={d.filename}
+                      meta={`${formatSize(d.sizeBytes)} · ${formatTime(d.createdAt)}`}
+                      actionLabel="下载"
+                      actionIcon={DownloadIcon}
+                      onAction={() => void openDocument(d)}
+                    />
+                  ))}
+                </AssetGroup>
+
+                <AssetGroup title="AI 服务记录" count={assets?.aiRecords.length ?? 0} empty="暂无 AI 服务记录">
+                  {assets?.aiRecords.map((a) => (
+                    <AssetRow
+                      key={a.id}
+                      icon={SparklesIcon}
+                      iconBg="bg-violet-50"
+                      iconColor="text-violet-600"
+                      name={`${a.kind === 'optimize' ? '简历优化' : '简历解析'} · ${aiStatusLabel(a.status)}`}
+                      meta={`${formatTime(a.createdAt)}`}
+                    />
+                  ))}
+                </AssetGroup>
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}
       {hasSessionRecords && (
@@ -459,9 +658,11 @@ export function ProfilePage() {
         </section>
       )}
 
-      {/* 合规说明 — 诚实化：本次会话记录，跨会话资产中心仍在建设中 */}
+      {/* 合规说明 — 诚实化：登录会员展示本人账号资产（留存到期清理）；游客仅本次会话 */}
       <p className="text-center text-xs leading-relaxed text-gray-400">
-        以上为本次服务产生的记录，仅保存在当前会话；账号资产中心（跨会话保存）建设中
+        {isLoggedIn
+          ? '账号资产仅本人可见，留存到期后自动清理，敏感文件不长期保存；更多资产能力逐步开放中'
+          : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人账号资产'}
       </p>
     </div>
   )

@@ -150,6 +150,50 @@
 
 ---
 
+## Phase C-2B：会员个人资产中心 MVP — 后端只读资产列表 API + Kiosk 最小接入（2026-06-07，Claude，feature/member-assets-mvp）
+
+**目标：** 把「我的」从会话态升级为登录会员可读的真实资产。本轮先做**后端只读资产列表 API**（不做活动/套餐/支付），并在 ProfilePage 保持现有入口风格的前提下，把对应入口最小接入真实列表/空态。无 schema 变更。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/member-assets/`（新增 module/controller/service/types） | 新增 `@Controller('me')` 三个只读端点 `GET /me/resumes` `/me/documents` `/me/ai-records`，全部 `@UseGuards(EndUserAuthGuard)`。模块自带 enduser 专用 `JwtModule`（同 JWT_SECRET + audience='enduser'）并本地 provide `EndUserAuthGuard`，使 guard 的 `JwtService` 可解析 |
+| `services/api/src/app.module.ts` | 注册 `MemberAssetsModule` |
+| `services/api/src/member-assets/member-assets.service.ts` | 查询只按**校验后的 endUserId**（来自 `req.endUser`，不接受任何外部传入 id）→ 跨用户越权天然不可能。resumes/ai-records 取 `AiResumeResult`（resumes=parse 行 + 是否已生成优化版；ai-records=parse+optimize 元数据）；documents 取 `FileObject`（active/未软删/未过期）。留存治理对齐 C-2A：`expiresAt > now`（自动排除 null 历史行 / 过期行）、文件排除软删/过期 |
+| `packages/shared/src/types/memberAssets.ts`（新增）+ `index.ts` | `MemberResumeItem` / `MemberDocumentItem` / `MemberAiRecordItem`（**只元数据**，无 payloadJson/report/accessTokenHash/storageKey/sha256；文件给 `downloadUrlPath`/`previewUrlPath` 端点路径，不在列表直接签发 URL） |
+| `apps/kiosk/src/services/api/memberAssets.ts`（新增） | `getMyResumes/getMyDocuments/getMyAiRecords(token)` + `fetchAccessUrl(path, token)`；envelope 解包；token 仅内存态传入；mock / 未登录返回 [] |
+| `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 保持九宫格入口风格不变；**仅登录会员**新增「账号资产」白卡：我的简历（查看报告→`/resume/report` 凭本人 token）/ 我的文档（下载，凭本人 token 换 TTL 签名 URL）/ AI 服务记录，含加载/空态/错误重试；游客不展示。footer 按登录态诚实化 |
+| `services/api/scripts/verify-member-assets.ts`（新增）+ `package.json` | `pnpm verify:member-assets`，10 类断言 |
+
+**安全/合规落地：**
+
+- **必须会员登录**：三端点受 `EndUserAuthGuard`；匿名 / 缺 token / 错 token / 失效会话 / 内部运营 token 一律 **401**（`MEMBER_MISSING_TOKEN` / `MEMBER_TOKEN_INVALID` / `MEMBER_SESSION_EXPIRED`）。
+- **只返回本人数据**：service 仅以校验后的 endUserId 查询，不接受外部 id → 跨用户隔离由构造保证。
+- **不返回简历原文 / AI payload / PII**：select 显式列出安全列；文件不回内容/storageKey/sha256，只给换取 TTL 签名 URL 的端点路径。
+- **空列表返回 []**；**不伪造数量**。
+- 不做活动 / 套餐 / 支付；无 schema 变更（纯读）。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` / `lint` | ✅ |
+| `pnpm --filter @ai-job-print/api verify:member-assets` | ✅ ALL PASS：本人可读简历/文档/AI记录、跨用户双向隔离、只回元数据无 payload/PII/storageKey、空列表 []、过期/软删排除、匿名/错 token/无会话 401、有效会员通过并注入本人 endUserId（共 10 类） |
+| `pnpm --filter @ai-job-print/shared typecheck` | ✅ |
+| `pnpm --filter @ai-job-print/kiosk typecheck` / `lint` / `build` | ✅（lint 仅既有 `KioskBusyContext` 2 warning） |
+| HTTP 真机冒烟（`pnpm dev` 源码起 API:3013 + local 存储） | ✅ `/me/resumes` `/me/documents` `/me/ai-records` 路由 Mapped；匿名 → 401 `MEMBER_MISSING_TOKEN`；错 token → 401 `MEMBER_TOKEN_INVALID`。**关键修正**：初版 module 误以为 import `MemberAuthModule` 即可复用 guard，真机启动报 `Nest can't resolve EndUserAuthGuard(JwtService)`；改为模块自带 `JwtModule` + 本地 provide guard 后路由正常（单元 verify 直接 new guard 未覆盖此装配问题，靠 HTTP 冒烟兜住） |
+| 浏览器手验（mock，5199） | ✅ 游客态：九宫格入口不变、无「账号资产」区、footer「登录后可查看本人账号资产」；登录态（临时强制+还原）：新增「账号资产」白卡，我的简历/我的文档/AI服务记录三组诚实空态，footer「留存到期自动清理，敏感文件不长期保存」 |
+| 合规禁词扫描（改动文件） | ✅ 0 命中 |
+
+**未解决 / 边界：**
+
+- 真实登录态端到端手验需 API + 会员短信验证码环境（自 C-1 起延后）：本轮已用 HTTP 冒烟覆盖路由/鉴权 401，登录后真实列表渲染靠 typecheck + 临时强制登录截图覆盖。
+- 文件临时访问目前回 `downloadUrlPath`/`previewUrlPath` 端点路径，前端操作时再换 TTL 签名 URL（复用既有 `/files/:id/download-url` 会员鉴权端点），未在列表里 eager 签发。
+- 收藏 / 权益（`Favorite` / `BenefitGrant`）、打印订单聚合属 C-2C；活动/套餐/支付属 C-3+，本轮不做。
+
+---
+
 ## Phase B-1：Kiosk 打印前材料检查最小接线（2026-06-06，Codex）
 
 **目标：** 在 Kiosk 打印上传后插入最小材料检查闭环：文件体检 `inspection` → 隐私片段检查 `pii_scan` → 用户逐项选择保留/遮挡 → 进入现有打印参数与确认流程。仅做前端接线，不改 `services/api` 后端骨架，不改变核心打印提交逻辑。
