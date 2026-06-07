@@ -5,6 +5,19 @@
 
 ---
 
+## 阶段开发与 UI/UX 节奏原则（2026-06-07，Codex）
+
+后续功能开发采用「功能可用 + 基础 UX 合格 + 合规文案正确」作为单功能交付标准；不要先把所有功能堆完再补体验，也不要在核心链路未跑通前投入大规模视觉精修。
+
+具体执行口径：
+
+- 每个功能开发时同步保证基础体验：流程入口/下一步清晰，触控按钮尺寸足够，加载/失败/空状态可理解，关键返回/重试/继续操作完整。
+- 每个功能完成后先做功能测试、流程测试和必要的真实 API / 浏览器 / 一体机手验；确认功能、流程、数据和合规文案都正常后，再进入该功能的小范围 UX 修正。
+- 阶段内不追求最终视觉精修；多个核心功能稳定后，再集中做 UI/UX 设计收口，包括视觉层级、组件一致性、触控屏布局、动效、AI 数字人引导员和三端体验统一。
+- 招聘相关入口始终优先校验合规文案：只能使用「去来源平台投递 / 扫码投递 / 去来源平台预约 / 扫码预约」等表述，禁止出现「一键投递 / 立即投递 / 平台投递」等闭环暗示。
+
+---
+
 ## Phase C-1：会员登录安全收口 + 首页登录状态栏（2026-06-07，Claude）
 
 **目标：** 不做完整「用户资产中心」，只做登录相关安全收口 + 首页登录状态栏，为后续「我的简历 / 我的文档 / AI记录 / 收藏」打基础。范围限定 Kiosk 登录态安全 + AI 结果读取归属 + 首页/我的页诚实文案，不新增底部 Tab，不动招聘闭环边界。
@@ -2278,6 +2291,7 @@ pnpm verify:job-sync
 | 2026-06-01 | W8 BullMQ API pull worker 完成（feat/w8-bullmq-api-worker）：@nestjs/bullmq + bullmq + ioredis 安装；Prisma JobSource 新增 responseConfig String?（migration 20260601110728）；src/job-sync/ 模块 5 文件（types/service/processor/scheduler/controller/module）；Cron 每 30min 调度 due sources（hourly/daily/weekly）；POST /admin/job-sync/sources/:id/trigger（202，JWT+Admin，Throttle 10/min）+ GET 列表；Admin /sync-sources 页面（配置完整性徽章 + 立即同步）；无 REDIS_URL 时 inline setImmediate fallback；BullMQ jobId 去重+inProgress Set 并发保护；$transaction 整批原子；凭证只服务端解密；reviewStatus/publishStatus 更新不覆写；SyncLog 成功/失败记录（api syncMode）；API/Admin/Partner tsc+lint+build ✅，合规禁词 ✅（0 violations） | Claude Code |
 | 2026-06-01 | Phase 7.11 R4 — Partner Sources 类型对齐 packages/shared：①shared/types/job.ts SyncFrequency 加 'weekly'(原 realtime/hourly/daily/manual 不够覆盖 UI 已有 weekly 选项)、新增 ConnStatus / PartnerDataSourceView(DataSourceConfig 的 UI 投影,扁平、只读、不含敏感字段、保留 credentialConfigured + webhookSecretOnce 语义)；②apps/partner types 改为别名 PartnerDataSource = PartnerDataSourceView, CreateDataSourcePayload.authType 用 shared AuthType, 同时把 FieldMappingRule/MappingValidationError/ImportBatch/ImportRecord/DataSourceConfig re-export 出来供 Excel 映射 UI 后续使用；SyncFreq 保留为 @deprecated 别名;③services/api jobs.service.ts PartnerDataSourceDto 对齐 PartnerDataSourceView 字面量(sourceKind/accessMode/syncFreq/connStatus 不再裸 string)，SSOT 注释指向 shared；UI 行为零变化(只是 FREQ_LABELS 增加 realtime 文案兜底)；端到端 demo 复跑通过、forbidden 字段 GET 不回显校验通过；pnpm -r typecheck/lint/build 全通过 | Claude Code |
 | 2026-06-03 | Dev server HMR `Reconnecting` 修复：三端 Vite 配置显式设置 HMR WebSocket 为 `ws://127.0.0.1:{5173,5174,5175}`，避免浏览器推断到 `0.0.0.0` 或错误端口后反复重连；补齐 admin/partner `ImportMeta.env` 类型声明。验证：kiosk/admin/partner typecheck 全通过；kiosk 本地浏览器打开 `http://127.0.0.1:5173`，控制台显示 `[vite] connected.`，无 Reconnecting。 | Codex |
+| 2026-06-07 | 记录阶段开发与 UI/UX 节奏原则：后续功能先做到功能可用、流程跑通、测试通过、合规文案正确；功能稳定后做基础 UX 修正；多个核心功能稳定后再集中做 UI/UX 设计、视觉体验、触控屏布局和 AI 数字人引导收口。同步更新 next-tasks.md。 | Codex |
 
 ---
 
