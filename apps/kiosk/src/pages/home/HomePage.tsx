@@ -15,7 +15,7 @@ import {
   UserRoundIcon,
   WifiIcon,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 
 // 首页卡片统一表面样式：圆角/边框/底色/阴影的单一来源，避免各卡片 ad-hoc 重复；
@@ -221,7 +221,10 @@ function RenshiEntryBar({ onAction }: { onAction: () => void }) {
 
 function LoginStatusBar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isLoggedIn, guestMode, displayName, continueAsGuest } = useAuth()
+  // 登录后返回来源页（首页）：把当前路径作为 from 传入 /login
+  const goLogin = () => navigate('/login', { state: { from: location.pathname } })
 
   // ── 已登录 ──────────────────────────────────────────────────
   if (isLoggedIn) {
@@ -260,7 +263,7 @@ function LoginStatusBar() {
         </div>
         <Button
           size="lg"
-          onClick={() => navigate('/login')}
+          onClick={goLogin}
           className="h-14 shrink-0 px-5 text-base"
         >
           <LogInIcon className="mr-1 h-5 w-5" aria-hidden="true" />
@@ -292,7 +295,7 @@ function LoginStatusBar() {
         </button>
         <Button
           size="lg"
-          onClick={() => navigate('/login')}
+          onClick={goLogin}
           className="h-14 px-6 text-base"
         >
           <LogInIcon className="mr-1 h-5 w-5" aria-hidden="true" />

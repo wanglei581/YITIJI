@@ -2,12 +2,16 @@
 //
 // 路由：/login（顶级路由，不嵌套在 KioskRoot 内）
 // 会话：通过 useAuth().login() 写入纯内存 AuthContext，不写任何浏览器存储
-// 流程：Step 1 输入手机号 → 发送验证码 → Step 2 输入6位码 → 登录 → 跳回 /
+// 流程：Step 1 输入手机号 → 发送验证码 → Step 2 输入6位码 → 登录 → 跳回来源页（returnTo）
+//
+// 返回体验：location.state.from 传入来源页（首页 / 我的页）；手机号页与验证码页
+// 均提供明确返回；登录成功 / 暂不登录都回 returnTo（站内路径，否则 fallback /）。
 //
 // 输入字段全部 readOnly + inputMode="none"，由 KioskNumPad 驱动，不触发系统软键盘
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ArrowLeftIcon } from 'lucide-react'
 import { MonitorCheckIcon } from 'lucide-react'
 import { KioskNumPad } from '../../components/KioskNumPad'
 import { useAuth } from '../../auth/useAuth'
@@ -84,8 +88,20 @@ type Step = 'phone' | 'code'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login, isLoggedIn } = useAuth()
   const countdown = useCountdown(60)
+
+  // 来源页返回目标：仅接受站内路径且非 /login，否则 fallback 到首页。
+  // 拒绝协议相对地址（//host）等开放重定向面，纯前端导航。
+  const fromState = (location.state as { from?: unknown } | null)?.from
+  const returnTo =
+    typeof fromState === 'string' &&
+    fromState.startsWith('/') &&
+    !fromState.startsWith('//') &&
+    fromState !== '/login'
+      ? fromState
+      : '/'
 
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
@@ -93,10 +109,12 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // 已登录用户直接跳走
+  const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
+
+  // 已登录（含登录成功后）跳回来源页
   useEffect(() => {
-    if (isLoggedIn) navigate('/', { replace: true })
-  }, [isLoggedIn, navigate])
+    if (isLoggedIn) navigate(returnTo, { replace: true })
+  }, [isLoggedIn, navigate, returnTo])
 
   // ── Step 1: 发送验证码 ────────────────────────────────────────
 
@@ -176,6 +194,8 @@ export function LoginPage() {
             phone={phone}
             onPhoneChange={setPhone}
             onSend={handleSendCode}
+            onCancel={goToReturn}
+            returnsHome={returnTo === '/'}
             loading={loading}
             error={error}
           />
@@ -198,11 +218,11 @@ export function LoginPage() {
         )}
       </div>
 
-      {/* 跳过提示 */}
+      {/* 跳过提示（两步均可见，直接退出登录流程回来源页）；触控区 ≥48px */}
       <button
         type="button"
-        onClick={() => navigate('/')}
-        className="mt-8 text-sm text-blue-300/70 underline-offset-4 hover:text-blue-200 active:underline"
+        onClick={goToReturn}
+        className="mt-8 flex min-h-[48px] items-center px-4 text-sm text-blue-300/70 underline-offset-4 hover:text-blue-200 active:underline"
       >
         暂不登录，继续使用
       </button>
@@ -216,15 +236,27 @@ interface PhoneStepProps {
   phone: string
   onPhoneChange: (v: string) => void
   onSend: () => void
+  onCancel: () => void
+  returnsHome: boolean
   loading: boolean
   error: string | null
 }
 
-function PhoneStep({ phone, onPhoneChange, onSend, loading, error }: PhoneStepProps) {
+function PhoneStep({ phone, onPhoneChange, onSend, onCancel, returnsHome, loading, error }: PhoneStepProps) {
   const canSend = phone.length === PHONE_LENGTH && !loading
 
   return (
     <div className="p-8">
+      {/* 顶部返回（触控友好，≥56px）：回到来源页 */}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="-ml-2 mb-4 flex min-h-[56px] items-center gap-1.5 rounded-xl px-2 text-base font-medium text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 active:bg-neutral-100"
+      >
+        <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
+        {returnsHome ? '返回首页' : '返回'}
+      </button>
+
       <h2 className="text-xl font-bold text-neutral-800">手机号登录</h2>
       <p className="mt-1 text-sm text-neutral-500">输入手机号，获取验证码</p>
 
@@ -301,12 +333,14 @@ function CodeStep({
 
   return (
     <div className="p-8">
+      {/* 返回修改手机号（保留手机号、清空验证码与错误）；触控区 ≥48px */}
       <button
         type="button"
         onClick={onBack}
-        className="mb-4 text-sm text-neutral-400 hover:text-neutral-600 active:underline"
+        className="-ml-2 mb-4 flex min-h-[48px] items-center gap-1.5 rounded-xl px-2 text-base font-medium text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-700 active:bg-neutral-100"
       >
-        ← 返回修改手机号
+        <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
+        返回修改手机号
       </button>
 
       <h2 className="text-xl font-bold text-neutral-800">输入验证码</h2>

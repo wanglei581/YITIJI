@@ -205,7 +205,7 @@ export function ProfilePage() {
           </div>
           <Button
             size="sm"
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/login', { state: { from: location.pathname } })}
             className="flex h-12 shrink-0 items-center gap-1 px-4 text-sm"
           >
             <LogInIcon className="h-4 w-4" aria-hidden="true" />
