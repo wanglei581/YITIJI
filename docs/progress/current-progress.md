@@ -129,6 +129,7 @@
 | `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
 | `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |
 | `git diff --check` | ✅ 通过 |
+| Safari mock 浏览器手验：`VITE_API_MODE=mock` Kiosk 5173 | ✅ `/print/upload` 上传本地 PDF → `/print/material-check` 完成 `inspection → normalize_a4 → pii_scan → pii_redact` → 展示“文件体检摘要 / A4 规范化摘要 / 当前版本仍使用原文件打印” → `/print/preview` 显示“材料检查流程演示完成 · 遮挡 0 项”；mock 环境打印机离线，进入确认按钮按预期禁用 |
 
 ---
 
