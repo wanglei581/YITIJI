@@ -75,6 +75,7 @@ export function PrintUploadPage() {
         fileId:  result.fileId,
         fileUrl: result.signedUrl,
         fileMd5: result.sha256,
+        mimeType: result.mimeType,
       }
       setFile(nextFile)
       savePrintMaterialSession({ file: nextFile })

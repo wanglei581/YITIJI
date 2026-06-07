@@ -10,6 +10,7 @@ export interface PrintFileState {
   fileId?: string
   fileUrl?: string
   fileMd5?: string
+  mimeType?: string
 }
 
 export interface StoredMaterialTask {
@@ -109,6 +110,7 @@ function sanitizeFile(file: PrintFileState): PrintFileState {
     fileId: file.fileId,
     fileUrl: file.fileUrl,
     fileMd5: file.fileMd5,
+    mimeType: file.mimeType,
   }
 }
 

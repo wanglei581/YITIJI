@@ -173,6 +173,30 @@
 | `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
 | `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增 `phone/email/id_card/address` 四类 PII finding 断言 |
 
+**2026-06-07 补充：打印设置页预览与说明区 UI/UX 修复（Codex）**
+
+**目标：** 参考秒哒打印服务页，把 Kiosk `/print/preview` 从单纯参数页补成更完整的打印确认前页面，并解释“左侧为什么看不到简历预览”的真实原因。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `apps/kiosk/src/pages/print/printMaterialSession.ts` | `PrintFileState` 增加 `mimeType`，当前会话可记录上传文件类型，便于预览页判断 PDF / 图片 / 暂不支持类型 |
+| `apps/kiosk/src/pages/print/PrintUploadPage.tsx` | 上传成功后把后端返回的 `mimeType` 写入打印文件状态 |
+| `apps/kiosk/src/pages/print/PrintPreviewPage.tsx` | 左侧文件区改为真实预览面板：PDF 用 iframe、图片用 img；无可嵌入 URL、mock 演示、签名链接过期或 Word/其他类型时显示原因说明；新增“费用明细”“价格说明”“打印须知”区块，参考秒哒结构但保留本项目现有黑白/彩色计费和合规提示 |
+
+**边界：** 通用打印 `print_doc` 当前后端只支持 PDF/JPG/PNG；Word 页内预览与转换服务未接入，因此页面明确写“后续接入”，不把 Word 伪装成已可预览。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/kiosk typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/kiosk lint` | ✅ 0 error；保留既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条 |
+| `pnpm --filter @ai-job-print/kiosk build` | ✅ 通过；保留既有 chunk-size warning |
+| `git diff --check` | ✅ 通过 |
+| Safari 本地页手验：`/print/preview` | ✅ 左侧显示无法预览原因与使用说明；页面下方出现费用明细、价格说明、打印须知；mock 打印机离线时继续禁用打印按钮 |
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）

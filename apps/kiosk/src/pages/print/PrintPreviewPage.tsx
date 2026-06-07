@@ -3,7 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
   AlertTriangleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CheckCircleIcon,
+  EyeIcon,
   FileTextIcon,
   InfoIcon,
   MinusIcon,
@@ -96,6 +99,25 @@ function formatPageCount(pages: number | null): string {
   return pages === null ? '页数待识别' : `共 ${pages} 页`
 }
 
+function inferMimeType(file: PrintFile): string {
+  if (file.mimeType) return file.mimeType
+  const lowerName = file.name.toLowerCase()
+  if (lowerName.endsWith('.pdf')) return 'application/pdf'
+  if (lowerName.endsWith('.png')) return 'image/png'
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg'
+  if (lowerName.endsWith('.webp')) return 'image/webp'
+  if (lowerName.endsWith('.doc') || lowerName.endsWith('.docx')) return 'application/msword'
+  return 'application/octet-stream'
+}
+
+function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'unsupported' | 'unavailable' {
+  if (!file.fileUrl || file.fileUrl.startsWith('/mock/')) return 'unavailable'
+  const mimeType = inferMimeType(file)
+  if (mimeType === 'application/pdf') return 'pdf'
+  if (mimeType.startsWith('image/')) return 'image'
+  return 'unsupported'
+}
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function SectionHead({ children }: { children: React.ReactNode }) {
@@ -155,6 +177,94 @@ function ToggleGroup({
   )
 }
 
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="text-right text-sm font-semibold text-gray-900">{value}</span>
+    </div>
+  )
+}
+
+function FilePreviewPanel({ file }: { file: PrintFile }) {
+  const previewKind = previewKindForFile(file)
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative flex h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+        {previewKind === 'pdf' && (
+          <iframe
+            title={`${file.name} 预览`}
+            src={file.fileUrl}
+            className="h-full w-full bg-white"
+          />
+        )}
+        {previewKind === 'image' && (
+          <img
+            src={file.fileUrl}
+            alt={`${file.name} 预览`}
+            className="h-full w-full object-contain"
+          />
+        )}
+        {(previewKind === 'unsupported' || previewKind === 'unavailable') && (
+          <div className="flex w-full flex-col items-center justify-center gap-4 px-5 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
+              <FileTextIcon className="h-8 w-8 text-gray-300" />
+            </div>
+            <div>
+              <p className="break-all text-sm font-semibold text-gray-800">{file.name}</p>
+              <p className="mt-2 text-xs leading-5 text-gray-500">
+                {previewKind === 'unavailable'
+                  ? '当前没有可嵌入的预览地址，通常出现在离线演示、签名链接过期或文件仍在上传处理中。'
+                  : '当前文件类型暂不支持浏览器内直接预览，可继续设置打印参数，打印前请核对文件名和页数。'}
+              </p>
+            </div>
+          </div>
+        )}
+        {previewKind !== 'unavailable' && (
+          <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm">
+            <EyeIcon className="h-3.5 w-3.5" />
+            预览
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700">
+        PDF 和图片可在左侧预览；Word 文档需后续接入转换服务后才能页内预览。若只看到文件图标，请确认文件链接未过期，或返回重新上传。
+      </div>
+    </div>
+  )
+}
+
+function CollapsibleInfoSection({
+  title,
+  accent,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string
+  accent: 'primary' | 'amber'
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex min-h-[56px] w-full items-center justify-center gap-2 px-5 text-sm font-semibold text-gray-900"
+      >
+        <span className={['h-4 w-1 rounded-full', accent === 'primary' ? 'bg-primary-600' : 'bg-amber-500'].join(' ')} />
+        {title}
+        {open ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+      </button>
+      {open && <div className="border-t border-gray-100 p-5">{children}</div>}
+    </Card>
+  )
+}
+
 // ── Main page ───────────────────────────────────────────────────────────────────
 
 export function PrintPreviewPage() {
@@ -189,6 +299,8 @@ export function PrintPreviewPage() {
     restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? restoredPrintParams.pageRange : '',
   )
   const [rangeError, setRangeError] = useState(false)
+  const [priceGuideOpen, setPriceGuideOpen] = useState(false)
+  const [printNoticeOpen, setPrintNoticeOpen] = useState(true)
 
   const colorTonerLow =
     printer.tonerLevels.cyan < 25 ||
@@ -285,13 +397,8 @@ export function PrintPreviewPage() {
 
       <div className="mt-6 flex flex-1 gap-6 overflow-hidden">
         {/* ── Left: file preview ─────────────────────────────────────────── */}
-        <div className="flex w-60 shrink-0 flex-col gap-3">
-          <div className="flex aspect-[3/4] w-full items-center justify-center rounded-xl border border-gray-200 bg-gray-50">
-            <div className="flex flex-col items-center gap-3 px-4 text-center">
-              <FileTextIcon className="h-16 w-16 text-gray-300" />
-              <p className="break-all text-xs leading-relaxed text-gray-400">{file.name}</p>
-            </div>
-          </div>
+        <div className="flex w-72 shrink-0 flex-col gap-3">
+          <FilePreviewPanel file={file} />
           <p className="text-center text-sm text-gray-500">
             {formatPageCount(file.pages)} · {file.size}
           </p>
@@ -499,21 +606,15 @@ export function PrintPreviewPage() {
           <SectionHead>用量预估</SectionHead>
 
           <Card className="p-5">
-            <div className="grid grid-cols-2 gap-y-2.5 text-sm">
-              <span className="text-gray-500">文件页数</span>
-              <span className="text-right font-medium text-gray-900">
-                {file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`}
-              </span>
-
-              <span className="text-gray-500">打印份数</span>
-              <span className="text-right font-medium text-gray-900">{copies} 份</span>
-
-              <span className="text-gray-500">总打印面</span>
-              <span className="text-right font-medium text-gray-900">{totalFaces} 面</span>
-
-              <span className="text-gray-500">预计用纸</span>
-              <span className="text-right font-medium text-gray-900">{sheetsUsed} 张</span>
-            </div>
+            <InfoRow
+              label="文件页数"
+              value={file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页`}
+            />
+            <InfoRow label="打印份数" value={`${copies} 份`} />
+            <InfoRow label="颜色模式" value={colorMode === 'color' ? '彩色' : '黑白'} />
+            <InfoRow label="纸张规格" value="A4" />
+            <InfoRow label="总打印面" value={`${totalFaces} 面`} />
+            <InfoRow label="预计用纸" value={`${sheetsUsed} 张`} />
 
             {paperSaved > 0 && (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
@@ -521,17 +622,80 @@ export function PrintPreviewPage() {
                 双面打印比单面节省 {paperSaved} 张纸
               </div>
             )}
+          </Card>
 
+          <SectionHead>费用明细</SectionHead>
+
+          <Card className="p-5">
+            <InfoRow label="单价" value={`¥${pricePerFace.toFixed(2)} / 面`} />
+            <InfoRow
+              label="页数 × 份数"
+              value={`${file.pages ?? effectivePages} × ${copies} = ${totalFaces}`}
+            />
+            <InfoRow label="打印费用" value={`¥${totalPrice}`} />
+            <InfoRow label="优惠券抵扣" value={<span className="font-medium text-gray-400">请选择优惠券</span>} />
             <div className="mt-4 flex items-baseline justify-between border-t border-gray-100 pt-4">
               <p className="text-sm text-gray-500">
-                ¥{pricePerFace.toFixed(1)}/面（{colorMode === 'color' ? '彩色' : '黑白'}）× {totalFaces} 面
+                实际以机器计费为准
               </p>
               <div className="flex items-baseline gap-1">
+                <span className="text-xs font-medium text-gray-500">实付金额</span>
                 <span className="text-xl font-bold text-gray-900">¥{totalPrice}</span>
-                <span className="text-xs text-gray-400">实际以机器计费为准</span>
               </div>
             </div>
           </Card>
+
+          <CollapsibleInfoSection
+            title="价格说明"
+            accent="primary"
+            open={priceGuideOpen}
+            onToggle={() => setPriceGuideOpen((open) => !open)}
+          >
+            <div className="overflow-hidden rounded-lg border border-gray-100">
+              <div className="grid grid-cols-4 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500">
+                <span>打印类型</span>
+                <span>规格</span>
+                <span>黑白</span>
+                <span>彩色</span>
+              </div>
+              {[
+                ['文档/简历', 'A4 普通纸', '¥0.20/面', '¥0.50/面'],
+                ['证件照', '1寸/2寸标准版', '—', '待接入'],
+                ['照片打印', '6寸 光面纸', '—', '待接入'],
+                ['铜版纸简历', 'A4 铜版纸', '待接入', '待接入'],
+              ].map(([type, spec, bw, color]) => (
+                <div key={type} className="grid grid-cols-4 border-t border-gray-100 px-3 py-2 text-xs text-gray-700">
+                  <span className="font-medium text-gray-900">{type}</span>
+                  <span>{spec}</span>
+                  <span>{bw}</span>
+                  <span className="font-semibold text-primary-600">{color}</span>
+                </div>
+              ))}
+            </div>
+          </CollapsibleInfoSection>
+
+          <CollapsibleInfoSection
+            title="打印须知"
+            accent="amber"
+            open={printNoticeOpen}
+            onToggle={() => setPrintNoticeOpen((open) => !open)}
+          >
+            <ol className="space-y-3 text-sm text-gray-600">
+              {[
+                '上传文件需清晰完整，当前支持 PDF、JPG、PNG；Word 页内预览和转换能力后续接入。',
+                '左侧可预览 PDF 和图片；如果无法预览，请检查签名链接是否过期，或返回重新上传。',
+                '隐私检查只用于本次打印前确认，不向第三方发送；当前遮挡产物未生成时会明确提示仍使用原文件。',
+                '打印完成后请从出纸口取件，如有质量问题请联系现场工作人员。',
+              ].map((item, index) => (
+                <li key={item} className="flex gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                    {index + 1}
+                  </span>
+                  <span className="leading-6">{item}</span>
+                </li>
+              ))}
+            </ol>
+          </CollapsibleInfoSection>
 
         </div>
       </div>
