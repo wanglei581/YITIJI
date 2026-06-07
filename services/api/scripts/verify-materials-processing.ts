@@ -81,6 +81,7 @@ async function main() {
   const pdfFileId = `file_mat_pdf_${suffix}`
   const unknownPdfFileId = `file_mat_pdf_unknown_${suffix}`
   const testFileIds = [ownedFileId, anonymousFileId, imageFileId, pdfFileId, unknownPdfFileId]
+  const imageObjectKey = `verify/materials/${imageFileId}.png`
   const pdfObjectKey = `verify/materials/${pdfFileId}.pdf`
   const unknownPdfObjectKey = `verify/materials/${unknownPdfFileId}.pdf`
   const now = new Date()
@@ -141,14 +142,18 @@ async function main() {
         ownerId: null,
       },
     })
+    const imageBytes = buildPngHeader(800, 600)
+    const imagePut = await storage.putObject(imageObjectKey, imageBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {
         id: imageFileId,
-        storageKey: `verify/materials/${imageFileId}.png`,
+        storageKey: imageObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
         filename: 'anonymous-print-image.png',
         mimeType: 'image/png',
-        sizeBytes: 64,
-        sha256: 'e'.repeat(64),
+        sizeBytes: imagePut.sizeBytes,
+        sha256: imagePut.sha256,
         purpose: 'print_doc',
         sensitiveLevel: 'normal',
         expiresAt,
@@ -410,6 +415,18 @@ async function main() {
     } else {
       fail(`Image inspection expected status messages, got ${JSON.stringify(imageChecks)}`)
     }
+    const imageQuality = imageChecks['imageQuality'] as Record<string, unknown> | undefined
+    if (
+      imageQuality?.['widthPx'] === 800 &&
+      imageQuality?.['heightPx'] === 600 &&
+      imageQuality?.['quality'] === 'low' &&
+      Array.isArray(imageChecks['warnings']) &&
+      imageChecks['warnings'].includes('IMAGE_RESOLUTION_LOW_FOR_A4')
+    ) {
+      pass('Image inspection estimates A4 print clarity from real image bytes')
+    } else {
+      fail(`Image inspection expected low-resolution A4 estimate, got ${JSON.stringify(imageChecks)}`)
+    }
 
     const imageNormalizeTask = await materials.createTask(
       { kind: 'normalize_a4', sourceFileId: imageFileId, params: { targetPaperSize: 'A4' } },
@@ -499,6 +516,7 @@ async function main() {
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: testFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: testFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [ownerId, otherId] } } })
+    await storage.deleteObject(imageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(pdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(unknownPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()
@@ -512,3 +530,18 @@ main().catch((error: unknown) => {
   console.error((error as Error).stack)
   process.exit(1)
 })
+
+function buildPngHeader(width: number, height: number): Buffer {
+  const header = Buffer.alloc(33)
+  Buffer.from('89504e470d0a1a0a', 'hex').copy(header, 0)
+  header.writeUInt32BE(13, 8)
+  header.write('IHDR', 12, 'ascii')
+  header.writeUInt32BE(width, 16)
+  header.writeUInt32BE(height, 20)
+  header[24] = 8
+  header[25] = 2
+  header[26] = 0
+  header[27] = 0
+  header[28] = 0
+  return header
+}

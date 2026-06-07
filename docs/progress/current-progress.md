@@ -131,6 +131,27 @@
 | `git diff --check` | ✅ 通过 |
 | Safari mock 浏览器手验：`VITE_API_MODE=mock` Kiosk 5173 | ✅ `/print/upload` 上传本地 PDF → `/print/material-check` 完成 `inspection → normalize_a4 → pii_scan → pii_redact` → 展示“文件体检摘要 / A4 规范化摘要 / 当前版本仍使用原文件打印” → `/print/preview` 显示“材料检查流程演示完成 · 遮挡 0 项”；mock 环境打印机离线，进入确认按钮按预期禁用 |
 
+**2026-06-07 补充：图片清晰度预检最小增量（Codex）**
+
+**目标：** 不引入 OCR / 图像处理重依赖，先让图片类材料体检读取真实对象字节中的文件头，返回像素尺寸与按 A4 打印的 DPI 估算，低于建议阈值时给出可解释 warning。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `services/api/src/materials/materials.service.ts` | `inspection` 对 png/jpeg 图片尝试读取对象存储字节并解析图片宽高；按 A4 纵向/横向最佳适配估算 DPI，低于 150 DPI 返回 `IMAGE_RESOLUTION_LOW_FOR_A4`、`imageQuality.widthPx/heightPx/estimatedDpiForA4/minRecommendedDpi/quality` 和用户提示；图片字节不可读或尺寸不可识别时只给 warning，不阻断继续打印 |
+| `services/api/scripts/verify-materials-processing.ts` | 新增本地对象存储低分辨率 PNG 断言，确认 `pageCount=1`、`imageQuality=800×600 / low`、`IMAGE_RESOLUTION_LOW_FOR_A4` 生效；继续覆盖匿名 token、A4 评估和 PII 遮挡评估回归 |
+
+**边界：** 本轮只做图片头部维度解析和 A4 DPI 估算；不做 OCR、图片内容质量模型、PDF 页面渲染清晰度、自动增强或重采样。
+
+**验证：**
+
+| 检查 | 结果 |
+|------|------|
+| `pnpm --filter @ai-job-print/api typecheck` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api lint` | ✅ 通过 |
+| `pnpm --filter @ai-job-print/api verify:materials-processing` | ✅ 通过，新增图片清晰度预检断言 |
+
 ---
 
 ## 阶段收口基线核查（2026-06-06，Claude）

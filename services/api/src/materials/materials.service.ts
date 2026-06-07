@@ -76,12 +76,21 @@ type InspectionSummary = {
   canPrint: boolean
   warnings: string[]
   messages: InspectionMessage[]
+  imageQuality?: ImageQualitySummary
 }
 
 type NormalizeA4Summary = InspectionSummary & {
   targetPaperSize: 'A4'
   canNormalize: boolean
   normalizedFileId: string | null
+}
+
+type ImageQualitySummary = {
+  widthPx: number
+  heightPx: number
+  estimatedDpiForA4: number
+  minRecommendedDpi: number
+  quality: 'ok' | 'low'
 }
 
 type PiiRedactionSummary = {
@@ -229,6 +238,7 @@ export class MaterialsService {
             pageCount: inspection.pageCount,
             pageCountSource: inspection.pageCountSource,
             canPrint: inspection.canPrint,
+            imageQuality: inspection.imageQuality,
             warnings: inspection.warnings,
             messages: inspection.messages,
           },
@@ -249,6 +259,7 @@ export class MaterialsService {
             sizeBytes: sourceFile.sizeBytes,
             pageCount: normalize.pageCount,
             pageCountSource: normalize.pageCountSource,
+            imageQuality: normalize.imageQuality,
             warnings: normalize.warnings,
             messages: normalize.messages,
           },
@@ -273,13 +284,7 @@ export class MaterialsService {
 
   private async inspectSourceFile(sourceFile: SourceFileRecord): Promise<InspectionSummary> {
     if (isSinglePageImage(sourceFile.mimeType)) {
-      return {
-        pageCount: 1,
-        pageCountSource: 'image_single_page',
-        canPrint: true,
-        warnings: [],
-        messages: [{ code: 'IMAGE_SINGLE_PAGE', severity: 'info', text: '图片将按 1 页参与打印设置' }],
-      }
+      return this.inspectImageSourceFile(sourceFile)
     }
     if (sourceFile.mimeType !== 'application/pdf') {
       return {
@@ -310,6 +315,70 @@ export class MaterialsService {
         canPrint: false,
         warnings: ['SOURCE_FILE_BYTES_UNAVAILABLE'],
         messages: [{ code: 'SOURCE_FILE_BYTES_UNAVAILABLE', severity: 'warning', text: '暂未读取到文件内容，请重新上传文件' }],
+      }
+    }
+  }
+
+  private async inspectImageSourceFile(sourceFile: SourceFileRecord): Promise<InspectionSummary> {
+    const baseMessage: InspectionMessage = {
+      code: 'IMAGE_SINGLE_PAGE',
+      severity: 'info',
+      text: '图片将按 1 页参与打印设置',
+    }
+    try {
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
+      const dimensions = readImageDimensions(buffer, sourceFile.mimeType)
+      if (!dimensions) {
+        return {
+          pageCount: 1,
+          pageCountSource: 'image_single_page',
+          canPrint: true,
+          warnings: ['IMAGE_DIMENSIONS_NOT_DETECTED'],
+          messages: [
+            baseMessage,
+            { code: 'IMAGE_DIMENSIONS_NOT_DETECTED', severity: 'warning', text: '暂未识别图片像素尺寸，请核对打印效果' },
+          ],
+        }
+      }
+      const estimatedDpiForA4 = estimateA4Dpi(dimensions.widthPx, dimensions.heightPx)
+      const imageQuality: ImageQualitySummary = {
+        ...dimensions,
+        estimatedDpiForA4,
+        minRecommendedDpi: 150,
+        quality: estimatedDpiForA4 >= 150 ? 'ok' : 'low',
+      }
+      const lowResolution = imageQuality.quality === 'low'
+      return {
+        pageCount: 1,
+        pageCountSource: 'image_single_page',
+        canPrint: true,
+        imageQuality,
+        warnings: lowResolution ? ['IMAGE_RESOLUTION_LOW_FOR_A4'] : [],
+        messages: [
+          baseMessage,
+          lowResolution
+            ? {
+                code: 'IMAGE_RESOLUTION_LOW_FOR_A4',
+                severity: 'warning',
+                text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI，清晰度可能不足`,
+              }
+            : {
+                code: 'IMAGE_RESOLUTION_OK_FOR_A4',
+                severity: 'info',
+                text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI`,
+              },
+        ],
+      }
+    } catch {
+      return {
+        pageCount: 1,
+        pageCountSource: 'image_single_page',
+        canPrint: true,
+        warnings: ['IMAGE_BYTES_UNAVAILABLE'],
+        messages: [
+          baseMessage,
+          { code: 'IMAGE_BYTES_UNAVAILABLE', severity: 'warning', text: '暂未读取到图片内容，请核对打印效果' },
+        ],
       }
     }
   }
@@ -582,6 +651,57 @@ function readStringParam(params: Record<string, unknown> | undefined, key: strin
 
 function isSinglePageImage(mimeType: string): boolean {
   return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp'
+}
+
+function readImageDimensions(buffer: Buffer, mimeType: string): { widthPx: number; heightPx: number } | null {
+  if (mimeType === 'image/png') return readPngDimensions(buffer)
+  if (mimeType === 'image/jpeg') return readJpegDimensions(buffer)
+  return null
+}
+
+function readPngDimensions(buffer: Buffer): { widthPx: number; heightPx: number } | null {
+  if (buffer.length < 24) return null
+  const pngSignature = '89504e470d0a1a0a'
+  if (buffer.subarray(0, 8).toString('hex') !== pngSignature) return null
+  return {
+    widthPx: buffer.readUInt32BE(16),
+    heightPx: buffer.readUInt32BE(20),
+  }
+}
+
+function readJpegDimensions(buffer: Buffer): { widthPx: number; heightPx: number } | null {
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null
+  let offset = 2
+  while (offset + 9 < buffer.length) {
+    while (offset < buffer.length && buffer[offset] === 0xff) offset += 1
+    const marker = buffer[offset]
+    offset += 1
+    if (marker === 0xd9 || marker === 0xda) return null
+    if (offset + 2 > buffer.length) return null
+    const segmentLength = buffer.readUInt16BE(offset)
+    if (segmentLength < 2 || offset + segmentLength > buffer.length) return null
+    if (isJpegStartOfFrame(marker)) {
+      return {
+        heightPx: buffer.readUInt16BE(offset + 3),
+        widthPx: buffer.readUInt16BE(offset + 5),
+      }
+    }
+    offset += segmentLength
+  }
+  return null
+}
+
+function isJpegStartOfFrame(marker: number | undefined): boolean {
+  return marker === 0xc0 || marker === 0xc1 || marker === 0xc2 || marker === 0xc3 ||
+    marker === 0xc5 || marker === 0xc6 || marker === 0xc7 ||
+    marker === 0xc9 || marker === 0xca || marker === 0xcb ||
+    marker === 0xcd || marker === 0xce || marker === 0xcf
+}
+
+function estimateA4Dpi(widthPx: number, heightPx: number): number {
+  const portraitDpi = Math.min(widthPx / 8.27, heightPx / 11.69)
+  const landscapeDpi = Math.min(widthPx / 11.69, heightPx / 8.27)
+  return Math.max(1, Math.round(Math.max(portraitDpi, landscapeDpi)))
 }
 
 function countPdfPages(buffer: Buffer): number | null {
