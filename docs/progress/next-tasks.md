@@ -33,6 +33,8 @@
 
 - ✅ **匿名 AI 结果一次性 accessToken（C-2A，2026-06-07，`feature/ai-anon-access-token`）**：`AiResumeResult` 加 `accessTokenHash` 列（additive migration `20260607120000`，dev.db 经 `db execute` 落地，PostgreSQL 迁移时随 drift 统一重整）；`POST /resume/parse` 匿名时铸 192-bit token 并**只回传一次**（DB 只存 SHA-256 hash）；读取改用 `x-resume-access-token` header（**不进 URL query**）+ `timingSafeEqual` 校验；新匿名行须持令牌才可读，历史 null-hash 行 **fail-closed**，会员路径不变（仍按 endUserId 本人校验）；optimize 懒生成继承 parse 行 hash，不铸新 token；Kiosk 加最小 `aiResumeSession`（只存 taskId/accessToken，不存任何 AI payload/原文/PII）+ idle/屏保清理。`verify:ai-result-ownership` 扩展为 12 类断言 ALL PASS；api/kiosk typecheck/lint/build 全绿。详见 [current-progress.md](./current-progress.md) §Phase C-2A。**待运行期手验**（真实 API + 会员短信验证码 + 浏览器/一体机：匿名拿 token→刷新仍可读、无/错 token 被拒、进屏保后下一位读不到）。
 - 🔄 **完整用户资产中心**：我的简历 / 文档 / AI记录（✅ C-2B `feature/member-assets-mvp`）+ 收藏 / 权益（✅ C-2C `feature/member-favorites-benefits-c2c`）的跨会话列表 API + ProfilePage 真实展示已落地；✅ **岗位收藏服务端化 + 登录态门控**（C-2C follow-up `feature/kiosk-job-favorites-server-sync`：JobsPage/JobDetailPage 登录会员写 `/me/favorites`、匿名沿用本机 + 「登录后可同步到账号」提示；`verify:job-favorites-http` 11 类 + 匿名本机运行期校验通过）。**剩余**：招聘会/政策收藏入口服务端化、本机→账号迁移、打印订单 `PrintTask` 聚合视图、登录态浏览器端到端手验。
+- 🔄 **短信服务商真实接入**：✅ 已预留 `SMS_PROVIDER=log|tencent`、腾讯云短信 env 位与 `TencentSmsSender` 占位，`verify:sms-provider` 覆盖 Provider 选择和生产保护；**剩余**：腾讯云短信服务审核通过后，补 `TencentSmsSender.sendCode()` 的真实 `SendSms` API 调用，并用真实签名 / 模板 / SDKAppID / CAM 密钥跑一遍登录验证码端到端手验。
+- 🔄 **扫码登录真实接入**：✅ Kiosk 登录页已预留微信扫码 / 支付宝扫码 UI 与二维码刷新入口；**剩余**：申请微信开放平台 / 支付宝开放平台能力后，设计扫码登录会话模型、二维码生成接口、手机端授权回调 / 轮询、EndUser 账号绑定与解绑、异常/超时/风控策略。
 - ⏳ **登录态运行期手验**：需 API + 会员短信验证码环境，手验已登录状态栏、idle 超时登出、进入屏保登出、忙碌态（打印/AI 中）不误登出。
 
 ---
