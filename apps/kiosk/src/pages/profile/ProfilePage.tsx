@@ -199,7 +199,7 @@ function ProfileHeader({
                 会员
               </span>
             </div>
-            <p className="mt-1 text-sm text-gray-500">当前展示本次服务记录，账号资产中心建设中</p>
+            <p className="mt-1 text-sm text-gray-500">当前展示本次服务记录与本人账号资产</p>
             <p className="mt-0.5 text-xs text-gray-400">长时间无操作将自动退出，保护个人资料</p>
           </>
         ) : (

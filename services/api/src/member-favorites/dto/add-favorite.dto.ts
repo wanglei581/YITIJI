@@ -5,7 +5,7 @@ import type { FavoriteTargetType } from '../member-favorites.types'
 export const FAVORITE_TARGET_TYPES: FavoriteTargetType[] = ['job', 'job_fair', 'policy']
 
 /**
- * 新增收藏入参。ValidationPipe(whitelist) 自动剥除未知字段，
+ * 新增收藏入参。ValidationPipe(whitelist + forbidNonWhitelisted) 会直接 400 拒绝未知字段，
  * 杜绝把任何投递 / 候选人 / 简历相关字段注入收藏记录。
  */
 export class AddFavoriteDto {
