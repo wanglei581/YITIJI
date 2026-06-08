@@ -1,6 +1,6 @@
 # 智慧校园对接设计规范
 
-> 最后更新：2026-06-08（首版，仅设计不开发）
+> 最后更新：2026-06-08（首版，仅设计不开发；+§十三 账号归属/菜单显隐/数据隔离 实现级判定逻辑）
 > 对应规划：[feature-scope.md §6.8](./feature-scope.md) | [next-tasks.md §智慧校园 产品规划](../progress/next-tasks.md)
 > 合规前置：[compliance-boundary.md §九 校园 / 学生数据隐私边界](../compliance/compliance-boundary.md)（**硬阻断**）
 > 对标文档：[external-data-source-design.md](./external-data-source-design.md)（本规范复用其双维度接入与审核机制）
@@ -219,6 +219,8 @@ CampusStatistic(reviewStatus: pending)
 | 审计 | 开关变更、归属变更、数据源接入/更新全部落 AuditLog |
 
 > 端架构（重申，与既有规划一致）：**不新建独立学校端 app；不给学校开 admin 子账号**（admin 全局视角、菜单隐藏≠数据隔离）。学校走 partner 后台 + `Organization.type='school_employment_center'`，service 层强制 `where terminal.orgId = user.orgId`。
+>
+> 👉 账号归属 / 菜单显隐 / 数据隔离的**实现级判定逻辑**（给 Codex/开发照做）见 **§十三**。
 
 ---
 
@@ -256,3 +258,99 @@ CampusStatistic(reviewStatus: pending)
 - [ ] 行李帮运第三方物流方是否确定、是否正规资质、是否纯外链（涉资金需另做支付合规评审）
 - [ ] 全景素材版权与人脸授权是否清晰
 - [ ] 终端归属与开关由谁操作（运营代配 vs 学校自助）
+
+---
+
+## 十三、账号归属 / 菜单显隐 / 数据隔离（给实现者 / Codex 的判定逻辑）
+
+> 本节是实现规约，目的是让开发照做不踩坑。**最重要的一条原则：前端隐藏菜单只是 UX，真正的安全边界永远在后端 guard + service 层。** 任何"学校只能看自己数据"的保证，必须由后端强制，不能依赖前端。
+
+### 13.1 涉及的现有模型（不新造，复用）
+
+```
+User          { id, role: 'admin'|'partner'|'kiosk', orgId?, ... }   // packages/shared/src/types/user.ts
+Organization  { id, type, ... }   // type 已含 'school_employment_center'
+Terminal      { id, terminalCode, ... }   // ⚠️ 需新增 orgId（见 §九 / next-tasks Phase 1）
+```
+
+JWT payload 已带 `{ sub, role, orgId }`；`RolesGuard` **只校验 role 集合、不做机构隔离**（见 `common/guards/roles.guard.ts`）——所以机构归属必须在 service 层手写。
+
+### 13.2 三层判定（缺一不可）
+
+| 层 | 判定 | 作用 | 在哪实现 |
+|----|------|------|----------|
+| 第一层：在哪个端 | `role` | 决定登录后进哪个后台 | 登录路由 / 各 app |
+| 第二层：看不看得到「智慧校园」 | partner 且 `org.type==='school_employment_center'`（增强：org 被授予 smart_campus 模块） | 菜单/路由显隐（**仅 UX**） | partner 前端 |
+| 第三层：能看/改哪些数据 | `terminal.orgId === user.orgId`（admin 例外，全放行） | **真正的安全边界** | services/api service 层 |
+
+### 13.3 判定流程
+
+```
+登录请求
+  → JwtAuthGuard 校验 JWT → 取 role
+     ├─ kiosk   → 一体机前台（无后台；智慧校园展示走免鉴权读端点，见 §八）
+     ├─ admin   → 管理员后台：看全部、可代配开关、审核/终端归属/审计
+     └─ partner → 合作机构后台
+            → 读 org.type
+               ├─ school_employment_center → 显示「智慧校园」菜单
+               │      → 所有读写 service 层强制 where orgId = user.orgId（只见/只改本校）
+               └─ 其它(hr_company / fair_organizer / aggregator ...) → 无「智慧校园」菜单
+```
+
+### 13.4 前端：菜单显隐（partner app）
+
+```ts
+// 仅 UX：决定侧边栏是否出现「智慧校园」。不承担安全职责。
+function canSeeSmartCampus(org: OrgView): boolean {
+  // MVP：按机构类型
+  return org.type === 'school_employment_center'
+  // 增强（推荐）：改为能力开关，平台可单独授予/收回
+  // return org.enabledModules?.includes('smart_campus') ?? false
+}
+```
+
+### 13.5 后端：写端点的强制校验（关键，照抄 jobs.service 范式）
+
+```ts
+// 例：学校在 partner 后台保存某终端的智慧校园开关
+// 路由：PUT /partner/smart-campus/terminals/:terminalId/config
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'partner')        // 角色门：admin 或 partner 才进得来
+async saveTerminalSmartCampusConfig(user: AuthedUser, terminalId: string, input: ...) {
+  if (user.role === 'partner') {
+    // ① partner 必须是「学校」机构
+    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+    if (!org || org.type !== 'school_employment_center') throw new ForbiddenException()
+    // ② 该终端必须归属本校（防 A 校用 path 里的 terminalId 改 B 校）
+    const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId } })
+    if (!terminal || terminal.orgId !== user.orgId) throw new ForbiddenException()
+  }
+  // admin 角色：平台运营，全放行（Phase 1 由 admin 代配置）
+  // ③ 落库 + 写审计 writeAudit('smart_campus_config.update', { terminalId, before, after })
+}
+```
+
+读列表同理：partner 一律 `where: { orgId: user.orgId }`，绝不读 path/body 里传入的 orgId。
+
+### 13.6 Kiosk 免鉴权读端点（不在权限体系内，但边界同样硬）
+
+```ts
+// GET /terminals/:terminalId/smart-campus  —— 无 JwtAuthGuard
+// 只返回开关与已审核外链元数据；绝不含任何学生统计 value（见 §八）
+// 返回体白名单：{ enabled, modules: {welcome, bigdata, luggage, panorama}, links: [...] }
+```
+
+### 13.7 给实现者的 Do / Don't
+
+**Do**
+- ✅ 菜单显隐用 `org.type`（或能力开关）；后端写/读端点**独立**再做 `org.type` + `terminal.orgId===user.orgId` 双重校验。
+- ✅ partner 所有查询强制注入 `where orgId = user.orgId`，orgId 取自 JWT，不信任前端传参。
+- ✅ 越权（非学校 partner、跨校 terminalId）一律 `403 ForbiddenException`，并写审计。
+- ✅ 写回归测试：A 校 token 配 B 校终端 → 403；非学校 partner 调智慧校园端点 → 403；免鉴权端点返回体断言不含统计 value。
+
+**Don't**
+- ❌ 不要只靠前端隐藏菜单当安全（接口仍可被直接调用）。
+- ❌ 不要给学校发 `admin` 账号 / 不要在 admin 端点放开 partner 角色去读全量。
+- ❌ 不要从 path/body 读 orgId 决定数据范围（只认 JWT 的 orgId）。
+- ❌ 不要在 `RolesGuard` 里塞机构逻辑（它只管 role；机构隔离在 service 层）。
+- ❌ 不要把校园大数据统计 value 放进免鉴权端点。
