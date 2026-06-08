@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>智慧校园 · 合作机构后台管理区原型</title>
+<!-- 对齐 packages/ui AdminLayout：深色侧边栏 neutral-900 / 顶栏 h-14 / canvas 内容区；primary=blue。-->
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: {
+      colors: {
+        primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8' },
+        canvas: '#f9fafb', surface: '#ffffff',
+        error:'#dc2626', success:'#16a34a', warning:'#d97706',
+      },
+      fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"PingFang SC"','"Microsoft YaHei"','Segoe UI','sans-serif'] },
+    }},
+  }
+</script>
+<style>
+  body{ background:#e2e8f0; }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+  .scroll::-webkit-scrollbar{ width:6px; } .scroll::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:3px; }
+</style>
+</head>
+<body class="font-sans text-gray-900">
+
+<div class="mx-auto max-w-[1240px] px-6 py-8">
+  <div class="mb-5">
+    <h1 class="text-2xl font-bold text-gray-900">智慧校园 · 合作机构(学校)后台管理区</h1>
+    <p class="mt-1 text-sm text-gray-500">对齐现有后台设计（深色侧边栏 + 顶栏 + 表格表单）。学校通过合作机构后台登录，按 <code class="rounded bg-gray-100 px-1">orgId</code> 只看到本校数据。与一体机前端原型 <a class="text-primary-600 underline" href="./smart-campus-demo.html">smart-campus-demo.html</a> 配套演示。</p>
+  </div>
+
+  <!-- ===== 后台机框 ===== -->
+  <div class="flex h-[760px] overflow-hidden rounded-xl border border-gray-300 bg-canvas shadow-2xl">
+
+    <!-- ---- 侧边栏 ---- -->
+    <aside class="flex w-60 shrink-0 flex-col bg-neutral-900">
+      <div class="flex h-14 shrink-0 items-center gap-3 border-b border-neutral-800 px-4">
+        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary-600"><span class="text-[11px] font-bold text-white">AI</span></div>
+        <div class="min-w-0"><p class="truncate text-sm font-semibold text-white">青岛科技大学 就业中心</p><p class="truncate text-[10px] text-neutral-500">AI求职打印服务终端</p></div>
+      </div>
+      <nav class="scroll flex-1 overflow-y-auto py-2">
+        <ul class="space-y-0.5 px-2 text-sm">
+          <li class="px-3 pb-1 pt-1"><span class="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">运营</span></li>
+          <li><div class="flex items-center gap-3 rounded-md px-3 py-2.5 font-medium text-neutral-400"><i data-lucide="layout-dashboard" class="h-4 w-4"></i>工作台</div></li>
+          <li><div class="flex items-center gap-3 rounded-md px-3 py-2.5 font-medium text-neutral-400"><i data-lucide="briefcase" class="h-4 w-4"></i>岗位信息管理</div></li>
+          <li><div class="flex items-center gap-3 rounded-md px-3 py-2.5 font-medium text-neutral-400"><i data-lucide="calendar" class="h-4 w-4"></i>招聘会管理</div></li>
+
+          <li class="px-3 pb-1 pt-4"><span class="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">智慧校园</span></li>
+          <li><div class="relative flex items-center gap-3 rounded-md bg-neutral-800 px-3 py-2.5 font-medium text-white"><span class="absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-primary-400"></span><i data-lucide="graduation-cap" class="h-4 w-4"></i>智慧校园</div>
+            <ul class="mt-0.5 space-y-0.5 pl-4">
+              <li><button onclick="tab('terminals')" data-navtab="terminals" class="navtab flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] text-neutral-300 hover:bg-neutral-800"><i data-lucide="monitor-smartphone" class="h-3.5 w-3.5"></i>终端开关</button></li>
+              <li><button onclick="tab('orientation')" data-navtab="orientation" class="navtab flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] text-neutral-300 hover:bg-neutral-800"><i data-lucide="party-popper" class="h-3.5 w-3.5"></i>迎新内容</button></li>
+              <li><button onclick="tab('bigdata')" data-navtab="bigdata" class="navtab flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] text-neutral-300 hover:bg-neutral-800"><i data-lucide="bar-chart-3" class="h-3.5 w-3.5"></i>校园大数据</button></li>
+              <li><button onclick="tab('usage')" data-navtab="usage" class="navtab flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] text-neutral-300 hover:bg-neutral-800"><i data-lucide="activity" class="h-3.5 w-3.5"></i>使用统计</button></li>
+            </ul>
+          </li>
+
+          <li class="px-3 pb-1 pt-4"><span class="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">数据</span></li>
+          <li><div class="flex items-center gap-3 rounded-md px-3 py-2.5 font-medium text-neutral-400"><i data-lucide="database" class="h-4 w-4"></i>数据源管理</div></li>
+          <li><div class="flex items-center gap-3 rounded-md px-3 py-2.5 font-medium text-neutral-400"><i data-lucide="scroll-text" class="h-4 w-4"></i>同步日志</div></li>
+          <li><div class="flex items-center gap-3 rounded-md px-3 py-2.5 font-medium text-neutral-400"><i data-lucide="settings" class="h-4 w-4"></i>账号权限</div></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- ---- 主区 ---- -->
+    <div class="flex flex-1 flex-col overflow-hidden">
+      <header class="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-6">
+        <div class="flex items-center gap-2 text-sm text-gray-400"><span>智慧校园</span><i data-lucide="chevron-right" class="h-3.5 w-3.5"></i><span id="crumb" class="font-medium text-gray-700">终端开关</span></div>
+        <div class="flex items-center gap-1">
+          <button class="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100"><i data-lucide="search" class="h-4 w-4"></i></button>
+          <button class="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100"><i data-lucide="bell" class="h-4 w-4"></i></button>
+          <div class="mx-1.5 h-5 w-px bg-neutral-200"></div>
+          <div class="flex items-center gap-2 rounded-md px-2 py-1">
+            <div class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600"><span class="text-[11px] font-semibold text-white">王</span></div>
+            <div class="text-left"><p class="text-xs font-medium leading-none text-neutral-800">王主任</p><p class="mt-0.5 text-[10px] leading-none text-neutral-400">机构管理员</p></div>
+          </div>
+        </div>
+      </header>
+
+      <main class="scroll flex-1 overflow-y-auto p-6">
+
+        <!-- ===== 终端开关 ===== -->
+        <section id="panel-terminals" class="panel active">
+          <div class="mb-4"><h2 class="text-lg font-bold text-gray-900">终端开关</h2><p class="mt-0.5 text-sm text-gray-500">开启后该机器前端首页显示「智慧校园」模块；关闭即整张隐藏（出校园即关）。</p></div>
+          <div class="mb-4 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-4 py-3"><i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0 text-blue-600"></i><p class="text-xs leading-relaxed text-blue-900">一期开关由平台运营代配置；签约后可开放学校自助（本页为自助管理预览）。子功能可单独开关；<b>校园大数据默认关闭</b>，需授权与合规就绪后开启。</p></div>
+          <div class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <table class="w-full text-sm">
+              <thead class="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-gray-500">
+                <tr><th class="px-4 py-3 font-medium">终端编码</th><th class="px-4 py-3 font-medium">位置</th><th class="px-4 py-3 font-medium">状态</th><th class="px-4 py-3 text-center font-medium">智慧校园</th><th class="px-4 py-3 text-center font-medium">迎新</th><th class="px-4 py-3 text-center font-medium">大数据</th><th class="px-4 py-3 text-center font-medium">行李</th><th class="px-4 py-3 text-center font-medium">全景</th></tr>
+              </thead>
+              <tbody class="divide-y divide-neutral-100">
+                <tr><td class="px-4 py-3 font-medium text-gray-900">KSK-QUST-01</td><td class="px-4 py-3 text-gray-600">崂山校区·图书馆</td><td class="px-4 py-3"><span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700"><span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>在线</span></td>
+                  <td class="px-4 py-3 text-center"><span class="sw on"></span></td><td class="px-4 py-3 text-center"><span class="sw on"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw on"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td></tr>
+                <tr><td class="px-4 py-3 font-medium text-gray-900">KSK-QUST-02</td><td class="px-4 py-3 text-gray-600">崂山校区·一食堂</td><td class="px-4 py-3"><span class="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700"><span class="h-1.5 w-1.5 rounded-full bg-green-500"></span>在线</span></td>
+                  <td class="px-4 py-3 text-center"><span class="sw on"></span></td><td class="px-4 py-3 text-center"><span class="sw on"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td></tr>
+                <tr><td class="px-4 py-3 font-medium text-gray-900">KSK-QUST-03</td><td class="px-4 py-3 text-gray-600">四方校区·行政楼</td><td class="px-4 py-3"><span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500"><span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>离线</span></td>
+                  <td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td><td class="px-4 py-3 text-center"><span class="sw off"></span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-3 text-xs text-gray-400">提示：终端归属由平台管理员指派（<code class="rounded bg-gray-100 px-1">Terminal.orgId</code>）；本校账号只能看到/配置归属本校的终端。</p>
+        </section>
+
+        <!-- ===== 迎新内容 ===== -->
+        <section id="panel-orientation" class="panel">
+          <div class="mb-4 flex items-center justify-between"><div><h2 class="text-lg font-bold text-gray-900">迎新内容管理</h2><p class="mt-0.5 text-sm text-gray-500">维护报到流程、办事窗口、官方链接，提交后经平台审核上终端。</p></div>
+            <button class="flex h-9 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"><i data-lucide="plus" class="h-4 w-4"></i>新增内容</button></div>
+          <div class="mb-4 flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3"><i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"></i><p class="text-xs leading-relaxed text-emerald-900">仅信息展示 + 官方外链，<b>不在终端采集任何学生个人信息</b>。报到登记请引导至学校官方系统。</p></div>
+
+          <div class="mb-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p class="mb-3 text-sm font-semibold text-gray-700">报到流程</p>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3 rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-2.5"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">1</span><div class="flex-1"><p class="text-sm text-gray-800">线上预报到</p><p class="text-xs text-gray-400">前往学校迎新官网/公众号完成信息确认</p></div><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已上线</span><button class="text-gray-400 hover:text-gray-600"><i data-lucide="pencil" class="h-4 w-4"></i></button></div>
+              <div class="flex items-center gap-3 rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-2.5"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">2</span><div class="flex-1"><p class="text-sm text-gray-800">学院报到</p><p class="text-xs text-gray-400">到所在学院迎新点核验、领取材料</p></div><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已上线</span><button class="text-gray-400 hover:text-gray-600"><i data-lucide="pencil" class="h-4 w-4"></i></button></div>
+              <div class="flex items-center gap-3 rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-2.5"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">3</span><div class="flex-1"><p class="text-sm text-gray-800">宿舍入住 / 校园卡激活</p><p class="text-xs text-gray-400">领取钥匙、办理水电网</p></div><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">待审核</span><button class="text-gray-400 hover:text-gray-600"><i data-lucide="pencil" class="h-4 w-4"></i></button></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <p class="mb-3 text-sm font-semibold text-gray-700">办事窗口</p>
+              <div class="space-y-1.5 text-sm text-gray-700">
+                <div class="flex justify-between rounded-md bg-neutral-50 px-3 py-2"><span>学生处</span><span class="text-gray-400">行政楼 1F</span></div>
+                <div class="flex justify-between rounded-md bg-neutral-50 px-3 py-2"><span>财务处</span><span class="text-gray-400">行政楼 2F</span></div>
+                <div class="flex justify-between rounded-md bg-neutral-50 px-3 py-2"><span>校医院</span><span class="text-gray-400">东门内 50m</span></div>
+              </div>
+            </div>
+            <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <p class="mb-3 text-sm font-semibold text-gray-700">官方链接（外链/二维码）</p>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-2"><i data-lucide="link" class="h-4 w-4 text-gray-400"></i><span class="flex-1 truncate text-gray-700">迎新官网 yingxin.qust.edu.cn</span><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已上线</span></div>
+                <div class="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-2"><i data-lucide="qr-code" class="h-4 w-4 text-gray-400"></i><span class="flex-1 truncate text-gray-700">迎新服务号（二维码）</span><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已上线</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 校园大数据 ===== -->
+        <section id="panel-bigdata" class="panel">
+          <div class="mb-4 flex items-center justify-between"><div><h2 class="text-lg font-bold text-gray-900">校园大数据录入</h2><p class="mt-0.5 text-sm text-gray-500">只录入聚合统计数字；提交后经平台审核与脱敏校验上终端。</p></div>
+            <button class="flex h-9 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white hover:bg-primary-700"><i data-lucide="plus" class="h-4 w-4"></i>新增指标</button></div>
+
+          <div class="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-3"><i data-lucide="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"></i><div class="text-xs leading-relaxed text-amber-900"><b>合规要求：</b>只接收已聚合脱敏的统计数字，<b>禁止录入任何学生个人明细</b>（姓名/学号/身份证/班级/宿舍）；样本量 &lt; 10 的分组自动合并；统计不可导出/打印；需先签数据授权书 + 数据处理协议(DPA)。</div></div>
+
+          <!-- 数据来源 -->
+          <div class="mb-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p class="mb-3 text-sm font-semibold text-gray-700">数据接入方式</p>
+            <div class="flex gap-2">
+              <button class="rounded-lg border-2 border-primary-500 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700">手工录入</button>
+              <button class="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-gray-600 hover:border-neutral-300">汇总 Excel 上传</button>
+              <button class="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-gray-600 hover:border-neutral-300">API 对接学校系统</button>
+            </div>
+            <p class="mt-2 text-xs text-gray-400">手工录入最安全，适合绝大多数学校；API 对接仅适合有教务/迎新系统且接口只返回聚合数字的学校。</p>
+          </div>
+
+          <!-- 指标表 -->
+          <div class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <table class="w-full text-sm">
+              <thead class="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-gray-500">
+                <tr><th class="px-4 py-3 font-medium">指标</th><th class="px-4 py-3 font-medium">维度</th><th class="px-4 py-3 font-medium">取值</th><th class="px-4 py-3 text-right font-medium">数值</th><th class="px-4 py-3 font-medium">可见范围</th><th class="px-4 py-3 font-medium">审核</th></tr>
+              </thead>
+              <tbody class="divide-y divide-neutral-100 text-gray-700">
+                <tr><td class="px-4 py-3">性别比例</td><td class="px-4 py-3">性别</td><td class="px-4 py-3">男</td><td class="px-4 py-3 text-right tabular-nums">3,370</td><td class="px-4 py-3"><span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">公共展示</span></td><td class="px-4 py-3"><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已通过</span></td></tr>
+                <tr><td class="px-4 py-3">性别比例</td><td class="px-4 py-3">性别</td><td class="px-4 py-3">女</td><td class="px-4 py-3 text-right tabular-nums">2,870</td><td class="px-4 py-3"><span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">公共展示</span></td><td class="px-4 py-3"><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已通过</span></td></tr>
+                <tr><td class="px-4 py-3">专业规模</td><td class="px-4 py-3">专业</td><td class="px-4 py-3">高分子材料</td><td class="px-4 py-3 text-right tabular-nums">620</td><td class="px-4 py-3"><span class="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">公共展示</span></td><td class="px-4 py-3"><span class="rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-700">已通过</span></td></tr>
+                <tr class="bg-amber-50/40"><td class="px-4 py-3">专业规模</td><td class="px-4 py-3">专业</td><td class="px-4 py-3 text-gray-400">中外合作小专业</td><td class="px-4 py-3 text-right text-gray-400">&lt;10 已合并</td><td class="px-4 py-3"><span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">隐藏</span></td><td class="px-4 py-3"><span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">k-匿名</span></td></tr>
+                <tr><td class="px-4 py-3">报到率</td><td class="px-4 py-3">全校</td><td class="px-4 py-3">—</td><td class="px-4 py-3 text-right tabular-nums">94%</td><td class="px-4 py-3"><span class="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-gray-600">仅后台</span></td><td class="px-4 py-3"><span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">待审核</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-3 text-xs text-gray-400">「公共展示」= 可在一体机前端给新生/家长看；「仅后台」= 只给校领导/运营看，不进公共终端。两者均不含个人明细。</p>
+        </section>
+
+        <!-- ===== 使用统计 ===== -->
+        <section id="panel-usage" class="panel">
+          <div class="mb-4"><h2 class="text-lg font-bold text-gray-900">使用统计</h2><p class="mt-0.5 text-sm text-gray-500">平台生成回传，反映本校终端上智慧校园功能的使用情况（不含任何个人信息，零合规风险）。</p></div>
+          <div class="mb-4 grid grid-cols-4 gap-4">
+            <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-gray-900">12,480</p><p class="mt-1 text-xs text-gray-500">智慧校园浏览</p></div>
+            <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-gray-900">8,920</p><p class="mt-1 text-xs text-gray-500">待机唤醒</p></div>
+            <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-gray-900">3,140</p><p class="mt-1 text-xs text-gray-500">迎新点击</p></div>
+            <div class="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"><p class="text-2xl font-bold text-gray-900">1,260</p><p class="mt-1 text-xs text-gray-500">导流到打印/简历</p></div>
+          </div>
+          <div class="mb-4 rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p class="mb-4 text-sm font-semibold text-gray-700">近 7 天浏览趋势</p>
+            <div class="flex items-end justify-between gap-3" style="height:140px">
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-500" style="height:55%"></div><span class="text-[11px] text-gray-400">周一</span></div>
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-500" style="height:48%"></div><span class="text-[11px] text-gray-400">周二</span></div>
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-500" style="height:70%"></div><span class="text-[11px] text-gray-400">周三</span></div>
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-500" style="height:62%"></div><span class="text-[11px] text-gray-400">周四</span></div>
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-600" style="height:100%"></div><span class="text-[11px] text-gray-400">周五</span></div>
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-400" style="height:88%"></div><span class="text-[11px] text-gray-400">周六</span></div>
+              <div class="flex flex-1 flex-col items-center justify-end gap-1"><div class="w-full rounded-t bg-primary-400" style="height:82%"></div><span class="text-[11px] text-gray-400">周日</span></div>
+            </div>
+          </div>
+          <div class="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <p class="mb-3 text-sm font-semibold text-gray-700">分功能使用占比</p>
+            <div class="space-y-2.5 text-sm">
+              <div><div class="mb-1 flex justify-between text-gray-700"><span>迎新系统</span><span class="tabular-nums text-gray-400">42%</span></div><div class="h-2.5 rounded-full bg-neutral-100"><div class="h-2.5 rounded-full bg-indigo-500" style="width:42%"></div></div></div>
+              <div><div class="mb-1 flex justify-between text-gray-700"><span>导流求职打印主业</span><span class="tabular-nums text-gray-400">28%</span></div><div class="h-2.5 rounded-full bg-neutral-100"><div class="h-2.5 rounded-full bg-indigo-500" style="width:28%"></div></div></div>
+              <div><div class="mb-1 flex justify-between text-gray-700"><span>行李帮运</span><span class="tabular-nums text-gray-400">18%</span></div><div class="h-2.5 rounded-full bg-neutral-100"><div class="h-2.5 rounded-full bg-indigo-500" style="width:18%"></div></div></div>
+              <div><div class="mb-1 flex justify-between text-gray-700"><span>校园全景</span><span class="tabular-nums text-gray-400">12%</span></div><div class="h-2.5 rounded-full bg-neutral-100"><div class="h-2.5 rounded-full bg-indigo-500" style="width:12%"></div></div></div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+</div>
+
+<style>
+  .sw{ display:inline-block; width:34px; height:18px; border-radius:9999px; position:relative; vertical-align:middle; }
+  .sw.on{ background:#2563eb; } .sw.off{ background:#cbd5e1; }
+  .sw::after{ content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:.15s; }
+  .sw.on::after{ transform:translateX(16px); }
+</style>
+
+<script>
+  const CRUMB = { terminals:'终端开关', orientation:'迎新内容', bigdata:'校园大数据', usage:'使用统计' };
+  function tab(id){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.getElementById('panel-'+id).classList.add('active');
+    document.querySelectorAll('.navtab').forEach(b=>{
+      const on = b.dataset.navtab===id;
+      b.classList.toggle('bg-neutral-800', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('text-neutral-300', !on);
+    });
+    document.getElementById('crumb').textContent = CRUMB[id];
+    document.querySelector('main').scrollTop = 0;
+    lucide.createIcons();
+  }
+  lucide.createIcons();
+  tab('terminals');
+</script>
+</body>
+</html>
