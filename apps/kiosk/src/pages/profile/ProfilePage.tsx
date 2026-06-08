@@ -172,6 +172,8 @@ function ProfileHeader({
   displayName,
   phoneMasked,
   stats,
+  statsLoading,
+  reserveBannerSpace,
   onLogin,
   onLogout,
   onShortcut,
@@ -179,18 +181,27 @@ function ProfileHeader({
   isLoggedIn: boolean
   displayName: string
   phoneMasked: string
+  // null = 账号资产尚未加载完成（展示「—」而非误导性的 0）
   stats: {
-    aiRecords: number
-    favorites: number
-    documents: number
+    aiRecords: number | null
+    favorites: number | null
+    documents: number | null
   }
+  statsLoading: boolean
+  // 下方是否会展示「本次服务记录」浮层卡：true 时预留底部空间承接 -mt-12 浮层，false 时收紧
+  reserveBannerSpace: boolean
   onLogin: () => void
   onLogout: () => void
   onShortcut: (message: string) => void
 }) {
   if (isLoggedIn) {
     return (
-      <section className="-mx-6 -mt-6 rounded-b-[28px] bg-gradient-to-br from-[#1677ff] via-[#1687ff] to-[#0f8cff] px-6 pb-16 pt-8 text-white shadow-sm">
+      <section
+        className={[
+          '-mx-6 -mt-6 rounded-b-[28px] bg-gradient-to-br from-[#1677ff] via-[#1687ff] to-[#0f8cff] px-6 pt-8 text-white shadow-sm',
+          reserveBannerSpace ? 'pb-16' : 'pb-8',
+        ].join(' ')}
+      >
         <div className="flex min-h-[44px] items-center justify-between">
           <h1 className="text-xl font-bold">我的主页</h1>
           <div className="flex items-center gap-2">
@@ -198,15 +209,15 @@ function ProfileHeader({
               type="button"
               onClick={() => onShortcut('账号设置建设中')}
               aria-label="账号设置"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
             >
-              <QrCodeIcon className="h-5 w-5" aria-hidden="true" />
+              <SettingsIcon className="h-5 w-5" aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={() => onShortcut('消息通知建设中')}
               aria-label="消息通知"
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
             >
               <BellIcon className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -247,9 +258,9 @@ function ProfileHeader({
 
         <div className="mt-6 rounded-2xl border border-white/18 bg-white/8 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
           <div className="grid grid-cols-3 divide-x divide-white/16 text-center">
-            <ProfileStat value={stats.aiRecords} label="AI记录" />
-            <ProfileStat value={stats.favorites} label="收藏记录" />
-            <ProfileStat value={stats.documents} label="文档记录" />
+            <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
+            <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
+            <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
           </div>
         </div>
       </section>
@@ -275,22 +286,28 @@ function ProfileHeader({
   )
 }
 
-function ProfileStat({ value, label }: { value: number; label: string }) {
+// value=null 表示账号资产尚未加载完成：展示「—」而非误导性的 0；loading 时轻微脉冲提示。
+function ProfileStat({ value, label, loading }: { value: number | null; label: string; loading: boolean }) {
+  const unloaded = value === null
   return (
-    <div className="px-2">
-      <p className="text-2xl font-bold leading-none">{value}</p>
+    <div className="px-2" aria-label={`${label}：${unloaded ? (loading ? '加载中' : '暂无数据') : value}`}>
+      <p
+        className={[
+          'text-2xl font-bold leading-none',
+          unloaded ? 'text-white/55' : '',
+          unloaded && loading ? 'motion-safe:animate-pulse' : '',
+        ].join(' ')}
+      >
+        {unloaded ? '—' : value}
+      </p>
       <p className="mt-2 text-xs font-semibold text-white/78">{label}</p>
     </div>
   )
 }
 
-function PendingTaskBanner({
-  hasTask,
-  onContinue,
-}: {
-  hasTask: boolean
-  onContinue: () => void
-}) {
+// 仅在「本次会话确有记录」时渲染（见调用处的 hasSessionRecords 门控）：
+// 不展示空横幅，避免无记录时被误认为有未完成任务。
+function PendingTaskBanner({ onContinue }: { onContinue: () => void }) {
   return (
     <section className="-mt-12 rounded-2xl border border-neutral-100 bg-white px-5 py-4 shadow-sm">
       <div className="flex items-center gap-3">
@@ -299,15 +316,12 @@ function PendingTaskBanner({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold text-gray-900">本次服务记录</h2>
-          <p className="mt-0.5 truncate text-xs text-gray-500">
-            {hasTask ? '本次服务产生的记录，可继续查看' : '暂无本次服务记录，完成简历或打印服务后在此查看'}
-          </p>
+          <p className="mt-0.5 truncate text-xs text-gray-500">本次服务产生的记录，可继续查看</p>
         </div>
         <button
           type="button"
           onClick={onContinue}
-          disabled={!hasTask}
-          className="flex min-h-[40px] shrink-0 items-center gap-1 rounded-full bg-primary-50 px-4 text-sm font-semibold text-primary-600 active:bg-primary-100 disabled:bg-gray-50 disabled:text-gray-300"
+          className="flex min-h-[44px] shrink-0 items-center gap-1 rounded-full bg-primary-50 px-4 text-sm font-semibold text-primary-600 active:bg-primary-100"
         >
           查看记录
           <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -617,10 +631,11 @@ export function ProfilePage() {
   const headerPhoneMasked = user?.phoneMasked ?? displayName
   // 头部统计只取真实账号资产计数（来自 /me/* API），不叠加本次会话记录，避免同一文件被双算；
   // 本次会话记录在下方「本次服务记录」单独展示。不展示「完整度」——无真实完整度计算，不编造数字。
+  // assets 为 null（加载中 / 未登录 / 加载失败）时取 null → 头部展示「—」，避免误显示 0。
   const headerStats = {
-    aiRecords: assets?.aiRecords.length ?? 0,
-    favorites: assets?.favorites.length ?? 0,
-    documents: assets?.documents.length ?? 0,
+    aiRecords: assets ? assets.aiRecords.length : null,
+    favorites: assets ? assets.favorites.length : null,
+    documents: assets ? assets.documents.length : null,
   }
 
   const loadAssets = useCallback(() => {
@@ -753,12 +768,14 @@ export function ProfilePage() {
         displayName={headerDisplayName}
         phoneMasked={headerPhoneMasked}
         stats={headerStats}
+        statsLoading={assetsLoading}
+        reserveBannerSpace={isLoggedIn && hasSessionRecords}
         onLogin={goLogin}
         onLogout={logout}
         onShortcut={setToastMsg}
       />
 
-      {isLoggedIn && <PendingTaskBanner hasTask={hasSessionRecords} onContinue={continuePendingTask} />}
+      {isLoggedIn && hasSessionRecords && <PendingTaskBanner onContinue={continuePendingTask} />}
 
       {/* 提示 toast */}
       {toastMsg && (
