@@ -161,6 +161,38 @@
 
 ---
 
+## 📐 智慧校园 产品规划（按终端开关的校园场景模块，2026-06-08，仅规划不开发）
+
+> 本节只做方向规划与开发路线沉淀。**当前无具体在谈 / 投标学校订单，仅落文档，不开发、不改任何业务代码。**
+> 多专家评审（产品 / 合规 / Kiosk-UX / 后端 / 业务可行性）结论沉淀；原型见 [docs/design/prototypes/smart-campus-demo.html](../design/prototypes/smart-campus-demo.html)。
+> 合规前置见 [compliance-boundary.md §九](../compliance/compliance-boundary.md)（**硬阻断：该章合入 main 前，校园大数据不得开发**）；功能范围见 [feature-scope.md §6.8](../product/feature-scope.md)；对接架构见 [smart-campus-integration-design.md](../product/smart-campus-integration-design.md)。
+
+### 定位与核心机制
+
+智慧校园 = 一体机「按部署场景变脸」的**渠道差异化能力**（不是新产品）。机器在校内由后台开启，搬离校园即关闭、前端模块整张消失（「出了校园就没有」）。开关**照抄 screensaver 按终端配置范式**（每终端 `enabled` + 免鉴权周期拉取 + 本地缓存），但缓存兜底**默认 OFF**（与 screensaver 反向），不确定状态一律不渲染。不新增底部 Tab。
+
+### 端架构决策（已拍板）
+
+- **不新建独立「学校端」app。**
+- **一期开关由我方运营在 admin 后台代配置**（当前单一 admin 角色即可；不需先建子账号 / 权限系统）。
+- 「子账号 + 细粒度权限」是 admin 独立能力（「权限管理」P1，给自己团队分工用），**非智慧校园前置**；当前 Prisma 无 Permission/Role/Menu 表。
+- **学校自助（如有）走 partner 后台 + `Organization.type='school_employment_center'`，按 `orgId` 隔离；不给学校开 admin 子账号**（admin 全局视角、菜单隐藏 ≠ 数据隔离）。
+
+### 推荐开发顺序（按真实学校订单触发，不预先开发）
+
+| 阶段 | 目标 | 主要范围 | 合规 / 前置 |
+|------|------|---------|------------|
+| **Phase 0（前置，blocker）** | 立合规红线 | [compliance-boundary.md §九](../compliance/compliance-boundary.md) 已合入 main（✅ 本次落地）；feature-scope §6.8 登记（✅）；确认是否有学校订单 | 无 §九不开工 |
+| **Phase 1（一期 MVP，约 1 PR）** | 跑通「按机器变脸」+ 1 轻入口 | `Terminal` 加 `orgId`（可空 + index）；新增 `TerminalSmartCampusConfig`（`enabled` 默认 false + 子开关 `modulesJson`）；免鉴权 `GET /terminals/:id/smart-campus`（白名单返回体，复用 `resolvePublicTerminalId`）+ admin 配置端点 `@Roles('admin')` + `writeAudit`；前端 HomePage MODULES 异步 append 智慧校园卡（OFF 不渲染）+ `/smart-campus` 服务中心页（2×2）+ 迎新 / 政策活动聚合轻入口（只读 + 外链）；行李 / 校园全景「即将上线」占位；Kiosk 开关链路 fork `useScreensaverController`（默认 OFF + 离开校园 pruneCache）；回归测试（OFF/断网/无 terminalId 不渲染；免鉴权端点不含 value） | 仅信息展示 + 外链；不采集个人信息 |
+| **Phase 2（按签约触发）** | 第三方外链子功能 + 学校自助（条件满足时） | 行李帮运 / 校园全景从占位切活态（仅第三方 `source_url` + `reviewStatus` 外链 / 扫码，admin 审核后展示，无支付闭环）；（仅 3+ 校签约且有日常内容运营需求时）开放 partner 后台写端点 + service 层 `terminal.orgId===user.orgId` 强制校验 + 越权 403 回归 + 审计；admin 批量指派终端归属运维入口 | §九 9.5/9.6/9.7 |
+| **Phase 3（带前置条件门控，未满足不开工）** | 校园大数据（受托处理者模式） | 前提：学校书面授权书 + DPA + §九已合入；新增 `CampusStatistic` 聚合指标表（metricKey/dimension/value/period/reviewStatus/orgId/terminalId）+ 学校端简单表单 / 汇总 Excel 录入（物理隔绝学生明细，不复用 Job 逐条字段映射）；录入与展示强制 k-匿名阈值；统计走鉴权端点或仅后台展示、禁进免鉴权口、禁接打印 / 导出；CSS 横向条 + 大数字看板（不引图表库），每图挂来源 + 口径说明条 | §九 9.2/9.3 全部红线 |
+
+### 子功能 ROI 提醒（业务专家）
+
+真正高频 / 变现的是**迎新引流 → 打印主业**与**就业季简历服务**；校园大数据是政绩 / 展示项（且是唯一合规硬阻断）；行李帮运 / 校园全景是标书加分项，只做第三方入口、零履约成本。优先级低于 Phase C 商业化主线与 Phase 9，**无订单不插队**。
+
+---
+
 ## 🧭 下一步候选（2026-06-06 阶段收口后）
 
 `main`（`6ac1ac4`）已确认为可开新功能的干净基线（核查见 [current-progress.md](./current-progress.md) §阶段收口基线核查）。三个候选方向，按需取一推进：
