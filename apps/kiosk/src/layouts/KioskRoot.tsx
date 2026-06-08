@@ -50,6 +50,9 @@ function KioskShell() {
     <KioskLayout
       activeTab={activeTab}
       onTabChange={(tab) => navigate(tabToPath(tab))}
+      // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
+      // 其余页面继续使用全局头部 + 设备状态徽标。
+      hideHeader={pathname === '/'}
       headerRight={<StatusBadge status={statusVariant} label={deviceStatus} />}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
