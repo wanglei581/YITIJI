@@ -96,6 +96,7 @@ export interface FairListItemDto {
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
   hasManagedData: boolean; managedCompanyCount: number; managedMaterialCount: number
   dataSourceNote: string
+  jobCount?: number; theme?: string
   // 详情/导航/预计（对齐 kiosk ExternalJobFairDTO；合规：均展示用，非实时）
   city?: string; address?: string; mapImageUrl?: string
   latitude?: number; longitude?: number; trafficInfo?: string
@@ -518,6 +519,8 @@ function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     managedCompanyCount: companyCount,
     managedMaterialCount: 0,
     dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${f.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    jobCount: f.jobCount,
+    theme: f.theme,
     city: f.city,
     address: f.address ?? undefined,
     mapImageUrl: f.mapImageUrl ?? undefined,

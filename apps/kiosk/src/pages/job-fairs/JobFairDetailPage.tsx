@@ -17,6 +17,7 @@ import {
   InfoIcon,
   MapIcon,
   MapPinIcon,
+  MonitorIcon,
   NavigationIcon,
   PrinterIcon,
   QrCodeIcon,
@@ -306,16 +307,6 @@ function DetailsTab({
   onNav: () => void
 }) {
   const navigate = useNavigate()
-  // 特色展区按城市分组
-  const grouped = useMemo(() => {
-    const map = new Map<string, FairZoneDTO[]>()
-    for (const z of featuredZones) {
-      const key = z.city || '特色展区'
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(z)
-    }
-    return [...map.entries()]
-  }, [featuredZones])
 
   return (
     <>
@@ -326,33 +317,26 @@ function DetailsTab({
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
         </div>
         <p className="mt-1 text-sm text-gray-500">主办方：{fair.organizer}</p>
-        <div className="mt-4 space-y-2 text-sm text-gray-700">
-          <div className="flex items-start gap-2">
-            <CalendarIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-            <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-gray-400">–</span>{formatDateTime(fair.endTime)}</span>
-          </div>
-          <div className="flex items-start gap-2">
-            <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-            <span>{fair.city ? `${fair.city} · ` : ''}{fair.venue}</span>
-          </div>
+        <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+          <CalendarIcon className="h-4 w-4 shrink-0 text-gray-400" />
+          <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-gray-400">–</span>{formatDateTime(fair.endTime)}</span>
         </div>
-        {/* 预计参会 / 参展企业（标注预计/已录入） */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-gray-50 p-3 text-center">
-            <p className="text-xl font-bold text-gray-900">
-              {fair.expectedAttendance != null ? fair.expectedAttendance.toLocaleString() : '—'}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-500">预计参会人数</p>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-3 text-center">
-            <p className="text-xl font-bold text-gray-900">
-              {fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? '—')}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-500">参展企业</p>
-          </div>
+        {/* 信息 pill 行（复刻参考图：地点 / 预计参会 / 参展企业） */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <MapPinIcon className="h-4 w-4 text-orange-500" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}
+          </span>
+          {fair.expectedAttendance != null && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              <UsersIcon className="h-4 w-4 text-primary-500" />预计参会 <b className="font-semibold">{fair.expectedAttendance.toLocaleString()}</b> 人
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <BuildingIcon className="h-4 w-4 text-emerald-500" />参展企业 <b className="font-semibold">{fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)}</b> 家
+          </span>
         </div>
         {fair.description && (
-          <p className="mt-4 text-sm leading-relaxed text-gray-600">{fair.description}</p>
+          <p className="mt-3 text-sm leading-relaxed text-gray-600">{fair.description}</p>
         )}
       </Card>
 
@@ -392,30 +376,26 @@ function DetailsTab({
         )}
       </Card>
 
-      {/* 各市区创新特色展区 */}
-      {grouped.length > 0 && (
+      {/* 各市区创新特色展区（复刻参考图：图标 + 城市角标 + 标题 + 描述） */}
+      {featuredZones.length > 0 && (
         <Card className="p-5">
           <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-gray-700">
             <SparklesIcon className="h-4 w-4 text-primary-500" />
-            创新特色展区
+            各市区创新特色展区
           </p>
-          <div className="space-y-3">
-            {grouped.map(([city, list]) => (
-              <div key={city}>
-                <span className="inline-block rounded-md bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
-                  {city}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {featuredZones.map((z) => (
+              <div key={z.id} className="relative rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-sm">
+                {z.city && (
+                  <span className="absolute right-3 top-3 text-xs font-medium text-primary-500">{z.city}</span>
+                )}
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
+                  <MonitorIcon className="h-5 w-5 text-primary-600" />
                 </span>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {list.map((z) => (
-                    <div key={z.id} className="rounded-xl border border-gray-100 bg-white p-3">
-                      <p className="text-sm font-semibold text-gray-900">{z.zoneName}</p>
-                      {z.industry && <p className="mt-0.5 text-xs text-primary-600">{z.industry}</p>}
-                      {z.description && (
-                        <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-gray-500">{z.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <p className="mt-3 pr-12 text-base font-semibold text-gray-900">{z.zoneName}</p>
+                {z.description && (
+                  <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{z.description}</p>
+                )}
               </div>
             ))}
           </div>

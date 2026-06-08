@@ -58,6 +58,10 @@ export interface ExternalJobFair extends ExternalJobSource {
   status: JobFairStatus
   description?: string
   boothCount?: number
+  /** 招聘岗位数（快照，卡片"N 个岗位"展示） */
+  jobCount?: number
+  /** 主题：general 综合 / campus 校园 / campus_corp 校企合作 / industry 行业专场 */
+  theme?: string
   // ── 招聘会详情/导航/预计（对齐 JobFair 表，均为展示用，非招聘闭环）──
   /** 城市（列表城市标签筛选） */
   city?: string
