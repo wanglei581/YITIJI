@@ -7,7 +7,7 @@
 //   - DTO      = API 响应类型（经过服务层处理和字段安全过滤）
 // ============================================================
 
-import type { ExternalJobFair } from './job'
+import type { ExternalJobFair, FairIntentSlice, FairIndustrySlice } from './job'
 
 // ──────────────────────────────────────────────────────────────
 // 枚举类型（canonical 定义，避免各端重复声明）
@@ -42,6 +42,8 @@ export interface ExternalJobFairDTO extends ExternalJobFair {
   managedMaterialCount: number
   /** 合规来源说明（必须展示） */
   dataSourceNote: string
+  /** 参展企业行业分布（按已录企业聚合，数据大屏柱状图） */
+  industryDistribution?: FairIndustrySlice[]
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -115,6 +117,12 @@ export interface FairZoneDTO {
   checkedInCount: number
   color?: string
   sortOrder: number
+  /** 展区类别：innovation 创新/特色展区 · service 现场服务 · campus_corp_topic 校企主题 */
+  category?: string
+  /** 城市/区（特色展区按地市分组，如「广州市」） */
+  city?: string
+  /** 特色展区封面图 URL */
+  coverImageUrl?: string
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -190,6 +198,16 @@ export interface FairLiveStatsDTO {
 
   zoneBreakdown: FairZoneBreakdown[]
   lastUpdated: string
+
+  // ── 数据大屏（合规：预计/来源数据，非实时）──
+  /** 预计参会人数（机构录入，标注"预计"） */
+  expectedAttendance?: number
+  /** 求职意向分布（机构录入预计值，饼图） */
+  seekerIntent: FairIntentSlice[]
+  /** 参展企业行业分布（按已录企业聚合，柱状图） */
+  industryDistribution: FairIndustrySlice[]
+  /** 数据来源标签（页面统一展示，如「预计/来源数据 · 非实时」） */
+  dataSourceLabel: string
 
   /** Phase 7 API 上线前为 true，前端据此展示 mock 数据提示 */
   isMockData: boolean
