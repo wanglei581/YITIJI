@@ -189,14 +189,13 @@ export class JobsController {
   }
 
   /**
-   * 招聘会统计。
-   * 模型限制:当前仅 JobFair 上有 companyCount / jobCount / viewCount 快照字段,
-   * 无独立统计/明细模型。此端点诚实返回 null;前端需要的总数走 /detail 或 /companies 的 total,
-   * 不在此处硬造统计假数据。
+   * 招聘会数据大屏统计。
+   * 合规：返回的规模/分布为「预计/来源数据」(机构录入 + 按已录企业/岗位聚合)，非实时；
+   * 系统真实服务数据(浏览量)如实返回，未落库计数器诚实置 0。招聘会未发布 → data:null。
    */
   @Get('job-fairs/:id/stats')
-  getFairStats(@Param('id') _id: string) {
-    return { data: null }
+  getFairStats(@Param('id') id: string) {
+    return this.jobsService.getFairStats(id)
   }
 
   // ── Admin(全部受 @Roles('admin') 保护)─────────────────────────────────────

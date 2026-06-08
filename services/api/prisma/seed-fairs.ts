@@ -37,6 +37,17 @@ const FAIR_2_END   = new Date('2026-06-17T17:00:00+08:00')
 const FAIR_3_START = new Date('2026-06-20T09:00:00+08:00')
 const FAIR_3_END   = new Date('2026-06-22T17:00:00+08:00')
 
+interface PositionSpec {
+  title: string
+  headcount: number
+  salary?: string
+  education?: string
+  experience?: string
+  location?: string
+  positionType?: 'full_time' | 'part_time' | 'intern'
+  department?: string
+}
+
 interface CompanySpec {
   name: string
   industry: string
@@ -44,6 +55,11 @@ interface CompanySpec {
   description: string
   hiringTags: string[]
   jobsCount: number
+  founded?: string
+  headquarters?: string
+  registeredCapital?: string
+  honorTags?: string[]
+  positions?: PositionSpec[]
 }
 
 interface ZoneSpec {
@@ -52,6 +68,47 @@ interface ZoneSpec {
   city?: string
   description: string
   sortOrder: number
+}
+
+interface SeekerIntentSlice { label: string; percent: number }
+
+// 按行业生成几个真实岗位（无显式 positions 的企业用），让数据大屏/岗位 tab 各场都有内容。
+const POS_BY_INDUSTRY: Record<string, Omit<PositionSpec, 'headcount'>[]> = {
+  internet: [
+    { title: '前端开发工程师', salary: '15-25K', education: '本科', positionType: 'full_time', department: '研发' },
+    { title: '后端开发工程师', salary: '18-30K', education: '本科', positionType: 'full_time', department: '研发' },
+    { title: '产品经理（校招）', salary: '15-22K', education: '本科', positionType: 'full_time', department: '产品' },
+  ],
+  ai: [
+    { title: '算法工程师', salary: '25-45K', education: '硕士', positionType: 'full_time', department: '算法' },
+    { title: 'AI 研究员', salary: '30-50K', education: '博士', positionType: 'full_time', department: '研究院' },
+    { title: '数据工程师', salary: '18-28K', education: '本科', positionType: 'full_time', department: '数据' },
+  ],
+  finance: [
+    { title: '柜面客户经理（校招）', salary: '面议', education: '本科', positionType: 'full_time', department: '零售' },
+    { title: '风控专员', salary: '12-18K', education: '本科', positionType: 'full_time', department: '风控' },
+    { title: '金融科技实习生', salary: '200/天', education: '本科在读', positionType: 'intern', department: '科技' },
+  ],
+  manufacturing: [
+    { title: '机械设计工程师', salary: '10-16K', education: '本科', positionType: 'full_time', department: '研发' },
+    { title: '质量管理工程师', salary: '12-18K', education: '本科', positionType: 'full_time', department: '质量' },
+  ],
+  consumer: [
+    { title: '硬件工程师', salary: '15-25K', education: '本科', positionType: 'full_time', department: '硬件' },
+    { title: '供应链管理', salary: '12-20K', education: '本科', positionType: 'full_time', department: '供应链' },
+  ],
+  service: [
+    { title: '门店储备干部', salary: '6-9K', education: '大专', positionType: 'full_time', department: '运营' },
+    { title: '运营专员', salary: '7-11K', education: '本科', positionType: 'full_time', department: '运营' },
+  ],
+}
+
+function resolvePositions(c: CompanySpec): PositionSpec[] {
+  if (c.positions && c.positions.length) return c.positions
+  const tpl = POS_BY_INDUSTRY[c.industry] ?? POS_BY_INDUSTRY.internet
+  // 按 jobsCount 平摊到模板岗位的 headcount
+  const per = Math.max(2, Math.round(c.jobsCount / tpl.length))
+  return tpl.map((p) => ({ ...p, headcount: per }))
 }
 
 async function upsertFair(args: {
@@ -68,9 +125,21 @@ async function upsertFair(args: {
   description: string
   coverImageUrl?: string
   mapImageUrl?: string
+  latitude?: number
+  longitude?: number
+  trafficInfo?: string
+  expectedAttendance?: number
+  seekerIntent?: SeekerIntentSlice[]
   companies: CompanySpec[]
   zones: ZoneSpec[]
 }): Promise<void> {
+  const navEstimate = {
+    latitude: args.latitude ?? null,
+    longitude: args.longitude ?? null,
+    trafficInfo: args.trafficInfo ?? null,
+    expectedAttendance: args.expectedAttendance ?? null,
+    seekerIntentJson: args.seekerIntent ? JSON.stringify(args.seekerIntent) : null,
+  }
   const fair = await prisma.jobFair.upsert({
     where: { sourceOrgId_externalId: { sourceOrgId: args.orgId, externalId: args.externalId } },
     update: {
@@ -83,6 +152,7 @@ async function upsertFair(args: {
       description: args.description,
       coverImageUrl: args.coverImageUrl,
       mapImageUrl: args.mapImageUrl,
+      ...navEstimate,
       companyCount: args.companies.length,
       jobCount: args.companies.reduce((sum, c) => sum + c.jobsCount, 0),
       reviewStatus: 'approved',
@@ -104,6 +174,7 @@ async function upsertFair(args: {
       description: args.description,
       coverImageUrl: args.coverImageUrl,
       mapImageUrl: args.mapImageUrl,
+      ...navEstimate,
       companyCount: args.companies.length,
       jobCount: args.companies.reduce((sum, c) => sum + c.jobsCount, 0),
       reviewStatus: 'approved',
@@ -118,6 +189,7 @@ async function upsertFair(args: {
   await prisma.fairZone.deleteMany({ where: { jobFairId: fair.id } })
 
   for (const c of args.companies) {
+    const positions = resolvePositions(c)
     await prisma.fairCompany.create({
       data: {
         jobFairId: fair.id,
@@ -126,8 +198,25 @@ async function upsertFair(args: {
         scale: c.scale,
         description: c.description,
         hiringTags: c.hiringTags.join(','),
+        honorTags: (c.honorTags ?? []).join(','),
+        founded: c.founded ?? null,
+        headquarters: c.headquarters ?? null,
+        registeredCapital: c.registeredCapital ?? null,
         jobsCount: c.jobsCount,
         sourceUrl: `https://example.com/companies/${encodeURIComponent(c.name)}`,
+        positions: {
+          create: positions.map((p, i) => ({
+            title: p.title,
+            headcount: p.headcount,
+            salary: p.salary ?? null,
+            education: p.education ?? null,
+            experience: p.experience ?? null,
+            location: p.location ?? args.city,
+            positionType: p.positionType ?? 'full_time',
+            department: p.department ?? null,
+            sortOrder: i,
+          })),
+        },
       },
     })
   }
@@ -163,6 +252,18 @@ async function main() {
     endAt: FAIR_1_END,
     venue: '某大学体育馆',
     city: '北京',
+    address: '北京市海淀区学院路 30 号 某大学体育馆',
+    latitude: 39.9911,
+    longitude: 116.3404,
+    trafficInfo: '地铁：8 号线/15 号线六道口站 A 口步行约 700 米。公交：392/438 路至学院路口站。自驾：东门访客停车场。',
+    expectedAttendance: 8600,
+    seekerIntent: [
+      { label: '研发技术类', percent: 46 },
+      { label: '产品运营类', percent: 19 },
+      { label: '市场销售类', percent: 16 },
+      { label: '设计艺术类', percent: 10 },
+      { label: '职能支持类', percent: 9 },
+    ],
     description: '面向 2026 届毕业生的春季校园双选会,涵盖互联网、金融、制造、消费等多个行业。',
     companies: [
       { name: '字节跳动', industry: 'internet', scale: '>2000', description: '互联网内容平台', hiringTags: ['校招', '应届'], jobsCount: 24 },
@@ -179,6 +280,10 @@ async function main() {
       { name: '上海展区', category: 'industry', city: '上海', description: '长三角金融科技岗位集中展区', sortOrder: 2 },
       { name: '深圳展区', category: 'industry', city: '深圳', description: '粤港澳大湾区互联网岗位展区', sortOrder: 3 },
       { name: '杭州展区', category: 'industry', city: '杭州', description: '电商/云计算岗位展区', sortOrder: 4 },
+      // 各区创新特色展区（详情「特色」区，按地市分组）
+      { name: '中关村科技创新', category: 'innovation', city: '海淀区', description: '人工智能、集成电路、生物医药的国家自主创新示范区核心区。', sortOrder: 5 },
+      { name: '商务与数字金融', category: 'innovation', city: '朝阳区', description: 'CBD 国际商务区，聚集跨国企业总部、数字金融与文化传媒。', sortOrder: 6 },
+      { name: '高端智能制造', category: 'innovation', city: '亦庄经开区', description: '集成电路、新能源汽车、机器人与高端装备制造基地。', sortOrder: 7 },
     ],
   })
 
@@ -194,6 +299,17 @@ async function main() {
     endAt: FAIR_2_END,
     venue: '某大学计算机学院报告厅',
     city: '北京',
+    address: '北京市海淀区中关村东路 95 号 计算机学院报告厅',
+    latitude: 39.9847,
+    longitude: 116.3186,
+    trafficInfo: '地铁：10 号线知春路站步行约 900 米。公交：运通 110 路至中关村东路站。',
+    expectedAttendance: 3200,
+    seekerIntent: [
+      { label: '算法研究类', percent: 48 },
+      { label: '工程开发类', percent: 30 },
+      { label: '数据类', percent: 14 },
+      { label: '产品类', percent: 8 },
+    ],
     description: '与 AI 产业领军企业共建的校企合作专场,提供产学研全链条岗位与课题。本场不代收简历,投递请前往各企业来源平台。',
     companies: [
       { name: '智谱 AI', industry: 'ai', scale: '500-2000', description: 'GLM 大模型研发,产学合作',  hiringTags: ['校招', '产学研', 'NLP'], jobsCount: 18 },
@@ -223,6 +339,17 @@ async function main() {
     endAt: FAIR_3_END,
     venue: '市国际会展中心 A 馆',
     city: '某市',
+    address: '某市经开区会展大道 1 号 国际会展中心 A 馆',
+    latitude: 36.0671,
+    longitude: 120.3826,
+    trafficInfo: '公交：会展专线至国际会展中心站。自驾：会展中心地面/地下停车场。',
+    expectedAttendance: 5400,
+    seekerIntent: [
+      { label: '生产制造类', percent: 38 },
+      { label: '市场销售类', percent: 24 },
+      { label: '职能支持类', percent: 20 },
+      { label: '金融服务类', percent: 18 },
+    ],
     description: '本场聚焦本地国企与民企岗位,覆盖制造、金融、服务三大领域。',
     companies: [
       { name: '本地装备制造集团',  industry: 'manufacturing', scale: '>2000', description: '装备制造与重工业', hiringTags: ['社招'],       jobsCount: 30 },

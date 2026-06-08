@@ -45,6 +45,20 @@ export interface Fair {
   updatedAt: string
 }
 
+export interface FairCompanyPosition {
+  id: string
+  title: string
+  headcount: number
+  salary: string | null
+  requirements: string | null
+  education: string | null
+  experience: string | null
+  location: string | null
+  positionType: string | null
+  department: string | null
+  sourceUrl: string | null
+}
+
 export interface FairCompany {
   id: string
   jobFairId: string
@@ -56,6 +70,15 @@ export interface FairCompany {
   sourceUrl: string | null
   hiringTags: string[]
   jobsCount: number
+  // 展示扩展字段（参展企业汇编 / 企业详情）
+  coverImageUrl: string | null
+  founded: string | null
+  headquarters: string | null
+  registeredCapital: string | null
+  honorTags: string[]
+  zoneId: string | null
+  boothNumber: string | null
+  positions: FairCompanyPosition[]
   createdAt: string
   updatedAt: string
 }

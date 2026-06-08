@@ -86,6 +86,9 @@ export interface JobListItemDto {
   dataSourceNote: string
 }
 
+export interface FairIntentSlice { label: string; percent: number }
+export interface FairIndustrySlice { label: string; count: number }
+
 export interface FairListItemDto {
   id: string; name: string; organizer: string
   startTime: string; endTime: string; venue: string; status: FairStatus
@@ -93,6 +96,25 @@ export interface FairListItemDto {
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
   hasManagedData: boolean; managedCompanyCount: number; managedMaterialCount: number
   dataSourceNote: string
+  // 详情/导航/预计（对齐 kiosk ExternalJobFairDTO；合规：均展示用，非实时）
+  city?: string; address?: string; mapImageUrl?: string
+  latitude?: number; longitude?: number; trafficInfo?: string
+  expectedAttendance?: number
+}
+
+/** 招聘会数据大屏统计（合规：预计/来源数据，非实时）。对齐 kiosk FairLiveStatsDTO。 */
+export interface FairStatsDto {
+  fairId: string; fairName: string
+  totalCompanies: number; checkedInCompanies: number
+  totalPositions: number; totalHeadcount: number
+  browseCount: number; scanCount: number; printCount: number; checkinCount: number
+  zoneBreakdown: { id: string; zoneName: string; boothCount: number; checkedInCount: number }[]
+  lastUpdated: string
+  expectedAttendance?: number
+  seekerIntent: FairIntentSlice[]
+  industryDistribution: FairIndustrySlice[]
+  dataSourceLabel: string
+  isMockData: boolean
 }
 
 export interface AdminJobDto {
@@ -443,6 +465,14 @@ interface PrismaJobFairRow {
   reviewedAt: Date | null
   rejectReason: string | null
   syncTime: Date
+  // 导航/预计列
+  latitude: number | null
+  longitude: number | null
+  trafficInfo: string | null
+  expectedAttendance: number | null
+  seekerIntentJson: string | null
+  // 关联计数（include _count 时存在）
+  _count?: { companies: number }
 }
 
 function deriveFairStatus(startAt: Date, endAt: Date, now = new Date()): FairStatus {
@@ -451,7 +481,24 @@ function deriveFairStatus(startAt: Date, endAt: Date, now = new Date()): FairSta
   return 'ongoing'
 }
 
+/** 安全解析 seekerIntentJson（机构录入的预计求职意向分布）。脏数据 → 空数组，不抛。 */
+function parseSeekerIntent(json: string | null): FairIntentSlice[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json) as unknown
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((x): x is { label: string; percent: number } =>
+        !!x && typeof (x as { label?: unknown }).label === 'string' &&
+        typeof (x as { percent?: unknown }).percent === 'number')
+      .map((x) => ({ label: x.label, percent: x.percent }))
+  } catch {
+    return []
+  }
+}
+
 function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
+  const companyCount = f._count?.companies ?? 0
   return {
     id: f.id,
     name: f.title,
@@ -467,10 +514,17 @@ function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     sourceName: f.sourceName,
     sourceUrl: f.sourceUrl,
     syncTime: fmtSyncTime(f.syncTime),
-    hasManagedData: false,
-    managedCompanyCount: 0,
+    hasManagedData: companyCount > 0,
+    managedCompanyCount: companyCount,
     managedMaterialCount: 0,
     dataSourceNote: `数据来源:${f.sourceName} · 同步于 ${f.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    city: f.city,
+    address: f.address ?? undefined,
+    mapImageUrl: f.mapImageUrl ?? undefined,
+    latitude: f.latitude ?? undefined,
+    longitude: f.longitude ?? undefined,
+    trafficInfo: f.trafficInfo ?? undefined,
+    expectedAttendance: f.expectedAttendance ?? undefined,
   }
 }
 
@@ -624,6 +678,7 @@ export class JobsService {
         orderBy: { startAt: 'asc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: { _count: { select: { companies: true } } },
       }),
       this.prisma.jobFair.count({ where }),
     ])
@@ -642,6 +697,7 @@ export class JobsService {
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
     const f = await this.prisma.jobFair.findFirst({
       where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      include: { _count: { select: { companies: true } } },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
   }
@@ -693,6 +749,7 @@ export class JobsService {
         orderBy: { jobsCount: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: { positions: { orderBy: { sortOrder: 'asc' } } },
       }),
       this.prisma.fairCompany.count({ where: { jobFairId: fairId } }),
     ])
@@ -708,6 +765,7 @@ export class JobsService {
     if (!fair) return { data: null }
     const company = await this.prisma.fairCompany.findFirst({
       where: { id: companyId, jobFairId: fairId },
+      include: { positions: { orderBy: { sortOrder: 'asc' } } },
     })
     return { data: company ? mapFairCompany(company) : null }
   }
@@ -740,7 +798,8 @@ export class JobsService {
     })
     if (!fair) return { data: null }
     const zones = await this.prisma.fairZone.findMany({
-      where: { jobFairId: fairId },
+      // 创新特色展区(category=innovation)不是展位区,不进展馆地图
+      where: { jobFairId: fairId, NOT: { category: 'innovation' } },
       orderBy: { sortOrder: 'asc' },
     })
     return {
@@ -749,6 +808,66 @@ export class JobsService {
         zones: zones.map(mapFairZone),
         // 模型限制:无 FairBooth 模型,展位坐标未录入 → 诚实空,不硬造
         booths: [],
+      },
+    }
+  }
+
+  /**
+   * 招聘会子资源 — 数据大屏统计。
+   *
+   * 合规：我们是第三方信息入口，无真实时数据。返回的规模/分布为
+   * 「预计 / 来源数据」(机构录入预计值 + 按已录企业/岗位聚合)，统一标注，非实时；
+   * 系统真实拥有的服务行为(浏览量)如实返回，其余计数器未落库则诚实置 0。
+   */
+  async getFairStats(fairId: string): Promise<{ data: FairStatsDto | null }> {
+    const fair = await this.prisma.jobFair.findFirst({
+      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      include: { companies: { include: { positions: true } } },
+    })
+    if (!fair) return { data: null }
+
+    const companies = fair.companies
+    const totalCompanies = companies.length
+    const totalPositions = companies.reduce((s, c) => s + c.positions.length, 0)
+    const totalHeadcount = companies.reduce(
+      (s, c) => s + c.positions.reduce((ps, p) => ps + (p.headcount ?? 0), 0),
+      0,
+    )
+
+    // 行业分布(按已录企业 industry 聚合;已知行业键映射为中文展示标签)
+    const INDUSTRY_LABEL: Record<string, string> = {
+      internet: '互联网/IT', ai: '人工智能', finance: '金融', manufacturing: '智能制造',
+      consumer: '消费电子', service: '生活服务', education: '教育', medical: '医疗健康',
+    }
+    const industryMap = new Map<string, number>()
+    for (const c of companies) {
+      const raw = c.industry?.trim() || '其他'
+      const key = INDUSTRY_LABEL[raw] ?? raw
+      industryMap.set(key, (industryMap.get(key) ?? 0) + 1)
+    }
+    const industryDistribution: FairIndustrySlice[] = [...industryMap.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+
+    return {
+      data: {
+        fairId: fair.id,
+        fairName: fair.title,
+        totalCompanies,
+        checkedInCompanies: 0, // 合规：不做现场签到
+        totalPositions,
+        totalHeadcount,
+        browseCount: fair.viewCount, // 系统真实服务数据
+        scanCount: 0,
+        printCount: 0,
+        checkinCount: 0,
+        zoneBreakdown: [], // 无展位计数模型 → 诚实空
+        lastUpdated: new Date().toISOString(),
+        expectedAttendance: fair.expectedAttendance ?? undefined,
+        seekerIntent: parseSeekerIntent(fair.seekerIntentJson),
+        industryDistribution,
+        dataSourceLabel: '预计 / 来源数据 · 非实时',
+        isMockData: false,
       },
     }
   }
