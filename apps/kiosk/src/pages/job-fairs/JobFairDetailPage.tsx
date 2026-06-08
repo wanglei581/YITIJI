@@ -9,11 +9,14 @@ import type {
 } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
+  BriefcaseIcon,
   BuildingIcon,
   CalendarIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   ExternalLinkIcon,
   FileTextIcon,
+  FilterIcon,
   InfoIcon,
   MapIcon,
   MapPinIcon,
@@ -29,7 +32,6 @@ import {
 import { getFairCompanies, getFairStats, getFairZones, getJobFairById } from '../../services/api'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
-import { COMPANY_SCALE_SHORT } from '../../types/fair'
 import { FairDataScreen } from './components/FairDataScreen'
 
 const STATUS_CONFIG = {
@@ -38,10 +40,35 @@ const STATUS_CONFIG = {
   ended:    { label: '已结束', bg: 'bg-gray-100', text: 'text-gray-400' },
 }
 
-const POSITION_TYPE_LABEL: Record<string, string> = {
-  full_time: '全职',
-  part_time: '兼职',
-  intern:    '实习',
+// 参展企业头像配色（按企业名 hash）
+const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-orange-500', 'bg-rose-500', 'bg-emerald-500', 'bg-cyan-600', 'bg-indigo-500', 'bg-slate-700']
+function avatarColor(s: string) {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+}
+
+// 行业键 → 中文标签（http 端为键，mock 端本就是中文）
+const INDUSTRY_LABEL: Record<string, string> = {
+  internet: '互联网', ai: '人工智能', finance: '金融', manufacturing: '智能制造',
+  consumer: '消费电子', service: '生活服务', education: '教育', medical: '医疗健康',
+}
+function industryLabel(s: string) {
+  return INDUSTRY_LABEL[s] ?? s
+}
+
+// 由岗位标题派生分类（参考图的研发类/产品类/设计类… 标签 + 筛选）
+const CAT_RULES: [RegExp, string][] = [
+  [/(测试|QA)/, '测试类'],
+  [/(硬件|电路)/, '硬件类'],
+  [/(产品经理|产品)/, '产品类'],
+  [/(设计|UI|视觉|动画|三维)/, '设计类'],
+  [/(运营|市场|销售|商务|推广|客户经理|柜)/, '运营类'],
+  [/(算法|开发|工程师|研发|架构|技术|数据|师)/, '研发类'],
+]
+function categoryOf(title: string) {
+  for (const [re, c] of CAT_RULES) if (re.test(title)) return c
+  return '职能类'
 }
 
 const TABS = ['详情与特色', '参展企业与岗位', '数据大屏'] as const
@@ -293,6 +320,32 @@ export function JobFairDetailPage() {
 
 // ─── Tab① 详情与特色 ─────────────────────────────────────────────────────────────
 
+// 高德静态地图 key（生产/合规优先）。未配置则回退 OSM 嵌入（演示用，无 key）。
+const AMAP_KEY = (import.meta.env as Record<string, string | undefined>).VITE_AMAP_KEY
+
+function MapBlock({ lat, lng, mapImageUrl, venue }: { lat?: number; lng?: number; mapImageUrl?: string; venue: string }) {
+  const cls = 'h-full min-h-[15rem] w-full'
+  if (mapImageUrl) {
+    return <img src={mapImageUrl} alt={`${venue}位置导览图`} className={`${cls} object-cover`} />
+  }
+  if (lat != null && lng != null) {
+    if (AMAP_KEY) {
+      const src = `https://restapi.amap.com/v3/staticmap?location=${lng},${lat}&zoom=15&size=750*400&scale=2&markers=mid,,A:${lng},${lat}&key=${AMAP_KEY}`
+      return <img src={src} alt={`${venue}地图`} className={`${cls} object-cover`} />
+    }
+    const d = 0.012
+    const bbox = `${(lng - d).toFixed(5)},${(lat - d * 0.62).toFixed(5)},${(lng + d).toFixed(5)},${(lat + d * 0.62).toFixed(5)}`
+    const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lng}`
+    return <iframe src={src} title={`${venue}位置地图`} className={`${cls} border-0`} loading="lazy" />
+  }
+  return (
+    <div className={`${cls} flex flex-col items-center justify-center gap-1.5 bg-gray-50 text-gray-400`}>
+      <MapPinIcon className="h-7 w-7" />
+      <span className="text-xs">暂无地图，可扫码在手机查看</span>
+    </div>
+  )
+}
+
 function DetailsTab({
   fair,
   sc,
@@ -310,91 +363,77 @@ function DetailsTab({
 
   return (
     <>
-      {/* 概览 */}
+      {/* 概览 + 地图（两栏：信息左 / 地图右，复刻参考图） */}
       <Card className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="flex-1 text-lg font-bold text-gray-900">{fair.name}</h2>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
-        </div>
-        <p className="mt-1 text-sm text-gray-500">主办方：{fair.organizer}</p>
-        <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-          <CalendarIcon className="h-4 w-4 shrink-0 text-gray-400" />
-          <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-gray-400">–</span>{formatDateTime(fair.endTime)}</span>
-        </div>
-        {/* 信息 pill 行（复刻参考图：地点 / 预计参会 / 参展企业） */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            <MapPinIcon className="h-4 w-4 text-orange-500" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}
-          </span>
-          {fair.expectedAttendance != null && (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-              <UsersIcon className="h-4 w-4 text-primary-500" />预计参会 <b className="font-semibold">{fair.expectedAttendance.toLocaleString()}</b> 人
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            <BuildingIcon className="h-4 w-4 text-emerald-500" />参展企业 <b className="font-semibold">{fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)}</b> 家
-          </span>
+        <div className="grid gap-5 lg:grid-cols-2">
+          {/* 左：信息 */}
+          <div className="flex flex-col">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="flex-1 text-xl font-bold text-gray-900">{fair.name}</h2>
+              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
+            </div>
+            <p className="mt-1 text-sm text-gray-500">主办方：{fair.organizer}</p>
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+              <CalendarIcon className="h-4 w-4 shrink-0 text-gray-400" />
+              <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-gray-400">–</span>{formatDateTime(fair.endTime)}</span>
+            </div>
+            {/* 信息 pill 行（地点 / 预计参会 / 参展企业） */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                <MapPinIcon className="h-4 w-4 text-orange-500" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}
+              </span>
+              {fair.expectedAttendance != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  <UsersIcon className="h-4 w-4 text-primary-500" />预计参会 <b className="font-semibold">{fair.expectedAttendance.toLocaleString()}</b> 人
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                <BuildingIcon className="h-4 w-4 text-emerald-500" />参展企业 <b className="font-semibold">{fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)}</b> 家
+              </span>
+            </div>
+            {/* 详细地址与交通指引（复刻参考图左栏） */}
+            <div className="mt-4">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <NavigationIcon className="h-4 w-4 text-primary-500" />详细地址与交通指引
+              </p>
+              {fair.address && <p className="mt-1.5 text-sm text-gray-600">{fair.address}</p>}
+              {fair.trafficInfo && <p className="mt-1 text-sm leading-relaxed text-gray-500">{fair.trafficInfo}</p>}
+            </div>
+            {navUrl && (
+              <Button size="md" variant="outline" className="mt-4 flex w-fit items-center justify-center gap-2" onClick={onNav}>
+                <NavigationIcon className="h-4 w-4" />扫码在手机上导航
+              </Button>
+            )}
+          </div>
+          {/* 右：地图 */}
+          <div className="overflow-hidden rounded-xl border border-gray-100">
+            <MapBlock lat={fair.latitude} lng={fair.longitude} mapImageUrl={fair.mapImageUrl} venue={fair.venue} />
+          </div>
         </div>
         {fair.description && (
-          <p className="mt-3 text-sm leading-relaxed text-gray-600">{fair.description}</p>
-        )}
-      </Card>
-
-      {/* 位置与导航 */}
-      <Card className="p-5">
-        <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-gray-700">
-          <MapPinIcon className="h-4 w-4 text-primary-500" />
-          位置与导航
-        </p>
-        <div className="overflow-hidden rounded-xl border border-gray-100">
-          {fair.mapImageUrl ? (
-            <img src={fair.mapImageUrl} alt="场馆位置导览图" className="h-40 w-full object-cover" />
-          ) : (
-            <div className="flex h-32 w-full flex-col items-center justify-center gap-1.5 bg-gray-50 text-gray-400">
-              <MapPinIcon className="h-7 w-7" />
-              <span className="text-xs">暂无导览图，可扫码在手机查看地图</span>
-            </div>
-          )}
-        </div>
-        {fair.address && (
-          <p className="mt-3 flex items-start gap-2 text-sm text-gray-700">
-            <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-            <span>{fair.address}</span>
-          </p>
-        )}
-        {fair.trafficInfo && (
-          <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2">
-            <p className="text-xs font-medium text-gray-500">交通指引</p>
-            <p className="mt-1 text-sm leading-relaxed text-gray-600">{fair.trafficInfo}</p>
-          </div>
-        )}
-        {navUrl && (
-          <Button size="md" variant="outline" className="mt-3 flex w-full items-center justify-center gap-2" onClick={onNav}>
-            <NavigationIcon className="h-4 w-4" />
-            扫码在手机上导航
-          </Button>
+          <p className="mt-4 border-t border-gray-100 pt-4 text-sm leading-relaxed text-gray-600">{fair.description}</p>
         )}
       </Card>
 
       {/* 各市区创新特色展区（复刻参考图：图标 + 城市角标 + 标题 + 描述） */}
       {featuredZones.length > 0 && (
         <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+          <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-gray-800">
             <SparklesIcon className="h-4 w-4 text-primary-500" />
             各市区创新特色展区
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {featuredZones.map((z) => (
-              <div key={z.id} className="relative rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-sm">
+              <div key={z.id} className="relative rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md">
                 {z.city && (
-                  <span className="absolute right-3 top-3 text-xs font-medium text-primary-500">{z.city}</span>
+                  <span className="absolute right-4 top-4 text-xs font-medium text-primary-500">{z.city}</span>
                 )}
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
-                  <MonitorIcon className="h-5 w-5 text-primary-600" />
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50">
+                  <MonitorIcon className="h-6 w-6 text-primary-600" />
                 </span>
                 <p className="mt-3 pr-12 text-base font-semibold text-gray-900">{z.zoneName}</p>
                 {z.description && (
-                  <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{z.description}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">{z.description}</p>
                 )}
               </div>
             ))}
@@ -464,31 +503,31 @@ function DetailsTab({
 
 function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCompanyDTO[] }) {
   const navigate = useNavigate()
-  const [typeFilter, setTypeFilter] = useState<string>('全部')
+  const [category, setCategory] = useState('全部分类')
+  const [catOpen, setCatOpen] = useState(false)
 
   const positions = useMemo(
     () =>
       companies.flatMap((c) =>
-        c.positions.map((p) => ({ ...p, companyName: c.companyName, companyId: c.id })),
+        c.positions.map((p) => ({
+          ...p,
+          companyName: c.companyName,
+          companyId: c.id,
+          category: categoryOf(p.title),
+        })),
       ),
     [companies],
   )
 
-  const types = useMemo(() => {
+  const categories = useMemo(() => {
     const set: string[] = []
-    for (const p of positions) {
-      const label = p.positionType ? POSITION_TYPE_LABEL[p.positionType] : null
-      if (label && !set.includes(label)) set.push(label)
-    }
-    return set
+    for (const p of positions) if (!set.includes(p.category)) set.push(p.category)
+    return ['全部分类', ...set]
   }, [positions])
 
   const visiblePositions = useMemo(
-    () =>
-      typeFilter === '全部'
-        ? positions
-        : positions.filter((p) => p.positionType && POSITION_TYPE_LABEL[p.positionType] === typeFilter),
-    [positions, typeFilter],
+    () => (category === '全部分类' ? positions : positions.filter((p) => p.category === category)),
+    [positions, category],
   )
 
   if (companies.length === 0) {
@@ -496,84 +535,87 @@ function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCo
   }
 
   return (
-    <>
-      {/* 参展企业汇编 */}
-      <div>
-        <p className="mb-2 flex items-center gap-1.5 text-sm font-medium text-gray-700">
-          <BuildingIcon className="h-4 w-4 text-primary-500" />
+    <div className="grid gap-4 lg:grid-cols-3">
+      {/* 左：参展企业汇编 */}
+      <Card className="p-5 lg:col-span-1">
+        <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-gray-800">
+          <BuildingIcon className="h-5 w-5 text-primary-500" />
           参展企业汇编
           <span className="ml-auto text-xs font-normal text-gray-400">{companies.length} 家</span>
         </p>
-        <div className="grid grid-cols-1 gap-2">
+        <div className="space-y-3">
           {companies.map((c) => (
             <button
               key={c.id}
               onClick={() => navigate(`/job-fairs/${fairId}/companies/${c.id}`)}
-              className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left transition-colors hover:bg-gray-50"
+              className="flex w-full items-start gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-sm font-bold text-primary-600">
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-bold text-white ${avatarColor(c.companyName)}`}>
                 {c.companyName.slice(0, 1)}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-gray-900">{c.companyName}</p>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-                  <span className="rounded bg-gray-100 px-1.5 py-0.5">{c.industry}</span>
-                  <span>{COMPANY_SCALE_SHORT[c.scale]}</span>
-                  <span>· {c.positions.length} 个岗位</span>
-                </div>
-                {c.description && <p className="mt-1 line-clamp-1 text-xs text-gray-400">{c.description}</p>}
+                <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{industryLabel(c.industry)}</span>
+                {c.description && <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-400">{c.description}</p>}
               </div>
-              <ChevronRightIcon className="mt-2 h-4 w-4 shrink-0 text-gray-300" />
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* 招聘岗位 */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-            <UsersIcon className="h-4 w-4 text-primary-500" />
+      {/* 右：招聘岗位 */}
+      <Card className="p-5 lg:col-span-2">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="flex items-center gap-1.5 text-base font-semibold text-gray-800">
+            <BriefcaseIcon className="h-5 w-5 text-emerald-500" />
             招聘岗位
+            <span className="ml-1 text-xs font-normal text-gray-400">{visiblePositions.length} 个</span>
           </p>
-          {types.length > 0 && (
-            <div className="flex gap-1.5">
-              {['全部', ...types].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTypeFilter(t)}
-                  className={[
-                    'rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                    typeFilter === t ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500',
-                  ].join(' ')}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 全部分类 下拉 */}
+          <div className="relative">
+            <button
+              onClick={() => setCatOpen((o) => !o)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            >
+              <FilterIcon className="h-3.5 w-3.5 text-gray-400" />
+              {category}
+              <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+            </button>
+            {catOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setCatOpen(false)} />
+                <div className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
+                  {categories.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => { setCategory(c); setCatOpen(false) }}
+                      className={[
+                        'block w-full px-3 py-2 text-left text-sm',
+                        category === c ? 'bg-primary-50 font-medium text-primary-700' : 'text-gray-600 hover:bg-gray-50',
+                      ].join(' ')}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-2">
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visiblePositions.map((p) => (
-            <div key={`${p.companyId}-${p.id}`} className="rounded-xl border border-gray-100 bg-white p-3">
+            <div key={`${p.companyId}-${p.id}`} className="rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-900">{p.title}</p>
-                {p.salary && <span className="shrink-0 text-sm font-semibold text-orange-600">{p.salary}</span>}
+                {p.salary && <span className="shrink-0 text-sm font-bold text-rose-500">{p.salary}</span>}
               </div>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-gray-500">
                 <BuildingIcon className="h-3.5 w-3.5 text-gray-400" />
                 {p.companyName}
               </p>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-400">
-                  {p.positionType && (
-                    <span className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">
-                      {POSITION_TYPE_LABEL[p.positionType]}
-                    </span>
-                  )}
-                  {p.education && <span>{p.education}</span>}
-                  {p.location && <span>· {p.location}</span>}
-                </div>
+              <div className="mt-3 flex items-center justify-between">
+                <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{p.category}</span>
                 <button
                   onClick={() => navigate(`/job-fairs/${fairId}/companies/${p.companyId}`)}
                   className="flex items-center gap-0.5 text-xs font-medium text-primary-600"
@@ -585,7 +627,7 @@ function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCo
             </div>
           ))}
         </div>
-      </div>
-    </>
+      </Card>
+    </div>
   )
 }

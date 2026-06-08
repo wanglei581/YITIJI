@@ -7,7 +7,6 @@ import {
   CalendarIcon,
   ChevronRightIcon,
   ClockIcon,
-  GraduationCapIcon,
   MapIcon,
   MapPinIcon,
   QrCodeIcon,
@@ -19,7 +18,7 @@ import {
 import { getJobFairs } from '../../services/api'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { FairCalendarPopover } from './components/FairCalendarPopover'
-import { RegionFilter } from './components/RegionFilter'
+import { RegionPicker } from './components/RegionPicker'
 import { matchesRegion, type RegionSelection } from '../../lib/regions'
 
 // 来源品牌渐变（按来源名 hash 取色，复刻参考图彩色大卡；class 为字面量，Tailwind 不 purge）
@@ -249,9 +248,9 @@ export function JobFairsPage() {
           actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
         />
 
-        {/* 搜索 + 日历小按钮 */}
-        <div className="mt-4 flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
+        {/* 搜索 */}
+        <div className="mt-4">
+          <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               value={query}
@@ -260,12 +259,12 @@ export function JobFairsPage() {
               className="h-12 w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:bg-white focus:outline-none"
             />
           </div>
-          <FairCalendarPopover fairs={fairs} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
         </div>
 
-        {/* 地区筛选（省 → 市 → 区） */}
-        <div className="mt-3">
-          <RegionFilter fairs={fairs} value={region} onChange={setRegion} />
+        {/* 地区筛选（全国省/市/区） + 日历小按钮 */}
+        <div className="mt-3 flex items-center gap-2">
+          <RegionPicker value={region} onChange={setRegion} />
+          <FairCalendarPopover fairs={fairs} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
         </div>
 
         {/* 状态筛选 */}
@@ -286,24 +285,6 @@ export function JobFairsPage() {
 
         {/* 步骤条 */}
         <div className="mt-3"><Stepper /></div>
-
-        {/* 校园招聘专区入口 */}
-        <button
-          type="button"
-          onClick={() => navigate('/campus')}
-          className="mt-3 flex w-full items-center justify-between gap-3 rounded-xl border border-cyan-200 bg-cyan-50/50 px-4 py-3 text-left transition-colors hover:bg-cyan-50"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-100">
-              <GraduationCapIcon className="h-5 w-5 text-cyan-700" />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-gray-900">校园招聘专区</p>
-              <p className="text-xs text-gray-500">应届校招 · 校园双选会 · 材料打印</p>
-            </div>
-          </div>
-          <ChevronRightIcon className="h-5 w-5 text-primary-500" />
-        </button>
       </div>
 
       <div className="mt-3 flex flex-1 flex-col overflow-y-auto px-6 pb-6">

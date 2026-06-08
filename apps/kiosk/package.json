@@ -13,6 +13,7 @@
   "dependencies": {
     "@ai-job-print/shared": "workspace:*",
     "@ai-job-print/ui": "workspace:*",
+    "china-division": "^2.7.0",
     "lucide-react": "^0.469.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
