@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@ai-job-print/ui'
 import { useComingSoonNotice } from '../../components/ComingSoonNotice'
@@ -24,6 +24,12 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type TabKey = 'policy' | 'social' | 'register' | 'notice'
+const VALID_TABS = new Set<TabKey>(['policy', 'social', 'register', 'notice'])
+
+function getInitialTab(searchParams: URLSearchParams): TabKey {
+  const tab = searchParams.get('tab')
+  return tab && VALID_TABS.has(tab as TabKey) ? (tab as TabKey) : 'policy'
+}
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -594,9 +600,13 @@ function PrintPackBanner() {
 
 export function RenshiPage() {
   const [searchParams] = useSearchParams()
-  const initialTab = (searchParams.get('tab') as TabKey | null) ?? 'policy'
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+  const [activeTab, setActiveTab] = useState<TabKey>(() => getInitialTab(searchParams))
   const { notify, overlay } = useComingSoonNotice()
+
+  // 同一路由内 search params 变化时同步首页深链 Tab，非法值回退「就业政策」。
+  useEffect(() => {
+    setActiveTab(getInitialTab(searchParams))
+  }, [searchParams])
 
   return (
     <div className="flex flex-col gap-6 p-6">

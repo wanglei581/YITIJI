@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
@@ -80,8 +80,12 @@ function uniqueSorted(values: (string | undefined)[]): string[] {
   return [...new Set(values.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, 'zh'))
 }
 
+// 首页岗位分类瓦片深链支持：/jobs?category=fulltime|intern|campus|parttime（值须在 TYPE_OPTIONS 内）。
+const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
+
 export function JobsPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { ids: favoriteSet, toggle: toggleFavorite } = useFavorites()
 
   // facet 集合：全量已发布岗位，用于构建筛选项 + 来源机构卡片（不随筛选变化）
@@ -98,9 +102,18 @@ export function JobsPage() {
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
   const [city, setCity] = useState('')
   const [industry, setIndustry] = useState('')
-  const [category, setCategory] = useState('')
+  const [category, setCategory] = useState(() => {
+    const c = searchParams.get('category')
+    return c && VALID_CATEGORIES.has(c) ? c : ''
+  })
   const [sourceOrgId, setSourceOrgId] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+
+  // 同一路由内 search params 变化时同步首页深链筛选，非法值回退「全部」。
+  useEffect(() => {
+    const c = searchParams.get('category')
+    setCategory(c && VALID_CATEGORIES.has(c) ? c : '')
+  }, [searchParams])
 
   // 关键词去抖（300ms）
   useEffect(() => {

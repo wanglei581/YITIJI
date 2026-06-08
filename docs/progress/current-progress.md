@@ -1,7 +1,33 @@
 # 当前开发进度
 
-> 最后更新：2026-06-07
+> 最后更新：2026-06-08
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## Kiosk 首页结构重构 + 首页定稿设计规范（2026-06-08，Claude，feature/kiosk-home-restructure）
+
+**背景：** 与产品确认参考"秒哒"的两级信息架构（大模块 → 子功能瓦片）、个人头部 + 数据概览，但**去掉其 AI 味**（摆拍 Hero / 毛玻璃浮卡 / 渐变按钮 / 营销标语），并修正秒哒越界内容（"求职平台 / 已投递 / 待面试 / 名企直达 / 智能匹配"）。一体机为**竖屏 9:16**。
+
+**沉淀设计规范（唯一依据）：**
+- 在 [docs/design/visual-design-spec.md](../design/visual-design-spec.md) 追加**锁定版 §15「Kiosk 首页定稿规范」**：顶栏（一体机名 + 状态栏 + 实时时间）、三态身份区、数据概览真实计数规则、两级模块 + 功能色（§14.2）、克制打底表皮、合规命名、触控/验收。冲突处覆盖 §14.6 探索方向。
+- 过程预览产物：[docs/design/ui-style-preview.html](../design/ui-style-preview.html)（非正式工程，仅用于评审定稿）。
+
+**首页落地（apps/kiosk）：**
+- 重写 [apps/kiosk/src/pages/home/HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx)：
+  - **移除**原深色 `HeroSection`（navy `#0B2A5B`）+ `DeviceStatusStrip`（与全局头部重复、偏 Hero 感）。
+  - **新增** `KioskTopBar`（自带）：左=「AI求职打印服务终端」，右=设备状态（中性，不写死"正常"）+ **实时时间**。
+  - **三态身份区**（复用 AuthContext：未登录/匿名/已登录）；已登录新增**数据概览**。
+  - **两级模块（只镜像真实功能，不臆造）**：子功能瓦片严格对照各服务中心页——AI简历服务镜像 `ResumeHomePage.ENTRIES`（诊断/优化/素材库/面试准备[即将上线]）、打印扫描镜像 `PrintScanHomePage.CAPABILITIES`（文档打印/材料扫描/照片打印/证件照·格式转换·签名盖章[即将上线]）、岗位镜像 `JobsPage.TYPE_OPTIONS`（全职/实习/校招/兼职，深链 `/jobs?category=`）、政策镜像 `RenshiPage` 四 Tab（深链 `/renshi?tab=`）；功能色按 §14.2（政策=amber）。
+  - **招聘会信息**本质是列表+状态筛选、无独立子功能 → 用**单行入口**（橙），不臆造子功能。
+  - **保留** 校园招聘专区 `/campus`、AI在青岛 `/qingdao`、AI助手 `/assistant` 入口。
+  - 配套：[JobsPage.tsx](../../apps/kiosk/src/pages/jobs/JobsPage.tsx) 新增 `?category=` 筛选（`useSearchParams`，值白名单校验，URL 变化同步）；[RenshiPage.tsx](../../apps/kiosk/src/pages/renshi/RenshiPage.tsx) 补齐 `?tab=` 白名单校验与 URL 变化同步。
+  - 表皮**克制打底**：白卡 + 1px 边框 + shadow-sm；功能色仅图标容器；hover 边框转功能色 + 微抬，按压回弹。
+- [apps/kiosk/src/layouts/KioskRoot.tsx](../../apps/kiosk/src/layouts/KioskRoot.tsx)：首页 `hideHeader`（首页自带顶栏），其余页面全局头部不变。
+
+**概览数字（合规强约束）：** 仅登录态凭本人 token 拉 `memberAssets`（简历/文档/AI记录）+ `memberFavorites`（收藏）**真实计数**；mock 模式返回 [] 即显示 0；加载中 `—`；**不使用任何占位假数**（如 3/12/27/8），不含"已投递/待面试/完整度"。
+
+**校验：** kiosk typecheck / lint（0 error，2 个 warning 为既有 KioskBusyContext，非本次引入）/ build 全部通过；`git diff --check` 通过；dev 服务器首页渲染正常。
 
 ---
 
