@@ -21,6 +21,7 @@
     "verify:ai-result-ownership": "node -r @swc-node/register scripts/verify-ai-result-ownership.ts",
     "verify:member-assets": "node -r @swc-node/register scripts/verify-member-assets.ts",
     "verify:member-favorites-benefits": "node -r @swc-node/register scripts/verify-member-favorites-benefits.ts",
+    "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",

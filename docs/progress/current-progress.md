@@ -1,7 +1,34 @@
 # 当前开发进度
 
-> 最后更新：2026-06-07
+> 最后更新：2026-06-08
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 会员「我的打印订单」只读列表 MVP（2026-06-08，Claude，`feature/member-print-orders-readonly`）
+
+**目标：** C-2C 后续小步 —— 让登录会员在「我的」页看到本人名下真实的打印订单（只读），不混入本次会话记录、不接支付、不造假订单。
+
+**Survey 结论（先查后写）：** `PrintTask` 可安全按会员归属查询 —— 有可空 `endUserId` 列 + `@@index([endUserId])`，且 Kiosk 提交打印时已凭会员 token 写入 `endUserId`（[print-jobs.service.ts](../../services/api/src/print-jobs/print-jobs.service.ts)）。匿名打印 `endUserId` 为 null，天然不归属任何会员。`pages` / `amount` / `paidStatus` / 设备名在 `PrintTask` 中**无真实列**（份数/黑白彩/A4 落在 `paramsJson`），故不返回、不编造。
+
+**改动范围：**
+
+| 文件 | 改动 |
+|------|------|
+| `packages/shared/src/types/memberPrintOrders.ts`（新增）+ `index.ts` | 新增只读类型 `MemberPrintOrderItem`（id/status/fileName/createdAt/completedAt/copies/colorMode/paperSize），并导出 |
+| `services/api/src/member-print-orders/`（新增模块） | `GET /api/v1/me/print-orders`：`@UseGuards(EndUserAuthGuard)`，service 只按本人 `endUserId` 查询，`select` 显式收口（连 fileUrl/fileMd5 都不从 DB 读出），`paramsJson` 按不可信源安全解析（损坏/缺字段/非法值→null），倒序返回 |
+| `services/api/src/app.module.ts` | 注册 `MemberPrintOrdersModule` |
+| `apps/kiosk/src/services/api/memberPrintOrders.ts`（新增） | `getMyPrintOrders(token)`，mock/未登录返回 `[]` |
+| `apps/kiosk/src/pages/profile/ProfilePage.tsx` | 账号资产新增「我的打印订单」分组（登录会员真实只读列表 / 诚实空态「暂无账号打印订单」）；九宫格「打印订单」入口改为指向账号资产（去掉误导的「本次记录」标签）；本次会话打印动作仍在「本次服务记录」单独呈现，不混为账号订单 |
+| `services/api/scripts/verify-member-print-orders.ts`（新增）+ `package.json` | `verify:member-print-orders`，6 组断言 ALL PASS |
+
+**合规边界：**
+
+- ✅ 只读安全元数据；**绝不返回** fileUrl（签名链接）/ fileMd5（SHA-256）/ paramsJson 原文 / errorCode/errorMessage / endUserId/terminalId / 支付字段。
+- ✅ 不新增支付 / 退款 / 套餐 / 活动 / 核销逻辑；空列表返回 `[]`，不伪造订单数量。
+- ✅ 跨用户隔离与匿名拒绝在 guard + service 双层保证；匿名 Kiosk 任务不出现在任何会员名下。
+
+**验证：** `verify:member-print-orders` 6 组断言 ALL PASS（本人可读+倒序 / 安全字段映射含脏 paramsJson 降级 / 跨用户隔离 / 空列表[] / 不返回敏感字段 / 鉴权 401×3+通过注入）；api typecheck+lint、kiosk typecheck+lint+build 全绿；`git diff --check` 无空白错误。kiosk lint 仅 `KioskBusyContext.tsx` 2 条既有 warning（非本次改动，0 error）。**待运行期手验**（真实 API + 会员短信验证码 + 浏览器：本人打印后在「我的打印订单」可见、游客不展示账号订单、空态文案正确）。
 
 ---
 

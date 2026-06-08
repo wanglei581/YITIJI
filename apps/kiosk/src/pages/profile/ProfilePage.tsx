@@ -9,6 +9,7 @@ import type {
   MemberBenefitItem,
   MemberDocumentItem,
   MemberFavoriteItem,
+  MemberPrintOrderItem,
   MemberResumeItem,
 } from '@ai-job-print/shared'
 import {
@@ -53,6 +54,7 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { fetchAccessUrl, getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyBenefits, getMyFavorites, removeFavorite } from '../../services/api/memberFavorites'
+import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 
 // 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
 // 诚实化与合规约束：
@@ -89,7 +91,7 @@ const ASSETS: Entry[] = [
   { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/resume' },
   { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', tag: '本次记录' },
   { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', tag: '本次记录' },
-  { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', tag: '本次记录' },
+  { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单' },
   { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏' },
   { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益' },
 ]
@@ -413,6 +415,30 @@ function aiStatusLabel(s: string): string {
   return AI_STATUS_LABEL[s] ?? s
 }
 
+// 打印订单状态文案（对齐后端 PrintTaskStatus：pending/claimed/printing/completed/failed/cancelled）。
+const PRINT_ORDER_STATUS_LABEL: Record<string, string> = {
+  pending: '排队中',
+  claimed: '已认领',
+  printing: '打印中',
+  completed: '已完成',
+  failed: '未完成',
+  cancelled: '已取消',
+}
+
+function printOrderStatusLabel(s: string): string {
+  return PRINT_ORDER_STATUS_LABEL[s] ?? s
+}
+
+// 打印订单副文本：份数 + 黑白/彩色 + 幅面（仅展示后端确有的安全字段，缺省则跳过，不编造页数/金额）。
+function printOrderMetaText(o: MemberPrintOrderItem): string {
+  const parts: string[] = [printOrderStatusLabel(o.status)]
+  if (o.copies != null) parts.push(`${o.copies} 份`)
+  if (o.colorMode) parts.push(o.colorMode === 'color' ? '彩色' : '黑白')
+  if (o.paperSize) parts.push(o.paperSize)
+  parts.push(formatTime(o.createdAt))
+  return parts.join(' · ')
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -623,6 +649,7 @@ export function ProfilePage() {
     aiRecords: MemberAiRecordItem[]
     favorites: MemberFavoriteItem[]
     benefits: MemberBenefitItem[]
+    printOrders: MemberPrintOrderItem[]
   } | null>(null)
   const [assetsLoading, setAssetsLoading] = useState(false)
   const [assetsError, setAssetsError] = useState(false)
@@ -649,9 +676,10 @@ export function ProfilePage() {
       getMyAiRecords(token),
       getMyFavorites(token),
       getMyBenefits(token),
+      getMyPrintOrders(token),
     ])
-      .then(([res, docs, ai, favorites, benefits]) =>
-        setAssets({ resumes: res, documents: docs, aiRecords: ai, favorites, benefits }),
+      .then(([res, docs, ai, favorites, benefits, printOrders]) =>
+        setAssets({ resumes: res, documents: docs, aiRecords: ai, favorites, benefits, printOrders }),
       )
       .catch(() => setAssetsError(true))
       .finally(() => setAssetsLoading(false))
@@ -751,6 +779,12 @@ export function ProfilePage() {
     // 收藏 / 权益已服务端化（Phase C-2C）：登录会员的真实列表在下方「账号资产」展示。
     if (entry.label === '我的收藏' || entry.label === '我的权益') {
       setToastMsg(isLoggedIn ? '见下方账号资产' : '登录后可查看本人收藏与权益')
+      return
+    }
+    // 打印订单已服务端化（Phase C-2C 后续小步）：登录会员的真实账号订单在下方「账号资产」展示；
+    // 本次会话的打印动作仍在「本次服务记录」单独呈现，不混为账号订单。
+    if (entry.label === '打印订单') {
+      setToastMsg(isLoggedIn ? '见下方账号资产' : '登录后可查看本人打印订单')
       return
     }
     if (entry.tag === '本次记录') {
@@ -864,6 +898,25 @@ export function ProfilePage() {
                       iconColor="text-violet-600"
                       name={`${a.kind === 'optimize' ? '简历优化' : '简历解析'} · ${aiStatusLabel(a.status)}`}
                       meta={`${formatTime(a.createdAt)}`}
+                    />
+                  ))}
+                </AssetGroup>
+
+                {/* 我的打印订单（Phase C-2C 后续小步）：会员名下打印任务，只读安全元数据；
+                    无文件原文 / 签名链接 / 哈希 / 支付字段。诚实空态：「暂无账号打印订单」 */}
+                <AssetGroup
+                  title="我的打印订单"
+                  count={assets?.printOrders.length ?? 0}
+                  empty="暂无账号打印订单"
+                >
+                  {assets?.printOrders.map((o) => (
+                    <AssetRow
+                      key={o.id}
+                      icon={PrinterIcon}
+                      iconBg="bg-amber-50"
+                      iconColor="text-amber-600"
+                      name={o.fileName || '打印任务'}
+                      meta={printOrderMetaText(o)}
                     />
                   ))}
                 </AssetGroup>
