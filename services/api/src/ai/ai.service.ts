@@ -169,20 +169,21 @@ export class AiService {
     const t0 = Date.now()
     try {
       const result = await this.provider.parseResume(input)
+      const resultWithProvider: ParseResumeOutput = { ...result, providerName: this.provider.name }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
       const isAnonymous = !endUserId
       const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
       const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
-      await this.persistResult(result.taskId, 'parse', result.status, result, endUserId ?? null, accessTokenHash)
+      await this.persistResult(resultWithProvider.taskId, 'parse', resultWithProvider.status, resultWithProvider, endUserId ?? null, accessTokenHash)
       this.logService.record({
-        taskId:    result.taskId,
+        taskId:    resultWithProvider.taskId,
         provider:  this.provider.name,
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
-        status:    result.status === 'failed' ? 'failed' : 'success',
+        status:    resultWithProvider.status === 'failed' ? 'failed' : 'success',
       })
-      return accessToken ? { ...result, accessToken } : result
+      return accessToken ? { ...resultWithProvider, accessToken } : resultWithProvider
     } catch (err) {
       this.logService.record({
         taskId:    `err-${Date.now()}`,

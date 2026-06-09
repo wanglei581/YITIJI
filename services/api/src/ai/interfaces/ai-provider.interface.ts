@@ -38,6 +38,8 @@ export interface ParseResumeInput {
 export interface ParseResumeOutput {
   taskId: string
   status: AiTaskStatus
+  /** 实际生成报告的 provider；用于前端诚实标记 mock / 真实 AI */
+  providerName?: AiProviderName
   report?: ResumeReport
   failReason?: string
   /**

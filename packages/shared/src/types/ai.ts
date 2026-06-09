@@ -80,6 +80,8 @@ export interface ResumeParseRequest {
 export interface ResumeParseResponse {
   taskId: string
   status: AiTaskStatus
+  /** 实际生成报告的 provider；mock 时前端必须明确标记为演示报告 */
+  providerName?: AiProviderName
   /** 解析成功时返回报告 */
   report?: ResumeReport
   /** 失败时返回原因 */

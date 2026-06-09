@@ -80,6 +80,7 @@ export const aiMockAdapter = {
     return {
       taskId: nextTaskId(),
       status: 'completed',
+      providerName: 'mock',
       report: MOCK_REPORT,
     }
   },
@@ -90,6 +91,7 @@ export const aiMockAdapter = {
     return {
       taskId,
       status: 'completed',
+      providerName: 'mock',
       report: MOCK_REPORT,
     }
   },

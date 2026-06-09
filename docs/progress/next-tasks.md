@@ -20,6 +20,23 @@
 
 ---
 
+## 📌 AI 简历诊断真实化后续（2026-06-09，Mavis）
+
+本轮已完成 Kiosk AI 简历诊断上传页 UI/UX 改造与 mock 诚实标记；但「真实有用的 AI 诊断报告」还需要后端能力继续接入，不能把 mock 当生产能力。
+
+**下一步必须补齐：**
+
+1. **真实文件文字提取 / OCR：**
+   - PDF：提取文本层；扫描版 PDF 需 OCR。
+   - DOC/DOCX：服务端解析正文，不在前端读取内容。
+   - 图片：OCR 识别简历文字。
+   - 所有原文只用于本次 AI 分析与短 TTL 结果，不长期保存。
+2. **真实 AI Provider 接入：** 当前 `openai/claude/qwen/zhipu/local` provider 仍是 stub；需选定一个真实 provider，服务端 env 保存密钥，输出结构化 `ResumeReport`。
+3. **报告结构扩展：** 在现有 `sections + suggestions` 基础上，若要做参考图中的「优势亮点 / 问题风险点 / 下一步建议」，需要扩展 shared 类型和后端结构化输出，不能前端硬编。
+4. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
+
+---
+
 ## 📌 Phase C-1 会员登录安全收口 + 首页登录状态栏（2026-06-07，Claude，已完成代码 + 静态/脚本/浏览器手验）
 
 详见 [current-progress.md](./current-progress.md) §Phase C-1。

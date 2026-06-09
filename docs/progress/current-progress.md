@@ -5,6 +5,45 @@
 
 ---
 
+## Kiosk AI 简历诊断上传页真实化改造（2026-06-09，Mavis）
+
+**目标：** 按用户提供的 AI 简历诊断参考图，把「AI简历服务 → AI简历诊断」入口改为文件上传优先的三段式体验：上传简历 → 诊断分析 → 查看报告。同时收紧诚实边界：不保留文本输入，不展示无法验证的模拟结论，不把 mock 报告伪装成真实 AI 结果。
+
+**改动范围：**
+- 重写 [apps/kiosk/src/pages/resume/ResumeSourcePage.tsx](../../apps/kiosk/src/pages/resume/ResumeSourcePage.tsx)：
+  - 页面标题改为「AI 简历诊断」，只保留文件上传路径，移除原「扫描纸质简历 / 从我的文档选择」作为诊断页主入口，不再出现文本输入。
+  - 上传方式改为横向双卡：`U盘上传` 与 `云端上传`。两者当前均通过系统文件选择器上传用户主动选择的本地文件；文案明确不保存云盘账号，U盘直达后续可由 Windows Agent 接管。
+  - 新增大面积虚线上传框「点击上传文件」，明确支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单文件最大 10MB。
+  - 诊断维度改为当前后端真实报告结构：基础信息完整度、教育经历完整度、实习/项目经历表达、技能关键词覆盖、排版可读性。
+  - 上传成功后留在当前页展示已选文件，再由用户点击「开始 AI 诊断」进入 `/resume/parse`，减少误触。
+- 调整 [apps/kiosk/src/pages/resume/ResumeParsePage.tsx](../../apps/kiosk/src/pages/resume/ResumeParsePage.tsx)：
+  - 进度页对齐参考图的「逐项诊断」视觉，但不显示虚假百分比；只展示读取文件、识别文字、提取结构、生成报告等真实阶段文案。
+- 调整 [apps/kiosk/src/pages/resume/ResumeReportPage.tsx](../../apps/kiosk/src/pages/resume/ResumeReportPage.tsx)：
+  - 增加报告边界提示：报告仅基于上传文件可解析内容生成，不发送企业，不代表录用/面试/投递结果。
+  - 删除原「打印报告」假链路（此前会构造一个并不存在的 `诊断报告_*.pdf`），改为「重新诊断」+「查看优化建议」。报告导出/打印须等真实 PDF 生成能力接入后再开放。
+  - 报告页在 `API_MODE !== http` 或后端 `providerName === mock` 时明确展示演示报告提示，避免把样例报告当真实 AI 报告。
+- 调整 AI 类型与后端响应：
+  - [packages/shared/src/types/ai.ts](../../packages/shared/src/types/ai.ts) 与 [services/api/src/ai/interfaces/ai-provider.interface.ts](../../services/api/src/ai/interfaces/ai-provider.interface.ts) 为 `ResumeParseResponse/ParseResumeOutput` 增加 `providerName?: AiProviderName`。
+  - [services/api/src/ai/ai.service.ts](../../services/api/src/ai/ai.service.ts) 在 parse 响应和持久化 payload 中写入实际 providerName。
+  - [apps/kiosk/src/services/api/aiMockAdapter.ts](../../apps/kiosk/src/services/api/aiMockAdapter.ts) 返回 `providerName: 'mock'`。
+
+**当前真实能力边界：**
+- ✅ 上传、文件安全、匿名 accessToken / 会员归属读取仍沿用既有真实链路。
+- ✅ 前端不再生成虚假报告文件，不再展示「超过多少人」「预计提升多少分」等无依据结论。
+- ✅ mock 报告会明确标记为演示；要得到真实有用报告，生产环境必须接入真实 AI Provider 与文件文字提取/OCR 能力。
+- ⏳ 真实 AI 简历诊断仍依赖后端后续能力：当前 `openai/claude/qwen/zhipu/local` provider 仍是 stub，且服务端尚未实现 PDF/DOCX/图片 OCR 内容提取；未接入前只能上传和走演示报告，不应对外宣称真实 AI 诊断已完成。
+
+**验证：**
+- `pnpm --filter @ai-job-print/shared typecheck` ✅
+- `pnpm --filter @ai-job-print/shared lint` ✅
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/api lint` ✅
+- `pnpm --filter @ai-job-print/kiosk typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk lint` ✅ 0 error；仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条（非本次引入）。
+- `pnpm --filter @ai-job-print/kiosk build` ✅ 通过；仅既有 chunk-size warning。
+
+---
+
 ## Kiosk 首页参考图风格改造（2026-06-09，Codex）
 
 **目标：** 按用户提供的首页 UI/UX 参考图，把 Kiosk 首页改为「顶部求职招聘会现场图 + 登录/匿名身份横条 + 六大业务分类卡片」结构，并把当前项目已有功能按分类放到对应区域。保留合规边界：岗位/招聘会只做第三方/官方来源信息入口，不做平台内投递或招聘闭环。

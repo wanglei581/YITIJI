@@ -15,11 +15,13 @@ import { saveAiResumeSession } from './aiResumeSession'
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
 
 const STEPS: { key: Step; label: string; duration: number }[] = [
-  { key: 'reading',    label: '读取文件', duration: 800 },
-  { key: 'ocr',       label: '识别文字', duration: 1500 },
-  { key: 'extracting',label: '提取结构', duration: 1200 },
-  { key: 'diagnosing',label: '生成诊断', duration: 1800 },
+  { key: 'reading',    label: '读取上传文件', duration: 800 },
+  { key: 'ocr',        label: '识别可解析文字', duration: 1500 },
+  { key: 'extracting', label: '提取简历结构', duration: 1200 },
+  { key: 'diagnosing', label: '生成诊断报告', duration: 1800 },
 ]
+
+const DIMENSIONS = ['基础信息完整度', '教育经历完整度', '实习/项目经历表达', '技能关键词覆盖', '排版可读性']
 
 const FAIL_REASONS = [
   '文件格式不支持，请重新上传',
@@ -72,7 +74,7 @@ export function ResumeParsePage() {
       // 供刷新 / 返回后读回本人结果（绝不持久化 report / 原文）。会员结果无 accessToken。
       saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
       navigate('/resume/report', {
-        state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, report: result.report },
+        state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, providerName: result.providerName, report: result.report },
       })
     } catch {
       if (cancelRef.current) return
@@ -136,11 +138,27 @@ export function ResumeParsePage() {
         {failed ? '解析出错' : 'AI 正在分析'}
       </h1>
       <p className="mt-2 text-base text-gray-500">
-        {failed ? '任务遇到问题，即将跳转…' : '请稍候，简历解析中…'}
+        {failed ? '任务遇到问题，即将跳转…' : '正在读取你上传的简历文件，请稍候…'}
       </p>
 
+      {!failed && (
+        <div className="mt-8 grid w-full max-w-3xl grid-cols-5 gap-3">
+          {DIMENSIONS.map((item, idx) => (
+            <div
+              key={item}
+              className={[
+                'rounded-2xl border px-3 py-3 text-center text-xs font-semibold transition-colors',
+                idx <= Math.min(currentIdx + 1, DIMENSIONS.length - 1) ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-400',
+              ].join(' ')}
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 步骤列表 */}
-      <div className="mt-12 w-full max-w-sm space-y-4">
+      <div className="mt-10 w-full max-w-sm space-y-4">
         {STEPS.map((step, idx) => {
           const done = idx < currentIdx
           const active = idx === currentIdx
