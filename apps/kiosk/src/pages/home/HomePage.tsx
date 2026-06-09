@@ -182,7 +182,7 @@ function IdentityPanel() {
     ]
 
     return (
-      <section className="-mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
+      <section className="relative z-10 -mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
         <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-blue-50 text-3xl font-bold text-blue-600 ring-4 ring-slate-100">
           {initial}
         </div>
@@ -212,7 +212,7 @@ function IdentityPanel() {
   }
 
   return (
-    <section className="-mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
+    <section className="relative z-10 -mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
       <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 ring-4 ring-slate-100">
         <UserCheckIcon className="h-14 w-14" aria-hidden="true" />
       </div>
