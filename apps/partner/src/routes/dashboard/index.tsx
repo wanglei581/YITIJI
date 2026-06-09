@@ -1,210 +1,237 @@
-import { Button, Card, StatusBadge } from '@ai-job-print/ui'
+import { useCallback, useEffect, useState, type ElementType, type ReactNode } from 'react'
+import { Button, Card, StatusBadge, LoadingState, ErrorState, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
-  AlertCircleIcon,
-  ArrowRightIcon,
-  BarChart2Icon,
-  BriefcaseIcon,
-  CalendarIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExternalLinkIcon,
-  MonitorIcon,
-  PrinterIcon,
-  RefreshCwIcon,
+  AlertCircleIcon, BriefcaseIcon, CalendarIcon, CheckCircleIcon, ClockIcon,
+  DatabaseIcon, RefreshCwIcon, XCircleIcon,
 } from 'lucide-react'
+import { getPartnerDashboard, type PartnerDashboard } from '../../services/api'
 
-// ─── Types & mock ─────────────────────────────────────────────────────────────
+// ─── 展示映射 ───────────────────────────────────────────────────────────────────
 
-interface MetricCard {
-  label: string
-  value: string | number
-  note: string
-  icon: React.ElementType
-  iconClass: string
+type Badge = 'success' | 'warning' | 'error' | 'info' | 'default'
+
+const REVIEW_MAP: Record<string, { badge: Badge; label: string }> = {
+  pending: { badge: 'warning', label: '待审核' },
+  reviewing: { badge: 'info', label: '审核中' },
+  approved: { badge: 'success', label: '已通过' },
+  rejected: { badge: 'error', label: '已拒绝' },
+}
+const PUBLISH_MAP: Record<string, { badge: Badge; label: string }> = {
+  draft: { badge: 'default', label: '草稿' },
+  published: { badge: 'success', label: '已发布' },
+  unpublished: { badge: 'default', label: '已下架' },
+  expired: { badge: 'default', label: '已过期' },
+}
+const SYNC_RESULT_MAP: Record<string, { badge: Badge; label: string }> = {
+  success: { badge: 'success', label: '成功' },
+  partial: { badge: 'warning', label: '部分失败' },
+  failed: { badge: 'error', label: '失败' },
+}
+const DATA_TYPE_LABELS: Record<string, string> = { job: '岗位', fair: '招聘会' }
+
+function reviewView(s: string) { return REVIEW_MAP[s] ?? { badge: 'default' as Badge, label: s } }
+function publishView(s: string) { return PUBLISH_MAP[s] ?? { badge: 'default' as Badge, label: s } }
+function syncView(s: string) { return SYNC_RESULT_MAP[s] ?? { badge: 'default' as Badge, label: s } }
+
+function fmtTime(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-interface SyncRecord {
-  source: string
-  type: '岗位' | '招聘会' | '政策'
-  result: '成功' | '失败' | '部分失败'
-  count: number
-  time: string
-}
-
-const METRICS: MetricCard[] = [
-  { label: '已上传岗位',   value: 28,   note: '已发布 24 条',     icon: BriefcaseIcon,  iconClass: 'bg-blue-50 text-blue-600' },
-  { label: '已上传招聘会', value: 5,    note: '进行中 1 场',       icon: CalendarIcon,   iconClass: 'bg-purple-50 text-purple-600' },
-  { label: '已发布数据',   value: 29,   note: '岗位 24 + 招聘会 5', icon: CheckCircleIcon,iconClass: 'bg-green-50 text-green-600' },
-  { label: '待审核数据',   value: 4,    note: '请及时跟进',        icon: ClockIcon,      iconClass: 'bg-orange-50 text-orange-500' },
-  { label: '外部跳转次数', value: 156,  note: '近 7 天',           icon: ExternalLinkIcon, iconClass: 'bg-cyan-50 text-cyan-600' },
-  { label: '终端展示次数', value: 842,  note: '近 7 天',           icon: MonitorIcon,    iconClass: 'bg-indigo-50 text-indigo-600' },
-  { label: '打印资料次数', value: 37,   note: '近 7 天',           icon: PrinterIcon,    iconClass: 'bg-teal-50 text-teal-600' },
-  { label: '数据统计',     value: '↑',  note: '查看完整报表',      icon: BarChart2Icon,  iconClass: 'bg-gray-100 text-gray-500' },
-]
-
-const RECENT_SYNCS: SyncRecord[] = [
-  { source: '市人才网 API',     type: '岗位',   result: '成功',    count: 12, time: '2026-05-25 08:00' },
-  { source: '市人才网 API',     type: '招聘会', result: '成功',    count: 2,  time: '2026-05-25 08:00' },
-  { source: '高校就业 Excel',   type: '岗位',   result: '部分失败', count: 8,  time: '2026-05-24 18:00' },
-  { source: '市人社局 Webhook', type: '招聘会', result: '成功',    count: 1,  time: '2026-05-24 12:00' },
-]
-
-const RESULT_CONFIG: Record<SyncRecord['result'], { color: string; badge: 'success' | 'error' | 'warning' }> = {
-  '成功':    { color: 'text-green-600', badge: 'success' },
-  '失败':    { color: 'text-red-500',   badge: 'error' },
-  '部分失败': { color: 'text-orange-500', badge: 'warning' },
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function PendingReviewCallout({ count }: { count: number }) {
-  if (count === 0) return null
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4">
-      <div className="flex items-center gap-3">
-        <AlertCircleIcon className="h-5 w-5 shrink-0 text-orange-500" aria-hidden="true" />
-        <div>
-          <p className="text-sm font-semibold text-orange-800">
-            有 {count} 条数据待管理员审核
-          </p>
-          <p className="mt-0.5 text-xs text-orange-600">
-            数据提交后需经管理员审核，通过后才会在终端展示
-          </p>
-        </div>
-      </div>
-      <Button variant="outline" size="sm" className="shrink-0 whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-100">
-        查看详情
-        <ArrowRightIcon className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-      </Button>
-    </div>
-  )
-}
-
-function MetricsGrid() {
-  return (
-    <section aria-label="数据概览">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
-        数据概览
-      </h2>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {METRICS.map((m) => {
-          const Icon = m.icon
-          return (
-            <Card key={m.label} className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-500">{m.label}</p>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-gray-900">{m.value}</p>
-                  <p className="mt-1 text-[10px] text-gray-400">{m.note}</p>
-                </div>
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${m.iconClass}`}>
-                  <Icon className="h-5 w-5" aria-hidden="true" />
-                </div>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function SyncLogSection() {
-  return (
-    <section aria-label="最近同步记录">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          最近同步记录
-        </h2>
-        <button
-          type="button"
-          className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700"
-        >
-          查看全部
-          <ArrowRightIcon className="h-3 w-3" aria-hidden="true" />
-        </button>
-      </div>
-
-      <Card className="overflow-hidden p-0">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-100 bg-gray-50">
-            <tr>
-              {['数据源', '类型', '本次同步', '结果', '同步时间', ''].map((h, i) => (
-                <th
-                  key={i}
-                  className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-gray-500"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {RECENT_SYNCS.map((s, i) => {
-              const cfg = RESULT_CONFIG[s.result]
-              return (
-                <tr key={i} className="transition-colors hover:bg-gray-50">
-                  <td className="px-5 py-3.5 font-medium text-gray-800">{s.source}</td>
-                  <td className="px-5 py-3.5">
-                    <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                      {s.type}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5 tabular-nums text-gray-700">
-                    {s.count} 条
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <StatusBadge status={cfg.badge} label={s.result} />
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-gray-400">
-                    {s.time}
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary-600 hover:text-primary-700"
-                    >
-                      详情
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-
-        <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-3">
-          <p className="text-xs text-gray-400">
-            上次成功同步：2026-05-25 08:00
-          </p>
-          <button
-            type="button"
-            disabled
-            title="手动同步写入端点未在工作台接入，已禁用"
-            className="flex cursor-not-allowed items-center gap-1.5 text-xs font-medium text-gray-300"
-          >
-            <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            立即同步
-          </button>
-        </div>
-      </Card>
-    </section>
-  )
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const pendingCount = 4
+  const [data, setData] = useState<PartnerDashboard | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      setData(await getPartnerDashboard())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载数据看板失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  if (loading) {
+    return <Page title="工作台" subtitle="合作机构数据概览"><LoadingState text="加载数据看板中…" className="py-16" /></Page>
+  }
+  if (error || !data) {
+    return (
+      <Page title="工作台" subtitle="合作机构数据概览">
+        <ErrorState title="加载数据看板失败" message={error ?? '未知错误'} onRetry={() => void load()} />
+      </Page>
+    )
+  }
+
+  const { org, stats, recentSyncLogs, recentJobs, recentJobFairs, updatedAt } = data
+  const isEmpty = stats.jobCount === 0 && stats.jobFairCount === 0 && stats.syncSourceCount === 0
+
+  const refreshBtn = (
+    <Button size="sm" variant="outline" className="flex items-center gap-1.5" onClick={() => void load()}>
+      <RefreshCwIcon className="h-4 w-4" />
+      刷新
+    </Button>
+  )
 
   return (
-    <Page title="工作台" subtitle="合作机构数据概览 · 市人才交流中心">
-      <div className="flex flex-col gap-6">
-        <PendingReviewCallout count={pendingCount} />
-        <MetricsGrid />
-        <SyncLogSection />
-      </div>
+    <Page title="工作台" subtitle={`合作机构数据概览 · ${org.name}`} actions={refreshBtn}>
+      <p className="mb-4 text-xs text-gray-400">
+        数据更新时间：{fmtTime(updatedAt)}
+        {stats.lastSyncTime && <span className="ml-3">最近同步：{fmtTime(stats.lastSyncTime)}</span>}
+      </p>
+
+      {isEmpty ? (
+        <EmptyState
+          icon={DatabaseIcon}
+          title="暂无数据"
+          description="配置数据源或提交岗位 / 招聘会信息后，统计会显示在这里。"
+        />
+      ) : (
+        <div className="flex flex-col gap-6">
+          {stats.pendingReviewCount > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4">
+              <AlertCircleIcon className="h-5 w-5 shrink-0 text-orange-500" />
+              <div>
+                <p className="text-sm font-semibold text-orange-800">有 {stats.pendingReviewCount} 条数据待管理员审核</p>
+                <p className="mt-0.5 text-xs text-orange-600">数据提交后需经管理员审核，通过后才会在终端展示</p>
+              </div>
+            </div>
+          )}
+
+          {/* 统计卡 */}
+          <section aria-label="数据概览">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">数据概览</h2>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+              <Metric label="岗位数量" value={stats.jobCount} icon={BriefcaseIcon} iconClass="bg-blue-50 text-blue-600" />
+              <Metric label="招聘会数量" value={stats.jobFairCount} icon={CalendarIcon} iconClass="bg-purple-50 text-purple-600" />
+              <Metric label="已发布" value={stats.publishedJobCount + stats.publishedFairCount} note={`岗位 ${stats.publishedJobCount} · 招聘会 ${stats.publishedFairCount}`} icon={CheckCircleIcon} iconClass="bg-green-50 text-green-600" />
+              <Metric label="待审核" value={stats.pendingReviewCount} icon={ClockIcon} iconClass="bg-orange-50 text-orange-500" />
+              <Metric label="已拒绝" value={stats.rejectedCount} icon={XCircleIcon} iconClass="bg-red-50 text-red-500" />
+              <Metric label="数据源" value={stats.syncSourceCount} icon={DatabaseIcon} iconClass="bg-cyan-50 text-cyan-600" />
+            </div>
+          </section>
+
+          {/* 最近同步记录 */}
+          <Section title="最近同步记录">
+            {recentSyncLogs.length === 0 ? (
+              <CardEmpty text="暂无同步记录" />
+            ) : (
+              <SimpleTable headers={['数据源', '类型', '本次同步', '结果', '同步时间']}>
+                {recentSyncLogs.map((s) => {
+                  const r = syncView(s.status)
+                  return (
+                    <tr key={s.id} className="hover:bg-gray-50">
+                      <td className="px-5 py-3 font-medium text-gray-800">{s.sourceName ?? '—'}</td>
+                      <td className="px-5 py-3"><Tag>{DATA_TYPE_LABELS[s.dataType] ?? s.dataType}</Tag></td>
+                      <td className="px-5 py-3 text-xs tabular-nums text-gray-600">成功 {s.successCount}{s.failCount > 0 && <span className="text-red-500"> · 失败 {s.failCount}</span>}</td>
+                      <td className="px-5 py-3"><StatusBadge status={r.badge} label={r.label} /></td>
+                      <td className="whitespace-nowrap px-5 py-3 text-xs tabular-nums text-gray-400">{fmtTime(s.createdAt)}</td>
+                    </tr>
+                  )
+                })}
+              </SimpleTable>
+            )}
+          </Section>
+
+          {/* 最近岗位 / 招聘会 */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Section title="最近岗位">
+              {recentJobs.length === 0 ? <CardEmpty text="暂无岗位数据" /> : (
+                <SimpleTable headers={['岗位', '来源', '审核', '发布']}>
+                  {recentJobs.map((j) => (
+                    <tr key={j.id} className="hover:bg-gray-50">
+                      <td className="max-w-[12rem] px-5 py-3 text-gray-800"><span className="line-clamp-1">{j.title}</span></td>
+                      <td className="px-5 py-3 text-xs text-gray-500">{j.sourceName ?? '—'}</td>
+                      <td className="px-5 py-3"><StatusBadge status={reviewView(j.reviewStatus).badge} label={reviewView(j.reviewStatus).label} /></td>
+                      <td className="px-5 py-3"><StatusBadge status={publishView(j.publishStatus).badge} label={publishView(j.publishStatus).label} /></td>
+                    </tr>
+                  ))}
+                </SimpleTable>
+              )}
+            </Section>
+            <Section title="最近招聘会">
+              {recentJobFairs.length === 0 ? <CardEmpty text="暂无招聘会数据" /> : (
+                <SimpleTable headers={['招聘会', '来源', '审核', '开始时间']}>
+                  {recentJobFairs.map((f) => (
+                    <tr key={f.id} className="hover:bg-gray-50">
+                      <td className="max-w-[12rem] px-5 py-3 text-gray-800"><span className="line-clamp-1">{f.title}</span></td>
+                      <td className="px-5 py-3 text-xs text-gray-500">{f.sourceName ?? '—'}</td>
+                      <td className="px-5 py-3"><StatusBadge status={reviewView(f.reviewStatus).badge} label={reviewView(f.reviewStatus).label} /></td>
+                      <td className="whitespace-nowrap px-5 py-3 text-xs tabular-nums text-gray-400">{fmtTime(f.startTime)}</td>
+                    </tr>
+                  ))}
+                </SimpleTable>
+              )}
+            </Section>
+          </div>
+        </div>
+      )}
+
+      <p className="mt-4 text-xs text-gray-400">
+        以上为本机构岗位 / 招聘会 / 数据源 / 同步的真实统计；不含访问量趋势等推测数据，仅展示真实计数。
+      </p>
     </Page>
   )
+}
+
+// ─── 小组件 ─────────────────────────────────────────────────────────────────────
+
+function Metric({ label, value, note, icon: Icon, iconClass }: { label: string; value: number; note?: string; icon: ElementType; iconClass: string }) {
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-gray-500">{label}</p>
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-gray-900">{value}</p>
+          {note && <p className="mt-1 text-[10px] text-gray-400">{note}</p>}
+        </div>
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title}>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">{title}</h2>
+      {children}
+    </section>
+  )
+}
+
+function SimpleTable({ headers, children }: { headers: string[]; children: ReactNode }) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="border-b border-gray-100 bg-gray-50">
+            <tr>{headers.map((h, i) => <th key={i} className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-gray-500">{h}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">{children}</tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+function CardEmpty({ text }: { text: string }) {
+  return <Card className="p-6"><p className="text-center text-xs text-gray-400">{text}</p></Card>
+}
+
+function Tag({ children }: { children: ReactNode }) {
+  return <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{children}</span>
 }

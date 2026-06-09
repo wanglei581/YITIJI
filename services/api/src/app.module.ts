@@ -17,6 +17,7 @@ import { MemberPrintOrdersModule } from './member-print-orders/member-print-orde
 import { AdminOrdersModule } from './admin-orders/admin-orders.module'
 import { AlertsModule } from './alerts/alerts.module'
 import { PartnerProfileModule } from './partner-profile/partner-profile.module'
+import { PartnerDashboardModule } from './partner-dashboard/partner-dashboard.module'
 import { MaterialsModule } from './materials/materials.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
@@ -70,6 +71,7 @@ const redisUrl = process.env['REDIS_URL']
     AdminOrdersModule,
     AlertsModule,
     PartnerProfileModule,
+    PartnerDashboardModule,
     MaterialsModule,
     AiModule,
     FilesModule,

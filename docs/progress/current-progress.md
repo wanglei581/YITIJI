@@ -5,6 +5,29 @@
 
 ---
 
+## Sprint 1 / Task 5：Partner Dashboard 真实化 + 统计卡片 UI/UX（2026-06-09，Mavis，全栈）
+
+> 分支：`feature/sprint1-partner-dashboard`（stacked 在 `feature/sprint1-partner-profile` 之上）。Sprint 1 收官任务。
+
+**目标：** `/partner/dashboard` 从 mock/硬编码统计切真实 API，展示**本机构**运营数据概览。是合作机构数据运营看板，**不是企业招聘端**。
+
+**后端（新建）：**
+- 新模块 `services/api/src/partner-dashboard/`（**Partner 鉴权** `@Roles('partner')`，orgId 强制取自 JWT，`PARTNER_ORG_REQUIRED` 守卫，partner 不能查其它机构数据）：`GET /api/v1/partner/dashboard`（只读，无审计）。
+- 统计全部 orgId-scoped 真实查询（Job/JobFair 用 `sourceOrgId`，JobSource/SyncLog 用 `orgId`）：jobCount / jobFairCount / publishedJob+Fair / pendingReviewCount（岗位+招聘会 pending）/ rejectedCount / syncSourceCount / lastSyncTime；recentSyncLogs（sourceName 解析、successCount=added+updated、failCount=error）/ recentJobs / recentJobFairs；updatedAt=快照计算时刻。
+- app.module 注册 `PartnerDashboardModule`。
+
+**前端（`apps/partner`）：**
+- 新增 [dashboard.ts](../../apps/partner/src/services/api/dashboard.ts)（http + mock 双 adapter）+ index 导出。
+- [dashboard/index.tsx](../../apps/partner/src/routes/dashboard/index.tsx) 重写：去 METRICS/RECENT_SYNCS 硬编码 → 真实 service；机构名 + 数据更新时间 + 最近同步时间 + 刷新按钮；6 张真实统计卡（岗位/招聘会/已发布/待审核/已拒绝/数据源）；最近同步记录、最近岗位、最近招聘会三张表；loading/error/**空态（"暂无数据，配置数据源或提交岗位/招聘会信息后显示"）**齐全。**删除原 mock 的「外部跳转/终端展示/打印次数（近7天）」等无数据来源的伪指标**，不展示假增长率/趋势/访问量。
+
+**数据边界（守住）：** 统计对象仅岗位/招聘会/数据源/同步日志/审核·发布状态；**绝不统计候选人/简历/投递/面试/Offer/企业筛选/收简历**；只看当前 orgId（验证含 orgB 隔离断言）。本轮 dashboard 只读，无 AuditLog、无主动同步动作。
+
+**验证：** `api typecheck/lint` ✅；新增 `verify:partner-dashboard` ✅（7 项：统计正确+orgId 隔离 / org 信息 / 最近列表 / **数据边界无伪造字段** / orgId 空→PARTNER_ORG_REQUIRED / org 不存在→PARTNER_PROFILE_NOT_FOUND）；回归 `verify:partner-profile`·`admin-alerts`·`admin-orders`·`order` ✅；`partner typecheck/lint/build` ✅。**浏览器实跑手验待办**。**未 commit。**
+
+> **Sprint 1 闭环达成**：Task 1 Order 落账 → Task 2 Admin Orders → Task 3 Admin Alerts → Task 4 Partner Profile → Task 5 Partner Dashboard，订单/告警/机构资料/机构看板全部由假页面转为真实运营能力（stacked 分支，均未 push）。下一步建议：Sprint 1 总审 + stacked 分支推送与 PR 策略。
+
+---
+
 ## Sprint 1 / Task 4：Partner Profile 可编辑 + 表单 UI/UX（2026-06-09，Mavis，全栈）
 
 > 分支：`feature/sprint1-partner-profile`（stacked 在 `feature/sprint1-admin-alerts` 之上）。
