@@ -35,6 +35,14 @@
 3. **报告结构扩展：** 在现有 `sections + suggestions` 基础上，若要做参考图中的「优势亮点 / 问题风险点 / 下一步建议」，需要扩展 shared 类型和后端结构化输出，不能前端硬编。
 4. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
 
+**📄 已沉淀技术方案（2026-06-09，Claude，仅方案不编码）：** [real-resume-diagnosis-phase1.md](../product/real-resume-diagnosis-phase1.md)
+
+- **审计结论**：地基已齐 —— Kiosk 上传产出真实 `fileId`，`FilesService.readContent(fileId)` 已能读 buffer，`AiResumeResult` 留存/过期/归属/匿名令牌就绪，前端 `providerName==='mock'` 已驱动演示横幅。简历 parse/optimize 走 `AI_PROVIDER`（除 `mock` 外全是 stub）；**助手对话**已能跑真实 LLM（`LlmConfigService` 加密凭证 + OpenAI 兼容），**简历诊断尚未复用**这套凭证。
+- **Phase 1 最小闭环**：①新增 `ResumeExtractionService`（`unpdf` 提 PDF 文本层 + `mammoth` 提 DOCX，纯 JS 零原生绑定，Node 26 安全）；②新增 `llm` provider，复用 `LlmConfigService` 凭证 + 新建 `LlmResumeService` 单轮结构化 JSON 调用（不引 SDK，用全局 `fetch`）；③提取/未配置失败返回明确 `failReason`，绝不伪造报告。`providerName!=='mock'` → 演示横幅自动消失（前端零改动）。
+- **明确决策**：**图片/扫描件 OCR 列二期**（`tesseract.js` WASM 重 + Node 26 风险，公共一体机宁可如实报错）；**报告结构 Phase 1 沿用 `sections + suggestions`**，strengths/issues/nextSteps 留 Phase 1.1；原文不落库、prompt 不入日志、`payloadJson` 不含原文全文、TTL/归属沿用现有机制。
+- **实施顺序**：1A 提取 service → 1B 真实 LLM provider → 1C verify 脚本(7 类断言)+安全断言 → 1D Kiosk 运行期手验 → 1E 报告结构扩展。
+- **待 review 决策**：provider 命名（`llm` vs 复用 stub）、optimize 是否进 Phase 1、文本截断上限、补 `AI_PROVIDER` 到 `.env.example`、扫描件「二期」文案。
+
 ---
 
 ## 📌 Phase C-1 会员登录安全收口 + 首页登录状态栏（2026-06-07，Claude，已完成代码 + 静态/脚本/浏览器手验）
