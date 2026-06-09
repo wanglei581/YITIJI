@@ -101,6 +101,8 @@ export interface FairCompanyDTO {
   headquarters?: string
   /** 注册资本 */
   registeredCapital?: string
+  /** AI 匹配度（机构录入的展示指标 0–100，仅展示不参与招聘闭环） */
+  aiMatchScore?: number
 }
 
 // ──────────────────────────────────────────────────────────────

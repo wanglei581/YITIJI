@@ -79,6 +79,15 @@ export interface ExternalJobFair extends ExternalJobSource {
   expectedAttendance?: number
   /** 预计求职意向分布（机构录入，数据大屏饼图） */
   seekerIntent?: FairIntentSlice[]
+  // ── 企业速览展示字段（机构/管理员录入，纯展示，后台可更新）──
+  /** 副标题（Hero 标语，如「智能招聘·职面未来」） */
+  tagline?: string
+  /** 现场服务清单（如 自助打印 / AI求职助手 / 导览地图） */
+  onsiteServices?: string[]
+  /** 入场方式说明（如「凭学生证或身份证免费入场」） */
+  admissionMethod?: string
+  /** AI 匹配率（机构录入的展示指标 0–100，仅展示不参与招聘闭环） */
+  aiMatchRate?: number
 }
 
 // ============================================================

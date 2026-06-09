@@ -54,6 +54,8 @@ export interface FairCompany {
   founded?: string
   headquarters?: string
   registeredCapital?: string
+  /** AI 匹配度（展示指标 0–100，仅展示不参与招聘闭环） */
+  aiMatchScore?: number
 }
 
 export interface FairZone {

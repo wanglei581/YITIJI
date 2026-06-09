@@ -101,6 +101,7 @@ function toCompanyDTO(company: FairCompany): FairCompanyDTO {
     founded:           company.founded,
     headquarters:      company.headquarters,
     registeredCapital: company.registeredCapital,
+    aiMatchScore:      company.aiMatchScore,
     applyNote:         '如需了解更多，请扫码前往来源平台',
   }
 }

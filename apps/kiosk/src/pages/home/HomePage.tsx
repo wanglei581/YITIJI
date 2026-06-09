@@ -3,7 +3,7 @@ import {
   BotIcon,
   BriefcaseIcon,
   Building2Icon,
-  CalendarIcon,
+  CalendarDaysIcon,
   ChevronRightIcon,
   ClipboardCheckIcon,
   ClockIcon,
@@ -306,12 +306,14 @@ const MODULES: ModuleDef[] = [
     ],
   },
   {
-    // 对照 RenshiPage 四个 Tab（深链 /renshi?tab=）
-    title: '政策服务',
+    // 人社专区：招聘会 / 校园招聘会 + RenshiPage 四个 Tab（深链 /renshi?tab=）
+    title: '人社专区',
     icon: LandmarkIcon,
     route: '/renshi',
     color: { bg: 'bg-amber-50', fg: 'text-amber-600', hover: 'hover:border-amber-300' },
     tiles: [
+      { label: '招聘会',   icon: CalendarDaysIcon, to: '/job-fairs' },
+      { label: '校园招聘会', icon: GraduationCapIcon, to: '/campus' },
       { label: '就业政策', icon: LandmarkIcon, to: '/renshi?tab=policy' },
       { label: '社保指南', icon: ShieldCheckIcon, to: '/renshi?tab=social' },
       { label: '就业登记', icon: ClipboardCheckIcon, to: '/renshi?tab=register' },
@@ -424,27 +426,10 @@ export function HomePage() {
           <ModuleCard key={m.title} module={m} />
         ))}
 
-        {/* 招聘会信息：列表 + 状态筛选，无独立子功能 → 单行入口（不臆造子功能，§15.5） */}
-        <EntryBar
-          icon={CalendarIcon}
-          iconBg="bg-orange-50"
-          iconColor="text-orange-600"
-          title="招聘会信息"
-          description="现场招聘会信息、状态与现场导览"
-          actionLabel="查看招聘会"
-          onAction={() => navigate('/job-fairs')}
-        />
+        {/* 招聘会、校园招聘会已固定收纳进「人社专区」（RenshiPage 顶部入口卡），
+            首页不再单独放，避免入口位置反复变动。 */}
 
         {/* 附加专区（保留既有入口） */}
-        <EntryBar
-          icon={GraduationCapIcon}
-          iconBg="bg-cyan-50"
-          iconColor="text-cyan-700"
-          title="校园招聘专区"
-          description="应届校招岗位 · 校园双选会 · 简历与材料"
-          actionLabel="进入专区"
-          onAction={() => navigate('/campus')}
-        />
         <EntryBar
           icon={MapPinIcon}
           iconBg="bg-teal-50"
