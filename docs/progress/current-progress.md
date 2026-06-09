@@ -5,6 +5,26 @@
 
 ---
 
+## Sprint 1 / Task 1：Order 模型 + 打印链路落账（2026-06-09，Mavis 拍板，后端）
+
+> 分支：`feature/sprint1-order-model`（从 main 切出，独立承载）。
+
+**背景：** Sprint 1 第一项是「Admin 订单管理真实化」。盘点确认 `PrintTask` 无 amount/payStatus，且 [member-print-orders.service.ts](../../services/api/src/member-print-orders/member-print-orders.service.ts) 已明确「不编造金额、不接支付」。故需引入承载金额/支付状态的 `Order` 业务层，与设备任务层 `PrintTask` 解耦，为后续 Admin Orders 提供真实数据。本轮只做后端，不动 Admin/Partner 页面、不改 Kiosk 前端。
+
+**金额取值决策（Mavis 拍板）：** 后端在「不改 Kiosk 前端调用方式」前提下拿不到可靠 pageCount，**本轮 `amountCents` 恒为 0（未计费）、`payStatus='unpaid'`**，绝不用 pageCount=1 伪造误导性金额；不接真实支付。新建后端单价常量模块作为未来计费唯一真相源（黑白 20 分 / 彩色 50 分），本轮仅预留不计算，代码内留 `TODO: calculate amountCents after reliable page count / quote flow is connected`。
+
+**处理：**
+- Prisma 新增 `Order` 模型 + `PrintTask.order` 反向关系；migration `prisma/migrations/20260609120000_add_order/`（additive CREATE TABLE）。因 dev.db 历史 migration drift，沿用既有约定经 `prisma db execute --file` 非破坏性注入 dev.db，不跑 `migrate reset`。`PrismaService` 暴露 `order` delegate。
+- 新增 [print-pricing.ts](../../services/api/src/print-jobs/print-pricing.ts)：`PRINT_UNIT_PRICE_CENTS = { black_white: 20, color: 50 }`（未来真相源，本轮不参与计算）。
+- [print-jobs.service.ts](../../services/api/src/print-jobs/print-jobs.service.ts) `create()`：把 `printTask.create` + `order.create` 包进 `$transaction`，保证「有打印任务必有对应订单」同成功/同回滚。Order 字段：`type='print' / amountCents=0 / payStatus='unpaid' / taskStatus` 镜像 PrintTask 初始 `pending` / `orderNo=ORD-YYYYMMDD-XXXXXX` / `endUserId` 透传。`print_job.create` 审计 payload 附 `orderId/orderNo`。
+- [terminals.service.ts](../../services/api/src/terminals/terminals.service.ts) 三个状态写入点镜像 `Order.taskStatus`（真相源仍是 PrintTask）：`claimTasks`（→claimed 并回填 `Order.terminalId`）、`patchTaskStatus`（→printing/completed/failed，事务内）、`resetExpiredClaims`（超时回收→pending，先取 id 再精确镜像）。均用 `order.updateMany`，无对应订单则 0 行，对 seed 等无单任务零副作用。
+
+**合规边界：** Order 是线下打印运营订单，不涉招聘闭环/简历投递；本轮不接真实支付、不引第三方支付 SDK、未建 PaymentAttempt/Refund 表；`amountCents=0` 是当前最诚实状态。
+
+**验证：** `pnpm --filter @ai-job-print/api typecheck` ✅、`lint` ✅；新增 `pnpm --filter @ai-job-print/api verify:order` ✅（8 项全 PASS：创建落账 / 会员归属 / 打印链路契约不变 / claim·patch·reset 三处状态镜像 / 无单任务非干扰 / 单价常量）；回归 `verify:member-print-orders` ✅；dev.db Order 表测试后 0 残留。
+
+---
+
 ## Kiosk 移除「AI 简历服务中心」中间页（导航结构收口，2026-06-09，Claude）
 
 **背景：** 首页 AI 简历服务区域的功能瓦片已直达各功能（上一轮首页改造），但仍保留 `/resume`「AI 简历服务中心」中间页，造成「点瓦片 → 进服务中心 → 再选一次功能」的二次选择。本轮做纯导航结构收口：删除中间页，所有入口直达真实功能。**不新增真实 AI/OCR 能力，不新增 mock，不改合规边界，不把未上线功能改成可点。**

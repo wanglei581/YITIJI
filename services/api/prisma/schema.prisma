@@ -53,6 +53,7 @@ model PrintTask {
   updatedAt    DateTime  @updatedAt
 
   statusLogs PrintTaskStatusLog[]
+  order      Order?
 
   @@index([endUserId])
 }
@@ -80,6 +81,52 @@ model PrintTaskStatusLog {
   toStatus   String
   errorCode  String?
   createdAt  DateTime  @default(now())
+}
+
+// ── Order ───────────────────────────────────────────────────────────────────
+// Sprint 1 / Task 1：打印运营订单。承载 PrintTask 无法承载的"金额 / 支付状态"
+// 业务层，与设备任务层(PrintTask)解耦。
+//
+// 合规与产品边界(CLAUDE.md §2/§10/§12)：
+//   - 这是**线下打印运营订单**,不是招聘业务,不涉及任何招聘闭环/简历投递。
+//   - 本阶段**不接真实支付**:payStatus 默认 'unpaid',amountCents 默认 0。
+//     amountCents=0 是当前最诚实状态——后端拿不到可靠页数,绝不用 pageCount=1 伪造金额。
+//     单价真相源见 src/print-jobs/print-pricing.ts;真实计费待页数/报价流程接通后再算。
+//   - taskStatus 镜像 PrintTask.status,便于 Admin 订单页一屏读全(真相源仍是 PrintTask)。
+//
+// type:       'print'(Sprint 1 只做打印订单)| 'scan' | 'photo' | 'ai'(后续预留)
+// payStatus:  'unpaid' | 'paid' | 'refunded' | 'failed'(Sprint 1 默认 unpaid,不接支付)
+// taskStatus: 同 PrintTaskStatus:'pending' | 'claimed' | 'printing' | 'completed' | 'failed' | 'cancelled'
+model Order {
+  id           String     @id @default(cuid())
+  orderNo      String     @unique
+  type         String     @default("print")
+
+  printTaskId  String?    @unique
+  printTask    PrintTask? @relation(fields: [printTaskId], references: [id])
+
+  endUserId    String?
+  terminalId   String?
+
+  // 整数「分」存储,绝不用浮点。Sprint 1 恒为 0(未计费),不接真实支付。
+  amountCents  Int        @default(0)
+  currency     String     @default("CNY")
+
+  payStatus    String     @default("unpaid")
+  taskStatus   String     @default("pending")
+
+  refundReason String?
+  refundedAt   DateTime?
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([type])
+  @@index([payStatus])
+  @@index([taskStatus])
+  @@index([endUserId])
+  @@index([terminalId])
+  @@index([createdAt])
 }
 
 // ── Organization ──────────────────────────────────────────────────────────────

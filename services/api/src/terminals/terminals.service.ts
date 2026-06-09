@@ -345,7 +345,7 @@ export class TerminalsService implements OnModuleInit {
         // status guard in WHERE prevents double-claim under concurrent requests
         // (PostgreSQL READ COMMITTED: two transactions could both see the same
         // pending task in findFirst; the guard ensures only one update wins)
-        return tx.printTask.update({
+        const updatedTask = await tx.printTask.update({
           where: { id: task.id, status: 'pending' },
           data: {
             status: 'claimed',
@@ -354,6 +354,13 @@ export class TerminalsService implements OnModuleInit {
             claimExpiry,
           },
         })
+        // Sprint 1：镜像订单 taskStatus 并回填下单终端（创建时 terminalId 未知）。
+        // updateMany 按 printTaskId 精确匹配，无对应订单（如 seed 任务）则 0 行，安全无副作用。
+        await tx.order.updateMany({
+          where: { printTaskId: task.id },
+          data: { taskStatus: 'claimed', terminalId },
+        })
+        return updatedTask
       })
 
       if (!claimed) break
@@ -455,6 +462,12 @@ export class TerminalsService implements OnModuleInit {
             errorCode: dto.errorCode ?? null,
           },
         })
+        // Sprint 1：镜像订单 taskStatus 到与 PrintTask 一致（真相源仍是 PrintTask）。
+        // 无对应订单则 0 行，安全。
+        await tx.order.updateMany({
+          where: { printTaskId: taskId },
+          data: { taskStatus: dto.status },
+        })
       }
     })
 
@@ -507,6 +520,11 @@ export class TerminalsService implements OnModuleInit {
   private async resetExpiredClaims(): Promise<void> {
     const now = new Date()
 
+    // Sprint 1：先取出将被回收的任务 id，以便随后精确把对应订单镜像回 pending。
+    const expiredClaimed = await this.prisma.printTask.findMany({
+      where: { status: 'claimed', claimExpiry: { lt: now } },
+      select: { id: true },
+    })
     // Reset claimed tasks whose lease has expired
     const claimedCount = await this.prisma.printTask.updateMany({
       where: { status: 'claimed', claimExpiry: { lt: now } },
@@ -517,10 +535,24 @@ export class TerminalsService implements OnModuleInit {
     // claimedAt is the best proxy — a task transitions from claimed to printing
     // shortly after being claimed, so claimedAt is a conservative lower bound.
     const printingTimeout = new Date(now.getTime() - 10 * 60 * 1000)
+    const expiredPrinting = await this.prisma.printTask.findMany({
+      where: { status: 'printing', claimedAt: { lt: printingTimeout } },
+      select: { id: true },
+    })
     const printingCount = await this.prisma.printTask.updateMany({
       where: { status: 'printing', claimedAt: { lt: printingTimeout } },
       data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
     })
+
+    // Sprint 1：把被回收任务对应的订单镜像回 pending（并清空下单终端），
+    // 避免 Admin 看到永久卡在 claimed/printing 的订单。无对应订单则 0 行，安全。
+    const resetIds = [...expiredClaimed, ...expiredPrinting].map((t) => t.id)
+    if (resetIds.length > 0) {
+      await this.prisma.order.updateMany({
+        where: { printTaskId: { in: resetIds } },
+        data: { taskStatus: 'pending', terminalId: null },
+      })
+    }
 
     const total = claimedCount.count + printingCount.count
     if (total > 0) {

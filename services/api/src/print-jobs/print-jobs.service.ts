@@ -70,6 +70,19 @@ function parseAndVerifySignedFileUrl(fileUrl: string): string | null {
   return verifyFileSignature(fileId, expires, sig) ? fileId : null
 }
 
+/**
+ * 生成打印运营订单号：ORD-YYYYMMDD-XXXXXX（后 6 位随机 hex，防撞）。
+ * orderNo 列 @unique 做最终兜底；天文级别概率的碰撞会让事务失败 → 500，与 printTask 落库失败一致。
+ */
+function makeOrderNo(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  const rand = crypto.randomBytes(3).toString('hex').toUpperCase() // 6 hex chars
+  return `ORD-${y}${m}${d}-${rand}`
+}
+
 @Injectable()
 export class PrintJobsService {
   constructor(
@@ -107,20 +120,47 @@ export class PrintJobsService {
       ...(dto.fileName ? { fileName: dto.fileName } : {}),
     }
 
-    const task = await this.prisma.printTask.create({
-      data: {
-        id:         taskId,
-        fileUrl:    storedFileUrl,
-        endUserId:  ctx.endUserId ?? null,
-        // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
-        fileMd5:    dto.fileMd5 ?? '',
-        paramsJson: JSON.stringify(storedParams),
-        status:     'pending',
-      },
+    // Sprint 1 / Task 1：一个打印任务对应一个打印运营订单（Order）。
+    const orderNo = makeOrderNo()
+
+    // PrintTask 与 Order 同一事务落库，保证"有打印任务必有对应订单"——二者同成功或同回滚。
+    // Order.create 的数据完全确定、同库无外部依赖，正常不会独立失败；真要失败（如 DB 不可用）
+    // 则 PrintTask 一并回滚、请求 500，与今天 printTask.create 失败行为一致，不会产生孤儿任务。
+    const { task, order } = await this.prisma.$transaction(async (tx) => {
+      const task = await tx.printTask.create({
+        data: {
+          id:         taskId,
+          fileUrl:    storedFileUrl,
+          endUserId:  ctx.endUserId ?? null,
+          // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
+          fileMd5:    dto.fileMd5 ?? '',
+          paramsJson: JSON.stringify(storedParams),
+          status:     'pending',
+        },
+      })
+      const order = await tx.order.create({
+        data: {
+          orderNo,
+          type:        'print',
+          printTaskId: task.id,
+          endUserId:   ctx.endUserId ?? null,
+          // Sprint 1：不接真实支付，且在"不改 Kiosk 前端"前提下后端拿不到可靠页数，
+          // 绝不用 pageCount=1 伪造金额 → amountCents 恒为 0（'未计费'），payStatus='unpaid'。
+          // 单价真相源见 ./print-pricing.ts（PRINT_UNIT_PRICE_CENTS）。
+          // TODO: calculate amountCents after reliable page count / quote flow is connected.
+          amountCents: 0,
+          payStatus:   'unpaid',
+          // taskStatus 镜像 PrintTask.status（初始 pending）；真相源仍是 PrintTask，
+          // 后续状态流转由 terminals.service 在各状态写入点同步镜像。
+          taskStatus:  task.status,
+        },
+      })
+      return { task, order }
     })
 
     // HIGH-3 (审计)：记录打印任务创建。actor 为匿名 Kiosk（无登录态），
     // 只记 fileId / 文件名 / 参数摘要 —— 不写文件正文、不写签名 URL（含 sig）等敏感串。
+    // Sprint 1：附带新建的订单号 / 订单 id，便于审计串联打印任务与运营订单。
     await this.audit.write({
       actorId:    null,
       actorRole:  'kiosk',
@@ -133,6 +173,8 @@ export class PrintJobsService {
         hasFileHash: Boolean(dto.fileMd5),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
+        orderId:     order.id,
+        orderNo:     order.orderNo,
       },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,
