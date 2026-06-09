@@ -227,7 +227,7 @@ export function ResumeOptimizePage() {
             <PrinterIcon className="h-4 w-4" />
             打印原简历
           </Button>
-          <Button size="lg" variant="secondary" onClick={() => navigate('/resume')}>返回服务中心</Button>
+          <Button size="lg" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
         </div>
       </div>
     </div>

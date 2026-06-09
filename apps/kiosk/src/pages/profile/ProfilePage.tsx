@@ -88,7 +88,7 @@ interface EntrySectionData {
 
 // 1. 我的资产
 const ASSETS: Entry[] = [
-  { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/resume' },
+  { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/resume/source' },
   { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', tag: '本次记录' },
   { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', tag: '本次记录' },
   { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单' },
@@ -98,7 +98,7 @@ const ASSETS: Entry[] = [
 
 // 2. 常用服务（均跳转既有功能页）
 const SERVICES: Entry[] = [
-  { icon: SparklesIcon,        iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: 'AI简历服务', route: '/resume' },
+  { icon: SparklesIcon,        iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: 'AI简历服务', route: '/resume/source' },
   { icon: LayoutTemplateIcon,  iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-600',  label: '简历模板',   route: '/resume/templates' },
   { icon: PrinterIcon,         iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '文档打印',   route: '/print/upload' },
   { icon: CopyIcon,            iconBg: 'bg-gray-100',   iconColor: 'text-gray-700',    label: '打印扫描',   route: '/print-scan' },
@@ -713,7 +713,7 @@ export function ProfilePage() {
 
   const continuePendingTask = () => {
     if (resumes[0]) {
-      navigate('/resume')
+      navigate('/resume/source')
       return
     }
     if (scans[0]) {
@@ -721,7 +721,7 @@ export function ProfilePage() {
       return
     }
     if (aiRecords[0]) {
-      navigate('/resume')
+      navigate('/resume/source')
     }
   }
 

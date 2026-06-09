@@ -118,8 +118,8 @@ export function ResumeReportPage() {
           请先上传或选择简历，生成 AI 诊断报告后再查看。
         </p>
         <div className="mt-8 flex w-full max-w-sm gap-3">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/resume')}>
-            返回 AI 简历服务
+          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
+            返回首页
           </Button>
           <Button size="lg" className="flex-1" onClick={() => navigate('/resume/source')}>
             开始简历诊断
