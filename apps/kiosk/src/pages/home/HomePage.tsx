@@ -282,9 +282,9 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source' },
       { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source' },
       { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates' },
-      { title: 'AI模拟面试', icon: HeadphonesIcon, to: '/assistant' },
+      { title: 'AI模拟面试', icon: HeadphonesIcon, disabled: true },
       { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },
-      { title: '求职材料', icon: FileBadge2Icon, to: '/print-scan/feature/materials', disabled: true },
+      { title: '求职材料', icon: FileBadge2Icon, disabled: true },
     ],
   },
   {
@@ -317,11 +317,11 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     accent: 'cyan',
     tiles: [
       { title: '文档打印', icon: FileTextIcon, to: '/print/upload' },
-      { title: '证件复印', icon: ClipboardCheckIcon, to: '/print-scan/feature/copy', disabled: true },
+      { title: '证件复印', icon: ClipboardCheckIcon, disabled: true },
       { title: '纸质扫描', icon: ScanLineIcon, to: '/scan/start' },
       { title: '云打印', icon: CloudUploadIcon, to: '/print/upload' },
-      { title: '格式转换', icon: FileType2Icon, to: '/print-scan/feature/convert' },
-      { title: '证件照打印', icon: ImageIcon, to: '/print-scan/feature/id-photo' },
+      { title: '格式转换', icon: FileType2Icon, disabled: true },
+      { title: '证件照打印', icon: ImageIcon, disabled: true },
     ],
   },
   {
@@ -330,8 +330,8 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     icon: HeadphonesIcon,
     accent: 'purple',
     tiles: [
-      { title: '模拟面试', icon: MonitorPlayIcon, to: '/assistant' },
-      { title: '面试技巧', icon: LightbulbIcon, to: '/assistant' },
+      { title: '模拟面试', icon: MonitorPlayIcon, disabled: true },
+      { title: '面试技巧', icon: LightbulbIcon, disabled: true },
       { title: '面试报告', icon: FileSearchIcon, disabled: true },
     ],
   },
