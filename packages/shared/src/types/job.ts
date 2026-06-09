@@ -14,6 +14,19 @@ export type PublishStatus = 'draft' | 'published' | 'unpublished' | 'expired'
 
 export type JobFairStatus = 'upcoming' | 'ongoing' | 'ended'
 
+/** 求职意向分布切片（数据大屏饼图；机构录入的预计值，非实时） */
+export interface FairIntentSlice {
+  label: string
+  /** 占比百分数 0–100 */
+  percent: number
+}
+
+/** 参展企业行业分布切片（数据大屏柱状图；按已录企业聚合） */
+export interface FairIndustrySlice {
+  label: string
+  count: number
+}
+
 export interface ExternalJobSource {
   sourceOrgId: string
   externalId: string
@@ -45,6 +58,34 @@ export interface ExternalJobFair extends ExternalJobSource {
   status: JobFairStatus
   description?: string
   boothCount?: number
+  /** 招聘岗位数（快照，卡片"N 个岗位"展示） */
+  jobCount?: number
+  /** 主题：general 综合 / campus 校园 / campus_corp 校企合作 / industry 行业专场 */
+  theme?: string
+  // ── 招聘会详情/导航/预计（对齐 JobFair 表，均为展示用，非招聘闭环）──
+  /** 城市（列表城市标签筛选） */
+  city?: string
+  /** 详细地址（导航块展示） */
+  address?: string
+  /** 静态导览图 / 地图截图 URL */
+  mapImageUrl?: string
+  /** 场馆纬度（生成手机导航深链用） */
+  latitude?: number
+  /** 场馆经度 */
+  longitude?: number
+  /** 交通指引文字（地铁/公交/自驾） */
+  trafficInfo?: string
+  /** 预计参会人数（机构录入，标注"预计"，非实时） */
+  expectedAttendance?: number
+  /** 预计求职意向分布（机构录入，数据大屏饼图） */
+  seekerIntent?: FairIntentSlice[]
+  // ── 企业速览展示字段（机构/管理员录入，纯展示，后台可更新）──
+  /** 副标题（Hero 标语，如「智能招聘·职面未来」） */
+  tagline?: string
+  /** 现场服务清单（如 自助打印 / AI求职助手 / 导览地图） */
+  onsiteServices?: string[]
+  /** 入场方式说明（如「凭学生证或身份证免费入场」） */
+  admissionMethod?: string
 }
 
 // ============================================================

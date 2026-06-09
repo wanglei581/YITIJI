@@ -9,11 +9,18 @@ import type {
 // ─── Fair f1: 2026春季高校毕业生双选会 ────────────────────────────────────────
 
 export const FAIR_F1_ZONES: FairZone[] = [
+  // 展位分区（展馆导览用）
   { id: 'z1-1', fairId: 'f1', zoneName: 'A区 互联网科技', description: '互联网、软件、大数据企业', industry: '互联网/软件', boothCount: 42, checkedInCount: 38, color: 'bg-blue-50' },
   { id: 'z1-2', fairId: 'f1', zoneName: 'B区 金融财务',   description: '银行、券商、会计师事务所等', industry: '金融/财务', boothCount: 30, checkedInCount: 27, color: 'bg-green-50' },
   { id: 'z1-3', fairId: 'f1', zoneName: 'C区 制造工程',   description: '制造业、机械、新能源企业', industry: '制造/工程', boothCount: 35, checkedInCount: 28, color: 'bg-orange-50' },
   { id: 'z1-4', fairId: 'f1', zoneName: 'D区 政事业单位', description: '政府机关、事业单位、国企', industry: '政事业', boothCount: 25, checkedInCount: 22, color: 'bg-purple-50' },
   { id: 'z1-5', fairId: 'f1', zoneName: 'E区 教育医疗',   description: '学校、医院、科研机构', industry: '教育/医疗', boothCount: 20, checkedInCount: 16, color: 'bg-pink-50' },
+  // 各区创新特色展区（详情「特色」区展示，按地市分组；category=innovation 不进展馆地图）
+  { id: 'z1-iz-1', fairId: 'f1', category: 'innovation', city: '市南区', zoneName: '现代海洋与金融服务', description: '依托香港中路金融街区，聚集银行、券商、保险区域总部，重点发展海洋金融与财富管理。', industry: '金融/财务', boothCount: 0, checkedInCount: 0 },
+  { id: 'z1-iz-2', fairId: 'f1', category: 'innovation', city: '市北区', zoneName: '数字科技与跨境电商', description: '青岛人工智能产业园所在地，聚焦大数据、跨境电商与工业互联网应用。', industry: '数字科技', boothCount: 0, checkedInCount: 0 },
+  { id: 'z1-iz-3', fairId: 'f1', category: 'innovation', city: '崂山区', zoneName: '虚拟现实与海洋生物', description: '国家级 VR 产业基地与海洋生物医药研发集群，汇聚一批高新技术企业。', industry: '虚拟现实/生物医药', boothCount: 0, checkedInCount: 0 },
+  { id: 'z1-iz-4', fairId: 'f1', category: 'innovation', city: '西海岸新区', zoneName: '高端智能制造', description: '船舶海工、家电电子、新能源汽车整车制造基地，产业链配套完善。', industry: '智能制造', boothCount: 0, checkedInCount: 0 },
+  { id: 'z1-iz-5', fairId: 'f1', category: 'innovation', city: '城阳区', zoneName: '轨道交通装备', description: '国家高速列车技术创新中心所在地，中车四方等龙头企业聚集。', industry: '轨道交通', boothCount: 0, checkedInCount: 0 },
 ]
 
 export const FAIR_F1_COMPANIES: FairCompany[] = [
@@ -159,9 +166,14 @@ export const FAIR_F1_STATS: FairLiveStats = {
 // ─── Fair f2: 互联网行业专场招聘会（进行中） ──────────────────────────────────
 
 export const FAIR_F2_ZONES: FairZone[] = [
+  // 展位分区（展馆导览用）
   { id: 'z2-1', fairId: 'f2', zoneName: 'A区 产品研发', description: '互联网产品、前后端、移动端开发', industry: '产品/技术', boothCount: 34, checkedInCount: 34, color: 'bg-blue-50' },
   { id: 'z2-2', fairId: 'f2', zoneName: 'B区 数据/AI',  description: '大数据、人工智能、算法', industry: '数据/AI', boothCount: 20, checkedInCount: 19, color: 'bg-indigo-50' },
   { id: 'z2-3', fairId: 'f2', zoneName: 'C区 运营市场', description: '产品运营、市场推广、内容创作', industry: '运营/市场', boothCount: 14, checkedInCount: 13, color: 'bg-teal-50' },
+  // 创新特色展区（详情「特色」区展示）
+  { id: 'z2-iz-1', fairId: 'f2', category: 'innovation', city: '人工智能', zoneName: '人工智能应用', description: '计算机视觉、自然语言处理与智能制造的产业化落地，覆盖智慧城市与工业检测。', industry: '人工智能', boothCount: 0, checkedInCount: 0 },
+  { id: 'z2-iz-2', fairId: 'f2', category: 'innovation', city: '大数据', zoneName: '大数据与云计算', description: 'IaaS/PaaS 全栈云产品与数据中台，服务政府、金融、医疗等行业。', industry: '云计算', boothCount: 0, checkedInCount: 0 },
+  { id: 'z2-iz-3', fairId: 'f2', category: 'innovation', city: '工业互联网', zoneName: '工业互联网平台', description: '以卡奥斯等平台为代表，赋能制造业数字化转型与柔性生产。', industry: '工业互联网', boothCount: 0, checkedInCount: 0 },
 ]
 
 export const FAIR_F2_COMPANIES: FairCompany[] = [
