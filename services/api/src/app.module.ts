@@ -14,6 +14,7 @@ import { MemberAssetsModule } from './member-assets/member-assets.module'
 import { MemberFavoritesModule } from './member-favorites/member-favorites.module'
 import { MemberBenefitsModule } from './member-benefits/member-benefits.module'
 import { MemberPrintOrdersModule } from './member-print-orders/member-print-orders.module'
+import { AdminOrdersModule } from './admin-orders/admin-orders.module'
 import { MaterialsModule } from './materials/materials.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
@@ -64,6 +65,7 @@ const redisUrl = process.env['REDIS_URL']
     MemberFavoritesModule,
     MemberBenefitsModule,
     MemberPrintOrdersModule,
+    AdminOrdersModule,
     MaterialsModule,
     AiModule,
     FilesModule,

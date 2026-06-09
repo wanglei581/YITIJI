@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-09（**Sprint 1 Task 1：Order 模型 + 打印链路落账后端已完成**，分支 `feature/sprint1-order-model`，`verify:order` 8 项 ALL PASS，详见下方 🧭 Sprint 1；会员「我的打印订单」只读列表 MVP 已完成 `feature/member-print-orders-readonly`，verify 6 组 ALL PASS，待运行期手验；Phase C-1 会员登录安全收口 + 首页登录状态栏已完成；**Phase C-2A 匿名 AI 简历结果一次性 accessToken 安全收口已完成**（`feature/ai-anon-access-token`，verify 12 类断言 ALL PASS，待运行期手验）；AI求职材料中心 B-2 各最小契约已推进，B-1 浏览器链路已手验；新增「个人资产中心 + 权益活动 + 服务套餐」产品规划 Phase C-2 ~ C-6；明确后续功能先完成测试/流程/功能闭环，再进入集中 UI/UX 设计收口）
+> 最后更新：2026-06-09（**Sprint 1 Task 1+2 已完成**：Task 1 Order 模型+打印链路落账（`feature/sprint1-order-model`，verify:order 8/8）、Task 2 Admin Orders 真实化+最小可运营 UI（`feature/sprint1-admin-orders`，verify:admin-orders 10/10，浏览器手验待办），详见下方 🧭 Sprint 1；会员「我的打印订单」只读列表 MVP 已完成 `feature/member-print-orders-readonly`，verify 6 组 ALL PASS，待运行期手验；Phase C-1 会员登录安全收口 + 首页登录状态栏已完成；**Phase C-2A 匿名 AI 简历结果一次性 accessToken 安全收口已完成**（`feature/ai-anon-access-token`，verify 12 类断言 ALL PASS，待运行期手验）；AI求职材料中心 B-2 各最小契约已推进，B-1 浏览器链路已手验；新增「个人资产中心 + 权益活动 + 服务套餐」产品规划 Phase C-2 ~ C-6；明确后续功能先完成测试/流程/功能闭环，再进入集中 UI/UX 设计收口）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -10,7 +10,7 @@
 Mavis 审过盘点报告后定的第一阶段执行顺序。逐项可独立验收，建议各从 main 开独立 feature 分支。
 
 - [x] **Task 1：Order 模型 + 打印链路落账（后端）** — 2026-06-09 完成，分支 `feature/sprint1-order-model`。`Order` 模型 + migration（非破坏性注入 dev.db）+ `print-jobs.service.create` 事务内同步建单（`amountCents=0`/`payStatus=unpaid`/`type=print`/`orderNo`/`endUserId` 透传）+ `terminals.service` 三处状态镜像 `Order.taskStatus`。单价常量 `print-pricing.ts`（黑白20/彩色50 分）仅预留，本轮不计费、不接支付，留 `TODO: calculate amountCents after reliable page count / quote flow`。`verify:order` 8 项 ALL PASS。详见 current-progress.md 同名条目。
-- [ ] **Task 2：Admin Orders 真实化** — 后端 `admin-orders` 模块（`GET /admin/orders`、`GET /:id`、`PATCH /:id/status`、`POST /:id/refund` 仅改状态+审计不动钱）；前端 [orders/index.tsx](../../apps/admin/src/routes/orders/index.tsx) 去 mock 接真实，启用退款按钮。Order 已就绪可直接查。
+- [x] **Task 2：Admin Orders 真实化 + 最小可运营 UI/UX** — 2026-06-09 完成，分支 `feature/sprint1-admin-orders`（stacked 在 Task 1 上）。后端 `admin-orders` 模块（list/detail/status/refund，admin guard，改状态+退款写审计、不动钱）；前端 [orders.ts](../../apps/admin/src/services/api/orders.ts) 双 adapter + [orders/index.tsx](../../apps/admin/src/routes/orders/index.tsx) 重写（筛选/详情抽屉/状态·退款/空·加载·错误态）。`verify:admin-orders` 10 项 ALL PASS；typecheck/lint/build 全绿。浏览器实跑手验待办。详见 current-progress.md 同名条目。
 - [ ] **Task 3：Admin Alerts 真实化** — 新建 `Alert` 模型 + `alerts` 模块 + ack/resolve；前端启用按钮 + 侧边栏 badge 动态化。告警可先手动造数据，自动产生留后。
 - [ ] **Task 4：Partner Profile 可编辑** — `Organization` 扩 nullable 列 + `profileJson`；`GET/PATCH /partner/profile`；前端编辑态+保存。
 - [ ] **Task 5：Partner Dashboard 真实化** — `GET /partner/dashboard/summary`，可算指标走真实 count/SyncLog；近7天无埋点指标返回 null 并前端标注「暂未统计」，不伪造。

@@ -23,6 +23,7 @@
     "verify:member-favorites-benefits": "node -r @swc-node/register scripts/verify-member-favorites-benefits.ts",
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
+    "verify:admin-orders": "node -r @swc-node/register scripts/verify-admin-orders.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",

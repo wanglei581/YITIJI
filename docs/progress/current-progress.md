@@ -5,6 +5,30 @@
 
 ---
 
+## Sprint 1 / Task 2：Admin Orders 真实化 + 最小可运营 UI/UX（2026-06-09，Mavis，全栈）
+
+> 分支：`feature/sprint1-admin-orders`（stacked 在 `feature/sprint1-order-model` 之上）。
+
+**背景：** 接 Task 1 的 Order 落账底座，把 `/admin/orders` 从纯 mock 切到真实 API，并做最小可运营 UI（筛选 / 详情抽屉 / 改支付状态 / 退款 / 空·加载·错误态）。
+
+**后端（新模块 `services/api/src/admin-orders/`）：**
+- 4 端点（`@UseGuards(JwtAuthGuard, RolesGuard) @Roles('admin')`）：`GET /api/v1/admin/orders`（type/payStatus/taskStatus/orderNo 筛选 + 分页）、`GET /admin/orders/:id`（含关联 PrintTask 打印参数 + 状态流转日志，**不回 fileUrl/fileMd5**）、`PATCH /admin/orders/:id/status`（**payStatus（paid/failed/unpaid）和/或 taskStatus 至少其一**；taskStatus 为「运营视图」状态，**仅改 Order 列、不反向改 PrintTask.status**——真实任务状态源仍是 PrintTask）、`POST /admin/orders/:id/refund`（仅 paid 可标记退款）。
+- 列表脱敏：endUserId 空→「游客」、有昵称→昵称、否则「会员」；terminalCode 关联解析；amountCents 透传（恒 0）。
+- 合规：**不接真实支付**——payStatus 为线下运营标记；退款仅置 `payStatus=refunded + refundReason + refundedAt`，**不发生资金流**；改状态/退款各同步写 [AuditLog](../../services/api/src/audit/audit.service.ts)（`order.status_change` / `order.refund`）。已退款订单再改状态→`ORDER_ALREADY_REFUNDED`；非 paid 退款→`ORDER_NOT_REFUNDABLE`。
+- audit 契约新增 `order` targetType + `order.status_change`/`order.refund` action（[shared](../../packages/shared/src/types/audit.ts) + [api 副本](../../services/api/src/audit/audit.types.ts) 双处同步）。app.module 注册 `AdminOrdersModule`。
+
+**前端（`apps/admin`）：**
+- 新增 [orders.ts](../../apps/admin/src/services/api/orders.ts)（http + mock 双 adapter selector，同 files.ts 模式；mock amountCents 也恒 0，与真实一致不造假金额），index 导出。
+- [orders/index.tsx](../../apps/admin/src/routes/orders/index.tsx) 重写：去 MOCK_ORDERS → 真实 service；type 胶囊 + payStatus 下拉 + 订单号搜索（250ms 防抖）+ 服务端分页；行点击 / 「查看详情」开 Drawer（订单信息 + 打印参数 + 状态流转时间线 + 操作区）；抽屉内「标记已支付 / 标记支付失败 / 标记退款（填原因）/ 运营视图任务状态下拉更新」；loading/error/empty 三态齐全；金额列显示「未计费」+ 页脚诚实说明。
+
+**验收补正（2026-06-09，Mavis）：**
+1. `PATCH /:id/status` 增补 `taskStatus`（运营视图，仅改 Order 列、不动 PrintTask）；前端抽屉加任务状态下拉 + 「更新任务状态」。
+2. 前端退款文案全部统一为「**标记退款**」（按钮 / 确认区标题 / 说明 / 成功 / 错误提示 / 状态标签「已标记退款」），并明确「当前未接入真实支付退款，仅运营记录，将订单标记为已标记退款」；后端 `ORDER_NOT_REFUNDABLE` / `ORDER_ALREADY_REFUNDED` 错误文案同步为「标记退款」。`verify:admin-orders` 增至 12 项（含 taskStatus 仅改 Order 列、空请求拦截）全 PASS。
+
+**验证：** `pnpm --filter @ai-job-print/api typecheck/lint` ✅；`verify:admin-orders` ✅（**12 项**：列表脱敏/4类筛选/详情不泄漏/NotFound/改支付状态/已退款拦截/taskStatus仅改Order列/空请求拦截/标记退款/非paid拦截/审计 status_change×2+refund×1）；Task 1 回归 `verify:order` ✅；`shared/admin typecheck` ✅、`admin lint` ✅、`admin build` ✅。**浏览器实跑手验待办**（admin 登录走真实后端，需起 API + admin 账号；mock 模式页面自包含可单独跑）。**未 commit。**
+
+---
+
 ## Sprint 1 / Task 1：Order 模型 + 打印链路落账（2026-06-09，Mavis 拍板，后端）
 
 > 分支：`feature/sprint1-order-model`（从 main 切出，独立承载）。

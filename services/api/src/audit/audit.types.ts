@@ -35,6 +35,9 @@ export type AuditAction =
   | 'user.disable'
   | 'system.login'
   | 'system.config_change'
+  // Sprint 1 / Task 2:打印运营订单管理(admin)
+  | 'order.status_change'
+  | 'order.refund'
 
 export type AuditTargetType =
   | 'file'
@@ -45,6 +48,7 @@ export type AuditTargetType =
   | 'fair_source'
   | 'user'
   | 'system'
+  | 'order'
 
 export interface AuditLogRecord {
   id: string
