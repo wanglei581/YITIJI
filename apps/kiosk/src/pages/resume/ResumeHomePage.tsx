@@ -2,7 +2,7 @@
 // ResumeHomePage — AI 简历服务中心首页（/resume）
 //
 // 用户从这里进入完整链路：
-//   选择来源 → 选择目标方向 → AI 诊断 → 优化前后对比 → 生成优化版 → 导出/打印
+//   上传简历文件 → AI 诊断 → 优化前后对比 → 生成优化版 → 导出/打印
 //
 // 4 个大入口：AI简历诊断 / AI简历优化 / 简历素材库 / 面试准备(即将上线)
 // 含四步流程说明、最近一次记录入口（无真实数据时空状态）、隐私合规提示。
@@ -80,10 +80,10 @@ const ENTRIES: EntryCard[] = [
 ]
 
 const FLOW_STEPS = [
-  { icon: UploadCloudIcon, label: '上传 / 扫描', sub: '电子或纸质简历' },
-  { icon: ClipboardCheckIcon, label: '选择目标方向', sub: '行业 · 岗位 · 场景' },
-  { icon: FileSearchIcon, label: '生成诊断', sub: '参考评分 + 建议' },
-  { icon: SparklesIcon, label: '优化导出打印', sub: '前后对比 + 输出' },
+  { icon: UploadCloudIcon, label: '上传简历', sub: 'U盘 / 云端文件' },
+  { icon: ClipboardCheckIcon, label: '读取内容', sub: '仅分析上传文件' },
+  { icon: FileSearchIcon, label: '生成诊断', sub: '分项评分 + 建议' },
+  { icon: SparklesIcon, label: '优化参考', sub: '基于真实经历表达' },
 ]
 
 export function ResumeHomePage() {
@@ -115,7 +115,7 @@ export function ResumeHomePage() {
     <div className="flex h-full flex-col overflow-y-auto p-6">
       <PageHeader
         title="AI 简历服务中心"
-        subtitle="上传或扫描简历，获取诊断、优化、素材与导出打印"
+        subtitle="上传简历文件，获取诊断、优化、素材与导出打印"
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
             返回首页

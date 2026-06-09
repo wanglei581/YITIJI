@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
-import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, PrinterIcon, SparklesIcon, TargetIcon } from 'lucide-react'
+import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
-import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
+import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
@@ -16,13 +16,14 @@ interface ReportState {
   taskId?: string
   /** 匿名结果一次性令牌（Phase C-2A）；登录会员无此值 */
   accessToken?: string
+  providerName?: string
   success?: boolean
   reason?: string
   report?: ResumeReport
   targetContext?: ResumeTargetContext
 }
 
-const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken'])
+const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
 
 // 目标方向摘要文本（无方向时返回 null）
 function targetSummary(tc?: ResumeTargetContext): string | null {
@@ -44,6 +45,7 @@ export function ResumeReportPage() {
   const taskId = state.taskId ?? session?.taskId
   const accessToken = state.accessToken ?? session?.accessToken
   const [report, setReport] = useState<ResumeReport | undefined>(state.report)
+  const [providerName, setProviderName] = useState<string | undefined>(state.providerName)
   const [loading, setLoading] = useState(!state.report && !!taskId && success)
   const [loadError, setLoadError] = useState(false)
 
@@ -56,6 +58,7 @@ export function ResumeReportPage() {
     getResumeRecord(taskId, { token: getToken(), accessToken })
       .then((res) => {
         if (cancelled) return
+        if (res.providerName) setProviderName(res.providerName)
         if (res.report) setReport(res.report)
         else setLoadError(true)
       })
@@ -69,20 +72,6 @@ export function ResumeReportPage() {
       Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
     )
     navigate('/resume/parse', { state: retryState })
-  }
-
-  const handlePrintReport = () => {
-    const file = state.file
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: `诊断报告_${file?.name ?? '简历'}.pdf`,
-          size: '128 KB',
-          pages: 2,
-        },
-        params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
-      },
-    })
   }
 
   if (!success) {
@@ -170,12 +159,16 @@ export function ResumeReportPage() {
       />
 
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* 演示数据提示：mock 模式下分数由演示 AI 生成，接真后端自动隐藏 */}
-        {API_MODE !== 'http' && (
+        {/* 演示数据提示：mock 模式或后端 provider=mock 时明确标记，避免把样例报告当真实报告 */}
+        {(API_MODE !== 'http' || providerName === 'mock') && (
           <ComplianceBanner tone="info">
             {COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}
           </ComplianceBanner>
         )}
+
+        <ComplianceBanner tone="success" title="报告边界">
+          本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。
+        </ComplianceBanner>
 
         {/* 目标方向摘要 */}
         {summary && (
@@ -195,7 +188,7 @@ export function ResumeReportPage() {
                 <span className="text-3xl font-bold text-gray-900">{totalScore}</span>
                 <span className="text-xl text-gray-400">/{totalMax}</span>
               </div>
-              <p className="mt-1 text-xs text-gray-400">参考评分，不代表真实招聘结果</p>
+              <p className="mt-1 text-xs text-gray-400">参考评分，由当前 AI 报告分项汇总，不代表真实招聘结果</p>
             </div>
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
               <CheckCircleIcon className="h-8 w-8 text-primary-600" />
@@ -285,10 +278,9 @@ export function ResumeReportPage() {
           size="lg"
           variant="secondary"
           className="flex flex-1 items-center gap-2"
-          onClick={handlePrintReport}
+          onClick={() => navigate('/resume/source')}
         >
-          <PrinterIcon className="h-4 w-4" />
-          打印报告
+          重新诊断
         </Button>
         <Button
           size="lg"

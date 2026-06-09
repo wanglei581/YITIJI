@@ -26,7 +26,6 @@ import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ResumeHomePage } from '../pages/resume/ResumeHomePage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
-import { ResumeTargetPage } from '../pages/resume/ResumeTargetPage'
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
 import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
@@ -67,7 +66,6 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume',            element: <ResumeHomePage /> },
       { path: 'resume/upload',     element: <Navigate to="/resume/source" replace /> },
       { path: 'resume/source',     element: <ResumeSourcePage /> },
-      { path: 'resume/target',     element: <ResumeTargetPage /> },
       { path: 'resume/parse',      element: <ResumeParsePage /> },
       { path: 'resume/report',     element: <ResumeReportPage /> },
       { path: 'resume/optimize',   element: <ResumeOptimizePage /> },
