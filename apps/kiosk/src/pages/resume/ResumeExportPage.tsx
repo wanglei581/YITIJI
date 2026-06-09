@@ -158,8 +158,8 @@ export function ResumeExportPage() {
       </p>
 
       <div className="mt-4">
-        <Button size="lg" variant="secondary" className="w-full" onClick={() => navigate('/resume')}>
-          返回 AI 简历服务
+        <Button size="lg" variant="secondary" className="w-full" onClick={() => navigate('/')}>
+          返回首页
         </Button>
       </div>
       <div className="h-2" />

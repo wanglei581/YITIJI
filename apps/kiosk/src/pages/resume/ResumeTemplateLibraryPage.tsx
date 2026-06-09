@@ -82,8 +82,8 @@ export function ResumeTemplateLibraryPage() {
         title="简历素材库"
         subtitle="精选模板与求职材料，按方向选用"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/resume')}>
-            返回服务中心
+          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
+            返回首页
           </Button>
         }
       />

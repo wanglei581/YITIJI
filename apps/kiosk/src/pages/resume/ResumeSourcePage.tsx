@@ -147,7 +147,7 @@ export function ResumeSourcePage() {
         title="AI 简历诊断"
         subtitle="上传简历文件，生成基于真实内容的结构化诊断报告"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/resume')}>返回服务中心</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
         }
       />
 

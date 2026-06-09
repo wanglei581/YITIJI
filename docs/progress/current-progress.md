@@ -5,6 +5,28 @@
 
 ---
 
+## Kiosk 移除「AI 简历服务中心」中间页（导航结构收口，2026-06-09，Claude）
+
+**背景：** 首页 AI 简历服务区域的功能瓦片已直达各功能（上一轮首页改造），但仍保留 `/resume`「AI 简历服务中心」中间页，造成「点瓦片 → 进服务中心 → 再选一次功能」的二次选择。本轮做纯导航结构收口：删除中间页，所有入口直达真实功能。**不新增真实 AI/OCR 能力，不新增 mock，不改合规边界，不把未上线功能改成可点。**
+
+**改动：**
+- 删除 `apps/kiosk/src/pages/resume/ResumeHomePage.tsx`（服务中心中间页）。
+- [routes/index.tsx](../../apps/kiosk/src/routes/index.tsx)：移除 `ResumeHomePage` import；`/resume` 服务中心页面已删除，`{ path: 'resume' }` 不再渲染中间页。
+- **`/resume` 保留为兼容旧入口**，改为 `<Navigate to="/resume/source" replace />` 直接重定向到上传页，**不再出现二次选择页**；旧链接/外部书签命中 `/resume` 不 404，直接进入上传流程。
+- **保留** `/resume/upload → /resume/source` 重定向（同为旧入口/外部书签兼容，旧链接不 404）。
+- **保留**真实流程路由：`/resume/source`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`。
+- 首页 [HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx)：AI 简历服务区瓦片已直达真实功能（AI简历诊断 / AI简历优化 → `/resume/source`；简历打印 → `/print/upload`），本次无需改动；未打通的「简历素材库 / 职业规划 / 岗位大师 / 模拟面试·面试技巧·面试报告 / 求职材料」继续保持「即将上线」不可点。
+- 重定向所有指向 `/resume` 的旧入口（删除中间页后会成死链）：
+  - [AssistantPage.tsx](../../apps/kiosk/src/pages/assistant/AssistantPage.tsx)：快捷操作「简历服务」、关键词路由、图标映射 → `/resume/source`（路由白名单仍保留 `/resume` 前缀，用于授权 `/resume/*` 子路由，非用户可点入口）。
+  - [ProfilePage.tsx](../../apps/kiosk/src/pages/profile/ProfilePage.tsx)：「我的简历」「AI简历服务」入口与「继续未完成任务」→ `/resume/source`。
+  - [CampusPage.tsx](../../apps/kiosk/src/pages/campus/CampusPage.tsx)：「进入简历服务」→ `/resume/source`。
+  - 各简历流程页返回按钮（Source / Report / Optimize / Export / 素材库）「返回服务中心 / 返回 AI 简历服务」→「返回首页」`/`。
+- **AI简历优化说明：** 优化入口统一进 `/resume/source` 而非直接进 `/resume/optimize`。没有最近真实 taskId 上下文时直接进 optimize 会是空页；必须先上传/诊断再优化。
+
+**验证：** `pnpm --filter @ai-job-print/kiosk typecheck` ✅、`lint` ✅（0 error，仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条，非本次引入）、`build` ✅；全仓 `grep ResumeHomePage` 无残留；`grep '/resume'` 仅剩 routes 的 `/resume` 兼容重定向项 + AssistantPage 白名单前缀（均非可点死链），无用户可见 `/resume` 死链。
+
+---
+
 ## Kiosk AI 简历诊断 /resume/target 孤儿路由清理（2026-06-09，Claude）
 
 **背景：** 上一轮「AI 简历诊断上传页真实化改造」把诊断流程改为 `source → parse` 直达，「选择目标方向」页（`/resume/target`）不再有任何入口导航，成为孤儿路由。本轮做小收尾清理，保持「诊断页只保留文件上传、无文本输入」的产品状态一致。

@@ -394,7 +394,7 @@ export function CampusPage() {
               title="AI 简历"
               description="应届简历诊断与优化，上传或扫描简历获取 AI 建议"
               actionLabel="进入简历服务"
-              onAction={() => navigate('/resume')}
+              onAction={() => navigate('/resume/source')}
             />
             <ServiceEntryCard
               icon={PrinterIcon}
