@@ -5,6 +5,23 @@
 
 ---
 
+## Kiosk AI 简历诊断 /resume/target 孤儿路由清理（2026-06-09，Claude）
+
+**背景：** 上一轮「AI 简历诊断上传页真实化改造」把诊断流程改为 `source → parse` 直达，「选择目标方向」页（`/resume/target`）不再有任何入口导航，成为孤儿路由。本轮做小收尾清理，保持「诊断页只保留文件上传、无文本输入」的产品状态一致。
+
+**改动：**
+- 删除 `apps/kiosk/src/pages/resume/ResumeTargetPage.tsx`（孤儿页面文件）。
+- 移除 [apps/kiosk/src/routes/index.tsx](../../apps/kiosk/src/routes/index.tsx) 中 `ResumeTargetPage` 的 import 与 `path: 'resume/target'` 路由项。
+- 诊断入口彻底收口为文件上传（U盘 / 云端 → `/resume/source` → `/resume/parse`），无文本输入、无目标方向选择步骤。
+
+**保留（有意不动）：**
+- Report / Optimize 页对 `targetContext` 的兼容展示逻辑保留：历史 state 或后续其它链路仍可能携带 `targetContext`，无方向时优雅降级不渲染，不影响当前产品。
+- 扫描结果转诊断链路保留：`ScanResultPage → /resume/parse` 仍可用（纸质扫描后做简历诊断是合理真实能力），只是诊断页主入口不再展示「扫描纸质简历」。
+
+**验证：** `pnpm --filter @ai-job-print/kiosk typecheck` ✅、`lint` ✅（0 error，仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条，非本次引入）、`build` ✅；全仓 `grep "resume/target\|ResumeTargetPage"` 无残留。
+
+---
+
 ## Kiosk AI 简历诊断上传页真实化改造（2026-06-09，Mavis）
 
 **目标：** 按用户提供的 AI 简历诊断参考图，把「AI简历服务 → AI简历诊断」入口改为文件上传优先的三段式体验：上传简历 → 诊断分析 → 查看报告。同时收紧诚实边界：不保留文本输入，不展示无法验证的模拟结论，不把 mock 报告伪装成真实 AI 结果。
