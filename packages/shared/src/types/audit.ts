@@ -41,6 +41,8 @@ export type AuditAction =
   // Sprint 1 / Task 2:打印运营订单管理(admin)
   | 'order.status_change'
   | 'order.refund'
+  // Sprint 1 / Task 3:运营告警处理(admin)
+  | 'alert.status_change'
 
 export type AuditTargetType =
   | 'file'
@@ -52,6 +54,7 @@ export type AuditTargetType =
   | 'user'
   | 'system'
   | 'order'
+  | 'alert'
 
 /** 单条审计返回。actorRole 冗余,actor 被禁用后仍可追溯。 */
 export interface AuditLogRecord {

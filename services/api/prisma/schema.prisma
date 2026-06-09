@@ -829,6 +829,50 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ── Alert ───────────────────────────────────────────────────────────────────
+// Sprint 1 / Task 3：终端 / 设备 / 系统运营告警。
+//
+// 合规与边界（CLAUDE.md §2/§8）：
+//   - 这是「线下一体机运营」告警，属运营后台范畴，不涉招聘业务。
+//   - 处理 / 忽略只是**运营状态记录**（handledBy/handledAt/handleNote + status），
+//     **不直接远程控制设备**；真实设备动作仍由 Terminal Agent 本地执行。
+//   - 告警来源边界（勿误读）：本阶段仅由**非生产环境 dev/demo 种子**写入演示数据；
+//     生产环境不自动种子。**自动告警生产逻辑尚未实现**，后续接入：终端心跳离线检测 /
+//     打印机缺纸·卡纸·碳粉低 / 数据同步失败 / AI 服务调用失败 / 打印任务异常。
+//     本轮完成的是「Alert 表 + Admin 告警运营后台 + 处理状态」，status 流转 + 处理动作落 AuditLog。
+//
+// severity: 'info' | 'warning' | 'critical'
+// status:   'new' | 'processing' | 'resolved' | 'ignored'
+// type:     'device-offline' | 'printer-fault' | 'paper-jam' | 'paper-empty' |
+//           'toner-low' | 'ai-call-fail' | 'file-clean-fail' | 'sync-fail' | ...（自由字符串）
+model Alert {
+  id          String    @id @default(cuid())
+  alertNo     String    @unique          // ALT-YYYYMMDD-XXXXXX
+  type        String
+  severity    String    @default("warning")
+  status      String    @default("new")
+  title       String
+  message     String?
+  // 关联终端（自由字符串，不强 FK：告警可能来自未注册 / 已注销终端）
+  terminalId  String?
+  deviceName  String?
+  // 原始告警 payload（JSON 字符串，可空）。不存任何用户 PII。
+  payloadJson String?
+  // 处理信息（运营状态记录，非设备控制）
+  handledBy   String?   // 处理人 User.id
+  handledAt   DateTime?
+  handleNote  String?
+  occurredAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([severity])
+  @@index([type])
+  @@index([terminalId])
+  @@index([occurredAt])
+}
+
 // ── AdAsset ───────────────────────────────────────────────────────────────────
 // 待机宣传屏素材(一期)。仅管理员后台上传、管理。
 //

@@ -5,6 +5,36 @@
 
 ---
 
+## Sprint 1 / Task 3：Admin Alerts 真实化 + 告警处理 UI/UX（2026-06-09，Mavis，全栈）
+
+> 分支：`feature/sprint1-admin-alerts`（stacked 在 `feature/sprint1-admin-orders` 之上）。
+
+**目标：** `/admin/alerts` 从纯 mock 切真实 API，并补最小可运营告警处理。
+
+**后端（新建）：**
+- Prisma 新增 `Alert` 模型（alertNo/type/severity/status/title/message/terminalId/deviceName/payloadJson/handledBy/handledAt/handleNote/occurredAt…）+ migration `20260609130000_add_alert`（非破坏性 `prisma db execute` 注入 dev.db，沿用既有约定）；`PrismaService` 暴露 `alert` delegate。
+- 新模块 `services/api/src/alerts/`（admin guard）：`GET /api/v1/admin/alerts`（keyword/severity/status/type/terminalId 筛选 + page/pageSize 分页）、`GET /admin/alerts/:id`、`PATCH /admin/alerts/:id/status`（processing/resolved/ignored，记 handledBy/handledAt/handleNote）。
+- **dev 种子**：`AlertsService.onModuleInit` 非生产环境 upsert 6 条演示告警（update 为空 → 不覆盖管理员已处理状态），保证页面有真实数据。
+
+> ⚠️ **告警来源边界（务必区分，勿误读为「告警生产逻辑已完成」）：**
+> - 这 6 条只是 **dev/demo seed**，仅非生产环境写入；**生产环境不会自动种子**（`NODE_ENV==='production'` 跳过）。
+> - 本轮（Task 3）完成的是 **「Alert 数据模型 + Admin 告警运营后台（列表/详情/处理状态）」**，**不是「设备/系统自动产生告警」**。
+> - **自动告警生产逻辑尚未实现**，后续需接入：终端心跳离线检测 / 打印机缺纸·卡纸·碳粉低 / 数据同步失败 / AI 服务调用失败 / 打印任务异常。
+> - Admin 页面的「处理 / 忽略」只是**运营状态记录与责任留痕，不直接远程控制设备**；真实设备动作仍由现场或 Terminal Agent 执行。
+- 状态：`new / processing / resolved / ignored`；级别：`info / warning / critical`。
+- audit 契约新增 `alert` targetType + `alert.status_change` action（[shared](../../packages/shared/src/types/audit.ts) + [api 副本](../../services/api/src/audit/audit.types.ts) 双处同步）；app.module 注册 `AlertsModule`。
+
+**前端（`apps/admin`）：**
+- 新增 [alerts.ts](../../apps/admin/src/services/api/alerts.ts)（http + mock 双 adapter）+ index 导出。
+- [alerts/index.tsx](../../apps/admin/src/routes/alerts/index.tsx) 重写：去 MOCK → 真实 service；级别/状态胶囊 + 类型下拉 + 关键词搜索（250ms 防抖）+ 服务端分页；行点击/「查看详情」开 Drawer（告警全字段 + 原始 payload 高亮 + 处理人/时间/备注）；抽屉内「标记处理中 / 标记已处理 / 忽略告警」+ 处理备注输入；loading/empty/error 三态齐全。
+- 侧边栏「告警中心」徽标 + 顶部通知数从硬编码 `3` 改为**真实「待处理」(status=new) 告警数**（[AdminLayoutWrapper](../../apps/admin/src/layouts/AdminLayoutWrapper.tsx) 鉴权后 + 路由变化时拉取，失败静默）。
+
+**合规：** 告警处理（处理中/已处理/忽略）**只是运营状态记录与责任留痕，不直接远程控制 / 重启设备**；真实设备动作仍由现场或 Terminal Agent 执行。前台无关、无招聘业务。处理动作同步写 AuditLog。
+
+**验证：** `api typecheck/lint` ✅；新增 `verify:admin-alerts` ✅（7 项：列表分页 / 4 类筛选 / 详情 / NotFound / 处理+handler 解析 / 审计 alert.status_change）；回归 `verify:admin-orders` ✅、`verify:order` ✅；`shared/admin typecheck` ✅、`admin lint/build` ✅。**浏览器实跑手验待办**（admin 登录走真实后端）。**未 commit。**
+
+---
+
 ## Sprint 1 / Task 2：Admin Orders 真实化 + 最小可运营 UI/UX（2026-06-09，Mavis，全栈）
 
 > 分支：`feature/sprint1-admin-orders`（stacked 在 `feature/sprint1-order-model` 之上）。

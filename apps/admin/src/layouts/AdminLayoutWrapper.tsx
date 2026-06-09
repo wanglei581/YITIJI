@@ -22,12 +22,13 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
+import { listAlerts } from '../services/api'
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
   { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维' },
   { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon },
-  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon,   badge: 3 },
+  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon },
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理' },
   { key: 'files',        label: '文件管理',     icon: FolderIcon },
   { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon },
@@ -93,6 +94,9 @@ export function AdminLayoutWrapper() {
   const [collapsed, setCollapsed] = useState(false)
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [authChecked, setAuthChecked] = useState(false)
+  // 侧栏「告警中心」徽标：真实「待处理」(status=new)告警数；0 时不显示。
+  // 在导航变化时重取，覆盖管理员处理后回到列表的场景（近似实时，足够运营用）。
+  const [pendingAlerts, setPendingAlerts] = useState(0)
   const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
 
   // Boot 时调 /auth/me 校验 token;失败 (verifyToken 返回 null) 跳 /login。
@@ -110,6 +114,20 @@ export function AdminLayoutWrapper() {
     return () => { cancelled = true }
   }, [navigate])
 
+  // 拉取真实「待处理」告警数作为侧栏徽标。鉴权通过后 + 路由变化时刷新；失败静默(不阻断布局)。
+  useEffect(() => {
+    if (!authChecked) return
+    let cancelled = false
+    listAlerts({ status: 'new', pageSize: 1 })
+      .then((res) => { if (!cancelled) setPendingAlerts(res.total) })
+      .catch(() => { /* 徽标拉取失败不影响布局 */ })
+    return () => { cancelled = true }
+  }, [authChecked, location.pathname])
+
+  const navItems: NavItem[] = NAV_ITEMS.map((item) =>
+    item.key === 'alerts' && pendingAlerts > 0 ? { ...item, badge: pendingAlerts } : item,
+  )
+
   // 等 /auth/me 回应再渲染,防 401 时先闪一帧后台 UI
   if (!authChecked) {
     return (
@@ -121,7 +139,7 @@ export function AdminLayoutWrapper() {
 
   return (
     <AdminLayout
-      navItems={NAV_ITEMS}
+      navItems={navItems}
       activeKey={activeKey}
       onNavChange={(key) => navigate(KEY_TO_PATH[key] ?? '/')}
       collapsed={collapsed}
@@ -129,7 +147,7 @@ export function AdminLayoutWrapper() {
       appName="管理后台"
       userName={user?.name ?? '当前用户'}
       userRole={user ? ROLE_LABEL[user.role] : ''}
-      notificationCount={3}
+      notificationCount={pendingAlerts}
       headerActions={
         <div className="flex items-center gap-3">
           <div className="text-right">

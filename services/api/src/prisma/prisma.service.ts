@@ -105,6 +105,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.auditLog
   }
 
+  // ── Sprint 1 / Task 3: 运营告警 ─────────────────────────────────────────────
+
+  get alert() {
+    return this.client.alert
+  }
+
   // ── BE-7 W2 ────────────────────────────────────────────────────────────────
 
   get jobFair() {
