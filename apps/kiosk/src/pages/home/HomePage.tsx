@@ -283,7 +283,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     tiles: [
       { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source' },
       { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source' },
-      { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates' },
+      { title: '简历素材库', icon: BookOpenIcon, disabled: true },
       { title: '职业规划', icon: CompassIcon, disabled: true },
       { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },
       { title: '求职材料', icon: FileBadge2Icon, disabled: true },
@@ -322,7 +322,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: '文档打印', icon: FileTextIcon, to: '/print/upload' },
       { title: '证件复印', icon: ClipboardCheckIcon, disabled: true },
       { title: '纸质扫描', icon: ScanLineIcon, to: '/scan/start' },
-      { title: '云打印', icon: CloudUploadIcon, to: '/print/upload' },
+      { title: '云打印', icon: CloudUploadIcon, disabled: true },
       { title: '格式转换', icon: FileType2Icon, disabled: true },
       { title: '证件照打印', icon: ImageIcon, disabled: true },
     ],
