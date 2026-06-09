@@ -282,7 +282,6 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source' },
       { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source' },
       { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates' },
-      { title: 'AI模拟面试', icon: HeadphonesIcon, disabled: true },
       { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },
       { title: '求职材料', icon: FileBadge2Icon, disabled: true },
     ],
