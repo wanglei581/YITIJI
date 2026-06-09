@@ -40,6 +40,8 @@ export type AuditAction =
   | 'order.refund'
   // Sprint 1 / Task 3:运营告警处理(admin)
   | 'alert.status_change'
+  // Sprint 1 / Task 4:合作机构资料维护(partner)
+  | 'partner.profile_update'
 
 export type AuditTargetType =
   | 'file'
@@ -52,6 +54,7 @@ export type AuditTargetType =
   | 'system'
   | 'order'
   | 'alert'
+  | 'partner'
 
 export interface AuditLogRecord {
   id: string

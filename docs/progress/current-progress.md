@@ -5,6 +5,28 @@
 
 ---
 
+## Sprint 1 / Task 4：Partner Profile 可编辑 + 表单 UI/UX（2026-06-09，Mavis，全栈）
+
+> 分支：`feature/sprint1-partner-profile`（stacked 在 `feature/sprint1-admin-alerts` 之上）。
+
+**目标：** 合作机构后台「机构资料」从静态 mock 展示，变为可读取 / 可编辑 / 可保存的真实 Profile。本轮**只做机构资料维护**。
+
+**后端（新建）：**
+- `Organization` 扩 6 个可空列（creditCode/contactPhone/contactEmail/address/description/websiteUrl）+ migration `20260609140000_add_org_profile_fields`（非破坏性 `ALTER TABLE ADD COLUMN` 经 `prisma db execute` 注入 dev.db）。`contactName` 复用既有 `contact` 列（单一真相源，admin 机构列表同读）；机构状态用既有 `enabled`，未引入 reviewStatus/publishStatus（不适用机构主体）。
+- 新模块 `services/api/src/partner-profile/`（**Partner 鉴权** `@Roles('partner')`，orgId 强制取自 JWT，复用 `PARTNER_ORG_REQUIRED` 守卫）：`GET /api/v1/partner/profile`、`PATCH /api/v1/partner/profile`。
+- 校验（class-validator，无新依赖）：机构名称 / 联系人 / 联系电话必填；邮箱、官网链接填写则校验格式；简介 ≤500 字。
+- audit 契约新增 `partner` targetType + `partner.profile_update` action（[shared](../../packages/shared/src/types/audit.ts) + [api 副本](../../services/api/src/audit/audit.types.ts) 双处同步）；app.module 注册 `PartnerProfileModule`。
+
+**前端（`apps/partner`）：**
+- 新增 [profile.ts](../../apps/partner/src/services/api/profile.ts)（http + mock 双 adapter）+ index 导出。
+- [profile/index.tsx](../../apps/partner/src/routes/profile/index.tsx) 重写：去 MOCK_PROFILE → 真实 service；只读视图 +「编辑资料 / 保存 / 取消」编辑态；机构基础信息 / 联系人信息 / 资质·状态 三块；客户端校验（必填 + 邮箱/URL 格式 + 简介限长）镜像后端；loading / **未初始化空态（暂无机构资料）** / error / 保存中 / 保存成功·失败反馈齐全。机构类型 / 合作状态只读（管理员维护）。移除原 mock 场景/模块/绑定终端展示。
+
+**合规：** 仅机构主体资料维护，**不涉招聘闭环**（无候选人 / 简历 / 面试 / Offer / 平台收简历）；不做 Partner Dashboard、不做岗位/招聘会导入；保存写 AuditLog。
+
+**验证：** `api typecheck/lint` ✅；新增 `verify:partner-profile` ✅（7 项：读取映射 / 更新落库+changedFields / 空串归一 / orgId 空→PARTNER_ORG_REQUIRED / 不存在→PARTNER_PROFILE_NOT_FOUND / 审计 partner.profile_update）；回归 `verify:admin-alerts`·`verify:admin-orders`·`verify:order` ✅；`shared/partner typecheck` ✅、`partner lint/build` ✅。**浏览器实跑手验待办**（partner 登录走真实后端）。**未 commit。**
+
+---
+
 ## Sprint 1 / Task 3：Admin Alerts 真实化 + 告警处理 UI/UX（2026-06-09，Mavis，全栈）
 
 > 分支：`feature/sprint1-admin-alerts`（stacked 在 `feature/sprint1-admin-orders` 之上）。

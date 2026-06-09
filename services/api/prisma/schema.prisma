@@ -141,8 +141,18 @@ model Organization {
   id         String   @id
   name       String
   type       String
+  // contact = 联系人姓名（Partner Profile 的 contactName 复用此列，单一真相源；admin 机构列表同读）
   contact    String?
   enabled    Boolean  @default(true)
+
+  // ── Sprint 1 / Task 4: 合作机构资料（Partner Profile 可编辑字段，全部可空，向后兼容）──
+  creditCode   String?  // 统一社会信用代码
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  description  String?  // 机构简介
+  websiteUrl   String?  // 外部官网 / 来源链接
+
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

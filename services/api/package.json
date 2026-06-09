@@ -25,6 +25,7 @@
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
     "verify:admin-orders": "node -r @swc-node/register scripts/verify-admin-orders.ts",
     "verify:admin-alerts": "node -r @swc-node/register scripts/verify-admin-alerts.ts",
+    "verify:partner-profile": "node -r @swc-node/register scripts/verify-partner-profile.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",
