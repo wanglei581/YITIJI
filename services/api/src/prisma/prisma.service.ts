@@ -177,6 +177,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalScreensaverConfig
   }
 
+  // ── 智慧校园(Smart Campus)──────────────────────────────────────────────
+
+  get terminalSmartCampusConfig() {
+    return this.client.terminalSmartCampusConfig
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

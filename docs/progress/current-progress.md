@@ -5,6 +5,59 @@
 
 ---
 
+## Kiosk 首页与「我的」页面功能结构冻结（2026-06-09，用户确认）
+
+**决策：** 以当前 Kiosk 首页功能结构和「我的」页面为主线版本，后续不再变动、不再重排、不再新增/删除入口。后续开发向前推进，优先做后台/学校端开关、数据接入、真实能力、接口联调、验证上线等工作。
+
+**执行约束：**
+- 不再改动首页业务分类、功能瓦片、导航结构与可点/不可点状态，除非用户后续明确要求。
+- 不再改动「我的」页面当前信息架构与入口布局，除非用户后续明确要求。
+- 新功能若需要入口，优先进入对应后台、学校端、配置端或已有功能子页面，不主动改变首页和「我的」页面。
+- Claude / Codex / Mavis 跨模型接力时，先遵守本冻结决策，再继续后续阶段任务。
+
+---
+
+## Kiosk 智慧校园首页模块恢复与学校端开关接入（2026-06-09，Mavis）
+
+**背景：** 用户希望恢复之前做过的「智慧校园」能力，并调整成学校/终端可控的校园专属模块：学校合作场景开启后，在 Kiosk 首页以横向内容区展示；关闭后首页完全不保留空白。智慧校园包含迎新系统、校园大数据、行李帮运、VR校园等校园服务，但不得采集个人学生数据。
+
+**处理：**
+- 恢复智慧校园共享类型与 Kiosk/API/Admin 基础代码：`SmartCampusModuleKey`、`KioskSmartCampusConfig`、`DEFAULT_SMART_CAMPUS_MODULES`、Kiosk 配置 hook、Admin 配置页、NestJS `SmartCampusModule`。
+- 在 Prisma schema 中新增 `TerminalSmartCampusConfig`，按 `terminalId` 保存 `enabled + modulesJson`，支持终端注册前预置；API 端注册 `SmartCampusModule`，`PrismaService` 暴露 `terminalSmartCampusConfig` delegate。
+- Admin 后台新增「智慧校园」菜单和路由 `/smart-campus`，用于按终端配置是否开启及子模块开关。
+- Kiosk 新增智慧校园路由：`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
+- 首页 [HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx) 新增 `SmartCampusHorizontalSection`：按 `useSmartCampusConfig()` 判断，`enabled=false` 或无模块开启时直接 `return null`，不占首页空间；开启时在首页服务卡片后插入一整条横向「智慧校园」内容区，不使用 fixed/absolute，不遮挡上方业务卡或底部导航。
+- 智慧校园服务中心恢复并调整：迎新系统、校园大数据、行李帮运、VR校园按终端模块开关显示；校园大数据进入 `/smart-campus/freshman-insights` 聚合看板；行李帮运/VR校园进入服务说明页。
+- 首页岗位信息板块文案将「海量机会，精准匹配」收口为「多类岗位，来源清晰」，避免暗示平台撮合/推荐。
+
+**合规边界：**
+- 智慧校园仅作为校方授权服务入口和信息展示，不在 Kiosk 端采集学生个人信息。
+- 新生大数据仅展示聚合统计（男女比例、年龄分布、热门专业、生源地、学院报到进度等），不含任何个人身份数据。
+- 行李帮运、VR校园、校园卡/一卡通/校园网均为说明与指引，不代办收费、不接招聘闭环。
+
+**验证：** `pnpm --filter @ai-job-print/shared typecheck` ✅、`pnpm --filter @ai-job-print/api typecheck` ✅、`pnpm --filter @ai-job-print/admin typecheck` ✅、`pnpm --filter @ai-job-print/kiosk typecheck` ✅、`pnpm --filter @ai-job-print/kiosk lint` ✅（0 error，仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）、`pnpm --filter @ai-job-print/admin lint` ✅、`pnpm --filter @ai-job-print/api lint` ✅、`pnpm --filter @ai-job-print/kiosk build` ✅（仅既有 chunk-size warning）。
+
+---
+
+## Kiosk 社会招聘会 / 校园招聘会新版页面恢复（2026-06-09，Mavis）
+
+**背景：** 用户反馈首页「社会招聘会」「校园招聘会」入口打开后变回第一批旧页面。排查确认：当前工作分支 `feature/remove-resume-service-center` 基于 `main` 继续做简历服务中心收口，但未包含之前 `feature/jobfair-revamp` / `feature/fair-detail-5tab` 中的招聘会新版页面提交，因此同一路由仍指向旧版 `JobFairsPage` / `CampusPage` 实现。
+
+**处理：**
+- 恢复新版社会招聘会页面到现有路由 `/job-fairs`：彩色招聘会卡片、关键词搜索、全国省/市/区地区筛选、日期筛选、状态筛选、扫码预约、详情/导览入口。
+- 恢复新版招聘会详情页到现有路由 `/job-fairs/:id`：详情与特色、参展企业与岗位、数据大屏、地图/导航二维码、活动资料打印入口。
+- 恢复新版校园招聘会页面到现有路由 `/campus`：沉浸式 5 Tab（企业速览 / 参展企业 / 导览图 / AI求职服务 / 打印服务）。
+- 恢复新版页面依赖：`RegionPicker`、`FairCalendarPopover`、`FairDataScreen`、`MapBlock`、`regions.ts`、地图导航 URL 工具、招聘会 mock/data adapter 与共享 DTO 补充字段，并引入 `china-division` 用于全国地区选择。
+- 第一批旧页面已被新版同路径文件覆盖，首页已有「社会招聘会」→ `/job-fairs`、「校园招聘会」→ `/campus`，无需新增入口或改变首页结构。
+
+**合规收口：**
+- 按项目红线移除新版校园页中越界的「AI匹配率 / 岗位推荐 / 匹配度」展示与文案，仅保留岗位信息查询、来源平台跳转和扫码预约语义。
+- `/resume` 旧入口仍按上一轮规则兼容重定向到 `/resume/source`；新版校园页内相关入口改为直达 `/resume/source`，不恢复已删除的简历服务中心中间页。
+
+**验证：** `pnpm --filter @ai-job-print/shared typecheck` ✅、`pnpm --filter @ai-job-print/api typecheck` ✅、`pnpm --filter @ai-job-print/kiosk typecheck` ✅、`pnpm --filter @ai-job-print/kiosk lint` ✅（0 error，仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）、`pnpm --filter @ai-job-print/api lint` ✅、`pnpm --filter @ai-job-print/kiosk build` ✅（仅既有 chunk-size warning）。
+
+---
+
 ## Kiosk 移除「AI 简历服务中心」中间页（导航结构收口，2026-06-09，Claude）
 
 **背景：** 首页 AI 简历服务区域的功能瓦片已直达各功能（上一轮首页改造），但仍保留 `/resume`「AI 简历服务中心」中间页，造成「点瓦片 → 进服务中心 → 再选一次功能」的二次选择。本轮做纯导航结构收口：删除中间页，所有入口直达真实功能。**不新增真实 AI/OCR 能力，不新增 mock，不改合规边界，不把未上线功能改成可点。**
