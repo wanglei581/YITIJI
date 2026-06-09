@@ -1,7 +1,34 @@
 # 当前开发进度
 
-> 最后更新：2026-06-08
+> 最后更新：2026-06-09
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## Kiosk 首页参考图风格改造（2026-06-09，Codex）
+
+**目标：** 按用户提供的首页 UI/UX 参考图，把 Kiosk 首页改为「顶部求职招聘会现场图 + 登录/匿名身份横条 + 六大业务分类卡片」结构，并把当前项目已有功能按分类放到对应区域。保留合规边界：岗位/招聘会只做第三方/官方来源信息入口，不做平台内投递或招聘闭环。
+
+**改动范围：**
+- 重写 [apps/kiosk/src/pages/home/HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx)：
+  - 新增顶部照片 Hero，文案为「AI求职打印一体机」，下方叠放登录/匿名/已登录三态身份横条。
+  - 首页主区改为 2 列业务分类卡片，视觉对齐参考图的白色大圆角卡片、浅灰功能小卡、线框图标、功能色分组。
+  - 分类调整为：AI简历服务、岗位信息、招聘会、打印扫描、AI面试训练、政策服务。
+  - AI简历服务内放入：AI简历诊断、AI简历优化、简历素材库、AI模拟面试、简历打印、求职材料；未真实打通项保持「即将上线」诚实状态。
+  - 招聘会板块将原招聘会入口改为「社会招聘会」，新增「校园招聘会」和「扫码签到」入口；扫码签到当前为即将上线，不伪造签到闭环。
+  - 打印扫描板块包含文档打印、证件复印、纸质扫描、云打印、格式转换、证件照打印，对应现有路由或说明页。
+  - 底部保留合规提示：投递与预约请前往来源平台完成。
+- 新增首页 Hero 图素材：[apps/kiosk/public/assets/kiosk-home-hero-job-fair.png](../../apps/kiosk/public/assets/kiosk-home-hero-job-fair.png)，由内置 imagegen 生成，用于替代纯色/渐变顶部背景。
+
+**验证：**
+- `eslint apps/kiosk/src/pages/home/HomePage.tsx` 通过。
+- `tsc --noEmit -p apps/kiosk/tsconfig.json` 当前仍被既有依赖问题阻断：`SourceUrlQr.tsx` 与 `LoginPage.tsx` 找不到 `qrcode.react` 类型/模块（根因：`qrcode.react` 已在 `apps/kiosk/package.json` 声明但本机 `node_modules` 未安装，与本次首页改动无关）；首页自身未再产生 TS 未使用项。
+- 内置浏览器尝试打开 `http://127.0.0.1:5173` 被当前浏览器安全策略拒绝，未做绕过；本次未完成浏览器截图验收。
+
+**Claude 跟进审查（2026-06-09）：**
+- 合规修正：岗位信息组的「智能匹配」瓦片改名为「全部岗位」（→ /jobs），与 2026-06-08 定稿规范"移除秒哒越界文案（智能匹配等）"保持一致，不暗示平台撮合候选人。
+- 确认旧首页「AI 在青岛」入口（→ /qingdao）本次被移除，该页面暂无首页入口（产品已确认接受，后续可在政策服务补回）。
+- 待办（不阻塞提交）：①身份横条为固定宽横向布局，需在真机/真视口核对竖屏 9:16 是否挤压溢出；②disabled 瓦片「求职材料/证件复印」指向 `feature/materials`、`feature/copy`，而 `PrintScanFeatureInfoPage` 仅支持 `id-photo|convert|sign`，当前 disabled 不可达、无害，去 disabled 前需先补对应 feature。
 
 ---
 
@@ -2624,7 +2651,7 @@ pnpm verify:job-sync
 | 2026-06-01 | W3 端到端 demo 验证（Partner→Webhook→Admin→Kiosk）：12 步链路全过 — partner1 登录 → POST /partner/data-sources(accessMode=webhook, credentialConfigured=true, webhookSecretOnce 一次性返回) → HMAC 签名推送 → admin 登录 → GET /admin/job-sources 见 pending/draft → PATCH review approve(→approved/draft) → PATCH publish(→published) → Kiosk GET /jobs 看到岗位；防重放 401 / 错签名 401 / 候选人字段注入 400 / 后续 GET 不再回显 webhookSecret(credentialConfigured=true 持久标志保留) 全部通过 | Claude Code |
 | 2026-06-01 | W8 BullMQ API pull worker 完成（feat/w8-bullmq-api-worker）：@nestjs/bullmq + bullmq + ioredis 安装；Prisma JobSource 新增 responseConfig String?（migration 20260601110728）；src/job-sync/ 模块 5 文件（types/service/processor/scheduler/controller/module）；Cron 每 30min 调度 due sources（hourly/daily/weekly）；POST /admin/job-sync/sources/:id/trigger（202，JWT+Admin，Throttle 10/min）+ GET 列表；Admin /sync-sources 页面（配置完整性徽章 + 立即同步）；无 REDIS_URL 时 inline setImmediate fallback；BullMQ jobId 去重+inProgress Set 并发保护；$transaction 整批原子；凭证只服务端解密；reviewStatus/publishStatus 更新不覆写；SyncLog 成功/失败记录（api syncMode）；API/Admin/Partner tsc+lint+build ✅，合规禁词 ✅（0 violations） | Claude Code |
 | 2026-06-01 | Phase 7.11 R4 — Partner Sources 类型对齐 packages/shared：①shared/types/job.ts SyncFrequency 加 'weekly'(原 realtime/hourly/daily/manual 不够覆盖 UI 已有 weekly 选项)、新增 ConnStatus / PartnerDataSourceView(DataSourceConfig 的 UI 投影,扁平、只读、不含敏感字段、保留 credentialConfigured + webhookSecretOnce 语义)；②apps/partner types 改为别名 PartnerDataSource = PartnerDataSourceView, CreateDataSourcePayload.authType 用 shared AuthType, 同时把 FieldMappingRule/MappingValidationError/ImportBatch/ImportRecord/DataSourceConfig re-export 出来供 Excel 映射 UI 后续使用；SyncFreq 保留为 @deprecated 别名;③services/api jobs.service.ts PartnerDataSourceDto 对齐 PartnerDataSourceView 字面量(sourceKind/accessMode/syncFreq/connStatus 不再裸 string)，SSOT 注释指向 shared；UI 行为零变化(只是 FREQ_LABELS 增加 realtime 文案兜底)；端到端 demo 复跑通过、forbidden 字段 GET 不回显校验通过；pnpm -r typecheck/lint/build 全通过 | Claude Code |
-| 2026-06-03 | Dev server HMR `Reconnecting` 修复：三端 Vite 配置显式设置 HMR WebSocket 为 `ws://127.0.0.1:{5173,5174,5175}`，避免浏览器推断到 `0.0.0.0` 或错误端口后反复重连；补齐 admin/partner `ImportMeta.env` 类型声明。验证：kiosk/admin/partner typecheck 全通过；kiosk 本地浏览器打开 `http://127.0.0.1:5173`，控制台显示 `[vite] connected.`，无 Reconnecting。 | Codex |
+| 2026-06-03 | Dev server HMR `Reconnecting` 修复：三端 Vite 配置显式设置 HMR WebSocket 为 `ws://127.0.0.1:{5173,5174,5175}`，避免浏览器推断到 `0.0.0.0` 或错误端口后反复重连；补齐 admin/partner `ImportMeta.env` 类型声明。验证：kiosk/admin/partner typecheck/build 全通过；kiosk 本地浏览器打开 `http://127.0.0.1:5173`，控制台显示 `[vite] connected.`，无 Reconnecting。 | Codex |
 | 2026-06-07 | 记录阶段开发与 UI/UX 节奏原则：后续功能先做到功能可用、流程跑通、测试通过、合规文案正确；功能稳定后做基础 UX 修正；多个核心功能稳定后再集中做 UI/UX 设计、视觉体验、触控屏布局和 AI 数字人引导收口。同步更新 next-tasks.md。 | Codex |
 
 ---

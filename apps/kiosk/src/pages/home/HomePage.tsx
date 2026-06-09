@@ -1,31 +1,30 @@
 import { Button } from '@ai-job-print/ui'
 import {
+  BookOpenIcon,
   BotIcon,
+  BriefcaseBusinessIcon,
   BriefcaseIcon,
   Building2Icon,
-  CalendarIcon,
   ChevronRightIcon,
   ClipboardCheckIcon,
-  ClockIcon,
+  CloudUploadIcon,
+  FileBadge2Icon,
   FileSearchIcon,
   FileTextIcon,
   FileType2Icon,
   GraduationCapIcon,
+  HeadphonesIcon,
+  HelpCircleIcon,
   ImageIcon,
   LandmarkIcon,
-  LayoutTemplateIcon,
-  LogInIcon,
+  LightbulbIcon,
   MapPinIcon,
-  MegaphoneIcon,
-  MessagesSquareIcon,
-  PenToolIcon,
+  MonitorPlayIcon,
   PrinterIcon,
+  QrCodeIcon,
   ScanLineIcon,
-  SchoolIcon,
-  ShieldCheckIcon,
   SparklesIcon,
-  UserRoundIcon,
-  UserSquareIcon,
+  UserCheckIcon,
   WifiIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -35,60 +34,61 @@ import { useAuth } from '../../auth/useAuth'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
 
-// 首页定稿规范见 docs/design/visual-design-spec.md §15（锁定版）。
-// 重要：首页子功能瓦片只镜像各模块服务中心「真实存在」的功能，不臆造；
-// 「即将上线」沿用各中心页的占位态。岗位/招聘会/政策走第三方/官方来源，无任何招聘闭环语义。
+const HERO_IMAGE = '/assets/kiosk-home-hero-job-fair.png'
 
-const card = 'rounded-2xl border border-neutral-200 bg-white shadow-sm'
-
-// ── 顶栏实时时钟（§15.2）─────────────────────────────────────────
 function useClock() {
   const [now, setNow] = useState(() => new Date())
+
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 15_000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => setNow(new Date()), 15_000)
+    return () => clearInterval(timer)
   }, [])
+
   const pad = (n: number) => String(n).padStart(2, '0')
-  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`
   const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()]
-  const date = `${week} ${pad(now.getMonth() + 1)}/${pad(now.getDate())}`
-  return { time, date }
+  return {
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    date: `${week} ${pad(now.getMonth() + 1)}/${pad(now.getDate())}`,
+  }
 }
 
-// ── 机器头顶状态栏（左：一体机名；右：设备状态 + 实时时间）────────
 function KioskTopBar() {
   const { time, date } = useClock()
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-neutral-200 bg-surface px-6 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-600 text-white">
-        <PrinterIcon className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <p className="text-base font-bold leading-tight text-gray-900">AI求职打印服务终端</p>
 
-      <div className="ml-auto flex items-center gap-4">
-        {/* 设备状态：中性提示，真实可用性以打印前检测为准（§15.2，不写死"正常"）。 */}
-        <div className="hidden items-center gap-3 sm:flex" title="设备状态以打印前检测为准">
-          {[
-            { icon: PrinterIcon, label: '打印机' },
-            { icon: WifiIcon, label: '网络' },
-          ].map(({ icon: Icon, label }) => (
-            <span key={label} className="flex items-center gap-1.5 text-sm text-gray-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" aria-hidden="true" />
-              <Icon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-              {label}
-            </span>
-          ))}
+  return (
+    <header className="sticky top-0 z-30 flex h-16 items-center border-b border-white/70 bg-white/92 px-8 shadow-sm backdrop-blur">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+          <PrinterIcon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-lg font-bold leading-none text-slate-950">AI求职打印一体机</p>
+          <p className="mt-1 text-xs font-medium text-slate-500">求职材料 · 招聘会 · 打印扫描</p>
         </div>
-        <div className="flex flex-col items-end border-l border-neutral-200 pl-4 leading-none">
-          <span className="text-lg font-bold tabular-nums text-gray-900">{time}</span>
-          <span className="mt-0.5 text-xs text-gray-400">{date}</span>
+      </div>
+
+      <div className="ml-auto flex items-center gap-5">
+        <div className="hidden items-center gap-3 text-sm font-medium text-slate-500 sm:flex">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+            <PrinterIcon className="h-4 w-4" aria-hidden="true" />
+            打印机
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+            <WifiIcon className="h-4 w-4" aria-hidden="true" />
+            网络
+          </span>
+        </div>
+        <div className="border-l border-slate-200 pl-5 text-right">
+          <p className="text-xl font-bold leading-none tabular-nums text-slate-950">{time}</p>
+          <p className="mt-1 text-xs font-medium text-slate-500">{date}</p>
         </div>
       </div>
     </header>
   )
 }
 
-// ── 登录后数据概览：只接后端允许字段的真实计数（§15.3）────────────
 interface HomeStats {
   resumes: number
   documents: number
@@ -105,24 +105,25 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
       setStats(null)
       return
     }
+
     const token = getToken()
     if (!token) {
       setStats(null)
       return
     }
+
     let alive = true
     setLoading(true)
-    // 仅本人 token 拉真实计数；mock 模式各接口返回 []，即显示 0，不伪造数字。
+
     Promise.all([getMyResumes(token), getMyDocuments(token), getMyAiRecords(token), getMyFavorites(token)])
       .then(([resumes, documents, aiRecords, favorites]) => {
-        if (alive) {
-          setStats({
-            resumes: resumes.length,
-            documents: documents.length,
-            aiRecords: aiRecords.length,
-            favorites: favorites.length,
-          })
-        }
+        if (!alive) return
+        setStats({
+          resumes: resumes.length,
+          documents: documents.length,
+          aiRecords: aiRecords.length,
+          favorites: favorites.length,
+        })
       })
       .catch(() => {
         if (alive) setStats(null)
@@ -130,6 +131,7 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
       .finally(() => {
         if (alive) setLoading(false)
       })
+
     return () => {
       alive = false
     }
@@ -138,340 +140,292 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
   return { stats, loading }
 }
 
-function StatCell({ value, label }: { value: string; label: string }) {
+function HeroSection() {
   return (
-    <div className="px-2 text-center">
-      <p className="text-2xl font-bold leading-none tabular-nums text-gray-900">{value}</p>
-      <p className="mt-1.5 text-xs text-gray-500">{label}</p>
-    </div>
+    <section
+      className="relative min-h-[300px] overflow-hidden bg-slate-900 bg-cover bg-center"
+      style={{ backgroundImage: `url(${HERO_IMAGE})` }}
+      aria-label="AI求职打印一体机欢迎区"
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/74 via-slate-900/36 to-slate-900/8" />
+      <div className="relative flex min-h-[300px] items-center px-10">
+        <div className="flex items-center gap-6">
+          <span className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 text-white shadow-lg ring-1 ring-white/25 backdrop-blur">
+            <PrinterIcon className="h-12 w-12" aria-hidden="true" />
+          </span>
+          <div className="text-white">
+            <p className="text-2xl font-semibold leading-none text-white/90">您好，欢迎使用</p>
+            <h1 className="mt-4 text-5xl font-extrabold leading-tight tracking-normal">AI求职打印一体机</h1>
+            <p className="mt-4 text-xl font-medium text-white/82">简历服务、岗位信息、招聘会服务、打印扫描一站办理</p>
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
 
-// ── 身份区（三态：已登录 / 匿名 / 未登录，§15.3）────────────────
-function IdentitySection() {
+function IdentityPanel() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isLoggedIn, guestMode, displayName, continueAsGuest, logout, getToken } = useAuth()
   const { stats, loading } = useHomeStats(isLoggedIn, getToken)
+
   const goLogin = () => navigate('/login', { state: { from: location.pathname } })
 
   if (isLoggedIn) {
-    const cells: { key: keyof HomeStats; label: string }[] = [
-      { key: 'resumes', label: '简历' },
-      { key: 'documents', label: '文档' },
-      { key: 'aiRecords', label: 'AI记录' },
-      { key: 'favorites', label: '收藏' },
-    ]
     const initial = displayName.replace(/\s/g, '').slice(0, 1) || '我'
+    const cells: { label: string; value: string }[] = [
+      { label: '简历', value: loading || !stats ? '-' : String(stats.resumes) },
+      { label: '文档', value: loading || !stats ? '-' : String(stats.documents) },
+      { label: 'AI记录', value: loading || !stats ? '-' : String(stats.aiRecords) },
+      { label: '收藏', value: loading || !stats ? '-' : String(stats.favorites) },
+    ]
+
     return (
-      <div className={`${card} p-5`}>
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xl font-bold text-primary-600">
-            {initial}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-bold text-gray-900">{displayName}</p>
-            <p className="mt-0.5 text-sm text-gray-500">可查看我的简历、文档、收藏与 AI 记录</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <Button size="lg" variant="secondary" onClick={() => logout()} className="h-12 px-5 text-base">
-              退出登录
-            </Button>
-            <Button size="lg" onClick={() => navigate('/profile')} className="h-12 px-5 text-base">
-              进入我的
-              <ChevronRightIcon className="ml-0.5 h-5 w-5" aria-hidden="true" />
-            </Button>
-          </div>
+      <section className="-mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-blue-50 text-3xl font-bold text-blue-600 ring-4 ring-slate-100">
+          {initial}
         </div>
-        {/* 数据概览：真实计数；加载中显示 —，为 0 显示 0，绝不占位假数 */}
-        <div className="mt-4 grid grid-cols-4 divide-x divide-neutral-100 border-t border-neutral-100 pt-4">
-          {cells.map(({ key, label }) => (
-            <StatCell key={key} value={loading || !stats ? '—' : String(stats[key])} label={label} />
+        <div className="ml-6 min-w-0 flex-1">
+          <p className="truncate text-3xl font-extrabold leading-tight text-slate-950">{displayName}</p>
+          <p className="mt-2 text-lg font-semibold text-slate-500">可查看本人的简历、文档、AI记录和收藏</p>
+        </div>
+        <div className="mr-6 grid w-[360px] grid-cols-4 divide-x divide-slate-100">
+          {cells.map((cell) => (
+            <div key={cell.label} className="text-center">
+              <p className="text-3xl font-extrabold tabular-nums text-slate-950">{cell.value}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{cell.label}</p>
+            </div>
           ))}
         </div>
-      </div>
-    )
-  }
-
-  if (guestMode) {
-    return (
-      <div className={`flex items-center gap-4 ${card} px-5 py-4`}>
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gray-100">
-          <UserRoundIcon className="h-6 w-6 text-gray-500" aria-hidden="true" />
+        <div className="flex shrink-0 gap-3">
+          <Button variant="secondary" size="lg" className="h-16 rounded-2xl px-6 text-lg" onClick={() => logout()}>
+            退出
+          </Button>
+          <Button size="lg" className="h-16 rounded-2xl px-8 text-lg" onClick={() => navigate('/profile')}>
+            进入我的
+            <ChevronRightIcon className="ml-1 h-6 w-6" aria-hidden="true" />
+          </Button>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-gray-900">当前为匿名使用</p>
-          <p className="mt-0.5 text-sm text-gray-500">当前记录仅用于本次服务，登录后可保存记录</p>
-        </div>
-        <Button size="lg" onClick={goLogin} className="h-14 shrink-0 px-5 text-base">
-          <LogInIcon className="mr-1 h-5 w-5" aria-hidden="true" />
-          手机号登录
-        </Button>
-      </div>
+      </section>
     )
   }
 
   return (
-    <div className={`flex flex-col gap-4 ${card} px-5 py-4 sm:flex-row sm:items-center`}>
-      <div className="flex min-w-0 flex-1 items-center gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-50">
-          <UserRoundIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-gray-900">登录后可查看历史简历与服务记录</p>
-          <p className="mt-0.5 text-sm text-gray-500">手机号验证码登录，仅本次会话有效，离开自动退出</p>
-        </div>
+    <section className="-mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
+      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 ring-4 ring-slate-100">
+        <UserCheckIcon className="h-14 w-14" aria-hidden="true" />
       </div>
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="ml-7 min-w-0 flex-1">
+        <p className="text-3xl font-extrabold leading-tight text-slate-950">
+          {guestMode ? '当前为匿名使用' : '欢迎来到求职服务终端'}
+        </p>
+        <p className="mt-2 text-lg font-semibold text-slate-500">
+          {guestMode ? '本次服务记录仅在当前会话中保留' : '登录后可查看更多专属权益和历史服务记录'}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-4">
+        {!guestMode && (
+          <button
+            type="button"
+            onClick={continueAsGuest}
+            className="h-16 rounded-2xl px-7 text-lg font-bold text-slate-500 transition-colors hover:bg-slate-50 active:bg-slate-100"
+          >
+            先使用
+          </button>
+        )}
         <button
           type="button"
-          onClick={continueAsGuest}
-          className="h-14 rounded-xl px-5 text-base font-medium text-gray-500 transition-colors hover:bg-gray-50 active:bg-gray-100"
+          onClick={goLogin}
+          className="flex h-16 min-w-[320px] items-center justify-center rounded-2xl bg-blue-600 px-9 text-2xl font-extrabold text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] transition-colors hover:bg-blue-700 active:bg-blue-800"
         >
-          先使用
+          立即登录 / 注册
+          <ChevronRightIcon className="ml-3 h-8 w-8" aria-hidden="true" />
         </button>
-        <Button size="lg" onClick={goLogin} className="h-14 px-6 text-base">
-          <LogInIcon className="mr-1 h-5 w-5" aria-hidden="true" />
-          手机号登录
-        </Button>
       </div>
-    </div>
+    </section>
   )
 }
 
-// ── 两级模块：子功能镜像各模块服务中心的真实功能（§15.4）─────────
-interface Tile {
-  label: string
-  icon: LucideIcon
-  /** 真实可达路由；缺省表示该子功能尚未上线（不可点） */
-  to?: string
-  state?: Record<string, unknown>
-  /** 即将上线标记（中心页同样标注） */
-  soon?: boolean
-}
-interface ModuleColor {
-  bg: string
-  fg: string
-  hover: string
-}
-interface ModuleDef {
+interface ServiceTile {
   title: string
   icon: LucideIcon
-  route: string
-  color: ModuleColor
-  tiles: Tile[]
+  to?: string
+  state?: Record<string, unknown>
+  disabled?: boolean
 }
 
-// 子功能严格对照各服务中心页（ResumeHomePage / PrintScanHomePage / JobsPage / RenshiPage）。
-const MODULES: ModuleDef[] = [
+interface ServiceGroup {
+  title: string
+  subtitle: string
+  icon: LucideIcon
+  accent: 'blue' | 'green' | 'orange' | 'cyan' | 'purple' | 'pink'
+  tiles: ServiceTile[]
+}
+
+const ACCENT: Record<ServiceGroup['accent'], { text: string; border: string; iconBg: string }> = {
+  blue: { text: 'text-blue-600', border: 'border-blue-200', iconBg: 'bg-blue-50' },
+  green: { text: 'text-emerald-600', border: 'border-emerald-200', iconBg: 'bg-emerald-50' },
+  orange: { text: 'text-orange-600', border: 'border-orange-200', iconBg: 'bg-orange-50' },
+  cyan: { text: 'text-cyan-600', border: 'border-cyan-200', iconBg: 'bg-cyan-50' },
+  purple: { text: 'text-violet-600', border: 'border-violet-200', iconBg: 'bg-violet-50' },
+  pink: { text: 'text-pink-600', border: 'border-pink-200', iconBg: 'bg-pink-50' },
+}
+
+const SERVICE_GROUPS: ServiceGroup[] = [
   {
-    // 对照 ResumeHomePage.ENTRIES
     title: 'AI简历服务',
-    icon: FileTextIcon,
-    route: '/resume',
-    color: { bg: 'bg-blue-50', fg: 'text-blue-600', hover: 'hover:border-blue-300' },
+    subtitle: '智能打造，高薪之选',
+    icon: BriefcaseBusinessIcon,
+    accent: 'blue',
     tiles: [
-      { label: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source' },
-      { label: 'AI简历优化', icon: SparklesIcon, to: '/resume/source' },
-      { label: '简历素材库', icon: LayoutTemplateIcon, to: '/resume/templates' },
-      { label: '面试准备', icon: MessagesSquareIcon, soon: true },
+      { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source' },
+      { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source' },
+      { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates' },
+      { title: 'AI模拟面试', icon: HeadphonesIcon, to: '/assistant' },
+      { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },
+      { title: '求职材料', icon: FileBadge2Icon, to: '/print-scan/feature/materials', disabled: true },
     ],
   },
   {
-    // 对照 PrintScanHomePage.CAPABILITIES
-    title: '打印扫描',
-    icon: PrinterIcon,
-    route: '/print-scan',
-    color: { bg: 'bg-cyan-50', fg: 'text-cyan-600', hover: 'hover:border-cyan-300' },
-    tiles: [
-      { label: '文档打印', icon: FileTextIcon, to: '/print/upload' },
-      { label: '材料扫描', icon: ScanLineIcon, to: '/scan/start' },
-      { label: '照片打印', icon: ImageIcon, to: '/print/upload', state: { category: 'photo' } },
-      { label: '证件照', icon: UserSquareIcon, to: '/print-scan/feature/id-photo', soon: true },
-      { label: '格式转换', icon: FileType2Icon, to: '/print-scan/feature/convert', soon: true },
-      { label: '签名盖章', icon: PenToolIcon, to: '/print-scan/feature/sign', soon: true },
-    ],
-  },
-  {
-    // 对照 JobsPage.TYPE_OPTIONS（岗位分类筛选；深链 /jobs?category=）
     title: '岗位信息',
+    subtitle: '海量机会，精准匹配',
     icon: BriefcaseIcon,
-    route: '/jobs',
-    color: { bg: 'bg-green-50', fg: 'text-green-600', hover: 'hover:border-green-300' },
+    accent: 'green',
     tiles: [
-      { label: '全职岗位', icon: Building2Icon, to: '/jobs?category=fulltime' },
-      { label: '实习岗位', icon: GraduationCapIcon, to: '/jobs?category=intern' },
-      { label: '校招岗位', icon: SchoolIcon, to: '/jobs?category=campus' },
-      { label: '兼职信息', icon: ClockIcon, to: '/jobs?category=parttime' },
+      { title: '全职岗位', icon: Building2Icon, to: '/jobs?category=fulltime' },
+      { title: '实习岗位', icon: GraduationCapIcon, to: '/jobs?category=intern' },
+      { title: '兼职信息', icon: FileTextIcon, to: '/jobs?category=parttime' },
+      { title: '全部岗位', icon: BriefcaseIcon, to: '/jobs' },
     ],
   },
   {
-    // 对照 RenshiPage 四个 Tab（深链 /renshi?tab=）
-    title: '政策服务',
-    icon: LandmarkIcon,
-    route: '/renshi',
-    color: { bg: 'bg-amber-50', fg: 'text-amber-600', hover: 'hover:border-amber-300' },
+    title: '招聘会',
+    subtitle: '校招社招，现场直达',
+    icon: MapPinIcon,
+    accent: 'orange',
     tiles: [
-      { label: '就业政策', icon: LandmarkIcon, to: '/renshi?tab=policy' },
-      { label: '社保指南', icon: ShieldCheckIcon, to: '/renshi?tab=social' },
-      { label: '就业登记', icon: ClipboardCheckIcon, to: '/renshi?tab=register' },
-      { label: '政策公告', icon: MegaphoneIcon, to: '/renshi?tab=notice' },
+      { title: '社会招聘会', icon: MapPinIcon, to: '/job-fairs' },
+      { title: '校园招聘会', icon: BookOpenIcon, to: '/campus' },
+      { title: '扫码签到', icon: QrCodeIcon, disabled: true },
+    ],
+  },
+  {
+    title: '打印扫描',
+    subtitle: '随时随地，极速出纸',
+    icon: PrinterIcon,
+    accent: 'cyan',
+    tiles: [
+      { title: '文档打印', icon: FileTextIcon, to: '/print/upload' },
+      { title: '证件复印', icon: ClipboardCheckIcon, to: '/print-scan/feature/copy', disabled: true },
+      { title: '纸质扫描', icon: ScanLineIcon, to: '/scan/start' },
+      { title: '云打印', icon: CloudUploadIcon, to: '/print/upload' },
+      { title: '格式转换', icon: FileType2Icon, to: '/print-scan/feature/convert' },
+      { title: '证件照打印', icon: ImageIcon, to: '/print-scan/feature/id-photo' },
+    ],
+  },
+  {
+    title: 'AI面试训练',
+    subtitle: '全真模拟，助力过关',
+    icon: HeadphonesIcon,
+    accent: 'purple',
+    tiles: [
+      { title: '模拟面试', icon: MonitorPlayIcon, to: '/assistant' },
+      { title: '面试技巧', icon: LightbulbIcon, to: '/assistant' },
+      { title: '面试报告', icon: FileSearchIcon, disabled: true },
+    ],
+  },
+  {
+    title: '政策服务',
+    subtitle: '权威解读，补贴快申',
+    icon: BookOpenIcon,
+    accent: 'pink',
+    tiles: [
+      { title: '就业政策', icon: HelpCircleIcon, to: '/renshi?tab=policy' },
+      { title: '补贴申请', icon: LandmarkIcon, to: '/renshi?tab=social' },
+      { title: '档案/登记', icon: FileBadge2Icon, to: '/renshi?tab=register' },
     ],
   },
 ]
 
-function TileButton({ tile, color }: { tile: Tile; color: ModuleColor }) {
+function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: ServiceGroup['accent'] }) {
   const navigate = useNavigate()
   const Icon = tile.icon
-  const disabled = !tile.to
+  const colors = ACCENT[accent]
+  const disabled = tile.disabled || !tile.to
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
       className={[
-        'flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white p-3 text-center shadow-sm transition-all duration-150',
+        'group relative flex min-h-[130px] flex-col items-center justify-center gap-4 rounded-[22px] border border-slate-200 bg-slate-50/78 px-3 text-center shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition-all',
         disabled
-          ? 'cursor-not-allowed opacity-60'
-          : `${color.hover} hover:-translate-y-0.5 active:translate-y-0 active:bg-neutral-50`,
+          ? 'cursor-not-allowed opacity-64'
+          : 'hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_12px_24px_rgba(15,23,42,0.1)] active:translate-y-0',
       ].join(' ')}
     >
-      <span className={`flex h-12 w-12 items-center justify-center rounded-xl ${color.bg}`}>
-        <Icon className={`h-6 w-6 ${color.fg}`} aria-hidden="true" />
+      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${colors.border} bg-white`}>
+        <Icon className={`h-7 w-7 ${colors.text}`} aria-hidden="true" />
       </span>
-      <span className="text-sm font-medium leading-tight text-gray-700">{tile.label}</span>
-      {tile.soon && (
-        <span className="rounded-full bg-gray-100 px-1.5 text-[10px] font-medium text-gray-400">即将上线</span>
+      <span className="text-xl font-extrabold leading-tight text-slate-950">{tile.title}</span>
+      {disabled && (
+        <span className="absolute right-3 top-3 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+          即将上线
+        </span>
       )}
     </button>
   )
 }
 
-function ModuleCard({ module }: { module: ModuleDef }) {
+function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   const navigate = useNavigate()
-  const { title, icon: Icon, route, color, tiles } = module
+  const Icon = group.icon
+  const colors = ACCENT[group.accent]
+  const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
+
   return (
-    <section aria-label={title} className="flex flex-col gap-3">
-      <button type="button" onClick={() => navigate(route)} className="flex w-full items-center gap-3 text-left">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${color.bg}`}>
-          <Icon className={`h-6 w-6 ${color.fg}`} aria-hidden="true" />
+    <section className="rounded-[34px] bg-white p-9 shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/80">
+      <button
+        type="button"
+        onClick={() => enabledFirst?.to && navigate(enabledFirst.to)}
+        className="flex w-full items-center gap-6 text-left"
+      >
+        <span className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border ${colors.border} bg-white`}>
+          <Icon className={`h-10 w-10 ${colors.text}`} aria-hidden="true" />
         </span>
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-        <span className="ml-auto flex items-center gap-0.5 text-sm font-medium text-gray-400">
-          全部
-          <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-3xl font-extrabold leading-tight tracking-normal text-slate-950 lg:text-4xl">{group.title}</span>
+          <span className="mt-2 block text-xl font-bold leading-tight text-slate-500 lg:text-2xl">{group.subtitle}</span>
         </span>
       </button>
 
-      <div className="grid grid-cols-3 gap-3">
-        {tiles.map((tile) => (
-          <TileButton key={tile.label} tile={tile} color={color} />
+      <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3">
+        {group.tiles.map((tile) => (
+          <ServiceTileButton key={tile.title} tile={tile} accent={group.accent} />
         ))}
       </div>
     </section>
   )
 }
 
-// ── 单行入口（招聘会 / 校园 / 青岛，§15.5）──────────────────────
-interface EntryBarProps {
-  icon: LucideIcon
-  iconBg: string
-  iconColor: string
-  title: string
-  description: string
-  actionLabel: string
-  onAction: () => void
-}
-
-function EntryBar({ icon: Icon, iconBg, iconColor, title, description, actionLabel, onAction }: EntryBarProps) {
-  return (
-    <button
-      type="button"
-      onClick={onAction}
-      className={`flex w-full items-center justify-between ${card} px-5 py-4 text-left transition-colors hover:bg-gray-50 active:bg-gray-100`}
-    >
-      <div className="flex min-w-0 items-center gap-4">
-        <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg}`}>
-          <Icon className={`h-6 w-6 ${iconColor}`} aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-          <p className="mt-0.5 truncate text-sm text-gray-500">{description}</p>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1 pl-3 text-base font-semibold text-primary-600">
-        <span>{actionLabel}</span>
-        <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
-      </div>
-    </button>
-  )
-}
-
-// ── HomePage ──────────────────────────────────────────────────
 export function HomePage() {
-  const navigate = useNavigate()
-
   return (
-    <div className="flex min-h-full flex-col bg-canvas">
+    <div className="min-h-full bg-[#eef1f5] pb-8">
       <KioskTopBar />
+      <HeroSection />
+      <IdentityPanel />
 
-      <div className="flex flex-1 flex-col gap-6 px-6 py-5">
-        {/* 身份区（三态） */}
-        <IdentitySection />
-
-        {/* 有真实子功能的核心模块（两级） */}
-        {MODULES.map((m) => (
-          <ModuleCard key={m.title} module={m} />
+      <main className="mx-auto mt-10 grid w-[min(1320px,calc(100%-64px))] grid-cols-1 gap-8 pb-6 xl:grid-cols-2">
+        {SERVICE_GROUPS.map((group) => (
+          <ServiceGroupCard key={group.title} group={group} />
         ))}
+      </main>
 
-        {/* 招聘会信息：列表 + 状态筛选，无独立子功能 → 单行入口（不臆造子功能，§15.5） */}
-        <EntryBar
-          icon={CalendarIcon}
-          iconBg="bg-orange-50"
-          iconColor="text-orange-600"
-          title="招聘会信息"
-          description="现场招聘会信息、状态与现场导览"
-          actionLabel="查看招聘会"
-          onAction={() => navigate('/job-fairs')}
-        />
-
-        {/* 附加专区（保留既有入口） */}
-        <EntryBar
-          icon={GraduationCapIcon}
-          iconBg="bg-cyan-50"
-          iconColor="text-cyan-700"
-          title="校园招聘专区"
-          description="应届校招岗位 · 校园双选会 · 简历与材料"
-          actionLabel="进入专区"
-          onAction={() => navigate('/campus')}
-        />
-        <EntryBar
-          icon={MapPinIcon}
-          iconBg="bg-teal-50"
-          iconColor="text-teal-600"
-          title="AI 在青岛"
-          description="青岛就业、政策、高校、园区、城市资讯"
-          actionLabel="进入专区"
-          onAction={() => navigate('/qingdao')}
-        />
-
-        {/* AI 助手入口（底部导航之外，首页保留引导） */}
-        <button
-          type="button"
-          onClick={() => navigate('/assistant')}
-          className={`flex min-h-[56px] w-full items-center gap-3 ${card} px-5 py-3 text-left transition-colors hover:border-primary-200 hover:bg-primary-50 active:bg-primary-100`}
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-            <BotIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-gray-800">不知道怎么操作？</p>
-            <p className="text-xs text-gray-500">问问 AI 助手，快速找到你需要的服务</p>
-          </div>
-          <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-        </button>
-
-        <div className="h-1" />
+      <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-slate-500">
+        <BotIcon className="h-4 w-4" aria-hidden="true" />
+        岗位和招聘会仅作为第三方/官方来源信息入口，投递与预约请前往来源平台完成。
       </div>
     </div>
   )
