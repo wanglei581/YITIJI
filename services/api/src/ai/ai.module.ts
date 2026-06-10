@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { AuthModule } from '../auth/auth.module'
+import { FilesModule } from '../files/files.module'
 import { AiController } from './ai.controller'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
@@ -13,9 +14,14 @@ import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
+import { ResumeExtractionService } from './resume/resume-extraction.service'
+import { OcrService } from './resume/ocr/ocr.service'
+import { DisabledOcrProvider } from './resume/ocr/disabled-ocr.provider'
+import { TencentOcrProvider } from './resume/ocr/tencent-ocr.provider.stub'
 
 @Module({
-  imports: [AuthModule],
+  // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
+  imports: [AuthModule, FilesModule],
   controllers: [AiController, AiConfigController],
   providers: [
     AiService,
@@ -29,7 +35,13 @@ import { AiResultCleanupTask } from './ai-result.cleanup.task'
     LlmConfigService,
     LlmChatService,
     AiResultCleanupTask,
+    // ── Phase 1A 简历文字提取 + OCR 底座 ──
+    ResumeExtractionService,
+    OcrService,
+    DisabledOcrProvider,
+    TencentOcrProvider,
   ],
-  exports: [AiService, AiLogService],
+  // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
+  exports: [AiService, AiLogService, ResumeExtractionService],
 })
 export class AiModule {}

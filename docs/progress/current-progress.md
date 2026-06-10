@@ -5,6 +5,50 @@
 
 ---
 
+## 真实 AI 简历诊断 Phase 1A —— 简历文件文字提取 + OCR 底座（2026-06-10，Claude，`feature/real-resume-extraction-1a`）
+
+**目标：** 把上传的简历文件真实提取为统一 `extractedText`，作为后续 LLM 简历诊断（Phase 1B）的唯一文本输入口。**本轮只做提取层**：不接大模型、不改报告页主 UI、不改 `submitResumeParse` 接线、不碰归属/令牌门禁、不生成任何 mock 报告；失败一律返回明确 `errorCode`，绝不返回假文本。
+
+> 方案文档 `docs/product/real-resume-diagnosis-phase1.md` 在并行分支 `feature/kiosk-fairs-smart-campus`（commit `2a7e586`）上，尚未合入 main，故本分支无此文件；其「OCR 整体列二期、1A 不建脚手架」的原结论已按用户决策调整为「1A 即建 disabled 默认 OCR 脚手架」，待两分支合入 main 后在该方案文档同步此决策。
+
+**新增依赖（纯 JS、零原生绑定，Node 26 / Windows 安全）：**
+- `unpdf ^1.6.2`：PDF 文本层提取（pdf.js serverless 封装，自带打包、无外部依赖）。
+- `mammoth ^1.12.0`：DOCX 正文提取（依赖闭包全为纯 JS：@xmldom/xmldom / jszip / lop 等，无 `.node` / `binding.gyp` / gyp 安装脚本）。
+- 已核：两包闭包内无原生二进制、consumer 安装无编译步骤；`unpdf` 用 `require()` + 本地最小接口规避 commonjs/node10 不读 exports types 的问题（见 [file.types.ts](../../services/api/src/files/file.types.ts) 同源 ESM-interop 说明）。
+
+**新增文件：**
+- [services/api/src/ai/resume/resume-extraction.types.ts](../../services/api/src/ai/resume/resume-extraction.types.ts)：`ResumeExtractionResult`（`ok / text / textSource / confidence / pageCount / charCount / warnings / errorCode / errorMessage`）+ 失败码 union。
+- [services/api/src/ai/resume/resume-extraction.service.ts](../../services/api/src/ai/resume/resume-extraction.service.ts)：`ResumeExtractionService.extractResumeText({ fileId, endUserId? })`，注入 `FilesService` + `OcrService`。
+- OCR Provider 架构（disabled 默认）：[ocr/ocr-provider.interface.ts](../../services/api/src/ai/resume/ocr/ocr-provider.interface.ts)、[ocr/disabled-ocr.provider.ts](../../services/api/src/ai/resume/ocr/disabled-ocr.provider.ts)、[ocr/tencent-ocr.provider.stub.ts](../../services/api/src/ai/resume/ocr/tencent-ocr.provider.stub.ts)、[ocr/ocr.service.ts](../../services/api/src/ai/resume/ocr/ocr.service.ts)。
+- [services/api/scripts/verify-resume-extraction.ts](../../services/api/scripts/verify-resume-extraction.ts) + `verify:resume-extraction` script。
+
+**改动文件：**
+- [ai.module.ts](../../services/api/src/ai/ai.module.ts)：`imports` 加 `FilesModule`；`providers` 加 4 项（ResumeExtractionService / OcrService / Disabled / Tencent）；`exports` 加 `ResumeExtractionService` 供 1B 复用。
+- [files.service.ts](../../services/api/src/files/files.service.ts)：`readContent` 返回值**非破坏性**新增 `purpose` 字段（供提取层做用途白名单校验；既有 `/content` controller 调用解构忽略额外字段，无影响）。
+- [.env.example](../../services/api/.env.example)：新增 OCR 区 `OCR_PROVIDER=disabled` + `TENCENT_OCR_SECRET_ID/SECRET_KEY/REGION`（密钥只读服务端 env）。
+
+**支持的文件类型与失败边界：**
+| 输入 | 结果 |
+|------|------|
+| DOCX（OOXML） | ✅ `textSource='docx'`，confidence=high |
+| 文本型 PDF | ✅ `textSource='pdf_text'`，confidence=high，带 pageCount |
+| 图片 JPG/PNG/WEBP（`OCR_PROVIDER=disabled`，默认） | ❌ `OCR_NOT_CONFIGURED`（诚实失败，不假识别） |
+| 扫描件 / 无文字层 PDF | ❌ `PDF_TEXT_EMPTY` |
+| 旧版 `.doc` / 其它格式 | ❌ `UNSUPPORTED_FILE_TYPE` |
+| 空文件 / 超 20MB | ❌ `FILE_EMPTY` / `FILE_TOO_LARGE` |
+| 文本过短（去空白 < 30 字符） | ❌ `TEXT_TOO_SHORT` |
+| fileId 不存在/已清理 / 非简历用途（白名单 `resume_upload`/`resume_scan`） | ❌ `FILE_NOT_FOUND` / `FILE_PURPOSE_REJECTED` |
+
+**OCR 决策（与既有方案文档的差异，已同步）：** 方案文档原把 OCR 整体列二期、1A 不建脚手架；本轮按用户指令在 1A 即建 **disabled 默认的 OCR Provider 架构** + 腾讯云占位 provider，默认行为与方案一致（图片诚实报错、绝不假识别），区别只是「现在就建好 OCR 抽象层 + env 位」，二期接真实腾讯云 OCR API 时零结构改动。腾讯占位即便配了凭证也只返回 `OCR_FAILED`，绝不返回假文本。
+
+**安全 / 合规：** 提取文本只在内存中流转给下游，不落任何表；我方 Logger 只记元数据（fileId / textSource / charCount / pageCount / 耗时 / 失败码），**绝不记简历原文、buffer、prompt**；文本传下游前按 20000 字符上限截断（截断只影响本次分析，不落库）；OCR / 腾讯密钥只读服务端 env，前端不接触；不新增任何对外发送路径。
+
+**验证：** `verify:resume-extraction` **11/11 ALL PASS**（含哨兵串 `ZZ_SECRET_RESUME_TOKEN_42` 真实提取 + 「日志/返回体无原文泄漏」断言 + tencent 占位不返回假文本）；`@ai-job-print/api` typecheck ✅ / lint ✅；`@ai-job-print/shared` typecheck ✅。脚本内手搓最小 DOCX（stored ZIP + zlib.crc32）与文本型 PDF（精确 xref），**零二进制 fixture 入仓**。
+
+**下一步（Phase 1B）：** 新增 `llm` provider + `LlmResumeService`（复用 `LlmConfigService` 加密凭证 + OpenAI 兼容协议，全局 fetch 不引 SDK），把 `extractedText` → 结构化 `ResumeReport`；`AiService.submitResumeParse` 接入「先提取→失败直接返回→成功传 LLM」；`providerName!=='mock'` 后前端演示横幅自动消失（前端零改动）。
+
+---
+
 ## Kiosk 移除「AI 简历服务中心」中间页（导航结构收口，2026-06-09，Claude）
 
 **背景：** 首页 AI 简历服务区域的功能瓦片已直达各功能（上一轮首页改造），但仍保留 `/resume`「AI 简历服务中心」中间页，造成「点瓦片 → 进服务中心 → 再选一次功能」的二次选择。本轮做纯导航结构收口：删除中间页，所有入口直达真实功能。**不新增真实 AI/OCR 能力，不新增 mock，不改合规边界，不把未上线功能改成可点。**

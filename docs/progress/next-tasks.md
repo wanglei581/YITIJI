@@ -26,12 +26,13 @@
 
 **下一步必须补齐：**
 
-1. **真实文件文字提取 / OCR：**
-   - PDF：提取文本层；扫描版 PDF 需 OCR。
-   - DOC/DOCX：服务端解析正文，不在前端读取内容。
-   - 图片：OCR 识别简历文字。
-   - 所有原文只用于本次 AI 分析与短 TTL 结果，不长期保存。
-2. **真实 AI Provider 接入：** 当前 `openai/claude/qwen/zhipu/local` provider 仍是 stub；需选定一个真实 provider，服务端 env 保存密钥，输出结构化 `ResumeReport`。
+1. ✅ **真实文件文字提取 / OCR 底座（Phase 1A 已完成，2026-06-10，`feature/real-resume-extraction-1a`）：**
+   - ✅ PDF 文本层提取（`unpdf`）；扫描件/无文字层 PDF 诚实返回 `PDF_TEXT_EMPTY`（不假识别）。
+   - ✅ DOCX 服务端解析正文（`mammoth`，前端不读内容）；旧版 `.doc` → `UNSUPPORTED_FILE_TYPE`。
+   - ✅ 图片 OCR 走 **Provider 架构**（`OCR_PROVIDER=disabled|tencent`，默认 disabled → `OCR_NOT_CONFIGURED`；腾讯云 provider 占位预留，二期接真实 API）。
+   - ✅ 原文只在内存流转给下游分析、不落任何表；日志只记元数据，不记原文/buffer。
+   - 新增 `ResumeExtractionService` + `verify:resume-extraction`（11/11 ALL PASS）；api/shared typecheck + api lint 全绿。详见 [current-progress.md](./current-progress.md) §真实 AI 简历诊断 Phase 1A。
+2. 🔄 **真实 AI Provider 接入（Phase 1B，下一步优先）：** `openai/claude/qwen/zhipu/local` provider 仍是 stub；新增 `llm` provider + `LlmResumeService`（复用 `LlmConfigService` 加密凭证 + OpenAI 兼容协议，全局 fetch 不引 SDK），把 Phase 1A 的 `extractedText` → 结构化 `ResumeReport`；`AiService.submitResumeParse` 接入「先提取 → 失败直接返回 → 成功传 LLM」；补 `AI_PROVIDER`（含 `llm`）到 `.env.example`。
 3. **报告结构扩展：** 在现有 `sections + suggestions` 基础上，若要做参考图中的「优势亮点 / 问题风险点 / 下一步建议」，需要扩展 shared 类型和后端结构化输出，不能前端硬编。
 4. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
 

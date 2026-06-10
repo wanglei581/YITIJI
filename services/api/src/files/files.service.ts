@@ -368,10 +368,17 @@ export class FilesService {
 
   // ── 读取文件 buffer(/content 代理;签名校验由 controller 完成)────────────
 
-  async readContent(fileId: string): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
+  async readContent(
+    fileId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
     const record = await this.requireAlive(fileId)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
-    return { buffer, mimeType: record.mimeType, filename: record.filename }
+    return {
+      buffer,
+      mimeType: record.mimeType,
+      filename: record.filename,
+      purpose: record.purpose as FilePurpose,
+    }
   }
 
   // ── 列表(admin)─────────────────────────────────────────────────────────
