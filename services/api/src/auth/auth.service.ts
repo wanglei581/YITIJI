@@ -42,6 +42,14 @@ export class AuthService {
       throw this.loginFailed()
     }
 
+    // 阶段1B:机构授权停用 → 该机构 partner 账号一并禁止登录
+    // (与 jobs.service 导入路径的 org.enabled 校验形成登录 + 写入双闸)。
+    if (role === 'partner') {
+      if (!user.orgId) throw this.loginFailed()
+      const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+      if (!org || !org.enabled) throw this.loginFailed()
+    }
+
     const token = this.jwtService.sign({
       sub:   user.id,
       role,

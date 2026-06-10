@@ -12,7 +12,7 @@
 **阶段1 三端数据打通 + 补写操作（消灭"有界面有 mock 但改不了"）：**
 
 - ✅ **1A Admin 招聘会管理接真**（`feature/admin-fairs-management`，2026-06-10）：FairMaterial 模型 + Admin 内容运营 CRUD（基本信息/企业/展区/活动资料/统计）+ Kiosk materials 公开端点接真。`verify:admin-fairs` 21 PASS。详见 [current-progress.md](./current-progress.md) §阶段1A。
-- ⏳ **1B Admin 合作机构管理接真**：partners 页 271 行 mock → 机构列表/新增机构+开账号/授权启停/详情抽屉。
+- ✅ **1B Admin 合作机构管理接真**（`feature/admin-partners-management`，2026-06-10）：Organization 档案字段 + /admin/orgs CRUD + 授权启停双闸（登录+导入）+ 机构账号开通/启停/重置密码。`verify:admin-orgs` 14 PASS。详见 [current-progress.md](./current-progress.md) §阶段1B。
 - ⏳ **1C Partner 岗位/招聘会编辑能力**：当前只能导入+下架；补 PATCH 编辑端点（编辑后 reviewStatus 重置 pending 走重审）+ 前端编辑表单。
 - ⏳ **1D 政策服务接真**：Kiosk RenshiPage 硬编码 → Policy 模型 + Partner 政策公告管理 + Admin 审核发布 + Kiosk 接真。
 - ⏳ **1E Admin 订单/告警/设备页按已有后端接真**：orders 接 PrintTask 真数据；alerts/devices 视后端现状接真或诚实标注。

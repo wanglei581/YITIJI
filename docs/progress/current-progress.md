@@ -5,7 +5,29 @@
 
 ---
 
-## 阶段1A —— Admin 招聘会管理接真后端（内容运营 CRUD + 活动资料）（2026-06-10，Claude，`feature/admin-fairs-management`）
+## 阶段1B —— Admin 合作机构管理接真后端（机构档案 + 授权启停 + 后台账号）（2026-06-10，Claude，`feature/admin-partners-management`）
+
+**目标：** 替换 Admin `partners` 页 271 行纯 mock（启停/配置按钮一直 disabled），建立合作机构真实管理链路：机构档案、授权启停、机构后台账号开通/启停/重置密码。
+
+**Schema（additive，migration `20260610130000_org_partner_profile`）：**
+- `Organization` 增 `sceneTemplate`、`enabledModulesJson`（shared SceneTemplate / EnabledModule，本地副本校验）；`contactPhone` 在 dev.db 已作为历史 drift 列存在（连同 creditCode 等无引用废弃列），本迁移起正式入 schema 声明，PG 重整时保留 contactPhone、丢弃其余无引用 drift 列。
+- 复用既有 `enabled` 作为**授权总开关**，形成双闸：`auth.service` 登录校验（本轮新增：partner 登录时机构必须存在且 enabled）+ `jobs.service` 导入路径既有 org.enabled 校验。
+
+**后端（新模块 [src/orgs/](../../services/api/src/orgs/)）：**
+- `GET/POST /admin/orgs`、`GET/PATCH /admin/orgs/:id`、`PATCH /admin/orgs/:id/status`（enable/disable）
+- 账号管理：`POST /admin/orgs/:id/accounts`、`PATCH .../accounts/:accountId/status`、`PATCH .../accounts/:accountId/password`（重置）
+- 安全/合规：密码 bcrypt(10) 单向落库,任何响应/审计/日志**绝不出现明文密码或 passwordHash**；启用模块白名单 = shared EnabledModule,招聘闭环模块（in_platform_apply / candidate_management / resume_delivery_to_enterprise / interview_invitation / offer_management）→ `MODULE_PROHIBITED` 硬拒绝；未知模块 → `MODULE_UNKNOWN`；全部写操作落 AuditLog（org.create/update/enable/disable + org.account.create/enable/disable/reset_password）。
+- 明确语义：停用机构 = 登录拒 + 导入拒；**已发布数据不自动下架**（如需下架走信息源逐条 unpublish,保持审计可溯）。
+
+**Admin 前端：**
+- 新增 [orgsAdmin.ts](../../apps/admin/src/services/api/orgsAdmin.ts)（http+mock 双适配器）。
+- 重写 [partners/index.tsx](../../apps/admin/src/routes/partners/index.tsx)：真实列表（状态/类型筛选+搜索+分页）、新增机构抽屉（含可选初始账号,场景模板选择自动回填默认模块）、详情抽屉（档案编辑 + 启用模块多选 + 账号列表/新增/启停/重置密码 + 数据计数）、机构启停两步确认。原 mock 的"绑定终端数"列无模型支撑 → 移除不造假；"审核中"状态当前无机构审批流 → 不虚构,状态仅 合作中/已停用。
+
+**验证（全绿）：** `verify:admin-orgs` **14 PASS / ALL PASS**（创建机构+初始账号 bcrypt 可登录 / 响应不含 passwordHash·明文密码 / 档案编辑落库 / 招聘闭环模块硬拒绝 / 未知模块拒绝 / 机构停用→登录拒·恢复→登录恢复 / 账号停用恢复 / 重置密码旧失效新生效 / 用户名冲突 409 / 计数一致 / 8 类审计齐全且无明文密码）；api+admin typecheck/lint/build 全绿；禁词 0 命中。
+
+---
+
+## 阶段1A —— Admin 招聘会管理接真后端（内容运营 CRUD + 活动资料）（2026-06-10，Claude，`feature/admin-fairs-management`，已 FF 合入 main `c7fd423`）
 
 > 背景：用户确认「三端数据打通」总路线（阶段1 数据打通 → 阶段2 AI 求职功能第一批 5 项，参考阿里百炼求职专区筛选后的合规清单，见 next-tasks.md §阶段路线）。本段为阶段1 第一刀。
 

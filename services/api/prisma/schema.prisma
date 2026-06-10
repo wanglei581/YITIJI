@@ -90,11 +90,22 @@ model PrintTaskStatusLog {
 //   'school_employment_center' | 'public_employment_service' |
 //   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source'
 
+// type 取值 = shared PartnerType:
+//   'school_employment_center' | 'public_employment_service' | 'licensed_hr_agency'
+//   | 'fair_organizer' | 'enterprise_source'
+// sceneTemplate 取值 = shared SceneTemplate('school' | 'public_employment' | 'licensed_hr_service')。
+// enabledModulesJson:JSON 数组,取值 = shared EnabledModule;招聘闭环模块(PROHIBITED_MODULES)
+//   服务端硬拒绝,任何配置都写不进来。
+// enabled 是授权总开关:false → 该机构 partner 账号无法登录(auth)、导入/写接口拒绝(jobs.service 既有校验)。
+
 model Organization {
   id         String   @id
   name       String
   type       String
   contact    String?
+  contactPhone String?
+  sceneTemplate String?
+  enabledModulesJson String @default("[]")
   enabled    Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
