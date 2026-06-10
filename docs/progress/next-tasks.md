@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-08（会员「我的打印订单」只读列表 MVP 已完成 `feature/member-print-orders-readonly`，verify 6 组 ALL PASS，待运行期手验；Phase C-1 会员登录安全收口 + 首页登录状态栏已完成；**Phase C-2A 匿名 AI 简历结果一次性 accessToken 安全收口已完成**（`feature/ai-anon-access-token`，verify 12 类断言 ALL PASS，待运行期手验）；AI求职材料中心 B-2 各最小契约已推进，B-1 浏览器链路已手验；新增「个人资产中心 + 权益活动 + 服务套餐」产品规划 Phase C-2 ~ C-6；明确后续功能先完成测试/流程/功能闭环，再进入集中 UI/UX 设计收口）
+> 最后更新：2026-06-10（Phase 1B 真实 AI 简历诊断运行期成功链路已补齐：有效 DeepSeek Key 下 DOCX/PDF → completed/providerName=llm/固定 5 维度，失败链路与隐私抽查通过；后续继续 OCR、报告导出/打印、报告结构扩展、optimize 真实化）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -37,9 +37,7 @@
 4. 🔄 **报告结构扩展（Phase 1.1）：** 在现有 `sections + suggestions` 基础上扩「优势亮点 / 问题风险点 / 下一步建议」（参考图三块），需扩 shared/后端类型 + diagnose prompt JSON schema + 前端卡片，不前端硬编。
 5. 🔄 **AI 简历优化真实化（Phase 1E）：** 当前 `llm` provider 的 optimizeResume 诚实返回 failed；后续补「基于真实报告的表达优化」单轮 LLM 调用。
 6. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
-7. 🔄 **运行期手验（2026-06-10 headless 已做大半，剩成功报告卡失效 key）：** 已用真实 API（`AI_PROVIDER=llm`+`local` 存储，端口 3019）跑通真实 HTTP 链路：启动/DI、providerName=llm、图片→`OCR_NOT_CONFIGURED`、`.doc`→`UNSUPPORTED`、归属令牌 200/404/404、落库与日志无简历原文均通过；诊断上游 DeepSeek 返回真实失败也走了诚实 failed、不伪造、不 fallback。详见 [current-progress.md](./current-progress.md) §Phase 1B 运行期手验。
-   - 🚧 **阻塞（凭证）：后台 DeepSeek API Key 已失效（上游 401）**，导致「真实成功诊断报告」未拿到。**需轮换有效 Key**（Admin「AI模型配置」更新 DeepSeek/qwen/minimax key + enabled，或 `AI_LLM_API_KEY` 首启兜底）后重启复跑，即得真实报告。
-   - ⏳ 换 key 后补浏览器/一体机手验：上传 DOCX/PDF → 报告无演示横幅、内容随简历变化、只含固定 5 维度；`AI_PROVIDER=mock` → 横幅回来。
+7. ✅ **运行期手验（2026-06-10，headless HTTP + 页面级检查已补齐）：** 有效 DeepSeek Key 下，后台模型测试 `ok:true`；真实 API（`AI_PROVIDER=llm` + `local` 存储）上传合成无 PII DOCX / 文本型 PDF → `status=completed`、`providerName=llm`、固定 5 维度、suggestions=6；图片→`OCR_NOT_CONFIGURED`、`.doc`→`UNSUPPORTED` 诚实失败；落库与日志无简历原文/明文 token；Kiosk 报告页 `providerName=llm` 时无「演示数据」横幅。详见 [current-progress.md](./current-progress.md) §Phase 1B 运行期手验。
 
 ---
 

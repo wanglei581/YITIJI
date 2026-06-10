@@ -1,11 +1,11 @@
 # 当前开发进度
 
-> 最后更新：2026-06-09
+> 最后更新：2026-06-10
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
 
-## 真实 AI 简历诊断 Phase 1B 运行期手验（2026-06-10，Claude，headless HTTP + 真实 DeepSeek）
+## 真实 AI 简历诊断 Phase 1B 运行期手验（2026-06-10，Claude + Mavis，headless HTTP + 真实 DeepSeek）
 
 **方式：** CLI headless 等价手验（非浏览器）。以 shell 覆盖启动真实 API（`AI_PROVIDER=llm` + `OCR_PROVIDER=disabled` + `FILE_STORAGE_DRIVER=local`，端口 3019，**不改 `.env`、不碰生产 COS**），用合成无 PII 测试简历跑真实 HTTP 链路：`POST /files/kiosk-upload` → `POST /resume/parse` → 真实 DeepSeek → `GET /resume/records/:taskId`。临时驱动脚本用完即删、未提交。
 
@@ -17,12 +17,15 @@
 - **隐私（落库 + 日志）**：`AiResumeResult.payloadJson` 不含简历原文哨兵；API 日志 grep 哨兵 **0 命中**；`[AI-LOG]` 行只有元数据（taskId/provider/operation/latency/status/errorCode），无简历原文 / prompt / LLM 响应正文。
 - **诚实失败（真实上游错误）**：见下方阻塞项——DeepSeek 返回 401 时，代码只记状态码 `resume diagnose http 401`（无正文）→ 返回 `status:'failed'` + 诚实 failReason，**绝不伪造报告、绝不 fallback mock**。即「未配置/失败明确失败」用一次真实上游失败验证通过。
 
-**🚧 阻塞项（凭证，非代码）：真实成功报告未拿到。**
-- DOCX / 文本 PDF 提取成功并真实调用 DeepSeek，但**后台配置的 DeepSeek API Key 已失效**：上游返回 **HTTP 401 Unauthorized**（连通性探针 `api.deepseek.com` 也回 401，确认网络出口正常、是 key 问题）。
-- 结果：诊断 `status:'failed'`，failReason「AI 诊断服务暂时不可用」。这是**预期内的诚实失败**，但导致**「真实成功诊断报告」这一头条项无法在本轮演示**。
-- **解法（你来做）**：在 Admin「AI模型配置」更新有效的 DeepSeek（或 qwen/minimax）Key（或设 `AI_LLM_API_KEY` 首启兜底），`enabled=true`，重启 API 后复跑即可得真实报告。轮换 key 后建议补一次浏览器/一体机手验：上传 DOCX/PDF → 报告无演示横幅、内容随简历变化、只含固定 5 维度。
+**✅ 阻塞已解除（凭证，非代码）：真实成功报告已补齐。**
+- 初次手验时 DOCX / 文本 PDF 已提取成功并真实调用 DeepSeek，但后台配置的 DeepSeek API Key 失效，上游返回 **HTTP 401 Unauthorized**（连通性探针 `api.deepseek.com` 也回 401，确认网络出口正常、是 key 问题）。代码当时诚实返回 `status:'failed'`，没有伪造报告、没有 fallback mock。
+- 用户在 Admin「AI模型配置」更新有效 DeepSeek Key 后，Mavis 复测：`POST /admin/ai-config/test` 返回 `ok:true`，样例回复正常。
+- 真实 HTTP 成功链路复测：合成无 PII DOCX 与文本型 PDF 均 `status:'completed'`、`providerName:'llm'`、`hasReport:true`、suggestions=6，报告只含固定 5 个维度（基础信息完整度 / 教育经历完整度 / 实习/项目经历表达 / 技能关键词覆盖 / 排版可读性）。
+- 失败链路复测：图片 JPG 在 `OCR_PROVIDER=disabled` 下仍 `OCR_NOT_CONFIGURED` 诚实失败；旧 `.doc` 仍 `UNSUPPORTED_FILE_TYPE` 诚实失败，均不生成假报告。
+- 隐私复测：API 日志不含测试简历哨兵 / prompt；`AiResumeResult.payloadJson` 不含简历原文哨兵、不含明文 accessToken，匿名 accessTokenHash 为 64 位 hash；固定 5 维度落库完整。
+- Kiosk 报告页页面级检查：`providerName='llm'` 时「演示数据」横幅不出现，报告边界提示与 5 维度正常展示。Playwright 直接注入报告 state 时出现 Recharts 宽高 warning（非本次后端链路阻塞，后续若真实上传浏览器流复现再单独处理）。
 
-**结论：** 真实链路除「成功诊断报告」外全部验证通过（启动/DI、providerName、提取门控、归属令牌、隐私、诚实失败）；成功报告卡在**失效的 DeepSeek 凭证**，属配置问题、非代码问题，待换有效 Key 后复跑。
+**结论：** Phase 1B 运行期成功链路已补齐；真实 DOCX/PDF → 提取 → LLM 诊断 → 落库 → Kiosk 真实报告展示的核心闭环通过。剩余为图片 OCR 真实接入、报告导出/打印、报告结构扩展、optimize 真实化等后续阶段任务。
 
 ---
 
