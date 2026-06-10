@@ -7,9 +7,11 @@ import { ClaudeProvider } from './providers/claude.provider.stub'
 import { LocalAiProvider } from './providers/local.provider.stub'
 import { QwenProvider } from './providers/qwen.provider.stub'
 import { ZhipuProvider } from './providers/zhipu.provider.stub'
+import { LlmResumeProvider } from './providers/llm.provider'
 import { AiLogService } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
+import { ResumeExtractionService } from './resume/resume-extraction.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 
@@ -50,7 +52,7 @@ const AI_RESUME_RESULT_TTL_HOURS = ((): number => {
 // ============================================================
 
 const KNOWN_PROVIDERS: readonly AiProviderName[] = [
-  'mock', 'openai', 'claude', 'local', 'qwen', 'zhipu',
+  'mock', 'openai', 'claude', 'local', 'qwen', 'zhipu', 'llm',
 ] as const
 
 /**
@@ -93,9 +95,11 @@ export class AiService {
     private readonly localProvider: LocalAiProvider,
     private readonly qwenProvider: QwenProvider,
     private readonly zhipuProvider: ZhipuProvider,
+    private readonly llmResumeProvider: LlmResumeProvider,
     private readonly logService: AiLogService,
     private readonly llmConfig: LlmConfigService,
     private readonly llmChat: LlmChatService,
+    private readonly resumeExtraction: ResumeExtractionService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {
@@ -116,6 +120,7 @@ export class AiService {
       local:  this.localProvider,
       qwen:   this.qwenProvider,
       zhipu:  this.zhipuProvider,
+      llm:    this.llmResumeProvider,
     }
     this.provider = providerMap[name]
   }
@@ -168,7 +173,33 @@ export class AiService {
   async submitResumeParse(input: ParseResumeInput, endUserId?: string | null): Promise<ParseResumeOutput> {
     const t0 = Date.now()
     try {
-      const result = await this.provider.parseResume(input)
+      // 真实诊断路径（llm provider）：先服务端提取简历文本。提取失败 → 直接返回明确原因，
+      // 不调 LLM、不落假报告。mock / stub provider 保持原行为（自包含演示，不提取）。
+      let result: ParseResumeOutput
+      let extractionErrorCode: string | undefined
+      if (this.provider.name === 'llm') {
+        const extraction = await this.resumeExtraction.extractResumeText({
+          fileId: input.fileId,
+          endUserId: endUserId ?? null,
+        })
+        if (!extraction.ok) {
+          extractionErrorCode = extraction.errorCode
+          result = {
+            taskId: `extract-fail-${randomBytes(8).toString('hex')}`,
+            status: 'failed',
+            failReason: extraction.errorMessage ?? '简历文件无法提取文本，请重新上传',
+          }
+        } else {
+          result = await this.provider.parseResume({
+            ...input,
+            extractedText: extraction.text,
+            extractedPageCount: extraction.pageCount,
+          })
+        }
+      } else {
+        result = await this.provider.parseResume(input)
+      }
+
       const resultWithProvider: ParseResumeOutput = { ...result, providerName: this.provider.name }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
@@ -182,6 +213,7 @@ export class AiService {
         operation: 'parseResume',
         latencyMs: Date.now() - t0,
         status:    resultWithProvider.status === 'failed' ? 'failed' : 'success',
+        ...(extractionErrorCode ? { errorCode: extractionErrorCode } : {}),
       })
       return accessToken ? { ...resultWithProvider, accessToken } : resultWithProvider
     } catch (err) {

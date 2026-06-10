@@ -18,6 +18,8 @@ import { ResumeExtractionService } from './resume/resume-extraction.service'
 import { OcrService } from './resume/ocr/ocr.service'
 import { DisabledOcrProvider } from './resume/ocr/disabled-ocr.provider'
 import { TencentOcrProvider } from './resume/ocr/tencent-ocr.provider.stub'
+import { LlmResumeService } from './resume/llm-resume.service'
+import { LlmResumeProvider } from './providers/llm.provider'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
@@ -40,6 +42,9 @@ import { TencentOcrProvider } from './resume/ocr/tencent-ocr.provider.stub'
     OcrService,
     DisabledOcrProvider,
     TencentOcrProvider,
+    // ── Phase 1B 真实 LLM 简历诊断（AI_PROVIDER=llm）──
+    LlmResumeService,
+    LlmResumeProvider,
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   exports: [AiService, AiLogService, ResumeExtractionService],

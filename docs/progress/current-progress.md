@@ -5,6 +5,46 @@
 
 ---
 
+## 真实 AI 简历诊断 Phase 1B —— LLM 结构化诊断报告（2026-06-10，Claude，`feature/real-resume-diagnosis-1b`，基于 1a）
+
+**目标：** 把 Phase 1A 的 `ResumeExtractionService` 接进 `AiService.submitResumeParse`，让 `AI_PROVIDER=llm` 时上传简历后走真实闭环：**提取文本 → 调后台配置的大模型 → 结构化 `ResumeReport` → 落 `AiResumeResult` → 前端按真实报告渲染、演示横幅自动消失**。失败一律明确报错，绝不伪造、绝不 fallback mock。
+
+**真实数据流（AI_PROVIDER=llm）：**
+```
+POST /resume/parse { fileId }
+  → AiService.submitResumeParse
+     ① ResumeExtractionService.extractResumeText(fileId)  （Phase 1A）
+     ② 提取失败 → status:'failed' + failReason（不调 LLM、不落假报告）
+     ③ 提取成功 → LlmResumeProvider.parseResume({ ...input, extractedText })
+          → LlmResumeService.diagnose(text)  单轮结构化 JSON，OpenAI 兼容，全局 fetch
+          → 非法 JSON 重试一次；仍失败 → status:'failed'（明确错误，无半截报告）
+     ④ persistResult（payloadJson 只存 report，不含原文）+ providerName='llm'
+```
+
+**新增文件：**
+- [services/api/src/ai/resume/llm-resume.service.ts](../../services/api/src/ai/resume/llm-resume.service.ts)：`LlmResumeService.diagnose(text)` —— 复用 `LlmConfigService` 加密凭证（与 AI 助手对话同源），单轮、低 temperature(0.2)、固定 5 维度评分 prompt、严格 JSON 解析 + 强校验、非法重试一次、suggestions 过 `enforceForbiddenWords`；**出错只记状态码，绝不记 prompt/提取文本/请求·响应正文**（区别于 LlmChatService）。
+- [services/api/src/ai/providers/llm.provider.ts](../../services/api/src/ai/providers/llm.provider.ts)：`LlmResumeProvider`（`name='llm'`），parseResume 串「提取文本 → diagnose」，任何失败返回 `status:'failed'+failReason`，**不伪造报告**；optimizeResume 诚实返回 failed（真实化留 Phase 1E）；chat 走 LlmChatService 不经本 provider。
+- [services/api/scripts/verify-real-resume-diagnosis.ts](../../services/api/scripts/verify-real-resume-diagnosis.ts) + `verify-real-resume-diagnosis` script（本地 stub HTTP LLM 端点，离线零费用）。
+
+**改动文件：**
+- [ai.service.ts](../../services/api/src/ai/ai.service.ts)：`KNOWN_PROVIDERS`/`providerMap` += `llm`；构造注入 `LlmResumeProvider` + `ResumeExtractionService`；`submitResumeParse` **仅对 `provider.name==='llm'` 路径**先提取再诊断（mock/stub 保持原行为，演示稳定、不破坏 `verify:ai-result-ownership`），失败/成功共用同一 persist/token/log 收口。
+- [ai.module.ts](../../services/api/src/ai/ai.module.ts)：providers += `LlmResumeService` + `LlmResumeProvider`。
+- 类型 SSOT 两处 `AiProviderName` += `'llm'`（[shared/ai.ts](../../packages/shared/src/types/ai.ts) + [interfaces/ai-provider.interface.ts](../../services/api/src/ai/interfaces/ai-provider.interface.ts)）；`ParseResumeInput` += `extractedText?`/`extractedPageCount?`（**服务端内部注入，不来自前端**）。
+- [.env.example](../../services/api/.env.example)：新增 `AI_PROVIDER`（含 `llm`）说明块。
+- [verify-ai-result-ownership.ts](../../services/api/scripts/verify-ai-result-ownership.ts)：同步 `AiService` 构造的两个新位参（mock 路径不触达，空桩即可）。
+
+**依赖后台模型配置：** `llm` provider 复用管理员后台「AI模型配置」（`LlmConfigService`，DeepSeek/通义/MiniMax，OpenAI 兼容，AES-256-GCM 加密落盘）。`isReady()===false`（未配置/未启用）→ 诊断明确失败，**绝不 fallback mock**。密钥只读服务端，前端只读 `apiKeyConfigured`。
+
+**未配置 / 失败时如何提示：** 提取失败→对应 errorCode 文案；模型未配置→「AI 诊断模型尚未配置，请联系管理员后重试」；非法输出/超时→「AI 诊断服务暂时不可用，请稍后重试」。均为 `status:'failed'+failReason` 在响应体内，前端失败页展示，不抛裸 500、不显示半截报告。
+
+**安全 / 合规：** 简历原文不落库（`payloadJson` 只存派生 report）；prompt/提取文本/LLM 请求响应正文不写日志/审计（`AiLogService` 仅记 provider/operation/latency/status/errorCode）；诊断 prompt 显式禁止编造经历、禁录用/投递/面试/Offer/企业匹配结论、建议不回贴原文；suggestions 过禁用词护栏；归属/令牌门禁（C-1/C-2A）完全沿用、未改动。
+
+**验证：** `verify-real-resume-diagnosis` **10/10 ALL PASS**（提取失败不调 LLM / DOCX 成功调 LLM 出结构化报告 / 非法 JSON 重试一次 / 重试仍失败明确错误 / providerName=llm / payloadJson 无原文哨兵 / 日志无原文哨兵 / 未配置明确失败不 fallback mock / 匿名·会员 accessToken 门禁完好）；`verify:resume-extraction` 11/11 回归 ✅；`verify:ai-result-ownership` 12 例回归 ✅（构造改动未破坏门禁）；api/shared typecheck ✅ + api lint ✅。stub LLM 端点本地起，零外部费用。
+
+**下一步：** ① **图片 OCR 真实接入**（当前仍是 Phase 1A 的 Provider 架构 + disabled，腾讯云 OCR 占位未接真实 API）；② **报告导出 / 打印**（须真实生成 PDF/DOCX 报告文件并落 `FileObject` 后才重开「打印报告」按钮，当前仍禁用）；③ 报告结构扩展（strengths/issues/nextSteps，Phase 1.1）；④ optimize 真实化（Phase 1E）；⑤ Kiosk 运行期手验（真实 API + `AI_PROVIDER=llm` + 后台配好模型）。
+
+---
+
 ## 真实 AI 简历诊断 Phase 1A —— 简历文件文字提取 + OCR 底座（2026-06-10，Claude，`feature/real-resume-extraction-1a`）
 
 **目标：** 把上传的简历文件真实提取为统一 `extractedText`，作为后续 LLM 简历诊断（Phase 1B）的唯一文本输入口。**本轮只做提取层**：不接大模型、不改报告页主 UI、不改 `submitResumeParse` 接线、不碰归属/令牌门禁、不生成任何 mock 报告；失败一律返回明确 `errorCode`，绝不返回假文本。

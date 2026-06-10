@@ -11,7 +11,8 @@
 
 export type AiTaskStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
-export type AiProviderName = 'openai' | 'claude' | 'qwen' | 'zhipu' | 'local' | 'mock'
+// 'llm'：复用后台 LlmConfigService 加密凭证（OpenAI 兼容）的真实简历诊断 provider（Phase 1B）。
+export type AiProviderName = 'openai' | 'claude' | 'qwen' | 'zhipu' | 'local' | 'mock' | 'llm'
 
 // ─── 简历解析类型 ────────────────────────────────────────────
 
@@ -33,6 +34,14 @@ export interface ParseResumeInput {
   fileName: string
   fileFormat: string
   source: 'upload' | 'scan' | 'manual'
+  /**
+   * 服务端提取的简历文本（Phase 1B）。由 AiService 在调 provider 前经
+   * ResumeExtractionService 提取后注入；**不来自前端**（前端只发 fileId）。
+   * mock/stub provider 忽略此字段；llm provider 据此调真实大模型。
+   */
+  extractedText?: string
+  /** 提取到的 PDF 页数（可得时）。 */
+  extractedPageCount?: number
 }
 
 export interface ParseResumeOutput {

@@ -24,6 +24,7 @@ export type AiProviderName =
   | 'zhipu'     // 智谱 GLM 系列
   | 'local'     // 本地部署模型（如 Ollama）
   | 'mock'      // 开发/测试 mock 模式
+  | 'llm'       // 复用后台 AI 模型配置的真实简历诊断（OpenAI 兼容，Phase 1B）
 
 // ─── 简历解析 ────────────────────────────────────────────────
 

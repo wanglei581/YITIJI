@@ -32,9 +32,12 @@
    - ✅ 图片 OCR 走 **Provider 架构**（`OCR_PROVIDER=disabled|tencent`，默认 disabled → `OCR_NOT_CONFIGURED`；腾讯云 provider 占位预留，二期接真实 API）。
    - ✅ 原文只在内存流转给下游分析、不落任何表；日志只记元数据，不记原文/buffer。
    - 新增 `ResumeExtractionService` + `verify:resume-extraction`（11/11 ALL PASS）；api/shared typecheck + api lint 全绿。详见 [current-progress.md](./current-progress.md) §真实 AI 简历诊断 Phase 1A。
-2. 🔄 **真实 AI Provider 接入（Phase 1B，下一步优先）：** `openai/claude/qwen/zhipu/local` provider 仍是 stub；新增 `llm` provider + `LlmResumeService`（复用 `LlmConfigService` 加密凭证 + OpenAI 兼容协议，全局 fetch 不引 SDK），把 Phase 1A 的 `extractedText` → 结构化 `ResumeReport`；`AiService.submitResumeParse` 接入「先提取 → 失败直接返回 → 成功传 LLM」；补 `AI_PROVIDER`（含 `llm`）到 `.env.example`。
-3. **报告结构扩展：** 在现有 `sections + suggestions` 基础上，若要做参考图中的「优势亮点 / 问题风险点 / 下一步建议」，需要扩展 shared 类型和后端结构化输出，不能前端硬编。
-4. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
+2. ✅ **真实 AI Provider 接入 / LLM 结构化诊断（Phase 1B 已完成，2026-06-10，`feature/real-resume-diagnosis-1b`）：** 新增 `llm` provider + `LlmResumeService`（复用 `LlmConfigService` 加密凭证 + OpenAI 兼容，全局 fetch 不引 SDK），`AiService.submitResumeParse` 在 `AI_PROVIDER=llm` 时「先提取 → 失败直接返回 → 成功调 LLM 出结构化 `ResumeReport` → 落库」；非法 JSON 重试一次、未配置/失败明确报错不 fallback mock；`providerName='llm'` 演示横幅自动消失（前端零改动）。`verify-real-resume-diagnosis` 10/10 + `verify:ai-result-ownership` 12 例回归 + `verify:resume-extraction` 11/11 全过。补 `AI_PROVIDER`（含 llm）到 `.env.example`。详见 [current-progress.md](./current-progress.md) §真实 AI 简历诊断 Phase 1B。
+3. 🔄 **图片 OCR 真实接入（下一步优先之一）：** 当前仍是 Phase 1A 的 OCR Provider 架构 + 默认 disabled，腾讯云 OCR 为占位（即便配凭证也只 `OCR_FAILED`）。下一步接真实腾讯云 OCR（GeneralAccurateOCR/GeneralBasicOCR，TC3-HMAC-SHA256 v3 签名在服务端，不记图片/原文），让扫描件/图片简历也能进诊断闭环。
+4. 🔄 **报告结构扩展（Phase 1.1）：** 在现有 `sections + suggestions` 基础上扩「优势亮点 / 问题风险点 / 下一步建议」（参考图三块），需扩 shared/后端类型 + diagnose prompt JSON schema + 前端卡片，不前端硬编。
+5. 🔄 **AI 简历优化真实化（Phase 1E）：** 当前 `llm` provider 的 optimizeResume 诚实返回 failed；后续补「基于真实报告的表达优化」单轮 LLM 调用。
+6. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
+7. ⏳ **Kiosk 运行期手验：** 需真实 API + `AI_PROVIDER=llm` + 后台「AI模型配置」配好真实模型；手验上传 PDF/DOCX → 真实报告无演示横幅、内容随简历变化；未配置/图片 → 明确失败提示；`AI_PROVIDER=mock` → 横幅回来。
 
 ---
 

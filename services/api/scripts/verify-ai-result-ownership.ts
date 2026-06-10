@@ -96,9 +96,11 @@ async function main() {
     otherProviderStub,  // localProvider
     otherProviderStub,  // qwenProvider
     otherProviderStub,  // zhipuProvider
+    otherProviderStub,  // llmResumeProvider（mock 路径不用，空桩即可）
     logServiceStub,     // logService（submit/optimize 会调 record）
     emptyStub,          // llmConfig
     emptyStub,          // llmChat
+    emptyStub,          // resumeExtraction（mock 路径不提取，空桩即可）
     prisma,
     emptyStub,          // audit
   )
