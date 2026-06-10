@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-10（Phase 1B 真实 AI 简历诊断运行期成功链路已补齐：有效 DeepSeek Key 下 DOCX/PDF → completed/providerName=llm/固定 5 维度，失败链路与隐私抽查通过；后续继续 OCR、报告导出/打印、报告结构扩展、optimize 真实化）
+> 最后更新：2026-06-10（AI 大模型配置中心 v1 已完成：功能级配置持久化到 `data/ai-model-configs.json`，旧 `ai-model-config.json` 首次迁移到 `assistant_chat` + `resume_diagnosis`；简历诊断读取功能级模型参数但继续强制服务端结构化 System Prompt；后续继续 OCR、报告导出/打印、报告结构扩展、optimize 真实化）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -38,6 +38,13 @@
 5. 🔄 **AI 简历优化真实化（Phase 1E）：** 当前 `llm` provider 的 optimizeResume 诚实返回 failed；后续补「基于真实报告的表达优化」单轮 LLM 调用。
 6. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
 7. ✅ **运行期手验（2026-06-10，headless HTTP + 页面级检查已补齐）：** 有效 DeepSeek Key 下，后台模型测试 `ok:true`；真实 API（`AI_PROVIDER=llm` + `local` 存储）上传合成无 PII DOCX / 文本型 PDF → `status=completed`、`providerName=llm`、固定 5 维度、suggestions=6；图片→`OCR_NOT_CONFIGURED`、`.doc`→`UNSUPPORTED` 诚实失败；落库与日志无简历原文/明文 token；Kiosk 报告页 `providerName=llm` 时无「演示数据」横幅。详见 [current-progress.md](./current-progress.md) §Phase 1B 运行期手验。
+
+### AI 大模型配置中心 v1（2026-06-10，已完成）
+
+- ✅ 功能级配置：`assistant_chat`、`resume_diagnosis` 已接入；`resume_optimize`、`digital_human`、`poster_generation` 为 planned，可独立保存配置但 UI 明确标注「后续接入 / 尚未被运行链路消费」。
+- ✅ 持久化：新文件 `data/ai-model-configs.json`；旧 `data/ai-model-config.json` 保留兼容/回退，首次迁移复制到 `assistant_chat` 与 `resume_diagnosis` 并写入新文件。
+- ✅ 简历诊断边界：`resume_diagnosis` 的 `vendor/model/baseURL/apiKey/temperature/enabled/forbiddenWords` 走功能级配置；诊断结构化 System Prompt 由服务端强制，v1 不消费管理员自定义 `systemPrompt`，避免破坏固定 5 维度 / JSON 契约；`forbiddenWords` 仍作用于 `suggestions`。
+- ✅ 验证：api/admin typecheck + lint 通过，admin build 通过；`verify-real-resume-diagnosis` 通过。`/assistant/chat` 与 DOCX/PDF 诊断已用受控 stub LLM + 本地 API 补跑 HTTP 回归：助手返回小青回复；DOCX/PDF 均 `completed/providerName=llm/sections=5`；配置 GET 不回显 API Key 明文；对抗探针确认非 2xx 上游错误 body sentinel 不进入日志。
 
 ---
 

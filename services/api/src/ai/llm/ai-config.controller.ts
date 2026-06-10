@@ -1,14 +1,14 @@
 // ============================================================
 // AiConfigController — 管理员后台「AI 大模型配置」端点
 //
-// GET  /api/v1/admin/ai-config        读取当前配置（apiKey 只回 configured 布尔）
-// PUT  /api/v1/admin/ai-config        更新配置（可含 apiKey 明文，加密落盘）
-// POST /api/v1/admin/ai-config/test   连通性测试，返回样例回复或错误
+// GET  /api/v1/admin/ai-config        读取功能级配置（apiKey 只回 configured 布尔）
+// PUT  /api/v1/admin/ai-config        更新指定功能配置（可含 apiKey 明文，加密落盘）
+// POST /api/v1/admin/ai-config/test   指定功能连通性测试，返回样例回复或错误
 //
 // 合规：apiKey 绝不回显；仅服务端保存。
 // ============================================================
 
-import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../../common/guards/roles.guard'
 import { Roles } from '../../common/decorators/roles.decorator'
@@ -17,6 +17,7 @@ import { LlmChatService } from './llm-chat.service'
 import { LLM_PRESETS, isLlmVendor } from './llm-presets'
 
 interface UpdateAiConfigDto {
+  feature?:      string
   vendor?:       string
   model?:        string
   baseURL?:      string
@@ -26,6 +27,10 @@ interface UpdateAiConfigDto {
   temperature?:  number
   enabled?:      boolean
   apiKey?:       string
+}
+
+interface TestAiConfigDto {
+  feature?: string
 }
 
 @Controller('admin/ai-config')
@@ -40,8 +45,10 @@ export class AiConfigController {
   @Get()
   get() {
     return {
-      config:  this.config.getView(),
-      presets: Object.values(LLM_PRESETS),
+      config:   this.config.getView('assistant_chat'),
+      configs:  this.config.getViews(),
+      features: this.config.getFeatures(),
+      presets:  Object.values(LLM_PRESETS),
     }
   }
 
@@ -57,11 +64,62 @@ export class AiConfigController {
     if (typeof body.temperature === 'number') patch.temperature = body.temperature
     if (typeof body.enabled === 'boolean')    patch.enabled = body.enabled
     if (body.apiKey !== undefined)       patch.apiKey = body.apiKey
-    return this.config.update(patch)
+    // 旧接口兼容：未带 feature → assistant_chat；带了非法 feature → 400（不静默回落）。
+    const feature = body.feature === undefined ? 'assistant_chat' : this.config.assertValidFeatureKey(body.feature)
+    return this.config.update(patch, feature)
   }
 
   @Post('test')
-  async test() {
-    return this.chat.test()
+  async test(@Body() body: TestAiConfigDto) {
+    const feature = body.feature === undefined ? 'assistant_chat' : this.config.assertValidFeatureKey(body.feature)
+    return this.chat.test(feature)
+  }
+}
+
+@Controller('admin/ai-configs')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+export class AiConfigsController {
+  constructor(
+    private readonly config: LlmConfigService,
+    private readonly chat: LlmChatService,
+  ) {}
+
+  @Get()
+  getAll() {
+    return {
+      config:   this.config.getView('assistant_chat'),
+      configs:  this.config.getViews(),
+      features: this.config.getFeatures(),
+      presets:  Object.values(LLM_PRESETS),
+    }
+  }
+
+  @Get(':featureKey')
+  getOne(@Param('featureKey') featureKey: string) {
+    return {
+      config: this.config.getView(this.config.assertValidFeatureKey(featureKey)),
+      presets: Object.values(LLM_PRESETS),
+    }
+  }
+
+  @Put(':featureKey')
+  updateOne(@Param('featureKey') featureKey: string, @Body() body: UpdateAiConfigDto) {
+    const patch: Parameters<LlmConfigService['update']>[0] = {}
+    if (body.vendor !== undefined && isLlmVendor(body.vendor)) patch.vendor = body.vendor
+    if (body.model !== undefined)        patch.model = body.model
+    if (body.baseURL !== undefined)      patch.baseURL = body.baseURL
+    if (body.systemPrompt !== undefined) patch.systemPrompt = body.systemPrompt
+    if (body.roleScope !== undefined)    patch.roleScope = body.roleScope
+    if (Array.isArray(body.forbiddenWords)) patch.forbiddenWords = body.forbiddenWords
+    if (typeof body.temperature === 'number') patch.temperature = body.temperature
+    if (typeof body.enabled === 'boolean')    patch.enabled = body.enabled
+    if (body.apiKey !== undefined)       patch.apiKey = body.apiKey
+    return this.config.update(patch, this.config.assertValidFeatureKey(featureKey))
+  }
+
+  @Post(':featureKey/test')
+  async testOne(@Param('featureKey') featureKey: string) {
+    return this.chat.test(this.config.assertValidFeatureKey(featureKey))
   }
 }

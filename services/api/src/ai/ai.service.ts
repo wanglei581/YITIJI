@@ -388,8 +388,8 @@ export class AiService {
     const t0 = Date.now()
     const sessionId = input.sessionId ?? `session-${Date.now()}`
     // 配置就绪时走真实大模型（DeepSeek/通义/MiniMax），否则降级到默认 provider
-    const useLlm = this.llmConfig.isReady()
-    const providerLabel = useLlm ? `llm:${this.llmConfig.getConfig().vendor}` : this.provider.name
+    const useLlm = this.llmConfig.isReady('assistant_chat')
+    const providerLabel = useLlm ? `llm:${this.llmConfig.getConfig('assistant_chat').vendor}` : this.provider.name
     try {
       const result = useLlm
         ? await this.llmChat.chat({ ...input, sessionId })

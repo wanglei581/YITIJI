@@ -16,6 +16,7 @@ import type {
   ChatOutput,
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from './llm-config.service'
+import type { AiModelFeatureKey } from './llm-config.service'
 import { buildGuardedSystemPrompt, enforceForbiddenWords } from './llm-guard'
 
 interface ChatMessage {
@@ -51,6 +52,13 @@ const INTENT_RULES: [RegExp, AssistantIntent][] = [
   [/政策|补贴|社保|落户|人社/i,        'policy'],
 ]
 
+
+function safeLogValue(value: unknown, maxChars = 80): string {
+  return String(value ?? '')
+    .replace(/[^a-zA-Z0-9_.:/() -]/g, '')
+    .slice(0, maxChars)
+}
+
 function classifyIntent(message: string): AssistantIntent {
   for (const [re, intent] of INTENT_RULES) {
     if (re.test(message)) return intent
@@ -73,8 +81,8 @@ export class LlmChatService {
 
   async chat(input: ChatInput): Promise<ChatOutput> {
     const sessionId = input.sessionId ?? `session-${Date.now()}`
-    const apiKey = this.config.getApiKey()
-    const cfg = this.config.getConfig()
+    const apiKey = this.config.getApiKey('assistant_chat')
+    const cfg = this.config.getConfig('assistant_chat')
 
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException('AI 模型未配置或未启用')
@@ -92,7 +100,7 @@ export class LlmChatService {
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
-    const rawReply = await this.callLlm(cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages)
+    const rawReply = await this.callLlm('assistant_chat', cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, payloadMessages)
     const reply = enforceForbiddenWords(rawReply, cfg.forbiddenWords)
     if (reply !== rawReply) {
       this.logger.warn('LLM 回复命中禁用词，已替换为范围内兜底回复')
@@ -119,6 +127,8 @@ export class LlmChatService {
 
   // ── 调用 OpenAI 兼容 Chat Completions ─────────────────────
   private async callLlm(
+    featureKey: AiModelFeatureKey,
+    vendor: string,
     baseURL: string,
     apiKey: string,
     model: string,
@@ -136,15 +146,17 @@ export class LlmChatService {
         },
         body: JSON.stringify({ model, messages, temperature, stream: false }),
       })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      this.logger.error(`LLM 请求失败: ${msg}`)
+    } catch {
+      this.logger.error(
+        `LLM 请求失败: category=network_error feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
+      )
       throw new ServiceUnavailableException('AI 模型连接失败')
     }
 
     if (!res.ok) {
-      const body = await res.text().catch(() => '')
-      this.logger.error(`LLM 返回 ${res.status}: ${body.slice(0, 300)}`)
+      this.logger.error(
+        `LLM 上游错误: category=upstream_non_2xx status=${res.status} statusText=${safeLogValue(res.statusText)} feature=${featureKey} vendor=${safeLogValue(vendor)} model=${safeLogValue(model)}`,
+      )
       throw new ServiceUnavailableException(`AI 模型返回错误 (${res.status})`)
     }
 
@@ -159,10 +171,19 @@ export class LlmChatService {
   }
 
   /** 连通性测试：发一条简短消息，返回成功与否 + 样例回复/错误 */
-  async test(): Promise<{ ok: boolean; reply?: string; error?: string }> {
+  async test(feature: AiModelFeatureKey = 'assistant_chat'): Promise<{ ok: boolean; reply?: string; error?: string }> {
     try {
-      const out = await this.chat({ message: '你好，请用一句话自我介绍。', sessionId: `test-${Date.now()}` })
-      return { ok: true, reply: out.reply }
+      const apiKey = this.config.getApiKey(feature)
+      const cfg = this.config.getConfig(feature)
+      if (!apiKey || !cfg.enabled) {
+        throw new ServiceUnavailableException('AI 模型未配置或未启用')
+      }
+      const messages: ChatMessage[] = [
+        { role: 'system', content: buildGuardedSystemPrompt(cfg) },
+        { role: 'user', content: '你好，请用一句话自我介绍。' },
+      ]
+      const rawReply = await this.callLlm(feature, cfg.vendor, cfg.baseURL, apiKey, cfg.model, cfg.temperature, messages)
+      return { ok: true, reply: enforceForbiddenWords(rawReply, cfg.forbiddenWords) }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }

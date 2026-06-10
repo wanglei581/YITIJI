@@ -2,6 +2,7 @@
 // Admin AI 大模型配置页
 //
 // 管理员选择/配置对话大模型（DeepSeek / 通义千问 / MiniMax）：
+//   - 按功能配置 assistant_chat / resume_diagnosis / planned 能力
 //   - 选择厂商 → 自动套用 baseURL/默认模型
 //   - 填写 API Key（写入后端加密保存，不回显）
 //   - 设置系统人设提示词、角色范围、禁用词、温度、启用开关
@@ -16,6 +17,8 @@ import { CheckCircle2Icon, XCircleIcon, KeyRoundIcon, SparklesIcon, ShieldCheckI
 import { Page } from '../Page'
 import {
   aiConfigApi,
+  type AiModelFeatureKey,
+  type AiModelFeatureMeta,
   type AiConfigView,
   type LlmPreset,
   type LlmVendor,
@@ -25,7 +28,10 @@ export default function AiConfigPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
   const [presets, setPresets] = useState<LlmPreset[]>([])
+  const [features, setFeatures] = useState<AiModelFeatureMeta[]>([])
+  const [configs, setConfigs] = useState<Record<AiModelFeatureKey, AiConfigView> | null>(null)
   const [cfg, setCfg]         = useState<AiConfigView | null>(null)
+  const [selectedFeature, setSelectedFeature] = useState<AiModelFeatureKey>('assistant_chat')
 
   // 表单状态
   const [vendor, setVendor]             = useState<LlmVendor>('deepseek')
@@ -44,6 +50,7 @@ export default function AiConfigPage() {
   const [savedTip, setSavedTip]     = useState(false)
 
   const currentPreset = presets.find((p) => p.vendor === vendor)
+  const currentFeature = features.find((f) => f.key === selectedFeature)
 
   const applyConfig = useCallback((c: AiConfigView) => {
     setCfg(c)
@@ -64,13 +71,23 @@ export default function AiConfigPage() {
     try {
       const data = await aiConfigApi.get()
       setPresets(data.presets)
-      applyConfig(data.config)
+      setFeatures(data.features)
+      setConfigs(data.configs)
+      applyConfig(data.configs[selectedFeature] ?? data.config)
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     } finally {
       setLoading(false)
     }
-  }, [applyConfig])
+  }, [applyConfig, selectedFeature])
+
+  function onFeatureChange(feature: AiModelFeatureKey) {
+    setSelectedFeature(feature)
+    setTestResult(null)
+    setSavedTip(false)
+    const next = configs?.[feature]
+    if (next) applyConfig(next)
+  }
 
   useEffect(() => { void load() }, [load])
 
@@ -105,9 +122,10 @@ export default function AiConfigPage() {
     setError(null)
     try {
       const updated = await aiConfigApi.update({
-        vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
+        feature: selectedFeature, vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
         ...(apiKey ? { apiKey } : {}),
       })
+      setConfigs((prev) => prev ? { ...prev, [selectedFeature]: updated } : prev)
       applyConfig(updated)
       setSavedTip(true)
       setTimeout(() => setSavedTip(false), 2500)
@@ -123,12 +141,13 @@ export default function AiConfigPage() {
     setTestResult(null)
     try {
       // 先保存当前配置，再测试，确保测的是最新值
-      await aiConfigApi.update({
-        vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
+      const updated = await aiConfigApi.update({
+        feature: selectedFeature, vendor, model, baseURL, systemPrompt, roleScope, forbiddenWords: parseForbiddenWords(), temperature, enabled,
         ...(apiKey ? { apiKey } : {}),
       })
+      setConfigs((prev) => prev ? { ...prev, [selectedFeature]: updated } : prev)
       setApiKey('')
-      const r = await aiConfigApi.test()
+      const r = await aiConfigApi.test(selectedFeature)
       setTestResult(r)
     } catch (e) {
       setTestResult({ ok: false, error: e instanceof Error ? e.message : '测试失败' })
@@ -137,18 +156,64 @@ export default function AiConfigPage() {
     }
   }
 
-  if (loading) return <Page title="AI 大模型配置"><LoadingState /></Page>
-  if (error && !cfg) return <Page title="AI 大模型配置"><ErrorState message={error} onRetry={load} /></Page>
+  if (loading) return <Page title="AI大模型"><LoadingState /></Page>
+  if (error && !cfg) return <Page title="AI大模型"><ErrorState message={error} onRetry={load} /></Page>
 
   const labelCls = 'block text-sm font-medium text-gray-700 mb-1.5'
   const inputCls = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20'
 
   return (
     <Page
-      title="AI 大模型配置"
-      subtitle="配置 AI 助手对话使用的大模型。API Key 仅保存在服务端，前端不回显。"
+      title="AI大模型"
+      subtitle="按功能配置大模型。API Key 仅保存在服务端，前端不回显。"
     >
-      <div className="max-w-2xl space-y-5">
+      <div className="max-w-3xl space-y-5">
+
+        {/* 功能选择 */}
+        <Card className="p-4">
+          <div className="mb-3">
+            <p className="text-sm font-medium text-gray-900">功能配置</p>
+            <p className="mt-1 text-xs text-gray-500">已接入功能会被运行链路消费；planned 功能可先保存配置，但当前不会影响线上流程。</p>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {features.map((feature) => {
+              const featureConfig = configs?.[feature.key]
+              const configured = Boolean(featureConfig?.enabled && featureConfig.apiKeyConfigured)
+              return (
+                <button
+                  key={feature.key}
+                  type="button"
+                  onClick={() => onFeatureChange(feature.key)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${selectedFeature === feature.key
+                    ? 'border-primary-400 bg-primary-50'
+                    : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-gray-900">{feature.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {configured ? '配置可用' : '未启用'}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-orange-50 text-orange-700'}`}
+                      >
+                        {feature.status === 'active' ? '已接入' : '后续接入'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    {featureConfig ? `${featureConfig.vendor} · ${featureConfig.model} · ${featureConfig.baseURL}` : feature.runtimeNote}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-gray-400">
+                    API Key：{featureConfig?.apiKeyConfigured ? '已配置' : '未配置'} · {feature.runtimeNote}
+                  </p>
+                </button>
+              )
+            })}
+          </div>
+        </Card>
 
         {/* 状态卡 */}
         <Card className="p-4">
@@ -156,10 +221,10 @@ export default function AiConfigPage() {
             <div className="flex items-center gap-2.5">
               <SparklesIcon className="h-5 w-5 text-primary-600" />
               <div>
-                <p className="text-sm font-medium text-gray-900">当前对话模型</p>
+                <p className="text-sm font-medium text-gray-900">当前功能模型：{currentFeature?.label ?? selectedFeature}</p>
                 <p className="text-xs text-gray-500">
                   {currentPreset?.label ?? vendor} · {cfg?.model}
-                  {cfg?.enabled ? '' : '（未启用，AI 助手将走默认应答）'}
+                  {cfg?.enabled ? '' : '（未启用，相关功能会明确失败或走既有默认应答）'}
                 </p>
               </div>
             </div>
@@ -249,7 +314,11 @@ export default function AiConfigPage() {
               rows={5}
               className={`${inputCls} resize-none leading-relaxed`}
             />
-            <p className="mt-1 text-xs text-gray-400">建议保留合规红线说明，避免引导用户在本系统内完成招聘闭环。</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {currentFeature?.allowCustomSystemPrompt === false
+                ? '此功能 v1 不会把管理员自定义 System Prompt 喂给运行链路；服务端会强制固定结构化提示词，避免破坏 JSON 契约。'
+                : '建议保留合规红线说明，避免引导用户在本系统内完成招聘闭环。'}
+            </p>
           </div>
 
           {/* 角色范围 */}
@@ -280,7 +349,7 @@ export default function AiConfigPage() {
               className={`${inputCls} resize-none leading-relaxed`}
               placeholder="每行一个词，也支持用逗号分隔"
             />
-            <p className="mt-1 text-xs text-gray-400">模型回复命中任一禁用词时，后端会直接替换为范围内兜底回复。</p>
+            <p className="mt-1 text-xs text-gray-400">模型回复命中任一禁用词时，后端会替换为范围内兜底回复；简历诊断中仍作用于 suggestions。</p>
           </div>
 
           {/* 温度 + 启用 */}
@@ -300,7 +369,7 @@ export default function AiConfigPage() {
             <label className="flex items-center gap-2 cursor-pointer pt-5">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)}
                      className="h-5 w-5 rounded accent-primary-600" />
-              <span className="text-sm font-medium text-gray-700">启用大模型对话</span>
+              <span className="text-sm font-medium text-gray-700">启用当前功能模型</span>
             </label>
           </div>
         </Card>

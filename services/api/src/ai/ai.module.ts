@@ -12,7 +12,7 @@ import { QwenProvider } from './providers/qwen.provider.stub'
 import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
-import { AiConfigController } from './llm/ai-config.controller'
+import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
 import { OcrService } from './resume/ocr/ocr.service'
@@ -24,7 +24,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   imports: [AuthModule, FilesModule],
-  controllers: [AiController, AiConfigController],
+  controllers: [AiController, AiConfigController, AiConfigsController],
   providers: [
     AiService,
     AiLogService,

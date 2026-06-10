@@ -6,7 +6,7 @@ import { enforceForbiddenWords } from '../llm/llm-guard'
 // ============================================================
 // LlmResumeService — 真实简历诊断（单轮、结构化 JSON，OpenAI 兼容协议）
 //
-// - 复用 LlmConfigService 的加密凭证（与 AI 助手对话同源），不引入任何 SDK，用全局 fetch。
+// - 复用 LlmConfigService 的 resume_diagnosis 功能级加密凭证，不引入任何 SDK，用全局 fetch。
 // - 单轮调用：固定 5 维度评分 + 可执行建议；严格 JSON 输出，非法重试一次。
 // - 合规：低 temperature 求稳；禁止编造经历 / 录用·投递·面试结论；建议不回贴原文。
 // - 安全：出错只记 status / 状态码，**绝不记 prompt / 提取文本 / 请求·响应正文**
@@ -65,8 +65,8 @@ export class LlmResumeService {
    * - 连接 / HTTP 错误 → 抛 AI_DIAGNOSIS_UNAVAILABLE。
    */
   async diagnose(extractedText: string): Promise<ResumeReport> {
-    const apiKey = this.config.getApiKey()
-    const cfg = this.config.getConfig()
+    const apiKey = this.config.getApiKey('resume_diagnosis')
+    const cfg = this.config.getConfig('resume_diagnosis')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({
         error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: 'AI 诊断模型尚未配置或未启用，请联系管理员' },

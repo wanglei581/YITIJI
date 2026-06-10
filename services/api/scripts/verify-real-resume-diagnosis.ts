@@ -100,9 +100,9 @@ async function main(): Promise<void> {
     enabled: true,
   }
   const configuredConfig = {
-    getApiKey: () => 'stub-key',
-    getConfig: () => ({ ...baseConfig }),
-    isReady: () => true,
+    getApiKey: (feature?: string) => feature === 'resume_diagnosis' ? 'stub-key' : null,
+    getConfig: (feature?: string) => ({ ...baseConfig, enabled: feature === 'resume_diagnosis' }),
+    isReady: (feature?: string) => feature === 'resume_diagnosis',
   }
   const unconfiguredConfig = {
     getApiKey: () => null,
@@ -223,7 +223,7 @@ async function main(): Promise<void> {
         { key: 'education', label: '教育经历完整度', score: 9, maxScore: 10 },
         { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
         { key: 'skills', label: '技能关键词覆盖', score: 5, maxScore: 10 },
-        { key: 'extra', label: '企业匹配度', score: 10, maxScore: 10 },
+        { key: 'extra', label: '非固定维度', score: 10, maxScore: 10 },
       ],
       suggestions: ['项目描述建议量化成果', '技能区补充岗位相关关键词', '个人简介精简至 2-3 句'],
     })

@@ -3,6 +3,16 @@ import { API_BASE_URL, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
 export type LlmVendor = 'deepseek' | 'qwen' | 'minimax'
+export type AiModelFeatureKey = 'assistant_chat' | 'resume_diagnosis' | 'resume_optimize' | 'digital_human' | 'poster_generation'
+
+export interface AiModelFeatureMeta {
+  key: AiModelFeatureKey
+  label: string
+  status: 'active' | 'planned'
+  description: string
+  runtimeNote: string
+  allowCustomSystemPrompt: boolean
+}
 
 export interface LlmPreset {
   vendor:       LlmVendor
@@ -14,6 +24,7 @@ export interface LlmPreset {
 }
 
 export interface AiConfigView {
+  featureKey?:       AiModelFeatureKey
   vendor:           LlmVendor
   model:            string
   baseURL:          string
@@ -26,11 +37,14 @@ export interface AiConfigView {
 }
 
 export interface AiConfigResponse {
-  config:  AiConfigView
-  presets: LlmPreset[]
+  config:   AiConfigView
+  configs:  Record<AiModelFeatureKey, AiConfigView>
+  features: AiModelFeatureMeta[]
+  presets:  LlmPreset[]
 }
 
 export interface UpdateAiConfigBody {
+  feature?:      AiModelFeatureKey
   vendor?:       LlmVendor
   model?:        string
   baseURL?:      string
@@ -69,8 +83,11 @@ async function request<T>(path: string, method: string, body?: unknown): Promise
 }
 
 export const aiConfigApi = {
-  get:    (): Promise<AiConfigResponse> => request('/admin/ai-config', 'GET'),
-  update: (body: UpdateAiConfigBody): Promise<AiConfigView> => request('/admin/ai-config', 'PUT', body),
-  test:   (): Promise<{ ok: boolean; reply?: string; error?: string }> =>
-            request('/admin/ai-config/test', 'POST', {}),
+  get:    (): Promise<AiConfigResponse> => request('/admin/ai-configs', 'GET'),
+  update: (body: UpdateAiConfigBody): Promise<AiConfigView> => {
+    const { feature = 'assistant_chat', ...rest } = body
+    return request(`/admin/ai-configs/${feature}`, 'PUT', rest)
+  },
+  test:   (feature: AiModelFeatureKey): Promise<{ ok: boolean; reply?: string; error?: string }> =>
+            request(`/admin/ai-configs/${feature}/test`, 'POST', {}),
 }

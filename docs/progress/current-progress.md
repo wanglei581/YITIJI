@@ -5,6 +5,27 @@
 
 ---
 
+## AI 大模型配置中心 v1 —— 功能级配置与简历诊断配置解耦（2026-06-10，Coder，`feature/real-resume-diagnosis-1b`）
+
+**目标：** 在 Phase 1B 真实简历诊断成功手验后，把 Admin「AI 大模型配置」从单一全局配置升级为功能级配置中心，为后续 AI 助手、简历诊断、简历优化、数字人/海报等能力分开配置模型打基线；同时确保 `resume_diagnosis` 不被管理员自定义 System Prompt 破坏固定 5 维度 / JSON 契约。
+
+**后端改动：**
+- [services/api/src/ai/llm/llm-config.service.ts](../../services/api/src/ai/llm/llm-config.service.ts)：持久化文件从单一 `data/ai-model-config.json` 升级为功能级 `data/ai-model-configs.json`；保留旧 `ai-model-config.json` 作为兼容/回退来源，首次迁移会把旧配置复制到 `assistant_chat` 与 `resume_diagnosis` 并写入新文件。API Key 仍 AES-256-GCM 加密落盘，前端只读 `apiKeyConfigured`。
+- 新增功能元数据：`assistant_chat`、`resume_diagnosis` 为已接入；`resume_optimize`、`digital_human`、`poster_generation` 为 planned，可独立保存配置但当前运行链路不消费。
+- [ai-config.controller.ts](../../services/api/src/ai/llm/ai-config.controller.ts)：新增 `GET /admin/ai-configs`、`GET /admin/ai-configs/:featureKey`、`PUT /admin/ai-configs/:featureKey`、`POST /admin/ai-configs/:featureKey/test`；保留旧 `GET/PUT/POST /admin/ai-config(/test)` 并映射 `assistant_chat`（也兼容 body.feature 指定功能）。`config` 字段继续兼容旧前端读取 `assistant_chat`。
+- [llm-chat.service.ts](../../services/api/src/ai/llm/llm-chat.service.ts)：AI 助手对话显式读取 `assistant_chat` 配置；连通性测试可按功能测试模型连接。
+- [llm-resume.service.ts](../../services/api/src/ai/resume/llm-resume.service.ts)：简历诊断显式读取 `resume_diagnosis` 的 `vendor/model/baseURL/apiKey/temperature/enabled/forbiddenWords`；**诊断结构化 System Prompt 仍由服务端强制**，v1 不把管理员自定义 `systemPrompt` 喂给简历诊断，避免破坏固定 5 维度与 JSON 输出契约；`forbiddenWords` 仍作用于 `suggestions`。
+
+**Admin UI 改动：**
+- [apps/admin/src/routes/ai-config/index.tsx](../../apps/admin/src/routes/ai-config/index.tsx)：新增功能选择卡片，展示「已接入 / 后续接入」状态；planned 功能文案明确「后续接入，当前尚未被运行链路消费」。
+- 简历诊断功能下方明确提示：该功能 v1 不会使用管理员自定义 System Prompt，服务端会强制固定结构化提示词；禁用词说明补充「简历诊断中仍作用于 suggestions」。
+
+**边界：** 本轮只做 AI 大模型配置中心 v1 与现有 AI 助手 / 简历诊断链路接线；不做 8 维度报告、不做 optimize 真实化、不做 OCR 真实接入、不做导出/打印报告、不 push。
+
+**验证：** `pnpm --filter @ai-job-print/api typecheck` ✅；`pnpm --filter @ai-job-print/api lint` ✅；`pnpm --filter @ai-job-print/admin typecheck` ✅；`pnpm --filter @ai-job-print/admin lint` ✅；`pnpm --filter @ai-job-print/admin build` ✅；`pnpm --filter @ai-job-print/api verify-real-resume-diagnosis` ✅（固定 5 维度、非法 JSON 重试、未配置不 fallback、匿名/会员门禁等全部通过）。运行期回归确认：受控 stub LLM + 本地 API HTTP 回归通过，`assistant_chat` 配置可供 `/assistant/chat` 使用并返回小青回复；`resume_diagnosis` 配置可供 `AI_PROVIDER=llm` 的 DOCX/PDF 诊断继续 `completed/providerName=llm`（固定 5 维度），且 `GET /admin/ai-configs` 不回显 API Key 明文；补充对抗探针验证 LlmChatService 非 2xx 上游错误路径不读取/记录响应 body，`LLM_ERROR_BODY_SENTINEL_12345` 未进入日志，只记录 status/statusText/feature/vendor/model 等安全元数据。
+
+---
+
 ## 真实 AI 简历诊断 Phase 1B 运行期手验（2026-06-10，Claude + Mavis，headless HTTP + 真实 DeepSeek）
 
 **方式：** CLI headless 等价手验（非浏览器）。以 shell 覆盖启动真实 API（`AI_PROVIDER=llm` + `OCR_PROVIDER=disabled` + `FILE_STORAGE_DRIVER=local`，端口 3019，**不改 `.env`、不碰生产 COS**），用合成无 PII 测试简历跑真实 HTTP 链路：`POST /files/kiosk-upload` → `POST /resume/parse` → 真实 DeepSeek → `GET /resume/records/:taskId`。临时驱动脚本用完即删、未提交。
