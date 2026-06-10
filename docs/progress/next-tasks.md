@@ -19,6 +19,8 @@
 
 - ✅ **1F 恢复招聘会/校园招聘新版 UI**（`feature/restore-jobfair-campus-ui`，2026-06-10）：合并 `feature/fair-detail-5tab`（6月8日新版 UI 5 提交）到 main，精细解决 7 文件冲突；/job-fairs 渐变大卡+省市区筛选、/job-fairs/:id 3-Tab（含真实数据大屏）、/campus 沉浸式 5-Tab 全部恢复且走真实 API；合规修正：打印资料只基于真实 FairMaterial（删虚拟 PDF）、/qingdao 删 LOCAL_FAIRS mock 接真、首页「补贴快申/补贴申请」改 info-only 文案。浏览器四页截图验收通过。详见 [current-progress.md](./current-progress.md) §阶段1F。
 
+- ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
+
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**

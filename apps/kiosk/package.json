@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview --port 5173"
+    "preview": "vite preview --port 5173",
+    "verify:jobfair-ui": "node scripts/verify-jobfair-ui.mjs"
   },
   "dependencies": {
     "@ai-job-print/shared": "workspace:*",

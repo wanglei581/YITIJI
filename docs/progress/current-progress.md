@@ -31,6 +31,8 @@
 
 **已知后续：** Kiosk 活动资料"打印"仍为元数据态（真实文件进打印任务链路属后续）;qingdao 重点企业岗位等其余板块仍为静态演示,属青岛专区二期。
 
+**防回退守卫（2026-06-10 补充,按 Mavis 建议,`feature/jobfair-ui-guard`）：** 新增 [apps/kiosk/scripts/verify-jobfair-ui.mjs](../../apps/kiosk/scripts/verify-jobfair-ui.mjs)（`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui`）,把新版 UI 关键结构钉死为 13 项断言:A 新版组件文件齐全 / B 列表页渐变大卡+省市区筛选+日历 / C 详情页 3 Tab+数据大屏+导航 / D 校园页 5 Tab+真实 API / E 路由绑定 / F qingdao LOCAL_FAIRS 不复活+走 getJobFairs / G 首页补贴文案 info-only+入口保留 / H 招聘闭环禁词 0 命中（「去来源平台投递」为合规标准文案,先剔除再查禁词防误报）。任何合并/回滚导致 /job-fairs、/job-fairs/:id、/campus 退回旧页面或 mock/虚拟 PDF 复活,脚本即 FAIL。**今后涉及 kiosk 招聘会/校园招聘的分支,合入前必须跑此脚本。** 13/13 ALL PASS;kiosk typecheck/lint/build 全绿。
+
 ---
 
 ## 阶段1E —— Admin 订单/告警页接真（打印任务流水 + 派生告警）（2026-06-10，Claude，`feature/admin-ops-pages-real`）
