@@ -19,6 +19,7 @@ import type {
   FairMaterialDTO,
   FairLiveStatsDTO,
   FairZoneBreakdown,
+  FairIndustrySlice,
 } from '@ai-job-print/shared'
 import type {
   FairCompany,
@@ -41,6 +42,18 @@ import {
 // 内部转换函数
 // ──────────────────────────────────────────────────────────────
 
+/** 按已录参展企业的 industry 聚合行业分布（数据大屏柱状图）。 */
+function computeIndustryDistribution(companies: FairCompany[]): FairIndustrySlice[] {
+  const counts = new Map<string, number>()
+  for (const c of companies) {
+    const key = c.industry?.trim() || '其他'
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
 function toJobFairDTO(fair: ExternalJobFair): ExternalJobFairDTO {
   const companies     = FAIR_COMPANIES_MAP[fair.id] ?? []
   const materials     = FAIR_MATERIALS_MAP[fair.id] ?? []
@@ -51,6 +64,7 @@ function toJobFairDTO(fair: ExternalJobFair): ExternalJobFairDTO {
     hasManagedData:        companyCount > 0,
     managedCompanyCount:   companyCount,
     managedMaterialCount:  materialCount,
+    industryDistribution:  companyCount > 0 ? computeIndustryDistribution(companies) : undefined,
     dataSourceNote: `数据来源：${fair.sourceName} · 同步于 ${fair.syncTime.slice(0, 10)} · 仅供参考`,
   }
 }
@@ -87,6 +101,7 @@ function toCompanyDTO(company: FairCompany): FairCompanyDTO {
     founded:           company.founded,
     headquarters:      company.headquarters,
     registeredCapital: company.registeredCapital,
+    aiMatchScore:      company.aiMatchScore,
     applyNote:         '如需了解更多，请扫码前往来源平台',
   }
 }
@@ -102,6 +117,9 @@ function toZoneDTO(zone: FairZone, index: number): FairZoneDTO {
     checkedInCount: zone.checkedInCount,
     color:          zone.color,
     sortOrder:      index,
+    category:       zone.category,
+    city:           zone.city,
+    coverImageUrl:  zone.coverImageUrl,
   }
 }
 
@@ -135,7 +153,12 @@ function toMaterialDTO(material: FairMaterial): FairMaterialDTO {
   }
 }
 
-function toStatsDTO(stats: FairLiveStats, fairName: string, zones: FairZone[]): FairLiveStatsDTO {
+function toStatsDTO(
+  stats: FairLiveStats,
+  fair: ExternalJobFair | undefined,
+  companies: FairCompany[],
+  zones: FairZone[],
+): FairLiveStatsDTO {
   const zoneBreakdown: FairZoneBreakdown[] = zones.map((z) => ({
     id:             z.id,
     zoneName:       z.zoneName,
@@ -144,7 +167,7 @@ function toStatsDTO(stats: FairLiveStats, fairName: string, zones: FairZone[]): 
   }))
   return {
     fairId:             stats.fairId,
-    fairName,
+    fairName:           fair?.name ?? stats.fairId,
     totalCompanies:     stats.totalCompanies,
     checkedInCompanies: stats.checkedInCompanies,
     totalPositions:     stats.totalPositions,
@@ -155,6 +178,11 @@ function toStatsDTO(stats: FairLiveStats, fairName: string, zones: FairZone[]): 
     checkinCount:       stats.checkinCount,
     zoneBreakdown,
     lastUpdated:        stats.lastUpdated,
+    // 数据大屏（预计/来源数据，非实时）
+    expectedAttendance: fair?.expectedAttendance,
+    seekerIntent:       fair?.seekerIntent ?? [],
+    industryDistribution: computeIndustryDistribution(companies),
+    dataSourceLabel:    '预计 / 来源数据 · 非实时',
     isMockData:         true,
   }
 }
@@ -204,7 +232,8 @@ export const mockJobFairAdapter = {
   },
 
   async getFairMap(fairId: string): Promise<ApiResponse<{ zones: FairZoneDTO[]; booths: FairBoothDTO[] }>> {
-    const zones  = (FAIR_ZONES_MAP[fairId]  ?? []).map(toZoneDTO)
+    // 创新特色展区（category=innovation）不是展位区，不进展馆地图
+    const zones  = (FAIR_ZONES_MAP[fairId] ?? []).filter((z) => z.category !== 'innovation').map(toZoneDTO)
     const booths = (FAIR_BOOTHS_MAP[fairId] ?? []).map(toBoothDTO)
     return ok({ zones, booths })
   },
@@ -219,8 +248,9 @@ export const mockJobFairAdapter = {
   async getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>> {
     const stats = FAIR_STATS_MAP[fairId] ?? null
     if (!stats) return ok(null)
-    const fair  = MOCK_FAIRS.find((f) => f.id === fairId)
-    const zones = FAIR_ZONES_MAP[fairId] ?? []
-    return ok(toStatsDTO(stats, fair?.name ?? fairId, zones))
+    const fair      = MOCK_FAIRS.find((f) => f.id === fairId)
+    const companies = FAIR_COMPANIES_MAP[fairId] ?? []
+    const zones     = FAIR_ZONES_MAP[fairId] ?? []
+    return ok(toStatsDTO(stats, fair, companies, zones))
   },
 }

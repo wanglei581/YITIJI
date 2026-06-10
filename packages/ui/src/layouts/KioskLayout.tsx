@@ -26,6 +26,8 @@ export interface KioskLayoutProps {
   headerRight?: ReactNode
   /** Hide the top status bar entirely. */
   hideHeader?: boolean
+  /** Hide the bottom navigation entirely (e.g. immersive 招聘会 detail pages). */
+  hideBottomNav?: boolean
   className?: string
 }
 
@@ -35,6 +37,7 @@ export function KioskLayout({
   onTabChange,
   headerRight,
   hideHeader = false,
+  hideBottomNav = false,
   className,
 }: KioskLayoutProps) {
   return (
@@ -54,6 +57,7 @@ export function KioskLayout({
       </main>
 
       {/* ── Bottom navigation ────────────────────────────── */}
+      {!hideBottomNav && (
       <nav
         aria-label="主导航"
         className="flex h-20 shrink-0 items-center border-t border-neutral-200 bg-surface"
@@ -81,6 +85,7 @@ export function KioskLayout({
           )
         })}
       </nav>
+      )}
     </div>
   )
 }

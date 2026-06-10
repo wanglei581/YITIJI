@@ -339,13 +339,15 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     ],
   },
   {
+    // 合规:补贴类只做政策说明/材料清单/官方入口/申请指引(info-only),
+    // 不出现"快申/申请"等暗示平台内办理的表述。
     title: '政策服务',
-    subtitle: '权威解读，补贴快申',
+    subtitle: '权威解读，办事指引',
     icon: BookOpenIcon,
     accent: 'pink',
     tiles: [
       { title: '就业政策', icon: HelpCircleIcon, to: '/renshi?tab=policy' },
-      { title: '补贴申请', icon: LandmarkIcon, to: '/renshi?tab=social' },
+      { title: '补贴指引', icon: LandmarkIcon, to: '/renshi?tab=social' },
       { title: '档案/登记', icon: FileBadge2Icon, to: '/renshi?tab=register' },
     ],
   },

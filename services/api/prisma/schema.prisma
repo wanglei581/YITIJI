@@ -532,6 +532,15 @@ model JobFair {
   description String?
   coverImageUrl String?
 
+  // 场馆导航（生成手机扫码导航深链；无坐标时回退地址搜索）
+  latitude    Float?
+  longitude   Float?
+  trafficInfo String?
+
+  // 数据大屏（合规：机构录入预计值，标注"预计/来源"，非实时）
+  expectedAttendance Int?      // 预计参会人数
+  seekerIntentJson   String?   // 求职意向分布 JSON: [{"label":"研发技术类","percent":43}]
+
   // 数据快照(由同步任务定期回填,只是展示用,非真相之源)
   companyCount Int @default(0)
   jobCount     Int @default(0)
@@ -577,15 +586,53 @@ model FairCompany {
   description String?
   sourceUrl   String?  // 跳走的对方平台企业页
 
+  // 展示扩展字段（参展企业汇编 / 企业详情）
+  coverImageUrl     String?
+  founded           String?
+  headquarters      String?
+  registeredCapital String?
+  honorTags         String   @default("")  // 企业荣誉标签(逗号分隔): 中国500强/高新技术企业/专精特新
+  zoneId            String?  // 关联展区(展位分布)
+  boothNumber       String?
+
   // 招聘类型标签(逗号分隔字符串,SQLite 无原生 array)
   hiringTags  String   @default("")
 
   jobsCount   Int      @default(0)
 
+  positions   FairCompanyPosition[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([jobFairId])
+}
+
+// ── FairCompanyPosition ────────────────────────────────────────────────────────
+// 参展企业的招聘岗位(展示信息)。合规：仅展示岗位信息，不接收简历、不做投递闭环；
+// 用户「查看详情」→ 扫码前往来源平台办理。
+
+model FairCompanyPosition {
+  id            String      @id @default(cuid())
+  fairCompanyId String
+  fairCompany   FairCompany @relation(fields: [fairCompanyId], references: [id], onDelete: Cascade)
+
+  title        String
+  headcount    Int      @default(0)
+  salary       String?
+  requirements String?
+  education    String?
+  experience   String?
+  location     String?
+  positionType String?  // 'full_time' / 'part_time' / 'intern'
+  department   String?
+  sourceUrl    String?
+  sortOrder    Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fairCompanyId])
 }
 
 // ── FairZone ──────────────────────────────────────────────────────────────────

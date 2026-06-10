@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@ai-job-print/ui'
+import type { ExternalJobFairDTO } from '@ai-job-print/shared'
+import { getJobFairs } from '../../services/api'
 import { useComingSoonNotice } from '../../components/ComingSoonNotice'
 import {
   ArrowUpRightIcon,
@@ -26,53 +28,7 @@ type TabKey = 'employment' | 'policy' | 'university' | 'park' | 'news'
 
 // ── Mock data: 青岛就业 ────────────────────────────────────────────────────────
 
-interface LocalJobFair {
-  id: string
-  title: string
-  date: string
-  venue: string
-  city: string
-  companyCount: number
-  jobCount: number
-  source: string
-  sourceUrl: string
-}
-
-const LOCAL_FAIRS: LocalJobFair[] = [
-  {
-    id: 'lf1',
-    title: '2026 青岛市春季大型综合招聘会',
-    date: '2026-06-15',
-    venue: '青岛国际博览中心 1 号馆',
-    city: '青岛',
-    companyCount: 320,
-    jobCount: 6800,
-    source: '青岛市人力资源和社会保障局',
-    sourceUrl: '#',
-  },
-  {
-    id: 'lf2',
-    title: '崂山区 2026 年第二季度专场招聘会',
-    date: '2026-06-20',
-    venue: '崂山区人力资源服务中心',
-    city: '青岛·崂山区',
-    companyCount: 85,
-    jobCount: 1200,
-    source: '崂山区就业服务中心',
-    sourceUrl: '#',
-  },
-  {
-    id: 'lf3',
-    title: '高新区智能制造专场双选会',
-    date: '2026-06-28',
-    venue: '青岛高新区创业中心报告厅',
-    city: '青岛·城阳区',
-    companyCount: 60,
-    jobCount: 900,
-    source: '青岛高新技术产业开发区管委会',
-    sourceUrl: '#',
-  },
-]
+// 近期招聘会改为真实数据(getJobFairs,只含 approved+published),不再使用本地 mock。
 
 interface KeyCompany {
   id: string
@@ -335,60 +291,80 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
 
 function EmploymentPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
   const navigate = useNavigate()
+  // 真实招聘会数据(只含 approved+published);加载失败/为空时诚实展示空态
+  const [fairs, setFairs] = useState<ExternalJobFairDTO[]>([])
+  const [fairsLoading, setFairsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    getJobFairs()
+      .then((res) => {
+        if (cancelled) return
+        // 青岛专区:优先展示青岛本地场次,不足时回退展示全部已发布场次(均为真实数据)
+        const all = res.data
+        const local = all.filter((f) => (f.city ?? '').includes('青岛') || f.venue.includes('青岛'))
+        setFairs((local.length > 0 ? local : all).slice(0, 3))
+      })
+      .catch(() => { if (!cancelled) setFairs([]) })
+      .finally(() => { if (!cancelled) setFairsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="flex flex-col gap-6">
       <p className="flex items-center gap-2 text-xs text-gray-400">
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        岗位与招聘会信息来源于合作机构及官方平台，本系统不参与招聘闭环。同步时间：2026-05-28
+        岗位与招聘会信息来源于合作机构及官方平台，本系统不参与招聘闭环。
       </p>
 
-      {/* 近期招聘会 */}
+      {/* 近期招聘会(真实数据) */}
       <section>
         <div className="mb-3 flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-teal-600" aria-hidden="true" />
           <h3 className="text-base font-semibold text-gray-800">近期招聘会</h3>
         </div>
         <div className="flex flex-col gap-3">
-          {LOCAL_FAIRS.map((fair) => (
-            <div key={fair.id} className="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold leading-snug text-gray-900">{fair.title}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <CalendarIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                      {fair.date}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPinIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                      {fair.venue}
-                    </span>
-                    <span>{fair.companyCount} 家企业 · {fair.jobCount.toLocaleString()} 个岗位</span>
+          {fairsLoading ? (
+            <p className="rounded-xl border border-gray-100 bg-white py-8 text-center text-sm text-gray-400">加载中…</p>
+          ) : fairs.length === 0 ? (
+            <p className="rounded-xl border border-gray-100 bg-white py-8 text-center text-sm text-gray-400">
+              暂无已发布的招聘会，可前往「招聘会」页查看全部场次
+            </p>
+          ) : (
+            fairs.map((fair) => (
+              <div key={fair.id} className="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold leading-snug text-gray-900">{fair.name}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <CalendarIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {fair.startTime.slice(0, 10)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MapPinIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {fair.venue}
+                      </span>
+                      {typeof fair.boothCount === 'number' && fair.boothCount > 0 && (
+                        <span>{fair.boothCount} 家企业</span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-xs text-gray-400">来源：{fair.sourceName} · 同步于 {fair.syncTime}</p>
                   </div>
-                  <p className="mt-1.5 text-xs text-gray-400">来源：{fair.source}</p>
-                </div>
-                <div className="flex shrink-0 flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/job-fairs')}
-                    className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-700 hover:bg-teal-100"
-                  >
-                    查看招聘会
-                    <ChevronRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onComingSoon('扫码预约')}
-                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-                  >
-                    <QrCodeIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                    扫码预约
-                  </button>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/job-fairs/${fair.id}`)}
+                      className="flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-medium text-teal-700 hover:bg-teal-100"
+                    >
+                      查看招聘会
+                      <ChevronRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
 

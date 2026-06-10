@@ -181,6 +181,41 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
   )
 }
 
+// ─── 招聘服务入口卡（招聘会 / 校园招聘会）──────────────────────────────────────
+
+function ZoneEntryCard({
+  icon: Icon,
+  iconBg,
+  iconColor,
+  title,
+  subtitle,
+  onClick,
+}: {
+  icon: typeof Building2Icon
+  iconBg: string
+  iconColor: string
+  title: string
+  subtitle: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[88px] items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50/40 active:bg-primary-100"
+    >
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg}`}>
+        <Icon className={`h-6 w-6 ${iconColor}`} aria-hidden="true" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-semibold text-gray-900">{title}</p>
+        <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>
+      </div>
+      <ChevronRightIcon className="h-5 w-5 shrink-0 text-gray-300" aria-hidden="true" />
+    </button>
+  )
+}
+
 // ─── Panel: 就业政策(真实数据,按人群分组)──────────────────────────────────
 
 function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceLine: string | null }) {
@@ -540,6 +575,7 @@ function PrintPackBanner() {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export function RenshiPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabKey>(() => getInitialTab(searchParams))
   const { notify, overlay } = useComingSoonNotice()
@@ -589,8 +625,28 @@ export function RenshiPage() {
       {overlay}
       <PageHeader
         title="人社专区"
-        subtitle="就业政策 · 社保指南 · 就业登记 · 政策公告"
+        subtitle="招聘会 · 校园招聘 · 就业政策 · 社保指南 · 政策公告"
       />
+
+      {/* 招聘服务入口（固定收纳于人社专区，不再单独漂在首页） */}
+      <div className="grid grid-cols-2 gap-4">
+        <ZoneEntryCard
+          icon={Building2Icon}
+          iconBg="bg-orange-50"
+          iconColor="text-orange-600"
+          title="招聘会"
+          subtitle="现场招聘会信息 · 状态 · 导览"
+          onClick={() => navigate('/job-fairs')}
+        />
+        <ZoneEntryCard
+          icon={GraduationCapIcon}
+          iconBg="bg-cyan-50"
+          iconColor="text-cyan-700"
+          title="校园招聘会"
+          subtitle="应届校招 · 校园双选会 · 材料"
+          onClick={() => navigate('/campus')}
+        />
+      </div>
 
       {/* Source attribution banner */}
       <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-5 py-3.5">

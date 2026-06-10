@@ -17,6 +17,7 @@ import type {
   PaginatedResponse,
   ExternalJobFairDTO,
   FairCompanyDTO,
+  FairCompanyPositionDTO,
   FairZoneDTO,
   FairBoothDTO,
   FairMaterialDTO,
@@ -87,6 +88,19 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 // 不硬造数据：positions=[]、checkinStatus='pending'、boothCount/checkedInCount=0。
 // ──────────────────────────────────────────────────────────────
 
+interface WireFairPosition {
+  id: string
+  title: string
+  headcount?: number
+  salary?: string | null
+  requirements?: string | null
+  education?: string | null
+  experience?: string | null
+  location?: string | null
+  positionType?: string | null
+  department?: string | null
+}
+
 interface WireFairCompany {
   id: string
   jobFairId: string
@@ -98,6 +112,14 @@ interface WireFairCompany {
   sourceUrl?: string | null
   hiringTags?: string[]
   jobsCount?: number
+  coverImageUrl?: string | null
+  founded?: string | null
+  headquarters?: string | null
+  registeredCapital?: string | null
+  honorTags?: string[]
+  zoneId?: string | null
+  boothNumber?: string | null
+  positions?: WireFairPosition[]
 }
 
 interface WireFairZone {
@@ -109,6 +131,33 @@ interface WireFairZone {
   description?: string | null
   coverImageUrl?: string | null
   sortOrder?: number
+}
+
+const VALID_POSITION_TYPES: ReadonlyArray<FairCompanyPositionDTO['positionType']> = [
+  'full_time',
+  'part_time',
+  'intern',
+]
+
+function coercePositionType(t?: string | null): FairCompanyPositionDTO['positionType'] {
+  return t && (VALID_POSITION_TYPES as readonly string[]).includes(t)
+    ? (t as FairCompanyPositionDTO['positionType'])
+    : undefined
+}
+
+function mapWirePosition(p: WireFairPosition): FairCompanyPositionDTO {
+  return {
+    id:           p.id,
+    title:        p.title,
+    headcount:    p.headcount ?? 0,
+    salary:       p.salary ?? undefined,
+    requirements: p.requirements ?? undefined,
+    education:    p.education ?? undefined,
+    experience:   p.experience ?? undefined,
+    location:     p.location ?? undefined,
+    positionType: coercePositionType(p.positionType),
+    department:   p.department ?? undefined,
+  }
 }
 
 const VALID_SCALES: ReadonlyArray<FairCompanyDTO['scale']> = [
@@ -127,18 +176,24 @@ function coerceScale(scale?: string | null): FairCompanyDTO['scale'] {
 
 function mapWireCompany(c: WireFairCompany): FairCompanyDTO {
   return {
-    id:            c.id,
-    fairId:        c.jobFairId,
-    companyName:   c.name,
-    industry:      c.industry ?? '',
-    scale:         coerceScale(c.scale),
-    description:   c.description ?? undefined,
-    sourceUrl:     c.sourceUrl ?? undefined,
-    coverImageUrl: c.logoUrl ?? undefined,
-    // 模型无岗位明细 / 现场签到 → 安全占位，不硬造
-    positions:     [],
-    checkinStatus: 'pending',
-    applyNote:     '如需了解更多，请扫码前往来源平台',
+    id:                c.id,
+    fairId:            c.jobFairId,
+    companyName:       c.name,
+    industry:          c.industry ?? '',
+    scale:             coerceScale(c.scale),
+    description:       c.description ?? undefined,
+    sourceUrl:         c.sourceUrl ?? undefined,
+    boothNumber:       c.boothNumber ?? undefined,
+    zoneId:            c.zoneId ?? undefined,
+    positions:         (c.positions ?? []).map(mapWirePosition),
+    honorTags:         c.honorTags ?? undefined,
+    coverImageUrl:     c.coverImageUrl ?? c.logoUrl ?? undefined,
+    founded:           c.founded ?? undefined,
+    headquarters:      c.headquarters ?? undefined,
+    registeredCapital: c.registeredCapital ?? undefined,
+    // 模型无现场签到 → 合规占位（不做签到）
+    checkinStatus:     'pending',
+    applyNote:         '如需了解更多，请扫码前往来源平台',
   }
 }
 
@@ -148,7 +203,10 @@ function mapWireZone(z: WireFairZone, index: number): FairZoneDTO {
     fairId:         z.jobFairId,
     zoneName:       z.name,
     description:    z.description ?? undefined,
-    industry:       z.category ?? undefined,
+    // 后端 FairZone 无 industry 列 → 不再把 category 误塞进 industry
+    category:       z.category ?? undefined,
+    city:           z.city ?? undefined,
+    coverImageUrl:  z.coverImageUrl ?? undefined,
     // 模型无展位 / 签到明细 → 0 占位
     boothCount:     0,
     checkedInCount: 0,

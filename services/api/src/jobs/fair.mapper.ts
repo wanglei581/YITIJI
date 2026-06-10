@@ -1,4 +1,4 @@
-import type { Fair, FairCompany, FairZone } from './fair.types'
+import type { Fair, FairCompany, FairCompanyPosition, FairZone } from './fair.types'
 
 /**
  * Prisma JobFair / FairCompany / FairZone 行 → API DTO 转换。
@@ -36,6 +36,20 @@ interface PrismaJobFairRow {
   updatedAt: Date
 }
 
+interface PrismaFairCompanyPositionRow {
+  id: string
+  title: string
+  headcount: number
+  salary: string | null
+  requirements: string | null
+  education: string | null
+  experience: string | null
+  location: string | null
+  positionType: string | null
+  department: string | null
+  sourceUrl: string | null
+}
+
 interface PrismaFairCompanyRow {
   id: string
   jobFairId: string
@@ -47,8 +61,36 @@ interface PrismaFairCompanyRow {
   sourceUrl: string | null
   hiringTags: string
   jobsCount: number
+  coverImageUrl: string | null
+  founded: string | null
+  headquarters: string | null
+  registeredCapital: string | null
+  honorTags: string
+  zoneId: string | null
+  boothNumber: string | null
+  positions?: PrismaFairCompanyPositionRow[]
   createdAt: Date
   updatedAt: Date
+}
+
+function splitTags(s: string): string[] {
+  return s ? s.split(',').map((t) => t.trim()).filter(Boolean) : []
+}
+
+function mapFairCompanyPosition(p: PrismaFairCompanyPositionRow): FairCompanyPosition {
+  return {
+    id: p.id,
+    title: p.title,
+    headcount: p.headcount,
+    salary: p.salary,
+    requirements: p.requirements,
+    education: p.education,
+    experience: p.experience,
+    location: p.location,
+    positionType: p.positionType,
+    department: p.department,
+    sourceUrl: p.sourceUrl,
+  }
 }
 
 interface PrismaFairZoneRow {
@@ -105,10 +147,16 @@ export function mapFairCompany(row: PrismaFairCompanyRow): FairCompany {
     scale: row.scale,
     description: row.description,
     sourceUrl: row.sourceUrl,
-    hiringTags: row.hiringTags
-      ? row.hiringTags.split(',').map((t) => t.trim()).filter(Boolean)
-      : [],
+    hiringTags: splitTags(row.hiringTags),
     jobsCount: row.jobsCount,
+    coverImageUrl: row.coverImageUrl,
+    founded: row.founded,
+    headquarters: row.headquarters,
+    registeredCapital: row.registeredCapital,
+    honorTags: splitTags(row.honorTags),
+    zoneId: row.zoneId,
+    boothNumber: row.boothNumber,
+    positions: (row.positions ?? []).map(mapFairCompanyPosition),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }

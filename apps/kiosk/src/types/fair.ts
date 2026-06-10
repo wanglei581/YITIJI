@@ -54,6 +54,8 @@ export interface FairCompany {
   founded?: string
   headquarters?: string
   registeredCapital?: string
+  /** AI 匹配度（展示指标 0–100，仅展示不参与招聘闭环） */
+  aiMatchScore?: number
 }
 
 export interface FairZone {
@@ -65,6 +67,12 @@ export interface FairZone {
   boothCount: number
   checkedInCount: number
   color?: string
+  /** 展区类别：innovation 创新/特色展区 · service 现场服务 · campus_corp_topic 校企主题 */
+  category?: 'innovation' | 'service' | 'campus_corp_topic'
+  /** 城市/区（特色展区按地市分组，如「广州市」） */
+  city?: string
+  /** 特色展区封面图 URL */
+  coverImageUrl?: string
 }
 
 export interface FairBooth {
