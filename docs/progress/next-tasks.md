@@ -37,7 +37,9 @@
 4. 🔄 **报告结构扩展（Phase 1.1）：** 在现有 `sections + suggestions` 基础上扩「优势亮点 / 问题风险点 / 下一步建议」（参考图三块），需扩 shared/后端类型 + diagnose prompt JSON schema + 前端卡片，不前端硬编。
 5. 🔄 **AI 简历优化真实化（Phase 1E）：** 当前 `llm` provider 的 optimizeResume 诚实返回 failed；后续补「基于真实报告的表达优化」单轮 LLM 调用。
 6. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
-7. ⏳ **Kiosk 运行期手验：** 需真实 API + `AI_PROVIDER=llm` + 后台「AI模型配置」配好真实模型；手验上传 PDF/DOCX → 真实报告无演示横幅、内容随简历变化；未配置/图片 → 明确失败提示；`AI_PROVIDER=mock` → 横幅回来。
+7. 🔄 **运行期手验（2026-06-10 headless 已做大半，剩成功报告卡失效 key）：** 已用真实 API（`AI_PROVIDER=llm`+`local` 存储，端口 3019）跑通真实 HTTP 链路：启动/DI、providerName=llm、图片→`OCR_NOT_CONFIGURED`、`.doc`→`UNSUPPORTED`、归属令牌 200/404/404、落库与日志无简历原文均通过；诊断上游 DeepSeek 返回真实失败也走了诚实 failed、不伪造、不 fallback。详见 [current-progress.md](./current-progress.md) §Phase 1B 运行期手验。
+   - 🚧 **阻塞（凭证）：后台 DeepSeek API Key 已失效（上游 401）**，导致「真实成功诊断报告」未拿到。**需轮换有效 Key**（Admin「AI模型配置」更新 DeepSeek/qwen/minimax key + enabled，或 `AI_LLM_API_KEY` 首启兜底）后重启复跑，即得真实报告。
+   - ⏳ 换 key 后补浏览器/一体机手验：上传 DOCX/PDF → 报告无演示横幅、内容随简历变化、只含固定 5 维度；`AI_PROVIDER=mock` → 横幅回来。
 
 ---
 

@@ -5,6 +5,27 @@
 
 ---
 
+## 真实 AI 简历诊断 Phase 1B 运行期手验（2026-06-10，Claude，headless HTTP + 真实 DeepSeek）
+
+**方式：** CLI headless 等价手验（非浏览器）。以 shell 覆盖启动真实 API（`AI_PROVIDER=llm` + `OCR_PROVIDER=disabled` + `FILE_STORAGE_DRIVER=local`，端口 3019，**不改 `.env`、不碰生产 COS**），用合成无 PII 测试简历跑真实 HTTP 链路：`POST /files/kiosk-upload` → `POST /resume/parse` → 真实 DeepSeek → `GET /resume/records/:taskId`。临时驱动脚本用完即删、未提交。
+
+**✅ 通过项（真实链路）：**
+- **启动 / DI**：API 干净启动，`AiModule dependencies initialized`、`OcrService: OCR provider = disabled`、`StorageService driver=local`，`/resume/parse`、`/files/kiosk-upload` 已映射（typecheck 查不出的 Nest DI 装配在 `AI_PROVIDER=llm` 下真实通过）。
+- **providerName=llm**：所有结果 `providerName='llm'`（≠mock → Kiosk 报告页演示横幅会自动消失）。
+- **提取门控（真实）**：图片 JPG → `OCR_NOT_CONFIGURED` 诚实失败；`.doc` → `UNSUPPORTED_FILE_TYPE` 诚实失败；均不调 LLM、不生成假报告。
+- **归属/令牌（真实 HTTP）**：匿名 parse 铸一次性 token；正确 token 读回 200；无 token / 错 token → 404 `AI_TASK_NOT_FOUND`。
+- **隐私（落库 + 日志）**：`AiResumeResult.payloadJson` 不含简历原文哨兵；API 日志 grep 哨兵 **0 命中**；`[AI-LOG]` 行只有元数据（taskId/provider/operation/latency/status/errorCode），无简历原文 / prompt / LLM 响应正文。
+- **诚实失败（真实上游错误）**：见下方阻塞项——DeepSeek 返回 401 时，代码只记状态码 `resume diagnose http 401`（无正文）→ 返回 `status:'failed'` + 诚实 failReason，**绝不伪造报告、绝不 fallback mock**。即「未配置/失败明确失败」用一次真实上游失败验证通过。
+
+**🚧 阻塞项（凭证，非代码）：真实成功报告未拿到。**
+- DOCX / 文本 PDF 提取成功并真实调用 DeepSeek，但**后台配置的 DeepSeek API Key 已失效**：上游返回 **HTTP 401 Unauthorized**（连通性探针 `api.deepseek.com` 也回 401，确认网络出口正常、是 key 问题）。
+- 结果：诊断 `status:'failed'`，failReason「AI 诊断服务暂时不可用」。这是**预期内的诚实失败**，但导致**「真实成功诊断报告」这一头条项无法在本轮演示**。
+- **解法（你来做）**：在 Admin「AI模型配置」更新有效的 DeepSeek（或 qwen/minimax）Key（或设 `AI_LLM_API_KEY` 首启兜底），`enabled=true`，重启 API 后复跑即可得真实报告。轮换 key 后建议补一次浏览器/一体机手验：上传 DOCX/PDF → 报告无演示横幅、内容随简历变化、只含固定 5 维度。
+
+**结论：** 真实链路除「成功诊断报告」外全部验证通过（启动/DI、providerName、提取门控、归属令牌、隐私、诚实失败）；成功报告卡在**失效的 DeepSeek 凭证**，属配置问题、非代码问题，待换有效 Key 后复跑。
+
+---
+
 ## 真实 AI 简历诊断 Phase 1B —— LLM 结构化诊断报告（2026-06-10，Claude，`feature/real-resume-diagnosis-1b`，基于 1a）
 
 **目标：** 把 Phase 1A 的 `ResumeExtractionService` 接进 `AiService.submitResumeParse`，让 `AI_PROVIDER=llm` 时上传简历后走真实闭环：**提取文本 → 调后台配置的大模型 → 结构化 `ResumeReport` → 落 `AiResumeResult` → 前端按真实报告渲染、演示横幅自动消失**。失败一律明确报错，绝不伪造、绝不 fallback mock。
