@@ -5,7 +5,30 @@
 
 ---
 
-## 阶段1C —— Partner 岗位/招聘会编辑能力（编辑 + 手动新增 + 强制重审）（2026-06-10，Claude，`feature/partner-edit-capability`）
+## 阶段1D —— 政策服务接真（Partner 录入 → Admin 审核 → Kiosk 展示）（2026-06-10，Claude，`feature/policy-service-real`）
+
+**目标：** Kiosk 人社专区(RenshiPage)的"就业政策/政策公告"两个 Tab 此前为前端硬编码（且写死补贴金额，真机有误导风险），Partner 政策公告页为空壳。本轮建立完整数据链路。
+
+**Schema（additive，migration `20260610140000_add_policy_post`）：**
+- 新增 `PolicyPost`：`kind`（policy_guide 政策扶持条目按 audience 人群分组 / notice 政策公告按 category 标签）+ title/summary/content/externalUrl/publishedDate + 来源字段（sourceOrgId/sourceName）+ reviewStatus/publishStatus 状态机（与 Job/JobFair 完全一致）。
+
+**后端（新模块 [src/policies/](../../services/api/src/policies/)）：**
+- Kiosk 公开：`GET /policies?kind=&audience=&category=`（只读 approved+published）。
+- Partner：`GET/POST /partner/policies`、`PATCH /partner/policies/:id`（编辑强制回 pending+draft 重审）、`PATCH .../publish`（下架）、`DELETE`（留审计）。kind 字段约束：policy_guide 必填 audience、notice 必填 category。
+- Admin：`GET /admin/policy-sources`、`PATCH .../review`（approve/reject/reviewing,reject 必填原因）、`PATCH .../publish`（未过审发布拒绝）。
+- 合规：info-only —— 仅政策说明/材料清单/官方入口字段;6 类审计动作齐全。
+
+**三端前端：**
+- **Partner** [policy/index.tsx](../../apps/partner/src/routes/policy/index.tsx)：空壳 → 完整管理页（列表/新增/编辑抽屉/下架/两步删除 + 重审提示 + 合规提示"勿写补贴必到账/代申请,审核不予通过"）。
+- **Admin** 新增「政策信息源」菜单 + [policy-sources](../../apps/admin/src/routes/policy-sources/index.tsx) 审核页（筛选/搜索/审核通过/拒绝带原因/发布/下架,样式对齐 fair-sources）。
+- **Kiosk** [RenshiPage](../../apps/kiosk/src/pages/renshi/RenshiPage.tsx)：「就业政策」「政策公告」两 Tab 接真（loading/error/empty 三态；政策按 audience 分组复用原卡片样式；公告支持展开正文+官方入口；数据来源行从真实 sourceName+syncTime 派生,**删除硬编码机构名与补贴金额**）；公告"查看详情"由 ComingSoon 改为真实内容展开。「社保指南」「就业登记」为办事指南模板,本轮保持静态。
+- 注意：Kiosk 政策 Tab 在 mock 模式展示明示"演示数据"的占位内容；首页入口不变。
+
+**验证（全绿）：** `verify:policies` **11 PASS / ALL PASS**（kind 字段约束 / 默认 pending+draft 不外露 / 未过审发布拒绝 / reject 必填原因 / approve+publish 后可见+kind·audience 过滤 / 编辑强制重审+立即撤下 / 跨机构 404 / 下架删除 / 6 类审计）；api+kiosk+admin+partner typecheck/lint/build 全绿；禁词扫描命中均为"禁止此类表述"的合规提示文案。
+
+---
+
+## 阶段1C —— Partner 岗位/招聘会编辑能力（编辑 + 手动新增 + 强制重审）（2026-06-10，Claude，`feature/partner-edit-capability`，已 FF 合入 main `f704f7d`）
 
 **目标：** Partner 端此前只能"导入 + 下架"，编辑/新增按钮一直禁用。本轮补齐：编辑本机构岗位/招聘会、手动录入单条数据，且**任何内容修订强制回 pending+draft 重审**（防"先过审后改内容"绕过审核）。
 

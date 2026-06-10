@@ -10,6 +10,7 @@ import AiServicesPage from './ai-services'
 import AiConfigPage from './ai-config'
 import JobSourcesPage from './job-sources'
 import FairSourcesPage from './fair-sources'
+import PolicySourcesPage from './policy-sources'
 import FairsPage from './fairs'
 import PartnersPage from './partners'
 import UsersPage from './users'
@@ -40,6 +41,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'ai-config',    element: <AiConfigPage /> },
       { path: 'job-sources',  element: <JobSourcesPage /> },
       { path: 'fair-sources', element: <FairSourcesPage /> },
+      { path: 'policy-sources', element: <PolicySourcesPage /> },
       { path: 'fairs',        element: <FairsPage /> },
       { path: 'partners',     element: <PartnersPage /> },
       { path: 'users',        element: <UsersPage /> },

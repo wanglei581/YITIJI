@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { PageHeader } from '@ai-job-print/ui'
+import { EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import { useComingSoonNotice } from '../../components/ComingSoonNotice'
+import { getPublishedPolicies, type PolicyPostView } from '../../services/api/policies'
 import {
   ArrowUpRightIcon,
   BookOpenIcon,
@@ -31,72 +32,16 @@ function getInitialTab(searchParams: URLSearchParams): TabKey {
   return tab && VALID_TABS.has(tab as TabKey) ? (tab as TabKey) : 'policy'
 }
 
-// ── Mock data ──────────────────────────────────────────────────────────────────
+// ── 政策内容(阶段1D 接真:Partner 录入 → Admin 审核发布 → 此处展示)────────────
 
-interface PolicyGroup {
-  key: string
-  icon: typeof GraduationCapIcon
-  iconBg: string
-  iconColor: string
-  title: string
-  tag: string
-  items: { label: string; desc: string }[]
+/** 政策扶持人群分组的展示元信息(数据本体来自后端 PolicyPost kind=policy_guide)。 */
+const AUDIENCE_META: Record<string, { icon: typeof GraduationCapIcon; iconBg: string; iconColor: string; title: string; tag: string; order: number }> = {
+  graduate: { icon: GraduationCapIcon,  iconBg: 'bg-blue-50',   iconColor: 'text-blue-600',   title: '应届高校毕业生',   tag: '重点群体',   order: 0 },
+  migrant:  { icon: UsersIcon,          iconBg: 'bg-green-50',  iconColor: 'text-green-600',  title: '返乡务工人员',     tag: '农村劳动力', order: 1 },
+  hardship: { icon: HeartHandshakeIcon, iconBg: 'bg-orange-50', iconColor: 'text-orange-600', title: '困难群体就业援助', tag: '优先保障',   order: 2 },
+  startup:  { icon: Building2Icon,      iconBg: 'bg-purple-50', iconColor: 'text-purple-600', title: '创业扶持',         tag: '创业支持',   order: 3 },
+  general:  { icon: FileTextIcon,       iconBg: 'bg-gray-100',  iconColor: 'text-gray-600',   title: '通用政策',         tag: '面向所有人', order: 4 },
 }
-
-const POLICY_GROUPS: PolicyGroup[] = [
-  {
-    key: 'graduate',
-    icon: GraduationCapIcon,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
-    title: '应届高校毕业生',
-    tag: '重点群体',
-    items: [
-      { label: '高校毕业生就业补贴', desc: '毕业年度内灵活就业或自主创业，可申请就业补贴，标准 2000 元/人' },
-      { label: '离校未就业登记服务', desc: '毕业半年内未就业可在户籍地或居住地办理实名登记，享受就业援助' },
-      { label: '创业担保贷款', desc: '在校及毕业5年内大学生，可申请最高 20 万元创业担保贷款，财政全额贴息' },
-    ],
-  },
-  {
-    key: 'migrant',
-    icon: UsersIcon,
-    iconBg: 'bg-green-50',
-    iconColor: 'text-green-600',
-    title: '返乡务工人员',
-    tag: '农村劳动力',
-    items: [
-      { label: '返乡创业补贴', desc: '返乡创业并正常经营1年以上，可申请一次性补贴 5000—20000 元' },
-      { label: '职业技能培训补贴', desc: '参加政府补贴培训取得证书，报销培训费用，按证书等级不同最高 2000 元' },
-      { label: '异地就业交通补贴', desc: '跨省务工农村劳动力，可申请一次性交通补贴，标准 500 元/人' },
-    ],
-  },
-  {
-    key: 'hardship',
-    icon: HeartHandshakeIcon,
-    iconBg: 'bg-orange-50',
-    iconColor: 'text-orange-600',
-    title: '困难群体就业援助',
-    tag: '优先保障',
-    items: [
-      { label: '公益性岗位安置', desc: '就业困难人员（含零就业家庭、低保家庭等）可申请公益性岗位安置，优先安排' },
-      { label: '灵活就业社保补贴', desc: '就业困难人员灵活就业后，可享受3年内社保补贴，比例最高 2/3' },
-      { label: '岗位拓展援助', desc: '登记失业超过3个月可获专属就业援助专员一对一跟踪帮扶服务' },
-    ],
-  },
-  {
-    key: 'startup',
-    icon: Building2Icon,
-    iconBg: 'bg-purple-50',
-    iconColor: 'text-purple-600',
-    title: '创业扶持',
-    tag: '创业支持',
-    items: [
-      { label: '创业场地补贴', desc: '在认定创业孵化基地内创业，可享受1—3年租金减免，最高减免50%' },
-      { label: '创业导师服务', desc: '免费配对创业导师，提供注册、融资、运营等全链条辅导，每年不少于4次' },
-      { label: '创业带动就业奖励', desc: '创业项目稳定带动就业满1年，按实际带动人数给予1000 元/人奖励' },
-    ],
-  },
-]
 
 interface SocialGuide {
   key: string
@@ -196,65 +141,13 @@ const REGISTER_ITEMS: RegisterItem[] = [
   },
 ]
 
-interface Notice {
-  id: string
-  title: string
-  date: string
-  source: string
-  tag: '政策' | '公告' | '通知' | '招募'
-  tagColor: string
+/** 公告标签展示元信息(数据本体来自后端 PolicyPost kind=notice)。 */
+const CATEGORY_META: Record<string, { label: string; color: string }> = {
+  policy:       { label: '政策', color: 'bg-purple-100 text-purple-700' },
+  announcement: { label: '公告', color: 'bg-green-100 text-green-700' },
+  notice:       { label: '通知', color: 'bg-blue-100 text-blue-700' },
+  recruitment:  { label: '招募', color: 'bg-orange-100 text-orange-700' },
 }
-
-const NOTICES: Notice[] = [
-  {
-    id: 'n1',
-    title: '关于 2026 年高校毕业生就业创业补贴申请工作的通知',
-    date: '2026-05-20',
-    source: '市人力资源和社会保障局',
-    tag: '通知',
-    tagColor: 'bg-blue-100 text-blue-700',
-  },
-  {
-    id: 'n2',
-    title: '2026 年第二批职业技能提升培训补贴发放公告',
-    date: '2026-05-15',
-    source: '市就业服务中心',
-    tag: '公告',
-    tagColor: 'bg-green-100 text-green-700',
-  },
-  {
-    id: 'n3',
-    title: '返乡创业担保贷款贴息申请截止日期提醒（2026年上半年）',
-    date: '2026-05-10',
-    source: '市人力资源和社会保障局',
-    tag: '政策',
-    tagColor: 'bg-purple-100 text-purple-700',
-  },
-  {
-    id: 'n4',
-    title: '2026 年第二季度公益性岗位开发招募公告',
-    date: '2026-04-28',
-    source: '市就业服务中心',
-    tag: '招募',
-    tagColor: 'bg-orange-100 text-orange-700',
-  },
-  {
-    id: 'n5',
-    title: '困难群体灵活就业社会保险补贴申请指南（2026 年修订版）',
-    date: '2026-04-15',
-    source: '市人力资源和社会保障局',
-    tag: '政策',
-    tagColor: 'bg-purple-100 text-purple-700',
-  },
-  {
-    id: 'n6',
-    title: '关于开展农村劳动力转移就业春风行动暨专项招聘会的通知',
-    date: '2026-04-01',
-    source: '市人力资源和社会保障局',
-    tag: '通知',
-    tagColor: 'bg-blue-100 text-blue-700',
-  },
-]
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -288,41 +181,63 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
   )
 }
 
-// ─── Panel: 就业政策 ─────────────────────────────────────────────────────────
+// ─── Panel: 就业政策(真实数据,按人群分组)──────────────────────────────────
 
-function PolicyPanel() {
-  const [expanded, setExpanded] = useState<string | null>('graduate')
-  const navigate = useNavigate()
+function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceLine: string | null }) {
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  // 按 audience 分组,缺省归 general;按 AUDIENCE_META.order 排序
+  const groups = Object.entries(
+    guides.reduce<Record<string, PolicyPostView[]>>((acc, g) => {
+      const key = g.audience && AUDIENCE_META[g.audience] ? g.audience : 'general'
+      ;(acc[key] ??= []).push(g)
+      return acc
+    }, {}),
+  ).sort(([a], [b]) => (AUDIENCE_META[a]?.order ?? 9) - (AUDIENCE_META[b]?.order ?? 9))
+
+  if (groups.length === 0) {
+    return (
+      <EmptyState
+        icon={FileTextIcon}
+        title="暂无政策内容"
+        description="政策内容由合作机构发布、管理员审核后展示,敬请关注"
+        className="py-16"
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="flex items-center gap-2 text-xs text-gray-400">
-        <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        数据来源：市人力资源和社会保障局 · 同步时间：2026-05-20
-      </p>
+      {sourceLine && (
+        <p className="flex items-center gap-2 text-xs text-gray-400">
+          <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          {sourceLine}
+        </p>
+      )}
 
-      {POLICY_GROUPS.map((group) => {
-        const Icon = group.icon
-        const isOpen = expanded === group.key
+      {groups.map(([audienceKey, items]) => {
+        const meta = AUDIENCE_META[audienceKey] ?? AUDIENCE_META.general
+        const Icon = meta.icon
+        const isOpen = expanded === audienceKey
         return (
-          <div key={group.key} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div key={audienceKey} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             {/* Group header */}
             <button
               type="button"
-              onClick={() => setExpanded(isOpen ? null : group.key)}
+              onClick={() => setExpanded(isOpen ? null : audienceKey)}
               className="flex w-full items-center gap-4 px-6 py-5 text-left"
             >
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${group.iconBg}`}>
-                <Icon className={`h-6 w-6 ${group.iconColor}`} aria-hidden="true" />
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${meta.iconBg}`}>
+                <Icon className={`h-6 w-6 ${meta.iconColor}`} aria-hidden="true" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold text-gray-900">{group.title}</span>
+                  <span className="text-lg font-semibold text-gray-900">{meta.title}</span>
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                    {group.tag}
+                    {meta.tag}
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm text-gray-500">{group.items.length} 项政策支持</p>
+                <p className="mt-0.5 text-sm text-gray-500">{items.length} 项政策支持</p>
               </div>
               <ChevronRightIcon
                 className={['h-5 w-5 text-gray-400 transition-transform', isOpen ? 'rotate-90' : ''].join(' ')}
@@ -333,27 +248,22 @@ function PolicyPanel() {
             {/* Items */}
             {isOpen && (
               <div className="border-t border-gray-100">
-                {group.items.map((item, i) => (
+                {items.map((item, i) => (
                   <div
-                    key={i}
+                    key={item.id}
                     className={[
                       'flex items-start gap-4 px-6 py-4',
-                      i < group.items.length - 1 ? 'border-b border-gray-50' : '',
+                      i < items.length - 1 ? 'border-b border-gray-50' : '',
                     ].join(' ')}
                   >
                     <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary-400" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-gray-800">{item.label}</p>
-                      <p className="mt-1 text-sm leading-relaxed text-gray-500">{item.desc}</p>
+                      <p className="text-base font-semibold text-gray-800">{item.title}</p>
+                      {(item.summary || item.content) && (
+                        <p className="mt-1 text-sm leading-relaxed text-gray-500">{item.summary ?? item.content}</p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-400">来源:{item.sourceName}{item.publishedDate ? ` · ${item.publishedDate}` : ''}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => navigate('/print/upload')}
-                      className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
-                    >
-                      <PrinterIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                      打印
-                    </button>
                   </div>
                 ))}
               </div>
@@ -507,56 +417,87 @@ function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string) => voi
   )
 }
 
-// ─── Panel: 政策公告 ─────────────────────────────────────────────────────────
+// ─── Panel: 政策公告(真实数据)──────────────────────────────────────────────
 
-function NoticePanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
-  const navigate = useNavigate()
+function NoticePanel({ notices, sourceLine }: { notices: PolicyPostView[]; sourceLine: string | null }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  if (notices.length === 0) {
+    return (
+      <EmptyState
+        icon={ScrollTextIcon}
+        title="暂无政策公告"
+        description="公告由合作机构发布、管理员审核后展示,敬请关注"
+        className="py-16"
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="flex items-center gap-2 text-xs text-gray-400">
-        <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        数据来源：市人力资源和社会保障局官方发布 · 同步时间：2026-05-20
-      </p>
+      {sourceLine && (
+        <p className="flex items-center gap-2 text-xs text-gray-400">
+          <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          {sourceLine}
+        </p>
+      )}
 
-      {NOTICES.map((notice) => (
-        <div
-          key={notice.id}
-          className="flex items-start gap-4 rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-50">
-            <FileTextIcon className="h-5 w-5 text-gray-500" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${notice.tagColor}`}>
-                {notice.tag}
-              </span>
-              <span className="text-xs text-gray-400">{notice.source}</span>
+      {notices.map((notice) => {
+        const meta = (notice.category && CATEGORY_META[notice.category]) || CATEGORY_META.notice
+        const isOpen = expandedId === notice.id
+        const hasDetail = Boolean(notice.content || notice.externalUrl)
+        return (
+          <div
+            key={notice.id}
+            className="rounded-xl border border-gray-200 bg-white px-6 py-5 shadow-sm"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-50">
+                <FileTextIcon className="h-5 w-5 text-gray-500" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                  <span className="text-xs text-gray-400">{notice.sourceName}</span>
+                </div>
+                <p className="mt-1.5 text-base font-medium leading-snug text-gray-800">{notice.title}</p>
+                {notice.summary && <p className="mt-1 text-sm text-gray-500">{notice.summary}</p>}
+                {notice.publishedDate && <p className="mt-1 text-xs text-gray-400">发布时间：{notice.publishedDate}</p>}
+              </div>
+              {hasDetail && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isOpen ? null : notice.id)}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                >
+                  {isOpen ? '收起' : '查看详情'}
+                  <ChevronRightIcon
+                    className={['h-3.5 w-3.5 transition-transform', isOpen ? 'rotate-90' : ''].join(' ')}
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
             </div>
-            <p className="mt-1.5 text-base font-medium leading-snug text-gray-800">{notice.title}</p>
-            <p className="mt-1 text-xs text-gray-400">发布时间：{notice.date}</p>
+
+            {isOpen && (
+              <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3">
+                {notice.content && (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{notice.content}</p>
+                )}
+                {notice.externalUrl && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                    <ArrowUpRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    官方入口:{notice.externalUrl}(请通过官方渠道访问办理)
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-gray-400">以上内容仅作展示说明,具体政策以官方发布为准。</p>
+              </div>
+            )}
           </div>
-          <div className="flex shrink-0 flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => onComingSoon('查看详情')}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-            >
-              查看详情
-              <ArrowUpRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/print/upload')}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-            >
-              <PrinterIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              打印
-            </button>
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -603,10 +544,45 @@ export function RenshiPage() {
   const [activeTab, setActiveTab] = useState<TabKey>(() => getInitialTab(searchParams))
   const { notify, overlay } = useComingSoonNotice()
 
+  // 政策内容(阶段1D 接真):一次拉取,前端按 kind 拆分到两个 Tab
+  const [policies, setPolicies] = useState<PolicyPostView[]>([])
+  const [policyState, setPolicyState] = useState<'loading' | 'error' | 'ready'>('loading')
+
+  const loadPolicies = () => {
+    setPolicyState('loading')
+    getPublishedPolicies()
+      .then((rows) => {
+        setPolicies(rows)
+        setPolicyState('ready')
+      })
+      .catch(() => setPolicyState('error'))
+  }
+
+  useEffect(() => { loadPolicies() }, [])
+
   // 同一路由内 search params 变化时同步首页深链 Tab，非法值回退「就业政策」。
   useEffect(() => {
     setActiveTab(getInitialTab(searchParams))
   }, [searchParams])
+
+  const guides  = policies.filter((p) => p.kind === 'policy_guide')
+  const notices = policies.filter((p) => p.kind === 'notice')
+
+  /** 数据来源说明:取真实来源机构名 + 最近同步时间,绝不硬编码机构名。 */
+  const sourceLine = (() => {
+    if (policies.length === 0) return null
+    const names = [...new Set(policies.map((p) => p.sourceName))].slice(0, 2).join('、')
+    const latest = policies.map((p) => p.syncTime).sort().at(-1)?.slice(0, 10) ?? ''
+    return `数据来源：${names} · 更新于 ${latest} · 仅供参考`
+  })()
+
+  const renderPolicyTab = () => {
+    if (policyState === 'loading') return <LoadingState className="py-16" />
+    if (policyState === 'error') return <ErrorState className="py-16" onRetry={loadPolicies} />
+    return activeTab === 'policy'
+      ? <PolicyPanel guides={guides} sourceLine={sourceLine} />
+      : <NoticePanel notices={notices} sourceLine={sourceLine} />
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -620,8 +596,7 @@ export function RenshiPage() {
       <div className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-5 py-3.5">
         <ShieldCheckIcon className="h-5 w-5 shrink-0 text-blue-600" aria-hidden="true" />
         <p className="text-sm text-blue-700">
-          本专区信息来源于市人力资源和社会保障局及国家相关平台，仅作展示说明，
-          具体政策以官方发布为准。
+          本专区政策内容由合作机构提供并经平台审核，仅作展示说明，具体政策以官方发布为准。
         </p>
       </div>
 
@@ -629,10 +604,9 @@ export function RenshiPage() {
       <TabBar active={activeTab} onChange={setActiveTab} />
 
       {/* Tab panels */}
-      {activeTab === 'policy'   && <PolicyPanel />}
+      {(activeTab === 'policy' || activeTab === 'notice') && renderPolicyTab()}
       {activeTab === 'social'   && <SocialPanel onComingSoon={notify} />}
       {activeTab === 'register' && <RegisterPanel onComingSoon={notify} />}
-      {activeTab === 'notice'   && <NoticePanel onComingSoon={notify} />}
 
       {/* Print pack always visible at bottom */}
       <PrintPackBanner />

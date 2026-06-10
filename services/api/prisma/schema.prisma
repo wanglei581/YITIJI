@@ -114,6 +114,57 @@ model Organization {
   jobs       Job[]      @relation("JobOrg")
   jobSources JobSource[]
   jobFairs   JobFair[]  @relation("FairOrg")
+  policyPosts PolicyPost[] @relation("PolicyOrg")
+}
+
+// ── PolicyPost ────────────────────────────────────────────────────────────────
+// 阶段1D:政策服务内容(政策扶持条目 + 政策公告),Partner 录入 → Admin 审核 → Kiosk 展示。
+//
+// kind:
+//   'policy_guide'  政策扶持条目(Kiosk 政策 Tab,按 audience 人群分组展示)
+//   'notice'        政策公告(Kiosk 公告 Tab,按 category 标签展示)
+// audience(kind=policy_guide):
+//   'graduate' 应届高校毕业生 | 'migrant' 返乡务工人员 | 'hardship' 困难群体 | 'startup' 创业扶持 | 'general'
+// category(kind=notice):
+//   'policy' 政策 | 'announcement' 公告 | 'notice' 通知 | 'recruitment' 招募
+//
+// 合规(CLAUDE.md / compliance §八):
+//   - info-only:只做政策说明 / 材料清单 / 官方入口;不承诺补贴到账、不代申请
+//   - reviewStatus/publishStatus 状态机与 Job/JobFair 完全一致,审核通过才可发布
+
+model PolicyPost {
+  id String @id @default(cuid())
+
+  // 来源(合规必填,与 Job/JobFair 同口径)
+  sourceOrgId String
+  org         Organization @relation("PolicyOrg", fields: [sourceOrgId], references: [id])
+  sourceName  String
+
+  kind     String @default("notice")
+  title    String
+  summary  String?
+  content  String?
+  audience String?
+  category String?
+  /** 官方入口链接(扫码/跳转,info-only) */
+  externalUrl String?
+  /** 对外展示的发布日期(机构提供) */
+  publishedDate DateTime?
+
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  rejectReason  String?
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceOrgId])
+  @@index([kind])
+  @@index([reviewStatus, publishStatus])
+  @@index([publishedDate])
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────

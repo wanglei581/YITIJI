@@ -119,6 +119,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.fairMaterial
   }
 
+  // ── 阶段1D 政策服务 ────────────────────────────────────────────────────────
+
+  get policyPost() {
+    return this.client.policyPost
+  }
+
   // ── W4 同步日志 + Excel 导入批次 ──────────────────────────────────────────
 
   get syncLog() {
