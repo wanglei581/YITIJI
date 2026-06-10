@@ -8,6 +8,8 @@ import type {
   ImportJobItem,
   ImportFairItem,
   ImportResult,
+  UpdatePartnerJobInput,
+  UpdatePartnerFairInput,
   JobCategory,
   JobFairStatus,
   ReviewStatus,
@@ -26,6 +28,8 @@ export type {
   ImportJobItem,
   ImportFairItem,
   ImportResult,
+  UpdatePartnerJobInput,
+  UpdatePartnerFairInput,
   JobCategory,
   JobFairStatus,
   ReviewStatus,
@@ -40,11 +44,14 @@ export type {
 export interface PartnerContentServiceInterface {
   getPartnerJobs(): Promise<PartnerJobRecord[]>
   unpublishPartnerJob(id: string): Promise<PartnerJobRecord>
+  // 阶段1C:编辑本机构数据(后端强制回 pending+draft 重审)
+  updatePartnerJob(id: string, input: UpdatePartnerJobInput): Promise<PartnerJobRecord>
   // sourceOrgId / sourceName 由后端从 JWT 推断，不再由前端传入
   importPartnerJobs(items: ImportJobItem[]): Promise<ImportResult<PartnerJobRecord>>
 
   getPartnerFairs(): Promise<PartnerFairRecord[]>
   unpublishPartnerFair(id: string): Promise<PartnerFairRecord>
+  updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord>
   importPartnerFairs(items: ImportFairItem[]): Promise<ImportResult<PartnerFairRecord>>
 
   getSyncLogs(): Promise<PartnerSyncLog[]>
@@ -66,11 +73,15 @@ const adapter: PartnerContentServiceInterface =
 
 export const getPartnerJobs      = ()              => adapter.getPartnerJobs()
 export const unpublishPartnerJob = (id: string)    => adapter.unpublishPartnerJob(id)
+export const updatePartnerJob    = (id: string, input: UpdatePartnerJobInput) =>
+  adapter.updatePartnerJob(id, input)
 export const importPartnerJobs   = (items: ImportJobItem[]) =>
   adapter.importPartnerJobs(items)
 
 export const getPartnerFairs      = ()              => adapter.getPartnerFairs()
 export const unpublishPartnerFair = (id: string)    => adapter.unpublishPartnerFair(id)
+export const updatePartnerFair    = (id: string, input: UpdatePartnerFairInput) =>
+  adapter.updatePartnerFair(id, input)
 export const importPartnerFairs   = (items: ImportFairItem[]) =>
   adapter.importPartnerFairs(items)
 

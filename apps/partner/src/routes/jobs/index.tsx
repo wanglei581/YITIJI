@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Button, Card, StatusBadge } from '@ai-job-print/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
 import type {
@@ -7,8 +7,9 @@ import type {
   JobCategory,
   ReviewStatus,
   PublishStatus,
+  UpdatePartnerJobInput,
 } from '../../services/api'
-import { getPartnerJobs, unpublishPartnerJob } from '../../services/api'
+import { getPartnerJobs, importPartnerJobs, unpublishPartnerJob, updatePartnerJob } from '../../services/api'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -38,6 +39,56 @@ const REVIEW_FILTERS   = ['全部', '待审核', '审核中', '已通过', '已�
 const CATEGORY_FILTER_MAP: Record<string, JobCategory | null>  = { 全部: null, 全职: 'fulltime', 实习: 'intern', 校招: 'campus', 兼职: 'parttime' }
 const REVIEW_FILTER_MAP:   Record<string, ReviewStatus | null> = { 全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected' }
 
+/** DB category('fulltime' 等)→ 编辑表单 workType('full_time' 等)。 */
+const CATEGORY_TO_WORKTYPE: Record<JobCategory, 'full_time' | 'part_time' | 'internship'> = {
+  fulltime: 'full_time',
+  parttime: 'part_time',
+  intern:   'internship',
+  campus:   'full_time',
+}
+
+const WORKTYPE_OPTIONS = [
+  { value: 'full_time',  label: '全职' },
+  { value: 'part_time',  label: '兼职' },
+  { value: 'internship', label: '实习' },
+] as const
+
+const inputCls =
+  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-gray-600">
+        {label}
+        {required && <span className="ml-0.5 text-red-500">*</span>}
+      </span>
+      {children}
+    </label>
+  )
+}
+
+interface JobFormState {
+  title: string
+  company: string
+  city: string
+  sourceUrl: string
+  workType: 'full_time' | 'part_time' | 'internship' | ''
+  salary: string
+  tags: string
+  description: string
+  requirements: string
+}
+
+const EMPTY_FORM: JobFormState = {
+  title: '', company: '', city: '', sourceUrl: '', workType: '', salary: '', tags: '', description: '', requirements: '',
+}
+
+function errMsg(e: unknown): string {
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string') return (e as Error).message
+  return '操作失败,请重试'
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
@@ -46,15 +97,27 @@ export default function JobsPage() {
   const [error,          setError]          = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('全部')
   const [reviewFilter,   setReviewFilter]   = useState('全部')
+  // 编辑/新增抽屉
+  const [editing, setEditing] = useState<PartnerJobRecord | 'new' | null>(null)
+  const [form, setForm] = useState<JobFormState>(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    getPartnerJobs()
+      .then(setJobs)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    let cancelled = false
-    getPartnerJobs()
-      .then((data) => { if (!cancelled) setJobs(data) })
-      .catch(() => { if (!cancelled) setError(true) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 8000)
+    return () => clearTimeout(t)
+  }, [notice])
 
   const filtered = jobs.filter((j) => {
     const matchCat    = categoryFilter === '全部' || j.category     === CATEGORY_FILTER_MAP[categoryFilter]
@@ -74,6 +137,63 @@ export default function JobsPage() {
     unpublishPartnerJob(id).then((updated) => {
       setJobs((prev) => prev.map((j) => j.id === id ? updated : j))
     })
+  }
+
+  const openNew = () => {
+    setForm(EMPTY_FORM)
+    setFormError(null)
+    setEditing('new')
+  }
+
+  const openEdit = (j: PartnerJobRecord) => {
+    setForm({
+      title: j.title,
+      company: j.company,
+      city: j.city,
+      sourceUrl: j.sourceUrl,
+      workType: j.category ? CATEGORY_TO_WORKTYPE[j.category] : '',
+      salary: j.salary ?? '',
+      tags: (j.tags ?? []).join(','),
+      description: j.description ?? '',
+      requirements: j.requirements ?? '',
+    })
+    setFormError(null)
+    setEditing(j)
+  }
+
+  const canSave = form.title.trim() && form.company.trim() && form.city.trim() && form.sourceUrl.trim()
+
+  const save = async () => {
+    setSaving(true)
+    setFormError(null)
+    const payload: UpdatePartnerJobInput = {
+      title: form.title.trim(),
+      company: form.company.trim(),
+      city: form.city.trim(),
+      sourceUrl: form.sourceUrl.trim(),
+      salary: form.salary.trim() || undefined,
+      tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+      description: form.description.trim() || undefined,
+      requirements: form.requirements.trim() || undefined,
+      workType: form.workType || undefined,
+    }
+    try {
+      if (editing === 'new') {
+        // 手动录入岗位:走导入端点,externalId 由前端生成 MANUAL- 前缀(本机构手工来源)
+        const externalId = `MANUAL-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        await importPartnerJobs([{ ...payload, externalId, title: payload.title!, company: payload.company!, city: payload.city!, sourceUrl: payload.sourceUrl! }])
+        setNotice('岗位已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
+      } else if (editing) {
+        await updatePartnerJob(editing.id, payload)
+        setNotice('修改已保存。该岗位已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')
+      }
+      setEditing(null)
+      load()
+    } catch (e) {
+      setFormError(errMsg(e))
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) {
@@ -102,18 +222,18 @@ export default function JobsPage() {
       title="岗位信息管理"
       subtitle={`共 ${jobs.length} 条岗位`}
       actions={
-        <Button
-          size="sm"
-          variant="primary"
-          disabled
-          title="手动新增岗位写入流程未接入，已禁用"
-          className="flex cursor-not-allowed items-center gap-1.5 opacity-60"
-        >
+        <Button size="sm" variant="primary" className="flex items-center gap-1.5" onClick={openNew}>
           <PlusIcon className="h-4 w-4" />
           新增岗位
         </Button>
       }
     >
+      {notice && (
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {notice}
+        </div>
+      )}
+
       {/* 双行筛选 */}
       <div className="mb-4 space-y-2">
         <div className="flex items-center gap-2">
@@ -202,13 +322,11 @@ export default function JobsPage() {
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">
                           <button
-                            disabled
-                            title="岗位编辑写入流程未接入，已禁用"
-                            className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
+                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                            onClick={() => openEdit(j)}
                           >
                             编辑
                           </button>
-                          <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">查看二维码</button>
                           {j.publishStatus === 'published' && (
                             <button
                               className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
@@ -229,8 +347,70 @@ export default function JobsPage() {
       </Card>
 
       <p className="mt-3 text-xs text-gray-400">
-        本后台仅管理外部来源岗位链接，不在本系统内接收求职者简历，不参与招聘闭环。
+        本后台仅管理外部来源岗位链接，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的岗位需经管理员重新审核后才会在终端展示。
       </p>
+
+      {/* 编辑/新增抽屉 */}
+      <Drawer
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing === 'new' ? '新增岗位(手动录入)' : '编辑岗位'}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">取消</button>
+            <button onClick={save} disabled={saving || !canSave} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
+              {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{formError}</p>}
+          {editing !== 'new' && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              保存后该岗位将重新进入待审核状态;审核通过并重新发布前,终端不展示该条数据。外部编号与来源机构不可修改。
+            </p>
+          )}
+          <Field label="岗位标题" required>
+            <input className={inputCls} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="公司名称" required>
+              <input className={inputCls} value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} />
+            </Field>
+            <Field label="城市" required>
+              <input className={inputCls} value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="岗位类型">
+              <select className={inputCls} value={form.workType} onChange={(e) => setForm((f) => ({ ...f, workType: e.target.value as JobFormState['workType'] }))}>
+                <option value="">未指定</option>
+                {WORKTYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
+            <Field label="薪资(展示文本)">
+              <input className={inputCls} placeholder="如 8k-12k" value={form.salary} onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))} />
+            </Field>
+          </div>
+          <Field label="外部投递链接(来源平台)" required>
+            <input className={inputCls} placeholder="https://…(求职者跳转外部平台投递)" value={form.sourceUrl} onChange={(e) => setForm((f) => ({ ...f, sourceUrl: e.target.value }))} />
+          </Field>
+          <Field label="标签(逗号分隔)">
+            <input className={inputCls} placeholder="如 五险一金,双休" value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} />
+          </Field>
+          <Field label="职位描述">
+            <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          </Field>
+          <Field label="任职要求">
+            <textarea className={`${inputCls} h-24 resize-none`} value={form.requirements} onChange={(e) => setForm((f) => ({ ...f, requirements: e.target.value }))} />
+          </Field>
+          <p className="text-xs text-gray-400">
+            岗位仅作为第三方来源信息展示,求职者通过"去来源平台投递/扫码投递"跳转,本系统不接收简历。
+          </p>
+        </div>
+      </Drawer>
     </Page>
   )
 }

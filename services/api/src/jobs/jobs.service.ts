@@ -50,6 +50,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
+import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 
 // ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
 //
@@ -121,6 +122,9 @@ export interface PartnerJobDto {
   id: string; externalId: string; title: string; company: string; city: string
   sourceUrl: string; syncTime: string; reviewStatus: ReviewStatus; publishStatus: PublishStatus
   sourceOrgId: string; sourceName: string
+  // 阶段1C:编辑表单回填用展示字段(additive,可缺省)
+  category?: string; salary?: string; tags?: string[]
+  description?: string; requirements?: string
 }
 
 export interface PartnerFairDto {
@@ -128,6 +132,8 @@ export interface PartnerFairDto {
   startTime: string; endTime: string; venue: string; status: FairStatus
   sourceUrl: string; syncTime: string; reviewStatus: ReviewStatus; publishStatus: PublishStatus
   sourceOrgId: string; sourceName: string
+  // 阶段1C:编辑表单回填用展示字段(additive,可缺省)
+  theme?: string; city?: string; address?: string; description?: string
 }
 
 export interface PaginatedResult<T> {
@@ -390,6 +396,12 @@ function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
     reviewStatus:  j.reviewStatus  as ReviewStatus,
     publishStatus: j.publishStatus as PublishStatus,
     sourceOrgId: j.sourceOrgId, sourceName: j.sourceName,
+    // 阶段1C:编辑表单回填字段
+    category: j.category ?? undefined,
+    salary: j.salary ?? undefined,
+    tags: safeJsonArr(j.tagsJson),
+    description: j.description ?? undefined,
+    requirements: j.requirements ?? undefined,
   }
 }
 
@@ -511,6 +523,11 @@ function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
     publishStatus: f.publishStatus as PublishStatus,
     sourceOrgId: f.sourceOrgId,
     sourceName: f.sourceName,
+    // 阶段1C:编辑表单回填字段
+    theme: f.theme,
+    city: f.city,
+    address: f.address ?? undefined,
+    description: f.description ?? undefined,
   }
 }
 
@@ -1194,6 +1211,63 @@ export class JobsService {
     return prismaJobToPartnerDto(updated)
   }
 
+  /**
+   * 阶段1C — Partner 编辑本机构岗位。
+   *
+   * 安全/合规:
+   *   - 只能改本机构数据(找不到/不属于本机构统一 404,防机构枚举)
+   *   - 机构必须存在且 enabled(与导入路径同闸)
+   *   - externalId / sourceOrgId / sourceName 不可改(来源可溯源)
+   *   - 编辑后强制 reviewStatus='pending'、publishStatus='draft'、清拒绝原因
+   *     —— 内容修订必须重新过审,防"先过审后改内容"
+   */
+  async updatePartnerJob(id: string, dto: UpdatePartnerJobDto, user: AuthedUser): Promise<PartnerJobDto> {
+    if (user.role !== 'partner' || !user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
+    }
+    const job = await this.prisma.job.findUnique({ where: { id } })
+    if (!job || job.sourceOrgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: `Job ${id} not found` } })
+    }
+
+    const changedFields = Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined)
+    const updated = await this.prisma.job.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.company !== undefined ? { company: dto.company } : {}),
+        ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.sourceUrl !== undefined ? { sourceUrl: dto.sourceUrl } : {}),
+        ...(dto.salary !== undefined ? { salary: dto.salary } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.requirements !== undefined ? { requirements: dto.requirements } : {}),
+        ...(dto.tags !== undefined ? { tagsJson: JSON.stringify(dto.tags) } : {}),
+        ...(dto.workType !== undefined ? { category: mapWorkTypeToCategory(dto.workType) } : {}),
+        // 状态机:内容修订 → 强制重审
+        reviewStatus: 'pending',
+        publishStatus: 'draft',
+        rejectReason: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        syncTime: new Date(),
+      },
+    })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'partner',
+      action: 'job.partner_update',
+      targetType: 'job',
+      targetId: id,
+      payload: { changedFields, fromReviewStatus: job.reviewStatus, fromPublishStatus: job.publishStatus },
+    })
+    this.logger.log(`updatePartnerJob: id=${id} orgId=${user.orgId} fields=${changedFields.join(',')}`)
+    return prismaJobToPartnerDto(updated)
+  }
+
   async getPartnerFairs(user: AuthedUser): Promise<PartnerFairDto[]> {
     if (!user.orgId) return []
     const rows = await this.prisma.jobFair.findMany({
@@ -1305,6 +1379,60 @@ export class JobsService {
       where: { id },
       data: { publishStatus: 'unpublished' },
     })
+    return prismaFairToPartnerDto(updated)
+  }
+
+  /** 阶段1C — Partner 编辑本机构招聘会(规则同 updatePartnerJob:本机构 + 重审 + 来源不可改)。 */
+  async updatePartnerFair(id: string, dto: UpdatePartnerFairDto, user: AuthedUser): Promise<PartnerFairDto> {
+    if (user.role !== 'partner' || !user.orgId) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
+    }
+    const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
+    if (!org || !org.enabled) {
+      throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
+    }
+    const fair = await this.prisma.jobFair.findUnique({ where: { id } })
+    if (!fair || fair.sourceOrgId !== user.orgId) {
+      throw new NotFoundException({ error: { code: 'FAIR_NOT_FOUND', message: `Fair ${id} not found` } })
+    }
+
+    const startAt = dto.startAt ? new Date(dto.startAt) : fair.startAt
+    const endAt   = dto.endAt ? new Date(dto.endAt) : fair.endAt
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt.getTime() <= startAt.getTime()) {
+      throw new BadRequestException({ error: { code: 'INVALID_DATE_RANGE', message: '结束时间必须晚于开始时间' } })
+    }
+
+    const changedFields = Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined)
+    const updated = await this.prisma.jobFair.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.theme !== undefined ? { theme: dto.theme } : {}),
+        ...(dto.startAt !== undefined ? { startAt } : {}),
+        ...(dto.endAt !== undefined ? { endAt } : {}),
+        ...(dto.venue !== undefined ? { venue: dto.venue } : {}),
+        ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.address !== undefined ? { address: dto.address } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.sourceUrl !== undefined ? { sourceUrl: dto.sourceUrl } : {}),
+        // 状态机:内容修订 → 强制重审
+        reviewStatus: 'pending',
+        publishStatus: 'draft',
+        rejectReason: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        syncTime: new Date(),
+      },
+    })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'partner',
+      action: 'fair.partner_update',
+      targetType: 'fair',
+      targetId: id,
+      payload: { changedFields, fromReviewStatus: fair.reviewStatus, fromPublishStatus: fair.publishStatus },
+    })
+    this.logger.log(`updatePartnerFair: id=${id} orgId=${user.orgId} fields=${changedFields.join(',')}`)
     return prismaFairToPartnerDto(updated)
   }
 

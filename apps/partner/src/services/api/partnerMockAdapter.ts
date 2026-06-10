@@ -7,6 +7,8 @@ import type {
   ImportJobItem,
   ImportFairItem,
   ImportResult,
+  UpdatePartnerJobInput,
+  UpdatePartnerFairInput,
   ExcelPreviewResult,
   ExcelConfirmResult,
   FieldMappingRuleResult,
@@ -130,11 +132,32 @@ export const partnerMockAdapter = {
       id: genId(), externalId: item.externalId, title: item.title,
       company: item.company, city: item.city,
       sourceUrl: item.sourceUrl, syncTime: sync,
+      salary: item.salary, tags: item.tags,
+      description: item.description, requirements: item.requirements,
       reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
       sourceOrgId: 'mock-org', sourceName: '测试机构',
     }))
     PARTNER_JOBS = [...PARTNER_JOBS, ...added]
     return { imported: added.length, items: added }
+  },
+  // 阶段1C:编辑本机构岗位(mock 同步后端状态机:编辑后回 pending+draft 重审)
+  async updatePartnerJob(id: string, input: UpdatePartnerJobInput): Promise<PartnerJobRecord> {
+    await delay()
+    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    PARTNER_JOBS = PARTNER_JOBS.map((j) =>
+      j.id === id
+        ? {
+            ...j,
+            ...Object.fromEntries(Object.entries(input).filter(([k, v]) => v !== undefined && k !== 'workType')),
+            reviewStatus: 'pending' as const,
+            publishStatus: 'draft' as const,
+            syncTime: sync,
+          }
+        : j,
+    )
+    const hit = PARTNER_JOBS.find((j) => j.id === id)
+    if (!hit) throw new Error('JOB_NOT_FOUND')
+    return hit
   },
 
   // Fairs
@@ -153,20 +176,46 @@ export const partnerMockAdapter = {
     await delay()
     const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
     const added: PartnerFairRecord[] = items.map((item) => {
-      const start = new Date(item.startTime)
-      const end   = new Date(item.endTime)
+      const start = new Date(item.startAt)
+      const end   = new Date(item.endAt)
       const now   = new Date()
       const status = now < start ? 'upcoming' as const : now > end ? 'ended' as const : 'ongoing' as const
       return {
-        id: genId(), externalId: item.externalId, name: item.name,
-        organizer: item.organizer, startTime: item.startTime, endTime: item.endTime,
+        id: genId(), externalId: item.externalId, name: item.title,
+        organizer: '测试机构', startTime: item.startAt, endTime: item.endAt,
         venue: item.venue, status, sourceUrl: item.sourceUrl, syncTime: sync,
+        theme: item.theme, city: item.city, address: item.address, description: item.description,
         reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
         sourceOrgId: 'mock-org', sourceName: '测试机构',
       }
     })
     PARTNER_FAIRS = [...PARTNER_FAIRS, ...added]
     return { imported: added.length, items: added }
+  },
+  // 阶段1C:编辑本机构招聘会(mock 同步后端状态机)
+  async updatePartnerFair(id: string, input: UpdatePartnerFairInput): Promise<PartnerFairRecord> {
+    await delay()
+    const sync = new Date().toISOString().replace('T', ' ').slice(0, 16)
+    PARTNER_FAIRS = PARTNER_FAIRS.map((f) => {
+      if (f.id !== id) return f
+      const next = { ...f }
+      if (input.title !== undefined) next.name = input.title
+      if (input.theme !== undefined) next.theme = input.theme
+      if (input.startAt !== undefined) next.startTime = input.startAt
+      if (input.endAt !== undefined) next.endTime = input.endAt
+      if (input.venue !== undefined) next.venue = input.venue
+      if (input.city !== undefined) next.city = input.city
+      if (input.address !== undefined) next.address = input.address
+      if (input.description !== undefined) next.description = input.description
+      if (input.sourceUrl !== undefined) next.sourceUrl = input.sourceUrl
+      next.reviewStatus = 'pending'
+      next.publishStatus = 'draft'
+      next.syncTime = sync
+      return next
+    })
+    const hit = PARTNER_FAIRS.find((f) => f.id === id)
+    if (!hit) throw new Error('FAIR_NOT_FOUND')
+    return hit
   },
 
   // Sync Logs (read-only)

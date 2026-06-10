@@ -76,6 +76,11 @@ export interface PartnerJobRecord {
   publishStatus: PublishStatus
   sourceOrgId: string
   sourceName: string  // R2: added
+  // 阶段1C:编辑表单回填字段(后端 additive 返回,可缺省)
+  salary?: string
+  tags?: string[]
+  description?: string
+  requirements?: string
 }
 
 // ─── Fairs ────────────────────────────────────────────────────────────────────
@@ -95,6 +100,11 @@ export interface PartnerFairRecord {
   publishStatus: PublishStatus
   sourceOrgId: string
   sourceName: string  // R2: added
+  // 阶段1C:编辑表单回填字段(后端 additive 返回,可缺省)
+  theme?: string
+  city?: string
+  address?: string
+  description?: string
 }
 
 // ─── Import payloads ──────────────────────────────────────────────────────────
@@ -113,16 +123,46 @@ export interface ImportJobItem {
   workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
 }
 
+/** 契约 = 后端 ImportFairItemDto(阶段1C 修正:旧 name/organizer/startTime 形状与后端不符,属死代码遗留)。 */
 export interface ImportFairItem {
   externalId: string
-  name: string
-  organizer: string
-  startTime: string
-  endTime: string
+  title: string
+  theme?: 'general' | 'campus' | 'campus_corp' | 'industry'
+  startAt: string
+  endAt: string
   venue: string
-  sourceUrl: string
+  city: string
+  address?: string
   description?: string
-  boothCount?: number
+  sourceUrl: string
+  companyCount?: number
+  jobCount?: number
+}
+
+// ─── 阶段1C:编辑 payload(契约 = 后端 UpdatePartnerJobDto / UpdatePartnerFairDto)──
+
+export interface UpdatePartnerJobInput {
+  title?: string
+  company?: string
+  city?: string
+  sourceUrl?: string
+  salary?: string
+  tags?: string[]
+  description?: string
+  requirements?: string
+  workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
+}
+
+export interface UpdatePartnerFairInput {
+  title?: string
+  theme?: 'general' | 'campus' | 'campus_corp' | 'industry'
+  startAt?: string
+  endAt?: string
+  venue?: string
+  city?: string
+  address?: string
+  description?: string
+  sourceUrl?: string
 }
 
 export interface ImportResult<T> {

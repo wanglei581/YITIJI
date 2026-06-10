@@ -8,6 +8,8 @@ import type {
   ImportJobItem,
   ImportFairItem,
   ImportResult,
+  UpdatePartnerJobInput,
+  UpdatePartnerFairInput,
   CreateDataSourcePayload,
   ExcelPreviewResult,
   ExcelConfirmResult,
@@ -96,6 +98,9 @@ export const partnerHttpAdapter = {
     get<PartnerJobRecord[]>('/partner/jobs'),
   unpublishPartnerJob: (id: string) =>
     patch<PartnerJobRecord>(`/partner/jobs/${id}/publish`, { action: 'unpublish' }),
+  // 阶段1C:编辑本机构岗位(后端强制回 pending+draft 重审)
+  updatePartnerJob: (id: string, input: UpdatePartnerJobInput) =>
+    patch<PartnerJobRecord>(`/partner/jobs/${id}`, input),
   // sourceOrgId / sourceName 由后端从 JWT 推断，前端只传 items
   importPartnerJobs: (items: ImportJobItem[]) =>
     post<ImportResult<PartnerJobRecord>>('/partner/jobs/import', { items }),
@@ -105,6 +110,9 @@ export const partnerHttpAdapter = {
     get<PartnerFairRecord[]>('/partner/fairs'),
   unpublishPartnerFair: (id: string) =>
     patch<PartnerFairRecord>(`/partner/fairs/${id}/publish`, { action: 'unpublish' }),
+  // 阶段1C:编辑本机构招聘会(后端强制回 pending+draft 重审)
+  updatePartnerFair: (id: string, input: UpdatePartnerFairInput) =>
+    patch<PartnerFairRecord>(`/partner/fairs/${id}`, input),
   // sourceOrgId / sourceName 由后端从 JWT 推断，前端只传 items
   importPartnerFairs: (items: ImportFairItem[]) =>
     post<ImportResult<PartnerFairRecord>>('/partner/fairs/import', { items }),

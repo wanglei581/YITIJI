@@ -54,6 +54,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { ImportFairsDto } from './dto/import-fairs.dto'
+import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 import { CreateDataSourceDto } from './dto/data-source.dto'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
@@ -329,6 +330,21 @@ export class JobsController {
     return this.jobsService.unpublishPartnerJob(id, user)
   }
 
+  /**
+   * 阶段1C — Partner 编辑本机构岗位(展示字段白名单)。
+   * 编辑成功后强制回 pending+draft 重审;externalId / 来源字段不可改。
+   */
+  @Patch('partner/jobs/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  updatePartnerJob(
+    @Param('id') id: string,
+    @Body() dto: UpdatePartnerJobDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsService.updatePartnerJob(id, dto, user)
+  }
+
   @Get('partner/fairs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
@@ -352,6 +368,18 @@ export class JobsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.jobsService.unpublishPartnerFair(id, user)
+  }
+
+  /** 阶段1C — Partner 编辑本机构招聘会(规则同岗位编辑:重审 + 来源不可改)。 */
+  @Patch('partner/fairs/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  updatePartnerFair(
+    @Param('id') id: string,
+    @Body() dto: UpdatePartnerFairDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.jobsService.updatePartnerFair(id, dto, user)
   }
 
   // ── Partner sync logs ────────────────────────────────────────────────────────

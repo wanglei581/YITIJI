@@ -5,7 +5,26 @@
 
 ---
 
-## 阶段1B —— Admin 合作机构管理接真后端（机构档案 + 授权启停 + 后台账号）（2026-06-10，Claude，`feature/admin-partners-management`）
+## 阶段1C —— Partner 岗位/招聘会编辑能力（编辑 + 手动新增 + 强制重审）（2026-06-10，Claude，`feature/partner-edit-capability`）
+
+**目标：** Partner 端此前只能"导入 + 下架"，编辑/新增按钮一直禁用。本轮补齐：编辑本机构岗位/招聘会、手动录入单条数据，且**任何内容修订强制回 pending+draft 重审**（防"先过审后改内容"绕过审核）。
+
+**后端（jobs 模块扩展）：**
+- 新端点：`PATCH /partner/jobs/:id`、`PATCH /partner/fairs/:id`（[partner-edit.dto.ts](../../services/api/src/jobs/dto/partner-edit.dto.ts) 白名单字段,全可选）。
+- 状态机：编辑成功 → `reviewStatus='pending'`、`publishStatus='draft'`、清 rejectReason/reviewedBy/reviewedAt → **已发布数据当即从 Kiosk 撤下,待重审**。
+- 安全：只能改本机构数据（不属于本机构统一 404 防枚举）；机构 enabled 写入闸沿用；externalId/sourceOrgId/sourceName 不可改（来源可溯源）；审计 `job.partner_update`/`fair.partner_update`（actorRole=partner + changedFields + 原状态）。
+- `PartnerJobDto`/`PartnerFairDto` additive 补编辑回填字段（salary/tags/description/requirements；theme/city/address/description）。
+
+**Partner 前端：**
+- [jobs/index.tsx](../../apps/partner/src/routes/jobs/index.tsx)、[fairs/index.tsx](../../apps/partner/src/routes/fairs/index.tsx)：启用「编辑」（抽屉表单回填 + 黄色提示"保存后重新进入待审核"）与「新增」（手动录入,externalId 前端生成 `MANUAL-` 前缀,走既有 import 端点）；保存后绿色提示明确告知重审语义。
+- 适配器：http/mock 双实现 `updatePartnerJob/updatePartnerFair`；**修正 `ImportFairItem` 死代码遗留形状**（旧 name/organizer/startTime 与后端 DTO 不符,从未被页面使用,本轮对齐后端契约并启用）；移除 fairs 页两个无功能按钮（查看预约二维码/打印活动资料,后者已由 Admin 招聘会管理-活动资料承接）。
+- 合规：新增/编辑表单要求「外部投递链接/来源平台预约链接」必填,文案仅"去来源平台投递/预约"语义,不收简历不收报名。
+
+**验证（全绿）：** `verify:partner-edit` **9 PASS / ALL PASS**（编辑落库+强制 pending·draft+审核痕迹清空 / workType→category 映射 / 来源字段不变 / 越权·不存在 404 / 机构停用拒绝 / 招聘会编辑+时间区间校验 / 编辑后 Kiosk 公开数据即时撤下 / partner_update 审计含 changedFields）；api+partner typecheck/lint/build 全绿。
+
+---
+
+## 阶段1B —— Admin 合作机构管理接真后端（机构档案 + 授权启停 + 后台账号）（2026-06-10，Claude，`feature/admin-partners-management`，已 FF 合入 main `b4d1db3`）
 
 **目标：** 替换 Admin `partners` 页 271 行纯 mock（启停/配置按钮一直 disabled），建立合作机构真实管理链路：机构档案、授权启停、机构后台账号开通/启停/重置密码。
 

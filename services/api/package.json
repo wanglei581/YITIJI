@@ -34,7 +34,8 @@
     "verify:external-video": "tsx scripts/verify-external-video.ts",
     "verify:external-video:e2e": "tsx scripts/verify-external-video-e2e.ts",
     "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts",
-    "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts"
+    "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
+    "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
