@@ -36,7 +36,8 @@
     "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts",
     "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
-    "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts"
+    "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
+    "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

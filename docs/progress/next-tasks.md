@@ -15,7 +15,9 @@
 - ✅ **1B Admin 合作机构管理接真**（`feature/admin-partners-management`，2026-06-10）：Organization 档案字段 + /admin/orgs CRUD + 授权启停双闸（登录+导入）+ 机构账号开通/启停/重置密码。`verify:admin-orgs` 14 PASS。详见 [current-progress.md](./current-progress.md) §阶段1B。
 - ✅ **1C Partner 岗位/招聘会编辑能力**（`feature/partner-edit-capability`，2026-06-10）：PATCH 编辑端点（强制回 pending+draft 重审）+ 编辑/手动新增抽屉 + ImportFairItem 死代码形状修正。`verify:partner-edit` 9 PASS。详见 [current-progress.md](./current-progress.md) §阶段1C。
 - ✅ **1D 政策服务接真**（`feature/policy-service-real`，2026-06-10）：PolicyPost 模型 + Partner 政策公告管理（空壳→完整 CRUD）+ Admin 政策信息源审核页 + Kiosk 人社专区两 Tab 接真（删除硬编码补贴金额）。`verify:policies` 11 PASS。详见 [current-progress.md](./current-progress.md) §阶段1D。
-- ⏳ **1E Admin 订单/告警/设备页按已有后端接真**：orders 接 PrintTask 真数据；alerts/devices 视后端现状接真或诚实标注。
+- ✅ **1E Admin 订单/告警页接真**（`feature/admin-ops-pages-real`，2026-06-10）：订单页假数据→真实打印任务流水（无支付域不造金额）；告警页→实时派生告警（离线/打印机异常/打印失败）；移除侧栏假角标。设备页核查已真实，外设待硬件上报。`verify:admin-ops` 3 PASS。详见 [current-progress.md](./current-progress.md) §阶段1E。
+
+> **阶段1 数据打通(1A–1E)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
 

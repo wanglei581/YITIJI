@@ -27,7 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
   { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维' },
   { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon },
-  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon,   badge: 3 },
+  // badge 不再硬编码:告警数为实时派生,进入页面即见真实数量
+  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon },
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理' },
   { key: 'files',        label: '文件管理',     icon: FolderIcon },
   { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon },

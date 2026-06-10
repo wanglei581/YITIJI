@@ -5,7 +5,26 @@
 
 ---
 
-## 阶段1D —— 政策服务接真（Partner 录入 → Admin 审核 → Kiosk 展示）（2026-06-10，Claude，`feature/policy-service-real`）
+## 阶段1E —— Admin 订单/告警页接真（打印任务流水 + 派生告警）（2026-06-10，Claude，`feature/admin-ops-pages-real`）
+
+**目标：** Admin 订单页(10 条硬编码假订单含编造金额/支付状态)与告警页(硬编码假告警+侧栏假角标 3)接真。设备管理页经核查已是真实数据(终端/打印机接真,外设待硬件上报),本轮不动。
+
+**后端（新模块 [src/admin-ops/](../../services/api/src/admin-ops/)，零 schema 变更）：**
+- `GET /admin/print-tasks?status=&page=&pageSize=`：打印任务流水。**select 显式收口**——不读出 fileUrl/fileMd5/errorMessage/endUser 关系;paramsJson 复用 member-print-orders 同口径白名单提取(损坏→null 不抛错);归属只回 member/anonymous 不回 endUserId;errorCode 保留(运维需要)。
+- `GET /admin/alerts`：**实时派生告警**(不建 Alert 模型不造假)——终端离线(心跳超 3 分钟,超 30 分钟升 error)/打印机异常(最近心跳 printerStatus≠ok)/近 24h 打印失败任务。条件恢复告警自动消失。
+
+**Admin 前端：**
+- [orders/index.tsx](../../apps/admin/src/routes/orders/index.tsx)：假订单 → 真实打印任务流水(状态筛选+服务端分页+刷新);**移除编造的金额/支付状态列**,页头诚实说明"支付/退款/对账域(Phase C-5)未上线"。
+- [alerts/index.tsx](../../apps/admin/src/routes/alerts/index.tsx)：假告警 → 真实派生告警(类型筛选/严重度徽章/刷新+生成时间);诚实说明"无独立告警模型,暂不支持确认/指派/处理记录"。
+- 侧栏告警假角标 `badge: 3` 移除。
+
+**验证（全绿）：** `verify:admin-ops` **3 PASS / ALL PASS**(列表+过滤+分页 / 敏感字段 8 项零泄露+损坏 params 优雅降级 / 离线 error·缺纸 warning·打印失败派生齐全且正常终端零告警)；api+admin typecheck/lint/build 全绿。
+
+**待办（依赖后续域）：** 真实支付列(Phase C-5 订单支付域)；告警确认/处理流转(需 Alert 模型);外设管理(待 Agent 上报外设数据)。
+
+---
+
+## 阶段1D —— 政策服务接真（Partner 录入 → Admin 审核 → Kiosk 展示）（2026-06-10，Claude，`feature/policy-service-real`，已 FF 合入 main `6340491`）
 
 **目标：** Kiosk 人社专区(RenshiPage)的"就业政策/政策公告"两个 Tab 此前为前端硬编码（且写死补贴金额，真机有误导风险），Partner 政策公告页为空壳。本轮建立完整数据链路。
 

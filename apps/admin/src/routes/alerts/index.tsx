@@ -1,241 +1,135 @@
-import { useState } from 'react'
-import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { AlertTriangleIcon } from 'lucide-react'
-import { Pagination, useTableState } from '../components/DataTable'
+import { AlertTriangleIcon, MonitorOffIcon, PrinterIcon, RefreshCwIcon } from 'lucide-react'
+import { adminOpsService, type AdminAlertItem } from '../../services/api/adminOps'
 
-// ─── Types & mock ─────────────────────────────────────────────────────────────
+// ─── Display maps ─────────────────────────────────────────────────────────────
 
-type AlertLevel  = 'info' | 'warning' | 'critical'
-type AlertStatus = 'pending' | 'handling' | 'resolved'
-type AlertType   =
-  | 'device-offline'
-  | 'printer-fault'
-  | 'paper-jam'
-  | 'paper-empty'
-  | 'toner-low'
-  | 'ai-call-fail'
-  | 'payment-anomaly'
-  | 'file-clean-fail'
-  | 'sync-fail'
-
-interface Alert {
-  id: string
-  no: string
-  type: AlertType
-  level: AlertLevel
-  terminal: string
-  device: string
-  message: string
-  occurredAt: string
-  handler: string | null
-  status: AlertStatus
+const TYPE_META: Record<AdminAlertItem['type'], { label: string; icon: typeof AlertTriangleIcon; iconColor: string }> = {
+  terminal_offline: { label: '终端离线',   icon: MonitorOffIcon,    iconColor: 'text-red-500' },
+  printer_issue:    { label: '打印机异常', icon: PrinterIcon,       iconColor: 'text-orange-500' },
+  print_failed:     { label: '打印失败',   icon: AlertTriangleIcon, iconColor: 'text-amber-500' },
 }
 
-const MOCK_ALERTS: Alert[] = [
-  { id: 'a1',  no: 'ALT-20260525-0012', type: 'printer-fault',   level: 'critical', terminal: 'KSK-008', device: 'Pantum-CM2820-008', message: '卡纸故障，打印任务队列阻塞，需人工处理',              occurredAt: '2026-05-25 09:45', handler: null,      status: 'pending'  },
-  { id: 'a2',  no: 'ALT-20260525-0011', type: 'device-offline',  level: 'critical', terminal: 'KSK-007', device: 'KSK-007 主机',        message: '终端心跳超时，已离线超过 2 小时，影响正常服务',     occurredAt: '2026-05-25 07:30', handler: '张运维',   status: 'handling' },
-  { id: 'a3',  no: 'ALT-20260525-0010', type: 'toner-low',       level: 'warning',  terminal: 'KSK-003', device: 'Pantum-CM2820-003', message: '碳粉余量低于 10%（当前 8%），建议尽快更换',         occurredAt: '2026-05-25 08:12', handler: null,      status: 'pending'  },
-  { id: 'a4',  no: 'ALT-20260525-0009', type: 'paper-empty',     level: 'warning',  terminal: 'KSK-005', device: 'Pantum-CM2820-005', message: '纸盒已空，无法执行打印任务',                        occurredAt: '2026-05-25 08:05', handler: '李运维',   status: 'handling' },
-  { id: 'a5',  no: 'ALT-20260525-0008', type: 'payment-anomaly', level: 'warning',  terminal: 'KSK-001', device: '支付终端',             message: '订单 ORD-20260525-0042 支付回调超时，状态异常',    occurredAt: '2026-05-25 08:20', handler: null,      status: 'pending'  },
-  { id: 'a6',  no: 'ALT-20260525-0007', type: 'ai-call-fail',    level: 'warning',  terminal: 'KSK-004', device: 'AI服务',              message: 'AI简历解析接口响应超时（>30s），任务已进入重试队列', occurredAt: '2026-05-25 07:58', handler: null,      status: 'pending'  },
-  { id: 'a7',  no: 'ALT-20260524-0031', type: 'device-offline',  level: 'critical', terminal: 'KSK-009', device: 'KSK-009 主机',        message: '终端离线超过 5 小时，网络断线，需现场检查',         occurredAt: '2026-05-24 04:20', handler: '张运维',   status: 'resolved' },
-  { id: 'a8',  no: 'ALT-20260524-0028', type: 'sync-fail',       level: 'info',     terminal: '—',       device: '数据同步服务',         message: '市人才网岗位数据同步失败，接口返回 503，已重试 3 次', occurredAt: '2026-05-24 06:00', handler: '系统自动', status: 'resolved' },
-  { id: 'a9',  no: 'ALT-20260524-0025', type: 'paper-jam',       level: 'warning',  terminal: 'KSK-002', device: 'Pantum-CM2820-002', message: '检测到卡纸，已自动暂停打印队列',                    occurredAt: '2026-05-24 14:33', handler: '李运维',   status: 'resolved' },
-  { id: 'a10', no: 'ALT-20260524-0020', type: 'file-clean-fail', level: 'info',     terminal: '—',       device: '文件清理服务',         message: '定时清理任务执行失败，目标文件被占用，将在下次重试', occurredAt: '2026-05-24 03:00', handler: '系统自动', status: 'resolved' },
-]
-
-const ALERT_TYPE_LABELS: Record<AlertType, string> = {
-  'device-offline':  '设备离线',
-  'printer-fault':   '打印机故障',
-  'paper-jam':       '卡纸',
-  'paper-empty':     '缺纸',
-  'toner-low':       '碳粉低余量',
-  'ai-call-fail':    'AI调用失败',
-  'payment-anomaly': '支付异常',
-  'file-clean-fail': '文件清理失败',
-  'sync-fail':       '数据同步失败',
+const SEVERITY_MAP: Record<string, { badge: 'error' | 'warning'; label: string }> = {
+  error:   { badge: 'error',   label: '严重' },
+  warning: { badge: 'warning', label: '警告' },
 }
 
-const LEVEL_MAP: Record<AlertLevel, { badge: 'info' | 'warning' | 'error'; label: string; dot: string }> = {
-  info:     { badge: 'info',    label: '提醒', dot: 'bg-blue-400'   },
-  warning:  { badge: 'warning', label: '警告', dot: 'bg-orange-400' },
-  critical: { badge: 'error',   label: '严重', dot: 'bg-red-500'    },
-}
+const TYPE_FILTERS = [
+  { label: '全部', value: '' },
+  { label: '终端离线', value: 'terminal_offline' },
+  { label: '打印机异常', value: 'printer_issue' },
+  { label: '打印失败', value: 'print_failed' },
+] as const
 
-const STATUS_MAP: Record<AlertStatus, { badge: 'warning' | 'info' | 'success'; label: string }> = {
-  pending:  { badge: 'warning', label: '待处理' },
-  handling: { badge: 'info',    label: '处理中' },
-  resolved: { badge: 'success', label: '已解决' },
+function fmt(iso: string): string {
+  return iso.slice(0, 16).replace('T', ' ')
 }
-
-const LEVEL_FILTERS  = ['全部', '严重', '警告', '提醒'] as const
-const STATUS_FILTERS = ['全部', '待处理', '处理中', '已解决'] as const
-const LEVEL_FILTER_MAP:  Record<string, AlertLevel  | null> = { 全部: null, 严重: 'critical', 警告: 'warning', 提醒: 'info' }
-const STATUS_FILTER_MAP: Record<string, AlertStatus | null> = { 全部: null, 待处理: 'pending', 处理中: 'handling', 已解决: 'resolved' }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AlertsPage() {
-  const [alerts] = useState(MOCK_ALERTS)
-  const [levelFilter,  setLevelFilter]  = useState('全部')
-  const [statusFilter, setStatusFilter] = useState('全部')
-  const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
+  const [alerts, setAlerts] = useState<AdminAlertItem[]>([])
+  const [derivedAt, setDerivedAt] = useState<string | null>(null)
+  const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
+  const [typeFilter, setTypeFilter] = useState('')
 
-  const filtered = alerts.filter((a) => {
-    const matchLevel  = levelFilter  === '全部' || a.level  === LEVEL_FILTER_MAP[levelFilter]
-    const matchStatus = statusFilter === '全部' || a.status === STATUS_FILTER_MAP[statusFilter]
-    return matchLevel && matchStatus
-  })
+  const load = useCallback(async () => {
+    setState('loading')
+    try {
+      const res = await adminOpsService.listAlerts()
+      setAlerts(res.data)
+      setDerivedAt(res.derivedAt)
+      setState('ready')
+    } catch {
+      setState('error')
+    }
+  }, [])
 
-  const searched = search.trim()
-    ? filtered.filter((a) =>
-        a.no.includes(search) ||
-        a.message.includes(search) ||
-        a.device.includes(search)
-      )
-    : filtered
+  useEffect(() => { void load() }, [load])
 
-  const total = searched.length
-  const paginated = searched.slice((page - 1) * pageSize, page * pageSize)
-
-  const levelCounts = {
-    全部: alerts.length,
-    严重: alerts.filter((a) => a.level === 'critical').length,
-    警告: alerts.filter((a) => a.level === 'warning').length,
-    提醒: alerts.filter((a) => a.level === 'info').length,
-  }
-
-  const statusCounts = {
-    全部:   alerts.length,
-    待处理: alerts.filter((a) => a.status === 'pending').length,
-    处理中: alerts.filter((a) => a.status === 'handling').length,
-    已解决: alerts.filter((a) => a.status === 'resolved').length,
-  }
-
-  const pendingCount = alerts.filter((a) => a.status === 'pending').length
+  const filtered = typeFilter ? alerts.filter((a) => a.type === typeFilter) : alerts
+  const errorCount = alerts.filter((a) => a.severity === 'error').length
 
   return (
     <Page
       title="告警中心"
-      subtitle={pendingCount > 0 ? `${pendingCount} 条待处理告警` : '全部告警已处理'}
+      subtitle={`实时派生告警 — ${alerts.length} 条(严重 ${errorCount})${derivedAt ? ` · 生成于 ${fmt(derivedAt)}` : ''}`}
+      actions={
+        <button
+          onClick={() => void load()}
+          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+        >
+          <RefreshCwIcon className="h-4 w-4" />
+          刷新
+        </button>
+      }
     >
-      {/* 双行筛选 */}
-      <div className="mb-4 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 w-10">级别</span>
-          <div className="flex gap-2">
-            {LEVEL_FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => { setLevelFilter(f); setPage(1) }}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  levelFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {f}
-                <span className="ml-1.5 text-xs opacity-70">{levelCounts[f]}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 w-10">状态</span>
-          <div className="flex gap-2">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => { setStatusFilter(f); setPage(1) }}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  statusFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {f}
-                {f !== '全部' && <span className="ml-1.5 text-xs opacity-70">{statusCounts[f]}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索告警编号..." className="h-8 w-48 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-        </div>
+      {/* 诚实说明:派生告警,无处理流转 */}
+      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+        告警由实时数据派生:终端离线(心跳超 3 分钟)、打印机异常(最近心跳上报)、近 24 小时打印失败任务。当前未建独立告警模型,故不支持确认/指派/处理记录;条件恢复后告警自动消失。
       </div>
 
-      {/* 表格 */}
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
-              <tr>
-                {['', '告警编号', '类型', '级别', '关联终端', '关联设备', '告警内容', '发生时间', '处理人', '状态', '操作'].map((h, i) => (
-                  <th key={i} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {paginated.length === 0 ? (
-                <tr>
-                  <td colSpan={11}>
-                    <EmptyState title={search ? '未找到匹配的告警' : '当前筛选条件下无告警'} description={search ? '请尝试其他关键词' : undefined} icon={AlertTriangleIcon} className="py-12" />
-                  </td>
-                </tr>
-              ) : (
-                paginated.map((a) => {
-                  const lv = LEVEL_MAP[a.level]
-                  const st = STATUS_MAP[a.status]
-                  return (
-                    <tr key={a.id} className="hover:bg-gray-50">
-                      <td className="pl-4 py-3">
-                        <span className={`inline-block h-2 w-2 rounded-full ${lv.dot}`} />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{a.no}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-700">{ALERT_TYPE_LABELS[a.type]}</td>
-                      <td className="px-4 py-3"><StatusBadge status={lv.badge} label={lv.label} /></td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">{a.terminal}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{a.device}</td>
-                      <td className="px-4 py-3 text-xs text-gray-700 max-w-xs">
-                        <span className="line-clamp-2">{a.message}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{a.occurredAt}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                        {a.handler ?? <span className="text-gray-300">未分配</span>}
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge status={st.badge} label={st.label} /></td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-2">
-                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看详情</button>
-                          {a.status === 'pending' && (
-                            <button
-                              disabled
-                              title="告警处理写入端点未接入，已禁用，避免误以为操作生效"
-                              className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
-                            >
-                              标记处理中
-                            </button>
-                          )}
-                          {(a.status === 'pending' || a.status === 'handling') && (
-                            <button
-                              disabled
-                              title="告警处理写入端点未接入，已禁用，避免误以为操作生效"
-                              className="cursor-not-allowed rounded px-2 py-1 text-xs font-medium text-gray-300"
-                            >
-                              标记已解决
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
-      </Card>
+      {/* 类型筛选 */}
+      <div className="mb-4 flex gap-2">
+        {TYPE_FILTERS.map((f) => (
+          <button
+            key={f.label}
+            onClick={() => setTypeFilter(f.value)}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              typeFilter === f.value ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {f.label}
+            <span className="ml-1.5 text-xs opacity-70">
+              {f.value ? alerts.filter((a) => a.type === f.value).length : alerts.length}
+            </span>
+          </button>
+        ))}
+      </div>
 
-      <p className="mt-3 text-xs text-gray-400">当前告警列表为示例数据；告警处理写入端点接入前，处理按钮保持禁用。</p>
+      {state === 'loading' && <LoadingState className="py-24" />}
+      {state === 'error' && <ErrorState className="py-24" onRetry={() => void load()} />}
+
+      {state === 'ready' && (
+        filtered.length === 0 ? (
+          <EmptyState
+            title="当前无告警"
+            description="所有终端在线、打印机正常、近 24 小时无失败任务"
+            icon={AlertTriangleIcon}
+            className="py-20"
+          />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filtered.map((alert) => {
+              const meta = TYPE_META[alert.type]
+              const severity = SEVERITY_MAP[alert.severity] ?? SEVERITY_MAP.warning
+              const Icon = meta.icon
+              return (
+                <Card key={alert.id} className="flex items-start gap-4 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-50">
+                    <Icon className={`h-5 w-5 ${meta.iconColor}`} aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge status={severity.badge} label={severity.label} />
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{meta.label}</span>
+                      {alert.terminalCode && (
+                        <span className="font-mono text-xs text-gray-400">{alert.terminalCode}</span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-sm font-medium text-gray-800">{alert.title}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">{alert.detail}</p>
+                  </div>
+                  <p className="shrink-0 text-xs text-gray-400">{fmt(alert.occurredAt)}</p>
+                </Card>
+              )
+            })}
+          </div>
+        )
+      )}
     </Page>
   )
 }
