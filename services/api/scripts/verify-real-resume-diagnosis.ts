@@ -14,7 +14,7 @@
 import 'dotenv/config'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { Logger } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AiService } from '../src/ai/ai.service'
@@ -35,17 +35,43 @@ function assert(cond: unknown, message: string): void {
   else fail(message)
 }
 
+// Phase 1.1：6 评分维度 + riskNotes + priorities。
 function validReportJson(): string {
   return JSON.stringify({
     sections: [
       { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
-      { key: 'education', label: '教育经历完整度', score: 9, maxScore: 10 },
-      { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
-      { key: 'skills', label: '技能关键词覆盖', score: 5, maxScore: 10 },
-      { key: 'layout', label: '排版可读性', score: 7, maxScore: 10 },
+      { key: 'objective', label: '求职目标清晰度', score: 6, maxScore: 10 },
+      { key: 'experience', label: '经历表达清晰度', score: 6, maxScore: 10 },
+      { key: 'quantification', label: '成果量化程度', score: 5, maxScore: 10 },
+      { key: 'keyword', label: '岗位关键词覆盖', score: 5, maxScore: 10 },
+      { key: 'readability', label: '版式与可读性', score: 7, maxScore: 10 },
     ],
     suggestions: ['项目描述建议量化成果', '技能区补充岗位相关关键词', '个人简介精简至 2-3 句'],
+    riskNotes: ['经历缺少量化描述', '求职目标表述偏笼统'],
+    priorities: [
+      { focus: '补充成果量化', reason: '职责描述缺少可衡量结果' },
+      { focus: '明确求职目标', reason: '意向方向不清晰' },
+    ],
   })
+}
+
+// 诊断专属合规拦截词测试输入（字符串拼接，避免源码出现完整违禁词）。
+const jw = (...p: string[]): string => p.join('')
+const GUARD_TERM_HIRE = jw('录用', '概率')
+const GUARD_TERM_MATCH = jw('企业', '匹配度')
+
+// 6 个合法评分维度（可用 mut 注入坏分值做拒绝测试）。
+function sixSections(mut) {
+  const s = [
+    { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
+    { key: 'objective', label: '求职目标清晰度', score: 6, maxScore: 10 },
+    { key: 'experience', label: '经历表达清晰度', score: 6, maxScore: 10 },
+    { key: 'quantification', label: '成果量化程度', score: 5, maxScore: 10 },
+    { key: 'keyword', label: '岗位关键词覆盖', score: 5, maxScore: 10 },
+    { key: 'readability', label: '版式与可读性', score: 7, maxScore: 10 },
+  ]
+  if (mut) mut(s)
+  return s
 }
 
 // 本地 stub LLM 端点：按 responseQueue 顺序返回，空则默认合法报告。
@@ -192,10 +218,14 @@ async function main(): Promise<void> {
     assert(
       r2.status === 'completed' &&
         !!r2.report &&
-        r2.report.sections.length > 0 &&
+        r2.report.sections.length === 6 &&
+        r2.report.sections.every((s) => s.maxScore === 10) &&
         r2.report.suggestions.length > 0 &&
+        (r2.report.riskNotes?.length ?? 0) > 0 &&
+        (r2.report.priorities?.length ?? 0) > 0 &&
+        r2.report.priorities!.every((p) => typeof p.focus === 'string' && p.focus.length > 0) &&
         llmCallCount === before2 + 1,
-      '2. DOCX 提取成功后调用 LLM 并生成结构化报告',
+      '2. DOCX 提取成功后调用 LLM 并生成 6 维度 + riskNotes + priorities 结构化报告',
     )
 
     // ── 3. LLM 返回非法 JSON → 重试一次后成功 ─────────────────────────────────
@@ -216,13 +246,14 @@ async function main(): Promise<void> {
       '4. 重试仍失败时返回明确错误（status=failed，无 report）',
     )
 
-    // ── 4b. 维度结构漂移 → 不接受半结构化报告 ───────────────────────────────
+    // ── 4b. 维度结构漂移 → 不接受半结构化报告（6 维度中混入未知 key）──────────
     const driftedReport = JSON.stringify({
       sections: [
         { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
-        { key: 'education', label: '教育经历完整度', score: 9, maxScore: 10 },
-        { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
-        { key: 'skills', label: '技能关键词覆盖', score: 5, maxScore: 10 },
+        { key: 'objective', label: '求职目标清晰度', score: 6, maxScore: 10 },
+        { key: 'experience', label: '经历表达清晰度', score: 6, maxScore: 10 },
+        { key: 'quantification', label: '成果量化程度', score: 5, maxScore: 10 },
+        { key: 'keyword', label: '岗位关键词覆盖', score: 5, maxScore: 10 },
         { key: 'extra', label: '非固定维度', score: 10, maxScore: 10 },
       ],
       suggestions: ['项目描述建议量化成果', '技能区补充岗位相关关键词', '个人简介精简至 2-3 句'],
@@ -232,7 +263,7 @@ async function main(): Promise<void> {
     const r4b = await submit('docx-file', null)
     assert(
       r4b.status === 'failed' && !r4b.report && !!r4b.failReason && llmCallCount === before4b + 2,
-      '4b. LLM 维度结构漂移时拒绝结果（只能返回固定 5 维度）',
+      '4b. LLM 维度结构漂移时拒绝结果（只能返回固定 6 维度，未知 key 被拒）',
     )
 
     // ── 5. providerName !== mock ─────────────────────────────────────────────
@@ -301,6 +332,155 @@ async function main(): Promise<void> {
     assert(
       !memberRes.accessToken && !!memberRead?.report && crossDenied,
       '9b. 会员结果：本人可读、不铸 token、跨会员 → AI_TASK_NOT_FOUND',
+    )
+
+    // ── 10. 合规词过滤：suggestions/riskNotes/priorities 含拦截词的条目被丢弃 ──
+    const dirtyReport = JSON.stringify({
+      sections: [
+        { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
+        { key: 'objective', label: '求职目标清晰度', score: 6, maxScore: 10 },
+        { key: 'experience', label: '经历表达清晰度', score: 6, maxScore: 10 },
+        { key: 'quantification', label: '成果量化程度', score: 5, maxScore: 10 },
+        { key: 'keyword', label: '岗位关键词覆盖', score: 5, maxScore: 10 },
+        { key: 'readability', label: '版式与可读性', score: 7, maxScore: 10 },
+      ],
+      suggestions: [`该简历${GUARD_TERM_HIRE}较低`, '个人简介精简至 2-3 句'],
+      riskNotes: [`${GUARD_TERM_MATCH}不高`, '经历缺少量化描述'],
+      priorities: [
+        { focus: '补充成果量化', reason: '缺少可衡量结果' },
+        { focus: `提升${GUARD_TERM_MATCH}`, reason: GUARD_TERM_HIRE },
+      ],
+    })
+    setResponses([{ status: 200, content: dirtyReport }])
+    const r10 = await submit('docx-file', null)
+    const rep10 = r10.report
+    const flat10 = JSON.stringify(rep10 ?? {})
+    assert(
+      r10.status === 'completed' &&
+        !!rep10 &&
+        !flat10.includes(GUARD_TERM_HIRE) &&
+        !flat10.includes(GUARD_TERM_MATCH) &&
+        // 干净条目保留：suggestions 仍有「个人简介」、riskNotes 仍有「经历缺少量化」、priorities 仍有「补充成果量化」
+        rep10.suggestions.some((s) => s.includes('个人简介')) &&
+        (rep10.riskNotes ?? []).some((s) => s.includes('经历缺少量化')) &&
+        (rep10.priorities ?? []).some((p) => p.focus.includes('补充成果量化')),
+      '10. 合规词过滤：含拦截词条目被丢弃、干净条目保留（录用概率/企业匹配度未进报告）',
+    )
+
+    // ── 11. 旧 5-section 报告向后兼容：直接落库旧结构，读回不崩、字段照常 ──────
+    const legacyTaskId = `legacy5_${suffix}`
+    createdTaskIds.push(legacyTaskId)
+    const legacyToken = 'feedface'.repeat(6)
+    await prisma.aiResumeResult.create({
+      data: {
+        taskId: legacyTaskId,
+        kind: 'parse',
+        status: 'completed',
+        provider: 'llm',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        endUserId: null,
+        accessTokenHash: createHash('sha256').update(legacyToken).digest('hex'),
+        payloadJson: JSON.stringify({
+          taskId: legacyTaskId,
+          status: 'completed',
+          providerName: 'llm',
+          report: {
+            sections: [
+              { key: 'basic', label: '基础信息完整度', score: 8, maxScore: 10 },
+              { key: 'education', label: '教育经历完整度', score: 9, maxScore: 10 },
+              { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
+              { key: 'skills', label: '技能关键词覆盖', score: 5, maxScore: 10 },
+              { key: 'layout', label: '排版可读性', score: 7, maxScore: 10 },
+            ],
+            suggestions: ['旧报告建议一', '旧报告建议二'],
+          },
+        }),
+      },
+    })
+    const legacyRead = await ai.getResumeRecord(legacyTaskId, { endUserId: null, accessToken: legacyToken })
+    assert(
+      !!legacyRead?.report &&
+        legacyRead.report.sections.length === 5 &&
+        legacyRead.report.suggestions.length === 2 &&
+        legacyRead.report.riskNotes === undefined &&
+        legacyRead.report.priorities === undefined,
+      '11. 旧 5-section 报告（无 riskNotes/priorities）仍可正常读回、不报错',
+    )
+
+    // ── 12. priorities 缺 reason 的条目被丢弃（report 仍 completed，只保留完整条目）──
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      priorities: [
+        { focus: '补充成果量化', reason: '缺少可衡量结果' },
+        { focus: '明确求职目标', reason: '意向方向不清晰' },
+        { focus: '缺 reason 的条目' }, // 无 reason → 应被丢弃
+      ],
+    }) }])
+    const r12 = await submit('docx-file', null)
+    assert(
+      r12.status === 'completed' &&
+        (r12.report?.priorities?.length ?? 0) === 2 &&
+        (r12.report?.priorities ?? []).every((p) => typeof p.reason === 'string' && p.reason.length > 0),
+      '12. priorities 缺 reason 条目被丢弃，完整条目保留（report 仍 completed）',
+    )
+
+    // ── 13. priorities 清洗后恰好 1 条 → 视为无效、触发 retry，最终失败 ──────────
+    const onePriorityReport = JSON.stringify({
+      sections: sixSections(),
+      suggestions: ['个人简介精简至 2-3 句'],
+      priorities: [{ focus: '补充成果量化', reason: '缺少可衡量结果' }],
+    })
+    setResponses([{ status: 200, content: onePriorityReport }, { status: 200, content: onePriorityReport }])
+    const before13 = llmCallCount
+    const r13 = await submit('docx-file', null)
+    assert(
+      r13.status === 'failed' && !r13.report && llmCallCount === before13 + 2,
+      '13. priorities 恰好 1 条 → 无效、重试一次后失败（不接受半截）',
+    )
+
+    // ── 14. 超长 suggestions/riskNotes/priorities 被截断 ────────────────────────
+    const longS = '改'.repeat(200)
+    const longR = '险'.repeat(200)
+    const longFocus = '点'.repeat(60)
+    const longReason = '因'.repeat(200)
+    setResponses([{ status: 200, content: JSON.stringify({
+      sections: sixSections(),
+      suggestions: [longS, '正常建议'],
+      riskNotes: [longR],
+      priorities: [
+        { focus: longFocus, reason: longReason },
+        { focus: '明确求职目标', reason: '意向方向不清晰' },
+      ],
+    }) }])
+    const r14 = await submit('docx-file', null)
+    const rep14 = r14.report
+    assert(
+      r14.status === 'completed' &&
+        !!rep14 &&
+        rep14.suggestions[0].length === 120 &&
+        (rep14.riskNotes ?? [])[0]?.length === 120 &&
+        (rep14.priorities ?? [])[0]?.focus.length === 40 &&
+        (rep14.priorities ?? [])[0]?.reason.length === 120,
+      '14. 超长 suggestions/riskNotes/priority.focus(≤40)/priority.reason(≤120) 被截断',
+    )
+
+    // ── 15. 小数 / 越界分值被拒绝（maxScore=9.6、score=7.5 均不放行）─────────────
+    const badMax = JSON.stringify({ sections: sixSections((s) => { s[0].maxScore = 9.6 }), suggestions: ['x 建议'] })
+    setResponses([{ status: 200, content: badMax }, { status: 200, content: badMax }])
+    const before15a = llmCallCount
+    const r15a = await submit('docx-file', null)
+    assert(
+      r15a.status === 'failed' && !r15a.report && llmCallCount === before15a + 2,
+      '15a. maxScore=9.6 被拒绝（严格 ===10，不四舍五入放行）',
+    )
+    const badScore = JSON.stringify({ sections: sixSections((s) => { s[1].score = 7.5 }), suggestions: ['x 建议'] })
+    setResponses([{ status: 200, content: badScore }, { status: 200, content: badScore }])
+    const before15b = llmCallCount
+    const r15b = await submit('docx-file', null)
+    assert(
+      r15b.status === 'failed' && !r15b.report && llmCallCount === before15b + 2,
+      '15b. score=7.5 被拒绝（必须 0~10 整数）',
     )
   } finally {
     if (createdTaskIds.length) {

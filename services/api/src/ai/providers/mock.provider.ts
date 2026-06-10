@@ -20,22 +20,33 @@ export class MockAiProvider implements AiProvider {
   readonly name: AiProviderName = 'mock'
 
   async parseResume(_input: ParseResumeInput): Promise<ParseResumeOutput> {
+    // Phase 1.1：6 评分维度 + 风险表述提醒 + 修改优先级建议（与真实 llm provider 结构一致）。
     return {
       taskId: nextTaskId(),
       status: 'completed',
       report: {
         sections: [
-          { key: 'basic',      label: '基础信息完整度',     score: 8, maxScore: 10 },
-          { key: 'education',  label: '教育经历完整度',     score: 9, maxScore: 10 },
-          { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
-          { key: 'skills',     label: '技能关键词覆盖',     score: 5, maxScore: 10 },
-          { key: 'layout',     label: '排版可读性',         score: 7, maxScore: 10 },
+          { key: 'basic',          label: '基础信息完整度', score: 8, maxScore: 10 },
+          { key: 'objective',      label: '求职目标清晰度', score: 6, maxScore: 10 },
+          { key: 'experience',     label: '经历表达清晰度', score: 6, maxScore: 10 },
+          { key: 'quantification', label: '成果量化程度',   score: 5, maxScore: 10 },
+          { key: 'keyword',        label: '岗位关键词覆盖', score: 5, maxScore: 10 },
+          { key: 'readability',    label: '版式与可读性',   score: 7, maxScore: 10 },
         ],
         suggestions: [
           '项目描述建议使用"负责、主导、实现"等动词开头，尽量量化成果',
-          '技能模块建议补充岗位相关技术栈关键词，提升简历匹配度',
+          '技能模块建议补充岗位相关技术栈关键词',
           '个人简介建议精简至 2-3 句，突出核心优势',
           '工作经历建议每条控制在 3-5 点，避免流水账式描述',
+        ],
+        riskNotes: [
+          '部分经历缺少量化成果描述，建议补充具体数字',
+          '求职目标表述偏笼统，建议明确意向岗位方向',
+        ],
+        priorities: [
+          { focus: '补充成果量化', reason: '多处职责描述缺少可衡量结果，影响说服力' },
+          { focus: '明确求职目标', reason: '求职意向不清晰，HR 难快速判断匹配方向' },
+          { focus: '补齐岗位关键词', reason: '简历文本对常见岗位表达覆盖偏低' },
         ],
       },
     }

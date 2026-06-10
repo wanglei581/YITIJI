@@ -5,6 +5,32 @@
 
 ---
 
+## AI 简历诊断 Phase 1.1 —— 8 项诊断结果（6 评分维度 + 风险提醒 + 修改优先级）（2026-06-10，Claude，`feature/real-resume-diagnosis-1b`，待 review）
+
+**目标：** 把诊断报告从固定 5 sections 升级为「8 项诊断结果」—— 内部结构 = **6 评分维度（sections）+ 风险表述提醒（riskNotes）+ 修改优先级建议（priorities）**，更利于用户理解与后续 optimize 接入；不硬塞成 8 根雷达轴。
+
+**新报告结构（`ResumeReport`，additive）：**
+- `sections`：6 评分维度（key 固定）`basic 基础信息完整度 / objective 求职目标清晰度 / experience 经历表达清晰度 / quantification 成果量化程度 / keyword 岗位关键词覆盖 / readability 版式与可读性`（旧 `education` 不再单独评分：信息完整性并入 basic、经历表达并入 experience、学历相关关键词并入 keyword）。
+- `riskNotes?: string[]`：风险**表述**提醒（0–5 条，只针对简历文本表达，严禁年龄/性别/婚育/地域/学历歧视等敏感判断、不暗示录用/面试结果）。
+- `priorities?: { focus, reason }[]`：修改优先级建议（2–4 条，有序）。
+- 两字段 **optional** → 旧 5-section 报告仍合法。
+
+**改动文件：**
+- 类型 SSOT 两处 [shared/ai.ts](../../packages/shared/src/types/ai.ts) + [interfaces/ai-provider.interface.ts](../../services/api/src/ai/interfaces/ai-provider.interface.ts)：`ResumeReport` 加 `riskNotes?`/`priorities?` + `ResumePriority`。
+- [llm-resume.service.ts](../../services/api/src/ai/resume/llm-resume.service.ts)：6 维度 prompt（含 riskNotes/priorities 要求 + 合规约束 + 数量上限 suggestions≤6/riskNotes≤5/priorities≤4）；`parseReport` 强校验 6 评分维度（恰好 6、key 命中、maxScore=10，漂移即拒、重试一次）+ 解析 riskNotes/priorities；**新增诊断专属恒定拦截词**（覆盖招聘结果类 / 匹配程度类 / 代投推荐类 / 企业筛选类红线表述，源码用字符串拼接避免出现完整违禁词，grep 0 命中）与管理员 `forbiddenWords` 叠加，**命中即丢弃该条**（drop-if-forbidden，不再用 chat 兜底串）。
+- [mock.provider.ts](../../services/api/src/ai/providers/mock.provider.ts)：同步 6 sections + riskNotes + priorities。
+- [ResumeReportPage.tsx](../../apps/kiosk/src/pages/resume/ResumeReportPage.tsx)：评分相关逻辑（雷达/总分/分项）**零改**，自动从 5→6 维度；新增「修改优先级建议」卡（有 priorities 用之，缺失回退按低分分项派生）+「风险表述提醒」卡（缺失不渲染）。
+
+**兼容旧报告：** 类型新增字段全 optional；前端 key-agnostic；`riskNotes` 缺失→不渲染风险卡；`priorities` 缺失→优先项回退按低分 section 派生；`sections` 是 5 个也照常渲染。**无 DB schema 变更、无数据迁移**（payloadJson 为 JSON）。
+
+**合规：** 报告称「AI 简历诊断报告 / 8 项诊断结果」，不出现「8 维能力评估 / 岗位匹配度 / 录用概率」；「岗位关键词覆盖」只评估文本是否覆盖常见岗位表达、不做企业匹配；报告页保留「仅供本人修改参考、不发企业、不代表录用/面试/投递」声明。
+
+**验证（全绿）：** `verify-real-resume-diagnosis` **18 PASS / ALL PASS**（6 评分维度成功 / riskNotes·priorities 解析 / 维度漂移拒绝 / priority 缺 reason 条目丢弃 / priority 恰好 1 条触发 retry 后失败 / 超长 suggestions·riskNotes·priority 文本截断 / maxScore=9.6 拒绝 / score=7.5 拒绝 / **合规词过滤(招聘结果·匹配程度类红线表述被丢、干净条目保留)** / **旧 5-section 报告兼容读回**）；红线词 grep `services/api/src/ai/resume` **0 命中**；`verify:resume-extraction` 11 ✅、`verify:ai-result-ownership` 12 ✅ 回归；`api/shared/kiosk typecheck` ✅、`api/kiosk lint` ✅、`kiosk build` ✅。
+
+**不做：** resume_optimize 真实化（Phase 1.2）、OCR 真实接入、报告导出/打印、改 AI 大模型配置中心、push。
+
+---
+
 ## AI 大模型配置中心 v1 —— 功能级配置与简历诊断配置解耦（2026-06-10，Coder，`feature/real-resume-diagnosis-1b`）
 
 **目标：** 在 Phase 1B 真实简历诊断成功手验后，把 Admin「AI 大模型配置」从单一全局配置升级为功能级配置中心，为后续 AI 助手、简历诊断、简历优化、数字人/海报等能力分开配置模型打基线；同时确保 `resume_diagnosis` 不被管理员自定义 System Prompt 破坏固定 5 维度 / JSON 契约。

@@ -144,6 +144,10 @@ export function ResumeReportPage() {
     .slice(0, 3)
     .filter((s) => s.pct < 100)
 
+  // Phase 1.1：风险表述提醒 / 修改优先级建议为可选；旧报告（5 sections、无此字段）优雅降级。
+  const llmPriorities = report.priorities ?? []
+  const riskNotes = report.riskNotes ?? []
+
   const summary = targetSummary(state.targetContext)
 
   return (
@@ -228,8 +232,29 @@ export function ResumeReportPage() {
           </div>
         </Card>
 
-        {/* 优先修改项 */}
-        {priorityItems.length > 0 && (
+        {/* 修改优先级建议：优先用真实报告 priorities；缺失（含旧 5-section 报告）回退按低分分项派生 */}
+        {llmPriorities.length > 0 ? (
+          <Card className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <ArrowUpRightIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />
+              <p className="text-sm font-medium text-gray-700">修改优先级建议</p>
+            </div>
+            <p className="mb-3 text-xs text-gray-400">按重要性排序，供本人修改简历参考</p>
+            <div className="space-y-2.5">
+              {llmPriorities.map((item, i) => (
+                <div key={i} className="flex gap-3 rounded-lg bg-amber-50/60 px-3 py-2.5">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-semibold text-amber-700">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-800">{item.focus}</p>
+                    {item.reason && <p className="mt-0.5 text-xs text-gray-500">{item.reason}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : priorityItems.length > 0 ? (
           <Card className="p-5">
             <div className="mb-3 flex items-center gap-2">
               <ArrowUpRightIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />
@@ -247,6 +272,25 @@ export function ResumeReportPage() {
                 </div>
               ))}
             </div>
+          </Card>
+        ) : null}
+
+        {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染 */}
+        {riskNotes.length > 0 && (
+          <Card className="p-5">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertCircleIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />
+              <p className="text-sm font-medium text-gray-700">风险表述提醒</p>
+            </div>
+            <p className="mb-3 text-xs text-gray-400">仅针对简历文本表达，不涉及身份信息判断；供本人修改参考</p>
+            <ul className="space-y-2">
+              {riskNotes.map((note, i) => (
+                <li key={i} className="flex gap-2 text-sm text-gray-600">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" aria-hidden="true" />
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
           </Card>
         )}
 

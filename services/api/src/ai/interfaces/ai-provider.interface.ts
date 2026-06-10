@@ -23,10 +23,26 @@ export interface ResumeSection {
   maxScore: number
 }
 
-/** 诊断报告：评分仅供参考，不代表真实招聘结果 */
+/** 修改优先级建议（Phase 1.1）：有序，告诉用户先改什么、为什么 */
+export interface ResumePriority {
+  focus: string
+  reason: string
+}
+
+/**
+ * 诊断报告：评分仅供参考，不代表真实招聘结果。
+ *
+ * Phase 1.1「8 项诊断结果」内部结构 = 6 评分维度（sections）+ 风险表述提醒（riskNotes）
+ * + 修改优先级建议（priorities）。riskNotes / priorities 为 additive 可选字段：
+ * 旧报告（5 sections、无这两个字段）仍合法，前端缺失时优雅降级。
+ */
 export interface ResumeReport {
   sections: ResumeSection[]
   suggestions: string[]
+  /** 风险表述提醒（只针对简历文本表达；0~5 条）。旧报告可能缺失。 */
+  riskNotes?: string[]
+  /** 修改优先级建议（2~4 条）。旧报告缺失时前端回退按低分 section 派生。 */
+  priorities?: ResumePriority[]
 }
 
 export interface ParseResumeInput {
