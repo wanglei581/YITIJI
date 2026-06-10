@@ -45,6 +45,7 @@ import {
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { JobsService } from './jobs.service'
+import { AdminFairsService } from './admin-fairs.service'
 import { ReviewActionDto } from './dto/review.dto'
 import { PublishActionDto } from './dto/publish.dto'
 import { ImportJobsDto } from './dto/import-jobs.dto'
@@ -83,7 +84,10 @@ function mapWorkTypeToCategory(workType: string): string | undefined {
 
 @Controller()
 export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly adminFairs: AdminFairsService,
+  ) {}
 
   // ── Kiosk ───────────────────────────────────────────────────────────────────
 
@@ -173,19 +177,19 @@ export class JobsController {
   }
 
   /**
-   * 招聘会活动资料。
-   * 模型限制:当前 schema 无 FairMaterial 模型(招聘会资料/模板素材未单独落库),
-   * 故诚实返回空集。落库后再接真实查询,不在此处硬造 mock。
+   * 招聘会活动资料(阶段1A 接真)。
+   * FairMaterial 已落库:只放出已发布资料,且所属招聘会须 approved+published;
+   * 响应内是 HMAC 签名短时 URL,不暴露原始存储路径。
    */
   @Get('job-fairs/:id/materials')
   getFairMaterials(
-    @Param('id') _id: string,
+    @Param('id') id: string,
     @Query('page') pageStr?: string,
     @Query('pageSize') sizeStr?: string,
   ) {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
-    return { data: [], total: 0, page, pageSize }
+    return this.adminFairs.getPublishedFairMaterials(id, page, pageSize)
   }
 
   /**

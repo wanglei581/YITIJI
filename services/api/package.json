@@ -32,7 +32,8 @@
     "verify:cos:files": "tsx scripts/verify-cos-files.ts",
     "verify:cos:live": "tsx scripts/verify-cos-live.ts",
     "verify:external-video": "tsx scripts/verify-external-video.ts",
-    "verify:external-video:e2e": "tsx scripts/verify-external-video-e2e.ts"
+    "verify:external-video:e2e": "tsx scripts/verify-external-video-e2e.ts",
+    "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

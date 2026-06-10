@@ -113,6 +113,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.fairZone
   }
 
+  // ── 阶段1A Admin 招聘会管理 ────────────────────────────────────────────────
+
+  get fairMaterial() {
+    return this.client.fairMaterial
+  }
+
   // ── W4 同步日志 + Excel 导入批次 ──────────────────────────────────────────
 
   get syncLog() {

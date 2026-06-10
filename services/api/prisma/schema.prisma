@@ -488,6 +488,7 @@ model JobFair {
 
   companies FairCompany[]
   zones     FairZone[]
+  materials FairMaterial[]
 
   @@unique([sourceOrgId, externalId])
   @@index([sourceOrgId])
@@ -546,6 +547,45 @@ model FairZone {
 
   @@index([jobFairId])
   @@index([category])
+}
+
+// ── FairMaterial ──────────────────────────────────────────────────────────────
+// 招聘会活动资料(日程 / 展区图 / 企业名册 / 岗位汇总 / 宣传手册),Admin 上传维护。
+// 运营内容,走 AdAsset 同款模式:自带 storageKey(StorageService 落地)、无 TTL 自动清理、
+// Kiosk 经 HMAC 签名短时 URL 读取,绝不暴露原始存储路径。
+//
+// type:          'schedule' | 'venue_map' | 'company_list' | 'position_list' | 'brochure' | 'other'
+// publishStatus: 'draft' | 'published' | 'unpublished'(Kiosk 只读 published,且所属招聘会须 approved+published)
+//
+// 合规:资料仅为招聘会现场服务信息,不含求职者数据,不参与招聘闭环。
+
+model FairMaterial {
+  id        String  @id @default(cuid())
+  jobFairId String
+  jobFair   JobFair @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  name        String
+  type        String  @default("other")
+  description String?
+
+  storageKey String @unique
+  mimeType   String
+  sizeBytes  Int
+  sha256     String
+  pageCount  Int    @default(0)
+
+  allowPrint    Boolean @default(true)
+  publishStatus String  @default("draft")
+  printCount    Int     @default(0)
+
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([jobFairId])
+  @@index([publishStatus])
+  @@index([deletedAt])
 }
 
 // ── SyncLog ───────────────────────────────────────────────────────────────────

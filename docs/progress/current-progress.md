@@ -5,7 +5,34 @@
 
 ---
 
-## AI 简历诊断 Phase 1.1 —— 8 项诊断结果（6 评分维度 + 风险提醒 + 修改优先级）（2026-06-10，Claude，`feature/real-resume-diagnosis-1b`，待 review）
+## 阶段1A —— Admin 招聘会管理接真后端（内容运营 CRUD + 活动资料）（2026-06-10，Claude，`feature/admin-fairs-management`）
+
+> 背景：用户确认「三端数据打通」总路线（阶段1 数据打通 → 阶段2 AI 求职功能第一批 5 项，参考阿里百炼求职专区筛选后的合规清单，见 next-tasks.md §阶段路线）。本段为阶段1 第一刀。
+
+**目标：** 替换 Admin `fairs` 页 563 行纯 mock，建立招聘会「内容运营」真实链路。与既有 `fair-sources`（审核/发布,已真实）分工：fair-sources 管整场招聘会的 approve/reject/publish/unpublish；本模块管内容 —— 基本信息修订、参展企业、展区、活动资料、统计。
+
+**Schema（additive，migration `20260610120000_add_fair_material`，沿用 `db execute` 先例）：**
+- 新增 `FairMaterial`：招聘会活动资料（日程/展馆地图/企业名册/岗位汇总/宣传手册），走 AdAsset 同款"运营内容"模式 —— 自带 `storageKey`（StorageService 落地，本地/COS 通吃）、**无 TTL 自动清理**（区别于用户文件 FileObject）、软删留痕（deletedAt）；`JobFair` 加 `materials` 关系；`PrismaService` 暴露 `fairMaterial` 委托。
+
+**后端（[admin-fairs.service.ts](../../services/api/src/jobs/admin-fairs.service.ts) + [admin-fairs.controller.ts](../../services/api/src/jobs/admin-fairs.controller.ts) + [dto/admin-fair.dto.ts](../../services/api/src/jobs/dto/admin-fair.dto.ts) + [fair-material-signing.ts](../../services/api/src/jobs/fair-material-signing.ts)）：**
+- `GET /admin/fairs`（列表+companies/zones/materials 计数）、`GET /admin/fairs/:id`（详情含 draft 资料）、`PATCH /admin/fairs/:id`（基本信息白名单编辑；**来源字段不可改**，startAt≥endAt 拒绝）、`GET /admin/fairs/:id/stats`（真实聚合，无签到/展位模型字段绝不编造）。
+- 参展企业/展区完整 CRUD：`POST/PATCH/DELETE /admin/fairs/:id/companies(/:companyId)`、`.../zones(/:zoneId)`，跨 fair 归属校验。
+- 活动资料：`POST .../materials`（multipart 上传，魔数校验仅 PDF/PNG/JPEG、≤20MB、MIME 伪装拒绝；先建行→落对象→失败回滚行）、`PATCH .../materials/:id`（元数据/allowPrint）、`PATCH .../materials/:id/publish`（发布/下架）、`DELETE`（物理删对象+软删行留痕）。
+- 资料内容流：`GET /job-fairs/materials/:id/content?expires&sig`（独立 HMAC 命名空间 `fairmat:`,同 FILE_SIGNING_SECRET;Kiosk 30min / Admin 预览 10min TTL）。响应 DTO 对齐 shared `FairMaterialDTO`，**绝不暴露 storageKey/sha256**。
+- Kiosk 公开端点 `GET /job-fairs/:id/materials` 从「诚实返回空」切真：仅 fair approved+published 且资料 published 可见。**Kiosk 前端零改动**（FairMaterialsPage/httpAdapter 本就消费此契约）。
+- 全部写操作落 AuditLog（fair.update / fair.company.* / fair.zone.* / fair.material.*）。
+
+**Admin 前端：**
+- 新增 [fairsAdmin.ts](../../apps/admin/src/services/api/fairsAdmin.ts)（http+mock 双适配器，mock 数据明示演示）。
+- 重写 [fairs/index.tsx](../../apps/admin/src/routes/fairs/index.tsx)：真实招聘会选择器（时间态+审核/发布徽章+计数）→ 编辑基本信息抽屉 → 4 个 Tab：参展企业（表格+新增/编辑抽屉+两步确认删除）、展区管理（卡片+CRUD）、活动资料（上传/预览签名URL/发布/下架/编辑/删除）、数据统计（真实聚合+来源快照分开展示）。原 mock 的"展位签到"无模型支撑 → 移除不造假，改为真实存在的"展区管理"；统计页明确「现场签到/展位未建模型,不展示估算数据」。
+
+**验证（全绿）：** `verify:admin-fairs` **21 PASS / ALL PASS**（列表计数 / 编辑落库+来源字段不变+时间区间拒绝 / 企业·展区 CRUD+跨 fair 404 / PDF 上传落 storage+sha256+读回 / 伪装 MIME 拒 / 超大拒 / draft 不外露 / publish 可见 / 未发布 fair 资料恒空 / DTO 无存储路径+签名 URL / 签名篡改·过期拒绝 / 删除软删+物理对象删除 / 7 类审计动作齐 / 统计与行数一致·软删不计入）；api+admin typecheck/lint/build 全绿；禁词扫描 0 命中（schema 命中行为既有合规注释）。
+
+**待办（后续分支）：** Kiosk 活动资料"免费打印"按钮当前仍走旧 print/confirm 元数据态（不带真实 fileId），待打印链路接资料文件；展位(booth)模型与现场签到如有真实需求再建模。
+
+---
+
+## AI 简历诊断 Phase 1.1 —— 8 项诊断结果（6 评分维度 + 风险提醒 + 修改优先级）（2026-06-10，Claude，`feature/real-resume-diagnosis-1b`，已 FF 合入 main `56dd844` 并推送）
 
 **目标：** 把诊断报告从固定 5 sections 升级为「8 项诊断结果」—— 内部结构 = **6 评分维度（sections）+ 风险表述提醒（riskNotes）+ 修改优先级建议（priorities）**，更利于用户理解与后续 optimize 接入；不硬塞成 8 根雷达轴。
 

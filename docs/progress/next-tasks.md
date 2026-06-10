@@ -1,7 +1,32 @@
 # 下一步任务
 
-> 最后更新：2026-06-10（AI 大模型配置中心 v1 已完成：功能级配置持久化到 `data/ai-model-configs.json`，旧 `ai-model-config.json` 首次迁移到 `assistant_chat` + `resume_diagnosis`；简历诊断读取功能级模型参数但继续强制服务端结构化 System Prompt；后续继续 OCR、报告导出/打印、报告结构扩展、optimize 真实化）
+> 最后更新：2026-06-10（用户确认总路线「阶段1 数据打通 → 阶段2 AI 求职功能」；Phase 1.1 已合入 main `56dd844`；阶段1A Admin 招聘会管理已完成验证，见下方 §阶段路线）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
+
+---
+
+## 🗺️ 阶段路线（2026-06-10，用户已确认，Claude 执行中）
+
+> 用户决策（2026-06-10 会话确认）：① 先数据打通再 AI；② AI 第一批做全 5 项；③ 首页功能入口不动，其余页面可重新设计。
+
+**阶段1 三端数据打通 + 补写操作（消灭"有界面有 mock 但改不了"）：**
+
+- ✅ **1A Admin 招聘会管理接真**（`feature/admin-fairs-management`，2026-06-10）：FairMaterial 模型 + Admin 内容运营 CRUD（基本信息/企业/展区/活动资料/统计）+ Kiosk materials 公开端点接真。`verify:admin-fairs` 21 PASS。详见 [current-progress.md](./current-progress.md) §阶段1A。
+- ⏳ **1B Admin 合作机构管理接真**：partners 页 271 行 mock → 机构列表/新增机构+开账号/授权启停/详情抽屉。
+- ⏳ **1C Partner 岗位/招聘会编辑能力**：当前只能导入+下架；补 PATCH 编辑端点（编辑后 reviewStatus 重置 pending 走重审）+ 前端编辑表单。
+- ⏳ **1D 政策服务接真**：Kiosk RenshiPage 硬编码 → Policy 模型 + Partner 政策公告管理 + Admin 审核发布 + Kiosk 接真。
+- ⏳ **1E Admin 订单/告警/设备页按已有后端接真**：orders 接 PrintTask 真数据；alerts/devices 视后端现状接真或诚实标注。
+
+**阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
+
+1. 简历优化真实化（Phase 1E llm optimizeResume）
+2. AI 简历生成（引导式表单→生成→模板渲染→打印，一体机无简历用户场景）
+3. 模拟面试 + 面试问题预测（结果只给本人，报告可打印）
+4. 目标岗位定向优化 + 岗位匹配度参考（仅参考，引导"去来源平台投递"）
+5. 职业规划建议
+
+百炼模板中**不做**（合规红线，企业侧）：生成优化岗位 JD、问答式生成职位、AI 自动招聘机器人、企业侧候选人筛选。
+二期候选：职业证件照（需图像 provider+摄像头）、政策问答知识库（依赖 1D）、简历风险审查扩展。
 
 ---
 
