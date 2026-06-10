@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kiosk",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@ai-job-print/kiosk", "exec", "vite", "--port", "5273"],
+      "port": 5273,
+      "autoPort": false
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@ai-job-print/admin", "exec", "vite", "--port", "5274"],
+      "port": 5274,
+      "autoPort": false
+    }
+  ]
+}

@@ -5,6 +5,34 @@
 
 ---
 
+## 阶段1F —— 恢复招聘会/校园招聘新版 UI（保留真实 API 链路）（2026-06-10，Claude，`feature/restore-jobfair-campus-ui`）
+
+**背景：** 6 月 8 日在 `feature/jobfair-revamp` / `feature/fair-detail-5tab` 完成的招聘会新版 UI（91fb6ee / 925007f / bc11d29 + 后端读路径 cf2c9e2/b30e60e）从未合入 main,阶段1 期间 main 上前台仍是旧卡片列表页。用户确认作为阶段1F 优先恢复。
+
+**做法：** `git merge feature/fair-detail-5tab`（非整文件覆盖）,7 个交集文件精细解决冲突:
+- HomePage:保留 main 新首页结构（首页功能入口不动）,仅按用户要求把「补贴快申/补贴申请」改为合规 info-only 文案「办事指引/补贴指引」。
+- RenshiPage:保留 main 真实政策数据链路（阶段1D）+ 合入分支的招聘会/校园招聘入口卡。
+- CampusPage:取分支新版（沉浸式 5-Tab,真实 getJobFairs/Companies/Zones/Stats）+ 套用 main 的 `/resume/source` 路由修复。
+- schema/jobs.service/jobs.controller:自动合并,新版读路径（导航坐标/数据大屏统计/企业岗位）与阶段1A-1E 的写能力共存。
+
+**恢复的页面（全部真实 API,VITE_API_MODE=http）：**
+- `/job-fairs`:彩色渐变大卡 + 搜索 + 省/市/区三级地区筛选 + 日历 + 状态 chip + 步骤条;卡片含岗位数/企业数/主题标签,「扫码预约」弹真实二维码。
+- `/job-fairs/:id`:3 Tab（详情与特色 / 参展企业与岗位 / 数据大屏）;概览 pill 行（地点/预计参会/参展企业）、交通指引 + OSM 地图 + 手机导航深链二维码、各市区创新特色展区图标网格;数据大屏统计为真实聚合（FairCompanyPosition 23 岗/178 名额等,签到诚实为 0,预计值标注"机构录入"）。
+- `/campus`:沉浸式 5-Tab 校园专区（企业速览/参展企业/导览图/AI求职/打印服务）,主体取校招主题评分最高的真实招聘会。
+
+**合规修正（本轮新增）：**
+- 详情页/校园页「打印资料」原会构造虚拟 PDF（`活动资料.pdf 256KB 2页`）进打印流 → 改为跳真实 FairMaterial 资料列表页（阶段1A 链路）,删除「打印活动资料(示例)」行;「一键打印」改「快速打印」。
+- `/qingdao` 近期招聘会:删除 LOCAL_FAIRS 硬编码 mock → 接真实 getJobFairs（青岛本地优先,空态诚实）,移除假「同步时间:2026-05-28」与不可用的扫码预约占位按钮。
+- 首页政策服务文案:「权威解读,补贴快申」→「权威解读,办事指引」;「补贴申请」→「补贴指引」（compliance §八 info-only）。
+
+**Schema 补档：** 迁移记录 `20260608200000_fair_revamp_columns`（JobFair 导航/大屏列、FairCompany 展示扩展列、FairCompanyPosition 表;dev.db 当时已 db push,本文件供 PG 重整,不需在 dev.db 重复执行）。
+
+**验证：** api/shared/kiosk/admin typecheck+lint+build 全绿;API 重启后 `/job-fairs/:id/stats` 返回真实聚合;浏览器实测 `/job-fairs`、`/job-fairs/:id`、`/campus`、`/qingdao` 四页截图核对,视觉对齐 6 月 8 日新版;清理 verify 脚本失败残留的「验证招聘会」测试数据（dev.db 余 3 场种子演示数据）。
+
+**已知后续：** Kiosk 活动资料"打印"仍为元数据态（真实文件进打印任务链路属后续）;qingdao 重点企业岗位等其余板块仍为静态演示,属青岛专区二期。
+
+---
+
 ## 阶段1E —— Admin 订单/告警页接真（打印任务流水 + 派生告警）（2026-06-10，Claude，`feature/admin-ops-pages-real`）
 
 **目标：** Admin 订单页(10 条硬编码假订单含编造金额/支付状态)与告警页(硬编码假告警+侧栏假角标 3)接真。设备管理页经核查已是真实数据(终端/打印机接真,外设待硬件上报),本轮不动。

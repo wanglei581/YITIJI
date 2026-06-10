@@ -17,7 +17,9 @@
 - ✅ **1D 政策服务接真**（`feature/policy-service-real`，2026-06-10）：PolicyPost 模型 + Partner 政策公告管理（空壳→完整 CRUD）+ Admin 政策信息源审核页 + Kiosk 人社专区两 Tab 接真（删除硬编码补贴金额）。`verify:policies` 11 PASS。详见 [current-progress.md](./current-progress.md) §阶段1D。
 - ✅ **1E Admin 订单/告警页接真**（`feature/admin-ops-pages-real`，2026-06-10）：订单页假数据→真实打印任务流水（无支付域不造金额）；告警页→实时派生告警（离线/打印机异常/打印失败）；移除侧栏假角标。设备页核查已真实，外设待硬件上报。`verify:admin-ops` 3 PASS。详见 [current-progress.md](./current-progress.md) §阶段1E。
 
-> **阶段1 数据打通(1A–1E)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
+- ✅ **1F 恢复招聘会/校园招聘新版 UI**（`feature/restore-jobfair-campus-ui`，2026-06-10）：合并 `feature/fair-detail-5tab`（6月8日新版 UI 5 提交）到 main，精细解决 7 文件冲突；/job-fairs 渐变大卡+省市区筛选、/job-fairs/:id 3-Tab（含真实数据大屏）、/campus 沉浸式 5-Tab 全部恢复且走真实 API；合规修正：打印资料只基于真实 FairMaterial（删虚拟 PDF）、/qingdao 删 LOCAL_FAIRS mock 接真、首页「补贴快申/补贴申请」改 info-only 文案。浏览器四页截图验收通过。详见 [current-progress.md](./current-progress.md) §阶段1F。
+
+> **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
 
