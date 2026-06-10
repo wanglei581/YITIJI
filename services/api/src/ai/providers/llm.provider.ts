@@ -14,6 +14,7 @@ import type {
 } from '../interfaces/ai-provider.interface'
 import { LlmResumeService } from '../resume/llm-resume.service'
 import { computeMissingHints, LlmResumeGenerateService } from '../resume/llm-resume-generate.service'
+import { LlmResumeOptimizeService } from '../resume/llm-resume-optimize.service'
 
 let taskCounter = 0
 const nextTaskId = (): string => `llm-ai-${Date.now()}-${++taskCounter}`
@@ -42,6 +43,7 @@ export class LlmResumeProvider implements AiProvider {
   constructor(
     private readonly resumeLlm: LlmResumeService,
     private readonly resumeGenerate: LlmResumeGenerateService,
+    private readonly resumeOptimize: LlmResumeOptimizeService,
   ) {}
 
   async parseResume(input: ParseResumeInput): Promise<ParseResumeOutput> {
@@ -69,12 +71,30 @@ export class LlmResumeProvider implements AiProvider {
     }
   }
 
-  optimizeResume(taskId: string, _report: ResumeReport): Promise<OptimizeResumeOutput> {
-    return Promise.resolve({
-      taskId,
-      status: 'failed',
-      failReason: 'AI 简历优化的真实化将在后续阶段开放，当前可参考诊断报告中的改进建议',
-    })
+  /**
+   * 阶段2B 真实简历优化:基于简历原文 + 诊断报告输出结构化优化版简历与新旧对比。
+   * 防编造契约在 LlmResumeOptimizeService 强制(事实串必须出现在原文)。
+   * 任何失败都返回 status:'failed' + 明确 failReason,绝不 fallback mock。
+   */
+  async optimizeResume(taskId: string, report: ResumeReport, extractedText?: string): Promise<OptimizeResumeOutput> {
+    if (!extractedText || !extractedText.trim()) {
+      return {
+        taskId,
+        status: 'failed',
+        failReason: '简历原文已按隐私策略自动清理，请重新上传简历后再生成优化版',
+      }
+    }
+    try {
+      const { optimizedResume, modules } = await this.resumeOptimize.optimize(extractedText, report)
+      return { taskId, status: 'completed', modules, optimizedResume }
+    } catch (err) {
+      const code = errorCodeOf(err)
+      const failReason =
+        code === 'AI_PROVIDER_NOT_CONFIGURED'
+          ? 'AI 简历优化模型尚未配置，请联系管理员后重试'
+          : 'AI 简历优化服务暂时不可用，请稍后重试'
+      return { taskId, status: 'failed', failReason }
+    }
   }
 
   /**

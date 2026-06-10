@@ -106,7 +106,19 @@ export const aiMockAdapter = {
     return {
       taskId,
       status: 'completed',
+      providerName: 'mock',
       modules: MOCK_OPTIMIZE_MODULES,
+      // 阶段2B:演示用结构化优化版简历(页面据 providerName 显示演示标记)
+      optimizedResume: {
+        basic: { name: '演示用户', city: '青岛' },
+        intention: { position: '前端开发工程师', city: '青岛' },
+        summary: '具有扎实前端基础的求职者,熟悉 React 与组件化开发,注重代码质量与用户体验。(演示内容)',
+        education: [{ school: '演示大学', major: '计算机科学与技术', degree: '本科', period: '2021-2025', description: '主修核心课程,成绩优良。(演示内容)' }],
+        experience: [{ company: '演示科技公司', role: '前端实习生', period: '2024.07-2024.12', description: '参与官网改版,负责组件库维护与页面性能优化。(演示内容)' }],
+        projects: [],
+        skills: ['JavaScript', 'React', 'CSS'],
+        certificates: [],
+      },
     }
   },
 

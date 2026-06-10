@@ -96,6 +96,8 @@ export interface ResumeParseRequest {
 export interface ResumeParseResponse {
   taskId: string
   status: AiTaskStatus
+  /** 上传文件 id(阶段2B):供后续优化按归属重新提取原文;不透明 id,无 PII */
+  fileId?: string
   /** 实际生成报告的 provider；mock 时前端必须明确标记为演示报告 */
   providerName?: AiProviderName
   /** 解析成功时返回报告 */
@@ -135,6 +137,13 @@ export interface ResumeOptimizeResponse {
   status: AiTaskStatus
   modules?: ResumeOptimizeModule[]
   failReason?: string
+  /** 实际生成结果的 provider;前端据此显示演示标记(阶段2B) */
+  providerName?: string
+  /**
+   * 优化版简历(阶段2B,结构化、可编辑)。
+   * 防编造:学校/公司/证书等事实串必须出现在简历原文中,服务端校验,缺失即拒绝输出。
+   */
+  optimizedResume?: GeneratedResume
 }
 
 // ─── AI 助手 ─────────────────────────────────────────────────

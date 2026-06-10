@@ -38,7 +38,8 @@
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
-    "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts"
+    "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
+    "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

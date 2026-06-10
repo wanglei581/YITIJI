@@ -25,7 +25,7 @@
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
 
-1. ⏳ 简历优化真实化（Phase 1E llm optimizeResume）
+1. ✅ **简历优化真实化**（`feature/ai-resume-optimize-real`，2026-06-11）：optimizeResume 真实化(原文重提+事实串校验防编造+承诺词拦截+失败不缓存);优化页新增可编辑优化版简历+导出 PDF+打印;删除假文件打印按钮。`verify:resume-optimize` 13 PASS。详见 [current-progress.md](./current-progress.md) §阶段2B。**待生产启用**:Admin 配置中心启用「AI简历优化」。
 2. ✅ **AI 简历生成 MVP**（`feature/ai-resume-generate`，2026-06-10）：6 步引导表单 → 防编造润色(事实字段逐字复制,长度漂移拒绝) → 预览可编辑 → pdfkit 真实 PDF(FileObject+签名URL+1h TTL) → 打印链路。`verify:resume-generate` 9 PASS;浏览器全链路截图核验。详见 [current-progress.md](./current-progress.md) §阶段2A。**待生产启用**:`.env` 设 `AI_PROVIDER=llm` + Admin 配置中心启用「AI简历生成」。
 3. ⏳ 模拟面试 + 面试问题预测（结果只给本人，报告可打印）
 4. ⏳ 目标岗位定向优化 + 岗位匹配度参考（仅参考，引导"去来源平台投递"）

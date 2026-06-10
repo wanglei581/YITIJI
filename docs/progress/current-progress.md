@@ -5,6 +5,34 @@
 
 ---
 
+## 阶段2B —— AI 简历优化真实化（提取 → 诊断 → 优化 → 对比/编辑 → PDF → 打印）（2026-06-11，Claude，`feature/ai-resume-optimize-real`）
+
+**目标：** 把 `optimizeResume` 从诚实占位(固定 failed)真实化:用户上传/扫描简历 → 文本提取 → 诊断 → AI 优化,输出**可编辑的结构化优化版简历 + 新旧对比**,导出真实 PDF 进打印链路。阶段2 第一批第 1 项(Phase 1E)落地。
+
+**防编造契约（针对"从原文重组"场景,服务端强制）：**
+- **事实串校验**:优化版中的 学校/公司/项目名/证书/电话/邮箱 必须能在简历原文中找到(空白标点归一后子串匹配)。任何事实串不在原文 → 判非法重试一次,仍坏 → `AI_OPTIMIZE_INVALID_OUTPUT` 明确失败,绝不输出含虚构事实的简历;电话/邮箱被改一位数字即置空。
+- **对比防稻草人**:modules.before 必须是原文真实片段,不在原文的对比条目直接丢弃。
+- **承诺类拦截**:优化文本命中 保录用/保面试/录用概率/内推 等(恒定词+管理员 forbiddenWords) → 判非法重试,绝不让承诺式表述进简历或建议。
+
+**原文获取与隐私（关键设计）：** 简历原文从不落库;`parse` 结果新增落 `fileId`(不透明 id,无 PII),优化时凭 fileId **按归属重新提取**原文;文件已按 TTL 清理 → 诚实失败「请重新上传简历后再生成优化版」,**失败不缓存**(成功结果才落库,临时失败可重试,修复了此前"失败粘滞缓存"的隐患)。
+
+**后端：**
+- 配置位 `resume_optimize` planned → **active**(服务端强制结构化 System Prompt,管理员自定义 prompt 不参与)。
+- 新增 [llm-resume-optimize.service.ts](../../services/api/src/ai/resume/llm-resume-optimize.service.ts)(OpenAI 兼容 fetch,单轮结构化 JSON:resume+modules;出错只记状态码,绝不记简历原文)。
+- [llm.provider](../../services/api/src/ai/providers/llm.provider.ts) `optimizeResume(taskId, report, extractedText)` 真实化;无原文 → 诚实失败。mock provider 补演示用 optimizedResume(providerName='mock' 前端显示演示标记)。
+- [AiService.getResumeOptimize](../../services/api/src/ai/ai.service.ts):llm 路径重提原文 → provider → **只缓存 completed**;注入 providerName;归属/令牌门禁不变(optimize 行继承 parse 行 hash)。
+- `OptimizeResumeOutput` += `optimizedResume?/providerName?`,`ParseResumeOutput` += `fileId?`(shared 同步)。
+
+**Kiosk（[ResumeOptimizePage](../../apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx) 重写）：**
+- 保留逐模块 diff 对比(left 标题改「优化前(摘自原文)」);新增「优化版简历」纸面卡(全部描述可编辑) + 事实来源声明;导出 PDF 复用 2A 真实链路(`exportGeneratedResume` → pdfkit → FileObject 1h TTL → 签名 URL) → 「去打印优化版」携真实 fileId/fileUrl 进 `/print/confirm`。
+- **合规修复**:删除旧版「打印原简历」按钮(构造 `{name,size:'200 KB',pages:1}` 假文件进打印流);failReason 透传(原文已清理/未配置等诚实文案);演示标记改按 providerName(替代按 API_MODE 判断)。
+
+**验证（全绿）：** `verify:resume-optimize` **13 PASS / ALL PASS**(全链路 / 事实串一致+数字保留 / 编造学校→重试仍坏→失败且不缓存→重试可成功 / 稻草人对比丢弃 / 承诺词重试后干净输出 / 电话篡改置空 / 继承 hash+错 token 404 / 成功缓存不再调 LLM / 原文清理诚实失败 / 未配置诚实失败 / 优化版真实 PDF);回归:`verify:resume-generate` 9 ✅、`verify-real-resume-diagnosis` 18 ✅、`verify:ai-result-ownership` ✅、`verify:jobfair-ui` 13 ✅;api/shared/kiosk/admin typecheck+lint+build 全绿;浏览器端到端:真实 API 上传→parse→优化页(演示横幅/diff/可编辑优化版)→导出真实 PDF(83KB)→去打印按钮可用,截图核验。
+
+**待生产启用：** `.env` 设 `AI_PROVIDER=llm` + Admin AI 配置中心启用「AI简历优化」(与诊断/生成同一配置页)。
+
+---
+
 ## 阶段2A —— AI 简历生成 MVP（引导式表单 → 生成 → 预览/编辑 → 真实 PDF → 打印链路）（2026-06-10，Claude，`feature/ai-resume-generate`）
 
 **目标：** 一体机用户(尤其没有电子简历的求职者)通过引导式表单填写真实资料,AI 润色生成结构化简历,预览可编辑,导出真实 PDF 进入既有打印链路。阶段2 AI 求职功能第一批第 2 项(百炼"AI简历生成"对应项)。

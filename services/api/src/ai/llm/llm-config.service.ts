@@ -93,10 +93,10 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
   {
     key: 'resume_optimize',
     label: 'AI简历优化',
-    status: 'planned',
-    description: '后续接入。用于基于真实诊断报告生成表达优化建议。',
-    runtimeNote: '后续接入，当前尚未被运行链路消费。',
-    allowCustomSystemPrompt: true,
+    status: 'active',
+    description: '用于基于简历原文与诊断报告生成优化版简历与新旧对比。AI 只优化表达，不编造经历；事实信息须出现在简历原文中。',
+    runtimeNote: '已被 AI 简历优化运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。',
+    allowCustomSystemPrompt: false,
   },
   {
     key: 'digital_human',

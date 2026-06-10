@@ -20,6 +20,7 @@ import { DisabledOcrProvider } from './resume/ocr/disabled-ocr.provider'
 import { TencentOcrProvider } from './resume/ocr/tencent-ocr.provider.stub'
 import { LlmResumeService } from './resume/llm-resume.service'
 import { LlmResumeGenerateService } from './resume/llm-resume-generate.service'
+import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { LlmResumeProvider } from './providers/llm.provider'
 
@@ -50,6 +51,8 @@ import { LlmResumeProvider } from './providers/llm.provider'
     // ── 阶段2A AI 简历生成(只润色不编造)+ PDF 导出 ──
     LlmResumeGenerateService,
     ResumePdfService,
+    // ── 阶段2B AI 简历优化真实化(基于原文,防编造) ──
+    LlmResumeOptimizeService,
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   exports: [AiService, AiLogService, ResumeExtractionService],

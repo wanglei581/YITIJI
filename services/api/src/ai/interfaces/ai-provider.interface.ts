@@ -63,6 +63,11 @@ export interface ParseResumeInput {
 export interface ParseResumeOutput {
   taskId: string
   status: AiTaskStatus
+  /**
+   * 上传文件 id(阶段2B):随 parse 结果落库,供后续优化按归属重新提取原文。
+   * 仅为不透明 id,无 PII;文件本体仍按 FileObject TTL 自动清理。
+   */
+  fileId?: string
   /** 实际生成报告的 provider；用于前端诚实标记 mock / 真实 AI */
   providerName?: AiProviderName
   report?: ResumeReport
@@ -90,6 +95,13 @@ export interface OptimizeResumeOutput {
   status: AiTaskStatus
   modules?: ResumeOptimizeModule[]
   failReason?: string
+  /** 实际生成结果的 provider;前端据此显示演示标记(阶段2B) */
+  providerName?: AiProviderName
+  /**
+   * 优化版简历(阶段2B,结构化、可编辑)。
+   * 防编造:学校/公司/证书等事实串必须出现在简历原文中,服务端校验,缺失即拒绝输出。
+   */
+  optimizedResume?: GeneratedResume
 }
 
 // ─── 简历生成类型（阶段2A）────────────────────────────────────
@@ -210,7 +222,11 @@ export interface AiProvider {
   readonly name: AiProviderName
 
   parseResume(input: ParseResumeInput): Promise<ParseResumeOutput>
-  optimizeResume(taskId: string, report: ResumeReport): Promise<OptimizeResumeOutput>
+  /**
+   * 简历优化。阶段2B 起 llm provider 需要简历原文(extractedText)做基于事实的优化;
+   * 未传原文时 llm provider 诚实失败。mock / stub 实现可忽略该参数。
+   */
+  optimizeResume(taskId: string, report: ResumeReport, extractedText?: string): Promise<OptimizeResumeOutput>
   chatAssistant(input: ChatInput): Promise<ChatOutput>
   classifyIntent(message: string): Promise<ClassifyIntentOutput>
   /**

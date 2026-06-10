@@ -204,7 +204,8 @@ export class AiService {
         result = await this.provider.parseResume(input)
       }
 
-      const resultWithProvider: ParseResumeOutput = { ...result, providerName: this.provider.name }
+      // fileId 随结果落库(阶段2B):优化时按归属重新提取原文;不透明 id,无 PII
+      const resultWithProvider: ParseResumeOutput = { ...result, providerName: this.provider.name, fileId: input.fileId }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
       const isAnonymous = !endUserId
@@ -312,25 +313,53 @@ export class AiService {
 
     const t0 = Date.now()
     try {
-      const result = await this.provider.optimizeResume(taskId, parseResult.report)
       // optimize 行继承 parse 行的 endUserId 与 accessTokenHash（不铸新 token）。
       const parseOwner = await this.prisma.aiResumeResult.findUnique({
         where: { taskId_kind: { taskId, kind: 'parse' } },
         select: { endUserId: true, accessTokenHash: true },
       })
-      await this.persistResult(
-        taskId, 'optimize', result.status, result,
-        parseOwner?.endUserId ?? null,
-        parseOwner?.accessTokenHash ?? null,
-      )
+
+      // 阶段2B:llm 真实优化需要简历原文。原文从不落库(隐私),凭 parse 行里的 fileId
+      // 按归属重新提取;文件已按 TTL 清理时诚实失败,引导重新上传。
+      let extractedText: string | undefined
+      if (this.provider.name === 'llm') {
+        const fileId = parseResult.fileId
+        if (fileId) {
+          const extraction = await this.resumeExtraction.extractResumeText({
+            fileId,
+            endUserId: parseOwner?.endUserId ?? null,
+          })
+          if (extraction.ok) extractedText = extraction.text
+        }
+        if (!extractedText) {
+          // 不缓存该失败:用户重新上传解析后即可再试
+          return {
+            taskId,
+            status: 'failed',
+            providerName: this.provider.name,
+            failReason: '简历原文已按隐私策略自动清理，请重新上传简历后再生成优化版',
+          }
+        }
+      }
+
+      const result = await this.provider.optimizeResume(taskId, parseResult.report, extractedText)
+      const withProvider: OptimizeResumeOutput = { ...result, providerName: this.provider.name }
+      // 只缓存成功结果:临时性失败(模型抖动/未配置)不落库,用户稍后重试可恢复
+      if (withProvider.status === 'completed') {
+        await this.persistResult(
+          taskId, 'optimize', withProvider.status, withProvider,
+          parseOwner?.endUserId ?? null,
+          parseOwner?.accessTokenHash ?? null,
+        )
+      }
       this.logService.record({
         taskId,
         provider:  this.provider.name,
         operation: 'optimizeResume',
         latencyMs: Date.now() - t0,
-        status:    result.status === 'failed' ? 'failed' : 'success',
+        status:    withProvider.status === 'failed' ? 'failed' : 'success',
       })
-      return result
+      return withProvider
     } catch (err) {
       this.logService.record({
         taskId,
