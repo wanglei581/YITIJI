@@ -92,6 +92,85 @@ export interface OptimizeResumeOutput {
   failReason?: string
 }
 
+// ─── 简历生成类型（阶段2A）────────────────────────────────────
+//
+// 契约源:packages/shared/src/types/ai.ts(前端 SSOT),本文件为 CJS 本地副本,改动须两处同步。
+//
+// 防编造红线:AI **只润色用户提供的信息**。学校/公司/学位/证书/时间段等事实字段
+// 由服务端从用户输入逐字复制,LLM 仅返回按 index 对齐的润色描述文本——
+// 结构上不可能新增/虚构经历条目;数量不齐立即判非法重试。
+
+export interface ResumeGenBasic {
+  name: string
+  phone?: string
+  email?: string
+  city?: string
+}
+
+export interface ResumeGenIntention {
+  position: string
+  city?: string
+  jobType?: string
+  salary?: string
+}
+
+export interface ResumeGenEducation {
+  school: string
+  major?: string
+  degree?: string
+  period?: string
+  description?: string
+}
+
+export interface ResumeGenExperience {
+  company: string
+  role: string
+  period?: string
+  description: string
+}
+
+export interface ResumeGenProject {
+  name: string
+  role?: string
+  description: string
+}
+
+export interface ResumeGenerateInput {
+  basic: ResumeGenBasic
+  intention: ResumeGenIntention
+  education: ResumeGenEducation[]
+  experience: ResumeGenExperience[]
+  projects: ResumeGenProject[]
+  skills: string[]
+  certificates: string[]
+  selfIntro?: string
+}
+
+/** 生成结果:事实字段与输入逐字一致,仅描述类文本为润色产物。 */
+export interface GeneratedResume {
+  basic: ResumeGenBasic
+  intention: ResumeGenIntention
+  /** 个人简介(基于用户输入整体润色;输入完全为空时为空串,提示用户补充) */
+  summary: string
+  education: ResumeGenEducation[]
+  experience: ResumeGenExperience[]
+  projects: ResumeGenProject[]
+  skills: string[]
+  certificates: string[]
+}
+
+export interface GenerateResumeOutput {
+  taskId: string
+  status: AiTaskStatus
+  providerName?: AiProviderName
+  resume?: GeneratedResume
+  /** 服务端确定性计算的缺失提示(如"未填写教育经历"),提示用户补充,AI 不代填 */
+  missingHints?: string[]
+  failReason?: string
+  /** 匿名结果一次性访问令牌,语义同 ParseResumeOutput.accessToken */
+  accessToken?: string
+}
+
 // ─── AI 助手类型 ─────────────────────────────────────────────
 
 /**
@@ -134,4 +213,9 @@ export interface AiProvider {
   optimizeResume(taskId: string, report: ResumeReport): Promise<OptimizeResumeOutput>
   chatAssistant(input: ChatInput): Promise<ChatOutput>
   classifyIntent(message: string): Promise<ClassifyIntentOutput>
+  /**
+   * 简历生成(阶段2A,可选能力)。未实现的 provider 由 AiService 统一返回
+   * 明确失败(AI_GENERATE_NOT_SUPPORTED),不静默 fallback。
+   */
+  generateResume?(input: ResumeGenerateInput): Promise<GenerateResumeOutput>
 }

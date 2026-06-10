@@ -11,6 +11,10 @@
 // ============================================================
 
 import type {
+  GeneratedResume,
+  ResumeGenerateExportResponse,
+  ResumeGenerateInput,
+  ResumeGenerateResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
@@ -130,5 +134,19 @@ export const aiHttpAdapter = {
 
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
     return post<AssistantChatResponse>('/assistant/chat', req)
+  },
+
+  // ── 阶段2A AI 简历生成 ──────────────────────────────────────
+
+  async submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse> {
+    return post<ResumeGenerateResponse>('/resume/generate', input, token)
+  },
+
+  async getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse> {
+    return get<ResumeGenerateResponse>(`/resume/generate/${taskId}`, access)
+  },
+
+  async exportGeneratedResume(resume: GeneratedResume, taskId?: string, token?: string | null): Promise<ResumeGenerateExportResponse> {
+    return post<ResumeGenerateExportResponse>('/resume/generate/export', { ...resume, ...(taskId ? { taskId } : {}) }, token)
   },
 }

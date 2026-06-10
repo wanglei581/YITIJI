@@ -14,6 +14,10 @@
 // ============================================================
 
 import type {
+  GeneratedResume,
+  ResumeGenerateExportResponse,
+  ResumeGenerateInput,
+  ResumeGenerateResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
@@ -45,6 +49,10 @@ export interface AiServiceInterface {
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
   getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse>
   chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
+  // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
+  submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
+  getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse>
+  exportGeneratedResume(resume: GeneratedResume, taskId?: string, token?: string | null): Promise<ResumeGenerateExportResponse>
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -77,3 +85,15 @@ export const getResumeOptimize = (taskId: string, access?: ResumeReadAccess) =>
 /** 向 AI 助手发送消息（意图分类 + 引导跳转） */
 export const chatWithAssistant = (req: AssistantChatRequest) =>
   adapter.chatWithAssistant(req)
+
+/** 阶段2A:提交 AI 简历生成(引导式表单;AI 只润色,不编造) */
+export const submitResumeGenerate = (input: ResumeGenerateInput, token?: string | null) =>
+  adapter.submitResumeGenerate(input, token)
+
+/** 阶段2A:读取生成结果(登录会员传 token,匿名传 accessToken) */
+export const getResumeGenerate = (taskId: string, access?: ResumeReadAccess) =>
+  adapter.getResumeGenerate(taskId, access)
+
+/** 阶段2A:导出确认后的简历为真实 PDF(FileObject + 签名 URL,可进打印链路) */
+export const exportGeneratedResume = (resume: GeneratedResume, taskId?: string, token?: string | null) =>
+  adapter.exportGeneratedResume(resume, taskId, token)

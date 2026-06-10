@@ -19,6 +19,8 @@ import { OcrService } from './resume/ocr/ocr.service'
 import { DisabledOcrProvider } from './resume/ocr/disabled-ocr.provider'
 import { TencentOcrProvider } from './resume/ocr/tencent-ocr.provider.stub'
 import { LlmResumeService } from './resume/llm-resume.service'
+import { LlmResumeGenerateService } from './resume/llm-resume-generate.service'
+import { ResumePdfService } from './resume/resume-pdf.service'
 import { LlmResumeProvider } from './providers/llm.provider'
 
 @Module({
@@ -45,6 +47,9 @@ import { LlmResumeProvider } from './providers/llm.provider'
     // ── Phase 1B 真实 LLM 简历诊断（AI_PROVIDER=llm）──
     LlmResumeService,
     LlmResumeProvider,
+    // ── 阶段2A AI 简历生成(只润色不编造)+ PDF 导出 ──
+    LlmResumeGenerateService,
+    ResumePdfService,
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
   exports: [AiService, AiLogService, ResumeExtractionService],

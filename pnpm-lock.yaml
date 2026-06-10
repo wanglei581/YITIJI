@@ -339,6 +339,9 @@ importers:
       multer:
         specifier: ^2.1.1
         version: 2.1.1
+      pdfkit:
+        specifier: ^0.15.2
+        version: 0.15.2
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -364,6 +367,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.19
+      '@types/pdfkit':
+        specifier: ^0.13.9
+        version: 0.13.9
       prisma:
         specifier: ^7.8.0
         version: 7.8.0(@types/react-dom@18.3.7(@types/react@18.3.29))(@types/react@18.3.29)(better-sqlite3@12.10.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)

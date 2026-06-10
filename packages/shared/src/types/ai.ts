@@ -174,3 +174,93 @@ export interface AssistantChatResponse {
   /** 可选的快捷操作按钮 */
   actions?: AssistantAction[]
 }
+
+// ─── AI 简历生成（阶段2A）──────────────────────────────────────
+//
+// 契约镜像:services/api/src/ai/interfaces/ai-provider.interface.ts(CJS 本地副本),
+// 改动须两处同步。
+//
+// 防编造红线:AI 只润色用户提供的信息。学校/公司/学位/证书/时间段等事实字段
+// 由服务端从用户输入逐字复制,缺失内容提示用户补充,AI 不代填。
+
+export interface ResumeGenBasic {
+  name: string
+  phone?: string
+  email?: string
+  city?: string
+}
+
+export interface ResumeGenIntention {
+  position: string
+  city?: string
+  jobType?: string
+  salary?: string
+}
+
+export interface ResumeGenEducation {
+  school: string
+  major?: string
+  degree?: string
+  period?: string
+  description?: string
+}
+
+export interface ResumeGenExperience {
+  company: string
+  role: string
+  period?: string
+  description: string
+}
+
+export interface ResumeGenProject {
+  name: string
+  role?: string
+  description: string
+}
+
+export interface ResumeGenerateInput {
+  basic: ResumeGenBasic
+  intention: ResumeGenIntention
+  education: ResumeGenEducation[]
+  experience: ResumeGenExperience[]
+  projects: ResumeGenProject[]
+  skills: string[]
+  certificates: string[]
+  selfIntro?: string
+}
+
+/** 生成结果:事实字段与输入逐字一致,仅描述类文本为润色产物。 */
+export interface GeneratedResume {
+  basic: ResumeGenBasic
+  intention: ResumeGenIntention
+  summary: string
+  education: ResumeGenEducation[]
+  experience: ResumeGenExperience[]
+  projects: ResumeGenProject[]
+  skills: string[]
+  certificates: string[]
+}
+
+export interface ResumeGenerateResponse {
+  taskId: string
+  status: AiTaskStatus
+  providerName?: string
+  resume?: GeneratedResume
+  /** 服务端确定性计算的缺失提示(提示用户补充,AI 不代填) */
+  missingHints?: string[]
+  failReason?: string
+  /** 匿名结果一次性访问令牌(仅提交响应返回一次) */
+  accessToken?: string
+}
+
+/** 导出 PDF 响应:真实 FileObject + 短时签名 URL,可直接进打印链路 */
+export interface ResumeGenerateExportResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  /** 短时签名下载 URL(inline),用于预览/打印/扫码下载 */
+  signedUrl: string
+  /** 签名 URL 过期时间(ISO) */
+  expiresAt: string
+}

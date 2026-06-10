@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
-import type { AiProvider, AiProviderName, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput } from './interfaces/ai-provider.interface'
+import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -12,6 +12,8 @@ import { AiLogService } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
+import { ResumePdfService } from './resume/resume-pdf.service'
+import { FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 
@@ -100,6 +102,8 @@ export class AiService {
     private readonly llmConfig: LlmConfigService,
     private readonly llmChat: LlmChatService,
     private readonly resumeExtraction: ResumeExtractionService,
+    private readonly resumePdf: ResumePdfService,
+    private readonly files: FilesService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {
@@ -134,7 +138,7 @@ export class AiService {
    */
   private async persistResult(
     taskId: string,
-    kind: 'parse' | 'optimize',
+    kind: 'parse' | 'optimize' | 'generate',
     status: string,
     payload: ParseResumeOutput | OptimizeResumeOutput,
     endUserId?: string | null,
@@ -244,7 +248,7 @@ export class AiService {
    */
   private async loadAuthorizedResult<T>(
     taskId: string,
-    kind: 'parse' | 'optimize',
+    kind: 'parse' | 'optimize' | 'generate',
     requester: AiResultRequester,
   ): Promise<T | null> {
     const row = await this.prisma.aiResumeResult.findUnique({
@@ -337,6 +341,98 @@ export class AiService {
         errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
       })
       throw err
+    }
+  }
+
+  // ── 阶段2A:AI 简历生成(引导式表单 → 只润色不编造)─────────────────────────
+
+  /**
+   * 提交简历生成。与 submitResumeParse 同一套归属/令牌/留存机制:
+   * 匿名铸一次性 accessToken(只在本响应返回一次),会员按 endUserId 归属;
+   * 结果落 AiResumeResult(kind='generate'),TTL 到期自动清理(公共一体机不长期留存)。
+   */
+  async submitResumeGenerate(input: ResumeGenerateInput, endUserId?: string | null): Promise<GenerateResumeOutput> {
+    const t0 = Date.now()
+    try {
+      let result: GenerateResumeOutput
+      if (this.provider.generateResume) {
+        result = await this.provider.generateResume(input)
+      } else {
+        // provider 未实现生成能力:明确失败,不静默 fallback
+        result = {
+          taskId: `gen-unsupported-${randomBytes(8).toString('hex')}`,
+          status: 'failed',
+          failReason: `当前 AI 服务(${this.provider.name})不支持简历生成，请联系管理员`,
+        }
+      }
+      const withProvider: GenerateResumeOutput = { ...result, providerName: this.provider.name }
+      const isAnonymous = !endUserId
+      const accessToken = isAnonymous ? randomBytes(24).toString('hex') : undefined
+      const accessTokenHash = accessToken ? hashAccessToken(accessToken) : null
+      await this.persistResult(withProvider.taskId, 'generate', withProvider.status, withProvider, endUserId ?? null, accessTokenHash)
+      this.logService.record({
+        taskId:    withProvider.taskId,
+        provider:  this.provider.name,
+        operation: 'generateResume',
+        latencyMs: Date.now() - t0,
+        status:    withProvider.status === 'failed' ? 'failed' : 'success',
+      })
+      return accessToken ? { ...withProvider, accessToken } : withProvider
+    } catch (err) {
+      this.logService.record({
+        taskId:    `err-${Date.now()}`,
+        provider:  this.provider.name,
+        operation: 'generateResume',
+        latencyMs: Date.now() - t0,
+        status:    'failed',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+      })
+      throw err
+    }
+  }
+
+  /** 读取生成结果(归属/令牌门禁同 parse;越权一律 AI_TASK_NOT_FOUND)。 */
+  async getResumeGenerate(
+    taskId: string,
+    requester: AiResultRequester = { endUserId: null, accessToken: null },
+  ): Promise<GenerateResumeOutput> {
+    const stored = await this.loadAuthorizedResult<GenerateResumeOutput>(taskId, 'generate', requester)
+    if (stored) return stored
+    throw new NotFoundException({
+      error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新生成简历' },
+    })
+  }
+
+  /**
+   * 导出用户确认后的简历为真实 PDF(进 FileObject + 签名 URL + 既有清理策略)。
+   *
+   * - 内容 = 用户在预览页确认/编辑后的最终简历(用户自己的资料,允许人工修改)。
+   * - purpose='resume_upload' → sensitiveLevel='sensitive',短 TTL 自动清理,
+   *   符合公共一体机"敏感信息不长期保留"。
+   * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
+   */
+  async exportGeneratedResume(
+    resume: GeneratedResume,
+    endUserId: string | null,
+  ): Promise<{ fileId: string; filename: string; sizeBytes: number; pageCount: number; signedUrl: string; expiresAt: string }> {
+    const { buffer, pageCount } = await this.resumePdf.render(resume)
+    const safeName = (resume.basic.name || '求职者').replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '求职者'
+    const uploaded = await this.files.upload({
+      buffer,
+      filename: `AI简历_${safeName}.pdf`,
+      mimeType: 'application/pdf',
+      purpose: 'resume_upload',
+      uploaderId: null,
+      endUserId,
+      createdBy: 'ai_resume_generate',
+    })
+    return {
+      fileId: uploaded.fileId,
+      filename: uploaded.filename,
+      sizeBytes: uploaded.sizeBytes,
+      pageCount,
+      signedUrl: uploaded.signedUrl,
+      expiresAt: uploaded.signedUrlExpiresAt,
     }
   }
 

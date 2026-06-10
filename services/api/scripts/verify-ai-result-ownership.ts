@@ -101,6 +101,8 @@ async function main() {
     emptyStub,          // llmConfig
     emptyStub,          // llmChat
     emptyStub,          // resumeExtraction（mock 路径不提取，空桩即可）
+    emptyStub,          // resumePdf（阶段2A,本脚本不导出 PDF,空桩即可）
+    emptyStub,          // files（阶段2A,本脚本不导出 PDF,空桩即可）
     prisma,
     emptyStub,          // audit
   )

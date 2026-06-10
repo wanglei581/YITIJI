@@ -180,6 +180,22 @@ export function ResumeSourcePage() {
           </div>
         </Card>
 
+        {/* 阶段2A:没有电子简历的用户 → AI 简历生成(引导式表单,只润色不编造) */}
+        <button
+          type="button"
+          onClick={() => navigate('/resume/generate')}
+          className="flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
+            <SparklesIcon className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <div className="flex-1">
+            <p className="text-lg font-bold text-gray-900">没有电子简历？AI 帮你生成一份</p>
+            <p className="mt-0.5 text-sm text-gray-500">填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</p>
+          </div>
+          <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
+        </button>
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {UPLOAD_OPTIONS.map((option) => {
           const isSelected = selected === option.type

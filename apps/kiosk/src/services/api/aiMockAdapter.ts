@@ -6,6 +6,10 @@
 // ============================================================
 
 import type {
+  GeneratedResume,
+  ResumeGenerateExportResponse,
+  ResumeGenerateInput,
+  ResumeGenerateResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeReport,
@@ -116,6 +120,67 @@ export const aiMockAdapter = {
         { label: '查看简历服务', route: '/resume/source' },
         { label: '浏览岗位信息', route: '/jobs' },
       ],
+    }
+  },
+
+  // ── 阶段2A AI 简历生成(mock:与后端 mock provider 同一防编造契约)──────────
+  // 事实字段逐字复制用户输入,仅对描述做确定性模板润色;providerName='mock'
+  // 供页面显示演示标记。
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async submitResumeGenerate(input: ResumeGenerateInput, _token?: string | null): Promise<ResumeGenerateResponse> {
+    await delay(600)
+    const polish = (t: string) => {
+      const v = t.trim()
+      return v ? (/[。.!！]$/.test(v) ? v : `${v}。`) : ''
+    }
+    const hints: string[] = []
+    if (!input.basic.phone && !input.basic.email) hints.push('未填写联系方式(电话/邮箱),招聘方将无法联系你')
+    if (input.education.length === 0) hints.push('未填写教育经历,建议补充学校与专业')
+    if (input.experience.length === 0 && input.projects.length === 0) hints.push('未填写实习/工作或项目经历,简历说服力会偏弱')
+    if (input.skills.length === 0) hints.push('未填写技能,建议补充与目标岗位相关的技能')
+    const summaryBase = input.selfIntro?.trim()
+      || [
+        input.education[0] ? `${input.education[0].school}${input.education[0].major ? ` ${input.education[0].major}` : ''}背景` : '',
+        input.intention.position ? `目标岗位为${input.intention.position}` : '',
+        input.skills.length > 0 ? `掌握 ${input.skills.slice(0, 3).join('、')} 等技能` : '',
+      ].filter(Boolean).join('，')
+    return {
+      taskId: nextTaskId(),
+      status: 'completed',
+      providerName: 'mock',
+      resume: {
+        basic: { ...input.basic },
+        intention: { ...input.intention },
+        summary: summaryBase ? `${summaryBase}。`.replace(/。。$/, '。') : '',
+        education: input.education.map((e) => ({ ...e, description: e.description ? polish(e.description) : undefined })),
+        experience: input.experience.map((e) => ({ ...e, description: polish(e.description) })),
+        projects: input.projects.map((pj) => ({ ...pj, description: polish(pj.description) })),
+        skills: input.skills.map((sk) => sk.trim()).filter(Boolean),
+        certificates: [...input.certificates],
+      },
+      missingHints: hints,
+    }
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getResumeGenerate(_taskId: string, _access?: ResumeReadAccess): Promise<ResumeGenerateResponse> {
+    // mock 模式不落库,刷新后无历史结果(诚实)
+    await delay(80)
+    return { taskId: _taskId, status: 'failed', providerName: 'mock', failReason: 'mock 模式不保存生成记录,请重新生成' }
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async exportGeneratedResume(resume: GeneratedResume, _taskId?: string, _token?: string | null): Promise<ResumeGenerateExportResponse> {
+    // mock 模式无后端,不构造假 PDF 文件;返回空 signedUrl,页面会诚实提示
+    await delay(400)
+    return {
+      fileId: `mock-resume-${Date.now()}`,
+      filename: `AI简历_${resume.basic.name || '求职者'}.pdf`,
+      sizeBytes: 0,
+      pageCount: 1,
+      signedUrl: '',
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     }
   },
 }

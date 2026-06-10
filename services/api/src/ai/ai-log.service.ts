@@ -9,7 +9,7 @@ import type { AiProviderName } from './interfaces/ai-provider.interface'
 // - 禁止记录：简历文本、优化建议内容、聊天消息原文、文件名、fileId
 // ============================================================
 
-export type AiOperation = 'parseResume' | 'optimizeResume' | 'chatAssistant' | 'classifyIntent'
+export type AiOperation = 'parseResume' | 'optimizeResume' | 'generateResume' | 'chatAssistant' | 'classifyIntent'
 
 export interface AiLogEntry {
   taskId: string

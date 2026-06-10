@@ -29,6 +29,7 @@ export interface LlmConfig {
 export type AiModelFeatureKey =
   | 'assistant_chat'
   | 'resume_diagnosis'
+  | 'resume_generate'
   | 'resume_optimize'
   | 'digital_human'
   | 'poster_generation'
@@ -79,6 +80,14 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     status: 'active',
     description: '用于上传简历后的 AI 诊断报告，仅供求职者本人修改简历参考，不代表投递、面试或录用结果。',
     runtimeNote: '已被 AI 简历诊断运行链路消费；诊断结构化 System Prompt 由服务端强制，管理员自定义 System Prompt v1 不参与诊断。',
+    allowCustomSystemPrompt: false,
+  },
+  {
+    key: 'resume_generate',
+    label: 'AI简历生成',
+    status: 'active',
+    description: '用于引导式表单生成简历。AI 只润色用户提供的信息，不编造学历、证书、公司或项目经历。',
+    runtimeNote: '已被 AI 简历生成运行链路消费；生成结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与生成。',
     allowCustomSystemPrompt: false,
   },
   {

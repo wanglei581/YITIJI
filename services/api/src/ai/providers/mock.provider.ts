@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common'
 import type {
   AiProvider,
   AiProviderName,
+  GenerateResumeOutput,
   ParseResumeInput,
   ParseResumeOutput,
+  ResumeGenerateInput,
   ResumeReport,
   OptimizeResumeOutput,
   ChatInput,
@@ -11,6 +13,7 @@ import type {
   ClassifyIntentOutput,
   AssistantIntent,
 } from '../interfaces/ai-provider.interface'
+import { computeMissingHints } from '../resume/llm-resume-generate.service'
 
 let taskCounter = 0
 const nextTaskId = (): string => `mock-ai-${Date.now()}-${++taskCounter}`
@@ -18,6 +21,40 @@ const nextTaskId = (): string => `mock-ai-${Date.now()}-${++taskCounter}`
 @Injectable()
 export class MockAiProvider implements AiProvider {
   readonly name: AiProviderName = 'mock'
+
+  /**
+   * 阶段2A 简历生成(演示):与真实 llm provider 同一防编造契约 —— 事实字段
+   * 逐字复制用户输入,仅对描述做确定性的模板化"润色"。providerName='mock'
+   * 由 AiService 注入,前端据此显示演示标记。
+   */
+  async generateResume(input: ResumeGenerateInput): Promise<GenerateResumeOutput> {
+    const polishDesc = (text: string): string => {
+      const t = text.trim()
+      if (!t) return ''
+      return /[。.!！]$/.test(t) ? t : `${t}。`
+    }
+    const summaryBase = input.selfIntro?.trim()
+      || [
+        input.education[0] ? `${input.education[0].school}${input.education[0].major ? ` ${input.education[0].major}` : ''}背景` : '',
+        input.intention.position ? `目标岗位为${input.intention.position}` : '',
+        input.skills.length > 0 ? `掌握 ${input.skills.slice(0, 3).join('、')} 等技能` : '',
+      ].filter(Boolean).join('，')
+    return {
+      taskId: nextTaskId(),
+      status: 'completed',
+      resume: {
+        basic: { ...input.basic },
+        intention: { ...input.intention },
+        summary: summaryBase ? `${summaryBase}。`.replace(/。。$/, '。') : '',
+        education: input.education.map((e) => ({ ...e, description: e.description ? polishDesc(e.description) : undefined })),
+        experience: input.experience.map((e) => ({ ...e, description: polishDesc(e.description) })),
+        projects: input.projects.map((p) => ({ ...p, description: polishDesc(p.description) })),
+        skills: input.skills.map((s) => s.trim()).filter(Boolean),
+        certificates: [...input.certificates],
+      },
+      missingHints: computeMissingHints(input),
+    }
+  }
 
   async parseResume(_input: ParseResumeInput): Promise<ParseResumeOutput> {
     // Phase 1.1：6 评分维度 + 风险表述提醒 + 修改优先级建议（与真实 llm provider 结构一致）。

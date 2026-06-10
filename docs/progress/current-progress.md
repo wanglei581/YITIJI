@@ -5,6 +5,36 @@
 
 ---
 
+## 阶段2A —— AI 简历生成 MVP（引导式表单 → 生成 → 预览/编辑 → 真实 PDF → 打印链路）（2026-06-10，Claude，`feature/ai-resume-generate`）
+
+**目标：** 一体机用户(尤其没有电子简历的求职者)通过引导式表单填写真实资料,AI 润色生成结构化简历,预览可编辑,导出真实 PDF 进入既有打印链路。阶段2 AI 求职功能第一批第 2 项(百炼"AI简历生成"对应项)。
+
+**防编造契约（本功能核心设计,结构性保证）：**
+- LLM **只返回按 index 对齐的润色文本**(summary / educationDesc[] / experienceDesc[] / projectDesc[] / skillsPolished[]);最终简历由服务端组装,学校/专业/学位/公司/职务/项目名/证书/时间段等**事实字段从用户输入逐字复制** —— 结构上不可能新增/虚构经历条目。
+- 数组长度与输入不一致(多塞/丢条目)→ 判非法重试一次,仍坏 → `AI_GENERATE_INVALID_OUTPUT` 明确失败,绝不出半截简历。
+- 润色文本命中合规拦截词(保录用/内推等恒定词 + 管理员 forbiddenWords)→ 丢弃润色回退用户原文。
+- 缺失内容(无联系方式/无教育经历/经历过短)由服务端**确定性计算** `missingHints` 提示用户补充,AI 不代填。
+
+**后端：**
+- [LlmConfigService](../../services/api/src/ai/llm/llm-config.service.ts) 新增功能位 `resume_generate`(active,服务端强制结构化 System Prompt,管理员自定义 prompt 不参与);Admin AI 配置中心自动出现该卡片,凭证仍 AES-256-GCM 加密,无任何硬编码 Key。
+- 新增 [llm-resume-generate.service.ts](../../services/api/src/ai/resume/llm-resume-generate.service.ts)(OpenAI 兼容 fetch,单轮结构化 JSON,出错只记状态码绝不记 PII/正文)。
+- `AiProvider` 接口加可选 `generateResume`;llm provider 走真实服务,mock provider 同一防编造契约(事实字段逐字复制,确定性模板润色,providerName='mock' 前端显示演示横幅);其余 stub provider → 明确不支持。
+- [AiService](../../services/api/src/ai/ai.service.ts):`submitResumeGenerate` / `getResumeGenerate` 复用既有归属/令牌/留存机制 —— 结果落 `AiResumeResult(kind='generate')`,匿名铸一次性 accessToken(DB 只存 hash,响应只回一次),TTL 到期 cron 清理;`exportGeneratedResume` 用新增 [resume-pdf.service.ts](../../services/api/src/ai/resume/resume-pdf.service.ts)(pdfkit,A4 单栏版式)渲染**真实 PDF** → 走既有 `FilesService.upload`(purpose=resume_upload → highly_sensitive,1h TTL 自动清理,签名 URL),**绝不构造假文件进打印链路**。
+- 中文字体方案:运行环境系统字体解析(Windows 雅黑/黑体、macOS 苹方、Linux Noto,env `RESUME_PDF_FONT_PATH` 可覆盖),找不到 → `RESUME_PDF_FONT_NOT_FOUND` 诚实报错,不输出乱码 PDF;零仓库膨胀、无网络依赖。
+- 路由:`POST /resume/generate`、`GET /resume/generate/:taskId`、`POST /resume/generate/export`;DTO 全嵌套白名单校验(forbidNonWhitelisted),审计只记元数据(条目数/页数/fileId),绝不含姓名/联系方式/简历内容。
+
+**Kiosk 前端（新版风格,触控友好,首页入口未动）：**
+- [ResumeGeneratePage](../../apps/kiosk/src/pages/resume/ResumeGeneratePage.tsx):6 步向导(基本信息/求职意向/教育/工作/项目/技能证书),大输入框、Stepper、逐步校验;顶部防编造+公共设备隐私声明;表单只在组件内存(不写任何本地存储,离开/待机即丢);生成期间 useBusyLock 豁免待机屏。
+- [ResumeGeneratePreviewPage](../../apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx):纸面式预览,所有描述文本可直接编辑;missingHints 橙色提示卡;mock 演示横幅;导出后显示文件信息(短期自动清理说明)+「去打印这份简历」→ 携真实 fileId/签名 URL 进 `/print/confirm`。
+- 入口:[ResumeSourcePage](../../apps/kiosk/src/pages/resume/ResumeSourcePage.tsx) 新增"没有电子简历?AI 帮你生成一份"卡(首页功能入口不变)。
+- 服务层:ai.ts facade + http/mock 双适配器(mock 不落库、导出诚实返回空 signedUrl,页面明示)。
+
+**验证（全绿）：** `verify:resume-generate` **9 PASS / ALL PASS**(LLM 多塞条目→重试后明确失败 / 事实字段逐字保留 / 拦截词回退原文 / 未配置明确失败不 fallback / missingHints 确定性 / kind=generate 落库+hash 门禁+payload 无明文 token / 真实 PDF %PDF 魔数+中文字体内嵌+highly_sensitive 短 TTL+文件名无手机号+签名 URL / mock 同契约);回归:`verify-real-resume-diagnosis` 18 PASS、`verify:ai-result-ownership` ALL PASS(两脚本已适配新构造签名)、`verify:jobfair-ui` 13 PASS;api/shared/kiosk/admin typecheck+lint+build 全绿;浏览器端到端走查:表单 6 步 → 生成 → 预览(演示横幅/可编辑) → 导出真实 PDF(84KB/1页) → 打印确认页(真实文件+A4+计价)截图核验。
+
+**待办（后续）：** 接真实 LLM 时在生产 `.env` 设 `AI_PROVIDER=llm` 并在 Admin AI 配置中心启用「AI简历生成」;简历模板多样式(当前单一 A4 版式);会员"我的简历"列表接入生成记录。
+
+---
+
 ## 阶段1F —— 恢复招聘会/校园招聘新版 UI（保留真实 API 链路）（2026-06-10，Claude，`feature/restore-jobfair-campus-ui`）
 
 **背景：** 6 月 8 日在 `feature/jobfair-revamp` / `feature/fair-detail-5tab` 完成的招聘会新版 UI（91fb6ee / 925007f / bc11d29 + 后端读路径 cf2c9e2/b30e60e）从未合入 main,阶段1 期间 main 上前台仍是旧卡片列表页。用户确认作为阶段1F 优先恢复。

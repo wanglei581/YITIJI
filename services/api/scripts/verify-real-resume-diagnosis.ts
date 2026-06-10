@@ -19,6 +19,7 @@ import { Logger } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AiService } from '../src/ai/ai.service'
 import { LlmResumeService } from '../src/ai/resume/llm-resume.service'
+import { LlmResumeGenerateService } from '../src/ai/resume/llm-resume-generate.service'
 import { LlmResumeProvider } from '../src/ai/providers/llm.provider'
 
 const SENTINEL = 'ZZ_DIAG_SENTINEL_77'
@@ -136,8 +137,9 @@ async function main(): Promise<void> {
     isReady: () => false,
   }
 
-  const llmProvider = new LlmResumeProvider(new LlmResumeService(configuredConfig as never))
-  const unconfiguredProvider = new LlmResumeProvider(new LlmResumeService(unconfiguredConfig as never))
+  // 阶段2A:LlmResumeProvider 增加生成服务依赖;本脚本只测诊断,生成服务用未配置实例即可
+  const llmProvider = new LlmResumeProvider(new LlmResumeService(configuredConfig as never), new LlmResumeGenerateService(unconfiguredConfig as never))
+  const unconfiguredProvider = new LlmResumeProvider(new LlmResumeService(unconfiguredConfig as never), new LlmResumeGenerateService(unconfiguredConfig as never))
 
   // 受控提取桩：按 fileId 返回提取结果（默认成功，文本含哨兵）
   const defaultText = `姓名 张三 ${SENTINEL}\n求职意向 前端工程师\n工作经历 2019-2024 ABC 高级前端\n技能 TypeScript React NestJS`
@@ -175,6 +177,8 @@ async function main(): Promise<void> {
       emptyStub, // llmConfig
       emptyStub, // llmChat
       fakeExtraction as never, // resumeExtraction
+      emptyStub, // resumePdf（阶段2A,本脚本不导出 PDF）
+      emptyStub, // files（阶段2A,本脚本不导出 PDF）
       prisma,
       emptyStub, // audit
     )

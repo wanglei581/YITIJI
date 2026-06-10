@@ -9,6 +9,7 @@ import { RedisService } from '../common/redis/redis.service'
 import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
+import { ResumeGenerateExportDto, ResumeGenerateRequestDto } from './dto/resume-generate.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
 import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
@@ -164,6 +165,82 @@ export class AiController {
         status: result.status,
         moduleCount: result.modules?.length ?? 0,
         hasEndUser: requester.endUserId !== null,
+      },
+      ipAddress: ipOf(req),
+      userAgent: uaOf(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
+  }
+
+  /**
+   * 阶段2A — 提交 AI 简历生成(引导式表单)。
+   *
+   * 合规:AI 只润色用户提供的资料(防编造契约在 service 层强制);
+   * 审计只放元数据(条目数/状态/taskId),绝不包含姓名、联系方式或简历内容。
+   */
+  @Post('resume/generate')
+  async submitResumeGenerate(
+    @Body() dto: ResumeGenerateRequestDto,
+    @Req() req: ReqLike,
+  ) {
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const result = await this.aiService.submitResumeGenerate(dto, endUser?.endUserId ?? null)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'kiosk',
+      action: 'resume.generate_submitted',
+      targetType: 'ai_task',
+      targetId: result.taskId,
+      payload: {
+        providerName: this.aiService.getProviderName(),
+        status: result.status,
+        educationCount: dto.education.length,
+        experienceCount: dto.experience.length,
+        projectCount: dto.projects.length,
+        hasEndUser: Boolean(endUser),
+        accessTokenIssued: Boolean(result.accessToken),
+      },
+      ipAddress: ipOf(req),
+      userAgent: uaOf(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
+  }
+
+  /** 阶段2A — 读取生成结果(归属/令牌门禁同 parse)。 */
+  @Get('resume/generate/:taskId')
+  async getResumeGenerate(
+    @Param('taskId') taskId: string,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    return this.aiService.getResumeGenerate(taskId, requester)
+  }
+
+  /**
+   * 阶段2A — 导出确认后的简历为真实 PDF(FileObject + 签名 URL + 既有清理策略)。
+   * 审计只放元数据(fileId/页数/大小),绝不包含简历内容。
+   */
+  @Post('resume/generate/export')
+  async exportGeneratedResume(
+    @Body() dto: ResumeGenerateExportDto,
+    @Req() req: ReqLike,
+  ) {
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const { taskId, ...resume } = dto
+    const result = await this.aiService.exportGeneratedResume(resume, endUser?.endUserId ?? null)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'kiosk',
+      action: 'resume.generate_exported',
+      targetType: 'file',
+      targetId: result.fileId,
+      payload: {
+        taskId: taskId ?? null,
+        pageCount: result.pageCount,
+        sizeBytes: result.sizeBytes,
+        hasEndUser: Boolean(endUser),
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
