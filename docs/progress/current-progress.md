@@ -5,6 +5,20 @@
 
 ---
 
+## 2C+ 模拟面试语音增强（2026-06-11，Claude，`feature/mock-interview-voice`，main `018337c`）
+
+在 2C 引擎上扩展「数字人面试官 + 语音回合制 + 转写确认」，**文字输入保留为硬兜底主路径**。
+
+- **语音回合**（ASR 启用 + 麦克风可用时默认）：数字人（复用 /assistant 小青照片视觉 + 说话光环/录音红点）播报问题（浏览器本地 TTS，文本已过服务端禁词扫描）→「开始回答 / 结束回答」两状态按钮（不做按住说话，58s 自动停）→ 16k WAV（AudioContext 重采样）→ `POST /mock-interviews/:id/transcribe` 转写 → **转写文本可编辑确认** → 确认提交走既有 /answer。
+- **文字兜底三重保障**：ASR 未配置（capabilities/voice 探测）→ 直接文字模式；麦克风权限拒绝 → 自动切换+提示；权限框挂起 → 10s 超时回退；任意时刻可手动双向切换。
+- **ASR provider**（对齐 OCR 范式）：`ASR_PROVIDER=disabled|baidu`（百度短语音识别标准版，密钥独立于 OCR）。**当前密钥无语音权限（err 3302 实测），须在百度控制台开通「语音技术-短语音识别」并创建语音应用后配置 `BAIDU_ASR_API_KEY/SECRET_KEY`**；未配置时全链路自动文字兜底。
+- **数据**：Session +interactionMode；Turn +inputMode/transcriptText(转写原文)/transcriptEdited/answerDurationSec（additive 迁移 20260611230000）；content=用户确认后最终文本。
+- **报告**：基于配置+简历+问题+转写文本+跳过记录+回答耗时生成；可评回答完整度/表达结构/追问应对/时间控制，**硬禁评语速/语调/情绪稳定**（无音频特征分析）——输出扫描命中即重试，与禁词同级。
+- **隐私**：音频仅内存转发转写后即弃（不落盘/不入 FileObject/不写日志）；转写文本不写日志；TTL 沿用 2C。
+- **验证**：`verify:mock-interview` 12→**15 PASS**（进 CI）；五端三检全绿；浏览器验收六点全过（语音 UI/麦克风拒绝回退/文字兜底/录音→转写→编辑→确认（受控 stub ASR + 注入 MediaStream，transcriptEdited 落库实测）/报告基于转写/零违规文案含语速语调）。**真实百度 ASR 待开通密钥后 live 补验。**
+
+---
+
 ## 2C 模拟面试 + 面试技巧 + 面试报告（2026-06-11，Claude，`feature/mock-interview-2c`）
 
 **闭环**：设置场景 → AI 面试官几分钟对话式练习 → 综合维度练习报告 → 真实 PDF 打印；面试技巧准备工具页；面试报告历史入口。首页「AI面试训练」三磁贴正式点亮。
