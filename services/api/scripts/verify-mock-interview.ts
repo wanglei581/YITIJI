@@ -345,14 +345,54 @@ async function main() {
       const big = await asr.recognizeWav(Buffer.alloc(5 * 1024 * 1024))
       if (big.ok || !big.errorMessage?.includes('过长')) fail('14. 超大音频应本地拒绝')
       asrStub.close()
+
+      // ── 14b. 腾讯一句话识别 provider(stub TC3 端点) ───────────────────────
+      const txReplies: Array<Record<string, unknown>> = []
+      const txStub = createServer((sreq, sres) => {
+        let b = ''
+        sreq.on('data', (ch) => { b += ch })
+        sreq.on('end', () => {
+          // TC3 头存在性断言(签名细节由 live 冒烟覆盖)
+          const auth = String(sreq.headers['authorization'] ?? '')
+          const action = String(sreq.headers['x-tc-action'] ?? '')
+          sres.setHeader('Content-Type', 'application/json')
+          if (!auth.startsWith('TC3-HMAC-SHA256') || action !== 'SentenceRecognition') {
+            sres.end(JSON.stringify({ Response: { Error: { Code: 'AuthFailure.SignatureFailure', Message: 'bad headers' } } }))
+            return
+          }
+          sres.end(JSON.stringify(txReplies.shift() ?? { Response: { Error: { Code: 'InternalError', Message: 'queue empty' } } }))
+        })
+      })
+      const txUrl: string = await new Promise((res) => txStub.listen(0, '127.0.0.1', () => {
+        const a = txStub.address()
+        res(`127.0.0.1:${typeof a === 'object' && a ? a.port : 0}`)
+      }))
+      process.env['ASR_PROVIDER'] = 'tencent'
+      process.env['TENCENT_ASR_SECRET_ID'] = 'stub-id'
+      process.env['TENCENT_ASR_SECRET_KEY'] = 'stub-key'
+      process.env['TENCENT_ASR_HOST'] = txUrl
+      const tx = new AsrService()
+      txReplies.push({ Response: { Result: '腾讯转写文本_标记TXAB', RequestId: 'x' } })
+      const tok = await tx.recognizeWav(Buffer.alloc(2000))
+      if (!tok.ok || tok.text !== '腾讯转写文本_标记TXAB') fail(`14b. 腾讯转写失败: ${tok.errorMessage}`)
+      txReplies.push({ Response: { Error: { Code: 'AuthFailure.SecretIdNotFound', Message: 'x' } } })
+      const tbad = await tx.recognizeWav(Buffer.alloc(2000))
+      if (tbad.ok || !tbad.errorMessage?.includes('鉴权失败')) fail('14b. AuthFailure 应映射鉴权失败文案')
+      txReplies.push({ Response: { Result: '', RequestId: 'x' } })
+      const tempty = await tx.recognizeWav(Buffer.alloc(2000))
+      if (tempty.ok || !tempty.errorMessage?.includes('没有识别到')) fail('14b. 空结果应明确报错')
+      txStub.close()
       delete process.env['ASR_PROVIDER']
-      pass('14. ASR：未配置诚实回退 / stub 转写成功 / 音质差与超长明确报错')
+      delete process.env['TENCENT_ASR_SECRET_ID']
+      delete process.env['TENCENT_ASR_SECRET_KEY']
+      delete process.env['TENCENT_ASR_HOST']
+      pass('14. ASR：未配置诚实回退 / 百度与腾讯 stub 转写成功 / 错误分类映射 / 超长拒绝')
     }
 
     // ── 10. 日志脱敏 ──────────────────────────────────────────────────────────
     {
       const joined = capturedLogs.join('\n')
-      for (const secret of [SECRET_ANSWER.slice(0, 20), SECRET_QUESTION.slice(0, 12), '机密标记XYZQ', '问题标记ABCD', '语音标记WXYZ', '编辑前的转写原文']) {
+      for (const secret of [SECRET_ANSWER.slice(0, 20), SECRET_QUESTION.slice(0, 12), '机密标记XYZQ', '问题标记ABCD', '语音标记WXYZ', '编辑前的转写原文', '标记TXAB']) {
         if (joined.includes(secret)) fail(`10. 日志泄露对话内容: ${secret.slice(0, 10)}…`)
       }
       pass('10. 日志脱敏：问题/回答原文不出现在任何日志')
