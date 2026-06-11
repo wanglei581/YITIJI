@@ -42,6 +42,9 @@ jobs:
       SECRET_ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
       REDIS_URL: redis://127.0.0.1:6379
       SMS_PROVIDER: log
+      # terminals.service 在模块加载期 requireEnv 这两项（verify 启动完整 AppModule 需要）
+      TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
+      TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
     steps:
       - uses: actions/checkout@v4
 
