@@ -1,12 +1,11 @@
 // ============================================================
 // 模拟面试 — 场景设置（2C）。
 //
-// 触控优先：大按钮选项卡（≥48px），单屏单任务，配置完成 → 创建会话 → 进入对话页。
-// 合规：页面明示「仅供本人练习参考，不代表任何招聘结果承诺」。
-// 简历可选：真实上传（复用 kiosk 上传链路）或不使用；提取失败如实报错。
+// 触控优先：左侧配置、右侧摘要，底部固定主操作。
+// 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import type {
@@ -17,10 +16,11 @@ import type {
   InterviewerType,
 } from '@ai-job-print/shared'
 import {
+  AlertCircleIcon,
   BriefcaseIcon,
+  CheckCircle2Icon,
   ClockIcon,
   FileTextIcon,
-  GaugeIcon,
   GraduationCapIcon,
   Loader2Icon,
   UserRoundCheckIcon,
@@ -64,14 +64,18 @@ const DURATIONS: Array<{ key: InterviewDuration; label: string; desc: string }> 
 
 const POSITION_EXAMPLES = ['前端开发工程师', '行政专员', '市场运营', '机械工程师', '会计', '销售代表']
 
-function OptionButton({ active, onClick, children, className = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
+function labelOf<T extends string | number>(items: Array<{ key: T; label: string }>, key: T): string {
+  return items.find((it) => it.key === key)?.label ?? String(key)
+}
+
+function OptionButton({ active, onClick, children, className = '' }: { active: boolean; onClick: () => void; children: ReactNode; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        'min-h-[48px] rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors',
-        active ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300',
+        'min-h-[52px] rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors',
+        active ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300',
         className,
       ].join(' ')}
     >
@@ -80,11 +84,23 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
   )
 }
 
-function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
+function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: string; desc?: string }) {
   return (
-    <div className="mb-3 flex items-center gap-2">
-      <Icon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+    <div className="mb-4 flex items-start gap-2">
+      <Icon className="mt-0.5 h-5 w-5 text-primary-600" aria-hidden="true" />
+      <div>
+        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        {desc && <p className="mt-0.5 text-xs text-gray-500">{desc}</p>}
+      </div>
+    </div>
+  )
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="max-w-[13rem] text-right text-sm font-semibold text-gray-900">{value}</span>
     </div>
   )
 }
@@ -107,7 +123,13 @@ export function InterviewSetupPage() {
 
   useBusyLock(creating || uploading)
 
-  const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const interviewerLabel = labelOf(INTERVIEWERS, interviewerType)
+  const experienceLabel = labelOf(EXPERIENCES, experience)
+  const difficultyLabel = labelOf(DIFFICULTIES, difficulty)
+  const durationLabel = labelOf(DURATIONS, duration)
+  const positionReady = position.trim().length > 0
+
+  const handleFileChosen = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -126,14 +148,19 @@ export function InterviewSetupPage() {
   const handleStart = async () => {
     const pos = position.trim()
     if (!pos) {
-      setError('请填写目标岗位，例如：前端开发工程师、行政专员')
+      setError('请先填写目标岗位，例如：前端开发工程师、行政专员')
       return
     }
     setCreating(true)
     setError(null)
     try {
       const input: CreateInterviewInput = {
-        interviewerType, industry, position: pos, experience, difficulty, durationMin: duration,
+        interviewerType,
+        industry,
+        position: pos,
+        experience,
+        difficulty,
+        durationMin: duration,
         ...(resumeFile ? { resumeFileId: resumeFile.fileId } : {}),
       }
       const token = getToken()
@@ -159,138 +186,177 @@ export function InterviewSetupPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f7fa] px-6 pt-6">
       <PageHeader
         title="模拟面试"
-        subtitle="配置练习场景，AI 面试官将进行几分钟对话式练习"
+        subtitle="配置本次练习场景，进入 AI 数字人面试间"
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
         }
       />
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-32">
+      <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-28">
         <ComplianceBanner tone="info">
           本功能仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
         </ComplianceBanner>
 
-        <Card className="mt-4 p-5">
-          <SectionTitle icon={UserRoundCheckIcon} title="面试官类型" />
-          <div className="flex flex-col gap-2">
-            {INTERVIEWERS.map((it) => (
-              <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)} className="text-left">
-                <span className="block font-semibold">{it.label}</span>
-                <span className="mt-0.5 block text-xs font-normal text-gray-500">{it.desc}</span>
-              </OptionButton>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="mt-4 p-5">
-          <SectionTitle icon={BriefcaseIcon} title="目标行业与岗位" />
-          <div className="flex flex-wrap gap-2">
-            {INDUSTRIES.map((name) => (
-              <OptionButton key={name} active={industry === name} onClick={() => setIndustry(name)}>{name}</OptionButton>
-            ))}
-          </div>
-          <input
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-            maxLength={50}
-            placeholder="输入目标岗位，如：前端开发工程师"
-            className="mt-3 min-h-[52px] w-full rounded-xl border border-gray-200 px-4 text-base focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-          />
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {POSITION_EXAMPLES.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPosition(p)}
-                className="min-h-[36px] rounded-full bg-gray-100 px-3 text-xs text-gray-600 hover:bg-gray-200"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="mt-4 p-5">
-          <SectionTitle icon={GraduationCapIcon} title="求职经验" />
-          <div className="flex flex-wrap gap-2">
-            {EXPERIENCES.map((e) => (
-              <OptionButton key={e.key} active={experience === e.key} onClick={() => setExperience(e.key)}>{e.label}</OptionButton>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="mt-4 p-5">
-          <SectionTitle icon={GaugeIcon} title="面试难度" />
-          <div className="grid grid-cols-3 gap-2">
-            {DIFFICULTIES.map((d) => (
-              <OptionButton key={d.key} active={difficulty === d.key} onClick={() => setDifficulty(d.key)} className="text-center">
-                <span className="block font-semibold">{d.label}</span>
-                <span className="mt-0.5 block text-[11px] font-normal leading-tight text-gray-500">{d.desc}</span>
-              </OptionButton>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="mt-4 p-5">
-          <SectionTitle icon={ClockIcon} title="练习时长" />
-          <div className="grid grid-cols-3 gap-2">
-            {DURATIONS.map((d) => (
-              <OptionButton key={d.key} active={duration === d.key} onClick={() => setDuration(d.key)} className="text-center">
-                <span className="block font-semibold">{d.label}</span>
-                <span className="mt-0.5 block text-[11px] font-normal text-gray-500">{d.desc}</span>
-              </OptionButton>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="mt-4 p-5">
-          <SectionTitle icon={FileTextIcon} title="简历（可选）" />
-          <p className="mb-3 text-xs text-gray-500">
-            提供简历后，面试官会结合你的经历提问；仅本次练习使用，按既有文件策略短期自动清理。
-          </p>
-          {resumeFile ? (
-            <div className="flex items-center justify-between rounded-xl bg-primary-50 px-4 py-3">
-              <span className="truncate text-sm font-medium text-primary-700">{resumeFile.name}</span>
-              <button
-                type="button"
-                onClick={() => setResumeFile(null)}
-                aria-label="移除简历"
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 hover:bg-white"
-              >
-                <XIcon className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="secondary" className="min-h-[52px] flex-1" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-                {uploading ? <Loader2Icon className="h-4 w-4 animate-spin" /> : '上传简历'}
-              </Button>
-              <div className="flex min-h-[52px] flex-1 items-center justify-center rounded-xl border border-dashed border-gray-200 text-sm text-gray-400">
-                不上传则按通用问题练习
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4">
+            <Card className="p-5">
+              <SectionTitle icon={UserRoundCheckIcon} title="面试官与难度" desc="先选择面试官身份，再选择练习压力。" />
+              <div className="grid gap-2 lg:grid-cols-2">
+                {INTERVIEWERS.map((it) => (
+                  <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)} className="text-left">
+                    <span className="block font-semibold">{it.label}</span>
+                    <span className="mt-0.5 block text-xs font-normal leading-relaxed text-gray-500">{it.desc}</span>
+                  </OptionButton>
+                ))}
               </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {DIFFICULTIES.map((d) => (
+                  <OptionButton key={d.key} active={difficulty === d.key} onClick={() => setDifficulty(d.key)} className="text-center">
+                    <span className="block font-semibold">{d.label}</span>
+                    <span className="mt-0.5 block text-[11px] font-normal leading-tight text-gray-500">{d.desc}</span>
+                  </OptionButton>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-5">
+              <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="目标岗位会影响问题方向，请尽量填写具体岗位名称。" />
+              <div className="flex flex-wrap gap-2">
+                {INDUSTRIES.map((name) => (
+                  <OptionButton key={name} active={industry === name} onClick={() => setIndustry(name)}>{name}</OptionButton>
+                ))}
+              </div>
+              <input
+                value={position}
+                onChange={(e) => {
+                  setPosition(e.target.value)
+                  if (error?.includes('目标岗位')) setError(null)
+                }}
+                maxLength={50}
+                placeholder="输入目标岗位，如：前端开发工程师"
+                className={[
+                  'mt-4 min-h-[56px] w-full rounded-xl border px-4 text-base focus:outline-none focus:ring-2',
+                  positionReady
+                    ? 'border-gray-200 focus:border-primary-500 focus:ring-primary-100'
+                    : 'border-orange-200 bg-orange-50/40 focus:border-orange-400 focus:ring-orange-100',
+                ].join(' ')}
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {POSITION_EXAMPLES.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => { setPosition(p); setError(null) }}
+                    className="min-h-[40px] rounded-full bg-gray-100 px-4 text-sm text-gray-600 hover:bg-gray-200"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </Card>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="p-5">
+                <SectionTitle icon={GraduationCapIcon} title="经验" />
+                <div className="grid grid-cols-2 gap-2">
+                  {EXPERIENCES.map((e) => (
+                    <OptionButton key={e.key} active={experience === e.key} onClick={() => setExperience(e.key)}>{e.label}</OptionButton>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <SectionTitle icon={ClockIcon} title="时长" />
+                <div className="grid gap-2">
+                  {DURATIONS.map((d) => (
+                    <OptionButton key={d.key} active={duration === d.key} onClick={() => setDuration(d.key)} className="text-left">
+                      <span className="block font-semibold">{d.label}</span>
+                      <span className="mt-0.5 block text-xs font-normal text-gray-500">{d.desc}</span>
+                    </OptionButton>
+                  ))}
+                </div>
+              </Card>
             </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
-            className="hidden"
-            onChange={handleFileChosen}
-          />
-        </Card>
+
+            <Card className="p-5">
+              <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="上传后面试官会结合经历提问；不上传则按通用问题练习。" />
+              {resumeFile ? (
+                <div className="flex items-center justify-between rounded-xl border border-primary-100 bg-primary-50 px-4 py-3">
+                  <span className="truncate text-sm font-medium text-primary-700">{resumeFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setResumeFile(null)}
+                    aria-label="移除简历"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 hover:bg-white"
+                  >
+                    <XIcon className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-[1fr_1fr]">
+                  <Button variant="secondary" className="min-h-[56px] text-base" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                    {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
+                    上传简历
+                  </Button>
+                  <div className="flex min-h-[56px] items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 text-sm text-gray-500">
+                    不上传也可以开始练习
+                  </div>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={handleFileChosen}
+              />
+            </Card>
+          </div>
+
+          <aside className="xl:sticky xl:top-0 xl:self-start">
+            <Card className="p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <CheckCircle2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
+                <h2 className="text-base font-semibold text-gray-900">本次练习摘要</h2>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 px-4">
+                <SummaryRow label="面试官类型" value={interviewerLabel} />
+                <SummaryRow label="行业" value={industry} />
+                <SummaryRow label="目标岗位" value={positionReady ? position.trim() : '待填写'} />
+                <SummaryRow label="经验" value={experienceLabel} />
+                <SummaryRow label="难度" value={difficultyLabel} />
+                <SummaryRow label="时长" value={durationLabel} />
+                <SummaryRow label="使用简历" value={resumeFile ? resumeFile.name : '不使用简历'} />
+              </div>
+              {!positionReady && (
+                <div className="mt-4 flex items-start gap-2 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                  <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  请填写目标岗位后开始模拟面试。
+                </div>
+              )}
+              <div className="mt-4 rounded-xl border border-gray-100 px-4 py-3 text-xs leading-relaxed text-gray-500">
+                报告将基于你的问题回答、跳过记录和确认后的转写文本生成，仅供本人练习复盘。
+              </div>
+            </Card>
+          </aside>
+        </div>
 
         {error && (
-          <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+          <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
         )}
       </div>
 
-      {/* 底部主操作（固定，触控 ≥56px） */}
       <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="h-14 w-full text-base" disabled={creating || uploading} onClick={() => void handleStart()}>
-          {creating ? '正在为你准备面试官…' : '开始模拟面试'}
+          {creating ? (
+            <>
+              <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
+              正在为你准备面试官…
+            </>
+          ) : positionReady ? '开始模拟面试' : '填写目标岗位后开始'}
         </Button>
       </div>
     </div>

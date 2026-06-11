@@ -1,35 +1,39 @@
 // ============================================================
 // 模拟面试 — 对话进行页（2C + 2C+ 语音回合制）。
 //
-// 语音主路径（ASR 启用 + 麦克风可用时）：
-//   面试官数字人播报问题（浏览器本地 TTS，播报文本已过服务端禁词扫描）→
-//   「开始回答」→ 录音（16k WAV，显式开始/结束，不做按住说话）→「结束回答」→
-//   服务端转写 → 转写文本可编辑确认 →「确认提交」走既有 /answer。
-// 文字兜底（硬要求）：麦克风权限失败 / ASR 未配置或失败 → 自动切文字输入并提示；
-//   任何时刻可手动「改用文字输入」。语音/TTS 能力绝不阻塞主流程。
-// 隐私：音频只在内存（录音 → 转写后即弃），不落本地、不持久化；回答耗时随
-//   /answer 提交用于报告"时间控制"维度（无音频特征分析，不评语速语调情绪）。
+// 语音主路径：面试官数字人播报问题 → 用户显式开始/结束录音 →
+// 服务端转写 → 转写文本可编辑确认 → 既有 /answer。
+// 文字输入是硬兜底；麦克风、TTS、ASR 任何一步失败都不能阻塞主流程。
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ElementType } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
+  BotIcon,
+  CheckCircle2Icon,
+  ClockIcon,
+  FileTextIcon,
   KeyboardIcon,
   Loader2Icon,
+  MessageSquareTextIcon,
   MicIcon,
   PencilLineIcon,
+  RotateCcwIcon,
   SendIcon,
+  ShieldCheckIcon,
   SkipForwardIcon,
   SquareIcon,
+  TimerIcon,
+  UserRoundIcon,
   Volume2Icon,
 } from 'lucide-react'
 import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-// 复用 /assistant 数字人「小青」照片资源(public 静态资源,与 AiAdvisorCall 同源)
+
 const advisorPortrait = '/assets/ai-advisor.png'
 
 interface SessionState {
@@ -44,15 +48,24 @@ interface SessionState {
 }
 
 const INTERVIEWER_LABEL: Record<string, string> = {
-  hr: 'HR 初筛', manager: '业务主管', tech: '技术面试官', campus: '校招面试官', final: '终面负责人',
+  hr: 'HR 初筛',
+  manager: '业务主管',
+  tech: '技术面试官',
+  campus: '校招面试官',
+  final: '终面负责人',
 }
 
-const MAX_RECORD_SEC = 58 // 百度短语音识别上限 60s，留余量自动停止
+const MAX_RECORD_SEC = 58
 
-interface Msg { role: 'interviewer' | 'candidate'; content: string; skipped?: boolean }
+interface Msg {
+  role: 'interviewer' | 'candidate'
+  content: string
+  skipped?: boolean
+}
 
 type VoiceState =
   | { kind: 'idle' }
+  | { kind: 'requesting_permission' }
   | { kind: 'recording'; startedAt: number }
   | { kind: 'transcribing' }
   | { kind: 'review'; transcript: string; edited: string; durationSec: number }
@@ -63,7 +76,6 @@ function fmtClock(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** 浏览器本地 TTS 播报（官方语音失败时的兜底；文本来自服务端，已过禁词扫描）。 */
 function speak(text: string, onState?: (speaking: boolean) => void): void {
   try {
     if (!('speechSynthesis' in window)) return
@@ -75,7 +87,24 @@ function speak(text: string, onState?: (speaking: boolean) => void): void {
     u.onend = () => onState?.(false)
     u.onerror = () => onState?.(false)
     window.speechSynthesis.speak(u)
-  } catch { /* TTS 不可用不阻塞 */ }
+  } catch {
+    // TTS 不可用不阻塞面试主流程。
+  }
+}
+
+function StatusPill({ icon: Icon, label, tone = 'gray' }: { icon: ElementType; label: string; tone?: 'gray' | 'blue' | 'red' | 'green' }) {
+  const toneClass = {
+    gray: 'border-gray-200 bg-gray-50 text-gray-600',
+    blue: 'border-primary-100 bg-primary-50 text-primary-700',
+    red: 'border-red-100 bg-red-50 text-red-700',
+    green: 'border-green-100 bg-green-50 text-green-700',
+  }[tone]
+  return (
+    <span className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium ${toneClass}`}>
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {label}
+    </span>
+  )
 }
 
 export function InterviewSessionPage() {
@@ -94,21 +123,28 @@ export function InterviewSessionPage() {
   const [remainingSec, setRemainingSec] = useState((state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
 
-  // ── 2C+ 语音态 ──────────────────────────────────────────────
-  const [voiceAvailable, setVoiceAvailable] = useState(false) // ASR 服务端可用
-  const [ttsOfficial, setTtsOfficial] = useState(false) // 腾讯官方语音可用(否则浏览器 TTS 兜底)
+  const [voiceAvailable, setVoiceAvailable] = useState(false)
+  const [ttsOfficial, setTtsOfficial] = useState(false)
   const [mode, setMode] = useState<'voice' | 'text'>('text')
   const [voice, setVoice] = useState<VoiceState>({ kind: 'idle' })
   const [speaking, setSpeaking] = useState(false)
   const [voiceHint, setVoiceHint] = useState<string | null>(null)
+  const [micError, setMicError] = useState(false)
   const recorderRef = useRef<WavRecorder | null>(null)
   const recordTimerRef = useRef<number | null>(null)
+  const recordStartedAtRef = useRef<number | null>(null)
   const [recordSec, setRecordSec] = useState(0)
   const questionShownAtRef = useRef(Date.now())
 
-  useBusyLock(true) // 面试中：屏保/idle 登出豁免
+  useBusyLock(true)
 
-  // 语音能力探测：ASR 启用且浏览器支持 getUserMedia → 默认语音模式
+  const access = useMemo(
+    () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),
+    [getToken, state?.accessToken],
+  )
+  const accessRef = useRef(access)
+  accessRef.current = access
+
   useEffect(() => {
     let cancelled = false
     getVoiceCapability()
@@ -120,31 +156,32 @@ export function InterviewSessionPage() {
           setVoiceAvailable(true)
           setMode('voice')
         } else if (asrEnabled && !micSupported) {
-          setVoiceHint('当前设备不支持麦克风，已切换为文字输入')
+          setVoiceHint('当前设备不支持麦克风，请使用文字输入完成练习')
         }
       })
-      .catch(() => undefined) // 探测失败 → 保持文字模式
+      .catch(() => undefined)
     return () => { cancelled = true }
   }, [])
 
-  // 播报最新面试官问题（仅语音模式）：优先腾讯官方语音（小青同音色），失败降级浏览器本地 TTS
   const interviewerMsgs = messages.filter((m) => m.role === 'interviewer')
   const lastInterviewerMsg = interviewerMsgs.slice(-1)[0]?.content ?? ''
-  // 面试官轮次在 turns 序列中的 idx：第 n 个 interviewer turn 的 idx = 2(n-1)（i/c 交替）
   const lastInterviewerTurnIdx = (interviewerMsgs.length - 1) * 2
+  const lastInterviewerMessageIndex = messages.map((m) => m.role).lastIndexOf('interviewer')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
   const stopPlayback = () => {
     try { audioRef.current?.pause() } catch { /* noop */ }
     audioRef.current = null
     try { window.speechSynthesis?.cancel() } catch { /* noop */ }
     setSpeaking(false)
   }
+
   useEffect(() => {
     questionShownAtRef.current = Date.now()
-    if (mode !== 'voice' || !lastInterviewerMsg) return
+    if (mode !== 'voice' || !lastInterviewerMsg || !state?.sessionId) return
     let cancelled = false
     if (ttsOfficial) {
-      fetchQuestionAudio(state!.sessionId, lastInterviewerTurnIdx, accessRef.current)
+      fetchQuestionAudio(state.sessionId, lastInterviewerTurnIdx, accessRef.current)
         .then(({ audio }) => {
           if (cancelled) return
           const el = new Audio(`data:audio/mpeg;base64,${audio}`)
@@ -154,7 +191,7 @@ export function InterviewSessionPage() {
           el.onerror = () => { setSpeaking(false); speak(lastInterviewerMsg, setSpeaking) }
           void el.play().catch(() => speak(lastInterviewerMsg, setSpeaking))
         })
-        .catch(() => { if (!cancelled) speak(lastInterviewerMsg, setSpeaking) }) // 官方语音失败 → 本地 TTS 兜底
+        .catch(() => { if (!cancelled) speak(lastInterviewerMsg, setSpeaking) })
     } else {
       speak(lastInterviewerMsg, setSpeaking)
     }
@@ -171,43 +208,57 @@ export function InterviewSessionPage() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, phase, voice.kind])
 
-  // 卸载兜底：释放麦克风
-  useEffect(() => () => { recorderRef.current?.cancel(); if (recordTimerRef.current) clearInterval(recordTimerRef.current) }, [])
-
-  const access = useMemo(
-    () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),
-    [getToken, state?.accessToken],
-  )
-  const accessRef = useRef(access)
-  accessRef.current = access
+  useEffect(() => () => {
+    recorderRef.current?.cancel()
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+    stopPlayback()
+  }, [])
 
   if (!state?.sessionId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-        <AlertCircleIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
-        <p className="text-base text-gray-500">练习会话已失效（公共设备不保留会话状态）</p>
-        <Button size="lg" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
+      <div className="flex h-full flex-col items-center justify-center gap-5 bg-[#f5f7fa] px-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-600">
+          <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">会话已失效，请重新开始</h1>
+          <p className="mt-2 text-base text-gray-500">公共设备不会保留面试会话状态，刷新或直接访问后需要重新创建练习。</p>
+        </div>
+        <Button size="lg" className="h-14 px-10 text-base" onClick={() => navigate('/interview/setup')}>
+          重新开始练习
+        </Button>
       </div>
     )
   }
 
-  const fallbackToText = (reason: string) => {
+  const resetVoiceState = () => {
     recorderRef.current?.cancel()
     recorderRef.current = null
+    recordStartedAtRef.current = null
     if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+    setRecordSec(0)
     setVoice({ kind: 'idle' })
+  }
+
+  const fallbackToText = (reason: string) => {
+    resetVoiceState()
     setMode('text')
     setVoiceHint(reason)
   }
 
-  // ── 语音回合 ────────────────────────────────────────────────
   const startRecording = async () => {
     setError(null)
+    setMicError(false)
+    setVoiceHint(null)
     stopPlayback()
+    setVoice({ kind: 'requesting_permission' })
     try {
-      recorderRef.current = await startWavRecorder()
-      setVoice({ kind: 'recording', startedAt: Date.now() })
+      const recorder = await startWavRecorder()
+      const startedAt = Date.now()
+      recorderRef.current = recorder
+      recordStartedAtRef.current = startedAt
       setRecordSec(0)
+      setVoice({ kind: 'recording', startedAt })
       recordTimerRef.current = window.setInterval(() => {
         setRecordSec((s) => {
           if (s + 1 >= MAX_RECORD_SEC) void stopRecording()
@@ -215,7 +266,9 @@ export function InterviewSessionPage() {
         })
       }, 1000)
     } catch {
-      fallbackToText('无法访问麦克风（未授权或被占用），已切换为文字输入')
+      resetVoiceState()
+      setMicError(true)
+      setError('无法访问麦克风，请检查浏览器权限或改用文字输入')
     }
   }
 
@@ -224,7 +277,9 @@ export function InterviewSessionPage() {
     if (!recorder) return
     recorderRef.current = null
     if (recordTimerRef.current) clearInterval(recordTimerRef.current)
-    const durationSec = recordSec
+    const startedAt = recordStartedAtRef.current ?? Date.now()
+    const durationSec = Math.max(1, Math.min(MAX_RECORD_SEC, Math.round((Date.now() - startedAt) / 1000)))
+    recordStartedAtRef.current = null
     setVoice({ kind: 'transcribing' })
     try {
       const wav = await recorder.stop()
@@ -233,7 +288,7 @@ export function InterviewSessionPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '语音转写失败'
       if (msg.includes('未启用') || msg.includes('未配置')) {
-        fallbackToText(`${msg}，已切换为文字输入`)
+        fallbackToText(`${msg}，请使用文字输入完成练习`)
       } else {
         setVoice({ kind: 'idle' })
         setError(`${msg}，可重新录音或改用文字输入`)
@@ -241,22 +296,16 @@ export function InterviewSessionPage() {
     }
   }
 
-  const cancelRecording = () => {
-    recorderRef.current?.cancel()
-    recorderRef.current = null
-    if (recordTimerRef.current) clearInterval(recordTimerRef.current)
-    setVoice({ kind: 'idle' })
-  }
-
-  // ── 提交（语音确认 / 文字 / 跳过共用）────────────────────────
   const submit = async (args: { text: string; skip: boolean; voiceMeta?: { transcript: string; edited: boolean; durationSec: number } }) => {
+    if (voice.kind === 'requesting_permission' || voice.kind === 'transcribing') return
     const answer = args.text.trim()
     if (!args.skip && !answer) {
       setError('请输入回答内容，或选择跳过此题')
       return
     }
     setError(null)
-    setMessages((prev) => [...prev, { role: 'candidate', content: args.skip ? '（跳过了这个问题）' : answer, skipped: args.skip }])
+    setMicError(false)
+    setMessages((prev) => [...prev, { role: 'candidate', content: args.skip ? '跳过了这个问题' : answer, skipped: args.skip }])
     setDraft('')
     setVoice({ kind: 'idle' })
     setPhase('thinking')
@@ -289,7 +338,9 @@ export function InterviewSessionPage() {
   }
 
   const finish = async () => {
+    if (voice.kind === 'requesting_permission' || voice.kind === 'transcribing' || phase === 'finishing') return
     stopPlayback()
+    resetVoiceState()
     setPhase('finishing')
     setError(null)
     try {
@@ -303,118 +354,210 @@ export function InterviewSessionPage() {
 
   const interviewerLabel = INTERVIEWER_LABEL[state.interviewerType] ?? '面试官'
   const statusText =
-    phase === 'thinking' ? '正在分析你的回答…'
+    phase === 'thinking' ? '面试官正在分析你的回答…'
     : phase === 'finishing' ? '正在生成练习报告…'
     : phase === 'done_suggest' ? '本场问题已问完，可以结束并生成报告'
-    : speaking ? '正在提问…'
+    : voice.kind === 'requesting_permission' ? '正在请求麦克风权限…'
     : voice.kind === 'recording' ? '正在听你的回答…'
     : voice.kind === 'transcribing' ? '正在转写你的回答…'
-    : '等待你的回答'
+    : voice.kind === 'review' ? '请确认转写结果'
+    : speaking ? '正在提问…'
+    : '等待你开始回答'
+
   const timeUp = remainingSec === 0
   const busyTurn = phase === 'thinking' || phase === 'finishing'
+  const voiceLocked = voice.kind === 'requesting_permission' || voice.kind === 'transcribing'
+  const ttsLabel = ttsOfficial ? '官方语音播报' : '浏览器语音兜底'
+  const micStatusLabel = micError || !voiceAvailable ? '麦克风不可用' : '语音回答可用'
+  const micStatusTone = micError || !voiceAvailable ? 'red' : 'green'
 
   return (
-    <div className="flex h-full flex-col">
-      {/* 数字人面试官卡 */}
+    <div className="flex h-full min-h-0 flex-col bg-[#f5f7fa]">
       <div className="border-b border-gray-100 bg-white px-6 py-4">
         <div className="flex items-center gap-4">
-          <div className="relative shrink-0">
-            <img
-              src={advisorPortrait}
-              alt="AI 数字人面试官"
-              className={[
-                'h-16 w-16 rounded-2xl object-cover ring-2 transition-shadow',
-                speaking ? 'ring-primary-400 shadow-[0_0_0_4px_rgba(22,119,255,0.15)]' : 'ring-gray-100',
-              ].join(' ')}
-            />
-            {speaking && (
-              <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-primary-600 text-white">
-                <Volume2Icon className="h-3.5 w-3.5" aria-hidden="true" />
-              </span>
-            )}
-            {voice.kind === 'recording' && (
-              <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white motion-safe:animate-pulse">
-                <MicIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              </span>
-            )}
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
+            <BotIcon className="h-6 w-6" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-base font-bold text-gray-900">{interviewerLabel} · 模拟练习</p>
-            <p className="mt-0.5 truncate text-xs text-gray-500">目标岗位：{state.position} · {statusText}</p>
+            <p className="text-xl font-bold text-gray-900">模拟面试</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <span>{interviewerLabel}</span>
+              <span className="text-gray-300">/</span>
+              <span className="max-w-[22rem] truncate">目标岗位：{state.position}</span>
+            </div>
           </div>
-          <div className="shrink-0 text-right">
-            <p className={['font-mono text-xl font-bold tabular-nums', timeUp ? 'text-orange-500' : 'text-gray-900'].join(' ')}>
-              {fmtClock(remainingSec)}
-            </p>
-            <p className="text-xs text-gray-400">第 {questionIndex} / {state.questionTarget} 题</p>
+          <div className="grid grid-cols-2 gap-2 text-right">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-2">
+              <p className={['font-mono text-2xl font-bold tabular-nums', timeUp ? 'text-orange-500' : 'text-gray-900'].join(' ')}>
+                {fmtClock(remainingSec)}
+              </p>
+              <p className="text-xs text-gray-400">剩余时间</p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-2">
+              <p className="text-2xl font-bold text-gray-900">{questionIndex}<span className="text-sm text-gray-400">/{state.questionTarget}</span></p>
+              <p className="text-xs text-gray-400">当前题目</p>
+            </div>
           </div>
         </div>
-        {voiceHint && (
-          <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">{voiceHint}</p>
-        )}
-        {timeUp && phase !== 'finishing' && (
-          <p className="mt-2 rounded-lg bg-orange-50 px-3 py-2 text-xs text-orange-700">
-            练习时长已到，建议回答完当前问题后点击「结束并生成报告」
-          </p>
-        )}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <StatusPill icon={TimerIcon} label={statusText} tone={voice.kind === 'requesting_permission' ? 'blue' : voice.kind === 'recording' ? 'red' : 'gray'} />
+          <StatusPill icon={Volume2Icon} label={ttsLabel} tone={ttsOfficial ? 'green' : 'blue'} />
+          <StatusPill icon={MicIcon} label={micStatusLabel} tone={micStatusTone} />
+        </div>
       </div>
 
-      {/* 对话记录 */}
-      <div ref={listRef} className="flex-1 overflow-y-auto bg-[#f5f7fa] px-5 py-4">
-        <div className="flex flex-col gap-3">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'interviewer' ? 'flex justify-start' : 'flex justify-end'}>
-              <div
-                className={[
-                  'max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
-                  m.role === 'interviewer'
-                    ? 'rounded-tl-sm border border-gray-100 bg-white text-gray-800 shadow-sm'
-                    : m.skipped
-                      ? 'rounded-tr-sm bg-gray-200 text-gray-500'
-                      : 'rounded-tr-sm bg-primary-600 text-white',
-                ].join(' ')}
-              >
-                {m.content}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col gap-4">
+          <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative">
+                <img
+                  src={advisorPortrait}
+                  alt="AI 数字人面试官小青"
+                  className={[
+                    'h-40 w-40 rounded-2xl object-cover ring-4 transition-shadow',
+                    speaking ? 'ring-primary-200 shadow-[0_0_0_8px_rgba(22,119,255,0.10)]' : 'ring-gray-100',
+                  ].join(' ')}
+                />
+                {voice.kind === 'recording' && (
+                  <span className="absolute -bottom-2 -right-2 flex h-11 w-11 items-center justify-center rounded-full bg-red-500 text-white motion-safe:animate-pulse">
+                    <MicIcon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                )}
+                {speaking && (
+                  <span className="absolute -bottom-2 -right-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary-600 text-white">
+                    <Volume2Icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                )}
+              </div>
+              <p className="mt-4 text-lg font-bold text-gray-900">小青 · {interviewerLabel}</p>
+              <p className="mt-1 text-sm text-gray-500">{statusText}</p>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3">
+                <p className="text-xs font-semibold text-primary-700">当前问题</p>
+                <p className="mt-1 line-clamp-4 text-sm leading-relaxed text-gray-800">{lastInterviewerMsg || '等待面试官出题'}</p>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <div className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-600">
+                  <UserRoundIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
+                  训练报告仅给本人查看，可按需打印
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-600">
+                  <ShieldCheckIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
+                  语音仅用于本次转写，不保存原始音频
+                </div>
               </div>
             </div>
-          ))}
-          {(phase === 'thinking' || phase === 'finishing') && (
-            <div className="flex justify-start">
-              <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-gray-100 bg-white px-4 py-3 text-sm text-gray-400 shadow-sm">
-                <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
-                {phase === 'finishing' ? '正在生成练习报告…' : '面试官正在思考…'}
-              </div>
-            </div>
+          </section>
+
+          {(voiceHint || timeUp) && (
+            <section className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+              {voiceHint && <p>{voiceHint}</p>}
+              {timeUp && phase !== 'finishing' && (
+                <p className={voiceHint ? 'mt-2' : ''}>练习时长已到，建议回答完当前问题后点击「结束面试」。</p>
+              )}
+            </section>
           )}
-        </div>
+        </aside>
+
+        <section className="flex min-h-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <MessageSquareTextIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-gray-900">对话记录</h2>
+            </div>
+            <p className="text-xs text-gray-400">自动滚动到底部</p>
+          </div>
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f8fafc] px-5 py-4">
+            <div className="flex flex-col gap-4">
+              {messages.map((m, i) => {
+                const isInterviewer = m.role === 'interviewer'
+                const isCurrent = i === lastInterviewerMessageIndex && isInterviewer && phase === 'answering'
+                return (
+                  <div key={`${m.role}-${i}`} className={isInterviewer ? 'flex justify-start' : 'flex justify-end'}>
+                    <div className={['max-w-[78%]', isInterviewer ? 'text-left' : 'text-right'].join(' ')}>
+                      <p className="mb-1 px-1 text-xs text-gray-400">{isInterviewer ? interviewerLabel : m.skipped ? '跳过记录' : '你的回答'}</p>
+                      <div
+                        className={[
+                          'rounded-2xl px-4 py-3 text-base leading-relaxed shadow-sm',
+                          isInterviewer
+                            ? isCurrent
+                              ? 'rounded-tl-sm border-2 border-primary-200 bg-white text-gray-900'
+                              : 'rounded-tl-sm border border-gray-100 bg-white text-gray-800'
+                            : m.skipped
+                              ? 'rounded-tr-sm border border-gray-200 bg-gray-100 text-gray-500'
+                              : 'rounded-tr-sm bg-primary-600 text-white',
+                        ].join(' ')}
+                      >
+                        {m.content}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {(phase === 'thinking' || phase === 'finishing') && (
+                <div className="flex justify-start">
+                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-gray-100 bg-white px-4 py-3 text-sm text-gray-500 shadow-sm">
+                    <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    {phase === 'finishing' ? '正在生成练习报告…' : '面试官正在分析你的回答…'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
 
-      {/* 输入与操作 */}
-      <div className="border-t border-gray-100 bg-white px-5 py-4">
-        {error && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+      <div className="border-t border-gray-100 bg-white px-5 py-4 shadow-[0_-4px_16px_rgba(15,23,42,0.04)]">
+        {micError && (
+          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden="true" />
+              <div>
+                <p className="font-semibold text-red-700">无法访问麦克风，请检查浏览器权限或改用文字输入</p>
+                <p className="mt-0.5 text-sm text-red-600">确认浏览器已允许麦克风，并检查设备是否被其他程序占用。</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button size="lg" className="h-14 px-5 text-base" disabled={voiceLocked || busyTurn} onClick={() => void startRecording()}>
+                <RotateCcwIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                重新尝试语音
+              </Button>
+              <Button size="lg" variant="secondary" className="h-14 px-5 text-base" disabled={voiceLocked || busyTurn} onClick={() => { setMode('text'); setMicError(false) }}>
+                <KeyboardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                改用文字输入
+              </Button>
+            </div>
+          </div>
+        )}
+        {error && !micError && <p className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>}
 
         {phase === 'done_suggest' ? (
-          <Button size="lg" className="h-14 w-full text-base" onClick={() => void finish()}>
+          <Button size="lg" className="h-14 w-full text-base" disabled={voiceLocked} onClick={() => void finish()}>
+            <FileTextIcon className="mr-2 h-5 w-5" aria-hidden="true" />
             结束并生成练习报告
           </Button>
         ) : mode === 'voice' && voice.kind === 'review' ? (
-          /* 转写确认/编辑 */
-          <>
-            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500">
-              <PencilLineIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              转写结果（可直接修改，确认后提交）
-            </p>
-            <textarea
-              value={voice.edited}
-              onChange={(e) => setVoice({ ...voice, edited: e.target.value })}
-              rows={4}
-              maxLength={2000}
-              className="w-full resize-none rounded-xl border border-primary-200 bg-primary-50/40 px-4 py-3 text-base leading-relaxed focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-            />
-            <div className="mt-2 flex gap-2">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-600">
+                <PencilLineIcon className="h-4 w-4" aria-hidden="true" />
+                转写结果（可编辑，确认后提交）
+              </span>
+              <textarea
+                value={voice.edited}
+                onChange={(e) => setVoice({ ...voice, edited: e.target.value })}
+                rows={3}
+                maxLength={2000}
+                className="w-full resize-none rounded-xl border border-primary-200 bg-primary-50/40 px-4 py-3 text-base leading-relaxed focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="lg"
-                className="h-14 flex-1 text-base"
+                className="h-14 min-w-[150px] text-base"
                 disabled={busyTurn}
                 onClick={() => void submit({
                   text: voice.edited,
@@ -422,22 +565,30 @@ export function InterviewSessionPage() {
                   voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec },
                 })}
               >
-                <SendIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                <CheckCircle2Icon className="mr-1.5 h-5 w-5" aria-hidden="true" />
                 确认提交
               </Button>
-              <Button size="lg" variant="secondary" className="h-14 min-w-[130px]" disabled={busyTurn} onClick={() => void startRecording()}>
+              <Button size="lg" variant="secondary" className="h-14 min-w-[132px]" disabled={busyTurn} onClick={() => void startRecording()}>
                 <MicIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 重新录音
               </Button>
+              <Button size="lg" variant="secondary" className="h-14 min-w-[150px]" disabled={busyTurn} onClick={() => { setMode('text'); setVoice({ kind: 'idle' }) }}>
+                <KeyboardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                改用文字输入
+              </Button>
             </div>
-          </>
+          </div>
         ) : mode === 'voice' ? (
-          /* 语音回合主操作 */
           <>
-            {voice.kind === 'recording' ? (
+            {voice.kind === 'requesting_permission' ? (
+              <Button size="lg" className="h-16 w-full text-base" disabled>
+                <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
+                正在请求麦克风权限…
+              </Button>
+            ) : voice.kind === 'recording' ? (
               <Button size="lg" className="h-16 w-full bg-red-500 text-base hover:bg-red-600" onClick={() => void stopRecording()}>
                 <SquareIcon className="mr-2 h-5 w-5" aria-hidden="true" />
-                结束回答（{fmtClock(MAX_RECORD_SEC - recordSec)} 后自动结束）
+                结束回答（已录 {fmtClock(recordSec)}，{fmtClock(MAX_RECORD_SEC - recordSec)} 后自动结束）
               </Button>
             ) : voice.kind === 'transcribing' ? (
               <Button size="lg" className="h-16 w-full text-base" disabled>
@@ -450,13 +601,13 @@ export function InterviewSessionPage() {
                 开始回答（语音）
               </Button>
             )}
-            <div className="mt-2 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 size="lg"
                 variant="secondary"
-                className="h-12 flex-1"
-                disabled={busyTurn || voice.kind === 'recording' || voice.kind === 'transcribing'}
-                onClick={() => { cancelRecording(); setMode('text') }}
+                className="h-14 flex-1 text-base"
+                disabled={busyTurn || voice.kind === 'recording' || voiceLocked}
+                onClick={() => { resetVoiceState(); setMode('text'); setMicError(false) }}
               >
                 <KeyboardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 改用文字输入
@@ -464,7 +615,7 @@ export function InterviewSessionPage() {
               <Button
                 size="lg"
                 variant="secondary"
-                className="h-12 min-w-[110px]"
+                className="h-14 min-w-[120px] text-base"
                 disabled={busyTurn || voice.kind !== 'idle'}
                 onClick={() => void submit({ text: '', skip: true })}
               >
@@ -474,9 +625,9 @@ export function InterviewSessionPage() {
               <Button
                 size="lg"
                 variant="secondary"
-                className="h-12 min-w-[110px] text-red-600"
-                disabled={busyTurn}
-                onClick={() => { cancelRecording(); void finish() }}
+                className="h-14 min-w-[132px] text-base text-red-600"
+                disabled={busyTurn || voiceLocked}
+                onClick={() => void finish()}
               >
                 <SquareIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 结束面试
@@ -484,8 +635,7 @@ export function InterviewSessionPage() {
             </div>
           </>
         ) : (
-          /* 文字兜底 */
-          <>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -495,13 +645,13 @@ export function InterviewSessionPage() {
               placeholder="在这里输入你的回答…"
               className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-base leading-relaxed focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 disabled:bg-gray-50"
             />
-            <div className="mt-2 flex gap-2">
-              <Button size="lg" className="h-14 flex-1 text-base" disabled={busyTurn} onClick={() => void submit({ text: draft, skip: false })}>
+            <div className="flex flex-wrap gap-2">
+              <Button size="lg" className="h-14 min-w-[150px] text-base" disabled={busyTurn} onClick={() => void submit({ text: draft, skip: false })}>
                 <SendIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 提交回答
               </Button>
               {voiceAvailable && (
-                <Button size="lg" variant="secondary" className="h-14 min-w-[130px]" disabled={busyTurn} onClick={() => setMode('voice')}>
+                <Button size="lg" variant="secondary" className="h-14 min-w-[150px]" disabled={busyTurn} onClick={() => { setMode('voice'); setMicError(false); setError(null) }}>
                   <MicIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                   改用语音回答
                 </Button>
@@ -510,16 +660,17 @@ export function InterviewSessionPage() {
                 <SkipForwardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 跳过
               </Button>
-              <Button size="lg" variant="secondary" className="h-14 min-w-[110px] text-red-600" disabled={busyTurn} onClick={() => void finish()}>
+              <Button size="lg" variant="secondary" className="h-14 min-w-[120px] text-red-600" disabled={busyTurn} onClick={() => void finish()}>
                 <SquareIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 结束面试
               </Button>
             </div>
-          </>
+          </div>
         )}
-        <p className="mt-2 text-center text-[11px] text-gray-400">
-          模拟练习仅供本人参考，对话内容不会发送给任何企业；语音仅用于本次转写，不保存原始音频
-        </p>
+        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-400">
+          <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          模拟练习仅供本人参考，对话内容不会发送给任何企业
+        </div>
       </div>
     </div>
   )
