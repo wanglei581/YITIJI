@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
+import { createHash, createHmac } from 'crypto'
 
 // ============================================================
 // 2C+ 语音转写（ASR）服务：provider 架构（对齐 OCR 范式）。
@@ -173,7 +174,6 @@ export class AsrService {
 
   /** TC3-HMAC-SHA256 签名（仅服务端；密钥绝不进前端/日志）。 */
   private tc3Sign(args: { host: string; service: string; payload: string; ts: number; secretId: string; secretKey: string }): string {
-    const { createHash, createHmac } = require('crypto') as typeof import('crypto')
     const hashHex = (d: string) => createHash('sha256').update(d).digest('hex')
     const hmac = (k: Buffer | string, d: string) => createHmac('sha256', k).update(d).digest()
     const date = new Date(args.ts * 1000).toISOString().slice(0, 10)
