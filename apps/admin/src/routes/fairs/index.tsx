@@ -13,6 +13,7 @@ import {
   UploadIcon,
 } from 'lucide-react'
 import { Page } from '../Page'
+import { VenueGuideTab } from './VenueGuideTab'
 import { API_BASE_URL } from '../../services/api/client'
 import {
   fairsAdminService,
@@ -965,11 +966,12 @@ function StatsTab({ stats }: { stats: AdminFairStats | null }) {
 
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
 
-type TabKey = 'companies' | 'zones' | 'materials' | 'stats'
+type TabKey = 'companies' | 'zones' | 'venue' | 'materials' | 'stats'
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'companies', label: '参展企业', icon: BuildingIcon },
   { key: 'zones',     label: '展区管理', icon: LayoutGridIcon },
+  { key: 'venue',     label: '场馆导览', icon: MapPinIcon },
   { key: 'materials', label: '活动资料', icon: FileTextIcon },
   { key: 'stats',     label: '数据统计', icon: ActivityIcon },
 ]
@@ -1122,6 +1124,7 @@ export default function FairsPage() {
 
               {activeTab === 'companies' && <CompaniesTab fairId={selectedFair.id} companies={detail?.companies ?? []} onChanged={refresh} />}
               {activeTab === 'zones'     && <ZonesTab fairId={selectedFair.id} zones={detail?.zones ?? []} onChanged={refresh} />}
+              {activeTab === 'venue'     && <VenueGuideTab fairId={selectedFair.id} venueDefault={selectedFair.venue} companies={detail?.companies ?? []} />}
               {activeTab === 'materials' && <MaterialsTab fairId={selectedFair.id} materials={detail?.materials ?? []} onChanged={refresh} />}
               {activeTab === 'stats'     && <StatsTab stats={stats} />}
 

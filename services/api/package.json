@@ -39,7 +39,9 @@
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
-    "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts"
+    "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts",
+    "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",
+    "db:seed:venue-guide": "node -r @swc-node/register prisma/seed-venue-guide.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

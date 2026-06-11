@@ -18,6 +18,7 @@ import type {
   FairBoothDTO,
   FairMaterialDTO,
   FairLiveStatsDTO,
+  FairVenueGuideDTO,
   FairZoneBreakdown,
   FairIndustrySlice,
 } from '@ai-job-print/shared'
@@ -243,6 +244,12 @@ export const mockJobFairAdapter = {
       .filter((m) => m.publishStatus === 'published')
       .map(toMaterialDTO)
     return makePaginated(materials)
+  },
+
+  // 场馆导览:导览数据由 Admin 配置/后端 seed 提供,mock 模式诚实返回空态,不前端硬编码
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async getFairVenueGuide(_fairId: string): Promise<ApiResponse<FairVenueGuideDTO | null>> {
+    return ok(null)
   },
 
   async getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>> {

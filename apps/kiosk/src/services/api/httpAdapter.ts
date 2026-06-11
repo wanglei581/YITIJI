@@ -22,6 +22,7 @@ import type {
   FairBoothDTO,
   FairMaterialDTO,
   FairLiveStatsDTO,
+  FairVenueGuideDTO,
 } from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
 
@@ -273,5 +274,9 @@ export const httpJobFairAdapter = {
 
   async getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>> {
     return get<ApiResponse<FairLiveStatsDTO | null>>(`/job-fairs/${fairId}/stats`)
+  },
+
+  async getFairVenueGuide(fairId: string): Promise<ApiResponse<FairVenueGuideDTO | null>> {
+    return get<ApiResponse<FairVenueGuideDTO | null>>(`/job-fairs/${fairId}/venue-guide`)
   },
 }

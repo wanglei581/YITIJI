@@ -10,6 +10,7 @@
 // 合规:只管理展示信息与现场服务资料,不含候选人 / 简历 / 报名任何字段。
 // ============================================================
 
+import type { FairVenueGuideDTO, SaveFairVenueGuideInput } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import type { ReviewStatus, PublishStatus } from './types'
@@ -142,6 +143,8 @@ export interface SaveFairZoneInput {
   sortOrder?: number
 }
 
+export type { FairVenueGuideDTO, SaveFairVenueGuideInput }
+
 export interface UpdateFairMaterialInput {
   name?: string
   type?: string
@@ -163,6 +166,11 @@ export interface FairsAdminServiceInterface {
   createZone(fairId: string, input: SaveFairZoneInput): Promise<FairZoneView>
   updateZone(fairId: string, zoneId: string, input: SaveFairZoneInput): Promise<FairZoneView>
   deleteZone(fairId: string, zoneId: string): Promise<void>
+
+  // ── 场馆导览(Admin 配置;Kiosk 只读走公开端点) ──
+  getVenueGuide(fairId: string): Promise<{ data: FairVenueGuideDTO | null }>
+  saveVenueGuide(fairId: string, input: SaveFairVenueGuideInput): Promise<FairVenueGuideDTO>
+  deleteVenueGuide(fairId: string): Promise<void>
 
   uploadMaterial(fairId: string, file: File, meta: { name: string; type?: string; description?: string; pageCount?: number }): Promise<FairMaterialView>
   updateMaterial(fairId: string, materialId: string, input: UpdateFairMaterialInput): Promise<FairMaterialView>
@@ -222,6 +230,12 @@ const httpAdapter: FairsAdminServiceInterface = {
   updateZone: (fairId, zoneId, input) => req<FairZoneView>('PATCH', `/admin/fairs/${fairId}/zones/${zoneId}`, input),
   deleteZone: async (fairId, zoneId) => {
     await req<{ success: boolean }>('DELETE', `/admin/fairs/${fairId}/zones/${zoneId}`)
+  },
+
+  getVenueGuide: (fairId) => req<{ data: FairVenueGuideDTO | null }>('GET', `/admin/fairs/${fairId}/venue-guide`),
+  saveVenueGuide: (fairId, input) => req<FairVenueGuideDTO>('PUT', `/admin/fairs/${fairId}/venue-guide`, input),
+  deleteVenueGuide: async (fairId) => {
+    await req<{ success: boolean }>('DELETE', `/admin/fairs/${fairId}/venue-guide`)
   },
 
   async uploadMaterial(fairId, file, meta) {
@@ -316,6 +330,8 @@ const mockZones: FairZoneView[] = [
     city: '青岛', description: '演示数据', coverImageUrl: null, sortOrder: 0, createdAt: now(), updatedAt: now(),
   },
 ]
+
+const mockVenueGuides = new Map<string, FairVenueGuideDTO>()
 
 const mockMaterials: FairMaterialView[] = [
   {
@@ -425,6 +441,42 @@ const mockAdapter: FairsAdminServiceInterface = {
   async deleteZone(fairId, zoneId) {
     const idx = mockZones.findIndex((z) => z.id === zoneId && z.jobFairId === fairId)
     if (idx >= 0) mockZones.splice(idx, 1)
+  },
+
+  async getVenueGuide(fairId) {
+    return { data: mockVenueGuides.get(fairId) ?? null }
+  },
+  async saveVenueGuide(fairId, input) {
+    const dto: FairVenueGuideDTO = {
+      fairId,
+      venueName: input.venueName,
+      halls: input.halls.map((h, i) => ({
+        hallId: `vh-mock-${i}`,
+        hallCode: h.hallCode.toUpperCase(),
+        hallName: h.hallName,
+        industryCategory: h.industryCategory,
+        description: h.description,
+        boothRange: h.boothRange,
+        companyCount: h.companies.length,
+        companies: h.companies.map((c) => {
+          const found = mockCompanies.find((mc) => mc.id === c.fairCompanyId)
+          return {
+            companyId: c.fairCompanyId,
+            companyName: found?.name ?? '演示企业',
+            boothNo: c.boothNo,
+            industry: found?.industry ?? undefined,
+            jobCount: found?.jobsCount ?? 0,
+            jobTitles: [],
+          }
+        }),
+      })),
+      facilities: input.facilities.map((f, i) => ({ id: `vf-mock-${i}`, type: f.type, name: f.name, locationLabel: f.locationLabel, relatedHallCode: f.relatedHallCode })),
+    }
+    mockVenueGuides.set(fairId, dto)
+    return dto
+  },
+  async deleteVenueGuide(fairId) {
+    mockVenueGuides.delete(fairId)
   },
 
   async uploadMaterial(fairId, file, meta) {

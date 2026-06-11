@@ -5,6 +5,34 @@
 
 ---
 
+## 招聘会场馆导览图（库表 → API → Admin 配置 → Kiosk 轻3D 展示,全链路真数据）（2026-06-11，Claude，`feature/jobfair-venue-guide`）
+
+**目标：** 帮助首次到场用户了解会场布局:A/B/C 展厅行业分布、企业展位、入口/服务台/打印点/咨询区设施点位。**可用功能而非 UI demo**:数据由 Admin 配置/seed 落库,Kiosk 经真实 API 读取,运行时零前端硬编码。
+
+**数据模型（additive 迁移 `20260611150000_add_fair_venue_guide`,db execute 先例）：**
+- `FairVenueGuide`(jobFairId 唯一,级联删) / `FairVenueHall`(hallCode 厅内唯一) / `FairVenueHallCompany`(**关联既有 FairCompany,不复制企业信息**) / `FairVenueFacility`(type: entrance/serviceDesk/printPoint/consulting)。
+
+**API（[admin-fairs.service](../../services/api/src/jobs/admin-fairs.service.ts) + [venue-guide.dto](../../services/api/src/jobs/dto/venue-guide.dto.ts)）：**
+- Kiosk 公开:`GET /job-fairs/:id/venue-guide`(仅 approved+published;未配置 → data null 空态;DTO 不含内部审计字段;企业岗位摘要 jobCount/jobTitles 为 FairCompanyPosition **真实统计**)。
+- Admin(`JwtAuthGuard + @Roles('admin')`):`GET/PUT/DELETE /admin/fairs/:id/venue-guide`;PUT 整体保存(事务性替换),**绑定企业必须属于本招聘会**(COMPANY_NOT_IN_FAIR)、展厅编码去重(HALL_CODE_DUPLICATE,大小写归一);save/delete 落 AuditLog。
+- 类型 SSOT:[shared/fairDto.ts](../../packages/shared/src/types/fairDto.ts)(FairVenueGuideDTO/SaveFairVenueGuideInput),api 侧 CJS 本地副本。
+
+**Admin 配置端（[VenueGuideTab](../../apps/admin/src/routes/fairs/VenueGuideTab.tsx),挂在招聘会管理第 3 个 Tab）：**
+- 空态+开始配置;布局预览(彩色厅块+企业数+设施 chip);场馆名称;展厅卡片列表(编码/名称/行业/展位范围/说明,两步确认删除);展厅编辑抽屉内**从本招聘会参展企业下拉绑定** + 逐企业展位号;设施点位行编辑(类型/名称/位置/关联厅);整体保存/删除配置;保存成功提示「一体机刷新后即可看到」。
+
+**Kiosk 展示端（[JobFairDetailPage](../../apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx) 新增第 3 个 Tab「场馆导览」,轻3D 不引入真 3D）：**
+- CSS perspective+rotateX 轻 3D 厅块(选中抬升高亮+白圈,展位范围角标,触控友好 128px 宽);设施点位图标 chip;选中厅详情:行业/说明/展位范围/企业列表(展位号徽章+岗位数+岗位摘要 chips)+「在参展企业与岗位中查看」切 Tab;loading/error/empty(「暂未配置场馆导览」)全态。
+- 服务层:`getFairVenueGuide` facade+http 适配器;**mock 适配器诚实返回空态**(导览数据只来自后端)。
+
+**Seed：** `pnpm db:seed:venue-guide`([seed-venue-guide.ts](../../services/api/prisma/seed-venue-guide.ts),幂等)给校园双选会按行业分 A(7 家)/B(1 家)/C 厅 + 4 设施。
+
+**验证（全绿）：** `verify:jobfair-venue-guide` **13 PASS / ALL PASS**(保存/Kiosk 读取含真实岗位摘要/不存在 404/未配置空态/未发布不泄露/跨会企业拒绝/编码重复拒绝/整体替换/删除级联/DTO 无内部字段/admin 守卫声明/审计);api/kiosk/admin/shared typecheck+lint+build 全绿;`verify:jobfair-ui` 13 PASS(C1 断言升级为 4 Tab 含场馆导览,防回退)。
+**浏览器端到端：** Admin 选中招聘会 → 场馆导览 Tab(seed 配置完整呈现) → 修改场馆名保存 → 后端确认落库 → Kiosk 刷新详情页场馆导览显示新名;空态(未配置招聘会)Admin/Kiosk 双端正确;切换 A/B 厅详情联动;页面 0 违规词。
+
+**合规：** 仅会场位置导览与展区/企业/岗位信息查看;页脚声明「投递请前往来源平台办理」;底部仍为「扫码预约/打印资料」合规按钮。**后续：** Partner 端配置入口(本轮明确不做);展厅平面图图片上传(当前为结构化轻 3D 块)。
+
+---
+
 ## 真实模型联调 + 2B 安全收口补丁（2026-06-11，Claude，`feature/2b-security-hardening`）
 
 **真实模型联调（AI_PROVIDER=llm + DeepSeek + COS,全部通过）：**

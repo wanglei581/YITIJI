@@ -557,9 +557,10 @@ model JobFair {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companies FairCompany[]
-  zones     FairZone[]
-  materials FairMaterial[]
+  companies  FairCompany[]
+  zones      FairZone[]
+  materials  FairMaterial[]
+  venueGuide FairVenueGuide?
 
   @@unique([sourceOrgId, externalId])
   @@index([sourceOrgId])
@@ -601,6 +602,7 @@ model FairCompany {
   jobsCount   Int      @default(0)
 
   positions   FairCompanyPosition[]
+  venueHallBindings FairVenueHallCompany[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -695,6 +697,86 @@ model FairMaterial {
   @@index([jobFairId])
   @@index([publishStatus])
   @@index([deletedAt])
+}
+
+// ── FairVenueGuide ───────────────────────────────────────────────────────────
+// 招聘会场馆导览(本轮新增):帮助现场用户了解会场布局 —— 展厅(A/B/C 厅)行业分布、
+// 企业展位、入口/服务台/打印点/咨询区等设施点位。
+//
+// 分工:Admin 配置(本期) → Kiosk 只读展示;Partner 配置后续扩展。
+// 合规:只做会场位置导览与信息查看,不形成任何投递/收简历闭环。
+// 企业绑定经 FairVenueHallCompany 关联既有 FairCompany,不复制企业信息。
+// facility type: 'entrance' | 'serviceDesk' | 'printPoint' | 'consulting'
+
+model FairVenueGuide {
+  id        String  @id @default(cuid())
+  jobFairId String  @unique
+  jobFair   JobFair @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  venueName String
+
+  halls      FairVenueHall[]
+  facilities FairVenueFacility[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FairVenueHall {
+  id      String         @id @default(cuid())
+  guideId String
+  guide   FairVenueGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  hallCode         String // 'A' / 'B' / 'C'
+  hallName         String // 'A 厅'
+  industryCategory String?
+  description      String?
+  boothRange       String? // 'A01-A30'
+  sortOrder        Int     @default(0)
+
+  companies FairVenueHallCompany[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guideId, hallCode])
+  @@index([guideId])
+}
+
+model FairVenueHallCompany {
+  id     String        @id @default(cuid())
+  hallId String
+  hall   FairVenueHall @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  fairCompanyId String
+  fairCompany   FairCompany @relation(fields: [fairCompanyId], references: [id], onDelete: Cascade)
+
+  boothNo   String?
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hallId, fairCompanyId])
+  @@index([hallId])
+  @@index([fairCompanyId])
+}
+
+model FairVenueFacility {
+  id      String         @id @default(cuid())
+  guideId String
+  guide   FairVenueGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  type            String // 'entrance' | 'serviceDesk' | 'printPoint' | 'consulting'
+  name            String
+  locationLabel   String?
+  relatedHallCode String?
+  sortOrder       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([guideId])
 }
 
 // ── SyncLog ───────────────────────────────────────────────────────────────────

@@ -214,3 +214,83 @@ export interface FairLiveStatsDTO {
   /** Phase 7 API 上线前为 true，前端据此展示 mock 数据提示 */
   isMockData: boolean
 }
+
+// ──────────────────────────────────────────────────────────────
+// 场馆导览(Venue Guide)
+// ──────────────────────────────────────────────────────────────
+//
+// 帮助现场用户了解会场布局:展厅(A/B/C 厅)行业分布、企业展位、设施点位。
+// Admin 配置 → API 持久化 → Kiosk 只读展示。
+// 合规:只做位置导览与信息查看,不形成投递/收简历闭环。
+
+export type FairVenueFacilityType = 'entrance' | 'serviceDesk' | 'printPoint' | 'consulting'
+
+export interface FairVenueHallCompanyDTO {
+  companyId: string
+  companyName: string
+  boothNo?: string
+  industry?: string
+  /** 该企业已录入的岗位数(来自 FairCompanyPosition 真实统计) */
+  jobCount: number
+  /** 岗位摘要(最多 3 条标题) */
+  jobTitles: string[]
+}
+
+export interface FairVenueHallDTO {
+  hallId: string
+  hallCode: string
+  hallName: string
+  industryCategory?: string
+  description?: string
+  boothRange?: string
+  companyCount: number
+  companies: FairVenueHallCompanyDTO[]
+}
+
+export interface FairVenueFacilityDTO {
+  id: string
+  type: FairVenueFacilityType
+  name: string
+  locationLabel?: string
+  relatedHallCode?: string
+}
+
+export interface FairVenueGuideDTO {
+  fairId: string
+  venueName: string
+  halls: FairVenueHallDTO[]
+  facilities: FairVenueFacilityDTO[]
+}
+
+// ── Admin 保存输入(整体 PUT,服务端事务性替换) ────────────────────────────
+
+export interface SaveVenueHallCompanyInput {
+  /** 必须属于当前招聘会的 FairCompany.id(服务端校验) */
+  fairCompanyId: string
+  boothNo?: string
+  sortOrder?: number
+}
+
+export interface SaveVenueHallInput {
+  hallCode: string
+  hallName: string
+  industryCategory?: string
+  description?: string
+  boothRange?: string
+  sortOrder?: number
+  companies: SaveVenueHallCompanyInput[]
+}
+
+export interface SaveVenueFacilityInput {
+  type: FairVenueFacilityType
+  name: string
+  locationLabel?: string
+  relatedHallCode?: string
+  sortOrder?: number
+}
+
+export interface SaveFairVenueGuideInput {
+  venueName: string
+  halls: SaveVenueHallInput[]
+  facilities: SaveVenueFacilityInput[]
+}

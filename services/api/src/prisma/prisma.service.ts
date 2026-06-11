@@ -119,6 +119,24 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.fairMaterial
   }
 
+  // ── 招聘会场馆导览 ─────────────────────────────────────────────────────────
+
+  get fairVenueGuide() {
+    return this.client.fairVenueGuide
+  }
+
+  get fairVenueHall() {
+    return this.client.fairVenueHall
+  }
+
+  get fairVenueHallCompany() {
+    return this.client.fairVenueHallCompany
+  }
+
+  get fairVenueFacility() {
+    return this.client.fairVenueFacility
+  }
+
   // ── 阶段1D 政策服务 ────────────────────────────────────────────────────────
 
   get policyPost() {

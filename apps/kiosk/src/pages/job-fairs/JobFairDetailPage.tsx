@@ -6,10 +6,13 @@ import type {
   FairCompanyDTO,
   FairZoneDTO,
   FairLiveStatsDTO,
+  FairVenueGuideDTO,
+  FairVenueHallDTO,
 } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
   BuildingIcon,
+  DoorOpenIcon,
   CalendarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -19,6 +22,7 @@ import {
   InfoIcon,
   MapIcon,
   MapPinIcon,
+  MessageCircleQuestionIcon,
   MonitorIcon,
   NavigationIcon,
   PrinterIcon,
@@ -28,7 +32,7 @@ import {
   UsersIcon,
   XIcon,
 } from 'lucide-react'
-import { getFairCompanies, getFairStats, getFairZones, getJobFairById } from '../../services/api'
+import { getFairCompanies, getFairStats, getFairVenueGuide, getFairZones, getJobFairById } from '../../services/api'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { FairDataScreen } from './components/FairDataScreen'
@@ -70,7 +74,7 @@ function categoryOf(title: string) {
   return '职能类'
 }
 
-const TABS = ['详情与特色', '参展企业与岗位', '数据大屏'] as const
+const TABS = ['详情与特色', '参展企业与岗位', '场馆导览', '数据大屏'] as const
 type TabKey = (typeof TABS)[number]
 
 function pad(n: number) {
@@ -283,6 +287,9 @@ export function JobFairDetailPage() {
         )}
         {tab === '参展企业与岗位' && (
           <CompaniesTab fairId={fair.id} companies={companies} />
+        )}
+        {tab === '场馆导览' && (
+          <VenueGuideTab fairId={fair.id} onGoCompanies={() => setTab('参展企业与岗位')} />
         )}
         {tab === '数据大屏' && (
           stats ? <FairDataScreen stats={stats} /> : (
@@ -624,6 +631,190 @@ function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCo
           ))}
         </div>
       </Card>
+    </div>
+  )
+}
+
+// ─── Tab③ 场馆导览(轻 3D;数据来自后端 Admin 配置,绝非前端硬编码)─────────────────
+//
+// 合规:只做会场位置导览与展区/企业/岗位信息查看;投递、预约一律前往来源平台办理。
+
+const HALL_BLOCK_COLORS = [
+  'from-blue-500 to-blue-600',
+  'from-violet-500 to-violet-600',
+  'from-emerald-500 to-emerald-600',
+  'from-orange-400 to-orange-500',
+  'from-cyan-500 to-cyan-600',
+  'from-rose-500 to-rose-600',
+]
+
+const FACILITY_META: Record<string, { label: string; icon: typeof InfoIcon }> = {
+  entrance: { label: '入口', icon: DoorOpenIcon },
+  serviceDesk: { label: '服务台', icon: InfoIcon },
+  printPoint: { label: '打印服务点', icon: PrinterIcon },
+  consulting: { label: '咨询区', icon: MessageCircleQuestionIcon },
+}
+
+function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoCompanies: () => void }) {
+  const [guide, setGuide] = useState<FairVenueGuideDTO | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [activeHallId, setActiveHallId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getFairVenueGuide(fairId)
+      .then((res) => {
+        if (cancelled) return
+        setGuide(res.data)
+        setActiveHallId(res.data?.halls[0]?.hallId ?? null)
+      })
+      .catch(() => { if (!cancelled) setError(true) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [fairId])
+
+  if (loading) return <LoadingState className="py-16" />
+  if (error) {
+    return <ErrorState message="场馆导览加载失败,请稍后重试" className="py-16" />
+  }
+  if (!guide || guide.halls.length === 0) {
+    return (
+      <EmptyState
+        icon={NavigationIcon}
+        title="暂未配置场馆导览"
+        description="主办方尚未提供会场布局信息,可在「参展企业与岗位」查看企业列表"
+        className="py-12"
+      />
+    )
+  }
+
+  const activeHall: FairVenueHallDTO | null = guide.halls.find((h) => h.hallId === activeHallId) ?? guide.halls[0]
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* 场馆名 + 轻 3D 展厅块 */}
+      <Card className="overflow-hidden p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <NavigationIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
+          <p className="text-sm font-semibold text-gray-800">{guide.venueName} · 会场布局</p>
+          <p className="ml-auto text-xs text-gray-400">点击展厅查看详情</p>
+        </div>
+        {/* 轻 3D:perspective + rotateX,选中展厅抬升高亮 */}
+        <div className="flex flex-wrap justify-center gap-5 py-3" style={{ perspective: '700px' }}>
+          {guide.halls.map((h, i) => {
+            const active = h.hallId === activeHall?.hallId
+            return (
+              <button
+                key={h.hallId}
+                onClick={() => setActiveHallId(h.hallId)}
+                className="group text-center"
+                style={{ transformStyle: 'preserve-3d' }}
+              >
+                <div
+                  className={[
+                    'relative mx-auto flex h-24 w-32 flex-col items-center justify-center rounded-2xl bg-gradient-to-br text-white transition-all duration-200',
+                    HALL_BLOCK_COLORS[i % HALL_BLOCK_COLORS.length],
+                    active
+                      ? 'shadow-[0_18px_28px_rgba(15,23,42,0.28)] ring-4 ring-white'
+                      : 'opacity-85 shadow-[0_10px_18px_rgba(15,23,42,0.18)]',
+                  ].join(' ')}
+                  style={{ transform: `rotateX(14deg) ${active ? 'translateY(-8px) scale(1.06)' : ''}` }}
+                >
+                  <p className="text-3xl font-extrabold leading-none">{h.hallCode}</p>
+                  <p className="mt-1 text-xs font-medium opacity-90">{h.companyCount} 家企业</p>
+                  {h.boothRange && (
+                    <span className="absolute -bottom-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-gray-600 shadow-sm">
+                      {h.boothRange}
+                    </span>
+                  )}
+                </div>
+                <p className={`mt-3 text-sm font-semibold ${active ? 'text-primary-700' : 'text-gray-700'}`}>{h.hallName}</p>
+                <p className="max-w-32 truncate text-xs text-gray-400">{h.industryCategory ?? ''}</p>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* 设施点位 */}
+        {guide.facilities.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+            {guide.facilities.map((f) => {
+              const meta = FACILITY_META[f.type] ?? FACILITY_META.serviceDesk
+              const Icon = meta.icon
+              return (
+                <span key={f.id} className="flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1.5 text-xs text-gray-600">
+                  <Icon className="h-3.5 w-3.5 text-primary-500" aria-hidden="true" />
+                  <span className="font-medium">{f.name}</span>
+                  {f.locationLabel && <span className="text-gray-400">· {f.locationLabel}</span>}
+                  {f.relatedHallCode && <span className="rounded bg-white px-1 text-[10px] font-semibold text-gray-500">{f.relatedHallCode} 厅</span>}
+                </span>
+              )
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* 选中展厅详情 */}
+      {activeHall && (
+        <Card className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-base font-bold text-gray-900">{activeHall.hallName} · {activeHall.industryCategory ?? '综合展区'}</p>
+              {activeHall.description && <p className="mt-1 text-sm text-gray-500">{activeHall.description}</p>}
+              <p className="mt-1 text-xs text-gray-400">
+                {activeHall.boothRange ? `展位 ${activeHall.boothRange} · ` : ''}共 {activeHall.companyCount} 家企业
+              </p>
+            </div>
+          </div>
+
+          {activeHall.companies.length === 0 ? (
+            <p className="mt-4 rounded-xl bg-gray-50 py-6 text-center text-sm text-gray-400">该展厅暂未录入企业</p>
+          ) : (
+            <div className="mt-4 space-y-2.5">
+              {activeHall.companies.map((c) => (
+                <div key={c.companyId} className="rounded-2xl border border-gray-100 p-3.5">
+                  <div className="flex items-center gap-3">
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-bold text-white ${avatarColor(c.companyName)}`}>
+                      {c.companyName.slice(0, 1)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900">{c.companyName}</p>
+                      <p className="text-xs text-gray-400">
+                        {c.industry ? `${industryLabel(c.industry)} · ` : ''}
+                        {c.jobCount > 0 ? `${c.jobCount} 个岗位` : '岗位待录入'}
+                      </p>
+                    </div>
+                    {c.boothNo && (
+                      <span className="shrink-0 rounded-lg bg-primary-50 px-2.5 py-1 text-sm font-bold text-primary-700">{c.boothNo}</span>
+                    )}
+                  </div>
+                  {c.jobTitles.length > 0 && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-14">
+                      {c.jobTitles.map((t) => (
+                        <span key={t} className="rounded bg-gray-50 px-2 py-0.5 text-xs text-gray-600">{t}</span>
+                      ))}
+                      {c.jobCount > c.jobTitles.length && <span className="text-xs text-gray-400">等 {c.jobCount} 个岗位</span>}
+                      <button
+                        onClick={onGoCompanies}
+                        className="ml-auto flex min-h-[36px] items-center gap-0.5 rounded-lg px-2 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                      >
+                        在参展企业与岗位中查看
+                        <ChevronRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      <p className="text-xs text-gray-400">
+        场馆导览信息由主办方/管理员提供,仅供现场参考;岗位投递请前往来源平台办理。
+      </p>
     </div>
   )
 }

@@ -17,6 +17,7 @@ import type {
   FairBoothDTO,
   FairMaterialDTO,
   FairLiveStatsDTO,
+  FairVenueGuideDTO,
 } from '@ai-job-print/shared'
 import { API_MODE } from './client'
 import { mockJobFairAdapter } from './mockAdapter'
@@ -35,6 +36,8 @@ export interface JobFairServiceInterface {
   getFairMap(fairId: string): Promise<ApiResponse<{ zones: FairZoneDTO[]; booths: FairBoothDTO[] }>>
   getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>>
   getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>>
+  /** 场馆导览(Admin 配置,Kiosk 只读;未配置 → data null) */
+  getFairVenueGuide(fairId: string): Promise<ApiResponse<FairVenueGuideDTO | null>>
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -56,3 +59,4 @@ export const getFairZones       = (fairId: string)                => adapter.get
 export const getFairMap         = (fairId: string)                => adapter.getFairMap(fairId)
 export const getFairMaterials   = (fairId: string)                => adapter.getFairMaterials(fairId)
 export const getFairStats       = (fairId: string)                => adapter.getFairStats(fairId)
+export const getFairVenueGuide  = (fairId: string)                => adapter.getFairVenueGuide(fairId)

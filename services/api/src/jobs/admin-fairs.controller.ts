@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UnauthorizedException,
@@ -30,6 +31,7 @@ import {
   UploadFairMaterialDto,
 } from './dto/admin-fair.dto'
 import { PublishActionDto } from './dto/publish.dto'
+import { SaveVenueGuideDto } from './dto/venue-guide.dto'
 
 // FileInterceptor 硬上限略高于业务上限,让"略微超限"的文件到 service 拿到友好错误。
 const UPLOAD_HARD_LIMIT = FAIR_MATERIAL_MAX_BYTES + 2 * 1024 * 1024
@@ -216,6 +218,32 @@ export class AdminFairsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.fairs.deleteMaterial(id, materialId, user)
+  }
+
+  // ── 场馆导览(Admin 配置)────────────────────────────────────────────────────
+  //   GET    /admin/fairs/:id/venue-guide   读取配置(未配置 → data null)
+  //   PUT    /admin/fairs/:id/venue-guide   整体保存(事务性替换;绑定企业须属于本会)
+  //   DELETE /admin/fairs/:id/venue-guide   删除配置(级联清理 halls/facilities)
+
+  @Get('admin/fairs/:id/venue-guide')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  getVenueGuide(@Param('id') id: string) {
+    return this.fairs.getVenueGuideAdmin(id)
+  }
+
+  @Put('admin/fairs/:id/venue-guide')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  saveVenueGuide(@Param('id') id: string, @Body() dto: SaveVenueGuideDto, @CurrentUser() user: AuthedUser) {
+    return this.fairs.saveVenueGuide(id, dto, user)
+  }
+
+  @Delete('admin/fairs/:id/venue-guide')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  deleteVenueGuide(@Param('id') id: string, @CurrentUser() user: AuthedUser) {
+    return this.fairs.deleteVenueGuide(id, user)
   }
 
   // ── 资料内容(无登录,HMAC 签名)────────────────────────────────────────────

@@ -96,8 +96,8 @@ mustNotContain(
 // ── C. /job-fairs/:id 详情页 ──────────────────────────────────────────────
 mustContain(
   'src/pages/job-fairs/JobFairDetailPage.tsx',
-  ['详情与特色', '参展企业与岗位', '数据大屏', 'FairDataScreen', 'buildNavUrl'],
-  'C1. 详情页保持 3 Tab + 数据大屏 + 场馆导航',
+  ['详情与特色', '参展企业与岗位', '场馆导览', '数据大屏', 'FairDataScreen', 'buildNavUrl', 'getFairVenueGuide'],
+  'C1. 详情页保持 4 Tab(含场馆导览) + 数据大屏 + 场馆导航',
 )
 mustNotContain(
   'src/pages/job-fairs/JobFairDetailPage.tsx',

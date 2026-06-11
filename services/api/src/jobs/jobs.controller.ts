@@ -194,6 +194,16 @@ export class JobsController {
   }
 
   /**
+   * 招聘会场馆导览(本轮新增)。
+   * 只放出 approved+published 招聘会;未配置导览 → data null(前端空态)。
+   * 数据由 Admin 配置落库,绝非前端硬编码。
+   */
+  @Get('job-fairs/:id/venue-guide')
+  getFairVenueGuide(@Param('id') id: string) {
+    return this.adminFairs.getPublishedVenueGuide(id)
+  }
+
+  /**
    * 招聘会数据大屏统计。
    * 合规：返回的规模/分布为「预计/来源数据」(机构录入 + 按已录企业/岗位聚合)，非实时；
    * 系统真实服务数据(浏览量)如实返回，未落库计数器诚实置 0。招聘会未发布 → data:null。
