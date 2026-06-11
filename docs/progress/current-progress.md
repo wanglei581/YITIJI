@@ -5,6 +5,24 @@
 
 ---
 
+## 工程基线修复 + CI（2026-06-11，Claude，`feature/engineering-baseline`）
+
+**基线体检结果：**
+- `pnpm install --frozen-lockfile` 通过(lockfile 与 workspace 一致)。
+- `mammoth`(api) / `pdfkit`(api+terminal-agent) / `china-division`(kiosk regions) 三依赖在各自 workspace `require.resolve` 全部解析正常。
+- 全工作区矩阵 typecheck+build:shared/ui/api/kiosk/admin/partner/terminal-agent **全绿**(shared/ui 本无 build 脚本,源码形态被消费,非故障)。未发现需要 skipLibCheck/伪造声明掩盖的问题。
+
+**新增 CI（[.github/workflows/ci.yml](../../.github/workflows/ci.yml)）：** push(main)+PR 触发,ubuntu + pnpm11 + node22:
+1. `pnpm install --frozen-lockfile`(干净环境安装即真实基线验证)
+2. lint(api/kiosk/admin/partner)
+3. typecheck(shared/api/kiosk/admin/partner/terminal-agent)
+4. build(api/kiosk/admin/partner/terminal-agent)
+5. **全新 SQLite 空库**(`prisma db push`,Prisma v7 无 --skip-generate,已用 --accept-data-loss)上跑 9 套 verify:jobfair-ui / jobfair-venue-guide / admin-fairs / admin-orgs / resume-generate / resume-optimize / real-resume-diagnosis / ai-result-ownership / llm-guard。
+- 安全:CI 无任何真实凭证;FILE_SIGNING_SECRET 为 CI 专用测试值;FILE_STORAGE_DRIVER 强制 local;PDF 验证装 fonts-noto-cjk(ResumePdfService Linux 候选字体)。
+- **本地等价演练已过**:用 `DATABASE_URL=file:./prisma/ci-test.db` 全新库逐套跑 8 个 api verify 全 PASS(证明 verify 不依赖 dev.db 既有数据、自建自清理)。
+
+---
+
 ## 招聘会场馆导览图（库表 → API → Admin 配置 → Kiosk 轻3D 展示,全链路真数据）（2026-06-11，Claude，`feature/jobfair-venue-guide`）
 
 **目标：** 帮助首次到场用户了解会场布局:A/B/C 展厅行业分布、企业展位、入口/服务台/打印点/咨询区设施点位。**可用功能而非 UI demo**:数据由 Admin 配置/seed 落库,Kiosk 经真实 API 读取,运行时零前端硬编码。
