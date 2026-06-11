@@ -22,7 +22,7 @@
 - ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
 
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
-> **2026-06-11 用户确认的执行顺序：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅ 代码/verify/浏览器登录态验收完成) → ⑤ 2C 模拟面试(入口先放 AI简历服务内部,MVP 验收后才点亮首页占位) → 2D/2E。**
+> **2026-06-11 用户确认的执行顺序：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(当前 P0,入口先放 AI简历服务内部,MVP 验收后才点亮首页占位) → 2D/2E → 第四阶段 PostgreSQL。**
 > 场馆导览后续扩展(择期):Partner 端配置入口;展厅平面图图片。
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
