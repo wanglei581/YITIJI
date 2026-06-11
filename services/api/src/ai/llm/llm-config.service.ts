@@ -28,6 +28,7 @@ export interface LlmConfig {
 
 export type AiModelFeatureKey =
   | 'assistant_chat'
+  | 'mock_interview'
   | 'resume_diagnosis'
   | 'resume_generate'
   | 'resume_optimize'
@@ -96,6 +97,14 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     status: 'active',
     description: '用于基于简历原文与诊断报告生成优化版简历与新旧对比。AI 只优化表达，不编造经历；事实信息须出现在简历原文中。',
     runtimeNote: '已被 AI 简历优化运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。',
+    allowCustomSystemPrompt: false,
+  },
+  {
+    key: 'mock_interview',
+    label: 'AI模拟面试',
+    status: 'active',
+    description: '用于求职者本人的对话式模拟面试练习与练习报告。仅供本人参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。',
+    runtimeNote: '已被 2C 模拟面试运行链路消费；面试官与报告结构化 System Prompt 由服务端强制，管理员自定义 System Prompt 不参与。',
     allowCustomSystemPrompt: false,
   },
   {

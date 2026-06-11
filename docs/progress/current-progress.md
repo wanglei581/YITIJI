@@ -5,6 +5,21 @@
 
 ---
 
+## 2C 模拟面试 + 面试技巧 + 面试报告（2026-06-11，Claude，`feature/mock-interview-2c`）
+
+**闭环**：设置场景 → AI 面试官几分钟对话式练习 → 综合维度练习报告 → 真实 PDF 打印；面试技巧准备工具页；面试报告历史入口。首页「AI面试训练」三磁贴正式点亮。
+
+- **后端**：Prisma 三表 `MockInterviewSession/Turn/Report`（additive 迁移 20260611200000）；`mock_interview` LLM 功能位（LlmConfigService，active）；端点 `POST /mock-interviews` + `:id/start|answer|end|report/print` + `GET :id|:id/report` + 会员 `GET/DELETE /me/mock-interviews`（游标分页）。
+- **面试引擎**：题量按时长硬控制（3min→4 / 5min→6 / 8min→8 题），最后一题自动收尾（反问环节）；五类面试官风格 + 三档难度（压力面只追问不冒犯）提示词服务端强制；可选简历经真实提取层进入上下文。
+- **报告**：10 模块 JSON 契约（综合等级=练习表现非通过率 / 表达 / 匹配参考 / 可信度 / 专业 / 应变 / 风险建议 / 高频问题预测 / STAR / 准备清单）服务端强校验；**禁词双层防线**（保过/通过率/Offer 概率/录用概率/精准命中/内部题库/保录用/企业筛选/候选人推荐等）：System Prompt 禁止 + 输出全文扫描 → 重试一次 → 仍命中诚实失败。
+- **归属与留存**（对齐 C-2A）：会员 endUserId 本人校验；匿名铸一次性 token（`x-interview-access-token`，DB 只存 SHA-256）；匿名 2h / 会员 7d TTL，每小时 cron 物理清理级联；会员删除硬删级联 + 审计；对话/报告原文不写日志（仅元数据）。
+- **Kiosk**：`/interview/setup|session|report|tips|reports` 五页（触控 ≥48px、主按钮 56px、白卡 1px 边框、lucide 图标、无 emoji/渐变堆叠）；对话页 busy 锁防 idle 误登出 + 客户端倒计时引导收尾；技巧页 = 可勾选清单 + 8 张可展开高频问题卡 + 完整 STAR + 30s/1min/3min 自我介绍结构（无死按钮）；报告入口页游客空态/会员真实列表+两步删除。
+- **验证**：`verify:mock-interview` 12 PASS（进 CI）：闭环/题量硬控/匿名门禁/会员隔离/禁词重试与诚实失败/JSON 重试/无回答拒绝/TTL/删除级联+审计/日志脱敏/PDF 渲染。
+- **浏览器真实验收（DeepSeek）十点全过**：三磁贴进入、全配置、真实开场与上下文追问（跳过追问被报告点名）、跳过/提交/结束、报告十模块零禁词、195KB 真实 PDF 进打印确认页、技巧页完整不截断、技巧页 CTA、页面与源码禁词扫描 0 命中、运行日志 0 对话泄露。
+- 首页占位兑现：模拟面试/面试技巧/面试报告由 disabled 转正式入口（MVP 验收完成）。
+
+---
+
 ## 审计修复回归补丁（2026-06-11，Codex）
 
 针对 `main@7bf5756` 审计修复后的浏览器回归点做小补丁，目标是保持三端真实数据口径不变，同时修复点击与登录体验问题。

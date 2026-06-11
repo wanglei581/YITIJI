@@ -1109,3 +1109,61 @@ model TerminalScreensaverConfig {
 
   @@index([playlistId])
 }
+
+// ── MockInterview(2C 模拟面试)────────────────────────────────────────────────
+// 求职者本人面试练习工具:配置 → AI 对话式模拟面试 → 综合报告(可打印)。
+// 合规:不是招聘能力;不向企业展示/转交;报告仅练习参考,无任何录用承诺。
+// 归属:endUserId(登录会员)或 accessTokenHash(匿名一次性令牌,只存 SHA-256)。
+// 留存:expiresAt 到期由清理任务移除(匿名短/会员长);对话与报告原文不写日志。
+model MockInterviewSession {
+  id              String   @id @default(cuid())
+  endUserId       String?
+  accessTokenHash String?
+  status          String   @default("configured") // configured / in_progress / completed / aborted
+  interviewerType String   // hr / manager / tech / campus / final
+  industry        String
+  position        String
+  experience      String   // fresh / lt1 / y1_3 / y3_5 / gt5 / switch
+  difficulty      String   // easy / standard / pressure
+  durationMin     Int      @default(5) // 3 / 5 / 8
+  questionTarget  Int      @default(5)
+  resumeFileId    String?  // 可选:上传简历 fileId(原文不落本表)
+  resumeDigest    String?  // 提取后的简历文本(仅会话期使用,随会话 TTL 清理)
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt       DateTime
+
+  turns  MockInterviewTurn[]
+  report MockInterviewReport?
+
+  @@index([endUserId, createdAt])
+  @@index([expiresAt])
+}
+
+model MockInterviewTurn {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   MockInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  idx       Int
+  role      String   // interviewer / candidate
+  qType     String?  // intro / position / experience / skill / behavior / plan / reverse / closing
+  content   String
+  skipped   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, idx])
+  @@index([sessionId])
+}
+
+model MockInterviewReport {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+  session     MockInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  payloadJson String   // 结构化报告(10 模块);不含简历原文
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+}

@@ -121,6 +121,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // ── 招聘会场馆导览 ─────────────────────────────────────────────────────────
 
+  get mockInterviewSession() {
+    return this.client.mockInterviewSession
+  }
+
+  get mockInterviewTurn() {
+    return this.client.mockInterviewTurn
+  }
+
+  get mockInterviewReport() {
+    return this.client.mockInterviewReport
+  }
+
   get fairVenueGuide() {
     return this.client.fairVenueGuide
   }

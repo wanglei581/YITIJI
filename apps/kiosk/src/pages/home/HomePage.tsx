@@ -340,9 +340,9 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     icon: HeadphonesIcon,
     accent: 'purple',
     tiles: [
-      { title: '模拟面试', icon: MonitorPlayIcon, disabled: true },
-      { title: '面试技巧', icon: LightbulbIcon, disabled: true },
-      { title: '面试报告', icon: FileSearchIcon, disabled: true },
+      { title: '模拟面试', icon: MonitorPlayIcon, to: '/interview/setup' },
+      { title: '面试技巧', icon: LightbulbIcon, to: '/interview/tips' },
+      { title: '面试报告', icon: FileSearchIcon, to: '/interview/reports' },
     ],
   },
   {

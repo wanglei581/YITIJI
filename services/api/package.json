@@ -44,7 +44,8 @@
     "db:seed:venue-guide": "node -r @swc-node/register prisma/seed-venue-guide.ts",
     "verify:member-assets-c2d": "node -r @swc-node/register scripts/verify-member-assets-c2d.ts",
     "verify:ocr-baidu": "node -r @swc-node/register scripts/verify-ocr-baidu.ts",
-    "verify:ocr-baidu-live": "node -r @swc-node/register scripts/verify-ocr-baidu-live.ts"
+    "verify:ocr-baidu-live": "node -r @swc-node/register scripts/verify-ocr-baidu-live.ts",
+    "verify:mock-interview": "node -r @swc-node/register scripts/verify-mock-interview.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

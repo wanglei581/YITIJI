@@ -2,6 +2,11 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
+import { InterviewSetupPage } from '../pages/interview/InterviewSetupPage'
+import { InterviewSessionPage } from '../pages/interview/InterviewSessionPage'
+import { InterviewReportPage } from '../pages/interview/InterviewReportPage'
+import { InterviewTipsPage } from '../pages/interview/InterviewTipsPage'
+import { InterviewReportsPage } from '../pages/interview/InterviewReportsPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
 import { JobFairDetailPage } from '../pages/job-fairs/JobFairDetailPage'
@@ -43,6 +48,11 @@ export const kioskRouter = createBrowserRouter([
   // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
   { path: '/login', element: <LoginPage /> },
   { path: '/legal/:doc', element: <LegalDocPage /> },
+  { path: '/interview/setup', element: <InterviewSetupPage /> },
+  { path: '/interview/session', element: <InterviewSessionPage /> },
+  { path: '/interview/report', element: <InterviewReportPage /> },
+  { path: '/interview/tips', element: <InterviewTipsPage /> },
+  { path: '/interview/reports', element: <InterviewReportsPage /> },
   // 待机宣传屏:顶级路由,全屏渲染(不套 KioskLayout 头部/底部导航)
   { path: '/screensaver', element: <ScreensaverPage /> },
   {
