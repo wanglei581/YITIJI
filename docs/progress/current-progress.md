@@ -1,7 +1,70 @@
 # 当前开发进度
 
-> 最后更新：2026-06-10
+> 最后更新：2026-06-11
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 文档口径同步 + 数字人死代码清理（2026-06-11，Codex，用户确认后执行）
+
+**目标：** 避免后续模型继续按旧文档重复开发已完成能力；只清理确认无引用且已被新方案取代的文件，不触碰 Claude 当前 C-2D 会员资产中心业务实现。
+
+**已核查并清理：**
+- 删除 `apps/kiosk/src/components/DigitalHuman.tsx`：全仓代码无任何 import / JSX 引用；当前 AI 数字人主体已由 `/assistant` 的 `AiAdvisorCall.tsx`（TRTC 真人照片顾问「小青」+ 文字对话）承接，早期 SVG 数字人不再是当前方案。
+- `SpeechBubble` 文件已不存在，仅剩历史文档提及；本轮只同步文档，不存在可删代码。
+- `AliAvatar` 文件已删除且全仓无引用；本轮不再重复处理，仅保留历史记录必要上下文。
+
+**同步口径：**
+- `AGENTS.md` / `CLAUDE.md` 当前阶段改为阶段2 AI 求职功能 + C-2D 会员资产中心收口；Excel 字段映射、BullMQ API worker、AI 数字人主体不再列为下一步。
+- `docs/progress/next-tasks.md`：旧 P0 快照归档；Partner 政策公告从空壳页清单移出；AI 简历优化真实化改为已由阶段2B完成；Phase 9 数字人 3D/SVG 方案标为历史规划，不再重做。
+- `docs/product/ai-avatar-guide.md` / `docs/product/ai-provider-integration.md`：顶部标注早期 3D/VRM/SVG 数字人方案已被 TRTC「小青」路线取代，仅作历史参考与合规边界参考。
+
+**明确不清理：**
+- `apps/admin/src/routes/peripherals/`：仍被 `DevicesPage` 的外设 Tab 引用，不是死代码。
+- `PrintScanFeatureInfoPage`、`ResumeTemplateLibraryPage`、`QingdaoPage` 等仍有路由或被文档明确保留为 MVP/地方化页面，本轮不删除。
+- `CampusPage` 的 AI 模拟面试入口属于 2C 模拟面试口径待统一问题，不能当死代码删除；后续应在 2C 开发或单独合规修正中处理。
+
+---
+
+## Phase C-2D 会员资产中心真实管理收口（2026-06-11，Claude + Codex 收尾，`feature/c2d-member-assets`）
+
+**目标：** 在既有 C-2B/C-2C 会员资产、收藏、权益、打印订单底座上，把 Kiosk「我的」页升级为可真实管理的账号资产中心：分页加载、独立失败重试、删除、文档访问/再打印、三类收藏与本机收藏显式合并。仍然只做本人资产管理，不新增活动、套餐、支付、招聘闭环或企业侧能力。
+
+**后端 / API：**
+- `/me/resumes`、`/me/documents`、`/me/ai-records`、`/me/print-orders`、`/me/favorites`、`/me/benefits` 统一游标分页：`cursor + pageSize`，默认 20，封顶 50，非法 `pageSize` 返回 `MEMBER_PAGE_INVALID`，`total` 为服务端真实 count。
+- `MemberAssetsService` 继续只返回本人、未过期、安全元数据；不返回 `payloadJson`、文件内容、`storageKey`、`sha256`、`accessTokenHash` 等敏感字段。
+- `DELETE /me/ai-records/:id`：会员本人可硬删 AI 记录；删除 `parse` 时级联删除同 `taskId` 的 `optimize` 派生记录；写 `member.ai_record_delete` 审计，`actorRole=enduser`、`actorId=null`，会员 id 放 payload。
+- `DELETE /files/:id` 支持会员本人删除自己的文档：对象存储物理删除 + `FileObject` 行软删 + `file.delete` 审计；删他人文件拒绝。
+- `/me/favorites` 扩展到 `job / job_fair / policy` 三类；新增/取消保持幂等，不记录投递、预约结果、候选人或任何招聘闭环状态。
+- `/me/print-orders` 与 `/me/benefits` 同步分页化，继续只读安全字段；权益发放/核销仍属 C-3/C-4/C-5 后续。
+
+**Kiosk：**
+- `ProfilePage` 的账号资产区拆成 `apps/kiosk/src/pages/profile/assets/*`：我的简历、我的文档、AI 服务记录、打印订单、收藏、权益六组各自独立加载、独立失败重试、独立「加载更多」，不再由一个 `Promise.all` 绑死。
+- 我的文档支持预览/下载/再打印/删除：预览和下载均先凭本人 token 换 TTL 签名 URL；再打印只对 PDF 开放，页数未知时诚实传 `pages:null`，不编造页数。
+- AI 服务记录支持两步确认删除；`parse` 级联删除时重载相关组，避免页面残留幽灵记录。
+- 我的收藏支持岗位 / 招聘会 / 政策查看与取消收藏；登录后可显式「合并本机收藏到账号」，成功项从本机 localStorage 清除，失败项保留下次重试。
+- `FavoritesProvider` 从只支持岗位扩展为三类收藏：登录会员以服务端 `/me/favorites` 为 SSOT；匿名/未登录继续本机 localStorage，并提示「登录后可同步到账号」；登录态不把本机收藏静默上传到账号。
+- 招聘会详情页新增招聘会收藏按钮；人社政策卡新增政策收藏按钮；岗位收藏沿用已接入的服务端/本机双模式。
+- 首页登录态统计改为按各资产接口 `pageSize=1` 拉真实 `total`，不再用页内条数冒充总数。
+- AI 生成简历预览页支持会员从「我的简历」仅带 `taskId` 回看生成结果，读取凭本人 token，经后端归属门禁。
+
+**CI / 验证：**
+- CI 增加 Redis service（`redis:7-alpine`）和测试 env：`REDIS_URL`、`SMS_PROVIDER=log`、CI 专用 `JWT_SECRET` / `SECRET_ENCRYPTION_KEY`，并把 `verify:member-assets-c2d` 纳入 Verify suites。
+- 新增 `pnpm --filter @ai-job-print/api verify:member-assets-c2d`，真实 Nest HTTP + dev SMS + Redis 登录，9 组断言全过：会员登录、简历/AI 记录 kind 如实、游标分页、跨会员隔离、AI 记录删除、文档删除、收藏幂等、登出失效、匿名 401。
+- Codex 收尾复跑通过：
+  - `pnpm --filter @ai-job-print/api typecheck`
+  - `pnpm --filter @ai-job-print/kiosk typecheck`
+  - `pnpm --filter @ai-job-print/shared typecheck`
+  - `pnpm --filter @ai-job-print/api lint`
+  - `pnpm --filter @ai-job-print/kiosk lint`（仅既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）
+  - `pnpm --filter @ai-job-print/api build`
+  - `pnpm --filter @ai-job-print/kiosk build`
+  - `pnpm --filter @ai-job-print/api verify:member-assets-c2d`
+
+**仍待最终验收：**
+- ✅ 登录态浏览器端到端手验已完成（2026-06-11，Codex）：Redis + API 3010 + Kiosk 5173，`VITE_API_MODE=http`，用真实登录页虚拟数字键盘 + dev SMS 验证码登录会员 `139****0811`；Profile 账号资产六组真实展示；文件 `preview-url`/`download-url` 返回短期签名 URL；文档再打印进入 `/print/confirm` 且页数显示「待识别，以实际打印为准」；文档删除后 UI 与 `/me/documents` 均为 0；AI 记录删除后 UI 与 `/me/ai-records` 均为 0，并联动移除简历记录；三类收藏取消后 UI 与服务端均清空；本机 job/job_fair/policy 三类收藏显式合并账号成功，localStorage 清空，DB 确认 3 类收藏写入；退出登录与页面刷新后账号资产不残留。验收数据已清理。
+- 已清理未跟踪临时演示 seed 脚本 `services/api/scripts/tmp-seed-c2d-demo.ts`，避免硬编码手机号/演示数据脚本进入主线。
+- 腾讯云短信真实发送、微信/支付宝扫码登录仍按既有 Phase C 后续计划推进。
 
 ---
 
@@ -397,7 +460,7 @@ POST /resume/parse { fileId }
 
 **新增文件：**
 - [services/api/src/ai/resume/llm-resume.service.ts](../../services/api/src/ai/resume/llm-resume.service.ts)：`LlmResumeService.diagnose(text)` —— 复用 `LlmConfigService` 加密凭证（与 AI 助手对话同源），单轮、低 temperature(0.2)、固定 5 维度评分 prompt、严格 JSON 解析 + 强校验、非法重试一次、suggestions 过 `enforceForbiddenWords`；**出错只记状态码，绝不记 prompt/提取文本/请求·响应正文**（区别于 LlmChatService）。
-- [services/api/src/ai/providers/llm.provider.ts](../../services/api/src/ai/providers/llm.provider.ts)：`LlmResumeProvider`（`name='llm'`），parseResume 串「提取文本 → diagnose」，任何失败返回 `status:'failed'+failReason`，**不伪造报告**；optimizeResume 诚实返回 failed（真实化留 Phase 1E）；chat 走 LlmChatService 不经本 provider。
+- [services/api/src/ai/providers/llm.provider.ts](../../services/api/src/ai/providers/llm.provider.ts)：`LlmResumeProvider`（`name='llm'`），parseResume 串「提取文本 → diagnose」，任何失败返回 `status:'failed'+failReason`，**不伪造报告**；当时 optimizeResume 诚实返回 failed（历史边界，已由 2026-06-11 阶段2B「AI 简历优化真实化」覆盖）；chat 走 LlmChatService 不经本 provider。
 - [services/api/scripts/verify-real-resume-diagnosis.ts](../../services/api/scripts/verify-real-resume-diagnosis.ts) + `verify-real-resume-diagnosis` script（本地 stub HTTP LLM 端点，离线零费用）。
 
 **改动文件：**
@@ -924,8 +987,8 @@ POST /resume/parse { fileId }
 **未解决 / 边界（已记 next-tasks）：**
 
 - **登录态真实列表端到端手验**未做：需 API + 会员短信验证码环境（自 C-1 起延后）——本轮用 HTTP 401 冒烟覆盖路由/鉴权、service+guard verify 覆盖读写/隔离/合规、typecheck/build 覆盖渲染编译。
-- **Jobs 页 localStorage 收藏未迁移**：`apps/kiosk/src/lib/useJobFavorites.ts` 仍是本机 localStorage（匿名浏览可用）。本轮按「先做后端模型/API/verify + ProfilePage 最小接入」范围，未把 Jobs/JobDetail/Campus/Home 的收藏切到服务端（需登录态门控 UX，留后续增量）。ProfilePage 已展示服务端收藏（登录会员）。
-- **打印订单聚合视图**（`PrintTask` 聚合）本轮未做，留 C-2C 后续 / C-5。
+- **历史边界：Jobs 页收藏当时仍在 localStorage**：这是 C-2C 当时边界；**已由 2026-06-07 C-2C follow-up 与 2026-06-11 C-2D 覆盖**，现在岗位收藏登录态写服务端、匿名保留本机收藏。
+- **历史边界：打印订单聚合视图当时尚未落地**：这是 C-2C 当时边界；**已由 2026-06-08「会员我的打印订单只读列表」与 2026-06-11 C-2D 分页化覆盖**，现在登录会员可查看本人只读打印订单。
 - 权益数据当前无写入入口（发放属活动 C-3 / 套餐 C-4，核销 / 支付属 C-5）；底座已就绪，verify 直接落库构造数据验证读取路径。
 
 ---
@@ -972,9 +1035,9 @@ POST /resume/parse { fileId }
 **未解决 / 边界（下一小步）：**
 
 - **浏览器交互手验未跑**（本环境无 Playwright JS 包）：建议在浏览器手验 —— 匿名：`/jobs` 点星标 → 填充 + 顶部提示「登录后可同步到账号」+ DevTools localStorage `kiosk:jobFavorites:v1` 含该 id；「只看收藏」过滤与计数正确；刷新后保留。登录态真实同步手验仍需 API + 短信验证码环境（自 C-1 起延后）；本轮以 HTTP e2e + 匿名本机运行期校验 + typecheck/lint/build 覆盖契约与编译。
-- **招聘会 / 政策收藏入口未接服务端**：当前仅岗位（job）。`Favorite` 模型已支持 `job_fair`/`policy`，招聘会列表/详情收藏入口作为下一小步。
+- **历史边界：招聘会 / 政策收藏入口当时未接入**：这是 C-2C follow-up 当时边界；**已由 2026-06-11 C-2D 覆盖**，现在招聘会详情页与政策卡均通过统一 `FavoritesProvider` 接入 `job_fair` / `policy` 收藏。
 - **跨视图一致性**：FavoritesProvider 在登录切换时拉一次服务端收藏；若用户在 ProfilePage 取消某收藏后未重新登录直接返回岗位页，Provider 状态可能短暂滞后（岗位页内 toggle 即时一致）。正向链路（岗位页收藏 → ProfilePage 挂载时 `getMyFavorites` 拉到）已由 HTTP e2e 的入库→读取覆盖。
-- **本机→账号迁移未做**：匿名收藏不自动推送到账号（登录后以服务端为准）；自动迁移涉及去重 / 标题快照，留后续按需评估。
+- **历史边界：本机收藏当时不能合并账号**：这是 C-2C follow-up 当时边界；**已由 2026-06-11 C-2D 覆盖为「显式合并本机收藏到账号」**，不做静默上传，成功项清除本机记录，失败项保留下次重试。
 
 ---
 
@@ -1694,10 +1757,10 @@ last common migration: 20260603155010_ai_result_persistence
 | 文字对话 | `AssistantPage.tsx` 内 `TextChat`，走 `chatWithAssistant()` → `POST /assistant/chat`；含路由白名单、会话隔离、"内容仅供参考"免责 |
 | **实际形象方案** | **TRTC 真人照片顾问形象「小青」（`/assets/ai-advisor.png`），不再是 SVG 数字人引导员主方案** |
 
-**待清理死代码（本任务不删除，仅标注）：**
-- `apps/kiosk/src/components/DigitalHuman.tsx`（Phase 9.2 的 2D SVG 数字人引导员）—— 全仓已无任何引用，被「小青」真人照片方案取代后未清理。
-- 配套 `SpeechBubble`（Phase 9.2）同样已无引用。
-- 处置建议：后续单独起一个清理任务删除或归档，**不在 T3B 范围内**。
+**死代码清理状态（2026-06-11 已同步）：**
+- `apps/kiosk/src/components/DigitalHuman.tsx`（Phase 9.2 的 2D SVG 数字人引导员）已删除；删除前确认全仓代码无 import / JSX 引用，当前由「小青」真人照片方案承接。
+- 配套 `SpeechBubble` 文件已不存在，仅剩历史记录提及。
+- 处置原则：后续不再按 SVG/3D 数字人路线重做，产品内数字人以 `/assistant` TRTC「小青」+ 文字对话为准。
 
 **Phase 9.5 编号冲突（待后续重命名/重新编号）：**
 - 本文档下方「✅ Phase 9.5：AI 数字人语音通话修复（2026-06-02）」= 已完成的 TRTC 语音通话修复。
@@ -1720,7 +1783,7 @@ last common migration: 20260603155010_ai_result_persistence
 | 岗位/招聘会数据 | 只做第三方/官方来源信息入口 | 2026-05 |
 | 旧秒哒项目 | 仅作参考库，不作为正式工程 | 2026-05 |
 | 技术栈 | React + Vite + TypeScript + Tailwind + shadcn/ui | 2026-05 |
-| AI数字人 | **已实现（2026-06，见 §〇·B）**：AI 助手页 `/assistant` 语音通话（TRTC 真人照片顾问「小青」）+ 文字对话均已完成；早期"轻量 3D/SVG 引导员"非当前主方案（SVG `DigitalHuman.tsx` 已成待清理死代码）；始终不做招聘官/候选人筛选官 | 2026-05 规划 / 2026-06 落地校正 |
+| AI数字人 | **已实现（2026-06，见 §〇·B）**：AI 助手页 `/assistant` 语音通话（TRTC 真人照片顾问「小青」）+ 文字对话均已完成；早期"轻量 3D/SVG 引导员"非当前主方案（旧 SVG `DigitalHuman.tsx` 已于 2026-06-11 清理）；始终不做招聘官/候选人筛选官 | 2026-05 规划 / 2026-06 落地校正 |
 
 ---
 
@@ -2390,11 +2453,11 @@ PAPER_EMPTY 无法通过 WMI preflight 预检实现。Pantum CM2800ADN Series Wi
 - 状态机：`idle`（待机，呼吸动画）/ `talking`（说话嘴型 + 脉冲光晕）/ `greeting`（挥手点头，3 秒后归 idle）
 
 **新增文件：**
-- `apps/kiosk/src/components/DigitalHuman.tsx`（276 行，commit `ed7fdf3`）
+- `apps/kiosk/src/components/DigitalHuman.tsx`（276 行，commit `ed7fdf3`；历史文件，已于 2026-06-11 清理）
 
 **修改文件：**
 - `apps/kiosk/src/pages/assistant/AssistantPage.tsx`（commit `5ea16a7`）
-  - 上半区：数字人 SVG + SpeechBubble 显示最新 AI 回复（截断 80 字）
+  - 上半区：数字人 SVG + SpeechBubble 显示最新 AI 回复（截断 80 字；历史方案，后续被 TRTC「小青」取代）
   - 中部：最新 AI 消息的快捷操作按钮（`isAllowedRoute` 过滤不变）
   - 下半区：对话历史（移除逐条 BotAvatar，简化 ChatBubble）
   - 状态联动：发送→talking；收到→idle；首次进入→greeting

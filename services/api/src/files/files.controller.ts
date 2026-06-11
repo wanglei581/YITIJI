@@ -320,12 +320,19 @@ export class FilesController {
     const finalReason = reason || 'manual delete'
     const result = await this.files.ownerDelete(id, requester, finalReason)
     await this.audit.write({
-      actorId: requester.kind === 'user' ? requester.userId : requester.endUserId,
+      // AuditLog.actorId 外键指向运营 User 表：会员删除 actorId 必须写 null，
+      // endUserId 放 payload（否则 FK 失败、审计行被静默吞掉 = 会员删除从未留痕）。
+      actorId: requester.kind === 'user' ? requester.userId : null,
       actorRole: requester.kind === 'user' ? requester.role : 'enduser',
       action: 'file.delete',
       targetType: 'file',
       targetId: id,
-      payload: { reason: finalReason, filename: result.filename, sensitiveLevel: result.sensitiveLevel },
+      payload: {
+        reason: finalReason,
+        filename: result.filename,
+        sensitiveLevel: result.sensitiveLevel,
+        ...(requester.kind === 'member' ? { endUserId: requester.endUserId } : {}),
+      },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,

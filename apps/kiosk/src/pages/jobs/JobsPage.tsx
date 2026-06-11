@@ -86,7 +86,8 @@ const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 export function JobsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { ids: favoriteSet, toggle: toggleFavorite } = useFavorites()
+  const { idsOf, toggle: toggleFavorite } = useFavorites()
+  const favoriteSet = idsOf('job')
 
   // facet 集合：全量已发布岗位，用于构建筛选项 + 来源机构卡片（不随筛选变化）
   const [facetJobs, setFacetJobs] = useState<ExternalJobDTO[]>([])
@@ -418,7 +419,7 @@ export function JobsPage() {
                         <div className="flex items-start justify-between gap-3">
                           <p className="min-w-0 flex-1 text-base font-semibold text-neutral-900">{job.title}</p>
                           <button
-                            onClick={() => toggleFavorite({ id: job.id, title: job.title })}
+                            onClick={() => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
                             aria-pressed={fav}
                             aria-label={fav ? '取消收藏' : '收藏岗位'}
                             className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 hover:bg-neutral-100"

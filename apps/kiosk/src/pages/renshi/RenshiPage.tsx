@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import { useComingSoonNotice } from '../../components/ComingSoonNotice'
 import { getPublishedPolicies, type PolicyPostView } from '../../services/api/policies'
+import { useFavorites } from '../../favorites/useFavorites'
 import {
   ArrowUpRightIcon,
   BookOpenIcon,
@@ -10,6 +11,7 @@ import {
   ChevronRightIcon,
   ClipboardListIcon,
   FileTextIcon,
+  HeartIcon,
   GraduationCapIcon,
   HeartHandshakeIcon,
   HelpCircleIcon,
@@ -220,6 +222,8 @@ function ZoneEntryCard({
 
 function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceLine: string | null }) {
   const [expanded, setExpanded] = useState<string | null>(null)
+  // 收藏(C-2D):政策只做兴趣标记,登录走 /me/favorites,匿名存本机
+  const { isFavorite, toggle: toggleFavorite } = useFavorites()
 
   // 按 audience 分组,缺省归 general;按 AUDIENCE_META.order 排序
   const groups = Object.entries(
@@ -299,6 +303,17 @@ function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceL
                       )}
                       <p className="mt-1 text-xs text-gray-400">来源:{item.sourceName}{item.publishedDate ? ` · ${item.publishedDate}` : ''}</p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}
+                      aria-label={isFavorite('policy', item.id) ? '取消收藏' : '收藏政策'}
+                      className={[
+                        'flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors',
+                        isFavorite('policy', item.id) ? 'bg-rose-50 text-rose-500' : 'text-gray-300 hover:text-rose-400',
+                      ].join(' ')}
+                    >
+                      <HeartIcon className={isFavorite('policy', item.id) ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
+                    </button>
                   </div>
                 ))}
               </div>

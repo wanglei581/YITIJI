@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { AddFavoriteInput, FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { PrismaService } from '../prisma/prisma.service'
+import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 // ============================================================
 // 会员收藏服务（Phase C-2C）。
@@ -17,14 +18,20 @@ import { PrismaService } from '../prisma/prisma.service'
 export class MemberFavoritesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** 我的收藏列表（本人，可按 targetType 过滤），按收藏时间倒序。 */
-  async list(endUserId: string, targetType?: FavoriteTargetType): Promise<MemberFavoriteItem[]> {
+  /** 我的收藏列表（本人，可按 targetType 过滤），游标分页（C-2D，不做无界查询）。 */
+  async list(
+    endUserId: string,
+    page: MemberPageQuery,
+    targetType?: FavoriteTargetType,
+  ): Promise<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }> {
+    const where = { endUserId, ...(targetType ? { targetType } : {}) }
+    const total = await this.prisma.favorite.count({ where })
     const rows = await this.prisma.favorite.findMany({
-      where: { endUserId, ...(targetType ? { targetType } : {}) },
+      where,
       select: { id: true, targetType: true, targetId: true, title: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
+      ...memberPageArgs(page),
     })
-    return rows.map((r) => ({
+    return buildMemberPage(rows, page, total, (r) => ({
       id: r.id,
       targetType: r.targetType as FavoriteTargetType,
       targetId: r.targetId,

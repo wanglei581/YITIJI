@@ -189,9 +189,11 @@ LOCAL_MODEL_URL=http://localhost:11434  # 仅在 AI_PROVIDER=local 时使用
 
 ---
 
-## 6. AI 数字人插件接入
+## 6. AI 数字人插件接入（历史规划）
 
-AI 数字人引导员（Phase 9.1+）通过扩展 `AssistantChatResponse.actions` 实现语音+动作指令，无需新增 API 端点。
+> 2026-06-11 同步：本节描述的是早期 Three.js / VRM 数字人动作指令扩展方案。当前实际落地路线已经改为 Kiosk `/assistant` 的 TRTC 真人照片顾问「小青」+ 文字对话；运行链路复用 `assistant_chat`，不消费 `digital_human` 配置位，也不再按本节重做 3D / SVG 数字人。
+
+早期设想中，AI 数字人引导员（Phase 9.1+）通过扩展 `AssistantChatResponse.actions` 实现语音+动作指令，无需新增 API 端点。
 
 ```typescript
 // 扩展 actions 携带数字人指令（Phase 9 启动后补充）

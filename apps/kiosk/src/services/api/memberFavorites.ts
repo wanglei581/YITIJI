@@ -72,14 +72,43 @@ async function request<T>(
 
 // ── 收藏 ─────────────────────────────────────────────────────
 
-/** 我的收藏（本人，可选按类型过滤）。未登录 / mock 模式返回 []。 */
+/** 我的收藏（本人，可选按类型过滤；游标分页，pageSize 封顶 50）。未登录 / mock 模式返回空页。 */
 export function getMyFavorites(
   token: string | null | undefined,
   type?: FavoriteTargetType,
+  opts?: { cursor?: string | null; pageSize?: number },
+): Promise<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null, total: 0 })
+  const params = new URLSearchParams()
+  if (type) params.set('type', type)
+  if (opts?.cursor) params.set('cursor', opts.cursor)
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize))
+  const q = params.toString()
+  return request<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }>(
+    `/me/favorites${q ? `?${q}` : ''}`,
+    token,
+  )
+}
+
+/**
+ * 拉取全部收藏（FavoritesProvider 需要完整 id 集合判断「已收藏」状态）。
+ * 逐页拉取（每页 50），硬上限 10 页 / 500 条防失控——超出部分不再拉取（只影响
+ * 心形按钮回显，不影响资产中心分页列表的完整浏览）。
+ */
+export async function getAllMyFavorites(
+  token: string | null | undefined,
+  type?: FavoriteTargetType,
 ): Promise<MemberFavoriteItem[]> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve([])
-  const query = type ? `?type=${encodeURIComponent(type)}` : ''
-  return request<MemberFavoriteItem[]>(`/me/favorites${query}`, token)
+  if (API_MODE !== 'http' || !token) return []
+  const all: MemberFavoriteItem[] = []
+  let cursor: string | null = null
+  for (let i = 0; i < 10; i += 1) {
+    const page = await getMyFavorites(token, type, { cursor, pageSize: 50 })
+    all.push(...page.items)
+    if (!page.nextCursor) break
+    cursor = page.nextCursor
+  }
+  return all
 }
 
 /** 新增收藏（幂等）。未登录 / mock 模式 no-op（返回 null）。 */
@@ -107,8 +136,18 @@ export function removeFavorite(
 
 // ── 权益（只读）─────────────────────────────────────────────
 
-/** 我的权益（本人，只读）。未登录 / mock 模式返回 []。 */
-export function getMyBenefits(token: string | null | undefined): Promise<MemberBenefitItem[]> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve([])
-  return request<MemberBenefitItem[]>('/me/benefits', token)
+/** 我的权益（本人，只读；游标分页，pageSize 封顶 50）。未登录 / mock 模式返回空页。 */
+export function getMyBenefits(
+  token: string | null | undefined,
+  opts?: { cursor?: string | null; pageSize?: number },
+): Promise<{ items: MemberBenefitItem[]; nextCursor: string | null; total: number }> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null, total: 0 })
+  const params = new URLSearchParams()
+  if (opts?.cursor) params.set('cursor', opts.cursor)
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize))
+  const q = params.toString()
+  return request<{ items: MemberBenefitItem[]; nextCursor: string | null; total: number }>(
+    `/me/benefits${q ? `?${q}` : ''}`,
+    token,
+  )
 }

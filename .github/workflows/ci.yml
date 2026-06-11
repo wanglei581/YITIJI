@@ -19,12 +19,29 @@ jobs:
   build-and-verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      # C-2D 会员资产 E2E（verify:member-assets-c2d）需要 Redis：
+      # 短信验证码 / 频控 / 会员会话全部落 Redis（dev SMS provider = log）。
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
       DATABASE_URL: file:./prisma/dev.db
       FILE_SIGNING_SECRET: ci-only-test-signing-secret-0123456789abcdef
       FILE_STORAGE_DIR: /tmp/ci-file-storage
       FILE_STORAGE_DRIVER: local
       AI_PROVIDER: mock
+      # 以下均为 CI 专用测试值，不是真实凭证
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
+      SECRET_ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      REDIS_URL: redis://127.0.0.1:6379
+      SMS_PROVIDER: log
     steps:
       - uses: actions/checkout@v4
 
@@ -82,3 +99,4 @@ jobs:
           pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
+          pnpm --filter @ai-job-print/api verify:member-assets-c2d

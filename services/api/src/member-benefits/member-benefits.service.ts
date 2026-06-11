@@ -6,6 +6,7 @@ import type {
   MemberBenefitItem,
 } from './member-benefits.types'
 import { PrismaService } from '../prisma/prisma.service'
+import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 // ============================================================
 // 会员权益只读服务（Phase C-2C 底座）。
@@ -26,12 +27,18 @@ export class MemberBenefitsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * 我的权益列表（本人）。排序：active 优先，其后按发放时间倒序，
-   * 便于"我的权益"先展示当前可用项；历史 / 失效项排在后面（诚实展示状态）。
+   * 我的权益列表（本人），游标分页（C-2D，不做无界查询）。
+   * 排序：发放时间倒序（游标分页要求全程稳定排序，原"active 在前"的内存重排会跨页
+   * 错乱游标，改为页内按状态标签如实展示——前端有清晰状态徽标，不影响诚实性）。
    */
-  async list(endUserId: string): Promise<MemberBenefitItem[]> {
+  async list(
+    endUserId: string,
+    page: MemberPageQuery,
+  ): Promise<{ items: MemberBenefitItem[]; nextCursor: string | null; total: number }> {
+    const where = { endUserId }
+    const total = await this.prisma.benefitGrant.count({ where })
     const rows = await this.prisma.benefitGrant.findMany({
-      where: { endUserId },
+      where,
       select: {
         id: true,
         benefitType: true,
@@ -45,15 +52,9 @@ export class MemberBenefitsService {
         validUntil: true,
         createdAt: true,
       },
-      orderBy: { createdAt: 'desc' },
+      ...memberPageArgs(page),
     })
-    // active 优先（SQLite 无法直接按"active 在前"排序，这里在内存稳定排序）。
-    const activeFirst = [...rows].sort((a, b) => {
-      const aw = a.status === 'active' ? 0 : 1
-      const bw = b.status === 'active' ? 0 : 1
-      return aw - bw
-    })
-    return activeFirst.map((r) => ({
+    return buildMemberPage(rows, page, total, (r) => ({
       id: r.id,
       benefitType: r.benefitType as BenefitType,
       title: r.title,

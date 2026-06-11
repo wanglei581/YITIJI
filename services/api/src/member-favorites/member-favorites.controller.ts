@@ -5,6 +5,7 @@ import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberFavoritesService } from './member-favorites.service'
 import { AddFavoriteDto, FAVORITE_TARGET_TYPES } from './dto/add-favorite.dto'
+import { parseMemberPageQuery } from '../common/utils/member-page'
 
 /**
  * 会员收藏接口（Phase C-2C）。路由前缀 /api/v1/me/favorites。
@@ -22,14 +23,18 @@ import { AddFavoriteDto, FAVORITE_TARGET_TYPES } from './dto/add-favorite.dto'
 export class MemberFavoritesController {
   constructor(private readonly favorites: MemberFavoritesService) {}
 
-  /** 我的收藏列表（本人，可选 ?type=job|job_fair|policy 过滤）。 */
+  /** 我的收藏列表（本人，可选 ?type=job|job_fair|policy 过滤；游标分页，pageSize 封顶 50）。 */
   @Get()
   async list(
     @CurrentEndUser() user: AuthedEndUser,
     @Query('type') type?: string,
-  ): Promise<ApiResponse<MemberFavoriteItem[]>> {
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<ApiResponse<{ items: MemberFavoriteItem[]; nextCursor: string | null; total: number }>> {
     const targetType = this.parseOptionalType(type)
-    return ApiResponse.ok(await this.favorites.list(user.endUserId, targetType))
+    return ApiResponse.ok(
+      await this.favorites.list(user.endUserId, parseMemberPageQuery(cursor, pageSize), targetType),
+    )
   }
 
   /** 新增收藏（幂等）。 */

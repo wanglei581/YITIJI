@@ -104,7 +104,7 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：W3 三轨数据源入口 + Phase 7.11 R4 类型对齐已合入 main（2026-06-01）
+当前阶段：阶段2 AI 求职功能 + Phase C-2D 会员资产中心收口（2026-06-11）
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
 - Phase 8 全部封板（2026-05-29，Mac 真实后端跨机 E2E 验证通过）：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固
@@ -115,7 +115,10 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
   - W2：BE-7 JobFair 8 端点切真 Prisma + audit + 校企合作详情端点
   - W3：JobSource 凭证加密落库 + Webhook 接收端（HMAC + 5min 时间窗 + nonce 防重放）+ Partner /sources 三轨入口（API/Webhook/Excel）
 - Phase 7.11 R4 完成（2026-06-01）：`packages/shared` 新增 `PartnerDataSourceView`/`ConnStatus`，`SyncFrequency` 加 `weekly`；前后端 Partner 数据源 DTO 收紧为字面量；UI 零变化；E2E demo 复跑通过
-- **下一步**：① Excel 字段映射 service 层接入（FieldMappingRule/ImportBatch/ImportRecord 已暴露）；② BullMQ API 拉取 worker；③ Phase 9 UI Polish + AI 数字人引导员
+- 阶段1 三端数据打通 1A–1F 已完成（2026-06-10）：Admin 招聘会 / 合作机构 / 订单告警、Partner 编辑与政策公告、Kiosk 招聘会与校园招聘 UI 均已接真。
+- 阶段2 已完成：AI 简历生成 MVP、AI 简历优化真实化、真实模型联调与安全收口、招聘会场馆导览图、C-2D 会员资产中心真实管理。
+- AI 数字人主体已完成：Kiosk `/assistant` 使用 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人方案已被替代，不再作为下一步重做。
+- **下一步**：① 2C 模拟面试 + 面试问题预测（结果只给本人，报告可打印）；② 2D 目标岗位定向优化 + 岗位匹配度参考；③ 2E 职业规划建议；④ 择期补图片 OCR 真实接入与场馆导览扩展（Partner 配置入口 / 平面图图片）。
 
 ---
 

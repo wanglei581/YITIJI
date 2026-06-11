@@ -14,6 +14,7 @@ import {
   BuildingIcon,
   DoorOpenIcon,
   CalendarIcon,
+  HeartIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   ExternalLinkIcon,
@@ -36,6 +37,7 @@ import { getFairCompanies, getFairStats, getFairVenueGuide, getFairZones, getJob
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { FairDataScreen } from './components/FairDataScreen'
+import { useFavorites } from '../../favorites/useFavorites'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-blue-50',  text: 'text-blue-600' },
@@ -165,6 +167,10 @@ export function JobFairDetailPage() {
   const [zones,     setZones]     = useState<FairZoneDTO[]>([])
   const [stats,     setStats]     = useState<FairLiveStatsDTO | null>(null)
 
+  // 收藏(C-2D):登录走 /me/favorites,匿名存本机;仅兴趣标记,不形成预约/投递闭环
+  const { isFavorite, toggle: toggleFavorite } = useFavorites()
+  const isFav = id ? isFavorite('job_fair', id) : false
+
   // 招聘会主体
   useEffect(() => {
     if (hasStateMatch) return
@@ -252,6 +258,18 @@ export function JobFairDetailPage() {
           <h1 className="truncate text-lg font-bold text-gray-900">{fair.name}</h1>
           <p className="mt-0.5 text-xs text-gray-400">{fair.sourceName}</p>
         </div>
+        {/* 收藏(C-2D):仅兴趣标记,登录走 /me/favorites,匿名存本机;不涉及任何预约/投递闭环 */}
+        <button
+          type="button"
+          onClick={() => toggleFavorite({ type: 'job_fair', id: fair.id, title: fair.name })}
+          aria-label={isFav ? '取消收藏' : '收藏招聘会'}
+          className={[
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors',
+            isFav ? 'border-rose-200 bg-rose-50 text-rose-500' : 'border-gray-200 bg-white text-gray-400 hover:text-rose-400',
+          ].join(' ')}
+        >
+          <HeartIcon className={isFav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
+        </button>
         <Button size="sm" variant="secondary" className="shrink-0" onClick={() => navigate('/job-fairs')}>
           关闭
         </Button>

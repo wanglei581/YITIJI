@@ -117,14 +117,20 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
     let alive = true
     setLoading(true)
 
-    Promise.all([getMyResumes(token), getMyDocuments(token), getMyAiRecords(token), getMyFavorites(token)])
+    // C-2D 分页化:列表只取 1 条,统计用服务端真实 total(绝不拿页内条数冒充总数)
+    Promise.all([
+      getMyResumes(token, { pageSize: 1 }),
+      getMyDocuments(token, { pageSize: 1 }),
+      getMyAiRecords(token, { pageSize: 1 }),
+      getMyFavorites(token, undefined, { pageSize: 1 }),
+    ])
       .then(([resumes, documents, aiRecords, favorites]) => {
         if (!alive) return
         setStats({
-          resumes: resumes.length,
-          documents: documents.length,
-          aiRecords: aiRecords.length,
-          favorites: favorites.length,
+          resumes: resumes.total,
+          documents: documents.total,
+          aiRecords: aiRecords.total,
+          favorites: favorites.total,
         })
       })
       .catch(() => {

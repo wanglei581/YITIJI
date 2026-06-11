@@ -12,12 +12,30 @@
 
 import type { AiTaskStatus } from './ai'
 
-/** 我的简历：会员名下 AI 解析过的简历版本（一条 = 一个解析任务，仅元数据）。 */
+/**
+ * 游标分页响应（Phase C-2D，所有 /me/* 列表统一形状）。
+ * - cursor 为上一页最后一条的行 id；首页不传。
+ * - pageSize 默认 20，服务端封顶 50；后端绝不做无界 findMany。
+ */
+export interface MemberAssetPage<T> {
+  items: T[]
+  /** 同条件下的真实总条数（头部统计用） */
+  total: number
+  /** 还有下一页时为下一页游标（最后一条 id）；否则 null */
+  nextCursor: string | null
+}
+
+/** AI 服务记录种类：解析 / 优化 / 生成（AI 生成简历绝不展示为「简历解析」）。 */
+export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate'
+
+/** 我的简历：会员名下简历资产（上传解析 parse / AI 生成 generate，一条 = 一个任务，仅元数据）。 */
 export interface MemberResumeItem {
-  /** AiResumeResult(parse) 行 id */
+  /** AiResumeResult 行 id */
   id: string
-  /** AI 任务 id（用于带本人 token 读回结果，结果读取走既有 /resume/records） */
+  /** AI 任务 id（用于带本人 token 读回结果，结果读取走既有 /resume/records 或 /resume/generate） */
   taskId: string
+  /** 简历来源：parse=上传并诊断的简历；generate=AI 引导生成的简历 */
+  kind: 'parse' | 'generate'
   status: AiTaskStatus
   provider: string
   /** 是否已生成优化版（同 taskId 是否存在 optimize 行） */
@@ -45,12 +63,12 @@ export interface MemberDocumentItem {
   previewUrlPath: string
 }
 
-/** AI 服务记录：会员名下 AI 解析 / 优化调用历史（仅元数据，不含 payload）。 */
+/** AI 服务记录：会员名下 AI 解析 / 优化 / 生成调用历史（仅元数据，不含 payload）。 */
 export interface MemberAiRecordItem {
   /** AiResumeResult 行 id */
   id: string
   taskId: string
-  kind: 'parse' | 'optimize'
+  kind: MemberAiRecordKind
   status: AiTaskStatus
   provider: string
   createdAt: string

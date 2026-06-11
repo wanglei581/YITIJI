@@ -1,9 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common'
+import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 import type { MemberBenefitItem } from './member-benefits.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberBenefitsService } from './member-benefits.service'
+import { parseMemberPageQuery } from '../common/utils/member-page'
 
 /**
  * 会员权益只读接口（Phase C-2C 底座）。路由前缀 /api/v1/me/benefits。
@@ -19,9 +20,13 @@ import { MemberBenefitsService } from './member-benefits.service'
 export class MemberBenefitsController {
   constructor(private readonly benefits: MemberBenefitsService) {}
 
-  /** 我的权益列表（本人，只读）。 */
+  /** 我的权益列表（本人，只读；游标分页，pageSize 封顶 50）。 */
   @Get()
-  async list(@CurrentEndUser() user: AuthedEndUser): Promise<ApiResponse<MemberBenefitItem[]>> {
-    return ApiResponse.ok(await this.benefits.list(user.endUserId))
+  async list(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<ApiResponse<{ items: MemberBenefitItem[]; nextCursor: string | null; total: number }>> {
+    return ApiResponse.ok(await this.benefits.list(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
   }
 }

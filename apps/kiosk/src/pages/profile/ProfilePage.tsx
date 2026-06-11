@@ -1,17 +1,6 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
-import type {
-  BenefitStatus,
-  BenefitType,
-  FavoriteTargetType,
-  MemberAiRecordItem,
-  MemberBenefitItem,
-  MemberDocumentItem,
-  MemberFavoriteItem,
-  MemberPrintOrderItem,
-  MemberResumeItem,
-} from '@ai-job-print/shared'
 import {
   BadgeCheckIcon,
   BellIcon,
@@ -22,7 +11,6 @@ import {
   CheckCircleIcon,
   ChevronRightIcon,
   CopyIcon,
-  DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
   FileInputIcon,
@@ -34,7 +22,6 @@ import {
   HelpCircleIcon,
   LandmarkIcon,
   LayoutTemplateIcon,
-  Loader2Icon,
   LogInIcon,
   MessageSquareIcon,
   PackageIcon,
@@ -52,9 +39,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { fetchAccessUrl, getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
-import { getMyBenefits, getMyFavorites, removeFavorite } from '../../services/api/memberFavorites'
-import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
+import { AccountAssetsPanel } from './assets/AccountAssetsPanel'
+import { useMemberAssetGroups } from './assets/useMemberAssetGroups'
+import { formatTime } from './assets/format'
+import { RowIconButton } from './assets/ui'
 
 // 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
 // 诚实化与合规约束：
@@ -156,15 +144,6 @@ interface IncomingState {
     suggestions: unknown[]
     savedAt: string
   }
-}
-
-function formatTime(iso: string) {
-  const d = new Date(iso)
-  const M = d.getMonth() + 1
-  const D = d.getDate()
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  return `${M}月${D}日 ${h}:${m}`
 }
 
 // ─── Presentational sub-components ─────────────────────────────────────────
@@ -375,206 +354,11 @@ function EntrySection({ section, onTap }: { section: EntrySectionData; onTap: (e
   )
 }
 
-// 列表项操作按钮：触控区 ≥48px（h-12 w-12）。
-function RowIconButton({
-  icon: Icon,
-  title,
-  tone = 'neutral',
-  onClick,
-}: {
-  icon: LucideIcon
-  title: string
-  tone?: 'neutral' | 'danger'
-  onClick: () => void
-}) {
-  const toneCls =
-    tone === 'danger'
-      ? 'text-gray-400 hover:bg-red-50 hover:text-red-500'
-      : 'text-gray-500 hover:bg-gray-50'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 ${toneCls}`}
-    >
-      <Icon className="h-5 w-5" aria-hidden="true" />
-    </button>
-  )
-}
-
-const AI_STATUS_LABEL: Record<string, string> = {
-  pending: '处理中',
-  processing: '处理中',
-  completed: '已完成',
-  failed: '未完成',
-}
-
-function aiStatusLabel(s: string): string {
-  return AI_STATUS_LABEL[s] ?? s
-}
-
-// 打印订单状态文案（对齐后端 PrintTaskStatus：pending/claimed/printing/completed/failed/cancelled）。
-const PRINT_ORDER_STATUS_LABEL: Record<string, string> = {
-  pending: '排队中',
-  claimed: '已认领',
-  printing: '打印中',
-  completed: '已完成',
-  failed: '未完成',
-  cancelled: '已取消',
-}
-
-function printOrderStatusLabel(s: string): string {
-  return PRINT_ORDER_STATUS_LABEL[s] ?? s
-}
-
-// 打印订单副文本：份数 + 黑白/彩色 + 幅面（仅展示后端确有的安全字段，缺省则跳过，不编造页数/金额）。
-function printOrderMetaText(o: MemberPrintOrderItem): string {
-  const parts: string[] = [printOrderStatusLabel(o.status)]
-  if (o.copies != null) parts.push(`${o.copies} 份`)
-  if (o.colorMode) parts.push(o.colorMode === 'color' ? '彩色' : '黑白')
-  if (o.paperSize) parts.push(o.paperSize)
-  parts.push(formatTime(o.createdAt))
-  return parts.join(' · ')
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
 function avatarInitial(name: string): string {
   const clean = name.replace(/\s/g, '')
   if (!clean) return '我'
   if (/^\d/.test(clean)) return clean.slice(0, 1)
   return clean.slice(0, 1)
-}
-
-// ── 收藏 / 权益展示元数据（Phase C-2C）─────────────────────────────────────────
-
-// 收藏对象按类型给图标 + 可选详情路由（job/job_fair 可跳既有详情页；policy 暂无详情页，仅展示）。
-const FAVORITE_META: Record<
-  FavoriteTargetType,
-  { icon: LucideIcon; iconBg: string; iconColor: string; label: string; route?: (id: string) => string }
-> = {
-  job: { icon: BriefcaseIcon, iconBg: 'bg-sky-50', iconColor: 'text-sky-600', label: '岗位', route: (id) => `/jobs/${id}` },
-  job_fair: { icon: CalendarIcon, iconBg: 'bg-green-50', iconColor: 'text-green-600', label: '招聘会', route: (id) => `/job-fairs/${id}` },
-  policy: { icon: LandmarkIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '政策' },
-}
-
-const BENEFIT_META: Record<BenefitType, { icon: LucideIcon; iconBg: string; iconColor: string; label: string }> = {
-  coupon: { icon: TicketIcon, iconBg: 'bg-rose-50', iconColor: 'text-rose-600', label: '优惠券' },
-  free_quota: { icon: GiftIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '免费次数' },
-  package_entitlement: { icon: BoxIcon, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', label: '套餐额度' },
-  subsidy_eligibility_hint: { icon: LandmarkIcon, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', label: '补贴资格提示' },
-}
-
-const BENEFIT_STATUS_LABEL: Record<BenefitStatus, string> = {
-  active: '可用',
-  used_up: '已用完',
-  expired: '已过期',
-  revoked: '已失效',
-}
-
-// 权益副文本：状态 + 额度（仅额度类）+ 有效期；不出现任何「到账 / 已发放金额」承诺。
-function benefitMetaText(b: MemberBenefitItem): string {
-  const parts: string[] = [BENEFIT_STATUS_LABEL[b.status] ?? b.status]
-  if (b.quantityRemaining != null) {
-    parts.push(b.quantityTotal != null ? `剩 ${b.quantityRemaining}/${b.quantityTotal} 次` : `剩 ${b.quantityRemaining} 次`)
-  }
-  if (b.validUntil) parts.push(`有效期至 ${formatTime(b.validUntil)}`)
-  return parts.join(' · ')
-}
-
-// 账号资产行：图标 + 名称 + 元信息 + 可选文本操作（触控区 ≥48px）。
-function AssetRow({
-  icon: Icon,
-  iconBg,
-  iconColor,
-  name,
-  meta,
-  actionLabel,
-  actionIcon: ActionIcon,
-  onAction,
-}: {
-  icon: LucideIcon
-  iconBg: string
-  iconColor: string
-  name: string
-  meta: string
-  actionLabel?: string
-  actionIcon?: LucideIcon
-  onAction?: () => void
-}) {
-  return (
-    <div className="flex items-center gap-3 py-3">
-      <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', iconBg].join(' ')}>
-        <Icon className={['h-5 w-5', iconColor].join(' ')} aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-900">{name}</p>
-        <p className="truncate text-xs text-gray-400">{meta}</p>
-      </div>
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-lg border border-gray-200 px-3 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50 active:bg-primary-100"
-        >
-          {ActionIcon && <ActionIcon className="h-4 w-4" aria-hidden="true" />}
-          {actionLabel}
-        </button>
-      )}
-    </div>
-  )
-}
-
-// 收藏行：图标 + 名称 + 类型/时间 + 可选「查看」(job/job_fair 跳详情) + 取消收藏（触控区 ≥48px）。
-function FavoriteRow({
-  fav,
-  onView,
-  onRemove,
-}: {
-  fav: MemberFavoriteItem
-  onView?: () => void
-  onRemove: () => void
-}) {
-  const meta = FAVORITE_META[fav.targetType]
-  const Icon = meta.icon
-  return (
-    <div className="flex items-center gap-3 py-3">
-      <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', meta.iconBg].join(' ')}>
-        <Icon className={['h-5 w-5', meta.iconColor].join(' ')} aria-hidden="true" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-900">{fav.title || `${meta.label}收藏`}</p>
-        <p className="truncate text-xs text-gray-400">{`${meta.label} · ${formatTime(fav.createdAt)}`}</p>
-      </div>
-      {onView && (
-        <button
-          type="button"
-          onClick={onView}
-          className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-lg border border-gray-200 px-3 text-sm font-medium text-primary-600 transition-colors hover:bg-primary-50 active:bg-primary-100"
-        >
-          <ExternalLinkIcon className="h-4 w-4" aria-hidden="true" />
-          查看
-        </button>
-      )}
-      <RowIconButton icon={Trash2Icon} title="取消收藏" tone="danger" onClick={onRemove} />
-    </div>
-  )
-}
-
-// 账号资产分组：小标题 + 行或一行空态（同一张白卡内，不卡片套卡片）。
-function AssetGroup({ title, count, empty, children }: { title: string; count: number; empty: string; children: ReactNode }) {
-  return (
-    <div className="border-t border-gray-100 py-2 first:border-t-0">
-      <p className="px-1 py-1.5 text-xs font-medium text-gray-500">{title}</p>
-      {count === 0 ? <p className="px-1 pb-2 text-xs text-gray-400">{empty}</p> : <div className="divide-y divide-gray-100">{children}</div>}
-    </div>
-  )
 }
 
 function SessionRow({
@@ -642,56 +426,21 @@ export function ProfilePage() {
 
   const hasSessionRecords = resumes.length + scans.length + aiRecords.length > 0
 
-  // ── 账号资产（Phase C-2B 简历/文档/AI记录 + C-2C 收藏/权益）：仅登录会员，凭本人 token 拉取后端只读列表 ──
-  const [assets, setAssets] = useState<{
-    resumes: MemberResumeItem[]
-    documents: MemberDocumentItem[]
-    aiRecords: MemberAiRecordItem[]
-    favorites: MemberFavoriteItem[]
-    benefits: MemberBenefitItem[]
-    printOrders: MemberPrintOrderItem[]
-  } | null>(null)
-  const [assetsLoading, setAssetsLoading] = useState(false)
-  const [assetsError, setAssetsError] = useState(false)
+  // ── 账号资产（C-2D）：六组独立加载 / 失败重试 / 游标翻页（不再单个 Promise.all 绑死）──
+  const assetGroups = useMemberAssetGroups(isLoggedIn, getToken)
 
   const headerDisplayName = user?.nickname?.trim() || displayName || '已登录用户'
   const headerPhoneMasked = user?.phoneMasked ?? displayName
-  // 头部统计只取真实账号资产计数（来自 /me/* API），不叠加本次会话记录，避免同一文件被双算；
+  // 头部统计取服务端真实 total（来自 /me/* 分页响应），不叠加本次会话记录，避免同一文件被双算；
   // 本次会话记录在下方「本次服务记录」单独展示。不展示「完整度」——无真实完整度计算，不编造数字。
-  // assets 为 null（加载中 / 未登录 / 加载失败）时取 null → 头部展示「—」，避免误显示 0。
+  // total 为 null（加载中 / 未登录 / 加载失败）时头部展示「—」，避免误显示 0。
   const headerStats = {
-    aiRecords: assets ? assets.aiRecords.length : null,
-    favorites: assets ? assets.favorites.length : null,
-    documents: assets ? assets.documents.length : null,
+    aiRecords: assetGroups.aiRecords.total,
+    favorites: assetGroups.favorites.total,
+    documents: assetGroups.documents.total,
   }
-
-  const loadAssets = useCallback(() => {
-    const token = getToken()
-    if (!token) return
-    setAssetsLoading(true)
-    setAssetsError(false)
-    Promise.all([
-      getMyResumes(token),
-      getMyDocuments(token),
-      getMyAiRecords(token),
-      getMyFavorites(token),
-      getMyBenefits(token),
-      getMyPrintOrders(token),
-    ])
-      .then(([res, docs, ai, favorites, benefits, printOrders]) =>
-        setAssets({ resumes: res, documents: docs, aiRecords: ai, favorites, benefits, printOrders }),
-      )
-      .catch(() => setAssetsError(true))
-      .finally(() => setAssetsLoading(false))
-  }, [getToken])
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setAssets(null)
-      return
-    }
-    loadAssets()
-  }, [isLoggedIn, loadAssets])
+  const statsLoading =
+    assetGroups.aiRecords.loading || assetGroups.favorites.loading || assetGroups.documents.loading
 
   // ── Toast ────────────────────────────────────────────────────
   // 诚实化：资产中心未完成前不承诺留存，只提示「已加入本次记录」。
@@ -731,46 +480,6 @@ export function ProfilePage() {
     })
   }
 
-  // 查看已登录会员的简历诊断报告：报告页凭本人 token 读回（归属收口 C-1）。
-  const viewResume = (taskId: string) => {
-    navigate('/resume/report', { state: { success: true, taskId } })
-  }
-
-  // 查看收藏：job / job_fair 跳既有详情页（policy 暂无详情页，不提供跳转）。
-  const viewFavorite = (fav: MemberFavoriteItem) => {
-    const route = FAVORITE_META[fav.targetType].route?.(fav.targetId)
-    if (route) navigate(route)
-  }
-
-  // 取消收藏：凭本人 token 调后端（幂等），成功后本地移除该行（不整页重载）。
-  const removeFavoriteItem = async (fav: MemberFavoriteItem) => {
-    const token = getToken()
-    if (!token) return
-    try {
-      await removeFavorite(token, fav.targetType, fav.targetId)
-      setAssets((prev) => (prev ? { ...prev, favorites: prev.favorites.filter((f) => f.id !== fav.id) } : prev))
-      setToastMsg('已取消收藏')
-    } catch {
-      setToastMsg('取消收藏失败，请稍后重试')
-    }
-  }
-
-  // 打开文档：凭本人 token 换取 TTL 受控的短期签名 URL，再触发下载（不在列表里直接持 URL）。
-  const openDocument = async (doc: MemberDocumentItem) => {
-    const token = getToken()
-    if (!token) return
-    try {
-      const { url } = await fetchAccessUrl(doc.downloadUrlPath, token)
-      const a = document.createElement('a')
-      a.href = url
-      a.target = '_blank'
-      a.rel = 'noopener'
-      a.click()
-    } catch {
-      setToastMsg('文件访问失败，请稍后重试')
-    }
-  }
-
   const handleEntryTap = (entry: Entry) => {
     if (entry.route) {
       navigate(entry.route)
@@ -802,7 +511,7 @@ export function ProfilePage() {
         displayName={headerDisplayName}
         phoneMasked={headerPhoneMasked}
         stats={headerStats}
-        statsLoading={assetsLoading}
+        statsLoading={statsLoading}
         reserveBannerSpace={isLoggedIn && hasSessionRecords}
         onLogin={goLogin}
         onLogout={logout}
@@ -831,136 +540,9 @@ export function ProfilePage() {
         <EntrySection key={section.title} section={section} onTap={handleEntryTap} />
       ))}
 
-      {/* ── 账号资产（Phase C-2B，仅登录会员；真实只读列表 / 空态）── */}
+      {/* ── 账号资产（C-2D，仅登录会员；六组独立加载 / 失败重试 / 游标翻页 / 会员操作）── */}
       {isLoggedIn && (
-        <section aria-label="账号资产" className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-medium text-gray-500">账号资产</h2>
-            <span className="text-xs text-gray-400">本人 · 留存期内可见</span>
-          </div>
-          <div className={`${cardSurface} px-4`}>
-            {assetsLoading ? (
-              <div className="flex items-center gap-2 py-5 text-sm text-gray-400">
-                <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
-                正在加载我的资产…
-              </div>
-            ) : assetsError ? (
-              <div className="flex items-center justify-between py-5 text-sm">
-                <span className="text-gray-500">资产加载失败，请重试</span>
-                <button
-                  type="button"
-                  onClick={loadAssets}
-                  className="min-h-[44px] rounded-lg border border-gray-200 px-4 font-medium text-primary-600 hover:bg-primary-50"
-                >
-                  重试
-                </button>
-              </div>
-            ) : (
-              <>
-                <AssetGroup title="我的简历" count={assets?.resumes.length ?? 0} empty="暂无简历记录，完成 AI 简历服务后在此查看">
-                  {assets?.resumes.map((r) => (
-                    <AssetRow
-                      key={r.id}
-                      icon={FileTextIcon}
-                      iconBg="bg-primary-50"
-                      iconColor="text-primary-600"
-                      name={`简历诊断 · ${aiStatusLabel(r.status)}${r.optimized ? ' · 已生成优化版' : ''}`}
-                      meta={`${formatTime(r.createdAt)}`}
-                      actionLabel="查看报告"
-                      actionIcon={EyeIcon}
-                      onAction={() => viewResume(r.taskId)}
-                    />
-                  ))}
-                </AssetGroup>
-
-                <AssetGroup title="我的文档" count={assets?.documents.length ?? 0} empty="暂无文档，上传或打印的文件将在此查看">
-                  {assets?.documents.map((d) => (
-                    <AssetRow
-                      key={d.id}
-                      icon={FilesIcon}
-                      iconBg="bg-blue-50"
-                      iconColor="text-blue-600"
-                      name={d.filename}
-                      meta={`${formatSize(d.sizeBytes)} · ${formatTime(d.createdAt)}`}
-                      actionLabel="下载"
-                      actionIcon={DownloadIcon}
-                      onAction={() => void openDocument(d)}
-                    />
-                  ))}
-                </AssetGroup>
-
-                <AssetGroup title="AI 服务记录" count={assets?.aiRecords.length ?? 0} empty="暂无 AI 服务记录">
-                  {assets?.aiRecords.map((a) => (
-                    <AssetRow
-                      key={a.id}
-                      icon={SparklesIcon}
-                      iconBg="bg-violet-50"
-                      iconColor="text-violet-600"
-                      name={`${a.kind === 'optimize' ? '简历优化' : '简历解析'} · ${aiStatusLabel(a.status)}`}
-                      meta={`${formatTime(a.createdAt)}`}
-                    />
-                  ))}
-                </AssetGroup>
-
-                {/* 我的打印订单（Phase C-2C 后续小步）：会员名下打印任务，只读安全元数据；
-                    无文件原文 / 签名链接 / 哈希 / 支付字段。诚实空态：「暂无账号打印订单」 */}
-                <AssetGroup
-                  title="我的打印订单"
-                  count={assets?.printOrders.length ?? 0}
-                  empty="暂无账号打印订单"
-                >
-                  {assets?.printOrders.map((o) => (
-                    <AssetRow
-                      key={o.id}
-                      icon={PrinterIcon}
-                      iconBg="bg-amber-50"
-                      iconColor="text-amber-600"
-                      name={o.fileName || '打印任务'}
-                      meta={printOrderMetaText(o)}
-                    />
-                  ))}
-                </AssetGroup>
-
-                {/* 我的收藏（Phase C-2C）：岗位 / 招聘会 / 政策的兴趣标记，仅浏览/收藏，不含投递 */}
-                <AssetGroup
-                  title="我的收藏"
-                  count={assets?.favorites.length ?? 0}
-                  empty="暂无收藏，浏览岗位 / 招聘会 / 政策时点收藏后在此查看"
-                >
-                  {assets?.favorites.map((f) => (
-                    <FavoriteRow
-                      key={f.id}
-                      fav={f}
-                      onView={FAVORITE_META[f.targetType].route ? () => viewFavorite(f) : undefined}
-                      onRemove={() => void removeFavoriteItem(f)}
-                    />
-                  ))}
-                </AssetGroup>
-
-                {/* 我的权益（Phase C-2C 底座）：只读展示；补贴资格提示 info-only，无「到账」承诺 */}
-                <AssetGroup
-                  title="我的权益"
-                  count={assets?.benefits.length ?? 0}
-                  empty="暂无可用权益，参与活动或购买套餐后在此查看"
-                >
-                  {assets?.benefits.map((b) => {
-                    const meta = BENEFIT_META[b.benefitType]
-                    return (
-                      <AssetRow
-                        key={b.id}
-                        icon={meta.icon}
-                        iconBg={meta.iconBg}
-                        iconColor={meta.iconColor}
-                        name={b.title}
-                        meta={`${meta.label} · ${benefitMetaText(b)}`}
-                      />
-                    )
-                  })}
-                </AssetGroup>
-              </>
-            )}
-          </div>
-        </section>
+        <AccountAssetsPanel groups={assetGroups} onToast={setToastMsg} cardSurface={cardSurface} />
       )}
 
       {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}

@@ -41,7 +41,8 @@
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
     "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts",
     "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",
-    "db:seed:venue-guide": "node -r @swc-node/register prisma/seed-venue-guide.ts"
+    "db:seed:venue-guide": "node -r @swc-node/register prisma/seed-venue-guide.ts",
+    "verify:member-assets-c2d": "node -r @swc-node/register scripts/verify-member-assets-c2d.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

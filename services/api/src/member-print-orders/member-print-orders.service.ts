@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import type { MemberPrintOrderItem } from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
+import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 // ============================================================
 // 会员「我的打印订单」服务（Phase C-2C 后续小步，只读）。
@@ -56,15 +57,20 @@ function parseSafeParams(paramsJson: string): ParsedParams {
 export class MemberPrintOrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** 我的打印订单（本人），按创建时间倒序。无任何订单返回 []。 */
-  async list(endUserId: string): Promise<MemberPrintOrderItem[]> {
+  /** 我的打印订单（本人），游标分页（C-2D，不做无界查询）。无任何订单返回空 items。 */
+  async list(
+    endUserId: string,
+    page: MemberPageQuery,
+  ): Promise<{ items: MemberPrintOrderItem[]; nextCursor: string | null; total: number }> {
+    const where = { endUserId }
+    const total = await this.prisma.printTask.count({ where })
     // select 显式收口：只取安全列，连 fileUrl / fileMd5 都不从 DB 读出，杜绝误透传。
     const rows = await this.prisma.printTask.findMany({
-      where: { endUserId },
+      where,
       select: { id: true, status: true, paramsJson: true, createdAt: true, completedAt: true },
-      orderBy: { createdAt: 'desc' },
+      ...memberPageArgs(page),
     })
-    return rows.map((r) => {
+    return buildMemberPage(rows, page, total, (r) => {
       const params = parseSafeParams(r.paramsJson)
       return {
         id: r.id,

@@ -669,7 +669,7 @@ Claude Code 每次开发前必须：
 - 岗位/招聘会只做第三方/官方来源信息入口。
 - 秒哒旧项目作为参考库，不作为正式工程继续开发。
 
-当前阶段（2026-06-01，**写完代码改这里 + docs/progress/current-progress.md**）：
+当前阶段（2026-06-11，**写完代码改这里 + docs/progress/current-progress.md**）：
 
 - Phase 1–7（设计系统、前台、后台、合作机构、API 设计、AI Provider 骨架、岗位/招聘会真实 API）全部完成
 - **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI 状态 / 8.2C 安全加固，全部 Mac 真实后端跨机 E2E 通过
@@ -678,21 +678,26 @@ Claude Code 每次开发前必须：
   - W2：BE-7 JobFair 8 端点切真 Prisma + audit + 校企合作详情端点
   - W3：JobSource 凭证加密落库（AES-256-GCM）+ Webhook 接收端（HMAC + 5min 时间窗 + nonce LRU 防重放）+ Partner /sources 三轨入口（API/Webhook/Excel）+ Phase 7.11 R4 类型对齐 `packages/shared/PartnerDataSourceView`
 - E2E demo（Partner → Webhook → Admin 审核 → Kiosk 展示）已跑通；防重放/错签名 401、候选人字段注入 400、webhookSecret 创建后 GET 不再回显 全部通过
+- **阶段1 三端数据打通 1A–1F 已完成（2026-06-10）**：Admin 招聘会/合作机构/订单告警、Partner 编辑与政策公告、Kiosk 招聘会与校园招聘新版 UI 均已接真。
+- **阶段2 已完成（2026-06-10 ~ 2026-06-11）**：AI 简历生成 MVP、AI 简历优化真实化、真实模型联调 + 安全收口、招聘会场馆导览图、C-2D 会员资产中心真实管理。
+- **AI 数字人主体已完成**：Kiosk `/assistant` 为 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人引导员方案已被实际方案取代，不再作为下一步重做。
 
 ## 16. 当前最高优先级
 
 **P0（next）：**
 
-- Excel 字段映射 service 层接入（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export，Sources 页 4 步向导 mock 已存在，下一步是把 mock 切到 service 调用 + 后端落 ImportBatch）
-- BullMQ API 拉取 worker（W3 后端 JobSource 已有 endpoint/encryptedCredential，待 worker 周期性拉取）
-- Phase 9 UI Polish + AI 数字人引导员（Phase 8 封板后启动）
+- 2C 模拟面试 + 面试问题预测（结果只给本人，报告可打印；入口先放 AI 简历服务内部，MVP 验收后再点亮首页占位）
+- 2D 目标岗位定向优化 + 岗位匹配度参考（仅参考，引导「去来源平台投递」）
+- 2E 职业规划建议
+- 择期补：图片 OCR 真实接入；场馆导览 Partner 配置入口 / 展厅平面图图片
 
 **已完成（保留作为基线）：**
 
 - 一体机首页 / 打印扫描核心流程 / 管理员后台基础框架 / 岗位/招聘会外部来源展示
-- AI简历服务 / 合作机构后台 P0 / 数据源同步骨架（W3 Webhook 已落地，API/Excel 后续接 worker）
+- AI简历服务 / 合作机构后台 P0 / 数据源同步骨架（W3 Webhook、Excel 字段映射、BullMQ API 拉取 worker 均已落地）
 - Windows Terminal Agent（Phase 8 全部封板，含 DPAPI/SQLite/WMI/单实例/断网重试/Windows 服务）
 - 待机宣传屏一期（`feature/kiosk-screensaver-ads`）：管理员上传图/视频 + 播放方案 + 终端配置；Kiosk 无操作进入全屏轮播、触摸唤醒、忙碌态豁免。AI 文生图为二期（一期 stub，`AI_IMAGE_PROVIDER=disabled`，零外部费用）。详见 docs/progress/current-progress.md
+- Excel 字段映射 service 层接入、BullMQ API 拉取 worker、Phase 9.1–9.5 AI 助手/数字人相关收口均已完成或被新方案替代；不要按旧待办重复开发。
 
 **P1（择期）：**
 

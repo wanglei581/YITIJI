@@ -1,9 +1,10 @@
-import { Controller, Get, UseGuards } from '@nestjs/common'
+import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 import type { MemberPrintOrderItem } from './member-print-orders.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberPrintOrdersService } from './member-print-orders.service'
+import { parseMemberPageQuery } from '../common/utils/member-page'
 
 /**
  * 会员「我的打印订单」接口（Phase C-2C 后续小步）。路由前缀 /api/v1/me/print-orders。
@@ -22,9 +23,13 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
 export class MemberPrintOrdersController {
   constructor(private readonly orders: MemberPrintOrdersService) {}
 
-  /** 我的打印订单列表（本人，只读）。无订单返回 []。 */
+  /** 我的打印订单列表（本人，只读；游标分页，pageSize 封顶 50）。无订单返回空 items。 */
   @Get()
-  async list(@CurrentEndUser() user: AuthedEndUser): Promise<ApiResponse<MemberPrintOrderItem[]>> {
-    return ApiResponse.ok(await this.orders.list(user.endUserId))
+  async list(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<ApiResponse<{ items: MemberPrintOrderItem[]; nextCursor: string | null; total: number }>> {
+    return ApiResponse.ok(await this.orders.list(user.endUserId, parseMemberPageQuery(cursor, pageSize)))
   }
 }

@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-10（用户确认总路线「阶段1 数据打通 → 阶段2 AI 求职功能」；Phase 1.1 已合入 main `56dd844`；阶段1A Admin 招聘会管理已完成验证，见下方 §阶段路线）
+> 最后更新：2026-06-11（同步 Phase C-2D 验收、AI 数字人实际方案、过期待办归档；用户确认总路线「阶段1 数据打通 → 阶段2 AI 求职功能」）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -22,7 +22,7 @@
 - ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
 
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
-> **2026-06-11 用户确认的执行顺序：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,下一步) → ⑤ 2C 模拟面试(入口先放 AI简历服务内部,MVP 验收后才点亮首页占位) → 2D/2E。**
+> **2026-06-11 用户确认的执行顺序：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅ 代码/verify/浏览器登录态验收完成) → ⑤ 2C 模拟面试(入口先放 AI简历服务内部,MVP 验收后才点亮首页占位) → 2D/2E。**
 > 场馆导览后续扩展(择期):Partner 端配置入口;展厅平面图图片。
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
@@ -47,7 +47,7 @@
 1. **功能实现**：先完成真实业务能力、API 接线、数据落库/读取、错误处理、权限与合规边界。
 2. **验证闭环**：功能完成后跑 typecheck/lint/build、脚本验证、浏览器流程手验；涉及一体机/打印/扫描的功能还要做真机或近似真实链路验证。
 3. **基础 UX 修正**：确认流程正常后，修正下一步不清晰、按钮过小、空/错/加载状态不足、文案不诚实、触控屏文本越界等问题。
-4. **集中 UI/UX 设计**：等一组核心功能稳定后，再统一做视觉层级、组件风格、触控屏布局、动效、AI 数字人引导和三端一致性。
+4. **集中 UI/UX 设计**：等一组核心功能稳定后，再统一做视觉层级、组件风格、触控屏布局、动效和三端一致性。AI 数字人主体已由 `/assistant` TRTC「小青」方案完成，后续不再按早期 3D/SVG 引导员方案重做。
 
 **注意：** 不在功能未跑通前投入大规模视觉精修；也不允许把合规文案留到最后才改。岗位/招聘会入口开发时必须同步保持「第三方/官方来源入口」定位。
 
@@ -68,13 +68,13 @@
 2. ✅ **真实 AI Provider 接入 / LLM 结构化诊断（Phase 1B 已完成，2026-06-10，`feature/real-resume-diagnosis-1b`）：** 新增 `llm` provider + `LlmResumeService`（复用 `LlmConfigService` 加密凭证 + OpenAI 兼容，全局 fetch 不引 SDK），`AiService.submitResumeParse` 在 `AI_PROVIDER=llm` 时「先提取 → 失败直接返回 → 成功调 LLM 出结构化 `ResumeReport` → 落库」；非法 JSON 重试一次、未配置/失败明确报错不 fallback mock；`providerName='llm'` 演示横幅自动消失（前端零改动）。`verify-real-resume-diagnosis` 10/10 + `verify:ai-result-ownership` 12 例回归 + `verify:resume-extraction` 11/11 全过。补 `AI_PROVIDER`（含 llm）到 `.env.example`。详见 [current-progress.md](./current-progress.md) §真实 AI 简历诊断 Phase 1B。
 3. 🔄 **图片 OCR 真实接入（下一步优先之一）：** 当前仍是 Phase 1A 的 OCR Provider 架构 + 默认 disabled，腾讯云 OCR 为占位（即便配凭证也只 `OCR_FAILED`）。下一步接真实腾讯云 OCR（GeneralAccurateOCR/GeneralBasicOCR，TC3-HMAC-SHA256 v3 签名在服务端，不记图片/原文），让扫描件/图片简历也能进诊断闭环。
 4. ✅ **报告结构扩展（Phase 1.1 已完成，2026-06-10，待 review）：** 升级为「8 项诊断结果」= **6 评分维度（basic/objective/experience/quantification/keyword/readability）+ riskNotes（风险表述提醒，0–5 条，仅文本表达、不涉敏感判断）+ priorities（修改优先级建议，2–4 条）**。`ResumeReport` 加 `riskNotes?`/`priorities?`（additive，旧 5-section 报告兼容）；`parseReport` 强校验 6 维度 + score/maxScore 严格(===10·整数) + priority 契约(focus·reason 必填、清洗后 1 条触发 retry) + 超长截断 + 诊断专属合规拦截词过滤(红线词 grep 0 命中)；前端新增风险卡/优先卡（缺失优雅降级）。`verify-real-resume-diagnosis` **18 PASS / ALL PASS** + 三端 typecheck/lint/build + ownership/extraction 回归全绿。详见 [current-progress.md](./current-progress.md) §Phase 1.1。
-5. 🔄 **AI 简历优化真实化（Phase 1E）：** 当前 `llm` provider 的 optimizeResume 诚实返回 failed；后续补「基于真实报告的表达优化」单轮 LLM 调用。
+5. ✅ **AI 简历优化真实化（阶段2B 已完成，2026-06-11）：** `resume_optimize` 已 active，`optimizeResume` 已走真实 LLM 优化链路；包含原文重提、事实串校验防编造、承诺词拦截、优化版可编辑、导出 PDF 与打印链路。`verify:resume-optimize` 已通过。旧 Phase 1E 待办已由阶段2B 覆盖，不再重复开发。
 6. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
 7. ✅ **运行期手验（2026-06-10，headless HTTP + 页面级检查已补齐）：** 有效 DeepSeek Key 下，后台模型测试 `ok:true`；真实 API（`AI_PROVIDER=llm` + `local` 存储）上传合成无 PII DOCX / 文本型 PDF → `status=completed`、`providerName=llm`、固定 5 维度、suggestions=6；图片→`OCR_NOT_CONFIGURED`、`.doc`→`UNSUPPORTED` 诚实失败；落库与日志无简历原文/明文 token；Kiosk 报告页 `providerName=llm` 时无「演示数据」横幅。详见 [current-progress.md](./current-progress.md) §Phase 1B 运行期手验。
 
 ### AI 大模型配置中心 v1（2026-06-10，已完成）
 
-- ✅ 功能级配置：`assistant_chat`、`resume_diagnosis` 已接入；`resume_optimize`、`digital_human`、`poster_generation` 为 planned，可独立保存配置但 UI 明确标注「后续接入 / 尚未被运行链路消费」。
+- ✅ 功能级配置：`assistant_chat`、`resume_diagnosis`、`resume_generate`、`resume_optimize` 已接入运行链路；`digital_human`、`poster_generation` 仍为 planned 配置位，UI 明确标注「后续接入 / 尚未被运行链路消费」。注意：当前 AI 数字人页面能力已由 `assistant_chat` + TRTC「小青」承接，`digital_human` 配置位不是现行数字人运行入口。
 - ✅ 持久化：新文件 `data/ai-model-configs.json`；旧 `data/ai-model-config.json` 保留兼容/回退，首次迁移复制到 `assistant_chat` 与 `resume_diagnosis` 并写入新文件。
 - ✅ 简历诊断边界：`resume_diagnosis` 的 `vendor/model/baseURL/apiKey/temperature/enabled/forbiddenWords` 走功能级配置；诊断结构化 System Prompt 由服务端强制，v1 不消费管理员自定义 `systemPrompt`，避免破坏固定 5 维度 / JSON 契约；`forbiddenWords` 仍作用于 `suggestions`。
 - ✅ 验证：api/admin typecheck + lint 通过，admin build 通过；`verify-real-resume-diagnosis` 通过。`/assistant/chat` 与 DOCX/PDF 诊断已用受控 stub LLM + 本地 API 补跑 HTTP 回归：助手返回小青回复；DOCX/PDF 均 `completed/providerName=llm/sections=5`；配置 GET 不回显 API Key 明文；对抗探针确认非 2xx 上游错误 body sentinel 不进入日志。
@@ -90,10 +90,10 @@
 - ✅ 首页登录状态栏（未登录/匿名/已登录三态，跳 `/login`，不改底部 Tab，按钮 ≥56px）；ProfilePage 诚实化（移除「跨设备查看」，资产中心建设中）。
 - ✅ kiosk typecheck/lint/build + api typecheck/lint 全绿；禁词 0 命中；Playwright mock 浏览器手验 13/13。
 
-**Phase C-2 待办（C-2A 已完成，其余未做）：**
+**Phase C-2 状态（C-2A–C-2D 代码、验证与浏览器登录态手验已完成）：**
 
 - ✅ **匿名 AI 结果一次性 accessToken（C-2A，2026-06-07，`feature/ai-anon-access-token`）**：`AiResumeResult` 加 `accessTokenHash` 列（additive migration `20260607120000`，dev.db 经 `db execute` 落地，PostgreSQL 迁移时随 drift 统一重整）；`POST /resume/parse` 匿名时铸 192-bit token 并**只回传一次**（DB 只存 SHA-256 hash）；读取改用 `x-resume-access-token` header（**不进 URL query**）+ `timingSafeEqual` 校验；新匿名行须持令牌才可读，历史 null-hash 行 **fail-closed**，会员路径不变（仍按 endUserId 本人校验）；optimize 懒生成继承 parse 行 hash，不铸新 token；Kiosk 加最小 `aiResumeSession`（只存 taskId/accessToken，不存任何 AI payload/原文/PII）+ idle/屏保清理。`verify:ai-result-ownership` 扩展为 12 类断言 ALL PASS；api/kiosk typecheck/lint/build 全绿。详见 [current-progress.md](./current-progress.md) §Phase C-2A。**待运行期手验**（真实 API + 会员短信验证码 + 浏览器/一体机：匿名拿 token→刷新仍可读、无/错 token 被拒、进屏保后下一位读不到）。
-- 🔄 **完整用户资产中心**：我的简历 / 文档 / AI记录（✅ C-2B `feature/member-assets-mvp`）+ 收藏 / 权益（✅ C-2C `feature/member-favorites-benefits-c2c`）的跨会话列表 API + ProfilePage 真实展示已落地；✅ **岗位收藏服务端化 + 登录态门控**（C-2C follow-up `feature/kiosk-job-favorites-server-sync`：JobsPage/JobDetailPage 登录会员写 `/me/favorites`、匿名沿用本机 + 「登录后可同步到账号」提示；`verify:job-favorites-http` 11 类 + 匿名本机运行期校验通过）；✅ **打印订单只读列表**（C-2C follow-up `feature/member-print-orders-readonly`：`GET /me/print-orders` 受 `EndUserAuthGuard` 保护，按本人 `endUserId` 只读安全元数据、不返回 fileUrl/fileMd5/paramsJson/支付字段、匿名任务不归属任何会员；ProfilePage 账号资产新增「我的打印订单」分组 + 诚实空态；`verify:member-print-orders` 6 组 ALL PASS）。**剩余**：招聘会/政策收藏入口服务端化、本机→账号迁移、打印订单登录态浏览器端到端运行期手验。
+- ✅ **完整用户资产中心 C-2D（已完成 2026-06-11）**：我的简历 / 文档 / AI记录 / 打印订单 / 收藏 / 权益六组已统一游标分页；ProfilePage 账号资产改为各组独立加载/失败重试/加载更多；AI 记录支持本人删除(parse 级联 optimize)；文档支持本人预览/下载/再打印/删除；收藏已覆盖岗位 / 招聘会 / 政策三类，登录会员写 `/me/favorites`、匿名保留本机收藏，并提供显式「合并本机收藏到账号」；CI 已加 Redis service 并纳入 `verify:member-assets-c2d`；未跟踪临时演示 seed 脚本已清理；登录态浏览器端到端手验已通过（账号资产分页/文档访问与删除/再打印/AI 记录删除/三类收藏取消/本机收藏合并/登出与刷新清空）。
 - 🔄 **短信服务商真实接入**：✅ 已预留 `SMS_PROVIDER=log|tencent`、腾讯云短信 env 位与 `TencentSmsSender` 占位，`verify:sms-provider` 覆盖 Provider 选择和生产保护；**剩余**：腾讯云短信服务审核通过后，补 `TencentSmsSender.sendCode()` 的真实 `SendSms` API 调用，并用真实签名 / 模板 / SDKAppID / CAM 密钥跑一遍登录验证码端到端手验。
 - 🔄 **扫码登录真实接入**：✅ Kiosk 登录页已预留微信扫码 / 支付宝扫码 UI 与二维码刷新入口；**剩余**：申请微信开放平台 / 支付宝开放平台能力后，设计扫码登录会话模型、二维码生成接口、手机端授权回调 / 轮询、EndUser 账号绑定与解绑、异常/超时/风控策略。
 - ⏳ **登录态运行期手验**：需 API + 会员短信验证码环境，手验已登录状态栏、idle 超时登出、进入屏保登出、忙碌态（打印/AI 中）不误登出。
@@ -123,11 +123,11 @@
 
 | 子模块 | 内容 | 数据来源 / 模型 | 现状 |
 |--------|------|----------------|------|
-| 我的简历 | 上传 / 解析 / 优化的简历版本列表 | `AiResumeResult` + `FileObject`（endUserId 归属） | 底座已建，缺列表 API |
-| 我的文档 | 打印过 / 上传过的文件记录 | `FileObject`（endUserId 归属，签名 URL，TTL） | 底座已建，缺列表 API |
-| AI记录 | 解析 / 诊断 / 优化历史（元数据，不存简历原文） | `AiResumeResult` 元数据 + AI 日志 | 底座已建，缺列表 API |
-| 打印订单 | 历史打印记录 | 先用 `PrintTask` 聚合视图；真实订单域留 C-5 | `PrintTask` 已落库 |
-| 我的收藏 | 岗位收藏 / 招聘会收藏 / 政策收藏 | **新增 `Favorite`**（targetType=job / job_fair / policy） | 当前仅 localStorage（岗位），需服务端化 |
+| 我的简历 | 上传 / 解析 / 优化的简历版本列表 | `AiResumeResult` + `FileObject`（endUserId 归属） | ✅ C-2D 已完成分页列表与本人归属读取 |
+| 我的文档 | 打印过 / 上传过的文件记录 | `FileObject`（endUserId 归属，签名 URL，TTL） | ✅ C-2D 已完成分页列表、预览/下载/再打印/删除 |
+| AI记录 | 解析 / 诊断 / 优化历史（元数据，不存简历原文） | `AiResumeResult` 元数据 + AI 日志 | ✅ C-2D 已完成分页列表与本人删除 |
+| 打印订单 | 历史打印记录 | 先用 `PrintTask` 聚合视图；真实订单域留 C-5 | ✅ 只读聚合视图已完成并在 C-2D 分页化 |
+| 我的收藏 | 岗位收藏 / 招聘会收藏 / 政策收藏 | `Favorite`（targetType=job / job_fair / policy） | ✅ C-2D 已完成三类收藏服务端化与本机收藏显式合并 |
 | 我的权益 | 优惠券 / 免费次数 / 套餐权益 / 补贴资格提示 | **新增 `BenefitGrant`** 底座 | 未建，C-2C 起底座 |
 
 合规要点（资产中心）：
@@ -211,8 +211,8 @@
 | 阶段 | 目标 | 主要范围 | 依赖 | 验收要点 | 合规 |
 |------|------|---------|------|---------|------|
 | **✅ C-2A 匿名 AI accessToken 安全收口（已完成 2026-06-07）** | 把匿名 AI 结果从「短 TTL 兜底」收紧为「持一次性令牌才可读」 | `AiResumeResult` 加 `accessTokenHash` 列；`POST /resume/parse` 回传一次性 token（header `x-resume-access-token`，不进 query）；各读取点透传（对齐 materials 任务机制）；optimize 继承 parse hash；历史 null-hash fail-closed | 无（纯安全，无商业域） | ✅ verify:ai-result-ownership 12 类断言 ALL PASS（无/错/仅会员 token 读匿名均 NOT_FOUND；本人 token 可读；hash 64 hex 且不落明文） | 不涉招聘闭环；纯越权收口 |
-| **🔄 C-2B 我的简历 / 文档 / AI记录真实列表（后端完成 + 前端最小接入，2026-06-07，`feature/member-assets-mvp`）** | 「我的」从会话态升级为登录会员跨会话真实资产 | ✅ `GET /me/resumes` `/me/documents` `/me/ai-records`（EndUserAuthGuard，仅本人 endUserId，只回元数据，文件给 TTL 签名 URL 端点路径，空列表 []，无 schema 变更）；✅ ProfilePage 仅登录会员新增「账号资产」白卡接真实列表/空态（保持九宫格入口风格）；`verify:member-assets` 10 类断言 + HTTP 401 冒烟通过。详见 [current-progress.md](./current-progress.md) §Phase C-2B | Phase A-1 归属底座（已完成） | 登录跨会话可见本人资产；匿名 401；文件走签名 URL；不伪造数量 | 不存高敏原文；管理员访问审计。**剩余**：登录态真实列表端到端手验（需 API+短信）、收藏/权益属 C-2C |
-| **🔄 C-2C 收藏 + 权益底座（最小底座完成，2026-06-07，`feature/member-favorites-benefits-c2c`）** | 收藏服务端化 + 权益底座建模 | ✅ 新增 `Favorite`（job/job_fair/policy）+ `GET/POST/DELETE /me/favorites`（EndUserAuthGuard，本人 endUserId，幂等 upsert/删，非法 type 400）；✅ 新增 `BenefitGrant` 底座 + `GET /me/benefits`（只读，active 优先，无支付凭证）；✅ ProfilePage「账号资产」白卡新增「我的收藏 / 我的权益」真实列表/空态（去掉九宫格误导「建设中」标签）；`verify:member-favorites-benefits` 14 类断言 + HTTP 401 冒烟通过。详见 [current-progress.md](./current-progress.md) §Phase C-2C。**剩余**：① Jobs/JobDetail/Campus/Home 页 localStorage 收藏切服务端（需登录态门控 UX）；② 打印订单 `PrintTask` 聚合视图；③ 权益发放/核销随 C-3/C-4/C-5 接入（本阶段只读底座，不接支付）；④ 登录态端到端手验（需 API+短信） | C-2B | 收藏跨会话；我的权益空态诚实；补贴资格提示 info-only | 收藏不记投递结果；补贴提示无「到账」 |
+| **✅ C-2B 我的简历 / 文档 / AI记录真实列表（2026-06-07，`feature/member-assets-mvp`；C-2D 已分页化与管理化）** | 「我的」从会话态升级为登录会员跨会话真实资产 | ✅ `GET /me/resumes` `/me/documents` `/me/ai-records`（EndUserAuthGuard，仅本人 endUserId，只回元数据，文件给 TTL 签名 URL 端点路径，空列表 []）；C-2D 已升级为游标分页、独立加载、AI 记录删除、文档预览/下载/再打印/删除，并完成登录态浏览器端到端手验。详见 [current-progress.md](./current-progress.md) §Phase C-2B / §Phase C-2D | Phase A-1 归属底座（已完成） | 登录跨会话可见本人资产；匿名 401；文件走签名 URL；不伪造数量 | 不存高敏原文；管理员/会员文件访问删除均留审计 |
+| **✅ C-2C 收藏 + 权益底座（2026-06-07，`feature/member-favorites-benefits-c2c`；C-2D 已扩到三类收藏与合并）** | 收藏服务端化 + 权益底座建模 | ✅ `Favorite`（job/job_fair/policy）+ `GET/POST/DELETE /me/favorites`；✅ `BenefitGrant` + `GET /me/benefits` 只读；C-2D 已将岗位 / 招聘会 / 政策收藏入口统一接入 FavoritesProvider，并提供本机收藏显式合并账号；打印订单 `PrintTask` 聚合视图已完成只读列表并分页化；登录态浏览器端到端手验已通过。详见 [current-progress.md](./current-progress.md) §Phase C-2C / §C-2C follow-up / §Phase C-2D。**剩余**：权益发放/核销随 C-3/C-4/C-5 接入（当前只读底座，不接支付） | C-2B | 收藏跨会话；我的权益空态诚实；补贴资格提示 info-only | 收藏不记投递结果；补贴提示无「到账」 |
 | **C-3 权益活动中心** | 运营可配活动，发权益 / 指向官方渠道 | 新增 `BenefitActivity`；Admin + Partner 配置；Kiosk 活动列表 / 详情 + 领取（发 BenefitGrant）/ 去官方入口 | C-2C（BenefitGrant） | 领券落 BenefitGrant；补贴活动只指引；企业赞助不收简历 | 见 §二合规要点 |
 | **C-4 服务套餐上架** | 套餐上架 + 购买发额度 | 新增 `ServicePackage`；套餐列表 / 详情；购买 → 发 entitlement（付费走 C-5，可先免费 / 占位） | C-2C；付费部分依赖 C-5 | 套餐不承诺录用；面试包结果只给本人；额度落 BenefitGrant | 见 §三合规要点 |
 | **C-5 支付 / 核销 / 退款 / 对账** | 真实订单支付域（== Phase E） | `Order` / `PaymentAttempt` / `Refund` / 校园卡 / 微信 / 支付宝 / 券核销；Admin 对账 + 支付异常时间线 | C-2C / C-3 / C-4 | 免费单落库；退款幂等；券核销幂等；不伪装支付异常 | 凭证只存服务端；补贴券核销 ≠ 政府补贴到账 |
@@ -511,17 +511,17 @@
 
 ## 📌 历史已完成状态（Phase 9.3 AI 助手快捷操作增强）
 
-**Phase 9.3 feat/phase9-assistant-actions（2026-06-01，已完成，待合入 main）：**
+**Phase 9.3 feat/phase9-assistant-actions（2026-06-01，历史已完成；后续已由 `/assistant` TRTC「小青」+ 文字对话方案承接）：**
 - ✅ 7 个常驻快捷入口（始终可见）：简历诊断 / 打印文件 / 扫描材料 / 查看岗位 / 查看招聘会 / AI 在青岛 / 人社专区
 - ✅ `KEYWORD_ROUTES` 关键词实时高亮：输入匹配关键词 → 相关快捷按钮高亮，无需 AI 响应
 - ✅ AI 上下文建议区（带"AI 建议"标签）：仅 AI 返回 actions 时出现
 - ✅ `/qingdao` 加入 `ALLOWED_ROUTE_PREFIXES` 白名单
 - ✅ `isAllowedRoute` 白名单保留（line 152），合规声明保留，无招聘闭环词
 - ✅ typecheck ✅ / lint ✅ / build ✅（915KB/272KB gzip）/ 合规扫描 ✅
-- ⏳ 待 FF merge 到 main
+- ✅ 已不作为当前待办；不要再按此历史分支重复实现 AI 助手快捷入口。
 
 **Phase 9.2 feat/phase9-digital-human（2026-06-01，✅ 已合入 main `f79b4d8`）：**
-- ✅ `DigitalHuman.tsx`：纯 SVG + CSS 动画，idle/talking/greeting 三状态，无 WebGL/VRM
+- ✅ `DigitalHuman.tsx`：纯 SVG + CSS 动画，idle/talking/greeting 三状态，无 WebGL/VRM（历史文件，2026-06-11 已删除；当前由 TRTC「小青」承接）
 - ✅ AssistantPage 两区布局（上：数字人+气泡，下：对话历史）
 
 **Phase 9.1 feat/phase9-kiosk-ui-polish（2026-06-01，✅ 已合入 main `b60fd8f`）：**
@@ -588,15 +588,19 @@
 
 ## 🔜 下一步优先级
 
-### P0（立即）
+### P0（历史快照，已归档）
 
-**安全改进 Round 3 已完成（本次）。剩余 P0 安全项：暂无。**
+> 本段是 2026-06-04 左右的历史 P0 快照，已被文档顶部「阶段路线」取代，不能再作为当前排期入口。
 
-**业务 P0：**
-1. **未提交的 TRTC/LLM 新功能定批**（合入 main 前必做）：工作区有 Round 3 之外的未跟踪新功能 —— `services/api/src/trtc/*`、`services/api/src/ai/llm/*`、`apps/admin/src/routes/ai-config/*`，且 `app.module.ts` 已 import `TrtcModule`（源文件未提交）。必须将依赖文件与 import 同批提交，否则 main 构建缺文件。决定：随 Round 3 一起合，还是独立 feature commit。
-2. **feat/phase9-assistant-actions FF 合入 main**（含 Round 1 + Round 2 + Round 3 安全修复）
-3. **Excel 字段映射 service 层接入**（FieldMappingRule / ImportBatch / ImportRecord 已在 partner adapter re-export）
-4. **BullMQ API 拉取 worker 验证**：`pnpm verify:job-sync` 通过后 FF merge
+**安全改进 Round 3 已完成。剩余 P0 安全项：暂无。**
+
+**已完成 / 已归档的旧业务 P0：**
+1. ✅ TRTC / LLM / Admin AI 配置相关文件已合入并被后续阶段验证；当前 `/assistant` 已接 TRTC「小青」+ 文字对话。
+2. ✅ Phase 9.3 AI 助手快捷入口已完成；后续不再按旧分支重复实现。
+3. ✅ Excel 字段映射 service 层接入已完成并合入，旧「把 mock 切 service」待办归档。
+4. ✅ BullMQ API 拉取 worker 已完成并通过 `verify:job-sync`，旧验证待办归档。
+
+**当前 P0 以文档顶部为准：** 2C 模拟面试 → 2D 目标岗位定向优化 / 岗位匹配度参考 → 2E 职业规划建议。
 
 ### P1（择期）
 **安全后续：**
@@ -1032,19 +1036,18 @@
 | 选项 | 内容 | 状态 |
 |------|------|------|
 | ~~A — Prisma 后端部署验证~~ | ~~将 Prisma 后端部署，验证心跳/claim 持久化~~ | ✅ 已完成（2026-05-29，Mac 跨机验证通过） |
-| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 + AI数字人 | 🚧 进行中：AI 数字人语音通话 + 文字对话**已完成**（`/assistant`，见下）；视觉收口待推进 |
+| **B — Phase 9 UI Polish** | Kiosk/Admin/Partner 视觉收口 | 🚧 进行中：AI 数字人语音通话 + 文字对话**已完成**（`/assistant`，见下），不再重做；视觉收口待推进 |
 | **C — Phase 7.11** | Partner Sources R4 对齐（DisplaySource → DataSourceConfig） | 📋 可与 Phase 9 并行 |
 
-## 🚧 Phase 9 — UI Polish + AI数字人（AI数字人已完成，视觉收口进行中）
+## 🚧 Phase 9 — UI Polish（AI数字人已完成，视觉收口进行中）
 
-> **AI 数字人现状校正（2026-06-04，T3B）**：AI 数字人语音通话（TRTC 真人照片顾问「小青」）+ 文字对话**均已完成并接入** Kiosk「AI助手」Tab → `/assistant`（`apps/kiosk/src/pages/assistant/AssistantPage.tsx` + `components/AiAdvisorCall.tsx`）。早期「轻量 3D / SVG 引导员」非当前主方案，SVG `DigitalHuman.tsx` 与 `SpeechBubble` 已成**待清理死代码**（本任务不删除）。**后续不再重做 AI 数字人功能。** 详见 [current-progress.md §〇·B](./current-progress.md)。
+> **AI 数字人现状校正（2026-06-04，2026-06-11 同步清理）**：AI 数字人语音通话（TRTC 真人照片顾问「小青」）+ 文字对话**均已完成并接入** Kiosk「AI助手」Tab → `/assistant`（`apps/kiosk/src/pages/assistant/AssistantPage.tsx` + `components/AiAdvisorCall.tsx`）。早期「轻量 3D / SVG 引导员」非当前主方案；旧 `DigitalHuman.tsx` 已于 2026-06-11 删除，`SpeechBubble` 文件已不存在。**后续不再重做 AI 数字人功能。** 详见 [current-progress.md §〇·B](./current-progress.md)。
 
 详细规划见：[current-progress.md §Phase 9](./current-progress.md)
 
-**Phase 9.1 静态 3D 引导员（首个交付）：**
-- AvatarGuide 组件、Three.js/VRM 模型加载
-- idle 动画、文字气泡
-- 关闭/静音、WebGL 降级
+**历史规划说明：**
+- 早期 `Phase 9.1 静态 3D 引导员`（AvatarGuide / Three.js / VRM / 文字气泡 / WebGL 降级）已被实际落地路线取代。
+- 当前运行方案是 `/assistant` 的 TRTC 真人照片顾问「小青」+ 文字对话；后续不再按 3D/SVG 数字人方案重做。
 
 **Phase 9 Kiosk 视觉升级范围：**
 - 首页业务入口层级增强
@@ -1120,11 +1123,11 @@ pnpm audit   # ✅ 已完成，0 vulnerabilities
 | **二维码弹层** | 基础占位框 | 统一弹层美化；QR 区域视觉优化；操作说明排版升级 |
 | **失败态 / 空状态** | 基础 ErrorState/EmptyState | 插画/图标升级；文案更具引导性；操作按钮更突出 |
 
-### AI数字人引导员（Phase 9.1 起）
+### AI数字人引导员（历史规划，已被实际方案取代）
 
 > 详细需求见：[AI数字人引导员需求规划](../product/ai-avatar-guide.md)
 
-定位：数字人是 Kiosk 前台的“AI就业服务引导员”，用于首页、AI助手、简历服务、打印扫描、招聘会导览等场景的操作引导，不进入 Admin/Partner 后台。
+定位：数字人是 Kiosk 前台的“AI就业服务引导员”，用于首页、AI助手、简历服务、打印扫描、招聘会导览等场景的操作引导，不进入 Admin/Partner 后台。当前已落地在 Kiosk `/assistant`，实际方案为 TRTC 真人照片顾问「小青」+ 文字对话。
 
 > ⚠️ **此表为早期规划，已被实际实现取代（2026-06-04 校正）。** 实际落地走的是 **TRTC 真人照片顾问「小青」+ 文字对话**路线，而非下表的轻量 3D / SVG 引导员。下表保留作历史规划参考；语音/文字对话已完成，**不再按此表重做**。
 
@@ -1133,7 +1136,7 @@ pnpm audit   # ✅ 已完成，0 vulnerabilities
 | 阶段 | 目标 | 交付 | 现状（2026-06 校正） |
 |------|------|------|------|
 | Phase 9.1 | 静态 3D 引导员 | AvatarGuide 组件、3D 模型加载、idle 动画、文字气泡、关闭/静音、WebGL 降级 | 改走真人照片方案，3D/SVG 未采用为主方案 |
-| Phase 9.2 | 语音与嘴型 | TTS 播报、简单嘴型同步、重播提示、页面欢迎语 | 由 TRTC 实时语音取代；SVG `DigitalHuman.tsx` 已成死代码 |
+| Phase 9.2 | 语音与嘴型 | TTS 播报、简单嘴型同步、重播提示、页面欢迎语 | 由 TRTC 实时语音取代；旧 SVG `DigitalHuman.tsx` 已清理 |
 | Phase 9.3 | 功能引导 | 快捷问题、intent router、跳转简历/打印/招聘会/政策页面 | ✅ 已实现（AssistantPage 快捷入口 + 路由白名单） |
 | Phase 9.4 | AI助手融合 | 用户提问、AI回答、回答转语音、意图跳转 | ✅ 已实现（语音通话 + 文字对话） |
 | ⚠️ Phase 9.5 | AI模拟面试官 | 根据简历/岗位方向生成问题、训练问答、报告保存与打印 | 📋 未开发。**编号与 current-progress.md 已完成的「Phase 9.5 AI数字人语音通话修复」冲突**，后续需重命名/重新编号 |
@@ -1291,16 +1294,16 @@ Phase 9.1 Admin 后台 Polish 已主体完成(commit 见 feat/ui-polish-9.1-fix)
 | `apps/admin/src/routes/permissions/` | 权限管理 | 骨架屏（40 行） | "角色权限模型设计中,后续将提供超级管理员/运营/只读等预置角色" | Phase 9+ 规划中（权限模型） |
 | `apps/admin/src/routes/users/` | 用户管理 | 骨架屏（40 行） | "用户数据接入中,接入后将显示真实记录" | Phase 9+ 待接用户数据 |
 
-### Partner 合作机构后台（4 个空壳）
+### Partner 合作机构后台（3 个空壳）
 
 | 路由 | 页面 | 当前形态 | 占位文案 | 计划 |
 |------|------|----------|----------|------|
 | `apps/partner/src/routes/account/` | 账号权限 | EmptyState（15 行） | "暂无账号配置 / 添加子账号后将在此处显示" | Phase 9+ 待做（子账号） |
-| `apps/partner/src/routes/policy/` | 政策公告 | EmptyState（15 行） | "暂无政策公告 / 发布就业政策和补贴申请指南" | Phase 9+ 待做 |
 | `apps/partner/src/routes/stats/` | 数据统计 | EmptyState（15 行） | "暂无统计数据 / 数据积累后自动展示统计报表" | Phase 9+ 待做（依赖数据积累） |
 | `apps/partner/src/routes/terminals/` | 终端数据 | EmptyState（15 行） | "暂无终端数据 / 关联终端后将显示使用统计" | Phase 9+ 待做 |
 
-> 说明：Admin / Partner 其余路由（orders / files / alerts / audit / job-sources / fair-sources / sync-sources / printers / partners / fairs / sources / jobs / sync-logs / dashboard / profile 等）均为已实现页面；其中用到的 `EmptyState` 是**数据为空时的正常空状态**，不属于空壳页。
+> 已移出空壳页：`apps/partner/src/routes/policy/` 已由阶段1D 政策服务接真覆盖，当前为 Partner 政策公告完整 CRUD 页面，不再作为待做占位。
+> 说明：Admin / Partner 其余路由（orders / files / alerts / audit / job-sources / fair-sources / policy-sources / sync-sources / printers / partners / fairs / sources / jobs / policy / sync-logs / dashboard / profile 等）均为已实现页面；其中用到的 `EmptyState` 是**数据为空时的正常空状态**，不属于空壳页。
 > 处置建议（待 owner 拍板）：完成实现，或在确认不在路线图内后删除——**不要长期留作无说明的占位**。
 
 ---
@@ -1308,8 +1311,8 @@ Phase 9.1 Admin 后台 Polish 已主体完成(commit 见 feat/ui-polish-9.1-fix)
 ## 近期不做
 
 - 后端数据库 / Prisma schema 迁移（Phase 7.6 第一步先出骨架和 stub）
-- **Kiosk 视觉打磨（第 9 阶段）** ← Phase 7/8 全部完成前不启动
-- **AI数字人互动（第 9 阶段）** ← Phase 8 完成前不启动；需求规划已在 [ai-avatar-guide.md](../product/ai-avatar-guide.md)，当前阶段不写任何实现代码
+- **Kiosk 视觉打磨（第 9 阶段）** ← 历史限制，Phase 7/8 已完成；当前可按顶部路线在功能稳定后做小范围 UX/视觉收口。
+- **AI数字人互动（第 9 阶段）** ← 历史限制，已完成 `/assistant` TRTC「小青」+ 文字对话；早期 3D/SVG 规划仅作历史参考，当前不再重做。
 - **底部 Tab 扩展** ← 底部导航固定为"首页 / AI助手 / 我的"三项，不增加第四个 Tab
 - **打印材料包 / 求职打印套餐 / 面试练习 / AI求职路线** ← Phase 8.1B 完成前不启动，不并行开发
 - 企业招聘端（已确认删除，永不开发）

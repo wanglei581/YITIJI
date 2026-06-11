@@ -8,7 +8,7 @@
 // - 公共设备:结果只在路由 state(内存),离开即丢;导出文件短期自动清理。
 // ============================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import type {
@@ -27,13 +27,15 @@ import {
   PrinterIcon,
   ShieldCheckIcon,
 } from 'lucide-react'
-import { exportGeneratedResume } from '../../services/api'
+import { exportGeneratedResume, getResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 
 interface LocationState {
-  result: ResumeGenerateResponse
-  input: ResumeGenerateInput
+  result?: ResumeGenerateResponse
+  input?: ResumeGenerateInput
+  /** 会员从「我的简历」回看：仅带 taskId，页面凭本人 token 读回结果（C-2D） */
+  taskId?: string
 }
 
 const taCls =
@@ -54,14 +56,47 @@ export function ResumeGeneratePreviewPage() {
   const state = location.state as LocationState | null
   const { getToken } = useAuth()
 
-  const [resume, setResume] = useState<GeneratedResume | null>(state?.result.resume ?? null)
+  const [resume, setResume] = useState<GeneratedResume | null>(state?.result?.resume ?? null)
+  const [result, setResult] = useState<ResumeGenerateResponse | null>(state?.result ?? null)
+  const [restoring, setRestoring] = useState(Boolean(!state?.result && state?.taskId))
   const [exporting, setExporting] = useState(false)
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useBusyLock(exporting)
 
-  if (!state || !resume) {
+  // 会员回看（C-2D）：无内存结果但带 taskId → 凭本人会员 token 读回（归属由后端门禁校验）。
+  const restoreTaskId = !state?.result && state?.taskId ? state.taskId : null
+  useEffect(() => {
+    if (!restoreTaskId) return
+    let cancelled = false
+    getResumeGenerate(restoreTaskId, { token: getToken() })
+      .then((res) => {
+        if (cancelled) return
+        setResult(res)
+        setResume(res.resume ?? null)
+      })
+      .catch(() => {
+        // 读不回（过期 / 非本人 / 网络）→ 走下方诚实空态引导重新生成
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoreTaskId])
+
+  if (restoring) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-gray-400">
+        <p className="text-base">正在读取生成结果…</p>
+      </div>
+    )
+  }
+
+  if (!result || !resume) {
     // 刷新 / 待机后内存态丢失(公共设备隐私设计):引导重新生成
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
@@ -72,14 +107,14 @@ export function ResumeGeneratePreviewPage() {
     )
   }
 
-  const isMock = state.result.providerName === 'mock'
-  const hints = state.result.missingHints ?? []
+  const isMock = result.providerName === 'mock'
+  const hints = result.missingHints ?? []
 
   const handleExport = async () => {
     setExporting(true)
     setError(null)
     try {
-      const file = await exportGeneratedResume(resume, state.result.taskId, getToken())
+      const file = await exportGeneratedResume(resume, result.taskId, getToken())
       setExported(file)
     } catch (err) {
       setError(err instanceof Error ? err.message : '导出失败，请稍后重试')

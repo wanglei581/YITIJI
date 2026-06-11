@@ -10,6 +10,7 @@
 // ============================================================
 
 import type {
+  MemberAssetPage,
   MemberResumeItem,
   MemberDocumentItem,
   MemberAiRecordItem,
@@ -33,11 +34,11 @@ interface Envelope<T> {
   data: T
 }
 
-async function call<T>(path: string, token: string): Promise<T> {
+async function call<T>(path: string, token: string, method: 'GET' | 'DELETE' = 'GET'): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'GET',
+      method,
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
       credentials: 'include',
     })
@@ -58,22 +59,66 @@ async function call<T>(path: string, token: string): Promise<T> {
   return json.data
 }
 
-/** 我的简历（本人，仅元数据）。未登录 / mock 模式返回 []。 */
-export function getMyResumes(token: string | null | undefined): Promise<MemberResumeItem[]> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve([])
-  return call<MemberResumeItem[]>('/me/resumes', token)
+/** 分页查询参数（C-2D 游标分页；pageSize 服务端封顶 50）。 */
+export interface MemberPageOpts {
+  cursor?: string | null
+  pageSize?: number
 }
 
-/** 我的文档（本人，仅元数据 + 临时访问端点路径）。未登录 / mock 模式返回 []。 */
-export function getMyDocuments(token: string | null | undefined): Promise<MemberDocumentItem[]> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve([])
-  return call<MemberDocumentItem[]>('/me/documents', token)
+const EMPTY_PAGE = { items: [], nextCursor: null, total: 0 }
+
+function pageQuery(opts?: MemberPageOpts): string {
+  const params = new URLSearchParams()
+  if (opts?.cursor) params.set('cursor', opts.cursor)
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize))
+  const q = params.toString()
+  return q ? `?${q}` : ''
 }
 
-/** AI 服务记录（本人，仅元数据）。未登录 / mock 模式返回 []。 */
-export function getMyAiRecords(token: string | null | undefined): Promise<MemberAiRecordItem[]> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve([])
-  return call<MemberAiRecordItem[]>('/me/ai-records', token)
+/** 我的简历（本人，仅元数据；含上传诊断 parse 与 AI 生成 generate）。未登录 / mock 模式返回空页。 */
+export function getMyResumes(
+  token: string | null | undefined,
+  opts?: MemberPageOpts,
+): Promise<MemberAssetPage<MemberResumeItem>> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
+  return call<MemberAssetPage<MemberResumeItem>>(`/me/resumes${pageQuery(opts)}`, token)
+}
+
+/** 我的文档（本人，仅元数据 + 临时访问端点路径）。未登录 / mock 模式返回空页。 */
+export function getMyDocuments(
+  token: string | null | undefined,
+  opts?: MemberPageOpts,
+): Promise<MemberAssetPage<MemberDocumentItem>> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
+  return call<MemberAssetPage<MemberDocumentItem>>(`/me/documents${pageQuery(opts)}`, token)
+}
+
+/** AI 服务记录（本人，仅元数据；kind=parse/optimize/generate 如实区分）。未登录 / mock 模式返回空页。 */
+export function getMyAiRecords(
+  token: string | null | undefined,
+  opts?: MemberPageOpts,
+): Promise<MemberAssetPage<MemberAiRecordItem>> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve(EMPTY_PAGE)
+  return call<MemberAssetPage<MemberAiRecordItem>>(`/me/ai-records${pageQuery(opts)}`, token)
+}
+
+/**
+ * 删除本人一条 AI 记录（C-2D，硬删；parse 行级联删同任务 optimize 行，服务端审计留痕）。
+ * 删他人 / 不存在后端统一 404。
+ */
+export function deleteMyAiRecord(
+  token: string,
+  recordId: string,
+): Promise<{ deleted: true; deletedCount: number }> {
+  return call(`/me/ai-records/${encodeURIComponent(recordId)}`, token, 'DELETE')
+}
+
+/**
+ * 删除本人一份文档（C-2D）：走既有 /files/:id 删除端点——对象存储物理删除 +
+ * DB 行软删保留删除日志（CLAUDE.md §11），归属校验与审计在服务端。
+ */
+export function deleteMyDocument(token: string, fileId: string): Promise<unknown> {
+  return call(`/files/${encodeURIComponent(fileId)}?reason=${encodeURIComponent('member self delete')}`, token, 'DELETE')
 }
 
 /** 凭本人 token 换取文档的短期签名访问 URL（下载 / 预览）。 */

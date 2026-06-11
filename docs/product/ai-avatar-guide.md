@@ -1,8 +1,18 @@
 # AI数字人引导员需求规划
 
-> 状态：规划中  
-> 目标阶段：Phase 9 UI Polish / AI助手增强  
-> 当前结论：先做轻量 3D 数字人引导员，不在 Phase 7 数据链路阶段开发。
+> 状态：历史规划，已被实际方案取代（2026-06-11 同步）
+> 原目标阶段：Phase 9 UI Polish / AI助手增强
+> 当前结论：Kiosk `/assistant` 已落地 TRTC 真人照片顾问「小青」+ 文字对话。早期轻量 3D / SVG 数字人引导员方案不再作为当前开发路线，仅保留本文件作历史参考与合规边界参考。
+
+## 0. 当前实现口径（2026-06）
+
+- 当前入口：Kiosk 底部导航「AI助手」Tab → `/assistant`。
+- 当前实现：`apps/kiosk/src/pages/assistant/AssistantPage.tsx` + `apps/kiosk/src/components/AiAdvisorCall.tsx`。
+- 当前能力：TRTC 对话式 AI 语音通话、字幕、文字对话、快捷入口、路由白名单、离开页面 stop 防持续计费。
+- 当前形象：真人照片顾问「小青」（`/assets/ai-advisor.png`）。
+- 不再重做：Three.js / VRM / SVG 数字人引导员、旧 `DigitalHuman.tsx` 路线。
+
+以下内容是 2026-05 的早期方案记录，若与当前实现冲突，以 `docs/progress/current-progress.md` 与实际代码为准。
 
 ## 1. 背景与目标
 
@@ -429,4 +439,3 @@ Kiosk 一体机优先，避免 3D 效果拖慢主流程。
 7. 不影响现有首页核心入口。
 8. 完成后运行 pnpm lint / pnpm typecheck / pnpm build。
 ```
-

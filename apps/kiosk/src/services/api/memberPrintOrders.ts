@@ -55,8 +55,18 @@ async function request<T>(path: string, token: string): Promise<T> {
   return json.data
 }
 
-/** 我的打印订单（本人，只读）。未登录 / mock 模式返回 []。 */
-export function getMyPrintOrders(token: string | null | undefined): Promise<MemberPrintOrderItem[]> {
-  if (API_MODE !== 'http' || !token) return Promise.resolve([])
-  return request<MemberPrintOrderItem[]>('/me/print-orders', token)
+/** 我的打印订单（本人，只读；游标分页，pageSize 封顶 50）。未登录 / mock 模式返回空页。 */
+export function getMyPrintOrders(
+  token: string | null | undefined,
+  opts?: { cursor?: string | null; pageSize?: number },
+): Promise<{ items: MemberPrintOrderItem[]; nextCursor: string | null; total: number }> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null, total: 0 })
+  const params = new URLSearchParams()
+  if (opts?.cursor) params.set('cursor', opts.cursor)
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize))
+  const q = params.toString()
+  return request<{ items: MemberPrintOrderItem[]; nextCursor: string | null; total: number }>(
+    `/me/print-orders${q ? `?${q}` : ''}`,
+    token,
+  )
 }
