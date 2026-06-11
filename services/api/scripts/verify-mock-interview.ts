@@ -28,6 +28,7 @@ import { MockInterviewLlmService, type InterviewReportPayload } from '../src/moc
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { AsrService } from '../src/mock-interview/asr/asr.service'
+import { TtsService, splitForTts } from '../src/mock-interview/asr/tts.service'
 
 const SECRET_ANSWER = '我在某电商项目里把首屏加载从4秒优化到1.5秒_机密标记XYZQ'
 const SECRET_QUESTION = '请讲讲你最有代表性的项目经历_问题标记ABCD'
@@ -387,6 +388,52 @@ async function main() {
       delete process.env['TENCENT_ASR_SECRET_KEY']
       delete process.env['TENCENT_ASR_HOST']
       pass('14. ASR：未配置诚实回退 / 百度与腾讯 stub 转写成功 / 错误分类映射 / 超长拒绝')
+
+      // ── 14c. 腾讯官方 TTS(stub):分段合成拼接 / 失败诚实 / 文本切分 ────────
+      const segs = splitForTts('第一句话。第二句话比较长一些但不超限。' + '很'.repeat(95) + '？尾句')
+      if (segs.length < 3 || segs.some((x: string) => x.length > 90)) fail(`14c. 切分不符: ${segs.map((x: string) => x.length).join(',')}`)
+      const ttsReplies: Array<Record<string, unknown>> = []
+      let ttsCalls = 0
+      const ttsStub = createServer((sreq, sres) => {
+        let b = ''
+        sreq.on('data', (ch) => { b += ch })
+        sreq.on('end', () => {
+          ttsCalls += 1
+          sres.setHeader('Content-Type', 'application/json')
+          const auth = String(sreq.headers['authorization'] ?? '')
+          if (!auth.startsWith('TC3-HMAC-SHA256') || String(sreq.headers['x-tc-action']) !== 'TextToVoice') {
+            sres.end(JSON.stringify({ Response: { Error: { Code: 'AuthFailure' } } }))
+            return
+          }
+          sres.end(JSON.stringify(ttsReplies.shift() ?? { Response: { Error: { Code: 'InternalError' } } }))
+        })
+      })
+      const ttsUrl: string = await new Promise((res) => ttsStub.listen(0, '127.0.0.1', () => {
+        const a = ttsStub.address()
+        res(`127.0.0.1:${typeof a === 'object' && a ? a.port : 0}`)
+      }))
+      process.env['TTS_PROVIDER'] = 'tencent'
+      process.env['TENCENT_TTS_SECRET_ID'] = 'stub-id'
+      process.env['TENCENT_TTS_SECRET_KEY'] = 'stub-key'
+      process.env['TENCENT_TTS_HOST'] = ttsUrl
+      const tts = new TtsService()
+      ttsReplies.push({ Response: { Audio: Buffer.from('AAA1').toString('base64') } })
+      ttsReplies.push({ Response: { Audio: Buffer.from('BBB2').toString('base64') } })
+      // 两句各 60 字(合并将超 90 字上限) → 必然切成 2 段
+      const longA = '这是第一句比较长的话'.repeat(6) + '。'
+      const longB = '这是第二句也比较长的话'.repeat(5) + '。'
+      const tok2 = await tts.synthesize(longA + longB)
+      if (!tok2.ok || Buffer.from(tok2.audio!, 'base64').toString() !== 'AAA1BBB2') fail('14c. 分段拼接错误')
+      if (ttsCalls !== 2) fail(`14c. 应分 2 段合成,实际 ${ttsCalls}`)
+      ttsReplies.push({ Response: { Error: { Code: 'UnsupportedOperation' } } })
+      const tfail = await tts.synthesize('一句失败的话。')
+      if (tfail.ok) fail('14c. 上游错误不应成功')
+      ttsStub.close()
+      delete process.env['TTS_PROVIDER']
+      delete process.env['TENCENT_TTS_SECRET_ID']
+      delete process.env['TENCENT_TTS_SECRET_KEY']
+      delete process.env['TENCENT_TTS_HOST']
+      pass('14c. 官方 TTS：按句分段合成拼接 / TC3 头断言 / 上游错误诚实失败')
     }
 
     // ── 10. 日志脱敏 ──────────────────────────────────────────────────────────

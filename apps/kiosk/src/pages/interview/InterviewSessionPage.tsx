@@ -25,7 +25,7 @@ import {
   SquareIcon,
   Volume2Icon,
 } from 'lucide-react'
-import { answerInterview, endInterview, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
+import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -63,7 +63,7 @@ function fmtClock(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** 浏览器本地 TTS 播报（失败静默；播报文本来自服务端，已过禁词扫描）。 */
+/** 浏览器本地 TTS 播报（官方语音失败时的兜底；文本来自服务端，已过禁词扫描）。 */
 function speak(text: string, onState?: (speaking: boolean) => void): void {
   try {
     if (!('speechSynthesis' in window)) return
@@ -96,6 +96,7 @@ export function InterviewSessionPage() {
 
   // ── 2C+ 语音态 ──────────────────────────────────────────────
   const [voiceAvailable, setVoiceAvailable] = useState(false) // ASR 服务端可用
+  const [ttsOfficial, setTtsOfficial] = useState(false) // 腾讯官方语音可用(否则浏览器 TTS 兜底)
   const [mode, setMode] = useState<'voice' | 'text'>('text')
   const [voice, setVoice] = useState<VoiceState>({ kind: 'idle' })
   const [speaking, setSpeaking] = useState(false)
@@ -111,8 +112,9 @@ export function InterviewSessionPage() {
   useEffect(() => {
     let cancelled = false
     getVoiceCapability()
-      .then(({ asrEnabled }) => {
+      .then(({ asrEnabled, ttsEnabled }) => {
         if (cancelled) return
+        setTtsOfficial(ttsEnabled === true)
         const micSupported = !!navigator.mediaDevices?.getUserMedia
         if (asrEnabled && micSupported) {
           setVoiceAvailable(true)
@@ -125,13 +127,40 @@ export function InterviewSessionPage() {
     return () => { cancelled = true }
   }, [])
 
-  // TTS 播报最新面试官问题（仅语音模式）
-  const lastInterviewerMsg = messages.filter((m) => m.role === 'interviewer').slice(-1)[0]?.content ?? ''
+  // 播报最新面试官问题（仅语音模式）：优先腾讯官方语音（小青同音色），失败降级浏览器本地 TTS
+  const interviewerMsgs = messages.filter((m) => m.role === 'interviewer')
+  const lastInterviewerMsg = interviewerMsgs.slice(-1)[0]?.content ?? ''
+  // 面试官轮次在 turns 序列中的 idx：第 n 个 interviewer turn 的 idx = 2(n-1)（i/c 交替）
+  const lastInterviewerTurnIdx = (interviewerMsgs.length - 1) * 2
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const stopPlayback = () => {
+    try { audioRef.current?.pause() } catch { /* noop */ }
+    audioRef.current = null
+    try { window.speechSynthesis?.cancel() } catch { /* noop */ }
+    setSpeaking(false)
+  }
   useEffect(() => {
-    if (mode === 'voice' && lastInterviewerMsg) speak(lastInterviewerMsg, setSpeaking)
     questionShownAtRef.current = Date.now()
-    return () => { try { window.speechSynthesis?.cancel() } catch { /* noop */ } }
-  }, [lastInterviewerMsg, mode])
+    if (mode !== 'voice' || !lastInterviewerMsg) return
+    let cancelled = false
+    if (ttsOfficial) {
+      fetchQuestionAudio(state!.sessionId, lastInterviewerTurnIdx, accessRef.current)
+        .then(({ audio }) => {
+          if (cancelled) return
+          const el = new Audio(`data:audio/mpeg;base64,${audio}`)
+          audioRef.current = el
+          el.onplay = () => setSpeaking(true)
+          el.onended = () => setSpeaking(false)
+          el.onerror = () => { setSpeaking(false); speak(lastInterviewerMsg, setSpeaking) }
+          void el.play().catch(() => speak(lastInterviewerMsg, setSpeaking))
+        })
+        .catch(() => { if (!cancelled) speak(lastInterviewerMsg, setSpeaking) }) // 官方语音失败 → 本地 TTS 兜底
+    } else {
+      speak(lastInterviewerMsg, setSpeaking)
+    }
+    return () => { cancelled = true; stopPlayback() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastInterviewerMsg, mode, ttsOfficial])
 
   useEffect(() => {
     const t = setInterval(() => setRemainingSec((s) => (s > 0 ? s - 1 : 0)), 1000)
@@ -149,6 +178,8 @@ export function InterviewSessionPage() {
     () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),
     [getToken, state?.accessToken],
   )
+  const accessRef = useRef(access)
+  accessRef.current = access
 
   if (!state?.sessionId) {
     return (
@@ -172,7 +203,7 @@ export function InterviewSessionPage() {
   // ── 语音回合 ────────────────────────────────────────────────
   const startRecording = async () => {
     setError(null)
-    try { window.speechSynthesis?.cancel() } catch { /* noop */ }
+    stopPlayback()
     try {
       recorderRef.current = await startWavRecorder()
       setVoice({ kind: 'recording', startedAt: Date.now() })
@@ -258,7 +289,7 @@ export function InterviewSessionPage() {
   }
 
   const finish = async () => {
-    try { window.speechSynthesis?.cancel() } catch { /* noop */ }
+    stopPlayback()
     setPhase('finishing')
     setError(null)
     try {

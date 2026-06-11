@@ -147,10 +147,20 @@ export function printInterviewReport(sessionId: string, access: InterviewAccess)
   return call<InterviewPrintResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/report/print`, access, { method: 'POST', body: {} })
 }
 
-/** 语音能力探测：ASR 未启用时前端自动回退文字输入。 */
-export function getVoiceCapability(): Promise<{ asrEnabled: boolean }> {
-  if (API_MODE !== 'http') return Promise.resolve({ asrEnabled: false })
-  return call<{ asrEnabled: boolean }>('/mock-interviews/capabilities/voice', {})
+/** 语音能力探测：ASR 未启用时前端自动回退文字输入；TTS 不可用时降级浏览器本地播报。 */
+export function getVoiceCapability(): Promise<{ asrEnabled: boolean; ttsEnabled?: boolean }> {
+  if (API_MODE !== 'http') return Promise.resolve({ asrEnabled: false, ttsEnabled: false })
+  return call<{ asrEnabled: boolean; ttsEnabled?: boolean }>('/mock-interviews/capabilities/voice', {})
+}
+
+/** 面试官问题官方语音(腾讯 TTS,小青同音色)。失败由调用方降级浏览器本地 TTS。 */
+export function fetchQuestionAudio(sessionId: string, turnIdx: number, access: InterviewAccess): Promise<{ audio: string; format: string }> {
+  if (API_MODE !== 'http') return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式无官方语音', 0))
+  return call<{ audio: string; format: string }>(
+    `/mock-interviews/${encodeURIComponent(sessionId)}/turns/${turnIdx}/audio`,
+    access,
+    { method: 'POST', body: {} },
+  )
 }
 
 /** 上传一段回答音频（16k 单声道 WAV）→ 转写文本（音频不持久化）。 */

@@ -11,6 +11,7 @@ import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MockInterviewService, type InterviewRequester } from './mock-interview.service'
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
+import { TtsService } from './asr/tts.service'
 
 // ── DTO（全局 forbidNonWhitelisted：未知字段直接 400）─────────────────────────
 
@@ -92,6 +93,7 @@ export class MockInterviewController {
   constructor(
     private readonly service: MockInterviewService,
     private readonly asr: AsrService,
+    private readonly tts: TtsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
   ) {}
@@ -153,10 +155,31 @@ export class MockInterviewController {
     return ApiResponse.ok({ text: result.text })
   }
 
+  /**
+   * 面试官问题语音播报(2C+,腾讯官方 TTS,小青同音色):
+   * 只为本会话已落库的 interviewer 轮次合成(不开放任意文本,防滥用;
+   * 问题文本生成时已过禁词扫描)。失败 → 前端降级浏览器本地 TTS。
+   */
+  @Post(':id/turns/:idx/audio')
+  @Throttle({ default: { ttl: 60_000, limit: 20 } })
+  async questionAudio(@Param('id') id: string, @Param('idx') idx: string, @Req() req: ReqLike) {
+    const session = await this.service.getSession(id, await this.requesterOf(req))
+    const turnIdx = Number(idx)
+    const turn = session.turns.find((t) => t.idx === turnIdx)
+    if (!turn || turn.role !== 'interviewer') {
+      throw new BadRequestException({ error: { code: 'TURN_NOT_FOUND', message: '该轮次不存在或不是面试官提问' } })
+    }
+    const result = await this.tts.synthesize(turn.content)
+    if (!result.ok) {
+      throw new BadRequestException({ error: { code: 'TTS_FAILED', message: result.errorMessage ?? '语音合成失败' } })
+    }
+    return ApiResponse.ok({ audio: result.audio, format: 'mp3' })
+  }
+
   /** 语音能力可用性(前端进入会话页时探测;不可用自动回退文字输入) */
   @Get('capabilities/voice')
   voiceCapability() {
-    return ApiResponse.ok({ asrEnabled: this.asr.enabled })
+    return ApiResponse.ok({ asrEnabled: this.asr.enabled, ttsEnabled: this.tts.enabled })
   }
 
   @Post(':id/end')

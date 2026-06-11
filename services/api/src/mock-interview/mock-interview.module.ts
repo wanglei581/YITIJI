@@ -8,6 +8,7 @@ import { MockInterviewService } from './mock-interview.service'
 import { MockInterviewLlmService } from './mock-interview-llm.service'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
 import { AsrService } from './asr/asr.service'
+import { TtsService } from './asr/tts.service'
 
 /**
  * 2C 模拟面试模块。
@@ -31,6 +32,6 @@ import { AsrService } from './asr/asr.service'
     }),
   ],
   controllers: [MockInterviewController, MemberMockInterviewController],
-  providers: [MockInterviewService, MockInterviewLlmService, InterviewReportPdfService, AsrService, EndUserAuthGuard],
+  providers: [MockInterviewService, MockInterviewLlmService, InterviewReportPdfService, AsrService, TtsService, EndUserAuthGuard],
 })
 export class MockInterviewModule {}
