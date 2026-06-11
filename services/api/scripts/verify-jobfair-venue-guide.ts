@@ -189,9 +189,33 @@ async function main(): Promise<void> {
       () => svc.saveVenueGuide(fairPub.id, {
         ...baseInput,
         halls: [{ ...baseInput.halls[0], companies: [{ fairCompanyId: foreignCompany.id }] }],
+        facilities: [], // 设施关联校验(6b)单独覆盖,此处只测企业归属
       } as never, admin),
       'COMPANY_NOT_IN_FAIR',
       '6. 绑定非本招聘会企业 → COMPANY_NOT_IN_FAIR',
+    )
+
+    // ── 6b. 设施关联不存在的展厅 → 拒绝(补丁) ────────────────────────────
+    await expectCode(
+      () => svc.saveVenueGuide(fairPub.id, {
+        ...baseInput,
+        facilities: [{ type: 'entrance', name: '幽灵入口', relatedHallCode: 'Z' }],
+      } as never, admin),
+      'FACILITY_HALL_NOT_FOUND',
+      '6b. 设施关联不存在展厅(Z) → FACILITY_HALL_NOT_FOUND',
+    )
+
+    // ── 6c. 企业跨展厅重复绑定 → 拒绝(补丁) ──────────────────────────────
+    await expectCode(
+      () => svc.saveVenueGuide(fairPub.id, {
+        ...baseInput,
+        halls: [
+          { ...baseInput.halls[0] },
+          { ...baseInput.halls[1], companies: [{ fairCompanyId: companyA.id, boothNo: 'B09' }] },
+        ],
+      } as never, admin),
+      'COMPANY_BOUND_MULTIPLE',
+      '6c. 同一企业绑定两个展厅 → COMPANY_BOUND_MULTIPLE',
     )
 
     // ── 7. 展厅编码重复拒绝 ────────────────────────────────────────────────
@@ -231,6 +255,21 @@ async function main(): Promise<void> {
       const orphans = await prisma.fairVenueHall.count({ where: { guide: { jobFairId: fairPub.id } } })
       if (orphans !== 0) fail('9. halls 未级联清理')
       pass('9. 删除导览 → Kiosk 空态,级联清理生效')
+    }
+
+    // ── 13. 审计失败不阻塞保存(补丁断言:AuditService 写失败只 log 不抛) ──
+    {
+      // 用不存在的 actorId 触发 AuditLog FK 失败:保存必须仍然成功且数据已持久化
+      const ghostAdmin: AuthedUser = { userId: `ghost_${suffix}`, role: 'admin', orgId: null }
+      const saved = await svc.saveVenueGuide(fairPub.id, {
+        venueName: '审计失败容错馆',
+        halls: [{ hallCode: 'D', hallName: 'D 厅', companies: [], sortOrder: 0 }],
+        facilities: [],
+      } as never, ghostAdmin)
+      if (saved.venueName !== '审计失败容错馆') fail('13. 审计失败时保存应仍成功')
+      const persisted = await prisma.fairVenueGuide.findUnique({ where: { jobFairId: fairPub.id } })
+      if (persisted?.venueName !== '审计失败容错馆') fail('13. 数据未持久化')
+      pass('13. 审计写失败(actor FK 不存在)不阻塞保存,数据已持久化')
     }
 
     // ── 11. Admin 写接口 @Roles('admin') 源码断言 ──────────────────────────

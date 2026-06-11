@@ -403,12 +403,11 @@ export function VenueGuideTab({
                 }}
               >
                 <option value="">+ 从本招聘会参展企业中添加…</option>
+                {/* 同一企业只能绑定一个展厅(服务端硬校验 COMPANY_BOUND_MULTIPLE),已绑其它展厅的不在候选中 */}
                 {companies
-                  .filter((c) => !hall.companies.some((b) => b.fairCompanyId === c.id))
+                  .filter((c) => !hall.companies.some((b) => b.fairCompanyId === c.id) && !boundElsewhere(c.id, editingHall))
                   .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}{boundElsewhere(c.id, editingHall) ? '(已在其它展厅)' : ''}
-                    </option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
               </select>
               {companies.length === 0 && (

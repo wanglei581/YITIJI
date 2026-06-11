@@ -661,9 +661,12 @@ function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoCompanie
   const [error, setError] = useState(false)
   const [activeHallId, setActiveHallId] = useState<string | null>(null)
 
+  const [reloadKey, setReloadKey] = useState(0)
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setError(false)
     getFairVenueGuide(fairId)
       .then((res) => {
         if (cancelled) return
@@ -673,11 +676,12 @@ function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoCompanie
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [fairId])
+  }, [fairId, reloadKey])
 
   if (loading) return <LoadingState className="py-16" />
   if (error) {
-    return <ErrorState message="场馆导览加载失败,请稍后重试" className="py-16" />
+    // 真实重试:重新发起 API 请求,而非静态提示
+    return <ErrorState message="场馆导览加载失败,请稍后重试" onRetry={() => setReloadKey((k) => k + 1)} className="py-16" />
   }
   if (!guide || guide.halls.length === 0) {
     return (

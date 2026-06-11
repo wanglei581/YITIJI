@@ -5,6 +5,16 @@
 
 ---
 
+## 场馆导览加固补丁（2026-06-11，Claude，`feature/venue-guide-hardening`）
+
+- **relatedHallCode 校验**:设施关联的展厅编码必须存在于本次配置(大小写归一),否则 `FACILITY_HALL_NOT_FOUND`。
+- **企业禁止跨展厅重复绑定**:同一企业出现在多个展厅 → `COMPANY_BOUND_MULTIPLE`(展位语义唯一);Admin 端下拉同步排除已绑其它展厅的企业。
+- **Kiosk 导览加载失败真实重试**:ErrorState onRetry 重新发起 API 请求(reloadKey),非静态提示。
+- **审计失败语义钉死**:AuditService 既有设计为"写失败只 log 不抛"(保存不因审计失败回滚);verify 新增断言——用不存在的 actorId 触发 AuditLog FK 失败,保存仍成功且数据持久化。
+- `verify:jobfair-venue-guide` **13 → 16 PASS**(新增 6b/6c/13);api/kiosk/admin 三检 + `verify:jobfair-ui` 全绿。
+
+---
+
 ## 工程基线修复 + CI（2026-06-11，Claude，`feature/engineering-baseline`）
 
 **基线体检结果：**

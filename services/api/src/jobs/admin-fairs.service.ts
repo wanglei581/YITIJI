@@ -544,8 +544,27 @@ export class AdminFairsService {
       throw new BadRequestException({ error: { code: 'HALL_CODE_DUPLICATE', message: '展厅编码不能重复' } })
     }
 
+    // 设施关联展厅校验:relatedHallCode(若填)必须是本次配置中的展厅编码
+    const codeSet = new Set(codes)
+    for (const facility of dto.facilities) {
+      const related = facility.relatedHallCode?.trim().toUpperCase()
+      if (related && !codeSet.has(related)) {
+        throw new BadRequestException({
+          error: { code: 'FACILITY_HALL_NOT_FOUND', message: `设施「${facility.name}」关联的展厅 ${related} 不存在` },
+        })
+      }
+    }
+
+    // 企业禁止跨展厅重复绑定:同一企业出现在多个展厅 → 拒绝(展位语义唯一)
+    const allBindings = dto.halls.flatMap((h) => h.companies.map((c) => c.fairCompanyId))
+    if (new Set(allBindings).size !== allBindings.length) {
+      throw new BadRequestException({
+        error: { code: 'COMPANY_BOUND_MULTIPLE', message: '同一企业只能绑定到一个展厅,请先从其它展厅解绑' },
+      })
+    }
+
     // 绑定企业归属校验:全部 fairCompanyId 必须属于本招聘会
-    const boundIds = [...new Set(dto.halls.flatMap((h) => h.companies.map((c) => c.fairCompanyId)))]
+    const boundIds = [...new Set(allBindings)]
     if (boundIds.length > 0) {
       const owned = await this.prisma.fairCompany.findMany({
         where: { id: { in: boundIds }, jobFairId: fairId },
