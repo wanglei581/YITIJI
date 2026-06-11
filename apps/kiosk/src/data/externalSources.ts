@@ -235,7 +235,6 @@ export const MOCK_FAIRS: ExternalJobFair[] = [
     tagline: '智能招聘 · 职面未来',
     onsiteServices: ['自助打印', 'AI求职助手', '导览地图'],
     admissionMethod: '凭学生证或身份证免费入场',
-    aiMatchRate: 98,
     theme: 'campus',
     sourceOrgId: 'org-002',
     externalId: 'GOV-FAIR-2026-0312',

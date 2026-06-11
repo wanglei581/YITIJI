@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
@@ -43,13 +43,52 @@ const UPLOAD_OPTIONS: UploadOption[] = [
   },
 ]
 
+// 与后端 Phase 1.1 真实报告结构对齐:6 评分维度 + 风险表述提醒 + 修改优先级建议
 const DIAGNOSIS_DIMENSIONS = [
   '基础信息完整度',
-  '教育经历完整度',
-  '实习/项目经历表达',
-  '技能关键词覆盖',
-  '排版可读性',
+  '求职目标清晰度',
+  '经历表达清晰度',
+  '成果量化程度',
+  '岗位关键词覆盖',
+  '版式与可读性',
+  '风险表述提醒',
+  '修改优先级建议',
 ]
+
+// ── intent 分流(diagnose / optimize):同一上传链路,不同语义引导 ──────────────
+type ResumeIntent = 'diagnose' | 'optimize'
+
+const INTENT_COPY: Record<ResumeIntent, {
+  title: string
+  subtitle: string
+  infoTitle: string
+  infoBody: string
+  privacyNote: string
+  buttonReady: string
+  buttonEmpty: string
+}> = {
+  diagnose: {
+    title: 'AI 简历诊断',
+    subtitle: '上传简历文件，生成基于真实内容的结构化诊断报告',
+    infoTitle: '只分析你上传的简历文件',
+    infoBody: '上传简历后，系统从完整度、表达清晰度、岗位表达、风险项、排版结构、修改优先级等方面生成诊断报告。本页面不提供文本粘贴输入，避免在公共一体机上遗留简历原文；未接入真实 AI 模型时，页面会明确标记为演示报告。',
+    privacyNote: '简历原文仅用于本次解析和诊断，不作为平台简历库沉淀。',
+    buttonReady: '开始 AI 诊断',
+    buttonEmpty: '请先上传简历文件',
+  },
+  optimize: {
+    title: 'AI 简历优化',
+    subtitle: '上传简历文件，先完成必要诊断，再基于原文生成可编辑的优化版简历',
+    infoTitle: '只基于你的简历原文优化表达',
+    infoBody: '上传简历后，系统会先完成必要诊断，再基于原文重组优化，生成可编辑的结构化优化版简历。优化版只基于原文事实重组，不补充虚构学校、公司、项目、证书、电话、邮箱等信息；原文没有的内容保持为空，由你自行补充。',
+    privacyNote: '简历原文仅用于本次解析、诊断与优化，不作为平台简历库沉淀。',
+    buttonReady: '上传并生成优化建议',
+    buttonEmpty: '请先上传简历文件',
+  },
+}
+
+/** 优化路径闭环展示(上传页直接告诉用户整条链路)。 */
+const OPTIMIZE_FLOW_STEPS = ['上传', '诊断', '优化', '新旧对比', '编辑', '导出 PDF', '打印']
 
 const SUPPORTED_FORMATS = ['PDF', 'DOC', 'DOCX', 'JPG', 'PNG', 'WEBP']
 
@@ -82,6 +121,9 @@ function formatSize(bytes: number): string {
 
 export function ResumeSourcePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const intent: ResumeIntent = searchParams.get('intent') === 'optimize' ? 'optimize' : 'diagnose'
+  const copy = INTENT_COPY[intent]
   const { getToken } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<UploadChannel>('cloud')
@@ -131,8 +173,10 @@ export function ResumeSourcePage() {
 
   const handleStartDiagnosis = () => {
     if (!uploadedFile || uploading) return
+    // intent 随 state 全链路透传(parse/report/optimize 均 ...state 转发)
     navigate('/resume/parse', {
       state: {
+        intent,
         source: 'upload',
         uploadChannel: uploadedFile.channel,
         file: { name: uploadedFile.name, size: uploadedFile.size, format: uploadedFile.format },
@@ -144,8 +188,8 @@ export function ResumeSourcePage() {
   return (
     <div className="flex h-full flex-col p-6">
       <PageHeader
-        title="AI 简历诊断"
-        subtitle="上传简历文件，生成基于真实内容的结构化诊断报告"
+        title={copy.title}
+        subtitle={copy.subtitle}
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
         }
@@ -153,7 +197,7 @@ export function ResumeSourcePage() {
 
       <div className="mt-4">
         <ComplianceBanner tone="success" title="隐私保护">
-          {COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
+          {copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
         </ComplianceBanner>
       </div>
 
@@ -171,11 +215,19 @@ export function ResumeSourcePage() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
               <SparklesIcon className="h-6 w-6" aria-hidden="true" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">只分析你上传的简历文件</h2>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                本页面不提供文本粘贴输入，避免在公共一体机上遗留简历原文。诊断报告来自后端 AI 解析结果；未接入真实 AI Provider 时，页面会明确标记为演示报告。
-              </p>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl font-bold text-gray-900">{copy.infoTitle}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">{copy.infoBody}</p>
+              {intent === 'optimize' && (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  {OPTIMIZE_FLOW_STEPS.map((step, i) => (
+                    <span key={step} className="flex items-center gap-1.5">
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-primary-700 shadow-sm">{step}</span>
+                      {i < OPTIMIZE_FLOW_STEPS.length - 1 && <span className="text-xs text-primary-300">→</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -263,9 +315,11 @@ export function ResumeSourcePage() {
         <Card className="p-5">
           <div className="flex items-center gap-2">
             <ShieldCheckIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-            <p className="text-base font-bold text-gray-900">当前可诊断维度</p>
+            <p className="text-base font-bold text-gray-900">
+              {intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}
+            </p>
           </div>
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-5">
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
             {DIAGNOSIS_DIMENSIONS.map((item) => (
               <div key={item} className="flex min-h-[64px] items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 px-3 text-center text-sm font-semibold text-gray-700">
                 {item}
@@ -296,7 +350,7 @@ export function ResumeSourcePage() {
           disabled={!uploadedFile || uploading}
           onClick={handleStartDiagnosis}
         >
-          {uploadedFile ? '开始 AI 诊断' : '请先上传简历文件'}
+          {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
         </Button>
       </div>
     </div>

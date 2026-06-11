@@ -89,10 +89,15 @@ export class LlmResumeProvider implements AiProvider {
       return { taskId, status: 'completed', modules, optimizedResume }
     } catch (err) {
       const code = errorCodeOf(err)
-      const failReason =
-        code === 'AI_PROVIDER_NOT_CONFIGURED'
-          ? 'AI 简历优化模型尚未配置，请联系管理员后重试'
-          : 'AI 简历优化服务暂时不可用，请稍后重试'
+      let failReason: string
+      if (code === 'AI_PROVIDER_NOT_CONFIGURED') {
+        failReason = 'AI 简历优化模型尚未配置，请联系管理员后重试'
+      } else if (code === 'AI_OPTIMIZE_INVALID_OUTPUT') {
+        // 防编造校验拦截:两次输出均含无法从原文确认的信息,绝不放行
+        failReason = '优化结果包含无法从原文确认的信息，系统已拦截，请重新生成或检查原文'
+      } else {
+        failReason = 'AI 简历优化服务暂时不可用，请稍后重试'
+      }
       return { taskId, status: 'failed', failReason }
     }
   }

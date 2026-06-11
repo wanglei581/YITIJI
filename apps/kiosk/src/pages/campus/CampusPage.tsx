@@ -53,6 +53,14 @@ const STATUS_CONFIG = {
   ended:    { label: '已结束', bg: 'bg-white/20', text: 'text-white/80' },
 }
 
+// 活动类型展示映射(真实 theme 字段;替代已移除的违规「AI匹配率」指标)
+const THEME_STAT_LABELS: Record<string, string> = {
+  campus: '校园双选',
+  campus_corp: '校企合作',
+  industry: '行业专场',
+  general: '综合',
+}
+
 // 校招会识别：DTO theme 优先，其次关键词（名称/主办方/简介/来源）
 const CAMPUS_RE = /校园|校招|高校|大学|学院|应届|毕业生|双选|研究生|校企/
 function isCampusFair(f: ExternalJobFairDTO) {
@@ -63,7 +71,7 @@ function isCampusFair(f: ExternalJobFairDTO) {
   )
 }
 
-// 校招会匹配度评分：主题 > 标题关键词 > 活动状态，挑「最像校园双选会」的一场作专区主体，
+// 校招会相关性排序：主题 > 标题关键词 > 活动状态，挑「最像校园双选会」的一场作专区主体，
 // 避免选中仅在简介里提到「应届」的行业专场。
 function campusScore(f: ExternalJobFairDTO) {
   let s = 0
@@ -463,7 +471,7 @@ function OverviewTab({
         <div className="mt-4 grid grid-cols-2 gap-y-5">
           <StatCell value={String(companyCount)} label="参展企业" />
           <StatCell value={`${jobCount}+`} label="招聘岗位" />
-          <StatCell value={fair.aiMatchRate != null ? `${fair.aiMatchRate}%` : '—'} label="AI匹配率" accent="text-emerald-300" />
+          <StatCell value={THEME_STAT_LABELS[fair.theme ?? ''] ?? '综合'} label="活动类型" accent="text-emerald-300" />
           <StatCell value={industryCount > 0 ? `${industryCount}+` : '—'} label="行业覆盖" accent="text-amber-300" />
         </div>
       </div>
@@ -496,7 +504,7 @@ function OverviewTab({
         <div className="grid grid-cols-2 gap-3">
           <QuickEntry icon={BuildingIcon} iconBg="bg-blue-50" iconColor="text-blue-600" title="参展企业查询" subtitle={`${companyCount} 家企业`} onClick={() => onGoTab('companies')} />
           <QuickEntry icon={NavigationIcon} iconBg="bg-orange-50" iconColor="text-orange-500" title="招聘会导览图" subtitle="展位地图 / 日程" onClick={() => onGoTab('map')} />
-          <QuickEntry icon={BriefcaseIcon} iconBg="bg-violet-50" iconColor="text-violet-600" title="AI智能求职" subtitle="简历 / 面试 / 岗位推荐" onClick={() => onGoTab('ai')} />
+          <QuickEntry icon={BriefcaseIcon} iconBg="bg-violet-50" iconColor="text-violet-600" title="AI智能求职" subtitle="简历 / 面试 / 求职准备" onClick={() => onGoTab('ai')} />
           <QuickEntry icon={PrinterIcon} iconBg="bg-emerald-50" iconColor="text-emerald-600" title="自助打印服务" subtitle="简历 / 通知单" onClick={() => onGoTab('print')} />
         </div>
       </div>
@@ -811,10 +819,10 @@ function AiJobTab() {
         <p className="mt-1 text-sm text-white/80">四大 AI 功能，全方位助力你的求职之路</p>
       </div>
       <div className="grid grid-cols-1 gap-3">
-        <AiFeatureCard icon={FileTextIcon} iconBg="bg-blue-50" iconColor="text-blue-600" title="AI简历诊断" desc="简历分析与诊断，提供专业修改建议，提升简历通过率。" cta="开始诊断" onClick={() => navigate('/resume/source')} />
+        <AiFeatureCard icon={FileTextIcon} iconBg="bg-blue-50" iconColor="text-blue-600" title="AI简历诊断" desc="简历分析与诊断，提供专业修改建议（仅供本人参考）。" cta="开始诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
         <AiFeatureCard icon={MicIcon} iconBg="bg-violet-50" iconColor="text-violet-600" title="AI模拟面试" desc="仿真面试场景与点评，迅速提升面试实战能力。" cta="开始模拟" onClick={() => navigate('/assistant')} />
-        <AiFeatureCard icon={PenToolIcon} iconBg="bg-emerald-50" iconColor="text-emerald-600" title="简历优化" desc="基于岗位 JD 智能配置简历关键词，突出个人优势。" cta="开始优化" onClick={() => navigate('/resume/optimize')} />
-        <AiFeatureCard icon={AwardIcon} iconBg="bg-amber-50" iconColor="text-amber-600" title="AI岗位推荐" desc="基于个人简历和岗位匹配度，智能推荐合适的岗位。" cta="查看岗位" onClick={() => navigate('/jobs')} />
+        <AiFeatureCard icon={PenToolIcon} iconBg="bg-emerald-50" iconColor="text-emerald-600" title="AI简历优化" desc="基于你的简历原文优化表达，生成可编辑的优化版简历（不补充虚构信息）。" cta="开始优化" onClick={() => navigate('/resume/source?intent=optimize')} />
+        <AiFeatureCard icon={AwardIcon} iconBg="bg-amber-50" iconColor="text-amber-600" title="岗位信息参考" desc="浏览第三方来源岗位信息，投递请前往来源平台办理。" cta="查看岗位" onClick={() => navigate('/jobs')} />
       </div>
     </div>
   )

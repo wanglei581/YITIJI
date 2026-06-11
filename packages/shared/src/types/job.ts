@@ -86,8 +86,6 @@ export interface ExternalJobFair extends ExternalJobSource {
   onsiteServices?: string[]
   /** 入场方式说明（如「凭学生证或身份证免费入场」） */
   admissionMethod?: string
-  /** AI 匹配率（机构录入的展示指标 0–100，仅展示不参与招聘闭环） */
-  aiMatchRate?: number
 }
 
 // ============================================================

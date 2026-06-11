@@ -5,6 +5,31 @@
 
 ---
 
+## 简历诊断/优化入口 intent 分流 + 链路闭环引导 + Campus 合规修复（2026-06-11，Claude，`feature/resume-intent-flow`）
+
+**背景：** 首页「AI简历诊断」「AI简历优化」此前都进 `/resume/source`,链路可复用但语义不清晰。本轮只做引导层完善与合规残留修复,**不重写任何已有页面/后端服务/防编造校验/PDF/打印链路,不改首页六大功能分组结构**。
+
+**intent 分流：**
+- 首页两入口改为 `/resume/source?intent=diagnose` / `?intent=optimize`(视觉与分组不变)。
+- [ResumeSourcePage](../../apps/kiosk/src/pages/resume/ResumeSourcePage.tsx) 按 intent 展示不同标题/说明/主按钮/隐私提示(默认 diagnose):diagnose=「开始 AI 诊断」+ 报告内容说明;optimize=「上传并生成优化建议」+ 防编造提示(不补充虚构学校/公司/项目/证书/电话/邮箱) + 闭环步骤条(上传→诊断→优化→新旧对比→编辑→导出 PDF→打印)。诊断维度卡同步为 Phase 1.1 真实 8 项结构(旧 5 维度文案已过时)。
+- intent 经 navigate state 全链路透传(parse/report/optimize 均 `...state` 转发);[ResumeReportPage](../../apps/kiosk/src/pages/resume/ResumeReportPage.tsx) optimize 路径显示「诊断已完成」引导条,主按钮变「继续生成优化版简历」,返回按钮保留 intent。
+- Campus AI 求职 Tab 的诊断/优化卡入口同步带 intent。
+
+**优化页失败态补全（[ResumeOptimizePage](../../apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx),只补不改）：**
+- 直接打开且无 taskId/accessToken → 「请先上传简历完成诊断」;文件 TTL 过期 → 「文件已过期，请重新上传简历」;按钮均回 `/resume/source?intent=optimize`。
+- 防编造拦截:后端 [llm.provider](../../services/api/src/ai/providers/llm.provider.ts) 把 `AI_OPTIMIZE_INVALID_OUTPUT` 映射为明确文案「优化结果包含无法从原文确认的信息，系统已拦截，请重新生成或检查原文」(只改 failReason 映射,校验逻辑零改动),前端透传展示。
+
+**Campus 合规残留修复（[CampusPage](../../apps/kiosk/src/pages/campus/CampusPage.tsx)）：**
+- 「AI匹配率」统计格 → 「活动类型」(真实 theme 字段);`aiMatchRate` 字段从 shared 类型与 mock 数据整体移除(违禁概念,后端从不返回)。
+- 「AI岗位推荐 / 岗位匹配度 / 智能推荐」卡 → 「岗位信息参考:浏览第三方来源岗位信息，投递请前往来源平台办理」。
+- 「提升简历通过率」→ 「提供专业修改建议（仅供本人参考）」;QuickEntry「岗位推荐」→「求职准备」;注释措辞同步清理。
+
+**其它：** 纳入此前未提交的 [admin aiConfig.ts](../../apps/admin/src/services/api/aiConfig.ts) 类型补丁(AiModelFeatureKey 增 `resume_generate`,与后端配置位一致)。
+
+**验证（全绿）：** kiosk/shared/admin/api typecheck+lint+build;`verify:jobfair-ui` 13 PASS;api 四套回归(`resume-optimize` 13 / `resume-generate` 9 / `real-resume-diagnosis` 18 / `ai-result-ownership`)ALL PASS;浏览器验收:首页两入口 URL 与语义正确、optimize 模式闭环步骤条、`/resume/optimize` 直开空态回优化上传入口、`/campus` 全文 0 违规词(活动类型=校园双选 真实值)。全链路(上传→诊断→优化→PDF→打印)与真实模型联调合并执行(见下一节)。
+
+---
+
 ## 阶段2B —— AI 简历优化真实化（提取 → 诊断 → 优化 → 对比/编辑 → PDF → 打印）（2026-06-11，Claude，`feature/ai-resume-optimize-real`）
 
 **目标：** 把 `optimizeResume` 从诚实占位(固定 failed)真实化:用户上传/扫描简历 → 文本提取 → 诊断 → AI 优化,输出**可编辑的结构化优化版简历 + 新旧对比**,导出真实 PDF 进打印链路。阶段2 第一批第 1 项(Phase 1E)落地。

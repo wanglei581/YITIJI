@@ -22,6 +22,7 @@
 - ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
 
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
+> **2026-06-11 用户确认的执行顺序：① intent 分流/链路闭环/Campus 合规修复(✅ `feature/resume-intent-flow`) → ② 真实模型联调 → ③ 2B 安全收口补丁 → ④ 会员资产中心真实管理(C-2D) → ⑤ 2C 模拟面试(入口先放 AI简历服务内部,MVP 验收后才点亮首页占位) → 2D/2E。**
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
 

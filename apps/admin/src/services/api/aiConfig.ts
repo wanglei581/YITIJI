@@ -3,7 +3,13 @@ import { API_BASE_URL, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
 export type LlmVendor = 'deepseek' | 'qwen' | 'minimax'
-export type AiModelFeatureKey = 'assistant_chat' | 'resume_diagnosis' | 'resume_optimize' | 'digital_human' | 'poster_generation'
+export type AiModelFeatureKey =
+  | 'assistant_chat'
+  | 'resume_diagnosis'
+  | 'resume_generate'
+  | 'resume_optimize'
+  | 'digital_human'
+  | 'poster_generation'
 
 export interface AiModelFeatureMeta {
   key: AiModelFeatureKey

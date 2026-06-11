@@ -11,6 +11,8 @@ import { API_MODE } from '../../services/api/client'
 import { readAiResumeSession } from './aiResumeSession'
 
 interface ReportState {
+  /** intent 分流(diagnose/optimize):由上传页随 state 透传 */
+  intent?: string
   source?: string
   file?: { name: string; size: string; format: string }
   taskId?: string
@@ -38,6 +40,8 @@ export function ResumeReportPage() {
   const location = useLocation()
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as ReportState
+  // intent 决定底部主引导语义(optimize 入口进来时诊断只是必经步骤)
+  const intent = state.intent === 'optimize' ? 'optimize' : 'diagnose'
 
   const { success = true, reason } = state
   // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
@@ -316,15 +320,23 @@ export function ResumeReportPage() {
         </p>
       </div>
 
+      {/* 优化路径引导:用户从「AI简历优化」入口进入时,诊断只是必经步骤,主引导是继续优化 */}
+      {intent === 'optimize' && (
+        <div className="mt-4 flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/70 px-4 py-3">
+          <SparklesIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
+          <p className="text-sm text-primary-800">诊断已完成。点击下方「继续生成优化版简历」，系统将基于原文重组优化（不补充虚构信息）。</p>
+        </div>
+      )}
+
       {/* 操作按钮 */}
       <div className="mt-6 flex gap-3">
         <Button
           size="lg"
           variant="secondary"
           className="flex flex-1 items-center gap-2"
-          onClick={() => navigate('/resume/source')}
+          onClick={() => navigate(`/resume/source?intent=${intent}`)}
         >
-          重新诊断
+          {intent === 'optimize' ? '重新上传' : '重新诊断'}
         </Button>
         <Button
           size="lg"
@@ -332,7 +344,7 @@ export function ResumeReportPage() {
           onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken } })}
         >
           <SparklesIcon className="h-4 w-4" />
-          查看优化建议
+          {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}
         </Button>
       </div>
     </div>

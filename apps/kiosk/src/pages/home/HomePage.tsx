@@ -281,8 +281,9 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     icon: BriefcaseBusinessIcon,
     accent: 'blue',
     tiles: [
-      { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source' },
-      { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source' },
+      // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
+      { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source?intent=diagnose' },
+      { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source?intent=optimize' },
       { title: '简历素材库', icon: BookOpenIcon, disabled: true },
       { title: '职业规划', icon: CompassIcon, disabled: true },
       { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },

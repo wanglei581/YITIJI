@@ -100,8 +100,9 @@ export function ResumeOptimizePage() {
 
   useEffect(() => {
     if (!taskId) {
+      // 直接打开 /resume/optimize 且无任务上下文:引导回优化上传入口
       setLoading(false)
-      setFailMsg('任务已失效，请重新上传简历')
+      setFailMsg('请先上传简历完成诊断')
       return
     }
     let cancelled = false
@@ -118,7 +119,13 @@ export function ResumeOptimizePage() {
             setFailMsg('暂无优化建议，请返回重新解析')
           }
         } else {
-          setFailMsg(res.failReason ?? '暂无优化建议，请返回重新解析')
+          // 失败态分类:文件 TTL 过期 / 防编造拦截 / 其它,均给明确文案
+          const reason = res.failReason ?? ''
+          if (reason.includes('重新上传')) {
+            setFailMsg('文件已过期，请重新上传简历')
+          } else {
+            setFailMsg(reason || '暂无优化建议，请返回重新解析')
+          }
         }
       })
       .catch(() => { if (!cancelled) setFailMsg('优化结果读取失败，请返回重新解析') })
@@ -199,7 +206,9 @@ export function ResumeOptimizePage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <AlertCircleIcon className="h-14 w-14 text-gray-300" />
           <p className="text-base text-gray-500">{failMsg}</p>
-          <Button variant="secondary" onClick={() => navigate('/resume/source')}>重新开始</Button>
+          <Button size="lg" onClick={() => navigate('/resume/source?intent=optimize')}>
+            重新上传简历
+          </Button>
         </div>
       </div>
     )
