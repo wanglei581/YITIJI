@@ -153,14 +153,17 @@ export function ResumeTemplateLibraryPage() {
                     <SparklesIcon className="h-4 w-4" />
                     用于简历优化
                   </Button>
+                  {/* 2B 安全收口:模板素材无真实文件渲染链路,禁止假文件进打印 */}
                   <Button
                     size="sm"
                     variant="secondary"
                     className="flex items-center gap-1.5"
+                    disabled
+                    title="模板真实渲染链路接入后开放打印"
                     onClick={() => handlePrint(m)}
                   >
                     <PrinterIcon className="h-4 w-4" />
-                    打印材料
+                    打印(待接入)
                   </Button>
                 </div>
               </Card>

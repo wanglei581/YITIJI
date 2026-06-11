@@ -247,6 +247,20 @@ async function main(): Promise<void> {
       pass('2c. 失败后再次请求成功(无失败缓存粘滞)')
     }
 
+    // ── 2d. 学历/专业篡改(2B 收口补强):原文"本科"被改"硕士" → 拦截 ────────
+    {
+      const { taskId, accessToken } = await submitParse(ai, `file_opt_b2_${suffix}`)
+      const degreeTampered = validOptimize((o) => {
+        const resume = o['resume'] as Record<string, unknown>
+        ;(resume['education'] as Record<string, unknown>[])[0]['degree'] = '硕士'
+      })
+      setResponses([{ status: 200, content: degreeTampered }, { status: 200, content: degreeTampered }])
+      const bad = await ai.getResumeOptimize(taskId, { endUserId: null, accessToken })
+      if (bad.status !== 'failed') fail('2d. 学历篡改应被拦截')
+      if (!(bad.failReason ?? '').includes('已拦截')) fail(`2d. 应返回明确拦截文案: ${bad.failReason}`)
+      pass('2d. 学历篡改(本科→硕士) → 防编造拦截,返回明确拦截文案')
+    }
+
     // ── 3. 稻草人对比 before 不在原文 → 丢弃 ─────────────────────────────
     {
       const { taskId, accessToken } = await submitParse(ai, `file_opt_c_${suffix}`)

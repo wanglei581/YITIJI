@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Param, Body, Query, Req, UseGuards } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { AiService } from './ai.service'
 import type { AiResultRequester } from './ai.service'
@@ -180,6 +181,7 @@ export class AiController {
    * 审计只放元数据(条目数/状态/taskId),绝不包含姓名、联系方式或简历内容。
    */
   @Post('resume/generate')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } }) // 触发 LLM 调用,公共一体机单 IP 收紧
   async submitResumeGenerate(
     @Body() dto: ResumeGenerateRequestDto,
     @Req() req: ReqLike,
@@ -223,6 +225,7 @@ export class AiController {
    * 审计只放元数据(fileId/页数/大小),绝不包含简历内容。
    */
   @Post('resume/generate/export')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } }) // 服务端 PDF 渲染 + 对象存储写入,防滥用
   async exportGeneratedResume(
     @Body() dto: ResumeGenerateExportDto,
     @Req() req: ReqLike,

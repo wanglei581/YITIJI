@@ -44,10 +44,19 @@ export function FairMaterialsPage() {
     return () => { cancelled = true }
   }, [fairId])
 
+  // 2B 安全收口:打印必须基于真实资料文件 —— 带上后端签名 previewUrl(30min TTL),
+  // http 模式下创建真实打印任务;无签名 URL(mock 演示)时按钮降级为不可用。
   const handlePrint = (material: FairMaterialDTO) => {
+    if (!material.previewUrl) return
     navigate('/print/confirm', {
       state: {
-        file: { name: material.name, size: formatSize(material.fileSizeKB), pages: material.pageCount },
+        file: {
+          name: material.name,
+          size: formatSize(material.fileSizeKB),
+          pages: material.pageCount > 0 ? material.pageCount : null,
+          fileUrl: material.previewUrl,
+          mimeType: 'application/pdf',
+        },
         params: makePrintParams({
           copies: 1,
           duplex: material.pageCount > 1 ? 'double' : 'single',
@@ -117,10 +126,12 @@ export function FairMaterialsPage() {
                 <Button
                   size="md"
                   className="mt-4 flex w-full items-center justify-center gap-2"
+                  disabled={!mat.previewUrl}
+                  title={mat.previewUrl ? undefined : '演示数据无真实文件,接入后端后可打印'}
                   onClick={() => handlePrint(mat)}
                 >
                   <PrinterIcon className="h-4 w-4" />
-                  免费打印（{mat.pageCount} 页）
+                  {mat.previewUrl ? `免费打印（${mat.pageCount > 0 ? `${mat.pageCount} 页` : '页数以文件为准'}）` : '演示数据暂不可打印'}
                 </Button>
               ) : (
                 <p className="mt-4 text-center text-xs text-gray-400">该资料暂不开放打印</p>

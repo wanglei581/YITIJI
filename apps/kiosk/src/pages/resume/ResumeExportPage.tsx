@@ -138,14 +138,18 @@ export function ResumeExportPage() {
                   <SaveIcon className="h-4 w-4" />
                   保存到我的简历
                 </Button>
+                {/* 2B 安全收口:本页无真实文件生成链路,禁止假文件进打印;
+                    真实打印请走优化页「导出 PDF → 去打印」 */}
                 <Button
                   size="lg"
                   variant="secondary"
                   className="flex items-center justify-center gap-2"
+                  disabled
+                  title="请在优化页使用「导出 PDF」生成真实文件后打印"
                   onClick={() => handlePrint(item)}
                 >
                   <PrinterIcon className="h-4 w-4" />
-                  打印
+                  打印(走优化导出)
                 </Button>
               </div>
             </Card>

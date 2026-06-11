@@ -216,13 +216,17 @@ export class LlmResumeOptimizeService {
     for (const item of asArray(r['education'], 6)) {
       const school = strOf(item, 'school', 100)
       if (!school) continue
-      if (!inText(school)) return null
+      const major = strOf(item, 'major', 60)
+      const degree = strOf(item, 'degree', 20)
+      // 2B 收口补强:学历/专业同为高危篡改点(如 大专→本科),必须在原文中出现;
+      // 原文没有时模型应留空(inText('') 合法),写了但不在原文 → 整体非法
+      if (!inText(school) || !inText(major) || !inText(degree)) return null
       const description = clean(item['description'], MAX_DESC_CHARS)
       if (description === null) return null
       education.push({
         school,
-        major: strOf(item, 'major', 60) || undefined,
-        degree: strOf(item, 'degree', 20) || undefined,
+        major: major || undefined,
+        degree: degree || undefined,
         period: strOf(item, 'period', 40) || undefined,
         description: description || undefined,
       })

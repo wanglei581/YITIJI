@@ -5,6 +5,30 @@
 
 ---
 
+## 真实模型联调 + 2B 安全收口补丁（2026-06-11，Claude，`feature/2b-security-hardening`）
+
+**真实模型联调（AI_PROVIDER=llm + DeepSeek + COS,全部通过）：**
+- `.env` 设 `AI_PROVIDER=llm`;配置中心三功能位(诊断/生成/优化)均 enabled+keyConfigured(deepseek-chat)。
+- **诊断**:真实中文简历 PDF(带文字层)上传 → 8s 返回 completed,6 维度+4 风险提醒+3 优先级,建议具体可执行。
+- **优化**:5.6s 返回;事实串逐字保留(姓名/电话/学校/公司/证书),原文数字未变(12 组件/4s→1.8s/30+bug),3 个对比模块 before 均为原文真实片段;**原文无自我评价段 → summary 留空(契约正确行为,AI 不代填)**。
+- **生成**:2.2s 返回,润色自然,missingHints 正确提示缺联系方式。
+- **导出**:`FILE_STORAGE_DRIVER=cos` 生产形态 —— PDF 落腾讯云 COS,预签名 URL 实际下载 103KB 真 PDF(%PDF 魔数)。
+- 浏览器截图:优化页 providerName=llm **无演示横幅**,内容为真实模型输出。
+- 注:联调测试文件写入了生产 COS 桶 tmp/ 前缀(1h TTL+清理 cron 自动回收);后续联调建议临时切 local driver。
+
+**2B 安全收口补丁：**
+- **事实校验补强**:[llm-resume-optimize.service.ts](../../services/api/src/ai/resume/llm-resume-optimize.service.ts) 学历(degree)/专业(major)纳入原文校验(高危篡改点:大专→本科);新增 verify 用例 2d(本科→硕士 → 拦截+明确文案)。
+- **假文件打印入口全仓清理(4 处)**:
+  - [FairMaterialsPage](../../apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx) **真修复**:打印携带后端签名 previewUrl(30min TTL),http 模式创建真实打印任务(完成阶段1A 待办);无签名 URL(演示)按钮降级。
+  - [ScanResultPage](../../apps/kiosk/src/pages/scan/ScanResultPage.tsx):扫描硬件未接,http 模式禁用打印按钮(「硬件接入后开放」),mock 演示保留。
+  - [ResumeExportPage](../../apps/kiosk/src/pages/resume/ResumeExportPage.tsx) / [ResumeTemplateLibraryPage](../../apps/kiosk/src/pages/resume/ResumeTemplateLibraryPage.tsx)(孤儿页,无入口仅路由可达):假打印按钮禁用+诚实提示。
+- **导出/生成限流**:`POST /resume/generate` 6 次/分(触发 LLM)、`POST /resume/generate/export` 10 次/分(PDF 渲染+对象存储写入),叠加全局 60/分。
+- **Admin 类型补丁**:aiConfig.ts `resume_generate` key 已随 intent 分流分支合入。
+
+**验证（全绿）：** `verify:resume-optimize` **14 PASS**(新增学历篡改拦截);`verify:resume-generate` 9 / `verify-real-resume-diagnosis` 18 / `verify:ai-result-ownership` / `verify:jobfair-ui` 13 全过;api/kiosk typecheck+lint+build 全绿。
+
+---
+
 ## 简历诊断/优化入口 intent 分流 + 链路闭环引导 + Campus 合规修复（2026-06-11，Claude，`feature/resume-intent-flow`）
 
 **背景：** 首页「AI简历诊断」「AI简历优化」此前都进 `/resume/source`,链路可复用但语义不清晰。本轮只做引导层完善与合规残留修复,**不重写任何已有页面/后端服务/防编造校验/PDF/打印链路,不改首页六大功能分组结构**。

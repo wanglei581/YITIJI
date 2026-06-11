@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
+import { API_MODE } from '../../services/api/client'
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -117,9 +118,17 @@ export function ScanResultPage() {
       {/* 操作按钮 */}
       {success ? (
         <div className="mt-8 grid w-full max-w-sm grid-cols-2 gap-3">
-          <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={handlePrint}>
+          {/* 2B 安全收口:扫描硬件未接入,http 模式无真实文件,禁止假文件进打印链路 */}
+          <Button
+            size="lg"
+            variant="secondary"
+            className="flex items-center gap-2"
+            disabled={API_MODE === 'http'}
+            title={API_MODE === 'http' ? '扫描硬件接入后开放真实打印' : undefined}
+            onClick={handlePrint}
+          >
             <PrinterIcon className="h-4 w-4" />
-            直接打印
+            {API_MODE === 'http' ? '打印(硬件接入后开放)' : '直接打印'}
           </Button>
           <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={handleSave}>
             <SaveIcon className="h-4 w-4" />
