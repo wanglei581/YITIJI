@@ -27,6 +27,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { MockInterviewLlmService, type InterviewReportPayload } from '../src/mock-interview/mock-interview-llm.service'
 import { MockInterviewService } from '../src/mock-interview/mock-interview.service'
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
+import { AsrService } from '../src/mock-interview/asr/asr.service'
 
 const SECRET_ANSWER = '我在某电商项目里把首屏加载从4秒优化到1.5秒_机密标记XYZQ'
 const SECRET_QUESTION = '请讲讲你最有代表性的项目经历_问题标记ABCD'
@@ -48,12 +49,14 @@ Logger.overrideLogger(new Cap())
 
 // ── stub LLM（OpenAI 兼容）────────────────────────────────────────────────────
 const responseQueue: string[] = []
+const llmRequestBodies: string[] = []
 function startStub(): Promise<{ server: Server; url: string }> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
       let body = ''
       req.on('data', (c) => { body += c })
       req.on('end', () => {
+        llmRequestBodies.push(body)
         const reply = responseQueue.shift() ?? '{"question":"stub 队列空了","qType":"experience"}'
         res.setHeader('Content-Type', 'application/json')
         res.end(JSON.stringify({ choices: [{ message: { content: reply } }] }))
@@ -266,10 +269,90 @@ async function main() {
       pass('7. 未回答任何问题 → INTERVIEW_NO_ANSWERS（不产出空报告）')
     }
 
+    // ── 12. 2C+ 语音元数据落 Turn + interactionMode 落 session ─────────────
+    {
+      const c = await svc.createSession({ ...baseCfg, durationMin: 3, interactionMode: 'voice' }, { endUserId: null, accessToken: null })
+      cleanupSessionIds.push(c.sessionId)
+      const sess = await prisma.mockInterviewSession.findUnique({ where: { id: c.sessionId } })
+      if (sess?.interactionMode !== 'voice') fail('12. interactionMode 未落 session')
+      const req = { endUserId: null, accessToken: c.accessToken! }
+      responseQueue.push(q('自我介绍', { qType: 'intro' }))
+      await svc.start(c.sessionId, req)
+      responseQueue.push(q('第二题'))
+      await svc.answer(c.sessionId, {
+        answer: '编辑后的最终回答内容',
+        inputMode: 'voice',
+        transcriptText: '编辑前的转写原文内容',
+        transcriptEdited: true,
+        answerDurationSec: 42,
+      }, req)
+      const turn = await prisma.mockInterviewTurn.findFirst({ where: { sessionId: c.sessionId, role: 'candidate' } })
+      if (turn?.inputMode !== 'voice' || turn.transcriptText !== '编辑前的转写原文内容' || !turn.transcriptEdited || turn.answerDurationSec !== 42) {
+        fail(`12. 语音元数据落库不符: ${JSON.stringify({ m: turn?.inputMode, e: turn?.transcriptEdited, d: turn?.answerDurationSec })}`)
+      }
+      if (turn.content !== '编辑后的最终回答内容') fail('12. content 应为用户确认后的最终文本')
+      pass('12. 语音回合：inputMode/转写原文/编辑标记/耗时 落 Turn；content=确认文本')
+
+      // ── 13. 报告 prompt 含耗时元数据;含「语速」评价 → 重试 ───────────────
+      llmRequestBodies.length = 0
+      responseQueue.push(reportJson({ expression: ['你的语速偏快,情绪稳定性一般'] })) // 违规音频特征评价 → 触发重试
+      responseQueue.push(reportJson())
+      const rep = await svc.end(c.sessionId, req)
+      const reportReq = llmRequestBodies.find((b) => b.includes('练习报告'))
+      if (!reportReq || !reportReq.includes('42')) fail('13. 报告 prompt 未携带回答耗时')
+      if (!reportReq.includes('禁止')) fail('13. 报告 prompt 缺音频特征禁评约束')
+      if (/语速|情绪稳定/.test(JSON.stringify(rep.report))) fail('13. 重试后报告仍含音频特征评价')
+      pass('13. 报告基于转写+耗时生成;「语速/情绪稳定」类无依据评价被拦截重试')
+    }
+
+    // ── 14. ASR：disabled 诚实回退;stub 转写成功;错误映射;超大拒绝 ─────────
+    {
+      delete process.env['ASR_PROVIDER']
+      const asrOff = new AsrService()
+      const off = await asrOff.recognizeWav(Buffer.alloc(1000))
+      if (off.ok || off.errorCode !== 'ASR_NOT_CONFIGURED') fail('14. 未配置应 ASR_NOT_CONFIGURED')
+
+      // stub 百度 vop + token
+      const asrReplies: Array<Record<string, unknown>> = []
+      const asrStub = createServer((sreq, sres) => {
+        let b = ''
+        sreq.on('data', (ch) => { b += ch })
+        sreq.on('end', () => {
+          sres.setHeader('Content-Type', 'application/json')
+          if ((sreq.url ?? '').includes('/oauth/')) {
+            sres.end(JSON.stringify({ access_token: 'asr-stub-token', expires_in: 2592000 }))
+            return
+          }
+          sres.end(JSON.stringify(asrReplies.shift() ?? { err_no: 3303, err_msg: 'busy' }))
+        })
+      })
+      const asrUrl: string = await new Promise((res) => asrStub.listen(0, '127.0.0.1', () => {
+        const a = asrStub.address()
+        res(`http://127.0.0.1:${typeof a === 'object' && a ? a.port : 0}`)
+      }))
+      process.env['ASR_PROVIDER'] = 'baidu'
+      process.env['BAIDU_ASR_API_KEY'] = 'stub'
+      process.env['BAIDU_ASR_SECRET_KEY'] = 'stub'
+      process.env['BAIDU_ASR_BASE_URL'] = asrUrl
+      process.env['BAIDU_ASR_VOP_URL'] = `${asrUrl}/vop`
+      const asr = new AsrService()
+      asrReplies.push({ err_no: 0, result: ['我的回答转写文本_语音标记WXYZ'] })
+      const ok = await asr.recognizeWav(Buffer.alloc(2000))
+      if (!ok.ok || ok.text !== '我的回答转写文本_语音标记WXYZ') fail(`14. 转写失败: ${ok.errorMessage}`)
+      asrReplies.push({ err_no: 3301, err_msg: 'quality' })
+      const bad = await asr.recognizeWav(Buffer.alloc(2000))
+      if (bad.ok || !bad.errorMessage?.includes('没有听清')) fail('14. 3301 应映射「没有听清」')
+      const big = await asr.recognizeWav(Buffer.alloc(5 * 1024 * 1024))
+      if (big.ok || !big.errorMessage?.includes('过长')) fail('14. 超大音频应本地拒绝')
+      asrStub.close()
+      delete process.env['ASR_PROVIDER']
+      pass('14. ASR：未配置诚实回退 / stub 转写成功 / 音质差与超长明确报错')
+    }
+
     // ── 10. 日志脱敏 ──────────────────────────────────────────────────────────
     {
       const joined = capturedLogs.join('\n')
-      for (const secret of [SECRET_ANSWER.slice(0, 20), SECRET_QUESTION.slice(0, 12), '机密标记XYZQ', '问题标记ABCD']) {
+      for (const secret of [SECRET_ANSWER.slice(0, 20), SECRET_QUESTION.slice(0, 12), '机密标记XYZQ', '问题标记ABCD', '语音标记WXYZ', '编辑前的转写原文']) {
         if (joined.includes(secret)) fail(`10. 日志泄露对话内容: ${secret.slice(0, 10)}…`)
       }
       pass('10. 日志脱敏：问题/回答原文不出现在任何日志')

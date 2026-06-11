@@ -68,7 +68,14 @@ export interface ReportInput {
   experience: string
   difficulty: string
   resumeDigest: string | null
-  transcript: Array<{ role: 'interviewer' | 'candidate'; content: string; skipped?: boolean }>
+  transcript: Array<{
+    role: 'interviewer' | 'candidate'
+    content: string
+    skipped?: boolean
+    /** 回答耗时(秒,2C+ 语音/计时回合) */
+    durationSec?: number
+    inputMode?: string
+  }>
 }
 
 export interface InterviewReportPayload {
@@ -148,6 +155,8 @@ export class MockInterviewLlmService {
       '\n你的任务：基于完整对话，生成一份「模拟面试练习报告」。这是练习反馈，不是录用评估。' +
       '\n要求：所有判断必须基于对话中真实出现的内容；用户没有回答到的方面如实写"本次练习未充分覆盖"；' +
       '不编造用户没有说过的经历；overall.level 是练习表现等级（needs_work=需要加强 / pass=基础达标 / good=表现良好 / excellent=表现突出），不是通过率。' +
+      '\n对话中部分回答带有耗时元数据（秒），可据此在 expression/adaptability 模块中评价回答完整度、表达结构、追问应对与时间控制（过短可能不充分、过长可能不聚焦）。' +
+      '【禁止】评价语速、语调、情绪稳定性——你只有文字转写，没有任何音频特征分析，不得编造此类判断。' +
       '\n只输出 JSON（不要 markdown 代码块），结构：' +
       '{"overall":{"level":"needs_work|pass|good|excellent","summary":"2-3 句总评"},' +
       '"expression":["表达清晰度要点 2-4 条：结构性/是否绕圈/重点突出/职责成果是否讲清"],' +
@@ -161,7 +170,10 @@ export class MockInterviewLlmService {
       '"checklist":["面试前准备清单 5-8 条：公司岗位调研/自我介绍/代表性经历/反问问题/材料/设备路线"]}'
 
     const transcript = input.transcript
-      .map((t) => `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过）' : t.content.slice(0, 800)}`)
+      .map((t) => {
+        const meta = t.role === 'candidate' && typeof t.durationSec === 'number' ? `（回答耗时 ${t.durationSec} 秒）` : ''
+        return `${t.role === 'interviewer' ? '面试官' : '求职者'}：${t.skipped ? '（跳过）' : t.content.slice(0, 800)}${meta}`
+      })
       .join('\n')
     const user =
       (input.resumeDigest ? `【简历摘要】\n${input.resumeDigest.slice(0, 3000)}\n\n` : '') +
@@ -179,6 +191,11 @@ export class MockInterviewLlmService {
       const banned = findBannedTerm(JSON.stringify(report))
       if (banned) {
         this.logger.warn(`interview.report_banned attempt=${attempt}`)
+        continue
+      }
+      // 2C+:无音频特征分析,报告不得出现语速/语调/情绪稳定类评价(命中按无效输出重试)
+      if (/语速|语调|音调|情绪稳定/.test(JSON.stringify(report))) {
+        this.logger.warn(`interview.report_audio_claim attempt=${attempt}`)
         continue
       }
       this.logger.log(`interview.report_ok ms=${Date.now() - t0}`)

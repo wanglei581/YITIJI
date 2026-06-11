@@ -72,6 +72,7 @@ export class MockInterviewService {
       difficulty: string
       durationMin: number
       resumeFileId?: string
+      interactionMode?: string
     },
     requester: InterviewRequester,
   ) {
@@ -103,6 +104,7 @@ export class MockInterviewService {
         questionTarget: DURATION_TARGET[dto.durationMin] ?? 6,
         resumeFileId: dto.resumeFileId ?? null,
         resumeDigest,
+        interactionMode: dto.interactionMode === 'voice' ? 'voice' : 'text',
         expiresAt: new Date(Date.now() + ttl),
       },
     })
@@ -134,8 +136,19 @@ export class MockInterviewService {
     return { question: content, qType: q.qType, questionIndex: 1, questionTarget: session.questionTarget, done: false }
   }
 
-  /** 提交回答（或跳过）→ 返回下一题或结束建议。 */
-  async answer(sessionId: string, input: { answer?: string; skip?: boolean }, requester: InterviewRequester) {
+  /** 提交回答（或跳过）→ 返回下一题或结束建议。语音回合附转写元数据（2C+）。 */
+  async answer(
+    sessionId: string,
+    input: {
+      answer?: string
+      skip?: boolean
+      inputMode?: string
+      transcriptText?: string
+      transcriptEdited?: boolean
+      answerDurationSec?: number
+    },
+    requester: InterviewRequester,
+  ) {
     const session = await this.loadAuthorized(sessionId, requester)
     if (session.status !== 'in_progress') {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NOT_ACTIVE', message: '本场练习未在进行中' } })
@@ -151,7 +164,17 @@ export class MockInterviewService {
     }
     const nextIdx = turns.length
     await this.prisma.mockInterviewTurn.create({
-      data: { sessionId: session.id, idx: nextIdx, role: 'candidate', content: input.skip ? '（跳过）' : answerText, skipped: !!input.skip },
+      data: {
+        sessionId: session.id,
+        idx: nextIdx,
+        role: 'candidate',
+        content: input.skip ? '（跳过）' : answerText,
+        skipped: !!input.skip,
+        inputMode: input.inputMode === 'voice' ? 'voice' : 'text',
+        transcriptText: input.transcriptText?.slice(0, MAX_ANSWER_CHARS) ?? null,
+        transcriptEdited: input.transcriptEdited === true,
+        answerDurationSec: typeof input.answerDurationSec === 'number' ? Math.max(0, Math.min(600, Math.round(input.answerDurationSec))) : null,
+      },
     })
 
     if (asked >= session.questionTarget) {
@@ -182,7 +205,13 @@ export class MockInterviewService {
     }
     const payload = await this.llm.buildReport({
       ...this.llmCtx(session),
-      transcript: turns.map((t) => ({ role: t.role as 'interviewer' | 'candidate', content: t.content, skipped: t.skipped })),
+      transcript: turns.map((t) => ({
+        role: t.role as 'interviewer' | 'candidate',
+        content: t.content,
+        skipped: t.skipped,
+        ...(t.role === 'candidate' && t.answerDurationSec != null ? { durationSec: t.answerDurationSec } : {}),
+        ...(t.role === 'candidate' ? { inputMode: t.inputMode } : {}),
+      })),
     })
     const ttl = session.endUserId ? MEMBER_TTL_MS : ANON_TTL_MS
     await this.prisma.$transaction(async (tx) => {

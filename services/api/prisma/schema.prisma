@@ -1127,6 +1127,7 @@ model MockInterviewSession {
   difficulty      String   // easy / standard / pressure
   durationMin     Int      @default(5) // 3 / 5 / 8
   questionTarget  Int      @default(5)
+  interactionMode String   @default("text") // text / voice(2C+ 语音回合制,文字兜底)
   resumeFileId    String?  // 可选:上传简历 fileId(原文不落本表)
   resumeDigest    String?  // 提取后的简历文本(仅会话期使用,随会话 TTL 清理)
   startedAt       DateTime?
@@ -1151,6 +1152,10 @@ model MockInterviewTurn {
   qType     String?  // intro / position / experience / skill / behavior / plan / reverse / closing
   content   String
   skipped   Boolean  @default(false)
+  inputMode String   @default("text") // text / voice(候选人回合)
+  transcriptText    String?  // 语音转写原文(用户编辑前;content=最终确认文本)
+  transcriptEdited  Boolean  @default(false)
+  answerDurationSec Int?     // 回答耗时(秒,前端计时;报告时间控制维度用)
   createdAt DateTime @default(now())
 
   @@unique([sessionId, idx])

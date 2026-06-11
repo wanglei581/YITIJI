@@ -116,7 +116,7 @@ export function startInterview(sessionId: string, access: InterviewAccess): Prom
 
 export function answerInterview(
   sessionId: string,
-  input: { answer?: string; skip?: boolean },
+  input: { answer?: string; skip?: boolean; inputMode?: 'text' | 'voice'; transcriptText?: string; transcriptEdited?: boolean; answerDurationSec?: number },
   access: InterviewAccess,
 ): Promise<InterviewQuestionResponse> {
   if (API_MODE !== 'http') {
@@ -145,6 +145,47 @@ export function printInterviewReport(sessionId: string, access: InterviewAccess)
     return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
   }
   return call<InterviewPrintResponse>(`/mock-interviews/${encodeURIComponent(sessionId)}/report/print`, access, { method: 'POST', body: {} })
+}
+
+/** 语音能力探测：ASR 未启用时前端自动回退文字输入。 */
+export function getVoiceCapability(): Promise<{ asrEnabled: boolean }> {
+  if (API_MODE !== 'http') return Promise.resolve({ asrEnabled: false })
+  return call<{ asrEnabled: boolean }>('/mock-interviews/capabilities/voice', {})
+}
+
+/** 上传一段回答音频（16k 单声道 WAV）→ 转写文本（音频不持久化）。 */
+export async function transcribeAnswer(sessionId: string, wav: Blob, access: InterviewAccess): Promise<{ text: string }> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new InterviewApiError('MOCK_MODE', '演示模式不支持语音转写，请使用文字输入', 0))
+  }
+  const form = new FormData()
+  form.append('audio', wav, 'answer.wav')
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/mock-interviews/${encodeURIComponent(sessionId)}/transcribe`, {
+      method: 'POST',
+      headers: {
+        ...(access.token ? { Authorization: `Bearer ${access.token}` } : {}),
+        ...(!access.token && access.accessToken ? { 'x-interview-access-token': access.accessToken } : {}),
+      },
+      credentials: 'include',
+      body: form,
+    })
+  } catch {
+    throw new InterviewApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
+  }
+  if (!res.ok) {
+    let code = 'ASR_FAILED'
+    let message = '语音转写失败'
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } }
+      code = body.error?.code ?? code
+      message = body.error?.message ?? message
+    } catch { /* keep defaults */ }
+    throw new InterviewApiError(code, message, res.status)
+  }
+  const json = (await res.json()) as { data: { text: string } }
+  return json.data
 }
 
 export function getMyInterviews(token: string | null | undefined): Promise<{ items: MemberInterviewItem[]; nextCursor: string | null }> {

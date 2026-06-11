@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { RedisService } from '../common/redis/redis.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
@@ -9,6 +10,7 @@ import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MockInterviewService, type InterviewRequester } from './mock-interview.service'
+import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 
 // ── DTO（全局 forbidNonWhitelisted：未知字段直接 400）─────────────────────────
 
@@ -37,6 +39,10 @@ export class CreateInterviewDto {
 
   @IsOptional() @IsString() @MaxLength(64)
   resumeFileId?: string
+
+  /** 交互方式偏好:voice=语音回合制(文字兜底);text=纯文字 */
+  @IsOptional() @IsIn(['text', 'voice'])
+  interactionMode?: string
 }
 
 export class InterviewAnswerDto {
@@ -45,6 +51,22 @@ export class InterviewAnswerDto {
 
   @IsOptional()
   skip?: boolean
+
+  /** 本回合输入方式(2C+):voice=语音转写后确认提交 */
+  @IsOptional() @IsIn(['text', 'voice'])
+  inputMode?: string
+
+  /** 语音转写原文(用户编辑前;answer=最终确认文本) */
+  @IsOptional() @IsString() @MaxLength(2000)
+  transcriptText?: string
+
+  /** 用户是否编辑过转写 */
+  @IsOptional() @IsBoolean()
+  transcriptEdited?: boolean
+
+  /** 回答耗时(秒,前端计时;1-600) */
+  @IsOptional() @IsInt() @Min(0) @Max(600)
+  answerDurationSec?: number
 }
 
 interface ReqLike {
@@ -69,6 +91,7 @@ function headerOf(req: ReqLike, name: string): string | null {
 export class MockInterviewController {
   constructor(
     private readonly service: MockInterviewService,
+    private readonly asr: AsrService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
   ) {}
@@ -96,7 +119,44 @@ export class MockInterviewController {
   @Post(':id/answer')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   async answer(@Param('id') id: string, @Body() dto: InterviewAnswerDto, @Req() req: ReqLike) {
-    return ApiResponse.ok(await this.service.answer(id, { answer: dto.answer, skip: dto.skip === true }, await this.requesterOf(req)))
+    return ApiResponse.ok(await this.service.answer(id, {
+      answer: dto.answer,
+      skip: dto.skip === true,
+      inputMode: dto.inputMode === 'voice' ? 'voice' : 'text',
+      transcriptText: dto.transcriptText,
+      transcriptEdited: dto.transcriptEdited === true,
+      answerDurationSec: dto.answerDurationSec,
+    }, await this.requesterOf(req)))
+  }
+
+  /**
+   * 语音回答转写(2C+):上传一段 16k 单声道 WAV → 转写文本(不落库、音频不落盘)。
+   * 转写文本由用户在前端确认/编辑后随 /answer 提交。归属门禁与会话一致。
+   */
+  @Post(':id/transcribe')
+  @Throttle({ default: { ttl: 60_000, limit: 12 } })
+  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: ASR_MAX_AUDIO_BYTES } }))
+  async transcribe(
+    @Param('id') id: string,
+    @UploadedFile() audio: Express.Multer.File | undefined,
+    @Req() req: ReqLike,
+  ) {
+    // 先做归属校验(借 getSession 的门禁;不存在/越权统一 404),再消费音频
+    await this.service.getSession(id, await this.requesterOf(req))
+    if (!audio?.buffer?.length) {
+      throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
+    }
+    const result = await this.asr.recognizeWav(audio.buffer)
+    if (!result.ok) {
+      throw new BadRequestException({ error: { code: result.errorCode ?? 'ASR_FAILED', message: result.errorMessage ?? '语音转写失败' } })
+    }
+    return ApiResponse.ok({ text: result.text })
+  }
+
+  /** 语音能力可用性(前端进入会话页时探测;不可用自动回退文字输入) */
+  @Get('capabilities/voice')
+  voiceCapability() {
+    return ApiResponse.ok({ asrEnabled: this.asr.enabled })
   }
 
   @Post(':id/end')
