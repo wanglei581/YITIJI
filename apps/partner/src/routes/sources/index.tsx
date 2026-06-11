@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
   CopyIcon,
@@ -122,7 +122,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
           <h2 className="text-base font-semibold text-gray-900">新增数据来源</h2>
           <p className="mt-1 text-sm text-gray-500">选择对方最容易配合的方式接入岗位或招聘会展示数据。</p>
         </div>
-        <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
+        <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600">
           <XIcon className="h-5 w-5" />
         </button>
       </div>
@@ -398,6 +398,7 @@ export default function SourcesPage() {
                         {s.accessMode === 'excel' && (
                           <button
                             className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                            type="button"
                             onClick={() => setExcelSource(s)}
                           >
                             字段映射
@@ -406,6 +407,7 @@ export default function SourcesPage() {
                         {s.accessMode === 'webhook' && (
                           <button
                             className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
+                            type="button"
                             onClick={() => setWebhookGuide(s)}
                           >
                             查看接入
@@ -417,6 +419,7 @@ export default function SourcesPage() {
                               ? 'text-green-600 hover:bg-green-50'
                               : 'text-orange-500 hover:bg-orange-50'
                           }`}
+                          type="button"
                           onClick={() => handleToggle(s.id)}
                         >
                           {s.connStatus === 'disabled' ? '启用' : '停用'}
@@ -447,38 +450,30 @@ export default function SourcesPage() {
       )}
 
       {/* Webhook 接入说明(只读指引;webhookSecret 创建时一次性下发,不再回显) */}
-      {webhookGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
-          <Card className="w-full max-w-lg p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">Webhook 接入说明 · {webhookGuide.name}</h3>
-              <button
-                type="button"
-                onClick={() => setWebhookGuide(null)}
-                aria-label="关闭"
-                className="rounded p-1 text-gray-400 hover:bg-gray-100"
-              >
-                ✕
-              </button>
+      <Drawer
+        open={Boolean(webhookGuide)}
+        onClose={() => setWebhookGuide(null)}
+        title={webhookGuide ? `Webhook 接入说明 · ${webhookGuide.name}` : 'Webhook 接入说明'}
+        size="md"
+      >
+        {webhookGuide && (
+          <div className="space-y-3 text-sm text-gray-700">
+            <div>
+              <p className="mb-1 text-xs text-gray-400">推送地址(POST)</p>
+              <code className="block break-all rounded bg-gray-50 px-3 py-2 font-mono text-xs">
+                {`${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`}
+              </code>
             </div>
-            <div className="space-y-3 text-sm text-gray-700">
-              <div>
-                <p className="mb-1 text-xs text-gray-400">推送地址(POST)</p>
-                <code className="block break-all rounded bg-gray-50 px-3 py-2 font-mono text-xs">
-                  {`${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`}
-                </code>
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">
-                <p className="mb-1 font-medium text-gray-700">签名要求(请求方实现)</p>
-                <p>Header 携带 <code className="font-mono">x-signature</code>(HMAC-SHA256,密钥为创建数据源时下发的 webhookSecret)、
-                <code className="font-mono">x-timestamp</code>(5 分钟内有效)与 <code className="font-mono">x-nonce</code>(防重放)。</p>
-                <p className="mt-1.5">webhookSecret 仅在创建时下发一次,平台不再回显;如遗失请删除数据源后重建。</p>
-              </div>
-              <p className="text-xs text-gray-400">payload 字段规范见对接文档;推送数据默认进入待审核,管理员审核通过后才会在终端展示。</p>
+            <div className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">
+              <p className="mb-1 font-medium text-gray-700">签名要求(请求方实现)</p>
+              <p>Header 携带 <code className="font-mono">x-signature</code>(HMAC-SHA256,密钥为创建数据源时下发的 webhookSecret)、
+              <code className="font-mono">x-timestamp</code>(5 分钟内有效)与 <code className="font-mono">x-nonce</code>(防重放)。</p>
+              <p className="mt-1.5">webhookSecret 仅在创建时下发一次,平台不再回显;如遗失请删除数据源后重建。</p>
             </div>
-          </Card>
-        </div>
-      )}
+            <p className="text-xs text-gray-400">payload 字段规范见对接文档;推送数据默认进入待审核,管理员审核通过后才会在终端展示。</p>
+          </div>
+        )}
+      </Drawer>
     </Page>
   )
 }

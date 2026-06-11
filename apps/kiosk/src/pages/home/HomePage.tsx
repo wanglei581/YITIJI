@@ -336,7 +336,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
   },
   {
     title: 'AI面试训练',
-    subtitle: '全真模拟，助力过关',
+    subtitle: '模拟练习，仅供参考',
     icon: HeadphonesIcon,
     accent: 'purple',
     tiles: [

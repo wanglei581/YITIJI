@@ -16,19 +16,6 @@ import {
 } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 
-const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard',  label: '工作台',        icon: LayoutDashboardIcon },
-  { key: 'profile',    label: '机构资料',       icon: Building2Icon,   group: '机构信息' },
-  { key: 'jobs',       label: '岗位信息管理',   icon: BriefcaseIcon,   group: '数据管理' },
-  { key: 'fairs',      label: '招聘会信息管理', icon: CalendarIcon },
-  { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon },
-  { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon },
-  { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon },
-  { key: 'terminals',  label: '终端数据',       icon: MonitorIcon,     group: '数据与账号' },
-  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon },
-  { key: 'account',    label: '账号权限',       icon: UserCogIcon },
-]
-
 const PATH_TO_KEY: Record<string, string> = {
   '/':           'dashboard',
   '/profile':    'profile',
@@ -45,6 +32,19 @@ const PATH_TO_KEY: Record<string, string> = {
 const KEY_TO_PATH: Record<string, string> = Object.fromEntries(
   Object.entries(PATH_TO_KEY).map(([path, key]) => [key, path])
 )
+
+const NAV_ITEMS: NavItem[] = [
+  { key: 'dashboard',  label: '工作台',        icon: LayoutDashboardIcon, href: KEY_TO_PATH.dashboard },
+  { key: 'profile',    label: '机构资料',       icon: Building2Icon,   group: '机构信息', href: KEY_TO_PATH.profile },
+  { key: 'jobs',       label: '岗位信息管理',   icon: BriefcaseIcon,   group: '数据管理', href: KEY_TO_PATH.jobs },
+  { key: 'fairs',      label: '招聘会信息管理', icon: CalendarIcon, href: KEY_TO_PATH.fairs },
+  { key: 'policy',     label: '政策公告管理',   icon: FileTextIcon, href: KEY_TO_PATH.policy },
+  { key: 'sources',    label: '数据源管理',     icon: DatabaseIcon, href: KEY_TO_PATH.sources },
+  { key: 'sync-logs',  label: '同步日志',       icon: RefreshCwIcon, href: KEY_TO_PATH['sync-logs'] },
+  { key: 'terminals',  label: '终端数据',       icon: MonitorIcon,     group: '数据与账号', href: KEY_TO_PATH.terminals },
+  { key: 'stats',      label: '数据统计',       icon: BarChart2Icon, href: KEY_TO_PATH.stats },
+  { key: 'account',    label: '账号权限',       icon: UserCogIcon, href: KEY_TO_PATH.account },
+]
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '管理员',

@@ -25,28 +25,6 @@ import {
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 import { adminOpsService } from '../services/api/adminOps'
 
-const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
-  { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维' },
-  { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon },
-  // badge 不再硬编码:告警数为实时派生,进入页面即见真实数量
-  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon },
-  { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理' },
-  { key: 'files',        label: '文件管理',     icon: FolderIcon },
-  { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon },
-  { key: 'ai-config',    label: 'AI大模型',     icon: SparklesIcon },
-  { key: 'job-sources',     label: '岗位信息源',   icon: BriefcaseIcon,         group: '数据内容' },
-  { key: 'fair-sources',   label: '招聘会信息源', icon: CalendarIcon },
-  { key: 'policy-sources', label: '政策信息源',   icon: ScrollTextIcon },
-  { key: 'fairs',          label: '招聘会管理',   icon: ConciergeBellIcon },
-  { key: 'import-batches', label: 'Excel 导入记录', icon: FileSpreadsheetIcon },
-  { key: 'sync-sources',   label: 'API 同步数据源', icon: RefreshCwIcon },
-  { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户' },
-  { key: 'users',        label: '用户管理',     icon: UsersIcon },
-  { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理' },
-  { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon },
-]
-
 // 历史路径(/terminals 等)在 routes 层重定向到 /devices?tab=…,
 // 这里把它们一并映射到 devices 菜单 key,保证侧栏高亮一致。
 const PATH_TO_KEY: Record<string, string> = {
@@ -85,6 +63,28 @@ const KEY_TO_PATH: Record<string, string> = (() => {
   }
   return out
 })()
+
+const NAV_ITEMS: NavItem[] = [
+  { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon, href: KEY_TO_PATH.dashboard },
+  { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维', href: KEY_TO_PATH.devices },
+  { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon, href: KEY_TO_PATH.screensaver },
+  // badge 不再硬编码:告警数为实时派生,进入页面即见真实数量
+  { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon, href: KEY_TO_PATH.alerts },
+  { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理', href: KEY_TO_PATH.orders },
+  { key: 'files',        label: '文件管理',     icon: FolderIcon, href: KEY_TO_PATH.files },
+  { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon, href: KEY_TO_PATH['ai-services'] },
+  { key: 'ai-config',    label: 'AI大模型',     icon: SparklesIcon, href: KEY_TO_PATH['ai-config'] },
+  { key: 'job-sources',     label: '岗位信息源',   icon: BriefcaseIcon,         group: '数据内容', href: KEY_TO_PATH['job-sources'] },
+  { key: 'fair-sources',   label: '招聘会信息源', icon: CalendarIcon, href: KEY_TO_PATH['fair-sources'] },
+  { key: 'policy-sources', label: '政策信息源',   icon: ScrollTextIcon, href: KEY_TO_PATH['policy-sources'] },
+  { key: 'fairs',          label: '招聘会管理',   icon: ConciergeBellIcon, href: KEY_TO_PATH.fairs },
+  { key: 'import-batches', label: 'Excel 导入记录', icon: FileSpreadsheetIcon, href: KEY_TO_PATH['import-batches'] },
+  { key: 'sync-sources',   label: 'API 同步数据源', icon: RefreshCwIcon, href: KEY_TO_PATH['sync-sources'] },
+  { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户', href: KEY_TO_PATH.partners },
+  { key: 'users',        label: '用户管理',     icon: UsersIcon, href: KEY_TO_PATH.users },
+  { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理', href: KEY_TO_PATH.permissions },
+  { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon, href: KEY_TO_PATH.audit },
+]
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '超级管理员',
@@ -143,9 +143,12 @@ export function AdminLayoutWrapper() {
       headerActions={
         <div className="flex items-center gap-3">
           {/* 真实告警数(实时派生);点击进入告警中心。原 notificationCount prop 在自定义 headerActions 下不渲染,已移除死代码 */}
-          <button
-            type="button"
-            onClick={() => navigate('/alerts')}
+          <a
+            href="/alerts"
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/alerts')
+            }}
             aria-label={`告警${alertCount > 0 ? `(${alertCount}条)` : ''}`}
             className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           >
@@ -155,7 +158,7 @@ export function AdminLayoutWrapper() {
                 {alertCount > 9 ? '9+' : alertCount}
               </span>
             )}
-          </button>
+          </a>
           <div className="text-right">
             <p className="text-sm font-medium text-gray-800">{user?.name ?? '当前用户'}</p>
             <p className="text-xs text-gray-500">{user ? ROLE_LABEL[user.role] : ''}</p>

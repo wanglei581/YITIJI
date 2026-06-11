@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
 import { Building2Icon } from 'lucide-react'
@@ -11,9 +11,11 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
 
-  if (getToken()) {
-    nav('/', { replace: true })
-  }
+  useEffect(() => {
+    if (getToken()) {
+      nav('/', { replace: true })
+    }
+  }, [nav])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

@@ -12,6 +12,8 @@ export interface NavItem {
   key: string
   label: string
   icon: LucideIcon
+  /** Optional href fallback for browser-native navigation semantics. */
+  href?: string
   /** Numeric/string badge shown on the nav item. */
   badge?: string | number
   /** Section header shown above this item when sidebar is expanded. */
@@ -116,10 +118,15 @@ export function AdminLayout({
                     </div>
                   )}
 
-                  <button
-                    type="button"
+                  <a
+                    href={item.href ?? '#'}
                     aria-current={active ? 'page' : undefined}
-                    onClick={() => onNavChange?.(item.key)}
+                    onClick={(e) => {
+                      if (onNavChange) {
+                        e.preventDefault()
+                        onNavChange(item.key)
+                      }
+                    }}
                     className={cn(
                       'relative flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                       active
@@ -154,7 +161,7 @@ export function AdminLayout({
                         {item.badge}
                       </span>
                     )}
-                  </button>
+                  </a>
                 </li>
               )
             })}

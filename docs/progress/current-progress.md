@@ -5,6 +5,18 @@
 
 ---
 
+## 审计修复回归补丁（2026-06-11，Codex）
+
+针对 `main@7bf5756` 审计修复后的浏览器回归点做小补丁，目标是保持三端真实数据口径不变，同时修复点击与登录体验问题。
+
+- **Admin 导航回归**：公共 `AdminLayout` 的侧边导航项增加 `href` 语义，Admin/Partner wrapper 按既有 `KEY_TO_PATH` 填充真实路径；仍保留 React Router `navigate`，但浏览器原生链接语义可作为兜底。Admin 顶部告警入口改为带 `href="/alerts"` 的可点击入口，点击仍进入告警中心。
+- **Partner 数据源接入说明**：`查看接入` 按钮补齐 `type="button"`，Webhook 接入说明改用公共 `Drawer`，复用统一抽屉层级与 Esc/遮罩关闭能力；内容继续只展示推送地址与 HMAC 签名要求，secret 不回显。
+- **Partner 登录 warning**：登录页已登录自动跳转从 render 期 `nav()` 移入 `useEffect`，修复 `setState during render` / `navigate() in render` warning。
+- **Kiosk 合规文案**：首页 `AI面试训练` 副标题由“全真模拟，助力过关”改为“模拟练习，仅供参考”。
+- **验证**：`pnpm typecheck` 全绿；`pnpm lint` 全绿（仅既有 Kiosk Fast Refresh warning 2 条）；`pnpm build` 全绿（仅既有前端大 chunk warning）。浏览器复验：Admin 顶部告警与侧栏岗位信息源均可跳转；Partner 登录后进入工作台且未新增同类 warning；Partner 数据源第一条 Webhook「查看接入」打开抽屉并展示 `推送地址(POST)` / `x-signature`；Kiosk 首页新文案存在、旧“助力过关”不存在。
+
+---
+
 ## 审计修复补丁（2026-06-11，Claude，`feature/audit-fixes`）
 
 37 代理全仓审计（101 项确认缺口）后的第一轮"假数据/死按钮"清理，目标：**http 模式下三端不再显示任何假数字**。
