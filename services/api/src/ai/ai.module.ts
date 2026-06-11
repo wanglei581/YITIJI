@@ -18,6 +18,7 @@ import { ResumeExtractionService } from './resume/resume-extraction.service'
 import { OcrService } from './resume/ocr/ocr.service'
 import { DisabledOcrProvider } from './resume/ocr/disabled-ocr.provider'
 import { TencentOcrProvider } from './resume/ocr/tencent-ocr.provider.stub'
+import { BaiduOcrProvider } from './resume/ocr/baidu-ocr.provider'
 import { LlmResumeService } from './resume/llm-resume.service'
 import { LlmResumeGenerateService } from './resume/llm-resume-generate.service'
 import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
@@ -45,6 +46,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
     OcrService,
     DisabledOcrProvider,
     TencentOcrProvider,
+    BaiduOcrProvider,
     // ── Phase 1B 真实 LLM 简历诊断（AI_PROVIDER=llm）──
     LlmResumeService,
     LlmResumeProvider,

@@ -48,3 +48,4 @@ services/api/data/
 
 # docs 下的二进制文档（如机器生成 / 外部 .docx）不入库，结论沉淀为同名 .md
 docs/**/*.docx
+services/api/prisma/ci-test.db

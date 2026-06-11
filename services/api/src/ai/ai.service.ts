@@ -199,6 +199,14 @@ export class AiService {
             extractedText: extraction.text,
             extractedPageCount: extraction.pageCount,
           })
+          // Stage 3:OCR 来源（图片 / 扫描件）附带置信度与复核提示,前端必须如实展示。
+          if (extraction.textSource === 'image_ocr' || extraction.textSource === 'pdf_ocr') {
+            result.extractionNotice = {
+              textSource: extraction.textSource,
+              confidence: extraction.confidence ?? 'low',
+              warnings: extraction.warnings ?? [],
+            }
+          }
         }
       } else {
         result = await this.provider.parseResume(input)

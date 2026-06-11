@@ -22,6 +22,8 @@ interface ReportState {
   success?: boolean
   reason?: string
   report?: ResumeReport
+  /** Stage 3:OCR 来源的置信度与复核提示(解析页随 state 透传) */
+  extractionNotice?: { textSource: string; confidence: 'high' | 'medium' | 'low'; warnings: string[] }
   targetContext?: ResumeTargetContext
 }
 
@@ -50,6 +52,10 @@ export function ResumeReportPage() {
   const accessToken = state.accessToken ?? session?.accessToken
   const [report, setReport] = useState<ResumeReport | undefined>(state.report)
   const [providerName, setProviderName] = useState<string | undefined>(state.providerName)
+  // Stage 3:OCR 来源(图片/扫描件)的置信度与复核提示,必须如实展示
+  const [extractionNotice, setExtractionNotice] = useState<
+    { textSource: string; confidence: 'high' | 'medium' | 'low'; warnings: string[] } | undefined
+  >(state.extractionNotice)
   const [loading, setLoading] = useState(!state.report && !!taskId && success)
   const [loadError, setLoadError] = useState(false)
 
@@ -63,6 +69,7 @@ export function ResumeReportPage() {
       .then((res) => {
         if (cancelled) return
         if (res.providerName) setProviderName(res.providerName)
+        if (res.extractionNotice) setExtractionNotice(res.extractionNotice)
         if (res.report) setReport(res.report)
         else setLoadError(true)
       })
@@ -177,6 +184,15 @@ export function ResumeReportPage() {
         <ComplianceBanner tone="success" title="报告边界">
           本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。
         </ComplianceBanner>
+
+        {/* Stage 3:扫描件/图片经 OCR 识别 → 如实标注来源与置信度;低置信度提示人工核对 */}
+        {extractionNotice && (
+          <ComplianceBanner tone="info" title={extractionNotice.textSource === 'pdf_ocr' ? '扫描件识别说明' : '图片识别说明'}>
+            本简历经文字识别（OCR）提取，识别置信度
+            {extractionNotice.confidence === 'high' ? '较高' : extractionNotice.confidence === 'medium' ? '中等' : '较低'}。
+            {extractionNotice.warnings.length > 0 ? ` ${extractionNotice.warnings.join('；')}。` : ''}
+          </ComplianceBanner>
+        )}
 
         {/* 目标方向摘要 */}
         {summary && (

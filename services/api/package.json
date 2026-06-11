@@ -42,10 +42,13 @@
     "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts",
     "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",
     "db:seed:venue-guide": "node -r @swc-node/register prisma/seed-venue-guide.ts",
-    "verify:member-assets-c2d": "node -r @swc-node/register scripts/verify-member-assets-c2d.ts"
+    "verify:member-assets-c2d": "node -r @swc-node/register scripts/verify-member-assets-c2d.ts",
+    "verify:ocr-baidu": "node -r @swc-node/register scripts/verify-ocr-baidu.ts",
+    "verify:ocr-baidu-live": "node -r @swc-node/register scripts/verify-ocr-baidu-live.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
+    "@napi-rs/canvas": "^1.0.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.24",
     "@nestjs/core": "^11.1.24",

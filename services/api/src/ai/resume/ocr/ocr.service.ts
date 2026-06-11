@@ -1,16 +1,18 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common'
 import { DisabledOcrProvider } from './disabled-ocr.provider'
 import { TencentOcrProvider } from './tencent-ocr.provider.stub'
+import { BaiduOcrProvider } from './baidu-ocr.provider'
 import type { OcrInput, OcrProvider, OcrProviderName, OcrResult } from './ocr-provider.interface'
 
-const KNOWN_OCR_PROVIDERS = ['disabled', 'tencent'] as const
+const KNOWN_OCR_PROVIDERS = ['disabled', 'tencent', 'baidu'] as const
 
 /**
  * OCR provider 选择器。
  *
  * 按 OCR_PROVIDER env 选择 active provider（默认 disabled）：
  *   - disabled：图片 / 扫描件诚实返回 OCR_NOT_CONFIGURED，绝不假识别。
- *   - tencent：占位（二期接真实腾讯云 OCR API）。
+ *   - baidu：真实百度智能云通用文字识别（高精度版 accurate_basic，Stage 3）。
+ *   - tencent：占位（保留扩展位，未接真实 API）。
  *
  * 非法 OCR_PROVIDER 值启动即抛 OCR_PROVIDER_INVALID，不静默回退
  * （对齐 AiService 对 AI_PROVIDER 的处理范式）。
@@ -23,6 +25,7 @@ export class OcrService {
   constructor(
     private readonly disabledProvider: DisabledOcrProvider,
     private readonly tencentProvider: TencentOcrProvider,
+    private readonly baiduProvider: BaiduOcrProvider,
   ) {
     const rawName = process.env['OCR_PROVIDER'] ?? 'disabled'
     if (!(KNOWN_OCR_PROVIDERS as readonly string[]).includes(rawName)) {
@@ -37,6 +40,7 @@ export class OcrService {
     const map: Record<OcrProviderName, OcrProvider> = {
       disabled: this.disabledProvider,
       tencent: this.tencentProvider,
+      baidu: this.baiduProvider,
     }
     this.provider = map[name]
     this.logger.log(`OCR provider = ${this.provider.name}`)

@@ -5,6 +5,25 @@
 
 ---
 
+## Stage 3 真实 OCR（百度智能云，2026-06-11，Claude，`feature/real-ocr-baidu`）
+
+- **Provider**：`OCR_PROVIDER=baidu` → `BaiduOcrProvider`（通用文字识别高精度版 `accurate_basic` + probability）。
+  - 鉴权：API Key/Secret Key（仅 `services/api/.env`）换 access_token（≈30 天），内存缓存 + 提前 1 天刷新 + 单飞；token 失效码（100/110/111）作废缓存自动重试一次。
+  - 限制：单图 ≤6MB（本地拒绝零外发）/ 超时 15s（AbortController 真实中断）/ 并发 2 + 队列上限（对齐免费档 QPS）；额度/限流/图片类错误分类映射，诚实失败不假成功。
+  - 脱敏：图片、识别文本、token 不落盘不写日志；只记元数据（ms/lines/confidence/错误码）。
+- **扫描版 PDF**：无文字层 PDF → `pdf-page-renderer`（unpdf 内部 pdfjs + 自注入 @napi-rs/canvas CanvasFactory；unpdf 自带 NodeCanvasFactory 是恒抛错占位，含图片的扫描件必炸，故绕开）→ 受控渲染（`OCR_PDF_MAX_PAGES` 默认 3，超出页如实 warning「仅识别前 N 页」）→ 逐页 OCR；任一页失败整体诚实失败。`textSource='pdf_ocr'`。
+- **低置信度复核**：OCR 来源（image_ocr/pdf_ocr）非 high 置信度 → 提取层附「请对照原件核对」warning；`ResumeParseResponse.extractionNotice`（additive）透传到 Kiosk 报告页提示条（来源 + 置信度 + 须知）。
+- **结构保证**：OCR 失败 → 提取失败 → 直接返回失败原因，**不调 LLM**（沿用 Phase 1B 流程）。
+- **验证**：
+  - `verify:ocr-baidu`（离线 stub 百度服务，12 PASS，进 CI）：成功映射 / 低置信度提示 / 额度 / 超时中断 / token 刷新重试 / 超大图本地拒绝 / 扫描件真实渲染逐页 / 多页限制 / 部分页失败整体失败 / disabled 回归 / 日志脱敏 / 未配置。
+  - `verify:ocr-baidu-live`（真实百度接口冒烟，2 PASS，手动）：合成中文样张识别 + 图片型 PDF 全链路。
+  - 浏览器端到端（真实 API + OCR_PROVIDER=baidu + AI_PROVIDER=llm/DeepSeek）：Kiosk 上传 PNG 简历 → 真实 OCR（919ms，confidence=high）→ 真实 LLM 8 项诊断报告 → 报告页「图片识别说明」提示条如实展示；运行日志 0 原文泄露。
+  - 回归：`verify:resume-extraction`（适配 OcrService 新构造）/ real-resume-diagnosis / ai-result-ownership / resume-optimize 全 PASS。
+- 新依赖：`@napi-rs/canvas`（darwin/win32/linux 预编译，无原生编译）。CI 新增 verify:ocr-baidu + verify:resume-extraction。
+- 安全注：本次百度密钥曾在聊天中暴露，**生产上线前必须在百度控制台删除应用重建轮换**。
+
+---
+
 ## 文档口径同步 + 数字人死代码清理（2026-06-11，Codex，用户确认后执行）
 
 **目标：** 避免后续模型继续按旧文档重复开发已完成能力；只清理确认无引用且已被新方案取代的文件，不触碰 Claude 当前 C-2D 会员资产中心业务实现。

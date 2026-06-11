@@ -74,7 +74,7 @@ export function ResumeParsePage() {
       // 供刷新 / 返回后读回本人结果（绝不持久化 report / 原文）。会员结果无 accessToken。
       saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })
       navigate('/resume/report', {
-        state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, providerName: result.providerName, report: result.report },
+        state: { ...state, success: true, taskId: result.taskId, accessToken: result.accessToken, providerName: result.providerName, report: result.report, extractionNotice: result.extractionNotice },
       })
     } catch {
       if (cancelRef.current) return

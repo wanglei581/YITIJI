@@ -10,8 +10,8 @@
 // - 原文 / buffer 不写日志、不写审计，只记元数据（charCount/source/耗时）
 // ============================================================
 
-/** 文本来源：标识提取走的是哪条路径。 */
-export type ResumeTextSource = 'docx' | 'pdf_text' | 'image_ocr'
+/** 文本来源：标识提取走的是哪条路径（pdf_ocr=扫描版 PDF 渲染后 OCR）。 */
+export type ResumeTextSource = 'docx' | 'pdf_text' | 'image_ocr' | 'pdf_ocr'
 
 /** 提取置信度。docx/pdf_text 文本层为 high；image_ocr 由 OCR provider 给出。 */
 export type ResumeExtractionConfidence = 'high' | 'medium' | 'low'

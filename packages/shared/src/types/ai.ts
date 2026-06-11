@@ -105,6 +105,15 @@ export interface ResumeParseResponse {
   /** 失败时返回原因 */
   failReason?: string
   /**
+   * 提取层提示（Stage 3 OCR）：textSource=pdf_ocr/image_ocr 时附带置信度与用户须知
+   * （低置信度须提示人工核对、扫描件仅识别前 N 页等）。仅元数据，不含简历原文。
+   */
+  extractionNotice?: {
+    textSource: string
+    confidence: 'high' | 'medium' | 'low'
+    warnings: string[]
+  }
+  /**
    * 匿名结果一次性访问令牌（Phase C-2A）。
    *
    * 仅匿名 parse（未登录会员）时返回，且只在本次响应中返回一次（DB 只存 SHA-256 hash）。

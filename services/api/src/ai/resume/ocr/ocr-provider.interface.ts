@@ -7,7 +7,7 @@
 // - 不把简历图片 URL / 识别原文写入日志或审计
 // ============================================================
 
-export type OcrProviderName = 'disabled' | 'tencent'
+export type OcrProviderName = 'disabled' | 'tencent' | 'baidu'
 
 /** OCR 失败码（上层映射为 ResumeExtractionErrorCode 的 OCR_* 子集）。 */
 export type OcrErrorCode = 'OCR_NOT_CONFIGURED' | 'OCR_FAILED'

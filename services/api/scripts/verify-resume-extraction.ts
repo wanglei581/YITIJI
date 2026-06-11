@@ -18,6 +18,7 @@ import { ResumeExtractionService } from '../src/ai/resume/resume-extraction.serv
 import { OcrService } from '../src/ai/resume/ocr/ocr.service'
 import { DisabledOcrProvider } from '../src/ai/resume/ocr/disabled-ocr.provider'
 import { TencentOcrProvider } from '../src/ai/resume/ocr/tencent-ocr.provider.stub'
+import { BaiduOcrProvider } from '../src/ai/resume/ocr/baidu-ocr.provider'
 
 const SENTINEL = 'ZZ_SECRET_RESUME_TOKEN_42'
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -191,7 +192,7 @@ async function main(): Promise<void> {
   delete process.env['TENCENT_OCR_SECRET_KEY']
   process.env['OCR_PROVIDER'] = 'disabled'
 
-  const ocrDisabled = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider())
+  const ocrDisabled = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
 
   const fixtures = new Map<string, { buffer: Buffer; mimeType: string; filename: string; purpose: string }>()
   const fakeFiles = {
@@ -318,7 +319,7 @@ async function main(): Promise<void> {
 
   // 10)（增强）tencent provider 占位也绝不返回假文本
   process.env['OCR_PROVIDER'] = 'tencent'
-  const ocrTencentNoCred = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider())
+  const ocrTencentNoCred = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
   const svcTencent = new ResumeExtractionService(fakeFiles as never, ocrTencentNoCred)
   const r10a = await svcTencent.extractResumeText({ fileId: 'img-1' })
   assert(

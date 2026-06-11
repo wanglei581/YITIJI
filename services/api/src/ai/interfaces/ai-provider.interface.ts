@@ -73,6 +73,15 @@ export interface ParseResumeOutput {
   report?: ResumeReport
   failReason?: string
   /**
+   * 提取层提示（Stage 3 OCR）：来源（pdf_ocr/image_ocr）+ 置信度 + 用户须知
+   * （如「置信度有限请人工核对」「仅识别前 N 页」）。仅元数据，不含简历原文。
+   */
+  extractionNotice?: {
+    textSource: string
+    confidence: 'high' | 'medium' | 'low'
+    warnings: string[]
+  }
+  /**
    * 匿名结果一次性访问令牌（Phase C-2A）。
    *
    * provider 不产生此字段；由 AiService.submitResumeParse 在匿名 parse 时铸造并注入到响应，

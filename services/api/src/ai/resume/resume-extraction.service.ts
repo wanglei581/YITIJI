@@ -3,6 +3,7 @@ import mammoth from 'mammoth'
 import { FilesService } from '../../files/files.service'
 import type { FilePurpose } from '../../files/file.types'
 import { OcrService } from './ocr/ocr.service'
+import { openPdfForRender } from './ocr/pdf-page-renderer'
 import type {
   ResumeExtractionConfidence,
   ResumeExtractionErrorCode,
@@ -36,6 +37,13 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024
 const MIN_TEXT_CHARS = 30
 /** 传给下游分析前的文本上限（防超长 + 控成本）；截断只影响本次分析，不落库。 */
 const MAX_TEXT_CHARS = 20000
+/** 扫描版 PDF 最多渲染识别的页数（控费 + 控时延；简历通常 1–3 页）。 */
+const OCR_PDF_MAX_PAGES = (() => {
+  const n = Number(process.env['OCR_PDF_MAX_PAGES'])
+  return Number.isInteger(n) && n > 0 && n <= 10 ? n : 3
+})()
+/** 渲染缩放（A4 在 scale=2 下约 1190×1684px，足够 OCR 且控制图片体积）。 */
+const OCR_PDF_RENDER_SCALE = 2
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const DOC_MIME = 'application/msword'
@@ -161,17 +169,81 @@ export class ResumeExtractionService {
         startedAt,
       )
     }
-    // 文字层为空 / 极少 → 扫描件，明确失败（不 OCR、不编造）
+    // 文字层为空 / 极少 → 扫描件：OCR 已配置则走受控页数渲染识别，否则明确失败（不编造）
     if (this.meaningfulLen(rawText) < MIN_TEXT_CHARS) {
-      return this.fail(
-        fileId,
-        'PDF_TEXT_EMPTY',
-        '检测到扫描件 / 图片型 PDF（无文字层），暂不支持自动识别，请上传带文字层的 PDF 或 DOCX',
-        startedAt,
-        pageCount,
-      )
+      if (this.ocr.activeProviderName === 'disabled') {
+        return this.fail(
+          fileId,
+          'PDF_TEXT_EMPTY',
+          '检测到扫描件 / 图片型 PDF（无文字层），暂不支持自动识别，请上传带文字层的 PDF 或 DOCX',
+          startedAt,
+          pageCount,
+        )
+      }
+      return this.extractScannedPdfOcr(fileId, buffer, pageCount ?? 0, startedAt)
     }
     return this.finalizeText(fileId, rawText, 'pdf_text', 'high', pageCount, startedAt)
+  }
+
+  /**
+   * 扫描版 PDF → 受控页数渲染成图 → 逐页 OCR（Stage 3）。
+   *
+   * 限制与诚实性：
+   * - 最多渲染 OCR_PDF_MAX_PAGES 页（默认 3），超出部分不识别并以 warning 告知，
+   *   绝不假装识别了整份文件。
+   * - 逐页串行调用（QPS 友好，provider 内另有并发闸）。任何一页 OCR 失败 → 整体
+   *   明确失败（部分页结果不冒充完整简历）。
+   * - 渲染图片只在内存中转交 OCR，不落盘、不写日志。
+   * - 整体置信度取各页最低值；低置信度由 finalize 附加「请人工核对」提示。
+   */
+  private async extractScannedPdfOcr(
+    fileId: string,
+    buffer: Buffer,
+    totalPages: number,
+    startedAt: number,
+  ): Promise<ResumeExtractionResult> {
+    const pages = Math.min(Math.max(totalPages, 1), OCR_PDF_MAX_PAGES)
+    const pageTexts: string[] = []
+    const rank = { high: 2, medium: 1, low: 0 } as const
+    let worst: ResumeExtractionConfidence = 'high'
+    try {
+      const rendered = await openPdfForRender(buffer)
+      try {
+        for (let pageNo = 1; pageNo <= pages; pageNo += 1) {
+          const img = await rendered.renderPage(pageNo, OCR_PDF_RENDER_SCALE)
+          const ocrResult = await this.ocr.recognize({ buffer: img, mimeType: 'image/png' })
+          if (!ocrResult.ok) {
+            const code: ResumeExtractionErrorCode =
+              ocrResult.errorCode === 'OCR_NOT_CONFIGURED' ? 'OCR_NOT_CONFIGURED' : 'OCR_FAILED'
+            return this.fail(
+              fileId,
+              code,
+              ocrResult.errorMessage ?? '扫描件文字识别失败，请上传带文字层的 PDF 或 DOCX',
+              startedAt,
+              totalPages,
+            )
+          }
+          pageTexts.push(ocrResult.text ?? '')
+          const c = ocrResult.confidence ?? 'low'
+          if (rank[c] < rank[worst]) worst = c
+        }
+      } finally {
+        await rendered.destroy().catch(() => undefined)
+      }
+    } catch {
+      return this.fail(
+        fileId,
+        'OCR_FAILED',
+        '扫描件页面渲染失败，请确认文件未损坏，或上传带文字层的 PDF / DOCX',
+        startedAt,
+        totalPages,
+      )
+    }
+    const extraWarnings: string[] = []
+    if (totalPages > pages) {
+      extraWarnings.push(`扫描件共 ${totalPages} 页，仅识别前 ${pages} 页用于诊断`)
+    }
+    return this.finalizeText(fileId, pageTexts.join('\n'), 'pdf_ocr', worst, totalPages, startedAt, extraWarnings)
   }
 
   private async extractImageOcr(
@@ -201,6 +273,7 @@ export class ResumeExtractionService {
     confidence: ResumeExtractionConfidence,
     pageCount: number | undefined,
     startedAt: number,
+    extraWarnings: string[] = [],
   ): ResumeExtractionResult {
     const cleaned = this.clean(rawText)
     if (this.meaningfulLen(cleaned) < MIN_TEXT_CHARS) {
@@ -213,7 +286,11 @@ export class ResumeExtractionService {
       )
     }
 
-    const warnings: string[] = []
+    const warnings: string[] = [...extraWarnings]
+    // OCR 路径低/中置信度：明确提示人工核对，不假装识别完全可靠（Stage 3 验收点）。
+    if ((textSource === 'image_ocr' || textSource === 'pdf_ocr') && confidence !== 'high') {
+      warnings.push('文字识别置信度有限，诊断结果仅供参考，请对照原件核对关键信息')
+    }
     let text = cleaned
     if (text.length > MAX_TEXT_CHARS) {
       text = text.slice(0, MAX_TEXT_CHARS)
