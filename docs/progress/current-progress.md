@@ -5,6 +5,20 @@
 
 ---
 
+## 审计修复补丁（2026-06-11，Claude，`feature/audit-fixes`）
+
+37 代理全仓审计（101 项确认缺口）后的第一轮"假数据/死按钮"清理，目标：**http 模式下三端不再显示任何假数字**。
+
+- **Kiosk 用户协议 / 隐私政策**：新增 `/legal/terms`、`/legal/privacy`（`pages/legal/LegalDocPage.tsx`），内容与系统真实数据实践对齐（短 TTL、不留简历库、OCR 不留原文、物理删除、无招聘闭环）；登录页两个按钮接线（原只弹「即将上线」）。文本为试运营版，正式运营前须法务审定。
+- **Admin 通知角标**：原 `notificationCount={3}` 是死 prop（自定义 headerActions 下 UI 库铃铛根本不渲染——审计结论修正）；现于 headerActions 内渲染真实铃铛，数值 = `GET /admin/alerts` 实时派生告警数，点击直达告警中心。浏览器验证：徽标 3 = 告警中心 3 条终端离线（同源）。
+- **Partner 通知角标**：无机构通知数据源 → 移除写死的 `1`，不显示假数字。
+- **Partner 工作台**：新端点 `GET /partner/dashboard`（本机构真实计数：岗位/招聘会/政策 总数·已发布·待审核、数据源启用数、最近 5 条同步日志；不返回任何无埋点支撑的"展示/跳转/打印次数"）；页面重写为 加载/错误/重试 三态，指标卡点击跳对应管理页；原 8 张硬编码卡与假"立即同步"按钮删除。
+- **Partner 机构资料**：新端点 `GET/PUT /partner/profile`（PUT 白名单仅 联系人/联系电话，越权字段 400；审计 `org.self_profile_update` 落库）；页面删除 MOCK_PROFILE，全真实数据 + 编辑联系方式抽屉；无数据支撑的"资质/绑定终端"假信息移除。
+- **死按钮清理**：数据源「测试连接」移除（无端点不放死按钮）；webhook「查看接入」接真实说明抽屉（推送地址 + HMAC 签名要求，secret 不回显）；同步日志「重试」移除（无重放端点）、「查看详情」接详情抽屉（完整失败原因/异常字段）。
+- **验证**：五端 typecheck/lint/build 全绿；真实 HTTP 验证（临时 partner 账号，已清理）：dashboard 真实计数、profile 读写、审计落库、白名单 400；浏览器验收：Kiosk 协议两页渲染、Admin 铃铛真实数并与告警中心同源、Partner 工作台/机构资料/数据源抽屉真实渲染（`.claude/launch.json` 新增 partner 5275 预览配置）。
+
+---
+
 ## Stage 3 真实 OCR（百度智能云，2026-06-11，Claude，`feature/real-ocr-baidu`）
 
 - **Provider**：`OCR_PROVIDER=baidu` → `BaiduOcrProvider`（通用文字识别高精度版 `accurate_basic` + probability）。

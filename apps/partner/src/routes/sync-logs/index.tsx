@@ -29,6 +29,8 @@ const RESULT_FILTER_MAP: Record<string, SyncResult | null> = {
 export default function SyncLogsPage() {
   const [logs,         setLogs]         = useState<PartnerSyncLog[]>([])
   const [loading,      setLoading]      = useState(true)
+  // 日志详情抽屉(审计修复:原「查看详情」死按钮)
+  const [detail, setDetail] = useState<(typeof logs)[number] | null>(null)
   const [error,        setError]        = useState(false)
   const [resultFilter, setResultFilter] = useState('全部')
 
@@ -137,12 +139,13 @@ export default function SyncLogsPage() {
                       <td className="px-4 py-3"><StatusBadge status={res.badge} label={res.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{l.syncTime}</td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-2">
-                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看详情</button>
-                          {(l.status === 'failed' || l.status === 'partial') && (
-                            <button className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50">重试</button>
-                          )}
-                        </div>
+                        {/* 「重试」已移除:后端暂无按日志重放端点,失败数据请修正后重新导入(审计修复) */}
+                        <button
+                          className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                          onClick={() => setDetail(l)}
+                        >
+                          查看详情
+                        </button>
                       </td>
                     </tr>
                   )
@@ -156,6 +159,48 @@ export default function SyncLogsPage() {
       <p className="mt-3 text-xs text-gray-400">
         本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。
       </p>
+
+      {/* 同步日志详情(展示该行全部字段,含完整失败原因) */}
+      {detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
+          <Card className="w-full max-w-lg p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">同步详情 · {detail.no}</h3>
+              <button type="button" onClick={() => setDetail(null)} aria-label="关闭" className="rounded p-1 text-gray-400 hover:bg-gray-100">✕</button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <DetailRow label="数据源" value={detail.source} />
+              <DetailRow label="数据类型" value={DATA_TYPE_MAP[detail.dataType]?.label ?? detail.dataType} />
+              <DetailRow label="结果" value={RESULT_MAP[detail.status]?.label ?? detail.status} />
+              <DetailRow label="新增 / 更新" value={`${detail.addedCount} / ${detail.updatedCount}`} />
+              <DetailRow label="失败 / 重复" value={`${detail.errorCount} / ${detail.dupCount}`} />
+              <DetailRow label="同步时间" value={detail.syncTime} />
+              {detail.errorFields && (
+                <div>
+                  <p className="mb-1 text-xs text-gray-400">异常字段</p>
+                  <code className="block break-all rounded bg-orange-50 px-3 py-2 font-mono text-xs text-orange-600">{detail.errorFields}</code>
+                </div>
+              )}
+              {detail.errorDetail && (
+                <div>
+                  <p className="mb-1 text-xs text-gray-400">失败原因(完整)</p>
+                  <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">{detail.errorDetail}</p>
+                </div>
+              )}
+              <p className="pt-1 text-xs text-gray-400">失败数据请在来源侧修正后重新导入;Excel 来源可在「数据源管理」重新上传。</p>
+            </div>
+          </Card>
+        </div>
+      )}
     </Page>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="w-20 shrink-0 text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-gray-700">{value}</span>
+    </div>
   )
 }

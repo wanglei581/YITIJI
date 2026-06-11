@@ -4,15 +4,43 @@
     {
       "name": "kiosk",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@ai-job-print/kiosk", "exec", "vite", "--port", "5273"],
+      "runtimeArgs": [
+        "--filter",
+        "@ai-job-print/kiosk",
+        "exec",
+        "vite",
+        "--port",
+        "5273"
+      ],
       "port": 5273,
       "autoPort": false
     },
     {
       "name": "admin",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@ai-job-print/admin", "exec", "vite", "--port", "5274"],
+      "runtimeArgs": [
+        "--filter",
+        "@ai-job-print/admin",
+        "exec",
+        "vite",
+        "--port",
+        "5274"
+      ],
       "port": 5274,
+      "autoPort": false
+    },
+    {
+      "name": "partner",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@ai-job-print/partner",
+        "exec",
+        "vite",
+        "--port",
+        "5275"
+      ],
+      "port": 5275,
       "autoPort": false
     }
   ]

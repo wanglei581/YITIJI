@@ -99,7 +99,7 @@ export function PartnerLayoutWrapper() {
       onCollapseChange={setCollapsed}
       userName={user?.name ?? '当前用户'}
       userRole={user ? ROLE_LABEL[user.role] : ''}
-      notificationCount={1}
+      // 通知角标:暂无机构通知数据源,不展示假数字(审计修复)
       headerActions={
         <div className="flex items-center gap-3">
           <div className="text-right">

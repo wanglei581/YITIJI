@@ -393,6 +393,13 @@ export class JobsController {
 
   // ── Partner sync logs ────────────────────────────────────────────────────────
 
+  @Get('partner/dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerDashboard(@CurrentUser() user: AuthedUser) {
+    return this.jobsService.getPartnerDashboard(user)
+  }
+
   @Get('partner/sync-logs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')

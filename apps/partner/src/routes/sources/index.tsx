@@ -11,6 +11,7 @@ import {
   XIcon,
 } from 'lucide-react'
 import type { AccessMode, PartnerDataSource, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
+import { API_BASE_URL } from '../../services/api/client'
 import { API_ORIGIN, getDataSources, toggleDataSource, createDataSource } from '../../services/api'
 import { ExcelImportModal } from './ExcelImportModal'
 
@@ -285,6 +286,8 @@ export default function SourcesPage() {
   const [error,      setError]      = useState(false)
   const [showWizard, setShowWizard] = useState(false)
   const [excelSource, setExcelSource] = useState<PartnerDataSource | null>(null)
+  // Webhook 接入说明抽屉(审计修复:原「查看接入」死按钮)
+  const [webhookGuide, setWebhookGuide] = useState<PartnerDataSource | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -391,9 +394,7 @@ export default function SourcesPage() {
                     <td className="px-4 py-3 text-center font-medium text-red-500">{s.failCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex gap-2">
-                        {s.connStatus !== 'disabled' && (
-                          <button className="rounded px-2 py-1 text-xs font-medium text-blue-500 hover:bg-blue-50">测试连接</button>
-                        )}
+                        {/* 「测试连接」已移除:后端暂无连通性测试端点,不放死按钮(审计修复) */}
                         {s.accessMode === 'excel' && (
                           <button
                             className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
@@ -403,7 +404,12 @@ export default function SourcesPage() {
                           </button>
                         )}
                         {s.accessMode === 'webhook' && (
-                          <button className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50">查看接入</button>
+                          <button
+                            className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
+                            onClick={() => setWebhookGuide(s)}
+                          >
+                            查看接入
+                          </button>
                         )}
                         <button
                           className={`rounded px-2 py-1 text-xs font-medium ${
@@ -438,6 +444,40 @@ export default function SourcesPage() {
             setExcelSource(null)
           }}
         />
+      )}
+
+      {/* Webhook 接入说明(只读指引;webhookSecret 创建时一次性下发,不再回显) */}
+      {webhookGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
+          <Card className="w-full max-w-lg p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900">Webhook 接入说明 · {webhookGuide.name}</h3>
+              <button
+                type="button"
+                onClick={() => setWebhookGuide(null)}
+                aria-label="关闭"
+                className="rounded p-1 text-gray-400 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-gray-700">
+              <div>
+                <p className="mb-1 text-xs text-gray-400">推送地址(POST)</p>
+                <code className="block break-all rounded bg-gray-50 px-3 py-2 font-mono text-xs">
+                  {`${API_BASE_URL}/sync/webhook?source=${webhookGuide.id}`}
+                </code>
+              </div>
+              <div className="rounded-lg bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">
+                <p className="mb-1 font-medium text-gray-700">签名要求(请求方实现)</p>
+                <p>Header 携带 <code className="font-mono">x-signature</code>(HMAC-SHA256,密钥为创建数据源时下发的 webhookSecret)、
+                <code className="font-mono">x-timestamp</code>(5 分钟内有效)与 <code className="font-mono">x-nonce</code>(防重放)。</p>
+                <p className="mt-1.5">webhookSecret 仅在创建时下发一次,平台不再回显;如遗失请删除数据源后重建。</p>
+              </div>
+              <p className="text-xs text-gray-400">payload 字段规范见对接文档;推送数据默认进入待审核,管理员审核通过后才会在终端展示。</p>
+            </div>
+          </Card>
+        </div>
       )}
     </Page>
   )

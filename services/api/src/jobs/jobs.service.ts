@@ -26,6 +26,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common'
@@ -1559,6 +1560,59 @@ export class JobsService {
   }
 
   // ── Partner 同步日志 ───────────────────────────────────────────────────────
+
+  /**
+   * Partner 工作台聚合（审计修复）：全部为真实计数 / 最近同步，不返回任何无埋点支撑的
+   * 「展示次数 / 跳转次数」类指标（没有的数据不编造）。只统计本机构（orgId）数据。
+   */
+  async getPartnerDashboard(user: AuthedUser) {
+    if (!user.orgId) {
+      throw new ForbiddenException({ error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' } })
+    }
+    const orgId = user.orgId
+    const [
+      jobsTotal, jobsPublished, jobsPending,
+      fairsTotal, fairsPublished, fairsPending,
+      policiesTotal, policiesPublished, policiesPending,
+      sourcesTotal, sourcesEnabled,
+      recentSyncRows,
+    ] = await Promise.all([
+      this.prisma.job.count({ where: { sourceOrgId: orgId } }),
+      this.prisma.job.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.job.count({ where: { sourceOrgId: orgId, reviewStatus: 'pending' } }),
+      this.prisma.jobFair.count({ where: { sourceOrgId: orgId } }),
+      this.prisma.jobFair.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.jobFair.count({ where: { sourceOrgId: orgId, reviewStatus: 'pending' } }),
+      this.prisma.policyPost.count({ where: { sourceOrgId: orgId } }),
+      this.prisma.policyPost.count({ where: { sourceOrgId: orgId, publishStatus: 'published' } }),
+      this.prisma.policyPost.count({ where: { sourceOrgId: orgId, reviewStatus: 'pending' } }),
+      this.prisma.jobSource.count({ where: { orgId } }),
+      this.prisma.jobSource.count({ where: { orgId, enabled: true } }),
+      this.prisma.syncLog.findMany({
+        where: { orgId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: { source: { select: { name: true } } },
+      }),
+    ])
+    return {
+      jobs: { total: jobsTotal, published: jobsPublished, pending: jobsPending },
+      fairs: { total: fairsTotal, published: fairsPublished, pending: fairsPending },
+      policies: { total: policiesTotal, published: policiesPublished, pending: policiesPending },
+      pendingTotal: jobsPending + fairsPending + policiesPending,
+      sources: { total: sourcesTotal, enabled: sourcesEnabled },
+      recentSyncs: recentSyncRows.map((r) => ({
+        id: r.id,
+        source: r.source?.name ?? r.sourceId,
+        dataType: r.dataType,
+        status: r.result,
+        addedCount: r.addedCount,
+        updatedCount: r.updatedCount,
+        errorCount: r.errorCount,
+        syncTime: fmtSyncTime(r.createdAt),
+      })),
+    }
+  }
 
   async getPartnerSyncLogs(user: AuthedUser): Promise<SyncLogDto[]> {
     if (!user.orgId) return []

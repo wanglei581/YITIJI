@@ -3,6 +3,7 @@ import { AdminLayout, type NavItem } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
 import {
   AlertTriangleIcon,
+  BellIcon,
   BotIcon,
   BriefcaseIcon,
   Building2Icon,
@@ -22,6 +23,7 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
+import { adminOpsService } from '../services/api/adminOps'
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon },
@@ -96,6 +98,8 @@ export function AdminLayoutWrapper() {
   const [collapsed, setCollapsed] = useState(false)
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [authChecked, setAuthChecked] = useState(false)
+  // 通知角标 = 实时派生告警数(审计修复:原硬编码 3);加载失败显示 0,不显示假数字
+  const [alertCount, setAlertCount] = useState(0)
   const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
 
   // Boot 时调 /auth/me 校验 token;失败 (verifyToken 返回 null) 跳 /login。
@@ -109,6 +113,10 @@ export function AdminLayoutWrapper() {
       }
       setUser(u)
       setAuthChecked(true)
+      adminOpsService
+        .listAlerts()
+        .then((r) => { if (!cancelled) setAlertCount(r.data.length) })
+        .catch(() => undefined)
     })
     return () => { cancelled = true }
   }, [navigate])
@@ -132,9 +140,22 @@ export function AdminLayoutWrapper() {
       appName="管理后台"
       userName={user?.name ?? '当前用户'}
       userRole={user ? ROLE_LABEL[user.role] : ''}
-      notificationCount={3}
       headerActions={
         <div className="flex items-center gap-3">
+          {/* 真实告警数(实时派生);点击进入告警中心。原 notificationCount prop 在自定义 headerActions 下不渲染,已移除死代码 */}
+          <button
+            type="button"
+            onClick={() => navigate('/alerts')}
+            aria-label={`告警${alertCount > 0 ? `(${alertCount}条)` : ''}`}
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <BellIcon className="h-4 w-4" aria-hidden="true" />
+            {alertCount > 0 && (
+              <span className="absolute right-1 top-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold leading-none text-white">
+                {alertCount > 9 ? '9+' : alertCount}
+              </span>
+            )}
+          </button>
           <div className="text-right">
             <p className="text-sm font-medium text-gray-800">{user?.name ?? '当前用户'}</p>
             <p className="text-xs text-gray-500">{user ? ROLE_LABEL[user.role] : ''}</p>

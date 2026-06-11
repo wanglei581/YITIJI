@@ -567,6 +567,7 @@ function ScanProviderButton({ active, label, onClick }: { active: boolean; label
 // 页脚：回首页 + 注册/协议/隐私说明。注册与协议尚无独立页面，点击给诚实提示，
 // 不保留无响应按钮（CLAUDE.md 诚实化原则）。
 function FooterActions({ onHome }: { onHome: () => void }) {
+  const navigate = useNavigate()
   const [hint, setHint] = useState<string | null>(null)
 
   useEffect(() => {
@@ -604,14 +605,14 @@ function FooterActions({ onHome }: { onHome: () => void }) {
         <span>登录即代表同意</span>
         <button
           type="button"
-          onClick={() => setHint('用户服务协议内容即将上线')}
+          onClick={() => navigate('/legal/terms')}
           className="min-h-[36px] px-1 font-semibold text-[#1677ff]"
         >
           《用户服务协议》
         </button>
         <button
           type="button"
-          onClick={() => setHint('隐私政策内容即将上线')}
+          onClick={() => navigate('/legal/privacy')}
           className="min-h-[36px] px-1 font-semibold text-[#1677ff]"
         >
           《隐私政策》

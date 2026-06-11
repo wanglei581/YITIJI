@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
@@ -371,5 +372,70 @@ export class AdminOrgsService {
       targetId: orgId,
       payload,
     })
+  }
+
+  // ── Partner 自助档案（审计修复：替换前端 MOCK_PROFILE）────────────────────
+
+  /** 本机构档案（无凭证字段；enabledModules 解析为数组）。 */
+  async getOwnProfile(user: AuthedUser) {
+    if (!user.orgId) {
+      throw new ForbiddenException({ error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' } })
+    }
+    const o = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: {
+        id: true, name: true, type: true, contact: true, contactPhone: true,
+        sceneTemplate: true, enabledModulesJson: true, enabled: true, createdAt: true,
+        _count: { select: { jobSources: true, users: true } },
+      },
+    })
+    if (!o) {
+      throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
+    }
+    return {
+      id: o.id,
+      name: o.name,
+      type: o.type,
+      contact: o.contact,
+      contactPhone: o.contactPhone,
+      sceneTemplate: o.sceneTemplate,
+      enabledModules: parseModules(o.enabledModulesJson),
+      enabled: o.enabled,
+      createdAt: o.createdAt.toISOString(),
+      sourceCount: o._count.jobSources,
+      accountCount: o._count.users,
+    }
+  }
+
+  /** 机构自助更新：仅 联系人/联系电话（名称/类型/模块归管理员）；写审计。 */
+  async updateOwnProfile(
+    user: AuthedUser,
+    dto: { contact?: string; contactPhone?: string },
+    req: { headers?: Record<string, string | string[] | undefined>; ip?: string; requestId?: string },
+  ) {
+    if (!user.orgId) {
+      throw new ForbiddenException({ error: { code: 'ORG_REQUIRED', message: '当前账号未绑定机构' } })
+    }
+    const data: Record<string, string> = {}
+    if (dto.contact !== undefined) data['contact'] = dto.contact.trim()
+    if (dto.contactPhone !== undefined) data['contactPhone'] = dto.contactPhone.trim()
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException({ error: { code: 'ORG_PROFILE_EMPTY', message: '没有可更新的字段' } })
+    }
+    await this.prisma.organization.update({ where: { id: user.orgId }, data })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: 'partner',
+      action: 'org.self_profile_update',
+      targetType: 'organization',
+      targetId: user.orgId,
+      payload: { fields: Object.keys(data) },
+      ipAddress: typeof req.headers?.['x-forwarded-for'] === 'string'
+        ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
+        : (req.ip ?? null),
+      userAgent: typeof req.headers?.['user-agent'] === 'string' ? req.headers['user-agent'] : null,
+      requestId: req.requestId ?? null,
+    })
+    return this.getOwnProfile(user)
   }
 }
