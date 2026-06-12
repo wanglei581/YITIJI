@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-12（同步入口稳定规则与首页功能 ↔「我的」数据闭环矩阵；用户确认后续不新增重复功能入口）
+> 最后更新：2026-06-12（同步入口稳定规则、首页功能 ↔「我的」数据闭环矩阵、生产部署与 Windows 换机验收清单）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -25,6 +25,8 @@
 > **2026-06-12 用户确认的执行顺序与产品原则：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 首页功能入口 ↔「我的」数据归属 ↔ 操作闭环矩阵(✅ `docs/product/user-data-flow-matrix.md`) → ⑧ 2E 职业规划建议(当前 P0，真实化现有「职业规划」入口，不新增卡片)。**
 > 场馆导览后续扩展(择期):Partner 端配置入口;展厅平面图图片。
 
+> **上线前验收提醒（2026-06-12）：** 页面功能闭环打通不等于生产服务器与 Windows 一体机换机无风险。正式上线/换机前必须按 [production-deployment-and-windows-host-checklist.md](../device/production-deployment-and-windows-host-checklist.md) 逐项验收：服务器环境、PostgreSQL、Redis、nginx/HTTPS、COS/OCR/LLM/ASR/TTS、进程守护、线上业务链路、Terminal Agent、打印机驱动、`printerName`、真机打印、扫描/U盘、断网恢复、密钥轮换与回滚。
+
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
 
 1. ✅ **简历优化真实化**（`feature/ai-resume-optimize-real`，2026-06-11）：optimizeResume 真实化(原文重提+事实串校验防编造+承诺词拦截+失败不缓存);优化页新增可编辑优化版简历+导出 PDF+打印;删除假文件打印按钮。`verify:resume-optimize` 13 PASS。详见 [current-progress.md](./current-progress.md) §阶段2B。**待生产启用**:Admin 配置中心启用「AI简历优化」。
@@ -32,6 +34,13 @@
 3. ✅ **模拟面试 + 面试问题预测**（2026-06-11）：2C 闭环已完成（设置场景→对话式练习→报告→PDF 打印，`verify:mock-interview` 12 PASS）；2C+ 语音增强已完成（数字人小青、腾讯 ASR、官方 TTS、转写确认，`verify:mock-interview` 16 PASS）；Kiosk 交互修复已补齐（设置页摘要、数字人面试间、语音权限 loading/失败强提示、文字兜底）。结果仅给本人，报告可打印，不参与企业筛选或录用决策。
 4. ✅ **目标岗位定向优化 + 岗位匹配度参考**（2026-06-12）：仅输出参考等级，系统内岗位只引导「去来源平台投递」，结果进入 AI 服务记录。`verify:job-fit` 11 PASS，详见 [current-progress.md](./current-progress.md) §2D。
 5. ⏳ **职业规划建议（当前 P0）**：不新增首页卡片；真实化 AI简历服务组已有「职业规划」入口。结果应进入 AI服务记录；可打印建议单应生成 FileObject 进入我的文档；打印任务进入打印订单。开发前必须参考 [user-data-flow-matrix.md](../product/user-data-flow-matrix.md)。
+
+**上线/换机 P0 验收（并行准备，不阻塞 2E 开发）：**
+
+- [ ] 生产服务器预部署演练：按清单完成环境变量、PostgreSQL 空库 deploy、seed、核心 verify、nginx/HTTPS、上传限制、进程守护、日志轮转。
+- [ ] 生产密钥轮换：百度 OCR、COS CAM、腾讯云 ASR/TTS/SMS/TRTC、LLM API Key 全部使用生产专用最小权限密钥。
+- [ ] Windows 本地主机换机演练：安装 Agent、配置 `printerName`、注册心跳、真机打印 PDF/图片/简历、黑白/彩色/份数/双面、断网恢复、扫描/U盘按实际能力验证。
+- [ ] 线上浏览器闭环验收：登录、AI简历、模拟面试、岗位/招聘会/政策收藏、我的文档、打印订单、删除与再打印。
 
 百炼模板中**不做**（合规红线，企业侧）：生成优化岗位 JD、问答式生成职位、AI 自动招聘机器人、企业侧候选人筛选。
 二期候选：职业证件照（需图像 provider+摄像头）、政策问答知识库（依赖 1D）、简历风险审查扩展。

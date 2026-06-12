@@ -11,7 +11,7 @@ export interface MemberAssetPage<T> {
 }
 
 /** AI 服务记录种类：解析 / 优化 / 生成。 */
-export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate' | 'job_fit'
+export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate' | 'job_fit' | 'career_plan'
 
 export interface MemberResumeItem {
   id: string

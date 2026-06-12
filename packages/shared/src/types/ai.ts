@@ -317,3 +317,30 @@ export interface JobFitResponse {
   targetedSuggestions?: string[]
   providerName?: string
 }
+
+// ── 2E 职业规划建议 ──────────────────────────────────────────────────────────
+// 合规:仅供本人参考;无薪资/录用/Offer/通过率承诺;现状画像 evidence 经服务端
+// 防编造校验(必须出自简历原文)。
+
+export interface CareerPlanResponse {
+  taskId: string
+  status: 'completed' | 'failed'
+  failReason?: string
+  /** 生成依据(如实展示):简历必有;岗位匹配/面试摘要可选 */
+  basedOn?: { resume: true; jobFit: string | null; interview: string | null }
+  summary?: string
+  currentSnapshot?: Array<{ point: string; evidence: string }>
+  directions?: Array<{ title: string; why: string; firstStep: string }>
+  skillPlan?: Array<{ skill: string; action: string; timeframe: string }>
+  actionChecklist?: string[]
+  providerName?: string
+}
+
+export interface CareerPlanPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+}

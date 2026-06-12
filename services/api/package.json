@@ -51,7 +51,8 @@
     "db:pg:sync:check": "node -r @swc-node/register scripts/sync-postgres-schema.ts --check",
     "db:pg:generate": "prisma generate --config prisma.postgres.config.ts",
     "db:pg:deploy": "prisma migrate deploy --config prisma.postgres.config.ts",
-    "db:pg:migrate-data": "node -r @swc-node/register scripts/migrate-sqlite-to-postgres.ts"
+    "db:pg:migrate-data": "node -r @swc-node/register scripts/migrate-sqlite-to-postgres.ts",
+    "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

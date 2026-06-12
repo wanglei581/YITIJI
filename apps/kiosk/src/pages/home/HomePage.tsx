@@ -291,7 +291,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source?intent=diagnose' },
       { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source?intent=optimize' },
       { title: '简历素材库', icon: BookOpenIcon, disabled: true },
-      { title: '职业规划', icon: CompassIcon, disabled: true },
+      { title: '职业规划', icon: CompassIcon, to: '/resume/career-plan' },
       { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },
       { title: '求职材料', icon: FileBadge2Icon, disabled: true },
     ],

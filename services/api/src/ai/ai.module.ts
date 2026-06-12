@@ -14,6 +14,10 @@ import { LlmConfigService } from './llm/llm-config.service'
 import { LlmJobFitService } from './resume/llm-job-fit.service'
 import { JobFitService } from './resume/job-fit.service'
 import { JobFitController } from './job-fit.controller'
+import { LlmCareerPlanService } from './resume/llm-career-plan.service'
+import { CareerPlanService } from './resume/career-plan.service'
+import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
+import { CareerPlanController } from './career-plan.controller'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
@@ -31,7 +35,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   imports: [AuthModule, FilesModule],
-  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController],
+  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController],
   providers: [
     AiService,
     AiLogService,
@@ -44,6 +48,9 @@ import { LlmResumeProvider } from './providers/llm.provider'
     LlmConfigService,
     LlmJobFitService,
     JobFitService,
+    LlmCareerPlanService,
+    CareerPlanService,
+    CareerPlanPdfService,
     LlmChatService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──

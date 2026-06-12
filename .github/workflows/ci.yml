@@ -110,6 +110,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:resume-extraction
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
@@ -184,6 +185,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
 
