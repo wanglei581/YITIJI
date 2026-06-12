@@ -219,6 +219,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalScreensaverConfig
   }
 
+  // ── 企业展示(CompanyProfile)─────────────────────────────────────────────
+
+  get companyProfile() {
+    return this.client.companyProfile
+  }
+
   // ── P1: 浏览 / 外部跳转记录 ──────────────────────────────────────────────
 
   get browseLog() {

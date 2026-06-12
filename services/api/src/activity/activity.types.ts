@@ -6,14 +6,14 @@
 // 企业处理 / 录取通知 / 签到入场等任何流程状态。
 // ============================================================
 
-export const ACTIVITY_TARGET_TYPES = ['job', 'job_fair', 'policy'] as const
+export const ACTIVITY_TARGET_TYPES = ['job', 'job_fair', 'policy', 'company_profile'] as const
 export type ActivityTargetType = (typeof ACTIVITY_TARGET_TYPES)[number]
 
 /**
  * 外部跳转动作（只描述「打开了哪类入口」，不描述办理结果）：
  * - external_apply        岗位：去来源平台投递 / 扫码投递
  * - external_appointment  招聘会：去来源平台预约 / 扫码预约
- * - external_open         政策：打开官方入口
+ * - external_open         政策：打开官方入口 / 企业：打开来源平台页
  *
  * 每类 target 只允许其对应动作，杜绝「岗位 + external_appointment」之类的脏数据。
  */
@@ -21,6 +21,7 @@ export const JUMP_ACTION_BY_TARGET: Record<ActivityTargetType, ActivityJumpActio
   job: 'external_apply',
   job_fair: 'external_appointment',
   policy: 'external_open',
+  company_profile: 'external_open',
 }
 export type ActivityJumpAction = 'external_apply' | 'external_appointment' | 'external_open'
 

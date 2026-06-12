@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import type { ActivityTargetType, MemberBrowseLogItem, MemberJumpLogItem } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
+  Building2Icon,
   CalendarIcon,
   ExternalLinkIcon,
   EyeIcon,
@@ -79,12 +80,23 @@ const TYPE_META: Record<ActivityTargetType, {
     notice: '政策办理结果以官方平台为准，本系统仅提供信息入口和材料服务。',
     viewRoute: () => '/renshi?tab=policy',
   },
+  company_profile: {
+    label: '企业',
+    icon: Building2Icon,
+    iconBg: 'bg-blue-50',
+    iconColor: 'text-blue-600',
+    jumpLabel: '来源入口打开记录',
+    emptyHint: '暂无记录，去「岗位信息 · 找企业」浏览企业后在此查看',
+    notice: '本系统仅展示来源机构提供的企业信息，不接收简历、不参与招聘流程。',
+    viewRoute: (id) => `/companies/${id}`,
+  },
 }
 
 const JUMP_ACTION: Record<ActivityTargetType, 'external_apply' | 'external_appointment' | 'external_open'> = {
   job: 'external_apply',
   job_fair: 'external_appointment',
   policy: 'external_open',
+  company_profile: 'external_open',
 }
 
 // ── 单个子列表的独立加载状态（失败只影响自身，可重试 / 加载更多）──────────────

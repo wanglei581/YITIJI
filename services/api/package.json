@@ -41,6 +41,7 @@
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
     "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts",
     "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",
+    "db:seed:companies": "node -r @swc-node/register prisma/seed-companies.ts",
     "db:seed:venue-guide": "node -r @swc-node/register prisma/seed-venue-guide.ts",
     "verify:member-assets-c2d": "node -r @swc-node/register scripts/verify-member-assets-c2d.ts",
     "verify:ocr-baidu": "node -r @swc-node/register scripts/verify-ocr-baidu.ts",
@@ -53,7 +54,8 @@
     "db:pg:deploy": "prisma migrate deploy --config prisma.postgres.config.ts",
     "db:pg:migrate-data": "node -r @swc-node/register scripts/migrate-sqlite-to-postgres.ts",
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
-    "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts"
+    "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",
+    "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

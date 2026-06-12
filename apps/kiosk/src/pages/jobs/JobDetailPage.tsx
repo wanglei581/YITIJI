@@ -301,6 +301,24 @@ export function JobDetailPage() {
           </div>
         </Card>
 
+        {/* 企业展示联动:岗位已关联来源企业时提供「查看企业」入口 */}
+        {job.companyProfileId && (
+          <button
+            type="button"
+            onClick={() => navigate(`/companies/${job.companyProfileId}`)}
+            className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 text-left transition-colors hover:bg-gray-50 active:bg-gray-100"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+              <BuildingIcon className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-gray-900">查看企业</span>
+              <span className="block truncate text-xs text-gray-400">{job.company} · 来源企业展示页</span>
+            </span>
+            <ExternalLinkIcon className="h-4 w-4 shrink-0 text-gray-300" aria-hidden="true" />
+          </button>
+        )}
+
         {/* 合规说明 */}
         <div className="flex items-start gap-2 rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-3">
           <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />

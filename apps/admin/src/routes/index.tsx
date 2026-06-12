@@ -12,6 +12,7 @@ import JobSourcesPage from './job-sources'
 import FairSourcesPage from './fair-sources'
 import PolicySourcesPage from './policy-sources'
 import FairsPage from './fairs'
+import CompaniesPage from './companies'
 import PartnersPage from './partners'
 import UsersPage from './users'
 import AlertsPage from './alerts'
@@ -43,6 +44,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'fair-sources', element: <FairSourcesPage /> },
       { path: 'policy-sources', element: <PolicySourcesPage /> },
       { path: 'fairs',        element: <FairsPage /> },
+      { path: 'companies',    element: <CompaniesPage /> },
       { path: 'partners',     element: <PartnersPage /> },
       { path: 'users',        element: <UsersPage /> },
       { path: 'alerts',       element: <AlertsPage /> },

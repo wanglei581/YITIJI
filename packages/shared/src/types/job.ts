@@ -290,4 +290,6 @@ export interface ExternalJobDTO extends ExternalJob {
   headcount?: number
   /** 合规来源说明（必须展示） */
   dataSourceNote: string
+  /** 企业展示关联（可选）：有值时前端可提供「查看企业」入口（/companies/:id） */
+  companyProfileId?: string | null
 }

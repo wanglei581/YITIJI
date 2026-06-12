@@ -4,7 +4,9 @@ import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '
 import type { ExternalJobDTO } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
+  Building2Icon,
   BuildingIcon,
+  ChevronRightIcon,
   ClockIcon,
   LayersIcon,
   MapPinIcon,
@@ -335,6 +337,24 @@ export function JobsPage() {
                 )}
               </div>
             </Card>
+
+            {/* ── 找企业 / 企业展示入口（来源企业导览;兼职页不突出企业专区）── */}
+            {category !== 'parttime' && (
+              <button
+                type="button"
+                onClick={() => navigate('/companies')}
+                className="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-5 text-left transition-colors hover:bg-primary-100/60 active:bg-primary-100"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white">
+                  <Building2Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-semibold text-gray-900">找企业 · 企业展示</span>
+                  <span className="mt-0.5 block text-xs text-gray-500">按地区 / 类型 / 行业浏览来源企业与岗位，本系统不接收简历</span>
+                </span>
+                <ChevronRightIcon className="h-5 w-5 shrink-0 text-primary-400" aria-hidden="true" />
+              </button>
+            )}
 
             {/* ── 本地信息来源 ───────────────────────────── */}
             <section>

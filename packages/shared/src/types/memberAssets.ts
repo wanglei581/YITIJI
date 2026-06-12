@@ -79,7 +79,7 @@ export interface MemberAiRecordItem {
 // 合规：只记录「浏览」和「打开来源平台入口」两类本人行为；
 // 投递/预约结果以来源平台为准，本系统不记录、类型上也不存在这类字段。
 
-export type ActivityTargetType = 'job' | 'job_fair' | 'policy'
+export type ActivityTargetType = 'job' | 'job_fair' | 'policy' | 'company_profile'
 
 /**
  * 外部跳转动作（只描述打开了哪类入口，不描述办理结果）：

@@ -86,6 +86,8 @@ export interface JobListItemDto {
   description?: string; requirements?: string
   salaryDisplay: string
   dataSourceNote: string
+  /** 企业展示关联(可选):有值时前端可提供「查看企业」入口(/companies/:id) */
+  companyProfileId?: string | null
 }
 
 export interface FairIntentSlice { label: string; percent: number }
@@ -349,6 +351,7 @@ function prismaJobSourceToPartnerDto(source: PrismaJobSourceRow): PartnerDataSou
 interface PrismaJobRow {
   id:            string
   sourceId:      string | null
+  companyProfileId?: string | null
   sourceOrgId:   string
   externalId:    string
   sourceName:    string
@@ -386,6 +389,7 @@ function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
     requirements: j.requirements ?? undefined,
     salaryDisplay: j.salary ?? '薪资面议',
     dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${j.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
+    companyProfileId: j.companyProfileId ?? null,
   }
 }
 

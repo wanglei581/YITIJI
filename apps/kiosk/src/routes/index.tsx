@@ -18,6 +18,8 @@ import { FairMapPage } from '../pages/job-fairs/FairMapPage'
 import { FairMaterialsPage } from '../pages/job-fairs/FairMaterialsPage'
 import { FairStatsPage } from '../pages/job-fairs/FairStatsPage'
 import { JobsPage } from '../pages/jobs/JobsPage'
+import { CompaniesPage } from '../pages/companies/CompaniesPage'
+import { CompanyDetailPage } from '../pages/companies/CompanyDetailPage'
 import { JobDetailPage } from '../pages/jobs/JobDetailPage'
 import { ScanStartPage } from '../pages/scan/ScanStartPage'
 import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
@@ -99,6 +101,8 @@ export const kioskRouter = createBrowserRouter([
       // 岗位 / 招聘会（Phase 4）
       { path: 'jobs',                                  element: <JobsPage /> },
       { path: 'jobs/:id',                              element: <JobDetailPage /> },
+      { path: 'companies',                             element: <CompaniesPage /> },
+      { path: 'companies/:id',                         element: <CompanyDetailPage /> },
       { path: 'job-fairs',                             element: <JobFairsPage /> },
       { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
       // 招聘会现场服务（Phase 招聘会数字化）

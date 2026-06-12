@@ -53,6 +53,21 @@
 
 ---
 
+## 企业展示 / 找企业（2026-06-12，Claude，`feature/company-profiles`）
+
+「岗位信息 → 找企业 / 企业展示 / 企业详情」全链路真实化。**定位（长期红线）：企业展示 = 来源企业与岗位导览，不是招聘平台**——不收简历、无平台内投递、无候选人/筛选/面试/Offer 能力；合规边界沉淀于 [compliance-boundary.md](../compliance/compliance-boundary.md) §4.5。
+
+- **数据模型**：新增 `CompanyProfile`（来源四要素 + 资料/媒体 URL + 类型/行业/省市区 + 荣誉/标签 + `fairParticipant` + **4 个详情页指标开关** + 与 Job/JobFair 同口径审核发布状态机）；`Job.companyProfileId` 可选展示关联（SetNull）。SQLite 迁移 `20260612220000_add_company_profiles` + PG 同名迁移（空库 deploy 演练通过）。
+- **公开 API（Kiosk 只读 approved+published）**：`GET /companies`（关键词/省市区/类型/行业/招聘类型/来源筛选 + 游标分页；openJobCount 与代表岗位为真实统计）、`/companies/stats`（企业数/在招岗位/今日新增/招聘会参展全真实聚合）、`/companies/filters`（可选项只来自真实已发布企业）、`/companies/:id`（指标只下发「开关开启且有数据」项，不造假数字）、`/companies/:id/jobs`。
+- **Admin**：`/admin/companies` CRUD + 审核（拒绝必填原因）/发布（未审核发布 400）/指标开关/媒体 URL（http/https 校验，随资料审核）+ 岗位关联（仅同机构已发布岗位，越界进 rejected）+ 全程审计（company.create/update/review/publish/link_jobs/unlink_job）。Admin 前端新增「企业展示管理」页（列表筛选/详情抽屉编辑/审核发布/关联岗位管理/新增企业）。
+- **Partner**：`/partner/companies` 列表 + import（upsert by externalId，默认 pending+draft，可按 `jobExternalIds` 关联本机构岗位）+ 编辑（强制回 pending+draft 重审，与 1C 岗位口径一致）；orgId 取自 JWT 天然隔离。Partner 前端新增「企业资料管理」页（新增/编辑抽屉 + 重审提示）。
+- **Kiosk**：`/companies` 找企业页（搜索/省市区级联/类型/行业/招聘类型/来源 chips/真实统计条/合规提示/2 列卡片/加载更多/空错态）；`/companies/:id` 企业详情（封面/宣传片仅真实媒体、基本信息+荣誉、指标卡受开关控制、合规提示条、在招岗位列表含「查看岗位 / 去来源平台投递」二维码、岗位匹配参考模块只引导本人走既有 2D 诊断链路——**不展示无依据的匹配等级**、来源信息 +「去来源平台查看」）。`/jobs` 页内新增「找企业」入口（兼职页不突出企业专区）；岗位详情有关联企业时显示「查看企业」回链。
+- **「我的」闭环**：BrowseLog/ExternalJumpLog `targetType` 扩展 `company_profile`（企业跳转 action=external_open；动作错配 400）；「浏览与跳转记录」资产组新增「企业」Tab（查看企业/再次打开来源/删除）。
+- **真实数据要求**：前端零写死企业/岗位/统计；mock 模式诚实失败；`db:seed:companies` 为明示「演示数据，仅开发环境」的 dev 种子。
+- **验证**：`verify:companies` **11/11 PASS（SQLite + 本地 PG 双跑，注册双 CI job）**——创建默认 pending+draft/审核发布门禁/岗位关联越界拒绝/五维筛选/统计与筛选项真实聚合/指标开关（含数据为空不下发）/未发布 404/Partner upsert+强制重审+跨机构 404/company_profile 浏览跳转闭环/禁词扫描（12 文件）。浏览器验收（真实后端+演示种子）：/jobs 入口 → 找企业列表（3 企业、真实统计条、类型/招聘类型/省市区级联筛选逐项正确）→ 企业详情（指标 4 项、荣誉、3 岗位、投递/来源二维码）→ DB 落 `company_profile` 浏览+external_open 跳转+岗位 external_apply → 关闭 showEmployeeScale 开关后前台实时消失 → 岗位详情「查看企业」回链 → 「我的·企业」Tab 展示记录。四端 lint/typecheck/build 全绿；`verify:activity-logs`、`verify:member-assets-c2d` 回归通过。
+
+---
+
 ## P1 浏览/外部跳转记录接真（2026-06-12，Codex，`feature/activity-logs-p1`）
 
 闭环矩阵 §六 P1 项完成：只记录登录会员本人浏览与打开外部入口的行为，不记录第三方平台结果，不新增首页入口或底部 Tab。

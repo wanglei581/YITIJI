@@ -120,6 +120,7 @@ model Organization {
   jobSources JobSource[]
   jobFairs   JobFair[]  @relation("FairOrg")
   policyPosts PolicyPost[] @relation("PolicyOrg")
+  companyProfiles CompanyProfile[] @relation("CompanyOrg")
 }
 
 // ── PolicyPost ────────────────────────────────────────────────────────────────
@@ -314,6 +315,10 @@ model Job {
   requirements String?
   tagsJson     String   @default("[]")
 
+  // 企业展示关联(可选,展示导览用;岗位本身的来源字段不依赖它)
+  companyProfileId String?
+  companyProfile   CompanyProfile? @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
+
   // 审核/发布
   reviewStatus  String @default("pending")
   publishStatus String @default("draft")
@@ -334,6 +339,67 @@ model Job {
   @@index([sourceOrgId])
   @@index([sourceId])
   @@index([reviewStatus, publishStatus])
+  @@index([companyProfileId])
+}
+
+// ── CompanyProfile ────────────────────────────────────────────────────────────
+// 企业展示 / 来源岗位导览(非招聘平台)。只展示来源机构提供并经管理员审核发布的
+// 企业信息;红线:不收简历、无平台内投递、无候选人/筛选/面试/Offer 能力。
+// 来源四要素(sourceOrgId/externalId/sourceName/sourceUrl)与 Job/JobFair 同口径。
+// 指标开关:Admin 可逐项开关详情页右侧指标;关闭或数据为空都不展示(不造假数字)。
+
+model CompanyProfile {
+  id          String @id @default(cuid())
+
+  sourceOrgId String
+  org         Organization @relation("CompanyOrg", fields: [sourceOrgId], references: [id])
+  externalId  String
+  sourceName  String
+  sourceUrl   String?
+
+  name          String
+  legalName     String?
+  logoUrl       String?
+  coverImageUrl String?
+  promoVideoUrl String?
+  description   String?
+  industry      String?  // shared CompanyIndustry
+  companyType   String?  // shared CompanyType
+  scale         String?  // 员工规模展示文本(如 "1200+")
+  foundedAt     DateTime?
+  province      String?
+  city          String?
+  district      String?
+  address       String?
+  boothNo       String?
+  honorTagsJson String  @default("[]")
+  tagsJson      String  @default("[]")
+  fairParticipant Boolean @default(false)
+
+  // 详情页右侧指标开关(关闭或数据为空都不展示)
+  showOpenJobCount  Boolean @default(true)
+  showCity          Boolean @default(true)
+  showEmployeeScale Boolean @default(true)
+  showBoothNo       Boolean @default(false)
+
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  rejectReason  String?
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobs Job[]
+
+  @@unique([sourceOrgId, externalId])
+  @@index([sourceOrgId])
+  @@index([reviewStatus, publishStatus])
+  @@index([province, city])
+  @@index([industry])
+  @@index([companyType])
 }
 
 // ── FileObject ────────────────────────────────────────────────────────────────

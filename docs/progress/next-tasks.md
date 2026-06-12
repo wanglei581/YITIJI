@@ -82,7 +82,7 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 - ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
 
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
-> **2026-06-12 用户确认的执行顺序与产品原则：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 首页功能入口 ↔「我的」数据归属 ↔ 操作闭环矩阵(✅ `docs/product/user-data-flow-matrix.md`) → ⑧ 2E 职业规划建议(✅ 2026-06-12，真实化现有「职业规划」入口，不新增卡片) → ⑨ P1 浏览/外部跳转记录建模 +「我的」建设中入口接真(✅ 2026-06-12)。**
+> **2026-06-12 用户确认的执行顺序与产品原则：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 首页功能入口 ↔「我的」数据归属 ↔ 操作闭环矩阵(✅ `docs/product/user-data-flow-matrix.md`) → ⑧ 2E 职业规划建议(✅ 2026-06-12，真实化现有「职业规划」入口，不新增卡片) → ⑨ P1 浏览/外部跳转记录建模 +「我的」建设中入口接真(✅ 2026-06-12) → ⑩ 企业展示/找企业 CompanyProfile(✅ 2026-06-12,用户指派,`verify:companies` 11 PASS 进双 CI)。**
 > 场馆导览后续扩展(择期):Partner 端配置入口;展厅平面图图片。
 
 > **上线前验收提醒（2026-06-12）：** 页面功能闭环打通不等于生产服务器与 Windows 一体机换机无风险。正式上线/换机前必须按 [production-deployment-and-windows-host-checklist.md](../device/production-deployment-and-windows-host-checklist.md) 逐项验收：服务器环境、PostgreSQL、Redis、nginx/HTTPS、COS/OCR/LLM/ASR/TTS、进程守护、线上业务链路、Terminal Agent、打印机驱动、`printerName`、真机打印、扫描/U盘、断网恢复、密钥轮换与回滚。
@@ -101,6 +101,15 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 - ✅ `POST /activity/browse`、`POST /activity/external-jump`、`GET/DELETE /me/browse-logs`、`GET/DELETE /me/external-jump-logs` 已接入；目标必须已审核发布，来源字段服务端补齐。
 - ✅ Kiosk 岗位 / 招聘会 / 校园招聘会 / 人社政策页已上报；Profile 既有建设中入口接到账号资产「浏览与跳转记录」真实分组。
 - ✅ `verify:activity-logs` 纳入 SQLite 主 CI 与 `postgres-readiness`。
+
+**企业展示 / 找企业（2026-06-12 已完成，用户指派）：**
+
+- ✅ `CompanyProfile` 模型 + `Job.companyProfileId` 展示关联（SQLite+PG 双迁移）；定位「来源企业与岗位导览」非招聘平台（红线见 [compliance-boundary.md](../compliance/compliance-boundary.md) §4.5）。
+- ✅ 公开 `/companies*`（列表/统计/筛选项/详情/岗位，全真实聚合）+ `/admin/companies*`（CRUD/审核/发布/指标开关/岗位关联+审计）+ `/partner/companies*`（导入 upsert/编辑强制回 pending+draft）。
+- ✅ Kiosk `/companies` 找企业 + `/companies/:id` 企业详情（指标受后台开关控制；岗位匹配参考只引导既有 2D 链路）；`/jobs` 页内入口；岗位详情「查看企业」回链。
+- ✅ Admin「企业展示管理」、Partner「企业资料管理」页面接真。
+- ✅ BrowseLog/ExternalJumpLog 扩展 `targetType=company_profile`（external_open）；「我的·浏览与跳转记录」新增企业 Tab。
+- ✅ `verify:companies` 11 PASS 纳入双 CI；四端 lint/typecheck/build 全绿；浏览器真实链路验收通过。
 
 **当前下一步建议：**
 
