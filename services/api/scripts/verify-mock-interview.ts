@@ -192,7 +192,18 @@ async function main() {
       if (!list.items.some((i) => i.sessionId === created.sessionId && i.hasReport)) fail('4. 会员历史列表缺记录')
       const listB = await svc.listMine(endUserB, null, 20)
       if (listB.items.length !== 0) fail('4. B 的列表不应含 A 的记录')
+      // 「我的」口径补丁断言:列表只回元数据,绝不含回答正文/转写/报告正文
+      const listJson = JSON.stringify(list.items)
+      for (const leak of [SECRET_ANSWER.slice(0, 14), '转写', 'transcriptText', 'payloadJson', 'content']) {
+        if (listJson.includes(leak)) fail(`4b. 列表泄露非元数据字段: ${leak.slice(0, 12)}`)
+      }
+      // 未开始(configured)的会话不得出现在「我的」列表(只收 completed)
+      const cfgOnly = await svc.createSession({ ...baseCfg, durationMin: 3 }, { endUserId: endUserA, accessToken: null })
+      cleanupSessionIds.push(cfgOnly.sessionId)
+      const list2 = await svc.listMine(endUserA, null, 20)
+      if (list2.items.some((i) => i.sessionId === cfgOnly.sessionId)) fail('4b. 未完成会话不应出现在「我的」列表')
       pass('4. 会员隔离：B 读不到 A；历史列表只见本人')
+      pass('4b. 「我的」口径：列表仅元数据（无回答正文/转写），未完成会话不出现')
 
       // B 删 A → NOT_FOUND；A 删自己 → 级联消失 + 审计
       try {

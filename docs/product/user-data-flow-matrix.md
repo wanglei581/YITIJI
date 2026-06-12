@@ -98,7 +98,7 @@
 
 | 已有入口 | 当前路由/状态 | 产生数据 | 「我的」归属 | 已打通状态 | 缺口/下一步 |
 |---|---|---|---|---|---|
-| 模拟面试 | `/interview/setup` → `/interview/session` → `/interview/report` | MockInterviewSession/Turn/Report、PDF PrintTask | AI服务记录、面试报告、打印订单 | ⚠️ 部分打通（核查 2026-06-12：自有历史页 `/interview/reports` ✅ 会员列表/查看/删除；报告 PDF 打印进打印订单 ✅；**但面试数据在独立 MockInterview 表，「我的」AI服务记录组（基于 AiResumeResult）看不到面试记录，两处入口无互链**） | P0-闭环：「我的」AI服务记录收纳面试记录或互链到 `/interview/reports`（见 §六） |
+| 模拟面试 | `/interview/setup` → `/interview/session` → `/interview/report` | MockInterviewSession/Turn/Report、PDF PrintTask | AI服务记录、面试报告、打印订单 | ✅ 已打通（2026-06-12 闭环补丁：「我的」AI服务记录组并列展示模拟面试报告条目（元数据+查看+删除），与 `/interview/reports` 双向互链） | 保持回归 |
 | 面试技巧 | `/interview/tips` | 勾选/学习记录（可选） | AI服务记录或本地学习记录 | 页面已可用 | 若无真实记录，不展示假学习进度 |
 | 面试报告 | `/interview/reports` | 面试报告历史 | AI服务记录/面试报告 | ✅ 历史页可用（会员真实列表+两步删除+TTL 说明；游客诚实空态） | 与「我的」互链统一（同上 P0-闭环项） |
 
@@ -153,7 +153,7 @@
 
 | 优先级 | 缺口 | 现状 | 修正方向 |
 |---|---|---|---|
-| **P0-闭环**（2E 前先修） | 模拟面试记录未进「我的」资产口径 | 面试数据在独立 MockInterview 表，ProfilePage AI服务记录组（AiResumeResult）看不到；`/interview/reports` 与「我的」无互链 | 最小修正：「我的」AI服务记录组头部加「面试练习报告」互链入口（复用 `/interview/reports`，不新增数据模型）；或将面试记录并入 AI记录列表聚合 |
+| ~~P0-闭环~~ ✅ 已完成（2026-06-12） | 模拟面试记录接入「我的」AI服务记录口径 | AI服务记录组顶部并列「模拟面试报告」条目（复用 /me/mock-interviews，仅元数据：岗位/面试官/时间/状态；查看报告/两步删除）；`/interview/reports` ↔「我的」双向互链；零新模型 | 浏览器登录态验收通过 |
 | **P0-2E** | 职业规划占位未真实化 | 首页 disabled 磁贴 | 按 §五 落点实施（kind=career_plan + PDF + 打印 + CTA 串联） |
 | P1 | 浏览记录 / 外部跳转记录无模型 | 无 ViewLog/JumpLog；「我的」三个对应入口为建设中 toast | 统一建模 `BrowseLog`（targetType=job/job_fair/policy）+ `ExternalJumpLog`（仅记录跳转目标与时间，绝不记录投递/预约结果）；TTL 短留存；「我的」建设中入口接真 |
 | P1 | 打印状态实时追踪 UI | 订单状态靠刷新 | 后端持久化已就绪，补轮询/推送 UI |
@@ -164,8 +164,8 @@
 ### 执行顺序（替代"直接做 2E"）
 
 ```text
-1. P0-闭环：面试记录进「我的」口径（小补丁）
-2. P0-2E：职业规划真实化（按 §五 落点，结果必须进 AI服务记录 + 我的文档 + 打印订单）
+1. ✅ P0-闭环：面试记录进「我的」口径（2026-06-12 完成）
+2. P0-2E：职业规划真实化（按 §五 落点，结果必须进 AI服务记录 + 我的文档 + 打印订单）← 当前
 3. P1：浏览/跳转记录建模 + 「我的」建设中入口接真
 ```
 

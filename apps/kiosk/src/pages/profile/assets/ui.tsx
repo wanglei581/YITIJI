@@ -128,12 +128,15 @@ export function AssetGroupShell<T extends { id: string }>({
   group,
   empty,
   headerExtra,
+  beforeRows,
   renderRow,
 }: {
   title: string
   group: AssetGroupHandle<T>
   empty: string
   headerExtra?: ReactNode
+  /** 行列表之前的固定内容（如同组并列的另一类记录），不受本组加载/空态影响 */
+  beforeRows?: ReactNode
   renderRow: (item: T) => ReactNode
 }) {
   return (
@@ -145,6 +148,7 @@ export function AssetGroupShell<T extends { id: string }>({
         </p>
         {headerExtra}
       </div>
+      {beforeRows}
       {group.loading ? (
         <p className="flex items-center gap-2 px-1 pb-2 text-xs text-gray-400">
           <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />

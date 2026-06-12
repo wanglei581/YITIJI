@@ -72,7 +72,14 @@ export function InterviewReportsPage() {
         title="面试报告"
         subtitle="模拟面试练习的历史报告（仅本人可见）"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          <div className="flex gap-2">
+            {isLoggedIn && (
+              <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
+                去我的 AI服务记录
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          </div>
         }
       />
 
