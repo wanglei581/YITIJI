@@ -11,6 +11,9 @@ import { LocalAiProvider } from './providers/local.provider.stub'
 import { QwenProvider } from './providers/qwen.provider.stub'
 import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmConfigService } from './llm/llm-config.service'
+import { LlmJobFitService } from './resume/llm-job-fit.service'
+import { JobFitService } from './resume/job-fit.service'
+import { JobFitController } from './job-fit.controller'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
@@ -28,7 +31,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   imports: [AuthModule, FilesModule],
-  controllers: [AiController, AiConfigController, AiConfigsController],
+  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController],
   providers: [
     AiService,
     AiLogService,
@@ -39,6 +42,8 @@ import { LlmResumeProvider } from './providers/llm.provider'
     QwenProvider,
     ZhipuProvider,
     LlmConfigService,
+    LlmJobFitService,
+    JobFitService,
     LlmChatService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──

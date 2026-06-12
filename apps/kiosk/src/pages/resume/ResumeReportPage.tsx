@@ -363,6 +363,16 @@ export function ResumeReportPage() {
           {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}
         </Button>
       </div>
+      {/* 2D:目标岗位定向参考(仅参考,引导去来源平台投递) */}
+      <Button
+        size="lg"
+        variant="secondary"
+        className="mt-3 flex w-full items-center justify-center gap-2"
+        onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
+      >
+        <TargetIcon className="h-4 w-4" />
+        目标岗位匹配参考（仅供参考）
+      </Button>
     </div>
   )
 }

@@ -52,6 +52,7 @@ export const AI_KIND_LABEL: Record<MemberAiRecordKind, string> = {
   parse: '简历解析',
   optimize: '简历优化',
   generate: '简历生成',
+  job_fit: '岗位匹配参考',
 }
 
 // 打印订单状态文案（对齐后端 PrintTaskStatus：pending/claimed/printing/completed/failed/cancelled）。

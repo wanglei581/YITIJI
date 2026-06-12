@@ -282,3 +282,38 @@ export interface ResumeGenerateExportResponse {
   /** 签名 URL 过期时间(ISO) */
   expiresAt: string
 }
+
+// ── 2D 目标岗位定向优化 + 岗位匹配度参考 ─────────────────────────────────────
+// 合规:fitLevel 为参考等级(高/中/低),绝无百分比/匹配率/录用概率;投递引导
+// 「去来源平台投递」。matchPoints.evidence 经服务端防编造校验(必须出自简历原文)。
+
+export interface JobFitRequest {
+  /** 简历解析任务 id(凭会员 token 或匿名 accessToken 读回原文) */
+  taskId: string
+  /** 二选一:系统内已发布岗位 id */
+  jobId?: string
+  /** 二选一:手填目标岗位 */
+  manualJob?: { title: string; requirements?: string }
+}
+
+export interface JobFitJobInfo {
+  title: string
+  company: string | null
+  /** 仅 jobId 模式:来源信息(用于「去来源平台投递」引导) */
+  sourceName: string | null
+  sourceUrl: string | null
+  externalId: string | null
+}
+
+export interface JobFitResponse {
+  taskId: string
+  status: 'completed' | 'failed'
+  failReason?: string
+  job?: JobFitJobInfo
+  fitLevel?: 'reference_high' | 'reference_medium' | 'reference_low'
+  summary?: string
+  matchPoints?: Array<{ point: string; evidence: string }>
+  gapPoints?: Array<{ gap: string; suggestion: string }>
+  targetedSuggestions?: string[]
+  providerName?: string
+}

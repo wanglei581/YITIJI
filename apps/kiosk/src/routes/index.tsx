@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
+import { JobFitPage } from '../pages/resume/JobFitPage'
 import { InterviewSetupPage } from '../pages/interview/InterviewSetupPage'
 import { InterviewSessionPage } from '../pages/interview/InterviewSessionPage'
 import { InterviewReportPage } from '../pages/interview/InterviewReportPage'
@@ -48,6 +49,7 @@ export const kioskRouter = createBrowserRouter([
   // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
   { path: '/login', element: <LoginPage /> },
   { path: '/legal/:doc', element: <LegalDocPage /> },
+  { path: '/resume/job-fit', element: <JobFitPage /> },
   { path: '/interview/setup', element: <InterviewSetupPage /> },
   { path: '/interview/session', element: <InterviewSessionPage /> },
   { path: '/interview/report', element: <InterviewReportPage /> },
