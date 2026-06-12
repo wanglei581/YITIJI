@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-11（同步 Phase C-2D 验收、AI 数字人实际方案、过期待办归档；用户确认总路线「阶段1 数据打通 → 阶段2 AI 求职功能」）
+> 最后更新：2026-06-12（同步入口稳定规则与首页功能 ↔「我的」数据闭环矩阵；用户确认后续不新增重复功能入口）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -22,7 +22,7 @@
 - ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
 
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
-> **2026-06-11 用户确认的执行顺序：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 2E 职业规划建议(当前 P0)。**
+> **2026-06-12 用户确认的执行顺序与产品原则：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 首页功能入口 ↔「我的」数据归属 ↔ 操作闭环矩阵(✅ `docs/product/user-data-flow-matrix.md`) → ⑧ 2E 职业规划建议(当前 P0，真实化现有「职业规划」入口，不新增卡片)。**
 > 场馆导览后续扩展(择期):Partner 端配置入口;展厅平面图图片。
 
 **阶段2 AI 求职功能第一批（5 项，参考阿里百炼求职专区合规筛选，全部走 LlmConfigService 功能级配置）：**
@@ -30,8 +30,8 @@
 1. ✅ **简历优化真实化**（`feature/ai-resume-optimize-real`，2026-06-11）：optimizeResume 真实化(原文重提+事实串校验防编造+承诺词拦截+失败不缓存);优化页新增可编辑优化版简历+导出 PDF+打印;删除假文件打印按钮。`verify:resume-optimize` 13 PASS。详见 [current-progress.md](./current-progress.md) §阶段2B。**待生产启用**:Admin 配置中心启用「AI简历优化」。
 2. ✅ **AI 简历生成 MVP**（`feature/ai-resume-generate`，2026-06-10）：6 步引导表单 → 防编造润色(事实字段逐字复制,长度漂移拒绝) → 预览可编辑 → pdfkit 真实 PDF(FileObject+签名URL+1h TTL) → 打印链路。`verify:resume-generate` 9 PASS;浏览器全链路截图核验。详见 [current-progress.md](./current-progress.md) §阶段2A。**待生产启用**:`.env` 设 `AI_PROVIDER=llm` + Admin 配置中心启用「AI简历生成」。
 3. ✅ **模拟面试 + 面试问题预测**（2026-06-11）：2C 闭环已完成（设置场景→对话式练习→报告→PDF 打印，`verify:mock-interview` 12 PASS）；2C+ 语音增强已完成（数字人小青、腾讯 ASR、官方 TTS、转写确认，`verify:mock-interview` 16 PASS）；Kiosk 交互修复已补齐（设置页摘要、数字人面试间、语音权限 loading/失败强提示、文字兜底）。结果仅给本人，报告可打印，不参与企业筛选或录用决策。
-4. ⏳ 目标岗位定向优化 + 岗位匹配度参考（仅参考，引导"去来源平台投递"）
-5. ⏳ 职业规划建议
+4. ✅ **目标岗位定向优化 + 岗位匹配度参考**（2026-06-12）：仅输出参考等级，系统内岗位只引导「去来源平台投递」，结果进入 AI 服务记录。`verify:job-fit` 11 PASS，详见 [current-progress.md](./current-progress.md) §2D。
+5. ⏳ **职业规划建议（当前 P0）**：不新增首页卡片；真实化 AI简历服务组已有「职业规划」入口。结果应进入 AI服务记录；可打印建议单应生成 FileObject 进入我的文档；打印任务进入打印订单。开发前必须参考 [user-data-flow-matrix.md](../product/user-data-flow-matrix.md)。
 
 百炼模板中**不做**（合规红线，企业侧）：生成优化岗位 JD、问答式生成职位、AI 自动招聘机器人、企业侧候选人筛选。
 二期候选：职业证件照（需图像 provider+摄像头）、政策问答知识库（依赖 1D）、简历风险审查扩展。
@@ -39,6 +39,14 @@
 ---
 
 ## 🎯 后续开发节奏原则（2026-06-07，Codex）
+
+### 入口稳定 + 我的数据闭环（2026-06-12，Mavis）
+
+当前首页和各业务板块的功能入口已经定版。后续开发不再新增重复入口 / 同义卡片 / 额外菜单层，而是把已有入口做实：页面接真、按钮接线、状态补齐、数据落库，并进入「我的」对应资产分组。
+
+开发前必须检查 `docs/product/user-data-flow-matrix.md`，明确：入口、当前路由、产生数据、「我的」归属、已打通状态和缺口。
+
+2E 职业规划的正确范围：**真实化现有「职业规划」入口**，不要写成「新增职业规划建议入口」。
 
 后续每个功能先做到「功能可用、流程跑通、测试通过、合规文案正确」，再进入该功能的小范围 UX 修正；多个核心功能稳定后，再集中做 UI/UX 设计和视觉体验收口。
 

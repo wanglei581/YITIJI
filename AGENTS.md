@@ -104,7 +104,7 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：阶段2 AI 求职功能 + Phase C-2D 会员资产中心收口（2026-06-11）
+当前阶段：阶段2 AI 求职功能 + 首页入口/我的资产数据闭环收口（2026-06-12）
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
 - Phase 8 全部封板（2026-05-29，Mac 真实后端跨机 E2E 验证通过）：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固
@@ -117,9 +117,11 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 - Phase 7.11 R4 完成（2026-06-01）：`packages/shared` 新增 `PartnerDataSourceView`/`ConnStatus`，`SyncFrequency` 加 `weekly`；前后端 Partner 数据源 DTO 收紧为字面量；UI 零变化；E2E demo 复跑通过
 - 阶段1 三端数据打通 1A–1F 已完成（2026-06-10）：Admin 招聘会 / 合作机构 / 订单告警、Partner 编辑与政策公告、Kiosk 招聘会与校园招聘 UI 均已接真。
 - 阶段2 已完成：AI 简历生成 MVP、AI 简历优化真实化、真实模型联调与安全收口、招聘会场馆导览图、C-2D 会员资产中心真实管理。
+- 2C 模拟面试 + 2C+ 语音增强已完成；2D 目标岗位定向优化 + 岗位匹配参考已完成；第四阶段 PostgreSQL 生产数据底座已完成（Windows 生产实例待部署复验）。
 - AI 数字人主体已完成：Kiosk `/assistant` 使用 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人方案已被替代，不再作为下一步重做。
 - Stage 3 真实 OCR 已完成（2026-06-11，百度智能云）：图片/扫描件简历真实进诊断闭环；上线前须轮换百度密钥。
-- **下一步**：① 2C 模拟面试 + 面试问题预测（结果只给本人，报告可打印）；② 2D 目标岗位定向优化 + 岗位匹配度参考；③ 2E 职业规划建议；④ 第四阶段 PostgreSQL 真实支持（上线阻塞项）；⑤ 择期补场馆导览扩展（Partner 配置入口 / 平面图图片）。
+- **入口稳定规则（2026-06-12 用户确认）**：当前首页与各业务板块里的功能入口已经定版；后续只做已有入口真实化、页面接真、按钮接线、状态补齐和「我的」数据闭环，不新增重复入口 / 同义卡片。详见 `docs/product/user-data-flow-matrix.md`。
+- **下一步**：① 按矩阵审查首页入口 ↔「我的」数据归属 ↔ 操作闭环；② 2E 职业规划建议真实化现有「职业规划」入口，结果进入 AI服务记录 / 我的文档 / 打印订单；③ 择期补场馆导览扩展（Partner 配置入口 / 平面图图片）。
 
 ---
 

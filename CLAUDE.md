@@ -664,12 +664,13 @@ Claude Code 每次开发前必须：
 
 - 项目定位为 AI求职打印服务终端，不是招聘平台。
 - 底部导航：首页、AI助手、我的。AI工具箱不作为一级导航。
+- 当前首页与各业务板块里的功能入口已经定版；后续只做已有入口真实化、页面接真、按钮接线、状态补齐和「我的」数据闭环，不新增重复入口 / 同义卡片。详见 `docs/product/user-data-flow-matrix.md`。
 - 企业招聘端删除；合作机构后台只做数据与运营后台；管理员后台管理整个终端运营体系。
 - 打印机：奔图 CM2800/CM2820 系列彩色激光多功能一体机，Windows 驱动识别名 `Pantum CM2800ADN Series`，代码必须通过 `printerName` 配置项指定。
 - 岗位/招聘会只做第三方/官方来源信息入口。
 - 秒哒旧项目作为参考库，不作为正式工程继续开发。
 
-当前阶段（2026-06-11，**写完代码改这里 + docs/progress/current-progress.md**）：
+当前阶段（2026-06-12，**写完代码改这里 + docs/progress/current-progress.md**）：
 
 - Phase 1–7（设计系统、前台、后台、合作机构、API 设计、AI Provider 骨架、岗位/招聘会真实 API）全部完成
 - **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI 状态 / 8.2C 安全加固，全部 Mac 真实后端跨机 E2E 通过
@@ -679,18 +680,17 @@ Claude Code 每次开发前必须：
   - W3：JobSource 凭证加密落库（AES-256-GCM）+ Webhook 接收端（HMAC + 5min 时间窗 + nonce LRU 防重放）+ Partner /sources 三轨入口（API/Webhook/Excel）+ Phase 7.11 R4 类型对齐 `packages/shared/PartnerDataSourceView`
 - E2E demo（Partner → Webhook → Admin 审核 → Kiosk 展示）已跑通；防重放/错签名 401、候选人字段注入 400、webhookSecret 创建后 GET 不再回显 全部通过
 - **阶段1 三端数据打通 1A–1F 已完成（2026-06-10）**：Admin 招聘会/合作机构/订单告警、Partner 编辑与政策公告、Kiosk 招聘会与校园招聘新版 UI 均已接真。
-- **阶段2 已完成（2026-06-10 ~ 2026-06-11）**：AI 简历生成 MVP、AI 简历优化真实化、真实模型联调 + 安全收口、招聘会场馆导览图、C-2D 会员资产中心真实管理。
+- **阶段2 已完成（2026-06-10 ~ 2026-06-12）**：AI 简历生成 MVP、AI 简历优化真实化、真实模型联调 + 安全收口、招聘会场馆导览图、C-2D 会员资产中心真实管理、2C 模拟面试 + 2C+ 语音增强、2D 岗位匹配参考。
 - **Stage 3 真实 OCR 已完成（2026-06-11，百度智能云）**：图片简历与扫描版 PDF（受控 ≤3 页）经 `OCR_PROVIDER=baidu` 真实识别进诊断闭环；低置信度报告页提示复核；OCR 失败不调 LLM；密钥仅服务端、原文不落日志。**上线前须在百度控制台重建应用轮换密钥（曾在聊天暴露）。**
+- **第四阶段 PostgreSQL 生产数据底座已完成（2026-06-12）**：`@prisma/adapter-pg`、PG schema 机械同步、干净 `0_init` 基线、空库 deploy、SQLite→PG 迁移演练、`postgres-readiness` CI 守门均已通过；Windows 生产实例仍需部署复验后再宣称生产就绪。
 - **AI 数字人主体已完成**：Kiosk `/assistant` 为 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人引导员方案已被实际方案取代，不再作为下一步重做。
 
 ## 16. 当前最高优先级
 
 **P0（next）：**
 
-- 2C 模拟面试 + 面试问题预测（结果只给本人，报告可打印；入口先放 AI 简历服务内部，MVP 验收后再点亮首页占位）
-- 2D 目标岗位定向优化 + 岗位匹配度参考（仅参考，引导「去来源平台投递」）
-- 2E 职业规划建议
-- 第四阶段 PostgreSQL 真实支持（adapter-pg、migration drift 重整、空库 deploy、数据迁移演练——上线阻塞项）
+- 先按 `docs/product/user-data-flow-matrix.md` 审查首页入口 ↔「我的」数据归属 ↔ 操作闭环，禁止继续堆重复入口。
+- 2E 职业规划建议：**真实化现有「职业规划」入口**，结果进入 AI服务记录 / 我的文档 / 打印订单；不新增「职业规划建议」卡片。
 - 择期补：场馆导览 Partner 配置入口 / 展厅平面图图片
 
 **已完成（保留作为基线）：**
