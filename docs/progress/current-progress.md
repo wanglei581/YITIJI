@@ -5,6 +5,54 @@
 
 ---
 
+## 上线前收口总盘点（2026-06-12，Codex，文档盘点）
+
+项目进入上线前收口阶段：不再新增非必要功能，不新增首页入口 / 底部 Tab / AI 能力，不扩展企业侧招聘闭环；本轮只做验收口径、阻塞项、部署准备与真机验证规划。
+
+**已确认闭环：**
+
+- AI 简历诊断 → AI 服务记录 / 我的简历；AI 简历生成 → 我的简历 / 我的文档 / 打印订单。
+- AI 简历优化 → AI 服务记录 / 我的文档 / 打印订单；岗位匹配参考 → AI 服务记录。
+- 模拟面试 → 面试报告 / 我的 AI 服务记录；职业规划 → AI 服务记录 / 我的文档 / 打印订单。
+- 岗位浏览 / 收藏 / 外部入口打开 → 我的收藏 / 浏览与跳转记录。
+- 招聘会浏览 / 收藏 / 外部预约入口打开 / 真实资料打印 → 我的收藏 / 浏览与跳转记录 / 我的文档 / 打印订单。
+- 政策浏览 / 收藏 / 官方入口打开 → 我的收藏 / 浏览与跳转记录；政策材料打印仍待真实材料源，不能按已上线宣称。
+
+**P0 阻塞项（不上线不能缺）：**
+
+- 生产或预生产服务器按清单完成部署验收：生产 `.env`、PostgreSQL `DATABASE_URL`、Redis、COS、OCR、LLM、ASR/TTS/SMS、nginx/HTTPS、上传限制、进程守护、日志轮转、健康检查、回滚流程。
+- 最新部署提交对应的 GitHub CI SQLite 主 job 与 `postgres-readiness` 均通过；服务器环境补跑核心 verify，确认没有误连 SQLite。
+- PostgreSQL 生产实例完成空库 `migrate deploy`、seed、核心 verify、备份恢复演练；如迁移旧数据，必须跑对账并记录孤儿/脏数据处理。
+- Windows 本地主机 / Terminal Agent / 打印机按真机清单复验：Agent 安装、自启动、心跳、`printerName`、PDF/图片/简历打印、黑白/彩色/份数/双面、断网恢复。
+- 生产密钥轮换与最小权限：百度 OCR、COS CAM、腾讯云 ASR/TTS/SMS/TRTC、LLM API Key；服务协议 / 隐私政策 / 合规说明完成法务确认。
+- 线上浏览器闭环验收：登录、AI 简历、模拟面试、岗位/招聘会/政策收藏、浏览与跳转记录、我的文档、打印订单、删除与再打印。
+
+**P1 上线前建议：**
+
+- 打印状态实时追踪 UI（轮询/推送），降低用户只能刷新查看订单状态的操作成本。
+- 生产 COS live 冒烟与文件删除一致性抽样；Admin / Partner / Kiosk 关键运营页浏览器手验。
+- 监控告警、日志脱敏抽样、备份定时任务与恢复演练记录沉淀。
+
+**P2 上线后优化：**
+
+- 场馆导览 Partner 配置入口 / 平面图图片。
+- AI 助手会话留存、异常反馈工单、扫描/U盘/云打印/证件复印/证件照等硬件或二期能力。
+- 支付、套餐、权益商业化继续后置，不能混入上线前收口。
+
+**当前不能宣称已完成：**
+
+- 真实生产服务器部署尚未验收。
+- PostgreSQL 真实生产实例尚未完成服务器侧部署验收与备份恢复演练。
+- 新 Windows 本地主机 / Terminal Agent / 打印扫描真机换机尚未验收。
+- 政策材料打印、真实扫描、U盘、云打印、证件复印、证件照仍是待真实材料源或硬件依赖能力。
+
+**验证与 CI 口径：**
+
+- `verify:activity-logs`、`verify:career-plan`、`verify:member-assets-c2d`、`verify:mock-interview`、`verify:job-fit`、`verify:resume-optimize`、`verify:ocr-baidu` 已在脚本层存在；CI SQLite 主 job 与 `postgres-readiness` 已包含最新核心集合。
+- 本轮为文档盘点，不改功能代码；完整 `typecheck` / `lint` / `build` 留给上线前最终部署提交统一补跑。
+
+---
+
 ## P1 浏览/外部跳转记录接真（2026-06-12，Codex，`feature/activity-logs-p1`）
 
 闭环矩阵 §六 P1 项完成：只记录登录会员本人浏览与打开外部入口的行为，不记录第三方平台结果，不新增首页入口或底部 Tab。
@@ -1136,7 +1184,7 @@ POST /resume/parse { fileId }
 
 - **必须会员登录**：4 个端点全部受 `EndUserAuthGuard`；匿名 / 缺 token / 错 token / 失效会话 / 内部运营 token 一律 **401**。
 - **只操作本人数据**：service 仅以校验后的 endUserId 读写，不接受任何外部传入 id；`DELETE` 用 `deleteMany({ endUserId, ... })` → 绝不可能删到他人收藏（已用「A 删同 targetId、B 不受影响」断言覆盖）。
-- **收藏合规（CLAUDE.md §10）**：只记录「对外部来源岗位 / 招聘会 / 政策的兴趣标记」，绝不记录投递结果 / 投递状态 / 面试 / Offer / 候选人数据；ValidationPipe(whitelist) 自动剥除未知字段，杜绝注入任何投递 / 候选人字段。
+- **收藏合规（CLAUDE.md §10）**：只记录「对外部来源岗位 / 招聘会 / 政策的兴趣标记」，绝不记录第三方后续结果、企业流程信息或候选人处理信息；ValidationPipe(whitelist) 自动剥除未知字段，杜绝注入任何投递 / 候选人字段。
 - **权益合规（next-tasks §五）**：`subsidy_eligibility_hint` 仅 info-only 资格提示，**绝不**出现「到账 / 已发放金额」承诺词（verify 断言扫描）；券 / 套餐额度只代表平台内服务 / 打印额度，不代表录用结果；表中不含任何支付凭证 / 密钥。
 - **空列表返回 []**，**不伪造数量**；本阶段不接活动 / 套餐 / 支付。
 
@@ -3271,9 +3319,9 @@ pnpm verify:job-sync
 | 第 4 阶段 | 岗位和招聘会信息 | ✅ 完成 |
 | 第 5 阶段 | 管理员后台 | P0/P1 全部完成（9页），P2/P3 页面待填充 |
 | 第 6 阶段 | 合作机构后台 | P0 完成（6页）+ Excel 导入向导 MVP，P1 待填充 |
-| 第 7 阶段 | 后端 API | Phase 7.6–7.10 ✅（Provider 骨架/AI Chat UI/Admin AI 管理页/接口闭环/岗位招聘会真实 API）；真实 Provider / Prisma 持久化待开发；`pnpm audit` ✅ 已完成，0 vulnerabilities |
+| 第 7 阶段 | 后端 API | ✅ Phase 7.6–7.10 已完成；真实 AI/OCR/ASR/TTS 与核心业务 API 已接入后续阶段；Prisma + PostgreSQL 代码层与 CI 守门已完成，真实生产实例仍待部署验收；`pnpm audit` ✅ 已完成，0 vulnerabilities |
 | 第 8 阶段 | Windows Terminal Agent | ✅ **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D 出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固 + 全部 Windows 真机验收通过；actionToken local 校验/lease 续租长任务前补齐 |
-| 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人 | 🚧 **进行中**：AI 数字人语音通话 + 文字对话已完成（`/assistant`，TRTC「小青」，见 §〇·B）；Kiosk/Admin/Partner 视觉收口仍在推进 |
+| 第 9 阶段 | UI Polish / Kiosk 视觉升级 + AI数字人 | AI 数字人主体已完成（`/assistant`，TRTC「小青」）；视觉收口后置为非上线 P0，不在上线前新增入口或 AI 能力 |
 
 ---
 

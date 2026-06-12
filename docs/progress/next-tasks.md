@@ -1,7 +1,67 @@
 # 下一步任务
 
-> 最后更新：2026-06-12（同步 P1 浏览/外部跳转记录接真、入口稳定规则、生产部署与 Windows 换机验收清单）
+> 最后更新：2026-06-12（上线前收口总盘点、同步 P1 浏览/外部跳转记录接真、入口稳定规则、生产部署与 Windows 换机验收清单）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
+
+---
+
+## 上线前收口总盘点（2026-06-12，Codex）
+
+当前 main 进入上线前收口：不再新增非必要功能；除阻塞上线的问题外，不扩大范围；岗位 / 招聘会 / 政策继续只做第三方 / 官方来源信息入口。
+
+### 已确认闭环
+
+- AI 简历诊断 / 生成 / 优化 / 岗位匹配参考 / 职业规划已进入对应 AI 服务记录、我的简历、我的文档与打印订单。
+- 模拟面试已进入面试报告与我的 AI 服务记录。
+- 我的资产中心已接真：我的简历、我的文档、AI 服务记录、模拟面试报告、打印订单、我的收藏、浏览与跳转记录。
+- 岗位 / 招聘会 / 政策的浏览、收藏、打开外部或官方入口已进入我的收藏与浏览与跳转记录；系统只记录打开入口行为，不记录第三方后续结果。
+- PostgreSQL 代码层、schema 同步、SQLite 主 CI 与 `postgres-readiness` 守门已完成；真实生产实例仍待部署验收。
+
+### P0 阻塞项（不上线不能缺）
+
+- [ ] 生产 / 预生产部署验收：生产 `.env`、`DATABASE_URL` 指向 PostgreSQL、`REDIS_URL`、COS、OCR、LLM、ASR/TTS/SMS、nginx/HTTPS、上传限制、进程守护、日志轮转、健康检查、回滚流程全部确认。
+- [ ] 最新部署提交对应 GitHub CI SQLite 主 job 与 `postgres-readiness` 通过；服务器上补跑核心 verify，确认连接生产 PostgreSQL 而不是 SQLite。
+- [ ] PostgreSQL 生产实例：空库 `migrate deploy`、seed、核心 verify、备份恢复演练；如迁移旧数据，必须完成行数对账与脏数据告警。
+- [ ] Windows 本地主机 / Terminal Agent / 打印机真机验收：安装、自启动、心跳、`printerName`、PDF/图片/简历打印、黑白/彩色/份数/双面、断网恢复。
+- [ ] 生产密钥轮换：百度 OCR、COS CAM、腾讯云 ASR/TTS/SMS/TRTC、LLM API Key；服务协议 / 隐私政策 / 合规说明法务确认。
+- [ ] 线上浏览器闭环验收：登录、AI 简历、模拟面试、岗位/招聘会/政策收藏、浏览与跳转记录、我的文档、打印订单、删除与再打印。
+
+### P1 上线前建议
+
+- [ ] 打印状态实时追踪 UI（轮询/推送），后端持久化已就绪。
+- [ ] 生产 COS live 冒烟、文件删除一致性抽样、Admin / Partner / Kiosk 运营页浏览器手验。
+- [ ] 监控告警、日志脱敏抽样、备份定时任务与恢复演练记录沉淀。
+
+### P2 上线后优化
+
+- [ ] 场馆导览 Partner 配置入口 / 展厅平面图图片。
+- [ ] AI 助手会话留存、异常反馈工单。
+- [ ] 扫描 / U盘 / 云打印 / 证件复印 / 证件照等硬件或二期能力。
+- [ ] 支付、套餐、权益商业化继续后置。
+
+### 当前不能宣称已完成
+
+- 真实生产服务器部署尚未验收。
+- PostgreSQL 真实生产实例尚未完成服务器侧部署验收与备份恢复演练。
+- 新 Windows 主机 / Terminal Agent / 打印扫描真机换机尚未验收。
+- 政策材料打印、真实扫描、U盘、云打印、证件复印、证件照仍待真实材料源或硬件验收。
+
+### 上线前建议命令
+
+```bash
+pnpm --filter ./services/api verify:activity-logs
+pnpm --filter ./services/api verify:career-plan
+pnpm --filter ./services/api verify:member-assets-c2d
+pnpm --filter ./services/api verify:mock-interview
+pnpm --filter ./services/api verify:job-fit
+pnpm --filter ./services/api verify:resume-optimize
+pnpm --filter ./services/api verify:ocr-baidu
+pnpm typecheck
+pnpm lint
+pnpm build
+```
+
+GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 
 ---
 
@@ -162,7 +222,7 @@
 
 合规要点（资产中心）：
 
-- 收藏只记录「浏览 / 收藏 / 外部跳转」行为，**不记录投递结果 / 投递状态 / 面试 / Offer**（沿用 compliance §4.4）。
+- 收藏只记录「浏览 / 收藏 / 外部跳转」行为，**不记录第三方后续结果、企业流程信息或候选人处理信息**（沿用 compliance §4.4）。
 - 「补贴资格提示」只展示**政策说明 + 材料清单 + 官方入口**，**绝不出现「补贴已到账 / 已发放金额」**等承诺性文案。
 - 资产中心只存**归属与元数据**，不长期保存身份证 / 简历原文等高敏 blob；沿用现有 TTL 清理 + 管理员访问审计。
 

@@ -104,7 +104,7 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  
 下一步任务：[docs/progress/next-tasks.md](docs/progress/next-tasks.md)
 
-当前阶段：阶段2 AI 求职功能 + 首页入口/我的资产数据闭环收口（2026-06-12）
+当前阶段：上线前收口（2026-06-12）：只做验收、阻塞项修复建议、文档收口、部署准备、真机验证规划；不再新增非必要功能。
 
 - Phase 1–7 已完成（设计系统、前台、后台、合作机构、API 设计）
 - Phase 8 全部封板（2026-05-29，Mac 真实后端跨机 E2E 验证通过）：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI / 8.2C 安全加固
@@ -121,7 +121,8 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 - AI 数字人主体已完成：Kiosk `/assistant` 使用 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人方案已被替代，不再作为下一步重做。
 - Stage 3 真实 OCR 已完成（2026-06-11，百度智能云）：图片/扫描件简历真实进诊断闭环；上线前须轮换百度密钥。
 - **入口稳定规则（2026-06-12 用户确认）**：当前首页与各业务板块里的功能入口已经定版；后续只做已有入口真实化、页面接真、按钮接线、状态补齐和「我的」数据闭环，不新增重复入口 / 同义卡片。详见 `docs/product/user-data-flow-matrix.md`。
-- **下一步**：① 打印任务状态实时追踪 UI；② 择期补场馆导览扩展（Partner 配置入口 / 平面图图片）；③ 按上线清单做生产服务器 + Windows 本地主机换机验收。
+- **上线前 P0**：按 `docs/device/production-deployment-and-windows-host-checklist.md` 完成生产服务器、PostgreSQL 生产实例、Windows 本地主机、Terminal Agent、打印扫描、密钥轮换、法务合规、线上浏览器闭环验收；最新部署提交必须保持 SQLite 主 CI 与 `postgres-readiness` 双 job 通过。
+- **下一步**：① 上线前 P0 验收；② 打印任务状态实时追踪 UI；③ 择期补场馆导览扩展（Partner 配置入口 / 平面图图片）。
 
 ---
 

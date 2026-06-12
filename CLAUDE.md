@@ -670,7 +670,7 @@ Claude Code 每次开发前必须：
 - 岗位/招聘会只做第三方/官方来源信息入口。
 - 秒哒旧项目作为参考库，不作为正式工程继续开发。
 
-当前阶段（2026-06-12，**写完代码改这里 + docs/progress/current-progress.md**）：
+当前阶段（2026-06-12，**上线前收口；写完代码改这里 + docs/progress/current-progress.md**）：
 
 - Phase 1–7（设计系统、前台、后台、合作机构、API 设计、AI Provider 骨架、岗位/招聘会真实 API）全部完成
 - **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI 状态 / 8.2C 安全加固，全部 Mac 真实后端跨机 E2E 通过
@@ -684,6 +684,7 @@ Claude Code 每次开发前必须：
 - **Stage 3 真实 OCR 已完成（2026-06-11，百度智能云）**：图片简历与扫描版 PDF（受控 ≤3 页）经 `OCR_PROVIDER=baidu` 真实识别进诊断闭环；低置信度报告页提示复核；OCR 失败不调 LLM；密钥仅服务端、原文不落日志。**上线前须在百度控制台重建应用轮换密钥（曾在聊天暴露）。**
 - **第四阶段 PostgreSQL 生产数据底座已完成（2026-06-12）**：`@prisma/adapter-pg`、PG schema 机械同步、干净 `0_init` 基线、空库 deploy、SQLite→PG 迁移演练、`postgres-readiness` CI 守门均已通过；Windows 生产实例仍需部署复验后再宣称生产就绪。
 - **AI 数字人主体已完成**：Kiosk `/assistant` 为 TRTC 真人照片顾问「小青」+ 文字对话；早期 3D/SVG 数字人引导员方案已被实际方案取代，不再作为下一步重做。
+- **上线前收口原则**：不再新增非必要功能；只做验收、阻塞项修复建议、文档收口、部署准备、真机验证规划。真实生产服务器、PostgreSQL 生产实例、新 Windows 主机与打印扫描真机均须按清单验收后再宣称生产就绪。
 
 ## 16. 当前最高优先级
 
@@ -693,11 +694,15 @@ Claude Code 每次开发前必须：
 - ~~2E 职业规划建议~~ ✅ 已完成（2026-06-12）：现有「职业规划」入口已真实化，结果进入 AI服务记录 / 我的文档 / 打印订单。
 - ~~P1 浏览/外部跳转记录建模 +「我的」建设中入口接真~~ ✅ 已完成（2026-06-12）：`BrowseLog` / `ExternalJumpLog` 只记录本人浏览与打开来源平台或官方入口的行为；不记录投递/预约结果；Profile 账号资产区已有「浏览与跳转记录」真实分组。
 
-**P1（next）：**
+**P0（上线前阻塞，先验收不堆功能）：**
+
+- 按 `docs/device/production-deployment-and-windows-host-checklist.md` 完成服务器、PostgreSQL、Windows 本地主机、Terminal Agent、打印扫描、密钥轮换、法务合规、线上浏览器闭环验收。
+- 最新部署提交必须保持 SQLite 主 CI 与 `postgres-readiness` 双 job 通过；服务器环境补跑核心 verify 并确认连接 PostgreSQL。
+
+**P1（上线前建议 / 择期）：**
 
 - 打印任务状态实时追踪 UI（后端持久化已就绪）
 - 场馆导览 Partner 配置入口 / 展厅平面图图片
-- 按上线清单做生产服务器 + Windows 本地主机换机验收
 
 **已完成（保留作为基线）：**
 

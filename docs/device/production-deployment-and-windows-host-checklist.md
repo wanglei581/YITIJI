@@ -132,12 +132,8 @@ pnpm --filter ./services/api verify:mock-interview
 pnpm --filter ./services/api verify:job-fit
 pnpm --filter ./services/api verify:resume-optimize
 pnpm --filter ./services/api verify:ocr-baidu
-```
-
-如 2E 已完成，追加：
-
-```bash
 pnpm --filter ./services/api verify:career-plan
+pnpm --filter ./services/api verify:activity-logs
 ```
 
 验收：
@@ -202,12 +198,15 @@ pnpm --filter ./services/api verify:career-plan
 
 - [ ] 岗位列表/详情真实数据展示来源机构、同步时间、外部 ID。
 - [ ] 岗位收藏进入我的收藏。
-- [ ] 去来源平台投递只记录跳转行为，不记录投递结果。
+- [ ] 去来源平台投递只记录打开入口行为，不记录第三方后续结果。
+- [ ] 岗位浏览与外部入口打开在「我的」浏览与跳转记录可见，可删除。
 - [ ] 招聘会详情真实数据可见。
 - [ ] 招聘会收藏进入我的收藏。
+- [ ] 招聘会浏览与外部预约入口打开在「我的」浏览与跳转记录可见，可删除。
 - [ ] 招聘会资料打印进入我的文档 + 打印订单。
 - [ ] 政策收藏进入我的收藏。
-- [ ] 政策资料打印进入我的文档 + 打印订单。
+- [ ] 政策浏览与官方入口打开在「我的」浏览与跳转记录可见，可删除。
+- [ ] 政策材料打印仅在真实材料源启用后验收；当前 info-only 卡片不得伪造我的文档或打印订单。
 
 ### 4.5 AI/外部服务
 
