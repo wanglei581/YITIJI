@@ -30,23 +30,9 @@ type TabKey = 'employment' | 'policy' | 'university' | 'park' | 'news'
 
 // 近期招聘会改为真实数据(getJobFairs,只含 approved+published),不再使用本地 mock。
 
-interface KeyCompany {
-  id: string
-  name: string
-  industry: string
-  openPositions: number
-  city: string
-  source: string
-  sourceUrl: string
-}
-
-const KEY_COMPANIES: KeyCompany[] = [
-  { id: 'c1', name: '海尔集团',     industry: '智慧家电 / 物联网', openPositions: 142, city: '青岛', source: '智联招聘',   sourceUrl: '#' },
-  { id: 'c2', name: '海信集团',     industry: '电子信息 / 智慧城市', openPositions: 98,  city: '青岛', source: '前程无忧',   sourceUrl: '#' },
-  { id: 'c3', name: '青岛啤酒',     industry: '食品饮料 / 制造业',  openPositions: 37,  city: '青岛', source: '青岛市人社局', sourceUrl: '#' },
-  { id: 'c4', name: '百洋医药',     industry: '医药健康 / 零售',    openPositions: 54,  city: '青岛', source: '猎聘网',     sourceUrl: '#' },
-  { id: 'c5', name: '中车青岛四方', industry: '轨道交通 / 制造',    openPositions: 76,  city: '青岛', source: '前程无忧',   sourceUrl: '#' },
-]
+// 上线前 P0 修复(2026-06-13):原「重点企业岗位」区为写死的企业岗位数与来源归属
+// (openPositions/source 均为虚构,sourceUrl='#')——违反「不允许静态假数字」红线,
+// 已整体移除,改为指向真实企业展示(/companies,CompanyProfile 已审核发布数据)。
 
 // ── Mock data: 青岛政策 ────────────────────────────────────────────────────────
 
@@ -135,8 +121,6 @@ interface ParkItem {
   name: string
   zone: string
   focus: string
-  companies: number
-  openPositions: number
   highlight: string
   source: string
 }
@@ -147,8 +131,6 @@ const PARKS: ParkItem[] = [
     name: '青岛高新技术产业开发区',
     zone: '城阳区',
     focus: '智能制造 · 生物医药 · 软件与信息服务',
-    companies: 3200,
-    openPositions: 4500,
     highlight: '国家级高新区，世界 500 强投资企业超 60 家',
     source: '青岛高新区管委会',
   },
@@ -157,8 +139,6 @@ const PARKS: ParkItem[] = [
     name: '崂山软件产业基地',
     zone: '崂山区',
     focus: '软件开发 · 大数据 · 人工智能',
-    companies: 820,
-    openPositions: 1800,
     highlight: '国家软件产业基地，青岛数字经济核心承载区',
     source: '崂山区科技和工业信息化局',
   },
@@ -167,8 +147,6 @@ const PARKS: ParkItem[] = [
     name: '西海岸新区（国家级）',
     zone: '黄岛区',
     focus: '航运物流 · 新能源 · 海洋经济',
-    companies: 5600,
-    openPositions: 9200,
     highlight: '国家级新区，2025年度引进重点项目超200个',
     source: '西海岸新区管委会',
   },
@@ -177,8 +155,6 @@ const PARKS: ParkItem[] = [
     name: '蓝谷高新区',
     zone: '即墨区',
     focus: '海洋科技 · 新材料 · 智能装备',
-    companies: 420,
-    openPositions: 780,
     highlight: '海洋科技创新高地，依托中科院海洋研究所',
     source: '即墨区人力资源和社会保障局',
   },
@@ -289,7 +265,7 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
 
 // ─── Panel: 青岛就业 ──────────────────────────────────────────────────────────
 
-function EmploymentPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
+function EmploymentPanel() {
   const navigate = useNavigate()
   // 真实招聘会数据(只含 approved+published);加载失败/为空时诚实展示空态
   const [fairs, setFairs] = useState<ExternalJobFairDTO[]>([])
@@ -368,43 +344,28 @@ function EmploymentPanel({ onComingSoon }: { onComingSoon: (action: string) => v
         </div>
       </section>
 
-      {/* 重点企业岗位 */}
+      {/* 找企业 · 企业展示(真实 CompanyProfile 数据入口;不再展示写死的企业岗位数) */}
       <section>
         <div className="mb-3 flex items-center gap-2">
           <BriefcaseIcon className="h-5 w-5 text-teal-600" aria-hidden="true" />
-          <h3 className="text-base font-semibold text-gray-800">重点企业岗位</h3>
+          <h3 className="text-base font-semibold text-gray-800">本地企业与岗位</h3>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {KEY_COMPANIES.map((co) => (
-            <div key={co.id} className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-base font-bold text-teal-700">
-                {co.name[0]}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold text-gray-900">{co.name}</p>
-                <p className="mt-0.5 text-xs text-gray-500">{co.industry}</p>
-                <p className="mt-0.5 text-xs text-teal-600">在招岗位 {co.openPositions} 个 · 来源：{co.source}</p>
-              </div>
-              <div className="flex shrink-0 flex-col gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => navigate('/jobs')}
-                  className="flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-medium text-teal-700 hover:bg-teal-100"
-                >
-                  查看岗位
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onComingSoon('去来源平台投递')}
-                  className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100"
-                >
-                  <ArrowUpRightIcon className="h-3 w-3" aria-hidden="true" />
-                  去来源平台投递
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/companies')}
+          className="flex min-h-[72px] w-full items-center gap-4 rounded-xl border border-teal-200 bg-teal-50/60 px-5 text-left transition-colors hover:bg-teal-100/60 active:bg-teal-100"
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white">
+            <Building2Icon className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold text-gray-900">找企业 · 企业展示</span>
+            <span className="mt-0.5 block text-xs text-gray-500">
+              浏览来源机构提供的本地企业与在招岗位（已审核发布数据），本系统不接收简历
+            </span>
+          </span>
+          <ChevronRightIcon className="h-5 w-5 shrink-0 text-teal-400" aria-hidden="true" />
+        </button>
       </section>
 
       {/* 校园招聘专区 */}
@@ -609,19 +570,10 @@ function ParkPanel({ onComingSoon }: { onComingSoon: (action: string) => void })
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-lg bg-gray-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">重点产业</p>
-              <p className="mt-1.5 text-sm text-gray-700">{park.focus}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">园区企业</p>
-              <p className="mt-1.5 text-sm font-semibold text-gray-800">{park.companies.toLocaleString()} 家</p>
-            </div>
-            <div className="rounded-lg bg-teal-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">在招岗位</p>
-              <p className="mt-1.5 text-sm font-semibold text-teal-700">{park.openPositions.toLocaleString()} 个</p>
-            </div>
+          {/* 上线前 P0 修复:删除写死的「园区企业数/在招岗位数」假统计,只保留客观介绍 */}
+          <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">重点产业</p>
+            <p className="mt-1.5 text-sm text-gray-700">{park.focus}</p>
           </div>
 
           <p className="mt-3 text-xs text-gray-500">{park.highlight}</p>
@@ -737,7 +689,7 @@ export function QingdaoPage() {
       <TabBar active={activeTab} onChange={setActiveTab} />
 
       {/* Tab panels */}
-      {activeTab === 'employment' && <EmploymentPanel onComingSoon={notify} />}
+      {activeTab === 'employment' && <EmploymentPanel />}
       {activeTab === 'policy'     && <PolicyPanel />}
       {activeTab === 'university' && <UniversityPanel onComingSoon={notify} />}
       {activeTab === 'park'       && <ParkPanel onComingSoon={notify} />}

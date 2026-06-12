@@ -13,6 +13,7 @@ import { OrgsModule } from './orgs/orgs.module'
 import { PoliciesModule } from './policies/policies.module'
 import { AdminOpsModule } from './admin-ops/admin-ops.module'
 import { MemberAuthModule } from './member-auth/member-auth.module'
+import { HealthController } from './common/health.controller'
 import { ActivityModule } from './activity/activity.module'
 import { CompaniesModule } from './companies/companies.module'
 import { MemberAssetsModule } from './member-assets/member-assets.module'
@@ -87,6 +88,7 @@ const redisUrl = process.env['REDIS_URL']
     TrtcModule,
     ContentModule,
   ],
+  controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
