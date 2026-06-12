@@ -5,7 +5,7 @@
 //   - 数据取自一场「校园」主题招聘会（getJobFairs + 校招过滤），渲染 5 个 Tab：
 //     企业速览 / 参展企业 / 导览图 / AI求职 / 打印服务。
 //   - 投递/预约一律跳来源平台（按钮文案见 docs/compliance/compliance-boundary.md）。
-// 红线：不接收/保存/转发简历给企业；无企业端候选人/面试/Offer/推荐。
+// 红线：不接收/保存/转发简历给企业；无企业端招聘后续处理功能。
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react'
@@ -43,6 +43,8 @@ import {
   XIcon,
 } from 'lucide-react'
 import { getFairCompanies, getFairStats, getFairZones, getJobFairs } from '../../services/api'
+import { recordBrowse, recordExternalJump } from '../../services/api/activity'
+import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { MapBlock } from '../job-fairs/components/MapBlock'
@@ -226,6 +228,18 @@ export function CampusPage() {
   const [companies, setCompanies] = useState<FairCompanyDTO[]>([])
   const [zones,     setZones]     = useState<FairZoneDTO[]>([])
   const [stats,     setStats]     = useState<FairLiveStatsDTO | null>(null)
+  const { getToken } = useAuth()
+
+  // 浏览记录(P1):校园专区主体招聘会真实加载后上报;fire-and-forget,服务端 30 分钟去重。
+  useEffect(() => {
+    if (fair?.id) recordBrowse(getToken(), 'job_fair', fair.id)
+  }, [fair?.id, getToken])
+
+  // 外部跳转记录(P1):只记录「打开来源平台预约入口」;预约结果以来源平台为准,本系统不记录。
+  const openBookingQr = () => {
+    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    setQr({ kind: 'book' })
+  }
 
   // 取一场校园主题招聘会作为本专区主体（进行中优先 → 即将开始 → 任意）
   useEffect(() => {
@@ -377,7 +391,7 @@ export function CampusPage() {
             companyCount={companyCount}
             jobCount={jobCount}
             onGoTab={setTab}
-            onBook={() => setQr({ kind: 'book' })}
+            onBook={openBookingQr}
           />
         )}
         {tab === 'companies' && (

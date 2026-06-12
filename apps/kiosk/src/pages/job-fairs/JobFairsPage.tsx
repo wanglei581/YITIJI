@@ -16,6 +16,8 @@ import {
   XIcon,
 } from 'lucide-react'
 import { getJobFairs } from '../../services/api'
+import { recordExternalJump } from '../../services/api/activity'
+import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { FairCalendarPopover } from './components/FairCalendarPopover'
 import { RegionPicker } from './components/RegionPicker'
@@ -215,6 +217,13 @@ export function JobFairsPage() {
   const [error,        setError]        = useState(false)
   const [retryKey,     setRetryKey]     = useState(0)
   const [qrFair,       setQrFair]       = useState<ExternalJobFairDTO | null>(null)
+  const { getToken } = useAuth()
+
+  // 外部跳转记录(P1):只记录「打开来源平台预约入口」;预约结果以来源平台为准,本系统不记录。
+  const openBookingQr = (fair: ExternalJobFairDTO) => {
+    recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    setQrFair(fair)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -305,7 +314,7 @@ export function JobFairsPage() {
                   <FairCard
                     key={fair.id}
                     fair={fair}
-                    onBook={() => setQrFair(fair)}
+                    onBook={() => openBookingQr(fair)}
                     onDetail={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}
                     onMap={() => navigate(`/job-fairs/${fair.id}/map`)}
                   />

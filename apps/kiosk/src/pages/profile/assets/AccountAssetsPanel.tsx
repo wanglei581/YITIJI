@@ -6,6 +6,7 @@
 // 全部凭本人会员 token，归属由后端 EndUserAuthGuard + endUserId 过滤校验。
 // ============================================================
 
+import { ActivityLogsGroup } from './ActivityLogsGroup'
 import { AiRecordsGroup } from './AiRecordsGroup'
 import { BenefitsGroup } from './BenefitsGroup'
 import { DocumentsGroup } from './DocumentsGroup'
@@ -40,6 +41,8 @@ export function AccountAssetsPanel({
         />
         <PrintOrdersGroup group={groups.printOrders} />
         <FavoritesGroup group={groups.favorites} onToast={onToast} />
+        {/* P1:浏览与跳转记录(岗位/招聘会/政策)——只记录浏览与打开入口,投递/预约结果以来源平台为准 */}
+        <ActivityLogsGroup onToast={onToast} />
         <BenefitsGroup group={groups.benefits} />
       </div>
     </section>

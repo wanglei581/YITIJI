@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-12（同步入口稳定规则、首页功能 ↔「我的」数据闭环矩阵、生产部署与 Windows 换机验收清单）
+> 最后更新：2026-06-12（同步 P1 浏览/外部跳转记录接真、入口稳定规则、生产部署与 Windows 换机验收清单）
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---
@@ -22,7 +22,7 @@
 - ✅ **1F-守卫 防回退验证脚本**（`feature/jobfair-ui-guard`，2026-06-10，Mavis 建议）：`pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` 13 项断言钉死新版 UI 结构（组件文件/列表页/详情页/校园页/路由/qingdao mock 不复活/首页文案/禁词）。**今后涉及 kiosk 招聘会/校园招聘的分支，合入前必须跑此脚本。**
 
 > **阶段1 数据打通(1A–1F)全部完成(2026-06-10)。下一步进入阶段2 AI 求职功能第一批(见下方清单)。**
-> **2026-06-12 用户确认的执行顺序与产品原则：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 首页功能入口 ↔「我的」数据归属 ↔ 操作闭环矩阵(✅ `docs/product/user-data-flow-matrix.md`) → ⑧ 2E 职业规划建议(当前 P0，真实化现有「职业规划」入口，不新增卡片)。**
+> **2026-06-12 用户确认的执行顺序与产品原则：① intent 分流/链路闭环/Campus 合规修复(✅) → ② 真实模型联调(✅ DeepSeek+COS 四链路全过) → ③ 2B 安全收口补丁(✅) → 插单:招聘会场馆导览图(✅ `feature/jobfair-venue-guide`,库表→API→Admin 配置→Kiosk 轻3D,`verify:jobfair-venue-guide` 13 PASS) → ④ 会员资产中心真实管理(C-2D,✅) → 插单:Stage 3 真实 OCR(✅ 2026-06-11 百度智能云,`verify:ocr-baidu` 12 PASS 进 CI + live 冒烟 + 浏览器真实链路) → ⑤ 2C 模拟面试(✅ 2026-06-11 完成并验收:对话式练习+报告+打印,首页 AI面试训练三磁贴已点亮,`verify:mock-interview` 12 PASS 进 CI) → ⑥ 2D 目标岗位定向优化+岗位匹配度参考(✅ 2026-06-12 完成并验收,`verify:job-fit` 10 PASS 进 CI) → 插单:第四阶段 PostgreSQL 生产底座(✅ 2026-06-12 Mavis 决策优先,本地+CI 双环境真实验证,`postgres-readiness` CI job 守门;Windows 生产实例待部署复验) → ⑦ 首页功能入口 ↔「我的」数据归属 ↔ 操作闭环矩阵(✅ `docs/product/user-data-flow-matrix.md`) → ⑧ 2E 职业规划建议(✅ 2026-06-12，真实化现有「职业规划」入口，不新增卡片) → ⑨ P1 浏览/外部跳转记录建模 +「我的」建设中入口接真(✅ 2026-06-12)。**
 > 场馆导览后续扩展(择期):Partner 端配置入口;展厅平面图图片。
 
 > **上线前验收提醒（2026-06-12）：** 页面功能闭环打通不等于生产服务器与 Windows 一体机换机无风险。正式上线/换机前必须按 [production-deployment-and-windows-host-checklist.md](../device/production-deployment-and-windows-host-checklist.md) 逐项验收：服务器环境、PostgreSQL、Redis、nginx/HTTPS、COS/OCR/LLM/ASR/TTS、进程守护、线上业务链路、Terminal Agent、打印机驱动、`printerName`、真机打印、扫描/U盘、断网恢复、密钥轮换与回滚。
@@ -33,7 +33,20 @@
 2. ✅ **AI 简历生成 MVP**（`feature/ai-resume-generate`，2026-06-10）：6 步引导表单 → 防编造润色(事实字段逐字复制,长度漂移拒绝) → 预览可编辑 → pdfkit 真实 PDF(FileObject+签名URL+1h TTL) → 打印链路。`verify:resume-generate` 9 PASS;浏览器全链路截图核验。详见 [current-progress.md](./current-progress.md) §阶段2A。**待生产启用**:`.env` 设 `AI_PROVIDER=llm` + Admin 配置中心启用「AI简历生成」。
 3. ✅ **模拟面试 + 面试问题预测**（2026-06-11）：2C 闭环已完成（设置场景→对话式练习→报告→PDF 打印，`verify:mock-interview` 12 PASS）；2C+ 语音增强已完成（数字人小青、腾讯 ASR、官方 TTS、转写确认，`verify:mock-interview` 16 PASS）；Kiosk 交互修复已补齐（设置页摘要、数字人面试间、语音权限 loading/失败强提示、文字兜底）。结果仅给本人，报告可打印，不参与企业筛选或录用决策。
 4. ✅ **目标岗位定向优化 + 岗位匹配度参考**（2026-06-12）：仅输出参考等级，系统内岗位只引导「去来源平台投递」，结果进入 AI 服务记录。`verify:job-fit` 11 PASS，详见 [current-progress.md](./current-progress.md) §2D。
-5. ⏳ **职业规划建议（当前 P0）**：不新增首页卡片；真实化 AI简历服务组已有「职业规划」入口。结果应进入 AI服务记录；可打印建议单应生成 FileObject 进入我的文档；打印任务进入打印订单。开发前必须参考 [user-data-flow-matrix.md](../product/user-data-flow-matrix.md)。
+5. ✅ **职业规划建议（2026-06-12）**：不新增首页卡片；已真实化 AI简历服务组已有「职业规划」入口。结果进入 AI服务记录；建议单 PDF 进入我的文档；打印任务进入打印订单。后续保持回归。
+
+**P1 浏览/外部跳转记录（2026-06-12 已完成）：**
+
+- ✅ 新增 `BrowseLog` / `ExternalJumpLog`，只记录登录会员本人浏览与打开外部入口的行为快照。
+- ✅ `POST /activity/browse`、`POST /activity/external-jump`、`GET/DELETE /me/browse-logs`、`GET/DELETE /me/external-jump-logs` 已接入；目标必须已审核发布，来源字段服务端补齐。
+- ✅ Kiosk 岗位 / 招聘会 / 校园招聘会 / 人社政策页已上报；Profile 既有建设中入口接到账号资产「浏览与跳转记录」真实分组。
+- ✅ `verify:activity-logs` 纳入 SQLite 主 CI 与 `postgres-readiness`。
+
+**当前下一步建议：**
+
+1. 打印状态实时追踪 UI（订单状态轮询/推送，后端持久化已就绪）。
+2. 场馆导览扩展：Partner 配置入口 / 展厅平面图图片。
+3. 按上线清单做生产服务器 + Windows 本地主机换机验收。
 
 **上线/换机 P0 验收（并行准备，不阻塞 2E 开发）：**
 
@@ -617,7 +630,7 @@
 3. ✅ Excel 字段映射 service 层接入已完成并合入，旧「把 mock 切 service」待办归档。
 4. ✅ BullMQ API 拉取 worker 已完成并通过 `verify:job-sync`，旧验证待办归档。
 
-**当前 P0 以文档顶部为准：** 2C 模拟面试 → 2D 目标岗位定向优化 / 岗位匹配度参考 → 2E 职业规划建议。
+**历史说明：** 本历史快照中的 2C / 2D / 2E 已完成；后续优先级以本文顶部「当前下一步建议」为准。
 
 ### P1（择期）
 **安全后续：**

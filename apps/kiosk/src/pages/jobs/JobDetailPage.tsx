@@ -16,9 +16,11 @@ import {
   XIcon,
 } from 'lucide-react'
 import { getJobById } from '../../services/api'
+import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { isValidSourceUrl } from '../../lib/url'
 import { useFavorites } from '../../favorites/useFavorites'
+import { useAuth } from '../../auth/useAuth'
 
 const CATEGORY_LABEL: Record<string, string> = {
   fulltime: '全职',
@@ -118,6 +120,7 @@ export function JobDetailPage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
+  const { getToken } = useAuth()
 
   const stateJob = (location.state as { job?: ExternalJobDTO } | null)?.job
   const hasStateMatch = stateJob?.id === id
@@ -146,6 +149,19 @@ export function JobDetailPage() {
       cancelled = true
     }
   }, [id, hasStateMatch])
+
+  // 浏览记录（P1）：详情真实加载成功后上报一次；fire-and-forget，失败不影响页面。
+  // 服务端 30 分钟窗口去重，反复进出不会刷屏「我的」记录。
+  useEffect(() => {
+    if (job?.id) recordBrowse(getToken(), 'job', job.id)
+  }, [job?.id, getToken])
+
+  // 外部跳转记录（P1）：记录的是「打开来源平台入口」这一动作本身，
+  // 不记录、也无法得知用户是否在来源平台完成投递。
+  const openSourceQr = () => {
+    recordExternalJump(getToken(), 'job', job!.id, 'external_apply')
+    setShowQr(true)
+  }
 
   if (loading) {
     return <LoadingState className="h-full" />
@@ -302,7 +318,7 @@ export function JobDetailPage() {
             size="lg"
             className="flex items-center gap-2"
             disabled={!sourceCanApply}
-            onClick={() => setShowQr(true)}
+            onClick={openSourceQr}
           >
             <ExternalLinkIcon className="h-4 w-4" />
             去来源平台投递
@@ -312,7 +328,7 @@ export function JobDetailPage() {
             variant="secondary"
             className="flex items-center gap-2"
             disabled={!sourceCanApply}
-            onClick={() => setShowQr(true)}
+            onClick={openSourceQr}
           >
             <QrCodeIcon className="h-4 w-4" />
             扫码投递

@@ -213,6 +213,8 @@ model EndUser {
   documentProcessTasks DocumentProcessTask[]
   favorites       Favorite[]
   benefitGrants   BenefitGrant[]
+  browseLogs       BrowseLog[]
+  externalJumpLogs ExternalJumpLog[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -934,7 +936,7 @@ model AiResumeResult {
 //
 // 合规约束（CLAUDE.md §10「系统只记录:浏览/收藏/外部跳转/打印/AI服务调用」）:
 //   - 收藏只记录"对某个外部来源岗位 / 招聘会 / 政策的兴趣标记",
-//     绝不记录投递结果 / 投递状态 / 面试 / Offer / 候选人数据,不形成任何招聘闭环。
+//     绝不记录投递结果 / 第三方后续处理信息 / 求职者材料流转数据,不形成任何招聘闭环。
 //   - 归属于会员本人(endUserId);跨用户在 EndUserAuthGuard + service 双重隔离。
 //
 // targetType: 'job' | 'job_fair' | 'policy'(外部来源信息入口的三类对象)
@@ -964,7 +966,7 @@ model Favorite {
 // 合规约束（next-tasks §五 / compliance §八）:
 //   - benefitType='subsidy_eligibility_hint' 只能是 info-only 资格提示:
 //     仅展示政策说明 / 材料清单 / 官方入口,**绝不**出现"补贴已到账 / 已发放金额"等承诺性文案。
-//   - 套餐 / 券类只代表"平台内服务 / 打印额度",不代表录用结果,不承诺面试 / 录用 / 补贴到账。
+//   - 套餐 / 券类只代表"平台内服务 / 打印额度",不代表就业结果,不承诺面试 / 补贴到账。
 //   - 不在前端保存任何支付凭证 / 密钥(本表也不含支付凭证)。
 //
 // benefitType: 'coupon' | 'free_quota' | 'package_entitlement' | 'subsidy_eligibility_hint'
@@ -1112,7 +1114,7 @@ model TerminalScreensaverConfig {
 
 // ── MockInterview(2C 模拟面试)────────────────────────────────────────────────
 // 求职者本人面试练习工具:配置 → AI 对话式模拟面试 → 综合报告(可打印)。
-// 合规:不是招聘能力;不向企业展示/转交;报告仅练习参考,无任何录用承诺。
+// 合规:不是招聘能力;不向企业展示/转交;报告仅练习参考,无任何就业结果承诺。
 // 归属:endUserId(登录会员)或 accessTokenHash(匿名一次性令牌,只存 SHA-256)。
 // 留存:expiresAt 到期由清理任务移除(匿名短/会员长);对话与报告原文不写日志。
 model MockInterviewSession {
@@ -1170,5 +1172,54 @@ model MockInterviewReport {
   createdAt   DateTime @default(now())
   expiresAt   DateTime
 
+  @@index([expiresAt])
+}
+
+// ── 浏览 / 外部跳转记录(P1 闭环)──────────────────────────────────────────────
+// 合规边界(compliance-boundary §4.4):只记录用户本人的「浏览」和「打开来源平台
+// 入口」两类行为;绝不记录第三方平台上的投递结果/预约结果/企业处理等任何
+// 流程状态——禁止新增招聘闭环状态类模型或字段。
+//
+// 归属:仅登录会员落库(endUserId 必填,onDelete Cascade)。共享一体机上匿名
+// 浏览历史既不落服务端、也不写本机存储——否则会泄露给下一位使用者。
+// 来源字段(targetTitle/sourceName/sourceUrl/externalId)由服务端从已发布目标
+// 对象快照补齐,不信任前端传入。TTL 短留存,到期 cron 物理清理;本人可随时删除。
+
+model BrowseLog {
+  id          String   @id @default(cuid())
+  endUserId   String
+  endUser     EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  targetType  String   // 'job' | 'job_fair' | 'policy'
+  targetId    String
+  targetTitle String?
+  sourceName  String?
+  sourceUrl   String?
+  externalId  String?
+  terminalId  String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([endUserId, createdAt])
+  @@index([endUserId, targetType, targetId, createdAt])
+  @@index([expiresAt])
+}
+
+model ExternalJumpLog {
+  id          String   @id @default(cuid())
+  endUserId   String
+  endUser     EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  targetType  String   // 'job' | 'job_fair' | 'policy'
+  targetId    String
+  action      String   // 'external_apply' | 'external_appointment' | 'external_open'(仅记录打开入口,不记录办理结果)
+  targetTitle String?
+  sourceName  String?
+  sourceUrl   String?
+  externalId  String?
+  terminalId  String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([endUserId, createdAt])
+  @@index([endUserId, targetType, createdAt])
   @@index([expiresAt])
 }

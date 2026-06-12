@@ -74,3 +74,32 @@ export interface MemberAiRecordItem {
   createdAt: string
   expiresAt: string | null
 }
+
+// ── 浏览 / 外部跳转记录（P1 闭环）─────────────────────────────────────────────
+// 合规：只记录「浏览」和「打开来源平台入口」两类本人行为；
+// 投递/预约结果以来源平台为准，本系统不记录、类型上也不存在这类字段。
+
+export type ActivityTargetType = 'job' | 'job_fair' | 'policy'
+
+/**
+ * 外部跳转动作（只描述打开了哪类入口，不描述办理结果）：
+ * external_apply=岗位投递入口；external_appointment=招聘会预约入口；external_open=政策官方入口。
+ */
+export type ActivityJumpAction = 'external_apply' | 'external_appointment' | 'external_open'
+
+/** 浏览记录条目（目标快照 + 时间，无任何状态字段）。 */
+export interface MemberBrowseLogItem {
+  id: string
+  targetType: ActivityTargetType
+  targetId: string
+  targetTitle: string | null
+  sourceName: string | null
+  sourceUrl: string | null
+  externalId: string | null
+  createdAt: string
+}
+
+/** 外部跳转记录条目。 */
+export interface MemberJumpLogItem extends MemberBrowseLogItem {
+  action: ActivityJumpAction
+}

@@ -13,6 +13,7 @@ import { OrgsModule } from './orgs/orgs.module'
 import { PoliciesModule } from './policies/policies.module'
 import { AdminOpsModule } from './admin-ops/admin-ops.module'
 import { MemberAuthModule } from './member-auth/member-auth.module'
+import { ActivityModule } from './activity/activity.module'
 import { MemberAssetsModule } from './member-assets/member-assets.module'
 import { MockInterviewModule } from './mock-interview/mock-interview.module'
 import { MemberFavoritesModule } from './member-favorites/member-favorites.module'
@@ -64,6 +65,7 @@ const redisUrl = process.env['REDIS_URL']
     AuditModule,
     AuthModule,
     MemberAuthModule,
+    ActivityModule,
     MemberAssetsModule,
     MockInterviewModule,
     MemberFavoritesModule,

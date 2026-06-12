@@ -34,10 +34,12 @@ import {
   XIcon,
 } from 'lucide-react'
 import { getFairCompanies, getFairStats, getFairVenueGuide, getFairZones, getJobFairById } from '../../services/api'
+import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { FairDataScreen } from './components/FairDataScreen'
 import { useFavorites } from '../../favorites/useFavorites'
+import { useAuth } from '../../auth/useAuth'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-blue-50',  text: 'text-blue-600' },
@@ -170,6 +172,7 @@ export function JobFairDetailPage() {
   // 收藏(C-2D):登录走 /me/favorites,匿名存本机;仅兴趣标记,不形成预约/投递闭环
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
   const isFav = id ? isFavorite('job_fair', id) : false
+  const { getToken } = useAuth()
 
   // 招聘会主体
   useEffect(() => {
@@ -200,6 +203,17 @@ export function JobFairDetailPage() {
   }, [fair])
 
   const featuredZones = useMemo(() => zones.filter((z) => z.category === 'innovation'), [zones])
+
+  // 浏览记录(P1):详情真实加载后上报;fire-and-forget,失败不影响页面;服务端 30 分钟去重。
+  useEffect(() => {
+    if (fair?.id) recordBrowse(getToken(), 'job_fair', fair.id)
+  }, [fair?.id, getToken])
+
+  // 外部跳转记录(P1):只记录「打开来源平台预约入口」动作;预约结果以来源平台为准,本系统不记录。
+  const openBookingQr = () => {
+    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    setQr({ kind: 'book' })
+  }
 
   if (loading) return <LoadingState className="h-full" />
   if (error || !fair) {
@@ -320,7 +334,7 @@ export function JobFairDetailPage() {
       <div className="border-t border-gray-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           {!isEnded ? (
-            <Button size="lg" className="flex flex-1 items-center justify-center gap-2" onClick={() => setQr({ kind: 'book' })}>
+            <Button size="lg" className="flex flex-1 items-center justify-center gap-2" onClick={openBookingQr}>
               <QrCodeIcon className="h-5 w-5" />
               扫码预约
             </Button>

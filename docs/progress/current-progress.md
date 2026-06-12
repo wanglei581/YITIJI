@@ -5,6 +5,17 @@
 
 ---
 
+## P1 浏览/外部跳转记录接真（2026-06-12，Codex，`feature/activity-logs-p1`）
+
+闭环矩阵 §六 P1 项完成：只记录登录会员本人浏览与打开外部入口的行为，不记录第三方平台结果，不新增首页入口或底部 Tab。
+
+- **数据模型**：新增 `BrowseLog` 与 `ExternalJumpLog`（SQLite + PostgreSQL schema / migration 同步）。`targetType=job|job_fair|policy`；`ExternalJumpLog.action=external_apply|external_appointment|external_open`；短 TTL 留存；删除为本人硬删 + 审计。匿名用户不落库，也不写本机存储，避免共享一体机泄露给下一位用户。
+- **后端接口**：新增 `POST /api/v1/activity/browse`、`POST /api/v1/activity/external-jump`、`GET /api/v1/me/browse-logs`、`GET /api/v1/me/external-jump-logs`、`DELETE /api/v1/me/browse-logs/:id`、`DELETE /api/v1/me/external-jump-logs/:id`。目标必须存在且已审核发布；来源名称、来源 URL、外部 ID 由服务端从目标快照补齐，前端不能伪造。
+- **Kiosk 接入**：岗位详情加载后记录岗位浏览；岗位「去来源平台投递 / 扫码投递」打开时记录 `external_apply`；招聘会详情与校园专区主体招聘会加载后记录浏览，列表/详情/校园页打开预约入口时记录 `external_appointment`；人社政策详情展开后记录政策浏览，官方入口二维码打开时记录 `external_open`。
+- **「我的」接真**：Profile 既有建设中入口「招聘会浏览记录 / 招聘会预约跳转记录」不再新增入口，提示用户查看下方账号资产；账号资产区新增真实「浏览与跳转记录」分组，按岗位 / 招聘会 / 政策分段展示最近记录、加载更多、删除、查看目标、再次打开来源平台 / 官方入口，含空态 / 加载 / 错误重试。
+- **合规文案**：页面说明统一为「投递结果以来源平台为准，本系统不记录也不参与投递流程」「预约结果以来源平台为准，本系统不记录也不参与预约流程」「办理结果以官方平台为准，本系统仅提供信息入口和材料服务」；记录失败 fire-and-forget，不阻断浏览或打开二维码。
+- **验证**：新增 `pnpm --filter ./services/api verify:activity-logs` 并纳入 SQLite 主 CI 与 `postgres-readiness` job；覆盖会员落库、外部入口打开记录、招聘会/政策、跨会员隔离、未发布/不存在 target 拒绝、非法 targetType/action 拒绝、删除审计、响应 JSON 无第三方结果字段、禁词扫描、匿名不上报落库、TTL 清理。
+
 ## 2E 职业规划真实化（2026-06-12，Claude，`feature/career-plan-2e`）
 
 闭环矩阵 §五 落点全兑现：**真实化首页既有「职业规划」磁贴（不新增卡片）**。

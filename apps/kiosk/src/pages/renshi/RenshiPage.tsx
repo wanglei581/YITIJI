@@ -3,7 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import { useComingSoonNotice } from '../../components/ComingSoonNotice'
 import { getPublishedPolicies, type PolicyPostView } from '../../services/api/policies'
+import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useFavorites } from '../../favorites/useFavorites'
+import { useAuth } from '../../auth/useAuth'
+import { SourceUrlQr } from '../../components/SourceUrlQr'
+import { isValidSourceUrl } from '../../lib/url'
 import {
   ArrowUpRightIcon,
   BookOpenIcon,
@@ -22,6 +26,7 @@ import {
   ShieldCheckIcon,
   UserCheckIcon,
   UsersIcon,
+  XIcon,
 } from 'lucide-react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -153,6 +158,32 @@ const CATEGORY_META: Record<string, { label: string; color: string }> = {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
+// 官方入口二维码弹层(P1):承载政策条目的真实 externalUrl;info-only。
+// 打开即记一条 external_open 跳转记录(仅记录打开入口动作,不记录办理结果)。
+function OfficialEntryQrOverlay({ policy, onClose }: { policy: PolicyPostView; onClose: () => void }) {
+  const url = policy.externalUrl ?? ''
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="relative w-[22rem] max-w-full rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          aria-label="关闭"
+          className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
+        >
+          <XIcon className="h-5 w-5" />
+        </button>
+        <p className="text-center text-base font-semibold text-gray-800">扫码打开官方入口</p>
+        <p className="mt-1 truncate text-center text-xs text-gray-400">{policy.title}</p>
+        <div className="mt-5 flex justify-center"><SourceUrlQr value={url} size={196} /></div>
+        <p className="mt-3 break-all rounded-lg bg-gray-50 px-3 py-2 text-center text-[11px] text-gray-500">{url}</p>
+        <p className="mt-4 text-xs leading-relaxed text-gray-500">
+          请使用手机扫码前往官方平台办理。办理结果以官方平台为准，本系统仅提供信息入口和材料服务。
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) => void }) {
   const tabs: { key: TabKey; label: string; icon: typeof FileTextIcon }[] = [
     { key: 'policy',   label: '就业政策', icon: FileTextIcon },
@@ -220,10 +251,28 @@ function ZoneEntryCard({
 
 // ─── Panel: 就业政策(真实数据,按人群分组)──────────────────────────────────
 
-function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceLine: string | null }) {
+function PolicyPanel({
+  guides,
+  sourceLine,
+  onOpened,
+  onOfficialEntry,
+}: {
+  guides: PolicyPostView[]
+  sourceLine: string | null
+  /** 浏览记录(P1):某条政策详情被展开时上报(fire-and-forget) */
+  onOpened: (policy: PolicyPostView) => void
+  onOfficialEntry: (policy: PolicyPostView) => void
+}) {
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [openItemId, setOpenItemId] = useState<string | null>(null)
   // 收藏(C-2D):政策只做兴趣标记,登录走 /me/favorites,匿名存本机
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
+
+  const toggleItem = (item: PolicyPostView) => {
+    const opening = openItemId !== item.id
+    setOpenItemId(opening ? item.id : null)
+    if (opening) onOpened(item)
+  }
 
   // 按 audience 分组,缺省归 general;按 AUDIENCE_META.order 排序
   const groups = Object.entries(
@@ -287,14 +336,18 @@ function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceL
             {/* Items */}
             {isOpen && (
               <div className="border-t border-gray-100">
-                {items.map((item, i) => (
+                {items.map((item, i) => {
+                  const itemOpen = openItemId === item.id
+                  const hasDetail = Boolean(item.content || item.externalUrl)
+                  return (
                   <div
                     key={item.id}
                     className={[
-                      'flex items-start gap-4 px-6 py-4',
+                      'px-6 py-4',
                       i < items.length - 1 ? 'border-b border-gray-50' : '',
                     ].join(' ')}
                   >
+                    <div className="flex items-start gap-4">
                     <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary-400" />
                     <div className="min-w-0 flex-1">
                       <p className="text-base font-semibold text-gray-800">{item.title}</p>
@@ -303,6 +356,19 @@ function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceL
                       )}
                       <p className="mt-1 text-xs text-gray-400">来源:{item.sourceName}{item.publishedDate ? ` · ${item.publishedDate}` : ''}</p>
                     </div>
+                    {hasDetail && (
+                      <button
+                        type="button"
+                        onClick={() => toggleItem(item)}
+                        className="flex min-h-[48px] shrink-0 items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        {itemOpen ? '收起' : '详情'}
+                        <ChevronRightIcon
+                          className={['h-3.5 w-3.5 transition-transform', itemOpen ? 'rotate-90' : ''].join(' ')}
+                          aria-hidden="true"
+                        />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}
@@ -314,8 +380,28 @@ function PolicyPanel({ guides, sourceLine }: { guides: PolicyPostView[]; sourceL
                     >
                       <HeartIcon className={isFavorite('policy', item.id) ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
                     </button>
+                    </div>
+                    {itemOpen && (
+                      <div className="ml-6 mt-3 rounded-lg bg-gray-50 px-4 py-3">
+                        {item.content && (
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{item.content}</p>
+                        )}
+                        {item.externalUrl && isValidSourceUrl(item.externalUrl) && (
+                          <button
+                            type="button"
+                            onClick={() => onOfficialEntry(item)}
+                            className="mt-3 flex min-h-[48px] items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-4 text-sm font-semibold text-primary-700 hover:bg-primary-100"
+                          >
+                            <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
+                            扫码打开官方入口
+                          </button>
+                        )}
+                        <p className="mt-2 text-xs text-gray-400">办理结果以官方平台为准,本系统仅提供信息入口和材料服务。</p>
+                      </div>
+                    )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -469,7 +555,18 @@ function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string) => voi
 
 // ─── Panel: 政策公告(真实数据)──────────────────────────────────────────────
 
-function NoticePanel({ notices, sourceLine }: { notices: PolicyPostView[]; sourceLine: string | null }) {
+function NoticePanel({
+  notices,
+  sourceLine,
+  onOpened,
+  onOfficialEntry,
+}: {
+  notices: PolicyPostView[]
+  sourceLine: string | null
+  /** 浏览记录(P1):公告「查看详情」展开时上报(fire-and-forget) */
+  onOpened: (policy: PolicyPostView) => void
+  onOfficialEntry: (policy: PolicyPostView) => void
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   if (notices.length === 0) {
@@ -519,7 +616,10 @@ function NoticePanel({ notices, sourceLine }: { notices: PolicyPostView[]; sourc
               {hasDetail && (
                 <button
                   type="button"
-                  onClick={() => setExpandedId(isOpen ? null : notice.id)}
+                  onClick={() => {
+                    setExpandedId(isOpen ? null : notice.id)
+                    if (!isOpen) onOpened(notice)
+                  }}
                   className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
                 >
                   {isOpen ? '收起' : '查看详情'}
@@ -541,6 +641,16 @@ function NoticePanel({ notices, sourceLine }: { notices: PolicyPostView[]; sourc
                     <ArrowUpRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
                     官方入口:{notice.externalUrl}(请通过官方渠道访问办理)
                   </p>
+                )}
+                {notice.externalUrl && isValidSourceUrl(notice.externalUrl) && (
+                  <button
+                    type="button"
+                    onClick={() => onOfficialEntry(notice)}
+                    className="mt-3 flex min-h-[48px] items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-4 text-sm font-semibold text-primary-700 hover:bg-primary-100"
+                  >
+                    <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
+                    扫码打开官方入口
+                  </button>
                 )}
                 <p className="mt-2 text-xs text-gray-400">以上内容仅作展示说明,具体政策以官方发布为准。</p>
               </div>
@@ -594,6 +704,17 @@ export function RenshiPage() {
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabKey>(() => getInitialTab(searchParams))
   const { notify, overlay } = useComingSoonNotice()
+  const { getToken } = useAuth()
+
+  // P1 浏览/跳转记录:fire-and-forget,失败不影响浏览与官方入口打开;匿名不上报。
+  const [officialQr, setOfficialQr] = useState<PolicyPostView | null>(null)
+  const handlePolicyOpened = (policy: PolicyPostView) => {
+    recordBrowse(getToken(), 'policy', policy.id)
+  }
+  const handleOfficialEntry = (policy: PolicyPostView) => {
+    recordExternalJump(getToken(), 'policy', policy.id, 'external_open')
+    setOfficialQr(policy)
+  }
 
   // 政策内容(阶段1D 接真):一次拉取,前端按 kind 拆分到两个 Tab
   const [policies, setPolicies] = useState<PolicyPostView[]>([])
@@ -631,13 +752,14 @@ export function RenshiPage() {
     if (policyState === 'loading') return <LoadingState className="py-16" />
     if (policyState === 'error') return <ErrorState className="py-16" onRetry={loadPolicies} />
     return activeTab === 'policy'
-      ? <PolicyPanel guides={guides} sourceLine={sourceLine} />
-      : <NoticePanel notices={notices} sourceLine={sourceLine} />
+      ? <PolicyPanel guides={guides} sourceLine={sourceLine} onOpened={handlePolicyOpened} onOfficialEntry={handleOfficialEntry} />
+      : <NoticePanel notices={notices} sourceLine={sourceLine} onOpened={handlePolicyOpened} onOfficialEntry={handleOfficialEntry} />
   }
 
   return (
     <div className="flex flex-col gap-6 p-6">
       {overlay}
+      {officialQr && <OfficialEntryQrOverlay policy={officialQr} onClose={() => setOfficialQr(null)} />}
       <PageHeader
         title="人社专区"
         subtitle="招聘会 · 校园招聘 · 就业政策 · 社保指南 · 政策公告"

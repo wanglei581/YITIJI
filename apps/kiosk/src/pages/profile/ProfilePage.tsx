@@ -96,10 +96,12 @@ const SERVICES: Entry[] = [
   { icon: BotIcon,             iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI助手',     route: '/assistant' },
 ]
 
-// 3. 招聘会与活动（外部来源信息入口 / 记录，均建设中）
+// 3. 招聘会与活动（外部来源信息入口 / 记录）
+// 浏览记录 / 预约跳转记录已接真（P1）：登录会员的真实记录在下方「账号资产 · 浏览与跳转记录」。
+// 只记录浏览与打开来源平台入口两类行为；预约/投递结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
-  { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '招聘会浏览记录',     tag: '建设中' },
-  { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '招聘会预约跳转记录', tag: '建设中' },
+  { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '招聘会浏览记录' },
+  { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '招聘会预约跳转记录' },
   { icon: QrCodeIcon,       iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-600',  label: '招聘会扫码凭证',     tag: '建设中' },
   { icon: GiftIcon,         iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',           tag: '建设中' },
 ]
@@ -494,6 +496,11 @@ export function ProfilePage() {
     // 本次会话的打印动作仍在「本次服务记录」单独呈现，不混为账号订单。
     if (entry.label === '打印订单') {
       setToastMsg(isLoggedIn ? '见下方账号资产' : '登录后可查看本人打印订单')
+      return
+    }
+    // 浏览/跳转记录已接真（P1）：真实列表在下方「账号资产 · 浏览与跳转记录」分组。
+    if (entry.label === '招聘会浏览记录' || entry.label === '招聘会预约跳转记录') {
+      setToastMsg(isLoggedIn ? '见下方账号资产「浏览与跳转记录」' : '登录后可查看本人浏览与跳转记录')
       return
     }
     if (entry.tag === '本次记录') {

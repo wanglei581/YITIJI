@@ -219,6 +219,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalScreensaverConfig
   }
 
+  // ── P1: 浏览 / 外部跳转记录 ──────────────────────────────────────────────
+
+  get browseLog() {
+    return this.client.browseLog
+  }
+
+  get externalJumpLog() {
+    return this.client.externalJumpLog
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
