@@ -8,14 +8,11 @@
  * 幂等:重复执行会整体重建该招聘会的导览配置。
  */
 import 'dotenv/config'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { createPrismaClient } from '../src/prisma/create-client'
 
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required')
-const adapter = new PrismaLibSql({ url })
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const prisma = new PrismaClient({ adapter } as any)
+const prisma = createPrismaClient(url).client
 
 const FAIR_ID = 'fair-uni-campus-2026q2'
 

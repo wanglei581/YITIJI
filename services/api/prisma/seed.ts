@@ -13,15 +13,12 @@
  *   1 pending+draft、1 approved+draft(后两条用于验证 Kiosk 不暴露未发布岗位)
  */
 import 'dotenv/config'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { createPrismaClient } from '../src/prisma/create-client'
 import * as bcrypt from 'bcryptjs'
 
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required to run seed')
-const adapter = new PrismaLibSql({ url })
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const prisma = new PrismaClient({ adapter } as any)
+const prisma = createPrismaClient(url).client
 
 const SALT_ROUNDS = 10
 

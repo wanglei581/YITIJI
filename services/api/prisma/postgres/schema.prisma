@@ -1,0 +1,1179 @@
+// ⚠️ 自动生成文件 — 请勿手改。
+// 由 scripts/sync-postgres-schema.ts 从 prisma/schema.prisma（唯一真相源）转换：
+// 仅替换 datasource provider 与 generator output，模型部分逐字一致。
+// 重新生成：pnpm --filter @ai-job-print/api db:pg:sync
+
+// Prisma schema — Phase 8.2A (Prisma v7 format)
+//
+// Database URL is configured in prisma.config.ts, not here.
+// Local dev:  DATABASE_URL="file:./prisma/dev.db"  (SQLite)
+// Production: DATABASE_URL="postgresql://..."       (PostgreSQL, change provider)
+//
+// Generated client is at: src/generated/prisma/
+// Import as: import { PrismaClient } from '../generated/prisma'
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma-pg"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Terminal ──────────────────────────────────────────────────────────────────
+
+model Terminal {
+  id                String   @id
+  terminalCode      String   @unique
+  agentToken        String   @unique
+  deviceFingerprint String
+  registeredAt      DateTime @default(now())
+  lastSeenAt        DateTime @updatedAt
+
+  heartbeats TerminalHeartbeat[]
+  printTasks PrintTask[]
+}
+
+// ── PrintTask ─────────────────────────────────────────────────────────────────
+// status values: "pending" | "claimed" | "printing" | "completed" | "failed"
+// Terminal states (completed / failed) must never be overwritten.
+
+model PrintTask {
+  id           String    @id
+  terminalId   String?
+  terminal     Terminal? @relation(fields: [terminalId], references: [id])
+  endUserId    String?
+  endUser      EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  fileUrl      String
+  fileMd5      String
+  paramsJson   String    @default("{}")
+  status       String    @default("pending")
+  claimedAt    DateTime?
+  claimExpiry  DateTime?
+  completedAt  DateTime?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  statusLogs PrintTaskStatusLog[]
+
+  @@index([endUserId])
+}
+
+// ── TerminalHeartbeat ─────────────────────────────────────────────────────────
+
+model TerminalHeartbeat {
+  id            String   @id @default(cuid())
+  terminalId    String
+  terminal      Terminal @relation(fields: [terminalId], references: [id])
+  printerStatus String?
+  agentVersion  String?
+  ipAddress     String?
+  diskFreeGb    Float?
+  createdAt     DateTime @default(now())
+}
+
+// ── PrintTaskStatusLog ────────────────────────────────────────────────────────
+
+model PrintTaskStatusLog {
+  id         String    @id @default(cuid())
+  taskId     String
+  task       PrintTask @relation(fields: [taskId], references: [id])
+  fromStatus String
+  toStatus   String
+  errorCode  String?
+  createdAt  DateTime  @default(now())
+}
+
+// ── Organization ──────────────────────────────────────────────────────────────
+// Phase 0b: 合作机构主体。Partner 账号(User.role='partner')必须挂在某个 org 下,
+// 上传的 Job/JobSource 也以 orgId 做硬隔离。
+//
+// type 取值同 packages/shared PartnerType:
+//   'school_employment_center' | 'public_employment_service' |
+//   'licensed_hr_agency' | 'fair_organizer' | 'enterprise_source'
+
+// type 取值 = shared PartnerType:
+//   'school_employment_center' | 'public_employment_service' | 'licensed_hr_agency'
+//   | 'fair_organizer' | 'enterprise_source'
+// sceneTemplate 取值 = shared SceneTemplate('school' | 'public_employment' | 'licensed_hr_service')。
+// enabledModulesJson:JSON 数组,取值 = shared EnabledModule;招聘闭环模块(PROHIBITED_MODULES)
+//   服务端硬拒绝,任何配置都写不进来。
+// enabled 是授权总开关:false → 该机构 partner 账号无法登录(auth)、导入/写接口拒绝(jobs.service 既有校验)。
+
+model Organization {
+  id         String   @id
+  name       String
+  type       String
+  contact    String?
+  contactPhone String?
+  sceneTemplate String?
+  enabledModulesJson String @default("[]")
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users      User[]
+  jobs       Job[]      @relation("JobOrg")
+  jobSources JobSource[]
+  jobFairs   JobFair[]  @relation("FairOrg")
+  policyPosts PolicyPost[] @relation("PolicyOrg")
+}
+
+// ── PolicyPost ────────────────────────────────────────────────────────────────
+// 阶段1D:政策服务内容(政策扶持条目 + 政策公告),Partner 录入 → Admin 审核 → Kiosk 展示。
+//
+// kind:
+//   'policy_guide'  政策扶持条目(Kiosk 政策 Tab,按 audience 人群分组展示)
+//   'notice'        政策公告(Kiosk 公告 Tab,按 category 标签展示)
+// audience(kind=policy_guide):
+//   'graduate' 应届高校毕业生 | 'migrant' 返乡务工人员 | 'hardship' 困难群体 | 'startup' 创业扶持 | 'general'
+// category(kind=notice):
+//   'policy' 政策 | 'announcement' 公告 | 'notice' 通知 | 'recruitment' 招募
+//
+// 合规(CLAUDE.md / compliance §八):
+//   - info-only:只做政策说明 / 材料清单 / 官方入口;不承诺补贴到账、不代申请
+//   - reviewStatus/publishStatus 状态机与 Job/JobFair 完全一致,审核通过才可发布
+
+model PolicyPost {
+  id String @id @default(cuid())
+
+  // 来源(合规必填,与 Job/JobFair 同口径)
+  sourceOrgId String
+  org         Organization @relation("PolicyOrg", fields: [sourceOrgId], references: [id])
+  sourceName  String
+
+  kind     String @default("notice")
+  title    String
+  summary  String?
+  content  String?
+  audience String?
+  category String?
+  /** 官方入口链接(扫码/跳转,info-only) */
+  externalUrl String?
+  /** 对外展示的发布日期(机构提供) */
+  publishedDate DateTime?
+
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  rejectReason  String?
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceOrgId])
+  @@index([kind])
+  @@index([reviewStatus, publishStatus])
+  @@index([publishedDate])
+}
+
+// ── User ──────────────────────────────────────────────────────────────────────
+// Phase 0b: 后台登录账号,替换 0a 的 DEV_USERS 硬编码。
+// role 取值见 packages/shared/UserRole:
+//   'admin' | 'partner' | 'kiosk'
+// admin/kiosk 角色 orgId 为 null;partner 必须有 orgId。
+
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  passwordHash String
+  name         String
+  role         String        // 见 UserRole
+  orgId        String?
+  org          Organization? @relation(fields: [orgId], references: [id])
+  enabled      Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  uploadedFiles FileObject[] @relation("FileUploader")
+  auditLogs     AuditLog[]
+
+  @@index([orgId])
+}
+
+// ── EndUser ─────────────────────────────────────────────────────────────────
+// 阶段 A: C 端求职者账号。手机号验证码登录;不存明文手机号。
+//   phoneHash: HMAC-SHA256(手机号) 唯一查找键
+//   phoneEnc:  AES-256-GCM 加密手机号,仅服务端可解,用于派生脱敏展示
+// 与内部运营 User 表完全独立,不参与企业招聘闭环。
+
+model EndUser {
+  id          String    @id @default(cuid())
+  phoneHash   String    @unique
+  phoneEnc    String
+  nickname    String?
+  enabled     Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  files           FileObject[]
+  aiResumeResults AiResumeResult[]
+  printTasks      PrintTask[]
+  documentProcessTasks DocumentProcessTask[]
+  favorites       Favorite[]
+  benefitGrants   BenefitGrant[]
+}
+
+// ── JobSource ─────────────────────────────────────────────────────────────────
+// Phase 0b: 一个机构可配多个数据源,按 sourceKind × accessMode 双维度刻画。
+//
+// sourceKind:'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'
+// accessMode:'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
+//
+// 敏感凭证(apiSecret / accessToken / clientSecret)绝不存在此表,
+// 走独立的服务端 secret store(后续阶段引入)。
+
+model JobSource {
+  id             String        @id @default(cuid())
+  orgId          String
+  org            Organization  @relation(fields: [orgId], references: [id])
+  name           String
+  sourceKind     String
+  accessMode     String
+  syncFreq       String        @default("manual")
+  enabled        Boolean       @default(true)
+  description    String?
+  lastSyncAt     DateTime?
+  lastSyncStatus String?
+
+  // ── W3 BE-8 同步接入(P0)──────────────────────────────────
+  // accessMode='api' 时:endpoint + authType + encryptedCredential 三件必填
+  // accessMode='webhook' 时:webhookSecret 必填(企业用解密后的原文 HMAC 签名 payload)
+  // 任一字段都不返回前端原文,前端只见 credentialConfigured: boolean。
+
+  /** API 模式的接入地址,例 "https://api.zhilian.com/v2/jobs" */
+  endpoint            String?
+  /** 'bearer' | 'oauth2' | 'api_key' | 'basic' | 'custom' */
+  authType            String?
+  /** AES-256-GCM 加密后的凭证字符串。详见 src/common/crypto/secret-cipher.ts */
+  encryptedCredential String?
+  /** AES-256-GCM 加密后的 Webhook 签名密钥。只在服务端解密用于 HMAC 校验。 */
+  webhookSecret       String?
+  /** Webhook 密钥上次轮换时间,审计用 */
+  webhookSecretRotatedAt DateTime?
+  /** W8 API pull worker 响应解析配置(JSON)。
+   *  { dataType:'job'|'fair', rootPath?:string, fields?:Record<string,string> }
+   *  rootPath: 点分路径到数据数组,如 "data.jobs"、"items"，空则 auto-detect。
+   *  fields: 标准字段 → 源字段名映射，如 { "externalId":"id","title":"position" }。
+   *  为 null 时按 auto-detect 逻辑处理(源字段名与标准字段名相同)。
+   */
+  responseConfig String?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  jobs          Job[]
+  syncLogs      SyncLog[]
+  importBatches ImportBatch[]
+  fieldMappingRules FieldMappingRule[]
+  fairs         JobFair[]  @relation("FairSource")
+
+  @@index([orgId])
+}
+
+// ── Job ───────────────────────────────────────────────────────────────────────
+// Phase 0b: 外部同步的岗位信息(信息入口,非招聘闭环)。
+//
+// 合规硬约束(CLAUDE.md §10):
+//   sourceOrgId / externalId / sourceUrl / sourceName 必填
+//   reviewStatus 默认 'pending',通过审核(approved)+ publishStatus='published' 才在 C 端可见
+//   @@unique(sourceOrgId, externalId) 防同一机构重复导入
+//
+// reviewStatus:  'pending' | 'reviewing' | 'approved' | 'rejected'
+// publishStatus: 'draft' | 'published' | 'unpublished' | 'expired'
+// tagsJson:      JSON 字符串,SQLite 无原生 array;读取时 JSON.parse,
+//                Postgres 切换后可改 String[]。
+
+model Job {
+  id   String @id @default(cuid())
+
+  // 来源(合规必填)
+  sourceOrgId String
+  org         Organization @relation("JobOrg", fields: [sourceOrgId], references: [id])
+  sourceId    String?
+  source      JobSource?   @relation(fields: [sourceId], references: [id])
+  externalId  String
+  sourceName  String
+  sourceUrl   String
+
+  // 岗位信息
+  title        String
+  company      String
+  city         String
+  category     String?  // 'fulltime' | 'intern' | 'campus' | 'parttime'
+  salary       String?
+  description  String?
+  requirements String?
+  tagsJson     String   @default("[]")
+
+  // 审核/发布
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+
+  // 审计字段(Phase #4):
+  //   - reviewedBy:执行 approve/reject 的 admin User.id
+  //   - reviewedAt:审核动作发生时间
+  //   - rejectReason:被拒原因(reject 时必填,approve 时清空)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  rejectReason String?
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceOrgId, externalId])
+  @@index([sourceOrgId])
+  @@index([sourceId])
+  @@index([reviewStatus, publishStatus])
+}
+
+// ── FileObject ────────────────────────────────────────────────────────────────
+// BE-1(P0 W1):用户文件元数据 + 隐私自动清理。
+//
+// 合规约束(CLAUDE.md §11):
+//   - 简历 / 身份证 / 证件照 / 求职材料等敏感文件设有效期,过期自动清理
+//   - 文件 URL 走 HMAC 签名 + 短 TTL(5 分钟),严禁公开持久 URL
+//   - 物理文件按 storageKey 落地(本地 FS 起步:./storage/<storageKey>,
+//     上线后可切 MinIO/OSS,storageKey 不变)
+//   - deletedAt 软删 + 物理清理通过 cron 完成,管理员手动清理同样走此路径
+//   - 所有访问 / 清理动作必须经 AuditLog 记录
+//
+// purpose 取值:
+//   'resume_upload'   — 求职者上传的简历(高敏)
+//   'resume_scan'     — Kiosk 扫描的纸质简历(高敏)
+//   'id_scan'         — 身份证 / 证件照(高敏)
+//   'print_doc'       — 通用打印文档(普通)
+//   'fair_material'   — 招聘会资料 / 模板素材(普通)
+//   'cover_letter'    — 求职信 / 推荐信(普通)
+//
+// sensitiveLevel:
+//   'normal'           — 默认 24h 过期
+//   'sensitive'        — 简历类,默认 6h 过期
+//   'highly_sensitive' — 身份证类,默认 1h 过期(分析完即删)
+
+model FileObject {
+  id          String  @id @default(cuid())
+  // storageKey 即对象存储 objectKey(COS:users/.../{id}.{ext};本地:同键落 FS)。
+  storageKey  String  @unique
+
+  // ── COS 接入:落库存储位置(provenance + 跨后端路由)─────────────────
+  //   bucket:COS 私有桶名;本地后端用哨兵 'local-fs'。
+  //   region:如 'ap-guangzhou';本地用 'local'。
+  //   读 / 删 / 签名按此 bucket 路由后端,兼容"先本地后切 COS"的历史数据。
+  bucket      String  @default("local-fs")
+  region      String  @default("local")
+
+  // 元数据
+  filename    String   // 原始文件名(originalName);绝不作为 objectKey
+  mimeType    String
+  sizeBytes   Int
+  sha256      String   // 服务端直传路径就 buffer 计算;直传意图未知时为 ''
+
+  // 业务关联 / 归属
+  uploaderId  String?  // 后台 User(admin/partner)上传者
+  uploader    User?   @relation("FileUploader", fields: [uploaderId], references: [id])
+  endUserId   String?
+  endUser     EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  // ownerType:'user' | 'partner' | 'admin' | 'system'(授权与 objectKey 前缀维度)
+  ownerType   String?
+  // ownerId:user→endUserId / partner→orgId / admin→userId;匿名 / system 为 null
+  ownerId     String?
+  purpose     String
+  sensitiveLevel String @default("normal")
+  // visibility:'private' | 'internal' | 'public'(默认 private,合规安全)
+  visibility  String  @default("private")
+  // status:'uploading' | 'active' | 'quarantined' | 'deleted'
+  status      String  @default("active")
+  createdBy   String?
+
+  // 隐私 / 清理
+  expiresAt   DateTime
+  deletedAt   DateTime?
+  deletedBy   String?  // 'auto' | 'admin:<userId>' | 'user'
+  deleteReason String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sourceDocumentTasks DocumentProcessTask[] @relation("DocumentProcessSourceFile")
+  resultDocumentTasks DocumentProcessTask[] @relation("DocumentProcessResultFile")
+
+  @@index([uploaderId])
+  @@index([endUserId])
+  @@index([ownerType, ownerId])
+  @@index([purpose])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([deletedAt])
+}
+
+// ── Materials / Document Processing ─────────────────────────────────────────
+// Phase A-2: AI求职材料中心后端任务骨架。
+//
+// kind:
+//   'inspection' | 'normalize_a4' | 'pii_scan' | 'pii_redact' | 'bundle_render'
+// status:
+//   'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+//
+// 合规约束:
+//   - 仅服务求职者本人材料处理与打印前确认。
+//   - 不接企业侧,不记录招聘闭环状态。
+//   - paramsJson 不长期保存完整原文;textSample 仅用于本期模拟扫描后丢弃。
+
+model DocumentProcessTask {
+  id           String   @id @default(cuid())
+  kind         String
+  status       String   @default("pending")
+  requesterMode String  @default("anonymous")
+  accessTokenHash String?
+
+  sourceFileId String
+  sourceFile   FileObject @relation("DocumentProcessSourceFile", fields: [sourceFileId], references: [id])
+  resultFileId String?
+  resultFile   FileObject? @relation("DocumentProcessResultFile", fields: [resultFileId], references: [id], onDelete: SetNull)
+  endUserId    String?
+  endUser      EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+
+  paramsJson   String   @default("{}")
+  resultJson   String?
+  errorCode    String?
+  errorMessage String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  findings PiiFinding[]
+
+  @@index([kind])
+  @@index([status])
+  @@index([requesterMode])
+  @@index([accessTokenHash])
+  @@index([sourceFileId])
+  @@index([resultFileId])
+  @@index([endUserId])
+  @@index([expiresAt])
+}
+
+// PII 命中项仅归属于材料处理任务,任务删除时级联删除。
+//
+// action:
+//   'pending' | 'keep' | 'redact'
+
+model PiiFinding {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       DocumentProcessTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type       String
+  label      String
+  pageNumber Int?
+  snippet    String?
+  confidence Float?
+  action     String   @default("pending")
+  createdAt  DateTime @default(now())
+
+  @@index([taskId])
+  @@index([type])
+  @@index([action])
+}
+
+// ── AuditLog ──────────────────────────────────────────────────────────────────
+// BE-2(P0 W2):管理员操作审计日志。
+//
+// 合规约束(CLAUDE.md §11/§12):
+//   - 任何 admin / partner 写操作必须落审计
+//   - 同步写入(不走异步队列),保证 demo 时点击强制清理立即看到日志
+//   - 不可删除,不可篡改(数据库层无 DELETE / UPDATE 权限,业务层永不暴露)
+//   - 保留期 ≥ 180 天(由独立归档作业搬运,不在业务库删)
+//
+// action 命名规范:'<resource>.<verb>',例:'file.force_delete' / 'job.review'
+//
+// targetType:'file' | 'job' | 'job_source' | 'organization' | 'user' | 'fair' | 'system'
+// targetId:被操作资源的主键(可选,系统级动作为 null)
+
+// ── JobFair ───────────────────────────────────────────────────────────────────
+// BE-7(P0 W2):招聘会 + 校企合作(主题变体)。
+//
+// 合规约束:
+//   - sourceOrgId / externalId / sourceUrl / sourceName 必填(同 Job)
+//   - reviewStatus 默认 'pending',approve + publish 才在 C 端可见
+//   - 不存"预约人列表"等候选人数据(预约走第三方,我方只跳转)
+//
+// theme:
+//   'general'      普通校招/社招招聘会
+//   'campus'       高校校园招聘会
+//   'campus_corp'  校企合作主题展(秒哒 kiosk/30-32,catalog Q1 结论)
+//   'industry'     行业专场(秒哒 partner/12 的 AI 人工智能专场)
+//
+// reviewStatus  / publishStatus 取值与 Job 完全一致(详见 Job model 上方注释)。
+
+model JobFair {
+  id   String @id @default(cuid())
+
+  // 来源(合规必填)
+  sourceOrgId String
+  org         Organization @relation("FairOrg", fields: [sourceOrgId], references: [id])
+  externalId  String
+  sourceName  String
+  sourceUrl   String
+  sourceId    String?
+  source      JobSource? @relation("FairSource", fields: [sourceId], references: [id])
+
+  // 招聘会信息
+  title       String
+  theme       String   @default("general")
+  startAt     DateTime
+  endAt       DateTime
+  venue       String
+  city        String
+  address     String?
+  mapImageUrl String?
+  description String?
+  coverImageUrl String?
+
+  // 场馆导航（生成手机扫码导航深链；无坐标时回退地址搜索）
+  latitude    Float?
+  longitude   Float?
+  trafficInfo String?
+
+  // 数据大屏（合规：机构录入预计值，标注"预计/来源"，非实时）
+  expectedAttendance Int?      // 预计参会人数
+  seekerIntentJson   String?   // 求职意向分布 JSON: [{"label":"研发技术类","percent":43}]
+
+  // 数据快照(由同步任务定期回填,只是展示用,非真相之源)
+  companyCount Int @default(0)
+  jobCount     Int @default(0)
+  viewCount    Int @default(0)
+
+  // 审核/发布
+  reviewStatus  String @default("pending")
+  publishStatus String @default("draft")
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  rejectReason  String?
+
+  syncTime  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies  FairCompany[]
+  zones      FairZone[]
+  materials  FairMaterial[]
+  venueGuide FairVenueGuide?
+
+  @@unique([sourceOrgId, externalId])
+  @@index([sourceOrgId])
+  @@index([sourceId])
+  @@index([theme])
+  @@index([reviewStatus, publishStatus])
+  @@index([startAt])
+}
+
+// ── FairCompany ───────────────────────────────────────────────────────────────
+// 参展企业。仅作"招聘会的子卡片"展示,不与 Job 表强关联
+// (Job 是岗位级别,FairCompany 是公司级别;招聘会场景下两表通过 sourceUrl
+// 链接,不强 FK,因为外部数据源未必同步给我们企业-岗位的映射)。
+
+model FairCompany {
+  id        String   @id @default(cuid())
+  jobFairId String
+  jobFair   JobFair  @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  name        String
+  logoUrl     String?
+  industry    String?  // 例 'tech' / 'finance' / 'manufacturing'
+  scale       String?  // '<50' / '50-500' / '500-2000' / '>2000'
+  description String?
+  sourceUrl   String?  // 跳走的对方平台企业页
+
+  // 展示扩展字段（参展企业汇编 / 企业详情）
+  coverImageUrl     String?
+  founded           String?
+  headquarters      String?
+  registeredCapital String?
+  honorTags         String   @default("")  // 企业荣誉标签(逗号分隔): 中国500强/高新技术企业/专精特新
+  zoneId            String?  // 关联展区(展位分布)
+  boothNumber       String?
+
+  // 招聘类型标签(逗号分隔字符串,SQLite 无原生 array)
+  hiringTags  String   @default("")
+
+  jobsCount   Int      @default(0)
+
+  positions   FairCompanyPosition[]
+  venueHallBindings FairVenueHallCompany[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([jobFairId])
+}
+
+// ── FairCompanyPosition ────────────────────────────────────────────────────────
+// 参展企业的招聘岗位(展示信息)。合规：仅展示岗位信息，不接收简历、不做投递闭环；
+// 用户「查看详情」→ 扫码前往来源平台办理。
+
+model FairCompanyPosition {
+  id            String      @id @default(cuid())
+  fairCompanyId String
+  fairCompany   FairCompany @relation(fields: [fairCompanyId], references: [id], onDelete: Cascade)
+
+  title        String
+  headcount    Int      @default(0)
+  salary       String?
+  requirements String?
+  education    String?
+  experience   String?
+  location     String?
+  positionType String?  // 'full_time' / 'part_time' / 'intern'
+  department   String?
+  sourceUrl    String?
+  sortOrder    Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fairCompanyId])
+}
+
+// ── FairZone ──────────────────────────────────────────────────────────────────
+// 创新展区 / 主题展区,对应秒哒 kiosk/22 的 6 卡(广州市 AI 智能网联汽车 等)。
+// 校企合作场景下也用此表挂"现场服务入口" / "创新展区"。
+
+model FairZone {
+  id        String   @id @default(cuid())
+  jobFairId String
+  jobFair   JobFair  @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  name          String
+  category      String?  // 'innovation' / 'service' / 'campus_corp_topic'
+  city          String?  // 城市/区,例 '广州市'(展区分布按地市)
+  description   String?
+  coverImageUrl String?
+  sortOrder     Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobFairId])
+  @@index([category])
+}
+
+// ── FairMaterial ──────────────────────────────────────────────────────────────
+// 招聘会活动资料(日程 / 展区图 / 企业名册 / 岗位汇总 / 宣传手册),Admin 上传维护。
+// 运营内容,走 AdAsset 同款模式:自带 storageKey(StorageService 落地)、无 TTL 自动清理、
+// Kiosk 经 HMAC 签名短时 URL 读取,绝不暴露原始存储路径。
+//
+// type:          'schedule' | 'venue_map' | 'company_list' | 'position_list' | 'brochure' | 'other'
+// publishStatus: 'draft' | 'published' | 'unpublished'(Kiosk 只读 published,且所属招聘会须 approved+published)
+//
+// 合规:资料仅为招聘会现场服务信息,不含求职者数据,不参与招聘闭环。
+
+model FairMaterial {
+  id        String  @id @default(cuid())
+  jobFairId String
+  jobFair   JobFair @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  name        String
+  type        String  @default("other")
+  description String?
+
+  storageKey String @unique
+  mimeType   String
+  sizeBytes  Int
+  sha256     String
+  pageCount  Int    @default(0)
+
+  allowPrint    Boolean @default(true)
+  publishStatus String  @default("draft")
+  printCount    Int     @default(0)
+
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([jobFairId])
+  @@index([publishStatus])
+  @@index([deletedAt])
+}
+
+// ── FairVenueGuide ───────────────────────────────────────────────────────────
+// 招聘会场馆导览(本轮新增):帮助现场用户了解会场布局 —— 展厅(A/B/C 厅)行业分布、
+// 企业展位、入口/服务台/打印点/咨询区等设施点位。
+//
+// 分工:Admin 配置(本期) → Kiosk 只读展示;Partner 配置后续扩展。
+// 合规:只做会场位置导览与信息查看,不形成任何投递/收简历闭环。
+// 企业绑定经 FairVenueHallCompany 关联既有 FairCompany,不复制企业信息。
+// facility type: 'entrance' | 'serviceDesk' | 'printPoint' | 'consulting'
+
+model FairVenueGuide {
+  id        String  @id @default(cuid())
+  jobFairId String  @unique
+  jobFair   JobFair @relation(fields: [jobFairId], references: [id], onDelete: Cascade)
+
+  venueName String
+
+  halls      FairVenueHall[]
+  facilities FairVenueFacility[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FairVenueHall {
+  id      String         @id @default(cuid())
+  guideId String
+  guide   FairVenueGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  hallCode         String // 'A' / 'B' / 'C'
+  hallName         String // 'A 厅'
+  industryCategory String?
+  description      String?
+  boothRange       String? // 'A01-A30'
+  sortOrder        Int     @default(0)
+
+  companies FairVenueHallCompany[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guideId, hallCode])
+  @@index([guideId])
+}
+
+model FairVenueHallCompany {
+  id     String        @id @default(cuid())
+  hallId String
+  hall   FairVenueHall @relation(fields: [hallId], references: [id], onDelete: Cascade)
+
+  fairCompanyId String
+  fairCompany   FairCompany @relation(fields: [fairCompanyId], references: [id], onDelete: Cascade)
+
+  boothNo   String?
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hallId, fairCompanyId])
+  @@index([hallId])
+  @@index([fairCompanyId])
+}
+
+model FairVenueFacility {
+  id      String         @id @default(cuid())
+  guideId String
+  guide   FairVenueGuide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  type            String // 'entrance' | 'serviceDesk' | 'printPoint' | 'consulting'
+  name            String
+  locationLabel   String?
+  relatedHallCode String?
+  sortOrder       Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([guideId])
+}
+
+// ── SyncLog ───────────────────────────────────────────────────────────────────
+// 每次数据同步（手动导入 / Webhook 接收 / API 拉取）的摘要记录。
+// 供 Partner 后台 /sync-logs 页面展示；Admin 走 AuditLog 详查。
+//
+// dataType:  'job' | 'fair'
+// syncMode:  'manual' | 'webhook' | 'api' | 'excel'
+// result:    'success' | 'partial' | 'failed'
+
+model SyncLog {
+  id           String    @id @default(cuid())
+  sourceId     String
+  source       JobSource @relation(fields: [sourceId], references: [id])
+  orgId        String
+  dataType     String
+  syncMode     String
+  totalCount   Int       @default(0)
+  addedCount   Int       @default(0)
+  updatedCount Int       @default(0)
+  dupCount     Int       @default(0)
+  errorCount   Int       @default(0)
+  errorFields  String    @default("[]")
+  errorDetail  String?
+  result       String
+  createdAt    DateTime  @default(now())
+
+  @@index([orgId])
+  @@index([sourceId])
+  @@index([createdAt])
+}
+
+// ── ImportBatch ───────────────────────────────────────────────────────────────
+// Excel / CSV 文件导入的批次记录。
+//
+// dataType:  'job' | 'fair'
+// status:    'pending' | 'confirmed' | 'cancelled' | 'failed'
+// mappingJson: 字段映射规则 { standardField: columnHeader }
+
+model ImportBatch {
+  id          String    @id @default(cuid())
+  sourceId    String
+  source      JobSource @relation(fields: [sourceId], references: [id])
+  orgId       String
+  dataType    String
+  fileName    String
+  totalRows   Int       @default(0)
+  validRows   Int       @default(0)
+  invalidRows Int       @default(0)
+  dupRows     Int       @default(0)
+  status      String    @default("pending")
+  mappingJson String    @default("{}")
+  createdBy   String
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  records ImportRecord[]
+
+  @@index([orgId])
+  @@index([sourceId])
+  @@index([status])
+}
+
+// ── ImportRecord ──────────────────────────────────────────────────────────────
+// Excel 导入批次中每一行的解析结果。
+//
+// status: 'ok' | 'invalid' | 'dup'
+
+model ImportRecord {
+  id          String      @id @default(cuid())
+  batchId     String
+  batch       ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowIndex    Int
+  rawDataJson String      @default("{}")
+  mappedJson  String      @default("{}")
+  status      String
+  errorsJson  String      @default("[]")
+  externalId  String?
+  createdAt   DateTime    @default(now())
+
+  @@index([batchId])
+  @@index([status])
+}
+
+// ── FieldMappingRule ────────────────────────────────────────────────────────────
+// T1:每个数据源(sourceId)× dataType 保存一份可复用的字段映射规则,
+// 让合作机构二次 Excel 导入时自动回填上次映射,无需重复手工映射列。
+//
+// mappingJson: { standardField: excelColumnHeader }  与 ImportBatch.mappingJson 同形状。
+// 一个 (sourceId, dataType) 至多一条;confirmExcelImport 成功后 upsert 更新为最近一次映射。
+//
+// 合规(CLAUDE.md §10/§11):只存"标准字段 → Excel 列名"的映射结构,
+// 不存任何行数据 / 求职者 PII;敏感列在 preview 阶段已被拦截,不可能进入此映射。
+
+model FieldMappingRule {
+  id          String    @id @default(cuid())
+  sourceId    String
+  source      JobSource @relation(fields: [sourceId], references: [id])
+  orgId       String
+  dataType    String    // 'job' | 'fair'
+  mappingJson String    @default("{}")
+  updatedBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([sourceId, dataType])
+  @@index([orgId])
+  @@index([sourceId])
+}
+
+// ── AiResumeResult ─────────────────────────────────────────────────────────────
+// HIGH-6:AI 解析 / 优化结果持久化。
+//
+// 之前 ai.service.ts 用进程内 Map(parseStore / optimizeStore)存结果,
+// API 重启或多实例后 GET /resume/records/:taskId 直接 404。改为落库:
+//   - taskId + kind 唯一(一个 taskId 最多一条 parse + 一条 optimize)
+//   - kind:'parse' | 'optimize'
+//   - status:复用 AiTaskStatus('pending' | 'processing' | 'completed' | 'failed')
+//   - payloadJson:序列化后的 ParseResumeOutput / OptimizeResumeOutput
+//     (只含诊断评分 / 优化模块文本,不含简历原文 / 候选人 PII)
+//
+// 合规约束(CLAUDE.md §11):AI 结果仅服务求职者本人,不推送企业,不做候选人推荐。
+// 注:本表沿用现有命名风格(payloadJson 同 AuditLog;cuid 主键)。
+
+model AiResumeResult {
+  id         String   @id @default(cuid())
+  taskId     String
+  kind       String   // 'parse' | 'optimize'
+  status     String   // AiTaskStatus
+  payloadJson String  @default("{}")
+  provider   String
+  endUserId  String?
+  endUser    EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  // 匿名结果一次性访问令牌的 SHA-256 hash(Phase C-2A,CLAUDE.md §11/§18)。
+  // 仅匿名 parse(endUserId 为 null)时铸造:明文 token 只在 POST /resume/parse 响应里返回一次,
+  // 数据库只存 hash;读取时凭 x-resume-access-token header 校验(timingSafeEqual)。
+  // 会员结果该列为 null(归属仍按 endUserId 本人校验);迁移前历史匿名行为 null → 读取 fail-closed。
+  accessTokenHash String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  // 留存治理(CLAUDE.md §11「不长期保存简历」):简历派生结果到期即清理。
+  // 迁移前历史行 expiresAt 为 null:读取路径与 cron 清理均按"已过期"处理
+  // (不可读 + 会被删),不让无留存窗口的历史简历派生数据长期留存。
+  expiresAt  DateTime?
+
+  @@unique([taskId, kind])
+  @@index([taskId])
+  @@index([endUserId])
+  @@index([expiresAt])
+}
+
+// ── Favorite ──────────────────────────────────────────────────────────────────
+// Phase C-2C: 会员收藏底座（收藏服务端化，替换 Kiosk 端 localStorage）。
+//
+// 合规约束（CLAUDE.md §10「系统只记录:浏览/收藏/外部跳转/打印/AI服务调用」）:
+//   - 收藏只记录"对某个外部来源岗位 / 招聘会 / 政策的兴趣标记",
+//     绝不记录投递结果 / 投递状态 / 面试 / Offer / 候选人数据,不形成任何招聘闭环。
+//   - 归属于会员本人(endUserId);跨用户在 EndUserAuthGuard + service 双重隔离。
+//
+// targetType: 'job' | 'job_fair' | 'policy'(外部来源信息入口的三类对象)
+// targetId:   对应对象的 id(Job.id / JobFair.id / 政策条目 id)
+// title:      收藏时的展示快照标题(可空)。仅最小展示元数据,便于"我的收藏"列表渲染,
+//             不依赖来源对象是否仍在架;绝不存简历 / PII / 投递信息。
+model Favorite {
+  id         String   @id @default(cuid())
+  endUserId  String
+  endUser    EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  targetType String
+  targetId   String
+  title      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([endUserId, targetType, targetId])
+  @@index([endUserId])
+  @@index([targetType, targetId])
+}
+
+// ── BenefitGrant ──────────────────────────────────────────────────────────────
+// Phase C-2C: 会员权益底座（只读展示底座，暂不接发放/核销真实逻辑、不接支付）。
+//
+// 一条 = 发放给某会员的一项权益（优惠券 / 免费次数 / 套餐额度 / 补贴资格提示）。
+// 本阶段只建模 + 只读列表 API；真实发放(活动 C-3 / 套餐 C-4)、核销 / 支付(C-5)后续接入。
+//
+// 合规约束（next-tasks §五 / compliance §八）:
+//   - benefitType='subsidy_eligibility_hint' 只能是 info-only 资格提示:
+//     仅展示政策说明 / 材料清单 / 官方入口,**绝不**出现"补贴已到账 / 已发放金额"等承诺性文案。
+//   - 套餐 / 券类只代表"平台内服务 / 打印额度",不代表录用结果,不承诺面试 / 录用 / 补贴到账。
+//   - 不在前端保存任何支付凭证 / 密钥(本表也不含支付凭证)。
+//
+// benefitType: 'coupon' | 'free_quota' | 'package_entitlement' | 'subsidy_eligibility_hint'
+// status:      'active' | 'used_up' | 'expired' | 'revoked'
+// sourceType:  'platform' | 'campus' | 'gov' | 'fair' | 'partner'(发放来源种类)
+// sourceRef:   关联活动 / 套餐 id(C-3 / C-4 接入后回填,当前可空)
+// quantity*:   额度类(free_quota / 多次券)的总量 / 剩余;不适用时为 null
+model BenefitGrant {
+  id                String    @id @default(cuid())
+  endUserId         String
+  endUser           EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  benefitType       String
+  title             String
+  description       String?
+  quantityTotal     Int?
+  quantityRemaining Int?
+  status            String    @default("active")
+  sourceType        String    @default("platform")
+  sourceRef         String?
+  validFrom         DateTime?
+  validUntil        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([endUserId])
+  @@index([endUserId, status])
+}
+
+model AuditLog {
+  id         String  @id @default(cuid())
+  actorId    String?
+  actor      User?   @relation(fields: [actorId], references: [id])
+  actorRole  String  // 冗余记录,actor 被禁用后仍可追溯
+  action     String  // '<resource>.<verb>'
+  targetType String
+  targetId   String?
+  payloadJson String @default("{}")   // 动作上下文(请求 body 摘要 / 旧值 / 新值)
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?  // 关联 RequestIdMiddleware 的 X-Request-Id
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+// ── AdAsset ───────────────────────────────────────────────────────────────────
+// 待机宣传屏素材(一期)。仅管理员后台上传、管理。
+//
+// 合规边界(CLAUDE.md §2/§8):
+//   - 这是"线下一体机运营"广告位,不属招聘闭环,允许做
+//   - 素材文案禁止出现"一键投递 / 立即投递 / 平台投递"等违规词(上传前端 + 审核把关)
+//   - 前台统一称"待机宣传屏",不强调"广告平台"属性
+//
+// 物理文件经 LocalFileStorage 落地(purpose='screensaver_ad'),Kiosk 经
+// HMAC 签名 URL(较长 TTL)拉取;Kiosk 端缓存 key 用 sha256 / id,绝不用签名 URL。
+//
+// type:   'image' | 'video'
+// source: 'uploaded' | 'ai_generated'(二期 AI 文生图产物,管理员确认后才入库)
+// status: 'active' | 'disabled'
+// durationSec:图片停留秒数 / 视频时长(秒)
+model AdAsset {
+  id             String   @id @default(cuid())
+  type           String   // 'image' | 'video'
+  title          String
+  storageKey     String   @unique
+  mimeType       String
+  sizeBytes      Int
+  sha256         String
+  width          Int?
+  height         Int?
+  durationSec    Int      @default(8)
+  source         String   @default("uploaded") // 'uploaded' | 'ai_generated' | 'external_url'
+  externalUrl    String?  // source='external_url' 时存 HTTPS 直链(mp4/webm);其它来源为 null
+  aiGenerationId String?
+  status         String   @default("active")    // 'active' | 'disabled'
+  createdBy      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  playlistItems AdPlaylistItem[]
+
+  @@index([status])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+// ── AdPlaylist ────────────────────────────────────────────────────────────────
+// 播放方案:一组按顺序轮播的素材,可绑定到一个或多个终端。
+// status: 'active' | 'disabled'(禁用后绑定它的终端拉取不到内容,屏保不触发)
+model AdPlaylist {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   @default("active")
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  items   AdPlaylistItem[]
+  configs TerminalScreensaverConfig[]
+
+  @@index([status])
+}
+
+// ── AdPlaylistItem ────────────────────────────────────────────────────────────
+// 播放方案与素材的关联(含排序与单项开关)。一期排序用 order 整数(上移/下移)。
+model AdPlaylistItem {
+  id         String     @id @default(cuid())
+  playlistId String
+  playlist   AdPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  assetId    String
+  asset      AdAsset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  order      Int        @default(0)
+  enabled    Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+
+  @@unique([playlistId, assetId])
+  @@index([playlistId])
+  @@index([assetId])
+}
+
+// ── TerminalScreensaverConfig ─────────────────────────────────────────────────
+// 每个终端的待机配置:是否启用、无操作多少秒进入屏保、绑定哪个播放方案。
+//
+// terminalId 为自由字符串(不强 FK 到 Terminal):配置可在终端注册前预置,
+// 与 printer-status 端点一致按 terminalId 字符串查找。
+// enabled=false 或未绑定 playlist → Kiosk 拉取返回 enabled:false,不进屏保。
+model TerminalScreensaverConfig {
+  id             String      @id @default(cuid())
+  terminalId     String      @unique
+  enabled        Boolean     @default(false)
+  idleTimeoutSec Int         @default(180)
+  playlistId     String?
+  playlist       AdPlaylist? @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  updatedBy      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([playlistId])
+}
+
+// ── MockInterview(2C 模拟面试)────────────────────────────────────────────────
+// 求职者本人面试练习工具:配置 → AI 对话式模拟面试 → 综合报告(可打印)。
+// 合规:不是招聘能力;不向企业展示/转交;报告仅练习参考,无任何录用承诺。
+// 归属:endUserId(登录会员)或 accessTokenHash(匿名一次性令牌,只存 SHA-256)。
+// 留存:expiresAt 到期由清理任务移除(匿名短/会员长);对话与报告原文不写日志。
+model MockInterviewSession {
+  id              String   @id @default(cuid())
+  endUserId       String?
+  accessTokenHash String?
+  status          String   @default("configured") // configured / in_progress / completed / aborted
+  interviewerType String   // hr / manager / tech / campus / final
+  industry        String
+  position        String
+  experience      String   // fresh / lt1 / y1_3 / y3_5 / gt5 / switch
+  difficulty      String   // easy / standard / pressure
+  durationMin     Int      @default(5) // 3 / 5 / 8
+  questionTarget  Int      @default(5)
+  interactionMode String   @default("text") // text / voice(2C+ 语音回合制,文字兜底)
+  resumeFileId    String?  // 可选:上传简历 fileId(原文不落本表)
+  resumeDigest    String?  // 提取后的简历文本(仅会话期使用,随会话 TTL 清理)
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt       DateTime
+
+  turns  MockInterviewTurn[]
+  report MockInterviewReport?
+
+  @@index([endUserId, createdAt])
+  @@index([expiresAt])
+}
+
+model MockInterviewTurn {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   MockInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  idx       Int
+  role      String   // interviewer / candidate
+  qType     String?  // intro / position / experience / skill / behavior / plan / reverse / closing
+  content   String
+  skipped   Boolean  @default(false)
+  inputMode String   @default("text") // text / voice(候选人回合)
+  transcriptText    String?  // 语音转写原文(用户编辑前;content=最终确认文本)
+  transcriptEdited  Boolean  @default(false)
+  answerDurationSec Int?     // 回答耗时(秒,前端计时;报告时间控制维度用)
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, idx])
+  @@index([sessionId])
+}
+
+model MockInterviewReport {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+  session     MockInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  payloadJson String   // 结构化报告(10 模块);不含简历原文
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+}

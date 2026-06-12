@@ -14,23 +14,23 @@
  */
 
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
-import { PrismaClient } from '../generated/prisma/client'
+import { createPrismaClient, type AppPrismaClient, type DbKind } from './create-client'
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name)
-  private readonly client: InstanceType<typeof PrismaClient>
+  private readonly client: AppPrismaClient
+  /** 当前数据库类型（sqlite=开发 / postgres=生产），由 DATABASE_URL 协议显式决定。 */
+  readonly dbKind: DbKind
 
   constructor() {
     const url = process.env['DATABASE_URL']
     if (!url) {
       throw new Error('DATABASE_URL environment variable is required')
     }
-    // PrismaLibSql accepts a config object with url (and optional authToken for Turso)
-    const adapter = new PrismaLibSql({ url })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.client = new PrismaClient({ adapter } as any)
+    const created = createPrismaClient(url)
+    this.client = created.client
+    this.dbKind = created.kind
   }
 
   async onModuleInit(): Promise<void> {

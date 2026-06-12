@@ -17,14 +17,11 @@
  *      5 家本地国企/民企 + 3 行业展区
  */
 import 'dotenv/config'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { createPrismaClient } from '../src/prisma/create-client'
 
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required to run seed-fairs')
-const adapter = new PrismaLibSql({ url })
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const prisma = new PrismaClient({ adapter } as any)
+const prisma = createPrismaClient(url).client
 
 const UNI_ORG_ID = 'org-uni-001'
 const HR_ORG_ID  = 'org-hr-002'

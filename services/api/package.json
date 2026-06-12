@@ -46,7 +46,12 @@
     "verify:ocr-baidu": "node -r @swc-node/register scripts/verify-ocr-baidu.ts",
     "verify:ocr-baidu-live": "node -r @swc-node/register scripts/verify-ocr-baidu-live.ts",
     "verify:mock-interview": "node -r @swc-node/register scripts/verify-mock-interview.ts",
-    "verify:job-fit": "node -r @swc-node/register scripts/verify-job-fit.ts"
+    "verify:job-fit": "node -r @swc-node/register scripts/verify-job-fit.ts",
+    "db:pg:sync": "node -r @swc-node/register scripts/sync-postgres-schema.ts",
+    "db:pg:sync:check": "node -r @swc-node/register scripts/sync-postgres-schema.ts --check",
+    "db:pg:generate": "prisma generate --config prisma.postgres.config.ts",
+    "db:pg:deploy": "prisma migrate deploy --config prisma.postgres.config.ts",
+    "db:pg:migrate-data": "node -r @swc-node/register scripts/migrate-sqlite-to-postgres.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
@@ -59,6 +64,7 @@
     "@nestjs/schedule": "^6.1.3",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-libsql": "^7.8.0",
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@types/express": "^5.0.6",
     "bcryptjs": "^3.0.3",

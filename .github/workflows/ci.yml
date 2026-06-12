@@ -63,6 +63,10 @@ jobs:
       - name: Install CJK font (resume PDF verify)
         run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk
 
+      - name: PG schema drift check
+        working-directory: services/api
+        run: pnpm db:pg:sync:check
+
       - name: Lint
         run: |
           pnpm --filter @ai-job-print/api lint
@@ -107,3 +111,76 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:resume-extraction
+
+  # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
+  # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
+  # 未通过此 job 不得宣称生产数据库已支持 PostgreSQL。
+  postgres-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ai_job_print_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ai_job_print_ci
+      POSTGRES_URL: postgresql://ci:ci@localhost:5432/ai_job_print_ci
+      REDIS_URL: redis://localhost:6379
+      FILE_SIGNING_SECRET: ci-only-test-signing-secret-0123456789abcdef
+      FILE_STORAGE_DIR: /tmp/ci-file-storage
+      FILE_STORAGE_DRIVER: local
+      AI_PROVIDER: mock
+      JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
+      SECRET_ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      SMS_PROVIDER: log
+      TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
+      TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Install CJK font (PDF verify)
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk
+      - name: PG schema drift check
+        working-directory: services/api
+        run: pnpm db:pg:sync:check
+      - name: Generate PG client
+        working-directory: services/api
+        run: pnpm db:pg:generate
+      - name: Migrate deploy on fresh PG
+        working-directory: services/api
+        run: pnpm db:pg:deploy
+      - name: Seed on PG
+        working-directory: services/api
+        run: |
+          node -r @swc-node/register prisma/seed.ts
+          node -r @swc-node/register prisma/seed-fairs.ts
+      - name: Core verify suites on PG
+        run: |
+          pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
+          pnpm --filter @ai-job-print/api verify:admin-fairs
+          pnpm --filter @ai-job-print/api verify:resume-optimize
+          pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:mock-interview
+          pnpm --filter @ai-job-print/api verify:member-assets-c2d
+

@@ -15,17 +15,14 @@
  *   psql $DATABASE_URL -c "UPDATE \"ImportRecord\" SET \"rawDataJson\" = '{}';"
  */
 
-import { PrismaLibSql } from '@prisma/adapter-libsql'
-import { PrismaClient } from '../src/generated/prisma/client'
+import { createPrismaClient } from '../src/prisma/create-client'
 
 async function main() {
   const url = process.env['DATABASE_URL']
   if (!url) {
     throw new Error('DATABASE_URL environment variable is required')
   }
-  const adapter = new PrismaLibSql({ url })
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const prisma = new PrismaClient({ adapter } as any)
+  const prisma = createPrismaClient(url).client
 
   await prisma.$connect()
   console.log('清理 ImportRecord.rawDataJson...')

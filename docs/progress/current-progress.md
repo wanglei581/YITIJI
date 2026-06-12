@@ -5,6 +5,19 @@
 
 ---
 
+## 第四阶段 PostgreSQL 生产数据底座（2026-06-12，Claude，`feature/postgres-production-readiness`）
+
+按 Mavis 决策实施，不新增业务页面。**本地（macOS PG 16.14）+ CI（postgres:16 容器）双环境真实验证；Windows 生产实例部署时按运维手册清单复验后方可宣称生产就绪。**
+
+- **运行时**：`src/prisma/create-client.ts` 工厂按 DATABASE_URL 协议显式选 adapter（`file:`→libsql / `postgres(ql)://`→@prisma/adapter-pg），不支持协议启动即错不静默回退；PrismaService/3 个 seed/清理脚本全部收口到工厂（verify 脚本经 PrismaService 自动获益）。
+- **Schema/迁移**：主 `schema.prisma`（SQLite）保持唯一模型真相源；`prisma/postgres/schema.prisma` 由 `db:pg:sync` 机械生成（CI 双 job 漂移校验）；**migration drift 一次性规范化**——PG 侧从 `prisma/postgres/migrations/0_init` 干净基线开始（全量 diff 生成，1080 行），SQLite 的 28 个历史迁移不再是生产真相；独立 `prisma.postgres.config.ts`（POSTGRES_URL 优先）。
+- **真实验证**：全新 PG 空库 `migrate deploy` ✓；3 个 seed ✓；API 启动（`DB connected — postgresql://…`）+ /jobs 真实数据 ✓；六套核心 verify 在 PG 全过（venue-guide 16 / admin-fairs / resume-optimize / job-fit 11 / mock-interview 16 / member-assets-c2d 真实 HTTP E2E 9）✓。
+- **数据迁移演练（真实跑通）**：`db:pg:migrate-data`（双 Prisma client 模型级复制，37 表拓扑序，批量 500，目标库空库保护，行数对账不一致退出码 1）——dev.db→全新 PG **502 行对账通过**；演练真实抓到 1 条 TerminalHeartbeat 孤儿行（SQLite 历史未强制 FK），脚本如实跳过+告警+对账扣减，不静默丢数据。
+- **CI**：新增 `postgres-readiness` job（postgres:16 + redis:7 service，空库 deploy→seed→六套 verify）；主 job 加 PG schema 漂移校验。SQLite 路径零回归（job-fit/member-assets 复跑 PASS，dev 环境恢复 SQLite）。
+- **文档**：`docs/device/postgres-operations.md`（架构/命令/上线切换七步/备份恢复/回滚/故障处置/如实边界声明）。本地装 postgresql@16（brew service，与 Redis 同模式）。
+
+---
+
 ## 2D 目标岗位定向优化 + 岗位匹配度参考（2026-06-12，Claude，`feature/job-fit-2d`）
 
 - **链路**：诊断报告页「目标岗位匹配参考（仅供参考）」入口 → `/resume/job-fit`：选择系统内**已发布岗位**（approved+published，搜索选择）或手填岗位（名称+可选 JD）→ 真实 LLM 分析 → 参考等级（较高/中等/偏低）+ 匹配点（**每条附简历原文依据**）+ 差距与准备建议 + 简历定向优化建议 → CTA「生成优化版简历」（衔接 2B）/「去来源平台投递」（仅系统内岗位，展示来源机构与外部ID）。
