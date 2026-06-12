@@ -53,6 +53,42 @@
 
 ---
 
+## 上线前 P0 验收与阻塞修复（2026-06-13，Claude，`chore/prelaunch-p0-validation`）
+
+按用户指令进入上线前验收阶段：不新增功能，只做验收、P0 阻塞修复、文档收口。完整执行记录见 [production-deployment-and-windows-host-checklist.md](../device/production-deployment-and-windows-host-checklist.md) 附录。
+
+**已通过（本地可执行部分）**：
+
+- main 封板 `80eabcc`（含 74ef526/5f0ce63/80eabcc），CI 双 job 绿；typecheck（6 包）/lint（4 端 0 error）/build（5 包）全绿；8 个核心 verify 全 PASS（activity-logs 12 / companies 11 / c2d 9 / career-plan 11 / mock-interview 17 / job-fit 11 / resume-optimize / ocr-baidu 12）。
+- PostgreSQL 底座：空库 deploy（4 迁移）+ seed + PG 上 3 个核心 verify 全过；**pg_dump 备份 → pg_restore 临时库恢复演练通过（行数核对一致）**。
+- OCR 真实冒烟：`verify:ocr-baidu-live` PASS（458ms，置信度 high）。
+- 合规禁词全仓扫描：**B 类违规为零**（命中均为禁词过滤防线代码/合规免责文案/子串误中）。
+- mock/假数据审计：生产路径 P0 为零；mock 分支全部受 `API_MODE!=http` 门控且明示演示；SMS/AI provider 有生产启动期校验（prod 禁 log/mock）。
+- 安全基线 10 项审计全通过（.env 隔离/无硬编码密钥/CORS 白名单/限流/异常不泄栈/签名 URL TTL/webhook 防重放/会员隔离/删除审计/日志脱敏）。
+
+**P0 修复（2 项，本轮完成）**：
+
+1. `fix` Kiosk `/qingdao`：删除写死的「重点企业岗位数」（虚构岗位数+虚构来源归属+sourceUrl='#'）与「园区企业数/在招岗位数」假统计——违反「不允许静态假数字」红线；改为真实 `/companies` 企业展示入口 + 园区客观介绍。浏览器复验：假数字消失、真实入口在位。
+2. `fix` 新增 `GET /api/v1/health`：真实 DB 往返探活（user.count）+ 返回 `db: sqlite|postgres`（部署验收据此确认生产连的是 PostgreSQL），DB 不可用如实 503；不输出任何配置/密钥。本地实测返回 `{"status":"ok","db":"sqlite"}`。
+
+**阻塞（须用户/外部操作，代码侧无法完成）**：
+
+| 阻塞项 | 需要 |
+|---|---|
+| 百度 OCR 密钥轮换（曾聊天暴露，AppID 7841387） | 用户在百度控制台删应用重建；换 Key 后复跑 `verify:ocr-baidu-live` |
+| 腾讯云 COS CAM 密钥轮换（曾终端回显） | 用户轮换 CAM 子用户密钥并最小化权限 |
+| 腾讯 SMS 签名/模板审核 | 审核通过前不得启用真实发送（服务端已有 prod 强制校验） |
+| 生产服务器/域名/HTTPS/生产 PG/Redis/COS 桶 | 用户提供服务器与云资源后按清单 §三 执行 |
+| 线上浏览器闭环（35 链路） | 依赖生产域名；本地真实后端等价验收均已通过 |
+| Windows 真机/Terminal Agent/奔图打印机 | 用户提供 Windows 一体机后按清单 §五 执行（含彩色/双面驱动参数实测） |
+| 用户协议/隐私政策法务审定 | 法务流程 |
+
+**判定记录**：打印状态实时追踪 UI 维持 P1（订单页已展示真实 PrintTask 状态，刷新可见；是否升 P0 待 Windows 真机现场验收再判）。场馆导览 Partner 配置入口维持 P1/P2，不阻塞上线。
+
+**结论：可以准备上线 ≠ 已经生产就绪。** 代码与本地验收侧已就绪；生产就绪以清单中 7 项阻塞逐项解除为准。
+
+---
+
 ## 企业展示 / 找企业（2026-06-12，Claude，`feature/company-profiles`）
 
 「岗位信息 → 找企业 / 企业展示 / 企业详情」全链路真实化。**定位（长期红线）：企业展示 = 来源企业与岗位导览，不是招聘平台**——不收简历、无平台内投递、无候选人/筛选/面试/Offer 能力；合规边界沉淀于 [compliance-boundary.md](../compliance/compliance-boundary.md) §4.5。

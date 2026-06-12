@@ -1,6 +1,20 @@
 # 下一步任务
 
-> 最后更新：2026-06-12（上线前收口总盘点、同步 P1 浏览/外部跳转记录接真、入口稳定规则、生产部署与 Windows 换机验收清单）
+> 最后更新：2026-06-13（上线前 P0 验收完成本地可执行部分；剩余 7 项阻塞均需用户/外部操作）
+
+## 🚦 上线前剩余阻塞（2026-06-13 验收结论，按清单附录为准）
+
+**P0（解除后才能宣称生产就绪）：**
+
+1. 百度 OCR 密钥轮换（曾聊天暴露）→ 用户百度控制台操作 + 复跑 `verify:ocr-baidu-live`
+2. 腾讯云 COS CAM 密钥轮换（曾终端回显）→ 用户腾讯云控制台操作
+3. 生产服务器/域名/HTTPS/生产 PostgreSQL/Redis/COS → 用户提供资源后按清单 §三 部署验收（`/api/v1/health` 已就绪，须返回 db=postgres）
+4. 线上浏览器闭环 35 链路 → 依赖生产域名（本地等价验收已全过）
+5. Windows 真机 + Terminal Agent + 奔图打印机真机验收 → 用户提供一体机后按清单 §五
+6. 腾讯 SMS 签名/模板审核（审核过前服务端已强制禁假发送）
+7. 用户协议/隐私政策法务审定
+
+**P1（上线后/择期）**：打印状态实时追踪 UI（真机验收若发现现场不可用则升 P0，做最小轮询）；场馆导览 Partner 配置入口；express body limit 显式化。
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
 
 ---

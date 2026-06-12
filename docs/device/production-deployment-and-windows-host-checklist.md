@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-12  
+> 最后更新：2026-06-13（追加：上线前 P0 验收本地执行记录，见文末附录）  
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -343,3 +343,53 @@ pnpm --filter ./services/api verify:activity-logs
 可以准备上线 ≠ 已经生产就绪。
 生产就绪必须以本清单逐项验收通过为准。
 ```
+
+---
+
+## 附录：上线前 P0 验收执行记录（2026-06-13，Claude，本地/预生产可执行部分）
+
+> 口径：以下只记录**本地可执行**的验收结果；凡需要生产服务器 / 云控制台 / Windows 真机的项，如实标记「未验证/阻塞」，不冒充完成。
+
+### A. §2.1 代码与分支 —— 已通过
+
+- main = `80eabcc`（含 74ef526 / 5f0ce63 / 80eabcc），工作区干净，与 origin 同步。
+- 最近 CI：`build-and-verify` ✅ + `postgres-readiness` ✅（run 27427254853）。
+- `git ls-files | grep -iE '\.env'` 仅 5 个 `.env.example`；`git log --all -- '**/.env'` 为空（.env 从未入库）；.gitignore 覆盖 .env/.env.local/*.log/dist。
+
+### B. §2.2 密钥轮换 —— 阻塞（待用户云控制台操作）
+
+| 密钥 | 暴露情况 | 状态 |
+|---|---|---|
+| 百度 OCR（AppID 7841387） | 曾在聊天明文暴露 | **阻塞：须用户在百度控制台删应用重建**；本地现 Key 真实冒烟通过（`verify:ocr-baidu-live` PASS，458ms/置信度 high），证明链路就绪，换新 Key 后只改 services/api/.env 复跑同一冒烟 |
+| 腾讯云 COS CAM | 配置时曾在终端回显 | **阻塞：须用户轮换 CAM 子用户密钥并最小化权限**（仅私有桶所需 action） |
+| 腾讯云 ASR/TTS/TRTC | 未发现聊天暴露记录 | 上线时按最小权限签发生产专用 Key；TRTC 凭证只改 services/api/.env（代码冻结） |
+| 腾讯 SMS | — | **阻塞：短信签名/模板审核未过**；审核通过前生产不得设 SMS_PROVIDER=log 以外的假发送，服务端已有启动期校验（prod 强制 tencent，禁止 log） |
+| LLM（DeepSeek 等） | 未发现聊天暴露记录 | 上线使用生产专用 Key；真实联调证据：2026-06-12 2E/2D 真实 DeepSeek 浏览器验收通过 |
+
+### C. §3.4/§3.6 PostgreSQL 底座 —— 本地预演通过
+
+- 空库 `migrate deploy`：4 个迁移（0_init + activity_logs + company_profiles…）全部应用 ✅；`db:pg:sync:check` 漂移校验通过 ✅。
+- PG seed（seed.ts + seed-fairs.ts）通过 ✅。
+- PG 上核心 verify：`verify:companies` 11 PASS、`verify:activity-logs` 12 PASS、`verify:member-assets-c2d` 9 PASS ✅。
+- **备份恢复演练 ✅**：`pg_dump -F c`（118KB）→ `pg_restore` 到临时库 → 行数核对 Job=13/JobFair=3/Organization=2 一致。
+- `GET /api/v1/health` 已实现（2026-06-13 新增）：真实 DB 往返探活 + 返回 `db: sqlite|postgres`，部署时以此确认生产连接 PostgreSQL。
+
+### D. §3.6 核心 verify（SQLite 全量）—— 已通过
+
+typecheck（6 包）/ lint（4 端，0 error）/ build（5 包）全绿；verify:activity-logs 12、verify:companies 11、verify:member-assets-c2d 9、verify:career-plan 11、verify:mock-interview 17、verify:job-fit 11、verify:resume-optimize、verify:ocr-baidu 12 全 PASS（日志 /tmp/prelaunch-verify.log，2026-06-13）。
+
+### E. §2.3 合规前置 —— 代码侧通过 / 法务阻塞
+
+- 全仓禁词扫描（19 词 × 5 目录）：**B 类（真实 UI/逻辑违规）为零**；约 28 处 A 类为禁词过滤防线/合规注释，约 11 处 C 类为子串误中或合规免责语境。
+- 2026-06-13 P0 修复：Kiosk `/qingdao` 删除写死的「重点企业岗位数」（142/98/37/54/76，来源归属与 sourceUrl 均虚构）与「园区企业数/在招岗位数」假统计，改为真实 `/companies` 企业展示入口 + 园区客观介绍。
+- **阻塞：用户协议/隐私政策法务审定未完成**（当前为试运营文本）。
+
+### F. 安全基线（10 项审计，2026-06-13）—— 通过
+
+.env 隔离 / 无硬编码密钥 / CORS 生产白名单（CORS_ALLOWED_ORIGINS）/ ValidationPipe whitelist+forbidNonWhitelisted / helmet / 全局限流 60/min / 异常过滤器不泄露栈 / 签名 URL TTL 夹紧 ≤30min + 敏感文件小时级清理 + 删除审计 / webhook HMAC+5min 窗+nonce 防重放（timingSafeEqual）/ /me/* 全员 EndUserAuthGuard + endUserId 过滤 / 日志只记元数据、启动日志无密钥。低优建议（非阻塞）：express.json/urlencoded 显式 body limit；如未来新增管理员强删会员端点须带审计。
+
+### G. §三服务器 / §四线上浏览器 / §五 Windows 真机 —— 未验证（阻塞）
+
+- 生产服务器：无服务器/域名/云账号权限 → 全部未验证。需要用户提供：服务器（含 root/部署权限）、域名+证书、生产 PostgreSQL/Redis 实例或安装授权、COS 生产桶。
+- 线上浏览器闭环：无生产域名 → 未验证。本地等价证据：35 项链路中除「线上域名」环境差异外，全部在本地真实后端浏览器验收通过（见 current-progress 各阶段记录）。
+- Windows 真机/Terminal Agent/奔图打印机：无 Windows 真机 → 未验证。Phase 8 封板时已有跨机 E2E 通过记录，但换机/生产 API 对接必须按 §五重新逐项验收。
