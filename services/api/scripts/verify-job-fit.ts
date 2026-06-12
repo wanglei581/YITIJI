@@ -7,8 +7,9 @@
  *  4. 禁词拦截：连续输出「录用概率」→ 诚实失败
  *  5. 未发布岗位 → JOB_NOT_FOUND；6. 错 token → AI_TASK_NOT_FOUND（不泄露存在性）
  *  7. 手填岗位模式成功；8. getLatest 读回 + 再分析 upsert 覆盖（同 taskId 单行）
- *  9. 简历文件已清理 → 诚实 failed（不调 LLM）
- * 10. 日志脱敏：简历/岗位文本不出现在日志
+ *  9. 诱导编造/无依据示例数字/学历自相矛盾 → 重试或诚实失败
+ * 10. 简历文件已清理 → 诚实 failed（不调 LLM）
+ * 11. 日志脱敏：简历/岗位文本不出现在日志
  *
  * 运行：pnpm --filter @ai-job-print/api verify:job-fit
  */
@@ -188,18 +189,41 @@ async function main() {
     if (count !== 1) fail(`8. 同 taskId 应只有 1 行 job_fit，实际 ${count}`)
     pass('8. getLatest 读回最近一次；upsert 单行覆盖')
 
-    // 9. 文件清理 → 诚实失败
-    fileStore.delete(fileId)
-    const r9 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
-    if (r9.status !== 'failed' || !r9.failReason?.includes('重新上传')) fail('9. 文件清理应诚实失败')
-    pass('9. 简历原文已清理 → 诚实 failed（不调 LLM、不编造）')
+    // 9. 内容质量与合规：诱导编造 / 无依据数字 / 自相矛盾学历判断
+    responseQueue.length = 0
+    responseQueue.push(vjson({ targetedSuggestions: ['删除行政经历，替换为 2-3 个前端项目经历'] }))
+    const r9a = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (r9a.status !== 'completed' || JSON.stringify(r9a).includes('替换为')) fail('9a. 诱导编造经历未被拦截')
 
-    // 10. 日志脱敏
+    responseQueue.length = 0
+    responseQueue.push(vjson({ targetedSuggestions: ['补充如每月归档100份文件、每周组织3次会议等数字'] }))
+    const r9b = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (r9b.status !== 'completed' || JSON.stringify(r9b).match(/(?:如|例如|比如)[^。；;，,]{0,40}\d/)) fail('9b. 无依据示例数字未被拦截')
+
+    responseQueue.length = 0
+    responseQueue.push(vjson({ matchPoints: [{ point: '学历符合本科要求（但为大专，差距较大）', evidence: '本科，行政管理专业' }] }))
+    responseQueue.push(vjson({ matchPoints: [{ point: '学历符合本科要求（但为大专，差距较大）', evidence: '本科，行政管理专业' }] }))
+    try {
+      await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+      fail('9c. 自相矛盾学历判断应失败')
+    } catch (e) {
+      const resp = JSON.stringify((e as { getResponse?: () => unknown }).getResponse?.() ?? '')
+      if (!resp.includes('AI_JOB_FIT_FAILED')) fail(`9c. 失败码不符: ${resp}`)
+    }
+    pass('9. 诱导编造/无依据示例数字/学历自相矛盾 → 重试或诚实失败')
+
+    // 10. 文件清理 → 诚实失败
+    fileStore.delete(fileId)
+    const r10 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (r10.status !== 'failed' || !r10.failReason?.includes('重新上传')) fail('10. 文件清理应诚实失败')
+    pass('10. 简历原文已清理 → 诚实 failed（不调 LLM、不编造）')
+
+    // 11. 日志脱敏
     const joined = capturedLogs.join('\n')
     for (const secret of ['简历标记RSME', '岗位标记JOBD', '档案管理与会议安排']) {
-      if (joined.includes(secret)) fail(`10. 日志泄露内容: ${secret.slice(0, 10)}`)
+      if (joined.includes(secret)) fail(`11. 日志泄露内容: ${secret.slice(0, 10)}`)
     }
-    pass('10. 日志脱敏：简历/岗位文本不出现在日志')
+    pass('11. 日志脱敏：简历/岗位文本不出现在日志')
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {

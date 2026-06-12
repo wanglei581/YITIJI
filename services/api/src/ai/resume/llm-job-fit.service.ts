@@ -10,7 +10,7 @@ import { LlmConfigService } from '../llm/llm-config.service'
 // - 防编造（对齐 2B 优化契约）：matchPoints 的 evidence 必须能在简历原文中
 //   找到（归一化子串匹配）；找不到的匹配点直接丢弃；建议只谈表达与准备方向，
 //   不替用户虚构经历。
-// - 输出全文扫描：禁词或数字百分比（如「85%」）命中 → 重试一次 → 仍命中诚实失败。
+// - 输出全文扫描：禁词、数字百分比（如「85%」）、诱导编造/自相矛盾建议命中 → 重试一次 → 仍命中诚实失败。
 // - 简历原文/岗位文本/输出不写日志（仅元数据）。
 // ============================================================
 
@@ -18,6 +18,35 @@ const BANNED = [
   '录用概率', '录用率', '通过率', '保过', '保录用', '保面试', '精准命中',
   'AI匹配率', '匹配率', '内部题库', '一键投递', '立即投递', '平台投递',
 ] as const
+
+// ── 输出安全防线（Mavis 2D 验收补丁）────────────────────────────────────────
+// A. 自相矛盾判断（如「符合本科要求…大专」）：全局 violation → 重试 → 连续命中诚实失败。
+// (?<!不) 负向断言:「学历不符合要求…本科…大专」是**正确**的差距表述,不能误伤;
+// 只拦「(基本)符合本科…大专」这类自相矛盾。
+const CONTRADICTION_PATTERNS: RegExp[] = [
+  /(?<!不)符合[^。；;]{0,12}本科[^。；;]{0,24}(大专|专科)/,
+  /(大专|专科)[^。；;]{0,24}(?<!不)符合[^。；;]{0,12}本科/,
+  /学历符合[^。；;]{0,24}(大专|专科)/,
+]
+
+// B. 诱导编造经历（「替换为/改写为/包装成…项目/经历」「删除…行政/经历」）：建议级过滤。
+const FABRICATION_HINT =
+  /(替换为|改写为|包装成|伪装成)[^。；;]{0,30}(项目|经历|公司|学历|证书|技能)|删除[^。；;]{0,20}(行政|工作|经历|描述|学历)/
+
+// C. 无依据示例数字（「如/例如/比如…100份」）：建议级过滤。已有的百分比拦截保持全局 violation。
+const EXAMPLE_NUMBER = /(?:如|例如|比如)[^。；;，,]{0,40}\d/
+
+/** 高风险建议被过滤后的安全兜底（不诱导编造、不给示例数字）。 */
+const SAFE_FALLBACK_SUGGESTION =
+  '只基于本人真实经历补充岗位相关内容；如确有相关学习、项目、证书或成果，请写清事实背景、个人职责与实际结果，不要虚构经历或数字。'
+
+function isRiskyAdvice(text: string): boolean {
+  return FABRICATION_HINT.test(text) || EXAMPLE_NUMBER.test(text)
+}
+
+function hasContradiction(text: string): boolean {
+  return CONTRADICTION_PATTERNS.some((p) => p.test(text))
+}
 
 export interface JobFitJobContext {
   title: string
@@ -49,7 +78,20 @@ function findViolation(text: string): string | null {
   }
   const pct = text.match(/\d{1,3}\s*%/)
   if (pct) return pct[0]
+  if (/(?:符合本科要求|学历符合)[^。；;]{0,40}(?:大专|专科)/.test(text)) return '学历自相矛盾'
+  if (/(?:大专|专科)[^。；;]{0,40}(?:符合本科要求|学历符合)/.test(text)) return '学历自相矛盾'
   return null
+}
+
+function isUnsafeAdvice(text: string): boolean {
+  if (/(?:如|例如|比如)[^。；;，,]{0,40}\d/.test(text)) return true
+  if (/(?:替换为|改写为|包装成)[^。；;，,]{0,40}(?:项目|经历|公司|学历|证书|技能)/.test(text)) return true
+  if (/删除[^。；;，,]{0,30}(?:行政|工作|经历|描述|学历)/.test(text)) return true
+  return false
+}
+
+function safeAdviceFallback(): string {
+  return '只基于本人真实经历补充岗位相关内容；如确有相关学习、项目、证书或成果，请写清事实背景、个人职责与实际结果，不要虚构经历或数字。'
 }
 
 @Injectable()
@@ -67,6 +109,12 @@ export class LlmJobFitService {
       '\n2. matchPoints 中每条的 evidence 必须是简历原文中真实出现的内容（原文摘录），绝不编造。' +
       '\n3. gapPoints 的 suggestion 只谈表达优化与准备方向（如补充量化数据、突出某段经历），绝不虚构求职者没有的经历或技能。' +
       '\n4. 不出现「一键投递/立即投递/平台投递」等表述；投递请引导用户前往岗位来源平台。' +
+      '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位。跨岗位差距较大时，应建议"如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配的岗位"。' +
+      '\n6. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
+      '\n7. 不得出现自相矛盾判断（如"大专但符合本科要求"）。学历、年限、技能不符合岗位要求时，直接说明差距（如"学历不符合要求：岗位要求本科及以上，当前简历为大专学历"）。' +
+      '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位；跨岗位差距较大时，应建议“如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配岗位”。' +
+      '\n6. 不得给出无依据的示例数字（例如“100份/月”“3次/周”“提升30%”）；只能说“补充你实际处理的数量、频次或结果”。' +
+      '\n7. 不得出现自相矛盾判断，例如“大专但符合本科要求”；学历、年限、技能不符合时要直接说差距。' +
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"fitLevel":"reference_high|reference_medium|reference_low","summary":"2-3 句总评（说明这是参考）",' +
       '"matchPoints":[{"point":"与岗位要求的匹配点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
@@ -88,17 +136,46 @@ export class LlmJobFitService {
         this.logger.warn(`jobfit.invalid attempt=${attempt} ms=${Date.now() - t0}`)
         continue
       }
-      const violation = findViolation(JSON.stringify(payload))
+      // 建议级安全过滤（不触发重试）：诱导编造 / 无依据示例数字 → 过滤或替换为安全兜底
+      const sanitized = this.sanitizeAdvice(payload)
+      // 全局 violation（触发重试）：禁词 / 百分比 / 自相矛盾判断
+      const serialized = JSON.stringify(sanitized)
+      const violation = findViolation(serialized)
       if (violation) {
         this.logger.warn(`jobfit.banned attempt=${attempt}`)
         continue
       }
-      this.logger.log(`jobfit.ok ms=${Date.now() - t0} match=${payload.matchPoints.length} gap=${payload.gapPoints.length}`)
-      return payload
+      if (hasContradiction(serialized)) {
+        this.logger.warn(`jobfit.contradiction attempt=${attempt}`)
+        continue
+      }
+      this.logger.log(`jobfit.ok ms=${Date.now() - t0} match=${sanitized.matchPoints.length} gap=${sanitized.gapPoints.length}`)
+      return sanitized
     }
     throw new ServiceUnavailableException({
       error: { code: 'AI_JOB_FIT_FAILED', message: '岗位匹配参考生成失败，请稍后重试' },
     })
+  }
+
+  /**
+   * 建议级安全过滤（Mavis 2D 验收补丁）：
+   * - targetedSuggestions：过滤诱导编造 / 无依据示例数字的建议；全被过滤时补安全兜底。
+   * - gapPoints.suggestion：命中高风险表达时整条替换为安全兜底。
+   * 不触发重试（内容仍可用），但高风险表达绝不直接发给用户。
+   */
+  private sanitizeAdvice(payload: JobFitPayload): JobFitPayload {
+    let filtered = 0
+    const targetedSuggestions = payload.targetedSuggestions.filter((sug) => {
+      if (isRiskyAdvice(sug)) { filtered += 1; return false }
+      return true
+    })
+    if (targetedSuggestions.length === 0) targetedSuggestions.push(SAFE_FALLBACK_SUGGESTION)
+    const gapPoints = payload.gapPoints.map((g) => {
+      if (isRiskyAdvice(g.suggestion)) { filtered += 1; return { ...g, suggestion: SAFE_FALLBACK_SUGGESTION } }
+      return g
+    })
+    if (filtered > 0) this.logger.warn(`jobfit.advice_filtered count=${filtered}`)
+    return { ...payload, targetedSuggestions, gapPoints }
   }
 
   // ── 校验 ──────────────────────────────────────────────────────────────────
@@ -125,14 +202,21 @@ export class LlmJobFitService {
     const gapPoints = p.gapPoints
       .filter((g): g is { gap: string; suggestion: string } =>
         !!g && typeof g.gap === 'string' && typeof g.suggestion === 'string' && g.gap.trim().length > 0)
-      .map((g) => ({ gap: g.gap.trim().slice(0, 200), suggestion: g.suggestion.trim().slice(0, 300) }))
+      .map((g) => {
+        const suggestion = g.suggestion.trim()
+        return {
+          gap: g.gap.trim().slice(0, 200),
+          suggestion: (isUnsafeAdvice(suggestion) ? safeAdviceFallback() : suggestion).slice(0, 300),
+        }
+      })
       .slice(0, 4)
 
     const targetedSuggestions = p.targetedSuggestions
       .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+      .filter((s) => !isUnsafeAdvice(s.trim()))
       .map((s) => s.trim().slice(0, 300))
       .slice(0, 5)
-    if (targetedSuggestions.length === 0) return null
+    if (targetedSuggestions.length === 0) targetedSuggestions.push(safeAdviceFallback())
 
     return {
       fitLevel: p.fitLevel as JobFitPayload['fitLevel'],
