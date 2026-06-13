@@ -103,6 +103,7 @@ jobs:
       - name: Verify suites
         run: |
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
+          pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:admin-orgs

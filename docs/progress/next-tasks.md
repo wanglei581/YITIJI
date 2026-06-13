@@ -52,7 +52,7 @@
 
 ### P1-B 验证与守门补强
 
-- [ ] **打印任务主链路 verify**：补 `POST /print/jobs` → Agent claim/状态回传的轻量 verify 或集成脚本，避免上线核心打印链路只靠历史真机记录。
+- [x] **打印任务主链路 verify**（✅ 2026-06-14，分支 `chore/verify-print-jobs`）：新增 `services/api/scripts/verify-print-jobs.ts`（service 级轻量 E2E，13 断言：合法签名创建 / 非法URL拦截SSRF / 终端 claim+401 / printing→completed / 终态幂等 / 404）+ `verify:print-jobs` 脚本 + 接进 CI Verify 步骤。本地 ALL PASS。
 - [ ] **待机屏 / Content / Audit / AI 配置 verify**：对已真实存在但缺专属守门的核心端点补回归脚本。
 - [ ] **生产存储驱动门禁**：上线环境 `FILE_STORAGE_DRIVER=cos` 必须强制校验，避免漏配后文件落本机磁盘；至少在部署脚本或健康检查里阻断。
 - [ ] **三端 mock 模式说明留给开发，不进生产**：保留开发演示能力，但生产部署 checklist 必须把 Kiosk/Admin/Partner 的 API mode、AI provider、OCR provider、storage driver 作为同一组门禁核对。

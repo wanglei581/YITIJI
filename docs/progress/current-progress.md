@@ -95,6 +95,17 @@
 
 ---
 
+## P1-B 验证守门 ①：打印任务主链路 verify（2026-06-14，Claude，分支 `chore/verify-print-jobs`）
+
+上线核心打印链路（`POST /print/jobs` → 终端 claim → 状态回传）此前只靠 Phase 8 历史真机记录，仓内无专属 verify。本轮补 service 级轻量 E2E 守门（service 直调真库，无需起 HTTP server，确定性、CI 友好；不改任何生产业务逻辑）。
+
+- 新增 `services/api/scripts/verify-print-jobs.ts`（13 断言）：① 合法签名 fileUrl → PrintTask pending；② 外部/无签名/篡改 sig → 400 `PRINT_INVALID_FILE_URL`（SSRF 防护）；③ 终端 claim（错 agentToken → 401，正确 → pending 被原子领取 claimed + 绑定终端）；④ 状态回传 printing → completed；⑤ 终态幂等（重复 completed / 终态后再 printing 均 ack 且 DB 不重写）；⑥ 查询不存在 → 404 `PRINT_TASK_NOT_FOUND`。
+- `package.json` 加 `verify:print-jobs`；`.github/workflows/ci.yml` 接进 build-and-verify 的 Verify 步骤（job env 已含 FILE_SIGNING/TERMINAL_ADMIN/TERMINAL_ACTION secret + Verify 前已 `prisma db push`，无缺依赖）。脚本内对三个 secret 用 `||=` 兜底测试值；claim 取全局最旧 pending，故把测试任务 createdAt 回拨保证确定命中。
+- **验证**：本地 `verify:print-jobs` ALL PASS（13/13）。
+- 待续（P1-B 后续）：待机屏 Content / Audit / AI 配置 / 岗位审核状态机 verify。
+
+---
+
 ## 上线前 P0 准备物（2026-06-13，Claude/Codex，不依赖外部资源的执行手册）
 
 数字人不在待办内，主线为上线前 P0 验收。5 项 P0 中，生产资源、线上域名闭环、Windows 真机、法务审定仍依赖用户/外部方；腾讯 SMS 除签名/模板审核外，还需补 `TencentSmsSender.sendCode()` 的真实 SendSms 接入与真号 E2E。当前本轮只沉淀可提前准备的执行手册/提交包，未执行真机或生产部署：
