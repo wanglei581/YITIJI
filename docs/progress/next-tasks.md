@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-13（百度 OCR / 腾讯云 COS 密钥轮换已用新 Key live 复验通过；剩余 5 项阻塞需用户/外部操作）
+> 最后更新：2026-06-14（政策服务页已重设计上线 `/renshi` 并删除 `/policy-preview` 预览页；百度 OCR / 腾讯云 COS 密钥轮换已用新 Key live 复验通过；全面审计报告已落地并拆成上线前 P0/P1/P2 任务）
 
 ## 🚦 上线前剩余阻塞（2026-06-13 验收结论，按清单附录为准）
 
@@ -25,6 +25,51 @@
 
 ---
 
+## 2026-06-14 全面审计后的执行拆解（8 月落地倒排）
+
+> 来源：[project-full-audit-and-august-launch-plan-2026-06-14.md](./project-full-audit-and-august-launch-plan-2026-06-14.md)。该报告由 23 个智能体分片精读 + 交叉复核 + 高影响缺口对抗复核生成。以下是落到 `next-tasks` 的执行口径；若与 6/14 之前旧审计结论冲突，以本节和 `current-progress.md` 顶部最新记录为准。
+
+### P0-A 代码侧上线门禁（6/14–6/30）
+
+- [ ] **生产构建禁止默认 mock**：三端生产构建必须显式 `VITE_API_MODE=http`，且 `VITE_API_BASE_URL` 指生产 API；补构建期断言，禁止 Kiosk/Admin/Partner 在生产产物里回落到 mock。目标是消除「漏配 env → 整机展示静态演示招聘会/岗位/政策」的单点风险。
+- [ ] **腾讯 SMS 真发接入**：在 `TencentSmsSender.sendCode()` 内接入真实腾讯云 `SendSms`（可复用现有 TC3 签名工具），同时提交短信签名/模板审核；审核通过后补真号 E2E。文档已反复确认：审核通过不等于可上线，当前代码仍会 `throw SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED`。
+- [ ] **青岛专区处置**：6/13 已移除「重点企业岗位数」虚构统计，但 `/qingdao` 仍存在硬编码具体补贴金额、人才政策金额、高校/园区/资讯静态数据。上线前二选一：优先下线该 orphan 路由；或接真后端并对未接真部分显著标注/隐藏。未完成前不得把该页作为上线能力展示。
+- [ ] **「我的」明细归位接真**：按 6/14 信息架构整改，不恢复 `ProfilePage` 下方账号资产聚合区；改为在对应业务页或独立轻量路由承载 `/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/browse-logs`、`/me/external-jump-logs`。Profile 只保留入口与概览，不能继续保留「本次记录 / 建设中」造成真假冲突。
+
+### P1-A 后台增改入口补齐（7/1–7/15）
+
+- [ ] **招聘会基础字段可录入**：Admin 招聘会编辑补封面图、地图底图、经纬度、交通指引、入场方式、现场服务等表单；后端 DTO/service 同步，避免新建招聘会地图/导航/概览区空白。
+- [ ] **招聘会数据大屏可录入**：Admin 补 `expectedAttendance` 与 `seekerIntentJson` 编辑入口；生产新建招聘会不能只依赖 seed 才有「预计参会人数 / 求职意向分布」。
+- [ ] **参展企业岗位明细 CRUD**：Admin 参展企业抽屉补 `FairCompanyPosition` 子表编辑（标题、薪资、学历、经验、人数、分类），后端 `SaveFairCompanyDto` 与 service 增加写入；前台企业卡不再只能展示 seed 岗位。
+- [ ] **Partner 招聘会子资源产品决策**：明确参展企业 / 展区 / 活动资料 / 场馆导览由 Admin 统一录入，还是开放 Partner 自维护并回 pending 重审。未拍板前，至少在 Partner 招聘会页加说明，避免机构误以为自己能维护全部子资源。
+- [ ] **死按钮接线或移除**：Admin 岗位信息源 / 招聘会信息源的「查看」「打印活动资料」补详情抽屉与真实资料打印；短期不做就移除死按钮。
+- [ ] **Partner 企业资料下架**：补机构侧企业资料下架/取消发布能力，与岗位、招聘会、政策公告保持一致。
+- [ ] **空壳页收口**：Admin 用户/权限/外设、Partner 统计/终端/账号 6 个空壳页上线前隐藏或明确标「建设中」；不要保留可点击但无真实端点的侧栏入口。
+
+### P1-B 验证与守门补强
+
+- [ ] **打印任务主链路 verify**：补 `POST /print/jobs` → Agent claim/状态回传的轻量 verify 或集成脚本，避免上线核心打印链路只靠历史真机记录。
+- [ ] **待机屏 / Content / Audit / AI 配置 verify**：对已真实存在但缺专属守门的核心端点补回归脚本。
+- [ ] **生产存储驱动门禁**：上线环境 `FILE_STORAGE_DRIVER=cos` 必须强制校验，避免漏配后文件落本机磁盘；至少在部署脚本或健康检查里阻断。
+- [ ] **三端 mock 模式说明留给开发，不进生产**：保留开发演示能力，但生产部署 checklist 必须把 Kiosk/Admin/Partner 的 API mode、AI provider、OCR provider、storage driver 作为同一组门禁核对。
+
+### P2 上线后或需产品拍板项
+
+- [ ] 展位网格 / 现场签到：决定隐藏 mock-only 展位网格，还是新建 `FairBooth` 模型与 Admin 录入；合规上不做现场签到闭环，建议先隐藏。
+- [ ] 社保指南 / 就业登记内置模板：逐步迁到政策内容管理，或保持 info-only 模板并标官方入口；不要写死具体可变金额。
+- [ ] 简历素材库 / `/resume/export` 半废弃页：上线前保持不可达或诚实禁用；二期若开放，需后端模板模型、Admin 管理与真实文件生成。
+- [ ] 支付域继续后置：8 月上线不依赖线上支付；若现场收费，优先线下收款不入系统，线上支付另起独立域设计。
+
+---
+
+## ✅ 政策服务页重设计（2026-06-14，已完成）
+
+- 首页「政策服务」→ `/renshi` 已由旧人社信息墙重构为竖屏「政策服务」页（政策匹配按身份筛选 + 四类 Tab + 内置办事指引 + 后端审核发布政策/公告混合 + 材料打印包 + 浏览/跳转/收藏闭环）；Codex 隐藏预览 `/policy-preview` + `PolicyServicePreviewPage` 已删除。
+- 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地竖屏渲染无报错、真实后端政策入列。详见 [current-progress.md](./current-progress.md)。
+- 合规：info-only，不代办 / 不代申请 / 不承诺到账 / 不存身份证·银行卡·社保；按钮文案合规。
+
+---
+
 ## 上线前收口总盘点（2026-06-12，Codex）
 
 当前 main 进入上线前收口：不再新增非必要功能；除阻塞上线的问题外，不扩大范围；岗位 / 招聘会 / 政策继续只做第三方 / 官方来源信息入口。
@@ -33,7 +78,7 @@
 
 - AI 简历诊断 / 生成 / 优化 / 岗位匹配参考 / 职业规划已进入对应 AI 服务记录、我的简历、我的文档与打印订单。
 - 模拟面试已进入面试报告与我的 AI 服务记录。
-- 我的资产中心已接真：我的简历、我的文档、AI 服务记录、模拟面试报告、打印订单、我的收藏、浏览与跳转记录。
+- 上述各类记录（我的简历 / 文档 / AI 服务记录 / 模拟面试报告 / 打印订单 / 收藏 / 浏览与跳转记录）数据均已接真。**信息架构整改（2026-06-14）后「我的」页只做入口与概览，明细归位到对应业务页面（简历 / 打印 / 岗位·招聘会·政策 / 权益），不再聚合为独立「账号资产」分区**，详见 [user-data-flow-matrix.md](../product/user-data-flow-matrix.md) 顶部整改说明。
 - 岗位 / 招聘会 / 政策的浏览、收藏、打开外部或官方入口已进入我的收藏与浏览与跳转记录；系统只记录打开入口行为，不记录第三方后续结果。
 - PostgreSQL 代码层、schema 同步、SQLite 主 CI 与 `postgres-readiness` 守门已完成；真实生产实例仍待部署验收。
 
@@ -119,7 +164,7 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 
 - ✅ 新增 `BrowseLog` / `ExternalJumpLog`，只记录登录会员本人浏览与打开外部入口的行为快照。
 - ✅ `POST /activity/browse`、`POST /activity/external-jump`、`GET/DELETE /me/browse-logs`、`GET/DELETE /me/external-jump-logs` 已接入；目标必须已审核发布，来源字段服务端补齐。
-- ✅ Kiosk 岗位 / 招聘会 / 校园招聘会 / 人社政策页已上报；Profile 既有建设中入口接到账号资产「浏览与跳转记录」真实分组。
+- ✅ Kiosk 岗位 / 招聘会 / 校园招聘会 / 人社政策页已上报；浏览与跳转记录数据已接真。2026-06-14 信息架构整改后，该明细归位到岗位 / 招聘会 / 政策业务页，「我的」页不再承载账号资产「浏览与跳转记录」聚合分组。
 - ✅ `verify:activity-logs` 纳入 SQLite 主 CI 与 `postgres-readiness`。
 
 **企业展示 / 找企业（2026-06-12 已完成，用户指派）：**
@@ -212,7 +257,7 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 **Phase C-2 状态（C-2A–C-2D 代码、验证与浏览器登录态手验已完成）：**
 
 - ✅ **匿名 AI 结果一次性 accessToken（C-2A，2026-06-07，`feature/ai-anon-access-token`）**：`AiResumeResult` 加 `accessTokenHash` 列（additive migration `20260607120000`，dev.db 经 `db execute` 落地，PostgreSQL 迁移时随 drift 统一重整）；`POST /resume/parse` 匿名时铸 192-bit token 并**只回传一次**（DB 只存 SHA-256 hash）；读取改用 `x-resume-access-token` header（**不进 URL query**）+ `timingSafeEqual` 校验；新匿名行须持令牌才可读，历史 null-hash 行 **fail-closed**，会员路径不变（仍按 endUserId 本人校验）；optimize 懒生成继承 parse 行 hash，不铸新 token；Kiosk 加最小 `aiResumeSession`（只存 taskId/accessToken，不存任何 AI payload/原文/PII）+ idle/屏保清理。`verify:ai-result-ownership` 扩展为 12 类断言 ALL PASS；api/kiosk typecheck/lint/build 全绿。详见 [current-progress.md](./current-progress.md) §Phase C-2A。**待运行期手验**（真实 API + 会员短信验证码 + 浏览器/一体机：匿名拿 token→刷新仍可读、无/错 token 被拒、进屏保后下一位读不到）。
-- ✅ **完整用户资产中心 C-2D（已完成 2026-06-11）**：我的简历 / 文档 / AI记录 / 打印订单 / 收藏 / 权益六组已统一游标分页；ProfilePage 账号资产改为各组独立加载/失败重试/加载更多；AI 记录支持本人删除(parse 级联 optimize)；文档支持本人预览/下载/再打印/删除；收藏已覆盖岗位 / 招聘会 / 政策三类，登录会员写 `/me/favorites`、匿名保留本机收藏，并提供显式「合并本机收藏到账号」；CI 已加 Redis service 并纳入 `verify:member-assets-c2d`；未跟踪临时演示 seed 脚本已清理；登录态浏览器端到端手验已通过（账号资产分页/文档访问与删除/再打印/AI 记录删除/三类收藏取消/本机收藏合并/登出与刷新清空）。
+- ✅ **完整用户资产中心 C-2D（已完成 2026-06-11，2026-06-14 IA 整改后展示位置调整）**：我的简历 / 文档 / AI记录 / 打印订单 / 收藏 / 权益六组后端 `/me/*` 真实数据与游标分页已完成；AI 记录支持本人删除(parse 级联 optimize)；文档支持本人预览/下载/再打印/删除；收藏已覆盖岗位 / 招聘会 / 政策三类，登录会员写 `/me/favorites`、匿名保留本机收藏，并提供显式「合并本机收藏到账号」；CI 已加 Redis service 并纳入 `verify:member-assets-c2d`；未跟踪临时演示 seed 脚本已清理；历史登录态浏览器端到端手验已通过。整改后 ProfilePage 不再展示账号资产聚合明细，旧 Profile 专属 Group 组件已删除，明细归位到对应业务页承载。
 - 🔄 **短信服务商真实接入**：✅ 已预留 `SMS_PROVIDER=log|tencent`、腾讯云短信 env 位与 `TencentSmsSender` 占位，`verify:sms-provider` 覆盖 Provider 选择和生产保护；**剩余**：腾讯云短信服务审核通过后，补 `TencentSmsSender.sendCode()` 的真实 `SendSms` API 调用，并用真实签名 / 模板 / SDKAppID / CAM 密钥跑一遍登录验证码端到端手验。
 - 🔄 **扫码登录真实接入**：✅ Kiosk 登录页已预留微信扫码 / 支付宝扫码 UI 与二维码刷新入口；**剩余**：申请微信开放平台 / 支付宝开放平台能力后，设计扫码登录会话模型、二维码生成接口、手机端授权回调 / 轮询、EndUser 账号绑定与解绑、异常/超时/风控策略。
 - ⏳ **登录态运行期手验**：需 API + 会员短信验证码环境，手验已登录状态栏、idle 超时登出、进入屏保登出、忙碌态（打印/AI 中）不误登出。

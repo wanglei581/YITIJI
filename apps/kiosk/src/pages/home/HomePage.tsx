@@ -267,7 +267,7 @@ interface ServiceGroup {
   title: string
   subtitle: string
   icon: LucideIcon
-  accent: 'blue' | 'green' | 'orange' | 'cyan' | 'purple' | 'pink'
+  accent: 'blue' | 'green' | 'orange' | 'cyan' | 'purple' | 'amber'
   tiles: ServiceTile[]
 }
 
@@ -277,7 +277,8 @@ const ACCENT: Record<ServiceGroup['accent'], { text: string; border: string; ico
   orange: { text: 'text-orange-600', border: 'border-orange-200', iconBg: 'bg-orange-50' },
   cyan: { text: 'text-cyan-600', border: 'border-cyan-200', iconBg: 'bg-cyan-50' },
   purple: { text: 'text-violet-600', border: 'border-violet-200', iconBg: 'bg-violet-50' },
-  pink: { text: 'text-pink-600', border: 'border-pink-200', iconBg: 'bg-pink-50' },
+  // 政策服务功能色：金/amber（visual-design-spec §14.2/§15.4）。
+  amber: { text: 'text-amber-700', border: 'border-amber-200', iconBg: 'bg-amber-50' },
 }
 
 const SERVICE_GROUPS: ServiceGroup[] = [
@@ -351,7 +352,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     title: '政策服务',
     subtitle: '权威解读，办事指引',
     icon: BookOpenIcon,
-    accent: 'pink',
+    accent: 'amber',
     tiles: [
       { title: '就业政策', icon: HelpCircleIcon, to: '/renshi?tab=policy' },
       { title: '补贴指引', icon: LandmarkIcon, to: '/renshi?tab=social' },

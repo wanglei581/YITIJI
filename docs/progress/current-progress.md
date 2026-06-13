@@ -1,7 +1,46 @@
 # 当前开发进度
 
-> 最后更新：2026-06-13
+> 最后更新：2026-06-14
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 全面审计报告与 8 月路线图拆解（2026-06-14，Codex）
+
+后台多智能体审计结果已落地为 [project-full-audit-and-august-launch-plan-2026-06-14.md](./project-full-audit-and-august-launch-plan-2026-06-14.md)，覆盖 Kiosk/Admin/Partner/API/基础设施/文档对账，并包含「前台有展示区、后台缺增改入口」矩阵与 8 月上线倒排路线。
+
+本轮把审计结论拆入 [next-tasks.md](./next-tasks.md) 顶部「2026-06-14 全面审计后的执行拆解」：
+
+- P0-A 代码侧上线门禁：生产构建强制三端 `VITE_API_MODE=http`、腾讯 SMS 真实 `SendSms` 接入、青岛专区硬编码政策金额处置、「我的」明细按信息架构归位接真。
+- P1-A 后台增改入口：招聘会基础字段/数据大屏/参展企业岗位明细可录入、Partner 招聘会子资源归属决策、Admin 信息源死按钮接线、Partner 企业下架、Admin/Partner 空壳页收口。
+- P1-B 验证守门：打印任务主链路、待机屏/Content/Audit/AI 配置补 verify，生产存储驱动与三端 API mode 纳入部署门禁。
+- P2 后置项：展位网格/现场签到、社保与就业登记模板内容化、简历素材库、支付域继续后置。
+
+校准说明：审计报告正文仍保留其生成时的代码证据和风险表述；后续执行以 `current-progress.md` 顶部最新记录和 `next-tasks.md` 顶部拆解为准。尤其是「我的」页已按 6/14 信息架构整改为入口与概览，不再恢复旧账号资产聚合区；青岛专区 6/13 仅移除了虚构企业岗位数，政策金额/高校/园区/资讯硬编码仍需作为上线前处置项继续跟进。
+
+---
+
+## Kiosk「我的」页账号资产聚合区清理（2026-06-14，Codex，信息架构整改）
+
+用户确认「我的」页不应同时存在上方业务入口和下方独立「账号资产」明细聚合区；各类数据应放回对应功能页面，避免同义重复入口和信息层级混乱。本轮先做页面层收口：
+
+- [ProfilePage.tsx](../../apps/kiosk/src/pages/profile/ProfilePage.tsx)：移除登录态下方独立 `AccountAssetsPanel` 渲染，不再展示「账号资产」大列表。
+- 「我的收藏」「AI服务记录」等已有明确业务入口的卡片改为跳转对应业务入口；暂无独立承载页的「我的权益」「招聘会浏览记录」「招聘会预约跳转记录」保持「建设中」诚实状态。
+- 移除「见下方账号资产」「账号资产 · 浏览与跳转记录」等提示文案；页脚改为「本人数据仅本人可见，各类记录将逐步归位到对应业务页面」。
+- 保留顶部 AI 记录 / 收藏 / 文档数量概览，作为个人中心摘要；删除旧聚合面板 `AccountAssetsPanel` 及 Profile 专属明细组组件（Resumes / Documents / AiRecords / PrintOrders / Favorites / ActivityLogs / Benefits），避免后续误恢复「账号资产」分区。后端 `/me/*` 接口继续作为业务页承载明细时的真实数据源。
+
+---
+
+## 政策服务页重设计上线（2026-06-14，Claude，已落地 /renshi）
+
+首页「政策服务」入口页（`/renshi`）由旧「人社专区信息墙」重构为竖屏「政策服务」页；Codex 早期的隐藏预览路由 `/policy-preview` 与 `PolicyServicePreviewPage` 已删除，不保留两套页面。
+
+- 信息架构：合规提示条（仅信息指引·不代办 + 直达 AI 助手政策问答）→「政策匹配」按身份筛选（全部 / 高校毕业生 / 灵活就业 / 创业人员 / 困难群体，通用事项始终展示）→ 就业政策 / 社保指南 / 就业登记 / 政策公告 四类 Tab →常用材料打印包→合规页脚。
+- 混合数据源：「就业政策」= 后端审核发布政策（`getPublishedPolicies` kind=policy_guide，经 `fromPublished` 归一）在前 + 内置办事指引模板（`BUILTIN_GUIDES`）在后；「政策公告」= 后端 kind=notice；社保 / 登记沿用内置办事指引。来源行取真实来源机构名 + 最近同步时间，不硬编码。
+- 闭环：政策事项展开记 `recordBrowse('policy')`，扫码官方入口记 `recordExternalJump('policy','external_open')` 并弹真实 `officialUrl` 二维码，收藏走 `useFavorites('policy')`；均 fire-and-forget、匿名不上报、不记录办理结果。
+- 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
+- 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
+- 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
 
 ---
 

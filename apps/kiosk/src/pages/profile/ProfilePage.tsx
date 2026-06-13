@@ -39,17 +39,18 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { AccountAssetsPanel } from './assets/AccountAssetsPanel'
-import { useMemberAssetGroups } from './assets/useMemberAssetGroups'
+import { useMemberProfileOverview } from './assets/useMemberProfileOverview'
 import { formatTime } from './assets/format'
 import { RowIconButton } from './assets/ui'
 
 // 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
 // 诚实化与合规约束：
-// - 只承诺本次会话记录，不宣称跨会话留存 / 多终端同步等尚未实现的能力；账号资产中心建设中。
+// - 只承诺本次会话记录，不宣称跨会话留存 / 多终端同步等尚未实现的能力。
 // - 不展示假数量；未实现入口用「建设中」标签，会话相关入口用「本次记录」标签。
 // - 岗位 / 招聘会只作第三方来源信息入口与跳转/浏览记录，不引入任何招聘闭环语义。
 // - 只改本文件，不新增后端 API，不做活动 / 套餐 / 支付真实逻辑。
+// - 信息架构收口：不再把各类明细堆在独立「账号资产」聚合区；我的页只保留入口与概览，
+//   后续明细应归位到简历、打印、岗位/招聘会、权益等对应业务页面。
 // 底部 Tab（首页 / AI助手 / 我的）由 KioskLayout 提供，本页不改动。
 
 // 卡片统一表面：圆角 / 1px 边框 / 白底 / 轻阴影（对齐共享设计系统）。
@@ -78,10 +79,10 @@ interface EntrySectionData {
 const ASSETS: Entry[] = [
   { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/resume/source' },
   { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', tag: '本次记录' },
-  { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', tag: '本次记录' },
-  { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单' },
-  { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏' },
-  { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益' },
+  { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', route: '/assistant' },
+  { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', tag: '本次记录' },
+  { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏', route: '/jobs' },
+  { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益', tag: '建设中' },
 ]
 
 // 2. 常用服务（均跳转既有功能页）
@@ -97,11 +98,11 @@ const SERVICES: Entry[] = [
 ]
 
 // 3. 招聘会与活动（外部来源信息入口 / 记录）
-// 浏览记录 / 预约跳转记录已接真（P1）：登录会员的真实记录在下方「账号资产 · 浏览与跳转记录」。
-// 只记录浏览与打开来源平台入口两类行为；预约/投递结果以来源平台为准，本系统不记录。
+// 浏览记录 / 预约跳转记录的明细页后续应归位到招聘会业务页；当前不再放到「我的」下方聚合展示。
+// 预约/投递结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
-  { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '招聘会浏览记录' },
-  { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '招聘会预约跳转记录' },
+  { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '招聘会浏览记录',     tag: '建设中' },
+  { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '招聘会预约跳转记录', tag: '建设中' },
   { icon: QrCodeIcon,       iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-600',  label: '招聘会扫码凭证',     tag: '建设中' },
   { icon: GiftIcon,         iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',           tag: '建设中' },
 ]
@@ -164,7 +165,7 @@ function ProfileHeader({
   isLoggedIn: boolean
   displayName: string
   phoneMasked: string
-  // null = 账号资产尚未加载完成（展示「—」而非误导性的 0）
+  // null = 账号概览统计尚未加载完成（展示「—」而非误导性的 0）
   stats: {
     aiRecords: number | null
     favorites: number | null
@@ -269,7 +270,7 @@ function ProfileHeader({
   )
 }
 
-// value=null 表示账号资产尚未加载完成：展示「—」而非误导性的 0；loading 时轻微脉冲提示。
+// value=null 表示账号概览统计尚未加载完成：展示「—」而非误导性的 0；loading 时轻微脉冲提示。
 function ProfileStat({ value, label, loading }: { value: number | null; label: string; loading: boolean }) {
   const unloaded = value === null
   return (
@@ -428,8 +429,8 @@ export function ProfilePage() {
 
   const hasSessionRecords = resumes.length + scans.length + aiRecords.length > 0
 
-  // ── 账号资产（C-2D）：六组独立加载 / 失败重试 / 游标翻页（不再单个 Promise.all 绑死）──
-  const assetGroups = useMemberAssetGroups(isLoggedIn, getToken)
+  // ── 账号概览统计：仅用于顶部三项数量，不在「我的」页下方聚合展示明细 ──
+  const profileOverview = useMemberProfileOverview(isLoggedIn, getToken)
 
   const headerDisplayName = user?.nickname?.trim() || displayName || '已登录用户'
   const headerPhoneMasked = user?.phoneMasked ?? displayName
@@ -437,15 +438,14 @@ export function ProfilePage() {
   // 本次会话记录在下方「本次服务记录」单独展示。不展示「完整度」——无真实完整度计算，不编造数字。
   // total 为 null（加载中 / 未登录 / 加载失败）时头部展示「—」，避免误显示 0。
   const headerStats = {
-    aiRecords: assetGroups.aiRecords.total,
-    favorites: assetGroups.favorites.total,
-    documents: assetGroups.documents.total,
+    aiRecords: profileOverview.aiRecords,
+    favorites: profileOverview.favorites,
+    documents: profileOverview.documents,
   }
-  const statsLoading =
-    assetGroups.aiRecords.loading || assetGroups.favorites.loading || assetGroups.documents.loading
+  const statsLoading = profileOverview.loading
 
   // ── Toast ────────────────────────────────────────────────────
-  // 诚实化：资产中心未完成前不承诺留存，只提示「已加入本次记录」。
+  // 诚实化：不承诺跨页面资产明细，只提示「已加入本次记录」。
   const [toastMsg, setToastMsg] = useState<string | null>(() => {
     if (incoming.savedResume) return '简历已加入本次记录'
     if (incoming.savedFile) return '扫描文件已加入本次记录'
@@ -485,22 +485,6 @@ export function ProfilePage() {
   const handleEntryTap = (entry: Entry) => {
     if (entry.route) {
       navigate(entry.route)
-      return
-    }
-    // 收藏 / 权益已服务端化（Phase C-2C）：登录会员的真实列表在下方「账号资产」展示。
-    if (entry.label === '我的收藏' || entry.label === '我的权益') {
-      setToastMsg(isLoggedIn ? '见下方账号资产' : '登录后可查看本人收藏与权益')
-      return
-    }
-    // 打印订单已服务端化（Phase C-2C 后续小步）：登录会员的真实账号订单在下方「账号资产」展示；
-    // 本次会话的打印动作仍在「本次服务记录」单独呈现，不混为账号订单。
-    if (entry.label === '打印订单') {
-      setToastMsg(isLoggedIn ? '见下方账号资产' : '登录后可查看本人打印订单')
-      return
-    }
-    // 浏览/跳转记录已接真（P1）：真实列表在下方「账号资产 · 浏览与跳转记录」分组。
-    if (entry.label === '招聘会浏览记录' || entry.label === '招聘会预约跳转记录') {
-      setToastMsg(isLoggedIn ? '见下方账号资产「浏览与跳转记录」' : '登录后可查看本人浏览与跳转记录')
       return
     }
     if (entry.tag === '本次记录') {
@@ -546,11 +530,6 @@ export function ProfilePage() {
       {SECTIONS.map((section) => (
         <EntrySection key={section.title} section={section} onTap={handleEntryTap} />
       ))}
-
-      {/* ── 账号资产（C-2D，仅登录会员；六组独立加载 / 失败重试 / 游标翻页 / 会员操作）── */}
-      {isLoggedIn && (
-        <AccountAssetsPanel groups={assetGroups} onToast={setToastMsg} cardSurface={cardSurface} />
-      )}
 
       {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}
       {hasSessionRecords && (
@@ -599,11 +578,11 @@ export function ProfilePage() {
         </section>
       )}
 
-      {/* 合规说明 — 诚实化：登录会员展示本人账号资产（留存到期清理）；游客仅本次会话 */}
+      {/* 合规说明 — 诚实化：我的页只做入口与概览；游客仅本次会话 */}
       <p className="text-center text-xs leading-relaxed text-gray-400">
         {isLoggedIn
-          ? '账号资产仅本人可见，留存到期后自动清理，敏感文件不长期保存；更多资产能力逐步开放中'
-          : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人账号资产'}
+          ? '本人数据仅本人可见，留存到期后自动清理；各类记录将逐步归位到对应业务页面'
+          : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人服务概览'}
       </p>
     </div>
   )

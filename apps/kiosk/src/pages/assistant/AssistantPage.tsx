@@ -58,7 +58,7 @@ const SHORTCUTS: AssistantAction[] = [
   { label: '打印文件',  route: '/print/upload'  },
   { label: '查看岗位',  route: '/jobs'          },
   { label: '查看招聘会', route: '/job-fairs'    },
-  { label: '人社专区',  route: '/renshi'        },
+  { label: '政策服务',  route: '/renshi'        },
 ]
 
 const SHORTCUT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
