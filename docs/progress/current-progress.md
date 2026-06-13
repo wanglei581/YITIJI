@@ -5,6 +5,18 @@
 
 ---
 
+## 上线前 P0 准备物（2026-06-13，Claude/Codex，不依赖外部资源的执行手册）
+
+数字人不在待办内，主线为上线前 P0 验收。5 项 P0 阻塞全部卡在外部资源/审核，代码侧无可改；本轮为其中可提前准备的 4 项写好「待解除即照做」的执行手册（未真机执行）：
+
+- 新增 [production-deployment-runbook.md](../device/production-deployment-runbook.md)：服务器部署可复制粘贴版（生产 `.env` 模板含密钥生成命令、构建序列、PG `db:pg:deploy`→seed→核心 verify、nginx 反代+上传限制样例、PM2 守护、`/api/v1/health` 判据、回滚）。配套清单 §三/§四。
+- 新增 [windows-host-acceptance-runbook.md](../device/windows-host-acceptance-runbook.md)：一体机换机操作版（记录打印机真实识别名→`config.json`/`printerName` 配置→注册心跳→服务安装自启单实例→真机打印 10 项含彩色/双面真机实测→扫描/U盘按实际能力）。配套清单 §五。
+- 新增 [launch-review-submissions.md](../compliance/launch-review-submissions.md)：① 腾讯云短信签名+验证码模板申请草稿；② 隐私政策/用户协议法务审定输入包（数据采集清单 + 6 个境内第三方处理者数据流向 + 真实 TTL + 现有 `LegalDocPage.tsx` 试运营草稿指引 + 待法务决策项）。
+- Codex 复核修正：短信验证码正文模板移除 `【签名】` 占位，避免运营复制提交时与腾讯云「签名管理」重复填写。
+- 所有文档密钥位置一律占位符/生成命令，不含真实值。
+
+---
+
 ## 上线前收口总盘点（2026-06-12，Codex，文档盘点）
 
 项目进入上线前收口阶段：不再新增非必要功能，不新增首页入口 / 底部 Tab / AI 能力，不扩展企业侧招聘闭环；本轮只做验收口径、阻塞项、部署准备与真机验证规划。
