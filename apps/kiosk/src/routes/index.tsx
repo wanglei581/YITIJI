@@ -32,6 +32,10 @@ import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
+import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
+import { MyDocumentsPage } from '../pages/profile/me/MyDocumentsPage'
+import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
+import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
@@ -67,6 +71,11 @@ export const kioskRouter = createBrowserRouter([
       { index: true,               element: <HomePage /> },
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
+      // 「我的」明细页（本人 /me/* 真实数据；未登录引导登录，空态诚实，不造假数据）
+      { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
+      { path: 'me/documents',      element: <MyDocumentsPage /> },
+      { path: 'me/favorites',      element: <MyFavoritesPage /> },
+      { path: 'me/activity',       element: <MyActivityPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'campus',            element: <CampusPage /> },
       // 打印扫描服务中心

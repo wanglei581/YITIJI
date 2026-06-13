@@ -78,6 +78,23 @@
 
 ---
 
+## 上线前 P0 收口 ④：「我的」明细归位接真（2026-06-14，Claude，分支 `feature/profile-detail-pages`）
+
+按 6/14 信息架构整改，「我的」页只做入口与概览，明细由 `/me/*` 轻量页承载（不恢复旧账号资产聚合区，不造本地假数据）。`/me/*` 后端端点与 kiosk 客户端函数此前已就绪，本轮只补前端明细页 + 路由 + ProfilePage 接线，**未动后端**。
+
+- 新增 `apps/kiosk/src/pages/profile/me/`：共享脚手架 `MeListShell`（未登录引导登录 / loading / error / 空态诚实）+ 4 个页：
+  - `MyPrintOrdersPage` `/me/print-orders` — 文件名/状态/份数/彩黑/幅面/时间（无页数/设备名/金额，后端无真实列不编造）。
+  - `MyDocumentsPage` `/me/documents` — 名称/大小/时间/有效期；查看凭本人 token 现换短期签名 URL（`fetchAccessUrl`），过期置灰不可打开。
+  - `MyFavoritesPage` `/me/favorites` — 按类型（岗位/招聘会/政策）分 Tab，点击跳来源详情（`/jobs/:id`、`/job-fairs/:id`、政策→`/renshi`）。
+  - `MyActivityPage` `/me/activity` — 浏览 / 外部跳转两 Tab（`?tab=jump`），跨类型（岗位/招聘会/政策/企业）；跳转记录文案统一「打开来源入口 / 官方入口」，不出现投递/预约结果/凭证（守招聘闭环红线）。
+- `routes/index.tsx` 增 4 条 `/me/*` 路由；`ProfilePage.tsx` 接线：「我的文档」「打印订单」由 `tag:'本次记录'`→真实路由，「我的收藏」由错指 `/jobs`→`/me/favorites`，「招聘会浏览记录/预约跳转记录」改名「浏览记录/外部跳转记录」并接 `/me/activity`。
+- 合规：仅本人数据；mock 模式各客户端返回空页→走诚实空态；未登录→「登录后查看」卡。
+- **验证**：kiosk typecheck / lint / build（http）全 PASS；`verify:jobfair-ui` ALL PASS。真实数据渲染需后端 + 登录会员（生产/联调环境）。
+
+> P0-A 四项（生产构建禁 mock / SMS 真发 / 青岛下线 / 「我的」归位）至此全部完成。
+
+---
+
 ## 上线前 P0 准备物（2026-06-13，Claude/Codex，不依赖外部资源的执行手册）
 
 数字人不在待办内，主线为上线前 P0 验收。5 项 P0 中，生产资源、线上域名闭环、Windows 真机、法务审定仍依赖用户/外部方；腾讯 SMS 除签名/模板审核外，还需补 `TencentSmsSender.sendCode()` 的真实 SendSms 接入与真号 E2E。当前本轮只沉淀可提前准备的执行手册/提交包，未执行真机或生产部署：

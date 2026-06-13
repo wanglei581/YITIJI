@@ -38,7 +38,7 @@
 - [x] **生产构建禁止默认 mock**（✅ 2026-06-14，已合入 main `bc5886d`）：三端 `vite.config.ts` 内联 `assertProdApiMode`，production 构建若 `VITE_API_MODE!=='http'` 直接失败；CI Build 步骤注入 `VITE_API_MODE=http`。消除「漏配 env → 整机展示静态演示招聘会/岗位/政策」的单点风险。
 - [x] **腾讯 SMS 真发接入**（✅ 2026-06-14，已合入 main `6f8a64f`）：`TencentSmsSender.sendCode()` 已接入真实腾讯云 `SendSms`（复用 TC3 签名工具），`verify:sms-send` 本地 stub 14/14 PASS；登录流程/前端零改动。真号 E2E 仍待短信签名/模板审核 + 真实密钥 + 真号（纯外部）。
 - [x] **青岛专区处置**（✅ 2026-06-14，分支 `feature/remove-qingdao-orphan`）：按「优先下线 orphan 路由」方案**物理删除** `/qingdao` 页面/路由/Assistant 白名单引用 + `verify:jobfair-ui` F 段，消除硬编码补贴金额合规风险。详见 current-progress.md（2026-06-14）。
-- [ ] **「我的」明细归位接真**：按 6/14 信息架构整改，不恢复 `ProfilePage` 下方账号资产聚合区；改为在对应业务页或独立轻量路由承载 `/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/browse-logs`、`/me/external-jump-logs`。Profile 只保留入口与概览，不能继续保留「本次记录 / 建设中」造成真假冲突。
+- [x] **「我的」明细归位接真**（✅ 2026-06-14，分支 `feature/profile-detail-pages`）：新增 `/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/activity`（浏览 + 外部跳转两 Tab）轻量明细页 + 共享 `MeListShell`；ProfilePage「我的文档/打印订单」由「本次记录」改真实路由、「我的收藏」从错指 `/jobs` 改 `/me/favorites`、浏览/跳转入口改名「浏览记录/外部跳转记录」接真。不恢复账号资产聚合区，未动后端，空态/未登录/错误态诚实，mock 模式走空态。kiosk typecheck/lint/build PASS。**P0-A 四项至此全部完成。**
 
 ### P1-A 后台增改入口补齐（7/1–7/15）
 

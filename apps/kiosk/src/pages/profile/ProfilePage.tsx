@@ -48,9 +48,9 @@ import { RowIconButton } from './assets/ui'
 // - 只承诺本次会话记录，不宣称跨会话留存 / 多终端同步等尚未实现的能力。
 // - 不展示假数量；未实现入口用「建设中」标签，会话相关入口用「本次记录」标签。
 // - 岗位 / 招聘会只作第三方来源信息入口与跳转/浏览记录，不引入任何招聘闭环语义。
-// - 只改本文件，不新增后端 API，不做活动 / 套餐 / 支付真实逻辑。
+// - 不新增后端 API（明细页消费既有 /me/* 端点）；不做活动 / 套餐 / 支付真实逻辑。
 // - 信息架构收口：不再把各类明细堆在独立「账号资产」聚合区；我的页只保留入口与概览，
-//   后续明细应归位到简历、打印、岗位/招聘会、权益等对应业务页面。
+//   明细由 /me/* 轻量页承载（打印订单 / 文档 / 收藏 / 浏览·跳转记录），其余仍归位对应业务页。
 // 底部 Tab（首页 / AI助手 / 我的）由 KioskLayout 提供，本页不改动。
 
 // 卡片统一表面：圆角 / 1px 边框 / 白底 / 轻阴影（对齐共享设计系统）。
@@ -78,10 +78,10 @@ interface EntrySectionData {
 // 1. 我的资产
 const ASSETS: Entry[] = [
   { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/resume/source' },
-  { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', tag: '本次记录' },
+  { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', route: '/me/documents' },
   { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', route: '/assistant' },
-  { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', tag: '本次记录' },
-  { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏', route: '/jobs' },
+  { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', route: '/me/print-orders' },
+  { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏', route: '/me/favorites' },
   { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益', tag: '建设中' },
 ]
 
@@ -98,11 +98,11 @@ const SERVICES: Entry[] = [
 ]
 
 // 3. 招聘会与活动（外部来源信息入口 / 记录）
-// 浏览记录 / 预约跳转记录的明细页后续应归位到招聘会业务页；当前不再放到「我的」下方聚合展示。
+// 浏览 / 外部跳转记录跨类型（岗位/招聘会/政策/企业），由 /me/activity 两 Tab 页承载。
 // 预约/投递结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
-  { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '招聘会浏览记录',     tag: '建设中' },
-  { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '招聘会预约跳转记录', tag: '建设中' },
+  { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '浏览记录',     route: '/me/activity' },
+  { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '外部跳转记录', route: '/me/activity?tab=jump' },
   { icon: QrCodeIcon,       iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-600',  label: '招聘会扫码凭证',     tag: '建设中' },
   { icon: GiftIcon,         iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',           tag: '建设中' },
 ]
