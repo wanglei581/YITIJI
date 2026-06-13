@@ -1,7 +1,20 @@
 # 当前开发进度
 
-> 最后更新：2026-06-13
+> 最后更新：2026-06-14
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 上线前 P0 收口 ③：腾讯云短信真发已接入（2026-06-14，Claude，分支 `feature/tencent-sms-send`）
+
+`services/api/src/member-auth/sms/sms-sender.ts` 的 `TencentSmsSender.sendCode()` 由原 `throw SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED` 改为**真实腾讯云 SendSms 调用**（`SendSms` / `2021-01-11`，TC3-HMAC-SHA256 签名复用 `common/tencent/tc3.ts`，与 ASR/TTS 同一套）。
+
+- 手机号转 E.164（大陆补 `+86`）；模板参数 `{1}=验证码`，可选 `{2}=有效期分钟`（`TENCENT_SMS_CODE_EXPIRE_MINUTES` 留空=单参数，填数字=双参数，须与实际验证码 TTL 一致）。
+- 失败统一抛 `SMS_SEND_FAILED`；`MemberAuthService` 已在 catch 中删码重置——**登录流程与前端零改动，契约不变**。
+- 安全：密钥仅服务端；日志只含脱敏手机号 + 腾讯返回码 + RequestId，**绝不记验证码**；`AbortController` 超时（默认 10s）。
+- 新增 `TENCENT_SMS_HOST`（默认正式域名，本地 stub 可指向 127.0.0.1:port）。
+- **验证**：`api typecheck` PASS；`verify:sms-provider` 5/5 PASS（provider 选择/生产守卫不变）；新增 `verify:sms-send` 本地 stub 14/14 PASS（TC3 签名头、Action/Version/Region、E.164、单/双参数、Ok 成功、Error/状态失败抛 `SMS_SEND_FAILED`、验证码不入日志）。
+- **仍待外部**：① 短信签名/模板审核通过拿 SignName/TemplateId/SDKAppID ② 真实 CAM 密钥进生产 env ③ 真号 E2E。三者齐备再置 `SMS_PROVIDER=tencent`（审核通过前生产强制禁假发送）。
 
 ---
 
