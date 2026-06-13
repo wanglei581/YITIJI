@@ -356,14 +356,14 @@ pnpm --filter ./services/api verify:activity-logs
 - 最近 CI：`build-and-verify` ✅ + `postgres-readiness` ✅（run 27427254853）。
 - `git ls-files | grep -iE '\.env'` 仅 5 个 `.env.example`；`git log --all -- '**/.env'` 为空（.env 从未入库）；.gitignore 覆盖 .env/.env.local/*.log/dist。
 
-### B. §2.2 密钥轮换 —— 阻塞（待用户云控制台操作）
+### B. §2.2 密钥轮换 —— OCR / COS 已解除（2026-06-13 新 Key live 复验）；ASR/TTS/SMS/LLM 上线时按生产 Key
 
 | 密钥 | 暴露情况 | 状态 |
 |---|---|---|
-| 百度 OCR（AppID 7841387） | 曾在聊天明文暴露 | **阻塞：须用户在百度控制台删应用重建**；本地现 Key 真实冒烟通过（`verify:ocr-baidu-live` PASS，458ms/置信度 high），证明链路就绪，换新 Key 后只改 services/api/.env 复跑同一冒烟 |
-| 腾讯云 COS CAM | 配置时曾在终端回显 | **阻塞：须用户轮换 CAM 子用户密钥并最小化权限**（仅私有桶所需 action） |
-| 腾讯云 ASR/TTS/TRTC | 未发现聊天暴露记录 | 上线时按最小权限签发生产专用 Key；TRTC 凭证只改 services/api/.env（代码冻结） |
-| 腾讯 SMS | — | **阻塞：短信签名/模板审核未过**；审核通过前生产不得设 SMS_PROVIDER=log 以外的假发送，服务端已有启动期校验（prod 强制 tencent，禁止 log） |
+| 百度 OCR（旧 AppID 7841387） | 曾在聊天明文暴露 | ✅ **已解除（2026-06-13）**：用户在百度控制台重建应用，新 Key 配入 `services/api/.env`；`verify:ocr-baidu-live` 真实联网通过，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。旧 Key 作废以用户控制台操作为准 |
+| 腾讯云 COS CAM | 配置时曾在终端回显 | ✅ **已解除（2026-06-13）**：用户轮换 CAM 子用户密钥，新 Key 配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action |
+| 腾讯云 ASR/TTS/TRTC | 未发现聊天暴露记录 | 上线时按最小权限签发生产专用 Key；TRTC 凭证只改 `services/api/.env`（代码冻结） |
+| 腾讯 SMS | — | **阻塞：短信签名/模板审核未过**；审核通过前生产不得设 `SMS_PROVIDER=log` 以外的假发送，服务端已有启动期校验（prod 强制 tencent，禁止 log） |
 | LLM（DeepSeek 等） | 未发现聊天暴露记录 | 上线使用生产专用 Key；真实联调证据：2026-06-12 2E/2D 真实 DeepSeek 浏览器验收通过 |
 
 ### C. §3.4/§3.6 PostgreSQL 底座 —— 本地预演通过

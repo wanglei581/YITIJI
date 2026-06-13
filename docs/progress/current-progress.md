@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-06-12
+> 最后更新：2026-06-13
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
@@ -24,13 +24,13 @@
 - 最新部署提交对应的 GitHub CI SQLite 主 job 与 `postgres-readiness` 均通过；服务器环境补跑核心 verify，确认没有误连 SQLite。
 - PostgreSQL 生产实例完成空库 `migrate deploy`、seed、核心 verify、备份恢复演练；如迁移旧数据，必须跑对账并记录孤儿/脏数据处理。
 - Windows 本地主机 / Terminal Agent / 打印机按真机清单复验：Agent 安装、自启动、心跳、`printerName`、PDF/图片/简历打印、黑白/彩色/份数/双面、断网恢复。
-- 生产密钥轮换与最小权限：百度 OCR、COS CAM、腾讯云 ASR/TTS/SMS/TRTC、LLM API Key；服务协议 / 隐私政策 / 合规说明完成法务确认。
+- 生产密钥轮换与最小权限：百度 OCR 与腾讯云 COS CAM 已用新 Key live 复验解除；腾讯云 ASR/TTS/SMS/TRTC、LLM API Key 上线时使用生产专用最小权限 Key；服务协议 / 隐私政策 / 合规说明完成法务确认。
 - 线上浏览器闭环验收：登录、AI 简历、模拟面试、岗位/招聘会/政策收藏、浏览与跳转记录、我的文档、打印订单、删除与再打印。
 
 **P1 上线前建议：**
 
 - 打印状态实时追踪 UI（轮询/推送），降低用户只能刷新查看订单状态的操作成本。
-- 生产 COS live 冒烟与文件删除一致性抽样；Admin / Partner / Kiosk 关键运营页浏览器手验。
+- 生产 COS 文件删除一致性抽样；Admin / Partner / Kiosk 关键运营页浏览器手验。
 - 监控告警、日志脱敏抽样、备份定时任务与恢复演练记录沉淀。
 
 **P2 上线后优化：**
@@ -61,7 +61,8 @@
 
 - main 封板 `80eabcc`（含 74ef526/5f0ce63/80eabcc），CI 双 job 绿；typecheck（6 包）/lint（4 端 0 error）/build（5 包）全绿；8 个核心 verify 全 PASS（activity-logs 12 / companies 11 / c2d 9 / career-plan 11 / mock-interview 17 / job-fit 11 / resume-optimize / ocr-baidu 12）。
 - PostgreSQL 底座：空库 deploy（4 迁移）+ seed + PG 上 3 个核心 verify 全过；**pg_dump 备份 → pg_restore 临时库恢复演练通过（行数核对一致）**。
-- OCR 真实冒烟：`verify:ocr-baidu-live` PASS（458ms，置信度 high）。
+- OCR 新 Key 真实冒烟：`verify:ocr-baidu-live` PASS，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。
+- COS 新 Key 真实冒烟：`verify:cos:live` PASS，真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。
 - 合规禁词全仓扫描：**B 类违规为零**（命中均为禁词过滤防线代码/合规免责文案/子串误中）。
 - mock/假数据审计：生产路径 P0 为零；mock 分支全部受 `API_MODE!=http` 门控且明示演示；SMS/AI provider 有生产启动期校验（prod 禁 log/mock）。
 - 安全基线 10 项审计全通过（.env 隔离/无硬编码密钥/CORS 白名单/限流/异常不泄栈/签名 URL TTL/webhook 防重放/会员隔离/删除审计/日志脱敏）。
@@ -71,12 +72,17 @@
 1. `fix` Kiosk `/qingdao`：删除写死的「重点企业岗位数」（虚构岗位数+虚构来源归属+sourceUrl='#'）与「园区企业数/在招岗位数」假统计——违反「不允许静态假数字」红线；改为真实 `/companies` 企业展示入口 + 园区客观介绍。浏览器复验：假数字消失、真实入口在位。
 2. `fix` 新增 `GET /api/v1/health`：真实 DB 往返探活（user.count）+ 返回 `db: sqlite|postgres`（部署验收据此确认生产连的是 PostgreSQL），DB 不可用如实 503；不输出任何配置/密钥。本地实测返回 `{"status":"ok","db":"sqlite"}`。
 
-**阻塞（须用户/外部操作，代码侧无法完成）**：
+**已解除（2026-06-13，新 Key live 复验通过）**：
+
+| 原阻塞项 | 解除记录 |
+|---|---|
+| 百度 OCR 密钥轮换（曾聊天暴露，旧 AppID 7841387） | 用户在百度控制台重建应用，新 Key 配入 `services/api/.env`；`verify:ocr-baidu-live` 真实联网通过，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。旧 Key 作废以用户控制台操作为准 |
+| 腾讯云 COS CAM 密钥轮换（曾终端回显） | 用户轮换 CAM 子用户密钥，新 Key 配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action |
+
+**剩余阻塞（须用户/外部操作，代码侧无法完成）**：
 
 | 阻塞项 | 需要 |
 |---|---|
-| 百度 OCR 密钥轮换（曾聊天暴露，AppID 7841387） | 用户在百度控制台删应用重建；换 Key 后复跑 `verify:ocr-baidu-live` |
-| 腾讯云 COS CAM 密钥轮换（曾终端回显） | 用户轮换 CAM 子用户密钥并最小化权限 |
 | 腾讯 SMS 签名/模板审核 | 审核通过前不得启用真实发送（服务端已有 prod 强制校验） |
 | 生产服务器/域名/HTTPS/生产 PG/Redis/COS 桶 | 用户提供服务器与云资源后按清单 §三 执行 |
 | 线上浏览器闭环（35 链路） | 依赖生产域名；本地真实后端等价验收均已通过 |
@@ -85,7 +91,7 @@
 
 **判定记录**：打印状态实时追踪 UI 维持 P1（订单页已展示真实 PrintTask 状态，刷新可见；是否升 P0 待 Windows 真机现场验收再判）。场馆导览 Partner 配置入口维持 P1/P2，不阻塞上线。
 
-**结论：可以准备上线 ≠ 已经生产就绪。** 代码与本地验收侧已就绪；生产就绪以清单中 7 项阻塞逐项解除为准。
+**结论：可以准备上线 ≠ 已经生产就绪。** 代码与本地验收侧已就绪；OCR/COS 密钥轮换已技术验证解除；生产就绪以清单中剩余 5 项阻塞逐项解除为准。
 
 ---
 
@@ -135,7 +141,7 @@
 - **结论口径**：页面功能闭环打通 ≠ 生产服务器无风险 ≠ Windows 一体机换机无风险；上线前必须做服务器部署级、线上业务级、Windows 硬件/Agent 级验收。
 - **正式文档**：新增 `docs/device/production-deployment-and-windows-host-checklist.md`。
 - **覆盖范围**：生产前置（分支/CI/密钥轮换/合规）、服务器环境、PostgreSQL 空库 deploy 与迁移演练、nginx/HTTPS/上传限制、进程守护、线上浏览器业务验收、Windows Terminal Agent 安装、打印机驱动与 `printerName` 配置、真机打印、扫描/U盘/外设、上线后观察与回滚。
-- **强制边界**：百度 OCR、COS、腾讯云、LLM 等生产密钥上线前必须轮换；Windows 生产实例 PostgreSQL 与新一体机主机必须按清单复验后才能宣称生产就绪。
+- **强制边界**：百度 OCR 与 COS 生产密钥已于 2026-06-13 轮换并 live 复验通过；腾讯云 ASR/TTS/SMS/TRTC、LLM 等生产密钥上线时仍须使用生产专用最小权限 Key；Windows 生产实例 PostgreSQL 与新一体机主机必须按清单复验后才能宣称生产就绪。
 
 ---
 
@@ -1627,10 +1633,10 @@ POST /resume/parse { fileId }
 | shared / kiosk / admin typecheck / lint / build | ✅(kiosk 2 条既有 KioskBusyContext fast-refresh warning,非本次) |
 | `verify:cos`(objectKey / COS 签名独立重算 / 校验,纯函数) | ✅ 37 checks |
 | `verify:cos:files`(本地后端打 dev.db E2E,自清理) | ✅ 30 checks:上传落 owner/bucket/objectKey、round-trip、跨用户/跨机构/机构访问用户文件全拒、管理员访问→needsAdminAudit、intent→raw→complete、软删物理回收 |
-| `verify:cos:live`(真实 COS) | ⏳ 无凭证 SKIPPED(用户在 .env 配 TENCENT_COS_* 后可一键跑 put→head→get→签名下载→delete) |
+| `verify:cos:live`(真实 COS) | ✅ 2026-06-13 已用新 CAM Key 跑通真实桶 put→head→get→预签名URL直连→delete，跑完清理无残留 |
 | 启动 + DI + 路由 | ✅ `StorageService driver=local cosAvailable=false`、12 条 /files 路由(含 5 新端点)全 mapped |
 
-**未做 / 后续：** 真实 COS 端到端需用户凭证(`verify:cos:live`);打印 / 宣传屏内容当前仍走 `/content` 代理签名 URL(短 TTL,合规),未来可改 Kiosk/Agent 直连 COS 预签名 URL 省一跳;`AdAsset` 未加 bucket 列(单 driver 部署足够,混合环境历史素材按默认后端读)。
+**未做 / 后续：** 打印 / 宣传屏内容当前仍走 `/content` 代理签名 URL(短 TTL,合规),未来可改 Kiosk/Agent 直连 COS 预签名 URL 省一跳;`AdAsset` 未加 bucket 列(单 driver 部署足够,混合环境历史素材按默认后端读)。真实 COS 端到端已于 2026-06-13 用新 CAM Key 补跑通过。
 
 ---
 

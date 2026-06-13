@@ -1,18 +1,22 @@
 # 下一步任务
 
-> 最后更新：2026-06-13（上线前 P0 验收完成本地可执行部分；剩余 7 项阻塞均需用户/外部操作）
+> 最后更新：2026-06-13（百度 OCR / 腾讯云 COS 密钥轮换已用新 Key live 复验通过；剩余 5 项阻塞需用户/外部操作）
 
 ## 🚦 上线前剩余阻塞（2026-06-13 验收结论，按清单附录为准）
 
+**已解除（2026-06-13，新 Key live 复验通过）：**
+
+- ✅ **百度 OCR 密钥轮换**：用户在百度控制台重建应用后，新 Key 已配入 `services/api/.env`；`verify:ocr-baidu-live` 真实联网通过，`accurate_basic` 识别与扫描件 `pdf_ocr` 全链路通过，置信度 high。旧 Key 作废以用户控制台操作为准。
+- ✅ **腾讯云 COS CAM 密钥轮换**：用户轮换 CAM 子用户密钥后，新 Key 已配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684`（ap-guangzhou）put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action。
+- 生产服务器上线时，同一套新 Key 写入服务器环境变量即可，代码无需改动。
+
 **P0（解除后才能宣称生产就绪）：**
 
-1. 百度 OCR 密钥轮换（曾聊天暴露）→ 用户百度控制台操作 + 复跑 `verify:ocr-baidu-live`
-2. 腾讯云 COS CAM 密钥轮换（曾终端回显）→ 用户腾讯云控制台操作
-3. 生产服务器/域名/HTTPS/生产 PostgreSQL/Redis/COS → 用户提供资源后按清单 §三 部署验收（`/api/v1/health` 已就绪，须返回 db=postgres）
-4. 线上浏览器闭环 35 链路 → 依赖生产域名（本地等价验收已全过）
-5. Windows 真机 + Terminal Agent + 奔图打印机真机验收 → 用户提供一体机后按清单 §五
-6. 腾讯 SMS 签名/模板审核（审核过前服务端已强制禁假发送）
-7. 用户协议/隐私政策法务审定
+1. 生产服务器/域名/HTTPS/生产 PostgreSQL/Redis/COS → 用户提供资源后按清单 §三 部署验收（`/api/v1/health` 已就绪，须返回 db=postgres）
+2. 线上浏览器闭环 35 链路 → 依赖生产域名（本地等价验收已全过）
+3. Windows 真机 + Terminal Agent + 奔图打印机真机验收 → 用户提供一体机后按清单 §五
+4. 腾讯 SMS 签名/模板审核（审核过前服务端已强制禁假发送）
+5. 用户协议/隐私政策法务审定
 
 **P1（上线后/择期）**：打印状态实时追踪 UI（真机验收若发现现场不可用则升 P0，做最小轮询）；场馆导览 Partner 配置入口；express body limit 显式化。
 > 关联文档：[current-progress.md](./current-progress.md) | [campus-recruitment-design.md](../product/campus-recruitment-design.md)
@@ -179,7 +183,7 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
    - ✅ 原文只在内存流转给下游分析、不落任何表；日志只记元数据，不记原文/buffer。
    - 新增 `ResumeExtractionService` + `verify:resume-extraction`（11/11 ALL PASS）；api/shared typecheck + api lint 全绿。详见 [current-progress.md](./current-progress.md) §真实 AI 简历诊断 Phase 1A。
 2. ✅ **真实 AI Provider 接入 / LLM 结构化诊断（Phase 1B 已完成，2026-06-10，`feature/real-resume-diagnosis-1b`）：** 新增 `llm` provider + `LlmResumeService`（复用 `LlmConfigService` 加密凭证 + OpenAI 兼容，全局 fetch 不引 SDK），`AiService.submitResumeParse` 在 `AI_PROVIDER=llm` 时「先提取 → 失败直接返回 → 成功调 LLM 出结构化 `ResumeReport` → 落库」；非法 JSON 重试一次、未配置/失败明确报错不 fallback mock；`providerName='llm'` 演示横幅自动消失（前端零改动）。`verify-real-resume-diagnosis` 10/10 + `verify:ai-result-ownership` 12 例回归 + `verify:resume-extraction` 11/11 全过。补 `AI_PROVIDER`（含 llm）到 `.env.example`。详见 [current-progress.md](./current-progress.md) §真实 AI 简历诊断 Phase 1B。
-3. ✅ **图片/扫描件 OCR 真实接入（Stage 3 已完成，2026-06-11，百度智能云）：** `OCR_PROVIDER=baidu` 真实接入百度高精度版 accurate_basic（用户选用百度而非腾讯）；图片简历与扫描版 PDF（受控 ≤3 页渲染）均可进诊断闭环；低置信度报告页如实提示复核；OCR 失败不调 LLM；`verify:ocr-baidu` 12 PASS（进 CI）+ live 冒烟 + 浏览器真实链路（百度 OCR → DeepSeek）验收通过。腾讯 OCR 仅保留扩展位。**上线前须轮换百度密钥（曾在聊天暴露）。**
+3. ✅ **图片/扫描件 OCR 真实接入（Stage 3 已完成，2026-06-11，百度智能云）：** `OCR_PROVIDER=baidu` 真实接入百度高精度版 accurate_basic（用户选用百度而非腾讯）；图片简历与扫描版 PDF（受控 ≤3 页渲染）均可进诊断闭环；低置信度报告页如实提示复核；OCR 失败不调 LLM；`verify:ocr-baidu` 12 PASS（进 CI）+ live 冒烟 + 浏览器真实链路（百度 OCR → DeepSeek）验收通过。腾讯 OCR 仅保留扩展位。**百度 OCR 密钥已于 2026-06-13 轮换并用新 Key live 复验通过。**
 4. ✅ **报告结构扩展（Phase 1.1 已完成，2026-06-10，待 review）：** 升级为「8 项诊断结果」= **6 评分维度（basic/objective/experience/quantification/keyword/readability）+ riskNotes（风险表述提醒，0–5 条，仅文本表达、不涉敏感判断）+ priorities（修改优先级建议，2–4 条）**。`ResumeReport` 加 `riskNotes?`/`priorities?`（additive，旧 5-section 报告兼容）；`parseReport` 强校验 6 维度 + score/maxScore 严格(===10·整数) + priority 契约(focus·reason 必填、清洗后 1 条触发 retry) + 超长截断 + 诊断专属合规拦截词过滤(红线词 grep 0 命中)；前端新增风险卡/优先卡（缺失优雅降级）。`verify-real-resume-diagnosis` **18 PASS / ALL PASS** + 三端 typecheck/lint/build + ownership/extraction 回归全绿。详见 [current-progress.md](./current-progress.md) §Phase 1.1。
 5. ✅ **AI 简历优化真实化（阶段2B 已完成，2026-06-11）：** `resume_optimize` 已 active，`optimizeResume` 已走真实 LLM 优化链路；包含原文重提、事实串校验防编造、承诺词拦截、优化版可编辑、导出 PDF 与打印链路。`verify:resume-optimize` 已通过。旧 Phase 1E 待办已由阶段2B 覆盖，不再重复开发。
 6. **报告导出/打印：** 只有在真实生成 PDF/DOCX 报告文件并落 `FileObject` 后，才能重新开放「打印报告 / 导出报告」按钮；当前禁止构造假文件进入打印链路。
@@ -370,7 +374,7 @@ GitHub Actions 必须确认 SQLite 主 job 与 `postgres-readiness` 均通过。
 - ✅ 5 新端点:upload-intent / :id/raw / :id/complete / :id/download-url / :id/preview-url;下载预览支持 User + 会员双身份;管理员访问用户文件写审计。
 - ✅ 现有 Kiosk 上传 / 打印 / Admin 文件管理 / Partner 上传 / 宣传屏素材透明切 COS,前端无需改动。
 - ✅ api/shared/kiosk/admin typecheck/lint/build 全绿;`verify:cos`(37)+`verify:cos:files`(30) 全过;启动 + DI + 12 路由 mapped。
-- ⏳ **[凭证]** 真实 COS 端到端:用户在 `services/api/.env` 配 `FILE_STORAGE_DRIVER=cos` + `TENCENT_COS_SECRET_ID/SECRET_KEY/BUCKET/REGION`,跑 `pnpm --filter @ai-job-print/api verify:cos:live`(put→head→get→签名下载→delete)。当前无凭证 SKIPPED。
+- ✅ **[凭证]** 真实 COS 端到端：2026-06-13 已用新 CAM Key 跑通 `pnpm --filter @ai-job-print/api verify:cos:live`，真实桶 `yitiji-prod-private-1257025684` put→head→get→预签名URL直连→delete 全过，跑完清理无残留。
 - ⏳ **[择期]** 打印 / 宣传屏内容改 Kiosk/Agent 直连 COS 预签名 URL(当前走 `/content` 代理签名,短 TTL,合规可用,只是多一跳)。
 - ⏳ **[择期]** `AdAsset` 加 `bucket/region` 列以支持宣传屏素材跨后端混合环境(当前单 driver 部署足够)。
 - ⏳ **[基础设施]** PostgreSQL 迁移时,本迁移随 dev.db drift 一并重生成规范化(与既有 PG 迁移条目合并处理)。
