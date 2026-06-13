@@ -12,7 +12,7 @@
 
 **P0（解除后才能宣称生产就绪）：**
 
-> 准备物已就位（2026-06-13，Claude，不依赖外部资源）：可复制粘贴的执行手册已写好，待用户/外部方解除阻塞后照做即可。
+> 准备物已就位（2026-06-13，Claude，不依赖外部资源）：生产/真机/审核准备物已写好；解除对应资源或审核阻塞后，按文档继续执行，其中 SMS 仍需真实 SendSms 代码接入和真号 E2E 后才能上线。
 
 1. 生产服务器/域名/HTTPS/生产 PostgreSQL/Redis/COS → 用户提供资源后按 [production-deployment-runbook.md](../device/production-deployment-runbook.md) 执行 + 清单 §三打勾（`/api/v1/health` 已就绪，须返回 db=postgres）
 2. 线上浏览器闭环 35 链路 → 依赖生产域名（本地等价验收已全过）

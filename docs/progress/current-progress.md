@@ -7,7 +7,7 @@
 
 ## 上线前 P0 准备物（2026-06-13，Claude/Codex，不依赖外部资源的执行手册）
 
-数字人不在待办内，主线为上线前 P0 验收。5 项 P0 阻塞全部卡在外部资源/审核，代码侧无可改；本轮为其中可提前准备的 4 项写好「待解除即照做」的执行手册（未真机执行）：
+数字人不在待办内，主线为上线前 P0 验收。5 项 P0 中，生产资源、线上域名闭环、Windows 真机、法务审定仍依赖用户/外部方；腾讯 SMS 除签名/模板审核外，还需补 `TencentSmsSender.sendCode()` 的真实 SendSms 接入与真号 E2E。当前本轮只沉淀可提前准备的执行手册/提交包，未执行真机或生产部署：
 
 - 新增 [production-deployment-runbook.md](../device/production-deployment-runbook.md)：服务器部署可复制粘贴版（生产 `.env` 模板含密钥生成命令、构建序列、PG `db:pg:deploy`→seed→核心 verify、nginx 反代+上传限制样例、PM2 守护、`/api/v1/health` 判据、回滚）。配套清单 §三/§四。
 - 新增 [windows-host-acceptance-runbook.md](../device/windows-host-acceptance-runbook.md)：一体机换机操作版（记录打印机真实识别名→`config.json`/`printerName` 配置→注册心跳→服务安装自启单实例→真机打印 10 项含彩色/双面真机实测→扫描/U盘按实际能力）。配套清单 §五。
