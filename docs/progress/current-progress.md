@@ -41,6 +41,16 @@
 - 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
 - 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
 - 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
+## 上线前 P0 收口 ①：生产构建禁 mock 门禁已完成（2026-06-14，Claude，分支 `feature/prod-build-http-guard`）
+
+针对 2026-06-14 全面审计报告（docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md）列出的「上线即假数据」单点风险：kiosk/admin/partner 三端默认 `VITE_API_MODE=mock`，生产构建若漏注入 `=http` 会把 `src/data/*.ts` 等静态假数据打进产物。
+
+- **门禁**：三端 `vite.config.ts` 各内联 `assertProdApiMode(command, mode, env)`——仅当 `command==='build' && mode==='production'` 且 `VITE_API_MODE!=='http'` 时抛错中断构建；`VITE_API_BASE_URL` 缺失仅告警（各端 client 有 `/api/v1` 兜底）。dev / 非 production 构建不受影响。
+- **CI**：Build 步骤注入 `VITE_API_MODE=http` + `VITE_API_BASE_URL=/api/v1`，保持 SQLite 主 / postgres-readiness 双 CI 绿，并顺带校验生产产物为 http 模式。
+- **文档**：三端 `.env.example` 加门禁说明。
+- **验证（worktree 真实构建）**：三端 `tsc -b tsconfig.node.json` typecheck PASS；生产构建缺 `VITE_API_MODE` → exit 1 + 门禁信息；`VITE_API_MODE=http` → exit 0 构建成功；`vite build --mode development` 不拦。改动 7 文件（3 `vite.config.ts` + 3 `.env.example` + `.github/workflows/ci.yml`），未碰任何业务页面。
+
+> 上线前 P0 收口后续（各自独立分支）：② 青岛专区 `/qingdao` orphan 页下线（硬编码假补贴金额，合规）；③ `TencentSmsSender.sendCode()` 真发接入；④「我的」打印订单/文档/收藏/浏览·跳转记录明细归位接真（不恢复旧账号资产聚合区）。
 
 ---
 

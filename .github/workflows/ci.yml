@@ -84,6 +84,11 @@ jobs:
           pnpm --filter terminal-agent typecheck
 
       - name: Build
+        # 三端生产构建门禁要求 VITE_API_MODE=http（见各 app vite.config.ts 的 assertProdApiMode）；
+        # 这里显式设上，既让构建通过，也让 CI 顺带校验生产产物为 http 模式（非 mock 假数据）。
+        env:
+          VITE_API_MODE: http
+          VITE_API_BASE_URL: /api/v1
         run: |
           pnpm --filter @ai-job-print/api build
           pnpm --filter @ai-job-print/kiosk build
