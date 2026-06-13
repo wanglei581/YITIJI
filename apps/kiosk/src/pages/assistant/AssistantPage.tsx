@@ -44,7 +44,7 @@ const LazyAiAdvisorCall = USE_VOICE_CALL
 // ─── 路由白名单 ────────────────────────────────────────────
 
 const ALLOWED_ROUTE_PREFIXES = [
-  '/resume', '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/renshi', '/qingdao',
+  '/resume', '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/renshi',
 ] as const
 
 function isAllowedRoute(route: string): boolean {

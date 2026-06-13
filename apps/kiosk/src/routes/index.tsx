@@ -43,7 +43,6 @@ import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
 import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
 import { HomePage } from '../pages/home/HomePage'
-import { QingdaoPage } from '../pages/qingdao/QingdaoPage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
 import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
@@ -69,7 +68,6 @@ export const kioskRouter = createBrowserRouter([
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
       { path: 'renshi',            element: <RenshiPage /> },
-      { path: 'qingdao',           element: <QingdaoPage /> },
       { path: 'campus',            element: <CampusPage /> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },

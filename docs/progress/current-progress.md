@@ -64,6 +64,20 @@
 
 ---
 
+## 上线前 P0 收口 ②：青岛专区 /qingdao 下线（2026-06-14，Claude，分支 `feature/remove-qingdao-orphan`）
+
+针对审计报告唯一明确触合规红线项——`/qingdao`「AI 在青岛」专区为不可达孤儿页（HomePage/底部导航无入口，仅 AssistantPage 白名单可达），且硬编码具体补贴金额（一次性就业补贴 2000 元/人、安家补贴 500 万元、博士后租房 6000 元/月）与高校/园区/资讯虚构静态数据、无「演示」标注。按上线前处置原则**物理删除**（不做「先隐藏」）：
+
+- 删除页面文件 `apps/kiosk/src/pages/qingdao/QingdaoPage.tsx`（目录随之移除）。
+- `routes/index.tsx`：移除 `QingdaoPage` import 与 `/qingdao` 路由注册。
+- `pages/assistant/AssistantPage.tsx`：从 `ALLOWED_ROUTE_PREFIXES` 白名单移除 `/qingdao`。
+- `scripts/verify-jobfair-ui.mjs`：移除 F 段（原校验 QingdaoPage mock 不复活，页面已删该校验失去对象）+ 从 H 段禁词页面列表移除 qingdao。
+- `components/ComingSoonNotice.tsx`：注释去掉「AI 在青岛」。
+- 保留项（合法、非本页，未动）：`externalSources.ts`/`fairData.ts` 以「青岛」为城市/企业名的演示数据、`regions.ts` 地名归一化、`RenshiPage.tsx` 真实青岛人社局官方 URL。
+- **验证**：kiosk typecheck / lint / build（http）全 PASS；`verify:jobfair-ui` ALL PASS；全仓无 `QingdaoPage`/`'/qingdao'` 悬挂引用。
+
+---
+
 ## 上线前 P0 准备物（2026-06-13，Claude/Codex，不依赖外部资源的执行手册）
 
 数字人不在待办内，主线为上线前 P0 验收。5 项 P0 中，生产资源、线上域名闭环、Windows 真机、法务审定仍依赖用户/外部方；腾讯 SMS 除签名/模板审核外，还需补 `TencentSmsSender.sendCode()` 的真实 SendSms 接入与真号 E2E。当前本轮只沉淀可提前准备的执行手册/提交包，未执行真机或生产部署：

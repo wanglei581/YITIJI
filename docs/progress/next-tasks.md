@@ -35,9 +35,9 @@
 
 ### P0-A 代码侧上线门禁（6/14–6/30）
 
-- [ ] **生产构建禁止默认 mock**：三端生产构建必须显式 `VITE_API_MODE=http`，且 `VITE_API_BASE_URL` 指生产 API；补构建期断言，禁止 Kiosk/Admin/Partner 在生产产物里回落到 mock。目标是消除「漏配 env → 整机展示静态演示招聘会/岗位/政策」的单点风险。
-- [ ] **腾讯 SMS 真发接入**：在 `TencentSmsSender.sendCode()` 内接入真实腾讯云 `SendSms`（可复用现有 TC3 签名工具），同时提交短信签名/模板审核；审核通过后补真号 E2E。文档已反复确认：审核通过不等于可上线，当前代码仍会 `throw SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED`。
-- [ ] **青岛专区处置**：6/13 已移除「重点企业岗位数」虚构统计，但 `/qingdao` 仍存在硬编码具体补贴金额、人才政策金额、高校/园区/资讯静态数据。上线前二选一：优先下线该 orphan 路由；或接真后端并对未接真部分显著标注/隐藏。未完成前不得把该页作为上线能力展示。
+- [x] **生产构建禁止默认 mock**（✅ 2026-06-14，已合入 main `bc5886d`）：三端 `vite.config.ts` 内联 `assertProdApiMode`，production 构建若 `VITE_API_MODE!=='http'` 直接失败；CI Build 步骤注入 `VITE_API_MODE=http`。消除「漏配 env → 整机展示静态演示招聘会/岗位/政策」的单点风险。
+- [x] **腾讯 SMS 真发接入**（✅ 2026-06-14，已合入 main `6f8a64f`）：`TencentSmsSender.sendCode()` 已接入真实腾讯云 `SendSms`（复用 TC3 签名工具），`verify:sms-send` 本地 stub 14/14 PASS；登录流程/前端零改动。真号 E2E 仍待短信签名/模板审核 + 真实密钥 + 真号（纯外部）。
+- [x] **青岛专区处置**（✅ 2026-06-14，分支 `feature/remove-qingdao-orphan`）：按「优先下线 orphan 路由」方案**物理删除** `/qingdao` 页面/路由/Assistant 白名单引用 + `verify:jobfair-ui` F 段，消除硬编码补贴金额合规风险。详见 current-progress.md（2026-06-14）。
 - [ ] **「我的」明细归位接真**：按 6/14 信息架构整改，不恢复 `ProfilePage` 下方账号资产聚合区；改为在对应业务页或独立轻量路由承载 `/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/browse-logs`、`/me/external-jump-logs`。Profile 只保留入口与概览，不能继续保留「本次记录 / 建设中」造成真假冲突。
 
 ### P1-A 后台增改入口补齐（7/1–7/15）

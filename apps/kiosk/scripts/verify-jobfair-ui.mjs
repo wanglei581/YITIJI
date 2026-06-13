@@ -12,7 +12,7 @@
  *   C. /job-fairs/:id 详情页:3 Tab(详情与特色/参展企业与岗位/数据大屏) + 导航深链
  *   D. /campus 校园页:沉浸式 5 Tab(overview/companies/map/ai/print) + 真实 API 取数
  *   E. 路由绑定:/job-fairs → JobFairsPage,/campus → CampusPage
- *   F. /qingdao:LOCAL_FAIRS mock 不得复活,近期招聘会必须走 getJobFairs
+ *   F. (已移除)/qingdao 专区 2026-06-14 物理下线,原 mock 回退校验随页面删除
  *   G. 首页:补贴文案保持 info-only(不得回退「补贴快申/补贴申请」)
  *   H. 合规红线:页面不得出现虚拟 PDF 构造、示例打印行、招聘闭环禁词
  *
@@ -129,17 +129,7 @@ mustNotContain(
   else fail('E. routes/index.tsx 路由绑定被改动(JobFairsPage/CampusPage 未挂载)')
 }
 
-// ── F. /qingdao 不得回退 mock 招聘会 ──────────────────────────────────────
-mustNotContain(
-  'src/pages/qingdao/QingdaoPage.tsx',
-  ['LOCAL_FAIRS'],
-  'F1. 青岛专区 LOCAL_FAIRS mock 未复活',
-)
-mustContain(
-  'src/pages/qingdao/QingdaoPage.tsx',
-  ['getJobFairs'],
-  'F2. 青岛专区近期招聘会走真实 getJobFairs',
-)
+// ── F. /qingdao 专区已物理下线(2026-06-14)，原 mock 回退校验随页面删除 ──────────
 
 // ── G. 首页补贴文案保持 info-only ─────────────────────────────────────────
 mustNotContain(
@@ -159,7 +149,6 @@ mustContain(
     'src/pages/job-fairs/JobFairsPage.tsx',
     'src/pages/job-fairs/JobFairDetailPage.tsx',
     'src/pages/campus/CampusPage.tsx',
-    'src/pages/qingdao/QingdaoPage.tsx',
   ]
   const banned = ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理']
   // 「去来源平台投递」是 CLAUDE.md §2 规定的合规标准文案,先剔除再查禁词,
