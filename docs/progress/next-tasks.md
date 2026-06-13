@@ -17,7 +17,7 @@
 1. 生产服务器/域名/HTTPS/生产 PostgreSQL/Redis/COS → 用户提供资源后按 [production-deployment-runbook.md](../device/production-deployment-runbook.md) 执行 + 清单 §三打勾（`/api/v1/health` 已就绪，须返回 db=postgres）
 2. 线上浏览器闭环 35 链路 → 依赖生产域名（本地等价验收已全过）
 3. Windows 真机 + Terminal Agent + 奔图打印机真机验收 → 用户提供一体机后按 [windows-host-acceptance-runbook.md](../device/windows-host-acceptance-runbook.md) 执行 + 清单 §五打勾
-4. 腾讯 SMS 签名/模板审核 → 申请草稿见 [launch-review-submissions.md](../compliance/launch-review-submissions.md) §A（审核过前服务端已强制禁假发送）
+4. 腾讯 SMS 签名/模板审核 **+ `TencentSmsSender` 真实 SendSms 发送接入 + 真号 E2E 验收** → 草稿与落地步骤见 [launch-review-submissions.md](../compliance/launch-review-submissions.md) §A（当前 `TencentSmsSender.sendCode` 仍 `throw SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED`，**审核过 ≠ 可上线，仍需代码接入**；审核过前服务端已强制禁假发送）
 5. 用户协议/隐私政策法务审定 → 法务输入包见 [launch-review-submissions.md](../compliance/launch-review-submissions.md) §B
 
 **P1（上线后/择期）**：打印状态实时追踪 UI（真机验收若发现现场不可用则升 P0，做最小轮询）；场馆导览 Partner 配置入口；express body limit 显式化。

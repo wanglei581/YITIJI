@@ -11,7 +11,7 @@
 
 - 新增 [production-deployment-runbook.md](../device/production-deployment-runbook.md)：服务器部署可复制粘贴版（生产 `.env` 模板含密钥生成命令、构建序列、PG `db:pg:deploy`→seed→核心 verify、nginx 反代+上传限制样例、PM2 守护、`/api/v1/health` 判据、回滚）。配套清单 §三/§四。
 - 新增 [windows-host-acceptance-runbook.md](../device/windows-host-acceptance-runbook.md)：一体机换机操作版（记录打印机真实识别名→`config.json`/`printerName` 配置→注册心跳→服务安装自启单实例→真机打印 10 项含彩色/双面真机实测→扫描/U盘按实际能力）。配套清单 §五。
-- 新增 [launch-review-submissions.md](../compliance/launch-review-submissions.md)：① 腾讯云短信签名+验证码模板申请草稿；② 隐私政策/用户协议法务审定输入包（数据采集清单 + 6 个境内第三方处理者数据流向 + 真实 TTL + 现有 `LegalDocPage.tsx` 试运营草稿指引 + 待法务决策项）。
+- 新增 [launch-review-submissions.md](../compliance/launch-review-submissions.md)：① 腾讯云短信签名+验证码模板申请草稿；② 隐私政策/用户协议法务审定输入包（数据采集清单 + 6 个境内第三方处理者数据流向 + 真实 TTL + 现有 `LegalDocPage.tsx` 试运营草稿指引 + 待法务决策项）。**SMS 口径已校正（§A.3）：当前 `TencentSmsSender.sendCode` 仍 `throw SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED`，外部审核通过 ≠ 可上线，仍需在该方法内接入真实腾讯云 SendSms + 真号 E2E 验收，不是填 `.env` 即可照做。**
 - Codex 复核修正：短信验证码正文模板移除 `【签名】` 占位，避免运营复制提交时与腾讯云「签名管理」重复填写。
 - 所有文档密钥位置一律占位符/生成命令，不含真实值。
 
