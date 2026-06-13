@@ -10,6 +10,10 @@
 - ✅ **腾讯云 COS CAM 密钥轮换**：用户轮换 CAM 子用户密钥后，新 Key 已配入 `.env`；`verify:cos:live` 真实桶 `yitiji-prod-private-1257025684`（ap-guangzhou）put→head→get→预签名URL直连→delete 全过，跑完清理无残留。建议确认权限已最小化到该私有桶所需 action。
 - 生产服务器上线时，同一套新 Key 写入服务器环境变量即可，代码无需改动。
 
+**已完成（2026-06-14，Claude，上线前 P0 收口）：**
+
+- ✅ **生产构建禁 mock 门禁（P0-A）**：kiosk/admin/partner 三端 `vite.config.ts` 内联 `assertProdApiMode`——生产构建（production）若 `VITE_API_MODE!=='http'` 直接失败，杜绝「上线即假数据」；CI Build 步骤注入 `VITE_API_MODE=http`。三端真实构建验证通过。详见 current-progress.md（2026-06-14）。分支 `feature/prod-build-http-guard`。
+
 **P0（解除后才能宣称生产就绪）：**
 
 > 准备物已就位（2026-06-13，Claude，不依赖外部资源）：生产/真机/审核准备物已写好；解除对应资源或审核阻塞后，按文档继续执行，其中 SMS 仍需真实 SendSms 代码接入和真号 E2E 后才能上线。
