@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { maskPhone } from '../../common/crypto/phone-identity'
+import { tc3Sign } from '../../common/tencent/tc3'
 
 export const SMS_SENDER = Symbol('SMS_SENDER')
 
@@ -10,7 +11,9 @@ export type SmsProvider = 'log' | 'tencent'
  *
  * 当前支持:
  * - log:开发联调用,验证码只打服务端日志。
- * - tencent:腾讯云短信预留接口;待短信服务审核通过并拿到模板/签名/密钥后补真实 API 调用。
+ * - tencent:腾讯云短信，已接入真实 SendSms API 调用（TC3-HMAC-SHA256 签名）。
+ *   上线还需:① 短信签名/模板审核通过拿到 SignName/TemplateId/SDKAppID;② 真实 CAM 密钥进
+ *   服务端 env;③ 真号 E2E 验收。三者齐备后置 SMS_PROVIDER=tencent 即可真发。
  */
 export interface SmsSender {
   sendCode(phone: string, code: string): Promise<void>
@@ -23,6 +26,8 @@ interface TencentSmsConfig {
   signName: string
   templateId: string
   region: string
+  /** 短信 API Host（默认 sms.tencentcloudapi.com；本地 stub 测试可指向 127.0.0.1:port） */
+  host: string
 }
 
 function requireEnv(name: string): string {
@@ -62,6 +67,7 @@ function readTencentSmsConfig(): TencentSmsConfig {
     signName: requireEnv('TENCENT_SMS_SIGN_NAME'),
     templateId: requireEnv('TENCENT_SMS_TEMPLATE_ID'),
     region: process.env['TENCENT_SMS_REGION']?.trim() || 'ap-guangzhou',
+    host: process.env['TENCENT_SMS_HOST']?.trim() || 'sms.tencentcloudapi.com',
   }
 }
 
@@ -86,22 +92,92 @@ export class LogSmsSender implements SmsSender {
   }
 }
 
+/** 腾讯云短信 SendSms API 版本（国内短信）。 */
+const SMS_API_VERSION = '2021-01-11'
+
 /**
- * 腾讯云短信发送器预留位。
+ * 腾讯云短信发送器（真实接入）。
  *
- * 这里先完成 provider 选择、启动期配置校验与安全失败语义,不引入腾讯云 SDK,
- * 不拼真实 API 请求,也不打印验证码。短信服务审核通过后,只需要在本类中补
- * SendSms API 调用,MemberAuthService 与前端登录流程无需再改。
+ * - 用共享 TC3-HMAC-SHA256 签名（common/tencent/tc3.ts，与 ASR/TTS 同一套），密钥仅服务端。
+ * - 模板参数顺序见 docs/compliance/launch-review-submissions.md §A.2：{1}=验证码、{2}=有效期分钟。
+ *   单参数模板只传 [code]；若选用带有效期的双参数模板，配 TENCENT_SMS_CODE_EXPIRE_MINUTES
+ *   （须与 MemberAuthService 的实际验证码 TTL 一致）→ 传 [code, minutes]。
+ * - 绝不记录验证码：日志只含脱敏手机号 + 腾讯云返回码 + RequestId。
+ * - 任何失败统一抛 SMS_SEND_FAILED；MemberAuthService 已在 catch 中删码重置，契约不变。
  */
 export class TencentSmsSender implements SmsSender {
   private readonly logger = new Logger('TencentSmsSender')
 
   constructor(private readonly config: TencentSmsConfig) {}
 
-  async sendCode(phone: string, _code: string): Promise<void> {
-    this.logger.error(
-      `腾讯云短信接口已预留但真实发送尚未接入,本次未发送验证码(手机号 ${maskPhone(phone)}, region=${this.config.region}, templateId=${this.config.templateId})。`,
-    )
-    throw new Error('SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED')
+  async sendCode(phone: string, code: string): Promise<void> {
+    const host = this.config.host
+    // 本地 stub（127.0.0.1/localhost）走 http，便于无外网联调；真实腾讯云始终 https。
+    const insecure = host.startsWith('127.0.0.1') || host.startsWith('localhost')
+    // 腾讯云要求 E.164（带国家码）；大陆手机号补 +86，已带 + 则原样。
+    const e164 = phone.startsWith('+') ? phone : `+86${phone}`
+
+    const expireMinutes = (process.env['TENCENT_SMS_CODE_EXPIRE_MINUTES'] ?? '').trim()
+    const templateParamSet = expireMinutes ? [code, expireMinutes] : [code]
+
+    const payload = JSON.stringify({
+      PhoneNumberSet: [e164],
+      SmsSdkAppId: this.config.sdkAppId,
+      SignName: this.config.signName,
+      TemplateId: this.config.templateId,
+      TemplateParamSet: templateParamSet,
+    })
+    const ts = Math.floor(Date.now() / 1000)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), Number(process.env['TENCENT_SMS_TIMEOUT_MS']) || 10_000)
+    try {
+      const res = await fetch(`${insecure ? 'http' : 'https'}://${host}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: tc3Sign({
+            host: host.split(':')[0],
+            service: 'sms',
+            payload,
+            ts,
+            secretId: this.config.secretId,
+            secretKey: this.config.secretKey,
+          }),
+          'X-TC-Action': 'SendSms',
+          'X-TC-Version': SMS_API_VERSION,
+          'X-TC-Timestamp': String(ts),
+          'X-TC-Region': this.config.region,
+        },
+        body: payload,
+        signal: controller.signal,
+      })
+      const body = (await res.json()) as {
+        Response?: {
+          Error?: { Code?: string; Message?: string }
+          RequestId?: string
+          SendStatusSet?: Array<{ Code?: string; Message?: string }>
+        }
+      }
+      const requestId = body.Response?.RequestId ?? '?'
+      const apiError = body.Response?.Error
+      if (apiError) {
+        // 只记元数据：脱敏手机号 + 腾讯云错误码 + RequestId，绝不记验证码。
+        this.logger.error(`SMS 下发失败(API) phone=${maskPhone(phone)} code=${apiError.Code ?? '?'} requestId=${requestId}`)
+        throw new Error('SMS_SEND_FAILED')
+      }
+      const status = body.Response?.SendStatusSet?.[0]
+      if (!status || status.Code !== 'Ok') {
+        this.logger.error(`SMS 下发失败(状态) phone=${maskPhone(phone)} code=${status?.Code ?? 'empty'} requestId=${requestId}`)
+        throw new Error('SMS_SEND_FAILED')
+      }
+      this.logger.log(`SMS 下发成功 phone=${maskPhone(phone)} requestId=${requestId}`)
+    } catch (e) {
+      if (e instanceof Error && e.message === 'SMS_SEND_FAILED') throw e
+      const reason = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'network'
+      this.logger.error(`SMS 下发异常 phone=${maskPhone(phone)} reason=${reason}`)
+      throw new Error('SMS_SEND_FAILED')
+    } finally {
+      clearTimeout(timer)
+    }
   }
 }
