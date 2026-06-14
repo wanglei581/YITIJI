@@ -113,7 +113,18 @@
 - 新增 `services/api/scripts/verify-screensaver-content.ts`（21 断言）：上传素材（魔数校验 + 落盘读回）、外链素材（白名单 / 私网 / 非 HTTPS / 非直链拦截、外链无本地内容 404）、启用/禁用、软删（默认列表不含、includeDeleted 才含）、播放方案排序、终端绑定（无方案不允许 enabled）；⭐`getKioskPlaylist` 七种过滤逐一断言：config 禁用 / playlist 非 active / item 禁用 / asset 非 active / 软删 / 外链缺 URL / 无可播素材 → 均不进可播，且上传素材回签名 URL（verifyAdAssetSignature 通过）、外链素材回 HTTPS 直链。
 - `package.json` 加 `verify:screensaver-content`；CI 接进 build-and-verify 的 Verify 步骤（P1-B verify 组，紧随 verify:print-jobs）。隔离：脚本强制 `FILE_STORAGE_DRIVER=local` + 自建临时 `FILE_STORAGE_DIR`（finally 清理）+ 自控 `ALLOWED_EXTERNAL_VIDEO_HOSTS`；DATABASE_URL 由 runner/CI 提供，脚本只创建+清理自身夹具，不碰主 dev.db。
 - **验证**：本地 `verify:screensaver-content` ALL PASS（21/21）。
-- 待续（P1-B 后续）：Audit / AI 配置 / 岗位审核状态机 verify。
+- 待续（P1-B 后续）：AI 配置 / 岗位审核状态机 verify。
+
+---
+
+## P1-B 验证守门 ③：审计日志 verify（2026-06-14，Claude，分支 `chore/verify-audit-logs`）
+
+审计日志（`AuditService.write` / `list`）是上线前追责与合规闭环的基础，此前无专属 verify。本轮补 service 级守门（临时 SQLite，不改 Audit 生产逻辑）。
+
+- 新增 `services/api/scripts/verify-audit-logs.ts`（按验收优先级，service 直调真库）：① write 同步落库字段完整性（actorId/actorRole/action/targetType/targetId/payloadJson/ipAddress/userAgent/requestId/createdAt 全字段回读）；② payloadJson 安全封顶（超 4KB → truncated 标记不撑表、不可序列化 → 错误标记）；③ list 过滤（action/actorId/targetType/targetId）+ createdAt 倒序 + limit/offset 分页 + startAt/endAt 时间范围；④ actorId=null 系统动作可写可读；⑤ write 失败 best-effort（actorRole 违约 → 不抛、不落行，仅记 ops 日志）。
+- `package.json` 加 `verify:audit-logs`；CI 接进 build-and-verify 的 Verify 步骤（P1-B 组，紧随 verify:screensaver-content）。隔离同口径：临时 SQLite（DATABASE_URL 由 runner/CI 提供），脚本只创建+清理自身夹具（User + 审计行），不碰主 dev.db。
+- **验证**：本地 `verify:audit-logs` ALL PASS（未暴露真实 bug；脚本里 test #5 的 `ERROR Audit write failed` 日志为故意触发的 best-effort 写失败，AuditService 正确不抛、不落行）。
+- 待续（P1-B 后续）：AI 配置 / 岗位审核状态机 verify。
 
 ---
 

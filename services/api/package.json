@@ -27,6 +27,7 @@
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",
+    "verify:audit-logs": "node -r @swc-node/register scripts/verify-audit-logs.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",
