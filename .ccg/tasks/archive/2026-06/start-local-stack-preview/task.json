@@ -1,0 +1,12 @@
+{
+  "id": "start-local-stack-preview",
+  "title": "启动本地前后端并预览页面效果",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "ops",
+  "currentPhase": "completed",
+  "nextAction": "本地 API 与三端前端已启动并完成基础预览",
+  "createdAt": "2026-06-14T00:00:00+08:00",
+  "branch": "main"
+}
