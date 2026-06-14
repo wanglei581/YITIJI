@@ -281,6 +281,19 @@ export default function CompaniesPage() {
     }
   }
 
+  // P1-A④ 下架本机构已发布企业(镜像岗位/招聘会/政策):只改 publishStatus,不触发重审。
+  const handleUnpublish = async (id: string) => {
+    try {
+      const updated = await partnerCompaniesService.unpublishPartnerCompany(id)
+      if (updated) setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      else load()
+      setNotice('企业资料已下架，终端将不再展示。如需重新上架，请用「编辑」重新提交并由管理员审核发布。')
+    } catch {
+      // 下架失败 → 重新拉取列表，保证 UI 与后端一致
+      load()
+    }
+  }
+
   if (loading) {
     return (
       <Page title="企业资料管理" subtitle="加载中...">
@@ -396,12 +409,22 @@ export default function CompaniesPage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <button
-                          className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                          onClick={() => openEdit(c)}
-                        >
-                          编辑
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                            onClick={() => openEdit(c)}
+                          >
+                            编辑
+                          </button>
+                          {c.publishStatus === 'published' && (
+                            <button
+                              className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
+                              onClick={() => void handleUnpublish(c.id)}
+                            >
+                              下架
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

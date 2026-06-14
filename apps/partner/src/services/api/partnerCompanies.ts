@@ -81,6 +81,8 @@ export interface PartnerCompaniesServiceInterface {
   getPartnerCompanies(): Promise<PartnerCompanyRecord[]>
   importPartnerCompanies(items: ImportCompanyItem[]): Promise<CompanyImportResult>
   updatePartnerCompany(id: string, input: UpdatePartnerCompanyInput): Promise<PartnerCompanyRecord | undefined>
+  /** P1-A④ 下架本机构企业(只改 publishStatus=unpublished;镜像岗位/招聘会/政策)。 */
+  unpublishPartnerCompany(id: string): Promise<PartnerCompanyRecord | undefined>
 }
 
 // ─── HTTP adapter（/partner/companies* 返回 {success,data} 信封）────────────────
@@ -119,6 +121,8 @@ const httpAdapter: PartnerCompaniesServiceInterface = {
     req<CompanyImportResult>('POST', '/partner/companies/import', { items }),
   updatePartnerCompany: (id, input) =>
     req<PartnerCompanyRecord | undefined>('PATCH', `/partner/companies/${id}`, input),
+  unpublishPartnerCompany: (id) =>
+    req<PartnerCompanyRecord | undefined>('PATCH', `/partner/companies/${id}/publish`, { action: 'unpublish' }),
 }
 
 // ─── Mock adapter（初始空列表；导入/编辑镜像后端 pending+draft 语义）────────────
@@ -187,6 +191,14 @@ const mockAdapter: PartnerCompaniesServiceInterface = {
     hit.reviewStatus = 'pending'
     hit.publishStatus = 'draft'
     hit.rejectReason = null
+    hit.updatedAt = now()
+    return { ...hit }
+  },
+  async unpublishPartnerCompany(id) {
+    const hit = mockRows.find((r) => r.id === id)
+    if (!hit) throw new ApiHttpError('COMPANY_NOT_FOUND', '企业不存在', 404)
+    // 下架只改发布状态,不动 reviewStatus(镜像后端)。
+    hit.publishStatus = 'unpublished'
     hit.updatedAt = now()
     return { ...hit }
   },

@@ -10,6 +10,7 @@ import {
   AdminCreateCompanyDto, AdminLinkJobsDto, AdminPublishCompanyDto, AdminReviewCompanyDto,
   AdminUpdateCompanyDto, PartnerImportCompaniesDto, PartnerUpdateCompanyDto,
 } from './dto/company.dto'
+import { PublishActionDto } from '../jobs/dto/publish.dto'
 
 // ============================================================
 // 企业展示（CompanyProfile）：
@@ -184,5 +185,13 @@ export class CompaniesController {
   @Roles('partner')
   async partnerUpdate(@Param('id') id: string, @Body() dto: PartnerUpdateCompanyDto, @CurrentUser() user: AuthedUser) {
     return ApiResponse.ok(await this.companies.partnerUpdate(user.orgId!, id, dto, user))
+  }
+
+  // P1-A④ Partner 下架本机构企业资料（端点只下架；body 复用 PublishActionDto 仅作契约一致，处理强制 unpublish）
+  @Patch('partner/companies/:id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  async partnerUnpublish(@Param('id') id: string, @Body() _dto: PublishActionDto, @CurrentUser() user: AuthedUser) {
+    return ApiResponse.ok(await this.companies.partnerUnpublish(user.orgId!, id, user))
   }
 }

@@ -41,6 +41,17 @@
 - 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
 - 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
 - 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
+## 上线前 P1-A④：Partner 企业资料下架 已完成（2026-06-14，Claude，分支 `feature/partner-company-unpublish`）
+
+针对审计「Partner 企业资料缺下架能力」:Partner companies 页有 `unpublished` 状态标签但无下架按钮,后端 Partner 仅有 GET/import/update、无 publish/unpublish 端点。本轮严格镜像 jobs/fairs/policy 的 Partner 下架模式补齐(不扩成重新发布/审核流重做):
+
+- **后端**:新增 `PATCH /partner/companies/:id/publish`(`@Roles('partner')`,body 复用 `jobs/dto` 的 `PublishActionDto` 仅作契约一致、处理强制 unpublish)+ `CompaniesService.partnerUnpublish(orgId, id, actor)`:以 `{ id, sourceOrgId: orgId }` 严格限定本机构 → 跨机构/不存在统一 **404 COMPANY_NOT_FOUND**(不泄露存在性)→ 只置 `publishStatus='unpublished'`(任意状态幂等,**不动 reviewStatus、不触发重审**)→ 写 audit `company.unpublish`(payload 记 `fromPublishStatus`)→ 返回更新后记录。
+- **前端**:`partnerCompanies.ts` 加 `unpublishPartnerCompany`(http: `PATCH .../publish {action:'unpublish'}`;mock: 只置 unpublished);`companies/index.tsx` 加 `handleUnpublish`(成功更新行 + 绿色通知,失败回退 `load()` 重新同步)+「下架」按钮(**仅 `publishStatus==='published'` 显示**,橙色,镜像岗位/招聘会/政策)。重新上架仍走 编辑 → Admin 审核发布,与现状一致。
+- **不做**:不碰 Admin 审核/发布、Partner 导入/编辑主流程;不做 Partner 重新发布;不改 `package.json`/`ci.yml`/`packages/shared`/Prisma 模型/Kiosk;无招聘闭环。`PublishActionDto` 复用、`PartnerCompanyRecord` 为 app-local。
+- **验证**:**扩展现有 `verify-companies.ts`**(第 9b 项,已在 SQLite 主 CI、不新增脚本):发布后 Partner 下架→unpublished(reviewStatus 仍 approved)、跨机构下架→404、审计 `company.unpublish` 记 `fromPublishStatus`——`verify:companies` **12 项全过(含禁词扫描)**;api typecheck + Partner typecheck/lint/build(http)全绿。下架按钮浏览器预览在 mock 模式不可演示(mock 企业列表初始为空、Partner 在 mock 无法发布,无 published 行则按钮按设计隐藏);按钮条件由 typecheck、后端行为由 verify 9b 端到端覆盖。改动 7 文件,PG 不接。
+
+---
+
 ## 上线前 P1-A③：Admin 信息源死按钮接线/移除 已完成（2026-06-14，Claude，分支 `feature/admin-source-dead-buttons`）
 
 针对审计「死按钮」项:Admin 岗位信息源 / 招聘会信息源页有 3 个无 onClick 的死按钮。本轮按「能接的接、不该有的移除」处置(纯前端,数据已加载,无新端点、无后端改动):

@@ -221,6 +221,21 @@ async function main() {
     await expectStatus(companies.partnerUpdate(orgA, pc.id, { description: 'x' }, partner), 404, '9. 跨机构编辑')
     pass('9. Partner 导入 upsert(pending+draft)+岗位外部ID关联；编辑强制重审；跨机构 404')
 
+    // ── 9b. Partner 下架本机构企业（P1-A④）────────────────────
+    await companies.adminReview(pc.id, { action: 'approve' }, admin)
+    await companies.adminPublish(pc.id, { publish: true }, admin)
+    const beforeUnpub = (await companies.partnerList(orgB)).find((c) => c.id === pc.id)
+    if (beforeUnpub?.publishStatus !== 'published') fail('9b. 前置：企业应为已发布')
+    const unpubbed = await companies.partnerUnpublish(orgB, pc.id, partner)
+    if (unpubbed?.publishStatus !== 'unpublished') fail('9b. 下架后应为 unpublished')
+    if (unpubbed?.reviewStatus !== 'approved') fail('9b. 下架不应改 reviewStatus（仍 approved）')
+    await expectStatus(companies.partnerUnpublish(orgA, pc.id, partner), 404, '9b. 跨机构下架')
+    const unpubLogs = await prisma.auditLog.findMany({ where: { action: 'company.unpublish', targetId: pc.id } })
+    if (unpubLogs.length === 0) fail('9b. 应写 company.unpublish 审计')
+    const unpubPayload = unpubLogs[0]?.payloadJson ? JSON.parse(unpubLogs[0].payloadJson) : {}
+    if (unpubPayload.fromPublishStatus !== 'published') fail('9b. 审计应记 fromPublishStatus=published')
+    pass('9b. Partner 下架→unpublished（不改 reviewStatus）；跨机构 404；审计 company.unpublish（记 fromPublishStatus）')
+
     // ── 10. 浏览/跳转闭环（company_profile）──────────────────
     const b = await activity.recordBrowse(userA, 'company_profile', companyId, null)
     if (!b.recorded) fail('10. 企业浏览应落库')

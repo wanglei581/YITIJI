@@ -535,4 +535,26 @@ export class CompaniesService {
     })
     return this.partnerList(orgId).then((list) => list.find((x) => x.id === id))
   }
+
+  /**
+   * Partner 下架本机构企业资料(P1-A④)。
+   * 镜像 jobs/fairs/policy 的 Partner 下架:只改 publishStatus=unpublished;
+   * 不动 reviewStatus、不触发重审、不做 Partner 重新发布(重新上架仍走 编辑 → Admin 审核发布)。
+   */
+  async partnerUnpublish(orgId: string, id: string, actor: { userId: string }) {
+    const existing = await this.prisma.companyProfile.findFirst({
+      where: { id, sourceOrgId: orgId },
+      select: { id: true, publishStatus: true },
+    })
+    // 跨机构 / 不存在统一 404，不泄露存在性
+    if (!existing) throw new NotFoundException({ error: { code: 'COMPANY_NOT_FOUND', message: '企业不存在' } })
+    // 任意 publishStatus → unpublished（幂等）
+    await this.prisma.companyProfile.update({ where: { id }, data: { publishStatus: 'unpublished' } })
+    await this.audit.write({
+      actorId: actor.userId, actorRole: 'partner', action: 'company.unpublish',
+      targetType: 'company_profile', targetId: id,
+      payload: { orgId, fromPublishStatus: existing.publishStatus },
+    })
+    return this.partnerList(orgId).then((list) => list.find((x) => x.id === id))
+  }
 }
