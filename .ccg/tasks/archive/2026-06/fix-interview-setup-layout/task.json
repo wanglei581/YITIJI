@@ -1,0 +1,12 @@
+{
+  "id": "fix-interview-setup-layout",
+  "title": "重新设计模拟面试设置页布局预览",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "frontend-design",
+  "currentPhase": "completed",
+  "nextAction": "已新增 /interview/setup-preview 预览页供确认",
+  "createdAt": "2026-06-14T00:00:00+08:00",
+  "branch": "main"
+}
