@@ -41,6 +41,18 @@
 - 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
 - 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
 - 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
+## 上线前 P1-A①：招聘会大屏/地图字段后台增改入口已完成（2026-06-14，Claude，分支 `feature/admin-fair-map-screen-fields`）
+
+针对审计「前台有展示区、后台缺增改入口」矩阵：Kiosk 招聘会详情/大屏/地图已读取 `mapImageUrl/coverImageUrl/latitude/longitude/trafficInfo/expectedAttendance/seekerIntent`，但 Admin 招聘会基本信息编辑只能改名称/时间/场馆，新建招聘会这些字段只能靠 seed。本轮补齐这 7 个字段的后台录入与回填闭环：
+
+- **写入**：`UpdateFairInfoDto` 增 5 字段（lat 范围 -90~90 / lng -180~180、expectedAttendance 非负整数、trafficInfo 文本、seekerIntent 经新增 `SeekerIntentSliceDto` 嵌套校验 label 非空 + percent 0–100）；`AdminFairsService.updateFairInfo` 数据子句写入 4 标量 + seekerIntent 序列化为 `seekerIntentJson`（空标签行过滤、空数组/全空→null 清空、trafficInfo 空串→null）。
+- **回填**：`fair.types.ts Fair` + `fair.mapper.ts mapFair`（PrismaJobFairRow 补 5 列 + `parseSeekerIntent` 安全解析脏数据→空数组）暴露这 5 字段；前端 `AdminFairView` 镜像。**`packages/shared` 不改**——本地 `Fair` 副本为支持 admin 回填有意新增这几字段，shared 是 Kiosk 契约源、不需要这些 admin 回填字段（有意的局部分叉，代码注释已标）。
+- **Admin UI**：`EditFairDrawer` 增「大屏 / 地图字段」分区——导览图/封面图 URL（仅填 URL，不上传、不接对象存储）、纬度/经度（数值，留空清空）、交通信息（文本域）、预计参会人数（非负整数）、求职意向分布（标签+百分比行编辑器，加/删行、空行前端过滤、合计≠100 仅轻提示不阻断保存）。mock adapter 透传 + fair-mock-1 加演示值。
+- **合规**：只补展示字段；不碰参展企业/展区/资料/导览/Partner 配置入口，不新增任何投递/预约/候选人闭环，来源字段（来源机构/外部编号/来源链接）不可经此编辑改动（verify 覆盖）。
+- **验证**：新增 `services/api/scripts/verify-fair-info-fields.ts`（service 级，**18 PASS**）——7 字段写入+读回、seekerIntent 序列化/parse、Kiosk 公开三面（getPublishedFairDetail/getFairMap/getFairStats）读取、空标签行过滤、清空语义、DTO 非法 lat/lng/人数/percent/空 label 被拒。接 SQLite 主 CI（`verify:fair-info-fields`），PG 暂不接。后端 typecheck + Admin typecheck/lint/build（http 模式）全绿。改动 11 文件，未碰 `packages/shared`。
+
+---
+
 ## 上线前 P0 收口 ①：生产构建禁 mock 门禁已完成（2026-06-14，Claude，分支 `feature/prod-build-http-guard`）
 
 针对 2026-06-14 全面审计报告（docs/progress/project-full-audit-and-august-launch-plan-2026-06-14.md）列出的「上线即假数据」单点风险：kiosk/admin/partner 三端默认 `VITE_API_MODE=mock`，生产构建若漏注入 `=http` 会把 `src/data/*.ts` 等静态假数据打进产物。

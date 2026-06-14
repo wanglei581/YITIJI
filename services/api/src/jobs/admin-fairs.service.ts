@@ -215,6 +215,16 @@ export class AdminFairsService {
     }
 
     const changedFields = Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined)
+    // seekerIntent: 过滤空标签行 → 序列化为 seekerIntentJson;清空(空数组/全空行)写 null。
+    const seekerIntentJson =
+      dto.seekerIntent === undefined
+        ? undefined
+        : ((): string | null => {
+            const cleaned = dto.seekerIntent.filter((s) => s.label.trim().length > 0)
+            return cleaned.length
+              ? JSON.stringify(cleaned.map((s) => ({ label: s.label.trim(), percent: s.percent })))
+              : null
+          })()
     const updated = await this.prisma.jobFair.update({
       where: { id: fairId },
       data: {
@@ -228,6 +238,11 @@ export class AdminFairsService {
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.mapImageUrl !== undefined ? { mapImageUrl: dto.mapImageUrl } : {}),
         ...(dto.coverImageUrl !== undefined ? { coverImageUrl: dto.coverImageUrl } : {}),
+        ...(dto.latitude !== undefined ? { latitude: dto.latitude } : {}),
+        ...(dto.longitude !== undefined ? { longitude: dto.longitude } : {}),
+        ...(dto.trafficInfo !== undefined ? { trafficInfo: dto.trafficInfo === '' ? null : dto.trafficInfo } : {}),
+        ...(dto.expectedAttendance !== undefined ? { expectedAttendance: dto.expectedAttendance } : {}),
+        ...(seekerIntentJson !== undefined ? { seekerIntentJson } : {}),
       },
     })
     await this.audit.write({

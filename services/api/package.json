@@ -40,6 +40,7 @@
     "verify:external-video": "tsx scripts/verify-external-video.ts",
     "verify:external-video:e2e": "tsx scripts/verify-external-video-e2e.ts",
     "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts",
+    "verify:fair-info-fields": "node -r @swc-node/register scripts/verify-fair-info-fields.ts",
     "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",

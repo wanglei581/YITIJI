@@ -17,6 +17,12 @@ import type { ReviewStatus, PublishStatus } from './types'
 
 // ─── 类型(契约 = services/api AdminFairsService 返回形状)──────────────────
 
+/** 求职意向分布切片(标签 + 百分比),与后端 Fair.seekerIntent 对齐。 */
+export interface FairIntentSliceView {
+  label: string
+  percent: number
+}
+
 export interface AdminFairView {
   id: string
   sourceOrgId: string
@@ -33,6 +39,12 @@ export interface AdminFairView {
   mapImageUrl: string | null
   description: string | null
   coverImageUrl: string | null
+  // P1-A① 地图/大屏字段(与后端 mapFair 对齐)
+  latitude: number | null
+  longitude: number | null
+  trafficInfo: string | null
+  expectedAttendance: number | null
+  seekerIntent: FairIntentSliceView[]
   companyCount: number
   jobCount: number
   viewCount: number
@@ -121,6 +133,12 @@ export interface UpdateFairInfoInput {
   description?: string
   mapImageUrl?: string
   coverImageUrl?: string
+  // P1-A① 地图/大屏字段(数值/文本空值传 null 清空,seekerIntent 传 [] 清空)
+  latitude?: number | null
+  longitude?: number | null
+  trafficInfo?: string | null
+  expectedAttendance?: number | null
+  seekerIntent?: FairIntentSliceView[]
 }
 
 export interface SaveFairCompanyInput {
@@ -280,6 +298,11 @@ function makeMockFair(partial: Partial<AdminFairView> & Pick<AdminFairView, 'id'
     mapImageUrl: null,
     description: '演示数据:这是 mock 模式下的招聘会,接真实后端后展示真实来源数据。',
     coverImageUrl: null,
+    latitude: null,
+    longitude: null,
+    trafficInfo: null,
+    expectedAttendance: null,
+    seekerIntent: [],
     companyCount: 0,
     jobCount: 0,
     viewCount: 0,
@@ -304,6 +327,15 @@ const mockFairs: AdminFairView[] = [
     endAt: '2026-06-20T09:00:00.000Z',
     venue: '市人才交流中心 A 展厅',
     city: '青岛',
+    latitude: 36.0671,
+    longitude: 120.3826,
+    trafficInfo: '演示数据:地铁 2 号线人才中心站 B 口步行 200m;周边 P1/P2 停车场。',
+    expectedAttendance: 3000,
+    seekerIntent: [
+      { label: '研发技术类', percent: 43 },
+      { label: '市场运营类', percent: 28 },
+      { label: '职能支持类', percent: 29 },
+    ],
   }),
   makeMockFair({
     id: 'fair-mock-2',

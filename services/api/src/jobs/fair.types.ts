@@ -16,6 +16,12 @@ export type FairTheme =
 export type FairReviewStatus = 'pending' | 'reviewing' | 'approved' | 'rejected'
 export type FairPublishStatus = 'draft' | 'published' | 'unpublished' | 'expired'
 
+/** 求职意向分布切片（机构录入的预计值，Kiosk 大屏展示用）。 */
+export interface FairIntentSlice {
+  label: string
+  percent: number
+}
+
 export interface Fair {
   id: string
   sourceOrgId: string
@@ -32,6 +38,14 @@ export interface Fair {
   mapImageUrl: string | null
   description: string | null
   coverImageUrl: string | null
+  // P1-A① 招聘会大屏/地图字段（Admin 可录入，Kiosk 已消费）。
+  // 注：本地 Fair 副本为支持 Admin 回填新增这几字段；packages/shared 的 Fair（Kiosk 契约源）
+  // 按 P1-A① 范围不改——shared 不需要这些 admin 回填字段，差异为有意的局部分叉。
+  latitude: number | null
+  longitude: number | null
+  trafficInfo: string | null
+  expectedAttendance: number | null
+  seekerIntent: FairIntentSlice[]
   companyCount: number
   jobCount: number
   viewCount: number

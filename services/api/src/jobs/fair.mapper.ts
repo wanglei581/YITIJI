@@ -1,4 +1,4 @@
-import type { Fair, FairCompany, FairCompanyPosition, FairZone } from './fair.types'
+import type { Fair, FairCompany, FairCompanyPosition, FairIntentSlice, FairZone } from './fair.types'
 
 /**
  * Prisma JobFair / FairCompany / FairZone 行 → API DTO 转换。
@@ -34,6 +34,12 @@ interface PrismaJobFairRow {
   syncTime: Date
   createdAt: Date
   updatedAt: Date
+  // P1-A① 地图/大屏列
+  latitude: number | null
+  longitude: number | null
+  trafficInfo: string | null
+  expectedAttendance: number | null
+  seekerIntentJson: string | null
 }
 
 interface PrismaFairCompanyPositionRow {
@@ -106,6 +112,25 @@ interface PrismaFairZoneRow {
   updatedAt: Date
 }
 
+/** 安全解析 seekerIntentJson → 切片数组（脏数据 → 空数组，不抛）。 */
+function parseSeekerIntent(json: string | null): FairIntentSlice[] {
+  if (!json) return []
+  try {
+    const arr = JSON.parse(json) as unknown
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter(
+        (x): x is FairIntentSlice =>
+          !!x &&
+          typeof (x as { label?: unknown }).label === 'string' &&
+          typeof (x as { percent?: unknown }).percent === 'number',
+      )
+      .map((x) => ({ label: x.label, percent: x.percent }))
+  } catch {
+    return []
+  }
+}
+
 export function mapFair(row: PrismaJobFairRow): Fair {
   return {
     id: row.id,
@@ -123,6 +148,11 @@ export function mapFair(row: PrismaJobFairRow): Fair {
     mapImageUrl: row.mapImageUrl,
     description: row.description,
     coverImageUrl: row.coverImageUrl,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    trafficInfo: row.trafficInfo,
+    expectedAttendance: row.expectedAttendance,
+    seekerIntent: parseSeekerIntent(row.seekerIntentJson),
     companyCount: row.companyCount,
     jobCount: row.jobCount,
     viewCount: row.viewCount,

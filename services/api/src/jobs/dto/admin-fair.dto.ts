@@ -1,13 +1,19 @@
+import { Type } from 'class-transformer'
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
   IsISO8601,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator'
 
 /**
@@ -20,6 +26,15 @@ import {
  * 来源字段(sourceOrgId / externalId / sourceName / sourceUrl)不可经本 DTO 修改,
  * 保持"第三方/官方来源"可溯源。
  */
+
+/** 求职意向分布切片(标签 + 百分比),Kiosk 大屏展示用,机构录入的预计值。 */
+export class SeekerIntentSliceDto {
+  @IsString() @IsNotEmpty() @MaxLength(40)
+  label!: string
+
+  @IsNumber() @Min(0) @Max(100)
+  percent!: number
+}
 
 export class UpdateFairInfoDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200)
@@ -51,6 +66,27 @@ export class UpdateFairInfoDto {
 
   @IsOptional() @IsString() @MaxLength(500)
   coverImageUrl?: string
+
+  // ── P1-A① 招聘会大屏/地图字段 ──────────────────────────────────────────────
+  // 经纬度 / 客流 / 求职意向均为"展示参考",非签到/报名真相;清空语义见 service。
+  @IsOptional() @IsNumber() @Min(-90) @Max(90)
+  latitude?: number | null
+
+  @IsOptional() @IsNumber() @Min(-180) @Max(180)
+  longitude?: number | null
+
+  @IsOptional() @IsString() @MaxLength(500)
+  trafficInfo?: string | null
+
+  @IsOptional() @IsInt() @Min(0)
+  expectedAttendance?: number | null
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => SeekerIntentSliceDto)
+  seekerIntent?: SeekerIntentSliceDto[]
 }
 
 /** 参展企业新增/编辑(展示信息,不关联岗位投递)。 */
