@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
+import { Card, Drawer, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, FilterIcon, XIcon } from 'lucide-react'
 import type { AdminFairSourceRecord, ReviewStatus, PublishStatus, JobFairStatus } from '../../services/api'
@@ -42,6 +42,17 @@ const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/** 只读详情行:值为空则不渲染该行。 */
+function DetailRow({ label, value }: { label: string; value?: ReactNode }) {
+  if (value === undefined || value === null || value === '') return null
+  return (
+    <div className="flex gap-3 border-b border-gray-50 py-2 last:border-0">
+      <span className="w-20 flex-shrink-0 text-xs text-gray-400">{label}</span>
+      <span className="flex-1 break-words text-sm text-gray-700">{value}</span>
+    </div>
+  )
+}
+
 export default function FairSourcesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const sourceOrgIdFilter = searchParams.get('sourceOrgId') ?? ''
@@ -51,6 +62,7 @@ export default function FairSourcesPage() {
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
+  const [viewing,      setViewing]      = useState<AdminFairSourceRecord | null>(null)
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -213,7 +225,7 @@ export default function FairSourcesPage() {
                       <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">
-                          <button className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
+                          <button onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
                           {s.reviewStatus === 'pending' && (
                             <button
                               className="rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50"
@@ -238,7 +250,6 @@ export default function FairSourcesPage() {
                               下架
                             </button>
                           )}
-                          <button className="rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">打印活动资料</button>
                         </div>
                       </td>
                     </tr>
@@ -254,6 +265,38 @@ export default function FairSourcesPage() {
       <p className="mt-3 text-xs text-gray-400">
         仅展示第三方平台同步的招聘会信息，不参与招聘闭环。
       </p>
+
+      <Drawer
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title="招聘会来源详情"
+        size="md"
+        footer={
+          <div className="flex justify-end">
+            <button onClick={() => setViewing(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">关闭</button>
+          </div>
+        }
+      >
+        {viewing && (
+          <div className="space-y-0.5">
+            <DetailRow label="来源机构" value={viewing.sourceName} />
+            <DetailRow label="外部编号" value={viewing.externalId} />
+            <DetailRow label="来源链接" value={viewing.sourceUrl ? <a href={viewing.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">去来源平台查看</a> : '—'} />
+            <DetailRow label="招聘会名称" value={viewing.name} />
+            <DetailRow label="主办方" value={viewing.organizer} />
+            <DetailRow label="开始时间" value={viewing.startTime} />
+            <DetailRow label="结束时间" value={viewing.endTime} />
+            <DetailRow label="举办场馆" value={viewing.venue} />
+            <DetailRow label="活动状态" value={FAIR_STATUS_LABELS[viewing.status]} />
+            <DetailRow label="展位数" value={viewing.boothCount !== undefined ? String(viewing.boothCount) : undefined} />
+            <DetailRow label="描述" value={viewing.description} />
+            <DetailRow label="同步时间" value={viewing.syncTime} />
+            <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
+            <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
+            <p className="mt-4 text-xs text-gray-400">仅展示第三方来源数据，不参与招聘闭环。资料打印由一体机现场提供，此处为来源审核入口。</p>
+          </div>
+        )}
+      </Drawer>
     </Page>
   )
 }

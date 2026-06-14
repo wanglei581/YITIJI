@@ -46,7 +46,7 @@
 - [x] **招聘会数据大屏可录入**（✅ 2026-06-14，P1-A①，同分支）：Admin 补 `expectedAttendance` 与 `seekerIntent`（→`seekerIntentJson`）编辑入口（求职意向分布标签+百分比行编辑器，合计≠100 仅轻提示不阻断）；`verify:fair-info-fields` 18 PASS 接 SQLite 主 CI，PG 暂不接。
 - [x] **参展企业岗位明细 CRUD**（✅ 2026-06-14，P1-A②，分支 `feature/admin-fair-company-positions`）：Admin `CompaniesTab` 企业表单补 `FairCompanyPosition` 岗位行编辑器（9 字段:标题/类型/薪资/人数/学历/经验/地点/部门/要求,覆盖 Kiosk 企业详情已展示字段）;后端 `SaveFairCompanyDto`+`createCompany`/`updateCompany` 嵌套写入(保存即全量替换、sortOrder 按行序、空标题过滤)、`getFairDetail` include positions 回填。Kiosk 读取链路/前台 UI 已就绪未改。`verify:fair-company-positions` 15 PASS 接 SQLite 主 CI,PG 暂不接。详见 current-progress.md（P1-A②）。
 - [ ] **Partner 招聘会子资源产品决策**：明确参展企业 / 展区 / 活动资料 / 场馆导览由 Admin 统一录入，还是开放 Partner 自维护并回 pending 重审。未拍板前，至少在 Partner 招聘会页加说明，避免机构误以为自己能维护全部子资源。
-- [ ] **死按钮接线或移除**：Admin 岗位信息源 / 招聘会信息源的「查看」「打印活动资料」补详情抽屉与真实资料打印；短期不做就移除死按钮。
+- [x] **死按钮接线或移除**（✅ 2026-06-14，P1-A③，分支 `feature/admin-source-dead-buttons`）：job-sources / fair-sources 的「查看」接只读详情抽屉(展示已加载行 + `sourceUrl` 外链 target=_blank/noopener)；fair-sources「打印活动资料」**移除**(Admin 无打印机、打印属 Kiosk 能力、资料管理在 fairs 页)。纯前端 2 文件,无后端改动;typecheck/lint/build + mock 浏览器预览通过。详见 current-progress.md（P1-A③）。
 - [ ] **Partner 企业资料下架**：补机构侧企业资料下架/取消发布能力，与岗位、招聘会、政策公告保持一致。
 - [ ] **空壳页收口**：Admin 用户/权限/外设、Partner 统计/终端/账号 6 个空壳页上线前隐藏或明确标「建设中」；不要保留可点击但无真实端点的侧栏入口。
 

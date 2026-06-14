@@ -41,6 +41,18 @@
 - 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
 - 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
 - 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
+## 上线前 P1-A③：Admin 信息源死按钮接线/移除 已完成（2026-06-14，Claude，分支 `feature/admin-source-dead-buttons`）
+
+针对审计「死按钮」项:Admin 岗位信息源 / 招聘会信息源页有 3 个无 onClick 的死按钮。本轮按「能接的接、不该有的移除」处置(纯前端,数据已加载,无新端点、无后端改动):
+
+- **job-sources「查看」→ 接线**:接 `@ai-job-print/ui` 的只读 `Drawer`「岗位来源详情」,展示当前行已加载字段(来源机构/外部编号/来源链接/岗位标题/公司/城市/薪资/行业/标签/描述/任职要求/同步时间/审核·发布状态);`sourceUrl` 作「去来源平台查看」外链(`target="_blank"` + `rel="noopener noreferrer"`)。
+- **fair-sources「查看」→ 接线**:同款只读 Drawer「招聘会来源详情」(来源机构/外部编号/来源链接/名称/主办方/起止时间/场馆/状态/展位数/描述/同步时间/审核·发布状态)。
+- **fair-sources「打印活动资料」→ 移除**:Admin 后台无打印机(打印是 Kiosk/终端能力),招聘会资料管理已在「招聘会内容运营」(fairs)页;此处保留死打印按钮属误导,直接删除、不做跳转。
+- **不做**:不改后端/DTO/service/DB;不碰审核/发布/下架已接线逻辑;不碰 Kiosk、`packages/shared`;详情抽屉**只读**,不加编辑/删除/投递/打印动作;无新增招聘闭环。共用一个本地 `DetailRow`(空值不渲染)。
+- **验证**:Admin `typecheck` / `lint` / `build(http)` 全绿;mock 模式浏览器预览(注入 dev 登录态绕过本地无后端的 `verifyToken` 门、其余走 mock 静态数据):两个「查看」抽屉均能打开,字段/来源外链(target=_blank/rel=noopener noreferrer)/关闭正常,**fair-sources「打印活动资料」按钮已消失(DOM 计数 0)**。改动 2 个前端路由文件 + 文档,无新增 verify 脚本、不改 package.json/CI、PG 不涉及。
+
+---
+
 ## 上线前 P1-A②：参展企业岗位明细 CRUD 已完成（2026-06-14，Claude，分支 `feature/admin-fair-company-positions`）
 
 针对审计「前台有展示区、后台缺增改入口」矩阵:Kiosk 企业详情页(`FairCompanyDetailPage`)已展示岗位列表(标题/类型/薪资/人数/地点/学历/经验/部门/要求),且 `getFairCompanies`/`getFairCompanyById` 已 `include: { positions }`——但 Admin 参展企业表单无法录入岗位,生产新建企业岗位只能靠 seed。本轮补 Admin 写入端(**Kiosk 读取链路与前台 UI 已就绪,未改**):
