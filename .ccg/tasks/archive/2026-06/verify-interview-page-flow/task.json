@@ -1,0 +1,12 @@
+{
+  "id": "verify-interview-page-flow",
+  "title": "复核模拟面试页面功能数据与测试流程",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend-backend",
+  "currentPhase": "completed",
+  "nextAction": "已完成 typecheck/lint/build/API verify 与真实后端浏览器主流程验证；上传简历 live 写 COS 未经确认未执行",
+  "createdAt": "2026-06-14T00:00:00+08:00",
+  "branch": "feature/interview-setup-redesign"
+}
