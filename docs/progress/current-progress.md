@@ -21,6 +21,32 @@
 
 ---
 
+## 模拟面试 setup 页重设计 + 全链路验收（2026-06-14，Claude，分支 `feature/interview-setup-redesign`）
+
+用户反馈 `/interview/setup` 旧版底部 sticky 大蓝按钮遮挡内容、横屏排版错位。本轮在不新增业务功能、不改后端契约的前提下，重设计 setup 页并对整条模拟面试链路做接线与真实后端验收。
+
+**根因与修复（仅前端）：**
+
+- 旧版 `InterviewSetupPage` 用 `flex h-full` + `absolute inset-x-0 bottom-0` 浮动 CTA 条；模拟面试为顶级路由（不套 `KioskLayout`），而 `html/body/#root` 无 `height:100%`，导致 `h-full` 塌陷、`absolute` CTA 失去定位锚点贴到视口底部遮挡内容。
+- 改为自包含 `min-h-screen` 容器（沿用已验证的 preview 版策略）+ 左侧编号 4 步骤（① 选择面试官 ② 岗位与行业 ③ 练习参数 ④ 简历可选）+ 右侧固定「本次练习摘要」，**CTA 收进摘要卡底部，删除浮动底栏**。布局贴近用户参考截图。
+- 触控目标全部 ≥44–48px；目标岗位必填高亮（橙色态 + 红星 `*`）；未填岗位时 CTA disabled 且摘要内橙色提示；2 列布局 `lg`(1024)+ 起，窄屏单列堆叠。
+- `handleStart` / 简历上传 / `useBusyLock` 忙碁锁 / token+accessToken / `navigate('/interview/session', {state})` 全部逐字保留，未改 `CreateInterviewInput`、`InterviewDuration(3|5|8)` 等 shared 契约与 `services/api/interview.ts`。
+
+**预览页收口：** 删除 `InterviewSetupPreviewPage.tsx` 及 `/interview/setup-preview` 路由（仅 routes/index.tsx 引用，无测试/守卫依赖），避免上线出现重复入口。
+
+**关联页面/入口（核对未破坏）：** HomePage「模拟面试」磁贴、CareerPlanPage「模拟面试」按钮、Tips 页「开始模拟面试」、Report/Session 的「重新练习/重新开始」、Reports 列表「开始模拟面试」均仍指向 `/interview/setup`；Session 语音/文字兜底、Report 打印按钮、Reports 查看/删除均未改动。
+
+**验收结果（全绿）：**
+
+- 前端：`kiosk typecheck` 0 ✅；`kiosk lint` 0 error（2 个既有 `KioskBusyContext` 警告无关）✅；`kiosk build`（注入 `VITE_API_MODE=http`）成功 ✅。
+- 后端（未改动，回归确认）：`verify:mock-interview` **ALL PASS（17 checks）** ✅；`api typecheck` 通过 ✅。
+- 浏览器真实后端手验（API on :3010 + kiosk http 模式）：1920×1080 首屏左步骤+右摘要完整、**无底部遮挡**、CTA 正确禁用；1280×720 无错位；填岗位/点热门岗位→摘要同步+CTA 可用；面试官/行业/经验/难度/时长切换→摘要 6 项同步；点击开始 **真实创建 session**（`interview.create target=6`）→进入 `/interview/session`（真实 LLM 首题，状态 1/6、5 分钟、HR 初筛、目标岗位正确传递）→文字兜底提交→真实 LLM 追问（2/6，引用本人回答）→结束→`/interview/report` 真实结构化报告（综合等级、表达/匹配度引用本人作答、合规声明齐全、打印/重新练习按钮在位）→`/interview/reports` 匿名引导态正常；**全程 console 无 error**。
+- 合规：页面保留「仅供本人练习与准备参考，不代表招聘结果，不参与企业筛选或录用决策」；报告页保留「不代表录用结果/不参与面试邀约」；无「通过率/录用概率/Offer」类承诺（禁词过滤 verify 覆盖）。
+
+> 说明：浏览器真实链路本机用 SQLite dev 库 + 已配置的真实 LLM 跑通；生产仍以上线清单为准。`mock_interview` 若在某些环境未配置 LLM，`start` 走 fail-closed 诚实报错，不产假数据。
+
+---
+
 ## 全面审计报告与 8 月路线图拆解（2026-06-14，Codex）
 
 后台多智能体审计结果已落地为 [project-full-audit-and-august-launch-plan-2026-06-14.md](./project-full-audit-and-august-launch-plan-2026-06-14.md)，覆盖 Kiosk/Admin/Partner/API/基础设施/文档对账，并包含「前台有展示区、后台缺增改入口」矩阵与 8 月上线倒排路线。

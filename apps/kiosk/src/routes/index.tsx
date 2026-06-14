@@ -5,7 +5,6 @@ import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { JobFitPage } from '../pages/resume/JobFitPage'
 import { CareerPlanPage } from '../pages/resume/CareerPlanPage'
 import { InterviewSetupPage } from '../pages/interview/InterviewSetupPage'
-import { InterviewSetupPreviewPage } from '../pages/interview/InterviewSetupPreviewPage'
 import { InterviewSessionPage } from '../pages/interview/InterviewSessionPage'
 import { InterviewReportPage } from '../pages/interview/InterviewReportPage'
 import { InterviewTipsPage } from '../pages/interview/InterviewTipsPage'
@@ -59,7 +58,6 @@ export const kioskRouter = createBrowserRouter([
   { path: '/resume/job-fit', element: <JobFitPage /> },
   { path: '/resume/career-plan', element: <CareerPlanPage /> },
   { path: '/interview/setup', element: <InterviewSetupPage /> },
-  { path: '/interview/setup-preview', element: <InterviewSetupPreviewPage /> },
   { path: '/interview/session', element: <InterviewSessionPage /> },
   { path: '/interview/report', element: <InterviewReportPage /> },
   { path: '/interview/tips', element: <InterviewTipsPage /> },
