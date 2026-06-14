@@ -44,7 +44,7 @@
 
 - [x] **招聘会基础字段可录入**（✅ 2026-06-14，P1-A①，分支 `feature/admin-fair-map-screen-fields`）：Admin `EditFairDrawer` 补封面图/地图底图 URL、经纬度、交通信息录入并回填；后端 `UpdateFairInfoDto`/`updateFairInfo`/`mapFair` 同步。范围限这几项「Kiosk 已读取的现有字段」；「入场方式 / 现场服务」非现有 JobFair 列，未纳入本轮（如需另起字段新增任务）。详见 current-progress.md（P1-A①）。
 - [x] **招聘会数据大屏可录入**（✅ 2026-06-14，P1-A①，同分支）：Admin 补 `expectedAttendance` 与 `seekerIntent`（→`seekerIntentJson`）编辑入口（求职意向分布标签+百分比行编辑器，合计≠100 仅轻提示不阻断）；`verify:fair-info-fields` 18 PASS 接 SQLite 主 CI，PG 暂不接。
-- [ ] **参展企业岗位明细 CRUD**：Admin 参展企业抽屉补 `FairCompanyPosition` 子表编辑（标题、薪资、学历、经验、人数、分类），后端 `SaveFairCompanyDto` 与 service 增加写入；前台企业卡不再只能展示 seed 岗位。
+- [x] **参展企业岗位明细 CRUD**（✅ 2026-06-14，P1-A②，分支 `feature/admin-fair-company-positions`）：Admin `CompaniesTab` 企业表单补 `FairCompanyPosition` 岗位行编辑器（9 字段:标题/类型/薪资/人数/学历/经验/地点/部门/要求,覆盖 Kiosk 企业详情已展示字段）;后端 `SaveFairCompanyDto`+`createCompany`/`updateCompany` 嵌套写入(保存即全量替换、sortOrder 按行序、空标题过滤)、`getFairDetail` include positions 回填。Kiosk 读取链路/前台 UI 已就绪未改。`verify:fair-company-positions` 15 PASS 接 SQLite 主 CI,PG 暂不接。详见 current-progress.md（P1-A②）。
 - [ ] **Partner 招聘会子资源产品决策**：明确参展企业 / 展区 / 活动资料 / 场馆导览由 Admin 统一录入，还是开放 Partner 自维护并回 pending 重审。未拍板前，至少在 Partner 招聘会页加说明，避免机构误以为自己能维护全部子资源。
 - [ ] **死按钮接线或移除**：Admin 岗位信息源 / 招聘会信息源的「查看」「打印活动资料」补详情抽屉与真实资料打印；短期不做就移除死按钮。
 - [ ] **Partner 企业资料下架**：补机构侧企业资料下架/取消发布能力，与岗位、招聘会、政策公告保持一致。

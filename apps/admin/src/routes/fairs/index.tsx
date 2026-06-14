@@ -25,6 +25,7 @@ import {
   type FairMaterialView,
   type FairZoneView,
   type SaveFairCompanyInput,
+  type SaveFairCompanyPositionInput,
   type SaveFairZoneInput,
   type UpdateFairInfoInput,
 } from '../../services/api/fairsAdmin'
@@ -413,7 +414,7 @@ function EditFairDrawer({
 
 // ─── 参展企业 Tab ─────────────────────────────────────────────────────────────
 
-const EMPTY_COMPANY: SaveFairCompanyInput = { name: '', industry: '', scale: '', description: '', sourceUrl: '', hiringTags: '', jobsCount: 0 }
+const EMPTY_COMPANY: SaveFairCompanyInput = { name: '', industry: '', scale: '', description: '', sourceUrl: '', hiringTags: '', jobsCount: 0, positions: [] }
 
 function CompaniesTab({
   fairId,
@@ -444,6 +445,17 @@ function CompaniesTab({
       sourceUrl: c.sourceUrl ?? '',
       hiringTags: c.hiringTags.join(','),
       jobsCount: c.jobsCount,
+      positions: c.positions.map((p) => ({
+        title: p.title,
+        positionType: p.positionType ?? undefined,
+        salary: p.salary ?? undefined,
+        headcount: p.headcount,
+        education: p.education ?? undefined,
+        experience: p.experience ?? undefined,
+        location: p.location ?? undefined,
+        department: p.department ?? undefined,
+        requirements: p.requirements ?? undefined,
+      })),
     })
     setError(null)
     setEditing(c)
@@ -453,8 +465,25 @@ function CompaniesTab({
     setSaving(true)
     setError(null)
     try {
-      if (editing === 'new') await fairsAdminService.createCompany(fairId, form)
-      else if (editing) await fairsAdminService.updateCompany(fairId, editing.id, form)
+      // 空标题岗位行前端过滤(后端 DTO 对 title 有非空校验);positionType/文本空值转 undefined → 后端落 null。
+      const payload: SaveFairCompanyInput = {
+        ...form,
+        positions: (form.positions ?? [])
+          .filter((p) => p.title.trim().length > 0)
+          .map((p) => ({
+            title: p.title.trim(),
+            positionType: p.positionType || undefined,
+            salary: p.salary?.trim() || undefined,
+            headcount: p.headcount ?? 0,
+            education: p.education?.trim() || undefined,
+            experience: p.experience?.trim() || undefined,
+            location: p.location?.trim() || undefined,
+            department: p.department?.trim() || undefined,
+            requirements: p.requirements?.trim() || undefined,
+          })),
+      }
+      if (editing === 'new') await fairsAdminService.createCompany(fairId, payload)
+      else if (editing) await fairsAdminService.updateCompany(fairId, editing.id, payload)
       setEditing(null)
       onChanged()
     } catch (e) {
@@ -473,6 +502,12 @@ function CompaniesTab({
       setBusyId(null)
     }
   }
+
+  const positions = form.positions ?? []
+  const setPos = (i: number, patch: Partial<SaveFairCompanyPositionInput>) =>
+    setForm((f) => ({ ...f, positions: (f.positions ?? []).map((p, j) => (j === i ? { ...p, ...patch } : p)) }))
+  const addPos = () => setForm((f) => ({ ...f, positions: [...(f.positions ?? []), { title: '' }] }))
+  const removePos = (i: number) => setForm((f) => ({ ...f, positions: (f.positions ?? []).filter((_, j) => j !== i) }))
 
   return (
     <div className="space-y-4">
@@ -581,6 +616,60 @@ function CompaniesTab({
           <Field label="来源平台企业页链接">
             <input className={inputCls} placeholder="https://…(用户跳转外部平台查看)" value={form.sourceUrl ?? ''} onChange={(e) => setForm((f) => ({ ...f, sourceUrl: e.target.value }))} />
           </Field>
+
+          {/* ── P1-A② 岗位明细(Kiosk 企业详情岗位列表展示用)── */}
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-700">岗位明细</p>
+              <GhostButton onClick={addPos}>添加岗位</GhostButton>
+            </div>
+            <p className="mt-0.5 text-xs text-gray-400">用于 Kiosk 企业详情岗位列表;仅展示信息,不接收简历、不参与平台内投递。保存即全量替换该企业岗位。</p>
+          </div>
+          {positions.length === 0 && (
+            <p className="text-xs text-gray-400">暂无岗位;点击「添加岗位」录入(标题必填)。</p>
+          )}
+          {positions.map((pos, i) => (
+            <div key={i} className="space-y-2.5 rounded-lg border border-gray-200 p-3">
+              <div className="flex items-center gap-2">
+                <input className={`${inputCls} flex-1`} placeholder="岗位标题(必填)" value={pos.title} onChange={(e) => setPos(i, { title: e.target.value })} />
+                <button type="button" className="shrink-0 rounded-md px-2 py-1 text-sm text-red-500 hover:bg-red-50" onClick={() => removePos(i)}>删除</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <Field label="岗位类型">
+                  <select className={inputCls} value={pos.positionType ?? ''} onChange={(e) => setPos(i, { positionType: e.target.value })}>
+                    <option value="">未填写</option>
+                    <option value="full_time">全职</option>
+                    <option value="part_time">兼职</option>
+                    <option value="intern">实习</option>
+                  </select>
+                </Field>
+                <Field label="招聘人数">
+                  <input
+                    type="number" min={0} className={inputCls} value={pos.headcount ?? 0}
+                    onChange={(e) => setPos(i, { headcount: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                  />
+                </Field>
+                <Field label="薪资">
+                  <input className={inputCls} placeholder="如 15-25K / 面议" value={pos.salary ?? ''} onChange={(e) => setPos(i, { salary: e.target.value })} />
+                </Field>
+                <Field label="工作地点">
+                  <input className={inputCls} value={pos.location ?? ''} onChange={(e) => setPos(i, { location: e.target.value })} />
+                </Field>
+                <Field label="学历">
+                  <input className={inputCls} placeholder="如 本科" value={pos.education ?? ''} onChange={(e) => setPos(i, { education: e.target.value })} />
+                </Field>
+                <Field label="经验">
+                  <input className={inputCls} placeholder="如 3-5年 / 不限" value={pos.experience ?? ''} onChange={(e) => setPos(i, { experience: e.target.value })} />
+                </Field>
+                <Field label="部门">
+                  <input className={inputCls} value={pos.department ?? ''} onChange={(e) => setPos(i, { department: e.target.value })} />
+                </Field>
+              </div>
+              <Field label="岗位要求">
+                <textarea className={`${inputCls} h-16 resize-none`} value={pos.requirements ?? ''} onChange={(e) => setPos(i, { requirements: e.target.value })} />
+              </Field>
+            </div>
+          ))}
         </div>
       </Drawer>
     </div>

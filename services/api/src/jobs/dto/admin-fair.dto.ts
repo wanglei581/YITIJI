@@ -89,6 +89,41 @@ export class UpdateFairInfoDto {
   seekerIntent?: SeekerIntentSliceDto[]
 }
 
+/**
+ * 参展企业岗位明细(P1-A②;展示信息)。
+ *
+ * 合规:岗位仅作现场展示明细,不含任何投递/申请/收简历/候选人能力;
+ * 用户跳走仍通过企业 sourceUrl 外链。position.sourceUrl 前台不展示,不在本编辑器范围。
+ */
+export class SaveFairCompanyPositionDto {
+  @IsString() @IsNotEmpty() @MaxLength(200)
+  title!: string
+
+  @IsOptional() @IsIn(['full_time', 'part_time', 'intern'])
+  positionType?: string
+
+  @IsOptional() @IsString() @MaxLength(100)
+  salary?: string
+
+  @IsOptional() @IsInt() @Min(0)
+  headcount?: number
+
+  @IsOptional() @IsString() @MaxLength(100)
+  education?: string
+
+  @IsOptional() @IsString() @MaxLength(100)
+  experience?: string
+
+  @IsOptional() @IsString() @MaxLength(200)
+  location?: string
+
+  @IsOptional() @IsString() @MaxLength(100)
+  department?: string
+
+  @IsOptional() @IsString() @MaxLength(2000)
+  requirements?: string
+}
+
 /** 参展企业新增/编辑(展示信息,不关联岗位投递)。 */
 export class SaveFairCompanyDto {
   @IsString() @IsNotEmpty() @MaxLength(200)
@@ -115,6 +150,14 @@ export class SaveFairCompanyDto {
 
   @IsOptional() @IsInt() @Min(0)
   jobsCount?: number
+
+  /** 岗位明细(展示);保存即全量替换该企业岗位,[] 或全空标题行清空。 */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => SaveFairCompanyPositionDto)
+  positions?: SaveFairCompanyPositionDto[]
 }
 
 /** 展区新增/编辑。 */

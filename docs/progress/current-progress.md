@@ -41,6 +41,19 @@
 - 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
 - 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
 - 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
+## 上线前 P1-A②：参展企业岗位明细 CRUD 已完成（2026-06-14，Claude，分支 `feature/admin-fair-company-positions`）
+
+针对审计「前台有展示区、后台缺增改入口」矩阵:Kiosk 企业详情页(`FairCompanyDetailPage`)已展示岗位列表(标题/类型/薪资/人数/地点/学历/经验/部门/要求),且 `getFairCompanies`/`getFairCompanyById` 已 `include: { positions }`——但 Admin 参展企业表单无法录入岗位,生产新建企业岗位只能靠 seed。本轮补 Admin 写入端(**Kiosk 读取链路与前台 UI 已就绪,未改**):
+
+- **写入**:`SaveFairCompanyDto` 增 `SaveFairCompanyPositionDto[]` 嵌套(title 必填、headcount 非负整数、positionType 限 full_time/part_time/intern、salary/education/experience/location/department/requirements 文本);`createCompany`/`updateCompany` 经 Prisma nested write 写岗位——**保存即全量替换**(update 用 `deleteMany:{}` + `create`,[] 或全空标题清空),`buildPositionCreates` 过滤空标题行 + 按表单顺序写 `sortOrder`,返回 `include: { positions }`。
+- **回填**:`getFairDetail` 的 companies `include: { positions }`(修复连 seed 已有岗位都回填不出的缺口);前端 `FairCompanyView` 增 `positions: FairCompanyPositionView[]`,`SaveFairCompanyInput` 增 `positions`。
+- **Admin UI**:`CompaniesTab` 企业表单增「岗位明细」行编辑器(加/删岗位、9 字段、岗位类型下拉、空标题前端过滤、保存即全量替换)。mock adapter 透传 + fc-mock-1 加演示岗位。
+- **合规**:岗位仅作现场展示明细,**不含投递/申请/收简历/候选人能力**,用户跳走仍走企业 `sourceUrl` 外链;`position.sourceUrl` 前台不展示,不进编辑器。**fair.types.ts / fair.mapper.ts / packages/shared 均未改**(FairCompany.positions 类型 + mapFairCompany 映射本已就绪)。
+- **验证**:新增 `services/api/scripts/verify-fair-company-positions.ts`(service 级,**15 PASS**)——create/update/getFairDetail 回填、sortOrder 排序、清空、空标题过滤、Kiosk getFairCompanyById/getFairCompanies 读取、DTO 非法 headcount/positionType/空 title 被拒、审计 payloadJson 含 positionCount、deleteCompany 级联删。接 SQLite 主 CI(`verify:fair-company-positions`),PG 暂不接。后端 typecheck + Admin typecheck/lint/build(http)全绿。改动 9 文件。
+- **实现备注**:`PrismaService` 经组合暴露 model delegate,未暴露顶层 `fairCompanyPosition`(岗位历来只经嵌套关系读写);verify 改用已暴露的 `fairCompany.findUnique({ include: { positions } })` 做 DB 断言,未碰 prisma.service.ts。
+
+---
+
 ## 上线前 P1-A①：招聘会大屏/地图字段后台增改入口已完成（2026-06-14，Claude，分支 `feature/admin-fair-map-screen-fields`）
 
 针对审计「前台有展示区、后台缺增改入口」矩阵：Kiosk 招聘会详情/大屏/地图已读取 `mapImageUrl/coverImageUrl/latitude/longitude/trafficInfo/expectedAttendance/seekerIntent`，但 Admin 招聘会基本信息编辑只能改名称/时间/场馆，新建招聘会这些字段只能靠 seed。本轮补齐这 7 个字段的后台录入与回填闭环：

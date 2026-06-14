@@ -62,6 +62,21 @@ export interface AdminFairListItem extends AdminFairView {
   counts: { companies: number; zones: number; materials: number }
 }
 
+/** 参展企业岗位明细(展示;镜像后端 FairCompanyPosition)。 */
+export interface FairCompanyPositionView {
+  id: string
+  title: string
+  headcount: number
+  salary: string | null
+  requirements: string | null
+  education: string | null
+  experience: string | null
+  location: string | null
+  positionType: string | null
+  department: string | null
+  sourceUrl: string | null
+}
+
 export interface FairCompanyView {
   id: string
   jobFairId: string
@@ -73,6 +88,7 @@ export interface FairCompanyView {
   sourceUrl: string | null
   hiringTags: string[]
   jobsCount: number
+  positions: FairCompanyPositionView[]
   createdAt: string
   updatedAt: string
 }
@@ -141,6 +157,19 @@ export interface UpdateFairInfoInput {
   seekerIntent?: FairIntentSliceView[]
 }
 
+/** 岗位明细录入(展示;不含投递/申请,position.sourceUrl 不在编辑器范围)。 */
+export interface SaveFairCompanyPositionInput {
+  title: string
+  positionType?: string
+  salary?: string
+  headcount?: number
+  education?: string
+  experience?: string
+  location?: string
+  department?: string
+  requirements?: string
+}
+
 export interface SaveFairCompanyInput {
   name: string
   industry?: string
@@ -150,6 +179,8 @@ export interface SaveFairCompanyInput {
   logoUrl?: string
   hiringTags?: string
   jobsCount?: number
+  /** 岗位明细;保存即全量替换该企业岗位,[] 或全空标题清空。 */
+  positions?: SaveFairCompanyPositionInput[]
 }
 
 export interface SaveFairZoneInput {
@@ -352,7 +383,12 @@ const mockCompanies: FairCompanyView[] = [
   {
     id: 'fc-mock-1', jobFairId: 'fair-mock-1', name: '演示智能科技有限公司', logoUrl: null,
     industry: '互联网/软件', scale: '500-2000', description: '演示数据', sourceUrl: 'https://example.com',
-    hiringTags: ['校招', '实习'], jobsCount: 12, createdAt: now(), updatedAt: now(),
+    hiringTags: ['校招', '实习'], jobsCount: 12,
+    positions: [
+      { id: 'fcp-mock-1', title: '前端工程师(演示)', headcount: 3, salary: '15-25K', requirements: '熟悉 React / TypeScript', education: '本科', experience: '3-5年', location: '青岛', positionType: 'full_time', department: '研发中心', sourceUrl: null },
+      { id: 'fcp-mock-2', title: '产品实习生(演示)', headcount: 2, salary: '200/天', requirements: null, education: '本科在读', experience: '不限', location: '青岛', positionType: 'intern', department: '产品部', sourceUrl: null },
+    ],
+    createdAt: now(), updatedAt: now(),
   },
 ]
 
@@ -372,6 +408,25 @@ const mockMaterials: FairMaterialView[] = [
     previewUrl: undefined, allowPrint: true, publishStatus: 'published', updatedAt: now(),
   },
 ]
+
+/** 岗位录入 → mock 视图(过滤空标题,分配 id;position.sourceUrl 不编辑故 null)。 */
+function toMockPositions(input?: SaveFairCompanyPositionInput[]): FairCompanyPositionView[] {
+  return (input ?? [])
+    .filter((p) => p.title.trim().length > 0)
+    .map((p) => ({
+      id: nextId('fcp'),
+      title: p.title.trim(),
+      headcount: p.headcount ?? 0,
+      salary: p.salary ?? null,
+      requirements: p.requirements ?? null,
+      education: p.education ?? null,
+      experience: p.experience ?? null,
+      location: p.location ?? null,
+      positionType: p.positionType ?? null,
+      department: p.department ?? null,
+      sourceUrl: null,
+    }))
+}
 
 const mockAdapter: FairsAdminServiceInterface = {
   async listFairs() {
@@ -421,7 +476,9 @@ const mockAdapter: FairsAdminServiceInterface = {
       industry: input.industry ?? null, scale: input.scale ?? null, description: input.description ?? null,
       sourceUrl: input.sourceUrl ?? null,
       hiringTags: (input.hiringTags ?? '').split(',').map((s) => s.trim()).filter(Boolean),
-      jobsCount: input.jobsCount ?? 0, createdAt: now(), updatedAt: now(),
+      jobsCount: input.jobsCount ?? 0,
+      positions: toMockPositions(input.positions),
+      createdAt: now(), updatedAt: now(),
     }
     mockCompanies.push(created)
     return created
@@ -438,6 +495,7 @@ const mockAdapter: FairsAdminServiceInterface = {
       logoUrl: input.logoUrl ?? null,
       hiringTags: (input.hiringTags ?? '').split(',').map((s) => s.trim()).filter(Boolean),
       jobsCount: input.jobsCount ?? 0,
+      ...(input.positions !== undefined ? { positions: toMockPositions(input.positions) } : {}),
       updatedAt: now(),
     })
     return company

@@ -13,7 +13,7 @@ import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { Fair, FairCompany, FairZone } from './fair.types'
 import { signFairMaterialPreviewUrl, signFairMaterialUrl } from './fair-material-signing'
-import type { UpdateFairInfoDto, SaveFairCompanyDto, SaveFairZoneDto, UpdateFairMaterialDto } from './dto/admin-fair.dto'
+import type { UpdateFairInfoDto, SaveFairCompanyDto, SaveFairCompanyPositionDto, SaveFairZoneDto, UpdateFairMaterialDto } from './dto/admin-fair.dto'
 import type { SaveVenueGuideDto } from './dto/venue-guide.dto'
 import type { PublishAction } from './dto/publish.dto'
 
@@ -49,6 +49,27 @@ function extForMime(mime: string): string {
   if (mime === 'application/pdf') return 'pdf'
   if (mime === 'image/png') return 'png'
   return 'jpg'
+}
+
+/**
+ * 参展企业岗位明细 → Prisma nested create 数据。
+ * 过滤空标题行(服务端兜底,前端也过滤),sortOrder 按入参顺序写入。
+ */
+function buildPositionCreates(positions: SaveFairCompanyPositionDto[]) {
+  return positions
+    .filter((p) => p.title.trim().length > 0)
+    .map((p, i) => ({
+      title: p.title.trim(),
+      headcount: p.headcount ?? 0,
+      salary: p.salary ?? null,
+      requirements: p.requirements ?? null,
+      education: p.education ?? null,
+      experience: p.experience ?? null,
+      location: p.location ?? null,
+      positionType: p.positionType ?? null,
+      department: p.department ?? null,
+      sortOrder: i,
+    }))
 }
 
 /** 与 shared FairMaterialDTO 对齐的资料 DTO(契约源 packages/shared/src/types/fairDto.ts)。 */
@@ -189,7 +210,7 @@ export class AdminFairsService {
     const f = await this.prisma.jobFair.findUnique({
       where: { id: fairId },
       include: {
-        companies: { orderBy: { jobsCount: 'desc' } },
+        companies: { orderBy: { jobsCount: 'desc' }, include: { positions: { orderBy: { sortOrder: 'asc' } } } },
         zones: { orderBy: { sortOrder: 'asc' } },
         materials: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
       },
@@ -272,9 +293,15 @@ export class AdminFairsService {
         logoUrl: dto.logoUrl ?? null,
         hiringTags: dto.hiringTags ?? '',
         jobsCount: dto.jobsCount ?? 0,
+        ...(dto.positions !== undefined ? { positions: { create: buildPositionCreates(dto.positions) } } : {}),
       },
+      include: { positions: { orderBy: { sortOrder: 'asc' } } },
     })
-    await this.writeFairAudit(user, 'fair.company.create', fairId, { companyId: created.id, name: dto.name })
+    await this.writeFairAudit(user, 'fair.company.create', fairId, {
+      companyId: created.id,
+      name: dto.name,
+      positionCount: created.positions.length,
+    })
     return mapFairCompany(created)
   }
 
@@ -291,9 +318,16 @@ export class AdminFairsService {
         logoUrl: dto.logoUrl ?? null,
         hiringTags: dto.hiringTags ?? '',
         jobsCount: dto.jobsCount ?? 0,
+        // 保存即全量替换岗位明细:先删该企业全部岗位,再按表单顺序重建([] / 全空标题 → 清空)。
+        ...(dto.positions !== undefined ? { positions: { deleteMany: {}, create: buildPositionCreates(dto.positions) } } : {}),
       },
+      include: { positions: { orderBy: { sortOrder: 'asc' } } },
     })
-    await this.writeFairAudit(user, 'fair.company.update', fairId, { companyId, name: dto.name })
+    await this.writeFairAudit(user, 'fair.company.update', fairId, {
+      companyId,
+      name: dto.name,
+      positionCount: updated.positions.length,
+    })
     return mapFairCompany(updated)
   }
 
