@@ -124,7 +124,18 @@
 - 新增 `services/api/scripts/verify-audit-logs.ts`（按验收优先级，service 直调真库）：① write 同步落库字段完整性（actorId/actorRole/action/targetType/targetId/payloadJson/ipAddress/userAgent/requestId/createdAt 全字段回读）；② payloadJson 安全封顶（超 4KB → truncated 标记不撑表、不可序列化 → 错误标记）；③ list 过滤（action/actorId/targetType/targetId）+ createdAt 倒序 + limit/offset 分页 + startAt/endAt 时间范围；④ actorId=null 系统动作可写可读；⑤ write 失败 best-effort（actorRole 违约 → 不抛、不落行，仅记 ops 日志）。
 - `package.json` 加 `verify:audit-logs`；CI 接进 build-and-verify 的 Verify 步骤（P1-B 组，紧随 verify:screensaver-content）。隔离同口径：临时 SQLite（DATABASE_URL 由 runner/CI 提供），脚本只创建+清理自身夹具（User + 审计行），不碰主 dev.db。
 - **验证**：本地 `verify:audit-logs` ALL PASS（未暴露真实 bug；脚本里 test #5 的 `ERROR Audit write failed` 日志为故意触发的 best-effort 写失败，AuditService 正确不抛、不落行）。
-- 待续（P1-B 后续）：AI 配置 / 岗位审核状态机 verify。
+- 待续（P1-B 后续）：岗位审核状态机 verify。
+
+---
+
+## P1-B 验证守门 ④：AI 大模型配置 verify（2026-06-14，Claude，分支 `chore/verify-ai-config`）
+
+AI 大模型配置（`LlmConfigService`：apiKey AES-256-GCM 加密落盘、启停、fail-closed）涉及密钥与上线安全，此前仅 `verify-llm-guard`（禁用词守门）有 verify，配置本身无守门。本轮补 service 级（纯 JSON 文件 + 加密，无 DB，不改 LlmConfigService 生产逻辑）。
+
+- 新增 `services/api/scripts/verify-ai-config.ts`（按验收顺序）：① apiKey 加密落盘——`update({apiKey})` 后配置文件 `ai-model-configs.json` 不含明文、存的是密文；② `getApiKey` 解密往返回原明文；③ `getView`/`getConfig` 不回显明文/密文，仅 `apiKeyConfigured` 布尔；④ fail-closed `isReady = enabled && 有 key`（禁用或无 key 都 not ready）；⑤ 清空 key → configured=false、getApiKey=null、isReady=false；⑥ feature 隔离（改一个不影响另一个）；⑦ 非法 featureKey → 400 `AI_FEATURE_KEY_INVALID`（不静默回落）；⑧ 重启（new LlmConfigService）后配置 + 解密 apiKey 持久仍在。
+- `package.json` 加 `verify:ai-config`；CI 接进 build-and-verify 的 Verify 步骤（P1-B 组，紧随 verify:audit-logs）。隔离：临时 `FILE_STORAGE_DIR`（配置 JSON 写临时目录，finally 清理）+ 测试 `SECRET_ENCRYPTION_KEY`；本任务无 DB，不涉及 PG。
+- **验证**：本地 `verify:ai-config` ALL PASS（未暴露真实 bug）。
+- 待续（P1-B 后续）：岗位审核状态机 verify。
 
 ---
 

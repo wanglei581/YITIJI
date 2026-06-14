@@ -55,7 +55,8 @@
 - [x] **打印任务主链路 verify**（✅ 2026-06-14，分支 `chore/verify-print-jobs`）：新增 `services/api/scripts/verify-print-jobs.ts`（service 级轻量 E2E，13 断言：合法签名创建 / 非法URL拦截SSRF / 终端 claim+401 / printing→completed / 终态幂等 / 404）+ `verify:print-jobs` 脚本 + 接进 CI Verify 步骤。本地 ALL PASS。
 - [x] **待机屏 Content verify**（✅ 2026-06-14，分支 `chore/verify-screensaver-content`）：新增 `verify-screensaver-content.ts`（service 级 E2E，21 断言：上传/外链白名单/启停/软删/方案排序/终端绑定/⭐getKioskPlaylist 七种可播过滤 + 签名URL vs 外链直链）+ `verify:screensaver-content` + 接进 CI（P1-B 组）。本地 ALL PASS。
 - [x] **审计日志 verify**（✅ 2026-06-14，分支 `chore/verify-audit-logs`）：新增 `verify-audit-logs.ts`（service 级：write 字段完整性 / payloadJson 4KB 封顶 / list 过滤·倒序·分页·时间范围 / actorId=null 系统动作 / write best-effort 不抛）+ `verify:audit-logs` + 接进 CI（P1-B 组）。本地 ALL PASS。
-- [ ] **AI 配置 / 岗位审核状态机 verify**：对已真实存在但缺专属守门的核心端点补回归脚本。
+- [x] **AI 大模型配置 verify**（✅ 2026-06-14，分支 `chore/verify-ai-config`）：新增 `verify-ai-config.ts`（service 级，无 DB：apiKey 加密落盘文件无明文 / 解密往返 / 不回显仅 configured / fail-closed isReady / 清空 key / feature 隔离 / 非法 featureKey 400 / 重载持久化）+ `verify:ai-config` + 接进 CI（P1-B 组）。本地 ALL PASS。
+- [ ] **岗位审核状态机 verify**：对已真实存在但缺专属守门的核心端点补回归脚本。
 - [ ] **生产存储驱动门禁**：上线环境 `FILE_STORAGE_DRIVER=cos` 必须强制校验，避免漏配后文件落本机磁盘；至少在部署脚本或健康检查里阻断。
 - [ ] **三端 mock 模式说明留给开发，不进生产**：保留开发演示能力，但生产部署 checklist 必须把 Kiosk/Admin/Partner 的 API mode、AI provider、OCR provider、storage driver 作为同一组门禁核对。
 
