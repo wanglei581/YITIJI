@@ -1,0 +1,12 @@
+{
+  "id": "open-interview-setup-page",
+  "title": "确认前端是否可直接看到模拟面试设置页",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已确认 5173 前端运行，/interview/setup 可直接打开并显示模拟面试设置页",
+  "createdAt": "2026-06-14T00:00:00+08:00",
+  "branch": "feature/interview-setup-redesign"
+}
