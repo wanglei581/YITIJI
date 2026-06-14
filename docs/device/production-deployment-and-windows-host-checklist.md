@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-13（追加：上线前 P0 验收本地执行记录，见文末附录）  
+> 最后更新：2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -300,9 +300,49 @@ pnpm --filter ./services/api verify:activity-logs
 
 ---
 
-## 六、上线后的观察与回滚
+## 六、小范围试运营验收
 
-### 6.1 首日观察
+生产环境、真实服务、Windows 真机与法务合规通过后，先进入小范围试运营，不直接扩大部署。
+
+### 6.1 试运营范围
+
+- [ ] 只启用 1 台终端。
+- [ ] 只连接 1 台奔图打印机。
+- [ ] 只邀请少量真实用户。
+- [ ] 只开放已通过生产/真机验收的能力；扫描、语音、政策材料打印等未验收能力不得宣称可用。
+- [ ] 现场人员知道回退方案：停止使用终端、切换人工服务、保留日志。
+
+### 6.2 试运营必跑路径
+
+- [ ] 手机号登录与登出。
+- [ ] 上传简历 → OCR/文本提取 → AI 诊断。
+- [ ] AI 简历生成或优化 → 生成 PDF → 我的文档。
+- [ ] 真实打印出纸 → 打印订单状态 completed。
+- [ ] 打印失败场景 → 打印订单状态 failed，不伪造成功。
+- [ ] 岗位 / 招聘会 / 政策浏览与收藏。
+- [ ] 去来源平台投递 / 预约 / 官方入口打开，只记录外部跳转行为。
+- [ ] 断网恢复后 Agent 与页面状态一致。
+
+### 6.3 问题记录要求
+
+每个问题至少记录：
+
+- [ ] 发生时间。
+- [ ] 终端编号 / Agent 日志路径。
+- [ ] 用户操作路径。
+- [ ] 相关任务 ID、文件 ID、打印任务 ID 或请求 ID。
+- [ ] 前端截图或错误提示。
+- [ ] API / Agent / nginx / Windows 事件日志位置。
+- [ ] 是否可复现。
+- [ ] 处理结论：阻塞修复、体验修正、配置问题、硬件问题、外部服务问题。
+
+试运营期间只修复阻塞上线、真实服务、真机、配置、合规和必要体验问题；不借试运营新增业务功能。
+
+---
+
+## 七、上线后的观察与回滚
+
+### 7.1 首日观察
 
 - [ ] API 错误率。
 - [ ] 登录成功率。
@@ -314,7 +354,7 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] PostgreSQL 连接数、慢查询、磁盘增长。
 - [ ] Redis 内存与队列积压。
 
-### 6.2 回滚准备
+### 7.2 回滚准备
 
 - [ ] 上一版本构建产物可恢复。
 - [ ] 数据库迁移有回滚/恢复方案；破坏性变更前有备份。
@@ -325,7 +365,7 @@ pnpm --filter ./services/api verify:activity-logs
 
 ---
 
-## 七、通过标准
+## 八、通过标准
 
 只有同时满足以下条件，才能进入正式上线或更换 Windows 主机交付：
 
@@ -335,6 +375,7 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] 线上浏览器业务验收通过。
 - [ ] Windows 本地主机硬件验收通过。
 - [ ] 密钥轮换与合规检查完成。
+- [ ] 1 台终端 + 1 台打印机小范围试运营问题已记录并完成阻塞项处理。
 - [ ] 发现的问题已记录到 `docs/progress/current-progress.md` 或对应正式文档，不使用临时 handoff。
 
 结论口径：

@@ -5,6 +5,22 @@
 
 ---
 
+## 当前窗口工作重心：上线验收与试运营准备（2026-06-14，用户确认）
+
+当前窗口专门负责上线前落地事项，工作重心已从“继续开发业务功能”切换为“部署、配置、真机、真实服务、验收”。除阻塞生产验收的问题修复外，后续不再新增非必要业务功能、不新增重复入口、不扩展招聘闭环。
+
+优先处理顺序：
+
+1. **生产环境准备**：Linux 服务器、域名、HTTPS、PostgreSQL、Redis、COS、nginx/反代、进程守护、日志与回滚。
+2. **真实服务接入**：腾讯短信签名/模板审核与真号 E2E、百度 OCR 生产 Key、AI 大模型 Key；必要时补 TRTC / ASR / TTS 生产配置与实测。
+3. **Windows 真机验收**：Terminal Agent、奔图打印机驱动、`printerName` 配置、真实出纸、扫描链路、断网/重启恢复。
+4. **法务与合规**：用户协议、隐私政策、文件留存说明、AI 免责声明、招聘信息来源免责声明。
+5. **小范围试运营**：先用 1 台终端 + 1 台打印机 + 少量真实用户试跑，记录问题后再修复。
+
+后续执行以 [next-tasks.md](./next-tasks.md) 顶部「当前窗口 P0 执行队列」和 [production-deployment-and-windows-host-checklist.md](../device/production-deployment-and-windows-host-checklist.md) 为准。`next-tasks.md` 中较早的“继续开发建议”仅作为后置项，不得抢占当前窗口。
+
+---
+
 ## 全面审计报告与 8 月路线图拆解（2026-06-14，Codex）
 
 后台多智能体审计结果已落地为 [project-full-audit-and-august-launch-plan-2026-06-14.md](./project-full-audit-and-august-launch-plan-2026-06-14.md)，覆盖 Kiosk/Admin/Partner/API/基础设施/文档对账，并包含「前台有展示区、后台缺增改入口」矩阵与 8 月上线倒排路线。
