@@ -57,6 +57,7 @@
 - [x] **审计日志 verify**（✅ 2026-06-14，分支 `chore/verify-audit-logs`）：新增 `verify-audit-logs.ts`（service 级：write 字段完整性 / payloadJson 4KB 封顶 / list 过滤·倒序·分页·时间范围 / actorId=null 系统动作 / write best-effort 不抛）+ `verify:audit-logs` + 接进 CI（P1-B 组）。本地 ALL PASS。
 - [x] **AI 大模型配置 verify**（✅ 2026-06-14，分支 `chore/verify-ai-config`）：新增 `verify-ai-config.ts`（service 级，无 DB：apiKey 加密落盘文件无明文 / 解密往返 / 不回显仅 configured / fail-closed isReady / 清空 key / feature 隔离 / 非法 featureKey 400 / 重载持久化）+ `verify:ai-config` + 接进 CI（P1-B 组）。本地 ALL PASS。
 - [x] **岗位审核状态机 verify**（✅ 2026-06-14，分支 `chore/verify-job-review`）：新增 `verify-job-review.ts`（service 级 temp SQLite：初始 pending+draft / 未approved禁publish红线 / approve→approved+draft不自动发布 / publish→published / Kiosk 只见 approved+published / unpublish / 终态不可回退 / reject 必填reason+强制draft）+ `verify:job-review` + 接进 CI（P1-B 组）。本地 ALL PASS。**P1-B SQLite service 级守门组补齐**（打印/待机屏/审计/AI配置/岗位审核）。
+- [x] **3 个核心 DB verify 接入 postgres-readiness**（✅ 2026-06-14，分支 `chore/verify-pg-extend`）：`verify:print-jobs` / `verify:job-review` / `verify:audit-logs` 接进 PG 核心 verify 段（不接 ai-config 无DB；暂缓 screensaver-content）。本地真 PG（PostgreSQL 16）throwaway 库 sync:check→generate→deploy→3 verify 全 ALL PASS。
 - [ ] **生产存储驱动门禁**：上线环境 `FILE_STORAGE_DRIVER=cos` 必须强制校验，避免漏配后文件落本机磁盘；至少在部署脚本或健康检查里阻断。
 - [ ] **三端 mock 模式说明留给开发，不进生产**：保留开发演示能力，但生产部署 checklist 必须把 Kiosk/Admin/Partner 的 API mode、AI provider、OCR provider、storage driver 作为同一组门禁核对。
 
