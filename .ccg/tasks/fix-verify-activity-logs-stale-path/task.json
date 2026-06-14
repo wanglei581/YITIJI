@@ -1,0 +1,12 @@
+{
+  "id": "fix-verify-activity-logs-stale-path",
+  "title": "修复 verify:activity-logs 引用已删除文件导致双 CI job 红",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "ci",
+  "currentPhase": "completed",
+  "nextAction": "已从 verify-activity-logs.ts 禁词扫描清单移除已删除的 ActivityLogsGroup.tsx;SQLite + PostgreSQL 各复跑 verify:activity-logs 均 12 PASS,两个 CI job 不再红;待 FF 合入 main",
+  "createdAt": "2026-06-14T00:00:00+08:00",
+  "branch": "fix/verify-activity-logs-stale-path"
+}

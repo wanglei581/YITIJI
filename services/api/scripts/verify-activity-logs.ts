@@ -221,7 +221,6 @@ async function main() {
       'services/api/src/activity/me-activity.controller.ts',
       'services/api/src/activity/activity.types.ts',
       'apps/kiosk/src/services/api/activity.ts',
-      'apps/kiosk/src/pages/profile/assets/ActivityLogsGroup.tsx',
       'apps/kiosk/src/pages/profile/ProfilePage.tsx',
       'apps/kiosk/src/pages/jobs/JobDetailPage.tsx',
       'apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx',
