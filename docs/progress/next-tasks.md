@@ -48,7 +48,7 @@
 - [ ] **Partner 招聘会子资源产品决策**：明确参展企业 / 展区 / 活动资料 / 场馆导览由 Admin 统一录入，还是开放 Partner 自维护并回 pending 重审。未拍板前，至少在 Partner 招聘会页加说明，避免机构误以为自己能维护全部子资源。
 - [x] **死按钮接线或移除**（✅ 2026-06-14，P1-A③，分支 `feature/admin-source-dead-buttons`）：job-sources / fair-sources 的「查看」接只读详情抽屉(展示已加载行 + `sourceUrl` 外链 target=_blank/noopener)；fair-sources「打印活动资料」**移除**(Admin 无打印机、打印属 Kiosk 能力、资料管理在 fairs 页)。纯前端 2 文件,无后端改动;typecheck/lint/build + mock 浏览器预览通过。详见 current-progress.md（P1-A③）。
 - [x] **Partner 企业资料下架**（✅ 2026-06-14，P1-A④，分支 `feature/partner-company-unpublish`）：新增 `PATCH /partner/companies/:id/publish` + `CompaniesService.partnerUnpublish`(本机构 only、跨机构 404、只置 `unpublished` 不触发重审、audit `company.unpublish` 记 `fromPublishStatus`)；前端 `unpublishPartnerCompany` + 「下架」按钮(仅 published 显示,橙色,镜像岗位/招聘会/政策)。**扩展 `verify:companies`**(9b,12 项全过)。详见 current-progress.md（P1-A④）。
-- [ ] **空壳页收口**：Admin 用户/权限/外设、Partner 统计/终端/账号 6 个空壳页上线前隐藏或明确标「建设中」；不要保留可点击但无真实端点的侧栏入口。
+- [x] **空壳页收口**（✅ 2026-06-14，P1-A⑤，分支 `feature/shell-pages-construction`）：6 个空壳页(Admin 用户/权限/外设、Partner 统计/终端/账号)统一改为诚实「功能建设中」(复用 `EmptyState`),users/permissions 移除假骨架表格、其余把"暂无数据"升级为"建设中";按拍板方案**不隐藏入口/不删路由/不删页面/不加 nav badge**。Admin+Partner typecheck/lint/build + mock 浏览器预览 6 页全确认。详见 current-progress.md（P1-A⑤）。**至此 P1-A 整组（①~⑤）收口完成。**
 
 ### P1-B 验证与守门补强
 

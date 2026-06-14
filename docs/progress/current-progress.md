@@ -41,6 +41,18 @@
 - 合规 info-only：只做政策说明 / 材料清单 / 办理路径 / 官方入口 / 打印；不代申请、不承诺补贴到账、不保存身份证 / 银行卡 / 社保；按钮文案合规。
 - 设计：amber/金 主色（首页政策分组同步 `pink→amber`）、白卡 1px 边框 + 轻阴影 + 圆角 12、竖屏单列、触控 ≥48px；AssistantPage 快捷入口「人社专区」→「政策服务」。
 - 验收：kiosk `tsc --noEmit` + `eslint` 通过；本地 5273 竖屏渲染无 console 报错，真实后端政策数据已进列表，身份筛选 / 展开（符合条件·材料·步骤）/ 打印 / 扫码 / 收藏均可用。
+## 上线前 P1-A⑤：空壳页收口（明确标「建设中」）已完成（2026-06-14，Claude，分支 `feature/shell-pages-construction`）
+
+针对审计「空壳页」项:6 个无真实端点的占位页(Admin 用户/权限/外设、Partner 统计/终端/账号)状态不一致且部分误导——users/permissions 渲染**假骨架表格**(像永久加载),其余为"暂无X数据"(暗示功能可用只是没数据)。本轮按用户拍板的**「明确标建设中」**方案收口(不隐藏入口、不删路由/页面,最低风险):
+
+- **6 页统一改为诚实「建设中」**(复用现有 `EmptyState`,保留各页上下文图标 + 标题):users/permissions 移除假骨架表格;peripherals/stats/terminals/account 把"暂无X数据"升级为明确"功能建设中"。统一正文「该模块正在开发中,上线前暂不开放,敬请期待。」消除"看起来像真实功能/暂无数据"的误导。
+- **不做**:不隐藏/删侧栏项、不改路由、不删页面文件、不加 nav badge(`PartnerLayout` 不渲染 `badge`,避免改 `packages/ui` 且两端不一致)、不引入新组件、不碰后端/端点/数据模型/`package.json`/`ci.yml`、不影响任何真实功能页、无招聘闭环。
+- **验证**:Admin + Partner `typecheck`/`lint`/`build(http)` 全绿;**mock 浏览器预览(P1-A③ 同款纯注入绕过 verifyToken)逐一确认 6 页均显示「功能建设中」**:Admin users/permissions(假骨架表已消失)、设备管理「外设」Tab、Partner stats/terminals/account。改动 6 个页面 + 2 文档共 8 文件,无新增 verify、PG 不涉及。
+
+> **P1-A「后台增改入口补齐」整组收口完成**(①招聘会地图/大屏字段 → ②参展企业岗位明细 → ③Admin 信息源死按钮 → ④Partner 企业资料下架 → ⑤空壳页收口),5 项均已合入 main。
+
+---
+
 ## 上线前 P1-A④：Partner 企业资料下架 已完成（2026-06-14，Claude，分支 `feature/partner-company-unpublish`）
 
 针对审计「Partner 企业资料缺下架能力」:Partner companies 页有 `unpublished` 状态标签但无下架按钮,后端 Partner 仅有 GET/import/update、无 publish/unpublish 端点。本轮严格镜像 jobs/fairs/policy 的 Partner 下架模式补齐(不扩成重新发布/审核流重做):

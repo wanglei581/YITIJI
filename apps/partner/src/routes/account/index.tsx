@@ -7,8 +7,8 @@ export default function AccountPage() {
     <Page title="账号权限" subtitle="机构子账号与操作权限管理">
       <EmptyState
         icon={UserCogIcon}
-        title="暂无账号配置"
-        description="添加子账号后将在此处显示"
+        title="功能建设中"
+        description="该模块正在开发中，上线前暂不开放，敬请期待。"
       />
     </Page>
   )

@@ -5,8 +5,8 @@ export default function PeripheralsPage() {
   return (
     <EmptyState
       icon={CableIcon}
-      title="暂无外设数据"
-      description="连接终端外设后将显示设备列表"
+      title="功能建设中"
+      description="该模块正在开发中，上线前暂不开放，敬请期待。"
     />
   )
 }
