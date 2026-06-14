@@ -102,7 +102,18 @@
 - 新增 `services/api/scripts/verify-print-jobs.ts`（13 断言）：① 合法签名 fileUrl → PrintTask pending；② 外部/无签名/篡改 sig → 400 `PRINT_INVALID_FILE_URL`（SSRF 防护）；③ 终端 claim（错 agentToken → 401，正确 → pending 被原子领取 claimed + 绑定终端）；④ 状态回传 printing → completed；⑤ 终态幂等（重复 completed / 终态后再 printing 均 ack 且 DB 不重写）；⑥ 查询不存在 → 404 `PRINT_TASK_NOT_FOUND`。
 - `package.json` 加 `verify:print-jobs`；`.github/workflows/ci.yml` 接进 build-and-verify 的 Verify 步骤（job env 已含 FILE_SIGNING/TERMINAL_ADMIN/TERMINAL_ACTION secret + Verify 前已 `prisma db push`，无缺依赖）。脚本内对三个 secret 用 `||=` 兜底测试值；claim 取全局最旧 pending，故把测试任务 createdAt 回拨保证确定命中。
 - **验证**：本地 `verify:print-jobs` ALL PASS（13/13）。
-- 待续（P1-B 后续）：待机屏 Content / Audit / AI 配置 / 岗位审核状态机 verify。
+- 待续（P1-B 后续）：Audit / AI 配置 / 岗位审核状态机 verify。
+
+---
+
+## P1-B 验证守门 ②：待机屏 Content verify（2026-06-14，Claude，分支 `chore/verify-screensaver-content`）
+
+待机宣传屏内容链路（AdAsset / AdPlaylist / AdPlaylistItem / TerminalScreensaverConfig + Kiosk 拉取）此前仅外部视频登记有 verify，主链路缺守门。本轮补 service 级 E2E（service 直调真库 + 临时 FILE_STORAGE_DIR local 存储，不起 server，不改生产逻辑）。
+
+- 新增 `services/api/scripts/verify-screensaver-content.ts`（21 断言）：上传素材（魔数校验 + 落盘读回）、外链素材（白名单 / 私网 / 非 HTTPS / 非直链拦截、外链无本地内容 404）、启用/禁用、软删（默认列表不含、includeDeleted 才含）、播放方案排序、终端绑定（无方案不允许 enabled）；⭐`getKioskPlaylist` 七种过滤逐一断言：config 禁用 / playlist 非 active / item 禁用 / asset 非 active / 软删 / 外链缺 URL / 无可播素材 → 均不进可播，且上传素材回签名 URL（verifyAdAssetSignature 通过）、外链素材回 HTTPS 直链。
+- `package.json` 加 `verify:screensaver-content`；CI 接进 build-and-verify 的 Verify 步骤（P1-B verify 组，紧随 verify:print-jobs）。隔离：脚本强制 `FILE_STORAGE_DRIVER=local` + 自建临时 `FILE_STORAGE_DIR`（finally 清理）+ 自控 `ALLOWED_EXTERNAL_VIDEO_HOSTS`；DATABASE_URL 由 runner/CI 提供，脚本只创建+清理自身夹具，不碰主 dev.db。
+- **验证**：本地 `verify:screensaver-content` ALL PASS（21/21）。
+- 待续（P1-B 后续）：Audit / AI 配置 / 岗位审核状态机 verify。
 
 ---
 
