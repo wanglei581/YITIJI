@@ -1,0 +1,12 @@
+{
+  "id": "production-env-config-advice",
+  "title": "梳理本项目生产环境资源与配置清单",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "ops",
+  "currentPhase": "completed",
+  "nextAction": "已读取 env 示例与部署文档并给出配置建议",
+  "createdAt": "2026-06-14T00:00:00+08:00",
+  "branch": "main"
+}
