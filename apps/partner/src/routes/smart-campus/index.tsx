@@ -163,7 +163,7 @@ function TerminalsPanel() {
       }
     } else {
       nextModules[key] = !nextModules[key]
-      nextEnabled = nextEnabled && (nextModules.welcome || nextModules.luggage || nextModules.panorama)
+      nextEnabled = nextModules.welcome || nextModules.luggage || nextModules.panorama
     }
 
     const id = terminal.terminalId
