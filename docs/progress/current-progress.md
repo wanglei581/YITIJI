@@ -5,6 +5,31 @@
 
 ---
 
+## 智慧校园真实可用闭环收口（2026-06-16，Codex/Claude，分支 codex/smart-campus-real-complete）
+
+在 `codex/restore-smart-campus-safe` 已恢复源码基础上，新建隔离工作区 `/Users/wanglei/smart-campus-real-wt`，将智慧校园从「恢复入口」推进到**真实后端开关可用、前端无 mock 冒充、页面不会无故消失**的最小完整闭环。当前 tip：`2e64f1e`。
+
+本轮落地内容：
+
+- 高校版模板联动：Admin 新增/编辑合作机构选择「高校版」时，启用模块包含并自动勾选 `smart_campus`；后端机构模块白名单允许保存该模块；Partner 侧菜单可见。
+- 真实终端开关闭环：Admin 绑定终端归属学校机构；Partner 学校账号只能查看/配置本机构终端；保存后 Kiosk 按 `KSK-001` 真实配置显示/隐藏首页智慧校园区块。
+- 去假数据：删除 Kiosk `freshmanInsights` mock 数据服务；Partner 移除假统计/假趋势/硬编码学校名；迎新内容与使用统计显示「未开放」真实空态。
+- 校园大数据严格冻结：Partner 不可开启，后端读写两侧强制 `bigdata=false`；直达 `/smart-campus/freshman-insights` 只显示「暂未开放」，不展示任何示例统计。
+- GUI 联调修复：本地浏览器验证发现 Partner 只点子模块时总开关不会自动开启；修复为任一子模块开启即 `enabled=true`，最后一个子模块关闭才 `enabled=false`。
+
+本地验收（2026-06-16）：
+
+- `pnpm --filter @ai-job-print/partner typecheck` ✅
+- `pnpm --filter @ai-job-print/partner lint` ✅
+- `VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3011/api/v1 pnpm --filter @ai-job-print/partner build` ✅
+- `pnpm --filter @ai-job-print/api verify:partner-smart-campus` ✅（含高校版模板联动、机构隔离、bigdata 强制冻结）
+- `pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui` ✅（bigdata 冻结、前台无假数据）
+- 本地真实 API + GUI 验证 ✅：Admin 登录不再卡身份验证；新增合作机构选择「高校版」后「智慧校园」可见且自动勾选；Partner 页面实际点击「迎新」保存后 API 返回 `enabled:true/welcome:true/bigdata:false`，Kiosk 首页出现智慧校园；再关闭后 Kiosk 首页整块消失；迎新页可打开，大数据直达页仅显示「暂未开放」。
+
+仍未开放（按设计，不用 mock 冒充）：校园大数据真实聚合、迎新内容 CMS、使用统计回传。后续如要做，必须另起数据模型/审核/合规授权任务。
+
+---
+
 ## 智慧校园「按学校/终端开关」安全恢复（2026-06-15，Claude，分支 codex/restore-smart-campus-safe）
 
 把此前停留在 `feature/restore-smart-campus`（未合入 main）的「智慧校园」作为**按学校/终端后台开关显示的附加模块**恢复回来，独立隔离工作区 `/Users/wanglei/restore-sc-safe-wt`，**基线为 main（bdccfb8）**，未合入 main / 当前 `feature/interview-setup-redesign`，待用户 review 后再决定合并。
