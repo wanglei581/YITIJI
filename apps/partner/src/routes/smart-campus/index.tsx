@@ -161,6 +161,11 @@ function TerminalsPanel() {
       if (nextEnabled && !nextModules.welcome && !nextModules.luggage && !nextModules.panorama) {
         nextModules.welcome = true
       }
+      if (!nextEnabled) {
+        nextModules.welcome = false
+        nextModules.luggage = false
+        nextModules.panorama = false
+      }
     } else {
       nextModules[key] = !nextModules[key]
       nextEnabled = nextModules.welcome || nextModules.luggage || nextModules.panorama

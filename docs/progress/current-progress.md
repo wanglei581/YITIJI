@@ -16,6 +16,7 @@
 - 去假数据：删除 Kiosk `freshmanInsights` mock 数据服务；Partner 移除假统计/假趋势/硬编码学校名；迎新内容与使用统计显示「未开放」真实空态。
 - 校园大数据严格冻结：Partner 不可开启，后端读写两侧强制 `bigdata=false`；直达 `/smart-campus/freshman-insights` 只显示「暂未开放」，不展示任何示例统计。
 - GUI 联调修复：本地浏览器验证发现 Partner 只点子模块时总开关不会自动开启；修复为任一子模块开启即 `enabled=true`，最后一个子模块关闭才 `enabled=false`。
+- 审查修复：总开关关闭时同步清空 `welcome/luggage/panorama`，避免运营看到“智慧校园关但子模块开”的误解；`SaveSmartCampusConfigDto` 改为嵌套布尔校验，拒绝 `"false"` 字符串和未知模块字段。
 
 本地验收（2026-06-16）：
 

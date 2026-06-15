@@ -50,5 +50,5 @@ export interface SmartCampusTerminalView {
 
 export interface SaveSmartCampusConfigInput {
   enabled: boolean
-  modules: SmartCampusModules
+  modules: Partial<SmartCampusModules>
 }

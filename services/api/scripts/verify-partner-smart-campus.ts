@@ -26,6 +26,8 @@
  * 不污染 seed 数据、不依赖 HTTP server、不 reset dev.db。
  */
 import 'dotenv/config'
+import { plainToInstance } from 'class-transformer'
+import { validate } from 'class-validator'
 // 直接从 shared 源码相对路径取契约常量（脚本经 swc-node 运行，api 运行期不解析
 // @ai-job-print/shared 别名——其源码仅用 import type；partner.ts 为纯类型+常量，无外部依赖）。
 import { SCENE_DEFAULT_MODULES, MODULE_LABELS } from '../../../packages/shared/src/types/partner'
@@ -34,6 +36,7 @@ import { SmartCampusService } from '../src/smart-campus/smart-campus.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { AuditService } from '../src/audit/audit.service'
+import { SaveSmartCampusConfigDto } from '../src/smart-campus/dto/save-smart-campus-config.dto'
 import type { SaveSmartCampusConfigInput } from '../src/smart-campus/smart-campus.types'
 
 function pass(m: string): void { console.log(`  PASS ${m}`) }
@@ -57,6 +60,12 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
     if (c === code) pass(`${label} → ${code}`)
     else fail(`${label} — 期望 ${code}，实际: ${c ?? (e as Error).message}`)
   }
+}
+
+async function validateSmartCampusDto(body: unknown): Promise<string[]> {
+  const dto = plainToInstance(SaveSmartCampusConfigDto, body)
+  const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true })
+  return errors.map((e) => JSON.stringify(e.constraints ?? e.children?.map((c) => c.constraints ?? {})))
 }
 
 const SCHOOL_A = 'test-sc-org-school-a'
@@ -203,6 +212,17 @@ async function main(): Promise<void> {
     const detailA = await adminOrgs.getOrgDetail(SCHOOL_A)
     if (detailA.enabledModules.includes('smart_campus')) pass('Case13 admin 保存 smart_campus 模块成功（白名单放行、读回保留）')
     else fail(`Case13 smart_campus 未被保存: ${JSON.stringify(detailA.enabledModules)}`)
+
+    // Case 14: DTO 边界——模块字段允许缺失（按 false 处理），但传入时必须是 boolean；未知字段直接拒绝。
+    const validDtoErrors = await validateSmartCampusDto({ enabled: true, modules: { welcome: true } })
+    if (validDtoErrors.length === 0) pass('Case14 DTO 允许 partial boolean modules（缺失字段由 service 视为 false）')
+    else fail(`Case14 合法 DTO 被拒绝: ${validDtoErrors.join('; ')}`)
+    const stringBoolErrors = await validateSmartCampusDto({ enabled: true, modules: { welcome: 'false' } })
+    if (stringBoolErrors.length > 0) pass('Case14 DTO 拒绝字符串布尔值，避免 "false" 被 !! 强转为 true')
+    else fail('Case14 DTO 未拒绝 modules.welcome="false"')
+    const extraKeyErrors = await validateSmartCampusDto({ enabled: true, modules: { welcome: true, studentCount: 42 } })
+    if (extraKeyErrors.length > 0) pass('Case14 DTO 拒绝未知 modules 字段（forbidNonWhitelisted）')
+    else fail('Case14 DTO 未拒绝未知 modules.studentCount')
 
     console.log('\n✅ ALL PASS — 智慧校园闭环（Partner 开关 + Admin 终端归属 + 高校版模板联动）验证通过\n')
   } catch (e) {
