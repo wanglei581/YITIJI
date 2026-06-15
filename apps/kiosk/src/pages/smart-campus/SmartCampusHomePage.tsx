@@ -13,7 +13,6 @@
 import { Button, Card } from '@ai-job-print/ui'
 import { useNavigate } from 'react-router-dom'
 import {
-  BarChart3Icon,
   ChevronRightIcon,
   CreditCardIcon,
   KeyRoundIcon,
@@ -49,7 +48,7 @@ const ENTRIES: EntryDef[] = [
     description: '报到流程、办事窗口、入学与求职准备',
     to: '/smart-campus/welcome',
   },
-  { key: 'bigdata', icon: BarChart3Icon, title: '校园大数据', description: '新生生源与专业分布聚合看板', to: '/smart-campus/freshman-insights' },
+  // 校园大数据本期严格冻结：不在此列出入口，后端开关亦强制 false，直达 URL 仅见“未开放”。
   { key: 'luggage', icon: PackageIcon, title: '行李帮运', description: '合作物流服务入口与服务点说明', to: '/smart-campus/service/luggage' },
   { key: 'panorama', icon: ScanFaceIcon, title: 'VR校园', description: '360° 云游校园与重点场馆介绍', to: '/smart-campus/service/panorama' },
 ]

@@ -1,33 +1,33 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, StatusBadge } from '@ai-job-print/ui'
+import { Card, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { getSmartCampusTerminals, saveSmartCampusConfig, type PartnerSmartCampusTerminal } from '../../services/api'
 import {
   ActivityIcon,
-  AlertTriangleIcon,
-  BarChart3Icon,
-  BellIcon,
   CheckCircleIcon,
   GraduationCapIcon,
   InfoIcon,
-  LinkIcon,
+  LockIcon,
   MonitorSmartphoneIcon,
   PartyPopperIcon,
-  PencilIcon,
-  PlusIcon,
-  QrCodeIcon,
-  SearchIcon,
-  ShieldCheckIcon,
 } from 'lucide-react'
 
-type SmartCampusTab = 'terminals' | 'orientation' | 'bigdata' | 'usage'
+// ============================================================
+// Partner 智慧校园 —— 仅「终端开关」为真实闭环（按 orgId 隔离 + 审计 + Kiosk 联动）。
+//
+// 迎新内容 / 使用统计：内容模型与统计回传尚未接入，故只展示「未开放」真实空态，
+//   绝不再展示示例数据 / 原型假统计（避免冒充可用）。
+// 校园大数据：本期严格冻结，机构端不展示入口，后端开关亦强制 false。
+// 合规（compliance-boundary.md §九）：不采集学生个人明细，无招聘闭环语义。
+// ============================================================
+
+type SmartCampusTab = 'terminals' | 'orientation' | 'usage'
 type SwitchState = 'on' | 'off'
 type ModuleColumn = 'enabled' | 'welcome' | 'bigdata' | 'luggage' | 'panorama'
 
 const TABS: Array<{ key: SmartCampusTab; label: string; icon: typeof GraduationCapIcon }> = [
   { key: 'terminals', label: '终端开关', icon: MonitorSmartphoneIcon },
   { key: 'orientation', label: '迎新内容', icon: PartyPopperIcon },
-  { key: 'bigdata', label: '校园大数据', icon: BarChart3Icon },
   { key: 'usage', label: '使用统计', icon: ActivityIcon },
 ]
 
@@ -38,42 +38,6 @@ const MODULE_HEADERS: Array<{ key: ModuleColumn; label: string; disabled?: boole
   { key: 'luggage', label: '行李' },
   { key: 'panorama', label: '全景' },
 ]
-
-const FLOW_STEPS = [
-  { step: 1, title: '线上预报到', desc: '前往学校迎新官网/公众号完成信息确认', status: '已上线', badge: 'success' as const },
-  { step: 2, title: '学院报到', desc: '到所在学院迎新点核验、领取材料', status: '已上线', badge: 'success' as const },
-  { step: 3, title: '宿舍入住 / 校园卡激活', desc: '领取钥匙、办理水电网', status: '待审核', badge: 'warning' as const },
-]
-
-const WINDOWS = [
-  ['学生处', '行政楼 1F'],
-  ['财务处', '行政楼 2F'],
-  ['校医院', '东门内 50m'],
-]
-
-const STAT_ROWS = [
-  { metric: '性别比例', dimension: '性别', valueName: '男', value: '3,370', visibility: '公共展示', visibilityStyle: 'bg-blue-50 text-blue-600', review: '已通过', reviewBadge: 'success' as const },
-  { metric: '性别比例', dimension: '性别', valueName: '女', value: '2,870', visibility: '公共展示', visibilityStyle: 'bg-blue-50 text-blue-600', review: '已通过', reviewBadge: 'success' as const },
-  { metric: '专业规模', dimension: '专业', valueName: '高分子材料', value: '620', visibility: '公共展示', visibilityStyle: 'bg-blue-50 text-blue-600', review: '已通过', reviewBadge: 'success' as const },
-  { metric: '专业规模', dimension: '专业', valueName: '中外合作小专业', value: '<10 已合并', visibility: '隐藏', visibilityStyle: 'bg-gray-100 text-gray-500', review: 'k-匿名', reviewBadge: 'default' as const, muted: true },
-  { metric: '报到率', dimension: '全校', valueName: '—', value: '94%', visibility: '仅后台', visibilityStyle: 'bg-neutral-100 text-gray-600', review: '待审核', reviewBadge: 'warning' as const },
-]
-
-const USAGE_METRICS = [
-  { value: '12,480', label: '智慧校园浏览' },
-  { value: '8,920', label: '待机唤醒' },
-  { value: '3,140', label: '迎新点击' },
-  { value: '1,260', label: '导流到打印/简历' },
-]
-
-const TREND = [55, 48, 70, 62, 100, 88, 82]
-const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const MODULE_USAGE = [
-  ['迎新系统', 42],
-  ['导流求职打印主业', 28],
-  ['行李帮运', 18],
-  ['校园全景', 12],
-] as const
 
 function SwitchPill({ state, disabled = false, onClick, title }: { state: SwitchState; disabled?: boolean; onClick?: () => void; title?: string }) {
   const content = (
@@ -105,37 +69,10 @@ function SwitchPill({ state, disabled = false, onClick, title }: { state: Switch
   )
 }
 
-function DisabledIconButton({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      disabled
-      title="写入端点未接入，当前仅按原型恢复展示"
-      className="text-gray-300"
-      aria-label={label}
-    >
-      <PencilIcon className="h-4 w-4" aria-hidden="true" />
-    </button>
-  )
-}
-
-function TopToolbar() {
-  return (
-    <div className="flex items-center gap-1 text-gray-400">
-      <button type="button" disabled className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300" title="搜索端点未接入">
-        <SearchIcon className="h-4 w-4" aria-hidden="true" />
-      </button>
-      <button type="button" disabled className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300" title="通知端点未接入">
-        <BellIcon className="h-4 w-4" aria-hidden="true" />
-      </button>
-    </div>
-  )
-}
-
 function SmartCampusTabs({ active, onChange }: { active: SmartCampusTab; onChange: (tab: SmartCampusTab) => void }) {
   return (
     <Card className="p-0">
-      <div className="grid gap-1 p-2 sm:grid-cols-4">
+      <div className="grid gap-1 p-2 sm:grid-cols-3">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const selected = active === tab.key
@@ -153,6 +90,21 @@ function SmartCampusTabs({ active, onChange }: { active: SmartCampusTab; onChang
             </button>
           )
         })}
+      </div>
+    </Card>
+  )
+}
+
+/** 未接入后端的子区统一空态：明确「未开放」原因，不展示任何假数据。 */
+function NotOpenState({ title, reason }: { title: string; reason: string }) {
+  return (
+    <Card className="flex flex-col items-center justify-center gap-3 p-10 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
+        <LockIcon className="h-7 w-7 text-gray-400" aria-hidden="true" />
+      </div>
+      <div>
+        <p className="text-base font-semibold text-gray-900">{title}</p>
+        <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-gray-500">{reason}</p>
       </div>
     </Card>
   )
@@ -209,9 +161,14 @@ function TerminalsPanel() {
       if (nextEnabled && !nextModules.welcome && !nextModules.luggage && !nextModules.panorama) {
         nextModules.welcome = true
       }
+      if (!nextEnabled) {
+        nextModules.welcome = false
+        nextModules.luggage = false
+        nextModules.panorama = false
+      }
     } else {
       nextModules[key] = !nextModules[key]
-      nextEnabled = nextEnabled && (nextModules.welcome || nextModules.luggage || nextModules.panorama)
+      nextEnabled = nextModules.welcome || nextModules.luggage || nextModules.panorama
     }
 
     const id = terminal.terminalId
@@ -303,126 +260,14 @@ function TerminalsPanel() {
 function OrientationPanel() {
   return (
     <section className="space-y-4" aria-label="迎新内容管理">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">迎新内容管理</h2>
-          <p className="mt-0.5 text-sm text-gray-500">维护报到流程、办事窗口、官方链接，提交后经平台审核上终端。</p>
-        </div>
-        <Button size="sm" disabled title="OrientationContent 写入端点未接入">
-          <PlusIcon className="mr-1 h-4 w-4" aria-hidden="true" />
-          新增内容
-        </Button>
+      <div>
+        <h2 className="text-lg font-bold text-gray-900">迎新内容管理</h2>
+        <p className="mt-0.5 text-sm text-gray-500">维护报到流程、办事窗口、官方链接，提交后经平台审核上终端。</p>
       </div>
-      <div className="flex items-start gap-2 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-emerald-900">
-          仅信息展示 + 官方外链，不在终端采集任何学生个人信息。报到登记请引导至学校官方系统。
-        </p>
-      </div>
-
-      <Card className="p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">报到流程</p>
-        <div className="space-y-2">
-          {FLOW_STEPS.map((step) => (
-            <div key={step.step} className="flex items-center gap-3 rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-2.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">{step.step}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-800">{step.title}</p>
-                <p className="text-xs text-gray-400">{step.desc}</p>
-              </div>
-              <StatusBadge status={step.badge} label={step.status} />
-              <DisabledIconButton label={`编辑${step.title}`} />
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-semibold text-gray-700">办事窗口</p>
-          <div className="space-y-1.5 text-sm text-gray-700">
-            {WINDOWS.map(([name, location]) => (
-              <div key={name} className="flex justify-between rounded-md bg-neutral-50 px-3 py-2">
-                <span>{name}</span>
-                <span className="text-gray-400">{location}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-semibold text-gray-700">官方链接（外链/二维码）</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-2">
-              <LinkIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-gray-700">迎新官网 yingxin.qust.edu.cn</span>
-              <StatusBadge status="success" label="已上线" />
-            </div>
-            <div className="flex items-center gap-2 rounded-md bg-neutral-50 px-3 py-2">
-              <QrCodeIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-gray-700">迎新服务号（二维码）</span>
-              <StatusBadge status="success" label="已上线" />
-            </div>
-          </div>
-        </Card>
-      </div>
-    </section>
-  )
-}
-
-function BigDataPanel() {
-  return (
-    <section className="space-y-4" aria-label="校园大数据录入">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">校园大数据录入</h2>
-          <p className="mt-0.5 text-sm text-gray-500">只录入聚合统计数字；提交后经平台审核与脱敏校验上终端。</p>
-        </div>
-        <Button size="sm" disabled title="CampusStatistic 写入端点未接入">
-          <PlusIcon className="mr-1 h-4 w-4" aria-hidden="true" />
-          新增指标
-        </Button>
-      </div>
-      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-3">
-        <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-amber-900">
-          <span className="font-semibold">合规要求：</span>只接收已聚合脱敏的统计数字，禁止录入学生个人明细；样本量低于阈值的分组自动合并。
-        </p>
-      </div>
-      <Card className="p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">数据接入方式</p>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="rounded-lg border-2 border-primary-500 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700">手工录入</button>
-          <button type="button" disabled title="汇总 Excel 端点未接入" className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-gray-400">汇总 Excel 上传</button>
-          <button type="button" disabled title="校园聚合 API worker 未接入" className="rounded-lg border border-neutral-200 px-4 py-2 text-sm text-gray-400">API 对接学校系统</button>
-        </div>
-        <p className="mt-2 text-xs text-gray-400">手工录入最安全，适合绝大多数学校；API 仅适合接口只返回聚合数字的学校。</p>
-      </Card>
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-gray-500">
-              <tr>
-                {['指标', '维度', '取值', '数值', '可见范围', '审核'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 font-medium last:text-left">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 text-gray-700">
-              {STAT_ROWS.map((row) => (
-                <tr key={`${row.metric}-${row.valueName}`} className={row.muted ? 'bg-amber-50/40 text-gray-400' : ''}>
-                  <td className="whitespace-nowrap px-4 py-3">{row.metric}</td>
-                  <td className="whitespace-nowrap px-4 py-3">{row.dimension}</td>
-                  <td className="whitespace-nowrap px-4 py-3">{row.valueName}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{row.value}</td>
-                  <td className="whitespace-nowrap px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-xs ${row.visibilityStyle}`}>{row.visibility}</span></td>
-                  <td className="whitespace-nowrap px-4 py-3"><StatusBadge status={row.reviewBadge} label={row.review} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      <p className="text-xs text-gray-400">「公共展示」= 可在一体机前端给新生/家长看；「仅后台」= 只给校领导/运营看，不进公共终端。</p>
+      <NotOpenState
+        title="迎新内容管理尚未开放"
+        reason="内容模型与平台审核流尚未接入，机构端暂不能在此录入或编辑迎新内容；开放前终端不展示任何示例内容。功能上线后将在此维护报到流程、办事窗口与官方外链，并经平台审核后下发终端。"
+      />
     </section>
   )
 }
@@ -434,39 +279,10 @@ function UsagePanel() {
         <h2 className="text-lg font-bold text-gray-900">使用统计</h2>
         <p className="mt-0.5 text-sm text-gray-500">平台生成回传，反映本校终端上智慧校园功能的使用情况，不含个人信息。</p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {USAGE_METRICS.map((m) => (
-          <Card key={m.label} className="p-4">
-            <p className="text-2xl font-bold text-gray-900">{m.value}</p>
-            <p className="mt-1 text-xs text-gray-500">{m.label}</p>
-          </Card>
-        ))}
-      </div>
-      <Card className="p-5">
-        <p className="mb-4 text-sm font-semibold text-gray-700">近 7 天浏览趋势</p>
-        <div className="flex h-36 items-end justify-between gap-3">
-          {TREND.map((height, index) => (
-            <div key={DAYS[index]} className="flex flex-1 flex-col items-center justify-end gap-1">
-              <div className={`w-full rounded-t ${height === 100 ? 'bg-primary-600' : height > 80 ? 'bg-primary-400' : 'bg-primary-500'}`} style={{ height: `${height}%` }} />
-              <span className="text-[11px] text-gray-400">{DAYS[index]}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-      <Card className="p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">分功能使用占比</p>
-        <div className="space-y-2.5 text-sm">
-          {MODULE_USAGE.map(([name, percent]) => (
-            <div key={name}>
-              <div className="mb-1 flex justify-between text-gray-700">
-                <span>{name}</span>
-                <span className="tabular-nums text-gray-400">{percent}%</span>
-              </div>
-              <div className="h-2.5 rounded-full bg-neutral-100"><div className="h-2.5 rounded-full bg-indigo-500" style={{ width: `${percent}%` }} /></div>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <NotOpenState
+        title="使用统计尚未开放"
+        reason="平台使用统计回传管线尚未接入，暂无可展示的真实数据；开放前不展示任何示例统计。功能上线后将在此查看本校终端的智慧校园浏览与导流情况（仅聚合，不含个人信息）。"
+      />
     </section>
   )
 }
@@ -478,8 +294,7 @@ export default function SmartCampusPage() {
   return (
     <Page
       title="智慧校园"
-      subtitle="合作机构（学校）后台管理区 · 终端开关按 orgId 隔离已联动 Kiosk，其余子区为原型"
-      actions={<TopToolbar />}
+      subtitle="合作机构（学校）后台管理区 · 终端开关按 orgId 隔离已联动 Kiosk"
     >
       <div className="space-y-5">
         <Card className="border-blue-100 bg-blue-50/50 p-5">
@@ -489,11 +304,11 @@ export default function SmartCampusPage() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-gray-900">青岛科技大学就业中心 · 智慧校园</h2>
+                <h2 className="text-base font-semibold text-gray-900">智慧校园 · 终端开关已联动</h2>
                 <StatusBadge status="success" label="终端开关已联动" />
               </div>
               <p className="mt-1 text-sm leading-6 text-gray-600">
-                「终端开关」已接通后端：学校账号按 orgId 隔离，只配置归属本校的终端，保存即联动 Kiosk 首页智慧校园显隐。迎新内容 / 校园大数据 / 使用统计仍为原型，待内容模型与审核流补齐后开放。
+                「终端开关」已接通后端：学校账号按 orgId 隔离，只配置归属本校的终端，保存即联动 Kiosk 首页智慧校园显隐。迎新内容 / 使用统计在内容模型与统计管线接入前显示「未开放」，不展示任何示例数据；校园大数据本期严格冻结。
               </p>
             </div>
           </div>
@@ -509,13 +324,12 @@ export default function SmartCampusPage() {
 
         {activeTab === 'terminals' && <TerminalsPanel />}
         {activeTab === 'orientation' && <OrientationPanel />}
-        {activeTab === 'bigdata' && <BigDataPanel />}
         {activeTab === 'usage' && <UsagePanel />}
 
         <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
           <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-amber-900">
-            「终端开关」已接通真实后端（含机构隔离与审计）。「迎新内容 / 校园大数据 / 使用统计」仍为原型展示，相关新增 / 编辑动作在内容模型与合规审核补齐前保持禁用。
+            「终端开关」已接通真实后端（含机构隔离与审计）。「迎新内容 / 使用统计」在内容模型与统计回传补齐前显示「未开放」真实空态，不展示任何示例数据；「校园大数据」本期严格冻结。
           </p>
         </div>
       </div>
