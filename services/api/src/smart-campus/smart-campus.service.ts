@@ -17,7 +17,8 @@ function parseModules(json: string): SmartCampusModules {
     const raw = JSON.parse(json) as Partial<SmartCampusModules> | null
     return {
       welcome: !!raw?.welcome,
-      bigdata: !!raw?.bigdata,
+      // 校园大数据本期严格冻结：读写两侧都强制 false，避免历史残留配置泄露为 true。
+      bigdata: false,
       luggage: !!raw?.luggage,
       panorama: !!raw?.panorama,
     }
