@@ -78,12 +78,13 @@ async function main() {
   // Agent 注册后仍可通过 terminalCode upsert 覆盖 token 和指纹;这里不硬编码任何打印机型号。
   const kioskTerminal = await prisma.terminal.upsert({
     where: { terminalCode: 'KSK-001' },
-    update: {},
+    update: { orgId: uniOrg.id },
     create: {
       id: 't_ksk_001',
       terminalCode: 'KSK-001',
       agentToken: 'seed-terminal-token-ksk-001',
       deviceFingerprint: 'seed-terminal-fingerprint-ksk-001',
+      orgId: uniOrg.id,
     },
   })
   await prisma.terminalHeartbeat.create({

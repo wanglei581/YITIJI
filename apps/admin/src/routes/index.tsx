@@ -21,6 +21,7 @@ import AuditPage from './audit'
 import ImportBatchesPage from './import-batches'
 import SyncSourcesPage from './sync-sources'
 import ScreensaverPage from './screensaver'
+import SmartCampusPage from './smart-campus'
 
 export const adminRouter = createBrowserRouter([
   // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
@@ -53,6 +54,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'import-batches',  element: <ImportBatchesPage /> },
       { path: 'sync-sources',    element: <SyncSourcesPage /> },
       { path: 'screensaver',     element: <ScreensaverPage /> },
+      { path: 'smart-campus',    element: <SmartCampusPage /> },
     ],
   },
 ])

@@ -19,6 +19,8 @@ export type TerminalPrinterStatus =
 export interface AdminTerminalRecord {
   id: string
   terminalCode: string
+  orgId: string | null            // 所属机构 id；null = 未绑定
+  orgName: string | null          // 所属机构名称
   registeredAt: string            // ISO
   lastSeenAt: string              // ISO
   online: boolean                 // lastSeenAt 距今 < 3 分钟 = true
@@ -31,6 +33,28 @@ export interface AdminTerminalRecord {
 
 export interface AdminTerminalsResponse {
   terminals: AdminTerminalRecord[]
+}
+
+// ─── 终端机构归属（绑定/解绑）─────────────────────────────────────────────────
+
+/** 可绑定机构下拉项（仅 enabled）。 */
+export interface AdminOrganizationOption {
+  id: string
+  name: string
+  type: string
+}
+
+export interface AdminOrgOptionsResponse {
+  organizations: AdminOrganizationOption[]
+}
+
+/** PATCH /admin/terminals/:id/org 返回。 */
+export interface AssignTerminalOrgResult {
+  terminalId: string
+  terminalCode: string
+  oldOrgId: string | null
+  newOrgId: string | null
+  orgName: string | null
 }
 
 // ─── Printers (设备管理 — 打印机视图) ───────────────────────────────────────

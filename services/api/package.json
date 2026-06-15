@@ -14,6 +14,7 @@
     "db:seed:fairs": "node -r @swc-node/register prisma/seed-fairs.ts",
     "verify:resume-extraction": "node -r @swc-node/register scripts/verify-resume-extraction.ts",
     "verify-real-resume-diagnosis": "node -r @swc-node/register scripts/verify-real-resume-diagnosis.ts",
+    "verify:partner-smart-campus": "node -r @swc-node/register scripts/verify-partner-smart-campus.ts",
     "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts",
     "verify:field-mapping": "node -r @swc-node/register scripts/verify-field-mapping-rule.ts",
     "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts",

@@ -12,6 +12,9 @@ import type {
   ExcelPreviewResult,
   ExcelConfirmResult,
   FieldMappingRuleResult,
+  PartnerSmartCampusTerminal,
+  SaveSmartCampusConfigPayload,
+  TerminalSmartCampusConfigView,
 } from './types'
 
 function delay(): Promise<void> {
@@ -73,11 +76,43 @@ const SYNC_LOGS: PartnerSyncLog[] = [
   { id: 'sl10', no: 'SYNC-20260520-0009', source: '校园兼职平台导入',   dataType: 'job',  addedCount: 5,  updatedCount: 0, errorCount: 2, dupCount: 0, errorFields: 'externalId',   errorDetail: '外部编号重复，无法写入',                    syncTime: '2026-05-20 10:00', status: 'partial' },
 ]
 
+let SMART_CAMPUS_TERMINALS: PartnerSmartCampusTerminal[] = [
+  {
+    terminalId: 'KSK-001',
+    terminalCode: 'KSK-001',
+    orgId: 'org-uni-001',
+    orgName: '某大学就业指导中心',
+    isOnline: true,
+    config: {
+      terminalId: 'KSK-001',
+      enabled: true,
+      modules: { welcome: true, bigdata: false, luggage: true, panorama: false },
+      updatedAt: '2026-06-09T22:30:00.000Z',
+    },
+  },
+]
+
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 function genId(): string { return `mock-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }
 
 export const partnerMockAdapter = {
+  // Smart Campus
+  async getSmartCampusTerminals(): Promise<PartnerSmartCampusTerminal[]> {
+    await delay()
+    return SMART_CAMPUS_TERMINALS.map((t) => ({ ...t, config: t.config ? { ...t.config, modules: { ...t.config.modules } } : null }))
+  },
+  async saveSmartCampusConfig(terminalId: string, payload: SaveSmartCampusConfigPayload): Promise<TerminalSmartCampusConfigView> {
+    await delay()
+    const modules = { ...payload.modules, bigdata: false }
+    const enabled = Boolean(payload.enabled && (modules.welcome || modules.luggage || modules.panorama))
+    const config: TerminalSmartCampusConfigView = { terminalId, enabled, modules, updatedAt: new Date().toISOString() }
+    SMART_CAMPUS_TERMINALS = SMART_CAMPUS_TERMINALS.map((t) =>
+      t.terminalId === terminalId || t.terminalCode === terminalId ? { ...t, config } : t
+    )
+    return config
+  },
+
   // Data Sources
   async getDataSources(): Promise<PartnerDataSource[]> {
     await delay()

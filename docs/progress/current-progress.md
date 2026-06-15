@@ -1,7 +1,35 @@
 # 当前开发进度
 
-> 最后更新：2026-06-14
+> 最后更新：2026-06-15
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 智慧校园「按学校/终端开关」安全恢复（2026-06-15，Claude，分支 codex/restore-smart-campus-safe）
+
+把此前停留在 `feature/restore-smart-campus`（未合入 main）的「智慧校园」作为**按学校/终端后台开关显示的附加模块**恢复回来，独立隔离工作区 `/Users/wanglei/restore-sc-safe-wt`，**基线为 main（bdccfb8）**，未合入 main / 当前 `feature/interview-setup-redesign`，待用户 review 后再决定合并。
+
+恢复方式（不带回旧改动）：从恢复分支 tip **文件级移植** 47 个干净文件；与 main 自分叉点后真正重叠的 5 个文件采用**手工并入**——
+
+- `apps/kiosk/src/pages/home/HomePage.tsx`：仅新增**默认隐藏**的智慧校园横向区块（`!config.enabled || 子模块为空 → return null`，首页默认像素级不变）；**保留** main 的 `pink→amber` 政策服务配色；**丢弃**恢复分支夹带的「岗位信息」副标题改字（首页业务文案不动）。
+- `apps/kiosk/src/routes/index.tsx`：仅新增 `/smart-campus*` 4 条路由；保留 main 现有路由、不回退已删的 Qingdao。
+- `services/api/package.json`：仅新增 `verify:partner-smart-campus` 脚本。
+
+数据库（仅非破坏性新增，未 reset、未改业务表语义）：
+
+- `Terminal.orgId String?`（可空，`onDelete: SetNull`）+ `@@index([orgId])`；新表 `TerminalSmartCampusConfig`（终端级开关 + 子模块位 JSON，不存任何学生数据）。
+- 迁移 `20260613211816_add_smart_campus_terminal_config`（SQLite + PG 双份）干净追加在 main 迁移链末尾，不插队、不乱序。
+
+边界落实（合规）：
+
+- Kiosk 首页智慧校园**默认隐藏**，仅「终端绑定学校机构 + 学校端开启对应子模块」时显示；`bigdata` 子模块本期冻结强制落 false。
+- Partner 侧仅**学校类型**机构可见可配，且只能配置**本机构绑定终端**；跨机构 / 非学校 / 未绑定 / orgId 为空均拒绝（`PARTNER_NOT_SCHOOL` / `TERMINAL_NOT_IN_ORG` / `PARTNER_ORG_REQUIRED`）。
+- Admin 侧仅新增「终端归属机构」绑定/解绑（2 个 admin-only 端点 + 审计），未扩展其它后台能力。
+- 智慧校园全量文案 0 招聘闭环禁词（无「一键投递 / 立即投递 / 平台投递」）。
+
+验收（全部通过，本地分支 SQLite）：`shared/api/kiosk/admin/partner` typecheck ✅；`verify:partner-smart-campus` 21/21 PASS ✅；`verify:jobfair-ui` ALL PASS（确认未回退旧招聘会/校园 UI）✅；`api/kiosk/admin/partner` lint 0 error ✅；四端 build ✅（三端前台按既有门禁用 `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 构建）。
+
+待办：合并到 main 前需复跑上述验收；PG 生产实例需 `prisma migrate deploy` 应用该迁移后复验。
 
 ---
 

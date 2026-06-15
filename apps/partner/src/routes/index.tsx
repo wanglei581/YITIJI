@@ -7,6 +7,7 @@ import ProfilePage from './profile'
 import JobsPage from './jobs'
 import CompaniesPage from './companies'
 import FairsPage from './fairs'
+import SmartCampusPage from './smart-campus'
 import PolicyPage from './policy'
 import TerminalsPage from './terminals'
 import StatsPage from './stats'
@@ -25,6 +26,7 @@ export const partnerRouter = createBrowserRouter([
       { path: 'jobs',       element: <JobsPage /> },
       { path: 'companies',  element: <CompaniesPage /> },
       { path: 'fairs',      element: <FairsPage /> },
+      { path: 'smart-campus', element: <SmartCampusPage /> },
       { path: 'policy',     element: <PolicyPage /> },
       { path: 'terminals',  element: <TerminalsPage /> },
       { path: 'stats',      element: <StatsPage /> },
