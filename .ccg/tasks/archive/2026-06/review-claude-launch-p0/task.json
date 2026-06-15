@@ -1,0 +1,12 @@
+{
+  "id": "review-claude-launch-p0",
+  "title": "复核 Claude 对 Mavis 上线评估的二次审计结论",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "cross-functional",
+  "currentPhase": "completed",
+  "nextAction": "按修正版 P0 顺序推进：扫描假流程、printerName fail-fast、触控目标与上线验收",
+  "createdAt": "2026-06-15T00:00:00Z",
+  "branch": "feature/interview-setup-redesign"
+}
