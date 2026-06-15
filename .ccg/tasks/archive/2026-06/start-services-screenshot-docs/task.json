@@ -1,0 +1,12 @@
+{
+  "id": "start-services-screenshot-docs",
+  "title": "启动项目前后端并整理页面截图文档",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "low",
+  "domain": "ops",
+  "currentPhase": "completed",
+  "nextAction": "已生成截图与整理文档",
+  "createdAt": "2026-06-15T14:36:00+08:00",
+  "branch": "feature/interview-setup-redesign"
+}
