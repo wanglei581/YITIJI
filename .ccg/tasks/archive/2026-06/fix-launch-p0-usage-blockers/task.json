@@ -1,0 +1,12 @@
+{
+  "id": "fix-launch-p0-usage-blockers",
+  "title": "修复上线前真实使用阻塞问题",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "kiosk-terminal-agent",
+  "currentPhase": "completed",
+  "nextAction": "进入生产部署与 Windows 真机验收；扫描真机接入另起任务",
+  "createdAt": "2026-06-15T00:00:00Z",
+  "branch": "feature/interview-setup-redesign"
+}
