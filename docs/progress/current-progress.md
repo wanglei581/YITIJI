@@ -1,13 +1,13 @@
 # 当前开发进度
 
-> 最后更新：2026-06-15
+> 最后更新：2026-06-16
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
 
-## 智慧校园真实可用闭环收口（2026-06-16，Codex/Claude，分支 codex/smart-campus-real-complete）
+## 智慧校园真实可用闭环已合入 main（2026-06-16，PR #47）
 
-在 `codex/restore-smart-campus-safe` 已恢复源码基础上，新建隔离工作区 `/Users/wanglei/smart-campus-real-wt`，将智慧校园从「恢复入口」推进到**真实后端开关可用、前端无 mock 冒充、页面不会无故消失**的最小完整闭环。当前 tip：`2e64f1e`。
+在 `codex/restore-smart-campus-safe` 已恢复源码基础上，新建隔离工作区 `/Users/wanglei/smart-campus-real-wt`，将智慧校园从「恢复入口」推进到**真实后端开关可用、前端无 mock 冒充、页面不会无故消失**的最小完整闭环。PR [#47](https://github.com/wanglei581/YITIJI/pull/47) 已合入 `main`，merge commit：`ced9374`。
 
 本轮落地内容：
 
@@ -20,6 +20,8 @@
 
 本地验收（2026-06-16）：
 
+- 合并前 GitHub CI：`build-and-verify` ✅、`postgres-readiness` ✅。
+- 合并后 main 复验：`shared/api/kiosk/admin/partner` typecheck ✅；`verify:partner-smart-campus` ✅；`verify:smart-campus-ui` ✅；`verify:jobfair-ui` ✅。
 - `pnpm --filter @ai-job-print/partner typecheck` ✅
 - `pnpm --filter @ai-job-print/partner lint` ✅
 - `VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3011/api/v1 pnpm --filter @ai-job-print/partner build` ✅

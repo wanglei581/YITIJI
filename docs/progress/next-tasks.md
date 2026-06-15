@@ -1,15 +1,15 @@
 # 下一步任务
 
-> 最后更新：2026-06-16（增补「智慧校园真实可用闭环后续」；其余维持上线验收与试运营准备重心）
+> 最后更新：2026-06-16（智慧校园真实可用闭环已合入 main；其余维持上线验收与试运营准备重心）
 
-## 智慧校园真实可用闭环后续（2026-06-16，分支 codex/smart-campus-real-complete，待 review / PR）
+## 智慧校园线上启用后续（2026-06-16，已合入 main / PR #47）
 
-智慧校园已从“恢复入口”推进到本地真实可用闭环（详见 [current-progress.md](./current-progress.md) 顶部），当前分支 `codex/smart-campus-real-complete` tip 为 `2e64f1e`。该分支尚未合入 main / `feature/interview-setup-redesign`，后续：
+智慧校园已从“恢复入口”推进到本地真实可用闭环并通过 PR [#47](https://github.com/wanglei581/YITIJI/pull/47) 合入 `main`（merge commit `ced9374`）。本地/CI 已完成合并前后验收，后续只剩生产环境启用与真实终端验证：
 
-- [ ] 用户 review 该分支（Admin 高校版模板联动、Partner 终端开关、Kiosk 首页显隐、bigdata 冻结页）。
-- [ ] 开 PR 前复跑：`shared/api/kiosk/admin/partner` typecheck + `verify:partner-smart-campus` + `verify:smart-campus-ui` + `verify:jobfair-ui` + 四端 lint/build（前台 `VITE_API_MODE=http`）。
-- [ ] 合并后上线验证：服务器执行 `prisma migrate deploy`（智慧校园表/终端归属迁移来自前序恢复提交，本轮无新增迁移）并复验 `Terminal.orgId` / `TerminalSmartCampusConfig` 已建。
-- [ ] 真机/试运营：生产 Admin 绑定真实终端到学校机构；学校 Partner 账号开启 `welcome/luggage/panorama` 子模块；Kiosk 以 http API 模式刷新首页验证智慧校园按开关出现/消失。
+- [ ] 服务器执行 `prisma migrate deploy`（智慧校园表/终端归属迁移来自前序恢复提交，本轮无新增迁移），并复验 `Terminal.orgId` / `TerminalSmartCampusConfig` 已建。
+- [ ] 生产 Admin 绑定真实终端到学校机构。
+- [ ] 学校 Partner 账号开启 `welcome/luggage/panorama` 子模块。
+- [ ] Kiosk 以 http API 模式刷新首页，验证智慧校园按开关出现/消失。
 - [ ] 继续冻结 `bigdata`，不得用示例统计冒充真实功能；解冻需学校书面授权、数据处理协议、聚合脱敏数据模型与审核流，另起任务。
 - [ ] 迎新内容 CMS、使用统计回传属于后续增量，需新增数据模型与审核/统计管线，不塞进当前闭环分支。
 
