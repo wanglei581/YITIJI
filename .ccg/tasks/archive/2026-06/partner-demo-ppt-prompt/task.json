@@ -1,0 +1,12 @@
+{
+  "id": "partner-demo-ppt-prompt",
+  "title": "生成合作方演示 PPT 设计提示词",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "已完成文档分析并生成合作演示 PPT 提示词",
+  "createdAt": "2026-06-15T05:23:21Z",
+  "branch": "feature/interview-setup-redesign"
+}
