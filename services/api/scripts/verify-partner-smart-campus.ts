@@ -16,15 +16,24 @@
  *   10. admin 解绑（orgId=null）后 partner(A) 不可见。
  *   11. admin 归属错误：终端不存在→TERMINAL_NOT_FOUND、机构不存在→ORG_NOT_FOUND、机构停用→ORG_DISABLED。
  *
+ * 高校版模板联动（codex/smart-campus-template-link）：
+ *   12. 共享契约：SCENE_DEFAULT_MODULES.school 含 smart_campus、MODULE_LABELS.smart_campus=智慧校园。
+ *   13. API enabledModules 白名单放行 smart_campus：admin 保存后能读回（未被 sanitizeModules 剔除）。
+ *
  * 运行：pnpm --filter @ai-job-print/api verify:partner-smart-campus
  *
  * 纯 service 层 + 真实 prisma（dev.db）：创建独立 test- 前缀夹具，跑完即清理，
  * 不污染 seed 数据、不依赖 HTTP server、不 reset dev.db。
  */
 import 'dotenv/config'
+// 直接从 shared 源码相对路径取契约常量（脚本经 swc-node 运行，api 运行期不解析
+// @ai-job-print/shared 别名——其源码仅用 import type；partner.ts 为纯类型+常量，无外部依赖）。
+import { SCENE_DEFAULT_MODULES, MODULE_LABELS } from '../../../packages/shared/src/types/partner'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { SmartCampusService } from '../src/smart-campus/smart-campus.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
+import { AuditService } from '../src/audit/audit.service'
 import type { SaveSmartCampusConfigInput } from '../src/smart-campus/smart-campus.types'
 
 function pass(m: string): void { console.log(`  PASS ${m}`) }
@@ -62,9 +71,13 @@ function onlyWelcome(): SaveSmartCampusConfigInput {
   return { enabled: true, modules: { welcome: true, bigdata: false, luggage: false, panorama: false } }
 }
 
+const ADMIN_USER_ID = 'test-sc-admin'
+
 async function cleanup(prisma: PrismaService): Promise<void> {
   await prisma.terminalSmartCampusConfig.deleteMany({ where: { terminalId: { in: [T_A, T_B, T_ADMIN] } } })
   await prisma.terminal.deleteMany({ where: { id: { in: [T_A, T_B, T_ADMIN] } } })
+  await prisma.auditLog.deleteMany({ where: { actorId: ADMIN_USER_ID } })
+  await prisma.user.deleteMany({ where: { id: ADMIN_USER_ID } })
   await prisma.organization.deleteMany({ where: { id: { in: [SCHOOL_A, SCHOOL_B, NONSCHOOL, DISABLED_ORG] } } })
 }
 
@@ -74,6 +87,7 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const svc = new SmartCampusService(prisma)
   const terminals = new TerminalsService(prisma) // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
+  const adminOrgs = new AdminOrgsService(prisma, new AuditService(prisma)) // 高校版模板联动：smart_campus 白名单保存验证
 
   let ok = true
   try {
@@ -87,6 +101,8 @@ async function main(): Promise<void> {
     await prisma.terminal.create({ data: { id: T_A, terminalCode: T_A, agentToken: 'test-sc-token-a', deviceFingerprint: 'test-sc-fp-a', orgId: SCHOOL_A } })
     await prisma.terminal.create({ data: { id: T_B, terminalCode: T_B, agentToken: 'test-sc-token-b', deviceFingerprint: 'test-sc-fp-b', orgId: SCHOOL_B } })
     await prisma.terminal.create({ data: { id: T_ADMIN, terminalCode: T_ADMIN, agentToken: 'test-sc-token-admin', deviceFingerprint: 'test-sc-fp-admin', orgId: null } })
+    // 平台管理员夹具：仅用于 Case13 admin 写操作的审计 actor 外键（跑完清理）。
+    await prisma.user.create({ data: { id: ADMIN_USER_ID, username: 'test-sc-admin', passwordHash: 'x', name: '验证用管理员', role: 'admin' } })
 
     const userA = { userId: 'test-sc-user-a', orgId: SCHOOL_A }
     const seesAdminTerminal = async (): Promise<boolean> =>
@@ -174,7 +190,21 @@ async function main(): Promise<void> {
     await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, 'test-sc-org-nope'), 'ORG_NOT_FOUND', 'Case11 机构不存在')
     await expectCode(() => terminals.assignTerminalOrg(T_ADMIN, DISABLED_ORG), 'ORG_DISABLED', 'Case11 机构已停用')
 
-    console.log('\n✅ ALL PASS — 智慧校园闭环（Partner 开关 + Admin 终端归属）验证通过\n')
+    // ── 高校版模板联动（codex/smart-campus-template-link）─────────────────────
+    // Case 12: 共享契约——学校场景默认含 smart_campus、且有中文标签「智慧校园」。
+    if (SCENE_DEFAULT_MODULES.school.includes('smart_campus')) pass('Case12 SCENE_DEFAULT_MODULES.school 含 smart_campus')
+    else fail(`Case12 学校默认模板缺 smart_campus: ${JSON.stringify(SCENE_DEFAULT_MODULES.school)}`)
+    if (MODULE_LABELS.smart_campus === '智慧校园') pass('Case12 MODULE_LABELS.smart_campus = 智慧校园')
+    else fail(`Case12 MODULE_LABELS.smart_campus 异常: ${MODULE_LABELS.smart_campus}`)
+
+    // Case 13: API enabledModules 白名单允许保存 smart_campus（学校机构写入后能读回，未被白名单剔除）。
+    const adminUser = { userId: ADMIN_USER_ID, role: 'admin' as const, orgId: null }
+    await adminOrgs.updateOrg(SCHOOL_A, { enabledModules: ['resume_service', 'smart_campus'] }, adminUser)
+    const detailA = await adminOrgs.getOrgDetail(SCHOOL_A)
+    if (detailA.enabledModules.includes('smart_campus')) pass('Case13 admin 保存 smart_campus 模块成功（白名单放行、读回保留）')
+    else fail(`Case13 smart_campus 未被保存: ${JSON.stringify(detailA.enabledModules)}`)
+
+    console.log('\n✅ ALL PASS — 智慧校园闭环（Partner 开关 + Admin 终端归属 + 高校版模板联动）验证通过\n')
   } catch (e) {
     ok = false
     console.error(`\n❌ ${(e as Error).message}\n`)

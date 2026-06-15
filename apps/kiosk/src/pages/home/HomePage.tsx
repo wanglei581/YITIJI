@@ -1,6 +1,5 @@
 import { Button } from '@ai-job-print/ui'
 import {
-  BarChart3Icon,
   BookOpenIcon,
   BotIcon,
   BrainCircuitIcon,
@@ -429,7 +428,8 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   )
 }
 
-const SMART_CAMPUS_TILES: Record<SmartCampusModuleKey, ServiceTile & { desc: string; color: string; bg: string }> = {
+// 校园大数据（bigdata）本期严格冻结：不在此列出入口卡，后端开关亦强制 false。
+const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { desc: string; color: string; bg: string }>> = {
   welcome: {
     title: '迎新服务',
     desc: '报到流程、办事窗口、入学材料打印',
@@ -437,14 +437,6 @@ const SMART_CAMPUS_TILES: Record<SmartCampusModuleKey, ServiceTile & { desc: str
     to: '/smart-campus/welcome',
     color: 'text-blue-600',
     bg: 'bg-blue-50',
-  },
-  bigdata: {
-    title: '校园大数据',
-    desc: '新生性别、专业、年龄、生源地聚合看板',
-    icon: BarChart3Icon,
-    to: '/smart-campus/freshman-insights',
-    color: 'text-cyan-600',
-    bg: 'bg-cyan-50',
   },
   luggage: {
     title: '行李帮运',
@@ -470,6 +462,7 @@ function SmartCampusHorizontalSection() {
   const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
     .filter((key) => config.modules[key])
     .map((key) => SMART_CAMPUS_TILES[key])
+    .filter((tile): tile is ServiceTile & { desc: string; color: string; bg: string } => !!tile)
 
   if (!config.enabled || enabledTiles.length === 0) return null
 

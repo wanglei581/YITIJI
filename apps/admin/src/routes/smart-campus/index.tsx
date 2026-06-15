@@ -12,9 +12,10 @@ import type { SmartCampusModules, SmartCampusTerminalView } from '@ai-job-print/
 import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
 import { smartCampusService } from '../../services/api/smartCampus'
 
-const MODULE_DEFS: { key: keyof SmartCampusModules; label: string; note?: string }[] = [
+const MODULE_DEFS: { key: keyof SmartCampusModules; label: string; note?: string; frozen?: boolean }[] = [
   { key: 'welcome', label: '迎新系统' },
-  { key: 'bigdata', label: '校园大数据', note: '需授权 + 合规就绪' },
+  // 本期严格冻结：后端 saveTerminalConfig 强制落 false，故此处禁用以免出现“假开关”。
+  { key: 'bigdata', label: '校园大数据', note: '本期冻结，不可开启', frozen: true },
   { key: 'luggage', label: '行李帮运' },
   { key: 'panorama', label: '校园全景' },
 ]
@@ -72,12 +73,13 @@ function TerminalConfigRow({
           <label key={m.key} className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
-              checked={modules[m.key]}
-              onChange={() => toggleModule(m.key)}
-              disabled={!enabled}
+              checked={m.frozen ? false : modules[m.key]}
+              onChange={() => !m.frozen && toggleModule(m.key)}
+              disabled={!enabled || m.frozen}
+              title={m.frozen ? '校园大数据本期冻结，不开放配置' : undefined}
               className="h-4 w-4"
             />
-            <span className={`text-sm ${enabled ? 'text-gray-700' : 'text-gray-400'}`}>
+            <span className={`text-sm ${enabled && !m.frozen ? 'text-gray-700' : 'text-gray-400'}`}>
               {m.label}
               {m.note && <span className="ml-1 text-[11px] text-amber-600">（{m.note}）</span>}
             </span>
