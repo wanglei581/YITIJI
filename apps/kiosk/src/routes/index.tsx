@@ -51,6 +51,10 @@ import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
 import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
+import { SmartCampusHomePage } from '../pages/smart-campus/SmartCampusHomePage'
+import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcomePage'
+import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
+import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage'
 
 export const kioskRouter = createBrowserRouter([
   // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
@@ -80,6 +84,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/activity',       element: <MyActivityPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'campus',            element: <CampusPage /> },
+      // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）
+      { path: 'smart-campus',                    element: <SmartCampusHomePage /> },
+      { path: 'smart-campus/welcome',            element: <SmartCampusWelcomePage /> },
+      { path: 'smart-campus/freshman-insights',  element: <FreshmanInsightsPage /> },
+      { path: 'smart-campus/service/:key',       element: <SmartCampusServicePage /> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },

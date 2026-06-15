@@ -6,6 +6,8 @@ import type {
   AdminImportBatch,
   AdminPrintersResponse,
   AdminTerminalsResponse,
+  AdminOrgOptionsResponse,
+  AssignTerminalOrgResult,
   AuditLogListResponse,
   AuditLogListQuery,
 } from './types'
@@ -75,6 +77,12 @@ async function patch<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** PATCH 到以 ApiResponse<T>({ data: T }) 包装的端点，统一拆 .data。 */
+async function patchData<T>(path: string, body: unknown): Promise<T> {
+  const res = await patch<{ data: T }>(path, body)
+  return res.data
+}
+
 export const adminHttpAdapter = {
   getJobSources: () =>
     get<AdminJobSourceRecord[]>('/admin/job-sources'),
@@ -100,6 +108,13 @@ export const adminHttpAdapter = {
   // ── 设备管理 — 终端心跳(契约 C1)──────────────────────────────────────────
   getTerminals: () =>
     getData<AdminTerminalsResponse>('/admin/terminals'),
+
+  // ── 终端机构归属（绑定/解绑）──────────────────────────────────────────────
+  getOrgOptions: () =>
+    getData<AdminOrgOptionsResponse>('/admin/terminals/org-options'),
+
+  assignTerminalOrg: (terminalId: string, orgId: string | null) =>
+    patchData<AssignTerminalOrgResult>(`/admin/terminals/${encodeURIComponent(terminalId)}/org`, { orgId }),
 
   getPrinters: () =>
     getData<AdminPrintersResponse>('/admin/printers'),

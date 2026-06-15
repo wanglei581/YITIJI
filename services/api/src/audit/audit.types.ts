@@ -26,6 +26,9 @@ export type AuditAction =
   | 'fair.import'
   | 'data_source.create'
   | 'data_source.toggle'
+  | 'smart_campus_config.update'
+  | 'partner.smart_campus_config.update'
+  | 'terminal.org.update'
   | 'resume.parse_submitted'
   | 'resume.optimize_requested'
   | 'assistant.chat_message'
@@ -45,6 +48,8 @@ export type AuditTargetType =
   | 'fair_source'
   | 'user'
   | 'system'
+  | 'smart_campus_config'
+  | 'terminal'
 
 export interface AuditLogRecord {
   id: string

@@ -6,6 +6,9 @@ import type {
   AdminPrinterRecord,
   AdminTerminalsResponse,
   AdminTerminalRecord,
+  AdminOrgOptionsResponse,
+  AdminOrganizationOption,
+  AssignTerminalOrgResult,
   TerminalPrinterStatus,
 } from './types'
 
@@ -14,12 +17,17 @@ export type {
   AdminPrinterRecord,
   AdminTerminalsResponse,
   AdminTerminalRecord,
+  AdminOrgOptionsResponse,
+  AdminOrganizationOption,
+  AssignTerminalOrgResult,
   TerminalPrinterStatus,
 }
 
 interface AdminDeviceServiceInterface {
   getTerminals(): Promise<AdminTerminalsResponse>
   getPrinters(): Promise<AdminPrintersResponse>
+  getOrgOptions(): Promise<AdminOrgOptionsResponse>
+  assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
 }
 
 const adapter: AdminDeviceServiceInterface =
@@ -30,3 +38,10 @@ export const getTerminals = () => adapter.getTerminals()
 
 /** 拉取打印机列表(GET /admin/printers)。由终端心跳聚合,不编造耗材/SN 等未上报字段。 */
 export const getPrinters = () => adapter.getPrinters()
+
+/** 终端机构归属下拉选项(GET /admin/terminals/org-options，仅 enabled 机构)。 */
+export const getOrgOptions = () => adapter.getOrgOptions()
+
+/** 绑定/解绑终端机构归属(PATCH /admin/terminals/:id/org，orgId=null 解绑)。admin only，写审计。 */
+export const assignTerminalOrg = (terminalId: string, orgId: string | null) =>
+  adapter.assignTerminalOrg(terminalId, orgId)

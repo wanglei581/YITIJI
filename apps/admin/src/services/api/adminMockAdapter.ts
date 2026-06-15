@@ -4,15 +4,36 @@ import type {
   AdminImportBatch,
   AdminPrinterRecord,
   AdminPrintersResponse,
+  AdminTerminalRecord,
   AdminTerminalsResponse,
+  AdminOrganizationOption,
+  AdminOrgOptionsResponse,
+  AssignTerminalOrgResult,
   AuditLogListResponse,
   AuditLogListQuery,
   AuditLogRecord,
 } from './types'
+import { ApiHttpError } from './client'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
 
 export type { ReviewAction, PublishAction }
+
+// ─── 终端机构归属 mock 状态（页面刷新重置；不写数据库）─────────────────────────
+
+const MOCK_ORG_OPTIONS: AdminOrganizationOption[] = [
+  { id: 'org-uni-001', name: '某大学就业指导中心', type: 'school_employment_center' },
+  { id: 'org-hr-002',  name: '市人才交流中心',     type: 'public_employment_service' },
+]
+// terminalCode → orgId（内存归属，演示用）
+const MOCK_TERMINAL_ORG: Record<string, string | null> = {
+  'KSK-001': 'org-uni-001',
+}
+function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
+  const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
+  const orgName = orgId ? (MOCK_ORG_OPTIONS.find((o) => o.id === orgId)?.name ?? null) : null
+  return { orgId, orgName }
+}
 
 // ─── Mutable module-level state (survives re-renders, reset on page reload) ───
 
@@ -127,18 +148,36 @@ export const adminMockAdapter = {
     await delay()
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
-    return {
-      terminals: [
-        { id: 't1',  terminalCode: 'KSK-001', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
-        { id: 't2',  terminalCode: 'KSK-002', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
-        { id: 't3',  terminalCode: 'KSK-003', registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
-        { id: 't4',  terminalCode: 'KSK-004', registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
-        { id: 't7',  terminalCode: 'KSK-007', registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
-        { id: 't8',  terminalCode: 'KSK-008', registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
-        { id: 't9',  terminalCode: 'KSK-009', registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          agentVersion: null,     ipAddress: null,          diskFreeGb: null },
-        { id: 't10', terminalCode: 'KSK-010', registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
-      ],
+    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName'>> = [
+      { id: 't1',  terminalCode: 'KSK-001', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
+      { id: 't2',  terminalCode: 'KSK-002', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
+      { id: 't3',  terminalCode: 'KSK-003', registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
+      { id: 't4',  terminalCode: 'KSK-004', registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
+      { id: 't7',  terminalCode: 'KSK-007', registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
+      { id: 't8',  terminalCode: 'KSK-008', registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
+      { id: 't9',  terminalCode: 'KSK-009', registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          agentVersion: null,     ipAddress: null,          diskFreeGb: null },
+      { id: 't10', terminalCode: 'KSK-010', registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
+    ]
+    return { terminals: base.map((t) => ({ ...t, ...mockOrgFields(t.terminalCode) })) }
+  },
+
+  // ── 终端机构归属（绑定/解绑）mock ─────────────────────────────────────────
+  async getOrgOptions(): Promise<AdminOrgOptionsResponse> {
+    await delay()
+    return { organizations: MOCK_ORG_OPTIONS.map((o) => ({ ...o })) }
+  },
+
+  async assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult> {
+    await delay()
+    const oldOrgId = MOCK_TERMINAL_ORG[terminalId] ?? null
+    let orgName: string | null = null
+    if (orgId !== null) {
+      const org = MOCK_ORG_OPTIONS.find((o) => o.id === orgId)
+      if (!org) throw new ApiHttpError('ORG_NOT_FOUND', '机构不存在', 404)
+      orgName = org.name
     }
+    MOCK_TERMINAL_ORG[terminalId] = orgId
+    return { terminalId, terminalCode: terminalId, oldOrgId, newOrgId: orgId, orgName }
   },
 
   async getPrinters(): Promise<AdminPrintersResponse> {

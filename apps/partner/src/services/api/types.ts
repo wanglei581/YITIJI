@@ -13,6 +13,9 @@ import type {
   MappingValidationError,
   ImportBatch,
   ImportRecord,
+  SmartCampusModules,
+  SmartCampusTerminalView,
+  TerminalSmartCampusConfigView,
 } from '@ai-job-print/shared'
 
 export type {
@@ -29,6 +32,16 @@ export type {
   MappingValidationError,
   ImportBatch,
   ImportRecord,
+  SmartCampusModules,
+  SmartCampusTerminalView,
+  TerminalSmartCampusConfigView,
+}
+
+export type PartnerSmartCampusTerminal = SmartCampusTerminalView
+
+export interface SaveSmartCampusConfigPayload {
+  enabled: boolean
+  modules: SmartCampusModules
 }
 
 // ─── Data Sources ─────────────────────────────────────────────────────────────
