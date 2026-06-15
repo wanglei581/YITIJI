@@ -37,6 +37,7 @@ const ALLOWED_MODULES = new Set([
   'policy_service',
   'job_info',
   'job_fair',
+  'smart_campus',
   'ai_interview',
   'device_status',
   'service_statistics',

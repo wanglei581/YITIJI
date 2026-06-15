@@ -145,7 +145,7 @@ const mockOrgs: Omit<AdminOrgListItem, 'counts'>[] = [
   {
     id: 'org-mock-2', name: '某大学就业指导中心(演示)', type: 'school_employment_center',
     contact: '王老师', contactPhone: null, sceneTemplate: 'school',
-    enabledModules: ['resume_service', 'print_scan', 'job_info', 'job_fair'],
+    enabledModules: ['resume_service', 'print_scan', 'job_info', 'job_fair', 'smart_campus'],
     enabled: false, createdAt: now(), updatedAt: now(),
   },
 ]
