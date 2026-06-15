@@ -1,0 +1,12 @@
+{
+  "id": "cloud-deployment-readiness-check",
+  "title": "盘点当前项目哪些模块可先上云服务器",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "deployment",
+  "currentPhase": "completed",
+  "nextAction": "交给 Claude 执行预生产服务器部署准备",
+  "createdAt": "2026-06-15T00:00:00Z",
+  "branch": "feature/interview-setup-redesign"
+}
