@@ -6,23 +6,35 @@
 // 投递一律引导「去来源平台投递 / 扫码投递」。
 // ============================================================
 
-/** 企业类型（展示标签；与筛选项一一对应）。 */
+/**
+ * 企业类型（展示标签；与筛选项一一对应）。
+ * 统一字典：与后端 services/api/src/companies/companies.types.ts 的 COMPANY_TYPES
+ * 严格同步（后端 DTO 以 @IsIn 校验、service 以 assertEnum 过滤）。新增值必须两边同改。
+ */
 export const COMPANY_TYPES = {
   central_soe: '央企',
   soe: '国企',
   public_institution: '事业单位',
   private: '民营企业',
   foreign: '外资企业',
+  joint_venture: '合资企业',
   listed: '上市公司',
   specialized_new: '专精特新',
   high_tech: '高新技术企业',
+  school_enterprise: '校企合作单位',
+  public_org: '公共机构',
+  other: '其他',
 } as const
 export type CompanyType = keyof typeof COMPANY_TYPES
 
-/** 行业（展示标签；与筛选项一一对应）。 */
+/**
+ * 行业（展示标签；与筛选项一一对应）。
+ * 统一字典：与后端 companies.types.ts 的 COMPANY_INDUSTRIES 严格同步。
+ */
 export const COMPANY_INDUSTRIES = {
   smart_manufacturing: '智能制造',
   internet_software: '互联网/软件',
+  ai_big_data: 'AI/大数据',
   electronics: '电子信息',
   new_energy: '新能源',
   new_materials: '新材料',
@@ -37,6 +49,7 @@ export const COMPANY_INDUSTRIES = {
   agriculture_food: '农业食品',
   professional_services: '专业服务',
   public_services: '公共服务',
+  other: '其他',
 } as const
 export type CompanyIndustry = keyof typeof COMPANY_INDUSTRIES
 
