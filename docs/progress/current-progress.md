@@ -77,6 +77,21 @@
 
 ---
 
+## 找企业 / 来源企业导览：真实数据联动增量改版（2026-06-16，分支 `codex/company-real-redesign`）
+
+在既有绿色基线（`CompanyProfile` + 公开 `/companies*` + Admin/Partner 管理链路 + `verify:companies`）之上做最小增量，不推倒重写。Admin/Partner CRUD·审核·发布状态机·机构隔离·禁词扫描·activity 落库·mock 诚实失败全部保持不变。
+
+**改动要点：**
+
+- **完整地区字典**：Kiosk `/companies` 地区筛选改为复用全国行政区划字典（`apps/kiosk/src/lib/regions.ts` 基于 `china-division`，地理字典非业务数据），省/市/区均可选；不再只显示当前已有企业反推出的部分地区。结果仍由后端真实过滤，选到无企业地区展示真实空态（不造数据）；后端公开查询补充直辖市与常见无后缀地区录入容错，避免规范筛选值筛不到真实企业。
+- **统一筛选字典**：企业类型/行业/来源筛选 chip 改为来自统一共享字典（完整），不再由当前三家企业反推不完整选项。招聘类型（绑定 `Job.category`）与来源类型（绑定 `Organization.type`）维持既有取值，不臆造永久空项。
+- **字典补齐（前后端同步）**：`packages/shared` 与 `services/api/.../companies.types.ts` 同步新增企业类型 合资企业/校企合作单位/公共机构/其他、行业 AI/大数据 与 其他；后端 DTO `@IsIn` + service `assertEnum` 自动同步校验，Admin/Partner 表单自动出现新选项。
+- **合规文案**：企业卡片主按钮「查看企业」→「查看企业风采」；其余（查看来源岗位 / 查看岗位 / 去来源平台投递 / 去来源平台查看）保持合规口径。详情页继续记录 `company_profile` 浏览与 `external_open` 跳转。
+- **验证脚本扩展**：`verify:companies` 12→15 检查，新增「补齐字典前后端同步可存可筛」「无企业地区真实空态 + 直辖市/地区别名命中」「正式前端企业页无『演示』字样」。
+
+**验证（全绿）：** `verify:companies` 15/15；kiosk/admin/partner/api `typecheck` 全 exit 0；`VITE_API_MODE=http` kiosk `build` 通过。未 push、未建 PR。
+
+---
 ## 全面审计报告与 8 月路线图拆解（2026-06-14，Codex）
 
 后台多智能体审计结果已落地为 [project-full-audit-and-august-launch-plan-2026-06-14.md](./project-full-audit-and-august-launch-plan-2026-06-14.md)，覆盖 Kiosk/Admin/Partner/API/基础设施/文档对账，并包含「前台有展示区、后台缺增改入口」矩阵与 8 月上线倒排路线。
