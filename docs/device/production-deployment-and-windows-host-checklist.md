@@ -74,6 +74,7 @@
 
 - [ ] `NODE_ENV=production`。
 - [ ] `DATABASE_URL` 指向 PostgreSQL，不再指向 SQLite 文件。
+- [ ] API 生产启动门禁已验证：`NODE_ENV=production` 搭配 `file:` SQLite 会启动失败，避免高并发写入误用本地库。
 - [ ] `REDIS_URL` 正确。
 - [ ] API 监听端口、前端 API base URL、CORS allowlist 正确。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。

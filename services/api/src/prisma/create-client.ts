@@ -24,7 +24,24 @@ export function dbKindOf(url: string): DbKind {
   throw new Error(`DATABASE_URL 协议不受支持（只允许 file: / postgres://）: ${url.split(':')[0]}:…`)
 }
 
-export function createPrismaClient(url: string): { client: AppPrismaClient; kind: DbKind } {
+export function assertRuntimeDatabaseAllowed(
+  url: string,
+  nodeEnv = process.env['NODE_ENV'],
+  options: { allowProductionSqliteSource?: boolean } = {},
+): void {
+  const kind = dbKindOf(url)
+  if (nodeEnv === 'production' && kind === 'sqlite' && !options.allowProductionSqliteSource) {
+    throw new Error(
+      'PRODUCTION_SQLITE_FORBIDDEN: NODE_ENV=production 时 DATABASE_URL 必须指向 PostgreSQL，不能使用 file: SQLite 本地库',
+    )
+  }
+}
+
+export function createPrismaClient(
+  url: string,
+  options: { allowProductionSqliteSource?: boolean } = {},
+): { client: AppPrismaClient; kind: DbKind } {
+  assertRuntimeDatabaseAllowed(url, process.env['NODE_ENV'], options)
   const kind = dbKindOf(url)
   if (kind === 'postgres') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

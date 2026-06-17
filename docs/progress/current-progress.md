@@ -5,6 +5,31 @@
 
 ---
 
+## 上线前 P0 数据库并发风险收口：生产禁 SQLite 门禁（2026-06-17，Codex）
+
+针对本地并行跑 `verify:admin-fairs` 与 `verify:fair-company-positions` 时出现的 Prisma/libSQL `P1008 SocketTimeout`，已确认根因是多个验证脚本同时写同一个本地 SQLite `dev.db` 引发文件库写锁竞争；两个脚本顺序复跑均通过，招聘会/智慧校园业务链路本身未失败。
+
+本轮完成的生产防线：
+
+- `services/api/src/prisma/create-client.ts` 新增运行时数据库门禁：`NODE_ENV=production` 且 `DATABASE_URL` 为 `file:` SQLite 时，API 直接启动失败并抛出 `PRODUCTION_SQLITE_FORBIDDEN`；生产必须使用 PostgreSQL。
+- `services/api/scripts/migrate-sqlite-to-postgres.ts` 对 SQLite 源库读取使用显式受控豁免，避免生产主机执行 SQLite → PostgreSQL 数据迁移时被门禁误伤；普通 API 运行路径仍不允许生产 SQLite。
+- 新增 `services/api/scripts/verify-production-db-guard.ts` 与 `verify:production-db-guard`，覆盖「开发允许 SQLite」「未声明 NODE_ENV 允许本地 SQLite」「生产允许 PostgreSQL」「生产拒绝 SQLite」「生产迁移源库显式豁免时允许读取 SQLite」五类断言；该脚本已接入 GitHub Actions 主 CI `Verify suites` 防退化。
+- `services/api/.env.example` 补充说明：生产环境硬拒绝 `file:` SQLite，避免高并发写入场景误用本地库。
+- `docs/device/production-deployment-and-windows-host-checklist.md` 的环境变量核对项补充：上线验收必须验证生产 DB 门禁，确保 `DATABASE_URL` 指向 PostgreSQL。
+
+验证结果：
+
+- `pnpm --filter @ai-job-print/api verify:production-db-guard` ✅
+- `pnpm --filter @ai-job-print/api build` ✅
+
+上线影响判断：
+
+- 本地 SQLite 仍只用于开发/脚本验证；多个写库 verify 不应并行抢同一个 `dev.db`。
+- 生产若误配 SQLite，现在会在启动期 fail-closed，不会带着文件库进入成百上千人并发使用。
+- 生产并发能力仍以 PostgreSQL、Redis、API 实例、队列、对象存储和外部 AI/OCR 服务的预生产压测与上线清单验收为准；不能仅凭本地 SQLite verify 代表生产容量。
+
+---
+
 ## 招聘会 verify 测试数据残留根治（2026-06-17，Claude）
 
 **问题根因：** 校招/招聘会 verify 脚本用随机 `suffix` 建 `approved+published` 测试招聘会,`cleanup()` 只按本次随机 id 清;一旦进程被强杀、或 finally 撞 SQLite 写锁中断,残留就再也无法被下次运行找到,泄漏到 `/campus`、`/job-fairs` 等公开前台(只读 approved+published)。
