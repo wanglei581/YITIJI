@@ -1,6 +1,11 @@
 # 下一步任务
 
-> 最后更新：2026-06-16（智慧校园真实可用闭环已合入 main；其余维持上线验收与试运营准备重心）
+> 最后更新：2026-06-17（招聘会 verify 测试数据残留根治分支已建；其余维持上线验收与试运营准备重心）
+
+## 招聘会 verify 测试数据残留根治（2026-06-17，Claude）
+
+- [x] 分支 `feature/fair-verify-residue-cleanup`（从 main 起，可独立合入）：新增 `services/api/scripts/lib/verify-fair-residue.ts`；main 上 6 个建 JobFair 的 verify 脚本（fair-info-fields/fair-company-positions/partner-edit/jobfair-venue-guide/admin-fairs/activity-logs）改用稳定唯一 tag（`vresid*`）+ 运行前预清 + finally 再清，崩溃/中断后下次运行按 tag 自愈收敛；CI 加串行护栏注释。不恢复"验证/演示"泛文本过滤、不改 dev 默认 `EXCLUDE_DEMO_PUBLIC_DATA`。
+- [ ] `verify-public-fair-demo-guard.ts` 的同款残留修复随未提交 campus-recruitment 功能（`EXCLUDE_DEMO_PUBLIC_DATA`/`DEMO_FAIR_*`/`publishedFairWhere` + 校园展示字段 schema）一起提交——该脚本测的功能尚未在 main，无法独立合入本分支。
 
 ## 智慧校园线上启用后续（2026-06-16，已合入 main / PR #47）
 

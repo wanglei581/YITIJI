@@ -20,6 +20,10 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+// 稳定且唯一的残留标记(跨运行不变):嵌进两个机构 id 与 partner username,开始前预清 + finally 再清。
+const RESIDUE_TAG = 'vresidpartneredit'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -50,9 +54,12 @@ async function main() {
   const audit = new AuditService(prisma)
   const svc = new JobsService(prisma, audit)
 
+  // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
+  await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
+
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
-  const orgA = `org_vpe_a_${suffix}`
-  const orgB = `org_vpe_b_${suffix}`
+  const orgA = `org_vpe_a_${RESIDUE_TAG}_${suffix}`
+  const orgB = `org_vpe_b_${RESIDUE_TAG}_${suffix}`
 
   await prisma.organization.createMany({
     data: [
@@ -62,7 +69,7 @@ async function main() {
   })
 
   const partnerRow = await prisma.user.create({
-    data: { username: `vpe_partner_${suffix}`, passwordHash: 'x', name: '验证机构账号', role: 'partner', orgId: orgA },
+    data: { username: `${RESIDUE_TAG}_partner_${suffix}`, passwordHash: 'x', name: '验证机构账号', role: 'partner', orgId: orgA },
   })
   const partnerA: AuthedUser = { userId: partnerRow.id, role: 'partner', orgId: orgA }
 
@@ -91,13 +98,8 @@ async function main() {
     },
   })
 
-  const cleanup = async () => {
-    await prisma.job.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
-    await prisma.jobFair.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
-    await prisma.auditLog.deleteMany({ where: { actorId: partnerA.userId } })
-    await prisma.user.delete({ where: { id: partnerA.userId } }).catch(() => undefined)
-    await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
-  }
+  // 按稳定 tag 清理:两个机构名下 job/fair(级联子资源)+ 该 tag 的 partner 账号及审计日志 + 机构。
+  const cleanup = async () => cleanFairVerifyResidue(prisma, RESIDUE_TAG)
 
   try {
     // ── 1+2. 岗位编辑 + 强制重审 + 来源不可改 ─────────────────────────────

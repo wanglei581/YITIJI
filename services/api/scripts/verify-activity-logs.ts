@@ -28,6 +28,11 @@ import { ActivityService } from '../src/activity/activity.service'
 import { ActivityController } from '../src/activity/activity.controller'
 import { MeActivityController } from '../src/activity/me-activity.controller'
 import type { RedisService } from '../src/common/redis/redis.service'
+import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+// 稳定且唯一的残留标记(跨运行不变):嵌进机构 id 与测试会员 phoneHash,开始前预清。
+// 本脚本的 finally 已按本次 id 清 endUser/浏览日志,这里的预清负责收掉历史残留。
+const RESIDUE_TAG = 'vresidactlog'
 
 let passCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
@@ -55,7 +60,10 @@ async function main() {
   const stubRedis = { get: async () => null } as unknown as RedisService
   const postController = new ActivityController(activity, new JwtService({ secret: 'verify-only-secret-0123456789' }), stubRedis)
 
-  const tag = `vfact${Date.now()}`
+  // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag 命中 org / endUser)。
+  await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
+
+  const tag = `${RESIDUE_TAG}${Date.now()}`
   const orgId = `org-${tag}`
   let userA = ''
   let userB = ''

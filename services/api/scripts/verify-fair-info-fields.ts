@@ -33,6 +33,10 @@ import { AdminFairsService } from '../src/jobs/admin-fairs.service'
 import { JobsService } from '../src/jobs/jobs.service'
 import { UpdateFairInfoDto } from '../src/jobs/dto/admin-fair.dto'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+// 稳定且唯一的残留标记(跨运行不变):嵌进机构 id 与管理员 username,开始前预清 + finally 再清。
+const RESIDUE_TAG = 'vresidinfofields'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -63,12 +67,15 @@ async function main() {
   const svc = new AdminFairsService(prisma, audit, storage)
   const jobs = new JobsService(prisma, audit)
 
-  const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
-  const orgId = `org_vff_${suffix}`
+  // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
+  await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
 
-  // AuditLog.actorId 有 FK → User,须建真实测试管理员行(脚本结束清理)。
+  const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
+  const orgId = `org_vff_${RESIDUE_TAG}_${suffix}`
+
+  // AuditLog.actorId 有 FK → User,须建真实测试管理员行(脚本结束清理)。username 含稳定 tag 便于残留清理。
   const adminRow = await prisma.user.create({
-    data: { username: `vff_admin_${suffix}`, passwordHash: 'x', name: '验证管理员', role: 'admin' },
+    data: { username: `${RESIDUE_TAG}_admin_${suffix}`, passwordHash: 'x', name: '验证管理员', role: 'admin' },
   })
   const adminUser: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
 
@@ -84,12 +91,8 @@ async function main() {
     },
   })
 
-  const cleanup = async () => {
-    await prisma.jobFair.deleteMany({ where: { sourceOrgId: orgId } })
-    await prisma.auditLog.deleteMany({ where: { actorId: adminUser.userId } })
-    await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined)
-    await prisma.user.delete({ where: { id: adminUser.userId } }).catch(() => undefined)
-  }
+  // 按稳定 tag 清理:机构名下 fair(级联子资源)+ 该 tag 的管理员及其审计日志 + 机构本身。
+  const cleanup = async () => cleanFairVerifyResidue(prisma, RESIDUE_TAG)
 
   const slices = [
     { label: '研发技术类', percent: 43 },

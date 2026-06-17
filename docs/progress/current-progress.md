@@ -1,9 +1,23 @@
 # 当前开发进度
 
-> 最后更新：2026-06-16
+> 最后更新：2026-06-17
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
+
+## 招聘会 verify 测试数据残留根治（2026-06-17，Claude）
+
+**问题根因：** 校招/招聘会 verify 脚本用随机 `suffix` 建 `approved+published` 测试招聘会,`cleanup()` 只按本次随机 id 清;一旦进程被强杀、或 finally 撞 SQLite 写锁中断,残留就再也无法被下次运行找到,泄漏到 `/campus`、`/job-fairs` 等公开前台(只读 approved+published)。
+
+**修复(本分支 `feature/fair-verify-residue-cleanup`,从 main 起,可独立合入)：**
+
+- 新增共享工具 `services/api/scripts/lib/verify-fair-residue.ts`:`cleanFairVerifyResidue(prisma, tag)` 按稳定 tag 清理 机构→fair(级联子资源)/job/policy + 测试会员及浏览/外跳记录 + 测试账号及审计日志 + 机构本身;带 `tag 须以 vresid 开头且 ≥6 字符` 护栏,防误清真实数据。
+- main 上 6 个建 JobFair 测试数据的 verify 脚本各分配一个**稳定且唯一**的 tag(`vresidinfofields / vresidcompos / vresidpartneredit / vresidvenueguide / vresidadminfairs / vresidactlog`),嵌进各自的 `Organization.id` / `User.username` / `EndUser.phoneHash`:**运行开始前预清**(收掉上次崩溃漏删的历史残留)+ **finally 再清**。即便 finally 被漏,下次运行预清按 tag 自愈 → 收敛。
+- CI `.github/workflows/ci.yml` "Verify suites" 增串行护栏注释(共享 SQLite,禁止并行致 finally 清理失败)。
+
+**范围说明:** `verify-public-fair-demo-guard.ts` 及其验证的「演示/验证数据生产隔离」(`EXCLUDE_DEMO_PUBLIC_DATA` / `DEMO_FAIR_*` / `publishedFairWhere`)目前是 main 之外的未提交 campus-recruitment 功能,无法在 main-based 分支独立运行,故该脚本的同款残留修复随该功能一起提交,不在本分支。
+
+**不做:** 不恢复"验证/演示"泛文本过滤;不改 dev 默认 `EXCLUDE_DEMO_PUBLIC_DATA`。
 
 ## 智慧校园真实可用闭环已合入 main（2026-06-16，PR #47）
 
