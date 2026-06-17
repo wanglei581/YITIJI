@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
+import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuditController } from './audit.controller'
 import { AuditService } from './audit.service'
@@ -18,9 +18,7 @@ import { AuditService } from './audit.service'
 @Module({
   imports: [
     PrismaModule,
-    JwtModule.register({
-      secret: process.env['JWT_SECRET'] ?? 'dev-only-secret',
-    }),
+    JwtVerifierModule,
   ],
   controllers: [AuditController],
   providers: [AuditService],

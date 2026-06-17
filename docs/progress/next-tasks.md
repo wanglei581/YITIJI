@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-17（招聘会 verify 测试数据残留根治分支已建；其余维持上线验收与试运营准备重心）
+> 最后更新：2026-06-17（P0 生产运行时门禁与 CI 核心验证已收口；招聘会 verify 测试数据残留根治分支已建；其余维持上线验收与试运营准备重心）
 
 ## 招聘会 verify 测试数据残留根治（2026-06-17，Claude）
 
@@ -21,6 +21,13 @@
 ## 当前窗口 P0 执行队列（部署 / 配置 / 真机 / 真实服务 / 验收）
 
 > 用户确认：当前工作重心从“继续开发功能”切到“部署、配置、真机、真实服务、验收”。本节优先级高于下方历史阶段路线和 P1/P2 功能建议。
+
+### 0. 已完成的代码门禁（2026-06-17，Codex + Claude）
+
+- [x] 生产运行时门禁：`NODE_ENV=production` 时强制 `JWT_SECRET` 合规、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL` 指向 PostgreSQL，误配即启动失败。
+- [x] 7 个历史 JWT 弱 fallback 模块已统一切到 `JwtVerifierModule`，`services/api/src` 中弱 fallback 扫描 0 命中。
+- [x] 主 CI 接入 `verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`、`verify:public-fair-demo-guard`、`verify:smart-campus-ui`。
+- [ ] CI 或可正常 `prisma db push` 的环境复跑新增的 3 个 AppModule+DB verify：`verify:partner-smart-campus` / `verify:partner-edit` / `verify:public-fair-demo-guard`。
 
 ### 1. 生产环境准备
 

@@ -108,7 +108,12 @@ jobs:
         # 但前提仍是串行,切勿改成并行。
         run: |
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
+          pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
           pnpm --filter @ai-job-print/api verify:production-db-guard
+          pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          pnpm --filter @ai-job-print/api verify:partner-smart-campus
+          pnpm --filter @ai-job-print/api verify:partner-edit
+          pnpm --filter @ai-job-print/api verify:public-fair-demo-guard
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs
