@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Command } from 'commander'
-import { DEFAULT_PRINTER, SUPPORTED_EXTENSIONS } from './config'
+import { SUPPORTED_EXTENSIONS } from './config'
 import { log, err, warn, section } from './logger'
 import { listPrinters, checkPrinterExists } from './printer/printer-status'
 import { printWithPowerShell } from './printer/print-with-powershell'
@@ -202,7 +202,7 @@ program
   .command('print')
   .description('Send a file to a printer (spike: validates both print methods)')
   .requiredOption('--file <path>', 'Absolute path to the file to print')
-  .option('--printer <name>', 'Printer name', DEFAULT_PRINTER)
+  .requiredOption('--printer <name>', 'Printer name from Windows; run list-printers to find the exact value')
   .option(
     '--method <auto|a|b|both>',
     'auto = production path (unified print() via pdfkit+Method B); a = PowerShell; b = pdf-to-printer; both = spike A+B',

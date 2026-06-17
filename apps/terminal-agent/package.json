@@ -9,6 +9,7 @@
     "list-printers": "ts-node src/index.ts list-printers",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "verify:printer-config": "node scripts/verify-printer-config.mjs",
     "dev": "ts-node src/index.ts"
   },
   "dependencies": {

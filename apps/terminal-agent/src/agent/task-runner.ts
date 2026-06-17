@@ -41,7 +41,6 @@ import { createApiClient, axiosErrorMessage } from './api-client'
 import { print } from '../printer/print'
 import { getPrinterPreflight, getPrintJobStatus, type PrinterPreflight } from './wmi'
 import { log, warn, err } from '../logger'
-import { DEFAULT_PRINTER } from '../config'
 import {
   isTaskDone,
   getTaskLocalStatus,
@@ -310,7 +309,7 @@ async function executeTask(
     // ── Step 2.5: Printer pre-flight ──────────────────────────────────────
     // 打印前预检：只在 WMI 明确报告故障时拦截，给出精确 errorCode，避免走到 5min 超时。
     // 非 Windows / 查询失败返回 'unknown' → 不阻塞，交由 print() 自然处理。
-    const resolvedPrinter = printerName || DEFAULT_PRINTER
+    const resolvedPrinter = printerName
     const preflight = await getPrinterPreflight(resolvedPrinter)
     const preflightErr = preflightToError(preflight, resolvedPrinter)
     if (preflightErr) {

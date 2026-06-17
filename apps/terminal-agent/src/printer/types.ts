@@ -35,8 +35,8 @@ export interface PrinterInfo {
  * Print job parameters forwarded from Kiosk → Backend → Terminal Agent.
  * Mirrors PrintJobParams in packages/shared/src/types/print.ts — keep in sync.
  *
- * 机型适用范围：奔图 CM2800ADN / CM2820ADN 系列（Windows 识别名称：Pantum CM2800ADN Series）
- * 打印机名称通过配置项 DEFAULT_PRINTER（config.ts）或 --printer 参数传入，禁止硬编码。
+ * 机型适用范围：奔图 CM2800/CM2820 系列。
+ * 打印机名称必须通过 Agent 配置项或 --printer 参数传入，禁止硬编码。
  *
  * colorMode 分层说明：
  *   LocalWindowsPrintExecutor（Phase 8.1 主方案）：

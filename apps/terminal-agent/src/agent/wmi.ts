@@ -22,7 +22,7 @@
  * Win32_Printer.DetectedErrorState reference:
  *   0 = Unknown  |  2 = No Error  |  3 = Low Paper  |  4 = No Paper
  *   5 = Low Toner  |  6 = No Toner  |  7 = Door Open  |  8 = Jammed  |  9 = Offline
- *   NOTE: Pantum CM2800ADN Series driver does NOT set DetectedErrorState=4 for paper-empty
+ *   NOTE: the verified printer driver does NOT set DetectedErrorState=4 for paper-empty
  *   via WMI. PAPER_EMPTY cannot be detected by preflight on this driver (N3 known limit).
  *
  * Mapping to PrinterStatus:
