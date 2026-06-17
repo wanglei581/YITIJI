@@ -82,6 +82,10 @@ export interface ExternalJobFair extends ExternalJobSource {
   // ── 企业速览展示字段（机构/管理员录入，纯展示，后台可更新）──
   /** 副标题（Hero 标语，如「智能招聘·职面未来」） */
   tagline?: string
+  /** 主办/承办学校名称；展示和筛选用，不用于前台可见性隔离 */
+  hostSchoolName?: string
+  /** 面向对象，如“2026届毕业生 / 本科 / 研究生 / 不限专业” */
+  audienceLabel?: string
   /** 现场服务清单（如 自助打印 / AI求职助手 / 导览地图） */
   onsiteServices?: string[]
   /** 入场方式说明（如「凭学生证或身份证免费入场」） */

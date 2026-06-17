@@ -1,893 +1,487 @@
-// ============================================================
-// 校园招聘专区（/campus）— 沉浸式 5-Tab 页（对齐参考图）
-//
-// 合规定位：第三方/官方校招信息入口 + 求职材料服务，不是平台自营校招。
-//   - 数据取自一场「校园」主题招聘会（getJobFairs + 校招过滤），渲染 5 个 Tab：
-//     企业速览 / 参展企业 / 导览图 / AI求职 / 打印服务。
-//   - 投递/预约一律跳来源平台（按钮文案见 docs/compliance/compliance-boundary.md）。
-// 红线：不接收/保存/转发简历给企业；无企业端招聘后续处理功能。
-// ============================================================
-
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
-import type {
-  ExternalJobFairDTO,
-  FairCompanyDTO,
-  FairZoneDTO,
-  FairLiveStatsDTO,
-} from '@ai-job-print/shared'
+import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { COMPLIANCE_COPY, type ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
-  AwardIcon,
-  BriefcaseIcon,
-  BuildingIcon,
-  CalendarIcon,
+  BotIcon,
+  BriefcaseBusinessIcon,
+  Building2Icon,
+  CalendarDaysIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ClockIcon,
-  ExternalLinkIcon,
-  FileTextIcon,
+  FactoryIcon,
+  FileSearchIcon,
   FilterIcon,
-  LayersIcon,
+  GraduationCapIcon,
+  LandmarkIcon,
   MapIcon,
   MapPinIcon,
-  MicIcon,
-  NavigationIcon,
-  PenToolIcon,
   PrinterIcon,
   QrCodeIcon,
-  SmartphoneIcon,
-  SparklesIcon,
-  TicketIcon,
+  SchoolIcon,
+  ShieldCheckIcon,
   XIcon,
 } from 'lucide-react'
-import { getFairCompanies, getFairStats, getFairZones, getJobFairs } from '../../services/api'
-import { recordBrowse, recordExternalJump } from '../../services/api/activity'
+import { getJobFairs } from '../../services/api'
+import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
-import { buildNavUrl } from '../../lib/url'
-import { MapBlock } from '../job-fairs/components/MapBlock'
 
-const STATUS_CONFIG = {
-  upcoming: { label: '未开始', bg: 'bg-white/20', text: 'text-white' },
-  ongoing:  { label: '进行中', bg: 'bg-emerald-400/90', text: 'text-white' },
-  ended:    { label: '已结束', bg: 'bg-white/20', text: 'text-white/80' },
-}
-
-// 活动类型展示映射(真实 theme 字段;替代已移除的违规「AI匹配率」指标)
-const THEME_STAT_LABELS: Record<string, string> = {
-  campus: '校园双选',
-  campus_corp: '校企合作',
-  industry: '行业专场',
-  general: '综合',
-}
-
-// 校招会识别：DTO theme 优先，其次关键词（名称/主办方/简介/来源）
 const CAMPUS_RE = /校园|校招|高校|大学|学院|应届|毕业生|双选|研究生|校企/
-function isCampusFair(f: ExternalJobFairDTO) {
+const PUBLIC_FAIR_PAGE_SIZE = 100
+
+function isCampusFair(fair: ExternalJobFairDTO): boolean {
   return (
-    f.theme === 'campus' ||
-    f.theme === 'campus_corp' ||
-    CAMPUS_RE.test(`${f.name} ${f.organizer} ${f.description ?? ''} ${f.sourceName}`)
+    fair.theme === 'campus' ||
+    fair.theme === 'campus_corp' ||
+    CAMPUS_RE.test(`${fair.name} ${fair.organizer} ${fair.description ?? ''} ${fair.sourceName} ${fair.hostSchoolName ?? ''}`)
   )
 }
 
-// 校招会相关性排序：主题 > 标题关键词 > 活动状态，挑「最像校园双选会」的一场作专区主体，
-// 避免选中仅在简介里提到「应届」的行业专场。
-function campusScore(f: ExternalJobFairDTO) {
-  let s = 0
-  if (f.theme === 'campus') s += 100
-  else if (f.theme === 'campus_corp') s += 80
-  if (/校园|校招|双选|高校|毕业生|研究生/.test(f.name)) s += 50
-  if (f.status === 'ongoing') s += 10
-  else if (f.status === 'upcoming') s += 5
-  return s
+const STATUS_LABEL: Record<ExternalJobFairDTO['status'], string> = {
+  upcoming: '未开始',
+  ongoing: '进行中',
+  ended: '已结束',
 }
 
-// 参展企业头像配色（按企业名 hash）
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-orange-500', 'bg-rose-500', 'bg-emerald-500', 'bg-cyan-600', 'bg-indigo-500', 'bg-slate-700']
-function avatarColor(s: string) {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return AVATAR_COLORS[h % AVATAR_COLORS.length]
+const STATUS_STYLE: Record<ExternalJobFairDTO['status'], string> = {
+  upcoming: 'border-orange-200 bg-orange-50 text-orange-600',
+  ongoing: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  ended: 'border-gray-200 bg-gray-100 text-gray-500',
 }
 
-// 行业键 → 中文标签（http 端为键，mock 端本就是中文）
-const INDUSTRY_LABEL: Record<string, string> = {
-  internet: '互联网', ai: '人工智能', finance: '金融', manufacturing: '智能制造',
-  consumer: '消费电子', service: '生活服务', education: '教育', medical: '医疗健康',
-}
-function industryLabel(s: string) {
-  return INDUSTRY_LABEL[s] ?? s
+function schoolOf(fair: ExternalJobFairDTO): string {
+  return fair.hostSchoolName || fair.sourceName || fair.organizer || '其他来源'
 }
 
-// 由岗位标题派生分类（参考图的研发类/产品类/设计类… 标签 + 筛选）
-const CAT_RULES: [RegExp, string][] = [
-  [/(测试|QA)/, '测试类'],
-  [/(硬件|电路)/, '硬件类'],
-  [/(产品经理|产品)/, '产品类'],
-  [/(设计|UI|视觉|动画|三维)/, '设计类'],
-  [/(运营|市场|销售|商务|推广|客户经理|柜)/, '运营类'],
-  [/(算法|开发|工程师|研发|架构|技术|数据|师)/, '研发类'],
-]
-function categoryOf(title: string) {
-  for (const [re, c] of CAT_RULES) if (re.test(title)) return c
-  return '职能类'
+function isSchoolSource(fair: ExternalJobFairDTO): boolean {
+  return /大学|学院|高校|就业指导/.test(`${schoolOf(fair)} ${fair.organizer}`)
 }
 
-const TABS = [
-  { key: 'overview',  label: '企业速览', icon: LayersIcon },
-  { key: 'companies', label: '参展企业', icon: BuildingIcon },
-  { key: 'map',       label: '导览图',   icon: NavigationIcon },
-  { key: 'ai',        label: 'AI求职',   icon: BriefcaseIcon },
-  { key: 'print',     label: '打印服务', icon: PrinterIcon },
-] as const
-type TabKey = (typeof TABS)[number]['key']
-
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-function fmtDate(iso: string) {
+function formatShortDate(iso: string): string {
   const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-}
-function fmtTime(iso: string) {
-  const d = new Date(iso)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-function fmtSync(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-}
-/** Hero 日期角标：「2026.05.15 — 05.17」，同日则只显示一天。 */
-function fmtDateBadge(start: string, end: string) {
-  const a = new Date(start)
-  const b = new Date(end)
-  const head = `${a.getFullYear()}.${pad(a.getMonth() + 1)}.${pad(a.getDate())}`
-  const sameDay = a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  return sameDay ? head : `${head} — ${pad(b.getMonth() + 1)}.${pad(b.getDate())}`
-}
-/** 活动信息「举办时间」：同日显示「日期 起–止」，跨日显示「起日期 – 止日期」。 */
-function fmtHeldTime(start: string, end: string) {
-  const a = new Date(start)
-  const b = new Date(end)
-  const sameDay = a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  return sameDay
-    ? `${fmtDate(start)} ${fmtTime(start)}–${fmtTime(end)}`
-    : `${fmtDate(start)} – ${fmtDate(end)}`
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}.${p(d.getDate())}（${weekdays[d.getDay()]}）`
 }
 
-// ─── 通用二维码弹层（真实二维码）────────────────────────────────────────────────
+function formatTimeRange(fair: ExternalJobFairDTO): string {
+  const start = new Date(fair.startTime)
+  const end = new Date(fair.endTime)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(start.getHours())}:${p(start.getMinutes())}-${p(end.getHours())}:${p(end.getMinutes())}`
+}
 
-function QrModal({
-  title,
-  subtitle,
-  value,
-  note,
-  meta,
-  onClose,
-}: {
-  title: string
-  subtitle?: string
-  value: string | undefined | null
-  note: string
-  meta?: { label: string; value: string }[]
-  onClose: () => void
-}) {
+function statusRank(status: ExternalJobFairDTO['status']): number {
+  if (status === 'ongoing') return 0
+  if (status === 'upcoming') return 1
+  return 2
+}
+
+async function loadAllPublishedFairs(): Promise<ExternalJobFairDTO[]> {
+  const all: ExternalJobFairDTO[] = []
+  let page = 1
+  let totalPages = 1
+  do {
+    const res = await getJobFairs({ page, pageSize: PUBLIC_FAIR_PAGE_SIZE })
+    all.push(...res.data)
+    totalPages = res.pagination?.totalPages ?? (res.data.length < PUBLIC_FAIR_PAGE_SIZE ? page : page + 1)
+    page += 1
+  } while (page <= totalPages)
+  return all
+}
+
+function QrModal({ fair, onClose }: { fair: ExternalJobFairDTO; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="relative w-80 rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100"
-          aria-label="关闭"
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" onClick={onClose}>
+      <div className="relative w-[360px] rounded-3xl bg-white p-7 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100" aria-label="关闭">
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="text-center text-base font-semibold text-gray-800">{title}</p>
-        {subtitle && <p className="mt-1 line-clamp-1 text-center text-sm text-gray-500">{subtitle}</p>}
+        <p className="text-center text-lg font-bold text-gray-950">扫码预约</p>
+        <p className="mt-1 line-clamp-1 text-center text-sm text-gray-500">{fair.name}</p>
         <div className="mt-5 flex justify-center">
-          <SourceUrlQr value={value} size={180} />
+          <SourceUrlQr value={fair.sourceUrl} size={190} />
         </div>
-        {meta && meta.length > 0 && (
-          <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
-            {meta.map((m) => (
-              <div key={m.label} className="flex justify-between">
-                <span className="text-gray-400">{m.label}</span>
-                <span className="font-medium">{m.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-4 flex items-start gap-2">
-          <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-          <p className="text-xs leading-relaxed text-gray-500">{note}</p>
+        <div className="mt-5 rounded-2xl bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-700">
+          预约请前往来源平台办理，本系统不接收报名信息，不记录预约结果。
         </div>
       </div>
     </div>
   )
 }
 
-// ─── 主组件 ─────────────────────────────────────────────────────────────────────
+function CampusLogo({ name, large = false }: { name: string; large?: boolean }) {
+  const initials = name.replace(/就业指导中心|学生就业|大学|学院|学校|中心/g, '').slice(0, 2) || '校招'
+  return (
+    <div className={`${large ? 'h-16 w-16 text-base' : 'h-14 w-14 text-sm'} flex shrink-0 items-center justify-center rounded-full border-2 border-blue-100 bg-white text-center font-black leading-tight text-blue-700 shadow-sm`}>
+      {initials}
+    </div>
+  )
+}
 
-type QrState =
-  | { kind: 'book' }
-  | { kind: 'nav'; url: string }
-  | null
+function FeaturedCampusCard({
+  fair,
+  onOpen,
+}: {
+  fair: ExternalJobFairDTO
+  onOpen: () => void
+}) {
+  const companyCount = fair.hasManagedData ? fair.managedCompanyCount : fair.boothCount ?? 0
+  return (
+    <section className="featuredCampusCard relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1f7af7] via-[#2f83f8] to-[#1261d5] px-9 py-7 text-white shadow-[0_12px_30px_rgba(31,122,247,0.25)]">
+      <div className="absolute right-8 top-8 hidden opacity-20 sm:block">
+        <SchoolIcon className="h-40 w-40 stroke-[1.2]" />
+      </div>
+      <div className="relative">
+        <div className="inline-flex items-center gap-2 rounded-br-2xl rounded-tl-xl bg-white/15 px-4 py-2 text-xl font-bold">
+          <ShieldCheckIcon className="h-6 w-6" />本校优先
+        </div>
+        <h2 className="mt-5 text-4xl font-black tracking-tight">{fair.name}</h2>
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-xl">
+          <span className={`rounded-lg border px-3 py-1 text-base font-bold ${STATUS_STYLE[fair.status]}`}>{STATUS_LABEL[fair.status]}</span>
+          <span className="flex items-center gap-2"><CalendarDaysIcon className="h-6 w-6" />{formatShortDate(fair.startTime)} {formatTimeRange(fair)}</span>
+        </div>
+        <p className="mt-3 flex items-center gap-2 text-xl">
+          <MapPinIcon className="h-6 w-6" />
+          {fair.city ? `${fair.city} · ` : ''}{fair.venue}
+        </p>
+        <div className="mt-8 grid gap-6 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <div className="flex items-center gap-4">
+            <Building2Icon className="h-12 w-12 opacity-90" />
+            <div>
+              <p className="text-base opacity-90">参会企业</p>
+              <p className="text-3xl font-black">{companyCount} 家</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 border-white/30 sm:border-l sm:pl-10">
+            <BriefcaseBusinessIcon className="h-12 w-12 opacity-90" />
+            <div>
+              <p className="text-base opacity-90">提供岗位</p>
+              <p className="text-3xl font-black">{fair.jobCount ?? 0} 个</p>
+            </div>
+          </div>
+          <button onClick={onOpen} className="flex h-16 min-w-[240px] items-center justify-center gap-3 rounded-xl bg-white px-8 text-2xl font-black text-blue-700 shadow-lg transition active:scale-[0.98]">
+            查看招聘会 <ChevronRightIcon className="h-8 w-8" />
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+type CampusFilterKind = 'school' | 'city' | 'status' | 'time'
+
+function FilterButton({
+  icon: Icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: typeof GraduationCapIcon
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex h-16 items-center justify-center gap-3 rounded-xl border px-5 text-xl font-bold shadow-sm transition active:scale-[0.98] ${
+        active ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-800'
+      }`}
+    >
+      <Icon className={`h-6 w-6 ${active ? 'text-blue-600' : 'text-gray-700'}`} />
+      <span>{label}</span>
+      <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+    </button>
+  )
+}
+
+function FilterSheet({
+  title,
+  options,
+  selected,
+  onSelect,
+  onClose,
+}: {
+  title: string
+  options: string[]
+  selected: string
+  onSelect: (option: string) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-5" onClick={onClose}>
+      <div className="w-full max-w-[640px] rounded-3xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-2xl font-black text-gray-950">{title}</h2>
+          <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-gray-100" aria-label="关闭筛选">
+            <XIcon className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {options.map((option) => (
+            <button
+              key={option}
+              onClick={() => {
+                onSelect(option)
+                onClose()
+              }}
+              className={`h-13 rounded-xl border px-4 py-3 text-lg font-bold ${
+                selected === option ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-white text-gray-700'
+              }`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CampusFairRow({
+  fair,
+  onOpen,
+  onQr,
+}: {
+  fair: ExternalJobFairDTO
+  onOpen: () => void
+  onQr: () => void
+}) {
+  return (
+    <div className="grid gap-4 border-t border-gray-100 bg-white px-4 py-5 first:border-t-0 sm:grid-cols-[72px_1fr_auto] sm:items-center">
+      <CampusLogo name={schoolOf(fair)} />
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-xl font-black text-gray-950">{fair.name}</h3>
+          <span className={`rounded-lg border px-2.5 py-1 text-sm font-bold ${STATUS_STYLE[fair.status]}`}>{STATUS_LABEL[fair.status]}</span>
+        </div>
+        <p className="mt-2 flex flex-wrap items-center gap-3 text-base text-gray-500">
+          <span className="inline-flex items-center gap-1"><CalendarDaysIcon className="h-4 w-4" />{formatShortDate(fair.startTime)} {formatTimeRange(fair)}</span>
+          <span>|</span>
+          <span className="inline-flex items-center gap-1"><MapPinIcon className="h-4 w-4" />{fair.venue}</span>
+        </p>
+        <p className="mt-2 text-base text-gray-500">来源：{fair.sourceName}</p>
+      </div>
+      <div className="flex gap-3">
+        <button onClick={onOpen} className="h-12 rounded-lg border border-blue-600 px-5 text-lg font-bold text-blue-700 transition active:scale-[0.98]">
+          查看招聘会 <ChevronRightIcon className="inline h-5 w-5" />
+        </button>
+        {fair.status !== 'ended' && (
+          <button onClick={onQr} className="h-12 rounded-lg border border-gray-300 px-5 text-lg font-bold text-gray-700 transition active:scale-[0.98]">
+            <QrCodeIcon className="mr-1 inline h-5 w-5" />扫码预约
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FairSection({
+  title,
+  icon: Icon,
+  tone,
+  fairs,
+  limit,
+  expanded,
+  onToggle,
+  onOpen,
+  onQr,
+}: {
+  title: string
+  icon: typeof GraduationCapIcon
+  tone: string
+  fairs: ExternalJobFairDTO[]
+  limit: number
+  expanded: boolean
+  onToggle: () => void
+  onOpen: (fair: ExternalJobFairDTO) => void
+  onQr: (fair: ExternalJobFairDTO) => void
+}) {
+  if (fairs.length === 0) return null
+  const visibleFairs = expanded ? fairs : fairs.slice(0, limit)
+  const hasMore = fairs.length > limit
+  return (
+    <section className="groupedCampusSections overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-white px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Icon className={`h-7 w-7 ${tone}`} />
+          <h2 className="text-2xl font-black text-gray-950">{title}</h2>
+        </div>
+        {hasMore && (
+          <button onClick={onToggle} className="flex items-center gap-1 text-lg font-medium text-gray-500">
+            {expanded ? '收起' : '更多场次'} <ChevronRightIcon className={`h-5 w-5 transition ${expanded ? 'rotate-90' : ''}`} />
+          </button>
+        )}
+      </div>
+      {visibleFairs.map((fair) => (
+        <CampusFairRow key={fair.id} fair={fair} onOpen={() => onOpen(fair)} onQr={() => onQr(fair)} />
+      ))}
+    </section>
+  )
+}
+
+function ServiceShortcut({ icon: Icon, title, desc, onClick }: { icon: typeof BotIcon; title: string; desc: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="serviceShortcutCards flex min-h-[92px] items-center gap-4 rounded-xl border border-gray-200 bg-white px-6 text-left shadow-sm transition active:scale-[0.98]">
+      <Icon className="h-10 w-10 text-blue-600" />
+      <span>
+        <span className="block text-xl font-black text-gray-950">{title}</span>
+        <span className="mt-1 block text-base text-gray-500">{desc}</span>
+      </span>
+    </button>
+  )
+}
 
 export function CampusPage() {
   const navigate = useNavigate()
-
-  const [fair,    setFair]    = useState<ExternalJobFairDTO | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(false)
-  const [tab,     setTab]     = useState<TabKey>('overview')
-  const [qr,      setQr]      = useState<QrState>(null)
-
-  const [companies, setCompanies] = useState<FairCompanyDTO[]>([])
-  const [zones,     setZones]     = useState<FairZoneDTO[]>([])
-  const [stats,     setStats]     = useState<FairLiveStatsDTO | null>(null)
   const { getToken } = useAuth()
+  const [fairs, setFairs] = useState<ExternalJobFairDTO[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [qrFair, setQrFair] = useState<ExternalJobFairDTO | null>(null)
+  const [activeFilter, setActiveFilter] = useState<CampusFilterKind | null>(null)
+  const [selectedSchool, setSelectedSchool] = useState('全部高校')
+  const [selectedCity, setSelectedCity] = useState('全部城市')
+  const [selectedStatus, setSelectedStatus] = useState('全部状态')
+  const [selectedTime, setSelectedTime] = useState('全部时间')
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
 
-  // 浏览记录(P1):校园专区主体招聘会真实加载后上报;fire-and-forget,服务端 30 分钟去重。
-  useEffect(() => {
-    if (fair?.id) recordBrowse(getToken(), 'job_fair', fair.id)
-  }, [fair?.id, getToken])
-
-  // 外部跳转记录(P1):只记录「打开来源平台预约入口」;预约结果以来源平台为准,本系统不记录。
-  const openBookingQr = () => {
-    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
-    setQr({ kind: 'book' })
-  }
-
-  // 取一场校园主题招聘会作为本专区主体（进行中优先 → 即将开始 → 任意）
   useEffect(() => {
     let cancelled = false
-    getJobFairs()
-      .then((res) => {
+    loadAllPublishedFairs()
+      .then((data) => {
         if (cancelled) return
-        const campus = res.data.filter(isCampusFair)
-        const pick = campus.length
-          ? [...campus].sort((a, b) => campusScore(b) - campusScore(a))[0]
-          : null
-        if (pick) setFair(pick)
-        else setError(true)
+        setFairs(data.filter(isCampusFair))
       })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
 
-  // 企业 / 展区 / 大屏数据（并行）
-  useEffect(() => {
-    if (!fair) return
-    let cancelled = false
-    Promise.all([
-      getFairCompanies(fair.id).then((r) => r.data).catch(() => []),
-      getFairZones(fair.id).then((r) => r.data).catch(() => []),
-      getFairStats(fair.id).then((r) => r.data).catch(() => null),
-    ]).then(([c, z, s]) => {
-      if (cancelled) return
-      setCompanies(c)
-      setZones(z)
-      setStats(s)
+  const schoolOptions = useMemo(
+    () => ['全部高校', ...Array.from(new Set(fairs.map(schoolOf))).filter(Boolean)],
+    [fairs],
+  )
+  const cityOptions = useMemo(
+    () => ['全部城市', ...Array.from(new Set(fairs.map((fair) => fair.city).filter(Boolean) as string[]))],
+    [fairs],
+  )
+  const statusOptions = ['全部状态', '进行中', '未开始', '已结束']
+  const timeOptions = ['全部时间', '今天', '7天内', '本月']
+
+  const visibleFairs = useMemo(() => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const sevenDaysLater = new Date(today)
+    sevenDaysLater.setDate(sevenDaysLater.getDate() + 7)
+    return fairs.filter((fair) => {
+      const start = new Date(fair.startTime)
+      const end = new Date(fair.endTime)
+      if (selectedSchool !== '全部高校' && schoolOf(fair) !== selectedSchool) return false
+      if (selectedCity !== '全部城市' && fair.city !== selectedCity) return false
+      if (selectedStatus !== '全部状态' && STATUS_LABEL[fair.status] !== selectedStatus) return false
+      if (selectedTime === '今天' && (start >= tomorrow || end < today)) return false
+      if (selectedTime === '7天内' && (start >= sevenDaysLater || end < today)) return false
+      if (selectedTime === '本月' && (start.getFullYear() !== today.getFullYear() || start.getMonth() !== today.getMonth())) return false
+      return true
     })
-    return () => { cancelled = true }
-  }, [fair])
+  }, [fairs, selectedCity, selectedSchool, selectedStatus, selectedTime])
+
+  const sortedFairs = useMemo(
+    () => [...visibleFairs].sort((a, b) => statusRank(a.status) - statusRank(b.status) || new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+    [visibleFairs],
+  )
+
+  const featuredFair = sortedFairs.find((fair) => fair.status !== 'ended') ?? sortedFairs[0]
+  const homeSchool = featuredFair ? schoolOf(featuredFair) : ''
+  const currentCity = featuredFair?.city
+
+  const homeFairs = useMemo(
+    () => sortedFairs.filter((fair) => schoolOf(fair) === homeSchool),
+    [homeSchool, sortedFairs],
+  )
+  const citySchoolFairs = useMemo(
+    () => sortedFairs.filter((fair) => schoolOf(fair) !== homeSchool && isSchoolSource(fair) && (!currentCity || fair.city === currentCity)),
+    [currentCity, homeSchool, sortedFairs],
+  )
+  const publicFairs = useMemo(
+    () => sortedFairs.filter((fair) => !homeFairs.includes(fair) && !citySchoolFairs.includes(fair)),
+    [citySchoolFairs, homeFairs, sortedFairs],
+  )
+  const toggleSection = (key: string) => setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }))
+
+  const openQr = (fair: ExternalJobFairDTO) => {
+    recordExternalJump(getToken(), 'job_fair', fair.id, 'external_appointment')
+    setQrFair(fair)
+  }
+  const openFair = (fair: ExternalJobFairDTO) => navigate(`/campus/${fair.id}`, { state: { fair } })
 
   if (loading) return <LoadingState className="h-full" />
-  if (error || !fair) {
-    return (
-      <ErrorState
-        message="暂无校园招聘会数据，请稍后再试"
-        onRetry={() => navigate('/')}
-        className="h-full"
-      />
-    )
-  }
+  if (error) return <ErrorState message="校园招聘会数据加载失败，请稍后重试" onRetry={() => window.location.reload()} className="h-full" />
 
-  const sc      = STATUS_CONFIG[fair.status]
-  const navUrl  = buildNavUrl({
-    latitude: fair.latitude,
-    longitude: fair.longitude,
-    venue: fair.venue,
-    address: fair.address,
-  })
-
-  const companyCount = fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? companies.length)
-  const jobCount     = stats?.totalPositions ?? fair.jobCount ?? companies.reduce((s, c) => s + c.positions.length, 0)
-
-  // 合规:打印只基于机构上传的真实活动资料(FairMaterial),不构造虚拟文件;
-  // 跳真实资料列表页,逐份选择打印。
-  const handlePrintMaterial = () => {
-    navigate(`/job-fairs/${fair.id}/materials`)
-  }
+  const filterConfig = activeFilter === 'school'
+    ? { title: '选择高校', options: schoolOptions, selected: selectedSchool, onSelect: setSelectedSchool }
+    : activeFilter === 'city'
+      ? { title: '选择城市', options: cityOptions, selected: selectedCity, onSelect: setSelectedCity }
+      : activeFilter === 'status'
+        ? { title: '选择状态', options: statusOptions, selected: selectedStatus, onSelect: setSelectedStatus }
+        : activeFilter === 'time'
+          ? { title: '选择时间', options: timeOptions, selected: selectedTime, onSelect: setSelectedTime }
+          : null
 
   return (
-    <div className="flex h-full flex-col bg-gray-50">
-      {qr?.kind === 'book' && (
-        <QrModal
-          title="扫码前往来源平台预约"
-          subtitle={fair.name}
-          value={fair.sourceUrl}
-          meta={[
-            { label: '来源机构', value: fair.sourceName },
-            { label: '外部编号', value: fair.externalId },
-          ]}
-          note="请使用手机扫码前往来源平台办理预约，预约由对方平台管理，本系统不参与活动报名流程、不接收简历。"
-          onClose={() => setQr(null)}
-        />
-      )}
-      {qr?.kind === 'nav' && (
-        <QrModal
-          title="扫码在手机上导航"
-          subtitle={fair.venue}
-          value={qr.url}
-          note="请使用手机扫码，在手机地图中打开场馆位置并开始导航。"
-          onClose={() => setQr(null)}
-        />
-      )}
+    <div className="校园招聘会参考图首页 min-h-full bg-[#f7faff] text-gray-950">
+      {qrFair && <QrModal fair={qrFair} onClose={() => setQrFair(null)} />}
+      {filterConfig && <FilterSheet {...filterConfig} onClose={() => setActiveFilter(null)} />}
 
-      {/* ── Hero（蓝色渐变大图）─────────────────────────────────── */}
-      <div className="relative shrink-0 bg-gradient-to-br from-blue-600 via-blue-600 to-blue-500 px-5 pb-5 pt-6 text-white">
-        <div className="flex items-center justify-between gap-3">
-          <button
-            onClick={() => navigate('/')}
-            className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15"
-            aria-label="返回首页"
-          >
-            <ChevronLeftIcon className="h-6 w-6" />
-          </button>
-          <span className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium tabular-nums">
-            {fmtDateBadge(fair.startTime, fair.endTime)}
-          </span>
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 px-8 py-6 backdrop-blur">
+        <button className="absolute left-8 top-8 text-gray-900" onClick={() => navigate('/')}>
+          <ChevronLeftIcon className="h-9 w-9" />
+        </button>
+        <div className="text-center">
+          <h1 className="text-4xl font-black tracking-tight">校园招聘会</h1>
+          <p className="mt-1 text-xl text-gray-500">第三方/官方来源信息入口</p>
         </div>
-        <div className="mt-2 flex items-start gap-2">
-          <h1 className="flex-1 text-xl font-bold leading-snug">{fair.name}</h1>
-          <span className={`mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
+      </header>
+
+      <main className="mx-auto max-w-[943px] space-y-6 px-7 py-7">
+        {featuredFair ? (
+          <FeaturedCampusCard fair={featuredFair} onOpen={() => openFair(featuredFair)} />
+        ) : (
+          <EmptyState icon={GraduationCapIcon} title="暂无校园招聘会" description="当前没有已审核发布的真实校园招聘会数据" className="rounded-2xl bg-white py-20" />
+        )}
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <FilterButton icon={GraduationCapIcon} label={selectedSchool} active={selectedSchool !== '全部高校'} onClick={() => setActiveFilter('school')} />
+          <FilterButton icon={MapPinIcon} label={selectedCity} active={selectedCity !== '全部城市'} onClick={() => setActiveFilter('city')} />
+          <FilterButton icon={FilterIcon} label={selectedStatus} active={selectedStatus !== '全部状态'} onClick={() => setActiveFilter('status')} />
+          <FilterButton icon={CalendarDaysIcon} label={selectedTime} active={selectedTime !== '全部时间'} onClick={() => setActiveFilter('time')} />
         </div>
-        {fair.tagline && <p className="mt-1 text-sm text-white/80">{fair.tagline}</p>}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/90">
-          <span className="inline-flex items-center gap-1">
-            <MapPinIcon className="h-4 w-4" />{fair.venue}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <BuildingIcon className="h-4 w-4" />参展企业 {companyCount} 家
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <BriefcaseIcon className="h-4 w-4" />招聘岗位 {jobCount}+
-          </span>
+
+        <FairSection title="本校场次" icon={Building2Icon} tone="text-blue-600" fairs={homeFairs} limit={3} expanded={!!expandedSections.home} onToggle={() => toggleSection('home')} onOpen={openFair} onQr={openQr} />
+        <FairSection title="同城高校" icon={LandmarkIcon} tone="text-orange-500" fairs={citySchoolFairs} limit={4} expanded={!!expandedSections.city} onToggle={() => toggleSection('city')} onOpen={openFair} onQr={openQr} />
+        <FairSection title="公共就业机构" icon={FactoryIcon} tone="text-emerald-600" fairs={publicFairs} limit={4} expanded={!!expandedSections.public} onToggle={() => toggleSection('public')} onOpen={openFair} onQr={openQr} />
+
+        {fairs.length > 0 && sortedFairs.length === 0 && (
+          <EmptyState icon={GraduationCapIcon} title="没有符合筛选的场次" description="请调整高校、城市、状态或时间筛选条件" className="rounded-2xl bg-white py-20" />
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <ServiceShortcut icon={FileSearchIcon} title="AI简历诊断" desc="智能分析，优化建议" onClick={() => navigate('/resume/source?intent=diagnose')} />
+          <ServiceShortcut icon={PrinterIcon} title="活动资料打印" desc="参会指南、企业名录" onClick={() => featuredFair && navigate(`/campus/${featuredFair.id}/materials`)} />
+          <ServiceShortcut icon={MapIcon} title="场馆导览" desc="平面图、交通指引" onClick={() => featuredFair && navigate(`/campus/${featuredFair.id}`)} />
         </div>
-      </div>
 
-      {/* ── Tab 栏 ─────────────────────────────────────────────── */}
-      <div className="flex shrink-0 border-b border-gray-100 bg-white">
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const active = tab === key
-          return (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={[
-                'relative flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
-                active ? 'text-primary-600' : 'text-gray-400 hover:text-gray-600',
-              ].join(' ')}
-            >
-              <Icon className="h-5 w-5" />
-              {label}
-              {active && <span className="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-primary-600" />}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Tab 内容 ───────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
-        {tab === 'overview' && (
-          <OverviewTab
-            fair={fair}
-            companies={companies}
-            companyCount={companyCount}
-            jobCount={jobCount}
-            onGoTab={setTab}
-            onBook={openBookingQr}
-          />
-        )}
-        {tab === 'companies' && (
-          <div className="px-5 py-4">
-            <CompaniesTab fairId={fair.id} companies={companies} />
-          </div>
-        )}
-        {tab === 'map' && (
-          <MapTab fair={fair} zones={zones} navUrl={navUrl} onNav={() => navUrl && setQr({ kind: 'nav', url: navUrl })} />
-        )}
-        {tab === 'ai' && <AiJobTab />}
-        {tab === 'print' && (
-          <PrintTab onPrintMaterial={handlePrintMaterial} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Tab① 企业速览 ──────────────────────────────────────────────────────────────
-
-function StatCell({ value, label, accent }: { value: string; label: string; accent?: string }) {
-  return (
-    <div className="text-center">
-      <p className={`text-2xl font-bold tabular-nums ${accent ?? 'text-white'}`}>{value}</p>
-      <p className="mt-0.5 text-xs text-white/80">{label}</p>
-    </div>
-  )
-}
-
-function QuickEntry({
-  icon: Icon,
-  iconBg,
-  iconColor,
-  title,
-  subtitle,
-  onClick,
-}: {
-  icon: typeof BuildingIcon
-  iconBg: string
-  iconColor: string
-  title: string
-  subtitle: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-2xl border border-gray-100 bg-white p-4 text-center transition-shadow hover:shadow-md active:scale-[0.99]"
-    >
-      <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconBg}`}>
-        <Icon className={`h-6 w-6 ${iconColor}`} />
-      </span>
-      <span className="text-sm font-semibold text-gray-900">{title}</span>
-      <span className="text-xs text-gray-400">{subtitle}</span>
-    </button>
-  )
-}
-
-function OverviewTab({
-  fair,
-  companies,
-  companyCount,
-  jobCount,
-  onGoTab,
-  onBook,
-}: {
-  fair: ExternalJobFairDTO
-  companies: FairCompanyDTO[]
-  companyCount: number
-  jobCount: number
-  onGoTab: (t: TabKey) => void
-  onBook: () => void
-}) {
-  const navigate = useNavigate()
-
-  const industryCount = fair.industryDistribution?.length ?? new Set(companies.map((c) => c.industry)).size
-
-  const hotCompanies = useMemo(
-    () => [...companies].sort((a, b) => b.positions.length - a.positions.length).slice(0, 5),
-    [companies],
-  )
-
-  return (
-    <div className="space-y-4 px-5 py-4">
-      {/* 实时数据 band */}
-      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 p-5 text-white shadow-sm">
-        <p className="flex items-center gap-1.5 text-sm font-medium text-white/90">
-          <SparklesIcon className="h-4 w-4" />实时数据
+        <p className="flex items-center justify-center gap-2 pb-5 text-center text-base text-gray-500">
+          <ShieldCheckIcon className="h-5 w-5" />
+          {COMPLIANCE_COPY.KIOSK_CAMPUS_TOP}
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-y-5">
-          <StatCell value={String(companyCount)} label="参展企业" />
-          <StatCell value={`${jobCount}+`} label="招聘岗位" />
-          <StatCell value={THEME_STAT_LABELS[fair.theme ?? ''] ?? '综合'} label="活动类型" accent="text-emerald-300" />
-          <StatCell value={industryCount > 0 ? `${industryCount}+` : '—'} label="行业覆盖" accent="text-amber-300" />
-        </div>
-      </div>
-
-      {/* 活动信息 */}
-      <Card className="p-5">
-        <p className="flex items-center gap-1.5 text-base font-semibold text-gray-900">
-          <CalendarIcon className="h-4 w-4 text-primary-500" />活动信息
-        </p>
-        <div className="mt-3 space-y-3 text-sm">
-          <InfoRow icon={ClockIcon} label="举办时间" value={fmtHeldTime(fair.startTime, fair.endTime)} />
-          <InfoRow icon={MapPinIcon} label="举办地点" value={fair.address || fair.venue} />
-          {fair.onsiteServices && fair.onsiteServices.length > 0 && (
-            <InfoRow icon={SparklesIcon} label="现场服务" value={fair.onsiteServices.join(' · ')} />
-          )}
-          {fair.admissionMethod && (
-            <InfoRow icon={TicketIcon} label="入场方式" value={fair.admissionMethod} />
-          )}
-        </div>
-        {fair.status !== 'ended' && (
-          <Button size="md" variant="outline" className="mt-4 flex w-full items-center justify-center gap-2" onClick={onBook}>
-            <QrCodeIcon className="h-4 w-4" />扫码预约 · 去来源平台办理
-          </Button>
-        )}
-      </Card>
-
-      {/* 现场服务快捷入口 */}
-      <div>
-        <p className="mb-3 text-base font-semibold text-gray-900">现场服务快捷入口</p>
-        <div className="grid grid-cols-2 gap-3">
-          <QuickEntry icon={BuildingIcon} iconBg="bg-blue-50" iconColor="text-blue-600" title="参展企业查询" subtitle={`${companyCount} 家企业`} onClick={() => onGoTab('companies')} />
-          <QuickEntry icon={NavigationIcon} iconBg="bg-orange-50" iconColor="text-orange-500" title="招聘会导览图" subtitle="展位地图 / 日程" onClick={() => onGoTab('map')} />
-          <QuickEntry icon={BriefcaseIcon} iconBg="bg-violet-50" iconColor="text-violet-600" title="AI智能求职" subtitle="简历 / 面试 / 求职准备" onClick={() => onGoTab('ai')} />
-          <QuickEntry icon={PrinterIcon} iconBg="bg-emerald-50" iconColor="text-emerald-600" title="自助打印服务" subtitle="简历 / 通知单" onClick={() => onGoTab('print')} />
-        </div>
-      </div>
-
-      {/* 热门企业 */}
-      {hotCompanies.length > 0 && (
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-base font-semibold text-gray-900">热门企业</p>
-            <button onClick={() => onGoTab('companies')} className="flex items-center gap-0.5 text-sm font-medium text-primary-600">
-              查看全部 <ChevronRightIcon className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="space-y-2.5">
-            {hotCompanies.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => navigate(`/job-fairs/${fair.id}/companies/${c.id}`)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3.5 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
-              >
-                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white ${avatarColor(c.companyName)}`}>
-                  {c.companyName.slice(0, 1)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">{c.companyName}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-400">
-                    {c.positions.slice(0, 3).map((p) => p.title).join(' · ') || industryLabel(c.industry)}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right">
-                  {c.aiMatchScore != null && (
-                    <p className="text-sm font-bold text-emerald-600">AI {c.aiMatchScore}%</p>
-                  )}
-                  <p className="mt-0.5 text-xs text-gray-400">{c.positions.length} 个岗位</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 数据来源（合规必展示） */}
-      <Card className="p-5">
-        <p className="mb-3 text-sm font-medium text-gray-700">数据来源</p>
-        <div className="space-y-2 text-sm text-gray-600">
-          <div className="flex justify-between">
-            <span className="text-gray-400">来源机构</span>
-            <span>{fair.sourceName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">同步时间</span>
-            <span>{fmtSync(fair.syncTime)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">外部编号</span>
-            <span className="font-mono text-xs">{fair.externalId}</span>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-gray-400">{fair.dataSourceNote}</p>
-      </Card>
+      </main>
     </div>
-  )
-}
-
-function InfoRow({ icon: Icon, label, value }: { icon: typeof ClockIcon; label: string; value: string }) {
-  return (
-    <div className="flex gap-3">
-      <span className="flex w-16 shrink-0 items-center gap-1.5 text-gray-400">
-        <Icon className="h-4 w-4" />{label}
-      </span>
-      <span className="flex-1 text-gray-700">{value}</span>
-    </div>
-  )
-}
-
-// ─── Tab② 参展企业 ──────────────────────────────────────────────────────────────
-
-function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCompanyDTO[] }) {
-  const navigate = useNavigate()
-  const [category, setCategory] = useState('全部分类')
-  const [catOpen, setCatOpen] = useState(false)
-
-  const positions = useMemo(
-    () =>
-      companies.flatMap((c) =>
-        c.positions.map((p) => ({
-          ...p,
-          companyName: c.companyName,
-          companyId: c.id,
-          category: categoryOf(p.title),
-        })),
-      ),
-    [companies],
-  )
-
-  const categories = useMemo(() => {
-    const set: string[] = []
-    for (const p of positions) if (!set.includes(p.category)) set.push(p.category)
-    return ['全部分类', ...set]
-  }, [positions])
-
-  const visiblePositions = useMemo(
-    () => (category === '全部分类' ? positions : positions.filter((p) => p.category === category)),
-    [positions, category],
-  )
-
-  if (companies.length === 0) {
-    return <EmptyState icon={BuildingIcon} title="暂无参展企业" description="该招聘会暂未录入参展企业明细" className="py-12" />
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* 参展企业汇编 */}
-      <Card className="p-5">
-        <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-gray-800">
-          <BuildingIcon className="h-5 w-5 text-primary-500" />
-          参展企业汇编
-          <span className="ml-auto text-xs font-normal text-gray-400">{companies.length} 家</span>
-        </p>
-        <div className="space-y-3">
-          {companies.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => navigate(`/job-fairs/${fairId}/companies/${c.id}`)}
-              className="flex w-full items-start gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
-            >
-              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-bold text-white ${avatarColor(c.companyName)}`}>
-                {c.companyName.slice(0, 1)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-gray-900">{c.companyName}</p>
-                <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{industryLabel(c.industry)}</span>
-                {c.description && <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-400">{c.description}</p>}
-              </div>
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      {/* 招聘岗位 */}
-      <Card className="p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-base font-semibold text-gray-800">
-            <BriefcaseIcon className="h-5 w-5 text-emerald-500" />
-            招聘岗位
-            <span className="ml-1 text-xs font-normal text-gray-400">{visiblePositions.length} 个</span>
-          </p>
-          {/* 全部分类 下拉 */}
-          <div className="relative">
-            <button
-              onClick={() => setCatOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-            >
-              <FilterIcon className="h-3.5 w-3.5 text-gray-400" />
-              {category}
-              <ChevronDownIcon className="h-4 w-4 text-gray-400" />
-            </button>
-            {catOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setCatOpen(false)} />
-                <div className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
-                  {categories.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => { setCategory(c); setCatOpen(false) }}
-                      className={[
-                        'block w-full px-3 py-2 text-left text-sm',
-                        category === c ? 'bg-primary-50 font-medium text-primary-700' : 'text-gray-600 hover:bg-gray-50',
-                      ].join(' ')}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3">
-          {visiblePositions.map((p) => (
-            <div key={`${p.companyId}-${p.id}`} className="rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">{p.title}</p>
-                {p.salary && <span className="shrink-0 text-sm font-bold text-rose-500">{p.salary}</span>}
-              </div>
-              <p className="mt-1.5 flex items-center gap-1 text-xs text-gray-500">
-                <BuildingIcon className="h-3.5 w-3.5 text-gray-400" />
-                {p.companyName}
-              </p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{p.category}</span>
-                <button
-                  onClick={() => navigate(`/job-fairs/${fairId}/companies/${p.companyId}`)}
-                  className="flex items-center gap-0.5 text-xs font-medium text-primary-600"
-                >
-                  查看详情
-                  <ExternalLinkIcon className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  )
-}
-
-// ─── Tab③ 导览图（基础版，后续细化为 A/B/C/D 平面图 + 日程）─────────────────────
-
-function MapTab({
-  fair,
-  zones,
-  navUrl,
-  onNav,
-}: {
-  fair: ExternalJobFairDTO
-  zones: FairZoneDTO[]
-  navUrl: string | null
-  onNav: () => void
-}) {
-  const navigate = useNavigate()
-  const boothZones = zones.filter((z) => z.category !== 'innovation')
-
-  return (
-    <div className="space-y-4 px-5 py-4">
-      {/* 场馆地图 */}
-      <Card className="overflow-hidden p-0">
-        <div className="h-48 w-full">
-          <MapBlock lat={fair.latitude} lng={fair.longitude} mapImageUrl={fair.mapImageUrl} venue={fair.venue} />
-        </div>
-        <div className="p-4">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-            <MapPinIcon className="h-4 w-4 text-orange-500" />{fair.address || fair.venue}
-          </p>
-          {fair.trafficInfo && <p className="mt-1.5 text-sm leading-relaxed text-gray-500">{fair.trafficInfo}</p>}
-          {navUrl && (
-            <Button size="md" variant="outline" className="mt-3 flex w-full items-center justify-center gap-2" onClick={onNav}>
-              <NavigationIcon className="h-4 w-4" />扫码在手机上导航
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* 展位分区 */}
-      {boothZones.length > 0 && (
-        <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-gray-900">
-            <LayersIcon className="h-4 w-4 text-primary-500" />展位平面图
-          </p>
-          <div className="space-y-2.5">
-            {boothZones.map((z) => (
-              <div key={z.id} className={`rounded-xl p-4 ${z.color ?? 'bg-gray-50'}`}>
-                <p className="text-sm font-semibold text-gray-900">{z.zoneName}</p>
-                {z.description && <p className="mt-1 text-xs leading-relaxed text-gray-500">{z.description}</p>}
-                <p className="mt-2 text-xs text-gray-400">展位 {z.boothCount} 个</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      <Button
-        size="lg"
-        variant="secondary"
-        className="flex w-full items-center justify-center gap-2"
-        onClick={() => navigate(`/job-fairs/${fair.id}/map`)}
-      >
-        <MapIcon className="h-5 w-5" />查看完整导览图
-      </Button>
-    </div>
-  )
-}
-
-// ─── Tab④ AI求职（基础版，后续细化为参考图四大卡）─────────────────────────────
-
-function AiFeatureCard({
-  icon: Icon,
-  iconBg,
-  iconColor,
-  title,
-  desc,
-  cta,
-  onClick,
-}: {
-  icon: typeof FileTextIcon
-  iconBg: string
-  iconColor: string
-  title: string
-  desc: string
-  cta: string
-  onClick: () => void
-}) {
-  return (
-    <Card className="flex flex-col p-5">
-      <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${iconBg}`}>
-        <Icon className={`h-6 w-6 ${iconColor}`} />
-      </span>
-      <p className="mt-3 text-base font-semibold text-gray-900">{title}</p>
-      <p className="mt-1 flex-1 text-sm leading-relaxed text-gray-500">{desc}</p>
-      <Button size="md" className="mt-4 w-full" onClick={onClick}>{cta}</Button>
-    </Card>
-  )
-}
-
-function AiJobTab() {
-  const navigate = useNavigate()
-  return (
-    <div className="space-y-4 px-5 py-4">
-      <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-violet-500 p-5 text-white">
-        <p className="text-lg font-bold">AI智能求职助手</p>
-        <p className="mt-1 text-sm text-white/80">四大 AI 功能，全方位助力你的求职之路</p>
-      </div>
-      <div className="grid grid-cols-1 gap-3">
-        <AiFeatureCard icon={FileTextIcon} iconBg="bg-blue-50" iconColor="text-blue-600" title="AI简历诊断" desc="简历分析与诊断，提供专业修改建议（仅供本人参考）。" cta="开始诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
-        <AiFeatureCard icon={MicIcon} iconBg="bg-violet-50" iconColor="text-violet-600" title="AI模拟面试" desc="仿真面试场景与点评，迅速提升面试实战能力。" cta="开始模拟" onClick={() => navigate('/assistant')} />
-        <AiFeatureCard icon={PenToolIcon} iconBg="bg-emerald-50" iconColor="text-emerald-600" title="AI简历优化" desc="基于你的简历原文优化表达，生成可编辑的优化版简历（不补充虚构信息）。" cta="开始优化" onClick={() => navigate('/resume/source?intent=optimize')} />
-        <AiFeatureCard icon={AwardIcon} iconBg="bg-amber-50" iconColor="text-amber-600" title="岗位信息参考" desc="浏览第三方来源岗位信息，投递请前往来源平台办理。" cta="查看岗位" onClick={() => navigate('/jobs')} />
-      </div>
-    </div>
-  )
-}
-
-// ─── Tab⑤ 打印服务（基础版）────────────────────────────────────────────────────
-
-function PrintTab({ onPrintMaterial }: { onPrintMaterial: () => void }) {
-  const navigate = useNavigate()
-  return (
-    <div className="space-y-4 px-5 py-4">
-      <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-500 p-5 text-white">
-        <p className="text-lg font-bold">自助打印服务</p>
-        <p className="mt-1 text-sm text-white/80">简历、通知单、活动资料，现场快速打印。</p>
-      </div>
-      <Card className="p-2">
-        <PrintRow icon={FileTextIcon} title="上传文件打印" subtitle="简历 / 证件 / 通知单 · 支持扫码上传" onClick={() => navigate('/print/upload')} />
-        <PrintRow icon={SparklesIcon} title="AI简历服务" subtitle="解析 / 诊断 / 优化 / 打印" onClick={() => navigate('/resume/source')} />
-        {/* 合规:活动资料打印只基于机构上传的真实 FairMaterial,跳资料列表逐份打印,不构造示例文件 */}
-        <PrintRow icon={LayersIcon} title="活动资料打印" subtitle="招聘会日程 / 企业名册 / 导览图" onClick={onPrintMaterial} last />
-      </Card>
-    </div>
-  )
-}
-
-function PrintRow({
-  icon: Icon,
-  title,
-  subtitle,
-  onClick,
-  last,
-}: {
-  icon: typeof FileTextIcon
-  title: string
-  subtitle: string
-  onClick: () => void
-  last?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 p-3.5 text-left transition-colors hover:bg-gray-50 ${last ? '' : 'border-b border-gray-100'}`}
-    >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50">
-        <Icon className="h-5 w-5 text-primary-600" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        <p className="mt-0.5 truncate text-xs text-gray-400">{subtitle}</p>
-      </div>
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-gray-300" />
-    </button>
   )
 }

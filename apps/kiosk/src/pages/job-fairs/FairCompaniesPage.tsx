@@ -6,6 +6,24 @@ import { COMPANY_SCALE_SHORT } from '../../types/fair'
 import { BuildingIcon, BriefcaseIcon, MapPinIcon, SearchIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
 
+// 真实 http 模式后端默认 pageSize=20,裸调用会静默截断参展企业(并使「共 N 家」计数错误) → 循环拉全。
+const FAIR_COMPANY_PAGE_SIZE = 100
+// 熔断:坏后端把 totalPages 返回成超大值时,最多拉 50 页就停,避免一体机被拖死。
+const MAX_FAIR_COMPANY_PAGE_LOAD = 50
+async function loadAllFairCompanies(fairId: string): Promise<FairCompanyDTO[]> {
+  const all: FairCompanyDTO[] = []
+  let page = 1
+  let totalPages = 1
+  do {
+    const res = await getFairCompanies(fairId, { page, pageSize: FAIR_COMPANY_PAGE_SIZE })
+    const pageData = Array.isArray(res.data) ? res.data : []
+    all.push(...pageData)
+    totalPages = res.pagination?.totalPages ?? (pageData.length < FAIR_COMPANY_PAGE_SIZE ? page : page + 1)
+    page += 1
+  } while (page <= totalPages && page <= MAX_FAIR_COMPANY_PAGE_LOAD)
+  return all
+}
+
 const CHECKIN_STYLES = {
   checked_in: 'bg-green-50 text-green-700',
   pending:    'bg-yellow-50 text-yellow-700',
@@ -36,13 +54,13 @@ export function FairCompaniesPage() {
     setLoading(true)
     Promise.all([
       getJobFairById(fairId),
-      getFairCompanies(fairId),
+      loadAllFairCompanies(fairId),
       getFairZones(fairId),
     ])
-      .then(([fairRes, companiesRes, zonesRes]) => {
+      .then(([fairRes, allCompanies, zonesRes]) => {
         if (cancelled) return
         setFair(fairRes.data)
-        setCompanies(companiesRes.data)
+        setCompanies(allCompanies)
         setZones(zonesRes.data)
       })
       .catch(() => { if (!cancelled) setError(true) })

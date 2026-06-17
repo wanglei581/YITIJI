@@ -27,6 +27,7 @@ const TYPE_LABEL: Record<ActivityTargetType, string> = {
   job_fair: '招聘会',
   policy: '政策',
   company_profile: '企业',
+  fair_company: '参展企业',
 }
 
 // 跳转动作 → 中性「入口」措辞（不出现投递 / 预约 / 凭证）。
@@ -44,6 +45,8 @@ function detailRoute(targetType: ActivityTargetType, targetId: string): string {
       return `/job-fairs/${targetId}`
     case 'company_profile':
       return `/companies/${targetId}`
+    case 'fair_company':
+      return '/campus'
     default:
       return '/renshi'
   }

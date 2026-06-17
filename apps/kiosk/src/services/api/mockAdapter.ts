@@ -204,12 +204,12 @@ function ok<T>(data: T): ApiResponse<T> {
 // ──────────────────────────────────────────────────────────────
 
 export const mockJobFairAdapter = {
-  async getJobFairs(params?: { status?: string }): Promise<PaginatedResponse<ExternalJobFairDTO>> {
+  async getJobFairs(params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<ExternalJobFairDTO>> {
     const fairs = MOCK_FAIRS
       .filter((f) => f.reviewStatus === 'approved' && f.publishStatus === 'published')
       .filter((f) => !params?.status || f.status === params.status)
       .map(toJobFairDTO)
-    return makePaginated(fairs)
+    return makePaginated(fairs, params?.page, params?.pageSize)
   },
 
   async getJobFairById(id: string): Promise<ApiResponse<ExternalJobFairDTO | null>> {
@@ -217,9 +217,9 @@ export const mockJobFairAdapter = {
     return ok(fair ? toJobFairDTO(fair) : null)
   },
 
-  async getFairCompanies(fairId: string): Promise<PaginatedResponse<FairCompanyDTO>> {
+  async getFairCompanies(fairId: string, params?: { page?: number; pageSize?: number }): Promise<PaginatedResponse<FairCompanyDTO>> {
     const companies = (FAIR_COMPANIES_MAP[fairId] ?? []).map(toCompanyDTO)
-    return makePaginated(companies)
+    return makePaginated(companies, params?.page, params?.pageSize)
   },
 
   async getFairCompanyById(fairId: string, companyId: string): Promise<ApiResponse<FairCompanyDTO | null>> {
@@ -239,11 +239,11 @@ export const mockJobFairAdapter = {
     return ok({ zones, booths })
   },
 
-  async getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>> {
+  async getFairMaterials(fairId: string, params?: { page?: number; pageSize?: number }): Promise<PaginatedResponse<FairMaterialDTO>> {
     const materials = (FAIR_MATERIALS_MAP[fairId] ?? [])
       .filter((m) => m.publishStatus === 'published')
       .map(toMaterialDTO)
-    return makePaginated(materials)
+    return makePaginated(materials, params?.page, params?.pageSize)
   },
 
   // 场馆导览:导览数据由 Admin 配置/后端 seed 提供,mock 模式诚实返回空态,不前端硬编码

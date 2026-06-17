@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { FairMaterialDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import { getFairMaterials, getJobFairById } from '../../services/api'
+const FAIR_MATERIAL_PAGE_SIZE = 100
+// 熔断:坏后端把 totalPages 返回成超大值时,最多拉 50 页就停,避免一体机被拖死。
+const MAX_FAIR_MATERIAL_PAGE_LOAD = 50
 
 const TYPE_STYLES: Record<string, string> = {
   schedule:     'bg-blue-50 text-blue-600',
@@ -20,10 +23,26 @@ function formatSize(kb: number) {
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
 }
 
+async function loadAllFairMaterials(fairId: string): Promise<FairMaterialDTO[]> {
+  const all: FairMaterialDTO[] = []
+  let page = 1
+  let totalPages = 1
+  do {
+    const res = await getFairMaterials(fairId, { page, pageSize: FAIR_MATERIAL_PAGE_SIZE })
+    const pageData = Array.isArray(res.data) ? res.data : []
+    all.push(...pageData)
+    totalPages = res.pagination?.totalPages ?? (pageData.length < FAIR_MATERIAL_PAGE_SIZE ? page : page + 1)
+    page += 1
+  } while (page <= totalPages && page <= MAX_FAIR_MATERIAL_PAGE_LOAD)
+  return all
+}
+
 export function FairMaterialsPage() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { id }   = useParams<{ id: string }>()
   const fairId   = id ?? ''
+  const detailPath = pathname.startsWith('/campus/') ? `/campus/${fairId}` : `/job-fairs/${fairId}`
 
   const [fair,      setFair]      = useState<ExternalJobFairDTO | null>(null)
   const [materials, setMaterials] = useState<FairMaterialDTO[]>([])
@@ -33,11 +52,11 @@ export function FairMaterialsPage() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([getJobFairById(fairId), getFairMaterials(fairId)])
-      .then(([fairRes, matsRes]) => {
+    Promise.all([getJobFairById(fairId), loadAllFairMaterials(fairId)])
+      .then(([fairRes, nextMaterials]) => {
         if (cancelled) return
         setFair(fairRes.data)
-        setMaterials(matsRes.data)
+        setMaterials(nextMaterials)
       })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -81,13 +100,13 @@ export function FairMaterialsPage() {
               : `${materials.length} 份资料`
           }
           actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+            <Button size="md" variant="secondary" className="min-h-[48px]" onClick={() => navigate(detailPath)}>
               返回详情
             </Button>
           }
         />
         <p className="mt-2 text-xs text-gray-400">
-          所有资料均可免费打印，请按需取用，节约纸张
+          可打印资料免费取用，请按需取用，节约纸张
         </p>
       </div>
 

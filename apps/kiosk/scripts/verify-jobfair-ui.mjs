@@ -10,7 +10,7 @@
  *   A. 新版组件文件存在(RegionPicker / FairCalendarPopover / FairDataScreen / MapBlock / regions / url)
  *   B. /job-fairs 列表页:渐变大卡 + 省市区筛选 + 日历 + 合规按钮文案
  *   C. /job-fairs/:id 详情页:3 Tab(详情与特色/参展企业与岗位/数据大屏) + 导航深链
- *   D. /campus 校园页:沉浸式 5 Tab(overview/companies/map/ai/print) + 真实 API 取数
+ *   D. /campus 校园页:学校优先公开聚合 + /campus/:id 5 Tab 详情 + 真实 API 取数
  *   E. 路由绑定:/job-fairs → JobFairsPage,/campus → CampusPage
  *   F. (已移除)/qingdao 专区 2026-06-14 物理下线,原 mock 回退校验随页面删除
  *   G. 首页:补贴文案保持 info-only(不得回退「补贴快申/补贴申请」)
@@ -108,13 +108,53 @@ mustNotContain(
 // ── D. /campus 校园页 ─────────────────────────────────────────────────────
 mustContain(
   'src/pages/campus/CampusPage.tsx',
-  ["'overview'", "'companies'", "'map'", "'ai'", "'print'", 'MapBlock', 'getFairStats', 'getJobFairs'],
-  'D1. 校园页保持沉浸式 5 Tab + 真实 API 取数',
+  [
+    '校园招聘会参考图首页',
+    'FeaturedCampusCard',
+    'FairSection',
+    'ServiceShortcut',
+    '本校优先',
+    '本校场次',
+    '同城高校',
+    '公共就业机构',
+    '活动资料打印',
+    'getJobFairs',
+    'recordExternalJump',
+  ],
+  'D1. 校园聚合页保持参考图首页结构 + 本校优先主推卡 + 分组列表 + 服务入口 + 真实 API 取数',
 )
 mustNotContain(
   'src/pages/campus/CampusPage.tsx',
-  ['活动资料.pdf', '（示例）', '一键打印', "data/fairData"],
-  'D2. 校园页无虚拟 PDF/示例打印行/违规文案、不直引 mock',
+  ['campusScore', 'const pick', 'setFair(', '活动资料.pdf', '（示例）', '一键打印', "data/fairData", 'AI匹配', '<select className'],
+  'D2. 校园聚合页无 Top-1 旧逻辑/虚拟 PDF/示例打印行/违规文案、不直引 mock、不回退原生下拉',
+)
+mustContain(
+  'src/pages/campus/CampusFairDetailPage.tsx',
+  [
+    '校园招聘会参考图详情',
+    '活动概览',
+    '参展企业与岗位',
+    '场馆导览',
+    '活动资料',
+    'AI求职准备',
+    'OverviewHero',
+    'CompanyPageShell',
+    'ResourcePageShell',
+    'VenueMaterialsAiPanel',
+    'FilterGroup',
+    'selectedCompanyId',
+    'activeCompany',
+    'getFairMaterials',
+    'getFairVenueGuide',
+    'SourceUrlQr',
+    'external_apply',
+  ],
+  'D3. 校园详情页保持参考图概览/企业岗位/场馆资料AI结构 + 真实子资源 + 外部投递入口埋点',
+)
+mustNotContain(
+  'src/pages/campus/CampusFairDetailPage.tsx',
+  ['活动资料.pdf', '（示例）', '一键打印', "data/fairData", 'AI匹配', '一键投递', '立即投递', 'job-fairs/${fairId}/materials'],
+  'D4. 校园详情页无虚拟 PDF/示例打印行/违规文案、不直引 mock、不跳普通资料路由',
 )
 
 // ── E. 路由绑定 ───────────────────────────────────────────────────────────
@@ -123,11 +163,25 @@ mustNotContain(
   const ok =
     src.includes('JobFairsPage') &&
     src.includes('CampusPage') &&
+    src.includes('CampusFairDetailPage') &&
+    src.includes('campus/:id/materials') &&
     /['"]job-fairs['"]/.test(src) &&
-    /['"]campus['"]/.test(src)
-  if (ok) pass('E. 路由绑定保持 /job-fairs → JobFairsPage、/campus → CampusPage')
-  else fail('E. routes/index.tsx 路由绑定被改动(JobFairsPage/CampusPage 未挂载)')
+    /['"]campus['"]/.test(src) &&
+    /['"]campus\/:id['"]/.test(src)
+  if (ok) pass('E. 路由绑定保持 /job-fairs、/campus、/campus/:id')
+  else fail('E. routes/index.tsx 路由绑定被改动(JobFairsPage/CampusPage/CampusFairDetailPage 未挂载)')
 }
+
+mustContain(
+  'src/layouts/KioskRoot.tsx',
+  ["pathname.startsWith('/campus/')"],
+  'E2. 校园专区详情/资料页保持沉浸式布局',
+)
+mustContain(
+  'src/pages/job-fairs/FairMaterialsPage.tsx',
+  ["pathname.startsWith('/campus/')", '`/campus/${fairId}`'],
+  'E3. 校园资料页返回校园详情,不跳出到普通招聘会专区',
+)
 
 // ── F. /qingdao 专区已物理下线(2026-06-14)，原 mock 回退校验随页面删除 ──────────
 
@@ -149,6 +203,7 @@ mustContain(
     'src/pages/job-fairs/JobFairsPage.tsx',
     'src/pages/job-fairs/JobFairDetailPage.tsx',
     'src/pages/campus/CampusPage.tsx',
+    'src/pages/campus/CampusFairDetailPage.tsx',
   ]
   const banned = ['一键投递', '立即投递', '平台投递', '企业收简历', '候选人管理']
   // 「去来源平台投递」是 CLAUDE.md §2 规定的合规标准文案,先剔除再查禁词,

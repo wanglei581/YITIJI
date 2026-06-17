@@ -38,6 +38,24 @@ function gradOf(s: string) {
   return GRADIENTS[h % GRADIENTS.length]
 }
 
+// 真实 http 模式后端默认 pageSize=20,裸调用会静默截断 >20 场招聘会 → 循环拉全。
+const FAIR_PAGE_SIZE = 100
+// 熔断:坏后端把 totalPages 返回成超大值时,最多拉 50 页就停,避免一体机被拖死。
+const MAX_FAIR_PAGE_LOAD = 50
+async function loadAllPublishedFairs(): Promise<ExternalJobFairDTO[]> {
+  const all: ExternalJobFairDTO[] = []
+  let page = 1
+  let totalPages = 1
+  do {
+    const res = await getJobFairs({ page, pageSize: FAIR_PAGE_SIZE })
+    const pageData = Array.isArray(res.data) ? res.data : []
+    all.push(...pageData)
+    totalPages = res.pagination?.totalPages ?? (pageData.length < FAIR_PAGE_SIZE ? page : page + 1)
+    page += 1
+  } while (page <= totalPages && page <= MAX_FAIR_PAGE_LOAD)
+  return all
+}
+
 const STATUS_DOT = {
   upcoming: { label: '即将开始', dot: 'bg-amber-300' },
   ongoing:  { label: '进行中',   dot: 'bg-emerald-300' },
@@ -228,8 +246,8 @@ export function JobFairsPage() {
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(false)
-    getJobFairs()
-      .then((res) => { if (!cancelled) { setFairs(res.data); setLoading(false) } })
+    loadAllPublishedFairs()
+      .then((all) => { if (!cancelled) { setFairs(all); setLoading(false) } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false) } })
     return () => { cancelled = true }
   }, [retryKey])

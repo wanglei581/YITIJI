@@ -81,6 +81,34 @@ function categoryOf(title: string) {
 const TABS = ['详情与特色', '参展企业与岗位', '场馆导览', '数据大屏'] as const
 type TabKey = (typeof TABS)[number]
 
+// 真实 http 模式后端默认 pageSize=20,裸调用会静默截断参展企业 → 循环拉全。
+const FAIR_COMPANY_PAGE_SIZE = 100
+// 熔断:坏后端把 totalPages 返回成超大值时,最多拉 50 页就停,避免一体机被拖死。
+const MAX_FAIR_COMPANY_PAGE_LOAD = 50
+async function loadAllFairCompanies(fairId: string): Promise<FairCompanyDTO[]> {
+  const all: FairCompanyDTO[] = []
+  let page = 1
+  let totalPages = 1
+  do {
+    const res = await getFairCompanies(fairId, { page, pageSize: FAIR_COMPANY_PAGE_SIZE })
+    const pageData = Array.isArray(res.data) ? res.data : []
+    all.push(...pageData)
+    totalPages = res.pagination?.totalPages ?? (pageData.length < FAIR_COMPANY_PAGE_SIZE ? page : page + 1)
+    page += 1
+  } while (page <= totalPages && page <= MAX_FAIR_COMPANY_PAGE_LOAD)
+  return all
+}
+
+// 子资源加载结果:区分「接口失败」(failed=true) 与「真实为空」(failed=false),
+// 让 UI 用 ErrorState / EmptyState 分别表达,而非把 4xx/5xx 静默吞成空态。
+async function settle<T>(promise: Promise<T>, fallback: T): Promise<{ data: T; failed: boolean }> {
+  try {
+    return { data: await promise, failed: false }
+  } catch {
+    return { data: fallback, failed: true }
+  }
+}
+
 function pad(n: number) {
   return String(n).padStart(2, '0')
 }
@@ -168,6 +196,11 @@ export function JobFairDetailPage() {
   const [companies, setCompanies] = useState<FairCompanyDTO[]>([])
   const [zones,     setZones]     = useState<FairZoneDTO[]>([])
   const [stats,     setStats]     = useState<FairLiveStatsDTO | null>(null)
+  // 子资源级 error(区分「接口失败」与「真实为空」)+ 重试 key
+  const [resourceKey,    setResourceKey]    = useState(0)
+  const [companiesError, setCompaniesError] = useState(false)
+  const [zonesError,     setZonesError]     = useState(false)
+  const [statsError,     setStatsError]     = useState(false)
 
   // 收藏(C-2D):登录走 /me/favorites,匿名存本机;仅兴趣标记,不形成预约/投递闭环
   const { isFavorite, toggle: toggleFavorite } = useFavorites()
@@ -185,22 +218,28 @@ export function JobFairDetailPage() {
     return () => { cancelled = true }
   }, [id, hasStateMatch])
 
-  // 企业 / 展区 / 大屏数据（并行）
+  // 企业 / 展区 / 大屏数据（并行）—— 用 settle 区分「接口失败」与「真实为空」,
+  // 5xx 不再被静默吞成空态;失败的子资源各自展示 ErrorState / 重试入口。
   useEffect(() => {
     if (!fair) return
     let cancelled = false
     Promise.all([
-      getFairCompanies(fair.id).then((r) => r.data).catch(() => []),
-      getFairZones(fair.id).then((r) => r.data).catch(() => []),
-      getFairStats(fair.id).then((r) => r.data).catch(() => null),
+      settle(loadAllFairCompanies(fair.id), [] as FairCompanyDTO[]),
+      settle(getFairZones(fair.id).then((r) => r.data), [] as FairZoneDTO[]),
+      settle(getFairStats(fair.id).then((r) => r.data), null as FairLiveStatsDTO | null),
     ]).then(([c, z, s]) => {
       if (cancelled) return
-      setCompanies(c)
-      setZones(z)
-      setStats(s)
+      setCompanies(c.data)
+      setCompaniesError(c.failed)
+      setZones(z.data)
+      setZonesError(z.failed)
+      setStats(s.data)
+      setStatsError(s.failed)
     })
     return () => { cancelled = true }
-  }, [fair])
+  }, [fair, resourceKey])
+
+  const reloadResources = () => setResourceKey((k) => k + 1)
 
   const featuredZones = useMemo(() => zones.filter((z) => z.category === 'innovation'), [zones])
 
@@ -313,18 +352,24 @@ export function JobFairDetailPage() {
             fair={fair}
             sc={sc}
             featuredZones={featuredZones}
+            zonesError={zonesError}
+            onRetryZones={reloadResources}
             navUrl={navUrl}
             onNav={() => navUrl && setQr({ kind: 'nav', url: navUrl })}
           />
         )}
         {tab === '参展企业与岗位' && (
-          <CompaniesTab fairId={fair.id} companies={companies} />
+          <CompaniesTab fairId={fair.id} companies={companies} error={companiesError} onRetry={reloadResources} />
         )}
         {tab === '场馆导览' && (
           <VenueGuideTab fairId={fair.id} onGoCompanies={() => setTab('参展企业与岗位')} />
         )}
         {tab === '数据大屏' && (
-          stats ? <FairDataScreen stats={stats} /> : (
+          statsError ? (
+            <ErrorState message="数据大屏加载失败,请稍后重试" onRetry={reloadResources} className="py-12" />
+          ) : stats ? (
+            <FairDataScreen stats={stats} />
+          ) : (
             <EmptyState icon={InfoIcon} title="暂无数据大屏" description="该招聘会暂未录入预计/来源数据" className="py-12" />
           )
         )}
@@ -385,12 +430,16 @@ function DetailsTab({
   fair,
   sc,
   featuredZones,
+  zonesError,
+  onRetryZones,
   navUrl,
   onNav,
 }: {
   fair: ExternalJobFairDTO
   sc: { label: string; bg: string; text: string }
   featuredZones: FairZoneDTO[]
+  zonesError: boolean
+  onRetryZones: () => void
   navUrl: string | null
   onNav: () => void
 }) {
@@ -449,6 +498,17 @@ function DetailsTab({
           <p className="mt-4 border-t border-gray-100 pt-4 text-sm leading-relaxed text-gray-600">{fair.description}</p>
         )}
       </Card>
+
+      {/* 展区加载失败:轻量重试入口,不把接口失败伪装成"无特色展区" */}
+      {zonesError && featuredZones.length === 0 && (
+        <button
+          onClick={onRetryZones}
+          className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-100"
+        >
+          <InfoIcon className="h-4 w-4" />
+          特色展区加载失败,点击重试
+        </button>
+      )}
 
       {/* 各市区创新特色展区（复刻参考图：图标 + 城市角标 + 标题 + 描述） */}
       {featuredZones.length > 0 && (
@@ -536,7 +596,17 @@ function DetailsTab({
 
 // ─── Tab② 参展企业与岗位 ─────────────────────────────────────────────────────────
 
-function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCompanyDTO[] }) {
+function CompaniesTab({
+  fairId,
+  companies,
+  error,
+  onRetry,
+}: {
+  fairId: string
+  companies: FairCompanyDTO[]
+  error: boolean
+  onRetry: () => void
+}) {
   const navigate = useNavigate()
   const [category, setCategory] = useState('全部分类')
   const [catOpen, setCatOpen] = useState(false)
@@ -565,6 +635,10 @@ function CompaniesTab({ fairId, companies }: { fairId: string; companies: FairCo
     [positions, category],
   )
 
+  // 接口失败且无数据 → ErrorState + 重试,绝不把 5xx 伪装成"暂无企业"。
+  if (error && companies.length === 0) {
+    return <ErrorState message="参展企业加载失败,请稍后重试" onRetry={onRetry} className="py-12" />
+  }
   if (companies.length === 0) {
     return <EmptyState icon={BuildingIcon} title="暂无参展企业" description="该招聘会暂未录入参展企业明细" className="py-12" />
   }

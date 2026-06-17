@@ -130,14 +130,22 @@ export function ScanResultPage() {
             <PrinterIcon className="h-4 w-4" />
             {API_MODE === 'http' ? '打印(硬件接入后开放)' : '直接打印'}
           </Button>
-          <Button size="lg" variant="secondary" className="flex items-center gap-2" onClick={handleSave}>
+          <Button
+            size="lg"
+            variant="secondary"
+            disabled={API_MODE === 'http'}
+            title={API_MODE === 'http' ? '扫描硬件接入后开放真实保存' : undefined}
+            className="flex items-center gap-2"
+            onClick={handleSave}
+          >
             <SaveIcon className="h-4 w-4" />
-            保存文档
+            {API_MODE === 'http' ? '保存(硬件接入后开放)' : '保存文档'}
           </Button>
           <Button
             size="lg"
             variant={scanType === 'resume' ? 'primary' : 'secondary'}
-            disabled={scanType !== 'resume'}
+            disabled={scanType !== 'resume' || API_MODE === 'http'}
+            title={API_MODE === 'http' ? '扫描硬件接入后开放真实识别' : undefined}
             className="flex items-center gap-2"
             onClick={handleResumeAI}
           >

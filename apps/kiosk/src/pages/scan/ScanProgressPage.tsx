@@ -9,6 +9,7 @@ import {
   XCircleIcon,
 } from 'lucide-react'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { API_MODE } from '../../services/api/client'
 
 type Step = 'init' | 'scanning' | 'generating'
 type ScanType = 'resume' | 'id' | 'document'
@@ -20,6 +21,7 @@ const FAIL_REASONS = [
   '扫描超时，请稍后重试',
   'PDF 生成失败，请重试',
 ]
+const SCAN_HARDWARE_UNAVAILABLE_REASON = '真机扫描尚未接入本机 Agent，请联系工作人员使用已验收的扫描入口'
 
 const SCAN_TYPE_LABELS: Record<ScanType, string> = {
   resume: '简历',
@@ -69,6 +71,7 @@ export function ScanProgressPage() {
   const source = (state?.source as Source) ?? 'flatbed'
   const shouldFail = state?.simulateFailure === true
   const failReason = typeof state?.failReason === 'string' ? (state.failReason as string) : FAIL_REASONS[0]
+  const useSimulatedScan = API_MODE !== 'http'
 
   const steps = buildSteps(source)
 
@@ -87,9 +90,13 @@ export function ScanProgressPage() {
   )
 
   const navigateSuccess = useCallback(() => {
+    if (!useSimulatedScan) {
+      navigateFail(SCAN_HARDWARE_UNAVAILABLE_REASON)
+      return
+    }
     const file = mockFile(scanType)
     navigate('/scan/result', { state: { ...state, success: true, file } })
-  }, [navigate, state, scanType])
+  }, [navigate, navigateFail, state, scanType, useSimulatedScan])
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
@@ -98,6 +105,10 @@ export function ScanProgressPage() {
 
   useEffect(() => {
     cancelRef.current = false
+    if (!useSimulatedScan) {
+      navigateFail(SCAN_HARDWARE_UNAVAILABLE_REASON)
+      return () => { cancelRef.current = true }
+    }
 
     const advance = (idx: number) => {
       if (idx >= steps.length) {

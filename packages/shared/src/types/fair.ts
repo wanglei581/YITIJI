@@ -48,6 +48,10 @@ export interface Fair {
   mapImageUrl: string | null
   description: string | null
   coverImageUrl: string | null
+  hostSchoolName: string | null
+  audienceLabel: string | null
+  onsiteServices: string[]
+  admissionMethod: string | null
 
   // 数据快照(同步任务回填)
   companyCount: number

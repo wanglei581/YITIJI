@@ -119,6 +119,7 @@ interface WireFairCompany {
   registeredCapital?: string | null
   honorTags?: string[]
   zoneId?: string | null
+  zoneName?: string | null
   boothNumber?: string | null
   positions?: WireFairPosition[]
 }
@@ -186,6 +187,8 @@ function mapWireCompany(c: WireFairCompany): FairCompanyDTO {
     sourceUrl:         c.sourceUrl ?? undefined,
     boothNumber:       c.boothNumber ?? undefined,
     zoneId:            c.zoneId ?? undefined,
+    // 展厅筛选依赖真实展区名(后端经 zoneId join FairZone 回填);缺失 → undefined,前端兜底 boothNumber 前缀
+    zoneName:          c.zoneName ?? undefined,
     positions:         (c.positions ?? []).map(mapWirePosition),
     honorTags:         c.honorTags ?? undefined,
     coverImageUrl:     c.coverImageUrl ?? c.logoUrl ?? undefined,
@@ -221,10 +224,12 @@ function mapWireZone(z: WireFairZone, index: number): FairZoneDTO {
 
 export const httpJobFairAdapter = {
   async getJobFairs(
-    params?: { status?: string },
+    params?: { status?: string; page?: number; pageSize?: number },
   ): Promise<PaginatedResponse<ExternalJobFairDTO>> {
     const query: Record<string, string> = {}
     if (params?.status) query.status = params.status
+    if (params?.page) query.page = String(params.page)
+    if (params?.pageSize) query.pageSize = String(params.pageSize)
     return get<PaginatedResponse<ExternalJobFairDTO>>('/job-fairs', query)
   },
 
@@ -232,8 +237,11 @@ export const httpJobFairAdapter = {
     return get<ApiResponse<ExternalJobFairDTO | null>>(`/job-fairs/${id}`)
   },
 
-  async getFairCompanies(fairId: string): Promise<PaginatedResponse<FairCompanyDTO>> {
-    const res = await get<PaginatedResponse<WireFairCompany>>(`/job-fairs/${fairId}/companies`)
+  async getFairCompanies(fairId: string, params?: { page?: number; pageSize?: number }): Promise<PaginatedResponse<FairCompanyDTO>> {
+    const query: Record<string, string> = {}
+    if (params?.page) query.page = String(params.page)
+    if (params?.pageSize) query.pageSize = String(params.pageSize)
+    const res = await get<PaginatedResponse<WireFairCompany>>(`/job-fairs/${fairId}/companies`, query)
     return { ...res, data: (res.data ?? []).map(mapWireCompany) }
   },
 
@@ -268,8 +276,11 @@ export const httpJobFairAdapter = {
     }
   },
 
-  async getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>> {
-    return get<PaginatedResponse<FairMaterialDTO>>(`/job-fairs/${fairId}/materials`)
+  async getFairMaterials(fairId: string, params?: { page?: number; pageSize?: number }): Promise<PaginatedResponse<FairMaterialDTO>> {
+    const query: Record<string, string> = {}
+    if (params?.page) query.page = String(params.page)
+    if (params?.pageSize) query.pageSize = String(params.pageSize)
+    return get<PaginatedResponse<FairMaterialDTO>>(`/job-fairs/${fairId}/materials`, query)
   },
 
   async getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>> {

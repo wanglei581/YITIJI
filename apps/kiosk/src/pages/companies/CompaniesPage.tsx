@@ -16,7 +16,6 @@ import {
   COMPANY_SOURCE_KINDS,
   COMPANY_TYPES,
   type CompanyCardDTO,
-  type CompanyFiltersDTO,
   type CompanyStatsDTO,
 } from '@ai-job-print/shared'
 import {
@@ -29,7 +28,8 @@ import {
   SearchIcon,
   ShieldCheckIcon,
 } from 'lucide-react'
-import { getCompanies, getCompanyFilters, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
+import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
+import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
 
 const PAGE_SIZE = 10
 
@@ -136,7 +136,7 @@ function CompanyCard({ company, onDetail, onJobs }: {
           onClick={onDetail}
           className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg border border-primary-200 bg-white text-sm font-semibold text-primary-600 active:bg-primary-50"
         >
-          查看企业
+          查看企业风采
         </button>
         <button
           type="button"
@@ -166,7 +166,6 @@ export function CompaniesPage() {
   const [recruitType, setRecruitType] = useState('')
   const [sourceKind, setSourceKind] = useState('')
 
-  const [filters, setFilters] = useState<CompanyFiltersDTO | null>(null)
   const [stats, setStats] = useState<CompanyStatsDTO | null>(null)
   const [items, setItems] = useState<CompanyCardDTO[]>([])
   const [total, setTotal] = useState<number | null>(null)
@@ -182,7 +181,16 @@ export function CompaniesPage() {
   }, [keywordInput])
 
   const query: Omit<CompanyQuery, 'cursor' | 'pageSize'> = useMemo(
-    () => ({ keyword, province, city, district, companyType, industry, recruitType, sourceKind }),
+    () => ({
+      keyword,
+      province,
+      city: province && isMunicipality(province) ? '' : city,
+      district,
+      companyType,
+      industry,
+      recruitType,
+      sourceKind,
+    }),
     [keyword, province, city, district, companyType, industry, recruitType, sourceKind],
   )
 
@@ -192,22 +200,18 @@ export function CompaniesPage() {
     Promise.all([
       getCompanies({ ...query, pageSize: PAGE_SIZE }),
       getCompanyStats(query),
-      filters ? Promise.resolve(filters) : getCompanyFilters(),
     ])
-      .then(([page, st, f]) => {
+      .then(([page, st]) => {
         if (g !== gen.current) return
         setItems(page.items)
         setTotal(page.total)
         setNextCursor(page.nextCursor)
         setStats(st)
-        setFilters(f)
         setState('ready')
       })
       .catch(() => {
         if (g === gen.current) setState('error')
       })
-    // filters 只需拉一次，不进依赖
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query])
 
   useEffect(() => { load() }, [load])
@@ -225,14 +229,20 @@ export function CompaniesPage() {
       .finally(() => setLoadingMore(false))
   }
 
-  // 地区联动选项（只来自真实数据）
-  const provinceOpts = filters?.regions.map((r) => r.province) ?? []
-  const cityOpts = filters?.regions.find((r) => r.province === province)?.cities.map((c) => c.city) ?? []
-  const districtOpts = filters?.regions.find((r) => r.province === province)?.cities.find((c) => c.city === city)?.districts ?? []
+  // 地区联动选项：完整全国行政区划字典（省/市/区，来自 china-division，非业务数据）。
+  // 用户可选任意地区；后端按真实数据过滤，选到无企业的地区时返回真实空态，不造数据。
+  const isMunicipalProvince = province ? isMunicipality(province) : false
+  const provinceOpts = PROVINCES
+  const cityOpts = province && !isMunicipalProvince ? citiesOf(province) : []
+  const districtOpts = province && (isMunicipalProvince || city)
+    ? districtsOf(province, isMunicipalProvince ? '市辖区' : city)
+    : []
 
-  const typeOpts = (filters?.companyTypes ?? []).map((v) => ({ value: v, text: labelOfType(v) ?? v }))
-  const industryOpts = (filters?.industries ?? []).map((v) => ({ value: v, text: labelOfIndustry(v) ?? v }))
-  const sourceOpts = (filters?.sourceKinds ?? []).map((v) => ({ value: v, text: (COMPANY_SOURCE_KINDS as Record<string, string>)[v] ?? v }))
+  // 筛选项来自统一共享字典（完整），不再由当前已有企业反推出不完整选项。
+  // 招聘类型/来源类型受后端语义约束（Job.category / Organization.type），保持既有取值不臆造空项。
+  const typeOpts = Object.entries(COMPANY_TYPES).map(([value, text]) => ({ value, text }))
+  const industryOpts = Object.entries(COMPANY_INDUSTRIES).map(([value, text]) => ({ value, text }))
+  const sourceOpts = Object.entries(COMPANY_SOURCE_KINDS).map(([value, text]) => ({ value, text }))
   const recruitOpts = Object.entries(RECRUIT_TYPE_LABEL).map(([value, text]) => ({ value, text }))
 
   const regionSelect = (
@@ -257,8 +267,8 @@ export function CompaniesPage() {
   return (
     <div className="flex flex-col gap-4 p-6">
       <PageHeader
-        title="找企业"
-        subtitle="企业展示 · 来源岗位导览"
+        title="找企业 · 来源企业导览"
+        subtitle="按地区 / 类型 / 行业浏览来源企业与岗位"
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/jobs')}>
             返回岗位信息
@@ -277,11 +287,11 @@ export function CompaniesPage() {
         />
       </div>
 
-      {/* 地区（选项只来自真实已发布企业） */}
+      {/* 地区（完整省/市/区字典，可选任意地区；结果由后端真实过滤，无企业即空态） */}
       <div className="flex gap-2">
         {regionSelect(province, (v) => { setProvince(v); setCity(''); setDistrict('') }, '全部省份', provinceOpts)}
-        {regionSelect(city, (v) => { setCity(v); setDistrict('') }, '全部城市', cityOpts, !province)}
-        {regionSelect(district, setDistrict, '全部区县', districtOpts, !city)}
+        {regionSelect(city, (v) => { setCity(v); setDistrict('') }, isMunicipalProvince ? '直辖市' : '全部城市', cityOpts, !province || isMunicipalProvince)}
+        {regionSelect(district, setDistrict, '全部区县', districtOpts, !province || (!isMunicipalProvince && !city))}
       </div>
 
       {/* 筛选 chips */}

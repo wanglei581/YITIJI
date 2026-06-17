@@ -49,6 +49,7 @@ import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibrary
 import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
+import { CampusFairDetailPage } from '../pages/campus/CampusFairDetailPage'
 import { ScreensaverPage } from '../pages/screensaver/ScreensaverPage'
 
 export const kioskRouter = createBrowserRouter([
@@ -78,6 +79,8 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/activity',       element: <MyActivityPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'campus',            element: <CampusPage /> },
+      { path: 'campus/:id',        element: <CampusFairDetailPage /> },
+      { path: 'campus/:id/materials', element: <FairMaterialsPage /> },
       // 打印扫描服务中心
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
