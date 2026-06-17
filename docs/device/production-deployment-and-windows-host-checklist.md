@@ -73,7 +73,10 @@
 以 `.env.example` 为清单逐项核对生产 `.env`：
 
 - [ ] `NODE_ENV=production`。
+- [ ] `JWT_SECRET` 使用生产强随机值，长度不少于 16 字符；不得使用本地开发/CI 测试值。
 - [ ] `DATABASE_URL` 指向 PostgreSQL，不再指向 SQLite 文件。
+- [ ] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。
+- [ ] API 生产启动门禁已验证：`NODE_ENV=production` 下，JWT_SECRET 缺失/过短、`FILE_STORAGE_DRIVER` 非 `cos`、`DATABASE_URL=file:` SQLite 均会启动失败。
 - [ ] `REDIS_URL` 正确。
 - [ ] API 监听端口、前端 API base URL、CORS allowlist 正确。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。

@@ -1,7 +1,7 @@
 /**
  * SQLite → PostgreSQL 数据迁移（第四阶段演练 + 上线切换用）。
  *
- * 双 Prisma client 模型级复制：SQLite 读（DATABASE_URL）→ PG 写（POSTGRES_URL）。
+ * 双 Prisma client 模型级复制：SQLite 源库读（DATABASE_URL）→ PG 目标库写（POSTGRES_URL）。
  * 类型转换（DateTime/Boolean 等）由 Prisma 两端各自处理，无手写 SQL 方言风险。
  * 表按外键拓扑序复制；结束后逐表行数对账，任何不一致退出码 1。
  *
@@ -58,7 +58,7 @@ async function main() {
   if (!pgUrl?.startsWith('postgres')) throw new Error('POSTGRES_URL 必须是 PostgreSQL 目标库')
   const force = process.argv.includes('--force')
 
-  const src = createPrismaClient(sqliteUrl).client
+  const src = createPrismaClient(sqliteUrl, { allowProductionSqliteSource: true }).client
   const dst = createPrismaClient(pgUrl).client
 
   try {

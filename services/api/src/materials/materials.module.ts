@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
+import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { StorageModule } from '../storage/storage.module'
 import { MaterialsController } from './materials.controller'
@@ -10,7 +10,7 @@ import { MaterialsService } from './materials.service'
   imports: [
     PrismaModule,
     StorageModule,
-    JwtModule.register({ secret: process.env['JWT_SECRET'] ?? 'dev-only-secret' }),
+    JwtVerifierModule,
   ],
   controllers: [MaterialsController],
   providers: [MaterialsService, MaterialsCleanupTask],

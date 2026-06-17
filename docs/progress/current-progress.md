@@ -5,6 +5,69 @@
 
 ---
 
+## 上线前 P0 生产运行时门禁与 CI 验证收口（2026-06-17，Codex + Claude）
+
+按 CCG 流程在隔离 worktree `/Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/p0-production-ci-gates`、分支 `codex/p0-production-ci-gates` 执行。Claude 负责首轮实现，Codex 负责 diff 审查、补丁修正、双模型审查整合与最终验证。
+
+本轮完成：
+
+- `services/api/src/config/production-runtime-gates.ts` 新增生产运行时启动门禁：`NODE_ENV=production` 时，`JWT_SECRET` 必须存在且长度不少于 16，`FILE_STORAGE_DRIVER` 必须为 `cos`，`DATABASE_URL` 必须存在且不得为 `file:` SQLite。
+- `services/api/src/main.ts` 在门禁通过后再动态导入 `AppModule`，避免生产配置不达标时先装载业务模块或连接外部依赖。
+- `services/api/src/common/jwt-verifier.module.ts` 新增共享 `JwtVerifierModule`，将 audit / content / files / materials / print-jobs / smart-campus / terminals 7 个模块中的 JWT 弱密钥 fallback 统一改为 fail-closed。
+- `.github/workflows/ci.yml` 主 CI `Verify suites` 接入 `verify:smart-campus-ui`、`verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`，防止智慧校园 / 合作机构关键闭环回退；`verify-public-fair-demo-guard.ts` 对应功能尚未在 main，随 campus-recruitment 功能后续接入。
+- `docs/device/production-deployment-and-windows-host-checklist.md` 补充生产 `.env` 门禁核对项：`NODE_ENV=production`、强随机 `JWT_SECRET`、PostgreSQL `DATABASE_URL`、`FILE_STORAGE_DRIVER=cos`。
+
+已通过本地验证：
+
+- `pnpm --filter @ai-job-print/api verify:production-runtime-gates` ✅
+- `pnpm --filter @ai-job-print/api verify:production-db-guard` ✅
+- `pnpm --filter @ai-job-print/api build` ✅
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/api lint` ✅
+- `pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui` ✅
+- `pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` ✅
+- `git diff --check` ✅
+- JWT 弱 fallback 扫描：`dev-only-secret` / `JWT_SECRET ??` / `JwtModule.register(` 在 `services/api/src` 中 0 命中 ✅
+
+本机限制：
+
+- `verify:partner-smart-campus` / `verify:partner-edit` 依赖 CI 先执行 `npx prisma db push --accept-data-loss` 创建全新 SQLite 测试库；当前本机 Prisma schema engine 返回空错误 `Schema engine error:`，无法完成本地 db push。这两项必须在 CI 或可正常 `db push` 的环境复跑。
+
+双模型审查结果：
+
+- Claude reviewer：Critical = 0；提示生产 `.env` 必须核验 `NODE_ENV=production` / `JWT_SECRET` / `FILE_STORAGE_DRIVER=cos` / PostgreSQL `DATABASE_URL`。
+- Antigravity reviewer：提出若干问题，其中缺少 verify 脚本、smart-campus-ui 未定义为误报；“共享动态模块语义”已收敛为 `JwtVerifierModule`；DATABASE_URL 缺失分支已补测试。
+
+上线影响判断：
+
+- 生产环境误配 SQLite、本地磁盘存储或弱/缺 JWT 密钥时，API 会在启动期 fail-closed，不会带着错误配置进入多人并发使用。
+- 真正上线容量仍需以 PostgreSQL、Redis、COS、API 实例、队列、外部 AI/OCR 服务和 Windows 真机按部署清单完成验收为准。
+
+## 上线前 P0 数据库并发风险收口：生产禁 SQLite 门禁（2026-06-17，Codex）
+
+针对本地并行跑 `verify:admin-fairs` 与 `verify:fair-company-positions` 时出现的 Prisma/libSQL `P1008 SocketTimeout`，已确认根因是多个验证脚本同时写同一个本地 SQLite `dev.db` 引发文件库写锁竞争；两个脚本顺序复跑均通过，招聘会/智慧校园业务链路本身未失败。
+
+本轮完成的生产防线：
+
+- `services/api/src/prisma/create-client.ts` 新增运行时数据库门禁：`NODE_ENV=production` 且 `DATABASE_URL` 为 `file:` SQLite 时，API 直接启动失败并抛出 `PRODUCTION_SQLITE_FORBIDDEN`；生产必须使用 PostgreSQL。
+- `services/api/scripts/migrate-sqlite-to-postgres.ts` 对 SQLite 源库读取使用显式受控豁免，避免生产主机执行 SQLite → PostgreSQL 数据迁移时被门禁误伤；普通 API 运行路径仍不允许生产 SQLite。
+- 新增 `services/api/scripts/verify-production-db-guard.ts` 与 `verify:production-db-guard`，覆盖「开发允许 SQLite」「未声明 NODE_ENV 允许本地 SQLite」「生产允许 PostgreSQL」「生产拒绝 SQLite」「生产迁移源库显式豁免时允许读取 SQLite」五类断言；该脚本已接入 GitHub Actions 主 CI `Verify suites` 防退化。
+- `services/api/.env.example` 补充说明：生产环境硬拒绝 `file:` SQLite，避免高并发写入场景误用本地库。
+- `docs/device/production-deployment-and-windows-host-checklist.md` 的环境变量核对项补充：上线验收必须验证生产 DB 门禁，确保 `DATABASE_URL` 指向 PostgreSQL。
+
+验证结果：
+
+- `pnpm --filter @ai-job-print/api verify:production-db-guard` ✅
+- `pnpm --filter @ai-job-print/api build` ✅
+
+上线影响判断：
+
+- 本地 SQLite 仍只用于开发/脚本验证；多个写库 verify 不应并行抢同一个 `dev.db`。
+- 生产若误配 SQLite，现在会在启动期 fail-closed，不会带着文件库进入成百上千人并发使用。
+- 生产并发能力仍以 PostgreSQL、Redis、API 实例、队列、对象存储和外部 AI/OCR 服务的预生产压测与上线清单验收为准；不能仅凭本地 SQLite verify 代表生产容量。
+
+---
+
 ## 招聘会 verify 测试数据残留根治（2026-06-17，Claude）
 
 **问题根因：** 校招/招聘会 verify 脚本用随机 `suffix` 建 `approved+published` 测试招聘会,`cleanup()` 只按本次随机 id 清;一旦进程被强杀、或 finally 撞 SQLite 写锁中断,残留就再也无法被下次运行找到,泄漏到 `/campus`、`/job-fairs` 等公开前台(只读 approved+published)。

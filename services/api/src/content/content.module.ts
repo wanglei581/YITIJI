@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
+import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { ContentController } from './content.controller'
 import { AiPosterController } from './ai-poster.controller'
@@ -23,7 +23,7 @@ import { AiPosterService } from './ai-poster.service'
 @Module({
   imports: [
     PrismaModule,
-    JwtModule.register({ secret: process.env['JWT_SECRET'] ?? 'dev-only-secret' }),
+    JwtVerifierModule,
   ],
   controllers: [ContentController, AiPosterController],
   providers: [ContentService, AiPosterService],
