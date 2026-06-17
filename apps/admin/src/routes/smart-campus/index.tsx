@@ -33,6 +33,19 @@ function TerminalConfigRow({
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
+  const toggleEnabled = (nextEnabled: boolean) => {
+    setEnabled(nextEnabled)
+    setModules((current) => {
+      if (!nextEnabled) {
+        return { ...current, welcome: false, luggage: false, panorama: false, bigdata: false }
+      }
+      if (!current.welcome && !current.luggage && !current.panorama) {
+        return { ...current, welcome: true, bigdata: false }
+      }
+      return { ...current, bigdata: false }
+    })
+  }
+
   const toggleModule = (key: keyof SmartCampusModules) =>
     setModules((m) => ({ ...m, [key]: !m[key] }))
 
@@ -65,7 +78,7 @@ function TerminalConfigRow({
 
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <label className="flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
+          <input type="checkbox" checked={enabled} onChange={(e) => toggleEnabled(e.target.checked)} className="h-4 w-4" />
           <span className="text-sm font-medium text-gray-800">启用智慧校园</span>
         </label>
         <div className="h-5 w-px bg-neutral-200" />

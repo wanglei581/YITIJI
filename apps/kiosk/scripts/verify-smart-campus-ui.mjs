@@ -10,6 +10,7 @@
  *   B. mock 聚合数据服务 freshmanInsights.ts 已物理删除。
  *   C. 智慧校园专区(SmartCampusHomePage)不再列出 bigdata 入口(无 freshman-insights 链接)。
  *   D. 首页(HomePage)智慧校园横排不再列出 bigdata 入口(无 freshman-insights 链接)。
+ *   E. Admin 总开关联动子模块:开启时自动勾选迎新,关闭时清空子模块,避免"保存成功但入口不显示"。
  *
  * 运行:pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
  */
@@ -76,6 +77,13 @@ mustNotContain(
   'src/pages/home/HomePage.tsx',
   ['freshman-insights'],
   'D HomePage 智慧校园横排不再列出校园大数据入口',
+)
+
+// ── E. Admin 总开关必须联动子模块，避免保存 enabled=true 但后端归零 ────────
+mustContain(
+  '../admin/src/routes/smart-campus/index.tsx',
+  ['toggleEnabled', 'welcome: true', 'welcome: false', 'panorama: false'],
+  'E Admin 总开关联动子模块，避免无子模块时入口不显示',
 )
 
 console.log('')
