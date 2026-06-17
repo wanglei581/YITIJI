@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { JwtModule } from '@nestjs/jwt'
+import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { FilesController } from './files.controller'
 import { FilesService } from './files.service'
@@ -25,9 +25,7 @@ import { FilesCleanupTask } from './files.cleanup.task'
 @Module({
   imports: [
     PrismaModule,
-    JwtModule.register({
-      secret: process.env['JWT_SECRET'] ?? 'dev-only-secret',
-    }),
+    JwtVerifierModule,
   ],
   controllers: [FilesController],
   providers: [FilesService, FilesCleanupTask],

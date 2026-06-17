@@ -1,0 +1,13 @@
+{
+  "id": "p0-production-ci-gates",
+  "title": "生产运行时门禁与 CI 核心验证收口",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "已完成本地提交；合并前等待 CI 真实跑绿新增 AppModule+DB verify",
+  "createdAt": "2026-06-17T18:30:00+08:00",
+  "branch": "codex/p0-production-ci-gates",
+  "worktree": "/Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/p0-production-ci-gates"
+}

@@ -5,8 +5,8 @@ import { BadRequestException, ValidationPipe, type ValidationError } from '@nest
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Request, Response } from 'express'
 import helmet from 'helmet'
-import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
+import { assertProductionRuntimeGates } from './config/production-runtime-gates'
 
 /**
  * 保留 webhook 路由的 raw body 供 HMAC 校验。
@@ -53,6 +53,12 @@ function flattenValidationErrors(errors: ValidationError[], parent = ''): string
 }
 
 async function bootstrap(): Promise<void> {
+  // 生产运行时启动门禁（fail-closed）：JWT_SECRET / FILE_STORAGE_DRIVER / DATABASE_URL
+  // 任一不满足生产安全底线即拒绝启动。必须在 NestFactory.create 之前，
+  // 让进程在装载任何模块/连接外部依赖前就快速失败。
+  assertProductionRuntimeGates()
+
+  const { AppModule } = await import('./app.module')
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // express 接管 json body parser,带 verify 回调写入 req.rawBody
     bodyParser: false,
