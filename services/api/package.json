@@ -5,7 +5,7 @@
   "description": "AI求职打印服务终端 — 后端 API 服务（NestJS）",
   "main": "dist/main.js",
   "scripts": {
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && pnpm db:pg:generate && tsc",
     "start": "node dist/main.js",
     "dev": "prisma generate && node -r @swc-node/register src/main.ts",
     "lint": "eslint src/",

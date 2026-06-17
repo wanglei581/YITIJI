@@ -49,24 +49,19 @@
 > - 实际发送时签名由腾讯云按签名管理拼接；正文模板里不要重复填写签名。
 > - `{1}` = 验证码，`{2}` = 有效期分钟数；后端 `TencentSmsSender.sendCode()` 按此顺序传参。
 > - 审核通过后拿到 **模板 ID** 和 **SDKAppID**，连同 **签名名** 和**已轮换的 CAM 短信密钥**，
->   按 §A.3 顺序落地（**注意：还需先完成代码接入，不是拿到凭证填 `.env` 就能发**）。
+>   按 §A.3 顺序落地（审核通过后仍需填齐生产凭证并完成真号 E2E 验收）。
 
-## A.3 提交后落地步骤（⚠️ 审核通过 ≠ 可上线，仍需一步代码接入）
+## A.3 提交后落地步骤（⚠️ 审核通过 ≠ 可上线）
 
-> ⚠️ **当前 `services/api/src/member-auth/sms/sms-sender.ts` 的 `TencentSmsSender.sendCode()`
-> 仍是预留实现**：只记录日志并 `throw new Error('SMS_PROVIDER_TENCENT_NOT_IMPLEMENTED')`，
-> **尚未真正调用腾讯云 SendSms**。因此「审核通过后填 `.env` 即可上线」是错的——
-> 外部审核只解除腾讯侧阻塞，真实发送还需要一步代码接入。
+> `services/api/src/member-auth/sms/sms-sender.ts` 已接入腾讯云 SendSms（TC3-HMAC-SHA256 签名）。
+> 外部审核只解除腾讯侧阻塞；生产上线仍必须填齐生产凭证，并用真实手机号完成端到端验收。
 
 1. **拿凭证**：审核通过后获得 模板 ID / SDKAppID / 签名名（`TENCENT_SMS_SIGN_NAME`）/
    已轮换的 CAM 短信密钥（`TENCENT_SMS_SECRET_ID` / `TENCENT_SMS_SECRET_KEY`）。
-2. **代码接入**：在 `TencentSmsSender.sendCode()` 内实现真实的腾讯云 **SendSms** API 调用，
-   替换当前的 `throw`。`SmsSender` 接口、`MemberAuthService` 与前端登录流程无需改动
-   （见文件内 §90–94 注释：接入点收敛在该方法内）。
-3. **配 `.env`**：接入完成后再写 `SMS_PROVIDER=tencent` + 填齐 5 项 +
+2. **配 `.env`**：写 `SMS_PROVIDER=tencent` + 填齐 5 项 +
    `TENCENT_SMS_REGION=ap-guangzhou`；生产环境 `SMS_PROVIDER` 不得为 `log`
    （服务端已有启动期强制校验，prod 禁 log）。
-4. **真号 E2E 验收**：用真实手机号端到端手验——登录页发码 → 收到短信 → 验证码登录成功；
+3. **真号 E2E 验收**：用真实手机号端到端手验——登录页发码 → 收到短信 → 验证码登录成功；
    失败路径（频控 / 无效号）不伪造成功。
 
 ---
