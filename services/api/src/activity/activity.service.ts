@@ -86,6 +86,26 @@ export class ActivityService {
       // 企业来源页可能未提供(手工录入条目),如实存 null
       return company && { targetTitle: company.name, sourceName: company.sourceName, sourceUrl: company.sourceUrl, externalId: company.externalId }
     }
+    if (targetType === 'fair_company') {
+      const company = await this.prisma.fairCompany.findFirst({
+        where: {
+          id: targetId,
+          jobFair: published,
+        },
+        select: {
+          id: true,
+          name: true,
+          sourceUrl: true,
+          jobFair: { select: { sourceName: true, sourceUrl: true, externalId: true } },
+        },
+      })
+      return company && {
+        targetTitle: company.name,
+        sourceName: company.jobFair.sourceName,
+        sourceUrl: company.sourceUrl ?? company.jobFair.sourceUrl,
+        externalId: company.jobFair.externalId ? `${company.jobFair.externalId}:${company.id}` : company.id,
+      }
+    }
     const policy = await this.prisma.policyPost.findFirst({
       where: { id: targetId, ...published },
       select: { title: true, sourceName: true, externalUrl: true },

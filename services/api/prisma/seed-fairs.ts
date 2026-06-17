@@ -21,6 +21,16 @@ import { createPrismaClient } from '../src/prisma/create-client'
 
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required to run seed-fairs')
+
+function assertDemoSeedAllowed(scriptName: string) {
+  const explicit = process.env['ALLOW_DEMO_SEED'] === 'true'
+  const looksProductionUrl = /\bprod(uction)?\b|ai_job_print_prod/i.test(url)
+  if (!explicit && (process.env['NODE_ENV'] === 'production' || looksProductionUrl)) {
+    throw new Error(`${scriptName} contains approved demo fairs and is blocked for production. Set ALLOW_DEMO_SEED=true only for a deliberate non-production restore.`)
+  }
+}
+
+assertDemoSeedAllowed('prisma/seed-fairs.ts')
 const prisma = createPrismaClient(url).client
 
 const UNI_ORG_ID = 'org-uni-001'
@@ -57,6 +67,10 @@ interface CompanySpec {
   registeredCapital?: string
   honorTags?: string[]
   positions?: PositionSpec[]
+  /** 关联展区(按展区 name 引用同场展区);用于 Kiosk 展厅筛选(经 zoneId→FairZone 回填 zoneName)。 */
+  zone?: string
+  /** 展位号(可空);展厅筛选在无 zone 时回退按首字母前缀分组。 */
+  boothNumber?: string
 }
 
 interface ZoneSpec {
@@ -185,8 +199,28 @@ async function upsertFair(args: {
   await prisma.fairCompany.deleteMany({ where: { jobFairId: fair.id } })
   await prisma.fairZone.deleteMany({ where: { jobFairId: fair.id } })
 
+  // 先建展区并记录 name→id,供企业 zoneId 关联(Kiosk 展厅筛选经 zoneId 回填 zoneName)。
+  const zoneIdByName = new Map<string, string>()
+  for (const z of args.zones) {
+    const zone = await prisma.fairZone.create({
+      data: {
+        jobFairId: fair.id,
+        name: z.name,
+        category: z.category,
+        city: z.city ?? null,
+        description: z.description,
+        sortOrder: z.sortOrder,
+      },
+    })
+    zoneIdByName.set(z.name, zone.id)
+  }
+
   for (const c of args.companies) {
     const positions = resolvePositions(c)
+    const zoneId = c.zone ? zoneIdByName.get(c.zone) ?? null : null
+    if (c.zone && !zoneId) {
+      throw new Error(`seed-fairs: company ${c.name} references unknown zone "${c.zone}" in fair ${fair.id}`)
+    }
     await prisma.fairCompany.create({
       data: {
         jobFairId: fair.id,
@@ -200,6 +234,8 @@ async function upsertFair(args: {
         headquarters: c.headquarters ?? null,
         registeredCapital: c.registeredCapital ?? null,
         jobsCount: c.jobsCount,
+        zoneId,
+        boothNumber: c.boothNumber ?? null,
         sourceUrl: `https://example.com/companies/${encodeURIComponent(c.name)}`,
         positions: {
           create: positions.map((p, i) => ({
@@ -214,19 +250,6 @@ async function upsertFair(args: {
             sortOrder: i,
           })),
         },
-      },
-    })
-  }
-
-  for (const z of args.zones) {
-    await prisma.fairZone.create({
-      data: {
-        jobFairId: fair.id,
-        name: z.name,
-        category: z.category,
-        city: z.city ?? null,
-        description: z.description,
-        sortOrder: z.sortOrder,
       },
     })
   }
@@ -263,14 +286,15 @@ async function main() {
     ],
     description: '面向 2026 届毕业生的春季校园双选会,涵盖互联网、金融、制造、消费等多个行业。',
     companies: [
-      { name: '字节跳动', industry: 'internet', scale: '>2000', description: '互联网内容平台', hiringTags: ['校招', '应届'], jobsCount: 24 },
-      { name: '阿里巴巴', industry: 'internet', scale: '>2000', description: '电商与云计算', hiringTags: ['校招', '应届'], jobsCount: 32 },
-      { name: '腾讯', industry: 'internet', scale: '>2000', description: '社交与游戏', hiringTags: ['校招'], jobsCount: 28 },
-      { name: '美团', industry: 'internet', scale: '>2000', description: '本地生活服务', hiringTags: ['校招', '应届'], jobsCount: 20 },
-      { name: '拼多多', industry: 'internet', scale: '>2000', description: '电商平台', hiringTags: ['校招', '应届'], jobsCount: 18 },
-      { name: '京东', industry: 'internet', scale: '>2000', description: '电商与物流', hiringTags: ['校招'], jobsCount: 22 },
-      { name: '小米', industry: 'consumer', scale: '>2000', description: '智能硬件与 IoT', hiringTags: ['校招', '硬件'], jobsCount: 16 },
-      { name: '蚂蚁集团', industry: 'finance', scale: '>2000', description: '金融科技', hiringTags: ['校招', '应届'], jobsCount: 19 },
+      // zone 按企业真实总部城市归入对应地区展区(非杜撰);boothNumber 取展区首字母+序号,演示展厅筛选。
+      { name: '字节跳动', industry: 'internet', scale: '>2000', description: '互联网内容平台', hiringTags: ['校招', '应届'], jobsCount: 24, zone: '北京展区', boothNumber: 'A01' },
+      { name: '阿里巴巴', industry: 'internet', scale: '>2000', description: '电商与云计算', hiringTags: ['校招', '应届'], jobsCount: 32, zone: '杭州展区', boothNumber: 'D01' },
+      { name: '腾讯', industry: 'internet', scale: '>2000', description: '社交与游戏', hiringTags: ['校招'], jobsCount: 28, zone: '深圳展区', boothNumber: 'C01' },
+      { name: '美团', industry: 'internet', scale: '>2000', description: '本地生活服务', hiringTags: ['校招', '应届'], jobsCount: 20, zone: '北京展区', boothNumber: 'A02' },
+      { name: '拼多多', industry: 'internet', scale: '>2000', description: '电商平台', hiringTags: ['校招', '应届'], jobsCount: 18, zone: '上海展区', boothNumber: 'B01' },
+      { name: '京东', industry: 'internet', scale: '>2000', description: '电商与物流', hiringTags: ['校招'], jobsCount: 22, zone: '北京展区', boothNumber: 'A03' },
+      { name: '小米', industry: 'consumer', scale: '>2000', description: '智能硬件与 IoT', hiringTags: ['校招', '硬件'], jobsCount: 16, zone: '北京展区', boothNumber: 'A04' },
+      { name: '蚂蚁集团', industry: 'finance', scale: '>2000', description: '金融科技', hiringTags: ['校招', '应届'], jobsCount: 19, zone: '杭州展区', boothNumber: 'D02' },
     ],
     zones: [
       { name: '北京展区', category: 'industry', city: '北京', description: '京津冀互联网/金融岗位集中展区', sortOrder: 1 },
@@ -309,12 +333,13 @@ async function main() {
     ],
     description: '与 AI 产业领军企业共建的校企合作专场,提供产学研全链条岗位与课题。本场不代收简历,投递请前往各企业来源平台。',
     companies: [
-      { name: '智谱 AI', industry: 'ai', scale: '500-2000', description: 'GLM 大模型研发,产学合作',  hiringTags: ['校招', '产学研', 'NLP'], jobsCount: 18 },
-      { name: 'DeepSeek', industry: 'ai', scale: '500-2000', description: '通用大模型与代码模型',     hiringTags: ['校招', '研究员'],       jobsCount: 14 },
-      { name: '月之暗面', industry: 'ai', scale: '50-500',    description: 'Kimi 长文本大模型',         hiringTags: ['校招', 'NLP'],          jobsCount: 12 },
-      { name: '商汤科技', industry: 'ai', scale: '>2000',     description: 'CV 与多模态大模型',         hiringTags: ['校招', 'CV', '研究员'], jobsCount: 22 },
-      { name: '旷视科技', industry: 'ai', scale: '500-2000', description: 'CV 与机器人',                 hiringTags: ['校招', 'CV', '机器人'], jobsCount: 16 },
-      { name: '第四范式', industry: 'ai', scale: '500-2000', description: '企业级 AI 平台',             hiringTags: ['校招', '工程'],         jobsCount: 11 },
+      // zone 按企业真实技术方向归入对应主题展区(非杜撰)。
+      { name: '智谱 AI', industry: 'ai', scale: '500-2000', description: 'GLM 大模型研发,产学合作',  hiringTags: ['校招', '产学研', 'NLP'], jobsCount: 18, zone: 'LLM 大模型展区',       boothNumber: 'L01' },
+      { name: 'DeepSeek', industry: 'ai', scale: '500-2000', description: '通用大模型与代码模型',     hiringTags: ['校招', '研究员'],       jobsCount: 14, zone: 'LLM 大模型展区',       boothNumber: 'L02' },
+      { name: '月之暗面', industry: 'ai', scale: '50-500',    description: 'Kimi 长文本大模型',         hiringTags: ['校招', 'NLP'],          jobsCount: 12, zone: 'LLM 大模型展区',       boothNumber: 'L03' },
+      { name: '商汤科技', industry: 'ai', scale: '>2000',     description: 'CV 与多模态大模型',         hiringTags: ['校招', 'CV', '研究员'], jobsCount: 22, zone: 'CV 视觉智能展区',       boothNumber: 'V01' },
+      { name: '旷视科技', industry: 'ai', scale: '500-2000', description: 'CV 与机器人',                 hiringTags: ['校招', 'CV', '机器人'], jobsCount: 16, zone: '智能机器人展区',         boothNumber: 'R01' },
+      { name: '第四范式', industry: 'ai', scale: '500-2000', description: '企业级 AI 平台',             hiringTags: ['校招', '工程'],         jobsCount: 11, zone: 'LLM 大模型展区',       boothNumber: 'L04' },
     ],
     zones: [
       { name: 'LLM 大模型展区',       category: 'campus_corp_topic', description: 'GLM / DeepSeek / Kimi 等通用大模型岗位与课题',     sortOrder: 1 },
@@ -349,11 +374,12 @@ async function main() {
     ],
     description: '本场聚焦本地国企与民企岗位,覆盖制造、金融、服务三大领域。',
     companies: [
-      { name: '本地装备制造集团',  industry: 'manufacturing', scale: '>2000', description: '装备制造与重工业', hiringTags: ['社招'],       jobsCount: 30 },
-      { name: '本地汽车零部件',    industry: 'manufacturing', scale: '500-2000', description: '汽车零部件',     hiringTags: ['社招', '校招'], jobsCount: 18 },
-      { name: '某市农村商业银行',  industry: 'finance',       scale: '>2000', description: '本地银行',         hiringTags: ['校招', '柜员'], jobsCount: 22 },
-      { name: '某市新华保险',      industry: 'finance',       scale: '500-2000', description: '寿险代理',       hiringTags: ['社招'],         jobsCount: 14 },
-      { name: '某市连锁餐饮',      industry: 'service',       scale: '50-500',  description: '本地餐饮连锁',     hiringTags: ['社招', '应届'], jobsCount: 12 },
+      // zone 按企业行业归入对应行业展区(非杜撰)。
+      { name: '本地装备制造集团',  industry: 'manufacturing', scale: '>2000', description: '装备制造与重工业', hiringTags: ['社招'],       jobsCount: 30, zone: '制造业展区', boothNumber: 'M01' },
+      { name: '本地汽车零部件',    industry: 'manufacturing', scale: '500-2000', description: '汽车零部件',     hiringTags: ['社招', '校招'], jobsCount: 18, zone: '制造业展区', boothNumber: 'M02' },
+      { name: '某市农村商业银行',  industry: 'finance',       scale: '>2000', description: '本地银行',         hiringTags: ['校招', '柜员'], jobsCount: 22, zone: '金融业展区', boothNumber: 'F01' },
+      { name: '某市新华保险',      industry: 'finance',       scale: '500-2000', description: '寿险代理',       hiringTags: ['社招'],         jobsCount: 14, zone: '金融业展区', boothNumber: 'F02' },
+      { name: '某市连锁餐饮',      industry: 'service',       scale: '50-500',  description: '本地餐饮连锁',     hiringTags: ['社招', '应届'], jobsCount: 12, zone: '服务业展区', boothNumber: 'S01' },
     ],
     zones: [
       { name: '制造业展区', category: 'industry', description: '装备制造 / 零部件 / 新能源岗位', sortOrder: 1 },

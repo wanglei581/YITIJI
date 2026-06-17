@@ -110,6 +110,10 @@ function localInputToIso(value: string): string {
   return new Date(value).toISOString()
 }
 
+function splitLines(value: string): string[] {
+  return value.split(/\n|,|，/).map((x) => x.trim()).filter(Boolean)
+}
+
 // ─── 通用小组件 ───────────────────────────────────────────────────────────────
 
 const inputCls =
@@ -226,6 +230,10 @@ function EditFairDrawer({
         trafficInfo: fair.trafficInfo ?? '',
         expectedAttendance: fair.expectedAttendance,
         seekerIntent: fair.seekerIntent.map((s) => ({ ...s })),
+        hostSchoolName: fair.hostSchoolName ?? '',
+        audienceLabel: fair.audienceLabel ?? '',
+        onsiteServices: fair.onsiteServices ?? [],
+        admissionMethod: fair.admissionMethod ?? '',
       })
       setError(null)
     }
@@ -317,6 +325,32 @@ function EditFairDrawer({
         </Field>
         <Field label="简介">
           <textarea className={`${inputCls} h-24 resize-none`} value={form.description ?? ''} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+        </Field>
+
+        <div className="border-t border-gray-100 pt-4">
+          <p className="text-sm font-medium text-gray-700">校园招聘展示字段</p>
+          <p className="mt-0.5 text-xs text-gray-400">
+            管理员负责审核来源、补全展示字段、检查合规文案并发布。来源机构、外部编号和来源链接不可被改成无来源数据。
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="主办/承办学校">
+            <input className={inputCls} value={form.hostSchoolName ?? ''} onChange={(e) => setForm((f) => ({ ...f, hostSchoolName: e.target.value }))} />
+          </Field>
+          <Field label="面向对象">
+            <input className={inputCls} placeholder="如 2026届毕业生 / 本科 / 研究生" value={form.audienceLabel ?? ''} onChange={(e) => setForm((f) => ({ ...f, audienceLabel: e.target.value }))} />
+          </Field>
+        </div>
+        <Field label="现场服务">
+          <textarea
+            className={`${inputCls} h-20 resize-none`}
+            placeholder="一行一个，如 自助打印 / AI简历诊断 / 咨询台"
+            value={(form.onsiteServices ?? []).join('\n')}
+            onChange={(e) => setForm((f) => ({ ...f, onsiteServices: splitLines(e.target.value) }))}
+          />
+        </Field>
+        <Field label="入场方式">
+          <textarea className={`${inputCls} h-16 resize-none`} placeholder="如 凭学生证或身份证免费入场，预约以来源平台为准" value={form.admissionMethod ?? ''} onChange={(e) => setForm((f) => ({ ...f, admissionMethod: e.target.value }))} />
         </Field>
 
         {/* ── P1-A① 大屏 / 地图字段(Kiosk 招聘会详情 / 现场大屏展示用,均为展示参考值)── */}

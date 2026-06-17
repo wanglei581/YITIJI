@@ -46,6 +46,7 @@ import {
 } from './dto/excel-import.dto'
 import { Workbook } from 'exceljs'
 import { PrismaService } from '../prisma/prisma.service'
+import type { AppPrismaClient } from '../prisma/create-client'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
@@ -74,6 +75,7 @@ type ConnStatus    = 'connected' | 'error' | 'disabled'
 type SourceKind    = 'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'
 type AccessMode    = 'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
 type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual'
+type JobFairWhereInput = NonNullable<Parameters<AppPrismaClient['jobFair']['findMany']>[0]>['where']
 
 // ─── DTO shapes returned to callers ──────────────────────────────────────────
 
@@ -105,6 +107,10 @@ export interface FairListItemDto {
   city?: string; address?: string; mapImageUrl?: string
   latitude?: number; longitude?: number; trafficInfo?: string
   expectedAttendance?: number
+  hostSchoolName?: string
+  audienceLabel?: string
+  onsiteServices?: string[]
+  admissionMethod?: string
 }
 
 /** 招聘会数据大屏统计（合规：预计/来源数据，非实时）。对齐 kiosk FairLiveStatsDTO。 */
@@ -142,6 +148,7 @@ export interface AdminFairDto {
   status: FairStatus; description?: string; boothCount?: number
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
   reviewStatus: ReviewStatus; publishStatus: PublishStatus
+  hostSchoolName?: string; audienceLabel?: string; onsiteServices?: string[]; admissionMethod?: string
 }
 
 export interface PartnerJobDto {
@@ -160,6 +167,7 @@ export interface PartnerFairDto {
   sourceOrgId: string; sourceName: string
   // 阶段1C:编辑表单回填用展示字段(additive,可缺省)
   theme?: string; city?: string; address?: string; description?: string
+  hostSchoolName?: string; audienceLabel?: string; onsiteServices?: string[]; admissionMethod?: string
 }
 
 export interface PaginatedResult<T> {
@@ -265,6 +273,71 @@ function safeJsonArr(s: string): string[] {
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
   } catch {
     return []
+  }
+}
+
+function parseStringArray(json: string | null): string[] {
+  if (!json) return []
+  try {
+    const value = JSON.parse(json) as unknown
+    return Array.isArray(value)
+      ? value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
+function stringifyStringArray(values: string[] | undefined): string | null | undefined {
+  if (values === undefined) return undefined
+  const cleaned = values.map((x) => x.trim()).filter((x) => x.length > 0)
+  return cleaned.length > 0 ? JSON.stringify(cleaned) : null
+}
+
+function emptyToNull(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+const DEMO_FAIR_SOURCE_ORG_IDS = ['org-uni-001', 'org-hr-002']
+const DEMO_FAIR_SOURCE_ORG_PREFIXES = ['org_vff_', 'org_vpe_', 'org_vaf_']
+const DEMO_FAIR_EXTERNAL_MARKERS = ['EXT-FAIR-', 'VFF-', 'VPE-', 'VAF-', 'demo-']
+// 仅保留明确占位词:'某大学' / '某市' 几乎不会出现在真实招聘会标题/来源/场馆里。
+// '验证' / '演示' 是高频真实用词(如「资格验证」「成果演示会」),纯文本匹配会误杀正式数据,
+// 已移除 —— 演示数据靠结构化标记(org 前缀 / externalId / 来源 URL)隔离即可。
+const DEMO_FAIR_TEXT_MARKERS = ['某大学', '某市']
+const DEMO_FAIR_URL_MARKERS = ['example.com', 'example.org']
+
+function shouldExcludeDemoPublicData(): boolean {
+  return process.env['NODE_ENV'] === 'production' || process.env['EXCLUDE_DEMO_PUBLIC_DATA'] === 'true'
+}
+
+function publishedFairWhere(extra: JobFairWhereInput = {}): JobFairWhereInput {
+  const where: JobFairWhereInput = {
+    reviewStatus: 'approved',
+    publishStatus: 'published',
+    ...extra,
+  }
+  if (!shouldExcludeDemoPublicData()) return where
+
+  return {
+    ...where,
+    NOT: [
+      { sourceOrgId: { in: DEMO_FAIR_SOURCE_ORG_IDS } },
+      ...DEMO_FAIR_SOURCE_ORG_PREFIXES.map((prefix) => ({ sourceOrgId: { startsWith: prefix } })),
+      ...DEMO_FAIR_EXTERNAL_MARKERS.map((marker) => ({ externalId: { contains: marker } })),
+      ...DEMO_FAIR_URL_MARKERS.map((marker) => ({ sourceUrl: { contains: marker } })),
+      ...DEMO_FAIR_TEXT_MARKERS.map((marker) => ({
+        OR: [
+          { title: { contains: marker } },
+          { sourceName: { contains: marker } },
+          { venue: { contains: marker } },
+          { city: { contains: marker } },
+        ],
+      })),
+    ],
   }
 }
 
@@ -474,6 +547,10 @@ interface PrismaJobFairRow {
   mapImageUrl: string | null
   description: string | null
   coverImageUrl: string | null
+  hostSchoolName: string | null
+  audienceLabel: string | null
+  onsiteServicesJson: string | null
+  admissionMethod: string | null
   companyCount: number
   jobCount: number
   viewCount: number
@@ -545,6 +622,10 @@ function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     longitude: f.longitude ?? undefined,
     trafficInfo: f.trafficInfo ?? undefined,
     expectedAttendance: f.expectedAttendance ?? undefined,
+    hostSchoolName: f.hostSchoolName ?? undefined,
+    audienceLabel: f.audienceLabel ?? undefined,
+    onsiteServices: parseStringArray(f.onsiteServicesJson),
+    admissionMethod: f.admissionMethod ?? undefined,
   }
 }
 
@@ -566,6 +647,10 @@ function prismaFairToAdminDto(f: PrismaJobFairRow): AdminFairDto {
     syncTime: fmtSyncTime(f.syncTime),
     reviewStatus: f.reviewStatus as ReviewStatus,
     publishStatus: f.publishStatus as PublishStatus,
+    hostSchoolName: f.hostSchoolName ?? undefined,
+    audienceLabel: f.audienceLabel ?? undefined,
+    onsiteServices: parseStringArray(f.onsiteServicesJson),
+    admissionMethod: f.admissionMethod ?? undefined,
   }
 }
 
@@ -590,6 +675,10 @@ function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
     city: f.city,
     address: f.address ?? undefined,
     description: f.description ?? undefined,
+    hostSchoolName: f.hostSchoolName ?? undefined,
+    audienceLabel: f.audienceLabel ?? undefined,
+    onsiteServices: parseStringArray(f.onsiteServicesJson),
+    admissionMethod: f.admissionMethod ?? undefined,
   }
 }
 
@@ -693,10 +782,7 @@ export class JobsService {
   async getPublishedFairs(params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<FairListItemDto>> {
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
-    const where = {
-      reviewStatus: 'approved',
-      publishStatus: 'published',
-    }
+    const where = publishedFairWhere()
     const [rows, total] = await Promise.all([
       this.prisma.jobFair.findMany({
         where,
@@ -721,7 +807,7 @@ export class JobsService {
 
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
     const f = await this.prisma.jobFair.findFirst({
-      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id }),
       include: { _count: { select: { companies: true } } },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
@@ -737,16 +823,17 @@ export class JobsService {
    */
   async getPublishedFairDetail(id: string): Promise<FairDetailResponse | null> {
     const f = await this.prisma.jobFair.findFirst({
-      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id }),
       include: {
         companies: { orderBy: { jobsCount: 'desc' } },
         zones: { orderBy: { sortOrder: 'asc' } },
       },
     })
     if (!f) return null
+    const zoneNameById = new Map(f.zones.map((z) => [z.id, z.name]))
     return {
       fair: mapFair(f),
-      companies: f.companies.map(mapFairCompany),
+      companies: f.companies.map((c) => mapFairCompany(c, c.zoneId ? zoneNameById.get(c.zoneId) ?? null : null)),
       zones: f.zones.map(mapFairZone),
     }
   }
@@ -761,14 +848,27 @@ export class JobsService {
     fairId: string,
     page: number,
     pageSize: number,
-  ): Promise<{ data: FairCompany[]; total: number; page: number; pageSize: number }> {
+  ): Promise<{
+    data: FairCompany[]
+    total: number
+    page: number
+    pageSize: number
+    pagination: { page: number; pageSize: number; total: number; totalPages: number }
+  }> {
+    const empty = (total = 0) => ({
+      data: [] as FairCompany[],
+      total,
+      page,
+      pageSize,
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    })
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id: fairId }),
       select: { id: true },
     })
-    if (!fair) return { data: [], total: 0, page, pageSize }
+    if (!fair) return empty()
 
-    const [rows, total] = await Promise.all([
+    const [rows, total, zones] = await Promise.all([
       this.prisma.fairCompany.findMany({
         where: { jobFairId: fairId },
         orderBy: { jobsCount: 'desc' },
@@ -777,14 +877,23 @@ export class JobsService {
         include: { positions: { orderBy: { sortOrder: 'asc' } } },
       }),
       this.prisma.fairCompany.count({ where: { jobFairId: fairId } }),
+      // 展厅筛选需真实展区名:无 Prisma 关系列 → 经 zoneId 自行回填,不硬造。
+      this.prisma.fairZone.findMany({ where: { jobFairId: fairId }, select: { id: true, name: true } }),
     ])
-    return { data: rows.map(mapFairCompany), total, page, pageSize }
+    const zoneNameById = new Map(zones.map((z) => [z.id, z.name]))
+    return {
+      data: rows.map((row) => mapFairCompany(row, row.zoneId ? zoneNameById.get(row.zoneId) ?? null : null)),
+      total,
+      page,
+      pageSize,
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    }
   }
 
   /** 招聘会子资源 — 单个参展企业详情。需归属该已发布招聘会。 */
   async getFairCompanyById(fairId: string, companyId: string): Promise<{ data: FairCompany | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id: fairId }),
       select: { id: true },
     })
     if (!fair) return { data: null }
@@ -792,13 +901,17 @@ export class JobsService {
       where: { id: companyId, jobFairId: fairId },
       include: { positions: { orderBy: { sortOrder: 'asc' } } },
     })
-    return { data: company ? mapFairCompany(company) : null }
+    if (!company) return { data: null }
+    const zone = company.zoneId
+      ? await this.prisma.fairZone.findUnique({ where: { id: company.zoneId }, select: { name: true } })
+      : null
+    return { data: mapFairCompany(company, zone?.name ?? null) }
   }
 
   /** 招聘会子资源 — 展区列表(sortOrder 升序)。 */
   async getFairZones(fairId: string): Promise<{ data: FairZone[] }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id: fairId }),
       select: { id: true },
     })
     if (!fair) return { data: [] }
@@ -818,7 +931,7 @@ export class JobsService {
    */
   async getFairMap(fairId: string): Promise<{ data: { mapImageUrl: string | null; zones: FairZone[]; booths: [] } | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id: fairId }),
       select: { id: true, mapImageUrl: true },
     })
     if (!fair) return { data: null }
@@ -846,7 +959,7 @@ export class JobsService {
    */
   async getFairStats(fairId: string): Promise<{ data: FairStatsDto | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: publishedFairWhere({ id: fairId }),
       include: { companies: { include: { positions: true } } },
     })
     if (!fair) return { data: null }
@@ -1453,6 +1566,10 @@ export class JobsService {
             mapImageUrl: item.mapImageUrl,
             coverImageUrl: item.coverImageUrl,
             description: item.description,
+            hostSchoolName: emptyToNull(item.hostSchoolName),
+            audienceLabel: emptyToNull(item.audienceLabel),
+            onsiteServicesJson: stringifyStringArray(item.onsiteServices),
+            admissionMethod: emptyToNull(item.admissionMethod),
             companyCount: item.companyCount ?? 0,
             jobCount: item.jobCount ?? 0,
             reviewStatus: 'pending', publishStatus: 'draft',
@@ -1468,6 +1585,10 @@ export class JobsService {
             mapImageUrl: item.mapImageUrl,
             coverImageUrl: item.coverImageUrl,
             description: item.description,
+            hostSchoolName: emptyToNull(item.hostSchoolName),
+            audienceLabel: emptyToNull(item.audienceLabel),
+            onsiteServicesJson: stringifyStringArray(item.onsiteServices),
+            admissionMethod: emptyToNull(item.admissionMethod),
             companyCount: item.companyCount ?? undefined,
             jobCount: item.jobCount ?? undefined,
             syncTime: sync,
@@ -1530,6 +1651,7 @@ export class JobsService {
     }
 
     const changedFields = Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined)
+    const onsiteServicesJson = stringifyStringArray(dto.onsiteServices)
     const updated = await this.prisma.jobFair.update({
       where: { id },
       data: {
@@ -1542,6 +1664,10 @@ export class JobsService {
         ...(dto.address !== undefined ? { address: dto.address } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.sourceUrl !== undefined ? { sourceUrl: dto.sourceUrl } : {}),
+        ...(dto.hostSchoolName !== undefined ? { hostSchoolName: emptyToNull(dto.hostSchoolName) } : {}),
+        ...(dto.audienceLabel !== undefined ? { audienceLabel: emptyToNull(dto.audienceLabel) } : {}),
+        ...(onsiteServicesJson !== undefined ? { onsiteServicesJson } : {}),
+        ...(dto.admissionMethod !== undefined ? { admissionMethod: emptyToNull(dto.admissionMethod) } : {}),
         // 状态机:内容修订 → 强制重审
         reviewStatus: 'pending',
         publishStatus: 'draft',

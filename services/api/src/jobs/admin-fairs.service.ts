@@ -51,6 +51,19 @@ function extForMime(mime: string): string {
   return 'jpg'
 }
 
+function stringifyStringArray(values: string[] | undefined): string | null | undefined {
+  if (values === undefined) return undefined
+  const cleaned = values.map((x) => x.trim()).filter((x) => x.length > 0)
+  return cleaned.length > 0 ? JSON.stringify(cleaned) : null
+}
+
+function emptyToNull(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined
+  if (value === null) return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 /**
  * 参展企业岗位明细 → Prisma nested create 数据。
  * 过滤空标题行(服务端兜底,前端也过滤),sortOrder 按入参顺序写入。
@@ -216,9 +229,10 @@ export class AdminFairsService {
       },
     })
     if (!f) this.throwFairNotFound(fairId)
+    const zoneNameById = new Map(f.zones.map((z) => [z.id, z.name]))
     return {
       fair: mapFair(f),
-      companies: f.companies.map(mapFairCompany),
+      companies: f.companies.map((c) => mapFairCompany(c, c.zoneId ? zoneNameById.get(c.zoneId) ?? null : null)),
       zones: f.zones.map(mapFairZone),
       // Admin 详情含 draft/unpublished 资料,预览走短 TTL 签名 URL
       materials: f.materials.map((m) => mapMaterial(m, signFairMaterialPreviewUrl(m.id))),
@@ -246,6 +260,7 @@ export class AdminFairsService {
               ? JSON.stringify(cleaned.map((s) => ({ label: s.label.trim(), percent: s.percent })))
               : null
           })()
+    const onsiteServicesJson = stringifyStringArray(dto.onsiteServices)
     const updated = await this.prisma.jobFair.update({
       where: { id: fairId },
       data: {
@@ -264,6 +279,10 @@ export class AdminFairsService {
         ...(dto.trafficInfo !== undefined ? { trafficInfo: dto.trafficInfo === '' ? null : dto.trafficInfo } : {}),
         ...(dto.expectedAttendance !== undefined ? { expectedAttendance: dto.expectedAttendance } : {}),
         ...(seekerIntentJson !== undefined ? { seekerIntentJson } : {}),
+        ...(dto.hostSchoolName !== undefined ? { hostSchoolName: emptyToNull(dto.hostSchoolName) } : {}),
+        ...(dto.audienceLabel !== undefined ? { audienceLabel: emptyToNull(dto.audienceLabel) } : {}),
+        ...(onsiteServicesJson !== undefined ? { onsiteServicesJson } : {}),
+        ...(dto.admissionMethod !== undefined ? { admissionMethod: emptyToNull(dto.admissionMethod) } : {}),
       },
     })
     await this.audit.write({
@@ -532,12 +551,25 @@ export class AdminFairsService {
     fairId: string,
     page: number,
     pageSize: number,
-  ): Promise<{ data: FairMaterialDto[]; total: number; page: number; pageSize: number }> {
+  ): Promise<{
+    data: FairMaterialDto[]
+    total: number
+    page: number
+    pageSize: number
+    pagination: { page: number; pageSize: number; total: number; totalPages: number }
+  }> {
+    const wrap = (data: FairMaterialDto[], total: number) => ({
+      data,
+      total,
+      page,
+      pageSize,
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    })
     const fair = await this.prisma.jobFair.findFirst({
       where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
       select: { id: true },
     })
-    if (!fair) return { data: [], total: 0, page, pageSize }
+    if (!fair) return wrap([], 0)
 
     const where = { jobFairId: fairId, deletedAt: null, publishStatus: 'published' }
     const [rows, total] = await Promise.all([
@@ -549,12 +581,7 @@ export class AdminFairsService {
       }),
       this.prisma.fairMaterial.count({ where }),
     ])
-    return {
-      data: rows.map((m) => mapMaterial(m, signFairMaterialUrl(m.id).url)),
-      total,
-      page,
-      pageSize,
-    }
+    return wrap(rows.map((m) => mapMaterial(m, signFairMaterialUrl(m.id).url)), total)
   }
 
   /** 签名内容流读取(签名已在 controller 验过)。 */

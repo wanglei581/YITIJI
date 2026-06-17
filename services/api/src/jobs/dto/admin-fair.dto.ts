@@ -87,6 +87,18 @@ export class UpdateFairInfoDto {
   @ValidateNested({ each: true })
   @Type(() => SeekerIntentSliceDto)
   seekerIntent?: SeekerIntentSliceDto[]
+
+  @IsOptional() @IsString() @MaxLength(120)
+  hostSchoolName?: string | null
+
+  @IsOptional() @IsString() @MaxLength(160)
+  audienceLabel?: string | null
+
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(50, { each: true })
+  onsiteServices?: string[]
+
+  @IsOptional() @IsString() @MaxLength(300)
+  admissionMethod?: string | null
 }
 
 /**

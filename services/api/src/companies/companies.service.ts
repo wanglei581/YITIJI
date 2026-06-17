@@ -45,7 +45,22 @@ function assertEnum(value: string | undefined, allowed: readonly string[], label
   }
 }
 
-/** 把筛选条件编译为 Prisma where（只允许白名单枚举，地区为等值匹配）。 */
+function regionVariants(value: string): string[] {
+  const v = value.trim()
+  if (!v) return []
+  // Kiosk 地区筛选值来自规范行政区字典；这里额外兼容库内常见无后缀录入（如 深圳/南山）。
+  const suffixes = ['特别行政区', '维吾尔自治区', '壮族自治区', '回族自治区', '自治区', '自治州', '地区', '盟', '省', '市', '区', '县']
+  const base = suffixes.reduce((acc, suffix) => acc.endsWith(suffix) ? acc.slice(0, -suffix.length) : acc, v)
+  return [...new Set([v, base].filter(Boolean))]
+}
+
+function addRegionFilter(where: Record<string, unknown>, field: 'province' | 'city' | 'district', value: string | undefined): void {
+  if (!value?.trim()) return
+  const variants = regionVariants(value)
+  where[field] = variants.length > 1 ? { in: variants } : variants[0]
+}
+
+/** 把筛选条件编译为 Prisma where（只允许白名单枚举；地区支持规范名与常见无后缀录入匹配）。 */
 function publicWhere(f: PublicCompanyFilters) {
   assertEnum(f.companyType, COMPANY_TYPES, '企业类型')
   assertEnum(f.industry, COMPANY_INDUSTRIES, '行业')
@@ -53,9 +68,9 @@ function publicWhere(f: PublicCompanyFilters) {
   assertEnum(f.sourceKind, COMPANY_SOURCE_KINDS, '来源')
 
   const where: Record<string, unknown> = { ...PUBLISHED }
-  if (f.province?.trim()) where['province'] = f.province.trim()
-  if (f.city?.trim()) where['city'] = f.city.trim()
-  if (f.district?.trim()) where['district'] = f.district.trim()
+  addRegionFilter(where, 'province', f.province)
+  addRegionFilter(where, 'city', f.city)
+  addRegionFilter(where, 'district', f.district)
   if (f.companyType) where['companyType'] = f.companyType
   if (f.industry) where['industry'] = f.industry
   if (f.sourceKind) where['org'] = { type: f.sourceKind }

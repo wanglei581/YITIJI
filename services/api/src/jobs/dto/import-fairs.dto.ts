@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   IsArray,
+  ArrayMaxSize,
   IsIn,
   IsInt,
   IsISO8601,
@@ -56,6 +57,18 @@ export class ImportFairItemDto {
 
   @IsOptional() @IsString() @MaxLength(5000)
   description?: string
+
+  @IsOptional() @IsString() @MaxLength(120)
+  hostSchoolName?: string
+
+  @IsOptional() @IsString() @MaxLength(160)
+  audienceLabel?: string
+
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(50, { each: true })
+  onsiteServices?: string[]
+
+  @IsOptional() @IsString() @MaxLength(300)
+  admissionMethod?: string
 
   @IsString() @IsNotEmpty() @MaxLength(500)
   sourceUrl!: string

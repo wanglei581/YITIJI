@@ -23,6 +23,10 @@ interface PrismaJobFairRow {
   mapImageUrl: string | null
   description: string | null
   coverImageUrl: string | null
+  hostSchoolName: string | null
+  audienceLabel: string | null
+  onsiteServicesJson: string | null
+  admissionMethod: string | null
   companyCount: number
   jobCount: number
   viewCount: number
@@ -81,6 +85,18 @@ interface PrismaFairCompanyRow {
 
 function splitTags(s: string): string[] {
   return s ? s.split(',').map((t) => t.trim()).filter(Boolean) : []
+}
+
+function parseStringArray(json: string | null): string[] {
+  if (!json) return []
+  try {
+    const value = JSON.parse(json) as unknown
+    return Array.isArray(value)
+      ? value.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim())
+      : []
+  } catch {
+    return []
+  }
 }
 
 function mapFairCompanyPosition(p: PrismaFairCompanyPositionRow): FairCompanyPosition {
@@ -148,6 +164,10 @@ export function mapFair(row: PrismaJobFairRow): Fair {
     mapImageUrl: row.mapImageUrl,
     description: row.description,
     coverImageUrl: row.coverImageUrl,
+    hostSchoolName: row.hostSchoolName,
+    audienceLabel: row.audienceLabel,
+    onsiteServices: parseStringArray(row.onsiteServicesJson),
+    admissionMethod: row.admissionMethod,
     latitude: row.latitude,
     longitude: row.longitude,
     trafficInfo: row.trafficInfo,
@@ -167,7 +187,7 @@ export function mapFair(row: PrismaJobFairRow): Fair {
   }
 }
 
-export function mapFairCompany(row: PrismaFairCompanyRow): FairCompany {
+export function mapFairCompany(row: PrismaFairCompanyRow, zoneName: string | null = null): FairCompany {
   return {
     id: row.id,
     jobFairId: row.jobFairId,
@@ -185,6 +205,8 @@ export function mapFairCompany(row: PrismaFairCompanyRow): FairCompany {
     registeredCapital: row.registeredCapital,
     honorTags: splitTags(row.honorTags),
     zoneId: row.zoneId,
+    // 展厅筛选依赖真实展区名:经 zoneId join FairZone 回填(调用方传入);无关联 → null,不硬造。
+    zoneName,
     boothNumber: row.boothNumber,
     positions: (row.positions ?? []).map(mapFairCompanyPosition),
     createdAt: row.createdAt.toISOString(),

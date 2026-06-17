@@ -71,6 +71,10 @@ function localInputToIso(value: string): string {
   return new Date(value).toISOString()
 }
 
+function splitLines(value: string): string[] {
+  return value.split(/\n|,|，/).map((x) => x.trim()).filter(Boolean)
+}
+
 interface FairFormState {
   title: string
   theme: 'general' | 'campus' | 'campus_corp' | 'industry'
@@ -81,10 +85,26 @@ interface FairFormState {
   address: string
   sourceUrl: string
   description: string
+  hostSchoolName: string
+  audienceLabel: string
+  onsiteServices: string[]
+  admissionMethod: string
 }
 
 const EMPTY_FORM: FairFormState = {
-  title: '', theme: 'general', startAt: '', endAt: '', venue: '', city: '', address: '', sourceUrl: '', description: '',
+  title: '',
+  theme: 'general',
+  startAt: '',
+  endAt: '',
+  venue: '',
+  city: '',
+  address: '',
+  sourceUrl: '',
+  description: '',
+  hostSchoolName: '',
+  audienceLabel: '',
+  onsiteServices: [],
+  admissionMethod: '',
 }
 
 function errMsg(e: unknown): string {
@@ -154,6 +174,10 @@ export default function FairsPage() {
       address: f.address ?? '',
       sourceUrl: f.sourceUrl,
       description: f.description ?? '',
+      hostSchoolName: f.hostSchoolName ?? f.sourceName,
+      audienceLabel: f.audienceLabel ?? '',
+      onsiteServices: f.onsiteServices ?? [],
+      admissionMethod: f.admissionMethod ?? '',
     })
     setFormError(null)
     setEditing(f)
@@ -175,6 +199,10 @@ export default function FairsPage() {
       address: form.address.trim() || undefined,
       sourceUrl: form.sourceUrl.trim(),
       description: form.description.trim() || undefined,
+      hostSchoolName: form.hostSchoolName.trim() || undefined,
+      audienceLabel: form.audienceLabel.trim() || undefined,
+      onsiteServices: form.onsiteServices,
+      admissionMethod: form.admissionMethod.trim() || undefined,
     }
     try {
       if (editing === 'new') {
@@ -190,6 +218,10 @@ export default function FairsPage() {
           address: payload.address,
           description: payload.description,
           sourceUrl: payload.sourceUrl!,
+          hostSchoolName: payload.hostSchoolName,
+          audienceLabel: payload.audienceLabel,
+          onsiteServices: payload.onsiteServices,
+          admissionMethod: payload.admissionMethod,
         }])
         setNotice('招聘会已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
       } else if (editing) {
@@ -399,6 +431,31 @@ export default function FairsPage() {
           </Field>
           <Field label="简介">
             <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          </Field>
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-sm font-medium text-gray-700">校园招聘展示字段</p>
+            <p className="mt-0.5 text-xs text-gray-400">
+              学校账号可维护本校校园招聘会基础信息、企业岗位、导览和资料。保存后将重新进入管理员审核，审核发布后才会在终端展示。
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="主办/承办学校">
+              <input className={inputCls} value={form.hostSchoolName} onChange={(e) => setForm((f) => ({ ...f, hostSchoolName: e.target.value }))} />
+            </Field>
+            <Field label="面向对象">
+              <input className={inputCls} placeholder="如 2026届毕业生 / 本科 / 研究生" value={form.audienceLabel} onChange={(e) => setForm((f) => ({ ...f, audienceLabel: e.target.value }))} />
+            </Field>
+          </div>
+          <Field label="现场服务">
+            <textarea
+              className={`${inputCls} h-20 resize-none`}
+              placeholder="一行一个，如 自助打印 / AI简历诊断 / 咨询台"
+              value={form.onsiteServices.join('\n')}
+              onChange={(e) => setForm((f) => ({ ...f, onsiteServices: splitLines(e.target.value) }))}
+            />
+          </Field>
+          <Field label="入场方式">
+            <textarea className={`${inputCls} h-16 resize-none`} placeholder="如 凭学生证或身份证免费入场，预约以来源平台为准" value={form.admissionMethod} onChange={(e) => setForm((f) => ({ ...f, admissionMethod: e.target.value }))} />
           </Field>
           <p className="text-xs text-gray-400">
             招聘会仅作为第三方/官方来源信息展示,求职者通过"去来源平台预约/扫码预约"跳转,本系统不接收报名信息。

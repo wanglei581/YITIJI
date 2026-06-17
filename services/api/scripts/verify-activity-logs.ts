@@ -4,6 +4,7 @@
  *  1. 会员浏览已发布岗位 → BrowseLog 落库（服务端补齐来源快照）→ /me/browse-logs 可见
  *  2. 会员岗位外部跳转 → ExternalJumpLog(action=external_apply) 落库 → /me/external-jump-logs 可见
  *  3. 招聘会浏览 / 外部预约跳转（external_appointment）记录可见
+ *  3b. 校园/招聘会参展企业外部投递入口（fair_company + external_apply）记录可见
  *  4. 政策浏览 / 官方入口（external_open）跳转记录可见（政策无 externalId，如实 null）
  *  5. 跨会员隔离：A 看不到 B 的记录；A 删 B 的记录统一 404
  *  6. 未发布 / 不存在 target → 拒绝记录（404），不产生任何行
@@ -28,6 +29,11 @@ import { ActivityService } from '../src/activity/activity.service'
 import { ActivityController } from '../src/activity/activity.controller'
 import { MeActivityController } from '../src/activity/me-activity.controller'
 import type { RedisService } from '../src/common/redis/redis.service'
+import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+// 稳定且唯一的残留标记(跨运行不变):嵌进机构 id 与测试会员 phoneHash,开始前预清。
+// 本脚本的 finally 已按本次 id 清 endUser/浏览日志,这里的预清负责收掉历史残留。
+const RESIDUE_TAG = 'vresidactlog'
 
 let passCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
@@ -55,12 +61,16 @@ async function main() {
   const stubRedis = { get: async () => null } as unknown as RedisService
   const postController = new ActivityController(activity, new JwtService({ secret: 'verify-only-secret-0123456789' }), stubRedis)
 
-  const tag = `vfact${Date.now()}`
+  // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag 命中 org / endUser)。
+  await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
+
+  const tag = `${RESIDUE_TAG}${Date.now()}`
   const orgId = `org-${tag}`
   let userA = ''
   let userB = ''
   let jobId = ''
   let fairId = ''
+  let fairCompanyId = ''
   let policyId = ''
   let draftJobId = ''
 
@@ -95,6 +105,17 @@ async function main() {
       },
     })
     fairId = fair.id
+    const fairCompany = await prisma.fairCompany.create({
+      data: {
+        jobFairId: fairId,
+        name: `参展企业${tag}`,
+        industry: 'ai',
+        scale: '50-500',
+        sourceUrl: 'https://example.com/fair-company',
+        jobsCount: 1,
+      },
+    })
+    fairCompanyId = fairCompany.id
     const policy = await prisma.policyPost.create({
       data: {
         sourceOrgId: orgId, sourceName: '人社局', kind: 'policy_guide', title: `就业补贴指引${tag}`,
@@ -131,6 +152,16 @@ async function main() {
     if (!fairJumps.items.some((x) => x.targetId === fairId && x.action === 'external_appointment')) fail('3. 预约跳转记录应可见')
     pass('3. 招聘会浏览 / 外部预约跳转记录可见（targetType 过滤生效）')
 
+    // ── 3b. 参展企业外部投递入口 ────────────────────────────
+    await activity.recordJump(userA, 'fair_company', fairCompanyId, 'external_apply', null)
+    const fairCompanyJumps = await activity.listJumps(userA, PAGE, 'fair_company')
+    const fcJump = fairCompanyJumps.items.find((x) => x.targetId === fairCompanyId)
+    if (!fcJump || fcJump.action !== 'external_apply') fail('3b. 参展企业投递入口跳转记录应可见且 action=external_apply')
+    if (fcJump.targetTitle !== `参展企业${tag}` || fcJump.sourceUrl !== 'https://example.com/fair-company') {
+      fail('3b. 参展企业跳转记录来源快照错误')
+    }
+    pass('3b. 参展企业外部投递入口 → ExternalJumpLog(fair_company/external_apply) 落库 → 列表可见')
+
     // ── 4. 政策浏览 + 官方入口跳转 ───────────────────────────
     await activity.recordBrowse(userA, 'policy', policyId, null)
     await activity.recordJump(userA, 'policy', policyId, 'external_open', null)
@@ -160,6 +191,7 @@ async function main() {
     // ── 7. 非法 targetType / action ──────────────────────────
     await expectStatus(activity.recordBrowse(userA, 'company', jobId, null), 400, '7. 非法 targetType')
     await expectStatus(activity.recordJump(userA, 'job', jobId, 'external_appointment', null), 400, '7. 动作与目标不匹配')
+    await expectStatus(activity.recordJump(userA, 'fair_company', fairCompanyId, 'external_appointment', null), 400, '7. 参展企业动作与目标不匹配')
     await expectStatus(activity.recordJump(userA, 'job', jobId, 'apply_done', null), 400, '7. 非法 action')
     await expectStatus(activity.listBrowse(userA, PAGE, 'candidate'), 400, '7. 非法列表过滤')
     pass('7. 非法 targetType / action 被拒绝（400）')
@@ -226,6 +258,7 @@ async function main() {
       'apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx',
       'apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx',
       'apps/kiosk/src/pages/campus/CampusPage.tsx',
+      'apps/kiosk/src/pages/campus/CampusFairDetailPage.tsx',
       'apps/kiosk/src/pages/renshi/RenshiPage.tsx',
     ]
     const bannedCopy = [

@@ -15,6 +15,11 @@
  * 10. 浏览/跳转闭环：company_profile 浏览与 external_open 跳转落库（快照服务端补齐）；
  *     企业用 external_apply → 400；未发布企业 → 404
  * 11. 禁词扫描（企业展示相关前后端文件无投递闭环/录用承诺文案）+ 响应 JSON 无候选人字段
+ * 12. 完整字典：补齐的企业类型/行业（合资/校企/公共机构/其他 + AI/大数据/其他）前后端同步，
+ *     shared/backend 字典一致，新增类型/行业可被 Admin 保存、后端真实筛选命中
+ * 13. 完整地区字典：选到无企业地区返回真实空态（列表空 + 统计 0），不造数据；
+ *     直辖市使用省+区过滤可命中真实企业；常见无后缀地区录入可被规范筛选命中
+ * 14. 正式前端企业页（apps/kiosk/src/pages/companies）无「演示」字样
  *
  * 运行：pnpm --filter @ai-job-print/api verify:companies
  */
@@ -26,6 +31,12 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { CompaniesService } from '../src/companies/companies.service'
 import { ActivityService } from '../src/activity/activity.service'
+import { COMPANY_INDUSTRIES, COMPANY_SOURCE_KINDS, COMPANY_TYPES } from '../src/companies/companies.types'
+import {
+  COMPANY_INDUSTRIES as SHARED_COMPANY_INDUSTRIES,
+  COMPANY_SOURCE_KINDS as SHARED_COMPANY_SOURCE_KINDS,
+  COMPANY_TYPES as SHARED_COMPANY_TYPES,
+} from '../../../packages/shared/src/types/company'
 
 let passCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
@@ -50,6 +61,14 @@ function walk(dir: string, out: string[] = []): string[] {
     else if (/\.(ts|tsx)$/.test(p)) out.push(p)
   }
   return out
+}
+
+function expectSameSet(actual: readonly string[], expected: readonly string[], label: string) {
+  const a = [...actual].sort()
+  const e = [...expected].sort()
+  if (a.length !== e.length || a.some((v, i) => v !== e[i])) {
+    fail(`${label}: 字典不一致 actual=${JSON.stringify(a)} expected=${JSON.stringify(e)}`)
+  }
 }
 
 async function main() {
@@ -292,6 +311,73 @@ async function main() {
       if (allJson.toLowerCase().includes(k.toLowerCase())) fail(`11. 公开响应含违规字段: ${k}`)
     }
     pass(`11. 禁词扫描通过（${files.length} 个文件）；公开响应无候选人/简历/投递状态字段`)
+
+    // ── 12. 完整字典：补齐的企业类型/行业前后端同步，可存可被真实筛选 ──
+    const typeList = COMPANY_TYPES as readonly string[]
+    const industryList = COMPANY_INDUSTRIES as readonly string[]
+    expectSameSet(Object.keys(SHARED_COMPANY_TYPES), typeList, '12. shared/backend 企业类型')
+    expectSameSet(Object.keys(SHARED_COMPANY_INDUSTRIES), industryList, '12. shared/backend 行业')
+    expectSameSet(Object.keys(SHARED_COMPANY_SOURCE_KINDS), COMPANY_SOURCE_KINDS, '12. shared/backend 来源')
+    for (const t of ['joint_venture', 'school_enterprise', 'public_org', 'other']) {
+      if (!typeList.includes(t)) fail(`12. 企业类型字典应包含「${t}」（与 shared 同步）`)
+    }
+    for (const i of ['ai_big_data', 'other']) {
+      if (!industryList.includes(i)) fail(`12. 行业字典应包含「${i}」（与 shared 同步）`)
+    }
+    const created2 = await companies.adminCreate({
+      sourceOrgId: orgA, externalId: `c2-${tag}`, name: `合资字典企业${tag}`,
+      companyType: 'joint_venture', industry: 'ai_big_data',
+      province: '广东省', city: '深圳市', district: '南山区',
+      sourceUrl: 'https://example.com/company/c2',
+    }, admin)
+    await companies.adminReview(created2.id, { action: 'approve' }, admin)
+    await companies.adminPublish(created2.id, { publish: true }, admin)
+    const byNewType = await companies.listPublic({ companyType: 'joint_venture' }, PAGE)
+    if (!byNewType.items.some((c) => c.id === created2.id)) fail('12. 新增企业类型(合资)应可被后端真实筛选命中')
+    const byNewIndustry = await companies.listPublic({ industry: 'ai_big_data' }, PAGE)
+    if (!byNewIndustry.items.some((c) => c.id === created2.id)) fail('12. 新增行业(AI/大数据)应可被后端真实筛选命中')
+    pass('12. 完整字典：合资/校企/公共机构/其他 + AI/大数据/其他 已补齐；新增类型/行业前后端同步、可存可筛')
+
+    // ── 13. 完整地区字典：选到无企业地区返回真实空态（不报错、不造数据）──
+    const emptyRegion = await companies.listPublic({ province: '西藏自治区', city: '拉萨市' }, PAGE)
+    if (emptyRegion.items.length !== 0) fail('13. 无企业地区应返回真实空态(空列表)')
+    const emptyStats = await companies.statsPublic({ province: '西藏自治区' })
+    if (emptyStats.companyCount !== 0 || emptyStats.openJobCount !== 0) fail('13. 无企业地区统计应为 0(不造数据)')
+    const municipal = await companies.adminCreate({
+      sourceOrgId: orgA, externalId: `c3-${tag}`, name: `北京直辖企业${tag}`,
+      companyType: 'public_org', industry: 'professional_services',
+      province: '北京市', city: '北京市', district: '朝阳区',
+      sourceUrl: 'https://example.com/company/c3',
+    }, admin)
+    await companies.adminReview(municipal.id, { action: 'approve' }, admin)
+    await companies.adminPublish(municipal.id, { publish: true }, admin)
+    const byMunicipalDistrict = await companies.listPublic({ province: '北京市', district: '朝阳区' }, PAGE)
+    if (!byMunicipalDistrict.items.some((c) => c.id === municipal.id)) {
+      fail('13. 直辖市应支持省+区真实筛选命中（前端不应下发 city=市辖区）')
+    }
+    const aliasRegion = await companies.adminCreate({
+      sourceOrgId: orgA, externalId: `c4-${tag}`, name: `地区别名企业${tag}`,
+      companyType: 'other', industry: 'other',
+      province: '广东', city: '深圳', district: '南山',
+      sourceUrl: 'https://example.com/company/c4',
+    }, admin)
+    await companies.adminReview(aliasRegion.id, { action: 'approve' }, admin)
+    await companies.adminPublish(aliasRegion.id, { publish: true }, admin)
+    const byCanonicalRegion = await companies.listPublic({ province: '广东省', city: '深圳市', district: '南山区' }, PAGE)
+    if (!byCanonicalRegion.items.some((c) => c.id === aliasRegion.id)) {
+      fail('13. 规范地区筛选应命中常见无后缀录入，避免真实企业被假空态掩盖')
+    }
+    pass('13. 完整地区字典下，无企业地区返回真实空态；直辖市省+区可命中；规范筛选可命中常见无后缀录入')
+
+    // ── 14. 正式前端企业页无「演示」字样 ──
+    const kioskCompanyDir = join(repoRoot, 'apps/kiosk/src/pages/companies')
+    const frontFiles: string[] = []
+    if (existsSync(kioskCompanyDir)) walk(kioskCompanyDir, frontFiles)
+    if (frontFiles.length < 2) fail(`14. 未找到正式前端企业页文件(${frontFiles.length})`)
+    for (const f of frontFiles) {
+      if (readFileSync(f, 'utf8').includes('演示')) fail(`14. 正式前端企业页 ${f.replace(repoRoot + '/', '')} 不应含「演示」字样`)
+    }
+    pass(`14. 正式前端企业页无「演示」字样（${frontFiles.length} 个文件）`)
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {

@@ -599,6 +599,10 @@ model JobFair {
   mapImageUrl String?
   description String?
   coverImageUrl String?
+  hostSchoolName String?
+  audienceLabel String?
+  onsiteServicesJson String?
+  admissionMethod String?
 
   // 场馆导航（生成手机扫码导航深链；无坐标时回退地址搜索）
   latitude    Float?

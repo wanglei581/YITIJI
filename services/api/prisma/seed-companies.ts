@@ -10,6 +10,17 @@ require('dotenv').config()
 
 import { PrismaService } from '../src/prisma/prisma.service'
 
+function assertDemoSeedAllowed(scriptName: string) {
+  const url = process.env['DATABASE_URL'] ?? ''
+  const explicit = process.env['ALLOW_DEMO_SEED'] === 'true'
+  const looksProductionUrl = /\bprod(uction)?\b|ai_job_print_prod/i.test(url)
+  if (!explicit && (process.env['NODE_ENV'] === 'production' || looksProductionUrl)) {
+    throw new Error(`${scriptName} contains published demo companies/jobs and is blocked for production. Set ALLOW_DEMO_SEED=true only for a deliberate non-production restore.`)
+  }
+}
+
+assertDemoSeedAllowed('prisma/seed-companies.ts')
+
 const ORG_ID = 'org-demo-companies'
 
 const COMPANIES = [

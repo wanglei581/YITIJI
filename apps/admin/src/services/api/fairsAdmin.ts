@@ -45,6 +45,10 @@ export interface AdminFairView {
   trafficInfo: string | null
   expectedAttendance: number | null
   seekerIntent: FairIntentSliceView[]
+  hostSchoolName: string | null
+  audienceLabel: string | null
+  onsiteServices: string[]
+  admissionMethod: string | null
   companyCount: number
   jobCount: number
   viewCount: number
@@ -155,6 +159,10 @@ export interface UpdateFairInfoInput {
   trafficInfo?: string | null
   expectedAttendance?: number | null
   seekerIntent?: FairIntentSliceView[]
+  hostSchoolName?: string | null
+  audienceLabel?: string | null
+  onsiteServices?: string[]
+  admissionMethod?: string | null
 }
 
 /** 岗位明细录入(展示;不含投递/申请,position.sourceUrl 不在编辑器范围)。 */
@@ -334,6 +342,10 @@ function makeMockFair(partial: Partial<AdminFairView> & Pick<AdminFairView, 'id'
     trafficInfo: null,
     expectedAttendance: null,
     seekerIntent: [],
+    hostSchoolName: null,
+    audienceLabel: null,
+    onsiteServices: [],
+    admissionMethod: null,
     companyCount: 0,
     jobCount: 0,
     viewCount: 0,
@@ -367,6 +379,10 @@ const mockFairs: AdminFairView[] = [
       { label: '市场运营类', percent: 28 },
       { label: '职能支持类', percent: 29 },
     ],
+    hostSchoolName: '某大学就业指导中心',
+    audienceLabel: '2026届毕业生 / 本科 / 研究生',
+    onsiteServices: ['自助打印', 'AI简历诊断', '咨询台'],
+    admissionMethod: '凭学生证或身份证免费入场，预约以来源平台为准',
   }),
   makeMockFair({
     id: 'fair-mock-2',

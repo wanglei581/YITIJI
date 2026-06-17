@@ -105,6 +105,10 @@ export interface PartnerFairRecord {
   city?: string
   address?: string
   description?: string
+  hostSchoolName?: string
+  audienceLabel?: string
+  onsiteServices?: string[]
+  admissionMethod?: string
 }
 
 // ─── Import payloads ──────────────────────────────────────────────────────────
@@ -137,6 +141,10 @@ export interface ImportFairItem {
   sourceUrl: string
   companyCount?: number
   jobCount?: number
+  hostSchoolName?: string
+  audienceLabel?: string
+  onsiteServices?: string[]
+  admissionMethod?: string
 }
 
 // ─── 阶段1C:编辑 payload(契约 = 后端 UpdatePartnerJobDto / UpdatePartnerFairDto)──
@@ -163,6 +171,10 @@ export interface UpdatePartnerFairInput {
   address?: string
   description?: string
   sourceUrl?: string
+  hostSchoolName?: string
+  audienceLabel?: string
+  onsiteServices?: string[]
+  admissionMethod?: string
 }
 
 export interface ImportResult<T> {

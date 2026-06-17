@@ -18,6 +18,16 @@ import * as bcrypt from 'bcryptjs'
 
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required to run seed')
+
+function assertDemoSeedAllowed(scriptName: string) {
+  const explicit = process.env['ALLOW_DEMO_SEED'] === 'true'
+  const looksProductionUrl = /\bprod(uction)?\b|ai_job_print_prod/i.test(url)
+  if (!explicit && (process.env['NODE_ENV'] === 'production' || looksProductionUrl)) {
+    throw new Error(`${scriptName} contains demo jobs/orgs and is blocked for production. Set ALLOW_DEMO_SEED=true only for a deliberate non-production restore.`)
+  }
+}
+
+assertDemoSeedAllowed('prisma/seed.ts')
 const prisma = createPrismaClient(url).client
 
 const SALT_ROUNDS = 10

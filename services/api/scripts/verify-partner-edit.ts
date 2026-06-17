@@ -7,7 +7,7 @@
  *   2. 来源不可改:externalId / sourceOrgId / sourceName 编辑后保持不变。
  *   3. 越权:编辑他机构数据 → JOB_NOT_FOUND / FAIR_NOT_FOUND(不区分原因,防枚举)。
  *   4. 机构停用 → PARTNER_ORG_NOT_FOUND(写入闸)。
- *   5. 招聘会编辑:同岗位;endAt <= startAt → INVALID_DATE_RANGE。
+ *   5. 招聘会编辑:同岗位;校园招聘展示字段落库;endAt <= startAt → INVALID_DATE_RANGE。
  *   6. Kiosk 不可见:编辑后的岗位/招聘会不再出现在已发布公开列表。
  *   7. 审计:job.partner_update / fair.partner_update 落 AuditLog(actorRole=partner,
  *      含 changedFields 与原状态)。
@@ -20,9 +20,14 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+// 稳定且唯一的残留标记(跨运行不变):嵌进两个机构 id 与 partner username,开始前预清 + finally 再清。
+const RESIDUE_TAG = 'vresidpartneredit'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+const json = (v: unknown) => JSON.stringify(v)
 
 function errCode(e: unknown): string | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
@@ -50,9 +55,12 @@ async function main() {
   const audit = new AuditService(prisma)
   const svc = new JobsService(prisma, audit)
 
+  // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
+  await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
+
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
-  const orgA = `org_vpe_a_${suffix}`
-  const orgB = `org_vpe_b_${suffix}`
+  const orgA = `org_vpe_a_${RESIDUE_TAG}_${suffix}`
+  const orgB = `org_vpe_b_${RESIDUE_TAG}_${suffix}`
 
   await prisma.organization.createMany({
     data: [
@@ -62,7 +70,7 @@ async function main() {
   })
 
   const partnerRow = await prisma.user.create({
-    data: { username: `vpe_partner_${suffix}`, passwordHash: 'x', name: '验证机构账号', role: 'partner', orgId: orgA },
+    data: { username: `${RESIDUE_TAG}_partner_${suffix}`, passwordHash: 'x', name: '验证机构账号', role: 'partner', orgId: orgA },
   })
   const partnerA: AuthedUser = { userId: partnerRow.id, role: 'partner', orgId: orgA }
 
@@ -91,13 +99,8 @@ async function main() {
     },
   })
 
-  const cleanup = async () => {
-    await prisma.job.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
-    await prisma.jobFair.deleteMany({ where: { sourceOrgId: { in: [orgA, orgB] } } })
-    await prisma.auditLog.deleteMany({ where: { actorId: partnerA.userId } })
-    await prisma.user.delete({ where: { id: partnerA.userId } }).catch(() => undefined)
-    await prisma.organization.deleteMany({ where: { id: { in: [orgA, orgB] } } })
-  }
+  // 按稳定 tag 清理:两个机构名下 job/fair(级联子资源)+ 该 tag 的 partner 账号及审计日志 + 机构。
+  const cleanup = async () => cleanFairVerifyResidue(prisma, RESIDUE_TAG)
 
   try {
     // ── 1+2. 岗位编辑 + 强制重审 + 来源不可改 ─────────────────────────────
@@ -135,10 +138,32 @@ async function main() {
 
     // ── 5. 招聘会编辑 ──────────────────────────────────────────────────────
     {
-      const updated = await svc.updatePartnerFair(fairA.id, { title: '验证招聘会(改)', venue: '新展馆' }, partnerA)
+      const onsiteServices = ['自助打印', 'AI简历诊断', '咨询台']
+      const updated = await svc.updatePartnerFair(
+        fairA.id,
+        {
+          title: '验证招聘会(改)',
+          venue: '新展馆',
+          theme: 'campus',
+          hostSchoolName: `机构A_${suffix}`,
+          audienceLabel: '2026届毕业生 / 本科 / 研究生',
+          onsiteServices,
+          admissionMethod: '凭学生证或身份证免费入场，预约以来源平台为准',
+        },
+        partnerA,
+      )
       if (updated.name !== '验证招聘会(改)' || updated.venue !== '新展馆') fail('5. 招聘会编辑未落库')
+      if (updated.theme !== 'campus') fail('5. 招聘会 theme 未落库')
+      if (updated.hostSchoolName !== `机构A_${suffix}`) fail('5. hostSchoolName 未落库')
+      if (updated.audienceLabel !== '2026届毕业生 / 本科 / 研究生') fail('5. audienceLabel 未落库')
+      if (json(updated.onsiteServices) !== json(onsiteServices)) fail(`5. onsiteServices 未落库/解析: ${json(updated.onsiteServices)}`)
+      if (updated.admissionMethod !== '凭学生证或身份证免费入场，预约以来源平台为准') fail('5. admissionMethod 未落库')
       if (updated.reviewStatus !== 'pending' || updated.publishStatus !== 'draft') fail('5. 招聘会编辑后未回 pending+draft')
-      pass('5a. 招聘会编辑落库 + 强制重审')
+      const raw = await prisma.jobFair.findUnique({ where: { id: fairA.id } })
+      if (!raw?.onsiteServicesJson || json(JSON.parse(raw.onsiteServicesJson)) !== json(onsiteServices)) {
+        fail(`5. onsiteServicesJson DB 列不是预期 JSON: ${raw?.onsiteServicesJson}`)
+      }
+      pass('5a. 招聘会编辑落库 + 校园招聘展示字段落库 + 强制重审')
 
       await expectCode(
         () => svc.updatePartnerFair(fairA.id, {

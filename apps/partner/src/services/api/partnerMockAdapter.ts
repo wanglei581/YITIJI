@@ -51,7 +51,7 @@ let PARTNER_JOBS: PartnerJobRecord[] = [
 // ─── Fairs (R2: added sourceName) ─────────────────────────────────────────────
 
 let PARTNER_FAIRS: PartnerFairRecord[] = [
-  { id: 'pf1', externalId: 'UNI-2026-FAIR-023', name: '高校双选会（春）',         organizer: '某大学就业指导中心', startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',       status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/23', syncTime: '2026-05-23 09:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
+  { id: 'pf1', externalId: 'UNI-2026-FAIR-023', name: '高校双选会（春）',         organizer: '某大学就业指导中心', startTime: '2026-05-28 10:00', endTime: '2026-05-28 16:00', venue: '某大学体育馆',       status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/23', syncTime: '2026-05-23 09:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网', hostSchoolName: '某大学就业指导中心', audienceLabel: '2026届毕业生', onsiteServices: ['自助打印', 'AI简历诊断'], admissionMethod: '凭学生证或身份证免费入场' },
   { id: 'pf2', externalId: 'UNI-2026-FAIR-024', name: '互联网行业专场招聘',       organizer: '某大学就业指导中心', startTime: '2026-06-10 14:00', endTime: '2026-06-10 17:00', venue: '某大学图书馆报告厅', status: 'upcoming', sourceUrl: 'https://job.uni.edu.cn/fair/24', syncTime: '2026-05-25 09:00', reviewStatus: 'reviewing', publishStatus: 'draft',       sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
   { id: 'pf3', externalId: 'UNI-2026-FAIR-020', name: '制造业专场招聘会',         organizer: '市人才交流中心',     startTime: '2026-05-25 09:00', endTime: '2026-05-25 15:00', venue: 'B区大厅',            status: 'ongoing',  sourceUrl: 'https://job.uni.edu.cn/fair/20', syncTime: '2026-05-22 14:00', reviewStatus: 'approved',  publishStatus: 'published',   sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
   { id: 'pf4', externalId: 'UNI-2026-FAIR-018', name: '护理医疗专场招聘',         organizer: '某大学就业指导中心', startTime: '2026-05-20 09:00', endTime: '2026-05-20 15:00', venue: 'C区多功能厅',        status: 'ended',    sourceUrl: 'https://job.uni.edu.cn/fair/18', syncTime: '2026-05-18 10:00', reviewStatus: 'approved',  publishStatus: 'unpublished', sourceOrgId: 'org-uni-001', sourceName: '高校就业信息网' },
@@ -185,6 +185,10 @@ export const partnerMockAdapter = {
         organizer: '测试机构', startTime: item.startAt, endTime: item.endAt,
         venue: item.venue, status, sourceUrl: item.sourceUrl, syncTime: sync,
         theme: item.theme, city: item.city, address: item.address, description: item.description,
+        hostSchoolName: item.hostSchoolName,
+        audienceLabel: item.audienceLabel,
+        onsiteServices: item.onsiteServices,
+        admissionMethod: item.admissionMethod,
         reviewStatus: 'pending' as const, publishStatus: 'draft' as const,
         sourceOrgId: 'mock-org', sourceName: '测试机构',
       }
@@ -208,6 +212,10 @@ export const partnerMockAdapter = {
       if (input.address !== undefined) next.address = input.address
       if (input.description !== undefined) next.description = input.description
       if (input.sourceUrl !== undefined) next.sourceUrl = input.sourceUrl
+      if (input.hostSchoolName !== undefined) next.hostSchoolName = input.hostSchoolName
+      if (input.audienceLabel !== undefined) next.audienceLabel = input.audienceLabel
+      if (input.onsiteServices !== undefined) next.onsiteServices = input.onsiteServices
+      if (input.admissionMethod !== undefined) next.admissionMethod = input.admissionMethod
       next.reviewStatus = 'pending'
       next.publishStatus = 'draft'
       next.syncTime = sync
