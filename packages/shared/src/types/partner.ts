@@ -29,6 +29,7 @@ export type EnabledModule =
   | 'policy_service'          // 政策服务（就业政策、补贴、社保等）
   | 'job_info'                // 岗位信息（外部来源展示）
   | 'job_fair'                // 招聘会（外部来源展示）
+  | 'smart_campus'            // 智慧校园（学校终端专属服务）
   | 'ai_interview'            // AI模拟面试
   | 'device_status'           // 设备状态（终端屏显）
   | 'service_statistics'      // 服务统计（管理后台可见）
@@ -105,6 +106,7 @@ export const SCENE_DEFAULT_MODULES: Record<SceneTemplate, EnabledModule[]> = {
     'print_scan',
     'job_info',
     'job_fair',
+    'smart_campus',
     'external_apply_redirect',
     'service_statistics',
   ],
@@ -150,6 +152,7 @@ export const MODULE_LABELS: Record<EnabledModule, string> = {
   policy_service:          '政策服务',
   job_info:                '岗位信息',
   job_fair:                '招聘会',
+  smart_campus:            '智慧校园',
   ai_interview:            'AI模拟面试',
   device_status:           '设备状态',
   service_statistics:      '服务统计',

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --port 5173",
     "verify:jobfair-ui": "node scripts/verify-jobfair-ui.mjs",
-    "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs"
+    "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs",
+    "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs"
   },
   "dependencies": {
     "@ai-job-print/shared": "workspace:*",

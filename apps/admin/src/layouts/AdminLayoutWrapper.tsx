@@ -12,6 +12,7 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
   FolderIcon,
+  GraduationCapIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   MonitorIcon,
@@ -34,6 +35,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/printers':     'devices',
   '/peripherals':  'devices',
   '/screensaver':  'screensaver',
+  '/smart-campus': 'smart-campus',
   '/orders':       'orders',
   '/files':        'files',
   '/ai-services':  'ai-services',
@@ -69,6 +71,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard',    label: '工作台',      icon: LayoutDashboardIcon, href: KEY_TO_PATH.dashboard },
   { key: 'devices',      label: '设备管理',     icon: MonitorIcon,         group: '设备运维', href: KEY_TO_PATH.devices },
   { key: 'screensaver',  label: '宣传屏',       icon: MonitorPlayIcon, href: KEY_TO_PATH.screensaver },
+  { key: 'smart-campus', label: '智慧校园',     icon: GraduationCapIcon, href: KEY_TO_PATH['smart-campus'] },
   // badge 不再硬编码:告警数为实时派生,进入页面即见真实数量
   { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon, href: KEY_TO_PATH.alerts },
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理', href: KEY_TO_PATH.orders },

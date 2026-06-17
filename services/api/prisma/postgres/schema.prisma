@@ -28,11 +28,15 @@ model Terminal {
   terminalCode      String   @unique
   agentToken        String   @unique
   deviceFingerprint String
+  orgId             String?
+  org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   registeredAt      DateTime @default(now())
   lastSeenAt        DateTime @updatedAt
 
   heartbeats TerminalHeartbeat[]
   printTasks PrintTask[]
+
+  @@index([orgId])
 }
 
 // ── PrintTask ─────────────────────────────────────────────────────────────────
@@ -116,6 +120,7 @@ model Organization {
   updatedAt  DateTime @updatedAt
 
   users      User[]
+  terminals  Terminal[]
   jobs       Job[]      @relation("JobOrg")
   jobSources JobSource[]
   jobFairs   JobFair[]  @relation("FairOrg")
@@ -1297,4 +1302,19 @@ model ExternalJumpLog {
   @@index([endUserId, createdAt])
   @@index([endUserId, targetType, createdAt])
   @@index([expiresAt])
+}
+
+// ── TerminalSmartCampusConfig ─────────────────────────────────────────────────
+// 每个终端的「智慧校园」配置：是否启用 + 各子模块开关位(JSON)。
+// terminalId 为自由字符串(不强 FK)：可在终端注册前预置，按 terminalId / terminalCode 查找。
+// enabled=false 或无配置 → Kiosk 拉取返回 enabled:false，首页整块不渲染、不留空白。
+// 合规：本表不存任何学生数据；校园大数据只允许聚合脱敏展示。
+model TerminalSmartCampusConfig {
+  id          String   @id @default(cuid())
+  terminalId  String   @unique
+  enabled     Boolean  @default(false)
+  modulesJson String   @default("{}")
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

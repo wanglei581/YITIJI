@@ -22,19 +22,24 @@ import {
   LightbulbIcon,
   MapPinIcon,
   MonitorPlayIcon,
+  PackageIcon,
+  PartyPopperIcon,
   PrinterIcon,
   QrCodeIcon,
+  ScanFaceIcon,
   ScanLineIcon,
   SparklesIcon,
   UserCheckIcon,
   WifiIcon,
   type LucideIcon,
 } from 'lucide-react'
+import type { SmartCampusModuleKey } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
+import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 
 const HERO_IMAGE = '/assets/kiosk-home-hero-job-fair.png'
 
@@ -423,6 +428,106 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   )
 }
 
+// 校园大数据（bigdata）本期严格冻结：不在此列出入口卡，后端开关亦强制 false。
+const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { desc: string; color: string; bg: string }>> = {
+  welcome: {
+    title: '迎新服务',
+    desc: '报到流程、办事窗口、入学材料打印',
+    icon: PartyPopperIcon,
+    to: '/smart-campus/welcome',
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+  },
+  luggage: {
+    title: '行李帮运',
+    desc: '校方合作服务入口、服务点与路线说明',
+    icon: PackageIcon,
+    to: '/smart-campus/service/luggage',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+  },
+  panorama: {
+    title: 'VR校园',
+    desc: '校园全景、路线导览、重点场馆介绍',
+    icon: ScanFaceIcon,
+    to: '/smart-campus/service/panorama',
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+  },
+}
+
+function SmartCampusHorizontalSection() {
+  const navigate = useNavigate()
+  const config = useSmartCampusConfig()
+  const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
+    .filter((key) => config.modules[key])
+    .map((key) => SMART_CAMPUS_TILES[key])
+    .filter((tile): tile is ServiceTile & { desc: string; color: string; bg: string } => !!tile)
+
+  if (!config.enabled || enabledTiles.length === 0) return null
+
+  return (
+    <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-blue-200 bg-white shadow-[0_14px_34px_rgba(37,99,235,0.12)]">
+      <div className="flex items-center gap-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-8 py-5">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.24)]">
+          <GraduationCapIcon className="h-8 w-8" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-3xl font-extrabold leading-tight text-slate-950">智慧校园</h2>
+            <span className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-bold text-blue-600">
+              学校端已开启
+            </span>
+          </div>
+          <p className="mt-1 text-base font-semibold text-slate-500">
+            学校专属服务专区，仅校园终端开启时显示；关闭后整块消失，不占首页空白。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/smart-campus')}
+          className="hidden min-h-[52px] shrink-0 items-center gap-1 rounded-2xl bg-white px-5 text-base font-extrabold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 active:bg-blue-100 sm:flex"
+        >
+          进入专区
+          <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
+        {enabledTiles.map((tile) => {
+          const Icon = tile.icon
+          const disabled = tile.disabled || !tile.to
+          return (
+            <button
+              key={tile.title}
+              type="button"
+              disabled={disabled}
+              onClick={() => tile.to && !disabled && navigate(tile.to)}
+              className={[
+                'relative min-h-[128px] overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50/70 p-5 text-left transition-all',
+                disabled
+                  ? 'cursor-not-allowed opacity-70'
+                  : 'hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0',
+              ].join(' ')}
+            >
+              <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tile.bg}`}>
+                <Icon className={`h-6 w-6 ${tile.color}`} aria-hidden="true" />
+              </span>
+              <span className="mt-4 block text-xl font-extrabold text-slate-950">{tile.title}</span>
+              <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{tile.desc}</span>
+              {disabled && (
+                <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+                  即将上线
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export function HomePage() {
   return (
     <div className="min-h-full bg-[#eef1f5] pb-8">
@@ -435,6 +540,8 @@ export function HomePage() {
           <ServiceGroupCard key={group.title} group={group} />
         ))}
       </main>
+
+      <SmartCampusHorizontalSection />
 
       <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-slate-500">
         <BotIcon className="h-4 w-4" aria-hidden="true" />

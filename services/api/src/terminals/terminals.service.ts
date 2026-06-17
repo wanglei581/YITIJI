@@ -110,6 +110,8 @@ function inferMimeFromFileName(fileName: string | undefined): string | undefined
 export interface AdminTerminalView {
   id: string
   terminalCode: string
+  orgId: string | null // 所属机构 id；null = 未绑定
+  orgName: string | null // 所属机构名称（便于前端直接展示）
   registeredAt: string // ISO
   lastSeenAt: string // ISO
   online: boolean // lastSeenAt 距今 < 3 分钟 = true
@@ -118,6 +120,24 @@ export interface AdminTerminalView {
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
+}
+
+// ── Admin 终端归属（绑定/解绑机构）─────────────────────────────────────────────
+
+/** 可绑定的机构选项（admin 终端归属下拉用，仅 enabled 机构）。 */
+export interface AdminOrganizationOption {
+  id: string
+  name: string
+  type: string
+}
+
+/** 终端归属变更结果（含旧/新机构，供 controller 写审计）。 */
+export interface AssignTerminalOrgResult {
+  terminalId: string // = terminalCode（对外稳定业务码）
+  terminalCode: string
+  oldOrgId: string | null
+  newOrgId: string | null
+  orgName: string | null // 绑定后的机构名；解绑时为 null
 }
 
 export interface AdminPrinterView {
@@ -595,6 +615,7 @@ export class TerminalsService implements OnModuleInit {
     const rows = await this.prisma.terminal.findMany({
       orderBy: { registeredAt: 'desc' },
       include: {
+        org: { select: { id: true, name: true } },
         heartbeats: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -617,6 +638,8 @@ export class TerminalsService implements OnModuleInit {
       return {
         id: t.id,
         terminalCode: t.terminalCode,
+        orgId: t.orgId,
+        orgName: t.org?.name ?? null,
         registeredAt: t.registeredAt.toISOString(),
         lastSeenAt: lastSeen.toISOString(),
         online: now - lastSeen.getTime() < ONLINE_WINDOW_MS,
@@ -629,6 +652,62 @@ export class TerminalsService implements OnModuleInit {
     })
 
     return { terminals }
+  }
+
+  /**
+   * Admin 终端归属下拉选项：仅 enabled 机构（id/name/type），按名称排序。
+   * 仅供 admin 绑定终端到机构时选择；不含敏感字段。
+   */
+  async listOrganizationOptions(): Promise<{ organizations: AdminOrganizationOption[] }> {
+    const organizations = await this.prisma.organization.findMany({
+      where: { enabled: true },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, type: true },
+    })
+    return { organizations }
+  }
+
+  /**
+   * Admin 绑定/解绑终端机构归属。
+   *   - orgId=null → 解绑（Terminal.orgId 置空）。
+   *   - orgId 非空 → 必须机构存在且 enabled，否则 404 ORG_NOT_FOUND / 400 ORG_DISABLED。
+   *   - 终端不存在 → 404 TERMINAL_NOT_FOUND。
+   * 错误体统一 { error: { code, message } }；审计在 controller 写（含 old/new orgId）。
+   */
+  async assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
+      select: { id: true, terminalCode: true, orgId: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+
+    let orgName: string | null = null
+    if (orgId !== null) {
+      const org = await this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { id: true, name: true, enabled: true },
+      })
+      if (!org) {
+        throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
+      }
+      if (!org.enabled) {
+        throw new BadRequestException({ error: { code: 'ORG_DISABLED', message: '机构已停用，不能绑定' } })
+      }
+      orgName = org.name
+    }
+
+    const oldOrgId = terminal.orgId
+    await this.prisma.terminal.update({ where: { id: terminal.id }, data: { orgId } })
+
+    return {
+      terminalId: terminal.terminalCode,
+      terminalCode: terminal.terminalCode,
+      oldOrgId,
+      newOrgId: orgId,
+      orgName,
+    }
   }
 
   /**

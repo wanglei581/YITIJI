@@ -14,6 +14,9 @@ import type {
   ExcelPreviewResult,
   ExcelConfirmResult,
   FieldMappingRuleResult,
+  PartnerSmartCampusTerminal,
+  SaveSmartCampusConfigPayload,
+  TerminalSmartCampusConfigView,
 } from './types'
 
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
@@ -82,9 +85,36 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let code = `HTTP_${res.status}`
+    let message = res.statusText
+    try {
+      const errBody = await res.json() as { error?: { code?: string; message?: string } }
+      if (errBody.error?.code) code = errBody.error.code
+      if (errBody.error?.message) message = errBody.error.message
+    } catch { /* keep defaults */ }
+    if (res.status === 401) redirectToLogin()
+    throw new ApiHttpError(code, message, res.status)
+  }
+  return res.json() as Promise<T>
+}
+
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 export const partnerHttpAdapter = {
+  // Smart Campus
+  getSmartCampusTerminals: () =>
+    get<PartnerSmartCampusTerminal[]>('/partner/smart-campus/terminals'),
+  saveSmartCampusConfig: (terminalId: string, payload: SaveSmartCampusConfigPayload) =>
+    put<TerminalSmartCampusConfigView>(`/partner/smart-campus/terminals/${encodeURIComponent(terminalId)}/config`, payload),
+
   // Data Sources
   getDataSources: () =>
     get<PartnerDataSource[]>('/partner/data-sources'),

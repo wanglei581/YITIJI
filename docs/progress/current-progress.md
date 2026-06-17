@@ -48,6 +48,62 @@
 
 ---
 
+## 智慧校园真实可用闭环已合入 main（2026-06-16，PR #47）
+
+在 `codex/restore-smart-campus-safe` 已恢复源码基础上，新建隔离工作区 `/Users/wanglei/smart-campus-real-wt`，将智慧校园从「恢复入口」推进到**真实后端开关可用、前端无 mock 冒充、页面不会无故消失**的最小完整闭环。PR [#47](https://github.com/wanglei581/YITIJI/pull/47) 已合入 `main`，merge commit：`ced9374`。
+
+本轮落地内容：
+
+- 高校版模板联动：Admin 新增/编辑合作机构选择「高校版」时，启用模块包含并自动勾选 `smart_campus`；后端机构模块白名单允许保存该模块；Partner 侧菜单可见。
+- 真实终端开关闭环：Admin 绑定终端归属学校机构；Partner 学校账号只能查看/配置本机构终端；保存后 Kiosk 按 `KSK-001` 真实配置显示/隐藏首页智慧校园区块。
+- 去假数据：删除 Kiosk `freshmanInsights` mock 数据服务；Partner 移除假统计/假趋势/硬编码学校名；迎新内容与使用统计显示「未开放」真实空态。
+- 校园大数据严格冻结：Partner 不可开启，后端读写两侧强制 `bigdata=false`；直达 `/smart-campus/freshman-insights` 只显示「暂未开放」，不展示任何示例统计。
+- GUI 联调修复：本地浏览器验证发现 Partner 只点子模块时总开关不会自动开启；修复为任一子模块开启即 `enabled=true`，最后一个子模块关闭才 `enabled=false`。
+- 审查修复：总开关关闭时同步清空 `welcome/luggage/panorama`，避免运营看到“智慧校园关但子模块开”的误解；`SaveSmartCampusConfigDto` 改为嵌套布尔校验，拒绝 `"false"` 字符串和未知模块字段。
+
+本地验收（2026-06-16）：
+
+- 合并前 GitHub CI：`build-and-verify` ✅、`postgres-readiness` ✅。
+- 合并后 main 复验：`shared/api/kiosk/admin/partner` typecheck ✅；`verify:partner-smart-campus` ✅；`verify:smart-campus-ui` ✅；`verify:jobfair-ui` ✅。
+- `pnpm --filter @ai-job-print/partner typecheck` ✅
+- `pnpm --filter @ai-job-print/partner lint` ✅
+- `VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3011/api/v1 pnpm --filter @ai-job-print/partner build` ✅
+- `pnpm --filter @ai-job-print/api verify:partner-smart-campus` ✅（含高校版模板联动、机构隔离、bigdata 强制冻结）
+- `pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui` ✅（bigdata 冻结、前台无假数据）
+- 本地真实 API + GUI 验证 ✅：Admin 登录不再卡身份验证；新增合作机构选择「高校版」后「智慧校园」可见且自动勾选；Partner 页面实际点击「迎新」保存后 API 返回 `enabled:true/welcome:true/bigdata:false`，Kiosk 首页出现智慧校园；再关闭后 Kiosk 首页整块消失；迎新页可打开，大数据直达页仅显示「暂未开放」。
+
+仍未开放（按设计，不用 mock 冒充）：校园大数据真实聚合、迎新内容 CMS、使用统计回传。后续如要做，必须另起数据模型/审核/合规授权任务。
+
+---
+
+## 智慧校园「按学校/终端开关」安全恢复（2026-06-15，Claude，分支 codex/restore-smart-campus-safe）
+
+把此前停留在 `feature/restore-smart-campus`（未合入 main）的「智慧校园」作为**按学校/终端后台开关显示的附加模块**恢复回来，独立隔离工作区 `/Users/wanglei/restore-sc-safe-wt`，**基线为 main（bdccfb8）**，未合入 main / 当前 `feature/interview-setup-redesign`，待用户 review 后再决定合并。
+
+恢复方式（不带回旧改动）：从恢复分支 tip **文件级移植** 47 个干净文件；与 main 自分叉点后真正重叠的 5 个文件采用**手工并入**——
+
+- `apps/kiosk/src/pages/home/HomePage.tsx`：仅新增**默认隐藏**的智慧校园横向区块（`!config.enabled || 子模块为空 → return null`，首页默认像素级不变）；**保留** main 的 `pink→amber` 政策服务配色；**丢弃**恢复分支夹带的「岗位信息」副标题改字（首页业务文案不动）。
+- `apps/kiosk/src/routes/index.tsx`：仅新增 `/smart-campus*` 4 条路由；保留 main 现有路由、不回退已删的 Qingdao。
+- `services/api/package.json`：仅新增 `verify:partner-smart-campus` 脚本。
+
+数据库（仅非破坏性新增，未 reset、未改业务表语义）：
+
+- `Terminal.orgId String?`（可空，`onDelete: SetNull`）+ `@@index([orgId])`；新表 `TerminalSmartCampusConfig`（终端级开关 + 子模块位 JSON，不存任何学生数据）。
+- 迁移 `20260613211816_add_smart_campus_terminal_config`（SQLite + PG 双份）干净追加在 main 迁移链末尾，不插队、不乱序。
+
+边界落实（合规）：
+
+- Kiosk 首页智慧校园**默认隐藏**，仅「终端绑定学校机构 + 学校端开启对应子模块」时显示；`bigdata` 子模块本期冻结强制落 false。
+- Partner 侧仅**学校类型**机构可见可配，且只能配置**本机构绑定终端**；跨机构 / 非学校 / 未绑定 / orgId 为空均拒绝（`PARTNER_NOT_SCHOOL` / `TERMINAL_NOT_IN_ORG` / `PARTNER_ORG_REQUIRED`）。
+- Admin 侧仅新增「终端归属机构」绑定/解绑（2 个 admin-only 端点 + 审计），未扩展其它后台能力。
+- 智慧校园全量文案 0 招聘闭环禁词（无「一键投递 / 立即投递 / 平台投递」）。
+
+验收（全部通过，本地分支 SQLite）：`shared/api/kiosk/admin/partner` typecheck ✅；`verify:partner-smart-campus` 21/21 PASS ✅；`verify:jobfair-ui` ALL PASS（确认未回退旧招聘会/校园 UI）✅；`api/kiosk/admin/partner` lint 0 error ✅；四端 build ✅（三端前台按既有门禁用 `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 构建）。
+
+待办：合并到 main 前需复跑上述验收；PG 生产实例需 `prisma migrate deploy` 应用该迁移后复验。
+
+---
+
 ## 当前窗口工作重心：上线验收与试运营准备（2026-06-14，用户确认）
 
 当前窗口专门负责上线前落地事项，工作重心已从“继续开发业务功能”切换为“部署、配置、真机、真实服务、验收”。除阻塞生产验收的问题修复外，后续不再新增非必要业务功能、不新增重复入口、不扩展招聘闭环。

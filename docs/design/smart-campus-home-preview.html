@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>智慧校园首页横向区效果图</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --line:#e7edf5;
+      --text:#162033;
+      --muted:#667085;
+      --blue:#2563eb;
+      --cyan:#0891b2;
+      --green:#059669;
+      --orange:#d97706;
+      --violet:#7c3aed;
+      --shadow:0 10px 28px rgba(15,23,42,.08);
+      --soft:0 4px 14px rgba(15,23,42,.05);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:#e9eef6;font-family:Outfit,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--text)}
+    .wrap{min-height:100dvh;display:grid;place-items:center;padding:28px}
+    .screen{width:min(980px,100%);height:760px;background:var(--bg);border-radius:30px;overflow:hidden;box-shadow:0 24px 70px rgba(15,23,42,.22);border:1px solid rgba(255,255,255,.9);position:relative;display:flex;flex-direction:column}
+    .topbar{height:62px;background:rgba(255,255,255,.94);display:flex;align-items:center;padding:0 26px;border-bottom:1px solid rgba(226,232,240,.9);gap:14px}
+    .logo{width:38px;height:38px;border-radius:14px;background:#eff6ff;color:#2563eb;display:grid;place-items:center}
+    .top-title{font-weight:800;font-size:19px;letter-spacing:.01em}.top-sub{font-size:12px;color:var(--muted);margin-top:1px}.top-status{margin-left:auto;display:flex;align-items:center;gap:18px;color:#667085;font-size:13px;font-weight:600}.dot{width:8px;height:8px;border-radius:99px;background:#10b981;display:inline-block;margin-right:6px}.time{text-align:right;border-left:1px solid #e2e8f0;padding-left:18px}.time strong{display:block;font-size:22px;color:#111827;line-height:1}.time span{font-size:12px;color:#64748b}
+    .hero{height:215px;background:linear-gradient(120deg,rgba(15,23,42,.86),rgba(30,64,175,.58)),url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260"%3E%3Cdefs%3E%3ClinearGradient id="g" x1="0" x2="1"%3E%3Cstop stop-color="%2387a6c8"/%3E%3Cstop offset="1" stop-color="%23d8e6f4"/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill="url(%23g)" width="900" height="260"/%3E%3Ccircle cx="725" cy="88" r="58" fill="%23fff" opacity=".18"/%3E%3Crect x="520" y="130" width="260" height="72" rx="16" fill="%23fff" opacity=".16"/%3E%3Cpath d="M0 210 C180 150 300 250 470 190 S760 165 900 214 V260 H0Z" fill="%23ffffff" opacity=".20"/%3E%3C/svg%3E');background-size:cover;background-position:center;display:flex;align-items:center;padding:0 42px;color:white;position:relative}
+    .hero h1{margin:0;font-size:40px;letter-spacing:.01em}.hero p{margin:10px 0 0;color:rgba(255,255,255,.82);font-size:17px;font-weight:500}.identity{position:relative;z-index:2;margin:-42px 34px 0;background:white;border:1px solid rgba(255,255,255,.9);border-radius:24px;padding:22px 26px;display:flex;align-items:center;box-shadow:var(--shadow)}
+    .avatar{width:74px;height:74px;border-radius:50%;background:#f8fafc;display:grid;place-items:center;color:#cbd5e1}.identity h2{margin:0;font-size:28px}.identity p{margin:6px 0 0;color:var(--muted);font-weight:600}.login{margin-left:auto;height:56px;min-width:250px;border:0;border-radius:18px;background:#2563eb;color:white;font-size:20px;font-weight:800;box-shadow:0 10px 24px rgba(37,99,235,.28)}
+    .content{padding:22px 34px 18px;flex:1;min-height:0;overflow-y:auto}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}.module{background:white;border:1px solid var(--line);border-radius:20px;padding:16px;box-shadow:var(--soft)}.module-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.module-title{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px}.module-title i{width:30px;height:30px;border-radius:10px;display:grid;place-items:center}.tile-row{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.tile{min-height:72px;border:1px solid #edf2f7;background:#f8fafc;border-radius:14px;padding:10px;text-align:left}.tile b{display:block;font-size:13px;color:#1f2937}.tile span{display:block;margin-top:4px;font-size:11px;color:#8a95a7;line-height:1.25}.tag{font-size:11px;color:#94a3b8;background:#f1f5f9;border-radius:99px;padding:4px 8px}
+    .smart-section{margin-top:16px;background:white;border:1px solid #cde0f7;border-radius:24px;box-shadow:0 18px 38px rgba(37,99,235,.13);overflow:hidden}.smart-top{min-height:58px;background:linear-gradient(90deg,#eff6ff,#ecfeff);display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid #dbeafe}.smart-badge{width:38px;height:38px;border-radius:14px;background:#2563eb;color:white;display:grid;place-items:center;margin-right:12px}.smart-title strong{display:block;font-size:18px}.smart-title span{display:block;font-size:12px;color:#64748b;margin-top:1px}.switch{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:#2563eb;font-weight:700;background:white;border:1px solid #bfdbfe;border-radius:999px;padding:6px 10px}.switch-dot{width:26px;height:16px;border-radius:99px;background:#2563eb;position:relative}.switch-dot:after{content:"";width:10px;height:10px;border-radius:99px;background:white;position:absolute;right:3px;top:3px}.smart-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:15px}.smart-card{min-height:94px;border-radius:18px;border:1px solid #e6eef9;background:#fbfdff;padding:14px;position:relative;overflow:hidden}.smart-card:after{content:"";position:absolute;right:-20px;bottom:-26px;width:76px;height:76px;border-radius:50%;background:currentColor;opacity:.08}.smart-icon{width:36px;height:36px;border-radius:13px;display:grid;place-items:center;margin-bottom:10px}.smart-card b{display:block;font-size:15px}.smart-card p{margin:4px 0 0;font-size:11px;line-height:1.35;color:#667085}.blue{color:var(--blue)}.cyan{color:var(--cyan)}.green{color:var(--green)}.orange{color:var(--orange)}.violet{color:var(--violet)}.blue .smart-icon{background:#eff6ff}.cyan .smart-icon{background:#ecfeff}.green .smart-icon{background:#ecfdf5}.orange .smart-icon{background:#fff7ed}.violet .smart-icon{background:#f5f3ff}.nav{height:54px;background:white;border-top:1px solid #e5e7eb;display:grid;grid-template-columns:repeat(3,1fr);flex:0 0 auto}.nav div{display:grid;place-items:center;color:#94a3b8;font-size:12px;font-weight:700}.nav div:first-child{color:#2563eb}.note{width:min(980px,100%);margin-top:16px;background:white;border:1px solid #dde5ef;border-radius:20px;padding:18px 22px;box-shadow:var(--soft);line-height:1.55;color:#344054}.note strong{color:#111827}.note-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:10px}.pill{display:inline-flex;align-items:center;border-radius:999px;background:#eff6ff;color:#1d4ed8;padding:4px 9px;font-size:12px;font-weight:700;margin-right:6px}.diagram{border:1px dashed #bfd3ef;border-radius:16px;padding:12px;background:#f8fbff;font-size:13px;color:#475569}.arrow{color:#2563eb;font-weight:800;margin:0 6px}
+    svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.smart-icon svg,.logo svg,.smart-badge svg{width:21px;height:21px}.module-title svg{width:17px;height:17px}.screen-label{display:inline-flex;margin-top:14px;color:#2563eb;font-size:12px;font-weight:800;background:#eff6ff;border:1px solid #bfdbfe;padding:5px 10px;border-radius:999px}
+    @media (max-width:860px){.screen{height:auto;min-height:760px}.grid{grid-template-columns:1fr}.smart-section{margin-top:18px}.content{height:auto;padding-bottom:18px}.smart-cards{grid-template-columns:repeat(2,1fr)}.note-grid{grid-template-columns:1fr}.identity{margin-left:18px;margin-right:18px}.login{min-width:180px}.hero h1{font-size:32px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="screen">
+      <div class="topbar">
+        <div class="logo"><svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></div>
+        <div><div class="top-title">AI求职打印一体机</div><div class="top-sub">求职材料 · 招聘会 · 打印扫描</div></div>
+        <div class="top-status"><span><i class="dot"></i>打印机</span><span><i class="dot"></i>网络</span><div class="time"><strong>17:01</strong><span>周二 06/09</span></div></div>
+      </div>
+      <div class="hero"><div><h1>AI求职打印一体机</h1><p>简历服务、岗位信息、招聘会服务、打印扫描一站办理</p></div></div>
+      <div class="identity"><div class="avatar"><svg viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></div><div style="margin-left:18px"><h2>欢迎来到求职服务终端</h2><p>登录后可查看更多专属权益和历史服务记录</p></div><button class="login">立即登录 / 注册</button></div>
+      <div class="content">
+        <div class="grid">
+          <div class="module"><div class="module-head"><div class="module-title"><i style="background:#eff6ff;color:#2563eb"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></i>AI简历服务</div><span class="tag">真实可用</span></div><div class="tile-row"><div class="tile"><b>AI简历诊断</b><span>上传简历查看报告</span></div><div class="tile"><b>简历优化</b><span>基于报告给建议</span></div><div class="tile"><b>简历打印</b><span>预览后打印</span></div></div></div>
+          <div class="module"><div class="module-head"><div class="module-title"><i style="background:#fff7ed;color:#d97706"><svg viewBox="0 0 24 24"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="M4 20h16"/></svg></i>招聘会</div><span class="tag">第三方来源</span></div><div class="tile-row"><div class="tile"><b>社会招聘会</b><span>列表/筛选/扫码预约</span></div><div class="tile"><b>校园招聘会</b><span>企业/导览/打印</span></div><div class="tile"><b>扫码签到</b><span>即将上线</span></div></div></div>
+        </div>
+        <div class="screen-label">学校端开关打开后，这里出现智慧校园横向框</div>
+        <section class="smart-section">
+          <div class="smart-top">
+            <div class="smart-badge"><svg viewBox="0 0 24 24"><path d="m22 10-10-5-10 5 10 5 10-5Z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
+            <div class="smart-title"><strong>智慧校园</strong><span>学校专属服务专区 · 仅校园机器开启时展示</span></div>
+            <div class="switch"><span>学校端已开启</span><i class="switch-dot"></i></div>
+          </div>
+          <div class="smart-cards">
+            <div class="smart-card blue"><div class="smart-icon"><svg viewBox="0 0 24 24"><path d="M12 2v6"/><path d="m5 5 4 4"/><path d="m19 5-4 4"/><path d="M4 13h16"/><path d="M6 21h12"/><path d="M7 13v8"/><path d="M17 13v8"/></svg></div><b>迎新服务</b><p>报到流程、办事窗口、入学材料打印</p></div>
+            <div class="smart-card cyan"><div class="smart-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 16v-5"/><path d="M12 16V7"/><path d="M17 16v-3"/></svg></div><b>校园大数据</b><p>新生性别、专业、年龄、生源地聚合看板</p></div>
+            <div class="smart-card green"><div class="smart-icon"><svg viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11h18Z"/><path d="M7 6V4h10v2"/><circle cx="8" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg></div><b>行李帮运</b><p>校方合作服务入口，显示路线与服务点</p></div>
+            <div class="smart-card violet"><div class="smart-icon"><svg viewBox="0 0 24 24"><path d="M3 7h18v10H3z"/><path d="M7 7V5h10v2"/><path d="M8 12h.01"/><path d="M16 12h.01"/></svg></div><b>VR校园</b><p>校园全景、路线导览、重点场馆介绍</p></div>
+          </div>
+        </section>
+      </div>
+      <div class="nav"><div>首页</div><div>AI助手</div><div>我的</div></div>
+    </div>
+    <div class="note">
+      <strong>建议方案：</strong>智慧校园不做公共常驻功能，而是做成“学校端租户配置 + 终端绑定 + 首页横向区显隐”。机器在校园场景时打开，出了校园后台关闭后整块消失。
+      <div class="note-grid">
+        <div>
+          <span class="pill">学校端</span><span class="pill">终端开关</span><span class="pill">模块配置</span>
+          <p style="margin:10px 0 0;font-size:14px;color:#667085">学校领导/管理员可以配置：是否展示智慧校园、展示哪些模块、模块排序、学校名称与服务说明。</p>
+        </div>
+        <div class="diagram">学校端配置 <span class="arrow">→</span> API 下发终端配置 <span class="arrow">→</span> Kiosk 首页读取 <span class="arrow">→</span> 显示/隐藏智慧校园横向框</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
