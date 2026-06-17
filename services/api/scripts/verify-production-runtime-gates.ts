@@ -7,7 +7,23 @@ const PROD_OK: Env = {
   JWT_SECRET: 'a-strong-production-secret-0123456789',
   FILE_STORAGE_DRIVER: 'cos',
   DATABASE_URL: 'postgresql://user:pass@127.0.0.1:5432/ai_job_print',
+  SMS_PROVIDER: 'tencent',
+  TENCENT_SMS_SECRET_ID: 'sms-secret-id',
+  TENCENT_SMS_SECRET_KEY: 'sms-secret-key',
+  TENCENT_SMS_SDK_APP_ID: 'sms-sdk-app-id',
+  TENCENT_SMS_SIGN_NAME: 'sms-sign-name',
+  TENCENT_SMS_TEMPLATE_ID: 'sms-template-id',
+  OCR_PROVIDER: 'baidu',
+  BAIDU_OCR_API_KEY: 'baidu-api-key',
+  BAIDU_OCR_SECRET_KEY: 'baidu-secret-key',
 }
+const REQUIRED_SMS_KEYS = [
+  'TENCENT_SMS_SECRET_ID',
+  'TENCENT_SMS_SECRET_KEY',
+  'TENCENT_SMS_SDK_APP_ID',
+  'TENCENT_SMS_SIGN_NAME',
+  'TENCENT_SMS_TEMPLATE_ID',
+] as const
 
 function expectAllowed(env: Env, label: string): void {
   assertProductionRuntimeGates(env)
@@ -78,6 +94,41 @@ function main(): void {
     { ...PROD_OK, DATABASE_URL: 'file:./prisma/dev.db' },
     'PRODUCTION_SQLITE_FORBIDDEN',
     '生产环境拒绝 SQLite 数据库',
+  )
+
+  // 生产环境：短信必须使用腾讯云真实 provider，且必填项齐全
+  expectRejected(
+    { ...PROD_OK, SMS_PROVIDER: undefined },
+    'PRODUCTION_SMS_PROVIDER_NOT_TENCENT',
+    '生产环境拒绝未设置 SMS_PROVIDER',
+  )
+  expectRejected(
+    { ...PROD_OK, SMS_PROVIDER: 'log' },
+    'PRODUCTION_SMS_PROVIDER_NOT_TENCENT',
+    '生产环境拒绝 SMS_PROVIDER=log',
+  )
+  for (const key of REQUIRED_SMS_KEYS) {
+    expectRejected(
+      { ...PROD_OK, [key]: key.endsWith('KEY') ? '   ' : '' },
+      'PRODUCTION_TENCENT_SMS_CONFIG_MISSING',
+      `生产环境拒绝腾讯短信配置缺项:${key}`,
+    )
+  }
+
+  // 生产环境：启用百度 OCR 时必须填齐百度密钥；未启用 OCR 时不强制
+  expectRejected(
+    { ...PROD_OK, BAIDU_OCR_API_KEY: '   ' },
+    'PRODUCTION_BAIDU_OCR_CONFIG_MISSING',
+    '生产环境拒绝百度 OCR 缺失 API Key',
+  )
+  expectRejected(
+    { ...PROD_OK, BAIDU_OCR_SECRET_KEY: undefined },
+    'PRODUCTION_BAIDU_OCR_CONFIG_MISSING',
+    '生产环境拒绝百度 OCR 缺失密钥',
+  )
+  expectAllowed(
+    { ...PROD_OK, OCR_PROVIDER: 'disabled', BAIDU_OCR_API_KEY: undefined, BAIDU_OCR_SECRET_KEY: undefined },
+    '生产环境 OCR_PROVIDER=disabled 时不强制百度密钥',
   )
 
   console.log('\n=== ALL PASS ===')

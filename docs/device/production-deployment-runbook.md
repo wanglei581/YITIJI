@@ -83,8 +83,9 @@ TENCENT_COS_SIGN_URL_EXPIRES_SECONDS=1800   # 合规上限，勿超
 # ── Redis：生产必配，禁止 inline 降级 ──
 REDIS_URL="redis://:PASSWORD@REDISHOST:6379/0"
 
-# ── 短信：审核通过前保持 log；通过后改 tencent 并填齐（见 launch-review-submissions.md）──
-SMS_PROVIDER=log
+# ── 短信：生产必须 tencent 并填齐；审核/凭证/真号 E2E 通过前不得上线生产 ──
+# 当前无“生产禁用会员短信登录但允许 API 启动”的开关；任一 TENCENT_SMS_* 缺失都会启动失败。
+SMS_PROVIDER=tencent
 TENCENT_SMS_SECRET_ID=
 TENCENT_SMS_SECRET_KEY=
 TENCENT_SMS_SDK_APP_ID=
@@ -152,8 +153,7 @@ pnpm build          # 5 包（pnpm -r --if-present build）
 ```bash
 cd services/api
 
-# 1) 生成 PG client + 部署迁移到空库
-POSTGRES_URL="postgresql://USER:PASS@PGHOST:5432/ai_job_print" pnpm db:pg:generate
+# 1) 构建会自动生成 SQLite + PG 两套 Prisma client；部署迁移到空库
 POSTGRES_URL="postgresql://USER:PASS@PGHOST:5432/ai_job_print" pnpm db:pg:deploy
 
 # 2) 漂移校验（CI 同款守门）
