@@ -103,6 +103,7 @@ jobs:
       - name: Verify suites
         run: |
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
+          pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs
@@ -207,4 +208,3 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs
-

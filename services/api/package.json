@@ -43,6 +43,7 @@
     "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts",
     "verify:fair-info-fields": "node -r @swc-node/register scripts/verify-fair-info-fields.ts",
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
+    "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:fair-company-positions": "node -r @swc-node/register scripts/verify-fair-company-positions.ts",
     "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
