@@ -101,6 +101,11 @@ jobs:
         run: npx prisma db push --accept-data-loss
 
       - name: Verify suites
+        # ⚠ 必须串行(逐行顺序执行)。这些 verify 共享同一个 SQLite dev.db,
+        # 并行(& / run-p / concurrently)会触发 SQLite 写锁超时,可能让脚本的
+        # finally 清理失败,残留 approved+published 测试招聘会泄漏到公开前台
+        # (/campus、/job-fairs)。各脚本已用稳定 tag 在下次运行前预清残留,
+        # 但前提仍是串行,切勿改成并行。
         run: |
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/api verify:print-jobs

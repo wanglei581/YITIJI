@@ -32,6 +32,10 @@ import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { AdminFairsService } from '../src/jobs/admin-fairs.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
+import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
+
+// 稳定且唯一的残留标记(跨运行不变):嵌进机构 id 与管理员 username,开始前预清 + finally 再清。
+const RESIDUE_TAG = 'vresidvenueguide'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exitCode = 1; throw new Error(m) }
@@ -63,10 +67,13 @@ async function main(): Promise<void> {
   const storage = new StorageService()
   const svc = new AdminFairsService(prisma, audit, storage)
 
+  // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
+  await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
+
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
-  const orgId = `org_vvg_${suffix}`
+  const orgId = `org_vvg_${RESIDUE_TAG}_${suffix}`
   const adminRow = await prisma.user.create({
-    data: { username: `vvg_admin_${suffix}`, passwordHash: 'x', name: '验证管理员', role: 'admin' },
+    data: { username: `${RESIDUE_TAG}_admin_${suffix}`, passwordHash: 'x', name: '验证管理员', role: 'admin' },
   })
   const admin: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
 
@@ -124,12 +131,8 @@ async function main(): Promise<void> {
     ],
   }
 
-  const cleanup = async () => {
-    await prisma.jobFair.deleteMany({ where: { sourceOrgId: orgId } }) // 级联清 guide/halls/companies
-    await prisma.auditLog.deleteMany({ where: { actorId: admin.userId } })
-    await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined)
-    await prisma.user.delete({ where: { id: admin.userId } }).catch(() => undefined)
-  }
+  // 按稳定 tag 清理:机构名下 fair(级联清 guide/halls/companies/positions)+ 该 tag 的管理员及审计日志 + 机构。
+  const cleanup = async () => cleanFairVerifyResidue(prisma, RESIDUE_TAG)
 
   try {
     // ── 4. 无配置 → data null(空态) ───────────────────────────────────────
