@@ -88,11 +88,11 @@ export class SmartCampusService {
   ): Promise<TerminalSmartCampusConfigView> {
     const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
     const modules: SmartCampusModules = {
-      welcome: !!input.modules?.welcome,
+      welcome: input.enabled ? !!input.modules?.welcome : false,
       // 校园大数据本期冻结：任何端传入 true 都强制落 false，避免误展示未授权统计。
       bigdata: false,
-      luggage: !!input.modules?.luggage,
-      panorama: !!input.modules?.panorama,
+      luggage: input.enabled ? !!input.modules?.luggage : false,
+      panorama: input.enabled ? !!input.modules?.panorama : false,
     }
     // 未开启任何子模块时不允许 enabled=true（否则前端拉到"空模块"）。
     const anyModule = modules.welcome || modules.bigdata || modules.luggage || modules.panorama

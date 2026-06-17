@@ -69,10 +69,10 @@ const mockAdapter: SmartCampusAdminServiceInterface = {
   },
   async saveConfig(terminalId, input) {
     const modules = {
-      welcome: !!input.modules.welcome,
-      bigdata: !!input.modules.bigdata,
-      luggage: !!input.modules.luggage,
-      panorama: !!input.modules.panorama,
+      welcome: input.enabled ? !!input.modules.welcome : false,
+      bigdata: false,
+      luggage: input.enabled ? !!input.modules.luggage : false,
+      panorama: input.enabled ? !!input.modules.panorama : false,
     }
     const anyOn = modules.welcome || modules.bigdata || modules.luggage || modules.panorama
     const enabled = input.enabled && anyOn

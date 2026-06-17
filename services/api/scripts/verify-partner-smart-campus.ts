@@ -9,6 +9,7 @@
  *   5. orgId 为空拒绝 → 403 PARTNER_ORG_REQUIRED（list + save 都拒）。
  *   6. 非学校机构 partner 调智慧校园 → 403 PARTNER_NOT_SCHOOL。
  *   7. enabled=true 但无任何子模块 → 落 enabled=false，Kiosk 读到整张关闭。
+ *   15. enabled=false 即使传入子模块 true，也强制清空模块，避免关闭后残留状态。
  *
  * Admin 终端归属 → partner 可见性联动（本 Sprint 新增）：
  *   8.  未绑定终端 partner 不可见；admin 绑定到 A 校后 partner(A) 可见。
@@ -169,6 +170,21 @@ async function main(): Promise<void> {
     const kioskOff = await svc.getKioskConfig(T_A)
     if (!kioskOff.enabled) pass('Case7 Kiosk 读到整张关闭')
     else fail('Case7 Kiosk 仍 enabled')
+
+    // Case 15: enabled=false 时清空所有模块，防旧前端 / 直接 API 调用留下残留开关。
+    const savedDisabled = await svc.savePartnerTerminalConfig(
+      T_A,
+      { enabled: false, modules: { welcome: true, bigdata: true, luggage: true, panorama: true } },
+      userA,
+    )
+    if (
+      savedDisabled.enabled === false &&
+      !savedDisabled.modules.welcome &&
+      !savedDisabled.modules.bigdata &&
+      !savedDisabled.modules.luggage &&
+      !savedDisabled.modules.panorama
+    ) pass('Case15 enabled=false 强制清空所有模块')
+    else fail(`Case15 关闭后仍有模块残留: ${JSON.stringify(savedDisabled)}`)
 
     // ── Admin 终端归属 → partner 可见性联动 ────────────────────────────────────
     // Case 8: 未绑定不可见；绑定到 A 校后 partner(A) 可见
