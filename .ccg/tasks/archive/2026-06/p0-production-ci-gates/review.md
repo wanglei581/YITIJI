@@ -32,7 +32,8 @@
 
 - `pnpm --filter @ai-job-print/api verify:partner-smart-campus`
 - `pnpm --filter @ai-job-print/api verify:partner-edit`
-- `pnpm --filter @ai-job-print/api verify:public-fair-demo-guard`
+
+`verify-public-fair-demo-guard.ts` 对应功能尚未在 main，待 campus-recruitment 功能进入 main 后再接入 CI。
 
 ## 结论
 

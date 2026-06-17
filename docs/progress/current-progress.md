@@ -14,7 +14,7 @@
 - `services/api/src/config/production-runtime-gates.ts` 新增生产运行时启动门禁：`NODE_ENV=production` 时，`JWT_SECRET` 必须存在且长度不少于 16，`FILE_STORAGE_DRIVER` 必须为 `cos`，`DATABASE_URL` 必须存在且不得为 `file:` SQLite。
 - `services/api/src/main.ts` 在门禁通过后再动态导入 `AppModule`，避免生产配置不达标时先装载业务模块或连接外部依赖。
 - `services/api/src/common/jwt-verifier.module.ts` 新增共享 `JwtVerifierModule`，将 audit / content / files / materials / print-jobs / smart-campus / terminals 7 个模块中的 JWT 弱密钥 fallback 统一改为 fail-closed。
-- `.github/workflows/ci.yml` 主 CI `Verify suites` 接入 `verify:smart-campus-ui`、`verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`、`verify:public-fair-demo-guard`，防止智慧校园 / 合作机构 / 招聘会关键闭环回退。
+- `.github/workflows/ci.yml` 主 CI `Verify suites` 接入 `verify:smart-campus-ui`、`verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`，防止智慧校园 / 合作机构关键闭环回退；`verify-public-fair-demo-guard.ts` 对应功能尚未在 main，随 campus-recruitment 功能后续接入。
 - `docs/device/production-deployment-and-windows-host-checklist.md` 补充生产 `.env` 门禁核对项：`NODE_ENV=production`、强随机 `JWT_SECRET`、PostgreSQL `DATABASE_URL`、`FILE_STORAGE_DRIVER=cos`。
 
 已通过本地验证：
@@ -31,7 +31,7 @@
 
 本机限制：
 
-- `verify:partner-smart-campus` / `verify:partner-edit` / `verify:public-fair-demo-guard` 依赖 CI 先执行 `npx prisma db push --accept-data-loss` 创建全新 SQLite 测试库；当前本机 Prisma schema engine 返回空错误 `Schema engine error:`，无法完成本地 db push。已确认脚本能加载 AppModule 并连接 SQLite，阻塞点为测试库缺表；这三项必须在 CI 或可正常 `db push` 的环境复跑。
+- `verify:partner-smart-campus` / `verify:partner-edit` 依赖 CI 先执行 `npx prisma db push --accept-data-loss` 创建全新 SQLite 测试库；当前本机 Prisma schema engine 返回空错误 `Schema engine error:`，无法完成本地 db push。这两项必须在 CI 或可正常 `db push` 的环境复跑。
 
 双模型审查结果：
 

@@ -26,8 +26,9 @@
 
 - [x] 生产运行时门禁：`NODE_ENV=production` 时强制 `JWT_SECRET` 合规、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL` 指向 PostgreSQL，误配即启动失败。
 - [x] 7 个历史 JWT 弱 fallback 模块已统一切到 `JwtVerifierModule`，`services/api/src` 中弱 fallback 扫描 0 命中。
-- [x] 主 CI 接入 `verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`、`verify:public-fair-demo-guard`、`verify:smart-campus-ui`。
-- [ ] CI 或可正常 `prisma db push` 的环境复跑新增的 3 个 AppModule+DB verify：`verify:partner-smart-campus` / `verify:partner-edit` / `verify:public-fair-demo-guard`。
+- [x] 主 CI 接入 `verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`、`verify:smart-campus-ui`。
+- [ ] CI 或可正常 `prisma db push` 的环境复跑新增的 2 个 AppModule+DB verify：`verify:partner-smart-campus` / `verify:partner-edit`。
+- [ ] `verify-public-fair-demo-guard.ts` 尚未在 main，待 campus-recruitment 功能进入 main 后再接入 CI。
 
 ### 1. 生产环境准备
 
