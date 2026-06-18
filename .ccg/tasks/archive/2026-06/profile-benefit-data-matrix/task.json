@@ -1,0 +1,12 @@
+{
+  "id": "profile-benefit-data-matrix",
+  "title": "我的页与权益活动前后端数据闭环矩阵补充",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "product-docs",
+  "currentPhase": "completed",
+  "nextAction": "矩阵已补充，待百度云 SSH 恢复后继续预生产复验",
+  "createdAt": "2026-06-19T00:40:00+08:00",
+  "branch": "main"
+}
