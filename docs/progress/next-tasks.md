@@ -11,7 +11,7 @@
 - [x] 后端 `verify:benefit-activities` 覆盖可见性、领取、重复领取、库存、过期/结束拒绝、补贴提示信息化、手机号脱敏审计和 controller 鉴权元数据。
 - [x] 本机 PostgreSQL 16 throwaway 库已完成 `db:pg:deploy`、表/外键核查、真实 API 进程 + Redis + HTTP 端到端、Kiosk/Admin Chrome 截图级冒烟。
 - [x] clean review 分支已完成本机验证、Antigravity + Claude 双模型审查，Critical = 0；Claude 提醒的 `verify-member-favorites-benefits` 已补跑通过。
-- [ ] 百度云 SSH 公钥恢复：当前 root 登录仍返回 `Permission denied (publickey,password)`；恢复后使用 `/tmp/yitiji-deploy/baidu-preprod-0c8850c8-commands.md` 执行包含权益活动与 P1 消息/反馈能力的部署与复验。
+- [ ] 百度云 SSH 公钥恢复：2026-06-19 复测 root 登录仍返回 `Permission denied (publickey,password)`；恢复后使用部署包 `/tmp/yitiji-deploy/yitiji-main-8e9cf7e9.tar.gz` 与命令 `/tmp/yitiji-deploy/baidu-preprod-8e9cf7e9-commands.md` 执行包含权益活动、P1 消息/反馈能力和本机验收证据的部署与复验。
 - [ ] 真实云服务器 PostgreSQL 迁移部署后，仍需在服务器补跑 `verify:benefit-activities` 或等价 live 冒烟；本机 PG 通过不等于生产通过。
 - [ ] 活动核销、Partner 自助配置、自动资格审核、活动推荐算法不在 P2；如要做需单独产品设计与数据模型。
 - [ ] 求职打印套餐、AI 服务套餐、招聘会扫码凭证仍后置，不得用权益活动模型伪造套餐、支付或预约凭证。

@@ -7,13 +7,14 @@
 
 ## 百度云预生产复验待 SSH 恢复（2026-06-19，Codex）
 
-权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已本地合入 `main`。当前本地 `main` 已继续追加文档证据提交，部署包仍对应功能代码与 clean review 记录所在的 `0c8850c8`：
+权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已本地合入 `main`。已基于包含本机 HTTP / Chrome 验收证据的提交重新生成可部署包；后续本段记录提交只用于说明部署包与 SSH 阻塞状态，不改变业务功能代码：
 
-- 部署包：`/tmp/yitiji-deploy/yitiji-main-0c8850c8.tar.gz`
-- SHA256：`c5652cdd4b44eed36b42381aa2c91a0efb5f8fa50de3da2d7233a075b4cd7559`
-- 复验命令：`/tmp/yitiji-deploy/baidu-preprod-0c8850c8-commands.md`
+- 部署包对应提交：`8e9cf7e9`
+- 部署包：`/tmp/yitiji-deploy/yitiji-main-8e9cf7e9.tar.gz`
+- SHA256：`d5dec6338cb9bb1dd567fa5b6515975de5449eca3ec913cddee4576a250ebe37`
+- 复验命令：`/tmp/yitiji-deploy/baidu-preprod-8e9cf7e9-commands.md`
 
-当前阻塞：`ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes root@120.48.13.190` 返回 `Permission denied (publickey,password)`，服务器 root 的 `authorized_keys` 尚未恢复当前 Mac 公钥，因此暂不能上传部署包、执行 PostgreSQL 迁移、重启 API 或进行公网 HTTP 复验。
+当前阻塞：2026-06-19 复测 `ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes root@120.48.13.190 'hostname && echo SSH_OK'` 仍返回 `Permission denied (publickey,password)`，服务器 root 的 `authorized_keys` 尚未恢复当前 Mac 公钥，因此暂不能上传部署包、执行 PostgreSQL 迁移、重启 API 或进行公网 HTTP 复验。
 
 恢复 SSH 后下一步执行：上传部署包 → PostgreSQL `db:pg:deploy` / `db:pg:sync:check` → API/Kiosk/Admin/Partner 构建 → PM2 重启 → `verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-favorites-benefits` → 公网检查 Admin 创建/发布、Kiosk 展示、会员领取、我的权益、Admin 领取记录、本人反馈提交、Admin 回复、本人消息读取。
 
