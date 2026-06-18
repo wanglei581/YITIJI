@@ -7,7 +7,7 @@
 
 ## 百度云预生产复验待 SSH 恢复（2026-06-19，Codex）
 
-权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已本地合入 `main`，当前本地 `main` HEAD 为 `0c8850c8`，领先 `origin/main` 11 个提交。百度云预生产部署包已准备好：
+权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已本地合入 `main`。当前本地 `main` 已继续追加文档证据提交，部署包仍对应功能代码与 clean review 记录所在的 `0c8850c8`：
 
 - 部署包：`/tmp/yitiji-deploy/yitiji-main-0c8850c8.tar.gz`
 - SHA256：`c5652cdd4b44eed36b42381aa2c91a0efb5f8fa50de3da2d7233a075b4cd7559`
@@ -17,7 +17,7 @@
 
 恢复 SSH 后下一步执行：上传部署包 → PostgreSQL `db:pg:deploy` / `db:pg:sync:check` → API/Kiosk/Admin/Partner 构建 → PM2 重启 → `verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-favorites-benefits` → 公网检查 Admin 创建/发布、Kiosk 展示、会员领取、我的权益、Admin 领取记录、本人反馈提交、Admin 回复、本人消息读取。
 
-验收边界：本机 PostgreSQL/Redis/HTTP/Chrome 已通过，不等于百度云预生产已通过；云端复验完成前不能宣称服务器版本具备权益活动商用闭环。
+补充本机验收：2026-06-19 已在本机 `http://localhost:3010/api/v1`、Kiosk `http://127.0.0.1:5183`、Admin `http://localhost:5174` 完成 P1 消息通知 / 意见反馈真实 HTTP + Chrome 登录态冒烟，结果见下方 P1 章节。验收边界：本机 PostgreSQL/Redis/HTTP/Chrome 已通过，不等于百度云预生产已通过；云端复验完成前不能宣称服务器版本具备权益活动商用闭环。
 
 ## 「我的」权益活动中心 MVP（2026-06-18，Codex + Claude/Antigravity 审查）
 
@@ -84,6 +84,17 @@
 - Antigravity 审查 ✅：Critical 0 / Warning 0 / Info 0，APPROVE。
 - Claude 审查 ✅：Critical 0 / Warning 0，APPROVE；Info 仅记录 `markAllRead` 单次 100 条广播上限、P1 单页合并快照、合规词正则后续可抽公共常量，均不阻塞合入。
 - `verify:member-favorites-benefits` 未作为本轮门禁：该旧脚本依赖外部 `DATABASE_URL`，本轮尝试用 Prisma `db push` 初始化临时 SQLite 时 schema engine 返回空错误；P1 自带验证与权益回归均已通过。
+
+补充真实 HTTP + Chrome 登录态验收（本地 SQLite + Redis + API dev + Kiosk/Admin dev，2026-06-19）：
+
+- API `GET /api/v1/health` ✅：返回 `success=true`、`status=ok`、`db=sqlite`。
+- 会员短信登录 ✅：`POST /member/auth/sms-code` 使用 `SMS_PROVIDER=log` 下发开发验证码，`POST /member/auth/login` 返回会员 token 与脱敏手机号 `139****1234`。
+- 本人反馈闭环 ✅：会员 `POST /me/feedback` 创建「本机HTTP闭环验证反馈」，返回 `status=pending` 与脱敏联系电话；Admin `GET /admin/feedback?status=pending` 可查到该工单。
+- Admin 回复与本人详情 ✅：Admin `POST /admin/feedback/:id/replies` 回复后工单变为 `replied`；会员 `GET /me/feedback/:id` 可见 1 条回复。
+- 消息通知闭环 ✅：Admin 回复后自动生成本人 `feedback` 通知；Admin `POST /admin/notifications/broadcasts` 创建「本机HTTP闭环广播」后，会员 `GET /me/notifications` 可见 personal + broadcast 两类消息；`PATCH /me/notifications/read-all` 后未读数从 2 归零。
+- Kiosk Chrome 登录态截图 ✅：通过真实手机号验证码页面流程登录，在同一 SPA 会话内进入 `/me/feedback` 与 `/me/notifications`，可见本人反馈与广播/反馈通知。截图：`/tmp/kiosk-me-feedback-p1-http.png`、`/tmp/kiosk-me-notifications-p1-http.png`。
+- Admin Chrome 截图 ✅：后台登录态打开 `/member-feedback` 与 `/member-notifications`，可见同一反馈工单与广播列表/创建表单。截图：`/tmp/admin-member-feedback-p1-http.png`、`/tmp/admin-member-notifications-p1-http.png`。
+- 浏览器验证限制：Kiosk 会员 token 按公共一体机安全要求只存 React 内存，不写 cookie/localStorage/sessionStorage；截图验证必须走真实登录流程或同一 SPA 会话跳转，不能通过硬刷新注入登录态。该本机验收仍不等于百度云公网复验，也不覆盖真实腾讯短信、Windows 真机、打印权益扣减或支付域。
 
 验收边界：本轮是本地代码、service-level、typecheck/lint/build 与双模型审查通过；百度云预生产仍受 SSH 公钥阻塞，尚未部署和公网复验；Windows 一体机真机、真实短信/COS/OCR/支付/打印权益扣减仍属于外部依赖或后续域。
 

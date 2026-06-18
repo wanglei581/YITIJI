@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-19（P0a/P0b 我的权益与 P2 权益活动已本地收口；P1 消息通知 + 意见反馈 clean review 已通过；百度云复验待 SSH 公钥恢复；套餐/支付/凭证仍后置）
+> 最后更新：2026-06-19（P0a/P0b 我的权益与 P2 权益活动已本地收口；P1 消息通知 + 意见反馈 clean review 与本机 HTTP/Chrome 登录态验收已通过；百度云复验待 SSH 公钥恢复；套餐/支付/凭证仍后置）
 
 ## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
 
@@ -11,7 +11,7 @@
 - [x] 后端 `verify:benefit-activities` 覆盖可见性、领取、重复领取、库存、过期/结束拒绝、补贴提示信息化、手机号脱敏审计和 controller 鉴权元数据。
 - [x] 本机 PostgreSQL 16 throwaway 库已完成 `db:pg:deploy`、表/外键核查、真实 API 进程 + Redis + HTTP 端到端、Kiosk/Admin Chrome 截图级冒烟。
 - [x] clean review 分支已完成本机验证、Antigravity + Claude 双模型审查，Critical = 0；Claude 提醒的 `verify-member-favorites-benefits` 已补跑通过。
-- [ ] 百度云 SSH 公钥恢复：当前 root 登录仍返回 `Permission denied (publickey,password)`；恢复后使用 `/tmp/yitiji-deploy/baidu-preprod-a9c9b55b-commands.md` 执行部署与复验。
+- [ ] 百度云 SSH 公钥恢复：当前 root 登录仍返回 `Permission denied (publickey,password)`；恢复后使用 `/tmp/yitiji-deploy/baidu-preprod-0c8850c8-commands.md` 执行包含权益活动与 P1 消息/反馈能力的部署与复验。
 - [ ] 真实云服务器 PostgreSQL 迁移部署后，仍需在服务器补跑 `verify:benefit-activities` 或等价 live 冒烟；本机 PG 通过不等于生产通过。
 - [ ] 活动核销、Partner 自助配置、自动资格审核、活动推荐算法不在 P2；如要做需单独产品设计与数据模型。
 - [ ] 求职打印套餐、AI 服务套餐、招聘会扫码凭证仍后置，不得用权益活动模型伪造套餐、支付或预约凭证。
@@ -27,6 +27,7 @@
 - [x] 回归 `verify:benefit-activities`、`verify:member-benefits-admin`，确认 P1 未破坏权益活动和我的权益链路。
 - [x] API/shared/Kiosk/Admin typecheck 与 API/Kiosk/Admin build 通过。
 - [x] Antigravity + Claude 双模型审查 Critical / 高风险问题清零。
+- [x] 本机真实 HTTP + Chrome 登录态冒烟通过：会员验证码登录、提交反馈、Admin 查看并回复、本人收到反馈通知、Admin 创建广播、本人收到广播、全部已读归零；Kiosk `/me/feedback`、`/me/notifications` 与 Admin `/member-feedback`、`/member-notifications` 截图已保存到 `/tmp/*-p1-http.png`。
 - [x] 将 `codex/profile-notifications-feedback-p1-clean` 快进合入本地 `main`；如需同步 GitHub，需用户明确同意 push。
 - [ ] 打印订单详情可后续增加「反馈此订单」入口，带 `relatedPrintTaskId` 进入 `/me/feedback`；本批未接线。
 - [ ] WebSocket/短信推送、附件、富文本、匿名反馈不在本批；如要做需单独设计频控、退订、存储与审核。
