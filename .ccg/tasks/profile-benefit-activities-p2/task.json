@@ -1,0 +1,12 @@
+{
+  "id": "profile-benefit-activities-p2",
+  "title": "权益活动中心 MVP 设计与实施",
+  "status": "in_progress",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack",
+  "currentPhase": "planning",
+  "nextAction": "完成权益活动 MVP 设计规格并等待用户确认",
+  "createdAt": "2026-06-18T12:35:48Z",
+  "branch": "codex/profile-benefit-activities-p2"
+}
