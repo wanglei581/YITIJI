@@ -17,6 +17,8 @@ import PartnersPage from './partners'
 import UsersPage from './users'
 import MemberBenefitsPage from './member-benefits'
 import BenefitActivitiesPage from './benefit-activities'
+import MemberFeedbackPage from './member-feedback'
+import MemberNotificationsPage from './member-notifications'
 import AlertsPage from './alerts'
 import PermissionsPage from './permissions'
 import AuditPage from './audit'
@@ -52,6 +54,8 @@ export const adminRouter = createBrowserRouter([
       { path: 'users',        element: <UsersPage /> },
       { path: 'benefit-activities', element: <BenefitActivitiesPage /> },
       { path: 'member-benefits', element: <MemberBenefitsPage /> },
+      { path: 'member-feedback', element: <MemberFeedbackPage /> },
+      { path: 'member-notifications', element: <MemberNotificationsPage /> },
       { path: 'alerts',       element: <AlertsPage /> },
       { path: 'permissions',     element: <PermissionsPage /> },
       { path: 'audit',           element: <AuditPage /> },

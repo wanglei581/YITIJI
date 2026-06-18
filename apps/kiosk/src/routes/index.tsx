@@ -39,6 +39,8 @@ import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
 import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
 import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
+import { MyNotificationsPage } from '../pages/profile/me/MyNotificationsPage'
+import { MyFeedbackPage } from '../pages/profile/me/MyFeedbackPage'
 import { HelpCenterPage } from '../pages/help/HelpCenterPage'
 import { BenefitActivitiesPage } from '../pages/activities/BenefitActivitiesPage'
 import { BenefitActivityDetailPage } from '../pages/activities/BenefitActivityDetailPage'
@@ -88,6 +90,8 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/favorites',      element: <MyFavoritesPage /> },
       { path: 'me/benefits',       element: <MyBenefitsPage /> },
       { path: 'me/activity',       element: <MyActivityPage /> },
+      { path: 'me/notifications',  element: <MyNotificationsPage /> },
+      { path: 'me/feedback',       element: <MyFeedbackPage /> },
       // 账号设置轻量版（只读状态 + 协议入口 + 退出/切换账号；不做换绑/注销）
       { path: 'me/settings',       element: <MySettingsPage /> },
       // 帮助中心（静态 FAQ；仅描述已上线能力）

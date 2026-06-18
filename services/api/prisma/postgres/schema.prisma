@@ -199,6 +199,7 @@ model User {
   uploadedFiles FileObject[] @relation("FileUploader")
   auditLogs     AuditLog[]
   createdBenefitActivities BenefitActivity[]
+  feedbackReplies FeedbackReply[]
 
   @@index([orgId])
 }
@@ -228,6 +229,9 @@ model EndUser {
   browseLogs       BrowseLog[]
   externalJumpLogs ExternalJumpLog[]
   benefitClaims     BenefitClaim[]
+  feedbackTickets  FeedbackTicket[]
+  notifications    MemberNotification[]
+  broadcastReadStates BroadcastReadState[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -1364,4 +1368,93 @@ model TerminalSmartCampusConfig {
   updatedBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ── 用户通知 / 意见反馈(P1 我的页商用闭环)────────────────────────────────────
+// 本域只承接系统服务、打印/文件/AI 工具类通知与设备/流程反馈;不得承接投递、
+// 面试、录用、候选人推荐等招聘闭环状态。
+
+model MemberNotification {
+  id          String   @id @default(cuid())
+  endUserId   String
+  endUser     EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  category    String   @default("system") // system / print / ai / feedback
+  relatedType String?  // feedback_ticket / print_task / ai_resume_result
+  relatedId   String?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([endUserId, isRead, createdAt])
+  @@index([endUserId, createdAt])
+  @@index([deletedAt])
+}
+
+model SystemBroadcast {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String   @default("system") // system / maintenance / notice
+  deletedAt DateTime?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  readStates BroadcastReadState[]
+
+  @@index([deletedAt, createdAt])
+}
+
+model BroadcastReadState {
+  id          String   @id @default(cuid())
+  endUserId   String
+  endUser     EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  broadcastId String
+  broadcast   SystemBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  readAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([endUserId, broadcastId])
+  @@index([endUserId])
+  @@index([broadcastId])
+}
+
+model FeedbackTicket {
+  id             String   @id @default(cuid())
+  endUserId      String
+  endUser        EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  terminalId     String?
+  relatedPrintTaskId String?
+  category       String   // device / print / file_process / general
+  title          String?
+  content        String
+  contactPhoneEnc String?
+  status         String   @default("pending") // pending / processing / replied / closed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  replies FeedbackReply[]
+
+  @@index([endUserId, createdAt])
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+}
+
+model FeedbackReply {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     FeedbackTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderType String   // user / admin / system
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  content    String
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([actorId])
 }

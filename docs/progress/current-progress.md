@@ -7,7 +7,7 @@
 
 ## 百度云预生产复验待 SSH 恢复（2026-06-19，Codex）
 
-权益活动 clean review 已本地合入 `main`，当前本地 `main` HEAD 为 `de34447a`，领先 `origin/main` 8 个提交。百度云预生产部署包已准备好：
+权益活动 clean review 已本地合入 `main`，当前本地 `main` HEAD 为 `77a2035c`，领先 `origin/main` 9 个提交。百度云预生产部署包已准备好：
 
 - 部署包：`/tmp/yitiji-deploy/yitiji-main-a9c9b55b.tar.gz`
 - SHA256：`51a9a7249f567192ef6dfef76b0e57847cf533341f521f1fea28b344d5954f09`
@@ -49,6 +49,38 @@
 
 - 求职打印套餐、AI 服务套餐、招聘会扫码凭证、支付/订单/核销、活动签到、自动资格审核、Partner 自助活动配置。
 - P1 消息通知 / 意见反馈未包含在本 clean review 分支，需单独审查和合入。
+
+## 「我的」页商用闭环 P1：消息通知 + 意见反馈 clean review（2026-06-19，Codex）
+
+在隔离 worktree `…/profile-notifications-feedback-p1-clean`、分支 `codex/profile-notifications-feedback-p1-clean` 将 P1 clean-pick 到已包含 P0a/P0b 与权益活动 P2 的本地 `main` 基线上。P1 只打通「我的」页已有的「消息通知 / 意见反馈」入口，不做套餐购买、招聘会扫码凭证、WebSocket/短信推送、附件、匿名反馈，也不新增任何招聘闭环语义。
+
+本轮目标：
+
+- **后端数据模型**：新增 `MemberNotification`、`SystemBroadcast`、`BroadcastReadState`、`FeedbackTicket`、`FeedbackReply`（SQLite/PG 双 schema + 双迁移），覆盖本人通知、系统广播、广播已读/隐藏状态、本人反馈工单与回复记录。
+- **本人消息接口**：新增 `/api/v1/me/notifications`，使用 `EndUserAuthGuard`；支持列表、未读筛选、全部已读、单条已读、删除个人消息、按本人隐藏广播。
+- **Admin 广播接口**：新增 `/api/v1/admin/notifications/broadcasts`，使用 `JwtAuthGuard + RolesGuard + @Roles('admin')`；支持创建/撤回广播并写审计。
+- **本人反馈接口**：新增 `/api/v1/me/feedback`，使用 `EndUserAuthGuard`；支持提交、列表、详情、补充描述、本人关闭。联系电话加密存储，页面只显示脱敏号码。
+- **Admin 反馈处理接口**：新增 `/api/v1/admin/feedback`，使用 `JwtAuthGuard + RolesGuard + @Roles('admin')`；支持筛选、查看、回复、改状态。Admin 回复后自动生成本人 `feedback` 消息通知。
+- **Kiosk 页面**：`ProfilePage`「消息通知」与「意见反馈」由建设中改为 `/me/notifications`、`/me/feedback`；新增本人消息页与反馈页，未登录 / mock 模式诚实空态，不展示假消息或假工单。
+- **Admin 页面**：侧栏新增「意见反馈」「消息通知」；新增反馈处理页与系统广播页，支持加载、失败、空态、筛选、回复、状态变更、创建/撤回广播。
+- **合规与隐私**：通知/反馈文案服务端拦截「一键投递、立即投递、平台投递、面试邀约、录用通知、候选人推荐、投递结果、预约结果」等招聘闭环或结果承诺；反馈审计 payload 只写 `phoneMasked`，不写明文手机号。
+- **服务验证脚本**：新增 `verify:feedback-notifications`，使用临时 SQLite 最小表，覆盖本人隔离、越权关闭拒绝、Admin 回复生成通知、广播逐用户已读、合规词拒绝、手机号不明文进审计、Admin controller 鉴权元数据。
+
+clean review 待完成验证：
+
+- `pnpm --filter @ai-job-print/api verify:feedback-notifications`
+- `pnpm --filter @ai-job-print/api verify:benefit-activities`
+- `pnpm --filter @ai-job-print/api verify:member-benefits-admin`
+- API / shared / Kiosk / Admin typecheck
+- API / Kiosk / Admin build
+- Antigravity + Claude 双模型审查，Critical / 高风险问题清零后再合入本地 `main`
+
+仍不在本批：
+
+- 打印订单详情携带 `relatedPrintTaskId` 直达反馈页的快捷入口。
+- WebSocket/短信/站外推送、推送退订、通知频控。
+- 反馈附件、富文本、匿名反馈。
+- 求职打印套餐、AI 服务套餐、招聘会扫码凭证与任何支付/核销域。
 
 ---
 

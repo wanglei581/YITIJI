@@ -243,6 +243,28 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.externalJumpLog
   }
 
+  // ── P1: 用户通知 / 意见反馈 ──────────────────────────────────────────────
+
+  get memberNotification() {
+    return this.client.memberNotification
+  }
+
+  get systemBroadcast() {
+    return this.client.systemBroadcast
+  }
+
+  get broadcastReadState() {
+    return this.client.broadcastReadState
+  }
+
+  get feedbackTicket() {
+    return this.client.feedbackTicket
+  }
+
+  get feedbackReply() {
+    return this.client.feedbackReply
+  }
+
   // ── 智慧校园(Smart Campus)──────────────────────────────────────────────
 
   get terminalSmartCampusConfig() {

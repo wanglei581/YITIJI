@@ -99,7 +99,7 @@ const SERVICES: Entry[] = [
 
 // 3. 招聘会与活动（外部来源信息入口 / 记录）
 // 浏览 / 外部跳转记录跨类型（岗位/招聘会/政策/企业），由 /me/activity 两 Tab 页承载。
-// 预约/投递结果以来源平台为准，本系统不记录。
+// 来源平台后续动作与结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
   { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '浏览记录',     route: '/me/activity' },
   { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '外部跳转记录', route: '/me/activity?tab=jump' },
@@ -116,15 +116,15 @@ const BENEFITS: Entry[] = [
   { icon: LandmarkIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '政策补贴指引', route: '/renshi?tab=policy' },
 ]
 
-// 5. 账户与服务（均建设中）
+// 5. 账户与服务（已接线入口直达本人消息、账号、帮助与反馈）
 const ACCOUNT: Entry[] = [
-  { icon: BellIcon,          iconBg: 'bg-blue-50',   iconColor: 'text-blue-600',   label: '消息通知', tag: '建设中' },
+  { icon: BellIcon,          iconBg: 'bg-blue-50',   iconColor: 'text-blue-600',   label: '消息通知', route: '/me/notifications' },
   // 账号设置轻量版：登录/游客状态、脱敏手机号、会话说明、协议入口、退出登录；不做换绑/注销。
   { icon: SettingsIcon,      iconBg: 'bg-gray-100',  iconColor: 'text-gray-600',   label: '账号设置', route: '/me/settings' },
   // 身份切换 = 退出当前账号后重新登录（不做多角色系统）；统一收口到账号设置页操作，避免数据串号。
   { icon: RepeatIcon,        iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600', label: '身份切换', route: '/me/settings' },
   { icon: HelpCircleIcon,    iconBg: 'bg-cyan-50',   iconColor: 'text-cyan-600',   label: '帮助中心', route: '/help' },
-  { icon: MessageSquareIcon, iconBg: 'bg-amber-50',  iconColor: 'text-amber-600',  label: '意见反馈', tag: '建设中' },
+  { icon: MessageSquareIcon, iconBg: 'bg-amber-50',  iconColor: 'text-amber-600',  label: '意见反馈', route: '/me/feedback' },
 ]
 
 const SECTIONS: EntrySectionData[] = [
@@ -163,8 +163,8 @@ function ProfileHeader({
   reserveBannerSpace,
   onLogin,
   onLogout,
-  onShortcut,
   onOpenSettings,
+  onOpenNotifications,
 }: {
   isLoggedIn: boolean
   displayName: string
@@ -180,8 +180,8 @@ function ProfileHeader({
   reserveBannerSpace: boolean
   onLogin: () => void
   onLogout: () => void
-  onShortcut: (message: string) => void
   onOpenSettings: () => void
+  onOpenNotifications: () => void
 }) {
   if (isLoggedIn) {
     return (
@@ -204,7 +204,7 @@ function ProfileHeader({
             </button>
             <button
               type="button"
-              onClick={() => onShortcut('消息通知建设中')}
+              onClick={onOpenNotifications}
               aria-label="消息通知"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
             >
@@ -437,7 +437,7 @@ export function ProfilePage() {
   // ── 账号概览统计：仅用于顶部三项数量，不在「我的」页下方聚合展示明细 ──
   const profileOverview = useMemberProfileOverview(isLoggedIn, getToken)
 
-  const headerDisplayName = user?.nickname?.trim() || displayName || '已登录用户'
+  const headerDisplayName = user?.nickname?.trim() || displayName || '会员账号'
   const headerPhoneMasked = user?.phoneMasked ?? displayName
   // 头部统计取服务端真实 total（来自 /me/* 分页响应），不叠加本次会话记录，避免同一文件被双算；
   // 本次会话记录在下方「本次服务记录」单独展示。不展示「完整度」——无真实完整度计算，不编造数字。
@@ -511,8 +511,8 @@ export function ProfilePage() {
         reserveBannerSpace={isLoggedIn && hasSessionRecords}
         onLogin={goLogin}
         onLogout={logout}
-        onShortcut={setToastMsg}
         onOpenSettings={() => navigate('/me/settings')}
+        onOpenNotifications={() => navigate('/me/notifications')}
       />
 
       {isLoggedIn && hasSessionRecords && <PendingTaskBanner onContinue={continuePendingTask} />}
