@@ -5,20 +5,44 @@
 
 ---
 
-## 百度云预生产复验待 SSH 恢复（2026-06-19，Codex）
+## 百度云预生产核心复验完成（2026-06-19，Codex）
 
-权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已本地合入 `main`。已基于包含本机 HTTP / Chrome 验收证据的提交重新生成可部署包；后续本段记录提交只用于说明部署包与 SSH 阻塞状态，不改变业务功能代码：
+权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `120.48.13.190`，当前云端版本：
 
-- 部署包对应提交：`8e9cf7e9`
-- 部署包：`/tmp/yitiji-deploy/yitiji-main-8e9cf7e9.tar.gz`
-- SHA256：`d5dec6338cb9bb1dd567fa5b6515975de5449eca3ec913cddee4576a250ebe37`
-- 复验命令：`/tmp/yitiji-deploy/baidu-preprod-8e9cf7e9-commands.md`
+- 部署提交：`9766bd2d`（含 `fix: align pnpm overrides for frozen install`，用于修复服务器 `pnpm install --frozen-lockfile` 的 overrides 校验）
+- 部署包：`/tmp/yitiji-deploy/yitiji-main-9766bd2d.tar.gz`
+- SHA256：`7cfdfb04fb8de0cbf3bebba3c2f0bcae21f4067a2e163c3645a30fb385b4820c`
+- 服务器部署源：`/srv/ai-job-print/DEPLOY_SOURCE.txt`
+- 回滚备份目录：`/srv/ai-job-print-prev-20260619020528`
 
-当前阻塞：2026-06-19 复测 `ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes root@120.48.13.190 'hostname && echo SSH_OK'` 仍返回 `Permission denied (publickey,password)`，服务器 root 的 `authorized_keys` 尚未恢复当前 Mac 公钥，因此暂不能上传部署包、执行 PostgreSQL 迁移、重启 API 或进行公网 HTTP 复验。
+本轮先用 root 密码恢复服务器 `authorized_keys`，随后公钥登录验证通过：`hostname && echo SSH_OK` 返回 `instance-061dyczx` / `SSH_OK`。部署过程中发现并修复两个真实预生产问题：
 
-恢复 SSH 后下一步执行：上传部署包 → PostgreSQL `db:pg:deploy` / `db:pg:sync:check` → API/Kiosk/Admin/Partner 构建 → PM2 重启 → `verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-favorites-benefits` → 公网检查 Admin 创建/发布、Kiosk 展示、会员领取、我的权益、Admin 领取记录、本人反馈提交、Admin 回复、本人消息读取。
+- **pnpm frozen install 阻塞**：`pnpm-lock.yaml` 含 overrides，但根 `package.json` 缺少 `pnpm.overrides`；已补回 `qs=6.15.2`、`@hono/node-server>=1.19.13`、`uuid>=11.1.1`，服务器 `pnpm install --frozen-lockfile` 通过。
+- **nginx `/api/v1` 反代缺失**：公网 `http://120.48.13.190/api/v1/health` 原先返回 Kiosk `index.html`；已备份 `/etc/nginx/sites-available/ai-job-print.bak-20260619020839` 并给 80/8081/8082 三个 server 添加 `/api/v1` → `127.0.0.1:3010/api/v1` 反代，`nginx -t` 与 reload 通过。
 
-补充本机验收：2026-06-19 已在本机 `http://localhost:3010/api/v1`、Kiosk `http://127.0.0.1:5183`、Admin `http://localhost:5174` 完成 P1 消息通知 / 意见反馈真实 HTTP + Chrome 登录态冒烟，结果见下方 P1 章节。验收边界：本机 PostgreSQL/Redis/HTTP/Chrome 已通过，不等于百度云预生产已通过；云端复验完成前不能宣称服务器版本具备权益活动商用闭环。
+云端部署与构建结果：
+
+- PostgreSQL `db:pg:deploy` ✅：已应用 `20260618180000_add_feedback_notifications` 与 `20260618190000_add_benefit_activities`。
+- PostgreSQL `db:pg:sync:check` ✅：schema 同步校验通过。
+- API build ✅；Kiosk/Admin/Partner build ✅（仅既有大 chunk warning）。
+- PM2 已收敛为单进程 `ai-job-print-api`，脚本路径 `/srv/ai-job-print/services/api/dist/main.js`，cwd `/srv/ai-job-print/services/api`。
+- 内网 health ✅：`http://127.0.0.1:3010/api/v1/health` 返回 `db=postgres`。
+- 公网 health ✅：`http://120.48.13.190/api/v1/health`、`:8081/api/v1/health`、`:8082/api/v1/health` 均返回 `db=postgres` JSON。
+
+云端服务验证：
+
+- `pnpm verify:member-benefits-admin` ✅ ALL PASS（连接 `postgresql://<redacted>@127.0.0.1:5432/ai_job_print`）。
+- `pnpm verify:benefit-activities` ✅ ALL PASS。
+- `pnpm verify:feedback-notifications` ✅ ALL PASS。
+- `DATABASE_URL=... pnpm verify:member-favorites-benefits` ✅ ALL PASS。
+
+公网 HTTP 核心链路：
+
+- 权益活动 ✅：Admin 登录 → `POST /admin/benefit-activities` 创建「百度云公网权益活动验证 20260618181014」→ 发布 → 公网 `GET /activities` 可见 → 会员 `139****4567` 验证码登录 → `POST /activities/:id/claim` 领取 → `GET /me/benefits` 可见 → Admin `/admin/benefit-activities/:id/claims` 可见脱敏领取记录。
+- 消息 / 反馈 ✅：会员 `139****4568` 公网提交反馈 → Admin `/admin/feedback` 可见 → Admin 回复后状态 `replied` → 本人 `/me/notifications` 收到「意见反馈已回复」→ Admin 创建系统广播 → 本人收到广播 → `read-all` 后未读归零。
+- 公网 Chrome 截图 ✅：Kiosk `/activities`、Admin `/benefit-activities`、Admin `/member-feedback` 已通过浏览器渲染检查，截图在本机 `/tmp/cloud-kiosk-activities-9766bd2d.png`、`/tmp/cloud-admin-benefit-activities-9766bd2d.png`、`/tmp/cloud-admin-member-feedback-9766bd2d.png`。
+
+验收边界：本轮完成的是百度云 IP + 端口预生产核心复验，不等于正式生产上线。仍未完成域名 / HTTPS、Windows 一体机真机触控、Terminal Agent + 奔图打印机真实出纸/扫描、真实腾讯短信、真实 COS/OCR/LLM 全链路复验、支付 / 套餐购买 / 打印权益扣减 / 退款回滚。
 
 ## 「我的」权益活动中心 MVP（2026-06-18，Codex + Claude/Antigravity 审查）
 

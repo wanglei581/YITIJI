@@ -1,0 +1,12 @@
+{
+  "id": "baidu-preprod-profile-deploy",
+  "title": "我的页与权益活动百度云预生产部署和复验",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "deployment",
+  "currentPhase": "completed",
+  "nextAction": "百度云 IP 预生产核心复验完成；剩余 Windows 真机、真实短信、支付/套餐/核销等外部域",
+  "createdAt": "2026-06-19T01:55:00+08:00",
+  "branch": "main"
+}
