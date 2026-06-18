@@ -27,7 +27,7 @@
 - [x] 回归 `verify:benefit-activities`、`verify:member-benefits-admin`，确认 P1 未破坏权益活动和我的权益链路。
 - [x] API/shared/Kiosk/Admin typecheck 与 API/Kiosk/Admin build 通过。
 - [x] Antigravity + Claude 双模型审查 Critical / 高风险问题清零。
-- [ ] 将 `codex/profile-notifications-feedback-p1-clean` 快进合入本地 `main`；如需同步 GitHub，需用户明确同意 push。
+- [x] 将 `codex/profile-notifications-feedback-p1-clean` 快进合入本地 `main`；如需同步 GitHub，需用户明确同意 push。
 - [ ] 打印订单详情可后续增加「反馈此订单」入口，带 `relatedPrintTaskId` 进入 `/me/feedback`；本批未接线。
 - [ ] WebSocket/短信推送、附件、富文本、匿名反馈不在本批；如要做需单独设计频控、退订、存储与审核。
 
