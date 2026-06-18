@@ -1,0 +1,12 @@
+{
+  "id": "benefit-activities-clean-review",
+  "title": "权益活动 clean 分支合入前审查",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "双模型审查已通过，下一步合入主线并部署百度云预生产复验",
+  "createdAt": "2026-06-18T23:55:00+08:00",
+  "branch": "codex/benefit-activities-clean-review"
+}

@@ -10,7 +10,7 @@
 - [x] Admin `/benefit-activities` 已接真实 API；支持创建草稿、更新草稿、发布、结束、查看领取记录。
 - [x] 后端 `verify:benefit-activities` 覆盖可见性、领取、重复领取、库存、过期/结束拒绝、补贴提示信息化、手机号脱敏审计和 controller 鉴权元数据。
 - [x] 本机 PostgreSQL 16 throwaway 库已完成 `db:pg:deploy`、表/外键核查、真实 API 进程 + Redis + HTTP 端到端、Kiosk/Admin Chrome 截图级冒烟。
-- [ ] clean review 分支完成本机验证、Antigravity + Claude 双模型审查，Critical 清零后再考虑合入。
+- [x] clean review 分支已完成本机验证、Antigravity + Claude 双模型审查，Critical = 0；Claude 提醒的 `verify-member-favorites-benefits` 已补跑通过。
 - [ ] 真实云服务器 PostgreSQL 迁移部署后，仍需在服务器补跑 `verify:benefit-activities` 或等价 live 冒烟；本机 PG 通过不等于生产通过。
 - [ ] 活动核销、Partner 自助配置、自动资格审核、活动推荐算法不在 P2；如要做需单独产品设计与数据模型。
 - [ ] 求职打印套餐、AI 服务套餐、招聘会扫码凭证仍后置，不得用权益活动模型伪造套餐、支付或预约凭证。
