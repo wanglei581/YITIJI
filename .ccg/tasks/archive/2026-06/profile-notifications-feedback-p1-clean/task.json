@@ -1,0 +1,12 @@
+{
+  "id": "profile-notifications-feedback-p1-clean",
+  "title": "消息通知与意见反馈 P1 clean review",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档任务记录",
+  "createdAt": "2026-06-19T00:55:00+08:00",
+  "branch": "codex/profile-notifications-feedback-p1-clean"
+}

@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-19（P0a/P0b 我的权益与 P2 权益活动已本地收口；P1 消息通知 + 意见反馈 clean review 中；百度云复验待 SSH 公钥恢复；套餐/支付/凭证仍后置）
+> 最后更新：2026-06-19（P0a/P0b 我的权益与 P2 权益活动已本地收口；P1 消息通知 + 意见反馈 clean review 已通过；百度云复验待 SSH 公钥恢复；套餐/支付/凭证仍后置）
 
 ## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
 
@@ -18,15 +18,16 @@
 
 ## 「我的」消息通知 + 意见反馈 clean review（2026-06-19，P1）
 
-- [ ] clean-pick 到 `codex/profile-notifications-feedback-p1-clean`，同时保留 P0a/P0b 我的权益与 P2 权益活动能力。
-- [ ] Kiosk `/me/notifications`：本人消息列表、未读筛选、全部已读、单条已读、删除/隐藏广播接真实 API；未登录 / mock 模式不造假。
-- [ ] Kiosk `/me/feedback`：本人提交、列表、详情、补充描述、关闭反馈接真实 API；联系电话加密存储、页面只显示脱敏。
-- [ ] Admin `/member-notifications`：系统广播创建/撤回接真实 API；合规词命中由后端拒绝并回显错误。
-- [ ] Admin `/member-feedback`：反馈筛选、查看、回复、改状态接真实 API；Admin 回复后自动生成本人消息。
-- [ ] 后端 `verify:feedback-notifications` 覆盖本人隔离、越权拒绝、Admin 回复通知、广播逐用户已读、合规词拒绝、审计不泄露明文手机号、Admin 鉴权元数据。
-- [ ] 回归 `verify:benefit-activities`、`verify:member-benefits-admin`，确认 P1 未破坏权益活动和我的权益链路。
-- [ ] API/shared/Kiosk/Admin typecheck 与 API/Kiosk/Admin build 通过。
-- [ ] Antigravity + Claude 双模型审查 Critical / 高风险问题清零后，再合入本地 `main`。
+- [x] clean-pick 到 `codex/profile-notifications-feedback-p1-clean`，同时保留 P0a/P0b 我的权益与 P2 权益活动能力。
+- [x] Kiosk `/me/notifications`：本人消息列表、未读筛选、全部已读、单条已读、删除/隐藏广播接真实 API；未登录 / mock 模式不造假。
+- [x] Kiosk `/me/feedback`：本人提交、列表、详情、补充描述、关闭反馈接真实 API；联系电话加密存储、页面只显示脱敏。
+- [x] Admin `/member-notifications`：系统广播创建/撤回接真实 API；合规词命中由后端拒绝并回显错误。
+- [x] Admin `/member-feedback`：反馈筛选、查看、回复、改状态接真实 API；Admin 回复后自动生成本人消息。
+- [x] 后端 `verify:feedback-notifications` 覆盖本人隔离、越权拒绝、Admin 回复通知、广播逐用户已读、合规词拒绝、审计不泄露明文手机号、Admin 鉴权元数据。
+- [x] 回归 `verify:benefit-activities`、`verify:member-benefits-admin`，确认 P1 未破坏权益活动和我的权益链路。
+- [x] API/shared/Kiosk/Admin typecheck 与 API/Kiosk/Admin build 通过。
+- [x] Antigravity + Claude 双模型审查 Critical / 高风险问题清零。
+- [ ] 将 `codex/profile-notifications-feedback-p1-clean` 快进合入本地 `main`；如需同步 GitHub，需用户明确同意 push。
 - [ ] 打印订单详情可后续增加「反馈此订单」入口，带 `relatedPrintTaskId` 进入 `/me/feedback`；本批未接线。
 - [ ] WebSocket/短信推送、附件、富文本、匿名反馈不在本批；如要做需单独设计频控、退订、存储与审核。
 

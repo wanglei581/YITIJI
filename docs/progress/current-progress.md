@@ -48,13 +48,13 @@
 仍不在本批：
 
 - 求职打印套餐、AI 服务套餐、招聘会扫码凭证、支付/订单/核销、活动签到、自动资格审核、Partner 自助活动配置。
-- P1 消息通知 / 意见反馈未包含在本 clean review 分支，需单独审查和合入。
+- P1 消息通知 / 意见反馈未包含在权益活动 clean review 分支；已在下方 P1 clean review 单独完成本地验证与双模型审查。
 
-## 「我的」页商用闭环 P1：消息通知 + 意见反馈 clean review（2026-06-19，Codex）
+## 「我的」页商用闭环 P1：消息通知 + 意见反馈 clean review（2026-06-19，Codex + Claude/Antigravity）
 
-在隔离 worktree `…/profile-notifications-feedback-p1-clean`、分支 `codex/profile-notifications-feedback-p1-clean` 将 P1 clean-pick 到已包含 P0a/P0b 与权益活动 P2 的本地 `main` 基线上。P1 只打通「我的」页已有的「消息通知 / 意见反馈」入口，不做套餐购买、招聘会扫码凭证、WebSocket/短信推送、附件、匿名反馈，也不新增任何招聘闭环语义。
+在隔离 worktree `…/profile-notifications-feedback-p1-clean`、分支 `codex/profile-notifications-feedback-p1-clean` 将 P1 clean-pick 到已包含 P0a/P0b 与权益活动 P2 的本地 `main` 基线上，生成 clean commit `b22f63f3`。P1 只打通「我的」页已有的「消息通知 / 意见反馈」入口，不做套餐购买、招聘会扫码凭证、WebSocket/短信推送、附件、匿名反馈，也不新增任何招聘闭环语义。
 
-本轮目标：
+本轮完成：
 
 - **后端数据模型**：新增 `MemberNotification`、`SystemBroadcast`、`BroadcastReadState`、`FeedbackTicket`、`FeedbackReply`（SQLite/PG 双 schema + 双迁移），覆盖本人通知、系统广播、广播已读/隐藏状态、本人反馈工单与回复记录。
 - **本人消息接口**：新增 `/api/v1/me/notifications`，使用 `EndUserAuthGuard`；支持列表、未读筛选、全部已读、单条已读、删除个人消息、按本人隐藏广播。
@@ -66,14 +66,26 @@
 - **合规与隐私**：通知/反馈文案服务端拦截「一键投递、立即投递、平台投递、面试邀约、录用通知、候选人推荐、投递结果、预约结果」等招聘闭环或结果承诺；反馈审计 payload 只写 `phoneMasked`，不写明文手机号。
 - **服务验证脚本**：新增 `verify:feedback-notifications`，使用临时 SQLite 最小表，覆盖本人隔离、越权关闭拒绝、Admin 回复生成通知、广播逐用户已读、合规词拒绝、手机号不明文进审计、Admin controller 鉴权元数据。
 
-clean review 待完成验证：
+本地 clean review 验证：
 
-- `pnpm --filter @ai-job-print/api verify:feedback-notifications`
-- `pnpm --filter @ai-job-print/api verify:benefit-activities`
-- `pnpm --filter @ai-job-print/api verify:member-benefits-admin`
-- API / shared / Kiosk / Admin typecheck
-- API / Kiosk / Admin build
-- Antigravity + Claude 双模型审查，Critical / 高风险问题清零后再合入本地 `main`
+- `pnpm --filter @ai-job-print/api verify:feedback-notifications` ✅
+- `pnpm --filter @ai-job-print/api verify:benefit-activities` ✅
+- `pnpm --filter @ai-job-print/api verify:member-benefits-admin` ✅
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/shared typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk typecheck` ✅
+- `pnpm --filter @ai-job-print/admin typecheck` ✅
+- `pnpm --filter @ai-job-print/api lint` ✅
+- `pnpm --filter @ai-job-print/kiosk lint` ✅（0 errors；既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）
+- `pnpm --filter @ai-job-print/admin lint` ✅
+- `pnpm --filter @ai-job-print/api build` ✅
+- `VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3010/api/v1 pnpm --filter @ai-job-print/kiosk build` ✅
+- `VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3010/api/v1 pnpm --filter @ai-job-print/admin build` ✅
+- Antigravity 审查 ✅：Critical 0 / Warning 0 / Info 0，APPROVE。
+- Claude 审查 ✅：Critical 0 / Warning 0，APPROVE；Info 仅记录 `markAllRead` 单次 100 条广播上限、P1 单页合并快照、合规词正则后续可抽公共常量，均不阻塞合入。
+- `verify:member-favorites-benefits` 未作为本轮门禁：该旧脚本依赖外部 `DATABASE_URL`，本轮尝试用 Prisma `db push` 初始化临时 SQLite 时 schema engine 返回空错误；P1 自带验证与权益回归均已通过。
+
+验收边界：本轮是本地代码、service-level、typecheck/lint/build 与双模型审查通过；百度云预生产仍受 SSH 公钥阻塞，尚未部署和公网复验；Windows 一体机真机、真实短信/COS/OCR/支付/打印权益扣减仍属于外部依赖或后续域。
 
 仍不在本批：
 
