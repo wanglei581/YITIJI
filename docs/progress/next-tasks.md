@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-18（P0a/P0b 我的权益与 P2 权益活动 clean review 分支已拆出；套餐/支付/凭证仍后置；上线验收与试运营准备仍是主线）
+> 最后更新：2026-06-19（P0a/P0b 我的权益与 P2 权益活动已本地收口；百度云复验待 SSH 公钥恢复；套餐/支付/凭证仍后置）
 
 ## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
 
@@ -11,6 +11,7 @@
 - [x] 后端 `verify:benefit-activities` 覆盖可见性、领取、重复领取、库存、过期/结束拒绝、补贴提示信息化、手机号脱敏审计和 controller 鉴权元数据。
 - [x] 本机 PostgreSQL 16 throwaway 库已完成 `db:pg:deploy`、表/外键核查、真实 API 进程 + Redis + HTTP 端到端、Kiosk/Admin Chrome 截图级冒烟。
 - [x] clean review 分支已完成本机验证、Antigravity + Claude 双模型审查，Critical = 0；Claude 提醒的 `verify-member-favorites-benefits` 已补跑通过。
+- [ ] 百度云 SSH 公钥恢复：当前 root 登录仍返回 `Permission denied (publickey,password)`；恢复后使用 `/tmp/yitiji-deploy/baidu-preprod-a9c9b55b-commands.md` 执行部署与复验。
 - [ ] 真实云服务器 PostgreSQL 迁移部署后，仍需在服务器补跑 `verify:benefit-activities` 或等价 live 冒烟；本机 PG 通过不等于生产通过。
 - [ ] 活动核销、Partner 自助配置、自动资格审核、活动推荐算法不在 P2；如要做需单独产品设计与数据模型。
 - [ ] 求职打印套餐、AI 服务套餐、招聘会扫码凭证仍后置，不得用权益活动模型伪造套餐、支付或预约凭证。

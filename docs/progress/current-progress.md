@@ -1,9 +1,23 @@
 # 当前开发进度
 
-> 最后更新：2026-06-18
+> 最后更新：2026-06-19
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
+
+## 百度云预生产复验待 SSH 恢复（2026-06-19，Codex）
+
+权益活动 clean review 已本地合入 `main`，当前本地 `main` HEAD 为 `de34447a`，领先 `origin/main` 8 个提交。百度云预生产部署包已准备好：
+
+- 部署包：`/tmp/yitiji-deploy/yitiji-main-a9c9b55b.tar.gz`
+- SHA256：`51a9a7249f567192ef6dfef76b0e57847cf533341f521f1fea28b344d5954f09`
+- 复验命令：`/tmp/yitiji-deploy/baidu-preprod-a9c9b55b-commands.md`
+
+当前阻塞：`ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes root@120.48.13.190` 返回 `Permission denied (publickey,password)`，服务器 root 的 `authorized_keys` 尚未恢复当前 Mac 公钥，因此暂不能上传部署包、执行 PostgreSQL 迁移、重启 API 或进行公网 HTTP 复验。
+
+恢复 SSH 后下一步执行：上传部署包 → PostgreSQL `db:pg:deploy` / `db:pg:sync:check` → API/Kiosk/Admin/Partner 构建 → PM2 重启 → `verify:member-benefits-admin`、`verify:benefit-activities`、`verify:member-favorites-benefits` → 公网检查 Admin 创建/发布、Kiosk 展示、会员领取、我的权益、Admin 领取记录。
+
+验收边界：本机 PostgreSQL/Redis/HTTP/Chrome 已通过，不等于百度云预生产已通过；云端复验完成前不能宣称服务器版本具备权益活动商用闭环。
 
 ## 「我的」权益活动中心 MVP（2026-06-18，Codex + Claude/Antigravity 审查）
 
