@@ -1,0 +1,12 @@
+{
+  "id": "benefit-activities-audit-verify-scope",
+  "title": "修复权益活动 verify 在非空 PostgreSQL 库上的审计日志误报",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "按本轮 activity targetId 收窄审计日志断言；本机 verify/build 通过，待部署到服务器复验",
+  "createdAt": "2026-06-19T10:43:00+08:00",
+  "branch": "main"
+}

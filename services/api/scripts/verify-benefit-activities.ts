@@ -64,12 +64,18 @@ async function main() {
   const phoneB = `138${Date.now().toString().slice(-8)}`
   const phoneC = `137${Date.now().toString().slice(-8)}`
   const admin: AuthedUser = { userId: adminId, role: 'admin', orgId: null }
+  const activityIds: string[] = []
 
   async function cleanup() {
+    const auditCleanupWhere: Array<Record<string, unknown>> = [
+      { actorId: adminId },
+      { actorId: { in: [userA, userB, userC] } },
+    ]
+    if (activityIds.length) auditCleanupWhere.push({ targetId: { in: activityIds } })
     await prisma.benefitClaim.deleteMany({ where: { endUserId: { in: [userA, userB, userC] } } }).catch(() => undefined)
     await prisma.benefitGrant.deleteMany({ where: { endUserId: { in: [userA, userB, userC] } } }).catch(() => undefined)
     await prisma.benefitActivity.deleteMany({ where: { title: { contains: suffix } } }).catch(() => undefined)
-    await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: adminId }, { actorId: { in: [userA, userB, userC] } }] } }).catch(() => undefined)
+    await prisma.auditLog.deleteMany({ where: { OR: auditCleanupWhere } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: { in: [userA, userB, userC] } } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: adminId } }).catch(() => undefined)
   }
@@ -103,6 +109,7 @@ async function main() {
     })
     if (draft.status === 'draft' && draft.stockRemaining === 10) pass('1. Admin 创建草稿活动')
     else fail(`1. 草稿活动异常：${JSON.stringify(draft)}`)
+    activityIds.push(draft.id)
 
     await prisma.benefitActivity.update({ where: { id: draft.id }, data: { description: '保证录用后再来打印' } })
     await expectReject('BENEFIT_ACTIVITY_COPY_FORBIDDEN', '2. 发布时二次合规校验拒绝违规文案', () => activities.publish(admin, draft.id))
@@ -144,6 +151,7 @@ async function main() {
       validUntil,
       grantValidDays: null,
     })
+    activityIds.push(limited.id)
     await activities.publish(admin, limited.id)
     await activities.claim(userB, limited.id)
     await expectReject('BENEFIT_ACTIVITY_SOLD_OUT', '8. 有限库存不会超发', () => activities.claim(userC, limited.id))
@@ -173,19 +181,22 @@ async function main() {
     else fail(`11. 领取记录脱敏异常：${JSON.stringify(claims)}`)
 
     const logs = await prisma.auditLog.findMany({
-      where: { action: { in: ['benefit_activity.create', 'benefit_activity.publish', 'benefit_activity.end', 'benefit_activity.claim'] } },
+      where: {
+        action: { in: ['benefit_activity.create', 'benefit_activity.publish', 'benefit_activity.end', 'benefit_activity.claim'] },
+        targetId: { in: [draft.id, limited.id] },
+      },
     })
-    const actions = new Set(logs.map((log) => log.action))
     const payloads = logs.map((log) => log.payloadJson).join('\n')
-    const claimLog = logs.find((log) => log.action === 'benefit_activity.claim')
+    const hasLog = (action: string, targetId: string) => logs.some((log) => log.action === action && log.targetId === targetId)
+    const claimLog = logs.find((log) => log.action === 'benefit_activity.claim' && log.targetId === draft.id)
     if (
-      actions.has('benefit_activity.create') &&
-      actions.has('benefit_activity.publish') &&
-      actions.has('benefit_activity.end') &&
+      hasLog('benefit_activity.create', draft.id) &&
+      hasLog('benefit_activity.publish', draft.id) &&
+      hasLog('benefit_activity.end', limited.id) &&
       claimLog?.actorId === null &&
-      claimLog.payloadJson.includes(userA)
+      claimLog?.payloadJson.includes(userA) === true
     ) pass('12a. create/publish/end/claim 写 AuditLog')
-    else fail(`12a. 审计动作缺失：${Array.from(actions).join(',')}`)
+    else fail(`12a. 审计动作缺失或串到历史数据：${logs.map((log) => `${log.action}:${log.targetId ?? '-'}`).join(',')}`)
     if (!payloads.includes(phoneA) && !payloads.includes(phoneB) && !payloads.includes(phoneC)) pass('12b. AuditLog payload 不含明文手机号')
     else fail('12b. AuditLog 泄露明文手机号')
 
