@@ -126,23 +126,20 @@ export class MemberNotificationsService {
 
   async markAllRead(endUserId: string): Promise<{ updated: number }> {
     const now = new Date()
-    const personal = await this.prisma.memberNotification.updateMany({
-      where: { endUserId, deletedAt: null, isRead: false },
-      data: { isRead: true, readAt: now },
-    })
-    const broadcasts = await this.prisma.systemBroadcast.findMany({
-      where: { deletedAt: null, readStates: { none: { endUserId } } },
-      select: { id: true },
-      take: 100,
-    })
-    for (const broadcast of broadcasts) {
-      await this.prisma.broadcastReadState.upsert({
-        where: { endUserId_broadcastId: { endUserId, broadcastId: broadcast.id } },
-        create: { endUserId, broadcastId: broadcast.id, readAt: now },
-        update: { readAt: now },
+    return this.prisma.$transaction(async (tx) => {
+      const personal = await tx.memberNotification.updateMany({
+        where: { endUserId, deletedAt: null, isRead: false },
+        data: { isRead: true, readAt: now },
       })
-    }
-    return { updated: personal.count + broadcasts.length }
+      const broadcasts = await tx.systemBroadcast.findMany({
+        where: { deletedAt: null, readStates: { none: { endUserId } } },
+        select: { id: true },
+      })
+      const broadcastReads = broadcasts.length > 0 ? await tx.broadcastReadState.createMany({
+        data: broadcasts.map((broadcast) => ({ endUserId, broadcastId: broadcast.id, readAt: now })),
+      }) : { count: 0 }
+      return { updated: personal.count + broadcastReads.count }
+    })
   }
 
   async listBroadcasts(): Promise<{ items: AdminBroadcastItem[] }> {

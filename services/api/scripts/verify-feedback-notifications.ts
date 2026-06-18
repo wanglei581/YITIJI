@@ -152,6 +152,21 @@ async function main() {
     if (unreadOnlyA.items.some((item) => item.id === unreadBoundary.id && item.kind === 'broadcast' && !item.isRead)) pass('7b. 未读广播列表不会被较新的已读广播截断')
     else fail(`7b. 未读广播分页异常：${JSON.stringify(unreadOnlyA.items.map((item) => ({ id: item.id, isRead: item.isRead, kind: item.kind })))}`)
 
+    const bulkUnreadBroadcasts = Array.from({ length: 105 }, (_, i) => ({
+      id: `unread_all_${suffix}_${i}`,
+      title: `批量未读广播 ${i}`,
+      content: '用于验证全部已读不能只处理前 100 条。',
+      category: 'notice',
+      createdBy: adminId,
+      createdAt: new Date(boundaryNow + 120_000 + i * 1000),
+      updatedAt: new Date(boundaryNow + 120_000 + i * 1000),
+    }))
+    await prisma.systemBroadcast.createMany({ data: bulkUnreadBroadcasts })
+    const markAll = await notifications.markAllRead(userB)
+    const afterMarkAllB = await notifications.listForEndUser(userB, { cursor: null, pageSize: 50, unreadOnly: true })
+    if (markAll.updated >= 105 && afterMarkAllB.unreadCount === 0) pass('7c. 全部已读可处理超过 100 条广播')
+    else fail(`7c. 全部已读未清空：updated=${markAll.updated}, unread=${afterMarkAllB.unreadCount}`)
+
     await expectReject('FEEDBACK_COPY_FORBIDDEN', '8. 反馈回复拒绝招聘流程文案', () =>
       feedback.addAdminReply(admin, ticket.id, { content: '已收到企业面试邀约，请查看投递结果。' }),
     )
