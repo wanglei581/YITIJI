@@ -12,6 +12,7 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
   FolderIcon,
+  GiftIcon,
   GraduationCapIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -49,6 +50,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/sync-sources':    'sync-sources',
   '/partners':     'partners',
   '/users':        'users',
+  '/member-benefits': 'member-benefits',
   '/alerts':       'alerts',
   '/permissions':  'permissions',
   '/audit':        'audit',
@@ -87,6 +89,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'sync-sources',   label: 'API 同步数据源', icon: RefreshCwIcon, href: KEY_TO_PATH['sync-sources'] },
   { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户', href: KEY_TO_PATH.partners },
   { key: 'users',        label: '用户管理',     icon: UsersIcon, href: KEY_TO_PATH.users },
+  { key: 'member-benefits', label: '会员权益', icon: GiftIcon, href: KEY_TO_PATH['member-benefits'] },
   { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理', href: KEY_TO_PATH.permissions },
   { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon, href: KEY_TO_PATH.audit },
 ]

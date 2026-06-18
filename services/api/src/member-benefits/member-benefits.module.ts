@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import { AdminMemberBenefitsController } from './admin-member-benefits.controller'
+import { AdminMemberBenefitsService } from './admin-member-benefits.service'
 import { MemberBenefitsController } from './member-benefits.controller'
 import { MemberBenefitsService } from './member-benefits.service'
 
@@ -27,7 +29,7 @@ import { MemberBenefitsService } from './member-benefits.service'
       },
     }),
   ],
-  controllers: [MemberBenefitsController],
-  providers: [MemberBenefitsService, EndUserAuthGuard],
+  controllers: [MemberBenefitsController, AdminMemberBenefitsController],
+  providers: [MemberBenefitsService, AdminMemberBenefitsService, EndUserAuthGuard],
 })
 export class MemberBenefitsModule {}

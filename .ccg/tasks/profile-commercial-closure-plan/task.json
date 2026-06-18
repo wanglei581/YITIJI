@@ -1,0 +1,12 @@
+{
+  "id": "profile-commercial-closure-plan",
+  "title": "我的页商用闭环第一批实施计划",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "product-architecture",
+  "currentPhase": "completed",
+  "nextAction": "P0a/P0b 已实现并通过本地验证和双模型审查；P1 通知/反馈后续独立工作区",
+  "createdAt": "2026-06-18T08:05:00Z",
+  "branch": "codex/profile-commercial-closure-p0a"
+}

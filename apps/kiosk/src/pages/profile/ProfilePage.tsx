@@ -82,7 +82,7 @@ const ASSETS: Entry[] = [
   { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', route: '/assistant' },
   { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', route: '/me/print-orders' },
   { icon: HeartIcon,    iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '我的收藏', route: '/me/favorites' },
-  { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益', tag: '建设中' },
+  { icon: TicketIcon,   iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '我的权益', route: '/me/benefits' },
 ]
 
 // 2. 常用服务（均跳转既有功能页）
@@ -112,15 +112,18 @@ const BENEFITS: Entry[] = [
   { icon: TicketIcon,   iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',     tag: '建设中' },
   { icon: PackageIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '求职打印套餐', tag: '建设中' },
   { icon: BoxIcon,      iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务套餐',   tag: '建设中' },
-  { icon: LandmarkIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '政策补贴指引', tag: '建设中' },
+  // 政策补贴指引：跳转既有政策服务页「就业政策」Tab（info-only 政策说明 / 材料清单 / 官方入口），不代办、不承诺到账。
+  { icon: LandmarkIcon, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: '政策补贴指引', route: '/renshi?tab=policy' },
 ]
 
 // 5. 账户与服务（均建设中）
 const ACCOUNT: Entry[] = [
   { icon: BellIcon,          iconBg: 'bg-blue-50',   iconColor: 'text-blue-600',   label: '消息通知', tag: '建设中' },
-  { icon: SettingsIcon,      iconBg: 'bg-gray-100',  iconColor: 'text-gray-600',   label: '账号设置', tag: '建设中' },
-  { icon: RepeatIcon,        iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600', label: '身份切换', tag: '建设中' },
-  { icon: HelpCircleIcon,    iconBg: 'bg-cyan-50',   iconColor: 'text-cyan-600',   label: '帮助中心', tag: '建设中' },
+  // 账号设置轻量版：登录/游客状态、脱敏手机号、会话说明、协议入口、退出登录；不做换绑/注销。
+  { icon: SettingsIcon,      iconBg: 'bg-gray-100',  iconColor: 'text-gray-600',   label: '账号设置', route: '/me/settings' },
+  // 身份切换 = 退出当前账号后重新登录（不做多角色系统）；统一收口到账号设置页操作，避免数据串号。
+  { icon: RepeatIcon,        iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600', label: '身份切换', route: '/me/settings' },
+  { icon: HelpCircleIcon,    iconBg: 'bg-cyan-50',   iconColor: 'text-cyan-600',   label: '帮助中心', route: '/help' },
   { icon: MessageSquareIcon, iconBg: 'bg-amber-50',  iconColor: 'text-amber-600',  label: '意见反馈', tag: '建设中' },
 ]
 
@@ -161,6 +164,7 @@ function ProfileHeader({
   onLogin,
   onLogout,
   onShortcut,
+  onOpenSettings,
 }: {
   isLoggedIn: boolean
   displayName: string
@@ -177,6 +181,7 @@ function ProfileHeader({
   onLogin: () => void
   onLogout: () => void
   onShortcut: (message: string) => void
+  onOpenSettings: () => void
 }) {
   if (isLoggedIn) {
     return (
@@ -191,7 +196,7 @@ function ProfileHeader({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onShortcut('账号设置建设中')}
+              onClick={onOpenSettings}
               aria-label="账号设置"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
             >
@@ -507,6 +512,7 @@ export function ProfilePage() {
         onLogin={goLogin}
         onLogout={logout}
         onShortcut={setToastMsg}
+        onOpenSettings={() => navigate('/me/settings')}
       />
 
       {isLoggedIn && hasSessionRecords && <PendingTaskBanner onContinue={continuePendingTask} />}

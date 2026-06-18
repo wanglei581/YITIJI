@@ -37,6 +37,9 @@ import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
 import { MyDocumentsPage } from '../pages/profile/me/MyDocumentsPage'
 import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
 import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
+import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
+import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
+import { HelpCenterPage } from '../pages/help/HelpCenterPage'
 import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
@@ -81,7 +84,12 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
       { path: 'me/documents',      element: <MyDocumentsPage /> },
       { path: 'me/favorites',      element: <MyFavoritesPage /> },
+      { path: 'me/benefits',       element: <MyBenefitsPage /> },
       { path: 'me/activity',       element: <MyActivityPage /> },
+      // 账号设置轻量版（只读状态 + 协议入口 + 退出/切换账号；不做换绑/注销）
+      { path: 'me/settings',       element: <MySettingsPage /> },
+      // 帮助中心（静态 FAQ；仅描述已上线能力）
+      { path: 'help',              element: <HelpCenterPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'campus',            element: <CampusPage /> },
       // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）

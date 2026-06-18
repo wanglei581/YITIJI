@@ -15,6 +15,7 @@ import FairsPage from './fairs'
 import CompaniesPage from './companies'
 import PartnersPage from './partners'
 import UsersPage from './users'
+import MemberBenefitsPage from './member-benefits'
 import AlertsPage from './alerts'
 import PermissionsPage from './permissions'
 import AuditPage from './audit'
@@ -48,6 +49,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'companies',    element: <CompaniesPage /> },
       { path: 'partners',     element: <PartnersPage /> },
       { path: 'users',        element: <UsersPage /> },
+      { path: 'member-benefits', element: <MemberBenefitsPage /> },
       { path: 'alerts',       element: <AlertsPage /> },
       { path: 'permissions',     element: <PermissionsPage /> },
       { path: 'audit',           element: <AuditPage /> },

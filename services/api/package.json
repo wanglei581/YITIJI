@@ -25,6 +25,7 @@
     "verify:ai-result-ownership": "node -r @swc-node/register scripts/verify-ai-result-ownership.ts",
     "verify:member-assets": "node -r @swc-node/register scripts/verify-member-assets.ts",
     "verify:member-favorites-benefits": "node -r @swc-node/register scripts/verify-member-favorites-benefits.ts",
+    "verify:member-benefits-admin": "node -r @swc-node/register scripts/verify-member-benefits-admin.ts",
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",

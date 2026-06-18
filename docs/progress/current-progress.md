@@ -1,7 +1,69 @@
 # 当前开发进度
 
-> 最后更新：2026-06-17
+> 最后更新：2026-06-18
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
+
+---
+
+## 「我的」页商用闭环第一批 P0b：我的权益 + Admin 手动发放/撤销（2026-06-18，Codex + Claude/Antigravity 审查）
+
+在同一隔离 worktree `…/profile-commercial-closure-p0a`、分支 `codex/profile-commercial-closure-p0a` 继续实施 P0b。P0b 只复用现有 `BenefitGrant` 底座，不新增 Prisma schema，不接支付、不接核销、不做权益活动领取，也不混入 P1 通知/反馈域。
+
+本轮完成：
+
+- **Kiosk 我的权益页**：新增 [apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx](../../apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx)，注册 `/me/benefits`；`ProfilePage`「我的权益」由「建设中」改为跳转该页。
+- **用户侧数据来源**：复用既有 `GET /api/v1/me/benefits` 与 `EndUserAuthGuard` 本人隔离；mock/未登录状态不请求真实后端、不展示假权益。
+- **Admin 会员权益接口**：新增 [services/api/src/member-benefits/admin-member-benefits.controller.ts](../../services/api/src/member-benefits/admin-member-benefits.controller.ts) 与 [services/api/src/member-benefits/admin-member-benefits.service.ts](../../services/api/src/member-benefits/admin-member-benefits.service.ts)，提供按手机号精确搜索会员、按会员列权益、手动发放、撤销权益。
+- **Admin 权限与审计**：Admin controller 使用 `JwtAuthGuard + RolesGuard + @Roles('admin')`；手机号搜索、grant、revoke 均写 `AuditLog`，payload 只含 `phoneMasked`，不写明文手机号。
+- **Admin 页面**：新增 [apps/admin/src/routes/member-benefits/index.tsx](../../apps/admin/src/routes/member-benefits/index.tsx)，并在后台侧栏增加「会员权益」入口；支持手机号精确搜索、发放表单、权益列表、撤销动作、加载/失败/空态。
+- **合规拦截**：Admin 发放前校验 `benefitType/sourceType/title/description/quantity/date`；文案命中承诺性词会拒绝写入；`subsidy_eligibility_hint` 不允许设置额度，仅作政策资格与官方入口指引。
+- **服务验证脚本**：新增 `verify:member-benefits-admin`，使用临时 SQLite 最小表，不污染真实 dev.db；覆盖手机号脱敏、手机号搜索审计、发放、Kiosk 只读回显、合规文案拒绝、撤销、二次撤销拒绝、审计不泄露明文手机号、Admin 鉴权元数据。
+
+本地验证：
+
+- `pnpm --filter @ai-job-print/api verify:member-benefits-admin` ✅
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk typecheck` ✅
+- `pnpm --filter @ai-job-print/admin typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk lint` ✅（0 errors；既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）
+- `pnpm --filter @ai-job-print/admin lint` ✅
+- `VITE_API_MODE=http pnpm --filter @ai-job-print/kiosk build` ✅（构建成功；既有大 chunk warning）
+- `VITE_API_MODE=http VITE_API_BASE_URL=http://localhost:3010/api/v1 pnpm --filter @ai-job-print/admin build` ✅（构建成功；既有大 chunk warning）
+
+暂不混入本批：
+
+- `消息通知 / 意见反馈`：仍属 P1，需要单独模型、本人隔离、频控、后台处理闭环。
+- `权益活动 / 求职打印套餐 / AI 服务套餐 / 招聘会扫码凭证`：仍未打通；需要活动、支付/订单/核销或真实预约凭证模型，不得用占位数据伪造。
+
+---
+
+## 「我的」页商用闭环第一批 P0a：低风险入口真实化（2026-06-18，Claude）
+
+在隔离 worktree `…/profile-commercial-closure-p0a`、分支 `codex/profile-commercial-closure-p0a` 仅实施 P0a（低风险前端真实化与既有页面跳转）。计划见 [docs/superpowers/plans/2026-06-18-profile-commercial-closure-p0.md](../superpowers/plans/2026-06-18-profile-commercial-closure-p0.md)。**未触碰** services/api、apps/admin、Prisma schema，不做 P0b（权益只读页 / Admin 发放）与 P1（反馈 / 通知）。
+
+本轮完成：
+
+- **政策补贴指引**（`ProfilePage` BENEFITS 组）：由「建设中」改为跳转既有政策服务页 `/renshi?tab=policy`（`RenshiPage` 默认有效 Tab key 为 `policy`）。仍为 info-only：政策说明 / 材料清单 / 官方入口，不代办、不承诺到账。
+- **帮助中心**：新增静态页 [apps/kiosk/src/pages/help/HelpCenterPage.tsx](../../apps/kiosk/src/pages/help/HelpCenterPage.tsx)，注册 `/help`，`ProfilePage` 帮助中心入口由「建设中」改为跳 `/help`。FAQ 仅覆盖已上线能力（登录与账号、AI 简历、文档打印与扫描、政策服务、招聘会与岗位来源入口、我的记录、隐私与文件留存），不出现投递 / 套餐 / 支付 / 凭证 / 通知等未实现承诺。
+- **账号设置轻量版**：新增 [apps/kiosk/src/pages/profile/me/MySettingsPage.tsx](../../apps/kiosk/src/pages/profile/me/MySettingsPage.tsx)，注册 `/me/settings`。展示登录/游客状态、脱敏手机号（`user.phoneMasked`，不展示原号）、公共终端会话说明、用户服务协议（`/legal/terms`）与隐私政策（`/legal/privacy`）入口、退出登录（二次确认）。明确不做昵称修改 / 手机号换绑 / 账号注销（页内诚实标注暂未开放）。
+- **身份切换**：不做角色系统。`ProfilePage` 身份切换入口与账号设置统一收口到 `/me/settings`；设置页内「切换账号」= `logout()` 清空内存会话后跳 `/login`，避免上一账号数据带入下一账号造成串号。
+- **顶部设置图标**：`ProfileHeader` 设置图标由弹「建设中」toast 改为跳 `/me/settings`；顶部铃铛保持「消息通知建设中」toast，未新增消息通知域。
+
+合规边界：未新增招聘会扫码凭证 / 套餐 / 支付 / 权益活动 / 通知 / 反馈功能；未新增假数据；未写资金发放结果、来源平台办理结果、平台内招聘闭环等承诺性措辞。
+
+本地验证：
+
+- `pnpm --filter @ai-job-print/kiosk typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk lint` ✅（0 errors；既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条，非本轮新增）
+- `VITE_API_MODE=http pnpm --filter @ai-job-print/kiosk build` ✅（构建成功；既有大 chunk warning）
+- 合规词扫描：新增页面未出现平台内招聘闭环、来源平台办理结果、资金发放结果、面试或录用承诺等正向能力表达，未新增违规按钮或业务能力。
+
+浏览器人工验收（`VITE_API_MODE=mock pnpm exec vite --host 127.0.0.1 --port 5178`）：
+
+- `/profile` ✅ 游客态可渲染；政策补贴指引 / 账号设置 / 身份切换 / 帮助中心均可见，帮助中心不再显示「建设中」。
+- `/help` ✅ 帮助中心可渲染，包含「返回我的」，仅描述已上线能力。
+- `/me/settings` ✅ 账号设置轻量版可渲染，游客态显示登录引导、公共终端会话说明、协议 / 隐私入口。
+- `/renshi?tab=policy` ✅ 政策服务页可渲染，仍保持 info-only 合规提示；该页未新增「返回我的」按钮（沿用既有 `RenshiPage` 布局，本轮不改政策页主体）。
 
 ---
 
