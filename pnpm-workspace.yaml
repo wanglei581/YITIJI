@@ -2,10 +2,12 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'services/*'
+# Keep in sync with package.json pnpm.overrides. Server pnpm 9 reads package.json,
+# while local/newer pnpm reads this workspace-level overrides block.
 overrides:
   qs: 6.15.2
-  '@hono/node-server': '>=1.19.13'
-  uuid: '>=11.1.1'
+  '@hono/node-server': 2.0.4
+  uuid: 14.0.0
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true
