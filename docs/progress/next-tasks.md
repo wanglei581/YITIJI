@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-19（P0a/P0b 我的权益与 P2 权益活动已本地收口；P1 消息通知 + 意见反馈 clean review、本机 HTTP/Chrome、百度云 IP 预生产核心复验均已通过；套餐/支付/凭证仍后置）
+> 最后更新：2026-06-19（P0a/P0b 我的权益、P2 权益活动、P1 消息通知 + 意见反馈已完成本机与百度云 IP 预生产复验；最终部署 `a4b1803a`；套餐/支付/凭证仍后置）
 
 ## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
 
@@ -12,9 +12,9 @@
 - [x] 本机 PostgreSQL 16 throwaway 库已完成 `db:pg:deploy`、表/外键核查、真实 API 进程 + Redis + HTTP 端到端、Kiosk/Admin Chrome 截图级冒烟。
 - [x] clean review 分支已完成本机验证、Antigravity + Claude 双模型审查，Critical = 0；Claude 提醒的 `verify-member-favorites-benefits` 已补跑通过。
 - [x] 百度云 SSH 公钥恢复：已用 root 密码恢复当前 Mac 公钥，`root@120.48.13.190` 公钥登录返回 `instance-061dyczx / SSH_OK`。
-- [x] 百度云预生产部署：`9766bd2d` 已部署到 `/srv/ai-job-print`；PostgreSQL 迁移、schema 同步、API/Kiosk/Admin/Partner 构建、PM2 `ai-job-print-api` 重启完成。
-- [x] 百度云核心 verify：`verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-favorites-benefits` 均在服务器 PostgreSQL 上 ALL PASS。
-- [x] 百度云公网 HTTP 冒烟：`/api/v1/health` 已修复为 nginx 反代到 API 并返回 `db=postgres`；Admin 创建/发布权益活动、Kiosk 公网列表可见、会员领取、`/me/benefits` 可见、Admin 领取记录可见；反馈/广播通知公网链路也通过。
+- [x] 百度云预生产部署：最终 `a4b1803a` 已部署到 `/srv/ai-job-print`；PostgreSQL 迁移、schema 同步、API/Kiosk/Admin/Partner 构建、PM2 `ai-job-print-api` 重启完成。
+- [x] 百度云核心 verify：`verify:member-benefits-admin`、`verify:benefit-activities`、`verify:feedback-notifications`、`verify:member-favorites-benefits` 均在服务器 PostgreSQL 上 ALL PASS；`verify:feedback-notifications` 已新增超过 100 条广播全部已读回归。
+- [x] 百度云公网 HTTP 冒烟：`/api/v1/health` 已修复为 nginx 反代到 API 并返回 `db=postgres`；Admin 创建/发布权益活动、Kiosk 公网列表可见、会员领取、`/me/benefits` 可见、Admin 领取记录可见；反馈/广播通知公网链路通过，最终样本 `unreadBefore=338` → `unreadAfter=0`。
 - [ ] 活动核销、Partner 自助配置、自动资格审核、活动推荐算法不在 P2；如要做需单独产品设计与数据模型。
 - [ ] 求职打印套餐、AI 服务套餐、招聘会扫码凭证仍后置，不得用权益活动模型伪造套餐、支付或预约凭证。
 
@@ -30,7 +30,7 @@
 - [x] API/shared/Kiosk/Admin typecheck 与 API/Kiosk/Admin build 通过。
 - [x] Antigravity + Claude 双模型审查 Critical / 高风险问题清零。
 - [x] 本机真实 HTTP + Chrome 登录态冒烟通过：会员验证码登录、提交反馈、Admin 查看并回复、本人收到反馈通知、Admin 创建广播、本人收到广播、全部已读归零；Kiosk `/me/feedback`、`/me/notifications` 与 Admin `/member-feedback`、`/member-notifications` 截图已保存到 `/tmp/*-p1-http.png`。
-- [x] 百度云公网 HTTP 冒烟通过：会员公网提交反馈、Admin 回复、本人收到反馈通知、Admin 创建广播、本人收到广播、全部已读归零；Admin `/member-feedback` 公网截图保存到 `/tmp/cloud-admin-member-feedback-9766bd2d.png`。
+- [x] 百度云公网 HTTP 冒烟通过：会员公网提交反馈、Admin 回复、本人收到反馈通知、Admin 创建广播、本人收到广播、全部已读归零；修复旧逻辑只处理前 100 条广播的问题，最终公网样本 `unreadBefore=338` → `unreadAfter=0`。Admin `/member-feedback` 公网截图保存到 `/tmp/cloud-admin-member-feedback-9766bd2d.png`。
 - [x] 将 `codex/profile-notifications-feedback-p1-clean` 快进合入本地 `main`；如需同步 GitHub，需用户明确同意 push。
 - [ ] 打印订单详情可后续增加「反馈此订单」入口，带 `relatedPrintTaskId` 进入 `/me/feedback`；本批未接线。
 - [ ] WebSocket/短信推送、附件、富文本、匿名反馈不在本批；如要做需单独设计频控、退订、存储与审核。

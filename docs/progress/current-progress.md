@@ -9,16 +9,18 @@
 
 权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `120.48.13.190`，当前云端版本：
 
-- 部署提交：`9766bd2d`（含 `fix: align pnpm overrides for frozen install`，用于修复服务器 `pnpm install --frozen-lockfile` 的 overrides 校验）
-- 部署包：`/tmp/yitiji-deploy/yitiji-main-9766bd2d.tar.gz`
-- SHA256：`7cfdfb04fb8de0cbf3bebba3c2f0bcae21f4067a2e163c3645a30fb385b4820c`
+- 部署提交：`a4b1803a`（最终包含 `fix: pin pnpm overrides for frozen install`、`test: scope benefit activity audit verification`、`fix: mark all broadcasts as read`）
+- 部署包：`/srv/yitiji-main-a4b1803a.tar.gz`
+- SHA256：`ca2bdd364fbf5c0b98c218eddf07b77cb381a7e283a2e7a2c984e2581310dfe2`
 - 服务器部署源：`/srv/ai-job-print/DEPLOY_SOURCE.txt`
-- 回滚备份目录：`/srv/ai-job-print-prev-20260619020528`
+- 最新回滚备份目录：`/srv/ai-job-print-prev-20260619030829`
 
 本轮先用 root 密码恢复服务器 `authorized_keys`，随后公钥登录验证通过：`hostname && echo SSH_OK` 返回 `instance-061dyczx` / `SSH_OK`。部署过程中发现并修复两个真实预生产问题：
 
-- **pnpm frozen install 阻塞**：`pnpm-lock.yaml` 含 overrides，但根 `package.json` 缺少 `pnpm.overrides`；已补回 `qs=6.15.2`、`@hono/node-server>=1.19.13`、`uuid>=11.1.1`，服务器 `pnpm install --frozen-lockfile` 通过。
+- **pnpm frozen install 阻塞**：`pnpm-lock.yaml` 含 overrides，但根 `package.json` 缺少 `pnpm.overrides`；已补回并收紧为 exact overrides：`qs=6.15.2`、`@hono/node-server=2.0.4`、`uuid=14.0.0`，同时要求 `node>=20.19`；服务器 `pnpm install --frozen-lockfile` 通过。
 - **nginx `/api/v1` 反代缺失**：公网 `http://120.48.13.190/api/v1/health` 原先返回 Kiosk `index.html`；已备份 `/etc/nginx/sites-available/ai-job-print.bak-20260619020839` 并给 80/8081/8082 三个 server 添加 `/api/v1` → `127.0.0.1:3010/api/v1` 反代，`nginx -t` 与 reload 通过。
+- **权益活动审计验证误报**：非空 PostgreSQL 库存在历史 `benefit_activity.*` 审计时，旧 `verify:benefit-activities` 只按 action 查全库，可能串到历史日志；已按本轮 activity `targetId` 收窄并清理 `actorId=null` 的 claim 审计，服务器 PostgreSQL 复验 ALL PASS。
+- **消息通知全部已读 100 条上限**：公网库已有大量系统广播时，旧 `read-all` 只处理前 100 条，导致 UI 显示未读不归零；已改成事务内批量写入 `BroadcastReadState`，新增 105 条广播回归，公网 HTTP 验证 `unreadBefore=338` → `unreadAfter=0`。
 
 云端部署与构建结果：
 
@@ -33,13 +35,13 @@
 
 - `pnpm verify:member-benefits-admin` ✅ ALL PASS（连接 `postgresql://<redacted>@127.0.0.1:5432/ai_job_print`）。
 - `pnpm verify:benefit-activities` ✅ ALL PASS。
-- `pnpm verify:feedback-notifications` ✅ ALL PASS。
+- `pnpm verify:feedback-notifications` ✅ ALL PASS（含 7c：全部已读可处理超过 100 条广播）。
 - `DATABASE_URL=... pnpm verify:member-favorites-benefits` ✅ ALL PASS。
 
 公网 HTTP 核心链路：
 
 - 权益活动 ✅：Admin 登录 → `POST /admin/benefit-activities` 创建「百度云公网权益活动验证 20260618181014」→ 发布 → 公网 `GET /activities` 可见 → 会员 `139****4567` 验证码登录 → `POST /activities/:id/claim` 领取 → `GET /me/benefits` 可见 → Admin `/admin/benefit-activities/:id/claims` 可见脱敏领取记录。
-- 消息 / 反馈 ✅：会员 `139****4568` 公网提交反馈 → Admin `/admin/feedback` 可见 → Admin 回复后状态 `replied` → 本人 `/me/notifications` 收到「意见反馈已回复」→ Admin 创建系统广播 → 本人收到广播 → `read-all` 后未读归零。
+- 消息 / 反馈 ✅：会员公网提交反馈 → Admin `/admin/feedback` 可见 → Admin 回复后状态 `replied` → 本人 `/me/notifications` 收到反馈关联通知 → Admin 创建系统广播 → 本人收到广播 → `read-all` 后未读归零；最终公网样本 `139****1513`：`unreadBefore=338`、`unreadAfter=0`。
 - 公网 Chrome 截图 ✅：Kiosk `/activities`、Admin `/benefit-activities`、Admin `/member-feedback` 已通过浏览器渲染检查，截图在本机 `/tmp/cloud-kiosk-activities-9766bd2d.png`、`/tmp/cloud-admin-benefit-activities-9766bd2d.png`、`/tmp/cloud-admin-member-feedback-9766bd2d.png`。
 
 验收边界：本轮完成的是百度云 IP + 端口预生产核心复验，不等于正式生产上线。仍未完成域名 / HTTPS、Windows 一体机真机触控、Terminal Agent + 奔图打印机真实出纸/扫描、真实腾讯短信、真实 COS/OCR/LLM 全链路复验、支付 / 套餐购买 / 打印权益扣减 / 退款回滚。
