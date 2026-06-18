@@ -19,6 +19,18 @@
 - **合规与隐私**：服务端拦截招聘闭环或结果承诺词；`subsidy_eligibility_hint` 只允许信息提示，不允许设置数量；领取记录和审计只显示/记录脱敏手机号。
 - **服务验证脚本**：新增 `verify:benefit-activities`，覆盖 Admin 创建/发布、合规词拦截、Kiosk 可见性、登录领取、`BenefitGrant` 可见、重复领取拒绝、库存不超卖、过期/结束不可领取、手机号不明文进审计、controller 鉴权元数据。
 
+补充真实环境验收（本地 PostgreSQL + Redis + 真实 HTTP + Chrome 截图，2026-06-18）：
+
+- PostgreSQL 16 throwaway 库 `yitiji_benefit_validation` 创建成功；`POSTGRES_URL=postgresql://wanglei@127.0.0.1:5432/yitiji_benefit_validation pnpm --filter ./services/api db:pg:deploy` ✅，`20260618190000_add_benefit_activities` 已由 Prisma 正常应用。
+- `BenefitActivity` / `BenefitClaim` PG 表结构核查 ✅：`BenefitClaim_activityId_endUserId_key`、`BenefitClaim_benefitGrantId_key`、`BenefitClaim_activityId_fkey`、`BenefitClaim_endUserId_fkey`、`BenefitClaim_benefitGrantId_fkey` 均存在。
+- `POSTGRES_URL=... pnpm --filter ./services/api db:pg:sync:check` ✅，PG schema 同步校验通过。
+- API 使用构建产物 `node dist/main.js` 连接 PostgreSQL + Redis 启动成功 ✅；`GET /api/v1/health` 返回 `db=postgres`。
+- 真实 HTTP 主链路通过 ✅：Admin `/auth/login` 登录；`POST /admin/benefit-activities` 创建活动；`PATCH /admin/benefit-activities/:id/publish` 发布；会员 `/member/auth/sms-code` + `/member/auth/login` 登录；`GET /activities` 与 `GET /activities/:id` 可读；`POST /activities/:id/claim` 领取成功并生成 `BenefitGrant`；`GET /me/benefits` 可见；重复领取返回 `BENEFIT_ACTIVITY_ALREADY_CLAIMED`；Admin `/admin/benefit-activities/:id/claims` 只显示脱敏手机号。
+- 合规拦截真实 HTTP 验证 ✅：活动文案中出现连续敏感词时，服务端返回 `BENEFIT_ACTIVITY_COPY_FORBIDDEN`。
+- PG 审计核查 ✅：`benefit_activity.create/publish` 使用 Admin `actorId=validation-admin`；`benefit_activity.claim` 使用 `actorId=null`、`actorRole=end_user`，payload 仅含 `endUserId/benefitGrantId/benefitType/sourceType`，不含明文手机号。
+- GUI 路由截图级冒烟 ✅：Kiosk `http://127.0.0.1:5183/activities` 渲染真实活动；Kiosk `/activities/:id` 渲染活动详情、规则、权益额度、合规提示与「登录后领取」；Admin `http://localhost:5174/benefit-activities` 登录后渲染真实活动列表、下架按钮、新建表单与领取记录面板。截图保存于本机 `/tmp/kiosk-activities-p2.png`、`/tmp/kiosk-activity-detail-direct-p2.png`、`/tmp/admin-benefit-activities-p2.png`。
+- 验收限制：这仍是本机 PostgreSQL/Redis/Chrome 验收，不等于云服务器生产验收；未做 Windows 一体机真机触控、打印权益消费/冲正、COS/OCR/短信真实服务和线上域名 HTTPS 验收。
+
 仍不在本批：
 
 - 求职打印套餐、AI 服务套餐、招聘会扫码凭证、支付/订单/核销、活动签到、自动资格审核、Partner 自助活动配置。

@@ -1,0 +1,12 @@
+{
+  "id": "benefit-activities-real-validation",
+  "title": "权益活动中心真实环境验收",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack-validation",
+  "currentPhase": "completed",
+  "nextAction": "本地 PostgreSQL/HTTP/GUI 验收完成，待云服务器和一体机真机验收",
+  "createdAt": "2026-06-18T22:50:00+08:00",
+  "branch": "codex/profile-benefit-activities-p2"
+}
