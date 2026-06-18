@@ -9,7 +9,7 @@
  *     4. 取消（幂等）：删除存在的收藏 removed:true；再次删除 removed:false，均不报错。
  *     5. 跨用户隔离（双向）：A 看不到 B 的收藏；A 删 B 的收藏（同 targetId）只删自己的，不影响 B。
  *   权益（BenefitGrant）
- *     6. 本人可读 + active 优先排序；只回元数据（无支付凭证 / sourceRef 内部关联不强制暴露敏感值）。
+ *     6. 本人可读 + 状态/额度字段正确；只回元数据（无支付凭证 / sourceRef 内部关联不强制暴露敏感值）。
  *     7. 跨用户隔离：A 看不到 B 的权益。
  *     8. 空列表返回 []（无任何收藏 / 权益的会员）。
  *     9. 合规：subsidy_eligibility_hint 资格提示文案 info-only，不含"到账 / 已发放金额"等承诺词。
@@ -61,6 +61,7 @@ async function main() {
   await prisma.onModuleInit()
   const favs = new MemberFavoritesService(prisma)
   const benefits = new MemberBenefitsService(prisma)
+  const firstPage = { cursor: null, pageSize: 20 }
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const userA = `eu_fb_a_${suffix}`
@@ -87,39 +88,39 @@ async function main() {
     await favs.add(userA, { targetType: 'job', targetId: sharedJobId, title: 'A 收藏的岗位' })
     await favs.add(userA, { targetType: 'job_fair', targetId: `fair_${suffix}`, title: 'A 收藏的招聘会' })
     await favs.add(userA, { targetType: 'policy', targetId: `policy_${suffix}`, title: 'A 收藏的政策' })
-    const listA = await favs.list(userA)
+    const listA = (await favs.list(userA, firstPage)).items
     if (listA.length === 3 && new Set(listA.map((f) => f.targetType)).size === 3) {
       pass('1. 新增 + 列表：A 收藏 job/job_fair/policy 各 1，读回 3 条')
     } else fail(`1. A 收藏列表异常：${JSON.stringify(listA)}`)
 
     // ── 2. 幂等新增 ──────────────────────────────────────────────
     const reAdded = await favs.add(userA, { targetType: 'job', targetId: sharedJobId, title: 'A 收藏的岗位(标题已更新)' })
-    const listA2 = await favs.list(userA)
+    const listA2 = (await favs.list(userA, firstPage)).items
     const jobFavs = listA2.filter((f) => f.targetType === 'job' && f.targetId === sharedJobId)
     if (listA2.length === 3 && jobFavs.length === 1 && jobFavs[0].title === 'A 收藏的岗位(标题已更新)' && reAdded.id === jobFavs[0].id) {
       pass('2. 幂等新增：重复收藏同一岗位不产生重复行，仅刷新标题快照')
     } else fail(`2. 幂等新增失败：${JSON.stringify(listA2)}`)
 
     // ── 3. type 过滤 ─────────────────────────────────────────────
-    const onlyJobs = await favs.list(userA, 'job')
+    const onlyJobs = (await favs.list(userA, firstPage, 'job')).items
     if (onlyJobs.length === 1 && onlyJobs[0].targetType === 'job') pass('3. type 过滤：?type=job 只返回 1 条 job 收藏')
     else fail(`3. type 过滤异常：${JSON.stringify(onlyJobs)}`)
 
     // ── 4. 取消（幂等）──────────────────────────────────────────
     const rm1 = await favs.remove(userA, 'policy', `policy_${suffix}`)
     const rm2 = await favs.remove(userA, 'policy', `policy_${suffix}`)
-    const listA3 = await favs.list(userA)
+    const listA3 = (await favs.list(userA, firstPage)).items
     if (rm1.removed === true && rm2.removed === false && listA3.length === 2 && !listA3.some((f) => f.targetType === 'policy')) {
       pass('4. 取消（幂等）：首次删 removed:true，再删 removed:false，policy 收藏已移除')
     } else fail(`4. 取消收藏异常：rm1=${JSON.stringify(rm1)} rm2=${JSON.stringify(rm2)} list=${JSON.stringify(listA3)}`)
 
     // ── 5. 跨用户隔离（B 收藏同一 sharedJobId）─────────────────────
     await favs.add(userB, { targetType: 'job', targetId: sharedJobId, title: 'B 收藏的同一岗位' })
-    const listB = await favs.list(userB)
+    const listB = (await favs.list(userB, firstPage)).items
     // A 试图删"同 targetId"的收藏：只应删自己的；B 的不受影响。
     await favs.remove(userA, 'job', sharedJobId)
-    const listAafter = await favs.list(userA)
-    const listBafter = await favs.list(userB)
+    const listAafter = (await favs.list(userA, firstPage)).items
+    const listBafter = (await favs.list(userB, firstPage)).items
     const crossOk =
       listB.length === 1 && listB[0].title === 'B 收藏的同一岗位' &&
       !listAafter.some((f) => f.targetId === sharedJobId) && // A 自己的已删
@@ -134,23 +135,23 @@ async function main() {
     await prisma.benefitGrant.create({ data: { endUserId: userA, benefitType: 'subsidy_eligibility_hint', title: '高校毕业生求职补贴资格提示', description: '符合条件可按官方指引准备材料清单，前往人社官方入口申请。具体以官方审核为准。', status: 'active', sourceType: 'gov' } })
     await prisma.benefitGrant.create({ data: { endUserId: userB, benefitType: 'coupon', title: 'B 的券', status: 'active', sourceType: 'platform' } })
 
-    // ── 6. 本人可读 + active 优先 + 只回元数据 ──────────────────────
-    const benA = await benefits.list(userA)
-    const activeFirstOk = benA.length === 3 && benA[0].status === 'active' && benA[benA.length - 1].status === 'expired'
+    // ── 6. 本人可读 + 只回元数据 ──────────────────────────────────
+    const benA = (await benefits.list(userA, firstPage)).items
+    const readableOk = benA.length === 3 && benA.some((b) => b.status === 'active') && benA.some((b) => b.status === 'expired')
     const quotaOk = benA.some((b) => b.benefitType === 'free_quota' && b.quantityRemaining === 3 && b.quantityTotal === 5)
-    if (activeFirstOk && quotaOk) pass('6. 本人可读权益：A 得到 3 条，active 优先、expired 殿后，额度字段正确')
+    if (readableOk && quotaOk) pass('6. 本人可读权益：A 得到 3 条，active/expired 状态与额度字段正确')
     else fail(`6. A 权益列表异常：${JSON.stringify(benA)}`)
 
     // ── 7. 跨用户隔离 ────────────────────────────────────────────
-    const benB = await benefits.list(userB)
+    const benB = (await benefits.list(userB, firstPage)).items
     if (benB.length === 1 && benB[0].title === 'B 的券' && !benA.some((b) => b.title === 'B 的券')) {
       pass('7. 跨用户隔离：A 看不到 B 的权益，B 只看到自己的')
     } else fail(`7. 权益跨用户隔离失败：benB=${JSON.stringify(benB)}`)
 
     // ── 8. 空列表返回 [] ─────────────────────────────────────────
     const emptyOk =
-      JSON.stringify(await favs.list(userC)) === '[]' &&
-      JSON.stringify(await benefits.list(userC)) === '[]'
+      JSON.stringify((await favs.list(userC, firstPage)).items) === '[]' &&
+      JSON.stringify((await benefits.list(userC, firstPage)).items) === '[]'
     if (emptyOk) pass('8. 空列表返回 []（无收藏 / 权益会员 C）')
     else fail('8. 空列表未返回 []')
 

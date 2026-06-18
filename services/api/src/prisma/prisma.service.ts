@@ -201,6 +201,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.benefitGrant
   }
 
+  get benefitActivity() {
+    return this.client.benefitActivity
+  }
+
+  get benefitClaim() {
+    return this.client.benefitClaim
+  }
+
   // ── 待机宣传屏(Screensaver)──────────────────────────────────────────────
 
   get adAsset() {

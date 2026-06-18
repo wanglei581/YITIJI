@@ -20,6 +20,7 @@ import { MemberAssetsModule } from './member-assets/member-assets.module'
 import { MockInterviewModule } from './mock-interview/mock-interview.module'
 import { MemberFavoritesModule } from './member-favorites/member-favorites.module'
 import { MemberBenefitsModule } from './member-benefits/member-benefits.module'
+import { BenefitActivitiesModule } from './benefit-activities/benefit-activities.module'
 import { MemberPrintOrdersModule } from './member-print-orders/member-print-orders.module'
 import { MaterialsModule } from './materials/materials.module'
 import { RedisModule } from './common/redis/redis.module'
@@ -74,6 +75,7 @@ const redisUrl = process.env['REDIS_URL']
     MockInterviewModule,
     MemberFavoritesModule,
     MemberBenefitsModule,
+    BenefitActivitiesModule,
     MemberPrintOrdersModule,
     MaterialsModule,
     AiModule,

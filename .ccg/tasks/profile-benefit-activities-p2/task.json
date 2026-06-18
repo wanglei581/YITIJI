@@ -1,12 +1,12 @@
 {
   "id": "profile-benefit-activities-p2",
   "title": "权益活动中心 MVP 设计与实施",
-  "status": "in_progress",
+  "status": "completed",
   "complexity": "L+",
   "risk": "high",
   "domain": "fullstack",
-  "currentPhase": "planning",
-  "nextAction": "实施计划已生成，等待确认后进入开发",
+  "currentPhase": "completed",
+  "nextAction": "已完成，归档任务目录",
   "createdAt": "2026-06-18T12:35:48Z",
   "branch": "codex/profile-benefit-activities-p2"
 }

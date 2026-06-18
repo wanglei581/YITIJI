@@ -5,6 +5,27 @@
 
 ---
 
+## 「我的」权益活动中心 MVP（2026-06-18，Codex + Claude/Antigravity 审查）
+
+本 clean review 分支从 `origin/main` 拆出，明确只包含 P0a/P0b「我的权益」基础闭环与 P2「权益活动」领取闭环，不包含 P1 消息通知 / 意见反馈改动。权益活动只打通既有入口和后台配置，不做支付、套餐购买、招聘会扫码凭证、活动核销、现场签到、Partner 自助配置或自动资格审核。
+
+本轮完成：
+
+- **后端数据模型**：新增 `BenefitActivity`、`BenefitClaim`（SQLite/PG 双 schema + 双迁移），领取成功后生成既有 `BenefitGrant`，进入 `/me/benefits`。
+- **用户侧活动接口**：新增 `/api/v1/activities`、`/api/v1/activities/:id`、`POST /api/v1/activities/:id/claim`；游客可浏览，领取必须会员登录；重复领取、库存不足、未发布、未开始、已结束均拒绝。
+- **Admin 活动接口**：新增 `/api/v1/admin/benefit-activities`、发布、结束、领取记录查询；Admin controller 使用 `JwtAuthGuard + RolesGuard + @Roles('admin')`，关键动作写审计。
+- **Kiosk 页面**：新增 `/activities` 与 `/activities/:id`；「我的」页权益活动入口接真实页面；未登录时引导登录，不伪造领取结果。
+- **Admin 页面**：新增 `/benefit-activities` 与侧栏「权益活动」入口，支持创建草稿、筛选列表、更新草稿、发布、结束、查看领取记录。
+- **合规与隐私**：服务端拦截招聘闭环或结果承诺词；`subsidy_eligibility_hint` 只允许信息提示，不允许设置数量；领取记录和审计只显示/记录脱敏手机号。
+- **服务验证脚本**：新增 `verify:benefit-activities`，覆盖 Admin 创建/发布、合规词拦截、Kiosk 可见性、登录领取、`BenefitGrant` 可见、重复领取拒绝、库存不超卖、过期/结束不可领取、手机号不明文进审计、controller 鉴权元数据。
+
+仍不在本批：
+
+- 求职打印套餐、AI 服务套餐、招聘会扫码凭证、支付/订单/核销、活动签到、自动资格审核、Partner 自助活动配置。
+- P1 消息通知 / 意见反馈未包含在本 clean review 分支，需单独审查和合入。
+
+---
+
 ## 「我的」页商用闭环第一批 P0b：我的权益 + Admin 手动发放/撤销（2026-06-18，Codex + Claude/Antigravity 审查）
 
 在同一隔离 worktree `…/profile-commercial-closure-p0a`、分支 `codex/profile-commercial-closure-p0a` 继续实施 P0b。P0b 只复用现有 `BenefitGrant` 底座，不新增 Prisma schema，不接支付、不接核销、不做权益活动领取，也不混入 P1 通知/反馈域。
@@ -33,7 +54,7 @@
 暂不混入本批：
 
 - `消息通知 / 意见反馈`：仍属 P1，需要单独模型、本人隔离、频控、后台处理闭环。
-- `权益活动 / 求职打印套餐 / AI 服务套餐 / 招聘会扫码凭证`：仍未打通；需要活动、支付/订单/核销或真实预约凭证模型，不得用占位数据伪造。
+- `求职打印套餐 / AI 服务套餐 / 招聘会扫码凭证`：仍未打通；需要支付/订单/核销或真实预约凭证模型，不得用占位数据伪造。权益活动已在后续 P2 clean review 范围内单独打通。
 
 ---
 

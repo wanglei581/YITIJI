@@ -1,6 +1,18 @@
 # 下一步任务
 
-> 最后更新：2026-06-17（P0 生产运行时门禁与 CI 核心验证已收口；招聘会 verify 测试数据残留根治分支已建；其余维持上线验收与试运营准备重心）
+> 最后更新：2026-06-18（P0a/P0b 我的权益与 P2 权益活动 clean review 分支已拆出；套餐/支付/凭证仍后置；上线验收与试运营准备仍是主线）
+
+## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
+
+- [x] P0a/P0b 依赖已纳入 clean review 分支：`/me/benefits` 与 Admin `/member-benefits` 提供领取结果展示和后台手动权益管理底座。
+- [x] 后端新增 `BenefitActivity` / `BenefitClaim`，领取成功后生成既有 `BenefitGrant`，进入 `/me/benefits`。
+- [x] Kiosk `/activities`、`/activities?source=fair`、`/activities/:id` 已接真实 API；游客可浏览，登录后可领取，未登录不伪造结果。
+- [x] Admin `/benefit-activities` 已接真实 API；支持创建草稿、更新草稿、发布、结束、查看领取记录。
+- [x] 后端 `verify:benefit-activities` 覆盖可见性、领取、重复领取、库存、过期/结束拒绝、补贴提示信息化、手机号脱敏审计和 controller 鉴权元数据。
+- [ ] clean review 分支完成本机验证、Antigravity + Claude 双模型审查，Critical 清零后再考虑合入。
+- [ ] 真实百度云 PostgreSQL/Redis 环境部署后，需在服务器补跑 `verify:benefit-activities` 或等价 live 冒烟。
+- [ ] 活动核销、Partner 自助配置、自动资格审核、活动推荐算法不在 P2；如要做需单独产品设计与数据模型。
+- [ ] 求职打印套餐、AI 服务套餐、招聘会扫码凭证仍后置，不得用权益活动模型伪造套餐、支付或预约凭证。
 
 ## 招聘会 verify 测试数据残留根治（2026-06-17，Claude）
 

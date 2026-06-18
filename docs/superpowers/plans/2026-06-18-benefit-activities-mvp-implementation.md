@@ -37,8 +37,8 @@ Backend files:
 
 - Modify: `services/api/prisma/schema.prisma`
 - Modify: `services/api/prisma/postgres/schema.prisma`
-- Create: `services/api/prisma/migrations/20260618123500_add_benefit_activities/migration.sql`
-- Modify: `services/api/prisma/postgres/migrations/0_init/migration.sql`
+- Create: `services/api/prisma/migrations/20260618190000_add_benefit_activities/migration.sql`
+- Create: `services/api/prisma/postgres/migrations/20260618190000_add_benefit_activities/migration.sql`
 - Create: `services/api/src/benefit-activities/benefit-activities.types.ts`
 - Create: `services/api/src/benefit-activities/dto/benefit-activities.dto.ts`
 - Create: `services/api/src/benefit-activities/benefit-activities.service.ts`
@@ -77,8 +77,8 @@ Docs:
 
 - Modify: `services/api/prisma/schema.prisma`
 - Modify: `services/api/prisma/postgres/schema.prisma`
-- Create: `services/api/prisma/migrations/20260618123500_add_benefit_activities/migration.sql`
-- Modify: `services/api/prisma/postgres/migrations/0_init/migration.sql`
+- Create: `services/api/prisma/migrations/20260618190000_add_benefit_activities/migration.sql`
+- Create: `services/api/prisma/postgres/migrations/20260618190000_add_benefit_activities/migration.sql`
 
 - [ ] **Step 1: Add Prisma models to SQLite schema**
 
@@ -152,7 +152,7 @@ Apply the same model changes to `services/api/prisma/postgres/schema.prisma`.
 
 - [ ] **Step 3: Create SQLite migration**
 
-Create `services/api/prisma/migrations/20260618123500_add_benefit_activities/migration.sql`:
+Create `services/api/prisma/migrations/20260618190000_add_benefit_activities/migration.sql`:
 
 ```sql
 CREATE TABLE "BenefitActivity" (
@@ -196,9 +196,9 @@ CREATE INDEX "BenefitClaim_endUserId_idx" ON "BenefitClaim"("endUserId");
 CREATE INDEX "BenefitClaim_activityId_createdAt_idx" ON "BenefitClaim"("activityId", "createdAt");
 ```
 
-- [ ] **Step 4: Update PostgreSQL init migration**
+- [ ] **Step 4: Add PostgreSQL timestamp migration**
 
-Add equivalent PostgreSQL DDL into `services/api/prisma/postgres/migrations/0_init/migration.sql`, using `TEXT`, `TIMESTAMP(3)`, and existing style in that file. Add foreign keys and indexes with the same names.
+Add equivalent PostgreSQL DDL into `services/api/prisma/postgres/migrations/20260618190000_add_benefit_activities/migration.sql`, using `TEXT`, `TIMESTAMP(3)`, and existing migration style. Add foreign keys and indexes with the same names. Do not modify the already-applied `0_init` baseline.
 
 - [ ] **Step 5: Generate Prisma client**
 

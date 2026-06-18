@@ -198,6 +198,7 @@ model User {
 
   uploadedFiles FileObject[] @relation("FileUploader")
   auditLogs     AuditLog[]
+  createdBenefitActivities BenefitActivity[]
 
   @@index([orgId])
 }
@@ -226,6 +227,7 @@ model EndUser {
   benefitGrants   BenefitGrant[]
   browseLogs       BrowseLog[]
   externalJumpLogs ExternalJumpLog[]
+  benefitClaims     BenefitClaim[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -1066,9 +1068,58 @@ model BenefitGrant {
   validUntil        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+  benefitClaim      BenefitClaim?
 
   @@index([endUserId])
   @@index([endUserId, status])
+}
+
+// ── BenefitActivity / BenefitClaim ───────────────────────────────────────────
+// C-3A: 权益活动中心 MVP。
+//
+// BenefitActivity 是活动模板和领取闸门；BenefitClaim 是领取流水与防重凭证。
+// 用户真正拥有的权益仍落 BenefitGrant，sourceRef 回填 BenefitActivity.id。
+// 本阶段不接支付 / 套餐购买 / 招聘会报名凭证 / 签到核销。
+
+model BenefitActivity {
+  id                String         @id @default(cuid())
+  title             String
+  description       String?
+  rulesText         String?
+  benefitType       String
+  sourceType        String         @default("platform")
+  quantityTotal     Int?
+  stockTotal        Int?
+  stockRemaining    Int?
+  claimLimitPerUser Int            @default(1)
+  status            String         @default("draft")
+  validFrom         DateTime?
+  validUntil        DateTime?
+  grantValidDays    Int?
+  createdById       String?
+  createdBy         User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  claims            BenefitClaim[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([status])
+  @@index([sourceType])
+  @@index([validFrom, validUntil])
+}
+
+model BenefitClaim {
+  id             String          @id @default(cuid())
+  activityId     String
+  activity       BenefitActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  endUserId      String
+  endUser        EndUser         @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  benefitGrantId String          @unique
+  benefitGrant   BenefitGrant    @relation(fields: [benefitGrantId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+
+  @@unique([activityId, endUserId])
+  @@index([endUserId])
+  @@index([activityId, createdAt])
 }
 
 model AuditLog {

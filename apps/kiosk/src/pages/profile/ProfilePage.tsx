@@ -104,12 +104,12 @@ const FAIRS: Entry[] = [
   { icon: EyeIcon,          iconBg: 'bg-sky-50',     iconColor: 'text-sky-600',     label: '浏览记录',     route: '/me/activity' },
   { icon: ExternalLinkIcon, iconBg: 'bg-teal-50',    iconColor: 'text-teal-600',    label: '外部跳转记录', route: '/me/activity?tab=jump' },
   { icon: QrCodeIcon,       iconBg: 'bg-indigo-50',  iconColor: 'text-indigo-600',  label: '招聘会扫码凭证',     tag: '建设中' },
-  { icon: GiftIcon,         iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',           tag: '建设中' },
+  { icon: GiftIcon,         iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',           route: '/activities?source=fair' },
 ]
 
 // 4. 权益活动与服务套餐（均建设中，不接支付）
 const BENEFITS: Entry[] = [
-  { icon: TicketIcon,   iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',     tag: '建设中' },
+  { icon: TicketIcon,   iconBg: 'bg-rose-50',    iconColor: 'text-rose-600',    label: '权益活动',     route: '/activities' },
   { icon: PackageIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '求职打印套餐', tag: '建设中' },
   { icon: BoxIcon,      iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务套餐',   tag: '建设中' },
   // 政策补贴指引：跳转既有政策服务页「就业政策」Tab（info-only 政策说明 / 材料清单 / 官方入口），不代办、不承诺到账。

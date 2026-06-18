@@ -40,6 +40,8 @@ import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
 import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
 import { HelpCenterPage } from '../pages/help/HelpCenterPage'
+import { BenefitActivitiesPage } from '../pages/activities/BenefitActivitiesPage'
+import { BenefitActivityDetailPage } from '../pages/activities/BenefitActivityDetailPage'
 import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
@@ -90,6 +92,9 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/settings',       element: <MySettingsPage /> },
       // 帮助中心（静态 FAQ；仅描述已上线能力）
       { path: 'help',              element: <HelpCenterPage /> },
+      // 权益活动中心（活动领取后生成 BenefitGrant，进入 /me/benefits；不含支付/套餐购买/招聘会凭证）
+      { path: 'activities',         element: <BenefitActivitiesPage /> },
+      { path: 'activities/:id',     element: <BenefitActivityDetailPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'campus',            element: <CampusPage /> },
       // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）
