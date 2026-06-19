@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-19（P0a/P0b 我的权益、P2 权益活动、P1 消息通知 + 意见反馈已完成本机与百度云 IP 预生产复验；最终部署 `a4b1803a`；套餐/支付/凭证仍后置）
+> 最后更新：2026-06-20（06-17 P0 队列第①项 JobFair Admin 审核专项 verify 已补齐；Kiosk `/campus` 本校优先与机构类型矩阵仍待单项方案确认后实施）
 
 ## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
 
@@ -60,8 +60,11 @@
 - [x] 生产运行时门禁：`NODE_ENV=production` 时强制 `JWT_SECRET` 合规、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL` 指向 PostgreSQL，误配即启动失败。
 - [x] 7 个历史 JWT 弱 fallback 模块已统一切到 `JwtVerifierModule`，`services/api/src` 中弱 fallback 扫描 0 命中。
 - [x] 主 CI 接入 `verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`、`verify:smart-campus-ui`。
+- [x] 招聘会 Admin 审核闭环专项门禁：新增 `verify:jobfair-review` 并接入 CI，覆盖 `reviewFairSource` / `publishFairSource` 的审核、发布、下架、拒绝、终态不可回退、公开列表过滤与 `fair.review/fair.publish` 审计；本项为 test-only，不改业务行为。
 - [ ] CI 或可正常 `prisma db push` 的环境复跑新增的 2 个 AppModule+DB verify：`verify:partner-smart-campus` / `verify:partner-edit`。
 - [ ] `verify-public-fair-demo-guard.ts` 尚未在 main，待 campus-recruitment 功能进入 main 后再接入 CI。
+- [ ] Kiosk `/campus` 本校优先：按终端真实归属学校优先选择本校校园招聘会，需单项方案确认后实施。
+- [ ] 机构类型矩阵硬约束：后端强制 `Organization.type → sceneTemplate → enabledModules`，风险最高，必须单独方案审查后实施。
 
 ### 1. 生产环境准备
 

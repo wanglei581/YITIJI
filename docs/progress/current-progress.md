@@ -1,9 +1,35 @@
 # 当前开发进度
 
-> 最后更新：2026-06-19
+> 最后更新：2026-06-20
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
+
+## 2026-06-17 P0 队列第①项：JobFair Admin 审核专项 verify 补强（2026-06-20，Codex + Claude/Antigravity）
+
+在隔离 worktree `/Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/jobfair-admin-review-verify`、分支 `codex/jobfair-admin-review-verify` 执行。范围严格 test-only，只补招聘会 Admin 审核 / 发布状态机的专项验证，不修改 `jobs.service.ts`、controller、DTO、Prisma schema 或任何业务行为；不处理 `verify-public-fair-demo-guard`、Kiosk `/campus` 本校优先、机构类型矩阵。
+
+本轮完成：
+
+- 新增 `services/api/scripts/verify-jobfair-review.ts`，service 级直调 `JobsService.reviewFairSource` / `publishFairSource`，覆盖 `pending+draft`、未审核禁止发布、`reviewing`、`approve → approved+draft` 且清空 `rejectReason`、发布、公开列表仅 `approved+published`、下架移出公开列表、`approved/rejected` 终态不可再次审核、reject 空 reason 拒绝、reject 落 reason、脏态 reject 强制回 `draft`、`fair.review/fair.publish` 审计 payload 含 from/to 状态且不含 password。
+- 复用 `services/api/scripts/lib/verify-fair-residue.ts`，使用稳定 tag `vresidfairreview` 运行前预清 + finally 清理，避免 approved+published 测试招聘会残留污染 `/campus` 或 `/job-fairs`。
+- `services/api/package.json` 新增 `verify:jobfair-review`。
+- `.github/workflows/ci.yml` 串行 Verify suites 接入 `pnpm --filter @ai-job-print/api verify:jobfair-review`，位置紧随 `verify:job-review`。
+
+验证结果：
+
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:jobfair-review` ✅
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:job-review` ✅
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:admin-fairs` ✅
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:partner-edit` ✅
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `git diff --check` ✅
+
+本机限制：新 worktree 中 `prisma db push` 仍触发本机 Prisma schema engine 空错误 `Schema engine error: undefined`；本轮使用同一 main 干净 worktree 的 ignored `dev.db` 作为本地验证库。该数据库文件未进入 git diff。
+
+双模型复核：Claude reviewer 与 Antigravity reviewer 均返回 `APPROVE_TEST_ONLY_DIFF`，确认仅 3 文件变更、无业务代码改动、无招聘闭环合规风险。
+
+整合与清理去向：本分支完成用户确认后，可将 `.github/workflows/ci.yml`、`services/api/package.json`、`services/api/scripts/verify-jobfair-review.ts` 作为独立 test-only 变更并入 `main` 或当前统一收口分支。合入后再执行 `git worktree remove /Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/jobfair-admin-review-verify` 与 `git worktree prune`；未合入前不清理该 worktree，避免丢失待审 diff。
 
 ## 百度云预生产核心复验完成（2026-06-19，Codex）
 
