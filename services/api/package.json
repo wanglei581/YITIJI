@@ -46,6 +46,7 @@
     "verify:external-video:e2e": "tsx scripts/verify-external-video-e2e.ts",
     "verify:admin-fairs": "node -r @swc-node/register scripts/verify-admin-fairs.ts",
     "verify:fair-info-fields": "node -r @swc-node/register scripts/verify-fair-info-fields.ts",
+    "verify:jobfair-campus-priority": "node -r @swc-node/register scripts/verify-jobfair-campus-priority.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
     "verify:fair-company-positions": "node -r @swc-node/register scripts/verify-fair-company-positions.ts",

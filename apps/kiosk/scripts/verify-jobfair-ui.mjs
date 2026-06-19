@@ -108,7 +108,7 @@ mustNotContain(
 // ── D. /campus 校园页 ─────────────────────────────────────────────────────
 mustContain(
   'src/pages/campus/CampusPage.tsx',
-  ["'overview'", "'companies'", "'map'", "'ai'", "'print'", 'MapBlock', 'getFairStats', 'getJobFairs'],
+  ["'overview'", "'companies'", "'map'", "'ai'", "'print'", 'MapBlock', 'getFairStats', 'getJobFairs', 'getTerminalId', '{ terminalId }'],
   'D1. 校园页保持沉浸式 5 Tab + 真实 API 取数',
 )
 mustNotContain(

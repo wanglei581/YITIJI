@@ -31,6 +31,34 @@
 
 整合与清理去向：本分支完成用户确认后，可将 `.github/workflows/ci.yml`、`services/api/package.json`、`services/api/scripts/verify-jobfair-review.ts` 作为独立 test-only 变更并入 `main` 或当前统一收口分支。合入后再执行 `git worktree remove /Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/jobfair-admin-review-verify` 与 `git worktree prune`；未合入前不清理该 worktree，避免丢失待审 diff。
 
+## P0 补项②：Kiosk /campus 本校优先（2026-06-20，Codex + Claude/Antigravity 复核）
+
+在隔离 worktree `…/campus-fair-school-priority`、分支 `codex/campus-fair-school-priority` 完成 2026-06-17 P0 队列中的「Kiosk /campus 本校优先」补项。范围只限招聘会公开展示排序与对应 verify，不引入平台内投递、收简历、候选人筛选、面试邀约、Offer 或企业招聘闭环。
+
+本轮完成：
+
+- **后端公开列表兼容**：`GET /job-fairs` 新增可选 `terminalId` scope；无 `terminalId` 时仍保持原 `approved + published` 全局公开列表与 `startAt asc` 排序，兼容既有公开调用。
+- **本校优先排序**：有 `terminalId` 时，后端按终端 `id` 或 `terminalCode` 解析真实终端归属机构；仅当机构存在、启用且 `type=school_employment_center` 时进入本校优先排序。
+- **回退策略**：终端不存在、未绑定机构、绑定非学校机构、绑定停用学校或本校没有场次时，不隐藏其它公开招聘会，只切到终端场景下的公开排序：未结束场次优先，其后已结束场次。
+- **排序规则**：学校终端有本校场次时按「本校未结束 → 本校已结束 → 其它未结束 → 其它已结束」分组展示；所有结果仍必须满足已审核、已发布、公开可见，不泄露待审/草稿。
+- **Kiosk 接线**：`/campus` 仅从终端配置读取 `terminalId` 后传给招聘会 API；普通 `/job-fairs` 公开列表不传 scope，默认行为不变。
+- **验证守门**：新增 `verify:jobfair-campus-priority`，覆盖无 terminalId 旧排序、本校优先、terminalCode/id 双路径、各类回退、小分页无重复/漏项、未审核/未发布不泄露、可见集合不变，并接入 CI。
+
+本地验证：
+
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:jobfair-campus-priority` ✅
+- `pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` ✅
+- `pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui` ✅
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:job-review` ✅
+- `DATABASE_URL='file:./prisma/dev.db' TERMINAL_ADMIN_SECRET='ci-only-terminal-admin-secret' TERMINAL_ACTION_TOKEN_SECRET='ci-only-terminal-action-secret' pnpm --filter @ai-job-print/api verify:partner-smart-campus` ✅
+- `pnpm --filter @ai-job-print/api lint` ✅
+- `pnpm --filter @ai-job-print/kiosk lint` ✅（0 errors；既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk typecheck` ✅
+- `git diff --check` ✅
+
+双模型终审：Antigravity + Claude 均 APPROVE；默认公开列表不变、本校优先只做展示排序、不隐藏其它公开招聘会、无招聘闭环能力新增。
+
 ## 百度云预生产核心复验完成（2026-06-19，Codex）
 
 权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `120.48.13.190`，当前云端版本：

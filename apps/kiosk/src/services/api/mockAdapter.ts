@@ -199,15 +199,29 @@ function ok<T>(data: T): ApiResponse<T> {
   return { data, success: true }
 }
 
+const FAIR_STATUS_RANK: Record<ExternalJobFair['status'], number> = {
+  ongoing: 0,
+  upcoming: 1,
+  ended: 2,
+}
+
+function orderTerminalScopedMockFairs(fairs: ExternalJobFair[], terminalId?: string): ExternalJobFair[] {
+  if (!terminalId) return fairs
+  return [...fairs].sort((a, b) => FAIR_STATUS_RANK[a.status] - FAIR_STATUS_RANK[b.status])
+}
+
 // ──────────────────────────────────────────────────────────────
 // Adapter 对象
 // ──────────────────────────────────────────────────────────────
 
 export const mockJobFairAdapter = {
-  async getJobFairs(params?: { status?: string }): Promise<PaginatedResponse<ExternalJobFairDTO>> {
-    const fairs = MOCK_FAIRS
-      .filter((f) => f.reviewStatus === 'approved' && f.publishStatus === 'published')
-      .filter((f) => !params?.status || f.status === params.status)
+  async getJobFairs(params?: { status?: string; terminalId?: string }): Promise<PaginatedResponse<ExternalJobFairDTO>> {
+    const fairs = orderTerminalScopedMockFairs(
+      MOCK_FAIRS
+        .filter((f) => f.reviewStatus === 'approved' && f.publishStatus === 'published')
+        .filter((f) => !params?.status || f.status === params.status),
+      params?.terminalId,
+    )
       .map(toJobFairDTO)
     return makePaginated(fairs)
   },
