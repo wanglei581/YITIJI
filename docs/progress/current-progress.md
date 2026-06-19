@@ -59,6 +59,27 @@
 
 双模型终审：Antigravity + Claude 均 APPROVE；默认公开列表不变、本校优先只做展示排序、不隐藏其它公开招聘会、无招聘闭环能力新增。
 
+## P0 补项③：机构类型矩阵后端硬约束（2026-06-20，Codex + Claude + Antigravity）
+
+按 2026-06-17 P0 队列和 Claude 监督方确认，已在独立 worktree `codex/org-type-matrix-guard` 完成 `Organization.type -> sceneTemplate -> enabledModules` 后端写路径硬约束。范围严格限定为 Admin 机构创建/更新校验与 verify 补强，不改读取、登录、启停、Partner 账号加载，不做数据迁移，不引入任何招聘闭环能力。
+
+核心规则：
+
+- `createOrg` 必须符合机构矩阵；`updateOrg` 仅当 `type`、`sceneTemplate` 或 `enabledModules` 最终值实际变化时校验。
+- 历史不合规机构 grandfather：`listOrgs`、`getOrgDetail`、`getOwnProfile`、Partner 登录、`setOrgStatus` 和编辑无关字段不被新矩阵阻断。
+- `school_employment_center` 仅允许 `sceneTemplate=school`，并且只有高校机构可启用 `smart_campus`。
+- `public_employment_service` 仅允许 `sceneTemplate=public_employment`；`licensed_hr_agency` 仅允许 `sceneTemplate=licensed_hr_service`，不开放企业招聘端闭环。
+- `fair_organizer`、`enterprise_source` 为 source-only，必须 `sceneTemplate=null` 且 `enabledModules=[]`，不得启用运营模块。
+- `in_platform_apply`、`candidate_management`、`resume_delivery_to_enterprise`、`interview_invitation`、`offer_management` 继续最高优先级硬拒绝。
+
+验证结果：
+
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:admin-orgs` ✅（新增 10a-10m 覆盖矩阵、grandfather、无关字段编辑、`enabledModules=null`、违禁模块优先级）
+- `DATABASE_URL='file:./prisma/dev.db' TERMINAL_ADMIN_SECRET='ci-only-terminal-admin-secret' TERMINAL_ACTION_TOKEN_SECRET='ci-only-terminal-action-secret' pnpm --filter @ai-job-print/api verify:partner-smart-campus` ✅
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:partner-edit` ✅
+- `pnpm --filter @ai-job-print/api typecheck && pnpm --filter @ai-job-print/api lint && git diff --check` ✅
+- Claude + Antigravity 终审均 APPROVE，Critical / Warning 为 0；Claude 的 3 条非阻塞 Info 已写入 `next-tasks.md` 作为 P1 后续。
+
 ## 百度云预生产核心复验完成（2026-06-19，Codex）
 
 权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `120.48.13.190`，当前云端版本：

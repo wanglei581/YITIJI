@@ -53,6 +53,67 @@ const PROHIBITED_MODULES = new Set([
   'offer_management',
 ])
 
+interface OrgTypeMatrixRule {
+  sceneTemplate: string | null
+  allowedModules: Set<string>
+}
+
+const matrixModules = (modules: string[]) => new Set(modules)
+
+/** 机构类型矩阵: type 决定唯一场景模板和模块权限上限。 */
+const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
+  school_employment_center: {
+    sceneTemplate: 'school',
+    allowedModules: matrixModules([
+      'resume_service',
+      'print_scan',
+      'policy_service',
+      'job_info',
+      'job_fair',
+      'smart_campus',
+      'ai_interview',
+      'device_status',
+      'service_statistics',
+      'external_apply_redirect',
+    ]),
+  },
+  public_employment_service: {
+    sceneTemplate: 'public_employment',
+    allowedModules: matrixModules([
+      'resume_service',
+      'print_scan',
+      'policy_service',
+      'job_info',
+      'job_fair',
+      'ai_interview',
+      'device_status',
+      'service_statistics',
+      'external_apply_redirect',
+    ]),
+  },
+  licensed_hr_agency: {
+    sceneTemplate: 'licensed_hr_service',
+    allowedModules: matrixModules([
+      'resume_service',
+      'print_scan',
+      'job_info',
+      'job_fair',
+      'ai_interview',
+      'device_status',
+      'service_statistics',
+      'external_apply_redirect',
+    ]),
+  },
+  fair_organizer: {
+    sceneTemplate: null,
+    allowedModules: matrixModules([]),
+  },
+  enterprise_source: {
+    sceneTemplate: null,
+    allowedModules: matrixModules([]),
+  },
+}
+
 export interface AdminOrgAccount {
   id: string
   username: string
@@ -99,6 +160,20 @@ function parseModules(json: string): string[] {
   } catch {
     return []
   }
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)]
+}
+
+function sameStringSet(a: string[], b: string[]): boolean {
+  const left = new Set(a)
+  const right = new Set(b)
+  if (left.size !== right.size) return false
+  for (const value of left) {
+    if (!right.has(value)) return false
+  }
+  return true
 }
 
 function mapOrg(
@@ -180,6 +255,8 @@ export class AdminOrgsService {
 
   async createOrg(dto: CreateOrgDto, admin: AuthedUser): Promise<AdminOrgDetail> {
     const enabledModules = this.sanitizeModules(dto.enabledModules)
+    const sceneTemplate = dto.sceneTemplate ?? null
+    this.assertOrgTypeMatrix({ type: dto.type, sceneTemplate, enabledModules })
 
     if (dto.account) {
       const exists = await this.prisma.user.findUnique({ where: { username: dto.account.username } })
@@ -196,7 +273,7 @@ export class AdminOrgsService {
         type: dto.type,
         contact: dto.contact ?? null,
         contactPhone: dto.contactPhone ?? null,
-        sceneTemplate: dto.sceneTemplate ?? null,
+        sceneTemplate,
         enabledModulesJson: JSON.stringify(enabledModules),
       },
     })
@@ -222,8 +299,27 @@ export class AdminOrgsService {
   }
 
   async updateOrg(orgId: string, dto: UpdateOrgDto, admin: AuthedUser): Promise<AdminOrgDetail> {
-    await this.assertOrgExists(orgId)
+    const current = await this.assertOrgExists(orgId)
     const changedFields = Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined)
+    const currentModules = parseModules(current.enabledModulesJson)
+    const enabledModulesInput = Array.isArray(dto.enabledModules) ? dto.enabledModules : null
+    const requestedModules = enabledModulesInput ? uniqueStrings(enabledModulesInput) : currentModules
+    const hasEnabledModulesInput = enabledModulesInput !== null
+    const modulesChanged = hasEnabledModulesInput && !sameStringSet(requestedModules, currentModules)
+    const nextModules = modulesChanged ? this.sanitizeModules(requestedModules) : currentModules
+    const nextType = dto.type ?? current.type
+    const nextSceneTemplate = dto.sceneTemplate !== undefined ? dto.sceneTemplate : current.sceneTemplate
+    const matrixFieldsChanged =
+      (dto.type !== undefined && dto.type !== current.type) ||
+      (dto.sceneTemplate !== undefined && (dto.sceneTemplate ?? null) !== (current.sceneTemplate ?? null)) ||
+      modulesChanged
+    if (matrixFieldsChanged) {
+      this.assertOrgTypeMatrix({
+        type: nextType,
+        sceneTemplate: nextSceneTemplate ?? null,
+        enabledModules: nextModules,
+      })
+    }
     await this.prisma.organization.update({
       where: { id: orgId },
       data: {
@@ -232,9 +328,7 @@ export class AdminOrgsService {
         ...(dto.contact !== undefined ? { contact: dto.contact } : {}),
         ...(dto.contactPhone !== undefined ? { contactPhone: dto.contactPhone } : {}),
         ...(dto.sceneTemplate !== undefined ? { sceneTemplate: dto.sceneTemplate } : {}),
-        ...(dto.enabledModules !== undefined
-          ? { enabledModulesJson: JSON.stringify(this.sanitizeModules(dto.enabledModules)) }
-          : {}),
+        ...(modulesChanged ? { enabledModulesJson: JSON.stringify(nextModules) } : {}),
       },
     })
     await this.writeAudit(admin, 'org.update', orgId, { changedFields })
@@ -343,6 +437,45 @@ export class AdminOrgsService {
       }
     }
     return unique
+  }
+
+  private assertOrgTypeMatrix(input: { type: string; sceneTemplate: string | null; enabledModules: string[] }): void {
+    for (const moduleName of input.enabledModules) {
+      if (PROHIBITED_MODULES.has(moduleName)) {
+        throw new BadRequestException({
+          error: { code: 'MODULE_PROHIBITED', message: `模块 ${moduleName} 属于招聘闭环功能,平台禁止启用` },
+        })
+      }
+    }
+    const rule = ORG_TYPE_MATRIX[input.type]
+    if (!rule) {
+      throw new BadRequestException({
+        error: {
+          code: 'ORG_TYPE_MATRIX_VIOLATION',
+          message: `机构类型 ${input.type} 不在支持矩阵内`,
+        },
+      })
+    }
+    if ((input.sceneTemplate ?? null) !== rule.sceneTemplate) {
+      const expected = rule.sceneTemplate ?? '空'
+      const actual = input.sceneTemplate ?? '空'
+      throw new BadRequestException({
+        error: {
+          code: 'ORG_TYPE_MATRIX_VIOLATION',
+          message: `机构类型 ${input.type} 的场景模板必须为 ${expected},当前为 ${actual}`,
+        },
+      })
+    }
+    for (const moduleName of input.enabledModules) {
+      if (!rule.allowedModules.has(moduleName)) {
+        throw new BadRequestException({
+          error: {
+            code: 'ORG_TYPE_MATRIX_VIOLATION',
+            message: `机构类型 ${input.type} 不允许启用模块 ${moduleName}`,
+          },
+        })
+      }
+    }
   }
 
   private throwOrgNotFound(orgId: string): never {

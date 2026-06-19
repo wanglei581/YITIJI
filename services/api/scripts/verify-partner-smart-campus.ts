@@ -103,10 +103,10 @@ async function main(): Promise<void> {
     await cleanup(prisma) // 预清理：上次异常退出的残留夹具
 
     // 夹具：两所学校 + 一个非学校机构 + 一个停用机构；A、B 各一台终端，另加一台归属可变终端。
-    await prisma.organization.create({ data: { id: SCHOOL_A, name: '测试学校A就业中心', type: 'school_employment_center' } })
-    await prisma.organization.create({ data: { id: SCHOOL_B, name: '测试学校B就业中心', type: 'school_employment_center' } })
-    await prisma.organization.create({ data: { id: NONSCHOOL, name: '测试市人才中心', type: 'public_employment_service' } })
-    await prisma.organization.create({ data: { id: DISABLED_ORG, name: '测试停用机构', type: 'school_employment_center', enabled: false } })
+    await prisma.organization.create({ data: { id: SCHOOL_A, name: '测试学校A就业中心', type: 'school_employment_center', sceneTemplate: 'school' } })
+    await prisma.organization.create({ data: { id: SCHOOL_B, name: '测试学校B就业中心', type: 'school_employment_center', sceneTemplate: 'school' } })
+    await prisma.organization.create({ data: { id: NONSCHOOL, name: '测试市人才中心', type: 'public_employment_service', sceneTemplate: 'public_employment' } })
+    await prisma.organization.create({ data: { id: DISABLED_ORG, name: '测试停用机构', type: 'school_employment_center', sceneTemplate: 'school', enabled: false } })
     await prisma.terminal.create({ data: { id: T_A, terminalCode: T_A, agentToken: 'test-sc-token-a', deviceFingerprint: 'test-sc-fp-a', orgId: SCHOOL_A } })
     await prisma.terminal.create({ data: { id: T_B, terminalCode: T_B, agentToken: 'test-sc-token-b', deviceFingerprint: 'test-sc-fp-b', orgId: SCHOOL_B } })
     await prisma.terminal.create({ data: { id: T_ADMIN, terminalCode: T_ADMIN, agentToken: 'test-sc-token-admin', deviceFingerprint: 'test-sc-fp-admin', orgId: null } })
