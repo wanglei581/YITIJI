@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-20
+> 最后更新：2026-06-21
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -10,9 +10,9 @@
 - [x] **Codex + Claude 协作模式**：已输出 `docs/reviews/project-normalization-codex-claude-collaboration.md`，确认 Claude 只做草案/清单，Codex 落盘，Antigravity + Claude 双模型复审。
 - [x] **T0 真值对齐**：已输出 `docs/reviews/project-normalization-truth-audit.md`，确认三层状态并存，不能整包同步或整包清理。
 - [x] **T1 进度文档收口**：已将入口文档短版化，保留历史归档，不迁入运行时代码。
-- [x] **T2 E 类本地工具状态 ignore 提案**：已输出提案文档，不直接改 `.gitignore`；等待确认 `.ccg/commander/`、`.product-pm/`、`.workbuddy/`、`.superpowers/*/state/` 是否仍被使用。
+- [x] **T2 E 类本地工具状态 ignore 提案**：已输出提案文档；T3 已按“先抽取再 ignore”落地，不直接清理本地文件。
 - [x] **T3 E 类本地工具落地**：已抽取 `.product-pm/prd/print-material-pack.md` 与 `.superpowers` HTML 预览摘要，并写入根路径锚定 ignore 规则；不删除本地文件。
-- [ ] **T4 C 类任务证据筛选**：只新增筛选清单；保留 plan / review / verify / deploy / audit；ack / advise / explain 等低价值记录不入库需用户确认。
+- [x] **T4 C 类任务证据筛选**：已输出任务证据筛选报告；只登记高价值摘要、脱敏规则和后续任务，不提交原始 `.ccg/tasks` 包。
 - [ ] **T5 D 类外部材料索引**：为 `docs/business/`、`deliverables/`、`opc-doc/` 建摘要索引；PDF/PNG/PPT/DOCX/ZIP 是否入库先确认仓库外备份。
 
 ## P0：上线前真实验收
@@ -45,6 +45,5 @@
 
 ## 待用户确认
 
-- [ ] 是否同意 C 类任务证据按价值筛选，不整包提交。
 - [ ] 是否同意 D 类外部材料采用“仓库摘要 + 大文件仓库外归档”。
 - [ ] 是否确认后续每个业务闭环都独立分支、独立验证、双模型审查后再推进。
