@@ -34,6 +34,7 @@ import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
+import { MyResumesPage } from '../pages/profile/me/MyResumesPage'
 import { MyDocumentsPage } from '../pages/profile/me/MyDocumentsPage'
 import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
 import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
@@ -86,6 +87,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
       // 「我的」明细页（本人 /me/* 真实数据；未登录引导登录，空态诚实，不造假数据）
+      { path: 'me/resumes',        element: <MyResumesPage /> },
       { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
       { path: 'me/documents',      element: <MyDocumentsPage /> },
       { path: 'me/favorites',      element: <MyFavoritesPage /> },

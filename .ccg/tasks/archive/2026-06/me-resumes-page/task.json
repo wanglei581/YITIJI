@@ -1,0 +1,12 @@
+{
+  "id": "me-resumes-page",
+  "title": "新增我的简历元数据页",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交分支",
+  "createdAt": "2026-06-20T17:51:41.255Z",
+  "branch": "codex/me-resumes-page"
+}

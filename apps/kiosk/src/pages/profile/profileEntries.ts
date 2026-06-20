@@ -28,7 +28,7 @@ import type { Entry, EntrySectionData } from './profileTypes'
 
 // 1. 我的资产
 const ASSETS: Entry[] = [
-  { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/resume/source' },
+  { icon: FileTextIcon, iconBg: 'bg-primary-50', iconColor: 'text-primary-600', label: '我的简历', route: '/me/resumes' },
   { icon: FilesIcon,    iconBg: 'bg-blue-50',    iconColor: 'text-blue-600',    label: '我的文档', route: '/me/documents' },
   { icon: SparklesIcon, iconBg: 'bg-violet-50',  iconColor: 'text-violet-600',  label: 'AI服务记录', route: '/me/ai-records' },
   { icon: PrinterIcon,  iconBg: 'bg-amber-50',   iconColor: 'text-amber-600',   label: '打印订单', route: '/me/print-orders' },
