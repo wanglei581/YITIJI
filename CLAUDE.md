@@ -185,6 +185,8 @@ ai-job-print-terminal/
     exported-code/
 ```
 
+当前物理目录仍采用标准 monorepo 结构；目录职责索引详见：[docs/project-structure.md](docs/project-structure.md)。当前阶段不做物理目录迁移。
+
 ## 7. 跨模型接力规则
 
 不要新增独立的 handoff / 交接记录文件。本项目的进度、需求和合规边界只写入现有正式文档，避免 Claude、Codex、Mavis 或 Windows 端读取到互相矛盾的临时文档。
@@ -196,6 +198,7 @@ ai-job-print-terminal/
 3. `docs/progress/next-tasks.md`
 4. `docs/product/feature-scope.md`
 5. `docs/compliance/compliance-boundary.md`
+6. `.ccg/spec/guides/index.md`（若存在）
 
 记录保存规则：
 
@@ -207,7 +210,17 @@ ai-job-print-terminal/
 
 聊天记录、截图、临时总结只能作为辅助背景，不作为需求来源。若文档状态和代码实现不一致，先执行审查与验证，更新正式进度文档后再继续开发。
 
-## 8. 页面风格要求
+## 8. 工程规模控制
+
+详见：[.ccg/spec/guides/index.md](.ccg/spec/guides/index.md)
+
+后续开发必须先确认任务范围和文件预算，再做方案审查，审查通过后才写代码。禁止为了“看起来完整”继续堆重复入口、占位页面、假数据闭环、临时脚本和无验证代码。
+
+单文件体积按以下阈值控制：300 行以内为理想状态，500 行以上新增功能前必须评估拆分，800 行以上不得继续堆新功能，1000 行以上进入重构/拆分清单。生成文件、迁移快照和必要静态快照除外。
+
+删除旧代码必须有证据：无路由引用、无 import 引用、无测试/verify 依赖、无当前文档声明、不会被生产部署或硬件链路使用。删除、隐藏、迁移页面或功能后必须同步 `docs/progress/current-progress.md`，并跑最小相关验证。
+
+## 9. 页面风格要求
 
 整体风格：
 
