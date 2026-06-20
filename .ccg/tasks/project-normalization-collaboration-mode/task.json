@@ -1,0 +1,12 @@
+{
+  "id": "project-normalization-collaboration-mode",
+  "title": "项目规范化：Codex 与 Claude 协作推进模式",
+  "status": "in_progress",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "process",
+  "currentPhase": "planning",
+  "nextAction": "固化双模型协作报告并等待用户确认执行边界",
+  "createdAt": "2026-06-20T20:10:00+08:00",
+  "branch": "codex/project-normalization-p0"
+}
