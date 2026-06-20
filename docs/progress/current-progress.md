@@ -80,6 +80,8 @@
 - `pnpm --filter @ai-job-print/api typecheck && pnpm --filter @ai-job-print/api lint && git diff --check` ✅
 - Claude + Antigravity 终审均 APPROVE，Critical / Warning 为 0；Claude 的 3 条非阻塞 Info 已写入 `next-tasks.md` 作为 P1 后续。
 
+收尾记录：PR #53 已 merge 到 main（merge commit `9509d30464b822a4c13e287f216dc803bacd4a96`）；合并后在 main 上跑 6 项收口 verify 全部通过：`jobfair-review`、`jobfair-campus-priority`、`admin-orgs`、`job-review`、`partner-smart-campus`、`partner-edit`。
+
 ## 百度云预生产核心复验完成（2026-06-19，Codex）
 
 权益活动 clean review 与 P1 消息通知 / 意见反馈 clean review 已部署到百度云预生产服务器 `120.48.13.190`，当前云端版本：
