@@ -89,6 +89,12 @@ Antigravity 结论为 `CHANGES_REQUESTED`，核心理由：
 - 整包提交 `.ccg/tasks/`、`docs/business/`、`deliverables/`、`opc-doc/`。
 - 让 Claude 直接在主工作区运行写操作。
 
+## 本地桥工具边界
+
+`.ccg/commander/` 是主工作区里出现过的本地 Claude -> Codex 指挥桥工具，包含 `README.md`、`codex-bridge.sh`、`inbox/`、`outbox/`、`processed/` 和 heartbeat 状态。该目录只作为个人或本机自动化工具，不作为正式项目事实来源。
+
+正式协作规则以本文件、`AGENTS.md`、`CLAUDE.md`、`.ccg/spec/guides/index.md`、`docs/progress/current-progress.md` 和 `docs/progress/next-tasks.md` 为准。若未来继续使用 Commander Bridge，应在本地保留；仓库只保留这里的边界说明，不跟踪桥脚本、消息队列、心跳或处理记录。
+
 ## 用户确认清单
 
 进入实际清理前，需要用户确认：
@@ -109,7 +115,7 @@ Antigravity 结论为 `CHANGES_REQUESTED`，核心理由：
 - `git diff --check`
 - `git diff --name-only origin/main...HEAD | rg '^(apps|services|packages)/' || true`
 - 对 `.gitignore` 类任务：`git check-ignore -v` 的命中结果。
-- 对 C/D 类任务：`rg -n "(password|secret|token|api[_-]?key|AKIA|BEGIN PRIVATE KEY)"` 的敏感信息扫描结果。
+- 对 C/D 类任务：运行敏感信息扫描并记录命中项人工判断结果；不得在审查报告中沉淀真实密钥值。
 - 对外部材料任务：`git status --short | rg '\\.(pdf|ppt|pptx|docx|zip)$' || true` 的无暂存证明。
 - 双模型审查结论：Claude、Antigravity 的 Critical / Warning / Info 与 Codex 裁决。
 - 合规口径检查：无“一键投递”“平台投递”“收取简历”“候选人筛选”等越界闭环被新增或恢复。
