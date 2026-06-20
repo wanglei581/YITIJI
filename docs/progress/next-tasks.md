@@ -34,7 +34,7 @@
 - [x] **我的页商用闭环计划与准入**：已输出 `docs/superpowers/plans/2026-06-21-profile-commercial-closure.md` 和 `docs/reviews/profile-commercial-closure-planning.md`；目标从“做出闭环”修正为“收口计划、拆分准入和首批执行任务定义”。
 - [x] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；`ProfilePage.tsx` 已降到 177 行，入口、路由、文案和行为保持不变。
 - [x] **我的页商用闭环 Branch 2：AI 服务记录页**：已新增 `/me/ai-records`，复用 `getMyAiRecords` / `deleteMyAiRecord`，修正「AI服务记录」入口，不展示 payload 或简历原文。
-- [ ] **我的页商用闭环 Branch 3：打印订单关联反馈**：从 `/me/print-orders` 跳转 `/me/feedback?category=print&relatedPrintTaskId=...`，提交时带 `relatedPrintTaskId`，以后端归属校验为安全边界。
+- [x] **我的页商用闭环 Branch 3：打印订单关联反馈**：从 `/me/print-orders` 跳转 `/me/feedback?category=print&relatedPrintTaskId=...`，提交时带 `relatedPrintTaskId`，以后端归属校验为安全边界；已补齐 `verify-member-print-orders` 分页正路径。
 - [ ] **AI 简历上传 / 资产中心**：登录保存、退出本机清空展示、本人可查看/删除、未登录临时文件规则、平台不提供给企业。
 - [ ] **招聘会 / 校园招聘**：Admin 审核、Partner 边界、Kiosk 本校优先、公开来源入口、外部跳转记录；继续禁止平台内投递和企业候选人管理。
 
@@ -43,9 +43,10 @@
 - [ ] 每个新任务先写目标、非目标、允许修改文件、验证方式。
 - [ ] 超过 30 行 diff 或跨模块任务必须 Claude + Antigravity 双模型审查。
 - [ ] 500 行以上文件新增功能前评估拆分；800 行以上不得继续堆新功能；1000 行以上进入拆分清单。
+- [ ] P3 拆分候选：`apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` 当前超过 500 行，后续反馈/通知扩展前先拆分表单、列表和详情面板。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
 
 ## 待用户确认
 
-- [ ] 是否确认后续每个业务闭环都独立分支、独立验证、双模型审查后再推进。
+- [x] 是否确认后续每个业务闭环都独立分支、独立验证、双模型审查后再推进。

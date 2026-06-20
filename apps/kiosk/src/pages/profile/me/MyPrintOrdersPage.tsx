@@ -5,9 +5,10 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
-import { PrinterIcon } from 'lucide-react'
+import { MessageSquareIcon, PrinterIcon } from 'lucide-react'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
@@ -33,6 +34,7 @@ function metaLine(item: MemberPrintOrderItem): string {
 
 export function MyPrintOrdersPage() {
   const { isLoggedIn, getToken } = useAuth()
+  const navigate = useNavigate()
   const [items, setItems] = useState<MemberPrintOrderItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
@@ -55,6 +57,14 @@ export function MyPrintOrdersPage() {
     load()
   }, [load, reloadKey])
 
+  const openFeedback = useCallback(
+    (printTaskId: string) => {
+      const params = new URLSearchParams({ category: 'print', relatedPrintTaskId: printTaskId })
+      navigate(`/me/feedback?${params.toString()}`)
+    },
+    [navigate],
+  )
+
   return (
     <MeListShell
       title="打印订单"
@@ -70,8 +80,12 @@ export function MyPrintOrdersPage() {
     >
       {items.map((item) => {
         const status = STATUS_META[item.status]
+        const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
         return (
-          <Card key={item.id} className="flex items-center gap-4 p-4">
+          <Card
+            key={item.id}
+            className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4 p-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]"
+          >
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
               <PrinterIcon className="h-6 w-6 text-amber-600" aria-hidden="true" />
             </div>
@@ -79,9 +93,22 @@ export function MyPrintOrdersPage() {
               <p className="truncate text-sm font-semibold text-gray-900">{item.fileName ?? '未命名文件'}</p>
               <p className="mt-0.5 truncate text-xs text-gray-400">{metaLine(item)}</p>
             </div>
-            <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', status.cls].join(' ')}>
-              {status.label}
-            </span>
+            <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
+              {canCreateFeedback && (
+                <button
+                  type="button"
+                  onClick={() => openFeedback(item.id)}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-amber-100 bg-white px-3 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  aria-label={`反馈打印订单 ${item.fileName ?? '未命名订单'}`}
+                >
+                  <MessageSquareIcon className="h-4 w-4" aria-hidden="true" />
+                  反馈
+                </button>
+              )}
+              <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', status.cls].join(' ')}>
+                {status.label}
+              </span>
+            </div>
           </Card>
         )
       })}
