@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '@ai-job-print/ui'
 import type { MemberDocumentItem } from '@ai-job-print/shared'
-import { FilesIcon, EyeIcon } from 'lucide-react'
-import { fetchAccessUrl, getMyDocuments } from '../../../services/api/memberAssets'
+import { FilesIcon, EyeIcon, Trash2Icon } from 'lucide-react'
+import { deleteMyDocument, fetchAccessUrl, getMyDocuments } from '../../../services/api/memberAssets'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
@@ -27,9 +27,12 @@ export function MyDocumentsPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
+      setItems([])
       setState('ready')
       return
     }
@@ -52,7 +55,14 @@ export function MyDocumentsPage() {
     return () => clearTimeout(t)
   }, [hint])
 
+  useEffect(() => {
+    if (!confirmId) return
+    const t = setTimeout(() => setConfirmId(null), 3500)
+    return () => clearTimeout(t)
+  }, [confirmId])
+
   const open = async (doc: MemberDocumentItem) => {
+    if (opening || busyId) return
     const token = getToken()
     if (!token) return
     setOpening(doc.id)
@@ -66,7 +76,29 @@ export function MyDocumentsPage() {
     }
   }
 
+  const remove = async (doc: MemberDocumentItem) => {
+    if (opening || busyId) return
+    if (confirmId !== doc.id) {
+      setConfirmId(doc.id)
+      return
+    }
+    const token = getToken()
+    if (!token) return
+    setConfirmId(null)
+    setBusyId(doc.id)
+    try {
+      await deleteMyDocument(token, doc.id)
+      setItems((prev) => prev.filter((item) => item.id !== doc.id))
+      setHint('文档已删除')
+    } catch {
+      setHint('删除失败，文档可能已到期或被清理')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const now = Date.now()
+  const isAnyPending = Boolean(opening || busyId)
 
   return (
     <MeListShell
@@ -88,6 +120,11 @@ export function MyDocumentsPage() {
       )}
       {items.map((doc) => {
         const expired = new Date(doc.expiresAt).getTime() < now
+        const confirming = confirmId === doc.id
+        const busy = busyId === doc.id
+        const openingThis = opening === doc.id
+        const viewDisabled = expired || isAnyPending
+        const deleteDisabled = isAnyPending
         return (
           <Card key={doc.id} className="flex items-center gap-4 p-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50">
@@ -100,20 +137,40 @@ export function MyDocumentsPage() {
                 {expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
               </p>
             </div>
-            <button
-              type="button"
-              disabled={expired || opening === doc.id}
-              onClick={() => void open(doc)}
-              className={[
-                'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
-                expired
-                  ? 'cursor-not-allowed border-gray-100 text-gray-300'
-                  : 'border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600',
-              ].join(' ')}
-            >
-              <EyeIcon className="h-4 w-4" aria-hidden="true" />
-              {expired ? '已到期' : opening === doc.id ? '打开中' : '查看'}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                disabled={viewDisabled}
+                onClick={() => void open(doc)}
+                className={[
+                  'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
+                  viewDisabled
+                    ? 'cursor-not-allowed border-gray-100 text-gray-300'
+                    : 'border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600',
+                ].join(' ')}
+              >
+                <EyeIcon className="h-4 w-4" aria-hidden="true" />
+                {expired ? '已到期' : openingThis ? '打开中' : '查看'}
+              </button>
+              <button
+                type="button"
+                disabled={deleteDisabled}
+                onClick={() => void remove(doc)}
+                title={confirming ? '再次点击确认删除' : '删除'}
+                aria-label={confirming ? `再次点击确认删除文档 ${doc.filename}` : `删除文档 ${doc.filename}`}
+                className={[
+                  'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
+                  deleteDisabled
+                    ? 'cursor-not-allowed border-gray-100 text-gray-300'
+                    : confirming
+                      ? 'border-red-300 bg-red-50 text-red-600'
+                      : 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500',
+                ].join(' ')}
+              >
+                <Trash2Icon className="h-4 w-4" aria-hidden="true" />
+                {busy ? <span className="ml-1">删除中</span> : confirming && <span className="ml-1">确认删除</span>}
+              </button>
+            </div>
           </Card>
         )
       })}
