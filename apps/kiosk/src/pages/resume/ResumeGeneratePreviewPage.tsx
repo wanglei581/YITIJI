@@ -8,7 +8,7 @@
 // - 公共设备:结果只在路由 state(内存),离开即丢;导出文件短期自动清理。
 // ============================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import type {
@@ -55,10 +55,13 @@ export function ResumeGeneratePreviewPage() {
   const location = useLocation()
   const state = location.state as LocationState | null
   const { getToken } = useAuth()
+  const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
+  const stateTaskId = typeof state?.taskId === 'string' ? state.taskId : undefined
+  const restoreTaskId = !state?.result ? (stateTaskId ?? queryTaskId ?? null) : null
 
   const [resume, setResume] = useState<GeneratedResume | null>(state?.result?.resume ?? null)
   const [result, setResult] = useState<ResumeGenerateResponse | null>(state?.result ?? null)
-  const [restoring, setRestoring] = useState(Boolean(!state?.result && state?.taskId))
+  const [restoring, setRestoring] = useState(Boolean(restoreTaskId))
   const [exporting, setExporting] = useState(false)
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -66,7 +69,6 @@ export function ResumeGeneratePreviewPage() {
   useBusyLock(exporting)
 
   // 会员回看（C-2D）：无内存结果但带 taskId → 凭本人会员 token 读回（归属由后端门禁校验）。
-  const restoreTaskId = !state?.result && state?.taskId ? state.taskId : null
   useEffect(() => {
     if (!restoreTaskId) return
     let cancelled = false

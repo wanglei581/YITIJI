@@ -69,6 +69,10 @@ function isActionable(item: MemberResumeItem): boolean {
   return item.status === 'completed'
 }
 
+function taskPath(path: string, taskId: string): string {
+  return `${path}?taskId=${encodeURIComponent(taskId)}`
+}
+
 export function MyResumesPage() {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
@@ -98,10 +102,10 @@ export function MyResumesPage() {
     load()
   }, [load, reloadKey])
 
-  const openReport = (taskId: string) => navigate('/resume/report', { state: { taskId } })
-  const openOptimize = (taskId: string) => navigate('/resume/optimize', { state: { taskId } })
-  const openJobFit = (taskId: string) => navigate('/resume/job-fit', { state: { taskId } })
-  const openGenerate = (taskId: string) => navigate('/resume/generate/preview', { state: { taskId } })
+  const openReport = (taskId: string) => navigate(taskPath('/resume/report', taskId), { state: { taskId } })
+  const openOptimize = (taskId: string) => navigate(taskPath('/resume/optimize', taskId), { state: { taskId } })
+  const openJobFit = (taskId: string) => navigate(taskPath('/resume/job-fit', taskId), { state: { taskId } })
+  const openGenerate = (taskId: string) => navigate(taskPath('/resume/generate/preview', taskId), { state: { taskId } })
 
   return (
     <MeListShell
