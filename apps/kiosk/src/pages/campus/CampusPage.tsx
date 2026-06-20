@@ -42,7 +42,7 @@ import {
   TicketIcon,
   XIcon,
 } from 'lucide-react'
-import { getFairCompanies, getFairStats, getFairZones, getJobFairs } from '../../services/api'
+import { getFairCompanies, getFairStats, getFairZones, getJobFairs, getTerminalId } from '../../services/api'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
@@ -241,16 +241,19 @@ export function CampusPage() {
     setQr({ kind: 'book' })
   }
 
-  // 取一场校园主题招聘会作为本专区主体（进行中优先 → 即将开始 → 任意）
+  // 取一场校园主题招聘会作为本专区主体；有 terminalId 时后端已按本校/未结束优先排序。
   useEffect(() => {
     let cancelled = false
-    getJobFairs()
+    const terminalId = getTerminalId()
+    getJobFairs(terminalId ? { terminalId } : undefined)
       .then((res) => {
         if (cancelled) return
         const campus = res.data.filter(isCampusFair)
-        const pick = campus.length
-          ? [...campus].sort((a, b) => campusScore(b) - campusScore(a))[0]
-          : null
+        const pick = (() => {
+          if (!campus.length) return null
+          if (terminalId) return campus[0]
+          return [...campus].sort((a, b) => campusScore(b) - campusScore(a))[0]
+        })()
         if (pick) setFair(pick)
         else setError(true)
       })

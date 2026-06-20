@@ -1,9 +1,84 @@
 # 当前开发进度
 
-> 最后更新：2026-06-19
+> 最后更新：2026-06-20
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md)
 
 ---
+
+## 2026-06-17 P0 队列第①项：JobFair Admin 审核专项 verify 补强（2026-06-20，Codex + Claude/Antigravity）
+
+在隔离 worktree `/Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/jobfair-admin-review-verify`、分支 `codex/jobfair-admin-review-verify` 执行。范围严格 test-only，只补招聘会 Admin 审核 / 发布状态机的专项验证，不修改 `jobs.service.ts`、controller、DTO、Prisma schema 或任何业务行为；不处理 `verify-public-fair-demo-guard`、Kiosk `/campus` 本校优先、机构类型矩阵。
+
+本轮完成：
+
+- 新增 `services/api/scripts/verify-jobfair-review.ts`，service 级直调 `JobsService.reviewFairSource` / `publishFairSource`，覆盖 `pending+draft`、未审核禁止发布、`reviewing`、`approve → approved+draft` 且清空 `rejectReason`、发布、公开列表仅 `approved+published`、下架移出公开列表、`approved/rejected` 终态不可再次审核、reject 空 reason 拒绝、reject 落 reason、脏态 reject 强制回 `draft`、`fair.review/fair.publish` 审计 payload 含 from/to 状态且不含 password。
+- 复用 `services/api/scripts/lib/verify-fair-residue.ts`，使用稳定 tag `vresidfairreview` 运行前预清 + finally 清理，避免 approved+published 测试招聘会残留污染 `/campus` 或 `/job-fairs`。
+- `services/api/package.json` 新增 `verify:jobfair-review`。
+- `.github/workflows/ci.yml` 串行 Verify suites 接入 `pnpm --filter @ai-job-print/api verify:jobfair-review`，位置紧随 `verify:job-review`。
+
+验证结果：
+
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:jobfair-review` ✅
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:job-review` ✅
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:admin-fairs` ✅
+- `DATABASE_URL=file:./prisma/dev.db pnpm --filter @ai-job-print/api verify:partner-edit` ✅
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `git diff --check` ✅
+
+本机限制：新 worktree 中 `prisma db push` 仍触发本机 Prisma schema engine 空错误 `Schema engine error: undefined`；本轮使用同一 main 干净 worktree 的 ignored `dev.db` 作为本地验证库。该数据库文件未进入 git diff。
+
+双模型复核：Claude reviewer 与 Antigravity reviewer 均返回 `APPROVE_TEST_ONLY_DIFF`，确认仅 3 文件变更、无业务代码改动、无招聘闭环合规风险。
+
+整合与清理去向：本分支完成用户确认后，可将 `.github/workflows/ci.yml`、`services/api/package.json`、`services/api/scripts/verify-jobfair-review.ts` 作为独立 test-only 变更并入 `main` 或当前统一收口分支。合入后再执行 `git worktree remove /Users/wanglei/.config/superpowers/worktrees/AI求职打印服务终端/jobfair-admin-review-verify` 与 `git worktree prune`；未合入前不清理该 worktree，避免丢失待审 diff。
+
+## P0 补项②：Kiosk /campus 本校优先（2026-06-20，Codex + Claude/Antigravity 复核）
+
+在隔离 worktree `…/campus-fair-school-priority`、分支 `codex/campus-fair-school-priority` 完成 2026-06-17 P0 队列中的「Kiosk /campus 本校优先」补项。范围只限招聘会公开展示排序与对应 verify，不引入平台内投递、收简历、候选人筛选、面试邀约、Offer 或企业招聘闭环。
+
+本轮完成：
+
+- **后端公开列表兼容**：`GET /job-fairs` 新增可选 `terminalId` scope；无 `terminalId` 时仍保持原 `approved + published` 全局公开列表与 `startAt asc` 排序，兼容既有公开调用。
+- **本校优先排序**：有 `terminalId` 时，后端按终端 `id` 或 `terminalCode` 解析真实终端归属机构；仅当机构存在、启用且 `type=school_employment_center` 时进入本校优先排序。
+- **回退策略**：终端不存在、未绑定机构、绑定非学校机构、绑定停用学校或本校没有场次时，不隐藏其它公开招聘会，只切到终端场景下的公开排序：未结束场次优先，其后已结束场次。
+- **排序规则**：学校终端有本校场次时按「本校未结束 → 本校已结束 → 其它未结束 → 其它已结束」分组展示；所有结果仍必须满足已审核、已发布、公开可见，不泄露待审/草稿。
+- **Kiosk 接线**：`/campus` 仅从终端配置读取 `terminalId` 后传给招聘会 API；普通 `/job-fairs` 公开列表不传 scope，默认行为不变。
+- **验证守门**：新增 `verify:jobfair-campus-priority`，覆盖无 terminalId 旧排序、本校优先、terminalCode/id 双路径、各类回退、小分页无重复/漏项、未审核/未发布不泄露、可见集合不变，并接入 CI。
+
+本地验证：
+
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:jobfair-campus-priority` ✅
+- `pnpm --filter @ai-job-print/kiosk verify:jobfair-ui` ✅
+- `pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui` ✅
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:job-review` ✅
+- `DATABASE_URL='file:./prisma/dev.db' TERMINAL_ADMIN_SECRET='ci-only-terminal-admin-secret' TERMINAL_ACTION_TOKEN_SECRET='ci-only-terminal-action-secret' pnpm --filter @ai-job-print/api verify:partner-smart-campus` ✅
+- `pnpm --filter @ai-job-print/api lint` ✅
+- `pnpm --filter @ai-job-print/kiosk lint` ✅（0 errors；既有 `KioskBusyContext.tsx` Fast Refresh warning 2 条）
+- `pnpm --filter @ai-job-print/api typecheck` ✅
+- `pnpm --filter @ai-job-print/kiosk typecheck` ✅
+- `git diff --check` ✅
+
+双模型终审：Antigravity + Claude 均 APPROVE；默认公开列表不变、本校优先只做展示排序、不隐藏其它公开招聘会、无招聘闭环能力新增。
+
+## P0 补项③：机构类型矩阵后端硬约束（2026-06-20，Codex + Claude + Antigravity）
+
+按 2026-06-17 P0 队列和 Claude 监督方确认，已在独立 worktree `codex/org-type-matrix-guard` 完成 `Organization.type -> sceneTemplate -> enabledModules` 后端写路径硬约束。范围严格限定为 Admin 机构创建/更新校验与 verify 补强，不改读取、登录、启停、Partner 账号加载，不做数据迁移，不引入任何招聘闭环能力。
+
+核心规则：
+
+- `createOrg` 必须符合机构矩阵；`updateOrg` 仅当 `type`、`sceneTemplate` 或 `enabledModules` 最终值实际变化时校验。
+- 历史不合规机构 grandfather：`listOrgs`、`getOrgDetail`、`getOwnProfile`、Partner 登录、`setOrgStatus` 和编辑无关字段不被新矩阵阻断。
+- `school_employment_center` 仅允许 `sceneTemplate=school`，并且只有高校机构可启用 `smart_campus`。
+- `public_employment_service` 仅允许 `sceneTemplate=public_employment`；`licensed_hr_agency` 仅允许 `sceneTemplate=licensed_hr_service`，不开放企业招聘端闭环。
+- `fair_organizer`、`enterprise_source` 为 source-only，必须 `sceneTemplate=null` 且 `enabledModules=[]`，不得启用运营模块。
+- `in_platform_apply`、`candidate_management`、`resume_delivery_to_enterprise`、`interview_invitation`、`offer_management` 继续最高优先级硬拒绝。
+
+验证结果：
+
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:admin-orgs` ✅（新增 10a-10m 覆盖矩阵、grandfather、无关字段编辑、`enabledModules=null`、违禁模块优先级）
+- `DATABASE_URL='file:./prisma/dev.db' TERMINAL_ADMIN_SECRET='ci-only-terminal-admin-secret' TERMINAL_ACTION_TOKEN_SECRET='ci-only-terminal-action-secret' pnpm --filter @ai-job-print/api verify:partner-smart-campus` ✅
+- `DATABASE_URL='file:./prisma/dev.db' pnpm --filter @ai-job-print/api verify:partner-edit` ✅
+- `pnpm --filter @ai-job-print/api typecheck && pnpm --filter @ai-job-print/api lint && git diff --check` ✅
+- Claude + Antigravity 终审均 APPROVE，Critical / Warning 为 0；Claude 的 3 条非阻塞 Info 已写入 `next-tasks.md` 作为 P1 后续。
 
 ## 百度云预生产核心复验完成（2026-06-19，Codex）
 

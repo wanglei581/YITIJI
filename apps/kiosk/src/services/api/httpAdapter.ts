@@ -221,10 +221,11 @@ function mapWireZone(z: WireFairZone, index: number): FairZoneDTO {
 
 export const httpJobFairAdapter = {
   async getJobFairs(
-    params?: { status?: string },
+    params?: { status?: string; terminalId?: string },
   ): Promise<PaginatedResponse<ExternalJobFairDTO>> {
     const query: Record<string, string> = {}
     if (params?.status) query.status = params.status
+    if (params?.terminalId) query.terminalId = params.terminalId
     return get<PaginatedResponse<ExternalJobFairDTO>>('/job-fairs', query)
   },
 

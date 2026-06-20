@@ -123,10 +123,11 @@ export class JobsController {
     @Query('status')   status?:   string,
     @Query('page')     pageStr?:  string,
     @Query('pageSize') sizeStr?:  string,
+    @Query('terminalId') terminalId?: string,
   ) {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
-    return this.jobsService.getPublishedFairs({ status, page, pageSize })
+    return this.jobsService.getPublishedFairs({ status, page, pageSize, terminalId })
   }
 
   @Get('job-fairs/:id')

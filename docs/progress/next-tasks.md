@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-19（P0a/P0b 我的权益、P2 权益活动、P1 消息通知 + 意见反馈已完成本机与百度云 IP 预生产复验；最终部署 `a4b1803a`；套餐/支付/凭证仍后置）
+> 最后更新：2026-06-20（06-17 P0 队列第①项 JobFair Admin 审核专项 verify、第②项 Kiosk `/campus` 本校优先、第③项机构类型矩阵后端硬约束均已补齐；套餐/支付/凭证仍后置）
 
 ## 「我的」权益活动中心 MVP（2026-06-18，clean review 中）
 
@@ -60,8 +60,17 @@
 - [x] 生产运行时门禁：`NODE_ENV=production` 时强制 `JWT_SECRET` 合规、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL` 指向 PostgreSQL，误配即启动失败。
 - [x] 7 个历史 JWT 弱 fallback 模块已统一切到 `JwtVerifierModule`，`services/api/src` 中弱 fallback 扫描 0 命中。
 - [x] 主 CI 接入 `verify:production-runtime-gates`、`verify:partner-smart-campus`、`verify:partner-edit`、`verify:smart-campus-ui`。
+- [x] 招聘会 Admin 审核闭环专项门禁：新增 `verify:jobfair-review` 并接入 CI，覆盖 `reviewFairSource` / `publishFairSource` 的审核、发布、下架、拒绝、终态不可回退、公开列表过滤与 `fair.review/fair.publish` 审计；本项为 test-only，不改业务行为。
+- [x] Kiosk `/campus` 本校优先（第②项，2026-06-20，分支 `codex/campus-fair-school-priority`）：`/campus` 仅传可选 `terminalId` scope；`/job-fairs` 无 `terminalId` 时默认公开列表保持 `approved + published + startAt asc`；有 `terminalId` 时按终端真实学校归属做「本校未结束 → 本校已结束 → 其它未结束 → 其它已结束」展示排序，不隐藏其它公开招聘会；新增 `verify:jobfair-campus-priority` 并接入 CI。
+- [x] 机构类型矩阵硬约束（2026-06-20，第③项，分支 `codex/org-type-matrix-guard`）：服务端写路径限制 `Organization.type -> sceneTemplate -> enabledModules`；`createOrg` 强制校验，`updateOrg` 仅矩阵字段实际变化时校验；读取、登录、启停、Partner 账号加载不阻断历史配置；`fair_organizer` / `enterprise_source` 按 source-only 空模块处理；违禁招聘闭环模块继续最高优先级硬拒绝。`verify:admin-orgs` 已扩展，`verify:partner-smart-campus` / `verify:partner-edit` 回归通过。
 - [ ] CI 或可正常 `prisma db push` 的环境复跑新增的 2 个 AppModule+DB verify：`verify:partner-smart-campus` / `verify:partner-edit`。
 - [ ] `verify-public-fair-demo-guard.ts` 尚未在 main，待 campus-recruitment 功能进入 main 后再接入 CI。
+
+### P1 后续：机构矩阵体验与审计口径（第③项终审 Info）
+
+- [ ] Admin 前端矩阵感知表单：后端已拒绝非法 `type -> sceneTemplate -> enabledModules` 组合；Admin 表单后续补预防式禁用、联动默认值和清晰错误提示，减少运营误填。
+- [ ] 机构更新审计 `changedFields` 口径：当前审计按请求字段记录；同集合重提 `enabledModules` 时可能显示“请求过但未写库”，后续按实际落库变化收窄审计含义。
+- [ ] source-only 转换清空 `sceneTemplate` 的前端入口：后端要求 `fair_organizer` / `enterprise_source` 为 `sceneTemplate=null` 且空模块；Admin 前端后续补显式清空场景模板入口，避免从运营机构转 source-only 时卡在旧场景值。
 
 ### 1. 生产环境准备
 

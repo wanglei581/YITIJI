@@ -13,10 +13,13 @@
  *   8.  计数:accounts 计数与真实行数一致。
  *   9.  审计:org.create / org.update / org.disable / org.enable / org.account.* 全落 AuditLog,
  *       且审计 payload 内绝不出现明文密码。
+ *   10. 机构类型矩阵:type → sceneTemplate → enabledModules 写路径硬约束;历史不合规数据
+ *       grandfather,无关字段编辑 / 读取 / 登录 / 启停不被误伤。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:admin-orgs
  */
 import 'dotenv/config'
+import * as bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { JwtService } from '@nestjs/jwt'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -65,10 +68,15 @@ async function main() {
   const passwordV1 = `InitPass_${suffix}`
   const passwordV2 = `ResetPass_${suffix}`
   let orgId = ''
+  let legacyOrgId = ''
+  let legacyUsername = ''
+  let legacyPassword = ''
 
   const cleanup = async () => {
     await prisma.user.deleteMany({ where: { username: { startsWith: `vao_partner_${suffix}` } } })
+    await prisma.organization.deleteMany({ where: { name: { contains: suffix } } }).catch(() => undefined)
     if (orgId) await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined)
+    if (legacyOrgId) await prisma.organization.delete({ where: { id: legacyOrgId } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { actorId: admin.userId } })
     await prisma.user.delete({ where: { id: admin.userId } }).catch(() => undefined)
   }
@@ -182,6 +190,180 @@ async function main() {
       const rawLogs = JSON.stringify(logs)
       if (rawLogs.includes(passwordV1) || rawLogs.includes(passwordV2)) fail('9. 审计日志泄露明文密码')
       pass('9. 8 类审计动作齐全,且审计不含明文密码')
+    }
+
+    // ── 10. 机构类型矩阵硬约束 + grandfather 兼容 ───────────────────────────
+    {
+      await expectCode(
+        () => svc.createOrg(
+          {
+            name: `矩阵错误学校_${suffix}`,
+            type: 'school_employment_center',
+            sceneTemplate: 'public_employment',
+            enabledModules: ['resume_service', 'smart_campus'],
+          },
+          admin,
+        ),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10a. 学校机构必须使用 school 场景模板',
+      )
+
+      await expectCode(
+        () => svc.createOrg(
+          {
+            name: `矩阵错误人社_${suffix}`,
+            type: 'public_employment_service',
+            sceneTemplate: 'public_employment',
+            enabledModules: ['policy_service', 'smart_campus'],
+          },
+          admin,
+        ),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10b. smart_campus 仅允许学校机构启用',
+      )
+
+      await expectCode(
+        () => svc.createOrg(
+          {
+            name: `矩阵错误来源方_${suffix}`,
+            type: 'enterprise_source',
+            sceneTemplate: undefined,
+            enabledModules: ['job_info'],
+          },
+          admin,
+        ),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10c. 企业数据来源方 source-only,不得启用运营模块',
+      )
+
+      await expectCode(
+        () => svc.createOrg(
+          {
+            name: `矩阵错误招聘会方_${suffix}`,
+            type: 'fair_organizer',
+            sceneTemplate: undefined,
+            enabledModules: ['job_fair'],
+          },
+          admin,
+        ),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10d. 招聘会主办方 source-only,不得启用前台招聘会模块',
+      )
+
+      const enterpriseSource = await svc.createOrg(
+        {
+          name: `矩阵合法来源方_${suffix}`,
+          type: 'enterprise_source',
+          sceneTemplate: undefined,
+          enabledModules: [],
+        },
+        admin,
+      )
+      const fairOrganizer = await svc.createOrg(
+        {
+          name: `矩阵合法招聘会方_${suffix}`,
+          type: 'fair_organizer',
+          sceneTemplate: undefined,
+          enabledModules: [],
+        },
+        admin,
+      )
+      await prisma.organization.deleteMany({ where: { id: { in: [enterpriseSource.id, fairOrganizer.id] } } })
+      pass('10e. source-only 机构仅空模块集可创建')
+
+      const typeSwitchOrg = await svc.createOrg(
+        {
+          name: `矩阵切换类型_${suffix}`,
+          type: 'public_employment_service',
+          sceneTemplate: 'public_employment',
+          enabledModules: ['print_scan', 'policy_service'],
+        },
+        admin,
+      )
+      await expectCode(
+        () => svc.updateOrg(typeSwitchOrg.id, { type: 'licensed_hr_agency' }, admin),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10f. 修改 type 时必须同时满足目标类型矩阵',
+      )
+      await prisma.organization.delete({ where: { id: typeSwitchOrg.id } })
+
+      const school = await svc.createOrg(
+        {
+          name: `矩阵合法学校_${suffix}`,
+          type: 'school_employment_center',
+          sceneTemplate: 'school',
+          enabledModules: ['resume_service', 'print_scan', 'job_info', 'job_fair', 'smart_campus'],
+        },
+        admin,
+      )
+      await prisma.organization.delete({ where: { id: school.id } })
+      pass('10g. 合法学校矩阵可创建并保留 smart_campus')
+
+      legacyOrgId = `vao_legacy_${suffix}`
+      legacyUsername = `vao_partner_${suffix}_legacy`
+      legacyPassword = `LegacyPass_${suffix}`
+      await prisma.organization.create({
+        data: {
+          id: legacyOrgId,
+          name: `历史不合规机构_${suffix}`,
+          type: 'enterprise_source',
+          sceneTemplate: 'school',
+          enabledModulesJson: JSON.stringify(['smart_campus', 'print_scan']),
+        },
+      })
+      await prisma.user.create({
+        data: {
+          username: legacyUsername,
+          passwordHash: await bcrypt.hash(legacyPassword, 10),
+          name: '历史机构账号',
+          role: 'partner',
+          orgId: legacyOrgId,
+        },
+      })
+
+      await svc.listOrgs()
+      await svc.getOrgDetail(legacyOrgId)
+      await svc.getOwnProfile({ userId: 'legacy-partner', role: 'partner', orgId: legacyOrgId })
+      await auth.login(legacyUsername, legacyPassword)
+      await svc.setOrgStatus(legacyOrgId, 'disable', admin)
+      await expectCode(() => auth.login(legacyUsername, legacyPassword), 'AUTH_LOGIN_FAILED', '10h. 历史机构停用仍走既有登录闸')
+      await svc.setOrgStatus(legacyOrgId, 'enable', admin)
+      await auth.login(legacyUsername, legacyPassword)
+      pass('10i. 历史不合规机构读取 / 登录 / 启停 grandfather 放行')
+
+      const renamed = await svc.updateOrg(legacyOrgId, { contact: '历史联系人' }, admin)
+      if (renamed.contact !== '历史联系人') fail('10j. 历史机构无关字段编辑未生效')
+      pass('10j. 历史不合规机构仅编辑无关字段不触发矩阵误拒')
+
+      const nullModules = await svc.updateOrg(
+        legacyOrgId,
+        { contact: '历史联系人-null', enabledModules: null as unknown as string[] },
+        admin,
+      )
+      if (nullModules.contact !== '历史联系人-null') fail('10k. enabledModules=null 时无关字段编辑未生效')
+      pass('10k. enabledModules=null 按未实际修改模块处理,不触发矩阵误拒')
+
+      await expectCode(
+        () => svc.updateOrg(legacyOrgId, { enabledModules: ['job_info', 'smart_campus'] }, admin),
+        'ORG_TYPE_MATRIX_VIOLATION',
+        '10l. 历史机构一旦实际修改矩阵字段,必须修正到合法矩阵',
+      )
+
+      const legacyProhibitedOrgId = `vao_legacy_prohibited_${suffix}`
+      await prisma.organization.create({
+        data: {
+          id: legacyProhibitedOrgId,
+          name: `历史闭环模块机构_${suffix}`,
+          type: 'school_employment_center',
+          sceneTemplate: 'school',
+          enabledModulesJson: JSON.stringify(['candidate_management']),
+        },
+      })
+      await expectCode(
+        () => svc.updateOrg(legacyProhibitedOrgId, { type: 'public_employment_service' }, admin),
+        'MODULE_PROHIBITED',
+        '10m. 历史闭环模块参与矩阵字段变更时仍按 MODULE_PROHIBITED 最高优先级拒绝',
+      )
     }
 
     console.log('\n=== ALL PASS ===')

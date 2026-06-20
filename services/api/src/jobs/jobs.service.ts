@@ -75,6 +75,24 @@ type SourceKind    = 'job_platform' | 'hr_company' | 'school' | 'fair_organizer'
 type AccessMode    = 'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
 type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'weekly' | 'manual'
 
+interface PublishedFairsParams {
+  status?: string
+  page?: number
+  pageSize?: number
+  terminalId?: string
+}
+
+interface PublishedFairQueryGroup {
+  where: {
+    reviewStatus: string
+    publishStatus: string
+    sourceOrgId?: string
+    NOT?: { sourceOrgId: string }
+    endAt?: { gte?: Date; lt?: Date }
+  }
+  orderBy: { startAt: 'asc' | 'desc' }
+}
+
 // ─── DTO shapes returned to callers ──────────────────────────────────────────
 
 export interface JobListItemDto {
@@ -690,23 +708,98 @@ export class JobsService {
     return { data: j ? prismaJobToListItem(j) : null, success: true }
   }
 
-  async getPublishedFairs(params?: { status?: string; page?: number; pageSize?: number }): Promise<PaginatedResult<FairListItemDto>> {
+  private async resolveCampusPreferredOrgId(terminalId?: string): Promise<string | null> {
+    const id = terminalId?.trim()
+    if (!id) return null
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id }, { terminalCode: id }] },
+      select: {
+        org: { select: { id: true, type: true, enabled: true } },
+      },
+    })
+    const org = terminal?.org
+    if (!org || !org.enabled || org.type !== 'school_employment_center') return null
+    return org.id
+  }
+
+  private async getPublishedFairRowsByGroups(
+    groups: PublishedFairQueryGroup[],
+    skip: number,
+    pageSize: number,
+  ): Promise<{ rows: PrismaJobFairRow[]; total: number }> {
+    // 分组穷尽性依赖 JobFair.sourceOrgId / endAt 在 Prisma schema 中为非空字段。
+    const totals = await Promise.all(groups.map((group) => this.prisma.jobFair.count({ where: group.where })))
+    const total = totals.reduce((sum, count) => sum + count, 0)
+    const rows: PrismaJobFairRow[] = []
+    let remainingSkip = skip
+    let remainingTake = pageSize
+    for (let i = 0; i < groups.length && remainingTake > 0; i++) {
+      const groupTotal = totals[i]
+      if (remainingSkip >= groupTotal) {
+        remainingSkip -= groupTotal
+        continue
+      }
+      const take = Math.min(remainingTake, groupTotal - remainingSkip)
+      const pageRows = await this.prisma.jobFair.findMany({
+        where: groups[i].where,
+        orderBy: groups[i].orderBy,
+        skip: remainingSkip,
+        take,
+        include: { _count: { select: { companies: true } } },
+      })
+      rows.push(...pageRows)
+      remainingTake -= take
+      remainingSkip = 0
+    }
+    return { rows, total }
+  }
+
+  async getPublishedFairs(params?: PublishedFairsParams): Promise<PaginatedResult<FairListItemDto>> {
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
     const where = {
       reviewStatus: 'approved',
       publishStatus: 'published',
     }
-    const [rows, total] = await Promise.all([
-      this.prisma.jobFair.findMany({
-        where,
-        orderBy: { startAt: 'asc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        include: { _count: { select: { companies: true } } },
-      }),
-      this.prisma.jobFair.count({ where }),
-    ])
+    const skip = (page - 1) * pageSize
+    const hasTerminalScope = !!params?.terminalId?.trim()
+    const preferredOrgId = await this.resolveCampusPreferredOrgId(params?.terminalId)
+    let rows: PrismaJobFairRow[]
+    let total: number
+    if (!preferredOrgId) {
+      if (!hasTerminalScope) {
+        const result = await Promise.all([
+          this.prisma.jobFair.findMany({
+            where,
+            orderBy: { startAt: 'asc' },
+            skip,
+            take: pageSize,
+            include: { _count: { select: { companies: true } } },
+          }),
+          this.prisma.jobFair.count({ where }),
+        ])
+        rows = result[0]
+        total = result[1]
+      } else {
+        const now = new Date()
+        const result = await this.getPublishedFairRowsByGroups([
+          { where: { ...where, endAt: { gte: now } }, orderBy: { startAt: 'asc' } },
+          { where: { ...where, endAt: { lt: now } }, orderBy: { startAt: 'desc' } },
+        ], skip, pageSize)
+        rows = result.rows
+        total = result.total
+      }
+    } else {
+      const now = new Date()
+      const result = await this.getPublishedFairRowsByGroups([
+        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { gte: now } }, orderBy: { startAt: 'asc' } },
+        { where: { ...where, sourceOrgId: preferredOrgId, endAt: { lt: now } }, orderBy: { startAt: 'desc' } },
+        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { gte: now } }, orderBy: { startAt: 'asc' } },
+        { where: { ...where, NOT: { sourceOrgId: preferredOrgId }, endAt: { lt: now } }, orderBy: { startAt: 'desc' } },
+      ], skip, pageSize)
+      rows = result.rows
+      total = result.total
+    }
     let data = rows.map(prismaFairToListItem)
     // 客户端可选 status 过滤(upcoming / ongoing / ended)
     if (params?.status && (params.status === 'upcoming' || params.status === 'ongoing' || params.status === 'ended')) {
