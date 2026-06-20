@@ -35,7 +35,10 @@
 - [x] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；`ProfilePage.tsx` 已降到 177 行，入口、路由、文案和行为保持不变。
 - [x] **我的页商用闭环 Branch 2：AI 服务记录页**：已新增 `/me/ai-records`，复用 `getMyAiRecords` / `deleteMyAiRecord`，修正「AI服务记录」入口，不展示 payload 或简历原文。
 - [x] **我的页商用闭环 Branch 3：打印订单关联反馈**：从 `/me/print-orders` 跳转 `/me/feedback?category=print&relatedPrintTaskId=...`，提交时带 `relatedPrintTaskId`，以后端归属校验为安全边界；已补齐 `verify-member-print-orders` 分页正路径。
-- [ ] **AI 简历上传 / 资产中心**：登录保存、退出本机清空展示、本人可查看/删除、未登录临时文件规则、平台不提供给企业。
+- [x] **AI 简历上传 / 资产中心计划与准入**：已输出 `docs/superpowers/plans/2026-06-21-ai-resume-assets-closure.md` 和 `docs/reviews/ai-resume-assets-closure-planning.md`；确认首个真实缺口是 `/me/resumes` Kiosk 页面缺失。
+- [ ] **AI 简历上传 / 资产中心 Branch 1：我的简历页**：新增 `/me/resumes`，复用 `getMyResumes`，Profile「我的简历」入口从上传页改为本人简历元数据页，上传入口保留在「AI简历服务」和空态 CTA。
+- [ ] **AI 简历上传 / 资产中心 Branch 2：我的简历动作 hardening**：确认报告回看、继续优化、岗位匹配、生成简历预览均通过 `taskId + member token` 恢复；不新增后端，除非现有页面确实缺门禁读取能力。
+- [ ] **AI 简历上传 / 资产中心 Branch 3：我的文档删除交互**：单独给 `/me/documents` 补本人删除按钮和两步确认，继续复用 `deleteMyDocument` 与 `verify:member-assets-c2d`。
 - [ ] **招聘会 / 校园招聘**：Admin 审核、Partner 边界、Kiosk 本校优先、公开来源入口、外部跳转记录；继续禁止平台内投递和企业候选人管理。
 
 ## P1：工程质量门禁
