@@ -59,7 +59,7 @@ Antigravity 结论为 `CHANGES_REQUESTED`，核心理由：
 | 文件修改 | 仅限被授权任务草案 | 主责 | 不执行 |
 | `git add` / commit / push | 不执行 | 主责，且禁止 `git add .` | 不执行 |
 | `.gitignore` / 删除 / 归档 | 仅给建议 | 用户确认后执行 | 必须复审 |
-| 运行时代码改动 | 默认禁止 | 本 T0-T4 规范化任务一律禁止；独立业务任务另开分支处理 | 必须复审 |
+| 运行时代码改动 | 默认禁止 | 本 T0-T5 规范化任务一律禁止；独立业务任务另开分支处理 | 必须复审 |
 | 最终审查 | 参与 | 汇总裁决 | 参与 |
 
 ## 第一批任务分配
@@ -68,9 +68,10 @@ Antigravity 结论为 `CHANGES_REQUESTED`，核心理由：
 | --- | --- | --- | --- | --- | --- | --- |
 | T0 | 无写分支或 `codex/normalization-truth-audit` | 只读真值对齐 | 可新增 `docs/reviews/*truth-audit.md` | 核对 P0 worktree 与主工作区物料差异，列出可迁入和不可迁入清单 | 核验命令输出，决定是否落盘报告 | 发现密钥、真实用户数据、大文件已入库 |
 | T1 | `codex/normalization-progress-rollup` | B 类进度文档收口 | `docs/progress/current-progress.md`、`docs/progress/next-tasks.md`、必要时 `docs/progress/archive/*.md` | 提供文档重写草案，保留当前阶段、已验证结论、下一步任务池 | 从 `origin/main` 新开干净分支，手工迁入结论并验证 | diff 出现 `apps/`、`services/`、`packages/`、lockfile |
-| T2 | `codex/normalization-ignore-proposal` | E 类工具状态 ignore 提案 | 首轮只新增 `docs/reviews/*ignore-proposal.md`；确认后才可改 `.gitignore` | 列出 `.ccg/commander/`、`.product-pm/`、`.workbuddy/`、`.superpowers/*/state/` 的 ignore 建议 | 用户确认后写 `.gitignore` 并跑 `git check-ignore -v` | 未确认本地工具是否仍使用 |
-| T3 | `codex/normalization-evidence-triage` | C 类任务证据筛选 | 首轮只新增 `docs/reviews/*evidence-triage.md`；确认后才处理 `.ccg/tasks/**` | 给出保留/归档/不入库清单和理由 | 执行显式路径暂存，扫描 secrets | 清单项缺少依据或发现疑似密钥 |
-| T4 | `codex/normalization-external-materials-index` | D 类外部材料索引 | `docs/business/README.md`、`deliverables/README.md`、`opc-doc/README.md`、确认后才改 `.gitignore` | 摘要化商业材料和交付物，区分仓库内摘要与仓库外大文件 | 验证无 PDF/PPT/DOCX/ZIP 暂存 | 未确认大文件是否已有外部备份 |
+| T2 | `codex/normalization-ignore-proposal` | E 类工具状态 ignore 提案 | 只新增 `docs/reviews/*ignore-proposal.md`，不改 `.gitignore` | 列出 `.ccg/commander/`、`.product-pm/`、`.workbuddy/`、`.superpowers/*/state/` 的 ignore 建议 | 核对事实、落盘提案、等待用户确认 | 未确认本地工具是否仍使用 |
+| T3 | `codex/normalization-local-tools-landing` | E 类本地工具落地 | 用户确认后才可改 `.gitignore`；必要时抽取 `docs/product/`、`docs/design/`、`docs/reviews/` | 复核 P0/P1 抽取项是否已沉淀，确认候选 ignore 模式 | 写 `.gitignore`、跑 `git check-ignore -v`，不删除本地文件 | PRD/HTML 预览去向未确认或命中疑似密钥 |
+| T4 | `codex/normalization-evidence-triage` | C 类任务证据筛选 | 首轮只新增 `docs/reviews/*evidence-triage.md`；确认后才处理 `.ccg/tasks/**` | 给出保留/归档/不入库清单和理由 | 执行显式路径暂存，扫描 secrets | 清单项缺少依据或发现疑似密钥 |
+| T5 | `codex/normalization-external-materials-index` | D 类外部材料索引 | `docs/business/README.md`、`deliverables/README.md`、`opc-doc/README.md`、确认后才改 `.gitignore` | 摘要化商业材料和交付物，区分仓库内摘要与仓库外大文件 | 验证无 PDF/PPT/DOCX/ZIP 暂存 | 未确认大文件是否已有外部备份 |
 
 ## 可立即执行与不可立即执行
 

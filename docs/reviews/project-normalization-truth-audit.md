@@ -122,10 +122,13 @@ P0 worktree 已 tracked：
 
 ## 后续执行建议
 
+> 编号注记：T2 提案完成后，后续执行编号已调整为 T3=E 类本地工具落地、T4=C 类任务证据筛选、T5=D 类外部材料索引；以 `docs/progress/next-tasks.md` 为当前执行入口。
+
 1. T1 `codex/normalization-progress-rollup`：从干净基线收口 `docs/progress/current-progress.md` 与 `docs/progress/next-tasks.md`，把主工作区高价值新增结论手工摘要迁入。
 2. T2 `codex/normalization-ignore-proposal`：只写 E 类本地工具状态 ignore 提案，不直接改 `.gitignore`，等待用户确认本地工具状态。
-3. T3 `codex/normalization-evidence-triage`：只写 C 类任务证据筛选清单，优先识别 plan/review/verify/deploy/audit。
-4. T4 `codex/normalization-external-materials-index`：处理 PDF/PNG/外部材料前，先确认仓库外归档位置。
+3. T3 `codex/normalization-local-tools-landing`：用户确认后，先抽取 E 类目录中的 P0/P1 价值内容，再写确认后的 ignore 规则。
+4. T4 `codex/normalization-evidence-triage`：只写 C 类任务证据筛选清单，优先识别 plan/review/verify/deploy/audit。
+5. T5 `codex/normalization-external-materials-index`：处理 PDF/PNG/外部材料前，先确认仓库外归档位置。
 
 ## 本轮边界
 

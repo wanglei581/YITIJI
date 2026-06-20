@@ -9,10 +9,11 @@
 - [x] **主工作区分类规则**：已输出 `docs/reviews/project-normalization-p0-worktree-inventory.md`，明确 A/B/C/D/E 类处理口径。
 - [x] **Codex + Claude 协作模式**：已输出 `docs/reviews/project-normalization-codex-claude-collaboration.md`，确认 Claude 只做草案/清单，Codex 落盘，Antigravity + Claude 双模型复审。
 - [x] **T0 真值对齐**：已输出 `docs/reviews/project-normalization-truth-audit.md`，确认三层状态并存，不能整包同步或整包清理。
-- [ ] **T1 进度文档收口**：当前任务。将入口文档短版化，保留历史归档，不迁入运行时代码。
-- [ ] **T2 E 类本地工具状态 ignore 提案**：只新增提案文档，不直接改 `.gitignore`；等待确认 `.ccg/commander/`、`.product-pm/`、`.workbuddy/`、`.superpowers/*/state/` 是否仍被使用。
-- [ ] **T3 C 类任务证据筛选**：只新增筛选清单；保留 plan / review / verify / deploy / audit；ack / advise / explain 等低价值记录不入库需用户确认。
-- [ ] **T4 D 类外部材料索引**：为 `docs/business/`、`deliverables/`、`opc-doc/` 建摘要索引；PDF/PNG/PPT/DOCX/ZIP 是否入库先确认仓库外备份。
+- [x] **T1 进度文档收口**：已将入口文档短版化，保留历史归档，不迁入运行时代码。
+- [x] **T2 E 类本地工具状态 ignore 提案**：已输出提案文档，不直接改 `.gitignore`；等待确认 `.ccg/commander/`、`.product-pm/`、`.workbuddy/`、`.superpowers/*/state/` 是否仍被使用。
+- [ ] **T3 E 类本地工具落地**：用户确认后，先抽取 `.product-pm/prd/print-material-pack.md` 与 `.superpowers` HTML 预览，再写入确认后的 ignore 规则；不删除本地文件。
+- [ ] **T4 C 类任务证据筛选**：只新增筛选清单；保留 plan / review / verify / deploy / audit；ack / advise / explain 等低价值记录不入库需用户确认。
+- [ ] **T5 D 类外部材料索引**：为 `docs/business/`、`deliverables/`、`opc-doc/` 建摘要索引；PDF/PNG/PPT/DOCX/ZIP 是否入库先确认仓库外备份。
 
 ## P0：上线前真实验收
 
@@ -44,7 +45,7 @@
 
 ## 待用户确认
 
-- [ ] 是否同意 E 类本地工具目录写入 ignore 但本地保留。
+- [ ] 是否同意按 `docs/reviews/project-normalization-ignore-proposal.md` 先抽取 P0/P1 内容，再写入 E 类本地工具目录 ignore。
 - [ ] 是否同意 C 类任务证据按价值筛选，不整包提交。
 - [ ] 是否同意 D 类外部材料采用“仓库摘要 + 大文件仓库外归档”。
 - [ ] 是否确认后续每个业务闭环都独立分支、独立验证、双模型审查后再推进。
