@@ -31,6 +31,7 @@
 | 2026-06-21 | `codex/normalization-external-materials-index` / `051af3b6` | 完成 T5 D 类外部材料索引：只登记外部材料清单和处置规则，不提交 PDF、OPC 原始输出或交付物。 |
 | 2026-06-21 | `codex/profile-commercial-closure-plan` / 计划分支 | 完成首批业务闭环的目标修正和准入设计：我的页商用闭环先拆 `ProfilePage`，再补 `/me/ai-records`，最后接打印订单反馈。 |
 | 2026-06-21 | `codex/profile-page-split` / 本分支 | 完成我的页商用闭环 Branch 1：`ProfilePage.tsx` 从 595 行拆到 177 行，入口、路由、文案和行为保持不变。 |
+| 2026-06-21 | `codex/profile-me-ai-records-page` / 本分支 | 完成我的页商用闭环 Branch 2：新增 `/me/ai-records` 元数据页，Profile「AI服务记录」入口已从 `/assistant` 修正为 `/me/ai-records`。 |
 
 ## 当前工作区事实
 

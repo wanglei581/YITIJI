@@ -38,6 +38,7 @@ import { MyDocumentsPage } from '../pages/profile/me/MyDocumentsPage'
 import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
 import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
+import { MyAiRecordsPage } from '../pages/profile/me/MyAiRecordsPage'
 import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
 import { MyNotificationsPage } from '../pages/profile/me/MyNotificationsPage'
 import { MyFeedbackPage } from '../pages/profile/me/MyFeedbackPage'
@@ -88,6 +89,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
       { path: 'me/documents',      element: <MyDocumentsPage /> },
       { path: 'me/favorites',      element: <MyFavoritesPage /> },
+      { path: 'me/ai-records',     element: <MyAiRecordsPage /> },
       { path: 'me/benefits',       element: <MyBenefitsPage /> },
       { path: 'me/activity',       element: <MyActivityPage /> },
       { path: 'me/notifications',  element: <MyNotificationsPage /> },
