@@ -32,7 +32,7 @@
 首批业务闭环不按目录搬家，按可验收业务流推进。
 
 - [x] **我的页商用闭环计划与准入**：已输出 `docs/superpowers/plans/2026-06-21-profile-commercial-closure.md` 和 `docs/reviews/profile-commercial-closure-planning.md`；目标从“做出闭环”修正为“收口计划、拆分准入和首批执行任务定义”。
-- [ ] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；禁止新增入口或改视觉，验证 `/profile` 游客态和登录态回归。
+- [x] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；`ProfilePage.tsx` 已降到 177 行，入口、路由、文案和行为保持不变。
 - [ ] **我的页商用闭环 Branch 2：AI 服务记录页**：新增 `/me/ai-records`，复用 `getMyAiRecords` / `deleteMyAiRecord`，修正「AI服务记录」入口，不展示 payload 或简历原文。
 - [ ] **我的页商用闭环 Branch 3：打印订单关联反馈**：从 `/me/print-orders` 跳转 `/me/feedback?category=print&relatedPrintTaskId=...`，提交时带 `relatedPrintTaskId`，以后端归属校验为安全边界。
 - [ ] **AI 简历上传 / 资产中心**：登录保存、退出本机清空展示、本人可查看/删除、未登录临时文件规则、平台不提供给企业。

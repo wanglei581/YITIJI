@@ -1,0 +1,12 @@
+{
+  "id": "profile-page-split",
+  "title": "ProfilePage 结构拆分",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已完成，归档任务并提交",
+  "createdAt": "2026-06-21T01:45:00+08:00",
+  "branch": "codex/profile-page-split"
+}
