@@ -80,6 +80,12 @@ TENCENT_COS_BUCKET=yitiji-prod-private-1257025684
 TENCENT_COS_REGION=ap-guangzhou
 TENCENT_COS_SIGN_URL_EXPIRES_SECONDS=1800   # 合规上限，勿超
 
+# COS 生命周期验收：
+# 1. 禁止配置 Bucket 全局过期规则，不能用桶级 Expiration 覆盖会员文件。
+# 2. long_term 长期保存文件在数据库中为 expiresAt = null，只能由用户主动删除或业务删除路径处理。
+# 3. 如需 COS 侧兜底清理，只允许对 tmp/ 临时前缀配置生命周期规则，且不得覆盖长期保存对象。
+# 4. 生产试运营前必须在腾讯云控制台人工验收并截图存档：规则名称、作用前缀、过期天数、启用状态。
+
 # ── Redis：生产必配，禁止 inline 降级 ──
 REDIS_URL="redis://:PASSWORD@REDISHOST:6379/0"
 

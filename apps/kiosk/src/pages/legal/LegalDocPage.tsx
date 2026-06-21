@@ -10,7 +10,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, PageHeader } from '@ai-job-print/ui'
 import { FileTextIcon, ShieldCheckIcon } from 'lucide-react'
 
-const UPDATED_AT = '2026 年 6 月 11 日'
+const UPDATED_AT = '2026 年 6 月 22 日'
 
 interface Section {
   title: string
@@ -80,8 +80,9 @@ const PRIVACY_SECTIONS: Section[] = [
   {
     title: '三、保存期限与自动清理',
     paragraphs: [
-      '上传的简历等敏感文件设置短期有效期（通常 1 小时内），到期自动删除。',
-      'AI 结果设置留存期，到期自动清理；您也可以在对应业务页面（我的文档 / AI服务记录等）随时自行删除本人的文档与 AI 记录，删除文件为物理删除。',
+      '证件照、身份证复印件、未登录上传文件等高敏或匿名文件设置短期有效期，到期自动删除。',
+      '登录会员上传的原始简历与求职材料默认保存 90 天；延长至 180 天或长期保存需确认保存条款。优化后或派生成果物可在本人确认后长期保存。',
+      '您可以在对应业务页面（我的文档 / AI服务记录等）查看保存期限、调整允许的保存策略，或随时自行删除本人的文档与 AI 记录，删除文件为物理删除。',
       '公共设备会话信息（含登录态）在退出、闲置超时或进入待机时即刻清除。',
     ],
   },

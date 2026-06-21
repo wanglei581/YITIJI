@@ -1,0 +1,48 @@
+/**
+ * COS 生命周期防误删验收文档防回退验证。
+ *
+ * 运行: pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy
+ */
+import { existsSync, readFileSync } from 'fs'
+import { join } from 'path'
+import { strict as assert } from 'assert'
+
+const repoRoot = join(__dirname, '../../..')
+const compliancePath = join(repoRoot, 'docs/compliance/file-retention-and-cos-lifecycle.md')
+const checklistPath = join(repoRoot, 'docs/device/production-deployment-and-windows-host-checklist.md')
+const runbookPath = join(repoRoot, 'docs/device/production-deployment-runbook.md')
+const cosBackendPath = join(repoRoot, 'services/api/src/storage/cos-storage.backend.ts')
+
+assert.ok(existsSync(compliancePath), 'must create docs/compliance/file-retention-and-cos-lifecycle.md')
+
+const compliance = readFileSync(compliancePath, 'utf8')
+const checklist = readFileSync(checklistPath, 'utf8')
+const runbook = readFileSync(runbookPath, 'utf8')
+const cosBackend = readFileSync(cosBackendPath, 'utf8')
+const docs = [compliance, checklist, runbook].join('\n')
+
+for (const marker of [
+  '禁止配置 Bucket 全局过期规则',
+  'long_term',
+  'expiresAt = null',
+  '人工验收',
+  '截图存档',
+  '90 天',
+  '180 天',
+  '长期保存',
+  '保存条款版本',
+]) {
+  assert.ok(docs.includes(marker), `COS lifecycle docs must mention: ${marker}`)
+}
+
+for (const marker of [
+  'users/',
+  'tmp/',
+  '不得覆盖长期保存对象',
+]) {
+  assert.ok(compliance.includes(marker), `compliance doc must include prefix guard: ${marker}`)
+}
+
+assert.doesNotMatch(cosBackend, /putBucketLifecycle|deleteBucketLifecycle|BucketLifecycle/i, 'API backend must not write bucket lifecycle rules')
+
+console.log('verify:cos-lifecycle-policy passed')
