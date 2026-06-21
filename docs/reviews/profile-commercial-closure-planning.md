@@ -1,7 +1,7 @@
 # 我的页商用闭环收口计划审查报告
 
-> 日期：2026-06-21  
-> 分支：`codex/profile-commercial-closure-plan`  
+> 日期：2026-06-21
+> 分支：`codex/profile-commercial-closure-plan`
 > 范围：只做计划、审查和进度同步，不修改 runtime 代码。
 
 ## 结论

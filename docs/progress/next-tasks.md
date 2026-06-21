@@ -39,6 +39,7 @@
 - [x] **AI 简历上传 / 资产中心 Branch 1：我的简历页**：新增 `/me/resumes`，复用 `getMyResumes`，Profile「我的简历」入口从上传页改为本人简历元数据页，上传入口保留在「AI简历服务」和空态 CTA。
 - [x] **AI 简历上传 / 资产中心 Branch 2：我的简历动作 hardening**：确认报告回看、继续优化、岗位匹配、生成简历预览均通过 `taskId + member token` 恢复；不新增后端，除非现有页面确实缺门禁读取能力。
 - [x] **AI 简历上传 / 资产中心 Branch 3：我的文档删除交互**：单独给 `/me/documents` 补本人删除按钮和两步确认，继续复用 `deleteMyDocument` 与 `verify:member-assets-c2d`。
+- [x] **规范化治理与首批业务闭合集成收口**：`codex/normalization-business-closures-integration` 已从干净 `main` 快进集成 18 个已验证提交，完成总验证、敏感信息扫描和 Claude + Antigravity 最终审查；无 Critical，可交付。
 - [ ] **招聘会 / 校园招聘**：Admin 审核、Partner 边界、Kiosk 本校优先、公开来源入口、外部跳转记录；继续禁止平台内投递和企业候选人管理。
 
 ## P1：工程质量门禁

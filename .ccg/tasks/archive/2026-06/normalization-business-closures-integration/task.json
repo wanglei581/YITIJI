@@ -1,0 +1,12 @@
+{
+  "id": "normalization-business-closures-integration",
+  "title": "规范化治理与首批业务闭合集成收口",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档任务记录并提交集成收口分支",
+  "createdAt": "2026-06-21T00:00:00+08:00",
+  "branch": "codex/normalization-business-closures-integration"
+}
