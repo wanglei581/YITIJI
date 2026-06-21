@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   PayloadTooLargeException,
   Post,
   Put,
@@ -33,6 +34,7 @@ import { FilesService, type FileRequester } from './files.service'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
+import { UpdateRetentionDto } from './dto/update-retention.dto'
 import { verifyFileSignature, verifyRawUploadSignature } from './signing'
 import type {
   FilePurpose,
@@ -44,6 +46,7 @@ import type {
   FileAccessUrlResponse,
   UploadIntentResponse,
   CompleteUploadResponse,
+  FileRetentionUpdateResponse,
 } from './file.types'
 
 /** 本地代理直传单文件上限(防内存打爆;COS 直传不经此路径)。 */
@@ -62,6 +65,7 @@ const RAW_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
  *   GET    /files/:id/preview-url       短期预览 URL(同上)
  *   GET    /files/:id/content?...       签名校验后流式返回(/content 代理,兼容本地 & COS)
  *   GET    /files                       列表(admin)
+ *   PATCH  /files/:id/retention         会员本人修改文件保存期限
  *   DELETE /files/:id?reason=xxx        删除(owner / 会员本人 / admin)
  *   POST   /files/cleanup-expired       admin 立即清理所有已过期文件
  */
@@ -301,6 +305,40 @@ export class FilesController {
         limit: limit ? Number(limit) : undefined,
       }),
     )
+  }
+
+  /** 会员本人修改文件保存期限。管理员代改不走此用户同意端点。 */
+  @Patch(':id/retention')
+  async updateRetention(
+    @Param('id') id: string,
+    @Body() body: UpdateRetentionDto,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<FileRetentionUpdateResponse>> {
+    const requester = await this.resolveRequester(req)
+    if (!requester) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_REQUIRED', message: '需登录后修改文件保存期限' } })
+    }
+    const result = await this.files.updateRetention(id, requester, {
+      retentionPolicy: body.retentionPolicy,
+      consentVersion: body.consentVersion,
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'enduser',
+      action: 'file.retention_update',
+      targetType: 'file',
+      targetId: id,
+      payload: {
+        endUserId: requester.kind === 'member' ? requester.endUserId : null,
+        retentionPolicy: result.file.retentionPolicy,
+        expiresAt: result.file.expiresAt,
+        consentVersion: result.file.retentionConsentVersion,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
   }
 
   /**

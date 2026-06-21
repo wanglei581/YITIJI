@@ -112,7 +112,7 @@ function getFileStats(files: AdminFileRecord[]): FileStats {
   const now = Date.now()
   const activeFiles = files.filter((file) => file.deletedAt === null)
   return {
-    expired: activeFiles.filter((file) => Date.parse(file.expiresAt) <= now).length,
+    expired: activeFiles.filter((file) => file.expiresAt !== null && Date.parse(file.expiresAt) <= now).length,
     sensitive: activeFiles.filter((file) => file.sensitiveLevel === 'highly_sensitive').length,
   }
 }

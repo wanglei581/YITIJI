@@ -119,7 +119,7 @@ export function MyDocumentsPage() {
         </div>
       )}
       {items.map((doc) => {
-        const expired = new Date(doc.expiresAt).getTime() < now
+        const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
         const confirming = confirmId === doc.id
         const busy = busyId === doc.id
         const openingThis = opening === doc.id
@@ -134,7 +134,7 @@ export function MyDocumentsPage() {
               <p className="truncate text-sm font-semibold text-gray-900">{doc.filename}</p>
               <p className="mt-0.5 truncate text-xs text-gray-400">
                 {formatBytes(doc.sizeBytes)} · {formatTime(doc.createdAt)}
-                {expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
+                {doc.expiresAt === null ? ' · 长期保存' : expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

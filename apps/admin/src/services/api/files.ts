@@ -34,7 +34,7 @@ export interface AdminFileRecord {
   sensitiveLevel: AdminFileSensitive
   uploaderId: string | null
   endUserId: string | null
-  expiresAt: string
+  expiresAt: string | null
   deletedAt: string | null
   deletedBy: string | null
   deleteReason: string | null
@@ -175,7 +175,7 @@ export const adminFilesMockAdapter: AdminFilesServiceInterface = {
     await delay()
     const store = getStore()
     const now = Date.parse('2026-06-05T12:00:00.000Z')
-    const expired = store.filter((f) => f.deletedAt === null && Date.parse(f.expiresAt) <= now)
+    const expired = store.filter((f) => f.deletedAt === null && f.expiresAt !== null && Date.parse(f.expiresAt) <= now)
     for (const f of expired) {
       f.deletedAt = '2026-06-05T12:00:00.000Z'
       f.deletedBy = 'manual'

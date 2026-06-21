@@ -86,7 +86,7 @@ export interface FileMetadata {
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
-  expiresAt: string  // ISO
+  expiresAt: string | null  // ISO; null 表示长期保存
   deletedAt: string | null
   deletedBy: string | null
   deleteReason: string | null
@@ -102,7 +102,7 @@ export interface FileUploadResponse {
   sha256: string
   signedUrl: string
   signedUrlExpiresAt: string  // ISO
-  fileExpiresAt: string       // ISO,过期后元数据软删 + 物理清理
+  fileExpiresAt: string | null       // ISO; null 表示长期保存
 }
 
 /** 仅返回签名 URL(用于已有 fileId 的二次访问)。 */
@@ -150,7 +150,19 @@ export interface CompleteUploadResponse {
   status: FileStatus
   sizeBytes: number
   sha256: string
-  fileExpiresAt: string  // ISO
+  fileExpiresAt: string | null  // ISO; null 表示长期保存
+}
+
+/** 更新文件保存期限请求。 */
+export interface FileRetentionUpdateRequest {
+  retentionPolicy: Extract<FileRetentionPolicy, 'months_3' | 'months_6' | 'long_term'>
+  consentVersion?: string
+}
+
+/** 更新文件保存期限响应。 */
+export interface FileRetentionUpdateResponse {
+  file: FileMetadata
+  allowedPolicies: FileRetentionPolicy[]
 }
 
 /** Admin 强制清理过期文件响应。 */

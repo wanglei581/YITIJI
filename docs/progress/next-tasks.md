@@ -44,6 +44,14 @@
 - [x] **招聘会 / 校园招聘 Branch 1：列表页本校优先接线**：`JobFairsPage` 调用 `getTerminalId()` 并透传 `getJobFairs(terminalId ? { terminalId } : undefined)`，对齐 `/campus` 已有本校优先排序；新增 `verify-jobfairs-terminal-priority` 防回退脚本，不改 UI、不改后端。
 - [x] **招聘会 / 校园招聘 Branch 2：参展企业外部投递跳转记录**：新增 `fair_company` activity target，限定 `external_apply`；`FairCompanyDetailPage` 使用真实 `SourceUrlQr` 并记录本人外部入口打开；`/me/activity` 支持参展企业记录回跳。
 - [x] **招聘会 / 校园招聘 Branch 3：大页面零行为拆分**：已拆分 `CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage`，保持路由、接口、文案和行为不变；新增 `verify:jobfair-size` 并接入 `verify:jobfair-ui`，已完成 Claude + Antigravity 双模型审查。
+- [x] **用户文件保存期限 Branch 2：策略服务与清理门禁**：`FileObject.expiresAt` 支持 `long_term` 的 `null` 语义；会员本人可改本人文件保存期限；原始文件首批仅 3/6 个月，`optimized/derived` 成果物可长期，证件/匿名/系统文件保持短期；补 `verify:file-retention` 与 Admin/Kiosk 可空兼容。
+
+## P1：用户文件与简历资产商用闭环后续
+
+- [ ] **Kiosk 文件保存期限 UI**：在 `/me/documents` 展示可选保存期限，允许本人选择 3 个月 / 6 个月 / 成果物长期保存，并提交当前 `file-retention-v1` 同意版本。
+- [ ] **Admin 文件生命周期运营视图**：后台展示 `retentionPolicy`、`retentionSetBy`、`retentionConsentAt`、长期保存数量与即将到期文件，不允许管理员代替用户设置长期保存。
+- [ ] **COS 生命周期与隐私文案验收**：确认私有桶生命周期策略不误删 `long_term`，同时把 90/180 天口径和长期保存说明写入用户协议/隐私政策。
+- [ ] **生产/试运营验收**：使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理和审计查询全链路。
 
 ## P1：工程质量门禁
 

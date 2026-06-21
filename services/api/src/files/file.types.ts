@@ -82,7 +82,7 @@ export interface FileMetadata {
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
-  expiresAt: string
+  expiresAt: string | null
   deletedAt: string | null
   deletedBy: string | null
   deleteReason: string | null
@@ -97,7 +97,7 @@ export interface FileUploadResponse {
   sha256: string
   signedUrl: string
   signedUrlExpiresAt: string
-  fileExpiresAt: string
+  fileExpiresAt: string | null
 }
 
 export interface SignedUrlResponse {
@@ -150,7 +150,17 @@ export interface CompleteUploadResponse {
   status: FileStatus
   sizeBytes: number
   sha256: string
-  fileExpiresAt: string
+  fileExpiresAt: string | null
+}
+
+export interface FileRetentionUpdateRequest {
+  retentionPolicy: Extract<FileRetentionPolicy, 'months_3' | 'months_6' | 'long_term'>
+  consentVersion?: string
+}
+
+export interface FileRetentionUpdateResponse {
+  file: FileMetadata
+  allowedPolicies: FileRetentionPolicy[]
 }
 
 export interface FileCleanupResponse {

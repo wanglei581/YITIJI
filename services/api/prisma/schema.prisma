@@ -468,7 +468,7 @@ model FileObject {
   createdBy   String?
 
   // 隐私 / 清理
-  expiresAt   DateTime
+  expiresAt   DateTime?
   deletedAt   DateTime?
   deletedBy   String?  // 'auto' | 'admin:<userId>' | 'user'
   deleteReason String?

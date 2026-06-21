@@ -67,6 +67,7 @@ function fmtDate(iso: string): string {
 
 function cleanStatusOf(f: AdminFileRecord, now: number): CleanStatus {
   if (f.deletedAt !== null) return 'cleaned'
+  if (f.expiresAt === null) return 'active'
   if (Date.parse(f.expiresAt) <= now) return 'scheduled'
   return 'active'
 }
@@ -74,6 +75,7 @@ function cleanStatusOf(f: AdminFileRecord, now: number): CleanStatus {
 function cleanPolicyOf(f: AdminFileRecord, status: CleanStatus): string {
   if (status === 'cleaned') return f.deleteReason ?? '已清理'
   if (status === 'scheduled') return '已过期，待定时清理'
+  if (f.expiresAt === null) return '长期保存'
   return f.sensitiveLevel === 'highly_sensitive' ? '高敏感·到期即删' : '到期自动清理'
 }
 
@@ -110,7 +112,7 @@ function toViewFile(f: AdminFileRecord, now: number): ViewFile {
     sensitiveBadge: sens.badge,
     sensitiveLabel: sens.label,
     createdAt: fmtDate(f.createdAt),
-    expiresAt: fmtDate(f.expiresAt),
+    expiresAt: f.expiresAt === null ? '长期保存' : fmtDate(f.expiresAt),
     clean,
     cleanPolicy: cleanPolicyOf(f, clean),
   }
