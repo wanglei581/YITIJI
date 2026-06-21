@@ -44,6 +44,15 @@ export type FileVisibility = 'private' | 'internal' | 'public'
 /** 文件状态。 */
 export type FileStatus = 'uploading' | 'active' | 'quarantined' | 'deleted'
 
+/** 文件资产分类。 */
+export type FileAssetCategory = 'original' | 'optimized' | 'derived'
+
+/** 文件保存策略。 */
+export type FileRetentionPolicy = 'months_3' | 'months_6' | 'long_term' | 'system_short'
+
+/** 文件保存策略设置来源。 */
+export type FileRetentionSetBy = 'system' | 'user' | 'admin'
+
 /** 默认有效期(小时),与 services/api/src/files/files.service.ts 保持一致。 */
 export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   normal: 24,
@@ -67,6 +76,13 @@ export interface FileMetadata {
   ownerId: string | null
   visibility: FileVisibility
   status: FileStatus
+  assetCategory?: FileAssetCategory
+  sourceFileId?: string | null
+  retentionPolicy?: FileRetentionPolicy | null
+  retentionSetBy?: FileRetentionSetBy | null
+  retentionConsentAt?: string | null
+  retentionConsentVersion?: string | null
+  retentionLockedReason?: string | null
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null

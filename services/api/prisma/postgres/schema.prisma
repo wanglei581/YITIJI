@@ -478,6 +478,18 @@ model FileObject {
   deletedBy   String?  // 'auto' | 'admin:<userId>' | 'user'
   deleteReason String?
 
+  // 文件资产分类 / 派生关系 / 保存策略。
+  // 取值由应用层校验,保持 SQLite / PostgreSQL schema parity。
+  assetCategory String @default("original") // 'original' | 'optimized' | 'derived'
+  sourceFileId  String?
+  sourceFile    FileObject? @relation("FileAssetDerivation", fields: [sourceFileId], references: [id], onDelete: SetNull)
+  derivedFiles  FileObject[] @relation("FileAssetDerivation")
+  retentionPolicy String? // 'months_3' | 'months_6' | 'long_term' | 'system_short'
+  retentionSetBy  String? // 'system' | 'user' | 'admin'
+  retentionConsentAt DateTime?
+  retentionConsentVersion String?
+  retentionLockedReason String?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -491,6 +503,7 @@ model FileObject {
   @@index([status])
   @@index([expiresAt])
   @@index([deletedAt])
+  @@index([sourceFileId])
 }
 
 // ── Materials / Document Processing ─────────────────────────────────────────

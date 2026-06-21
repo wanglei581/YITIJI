@@ -42,6 +42,15 @@ export type FileVisibility = 'private' | 'internal' | 'public'
 /** 文件状态。直传意图创建后为 uploading,确认后 active。 */
 export type FileStatus = 'uploading' | 'active' | 'quarantined' | 'deleted'
 
+/** 文件资产分类。 */
+export type FileAssetCategory = 'original' | 'optimized' | 'derived'
+
+/** 文件保存策略。 */
+export type FileRetentionPolicy = 'months_3' | 'months_6' | 'long_term' | 'system_short'
+
+/** 文件保存策略设置来源。 */
+export type FileRetentionSetBy = 'system' | 'user' | 'admin'
+
 export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   normal: 24,
   sensitive: 6,
@@ -63,6 +72,13 @@ export interface FileMetadata {
   ownerId: string | null
   visibility: FileVisibility
   status: FileStatus
+  assetCategory?: FileAssetCategory
+  sourceFileId?: string | null
+  retentionPolicy?: FileRetentionPolicy | null
+  retentionSetBy?: FileRetentionSetBy | null
+  retentionConsentAt?: string | null
+  retentionConsentVersion?: string | null
+  retentionLockedReason?: string | null
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
