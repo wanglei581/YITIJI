@@ -40,15 +40,21 @@
 
 ## 四、Gate 1 预生产只读预检
 
-> 尚未执行。执行前必须确认计划审查无 Critical。
+> 2026-06-22 已执行只读预检。仅执行 SSH/curl 只读命令；未部署、未拉取、未 checkout、未重启 PM2、未迁移数据库、未写 COS/DB。
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |
-| 主机与时间 | `hostname`、`date`，确认时区 | PENDING |
-| 部署 commit | `/srv/ai-job-print` 下 `git rev-parse --short HEAD` | PENDING |
-| 工作区状态 | 服务器工作区不得有不明改动 | PENDING |
-| PM2 状态 | `ai-job-print-api` 在线状态 | PENDING |
-| health | `GET /api/v1/health` 显示 PostgreSQL | PENDING |
+| 主机与时间 | `hostname`、`date`，确认时区 | PASS：主机 `instance-061dyczx`，服务器时间 `2026-06-22 01:53 CST`。 |
+| 部署 commit | `/srv/ai-job-print` 下 `git rev-parse --short HEAD` | STOP：`/srv/ai-job-print` 不是 Git 仓库；`DEPLOY_SOURCE.txt` 显示部署源 commit 为 `6b055d6b`，不是目标候选 `9146fa1c`。`DEPLOY_SOURCE.txt` 是部署脚本自报元数据，不等于 Git HEAD 校验；实际运行代码与该 commit 的一致性需在 Gate 2 重新构建/部署时核验。 |
+| 工作区状态 | 服务器工作区不得有不明改动 | N/A：部署目录为 `local-git-archive` 展开目录，无 `.git`；未发现 `/srv` 三层内 `.git` 目录。 |
+| PM2 状态 | `ai-job-print-api` 在线状态 | PASS：PM2 `ai-job-print-api` online，脚本路径 `/srv/ai-job-print/services/api/dist/main.js`，cwd `/srv/ai-job-print/services/api`。 |
+| health | `GET /api/v1/health` 显示 PostgreSQL | PASS：本机 `127.0.0.1:3010/api/v1/health` 与公网 `http://<PREPROD_HOST>/api/v1/health` 均返回 `success=true`、`status=ok`、`db=postgres`。 |
+
+Gate 1 结论：
+
+- 预生产主机、API 进程和 PostgreSQL health 可达。
+- 当前部署源自报仍是 `6b055d6b` 阶段性预生产包，不是用户文件资产候选 `9146fa1c`；实际运行代码一致性待 Gate 2 重新部署时核验。
+- 已触发计划停止条件：实际部署 commit 不是目标候选；本轮停止在 Gate 1，不执行 Gate 2 候选部署或刷新。
 
 ## 五、Gate 2 候选部署或刷新
 
@@ -121,8 +127,8 @@
 ```text
 用户文件与简历资产预生产执行：已计划 / Gate 0 本地静态门禁通过 / 未执行外部状态变更
 执行环境：预生产
-执行时间：2026-06-22 开始本地计划与 Gate 0
-部署 commit：9146fa1c 目标候选，预生产实际 commit 待 Gate 1 确认
-阻塞项：需用户确认后才能执行 Gate 1 预生产只读预检；Gate 2 及以后任何外部状态变更需再次确认
+执行时间：2026-06-22 Gate 0 + Gate 1
+部署 commit：目标候选 9146fa1c；Gate 1 只读预检确认预生产实际部署源仍为 6b055d6b
+阻塞项：需用户确认是否执行 Gate 2 候选部署或刷新；Gate 2 及以后任何外部状态变更需再次确认
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```
