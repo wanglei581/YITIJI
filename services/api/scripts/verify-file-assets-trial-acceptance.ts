@@ -15,6 +15,7 @@ const gateEvidenceRunbookPath = join(repoRoot, 'docs/acceptance/user-file-assets
 const checklistPath = join(repoRoot, 'docs/device/production-deployment-and-windows-host-checklist.md')
 const progressPath = join(repoRoot, 'docs/progress/current-progress.md')
 const nextTasksPath = join(repoRoot, 'docs/progress/next-tasks.md')
+const apiPackagePath = join(repoRoot, 'services/api/package.json')
 const filesServicePath = join(repoRoot, 'services/api/src/files/files.service.ts')
 const filesControllerPath = join(repoRoot, 'services/api/src/files/files.controller.ts')
 const filesCleanupTaskPath = join(repoRoot, 'services/api/src/files/files.cleanup.task.ts')
@@ -29,6 +30,7 @@ const gateEvidenceRunbook = readFileSync(gateEvidenceRunbookPath, 'utf8')
 const checklist = readFileSync(checklistPath, 'utf8')
 const progress = readFileSync(progressPath, 'utf8')
 const nextTasks = readFileSync(nextTasksPath, 'utf8')
+const apiPackage = JSON.parse(readFileSync(apiPackagePath, 'utf8')) as { scripts?: Record<string, string> }
 const filesService = readFileSync(filesServicePath, 'utf8')
 const filesController = readFileSync(filesControllerPath, 'utf8')
 const filesCleanupTask = readFileSync(filesCleanupTaskPath, 'utf8')
@@ -82,6 +84,36 @@ for (const marker of [
 
 for (const marker of ['G3-09', 'verify:audit-logs', 'AuditLog']) {
   assert.ok(gateEvidenceRunbook.includes(marker), `gate evidence runbook must mention AuditLog evidence: ${marker}`)
+}
+
+const gate3SectionStart = gateEvidenceRunbook.indexOf('## 四、Gate 3 自动命令门禁')
+const gate4SectionStart = gateEvidenceRunbook.indexOf('## 五、Gate 4 浏览器和账号验收')
+assert.ok(
+  gate3SectionStart >= 0 && gate4SectionStart > gate3SectionStart,
+  'gate evidence runbook must keep Gate 3 before Gate 4 sections',
+)
+const gate3Section = gateEvidenceRunbook.slice(gate3SectionStart, gate4SectionStart)
+
+// Deliberately mirrors the runbook sequence so Gate 3 command changes must be reviewed.
+const expectedGate3Commands = [
+  'verify:production-runtime-gates',
+  'verify:production-db-guard',
+  'verify:cos-lifecycle-policy',
+  'verify:file-retention',
+  'verify:file-lifecycle-summary',
+  'verify:cos:live',
+  'verify:member-assets-c2d',
+  'verify:file-assets-trial-acceptance',
+  'verify:audit-logs',
+]
+const gate3Commands = Array.from(gate3Section.matchAll(/pnpm --filter @ai-job-print\/api (verify:[\w:-]+)/g), (match) => match[1])
+assert.deepEqual(
+  gate3Commands,
+  expectedGate3Commands,
+  'Gate 3 runbook must list the expected verify commands in execution order',
+)
+for (const command of gate3Commands) {
+  assert.ok(apiPackage.scripts?.[command], `Gate 3 verify command must exist in services/api/package.json: ${command}`)
 }
 
 for (const marker of [
