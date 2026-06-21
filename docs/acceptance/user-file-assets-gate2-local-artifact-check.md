@@ -79,7 +79,7 @@ git archive --format=tar --prefix=ai-job-print/ 9146fa1c -- \
 Gate 2 执行计划已修正：
 
 - 本地候选包生成使用裁剪路径清单，而不是完整仓库归档。
-- 本地和远端候选包仍使用 `/tmp/yitiji-preprod-9146fa1c.tar.gz`、`/srv/yitiji-preprod-9146fa1c.tar.gz` 的既定文件名，避免后续执行脚本额外分叉。
+- 后续 Gate 2 建议候选已刷新为 `9a702981`；实际执行文件名改为 `/tmp/yitiji-preprod-9a702981.tar.gz`、`/srv/yitiji-preprod-9a702981.tar.gz`，本文件保留 `9146fa1c` 的归档范围历史预检结果作为对照。
 - 归档生成使用 `gzip -n -9`，确保 sha256 可复现。
 - 审批包新增说明：候选包为裁剪运行时归档，不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态。
 

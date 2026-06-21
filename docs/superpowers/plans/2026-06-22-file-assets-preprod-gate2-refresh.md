@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task after explicit user confirmation. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refresh the Baidu Cloud preproduction application package from the current self-reported `6b055d6b` deployment to the file-assets candidate `9146fa1c`, including the candidate's required additive PostgreSQL schema migrations, without changing business data, COS objects, secrets, nginx, DNS, or Windows hardware.
+**Goal:** Refresh the Baidu Cloud preproduction application package from the current self-reported `6b055d6b` deployment to the file-assets candidate `9a702981`, including the candidate's required additive PostgreSQL schema migrations, without changing business data, COS objects, secrets, nginx, DNS, or Windows hardware.
 
-**Architecture:** The preproduction server is not a Git checkout; it is a `local-git-archive` unpacked application directory. Deployment therefore uses a locally generated pruned runtime archive from `9146fa1c`, uploads it to `/srv`, unpacks the candidate, preserves runtime and build-time env files without printing them, installs dependencies, generates both Prisma clients, builds API/Kiosk/Admin, backs up PostgreSQL, applies candidate migrations, atomically renames the current app directory as the rollback copy, promotes the candidate, restarts the existing PM2 process, and validates health plus build fingerprints.
+**Architecture:** The preproduction server is not a Git checkout; it is a `local-git-archive` unpacked application directory. Deployment therefore uses a locally generated pruned runtime archive from `9a702981`, uploads it to `/srv`, unpacks the candidate, preserves runtime and build-time env files without printing them, installs dependencies, generates both Prisma clients, builds API/Kiosk/Admin, backs up PostgreSQL, applies candidate migrations, atomically renames the current app directory as the rollback copy, promotes the candidate, restarts the existing PM2 process, and validates health plus build fingerprints.
 
 **Tech Stack:** Git archive, scp/ssh, pnpm workspace, NestJS API, Prisma SQLite/PostgreSQL clients and migrations, pg_dump, React/Vite Kiosk/Admin builds, PM2, PostgreSQL health endpoint.
 
@@ -16,9 +16,9 @@ Do not execute this plan until the user explicitly confirms Gate 2 deployment re
 
 Before executing, restate:
 
-- **Target:** preproduction only, refresh `/srv/ai-job-print` to candidate `9146fa1c`.
+- **Target:** preproduction only, refresh `/srv/ai-job-print` to candidate `9a702981`.
 - **Non-target:** production domain/cert, business data writes, COS objects, secrets, nginx, SMS/OCR/TRTC/ASR/TTS config, Windows hardware.
-- **Allowed remote changes:** `/srv/yitiji-preprod-9146fa1c.tar.gz`, `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump`, `/srv/ai-job-print-prev-<timestamp>`, `/srv/ai-job-print`, generated dependencies/build output, candidate PostgreSQL additive migrations, PM2 restart of `ai-job-print-api`.
+- **Allowed remote changes:** `/srv/yitiji-preprod-9a702981.tar.gz`, `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump`, `/srv/ai-job-print-prev-<timestamp>`, `/srv/ai-job-print`, generated dependencies/build output, candidate PostgreSQL additive migrations, PM2 restart of `ai-job-print-api`.
 - **Verification:** artifact sha256, DB backup file, migration status/deploy output, API dist hash, `DEPLOY_SOURCE.txt` metadata, PM2 online, local/public health `db=postgres`, no secret output.
 - **Rollback:** restore `/srv/ai-job-print-prev-<timestamp>` and restart PM2.
 
@@ -26,8 +26,8 @@ Before executing, restate:
 
 **Files:**
 - Read: local Git repository
-- Output outside Git: `/tmp/yitiji-preprod-9146fa1c.tar.gz`
-- Output outside Git: `/tmp/yitiji-preprod-9146fa1c.sha256`
+- Output outside Git: `/tmp/yitiji-preprod-9a702981.tar.gz`
+- Output outside Git: `/tmp/yitiji-preprod-9a702981.sha256`
 
 - [ ] **Step 1: Confirm local clean base**
 
@@ -35,14 +35,14 @@ Run:
 
 ```bash
 git status --short --branch
-git rev-parse --short 9146fa1c
-git cat-file -e 9146fa1c^{commit}
+git rev-parse --short 9a702981
+git cat-file -e 9a702981^{commit}
 ```
 
 Expected:
 
 - Current branch is the Gate 2 execution branch.
-- `9146fa1c` exists locally.
+- `9a702981` exists locally.
 - No unrelated uncommitted changes.
 
 - [ ] **Step 2: Generate pruned runtime archive from the candidate commit**
@@ -50,13 +50,13 @@ Expected:
 Run:
 
 ```bash
-git archive --format=tar --prefix=ai-job-print/ 9146fa1c -- \
+git archive --format=tar --prefix=ai-job-print/ 9a702981 -- \
   package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json \
   apps services packages \
   ':(exclude)**/.env.example' \
-  | gzip -n -9 > /tmp/yitiji-preprod-9146fa1c.tar.gz
-(cd /tmp && shasum -a 256 yitiji-preprod-9146fa1c.tar.gz > yitiji-preprod-9146fa1c.sha256)
-ls -lh /tmp/yitiji-preprod-9146fa1c.tar.gz /tmp/yitiji-preprod-9146fa1c.sha256
+  | gzip -n -9 > /tmp/yitiji-preprod-9a702981.tar.gz
+(cd /tmp && shasum -a 256 yitiji-preprod-9a702981.tar.gz > yitiji-preprod-9a702981.sha256)
+ls -lh /tmp/yitiji-preprod-9a702981.tar.gz /tmp/yitiji-preprod-9a702981.sha256
 ```
 
 Expected:
@@ -156,7 +156,7 @@ Expected:
 Run:
 
 ```bash
-scp /tmp/yitiji-preprod-9146fa1c.tar.gz /tmp/yitiji-preprod-9146fa1c.sha256 root@<PREPROD_HOST>:/srv/
+scp /tmp/yitiji-preprod-9a702981.tar.gz /tmp/yitiji-preprod-9a702981.sha256 root@<PREPROD_HOST>:/srv/
 ```
 
 Expected:
@@ -169,7 +169,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'cd /srv && sha256sum -c yitiji-preprod-9146fa1c.sha256'
+ssh root@<PREPROD_HOST> 'cd /srv && sha256sum -c yitiji-preprod-9a702981.sha256'
 ```
 
 Expected:
@@ -181,7 +181,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'set -e; rm -rf /srv/ai-job-print-candidate-9146fa1c; mkdir -p /srv/ai-job-print-candidate-9146fa1c; tar -xzf /srv/yitiji-preprod-9146fa1c.tar.gz -C /srv/ai-job-print-candidate-9146fa1c --strip-components=1; test -f /srv/ai-job-print-candidate-9146fa1c/package.json'
+ssh root@<PREPROD_HOST> 'set -e; rm -rf /srv/ai-job-print-candidate-9a702981; mkdir -p /srv/ai-job-print-candidate-9a702981; tar -xzf /srv/yitiji-preprod-9a702981.tar.gz -C /srv/ai-job-print-candidate-9a702981 --strip-components=1; test -f /srv/ai-job-print-candidate-9a702981/package.json'
 ```
 
 Expected:
@@ -194,7 +194,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'set -e; cd /srv/ai-job-print; for f in services/api/.env .env apps/kiosk/.env apps/kiosk/.env.local apps/admin/.env apps/admin/.env.local apps/partner/.env apps/partner/.env.local; do if [ -f "$f" ]; then mkdir -p "/srv/ai-job-print-candidate-9146fa1c/$(dirname "$f")"; cp -p "$f" "/srv/ai-job-print-candidate-9146fa1c/$f"; fi; done; find /srv/ai-job-print-candidate-9146fa1c -path "*/node_modules/*" -prune -o \( -name ".env" -o -name ".env.local" \) -print | sed "s#/srv/ai-job-print-candidate-9146fa1c/##"'
+ssh root@<PREPROD_HOST> 'set -e; cd /srv/ai-job-print; for f in services/api/.env .env apps/kiosk/.env apps/kiosk/.env.local apps/admin/.env apps/admin/.env.local apps/partner/.env apps/partner/.env.local; do if [ -f "$f" ]; then mkdir -p "/srv/ai-job-print-candidate-9a702981/$(dirname "$f")"; cp -p "$f" "/srv/ai-job-print-candidate-9a702981/$f"; fi; done; find /srv/ai-job-print-candidate-9a702981 -path "*/node_modules/*" -prune -o \( -name ".env" -o -name ".env.local" \) -print | sed "s#/srv/ai-job-print-candidate-9a702981/##"'
 ```
 
 Expected:
@@ -211,7 +211,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9146fa1c && pnpm install --frozen-lockfile'
+ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9a702981 && pnpm install --frozen-lockfile'
 ```
 
 Expected:
@@ -224,7 +224,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9146fa1c && pnpm --filter @ai-job-print/api exec prisma generate && pnpm --filter @ai-job-print/api db:pg:generate'
+ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9a702981 && pnpm --filter @ai-job-print/api exec prisma generate && pnpm --filter @ai-job-print/api db:pg:generate'
 ```
 
 Expected:
@@ -236,7 +236,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9146fa1c && pnpm --filter @ai-job-print/api build && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true pnpm --filter @ai-job-print/kiosk build && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build'
+ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9a702981 && pnpm --filter @ai-job-print/api build && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true pnpm --filter @ai-job-print/kiosk build && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build'
 ```
 
 Expected:
@@ -251,10 +251,10 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'set -e; TS=$(cat /srv/yitiji-gate2-ts); SHA=$(cut -d " " -f1 /srv/yitiji-preprod-9146fa1c.sha256); API_HASH=$(sha256sum /srv/ai-job-print-candidate-9146fa1c/services/api/dist/main.js | cut -d " " -f1); echo "$API_HASH" > /srv/yitiji-api-main-9146fa1c.sha256; cat > /srv/ai-job-print-candidate-9146fa1c/DEPLOY_SOURCE.txt <<EOF
+ssh root@<PREPROD_HOST> 'set -e; TS=$(cat /srv/yitiji-gate2-ts); SHA=$(cut -d " " -f1 /srv/yitiji-preprod-9a702981.sha256); API_HASH=$(sha256sum /srv/ai-job-print-candidate-9a702981/services/api/dist/main.js | cut -d " " -f1); echo "$API_HASH" > /srv/yitiji-api-main-9a702981.sha256; cat > /srv/ai-job-print-candidate-9a702981/DEPLOY_SOURCE.txt <<EOF
 source=local-git-archive
-commit=9146fa1c
-artifact=/srv/yitiji-preprod-9146fa1c.tar.gz
+commit=9a702981
+artifact=/srv/yitiji-preprod-9a702981.tar.gz
 sha256=$SHA
 api_dist_main_sha256=$API_HASH
 built_at=$(date -Is)
@@ -276,7 +276,7 @@ ssh root@<PREPROD_HOST> 'bash -lc '"'"'
 set -euo pipefail
 TS=$(cat /srv/yitiji-gate2-ts)
 mkdir -p /srv/db-backups
-cd /srv/ai-job-print-candidate-9146fa1c
+cd /srv/ai-job-print-candidate-9a702981
 unset POSTGRES_URL DATABASE_URL PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD PGPASSFILE PGSSLMODE
 PGPASSFILE="/srv/.pgpass-yitiji-gate2-$TS"
 PGTARGET_ENV="/srv/yitiji-pg-target-$TS.env"
@@ -386,7 +386,7 @@ Stop if `pg_dump`, `db:pg:deploy`, or final migrate status fails.
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'set -e; TS=$(cat /srv/yitiji-gate2-ts); test -d /srv/ai-job-print-candidate-9146fa1c; mv /srv/ai-job-print "/srv/ai-job-print-prev-$TS"; test -d "/srv/ai-job-print-prev-$TS"'
+ssh root@<PREPROD_HOST> 'set -e; TS=$(cat /srv/yitiji-gate2-ts); test -d /srv/ai-job-print-candidate-9a702981; mv /srv/ai-job-print "/srv/ai-job-print-prev-$TS"; test -d "/srv/ai-job-print-prev-$TS"'
 ```
 
 Expected:
@@ -399,7 +399,7 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'set -e; mv /srv/ai-job-print-candidate-9146fa1c /srv/ai-job-print'
+ssh root@<PREPROD_HOST> 'set -e; mv /srv/ai-job-print-candidate-9a702981 /srv/ai-job-print'
 ```
 
 Expected:
@@ -431,7 +431,7 @@ grep -q '"success":true' /tmp/yitiji-health-public.json
 grep -q '"db":"postgres"' /tmp/yitiji-health-public.json
 ssh root@<PREPROD_HOST> 'bash -lc '"'"'
 set -e
-EXPECTED=$(cut -d " " -f1 /srv/yitiji-api-main-9146fa1c.sha256)
+EXPECTED=$(cut -d " " -f1 /srv/yitiji-api-main-9a702981.sha256)
 ACTUAL=$(sha256sum /srv/ai-job-print/services/api/dist/main.js | cut -d " " -f1)
 test "$EXPECTED" = "$ACTUAL"
 sed -n "1,40p" /srv/ai-job-print/DEPLOY_SOURCE.txt
@@ -443,7 +443,7 @@ grep -q "online" /tmp/yitiji-pm2-status.txt
 Expected:
 
 - Local and public health return `success=true`, `status=ok`, `db=postgres`.
-- `DEPLOY_SOURCE.txt` reports `commit=9146fa1c`, but remains metadata only.
+- `DEPLOY_SOURCE.txt` reports `commit=9a702981`, but remains metadata only.
 - API dist `main.js` hash matches the candidate build hash.
 - PM2 process is online; do not print full `pm2 describe` output because it can expose environment variables. The verification chain is candidate build hash -> promoted disk file hash -> PM2 online -> local/public health.
 

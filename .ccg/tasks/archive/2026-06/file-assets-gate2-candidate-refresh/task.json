@@ -1,0 +1,14 @@
+{
+  "id": "file-assets-gate2-candidate-refresh",
+  "title": "用户文件与简历资产 Gate 2 候选刷新本地预检",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "acceptance-docs",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交本分支",
+  "createdAt": "2026-06-22T04:40:00+08:00",
+  "branch": "codex/file-assets-gate2-candidate-refresh",
+  "baseCommit": "9a702981",
+  "completedAt": "2026-06-22T04:37:43+08:00"
+}

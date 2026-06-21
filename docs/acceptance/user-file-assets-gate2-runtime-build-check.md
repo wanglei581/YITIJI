@@ -1,13 +1,15 @@
 # 用户文件与简历资产 Gate 2 裁剪包本地构建预检
 
 > 状态：LOCAL BUILD CHECK ONLY，尚未执行预生产远端操作。
-> 候选 commit：`9146fa1c`。
+> 候选 commit：`9a702981`。
 > 本地执行时间：2026-06-22。
 > 口径：本文件只证明裁剪候选包在本地 `/tmp` 解压目录可安装和构建；不代表 Gate 2、Gate 3/Gate 4、正式生产、试运营或 Windows 真机验收完成。
 
 ## 一、结论
 
-裁剪运行时归档可以在干净 `/tmp` 解压目录中完成依赖安装、Prisma client 生成、API build、Kiosk production build 和 Admin build。预检同时发现并修正了 Gate 2 计划中的构建变量缺口：
+裁剪运行时归档可以在干净 `/tmp` 解压目录中完成依赖安装、Prisma client 生成、API build、Kiosk production build 和 Admin build。本轮将后续 Gate 2 建议候选从 `9146fa1c` 刷新为 `9a702981`，原因是 `9a702981` 包含后续 Gate 2/Gate 3 本地门禁与证据修正；API dist hash 与 `9146fa1c` 预检保持一致，说明后续提交未改变 API 运行时构建产物。
+
+预检同时确认 Gate 2 计划中的构建变量要求仍然成立：
 
 - 原计划 Kiosk build 只设置 `VITE_USE_TRTC_CALL=true`。
 - 实际 Kiosk production build 守卫还要求 `VITE_API_MODE=http`，否则拒绝构建，防止 mock 数据进入线上产物。
@@ -23,16 +25,16 @@
 
 | 项目 | 结果 |
 | --- | --- |
-| 文件 | `/tmp/yitiji-preprod-9146fa1c.tar.gz` |
-| sha256 | `950a025e33ad9a18d97120194c1df32e852b049d5c676a1ddf7d670e2a220cd2` |
-| 解压目录 | `/tmp/yitiji-gate2-runtime-build-check/ai-job-print` |
+| 文件 | `/tmp/yitiji-preprod-9a702981.tar.gz` |
+| sha256 | `d75386f422311ff4b5ae3e1242b43d72a5ef99e7490b040e8b7fcab58255a199` |
+| 解压目录 | `/tmp/yitiji-gate2-runtime-build-check-9a702981/ai-job-print` |
 | root entries | 7 |
 
 命令：
 
 ```bash
-tar -xzf /tmp/yitiji-preprod-9146fa1c.tar.gz -C /tmp/yitiji-gate2-runtime-build-check
-cd /tmp/yitiji-gate2-runtime-build-check/ai-job-print
+tar -xzf /tmp/yitiji-preprod-9a702981.tar.gz -C /tmp/yitiji-gate2-runtime-build-check-9a702981
+cd /tmp/yitiji-gate2-runtime-build-check-9a702981/ai-job-print
 pnpm install --frozen-lockfile
 ```
 
@@ -42,6 +44,8 @@ pnpm install --frozen-lockfile
 - workspace 识别为 9 个项目。
 - lockfile up to date，resolution step skipped。
 - 安装未依赖被裁剪掉的 `docs/`、`.ccg/`、根级 lint/format 文档或任务文件。
+- 解压后根目录为 `apps`、`package.json`、`packages`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、`services`、`tsconfig.base.json`。
+- 根目录不包含 `docs/` 或 `.ccg/`；归档内未发现 `.env.example`。
 
 ## 三、Prisma 与 API build
 
@@ -60,6 +64,8 @@ pnpm --filter @ai-job-print/api build
 - API build 通过。
 - `services/api/dist/main.js` 存在。
 - `services/api/dist/main.js` sha256：`d309c660b685680409ddf441f8ec5401d4810d61ad2162bc666bf7ab7e27b5b8`
+
+历史对照：`9146fa1c` 裁剪包 sha256 为 `950a025e33ad9a18d97120194c1df32e852b049d5c676a1ddf7d670e2a220cd2`，其 `services/api/dist/main.js` sha256 同样为 `d309c660b685680409ddf441f8ec5401d4810d61ad2162bc666bf7ab7e27b5b8`。该对照证明 `9146fa1c` 之后的候选刷新没有改变 API 运行时构建产物。
 
 ## 四、Kiosk production build
 
