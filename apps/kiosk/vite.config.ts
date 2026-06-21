@@ -24,6 +24,38 @@ function assertProdApiMode(command: string, mode: string, env: Record<string, st
   }
 }
 
+function assertProdAssistantTrtcMode(command: string, mode: string, env: Record<string, string>) {
+  if (command !== 'build' || mode !== 'production') return
+  if ((env['VITE_ALLOW_TEXT_ONLY_ASSISTANT'] ?? '').trim() === 'true') {
+    console.warn(
+      '[kiosk] 生产构建显式允许 AI 助手纯文字模式：VITE_ALLOW_TEXT_ONLY_ASSISTANT=true。' +
+        '已跳过数字人强制校验；数字人是否启用以 VITE_USE_TRTC_CALL 为准。',
+    )
+    return
+  }
+  const useTrtcCall = (env['VITE_USE_TRTC_CALL'] ?? '').trim()
+  if (useTrtcCall !== 'true') {
+    throw new Error(
+      `[kiosk] 生产构建被拒绝：VITE_USE_TRTC_CALL 必须为 "true"（当前 "${useTrtcCall || '未设置'}"）。` +
+        `缺失该变量会让 /assistant 不启用数字人通话入口，线上静默回落为文字助手。` +
+        `如本次确认为纯文字助手部署，请显式设置 VITE_ALLOW_TEXT_ONLY_ASSISTANT=true。`,
+    )
+  }
+}
+
+function warnAssistantTrtcDevMode(command: string, env: Record<string, string>) {
+  if (command !== 'serve') return
+  const allowTextOnly = (env['VITE_ALLOW_TEXT_ONLY_ASSISTANT'] ?? '').trim() === 'true'
+  const useTrtcCall = (env['VITE_USE_TRTC_CALL'] ?? '').trim() === 'true'
+  if (!allowTextOnly && !useTrtcCall) {
+    console.warn(
+      '[kiosk] AI 助手数字人未启用：当前 dev 会进入文字助手。' +
+        '联调数字人请使用 pnpm --filter @ai-job-print/kiosk dev:trtc，' +
+        '或设置 VITE_USE_TRTC_CALL=true。',
+    )
+  }
+}
+
 function resolveApiProxyTarget(env: Record<string, string>): string {
   const baseUrl = env['VITE_API_BASE_URL']
   if (env['VITE_API_PROXY_TARGET']) return env['VITE_API_PROXY_TARGET']
@@ -34,6 +66,8 @@ function resolveApiProxyTarget(env: Record<string, string>): string {
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   assertProdApiMode(command, mode, env)
+  assertProdAssistantTrtcMode(command, mode, env)
+  warnAssistantTrtcDevMode(command, env)
   return {
     plugins: [react(), tailwindcss()],
     resolve: {

@@ -84,11 +84,12 @@ jobs:
           pnpm --filter terminal-agent typecheck
 
       - name: Build
-        # 三端生产构建门禁要求 VITE_API_MODE=http（见各 app vite.config.ts 的 assertProdApiMode）；
-        # 这里显式设上，既让构建通过，也让 CI 顺带校验生产产物为 http 模式（非 mock 假数据）。
+        # 三端生产构建门禁要求 VITE_API_MODE=http；Kiosk 还要求数字人构建期开关，
+        # 避免 /assistant 未启用数字人通话入口后静默回落文字助手。
         env:
           VITE_API_MODE: http
           VITE_API_BASE_URL: /api/v1
+          VITE_USE_TRTC_CALL: 'true'
         run: |
           pnpm --filter @ai-job-print/api build
           pnpm --filter @ai-job-print/kiosk build
@@ -107,6 +108,7 @@ jobs:
         # (/campus、/job-fairs)。各脚本已用稳定 tag 在下次运行前预清残留,
         # 但前提仍是串行,切勿改成并行。
         run: |
+          pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
           pnpm --filter @ai-job-print/api verify:production-db-guard
