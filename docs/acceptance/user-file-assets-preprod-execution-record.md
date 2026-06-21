@@ -10,7 +10,7 @@
 目标：
 
 - 基于 `9146fa1c` 在预生产环境执行用户文件与简历资产验收。
-- 覆盖 PostgreSQL、COS 私有桶、会员账号、原始文件、优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 ActivityLog 审计。
+- 覆盖 PostgreSQL、COS 私有桶、会员账号、原始文件、优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 AuditLog 审计。
 - 留存命令日志、浏览器截图、COS 控制台截图、PostgreSQL 抽样和审计查询结果，所有证据必须脱敏。
 
 非目标：
@@ -91,6 +91,7 @@ Gate 1 结论：
 | `pnpm --filter @ai-job-print/api verify:cos:live` | PENDING | PASS 需记录脱敏桶指纹；SKIPPED 需记录缺少的配置项名称，不记录值 |
 | `pnpm --filter @ai-job-print/api verify:member-assets-c2d` | PENDING | 待执行 |
 | `pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance` | PENDING | 待执行 |
+| `pnpm --filter @ai-job-print/api verify:audit-logs` | PENDING | AuditLog 基础审计命令证据；不能替代 Gate 4 针对本轮测试文件的审计抽样 |
 
 ## 七、Gate 4 浏览器和账号验收
 
@@ -107,8 +108,8 @@ Gate 1 结论：
 | 签名 URL 预览 | TTL <= 30min、过期后不可访问、截图和日志中的签名 URL 查询串已脱敏 | PENDING |
 | 重登查看 | 文件仍可见，API 只返回本人 active 文件 | PENDING |
 | 跨账号否定测试 | 会员 B 403/404，无签名 URL 泄露 | PENDING |
-| 删除三态一致 | UI 不可见、DB deleted、COS 404、ActivityLog | PENDING |
-| 过期清理 | 清理前用查询限定仅命中指定测试账号和测试文件 ID；过期文件被清，long_term 对照仍 active/COS 200；审计取证须走整点 cron 路径，手动接口仅核对返回值/DB/COS | PENDING |
+| 删除三态一致 | UI 不可见、DB deleted、COS 404、AuditLog | PENDING |
+| 过期清理 | 清理前用查询限定仅命中指定测试账号和测试文件 ID；过期文件被清，long_term 对照仍 active/COS 200；生命周期聚合审计优先走整点 cron 路径；如使用手动接口，也需核对管理员操作 AuditLog、返回值、DB 与 COS 状态 | PENDING |
 | Admin 生命周期视图 | 统计、状态、长期保存、删除/清理结果截图 | PENDING |
 
 ## 八、停止条件与回滚记录

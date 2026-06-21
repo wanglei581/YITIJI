@@ -25,6 +25,7 @@
 | G3-06 | 命令日志 | `G3-06-cos-live-<timestamp>.log` | COS live put/head/get/signed-url/delete，日志脱敏 |
 | G3-07 | 命令日志 | `G3-07-member-assets-c2d-<timestamp>.log` | 会员资产 HTTP E2E；不得替代 COS live 验收 |
 | G3-08 | 命令日志 | `G3-08-trial-acceptance-static-<timestamp>.log` | 静态证据包防回退检查 |
+| G3-09 | 命令日志 | `G3-09-audit-logs-<timestamp>.log` | AuditLog 基础审计服务门禁；文件级保存期限变更、删除、过期清理仍需 Gate 4 按测试文件 ID 抽样 |
 | G4-01 | 浏览器截图 | `G4-01-login-member-a-<timestamp>.png` | 会员 A 登录后页面，手机号脱敏 |
 | G4-02 | 浏览器截图 + API 摘要 | `G4-02-upload-raw-file-<timestamp>.md` | 原始文件上传、文件 ID 脱敏、sha256 前 8 位 |
 | G4-03 | DB 摘要 | `G4-03-default-retention-<timestamp>.md` | 默认 90 天保存期限 |
@@ -32,7 +33,7 @@
 | G4-05 | 浏览器截图 + DB 摘要 | `G4-05-output-long-term-<timestamp>.md` | 优化后/修改后成果物长期保存 |
 | G4-06 | 浏览器截图 + 日志摘要 | `G4-06-signed-url-preview-<timestamp>.md` | 签名 URL TTL、过期验证、查询串脱敏；TTL 以预生产实际配置为准且不得超过 30 分钟 |
 | G4-07 | API 摘要 | `G4-07-cross-account-deny-<timestamp>.md` | 会员 B 访问会员 A 文件 403/404 |
-| G4-08 | DB + COS + UI 摘要 | `G4-08-delete-three-state-<timestamp>.md` | UI 不可见、DB deleted、COS 404、ActivityLog |
+| G4-08 | DB + COS + UI 摘要 | `G4-08-delete-three-state-<timestamp>.md` | UI 不可见、DB deleted、COS 404、AuditLog |
 | G4-09 | DB + COS + 审计摘要 | `G4-09-expired-cleanup-<timestamp>.md` | 过期清理命中测试文件，long_term 对照不被删 |
 | G4-10 | Admin 截图 | `G4-10-admin-lifecycle-view-<timestamp>.png` | Admin 文件生命周期视图截图 |
 
@@ -69,6 +70,7 @@ pnpm --filter @ai-job-print/api verify:file-lifecycle-summary | tee "G3-05-file-
 pnpm --filter @ai-job-print/api verify:cos:live | tee "G3-06-cos-live-$TS.log"
 pnpm --filter @ai-job-print/api verify:member-assets-c2d | tee "G3-07-member-assets-c2d-$TS.log"
 pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance | tee "G3-08-trial-acceptance-static-$TS.log"
+pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.log"
 ```
 
 判定规则：
@@ -76,6 +78,7 @@ pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance | tee "G3-08
 - `verify:cos:live` 如果输出 `SKIPPED`，Gate 3 不通过；必须记录缺少的配置项名称，不记录值。
 - `verify:member-assets-c2d` 强制本地存储，不能替代 COS live 或浏览器账号验收。
 - `verify:file-assets-trial-acceptance` 仍是静态检查，只能作为证据包结构防回退。
+- `verify:audit-logs` 是 AuditLog 基础审计服务门禁，只证明审计写入、查询、分页、payload 封顶和 best-effort 行为；Gate 4 仍必须针对本轮测试文件 ID 抽样确认保存期限变更、删除、过期清理审计记录。
 - 任一日志出现密钥、token、完整手机号、签名 URL 查询串或简历正文，立即停止并轮换相关凭据。
 
 ## 五、Gate 4 浏览器和账号验收
@@ -95,7 +98,7 @@ pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance | tee "G3-08
 | 登录会员 A | 使用预生产域名登录 | G4-01 | 登录成功，页面不展示 token/cookie |
 | 上传原始文件 | 上传受控测试 PDF 或图片 | G4-02 | 生成 `FILE_A_RAW`，COS object 存在，sha256 前 8 位记录 |
 | 默认保存期限 | 打开我的文档并查询 DB | G4-03 | `retentionPolicy=months_3`、`retentionSetBy=system`、`expiresAt` 约 90 天 |
-| 设置 180 天 | 用户确认保存条款后更新 | G4-04 | `retentionPolicy=months_6`、`retentionConsentVersion=file-retention-v1`、ActivityLog 存在 |
+| 设置 180 天 | 用户确认保存条款后更新 | G4-04 | `retentionPolicy=months_6`、`retentionConsentVersion=file-retention-v1`、AuditLog 存在 |
 | 重登查看 | 退出再登录会员 A | G4-04 | `FILE_A_RAW` 仍可见，API 只返回本人 active 文件 |
 
 ### 5.2 优化后或修改后文件链路
@@ -111,8 +114,8 @@ pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance | tee "G3-08
 | 步骤 | 操作 | 证据 ID | 通过标准 |
 | --- | --- | --- | --- |
 | 跨账号否定测试 | 会员 B 访问会员 A 文件详情/下载/删除 | G4-07 | 403/404，无签名 URL 泄露 |
-| 用户主动删除 | 删除 `FILE_A_RAW` | G4-08 | UI 不可见、DB `status=deleted`、COS HEAD 404、ActivityLog 存在 |
-| 过期清理 | 准备一个过期测试文件和一个 long_term 对照 | G4-09 | 过期文件被清理，long_term 对照 DB active/COS 200/用户可见；审计取证须走整点 cron 路径，手动接口仅核对返回值、DB 与 COS 状态 |
+| 用户主动删除 | 删除 `FILE_A_RAW` | G4-08 | UI 不可见、DB `status=deleted`、COS HEAD 404、AuditLog 存在 |
+| 过期清理 | 准备一个过期测试文件和一个 long_term 对照 | G4-09 | 过期文件被清理，long_term 对照 DB active/COS 200/用户可见；生命周期聚合审计优先走整点 cron 路径；如使用手动接口，也需核对管理员操作 AuditLog、返回值、DB 与 COS 状态 |
 | Admin 生命周期视图 | 管理员查看文件生命周期 | G4-10 | 展示统计、状态、长期保存、删除/清理结果；不得提供 Admin 修改用户保存期限入口 |
 
 ## 六、PostgreSQL 查询摘要模板
@@ -130,7 +133,7 @@ where id in ('FILE_A_RAW', 'FILE_A_OUTPUT', 'FILE_A_EXPIRED', 'FILE_A_LONG_TERM_
 -- 审计抽样，只查本轮测试文件 ID 和时间窗口
 select action, "actorRole", "actorId", "targetType", "targetId",
        payload, "createdAt"
-from "ActivityLog"
+from "AuditLog"
 where action in ('file.delete', 'file.retention_update', 'file.cleanup_expired')
   and "createdAt" >= 'REDACTED_GATE4_START_AT'
 order by "createdAt" desc
@@ -147,7 +150,7 @@ limit 100;
 - 签名 URL 超过 30 分钟或过期后仍可访问。
 - 日志或截图出现密钥、token、完整手机号、完整签名 URL、简历正文。
 - COS 生命周期规则覆盖 `users/`、会员简历、AI 成果物或长期保存对象。
-- ActivityLog 缺失保存期限变更、删除或过期清理记录。
+- AuditLog 缺失保存期限变更、删除或过期清理记录。
 
 ## 八、结论模板
 

@@ -60,7 +60,7 @@ Gate 2 不做以下事项：
 - PostgreSQL 业务行数据、Redis 数据、COS 对象。
 - COS bucket 生命周期规则、CAM 权限、云密钥。
 - nginx、证书、域名解析、hosts 以外的正式域名配置。
-- 测试会员账号、文件资产、保存期限、删除状态、ActivityLog。
+- 测试会员账号、文件资产、保存期限、删除状态、AuditLog。
 - Windows 设备、Terminal Agent、打印机和扫描仪配置。
 
 ## 五、执行前置确认项

@@ -325,7 +325,7 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] 手机号登录与登出。
 - [ ] 上传简历 → OCR/文本提取 → AI 诊断。
 - [ ] AI 简历生成或优化 → 生成 PDF → 我的文档。
-- [ ] 用户文件与简历资产证据包已执行：覆盖上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 ActivityLog 审计；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。
+- [ ] 用户文件与简历资产证据包已执行：覆盖上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 AuditLog 审计；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。
 - [ ] 真实打印出纸 → 打印订单状态 completed。
 - [ ] 打印失败场景 → 打印订单状态 failed，不伪造成功。
 - [ ] 岗位 / 招聘会 / 政策浏览与收藏。

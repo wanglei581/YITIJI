@@ -16,7 +16,7 @@
 
 - Baseline: `codex/file-assets-preprod-integration` at `9146fa1c`.
 - Execution branch: `codex/file-assets-preprod-execution`.
-- Acceptance area: member-owned raw files, resumes, optimized/modified output files, AI-derived documents, `/me/documents`, Admin `/files`, PostgreSQL, COS private bucket, ActivityLog.
+- Acceptance area: member-owned raw files, resumes, optimized/modified output files, AI-derived documents, `/me/documents`, Admin `/files`, PostgreSQL, COS private bucket, AuditLog.
 
 ### Non-Target
 
@@ -133,9 +133,9 @@ Manual flow:
 6. Member A changes output file retention to long term after consent.
 7. Member A logs out and logs back in; both files remain visible according to policy.
 8. Member B attempts to read or delete Member A files and receives 403/404 without signed URL leakage.
-9. Member A deletes one controlled file; UI, PostgreSQL, COS, and ActivityLog all agree.
+9. Member A deletes one controlled file; UI, PostgreSQL, COS, and AuditLog all agree.
 10. Verify signed URL preview/download TTL is no more than 30 minutes, the URL expires as expected, and screenshots/logs redact the query string.
-11. Prepare one expired short-retention file and one long-term control file belonging only to designated test accounts; query-match the exact test file IDs before cleanup; prove the expired file is deleted and long-term file remains. Cleanup ActivityLog evidence must come from the scheduled cron path; manual cleanup can only prove return value, PostgreSQL, and COS state.
+11. Prepare one expired short-retention file and one long-term control file belonging only to designated test accounts; query-match the exact test file IDs before cleanup; prove the expired file is deleted and long-term file remains. Cleanup AuditLog evidence must come from the scheduled cron path; manual cleanup can only prove return value, PostgreSQL, and COS state.
 12. Admin `/files` shows lifecycle summary and deleted/active/long-term state without offering retention edits.
 
 Expected:
@@ -329,5 +329,5 @@ Update next tasks to name the next required action:
 - [ ] Plan does not claim production or trial completion.
 - [ ] Plan preserves compliance boundary: AI job-materials and print service terminal, not a recruiting platform.
 - [ ] Plan includes rollback and stopping conditions.
-- [ ] Plan requires evidence for PostgreSQL, COS, member ownership, UI, Admin lifecycle view, and ActivityLog.
+- [ ] Plan requires evidence for PostgreSQL, COS, member ownership, UI, Admin lifecycle view, and AuditLog.
 - [ ] Plan includes the Prisma PostgreSQL client generation step before production runtime gates in cold environments.

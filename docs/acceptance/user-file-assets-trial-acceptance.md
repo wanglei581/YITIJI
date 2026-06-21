@@ -49,6 +49,7 @@ pnpm --filter @ai-job-print/api verify:file-retention
 pnpm --filter @ai-job-print/api verify:file-lifecycle-summary
 pnpm --filter @ai-job-print/api verify:cos:live
 pnpm --filter @ai-job-print/api verify:member-assets-c2d
+pnpm --filter @ai-job-print/api verify:audit-logs
 pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
 ```
 
@@ -56,6 +57,7 @@ pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
 
 - `verify:cos:live` 是 COS live 冒烟，必须在生产或预生产 COS 凭据下单独执行；若 SKIPPED，必须写明缺少哪项配置。
 - `verify:member-assets-c2d` 只能证明会员资产 API 逻辑和本地存储路径，不能替代 COS 私有桶验收。
+- `verify:audit-logs` 必须作为 AuditLog 基础审计服务命令证据；通过后仍不能替代 Gate 4 针对本轮测试文件 ID 的保存期限变更、删除和过期清理审计抽样。
 - `verify:file-assets-trial-acceptance` 是 STATIC DOC CHECK ONLY；通过后只代表本文档结构和部署清单引用没有遗漏，不代表生产/试运营验收完成。
 - 命令日志不得包含密钥、完整手机号、access token、签名 URL 查询串或简历正文。
 
@@ -92,12 +94,12 @@ pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
 | 用户主动删除 | 两步确认截图、删除请求 ID、操作人脱敏 | [ ] PENDING REAL-EVIDENCE |
 | DB 状态 | `status=deleted`、`deletedAt`、`deletedBy`、`deleteReason` | [ ] PENDING REAL-EVIDENCE |
 | COS 状态 | COS HEAD 404 或控制台对象不存在截图；对象 key 脱敏 | [ ] PENDING REAL-EVIDENCE |
-| ActivityLog | `ActivityLog` 中存在删除审计，含 actor、target、requestId 或时间窗口 | [ ] PENDING REAL-EVIDENCE |
+| AuditLog | `AuditLog` 中存在删除审计，含 actor、target、requestId 或时间窗口 | [ ] PENDING REAL-EVIDENCE |
 | 用户界面 | `/me/documents` 不再展示该文件；Admin 生命周期视图可看到删除/清理结果 | [ ] PENDING REAL-EVIDENCE |
 
 ### 4.4 过期清理
 
-过期清理由 `FilesCleanupTask` 每小时 cron 或 `POST /files/cleanup-expired` 手动触发。生产验收必须证明目标环境实际挂载 `ScheduleModule.forRoot()` 和 `FilesCleanupTask`，且清理只命中 `deletedAt=null` 且 `expiresAt < now` 的文件。当前 `file.cleanup_expired` 的 `ActivityLog` 只由 cron 路径写入；如需取证清理审计，应等待整点 cron 或在预生产中让 cron 触发，手动接口只作为立即清理结果核对。
+过期清理由 `FilesCleanupTask` 每小时 cron 或 `POST /files/cleanup-expired` 手动触发。生产验收必须证明目标环境实际挂载 `ScheduleModule.forRoot()` 和 `FilesCleanupTask`，且清理只命中 `deletedAt=null` 且 `expiresAt < now` 的文件。手动接口会写入一条 `file.cleanup_expired` 的管理员操作 AuditLog；cron 路径会额外写入包含 `triggeredBy`、`deletedCount`、`bySensitiveLevel`、`byPurpose` 和 `fileIdDigest` 的系统 AuditLog。生命周期聚合取证优先等待整点 cron 或在预生产中让 cron 触发，手动接口只作为立即清理结果和管理员操作记录核对。
 
 | 步骤 | 必留证据 | 状态 |
 | --- | --- | --- |
@@ -106,7 +108,7 @@ pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
 | 触发清理 | cron 日志或管理员手动接口日志，记录 triggeredBy、请求 ID、执行时间 | [ ] PENDING REAL-EVIDENCE |
 | 被清理文件 | COS HEAD 404、DB `status=deleted`、`deletedAt`、`deleteReason` | [ ] PENDING REAL-EVIDENCE |
 | long_term 防误删 | 长期保存对照文件 DB active、COS HEAD 200、用户仍可见 | [ ] PENDING REAL-EVIDENCE |
-| ActivityLog | cron 路径下 `file.cleanup_expired` 审计存在，deletedCount 与抽样文件一致；手动接口清理只核对返回值、DB 与 COS 状态 | [ ] PENDING REAL-EVIDENCE |
+| AuditLog | cron 路径下 `file.cleanup_expired` 系统审计存在，deletedCount 与抽样文件一致；如使用手动接口，也需核对管理员操作 AuditLog、返回值、DB 与 COS 状态 | [ ] PENDING REAL-EVIDENCE |
 
 ## 五、COS 与隐私专项证据
 
@@ -133,7 +135,7 @@ where id in ('REDACTED_FILE_ID');
 -- 删除与清理审计抽样
 select action, "actorRole", "actorId", "targetType", "targetId",
        payload, "createdAt"
-from "ActivityLog"
+from "AuditLog"
 where action in ('file.delete', 'file.retention_update', 'file.cleanup_expired')
 order by "createdAt" desc
 limit 50;
@@ -148,7 +150,7 @@ limit 50;
 - 会员 B 可读、可下载或可删除会员 A 文件。
 - 签名 URL 超过 TTL、永久可访问，或日志/截图泄露 token、签名 URL、手机号、简历正文。
 - COS 生命周期存在 Bucket 全局过期规则，或 `users/`、会员简历、AI 成果物前缀被 Expiration 覆盖。
-- ActivityLog 缺失删除、保存期限变更或过期清理记录。
+- AuditLog 缺失删除、保存期限变更或过期清理记录。
 
 回滚方式：
 

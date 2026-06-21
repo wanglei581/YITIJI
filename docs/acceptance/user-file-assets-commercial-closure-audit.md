@@ -37,7 +37,7 @@
 | 隐私与合规文案 | 采集点、帮助中心、隐私政策、Admin 横幅和 COS 合规文档已统一短期/90 天/180 天/长期保存口径。 | 文档候选已具备 | 法务或业务负责人未签字确认；正式试运营前不能只凭工程文档替代审定。 | 正式试运营前完成用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。 |
 | 预生产 Gate 1 | 已只读确认主机、PM2、health、PostgreSQL 可达；发现 `/srv/ai-job-print` 是 `local-git-archive`，部署源自报仍为 `6b055d6b`。 | 已完成只读预检 | Gate 1 不部署、不迁移、不写数据，不能证明文件资产代码在预生产运行。 | 已进入 Gate 2 方案待确认。 |
 | 预生产 Gate 2 | 已形成本地 `git archive` 上传、候选目录展开、保留 env、构建、DB 备份、迁移、原子切换、PM2 重启、health/hash 复验方案。 | 待执行 | 需要用户再次确认远端修改边界；会改变预生产代码、构建产物、DB schema 和进程状态。 | 用户确认后执行，目标/非目标/允许修改内容/验证/回滚需再次列明。 |
-| 预生产 Gate 3 | 已有 G3-01 至 G3-08 命令日志模板，覆盖 health、trial acceptance、COS lifecycle、COS live、lifecycle summary、member assets、activity logs、DB 摘要。 | 待执行 | Gate 2 未完成；Gate 3 可能写测试 DB/COS 对象，需要授权。 | Gate 2 通过后执行，并按模板留存脱敏日志。 |
+| 预生产 Gate 3 | 已有 G3-01 至 G3-09 命令日志模板，覆盖 health、trial acceptance、COS lifecycle、COS live、lifecycle summary、member assets、audit logs、DB 摘要。 | 待执行 | Gate 2 未完成；Gate 3 可能写测试 DB/COS 对象，需要授权。 | Gate 2 通过后执行，并按模板留存脱敏日志。 |
 | 预生产 Gate 4 | 已有 G4-01 至 G4-10 浏览器/账号证据模板，覆盖 MEMBER_A、MEMBER_B、ADMIN_A、原始文件、成果物、保存期限、长期保存、删除、Admin 生命周期截图。 | 待执行 | Gate 2/Gate 3 未完成；会写测试账号文件和状态，需要授权。 | Gate 3 通过后执行，失败即停止并回填阻塞项。 |
 | 正式生产与试运营 | P0 清单已有生产域名/HTTPS、PostgreSQL、Redis、COS、短信、OCR、AI/TRTC/ASR/TTS、法务、小范围试运营要求。 | 待真实验收 | 当前域名审核和腾讯短信仍在外部审核；一体机外壳未完成；Windows 真机和打印扫描未验。 | 预生产文件资产闭环通过后，再推进正式域名/HTTPS、短信审核后登录 E2E、Windows 真机和 1 台终端试运营。 |
 
@@ -56,7 +56,7 @@
 ## 四、推荐持续推进顺序
 
 1. **执行 Gate 2 预生产候选刷新**：先再次确认目标、非目标、允许修改远端内容、验证方式和回滚方式；确认预生产 DB、Redis、COS 与正式生产资源隔离；再执行候选部署、DB 备份、additive migrations、构建、PM2 重启和 health/hash 复验。
-2. **执行 Gate 3 自动命令证据**：按 G3-01 至 G3-08 留存命令日志，重点确认 `verify:file-assets-trial-acceptance`、COS live、COS 生命周期静态检查、生命周期 summary、member assets、activity logs 和 DB 摘要。
+2. **执行 Gate 3 自动命令证据**：按 G3-01 至 G3-09 留存命令日志，重点确认 `verify:file-assets-trial-acceptance`、COS live、COS 生命周期静态检查、生命周期 summary、member assets、audit logs 和 DB 摘要。
 3. **执行 Gate 4 浏览器账号验收**：使用 MEMBER_A、MEMBER_B、ADMIN_A 跑真实上传、保存期限、长期保存、重登查看、跨账号隔离、删除、Admin 生命周期截图。
 4. **补齐正式生产外部 P0**：域名/HTTPS、腾讯短信审核后的真实手机号 E2E、百度 OCR、AI/TRTC/ASR/TTS 按启用范围 live 冒烟、法务材料审定。招聘信息只作为外部/官方来源展示与免责声明审定，不进入平台内投递、筛选、面试邀约或 Offer 流程。
 5. **Windows 一体机真实验收**：在已购买设备上跑 Terminal Agent、奔图真实出纸、扫描链路、断网/重启恢复、日志和告警；外壳未完成不阻塞裸机验收，但不能替代最终交付形态验收。

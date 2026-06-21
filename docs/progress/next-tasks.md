@@ -52,7 +52,7 @@
 - [x] **用户文件保存期限 Branch 3：Kiosk 文件保存期限 UI**：`/me/documents` 展示当前保存期限和后端允许策略；本人可设置 3 个月 / 6 个月 / 成果物长期保存，6 个月 / 长期保存自动带当前保存条款版本；保存条款版本由 shared/API 本地副本常量收敛并有防回退验证。
 - [x] **用户文件保存期限 Branch 4：Admin 文件生命周期运营视图**：Admin `/files` 复用现有入口展示保存策略、设置来源、同意时间、长期保存数量和即将到期/待清理统计；新增全库只读 `GET /files/lifecycle-summary`，不受列表 `limit=200` 截断；管理员无保存期限修改入口，查看文件兼容 COS 绝对签名 URL。
 - [x] **用户文件保存期限 Branch 5：COS 生命周期与隐私文案验收**：采集点、帮助中心、隐私政策、Admin 文件横幅统一为短期 / 90 天 / 180 天 / 长期保存口径；新增 COS 生命周期合规文档，明确禁止 Bucket 全局过期规则、`long_term` 防误删人工验收和截图存档；新增 `verify:legal-retention-copy` 与 `verify:cos-lifecycle-policy`。
-- [x] **用户文件与简历资产证据包**：新增 `docs/acceptance/user-file-assets-trial-acceptance.md` 和 `verify:file-assets-trial-acceptance`，把生产/试运营验收拆成 PostgreSQL、COS 私有桶、会员账号、上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删、ActivityLog 审计和证据脱敏；静态验证只证明证据包完整，不代表真实生产/试运营执行完成。
+- [x] **用户文件与简历资产证据包**：新增 `docs/acceptance/user-file-assets-trial-acceptance.md` 和 `verify:file-assets-trial-acceptance`，把生产/试运营验收拆成 PostgreSQL、COS 私有桶、会员账号、上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删、AuditLog 审计和证据脱敏；静态验证只证明证据包完整，不代表真实生产/试运营执行完成。
 - [x] **用户文件资产 + 预生产候选集成**：`codex/file-assets-preprod-integration` 已合并文件资产保存期限栈、生产/试运营证据包、TRTC assistant 生产构建守卫和预生产阶段性记录；后续真实验收应基于该集成候选继续，不再用只含 TRTC guard 的预生产分支替代。
 
 ## P1：用户文件与简历资产商用闭环后续
@@ -64,7 +64,7 @@
 - [x] **本地预检：预生产 Gate 2 裁剪包构建**：已输出 `docs/acceptance/user-file-assets-gate2-runtime-build-check.md`，确认裁剪包在 `/tmp` 解压目录可完成 install、Prisma client 生成、API build、Kiosk build、Admin build；同时修正 Gate 2 计划中前端生产构建变量，Kiosk/Admin 必须显式 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是目标候选 `9146fa1c`，已按计划停止。
 - [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以 `9146fa1c` 为目标候选执行部署刷新；执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
-- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 通过后，按 `docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md` 执行 G3-01 至 G3-08 自动命令证据、G4-01 至 G4-10 浏览器账号验收；执行前仍需用户确认，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录。
+- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 通过后，按 `docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md` 执行 G3-01 至 G3-09 自动命令证据、G4-01 至 G4-10 浏览器账号验收；执行前仍需用户确认，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录。
 
 ## P1：工程质量门禁
 
