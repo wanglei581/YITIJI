@@ -76,6 +76,7 @@ Gate 1 结论：
 ## 六、Gate 3 自动命令门禁
 
 > 尚未执行。所有日志进入证据包前必须脱敏，不得提交 `.env`、token、签名 URL 查询串或简历正文。
+> 详细证据编号、日志命名和脱敏规则见 [Gate 3/Gate 4 证据执行模板](./user-file-assets-gate3-gate4-evidence-runbook.md)。
 
 | 命令 | 结果 | 证据 |
 | --- | --- | --- |
@@ -89,6 +90,8 @@ Gate 1 结论：
 | `pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance` | PENDING | 待执行 |
 
 ## 七、Gate 4 浏览器和账号验收
+
+> 尚未执行。执行前必须准备 MEMBER_A、MEMBER_B、ADMIN_A 三类受控账号，并按 [Gate 3/Gate 4 证据执行模板](./user-file-assets-gate3-gate4-evidence-runbook.md) 留存 G4-01 至 G4-10 脱敏证据。
 
 | 场景 | 必留证据 | 结果 |
 | --- | --- | --- |
