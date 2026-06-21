@@ -161,6 +161,20 @@ function assertNoOldOperationalMarkers(source: string, label: string) {
   }
 }
 
+function extractRequiredBlock(source: string, label: string, startMarker: string, endMarker: string) {
+  const start = source.indexOf(startMarker)
+  const end = source.indexOf(endMarker)
+  assert.ok(start >= 0, `${label} must include guard start marker: ${startMarker}`)
+  assert.ok(end > start, `${label} must include guard end marker after start marker: ${endMarker}`)
+  return source.slice(start + startMarker.length, end)
+}
+
+function findRequiredLine(source: string, label: string, prefix: string) {
+  const line = source.split('\n').find((candidate) => candidate.trim().startsWith(prefix))
+  assert.ok(line, `${label} must include a line that starts with: ${prefix}`)
+  return line
+}
+
 assertIncludesAll(gate2RefreshPlan, 'Gate 2 refresh plan', [
   gate2Candidate,
   `/tmp/${currentGate2Artifact}`,
@@ -183,6 +197,56 @@ assertIncludesAll(gate2ApprovalPackage, 'Gate 2 approval package', [
   `git cat-file -e ${gate2Candidate}^{commit}`,
 ])
 assertNoOldOperationalMarkers(gate2ApprovalPackage, 'Gate 2 approval package')
+assert.ok(
+  gate2ApprovalPackage.includes('> 状态：APPROVAL REQUIRED，尚未执行。'),
+  'Gate 2 approval package must remain approval-required and not executed in repository',
+)
+const gate2ApprovalConsentBlock = extractRequiredBlock(
+  gate2ApprovalPackage,
+  'Gate 2 approval package consent block',
+  '<!-- GATE2_APPROVAL_STATEMENT_START -->',
+  '<!-- GATE2_APPROVAL_STATEMENT_END -->',
+)
+assertIncludesAll(gate2ApprovalConsentBlock, 'Gate 2 approval package consent block', [
+  '只有用户明确确认以下内容后，才能执行 Gate 2 远端操作',
+  '确认执行用户文件与简历资产预生产 Gate 2',
+  `目标：仅刷新预生产 \`/srv/ai-job-print\` 到候选 \`${gate2Candidate}\``,
+])
+const gate2ApprovalAgreeLine = findRequiredLine(gate2ApprovalConsentBlock, 'Gate 2 approval package consent block', '同意：')
+const gate2ApprovalDisagreeLine = findRequiredLine(gate2ApprovalConsentBlock, 'Gate 2 approval package consent block', '不同意：')
+const gate2ApprovalKnownLine = findRequiredLine(gate2ApprovalConsentBlock, 'Gate 2 approval package consent block', '已知：')
+assertIncludesAll(gate2ApprovalAgreeLine, 'Gate 2 approval package agree line', [
+  '上传候选包',
+  '展开候选目录',
+  '复制既有 env 文件',
+  '安装依赖',
+  '构建 API/Kiosk/Admin',
+  '备份 PostgreSQL',
+  '执行候选 additive migrations',
+  '原子切换应用目录',
+  '重启既有 PM2',
+  '复验 health',
+])
+assertIncludesAll(gate2ApprovalDisagreeLine, 'Gate 2 approval package disagree line', [
+  '修改正式生产',
+  '域名/证书/nginx',
+  '云密钥',
+  '短信/OCR/TRTC/ASR/TTS',
+  'COS 生命周期',
+  '业务数据',
+  '测试账号文件',
+  'Windows 真机',
+  '打印扫描配置',
+])
+assertIncludesAll(gate2ApprovalKnownLine, 'Gate 2 approval package known line', [
+  'Gate 2 通过后仍需另行确认 Gate 3/Gate 4',
+  'Gate 2 通过不等于试运营或商用闭环完成',
+])
+for (const line of gate2ApprovalPackage.split('\n')) {
+  const completionClaim = /(?:Gate 2 已执行|Gate 2 已完成|生产验收已完成|试运营已完成|已正式上线|商用闭环完成)/.test(line)
+  const negativeContext = /(?:尚未|不得|禁止|不宣布|不等于|不能|不可|没有证据|不代表)/.test(line)
+  assert.ok(!completionClaim || negativeContext, `Gate 2 approval package must not claim completion without negative context: ${line}`)
+}
 
 assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   `/ \`${gate2Candidate}\``,
@@ -229,6 +293,14 @@ assert.ok(
 assert.ok(
   nextTasks.includes('用户文件与简历资产证据包') && nextTasks.includes('真实生产/试运营执行'),
   'next-tasks must keep real production/trial execution pending',
+)
+assert.ok(
+  progress.includes('codex/file-assets-gate2-approval-guard') && progress.includes('审批确认口径防回退'),
+  'current-progress must record Gate 2 approval confirmation guard as local-only work',
+)
+assert.ok(
+  nextTasks.includes('审批确认口径防回退') && nextTasks.includes('不代表 Gate 2 已授权或已执行'),
+  'next-tasks must record Gate 2 approval confirmation guard without implying execution',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')
 assert.ok(nextTasks.includes('AuditLog'), 'next-tasks must use AuditLog for file lifecycle audit evidence')

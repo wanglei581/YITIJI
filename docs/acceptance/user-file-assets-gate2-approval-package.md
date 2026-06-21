@@ -132,6 +132,8 @@ Gate 2 的代码回滚路径：
 
 ## 九、用户确认口径
 
+<!-- GATE2_APPROVAL_STATEMENT_START -->
+
 只有用户明确确认以下内容后，才能执行 Gate 2 远端操作：
 
 ```text
@@ -141,6 +143,8 @@ Gate 2 的代码回滚路径：
 不同意：修改正式生产、域名/证书/nginx、云密钥、短信/OCR/TRTC/ASR/TTS、COS 生命周期、业务数据、测试账号文件、Windows 真机或打印扫描配置。
 已知：Gate 2 通过后仍需另行确认 Gate 3/Gate 4；Gate 2 通过不等于试运营或商用闭环完成。
 ```
+
+<!-- GATE2_APPROVAL_STATEMENT_END -->
 
 ## 十、Gate 2 通过后的下一步
 

@@ -64,6 +64,7 @@
 - [x] **本地预检：预生产 Gate 2 裁剪包构建**：已输出 `docs/acceptance/user-file-assets-gate2-runtime-build-check.md`，确认裁剪包在 `/tmp` 解压目录可完成 install、Prisma client 生成、API build、Kiosk build、Admin build；同时修正 Gate 2 计划中前端生产构建变量，Kiosk/Admin 必须显式 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`。
 - [x] **本地预检：预生产 Gate 2 候选刷新**：后续 Gate 2 建议目标候选已从 `9146fa1c` 刷新为 `9a702981`，并重新生成裁剪运行时归档完成 install、Prisma 双 client、API/Kiosk/Admin build；该预检不代表上传或远端执行完成。
 - [x] **本地门禁：预生产 Gate 2 候选一致性防回退**：`verify:file-assets-trial-acceptance` 已检查操作型 Gate 2 refresh plan、审批包、执行记录、Gate 3/Gate 4 runbook、构建预检和进度入口均指向 `9a702981`，并阻断旧候选 `9146fa1c` 的操作型归档/目录/DEPLOY_SOURCE marker 回流；旧本地预检命令只保留为历史证据且已标记勿执行；该门禁不代表上传或远端执行完成。
+- [x] **本地门禁：预生产 Gate 2 审批确认口径防回退**：`verify:file-assets-trial-acceptance` 已检查 Gate 2 审批包的 `APPROVAL REQUIRED，尚未执行` 状态、机读确认块、用户明确确认前不得远端执行、同意/不同意范围、Gate 3/Gate 4 另行确认和 Gate 2 不等于试运营或商用闭环完成；该门禁不代表 Gate 2 已授权或已执行。
 - [x] **本地预检：预生产 Gate 3 命令清单防回退**：`verify:file-assets-trial-acceptance` 已检查 Gate 3/Gate 4 runbook 中 G3-01 至 G3-09 的 `verify:*` 命令顺序，并确认每条命令存在于 `services/api/package.json`；该检查不代表 Gate 3 已执行。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
 - [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以 `9a702981` 为目标候选执行部署刷新；执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
