@@ -14,6 +14,21 @@
 
 Do not execute this plan until the user explicitly confirms Gate 2 deployment refresh.
 
+### 部署候选冻结
+
+Gate 2 部署候选冻结为 `2187f6a7`。本计划之后的纯治理提交、文档提交、本地静态门禁提交或 CCG 任务归档提交，不自动刷新 Gate 2 部署候选；治理提交不刷新部署候选。
+
+只有下列输入发生变化时，才需要重新生成候选包并刷新本计划里的候选 commit、归档名、sha256 和远端目录：
+
+- 运行时代码
+- 数据库 schema
+- 构建输入
+- 归档范围
+- 生产构建变量
+- Gate 2 执行命令
+
+执行前如 `git diff --name-only 2187f6a7` 只包含 `docs/`、`.ccg/` 或 `services/api/scripts/verify-file-assets-trial-acceptance.ts`，仍按冻结候选 `2187f6a7` 执行 Gate 2，不把后续治理提交当作部署源。
+
 Before executing, restate:
 
 - **Target:** preproduction only, refresh `/srv/ai-job-print` to candidate `2187f6a7`.

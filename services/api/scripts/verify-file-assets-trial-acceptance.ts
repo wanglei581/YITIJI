@@ -6,6 +6,7 @@
  * 注意: 本脚本只做静态文档与门禁口径检查,不连接生产 PostgreSQL、Redis 或 COS。
  */
 import { strict as assert } from 'assert'
+import { execSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -177,6 +178,7 @@ assert.ok(
 
 const gate2Candidate = '2187f6a7'
 const oldGate2Candidate = '9a702981'
+const governanceCommitNotGate2Candidate = '39914fca'
 const currentGate2Artifact = `yitiji-preprod-${gate2Candidate}.tar.gz`
 const currentGate2Checksum = `yitiji-preprod-${gate2Candidate}.sha256`
 const currentGate2CandidateDir = `ai-job-print-candidate-${gate2Candidate}`
@@ -189,6 +191,14 @@ const forbiddenOldGate2OperationalMarkers = [
   `commit=${oldGate2Candidate}`,
   `checkout --detach ${oldGate2Candidate}`,
 ]
+const forbiddenGovernanceCommitOperationalMarkers = [
+  `yitiji-preprod-${governanceCommitNotGate2Candidate}.tar.gz`,
+  `yitiji-preprod-${governanceCommitNotGate2Candidate}.sha256`,
+  `ai-job-print-candidate-${governanceCommitNotGate2Candidate}`,
+  `yitiji-api-main-${governanceCommitNotGate2Candidate}.sha256`,
+  `commit=${governanceCommitNotGate2Candidate}`,
+  `checkout --detach ${governanceCommitNotGate2Candidate}`,
+]
 
 function assertIncludesAll(source: string, label: string, markers: string[]) {
   for (const marker of markers) {
@@ -199,6 +209,12 @@ function assertIncludesAll(source: string, label: string, markers: string[]) {
 function assertNoOldOperationalMarkers(source: string, label: string) {
   for (const marker of forbiddenOldGate2OperationalMarkers) {
     assert.ok(!source.includes(marker), `${label} must not contain old Gate 2 operational marker: ${marker}`)
+  }
+}
+
+function assertNoGovernanceCommitOperationalMarkers(source: string, label: string) {
+  for (const marker of forbiddenGovernanceCommitOperationalMarkers) {
+    assert.ok(!source.includes(marker), `${label} must not contain governance-only commit as Gate 2 operational marker: ${marker}`)
   }
 }
 
@@ -216,6 +232,22 @@ function findRequiredLine(source: string, label: string, prefix: string) {
   return line
 }
 
+function readRequiredGitOutput(command: string, failureMessage: string) {
+  try {
+    return execSync(command, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch (error) {
+    const stderr =
+      error && typeof error === 'object' && 'stderr' in error
+        ? String((error as { stderr?: unknown }).stderr ?? '').trim()
+        : ''
+    assert.fail(stderr ? `${failureMessage}: ${stderr.split('\n')[0]}` : failureMessage)
+  }
+}
+
 assertIncludesAll(gate2RefreshPlan, 'Gate 2 refresh plan', [
   gate2Candidate,
   `/tmp/${currentGate2Artifact}`,
@@ -228,6 +260,68 @@ assertIncludesAll(gate2RefreshPlan, 'Gate 2 refresh plan', [
   `git cat-file -e ${gate2Candidate}^{commit}`,
 ])
 assert.doesNotMatch(gate2RefreshPlan, new RegExp(oldGate2Candidate), 'Gate 2 refresh plan must not reference the old candidate')
+assertNoGovernanceCommitOperationalMarkers(gate2RefreshPlan, 'Gate 2 refresh plan')
+
+assert.equal(gate2Candidate, '2187f6a7', 'Gate 2 deployment candidate must stay frozen at 2187f6a7 until runtime-impacting inputs change')
+assert.equal(oldGate2Candidate, '9a702981', 'previous Gate 2 candidate marker must remain 9a702981 for operational rollback guards')
+for (const marker of [
+  '部署候选冻结',
+  '治理提交不刷新部署候选',
+  '运行时代码',
+  '数据库 schema',
+  '构建输入',
+  '归档范围',
+  '生产构建变量',
+  'Gate 2 执行命令',
+]) {
+  assert.ok(gate2RefreshPlan.includes(marker), `Gate 2 refresh plan must define candidate-freeze marker: ${marker}`)
+}
+for (const [label, source] of [
+  ['Gate 2 approval package', gate2ApprovalPackage],
+  ['Gate 2 runtime build check', gate2RuntimeBuildCheck],
+  ['current-progress', progress],
+  ['next-tasks', nextTasks],
+] as const) {
+  assert.ok(
+    source.includes('治理提交不刷新部署候选') && source.includes(gate2Candidate),
+    `${label} must explain that governance commits do not refresh the frozen Gate 2 deployment candidate`,
+  )
+  assertNoGovernanceCommitOperationalMarkers(source, label)
+}
+readRequiredGitOutput(
+  `git cat-file -e ${gate2Candidate}^{commit}`,
+  `frozen Gate 2 candidate ${gate2Candidate} must be reachable; fetch full history before running this gate`,
+)
+const changedSinceFrozenCandidate = readRequiredGitOutput(
+  `git diff --name-only ${gate2Candidate}`,
+  `failed to inspect changes since frozen Gate 2 candidate ${gate2Candidate}`,
+)
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean)
+const untrackedFiles = readRequiredGitOutput(
+  'git ls-files --others --exclude-standard',
+  'failed to inspect untracked files for Gate 2 candidate freeze',
+)
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean)
+const allowedGovernanceChange = (file: string) =>
+  file.startsWith('docs/') ||
+  file.startsWith('.ccg/') ||
+  file === 'services/api/scripts/verify-file-assets-trial-acceptance.ts'
+const runtimeImpactingChanges = changedSinceFrozenCandidate.filter((file) => !allowedGovernanceChange(file))
+const runtimeImpactingUntrackedFiles = untrackedFiles.filter((file) => !allowedGovernanceChange(file))
+assert.deepEqual(
+  runtimeImpactingChanges,
+  [],
+  `changes after frozen Gate 2 candidate ${gate2Candidate} must be governance-only unless the deployment candidate is refreshed`,
+)
+assert.deepEqual(
+  runtimeImpactingUntrackedFiles,
+  [],
+  `untracked files during frozen Gate 2 candidate ${gate2Candidate} must be governance-only unless the deployment candidate is refreshed`,
+)
 
 assertIncludesAll(gate2ApprovalPackage, 'Gate 2 approval package', [
   `适用候选：\`${gate2Candidate}\``,

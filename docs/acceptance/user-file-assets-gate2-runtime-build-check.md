@@ -9,6 +9,8 @@
 
 裁剪运行时归档可以在干净 `/tmp` 解压目录中完成依赖安装、Prisma client 生成、API build、Kiosk production build 和 Admin build。本轮将后续 Gate 2 建议候选从 `9a702981` 刷新为 `2187f6a7`，原因是 `2187f6a7` 包含后续 Gate 2/Gate 3/Gate 0 本地门禁与证据口径修正；API dist hash 与 `9146fa1c` / `9a702981` 预检保持一致，说明后续提交未改变 API 运行时构建产物。
 
+部署候选冻结：本地构建预检固定证明 `2187f6a7`；后续纯治理、文档、本地静态门禁或任务归档提交不自动刷新部署候选，治理提交不刷新部署候选。只有运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化，才需要重新生成裁剪包并重跑本地构建预检。
+
 预检同时确认 Gate 2 计划中的构建变量要求仍然成立：
 
 - 原计划 Kiosk build 只设置 `VITE_USE_TRTC_CALL=true`。

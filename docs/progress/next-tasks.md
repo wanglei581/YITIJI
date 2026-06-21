@@ -68,8 +68,9 @@
 - [x] **本地门禁：预生产 Gate 3 文档静态门禁执行范围修正**：`verify:file-assets-trial-acceptance` 已明确为 Gate 0 本地/仓库侧静态文档门禁，不再列入预生产裁剪运行时包内 Gate 3 远端命令；不得为了远端运行该脚本把 `docs/` 或 `.ccg/` 加回裁剪包。
 - [x] **本地门禁：历史集成计划静态门禁口径收口**：`docs/superpowers/plans/2026-06-22-file-assets-preprod-integration.md` 已将 `verify:file-assets-trial-acceptance` 从 API runtime gates 中拆出为 Gate 0 本地静态文档门禁，防止后续误按远端裁剪运行时包命令执行；该检查不代表 Gate 2/Gate 3/Gate 4 已执行。
 - [x] **本地预检：预生产 Gate 3 命令清单防回退**：`verify:file-assets-trial-acceptance` 已检查 Gate 3/Gate 4 runbook 中远端 `verify:*` 命令顺序，并确认每条命令存在于 `services/api/package.json`；G3-08 静态证据包防回退已移至 Gate 0 本地执行，G3-09 AuditLog 槽位保留；该检查不代表 Gate 3 已执行。
+- [x] **本地门禁：预生产 Gate 2 部署候选冻结口径**：Gate 2 远端部署候选冻结为 `2187f6a7`，治理提交不刷新部署候选；只有运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化，才重新生成候选包并刷新执行计划。该门禁不代表 Gate 2 已授权或已执行。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
-- [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以 `2187f6a7` 为目标候选执行部署刷新；执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
+- [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以冻结候选 `2187f6a7` 为目标执行部署刷新；治理提交不刷新部署候选，除非运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化。执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
 - [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 通过后，按 `docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md` 执行 G3-01 至 G3-09 自动命令证据、G4-01 至 G4-10 浏览器账号验收；执行前仍需用户确认，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录。
 
 ## P1：工程质量门禁
