@@ -31,7 +31,11 @@ import type { AssistantAction } from '@ai-job-print/shared'
 import { chatWithAssistant } from '../../services/api'
 
 // 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
-const USE_VOICE_CALL = import.meta.env['VITE_USE_TRTC_CALL'] === 'true'
+const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
+
+if (import.meta.env.DEV && !USE_VOICE_CALL) {
+  console.warn('[assistant] 数字人未启用：本地联调数字人需设置 VITE_USE_TRTC_CALL=true。')
+}
 
 // 条件式懒加载：VITE_USE_TRTC_CALL=false 时 Vite 完全排除 AiAdvisorCall 及其 trtc-sdk-v5 依赖
 // Vite 在构建时将 import.meta.env.VITE_USE_TRTC_CALL 替换为字面字符串，Rollup 再做死代码消除

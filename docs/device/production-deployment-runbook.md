@@ -127,7 +127,12 @@ ASR_PROVIDER=disabled
 # apps/kiosk/.env.local、apps/admin/.env.local、apps/partner/.env.local 各自：
 VITE_API_MODE=http
 VITE_API_BASE_URL=/api/v1
+# kiosk 默认启用 AI 助手数字人。缺少 VITE_USE_TRTC_CALL=true 时，生产构建会直接失败，
+# 避免 /assistant 未启用数字人通话入口后线上静默回落文字助手。
+VITE_USE_TRTC_CALL=true
 # kiosk 可选：VITE_TERMINAL_ID=<注册后的 terminalId>、VITE_KIOSK_LOGOUT_IDLE_SEC=180
+# 如本次部署明确只上线文字助手，必须显式设置：
+# VITE_ALLOW_TEXT_ONLY_ASSISTANT=true
 ```
 
 ---

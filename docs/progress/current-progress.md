@@ -42,6 +42,7 @@
 | 2026-06-21 | `codex/jobfairs-list-terminal-priority` / 本分支 | 完成招聘会 / 校园招聘 Branch 1：`JobFairsPage` 读取 `getTerminalId()` 并透传 `getJobFairs(terminalId ? { terminalId } : undefined)`，列表主入口对齐 `/campus` 的本校优先排序；新增静态防回退验证，Kiosk typecheck/lint 和 API `verify:jobfair-campus-priority` 已通过。 |
 | 2026-06-21 | `codex/fair-company-external-activity` / 本分支 | 完成招聘会 / 校园招聘 Branch 2：新增 `fair_company` activity target 且只允许 `external_apply`；服务端仅记录已审核已发布招聘会下的参展企业；`FairCompanyDetailPage` 改为真实来源二维码并记录本人外部入口打开；`/me/activity` 可识别并回跳参展企业详情。 |
 | 2026-06-21 | `codex/jobfair-pages-size-split` / 本分支 | 完成招聘会 / 校园招聘 Branch 3：`CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage` 零行为拆分，主入口文件分别降到 343 / 298 / 197 行；新增并接入 `verify:jobfair-size`，`verify:jobfair-ui` 会先跑尺寸守卫。 |
+| 2026-06-21 | `codex/guard-kiosk-trtc-assistant` / 本分支 | 补 AI 助手数字人生产构建防回退：Kiosk production build 默认要求 `VITE_USE_TRTC_CALL=true`，避免 `/assistant` 未启用数字人通话入口后线上静默回落文字助手；如明确纯文字部署，必须显式设置 `VITE_ALLOW_TEXT_ONLY_ASSISTANT=true`。 |
 
 ## 当前工作区事实
 
