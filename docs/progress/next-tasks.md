@@ -27,6 +27,8 @@
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
 - [ ] 小范围试运营：仅 1 台终端 + 1 台打印机先跑，问题记录按任务闭环处理。
 
+2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
+
 ## P1：渐进式重构首批业务闭环
 
 首批业务闭环不按目录搬家，按可验收业务流推进。
