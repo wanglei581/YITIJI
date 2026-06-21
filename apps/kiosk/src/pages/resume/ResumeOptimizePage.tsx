@@ -80,8 +80,11 @@ export function ResumeOptimizePage() {
 
   // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
   const session = useMemo(() => readAiResumeSession(), [])
-  const taskId = (typeof state?.taskId === 'string' ? state.taskId : undefined) ?? session?.taskId
-  const accessToken = (typeof state?.accessToken === 'string' ? state.accessToken : undefined) ?? session?.accessToken
+  const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
+  const stateTaskId = typeof state?.taskId === 'string' ? state.taskId : undefined
+  const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
+  const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
+  const accessToken = (typeof state?.accessToken === 'string' ? state.accessToken : undefined) ?? (usingSessionTask ? session?.accessToken : undefined)
   const file   = state?.file as { name: string; size: string; format: string } | undefined
   const targetContext = state?.targetContext as ResumeTargetContext | undefined
   const summary = targetSummary(targetContext)

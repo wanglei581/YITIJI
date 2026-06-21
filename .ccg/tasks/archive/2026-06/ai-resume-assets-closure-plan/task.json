@@ -1,0 +1,12 @@
+{
+  "id": "ai-resume-assets-closure-plan",
+  "title": "AI 简历上传与资产中心闭环计划",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "medium",
+  "domain": "frontend-backend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交计划分支",
+  "createdAt": "2026-06-20T17:43:38.215Z",
+  "branch": "codex/ai-resume-assets-closure-plan"
+}

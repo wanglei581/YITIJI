@@ -1,0 +1,12 @@
+{
+  "id": "normalization-ignore-proposal",
+  "title": "项目规范化 T2：E 类本地工具状态 ignore 提案",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "等待用户确认 T3 是否先抽取 P0/P1 内容再写入 ignore",
+  "createdAt": "2026-06-20T23:45:00+08:00",
+  "branch": "codex/normalization-ignore-proposal"
+}

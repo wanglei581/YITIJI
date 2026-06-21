@@ -1,0 +1,12 @@
+{
+  "id": "normalization-external-materials-index",
+  "title": "项目规范化 T5：D 类外部材料索引",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "进入首批业务闭环重构准备",
+  "createdAt": "2026-06-21T00:40:00+08:00",
+  "branch": "codex/normalization-external-materials-index"
+}

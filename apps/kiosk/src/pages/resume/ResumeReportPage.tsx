@@ -48,8 +48,11 @@ export function ResumeReportPage() {
   const { success = true, reason } = state
   // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
   const session = useMemo(() => readAiResumeSession(), [])
-  const taskId = state.taskId ?? session?.taskId
-  const accessToken = state.accessToken ?? session?.accessToken
+  const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
+  const stateTaskId = typeof state.taskId === 'string' ? state.taskId : undefined
+  const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
+  const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
+  const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
   const [report, setReport] = useState<ResumeReport | undefined>(state.report)
   const [providerName, setProviderName] = useState<string | undefined>(state.providerName)
   // Stage 3:OCR 来源(图片/扫描件)的置信度与复核提示,必须如实展示

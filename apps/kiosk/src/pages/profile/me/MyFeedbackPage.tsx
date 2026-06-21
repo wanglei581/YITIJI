@@ -26,6 +26,7 @@ import {
   type FeedbackStatus,
   getMyFeedback,
   getMyFeedbackDetail,
+  MemberFeedbackApiError,
   type MemberFeedbackTicketDetail,
   type MemberFeedbackTicketItem,
 } from '../../../services/api/memberFeedback'
@@ -69,6 +70,11 @@ const emptyForm: FormState = {
   contactPhone: '',
 }
 
+function parseFeedbackCategory(value: string | null): FeedbackCategory | null {
+  if (!value) return null
+  return CATEGORY_OPTIONS.some((option) => option.value === value) ? (value as FeedbackCategory) : null
+}
+
 export function MyFeedbackPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn, getToken } = useAuth()
@@ -83,6 +89,8 @@ export function MyFeedbackPage() {
 
   const canUseRemote = API_MODE === 'http' && Boolean(getToken())
   const selectedId = searchParams.get('ticket')
+  const relatedPrintTaskId = searchParams.get('relatedPrintTaskId')?.trim() ?? ''
+  const categoryFromQuery = parseFeedbackCategory(searchParams.get('category'))
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
@@ -119,6 +127,16 @@ export function MyFeedbackPage() {
       .finally(() => setBusy(null))
   }, [canUseRemote, getToken, selectedId])
 
+  useEffect(() => {
+    if (!relatedPrintTaskId && !categoryFromQuery) return
+    setForm((value) => {
+      const nextCategory = relatedPrintTaskId ? 'print' : (categoryFromQuery ?? value.category)
+      const nextTitle = relatedPrintTaskId && value.title.trim().length === 0 ? '打印订单问题反馈' : value.title
+      if (value.category === nextCategory && value.title === nextTitle) return value
+      return { ...value, category: nextCategory, title: nextTitle }
+    })
+  }, [categoryFromQuery, relatedPrintTaskId])
+
   const refresh = () => setReloadKey((k) => k + 1)
 
   const submit = async () => {
@@ -130,18 +148,23 @@ export function MyFeedbackPage() {
     setBusy('submit')
     try {
       const detail = await createMyFeedback(getToken(), {
-        category: form.category,
+        category: relatedPrintTaskId ? 'print' : form.category,
         title: form.title.trim() || undefined,
         content,
         contactPhone: form.contactPhone.trim() || undefined,
+        relatedPrintTaskId: relatedPrintTaskId || undefined,
       })
       setForm(emptyForm)
       setSelected(detail)
       setSearchParams({ ticket: detail.id })
       setHint('反馈已提交')
       refresh()
-    } catch {
-      setHint('提交失败，请检查登录状态或稍后重试')
+    } catch (error) {
+      if (error instanceof MemberFeedbackApiError && error.code === 'FEEDBACK_PRINT_TASK_INVALID') {
+        setHint('关联打印订单不存在或无权反馈')
+      } else {
+        setHint('提交失败，请检查登录状态或稍后重试')
+      }
     } finally {
       setBusy(null)
     }
@@ -239,6 +262,7 @@ export function MyFeedbackPage() {
                 <select
                   className={inputCls}
                   value={form.category}
+                  disabled={Boolean(relatedPrintTaskId)}
                   onChange={(e) => setForm((v) => ({ ...v, category: e.target.value as FeedbackCategory }))}
                 >
                   {CATEGORY_OPTIONS.map((option) => (
@@ -247,6 +271,7 @@ export function MyFeedbackPage() {
                     </option>
                   ))}
                 </select>
+                {relatedPrintTaskId && <span className="text-xs text-amber-600">关联打印订单时固定为打印服务</span>}
               </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-gray-500">联系电话（选填）</span>
@@ -260,6 +285,13 @@ export function MyFeedbackPage() {
                 />
               </label>
             </div>
+
+            {relatedPrintTaskId && (
+              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+                <p className="text-xs font-semibold text-amber-700">已关联打印订单</p>
+                <p className="mt-1 break-all text-xs text-amber-600">{relatedPrintTaskId}</p>
+              </div>
+            )}
 
             <label className="mt-3 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-gray-500">标题（选填）</span>

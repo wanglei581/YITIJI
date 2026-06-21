@@ -34,10 +34,12 @@ import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
+import { MyResumesPage } from '../pages/profile/me/MyResumesPage'
 import { MyDocumentsPage } from '../pages/profile/me/MyDocumentsPage'
 import { MyFavoritesPage } from '../pages/profile/me/MyFavoritesPage'
 import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
+import { MyAiRecordsPage } from '../pages/profile/me/MyAiRecordsPage'
 import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
 import { MyNotificationsPage } from '../pages/profile/me/MyNotificationsPage'
 import { MyFeedbackPage } from '../pages/profile/me/MyFeedbackPage'
@@ -85,9 +87,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
       // 「我的」明细页（本人 /me/* 真实数据；未登录引导登录，空态诚实，不造假数据）
+      { path: 'me/resumes',        element: <MyResumesPage /> },
       { path: 'me/print-orders',   element: <MyPrintOrdersPage /> },
       { path: 'me/documents',      element: <MyDocumentsPage /> },
       { path: 'me/favorites',      element: <MyFavoritesPage /> },
+      { path: 'me/ai-records',     element: <MyAiRecordsPage /> },
       { path: 'me/benefits',       element: <MyBenefitsPage /> },
       { path: 'me/activity',       element: <MyActivityPage /> },
       { path: 'me/notifications',  element: <MyNotificationsPage /> },

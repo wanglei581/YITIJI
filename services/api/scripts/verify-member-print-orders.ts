@@ -128,16 +128,33 @@ async function main() {
     })
     pass('打印任务夹具已创建（A×3 含1条脏params / B×1 / 匿名×1）')
 
+    const defaultPage = { cursor: null, pageSize: 50 }
+
     // ── 1. 本人可读 + 倒序 ──────────────────────────────────────
-    const listA = await orders.list(userA)
+    const pageA = await orders.list(userA, defaultPage)
+    const listA = pageA.items
     const idsA = listA.map((o) => o.id)
     if (
       listA.length === 3 &&
+      pageA.total === 3 &&
+      pageA.nextCursor === null &&
       idsA[0] === t('a2') && idsA[1] === t('a1') && idsA[2] === t('a_bad') && // createdAt 20 > 10 > 5
       !idsA.includes(t('b1')) && !idsA.includes(t('anon'))
     ) {
-      pass('1. 本人可读 + 倒序：A 读回本人 3 条，按 createdAt 倒序，且不含 B / 匿名任务')
+      pass('1. 本人可读 + 倒序：A 读回本人 3 条分页结果，按 createdAt 倒序，且不含 B / 匿名任务')
     } else fail(`1. A 列表异常：${JSON.stringify(idsA)}`)
+
+    const firstSlice = await orders.list(userA, { cursor: null, pageSize: 2 })
+    const secondSlice = await orders.list(userA, { cursor: firstSlice.nextCursor, pageSize: 2 })
+    const cursorOk =
+      firstSlice.items.map((o) => o.id).join(',') === `${t('a2')},${t('a1')}` &&
+      firstSlice.nextCursor === t('a1') &&
+      firstSlice.total === 3 &&
+      secondSlice.items.map((o) => o.id).join(',') === t('a_bad') &&
+      secondSlice.nextCursor === null &&
+      secondSlice.total === 3
+    if (cursorOk) pass('1b. 游标分页：pageSize=2 时能拿到下一页且无重复')
+    else fail(`1b. 游标分页异常：first=${JSON.stringify(firstSlice)} second=${JSON.stringify(secondSlice)}`)
 
     // ── 2. 安全字段映射 ─────────────────────────────────────────
     const a2 = listA.find((o) => o.id === t('a2'))!
@@ -154,7 +171,7 @@ async function main() {
     } else fail(`2. 字段映射异常：a2=${JSON.stringify(a2)} aBad=${JSON.stringify(aBad)}`)
 
     // ── 3. 跨用户隔离 ───────────────────────────────────────────
-    const listB = await orders.list(userB)
+    const listB = (await orders.list(userB, defaultPage)).items
     const isolationOk =
       listB.length === 1 && listB[0].id === t('b1') &&
       !listB.some((o) => o.id === t('a1') || o.id === t('a2') || o.id === t('a_bad') || o.id === t('anon'))
@@ -162,9 +179,10 @@ async function main() {
     else fail(`3. 跨用户隔离失败：listB=${JSON.stringify(listB.map((o) => o.id))}`)
 
     // ── 4. 空列表返回 [] ────────────────────────────────────────
-    const listC = await orders.list(userC)
-    if (JSON.stringify(listC) === '[]') pass('4. 空列表返回 []（无订单会员 C）')
-    else fail(`4. 空列表未返回 []：${JSON.stringify(listC)}`)
+    const pageC = await orders.list(userC, defaultPage)
+    if (JSON.stringify(pageC.items) === '[]' && pageC.total === 0 && pageC.nextCursor === null) {
+      pass('4. 空列表返回空分页结果（无订单会员 C）')
+    } else fail(`4. 空列表未返回空分页结果：${JSON.stringify(pageC)}`)
 
     // ── 5. 不返回敏感字段 ───────────────────────────────────────
     const allItems = [...listA, ...listB]

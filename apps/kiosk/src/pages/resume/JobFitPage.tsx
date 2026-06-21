@@ -24,7 +24,7 @@ import {
   TrendingUpIcon,
 } from 'lucide-react'
 import { getJobs } from '../../services/api'
-import { analyzeJobFit } from '../../services/api/jobFit'
+import { analyzeJobFit, getLatestJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
@@ -46,8 +46,11 @@ export function JobFitPage() {
   const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
   const session = useMemo(() => readAiResumeSession(), [])
-  const taskId = state.taskId ?? session?.taskId
-  const accessToken = state.accessToken ?? session?.accessToken
+  const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
+  const stateTaskId = typeof state.taskId === 'string' ? state.taskId : undefined
+  const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
+  const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
+  const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
 
   const [tab, setTab] = useState<'pick' | 'manual'>('pick')
   const [keyword, setKeyword] = useState('')
@@ -57,6 +60,7 @@ export function JobFitPage() {
   const [manualTitle, setManualTitle] = useState('')
   const [manualReq, setManualReq] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
+  const [loadingLatest, setLoadingLatest] = useState(Boolean(taskId))
   const [result, setResult] = useState<JobFitResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -72,12 +76,45 @@ export function JobFitPage() {
     return () => { cancelled = true }
   }, [keyword])
 
+  useEffect(() => {
+    setResult(null)
+    setSelectedJob(null)
+    setError(null)
+    if (!taskId) {
+      setLoadingLatest(false)
+      return
+    }
+    let cancelled = false
+    setLoadingLatest(true)
+    getLatestJobFit(taskId, { token: getToken(), accessToken })
+      .then((res) => {
+        if (!cancelled) setResult(res.status === 'completed' ? res : null)
+      })
+      .catch(() => {
+        // 没有历史匹配、已过期或非本人时，保持现有选岗/手填入口。
+        if (!cancelled) setResult(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingLatest(false)
+      })
+    return () => { cancelled = true }
+  }, [taskId, accessToken, getToken])
+
   if (!taskId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
         <AlertCircleIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
         <p className="text-base text-gray-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
         <Button size="lg" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
+      </div>
+    )
+  }
+
+  if (loadingLatest) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+        <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
+        <p className="text-base text-gray-500">正在恢复岗位匹配报告…</p>
       </div>
     )
   }
@@ -197,12 +234,12 @@ export function JobFitPage() {
               <PencilLineIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
               生成优化版简历
             </Button>
-            {result.job?.sourceUrl ? (
+            {result.job?.sourceUrl && selectedJob?.id ? (
               <Button
                 size="lg"
                 variant="secondary"
                 className="h-14 flex-1 text-base"
-                onClick={() => navigate(`/jobs/${selectedJob?.id ?? ''}`)}
+                onClick={() => navigate(`/jobs/${selectedJob.id}`)}
               >
                 <ExternalLinkIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
                 去来源平台投递

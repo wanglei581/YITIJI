@@ -1,0 +1,12 @@
+{
+  "id": "profile-print-feedback-link",
+  "title": "打印订单关联意见反馈",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交分支",
+  "createdAt": "2026-06-21T02:45:00+08:00",
+  "branch": "codex/profile-print-feedback-link"
+}
