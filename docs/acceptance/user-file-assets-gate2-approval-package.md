@@ -39,7 +39,7 @@ Gate 2 不做以下事项：
 
 | 类型 | 路径或对象 | 说明 |
 | --- | --- | --- |
-| 候选包 | `/srv/yitiji-preprod-9146fa1c.tar.gz` | 从本地 commit `9146fa1c` 生成并上传。 |
+| 候选包 | `/srv/yitiji-preprod-9146fa1c.tar.gz` | 从本地 commit `9146fa1c` 生成裁剪运行时归档并上传；不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态。 |
 | 候选包校验 | `/srv/yitiji-preprod-9146fa1c.sha256` | 用于远端 `sha256sum -c`。 |
 | 共享时间戳 | `/srv/yitiji-gate2-ts` | 统一备份目录、失败目录、DB 备份命名。 |
 | 候选目录 | `/srv/ai-job-print-candidate-9146fa1c` | 构建完成前不替换当前应用目录。 |
@@ -52,7 +52,7 @@ Gate 2 不做以下事项：
 | PostgreSQL schema | 仅候选中已审查的 additive migrations | 预期只包含 `20260621154500_file_asset_retention_model` 与 `20260621162500_file_retention_expires_nullable`。 |
 | PM2 | 既有 `ai-job-print-api` 进程 | 仅允许 restart，不新增进程，不打印完整环境变量。 |
 
-本地临时产物允许写入 `/tmp/yitiji-preprod-9146fa1c.tar.gz` 与 `/tmp/yitiji-preprod-9146fa1c.sha256`，仅用于上传到预生产 `/srv`；不得写入仓库或提交到 Git。
+本地临时产物允许写入 `/tmp/yitiji-preprod-9146fa1c.tar.gz` 与 `/tmp/yitiji-preprod-9146fa1c.sha256`，仅用于上传到预生产 `/srv`；不得写入仓库或提交到 Git。归档生成必须使用 `gzip -n -9`，确保 sha256 可复现。
 
 ## 四、禁止修改的远端内容
 

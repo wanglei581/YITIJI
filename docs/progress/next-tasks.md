@@ -60,6 +60,7 @@
 - [ ] **真实生产/试运营执行**：按用户文件与简历资产证据包，使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理、`long_term` 防误删和审计查询全链路，并留存命令日志、浏览器截图、COS 控制台截图和 DB 抽样。
 - [x] **文档产出：商用闭环完成度审计矩阵**：已输出 `docs/acceptance/user-file-assets-commercial-closure-audit.md`，明确哪些能力只是代码/文档候选已具备，哪些仍待 Gate 2/3/4、正式生产、Windows 真机和试运营真实验收；该审计不代表远端执行完成。
 - [x] **文档产出：预生产 Gate 2 执行审批包**：已输出 `docs/acceptance/user-file-assets-gate2-approval-package.md`，把执行前必须确认的目标、非目标、远端允许修改内容、禁止事项、前置确认、验证方式、停止条件、回滚方式和用户确认口径集中到短入口；该审批包不代表 Gate 2 已执行。
+- [x] **本地预检：预生产 Gate 2 候选包**：已输出 `docs/acceptance/user-file-assets-gate2-local-artifact-check.md`，确认完整归档会带入非运行时文档/任务资料，Gate 2 计划已改为裁剪运行时归档并使用 `gzip -n -9` 生成可复现 sha256；该预检不代表上传或远端执行完成。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是目标候选 `9146fa1c`，已按计划停止。
 - [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以 `9146fa1c` 为目标候选执行部署刷新；执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
 - [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 通过后，按 `docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md` 执行 G3-01 至 G3-08 自动命令证据、G4-01 至 G4-10 浏览器账号验收；执行前仍需用户确认，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录。

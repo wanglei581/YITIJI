@@ -4,7 +4,7 @@
 
 **Goal:** Refresh the Baidu Cloud preproduction application package from the current self-reported `6b055d6b` deployment to the file-assets candidate `9146fa1c`, including the candidate's required additive PostgreSQL schema migrations, without changing business data, COS objects, secrets, nginx, DNS, or Windows hardware.
 
-**Architecture:** The preproduction server is not a Git checkout; it is a `local-git-archive` unpacked application directory. Deployment therefore uses a locally generated archive from `9146fa1c`, uploads it to `/srv`, unpacks the candidate, preserves runtime and build-time env files without printing them, installs dependencies, generates both Prisma clients, builds API/Kiosk/Admin, backs up PostgreSQL, applies candidate migrations, atomically renames the current app directory as the rollback copy, promotes the candidate, restarts the existing PM2 process, and validates health plus build fingerprints.
+**Architecture:** The preproduction server is not a Git checkout; it is a `local-git-archive` unpacked application directory. Deployment therefore uses a locally generated pruned runtime archive from `9146fa1c`, uploads it to `/srv`, unpacks the candidate, preserves runtime and build-time env files without printing them, installs dependencies, generates both Prisma clients, builds API/Kiosk/Admin, backs up PostgreSQL, applies candidate migrations, atomically renames the current app directory as the rollback copy, promotes the candidate, restarts the existing PM2 process, and validates health plus build fingerprints.
 
 **Tech Stack:** Git archive, scp/ssh, pnpm workspace, NestJS API, Prisma SQLite/PostgreSQL clients and migrations, pg_dump, React/Vite Kiosk/Admin builds, PM2, PostgreSQL health endpoint.
 
@@ -45,12 +45,16 @@ Expected:
 - `9146fa1c` exists locally.
 - No unrelated uncommitted changes.
 
-- [ ] **Step 2: Generate archive from the candidate commit**
+- [ ] **Step 2: Generate pruned runtime archive from the candidate commit**
 
 Run:
 
 ```bash
-git archive --format=tar --prefix=ai-job-print/ 9146fa1c | gzip -9 > /tmp/yitiji-preprod-9146fa1c.tar.gz
+git archive --format=tar --prefix=ai-job-print/ 9146fa1c -- \
+  package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json \
+  apps services packages \
+  ':(exclude)**/.env.example' \
+  | gzip -n -9 > /tmp/yitiji-preprod-9146fa1c.tar.gz
 (cd /tmp && shasum -a 256 yitiji-preprod-9146fa1c.tar.gz > yitiji-preprod-9146fa1c.sha256)
 ls -lh /tmp/yitiji-preprod-9146fa1c.tar.gz /tmp/yitiji-preprod-9146fa1c.sha256
 ```
@@ -59,7 +63,9 @@ Expected:
 
 - Archive exists outside the repo.
 - sha256 is recorded in the execution record.
-- No `.env`, `node_modules`, `dist`, real user files, logs, screenshots, or secrets are included because `git archive` only packages tracked files.
+- The archive is pruned to build/runtime source paths only: root workspace manifests plus `apps/`, `services/`, and `packages/`.
+- `docs/`, `.ccg/`, `.github/`, `.claude/`, README/agent instruction files, `.env.example`, `.env`, `node_modules`, `dist`, real user files, logs, screenshots, DB backups, and secrets are not included.
+- `gzip -n -9` is used so repeated local generation produces the same bytes and sha256.
 
 ## Task 2: Remote Preflight
 
