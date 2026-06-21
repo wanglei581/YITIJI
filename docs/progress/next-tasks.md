@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-21
+> 最后更新：2026-06-22
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -46,10 +46,10 @@
 - [x] **招聘会 / 校园招聘 Branch 3：大页面零行为拆分**：已拆分 `CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage`，保持路由、接口、文案和行为不变；新增 `verify:jobfair-size` 并接入 `verify:jobfair-ui`，已完成 Claude + Antigravity 双模型审查。
 - [x] **用户文件保存期限 Branch 2：策略服务与清理门禁**：`FileObject.expiresAt` 支持 `long_term` 的 `null` 语义；会员本人可改本人文件保存期限；原始文件首批仅 3/6 个月，`optimized/derived` 成果物可长期，证件/匿名/系统文件保持短期；补 `verify:file-retention` 与 Admin/Kiosk 可空兼容。
 - [x] **用户文件保存期限 Branch 3：Kiosk 文件保存期限 UI**：`/me/documents` 展示当前保存期限和后端允许策略；本人可设置 3 个月 / 6 个月 / 成果物长期保存，6 个月 / 长期保存自动带当前保存条款版本；保存条款版本由 shared/API 本地副本常量收敛并有防回退验证。
+- [x] **用户文件保存期限 Branch 4：Admin 文件生命周期运营视图**：Admin `/files` 复用现有入口展示保存策略、设置来源、同意时间、长期保存数量和即将到期/待清理统计；新增全库只读 `GET /files/lifecycle-summary`，不受列表 `limit=200` 截断；管理员无保存期限修改入口，查看文件兼容 COS 绝对签名 URL。
 
 ## P1：用户文件与简历资产商用闭环后续
 
-- [ ] **Admin 文件生命周期运营视图**：后台展示 `retentionPolicy`、`retentionSetBy`、`retentionConsentAt`、长期保存数量与即将到期文件，不允许管理员代替用户设置长期保存。
 - [ ] **COS 生命周期与隐私文案验收**：确认私有桶生命周期策略不误删 `long_term`，同时把 90/180 天口径和长期保存说明写入用户协议/隐私政策。
 - [ ] **生产/试运营验收**：使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理和审计查询全链路。
 

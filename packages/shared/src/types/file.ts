@@ -168,6 +168,30 @@ export interface FileRetentionUpdateResponse {
   allowedPolicies: FileRetentionPolicy[]
 }
 
+/** Admin 文件生命周期策略分布项。 */
+export interface FileLifecyclePolicyCount {
+  key: FileRetentionPolicy | null
+  count: number
+}
+
+/** Admin 文件生命周期设置来源分布项。 */
+export interface FileLifecycleSetByCount {
+  key: FileRetentionSetBy | null
+  count: number
+}
+
+/** Admin 文件生命周期只读统计响应。 */
+export interface FileLifecycleSummaryResponse {
+  totalActive: number
+  longTermCount: number
+  expiringWithin7Days: number
+  expiringWithin30Days: number
+  expiredPendingCleanup: number
+  byRetentionPolicy: FileLifecyclePolicyCount[]
+  byRetentionSetBy: FileLifecycleSetByCount[]
+  generatedAt: string  // ISO
+}
+
 /** Admin 强制清理过期文件响应。 */
 export interface FileCleanupResponse {
   deletedCount: number

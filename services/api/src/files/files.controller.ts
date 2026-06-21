@@ -47,6 +47,7 @@ import type {
   UploadIntentResponse,
   CompleteUploadResponse,
   FileRetentionUpdateResponse,
+  FileLifecycleSummaryResponse,
 } from './file.types'
 
 /** 本地代理直传单文件上限(防内存打爆;COS 直传不经此路径)。 */
@@ -65,6 +66,7 @@ const RAW_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
  *   GET    /files/:id/preview-url       短期预览 URL(同上)
  *   GET    /files/:id/content?...       签名校验后流式返回(/content 代理,兼容本地 & COS)
  *   GET    /files                       列表(admin)
+ *   GET    /files/lifecycle-summary     文件生命周期全局统计(admin)
  *   PATCH  /files/:id/retention         会员本人修改文件保存期限
  *   DELETE /files/:id?reason=xxx        删除(owner / 会员本人 / admin)
  *   POST   /files/cleanup-expired       admin 立即清理所有已过期文件
@@ -241,6 +243,14 @@ export class FilesController {
       })
     }
     return ApiResponse.ok(response)
+  }
+
+  /** Admin 文件生命周期全局只读统计。 */
+  @Get('lifecycle-summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async lifecycleSummary(): Promise<ApiResponse<FileLifecycleSummaryResponse>> {
+    return ApiResponse.ok(await this.files.lifecycleSummary())
   }
 
   /** 旧端点:重发签名 URL(已登录 User)。 */

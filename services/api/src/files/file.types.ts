@@ -166,6 +166,27 @@ export interface FileRetentionUpdateResponse {
   allowedPolicies: FileRetentionPolicy[]
 }
 
+export interface FileLifecyclePolicyCount {
+  key: FileRetentionPolicy | null
+  count: number
+}
+
+export interface FileLifecycleSetByCount {
+  key: FileRetentionSetBy | null
+  count: number
+}
+
+export interface FileLifecycleSummaryResponse {
+  totalActive: number
+  longTermCount: number
+  expiringWithin7Days: number
+  expiringWithin30Days: number
+  expiredPendingCleanup: number
+  byRetentionPolicy: FileLifecyclePolicyCount[]
+  byRetentionSetBy: FileLifecycleSetByCount[]
+  generatedAt: string
+}
+
 export interface FileCleanupResponse {
   deletedCount: number
   deletedFileIds: string[]

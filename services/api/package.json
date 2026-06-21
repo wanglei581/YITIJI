@@ -42,6 +42,7 @@
     "verify:cos": "tsx scripts/verify-cos-storage.ts",
     "verify:cos:files": "tsx scripts/verify-cos-files.ts",
     "verify:file-retention": "node -r @swc-node/register scripts/verify-file-retention.ts",
+    "verify:file-lifecycle-summary": "node -r @swc-node/register scripts/verify-file-lifecycle-summary.ts",
     "verify:cos:live": "tsx scripts/verify-cos-live.ts",
     "verify:external-video": "tsx scripts/verify-external-video.ts",
     "verify:external-video:e2e": "tsx scripts/verify-external-video-e2e.ts",

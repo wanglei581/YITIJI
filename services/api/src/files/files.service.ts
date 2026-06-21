@@ -8,10 +8,12 @@ import type {
   FileOwnerType,
   FilePurpose,
   FileRetentionPolicy,
+  FileRetentionSetBy,
   FileRetentionUpdateResponse,
   FileSensitiveLevel,
   FileStatus,
   FileUploadResponse,
+  FileLifecycleSummaryResponse,
   SignedUrlResponse,
   FileCleanupResponse,
   UploadIntentResponse,
@@ -34,6 +36,7 @@ import {
   computeRetentionDecision,
   defaultRetentionForUpload,
 } from './retention-policy'
+import { summarizeFileLifecycleRows } from './lifecycle-summary'
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -419,6 +422,29 @@ export class FilesService {
       take: Math.min(args.limit ?? 100, 500),
     })
     return records.map(toMetadata)
+  }
+
+  /** Admin 文件生命周期全局只读统计。 */
+  async lifecycleSummary(now = new Date()): Promise<FileLifecycleSummaryResponse> {
+    const rows = await this.prisma.fileObject.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        retentionPolicy: true,
+        retentionSetBy: true,
+        expiresAt: true,
+      },
+    })
+    return summarizeFileLifecycleRows(
+      rows.map((row) => ({
+        id: row.id,
+        retentionPolicy: row.retentionPolicy as FileRetentionPolicy | null,
+        retentionSetBy: row.retentionSetBy as FileRetentionSetBy | null,
+        expiresAt: row.expiresAt,
+        deletedAt: null,
+      })),
+      now,
+    )
   }
 
   // ── 删除 ────────────────────────────────────────────────────────────────────
