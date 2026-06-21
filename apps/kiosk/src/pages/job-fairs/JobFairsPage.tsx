@@ -15,7 +15,7 @@ import {
   UsersIcon,
   XIcon,
 } from 'lucide-react'
-import { getJobFairs } from '../../services/api'
+import { getJobFairs, getTerminalId } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
@@ -227,8 +227,9 @@ export function JobFairsPage() {
 
   useEffect(() => {
     let cancelled = false
+    const terminalId = getTerminalId()
     setLoading(true); setError(false)
-    getJobFairs()
+    getJobFairs(terminalId ? { terminalId } : undefined)
       .then((res) => { if (!cancelled) { setFairs(res.data); setLoading(false) } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false) } })
     return () => { cancelled = true }
