@@ -12,6 +12,12 @@ import { join } from 'path'
 const repoRoot = join(__dirname, '../../..')
 const acceptancePath = join(repoRoot, 'docs/acceptance/user-file-assets-trial-acceptance.md')
 const gateEvidenceRunbookPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md')
+const gate2RefreshPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md')
+const supersededPreprodExecutionPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-execution.md')
+const gate2ApprovalPackagePath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-approval-package.md')
+const gate2LocalArtifactCheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-local-artifact-check.md')
+const gate2RuntimeBuildCheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-runtime-build-check.md')
+const preprodExecutionRecordPath = join(repoRoot, 'docs/acceptance/user-file-assets-preprod-execution-record.md')
 const checklistPath = join(repoRoot, 'docs/device/production-deployment-and-windows-host-checklist.md')
 const progressPath = join(repoRoot, 'docs/progress/current-progress.md')
 const nextTasksPath = join(repoRoot, 'docs/progress/next-tasks.md')
@@ -24,9 +30,21 @@ const appModulePath = join(repoRoot, 'services/api/src/app.module.ts')
 
 assert.ok(existsSync(acceptancePath), 'must create docs/acceptance/user-file-assets-trial-acceptance.md')
 assert.ok(existsSync(gateEvidenceRunbookPath), 'must create docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md')
+assert.ok(existsSync(gate2RefreshPlanPath), 'must create docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md')
+assert.ok(existsSync(supersededPreprodExecutionPlanPath), 'must keep superseded preprod execution plan with replacement notice')
+assert.ok(existsSync(gate2ApprovalPackagePath), 'must create docs/acceptance/user-file-assets-gate2-approval-package.md')
+assert.ok(existsSync(gate2LocalArtifactCheckPath), 'must create docs/acceptance/user-file-assets-gate2-local-artifact-check.md')
+assert.ok(existsSync(gate2RuntimeBuildCheckPath), 'must create docs/acceptance/user-file-assets-gate2-runtime-build-check.md')
+assert.ok(existsSync(preprodExecutionRecordPath), 'must create docs/acceptance/user-file-assets-preprod-execution-record.md')
 
 const acceptance = readFileSync(acceptancePath, 'utf8')
 const gateEvidenceRunbook = readFileSync(gateEvidenceRunbookPath, 'utf8')
+const gate2RefreshPlan = readFileSync(gate2RefreshPlanPath, 'utf8')
+const supersededPreprodExecutionPlan = readFileSync(supersededPreprodExecutionPlanPath, 'utf8')
+const gate2ApprovalPackage = readFileSync(gate2ApprovalPackagePath, 'utf8')
+const gate2LocalArtifactCheck = readFileSync(gate2LocalArtifactCheckPath, 'utf8')
+const gate2RuntimeBuildCheck = readFileSync(gate2RuntimeBuildCheckPath, 'utf8')
+const preprodExecutionRecord = readFileSync(preprodExecutionRecordPath, 'utf8')
 const checklist = readFileSync(checklistPath, 'utf8')
 const progress = readFileSync(progressPath, 'utf8')
 const nextTasks = readFileSync(nextTasksPath, 'utf8')
@@ -115,6 +133,86 @@ assert.deepEqual(
 for (const command of gate3Commands) {
   assert.ok(apiPackage.scripts?.[command], `Gate 3 verify command must exist in services/api/package.json: ${command}`)
 }
+
+const gate2Candidate = '9a702981'
+const oldGate2Candidate = '9146fa1c'
+const currentGate2Artifact = `yitiji-preprod-${gate2Candidate}.tar.gz`
+const currentGate2Checksum = `yitiji-preprod-${gate2Candidate}.sha256`
+const currentGate2CandidateDir = `ai-job-print-candidate-${gate2Candidate}`
+const currentGate2ApiHashSidecar = `yitiji-api-main-${gate2Candidate}.sha256`
+const forbiddenOldGate2OperationalMarkers = [
+  `yitiji-preprod-${oldGate2Candidate}.tar.gz`,
+  `yitiji-preprod-${oldGate2Candidate}.sha256`,
+  `ai-job-print-candidate-${oldGate2Candidate}`,
+  `yitiji-api-main-${oldGate2Candidate}.sha256`,
+  `commit=${oldGate2Candidate}`,
+  `checkout --detach ${oldGate2Candidate}`,
+]
+
+function assertIncludesAll(source: string, label: string, markers: string[]) {
+  for (const marker of markers) {
+    assert.ok(source.includes(marker), `${label} must mention current Gate 2 candidate marker: ${marker}`)
+  }
+}
+
+function assertNoOldOperationalMarkers(source: string, label: string) {
+  for (const marker of forbiddenOldGate2OperationalMarkers) {
+    assert.ok(!source.includes(marker), `${label} must not contain old Gate 2 operational marker: ${marker}`)
+  }
+}
+
+assertIncludesAll(gate2RefreshPlan, 'Gate 2 refresh plan', [
+  gate2Candidate,
+  `/tmp/${currentGate2Artifact}`,
+  `/srv/${currentGate2Artifact}`,
+  `/tmp/${currentGate2Checksum}`,
+  `/srv/${currentGate2Checksum}`,
+  `/srv/${currentGate2CandidateDir}`,
+  `/srv/${currentGate2ApiHashSidecar}`,
+  `commit=${gate2Candidate}`,
+  `git cat-file -e ${gate2Candidate}^{commit}`,
+])
+assert.doesNotMatch(gate2RefreshPlan, new RegExp(oldGate2Candidate), 'Gate 2 refresh plan must not reference the old candidate')
+
+assertIncludesAll(gate2ApprovalPackage, 'Gate 2 approval package', [
+  `适用候选：\`${gate2Candidate}\``,
+  `/srv/${currentGate2Artifact}`,
+  `/srv/${currentGate2Checksum}`,
+  `/srv/${currentGate2CandidateDir}`,
+  `commit=${gate2Candidate}`,
+  `git cat-file -e ${gate2Candidate}^{commit}`,
+])
+assertNoOldOperationalMarkers(gate2ApprovalPackage, 'Gate 2 approval package')
+
+assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
+  `/ \`${gate2Candidate}\``,
+  `/tmp/${currentGate2Artifact}`,
+  '后续 Gate 2 建议目标候选 9a702981',
+])
+assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
+
+assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [`部署候选 \`${gate2Candidate}\``])
+assert.doesNotMatch(gateEvidenceRunbook, new RegExp(oldGate2Candidate), 'Gate 3/Gate 4 evidence runbook must not reference the old Gate 2 candidate')
+
+assertIncludesAll(gate2RuntimeBuildCheck, 'Gate 2 runtime build check', [
+  `候选 commit：\`${gate2Candidate}\``,
+  `/tmp/${currentGate2Artifact}`,
+  `历史对照：\`${oldGate2Candidate}\``,
+])
+assert.ok(
+  gate2LocalArtifactCheck.includes('历史记录：本文中的 `9146fa1c` 归档命令仅保留为旧候选本地预检证据，后续 Gate 2 不得执行') &&
+    gate2LocalArtifactCheck.includes('以下命令仅为 `9146fa1c` 历史预检命令，已废弃，勿执行') &&
+    gate2LocalArtifactCheck.includes('后续 Gate 2 建议候选已刷新为 `9a702981`') &&
+    gate2LocalArtifactCheck.includes(`/srv/${currentGate2Artifact}`),
+  'Gate 2 local artifact check must mark its old 9146fa1c data as historical and point execution to 9a702981',
+)
+assert.ok(
+  supersededPreprodExecutionPlan.includes(`已被`) &&
+    supersededPreprodExecutionPlan.includes(`2026-06-22-file-assets-preprod-gate2-refresh.md`) &&
+    supersededPreprodExecutionPlan.includes(gate2Candidate) &&
+    supersededPreprodExecutionPlan.includes('以下旧命令仅保留为 `9146fa1c` 历史执行准备记录，已废弃，勿执行'),
+  'superseded preprod execution plan must clearly point operators to the 9a702981 Gate 2 refresh plan',
+)
 
 for (const marker of [
   'user-file-assets-trial-acceptance.md',
