@@ -64,6 +64,7 @@
 | 2026-06-22 | `codex/file-assets-gate2-candidate-guard` / 本分支 | 补齐用户文件与简历资产 Gate 2 候选一致性防回退：`verify:file-assets-trial-acceptance` 会检查操作型 Gate 2 refresh plan、审批包、执行记录、Gate 3/Gate 4 runbook、构建预检和进度入口均指向 `9a702981`，并禁止旧候选 `9146fa1c` 的操作型归档/目录/DEPLOY_SOURCE marker 回流；旧 execution plan 和旧本地归档预检命令均已标记为历史记录、已废弃、勿执行；本分支不连接预生产、不上传候选包、不迁移数据库、不重启 PM2。 |
 | 2026-06-22 | `codex/file-assets-gate2-approval-guard` / 本分支 | 补齐用户文件与简历资产 Gate 2 审批确认口径防回退：`verify:file-assets-trial-acceptance` 会检查审批包保留 `APPROVAL REQUIRED，尚未执行` 状态、机读确认块、用户明确确认前不得执行远端操作、同意范围、不同意范围、Gate 3/Gate 4 另行确认和 Gate 2 不等于试运营或商用闭环完成；本分支只做本地门禁和文档收口，不连接预生产、不上传候选包、不迁移数据库、不重启 PM2。 |
 | 2026-06-22 | `codex/file-assets-gate3-doc-verify-scope` / 本分支 | 修正用户文件与简历资产 Gate 3 文档静态门禁执行范围：`verify:file-assets-trial-acceptance` 依赖完整仓库 `docs/`，已明确为 Gate 0 本地/仓库侧静态门禁，不再列入预生产裁剪运行时包内的 Gate 3 远端命令清单；本分支不把 `docs/` 或 `.ccg/` 加回运行时归档，不连接预生产、不上传候选包、不迁移数据库、不重启 PM2。 |
+| 2026-06-22 | `codex/file-assets-integration-static-gate-scope` / 本分支 | 修正用户文件资产历史集成计划的静态门禁口径：`verify:file-assets-trial-acceptance` 在集成计划中拆出为 Gate 0 本地静态文档门禁，API runtime gates 不再与该 docs-only 命令并列；本分支不连接预生产、不上传候选包、不迁移数据库、不重启 PM2。 |
 
 ## 当前工作区事实
 

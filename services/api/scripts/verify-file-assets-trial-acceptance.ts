@@ -13,6 +13,7 @@ const repoRoot = join(__dirname, '../../..')
 const acceptancePath = join(repoRoot, 'docs/acceptance/user-file-assets-trial-acceptance.md')
 const commercialClosureAuditPath = join(repoRoot, 'docs/acceptance/user-file-assets-commercial-closure-audit.md')
 const gateEvidenceRunbookPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md')
+const preprodIntegrationPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-integration.md')
 const gate2RefreshPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md')
 const supersededPreprodExecutionPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-execution.md')
 const gate2ApprovalPackagePath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-approval-package.md')
@@ -32,6 +33,7 @@ const appModulePath = join(repoRoot, 'services/api/src/app.module.ts')
 assert.ok(existsSync(acceptancePath), 'must create docs/acceptance/user-file-assets-trial-acceptance.md')
 assert.ok(existsSync(commercialClosureAuditPath), 'must create docs/acceptance/user-file-assets-commercial-closure-audit.md')
 assert.ok(existsSync(gateEvidenceRunbookPath), 'must create docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md')
+assert.ok(existsSync(preprodIntegrationPlanPath), 'must keep docs/superpowers/plans/2026-06-22-file-assets-preprod-integration.md')
 assert.ok(existsSync(gate2RefreshPlanPath), 'must create docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md')
 assert.ok(existsSync(supersededPreprodExecutionPlanPath), 'must keep superseded preprod execution plan with replacement notice')
 assert.ok(existsSync(gate2ApprovalPackagePath), 'must create docs/acceptance/user-file-assets-gate2-approval-package.md')
@@ -42,6 +44,7 @@ assert.ok(existsSync(preprodExecutionRecordPath), 'must create docs/acceptance/u
 const acceptance = readFileSync(acceptancePath, 'utf8')
 const commercialClosureAudit = readFileSync(commercialClosureAuditPath, 'utf8')
 const gateEvidenceRunbook = readFileSync(gateEvidenceRunbookPath, 'utf8')
+const preprodIntegrationPlan = readFileSync(preprodIntegrationPlanPath, 'utf8')
 const gate2RefreshPlan = readFileSync(gate2RefreshPlanPath, 'utf8')
 const supersededPreprodExecutionPlan = readFileSync(supersededPreprodExecutionPlanPath, 'utf8')
 const gate2ApprovalPackage = readFileSync(gate2ApprovalPackagePath, 'utf8')
@@ -115,6 +118,28 @@ assert.doesNotMatch(
   commercialClosureAudit,
   /重点确认 `verify:file-assets-trial-acceptance`/,
   'commercial closure audit must not list verify:file-assets-trial-acceptance as a Gate 3 remote focus command',
+)
+assert.ok(
+  preprodIntegrationPlan.includes('Gate 0 本地静态文档门禁') &&
+    preprodIntegrationPlan.includes('完整仓库 `docs/`') &&
+    preprodIntegrationPlan.includes('不属于 Gate 3 远端裁剪运行时包命令清单'),
+  'preprod integration plan must classify verify:file-assets-trial-acceptance as a Gate 0 local docs-only gate',
+)
+assert.doesNotMatch(
+  preprodIntegrationPlan,
+  /在 Gate 3 远端裁剪运行时包执行 `?verify:file-assets-trial-acceptance`?|(?<!不)属于 Gate 3 远端裁剪运行时包命令清单/,
+  'preprod integration plan must not present verify:file-assets-trial-acceptance as a remote trimmed-runtime command',
+)
+const integrationApiGatesStart = preprodIntegrationPlan.indexOf('Run API runtime file asset gates')
+const integrationKioskGatesStart = preprodIntegrationPlan.indexOf('Run Kiosk/Admin gates')
+assert.ok(
+  integrationApiGatesStart >= 0 && integrationKioskGatesStart > integrationApiGatesStart,
+  'preprod integration plan must keep API runtime gates before Kiosk/Admin gates',
+)
+const integrationApiGatesSection = preprodIntegrationPlan.slice(integrationApiGatesStart, integrationKioskGatesStart)
+assert.ok(
+  !integrationApiGatesSection.includes('verify:file-assets-trial-acceptance'),
+  'preprod integration plan must not list local docs-only verify:file-assets-trial-acceptance under API runtime gates',
 )
 
 const gate3SectionStart = gateEvidenceRunbook.indexOf('## 四、Gate 3 自动命令门禁')

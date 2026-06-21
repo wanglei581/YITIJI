@@ -87,10 +87,19 @@ Expected: no unresolved conflict markers, no whitespace errors, and both the fil
 **Files:**
 - No production code changes expected after merge resolution.
 
-- [ ] **Step 1: Run API file asset gates**
+- [ ] **Step 0: Run Gate 0 local static doc check**
+
+`verify:file-assets-trial-acceptance` 是 Gate 0 本地静态文档门禁，依赖完整仓库 `docs/`，只在完整仓库 checkout 中运行；它不属于 Gate 3 远端裁剪运行时包命令清单，不得在裁剪包内执行，也不得为了执行它把 `docs/` 或 `.ccg/` 加回运行时归档。
 
 ```bash
 pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance
+```
+
+Expected: PASS, and it still only proves static evidence-package structure.
+
+- [ ] **Step 1: Run API runtime file asset gates**
+
+```bash
 pnpm --filter @ai-job-print/api verify:production-runtime-gates
 pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy
 pnpm --filter @ai-job-print/api verify:file-retention
