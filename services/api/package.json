@@ -43,6 +43,7 @@
     "verify:cos:files": "tsx scripts/verify-cos-files.ts",
     "verify:cos-lifecycle-policy": "node -r @swc-node/register scripts/verify-cos-lifecycle-policy.ts",
     "verify:file-retention": "node -r @swc-node/register scripts/verify-file-retention.ts",
+    "verify:file-assets-trial-acceptance": "node -r @swc-node/register scripts/verify-file-assets-trial-acceptance.ts",
     "verify:file-lifecycle-summary": "node -r @swc-node/register scripts/verify-file-lifecycle-summary.ts",
     "verify:cos:live": "tsx scripts/verify-cos-live.ts",
     "verify:external-video": "tsx scripts/verify-external-video.ts",

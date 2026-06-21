@@ -48,10 +48,11 @@
 - [x] **用户文件保存期限 Branch 3：Kiosk 文件保存期限 UI**：`/me/documents` 展示当前保存期限和后端允许策略；本人可设置 3 个月 / 6 个月 / 成果物长期保存，6 个月 / 长期保存自动带当前保存条款版本；保存条款版本由 shared/API 本地副本常量收敛并有防回退验证。
 - [x] **用户文件保存期限 Branch 4：Admin 文件生命周期运营视图**：Admin `/files` 复用现有入口展示保存策略、设置来源、同意时间、长期保存数量和即将到期/待清理统计；新增全库只读 `GET /files/lifecycle-summary`，不受列表 `limit=200` 截断；管理员无保存期限修改入口，查看文件兼容 COS 绝对签名 URL。
 - [x] **用户文件保存期限 Branch 5：COS 生命周期与隐私文案验收**：采集点、帮助中心、隐私政策、Admin 文件横幅统一为短期 / 90 天 / 180 天 / 长期保存口径；新增 COS 生命周期合规文档，明确禁止 Bucket 全局过期规则、`long_term` 防误删人工验收和截图存档；新增 `verify:legal-retention-copy` 与 `verify:cos-lifecycle-policy`。
+- [x] **用户文件与简历资产证据包**：新增 `docs/acceptance/user-file-assets-trial-acceptance.md` 和 `verify:file-assets-trial-acceptance`，把生产/试运营验收拆成 PostgreSQL、COS 私有桶、会员账号、上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删、ActivityLog 审计和证据脱敏；静态验证只证明证据包完整，不代表真实生产/试运营执行完成。
 
 ## P1：用户文件与简历资产商用闭环后续
 
-- [ ] **生产/试运营验收**：使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理和审计查询全链路。
+- [ ] **真实生产/试运营执行**：按用户文件与简历资产证据包，使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理、`long_term` 防误删和审计查询全链路，并留存命令日志、浏览器截图、COS 控制台截图和 DB 抽样。
 
 ## P1：工程质量门禁
 
