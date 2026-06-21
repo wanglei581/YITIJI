@@ -46,7 +46,7 @@
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |
-| 主机与时间 | `hostname`、`date`，确认时区 | PASS：主机 `instance-061dyczx`，服务器时间 `2026-06-22 01:53 CST`。 |
+| 主机与时间 | `hostname`、`date`，确认时区 | PASS：主机名已脱敏为 `<PREPROD_HOSTNAME>`，服务器时间 `2026-06-22 01:53 CST`。 |
 | 部署 commit | `/srv/ai-job-print` 下 `git rev-parse --short HEAD` | STOP：`/srv/ai-job-print` 不是 Git 仓库；`DEPLOY_SOURCE.txt` 显示部署源 commit 为 `6b055d6b`，不是目标候选 `9146fa1c`。`DEPLOY_SOURCE.txt` 是部署脚本自报元数据，不等于 Git HEAD 校验；实际运行代码与该 commit 的一致性需在 Gate 2 重新构建/部署时核验。 |
 | 工作区状态 | 服务器工作区不得有不明改动 | N/A：部署目录为 `local-git-archive` 展开目录，无 `.git`；未发现 `/srv` 三层内 `.git` 目录。 |
 | PM2 状态 | `ai-job-print-api` 在线状态 | PASS：PM2 `ai-job-print-api` online，脚本路径 `/srv/ai-job-print/services/api/dist/main.js`，cwd `/srv/ai-job-print/services/api`。 |
@@ -65,6 +65,7 @@ Gate 1 结论：
 > 2026-06-22 已新增 [Gate 2 执行审批包](./user-file-assets-gate2-approval-package.md)：执行前必须按审批包再次确认目标、非目标、远端允许修改内容、禁止事项、验证方式、停止条件和回滚方式。
 > 2026-06-22 已完成 [Gate 2 本地候选包预检](./user-file-assets-gate2-local-artifact-check.md)：完整归档会带入 `docs/` 和 `.ccg/` 等非运行时内容，Gate 2 计划已修正为裁剪运行时归档并使用 `gzip -n -9` 生成可复现 sha256；该预检未连接预生产或修改远端状态。
 > 2026-06-22 已完成 [Gate 2 裁剪包本地构建预检](./user-file-assets-gate2-runtime-build-check.md)：`2187f6a7` 裁剪包在 `/tmp` 解压目录中完成 install、Prisma client 生成、API build、Kiosk build、Admin build；预检确认 Kiosk/Admin 生产构建必须显式设置 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`，Kiosk 还必须显式 `VITE_USE_TRTC_CALL=true`。
+> 2026-06-22 已完成 [Gate 2 执行前只读就绪复核](./user-file-assets-gate2-readiness-recheck.md)：预生产仍自报部署源 `6b055d6b`，本机和公网 health 均为 `db=postgres`，磁盘预算、API env、`node` / `pnpm` / `pg_dump` / `pm2`、PostgreSQL/Redis/Tencent COS 脱敏指纹均满足执行前只读检查；本轮未上传包、未写 `/srv`、未迁移数据库、未重启 PM2。
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |

@@ -20,6 +20,7 @@ const supersededPreprodExecutionPlanPath = join(repoRoot, 'docs/superpowers/plan
 const gate2ApprovalPackagePath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-approval-package.md')
 const gate2LocalArtifactCheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-local-artifact-check.md')
 const gate2RuntimeBuildCheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-runtime-build-check.md')
+const gate2ReadinessRecheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-readiness-recheck.md')
 const preprodExecutionRecordPath = join(repoRoot, 'docs/acceptance/user-file-assets-preprod-execution-record.md')
 const checklistPath = join(repoRoot, 'docs/device/production-deployment-and-windows-host-checklist.md')
 const progressPath = join(repoRoot, 'docs/progress/current-progress.md')
@@ -40,6 +41,7 @@ assert.ok(existsSync(supersededPreprodExecutionPlanPath), 'must keep superseded 
 assert.ok(existsSync(gate2ApprovalPackagePath), 'must create docs/acceptance/user-file-assets-gate2-approval-package.md')
 assert.ok(existsSync(gate2LocalArtifactCheckPath), 'must create docs/acceptance/user-file-assets-gate2-local-artifact-check.md')
 assert.ok(existsSync(gate2RuntimeBuildCheckPath), 'must create docs/acceptance/user-file-assets-gate2-runtime-build-check.md')
+assert.ok(existsSync(gate2ReadinessRecheckPath), 'must create docs/acceptance/user-file-assets-gate2-readiness-recheck.md')
 assert.ok(existsSync(preprodExecutionRecordPath), 'must create docs/acceptance/user-file-assets-preprod-execution-record.md')
 
 const acceptance = readFileSync(acceptancePath, 'utf8')
@@ -51,6 +53,7 @@ const supersededPreprodExecutionPlan = readFileSync(supersededPreprodExecutionPl
 const gate2ApprovalPackage = readFileSync(gate2ApprovalPackagePath, 'utf8')
 const gate2LocalArtifactCheck = readFileSync(gate2LocalArtifactCheckPath, 'utf8')
 const gate2RuntimeBuildCheck = readFileSync(gate2RuntimeBuildCheckPath, 'utf8')
+const gate2ReadinessRecheck = readFileSync(gate2ReadinessRecheckPath, 'utf8')
 const preprodExecutionRecord = readFileSync(preprodExecutionRecordPath, 'utf8')
 const checklist = readFileSync(checklistPath, 'utf8')
 const progress = readFileSync(progressPath, 'utf8')
@@ -276,6 +279,12 @@ for (const marker of [
 ]) {
   assert.ok(gate2RefreshPlan.includes(marker), `Gate 2 refresh plan must define candidate-freeze marker: ${marker}`)
 }
+assert.ok(
+  gate2RefreshPlan.includes('"TENCENT_COS_BUCKET"') &&
+    gate2RefreshPlan.includes('"TENCENT_COS_REGION"') &&
+    !/"COS_BUCKET"|"COS_REGION"/.test(gate2RefreshPlan),
+  'Gate 2 refresh plan must fingerprint runtime Tencent COS keys, not generic COS_BUCKET/COS_REGION keys',
+)
 for (const [label, source] of [
   ['Gate 2 approval package', gate2ApprovalPackage],
   ['Gate 2 runtime build check', gate2RuntimeBuildCheck],
@@ -404,6 +413,31 @@ assert.ok(
     gate2LocalArtifactCheck.includes(`后续 Gate 2 建议候选已刷新为 \`${gate2Candidate}\``) &&
     gate2LocalArtifactCheck.includes(`/srv/${currentGate2Artifact}`),
   'Gate 2 local artifact check must mark its old 9146fa1c data as historical and point execution to the current Gate 2 candidate',
+)
+assertIncludesAll(gate2ReadinessRecheck, 'Gate 2 readiness recheck', [
+  'READ-ONLY RECHECK ONLY',
+  'Gate 2 尚未执行',
+  gate2Candidate,
+  '6b055d6b',
+  'STATIC DOC CHECK ONLY',
+  'db=postgres',
+  'FILE_STORAGE_DRIVER',
+  'TENCENT_COS_BUCKET',
+  'TENCENT_COS_REGION',
+  'NODE_ENV',
+  'staging',
+  '未上传',
+  '未写入 `/srv`',
+  '未迁移数据库',
+  '未重启 PM2',
+])
+assertNoOldOperationalMarkers(gate2ReadinessRecheck, 'Gate 2 readiness recheck')
+assertNoGovernanceCommitOperationalMarkers(gate2ReadinessRecheck, 'Gate 2 readiness recheck')
+assert.ok(
+  preprodExecutionRecord.includes('Gate 2 执行前只读就绪复核') &&
+    preprodExecutionRecord.includes('user-file-assets-gate2-readiness-recheck.md') &&
+    preprodExecutionRecord.includes('未上传包、未写 `/srv`、未迁移数据库、未重启 PM2'),
+  'preprod execution record must link the Gate 2 readiness recheck without implying execution',
 )
 assert.ok(
   supersededPreprodExecutionPlan.includes(`已被`) &&

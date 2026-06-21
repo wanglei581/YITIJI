@@ -128,7 +128,7 @@ const env = Object.fromEntries(fs.readFileSync(envPath, "utf8").split(/\r?\n/).f
   const idx = line.indexOf("=");
   return idx === -1 ? [line, ""] : [line.slice(0, idx), line.slice(idx + 1)];
 }));
-const keys = ["DATABASE_URL", "POSTGRES_URL", "REDIS_URL", "FILE_STORAGE_DRIVER", "COS_BUCKET", "COS_REGION", "NODE_ENV"];
+const keys = ["DATABASE_URL", "POSTGRES_URL", "REDIS_URL", "FILE_STORAGE_DRIVER", "TENCENT_COS_BUCKET", "TENCENT_COS_REGION", "NODE_ENV"];
 for (const key of keys) {
   const value = env[key] || "";
   const fingerprint = value ? crypto.createHash("sha256").update(value).digest("hex").slice(0, 10) : "missing";
@@ -146,6 +146,7 @@ Expected:
 
 - `DATABASE_URL` hint is `postgres`, or `POSTGRES_URL` is present and `postgres`; Prisma PostgreSQL migration target is `POSTGRES_URL ?? DATABASE_URL`.
 - `FILE_STORAGE_DRIVER` hint is `cos`.
+- `TENCENT_COS_BUCKET` and `TENCENT_COS_REGION` are present. These are the runtime keys used by `StorageService`; generic `COS_BUCKET` / `COS_REGION` are not authoritative for this codebase.
 - `NODE_ENV` hint is acceptable for current preproduction startup policy.
 - The output contains no URLs, passwords, usernames, secret IDs, secret keys, bucket full names, or tokens.
 
