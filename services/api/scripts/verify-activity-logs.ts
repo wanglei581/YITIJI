@@ -4,16 +4,17 @@
  *  1. 会员浏览已发布岗位 → BrowseLog 落库（服务端补齐来源快照）→ /me/browse-logs 可见
  *  2. 会员岗位外部跳转 → ExternalJumpLog(action=external_apply) 落库 → /me/external-jump-logs 可见
  *  3. 招聘会浏览 / 外部预约跳转（external_appointment）记录可见
- *  4. 政策浏览 / 官方入口（external_open）跳转记录可见（政策无 externalId，如实 null）
- *  5. 跨会员隔离：A 看不到 B 的记录；A 删 B 的记录统一 404
- *  6. 未发布 / 不存在 target → 拒绝记录（404），不产生任何行
- *  7. 非法 targetType / 动作与目标不匹配 → 400 拒绝
- *  8. 删除本人记录（controller 路径）→ 列表不再返回 + 审计落库
- *  9. 浏览去重：30 分钟窗口内同目标重复浏览不刷行；列表 JSON 无投递/预约/筛选/候选人状态字段
- * 10. 匿名上报（controller 路径，无 Authorization）→ recorded:false 且零落库
- * 11. 禁词扫描（本轮触达的前后端文件无违规状态文案）
+ *  4. 参展企业外部投递入口（fair_company + external_apply）记录可见
+ *  5. 政策浏览 / 官方入口（external_open）跳转记录可见（政策无 externalId，如实 null）
+ *  6. 跨会员隔离：A 看不到 B 的记录；A 删 B 的记录统一 404
+ *  7. 未发布 / 不存在 target → 拒绝记录（404），不产生任何行
+ *  8. 非法 targetType / 动作与目标不匹配 → 400 拒绝
+ *  9. 删除本人记录（controller 路径）→ 列表不再返回 + 审计落库
+ * 10. 浏览去重：30 分钟窗口内同目标重复浏览不刷行；列表 JSON 无投递/预约/筛选/候选人状态字段
+ * 11. 匿名上报（controller 路径，无 Authorization）→ recorded:false 且零落库
+ * 12. 禁词扫描（本轮触达的前后端文件无违规状态文案）
  *     + 前端封装 fire-and-forget（记录失败不阻断主流程）
- * 12. TTL 清理 cron：过期行被物理删除
+ * 13. TTL 清理 cron：过期行被物理删除
  *
  * 运行：pnpm --filter @ai-job-print/api verify:activity-logs
  */
@@ -69,6 +70,8 @@ async function main() {
   let userB = ''
   let jobId = ''
   let fairId = ''
+  let fairCompanyId = ''
+  let draftFairCompanyId = ''
   let policyId = ''
   let draftJobId = ''
 
@@ -103,6 +106,32 @@ async function main() {
       },
     })
     fairId = fair.id
+    const fairCompany = await prisma.fairCompany.create({
+      data: {
+        jobFairId: fair.id,
+        name: `参展企业${tag}`,
+        industry: '互联网/软件',
+        scale: '50-500',
+        sourceUrl: 'https://example.com/fair-company',
+      },
+    })
+    fairCompanyId = fairCompany.id
+    const draftFair = await prisma.jobFair.create({
+      data: {
+        sourceOrgId: orgId, externalId: `ext-draft-fair-${tag}`, sourceName: '来源平台乙',
+        sourceUrl: 'https://example.com/draft-fair', title: `未发布招聘会${tag}`, venue: '会展中心', city: '青岛',
+        startAt: new Date(), endAt: new Date(Date.now() + 86400_000),
+        reviewStatus: 'pending', publishStatus: 'draft',
+      },
+    })
+    const draftFairCompany = await prisma.fairCompany.create({
+      data: {
+        jobFairId: draftFair.id,
+        name: `未发布参展企业${tag}`,
+        sourceUrl: 'https://example.com/draft-fair-company',
+      },
+    })
+    draftFairCompanyId = draftFairCompany.id
     const policy = await prisma.policyPost.create({
       data: {
         sourceOrgId: orgId, sourceName: '人社局', kind: 'policy_guide', title: `就业补贴指引${tag}`,
@@ -139,58 +168,73 @@ async function main() {
     if (!fairJumps.items.some((x) => x.targetId === fairId && x.action === 'external_appointment')) fail('3. 预约跳转记录应可见')
     pass('3. 招聘会浏览 / 外部预约跳转记录可见（targetType 过滤生效）')
 
-    // ── 4. 政策浏览 + 官方入口跳转 ───────────────────────────
+    // ── 4. 参展企业外部投递入口跳转 ─────────────────────────
+    await activity.recordJump(userA, 'fair_company', fairCompanyId, 'external_apply', null)
+    const fairCompanyJumps = await activity.listJumps(userA, PAGE, 'fair_company')
+    const fc4 = fairCompanyJumps.items.find((x) => x.targetId === fairCompanyId)
+    if (!fc4 || fc4.action !== 'external_apply') fail('4. 参展企业投递入口跳转记录应可见且 action=external_apply')
+    if (fc4.targetTitle !== `参展企业${tag}`) fail('4. 参展企业跳转 targetTitle 应取 FairCompany.name')
+    if (fc4.sourceName !== '来源平台乙') fail('4. 参展企业跳转 sourceName 应取父招聘会来源')
+    if (fc4.sourceUrl !== 'https://example.com/fair-company') fail('4. 参展企业跳转 sourceUrl 应取企业来源链接')
+    if (fc4.externalId !== fairId) fail('4. 参展企业跳转 externalId 应保存父级 JobFair.id 以支持详情回跳')
+    pass('4. 参展企业外部投递入口 → ExternalJumpLog 落库 → 列表可见')
+
+    // ── 5. 政策浏览 + 官方入口跳转 ───────────────────────────
     await activity.recordBrowse(userA, 'policy', policyId, null)
     await activity.recordJump(userA, 'policy', policyId, 'external_open', null)
     const polJumps = await activity.listJumps(userA, PAGE, 'policy')
     const p4 = polJumps.items.find((x) => x.targetId === policyId)
-    if (!p4 || p4.action !== 'external_open') fail('4. 政策官方入口跳转记录应可见')
-    if (p4.externalId !== null) fail('4. 政策无外部编号，应如实 null')
-    if (p4.sourceUrl !== 'https://example.gov.cn/policy') fail('4. 政策官方入口 URL 快照错误')
-    pass('4. 政策浏览 / 官方入口跳转记录可见（externalId 如实 null）')
+    if (!p4 || p4.action !== 'external_open') fail('5. 政策官方入口跳转记录应可见')
+    if (p4.externalId !== null) fail('5. 政策无外部编号，应如实 null')
+    if (p4.sourceUrl !== 'https://example.gov.cn/policy') fail('5. 政策官方入口 URL 快照错误')
+    pass('5. 政策浏览 / 官方入口跳转记录可见（externalId 如实 null）')
 
-    // ── 5. 跨会员隔离 ────────────────────────────────────────
+    // ── 6. 跨会员隔离 ────────────────────────────────────────
     const bBrowse = await activity.listBrowse(userB, PAGE)
     const bJumps = await activity.listJumps(userB, PAGE)
-    if (bBrowse.total !== 0 || bJumps.total !== 0) fail('5. B 不应看到 A 的记录')
+    if (bBrowse.total !== 0 || bJumps.total !== 0) fail('6. B 不应看到 A 的记录')
     const aBrowseId = row1.id
-    await expectStatus(activity.deleteBrowse(userB, aBrowseId), 404, '5. B 删 A 的记录')
-    pass('5. 跨会员隔离：B 看不到 A 的记录；删他人记录统一 404')
+    await expectStatus(activity.deleteBrowse(userB, aBrowseId), 404, '6. B 删 A 的记录')
+    pass('6. 跨会员隔离：B 看不到 A 的记录；删他人记录统一 404')
 
-    // ── 6. 未发布 / 不存在 target ────────────────────────────
-    await expectStatus(activity.recordBrowse(userA, 'job', draftJobId, null), 404, '6. 未发布岗位浏览')
-    await expectStatus(activity.recordJump(userA, 'job', draftJobId, 'external_apply', null), 404, '6. 未发布岗位跳转')
-    await expectStatus(activity.recordBrowse(userA, 'job', 'no-such-id', null), 404, '6. 不存在岗位')
+    // ── 7. 未发布 / 不存在 target ────────────────────────────
+    await expectStatus(activity.recordBrowse(userA, 'job', draftJobId, null), 404, '7. 未发布岗位浏览')
+    await expectStatus(activity.recordJump(userA, 'job', draftJobId, 'external_apply', null), 404, '7. 未发布岗位跳转')
+    await expectStatus(activity.recordJump(userA, 'fair_company', draftFairCompanyId, 'external_apply', null), 404, '7. 未发布招聘会下的参展企业跳转')
+    await expectStatus(activity.recordBrowse(userA, 'job', 'no-such-id', null), 404, '7. 不存在岗位')
     const draftRows = await prisma.browseLog.count({ where: { targetId: draftJobId } })
-    if (draftRows !== 0) fail('6. 未发布目标不应产生任何行')
-    pass('6. 未发布 / 不存在 target 拒绝记录（404），零落库')
+    if (draftRows !== 0) fail('7. 未发布目标不应产生任何行')
+    const draftCompanyRows = await prisma.externalJumpLog.count({ where: { targetId: draftFairCompanyId } })
+    if (draftCompanyRows !== 0) fail('7. 未发布招聘会下的参展企业不应产生跳转行')
+    pass('7. 未发布 / 不存在 target 拒绝记录（404），零落库')
 
-    // ── 7. 非法 targetType / action ──────────────────────────
-    await expectStatus(activity.recordBrowse(userA, 'company', jobId, null), 400, '7. 非法 targetType')
-    await expectStatus(activity.recordJump(userA, 'job', jobId, 'external_appointment', null), 400, '7. 动作与目标不匹配')
-    await expectStatus(activity.recordJump(userA, 'job', jobId, 'apply_done', null), 400, '7. 非法 action')
-    await expectStatus(activity.listBrowse(userA, PAGE, 'candidate'), 400, '7. 非法列表过滤')
-    pass('7. 非法 targetType / action 被拒绝（400）')
+    // ── 8. 非法 targetType / action ──────────────────────────
+    await expectStatus(activity.recordBrowse(userA, 'company', jobId, null), 400, '8. 非法 targetType')
+    await expectStatus(activity.recordJump(userA, 'job', jobId, 'external_appointment', null), 400, '8. 动作与目标不匹配')
+    await expectStatus(activity.recordJump(userA, 'fair_company', fairCompanyId, 'external_appointment', null), 400, '8. 参展企业动作与目标不匹配')
+    await expectStatus(activity.recordJump(userA, 'job', jobId, 'apply_done', null), 400, '8. 非法 action')
+    await expectStatus(activity.listBrowse(userA, PAGE, 'candidate'), 400, '8. 非法列表过滤')
+    pass('8. 非法 targetType / action 被拒绝（400）')
 
-    // ── 8. controller 删除 + 审计 ────────────────────────────
+    // ── 9. controller 删除 + 审计 ────────────────────────────
     const delJump = jumps2.items.find((x) => x.targetId === jobId)!
     await meController.deleteJumpLog({ endUserId: userA, sessionId: 's' }, delJump.id, { headers: {} })
     const jumpsAfter = await activity.listJumps(userA, PAGE, 'job')
-    if (jumpsAfter.items.some((x) => x.id === delJump.id)) fail('8. 删除后列表不应返回')
+    if (jumpsAfter.items.some((x) => x.id === delJump.id)) fail('9. 删除后列表不应返回')
     const auditRow = await prisma.auditLog.findFirst({
       where: { action: 'member.external_jump_log_delete', targetId: delJump.id },
     })
-    if (!auditRow || !auditRow.payloadJson.includes(userA)) fail('8. 删除应写审计（payload 含 endUserId）')
+    if (!auditRow || !auditRow.payloadJson.includes(userA)) fail('9. 删除应写审计（payload 含 endUserId）')
     await meController.deleteBrowseLog({ endUserId: userA, sessionId: 's' }, aBrowseId, { headers: {} })
     const browseAfter = await activity.listBrowse(userA, PAGE, 'job')
-    if (browseAfter.items.some((x) => x.id === aBrowseId)) fail('8. 浏览记录删除后不应返回')
-    pass('8. 删除本人记录（真实 controller 路径）→ 列表不返回 + 审计落库')
+    if (browseAfter.items.some((x) => x.id === aBrowseId)) fail('9. 浏览记录删除后不应返回')
+    pass('9. 删除本人记录（真实 controller 路径）→ 列表不返回 + 审计落库')
 
-    // ── 9. 浏览去重 + 响应无状态字段 ─────────────────────────
+    // ── 10. 浏览去重 + 响应无状态字段 ────────────────────────
     const d1 = await activity.recordBrowse(userA, 'job_fair', fairId, null)
-    if (!d1.deduped) fail('9. 30 分钟内重复浏览应去重')
+    if (!d1.deduped) fail('10. 30 分钟内重复浏览应去重')
     const dedupCount = await prisma.browseLog.count({ where: { endUserId: userA, targetId: fairId } })
-    if (dedupCount !== 1) fail('9. 去重后应仍为单行')
+    if (dedupCount !== 1) fail('10. 去重后应仍为单行')
     const allJson = JSON.stringify([await activity.listBrowse(userA, PAGE), await activity.listJumps(userA, PAGE)])
     for (const banned of [
       w('application', 'Status'),
@@ -204,24 +248,24 @@ async function main() {
       w('预约', '成功'),
       '筛选',
     ]) {
-      if (allJson.includes(banned)) fail(`9. 响应 JSON 含违规字段/文案: ${banned}`)
+      if (allJson.includes(banned)) fail(`10. 响应 JSON 含违规字段/文案: ${banned}`)
     }
-    pass('9. 浏览 30 分钟去重；响应 JSON 无投递/预约/筛选/候选人状态字段')
+    pass('10. 浏览 30 分钟去重；响应 JSON 无投递/预约/筛选/候选人状态字段')
 
-    // ── 10. 匿名上报（controller 路径）──────────────────────
+    // ── 11. 匿名上报（controller 路径）──────────────────────
     const beforeBrowse = await prisma.browseLog.count()
     const beforeJump = await prisma.externalJumpLog.count()
     const anon1 = await postController.browse({ targetType: 'job', targetId: jobId }, { headers: {} })
     const anon2 = await postController.externalJump({ targetType: 'job', targetId: jobId, action: 'external_apply' }, { headers: {} })
     const anonData1 = (anon1 as { data: { recorded: boolean } }).data
     const anonData2 = (anon2 as { data: { recorded: boolean } }).data
-    if (anonData1.recorded !== false || anonData2.recorded !== false) fail('10. 匿名应诚实返回 recorded:false')
+    if (anonData1.recorded !== false || anonData2.recorded !== false) fail('11. 匿名应诚实返回 recorded:false')
     if ((await prisma.browseLog.count()) !== beforeBrowse || (await prisma.externalJumpLog.count()) !== beforeJump) {
-      fail('10. 匿名上报不应落库')
+      fail('11. 匿名上报不应落库')
     }
-    pass('10. 匿名上报 → recorded:false 且零落库（共享一体机不留影子记录）')
+    pass('11. 匿名上报 → recorded:false 且零落库（共享一体机不留影子记录）')
 
-    // ── 11. 禁词扫描 + 前端 fire-and-forget ──────────────────
+    // ── 12. 禁词扫描 + 前端 fire-and-forget ──────────────────
     const repoRoot = join(__dirname, '..', '..', '..')
     const scanFiles = [
       'services/api/src/activity/activity.service.ts',
@@ -232,6 +276,7 @@ async function main() {
       'apps/kiosk/src/pages/profile/ProfilePage.tsx',
       'apps/kiosk/src/pages/jobs/JobDetailPage.tsx',
       'apps/kiosk/src/pages/job-fairs/JobFairDetailPage.tsx',
+      'apps/kiosk/src/pages/job-fairs/FairCompanyDetailPage.tsx',
       'apps/kiosk/src/pages/job-fairs/JobFairsPage.tsx',
       'apps/kiosk/src/pages/campus/CampusPage.tsx',
       'apps/kiosk/src/pages/renshi/RenshiPage.tsx',
@@ -272,23 +317,23 @@ async function main() {
         .replaceAll('登录用户', '')
         .replaceAll('记录用于', '')
       for (const w of bannedCopy) {
-        if (content.includes(w)) fail(`11. ${f} 含违规状态文案「${w}」`)
+        if (content.includes(w)) fail(`12. ${f} 含违规状态文案「${w}」`)
       }
     }
     const kioskApi = readFileSync(join(repoRoot, 'apps/kiosk/src/services/api/activity.ts'), 'utf8')
-    if (!kioskApi.includes('.catch(() => {')) fail('11. 前端上报封装必须吞掉失败（fire-and-forget）')
-    if (!/recordBrowse[\s\S]{0,200}?\): void/.test(kioskApi)) fail('11. recordBrowse 应为 void（调用方不可 await 阻塞）')
-    pass('11. 禁词扫描通过；前端上报 fire-and-forget（记录失败不阻断主流程）')
+    if (!kioskApi.includes('.catch(() => {')) fail('12. 前端上报封装必须吞掉失败（fire-and-forget）')
+    if (!/recordBrowse[\s\S]{0,200}?\): void/.test(kioskApi)) fail('12. recordBrowse 应为 void（调用方不可 await 阻塞）')
+    pass('12. 禁词扫描通过；前端上报 fire-and-forget（记录失败不阻断主流程）')
 
-    // ── 12. TTL 清理 ─────────────────────────────────────────
+    // ── 13. TTL 清理 ─────────────────────────────────────────
     const expired = await prisma.browseLog.create({
       data: { endUserId: userA, targetType: 'job', targetId: jobId, expiresAt: new Date(Date.now() - 1000) },
     })
     const listBeforeCleanup = await activity.listBrowse(userA, PAGE)
-    if (listBeforeCleanup.items.some((x) => x.id === expired.id)) fail('12. 过期行不应出现在列表')
+    if (listBeforeCleanup.items.some((x) => x.id === expired.id)) fail('13. 过期行不应出现在列表')
     await activity.cleanupExpired()
-    if (await prisma.browseLog.findFirst({ where: { id: expired.id } })) fail('12. cron 应物理清理过期行')
-    pass('12. 过期行列表不可见且 cron 物理清理')
+    if (await prisma.browseLog.findFirst({ where: { id: expired.id } })) fail('13. cron 应物理清理过期行')
+    pass('13. 过期行列表不可见且 cron 物理清理')
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {
@@ -298,6 +343,7 @@ async function main() {
     await prisma.browseLog.deleteMany({ where: { endUserId: { in: [userA, userB].filter(Boolean) } } }).catch(() => undefined)
     await prisma.externalJumpLog.deleteMany({ where: { endUserId: { in: [userA, userB].filter(Boolean) } } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { action: { in: ['member.browse_log_delete', 'member.external_jump_log_delete'] }, payloadJson: { contains: userA } } }).catch(() => undefined)
+    await prisma.fairCompany.deleteMany({ where: { id: { in: [fairCompanyId, draftFairCompanyId].filter(Boolean) } } }).catch(() => undefined)
     await prisma.job.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.jobFair.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.policyPost.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)

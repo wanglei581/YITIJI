@@ -24,6 +24,10 @@ import {
   XIcon,
 } from 'lucide-react'
 import { getFairCompanyById } from '../../services/api'
+import { recordExternalJump } from '../../services/api/activity'
+import { SourceUrlQr } from '../../components/SourceUrlQr'
+import { isValidSourceUrl } from '../../lib/url'
+import { useAuth } from '../../auth/useAuth'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +74,15 @@ const INDUSTRY_GRADIENT: Record<string, string> = {
 
 // ─── QR overlay ───────────────────────────────────────────────────────────────
 
-function QrOverlay({ companyName, onClose }: { companyName: string; onClose: () => void }) {
+function QrOverlay({
+  companyName,
+  sourceUrl,
+  onClose,
+}: {
+  companyName: string
+  sourceUrl: string | undefined
+  onClose: () => void
+}) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -88,11 +100,8 @@ function QrOverlay({ companyName, onClose }: { companyName: string; onClose: () 
         </button>
         <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台</p>
         <p className="mt-1 text-center text-xs text-gray-400">{companyName}</p>
-        <div className="mx-auto mt-5 flex h-44 w-44 items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50">
-          <div className="flex flex-col items-center gap-2 text-gray-300">
-            <QrCodeIcon className="h-16 w-16" />
-            <span className="text-xs">二维码由来源平台生成</span>
-          </div>
+        <div className="mt-5 flex justify-center">
+          <SourceUrlQr value={sourceUrl} size={180} />
         </div>
         <div className="mt-5 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2.5">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
@@ -221,16 +230,17 @@ function CompanyInfoCard({ company }: { company: FairCompanyDTO }) {
 // ─── Action bar ───────────────────────────────────────────────────────────────
 
 interface ActionBarProps {
-  company:          FairCompanyDTO
+  sourceCanApply:   boolean
   onScanQr:         () => void
+  onOpenSource:     () => void
   onPrintProfile:   () => void
   onPrintPositions: () => void
 }
 
-function ActionBar({ company, onScanQr, onPrintProfile, onPrintPositions }: ActionBarProps) {
+function ActionBar({ sourceCanApply, onScanQr, onOpenSource, onPrintProfile, onPrintPositions }: ActionBarProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Button size="lg" onClick={onScanQr} className="flex min-h-[56px] items-center justify-center gap-2">
+      <Button size="lg" onClick={onScanQr} disabled={!sourceCanApply} className="flex min-h-[56px] items-center justify-center gap-2">
         <QrCodeIcon className="h-4 w-4" />
         扫码投递
       </Button>
@@ -238,8 +248,8 @@ function ActionBar({ company, onScanQr, onPrintProfile, onPrintPositions }: Acti
         size="lg"
         variant="secondary"
         className="flex min-h-[56px] items-center justify-center gap-2"
-        onClick={() => company.sourceUrl && window.open(company.sourceUrl, '_blank', 'noopener')}
-        disabled={!company.sourceUrl}
+        onClick={onOpenSource}
+        disabled={!sourceCanApply}
       >
         <ExternalLinkIcon className="h-4 w-4" />
         去来源平台投递
@@ -466,6 +476,7 @@ export function FairCompanyDetailPage() {
   const navigate = useNavigate()
   const { id, companyId } = useParams<{ id: string; companyId: string }>()
   const location = useLocation()
+  const { getToken } = useAuth()
   const fairId   = id ?? ''
 
   const stateCompany  = (location.state as { company?: FairCompanyDTO } | null)?.company
@@ -536,6 +547,12 @@ export function FairCompanyDetailPage() {
     navigate('/print/preview', { state: { file, returnUrl, returnLabel } })
   }
 
+  const openApplyQr = () => {
+    if (!company || !isValidSourceUrl(company.sourceUrl)) return
+    recordExternalJump(getToken(), 'fair_company', company.id, 'external_apply')
+    setShowQr(true)
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -558,7 +575,7 @@ export function FairCompanyDetailPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      {showQr && <QrOverlay companyName={company.companyName} onClose={() => setShowQr(false)} />}
+      {showQr && <QrOverlay companyName={company.companyName} sourceUrl={company.sourceUrl} onClose={() => setShowQr(false)} />}
 
       {/* Page header */}
       <div className="border-b border-gray-100 bg-white px-6 pt-4 pb-3">
@@ -580,8 +597,9 @@ export function FairCompanyDetailPage() {
       <div className="flex flex-1 flex-col gap-4 px-6 py-5 pb-8">
         <CompanyInfoCard company={company} />
         <ActionBar
-          company={company}
-          onScanQr={() => setShowQr(true)}
+          sourceCanApply={isValidSourceUrl(company.sourceUrl)}
+          onScanQr={openApplyQr}
+          onOpenSource={openApplyQr}
           onPrintProfile={handlePrintProfile}
           onPrintPositions={handlePrintPositions}
         />

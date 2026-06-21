@@ -1,6 +1,6 @@
 // ============================================================
 // 我的浏览 / 外部跳转记录 — /me/browse-logs + /me/external-jump-logs（本人）。
-// 两 Tab 合一：浏览记录 / 外部跳转记录。数据跨类型（岗位 / 招聘会 / 政策 / 企业）。
+// 两 Tab 合一：浏览记录 / 外部跳转记录。数据跨类型（岗位 / 招聘会 / 政策 / 企业 / 参展企业）。
 //
 // 合规（CLAUDE.md §2/§10）：只记录「浏览」与「打开来源平台 / 官方入口」这一动作本身；
 // 文案统一用「打开来源入口 / 官方入口」，绝不写「投递结果 / 预约结果 / 凭证」；
@@ -27,6 +27,7 @@ const TYPE_LABEL: Record<ActivityTargetType, string> = {
   job_fair: '招聘会',
   policy: '政策',
   company_profile: '企业',
+  fair_company: '参展企业',
 }
 
 // 跳转动作 → 中性「入口」措辞（不出现投递 / 预约 / 凭证）。
@@ -36,7 +37,7 @@ const ACTION_LABEL: Record<ActivityJumpAction, string> = {
   external_open: '官方入口',
 }
 
-function detailRoute(targetType: ActivityTargetType, targetId: string): string {
+function detailRoute(targetType: ActivityTargetType, targetId: string, externalId?: string | null): string {
   switch (targetType) {
     case 'job':
       return `/jobs/${targetId}`
@@ -44,9 +45,17 @@ function detailRoute(targetType: ActivityTargetType, targetId: string): string {
       return `/job-fairs/${targetId}`
     case 'company_profile':
       return `/companies/${targetId}`
+    case 'fair_company':
+      return externalId ? `/job-fairs/${externalId}/companies/${targetId}` : '/job-fairs'
     default:
       return '/renshi'
   }
+}
+
+function actionLabel(action: ActivityJumpAction, targetType: ActivityTargetType): string {
+  if (action === 'external_apply' && targetType === 'fair_company') return '参展企业来源入口'
+  if (action === 'external_apply') return '岗位来源入口'
+  return ACTION_LABEL[action]
 }
 
 export function MyActivityPage() {
@@ -129,7 +138,7 @@ export function MyActivityPage() {
               iconColor="text-sky-600"
               title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
               meta={`浏览 · ${TYPE_LABEL[it.targetType]}${it.sourceName ? ` · ${it.sourceName}` : ''} · ${formatTime(it.createdAt)}`}
-              onTap={() => navigate(detailRoute(it.targetType, it.targetId))}
+              onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
             />
           ))
         )
@@ -145,8 +154,8 @@ export function MyActivityPage() {
             iconBg="bg-teal-50"
             iconColor="text-teal-600"
             title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
-            meta={`打开${ACTION_LABEL[it.action]} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
-            onTap={() => navigate(detailRoute(it.targetType, it.targetId))}
+            meta={`打开${actionLabel(it.action, it.targetType)} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
+            onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
           />
         ))
       )}

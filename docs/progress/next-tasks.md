@@ -42,7 +42,7 @@
 - [x] **规范化治理与首批业务闭合集成收口**：`codex/normalization-business-closures-integration` 已从干净 `main` 快进集成 18 个已验证提交，完成总验证、敏感信息扫描和 Claude + Antigravity 最终审查；无 Critical，可交付。
 - [x] **招聘会 / 校园招聘准入审查**：已输出 `docs/reviews/jobfair-campus-closure-admission.md` 和 `docs/superpowers/plans/2026-06-21-jobfair-campus-closure.md`；确认不新增入口、不做报名/签到/候选人闭环，后续拆为 3 个独立分支。
 - [x] **招聘会 / 校园招聘 Branch 1：列表页本校优先接线**：`JobFairsPage` 调用 `getTerminalId()` 并透传 `getJobFairs(terminalId ? { terminalId } : undefined)`，对齐 `/campus` 已有本校优先排序；新增 `verify-jobfairs-terminal-priority` 防回退脚本，不改 UI、不改后端。
-- [ ] **招聘会 / 校园招聘 Branch 2：参展企业外部投递跳转记录**：新增 `fair_company` activity target，限定 `external_apply`，并让 `FairCompanyDetailPage` 真实二维码和来源平台打开动作进入本人跳转记录；必须双模型审查。
+- [x] **招聘会 / 校园招聘 Branch 2：参展企业外部投递跳转记录**：新增 `fair_company` activity target，限定 `external_apply`；`FairCompanyDetailPage` 使用真实 `SourceUrlQr` 并记录本人外部入口打开；`/me/activity` 支持参展企业记录回跳。
 - [ ] **招聘会 / 校园招聘 Branch 3：大页面零行为拆分**：拆分 `CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage`，保持路由、接口、文案和行为不变；必须双模型审查。
 
 ## P1：工程质量门禁
