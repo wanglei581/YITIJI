@@ -78,7 +78,9 @@ Gate 2 不做以下事项：
 | 前端 build env | 记录存在的 `.env` / `.env.local` 路径；如 Kiosk build-time env 缺失，需要停下确认是否使用 inline `VITE_*`。 |
 | DB 备份工具 | `pg_dump` 可用，且备份目标与 Prisma PostgreSQL deploy 使用同一个 `POSTGRES_URL ?? DATABASE_URL`。 |
 | pending migrations | pending 只允许为空，或只包含两个文件资产 migration。 |
-| Kiosk TRTC build guard | build 时显式 `VITE_USE_TRTC_CALL=true`；除非另有审定，不允许启用纯文字逃生口。 |
+| 前端生产构建 guard | Kiosk build 时显式 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true`；Admin build 时显式 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`；除非另有审定，不允许启用纯文字逃生口。 |
+
+说明：`VITE_API_MODE=http` 是 Kiosk/Admin 生产构建的代码门禁；`VITE_API_BASE_URL=/api/v1` 是 Gate 2 执行策略要求，用于避免依赖默认回落或未来配置变化。
 
 ## 六、验证方式
 
@@ -105,6 +107,8 @@ Gate 2 执行后必须留存以下脱敏证据：
 - 磁盘空间不足。
 - 候选包 sha256 校验失败。
 - Kiosk build-time env 缺失且无法确认 prior build 方式。
+- Kiosk/Admin build 未显式使用 `VITE_API_MODE=http`，或未按 Gate 2 执行策略显式设置 `VITE_API_BASE_URL=/api/v1`。
+- Kiosk build 未显式启用 `VITE_USE_TRTC_CALL=true`，且没有审定的纯文字例外。
 - `pg_dump` 失败或 DB 备份为空。
 - pending migrations 包含非预期 migration。
 - `db:pg:deploy` 失败。

@@ -62,6 +62,7 @@ Gate 1 结论：
 > 2026-06-22 已补充 Gate 2 刷新方案：由于 `/srv/ai-job-print` 不是 Git 仓库，后续如用户确认执行，应使用本地 `git archive` 生成 `9146fa1c` 候选归档包、上传到 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录并重启既有 PM2 进程。该方案尚未执行。
 > 2026-06-22 已新增 [Gate 2 执行审批包](./user-file-assets-gate2-approval-package.md)：执行前必须按审批包再次确认目标、非目标、远端允许修改内容、禁止事项、验证方式、停止条件和回滚方式。
 > 2026-06-22 已完成 [Gate 2 本地候选包预检](./user-file-assets-gate2-local-artifact-check.md)：完整归档会带入 `docs/` 和 `.ccg/` 等非运行时内容，Gate 2 计划已修正为裁剪运行时归档并使用 `gzip -n -9` 生成可复现 sha256；该预检未连接预生产或修改远端状态。
+> 2026-06-22 已完成 [Gate 2 裁剪包本地构建预检](./user-file-assets-gate2-runtime-build-check.md)：裁剪包在 `/tmp` 解压目录中完成 install、Prisma client 生成、API build、Kiosk build、Admin build；预检发现 Kiosk/Admin 生产构建必须显式设置 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`，Gate 2 计划已同步修正。
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |
@@ -72,7 +73,7 @@ Gate 1 结论：
 | PostgreSQL migration | 执行候选 `db:pg:deploy`；仅应用 additive schema migration，不写业务数据 | PENDING |
 | 依赖安装 | `pnpm install --frozen-lockfile` | PENDING |
 | Prisma client | `prisma generate` 与 `db:pg:generate` | PENDING |
-| 构建 | API / Kiosk / Admin build；Kiosk production build 明确 `VITE_USE_TRTC_CALL=true` 或有审定的纯文字例外 | PENDING |
+| 构建 | API / Kiosk / Admin build；Kiosk/Admin production build 明确 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`；Kiosk production build 明确 `VITE_USE_TRTC_CALL=true` 或有审定的纯文字例外 | PENDING |
 | 进程重启 | PM2 restart、API dist hash、PM2 online 与 health 复验；不得打印完整 `pm2 describe` 环境变量 | PENDING |
 
 ## 六、Gate 3 自动命令门禁

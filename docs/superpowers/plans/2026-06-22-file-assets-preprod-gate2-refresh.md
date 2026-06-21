@@ -236,13 +236,15 @@ Expected:
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9146fa1c && pnpm --filter @ai-job-print/api build && VITE_USE_TRTC_CALL=true pnpm --filter @ai-job-print/kiosk build && pnpm --filter @ai-job-print/admin build'
+ssh root@<PREPROD_HOST> 'cd /srv/ai-job-print-candidate-9146fa1c && pnpm --filter @ai-job-print/api build && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true pnpm --filter @ai-job-print/kiosk build && VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build'
 ```
 
 Expected:
 
 - Builds pass.
-- Stop if Kiosk build fails due missing TRTC production env. Do not bypass with text-only mode unless separately approved.
+- Stop if Kiosk build fails due missing `VITE_API_MODE=http` or missing TRTC production env. Do not bypass with text-only mode unless separately approved.
+- Treat `VITE_API_BASE_URL=/api/v1` as a Gate 2 operator policy requirement: do not rely on the Vite config default fallback for Kiosk/Admin builds.
+- Stop if Admin build fails due missing `VITE_API_MODE=http`.
 
 - [ ] **Step 4: Write candidate deploy metadata**
 
