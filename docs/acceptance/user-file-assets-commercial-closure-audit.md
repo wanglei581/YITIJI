@@ -56,9 +56,9 @@
 ## 四、推荐持续推进顺序
 
 1. **执行 Gate 2 预生产候选刷新**：先再次确认目标、非目标、允许修改远端内容、验证方式和回滚方式；确认预生产 DB、Redis、COS 与正式生产资源隔离；再执行候选部署、DB 备份、additive migrations、构建、PM2 重启和 health/hash 复验。
-2. **执行 Gate 3 自动命令证据**：按 G3-01 至 G3-09 留存命令日志，重点确认 `verify:file-assets-trial-acceptance`、COS live、COS 生命周期静态检查、生命周期 summary、member assets、audit logs 和 DB 摘要。
+2. **执行 Gate 3 自动命令证据**：按 Gate 3/Gate 4 证据模板留存远端命令日志，重点确认 COS live、COS 生命周期静态检查、生命周期 summary、member assets、audit logs 和 DB 摘要；`verify:file-assets-trial-acceptance` 是 Gate 0 本地静态门禁，依赖完整仓库 `docs/`，不在 Gate 3 远端执行。
 3. **执行 Gate 4 浏览器账号验收**：使用 MEMBER_A、MEMBER_B、ADMIN_A 跑真实上传、保存期限、长期保存、重登查看、跨账号隔离、删除、Admin 生命周期截图。
-4. **补齐正式生产外部 P0**：域名/HTTPS、腾讯短信审核后的真实手机号 E2E、百度 OCR、AI/TRTC/ASR/TTS 按启用范围 live 冒烟、法务材料审定。招聘信息只作为外部/官方来源展示与免责声明审定，不进入平台内投递、筛选、面试邀约或 Offer 流程。
+4. **补齐正式生产外部 P0**：域名/HTTPS、腾讯短信审核后的真实手机号 E2E、百度 OCR、AI/TRTC/ASR/TTS 按启用范围 live 冒烟、法务材料审定。招聘信息只作为外部/官方来源展示与免责声明审定，不承接招聘闭环动作。
 5. **Windows 一体机真实验收**：在已购买设备上跑 Terminal Agent、奔图真实出纸、扫描链路、断网/重启恢复、日志和告警；外壳未完成不阻塞裸机验收，但不能替代最终交付形态验收。
 6. **小范围试运营**：仅 1 台终端 + 1 台打印机 + 受控账号先跑；问题按独立任务闭环，不在试运营中临时堆新功能。
 

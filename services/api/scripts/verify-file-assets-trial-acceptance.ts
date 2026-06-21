@@ -11,6 +11,7 @@ import { join } from 'path'
 
 const repoRoot = join(__dirname, '../../..')
 const acceptancePath = join(repoRoot, 'docs/acceptance/user-file-assets-trial-acceptance.md')
+const commercialClosureAuditPath = join(repoRoot, 'docs/acceptance/user-file-assets-commercial-closure-audit.md')
 const gateEvidenceRunbookPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md')
 const gate2RefreshPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md')
 const supersededPreprodExecutionPlanPath = join(repoRoot, 'docs/superpowers/plans/2026-06-22-file-assets-preprod-execution.md')
@@ -29,6 +30,7 @@ const filesModulePath = join(repoRoot, 'services/api/src/files/files.module.ts')
 const appModulePath = join(repoRoot, 'services/api/src/app.module.ts')
 
 assert.ok(existsSync(acceptancePath), 'must create docs/acceptance/user-file-assets-trial-acceptance.md')
+assert.ok(existsSync(commercialClosureAuditPath), 'must create docs/acceptance/user-file-assets-commercial-closure-audit.md')
 assert.ok(existsSync(gateEvidenceRunbookPath), 'must create docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md')
 assert.ok(existsSync(gate2RefreshPlanPath), 'must create docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md')
 assert.ok(existsSync(supersededPreprodExecutionPlanPath), 'must keep superseded preprod execution plan with replacement notice')
@@ -38,6 +40,7 @@ assert.ok(existsSync(gate2RuntimeBuildCheckPath), 'must create docs/acceptance/u
 assert.ok(existsSync(preprodExecutionRecordPath), 'must create docs/acceptance/user-file-assets-preprod-execution-record.md')
 
 const acceptance = readFileSync(acceptancePath, 'utf8')
+const commercialClosureAudit = readFileSync(commercialClosureAuditPath, 'utf8')
 const gateEvidenceRunbook = readFileSync(gateEvidenceRunbookPath, 'utf8')
 const gate2RefreshPlan = readFileSync(gate2RefreshPlanPath, 'utf8')
 const supersededPreprodExecutionPlan = readFileSync(supersededPreprodExecutionPlanPath, 'utf8')
@@ -103,6 +106,16 @@ for (const marker of [
 for (const marker of ['G3-09', 'verify:audit-logs', 'AuditLog']) {
   assert.ok(gateEvidenceRunbook.includes(marker), `gate evidence runbook must mention AuditLog evidence: ${marker}`)
 }
+assert.ok(
+  commercialClosureAudit.includes('Gate 0 本地静态门禁') &&
+    commercialClosureAudit.includes('不在 Gate 3 远端执行'),
+  'commercial closure audit must classify verify:file-assets-trial-acceptance as a Gate 0 local docs-only gate',
+)
+assert.doesNotMatch(
+  commercialClosureAudit,
+  /重点确认 `verify:file-assets-trial-acceptance`/,
+  'commercial closure audit must not list verify:file-assets-trial-acceptance as a Gate 3 remote focus command',
+)
 
 const gate3SectionStart = gateEvidenceRunbook.indexOf('## 四、Gate 3 自动命令门禁')
 const gate4SectionStart = gateEvidenceRunbook.indexOf('## 五、Gate 4 浏览器和账号验收')
@@ -121,7 +134,6 @@ const expectedGate3Commands = [
   'verify:file-lifecycle-summary',
   'verify:cos:live',
   'verify:member-assets-c2d',
-  'verify:file-assets-trial-acceptance',
   'verify:audit-logs',
 ]
 const gate3Commands = Array.from(gate3Section.matchAll(/pnpm --filter @ai-job-print\/api (verify:[\w:-]+)/g), (match) => match[1])
@@ -133,6 +145,10 @@ assert.deepEqual(
 for (const command of gate3Commands) {
   assert.ok(apiPackage.scripts?.[command], `Gate 3 verify command must exist in services/api/package.json: ${command}`)
 }
+assert.ok(
+  !gate3Commands.includes('verify:file-assets-trial-acceptance'),
+  'Gate 3 remote runtime command list must not include local docs-only verify:file-assets-trial-acceptance',
+)
 
 const gate2Candidate = '9a702981'
 const oldGate2Candidate = '9146fa1c'

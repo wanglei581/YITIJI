@@ -38,6 +38,8 @@
 | 静态证据包检查 | `pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance` | PASS | 2026-06-22：脚本输出 `verify:file-assets-trial-acceptance passed`，并明确 `STATIC DOC CHECK ONLY`。 |
 | whitespace | `git diff --check` | PASS | 2026-06-22：无输出。 |
 
+说明：`verify:file-assets-trial-acceptance` 依赖完整仓库文档目录，只作为 Gate 0 本地/仓库侧静态门禁；Gate 2 裁剪运行时归档不包含 `docs/` 或 `.ccg/`，因此 Gate 3 远端自动命令清单不再执行该命令。
+
 ## 四、Gate 1 预生产只读预检
 
 > 2026-06-22 已执行只读预检。仅执行 SSH/curl 只读命令；未部署、未拉取、未 checkout、未重启 PM2、未迁移数据库、未写 COS/DB。
@@ -90,7 +92,6 @@ Gate 1 结论：
 | `pnpm --filter @ai-job-print/api verify:file-lifecycle-summary` | PENDING | 待执行 |
 | `pnpm --filter @ai-job-print/api verify:cos:live` | PENDING | PASS 需记录脱敏桶指纹；SKIPPED 需记录缺少的配置项名称，不记录值 |
 | `pnpm --filter @ai-job-print/api verify:member-assets-c2d` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance` | PENDING | 待执行 |
 | `pnpm --filter @ai-job-print/api verify:audit-logs` | PENDING | AuditLog 基础审计命令证据；不能替代 Gate 4 针对本轮测试文件的审计抽样 |
 
 ## 七、Gate 4 浏览器和账号验收

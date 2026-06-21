@@ -24,7 +24,8 @@
 | G3-05 | 命令日志 | `G3-05-file-lifecycle-summary-<timestamp>.log` | Admin 生命周期聚合检查 |
 | G3-06 | 命令日志 | `G3-06-cos-live-<timestamp>.log` | COS live put/head/get/signed-url/delete，日志脱敏 |
 | G3-07 | 命令日志 | `G3-07-member-assets-c2d-<timestamp>.log` | 会员资产 HTTP E2E；不得替代 COS live 验收 |
-| G3-08 | 命令日志 | `G3-08-trial-acceptance-static-<timestamp>.log` | 静态证据包防回退检查 |
+| G0-01 | 本地命令日志 | `G0-01-trial-acceptance-static-<timestamp>.log` | 仓库侧静态证据包防回退检查；必须在本地完整仓库运行，不在裁剪后的预生产运行时包内执行 |
+| G3-08 | 不适用 | 已移至 `G0-01-trial-acceptance-static-<timestamp>.log` | 原静态证据包防回退检查已移出远端 Gate 3；不得为了远端执行该脚本把 `docs/` 或 `.ccg/` 加回裁剪包 |
 | G3-09 | 命令日志 | `G3-09-audit-logs-<timestamp>.log` | AuditLog 基础审计服务门禁；文件级保存期限变更、删除、过期清理仍需 Gate 4 按测试文件 ID 抽样 |
 | G4-01 | 浏览器截图 | `G4-01-login-member-a-<timestamp>.png` | 会员 A 登录后页面，手机号脱敏 |
 | G4-02 | 浏览器截图 + API 摘要 | `G4-02-upload-raw-file-<timestamp>.md` | 原始文件上传、文件 ID 脱敏、sha256 前 8 位 |
@@ -58,6 +59,7 @@
 - Gate 2 已通过，并记录预生产 health `db=postgres`。
 - 环境变量指向预生产 PostgreSQL、Redis、COS 私有桶；只记录脱敏指纹。
 - 命令输出通过 `tee` 写入证据日志，执行后人工脱敏再归档。
+- `verify:file-assets-trial-acceptance` 是仓库侧静态文档门禁，依赖 `docs/`、`docs/progress/` 和 `docs/device/`；Gate 2 裁剪运行时包不包含这些目录，因此该命令必须在 Gate 0 本地完整仓库中运行，不列入远端 Gate 3 命令清单。
 
 ```bash
 set -euo pipefail
@@ -69,7 +71,6 @@ pnpm --filter @ai-job-print/api verify:file-retention | tee "G3-04-file-retentio
 pnpm --filter @ai-job-print/api verify:file-lifecycle-summary | tee "G3-05-file-lifecycle-summary-$TS.log"
 pnpm --filter @ai-job-print/api verify:cos:live | tee "G3-06-cos-live-$TS.log"
 pnpm --filter @ai-job-print/api verify:member-assets-c2d | tee "G3-07-member-assets-c2d-$TS.log"
-pnpm --filter @ai-job-print/api verify:file-assets-trial-acceptance | tee "G3-08-trial-acceptance-static-$TS.log"
 pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.log"
 ```
 
@@ -77,7 +78,7 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 
 - `verify:cos:live` 如果输出 `SKIPPED`，Gate 3 不通过；必须记录缺少的配置项名称，不记录值。
 - `verify:member-assets-c2d` 强制本地存储，不能替代 COS live 或浏览器账号验收。
-- `verify:file-assets-trial-acceptance` 仍是静态检查，只能作为证据包结构防回退。
+- Gate 0 本地 `verify:file-assets-trial-acceptance` 只证明证据包结构防回退，不证明远端运行时可用；不得为了远端执行该命令把 `docs/` 或 `.ccg/` 加回 Gate 2 裁剪运行时归档。
 - `verify:audit-logs` 是 AuditLog 基础审计服务门禁，只证明审计写入、查询、分页、payload 封顶和 best-effort 行为；Gate 4 仍必须针对本轮测试文件 ID 抽样确认保存期限变更、删除、过期清理审计记录。
 - 任一日志出现密钥、token、完整手机号、签名 URL 查询串或简历正文，立即停止并轮换相关凭据。
 
