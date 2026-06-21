@@ -1,7 +1,7 @@
 # 用户文件与简历资产预生产 Gate 2 执行审批包
 
 > 状态：APPROVAL REQUIRED，尚未执行。
-> 适用候选：`9a702981`，即 `codex/file-assets-gate3-command-guard`，包含 `9146fa1c` 之后的 Gate 2/Gate 3 本地门禁与证据修正。
+> 适用候选：`2187f6a7`，即当前本地 Gate 2/Gate 3/Gate 0 门禁收口链，包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正。
 > 当前预生产事实：Gate 1 只读预检显示预生产部署源自报仍为 `6b055d6b`，且 `/srv/ai-job-print` 是 `local-git-archive` 展开目录，不是 Git 仓库。
 > 口径：本文件只用于 Gate 2 远端执行前确认，不代表 Gate 2、Gate 3/Gate 4、正式生产、试运营或 Windows 真机验收完成。
 
@@ -9,7 +9,7 @@
 
 确认后，仅在预生产环境执行 Gate 2 候选部署刷新：
 
-- 从本地 `9a702981` 生成 `git archive` 候选包。
+- 从本地 `2187f6a7` 生成 `git archive` 候选包。
 - 上传候选包到预生产 `/srv`。
 - 展开候选目录，复制现有运行时和前端构建时 env 文件但不打印内容。
 - 安装依赖、生成 Prisma client、构建 API/Kiosk/Admin。
@@ -39,10 +39,10 @@ Gate 2 不做以下事项：
 
 | 类型 | 路径或对象 | 说明 |
 | --- | --- | --- |
-| 候选包 | `/srv/yitiji-preprod-9a702981.tar.gz` | 从本地 commit `9a702981` 生成裁剪运行时归档并上传；不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态。 |
-| 候选包校验 | `/srv/yitiji-preprod-9a702981.sha256` | 用于远端 `sha256sum -c`。 |
+| 候选包 | `/srv/yitiji-preprod-2187f6a7.tar.gz` | 从本地 commit `2187f6a7` 生成裁剪运行时归档并上传；不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态。 |
+| 候选包校验 | `/srv/yitiji-preprod-2187f6a7.sha256` | 用于远端 `sha256sum -c`。 |
 | 共享时间戳 | `/srv/yitiji-gate2-ts` | 统一备份目录、失败目录、DB 备份命名。 |
-| 候选目录 | `/srv/ai-job-print-candidate-9a702981` | 构建完成前不替换当前应用目录。 |
+| 候选目录 | `/srv/ai-job-print-candidate-2187f6a7` | 构建完成前不替换当前应用目录。 |
 | DB 备份 | `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump` | migration 前必须存在且非空。 |
 | 回滚目录 | `/srv/ai-job-print-prev-<timestamp>` | 原当前应用目录通过 `mv` 原子改名保存。 |
 | 应用目录 | `/srv/ai-job-print` | 仅在构建、备份和 migration 成功后提升候选目录。 |
@@ -52,7 +52,7 @@ Gate 2 不做以下事项：
 | PostgreSQL schema | 仅候选中已审查的 additive migrations | 预期只包含 `20260621154500_file_asset_retention_model` 与 `20260621162500_file_retention_expires_nullable`。 |
 | PM2 | 既有 `ai-job-print-api` 进程 | 仅允许 restart，不新增进程，不打印完整环境变量。 |
 
-本地临时产物允许写入 `/tmp/yitiji-preprod-9a702981.tar.gz` 与 `/tmp/yitiji-preprod-9a702981.sha256`，仅用于上传到预生产 `/srv`；不得写入仓库或提交到 Git。归档生成必须使用 `gzip -n -9`，确保 sha256 可复现。
+本地临时产物允许写入 `/tmp/yitiji-preprod-2187f6a7.tar.gz` 与 `/tmp/yitiji-preprod-2187f6a7.sha256`，仅用于上传到预生产 `/srv`；不得写入仓库或提交到 Git。归档生成必须使用 `gzip -n -9`，确保 sha256 可复现。
 
 ## 四、禁止修改的远端内容
 
@@ -69,7 +69,7 @@ Gate 2 不做以下事项：
 
 | 确认项 | 通过标准 |
 | --- | --- |
-| 本地候选存在 | `git cat-file -e 9a702981^{commit}` 通过。 |
+| 本地候选存在 | `git cat-file -e 2187f6a7^{commit}` 通过。 |
 | 本地工作区干净 | 无无关未提交变更。 |
 | 预生产资源隔离 | `DATABASE_URL` 或 `POSTGRES_URL` 指向 PostgreSQL 预生产资源；`REDIS_URL`、COS bucket/region 为预生产资源；只记录脱敏指纹，不打印值。 |
 | 当前应用形态 | `/srv/ai-job-print` 仍为 `local-git-archive` 展开目录，当前部署源自报为 `6b055d6b` 或记录实际差异。 |
@@ -95,7 +95,7 @@ Gate 2 执行后必须留存以下脱敏证据：
 | 目录提升 | `/srv/ai-job-print-prev-<timestamp>` 与新的 `/srv/ai-job-print` 均存在。 |
 | PM2 | `pm2 status ai-job-print-api` 显示 online；不得使用会打印 env 的完整 `pm2 describe`。 |
 | health | `127.0.0.1:3010/api/v1/health` 和公网 `/api/v1/health` 均返回 `success=true`、`db=postgres`。 |
-| 部署元数据 | `DEPLOY_SOURCE.txt` 记录 `commit=9a702981`、artifact hash、API dist hash；但仍只作为元数据，不替代运行证据。 |
+| 部署元数据 | `DEPLOY_SOURCE.txt` 记录 `commit=2187f6a7`、artifact hash、API dist hash；但仍只作为元数据，不替代运行证据。 |
 | 敏感信息 | 日志不得包含密钥、token、完整手机号、签名 URL 查询串、简历正文、完整数据库连接串。 |
 
 ## 七、停止条件
@@ -121,7 +121,7 @@ Gate 2 执行后必须留存以下脱敏证据：
 
 Gate 2 的代码回滚路径：
 
-1. 如果还未提升候选目录：删除 `/srv/ai-job-print-candidate-9a702981` 和候选包，保留当前 `/srv/ai-job-print` 不动。
+1. 如果还未提升候选目录：删除 `/srv/ai-job-print-candidate-2187f6a7` 和候选包，保留当前 `/srv/ai-job-print` 不动。
 2. 如果已经提升候选目录但 health 失败：
    - 将失败目录移动到 `/srv/ai-job-print-failed-<timestamp>`。
    - 将 `/srv/ai-job-print-prev-<timestamp>` 恢复为 `/srv/ai-job-print`。
@@ -138,7 +138,7 @@ Gate 2 的代码回滚路径：
 
 ```text
 确认执行用户文件与简历资产预生产 Gate 2。
-目标：仅刷新预生产 `/srv/ai-job-print` 到候选 `9a702981`。
+目标：仅刷新预生产 `/srv/ai-job-print` 到候选 `2187f6a7`。
 同意：上传候选包、展开候选目录、复制既有 env 文件、安装依赖、构建 API/Kiosk/Admin、备份 PostgreSQL、执行候选 additive migrations、原子切换应用目录、重启既有 PM2 进程并复验 health。
 不同意：修改正式生产、域名/证书/nginx、云密钥、短信/OCR/TRTC/ASR/TTS、COS 生命周期、业务数据、测试账号文件、Windows 真机或打印扫描配置。
 已知：Gate 2 通过后仍需另行确认 Gate 3/Gate 4；Gate 2 通过不等于试运营或商用闭环完成。

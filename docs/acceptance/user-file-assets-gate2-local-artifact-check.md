@@ -4,7 +4,7 @@
 > 候选 commit：`9146fa1c`。
 > 本地执行时间：2026-06-22。
 > 口径：本文件只证明本地候选包生成、归档范围和敏感扫描已预检；不代表 Gate 2、Gate 3/Gate 4、正式生产、试运营或 Windows 真机验收完成。
-> 历史记录：本文中的 `9146fa1c` 归档命令仅保留为旧候选本地预检证据，后续 Gate 2 不得执行；实际 Gate 2 远端刷新以 `9a702981` refresh plan 为准。
+> 历史记录：本文中的 `9146fa1c` 归档命令仅保留为旧候选本地预检证据，后续 Gate 2 不得执行；实际 Gate 2 远端刷新以 `2187f6a7` refresh plan 为准。
 
 ## 一、本地检查结论
 
@@ -84,7 +84,7 @@ git archive --format=tar --prefix=ai-job-print/ 9146fa1c -- \
 Gate 2 执行计划已修正：
 
 - 本地候选包生成使用裁剪路径清单，而不是完整仓库归档。
-- 后续 Gate 2 建议候选已刷新为 `9a702981`；实际执行文件名改为 `/tmp/yitiji-preprod-9a702981.tar.gz`、`/srv/yitiji-preprod-9a702981.tar.gz`，本文件保留 `9146fa1c` 的归档范围历史预检结果作为对照。
+- 后续 Gate 2 建议候选已刷新为 `2187f6a7`；实际执行文件名改为 `/tmp/yitiji-preprod-2187f6a7.tar.gz`、`/srv/yitiji-preprod-2187f6a7.tar.gz`，本文件保留 `9146fa1c` 的归档范围历史预检结果作为对照。
 - 归档生成使用 `gzip -n -9`，确保 sha256 可复现。
 - 审批包新增说明：候选包为裁剪运行时归档，不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态。
 

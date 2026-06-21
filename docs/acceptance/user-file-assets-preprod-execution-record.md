@@ -1,7 +1,7 @@
 # 用户文件与简历资产预生产执行记录
 
 > 状态：PLANNED，尚未执行会修改服务器、数据库、COS、账号或第三方配置的真实验收。
-> 基线候选：`codex/file-assets-gate3-command-guard` / `9a702981`（包含 `9146fa1c` 之后的 Gate 2/Gate 3 本地门禁与证据修正）
+> 基线候选：当前本地 Gate 2/Gate 3/Gate 0 门禁收口链 / `2187f6a7`（包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正）
 > 执行分支：`codex/file-assets-preprod-execution`
 > 口径：本文件是预生产执行记录模板和后续证据入口，不代表正式生产部署、真实试运营或 Windows 真机验收完成。
 
@@ -9,7 +9,7 @@
 
 目标：
 
-- 基于 `9a702981` 在预生产环境执行用户文件与简历资产验收；Gate 1 历史实测仍保留当时目标候选 `9146fa1c` 的记录。
+- 基于 `2187f6a7` 在预生产环境执行用户文件与简历资产验收；Gate 1 历史实测仍保留当时目标候选 `9146fa1c` 的记录。
 - 覆盖 PostgreSQL、COS 私有桶、会员账号、原始文件、优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 AuditLog 审计。
 - 留存命令日志、浏览器截图、COS 控制台截图、PostgreSQL 抽样和审计查询结果，所有证据必须脱敏。
 
@@ -60,17 +60,17 @@ Gate 1 结论：
 
 ## 五、Gate 2 候选部署或刷新
 
-> 尚未执行。Gate 1 已显示预生产未部署当时目标候选 `9146fa1c`；后续 Gate 2 建议目标已刷新为 `9a702981`，必须先停下并确认是否执行候选部署或刷新。
-> 2026-06-22 已补充 Gate 2 刷新方案：由于 `/srv/ai-job-print` 不是 Git 仓库，后续如用户确认执行，应使用本地 `git archive` 生成 `9a702981` 候选归档包、上传到 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录并重启既有 PM2 进程。该方案尚未执行。
+> 尚未执行。Gate 1 已显示预生产未部署当时目标候选 `9146fa1c`；后续 Gate 2 建议目标已刷新为 `2187f6a7`，必须先停下并确认是否执行候选部署或刷新。
+> 2026-06-22 已补充 Gate 2 刷新方案：由于 `/srv/ai-job-print` 不是 Git 仓库，后续如用户确认执行，应使用本地 `git archive` 生成 `2187f6a7` 候选归档包、上传到 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录并重启既有 PM2 进程。该方案尚未执行。
 > 2026-06-22 已新增 [Gate 2 执行审批包](./user-file-assets-gate2-approval-package.md)：执行前必须按审批包再次确认目标、非目标、远端允许修改内容、禁止事项、验证方式、停止条件和回滚方式。
 > 2026-06-22 已完成 [Gate 2 本地候选包预检](./user-file-assets-gate2-local-artifact-check.md)：完整归档会带入 `docs/` 和 `.ccg/` 等非运行时内容，Gate 2 计划已修正为裁剪运行时归档并使用 `gzip -n -9` 生成可复现 sha256；该预检未连接预生产或修改远端状态。
-> 2026-06-22 已完成 [Gate 2 裁剪包本地构建预检](./user-file-assets-gate2-runtime-build-check.md)：`9a702981` 裁剪包在 `/tmp` 解压目录中完成 install、Prisma client 生成、API build、Kiosk build、Admin build；预检确认 Kiosk/Admin 生产构建必须显式设置 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`，Kiosk 还必须显式 `VITE_USE_TRTC_CALL=true`。
+> 2026-06-22 已完成 [Gate 2 裁剪包本地构建预检](./user-file-assets-gate2-runtime-build-check.md)：`2187f6a7` 裁剪包在 `/tmp` 解压目录中完成 install、Prisma client 生成、API build、Kiosk build、Admin build；预检确认 Kiosk/Admin 生产构建必须显式设置 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`，Kiosk 还必须显式 `VITE_USE_TRTC_CALL=true`。
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |
 | 部署前 commit | 记录上一部署源自报 commit、备份目录和回滚路径；`DEPLOY_SOURCE.txt` 仅为自报元数据 | PENDING |
 | 资源隔离 | 预生产 `DATABASE_URL`、`REDIS_URL`、COS bucket/region 指向隔离资源；只记录脱敏指纹，不打印密钥 | PENDING |
-| 候选归档 | 本地从 `9a702981` 生成裁剪运行时归档 `/tmp/yitiji-preprod-9a702981.tar.gz` 和 sha256，并上传到 `/srv`；归档不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态 | PENDING |
+| 候选归档 | 本地从 `2187f6a7` 生成裁剪运行时归档 `/tmp/yitiji-preprod-2187f6a7.tar.gz` 和 sha256，并上传到 `/srv`；归档不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态 | PENDING |
 | PostgreSQL 备份 | 迁移前生成 `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump`，不打印连接串 | PENDING |
 | PostgreSQL migration | 执行候选 `db:pg:deploy`；仅应用 additive schema migration，不写业务数据 | PENDING |
 | 依赖安装 | `pnpm install --frozen-lockfile` | PENDING |
@@ -140,7 +140,7 @@ Gate 1 结论：
 用户文件与简历资产预生产执行：已计划 / Gate 0 本地静态门禁通过 / 未执行外部状态变更
 执行环境：预生产
 执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 方案
-部署 commit：后续 Gate 2 建议目标候选 9a702981；Gate 1 只读预检确认预生产实际部署源仍为 6b055d6b，当时目标候选 9146fa1c 的历史记录保留
+部署 commit：后续 Gate 2 建议目标候选 2187f6a7；Gate 1 只读预检确认预生产实际部署源仍为 6b055d6b，当时目标候选 9146fa1c 的历史记录保留
 阻塞项：Gate 2 方案已准备，需用户确认后才能执行候选部署或刷新；Gate 2 及以后任何外部状态变更需再次确认
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```

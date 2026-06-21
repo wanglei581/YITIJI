@@ -175,8 +175,8 @@ assert.ok(
   'Gate 3 remote runtime command list must not include local docs-only verify:file-assets-trial-acceptance',
 )
 
-const gate2Candidate = '9a702981'
-const oldGate2Candidate = '9146fa1c'
+const gate2Candidate = '2187f6a7'
+const oldGate2Candidate = '9a702981'
 const currentGate2Artifact = `yitiji-preprod-${gate2Candidate}.tar.gz`
 const currentGate2Checksum = `yitiji-preprod-${gate2Candidate}.sha256`
 const currentGate2CandidateDir = `ai-job-print-candidate-${gate2Candidate}`
@@ -292,7 +292,7 @@ for (const line of gate2ApprovalPackage.split('\n')) {
 assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   `/ \`${gate2Candidate}\``,
   `/tmp/${currentGate2Artifact}`,
-  '后续 Gate 2 建议目标候选 9a702981',
+  `后续 Gate 2 建议目标候选 ${gate2Candidate}`,
 ])
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
 
@@ -307,16 +307,16 @@ assertIncludesAll(gate2RuntimeBuildCheck, 'Gate 2 runtime build check', [
 assert.ok(
   gate2LocalArtifactCheck.includes('历史记录：本文中的 `9146fa1c` 归档命令仅保留为旧候选本地预检证据，后续 Gate 2 不得执行') &&
     gate2LocalArtifactCheck.includes('以下命令仅为 `9146fa1c` 历史预检命令，已废弃，勿执行') &&
-    gate2LocalArtifactCheck.includes('后续 Gate 2 建议候选已刷新为 `9a702981`') &&
+    gate2LocalArtifactCheck.includes(`后续 Gate 2 建议候选已刷新为 \`${gate2Candidate}\``) &&
     gate2LocalArtifactCheck.includes(`/srv/${currentGate2Artifact}`),
-  'Gate 2 local artifact check must mark its old 9146fa1c data as historical and point execution to 9a702981',
+  'Gate 2 local artifact check must mark its old 9146fa1c data as historical and point execution to the current Gate 2 candidate',
 )
 assert.ok(
   supersededPreprodExecutionPlan.includes(`已被`) &&
     supersededPreprodExecutionPlan.includes(`2026-06-22-file-assets-preprod-gate2-refresh.md`) &&
     supersededPreprodExecutionPlan.includes(gate2Candidate) &&
     supersededPreprodExecutionPlan.includes('以下旧命令仅保留为 `9146fa1c` 历史执行准备记录，已废弃，勿执行'),
-  'superseded preprod execution plan must clearly point operators to the 9a702981 Gate 2 refresh plan',
+  'superseded preprod execution plan must clearly point operators to the current Gate 2 refresh plan',
 )
 
 for (const marker of [

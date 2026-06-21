@@ -1,7 +1,7 @@
 # File Assets Preproduction Execution Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-> **Superseded for Gate 2 execution:** 本计划保留为 `9146fa1c` 历史执行准备记录；后续预生产 Gate 2 远端执行已被 `docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md` 取代，目标候选为 `9a702981`。不要复制本文中的旧 `9146fa1c` 部署命令执行远端刷新。
+> **Superseded for Gate 2 execution:** 本计划保留为 `9146fa1c` 历史执行准备记录；后续预生产 Gate 2 远端执行已被 `docs/superpowers/plans/2026-06-22-file-assets-preprod-gate2-refresh.md` 取代，目标候选为 `2187f6a7`。不要复制本文中的旧 `9146fa1c` 部署命令执行远端刷新。
 
 **Goal:** Execute the next controlled step toward commercial closure for user files and resume assets by preparing and reviewing a preproduction acceptance run based on `9146fa1c`.
 
@@ -75,7 +75,7 @@ Expected:
 
 External mutation. Requires explicit operator confirmation after Gate 1.
 
-以下旧命令仅保留为 `9146fa1c` 历史执行准备记录，已废弃，勿执行；后续 Gate 2 远端刷新必须使用 `9a702981` refresh plan。
+以下旧命令仅保留为 `9146fa1c` 历史执行准备记录，已废弃，勿执行；后续 Gate 2 远端刷新必须使用 `2187f6a7` refresh plan。
 
 Allowed only if approved:
 
