@@ -26,7 +26,7 @@
 | --- | --- | --- | --- |
 | Gate 0 | 本地静态门禁 | 是 | 只运行本地文档/静态检查，不连接服务器或云资源。 |
 | Gate 1 | 预生产只读预检 | 需计划审查通过 | 只读 SSH、PM2 状态、health、commit，不改服务器。 |
-| Gate 2 | 候选部署或刷新 | 需用户确认 | 会改变预生产代码、构建产物和进程状态。 |
+| Gate 2 | 候选部署或刷新 | 需用户确认 | 会改变预生产代码、构建产物、PostgreSQL schema 和进程状态；不写业务数据/COS。 |
 | Gate 3 | 自动命令门禁 | 需用户确认 | `verify:cos:live`、测试数据和部分 verify 可能写入 COS/DB。 |
 | Gate 4 | 浏览器和账号验收 | 需用户确认 | 会创建/修改测试会员文件、保存期限、删除状态和审计记录。 |
 
@@ -59,15 +59,19 @@ Gate 1 结论：
 ## 五、Gate 2 候选部署或刷新
 
 > 尚未执行。若 Gate 1 显示预生产未部署 `9146fa1c`，必须先停下并确认是否执行候选部署或刷新。
+> 2026-06-22 已补充 Gate 2 刷新方案：由于 `/srv/ai-job-print` 不是 Git 仓库，后续如用户确认执行，应使用本地 `git archive` 生成 `9146fa1c` 候选归档包、上传到 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录并重启既有 PM2 进程。该方案尚未执行。
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |
-| 部署前 commit | 记录上一部署 commit 和回滚路径 | PENDING |
+| 部署前 commit | 记录上一部署源自报 commit、备份目录和回滚路径；`DEPLOY_SOURCE.txt` 仅为自报元数据 | PENDING |
 | 资源隔离 | 预生产 `DATABASE_URL`、`REDIS_URL`、COS bucket/region 指向隔离资源；只记录脱敏指纹，不打印密钥 | PENDING |
+| 候选归档 | 本地从 `9146fa1c` 生成 `/tmp/yitiji-preprod-9146fa1c.tar.gz` 和 sha256，并上传到 `/srv` | PENDING |
+| PostgreSQL 备份 | 迁移前生成 `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump`，不打印连接串 | PENDING |
+| PostgreSQL migration | 执行候选 `db:pg:deploy`；仅应用 additive schema migration，不写业务数据 | PENDING |
 | 依赖安装 | `pnpm install --frozen-lockfile` | PENDING |
 | Prisma client | `prisma generate` 与 `db:pg:generate` | PENDING |
 | 构建 | API / Kiosk / Admin build；Kiosk production build 明确 `VITE_USE_TRTC_CALL=true` 或有审定的纯文字例外 | PENDING |
-| 进程重启 | PM2 restart 与 health 复验 | PENDING |
+| 进程重启 | PM2 restart、API dist hash、PM2 online 与 health 复验；不得打印完整 `pm2 describe` 环境变量 | PENDING |
 
 ## 六、Gate 3 自动命令门禁
 
@@ -127,8 +131,8 @@ Gate 1 结论：
 ```text
 用户文件与简历资产预生产执行：已计划 / Gate 0 本地静态门禁通过 / 未执行外部状态变更
 执行环境：预生产
-执行时间：2026-06-22 Gate 0 + Gate 1
+执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 方案
 部署 commit：目标候选 9146fa1c；Gate 1 只读预检确认预生产实际部署源仍为 6b055d6b
-阻塞项：需用户确认是否执行 Gate 2 候选部署或刷新；Gate 2 及以后任何外部状态变更需再次确认
+阻塞项：Gate 2 方案已准备，需用户确认后才能执行候选部署或刷新；Gate 2 及以后任何外部状态变更需再次确认
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```

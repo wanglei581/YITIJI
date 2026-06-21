@@ -59,7 +59,7 @@
 
 - [ ] **真实生产/试运营执行**：按用户文件与简历资产证据包，使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理、`long_term` 防误删和审计查询全链路，并留存命令日志、浏览器截图、COS 控制台截图和 DB 抽样。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是目标候选 `9146fa1c`，已按计划停止。
-- [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按已审查计划以 `9146fa1c` 为目标候选执行部署刷新；执行前必须再次列出目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。
+- [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以 `9146fa1c` 为目标候选执行部署刷新；执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
 
 ## P1：工程质量门禁
 

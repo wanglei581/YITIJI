@@ -52,6 +52,7 @@
 | 2026-06-22 | `codex/file-assets-preprod-integration` / 本分支 | 完成用户文件资产商用闭环栈与预生产验收候选集成：在 `codex/file-assets-trial-acceptance` 基线上合入 `codex/preprod-deployment-acceptance`，形成同时包含文件资产保存期限/证据包、Admin 生命周期视图、COS 生命周期口径、TRTC assistant 生产构建守卫和预生产阶段性记录的统一候选；本分支仅代表代码与文档候选已集成并通过本地静态/类型验证，不等于正式生产部署、真实文件资产试运营验收或 Windows 真机验收完成。 |
 | 2026-06-22 | `codex/file-assets-preprod-execution` / 本分支 | 完成用户文件与简历资产预生产真实验收执行计划和 Gate 0 本地静态门禁：新增预生产执行记录模板，明确 Gate 1 只读预检、Gate 2 候选部署、Gate 3 自动命令、Gate 4 浏览器账号验收的许可边界、证据要求、停止条件和回滚方式；Claude + Antigravity 双模型审查无 Critical，Gate 0 `verify:file-assets-trial-acceptance` 与 `git diff --check` 通过。该结果仅代表执行计划和本地静态门禁通过，不等于预生产已执行、正式生产上线、试运营完成或 Windows 真机验收完成。 |
 | 2026-06-22 | `codex/file-assets-preprod-gate1-readonly` / 本分支 | 完成用户文件与简历资产预生产 Gate 1 只读预检：`<PREPROD_HOST>` 主机可登录，PM2 `ai-job-print-api` online，本机与公网 health 均返回 `db=postgres`；但 `/srv/ai-job-print` 是 `local-git-archive` 展开目录而非 Git 仓库，`DEPLOY_SOURCE.txt` 自报当前部署源 commit 为 `6b055d6b`，不是目标候选 `9146fa1c`，且实际运行代码一致性需 Gate 2 重新部署时核验。按计划停止在 Gate 1，未执行部署、重启、迁移、COS live、账号或文件操作；下一步需用户确认是否进入 Gate 2 候选部署或刷新。 |
+| 2026-06-22 | `codex/file-assets-preprod-gate2-plan` / 本分支 | 完成用户文件与简历资产预生产 Gate 2 候选部署刷新方案：根据 Gate 1 发现的 `local-git-archive` 服务器形态，将早期 Git checkout 流程修正为本地 `git archive` 生成 `9146fa1c` 候选包、上传 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建 API/Kiosk/Admin、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录、重启既有 PM2 并复验 health/API dist hash 的执行方案；本分支仅记录方案与待确认边界，未上传归档包、未替换目录、未重启 PM2、未迁移数据库、未写业务数据或 COS。 |
 
 ## 当前工作区事实
 
