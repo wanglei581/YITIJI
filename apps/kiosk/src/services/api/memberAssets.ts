@@ -15,7 +15,10 @@ import type {
   MemberDocumentItem,
   MemberAiRecordItem,
   FileAccessUrlResponse,
+  FileRetentionUpdateResponse,
+  FileRetentionUpdateRequest,
 } from '@ai-job-print/shared'
+import { FILE_RETENTION_CONSENT_VERSION } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class MemberAssetsApiError extends Error {
@@ -34,13 +37,21 @@ interface Envelope<T> {
   data: T
 }
 
-async function call<T>(path: string, token: string, method: 'GET' | 'DELETE' = 'GET'): Promise<T> {
+async function call<T>(
+  path: string,
+  token: string,
+  method: 'GET' | 'DELETE' | 'PATCH' = 'GET',
+  body?: unknown,
+): Promise<T> {
   let res: Response
   try {
+    const headers: Record<string, string> = { Accept: 'application/json', Authorization: `Bearer ${token}` }
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
     res = await fetch(`${API_BASE_URL}${path}`, {
       method,
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      headers,
       credentials: 'include',
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     })
   } catch {
     throw new MemberAssetsApiError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
@@ -119,6 +130,27 @@ export function deleteMyAiRecord(
  */
 export function deleteMyDocument(token: string, fileId: string): Promise<unknown> {
   return call(`/files/${encodeURIComponent(fileId)}?reason=${encodeURIComponent('member self delete')}`, token, 'DELETE')
+}
+
+/** 修改本人文档保存期限。6 个月 / 长期保存的 consentVersion 在 adapter 内部收敛。 */
+export function updateMyDocumentRetention(
+  token: string | null | undefined,
+  fileId: string,
+  retentionPolicy: FileRetentionUpdateRequest['retentionPolicy'],
+): Promise<FileRetentionUpdateResponse> {
+  if (API_MODE !== 'http' || !token) {
+    return Promise.reject(new MemberAssetsApiError('AUTH_REQUIRED', '需登录后修改保存期限', 401))
+  }
+  const body: FileRetentionUpdateRequest = { retentionPolicy }
+  if (retentionPolicy === 'months_6' || retentionPolicy === 'long_term') {
+    body.consentVersion = FILE_RETENTION_CONSENT_VERSION
+  }
+  return call<FileRetentionUpdateResponse>(
+    `/files/${encodeURIComponent(fileId)}/retention`,
+    token,
+    'PATCH',
+    body,
+  )
 }
 
 /** 凭本人 token 换取文档的短期签名访问 URL（下载 / 预览）。 */

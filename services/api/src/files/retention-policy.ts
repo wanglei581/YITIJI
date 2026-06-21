@@ -1,5 +1,6 @@
 import {
   FILE_DEFAULT_TTL_HOURS,
+  FILE_RETENTION_CONSENT_VERSION,
   type FileAssetCategory,
   type FileOwnerType,
   type FilePurpose,
@@ -12,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>(['resume_upload', 'resume_scan', 'cover_letter'])
 
-export const CURRENT_RETENTION_CONSENT_VERSION = 'file-retention-v1'
+export const CURRENT_RETENTION_CONSENT_VERSION = FILE_RETENTION_CONSENT_VERSION
 
 export class RetentionPolicyError extends Error {
   constructor(

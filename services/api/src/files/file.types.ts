@@ -51,6 +51,9 @@ export type FileRetentionPolicy = 'months_3' | 'months_6' | 'long_term' | 'syste
 /** 文件保存策略设置来源。 */
 export type FileRetentionSetBy = 'system' | 'user' | 'admin'
 
+/** 当前延长保存期限用户确认条款版本。 */
+export const FILE_RETENTION_CONSENT_VERSION = 'file-retention-v1'
+
 export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   normal: 24,
   sensitive: 6,

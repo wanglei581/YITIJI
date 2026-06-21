@@ -11,6 +11,7 @@
     "preview": "vite preview --port 5173",
     "verify:jobfair-size": "node scripts/verify-jobfair-page-size.mjs",
     "verify:jobfair-ui": "node scripts/verify-jobfair-page-size.mjs && node scripts/verify-jobfair-ui.mjs",
+    "verify:file-retention-ui": "node scripts/verify-file-retention-ui.mjs",
     "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs"
   },
   "dependencies": {
