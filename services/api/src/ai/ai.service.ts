@@ -446,6 +446,7 @@ export class AiService {
    *
    * 只给会员文件绑定 sourceFileId；匿名 / system 文件保持 null，避免把临时文件
    * 纳入会员长期保存链路。候选文件不存在或归属不匹配时不阻断导出。
+   * 引导式生成流通常只有 generate taskId，没有源文件；优化流共用 parse taskId 时才绑定。
    */
   async resolveExportSourceFileId(
     taskId: string | undefined | null,
@@ -457,8 +458,8 @@ export class AiService {
     const candidateFileId = parseResult?.fileId
     if (!candidateFileId) return null
 
-    const file = await this.prisma.fileObject.findUnique({
-      where: { id: candidateFileId },
+    const file = await this.prisma.fileObject.findFirst({
+      where: { id: candidateFileId, deletedAt: null },
       select: { id: true, uploaderId: true, endUserId: true, ownerType: true, ownerId: true },
     })
     if (!file) {
