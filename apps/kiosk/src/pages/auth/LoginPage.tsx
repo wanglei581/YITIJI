@@ -27,6 +27,7 @@ import {
   memberLogin,
   sendSmsCode,
 } from '../../services/auth/memberAuthApi'
+import { getMemberAuthDeviceId } from '../../services/auth/memberAuthDevice'
 
 const PHONE_LENGTH = 11
 const CODE_LENGTH = 6
@@ -101,7 +102,8 @@ export function LoginPage() {
     setError(null)
     setNotice(null)
     try {
-      const res = await sendSmsCode(phone)
+      const deviceId = getMemberAuthDeviceId()
+      const res = await sendSmsCode(phone, deviceId)
       countdown.start(res.cooldownSeconds > 0 ? res.cooldownSeconds : 60)
       setNotice(`验证码已发送至 ${formatPhone(phone)}`)
     } catch (e) {
@@ -117,7 +119,8 @@ export function LoginPage() {
     setError(null)
     setNotice(null)
     try {
-      const res = await memberLogin(phone, code)
+      const deviceId = getMemberAuthDeviceId()
+      const res = await memberLogin(phone, code, deviceId)
       login({
         id: res.user.id,
         phoneMasked: res.user.phoneMasked,

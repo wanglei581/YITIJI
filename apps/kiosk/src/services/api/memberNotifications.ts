@@ -5,6 +5,7 @@
 // mock 模式 / 游客态直接返回空页或 no-op，不伪造消息。
 // ============================================================
 
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export type MemberNotificationCategory = 'system' | 'print' | 'ai' | 'feedback'
@@ -74,6 +75,7 @@ async function request<T>(
     } catch {
       /* keep defaults */
     }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new MemberNotificationsApiError(code, message, res.status)
   }
 

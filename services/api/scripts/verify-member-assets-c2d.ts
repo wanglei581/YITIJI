@@ -81,6 +81,8 @@ async function main() {
   const redis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379')
 
   const suffix = Date.now().toString(36)
+  const orgId = `c2dorg_${suffix}`
+  const favTarget = `c2dfair_${suffix}`
   const PHONE_A = '13912340701'
   const PHONE_B = '13912340702'
   const hashA = hashPhone(PHONE_A)
@@ -123,6 +125,8 @@ async function main() {
       await prisma.printTask.deleteMany({ where: { endUserId: { in: userIds } } })
       await prisma.endUser.deleteMany({ where: { id: { in: userIds } } })
     }
+    await prisma.jobFair.deleteMany({ where: { id: favTarget } })
+    await prisma.organization.deleteMany({ where: { id: orgId } })
     await prisma.auditLog.deleteMany({
       where: { action: { in: ['member.ai_record_delete', 'file.delete'] }, payloadJson: { contains: suffix } },
     })
@@ -315,7 +319,25 @@ async function main() {
     pass('7. 文档删除：对象物理删除 + 行软删（deletedBy=member）+ 审计 + 列表不再返回')
 
     // ── 8. 收藏幂等 ──────────────────────────────────────────────────────────
-    const favTarget = `c2dfair_${suffix}`
+    await prisma.organization.create({
+      data: { id: orgId, name: `C2D 收藏验证机构 ${suffix}`, type: 'school' },
+    })
+    await prisma.jobFair.create({
+      data: {
+        id: favTarget,
+        sourceOrgId: orgId,
+        externalId: `c2dfair-ext-${suffix}`,
+        sourceName: 'C2D 验证来源',
+        sourceUrl: 'https://example.com/c2d-fair',
+        title: '幂等测试招聘会',
+        startAt: new Date(Date.now() + 86_400_000),
+        endAt: new Date(Date.now() + 2 * 86_400_000),
+        venue: '验证会场',
+        city: '杭州',
+        reviewStatus: 'approved',
+        publishStatus: 'published',
+      },
+    })
     const add1 = await http('POST', '/me/favorites', { token: tokenA, body: { targetType: 'job_fair', targetId: favTarget, title: '幂等测试' } })
     const add2 = await http('POST', '/me/favorites', { token: tokenA, body: { targetType: 'job_fair', targetId: favTarget, title: '幂等测试' } })
     if (add1.status >= 300 || add2.status >= 300) fail('重复收藏不应报错')

@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { CareerPlanResponse, CareerPlanPrintResponse } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class CareerPlanApiError extends Error {
@@ -48,6 +49,7 @@ async function call<T>(path: string, access: CareerPlanAccess, init?: { method?:
       code = body.error?.code ?? code
       message = body.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(access.token))) notifyMemberSessionExpired(access.token ?? undefined)
     throw new CareerPlanApiError(code, message, res.status)
   }
   return (await res.json()) as T

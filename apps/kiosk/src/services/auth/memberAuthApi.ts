@@ -8,6 +8,7 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from './memberSessionEvents'
 
 // ── 错误类型 ──────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ async function call<T>(
     } catch {
       /* 非 JSON 响应，保留默认错误信息 */
     }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(options.token))) notifyMemberSessionExpired(options.token)
     throw new MemberApiError(code, message, res.status)
   }
 

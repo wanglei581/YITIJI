@@ -16,6 +16,7 @@ import type {
   MemberFavoriteItem,
   FavoriteTargetType,
 } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class MemberFavoritesApiError extends Error {
@@ -64,6 +65,7 @@ async function request<T>(
     } catch {
       /* keep defaults */
     }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new MemberFavoritesApiError(code, message, res.status)
   }
   const json = (await res.json()) as Envelope<T>

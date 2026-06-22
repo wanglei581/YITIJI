@@ -22,6 +22,7 @@ import type {
   AssistantChatResponse,
 } from '@ai-job-print/shared'
 import type { ResumeReadAccess } from './ai'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 
@@ -73,6 +74,7 @@ async function get<T>(path: string, access?: ResumeReadAccess): Promise<T> {
       code    = body.error?.code    ?? code
       message = body.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(access?.token))) notifyMemberSessionExpired(access?.token ?? undefined)
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>
@@ -110,6 +112,7 @@ async function post<T>(path: string, body: unknown, token?: string | null): Prom
       code    = body2.error?.code    ?? code
       message = body2.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(token))) notifyMemberSessionExpired(token ?? undefined)
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<T>
