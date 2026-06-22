@@ -64,15 +64,15 @@
 - [x] **本地预检：预生产 Gate 2 裁剪包构建**：已输出 `docs/acceptance/user-file-assets-gate2-runtime-build-check.md`，确认裁剪包在 `/tmp` 解压目录可完成 install、Prisma client 生成、API build、Kiosk build、Admin build；同时修正 Gate 2 计划中前端生产构建变量，Kiosk/Admin 必须显式 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`。
 - [x] **本地预检：预生产 Gate 2 候选刷新**：后续 Gate 2 建议目标候选已从 `9146fa1c` 刷新为 `2187f6a7`，并重新生成裁剪运行时归档完成 install、Prisma 双 client、API/Kiosk/Admin build；该预检不代表上传或远端执行完成。
 - [x] **本地门禁：预生产 Gate 2 候选一致性防回退**：`verify:file-assets-trial-acceptance` 已检查操作型 Gate 2 refresh plan、审批包、执行记录、Gate 3/Gate 4 runbook、构建预检和进度入口均指向 `2187f6a7`，并阻断旧候选 `9146fa1c` 的操作型归档/目录/DEPLOY_SOURCE marker 回流；旧本地预检命令只保留为历史证据且已标记勿执行；该门禁不代表上传或远端执行完成。
-- [x] **本地门禁：预生产 Gate 2 审批确认口径防回退**：`verify:file-assets-trial-acceptance` 已检查 Gate 2 审批包的 `APPROVAL REQUIRED，尚未执行` 状态、机读确认块、用户明确确认前不得远端执行、同意/不同意范围、Gate 3/Gate 4 另行确认和 Gate 2 不等于试运营或商用闭环完成；该门禁不代表 Gate 2 已授权或已执行。
+- [x] **本地门禁：预生产 Gate 2 审批确认口径防回退**：`verify:file-assets-trial-acceptance` 已升级为执行后口径，检查 Gate 2 审批包记录 `PREPRODUCTION GATE 2 PASSED`，同时保留机读确认块、用户明确确认范围、同意/不同意范围、Gate 3/Gate 4 另行确认和 Gate 2 不等于试运营或商用闭环完成。
 - [x] **本地门禁：预生产 Gate 3 文档静态门禁执行范围修正**：`verify:file-assets-trial-acceptance` 已明确为 Gate 0 本地/仓库侧静态文档门禁，不再列入预生产裁剪运行时包内 Gate 3 远端命令；不得为了远端运行该脚本把 `docs/` 或 `.ccg/` 加回裁剪包。
 - [x] **本地门禁：历史集成计划静态门禁口径收口**：`docs/superpowers/plans/2026-06-22-file-assets-preprod-integration.md` 已将 `verify:file-assets-trial-acceptance` 从 API runtime gates 中拆出为 Gate 0 本地静态文档门禁，防止后续误按远端裁剪运行时包命令执行；该检查不代表 Gate 2/Gate 3/Gate 4 已执行。
 - [x] **本地预检：预生产 Gate 3 命令清单防回退**：`verify:file-assets-trial-acceptance` 已检查 Gate 3/Gate 4 runbook 中远端 `verify:*` 命令顺序，并确认每条命令存在于 `services/api/package.json`；G3-08 静态证据包防回退已移至 Gate 0 本地执行，G3-09 AuditLog 槽位保留；该检查不代表 Gate 3 已执行。
 - [x] **本地门禁：预生产 Gate 2 部署候选冻结口径**：Gate 2 远端部署候选冻结为 `2187f6a7`，治理提交不刷新部署候选；只有运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化，才重新生成候选包并刷新执行计划。该门禁不代表 Gate 2 已授权或已执行。
-- [x] **只读复核：预生产 Gate 2 执行前就绪状态**：已输出 `docs/acceptance/user-file-assets-gate2-readiness-recheck.md`，确认本地候选包、预生产部署源、PM2、health、磁盘预算、API env、工具链和 PostgreSQL/Redis/Tencent COS 脱敏指纹；同时修正 Gate 2 主计划里的 Tencent COS key 名。该复核不代表 Gate 2 已授权或已执行。
+- [x] **只读复核：预生产 Gate 2 执行前就绪状态**：已输出 `docs/acceptance/user-file-assets-gate2-readiness-recheck.md`，确认本地候选包、预生产部署源、PM2、health、磁盘预算、API env、工具链和 PostgreSQL/Redis/Tencent COS 脱敏指纹；同时修正 Gate 2 主计划里的 Tencent COS key 名。该复核是 Gate 2 执行前历史证据，本身不代表远端执行。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
-- [ ] **预生产 Gate 2 候选部署或刷新**：如用户确认，按 `codex/file-assets-preprod-gate2-plan` 的方案以冻结候选 `2187f6a7` 为目标执行部署刷新；治理提交不刷新部署候选，除非运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化。执行前必须再次确认目标/非目标/允许修改远端内容/验证方式/回滚方式，并确认预生产 DB、Redis、COS bucket 与正式生产资源隔离。Gate 2 需要在 DB 备份后执行候选所需 additive PostgreSQL schema migrations，否则文件资产代码会因 schema 不匹配不可用。本方案尚未执行，当前预生产仍停留在 `6b055d6b` 自报部署源。
-- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 通过后，按 `docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md` 执行 G3-01 至 G3-09 自动命令证据、G4-01 至 G4-10 浏览器账号验收；执行前仍需用户确认，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录。
+- [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
+- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 已通过；下一步按 `docs/acceptance/user-file-assets-gate3-gate4-evidence-runbook.md` 执行 G3-01 至 G3-09 自动命令证据、G4-01 至 G4-10 浏览器账号验收；执行前仍需用户确认，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录。
 
 ## P1：工程质量门禁
 

@@ -1,9 +1,9 @@
 # 用户文件与简历资产预生产 Gate 2 执行审批包
 
-> 状态：APPROVAL REQUIRED，尚未执行。
+> 状态：PREPRODUCTION GATE 2 PASSED，Gate 3/Gate 4 尚未执行。
 > 适用候选：`2187f6a7`，即当前本地 Gate 2/Gate 3/Gate 0 门禁收口链，包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正。
 > 当前预生产事实：Gate 1 只读预检显示预生产部署源自报仍为 `6b055d6b`，且 `/srv/ai-job-print` 是 `local-git-archive` 展开目录，不是 Git 仓库。
-> 口径：本文件只用于 Gate 2 远端执行前确认，不代表 Gate 2、Gate 3/Gate 4、正式生产、试运营或 Windows 真机验收完成。
+> 口径：本文件记录 Gate 2 远端执行前确认边界和执行后状态；不代表 Gate 3/Gate 4、正式生产、试运营或 Windows 真机验收完成。
 
 > 部署候选冻结：Gate 2 远端部署候选保持为 `2187f6a7`；后续纯治理、文档、本地静态门禁或任务归档提交不自动刷新候选，治理提交不刷新部署候选。只有运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令发生变化时，才重新确认候选。
 
@@ -157,3 +157,25 @@ Gate 2 通过后，才能进入：
 3. 正式生产外部 P0：域名/HTTPS、腾讯短信审核后 E2E、OCR/AI/TRTC/ASR/TTS live。
 4. Windows 真机和奔图打印扫描验收。
 5. 1 台终端 + 1 台打印机小范围试运营。
+
+## 十一、执行后状态
+
+2026-06-22，用户明确确认后已在预生产执行 Gate 2，候选 `2187f6a7` 已刷新到 `/srv/ai-job-print`。执行证据以 [用户文件与简历资产预生产执行记录](./user-file-assets-preprod-execution-record.md) 为准。
+
+已完成：
+
+- 从本地 `2187f6a7` 生成裁剪运行时归档 `/tmp/yitiji-preprod-2187f6a7.tar.gz`，sha256 为 `6019de34f837850b22eb7ab12f9b0d25ea6fa14bac3fcfc827441803123e4b07`。
+- 上传候选包和 sha256 到预生产 `/srv`，远端 `sha256sum -c` 通过。
+- 预生产资源指纹复核通过：PostgreSQL、Redis、COS driver、Tencent COS bucket/region、`NODE_ENV=staging` 均只记录脱敏指纹。
+- 候选目录完成依赖安装、Prisma 双 client 生成、API/Kiosk/Admin production build；Kiosk build 显式使用 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`、`VITE_USE_TRTC_CALL=true`，产物包含 `AiAdvisorCall` 与 `trtc` chunk。
+- PostgreSQL 迁移前生成 DB 备份 `/srv/db-backups/pre-file-assets-gate2-20260622120958.dump`，备份非空且 `pg_restore -l` 可读。
+- 仅应用预期 additive migrations：`20260621154500_file_asset_retention_model`、`20260621162500_file_retention_expires_nullable`；最终 `prisma migrate status` 为 up to date。
+- `/srv/ai-job-print` 已切换为候选，`/srv/ai-job-print-prev-20260622120958` 回滚目录存在。
+- PM2 `ai-job-print-api` restart 后 online；本机与公网 `/api/v1/health` 均返回 `success=true`、`db=postgres`；API dist hash 与候选构建 hash 匹配。
+
+仍未执行：
+
+- Gate 3 自动命令证据。
+- Gate 4 浏览器账号验收。
+- COS live 测试文件、受控会员账号、保存期限、删除状态、AuditLog 抽样验收。
+- 正式生产域名/HTTPS、腾讯短信、OCR/AI/TRTC/ASR/TTS live、Windows 真机、打印扫描和试运营。

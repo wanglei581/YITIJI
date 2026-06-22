@@ -342,8 +342,8 @@ assertIncludesAll(gate2ApprovalPackage, 'Gate 2 approval package', [
 ])
 assertNoOldOperationalMarkers(gate2ApprovalPackage, 'Gate 2 approval package')
 assert.ok(
-  gate2ApprovalPackage.includes('> 状态：APPROVAL REQUIRED，尚未执行。'),
-  'Gate 2 approval package must remain approval-required and not executed in repository',
+  gate2ApprovalPackage.includes('> 状态：PREPRODUCTION GATE 2 PASSED，Gate 3/Gate 4 尚未执行。'),
+  'Gate 2 approval package must record preproduction Gate 2 passed while keeping Gate 3/Gate 4 unexecuted',
 )
 const gate2ApprovalConsentBlock = extractRequiredBlock(
   gate2ApprovalPackage,
@@ -387,7 +387,7 @@ assertIncludesAll(gate2ApprovalKnownLine, 'Gate 2 approval package known line', 
   'Gate 2 通过不等于试运营或商用闭环完成',
 ])
 for (const line of gate2ApprovalPackage.split('\n')) {
-  const completionClaim = /(?:Gate 2 已执行|Gate 2 已完成|生产验收已完成|试运营已完成|已正式上线|商用闭环完成)/.test(line)
+  const completionClaim = /(?:生产验收已完成|试运营已完成|已正式上线|商用闭环完成)/.test(line)
   const negativeContext = /(?:尚未|不得|禁止|不宣布|不等于|不能|不可|没有证据|不代表)/.test(line)
   assert.ok(!completionClaim || negativeContext, `Gate 2 approval package must not claim completion without negative context: ${line}`)
 }
@@ -395,7 +395,9 @@ for (const line of gate2ApprovalPackage.split('\n')) {
 assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   `/ \`${gate2Candidate}\``,
   `/tmp/${currentGate2Artifact}`,
-  `后续 Gate 2 建议目标候选 ${gate2Candidate}`,
+  `Gate 2 执行候选 ${gate2Candidate}`,
+  'PREPRODUCTION GATE 2 PASSED',
+  'Gate 3/Gate 4 尚未执行',
 ])
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
 
@@ -464,12 +466,17 @@ assert.ok(
   'next-tasks must keep real production/trial execution pending',
 )
 assert.ok(
-  progress.includes('codex/file-assets-gate2-approval-guard') && progress.includes('审批确认口径防回退'),
-  'current-progress must record Gate 2 approval confirmation guard as local-only work',
+  progress.includes('codex/file-assets-gate2-execution') &&
+    progress.includes('PREPRODUCTION GATE 2 PASSED') &&
+    progress.includes('Gate 3/Gate 4 尚未执行'),
+  'current-progress must record preproduction Gate 2 passed without implying Gate 3/Gate 4 completion',
 )
 assert.ok(
-  nextTasks.includes('审批确认口径防回退') && nextTasks.includes('不代表 Gate 2 已授权或已执行'),
-  'next-tasks must record Gate 2 approval confirmation guard without implying execution',
+  nextTasks.includes('预生产 Gate 2 候选部署或刷新') &&
+    nextTasks.includes('已完成') &&
+    nextTasks.includes('Gate 3/Gate 4') &&
+    nextTasks.includes('仍需用户确认'),
+  'next-tasks must record Gate 2 passed and keep Gate 3/Gate 4 pending',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')
 assert.ok(nextTasks.includes('AuditLog'), 'next-tasks must use AuditLog for file lifecycle audit evidence')

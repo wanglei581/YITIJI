@@ -1,9 +1,9 @@
 # 用户文件与简历资产预生产执行记录
 
-> 状态：PLANNED，尚未执行会修改服务器、数据库、COS、账号或第三方配置的真实验收。
+> 状态：PREPRODUCTION GATE 2 PASSED；Gate 3/Gate 4、正式生产、试运营和 Windows 真机尚未执行。
 > 基线候选：当前本地 Gate 2/Gate 3/Gate 0 门禁收口链 / `2187f6a7`（包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正）
-> 执行分支：`codex/file-assets-preprod-execution`
-> 口径：本文件是预生产执行记录模板和后续证据入口，不代表正式生产部署、真实试运营或 Windows 真机验收完成。
+> 执行分支：`codex/file-assets-gate2-execution`
+> 口径：本文件记录预生产 Gate 2 执行证据和后续证据入口，不代表正式生产部署、真实试运营或 Windows 真机验收完成。
 
 ## 一、目标和非目标
 
@@ -26,7 +26,7 @@
 | --- | --- | --- | --- |
 | Gate 0 | 本地静态门禁 | 是 | 只运行本地文档/静态检查，不连接服务器或云资源。 |
 | Gate 1 | 预生产只读预检 | 需计划审查通过 | 只读 SSH、PM2 状态、health、commit，不改服务器。 |
-| Gate 2 | 候选部署或刷新 | 需用户确认 | 会改变预生产代码、构建产物、PostgreSQL schema 和进程状态；不写业务数据/COS。 |
+| Gate 2 | 候选部署或刷新 | 已执行 | 已改变预生产代码、构建产物、PostgreSQL schema 和进程状态；未写业务数据/COS。 |
 | Gate 3 | 自动命令门禁 | 需用户确认 | `verify:cos:live`、测试数据和部分 verify 可能写入 COS/DB。 |
 | Gate 4 | 浏览器和账号验收 | 需用户确认 | 会创建/修改测试会员文件、保存期限、删除状态和审计记录。 |
 
@@ -60,24 +60,37 @@ Gate 1 结论：
 
 ## 五、Gate 2 候选部署或刷新
 
-> 尚未执行。Gate 1 已显示预生产未部署当时目标候选 `9146fa1c`；后续 Gate 2 建议目标已刷新为 `2187f6a7`，必须先停下并确认是否执行候选部署或刷新。
-> 2026-06-22 已补充 Gate 2 刷新方案：由于 `/srv/ai-job-print` 不是 Git 仓库，后续如用户确认执行，应使用本地 `git archive` 生成 `2187f6a7` 候选归档包、上传到 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录并重启既有 PM2 进程。该方案尚未执行。
-> 2026-06-22 已新增 [Gate 2 执行审批包](./user-file-assets-gate2-approval-package.md)：执行前必须按审批包再次确认目标、非目标、远端允许修改内容、禁止事项、验证方式、停止条件和回滚方式。
+> 已执行。Gate 1 曾显示预生产未部署当时目标候选 `9146fa1c`；本轮 Gate 2 执行候选 `2187f6a7` 已刷新到预生产 `/srv/ai-job-print`。
+> 2026-06-22 已补充 Gate 2 刷新方案：由于 `/srv/ai-job-print` 不是 Git 仓库，执行使用本地 `git archive` 生成 `2187f6a7` 候选归档包、上传到 `/srv`、展开候选目录、保留运行时和前端构建时 env 文件、生成 Prisma client、构建、备份 PostgreSQL、执行候选所需 additive migrations、原子重命名当前目录为回滚目录、提升候选目录并重启既有 PM2 进程。
+> 2026-06-22 已新增 [Gate 2 执行审批包](./user-file-assets-gate2-approval-package.md)：执行前已按审批包确认目标、非目标、远端允许修改内容、禁止事项、验证方式、停止条件和回滚方式。
 > 2026-06-22 已完成 [Gate 2 本地候选包预检](./user-file-assets-gate2-local-artifact-check.md)：完整归档会带入 `docs/` 和 `.ccg/` 等非运行时内容，Gate 2 计划已修正为裁剪运行时归档并使用 `gzip -n -9` 生成可复现 sha256；该预检未连接预生产或修改远端状态。
 > 2026-06-22 已完成 [Gate 2 裁剪包本地构建预检](./user-file-assets-gate2-runtime-build-check.md)：`2187f6a7` 裁剪包在 `/tmp` 解压目录中完成 install、Prisma client 生成、API build、Kiosk build、Admin build；预检确认 Kiosk/Admin 生产构建必须显式设置 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`，Kiosk 还必须显式 `VITE_USE_TRTC_CALL=true`。
-> 2026-06-22 已完成 [Gate 2 执行前只读就绪复核](./user-file-assets-gate2-readiness-recheck.md)：预生产仍自报部署源 `6b055d6b`，本机和公网 health 均为 `db=postgres`，磁盘预算、API env、`node` / `pnpm` / `pg_dump` / `pm2`、PostgreSQL/Redis/Tencent COS 脱敏指纹均满足执行前只读检查；本轮未上传包、未写 `/srv`、未迁移数据库、未重启 PM2。
+> 2026-06-22 已完成 [Gate 2 执行前只读就绪复核](./user-file-assets-gate2-readiness-recheck.md)：预生产当时仍自报部署源 `6b055d6b`，本机和公网 health 均为 `db=postgres`，磁盘预算、API env、`node` / `pnpm` / `pg_dump` / `pm2`、PostgreSQL/Redis/Tencent COS 脱敏指纹均满足执行前只读检查；该复核本身未上传包、未写 `/srv`、未迁移数据库、未重启 PM2。
+> 2026-06-22 用户已明确确认 `确认执行用户文件与简历资产预生产 Gate 2。`；执行前已复述目标、非目标、允许修改范围、验证方式和回滚方式，并完成 Claude + Antigravity 双模型执行前审查，结论均为 GO。
 
 | 项目 | 证据要求 | 结果 |
 | --- | --- | --- |
-| 部署前 commit | 记录上一部署源自报 commit、备份目录和回滚路径；`DEPLOY_SOURCE.txt` 仅为自报元数据 | PENDING |
-| 资源隔离 | 预生产 `DATABASE_URL`、`REDIS_URL`、COS bucket/region 指向隔离资源；只记录脱敏指纹，不打印密钥 | PENDING |
-| 候选归档 | 本地从 `2187f6a7` 生成裁剪运行时归档 `/tmp/yitiji-preprod-2187f6a7.tar.gz` 和 sha256，并上传到 `/srv`；归档不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态 | PENDING |
-| PostgreSQL 备份 | 迁移前生成 `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump`，不打印连接串 | PENDING |
-| PostgreSQL migration | 执行候选 `db:pg:deploy`；仅应用 additive schema migration，不写业务数据 | PENDING |
-| 依赖安装 | `pnpm install --frozen-lockfile` | PENDING |
-| Prisma client | `prisma generate` 与 `db:pg:generate` | PENDING |
-| 构建 | API / Kiosk / Admin build；Kiosk/Admin production build 明确 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`；Kiosk production build 明确 `VITE_USE_TRTC_CALL=true` 或有审定的纯文字例外 | PENDING |
-| 进程重启 | PM2 restart、API dist hash、PM2 online 与 health 复验；不得打印完整 `pm2 describe` 环境变量 | PENDING |
+| 部署前 commit | 记录上一部署源自报 commit、备份目录和回滚路径；`DEPLOY_SOURCE.txt` 仅为自报元数据 | PASS：执行前自报 `commit=6b055d6b`；共享时间戳 `20260622120958`；回滚目录为 `/srv/ai-job-print-prev-20260622120958`。 |
+| 资源隔离 | 预生产 `DATABASE_URL`、`REDIS_URL`、COS bucket/region 指向隔离资源；只记录脱敏指纹，不打印密钥 | PASS：`DATABASE_URL` / `POSTGRES_URL` hint 为 `postgres`，`REDIS_URL` 为 set，`FILE_STORAGE_DRIVER=cos`，`TENCENT_COS_BUCKET` / `TENCENT_COS_REGION` 为 set，`NODE_ENV=staging`；只记录短指纹。 |
+| 候选归档 | 本地从 `2187f6a7` 生成裁剪运行时归档 `/tmp/yitiji-preprod-2187f6a7.tar.gz` 和 sha256，并上传到 `/srv`；归档不包含 `docs/`、`.ccg/`、示例 env 文件或本地工具状态 | PASS：sha256 `6019de34f837850b22eb7ab12f9b0d25ea6fa14bac3fcfc827441803123e4b07`；远端 `sha256sum -c` 通过。 |
+| PostgreSQL 备份 | 迁移前生成 `/srv/db-backups/pre-file-assets-gate2-<timestamp>.dump`，不打印连接串 | PASS：`/srv/db-backups/pre-file-assets-gate2-20260622120958.dump` 存在且非空；`pg_restore -l` 可读；未打印连接串、用户名或密码。 |
+| PostgreSQL migration | 执行候选 `db:pg:deploy`；仅应用 additive schema migration，不写业务数据 | PASS：执行前 pending 仅为 `20260621154500_file_asset_retention_model` 与 `20260621162500_file_retention_expires_nullable`；两项已应用；最终 `prisma migrate status` 为 `Database schema is up to date!`。 |
+| 依赖安装 | `pnpm install --frozen-lockfile` | PASS：候选目录安装成功。 |
+| Prisma client | `prisma generate` 与 `db:pg:generate` | PASS：SQLite 与 PostgreSQL Prisma clients 均生成成功。 |
+| 构建 | API / Kiosk / Admin build；Kiosk/Admin production build 明确 `VITE_API_MODE=http`、`VITE_API_BASE_URL=/api/v1`；Kiosk production build 明确 `VITE_USE_TRTC_CALL=true` 或有审定的纯文字例外 | PASS：API build、Kiosk build、Admin build 均通过；Kiosk 显式 `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true`，产物包含 `AiAdvisorCall` / `trtc` chunk。 |
+| 进程重启 | PM2 restart、API dist hash、PM2 online 与 health 复验；不得打印完整 `pm2 describe` 环境变量 | PASS：PM2 restart 后 online；首次立即 health 命中启动瞬间未监听，随后重试成功；本机与公网 health 均为 `success=true`、`db=postgres`；API dist hash `d309c660b685680409ddf441f8ec5401d4810d61ad2162bc666bf7ab7e27b5b8` 匹配；未打印 `pm2 describe` 环境。 |
+
+Gate 2 结论：
+
+```text
+PREPRODUCTION GATE 2 PASSED
+Gate 2 执行候选 2187f6a7
+预生产部署源已刷新为 commit=2187f6a7
+PostgreSQL schema 已应用文件资产保存期限 additive migrations
+本机/公网 health 均为 db=postgres
+Gate 3/Gate 4 尚未执行
+不得宣称正式生产、试运营或 Windows 真机验收完成
+```
 
 ## 六、Gate 3 自动命令门禁
 
@@ -138,10 +151,10 @@ Gate 1 结论：
 当前结论：
 
 ```text
-用户文件与简历资产预生产执行：已计划 / Gate 0 本地静态门禁通过 / 未执行外部状态变更
+用户文件与简历资产预生产执行：PREPRODUCTION GATE 2 PASSED / Gate 3/Gate 4 尚未执行
 执行环境：预生产
-执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 方案
-部署 commit：后续 Gate 2 建议目标候选 2187f6a7；Gate 1 只读预检确认预生产实际部署源仍为 6b055d6b，当时目标候选 9146fa1c 的历史记录保留
-阻塞项：Gate 2 方案已准备，需用户确认后才能执行候选部署或刷新；Gate 2 及以后任何外部状态变更需再次确认
+执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2
+部署 commit：Gate 2 执行候选 2187f6a7；执行前部署源为 6b055d6b，执行后 DEPLOY_SOURCE.txt 自报 commit=2187f6a7
+阻塞项：Gate 3/Gate 4 仍需用户确认后才能执行，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```

@@ -357,6 +357,7 @@ set -a
 set +a
 pg_dump -w -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -F c -f "/srv/db-backups/pre-file-assets-gate2-$TS.dump"
 test -s "/srv/db-backups/pre-file-assets-gate2-$TS.dump"
+pg_restore -l "/srv/db-backups/pre-file-assets-gate2-$TS.dump" >/dev/null
 set +e
 pnpm --filter @ai-job-print/api exec prisma migrate status --config prisma.postgres.config.ts > /srv/yitiji-migrate-status-before.txt 2>&1
 STATUS=$?
@@ -383,6 +384,7 @@ pnpm --filter @ai-job-print/api exec prisma migrate status --config prisma.postg
 Expected:
 
 - DB backup exists and is non-empty.
+- DB backup is readable by `pg_restore -l` before any schema migration runs.
 - Backup derives its `pg_dump` host/user/database target from the same configured URL string used by Prisma PostgreSQL deploy: `POSTGRES_URL ?? DATABASE_URL`.
 - The script unsets ambient DB/libpq variables, parses the env file with the same `POSTGRES_URL ?? DATABASE_URL` precedence as the Prisma PostgreSQL config, and prints only a redacted fingerprint. `pg_dump` still uses exported decomposed libpq parameters to avoid exposing the URL on the command line.
 - `pg_dump` uses a temporary mode-600 `.pgpass` file plus host/user/database args and `-w` fail-fast mode, not a connection URL on the command line.
@@ -397,33 +399,21 @@ Stop if `pg_dump`, `db:pg:deploy`, or final migrate status fails.
 
 ## Task 5: Switchover and Health
 
-- [ ] **Step 1: Atomically move current app directory to rollback path**
+- [ ] **Step 1: Atomically swap app directory to candidate with rollback path**
 
 Run:
 
 ```bash
-ssh root@<PREPROD_HOST> 'set -e; TS=$(cat /srv/yitiji-gate2-ts); test -d /srv/ai-job-print-candidate-2187f6a7; mv /srv/ai-job-print "/srv/ai-job-print-prev-$TS"; test -d "/srv/ai-job-print-prev-$TS"'
-```
-
-Expected:
-
-- Rollback directory exists.
-- This uses atomic rename instead of `cp -a`, so it does not duplicate `node_modules` or risk a partial copied backup.
-
-- [ ] **Step 2: Replace app directory**
-
-Run:
-
-```bash
-ssh root@<PREPROD_HOST> 'set -e; mv /srv/ai-job-print-candidate-2187f6a7 /srv/ai-job-print'
+ssh root@<PREPROD_HOST> 'set -e; TS=$(cat /srv/yitiji-gate2-ts); test -d /srv/ai-job-print; test -d /srv/ai-job-print-candidate-2187f6a7; mv /srv/ai-job-print "/srv/ai-job-print-prev-$TS" && mv /srv/ai-job-print-candidate-2187f6a7 /srv/ai-job-print; test -d "/srv/ai-job-print-prev-$TS"; test -d /srv/ai-job-print'
 ```
 
 Expected:
 
 - `/srv/ai-job-print` now contains candidate.
 - Rollback directory remains available for immediate rollback.
+- The two renames are chained in one SSH command to reduce the window where `/srv/ai-job-print` is absent.
 
-- [ ] **Step 3: Restart existing PM2 process**
+- [ ] **Step 2: Restart existing PM2 process**
 
 Run:
 
@@ -435,7 +425,7 @@ Expected:
 
 - PM2 restart succeeds.
 
-- [ ] **Step 4: Verify health**
+- [ ] **Step 3: Verify health**
 
 Run:
 

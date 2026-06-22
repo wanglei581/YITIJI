@@ -68,6 +68,7 @@
 | 2026-06-22 | `codex/file-assets-gate2-latest-candidate-guard` / 本分支 | 将用户文件与简历资产 Gate 2 后续建议目标候选从上一代 `9a702981` 刷新为当前本地门禁链 `2187f6a7`，并重新生成裁剪运行时归档完成 install、Prisma 双 client、API/Kiosk/Admin build；API dist hash 与旧候选一致；本分支不连接预生产、不上传候选包、不迁移数据库、不重启 PM2。 |
 | 2026-06-22 | `codex/file-assets-gate2-candidate-freeze-policy` / 本分支 | 补齐用户文件与简历资产 Gate 2 部署候选冻结口径：当前远端执行候选保持为 `2187f6a7`，后续纯治理、文档、本地静态门禁或任务归档提交不自动刷新候选，治理提交不刷新部署候选；只有运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化才重新确认候选。本分支不连接预生产、不上传候选包、不迁移数据库、不重启 PM2。 |
 | 2026-06-22 | `codex/file-assets-gate2-readiness-recheck` / 本分支 | 完成用户文件与简历资产 Gate 2 执行前只读就绪复核：本地冻结候选 `2187f6a7` 仍可执行，`/tmp` 候选包 sha256 与记录一致；预生产仍自报部署源 `6b055d6b`，PM2 online，本机和公网 health 均为 `db=postgres`，磁盘预算、API env、`node` / `pnpm` / `pg_dump` / `pm2`、PostgreSQL/Redis/Tencent COS 脱敏指纹满足执行前只读检查；本分支仅修正 Gate 2 指纹脚本的 Tencent COS key 名并记录报告，未上传候选包、未写 `/srv`、未迁移数据库、未重启 PM2。 |
+| 2026-06-22 | `codex/file-assets-gate2-execution` / 本分支 | PREPRODUCTION GATE 2 PASSED：经用户明确确认和 Claude + Antigravity 执行前审查，已将预生产 `/srv/ai-job-print` 从自报 `6b055d6b` 刷新到冻结候选 `2187f6a7`；候选包 sha256 校验通过，API/Kiosk/Admin production build 通过，Kiosk 产物包含 `AiAdvisorCall` / `trtc` chunk；迁移前 DB 备份存在且 `pg_restore -l` 可读；仅应用两个预期 additive migrations；PM2 online，本机和公网 health 均为 `db=postgres`，API dist hash 匹配。Gate 3/Gate 4 尚未执行；该结果仍不等于正式生产、Windows 真机或试运营完成。 |
 
 ## 当前工作区事实
 
