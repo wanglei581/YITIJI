@@ -32,3 +32,11 @@
 - Claude 二次复审：无 Critical，无 Warning。
 - Codex reviewer 二次复审：无 Critical，无 Warning。
 - 最终验证重新执行并通过：`verify:member-login-data-closure`、`typecheck`、`lint`。
+
+PR CI 补充修复：
+
+- GitHub CI `build-and-verify` 首次失败于 `verify:ocr-baidu`，原因是该脚本的 fake `FilesService` 仍只实现旧 `readContent`，未跟随 `ResumeExtractionService` 切换到 `readContentForEndUser`。
+- 已为 `verify-ocr-baidu.ts` 的测试替身补 `readContentForEndUser`，并把 `verify:ocr-baidu` 纳入 `verify:member-login-data-closure`，避免本地 P0 门禁漏掉 CI 覆盖项。
+- 本地复验通过：`verify:ocr-baidu`、`verify:member-login-data-closure`、`typecheck`、`lint`。
+- Antigravity 复审：无 Critical，无 Warning，结论 Approve。
+- Claude 复审：无 Critical，无 Warning；仅提示 `verify-ocr-baidu` 的旧 `readContent` stub 与 `as never` 类型强转可作为后续非阻塞清理点。
