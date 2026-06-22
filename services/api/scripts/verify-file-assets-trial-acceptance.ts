@@ -418,7 +418,9 @@ assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   `Gate 2 执行候选 ${gate2Candidate}`,
   'PREPRODUCTION GATE 2 PASSED',
   'PREPRODUCTION GATE 3 PASSED FOR AUTOMATED COMMANDS',
-  'Gate 4 尚未执行',
+  'PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES',
+  '完整浏览器截图验收',
+  '真实 AI 优化产物自动入库分类待补',
   '| `pnpm --filter @ai-job-print/api verify:cos:live` | PASS |',
   'G3-06',
   'd855f7e900',
@@ -428,12 +430,15 @@ assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
 ])
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
 assert.ok(
-  preprodExecutionRecord.includes('仍不能宣称 Gate 4、正式生产、试运营或 Windows 真机验收完成'),
-  'preprod execution record may mark Gate 3 automated commands passed only with Gate 4/production/trial/Windows negative context',
+  preprodExecutionRecord.includes('Gate 4 结果：受控账号/API 验收通过') &&
+    preprodExecutionRecord.includes('SMS B 方案已回滚到 tencent，SSH 只读环境复核通过') &&
+    preprodExecutionRecord.includes('浏览器截图和 COS 控制台/HEAD 证据待补') &&
+    preprodExecutionRecord.includes('结论：不得宣称生产验收、试运营或 Windows 真机验收完成'),
+  'preprod execution record may mark Gate 4 API-level acceptance only with browser/manual evidence and production/trial/Windows negative context',
 )
 for (const line of preprodExecutionRecord.split('\n')) {
   const productionCompletionClaim = /(?:正式生产|生产验收|试运营|Windows 真机|Gate\s*4)[^。\n]{0,16}(?:已?通过|已?完成|已执行|完整通过)/i.test(line)
-  const negativeContext = /(?:尚未|不得|不把|不代表|不能|未执行|NOT EXECUTED|缺少|暂停|待执行)/.test(line)
+  const negativeContext = /(?:尚未|不得|不把|不代表|不能|未执行|未输出|NOT EXECUTED|缺少|暂停|待执行|待补|补齐|不是完整)/.test(line)
   assert.ok(!productionCompletionClaim || negativeContext, `preprod execution record must not claim production/trial/Gate 4 completion: ${line}`)
 }
 assertIncludesAll(preprodCosSwitchApproval, 'preprod COS switch approval package', [
@@ -461,6 +466,11 @@ for (const line of preprodCosSwitchApproval.split('\n')) {
 }
 
 assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [`部署候选 \`${gate2Candidate}\``])
+assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [
+  'Gate 4 受控账号/API 级验收已通过，完整浏览器截图证据待补',
+  'Gate 4 账号/API 级验收通过，浏览器截图与部分人工证据待补',
+  '不等于真实 AI 优化产物生成链路已完整验收',
+])
 assert.doesNotMatch(gateEvidenceRunbook, new RegExp(oldGate2Candidate), 'Gate 3/Gate 4 evidence runbook must not reference the old Gate 2 candidate')
 
 assertIncludesAll(gate2RuntimeBuildCheck, 'Gate 2 runtime build check', [
@@ -531,15 +541,22 @@ assert.ok(
   'current-progress must record preproduction Gate 2 passed without implying Gate 3/Gate 4 completion',
 )
 assert.ok(
+  progress.includes('PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES') &&
+    progress.includes('SSH 只读复核确认 `SMS_PROVIDER=tencent`') &&
+    progress.includes('完整浏览器截图、签名 URL 过期等待窗口和 COS 控制台/HEAD 证据仍待补') &&
+    progress.includes('真实 AI 优化产物自动分类链路仍待补'),
+  'current-progress must record Gate 4 API-level acceptance with remaining browser/manual evidence and optimized-output gap',
+)
+assert.ok(
   nextTasks.includes('预生产 Gate 2 候选部署或刷新') &&
     nextTasks.includes('已完成') &&
     nextTasks.includes('预生产 COS bucket 切换') &&
     nextTasks.includes('已完成。腾讯云已创建隔离预生产 bucket') &&
     nextTasks.includes('G3-06 `verify:cos:live` 已通过') &&
-    nextTasks.includes('预生产 Gate 4 证据执行') &&
-    nextTasks.includes('Gate 3 自动命令门禁已通过') &&
-    nextTasks.includes('G4-01 至 G4-10'),
-  'next-tasks must record Gate 2 passed, COS switch/G3-06 passed, and Gate 4 still pending',
+    nextTasks.includes('预生产 Gate 4 账号/API 级验收') &&
+    nextTasks.includes('预生产 Gate 4 人工证据补齐') &&
+    nextTasks.includes('真实 AI 优化产物导出后自动标记 `assetCategory=optimized`'),
+  'next-tasks must record Gate 2 passed, COS switch/G3-06 passed, Gate 4 API acceptance passed, and manual evidence still pending',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')
 assert.ok(nextTasks.includes('AuditLog'), 'next-tasks must use AuditLog for file lifecycle audit evidence')

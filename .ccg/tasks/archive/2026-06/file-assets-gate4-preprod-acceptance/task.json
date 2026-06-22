@@ -1,0 +1,12 @@
+{
+  "id": "file-assets-gate4-preprod-acceptance",
+  "title": "用户文件与简历资产预生产 Gate 4 受控验收",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "deployment",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交 Gate 4 预生产 API 级验收记录",
+  "createdAt": "2026-06-22T14:40:00+08:00",
+  "branch": "codex/file-assets-gate4-runbook-preflight"
+}

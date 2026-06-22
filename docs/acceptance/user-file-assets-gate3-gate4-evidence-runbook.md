@@ -1,6 +1,6 @@
 # 用户文件与简历资产 Gate 3/Gate 4 证据执行模板
 
-> 状态：模板 + 当前执行口径；Gate 3 自动命令门禁已通过（含 G3-06 COS live），Gate 4 浏览器账号验收待执行。
+> 状态：模板 + 当前执行口径；Gate 3 自动命令门禁已通过（含 G3-06 COS live），Gate 4 受控账号/API 级验收已通过，完整浏览器截图证据待补。
 > 适用基线：Gate 2 预生产刷新完成后，以部署候选 `2187f6a7` 或后续用户确认的替代候选为准。
 > 口径：本文只定义证据编号、日志命名、脱敏规则和停止条件；不得据此宣称生产验收、试运营或 Windows 真机验收完成。
 
@@ -12,6 +12,7 @@
 - **非目标**：正式生产、正式域名、正式试运营扩大、Windows 真机、打印扫描、短信/OCR/TRTC/ASR/TTS 配置变更、COS 生命周期规则变更。
 - **允许写入**：受控测试会员账号、受控测试文件、受控 COS 对象、保存期限变更、删除/清理审计记录、命令日志和截图证据。
 - **禁止写入**：真实用户简历正文、未脱敏手机号、生产密钥、完整签名 URL、非测试账号文件、Bucket 级生命周期配置。
+- **2026-06-22 B 方案记录**：腾讯短信审核未完成，用户确认临时切 `SMS_PROVIDER=log` 执行 Gate 4；执行后已回滚 `SMS_PROVIDER=tencent`。后续短信审核通过后，仍需真实腾讯短信手机号登录 E2E。
 
 ## 二、证据命名规范
 
@@ -100,6 +101,22 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 
 ## 五、Gate 4 浏览器和账号验收
 
+2026-06-22 已完成受控账号/API 级验收：
+
+- MEMBER_A 登录成功，脱敏手机号 `139****7032`，会员 ID digest `bf165f504d98`。
+- MEMBER_B 越权否定测试成功，脱敏手机号 `138****7032`；跨账号预览和删除均为 403。
+- 原始文件 digest `2b44f637ef7b`：默认 `months_3`，可设置 `months_6`，设置 `long_term` 被 400 拒绝，删除后不可预览。
+- 优化成果夹具 digest `6c4869d21445`：受控上传后通过 DB 夹具标记 `assetCategory=optimized`，再走保存期限 API 设置 `long_term` 成功；这证明规则与资产中心管理能力，不等于真实 AI 优化产物生成链路已完整验收。
+- 过期清理测试文件 digest `9e14136ea1ee`：清理前确认没有非本轮 active expired 文件，手动 cleanup 删除 1 个测试文件，`long_term` 对照未被删除。
+- Admin 生命周期 API：清理前 `totalActive=3`、`longTermCount=1`、`expiredPendingCleanup=1`；清理后 `totalActive=2`、`longTermCount=1`、`expiredPendingCleanup=0`。临时 Admin 已禁用。
+
+仍待补齐：
+
+- 浏览器截图证据 G4-01 / G4-02 / G4-05 / G4-10。
+- 签名 URL 过期后不可访问的等待窗口证据。
+- COS 控制台或对象 HEAD 脱敏证据，补强删除三态。
+- SSH `SMS_PROVIDER=tencent` 只读复核已补齐：`SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。
+
 测试账号：
 
 | 别名 | 用途 | 记录方式 |
@@ -184,4 +201,4 @@ limit 100;
 结论口径：
 ```
 
-只有所有 Gate 3 命令 PASS、Gate 4 证据 ID 完整、停止条件未触发，才能写“Gate 3/Gate 4 已执行通过”。这仍不等于正式小范围试运营完成；试运营还需结合 Windows 真机、打印扫描、短信/OCR/AI live 和法务材料验收。
+只有所有 Gate 3 命令 PASS、Gate 4 证据 ID 完整、停止条件未触发，才能写“Gate 3/Gate 4 完整浏览器验收通过”。当前只能写“Gate 4 账号/API 级验收通过，浏览器截图与部分人工证据待补”。这仍不等于正式小范围试运营完成；试运营还需结合 Windows 真机、打印扫描、短信/OCR/AI live 和法务材料验收。
