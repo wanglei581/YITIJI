@@ -19,6 +19,13 @@ export interface SmsSender {
   sendCode(phone: string, code: string): Promise<void>
 }
 
+export class SmsSendError extends Error {
+  constructor(readonly providerCode?: string) {
+    super('SMS_SEND_FAILED')
+    this.name = 'SmsSendError'
+  }
+}
+
 interface TencentSmsConfig {
   secretId: string
   secretKey: string
@@ -103,7 +110,7 @@ const SMS_API_VERSION = '2021-01-11'
  *   单参数模板只传 [code]；若选用带有效期的双参数模板，配 TENCENT_SMS_CODE_EXPIRE_MINUTES
  *   （须与 MemberAuthService 的实际验证码 TTL 一致）→ 传 [code, minutes]。
  * - 绝不记录验证码：日志只含脱敏手机号 + 腾讯云返回码 + RequestId。
- * - 任何失败统一抛 SMS_SEND_FAILED；MemberAuthService 已在 catch 中删码重置，契约不变。
+ * - 任何失败统一抛 SMS_SEND_FAILED，并保留非敏感供应商 code 供 service 层做用户友好分类。
  */
 export class TencentSmsSender implements SmsSender {
   private readonly logger = new Logger('TencentSmsSender')
@@ -163,19 +170,19 @@ export class TencentSmsSender implements SmsSender {
       if (apiError) {
         // 只记元数据：脱敏手机号 + 腾讯云错误码 + RequestId，绝不记验证码。
         this.logger.error(`SMS 下发失败(API) phone=${maskPhone(phone)} code=${apiError.Code ?? '?'} requestId=${requestId}`)
-        throw new Error('SMS_SEND_FAILED')
+        throw new SmsSendError(apiError.Code)
       }
       const status = body.Response?.SendStatusSet?.[0]
       if (!status || status.Code !== 'Ok') {
         this.logger.error(`SMS 下发失败(状态) phone=${maskPhone(phone)} code=${status?.Code ?? 'empty'} requestId=${requestId}`)
-        throw new Error('SMS_SEND_FAILED')
+        throw new SmsSendError(status?.Code ?? 'empty')
       }
       this.logger.log(`SMS 下发成功 phone=${maskPhone(phone)} requestId=${requestId}`)
     } catch (e) {
-      if (e instanceof Error && e.message === 'SMS_SEND_FAILED') throw e
+      if (e instanceof SmsSendError) throw e
       const reason = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'network'
       this.logger.error(`SMS 下发异常 phone=${maskPhone(phone)} reason=${reason}`)
-      throw new Error('SMS_SEND_FAILED')
+      throw new SmsSendError(reason)
     } finally {
       clearTimeout(timer)
     }

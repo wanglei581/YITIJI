@@ -14,6 +14,8 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
 
+type SmsProviderFailure = Error & { providerCode?: string }
+
 // ── 时效 / 阈值(秒)─────────────────────────────────────────────
 const CODE_TTL = 300 // 验证码 5 分钟
 const SESSION_TTL = 1800 // 会话 30 分钟,与 JWT 过期一致
@@ -98,7 +100,7 @@ export class MemberAuthService {
     } catch (error) {
       await this.redis.del(codeKey)
       await this.redis.del(this.k.cooldown(phoneHash))
-      throw error
+      throw this.toSmsSendException(error)
     }
 
     return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: CODE_TTL }
@@ -192,6 +194,29 @@ export class MemberAuthService {
 
   private tooMany(code: string, message: string): HttpException {
     return new HttpException({ error: { code, message } }, HttpStatus.TOO_MANY_REQUESTS)
+  }
+
+  private toSmsSendException(error: unknown): HttpException {
+    if (error instanceof HttpException) return error
+
+    const providerCode = this.smsProviderCode(error)
+    if (providerCode === 'LimitExceeded.PhoneNumberDailyLimit') {
+      return this.tooMany('SMS_PROVIDER_PHONE_DAILY_LIMIT', '该手机号今日短信发送次数已达上限,请明天再试')
+    }
+    if (providerCode?.startsWith('LimitExceeded.')) {
+      return this.tooMany('SMS_PROVIDER_RATE_LIMIT', '短信通道请求过于频繁,请稍后再试')
+    }
+
+    return new HttpException(
+      { error: { code: 'SMS_SEND_FAILED', message: '短信发送失败,请稍后再试' } },
+      HttpStatus.BAD_GATEWAY,
+    )
+  }
+
+  private smsProviderCode(error: unknown): string | undefined {
+    if (!(error instanceof Error)) return undefined
+    const providerCode = (error as SmsProviderFailure).providerCode
+    return typeof providerCode === 'string' && providerCode ? providerCode : undefined
   }
 
   private loginFailed(code: string, message: string): UnauthorizedException {

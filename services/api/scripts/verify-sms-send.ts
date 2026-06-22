@@ -4,7 +4,7 @@
  * 起一个本地 http server 冒充 sms.tencentcloudapi.com，校验:
  * - 请求:POST、TC3-HMAC-SHA256 Authorization、X-TC-Action/Version/Region、E.164 手机号、
  *   SignName/TemplateId/SmsSdkAppId、单/双参数 TemplateParamSet。
- * - 响应:Code=Ok → 成功;Response.Error 或状态非 Ok → 抛 SMS_SEND_FAILED。
+ * - 响应:Code=Ok → 成功;Response.Error 或状态非 Ok → 抛 SMS_SEND_FAILED 并保留 providerCode。
  * 真号 E2E 仍需短信审核通过 + 真实密钥 + 真实手机号，另行验收。
  */
 import 'dotenv/config'
@@ -16,6 +16,10 @@ let pass = 0
 let fail = 0
 const ok = (m: string) => { console.log(`  ✅ ${m}`); pass++ }
 const bad = (m: string) => { console.error(`  ❌ ${m}`); fail++ }
+const providerCodeOf = (e: unknown): string | undefined => {
+  const code = (e as { providerCode?: unknown } | undefined)?.providerCode
+  return typeof code === 'string' ? code : undefined
+}
 
 let nextResponse: unknown = { Response: { SendStatusSet: [{ Code: 'Ok' }], RequestId: 'req' } }
 let last: { method?: string; headers: http.IncomingHttpHeaders; body: string } = { headers: {}, body: '' }
@@ -85,12 +89,22 @@ async function main(): Promise<void> {
   // 4) Response.Error → 抛 SMS_SEND_FAILED
   nextResponse = { Response: { Error: { Code: 'LimitExceeded.PhoneNumberDailyLimit', Message: 'x' }, RequestId: 'r4' } }
   try { await sender.sendCode('13800000000', '111111'); bad('API Error 应抛错') }
-  catch (e) { (e as Error).message === 'SMS_SEND_FAILED' ? ok('Response.Error → 抛 SMS_SEND_FAILED') : bad(`错误信息不符: ${(e as Error).message}`) }
+  catch (e) {
+    (e as Error).message === 'SMS_SEND_FAILED' ? ok('Response.Error → 抛 SMS_SEND_FAILED') : bad(`错误信息不符: ${(e as Error).message}`)
+    providerCodeOf(e) === 'LimitExceeded.PhoneNumberDailyLimit'
+      ? ok('Response.Error 保留 providerCode')
+      : bad(`providerCode 不符: ${providerCodeOf(e) ?? 'missing'}`)
+  }
 
   // 5) 发送状态非 Ok → 抛 SMS_SEND_FAILED
   nextResponse = { Response: { SendStatusSet: [{ Code: 'FailedOperation.SignatureIncorrectOrUnapproved', Message: 'x' }], RequestId: 'r5' } }
   try { await sender.sendCode('13800000000', '222222'); bad('状态非 Ok 应抛错') }
-  catch (e) { (e as Error).message === 'SMS_SEND_FAILED' ? ok('状态非 Ok → 抛 SMS_SEND_FAILED') : bad(`错误信息不符: ${(e as Error).message}`) }
+  catch (e) {
+    (e as Error).message === 'SMS_SEND_FAILED' ? ok('状态非 Ok → 抛 SMS_SEND_FAILED') : bad(`错误信息不符: ${(e as Error).message}`)
+    providerCodeOf(e) === 'FailedOperation.SignatureIncorrectOrUnapproved'
+      ? ok('状态非 Ok 保留 providerCode')
+      : bad(`providerCode 不符: ${providerCodeOf(e) ?? 'missing'}`)
+  }
 
   finish()
 }
