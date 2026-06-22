@@ -1,0 +1,12 @@
+{
+  "id": "member-login-data-closure-p0",
+  "title": "完成会员登录个人数据隔离 P0 安全闭环",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务目录",
+  "createdAt": "2026-06-22T00:00:00Z",
+  "branch": "codex/member-login-data-closure-p0"
+}

@@ -154,10 +154,15 @@ async function main() {
   const newOcrService = () =>
     new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
 
-  // 提取层只需要 readContent → stub FilesService（不触库、不触真实存储）
+  // 提取层只需要 scoped read → stub FilesService（不触库、不触真实存储）
   const fileStore = new Map<string, { buffer: Buffer; mimeType: string; filename: string }>()
   const stubFiles = {
     readContent: (fileId: string) => {
+      const f = fileStore.get(fileId)
+      if (!f) throw new Error('not found')
+      return Promise.resolve({ ...f, purpose: 'resume_upload' })
+    },
+    readContentForEndUser: (fileId: string, _endUserId: string | null) => {
       const f = fileStore.get(fileId)
       if (!f) throw new Error('not found')
       return Promise.resolve({ ...f, purpose: 'resume_upload' })

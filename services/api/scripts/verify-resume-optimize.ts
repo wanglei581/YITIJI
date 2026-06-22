@@ -139,13 +139,19 @@ async function main(): Promise<void> {
       new LlmResumeOptimizeService(cfg as never),
     )
 
-  // 提取桩:默认成功返回受控原文;可按 fileId 注入失败
+  // 提取桩:默认成功返回受控原文;可按 fileId 注入失败,并校验调用方 endUserId 透传。
   const extractionByFileId = new Map<string, unknown>()
+  const fileOwners = new Map<string, string | null>()
   const fakeExtraction = {
-    extractResumeText: async ({ fileId }: { fileId: string }) =>
-      extractionByFileId.get(fileId) ?? {
+    extractResumeText: async ({ fileId, endUserId }: { fileId: string; endUserId?: string | null }) => {
+      const expectedOwner = fileOwners.get(fileId) ?? null
+      if ((endUserId ?? null) !== expectedOwner) {
+        return { ok: false, fileId, errorCode: 'FILE_NOT_FOUND', errorMessage: '文件不存在' }
+      }
+      return extractionByFileId.get(fileId) ?? {
         ok: true, fileId, text: RESUME_TEXT, textSource: 'docx', confidence: 'high', charCount: RESUME_TEXT.length,
-      },
+      }
+    },
   }
 
   const prisma = new PrismaService()
@@ -175,17 +181,24 @@ async function main(): Promise<void> {
 
   const createdTaskIds: string[] = []
   const createdFileIds: string[] = []
+  const createdEndUserIds: string[] = []
   const suffix = randomUUID().replace(/-/g, '').slice(0, 8)
+  const endUserA = `vro_member_${suffix}`
 
-  const submitParse = async (svc: AiService, fileId: string) => {
+  const submitParseForOwner = async (svc: AiService, fileId: string, endUserId: string | null) => {
+    fileOwners.set(fileId, endUserId)
     setResponses([{ status: 200, content: validDiagnosis() }])
-    const out = await svc.submitResumeParse({ fileId, fileName: 'r.docx', fileFormat: 'docx', source: 'upload' } as never, null)
+    const out = await svc.submitResumeParse({ fileId, fileName: 'r.docx', fileFormat: 'docx', source: 'upload' } as never, endUserId)
     createdTaskIds.push(out.taskId)
-    if (out.status !== 'completed' || !out.accessToken) fail(`parse 失败: ${out.failReason}`)
+    if (out.status !== 'completed') fail(`parse 失败: ${out.failReason}`)
     return { taskId: out.taskId, accessToken: out.accessToken }
   }
+  const submitParse = (svc: AiService, fileId: string) => submitParseForOwner(svc, fileId, null)
 
   try {
+    await prisma.endUser.create({ data: { id: endUserA, phoneHash: `h_${endUserA}`, phoneEnc: `e_${endUserA}` } })
+    createdEndUserIds.push(endUserA)
+
     // ── 1+2+6+7. 全链路 + 事实串保留 + 门禁 + 缓存 ───────────────────────
     {
       const { taskId, accessToken } = await submitParse(ai, `file_opt_a_${suffix}`)
@@ -223,6 +236,21 @@ async function main(): Promise<void> {
         if (errCode(e) !== 'AI_TASK_NOT_FOUND') fail(`6. 期望 AI_TASK_NOT_FOUND,实际 ${errCode(e)}`)
       }
       pass('6b. 错 token → AI_TASK_NOT_FOUND')
+    }
+
+    // ── 6c. 会员优化路径必须把 parse 行 endUserId 传入提取层 ───────────────
+    {
+      const { taskId } = await submitParseForOwner(ai, `file_opt_member_${suffix}`, endUserA)
+      setResponses([{ status: 200, content: validOptimize() }])
+      const opt = await ai.getResumeOptimize(taskId, { endUserId: endUserA, accessToken: null })
+      if (opt.status !== 'completed') fail(`6c. 会员本人优化应成功: ${opt.failReason}`)
+      try {
+        await ai.getResumeOptimize(taskId, { endUserId: `${endUserA}_other`, accessToken: null })
+        fail('6c. 其他会员不应读取会员优化结果')
+      } catch (e) {
+        if (errCode(e) !== 'AI_TASK_NOT_FOUND') fail(`6c. 期望 AI_TASK_NOT_FOUND,实际 ${errCode(e)}`)
+      }
+      pass('6c. 会员优化路径按 parse 行 endUserId 提取原文,他人会员被拒')
     }
 
     // ── 2b. 编造学校 → 重试仍坏 → 诚实失败,且失败不缓存 ───────────────────
@@ -359,6 +387,7 @@ async function main(): Promise<void> {
       }
     }
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: createdTaskIds } } }).catch(() => undefined)
+    await prisma.endUser.deleteMany({ where: { id: { in: createdEndUserIds } } }).catch(() => undefined)
     server.close()
     await prisma.onModuleDestroy?.()
   }

@@ -79,7 +79,7 @@ export class ResumeExtractionService {
     let filename: string
     let purpose: FilePurpose
     try {
-      const content = await this.files.readContent(fileId)
+      const content = await this.files.readContentForEndUser(fileId, input.endUserId ?? null)
       buffer = content.buffer
       mimeType = content.mimeType
       filename = content.filename
