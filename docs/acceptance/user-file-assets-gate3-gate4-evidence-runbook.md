@@ -1,6 +1,6 @@
 # 用户文件与简历资产 Gate 3/Gate 4 证据执行模板
 
-> 状态：模板 + 部分执行记录口径；Gate 3 安全子集已执行，COS live 与 Gate 4 仍阻塞。
+> 状态：模板 + 当前执行口径；Gate 3 自动命令门禁已通过（含 G3-06 COS live），Gate 4 浏览器账号验收待执行。
 > 适用基线：Gate 2 预生产刷新完成后，以部署候选 `2187f6a7` 或后续用户确认的替代候选为准。
 > 口径：本文只定义证据编号、日志命名、脱敏规则和停止条件；不得据此宣称生产验收、试运营或 Windows 真机验收完成。
 
@@ -59,6 +59,7 @@
 - Gate 2 已通过，并记录预生产 health `db=postgres`。
 - 环境变量指向预生产 PostgreSQL、Redis、COS 私有桶；只记录脱敏指纹。
 - G3-06 执行前必须正向证明当前 COS bucket 为预生产用途；只记录用途 hint、region 和 bucket 指纹，不记录完整 bucket 名。仅有项目名或业务名标签不够，需能证明 `preprod` / `staging` / `test` / `dev` / `uat` 等非生产隔离语义，或由用户提供云控制台/命名/权限隔离证明。
+- 2026-06-22 当前预生产 COS bucket 已完成切换并通过 G3-06：bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`。后续如 bucket/env 发生变化，必须重新执行隔离证明和 G3-06。
 - 命令输出通过 `tee` 写入证据日志，执行后人工脱敏再归档。
 - `verify:file-assets-trial-acceptance` 和 `verify:cos-lifecycle-policy` 是仓库侧静态文档门禁，依赖 `docs/`；Gate 2 裁剪运行时包不包含这些目录，因此必须在 Gate 0 / G3-03 本地完整仓库中运行，不得为了远端执行把 `docs/` 或 `.ccg/` 加回裁剪运行时包。
 
@@ -91,6 +92,7 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 - `verify:cos:live` 如果输出 `SKIPPED`，Gate 3 不通过；必须记录缺少的配置项名称，不记录值。
 - `verify:cos:live` 执行前如无法证明当前 bucket 为预生产/非生产用途，必须停止，不能用项目名标签替代隔离证明。
 - 如果只读取证据显示 bucket `prod_label=true` 或与历史生产私有桶指纹一致，禁止设置 `COS_BUCKET_PREPROD_PROOF_CONFIRMED=true`，必须先切换到明确隔离的预生产 bucket。
+- 当前 Gate 3 自动命令门禁已经通过；Gate 4 仍未执行，不能把 G3-06 PASS 写成 Gate 4、正式生产、试运营或 Windows 真机完成。
 - `verify:member-assets-c2d` 强制本地存储，不能替代 COS live 或浏览器账号验收。
 - Gate 0 本地 `verify:file-assets-trial-acceptance` 只证明证据包结构防回退，不证明远端运行时可用；不得为了远端执行该命令把 `docs/` 或 `.ccg/` 加回 Gate 2 裁剪运行时归档。
 - `verify:audit-logs` 是 AuditLog 基础审计服务门禁，只证明审计写入、查询、分页、payload 封顶和 best-effort 行为；Gate 4 仍必须针对本轮测试文件 ID 抽样确认保存期限变更、删除、过期清理审计记录。

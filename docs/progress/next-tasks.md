@@ -73,7 +73,7 @@
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
 - [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
 - [x] **预生产 COS bucket 切换**：已完成。腾讯云已创建隔离预生产 bucket 和预生产专用 CAM 子用户；预生产服务器仅替换 COS 相关 env，备份为 `/srv/ai-job-print-env-backups/api.env.20260622134416.bak`；新 bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`；PM2 online，health 为 `db=postgres`；G3-06 `verify:cos:live` 已通过 put/head/get/预签名下载/delete。
-- [ ] **预生产 Gate 4 证据执行**：Gate 2 已通过；Gate 3 自动命令门禁已通过：预生产运行时包通过 G3-01、G3-02、G3-04、G3-05、G3-06、G3-07、G3-09，本地完整仓库通过 G3-03。下一步准备受控 MEMBER_A / MEMBER_B / ADMIN_A 账号，执行 G4-01 至 G4-10：上传原始文件、默认 90 天、设置 180 天、成果物长期保存、重登查看、跨账号否定、删除三态、过期清理、Admin 生命周期视图和脱敏证据归档。
+- [ ] **预生产 Gate 4 证据执行**：Gate 2 已通过；Gate 3 自动命令门禁已通过：预生产运行时包通过 G3-01、G3-02、G3-04、G3-05、G3-06、G3-07、G3-09，本地完整仓库通过 G3-03；Gate 3/Gate 4 runbook 已校准为当前口径。下一步先做 Gate 4 只读预检，再准备受控 MEMBER_A / MEMBER_B / ADMIN_A 账号，执行 G4-01 至 G4-10：上传原始文件、默认 90 天、设置 180 天、成果物长期保存、重登查看、跨账号否定、删除三态、过期清理、Admin 生命周期视图和脱敏证据归档。
 
 ## P1：工程质量门禁
 
