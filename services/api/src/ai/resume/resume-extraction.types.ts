@@ -36,8 +36,9 @@ export type ResumeExtractionErrorCode =
 export interface ResumeExtractionInput {
   fileId: string
   /**
-   * 归属会员 id（保留字段，1A 不参与鉴权）。
-   * 文件归属/令牌门禁在 Phase 1B 的 AiService / 路由层校验，提取层只读 buffer。
+   * 归属会员 id。提取层按该值读取文件：
+   * - string: 只能读取本人会员文件。
+   * - null / undefined: 只能读取匿名文件。
    */
   endUserId?: string | null
 }

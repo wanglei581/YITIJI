@@ -1,4 +1,5 @@
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
+import { resolveJwtSecret } from '../src/common/jwt-verifier.module'
 
 type Env = Parameters<typeof assertProductionRuntimeGates>[0]
 
@@ -44,6 +45,36 @@ function expectRejected(env: Env, expectedCode: string, label: string): void {
   throw new Error(`${label}: expected rejection (${expectedCode})`)
 }
 
+function expectJwtSecretAllowed(secret: string, label: string): void {
+  const prev = process.env['JWT_SECRET']
+  process.env['JWT_SECRET'] = secret
+  try {
+    const resolved = resolveJwtSecret()
+    if (resolved !== secret) throw new Error(`${label}: resolved secret mismatch`)
+    console.log(`  PASS ${label}`)
+  } finally {
+    if (prev === undefined) delete process.env['JWT_SECRET']
+    else process.env['JWT_SECRET'] = prev
+  }
+}
+
+function expectJwtSecretRejected(secret: string | undefined, label: string): void {
+  const prev = process.env['JWT_SECRET']
+  if (secret === undefined) delete process.env['JWT_SECRET']
+  else process.env['JWT_SECRET'] = secret
+  try {
+    resolveJwtSecret()
+  } catch {
+    console.log(`  PASS ${label}`)
+    if (prev === undefined) delete process.env['JWT_SECRET']
+    else process.env['JWT_SECRET'] = prev
+    return
+  }
+  if (prev === undefined) delete process.env['JWT_SECRET']
+  else process.env['JWT_SECRET'] = prev
+  throw new Error(`${label}: expected JWT verifier rejection`)
+}
+
 function main(): void {
   console.log('\n=== 生产运行时启动门禁验证 ===')
 
@@ -56,6 +87,11 @@ function main(): void {
     { JWT_SECRET: undefined, FILE_STORAGE_DRIVER: undefined, DATABASE_URL: 'file:./prisma/dev.db' },
     '未声明 NODE_ENV 时放行',
   )
+
+  // 运行时 JwtModule 验签配置必须始终 fail-closed；不依赖 NODE_ENV。
+  expectJwtSecretRejected(undefined, 'JwtVerifierModule 拒绝缺失 JWT_SECRET')
+  expectJwtSecretRejected('too-short', 'JwtVerifierModule 拒绝过短 JWT_SECRET')
+  expectJwtSecretAllowed('runtime-jwt-secret-0123456789', 'JwtVerifierModule 接受强 JWT_SECRET')
 
   // 生产环境：全部满足时放行
   expectAllowed(PROD_OK, '生产环境合规配置放行')

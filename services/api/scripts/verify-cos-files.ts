@@ -99,6 +99,23 @@ async function main() {
     ok(rec?.sensitiveLevel === 'highly_sensitive', '简历默认 highly_sensitive')
     const read = await files.readContent(up.fileId)
     ok(read.buffer.equals(bytes), 'readContent round-trip 字节一致')
+    const scopedRead = await files.readContentForEndUser(up.fileId, eu1)
+    ok(scopedRead.buffer.equals(bytes), 'readContentForEndUser 本人会员 round-trip 字节一致')
+    await expectThrow(() => files.readContentForEndUser(up.fileId, eu2), 'readContentForEndUser 拒绝其他会员读取本人外简历')
+    await expectThrow(() => files.readContentForEndUser(up.fileId, null), 'readContentForEndUser 拒绝匿名读取会员简历')
+
+    const anon = await files.upload({
+      buffer: Buffer.from('%PDF-1.4 anonymous resume ' + sfx),
+      filename: 'anon-resume.pdf',
+      mimeType: 'application/pdf',
+      purpose: 'resume_upload',
+      uploaderId: null,
+      endUserId: null,
+    })
+    createdFileIds.push(anon.fileId)
+    const anonRead = await files.readContentForEndUser(anon.fileId, null)
+    ok(anonRead.buffer.includes(Buffer.from('anonymous resume')), 'readContentForEndUser 允许匿名读取匿名简历')
+    await expectThrow(() => files.readContentForEndUser(anon.fileId, eu1), 'readContentForEndUser 拒绝会员身份借读匿名简历')
 
     // ── B. 归属鉴权(隔离)──────────────────────────────────────────────
     console.log('\n[B] 归属鉴权')
@@ -149,6 +166,7 @@ async function main() {
     const intentRec = await prisma.fileObject.findUnique({ where: { id: intent.fileId } })
     ok(intentRec?.status === 'uploading', '意图创建后 status=uploading')
     ok(intentRec?.storageKey === `admin/uploads/${intent.fileId}.pdf`, 'admin 直传 objectKey 前缀正确')
+    await expectThrow(() => files.readContentForEndUser(intent.fileId, null), 'readContentForEndUser 拒绝匿名读取后台文件')
 
     const docBytes = Buffer.from('%PDF-1.4 admin doc ' + sfx)
     await files.writeRawUpload(intent.fileId, docBytes)

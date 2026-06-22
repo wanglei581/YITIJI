@@ -194,11 +194,16 @@ async function main(): Promise<void> {
 
   const ocrDisabled = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
 
-  const fixtures = new Map<string, { buffer: Buffer; mimeType: string; filename: string; purpose: string }>()
+  type Fixture = { buffer: Buffer; mimeType: string; filename: string; purpose: string; endUserId: string | null }
+  const fixtures = new Map<string, Fixture>()
   const fakeFiles = {
-    readContent: async (fileId: string) => {
+    readContent: async () => {
+      throw new Error('UNSCOPED_READ_FORBIDDEN')
+    },
+    readContentForEndUser: async (fileId: string, endUserId: string | null) => {
       const f = fixtures.get(fileId)
       if (!f) throw new Error('FILE_NOT_FOUND')
+      if ((f.endUserId ?? null) !== (endUserId ?? null)) throw new Error('FILE_ACCESS_DENIED')
       return f
     },
   }
@@ -215,6 +220,7 @@ async function main(): Promise<void> {
     mimeType: DOCX_MIME,
     filename: 'resume.docx',
     purpose: 'resume_upload',
+    endUserId: null,
   })
   fixtures.set('pdf-1', {
     buffer: buildTextPdf([
@@ -226,36 +232,49 @@ async function main(): Promise<void> {
     mimeType: PDF_MIME,
     filename: 'resume.pdf',
     purpose: 'resume_upload',
+    endUserId: null,
   })
   fixtures.set('img-1', {
     buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]),
     mimeType: 'image/jpeg',
     filename: 'resume.jpg',
     purpose: 'resume_scan',
+    endUserId: null,
   })
   fixtures.set('doc-1', {
     buffer: Buffer.from('this pretends to be an old binary .doc payload', 'utf8'),
     mimeType: DOC_MIME,
     filename: 'resume.doc',
     purpose: 'resume_upload',
+    endUserId: null,
   })
   fixtures.set('empty-1', {
     buffer: Buffer.alloc(0),
     mimeType: DOCX_MIME,
     filename: 'resume.docx',
     purpose: 'resume_upload',
+    endUserId: null,
   })
   fixtures.set('short-1', {
     buffer: buildDocx(['你好']),
     mimeType: DOCX_MIME,
     filename: 'tiny.docx',
     purpose: 'resume_upload',
+    endUserId: null,
   })
   fixtures.set('notresume-1', {
     buffer: buildDocx(docxParagraphs),
     mimeType: DOCX_MIME,
     filename: 'id-card.docx',
     purpose: 'id_scan',
+    endUserId: null,
+  })
+  fixtures.set('docx-owned-a', {
+    buffer: buildDocx(docxParagraphs),
+    mimeType: DOCX_MIME,
+    filename: 'owned-resume.docx',
+    purpose: 'resume_upload',
+    endUserId: 'enduser-a',
   })
 
   // 1) DOCX 提取
@@ -317,21 +336,29 @@ async function main(): Promise<void> {
   const r9 = await service.extractResumeText({ fileId: 'does-not-exist' })
   assert(!r9.ok && r9.errorCode === 'FILE_NOT_FOUND', '9. 不存在 / 已清理 fileId 返回 FILE_NOT_FOUND')
 
-  // 10)（增强）tencent provider 占位也绝不返回假文本
+  // 10)（增强）提取层必须按会员归属读取，不能绕过 FilesService 归属门禁
+  const r10a = await service.extractResumeText({ fileId: 'docx-owned-a', endUserId: 'enduser-a' })
+  assert(r10a.ok && r10a.textSource === 'docx', '10a. 本人会员可提取本人上传的简历文件')
+  const r10b = await service.extractResumeText({ fileId: 'docx-owned-a', endUserId: 'enduser-b' })
+  assert(!r10b.ok && r10b.errorCode === 'FILE_NOT_FOUND', '10b. 其他会员不可借 fileId 提取本人外文件')
+  const r10c = await service.extractResumeText({ fileId: 'docx-owned-a', endUserId: null })
+  assert(!r10c.ok && r10c.errorCode === 'FILE_NOT_FOUND', '10c. 匿名调用不可借 fileId 提取会员文件')
+
+  // 11)（增强）tencent provider 占位也绝不返回假文本
   process.env['OCR_PROVIDER'] = 'tencent'
   const ocrTencentNoCred = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
   const svcTencent = new ResumeExtractionService(fakeFiles as never, ocrTencentNoCred)
-  const r10a = await svcTencent.extractResumeText({ fileId: 'img-1' })
+  const r11a = await svcTencent.extractResumeText({ fileId: 'img-1' })
   assert(
-    !r10a.ok && r10a.errorCode === 'OCR_NOT_CONFIGURED' && r10a.text === undefined,
-    '10a. OCR_PROVIDER=tencent 且无凭证 → OCR_NOT_CONFIGURED，无假文本',
+    !r11a.ok && r11a.errorCode === 'OCR_NOT_CONFIGURED' && r11a.text === undefined,
+    '11a. OCR_PROVIDER=tencent 且无凭证 → OCR_NOT_CONFIGURED，无假文本',
   )
   process.env['TENCENT_OCR_SECRET_ID'] = 'dummy-id-not-real'
   process.env['TENCENT_OCR_SECRET_KEY'] = 'dummy-key-not-real'
-  const r10b = await svcTencent.extractResumeText({ fileId: 'img-1' })
+  const r11b = await svcTencent.extractResumeText({ fileId: 'img-1' })
   assert(
-    !r10b.ok && r10b.errorCode === 'OCR_FAILED' && r10b.text === undefined,
-    '10b. OCR_PROVIDER=tencent 占位（有凭证）→ OCR_FAILED，仍不返回假文本',
+    !r11b.ok && r11b.errorCode === 'OCR_FAILED' && r11b.text === undefined,
+    '11b. OCR_PROVIDER=tencent 占位（有凭证）→ OCR_FAILED，仍不返回假文本',
   )
   delete process.env['TENCENT_OCR_SECRET_ID']
   delete process.env['TENCENT_OCR_SECRET_KEY']

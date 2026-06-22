@@ -21,7 +21,7 @@
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
-- [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
+- [x] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 已完成；预生产已启用 `SMS_PROVIDER=tencent` 并通过真号验证码登录冒烟。上线前仍需按生产密钥轮换制度复核 CAM 最小权限。
 - [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收。
 - [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
@@ -44,6 +44,9 @@
 - [x] **招聘会 / 校园招聘 Branch 1：列表页本校优先接线**：`JobFairsPage` 调用 `getTerminalId()` 并透传 `getJobFairs(terminalId ? { terminalId } : undefined)`，对齐 `/campus` 已有本校优先排序；新增 `verify-jobfairs-terminal-priority` 防回退脚本，不改 UI、不改后端。
 - [x] **招聘会 / 校园招聘 Branch 2：参展企业外部投递跳转记录**：新增 `fair_company` activity target，限定 `external_apply`；`FairCompanyDetailPage` 使用真实 `SourceUrlQr` 并记录本人外部入口打开；`/me/activity` 支持参展企业记录回跳。
 - [x] **招聘会 / 校园招聘 Branch 3：大页面零行为拆分**：已拆分 `CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage`，保持路由、接口、文案和行为不变；新增 `verify:jobfair-size` 并接入 `verify:jobfair-ui`，已完成 Claude + Antigravity 双模型审查。
+- [x] **会员登录个人数据隔离 P0：文件提取归属门禁**：`ResumeExtractionService` 读取文件时按 `endUserId` scoped read；会员只能提取本人文件，匿名只能提取匿名文件；签名 URL 内容代理不变；新增 `verify:member-login-data-closure` 组合验证。
+- [ ] **会员登录个人数据隔离 P1：前端会话态和数据质量**：统一 Kiosk 会员 API 401 处理、登录发送 `deviceId` 激活设备限流、收藏写入前验证目标存在并由服务端派生标题。
+- [ ] **会员登录个人数据隔离 P1：账号状态和留存治理**：账号禁用后既有 session 立即失效、打印订单保留策略和个人数据留存矩阵文档化。
 
 ## P1：工程质量门禁
 

@@ -90,11 +90,14 @@ async function main() {
   }
   const llm = new LlmCareerPlanService(stubConfig as never)
   const pdf = new CareerPlanPdfService()
-  const fileStore = new Map<string, string>()
+  const fileStore = new Map<string, { text: string; endUserId: string | null }>()
   const stubExtraction = {
-    extractResumeText: ({ fileId }: { fileId: string }) => {
-      const text = fileStore.get(fileId)
-      return Promise.resolve(text ? { ok: true, text } : { ok: false, errorCode: 'FILE_NOT_FOUND', errorMessage: 'gone' })
+    extractResumeText: ({ fileId, endUserId }: { fileId: string; endUserId?: string | null }) => {
+      const record = fileStore.get(fileId)
+      if (!record || record.endUserId !== (endUserId ?? null)) {
+        return Promise.resolve({ ok: false, errorCode: 'FILE_NOT_FOUND', errorMessage: 'gone' })
+      }
+      return Promise.resolve({ ok: true, fileId, text: record.text, textSource: 'docx', confidence: 'high', charCount: record.text.length })
     },
   }
   const stubFiles = {
@@ -109,7 +112,8 @@ async function main() {
   const suffix = Date.now().toString(36)
   const taskAnon = `vcp_anon_${suffix}`
   const taskMember = `vcp_member_${suffix}`
-  const fileId = `vcp_file_${suffix}`
+  const anonFileId = `vcp_file_anon_${suffix}`
+  const memberFileId = `vcp_file_member_${suffix}`
   const endUserA = `vcp_a_${suffix}`
   const accessToken = 'bb'.repeat(24)
   const { createHash } = await import('crypto')
@@ -117,13 +121,14 @@ async function main() {
   const sessionIds: string[] = []
 
   try {
-    fileStore.set(fileId, RESUME_TEXT)
+    fileStore.set(anonFileId, { text: RESUME_TEXT, endUserId: null })
+    fileStore.set(memberFileId, { text: RESUME_TEXT, endUserId: endUserA })
     await prisma.endUser.create({ data: { id: endUserA, phoneHash: `h_${endUserA}`, phoneEnc: `e_${endUserA}` } })
     // 匿名 parse 行（含同任务 job_fit 行供上下文聚合断言）
     await prisma.aiResumeResult.create({
       data: {
         taskId: taskAnon, kind: 'parse', status: 'completed', provider: 'llm',
-        payloadJson: JSON.stringify({ taskId: taskAnon, status: 'completed', fileId }),
+        payloadJson: JSON.stringify({ taskId: taskAnon, status: 'completed', fileId: anonFileId }),
         endUserId: null, accessTokenHash: tokenHash, expiresAt: new Date(Date.now() + 3600_000),
       },
     })
@@ -138,7 +143,7 @@ async function main() {
     await prisma.aiResumeResult.create({
       data: {
         taskId: taskMember, kind: 'parse', status: 'completed', provider: 'llm',
-        payloadJson: JSON.stringify({ taskId: taskMember, status: 'completed', fileId }),
+        payloadJson: JSON.stringify({ taskId: taskMember, status: 'completed', fileId: memberFileId }),
         endUserId: endUserA, accessTokenHash: null, expiresAt: new Date(Date.now() + 3600_000),
       },
     })
@@ -234,10 +239,10 @@ async function main() {
     pass('7. getLatest 读回；upsert 单行覆盖')
 
     // ── 8. 文件清理 → 诚实失败 ────────────────────────────────────────────────
-    fileStore.delete(fileId)
+    fileStore.delete(anonFileId)
     const r8 = await svc.generate(taskAnon, anonReq)
     if (r8.status !== 'failed' || !r8.failReason?.includes('重新上传')) fail('8. 文件清理应诚实失败')
-    fileStore.set(fileId, RESUME_TEXT)
+    fileStore.set(anonFileId, { text: RESUME_TEXT, endUserId: null })
     pass('8. 简历原文已清理 → 诚实 failed（不调 LLM、不编造）')
 
     // ── 9. 建议单 PDF ─────────────────────────────────────────────────────────

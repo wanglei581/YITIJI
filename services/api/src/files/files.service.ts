@@ -381,6 +381,36 @@ export class FilesService {
     }
   }
 
+  /**
+   * 会员 / 匿名业务流按上传归属读取文件内容。
+   *
+   * - endUserId 为 string: 只允许读取该会员自己的文件。
+   * - endUserId 为 null: 只允许读取匿名上传文件(ownerType=system)。
+   *
+   * 这里故意用 NOT_FOUND 口径，避免通过 fileId 探测他人文件是否存在。
+   * 签名 URL 内容代理仍使用 readContent；签名校验由 controller 完成。
+   */
+  async readContentForEndUser(
+    fileId: string,
+    endUserId: string | null,
+  ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
+    const record = await this.requireAlive(fileId)
+    const allowed =
+      endUserId
+        ? record.endUserId === endUserId
+        : record.endUserId === null && record.ownerType === 'system'
+    if (!allowed) {
+      throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+    }
+    const buffer = await this.storage.getObject(record.storageKey, record.bucket)
+    return {
+      buffer,
+      mimeType: record.mimeType,
+      filename: record.filename,
+      purpose: record.purpose as FilePurpose,
+    }
+  }
+
   // ── 列表(admin)─────────────────────────────────────────────────────────
 
   async list(args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}): Promise<FileMetadata[]> {

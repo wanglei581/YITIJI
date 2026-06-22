@@ -113,6 +113,48 @@ async function main() {
 
     const baseCfg = { interviewerType: 'tech', industry: '互联网 / AI', position: '前端开发工程师', experience: 'y1_3', difficulty: 'standard', durationMin: 5 }
 
+    // ── 0. resumeFileId 必须随当前会员身份传入提取层 ───────────────────────
+    {
+      const ownedResumeFileId = `owned_resume_${suffix}`
+      const guardedExtraction = {
+        extractResumeText: async ({ fileId, endUserId }: { fileId: string; endUserId?: string | null }) => {
+          if (fileId === ownedResumeFileId && endUserId === endUserA) {
+            return {
+              ok: true,
+              fileId,
+              text: `${SECRET_ANSWER}。这是一份用于验证 resumeFileId 归属传递的简历摘要。`,
+              textSource: 'docx',
+              confidence: 'high',
+              charCount: 120,
+            }
+          }
+          return {
+            ok: false,
+            fileId,
+            errorCode: 'FILE_NOT_FOUND',
+            errorMessage: '文件已失效或无法读取，请重新上传',
+          }
+        },
+      }
+      const guardedSvc = new MockInterviewService(prisma, llm, pdf, {} as never, guardedExtraction as never, audit)
+      const created = await guardedSvc.createSession(
+        { ...baseCfg, resumeFileId: ownedResumeFileId },
+        { endUserId: endUserA, accessToken: null },
+      )
+      cleanupSessionIds.push(created.sessionId)
+      try {
+        await guardedSvc.createSession(
+          { ...baseCfg, resumeFileId: ownedResumeFileId },
+          { endUserId: endUserB, accessToken: null },
+        )
+        fail('0. B 不应能用 A 的 resumeFileId 创建模拟面试')
+      } catch (e) {
+        const status = e instanceof Error && 'getStatus' in e ? (e as { getStatus(): number }).getStatus() : 0
+        if (status !== 400) throw e
+      }
+      pass('0. resumeFileId 提取按当前会员身份传递：本人可用，他人被拒')
+    }
+
     // ── 1+2. 匿名完整闭环 + 题量硬控制 ──────────────────────────────────────
     {
       const created = await svc.createSession(baseCfg, { endUserId: null, accessToken: null })
