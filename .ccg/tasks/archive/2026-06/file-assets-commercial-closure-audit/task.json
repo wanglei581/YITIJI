@@ -1,0 +1,13 @@
+{
+  "id": "file-assets-commercial-closure-audit",
+  "title": "用户文件与简历资产商用闭环完成度审计矩阵",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交文档审计矩阵",
+  "createdAt": "2026-06-22T00:00:00+08:00",
+  "branch": "codex/file-assets-commercial-closure-audit",
+  "baseCommit": "2d3ecd4d"
+}

@@ -3,19 +3,23 @@ import { randomUUID } from 'crypto'
 import type {
   CompleteUploadResponse,
   FileAccessUrlResponse,
+  FileAssetCategory,
   FileMetadata,
   FileOwnerType,
   FilePurpose,
+  FileRetentionPolicy,
+  FileRetentionSetBy,
+  FileRetentionUpdateResponse,
   FileSensitiveLevel,
   FileStatus,
   FileUploadResponse,
+  FileLifecycleSummaryResponse,
   SignedUrlResponse,
   FileCleanupResponse,
   UploadIntentResponse,
 } from './file.types'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { UserRole } from '../common/decorators/roles.decorator'
-import { FILE_DEFAULT_TTL_HOURS } from './file.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
@@ -26,6 +30,13 @@ import {
   validateUpload,
   isPurpose,
 } from './file-validation'
+import {
+  RetentionPolicyError,
+  allowedPoliciesForFile,
+  computeRetentionDecision,
+  defaultRetentionForUpload,
+} from './retention-policy'
+import { summarizeFileLifecycleRows } from './lifecycle-summary'
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -62,6 +73,8 @@ export class FilesService {
     sensitiveLevel?: FileSensitiveLevel
     uploaderId: string | null
     endUserId?: string | null
+    assetCategory?: FileAssetCategory
+    sourceFileId?: string | null
     actorRole?: UserRole | null
     actorOrgId?: string | null
     createdBy?: string | null
@@ -78,13 +91,18 @@ export class FilesService {
     }
 
     const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
-    const expiresAt = this.computeExpiry(sensitiveLevel)
     const id = randomUUID().replace(/-/g, '')
     const owner = deriveOwner({
       endUserId: args.endUserId ?? null,
       role: args.actorRole ?? null,
       uploaderId: args.uploaderId,
       orgId: args.actorOrgId ?? null,
+    })
+    const retention = defaultRetentionForUpload({
+      purpose: args.purpose,
+      sensitiveLevel,
+      ownerType: owner.ownerType,
+      endUserId: args.endUserId ?? null,
     })
     const objectKey = generateObjectKey({
       purpose: args.purpose,
@@ -115,7 +133,13 @@ export class FilesService {
         visibility: 'private',
         status: 'active',
         createdBy: args.createdBy ?? args.uploaderId ?? null,
-        expiresAt,
+        assetCategory: args.assetCategory ?? 'original',
+        sourceFileId: args.sourceFileId ?? null,
+        expiresAt: retention.expiresAt,
+        retentionPolicy: retention.retentionPolicy,
+        retentionSetBy: retention.retentionSetBy,
+        retentionConsentAt: retention.retentionConsentAt,
+        retentionConsentVersion: retention.retentionConsentVersion,
       },
     })
 
@@ -139,7 +163,7 @@ export class FilesService {
       sha256: record.sha256,
       signedUrl: signed.url,
       signedUrlExpiresAt: signed.expiresAt.toISOString(),
-      fileExpiresAt: record.expiresAt.toISOString(),
+      fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
     }
   }
 
@@ -173,13 +197,18 @@ export class FilesService {
       body.purpose as FilePurpose,
       body.sensitiveLevel as FileSensitiveLevel | undefined,
     )
-    const expiresAt = this.computeExpiry(sensitiveLevel)
     const id = randomUUID().replace(/-/g, '')
     const owner = deriveOwner({
       endUserId: args.endUserId ?? null,
       role: args.actorRole ?? null,
       uploaderId: args.uploaderId,
       orgId: args.actorOrgId ?? null,
+    })
+    const retention = defaultRetentionForUpload({
+      purpose: body.purpose as FilePurpose,
+      sensitiveLevel,
+      ownerType: owner.ownerType,
+      endUserId: args.endUserId ?? null,
     })
     const objectKey = generateObjectKey({
       purpose: body.purpose as FilePurpose,
@@ -208,7 +237,11 @@ export class FilesService {
         visibility: 'private',
         status: 'uploading',
         createdBy: args.createdBy ?? args.uploaderId ?? null,
-        expiresAt,
+        expiresAt: retention.expiresAt,
+        retentionPolicy: retention.retentionPolicy,
+        retentionSetBy: retention.retentionSetBy,
+        retentionConsentAt: retention.retentionConsentAt,
+        retentionConsentVersion: retention.retentionConsentVersion,
       },
     })
 
@@ -270,7 +303,7 @@ export class FilesService {
       status: updated.status as FileStatus,
       sizeBytes: updated.sizeBytes,
       sha256: updated.sha256,
-      fileExpiresAt: updated.expiresAt.toISOString(),
+      fileExpiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
     }
   }
 
@@ -425,6 +458,29 @@ export class FilesService {
     return records.map(toMetadata)
   }
 
+  /** Admin 文件生命周期全局只读统计。 */
+  async lifecycleSummary(now = new Date()): Promise<FileLifecycleSummaryResponse> {
+    const rows = await this.prisma.fileObject.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        retentionPolicy: true,
+        retentionSetBy: true,
+        expiresAt: true,
+      },
+    })
+    return summarizeFileLifecycleRows(
+      rows.map((row) => ({
+        id: row.id,
+        retentionPolicy: row.retentionPolicy as FileRetentionPolicy | null,
+        retentionSetBy: row.retentionSetBy as FileRetentionSetBy | null,
+        expiresAt: row.expiresAt,
+        deletedAt: null,
+      })),
+      now,
+    )
+  }
+
   // ── 删除 ────────────────────────────────────────────────────────────────────
 
   /** 管理员强制删除(软删 + 物理删 COS / 本地对象)。 */
@@ -443,6 +499,59 @@ export class FilesService {
     }
     const deletedBy = requester.kind === 'member' ? `member:${requester.endUserId}` : requester.role === 'admin' ? `admin:${requester.userId}` : `user:${requester.userId}`
     return this._delete(fileId, deletedBy, reason)
+  }
+
+  /** 会员本人修改文件保存期限。Admin 代改留给后续独立审批/锁定通道。 */
+  async updateRetention(
+    fileId: string,
+    requester: FileRequester,
+    args: { retentionPolicy: FileRetentionPolicy; consentVersion?: string },
+  ): Promise<FileRetentionUpdateResponse> {
+    const record = await this.requireAlive(fileId)
+    if (!canAccessFile(record, requester)) {
+      throw new ForbiddenException({ error: { code: 'FILE_ACCESS_DENIED', message: '无权修改此文件' } })
+    }
+    try {
+      const decision = computeRetentionDecision({
+        now: new Date(),
+        policy: args.retentionPolicy,
+        purpose: record.purpose as FilePurpose,
+        sensitiveLevel: record.sensitiveLevel as FileSensitiveLevel,
+        assetCategory: record.assetCategory as FileAssetCategory,
+        ownerType: record.ownerType as FileOwnerType | null,
+        endUserId: record.endUserId,
+        requesterKind: requester.kind,
+        requesterEndUserId: requester.kind === 'member' ? requester.endUserId : null,
+        consentVersion: args.consentVersion,
+        retentionLockedReason: record.retentionLockedReason,
+      })
+      const updated = await this.prisma.fileObject.update({
+        where: { id: fileId },
+        data: {
+          expiresAt: decision.expiresAt,
+          retentionPolicy: decision.retentionPolicy,
+          retentionSetBy: decision.retentionSetBy,
+          retentionConsentAt: decision.retentionConsentAt,
+          retentionConsentVersion: decision.retentionConsentVersion,
+        },
+      })
+      return {
+        file: toMetadata(updated),
+        allowedPolicies: allowedPoliciesForFile({
+          purpose: updated.purpose,
+          assetCategory: updated.assetCategory,
+        }),
+      }
+    } catch (err) {
+      if (err instanceof RetentionPolicyError) {
+        const payload = { error: { code: err.code, message: err.message } }
+        if (err.code === 'RETENTION_MEMBER_REQUIRED' || err.code === 'RETENTION_ACCESS_DENIED' || err.code === 'RETENTION_LOCKED') {
+          throw new ForbiddenException(payload)
+        }
+        throw new BadRequestException(payload)
+      }
+      throw err
+    }
   }
 
   private async _delete(fileId: string, deletedBy: string, reason: string): Promise<FileMetadata> {
@@ -522,11 +631,6 @@ export class FilesService {
     return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
   }
 
-  private computeExpiry(sensitiveLevel: FileSensitiveLevel): Date {
-    const ttlHours = FILE_DEFAULT_TTL_HOURS[sensitiveLevel]
-    return new Date(Date.now() + ttlHours * 60 * 60 * 1000)
-  }
-
   private async requireAlive(fileId: string) {
     const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!record || record.deletedAt) {
@@ -588,10 +692,17 @@ function toMetadata(r: {
   ownerId: string | null
   visibility: string
   status: string
+  assetCategory: string
+  sourceFileId: string | null
+  retentionPolicy: string | null
+  retentionSetBy: string | null
+  retentionConsentAt: Date | null
+  retentionConsentVersion: string | null
+  retentionLockedReason: string | null
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
-  expiresAt: Date
+  expiresAt: Date | null
   deletedAt: Date | null
   deletedBy: string | null
   deleteReason: string | null
@@ -612,10 +723,17 @@ function toMetadata(r: {
     ownerId: r.ownerId,
     visibility: r.visibility as FileMetadata['visibility'],
     status: r.status as FileStatus,
+    assetCategory: r.assetCategory as FileAssetCategory,
+    sourceFileId: r.sourceFileId,
+    retentionPolicy: r.retentionPolicy as FileRetentionPolicy | null,
+    retentionSetBy: r.retentionSetBy as FileMetadata['retentionSetBy'],
+    retentionConsentAt: r.retentionConsentAt?.toISOString() ?? null,
+    retentionConsentVersion: r.retentionConsentVersion,
+    retentionLockedReason: r.retentionLockedReason,
     uploaderId: r.uploaderId,
     endUserId: r.endUserId,
     createdBy: r.createdBy,
-    expiresAt: r.expiresAt.toISOString(),
+    expiresAt: r.expiresAt?.toISOString() ?? null,
     deletedAt: r.deletedAt?.toISOString() ?? null,
     deletedBy: r.deletedBy,
     deleteReason: r.deleteReason,

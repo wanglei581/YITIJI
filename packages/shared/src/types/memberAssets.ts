@@ -11,6 +11,7 @@
 // ============================================================
 
 import type { AiTaskStatus } from './ai'
+import type { FileAssetCategory, FileRetentionPolicy } from './file'
 
 /**
  * 游标分页响应（Phase C-2D，所有 /me/* 列表统一形状）。
@@ -55,8 +56,11 @@ export interface MemberDocumentItem {
   sizeBytes: number
   purpose: string
   sensitiveLevel: string
+  assetCategory: FileAssetCategory
+  retentionPolicy: FileRetentionPolicy | null
+  allowedRetentionPolicies: FileRetentionPolicy[]
   createdAt: string
-  expiresAt: string
+  expiresAt: string | null
   /** 临时访问能力：会员凭本人 token 调此端点换取短期签名下载 URL（不在列表直接签发） */
   downloadUrlPath: string
   /** 临时访问能力：换取短期签名预览 URL */

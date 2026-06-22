@@ -1,0 +1,14 @@
+{
+  "id": "file-assets-gate3-doc-verify-scope",
+  "title": "用户文件与简历资产 Gate 3 文档静态门禁执行范围修正",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "acceptance-docs",
+  "currentPhase": "completed",
+  "nextAction": "已归档；等待用户确认后进入 Gate 2 预生产刷新",
+  "createdAt": "2026-06-22T05:14:16+08:00",
+  "completedAt": "2026-06-22T05:27:21+08:00",
+  "branch": "codex/file-assets-gate3-doc-verify-scope",
+  "baseCommit": "95bccaef"
+}

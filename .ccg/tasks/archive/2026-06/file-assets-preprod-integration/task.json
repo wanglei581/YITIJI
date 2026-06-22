@@ -1,0 +1,14 @@
+{
+  "id": "file-assets-preprod-integration",
+  "title": "用户文件资产商用闭环与预生产验收候选集成",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "integration",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交集成候选",
+  "createdAt": "2026-06-22T00:00:00+08:00",
+  "branch": "codex/file-assets-preprod-integration",
+  "baseBranch": "codex/file-assets-trial-acceptance",
+  "mergeBranch": "codex/preprod-deployment-acceptance"
+}

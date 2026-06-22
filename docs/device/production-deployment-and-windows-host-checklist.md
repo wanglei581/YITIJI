@@ -39,6 +39,8 @@
 
 - [ ] 百度 OCR 应用密钥已在百度控制台重建/轮换。
 - [ ] 腾讯云 COS CAM 子用户密钥已轮换，权限最小化到私有桶所需动作。
+- [ ] 腾讯云 COS 生命周期已人工验收：禁止配置 Bucket 全局过期规则；任何规则不得覆盖 `users/`、会员简历、AI 成果物或 `long_term` 长期保存对象。
+- [ ] 如启用 COS 生命周期兜底规则，仅允许作用于 `tmp/` 临时前缀；规则名称、作用前缀、过期天数和启用状态已截图存档。
 - [ ] 腾讯 ASR/TTS/SMS/TRTC 相关 CAM 权限已按生产最小权限配置。
 - [ ] LLM/DeepSeek 或其他模型 API Key 已使用生产专用 Key。
 - [ ] 短信签名/模板审核通过后再启用真实短信。
@@ -47,6 +49,7 @@
 ### 2.3 合规前置
 
 - [ ] 用户协议 / 隐私政策已经法务审定；当前试运营文本不得冒充正式法务版本。
+- [ ] 用户协议 / 隐私政策已说明文件分级保存：高敏/匿名文件短期保存，会员简历默认 90 天，用户确认后可延长至 180 天或长期保存；延长至 180 天或长期保存需确认保存条款版本。
 - [ ] 岗位/招聘会按钮文案只使用：`查看岗位`、`去来源平台投递`、`扫码投递`、`查看招聘会`、`去来源平台预约`、`扫码预约`。
 - [ ] 不存在平台内投递、收简历给企业、企业候选人筛选、面试邀约、Offer 管理、候选人推荐。
 - [ ] 外部跳转只记录跳转行为，不记录投递/预约结果。
@@ -80,6 +83,7 @@
 - [ ] `REDIS_URL` 正确。
 - [ ] API 监听端口、前端 API base URL、CORS allowlist 正确。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。
+- [ ] COS 生命周期人工验收已完成并截图存档：禁止配置 Bucket 全局过期规则，`tmp/` 以外前缀不得覆盖长期保存对象，`long_term` 文件的 `expiresAt = null` 只能由业务删除或用户主动删除处理。
 - [ ] OCR provider 与百度密钥正确。
 - [ ] AI provider / LLM 功能级配置可读取。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
@@ -190,6 +194,7 @@ pnpm --filter ./services/api verify:activity-logs
 
 ### 4.3 打印/文件闭环
 
+- [ ] 按 [用户文件与简历资产生产/试运营验收证据包](../acceptance/user-file-assets-trial-acceptance.md) 完成用户文件与简历资产证据包，留存命令日志、浏览器截图、COS 控制台截图、PostgreSQL 抽样和审计查询结果；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。
 - [ ] 上传文件 → 我的文档可见。
 - [ ] 文档预览使用短期签名 URL。
 - [ ] 文档下载成功。
@@ -320,6 +325,7 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] 手机号登录与登出。
 - [ ] 上传简历 → OCR/文本提取 → AI 诊断。
 - [ ] AI 简历生成或优化 → 生成 PDF → 我的文档。
+- [ ] 用户文件与简历资产证据包已执行：覆盖上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 AuditLog 审计；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。
 - [ ] 真实打印出纸 → 打印订单状态 completed。
 - [ ] 打印失败场景 → 打印订单状态 failed，不伪造成功。
 - [ ] 岗位 / 招聘会 / 政策浏览与收藏。

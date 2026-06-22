@@ -7,6 +7,7 @@ import type {
   MemberDocumentItem,
   MemberResumeItem,
 } from './member-assets.types'
+import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
 
 // ============================================================
 // 会员个人资产中心服务（Phase C-2B 只读 → C-2D 真实管理）
@@ -18,7 +19,8 @@ import type {
 // 留存治理对齐（CLAUDE.md §11，与 C-2A loadAuthorizedResult 一致）：
 // - AiResumeResult：仅返回未过期（expiresAt > now）行；expiresAt 为 null 的迁移前历史行
 //   按「已过期」处理，不返回（`{ gt: now }` 自动排除 null）。
-// - FileObject：仅返回 active、未软删、未过期的文件。
+// - FileObject：仅返回 active、未软删、未过期的文件；expiresAt=null 在 FileObject
+//   中表示 long_term 长期保存，必须继续显示。
 //
 // 分页（C-2D）：所有列表走游标分页（take pageSize+1，封顶 50），绝不无界 findMany。
 //
@@ -75,13 +77,13 @@ export class MemberAssetsService {
 
   /** 我的文档：本人 FileObject（仅元数据 + 临时访问端点路径，无文件内容）。 */
   async listDocuments(endUserId: string, page: MemberPageQuery): Promise<MemberAssetPage<MemberDocumentItem>> {
-    const where = { endUserId, status: 'active', deletedAt: null, expiresAt: { gt: new Date() } }
+    const where = isVisibleMemberFileWhere(endUserId, new Date())
     const total = await this.prisma.fileObject.count({ where })
     const rows = await this.prisma.fileObject.findMany({
       where,
       select: {
         id: true, filename: true, mimeType: true, sizeBytes: true,
-        purpose: true, sensitiveLevel: true, createdAt: true, expiresAt: true,
+        purpose: true, sensitiveLevel: true, assetCategory: true, retentionPolicy: true, createdAt: true, expiresAt: true,
       },
       ...memberPageArgs(page),
     })
@@ -92,8 +94,14 @@ export class MemberAssetsService {
       sizeBytes: f.sizeBytes,
       purpose: f.purpose,
       sensitiveLevel: f.sensitiveLevel,
+      assetCategory: f.assetCategory as MemberDocumentItem['assetCategory'],
+      retentionPolicy: f.retentionPolicy as MemberDocumentItem['retentionPolicy'],
+      allowedRetentionPolicies: allowedPoliciesForFile({
+        purpose: f.purpose,
+        assetCategory: f.assetCategory,
+      }) as MemberDocumentItem['allowedRetentionPolicies'],
       createdAt: f.createdAt.toISOString(),
-      expiresAt: f.expiresAt.toISOString(),
+      expiresAt: f.expiresAt ? f.expiresAt.toISOString() : null,
       // 必要的临时访问能力：会员带本人 token 调既有端点换取 TTL 受控签名 URL。
       downloadUrlPath: `/files/${f.id}/download-url`,
       previewUrlPath: `/files/${f.id}/preview-url`,

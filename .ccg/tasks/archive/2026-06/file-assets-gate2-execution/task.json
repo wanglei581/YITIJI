@@ -1,0 +1,12 @@
+{
+  "id": "file-assets-gate2-execution",
+  "title": "执行用户文件与简历资产预生产 Gate 2 刷新",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "deployment",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交执行记录",
+  "createdAt": "2026-06-22T04:04:25Z",
+  "branch": "codex/file-assets-gate2-execution"
+}

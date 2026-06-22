@@ -1,0 +1,12 @@
+{
+  "id": "guard-kiosk-trtc-assistant",
+  "title": "防止 Kiosk AI 助手数字人因构建或启动变量缺失而消失",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交",
+  "createdAt": "2026-06-21T13:36:00+08:00",
+  "branch": "codex/guard-kiosk-trtc-assistant"
+}

@@ -27,6 +27,10 @@
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
 - [ ] 小范围试运营：仅 1 台终端 + 1 台打印机先跑，问题记录按任务闭环处理。
 
+2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
+
+2026-06-22 补充：`codex/file-assets-preprod-integration` 已把用户文件资产商用闭环栈与预生产验收候选合到同一分支，后续预生产/试运营应以该集成候选为基线继续执行；这仍不代表真实生产/试运营执行完成。
+
 ## P1：渐进式重构首批业务闭环
 
 首批业务闭环不按目录搬家，按可验收业务流推进。
@@ -44,13 +48,42 @@
 - [x] **招聘会 / 校园招聘 Branch 1：列表页本校优先接线**：`JobFairsPage` 调用 `getTerminalId()` 并透传 `getJobFairs(terminalId ? { terminalId } : undefined)`，对齐 `/campus` 已有本校优先排序；新增 `verify-jobfairs-terminal-priority` 防回退脚本，不改 UI、不改后端。
 - [x] **招聘会 / 校园招聘 Branch 2：参展企业外部投递跳转记录**：新增 `fair_company` activity target，限定 `external_apply`；`FairCompanyDetailPage` 使用真实 `SourceUrlQr` 并记录本人外部入口打开；`/me/activity` 支持参展企业记录回跳。
 - [x] **招聘会 / 校园招聘 Branch 3：大页面零行为拆分**：已拆分 `CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage`，保持路由、接口、文案和行为不变；新增 `verify:jobfair-size` 并接入 `verify:jobfair-ui`，已完成 Claude + Antigravity 双模型审查。
+- [x] **用户文件保存期限 Branch 2：策略服务与清理门禁**：`FileObject.expiresAt` 支持 `long_term` 的 `null` 语义；会员本人可改本人文件保存期限；原始文件首批仅 3/6 个月，`optimized/derived` 成果物可长期，证件/匿名/系统文件保持短期；补 `verify:file-retention` 与 Admin/Kiosk 可空兼容。
+- [x] **用户文件保存期限 Branch 3：Kiosk 文件保存期限 UI**：`/me/documents` 展示当前保存期限和后端允许策略；本人可设置 3 个月 / 6 个月 / 成果物长期保存，6 个月 / 长期保存自动带当前保存条款版本；保存条款版本由 shared/API 本地副本常量收敛并有防回退验证。
+- [x] **用户文件保存期限 Branch 4：Admin 文件生命周期运营视图**：Admin `/files` 复用现有入口展示保存策略、设置来源、同意时间、长期保存数量和即将到期/待清理统计；新增全库只读 `GET /files/lifecycle-summary`，不受列表 `limit=200` 截断；管理员无保存期限修改入口，查看文件兼容 COS 绝对签名 URL。
+- [x] **用户文件保存期限 Branch 5：COS 生命周期与隐私文案验收**：采集点、帮助中心、隐私政策、Admin 文件横幅统一为短期 / 90 天 / 180 天 / 长期保存口径；新增 COS 生命周期合规文档，明确禁止 Bucket 全局过期规则、`long_term` 防误删人工验收和截图存档；新增 `verify:legal-retention-copy` 与 `verify:cos-lifecycle-policy`。
+- [x] **用户文件与简历资产证据包**：新增 `docs/acceptance/user-file-assets-trial-acceptance.md` 和 `verify:file-assets-trial-acceptance`，把生产/试运营验收拆成 PostgreSQL、COS 私有桶、会员账号、上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删、AuditLog 审计和证据脱敏；静态验证只证明证据包完整，不代表真实生产/试运营执行完成。
+- [x] **用户文件资产 + 预生产候选集成**：`codex/file-assets-preprod-integration` 已合并文件资产保存期限栈、生产/试运营证据包、TRTC assistant 生产构建守卫和预生产阶段性记录；后续真实验收应基于该集成候选继续，不再用只含 TRTC guard 的预生产分支替代。
+
+## P1：用户文件与简历资产商用闭环后续
+
+- [ ] **真实生产/试运营执行**：按用户文件与简历资产证据包，使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理、`long_term` 防误删和审计查询全链路，并留存命令日志、浏览器截图、COS 控制台截图和 DB 抽样。
+- [x] **文档产出：商用闭环完成度审计矩阵**：已输出 `docs/acceptance/user-file-assets-commercial-closure-audit.md`，明确哪些能力只是代码/文档候选已具备，哪些仍待 Gate 2/3/4、正式生产、Windows 真机和试运营真实验收；该审计不代表远端执行完成。
+- [x] **文档产出：预生产 Gate 2 执行审批包**：已输出 `docs/acceptance/user-file-assets-gate2-approval-package.md`，把执行前必须确认的目标、非目标、远端允许修改内容、禁止事项、前置确认、验证方式、停止条件、回滚方式和用户确认口径集中到短入口；该审批包不代表 Gate 2 已执行。
+- [x] **本地预检：预生产 Gate 2 候选包**：已输出 `docs/acceptance/user-file-assets-gate2-local-artifact-check.md`，确认完整归档会带入非运行时文档/任务资料，Gate 2 计划已改为裁剪运行时归档并使用 `gzip -n -9` 生成可复现 sha256；该预检不代表上传或远端执行完成。
+- [x] **本地预检：预生产 Gate 2 裁剪包构建**：已输出 `docs/acceptance/user-file-assets-gate2-runtime-build-check.md`，确认裁剪包在 `/tmp` 解压目录可完成 install、Prisma client 生成、API build、Kiosk build、Admin build；同时修正 Gate 2 计划中前端生产构建变量，Kiosk/Admin 必须显式 `VITE_API_MODE=http` 与 `VITE_API_BASE_URL=/api/v1`。
+- [x] **本地预检：预生产 Gate 2 候选刷新**：后续 Gate 2 建议目标候选已从 `9146fa1c` 刷新为 `2187f6a7`，并重新生成裁剪运行时归档完成 install、Prisma 双 client、API/Kiosk/Admin build；该预检不代表上传或远端执行完成。
+- [x] **本地门禁：预生产 Gate 2 候选一致性防回退**：`verify:file-assets-trial-acceptance` 已检查操作型 Gate 2 refresh plan、审批包、执行记录、Gate 3/Gate 4 runbook、构建预检和进度入口均指向 `2187f6a7`，并阻断旧候选 `9146fa1c` 的操作型归档/目录/DEPLOY_SOURCE marker 回流；旧本地预检命令只保留为历史证据且已标记勿执行；该门禁不代表上传或远端执行完成。
+- [x] **本地门禁：预生产 Gate 2 审批确认口径防回退**：`verify:file-assets-trial-acceptance` 已升级为执行后口径，检查 Gate 2 审批包记录 `PREPRODUCTION GATE 2 PASSED`，同时保留机读确认块、用户明确确认范围、同意/不同意范围、Gate 3/Gate 4 另行确认和 Gate 2 不等于试运营或商用闭环完成。
+- [x] **本地门禁：预生产 Gate 3 文档静态门禁执行范围修正**：`verify:file-assets-trial-acceptance` 已明确为 Gate 0 本地/仓库侧静态文档门禁，不再列入预生产裁剪运行时包内 Gate 3 远端命令；不得为了远端运行该脚本把 `docs/` 或 `.ccg/` 加回裁剪包。
+- [x] **本地门禁：历史集成计划静态门禁口径收口**：`docs/superpowers/plans/2026-06-22-file-assets-preprod-integration.md` 已将 `verify:file-assets-trial-acceptance` 从 API runtime gates 中拆出为 Gate 0 本地静态文档门禁，防止后续误按远端裁剪运行时包命令执行；该检查不代表 Gate 2/Gate 3/Gate 4 已执行。
+- [x] **本地预检：预生产 Gate 3 命令清单防回退**：`verify:file-assets-trial-acceptance` 已检查 Gate 3/Gate 4 runbook 中远端 `verify:*` 命令顺序，并确认每条命令存在于 `services/api/package.json`；G3-08 静态证据包防回退已移至 Gate 0 本地执行，G3-09 AuditLog 槽位保留；该检查不代表 Gate 3 已执行。
+- [x] **本地门禁：预生产 Gate 2 部署候选冻结口径**：Gate 2 远端部署候选冻结为 `2187f6a7`，治理提交不刷新部署候选；只有运行时代码、数据库 schema、构建输入、归档范围、生产构建变量或 Gate 2 执行命令变化，才重新生成候选包并刷新执行计划。该门禁不代表 Gate 2 已授权或已执行。
+- [x] **只读复核：预生产 Gate 2 执行前就绪状态**：已输出 `docs/acceptance/user-file-assets-gate2-readiness-recheck.md`，确认本地候选包、预生产部署源、PM2、health、磁盘预算、API env、工具链和 PostgreSQL/Redis/Tencent COS 脱敏指纹；同时修正 Gate 2 主计划里的 Tencent COS key 名。该复核是 Gate 2 执行前历史证据，本身不代表远端执行。
+- [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
+- [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
+- [x] **预生产 COS bucket 切换**：已完成。腾讯云已创建隔离预生产 bucket 和预生产专用 CAM 子用户；预生产服务器仅替换 COS 相关 env，备份为 `/srv/ai-job-print-env-backups/api.env.20260622134416.bak`；新 bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`；PM2 online，health 为 `db=postgres`；G3-06 `verify:cos:live` 已通过 put/head/get/预签名下载/delete。
+- [x] **预生产 Gate 4 账号/API 级验收**：已按用户确认的 B 方案临时切 `SMS_PROVIDER=log`，通过真实 HTTP API + PostgreSQL + Redis + COS 完成受控会员登录、原始文件上传、默认 90 天、设置 180 天、原始文件长期保存拒绝、签名 URL 内部访问、跨账号 403、删除三态、过期清理、Admin 生命周期汇总和审计抽样；执行后已回滚 `SMS_PROVIDER=tencent`，公网 health 复核 `db=postgres`，SSH 只读复核确认 `SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。该项仍不是完整浏览器截图验收、正式生产或试运营完成。
+- [ ] **预生产 Gate 4 人工证据补齐**：真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的代码侧链路已补齐并由 `verify:resume-generate` 覆盖；下一步仍需部署后预生产复验，并补 G4 浏览器截图、签名 URL 过期等待窗口、COS 控制台/HEAD 脱敏证据，避免把 API 级验收或本地代码验证误写成完整浏览器验收。
 - [x] **会员登录个人数据隔离 P0：文件提取归属门禁**：`ResumeExtractionService` 读取文件时按 `endUserId` scoped read；会员只能提取本人文件，匿名只能提取匿名文件；签名 URL 内容代理不变；新增 `verify:member-login-data-closure` 组合验证。
 - [x] **会员登录个人数据隔离 P1：前端会话态和数据质量**：Kiosk 主要会员 API 已统一 401 / 账号禁用失效通知，登录发送会话级 `deviceId` 激活设备限流，收藏写入前验证已发布目标并由服务端派生标题。
 - [x] **会员登录个人数据隔离 P1：账号状态和留存治理**：账号禁用后既有 session 立即失效；已新增 `docs/compliance/member-personal-data-retention.md` 并接入 `verify:member-data-retention`。
+- [ ] **预生产部署分支回流 main**：当前预生产部署候选需要同时包含 `76c06ca8` file-assets 能力与 PR #61 会员登录闭环；在 file-assets 正式回流 `origin/main` 前，禁止直接从裸 `origin/main` 覆盖预生产，否则会回退用户文件资产能力。
 
 ## P1：工程质量门禁
 
 - [ ] 每个新任务先写目标、非目标、允许修改文件、验证方式。
+- [ ] 后续另起分支统一 `docs/product/*` 和历史计划中旧文件 TTL 参考口径；本轮已完成 UI / 隐私政策 / shared copy / 送审材料 / 部署验收文档，产品参考文档历史口径不作为本分支继续扩范围修改。
 - [ ] 超过 30 行 diff 或跨模块任务必须 Claude + Antigravity 双模型审查。
 - [ ] 500 行以上文件新增功能前评估拆分；800 行以上不得继续堆新功能；1000 行以上进入拆分清单。
 - [ ] P3 拆分候选：`apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` 当前超过 500 行，后续反馈/通知扩展前先拆分表单、列表和详情面板。

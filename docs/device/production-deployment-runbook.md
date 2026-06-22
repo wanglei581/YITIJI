@@ -80,6 +80,12 @@ TENCENT_COS_BUCKET=yitiji-prod-private-1257025684
 TENCENT_COS_REGION=ap-guangzhou
 TENCENT_COS_SIGN_URL_EXPIRES_SECONDS=1800   # 合规上限，勿超
 
+# COS 生命周期验收：
+# 1. 禁止配置 Bucket 全局过期规则，不能用桶级 Expiration 覆盖会员文件。
+# 2. long_term 长期保存文件在数据库中为 expiresAt = null，只能由用户主动删除或业务删除路径处理。
+# 3. 如需 COS 侧兜底清理，只允许对 tmp/ 临时前缀配置生命周期规则，且不得覆盖长期保存对象。
+# 4. 生产试运营前必须在腾讯云控制台人工验收并截图存档：规则名称、作用前缀、过期天数、启用状态。
+
 # ── Redis：生产必配，禁止 inline 降级 ──
 REDIS_URL="redis://:PASSWORD@REDISHOST:6379/0"
 
@@ -127,7 +133,12 @@ ASR_PROVIDER=disabled
 # apps/kiosk/.env.local、apps/admin/.env.local、apps/partner/.env.local 各自：
 VITE_API_MODE=http
 VITE_API_BASE_URL=/api/v1
+# kiosk 默认启用 AI 助手数字人。缺少 VITE_USE_TRTC_CALL=true 时，生产构建会直接失败，
+# 避免 /assistant 未启用数字人通话入口后线上静默回落文字助手。
+VITE_USE_TRTC_CALL=true
 # kiosk 可选：VITE_TERMINAL_ID=<注册后的 terminalId>、VITE_KIOSK_LOGOUT_IDLE_SEC=180
+# 如本次部署明确只上线文字助手，必须显式设置：
+# VITE_ALLOW_TEXT_ONLY_ASSISTANT=true
 ```
 
 ---
@@ -135,6 +146,13 @@ VITE_API_BASE_URL=/api/v1
 ## 3. 构建
 
 ```bash
+# 依赖安装只跑一次，避免多进程并发 pnpm install 导致 node_modules 锁竞争
+pnpm install --frozen-lockfile
+
+# 冷环境先生成 SQLite + PG 两套 Prisma client，生产门禁/typecheck 依赖生成产物
+pnpm --filter @ai-job-print/api exec prisma generate
+pnpm --filter @ai-job-print/api db:pg:generate
+
 pnpm typecheck      # 6 包
 pnpm lint           # 4 端
 pnpm build          # 5 包（pnpm -r --if-present build）

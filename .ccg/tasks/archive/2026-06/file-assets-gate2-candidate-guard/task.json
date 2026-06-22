@@ -1,0 +1,14 @@
+{
+  "id": "file-assets-gate2-candidate-guard",
+  "title": "用户文件与简历资产 Gate 2 候选一致性防回退",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "acceptance-docs",
+  "currentPhase": "completed",
+  "nextAction": "已归档前待最终验证和提交",
+  "createdAt": "2026-06-22T04:50:00+08:00",
+  "completedAt": "2026-06-22T04:54:39+08:00",
+  "branch": "codex/file-assets-gate2-candidate-guard",
+  "baseCommit": "012f7c98"
+}

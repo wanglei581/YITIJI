@@ -44,6 +44,18 @@ export type FileVisibility = 'private' | 'internal' | 'public'
 /** 文件状态。 */
 export type FileStatus = 'uploading' | 'active' | 'quarantined' | 'deleted'
 
+/** 文件资产分类。 */
+export type FileAssetCategory = 'original' | 'optimized' | 'derived'
+
+/** 文件保存策略。 */
+export type FileRetentionPolicy = 'months_3' | 'months_6' | 'long_term' | 'system_short'
+
+/** 文件保存策略设置来源。 */
+export type FileRetentionSetBy = 'system' | 'user' | 'admin'
+
+/** 当前延长保存期限用户确认条款版本。 */
+export const FILE_RETENTION_CONSENT_VERSION = 'file-retention-v1'
+
 /** 默认有效期(小时),与 services/api/src/files/files.service.ts 保持一致。 */
 export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   normal: 24,
@@ -67,10 +79,17 @@ export interface FileMetadata {
   ownerId: string | null
   visibility: FileVisibility
   status: FileStatus
+  assetCategory?: FileAssetCategory
+  sourceFileId?: string | null
+  retentionPolicy?: FileRetentionPolicy | null
+  retentionSetBy?: FileRetentionSetBy | null
+  retentionConsentAt?: string | null
+  retentionConsentVersion?: string | null
+  retentionLockedReason?: string | null
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
-  expiresAt: string  // ISO
+  expiresAt: string | null  // ISO; null 表示长期保存
   deletedAt: string | null
   deletedBy: string | null
   deleteReason: string | null
@@ -86,7 +105,7 @@ export interface FileUploadResponse {
   sha256: string
   signedUrl: string
   signedUrlExpiresAt: string  // ISO
-  fileExpiresAt: string       // ISO,过期后元数据软删 + 物理清理
+  fileExpiresAt: string | null       // ISO; null 表示长期保存
 }
 
 /** 仅返回签名 URL(用于已有 fileId 的二次访问)。 */
@@ -134,7 +153,43 @@ export interface CompleteUploadResponse {
   status: FileStatus
   sizeBytes: number
   sha256: string
-  fileExpiresAt: string  // ISO
+  fileExpiresAt: string | null  // ISO; null 表示长期保存
+}
+
+/** 更新文件保存期限请求。 */
+export interface FileRetentionUpdateRequest {
+  retentionPolicy: Extract<FileRetentionPolicy, 'months_3' | 'months_6' | 'long_term'>
+  consentVersion?: string
+}
+
+/** 更新文件保存期限响应。 */
+export interface FileRetentionUpdateResponse {
+  file: FileMetadata
+  allowedPolicies: FileRetentionPolicy[]
+}
+
+/** Admin 文件生命周期策略分布项。 */
+export interface FileLifecyclePolicyCount {
+  key: FileRetentionPolicy | null
+  count: number
+}
+
+/** Admin 文件生命周期设置来源分布项。 */
+export interface FileLifecycleSetByCount {
+  key: FileRetentionSetBy | null
+  count: number
+}
+
+/** Admin 文件生命周期只读统计响应。 */
+export interface FileLifecycleSummaryResponse {
+  totalActive: number
+  longTermCount: number
+  expiringWithin7Days: number
+  expiringWithin30Days: number
+  expiredPendingCleanup: number
+  byRetentionPolicy: FileLifecyclePolicyCount[]
+  byRetentionSetBy: FileLifecycleSetByCount[]
+  generatedAt: string  // ISO
 }
 
 /** Admin 强制清理过期文件响应。 */

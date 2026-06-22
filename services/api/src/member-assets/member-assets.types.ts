@@ -33,8 +33,11 @@ export interface MemberDocumentItem {
   sizeBytes: number
   purpose: string
   sensitiveLevel: string
+  assetCategory: 'original' | 'optimized' | 'derived'
+  retentionPolicy: 'months_3' | 'months_6' | 'long_term' | 'system_short' | null
+  allowedRetentionPolicies: ('months_3' | 'months_6' | 'long_term' | 'system_short')[]
   createdAt: string
-  expiresAt: string
+  expiresAt: string | null
   downloadUrlPath: string
   previewUrlPath: string
 }

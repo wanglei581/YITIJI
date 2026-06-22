@@ -42,6 +42,18 @@ export type FileVisibility = 'private' | 'internal' | 'public'
 /** 文件状态。直传意图创建后为 uploading,确认后 active。 */
 export type FileStatus = 'uploading' | 'active' | 'quarantined' | 'deleted'
 
+/** 文件资产分类。 */
+export type FileAssetCategory = 'original' | 'optimized' | 'derived'
+
+/** 文件保存策略。 */
+export type FileRetentionPolicy = 'months_3' | 'months_6' | 'long_term' | 'system_short'
+
+/** 文件保存策略设置来源。 */
+export type FileRetentionSetBy = 'system' | 'user' | 'admin'
+
+/** 当前延长保存期限用户确认条款版本。 */
+export const FILE_RETENTION_CONSENT_VERSION = 'file-retention-v1'
+
 export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   normal: 24,
   sensitive: 6,
@@ -63,10 +75,17 @@ export interface FileMetadata {
   ownerId: string | null
   visibility: FileVisibility
   status: FileStatus
+  assetCategory?: FileAssetCategory
+  sourceFileId?: string | null
+  retentionPolicy?: FileRetentionPolicy | null
+  retentionSetBy?: FileRetentionSetBy | null
+  retentionConsentAt?: string | null
+  retentionConsentVersion?: string | null
+  retentionLockedReason?: string | null
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
-  expiresAt: string
+  expiresAt: string | null
   deletedAt: string | null
   deletedBy: string | null
   deleteReason: string | null
@@ -81,7 +100,7 @@ export interface FileUploadResponse {
   sha256: string
   signedUrl: string
   signedUrlExpiresAt: string
-  fileExpiresAt: string
+  fileExpiresAt: string | null
 }
 
 export interface SignedUrlResponse {
@@ -134,7 +153,38 @@ export interface CompleteUploadResponse {
   status: FileStatus
   sizeBytes: number
   sha256: string
-  fileExpiresAt: string
+  fileExpiresAt: string | null
+}
+
+export interface FileRetentionUpdateRequest {
+  retentionPolicy: Extract<FileRetentionPolicy, 'months_3' | 'months_6' | 'long_term'>
+  consentVersion?: string
+}
+
+export interface FileRetentionUpdateResponse {
+  file: FileMetadata
+  allowedPolicies: FileRetentionPolicy[]
+}
+
+export interface FileLifecyclePolicyCount {
+  key: FileRetentionPolicy | null
+  count: number
+}
+
+export interface FileLifecycleSetByCount {
+  key: FileRetentionSetBy | null
+  count: number
+}
+
+export interface FileLifecycleSummaryResponse {
+  totalActive: number
+  longTermCount: number
+  expiringWithin7Days: number
+  expiringWithin30Days: number
+  expiredPendingCleanup: number
+  byRetentionPolicy: FileLifecyclePolicyCount[]
+  byRetentionSetBy: FileLifecycleSetByCount[]
+  generatedAt: string
 }
 
 export interface FileCleanupResponse {
