@@ -186,6 +186,12 @@ assert.ok(
   'Gate 3 runbook must keep verify:cos-lifecycle-policy as a local full-repository docs gate',
 )
 assert.ok(
+  gate3Section.includes('禁止设置 `COS_BUCKET_PREPROD_PROOF_CONFIRMED=true`') &&
+    gate3Section.includes('prod_label=true') &&
+    gate3Section.includes('历史生产私有桶指纹一致'),
+  'Gate 3 runbook must forbid enabling COS live when the bucket looks like the historical production bucket',
+)
+assert.ok(
   !gate3Commands.includes('verify:file-assets-trial-acceptance'),
   'Gate 3 remote runtime command list must not include local docs-only verify:file-assets-trial-acceptance',
 )
@@ -410,9 +416,18 @@ assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   'PREPRODUCTION GATE 2 PASSED',
   'Gate 3 安全子集部分通过',
   'Gate 4 尚未执行',
+  '| `pnpm --filter @ai-job-print/api verify:cos:live` | BLOCKED |',
+  '未执行：G3-06 COS live',
+  'fp=7637995480',
+  'prod_label=true',
   'strict_nonprod=false',
 ])
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
+assert.doesNotMatch(
+  preprodExecutionRecord,
+  /(?:PREPRODUCTION\s+)?GATE 3 (?:FULL )?(?:PASSED|已执行通过|完整通过)/,
+  'preprod execution record must not claim full Gate 3 pass while G3-06 is blocked',
+)
 
 assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [`部署候选 \`${gate2Candidate}\``])
 assert.doesNotMatch(gateEvidenceRunbook, new RegExp(oldGate2Candidate), 'Gate 3/Gate 4 evidence runbook must not reference the old Gate 2 candidate')
@@ -489,7 +504,8 @@ assert.ok(
     nextTasks.includes('已完成') &&
     nextTasks.includes('Gate 3 安全子集已部分通过') &&
     nextTasks.includes('G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停') &&
-    nextTasks.includes('预生产/非生产隔离用途'),
+    nextTasks.includes('prod_label=true') &&
+    nextTasks.includes('明确预生产 bucket'),
   'next-tasks must record Gate 2 passed, Gate 3 partial state, and Gate 4/COS blocker',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')

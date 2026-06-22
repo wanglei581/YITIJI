@@ -1,0 +1,12 @@
+{
+  "id": "file-assets-cos-bucket-isolation-proof",
+  "title": "确认用户文件资产 Gate 4 前 COS bucket 隔离阻塞",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "deployment",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交 COS bucket 隔离阻塞确认结果",
+  "createdAt": "2026-06-22T04:45:00Z",
+  "branch": "codex/file-assets-cos-bucket-isolation-proof"
+}

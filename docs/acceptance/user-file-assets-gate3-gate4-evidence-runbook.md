@@ -90,6 +90,7 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 
 - `verify:cos:live` 如果输出 `SKIPPED`，Gate 3 不通过；必须记录缺少的配置项名称，不记录值。
 - `verify:cos:live` 执行前如无法证明当前 bucket 为预生产/非生产用途，必须停止，不能用项目名标签替代隔离证明。
+- 如果只读取证据显示 bucket `prod_label=true` 或与历史生产私有桶指纹一致，禁止设置 `COS_BUCKET_PREPROD_PROOF_CONFIRMED=true`，必须先切换到明确隔离的预生产 bucket。
 - `verify:member-assets-c2d` 强制本地存储，不能替代 COS live 或浏览器账号验收。
 - Gate 0 本地 `verify:file-assets-trial-acceptance` 只证明证据包结构防回退，不证明远端运行时可用；不得为了远端执行该命令把 `docs/` 或 `.ccg/` 加回 Gate 2 裁剪运行时归档。
 - `verify:audit-logs` 是 AuditLog 基础审计服务门禁，只证明审计写入、查询、分页、payload 封顶和 best-effort 行为；Gate 4 仍必须针对本轮测试文件 ID 抽样确认保存期限变更、删除、过期清理审计记录。

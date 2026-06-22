@@ -72,7 +72,7 @@
 - [x] **只读复核：预生产 Gate 2 执行前就绪状态**：已输出 `docs/acceptance/user-file-assets-gate2-readiness-recheck.md`，确认本地候选包、预生产部署源、PM2、health、磁盘预算、API env、工具链和 PostgreSQL/Redis/Tencent COS 脱敏指纹；同时修正 Gate 2 主计划里的 Tencent COS key 名。该复核是 Gate 2 执行前历史证据，本身不代表远端执行。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
 - [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
-- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 已通过；Gate 3 安全子集已部分通过：预生产运行时包通过 G3-01、G3-02、G3-04、G3-05、G3-07、G3-09，本地完整仓库通过 G3-03。G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停，原因是当前 COS bucket 脱敏复核只能证明项目标签，不能正向证明预生产/非生产隔离用途。下一步先提供 COS bucket 隔离证明或切换明确预生产 bucket，再执行 G3-06 与 G4-01 至 G4-10。
+- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 已通过；Gate 3 安全子集已部分通过：预生产运行时包通过 G3-01、G3-02、G3-04、G3-05、G3-07、G3-09，本地完整仓库通过 G3-03。G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停，原因是当前 COS bucket 脱敏复核为 fp=7637995480、`prod_label=true`、`strict_nonprod=false`，且与历史生产私有桶记录一致。下一步先切换到明确预生产 bucket 或提供等效隔离证明，再执行 G3-06 与 G4-01 至 G4-10。
 
 ## P1：工程质量门禁
 
