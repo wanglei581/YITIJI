@@ -19,6 +19,7 @@ import type {
   FileRetentionUpdateRequest,
 } from '@ai-job-print/shared'
 import { FILE_RETENTION_CONSENT_VERSION } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class MemberAssetsApiError extends Error {
@@ -64,6 +65,7 @@ async function call<T>(
       code = body.error?.code ?? code
       message = body.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new MemberAssetsApiError(code, message, res.status)
   }
   const json = (await res.json()) as Envelope<T>

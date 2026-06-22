@@ -78,24 +78,32 @@ async function main() {
     getConfig: () => ({ vendor: 'deepseek', model: 'stub', baseURL: url, systemPrompt: '', roleScope: '', forbiddenWords: [], temperature: 0, enabled: true, apiKeyEncrypted: 'x' }),
   }
   const llm = new LlmJobFitService(stubConfig as never)
-  const fileStore = new Map<string, string>()
+  const fileStore = new Map<string, { text: string; endUserId: string | null }>()
   const stubExtraction = {
-    extractResumeText: ({ fileId }: { fileId: string }) => {
-      const text = fileStore.get(fileId)
-      return Promise.resolve(text ? { ok: true, text } : { ok: false, errorCode: 'FILE_NOT_FOUND', errorMessage: 'gone' })
+    extractResumeText: ({ fileId, endUserId }: { fileId: string; endUserId?: string | null }) => {
+      const record = fileStore.get(fileId)
+      if (!record || record.endUserId !== (endUserId ?? null)) {
+        return Promise.resolve({ ok: false, errorCode: 'FILE_NOT_FOUND', errorMessage: 'gone' })
+      }
+      return Promise.resolve({ ok: true, fileId, text: record.text, textSource: 'docx', confidence: 'high', charCount: record.text.length })
     },
   }
   const svc = new JobFitService(prisma, llm, stubExtraction as never, audit)
   const suffix = Date.now().toString(36)
   const taskId = `vjf_task_${suffix}`
+  const memberTaskId = `vjf_member_task_${suffix}`
   const fileId = `vjf_file_${suffix}`
+  const memberFileId = `vjf_member_file_${suffix}`
+  const endUserA = `vjf_member_${suffix}`
   const orgId = `vjf_org_${suffix}`
   const accessToken = 'aa'.repeat(24)
   const { createHash } = await import('crypto')
   const tokenHash = createHash('sha256').update(accessToken, 'utf8').digest('hex')
 
   try {
-    fileStore.set(fileId, RESUME_TEXT)
+    fileStore.set(fileId, { text: RESUME_TEXT, endUserId: null })
+    fileStore.set(memberFileId, { text: RESUME_TEXT, endUserId: endUserA })
+    await prisma.endUser.create({ data: { id: endUserA, phoneHash: `h_${endUserA}`, phoneEnc: `e_${endUserA}` } })
     await prisma.organization.create({ data: { id: orgId, name: '验证机构2D', type: 'school' } })
     const jobPub = await prisma.job.create({
       data: {
@@ -118,7 +126,16 @@ async function main() {
         expiresAt: new Date(Date.now() + 3600_000),
       },
     })
+    await prisma.aiResumeResult.create({
+      data: {
+        taskId: memberTaskId, kind: 'parse', status: 'completed', provider: 'llm',
+        payloadJson: JSON.stringify({ taskId: memberTaskId, status: 'completed', fileId: memberFileId }),
+        endUserId: endUserA, accessTokenHash: null,
+        expiresAt: new Date(Date.now() + 3600_000),
+      },
+    })
     const requester = { endUserId: null, accessToken }
+    const memberRequester = { endUserId: endUserA, accessToken: null }
 
     // 1. jobId 闭环
     responseQueue.push(vjson())
@@ -128,6 +145,11 @@ async function main() {
     const row1 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row1 || row1.accessTokenHash !== tokenHash) fail('1. job_fit 行未继承 parse 归属')
     pass('1. jobId 闭环：completed + 来源信息 + kind=job_fit 落库继承归属')
+
+    responseQueue.push(vjson())
+    const r1b = await svc.analyze({ taskId: memberTaskId, jobId: jobPub.id }, memberRequester)
+    if (r1b.status !== 'completed') fail('1b. 会员岗位匹配应 completed')
+    pass('1b. 会员岗位匹配路径按 parse 行 endUserId 提取原文')
 
     // 2. 防编造
     responseQueue.push(vjson({ matchPoints: [{ point: '会开挖掘机', evidence: '持有挖掘机证书五年经验' }] }))
@@ -230,10 +252,11 @@ async function main() {
     process.exitCode = 1
     console.error(err instanceof Error ? err.message : err)
   } finally {
-    await prisma.aiResumeResult.deleteMany({ where: { taskId } }).catch(() => undefined)
+    await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: [taskId, memberTaskId] } } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { targetId: taskId } }).catch(() => undefined)
     await prisma.job.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.organization.deleteMany({ where: { id: orgId } }).catch(() => undefined)
+    await prisma.endUser.deleteMany({ where: { id: endUserA } }).catch(() => undefined)
     server.close()
     await prisma.onModuleDestroy?.()
   }

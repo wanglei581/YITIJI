@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { AuthedEndUser } from '../decorators/current-end-user.decorator'
 import { RedisService } from '../redis/redis.service'
+import { PrismaService } from '../../prisma/prisma.service'
 
 interface EndUserJwtPayload {
   sub: string
@@ -29,6 +30,7 @@ export class EndUserAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -54,6 +56,18 @@ export class EndUserAuthGuard implements CanActivate {
     const ownerId = await this.redis.get(memberSessionKey(sessionId))
     if (!ownerId || ownerId !== payload.sub) {
       throw this.unauthorized('MEMBER_SESSION_EXPIRED', '会话已失效,请重新登录')
+    }
+
+    const user = await this.prisma.endUser.findUnique({
+      where: { id: payload.sub },
+      select: { enabled: true },
+    })
+    if (!user || !user.enabled) {
+      await this.redis.del(memberSessionKey(sessionId))
+      throw this.unauthorized(
+        user ? 'ACCOUNT_DISABLED' : 'MEMBER_SESSION_EXPIRED',
+        user ? '账号已被停用' : '会话已失效,请重新登录',
+      )
     }
 
     req.endUser = { endUserId: payload.sub, sessionId }

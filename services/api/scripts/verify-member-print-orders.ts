@@ -204,18 +204,19 @@ async function main() {
     else fail(`5. 敏感字段泄漏：${leak}`)
 
     // ── 6. 鉴权（EndUserAuthGuard）─────────────────────────────
-    const guardNoToken = new EndUserAuthGuard({} as never, {} as never)
+    const guardNoToken = new EndUserAuthGuard({} as never, {} as never, {} as never)
     await expectGuardCode(() => guardNoToken.canActivate(mockCtx({})), 'MEMBER_MISSING_TOKEN', '6a. 匿名（无 Authorization）→ 401 MEMBER_MISSING_TOKEN')
 
     const jwtThrows = { verify: () => { throw new Error('bad') } } as never
-    const guardBad = new EndUserAuthGuard(jwtThrows, {} as never)
+    const guardBad = new EndUserAuthGuard(jwtThrows, {} as never, {} as never)
     await expectGuardCode(() => guardBad.canActivate(mockCtx({ authorization: 'Bearer bad.token' })), 'MEMBER_TOKEN_INVALID', '6b. 错 token → 401 MEMBER_TOKEN_INVALID')
 
     const jwtOk = { verify: () => ({ sub: userA, jti: 'sess-x' }) } as never
-    const guardNoSession = new EndUserAuthGuard(jwtOk, { get: async () => null } as never)
+    const guardNoSession = new EndUserAuthGuard(jwtOk, { get: async () => null } as never, {} as never)
     await expectGuardCode(() => guardNoSession.canActivate(mockCtx({ authorization: 'Bearer ok.token' })), 'MEMBER_SESSION_EXPIRED', '6c. 有效 token 但无 Redis 会话（含过期会话）→ 401 MEMBER_SESSION_EXPIRED')
 
-    const guardOk = new EndUserAuthGuard(jwtOk, { get: async () => userA } as never)
+    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true }) } } as never
+    const guardOk = new EndUserAuthGuard(jwtOk, { get: async () => userA } as never, prismaEnabled)
     const ctx = mockCtx({ authorization: 'Bearer ok.token' })
     const allowed = await guardOk.canActivate(ctx)
     const injected = (ctx.switchToHttp().getRequest() as { endUser?: { endUserId: string } }).endUser

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import type { AddFavoriteInput, FavoriteTargetType, MemberFavoriteItem } from './member-favorites.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
@@ -17,6 +17,30 @@ import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common
 @Injectable()
 export class MemberFavoritesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** 只允许收藏「已审核 + 已发布」的可见目标；标题快照由服务端派生，避免前端伪造。 */
+  private async resolvePublishedTitle(targetType: FavoriteTargetType, targetId: string): Promise<string | null> {
+    const published = { reviewStatus: 'approved', publishStatus: 'published' }
+    if (targetType === 'job') {
+      const job = await this.prisma.job.findFirst({
+        where: { id: targetId, ...published },
+        select: { title: true },
+      })
+      return job?.title ?? null
+    }
+    if (targetType === 'job_fair') {
+      const fair = await this.prisma.jobFair.findFirst({
+        where: { id: targetId, ...published },
+        select: { title: true },
+      })
+      return fair?.title ?? null
+    }
+    const policy = await this.prisma.policyPost.findFirst({
+      where: { id: targetId, ...published },
+      select: { title: true },
+    })
+    return policy?.title ?? null
+  }
 
   /** 我的收藏列表（本人，可按 targetType 过滤），游标分页（C-2D，不做无界查询）。 */
   async list(
@@ -45,6 +69,13 @@ export class MemberFavoritesService {
    * 唯一键 (endUserId, targetType, targetId) 保证同一会员对同一对象只有一条。
    */
   async add(endUserId: string, input: AddFavoriteInput): Promise<MemberFavoriteItem> {
+    const title = await this.resolvePublishedTitle(input.targetType, input.targetId)
+    if (!title) {
+      throw new NotFoundException({
+        error: { code: 'FAVORITE_TARGET_NOT_FOUND', message: '收藏目标不存在或未发布' },
+      })
+    }
+
     const row = await this.prisma.favorite.upsert({
       where: {
         endUserId_targetType_targetId: {
@@ -53,13 +84,13 @@ export class MemberFavoritesService {
           targetId: input.targetId,
         },
       },
-      // 已存在则只刷新展示标题（来源标题可能更新）；不改 createdAt。
-      update: input.title !== undefined ? { title: input.title } : {},
+      // 已存在则按服务端来源刷新展示标题（来源标题可能更新）；不改 createdAt。
+      update: { title },
       create: {
         endUserId,
         targetType: input.targetType,
         targetId: input.targetId,
-        title: input.title ?? null,
+        title,
       },
       select: { id: true, targetType: true, targetId: true, title: true, createdAt: true },
     })

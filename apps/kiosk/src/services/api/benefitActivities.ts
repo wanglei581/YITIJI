@@ -1,4 +1,5 @@
 import type { BenefitActivityListItem, BenefitActivitySourceType, MemberBenefitItem } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class BenefitActivitiesApiError extends Error {
@@ -47,6 +48,7 @@ async function request<T>(
     } catch {
       /* keep defaults */
     }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(token))) notifyMemberSessionExpired(token ?? undefined)
     throw new BenefitActivitiesApiError(code, message, res.status)
   }
   const json = (await res.json()) as Envelope<T>

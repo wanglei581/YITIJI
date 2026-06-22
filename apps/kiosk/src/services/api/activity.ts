@@ -18,6 +18,7 @@ import type {
   MemberBrowseLogItem,
   MemberJumpLogItem,
 } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 interface Envelope<T> {
@@ -54,6 +55,7 @@ async function call<T>(path: string, token: string, method: 'GET' | 'DELETE' = '
       code = body.error?.code ?? code
       message = body.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new ActivityApiError(code, message)
   }
   const json = (await res.json()) as Envelope<T>
@@ -71,6 +73,16 @@ function fireRecord(path: string, token: string, body: Record<string, string>): 
     },
     credentials: 'include',
     body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (res.ok) return
+    let code = 'UNKNOWN_ERROR'
+    try {
+      const body = (await res.json()) as { error?: { code?: string } }
+      code = body.error?.code ?? code
+    } catch {
+      /* keep defaults */
+    }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
   }).catch(() => {
     /* 记录失败不影响用户主流程（浏览 / 打开来源平台照常） */
   })

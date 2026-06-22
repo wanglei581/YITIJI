@@ -21,8 +21,9 @@
  *   7. GET /me 带 token → 200 phoneMasked
  *   8. EndUser 落库不含明文手机号（phoneHash 命中 + phoneEnc 可解密 ≠ 明文列）
  *   9. logout 删除 Redis 会话 → 同一 token 再访问 /me → 401（JWT 未过期也失效）
- *  10. 双向隔离：内部 token 被 EndUserAuthGuard 拒；enduser token 被内部 JwtAuthGuard 拒
- *  11. 清理测试数据 → 报告 PASS / FAIL
+ *  10. 账号禁用后既有 Redis session 立即 fail-closed
+ *  11. 双向隔离：内部 token 被 EndUserAuthGuard 拒；enduser token 被内部 JwtAuthGuard 拒
+ *  12. 清理测试数据 → 报告 PASS / FAIL
  */
 import 'dotenv/config'
 import { ExecutionContext } from '@nestjs/common'
@@ -34,6 +35,7 @@ import { AppModule } from '../src/app.module'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
+import { OptionalEndUserAuthGuard } from '../src/common/guards/optional-end-user-auth.guard'
 import { RedisService } from '../src/common/redis/redis.service'
 import { hashPhone } from '../src/common/crypto/phone-identity'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -42,6 +44,18 @@ import { PrismaService } from '../src/prisma/prisma.service'
 function pass(msg: string) { console.log(`  ✅ ${msg}`) }
 function fail(msg: string) { console.error(`  ❌ ${msg}`); process.exitCode = 1 }
 function info(msg: string) { console.log(`  ℹ  ${msg}`) }
+
+async function expectGuardCode(fn: () => Promise<unknown>, code: string, label: string): Promise<void> {
+  try {
+    await fn()
+    fail(`${label}（期望拒绝）`)
+  } catch (error) {
+    const response = (error as { getResponse?: () => unknown }).getResponse?.()
+    const actual = (response as { error?: { code?: string } } | undefined)?.error?.code
+    if (actual === code) pass(label)
+    else fail(`${label}（期望 ${code}，实际 ${actual ?? 'unknown'}）`)
+  }
+}
 
 function flatten(errors: ValidationError[], parent = ''): string[] {
   const out: string[] = []
@@ -197,11 +211,53 @@ async function main() {
     if (meAfter.status === 401) pass('logout 后同一 token /me → 401（JWT 未过期也失效）')
     else fail(`logout 后 /me → ${meAfter.status} (expected 401)`)
 
-    // ── 10. 双向隔离 ──────────────────────────────────────────────────────────
-    console.log('\n── 10. 双向 token 隔离 ────────────────────────────────────────')
+    // ── 10. 账号禁用后既有 session 立即失效 ──────────────────────────────────
+    console.log('\n── 10. 账号禁用后既有 session 立即失效 ───────────────────────')
+    const jwtOkForDisabled = { verify: () => ({ sub: user.id as string, jti: 'sess-disabled' }) } as never
+    let deletedDisabledSession = false
+    const redisDisabled = {
+      get: async () => user.id as string,
+      del: async (key: string) => {
+        deletedDisabledSession = key === 'member:session:sess-disabled'
+      },
+    } as never
+    const prismaDisabled = {
+      endUser: {
+        findUnique: async () => ({ id: user.id as string, enabled: false }),
+      },
+    } as never
+    const guardDisabled = new EndUserAuthGuard(jwtOkForDisabled, redisDisabled, prismaDisabled)
+    await expectGuardCode(
+      () => guardDisabled.canActivate(mockCtx('Bearer disabled-session-token')),
+      'ACCOUNT_DISABLED',
+      '账号禁用后旧 token → ACCOUNT_DISABLED',
+    )
+    if (deletedDisabledSession) pass('账号禁用时 guard 顺手删除既有 Redis session')
+    else fail('账号禁用时 guard 未删除既有 Redis session')
+
+    // ── 11. optional guard 禁用账号不注入本人态 ───────────────────────────────
+    console.log('\n── 11. optional guard 禁用账号不注入本人态 ────────────────────')
+    let deletedOptionalDisabledSession = false
+    const redisOptionalDisabled = {
+      get: async () => user.id as string,
+      del: async (key: string) => {
+        deletedOptionalDisabledSession = key === 'member:session:sess-disabled'
+      },
+    } as never
+    const optionalDisabledGuard = new OptionalEndUserAuthGuard(jwtOkForDisabled, redisOptionalDisabled, prismaDisabled)
+    const optionalCtx = mockCtx('Bearer optional-disabled-session-token')
+    const optionalAllowed = await optionalDisabledGuard.canActivate(optionalCtx)
+    const optionalReq = optionalCtx.switchToHttp().getRequest() as { endUser?: unknown }
+    if (optionalAllowed === true && optionalReq.endUser === undefined) pass('optional guard 对禁用账号放行公共读但不注入 endUser')
+    else fail('optional guard 对禁用账号仍注入 endUser')
+    if (deletedOptionalDisabledSession) pass('optional guard 对禁用账号顺手删除既有 Redis session')
+    else fail('optional guard 对禁用账号未删除既有 Redis session')
+
+    // ── 12. 双向隔离 ──────────────────────────────────────────────────────────
+    console.log('\n── 12. 双向 token 隔离 ────────────────────────────────────────')
     const internalJwt = new JwtService({ secret: jwtSecret })
     const memberJwt = new JwtService({ secret: jwtSecret, signOptions: { expiresIn: '30m', audience: 'enduser' } })
-    const endUserGuard = new EndUserAuthGuard(memberJwt, redis)
+    const endUserGuard = new EndUserAuthGuard(memberJwt, redis, prisma)
     const internalGuard = new JwtAuthGuard(internalJwt)
 
     // 10a: 内部 token（无 aud）→ EndUserAuthGuard 必须拒

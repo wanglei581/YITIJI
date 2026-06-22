@@ -10,6 +10,7 @@
 // ============================================================
 
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class MemberPrintOrdersApiError extends Error {
@@ -49,6 +50,7 @@ async function request<T>(path: string, token: string): Promise<T> {
     } catch {
       /* keep defaults */
     }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new MemberPrintOrdersApiError(code, message, res.status)
   }
   const json = (await res.json()) as Envelope<T>

@@ -1,4 +1,5 @@
 import type { FileUploadResponse, FilePurpose } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 
@@ -28,6 +29,7 @@ export const filesHttpAdapter = {
         code = body.error?.code ?? code
         message = body.error?.message ?? message
       } catch { /* keep defaults */ }
+      if (isMemberSessionInvalidError(res.status, code, Boolean(token))) notifyMemberSessionExpired(token ?? undefined)
       throw new ApiHttpError(code, message, res.status)
     }
     const body = (await res.json()) as ResponseEnvelope<FileUploadResponse>
