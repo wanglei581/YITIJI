@@ -155,10 +155,10 @@ assert.ok(
 const gate3Section = gateEvidenceRunbook.slice(gate3SectionStart, gate4SectionStart)
 
 // Deliberately mirrors the runbook sequence so Gate 3 command changes must be reviewed.
-const expectedGate3Commands = [
+const expectedGate3LocalCommands = ['verify:cos-lifecycle-policy']
+const expectedGate3RuntimeCommands = [
   'verify:production-runtime-gates',
   'verify:production-db-guard',
-  'verify:cos-lifecycle-policy',
   'verify:file-retention',
   'verify:file-lifecycle-summary',
   'verify:cos:live',
@@ -167,13 +167,24 @@ const expectedGate3Commands = [
 ]
 const gate3Commands = Array.from(gate3Section.matchAll(/pnpm --filter @ai-job-print\/api (verify:[\w:-]+)/g), (match) => match[1])
 assert.deepEqual(
-  gate3Commands,
-  expectedGate3Commands,
-  'Gate 3 runbook must list the expected verify commands in execution order',
+  gate3Commands.slice(0, expectedGate3LocalCommands.length),
+  expectedGate3LocalCommands,
+  'Gate 3 runbook must list local full-repository verify commands first',
+)
+assert.deepEqual(
+  gate3Commands.slice(expectedGate3LocalCommands.length),
+  expectedGate3RuntimeCommands,
+  'Gate 3 runbook must list the expected trimmed-runtime verify commands in execution order',
 )
 for (const command of gate3Commands) {
   assert.ok(apiPackage.scripts?.[command], `Gate 3 verify command must exist in services/api/package.json: ${command}`)
 }
+assert.ok(
+  gate3Section.includes('verify:cos-lifecycle-policy') &&
+    gate3Section.includes('完整仓库') &&
+    gate3Section.includes('不得为了远端执行把 `docs/` 或 `.ccg/` 加回裁剪运行时包'),
+  'Gate 3 runbook must keep verify:cos-lifecycle-policy as a local full-repository docs gate',
+)
 assert.ok(
   !gate3Commands.includes('verify:file-assets-trial-acceptance'),
   'Gate 3 remote runtime command list must not include local docs-only verify:file-assets-trial-acceptance',
@@ -397,7 +408,9 @@ assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   `/tmp/${currentGate2Artifact}`,
   `Gate 2 执行候选 ${gate2Candidate}`,
   'PREPRODUCTION GATE 2 PASSED',
-  'Gate 3/Gate 4 尚未执行',
+  'Gate 3 安全子集部分通过',
+  'Gate 4 尚未执行',
+  'strict_nonprod=false',
 ])
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
 
@@ -474,9 +487,10 @@ assert.ok(
 assert.ok(
   nextTasks.includes('预生产 Gate 2 候选部署或刷新') &&
     nextTasks.includes('已完成') &&
-    nextTasks.includes('Gate 3/Gate 4') &&
-    nextTasks.includes('仍需用户确认'),
-  'next-tasks must record Gate 2 passed and keep Gate 3/Gate 4 pending',
+    nextTasks.includes('Gate 3 安全子集已部分通过') &&
+    nextTasks.includes('G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停') &&
+    nextTasks.includes('预生产/非生产隔离用途'),
+  'next-tasks must record Gate 2 passed, Gate 3 partial state, and Gate 4/COS blocker',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')
 assert.ok(nextTasks.includes('AuditLog'), 'next-tasks must use AuditLog for file lifecycle audit evidence')

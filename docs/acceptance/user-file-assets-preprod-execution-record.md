@@ -1,6 +1,6 @@
 # 用户文件与简历资产预生产执行记录
 
-> 状态：PREPRODUCTION GATE 2 PASSED；Gate 3/Gate 4、正式生产、试运营和 Windows 真机尚未执行。
+> 状态：PREPRODUCTION GATE 2 PASSED；Gate 3 安全子集已部分通过但 COS live 仍阻塞；Gate 4、正式生产、试运营和 Windows 真机尚未执行。
 > 基线候选：当前本地 Gate 2/Gate 3/Gate 0 门禁收口链 / `2187f6a7`（包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正）
 > 执行分支：`codex/file-assets-gate2-execution`
 > 口径：本文件记录预生产 Gate 2 执行证据和后续证据入口，不代表正式生产部署、真实试运营或 Windows 真机验收完成。
@@ -27,8 +27,8 @@
 | Gate 0 | 本地静态门禁 | 是 | 只运行本地文档/静态检查，不连接服务器或云资源。 |
 | Gate 1 | 预生产只读预检 | 需计划审查通过 | 只读 SSH、PM2 状态、health、commit，不改服务器。 |
 | Gate 2 | 候选部署或刷新 | 已执行 | 已改变预生产代码、构建产物、PostgreSQL schema 和进程状态；未写业务数据/COS。 |
-| Gate 3 | 自动命令门禁 | 需用户确认 | `verify:cos:live`、测试数据和部分 verify 可能写入 COS/DB。 |
-| Gate 4 | 浏览器和账号验收 | 需用户确认 | 会创建/修改测试会员文件、保存期限、删除状态和审计记录。 |
+| Gate 3 | 自动命令门禁 | 已部分执行 | 已执行不触达 COS live 的安全子集；`verify:cos:live` 仍需先证明 COS bucket 为预生产/非生产用途。 |
+| Gate 4 | 浏览器和账号验收 | 暂停 | 会创建/修改测试会员文件、保存期限、删除状态和审计记录；当前因 COS bucket 预生产用途证明不足暂停。 |
 
 ## 三、Gate 0 本地静态门禁
 
@@ -94,23 +94,35 @@ Gate 3/Gate 4 尚未执行
 
 ## 六、Gate 3 自动命令门禁
 
-> 尚未执行。所有日志进入证据包前必须脱敏，不得提交 `.env`、token、签名 URL 查询串或简历正文。
+> 已部分执行。所有日志进入证据包前必须脱敏，不得提交 `.env`、token、签名 URL 查询串或简历正文。
 > 详细证据编号、日志命名和脱敏规则见 [Gate 3/Gate 4 证据执行模板](./user-file-assets-gate3-gate4-evidence-runbook.md)。
 
 | 命令 | 结果 | 证据 |
 | --- | --- | --- |
-| `pnpm --filter @ai-job-print/api verify:production-runtime-gates` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:production-db-guard` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:file-retention` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:file-lifecycle-summary` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:cos:live` | PENDING | PASS 需记录脱敏桶指纹；SKIPPED 需记录缺少的配置项名称，不记录值 |
-| `pnpm --filter @ai-job-print/api verify:member-assets-c2d` | PENDING | 待执行 |
-| `pnpm --filter @ai-job-print/api verify:audit-logs` | PENDING | AuditLog 基础审计命令证据；不能替代 Gate 4 针对本轮测试文件的审计抽样 |
+| `pnpm --filter @ai-job-print/api verify:production-runtime-gates` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-20260622123254`，日志 `G3-01-runtime-gates-20260622123254.log`。 |
+| `pnpm --filter @ai-job-print/api verify:production-db-guard` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-20260622123254`，日志 `G3-02-db-guard-20260622123254.log`。 |
+| `pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy` | PASS（本地完整仓库）/ REMOTE N/A | 2026-06-22 本地完整仓库执行通过，证据目录 `/tmp/ai-job-print-gate34-local-20260622123403`；预生产裁剪运行时包不包含 `docs/`，远端直接执行会失败，不能为运行该 docs-only 门禁把 `docs/` 加回运行时包。 |
+| `pnpm --filter @ai-job-print/api verify:file-retention` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-static-20260622123427`，日志 `G3-04-file-retention-20260622123427.log`。 |
+| `pnpm --filter @ai-job-print/api verify:file-lifecycle-summary` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-static-20260622123427`，日志 `G3-05-file-lifecycle-summary-20260622123427.log`。 |
+| `pnpm --filter @ai-job-print/api verify:cos:live` | BLOCKED | 执行前脱敏指纹复核显示 `TENCENT_COS_BUCKET` 只能证明 `project_label=true`，但 `strict_nonprod=false`；尚不能正向证明当前 bucket 是预生产/非生产用途，因此未执行 COS live put/head/get/signed-url/delete。 |
+| `pnpm --filter @ai-job-print/api verify:member-assets-c2d` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-20260622123346`，日志 `G3-07-member-assets-c2d-20260622123346.log`；单次命令显式覆盖 `SMS_PROVIDER=log`，脚本强制 `FILE_STORAGE_DRIVER=local`，不触达 COS 或真实短信。 |
+| `pnpm --filter @ai-job-print/api verify:audit-logs` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-20260622123346`，日志 `G3-09-audit-logs-20260622123346.log`；该命令仅证明 AuditLog 基础审计门禁，不能替代 Gate 4 针对本轮测试文件的审计抽样。 |
+
+Gate 3 结论：
+
+```text
+PREPRODUCTION GATE 3 PARTIAL PASS / BLOCKED
+已通过：G3-01、G3-02、G3-03（本地完整仓库）、G3-04、G3-05、G3-07、G3-09
+未执行：G3-06 COS live
+阻塞项：当前 COS bucket 脱敏复核为 strict_nonprod=false、project_label=true，缺少预生产/非生产用途的正向证明
+健康复核：G3 安全子集执行后，预生产 health 仍为 success=true、db=postgres，PM2 ai-job-print-api online
+结论口径：不能宣称 Gate 3 完整通过，不能进入写 COS 的 Gate 4 文件链路
+```
 
 ## 七、Gate 4 浏览器和账号验收
 
 > 尚未执行。执行前必须准备 MEMBER_A、MEMBER_B、ADMIN_A 三类受控账号，并按 [Gate 3/Gate 4 证据执行模板](./user-file-assets-gate3-gate4-evidence-runbook.md) 留存 G4-01 至 G4-10 脱敏证据。
+> 当前暂停原因：G4 会写入测试文件和 COS 对象，必须先正向证明当前 COS bucket 是预生产/非生产用途，或切换到明确隔离的预生产 bucket。
 
 | 场景 | 必留证据 | 结果 |
 | --- | --- | --- |
@@ -151,10 +163,10 @@ Gate 3/Gate 4 尚未执行
 当前结论：
 
 ```text
-用户文件与简历资产预生产执行：PREPRODUCTION GATE 2 PASSED / Gate 3/Gate 4 尚未执行
+用户文件与简历资产预生产执行：PREPRODUCTION GATE 2 PASSED / Gate 3 安全子集部分通过 / Gate 4 尚未执行
 执行环境：预生产
-执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2
+执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 + Gate 3 安全子集
 部署 commit：Gate 2 执行候选 2187f6a7；执行前部署源为 6b055d6b，执行后 DEPLOY_SOURCE.txt 自报 commit=2187f6a7
-阻塞项：Gate 3/Gate 4 仍需用户确认后才能执行，因为会写入受控测试账号、测试文件、COS 对象、保存期限、删除状态和审计记录
+阻塞项：G3-06/Gate 4 需要先证明当前 COS bucket 是预生产/非生产用途；当前脱敏复核只能证明 `project_label=true`，不能证明 `strict_nonprod=true`
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```

@@ -1,6 +1,6 @@
 # 用户文件与简历资产 Gate 3/Gate 4 证据执行模板
 
-> 状态：TEMPLATE ONLY，尚未执行 Gate 3 或 Gate 4。
+> 状态：模板 + 部分执行记录口径；Gate 3 安全子集已执行，COS live 与 Gate 4 仍阻塞。
 > 适用基线：Gate 2 预生产刷新完成后，以部署候选 `2187f6a7` 或后续用户确认的替代候选为准。
 > 口径：本文只定义证据编号、日志命名、脱敏规则和停止条件；不得据此宣称生产验收、试运营或 Windows 真机验收完成。
 
@@ -19,7 +19,7 @@
 | --- | --- | --- | --- |
 | G3-01 | 命令日志 | `G3-01-runtime-gates-<timestamp>.log` | `verify:production-runtime-gates` 输出 |
 | G3-02 | 命令日志 | `G3-02-db-guard-<timestamp>.log` | `verify:production-db-guard` 输出 |
-| G3-03 | 命令日志 | `G3-03-cos-lifecycle-policy-<timestamp>.log` | COS 生命周期静态策略检查 |
+| G3-03 | 本地命令日志 | `G3-03-cos-lifecycle-policy-<timestamp>.log` | COS 生命周期静态策略检查；依赖完整仓库 `docs/`，不得在裁剪运行时包内执行 |
 | G3-04 | 命令日志 | `G3-04-file-retention-<timestamp>.log` | 保存期限策略检查 |
 | G3-05 | 命令日志 | `G3-05-file-lifecycle-summary-<timestamp>.log` | Admin 生命周期聚合检查 |
 | G3-06 | 命令日志 | `G3-06-cos-live-<timestamp>.log` | COS live put/head/get/signed-url/delete，日志脱敏 |
@@ -58,18 +58,30 @@
 
 - Gate 2 已通过，并记录预生产 health `db=postgres`。
 - 环境变量指向预生产 PostgreSQL、Redis、COS 私有桶；只记录脱敏指纹。
+- G3-06 执行前必须正向证明当前 COS bucket 为预生产用途；只记录用途 hint、region 和 bucket 指纹，不记录完整 bucket 名。仅有项目名或业务名标签不够，需能证明 `preprod` / `staging` / `test` / `dev` / `uat` 等非生产隔离语义，或由用户提供云控制台/命名/权限隔离证明。
 - 命令输出通过 `tee` 写入证据日志，执行后人工脱敏再归档。
-- `verify:file-assets-trial-acceptance` 是仓库侧静态文档门禁，依赖 `docs/`、`docs/progress/` 和 `docs/device/`；Gate 2 裁剪运行时包不包含这些目录，因此该命令必须在 Gate 0 本地完整仓库中运行，不列入远端 Gate 3 命令清单。
+- `verify:file-assets-trial-acceptance` 和 `verify:cos-lifecycle-policy` 是仓库侧静态文档门禁，依赖 `docs/`；Gate 2 裁剪运行时包不包含这些目录，因此必须在 Gate 0 / G3-03 本地完整仓库中运行，不得为了远端执行把 `docs/` 或 `.ccg/` 加回裁剪运行时包。
+
+```bash
+set -euo pipefail
+TS=$(date +%Y%m%d%H%M%S)
+pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy | tee "G3-03-cos-lifecycle-policy-$TS.log"
+```
+
+预生产裁剪运行时包执行：
 
 ```bash
 set -euo pipefail
 TS=$(date +%Y%m%d%H%M%S)
 pnpm --filter @ai-job-print/api verify:production-runtime-gates | tee "G3-01-runtime-gates-$TS.log"
 pnpm --filter @ai-job-print/api verify:production-db-guard | tee "G3-02-db-guard-$TS.log"
-pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy | tee "G3-03-cos-lifecycle-policy-$TS.log"
 pnpm --filter @ai-job-print/api verify:file-retention | tee "G3-04-file-retention-$TS.log"
 pnpm --filter @ai-job-print/api verify:file-lifecycle-summary | tee "G3-05-file-lifecycle-summary-$TS.log"
-pnpm --filter @ai-job-print/api verify:cos:live | tee "G3-06-cos-live-$TS.log"
+if [ "${COS_BUCKET_PREPROD_PROOF_CONFIRMED:-}" = "true" ]; then
+  pnpm --filter @ai-job-print/api verify:cos:live | tee "G3-06-cos-live-$TS.log"
+else
+  echo "G3-06 BLOCKED: set COS_BUCKET_PREPROD_PROOF_CONFIRMED=true only after positive preproduction/non-production bucket proof"
+fi
 pnpm --filter @ai-job-print/api verify:member-assets-c2d | tee "G3-07-member-assets-c2d-$TS.log"
 pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.log"
 ```
@@ -77,6 +89,7 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 判定规则：
 
 - `verify:cos:live` 如果输出 `SKIPPED`，Gate 3 不通过；必须记录缺少的配置项名称，不记录值。
+- `verify:cos:live` 执行前如无法证明当前 bucket 为预生产/非生产用途，必须停止，不能用项目名标签替代隔离证明。
 - `verify:member-assets-c2d` 强制本地存储，不能替代 COS live 或浏览器账号验收。
 - Gate 0 本地 `verify:file-assets-trial-acceptance` 只证明证据包结构防回退，不证明远端运行时可用；不得为了远端执行该命令把 `docs/` 或 `.ccg/` 加回 Gate 2 裁剪运行时归档。
 - `verify:audit-logs` 是 AuditLog 基础审计服务门禁，只证明审计写入、查询、分页、payload 封顶和 best-effort 行为；Gate 4 仍必须针对本轮测试文件 ID 抽样确认保存期限变更、删除、过期清理审计记录。
@@ -116,7 +129,7 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 | --- | --- | --- | --- |
 | 跨账号否定测试 | 会员 B 访问会员 A 文件详情/下载/删除 | G4-07 | 403/404，无签名 URL 泄露 |
 | 用户主动删除 | 删除 `FILE_A_RAW` | G4-08 | UI 不可见、DB `status=deleted`、COS HEAD 404、AuditLog 存在 |
-| 过期清理 | 准备一个过期测试文件和一个 long_term 对照 | G4-09 | 过期文件被清理，long_term 对照 DB active/COS 200/用户可见；生命周期聚合审计优先走整点 cron 路径；如使用手动接口，也需核对管理员操作 AuditLog、返回值、DB 与 COS 状态 |
+| 过期清理 | 准备一个过期测试文件和一个 long_term 对照 | G4-09 | 仅允许把本轮受控测试文件的 `expiresAt` 回拨到过去来模拟过期；执行前确认清理窗口内除本轮测试文件外无其它会被误清理的文件；过期文件被清理，long_term 对照 DB active/COS 200/用户可见；生命周期聚合审计优先走整点 cron 路径；如使用手动接口，也需核对管理员操作 AuditLog、返回值、DB 与 COS 状态 |
 | Admin 生命周期视图 | 管理员查看文件生命周期 | G4-10 | 展示统计、状态、长期保存、删除/清理结果；不得提供 Admin 修改用户保存期限入口 |
 
 ## 六、PostgreSQL 查询摘要模板
@@ -145,8 +158,10 @@ limit 100;
 
 出现任一情况必须停止 Gate 4，不扩大试运营：
 
+- G4-01 前无法证明测试账号开通方式不会修改短信、OCR、AI、TRTC、ASR/TTS 配置。
 - 会员 B 能读、下载或删除会员 A 文件。
 - `long_term` 对照在过期清理后消失。
+- G4-09 前无法证明过期清理只会命中本轮测试文件 ID。
 - 删除后 PostgreSQL、COS、用户界面三态不一致。
 - 签名 URL 超过 30 分钟或过期后仍可访问。
 - 日志或截图出现密钥、token、完整手机号、完整签名 URL、简历正文。
