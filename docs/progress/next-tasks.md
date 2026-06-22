@@ -78,6 +78,7 @@
 - [x] **会员登录个人数据隔离 P0：文件提取归属门禁**：`ResumeExtractionService` 读取文件时按 `endUserId` scoped read；会员只能提取本人文件，匿名只能提取匿名文件；签名 URL 内容代理不变；新增 `verify:member-login-data-closure` 组合验证。
 - [x] **会员登录个人数据隔离 P1：前端会话态和数据质量**：Kiosk 主要会员 API 已统一 401 / 账号禁用失效通知，登录发送会话级 `deviceId` 激活设备限流，收藏写入前验证已发布目标并由服务端派生标题。
 - [x] **会员登录个人数据隔离 P1：账号状态和留存治理**：账号禁用后既有 session 立即失效；已新增 `docs/compliance/member-personal-data-retention.md` 并接入 `verify:member-data-retention`。
+- [ ] **预生产部署分支回流 main**：当前预生产部署候选需要同时包含 `76c06ca8` file-assets 能力与 PR #61 会员登录闭环；在 file-assets 正式回流 `origin/main` 前，禁止直接从裸 `origin/main` 覆盖预生产，否则会回退用户文件资产能力。
 
 ## P1：工程质量门禁
 
