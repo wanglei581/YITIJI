@@ -72,8 +72,8 @@
 - [x] **只读复核：预生产 Gate 2 执行前就绪状态**：已输出 `docs/acceptance/user-file-assets-gate2-readiness-recheck.md`，确认本地候选包、预生产部署源、PM2、health、磁盘预算、API env、工具链和 PostgreSQL/Redis/Tencent COS 脱敏指纹；同时修正 Gate 2 主计划里的 Tencent COS key 名。该复核是 Gate 2 执行前历史证据，本身不代表远端执行。
 - [x] **预生产 Gate 1 只读预检**：基于 `codex/file-assets-preprod-execution` 的计划，已只读检查预生产主机、部署 commit、PM2、health 和 PostgreSQL 连接状态；结论为主机/API/PostgreSQL 可达，但预生产实际部署源仍为 `6b055d6b`，不是当时目标候选 `9146fa1c`，已按计划停止。
 - [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
-- [ ] **预生产 COS bucket 切换**：已输出 `docs/acceptance/user-file-assets-preprod-cos-switch-approval.md`。下一步需要用户在腾讯云创建或确认明确隔离的预生产 bucket，并提供/确认 bucket 名、region、私有读写、CAM 最小权限、生命周期规则和 CORS 边界；确认后才能修改预生产服务器 `.env`、重启 PM2、执行 G3-06 `verify:cos:live`。
-- [ ] **预生产 Gate 3/Gate 4 证据执行**：Gate 2 已通过；Gate 3 安全子集已部分通过：预生产运行时包通过 G3-01、G3-02、G3-04、G3-05、G3-07、G3-09，本地完整仓库通过 G3-03。G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停，原因是当前 COS bucket 脱敏复核为 fp=7637995480、`prod_label=true`、`strict_nonprod=false`，且与历史生产私有桶记录一致。预生产 COS bucket 切换完成后，再执行 G3-06 与 G4-01 至 G4-10。
+- [x] **预生产 COS bucket 切换**：已完成。腾讯云已创建隔离预生产 bucket 和预生产专用 CAM 子用户；预生产服务器仅替换 COS 相关 env，备份为 `/srv/ai-job-print-env-backups/api.env.20260622134416.bak`；新 bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`；PM2 online，health 为 `db=postgres`；G3-06 `verify:cos:live` 已通过 put/head/get/预签名下载/delete。
+- [ ] **预生产 Gate 4 证据执行**：Gate 2 已通过；Gate 3 自动命令门禁已通过：预生产运行时包通过 G3-01、G3-02、G3-04、G3-05、G3-06、G3-07、G3-09，本地完整仓库通过 G3-03。下一步准备受控 MEMBER_A / MEMBER_B / ADMIN_A 账号，执行 G4-01 至 G4-10：上传原始文件、默认 90 天、设置 180 天、成果物长期保存、重登查看、跨账号否定、删除三态、过期清理、Admin 生命周期视图和脱敏证据归档。
 
 ## P1：工程质量门禁
 

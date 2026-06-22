@@ -1,6 +1,6 @@
 # 用户文件与简历资产预生产执行记录
 
-> 状态：PREPRODUCTION GATE 2 PASSED；Gate 3 安全子集已部分通过但 COS live 仍阻塞；Gate 4、正式生产、试运营和 Windows 真机尚未执行。
+> 状态：PREPRODUCTION GATE 2 PASSED；Gate 3 自动命令门禁已补齐 COS live 并通过；Gate 4、正式生产、试运营和 Windows 真机尚未执行。
 > 基线候选：当前本地 Gate 2/Gate 3/Gate 0 门禁收口链 / `2187f6a7`（包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正）
 > 执行分支：`codex/file-assets-gate2-execution`
 > 口径：本文件记录预生产 Gate 2 执行证据和后续证据入口，不代表正式生产部署、真实试运营或 Windows 真机验收完成。
@@ -27,8 +27,8 @@
 | Gate 0 | 本地静态门禁 | 是 | 只运行本地文档/静态检查，不连接服务器或云资源。 |
 | Gate 1 | 预生产只读预检 | 需计划审查通过 | 只读 SSH、PM2 状态、health、commit，不改服务器。 |
 | Gate 2 | 候选部署或刷新 | 已执行 | 已改变预生产代码、构建产物、PostgreSQL schema 和进程状态；未写业务数据/COS。 |
-| Gate 3 | 自动命令门禁 | 已部分执行 | 已执行不触达 COS live 的安全子集；`verify:cos:live` 仍需先证明 COS bucket 为预生产/非生产用途。 |
-| Gate 4 | 浏览器和账号验收 | 暂停 | 会创建/修改测试会员文件、保存期限、删除状态和审计记录；当前因 COS bucket 预生产用途证明不足暂停。 |
+| Gate 3 | 自动命令门禁 | 已执行 | 安全子集已通过；预生产 COS bucket 切换后，`verify:cos:live` 已通过 put/head/get/signed-url/delete。 |
+| Gate 4 | 浏览器和账号验收 | 待执行 | 会创建/修改测试会员文件、保存期限、删除状态和审计记录；需准备受控会员/Admin 账号并另行确认执行。 |
 
 ## 三、Gate 0 本地静态门禁
 
@@ -94,7 +94,7 @@ Gate 3/Gate 4 尚未执行
 
 ## 六、Gate 3 自动命令门禁
 
-> 已部分执行。所有日志进入证据包前必须脱敏，不得提交 `.env`、token、签名 URL 查询串或简历正文。
+> 已执行（自动命令门禁，含 G3-06 COS live）。所有日志进入证据包前必须脱敏，不得提交 `.env`、token、签名 URL 查询串或简历正文。
 > 详细证据编号、日志命名和脱敏规则见 [Gate 3/Gate 4 证据执行模板](./user-file-assets-gate3-gate4-evidence-runbook.md)。
 
 | 命令 | 结果 | 证据 |
@@ -104,25 +104,24 @@ Gate 3/Gate 4 尚未执行
 | `pnpm --filter @ai-job-print/api verify:cos-lifecycle-policy` | PASS（本地完整仓库）/ REMOTE N/A | 2026-06-22 本地完整仓库执行通过，证据目录 `/tmp/ai-job-print-gate34-local-20260622123403`；预生产裁剪运行时包不包含 `docs/`，远端直接执行会失败，不能为运行该 docs-only 门禁把 `docs/` 加回运行时包。 |
 | `pnpm --filter @ai-job-print/api verify:file-retention` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-static-20260622123427`，日志 `G3-04-file-retention-20260622123427.log`。 |
 | `pnpm --filter @ai-job-print/api verify:file-lifecycle-summary` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-static-20260622123427`，日志 `G3-05-file-lifecycle-summary-20260622123427.log`。 |
-| `pnpm --filter @ai-job-print/api verify:cos:live` | BLOCKED | 执行前脱敏指纹复核显示 `TENCENT_COS_BUCKET` 指纹 `7637995480`、`project_label=true`、`prod_label=true`、`strict_nonprod=false`；该指纹与仓库历史归档中的生产私有桶记录一致。当前预生产 env 不应继续写 COS，未执行 COS live put/head/get/signed-url/delete。 |
+| `pnpm --filter @ai-job-print/api verify:cos:live` | PASS | 2026-06-22 已先切换到预生产隔离 COS：bucket 指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`；远端 `.env` 备份 `/srv/ai-job-print-env-backups/api.env.20260622134416.bak`；命令执行 put/head/get/预签名下载/delete 全部通过，删除后对象不存在；未打印密钥或完整签名 URL 查询串。 |
 | `pnpm --filter @ai-job-print/api verify:member-assets-c2d` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-20260622123346`，日志 `G3-07-member-assets-c2d-20260622123346.log`；单次命令显式覆盖 `SMS_PROVIDER=log`，脚本强制 `FILE_STORAGE_DRIVER=local`，不触达 COS 或真实短信。 |
 | `pnpm --filter @ai-job-print/api verify:audit-logs` | PASS | 2026-06-22 预生产运行时包执行通过；证据目录 `/srv/ai-job-print-evidence/file-assets-gate34-runtime-20260622123346`，日志 `G3-09-audit-logs-20260622123346.log`；该命令仅证明 AuditLog 基础审计门禁，不能替代 Gate 4 针对本轮测试文件的审计抽样。 |
 
 Gate 3 结论：
 
 ```text
-PREPRODUCTION GATE 3 PARTIAL PASS / BLOCKED
-已通过：G3-01、G3-02、G3-03（本地完整仓库）、G3-04、G3-05、G3-07、G3-09
-未执行：G3-06 COS live
-阻塞项：当前 COS bucket 脱敏复核为 fp=7637995480、strict_nonprod=false、prod_label=true、project_label=true；该指纹与历史生产私有桶记录一致，必须先切换到明确隔离的预生产 bucket 或提供等效隔离证明
+PREPRODUCTION GATE 3 PASSED FOR AUTOMATED COMMANDS
+已通过：G3-01、G3-02、G3-03（本地完整仓库）、G3-04、G3-05、G3-06、G3-07、G3-09
+COS live：预生产隔离 bucket 指纹 d855f7e900，strict_nonprod=true，prod_label=false
 健康复核：G3 安全子集执行后，预生产 health 仍为 success=true、db=postgres，PM2 ai-job-print-api online
-结论口径：不能宣称 Gate 3 完整通过，不能进入写 COS 的 Gate 4 文件链路
+结论口径：Gate 3 自动命令门禁通过；仍不能宣称 Gate 4、正式生产、试运营或 Windows 真机验收完成
 ```
 
 ## 七、Gate 4 浏览器和账号验收
 
 > 尚未执行。执行前必须准备 MEMBER_A、MEMBER_B、ADMIN_A 三类受控账号，并按 [Gate 3/Gate 4 证据执行模板](./user-file-assets-gate3-gate4-evidence-runbook.md) 留存 G4-01 至 G4-10 脱敏证据。
-> 当前暂停原因：G4 会写入测试文件和 COS 对象；当前预生产 env 的 COS bucket 脱敏标签为 `prod_label=true`、`strict_nonprod=false`，且指纹与历史生产私有桶记录一致，必须先切换到明确隔离的预生产 bucket 或提供等效隔离证明。
+> 当前前置状态：COS 已切换到预生产隔离 bucket 且 G3-06 已通过；G4 仍会写入测试文件、保存期限、删除状态和审计记录，需要另行确认执行边界。
 
 | 场景 | 必留证据 | 结果 |
 | --- | --- | --- |
@@ -163,10 +162,11 @@ PREPRODUCTION GATE 3 PARTIAL PASS / BLOCKED
 当前结论：
 
 ```text
-用户文件与简历资产预生产执行：PREPRODUCTION GATE 2 PASSED / Gate 3 安全子集部分通过 / Gate 4 尚未执行
+用户文件与简历资产预生产执行：PREPRODUCTION GATE 2 PASSED / Gate 3 自动命令门禁通过（含 G3-06）/ Gate 4 尚未执行
 执行环境：预生产
-执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 + Gate 3 安全子集
+执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 + Gate 3 安全子集 + 预生产 COS 切换 + G3-06 COS live
 部署 commit：Gate 2 执行候选 2187f6a7；执行前部署源为 6b055d6b，执行后 DEPLOY_SOURCE.txt 自报 commit=2187f6a7
-阻塞项：G3-06/Gate 4 需要先切换到明确隔离的预生产 bucket 或提供等效隔离证明；当前脱敏复核为 fp=7637995480、`prod_label=true`、`strict_nonprod=false`，且与历史生产私有桶记录一致
+COS 状态：已切换到明确隔离的预生产 bucket，脱敏复核为 fp=d855f7e900、strict_nonprod=true、prod_label=false，G3-06 verify:cos:live 已通过；env 备份为 /srv/ai-job-print-env-backups/api.env.20260622134416.bak
+剩余事项：Gate 4 浏览器账号验收待执行，需覆盖受控会员文件上传、保存期限、重登查看、跨账号否定、删除三态、过期清理和 Admin 生命周期视图
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```

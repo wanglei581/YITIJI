@@ -417,24 +417,29 @@ assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
   `/tmp/${currentGate2Artifact}`,
   `Gate 2 执行候选 ${gate2Candidate}`,
   'PREPRODUCTION GATE 2 PASSED',
-  'Gate 3 安全子集部分通过',
+  'PREPRODUCTION GATE 3 PASSED FOR AUTOMATED COMMANDS',
   'Gate 4 尚未执行',
-  '| `pnpm --filter @ai-job-print/api verify:cos:live` | BLOCKED |',
-  '未执行：G3-06 COS live',
-  'fp=7637995480',
-  'prod_label=true',
-  'strict_nonprod=false',
+  '| `pnpm --filter @ai-job-print/api verify:cos:live` | PASS |',
+  'G3-06',
+  'd855f7e900',
+  'strict_nonprod=true',
+  'prod_label=false',
+  '/srv/ai-job-print-env-backups/api.env.20260622134416.bak',
 ])
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
-assert.doesNotMatch(
-  preprodExecutionRecord,
-  /(?:PREPRODUCTION\s+)?GATE 3 (?:FULL )?(?:PASSED|已执行通过|完整通过)/,
-  'preprod execution record must not claim full Gate 3 pass while G3-06 is blocked',
+assert.ok(
+  preprodExecutionRecord.includes('仍不能宣称 Gate 4、正式生产、试运营或 Windows 真机验收完成'),
+  'preprod execution record may mark Gate 3 automated commands passed only with Gate 4/production/trial/Windows negative context',
 )
+for (const line of preprodExecutionRecord.split('\n')) {
+  const productionCompletionClaim = /(?:正式生产|生产验收|试运营|Windows 真机|Gate\s*4)[^。\n]{0,16}(?:已?通过|已?完成|已执行|完整通过)/i.test(line)
+  const negativeContext = /(?:尚未|不得|不把|不代表|不能|未执行|NOT EXECUTED|缺少|暂停|待执行)/.test(line)
+  assert.ok(!productionCompletionClaim || negativeContext, `preprod execution record must not claim production/trial/Gate 4 completion: ${line}`)
+}
 assertIncludesAll(preprodCosSwitchApproval, 'preprod COS switch approval package', [
-  'APPROVAL / INPUT REQUIRED，尚未切换',
+  'EXECUTED / PREPRODUCTION COS SWITCH PASSED',
   'COS_BUCKET_PROOF fp=7637995480 strict_nonprod=false prod_label=true project_label=true',
-  '不得设置 `COS_BUCKET_PREPROD_PROOF_CONFIRMED=true`',
+  'COS_BUCKET_PROOF fp=d855f7e900 strict_nonprod=true prod_label=false region=ap-guangzhou',
   '预生产 bucket 名',
   '私有读写',
   'CAM 权限',
@@ -445,12 +450,14 @@ assertIncludesAll(preprodCosSwitchApproval, 'preprod COS switch approval package
   'TENCENT_COS_SECRET_ID',
   'TENCENT_COS_SECRET_KEY',
   'verify:cos:live',
-  'PREPRODUCTION COS SWITCH NOT EXECUTED',
+  'PREPRODUCTION COS SWITCH PASSED',
+  '/srv/ai-job-print-env-backups/api.env.20260622134416.bak',
+  'G3-06 verify:cos:live 已通过',
 ])
 for (const line of preprodCosSwitchApproval.split('\n')) {
-  const completionClaim = /(?:切换|COS\s*live|Gate\s*4|试运营|生产验收|Gate\s*3)[^。\n]{0,10}(?:已?通过|已?完成|已执行|已切换|完整通过)/i.test(line)
-  const negativeContext = /(?:尚未|不得|不代表|不能|未执行|NOT EXECUTED|缺少|暂停|安全子集|PARTIAL)/.test(line)
-  assert.ok(!completionClaim || negativeContext, `preprod COS switch approval must not claim execution completion: ${line}`)
+  const productionCompletionClaim = /(?:正式生产|生产验收|试运营|Windows 真机|Gate\s*4)[^。\n]{0,16}(?:已?通过|已?完成|已执行|完整通过)/i.test(line)
+  const negativeContext = /(?:尚未|不得|不把|不代表|不能|未执行|NOT EXECUTED|缺少|暂停|待执行)/.test(line)
+  assert.ok(!productionCompletionClaim || negativeContext, `preprod COS switch approval must not claim production/trial/Gate 4 completion: ${line}`)
 }
 
 assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [`部署候选 \`${gate2Candidate}\``])
@@ -527,12 +534,12 @@ assert.ok(
   nextTasks.includes('预生产 Gate 2 候选部署或刷新') &&
     nextTasks.includes('已完成') &&
     nextTasks.includes('预生产 COS bucket 切换') &&
-    nextTasks.includes('user-file-assets-preprod-cos-switch-approval.md') &&
-    nextTasks.includes('Gate 3 安全子集已部分通过') &&
-    nextTasks.includes('G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停') &&
-    nextTasks.includes('prod_label=true') &&
-    nextTasks.includes('明确隔离的预生产 bucket'),
-  'next-tasks must record Gate 2 passed, Gate 3 partial state, and Gate 4/COS blocker',
+    nextTasks.includes('已完成。腾讯云已创建隔离预生产 bucket') &&
+    nextTasks.includes('G3-06 `verify:cos:live` 已通过') &&
+    nextTasks.includes('预生产 Gate 4 证据执行') &&
+    nextTasks.includes('Gate 3 自动命令门禁已通过') &&
+    nextTasks.includes('G4-01 至 G4-10'),
+  'next-tasks must record Gate 2 passed, COS switch/G3-06 passed, and Gate 4 still pending',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')
 assert.ok(nextTasks.includes('AuditLog'), 'next-tasks must use AuditLog for file lifecycle audit evidence')

@@ -1,8 +1,8 @@
 # 用户文件资产预生产 COS bucket 切换审批包
 
-> 状态：APPROVAL / INPUT REQUIRED，尚未切换。
+> 状态：EXECUTED / PREPRODUCTION COS SWITCH PASSED。
 > 背景：Gate 3 安全子集已通过；G3-06 `verify:cos:live` 与 Gate 4 因当前预生产 env 指向生产语义 COS bucket 而暂停。
-> 口径：本文只定义预生产 COS bucket 隔离切换的目标、边界、前置输入、验证和回滚；不代表已经创建 bucket、修改服务器 env、执行 COS live 或完成 Gate 4。
+> 口径：本文记录预生产 COS bucket 隔离切换的目标、边界、执行结果和回滚；不代表 Gate 4、正式生产、试运营或 Windows 真机验收完成。
 
 ## 一、当前阻塞
 
@@ -13,6 +13,14 @@ COS_BUCKET_PROOF fp=7637995480 strict_nonprod=false prod_label=true project_labe
 ```
 
 该指纹与历史生产私有桶记录一致。当前不得设置 `COS_BUCKET_PREPROD_PROOF_CONFIRMED=true`，不得执行 `verify:cos:live`，不得进入 Gate 4 文件上传、删除三态和过期清理验收。
+
+2026-06-22 已切换到明确隔离的预生产 bucket：
+
+```text
+COS_BUCKET_PROOF fp=d855f7e900 strict_nonprod=true prod_label=false region=ap-guangzhou
+```
+
+原阻塞项已解除；Gate 4 仍需另行执行会员账号和文件资产浏览器验收。
 
 ## 二、目标
 
@@ -99,7 +107,12 @@ COS_BUCKET_PROOF fp=7637995480 strict_nonprod=false prod_label=true project_labe
 ## 十、当前结论
 
 ```text
-PREPRODUCTION COS SWITCH NOT EXECUTED
-阻塞项：缺少明确隔离的预生产 bucket 名、region、权限和 CAM 策略确认
-下一步：用户提供/确认预生产 bucket 后，才能执行远端 .env 切换和 G3-06 COS live
+PREPRODUCTION COS SWITCH PASSED
+预生产 bucket 指纹：d855f7e900
+预生产 region：ap-guangzhou
+远端 env 备份：/srv/ai-job-print-env-backups/api.env.20260622134416.bak
+PM2 ai-job-print-api online
+本机和公网 health 均为 success=true、db=postgres
+G3-06 verify:cos:live 已通过 put/head/get/signed-url/delete，且删除后对象不存在
+下一步：另行执行 Gate 4 会员账号、文件资产、保存期限、删除三态、过期清理和 Admin 生命周期浏览器验收
 ```
