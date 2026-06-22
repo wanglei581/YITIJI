@@ -74,7 +74,7 @@
 - [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
 - [x] **预生产 COS bucket 切换**：已完成。腾讯云已创建隔离预生产 bucket 和预生产专用 CAM 子用户；预生产服务器仅替换 COS 相关 env，备份为 `/srv/ai-job-print-env-backups/api.env.20260622134416.bak`；新 bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`；PM2 online，health 为 `db=postgres`；G3-06 `verify:cos:live` 已通过 put/head/get/预签名下载/delete。
 - [x] **预生产 Gate 4 账号/API 级验收**：已按用户确认的 B 方案临时切 `SMS_PROVIDER=log`，通过真实 HTTP API + PostgreSQL + Redis + COS 完成受控会员登录、原始文件上传、默认 90 天、设置 180 天、原始文件长期保存拒绝、签名 URL 内部访问、跨账号 403、删除三态、过期清理、Admin 生命周期汇总和审计抽样；执行后已回滚 `SMS_PROVIDER=tencent`，公网 health 复核 `db=postgres`，SSH 只读复核确认 `SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。该项仍不是完整浏览器截图验收、正式生产或试运营完成。
-- [ ] **预生产 Gate 4 人工证据补齐**：补 G4 浏览器截图、签名 URL 过期等待窗口、COS 控制台/HEAD 脱敏证据；同时补真实 AI 优化产物导出后自动标记 `assetCategory=optimized` / `sourceFileId` 的业务链路或明确产品限制，避免长期保存能力只能依赖 DB 夹具。
+- [ ] **预生产 Gate 4 人工证据补齐**：真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的代码侧链路已补齐并由 `verify:resume-generate` 覆盖；下一步仍需部署后预生产复验，并补 G4 浏览器截图、签名 URL 过期等待窗口、COS 控制台/HEAD 脱敏证据，避免把 API 级验收或本地代码验证误写成完整浏览器验收。
 
 ## P1：工程质量门禁
 

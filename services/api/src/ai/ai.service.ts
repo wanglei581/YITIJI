@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
@@ -13,7 +13,7 @@ import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
-import { FilesService } from '../files/files.service'
+import { canAccessFile, FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 
@@ -88,6 +88,7 @@ function verifyAccessToken(token: string | null, expectedHash: string): boolean 
 
 @Injectable()
 export class AiService {
+  private readonly logger = new Logger(AiService.name)
   private readonly provider: AiProvider
 
   constructor(
@@ -441,6 +442,37 @@ export class AiService {
   }
 
   /**
+   * 从已授权 AI 结果推导确认版简历的原始文件。
+   *
+   * 只给会员文件绑定 sourceFileId；匿名 / system 文件保持 null，避免把临时文件
+   * 纳入会员长期保存链路。候选文件不存在或归属不匹配时不阻断导出。
+   */
+  async resolveExportSourceFileId(
+    taskId: string | undefined | null,
+    requester: AiResultRequester,
+  ): Promise<string | null> {
+    if (!taskId || !requester.endUserId) return null
+
+    const parseResult = await this.loadAuthorizedResult<ParseResumeOutput>(taskId, 'parse', requester)
+    const candidateFileId = parseResult?.fileId
+    if (!candidateFileId) return null
+
+    const file = await this.prisma.fileObject.findUnique({
+      where: { id: candidateFileId },
+      select: { id: true, uploaderId: true, endUserId: true, ownerType: true, ownerId: true },
+    })
+    if (!file) {
+      this.logger.warn('AI resume export source file is missing; exporting without sourceFileId')
+      return null
+    }
+    if (!canAccessFile(file, { kind: 'member', endUserId: requester.endUserId })) {
+      this.logger.warn('AI resume export source file ownership mismatch; exporting without sourceFileId')
+      return null
+    }
+    return file.id
+  }
+
+  /**
    * 导出用户确认后的简历为真实 PDF(进 FileObject + 签名 URL + 既有清理策略)。
    *
    * - 内容 = 用户在预览页确认/编辑后的最终简历(用户自己的资料,允许人工修改)。
@@ -451,6 +483,7 @@ export class AiService {
   async exportGeneratedResume(
     resume: GeneratedResume,
     endUserId: string | null,
+    sourceFileId: string | null = null,
   ): Promise<{ fileId: string; filename: string; sizeBytes: number; pageCount: number; signedUrl: string; expiresAt: string }> {
     const { buffer, pageCount } = await this.resumePdf.render(resume)
     const safeName = (resume.basic.name || '求职者').replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '求职者'
@@ -461,6 +494,8 @@ export class AiService {
       purpose: 'resume_upload',
       uploaderId: null,
       endUserId,
+      assetCategory: 'optimized',
+      sourceFileId,
       createdBy: 'ai_resume_generate',
     })
     return {

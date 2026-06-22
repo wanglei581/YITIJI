@@ -33,6 +33,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
+import { CURRENT_RETENTION_CONSENT_VERSION } from '../src/files/retention-policy'
 import { AiService } from '../src/ai/ai.service'
 import { MockAiProvider } from '../src/ai/providers/mock.provider'
 import { LlmResumeGenerateService } from '../src/ai/resume/llm-resume-generate.service'
@@ -207,6 +208,7 @@ async function main(): Promise<void> {
 
   const createdTaskIds: string[] = []
   const createdFileIds: string[] = []
+  const createdEndUserIds: string[] = []
   try {
     const out = await ai.submitResumeGenerate(INPUT, null)
     createdTaskIds.push(out.taskId)
@@ -255,6 +257,125 @@ async function main(): Promise<void> {
     if (buf.length < 2000) fail('7. PDF 过小,疑似未嵌中文字体')
     pass(`7. 真实 PDF(${exported.pageCount} 页,${Math.round(buf.length / 1024)}KB,中文字体内嵌);FileObject sensitive 短 TTL;文件名无手机号;签名 URL`)
 
+    // ── 7b. 会员确认版导出: optimized + sourceFileId + 长期保存策略 ─────
+    const endUser = await prisma.endUser.create({
+      data: {
+        phoneHash: `verify-resume-generate-${randomUUID()}`,
+        phoneEnc: `verify-phone-${randomUUID()}`,
+        nickname: '验证会员',
+      },
+    })
+    createdEndUserIds.push(endUser.id)
+    const source = await files.upload({
+      buffer: Buffer.from('%PDF-verify-member-source-resume'),
+      filename: 'member-source-resume.pdf',
+      mimeType: 'application/pdf',
+      purpose: 'resume_upload',
+      uploaderId: null,
+      endUserId: endUser.id,
+      createdBy: 'verify_resume_generate',
+    })
+    createdFileIds.push(source.fileId)
+    const sourceRow = await prisma.fileObject.findUnique({ where: { id: source.fileId } })
+    if (!sourceRow) fail('7b. 源文件未落库')
+    if (sourceRow.assetCategory !== 'original' || sourceRow.sourceFileId !== null) {
+      fail(`7b. 普通上传默认分类错误: ${sourceRow.assetCategory}/${sourceRow.sourceFileId}`)
+    }
+    try {
+      await files.updateRetention(source.fileId, { kind: 'member', endUserId: endUser.id }, {
+        retentionPolicy: 'long_term',
+        consentVersion: CURRENT_RETENTION_CONSENT_VERSION,
+      })
+      fail('7b. 原始文件不应允许长期保存')
+    } catch (e) {
+      if (errCode(e) !== 'RETENTION_LONG_TERM_ORIGINAL_FORBIDDEN') {
+        fail(`7b. 原始文件长期保存应被拒绝,实际 ${errCode(e)}`)
+      }
+    }
+
+    const parsed = await ai.submitResumeParse({
+      fileId: source.fileId,
+      fileName: 'member-source-resume.pdf',
+      fileFormat: 'pdf',
+      source: 'upload',
+    }, endUser.id)
+    createdTaskIds.push(parsed.taskId)
+    const resolvedSourceFileId = await ai.resolveExportSourceFileId(parsed.taskId, { endUserId: endUser.id, accessToken: null })
+    if (resolvedSourceFileId !== source.fileId) fail(`7b. sourceFileId 推导失败: ${resolvedSourceFileId}`)
+
+    const memberExported = await ai.exportGeneratedResume(readBack.resume!, endUser.id, resolvedSourceFileId)
+    createdFileIds.push(memberExported.fileId)
+    const memberExportRow = await prisma.fileObject.findUnique({ where: { id: memberExported.fileId } })
+    if (!memberExportRow) fail('7b. 会员导出文件未落库')
+    if (memberExportRow.assetCategory !== 'optimized') fail(`7b. 导出文件分类应为 optimized,实际 ${memberExportRow.assetCategory}`)
+    if (memberExportRow.sourceFileId !== source.fileId) fail(`7b. 导出文件 sourceFileId 错误: ${memberExportRow.sourceFileId}`)
+    const longTerm = await files.updateRetention(memberExported.fileId, { kind: 'member', endUserId: endUser.id }, {
+      retentionPolicy: 'long_term',
+      consentVersion: CURRENT_RETENTION_CONSENT_VERSION,
+    })
+    if (longTerm.file.retentionPolicy !== 'long_term' || longTerm.file.expiresAt !== null) {
+      fail('7b. optimized 导出文件未能设置长期保存')
+    }
+    pass('7b. 会员确认版导出写入 optimized/sourceFileId,允许本人设置长期保存;原始文件仍禁止长期保存')
+
+    const missingSourceParsed = await ai.submitResumeParse({
+      fileId: `missing-${randomUUID()}`,
+      fileName: 'missing-source-resume.pdf',
+      fileFormat: 'pdf',
+      source: 'upload',
+    }, endUser.id)
+    createdTaskIds.push(missingSourceParsed.taskId)
+    const missingSourceFileId = await ai.resolveExportSourceFileId(missingSourceParsed.taskId, { endUserId: endUser.id, accessToken: null })
+    if (missingSourceFileId !== null) fail(`7b. 源文件不存在时应回退 null,实际 ${missingSourceFileId}`)
+
+    const otherEndUser = await prisma.endUser.create({
+      data: {
+        phoneHash: `verify-resume-generate-other-${randomUUID()}`,
+        phoneEnc: `verify-phone-other-${randomUUID()}`,
+        nickname: '验证会员B',
+      },
+    })
+    createdEndUserIds.push(otherEndUser.id)
+    const otherSource = await files.upload({
+      buffer: Buffer.from('%PDF-verify-other-member-source-resume'),
+      filename: 'other-member-source-resume.pdf',
+      mimeType: 'application/pdf',
+      purpose: 'resume_upload',
+      uploaderId: null,
+      endUserId: otherEndUser.id,
+      createdBy: 'verify_resume_generate',
+    })
+    createdFileIds.push(otherSource.fileId)
+    const crossUserParsed = await ai.submitResumeParse({
+      fileId: otherSource.fileId,
+      fileName: 'other-member-source-resume.pdf',
+      fileFormat: 'pdf',
+      source: 'upload',
+    }, endUser.id)
+    createdTaskIds.push(crossUserParsed.taskId)
+    const crossUserSourceFileId = await ai.resolveExportSourceFileId(crossUserParsed.taskId, { endUserId: endUser.id, accessToken: null })
+    if (crossUserSourceFileId !== null) fail(`7b. 他人源文件应回退 null,实际 ${crossUserSourceFileId}`)
+    pass('7b+. 源文件不存在或归属不匹配时 sourceFileId 回退 null,不阻断导出')
+
+    const unlinkedExported = await ai.exportGeneratedResume(readBack.resume!, endUser.id, null)
+    createdFileIds.push(unlinkedExported.fileId)
+    const unlinkedRow = await prisma.fileObject.findUnique({ where: { id: unlinkedExported.fileId } })
+    if (!unlinkedRow) fail('7c. 未关联导出文件未落库')
+    if (unlinkedRow.assetCategory !== 'optimized' || unlinkedRow.sourceFileId !== null) {
+      fail(`7c. 未带 task/source 导出应为 optimized/null,实际 ${unlinkedRow.assetCategory}/${unlinkedRow.sourceFileId}`)
+    }
+
+    try {
+      await files.updateRetention(exported.fileId, { kind: 'member', endUserId: endUser.id }, {
+        retentionPolicy: 'long_term',
+        consentVersion: CURRENT_RETENTION_CONSENT_VERSION,
+      })
+      fail('7d. 匿名/system 导出不应允许会员设置长期保存')
+    } catch (e) {
+      if (errCode(e) !== 'FILE_ACCESS_DENIED') fail(`7d. 匿名/system 导出长期保存应拒绝,实际 ${errCode(e)}`)
+    }
+    pass('7c/7d. 无源文件导出仍为 optimized/null;匿名 system 文件不可被会员设置长期保存')
+
     console.log('\n=== ALL PASS ===')
   } finally {
     for (const fid of createdFileIds) {
@@ -266,6 +387,7 @@ async function main(): Promise<void> {
     }
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: createdTaskIds } } }).catch(() => undefined)
     await prisma.auditLog.deleteMany({ where: { targetId: { in: [...createdTaskIds, ...createdFileIds] } } }).catch(() => undefined)
+    await prisma.endUser.deleteMany({ where: { id: { in: createdEndUserIds } } }).catch(() => undefined)
     server.close()
     await prisma.onModuleDestroy?.()
   }

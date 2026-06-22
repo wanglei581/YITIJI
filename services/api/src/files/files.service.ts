@@ -73,6 +73,8 @@ export class FilesService {
     sensitiveLevel?: FileSensitiveLevel
     uploaderId: string | null
     endUserId?: string | null
+    assetCategory?: FileAssetCategory
+    sourceFileId?: string | null
     actorRole?: UserRole | null
     actorOrgId?: string | null
     createdBy?: string | null
@@ -131,6 +133,8 @@ export class FilesService {
         visibility: 'private',
         status: 'active',
         createdBy: args.createdBy ?? args.uploaderId ?? null,
+        assetCategory: args.assetCategory ?? 'original',
+        sourceFileId: args.sourceFileId ?? null,
         expiresAt: retention.expiresAt,
         retentionPolicy: retention.retentionPolicy,
         retentionSetBy: retention.retentionSetBy,

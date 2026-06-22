@@ -106,7 +106,8 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 - MEMBER_A 登录成功，脱敏手机号 `139****7032`，会员 ID digest `bf165f504d98`。
 - MEMBER_B 越权否定测试成功，脱敏手机号 `138****7032`；跨账号预览和删除均为 403。
 - 原始文件 digest `2b44f637ef7b`：默认 `months_3`，可设置 `months_6`，设置 `long_term` 被 400 拒绝，删除后不可预览。
-- 优化成果夹具 digest `6c4869d21445`：受控上传后通过 DB 夹具标记 `assetCategory=optimized`，再走保存期限 API 设置 `long_term` 成功；这证明规则与资产中心管理能力，不等于真实 AI 优化产物生成链路已完整验收。
+- 优化成果夹具 digest `6c4869d21445`：受控上传后通过 DB 夹具标记 `assetCategory=optimized`，再走保存期限 API 设置 `long_term` 成功；这证明预生产规则与资产中心管理能力。
+- 代码侧补充：`codex/file-assets-gate4-browser-ai-output` 已让真实 AI 导出 PDF 写入 `assetCategory=optimized`，并在会员本人已授权 parse 记录可校验时绑定 `sourceFileId`；`verify:resume-generate` 已覆盖长期保存、源文件缺失/越权回退和匿名 system 文件不可长期保存。后续 Gate 4 人工证据仍需在部署后补浏览器截图、签名 URL 过期等待窗口和 COS HEAD/控制台脱敏证据。
 - 过期清理测试文件 digest `9e14136ea1ee`：清理前确认没有非本轮 active expired 文件，手动 cleanup 删除 1 个测试文件，`long_term` 对照未被删除。
 - Admin 生命周期 API：清理前 `totalActive=3`、`longTermCount=1`、`expiredPendingCleanup=1`；清理后 `totalActive=2`、`longTermCount=1`、`expiredPendingCleanup=0`。临时 Admin 已禁用。
 
