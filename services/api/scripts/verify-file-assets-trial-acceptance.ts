@@ -22,6 +22,7 @@ const gate2LocalArtifactCheckPath = join(repoRoot, 'docs/acceptance/user-file-as
 const gate2RuntimeBuildCheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-runtime-build-check.md')
 const gate2ReadinessRecheckPath = join(repoRoot, 'docs/acceptance/user-file-assets-gate2-readiness-recheck.md')
 const preprodExecutionRecordPath = join(repoRoot, 'docs/acceptance/user-file-assets-preprod-execution-record.md')
+const preprodCosSwitchApprovalPath = join(repoRoot, 'docs/acceptance/user-file-assets-preprod-cos-switch-approval.md')
 const checklistPath = join(repoRoot, 'docs/device/production-deployment-and-windows-host-checklist.md')
 const progressPath = join(repoRoot, 'docs/progress/current-progress.md')
 const nextTasksPath = join(repoRoot, 'docs/progress/next-tasks.md')
@@ -43,6 +44,7 @@ assert.ok(existsSync(gate2LocalArtifactCheckPath), 'must create docs/acceptance/
 assert.ok(existsSync(gate2RuntimeBuildCheckPath), 'must create docs/acceptance/user-file-assets-gate2-runtime-build-check.md')
 assert.ok(existsSync(gate2ReadinessRecheckPath), 'must create docs/acceptance/user-file-assets-gate2-readiness-recheck.md')
 assert.ok(existsSync(preprodExecutionRecordPath), 'must create docs/acceptance/user-file-assets-preprod-execution-record.md')
+assert.ok(existsSync(preprodCosSwitchApprovalPath), 'must create docs/acceptance/user-file-assets-preprod-cos-switch-approval.md')
 
 const acceptance = readFileSync(acceptancePath, 'utf8')
 const commercialClosureAudit = readFileSync(commercialClosureAuditPath, 'utf8')
@@ -53,6 +55,7 @@ const supersededPreprodExecutionPlan = readFileSync(supersededPreprodExecutionPl
 const gate2ApprovalPackage = readFileSync(gate2ApprovalPackagePath, 'utf8')
 const gate2LocalArtifactCheck = readFileSync(gate2LocalArtifactCheckPath, 'utf8')
 const gate2RuntimeBuildCheck = readFileSync(gate2RuntimeBuildCheckPath, 'utf8')
+const preprodCosSwitchApproval = readFileSync(preprodCosSwitchApprovalPath, 'utf8')
 const gate2ReadinessRecheck = readFileSync(gate2ReadinessRecheckPath, 'utf8')
 const preprodExecutionRecord = readFileSync(preprodExecutionRecordPath, 'utf8')
 const checklist = readFileSync(checklistPath, 'utf8')
@@ -428,6 +431,27 @@ assert.doesNotMatch(
   /(?:PREPRODUCTION\s+)?GATE 3 (?:FULL )?(?:PASSED|已执行通过|完整通过)/,
   'preprod execution record must not claim full Gate 3 pass while G3-06 is blocked',
 )
+assertIncludesAll(preprodCosSwitchApproval, 'preprod COS switch approval package', [
+  'APPROVAL / INPUT REQUIRED，尚未切换',
+  'COS_BUCKET_PROOF fp=7637995480 strict_nonprod=false prod_label=true project_label=true',
+  '不得设置 `COS_BUCKET_PREPROD_PROOF_CONFIRMED=true`',
+  '预生产 bucket 名',
+  '私有读写',
+  'CAM 权限',
+  '生命周期规则',
+  'CORS / 直传',
+  'TENCENT_COS_BUCKET',
+  'TENCENT_COS_REGION',
+  'TENCENT_COS_SECRET_ID',
+  'TENCENT_COS_SECRET_KEY',
+  'verify:cos:live',
+  'PREPRODUCTION COS SWITCH NOT EXECUTED',
+])
+for (const line of preprodCosSwitchApproval.split('\n')) {
+  const completionClaim = /(?:切换|COS\s*live|Gate\s*4|试运营|生产验收|Gate\s*3)[^。\n]{0,10}(?:已?通过|已?完成|已执行|已切换|完整通过)/i.test(line)
+  const negativeContext = /(?:尚未|不得|不代表|不能|未执行|NOT EXECUTED|缺少|暂停|安全子集|PARTIAL)/.test(line)
+  assert.ok(!completionClaim || negativeContext, `preprod COS switch approval must not claim execution completion: ${line}`)
+}
 
 assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [`部署候选 \`${gate2Candidate}\``])
 assert.doesNotMatch(gateEvidenceRunbook, new RegExp(oldGate2Candidate), 'Gate 3/Gate 4 evidence runbook must not reference the old Gate 2 candidate')
@@ -502,10 +526,12 @@ assert.ok(
 assert.ok(
   nextTasks.includes('预生产 Gate 2 候选部署或刷新') &&
     nextTasks.includes('已完成') &&
+    nextTasks.includes('预生产 COS bucket 切换') &&
+    nextTasks.includes('user-file-assets-preprod-cos-switch-approval.md') &&
     nextTasks.includes('Gate 3 安全子集已部分通过') &&
     nextTasks.includes('G3-06 `verify:cos:live` 和 Gate 4 浏览器账号验收暂停') &&
     nextTasks.includes('prod_label=true') &&
-    nextTasks.includes('明确预生产 bucket'),
+    nextTasks.includes('明确隔离的预生产 bucket'),
   'next-tasks must record Gate 2 passed, Gate 3 partial state, and Gate 4/COS blocker',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')

@@ -1,0 +1,12 @@
+{
+  "id": "file-assets-preprod-cos-switch-plan",
+  "title": "制定用户文件资产预生产 COS bucket 切换审批包",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "deployment",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交审批包",
+  "createdAt": "2026-06-22T05:10:00Z",
+  "branch": "codex/file-assets-preprod-cos-switch-plan"
+}
