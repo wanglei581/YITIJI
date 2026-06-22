@@ -1,4 +1,5 @@
 import { API_BASE_URL, API_MODE } from './client'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { ApiHttpError } from './httpAdapter'
 
 export type MaterialTaskKind =
@@ -103,10 +104,11 @@ function extractError(body: ResponseEnvelope<unknown>, fallback: string): { code
   }
 }
 
-async function parseEnvelope<T>(res: Response): Promise<T> {
+async function parseEnvelope<T>(res: Response, failedToken?: string): Promise<T> {
   const body = (await res.json().catch(() => ({}))) as ResponseEnvelope<T>
   if (!res.ok) {
     const error = extractError(body, `HTTP ${res.status}`)
+    if (isMemberSessionInvalidError(res.status, error.code, Boolean(failedToken))) notifyMemberSessionExpired(failedToken)
     throw new ApiHttpError(error.code, error.message, res.status)
   }
   if (body.success === false) {
@@ -129,7 +131,7 @@ async function request<T>(
     headers: authHeaders(access),
     credentials: 'include',
   })
-  return parseEnvelope<T>(res)
+  return parseEnvelope<T>(res, access?.token ?? undefined)
 }
 
 function createMockTask(input: CreateMaterialTaskInput, token?: string | null): DocumentProcessTaskView {

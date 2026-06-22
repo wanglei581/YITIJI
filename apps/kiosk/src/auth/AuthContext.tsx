@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { memberLogout } from '../services/auth/memberAuthApi'
+import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
 import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } from './context'
 
 /**
@@ -48,6 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       memberLogout(token).catch(() => undefined)
     }
   }, [])
+
+  useEffect(
+    () => onMemberSessionExpired((failedToken) => {
+      if (failedToken && userRef.current?.token !== failedToken) return
+      logout()
+    }),
+    [logout],
+  )
 
   const setBusy = useCallback((next: boolean) => setBusyState(next), [])
 

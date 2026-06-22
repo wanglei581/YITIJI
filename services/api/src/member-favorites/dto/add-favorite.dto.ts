@@ -17,7 +17,7 @@ export class AddFavoriteDto {
   @MaxLength(128)
   targetId!: string
 
-  /** 展示标题快照（可空，仅展示用，不含 PII / 投递信息）。 */
+  /** 兼容旧前端的标题提示；服务端会忽略该字段并从已发布目标重新派生标题。 */
   @IsOptional()
   @IsString()
   @MaxLength(200)

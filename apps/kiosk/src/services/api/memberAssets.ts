@@ -16,6 +16,7 @@ import type {
   MemberAiRecordItem,
   FileAccessUrlResponse,
 } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class MemberAssetsApiError extends Error {
@@ -53,6 +54,7 @@ async function call<T>(path: string, token: string, method: 'GET' | 'DELETE' = '
       code = body.error?.code ?? code
       message = body.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new MemberAssetsApiError(code, message, res.status)
   }
   const json = (await res.json()) as Envelope<T>

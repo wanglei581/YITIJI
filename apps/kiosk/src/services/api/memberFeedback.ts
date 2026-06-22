@@ -5,6 +5,7 @@
 // 不伪造工单与回复。
 // ============================================================
 
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export type FeedbackCategory = 'device' | 'print' | 'file_process' | 'general'
@@ -98,6 +99,7 @@ async function request<T>(
     } catch {
       /* keep defaults */
     }
+    if (isMemberSessionInvalidError(res.status, code, true)) notifyMemberSessionExpired(token)
     throw new MemberFeedbackApiError(code, message, res.status)
   }
 

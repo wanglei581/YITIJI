@@ -52,6 +52,7 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const svc = new MemberAssetsService(prisma)
+  const firstPage = { cursor: null, pageSize: 20 }
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const userA = `eu_ma_a_${suffix}`
@@ -96,21 +97,21 @@ async function main() {
     await prisma.fileObject.create({ data: { id: fileB, storageKey: `ma/${fileB}.pdf`, filename: '简历B.pdf', mimeType: 'application/pdf', sizeBytes: 4321, sha256: 'SHA-B', purpose: 'resume', expiresAt: future, endUserId: userB, ownerType: 'user', ownerId: userB, status: 'active' } })
 
     // ── 1. 本人可读 ──────────────────────────────────────────────
-    const resA = await svc.listResumes(userA)
+    const resA = (await svc.listResumes(userA, firstPage)).items
     if (resA.length === 1 && resA[0].taskId === taskA && resA[0].optimized === true) pass('1. 本人可读简历：A 得到 1 条 parse，optimized=true（过期 parse 已排除）')
     else fail(`1. A 简历列表异常：${JSON.stringify(resA)}`)
 
-    const docA = await svc.listDocuments(userA)
+    const docA = (await svc.listDocuments(userA, firstPage)).items
     if (docA.length === 1 && docA[0].id === fileA && docA[0].downloadUrlPath === `/files/${fileA}/download-url`) pass('2. 本人可读文档：A 得到 1 个 active 文件（软删已排除），含临时访问端点路径')
     else fail(`2. A 文档列表异常：${JSON.stringify(docA)}`)
 
-    const aiA = await svc.listAiRecords(userA)
+    const aiA = (await svc.listAiRecords(userA, firstPage)).items
     if (aiA.length === 2 && aiA.every((r) => r.taskId === taskA) && new Set(aiA.map((r) => r.kind)).size === 2) pass('3. 本人可读 AI 记录：A 得到 parse+optimize 2 条（过期已排除）')
     else fail(`3. A AI 记录异常：${JSON.stringify(aiA)}`)
 
     // ── 2. 跨用户隔离（双向）─────────────────────────────────────
-    const resB = await svc.listResumes(userB)
-    const docB = await svc.listDocuments(userB)
+    const resB = (await svc.listResumes(userB, firstPage)).items
+    const docB = (await svc.listDocuments(userB, firstPage)).items
     const crossOk =
       resB.length === 1 && resB[0].taskId === taskB &&
       !resA.some((r) => r.taskId === taskB) &&
@@ -131,28 +132,29 @@ async function main() {
 
     // ── 4. 空列表返回 [] ─────────────────────────────────────────
     const emptyOk =
-      JSON.stringify(await svc.listResumes(userC)) === '[]' &&
-      JSON.stringify(await svc.listDocuments(userC)) === '[]' &&
-      JSON.stringify(await svc.listAiRecords(userC)) === '[]'
+      JSON.stringify((await svc.listResumes(userC, firstPage)).items) === '[]' &&
+      JSON.stringify((await svc.listDocuments(userC, firstPage)).items) === '[]' &&
+      JSON.stringify((await svc.listAiRecords(userC, firstPage)).items) === '[]'
     if (emptyOk) pass('6. 空列表返回 []（无资产会员 C）')
     else fail('6. 空列表未返回 []')
 
     // ── 5. 匿名 / 失效鉴权拒绝（EndUserAuthGuard）────────────────
-    const guardNoToken = new EndUserAuthGuard({} as never, {} as never)
+    const guardNoToken = new EndUserAuthGuard({} as never, {} as never, {} as never)
     await expectGuardCode(() => guardNoToken.canActivate(mockCtx({})), 'MEMBER_MISSING_TOKEN', '7. 匿名（无 Authorization）→ 401 MEMBER_MISSING_TOKEN')
 
     const jwtThrows = { verify: () => { throw new Error('bad') } } as never
-    const guardBad = new EndUserAuthGuard(jwtThrows, {} as never)
+    const guardBad = new EndUserAuthGuard(jwtThrows, {} as never, {} as never)
     await expectGuardCode(() => guardBad.canActivate(mockCtx({ authorization: 'Bearer bad.token' })), 'MEMBER_TOKEN_INVALID', '8. 错 token → 401 MEMBER_TOKEN_INVALID')
 
     const jwtOk = { verify: () => ({ sub: userA, jti: 'sess-x' }) } as never
     const redisNull = { get: async () => null } as never
-    const guardNoSession = new EndUserAuthGuard(jwtOk, redisNull)
+    const guardNoSession = new EndUserAuthGuard(jwtOk, redisNull, {} as never)
     await expectGuardCode(() => guardNoSession.canActivate(mockCtx({ authorization: 'Bearer ok.token' })), 'MEMBER_SESSION_EXPIRED', '9. 有效 token 但无 Redis 会话 → 401 MEMBER_SESSION_EXPIRED')
 
     // ── 6. 正向：有效 token + 会话 → 通过并注入 endUser ──────────
     const redisOk = { get: async () => userA } as never
-    const guardOk = new EndUserAuthGuard(jwtOk, redisOk)
+    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true }) } } as never
+    const guardOk = new EndUserAuthGuard(jwtOk, redisOk, prismaEnabled)
     const ctx = mockCtx({ authorization: 'Bearer ok.token' })
     const allowed = await guardOk.canActivate(ctx)
     const injected = (ctx.switchToHttp().getRequest() as { endUser?: { endUserId: string } }).endUser

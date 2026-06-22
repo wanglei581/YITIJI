@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
+import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
 export class JobFitApiError extends Error {
@@ -50,6 +51,7 @@ async function call<T>(path: string, access: JobFitAccess, init?: { method?: str
       code = body.error?.code ?? code
       message = body.error?.message ?? message
     } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(access.token))) notifyMemberSessionExpired(access.token ?? undefined)
     throw new JobFitApiError(code, message, res.status)
   }
   return (await res.json()) as T
