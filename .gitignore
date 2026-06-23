@@ -18,6 +18,11 @@ outputs/
 .env
 .env.local
 .env.*.local
+# .env 备份文件不入库（可能含密钥）；保留 .env.example / .env.template 跟踪
+.env.bak*
+*.env.bak*
+.env.*.bak
+services/**/.env.bak-*
 
 # Editor
 .vscode
