@@ -14,6 +14,7 @@ function assert(condition, message) {
 
 const loginPage = read('src/pages/auth/LoginPage.tsx')
 const authContext = read('src/auth/AuthContext.tsx')
+const returnPath = read('src/auth/returnPath.ts')
 const memberAuthDevice = read('src/services/auth/memberAuthDevice.ts')
 const memberSessionEvents = read('src/services/auth/memberSessionEvents.ts')
 
@@ -46,9 +47,31 @@ assert(
 assert(
   authContext.includes('onMemberSessionExpired') &&
     authContext.includes('logout()') &&
+    authContext.includes('sessionExpiredRedirectingRef') &&
+    authContext.includes('!isLoginPath(window.location.pathname)') &&
+    authContext.includes('window.location.assign(loginPathForCurrentLocation())') &&
     !authContext.includes('resetMemberAuthDevice') &&
     authContext.includes('userRef.current?.token !== failedToken'),
-  'AuthProvider 订阅会员 API 失效事件，只清空仍匹配失败 token 的内存会话，不重置风控 deviceId',
+  'AuthProvider 订阅会员 API 失效事件，只清空仍匹配失败 token 的内存会话，不重置风控 deviceId，并安全回到登录页',
+)
+
+assert(
+  returnPath.includes('isSafeInternalPath') &&
+    returnPath.includes('loginPathForCurrentLocation') &&
+    returnPath.includes("path.startsWith('/')") &&
+    returnPath.includes("!path.startsWith('//')") &&
+    returnPath.includes("!path.includes('\\\\')") &&
+    returnPath.includes('isLoginPath') &&
+    returnPath.includes("path.startsWith('/login?')") &&
+    returnPath.includes("path.startsWith('/login#')"),
+  '会员会话失效登录回跳只允许站内安全路径，并拒绝登录页自循环',
+)
+
+assert(
+  loginPage.includes('new URLSearchParams(location.search)') &&
+    loginPage.includes('isSafeInternalPath(queryFrom)') &&
+    loginPage.includes('isSafeInternalPath(fromState)'),
+  'LoginPage 对 state.from 与 query.from 使用同一站内安全回跳校验',
 )
 
 const memberServiceFiles = [
