@@ -18,6 +18,12 @@ outputs/
 .env
 .env.local
 .env.*.local
+# 忽略所有 .env.* 环境文件（可能含密钥）；下方显式放行示例/模板
+.env.*
+!.env.example
+!**/.env.example
+!.env.template
+!**/.env.template
 # .env 备份文件不入库（可能含密钥）；保留 .env.example / .env.template 跟踪
 .env.bak*
 *.env.bak*
