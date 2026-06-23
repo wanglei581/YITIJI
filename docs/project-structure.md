@@ -18,6 +18,8 @@
 
 `packages/` 是项目内部共享包，不是第三方依赖目录。第三方依赖由 `package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml` 和 `node_modules/` 管理，不能手动搬运或整理 `node_modules/`。
 
+新功能开工前的功能归位准入规则以 `.ccg/spec/guides/index.md` 的“开发前准入”为准；本文件只提供目录职责事实源，不作为物理迁移计划。
+
 ## 正式文档目录
 
 - `docs/progress/`：当前进度、下一步任务、阶段记录。
