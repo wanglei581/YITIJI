@@ -112,6 +112,26 @@ legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 
 删除旧代码必须有证据：无路由引用、无 import 引用、无测试/verify 依赖、无当前文档声明、不会被生产部署或硬件链路使用。删除、隐藏、迁移页面或功能后必须同步 `docs/progress/current-progress.md`，并跑最小相关验证。
 
+### 标准化执行口径
+
+项目已经定过标准化结构：当前采用 `apps/`、`services/`、`packages/` 的 monorepo 结构，正式目录职责以 `docs/project-structure.md` 为准，工程规模和反堆砌规则以 `.ccg/spec/guides/index.md` 为准。后续不要另起一套并列标准，也不要因为“重新统一”而从零重写项目。
+
+后续 Claude、Codex 或其他模型推进功能、修复、重构时，默认执行口径是：保留已验证能力，按现有标准渐进式规范化。每个任务开始前必须写清：
+
+- 本任务对应哪个真实功能闭环或上线阻塞。
+- 允许修改哪些文件，禁止修改哪些文件。
+- 是否新增入口、页面、数据模型、服务或外部依赖；如新增，必须说明为什么现有能力不能复用。
+- 是否触碰岗位、招聘会、简历、文件、打印、生产配置、数据库、密钥或硬件链路。
+- 需要执行哪些 typecheck、lint、build、verify、浏览器或真机验证。
+- 是否需要同步 `docs/progress/current-progress.md`、`docs/progress/next-tasks.md`、`docs/product/feature-scope.md` 或 `docs/compliance/compliance-boundary.md`。
+
+禁止事项：
+
+- 不新增第二套“项目标准”或临时 handoff 文档来替代正式入口文档。
+- 不在当前上线前收口阶段做物理目录迁移；如未来必须迁移，按 `docs/reviews/project-directory-migration-impact.md` 从干净 `main` 或独立 worktree 分阶段执行。
+- 不以降低代码量为理由删除已验证闭环、CI/verify 门禁、合规防线或硬件适配代码。
+- 不把标准化执行变成大范围重写；只能按业务闭环、文件预算和验证门禁逐步收口。
+
 ---
 
 ## 当前进度
