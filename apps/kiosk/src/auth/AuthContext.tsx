@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { memberLogout } from '../services/auth/memberAuthApi'
 import { onMemberSessionExpired } from '../services/auth/memberSessionEvents'
 import { AuthContext, deriveDisplayName, type AuthContextValue, type AuthUser } from './context'
+import { isLoginPath, loginPathForCurrentLocation } from './returnPath'
 
 /**
  * Kiosk C 端会话 Provider（纯内存）。
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 用 ref 在 logout 中读取最新 token，避免 useCallback 依赖 user 导致的闭包问题。
   const userRef = useRef<AuthUser | null>(null)
+  const sessionExpiredRedirectingRef = useRef(false)
 
   // 纯内存方案：无需异步校验，挂载后立即标记 ready。
   useEffect(() => {
@@ -31,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback((next: AuthUser) => {
+    sessionExpiredRedirectingRef.current = false
     userRef.current = next
     setUser(next)
     setGuestMode(false)
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     const token = userRef.current?.token ?? null
+    sessionExpiredRedirectingRef.current = false
     // 先清本地状态，后端失败也不影响。
     userRef.current = null
     setUser(null)
@@ -53,7 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(
     () => onMemberSessionExpired((failedToken) => {
       if (failedToken && userRef.current?.token !== failedToken) return
+      if (sessionExpiredRedirectingRef.current) return
+      const shouldRedirect =
+        typeof window !== 'undefined' &&
+        !isLoginPath(window.location.pathname)
       logout()
+      if (shouldRedirect) {
+        sessionExpiredRedirectingRef.current = true
+        // Public kiosk sessions use a hard reload here to fully reset in-memory state.
+        window.location.assign(loginPathForCurrentLocation())
+      }
     }),
     [logout],
   )

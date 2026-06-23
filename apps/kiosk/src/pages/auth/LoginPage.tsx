@@ -21,6 +21,7 @@ import {
   ShieldCheckIcon,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { isSafeInternalPath } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import {
   MemberApiError,
@@ -65,13 +66,12 @@ export function LoginPage() {
   const countdown = useCountdown()
 
   const fromState = (location.state as { from?: unknown } | null)?.from
+  const queryFrom = new URLSearchParams(location.search).get('from')
+  const safeQueryFrom = typeof queryFrom === 'string' && isSafeInternalPath(queryFrom) ? queryFrom : null
   const returnTo =
-    typeof fromState === 'string' &&
-    fromState.startsWith('/') &&
-    !fromState.startsWith('//') &&
-    fromState !== '/login'
+    typeof fromState === 'string' && isSafeInternalPath(fromState)
       ? fromState
-      : '/'
+      : safeQueryFrom ?? '/'
 
   const [tab, setTab] = useState<LoginTab>('phone')
   const [phone, setPhone] = useState('')
