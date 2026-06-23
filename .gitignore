@@ -44,10 +44,14 @@ mavis-workspace/
 .opencode/
 
 # Local collaboration/tool workspaces (keep locally, do not track)
+# 注：.ccg/spec 是正式工程规范，保持跟踪，不在此列
 /.ccg/commander/
+/.ccg/tasks/
 /.product-pm/
 /.workbuddy/
 /.superpowers/
+/.worktrees/
+/opc-doc/
 
 # Runtime-generated API state（含 ai-model-config.json 的 apiKeyEncrypted 等密钥材料，不入仓库）
 services/api/data/
