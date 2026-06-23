@@ -48,6 +48,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Guard — no tracked AI tool state
+        # 防止 .ccg/tasks 等 AI 工具临时状态被(强制)提交回库；.ccg/spec 正式规范不在此列。
+        run: |
+          tracked=$(git ls-files .ccg/tasks .ccg/commander .product-pm .workbuddy .superpowers .worktrees opc-doc)
+          if [ -n "$tracked" ]; then
+            echo "::error::AI 工具临时状态目录不得纳入版本管理（见 .gitignore / CLAUDE.md §7）。违规文件："
+            echo "$tracked"
+            exit 1
+          fi
+          echo "OK: 无被跟踪的 AI 工具状态文件"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 11
