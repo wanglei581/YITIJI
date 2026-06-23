@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>运动语言演示台 · AI求职打印服务终端</title>
+<style>
+  :root{
+    /* ---- motion tokens (单一来源，与 motion-system.md 同步) ---- */
+    --enter:220ms; --press:120ms; --state:220ms; --flow:360ms; --stagger:50ms;
+    --ease-out:cubic-bezier(.22,1,.36,1);
+    --ease-inout:cubic-bezier(.4,0,.2,1);
+    --ease-press:cubic-bezier(.4,0,.6,1);
+    --ease-in:cubic-bezier(.4,0,1,1);
+    /* ---- palette ---- */
+    --page:#020b22; --bg:#04153a; --bg2:#072049;
+    --ink:#fff; --soft:#b3c6ec; --dim:#7187b6;
+    --tech:#2f7bf6; --cyan:#5fd0ff; --teal:#10b6a4; --violet:#8164ff; --amber:#f5972a;
+    --ok:#28d07c; --warn:#f5972a; --err:#ff6b6b;
+    --surface:rgba(255,255,255,.06); --surface2:rgba(255,255,255,.04);
+    --line:rgba(255,255,255,.12); --line-soft:rgba(255,255,255,.07);
+    --font:"PingFang SC","Microsoft YaHei","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{background:var(--page);color:var(--ink);font-family:var(--font);}
+  body{padding:34px 26px 70px;}
+  .wrap{max-width:1180px;margin:0 auto;}
+  h1{font-size:30px;font-weight:800;background:linear-gradient(120deg,#fff,#9cc4ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .lead{color:var(--soft);font-size:15px;margin-top:9px;line-height:1.6;font-weight:300;}
+  .tokchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;}
+  .tokchips span{font-size:12px;color:#cfe0ff;background:var(--surface);border:1px solid var(--line);padding:6px 12px;border-radius:30px;}
+  .tokchips b{color:var(--cyan);}
+
+  .app{display:flex;gap:26px;margin-top:28px;align-items:flex-start;}
+  .nav{width:208px;flex:0 0 auto;position:sticky;top:24px;display:flex;flex-direction:column;gap:8px;}
+  .nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+    background:var(--surface2);border:1px solid var(--line-soft);color:var(--soft);
+    font-family:var(--font);font-size:15px;padding:13px 15px;border-radius:12px;
+    transition:transform var(--press) var(--ease-press),background var(--state),color var(--state),border-color var(--state);}
+  .nav button:hover{background:var(--surface);}
+  .nav button:active{transform:scale(.98);}
+  .nav button.on{background:rgba(47,123,246,.18);border-color:rgba(95,170,255,.5);color:#fff;}
+  .nav button .i{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:0 0 auto;}
+  .nav button.on .i{background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;}
+  .stage .sub{color:var(--dim);font-size:13px;margin-bottom:14px;text-align:center;line-height:1.6;}
+  .device{width:392px;max-width:92vw;aspect-ratio:9/16;border-radius:26px;overflow:hidden;position:relative;
+    background:radial-gradient(120% 80% at 50% 12%,#0a2a63,#04153a 70%);
+    border:1px solid var(--line);box-shadow:0 36px 100px rgba(0,0,0,.55);}
+  .screen{position:absolute;inset:0;overflow-y:auto;padding:22px 20px 26px;}
+  .screen::-webkit-scrollbar{width:0;}
+  .ctrls{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:440px;}
+  .ctrl{cursor:pointer;font-family:var(--font);font-size:13px;color:#dce6fb;background:var(--surface);
+    border:1px solid var(--line);padding:9px 15px;border-radius:30px;
+    transition:transform var(--press) var(--ease-press),background var(--state),border-color var(--state);}
+  .ctrl:hover{background:rgba(255,255,255,.1);}
+  .ctrl:active{transform:scale(.96);}
+  .ctrl.primary{background:linear-gradient(135deg,#fff,#cfe2ff);color:#062a73;font-weight:700;border:none;}
+  .ctrl.danger{color:#ffc4c4;border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.12);}
+
+  /* ---------- shared building blocks ---------- */
+  .reveal{opacity:0;transform:translateY(12px);}
+  .reveal.in{opacity:1;transform:none;transition:opacity var(--enter) var(--ease-out),transform var(--enter) var(--ease-out);}
+  .head{font-size:13px;letter-spacing:2px;color:var(--cyan);font-weight:600;}
+  .h2{font-size:21px;font-weight:700;margin:5px 0 16px;}
+  .note{font-size:11px;color:var(--dim);margin-top:14px;line-height:1.6;}
+  .pressable{transition:transform var(--press) var(--ease-press);}
+  .pressable:active{transform:translateY(3px) scale(.99);}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 11px;border-radius:30px;
+    transition:background var(--state) var(--ease-inout),color var(--state),border-color var(--state);}
+  .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .dot.breathe{animation:breathe 2.4s var(--ease-inout) infinite;}
+  .s-ok{background:rgba(40,208,124,.16);color:#9be9c4;border:1px solid rgba(40,208,124,.4);}
+  .s-ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok);}
+  .s-warn{background:rgba(245,151,42,.16);color:#ffd29a;border:1px solid rgba(245,151,42,.45);}
+  .s-warn .dot{background:var(--warn);box-shadow:0 0 8px var(--warn);}
+  .s-err{background:rgba(255,107,107,.16);color:#ffc0c0;border:1px solid rgba(255,107,107,.5);}
+  .s-err .dot{background:var(--err);box-shadow:0 0 8px var(--err);}
+  @keyframes breathe{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.45;transform:scale(.8);}}
+
+  /* token playground */
+  .tk-row{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;}
+  .tk-row .lab{display:flex;align-items:baseline;gap:8px;}
+  .tk-row .lab b{font-size:15px;} .tk-row .lab span{font-size:12px;color:var(--cyan);margin-left:auto;}
+  .tk-row .demo{margin-top:14px;min-height:54px;display:flex;align-items:center;gap:10px;}
+  .tk-box{width:54px;height:54px;border-radius:12px;background:linear-gradient(135deg,#2f7bf6,#1d5fd0);flex:0 0 auto;}
+  .tk-card{flex:1;height:54px;border-radius:12px;background:var(--surface);border:1px solid var(--line);}
+  .tk-flowwrap{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--flow) var(--ease-inout),opacity var(--flow);opacity:0;}
+  .tk-flowwrap.open{grid-template-rows:1fr;opacity:1;}
+  .tk-flowwrap>div{overflow:hidden;}
+  .tk-panel{background:rgba(47,123,246,.14);border:1px solid rgba(95,170,255,.35);border-radius:10px;padding:14px;font-size:13px;color:#cfe0ff;margin-top:10px;}
+
+  /* generic card grid (home / mine) */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .scard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;min-height:92px;
+    display:flex;flex-direction:column;gap:10px;cursor:pointer;}
+  .scard .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;}
+  .scard .ic svg{width:21px;height:21px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .scard h4{font-size:15px;font-weight:600;}
+  .ic-blue{background:linear-gradient(135deg,#2f7bf6,#1d5fd0);} .ic-teal{background:linear-gradient(135deg,#10b6a4,#0a8f80);}
+  .ic-violet{background:linear-gradient(135deg,#8164ff,#6a4ad6);} .ic-amber{background:linear-gradient(135deg,#f5972a,#e07a12);}
+
+  .statsrow{display:flex;gap:10px;margin:6px 0 16px;}
+  .stat{flex:1;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:12px 8px;text-align:center;}
+  .stat b{font-size:23px;font-weight:800;display:block;}
+  .stat small{font-size:11px;color:var(--soft);}
+
+  .topbar{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+  .topbar .badge{padding:5px 10px;}
+
+  .collapse{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--flow) var(--ease-inout),opacity var(--flow);opacity:0;margin-top:14px;}
+  .collapse.open{grid-template-rows:1fr;opacity:1;}
+  .collapse>div{overflow:hidden;}
+  .campus{background:linear-gradient(150deg,rgba(47,123,246,.2),rgba(124,58,237,.12));border:1px solid rgba(120,170,255,.35);border-radius:16px;padding:18px;}
+  .campus h4{font-size:16px;font-weight:700;} .campus p{font-size:12.5px;color:var(--soft);margin-top:8px;line-height:1.5;}
+
+  /* step bar (resume / generic) */
+  .stepbar{display:flex;align-items:center;margin:4px 0 16px;}
+  .step{flex:1;text-align:center;position:relative;}
+  .step .ball{width:26px;height:26px;border-radius:50%;margin:0 auto;display:grid;place-items:center;font-size:12px;font-weight:700;
+    background:var(--surface);border:1px solid var(--line);color:var(--dim);
+    transition:background var(--state) var(--ease-inout),color var(--state),border-color var(--state);}
+  .step .tx{font-size:11px;color:var(--dim);margin-top:7px;transition:color var(--state);}
+  .step .seg{position:absolute;top:13px;left:-50%;width:100%;height:2px;background:var(--line);overflow:hidden;}
+  .step .seg i{position:absolute;inset:0;background:var(--cyan);transform:scaleX(0);transform-origin:left;
+    transition:transform var(--flow) var(--ease-inout);}
+  .step:first-child .seg{display:none;}
+  .step.done .ball{background:rgba(40,208,124,.2);border-color:var(--ok);color:#9be9c4;}
+  .step.active .ball{background:var(--tech);border-color:var(--cyan);color:#fff;box-shadow:0 0 0 4px rgba(95,170,255,.18);}
+  .step.active .tx,.step.done .tx{color:#cfe0ff;}
+  .step.done .seg i,.step.active .seg i{transform:scaleX(1);}
+
+  .panelcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}
+  .scoreline{display:flex;align-items:center;gap:14px;}
+  .scoreline b{font-size:34px;font-weight:800;color:#9be9c4;}
+  .scoreline small{font-size:12px;color:var(--soft);}
+  .diag{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#dce6fb;padding:10px 0;border-top:1px solid var(--line-soft);}
+  .diag:first-child{border-top:0;}
+  .ptag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex:0 0 auto;margin-top:1px;}
+  .p-high{background:rgba(255,107,107,.18);color:#ffc0c0;} .p-mid{background:rgba(245,151,42,.18);color:#ffd29a;} .p-low{background:rgba(95,170,255,.18);color:#bcd6ff;}
+
+  .upzone{border:1.5px dashed rgba(120,170,255,.4);border-radius:14px;padding:18px;text-align:center;color:var(--soft);font-size:13px;background:var(--surface2);margin-bottom:14px;position:relative;min-height:64px;}
+  .filechip{display:inline-flex;align-items:center;gap:8px;background:rgba(47,123,246,.18);border:1px solid rgba(95,170,255,.4);border-radius:10px;padding:9px 13px;font-size:13px;color:#dce6fb;
+    transition:transform var(--enter) var(--ease-out),opacity var(--enter);}
+  .compare{margin-top:6px;}
+  .cmp-line{position:relative;font-size:13px;line-height:1.5;padding:8px 0;overflow:hidden;}
+  .cmp-line.old{color:var(--soft);text-decoration:line-through;text-decoration-color:rgba(255,120,120,.5);}
+  .cmp-line.new{color:#fff;}
+  .sweep{position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(95,208,255,.3),transparent);transform:translateX(-110%);}
+  .sweep.go{animation:sweep var(--flow) var(--ease-inout);}
+  @keyframes sweep{to{transform:translateX(110%);}}
+
+  /* timeline (print) */
+  .timeline{display:flex;flex-direction:column;gap:0;margin:6px 0 14px;}
+  .tl{display:flex;gap:12px;align-items:flex-start;position:relative;padding-bottom:14px;}
+  .tl .mk{width:22px;height:22px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;z-index:1;
+    background:var(--surface);border:1px solid var(--line);transition:background var(--state) var(--ease-inout),border-color var(--state);}
+  .tl .mk svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--state);}
+  .tl .line{position:absolute;left:10px;top:22px;bottom:0;width:2px;background:var(--line);}
+  .tl:last-child .line{display:none;}
+  .tl .lab{font-size:14px;color:var(--dim);padding-top:1px;transition:color var(--state);}
+  .tl.done .mk{background:rgba(40,208,124,.22);border-color:var(--ok);} .tl.done .mk svg{opacity:1;}
+  .tl.done .lab{color:#cfe0ff;}
+  .tl.active .mk{background:var(--tech);border-color:var(--cyan);box-shadow:0 0 0 4px rgba(95,170,255,.18);}
+  .tl.active .lab{color:#fff;font-weight:600;}
+  .tl.err .mk{background:rgba(255,107,107,.2);border-color:var(--err);} .tl.err .lab{color:#ffc0c0;font-weight:600;}
+  .tl.err .mk svg{opacity:1;stroke:#ffc0c0;}
+
+  .statusbox{background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:6px 14px;margin-bottom:12px;}
+  .stline{display:flex;align-items:center;gap:9px;font-size:13px;color:#dce6fb;padding:9px 0;border-top:1px solid var(--line-soft);}
+  .stline:first-child{border-top:0;}
+  .stline .ck{width:18px;height:18px;border-radius:50%;background:rgba(40,208,124,.2);display:grid;place-items:center;flex:0 0 auto;}
+  .stline .ck svg{width:10px;height:10px;stroke:var(--ok);fill:none;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;}
+  .errbox{background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.45);border-radius:12px;padding:14px;color:#ffc0c0;font-size:13px;line-height:1.5;}
+  .errbox b{color:#ffd9d9;}
+  .successcheck{display:grid;place-items:center;padding:18px 0 6px;}
+  .successcheck .ring{width:74px;height:74px;border-radius:50%;background:rgba(40,208,124,.16);border:3px solid var(--ok);display:grid;place-items:center;transform:scale(0);}
+  .successcheck .ring.go{animation:popcheck var(--flow) var(--ease-out) forwards;}
+  .successcheck svg{width:38px;height:38px;stroke:var(--ok);fill:none;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;}
+  @keyframes popcheck{0%{transform:scale(0);}70%{transform:scale(1.12);}100%{transform:scale(1);}}
+
+  /* jobs */
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .fil{font-size:12px;padding:7px 14px;border-radius:30px;background:var(--surface);border:1px solid var(--line);color:var(--soft);cursor:pointer;
+    transition:transform var(--press) var(--ease-press),background var(--state),color var(--state),border-color var(--state);}
+  .fil:active{transform:scale(.96);}
+  .fil.on{background:rgba(47,123,246,.22);border-color:rgba(95,170,255,.5);color:#fff;}
+  .jcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:11px;}
+  .jcard .jr{font-size:16px;font-weight:600;} .jcard .jp{font-size:14px;font-weight:700;color:#7ee0b4;float:right;}
+  .jcard .src{font-size:11px;color:var(--dim);margin-top:7px;display:flex;gap:10px;flex-wrap:wrap;}
+  .jcard .src b{color:#9cc4ff;font-weight:600;}
+  .jbtns{display:flex;gap:8px;margin-top:12px;}
+  .jbtn{flex:1;text-align:center;font-size:13px;padding:10px;border-radius:10px;cursor:pointer;
+    transition:transform var(--press) var(--ease-press);}
+  .jbtn:active{transform:scale(.97);}
+  .jbtn.ghost{background:var(--surface2);border:1px solid var(--line);color:#cfe0ff;}
+  .jbtn.fill{background:linear-gradient(135deg,#2f7bf6,#1d5fd0);color:#fff;font-weight:600;}
+  .qrpop{position:absolute;left:50%;bottom:78px;transform:translateX(-50%) scale(.92);transform-origin:bottom center;opacity:0;
+    background:#fff;border-radius:16px;padding:18px;width:210px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.5);z-index:20;
+    transition:opacity var(--flow) var(--ease-out),transform var(--flow) var(--ease-out);}
+  .qrpop.show{opacity:1;transform:translateX(-50%) scale(1);}
+  .qrpop .qimg{width:130px;height:130px;margin:0 auto 10px;}
+  .qrpop .qt{color:#0b2a64;font-size:13px;font-weight:700;} .qrpop .qs{color:#5a6b8c;font-size:11px;margin-top:4px;}
+  .scrim{position:absolute;inset:0;background:rgba(2,6,18,.4);opacity:0;pointer-events:none;transition:opacity var(--state);z-index:15;}
+  .scrim.show{opacity:1;pointer-events:auto;}
+
+  /* assistant */
+  .chat{display:flex;flex-direction:column;gap:12px;}
+  .msg{max-width:82%;font-size:14px;line-height:1.5;padding:12px 15px;border-radius:16px;}
+  .msg.user{align-self:flex-end;background:linear-gradient(135deg,#2f7bf6,#1d5fd0);border-bottom-right-radius:5px;}
+  .msg.ai{align-self:flex-start;background:rgba(124,77,255,.16);border:1px solid rgba(150,120,255,.35);border-bottom-left-radius:5px;}
+  .advisor{display:flex;align-items:center;gap:11px;margin-bottom:16px;}
+  .advisor .ava{width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#3b82f6,#7c3aed);display:grid;place-items:center;font-size:18px;font-weight:700;flex:0 0 auto;}
+  .advisor .nm{font-size:16px;font-weight:700;} .advisor .rl{font-size:11px;color:var(--soft);}
+  .think{display:inline-flex;gap:5px;align-items:center;padding:4px 0;}
+  .think i{width:8px;height:8px;border-radius:50%;background:#c9b8ff;animation:bounce 1.2s infinite;}
+  .think i:nth-child(2){animation-delay:.2s;} .think i:nth-child(3){animation-delay:.4s;}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.55;}30%{transform:translateY(-7px);opacity:1;}}
+  .cur{display:inline-block;width:2px;height:15px;background:var(--cyan);vertical-align:-2px;margin-left:1px;animation:blink 1s steps(1) infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  .recos{display:flex;gap:10px;margin-top:14px;}
+  .reco{flex:1;background:var(--surface);border:1px solid rgba(95,170,255,.35);border-radius:14px;padding:14px;text-align:center;cursor:pointer;
+    font-size:13.5px;font-weight:600;color:#dce6fb;}
+  .reco .ri{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2f7bf6,#1d5fd0);margin:0 auto 9px;display:grid;place-items:center;}
+  .reco .ri svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;}
+  .gotarget{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 30%,#0a2a63,#04153a);display:grid;place-items:center;text-align:center;
+    opacity:0;pointer-events:none;transition:opacity var(--flow) var(--ease-out);z-index:25;}
+  .gotarget.show{opacity:1;}
+  .gotarget .big{font-size:18px;font-weight:700;} .gotarget .sm{font-size:13px;color:var(--soft);margin-top:8px;}
+
+  /* mine skeleton */
+  .sk{position:relative;overflow:hidden;background:rgba(255,255,255,.08);border-radius:8px;}
+  .sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(159,196,255,.32),transparent);animation:shimmer 1.4s infinite;}
+  @keyframes shimmer{to{transform:translateX(100%);}}
+  .recrow{display:flex;gap:11px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px;}
+  .recrow .ri{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#10b6a4,#0a8f80);display:grid;place-items:center;flex:0 0 auto;}
+  .recrow .ri svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2;}
+  .recrow .rx{flex:1;} .recrow .rt{font-size:14px;} .recrow .rs{font-size:11px;color:var(--soft);margin-top:3px;}
+  .entries{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
+  .entry{background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:14px;font-size:14px;color:#dce6fb;text-align:center;cursor:pointer;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms !important;animation-iteration-count:1 !important;}
+    .reveal{opacity:1;transform:none;}
+  }
+  @media(max-width:820px){.app{flex-direction:column;}.nav{width:100%;flex-direction:row;flex-wrap:wrap;position:static;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>运动语言演示台</h1>
+  <p class="lead">AI求职打印服务终端 · 统一运动语言可交互演示。所有动效只动 opacity / transform，时长取自统一 token，且表达真实状态——不做装饰、不做假成功。配套规范见 <b>docs/design/motion-system.md</b>。</p>
+  <div class="tokchips">
+    <span>进入 <b>220ms</b></span><span>点击反馈 <b>120ms</b></span><span>状态切换 <b>180–260ms</b></span><span>复杂流程 <b>300–400ms</b></span><span>stagger <b>50ms</b></span><span>成功反馈 <b>≤1s</b></span>
+  </div>
+
+  <div class="app">
+    <div class="nav" id="nav"></div>
+    <div class="stage">
+      <div class="sub" id="sub"></div>
+      <div class="device"><div class="screen" id="screen"></div></div>
+      <div class="ctrls" id="ctrls"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const T={enter:220,press:120,state:220,flow:360,stagger:50};
+const ICON={
+  resume:'<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5M9 13h6M9 17h6"/>',
+  print:'<rect x="6" y="9" width="12" height="7" rx="1"/><path d="M6 9V3h12v6M6 14h12v7H6z"/>',
+  job:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  fair:'<path d="M3 21h18M5 21V8l7-4 7 4v13M10 21v-6h4v6"/>',
+  policy:'<path d="M3 11l16-7v16L3 13z"/><path d="M7 13v5a2 2 0 0 0 4 0"/>',
+  mine:'<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>',
+  check:'<path d="M5 13l4 4L19 7"/>',
+  doc:'<path d="M6 2h9l5 5v15H6z"/>',
+  order:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  star:'<path d="M12 3l2.9 6 6.1.9-4.5 4.3 1.1 6.1L12 17.8 6.4 20.3l1.1-6.1L3 9.9 9.1 9z"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'
+};
+let timers=[];
+function later(fn,ms){const t=setTimeout(fn,ms);timers.push(t);return t;}
+function clearTimers(){timers.forEach(clearTimeout);timers=[];}
+function reveal(el,delay){later(()=>el.classList.add('in'),delay);}
+function countUp(el,target,dur){const start=performance.now();function f(now){let p=Math.min(1,(now-start)/dur);p=1-Math.pow(1-p,3);el.textContent=Math.round(target*p).toLocaleString();if(p<1)requestAnimationFrame(f);}requestAnimationFrame(f);}
+
+/* ============ SECTIONS ============ */
+const S={};
+
+/* ---- 0 token playground ---- */
+S.tokens={nav:'运动 token 试听台',sub:'点下面的按钮，逐个感受四档时长与对应缓动。',
+  screen:`
+    <div class="head">MOTION TOKENS</div><div class="h2">运动 token 试听台</div>
+    <div class="tk-row"><div class="lab"><b>进入 enter</b><span>220ms · ease-out</span></div><div class="demo"><div class="tk-card reveal" id="tkE"></div></div></div>
+    <div class="tk-row"><div class="lab"><b>点击反馈 press</b><span>120ms · ease-press</span></div><div class="demo"><div class="tk-box pressable" id="tkP" style="cursor:pointer"></div><span style="font-size:12px;color:var(--soft)">← 点我按压</span></div></div>
+    <div class="tk-row"><div class="lab"><b>状态切换 state</b><span>220ms · ease-inout</span></div><div class="demo"><span class="badge s-ok" id="tkS"><span class="dot"></span>在线</span></div></div>
+    <div class="tk-row"><div class="lab"><b>复杂流程 flow</b><span>360ms · ease-inout</span></div>
+      <div class="tk-flowwrap" id="tkF"><div><div class="tk-panel">展开 / 收起用 grid-rows 0fr↔1fr + opacity，收起不留空白。</div></div></div>
+    </div>`,
+  controls:`<button class="ctrl primary" data-act="enter">播放 进入</button><button class="ctrl" data-act="state">切换 状态</button><button class="ctrl" data-act="flow">展开 / 收起</button>`,
+  init(scr,ctr){
+    const E=scr.querySelector('#tkE'),S_=scr.querySelector('#tkS'),F=scr.querySelector('#tkF');
+    reveal(E,60);
+    ctr.querySelector('[data-act=enter]').onclick=()=>{E.classList.remove('in');void E.offsetWidth;E.classList.add('in');};
+    ctr.querySelector('[data-act=state]').onclick=()=>{const on=S_.classList.contains('s-ok');S_.className='badge '+(on?'s-warn':'s-ok');S_.innerHTML='<span class="dot"></span>'+(on?'离线':'在线');};
+    ctr.querySelector('[data-act=flow]').onclick=()=>F.classList.toggle('open');
+  }};
+
+/* ---- 1 home ---- */
+S.home={nav:'首页 · 服务总控屏',sub:'设备状态点呼吸/警示、服务卡 stagger 进入与按压、数量 count-up、智慧校园展开收起。',
+  screen:`
+    <div class="topbar">
+      <span class="badge s-ok" id="dPrint"><span class="dot breathe"></span>打印机就绪</span>
+      <span class="badge s-ok" id="dNet"><span class="dot breathe"></span>网络在线</span>
+    </div>
+    <div class="head">就业服务大厅 · 一体机</div><div class="h2">请选择服务</div>
+    <div class="statsrow" id="stats">
+      <div class="stat"><b data-n="3">0</b><small>我的简历</small></div>
+      <div class="stat"><b data-n="12">0</b><small>我的文档</small></div>
+      <div class="stat"><b data-n="8">0</b><small>AI记录</small></div>
+      <div class="stat"><b data-n="5">0</b><small>收藏</small></div>
+    </div>
+    <div class="grid2" id="cards">
+      <div class="scard pressable reveal"><div class="ic ic-blue"><svg viewBox="0 0 24 24">${ICON.resume}</svg></div><h4>AI简历服务</h4></div>
+      <div class="scard pressable reveal"><div class="ic ic-teal"><svg viewBox="0 0 24 24">${ICON.print}</svg></div><h4>打印扫描</h4></div>
+      <div class="scard pressable reveal"><div class="ic ic-violet"><svg viewBox="0 0 24 24">${ICON.job}</svg></div><h4>岗位信息</h4></div>
+      <div class="scard pressable reveal"><div class="ic ic-amber"><svg viewBox="0 0 24 24">${ICON.fair}</svg></div><h4>招聘会信息</h4></div>
+      <div class="scard pressable reveal"><div class="ic ic-blue"><svg viewBox="0 0 24 24">${ICON.policy}</svg></div><h4>政策服务</h4></div>
+      <div class="scard pressable reveal"><div class="ic ic-teal"><svg viewBox="0 0 24 24">${ICON.mine}</svg></div><h4>我的记录</h4></div>
+    </div>
+    <div class="collapse" id="campus"><div><div class="campus"><h4>智慧校园专区</h4><p>仅当本终端开启校园模式时淡入展开；关闭时整块收起，不留空白占位。</p></div></div></div>
+    <div class="note">状态点：在线轻微呼吸；离线为明确警示终态，不持续闪烁。</div>`,
+  controls:`<button class="ctrl primary" data-act="replay">↻ 重播进入</button><button class="ctrl danger" data-act="net">网络离线 / 恢复</button><button class="ctrl" data-act="campus">智慧校园 开 / 关</button>`,
+  init(scr,ctr){
+    const cards=[...scr.querySelectorAll('.scard')];
+    cards.forEach((c,i)=>reveal(c,80+i*T.stagger));
+    later(()=>scr.querySelectorAll('#stats b').forEach(b=>countUp(b,+b.dataset.n,640)),120);
+    cards.forEach(c=>c.onclick=()=>{}); // press handled by CSS :active
+    const net=scr.querySelector('#dNet');
+    ctr.querySelector('[data-act=net]').onclick=()=>{
+      const off=net.classList.contains('s-err');
+      if(off){net.className='badge s-ok';net.innerHTML='<span class="dot breathe"></span>网络在线';}
+      else{net.className='badge s-err';net.innerHTML='<span class="dot"></span>网络离线 · 请检查';}
+    };
+    ctr.querySelector('[data-act=campus]').onclick=()=>scr.querySelector('#campus').classList.toggle('open');
+    ctr.querySelector('[data-act=replay]').onclick=()=>mount('home');
+  }};
+
+/* ---- 2 resume ---- */
+S.resume={nav:'AI 简历 · 工作台',sub:'文件滑入流程条、步骤光带推进、诊断分批出现(高优先级先)、新旧对比柔和扫光。不承诺录用/投递。',
+  screen:`
+    <div class="head">AI 简历服务 · 材料处理</div><div class="h2">正在处理你的材料</div>
+    <div class="upzone" id="up">拖入 / 扫描简历原件</div>
+    <div class="stepbar" id="steps">
+      <div class="step"><div class="seg"><i></i></div><div class="ball">1</div><div class="tx">解析</div></div>
+      <div class="step"><div class="seg"><i></i></div><div class="ball">2</div><div class="tx">诊断</div></div>
+      <div class="step"><div class="seg"><i></i></div><div class="ball">3</div><div class="tx">优化</div></div>
+      <div class="step"><div class="seg"><i></i></div><div class="ball">4</div><div class="tx">导出PDF</div></div>
+    </div>
+    <div class="panelcard reveal" id="report">
+      <div class="scoreline"><b id="score">0</b><small>简历完整度评分<br/>仅供参考，不代表录用结果</small></div>
+    </div>
+    <div id="diags"></div>
+    <div class="panelcard reveal" id="cmp">
+      <div style="font-size:12px;color:var(--cyan);margin-bottom:6px">优化前后对比</div>
+      <div class="compare">
+        <div class="cmp-line old">做过一些前端项目，负责页面开发</div>
+        <div class="cmp-line new" id="cmpnew">主导 3 个中大型项目，服务用户超 50 万，首屏性能提升 40%<span class="sweep" id="sweep"></span></div>
+      </div>
+    </div>
+    <div class="note">仅做材料处理与优化建议，不提供投递、不承诺录用结果。</div>`,
+  controls:`<button class="ctrl primary" data-act="run">▶ 上传并处理</button><button class="ctrl" data-act="replay">↻ 重播</button>`,
+  init(scr,ctr){
+    const steps=[...scr.querySelectorAll('.step')];
+    const diagsData=[['高','量化成果','工作经历缺少量化数据，建议补充关键指标'],['高','突出技能','核心技能未前置，建议置顶展示'],['中','精简描述','部分描述偏长，建议提炼为短句'],['低','排版统一','字号与间距可进一步统一']];
+    function run(){
+      clearTimers();
+      // reset
+      steps.forEach(s=>s.classList.remove('done','active'));
+      scr.querySelector('#report').classList.remove('in');
+      scr.querySelector('#cmp').classList.remove('in');
+      scr.querySelector('#diags').innerHTML='';
+      scr.querySelector('#score').textContent='0';
+      const up=scr.querySelector('#up');
+      up.innerHTML='拖入 / 扫描简历原件';
+      // file slides into flow
+      later(()=>{up.innerHTML='<span class="filechip" id="fc" style="opacity:0;transform:translateY(-14px)"><svg viewBox="0 0 24 24" width="15" stroke="#9cc4ff" fill="none" stroke-width="2">'+ICON.doc+'</svg>我的简历.pdf</span>';
+        const fc=scr.querySelector('#fc');later(()=>{fc.style.opacity='1';fc.style.transform='none';},30);},120);
+      // steps advance
+      [0,1,2,3].forEach((n,idx)=>{
+        later(()=>{steps.forEach((s,i)=>{s.classList.toggle('active',i===n);if(i<n)s.classList.add('done');});if(n===3)steps[3].classList.add('done');},700+idx*620);
+      });
+      // diagnosis after 诊断 step
+      later(()=>{scr.querySelector('#report').classList.add('in');countUp(scr.querySelector('#score'),78,700);},1500);
+      diagsData.forEach((d,i)=>{later(()=>{const el=document.createElement('div');el.className='diag reveal';const cls=d[0]==='高'?'p-high':d[0]==='中'?'p-mid':'p-low';el.innerHTML='<span class="ptag '+cls+'">'+d[0]+'</span><div><b>'+d[1]+'</b><br/><span style="color:var(--soft)">'+d[2]+'</span></div>';scr.querySelector('#diags').appendChild(el);requestAnimationFrame(()=>el.classList.add('in'));},1700+i*T.stagger*4);});
+      // compare sweep
+      later(()=>{scr.querySelector('#cmp').classList.add('in');later(()=>{const sw=scr.querySelector('#sweep');sw.classList.remove('go');void sw.offsetWidth;sw.classList.add('go');},260);},3500);
+    }
+    ctr.querySelector('[data-act=run]').onclick=run;
+    ctr.querySelector('[data-act=replay]').onclick=run;
+    run();
+  }};
+
+/* ---- 3 print (focus) ---- */
+S.print={nav:'打印扫描 · 流程可视化 ★',sub:'明确时间线 + 真实状态流；离线/缺纸/卡纸直接切错误态，绝不播放假成功；成功反馈 ≤1s。',
+  screen:`
+    <div class="head">打印任务 · 实时进度</div><div class="h2">岗位推荐表 · 1 份</div>
+    <div class="timeline" id="tl">
+      <div class="tl"><div class="line"></div><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">上传文件</div></div>
+      <div class="tl"><div class="line"></div><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">预览确认</div></div>
+      <div class="tl"><div class="line"></div><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">打印参数</div></div>
+      <div class="tl"><div class="line"></div><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">确认打印</div></div>
+      <div class="tl"><div class="line"></div><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">进入队列</div></div>
+      <div class="tl"><div class="line"></div><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">打印中</div></div>
+      <div class="tl"><div class="mk"><svg viewBox="0 0 24 24">${ICON.check}</svg></div><div class="lab">完成</div></div>
+    </div>
+    <div class="statusbox" id="status"></div>
+    <div id="errslot"></div>
+    <div id="okslot"></div>
+    <div class="note">硬件未真实成功不播放成功动画；离线 / 缺纸 / 卡纸如实切错误态。</div>`,
+  controls:`<button class="ctrl primary" data-act="run">▶ 正常流程</button><button class="ctrl danger" data-act="offline">注入 离线</button><button class="ctrl danger" data-act="nopaper">注入 缺纸</button><button class="ctrl danger" data-act="jam">注入 卡纸</button>`,
+  init(scr,ctr){
+    const nodes=[...scr.querySelectorAll('.tl')];
+    const statusMsgs=['任务已提交','终端已领取','打印机执行中','出纸完成'];
+    function reset(){clearTimers();nodes.forEach(n=>n.classList.remove('done','active','err'));scr.querySelector('#status').innerHTML='';scr.querySelector('#errslot').innerHTML='';scr.querySelector('#okslot').innerHTML='';}
+    function light(i){nodes.forEach((n,k)=>{n.classList.toggle('active',k===i);if(k<i){n.classList.add('done');n.classList.remove('active');}});}
+    function addStatus(txt){const el=document.createElement('div');el.className='stline reveal';el.innerHTML='<span class="ck"><svg viewBox="0 0 24 24">'+ICON.check+'</svg></span>'+txt;scr.querySelector('#status').appendChild(el);requestAnimationFrame(()=>el.classList.add('in'));}
+    function run(){
+      reset();
+      [0,1,2,3,4].forEach((i,k)=>later(()=>light(i),300+k*430));
+      // 打印中 node + real status stream
+      later(()=>{light(5);},300+5*430);
+      statusMsgs.forEach((m,k)=>later(()=>addStatus(m),2700+k*640));
+      // complete
+      later(()=>{nodes[5].classList.add('done');nodes[5].classList.remove('active');nodes[6].classList.add('active');},2700+statusMsgs.length*640);
+      later(()=>{nodes[6].classList.add('done');nodes[6].classList.remove('active');
+        scr.querySelector('#okslot').innerHTML='<div class="successcheck"><div class="ring" id="ok"><svg viewBox="0 0 24 24">'+ICON.check+'</svg></div></div><div style="text-align:center;font-size:14px;color:#9be9c4;margin-top:6px">打印完成 · 请取走</div>';
+        const ok=scr.querySelector('#ok');requestAnimationFrame(()=>ok.classList.add('go'));// ≤1s
+      },2900+statusMsgs.length*640);
+    }
+    function fail(kind){
+      reset();
+      // advance to 打印中 then fail — NO success animation
+      [0,1,2,3,4].forEach((i,k)=>later(()=>light(i),250+k*360));
+      later(()=>{light(5);addStatus('任务已提交');},250+5*360);
+      later(()=>addStatus('终端已领取'),250+5*360+560);
+      later(()=>{
+        const node=nodes[5];node.classList.remove('active','done');node.classList.add('err');
+        const map={offline:['打印机离线','终端未检测到打印机，请检查 USB / 网线连接后重试。'],nopaper:['打印机缺纸','纸盒缺纸，请添加 A4 纸后点击重试。'],jam:['打印机卡纸','检测到卡纸，请按机器提示打开盖板取出纸张。']};
+        const m=map[kind];
+        scr.querySelector('#errslot').innerHTML='<div class="errbox reveal" id="eb"><b>⚠ '+m[0]+'</b><br/>'+m[1]+'</div>';
+        const eb=scr.querySelector('#eb');requestAnimationFrame(()=>eb.classList.add('in'));
+      },250+5*360+1200);
+    }
+    ctr.querySelector('[data-act=run]').onclick=run;
+    ctr.querySelector('[data-act=offline]').onclick=()=>fail('offline');
+    ctr.querySelector('[data-act=nopaper]').onclick=()=>fail('nopaper');
+    ctr.querySelector('[data-act=jam]').onclick=()=>fail('jam');
+    run();
+  }};
+
+/* ---- 4 jobs ---- */
+S.jobs={nav:'岗位 / 招聘会 · 来源导览',sub:'筛选切换淡入重排；来源机构/同步时间固定可见；弹层从按钮位置弹出；按钮文案合规。',
+  screen:`
+    <div class="head">第三方 / 官方来源信息</div><div class="h2">岗位信息</div>
+    <div class="filters" id="filters">
+      <span class="fil on" data-f="all">全部</span><span class="fil" data-f="tech">技术</span><span class="fil" data-f="sales">销售</span><span class="fil" data-f="remote">远程</span>
+    </div>
+    <div id="list"></div>
+    <div class="scrim" id="scrim"></div>
+    <div class="qrpop" id="qrpop">
+      <svg class="qimg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#fff"/><rect x="8" y="8" width="22" height="22" fill="#0b2a64"/><rect x="13" y="13" width="12" height="12" fill="#fff"/><rect x="70" y="8" width="22" height="22" fill="#0b2a64"/><rect x="75" y="13" width="12" height="12" fill="#fff"/><rect x="8" y="70" width="22" height="22" fill="#0b2a64"/><rect x="13" y="75" width="12" height="12" fill="#fff"/><g fill="#0b2a64"><rect x="40" y="12" width="6" height="6"/><rect x="52" y="12" width="6" height="6"/><rect x="40" y="40" width="6" height="6"/><rect x="58" y="40" width="6" height="6"/><rect x="12" y="40" width="6" height="6"/><rect x="24" y="52" width="6" height="6"/><rect x="40" y="52" width="6" height="6"/><rect x="52" y="58" width="6" height="6"/><rect x="70" y="52" width="6" height="6"/><rect x="40" y="70" width="6" height="6"/><rect x="58" y="70" width="6" height="6"/><rect x="70" y="70" width="6" height="6"/></g></svg>
+      <div class="qt" id="qtt">扫码投递</div><div class="qs">用手机扫码，前往来源平台完成投递</div>
+    </div>
+    <div class="note">来源机构、同步时间、外部入口固定可见，强化第三方 / 官方来源属性。</div>`,
+  controls:`<button class="ctrl primary" data-act="replay">↻ 重播</button><button class="ctrl" data-act="hint">点筛选 / 按钮试试</button>`,
+  init(scr,ctr){
+    const all=[
+      {r:'前端开发工程师',p:'15–25K',src:'XX人才网',t:'2h前',c:'tech'},
+      {r:'Java 后端工程师',p:'18–30K',src:'XX人才网',t:'2h前',c:'tech'},
+      {r:'销售代表',p:'8–15K',src:'XX招聘',t:'5h前',c:'sales'},
+      {r:'远程客服专员',p:'6–9K',src:'官方就业平台',t:'1d前',c:'remote'},
+      {r:'区域销售经理',p:'12–20K',src:'XX招聘',t:'1d前',c:'sales'}
+    ];
+    const list=scr.querySelector('#list');
+    function render(f){
+      const items=all.filter(j=>f==='all'||j.c===f);
+      // fade out current
+      [...list.children].forEach(c=>{c.style.transition='opacity var(--state) var(--ease-in),transform var(--state)';c.style.opacity='0';c.style.transform='translateY(8px)';});
+      later(()=>{
+        list.innerHTML='';
+        items.forEach((j,i)=>{
+          const el=document.createElement('div');el.className='jcard reveal';
+          el.innerHTML='<div><span class="jp">'+j.p+'</span><div class="jr">'+j.r+'</div></div><div class="src"><span>来源：<b>'+j.src+'</b></span><span>同步：'+j.t+'</span></div><div class="jbtns"><span class="jbtn ghost">查看岗位</span><span class="jbtn fill" data-qr="去来源平台投递">扫码投递</span></div>';
+          list.appendChild(el);reveal(el,40+i*T.stagger);
+          el.querySelector('[data-qr]').onclick=showQR;
+        });
+      },T.state);
+    }
+    const scrim=scr.querySelector('#scrim'),pop=scr.querySelector('#qrpop');
+    function showQR(){scr.querySelector('#qtt').textContent='扫码投递 · 去来源平台';scrim.classList.add('show');pop.classList.add('show');}
+    function hideQR(){scrim.classList.remove('show');pop.classList.remove('show');}
+    scrim.onclick=hideQR;
+    scr.querySelectorAll('.fil').forEach(f=>f.onclick=()=>{scr.querySelectorAll('.fil').forEach(x=>x.classList.remove('on'));f.classList.add('on');render(f.dataset.f);});
+    ctr.querySelector('[data-act=replay]').onclick=()=>mount('jobs');
+    ctr.querySelector('[data-act=hint]').onclick=()=>{};
+    render('all');
+  }};
+
+/* ---- 5 assistant ---- */
+S.assistant={nav:'AI 助手 · 小青',sub:'流式回复 + 思考点；推荐卡从底部浮出；点卡片共享转场进入业务页；会话未落库不提示已保存。',
+  screen:`
+    <div class="advisor"><div class="ava">青</div><div><div class="nm">顾问 · 小青</div><div class="rl">在线 · 求职 / 打印帮助</div></div></div>
+    <div class="chat" id="chat"></div>
+    <div id="recoslot"></div>
+    <div class="gotarget" id="goto"><div><div class="big" id="gotxt">正在前往…</div><div class="sm">共享转场演示</div></div></div>
+    <div class="note">回复流式呈现；当前会话未落库时不显示"历史已保存"。</div>`,
+  controls:`<button class="ctrl primary" data-act="replay">↻ 重播对话</button>`,
+  init(scr,ctr){
+    const chat=scr.querySelector('#chat');
+    function run(){
+      clearTimers();chat.innerHTML='';scr.querySelector('#recoslot').innerHTML='';scr.querySelector('#goto').classList.remove('show');
+      // user msg
+      later(()=>{const u=document.createElement('div');u.className='msg user reveal';u.textContent='我要打印简历';chat.appendChild(u);requestAnimationFrame(()=>u.classList.add('in'));},150);
+      // ai thinking
+      later(()=>{const a=document.createElement('div');a.className='msg ai reveal';a.innerHTML='<span class="think"><i></i><i></i><i></i></span>';chat.appendChild(a);requestAnimationFrame(()=>a.classList.add('in'));
+        // stream reply
+        later(()=>{const full='好的，我可以带你去打印你的简历。你可以先在「AI简历服务」生成或优化，再到「打印扫描」出纸。';a.innerHTML='';let i=0;const cur=document.createElement('span');function type(){a.textContent=full.slice(0,i);a.appendChild(cur);cur.className='cur';i++;if(i<=full.length)later(type,22);else{cur.remove();showRecos();}}type();},760);
+      },650);
+      function showRecos(){
+        const box=scr.querySelector('#recoslot');
+        box.innerHTML='<div class="recos"><div class="reco reveal" data-go="AI简历服务"><div class="ri"><svg viewBox="0 0 24 24">'+ICON.resume+'</svg></div>去简历服务</div><div class="reco reveal" data-go="打印扫描"><div class="ri"><svg viewBox="0 0 24 24">'+ICON.print+'</svg></div>去打印扫描</div></div>';
+        [...box.querySelectorAll('.reco')].forEach((r,i)=>{reveal(r,80+i*T.stagger);r.onclick=()=>goTo(r.dataset.go,r);});
+      }
+      function goTo(name,el){
+        el.style.transition='transform var(--flow) var(--ease-out),opacity var(--flow)';el.style.transform='scale(1.08)';
+        scr.querySelector('#gotxt').textContent='正在前往 '+name+'…';
+        later(()=>scr.querySelector('#goto').classList.add('show'),120);
+        later(()=>scr.querySelector('#goto').classList.remove('show'),1500);
+        later(()=>{el.style.transform='none';},1500);
+      }
+    }
+    ctr.querySelector('[data-act=replay]').onclick=run;run();
+  }};
+
+/* ---- 6 mine ---- */
+S.mine={nav:'我的 · 服务回执台',sub:'统计骨架屏→crossfade(失败显示—不假0)；本次记录上浮；入口按压反馈；明细不回聚合。',
+  screen:`
+    <div class="head">个人服务回执</div><div class="h2">我刚做过什么</div>
+    <div class="statsrow" id="mstats">
+      <div class="stat"><b class="sk" style="height:23px;width:70%;margin:0 auto 4px"></b><small>简历</small></div>
+      <div class="stat"><b class="sk" style="height:23px;width:70%;margin:0 auto 4px"></b><small>文档</small></div>
+      <div class="stat"><b class="sk" style="height:23px;width:70%;margin:0 auto 4px"></b><small>订单</small></div>
+      <div class="stat"><b class="sk" style="height:23px;width:70%;margin:0 auto 4px"></b><small>AI记录</small></div>
+    </div>
+    <div style="font-size:12px;color:var(--cyan);margin:4px 0 10px">本次服务记录</div>
+    <div id="recs"></div>
+    <div style="font-size:12px;color:var(--cyan);margin:8px 0 8px">快速入口</div>
+    <div class="entries">
+      <div class="entry pressable">我的文档</div><div class="entry pressable">打印订单</div><div class="entry pressable">我的收藏</div><div class="entry pressable">浏览记录</div>
+    </div>
+    <div class="note">统计加载失败显示"—"，不显示假 0；明细归位到对应业务页，不在此重新聚合。</div>`,
+  controls:`<button class="ctrl primary" data-act="ok">↻ 加载(成功)</button><button class="ctrl danger" data-act="fail">模拟 加载失败</button>`,
+  init(scr,ctr){
+    const recsData=[['order','打印「岗位推荐表」','2 分钟前 · 完成'],['resume','AI 优化简历','10 分钟前 · 已生成'],['eye','浏览岗位「前端开发」','今天 · 来源 XX人才网']];
+    function load(fail){
+      clearTimers();
+      const cells=[...scr.querySelectorAll('#mstats b')];
+      cells.forEach(b=>{b.className='sk';b.style.height='23px';b.style.width='70%';b.style.margin='0 auto 4px';b.textContent='';});
+      scr.querySelector('#recs').innerHTML='';
+      later(()=>{
+        const vals=[3,12,5,8];
+        cells.forEach((b,i)=>{b.className='';b.style.height='';b.style.width='';b.style.margin='';b.style.opacity='0';b.style.transition='opacity var(--state) var(--ease-out)';
+          b.textContent=fail?'—':'0';requestAnimationFrame(()=>b.style.opacity='1');if(!fail)countUp(b,vals[i],560);});
+      },900);
+      recsData.forEach((r,i)=>later(()=>{const el=document.createElement('div');el.className='recrow reveal';el.innerHTML='<div class="ri"><svg viewBox="0 0 24 24">'+ICON[r[0]]+'</svg></div><div class="rx"><div class="rt">'+r[1]+'</div><div class="rs">'+r[2]+'</div></div>';scr.querySelector('#recs').appendChild(el);requestAnimationFrame(()=>el.classList.add('in'));},1100+i*T.stagger*3));
+    }
+    ctr.querySelector('[data-act=ok]').onclick=()=>load(false);
+    ctr.querySelector('[data-act=fail]').onclick=()=>load(true);
+    load(false);
+  }};
+
+/* ============ runtime ============ */
+const ORDER=['tokens','home','resume','print','jobs','assistant','mine'];
+const nav=document.getElementById('nav'),screen=document.getElementById('screen'),ctrls=document.getElementById('ctrls'),sub=document.getElementById('sub');
+let current=null;
+ORDER.forEach(id=>{const b=document.createElement('button');b.dataset.id=id;b.innerHTML='<span class="i"></span>'+S[id].nav;b.onclick=()=>mount(id);nav.appendChild(b);});
+function mount(id){
+  clearTimers();current=id;const e=S[id];
+  screen.innerHTML=e.screen;ctrls.innerHTML=e.controls;sub.textContent=e.sub;
+  [...nav.children].forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  e.init(screen,ctrls);
+  screen.scrollTop=0;
+}
+mount('tokens');
+</script>
+</body>
+</html>
