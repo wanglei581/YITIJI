@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-06-22
+> 最后更新：2026-06-23
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -15,6 +15,16 @@
 - `apps/`、`services/`、`packages/` 属运行时代码，规范化任务默认不触碰。
 - 删除、ignore、大文件外部归档、主工作区物料迁入前必须先确认并双模型审查。
 - 岗位 / 招聘会 / 政策继续只做第三方或官方来源信息入口；项目不是招聘平台。
+
+## 仓库整改与交付物收口（2026-06-23）
+
+在独立 worktree（分支 `chore/land-hygiene-cleanup`，基于最新 `main`）对历史遗留的未提交内容做低风险收口；不改产品定位、不动运行时代码、不删已验证闭环。本 PR 落地内容：
+
+- **文档入库**：`docs/reviews/kiosk-page-split-backlog.md`（上线后重构 backlog）；`docs/design/dynamic-blue-styles.html` / `-2.html`，闭合 `docs/design/motion-system.md` 对二者的引用；`docs/product/roadmap-update-launch-2026Q3-2027Q2-2026-06-17.md`（原创发布路线图，从 `deliverables/` 归位）。
+- **`.gitignore`**：新增 `/deliverables/**/*.{pdf,pptx,docx}`，拦截交付物二进制误提交；因 `docs/business` 已有跟踪 PDF，未加全仓 `*.pdf` / `*.pptx` 规则。
+- **交付物外置**：OPC 参赛二进制成品（PPT / PDF / DOCX / 导出 HTML）、重复的 232 行叙述版 BP、冗余专家评审 PDF 已外置到本机归档（含 `SHA256SUMS` 校验），仓库内仅留 `deliverables/README.md` pointer 索引（含 sha256 清单）；原创文本未丢失，事实来源仍在 `docs/business` 已入库 md。
+
+暂缓项（本机保留、未入库，待产品决策）：支付域设计文档与 `docs/superpowers/plans/` 三份工具执行计划，已分别移入已忽略的 `.product-pm/backlog/` 与 `.superpowers/plans/archive/`。
 
 ## 规范化治理已完成
 
