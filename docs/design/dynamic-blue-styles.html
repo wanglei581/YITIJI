@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI求职打印服务终端 · 动态蓝色样式合集</title>
+<style>
+  :root{
+    --bg-0:#04153a; --bg-1:#0a3486; --bg-2:#1660d8;
+    --ink:#ffffff; --ink-soft:#b3c6ec; --ink-dim:#7187b6;
+    --tech:#2f7bf6; --cyan:#5fd0ff; --teal:#10b6a4; --violet:#8164ff; --amber:#f5972a;
+    --ok:#28d07c;
+    --page:#020b22;
+    --card:rgba(255,255,255,.05);
+    --line:rgba(255,255,255,.12);
+    --line-soft:rgba(255,255,255,.07);
+    --r:18px; --r-sm:12px;
+    --font:"PingFang SC","Microsoft YaHei","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{background:var(--page);color:var(--ink);font-family:var(--font);}
+  body{padding:40px 28px 80px;}
+  a{color:inherit;}
+
+  /* ---------- page header ---------- */
+  .wrap{max-width:1180px;margin:0 auto;}
+  .masthead{text-align:center;margin-bottom:14px;}
+  .masthead h1{font-size:34px;font-weight:800;letter-spacing:1px;
+    background:linear-gradient(120deg,#fff,#9cc4ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .masthead p{color:var(--ink-soft);font-size:16px;margin-top:10px;font-weight:300;letter-spacing:1px;}
+  .notice{max-width:760px;margin:22px auto 6px;background:rgba(245,151,42,.1);
+    border:1px solid rgba(245,151,42,.35);border-radius:var(--r-sm);padding:14px 18px;
+    color:#ffd9a8;font-size:13.5px;line-height:1.7;}
+  .notice b{color:#ffe9cf;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:22px 0 8px;}
+  .lg{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);
+    background:var(--card);border:1px solid var(--line);padding:6px 12px;border-radius:30px;}
+  .lg i{width:9px;height:9px;border-radius:50%;}
+  .lg.s i{background:var(--cyan);} .lg.m i{background:var(--tech);} .lg.w i{background:var(--ink-dim);}
+  .lg.c i{background:var(--ok);}
+
+  /* ---------- section ---------- */
+  .section{margin-top:40px;}
+  .section-h{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding-bottom:12px;
+    border-bottom:1px solid var(--line-soft);}
+  .section-h h2{font-size:20px;font-weight:700;}
+  .section-h span{font-size:13px;color:var(--ink-dim);}
+
+  /* ---------- grid + card ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:22px;}
+  .card{background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+    border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+    transition:transform .2s,box-shadow .2s,border-color .2s;}
+  .card:hover{transform:translateY(-4px);box-shadow:0 18px 44px rgba(0,0,0,.45);border-color:rgba(120,170,255,.45);}
+  .preview{position:relative;height:300px;overflow:hidden;background:#04153a;cursor:zoom-in;}
+  .preview .expand{position:absolute;top:12px;right:12px;z-index:9;display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;color:#fff;background:rgba(4,12,30,.55);backdrop-filter:blur(4px);
+    border:1px solid var(--line);padding:6px 11px;border-radius:30px;opacity:0;transition:.2s;}
+  .preview:hover .expand{opacity:1;}
+  .expand svg{width:13px;height:13px;stroke:#fff;fill:none;stroke-width:2;}
+  .cap{padding:16px 18px 18px;}
+  .cap .row1{display:flex;align-items:center;gap:10px;}
+  .cap h3{font-size:17px;font-weight:700;}
+  .cap .lvl{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.5px;}
+  .lvl.s{background:rgba(95,208,255,.16);color:#bfeaff;border:1px solid rgba(95,208,255,.35);}
+  .lvl.m{background:rgba(47,123,246,.16);color:#bcd6ff;border:1px solid rgba(47,123,246,.35);}
+  .lvl.w{background:rgba(113,135,182,.16);color:#cfd9ef;border:1px solid rgba(113,135,182,.35);}
+  .cap p{font-size:13px;color:var(--ink-soft);line-height:1.6;margin-top:9px;}
+  .cap .use{font-size:12px;color:var(--ink-dim);margin-top:10px;}
+  .cap .use b{color:#9cc4ff;font-weight:600;}
+  .cap .ok{color:#8ee6bb;}
+
+  /* ================= EFFECT STYLES ================= */
+  .fx{position:absolute;inset:0;}
+
+  /* 1. Aurora */
+  .fx-aurora{background:radial-gradient(120% 90% at 50% 0%,#0a3486,#04153a 70%);}
+  .fx-aurora .blob{position:absolute;border-radius:50%;filter:blur(46px);mix-blend-mode:screen;opacity:.8;}
+  .fx-aurora .b1{width:70%;height:70%;left:-10%;top:-20%;background:radial-gradient(circle,#1f6dff,transparent 65%);animation:aa 13s ease-in-out infinite;}
+  .fx-aurora .b2{width:60%;height:60%;right:-15%;top:10%;background:radial-gradient(circle,#5fd0ff,transparent 65%);animation:ab 16s ease-in-out infinite;}
+  .fx-aurora .b3{width:65%;height:65%;left:15%;bottom:-25%;background:radial-gradient(circle,#7c4dff,transparent 65%);animation:ac 18s ease-in-out infinite;}
+  .fx-aurora .b4{width:45%;height:45%;right:5%;bottom:-10%;background:radial-gradient(circle,#19c6b0,transparent 65%);animation:ab 14s ease-in-out infinite reverse;}
+  @keyframes aa{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(18%,12%) scale(1.18);}}
+  @keyframes ab{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(-14%,16%) scale(1.12);}}
+  @keyframes ac{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(10%,-14%) scale(1.2);}}
+
+  /* 2. Particle network (canvas) */
+  .fx-net{background:radial-gradient(120% 100% at 50% 20%,#0a285f,#020f2c 80%);}
+  .fx-net canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+  /* 3. Tech perspective grid */
+  .fx-grid{background:linear-gradient(180deg,#061a44 0%,#020b22 75%);overflow:hidden;}
+  .fx-grid .horizon{position:absolute;left:0;right:0;top:38%;height:1px;
+    box-shadow:0 0 60px 18px rgba(95,170,255,.5);background:rgba(150,200,255,.7);}
+  .fx-grid .plane{position:absolute;left:-60%;right:-60%;top:40%;bottom:-30%;
+    background-image:linear-gradient(rgba(95,170,255,.55) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(95,170,255,.45) 1px,transparent 1px);
+    background-size:46px 46px;transform:perspective(340px) rotateX(64deg);transform-origin:top center;
+    animation:gridmove 2.6s linear infinite;}
+  .fx-grid .topglow{position:absolute;inset:0;background:radial-gradient(80% 50% at 50% 30%,rgba(31,109,255,.35),transparent 70%);}
+  @keyframes gridmove{from{background-position:0 0;}to{background-position:0 46px;}}
+
+  /* 4. Radar ripples */
+  .fx-radar{background:radial-gradient(circle at 50% 50%,#0a3072,#03102f 75%);display:grid;place-items:center;overflow:hidden;}
+  .fx-radar .pulse{position:absolute;left:50%;top:50%;border:2px solid rgba(95,208,255,.55);border-radius:50%;
+    transform:translate(-50%,-50%);animation:radar 3.2s ease-out infinite;}
+  .fx-radar .pulse:nth-child(2){animation-delay:.8s;}
+  .fx-radar .pulse:nth-child(3){animation-delay:1.6s;}
+  .fx-radar .pulse:nth-child(4){animation-delay:2.4s;}
+  .fx-radar .sweep{position:absolute;left:50%;top:50%;width:150%;height:150%;transform:translate(-50%,-50%);border-radius:50%;
+    background:conic-gradient(from 0deg,rgba(95,208,255,.35),transparent 25%);animation:spin 3.4s linear infinite;}
+  .fx-radar .core{position:absolute;width:14px;height:14px;border-radius:50%;background:#bfeaff;box-shadow:0 0 18px 4px var(--cyan);}
+  @keyframes radar{0%{width:0;height:0;opacity:.85;}100%{width:135%;height:135%;opacity:0;}}
+
+  /* 5. Data streams */
+  .fx-stream{background:linear-gradient(180deg,#04153a,#020b22);overflow:hidden;}
+  .fx-stream .s{position:absolute;top:-30%;width:2px;height:34%;border-radius:2px;
+    background:linear-gradient(transparent,var(--cyan),transparent);animation:fall linear infinite;opacity:.7;}
+  @keyframes fall{to{transform:translateY(440%);}}
+
+  /* 6. Subtle dot grid (restrained) */
+  .fx-dots{background:#071c44;overflow:hidden;
+    background-image:radial-gradient(rgba(120,180,255,.22) 1.5px,transparent 1.6px);background-size:22px 22px;}
+  .fx-dots .sheen{position:absolute;width:420px;height:420px;border-radius:50%;left:-120px;top:-120px;
+    background:radial-gradient(circle,rgba(95,170,255,.32),transparent 65%);filter:blur(8px);
+    animation:drift 11s ease-in-out infinite;}
+  @keyframes drift{0%{transform:translate(0,0);}25%{transform:translate(220px,90px);}
+    50%{transform:translate(120px,240px);}75%{transform:translate(-40px,120px);}100%{transform:translate(0,0);}}
+
+  /* 7. Compliant scan (document / resume) */
+  .fx-scan{background:radial-gradient(circle at 50% 40%,#0c2a64,#04153a 75%);display:grid;place-items:center;overflow:hidden;}
+  .fx-scan .doc{position:relative;width:46%;height:70%;background:#f4f7ff;border-radius:8px;
+    box-shadow:0 18px 40px rgba(0,0,0,.45);padding:16px 14px;overflow:hidden;}
+  .fx-scan .doc .ln{height:6px;border-radius:4px;background:#cdd9ef;margin-bottom:9px;}
+  .fx-scan .doc .ln.t{height:9px;width:60%;background:var(--tech);margin-bottom:13px;}
+  .fx-scan .doc .ln.a{width:90%;} .fx-scan .doc .ln.b{width:78%;} .fx-scan .doc .ln.c{width:84%;}
+  .fx-scan .scanline{position:absolute;left:0;right:0;height:5px;
+    background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 16px var(--cyan);animation:scan 2.4s ease-in-out infinite;}
+  .fx-scan .ret{position:absolute;width:30px;height:30px;border:3px solid var(--cyan);}
+  .fx-scan .ret.tl{top:12%;left:24%;border-right:0;border-bottom:0;}
+  .fx-scan .ret.tr{top:12%;right:24%;border-left:0;border-bottom:0;}
+  .fx-scan .ret.bl{bottom:12%;left:24%;border-right:0;border-top:0;}
+  .fx-scan .ret.br{bottom:12%;right:24%;border-left:0;border-top:0;}
+  .fx-scan .tagline{position:absolute;bottom:18px;left:0;right:0;text-align:center;font-size:13px;color:var(--ink-soft);letter-spacing:2px;}
+  @keyframes scan{0%{top:14%;}50%{top:82%;}100%{top:14%;}}
+
+  /* 8. Match ring */
+  .fx-ring{background:radial-gradient(circle at 50% 45%,#13346f,#04153a 78%);display:grid;place-items:center;}
+  .fx-ring .ringbox{position:relative;width:150px;height:150px;}
+  .fx-ring svg{transform:rotate(-90deg);}
+  .fx-ring .num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .fx-ring .num b{font-size:38px;font-weight:800;}
+  .fx-ring .num small{font-size:12px;color:var(--ink-soft);margin-top:4px;letter-spacing:2px;}
+  .fx-ring .chip{position:absolute;bottom:22px;left:0;right:0;text-align:center;}
+  .fx-ring .chip span{font-size:12px;color:#062a73;background:linear-gradient(135deg,#fff,#bfe0ff);padding:5px 14px;border-radius:20px;font-weight:700;}
+
+  /* 9. Card slide-in + status */
+  .fx-list{background:linear-gradient(180deg,#071f4a,#04153a);padding:26px 22px;display:flex;flex-direction:column;gap:12px;justify-content:center;}
+  .fx-list .item{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.06);
+    border:1px solid var(--line);border-radius:12px;padding:13px 15px;opacity:0;animation:rowcycle 5s ease-in-out infinite;}
+  .fx-list .item:nth-child(1){animation-delay:0s;} .fx-list .item:nth-child(2){animation-delay:.4s;}
+  .fx-list .item:nth-child(3){animation-delay:.8s;} .fx-list .item:nth-child(4){animation-delay:1.2s;}
+  .fx-list .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;}
+  .fx-list .dot.on{background:var(--ok);box-shadow:0 0 10px var(--ok);}
+  .fx-list .dot.sync{background:var(--cyan);box-shadow:0 0 10px var(--cyan);animation:blink 1.2s infinite;}
+  .fx-list .dot.off{background:var(--ink-dim);}
+  .fx-list .tx{flex:1;font-size:14px;color:#dce6fb;}
+  .fx-list .st{font-size:11px;color:var(--ink-soft);}
+  @keyframes rowcycle{0%{opacity:0;transform:translateX(22px);}12%{opacity:1;transform:none;}88%{opacity:1;transform:none;}100%{opacity:0;transform:translateX(-12px);}}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* 10. Printing */
+  .fx-print{background:radial-gradient(circle at 50% 30%,#0c2a64,#04153a 80%);display:grid;place-items:center;overflow:hidden;}
+  .fx-print .printer{position:relative;width:190px;height:170px;}
+  .fx-print .paper{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:118px;height:150px;
+    background:#fff;border-radius:5px 5px 0 0;box-shadow:0 -6px 18px rgba(0,0,0,.25);padding:14px 12px;
+    animation:emit 3.4s ease-in-out infinite;}
+  .fx-print .paper .ln{height:5px;border-radius:3px;background:#dfe6f3;margin-bottom:7px;}
+  .fx-print .paper .ln.t{height:8px;width:60%;background:var(--tech);margin-bottom:11px;}
+  .fx-print .body{position:absolute;bottom:0;left:0;right:0;height:96px;border-radius:14px;
+    background:linear-gradient(180deg,#1a3c7e,#0c2459);border:1px solid var(--line);box-shadow:0 16px 40px rgba(0,0,0,.4);}
+  .fx-print .slot{position:absolute;top:18px;left:24px;right:24px;height:10px;border-radius:6px;background:#020b22;box-shadow:inset 0 2px 6px rgba(0,0,0,.8);}
+  .fx-print .bar{position:absolute;bottom:18px;left:24px;right:24px;height:7px;border-radius:6px;background:rgba(255,255,255,.14);overflow:hidden;}
+  .fx-print .bar i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#3b82f6,#5fd0ff);animation:fillbar 3.4s ease-in-out infinite;}
+  @keyframes emit{0%,12%{transform:translateX(-50%) translateY(60px);clip-path:inset(0 0 100% 0);}
+    55%,80%{transform:translateX(-50%) translateY(-58px);clip-path:inset(0 0 0 0);}
+    100%{transform:translateX(-50%) translateY(60px);clip-path:inset(0 0 100% 0);}}
+  @keyframes fillbar{0%{width:0;}70%{width:100%;}100%{width:100%;}}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- fullscreen modal ---------- */
+  .modal{position:fixed;inset:0;background:rgba(2,6,18,.88);backdrop-filter:blur(6px);
+    z-index:99;display:none;align-items:center;justify-content:center;padding:24px;}
+  .modal.open{display:flex;}
+  .modal .device{position:relative;width:min(440px,92vw);aspect-ratio:9/16;border-radius:28px;overflow:hidden;
+    border:1px solid var(--line);box-shadow:0 40px 120px rgba(0,0,0,.7);}
+  .modal .device .fx{inset:0;}
+  .modal .mtitle{position:absolute;top:-44px;left:0;font-size:16px;font-weight:700;color:#dce6fb;}
+  .modal .close{position:absolute;top:-46px;right:0;cursor:pointer;font-size:14px;color:var(--ink-soft);
+    background:var(--card);border:1px solid var(--line);border-radius:30px;padding:7px 16px;}
+  .modal .close:hover{color:#fff;}
+
+  @media (prefers-reduced-motion: reduce){
+    .fx *{animation:none !important;}
+  }
+  @media(max-width:640px){
+    body{padding:28px 16px 60px;}
+    .preview{height:260px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <h1>动态蓝色样式合集</h1>
+    <p>AI求职打印服务终端 · 一体机大屏 / 首页 / 业务页 可选动效</p>
+  </div>
+
+  <div class="notice">
+    <b>合规说明：</b>所有效果均复用项目科技蓝配色，并已按 <b>CLAUDE.md 合规边界</b>改造——
+    原型里的人脸识别登录已改为<b>简历 / 证件扫描</b>动效；按钮文案只用「查看岗位 / 扫码投递 / 去来源平台投递」，
+    不出现平台内投递类红线词（见 CLAUDE.md §2）。
+  </div>
+
+  <div class="legend">
+    <span class="lg s"><i></i>强动效 · 待机大屏</span>
+    <span class="lg m"><i></i>中动效 · 首页</span>
+    <span class="lg w"><i></i>克制 · 业务页/后台</span>
+    <span class="lg c"><i></i>合规改造</span>
+    <span class="lg" style="color:var(--ink-dim)">点任意卡片可全屏竖屏预览</span>
+  </div>
+
+  <!-- ============ Section A: backgrounds ============ -->
+  <div class="section">
+    <div class="section-h"><h2>背景氛围层</h2><span>整页或卡片背景，可叠加内容</span></div>
+    <div class="grid" id="gridBg"></div>
+  </div>
+
+  <!-- ============ Section B: module effects ============ -->
+  <div class="section">
+    <div class="section-h"><h2>功能模块动效</h2><span>扫描 / 匹配 / 状态 / 打印 等单点交互动画</span></div>
+    <div class="grid" id="gridMod"></div>
+  </div>
+
+  <p style="text-align:center;color:var(--ink-dim);font-size:13px;margin-top:46px;line-height:1.7;">
+    选定你喜欢的样式后告诉我编号，我把它转成 React + Tailwind 组件接入你的项目。<br/>
+    建议：待机大屏用强动效，首页用中动效，岗位/简历/后台业务页用克制款，保持「真实克制」的设计基调。
+  </p>
+</div>
+
+<!-- modal -->
+<div class="modal" id="modal">
+  <div class="device" id="modalDevice">
+    <span class="mtitle" id="modalTitle"></span>
+    <span class="close" id="modalClose">关闭 ✕</span>
+  </div>
+</div>
+
+<script>
+/* ---------------- effect registry ---------------- */
+const EFFECTS = {
+  aurora:{
+    title:"极光流光", level:"s", levelTxt:"强",
+    desc:"多团蓝紫青光晕缓慢漂移、相互融合，高级且不刺眼。",
+    use:"<b>待机大屏首选</b>、品牌欢迎页",
+    html:`<div class="fx fx-aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>`
+  },
+  net:{
+    title:"粒子星网", level:"s", levelTxt:"强",
+    desc:"节点缓慢游动并连线，呼应「智能匹配」的科技感。",
+    use:"<b>待机大屏</b>、AI 匹配/网络主题页",
+    html:`<div class="fx fx-net"><canvas></canvas></div>`,
+    init(el){
+      const c=el.querySelector('canvas'), ctx=c.getContext('2d');
+      let w,h,pts,raf;
+      function size(){const r=el.getBoundingClientRect();w=c.width=r.width;h=c.height=r.height;}
+      function build(){const n=Math.max(26,Math.round(w*h/14000));pts=[];for(let i=0;i<n;i++)pts.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35});}
+      function tick(){
+        ctx.clearRect(0,0,w,h);
+        for(const p of pts){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;}
+        for(let i=0;i<pts.length;i++){
+          for(let j=i+1;j<pts.length;j++){
+            const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);
+            if(d<120){ctx.strokeStyle="rgba(95,208,255,"+(1-d/120)*0.5+")";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.stroke();}
+          }
+          ctx.fillStyle="#9cc4ff";ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,2,0,7);ctx.fill();
+        }
+        raf=requestAnimationFrame(tick);
+      }
+      size();build();tick();
+      const ro=()=>{size();build();};window.addEventListener('resize',ro);
+      return ()=>{cancelAnimationFrame(raf);window.removeEventListener('resize',ro);};
+    }
+  },
+  grid:{
+    title:"科技透视网格", level:"s", levelTxt:"强",
+    desc:"地平线发光 + 无限滚动的透视网格，未来感强。",
+    use:"<b>待机大屏</b>、设备/数据可视化页",
+    html:`<div class="fx fx-grid"><div class="topglow"></div><div class="plane"></div><div class="horizon"></div></div>`
+  },
+  radar:{
+    title:"雷达光波", level:"m", levelTxt:"中",
+    desc:"中心向外扩散的环波 + 旋转扫描线，适合「正在匹配/检索」。",
+    use:"<b>首页入口</b>、匹配中/搜索中状态",
+    html:`<div class="fx fx-radar"><div class="sweep"></div><div class="pulse"></div><div class="pulse"></div><div class="pulse"></div><div class="pulse"></div><div class="core"></div></div>`
+  },
+  stream:{
+    title:"数据流光", level:"m", levelTxt:"中",
+    desc:"竖向光柱缓缓下落，像数据在流动，密度可调。",
+    use:"<b>首页</b>、信息同步/导入主题",
+    html:(function(){let s='';for(let i=0;i<16;i++){const left=(Math.random()*100).toFixed(1);const dur=(2.6+Math.random()*3).toFixed(2);const del=(Math.random()*4).toFixed(2);const op=(0.35+Math.random()*0.5).toFixed(2);s+=`<span class="s" style="left:${left}%;animation-duration:${dur}s;animation-delay:${del}s;opacity:${op}"></span>`;}return `<div class="fx fx-stream">${s}</div>`;})()
+  },
+  dots:{
+    title:"呼吸点阵（克制）", level:"w", levelTxt:"弱",
+    desc:"静态点阵 + 一团缓慢游走的微光，安静、专业、不抢内容。",
+    use:"<b>业务页 / 后台首选</b>，符合「真实克制」基调",
+    html:`<div class="fx fx-dots"><div class="sheen"></div></div>`
+  },
+  scan:{
+    title:"简历 / 证件扫描", level:"m", levelTxt:"中", compliant:true,
+    desc:"扫描线上下移动 + 四角取景框，由原型「刷脸」合规改造而来。",
+    use:"<b>纸质简历扫描、证件扫描</b>（在业务范围内）",
+    html:`<div class="fx fx-scan"><div class="doc"><div class="ln t"></div><div class="ln a"></div><div class="ln b"></div><div class="ln c"></div><div class="ln a"></div><div class="ln b"></div></div><div class="ret tl"></div><div class="ret tr"></div><div class="ret bl"></div><div class="ret br"></div><div class="scanline"></div><div class="tagline">正在扫描原件…</div></div>`
+  },
+  ring:{
+    title:"匹配度环形进度", level:"m", levelTxt:"中", compliant:true,
+    desc:"环形进度填充 + 数字滚动；文案为「岗位匹配（参考）」，配「扫码投递」。",
+    use:"<b>岗位匹配参考卡片</b>，不做平台内投递",
+    html:`<div class="fx fx-ring"><div class="ringbox"><svg width="150" height="150"><circle cx="75" cy="75" r="62" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="11"/><circle class="prog" cx="75" cy="75" r="62" fill="none" stroke="#5fd0ff" stroke-width="11" stroke-linecap="round" stroke-dasharray="389.6" stroke-dashoffset="389.6"/></svg><div class="num"><b class="pct">0%</b><small>岗位匹配·参考</small></div></div><div class="chip"><span>扫码投递</span></div></div>`,
+    init(el){
+      const ring=el.querySelector('.prog'),txt=el.querySelector('.pct'),C=389.6,target=94;let cur=0,iv;
+      function run(){cur=0;iv=setInterval(()=>{cur+=2;if(cur>=target){cur=target;clearInterval(iv);setTimeout(()=>{cur=0;txt.textContent='0%';ring.setAttribute('stroke-dashoffset',C);run();},1400);}txt.textContent=cur+'%';ring.setAttribute('stroke-dashoffset',C-(C*cur/100));},26);}
+      run();return ()=>clearInterval(iv);
+    }
+  },
+  list:{
+    title:"卡片滑入 + 状态点", level:"w", levelTxt:"弱",
+    desc:"列表项依次滑入，配在线/同步中/离线状态点，循环演示。",
+    use:"<b>终端状态、数据源同步、后台列表</b>",
+    html:`<div class="fx fx-list">
+      <div class="item"><span class="dot on"></span><span class="tx">终端 KIOSK-001</span><span class="st">在线</span></div>
+      <div class="item"><span class="dot sync"></span><span class="tx">岗位数据源同步</span><span class="st">同步中</span></div>
+      <div class="item"><span class="dot on"></span><span class="tx">打印机 就绪</span><span class="st">正常</span></div>
+      <div class="item"><span class="dot off"></span><span class="tx">扫描仪</span><span class="st">离线</span></div>
+    </div>`
+  },
+  print:{
+    title:"打印出纸动画", level:"m", levelTxt:"中", compliant:true,
+    desc:"进度条推进 + 纸张缓缓送出，呼应核心打印业务。",
+    use:"<b>打印进度 / 完成反馈</b>（核心业务）",
+    html:`<div class="fx fx-print"><div class="printer"><div class="paper"><div class="ln t"></div><div class="ln"></div><div class="ln" style="width:84%"></div><div class="ln" style="width:70%"></div></div><div class="body"><div class="slot"></div><div class="bar"><i></i></div></div></div></div>`
+  }
+};
+
+const ORDER_BG=["aurora","net","grid","radar","stream","dots"];
+const ORDER_MOD=["scan","ring","list","print"];
+const mounted=new Map(); // el -> cleanup
+
+function mount(id, el){
+  const e=EFFECTS[id];
+  el.innerHTML=e.html;
+  const cleanup=e.init?e.init(el):null;
+  if(cleanup)mounted.set(el,cleanup);
+}
+function unmount(el){const c=mounted.get(el);if(c){c();mounted.delete(el);}el.innerHTML='';}
+
+function makeCard(id){
+  const e=EFFECTS[id];
+  const card=document.createElement('div');card.className='card';
+  const okTag=e.compliant?` <span class="ok">· 合规改造</span>`:'';
+  card.innerHTML=`
+    <div class="preview" data-id="${id}">
+      <span class="expand"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>全屏</span>
+    </div>
+    <div class="cap">
+      <div class="row1"><h3>${e.title}</h3><span class="lvl ${e.level}">${e.levelTxt}动效</span></div>
+      <p>${e.desc}</p>
+      <div class="use">适用：${e.use}${okTag}</div>
+    </div>`;
+  const prev=card.querySelector('.preview');
+  mount(id, prev);
+  prev.addEventListener('click',()=>openModal(id));
+  return card;
+}
+
+const gridBg=document.getElementById('gridBg'),gridMod=document.getElementById('gridMod');
+ORDER_BG.forEach(id=>gridBg.appendChild(makeCard(id)));
+ORDER_MOD.forEach(id=>gridMod.appendChild(makeCard(id)));
+
+/* ---------------- modal ---------------- */
+const modal=document.getElementById('modal'),device=document.getElementById('modalDevice'),
+      mTitle=document.getElementById('modalTitle'),mClose=document.getElementById('modalClose');
+let modalFx=null;
+function openModal(id){
+  const e=EFFECTS[id];mTitle.textContent=e.title;
+  modalFx=document.createElement('div');modalFx.className='fx-host';modalFx.style.cssText='position:absolute;inset:0;';
+  device.appendChild(modalFx);mount(id,modalFx);modal.classList.add('open');
+}
+function closeModal(){if(modalFx){unmount(modalFx);modalFx.remove();modalFx=null;}modal.classList.remove('open');}
+mClose.addEventListener('click',closeModal);
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+</script>
+</body>
+</html>
