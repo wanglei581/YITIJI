@@ -21,7 +21,7 @@
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
-- [x] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 已完成；预生产已启用 `SMS_PROVIDER=tencent` 并通过真号验证码登录冒烟。上线前仍需按生产密钥轮换制度复核 CAM 最小权限。
+- [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
 - [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收。
 - [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
@@ -74,11 +74,8 @@
 - [x] **预生产 Gate 2 候选部署或刷新**：已完成。用户确认后按冻结候选 `2187f6a7` 执行部署刷新；候选包 sha256 校验通过，API/Kiosk/Admin build 通过，迁移前 DB 备份存在且 `pg_restore -l` 可读，仅应用两个预期 additive PostgreSQL migrations，PM2 online，本机和公网 health 均为 `db=postgres`。该项已完成但不代表 Gate 3/Gate 4、正式生产或试运营完成。
 - [x] **预生产 COS bucket 切换**：已完成。腾讯云已创建隔离预生产 bucket 和预生产专用 CAM 子用户；预生产服务器仅替换 COS 相关 env，备份为 `/srv/ai-job-print-env-backups/api.env.20260622134416.bak`；新 bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`；PM2 online，health 为 `db=postgres`；G3-06 `verify:cos:live` 已通过 put/head/get/预签名下载/delete。
 - [x] **预生产 Gate 4 账号/API 级验收**：已按用户确认的 B 方案临时切 `SMS_PROVIDER=log`，通过真实 HTTP API + PostgreSQL + Redis + COS 完成受控会员登录、原始文件上传、默认 90 天、设置 180 天、原始文件长期保存拒绝、签名 URL 内部访问、跨账号 403、删除三态、过期清理、Admin 生命周期汇总和审计抽样；执行后已回滚 `SMS_PROVIDER=tencent`，公网 health 复核 `db=postgres`，SSH 只读复核确认 `SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。该项仍不是完整浏览器截图验收、正式生产或试运营完成。
-- [ ] **预生产 Gate 4 人工证据补齐**：真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的代码侧链路已补齐并由 `verify:resume-generate` 覆盖；下一步仍需部署后预生产复验，并补 G4 浏览器截图、签名 URL 过期等待窗口、COS 控制台/HEAD 脱敏证据，避免把 API 级验收或本地代码验证误写成完整浏览器验收。
-- [x] **会员登录个人数据隔离 P0：文件提取归属门禁**：`ResumeExtractionService` 读取文件时按 `endUserId` scoped read；会员只能提取本人文件，匿名只能提取匿名文件；签名 URL 内容代理不变；新增 `verify:member-login-data-closure` 组合验证。
-- [x] **会员登录个人数据隔离 P1：前端会话态和数据质量**：Kiosk 主要会员 API 已统一 401 / 账号禁用失效通知，登录发送会话级 `deviceId` 激活设备限流，收藏写入前验证已发布目标并由服务端派生标题。
-- [x] **会员登录个人数据隔离 P1：账号状态和留存治理**：账号禁用后既有 session 立即失效；已新增 `docs/compliance/member-personal-data-retention.md` 并接入 `verify:member-data-retention`。
-- [ ] **预生产部署分支回流 main**：当前预生产部署候选需要同时包含 `76c06ca8` file-assets 能力与 PR #61 会员登录闭环；在 file-assets 正式回流 `origin/main` 前，禁止直接从裸 `origin/main` 覆盖预生产，否则会回退用户文件资产能力。
+- [x] **预生产 Gate 4 AI 导出产物补证**：真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的链路已部署到预生产 `76c06ca8`；自动 Gate 通过 `verify:production-runtime-gates`、`verify:production-db-guard`、`verify:resume-generate`、`verify:file-retention`；真实 COS 补证显示导出文件 digest `34f964913eec`、`assetCategory=optimized`、`sourceMatches=true`、COS HEAD 200、短 TTL 签名 URL 200→403、会员 B 拒绝访问。该项仍不是完整浏览器截图验收、正式生产或试运营完成。
+- [ ] **预生产 Gate 4 浏览器截图补齐**：仍需补 G4-01 / G4-02 / G4-05 / G4-10 浏览器截图和常规 30 分钟签名 URL 等待窗口截图；腾讯短信审核通过后还需用真实短信完成会员登录 E2E，避免把 API/COS 级验收误写成完整浏览器验收。
 
 ## P1：工程质量门禁
 

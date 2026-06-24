@@ -1,7 +1,7 @@
 # 用户文件与简历资产预生产执行记录
 
-> 状态：PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES；Gate 2 已部署，Gate 3 自动命令门禁已通过，Gate 4 受控账号/API 级验收已通过；代码侧已补真实 AI 导出产物 `optimized/sourceFileId` 验证，但尚未重新部署到预生产；完整浏览器截图验收、正式生产、试运营和 Windows 真机尚未执行。
-> 基线候选：当前本地 Gate 2/Gate 3/Gate 0 门禁收口链 / `2187f6a7`（包含 `9146fa1c` 和上一代 `9a702981` 之后的本地门禁与证据口径修正）
+> 状态：PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH AI OUTPUT COS EVIDENCE；Gate 2/Gate 3 已通过，Gate 4 受控账号/API 级验收已通过；真实 AI 导出产物 `optimized/sourceFileId` 链路已刷新到预生产 `76c06ca8`，并已补真实 COS HEAD、短 TTL 签名 URL 过期、跨账号拒绝和审计脱敏证据；完整浏览器截图验收、正式生产、试运营和 Windows 真机尚未执行。
+> 基线候选：当前预生产 AI 导出产物复验候选 / `76c06ca8`；上一轮用户文件资产 Gate 2/Gate 3/Gate 4 API 基线为 `2187f6a7`。
 > 执行分支：`codex/file-assets-gate2-execution`
 > 口径：本文件记录预生产 Gate 2/Gate 3/Gate 4 API 级执行证据和后续证据入口，不代表正式生产部署、真实试运营或 Windows 真机验收完成。
 
@@ -28,7 +28,7 @@
 | Gate 1 | 预生产只读预检 | 需计划审查通过 | 只读 SSH、PM2 状态、health、commit，不改服务器。 |
 | Gate 2 | 候选部署或刷新 | 已执行 | 已改变预生产代码、构建产物、PostgreSQL schema 和进程状态；未写业务数据/COS。 |
 | Gate 3 | 自动命令门禁 | 已执行 | 安全子集已通过；预生产 COS bucket 切换后，`verify:cos:live` 已通过 put/head/get/signed-url/delete。 |
-| Gate 4 | 账号/API 验收 | 已执行（B 方案） | 腾讯短信审核未完成，用户确认临时切 `SMS_PROVIDER=log`；已创建受控会员、测试文件、保存期限、删除状态和审计记录；执行后已回滚 `SMS_PROVIDER=tencent`。完整浏览器截图证据仍需补齐，不能视为完整 Gate 4 浏览器验收。 |
+| Gate 4 | 账号/API 验收 | 已执行（B 方案 + AI 输出补证） | 腾讯短信审核未完成，上一轮用户确认临时切 `SMS_PROVIDER=log` 完成账号/API 级验收并回滚；本轮未修改短信配置，直接在预生产 `76c06ca8` 上补真实 AI 导出产物 COS/DB 脱敏证据。完整浏览器截图证据仍需补齐，不能视为完整 Gate 4 浏览器验收。 |
 
 ## 三、Gate 0 本地静态门禁
 
@@ -122,7 +122,7 @@ COS live：预生产隔离 bucket 指纹 d855f7e900，strict_nonprod=true，prod
 
 > 已执行（2026-06-22，B 方案）。由于腾讯短信仍在审核，执行前用户确认临时将预生产 `SMS_PROVIDER` 切换为 `log`；脚本通过真实 HTTP API、PostgreSQL、Redis 和 COS 私有桶完成受控验收，输出仅保留脱敏摘要。执行后已运行回滚命令将 `SMS_PROVIDER=tencent` 并重启 PM2，公网 HTTPS health 复核 `success=true`、`db=postgres`；SSH 只读环境复核确认 `SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。
 >
-> 说明：本轮是账号/API 级真实链路验收，不包含浏览器截图和人工 UI 证据；不得写成完整浏览器验收完成。2026-06-22 后续代码分支 `codex/file-assets-gate4-browser-ai-output` 已补服务端真实导出链路：`/resume/generate/export` 产物按 `assetCategory=optimized` 入库，并在已授权会员 parse 记录可校验时绑定 `sourceFileId`；`verify:resume-generate` 已覆盖原始文件长期保存拒绝、成果物长期保存、源文件缺失/越权回退和匿名 system 文件不可长期保存。该代码侧结论仍需后续部署到预生产并补浏览器/COS 人工证据。
+> 说明：本轮仍是账号/API/COS 级真实链路验收，不包含完整浏览器截图和人工 UI 证据；不得写成完整浏览器验收完成。2026-06-22 分支 `codex/file-assets-gate4-browser-ai-output` 已刷新到预生产 `76c06ca8`：`/resume/generate/export` 产物按 `assetCategory=optimized` 入库，并在已授权会员 parse 记录可校验时绑定 `sourceFileId`；`verify:resume-generate` 已在预生产通过，并已补真实 COS HEAD、短 TTL 签名 URL 过期、跨账号拒绝和审计脱敏证据。
 
 | 场景 | 必留证据 | 结果 |
 | --- | --- | --- |
@@ -130,9 +130,9 @@ COS live：预生产隔离 bucket 指纹 d855f7e900，strict_nonprod=true，prod
 | 上传原始文件 | 文件 ID 脱敏、size、sha256 前 8 位、COS 前缀脱敏 | API PASS：原始文件 digest `2b44f637ef7b`，`assetCategory=original`，bucket 指纹 `d855f7e9004c`，region `ap-guangzhou`；未输出 objectKey 或完整签名 URL。 |
 | 默认 90 天 | DB `retentionPolicy`、`expiresAt`、`retentionSetBy` | API/DB PASS：原始文件默认 `retentionPolicy=months_3`、`retentionSetBy=system`。 |
 | 设置 180 天 | `retentionConsentVersion=file-retention-v1`、consent at、审计记录 | API/DB PASS：原始文件设置 `months_6` 成功；原始文件设置 `long_term` 按预期 400 拒绝。 |
-| 生成或上传成果物 | 任务 ID、文件 ID、我的文档截图 | API PASS（预生产夹具）+ CODE PASS（本分支）：预生产已通过受控上传 + DB 夹具生成 optimized 测试文件 digest `6c4869d21445`；本分支已补真实 AI 导出产物自动 `optimized/sourceFileId` 链路并通过本地 verify。预生产浏览器截图待补。 |
-| 设置长期保存 | `retentionPolicy=long_term`、`expiresAt = null`、`retentionConsentVersion=file-retention-v1` | API/DB PASS（预生产夹具）+ CODE PASS（本分支）：optimized 测试文件设置 `long_term` 成功，`expiresAt=null`；本分支验证真实导出成果物也可由会员本人设置 `long_term`。 |
-| 签名 URL 预览 | TTL <= 30min、过期后不可访问、截图和日志中的签名 URL 查询串已脱敏 | API PASS：本人 `preview-url` 与 `download-url` 返回成功，脚本内部 fetch 签名 URL 成功；未打印完整 URL。过期后访问待浏览器/等待窗口补证。 |
+| 生成或上传成果物 | 任务 ID、文件 ID、我的文档截图 | API/COS PASS：预生产 `76c06ca8` 已生成真实 AI 导出 PDF，导出文件 digest `34f964913eec`，`assetCategory=optimized`，`sourceFileDigest=eac31dc38b0c` 且 `sourceMatches=true`，COS HEAD 200，PDF 1 页；浏览器截图待补。 |
+| 设置长期保存 | `retentionPolicy=long_term`、`expiresAt = null`、`retentionConsentVersion=file-retention-v1` | API/DB PASS：真实 AI 导出成果物设置 `long_term` 成功，`expiresAt=null`，`retentionConsentVersion=file-retention-v1`；原始源文件仍按预期拒绝 `long_term`。 |
+| 签名 URL 预览 | TTL <= 30min、过期后不可访问、截图和日志中的签名 URL 查询串已脱敏 | API/COS PASS：本轮一例短 TTL 预签名 URL 探针 `beforeStatus=200`、过期后 `afterStatus=403`；未打印完整 URL。常规 30 分钟浏览器等待窗口截图仍待补。 |
 | 重登查看 | 文件仍可见，API 只返回本人 active 文件 | API PASS：`/me/documents` 仅返回本人 active 文件；删除后的原始文件不可见，长期保存 optimized 夹具仍可见。真实浏览器重登截图待补。 |
 | 跨账号否定测试 | 会员 B 403/404，无签名 URL 泄露 | API PASS：MEMBER_B `138****7032` 访问/删除 MEMBER_A 文件均为 403，无签名 URL 泄露。 |
 | 删除三态一致 | UI 不可见、DB deleted、COS 404、AuditLog | API/DB PASS：原始文件删除后 `status=deleted`、`deletedAt` 存在，`preview-url` 拒绝；`file.delete` 审计存在。COS 物理删除通过应用链路执行，控制台/HEAD 截图待补。 |
@@ -158,17 +158,18 @@ COS live：预生产隔离 bucket 指纹 d855f7e900，strict_nonprod=true，prod
 | --- | --- | --- | --- |
 | 2026-06-22 | 腾讯短信审核未完成，Gate 4 选择 B 方案 | 临时将预生产 `SMS_PROVIDER=tencent` 切到 `log`，执行受控账号/API 验收 | Gate 4 API 级验收通过；未输出验证码、token、密钥、完整手机号或签名 URL；不是完整浏览器验收。 |
 | 2026-06-22 | B 方案回滚收尾 | 将 `.env` 回滚为 `SMS_PROVIDER=tencent` 并重启 `ai-job-print-api` | 回滚命令返回 `rollback-ok`，公网 HTTPS health 复核 `success=true`、`db=postgres`；SSH 只读环境复核确认 `SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。 |
+| 2026-06-22 | AI 导出 PDF 复验发现预生产 Linux 缺少可用中文字体 | 安装 `fonts-wqy-microhei`，在 API `.env` 写入 `RESUME_PDF_FONT_PATH=/usr/share/fonts/truetype/wqy/wqy-microhei.ttc` 与 `RESUME_PDF_FONT_FAMILY=WenQuanYiMicroHei`，备份 `.env.pre-ai-output-font-<timestamp>.bak` 并重启 PM2 | `verify:resume-generate` 从 `RESUME_PDF_FONT_NOT_FOUND` 恢复为 PASS；回滚方式为 purge 字体包、还原 `.env` 备份并重启 PM2。 |
 
 ## 九、结论
 
 当前结论：
 
 ```text
-用户文件与简历资产预生产执行：PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES
+用户文件与简历资产预生产执行：PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH AI OUTPUT COS EVIDENCE
 执行环境：预生产
-执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 + Gate 3 自动命令门禁 + 预生产 COS 切换 + G3-06 COS live + Gate 4 受控账号/API 验收
-部署 commit：Gate 2 执行候选 2187f6a7；执行前部署源为 6b055d6b，执行后 DEPLOY_SOURCE.txt 自报 commit=2187f6a7
+执行时间：2026-06-22 Gate 0 + Gate 1 + Gate 2 + Gate 3 自动命令门禁 + 预生产 COS 切换 + G3-06 COS live + Gate 4 受控账号/API 验收 + AI 导出产物预生产复验
+部署 commit：Gate 2 执行候选 2187f6a7；AI 导出产物复验候选 76c06ca8 已刷新到预生产；DEPLOY_SOURCE.txt 当前自报 commit=76c06ca8
 COS 状态：已切换到明确隔离的预生产 bucket，脱敏复核为 fp=d855f7e900、strict_nonprod=true、prod_label=false，G3-06 verify:cos:live 已通过；env 备份为 /srv/ai-job-print-env-backups/api.env.20260622134416.bak
-Gate 4 结果：受控账号/API 验收通过；SMS B 方案已回滚到 tencent，SSH 只读环境复核通过；优化成果长期保存预生产仍使用 optimized DB 夹具，本分支已补真实 AI 导出产物自动入库分类与 sourceFileId 绑定的代码侧验证；浏览器截图、重新部署后的预生产复验和 COS 控制台/HEAD 证据待补。
+Gate 4 结果：受控账号/API 验收通过；SMS B 方案已回滚到 tencent，本轮 AI 输出补证未修改短信配置；真实 AI 导出产物已在预生产写入 COS，导出文件 digest 34f964913eec，source digest eac31dc38b0c，sourceMatches=true，COS HEAD 200，短 TTL 过期探针 200→403，会员 B 拒绝访问；浏览器截图仍待补。
 结论：不得宣称生产验收、试运营或 Windows 真机验收完成
 ```
