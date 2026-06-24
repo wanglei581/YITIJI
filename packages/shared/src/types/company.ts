@@ -130,7 +130,7 @@ export interface CompanyStatsDTO {
   fairCompanyCount: number
 }
 
-/** 筛选可选项（只来自真实已发布数据，绝不渲染没有数据支撑的地区）。 */
+/** 兼容/诊断筛选聚合（只来自真实已发布数据；Kiosk 完整筛选字典不再依赖此 DTO）。 */
 export interface CompanyFiltersDTO {
   regions: { province: string; cities: { city: string; districts: string[] }[] }[]
   industries: CompanyIndustry[]

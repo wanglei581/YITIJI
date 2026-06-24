@@ -238,6 +238,10 @@ importers:
         version: 5.9.3
 
   packages/shared:
+    dependencies:
+      china-division:
+        specifier: ^2.7.0
+        version: 2.7.0
     devDependencies:
       typescript:
         specifier: ^5.7.0

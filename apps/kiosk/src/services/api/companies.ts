@@ -2,7 +2,8 @@
 // Kiosk 企业展示 Service（找企业 / 企业详情 / 企业在招岗位）。
 //
 // 合规定位（长期红线）：企业展示 = 来源企业与岗位导览，不是招聘平台。
-// 只读「已审核 + 已发布」数据；列表/统计/筛选项全部来自后端真实聚合——
+// 只读「已审核 + 已发布」数据；列表/统计来自后端真实聚合。
+// /companies/filters 仅保留为兼容/诊断接口；Kiosk 完整筛选字典来自 shared 行政区划/类型字典。
 // 本文件没有也不允许出现任何写死的企业、岗位数量、城市统计。
 // mock 模式诚实失败（页面显示连接后端提示），不提供假企业数据。
 // ============================================================
@@ -60,7 +61,7 @@ export function getCompanyStats(q: Omit<CompanyQuery, 'cursor' | 'pageSize'>): P
   return get(`/companies/stats${qs({ ...q })}`)
 }
 
-/** 筛选可选项（只来自真实已发布数据）。 */
+/** 兼容/诊断接口：真实已发布数据聚合；当前 Kiosk 页面不再用它生成完整筛选项。 */
 export function getCompanyFilters(): Promise<CompanyFiltersDTO> {
   return get('/companies/filters')
 }
