@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-06-22
+> 最后更新：2026-06-24
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -74,6 +74,7 @@
 | 2026-06-22 | `codex/file-assets-gate4-runbook-preflight` / 本分支 | 校准用户文件与简历资产 Gate 3/Gate 4 证据执行模板：将 runbook 当前状态从“COS live 与 Gate 4 仍阻塞”修正为“Gate 3 自动命令门禁已通过（含 G3-06 COS live），Gate 4 浏览器账号验收待执行”；保留旧生产语义 bucket 的阻断规则，并新增当前预生产 bucket 脱敏指纹 `d855f7e900`、`strict_nonprod=true`、`prod_label=false`、region `ap-guangzhou`。本分支仅做 Gate 4 前置文档校准，不执行账号登录、文件上传、DB/COS 写入、过期清理或 Admin 浏览器验收。 |
 | 2026-06-22 | `codex/file-assets-gate4-runbook-preflight` / 本分支 | PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES：用户确认 B 方案后，临时将预生产 `SMS_PROVIDER=log`，使用受控 MEMBER_A / MEMBER_B / 临时 Admin 通过真实 HTTP API + PostgreSQL + Redis + COS 完成会员登录、原始文件上传、默认 90 天、设置 180 天、原始文件长期保存拒绝、签名 URL 内部访问、跨账号 403、删除三态、过期清理和 Admin 生命周期汇总；执行后已回滚 `SMS_PROVIDER=tencent`，公网 health 复核 `db=postgres`，SSH 只读复核确认 `SMS_PROVIDER=tencent`、`FILE_STORAGE_DRIVER=cos`、`DATABASE_URL=postgres`、`REDIS_URL=set`。注意：完整浏览器截图仍待补；当时优化成果长期保存使用受控 DB 夹具标记 `assetCategory=optimized`，真实 AI 导出产物自动分类链路已由后续 `codex/file-assets-gate4-browser-ai-output` 刷新到预生产并补证。 |
 | 2026-06-22 | `codex/file-assets-gate4-browser-ai-output` / 本分支 | PREPRODUCTION AI OUTPUT RECHECK PASSED WITH NOTES：用户确认后已将预生产从 `2187f6a7` 刷新到 AI 导出产物候选 `76c06ca8`；候选包 sha256 校验、API/Kiosk/Admin build、PostgreSQL 备份、无 pending migration、PM2 重启和 health 均通过。预生产缺少中文字体导致 `verify:resume-generate` 初次失败，已安装 `fonts-wqy-microhei` 并配置 `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY=WenQuanYiMicroHei` 后复跑通过。自动 Gate 通过 `verify:production-runtime-gates`、`verify:production-db-guard`、`verify:resume-generate`、`verify:file-retention`；真实 COS 补证显示 AI 导出文件 digest `34f964913eec` 为 `optimized`，`sourceMatches=true`，COS HEAD 200，短 TTL 签名 URL 200→403，会员 B 拒绝访问，审计写入存在。完整浏览器截图、正式生产、Windows 真机和试运营仍未完成。 |
+| 2026-06-24 | `docs/real-resume-diagnosis-phase1-refresh` / 本分支 | 从旧远程分支 `origin/docs/real-resume-diagnosis-phase1` 提取仍有价值的真实 AI 简历诊断 Phase 1 设计目标，并按当前 `main` 已落地实现重写为 `docs/product/real-resume-diagnosis-phase1.md`；不迁回旧 job fair / smart campus 运行时代码，不回写旧进度条目。 |
 
 ## 当前工作区事实
 
