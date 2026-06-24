@@ -20,6 +20,7 @@
  * 13. 完整地区字典：选到无企业地区返回真实空态（列表空 + 统计 0），不造数据；
  *     直辖市使用省+区过滤可命中真实企业；常见无后缀地区录入可被规范筛选命中
  * 14. 正式前端企业页（apps/kiosk/src/pages/companies）无「演示」字样
+ * 15. Admin/Partner 企业地区录入使用共享行政区划级联选择；旧 filters 接口明确为兼容/诊断链路
  *
  * 运行：pnpm --filter @ai-job-print/api verify:companies
  */
@@ -378,6 +379,39 @@ async function main() {
       if (readFileSync(f, 'utf8').includes('演示')) fail(`14. 正式前端企业页 ${f.replace(repoRoot + '/', '')} 不应含「演示」字样`)
     }
     pass(`14. 正式前端企业页无「演示」字样（${frontFiles.length} 个文件）`)
+
+    // ── 15. 后台企业地区录入与旧 filters 链路标注 ──
+    const adminCompaniesPage = readFileSync(join(repoRoot, 'apps/admin/src/routes/companies/index.tsx'), 'utf8')
+    const partnerCompaniesPage = readFileSync(join(repoRoot, 'apps/partner/src/routes/companies/index.tsx'), 'utf8')
+    const sharedIndex = readFileSync(join(repoRoot, 'packages/shared/src/index.ts'), 'utf8')
+    const controllerDoc = readFileSync(join(repoRoot, 'services/api/src/companies/companies.controller.ts'), 'utf8')
+    const serviceDoc = readFileSync(join(repoRoot, 'services/api/src/companies/companies.service.ts'), 'utf8')
+    const kioskCompanyApi = readFileSync(join(repoRoot, 'apps/kiosk/src/services/api/companies.ts'), 'utf8')
+    for (const [label, content] of [
+      ['Admin 企业表单', adminCompaniesPage],
+      ['Partner 企业表单', partnerCompaniesPage],
+    ] as const) {
+      for (const symbol of ['PROVINCES', 'citiesOf', 'districtsOf', 'isMunicipality', 'resolveRegionSelection']) {
+        if (!content.includes(symbol)) fail(`15. ${label} 应使用共享行政区划工具 ${symbol}`)
+      }
+      if (!content.includes('<select') || !content.includes('value={form.province}')) fail(`15. ${label} 省份应为级联 select，不应是自由文本`)
+      if (!content.includes('districtsOf(form.province')) fail(`15. ${label} 区县应由省市级联计算`)
+      if (!content.includes('（原值）')) fail(`15. ${label} 应保留历史非规范地区原值的可见回显`)
+      if (content.includes("if (!form.district) return '请选择区/县'")) fail(`15. ${label} 不应把历史 partial 地区记录锁死为区县必填`)
+      if (content.includes("return '请选择城市'")) fail(`15. ${label} 不应把省+区县的历史 partial 地区记录锁死为城市必填`)
+      if (content.includes('set({ province: e.target.value })') || content.includes('province: e.target.value }))')) {
+        fail(`15. ${label} 仍存在省份自由文本录入逻辑`)
+      }
+    }
+    if (!sharedIndex.includes("export * from './regions'")) fail('15. @ai-job-print/shared 应导出统一 regions 工具')
+    for (const [label, content] of [
+      ['companies.controller.ts', controllerDoc],
+      ['companies.service.ts', serviceDoc],
+      ['apps/kiosk/src/services/api/companies.ts', kioskCompanyApi],
+    ] as const) {
+      if (!content.includes('兼容') || !content.includes('诊断')) fail(`15. ${label} 应明确 /companies/filters 为兼容/诊断链路`)
+    }
+    pass('15. Admin/Partner 地区录入使用共享级联选择；/companies/filters 已标注兼容/诊断')
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {

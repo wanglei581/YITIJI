@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card, Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { COMPANY_INDUSTRIES, COMPANY_TYPES } from '@ai-job-print/shared'
+import {
+  COMPANY_INDUSTRIES,
+  COMPANY_TYPES,
+  PROVINCES,
+  citiesOf,
+  districtsOf,
+  isMunicipality,
+  resolveRegionSelection,
+} from '@ai-job-print/shared'
 import {
   Building2Icon,
   LinkIcon,
@@ -227,7 +235,25 @@ const EMPTY_FORM: CompanyFormState = {
   showOpenJobCount: true, showCity: true, showEmployeeScale: true, showBoothNo: true,
 }
 
+function cityForSubmit(form: Pick<CompanyFormState, 'province' | 'city'>): string {
+  // 直辖市前端跳过「市辖区」层级，落库统一用省级市名便于公开筛选按省+区命中。
+  return form.province && isMunicipality(form.province) ? form.province : form.city
+}
+
+function validateRegion(form: Pick<CompanyFormState, 'province' | 'city' | 'district'>): string | null {
+  if (!form.province) {
+    return form.city || form.district ? '请选择省份' : null
+  }
+  return null
+}
+
 function detailToForm(d: AdminCompanyDetail): CompanyFormState {
+  const region = resolveRegionSelection({
+    province: d.province ?? '',
+    city: d.city ?? '',
+    district: d.district ?? '',
+  })
+  const province = region.province ?? ''
   return {
     name: d.name,
     legalName: d.legalName ?? '',
@@ -235,9 +261,9 @@ function detailToForm(d: AdminCompanyDetail): CompanyFormState {
     industry: d.industry ?? '',
     scale: d.scale ?? '',
     foundedAt: d.foundedAt ? d.foundedAt.slice(0, 10) : '',
-    province: d.province ?? '',
-    city: d.city ?? '',
-    district: d.district ?? '',
+    province,
+    city: province && isMunicipality(province) ? '' : region.city ?? '',
+    district: region.district ?? '',
     address: d.address ?? '',
     boothNo: d.boothNo ?? '',
     description: d.description ?? '',
@@ -272,12 +298,15 @@ function validateForm(form: CompanyFormState): string | null {
   if (form.description.length > 2000) return '企业简介不能超过 2000 字'
   if (splitTags(form.honorTags).length > 10) return '荣誉标签最多 10 个'
   if (splitTags(form.tags).length > 10) return '展示标签最多 10 个'
+  const regionError = validateRegion(form)
+  if (regionError) return regionError
   return null
 }
 
 /** 表单 → PATCH 载荷：空字符串字段传 null 表示清空（foundedAt 例外：留空 = 不修改）。 */
 function formToFields(form: CompanyFormState): CompanyFieldsInput {
   const strOrNull = (s: string) => (s.trim() ? s.trim() : null)
+  const city = cityForSubmit(form)
   return {
     name: form.name.trim(),
     legalName: strOrNull(form.legalName),
@@ -286,7 +315,7 @@ function formToFields(form: CompanyFormState): CompanyFieldsInput {
     scale: strOrNull(form.scale),
     ...(form.foundedAt ? { foundedAt: form.foundedAt } : {}),
     province: strOrNull(form.province),
-    city: strOrNull(form.city),
+    city: strOrNull(city),
     district: strOrNull(form.district),
     address: strOrNull(form.address),
     boothNo: strOrNull(form.boothNo),
@@ -312,6 +341,14 @@ function stripNulls(fields: CompanyFieldsInput): CompanyFieldsInput {
 
 function CompanyFormFields({ form, onChange }: { form: CompanyFormState; onChange: (next: CompanyFormState) => void }) {
   const set = (patch: Partial<CompanyFormState>) => onChange({ ...form, ...patch })
+  const municipal = form.province ? isMunicipality(form.province) : false
+  const cityOptions = form.province && !municipal ? citiesOf(form.province) : []
+  const districtOptions = form.province && (municipal || form.city)
+    ? districtsOf(form.province, municipal ? '市辖区' : form.city)
+    : []
+  const showProvinceOriginal = Boolean(form.province && !PROVINCES.includes(form.province))
+  const showCityOriginal = Boolean(form.city && !cityOptions.includes(form.city))
+  const showDistrictOriginal = Boolean(form.district && !districtOptions.includes(form.district))
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
@@ -346,13 +383,39 @@ function CompanyFormFields({ form, onChange }: { form: CompanyFormState; onChang
       </div>
       <div className="grid grid-cols-3 gap-3">
         <Field label="省份">
-          <input className={inputCls} value={form.province} onChange={(e) => set({ province: e.target.value })} />
+          <select
+            className={inputCls}
+            value={form.province}
+            onChange={(e) => set({ province: e.target.value, city: '', district: '' })}
+          >
+            <option value="">未设置</option>
+            {showProvinceOriginal && <option value={form.province}>{form.province}（原值）</option>}
+            {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
         </Field>
         <Field label="城市">
-          <input className={inputCls} value={form.city} onChange={(e) => set({ city: e.target.value })} />
+          <select
+            className={inputCls}
+            value={form.city}
+            disabled={!form.province || municipal}
+            onChange={(e) => set({ city: e.target.value, district: '' })}
+          >
+            <option value="">{municipal ? '直辖市' : '未设置'}</option>
+            {showCityOriginal && <option value={form.city}>{form.city}（原值）</option>}
+            {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </Field>
         <Field label="区/县">
-          <input className={inputCls} value={form.district} onChange={(e) => set({ district: e.target.value })} />
+          <select
+            className={inputCls}
+            value={form.district}
+            disabled={!form.province || (!municipal && !form.city)}
+            onChange={(e) => set({ district: e.target.value })}
+          >
+            <option value="">未设置</option>
+            {showDistrictOriginal && <option value={form.district}>{form.district}（原值）</option>}
+            {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">

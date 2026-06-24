@@ -18,7 +18,8 @@ import type {
 // 企业展示服务（CompanyProfile，来源企业与岗位导览）。
 //
 // 合规定位（长期红线）：不是招聘平台。
-// - Kiosk 只读「approved + published」企业；列表/统计/筛选项全部为真实聚合，
+// - Kiosk 只读「approved + published」企业；列表/统计全部为真实聚合，
+//   /companies/filters 仅保留为兼容/诊断接口，不再作为 Kiosk 完整筛选字典来源。
 //   没有任何写死数字。
 // - 不收简历、无平台内投递；岗位行只引导既有「去来源平台投递」链路。
 // - Partner 只能维护本机构来源数据（orgId 取自 JWT），导入/编辑一律回
@@ -158,7 +159,7 @@ export class CompaniesService {
     return { companyCount, openJobCount, todayNewJobCount, fairCompanyCount }
   }
 
-  /** 筛选可选项：只来自真实已发布企业（绝不渲染无数据支撑的地区/行业）。 */
+  /** 兼容/诊断筛选聚合：只来自真实已发布企业；Kiosk 当前不再用它生成完整筛选字典。 */
   async filtersPublic() {
     const rows = await this.prisma.companyProfile.findMany({
       where: { ...PUBLISHED },

@@ -17,7 +17,7 @@ import { PublishActionDto } from '../jobs/dto/publish.dto'
 //   公开（Kiosk，只读已审核发布）:
 //     GET /companies                 — 找企业列表（筛选 + 游标分页）
 //     GET /companies/stats           — 统计条（真实聚合）
-//     GET /companies/filters         — 筛选可选项（只来自真实数据）
+//     GET /companies/filters         — 兼容/诊断接口（真实数据聚合；Kiosk 不再用它生成完整筛选字典）
 //     GET /companies/:id             — 企业详情（指标受后台开关控制）
 //     GET /companies/:id/jobs        — 企业在招岗位（已发布）
 //   Admin:
@@ -77,6 +77,7 @@ export class CompaniesController {
   }
 
   @Get('companies/filters')
+  /** @deprecated 兼容/诊断接口；Kiosk 找企业页使用 shared 完整行政区划字典 + /companies 真实查询。 */
   async filters() {
     return ApiResponse.ok(await this.companies.filtersPublic())
   }

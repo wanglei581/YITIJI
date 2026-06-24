@@ -10,7 +10,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { Building2Icon, PlusIcon, RefreshCwIcon } from 'lucide-react'
-import { COMPANY_TYPES, COMPANY_INDUSTRIES } from '@ai-job-print/shared'
+import {
+  COMPANY_TYPES,
+  COMPANY_INDUSTRIES,
+  PROVINCES,
+  citiesOf,
+  districtsOf,
+  isMunicipality,
+  resolveRegionSelection,
+} from '@ai-job-print/shared'
 import type { CompanyType, CompanyIndustry } from '@ai-job-print/shared'
 import type { ReviewStatus, PublishStatus } from '../../services/api'
 import {
@@ -114,6 +122,22 @@ const EMPTY_FORM: CompanyFormState = {
   honorTags: '', tags: '', fairParticipant: false, jobExternalIds: '',
 }
 
+function cityForSubmit(form: Pick<CompanyFormState, 'province' | 'city'>): string {
+  // 直辖市前端跳过「市辖区」层级，落库统一用省级市名便于公开筛选按省+区命中。
+  return form.province && isMunicipality(form.province) ? form.province : form.city
+}
+
+function normalizeRegionForSubmit(form: CompanyFormState): CompanyFormState {
+  return { ...form, city: cityForSubmit(form) }
+}
+
+function validateRegion(form: Pick<CompanyFormState, 'province' | 'city' | 'district'>): string | null {
+  if (!form.province) {
+    return form.city || form.district ? '请选择省份' : null
+  }
+  return null
+}
+
 /** 逗号（中英文）分隔输入 → 字符串数组。 */
 function splitList(s: string): string[] {
   return s.split(/[,，]/).map((t) => t.trim()).filter(Boolean)
@@ -130,6 +154,8 @@ function validateForm(form: CompanyFormState, isNew: boolean): string | null {
   if (isNew && !name) return '企业名称为必填项'
   if (name && (name.length < 2 || name.length > 80)) return '企业名称长度须为 2-80 个字符'
   if (form.description.length > 2000) return '企业简介不能超过 2000 字'
+  const regionError = validateRegion(form)
+  if (regionError) return regionError
   for (const [label, v] of [
     ['Logo 链接', form.logoUrl], ['封面图链接', form.coverImageUrl],
     ['宣传视频链接', form.promoVideoUrl], ['来源链接', form.sourceUrl],
@@ -146,20 +172,22 @@ function validateForm(form: CompanyFormState, isNew: boolean): string | null {
  *   文本字段改回空串视为「不修改」，本期 UI 不支持清空文本字段（标签数组可清空）。
  */
 function buildFields(form: CompanyFormState, initial: CompanyFormState | null): CompanyFieldsInput {
-  const changed = (k: keyof CompanyFormState) => initial === null || form[k] !== initial[k]
+  const submitForm = normalizeRegionForSubmit(form)
+  const initialForm = initial ? normalizeRegionForSubmit(initial) : null
+  const changed = (k: keyof CompanyFormState) => initialForm === null || submitForm[k] !== initialForm[k]
   const out: CompanyFieldsInput = {}
   const text = (k: 'name' | 'legalName' | 'scale' | 'foundedAt' | 'province' | 'city' | 'district' | 'address' | 'boothNo' | 'description' | 'logoUrl' | 'coverImageUrl' | 'promoVideoUrl' | 'sourceUrl') => {
-    const v = form[k].trim()
+    const v = submitForm[k].trim()
     if (v && changed(k)) out[k] = v
   }
   text('name'); text('legalName'); text('scale'); text('foundedAt')
   text('province'); text('city'); text('district'); text('address'); text('boothNo')
   text('description'); text('logoUrl'); text('coverImageUrl'); text('promoVideoUrl'); text('sourceUrl')
-  if (form.industry && changed('industry')) out.industry = form.industry
-  if (form.companyType && changed('companyType')) out.companyType = form.companyType
-  if (changed('fairParticipant')) out.fairParticipant = form.fairParticipant
-  if (changed('honorTags')) out.honorTags = splitList(form.honorTags)
-  if (changed('tags')) out.tags = splitList(form.tags)
+  if (submitForm.industry && changed('industry')) out.industry = submitForm.industry
+  if (submitForm.companyType && changed('companyType')) out.companyType = submitForm.companyType
+  if (changed('fairParticipant')) out.fairParticipant = submitForm.fairParticipant
+  if (changed('honorTags')) out.honorTags = splitList(submitForm.honorTags)
+  if (changed('tags')) out.tags = splitList(submitForm.tags)
   return out
 }
 
@@ -221,15 +249,21 @@ export default function CompaniesPage() {
 
   const openEdit = (c: PartnerCompanyRecord) => {
     // 列表行只含摘要字段;简介/链接等详情字段留空表示「不修改」(PATCH 不提交即保持原值)
+    const region = resolveRegionSelection({
+      province: c.province ?? '',
+      city: c.city ?? '',
+      district: c.district ?? '',
+    })
+    const province = region.province ?? ''
     const f: CompanyFormState = {
       ...EMPTY_FORM,
       externalId: c.externalId,
       name: c.name,
       industry: c.industry ?? '',
       companyType: c.companyType ?? '',
-      province: c.province ?? '',
-      city: c.city ?? '',
-      district: c.district ?? '',
+      province,
+      city: province && isMunicipality(province) ? '' : region.city ?? '',
+      district: region.district ?? '',
       fairParticipant: c.fairParticipant,
     }
     setForm(f)
@@ -241,6 +275,14 @@ export default function CompaniesPage() {
   const canSave = editing === 'new'
     ? Boolean(form.externalId.trim() && form.name.trim())
     : Boolean(form.name.trim())
+  const municipal = form.province ? isMunicipality(form.province) : false
+  const cityOptions = form.province && !municipal ? citiesOf(form.province) : []
+  const districtOptions = form.province && (municipal || form.city)
+    ? districtsOf(form.province, municipal ? '市辖区' : form.city)
+    : []
+  const showProvinceOriginal = Boolean(form.province && !PROVINCES.includes(form.province))
+  const showCityOriginal = Boolean(form.city && !cityOptions.includes(form.city))
+  const showDistrictOriginal = Boolean(form.district && !districtOptions.includes(form.district))
 
   const save = async () => {
     const invalid = validateForm(form, editing === 'new')
@@ -499,13 +541,35 @@ export default function CompaniesPage() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Field label="省份">
-              <input className={inputCls} value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))} />
+              <select className={inputCls} value={form.province} onChange={(e) => setForm((f) => ({ ...f, province: e.currentTarget.value, city: '', district: '' }))}>
+                <option value="">未指定</option>
+                {showProvinceOriginal && <option value={form.province}>{form.province}（原值）</option>}
+                {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
             </Field>
             <Field label="城市">
-              <input className={inputCls} value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
+              <select
+                className={inputCls}
+                value={form.city}
+                disabled={!form.province || municipal}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.currentTarget.value, district: '' }))}
+              >
+                <option value="">{municipal ? '直辖市' : '未指定'}</option>
+                {showCityOriginal && <option value={form.city}>{form.city}（原值）</option>}
+                {cityOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </Field>
             <Field label="区县">
-              <input className={inputCls} value={form.district} onChange={(e) => setForm((f) => ({ ...f, district: e.target.value }))} />
+              <select
+                className={inputCls}
+                value={form.district}
+                disabled={!form.province || (!municipal && !form.city)}
+                onChange={(e) => setForm((f) => ({ ...f, district: e.currentTarget.value }))}
+              >
+                <option value="">未指定</option>
+                {showDistrictOriginal && <option value={form.district}>{form.district}（原值）</option>}
+                {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
