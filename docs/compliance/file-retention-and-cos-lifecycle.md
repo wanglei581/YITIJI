@@ -62,6 +62,6 @@ Status: Enabled
 
 ## 四、保存条款版本
 
-当前保存条款版本由 `FILE_RETENTION_CONSENT_VERSION` / `CURRENT_RETENTION_CONSENT_VERSION` 控制。用户延长至 180 天或长期保存需确认保存条款。
+当前保存条款版本由 `FILE_RETENTION_CONSENT_VERSION` / `CURRENT_RETENTION_CONSENT_VERSION` 控制。用户将文件延长至 180 天，或将优化后 / 派生成果物设为长期保存，均需确认保存条款。
 
 本分支只同步隐私告知和验收文档，不静默修改保存条款版本。若法务审定后认定长期保存说明属于实质性条款变更，应另起独立分支决策是否 bump 保存条款版本，并要求用户重新确认。

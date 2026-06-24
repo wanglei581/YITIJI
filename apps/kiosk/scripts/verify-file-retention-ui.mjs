@@ -10,11 +10,13 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const REPO_ROOT = join(ROOT, '../..')
 const memberAssetsPath = join(ROOT, 'src/services/api/memberAssets.ts')
+const filesMockAdapterPath = join(ROOT, 'src/services/api/filesMockAdapter.ts')
 const documentsPagePath = join(ROOT, 'src/pages/profile/me/MyDocumentsPage.tsx')
 const sharedFileTypesPath = join(REPO_ROOT, 'packages/shared/src/types/file.ts')
 const apiFileTypesPath = join(REPO_ROOT, 'services/api/src/files/file.types.ts')
 const apiRetentionPolicyPath = join(REPO_ROOT, 'services/api/src/files/retention-policy.ts')
 const memberAssets = readFileSync(memberAssetsPath, 'utf8')
+const filesMockAdapter = readFileSync(filesMockAdapterPath, 'utf8')
 const documentsPage = readFileSync(documentsPagePath, 'utf8')
 const sharedFileTypes = readFileSync(sharedFileTypesPath, 'utf8')
 const apiFileTypes = readFileSync(apiFileTypesPath, 'utf8')
@@ -32,6 +34,11 @@ function mustContain(src, marker, label) {
 function mustMatch(src, pattern, label) {
   if (pattern.test(src)) pass(label)
   else fail(`${label} — 未匹配: ${pattern}`)
+}
+
+function mustNotMatch(src, pattern, label) {
+  if (!pattern.test(src)) pass(label)
+  else fail(`${label} — 命中旧口径: ${pattern}`)
 }
 
 function extractConst(src, name) {
@@ -63,6 +70,9 @@ mustMatch(documentsPage, /retentionBusy\?\.fileId\s*===\s*doc\.id\s*&&\s*retenti
 mustContain(documentsPage, 'error instanceof MemberAssetsApiError', '16. 保存期限错误透出后端可读原因')
 mustContain(documentsPage, '保存期限已更新', '17. 成功后给出短提示')
 mustMatch(documentsPage, /setItems\(\(prev\)\s*=>\s*prev\.map/, '18. 成功后局部回填文档卡片')
+mustNotMatch(filesMockAdapter, /简历\s*1h\s*自动清理|resume_upload:\s*1\b/, '19. Mock 上传不得保留会员简历 1h 旧口径')
+mustContain(filesMockAdapter, '90 * 24 * 60 * 60 * 1000', '20. Mock 会员简历类上传默认 90 天')
+mustContain(filesMockAdapter, 'FILE_DEFAULT_TTL_HOURS', '21. Mock 匿名/系统短期文件复用 24h/6h/1h 常量')
 
 if (failed > 0) {
   console.error(`\n=== FAILED (${failed} 项) ===`)

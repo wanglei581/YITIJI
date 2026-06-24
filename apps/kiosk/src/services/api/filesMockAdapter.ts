@@ -1,34 +1,45 @@
-import type { FileUploadResponse, FilePurpose } from '@ai-job-print/shared'
+import { FILE_DEFAULT_TTL_HOURS, type FileUploadResponse, type FilePurpose, type FileSensitiveLevel } from '@ai-job-print/shared'
 
 /**
- * 按 purpose 推断默认过期(与后端 FilesService.DEFAULT_SENSITIVE_BY_PURPOSE 一致)。
- * 让 mock 行为对齐真后端,UI 在 mock 模式下也能看到"简历 1h 自动清理"的真实呈现。
+ * Mock 仅能根据 purpose + token 近似模拟后端默认保存策略:
+ * - 登录会员的简历类账号资产默认 90 天;
+ * - 匿名/证件/系统文件保持 system_short 的 24h/6h/1h。
+ * 真实归属仍以后端 ownerType/endUserId 判断为准。
  */
-const TTL_HOURS_BY_PURPOSE: Record<FilePurpose, number> = {
-  resume_upload:        1,
-  resume_scan:          1,
-  id_scan:              1,
-  print_doc:           24,
-  fair_material:       24,
-  cover_letter:         6,
-  partner_profile:     24,
-  partner_image:       24,
-  partner_video:       24,
-  job_fair_material:   24,
-  screensaver_material: 24,
-  admin_upload:        24,
-  temp:                 6,
+const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>(['resume_upload', 'resume_scan', 'cover_letter'])
+
+const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
+  resume_upload: 'highly_sensitive',
+  resume_scan: 'highly_sensitive',
+  id_scan: 'highly_sensitive',
+  print_doc: 'normal',
+  fair_material: 'normal',
+  cover_letter: 'sensitive',
+  partner_profile: 'normal',
+  partner_image: 'normal',
+  partner_video: 'normal',
+  job_fair_material: 'normal',
+  screensaver_material: 'normal',
+  admin_upload: 'normal',
+  temp: 'sensitive',
 }
 
 let nextId = 1
 
+function computeMockFileExpiresAt(purpose: FilePurpose, token: string | null | undefined, now: number): string {
+  if (token && MEMBER_DEFAULT_PURPOSES.has(purpose)) {
+    return new Date(now + 90 * 24 * 60 * 60 * 1000).toISOString()
+  }
+  const sensitiveLevel = SENSITIVE_BY_PURPOSE[purpose]
+  const ttlHours = FILE_DEFAULT_TTL_HOURS[sensitiveLevel]
+  return new Date(now + ttlHours * 60 * 60 * 1000).toISOString()
+}
+
 export const filesMockAdapter = {
   async kioskUpload(file: File, purpose: FilePurpose, token?: string | null): Promise<FileUploadResponse> {
-    void token
     await new Promise((r) => setTimeout(r, 600))
     const fileId = `mock-file-${Date.now()}-${nextId++}`
     const now = Date.now()
-    const ttlMs = TTL_HOURS_BY_PURPOSE[purpose] * 60 * 60 * 1000
     return {
       fileId,
       filename: file.name,
@@ -37,7 +48,7 @@ export const filesMockAdapter = {
       sha256: `mock-sha256-${purpose}-${fileId}`,
       signedUrl: `/mock/files/${fileId}/content?purpose=${purpose}`,
       signedUrlExpiresAt: new Date(now + 5 * 60 * 1000).toISOString(),
-      fileExpiresAt: new Date(now + ttlMs).toISOString(),
+      fileExpiresAt: computeMockFileExpiresAt(purpose, token, now),
     }
   },
 }

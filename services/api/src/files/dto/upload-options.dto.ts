@@ -3,9 +3,9 @@ import { IsIn, IsOptional } from 'class-validator'
 /**
  * 上传时除 multipart file 之外可选的 form fields。
  *
- * purpose 决定默认 sensitiveLevel 和 TTL:
- *   resume_upload / resume_scan / id_scan → highly_sensitive(1h)/ sensitive(6h)
- *   print_doc / fair_material / cover_letter → normal(24h)
+ * purpose 决定默认 sensitiveLevel；实际 expiresAt 由 retention-policy 仲裁：
+ *   - 未登录 / 匿名 / 证件 / 系统文件走 system_short，按 normal 24h / sensitive 6h / highly_sensitive 1h。
+ *   - 登录会员简历/求职材料走 months_3 / months_6 / long_term 的账号资产策略。
  *
  * 如显式传 sensitiveLevel,会覆盖 purpose 默认值(更严的有效)。
  */

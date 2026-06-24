@@ -9,7 +9,7 @@ import { FilesService } from './files.service'
  * cron 由 @nestjs/schedule 驱动,服务不重启即生效。
  *
  * 验证方式:
- *   - 上传 sensitiveLevel='highly_sensitive' 文件(默认 1h 过期)
+ *   - 构造已过期文件；system_short 高敏文件通常 1h 过期，会员长期保存文件 expiresAt=null 不应被清理
  *   - 等待 cron 触发(每小时整点)或手动调用 POST /files/cleanup-expired
  *   - 查 audit log + 文件管理列表(deletedAt 应有值)
  */

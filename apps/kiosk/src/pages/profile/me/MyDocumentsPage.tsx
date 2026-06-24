@@ -1,7 +1,7 @@
 // ============================================================
 // 我的文档 — /me/documents（本人，只读元数据）。
 // 列表只给 downloadUrlPath/previewUrlPath；查看时凭本人 token 现换 TTL 受控签名 URL
-// （fetchAccessUrl），过期文档诚实置灰不可打开。不长期留存敏感文件（后端到期自动清理）。
+// （fetchAccessUrl），过期文档诚实置灰不可打开；保存期限以后端返回的 retentionPolicy 为准。
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
@@ -376,7 +376,7 @@ export function MyDocumentsPage() {
           </Card>
         )
       })}
-      <p className="mt-1 text-center text-xs text-gray-400">文档查看使用短期签名链接；敏感文件不长期留存，到期自动清理</p>
+      <p className="mt-1 text-center text-xs text-gray-400">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</p>
     </MeListShell>
   )
 }

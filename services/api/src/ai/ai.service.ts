@@ -474,11 +474,11 @@ export class AiService {
   }
 
   /**
-   * 导出用户确认后的简历为真实 PDF(进 FileObject + 签名 URL + 既有清理策略)。
+   * 导出用户确认后的简历为真实 PDF(进 FileObject + 签名 URL + 账号资产保存策略)。
    *
    * - 内容 = 用户在预览页确认/编辑后的最终简历(用户自己的资料,允许人工修改)。
-   * - purpose='resume_upload' → sensitiveLevel='sensitive',短 TTL 自动清理,
-   *   符合公共一体机"敏感信息不长期保留"。
+   * - assetCategory='optimized';登录会员默认 90 天,可由本人按规则延长。
+   *   匿名 / system 文件仍走短期保存,且不能被会员转为长期保存。
    * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
    */
   async exportGeneratedResume(
