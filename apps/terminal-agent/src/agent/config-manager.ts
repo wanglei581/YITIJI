@@ -29,6 +29,20 @@ import type { AgentConfig } from './types'
 const CONFIG_FILE = path.resolve(__dirname, '../../config/agent-config.json')
 const EXAMPLE_FILE = path.resolve(__dirname, '../../config/agent-config.example.json')
 
+function requireNonEmpty(value: unknown, field: keyof AgentConfig, help: string): string {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  throw new Error(`Agent config field "${field}" is required. ${help}`)
+}
+
+function validateRequiredConfig(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    apiBaseUrl: requireNonEmpty(config.apiBaseUrl, 'apiBaseUrl', 'Fill in the backend API base URL.'),
+    terminalCode: requireNonEmpty(config.terminalCode, 'terminalCode', 'Fill in the terminal code registered for this kiosk.'),
+    printerName: requireNonEmpty(config.printerName, 'printerName', '必须填写 Windows 实际识别名；可先运行 list-printers 获取。'),
+  }
+}
+
 // ── Read ──────────────────────────────────────────────────────────────────────
 
 /**
@@ -45,7 +59,7 @@ export function loadConfig(): AgentConfig {
   if (!fs.existsSync(CONFIG_FILE)) {
     throw new Error(
       `Agent config not found: ${CONFIG_FILE}\n` +
-        `Copy ${EXAMPLE_FILE} → ${CONFIG_FILE} and fill in apiBaseUrl / terminalCode / adminSecret.`,
+        `Copy ${EXAMPLE_FILE} → ${CONFIG_FILE} and fill in apiBaseUrl / terminalCode / printerName.`,
     )
   }
 
@@ -70,7 +84,7 @@ export function loadConfig(): AgentConfig {
     parsed.agentToken = agentToken
   }
 
-  return parsed
+  return validateRequiredConfig(parsed)
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────

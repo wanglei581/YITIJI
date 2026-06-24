@@ -3,7 +3,7 @@ import path from 'path'
 import { PrintResult, PrintJobParams } from './types'
 import { printWithPdfToPrinter } from './print-with-pdf-to-printer'
 import { imageToPdf, cleanupTempPdf } from './image-to-pdf'
-import { DEFAULT_PRINTER, SUPPORTED_EXTENSIONS } from '../config'
+import { SUPPORTED_EXTENSIONS } from '../config'
 import { log } from '../logger'
 
 /**
@@ -35,12 +35,12 @@ const IMAGE_EXTENSIONS_PHASE_NEXT = new Set(['.bmp', '.tiff', '.tif'])
  * 统一打印函数（Phase 8.1A）。
  *
  * @param filePath     待打印文件的绝对路径
- * @param printerName  打印机名称（默认从 config.ts DEFAULT_PRINTER 读取）
+ * @param printerName  打印机名称（必须由 CLI 参数或 Agent 配置传入）
  * @param params       打印参数（W7 起真实传给 SumatraPDF -print-settings）
  */
 export async function print(
   filePath: string,
-  printerName: string = DEFAULT_PRINTER,
+  printerName: string,
   params?: Partial<PrintJobParams>,
 ): Promise<PrintResult> {
   const startedAt = new Date().toISOString()

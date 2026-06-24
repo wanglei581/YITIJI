@@ -37,8 +37,8 @@ export interface AgentConfig {
    */
   adminSecret?: string
   /**
-   * Printer name. Must be configurable; never hard-code model string.
-   * Default: "Pantum CM2800ADN Series" (Windows driver name, confirmed on real machine).
+   * Printer name. Must be configurable and match the Windows printer name.
+   * Do not rely on a code default; deployment must fill this value explicitly.
    */
   printerName: string
   /** Agent version echoed in heartbeat. e.g. "0.2.0" */

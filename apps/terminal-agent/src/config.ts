@@ -1,11 +1,4 @@
 /**
- * 打印机名称配置项（Phase 8.1A）。
- * 必须通过此配置项传入，禁止在代码中硬编码具体型号字符串。
- * Phase 8.1B 起将从 Agent 注册信息或配置文件动态读取。
- */
-export const DEFAULT_PRINTER = 'Pantum CM2800ADN Series'
-
-/**
  * 支持的文件扩展名（print.ts 路由覆盖范围）：
  *   .pdf                  → Method B 直接打印（已验证真实出纸）
  *   .jpg / .jpeg / .png   → pdfkit 临时 PDF → Method B（Phase 8.1A 支持）

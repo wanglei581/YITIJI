@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Command } from 'commander'
-import { DEFAULT_PRINTER, SUPPORTED_EXTENSIONS } from './config'
+import { SUPPORTED_EXTENSIONS } from './config'
 import { log, err, warn, section } from './logger'
 import { listPrinters, checkPrinterExists } from './printer/printer-status'
 import { printWithPowerShell } from './printer/print-with-powershell'
@@ -202,7 +202,7 @@ program
   .command('print')
   .description('Send a file to a printer (spike: validates both print methods)')
   .requiredOption('--file <path>', 'Absolute path to the file to print')
-  .option('--printer <name>', 'Printer name', DEFAULT_PRINTER)
+  .requiredOption('--printer <name>', 'Printer name')
   .option(
     '--method <auto|a|b|both>',
     'auto = production path (unified print() via pdfkit+Method B); a = PowerShell; b = pdf-to-printer; both = spike A+B',
@@ -210,14 +210,19 @@ program
   )
   .action(async (opts: { file: string; printer: string; method: string }) => {
     const { file, printer, method } = opts
+    const printerName = printer.trim()
 
     section(`Print — ${new Date().toISOString()}`)
     log(`File    : ${file}`)
-    log(`Printer : ${printer}`)
+    log(`Printer : ${printerName}`)
     log(`Method  : ${method}`)
     if (method === 'both') {
       warn('⚠️  both mode sends the file to the printer TWICE (once per method).')
       warn('   Use only for spike verification. Do NOT use as default in production.')
+    }
+    if (!printerName) {
+      err('PRINTER_NAME_REQUIRED: --printer must match the Windows printer name. Run list-printers first.')
+      process.exit(1)
     }
 
     if (!fs.existsSync(file)) {
@@ -233,18 +238,18 @@ program
 
     log(`File size: ${(fs.statSync(file).size / 1024).toFixed(1)} KB`)
 
-    if (!checkPrinterExists(printer)) {
-      err(`PRINTER_NOT_FOUND: "${printer}"`)
+    if (!checkPrinterExists(printerName)) {
+      err(`PRINTER_NOT_FOUND: "${printerName}"`)
       log('Available printers:')
       listPrinters().forEach((p) => log(`  • ${p.name} [${p.status}]`))
       process.exit(1)
     }
 
-    log(`Printer "${printer}" found ✓`)
+    log(`Printer "${printerName}" found ✓`)
 
     if (method === 'auto') {
       section('Print [auto] — unified print() (Phase 8.1A)')
-      const r = await printUnified(file, printer)
+      const r = await printUnified(file, printerName)
       printResultSummary(r)
       section('Result')
       if (r.success) {
@@ -260,14 +265,14 @@ program
 
     if (method === 'a' || method === 'both') {
       section('Method A — PowerShell Start-Process -Verb PrintTo')
-      const r = printWithPowerShell(file, printer)
+      const r = printWithPowerShell(file, printerName)
       results.push(r)
       printResultSummary(r)
     }
 
     if (method === 'b' || method === 'both') {
       section('Method B — pdf-to-printer (SumatraPDF)')
-      const r = await printWithPdfToPrinter(file, printer)
+      const r = await printWithPdfToPrinter(file, printerName)
       results.push(r)
       printResultSummary(r)
     }
