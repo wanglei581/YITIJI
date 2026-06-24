@@ -3,7 +3,7 @@
   "apiBaseUrl": "http://localhost:3000/api/v1",
   "terminalCode": "T-001",
   "adminSecret": "change-me-before-deploy",
-  "printerName": "Pantum CM2800ADN Series",
+  "printerName": "",
   "agentVersion": "0.2.0",
   "heartbeatIntervalMs": 30000,
   "claimIntervalMs": 5000

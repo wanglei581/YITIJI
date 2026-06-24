@@ -9,7 +9,8 @@
     "list-printers": "ts-node src/index.ts list-printers",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "verify:printer-config": "node scripts/verify-printer-config.mjs"
   },
   "dependencies": {
     "axios": "^1.7.0",
