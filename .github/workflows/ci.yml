@@ -101,9 +101,10 @@ jobs:
           VITE_API_MODE: http
           VITE_API_BASE_URL: /api/v1
           VITE_USE_TRTC_CALL: 'true'
+          VITE_TERMINAL_ID: KSK-001
         run: |
           pnpm --filter @ai-job-print/api build
-          pnpm --filter @ai-job-print/kiosk build
+          pnpm build:kiosk:production
           pnpm --filter @ai-job-print/admin build
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
