@@ -45,6 +45,7 @@ import {
   type ParsedRow,
 } from './dto/excel-import.dto'
 import { Workbook } from 'exceljs'
+import type { Prisma } from '../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
@@ -83,13 +84,7 @@ interface PublishedFairsParams {
 }
 
 interface PublishedFairQueryGroup {
-  where: {
-    reviewStatus: string
-    publishStatus: string
-    sourceOrgId?: string
-    NOT?: { sourceOrgId: string }
-    endAt?: { gte?: Date; lt?: Date }
-  }
+  where: Prisma.JobFairWhereInput
   orderBy: { startAt: 'asc' | 'desc' }
 }
 
@@ -611,6 +606,26 @@ function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
   }
 }
 
+const PUBLIC_FAIR_DEMO_FILTERS: Prisma.JobFairWhereInput[] = [
+  { sourceOrgId: { startsWith: 'org_vff_' } },
+  { externalId: { startsWith: 'VFF-' } },
+  { sourceUrl: { contains: 'example.org' } },
+  { sourceName: { contains: '验证' } },
+  { title: { contains: '验证' } },
+  { venue: { contains: '验证' } },
+  { city: { contains: '验证' } },
+]
+
+function withPublicFairDemoExclusion(where: Prisma.JobFairWhereInput): Prisma.JobFairWhereInput {
+  if (process.env['EXCLUDE_DEMO_PUBLIC_DATA'] !== 'true') return where
+  return {
+    AND: [
+      where,
+      { NOT: { OR: PUBLIC_FAIR_DEMO_FILTERS } },
+    ],
+  }
+}
+
 function toPreviewRow(r: ParsedRow): ExcelPreviewRowDto {
   return {
     rowIndex: r.rowIndex,
@@ -757,10 +772,10 @@ export class JobsService {
   async getPublishedFairs(params?: PublishedFairsParams): Promise<PaginatedResult<FairListItemDto>> {
     const page     = Math.max(1, params?.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params?.pageSize ?? 20))
-    const where = {
+    const where = withPublicFairDemoExclusion({
       reviewStatus: 'approved',
       publishStatus: 'published',
-    }
+    })
     const skip = (page - 1) * pageSize
     const hasTerminalScope = !!params?.terminalId?.trim()
     const preferredOrgId = await this.resolveCampusPreferredOrgId(params?.terminalId)
@@ -814,7 +829,7 @@ export class JobsService {
 
   async getPublishedFairById(id: string): Promise<SingleResult<FairListItemDto>> {
     const f = await this.prisma.jobFair.findFirst({
-      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
       include: { _count: { select: { companies: true } } },
     })
     return { data: f ? prismaFairToListItem(f) : null, success: true }
@@ -830,7 +845,7 @@ export class JobsService {
    */
   async getPublishedFairDetail(id: string): Promise<FairDetailResponse | null> {
     const f = await this.prisma.jobFair.findFirst({
-      where: { id, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id, reviewStatus: 'approved', publishStatus: 'published' }),
       include: {
         companies: { orderBy: { jobsCount: 'desc' } },
         zones: { orderBy: { sortOrder: 'asc' } },
@@ -856,7 +871,7 @@ export class JobsService {
     pageSize: number,
   ): Promise<{ data: FairCompany[]; total: number; page: number; pageSize: number }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
     })
     if (!fair) return { data: [], total: 0, page, pageSize }
@@ -877,7 +892,7 @@ export class JobsService {
   /** 招聘会子资源 — 单个参展企业详情。需归属该已发布招聘会。 */
   async getFairCompanyById(fairId: string, companyId: string): Promise<{ data: FairCompany | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
     })
     if (!fair) return { data: null }
@@ -891,7 +906,7 @@ export class JobsService {
   /** 招聘会子资源 — 展区列表(sortOrder 升序)。 */
   async getFairZones(fairId: string): Promise<{ data: FairZone[] }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true },
     })
     if (!fair) return { data: [] }
@@ -911,7 +926,7 @@ export class JobsService {
    */
   async getFairMap(fairId: string): Promise<{ data: { mapImageUrl: string | null; zones: FairZone[]; booths: [] } | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       select: { id: true, mapImageUrl: true },
     })
     if (!fair) return { data: null }
@@ -939,7 +954,7 @@ export class JobsService {
    */
   async getFairStats(fairId: string): Promise<{ data: FairStatsDto | null }> {
     const fair = await this.prisma.jobFair.findFirst({
-      where: { id: fairId, reviewStatus: 'approved', publishStatus: 'published' },
+      where: withPublicFairDemoExclusion({ id: fairId, reviewStatus: 'approved', publishStatus: 'published' }),
       include: { companies: { include: { positions: true } } },
     })
     if (!fair) return { data: null }
