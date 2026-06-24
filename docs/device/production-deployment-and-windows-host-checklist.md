@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
+> 最后更新：2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -438,8 +438,35 @@ typecheck（6 包）/ lint（4 端，0 error）/ build（5 包）全绿；verify
 
 .env 隔离 / 无硬编码密钥 / CORS 生产白名单（CORS_ALLOWED_ORIGINS）/ ValidationPipe whitelist+forbidNonWhitelisted / helmet / 全局限流 60/min / 异常过滤器不泄露栈 / 签名 URL TTL 夹紧 ≤30min + 敏感文件小时级清理 + 删除审计 / webhook HMAC+5min 窗+nonce 防重放（timingSafeEqual）/ /me/* 全员 EndUserAuthGuard + endUserId 过滤 / 日志只记元数据、启动日志无密钥。低优建议（非阻塞）：express.json/urlencoded 显式 body limit；如未来新增管理员强删会员端点须带审计。
 
-### G. §三服务器 / §四线上浏览器 / §五 Windows 真机 —— 未验证（阻塞）
+### G. §三服务器 / §四线上浏览器 / §五 Windows 真机 —— 2026-06-13 状态：未验证（阻塞）
+
+> ⚠️ 本节是 2026-06-13 无服务器权限时的记录。2026-06-22 起预生产已部署并推进到 Gate 4 API 级，**最新真实状态见下方「附录二」**，不要再据本节断言「服务器全部未验证」。
 
 - 生产服务器：无服务器/域名/云账号权限 → 全部未验证。需要用户提供：服务器（含 root/部署权限）、域名+证书、生产 PostgreSQL/Redis 实例或安装授权、COS 生产桶。
 - 线上浏览器闭环：无生产域名 → 未验证。本地等价证据：35 项链路中除「线上域名」环境差异外，全部在本地真实后端浏览器验收通过（见 current-progress 各阶段记录）。
 - Windows 真机/Terminal Agent/奔图打印机：无 Windows 真机 → 未验证。Phase 8 封板时已有跨机 E2E 通过记录，但换机/生产 API 对接必须按 §五重新逐项验收。
+
+---
+
+## 附录二：2026-06-24 预生产部署与验收状态对齐
+
+> 口径：本节对齐 `docs/progress/current-progress.md`（2026-06-22 记录）的真实预生产状态，纠正附录 §G「服务器全部未验证」的过期判断。**预生产阶段性验收 ≠ 正式生产就绪**；正文 §二–§八 复选框仍以正式生产 / 真机 / 法务验收为准，本节不改变正文门禁。预生产服务器侧操作由 codex 在主机执行，主工作区 / Claude 不直接 SSH。
+
+### 已达成（预生产，2026-06-21 ~ 2026-06-22）
+
+- 预生产已部署：百度云 `/srv/ai-job-print`，PM2 `ai-job-print-api` online，公网 health 三端返回 `db=postgres`；部署候选已刷新至 `76c06ca8`（AI 导出产物复验候选）。
+- Gate 2（候选部署）PASSED：初始候选包 sha256 校验、API/Kiosk/Admin production build、迁移前 PostgreSQL 备份、仅应用预期 additive migration、API dist hash 匹配；后续部署候选已刷新至 `76c06ca8`。
+- Gate 3（自动命令门禁）PASSED：预生产运行时包通过 `verify:production-runtime-gates` / `verify:production-db-guard` / `verify:file-retention` / `verify:file-lifecycle-summary` / `verify:member-assets-c2d` / `verify:audit-logs` / `verify:resume-generate`；本地整仓通过 `verify:cos-lifecycle-policy`。
+- 预生产 COS 隔离桶切换 PASSED：腾讯云新建隔离预生产 bucket + 预生产专用 CAM 子用户（`strict_nonprod=true`、`prod_label=false`、`ap-guangzhou`）；G3-06 `verify:cos:live` put/head/get/预签名下载/delete 通过，删除后对象不存在。
+- Gate 4（账号 / API 级）PASSED WITH NOTES：受控 MEMBER_A / MEMBER_B / 临时 Admin 经真实 HTTP API + PostgreSQL + Redis + COS 完成会员登录、原始文件上传、默认 90 天、设置 180 天、原始件长期保存拒绝、签名 URL、跨账号 403、删除三态、过期清理、Admin 生命周期汇总；真实 AI 导出产物自动标记 `assetCategory=optimized` + `sourceFileId` 已补 COS/DB 脱敏证据。临时将 `SMS_PROVIDER=log` 执行后已回滚 `tencent`。
+- 临时 HTTPS：30 天自签 + hosts 映射（`kiosk/admin/partner.preprod.local`）可返回 HTTP/2 200 与 `db=postgres` health。
+
+### 仍待完成（正式生产 P0 阻塞，正文 §八 复选框不勾）
+
+- Gate 4 **浏览器截图**补齐（API 级已过，完整截图待补）。
+- **百度 OCR Key 预生产 live**、**AI / TRTC / ASR / TTS 按启用范围 live**（本地已验，预生产 live 待补）。
+- **正式域名 + 正式 HTTPS**（当前仅 30 天临时自签）。
+- **腾讯短信审核**通过后**真实手机号 E2E**（预生产仍 `SMS_PROVIDER=tencent`，真实发送待审核）。
+- **Windows 真机 / Terminal Agent / 奔图打印·扫描 / 断网恢复 / 真实出纸**（§五，需真机）。
+- **法务**用户协议 / 隐私政策审定（§2.3，当前为试运营文本）。
+- **小范围试运营**（§六）未开始。
