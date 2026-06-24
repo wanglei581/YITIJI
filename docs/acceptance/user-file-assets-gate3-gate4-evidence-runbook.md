@@ -1,6 +1,6 @@
 # 用户文件与简历资产 Gate 3/Gate 4 证据执行模板
 
-> 状态：模板 + 当前执行口径；Gate 3 自动命令门禁已通过（含 G3-06 COS live），Gate 4 受控账号/API 级验收已通过，完整浏览器截图证据待补。
+> 状态：模板 + 当前执行口径；Gate 3 自动命令门禁已通过（含 G3-06 COS live），Gate 4 受控账号/API 级验收已通过；真实 AI 导出产物 `optimized/sourceFileId` 链路已在预生产 `76c06ca8` 补 COS/DB 脱敏证据，完整浏览器截图证据待补。
 > 适用基线：Gate 2 预生产刷新完成后，以部署候选 `2187f6a7` 或后续用户确认的替代候选为准。
 > 口径：本文只定义证据编号、日志命名、脱敏规则和停止条件；不得据此宣称生产验收、试运营或 Windows 真机验收完成。
 
@@ -107,7 +107,7 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 - MEMBER_B 越权否定测试成功，脱敏手机号 `138****7032`；跨账号预览和删除均为 403。
 - 原始文件 digest `2b44f637ef7b`：默认 `months_3`，可设置 `months_6`，设置 `long_term` 被 400 拒绝，删除后不可预览。
 - 优化成果夹具 digest `6c4869d21445`：受控上传后通过 DB 夹具标记 `assetCategory=optimized`，再走保存期限 API 设置 `long_term` 成功；这证明预生产规则与资产中心管理能力。
-- 代码侧补充：`codex/file-assets-gate4-browser-ai-output` 已让真实 AI 导出 PDF 写入 `assetCategory=optimized`，并在会员本人已授权 parse 记录可校验时绑定 `sourceFileId`；`verify:resume-generate` 已覆盖长期保存、源文件缺失/越权回退和匿名 system 文件不可长期保存。后续 Gate 4 人工证据仍需在部署后补浏览器截图、签名 URL 过期等待窗口和 COS HEAD/控制台脱敏证据。
+- AI 输出补证：`codex/file-assets-gate4-browser-ai-output` 已部署到预生产 `76c06ca8`，真实 AI 导出 PDF digest `34f964913eec` 写入 `assetCategory=optimized`，`sourceFileDigest=eac31dc38b0c` 且 `sourceMatches=true`；COS HEAD 200，PDF 1 页，导出文件可设置 `long_term`，原始文件仍拒绝 `long_term`，会员 B 访问拒绝；短 TTL 签名 URL 探针 200→403。完整浏览器截图仍待补。
 - 过期清理测试文件 digest `9e14136ea1ee`：清理前确认没有非本轮 active expired 文件，手动 cleanup 删除 1 个测试文件，`long_term` 对照未被删除。
 - Admin 生命周期 API：清理前 `totalActive=3`、`longTermCount=1`、`expiredPendingCleanup=1`；清理后 `totalActive=2`、`longTermCount=1`、`expiredPendingCleanup=0`。临时 Admin 已禁用。
 
@@ -140,9 +140,9 @@ pnpm --filter @ai-job-print/api verify:audit-logs | tee "G3-09-audit-logs-$TS.lo
 
 | 步骤 | 操作 | 证据 ID | 通过标准 |
 | --- | --- | --- | --- |
-| 生成成果物 | 完成简历优化/修改后文件 | G4-05 | 生成 `FILE_A_OUTPUT`，我的文档可见 |
-| 设置长期保存 | 用户确认保存条款后设置长期保存 | G4-05 | `retentionPolicy=long_term`、`expiresAt=null`、consent 字段存在 |
-| 签名 URL 预览 | 预览或下载成果物 | G4-06 | TTL 以预生产实际配置为准且不得超过 30min，过期后不可访问，证据中查询串已脱敏 |
+| 生成成果物 | 完成简历优化/修改后文件 | G4-05 | API/COS 已补：真实 AI 导出文件 digest `34f964913eec`，`assetCategory=optimized`，`sourceMatches=true`，COS HEAD 200；我的文档浏览器截图待补 |
+| 设置长期保存 | 用户确认保存条款后设置长期保存 | G4-05 | API/DB 已补：`retentionPolicy=long_term`、`expiresAt=null`、`consentVersion=file-retention-v1` |
+| 签名 URL 预览 | 预览或下载成果物 | G4-06 | API/COS 已补短 TTL 探针 200→403，证据中未记录查询串；常规浏览器等待窗口截图待补 |
 
 ### 5.3 安全与生命周期
 

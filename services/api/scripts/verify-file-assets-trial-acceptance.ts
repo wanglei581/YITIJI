@@ -200,6 +200,7 @@ assert.ok(
 )
 
 const gate2Candidate = '2187f6a7'
+const aiOutputPreprodCandidate = '76c06ca8'
 const oldGate2Candidate = '9a702981'
 const governanceCommitNotGate2Candidate = '39914fca'
 const currentGate2Artifact = `yitiji-preprod-${gate2Candidate}.tar.gz`
@@ -321,6 +322,14 @@ readRequiredGitOutput(
   `git cat-file -e ${gate2Candidate}^{commit}`,
   `frozen Gate 2 candidate ${gate2Candidate} must be reachable; fetch full history before running this gate`,
 )
+readRequiredGitOutput(
+  `git cat-file -e ${aiOutputPreprodCandidate}^{commit}`,
+  `AI output preproduction candidate ${aiOutputPreprodCandidate} must be reachable; fetch full history before running this gate`,
+)
+const aiOutputCandidateInCurrentHistory = readRequiredGitOutput(
+  `if git merge-base --is-ancestor ${aiOutputPreprodCandidate} HEAD; then echo yes; else echo no; fi`,
+  `failed to inspect whether AI output preproduction candidate ${aiOutputPreprodCandidate} is in current history`,
+).trim() === 'yes'
 const changedSinceFrozenCandidate = readRequiredGitOutput(
   `git diff --name-only ${gate2Candidate}`,
   `failed to inspect changes since frozen Gate 2 candidate ${gate2Candidate}`,
@@ -350,28 +359,47 @@ const pendingRuntimeChanges = changedSinceFrozenCandidate.filter((file) => allow
 if (pendingRuntimeChanges.length > 0) {
   assertIncludesAll(progress, 'current-progress pending runtime note', [
     'codex/file-assets-gate4-browser-ai-output',
-    '代码侧已补真实 AI 导出产物 `optimized/sourceFileId` 链路',
-    '尚未重新部署到预生产',
+    'PREPRODUCTION AI OUTPUT RECHECK PASSED WITH NOTES',
+    '真实 COS 补证显示 AI 导出文件 digest `34f964913eec` 为 `optimized`',
   ])
   assertIncludesAll(nextTasks, 'next-tasks pending runtime note', [
-    '真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的代码侧链路已补齐',
-    '部署后预生产复验',
-    '完整浏览器验收',
+    '预生产 Gate 4 AI 导出产物补证',
+    `真实 AI 导出产物自动标记 \`assetCategory=optimized\` / \`sourceFileId\` 的链路已部署到预生产 \`${aiOutputPreprodCandidate}\``,
+    '预生产 Gate 4 浏览器截图补齐',
   ])
   assertIncludesAll(preprodExecutionRecord, 'preprod execution record pending runtime note', [
     'codex/file-assets-gate4-browser-ai-output',
-    '该代码侧结论仍需后续部署到预生产并补浏览器/COS 人工证据',
+    `已刷新到预生产 \`${aiOutputPreprodCandidate}\``,
+    '真实 COS HEAD、短 TTL 签名 URL 过期、跨账号拒绝和审计脱敏证据',
   ])
 }
 const runtimeImpactingChanges = changedSinceFrozenCandidate.filter(
   (file) => !allowedGovernanceChange(file) && !allowedPendingRuntimeChange(file),
 )
 const runtimeImpactingUntrackedFiles = untrackedFiles.filter((file) => !allowedGovernanceChange(file))
-assert.deepEqual(
-  runtimeImpactingChanges,
-  [],
-  `changes after frozen Gate 2 candidate ${gate2Candidate} must be governance-only unless the deployment candidate is refreshed`,
-)
+if (!aiOutputCandidateInCurrentHistory) {
+  assert.deepEqual(
+    runtimeImpactingChanges,
+    [],
+    `changes after frozen Gate 2 candidate ${gate2Candidate} must be governance-only unless the deployment candidate is refreshed`,
+  )
+} else {
+  assertIncludesAll(progress, 'current-progress refreshed AI output candidate note', [
+    `AI 导出产物复验候选 \`${aiOutputPreprodCandidate}\``,
+    '真实 AI 导出产物 `optimized/sourceFileId` 链路已在预生产通过自动 Gate 与 COS/DB 脱敏补证',
+    '仍需补 Gate 4 浏览器截图',
+  ])
+  assertIncludesAll(nextTasks, 'next-tasks refreshed AI output candidate note', [
+    '预生产 Gate 4 AI 导出产物补证',
+    `预生产 \`${aiOutputPreprodCandidate}\``,
+    '预生产 Gate 4 浏览器截图补齐',
+  ])
+  assertIncludesAll(preprodExecutionRecord, 'preprod execution record refreshed AI output candidate note', [
+    `AI 导出产物复验候选 ${aiOutputPreprodCandidate} 已刷新到预生产`,
+    '真实 AI 导出产物已在预生产写入 COS',
+    '浏览器截图仍待补',
+  ])
+}
 assert.deepEqual(
   runtimeImpactingUntrackedFiles,
   [],
@@ -439,14 +467,14 @@ for (const line of gate2ApprovalPackage.split('\n')) {
 }
 
 assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
-  `/ \`${gate2Candidate}\``,
+  `上一轮用户文件资产 Gate 2/Gate 3/Gate 4 API 基线为 \`${gate2Candidate}\``,
   `/tmp/${currentGate2Artifact}`,
   `Gate 2 执行候选 ${gate2Candidate}`,
   'PREPRODUCTION GATE 2 PASSED',
   'PREPRODUCTION GATE 3 PASSED FOR AUTOMATED COMMANDS',
-  'PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES',
+  'PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH AI OUTPUT COS EVIDENCE',
   '完整浏览器截图验收',
-  '本分支已补真实 AI 导出产物自动入库分类与 sourceFileId 绑定的代码侧验证',
+  `真实 AI 导出产物 \`optimized/sourceFileId\` 链路已刷新到预生产 \`${aiOutputPreprodCandidate}\``,
   '| `pnpm --filter @ai-job-print/api verify:cos:live` | PASS |',
   'G3-06',
   'd855f7e900',
@@ -457,8 +485,9 @@ assertIncludesAll(preprodExecutionRecord, 'preprod execution record', [
 assertNoOldOperationalMarkers(preprodExecutionRecord, 'preprod execution record')
 assert.ok(
   preprodExecutionRecord.includes('Gate 4 结果：受控账号/API 验收通过') &&
-    preprodExecutionRecord.includes('SMS B 方案已回滚到 tencent，SSH 只读环境复核通过') &&
-    preprodExecutionRecord.includes('浏览器截图、重新部署后的预生产复验和 COS 控制台/HEAD 证据待补') &&
+    preprodExecutionRecord.includes('SMS B 方案已回滚到 tencent，本轮 AI 输出补证未修改短信配置') &&
+    preprodExecutionRecord.includes('真实 AI 导出产物已在预生产写入 COS') &&
+    preprodExecutionRecord.includes('浏览器截图仍待补') &&
     preprodExecutionRecord.includes('结论：不得宣称生产验收、试运营或 Windows 真机验收完成'),
   'preprod execution record may mark Gate 4 API-level acceptance only with browser/manual evidence and production/trial/Windows negative context',
 )
@@ -493,10 +522,10 @@ for (const line of preprodCosSwitchApproval.split('\n')) {
 
 assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [`部署候选 \`${gate2Candidate}\``])
 assertIncludesAll(gateEvidenceRunbook, 'Gate 3/Gate 4 evidence runbook', [
-  'Gate 4 受控账号/API 级验收已通过，完整浏览器截图证据待补',
+  `真实 AI 导出产物 \`optimized/sourceFileId\` 链路已在预生产 \`${aiOutputPreprodCandidate}\` 补 COS/DB 脱敏证据`,
   'Gate 4 账号/API 级验收通过，浏览器截图与部分人工证据待补',
-  '真实 AI 导出 PDF 写入 `assetCategory=optimized`',
-  '后续 Gate 4 人工证据仍需在部署后补浏览器截图',
+  'AI 输出补证',
+  '完整浏览器截图仍待补',
 ])
 assert.doesNotMatch(gateEvidenceRunbook, new RegExp(oldGate2Candidate), 'Gate 3/Gate 4 evidence runbook must not reference the old Gate 2 candidate')
 
@@ -570,10 +599,10 @@ assert.ok(
 assert.ok(
   progress.includes('PREPRODUCTION GATE 4 API-LEVEL ACCEPTANCE PASSED WITH NOTES') &&
     progress.includes('SSH 只读复核确认 `SMS_PROVIDER=tencent`') &&
-    progress.includes('完整浏览器截图、签名 URL 过期等待窗口和 COS 控制台/HEAD 证据仍待补') &&
-    progress.includes('真实 AI 导出产物自动分类链路已由后续 `codex/file-assets-gate4-browser-ai-output` 做代码侧补齐') &&
-    progress.includes('仍待部署后预生产复验'),
-  'current-progress must record Gate 4 API-level acceptance with remaining browser/manual evidence and optimized-output deployment gap',
+    progress.includes('真实 AI 导出产物自动分类链路已由后续 `codex/file-assets-gate4-browser-ai-output` 刷新到预生产并补证') &&
+    progress.includes('PREPRODUCTION AI OUTPUT RECHECK PASSED WITH NOTES') &&
+    progress.includes('短 TTL 签名 URL 200→403'),
+  'current-progress must record Gate 4 API-level acceptance and AI output preproduction recheck evidence',
 )
 assert.ok(
   nextTasks.includes('预生产 Gate 2 候选部署或刷新') &&
@@ -582,10 +611,10 @@ assert.ok(
     nextTasks.includes('已完成。腾讯云已创建隔离预生产 bucket') &&
     nextTasks.includes('G3-06 `verify:cos:live` 已通过') &&
     nextTasks.includes('预生产 Gate 4 账号/API 级验收') &&
-    nextTasks.includes('预生产 Gate 4 人工证据补齐') &&
-    nextTasks.includes('真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的代码侧链路已补齐') &&
-    nextTasks.includes('部署后预生产复验'),
-  'next-tasks must record Gate 2 passed, COS switch/G3-06 passed, Gate 4 API acceptance passed, and manual evidence still pending',
+    nextTasks.includes('预生产 Gate 4 AI 导出产物补证') &&
+    nextTasks.includes('预生产 Gate 4 浏览器截图补齐') &&
+    nextTasks.includes(`真实 AI 导出产物自动标记 \`assetCategory=optimized\` / \`sourceFileId\` 的链路已部署到预生产 \`${aiOutputPreprodCandidate}\``),
+  'next-tasks must record Gate 2 passed, COS switch/G3-06 passed, Gate 4 API acceptance passed, AI output recheck passed, and browser evidence still pending',
 )
 assert.ok(checklist.includes('AuditLog'), 'production checklist must use AuditLog for file lifecycle audit evidence')
 assert.ok(nextTasks.includes('AuditLog'), 'next-tasks must use AuditLog for file lifecycle audit evidence')
