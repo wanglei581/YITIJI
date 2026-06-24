@@ -136,7 +136,9 @@ VITE_API_BASE_URL=/api/v1
 # kiosk 默认启用 AI 助手数字人。缺少 VITE_USE_TRTC_CALL=true 时，生产构建会直接失败，
 # 避免 /assistant 未启用数字人通话入口后线上静默回落文字助手。
 VITE_USE_TRTC_CALL=true
-# kiosk 可选：VITE_TERMINAL_ID=<注册后的 terminalId>、VITE_KIOSK_LOGOUT_IDLE_SEC=180
+# 启用数字人时必须提供真实终端 ID，通话 session/stop 会作为 X-Terminal-Id 发给 API。
+VITE_TERMINAL_ID="<注册后的 terminalId>"
+# kiosk 可选：VITE_KIOSK_LOGOUT_IDLE_SEC=180
 # 如本次部署明确只上线文字助手，必须显式设置：
 # VITE_ALLOW_TEXT_ONLY_ASSISTANT=true
 ```
@@ -156,6 +158,21 @@ pnpm --filter @ai-job-print/api db:pg:generate
 pnpm typecheck      # 6 包
 pnpm lint           # 4 端
 pnpm build          # 5 包（pnpm -r --if-present build）
+
+# Kiosk 数字人生产构建后必须跑专项守卫。
+# 它会检查 VITE_API_MODE、VITE_API_BASE_URL、VITE_USE_TRTC_CALL、
+# VITE_TERMINAL_ID，以及 dist 内 AiAdvisorCall / TRTC chunk 是否存在。
+VITE_API_MODE=http \
+VITE_API_BASE_URL=/api/v1 \
+VITE_USE_TRTC_CALL=true \
+VITE_TERMINAL_ID="<注册后的 terminalId>" \
+pnpm build:kiosk:production
+
+# 如本次部署明确只上线文字助手，使用显式 text-only 守卫路径：
+VITE_API_MODE=http \
+VITE_API_BASE_URL=/api/v1 \
+VITE_ALLOW_TEXT_ONLY_ASSISTANT=true \
+pnpm build:kiosk:production
 ```
 
 产物：

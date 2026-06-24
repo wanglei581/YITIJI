@@ -11,6 +11,7 @@
     "dev:kiosk": "pnpm --filter ./apps/kiosk dev",
     "dev:admin": "pnpm --filter ./apps/admin dev",
     "dev:partner": "pnpm --filter ./apps/partner dev",
+    "build:kiosk:production": "pnpm --filter @ai-job-print/kiosk build && pnpm --filter @ai-job-print/kiosk verify:prod-build-config",
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
