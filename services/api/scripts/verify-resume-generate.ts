@@ -10,8 +10,8 @@
  *   6.  持久化+令牌:kind='generate' 落库;匿名铸一次性 accessToken(响应仅一次,DB 只存 hash);
  *       正确 token 可读,错 token / 无 token → AI_TASK_NOT_FOUND;payloadJson 不含明文 token。
  *   7.  PDF 导出:pdfkit 渲染真实 PDF(%PDF 魔数,页数≥1,中文字体内嵌);
- *       FileObject purpose='resume_upload'、sensitiveLevel='sensitive'(短 TTL 自动清理);
- *       文件名不含手机号;签名 URL 含 expires/sig 参数。
+ *       匿名导出保持短期保存;会员确认版导出写入 optimized/sourceFileId,
+ *       可按保存策略延长至长期;文件名不含手机号;签名 URL 含 expires/sig 参数。
  *   8.  mock provider:同一防编造契约(事实字段逐字复制)。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:resume-generate
@@ -246,9 +246,12 @@ async function main(): Promise<void> {
     }
     const fileRow = await prisma.fileObject.findUnique({ where: { id: exported.fileId } })
     if (!fileRow) fail('7. FileObject 未落库')
-    // 既有策略:resume_upload → highly_sensitive(1h TTL);敏感级别只能更严不能更松
+    // 匿名导出无会员归属,仍走 system_short 短期保存;会员导出在 7b 覆盖账号资产策略。
     if (fileRow.purpose !== 'resume_upload' || !['sensitive', 'highly_sensitive'].includes(fileRow.sensitiveLevel)) {
       fail(`7. purpose/sensitiveLevel 错误: ${fileRow.purpose}/${fileRow.sensitiveLevel}`)
+    }
+    if (fileRow.retentionPolicy !== 'system_short') {
+      fail(`7. 匿名导出应保持 system_short,实际 ${fileRow.retentionPolicy}`)
     }
     const ttlMs = fileRow.expiresAt.getTime() - Date.now()
     if (ttlMs <= 0 || ttlMs > 24 * 60 * 60 * 1000) fail(`7. 敏感文件 TTL 异常: ${Math.round(ttlMs / 3600_000)}h`)

@@ -119,7 +119,7 @@ expiresAt / deletedAt / deletedBy / deleteReason / createdAt / updatedAt`
   - 合作机构（partner）只能访问本机构（`ownerType=partner && ownerId=orgId`）文件，**绝不能访问用户简历**。
   - 管理员可访问任意文件，但访问用户文件会写 `file.admin_access` 审计（CLAUDE.md §11）。
 - 上传强制校验：`purpose` × MIME 白名单、扩展名与 MIME 一致、大小上限、登录身份 / 机构 / 角色。
-- 文件 URL 全部短期签名；敏感文件（简历 1h / 身份证 1h）到期 cron 清理；删除物理回收 + 留删除日志。
+- 文件 URL 全部短期签名；证件/匿名/system_short 文件按 1h/6h/24h 分级短期清理；登录会员原始简历/求职材料按 90 天/180 天保存策略清理，优化后或派生成果物可由用户确认后长期保存；删除物理回收 + 留删除日志。
 - 前端不出现 `SecretId` / `SecretKey`；前端只读 `signedUrl` / `uploadUrl`。
 
 ---

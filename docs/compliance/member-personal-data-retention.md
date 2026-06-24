@@ -11,7 +11,9 @@
 | 短信验证码 | Redis `member:sms:code:*` | 5 分钟 | 验证成功、超限或 TTL 到期删除 | 不返回前端；生产环境禁止日志短信通道 |
 | 会员会话 | Redis `member:session:*` + JWT `jti` | 30 分钟 | 登出、账号禁用、Redis TTL 到期删除 | token 只存 Kiosk React 内存，不写浏览器存储 |
 | 手机号身份 | PostgreSQL / SQLite `EndUser.phoneHash`、`phoneEnc` | 账号存在期间 | 账号治理流程处理；页面只展示脱敏手机号 | 不保存手机号明文字段 |
-| 我的简历 / 文档文件 | 私有对象存储 + `FileObject` | normal 24 小时、sensitive 6 小时、高敏文件 1 小时 | 文件 TTL 清理；本人可删除；删除动作留审计 | 签名 URL 访问，不暴露对象存储真实地址 |
+| 未登录 / 匿名 / 系统短期文件 | 私有对象存储 + `FileObject(retentionPolicy=system_short)` | normal 24 小时、sensitive 6 小时、高敏文件 1 小时 | 到期按 `expiresAt` 物理删除；本人或管理员可触发删除；删除动作留审计 | 仅用于本次服务、证件/临时/系统处理等短期场景，不进入会员长期资产 |
+| 登录会员原始简历 / 原始求职材料 | 私有对象存储 + `FileObject(retentionPolicy=months_3/months_6)` | 默认 90 天 | 本人可延长至 180 天或主动删除；到期按 `expiresAt` 物理删除；删除动作留审计 | 原始文件首批不开放长期保存；签名 URL 访问，不暴露对象存储真实地址 |
+| 登录会员优化后简历 / AI 派生成果物 | 私有对象存储 + `FileObject(retentionPolicy=months_3/months_6/long_term)` | 默认 90 天 | 本人确认保存条款后可延长至 180 天或长期保存；长期保存为 `expiresAt = null`；本人可删除 | 只服务本人查看、下载、打印，不向企业或合作机构提供 |
 | 签名 URL | HMAC / COS 预签名 URL | 不超过 30 分钟 | URL 到期失效 | 仅本人 token 换取，不在列表接口直接返回长期链接 |
 | AI 简历结果 | `AiResumeResult` | 默认 24 小时 | 到期 cron 硬删；本人可删除关联记录 | 不长期保存简历派生文本 |
 | 模拟面试记录 | `MockInterviewSession` / `MockInterviewReport` | 匿名 2 小时；会员模拟面试 7 天 | 到期 cron 硬删；本人可删除 | 报告原文不写日志，不进入审计 payload |
