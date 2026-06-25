@@ -85,11 +85,12 @@
 | 2026-06-25 | `codex/partner-org-self-verify` / `ba7d0fdb` | 完成 `origin/feature/sprint1-partner-dashboard` 剩余价值收口：旧 Admin alerts 持久化表因无生产告警生产器不迁，旧 Partner profile 因扩大机构自助改名 / 信用代码等权限不迁，旧 Partner dashboard 因主线已有更完整真实聚合不迁；#98 已 rebase merge 到 `main`，新增当前主线形态的 `verify:partner-org-self`，锁住 Partner 资料自助 allowlist、机构隔离、dashboard 真实聚合和无伪指标边界。 |
 | 2026-06-25 | `codex/final-inventory-doc-sync` / 本分支 | 同步阶段性只读盘点事实：`main == origin/main == ba7d0fdb`，worktree 只剩主仓，远程 head 只剩 `origin/main`，旧 Sprint1 订单 / Partner dashboard 远程候选与 #98 过渡分支均已清理；当时仅保留 `feature/interview-setup-redesign` 与 `backup/interview-b65d6e48` 两个本地面试候选，后续已由 #100 和最终清理完成收口。 |
 | 2026-06-25 | `codex/remove-interview-setup-preview` / 本分支 | 清理模拟面试旧布局预览页：删除仅用于确认排版且不调用后端的 `/interview/setup-preview` 与 `InterviewSetupPreviewPage.tsx`，保留正式 `/interview/setup` 真实创建面试、简历上传、合规提示和会话启动链路。 |
-| 2026-06-25 | `codex/final-clean-state-doc-sync` / 本分支 | 同步 #100 合入后的最终清理事实：`main == origin/main == 4e574dee`；本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；旧面试重设计本地候选、备份分支、本地 `keep/b65d6e48` tag、#100 过渡分支和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录均已清理，运行时代码无 `setup-preview` 残留。 |
+| 2026-06-25 | `codex/final-clean-state-doc-sync` / `8c2f2b78` | 同步 #100 / #101 合入后的最终清理事实：#100 清理旧面试预览页的 rebase merge 提交为 `4e574dee`，#101 文档完成态同步提交为 `8c2f2b78`；本地分支、远程 head、worktree 在过渡分支清理后均只剩 `main` / 主仓；旧面试重设计本地候选、备份分支、本地 `keep/b65d6e48` tag、#100 过渡分支和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录均已清理，运行时代码无 `setup-preview` 残留。 |
+| 2026-06-25 | `codex/final-clean-state-sha-wording` / 本分支 | 修正最终清理文档的 SHA 表述：历史合并 SHA 保留为历史事实，live 当前 `main == origin/main` 不再写死具体 tip，避免文档同步提交自身改变当前 tip 后产生过期表述。 |
 
 ## 当前工作区事实
 
-主工作区：`/Users/wanglei/AI求职打印服务终端`。当前 `main == origin/main == 4e574dee`，工作区干净，worktree 只剩主仓；远程 head 只剩 `origin/main`。本 docs 分支合入并清理后，本地分支也只剩 `main`。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以任何旧落后分叉作为治理基线。
+主工作区：`/Users/wanglei/AI求职打印服务终端`。当前 `main == origin/main`（具体 tip 以 `git rev-parse main` / `git rev-parse origin/main` 为准），工作区干净，worktree 只剩主仓；远程 head 只剩 `origin/main`。本 docs 分支合入并清理后，本地分支也只剩 `main`。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以任何旧落后分叉作为治理基线。
 
 当前特殊 worktree / 分支边界：
 
