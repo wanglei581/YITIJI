@@ -32,6 +32,7 @@
     "verify:feedback-notifications": "node -r @swc-node/register scripts/verify-feedback-notifications.ts",
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
+    "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",
     "verify:audit-logs": "node -r @swc-node/register scripts/verify-audit-logs.ts",

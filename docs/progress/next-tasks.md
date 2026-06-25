@@ -20,7 +20,10 @@
 
 - [x] **QR 登录候选合入与旧 worktree 清理**：#91 已通过 rebase merge 合入 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 的本地 / 远程 head 也已清理。
 - [x] **订单模型候选选择性迁入**：已从干净 `main` 另起 `codex/order-model-foundation`，仅迁入订单底座、打印任务创建时的未支付订单记录、Terminal 状态镜像、SQLite/PostgreSQL additive migration 和 `verify:order` 门禁；不迁 PaymentAttempt / Refund / Partner dashboard / 旧 Sprint1 顶层栈。源远程候选待本分支 PR/CI/合并后再清理。
-- [ ] **Partner dashboard 候选拆分**：在订单模型底座合并后，拆分审查 `origin/feature/sprint1-partner-dashboard` 中 Admin orders / alerts、Partner profile / dashboard 的可迁移价值；禁止整分支合并。
+- [x] **Admin 订单只读补齐**：已从 `origin/feature/sprint1-partner-dashboard` 选择性提取订单只读价值，补齐 `GET /admin/orders` / `GET /admin/orders/:id` 与 Admin `/orders` 只读列表 / 详情；不迁标记支付、退款、改状态等旧写操作。
+- [ ] **Admin alerts 候选取舍**：继续只读审查旧候选中的 `Alert` / 告警处理流转；未确认真实告警生产器、运营闭环和权限边界前，不迁数据库模型或处理按钮。
+- [ ] **Partner dashboard / profile 候选取舍**：继续只读审查旧候选中的 Partner 首页摘要和机构资料方案；只迁真实缺口，不迁会扩大机构自助改名、统一社会信用代码、权限边界的旧 profile 写操作。
+- [ ] **Sprint1 顶层旧栈最终清理**：Admin orders / alerts、Partner dashboard / profile 全部完成取舍后，再决定是否删除 `origin/feature/sprint1-partner-dashboard`；禁止整分支合并。
 - [ ] **面试重设计候选取舍**：对比当前 `main` 面试页与 `feature/interview-setup-redesign` / `backup/interview-b65d6e48`，决定迁移具体 UI 思路或放弃旧分叉；未完成前保留备份。
 - [ ] **最终清理**：仅在上述取舍完成并有证据后，删除已放弃的本地分支 / worktree / 远程候选；不得执行 `prune` / `gc`。
 
