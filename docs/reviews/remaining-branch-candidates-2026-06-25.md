@@ -4,7 +4,7 @@
 
 ## 复核基线
 
-- 主线：`main == origin/main == 04d71160`
+- 主线：`main == origin/main`（具体 tip 以 `git rev-parse HEAD` / `git rev-parse origin/main` 为准）
 - 当前开放 PR：0
 - 本地分支：3 个（`main`、`feature/interview-setup-redesign`、`backup/interview-b65d6e48`）
 - worktree：1 个（主仓）
