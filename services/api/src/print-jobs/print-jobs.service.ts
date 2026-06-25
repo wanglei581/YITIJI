@@ -70,6 +70,16 @@ function parseAndVerifySignedFileUrl(fileUrl: string): string | null {
   return verifyFileSignature(fileId, expires, sig) ? fileId : null
 }
 
+/** 生成打印运营订单号:ORD-YYYYMMDD-XXXXXXXXXX。唯一索引负责最终防撞。 */
+function makeOrderNo(): string {
+  const now = new Date()
+  const yyyy = now.getFullYear()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  const suffix = crypto.randomBytes(5).toString('hex').toUpperCase()
+  return `ORD-${yyyy}${mm}${dd}-${suffix}`
+}
+
 @Injectable()
 export class PrintJobsService {
   constructor(
@@ -107,16 +117,32 @@ export class PrintJobsService {
       ...(dto.fileName ? { fileName: dto.fileName } : {}),
     }
 
-    const task = await this.prisma.printTask.create({
-      data: {
-        id:         taskId,
-        fileUrl:    storedFileUrl,
-        endUserId:  ctx.endUserId ?? null,
-        // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
-        fileMd5:    dto.fileMd5 ?? '',
-        paramsJson: JSON.stringify(storedParams),
-        status:     'pending',
-      },
+    const orderNo = makeOrderNo()
+    const { task, order } = await this.prisma.$transaction(async (tx) => {
+      const task = await tx.printTask.create({
+        data: {
+          id:         taskId,
+          fileUrl:    storedFileUrl,
+          endUserId:  ctx.endUserId ?? null,
+          // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
+          fileMd5:    dto.fileMd5 ?? '',
+          paramsJson: JSON.stringify(storedParams),
+          status:     'pending',
+        },
+      })
+      const order = await tx.order.create({
+        data: {
+          orderNo,
+          type:        'print',
+          printTaskId: task.id,
+          endUserId:   ctx.endUserId ?? null,
+          // 当前未接真实报价/支付;不伪造页数或金额。
+          amountCents: 0,
+          payStatus:   'unpaid',
+          taskStatus:  task.status,
+        },
+      })
+      return { task, order }
     })
 
     // HIGH-3 (审计)：记录打印任务创建。actor 为匿名 Kiosk（无登录态），
@@ -133,6 +159,8 @@ export class PrintJobsService {
         hasFileHash: Boolean(dto.fileMd5),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
+        orderId:     order.id,
+        orderNo:     order.orderNo,
       },
       ipAddress: ctx.ipAddress ?? null,
       userAgent: ctx.userAgent ?? null,

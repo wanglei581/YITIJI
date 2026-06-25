@@ -365,7 +365,7 @@ export class TerminalsService implements OnModuleInit {
         // status guard in WHERE prevents double-claim under concurrent requests
         // (PostgreSQL READ COMMITTED: two transactions could both see the same
         // pending task in findFirst; the guard ensures only one update wins)
-        return tx.printTask.update({
+        const updatedTask = await tx.printTask.update({
           where: { id: task.id, status: 'pending' },
           data: {
             status: 'claimed',
@@ -374,6 +374,11 @@ export class TerminalsService implements OnModuleInit {
             claimExpiry,
           },
         })
+        await tx.order.updateMany({
+          where: { printTaskId: task.id },
+          data: { taskStatus: 'claimed', terminalId },
+        })
+        return updatedTask
       })
 
       if (!claimed) break
@@ -475,6 +480,10 @@ export class TerminalsService implements OnModuleInit {
             errorCode: dto.errorCode ?? null,
           },
         })
+        await tx.order.updateMany({
+          where: { printTaskId: taskId },
+          data: { taskStatus: dto.status },
+        })
       }
     })
 
@@ -530,20 +539,44 @@ export class TerminalsService implements OnModuleInit {
 
   private async resetExpiredClaims(): Promise<void> {
     const now = new Date()
-
-    // Reset claimed tasks whose lease has expired
-    const claimedCount = await this.prisma.printTask.updateMany({
-      where: { status: 'claimed', claimExpiry: { lt: now } },
-      data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
-    })
-
-    // Reset printing tasks stuck for more than 10 minutes (agent crash recovery).
-    // claimedAt is the best proxy — a task transitions from claimed to printing
-    // shortly after being claimed, so claimedAt is a conservative lower bound.
     const printingTimeout = new Date(now.getTime() - 10 * 60 * 1000)
-    const printingCount = await this.prisma.printTask.updateMany({
-      where: { status: 'printing', claimedAt: { lt: printingTimeout } },
-      data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
+
+    const { claimedCount, printingCount } = await this.prisma.$transaction(async (tx) => {
+      const expiredClaimed = await tx.printTask.findMany({
+        where: { status: 'claimed', claimExpiry: { lt: now } },
+        select: { id: true },
+      })
+      const expiredPrinting = await tx.printTask.findMany({
+        where: { status: 'printing', claimedAt: { lt: printingTimeout } },
+        select: { id: true },
+      })
+
+      // Reset claimed tasks whose lease has expired.
+      const claimedCount = await tx.printTask.updateMany({
+        where: { status: 'claimed', claimExpiry: { lt: now } },
+        data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
+      })
+
+      // Reset printing tasks stuck for more than 10 minutes (agent crash recovery).
+      // claimedAt is the best proxy — a task transitions from claimed to printing
+      // shortly after being claimed, so claimedAt is a conservative lower bound.
+      const printingCount = await tx.printTask.updateMany({
+        where: { status: 'printing', claimedAt: { lt: printingTimeout } },
+        data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
+      })
+
+      const resetIds = [...expiredClaimed, ...expiredPrinting].map((task) => task.id)
+      if (resetIds.length > 0) {
+        await tx.order.updateMany({
+          where: {
+            printTaskId: { in: resetIds },
+            printTask: { is: { status: 'pending', terminalId: null } },
+          },
+          data: { taskStatus: 'pending', terminalId: null },
+        })
+      }
+
+      return { claimedCount, printingCount }
     })
 
     const total = claimedCount.count + printingCount.count
