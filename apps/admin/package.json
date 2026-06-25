@@ -9,6 +9,7 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "verify:admin-file-lifecycle-ui": "node scripts/verify-admin-file-lifecycle.mjs",
+    "verify:admin-orders-readonly-ui": "node scripts/verify-admin-orders-readonly-ui.mjs",
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
