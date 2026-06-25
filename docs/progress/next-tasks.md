@@ -14,7 +14,7 @@
 - [x] **T3 E 类本地工具落地**：已抽取 `.product-pm/prd/print-material-pack.md` 与 `.superpowers` HTML 预览摘要，并写入根路径锚定 ignore 规则；不删除本地文件。
 - [x] **T4 C 类任务证据筛选**：已输出任务证据筛选报告；只登记高价值摘要、脱敏规则和后续任务，不提交原始 `.ccg/tasks` 包。
 - [x] **T5 D 类外部材料索引**：已输出外部材料索引报告；只登记 Markdown 转正候选、PDF/二进制外部归档规则、OPC 输出处置，不提交原始外部材料。
-- [x] **剩余候选分支定级**：已输出 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单与 Sprint1 Partner dashboard 远程候选均已完成迁移 / 取舍 / 清理，当前只剩面试重设计本地候选与备份候选。
+- [x] **剩余候选分支定级**：已输出并更新 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单、Sprint1 Partner dashboard、面试重设计本地候选与备份候选均已完成迁移 / 取舍 / 清理，当前无剩余本地或远程候选分支。
 
 ## P0：剩余分支 / worktree 收口
 
@@ -24,8 +24,8 @@
 - [x] **Admin alerts 候选取舍**：已完成 Codex + Claude 只读复核；当前 `main` 的实时派生告警已有真实数据源和 `verify:admin-ops`，旧候选的持久化 `Alert` 表只有 dev seed、无生产告警生产器，故不迁数据库模型或处理按钮。
 - [x] **Partner dashboard / profile 候选取舍**：已完成 Codex + Claude 只读复核；旧 profile 会扩大 Partner 自助改名、信用代码等权限，旧 dashboard 已被主线含政策统计的真实聚合取代；本分支仅新增当前主线形态的 `verify:partner-org-self` 锁住资料 allowlist、机构隔离、真实聚合和无伪指标边界。
 - [x] **Sprint1 顶层旧栈最终清理**：`origin/feature/sprint1-partner-dashboard` 的订单、Admin orders、Admin alerts、Partner profile/dashboard 价值均已完成取舍；#98 已 rebase merge 到 `main`，旧远程 head 已删除。未整分支合并，未执行 `prune` / `gc`。
-- [ ] **面试重设计候选取舍**：对比当前 `main` 面试页与 `feature/interview-setup-redesign` / `backup/interview-b65d6e48`，决定迁移具体 UI 思路或放弃旧分叉；未完成前保留备份。
-- [ ] **最终清理**：面试重设计候选取舍完成并有证据后，再删除已放弃的本地分支；当前无额外 worktree、无远程候选 head。不得执行 `prune` / `gc`。
+- [x] **面试重设计候选取舍**：已完成只读深审并由 #100 收口唯一可迁移的旧 `/interview/setup-preview` 清理点；正式 `/interview/setup` 真实链路保留，旧分叉本体不迁，fair verify residue guard 已由当前 `main` 更新版覆盖。
+- [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
 
 ## P0：上线前真实验收
 
