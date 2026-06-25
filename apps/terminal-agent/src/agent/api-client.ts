@@ -14,8 +14,17 @@
  *   - Callers must not log full request/response objects.
  */
 
-import axios, { AxiosInstance, AxiosError } from 'axios'
+import http from 'http'
+import https from 'https'
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios'
 import { warn } from '../logger'
+
+export function createDirectHttpAgents(): Pick<AxiosRequestConfig, 'httpAgent' | 'httpsAgent'> {
+  return {
+    httpAgent: new http.Agent({ keepAlive: false }),
+    httpsAgent: new https.Agent({ keepAlive: false }),
+  }
+}
 
 /**
  * Create an authenticated Axios instance.
@@ -41,8 +50,12 @@ export function createApiClient(
     // system http_proxy env variable (e.g. Clash / v2ray local proxy at
     // 127.0.0.1:xxxx) and routes all API requests through it, causing timeouts.
     proxy: false,
+    // Do not keep sockets alive across requests. This prevents the agent from
+    // reusing a stale connection after the local proxy / network route changes.
+    ...createDirectHttpAgents(),
     headers: {
       'Content-Type': 'application/json',
+      'Connection': 'close',
       ...headers,
     },
   })
