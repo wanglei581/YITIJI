@@ -135,6 +135,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:jobfair-review
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:jobfair-campus-priority
+          pnpm --filter @ai-job-print/api verify:public-fair-demo-guard
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:fair-info-fields
           pnpm --filter @ai-job-print/api verify:fair-company-positions
