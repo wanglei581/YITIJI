@@ -76,16 +76,18 @@
 | 2026-06-22 | `codex/file-assets-gate4-browser-ai-output` / 本分支 | PREPRODUCTION AI OUTPUT RECHECK PASSED WITH NOTES：用户确认后已将预生产从 `2187f6a7` 刷新到 AI 导出产物候选 `76c06ca8`；候选包 sha256 校验、API/Kiosk/Admin build、PostgreSQL 备份、无 pending migration、PM2 重启和 health 均通过。预生产缺少中文字体导致 `verify:resume-generate` 初次失败，已安装 `fonts-wqy-microhei` 并配置 `RESUME_PDF_FONT_PATH` / `RESUME_PDF_FONT_FAMILY=WenQuanYiMicroHei` 后复跑通过。自动 Gate 通过 `verify:production-runtime-gates`、`verify:production-db-guard`、`verify:resume-generate`、`verify:file-retention`；真实 COS 补证显示 AI 导出文件 digest `34f964913eec` 为 `optimized`，`sourceMatches=true`，COS HEAD 200，短 TTL 签名 URL 200→403，会员 B 拒绝访问，审计写入存在。完整浏览器截图、正式生产、Windows 真机和试运营仍未完成。 |
 | 2026-06-24 | `docs/real-resume-diagnosis-phase1-refresh` / 本分支 | 从旧远程分支 `origin/docs/real-resume-diagnosis-phase1` 提取仍有价值的真实 AI 简历诊断 Phase 1 设计目标，并按当前 `main` 已落地实现重写为 `docs/product/real-resume-diagnosis-phase1.md`；不迁回旧 job fair / smart campus 运行时代码，不回写旧进度条目。 |
 | 2026-06-25 | `codex/standardization-execution-guidance` / 本分支 | 固化后续规范化治理启动口径：默认从干净 `main` 新建独立分支推进，旧分支只允许选择性提取已复核价值，不直接复活落后旧分叉；旧 worktree / 旧分支清理前必须只读盘点并保护仍有价值的候选功能分支。 |
+| 2026-06-25 | `codex/standardization-cleanup-state` / 本分支 | 同步分支 / worktree 治理收口后的当前事实：主线保持干净，已清理可证实冗余的远程历史分支；保留 QR 登录、面试重设计、订单模型、Sprint1 顶层旧栈和专家审查小候选，后续只能从干净 `main` 新分支选择性迁移。 |
 
 ## 当前工作区事实
 
-主工作区：`/Users/wanglei/AI求职打印服务终端`。当前治理同步分支从 `main` / `origin/main` 一致基线 `e9709717` 切出；后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以旧 `feature/interview-setup-redesign` 等落后分叉作为治理基线。
+主工作区：`/Users/wanglei/AI求职打印服务终端`。当前治理收口后的主线基线为 `main` / `origin/main` 一致提交 `2d848bc9`；主工作区保持 clean，当前无打开 PR。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以旧 `feature/interview-setup-redesign` 等落后分叉作为治理基线。
 
 当前仍保留的特殊 worktree / 分支边界：
 
-- `codex/p0-production-ci-gates`：生产候选 / 门禁相关分支，未授权前只读保留。
-- `codex/qr-ticket-login`：仍有未收口改动的候选功能 worktree，禁止顺手清理；需要另行深审后决定迁移、拆分或废弃。
-- 其余旧 worktree / 分支清理前均需先确认工作区干净、内容已被 `main` 覆盖或价值已迁移，并单独记录清理范围。
+- `codex/qr-ticket-login`：仍有未收口改动的候选功能 worktree，禁止顺手清理。主线已具备 terminal-bound QR 登录后端；旧 worktree 的前端 UI 只能作为迁移参考，必须另起安全设计接入终端鉴权，不能直接复活旧后端实现。
+- `feature/interview-setup-redesign` / `backup/interview-b65d6e48`：本地候选分支仍保留；前者涉及面试页重设计产品取舍，后者涉及 fair verify residue 候选验证。未确认迁移或明确放弃前不得删除。
+- 真实远程候选 head 仅保留 `fix/expert-audit-stage-a`、`feature/sprint1-order-model`、`feature/sprint1-partner-dashboard` 和 `main`：分别对应专家审查小修候选、订单 / 支付域基础候选、Sprint1 顶层旧栈候选和主线。旧远程中间分支已清理，后续迁移必须从干净 `main` 单独提取最小价值。
+- 本地可能仍存在已删除远程分支的 stale remote-tracking ref；未授权前不得用 `git remote prune` / `git gc` 清理。
 
 ## 主工作区高价值新增结论（待后续按证据迁入）
 
