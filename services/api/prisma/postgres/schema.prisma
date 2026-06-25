@@ -62,6 +62,7 @@ model PrintTask {
   updatedAt    DateTime  @updatedAt
 
   statusLogs PrintTaskStatusLog[]
+  order      Order?
 
   @@index([endUserId])
 }
@@ -89,6 +90,50 @@ model PrintTaskStatusLog {
   toStatus   String
   errorCode  String?
   createdAt  DateTime  @default(now())
+}
+
+// ── Order ───────────────────────────────────────────────────────────────────
+// 打印运营订单。承载 PrintTask 无法承载的金额、支付状态和运营订单号,
+// 与设备任务层(PrintTask)解耦。
+//
+// 合规与产品边界:
+//   - 这是线下打印运营订单,不是招聘业务,不涉及投递/收简历/候选人推荐闭环。
+//   - 当前不接真实支付:payStatus 默认 unpaid,amountCents 默认 0。
+//   - taskStatus 镜像 PrintTask.status,便于 Admin 后续订单页读取;真相源仍是 PrintTask。
+//
+// type:       print | scan | photo | ai(后续预留)
+// payStatus:  unpaid | paid | refunded | failed(当前默认 unpaid,不接支付)
+// taskStatus: pending | claimed | printing | completed | failed | cancelled(后续预留)
+model Order {
+  id      String @id @default(cuid())
+  orderNo String @unique
+  type    String @default("print")
+
+  printTaskId String?    @unique
+  printTask   PrintTask? @relation(fields: [printTaskId], references: [id])
+
+  endUserId  String?
+  terminalId String?
+
+  // 整数「分」存储,绝不用浮点。当前不接真实支付,amountCents 恒为 0。
+  amountCents Int    @default(0)
+  currency    String @default("CNY")
+
+  payStatus  String @default("unpaid")
+  taskStatus String @default("pending")
+
+  refundReason String?
+  refundedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([payStatus])
+  @@index([taskStatus])
+  @@index([endUserId])
+  @@index([terminalId])
+  @@index([createdAt])
 }
 
 // ── Organization ──────────────────────────────────────────────────────────────

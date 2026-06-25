@@ -128,6 +128,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
@@ -232,5 +233,6 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs

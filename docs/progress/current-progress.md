@@ -80,6 +80,7 @@
 | 2026-06-25 | `docs/progress-remaining-candidates-sync` / 本分支 | 同步 #89 合入后的主线事实与剩余候选边界：`main == origin/main == f1d6f8e7`，旧 UI 候选 `fix/expert-audit-stage-a` 已删除；剩余 QR 登录 dirty worktree、面试重设计本地候选 / 备份、Sprint1 订单 / Partner dashboard 远程候选已定级到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`。 |
 | 2026-06-25 | `codex/qr-login-local-agent-bridge` / 本分支 | 从干净 `main` 补齐 QR 扫码登录候选：保留现有 terminal-bound 后端 QR 安全模型，新增 Terminal Agent 127.0.0.1 本地 create/claim 代理，`claimToken` 仅留在 Agent 内存；Kiosk 扫码页改为手机确认登录，手机页只执行 status/confirm、不接收 member token；旧微信/支付宝占位扫码 UI 已移除。 |
 | 2026-06-25 | `docs/qr-login-cleanup-progress` / 本分支 | 同步 QR 登录收口后的当前事实：#91 已 rebase merge 到 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 本地 / 远程 head 也已清理。 |
+| 2026-06-25 | `codex/order-model-foundation` / 本分支 | 从远程候选 `origin/feature/sprint1-order-model` 选择性迁入订单底座：新增 `Order` 数据模型与 SQLite/PostgreSQL additive migration，`PrintJobsService.create` 在保持原 `{ taskId, status, createdAt }` API 合约不变的同时创建 `type=print`、`payStatus=unpaid`、`amountCents=0` 的运营订单，Terminal claim/status/reset 会镜像 `taskStatus` / `terminalId`；新增 `verify:order` 并接入 CI。当前不接真实支付、报价、退款、PaymentAttempt 或 Partner dashboard，源远程候选待本分支 PR/CI/合并后再决定清理。 |
 
 ## 当前工作区事实
 
