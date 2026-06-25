@@ -4,7 +4,7 @@
 
 ## 复核基线
 
-- 主线：`main == origin/main == 4e574dee`
+- 主线：`main == origin/main`（具体 tip 以 `git rev-parse main` / `git rev-parse origin/main` 为准；#101 合入时为 `8c2f2b78`）
 - 当前开放 PR：0
 - 本地分支完成态：1 个（`main`；本 docs 分支合入并清理后达到）
 - worktree：1 个（主仓）
