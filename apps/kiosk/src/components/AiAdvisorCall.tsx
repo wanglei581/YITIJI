@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBusyLock } from '../contexts/KioskBusyContext'
+import { API_BASE_URL } from '../services/api/client'
 
 const ADVISOR_IMG = '/assets/ai-advisor.png'
 const TERMINAL_ID = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
@@ -27,7 +28,7 @@ const TERMINAL_ID = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
 // 纯函数、模块级：可在 cleanup、startCall 中途离开、pagehide 三处复用。
 function stopBackendTask(taskId: string): void {
   if (!taskId) return
-  fetch('/api/v1/trtc/session/stop', {
+  fetch(`${API_BASE_URL}/trtc/session/stop`, {
     method:    'POST',
     headers:   { 'Content-Type': 'application/json', 'X-Terminal-Id': TERMINAL_ID },
     body:      JSON.stringify({ taskId }),
@@ -155,7 +156,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
       const timeoutId = setTimeout(() => ac.abort(), 30_000)
       let res: Response
       try {
-        res = await fetch('/api/v1/trtc/session', {
+        res = await fetch(`${API_BASE_URL}/trtc/session`, {
           method:  'POST',
           headers: {
             'Content-Type': 'application/json',
