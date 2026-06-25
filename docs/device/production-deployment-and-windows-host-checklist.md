@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
+> 最后更新：2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -178,6 +178,8 @@ pnpm --filter ./services/api verify:activity-logs
 ### 4.1 账号与资产
 
 - [ ] 手机号登录/登出成功。
+- [ ] QR 扫码登录成功：Kiosk 通过 Terminal Agent 本地桥接创建二维码，手机打开二维码 URL 后只确认登录，一体机拿到会员态；手机端不接收 member token。
+- [ ] QR 二维码 URL 的公网/局域网基址可被手机访问；如果 Kiosk 页面运行在 `localhost`，必须显式配置手机可访问的 `VITE_QR_LOGIN_PUBLIC_BASE_URL`。
 - [ ] 空闲自动退出生效。
 - [ ] 忙碌态（上传/AI/打印中）不误触发退出。
 - [ ] 「我的」资产区加载成功，无假数量。
@@ -272,6 +274,8 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] Kiosk 页面可从生产域名打开。
 - [ ] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。
 - [ ] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。
+- [ ] QR 登录本地桥接端口与 Kiosk 构建变量一致：Agent `localApiPort` / `localApiAllowedOrigins` 与 Kiosk `VITE_TERMINAL_AGENT_LOCAL_URL`、实际 Kiosk Origin 完全匹配。
+- [ ] 如 Kiosk 使用 HTTPS 页面，已实测浏览器不会因 mixed content / Private Network Access 阻断 `http://127.0.0.1:<localApiPort>`；若被阻断，扫码登录不得宣称可用，需改为受信本地桥接方案或现场允许的本地访问策略。
 - [ ] localAuthToken/actionToken 校验有效。
 - [ ] Token 过期、nonce 重放、action 不匹配时拒绝。
 - [ ] 页面展示设备状态与 Agent 上报一致。
@@ -323,6 +327,7 @@ pnpm --filter ./services/api verify:activity-logs
 ### 6.2 试运营必跑路径
 
 - [ ] 手机号登录与登出。
+- [ ] QR 扫码登录：手机扫码确认后，一体机进入同一会员态；本机桥接不可用时页面能回退到手机号登录。
 - [ ] 上传简历 → OCR/文本提取 → AI 诊断。
 - [ ] AI 简历生成或优化 → 生成 PDF → 我的文档。
 - [ ] 用户文件与简历资产证据包已执行：覆盖上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删和 AuditLog 审计；不得以本地 SQLite/local storage verify 代替 PostgreSQL + COS + 会员账号真实验收。

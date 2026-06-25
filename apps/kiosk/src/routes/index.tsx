@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
+import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { LegalDocPage } from '../pages/legal/LegalDocPage'
 import { JobFitPage } from '../pages/resume/JobFitPage'
 import { CareerPlanPage } from '../pages/resume/CareerPlanPage'
@@ -68,6 +69,7 @@ import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage
 export const kioskRouter = createBrowserRouter([
   // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
   { path: '/login', element: <LoginPage /> },
+  { path: '/member/qr-login', element: <MobileQrLoginPage /> },
   { path: '/legal/:doc', element: <LegalDocPage /> },
   { path: '/resume/job-fit', element: <JobFitPage /> },
   { path: '/resume/career-plan', element: <CareerPlanPage /> },
