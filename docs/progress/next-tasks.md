@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-22
+> 最后更新：2026-06-25
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -14,6 +14,15 @@
 - [x] **T3 E 类本地工具落地**：已抽取 `.product-pm/prd/print-material-pack.md` 与 `.superpowers` HTML 预览摘要，并写入根路径锚定 ignore 规则；不删除本地文件。
 - [x] **T4 C 类任务证据筛选**：已输出任务证据筛选报告；只登记高价值摘要、脱敏规则和后续任务，不提交原始 `.ccg/tasks` 包。
 - [x] **T5 D 类外部材料索引**：已输出外部材料索引报告；只登记 Markdown 转正候选、PDF/二进制外部归档规则、OPC 输出处置，不提交原始外部材料。
+- [x] **剩余候选分支定级**：已输出 `docs/reviews/remaining-branch-candidates-2026-06-25.md`，确认旧 UI 候选远程已删除，当前只剩 QR 登录 dirty worktree、面试重设计本地候选 / 备份，以及 Sprint1 订单 / Partner dashboard 两条远程高价值候选。
+
+## P0：剩余分支 / worktree 收口
+
+- [ ] **QR 登录 dirty worktree 审查**：只读审查 `codex/qr-ticket-login` worktree 的已暂存 / 未提交改动，决定是否从干净 `main` 迁移前端 QR 登录草案；未决前不得删除该 worktree 或分支。
+- [ ] **订单模型候选深审**：只读审查 `origin/feature/sprint1-order-model` 的 Prisma migration、打印任务计费、verify 覆盖和生产数据影响；如采纳，另起最小迁移分支。
+- [ ] **Partner dashboard 候选拆分**：在订单模型决策后，拆分审查 `origin/feature/sprint1-partner-dashboard` 中 Admin orders / alerts、Partner profile / dashboard 的可迁移价值；禁止整分支合并。
+- [ ] **面试重设计候选取舍**：对比当前 `main` 面试页与 `feature/interview-setup-redesign` / `backup/interview-b65d6e48`，决定迁移具体 UI 思路或放弃旧分叉；未完成前保留备份。
+- [ ] **最终清理**：仅在上述取舍完成并有证据后，删除已放弃的本地分支 / worktree / 远程候选；不得执行 `prune` / `gc`。
 
 ## P0：上线前真实验收
 
