@@ -19,6 +19,73 @@ export class RedisService implements OnModuleDestroy {
     return this.client.get(key)
   }
 
+  async getDel(key: string): Promise<string | null> {
+    const value = await this.client.call('GETDEL', key)
+    return typeof value === 'string' ? value : null
+  }
+
+  async getAndDelIfEquals(key: string, expectedValue: string): Promise<'missing' | 'matched' | 'mismatched'> {
+    const result = await this.client.eval(
+      `
+      local value = redis.call('GET', KEYS[1])
+      if not value then return 0 end
+      if value == ARGV[1] then
+        redis.call('DEL', KEYS[1])
+        return 1
+      end
+      return -1
+      `,
+      1,
+      key,
+      expectedValue,
+    )
+    if (result === 1) return 'matched'
+    if (result === -1) return 'mismatched'
+    return 'missing'
+  }
+
+  async getDelAndSetEx(
+    key: string,
+    markerKey: string,
+    markerTtlSeconds: number,
+    markerValue: string,
+  ): Promise<string | null> {
+    const value = await this.client.eval(
+      `
+      local value = redis.call('GET', KEYS[1])
+      if not value then return nil end
+      redis.call('DEL', KEYS[1])
+      redis.call('SET', KEYS[2], ARGV[2], 'EX', tonumber(ARGV[1]))
+      return value
+      `,
+      2,
+      key,
+      markerKey,
+      markerTtlSeconds,
+      markerValue,
+    )
+    return typeof value === 'string' ? value : null
+  }
+
+  async setExistingWithCurrentTtl(key: string, value: string): Promise<'missing' | 'updated'> {
+    const result = await this.client.eval(
+      `
+      local ttl = redis.call('TTL', KEYS[1])
+      if ttl <= 0 then return 0 end
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', ttl)
+      return 1
+      `,
+      1,
+      key,
+      value,
+    )
+    return result === 1 ? 'updated' : 'missing'
+  }
+
+  ttl(key: string): Promise<number> {
+    return this.client.ttl(key)
+  }
+
   /** SET key val EX ttl(秒) */
   async setEx(key: string, ttlSeconds: number, value: string): Promise<void> {
     await this.client.set(key, value, 'EX', ttlSeconds)
