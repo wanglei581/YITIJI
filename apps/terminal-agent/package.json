@@ -10,6 +10,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "dev": "ts-node src/index.ts",
+    "verify:direct-http-agents": "ts-node scripts/verify-direct-http-agents.ts",
     "verify:printer-config": "node scripts/verify-printer-config.mjs"
   },
   "dependencies": {
