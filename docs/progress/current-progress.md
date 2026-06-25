@@ -79,14 +79,15 @@
 | 2026-06-25 | `codex/standardization-cleanup-state` / 本分支 | 同步分支 / worktree 治理收口后的当前事实：主线保持干净，已清理可证实冗余的远程历史分支；保留 QR 登录、面试重设计、订单模型、Sprint1 顶层旧栈和专家审查小候选，后续只能从干净 `main` 新分支选择性迁移。 |
 | 2026-06-25 | `docs/progress-remaining-candidates-sync` / 本分支 | 同步 #89 合入后的主线事实与剩余候选边界：`main == origin/main == f1d6f8e7`，旧 UI 候选 `fix/expert-audit-stage-a` 已删除；剩余 QR 登录 dirty worktree、面试重设计本地候选 / 备份、Sprint1 订单 / Partner dashboard 远程候选已定级到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`。 |
 | 2026-06-25 | `codex/qr-login-local-agent-bridge` / 本分支 | 从干净 `main` 补齐 QR 扫码登录候选：保留现有 terminal-bound 后端 QR 安全模型，新增 Terminal Agent 127.0.0.1 本地 create/claim 代理，`claimToken` 仅留在 Agent 内存；Kiosk 扫码页改为手机确认登录，手机页只执行 status/confirm、不接收 member token；旧微信/支付宝占位扫码 UI 已移除。 |
+| 2026-06-25 | `docs/qr-login-cleanup-progress` / 本分支 | 同步 QR 登录收口后的当前事实：#91 已 rebase merge 到 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 本地 / 远程 head 也已清理。 |
 
 ## 当前工作区事实
 
-主工作区：`/Users/wanglei/AI求职打印服务终端`。当前治理收口后的主线基线为 `main` / `origin/main` 一致提交 `f1d6f8e7`；主工作区保持 clean，本次复核时 GitHub 开放 PR 为 0。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以旧 `feature/interview-setup-redesign` 等落后分叉作为治理基线。
+主工作区：`/Users/wanglei/AI求职打印服务终端`。QR 登录运行时代码已在 `main` / `origin/main` 的 `535587e0` 合入；本次文档收口仅同步清理事实，不改变运行时代码。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以旧 `feature/interview-setup-redesign` 等落后分叉作为治理基线。
 
 当前仍保留的特殊 worktree / 分支边界：
 
-- `codex/qr-ticket-login`：分支提交已被 `main` 覆盖，但独立 worktree 仍有已暂存 / 未提交 QR 登录草案和未跟踪 `.ccg/tasks/profile-commercial-closure-audit/`，禁止顺手清理。本轮已在 `codex/qr-login-local-agent-bridge` 从干净 `main` 选择性重做安全接线候选；旧 worktree 仅待该候选完成 PR/CI/合入后再按证据清理，不能直接复活旧后端实现。
+- `codex/qr-ticket-login`：已清理。旧 dirty worktree 中的暂存 QR 登录草案会把 `claimToken` 放在浏览器侧、Kiosk 直接打后端 QR 接口，且不具备 #91 的 Terminal Agent 本地代理边界；#91 已用更安全实现合入 `main`，旧 worktree / 本地分支已移除，无同名远程 head。
 - `feature/interview-setup-redesign` / `backup/interview-b65d6e48`：本地候选分支仍保留；前者涉及面试页重设计产品取舍，后者涉及 fair verify residue 候选验证。未确认迁移或明确放弃前不得删除。
 - 真实远程候选 head 仅保留 `feature/sprint1-order-model`、`feature/sprint1-partner-dashboard` 和 `main`：分别对应订单 / 支付域基础候选、Sprint1 顶层旧栈候选和主线。旧远程中间分支与旧 UI 候选 `fix/expert-audit-stage-a` 已清理；后续迁移必须从干净 `main` 单独提取最小价值。
 - 剩余候选定级已记录到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；未授权前不得用 `git remote prune` / `git gc` 做额外清理。

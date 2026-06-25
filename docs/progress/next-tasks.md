@@ -14,11 +14,11 @@
 - [x] **T3 E 类本地工具落地**：已抽取 `.product-pm/prd/print-material-pack.md` 与 `.superpowers` HTML 预览摘要，并写入根路径锚定 ignore 规则；不删除本地文件。
 - [x] **T4 C 类任务证据筛选**：已输出任务证据筛选报告；只登记高价值摘要、脱敏规则和后续任务，不提交原始 `.ccg/tasks` 包。
 - [x] **T5 D 类外部材料索引**：已输出外部材料索引报告；只登记 Markdown 转正候选、PDF/二进制外部归档规则、OPC 输出处置，不提交原始外部材料。
-- [x] **剩余候选分支定级**：已输出 `docs/reviews/remaining-branch-candidates-2026-06-25.md`，确认旧 UI 候选远程已删除，当前只剩 QR 登录 dirty worktree、面试重设计本地候选 / 备份，以及 Sprint1 订单 / Partner dashboard 两条远程高价值候选。
+- [x] **剩余候选分支定级**：已输出 `docs/reviews/remaining-branch-candidates-2026-06-25.md`，确认旧 UI 候选远程已删除；QR 登录已由后续 #91 收口，当前剩面试重设计本地候选 / 备份，以及 Sprint1 订单 / Partner dashboard 两条远程高价值候选。
 
 ## P0：剩余分支 / worktree 收口
 
-- [ ] **QR 登录候选合入与旧 worktree 清理**：`codex/qr-login-local-agent-bridge` 已从干净 `main` 重做安全接线候选；待 PR/CI/合入后，再只读确认并清理旧 `codex/qr-ticket-login` dirty worktree / 分支。合入前不得删除旧 worktree，也不得直接复活旧后端实现。
+- [x] **QR 登录候选合入与旧 worktree 清理**：#91 已通过 rebase merge 合入 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 的本地 / 远程 head 也已清理。
 - [ ] **订单模型候选深审**：只读审查 `origin/feature/sprint1-order-model` 的 Prisma migration、打印任务计费、verify 覆盖和生产数据影响；如采纳，另起最小迁移分支。
 - [ ] **Partner dashboard 候选拆分**：在订单模型决策后，拆分审查 `origin/feature/sprint1-partner-dashboard` 中 Admin orders / alerts、Partner profile / dashboard 的可迁移价值；禁止整分支合并。
 - [ ] **面试重设计候选取舍**：对比当前 `main` 面试页与 `feature/interview-setup-redesign` / `backup/interview-b65d6e48`，决定迁移具体 UI 思路或放弃旧分叉；未完成前保留备份。
