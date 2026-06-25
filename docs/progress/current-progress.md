@@ -83,19 +83,20 @@
 | 2026-06-25 | `docs/qr-login-cleanup-progress` / 本分支 | 同步 QR 登录收口后的当前事实：#91 已 rebase merge 到 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 本地 / 远程 head 也已清理。 |
 | 2026-06-25 | `codex/order-model-foundation` / 本分支 | 从远程候选 `origin/feature/sprint1-order-model` 选择性迁入订单底座：新增 `Order` 数据模型与 SQLite/PostgreSQL additive migration，`PrintJobsService.create` 在保持原 `{ taskId, status, createdAt }` API 合约不变的同时创建 `type=print`、`payStatus=unpaid`、`amountCents=0` 的运营订单，Terminal claim/status/reset 会镜像 `taskStatus` / `terminalId`；新增 `verify:order` 并接入 CI。当前不接真实支付、报价、退款、PaymentAttempt 或 Partner dashboard；源远程候选已在确认主线覆盖后清理。 |
 | 2026-06-25 | `codex/partner-org-self-verify` / `ba7d0fdb` | 完成 `origin/feature/sprint1-partner-dashboard` 剩余价值收口：旧 Admin alerts 持久化表因无生产告警生产器不迁，旧 Partner profile 因扩大机构自助改名 / 信用代码等权限不迁，旧 Partner dashboard 因主线已有更完整真实聚合不迁；#98 已 rebase merge 到 `main`，新增当前主线形态的 `verify:partner-org-self`，锁住 Partner 资料自助 allowlist、机构隔离、dashboard 真实聚合和无伪指标边界。 |
-| 2026-06-25 | `codex/final-inventory-doc-sync` / 本分支 | 同步最终只读盘点事实：`main == origin/main == ba7d0fdb`，worktree 只剩主仓，远程 head 只剩 `origin/main`，旧 Sprint1 订单 / Partner dashboard 远程候选与 #98 过渡分支均已清理；当前仅保留 `feature/interview-setup-redesign` 与 `backup/interview-b65d6e48` 两个本地面试候选，待产品取舍后再处理。 |
+| 2026-06-25 | `codex/final-inventory-doc-sync` / 本分支 | 同步阶段性只读盘点事实：`main == origin/main == ba7d0fdb`，worktree 只剩主仓，远程 head 只剩 `origin/main`，旧 Sprint1 订单 / Partner dashboard 远程候选与 #98 过渡分支均已清理；当时仅保留 `feature/interview-setup-redesign` 与 `backup/interview-b65d6e48` 两个本地面试候选，后续已由 #100 和最终清理完成收口。 |
 | 2026-06-25 | `codex/remove-interview-setup-preview` / 本分支 | 清理模拟面试旧布局预览页：删除仅用于确认排版且不调用后端的 `/interview/setup-preview` 与 `InterviewSetupPreviewPage.tsx`，保留正式 `/interview/setup` 真实创建面试、简历上传、合规提示和会话启动链路。 |
+| 2026-06-25 | `codex/final-clean-state-doc-sync` / 本分支 | 同步 #100 合入后的最终清理事实：`main == origin/main == 4e574dee`；本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；旧面试重设计本地候选、备份分支、本地 `keep/b65d6e48` tag、#100 过渡分支和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录均已清理，运行时代码无 `setup-preview` 残留。 |
 
 ## 当前工作区事实
 
-主工作区：`/Users/wanglei/AI求职打印服务终端`。当前 `main == origin/main == ba7d0fdb`，工作区干净，worktree 只剩主仓；本次文档收口仅同步清理事实，不改变运行时代码。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以旧 `feature/interview-setup-redesign` 等落后分叉作为治理基线。
+主工作区：`/Users/wanglei/AI求职打印服务终端`。当前 `main == origin/main == 4e574dee`，工作区干净，worktree 只剩主仓；远程 head 只剩 `origin/main`。本 docs 分支合入并清理后，本地分支也只剩 `main`。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以任何旧落后分叉作为治理基线。
 
-当前仍保留的特殊 worktree / 分支边界：
+当前特殊 worktree / 分支边界：
 
 - `codex/qr-ticket-login`：已清理。旧 dirty worktree 中的暂存 QR 登录草案会把 `claimToken` 放在浏览器侧、Kiosk 直接打后端 QR 接口，且不具备 #91 的 Terminal Agent 本地代理边界；#91 已用更安全实现合入 `main`，旧 worktree / 本地分支已移除，无同名远程 head。
-- `feature/interview-setup-redesign` / `backup/interview-b65d6e48`：本地候选分支仍保留；已从中确认唯一可单独收口的运行时清理点是旧 `/interview/setup-preview` 预览页，fair verify residue guard 已在当前 `main` 中以更新形态覆盖。旧分支本体落后主线且会回退当前页面 / 路由，不得整体合并。
-- 远程 head 仅保留 `main`：订单 / 支付域基础候选 `feature/sprint1-order-model` 已在 `Order` 底座和 Admin 订单只读补齐后清理；Sprint1 顶层旧栈候选 `feature/sprint1-partner-dashboard` 的剩余价值已通过 #98 的 `verify:partner-org-self` 收口并清理远程 head。旧远程中间分支与旧 UI 候选 `fix/expert-audit-stage-a` 已清理；后续迁移必须从干净 `main` 单独提取最小价值。
-- 剩余候选定级已记录到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；未授权前不得用 `git remote prune` / `git gc` 做额外清理。
+- `feature/interview-setup-redesign` / `backup/interview-b65d6e48`：已清理。只读深审确认旧分支本体会回退当前页面 / 路由且不得整体合并；唯一可单独收口的运行时清理点是旧 `/interview/setup-preview` 预览页，已由 #100 合入 `main`；fair verify residue guard 已在当前 `main` 中以更新形态覆盖。
+- 远程 head 仅保留 `main`：订单 / 支付域基础候选 `feature/sprint1-order-model` 已在 `Order` 底座和 Admin 订单只读补齐后清理；Sprint1 顶层旧栈候选 `feature/sprint1-partner-dashboard` 的剩余价值已通过 #98 的 `verify:partner-org-self` 收口并清理远程 head；#100 过渡分支也已清理。旧远程中间分支与旧 UI 候选 `fix/expert-audit-stage-a` 已清理；后续迁移必须从干净 `main` 单独提取最小价值。
+- 剩余候选定级文档已更新为完成态：`docs/reviews/remaining-branch-candidates-2026-06-25.md`。未授权前仍不得用 `git remote prune` / `git gc` 做额外清理。
 
 ## 主工作区高价值新增结论（待后续按证据迁入）
 
