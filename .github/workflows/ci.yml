@@ -127,6 +127,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
           pnpm --filter @ai-job-print/api verify:partner-edit
+          pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:screensaver-content

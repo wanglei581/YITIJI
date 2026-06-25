@@ -82,6 +82,7 @@
 | 2026-06-25 | `codex/qr-login-local-agent-bridge` / 本分支 | 从干净 `main` 补齐 QR 扫码登录候选：保留现有 terminal-bound 后端 QR 安全模型，新增 Terminal Agent 127.0.0.1 本地 create/claim 代理，`claimToken` 仅留在 Agent 内存；Kiosk 扫码页改为手机确认登录，手机页只执行 status/confirm、不接收 member token；旧微信/支付宝占位扫码 UI 已移除。 |
 | 2026-06-25 | `docs/qr-login-cleanup-progress` / 本分支 | 同步 QR 登录收口后的当前事实：#91 已 rebase merge 到 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 本地 / 远程 head 也已清理。 |
 | 2026-06-25 | `codex/order-model-foundation` / 本分支 | 从远程候选 `origin/feature/sprint1-order-model` 选择性迁入订单底座：新增 `Order` 数据模型与 SQLite/PostgreSQL additive migration，`PrintJobsService.create` 在保持原 `{ taskId, status, createdAt }` API 合约不变的同时创建 `type=print`、`payStatus=unpaid`、`amountCents=0` 的运营订单，Terminal claim/status/reset 会镜像 `taskStatus` / `terminalId`；新增 `verify:order` 并接入 CI。当前不接真实支付、报价、退款、PaymentAttempt 或 Partner dashboard，源远程候选待本分支 PR/CI/合并后再决定清理。 |
+| 2026-06-25 | `codex/partner-org-self-verify` / 本分支 | 完成 `origin/feature/sprint1-partner-dashboard` 剩余价值收口：旧 Admin alerts 持久化表因无生产告警生产器不迁，旧 Partner profile 因扩大机构自助改名 / 信用代码等权限不迁，旧 Partner dashboard 因主线已有更完整真实聚合不迁；仅新增当前主线形态的 `verify:partner-org-self`，锁住 Partner 资料自助 allowlist、机构隔离、dashboard 真实聚合和无伪指标边界。 |
 
 ## 当前工作区事实
 
@@ -91,7 +92,7 @@
 
 - `codex/qr-ticket-login`：已清理。旧 dirty worktree 中的暂存 QR 登录草案会把 `claimToken` 放在浏览器侧、Kiosk 直接打后端 QR 接口，且不具备 #91 的 Terminal Agent 本地代理边界；#91 已用更安全实现合入 `main`，旧 worktree / 本地分支已移除，无同名远程 head。
 - `feature/interview-setup-redesign` / `backup/interview-b65d6e48`：本地候选分支仍保留；前者涉及面试页重设计产品取舍，后者涉及 fair verify residue 候选验证。未确认迁移或明确放弃前不得删除。
-- 真实远程候选 head 仅保留 `feature/sprint1-order-model`、`feature/sprint1-partner-dashboard` 和 `main`：分别对应订单 / 支付域基础候选、Sprint1 顶层旧栈候选和主线。旧远程中间分支与旧 UI 候选 `fix/expert-audit-stage-a` 已清理；后续迁移必须从干净 `main` 单独提取最小价值。
+- 真实远程候选 head 仅保留 `feature/sprint1-partner-dashboard` 和 `main`：订单 / 支付域基础候选 `feature/sprint1-order-model` 已在 `Order` 底座和 Admin 订单只读补齐后清理；Sprint1 顶层旧栈候选的剩余价值已在 `codex/partner-org-self-verify` 中通过当前形态 verify 收口，待本分支合入后清理远程旧栈 head。旧远程中间分支与旧 UI 候选 `fix/expert-audit-stage-a` 已清理；后续迁移必须从干净 `main` 单独提取最小价值。
 - 剩余候选定级已记录到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；未授权前不得用 `git remote prune` / `git gc` 做额外清理。
 
 ## 主工作区高价值新增结论（待后续按证据迁入）
