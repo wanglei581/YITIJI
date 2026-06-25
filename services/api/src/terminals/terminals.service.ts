@@ -481,6 +481,10 @@ export class TerminalsService implements OnModuleInit {
     return { acknowledged: true }
   }
 
+  async validateTerminalToken(terminalId: string, authHeader: string | undefined): Promise<void> {
+    await this.findAndValidate(terminalId, authHeader)
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────────
 
   private async findAndValidate(

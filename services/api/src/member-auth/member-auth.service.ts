@@ -107,15 +107,21 @@ export class MemberAuthService {
   }
 
   /** 校验验证码 → upsert EndUser → 建立 Redis 会话 → 签发 JWT。 */
-  async login(phone: string, code: string, _deviceId: string | undefined, _ip: string): Promise<MemberLoginResult> {
+  async login(phone: string, code: string, deviceId: string | undefined, ip: string): Promise<MemberLoginResult> {
+    return this.loginWithSmsCode(phone, code, deviceId, ip)
+  }
+
+  /** 供手机号登录与 QR 确认共用同一套验证码校验、账号创建与会话签发逻辑。 */
+  async loginWithSmsCode(phone: string, code: string, _deviceId: string | undefined, _ip: string): Promise<MemberLoginResult> {
+    const user = await this.verifySmsCodeForUser(phone, code)
+    return this.issueLoginForUser(user)
+  }
+
+  /** 原子消费短信验证码并创建/更新 EndUser；不签发 token，供 QR 确认阶段使用。 */
+  async verifySmsCodeForUser(phone: string, code: string): Promise<MemberAuthUser> {
     const phoneHash = hashPhone(phone)
     const codeKey = this.k.code(phoneHash)
     const attemptKey = this.k.attempt(phoneHash)
-
-    const stored = await this.redis.get(codeKey)
-    if (!stored) {
-      throw this.loginFailed('SMS_CODE_EXPIRED', '验证码已过期或不存在,请重新获取')
-    }
 
     // 尝试次数闸:防对 6 位码暴力穷举。超限即作废当前码。
     const attempts = await this.redis.incrWithTtl(attemptKey, CODE_TTL)
@@ -125,12 +131,15 @@ export class MemberAuthService {
       throw this.loginFailed('SMS_CODE_LOCKED', '验证码尝试次数过多,请重新获取')
     }
 
-    if (stored !== code) {
+    const codeStatus = await this.redis.getAndDelIfEquals(codeKey, code)
+    if (codeStatus === 'missing') {
+      throw this.loginFailed('SMS_CODE_EXPIRED', '验证码已过期或不存在,请重新获取')
+    }
+    if (codeStatus === 'mismatched') {
       throw this.loginFailed('SMS_CODE_INVALID', '验证码不正确')
     }
 
-    // 验证通过:立即销毁验证码与尝试计数(防重放)。
-    await this.redis.del(codeKey)
+    // 验证通过:立即销毁尝试计数；验证码已由 Redis 原子脚本删除(防并发重放)。
     await this.redis.del(attemptKey)
 
     // upsert EndUser(by phoneHash)。新用户落 phoneEnc;停用用户拒登。
@@ -149,6 +158,10 @@ export class MemberAuthService {
       })
     }
 
+    return { id: user.id, phoneMasked: maskPhone(phone), nickname: user.nickname }
+  }
+
+  async issueLoginForUser(user: MemberAuthUser): Promise<MemberLoginResult> {
     // 建立 Redis 会话(jti),签发短期 JWT(aud=enduser + jti)。
     const sessionId = randomUUID()
     await this.redis.setEx(memberSessionKey(sessionId), SESSION_TTL, user.id)
@@ -156,7 +169,7 @@ export class MemberAuthService {
 
     return {
       token,
-      user: { id: user.id, phoneMasked: maskPhone(phone), nickname: user.nickname },
+      user,
     }
   }
 

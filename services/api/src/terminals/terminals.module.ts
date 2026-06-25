@@ -13,5 +13,6 @@ import { TerminalsService } from './terminals.service'
   ],
   controllers: [TerminalsController, AdminTerminalsController, AdminPrintersController],
   providers: [TerminalsService],
+  exports: [TerminalsService],
 })
 export class TerminalsModule {}
