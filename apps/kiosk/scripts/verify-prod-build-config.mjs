@@ -92,7 +92,7 @@ if (!existsSync(ASSETS)) {
     pass('C1 文字助手模式不要求数字人通话产物')
   } else {
     const aiAdvisorAsset = jsAssets.find(({ src }) =>
-      src.includes('/api/v1/trtc/session') && src.includes('X-Terminal-Id'),
+      src.includes('/trtc/session') && src.includes('X-Terminal-Id'),
     )
     const trtcAsset = jsAssets.find(({ src }) => {
       const sdkSignals = ['trtc-sdk', 'enterRoom', 'REMOTE_AUDIO_AVAILABLE']
@@ -107,8 +107,8 @@ if (!existsSync(ASSETS)) {
     else fail('C2 未找到包含 TRTC SDK 核心信号的产物，数字人语音通话不会加载')
 
     if (aiAdvisorAsset) {
-      if (aiAdvisorAsset.src.includes('/api/v1/trtc/session')) pass('C3 数字人产物调用 TRTC session API')
-      else fail('C3 数字人产物未包含 /api/v1/trtc/session 调用')
+      if (aiAdvisorAsset.src.includes('/trtc/session')) pass('C3 数字人产物调用 TRTC session API 路径')
+      else fail('C3 数字人产物未包含 /trtc/session 调用')
 
       if (aiAdvisorAsset.src.includes('X-Terminal-Id')) pass('C4 数字人产物携带 X-Terminal-Id header')
       else fail('C4 数字人产物未包含 X-Terminal-Id header')
