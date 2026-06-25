@@ -17,7 +17,8 @@
     "verify:legal-retention-copy": "node scripts/verify-legal-retention-copy.mjs",
     "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs",
     "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs",
-    "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs"
+    "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",
+    "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs"
   },
   "dependencies": {
     "@ai-job-print/shared": "workspace:*",

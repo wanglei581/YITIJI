@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import { AlertCircleIcon, InfoIcon } from 'lucide-react'
+import { API_MODE } from '../../services/api/client'
 
 type ScanType = 'resume' | 'id' | 'document'
 type Source = 'flatbed' | 'adf'
@@ -61,6 +62,7 @@ export function ScanSettingsPage() {
   const location = useLocation()
   const state = (location.state ?? {}) as LocationState
   const scanType = state.scanType ?? 'document'
+  const scanUnavailable = API_MODE === 'http'
 
   const [source, setSource] = useState<Source>('flatbed')
   const [pageMode, setPageMode] = useState<PageMode>('single')
@@ -73,6 +75,7 @@ export function ScanSettingsPage() {
   }
 
   const handleConfirm = () => {
+    if (scanUnavailable) return
     navigate('/scan/progress', {
       state: { scanType, source, pageMode, color, dpi },
     })
@@ -165,7 +168,11 @@ export function ScanSettingsPage() {
           </div>
           <div className="mt-3 flex items-start gap-2">
             <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
-            <p className="text-xs text-gray-400">扫描由本机服务处理，不依赖网络</p>
+            <p className="text-xs text-gray-400">
+              {scanUnavailable
+                ? '当前生产模式未接入本机扫描 Agent，扫描服务暂不开放。'
+                : '扫描由本机服务处理，不依赖网络'}
+            </p>
           </div>
         </Card>
       </div>
@@ -174,8 +181,8 @@ export function ScanSettingsPage() {
         <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
           返回
         </Button>
-        <Button size="lg" className="flex-1" onClick={handleConfirm}>
-          开始扫描
+        <Button size="lg" className="flex-1" disabled={scanUnavailable} onClick={handleConfirm}>
+          {scanUnavailable ? '真机扫描待接入' : '开始扫描'}
         </Button>
       </div>
     </div>
