@@ -6,5 +6,10 @@
   "printerName": "",
   "agentVersion": "0.2.0",
   "heartbeatIntervalMs": 30000,
-  "claimIntervalMs": 5000
+  "claimIntervalMs": 5000,
+  "localApiPort": 9527,
+  "localApiAllowedOrigins": [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+  ]
 }

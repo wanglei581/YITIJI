@@ -47,6 +47,16 @@ export interface AgentConfig {
   heartbeatIntervalMs?: number
   /** Claim poll interval in ms. Default: 5000. May be overridden by server response. */
   claimIntervalMs?: number
+  /**
+   * Local-only QR login bridge port. The server binds 127.0.0.1 only.
+   * Default: 9527. Use 0 in tests to let the OS assign a free port.
+   */
+  localApiPort?: number
+  /**
+   * Exact browser origins allowed to call the local QR login bridge.
+   * Production kiosks must include the deployed Kiosk origin here.
+   */
+  localApiAllowedOrigins?: string[]
 
   // ── Written on first registration / loaded from encrypted file at startup ──
   /** Assigned by backend on registration. Persisted to config.json. */

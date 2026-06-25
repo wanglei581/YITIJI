@@ -18,7 +18,7 @@
 
 ## P0：剩余分支 / worktree 收口
 
-- [ ] **QR 登录 dirty worktree 审查**：只读审查 `codex/qr-ticket-login` worktree 的已暂存 / 未提交改动，决定是否从干净 `main` 迁移前端 QR 登录草案；未决前不得删除该 worktree 或分支。
+- [ ] **QR 登录候选合入与旧 worktree 清理**：`codex/qr-login-local-agent-bridge` 已从干净 `main` 重做安全接线候选；待 PR/CI/合入后，再只读确认并清理旧 `codex/qr-ticket-login` dirty worktree / 分支。合入前不得删除旧 worktree，也不得直接复活旧后端实现。
 - [ ] **订单模型候选深审**：只读审查 `origin/feature/sprint1-order-model` 的 Prisma migration、打印任务计费、verify 覆盖和生产数据影响；如采纳，另起最小迁移分支。
 - [ ] **Partner dashboard 候选拆分**：在订单模型决策后，拆分审查 `origin/feature/sprint1-partner-dashboard` 中 Admin orders / alerts、Partner profile / dashboard 的可迁移价值；禁止整分支合并。
 - [ ] **面试重设计候选取舍**：对比当前 `main` 面试页与 `feature/interview-setup-redesign` / `backup/interview-b65d6e48`，决定迁移具体 UI 思路或放弃旧分叉；未完成前保留备份。

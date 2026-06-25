@@ -6,6 +6,9 @@ interface ImportMetaEnv {
   readonly VITE_ALLOW_TEXT_ONLY_ASSISTANT: string
   readonly VITE_TERMINAL_ID: string
   readonly VITE_PRINTER_NAME: string
+  readonly VITE_TERMINAL_DISPLAY_NAME: string
+  readonly VITE_TERMINAL_AGENT_LOCAL_URL: string
+  readonly VITE_QR_LOGIN_PUBLIC_BASE_URL: string
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv

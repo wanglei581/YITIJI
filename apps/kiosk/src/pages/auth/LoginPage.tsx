@@ -3,12 +3,12 @@
 // 路由：/login（顶级路由，不嵌套在 KioskRoot 内）
 // 会话：通过 useAuth().login() 写入纯内存 AuthContext，不写任何浏览器存储
 // 已接入：手机号 + 短信验证码
-// 已预留：邮箱登录、微信/支付宝扫码登录（只做 UI 与状态占位，不伪造登录成功）
+// 已接入：手机扫描二维码确认一体机登录（claimToken 只保存在 Terminal Agent 本机代理）
 //
 // 公共一体机无系统软键盘：手机号 / 验证码输入框 readOnly + inputMode="none"，
 // 全部由页面内嵌虚拟数字键盘驱动（触控区对齐 KioskNumPad 标准）。
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeftIcon,
@@ -17,24 +17,23 @@ import {
   MailIcon,
   PhoneIcon,
   QrCodeIcon,
-  RefreshCwIcon,
   ShieldCheckIcon,
 } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { useAuth } from '../../auth/useAuth'
 import {
+  type LoginResult,
   MemberApiError,
   memberLogin,
   sendSmsCode,
 } from '../../services/auth/memberAuthApi'
 import { getMemberAuthDeviceId } from '../../services/auth/memberAuthDevice'
+import { ScanQrLoginPanel } from './ScanQrLoginPanel'
 
 const PHONE_LENGTH = 11
 const CODE_LENGTH = 6
 
 type LoginTab = 'phone' | 'email' | 'scan'
-type ScanProvider = 'wechat' | 'alipay'
 type ActiveNumberInput = 'phone' | 'code' | null
 
 function formatPhone(raw: string): string {
@@ -79,8 +78,6 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [scanProvider, setScanProvider] = useState<ScanProvider>('wechat')
-  const [qrNonce, setQrNonce] = useState(() => Date.now())
   const [activeNumberInput, setActiveNumberInput] = useState<ActiveNumberInput>(null)
 
   const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
@@ -136,10 +133,15 @@ export function LoginPage() {
     }
   }, [code, phone, loading, login])
 
-  const qrValue = useMemo(
-    () => `ai-job-print://member-login/${scanProvider}?nonce=${qrNonce}`,
-    [qrNonce, scanProvider],
-  )
+  const handleQrLoginSuccess = useCallback((res: LoginResult) => {
+    login({
+      id: res.user.id,
+      phoneMasked: res.user.phoneMasked,
+      nickname: res.user.nickname,
+      token: res.token,
+      method: 'phone',
+    })
+  }, [login])
 
   return (
     <div className="min-h-screen bg-[#f3f5f9] text-neutral-900">
@@ -184,14 +186,10 @@ export function LoginPage() {
           {tab === 'email' && <EmailReservedPanel />}
 
           {tab === 'scan' && (
-            <ScanLoginPanel
-              provider={scanProvider}
-              qrValue={qrValue}
-              onProviderChange={(next) => {
-                setScanProvider(next)
-                setQrNonce(Date.now())
-              }}
-              onRefresh={() => setQrNonce(Date.now())}
+            <ScanQrLoginPanel
+              returnTo={returnTo}
+              onUsePhoneLogin={() => switchTab('phone')}
+              onLoginSuccess={handleQrLoginSuccess}
             />
           )}
         </section>
@@ -508,62 +506,6 @@ function EmailReservedPanel() {
         当前会员账号体系先使用手机号验证码。邮箱登录入口已预留，后续接入邮箱验证码服务后开放。
       </p>
     </div>
-  )
-}
-
-function ScanLoginPanel({
-  provider,
-  qrValue,
-  onProviderChange,
-  onRefresh,
-}: {
-  provider: ScanProvider
-  qrValue: string
-  onProviderChange: (provider: ScanProvider) => void
-  onRefresh: () => void
-}) {
-  const helper = provider === 'wechat' ? '使用微信扫码登录' : '使用支付宝扫码登录'
-
-  return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center text-center">
-      <div className="grid w-full max-w-[360px] grid-cols-2 gap-2 rounded-[8px] bg-[#e9edf3] p-1">
-        <ScanProviderButton active={provider === 'wechat'} label="微信扫码" onClick={() => onProviderChange('wechat')} />
-        <ScanProviderButton active={provider === 'alipay'} label="支付宝扫码" onClick={() => onProviderChange('alipay')} />
-      </div>
-
-      <div className="mt-8 flex h-[184px] w-[184px] items-center justify-center rounded-[18px] border-2 border-[#1677ff] bg-white shadow-sm">
-        <QRCodeSVG value={qrValue} size={142} level="M" marginSize={1} />
-      </div>
-
-      <p className="mt-4 text-base font-bold text-[#1e293b]">{helper}</p>
-      <p className="mt-1 text-sm text-[#7e8797]">二维码有效期 3 分钟</p>
-      <p className="mt-2 max-w-[460px] text-xs leading-5 text-[#98a2b3]">
-        扫码登录已完成页面预留，真实登录需后续接入微信开放平台 / 支付宝开放平台授权回调。
-      </p>
-
-      <button
-        type="button"
-        onClick={onRefresh}
-        className="mt-5 flex min-h-[44px] items-center gap-2 rounded-[8px] border border-[#dfe4ec] bg-white px-5 text-sm font-semibold text-[#667085] shadow-sm transition-colors active:bg-neutral-50"
-      >
-        <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />
-        刷新二维码
-      </button>
-    </div>
-  )
-}
-
-function ScanProviderButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-[40px] rounded-[8px] text-sm font-bold transition-all ${
-        active ? 'bg-white text-[#1677ff] shadow-sm' : 'text-[#7e8797] active:bg-white/70'
-      }`}
-    >
-      {label}
-    </button>
   )
 }
 

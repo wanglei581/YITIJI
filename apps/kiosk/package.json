@@ -15,6 +15,7 @@
     "verify:jobfair-ui": "node scripts/verify-jobfair-page-size.mjs && node scripts/verify-jobfair-ui.mjs",
     "verify:file-retention-ui": "node scripts/verify-file-retention-ui.mjs",
     "verify:legal-retention-copy": "node scripts/verify-legal-retention-copy.mjs",
+    "verify:qr-login-ui": "node scripts/verify-qr-login-ui.mjs",
     "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs",
     "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs",
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",

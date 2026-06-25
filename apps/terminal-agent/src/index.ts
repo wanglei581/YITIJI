@@ -14,6 +14,7 @@ import { registerOrLoad } from './agent/registration'
 import { startHeartbeat } from './agent/heartbeat'
 import { startTaskRunner } from './agent/task-runner'
 import type { AgentConfig } from './agent/types'
+import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/qr-login-server'
 // Phase 8.1C additions
 import { acquireLock, releaseLock } from './agent/instance-lock'
 import { openDatabase, type AgentDatabase } from './agent/db'
@@ -80,6 +81,14 @@ program
     // ── Step 7: Start offline PATCH retry loop ────────────────────────────
     const offlineRetryTimer = startOfflineRetry(config, db)
 
+    // ── Step 8: Start local QR-login bridge (best-effort) ─────────────────
+    let qrLocalServer: LocalQrServerHandle | null = null
+    try {
+      qrLocalServer = startQrLoginLocalServer(config)
+    } catch (e) {
+      warn(`local-qr: disabled — ${e instanceof Error ? e.message : String(e)}`)
+    }
+
     log('Agent running. Press Ctrl+C to stop.')
 
     // ── Graceful shutdown ─────────────────────────────────────────────────
@@ -88,6 +97,7 @@ program
       clearInterval(heartbeatTimer)
       clearInterval(claimTimer)
       clearInterval(offlineRetryTimer)
+      void qrLocalServer?.close()
       releaseLock()
       process.exit(0)
     }

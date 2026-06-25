@@ -78,6 +78,7 @@
 | 2026-06-25 | `codex/standardization-execution-guidance` / 本分支 | 固化后续规范化治理启动口径：默认从干净 `main` 新建独立分支推进，旧分支只允许选择性提取已复核价值，不直接复活落后旧分叉；旧 worktree / 旧分支清理前必须只读盘点并保护仍有价值的候选功能分支。 |
 | 2026-06-25 | `codex/standardization-cleanup-state` / 本分支 | 同步分支 / worktree 治理收口后的当前事实：主线保持干净，已清理可证实冗余的远程历史分支；保留 QR 登录、面试重设计、订单模型、Sprint1 顶层旧栈和专家审查小候选，后续只能从干净 `main` 新分支选择性迁移。 |
 | 2026-06-25 | `docs/progress-remaining-candidates-sync` / 本分支 | 同步 #89 合入后的主线事实与剩余候选边界：`main == origin/main == f1d6f8e7`，旧 UI 候选 `fix/expert-audit-stage-a` 已删除；剩余 QR 登录 dirty worktree、面试重设计本地候选 / 备份、Sprint1 订单 / Partner dashboard 远程候选已定级到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`。 |
+| 2026-06-25 | `codex/qr-login-local-agent-bridge` / 本分支 | 从干净 `main` 补齐 QR 扫码登录候选：保留现有 terminal-bound 后端 QR 安全模型，新增 Terminal Agent 127.0.0.1 本地 create/claim 代理，`claimToken` 仅留在 Agent 内存；Kiosk 扫码页改为手机确认登录，手机页只执行 status/confirm、不接收 member token；旧微信/支付宝占位扫码 UI 已移除。 |
 
 ## 当前工作区事实
 
@@ -85,7 +86,7 @@
 
 当前仍保留的特殊 worktree / 分支边界：
 
-- `codex/qr-ticket-login`：分支提交已被 `main` 覆盖，但独立 worktree 仍有已暂存 / 未提交 QR 登录草案和未跟踪 `.ccg/tasks/profile-commercial-closure-audit/`，禁止顺手清理。主线已具备 terminal-bound QR 登录后端；旧 worktree 的前端 UI 只能作为迁移参考，必须另起安全设计接入终端鉴权，不能直接复活旧后端实现。
+- `codex/qr-ticket-login`：分支提交已被 `main` 覆盖，但独立 worktree 仍有已暂存 / 未提交 QR 登录草案和未跟踪 `.ccg/tasks/profile-commercial-closure-audit/`，禁止顺手清理。本轮已在 `codex/qr-login-local-agent-bridge` 从干净 `main` 选择性重做安全接线候选；旧 worktree 仅待该候选完成 PR/CI/合入后再按证据清理，不能直接复活旧后端实现。
 - `feature/interview-setup-redesign` / `backup/interview-b65d6e48`：本地候选分支仍保留；前者涉及面试页重设计产品取舍，后者涉及 fair verify residue 候选验证。未确认迁移或明确放弃前不得删除。
 - 真实远程候选 head 仅保留 `feature/sprint1-order-model`、`feature/sprint1-partner-dashboard` 和 `main`：分别对应订单 / 支付域基础候选、Sprint1 顶层旧栈候选和主线。旧远程中间分支与旧 UI 候选 `fix/expert-audit-stage-a` 已清理；后续迁移必须从干净 `main` 单独提取最小价值。
 - 剩余候选定级已记录到 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；未授权前不得用 `git remote prune` / `git gc` 做额外清理。
