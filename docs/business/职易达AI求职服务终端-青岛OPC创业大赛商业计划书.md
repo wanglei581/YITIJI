@@ -665,4 +665,4 @@ C端AI工具服务收入 =
 5. `docs/product/user-data-flow-matrix.md`
 6. `docs/device/pantum-cm2820adn.md`
 7. `docs/device/windows-terminal-agent-design.md`
-8. `docs/business/AI求职打印服务终端-B2G-B2B2C线下就业服务终端解决方案.pdf`
+8. 旧方案 PDF 原件已仓库外归档：`其他文档/商业材料/PDF归档/AI求职打印服务终端-B2G-B2B2C线下就业服务终端解决方案.pdf`

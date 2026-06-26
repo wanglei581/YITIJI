@@ -1,7 +1,7 @@
 # 操作手册功能借鉴分析与落地方案（内部摘要）
 
 > 编制：2026-06-06 · 密级：内部 · 产品与合规
-> 本文是对一份机器生成的产品分析稿（`docs/product/操作手册功能借鉴分析与落地方案.docx`，未跟踪、不入库）的**人工可 review 摘要**，只沉淀可执行结论。
+> 本文是对一份机器生成的产品分析稿（原稿已仓库外归档到 `其他文档/产品需求资料/操作手册功能借鉴分析与落地方案.docx`，不入库）的**人工可 review 摘要**，只沉淀可执行结论。
 >
 > ⚠️ **以实物为准**：所有合规判断以 [docs/compliance/compliance-boundary.md](../compliance/compliance-boundary.md) 与 [docs/product/feature-scope.md](./feature-scope.md) 为准；所有"已具备/已落地"以**实际代码**与 [docs/progress/current-progress.md](../progress/current-progress.md) 为准。本文结论需产品 + 合规人工复核后方可作为排期依据。
 

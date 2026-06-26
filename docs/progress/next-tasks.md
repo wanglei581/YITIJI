@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-25
+> 最后更新：2026-06-26
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -14,6 +14,7 @@
 - [x] **T3 E 类本地工具落地**：已抽取 `.product-pm/prd/print-material-pack.md` 与 `.superpowers` HTML 预览摘要，并写入根路径锚定 ignore 规则；不删除本地文件。
 - [x] **T4 C 类任务证据筛选**：已输出任务证据筛选报告；只登记高价值摘要、脱敏规则和后续任务，不提交原始 `.ccg/tasks` 包。
 - [x] **T5 D 类外部材料索引**：已输出外部材料索引报告；只登记 Markdown 转正候选、PDF/二进制外部归档规则、OPC 输出处置，不提交原始外部材料。
+- [x] **T5 派生旧 PDF 与 docs 旧材料清理**：已将旧 B2G/B2B2C 方案 PDF、本地 docx 原稿、旧 handoff 交接文件和两个已弃用 HTML 预览移出正式 `docs/`；原始材料归档到本地 `其他文档/`，仓库内保留 Markdown 摘要、审计事实和当前正式入口。
 - [x] **剩余候选分支定级**：已输出并更新 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单、Sprint1 Partner dashboard、面试重设计本地候选与备份候选均已完成迁移 / 取舍 / 清理，当前无剩余本地或远程候选分支。
 
 ## P0：剩余分支 / worktree 收口

@@ -3,6 +3,7 @@
 > **本文档是 Claude 与 Mavis 协同开发 P0 4 周冲刺的硬合同**。
 > **任何一方在编辑文件前必须 Read 本文档,确认归属,违规直接 revert**。
 > 起草:2026-05-30,有效期:P0 冲刺至少 4 周。期间如需修改,**双方在 PR 里达成共识后再改**。
+> 现状：本文仅作历史协作归属参考；当前跨模型协作、进度和待办以 `AGENTS.md` / `CLAUDE.md`、`docs/progress/current-progress.md` 和 `docs/progress/next-tasks.md` 为准，不再使用独立 handoff 文件。
 
 ---
 
@@ -10,7 +11,7 @@
 
 - **Claude 负责**:架构演进 / 合规关键代码 / 复杂算法 / 共享基础设施(packages/ui / packages/shared / Prisma schema / API 中间件 / 认证 / 文件 / 审计 / AI 网关)
 - **Mavis 负责**:标准 CRUD UI / 现有页面修补 / 数据 seed / 既有 API 的前端联调
-- **共享目录**:改之前在 `today-{name}.md` 标记意图,等对方读到后再动
+- **共享目录**:改之前在正式进度文档中写清任务范围、允许修改文件和验证方式,避免临时 handoff 文件成为事实源
 
 ---
 
@@ -31,7 +32,7 @@ services/api/src/common/                    — 守卫 / 装饰器 / 中间件 /
 apps/kiosk/src/pages/resume/                — AI 简历核心(合规高敏)
 ```
 
-**违规后果**:Mavis 不慎编辑这些文件时,Claude 有权直接 `git revert` 该 commit,Mavis 不得反对。Mavis 需求改这里 → 写到 `docs/progress/handoff-to-claude.md`,Claude 在 24h 内处理。
+**违规后果**:Mavis 不慎编辑这些文件时,Claude 有权直接 `git revert` 该 commit,Mavis 不得反对。Mavis 需求改这里时,应在正式进度文档或 PR 描述中写清背景、目标、允许修改文件和验证方式,不再新建独立 handoff 文件。
 
 ---
 
@@ -180,22 +181,22 @@ feat/p0-w1-<owner>-<topic>      — 周 + 负责人 + 主题
 4. **改 packages/shared 不通知**(对方代码会同时挂)
 5. **改 packages/ui 已有组件签名**(对方页面会挂)
 6. **改 main.ts / app.module.ts 不让对方知道**(全局副作用)
-7. **删除任何 docs/progress/* 文件**
+7. **删除当前进度事实源文件**(删除旧交接、模板或归档记录前必须先确认引用并同步当前进度)
 8. **跳过 lint / typecheck**(P0 期间 hooks 不能 `--no-verify`)
 
 ---
 
-## 8. handoff 文件位置
+## 8. 正式记录文件位置
 
 ```
-docs/progress/handoff-to-claude.md       — Mavis 要 Claude 做的事(代办清单)
-docs/progress/handoff-to-mavis.md        — Claude 要 Mavis 做的事
-docs/progress/today-claude.md            — Claude 今日意图(每天覆盖)
-docs/progress/today-mavis.md             — Mavis 今日意图(每天覆盖)
-docs/progress/current-progress.md        — 总进度(双方各加自己段,不动对方段)
+docs/progress/current-progress.md        — 当前阶段、已验证事实、重要边界
+docs/progress/next-tasks.md              — 下一步任务和待验收事项
+docs/progress/today-claude.md            — Claude 当日开发摘要或协作收尾(如仍需记录)
 docs/progress/p0-sprint-plan.md          — 架构师产出的 4 周计划(只读参考)
 docs/progress/p0-frontend-estimate.md    — 前端 Lead 工作量评估(只读参考)
 ```
+
+不再使用 `docs/progress/handoff-to-claude.md` / `docs/progress/handoff-to-mavis.md` 作为正式协作入口；临时聊天记录和交接草稿不得替代上述正式入口。
 
 ---
 
