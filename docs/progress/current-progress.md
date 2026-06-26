@@ -90,6 +90,8 @@
 | 2026-06-25 | `codex/gate4-browser-evidence-runbook-hardening` / 本分支 | 加固用户文件资产 Gate 4 浏览器截图执行手册：补明确会话来源三选一、仓库外证据保存、截图 / 签名 URL / COS XML 脱敏、Admin 仅按受控测试文件过滤和 cleanup 禁止误伤规则；本分支只改文档，不登录、不上传、不发短信、不写远程数据。 |
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 同步 Gate 4 浏览器会员路径证据事实：仓库外证据目录 `/Users/wanglei/gate4-evidence/gate4-browser-20260625231841` 已保存真实短信登录会员页、合成 PDF 上传窗口、`/me/documents` 会员文件与保存期限截图，以及合成测试 PDF 和 `evidence-summary.md`；坏的全屏截图 / Playwright 中间文件已删除，预生产中可见的 `gate4-synthetic-resume.pdf` 测试记录已清理。本分支仅同步文档状态，不提交截图、不提交测试 PDF、不登录、不上传、不写远端数据；Admin 生命周期、签名 URL 等剩余浏览器证据、正式域名 HTTPS、真实短信上线 E2E、Windows 真机和试运营仍待单独验收。 |
 
+| 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成本地主工作区物料整理：将根目录 `.product-pm/`、`.superpowers/`、`.mavis/`、`.workbuddy/`、`mavis-workspace/`、`opc-doc/`、未跟踪 `DESIGN.md` 和 `项目源码及需求文档.zip` 归入本地 `其他文档/` 分类目录；删除根目录和归档材料中的 `.DS_Store`，删除空 `.worktrees/` 和空 `scripts/`；`node_modules/` 作为本地依赖保留。`其他文档/` 已加入 `.gitignore`，不作为正式项目事实或运行时代码。 |
+
 ## 当前工作区事实
 
 主工作区：`/Users/wanglei/AI求职打印服务终端`。当前 `main == origin/main`（具体 tip 以 `git rev-parse main` / `git rev-parse origin/main` 为准），工作区干净，worktree 只剩主仓；远程 head 只剩 `origin/main`。本 docs 分支合入并清理后，本地分支也只剩 `main`。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以任何旧落后分叉作为治理基线。
