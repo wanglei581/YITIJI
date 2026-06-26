@@ -35,18 +35,19 @@
 
 - `deliverables/`：对外交付材料、产品策略输出和可归档成品。
 - `docs/business/`：商业计划、路演、评审、竞赛和合作材料。
-- `opc-doc/`：OPC 相关材料和输出，按交付物管理，不作为运行时代码。
+- `其他文档/OPC外部材料/opc-doc/`：本地 OPC 相关材料和输出归档，不作为运行时代码，不进入 Git。
 
 这些目录可以包含面向外部的文档或 PDF，但不应混入运行时代码、密钥、真实用户数据或临时缓存。
 
 ## 协作与任务记录
 
 - `.ccg/`：CCG 任务、规范和多模型协作记录。
-- `.superpowers/`：Superpowers 流程工作目录。计划、规格或审查证据需按价值分类；运行状态、临时服务 PID、浏览器缓存等不作为正式项目事实。
-- `.mavis/`、`mavis-workspace/`：Mavis 相关规划或历史协作材料。
-- `.worktrees/`：本地隔离工作区目录，不作为正式源码。
+- `其他文档/产品需求资料/`：本地产品工具草稿归档，例如已抽取过正式结论的 `.product-pm` 资料。
+- `其他文档/流程设计草稿/`：本地流程、设计和 Superpowers 草稿归档；正式设计结论仍应抽取到 `docs/design/` 或 `docs/reviews/`。
+- `其他文档/AI工具记忆/`：Mavis / Workbuddy 等本地工具记忆和规划材料归档，不作为项目事实来源。
+- `.worktrees/`：如后续临时创建本地隔离工作区，仍不作为正式源码；当前根目录不保留空 worktree 目录。
 
-这些目录用于协作和任务追踪。正式产品事实仍以 `AGENTS.md` / `CLAUDE.md`、`docs/progress/current-progress.md`、`docs/progress/next-tasks.md`、`docs/product/feature-scope.md`、`docs/compliance/compliance-boundary.md` 和本文件为准。
+这些目录用于协作和任务追踪或本地归档，已通过 `.gitignore` 排除。正式产品事实仍以 `AGENTS.md` / `CLAUDE.md`、`docs/progress/current-progress.md`、`docs/progress/next-tasks.md`、`docs/product/feature-scope.md`、`docs/compliance/compliance-boundary.md` 和本文件为准。
 
 ## 临时与生成目录
 
