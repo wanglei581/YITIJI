@@ -465,10 +465,11 @@ typecheck（6 包）/ lint（4 端，0 error）/ build（5 包）全绿；verify
 - 预生产 COS 隔离桶切换 PASSED：腾讯云新建隔离预生产 bucket + 预生产专用 CAM 子用户（`strict_nonprod=true`、`prod_label=false`、`ap-guangzhou`）；G3-06 `verify:cos:live` put/head/get/预签名下载/delete 通过，删除后对象不存在。
 - Gate 4（账号 / API 级）PASSED WITH NOTES：受控 MEMBER_A / MEMBER_B / 临时 Admin 经真实 HTTP API + PostgreSQL + Redis + COS 完成会员登录、原始文件上传、默认 90 天、设置 180 天、原始件长期保存拒绝、签名 URL、跨账号 403、删除三态、过期清理、Admin 生命周期汇总；真实 AI 导出产物自动标记 `assetCategory=optimized` + `sourceFileId` 已补 COS/DB 脱敏证据。临时将 `SMS_PROVIDER=log` 执行后已回滚 `tencent`。
 - 临时 HTTPS：30 天自签 + hosts 映射（`kiosk/admin/partner.preprod.local`）可返回 HTTP/2 200 与 `db=postgres` health。
+- Gate 4（浏览器会员路径）PARTIAL PASSED WITH NOTES：2026-06-26 使用真实短信登录路径补齐会员页、合成 PDF 上传窗口和 `/me/documents` 会员文件与保存期限截图；证据保存到仓库外 `/Users/wanglei/gate4-evidence/gate4-browser-20260625231841`，坏的全屏截图 / Playwright 中间文件已删除，预生产中可见的 `gate4-synthetic-resume.pdf` 测试记录已清理。该项只覆盖会员浏览器路径，不等于完整 Gate 4、正式生产或试运营完成。
 
 ### 仍待完成（正式生产 P0 阻塞，正文 §八 复选框不勾）
 
-- Gate 4 **浏览器截图**补齐（API 级已过，完整截图待补）。
+- Gate 4 **剩余浏览器证据**补齐（Admin 生命周期、签名 URL / 等待窗口、必要时 COS 控制台或 DB 脱敏摘要；API 级和会员路径已过，完整截图待补）。
 - **百度 OCR Key 预生产 live**、**AI / TRTC / ASR / TTS 按启用范围 live**（本地已验，预生产 live 待补）。
 - **正式域名 + 正式 HTTPS**（当前仅 30 天临时自签）。
 - **腾讯短信审核**通过后**真实手机号 E2E**（预生产仍 `SMS_PROVIDER=tencent`，真实发送待审核）。
