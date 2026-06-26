@@ -72,9 +72,9 @@ rg --hidden --no-ignore -n -i "(password|secret|token|api[_-]?key|access[_-]?key
 
 ## 二进制/大文件风险
 
-P0 worktree 已 tracked：
+P0 worktree 当时已 tracked；2026-06-26 已在后续 docs 清理中移出 Git 并仓库外归档：
 
-- `docs/business/AI求职打印服务终端-B2G-B2B2C线下就业服务终端解决方案.pdf`，约 20K。
+- `docs/business/AI求职打印服务终端-B2G-B2B2C线下就业服务终端解决方案.pdf`，约 20K，原件归档到 `其他文档/商业材料/PDF归档/`。
 
 主工作区 untracked：
 

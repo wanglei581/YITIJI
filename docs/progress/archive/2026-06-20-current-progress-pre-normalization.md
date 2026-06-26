@@ -1585,7 +1585,7 @@ POST /resume/parse { fileId }
 
 **沉淀设计规范（唯一依据）：**
 - 在 [docs/design/visual-design-spec.md](../design/visual-design-spec.md) 追加**锁定版 §15「Kiosk 首页定稿规范」**：顶栏（一体机名 + 状态栏 + 实时时间）、三态身份区、数据概览真实计数规则、两级模块 + 功能色（§14.2）、克制打底表皮、合规命名、触控/验收。冲突处覆盖 §14.6 探索方向。
-- 过程预览产物：[docs/design/ui-style-preview.html](../design/ui-style-preview.html)（非正式工程，仅用于评审定稿）。
+- 过程预览产物：`docs/design/ui-style-preview.html`（非正式工程，仅用于评审定稿；2026-06-26 已移出 Git 并仓库外归档）。
 
 **首页落地（apps/kiosk）：**
 - 重写 [apps/kiosk/src/pages/home/HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx)：
