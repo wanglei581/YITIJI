@@ -48,7 +48,8 @@ T5 必须区分“新增不入库”和“历史已跟踪”：
 | `docs/business/*OPC创业大赛商业计划书.md` | 未跟踪 | 可转正式商业计划候选；T5 只索引 |
 | `docs/business/*商业计划书.md` | 未跟踪 | 旧版商业计划候选；需和 OPC 版合并去重后再转正 |
 | `docs/business/*商业计划书.pdf` | 未跟踪 | 仓库外归档候选；T5 不提交 |
-| `deliverables/product-strategy/*.md` | 未跟踪 | 路线图转正式产品/运营计划候选 |
+| `deliverables/product-strategy/*.md` | 未跟踪 | 路线图转正式产品/运营计划候选；后续已转入 `docs/product/roadmap-update-launch-2026Q3-2027Q2-2026-06-17.md` |
+| `deliverables/README.md` 与 3 个宣传片 Markdown | T5 后续曾被跟踪；2026-06-26 已移出 Git 并仓库外归档 | 逐字节一致副本保留在 `其他文档/deliverables/`；OPC 成品完整性记录迁入本文下方 |
 | `opc-doc/outputs/` | 已被 ignore | 只作为商业策略输入；不直接入库 |
 | `opc-doc/state/*.json` | 未跟踪且未忽略 | 过程态状态文件；不入库，后续可随 `opc-doc/` 外部归档或本地保留 |
 | `opc-doc/.DS_Store` | 已被 ignore | 本地垃圾；可本地删除，不入库 |
@@ -76,6 +77,40 @@ T5 必须区分“新增不入库”和“历史已跟踪”：
 - 新增 PDF、PPT、DOCX、ZIP、图片和压缩包默认不进 Git。
 - 有 Markdown 源的 PDF 作为导出版，优先仓库外归档。
 - 无 Markdown 源但已经跟踪的 PDF，清理必须另起任务，先确认外部归档位置和是否仍需保留。
+
+## 交付物归档完整性记录（2026-06-26 迁入）
+
+原 `deliverables/README.md` 与 3 个宣传片 Markdown 已从 Git 移出，逐字节一致副本保留在本地 `其他文档/deliverables/`。为避免删除 `deliverables/README.md` 后丢失仓库内留痕，本节迁入 OPC 2026 交付物清单和 sha256 校验记录。
+
+外部存储位置仍为本机归档，待上传 COS / 网盘 / GitHub release 附件后再补可访问 URL 与访问权限。本机归档目录：`/Users/wanglei/Documents/AI求职打印服务终端交付物归档/OPC-2026-06/`。
+
+| 文件 | 类型 | 大小(字节) | 原仓库相对路径 | 对应 Markdown 源 |
+| --- | --- | ---: | --- | --- |
+| `AI求职打印服务终端-交互演示.html` | HTML | 51332 | `deliverables/opc-参赛材料/` | 无（app / PPT 衍生导出） |
+| `AI求职打印服务终端-演示PPT.pptx` | PPTX | 4925351 | `deliverables/opc-参赛材料/` | 内容源＝668 行 BP |
+| `AI求职打印服务终端-演示PPT.pdf` | PDF | 1084405 | `deliverables/opc-参赛材料/` | 同上（PPT 的 PDF 导出） |
+| `职易达-OPC路演PPT.pptx` | PPTX | 341980 | `deliverables/opc-参赛材料/` | 内容源＝668 行 BP |
+| `职易达-OPC路演PPT.pdf` | PDF | 654476 | `deliverables/opc-参赛材料/` | 同上 |
+| `职易达-OPC参赛项目介绍.docx` | DOCX | 26628 | `deliverables/opc-参赛材料/` | 约等于参赛项目简介.md |
+| `职易达-项目介绍.pdf` | PDF | 583157 | `deliverables/opc-参赛材料/` | 约等于参赛项目简介.md / 668 行 BP |
+| `AI求职打印服务终端-B2G-B2B2C方案-专家评审报告.pdf` | PDF | 805630 | `docs/business/` | 专家评审报告.md |
+| `职易达AI求职服务终端商业计划书.pdf` | PDF | 1064859 | `docs/business/` | 232 行叙述版 BP |
+| `职易达AI求职服务终端商业计划书.md` | Markdown | 22195 | `docs/business/` | 668 行 canonical BP 的叙述体重复 |
+
+可用下列 `shasum -a 256` 清单在归档目录校验完整性：
+
+```text
+c2b10c6af96a81ce13f3d1d80b826f74259b9979a30a84dc28e5ca0a704d3869  AI求职打印服务终端-交互演示.html
+e4291266f1582066025d08f1fdec996bbbda3e6cab1c71b5a0d8bfd1c58c42ae  AI求职打印服务终端-演示PPT.pptx
+5d103573f96d5a73e3c3f18bd9086084767cd4c88b4545e74d55787bb89dbd16  AI求职打印服务终端-演示PPT.pdf
+3abd952c7371cde1178967e3550029a278ac61a5d7f94503e1ee7f32b0b253f3  职易达-OPC路演PPT.pptx
+066634de496df69bf424cdac217d98df6714f9b24c42fd47173dd9bedc4d5542  职易达-OPC路演PPT.pdf
+827851a73e04a6ccd178ae2f698202941287819d4ab01b7d6733a0e35a9a3adc  职易达-OPC参赛项目介绍.docx
+870cb0ccbfef18b8a640a92f7da4c6febaf263c67ade09a12110d589edaa35f4  职易达-项目介绍.pdf
+7413d1acef0c1651fd5f5606617131937d6c094d8f43447e61c2804af781f579  AI求职打印服务终端-B2G-B2B2C方案-专家评审报告.pdf
+125784a37a96167e35e293b17d925b5f4f004b2c5f67da1e37c19d6f0f615c3c  职易达AI求职服务终端商业计划书.pdf
+41de3e662a8595329b324ebef2e87f7356094edac12f5ffa2940e9767e02414b  职易达AI求职服务终端商业计划书.md
+```
 
 ## OPC 输出与状态文件
 
@@ -110,6 +145,7 @@ T5 必须区分“新增不入库”和“历史已跟踪”：
 | D3 对外简介转正 | 参赛项目简介、品牌名讨论 | 确认品牌名后转为正式项目简介 |
 | D4 路线图转正 | Q3-Q2 路线图更新 | 按最新部署、真机和试运营事实复核日期与指标 |
 | D5 OPC 策略输入归档 | `opc-doc/outputs/`、`opc-doc/state/` | 建仓库外归档位置或转正式摘要，不整包入库 |
+| D6 `deliverables/` 跟踪文件清理 | 交付物索引和宣传片 Markdown | 已于 2026-06-26 完成：同名副本归档到 `其他文档/deliverables/`，完整性记录迁入本文 |
 
 ## 双模型分析结论
 
@@ -135,4 +171,4 @@ Antigravity 结论为 `APPROVE_PLAN`：
 
 ## 最终口径
 
-T5 的可提交结果是“外部材料索引”，不是“外部材料迁移”。主工作区 D 类文件保持原状；是否转正式文档、仓库外归档、清理已跟踪 PDF 或删除本地垃圾，全部另起独立任务处理。
+T5 的原始可提交结果是“外部材料索引”，不是“外部材料迁移”。后续已按独立确认完成旧方案 PDF 与 `deliverables/` 跟踪文件清理：原始材料保留在本地 `其他文档/` 或外部归档目录，仓库内只保留可审查 Markdown 正式材料、审计索引和完整性记录。
