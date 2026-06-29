@@ -1,22 +1,23 @@
-# 运动语言规范（Motion System）
+# 运动语言参考（Motion System）
 
 > 适用范围：AI求职打印服务终端 —— 一体机前台（Kiosk）、管理员后台、合作机构后台。
-> 所有页面动效统一遵守本规范。各页不得自定义时长与缓动，必须取自下方 token。
+> 本文档为历史动效参考，不再要求所有页面统一遵守。各页可根据当前设计任务自定义时长、缓动、动画库和动效语言。
+> 不可覆盖的底线是：不伪造成功状态、不掩盖错误 / 离线 / 硬件失败、不降低触控可用性和可访问性。
 > 配套可交互演示台：`docs/design/motion-playground.html`。
 
 ---
 
 ## 0. 核心原则
 
-统一运动语言的目标是"稳、清楚、有现场设备感"，而不是炫技。落地时遵守以下五条：
+旧版统一运动语言的目标是"稳、清楚、有现场设备感"，而不是炫技。落地时可参考以下五条：
 
-1. **只动 `opacity` 与 `transform`（translate / scale）。** 不对 `width / height / top / left / box-shadow / filter` 做大面积动画，避免重排卡顿与抖动。需要展开/收起时用 `grid-template-rows: 0fr↔1fr` 或 `clip-path`，不要让高度大幅跳变。
-2. **动效必须表达状态，不做纯装饰。** 每个动画都要能回答"系统现在处于什么状态 / 发生了什么变化"。看不出状态含义的动画一律删掉。
-3. **时长与缓动统一取 token。** 见第 1、2 节。同一类交互在所有页面必须用同一时长。
-4. **克制。** 一体机业务页与后台不做大面积持续飘动背景。强动效背景只用于待机宣传屏（见 `dynamic-blue-styles.html` / `-2.html` 的"强动效"档）。
-5. **可访问 + 触控优先。** 主按钮触控区 ≥ 56px，可点击区 ≥ 48px；`prefers-reduced-motion` 必须降级为"瞬时切换 + 淡入"。
+1. **优先使用 `opacity` 与 `transform`（translate / scale）。** 如需动画 `width / height / top / left / box-shadow / filter`，先评估性能与抖动风险。
+2. **关键动效表达状态。** 纯装饰动效可以使用，但不得掩盖系统状态或误导用户认为任务已成功。
+3. **时长与缓动可参考 token。** 见第 1、2 节；新设计任务可以定义自己的节奏。
+4. **性能可控。** 一体机业务页和后台可以使用更强视觉动效，但不能造成输入延迟、滚动卡顿或长时间占用注意力。
+5. **可访问 + 触控优先。** 主按钮触控区 ≥ 56px，可点击区 ≥ 48px；`prefers-reduced-motion` 必须提供降级体验。这是可用性硬约束，不属于可放宽的视觉风格限制。
 
-动效层的合规红线单列在第 5 节，开发前必读。
+动效层的合规红线单列在第 5 节，仍为硬约束。
 
 ---
 
@@ -29,9 +30,9 @@
 | `--motion-state` | **180–260ms（默认 220ms）** | 状态切换（在线↔离线、徽章变色、crossfade、筛选重排） |
 | `--motion-flow` | **300–400ms（默认 360ms）** | 复杂流程 / 页面转场 / 共享元素转场 |
 | `--motion-stagger` | **40–60ms** | 多元素依次出现的相邻间隔（默认 50ms） |
-| `--motion-success-max` | **≤ 1000ms** | 成功反馈动画总时长上限（如对勾扩散），必须在 1 秒内结束 |
+| `--motion-success-max` | **≤ 1000ms** | 成功反馈动画旧版建议总时长上限（如对勾扩散），优先在 1 秒内结束 |
 
-约束：单个动画时长不超过对应档上限；`stagger` 队列封顶约 6 项，超出的项同时出现，避免长尾等待。
+建议：单个动画时长不宜过长；`stagger` 队列避免长尾等待。
 
 ---
 
@@ -44,13 +45,13 @@
 | `--ease-press` | `cubic-bezier(.4,0,.6,1)` | 按压（快进快出，无明显回弹） |
 | `--ease-in` | `cubic-bezier(.4,0,1,1)` | 离场 / 收起（加速离开，时长可比进入短 ~40ms） |
 
-不使用夸张弹性（overshoot）曲线，保持"专业设备"观感。
+默认不使用夸张弹性（overshoot）曲线；如果当前设计任务需要更强表现，可以在不影响触控和阅读的前提下使用。
 
 ---
 
 ## 3. 通用动效模式
 
-下列模式是各页复用的基础积木，落地时直接套用，不要再造新写法。
+下列模式是各页可复用的基础积木，落地时优先参考；新设计任务可以自定义写法。
 
 **卡片 / 区块进入：** `opacity 0→1` + `translateY(12px→0)`，时长 `--motion-enter`，缓动 `--ease-out`。
 
@@ -100,7 +101,7 @@
 | 流程时间线 | 上传 → 预览 → 参数 → 确认 → 队列 → 打印中 → 完成，做成明确时间线，逐节点点亮 | `--motion-state` |
 | 打印中状态流 | 「任务已提交 / 终端已领取 / 打印机执行 / 出纸完成」逐条真实状态出现 | `--motion-enter` |
 | 错误态 | 离线 / 缺纸 / 卡纸时**直接切错误态，绝不播放模拟成功动画**，给出明确处理提示 | `--motion-state` |
-| 成功反馈 | 对勾扩散 + 纸张轻微滑出，**≤ 1 秒内结束** | `--motion-success-max` |
+| 成功反馈 | 对勾扩散 + 纸张轻微滑出，旧版建议 **≤ 1 秒内结束** | `--motion-success-max` |
 
 ### 4.4 岗位 / 招聘会 / 企业展示页 · 来源导览感
 方向：像信息入口和现场导览，**不要像招聘平台**。
@@ -148,7 +149,7 @@
 
 ## 6. 技术落地（纯 CSS + Tailwind v4）
 
-本项目用 **Tailwind v4**（`@tailwindcss/vite`，**无 `tailwind.config.js`**），主题在 `packages/ui/src/styles/tokens.css` 的 `@theme` 块声明，三端 `index.css` 已 `@import` 它。动效**只用 CSS + Tailwind**，**不引入 Framer Motion 等运行时动画库**，保证 21.5 寸一体机性能。
+本项目用 **Tailwind v4**（`@tailwindcss/vite`，**无 `tailwind.config.js`**），主题在 `packages/ui/src/styles/tokens.css` 的 `@theme` 块声明，三端 `index.css` 已 `@import` 它。默认优先用 CSS + Tailwind 实现轻量动效；如当前设计任务确需运行时动画库，可以在评估包体、性能、可维护性和一体机表现后引入，并必须补充浏览器或真机性能验收，覆盖触控响应、滚动流畅度和主要转场卡顿风险。
 
 ### 6.1 第一步：把第 1、2 节 token 写入 `tokens.css` 的 `@theme`（与 `--color-*` / `--radius-*` 同级）
 
@@ -192,7 +193,7 @@
 | 状态切换 | `class="transition-colors duration-[var(--motion-state)] ease-inout"`（建议配 `data-state="online\|offline\|error"`） |
 | 原生 CSS | `transition: opacity var(--motion-state) var(--ease-inout);` |
 
-> 时长统一用 `duration-[var(--motion-*)]` 引用变量，**不散写** `duration-200` 魔法数；缓动用生成的 `ease-out / ease-inout / ease-press / ease-in` 工具类。
+> 需要沿用旧 motion token 时，可用 `duration-[var(--motion-*)]` 引用变量；新设计任务也可以定义新的时长和缓动。
 
 ### 6.3 第三步：复用、降级与性能
 
@@ -213,4 +214,4 @@
 
 ---
 
-_维护：本规范与 `motion-playground.html` 为配套资产。修改 token 时两者必须同步更新，并在 `docs/progress/current-progress.md` 记录。_
+_维护：本参考与 `motion-playground.html` 为配套资产。修改 token 时建议同步更新两者，并在 `docs/progress/current-progress.md` 记录。_
