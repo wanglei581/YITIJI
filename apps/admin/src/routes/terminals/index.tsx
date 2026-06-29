@@ -8,11 +8,13 @@ import {
   getTerminals,
   getOrgOptions,
   assignTerminalOrg,
+  updateTerminalProfile,
   type AdminTerminalRecord,
   type AdminOrganizationOption,
+  type UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 
-const TABLE_COLS = 9
+const TABLE_COLS = 12
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
 // ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
@@ -64,8 +66,12 @@ export default function TerminalsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('') // '' = 未绑定/解绑
   const [saving, setSaving] = useState(false)
+  const [profileEditingId, setProfileEditingId] = useState<string | null>(null)
+  const [profileDraft, setProfileDraft] = useState<UpdateTerminalProfileInput>({})
+  const [profileSaving, setProfileSaving] = useState(false)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
+  const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
 
   const {
     data: terminalData,
@@ -88,14 +94,15 @@ export default function TerminalsPage() {
     },
   )
 
-  useInteractionLock(editingId !== null || saving, [TERMINALS_REFRESH_KEY], 'hard')
+  useInteractionLock(editingId !== null || saving || profileEditingId !== null || profileSaving, [TERMINALS_REFRESH_KEY], 'hard')
 
   const terminals = useMemo(
     () => (terminalData?.terminals ?? []).map((terminal) => {
-      const patch = localOrgPatch[terminal.id]
-      return patch ? { ...terminal, ...patch } : terminal
+      const orgPatch = localOrgPatch[terminal.id]
+      const profilePatch = localProfilePatch[terminal.id]
+      return { ...terminal, ...orgPatch, ...profilePatch }
     }),
-    [localOrgPatch, terminalData?.terminals],
+    [localOrgPatch, localProfilePatch, terminalData?.terminals],
   )
 
   const loading = status === 'loading' && terminals.length === 0
@@ -125,6 +132,7 @@ export default function TerminalsPage() {
   function startEdit(t: AdminTerminalRecord) {
     setEditingId(t.id)
     setEditValue(t.orgId ?? '')
+    setProfileEditingId(null)
     setNotice(null)
   }
   function cancelEdit() {
@@ -170,6 +178,54 @@ export default function TerminalsPage() {
     }
   }
 
+  function startProfileEdit(t: AdminTerminalRecord) {
+    setProfileEditingId(t.id)
+    setEditingId(null)
+    setProfileDraft({
+      displayName: t.displayName ?? '',
+      macAddress: t.macAddress ?? '',
+      locationLabel: t.locationLabel ?? '',
+      enabled: t.enabled,
+    })
+    setNotice(null)
+  }
+
+  function cancelProfileEdit() {
+    setProfileEditingId(null)
+    setProfileDraft({})
+  }
+
+  async function saveProfile(t: AdminTerminalRecord) {
+    setProfileSaving(true)
+    setNotice(null)
+    try {
+      const payload: UpdateTerminalProfileInput = {
+        displayName: profileDraft.displayName === '' ? null : profileDraft.displayName,
+        macAddress: profileDraft.macAddress === '' ? null : profileDraft.macAddress,
+        locationLabel: profileDraft.locationLabel === '' ? null : profileDraft.locationLabel,
+        enabled: profileDraft.enabled ?? true,
+      }
+      const res = await updateTerminalProfile(t.terminalCode, payload)
+      setLocalProfilePatch((current) => ({
+        ...current,
+        [t.id]: {
+          displayName: res.displayName,
+          macAddress: res.macAddress,
+          locationLabel: res.locationLabel,
+          enabled: res.enabled,
+        },
+      }))
+      setProfileEditingId(null)
+      setProfileDraft({})
+      void refresh().catch(() => undefined)
+      setNotice({ type: 'success', text: `已更新终端 ${t.terminalCode} 的设备档案，Kiosk 下一轮配置刷新后生效` })
+    } catch (e) {
+      setNotice({ type: 'error', text: e instanceof Error ? e.message : '设备档案保存失败，请稍后重试' })
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
   const byStatus = filter === '全部'
     ? terminals
     : terminals.filter((t) => (filter === '在线' ? t.online : !t.online))
@@ -177,6 +233,9 @@ export default function TerminalsPage() {
   const searched = search.trim()
     ? byStatus.filter((t) =>
         t.terminalCode.toLowerCase().includes(search.toLowerCase()) ||
+        (t.displayName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (t.macAddress ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (t.locationLabel ?? '').toLowerCase().includes(search.toLowerCase()) ||
         (t.ipAddress ?? '').includes(search) ||
         (t.agentVersion ?? '').toLowerCase().includes(search.toLowerCase())
       )
@@ -197,7 +256,7 @@ export default function TerminalsPage() {
         <p className="text-sm text-gray-500">共 {total} 台终端</p>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索终端编号、IP、版本..." className="h-8 w-72 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索编号、设备名、MAC、位置、IP..." className="h-8 w-80 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
             <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
           </div>
           <button onClick={() => void refresh()} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
@@ -241,7 +300,7 @@ export default function TerminalsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
-                {['终端编号', '所属机构', '状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
+                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
                   <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
                 ))}
               </tr>
@@ -277,6 +336,86 @@ export default function TerminalsPage() {
                   return (
                     <tr key={t.id} className="hover:bg-gray-50">
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700">{t.terminalCode}</td>
+                      <td className="min-w-[260px] px-4 py-3 text-xs">
+                        {profileEditingId === t.id ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                value={profileDraft.displayName ?? ''}
+                                onChange={(e) => setProfileDraft((d) => ({ ...d, displayName: e.target.value }))}
+                                disabled={profileSaving}
+                                placeholder="设备名称"
+                                className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                              />
+                              <input
+                                value={profileDraft.macAddress ?? ''}
+                                onChange={(e) => setProfileDraft((d) => ({ ...d, macAddress: e.target.value }))}
+                                disabled={profileSaving}
+                                placeholder="MAC 地址"
+                                className="h-7 rounded-md border border-gray-200 px-2 font-mono text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                              />
+                            </div>
+                            <input
+                              value={profileDraft.locationLabel ?? ''}
+                              onChange={(e) => setProfileDraft((d) => ({ ...d, locationLabel: e.target.value }))}
+                              disabled={profileSaving}
+                              placeholder="摆放位置"
+                              className="h-7 w-full rounded-md border border-gray-200 px-2 text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                            />
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                                <input
+                                  type="checkbox"
+                                  checked={profileDraft.enabled ?? true}
+                                  onChange={(e) => setProfileDraft((d) => ({ ...d, enabled: e.target.checked }))}
+                                  disabled={profileSaving}
+                                  className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600"
+                                />
+                                启用终端
+                              </label>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => saveProfile(t)}
+                                  disabled={profileSaving}
+                                  title="保存设备档案"
+                                  aria-label="保存设备档案"
+                                  className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+                                >
+                                  <CheckIcon className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelProfileEdit}
+                                  disabled={profileSaving}
+                                  title="取消"
+                                  aria-label="取消"
+                                  className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                  <XIcon className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-gray-800">{t.displayName || '未命名终端'}</p>
+                              <p className="mt-0.5 max-w-[220px] truncate text-gray-400">{t.locationLabel || '未设置摆放位置'}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => startProfileEdit(t)}
+                              title="编辑设备档案"
+                              aria-label={`编辑 ${t.terminalCode} 设备档案`}
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{t.macAddress ?? '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs">
                         {editingId === t.id ? (
                           <div className="flex items-center gap-1.5">
@@ -334,6 +473,9 @@ export default function TerminalsPage() {
                           </div>
                         )}
                       </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} />
+                      </td>
                       <td className="px-4 py-3"><StatusBadge status={onlineView.badge} label={onlineView.label} /></td>
                       <td className="px-4 py-3"><StatusBadge status={printerView.badge} label={printerView.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
@@ -357,6 +499,9 @@ export default function TerminalsPage() {
       </p>
       <p className="mt-1 text-xs text-gray-400">
         「所属机构」决定该终端归哪所学校；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。
+      </p>
+      <p className="mt-1 text-xs text-gray-400">
+        「设备档案」用于商用部署的机器识别和权限绑定；MAC 地址建议由 Terminal Agent 上报，也可由管理员人工校正。停用终端后，Kiosk 统一配置会关闭敏感模块。
       </p>
     </>
   )

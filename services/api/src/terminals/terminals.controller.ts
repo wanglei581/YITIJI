@@ -4,6 +4,7 @@
 // Routes:
 //   POST  /auth/terminal/register               — no auth
 //   PUT   /terminals/:terminalId/heartbeat      — Bearer token
+//   GET   /terminals/:terminalId/config         — public, read-only kiosk config
 //   POST  /terminals/:terminalId/tasks/claim    — Bearer token
 //   PATCH /print-tasks/:taskId/status           — Bearer token + X-Terminal-Id
 //   GET   /test/sample.png                      — public, for mock task download
@@ -52,6 +53,14 @@ export class TerminalsController {
     @Headers('authorization') auth: string | undefined,
   ) {
     return this.terminalsService.heartbeat(terminalId, dto, auth)
+  }
+
+  // ── 3. Claim tasks ───────────────────────────────────────────────────────
+  // GET /api/v1/terminals/:terminalId/config
+  @Get('terminals/:terminalId/config')
+  @HttpCode(HttpStatus.OK)
+  getTerminalConfig(@Param('terminalId') terminalId: string) {
+    return this.terminalsService.getKioskTerminalConfig(terminalId)
   }
 
   // ── 3. Claim tasks ───────────────────────────────────────────────────────

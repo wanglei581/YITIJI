@@ -83,7 +83,8 @@
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
     "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",
     "verify:member-data-retention": "node -r @swc-node/register scripts/verify-member-data-retention.ts",
-    "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts"
+    "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",
+    "verify:terminal-device-config": "node -r @swc-node/register scripts/verify-terminal-device-config.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

@@ -95,6 +95,7 @@
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成 `deliverables/` 外部交付物清理：4 个已跟踪宣传片 / 交付物 Markdown 与索引文件已移出 Git，逐字节一致副本保留在本地 `其他文档/deliverables/`；OPC 二进制归档的资产清单和 sha256 完整性记录已迁入 `docs/reviews/project-normalization-external-materials-index.md`，避免删除 `deliverables/README.md` 后丢失仓库内留痕。 |
 | 2026-06-29 | `codex/global-refresh-mechanism` / 本分支 | 完成三端全局无感数据刷新机制首期底座和 Admin 试点：新增 `packages/refresh`，三端挂载 `RefreshProvider`，Admin 终端 / 打印机 / 订单只读页接入统一刷新；自动刷新必须等用户连续 15 秒无操作，详情 / 编辑 / 保存 hard lock 时新数据只进 pending buffer，不触发跳转、弹窗关闭或页面替换。 |
 | 2026-06-29 | `codex/partner-refresh-rollout` / 本分支 | 完成 Partner 端全局无感刷新首轮推广：岗位、招聘会、政策公告三类列表从页面内 `load + setState` 改为 `useRefreshable` 统一资源；自动刷新间隔 60 秒且仍受全局 15 秒无操作门禁约束；新增 / 编辑抽屉、保存、下架、删除确认期间使用 hard lock，新数据进入 pending buffer，不覆盖表单、不关闭抽屉、不跳转。 |
+| 2026-06-29 | `codex/terminal-device-profile-closure` / 本分支 | 收口终端设备档案与 Kiosk 统一配置候选：Terminal 新增设备名、MAC、摆放位置、启停字段和 SQLite/PostgreSQL additive migration；Admin 终端页可编辑设备档案并写 `terminal.profile.update` 审计；终端 register/heartbeat 可上报档案；Kiosk 智慧校园优先读取统一配置并保留旧接口回退。公开 Kiosk config 已收窄为智慧校园模块开关、配置版本、刷新间隔和服务端时间，不返回设备名、摆放位置、MAC、机构 ID 或机构名称，且不再用 MAC 作为公开查询键；停用终端允许心跳但拒绝 claim / 状态回写，避免继续打印。新增 `verify:terminal-device-config` 锁住字段、公开白名单、停用语义和坏 MAC 不打挂心跳；真实 Windows Agent 上报与生产 PostgreSQL 迁移仍需真机 / 预生产验收。 |
 
 ## 当前工作区事实
 

@@ -22,6 +22,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
@@ -29,6 +30,9 @@ import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
+import type { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
+import type { KioskTerminalConfigView } from './terminal-config.types'
+import { DEFAULT_SMART_CAMPUS_MODULES, type SmartCampusModules } from '../smart-campus/smart-campus.types'
 
 // ── Task status type ──────────────────────────────────────────────────────────
 
@@ -39,6 +43,56 @@ const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed']
 const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
   claimed: ['printing', 'failed'],
   printing: ['completed', 'failed'],
+}
+
+const CONFIG_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
+function cleanNullable(value: string | null | undefined): string | null | undefined {
+  if (value === null) return null
+  if (value === undefined) return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizeMacAddress(value: string | null | undefined): string | null | undefined {
+  const cleaned = cleanNullable(value)
+  if (cleaned === null || cleaned === undefined) return cleaned
+  const hex = cleaned.replace(/[^0-9a-fA-F]/g, '').toUpperCase()
+  if (hex.length !== 12) {
+    throw new BadRequestException({ error: { code: 'INVALID_MAC_ADDRESS', message: 'MAC 地址格式不正确' } })
+  }
+  return hex.match(/.{1,2}/g)!.join(':')
+}
+
+function tryNormalizeMacAddress(value: string | null | undefined): string | null | undefined {
+  try {
+    return normalizeMacAddress(value)
+  } catch {
+    return undefined
+  }
+}
+
+function isMacUniqueConstraintError(error: unknown): boolean {
+  const maybe = error as { code?: string; meta?: { target?: unknown } }
+  if (maybe.code !== 'P2002') return false
+  const target = maybe.meta?.target
+  return Array.isArray(target)
+    ? target.includes('macAddress')
+    : typeof target === 'string' && target.includes('macAddress')
+}
+
+function parseSmartCampusModules(json: string): SmartCampusModules {
+  try {
+    const raw = JSON.parse(json) as Partial<SmartCampusModules> | null
+    return {
+      welcome: !!raw?.welcome,
+      bigdata: false,
+      luggage: !!raw?.luggage,
+      panorama: !!raw?.panorama,
+    }
+  } catch {
+    return { ...DEFAULT_SMART_CAMPUS_MODULES }
+  }
 }
 
 // ── PrintJobParams ────────────────────────────────────────────────────────────
@@ -110,6 +164,10 @@ function inferMimeFromFileName(fileName: string | undefined): string | undefined
 export interface AdminTerminalView {
   id: string
   terminalCode: string
+  displayName: string | null
+  macAddress: string | null
+  locationLabel: string | null
+  enabled: boolean
   orgId: string | null // 所属机构 id；null = 未绑定
   orgName: string | null // 所属机构名称（便于前端直接展示）
   registeredAt: string // ISO
@@ -138,6 +196,15 @@ export interface AssignTerminalOrgResult {
   oldOrgId: string | null
   newOrgId: string | null
   orgName: string | null // 绑定后的机构名；解绑时为 null
+}
+
+export interface UpdateTerminalProfileResult {
+  terminalId: string
+  terminalCode: string
+  displayName: string | null
+  macAddress: string | null
+  locationLabel: string | null
+  enabled: boolean
 }
 
 export interface AdminPrinterView {
@@ -298,20 +365,32 @@ export class TerminalsService implements OnModuleInit {
 
     const agentToken = crypto.randomBytes(32).toString('hex')
     const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
+    const macAddress = normalizeMacAddress(dto.macAddress)
+    if (macAddress) {
+      await this.assertMacAvailable(macAddress, dto.terminalCode)
+    }
 
-    const terminal = await this.prisma.terminal.upsert({
-      where: { terminalCode: dto.terminalCode },
-      update: {
-        agentToken,
-        deviceFingerprint: dto.deviceFingerprint,
-      },
-      create: {
-        id: `t_${crypto.randomBytes(8).toString('hex')}`,
-        terminalCode: dto.terminalCode,
-        agentToken,
-        deviceFingerprint: dto.deviceFingerprint,
-      },
-    })
+    const terminal = await this.writeWithMacConflictMapping(() =>
+      this.prisma.terminal.upsert({
+        where: { terminalCode: dto.terminalCode },
+        update: {
+          agentToken,
+          deviceFingerprint: dto.deviceFingerprint,
+          displayName: cleanNullable(dto.displayName),
+          macAddress,
+          locationLabel: cleanNullable(dto.locationLabel),
+        },
+        create: {
+          id: `t_${crypto.randomBytes(8).toString('hex')}`,
+          terminalCode: dto.terminalCode,
+          agentToken,
+          deviceFingerprint: dto.deviceFingerprint,
+          displayName: cleanNullable(dto.displayName),
+          macAddress,
+          locationLabel: cleanNullable(dto.locationLabel),
+        },
+      }),
+    )
 
     this.logger.log(`register: terminalId=${terminal.id} code=${dto.terminalCode}`)
     return { terminalId: terminal.id, terminalToken: agentToken, expiresAt }
@@ -324,7 +403,15 @@ export class TerminalsService implements OnModuleInit {
     dto: HeartbeatDto,
     authHeader: string | undefined,
   ): Promise<{ acknowledged: true }> {
-    await this.findAndValidate(terminalId, authHeader)
+    await this.findAndValidate(terminalId, authHeader, { allowDisabled: true })
+    const profilePatch = await this.buildDeviceProfilePatch(dto, terminalId)
+
+    await this.writeWithMacConflictMapping(() =>
+      this.prisma.terminal.update({
+        where: { id: terminalId },
+        data: { ...profilePatch, lastSeenAt: new Date() },
+      }),
+    )
 
     await this.prisma.terminalHeartbeat.create({
       data: {
@@ -499,6 +586,7 @@ export class TerminalsService implements OnModuleInit {
   private async findAndValidate(
     terminalId: string,
     authHeader: string | undefined,
+    options: { allowDisabled?: boolean } = {},
   ): Promise<void> {
     const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId } })
     if (!terminal) {
@@ -510,6 +598,11 @@ export class TerminalsService implements OnModuleInit {
     if (!token || token !== terminal.agentToken) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
+      })
+    }
+    if (!options.allowDisabled && !terminal.enabled) {
+      throw new ForbiddenException({
+        error: { code: 'TERMINAL_DISABLED', message: '终端已停用' },
       })
     }
   }
@@ -535,6 +628,91 @@ export class TerminalsService implements OnModuleInit {
         error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
       })
     }
+    if (!found.enabled) {
+      throw new ForbiddenException({
+        error: { code: 'TERMINAL_DISABLED', message: '终端已停用' },
+      })
+    }
+  }
+
+  private async assertMacAvailable(macAddress: string, ownerRef: string): Promise<void> {
+    const found = await this.prisma.terminal.findFirst({
+      where: { macAddress },
+      select: { id: true, terminalCode: true },
+    })
+    if (found && found.id !== ownerRef && found.terminalCode !== ownerRef) {
+      throw new BadRequestException({
+        error: { code: 'MAC_ALREADY_BOUND', message: `MAC 地址已绑定到终端 ${found.terminalCode}` },
+      })
+    }
+  }
+
+  private async buildDeviceProfilePatch(
+    dto: Pick<HeartbeatDto, 'displayName' | 'macAddress' | 'locationLabel'>,
+    ownerRef: string,
+  ): Promise<{ displayName?: string | null; macAddress?: string | null; locationLabel?: string | null }> {
+    const data: { displayName?: string | null; macAddress?: string | null; locationLabel?: string | null } = {}
+    if (dto.displayName !== undefined) data.displayName = cleanNullable(dto.displayName)
+    if (dto.locationLabel !== undefined) data.locationLabel = cleanNullable(dto.locationLabel)
+    if (dto.macAddress !== undefined) {
+      const cleanedMacAddress = cleanNullable(dto.macAddress)
+      if (cleanedMacAddress === null) {
+        this.logger.warn(`heartbeat ignored blank MAC address from terminal ${ownerRef}`)
+        return data
+      }
+      const macAddress = tryNormalizeMacAddress(dto.macAddress)
+      if (macAddress === undefined && cleanNullable(dto.macAddress) !== undefined) {
+        this.logger.warn(`heartbeat ignored invalid MAC address from terminal ${ownerRef}`)
+      }
+      if (macAddress) await this.assertMacAvailable(macAddress, ownerRef)
+      data.macAddress = macAddress === undefined ? undefined : macAddress
+    }
+    return data
+  }
+
+  private async writeWithMacConflictMapping<T>(write: () => Promise<T>): Promise<T> {
+    try {
+      return await write()
+    } catch (error) {
+      if (isMacUniqueConstraintError(error)) {
+        throw new BadRequestException({
+          error: { code: 'MAC_ALREADY_BOUND', message: 'MAC 地址已绑定到其它终端' },
+        })
+      }
+      throw error
+    }
+  }
+
+  private terminalRefWhere(terminalRef: string) {
+    return {
+      OR: [
+        { id: terminalRef },
+        { terminalCode: terminalRef },
+      ],
+    }
+  }
+
+  private findTerminalByRef(terminalRef: string) {
+    return this.prisma.terminal.findFirst({
+      where: this.terminalRefWhere(terminalRef),
+      select: { id: true, terminalCode: true, enabled: true, lastSeenAt: true },
+    })
+  }
+
+  private async findSmartCampusConfigByTerminalRef(
+    terminalRef: string,
+    terminal: Awaited<ReturnType<TerminalsService['findTerminalByRef']>>,
+  ) {
+    const keys = [
+      terminalRef,
+      terminal?.terminalCode,
+      terminal?.id,
+    ].filter((v): v is string => !!v)
+    const configs = await this.prisma.terminalSmartCampusConfig.findMany({
+      where: { terminalId: { in: [...new Set(keys)] } },
+      orderBy: { updatedAt: 'desc' },
+    })
+    return configs.sort((a, b) => keys.indexOf(a.terminalId) - keys.indexOf(b.terminalId))[0] ?? null
   }
 
   private async resetExpiredClaims(): Promise<void> {
@@ -675,6 +853,10 @@ export class TerminalsService implements OnModuleInit {
       return {
         id: t.id,
         terminalCode: t.terminalCode,
+        displayName: t.displayName ?? null,
+        macAddress: t.macAddress ?? null,
+        locationLabel: t.locationLabel ?? null,
+        enabled: t.enabled,
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
         registeredAt: t.registeredAt.toISOString(),
@@ -744,6 +926,88 @@ export class TerminalsService implements OnModuleInit {
       oldOrgId,
       newOrgId: orgId,
       orgName,
+    }
+  }
+
+  async updateTerminalProfile(
+    terminalId: string,
+    dto: UpdateTerminalProfileDto,
+  ): Promise<UpdateTerminalProfileResult> {
+    const terminalRefClauses: Array<{ id?: string; terminalCode?: string; macAddress?: string }> = [
+      { id: terminalId },
+      { terminalCode: terminalId },
+    ]
+    const macAddressRef = tryNormalizeMacAddress(terminalId)
+    if (macAddressRef) terminalRefClauses.push({ macAddress: macAddressRef })
+
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: terminalRefClauses },
+      select: { id: true, terminalCode: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+
+    const data: {
+      displayName?: string | null
+      macAddress?: string | null
+      locationLabel?: string | null
+      enabled?: boolean
+    } = {}
+    if ('displayName' in dto) data.displayName = cleanNullable(dto.displayName)
+    if ('locationLabel' in dto) data.locationLabel = cleanNullable(dto.locationLabel)
+    if ('enabled' in dto && dto.enabled !== undefined) data.enabled = dto.enabled
+    if ('macAddress' in dto) {
+      const macAddress = normalizeMacAddress(dto.macAddress)
+      if (macAddress) await this.assertMacAvailable(macAddress, terminal.id)
+      data.macAddress = macAddress === undefined ? undefined : macAddress
+    }
+
+    const saved = await this.writeWithMacConflictMapping(() =>
+      this.prisma.terminal.update({
+        where: { id: terminal.id },
+        data,
+        select: {
+          id: true,
+          terminalCode: true,
+          displayName: true,
+          macAddress: true,
+          locationLabel: true,
+          enabled: true,
+        },
+      }),
+    )
+
+    return {
+      terminalId: saved.terminalCode,
+      terminalCode: saved.terminalCode,
+      displayName: saved.displayName ?? null,
+      macAddress: saved.macAddress ?? null,
+      locationLabel: saved.locationLabel ?? null,
+      enabled: saved.enabled,
+    }
+  }
+
+  async getKioskTerminalConfig(terminalRef: string): Promise<KioskTerminalConfigView> {
+    const terminal = await this.findTerminalByRef(terminalRef)
+    const smartCampusConfig = await this.findSmartCampusConfigByTerminalRef(terminalRef, terminal)
+    const terminalEnabled = terminal?.enabled ?? false
+    const smartCampusEnabled = terminalEnabled && !!smartCampusConfig?.enabled
+    const serverTime = new Date().toISOString()
+
+    return {
+      smartCampus: {
+        enabled: smartCampusEnabled,
+        modules: smartCampusEnabled
+          ? parseSmartCampusModules(smartCampusConfig!.modulesJson)
+          : { ...DEFAULT_SMART_CAMPUS_MODULES },
+      },
+      configVersion: [
+        terminal?.lastSeenAt.toISOString() ?? 'unregistered',
+        smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
+      ].join('|'),
+      refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
+      serverTime,
     }
   }
 

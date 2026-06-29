@@ -8,6 +8,8 @@ import type {
   AdminTerminalsResponse,
   AdminOrgOptionsResponse,
   AssignTerminalOrgResult,
+  UpdateTerminalProfileInput,
+  UpdateTerminalProfileResult,
   AuditLogListResponse,
   AuditLogListQuery,
 } from './types'
@@ -115,6 +117,9 @@ export const adminHttpAdapter = {
 
   assignTerminalOrg: (terminalId: string, orgId: string | null) =>
     patchData<AssignTerminalOrgResult>(`/admin/terminals/${encodeURIComponent(terminalId)}/org`, { orgId }),
+
+  updateTerminalProfile: (terminalId: string, input: UpdateTerminalProfileInput) =>
+    patchData<UpdateTerminalProfileResult>(`/admin/terminals/${encodeURIComponent(terminalId)}/profile`, input),
 
   getPrinters: () =>
     getData<AdminPrintersResponse>('/admin/printers'),

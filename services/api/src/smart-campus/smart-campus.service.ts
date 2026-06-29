@@ -59,6 +59,13 @@ export class SmartCampusService {
 
   // ── Kiosk 拉取（免鉴权，白名单：只含开关，绝不含学生数据）────────────────
   async getKioskConfig(terminalId: string): Promise<KioskSmartCampusConfig> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
+      select: { enabled: true },
+    })
+    if (terminal && !terminal.enabled) {
+      return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES } }
+    }
     const config = await this.findConfigByTerminalRef(terminalId)
     if (!config || !config.enabled) {
       return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES } }
