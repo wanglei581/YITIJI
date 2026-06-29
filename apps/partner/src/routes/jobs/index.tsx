@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
@@ -38,6 +39,7 @@ const CATEGORY_FILTERS = ['全部', '全职', '实习', '校招', '兼职'] as c
 const REVIEW_FILTERS   = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
 const CATEGORY_FILTER_MAP: Record<string, JobCategory | null>  = { 全部: null, 全职: 'fulltime', 实习: 'intern', 校招: 'campus', 兼职: 'parttime' }
 const REVIEW_FILTER_MAP:   Record<string, ReviewStatus | null> = { 全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected' }
+const PARTNER_JOBS_REFRESH_KEY = 'partner:jobs'
 
 /** DB category('fulltime' 等)→ 编辑表单 workType('full_time' 等)。 */
 const CATEGORY_TO_WORKTYPE: Record<JobCategory, 'full_time' | 'part_time' | 'internship'> = {
@@ -92,32 +94,37 @@ function errMsg(e: unknown): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function JobsPage() {
-  const [jobs,           setJobs]           = useState<PartnerJobRecord[]>([])
-  const [loading,        setLoading]        = useState(true)
-  const [error,          setError]          = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('全部')
   const [reviewFilter,   setReviewFilter]   = useState('全部')
   // 编辑/新增抽屉
   const [editing, setEditing] = useState<PartnerJobRecord | 'new' | null>(null)
   const [form, setForm] = useState<JobFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    getPartnerJobs()
-      .then(setJobs)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data, status, refresh } = useRefreshable(
+    PARTNER_JOBS_REFRESH_KEY,
+    getPartnerJobs,
+    {
+      intervalMs: 60_000,
+      merge: mergeById<PartnerJobRecord>((item) => item.id),
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useEffect(() => { load() }, [load])
+  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_JOBS_REFRESH_KEY], 'hard')
 
   useEffect(() => {
     if (!notice) return
     const t = setTimeout(() => setNotice(null), 8000)
     return () => clearTimeout(t)
   }, [notice])
+
+  const jobs = data ?? []
+  const loading = status === 'idle' || (status === 'loading' && jobs.length === 0)
+  const error = status === 'error' && jobs.length === 0
 
   const filtered = jobs.filter((j) => {
     const matchCat    = categoryFilter === '全部' || j.category     === CATEGORY_FILTER_MAP[categoryFilter]
@@ -133,10 +140,16 @@ export default function JobsPage() {
     已拒绝: jobs.filter((j) => j.reviewStatus === 'rejected').length,
   }
 
-  const handleUnpublish = (id: string) => {
-    unpublishPartnerJob(id).then((updated) => {
-      setJobs((prev) => prev.map((j) => j.id === id ? updated : j))
-    })
+  const handleUnpublish = async (id: string) => {
+    setBusyId(id)
+    try {
+      await unpublishPartnerJob(id)
+      void refresh()
+    } catch (e) {
+      setNotice(errMsg(e))
+    } finally {
+      setBusyId(null)
+    }
   }
 
   const openNew = () => {
@@ -188,7 +201,7 @@ export default function JobsPage() {
         setNotice('修改已保存。该岗位已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')
       }
       setEditing(null)
-      load()
+      void refresh()
     } catch (e) {
       setFormError(errMsg(e))
     } finally {
@@ -329,10 +342,11 @@ export default function JobsPage() {
                           </button>
                           {j.publishStatus === 'published' && (
                             <button
+                              disabled={busyId === j.id}
                               className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
-                              onClick={() => handleUnpublish(j.id)}
+                              onClick={() => void handleUnpublish(j.id)}
                             >
-                              下架
+                              {busyId === j.id ? '处理中…' : '下架'}
                             </button>
                           )}
                         </div>
