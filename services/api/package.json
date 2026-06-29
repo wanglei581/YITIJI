@@ -43,6 +43,7 @@
     "verify:jobfair-review": "node -r @swc-node/register scripts/verify-jobfair-review.ts",
     "verify:job-favorites-http": "node -r @swc-node/register scripts/verify-job-favorites-http.ts",
     "verify:materials-processing": "node -r @swc-node/register scripts/verify-materials-processing.ts",
+    "verify:job-materials": "node -r @swc-node/register scripts/verify-job-materials.ts",
     "verify:trtc-ownership": "node -r @swc-node/register scripts/verify-trtc-ownership.ts",
     "verify:llm-guard": "tsx scripts/verify-llm-guard.ts",
     "verify:cos": "tsx scripts/verify-cos-storage.ts",

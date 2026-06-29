@@ -67,6 +67,7 @@
 - [x] **用户文件保存期限 Branch 5：COS 生命周期与隐私文案验收**：采集点、帮助中心、隐私政策、Admin 文件横幅统一为短期 / 90 天 / 180 天 / 长期保存口径；新增 COS 生命周期合规文档，明确禁止 Bucket 全局过期规则、`long_term` 防误删人工验收和截图存档；新增 `verify:legal-retention-copy` 与 `verify:cos-lifecycle-policy`。
 - [x] **用户文件与简历资产证据包**：新增 `docs/acceptance/user-file-assets-trial-acceptance.md` 和 `verify:file-assets-trial-acceptance`，把生产/试运营验收拆成 PostgreSQL、COS 私有桶、会员账号、上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删、AuditLog 审计和证据脱敏；静态验证只证明证据包完整，不代表真实生产/试运营执行完成。
 - [x] **用户文件资产 + 预生产候选集成**：`codex/file-assets-preprod-integration` 已合并文件资产保存期限栈、生产/试运营证据包、TRTC assistant 生产构建守卫和预生产阶段性记录；后续真实验收应基于该集成候选继续，不再用只含 TRTC guard 的预生产分支替代。
+- [x] **简历素材库 / 求职材料商用闭环整改**：两个既有首页入口已统一进入 `/resume/templates` 求职材料库；内置模板通过 `JobMaterialsModule` 生成真实 PDF 并以会员 `FileObject` 进入 `/me/documents`；我的文档支持重签 URL 后打印；Admin 新增只读 `/job-materials` 运营统计；已补 API/Kiosk/Admin 防回退 verify 和三端 typecheck。本项不包含动态模板 CRUD、Partner 上传模板、支付套餐、平台投递或 Windows 真机验收。
 
 ## P1：用户文件与简历资产商用闭环后续
 
@@ -91,6 +92,8 @@
 - [x] **预生产 Gate 4 浏览器会员路径证据补齐**：2026-06-26 使用真实短信登录路径完成会员页、合成 PDF 上传窗口和 `/me/documents` 会员文件与保存期限截图；证据保存在仓库外 `/Users/wanglei/gate4-evidence/gate4-browser-20260625231841`，包含 `evidence-summary.md`、3 张 Chrome 窗口截图和合成测试 PDF。全程不把完整手机号、验证码、token、cookie、签名 URL 或 COS XML 写入仓库；坏的全屏截图 / Playwright 中间文件已删除；预生产中可见的 `gate4-synthetic-resume.pdf` 测试记录已清理。该项仍不等于完整 Gate 4 浏览器验收、正式生产或试运营完成。
 - [ ] **预生产 Gate 4 剩余浏览器证据补齐**：仍需补 Admin 生命周期视图、签名 URL / 等待窗口、必要时 COS 控制台或 DB 脱敏摘要等剩余证据；执行前必须继续按 runbook 确认仓库外证据目录、地址栏 / 签名 URL / COS XML / 手机号 / token 脱敏规则，以及 Admin 仅筛选本轮测试文件；腾讯短信审核通过后还需用真实短信完成会员登录 E2E，避免把预生产 API/COS/部分浏览器证据误写成正式生产或完整试运营验收。
 - [ ] **AI 简历诊断手机扫码上传联调复验**：本地 API + Redis + `FILE_STORAGE_DRIVER=local` 已通过 `verify:upload-sessions:http`，覆盖创建二维码会话、手机 multipart 上传 synthetic PDF、Kiosk 轮询 / 确认 / 取消、安全门禁、精确错误码、本地测试文件清理、member 真实 JWT + Redis session 成功绑定、匿名 / 其他会员 confirm 越权拒绝、status throttle、已绑定会员文件 cleanup 防误删和手机 token 仅从 fragment 读取；浏览器实际点击 `/resume/source` 可生成二维码且无会话创建错误。脚本默认不触发 `/resume/parse`、OCR 或 AI 配额；运行前必须确认被测 API 进程本身也以 `FILE_STORAGE_DRIVER=local` 启动。后续仍需在域名审核 / HTTPS / 反代 / H5 fallback 就绪后，用预生产或真机隔离对象存储和真实可解析 PDF 跑完整浏览器 E2E，覆盖手机上传真实简历、OCR/AI 诊断成功、报告页回填、会员绑定 / 我的简历资产回看和打印 / 导出入口；另需择期补 `/health` 暴露存储 driver、`EndUser.enabled` 可选会员一致性和 Multer 超限错误码统一。
+- [ ] **求职材料库真实浏览器与预生产验收**：部署到预生产后用真实会员登录跑 `/resume/templates -> 生成 PDF -> /me/documents -> 打印确认` 浏览器链路，保留脱敏截图、FileObject 抽样、AuditLog 抽样和短期签名 URL 证据；该验收通过前不得宣称求职材料库已完成生产或真机商用验收。
+- [ ] **求职材料库二期动态治理设计**：如要开放 Admin 模板 CRUD、Partner 模板申请、版权素材上传、套餐收费或岗位关键词辅助，必须另起独立设计与审查，先补审核流、版权归属、字段白名单、滥用风控和合规文案，再写代码。
 
 ## P1：工程质量门禁
 

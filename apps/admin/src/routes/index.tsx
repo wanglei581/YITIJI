@@ -26,6 +26,7 @@ import ImportBatchesPage from './import-batches'
 import SyncSourcesPage from './sync-sources'
 import ScreensaverPage from './screensaver'
 import SmartCampusPage from './smart-campus'
+import JobMaterialsPage from './job-materials'
 
 export const adminRouter = createBrowserRouter([
   // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
@@ -43,6 +44,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'peripherals',  element: <Navigate to="/devices?tab=peripherals" replace /> },
       { path: 'orders',       element: <OrdersPage /> },
       { path: 'files',        element: <FilesPage /> },
+      { path: 'job-materials', element: <JobMaterialsPage /> },
       { path: 'ai-services',  element: <AiServicesPage /> },
       { path: 'ai-config',    element: <AiConfigPage /> },
       { path: 'job-sources',  element: <JobSourcesPage /> },
