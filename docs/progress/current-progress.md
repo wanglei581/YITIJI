@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-06-25
+> 最后更新：2026-06-29
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -93,6 +93,7 @@
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成本地主工作区物料整理：将根目录 `.product-pm/`、`.superpowers/`、`.mavis/`、`.workbuddy/`、`mavis-workspace/`、`opc-doc/`、未跟踪 `DESIGN.md` 和 `项目源码及需求文档.zip` 归入本地 `其他文档/` 分类目录；删除根目录和归档材料中的 `.DS_Store`，删除空 `.worktrees/` 和空 `scripts/`；`node_modules/` 作为本地依赖保留。`其他文档/` 已加入 `.gitignore`，不作为正式项目事实或运行时代码。 |
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成 `docs/` 旧材料清理：移出旧 handoff 交接文件、旧 B2G/B2B2C 方案 PDF、两个已弃用 HTML 设计预览和本地 docx 原稿；原始材料归档到本地 `其他文档/`，Git 仅保留 Markdown 摘要、审计事实和当前正式入口；`motion-system.md` 仍引用的 `motion-playground.html` 与 `dynamic-blue-styles*.html` 保留。 |
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成 `deliverables/` 外部交付物清理：4 个已跟踪宣传片 / 交付物 Markdown 与索引文件已移出 Git，逐字节一致副本保留在本地 `其他文档/deliverables/`；OPC 二进制归档的资产清单和 sha256 完整性记录已迁入 `docs/reviews/project-normalization-external-materials-index.md`，避免删除 `deliverables/README.md` 后丢失仓库内留痕。 |
+| 2026-06-29 | `codex/global-refresh-mechanism` / 本分支 | 完成三端全局无感数据刷新机制首期底座和 Admin 试点：新增 `packages/refresh`，三端挂载 `RefreshProvider`，Admin 终端 / 打印机 / 订单只读页接入统一刷新；自动刷新必须等用户连续 15 秒无操作，详情 / 编辑 / 保存 hard lock 时新数据只进 pending buffer，不触发跳转、弹窗关闭或页面替换。 |
 
 ## 当前工作区事实
 

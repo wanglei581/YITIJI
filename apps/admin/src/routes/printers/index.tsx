@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { mergeById, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { PrinterIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { Pagination } from '../components/DataTable'
@@ -6,6 +7,7 @@ import { API_MODE } from '../../services/api/client'
 import { getPrinters, type AdminPrinterRecord } from '../../services/api/devices'
 
 const PAGE_SIZE = 10
+const PRINTERS_REFRESH_KEY = 'admin:printers'
 
 const STATUS_MAP: Record<AdminPrinterRecord['status'], { badge: 'success' | 'error'; label: string }> = {
   online:  { badge: 'success', label: '在线' },
@@ -53,23 +55,37 @@ function matchesSearch(p: AdminPrinterRecord, search: string): boolean {
 }
 
 export default function PrintersPage() {
-  const [printers, setPrinters] = useState<AdminPrinterRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('全部')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
-  const load = useCallback(() => {
-    setLoading(true)
-    setError(null)
-    getPrinters()
-      .then((res) => setPrinters(res.printers))
-      .catch((e) => setError((e as Error)?.message ?? '打印机数据加载失败'))
-      .finally(() => setLoading(false))
-  }, [])
+  const {
+    data: printerData,
+    status,
+    error,
+    refresh,
+  } = useRefreshable(
+    PRINTERS_REFRESH_KEY,
+    getPrinters,
+    {
+      intervalMs: 30_000,
+      merge: (current, incoming) => {
+        const printers = mergeById<AdminPrinterRecord>((item) => item.id)(
+          current?.printers,
+          incoming.printers,
+        )
+        if (current && printers === current.printers) return current
+        return { printers }
+      },
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useEffect(() => { load() }, [load])
+  const printers = printerData?.printers ?? []
+  const loading = status === 'loading' && printers.length === 0
+  const errorMessage = status === 'error'
+    ? (error instanceof Error ? error.message : '打印机数据加载失败')
+    : null
 
   const byStatus = filter === '全部'
     ? printers
@@ -93,7 +109,7 @@ export default function PrintersPage() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">打印机状态来自 Windows Terminal Agent 心跳上报</p>
         <button
-          onClick={load}
+          onClick={() => void refresh()}
           className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
         >
           <RefreshCwIcon className="h-3.5 w-3.5" />
@@ -146,12 +162,12 @@ export default function PrintersPage() {
                     ))}
                   </tr>
                 ))
-              ) : error ? (
+              ) : errorMessage ? (
                 <tr>
                   <td colSpan={10}>
                     <div className="flex flex-col items-center gap-3 py-12">
-                      <p className="text-sm text-neutral-400">{error}</p>
-                      <button onClick={load} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
+                      <p className="text-sm text-neutral-400">{errorMessage}</p>
+                      <button onClick={() => void refresh()} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
                     </div>
                   </td>
                 </tr>

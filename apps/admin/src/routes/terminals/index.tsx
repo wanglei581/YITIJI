@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon } from 'lucide-react'
 import { Pagination, useTableState } from '../components/DataTable'
@@ -12,6 +13,7 @@ import {
 } from '../../services/api/devices'
 
 const TABLE_COLS = 9
+const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
 // ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
 
@@ -54,9 +56,6 @@ function fmtDisk(gb: number | null): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TerminalsPage() {
-  const [terminals, setTerminals] = useState<AdminTerminalRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [filter, setFilter] = useState<string>('全部')
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
@@ -66,22 +65,62 @@ export default function TerminalsPage() {
   const [editValue, setEditValue] = useState<string>('') // '' = 未绑定/解绑
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
 
-  const load = useCallback(() => {
-    setLoading(true)
-    setError(false)
-    getTerminals()
-      .then((res) => setTerminals(res.terminals))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [])
+  const {
+    data: terminalData,
+    status,
+    refresh,
+  } = useRefreshable(
+    TERMINALS_REFRESH_KEY,
+    getTerminals,
+    {
+      intervalMs: 30_000,
+      merge: (current, incoming) => {
+        const terminals = mergeById<AdminTerminalRecord>((item) => item.id)(
+          current?.terminals,
+          incoming.terminals,
+        )
+        if (current && terminals === current.terminals) return current
+        return { terminals }
+      },
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useEffect(() => { load() }, [load])
+  useInteractionLock(editingId !== null || saving, [TERMINALS_REFRESH_KEY], 'hard')
+
+  const terminals = useMemo(
+    () => (terminalData?.terminals ?? []).map((terminal) => {
+      const patch = localOrgPatch[terminal.id]
+      return patch ? { ...terminal, ...patch } : terminal
+    }),
+    [localOrgPatch, terminalData?.terminals],
+  )
+
+  const loading = status === 'loading' && terminals.length === 0
+  const error = status === 'error' && terminals.length === 0
 
   // 机构下拉选项（绑定用）。失败不阻断页面，仍可解绑。
   useEffect(() => {
     getOrgOptions().then((r) => setOrgOptions(r.organizations)).catch(() => { /* ignore */ })
   }, [])
+
+  useEffect(() => {
+    if (!terminalData) return
+    setLocalOrgPatch((current) => {
+      let changed = false
+      const next = { ...current }
+      for (const terminal of terminalData.terminals) {
+        const patch = next[terminal.id]
+        if (patch && patch.orgId === terminal.orgId && patch.orgName === terminal.orgName) {
+          delete next[terminal.id]
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [terminalData])
 
   function startEdit(t: AdminTerminalRecord) {
     setEditingId(t.id)
@@ -98,9 +137,26 @@ export default function TerminalsPage() {
     try {
       const orgId = editValue === '' ? null : editValue
       const res = await assignTerminalOrg(t.terminalCode, orgId)
-      setTerminals((rows) => rows.map((r) => (r.id === t.id ? { ...r, orgId: res.newOrgId, orgName: res.orgName } : r)))
+      setLocalOrgPatch((current) => ({
+        ...current,
+        [t.id]: { orgId: res.newOrgId, orgName: res.orgName },
+      }))
       setEditingId(null)
       setEditValue('')
+      void refresh()
+        .catch(() => undefined)
+        .then(() => refresh())
+        .then(() => {
+          setLocalOrgPatch((current) => {
+            if (!current[t.id]) return current
+            const next = { ...current }
+            delete next[t.id]
+            return next
+          })
+        })
+        .catch(() => {
+          /* keep optimistic patch until a later successful refresh reconciles */
+        })
       setNotice({
         type: 'success',
         text: res.newOrgId
@@ -144,7 +200,7 @@ export default function TerminalsPage() {
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索终端编号、IP、版本..." className="h-8 w-72 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
             <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
           </div>
-          <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+          <button onClick={() => void refresh()} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
             <RefreshCwIcon className="h-3.5 w-3.5" />刷新
           </button>
         </div>
@@ -204,7 +260,7 @@ export default function TerminalsPage() {
                   <td colSpan={TABLE_COLS}>
                     <div className="flex flex-col items-center gap-3 py-12">
                       <p className="text-sm text-gray-400">终端数据加载失败,请稍后重试</p>
-                      <button onClick={load} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
+                      <button onClick={() => void refresh()} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
                     </div>
                   </td>
                 </tr>

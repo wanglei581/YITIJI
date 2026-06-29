@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FileTextIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
@@ -57,39 +58,61 @@ function amountText(amountCents: number, currency: string): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
-  const [items, setItems] = useState<AdminOrderReadonlyItem[]>([])
   const [detail, setDetail] = useState<AdminOrderReadonlyDetail | null>(null)
-  const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading')
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
   const [statusFilter, setStatusFilter] = useState('')
   const [payStatus, setPayStatus] = useState('')
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
   const pageSize = 20
+  const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${search}:${page}:${pageSize}`
 
-  const load = useCallback(async () => {
-    setState('loading')
-    try {
-      const res = await adminOrdersReadonlyService.list({
-        taskStatus: statusFilter || undefined,
-        payStatus: payStatus || undefined,
-        search: search || undefined,
-        page,
-        pageSize,
-      })
-      setItems(res.items)
-      setTotal(res.pagination.total)
-      setTotalPages(res.pagination.totalPages)
-      setState('ready')
-    } catch {
-      setState('error')
-    }
-  }, [statusFilter, payStatus, search, page])
+  const {
+    data: orderPage,
+    status,
+    refresh,
+  } = useRefreshable(
+    ordersKey,
+    () => adminOrdersReadonlyService.list({
+      taskStatus: statusFilter || undefined,
+      payStatus: payStatus || undefined,
+      search: search || undefined,
+      page,
+      pageSize,
+    }),
+    {
+      intervalMs: 30_000,
+      merge: (current, incoming) => {
+        const items = mergeById<AdminOrderReadonlyItem>((item) => item.id)(
+          current?.items,
+          incoming.items,
+        )
+        if (
+          current &&
+          items === current.items &&
+          current.pagination.page === incoming.pagination.page &&
+          current.pagination.pageSize === incoming.pagination.pageSize &&
+          current.pagination.total === incoming.pagination.total &&
+          current.pagination.totalPages === incoming.pagination.totalPages
+        ) {
+          return current
+        }
+        return { ...incoming, items }
+      },
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useEffect(() => { void load() }, [load])
+  useInteractionLock(detailState === 'loading' || detailState === 'ready', [ordersKey], 'hard')
+
+  const items = orderPage?.items ?? []
+  const total = orderPage?.pagination.total ?? 0
+  const totalPages = orderPage?.pagination.totalPages ?? 1
+  const state: 'loading' | 'error' | 'ready' =
+    status === 'error' && !orderPage ? 'error' :
+    status === 'loading' && !orderPage ? 'loading' :
+    orderPage ? 'ready' : 'loading'
 
   const openDetail = async (id: string) => {
     setDetailState('loading')
@@ -109,7 +132,7 @@ export default function OrdersPage() {
       subtitle={`订单只读视图 — 共 ${total} 条`}
       actions={
         <button
-          onClick={() => void load()}
+          onClick={() => void refresh()}
           className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
         >
           <RefreshCwIcon className="h-4 w-4" />
@@ -170,7 +193,7 @@ export default function OrdersPage() {
       </div>
 
       {state === 'loading' && <LoadingState className="py-24" />}
-      {state === 'error' && <ErrorState className="py-24" onRetry={() => void load()} />}
+      {state === 'error' && <ErrorState className="py-24" onRetry={() => void refresh()} />}
 
       {state === 'ready' && (
         <Card className="overflow-hidden p-0">
