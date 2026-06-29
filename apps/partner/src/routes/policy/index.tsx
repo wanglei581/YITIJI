@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, Drawer, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
@@ -34,6 +35,7 @@ const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; la
   unpublished: { badge: 'default', label: '已下架' },
   expired:     { badge: 'default', label: '已过期' },
 }
+const PARTNER_POLICIES_REFRESH_KEY = 'partner:policies'
 
 const inputCls =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -73,9 +75,6 @@ function errMsg(e: unknown): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PolicyPage() {
-  const [rows, setRows] = useState<PartnerPolicyRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [editing, setEditing] = useState<PartnerPolicyRecord | 'new' | null>(null)
   const [form, setForm] = useState<PolicyFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -84,14 +83,21 @@ export default function PolicyPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    partnerPoliciesService.getPolicies()
-      .then(setRows)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data, status, refresh } = useRefreshable(
+    PARTNER_POLICIES_REFRESH_KEY,
+    () => partnerPoliciesService.getPolicies(),
+    {
+      intervalMs: 60_000,
+      merge: mergeById<PartnerPolicyRecord>((item) => item.id),
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useEffect(() => { load() }, [load])
+  useInteractionLock(
+    editing !== null || saving || busyId !== null || deletingId !== null,
+    [PARTNER_POLICIES_REFRESH_KEY],
+    'hard',
+  )
 
   useEffect(() => {
     if (!notice) return
@@ -104,6 +110,10 @@ export default function PolicyPage() {
     const t = setTimeout(() => setDeletingId(null), 5000)
     return () => clearTimeout(t)
   }, [deletingId])
+
+  const rows = data ?? []
+  const loading = status === 'idle' || (status === 'loading' && rows.length === 0)
+  const error = status === 'error' && rows.length === 0
 
   const openNew = () => {
     setForm(EMPTY_FORM)
@@ -150,7 +160,7 @@ export default function PolicyPage() {
         setNotice('修改已保存。该内容已重新进入待审核,审核通过并重新发布前,终端不展示。')
       }
       setEditing(null)
-      load()
+      void refresh()
     } catch (e) {
       setFormError(errMsg(e))
     } finally {
@@ -162,7 +172,9 @@ export default function PolicyPage() {
     setBusyId(id)
     try {
       await partnerPoliciesService.unpublishPolicy(id)
-      load()
+      void refresh()
+    } catch (e) {
+      setNotice(errMsg(e))
     } finally {
       setBusyId(null)
     }
@@ -177,7 +189,9 @@ export default function PolicyPage() {
     setBusyId(id)
     try {
       await partnerPoliciesService.deletePolicy(id)
-      load()
+      void refresh()
+    } catch (e) {
+      setNotice(errMsg(e))
     } finally {
       setBusyId(null)
     }

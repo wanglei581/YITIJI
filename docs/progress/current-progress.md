@@ -94,6 +94,7 @@
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成 `docs/` 旧材料清理：移出旧 handoff 交接文件、旧 B2G/B2B2C 方案 PDF、两个已弃用 HTML 设计预览和本地 docx 原稿；原始材料归档到本地 `其他文档/`，Git 仅保留 Markdown 摘要、审计事实和当前正式入口；`motion-system.md` 仍引用的 `motion-playground.html` 与 `dynamic-blue-styles*.html` 保留。 |
 | 2026-06-26 | `codex/gate4-browser-evidence-status-sync` / 本分支 | 完成 `deliverables/` 外部交付物清理：4 个已跟踪宣传片 / 交付物 Markdown 与索引文件已移出 Git，逐字节一致副本保留在本地 `其他文档/deliverables/`；OPC 二进制归档的资产清单和 sha256 完整性记录已迁入 `docs/reviews/project-normalization-external-materials-index.md`，避免删除 `deliverables/README.md` 后丢失仓库内留痕。 |
 | 2026-06-29 | `codex/global-refresh-mechanism` / 本分支 | 完成三端全局无感数据刷新机制首期底座和 Admin 试点：新增 `packages/refresh`，三端挂载 `RefreshProvider`，Admin 终端 / 打印机 / 订单只读页接入统一刷新；自动刷新必须等用户连续 15 秒无操作，详情 / 编辑 / 保存 hard lock 时新数据只进 pending buffer，不触发跳转、弹窗关闭或页面替换。 |
+| 2026-06-29 | `codex/partner-refresh-rollout` / 本分支 | 完成 Partner 端全局无感刷新首轮推广：岗位、招聘会、政策公告三类列表从页面内 `load + setState` 改为 `useRefreshable` 统一资源；自动刷新间隔 60 秒且仍受全局 15 秒无操作门禁约束；新增 / 编辑抽屉、保存、下架、删除确认期间使用 hard lock，新数据进入 pending buffer，不覆盖表单、不关闭抽屉、不跳转。 |
 
 ## 当前工作区事实
 

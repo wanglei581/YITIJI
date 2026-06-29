@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
@@ -37,6 +38,7 @@ const STATUS_FILTERS = ['全部', '未开始', '进行中', '已结束'] as cons
 const STATUS_FILTER_MAP: Record<string, JobFairStatus | null> = {
   全部: null, 未开始: 'upcoming', 进行中: 'ongoing', 已结束: 'ended',
 }
+const PARTNER_FAIRS_REFRESH_KEY = 'partner:fairs'
 
 const THEME_OPTIONS = [
   { value: 'general',     label: '综合招聘会' },
@@ -95,30 +97,35 @@ function errMsg(e: unknown): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FairsPage() {
-  const [fairs,        setFairs]        = useState<PartnerFairRecord[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState(false)
   const [statusFilter, setStatusFilter] = useState('全部')
   const [editing, setEditing] = useState<PartnerFairRecord | 'new' | null>(null)
   const [form, setForm] = useState<FairFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const load = useCallback(() => {
-    getPartnerFairs()
-      .then(setFairs)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false))
-  }, [])
+  const { data, status, refresh } = useRefreshable(
+    PARTNER_FAIRS_REFRESH_KEY,
+    getPartnerFairs,
+    {
+      intervalMs: 60_000,
+      merge: mergeById<PartnerFairRecord>((item) => item.id),
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useEffect(() => { load() }, [load])
+  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_FAIRS_REFRESH_KEY], 'hard')
 
   useEffect(() => {
     if (!notice) return
     const t = setTimeout(() => setNotice(null), 8000)
     return () => clearTimeout(t)
   }, [notice])
+
+  const fairs = data ?? []
+  const loading = status === 'idle' || (status === 'loading' && fairs.length === 0)
+  const error = status === 'error' && fairs.length === 0
 
   const filtered = statusFilter === '全部'
     ? fairs
@@ -131,10 +138,16 @@ export default function FairsPage() {
     已结束: fairs.filter((f) => f.status === 'ended').length,
   }
 
-  const handleUnpublish = (id: string) => {
-    unpublishPartnerFair(id).then((updated) => {
-      setFairs((prev) => prev.map((f) => f.id === id ? updated : f))
-    })
+  const handleUnpublish = async (id: string) => {
+    setBusyId(id)
+    try {
+      await unpublishPartnerFair(id)
+      void refresh()
+    } catch (e) {
+      setNotice(errMsg(e))
+    } finally {
+      setBusyId(null)
+    }
   }
 
   const openNew = () => {
@@ -197,7 +210,7 @@ export default function FairsPage() {
         setNotice('修改已保存。该招聘会已重新进入待审核,审核通过并重新发布前,终端不展示该条数据。')
       }
       setEditing(null)
-      load()
+      void refresh()
     } catch (e) {
       setFormError(errMsg(e))
     } finally {
@@ -314,10 +327,11 @@ export default function FairsPage() {
                           </button>
                           {f.publishStatus === 'published' && (
                             <button
+                              disabled={busyId === f.id}
                               className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
-                              onClick={() => handleUnpublish(f.id)}
+                              onClick={() => void handleUnpublish(f.id)}
                             >
-                              下架
+                              {busyId === f.id ? '处理中…' : '下架'}
                             </button>
                           )}
                         </div>
