@@ -69,6 +69,7 @@ export default function TerminalsPage() {
   const [profileEditingId, setProfileEditingId] = useState<string | null>(null)
   const [profileDraft, setProfileDraft] = useState<UpdateTerminalProfileInput>({})
   const [profileSaving, setProfileSaving] = useState(false)
+  const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
@@ -94,7 +95,11 @@ export default function TerminalsPage() {
     },
   )
 
-  useInteractionLock(editingId !== null || saving || profileEditingId !== null || profileSaving, [TERMINALS_REFRESH_KEY], 'hard')
+  useInteractionLock(
+    editingId !== null || saving || profileEditingId !== null || profileSaving || statusSavingId !== null,
+    [TERMINALS_REFRESH_KEY],
+    'hard',
+  )
 
   const terminals = useMemo(
     () => (terminalData?.terminals ?? []).map((terminal) => {
@@ -130,6 +135,7 @@ export default function TerminalsPage() {
   }, [terminalData])
 
   function startEdit(t: AdminTerminalRecord) {
+    if (statusSavingId !== null) return
     setEditingId(t.id)
     setEditValue(t.orgId ?? '')
     setProfileEditingId(null)
@@ -179,6 +185,7 @@ export default function TerminalsPage() {
   }
 
   function startProfileEdit(t: AdminTerminalRecord) {
+    if (statusSavingId !== null) return
     setProfileEditingId(t.id)
     setEditingId(null)
     setProfileDraft({
@@ -223,6 +230,38 @@ export default function TerminalsPage() {
       setNotice({ type: 'error', text: e instanceof Error ? e.message : '设备档案保存失败，请稍后重试' })
     } finally {
       setProfileSaving(false)
+    }
+  }
+
+  async function toggleTerminalStatus(t: AdminTerminalRecord) {
+    const nextEnabled = !t.enabled
+    if (!nextEnabled && !window.confirm(`确定停用终端 ${t.terminalCode}？停用后该终端的 Kiosk 敏感模块会在下一轮配置刷新后关闭。`)) {
+      return
+    }
+
+    setStatusSavingId(t.id)
+    setNotice(null)
+    try {
+      const res = await updateTerminalProfile(t.terminalCode, { enabled: nextEnabled })
+      setLocalProfilePatch((current) => ({
+        ...current,
+        [t.id]: {
+          ...current[t.id],
+          displayName: res.displayName,
+          macAddress: res.macAddress,
+          locationLabel: res.locationLabel,
+          enabled: res.enabled,
+        },
+      }))
+      void refresh().catch(() => undefined)
+      setNotice({
+        type: 'success',
+        text: `已${res.enabled ? '启用' : '停用'}终端 ${t.terminalCode}，Kiosk 下一轮配置刷新后生效`,
+      })
+    } catch (e) {
+      setNotice({ type: 'error', text: e instanceof Error ? e.message : '终端状态更新失败，请稍后重试' })
+    } finally {
+      setStatusSavingId(null)
     }
   }
 
@@ -398,7 +437,7 @@ export default function TerminalsPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate font-medium text-gray-800">{t.displayName || '未命名终端'}</p>
                               <p className="mt-0.5 max-w-[220px] truncate text-gray-400">{t.locationLabel || '未设置摆放位置'}</p>
@@ -406,11 +445,13 @@ export default function TerminalsPage() {
                             <button
                               type="button"
                               onClick={() => startProfileEdit(t)}
+                              disabled={statusSavingId !== null}
                               title="编辑设备档案"
                               aria-label={`编辑 ${t.terminalCode} 设备档案`}
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                              className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
+                              编辑档案
                             </button>
                           </div>
                         )}
@@ -453,7 +494,7 @@ export default function TerminalsPage() {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             {t.orgName ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-blue-600">
                                 <Building2Icon className="h-3 w-3" />{t.orgName}
@@ -464,17 +505,38 @@ export default function TerminalsPage() {
                             <button
                               type="button"
                               onClick={() => startEdit(t)}
+                              disabled={statusSavingId !== null}
                               title="编辑所属机构"
                               aria-label={`编辑 ${t.terminalCode} 所属机构`}
-                              className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                              className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
+                              {t.orgName ? '更改机构' : '绑定机构'}
                             </button>
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} />
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} />
+                          <button
+                            type="button"
+                            onClick={() => toggleTerminalStatus(t)}
+                            disabled={statusSavingId !== null || profileSaving || saving || profileEditingId === t.id || editingId === t.id}
+                            aria-label={`${t.enabled ? '停用' : '启用'} ${t.terminalCode}`}
+                            className={`inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                              t.enabled
+                                ? 'border-red-100 bg-white text-red-600 hover:bg-red-50'
+                                : 'border-emerald-100 bg-white text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {statusSavingId === t.id
+                              ? '保存中'
+                              : profileEditingId === t.id || editingId === t.id
+                                ? '编辑中'
+                                : t.enabled ? '停用' : '启用'}
+                          </button>
+                        </div>
                       </td>
                       <td className="px-4 py-3"><StatusBadge status={onlineView.badge} label={onlineView.label} /></td>
                       <td className="px-4 py-3"><StatusBadge status={printerView.badge} label={printerView.label} /></td>
