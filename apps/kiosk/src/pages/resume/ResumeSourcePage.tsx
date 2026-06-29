@@ -221,6 +221,7 @@ export function ResumeSourcePage() {
       <input
         ref={fileInputRef}
         type="file"
+        aria-label="选择本机简历文件"
         accept={ACCEPT}
         className="hidden"
         onChange={handleFileChosen}

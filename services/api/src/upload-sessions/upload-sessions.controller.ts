@@ -50,6 +50,7 @@ export class UploadSessionsController {
   }
 
   @Get(':sessionId')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
   async status(
     @Param('sessionId') sessionId: string,
     @Headers('x-upload-session-control') controlToken: string | undefined,

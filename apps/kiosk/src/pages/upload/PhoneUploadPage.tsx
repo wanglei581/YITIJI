@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { AlertCircleIcon, CheckCircleIcon, FileTextIcon, Loader2Icon, ShieldCheckIcon, UploadCloudIcon } from 'lucide-react'
 import { Button, Card } from '@ai-job-print/ui'
 import { uploadPhoneSessionFile } from '../../services/api/uploadSessions'
@@ -17,10 +17,9 @@ function formatSize(bytes: number): string {
 
 export function PhoneUploadPage() {
   const location = useLocation()
-  const [searchParams] = useSearchParams()
   const hashParams = useMemo(() => new URLSearchParams(location.hash.replace(/^#/, '')), [location.hash])
-  const sessionId = (hashParams.get('sessionId') ?? searchParams.get('sessionId'))?.trim() ?? ''
-  const uploadToken = (hashParams.get('token') ?? searchParams.get('token'))?.trim() ?? ''
+  const sessionId = hashParams.get('sessionId')?.trim() ?? ''
+  const uploadToken = hashParams.get('token')?.trim() ?? ''
   const [state, setState] = useState<UploadState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [fileLabel, setFileLabel] = useState<string | null>(null)
@@ -91,6 +90,7 @@ export function PhoneUploadPage() {
           >
             <input
               type="file"
+              aria-label="选择简历文件"
               accept={ACCEPT}
               className="hidden"
               disabled={!ready || state === 'uploading'}

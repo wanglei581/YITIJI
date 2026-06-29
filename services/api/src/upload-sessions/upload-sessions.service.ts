@@ -279,6 +279,11 @@ export class UploadSessionsService {
 
   private async cleanupAbandonedFile(record: StoredUploadSession, reason: string): Promise<void> {
     if (!record.file || record.status === 'confirmed') return
+    const file = await this.prisma.fileObject.findUnique({
+      where: { id: record.file.fileId },
+      select: { endUserId: true, ownerType: true },
+    })
+    if (file?.endUserId || file?.ownerType === 'user') return
     await this.files.forceDelete(record.file.fileId, 'upload-session', reason).catch(() => undefined)
   }
 

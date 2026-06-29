@@ -1,5 +1,6 @@
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
 import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
@@ -361,6 +362,36 @@ async function main(): Promise<void> {
     const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
     await service.cancel(session.sessionId, session.controlToken)
     assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null)
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const current = prisma.files.get(uploaded.file!.fileId)!
+    prisma.files.set(uploaded.file!.fileId, {
+      ...current,
+      endUserId: 'member_1',
+      ownerType: 'user',
+      ownerId: 'member_1',
+    })
+    await service.cancel(session.sessionId, session.controlToken)
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null, 'bound member file must not be deleted by abandoned cleanup')
+  }
+
+  {
+    const controller = readFileSync(new URL('../src/upload-sessions/upload-sessions.controller.ts', import.meta.url), 'utf8')
+    assert.match(
+      controller,
+      /@Get\(':sessionId'\)\n\s+@Throttle\(\{ default: \{ ttl: 60_000, limit: 60 \} \}\)/,
+      'status polling endpoint should have a wide throttle',
+    )
   }
 
   console.log('PASS upload session verification')

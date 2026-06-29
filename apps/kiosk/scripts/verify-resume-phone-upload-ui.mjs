@@ -30,6 +30,10 @@ assertIncludes(panel, 'UPLOAD_SESSION_NOT_FOUND', 'polling stops when session di
 assertIncludes(api, 'url.hash = fragment.toString()', 'phone upload token stays in URL fragment')
 assertIncludes(phone, '一体机上确认', 'phone page explains kiosk confirmation')
 assertIncludes(phone, 'location.hash', 'phone page reads fragment upload token')
+assertNotIncludes(phone, 'useSearchParams', 'phone page does not read upload token from query string')
+assertNotIncludes(phone, 'searchParams.get', 'phone page does not fall back to query token')
+assertIncludes(phone, 'aria-label="选择简历文件"', 'phone upload file input has accessible label')
+assertIncludes(source, 'aria-label="选择本机简历文件"', 'resume source file input has accessible label')
 assertIncludes(routes, '/upload/phone', 'phone upload route is registered')
 assertNotIncludes(source, '/print/upload', 'resume phone upload must not route through print flow')
 
