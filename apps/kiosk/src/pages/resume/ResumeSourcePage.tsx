@@ -10,13 +10,15 @@ import {
   CloudUploadIcon,
   FileTextIcon,
   ShieldCheckIcon,
+  SmartphoneIcon,
   SparklesIcon,
   UploadCloudIcon,
   UsbIcon,
 } from 'lucide-react'
 import { kioskUploadFile } from '../../services/api'
+import { UploadSessionQrPanel, type PhoneUploadedResumeFile } from '../upload/components/UploadSessionQrPanel'
 
-type UploadChannel = 'usb' | 'cloud'
+type UploadChannel = 'usb' | 'cloud' | 'phone'
 
 interface UploadOption {
   type: UploadChannel
@@ -40,6 +42,13 @@ const UPLOAD_OPTIONS: UploadOption[] = [
     description: '选择云盘同步目录或本机下载目录中的简历文件',
     helper: '不保存云盘账号，不直接连接第三方网盘；只上传用户主动选择的本地文件。',
     icon: CloudUploadIcon,
+  },
+  {
+    type: 'phone',
+    label: '手机扫码上传',
+    description: '用手机扫码选择简历文件，再回到一体机确认',
+    helper: '二维码只含一次性上传令牌；手机端不会获得一体机会员登录凭证。',
+    icon: SmartphoneIcon,
   },
 ]
 
@@ -129,18 +138,21 @@ export function ResumeSourcePage() {
   const [selected, setSelected] = useState<UploadChannel>('cloud')
   const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [phoneBusy, setPhoneBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(uploading)
+  useBusyLock(uploading || phoneBusy)
 
   const handleSelect = (option: UploadOption) => {
     setError(null)
     setSelected(option.type)
+    if (option.type === 'phone') return
     fileInputRef.current?.click()
   }
 
   const handleUploadBoxClick = () => {
     setError(null)
+    if (selected === 'phone') return
     fileInputRef.current?.click()
   }
 
@@ -169,6 +181,11 @@ export function ResumeSourcePage() {
     } finally {
       setUploading(false)
     }
+  }
+
+  const handlePhoneUploaded = (file: PhoneUploadedResumeFile) => {
+    setUploadedFile(file)
+    setError(null)
   }
 
   const handleStartDiagnosis = () => {
@@ -248,13 +265,14 @@ export function ResumeSourcePage() {
           <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
         </button>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {UPLOAD_OPTIONS.map((option) => {
           const isSelected = selected === option.type
           const Icon = option.icon
           const disabled = uploading
           return (
             <button
+              type="button"
               key={option.type}
               onClick={() => !disabled && handleSelect(option)}
               disabled={disabled}
@@ -282,35 +300,43 @@ export function ResumeSourcePage() {
           })}
         </div>
 
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={handleUploadBoxClick}
-          className={[
-            'flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
-            uploadedFile
-              ? 'border-primary-300 bg-primary-50/35'
-              : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
-            uploading ? 'cursor-not-allowed opacity-70' : '',
-          ].join(' ')}
-        >
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
-            {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
-          </div>
-          <p className="mt-4 text-2xl font-extrabold text-gray-900">
-            {uploadedFile ? uploadedFile.name : '点击上传文件'}
-          </p>
-          <p className="mt-2 text-base font-medium text-gray-500">
-            {uploadedFile ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${uploadedFile.channel === 'usb' ? 'U盘上传' : '云端上传'}` : '支持 PDF / DOC / DOCX / 图片格式，单个文件最大 10MB'}
-          </p>
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {SUPPORTED_FORMATS.map((format) => (
-              <span key={format} className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-500">
-                {format}
-              </span>
-            ))}
-          </div>
-        </button>
+        {selected === 'phone' ? (
+          <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
+        ) : (
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={handleUploadBoxClick}
+            className={[
+              'flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
+              uploadedFile
+                ? 'border-primary-300 bg-primary-50/35'
+                : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
+              uploading ? 'cursor-not-allowed opacity-70' : '',
+            ].join(' ')}
+          >
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+              {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
+            </div>
+            <p className="mt-4 text-2xl font-extrabold text-gray-900">
+              {uploadedFile ? uploadedFile.name : '点击上传文件'}
+            </p>
+            <p className="mt-2 text-base font-medium text-gray-500">
+              {uploadedFile
+                ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
+                  uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
+                }`
+                : '支持 PDF / DOC / DOCX / 图片格式，单个文件最大 10MB'}
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {SUPPORTED_FORMATS.map((format) => (
+                <span key={format} className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-500">
+                  {format}
+                </span>
+              ))}
+            </div>
+          </button>
+        )}
 
         <Card className="p-5">
           <div className="flex items-center gap-2">
