@@ -2,8 +2,7 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'services/*'
-# Keep in sync with package.json pnpm.overrides. Server pnpm 9 reads package.json,
-# while local/newer pnpm reads this workspace-level overrides block.
+# Workspace-level overrides are the single source of truth for pnpm 9+.
 overrides:
   qs: 6.15.2
   '@hono/node-server': 2.0.4
