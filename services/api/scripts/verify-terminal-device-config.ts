@@ -5,7 +5,7 @@
  *   1. Terminal schema / 迁移包含 displayName、macAddress、locationLabel、enabled。
  *   2. Admin 可编辑设备档案/MAC/启停,并写 terminal.profile.update 审计。
  *   3. MAC 地址规范化、非法格式拒绝、唯一冲突拒绝。
- *   4. 停用终端仍可 heartbeat,但 claim 被 TERMINAL_DISABLED 拦截。
+ *   4. 停用终端仍可 heartbeat,但 claim/status 被 TERMINAL_DISABLED 拦截。
  *   5. 停用终端的 Kiosk config 强制 smartCampus.enabled=false。
  *   6. 公开 Kiosk config 只返回 Kiosk 必需白名单字段,不泄露设备档案/机构字段。
  *
@@ -338,11 +338,32 @@ async function runServiceChecks(): Promise<void> {
     } else {
       fail(`5b. heartbeat 空白 MAC 清空或覆盖了档案: ${afterBlankMacHeartbeat?.macAddress ?? 'null'}`)
     }
+    await terminals.heartbeat(
+      tA,
+      { printerStatus: 'ok', macAddress: 'aa-bb-cc-dd-ee-ff', agentVersion: 'verify' },
+      `Bearer ${tokenA}`,
+    )
+    const afterConflictMacHeartbeat = await prisma.terminal.findUnique({ where: { id: tA } })
+    if (afterConflictMacHeartbeat?.macAddress === 'A8:5E:45:10:00:01') {
+      pass('5c. heartbeat 冲突 MAC 不打挂心跳且不覆盖 Admin 设备档案')
+    } else {
+      fail(`5c. heartbeat 冲突 MAC 覆盖了档案: ${afterConflictMacHeartbeat?.macAddress ?? 'null'}`)
+    }
 
     await expectCode(
       () => terminals.claimTasks(tA, { maxTasks: 1 }, `Bearer ${tokenA}`),
       'TERMINAL_DISABLED',
       '6. 停用终端 claim 被拦截',
+    )
+    await expectCode(
+      () => terminals.patchTaskStatus(taskId, { status: 'printing' }, `Bearer ${tokenA}`, tA),
+      'TERMINAL_DISABLED',
+      '6b. 停用终端 status 回传带 terminalId 被拦截',
+    )
+    await expectCode(
+      () => terminals.patchTaskStatus(taskId, { status: 'printing' }, `Bearer ${tokenA}`, undefined),
+      'TERMINAL_DISABLED',
+      '6c. 停用终端 status 回传 token fallback 被拦截',
     )
 
     const kioskConfig = await terminals.getKioskTerminalConfig(codeA)

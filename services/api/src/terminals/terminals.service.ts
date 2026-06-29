@@ -81,6 +81,14 @@ function isMacUniqueConstraintError(error: unknown): boolean {
     : typeof target === 'string' && target.includes('macAddress')
 }
 
+function exceptionErrorCode(error: unknown): string | undefined {
+  const maybe = error as { getResponse?: () => unknown; response?: unknown }
+  const response = typeof maybe.getResponse === 'function' ? maybe.getResponse() : maybe.response
+  if (!response || typeof response !== 'object') return undefined
+  const nested = (response as { error?: { code?: unknown } }).error?.code
+  return typeof nested === 'string' ? nested : undefined
+}
+
 function parseSmartCampusModules(json: string): SmartCampusModules {
   try {
     const raw = JSON.parse(json) as Partial<SmartCampusModules> | null
@@ -405,13 +413,30 @@ export class TerminalsService implements OnModuleInit {
   ): Promise<{ acknowledged: true }> {
     await this.findAndValidate(terminalId, authHeader, { allowDisabled: true })
     const profilePatch = await this.buildDeviceProfilePatch(dto, terminalId)
+    const lastSeenAt = new Date()
 
-    await this.writeWithMacConflictMapping(() =>
-      this.prisma.terminal.update({
-        where: { id: terminalId },
-        data: { ...profilePatch, lastSeenAt: new Date() },
-      }),
-    )
+    try {
+      await this.writeWithMacConflictMapping(() =>
+        this.prisma.terminal.update({
+          where: { id: terminalId },
+          data: { ...profilePatch, lastSeenAt },
+        }),
+      )
+    } catch (error) {
+      if (profilePatch.macAddress !== undefined && exceptionErrorCode(error) === 'MAC_ALREADY_BOUND') {
+        const safeProfilePatch = {
+          displayName: profilePatch.displayName,
+          locationLabel: profilePatch.locationLabel,
+        }
+        this.logger.warn(`heartbeat ignored duplicated MAC address from terminal ${terminalId}`)
+        await this.prisma.terminal.update({
+          where: { id: terminalId },
+          data: { ...safeProfilePatch, lastSeenAt },
+        })
+      } else {
+        throw error
+      }
+    }
 
     await this.prisma.terminalHeartbeat.create({
       data: {
@@ -664,8 +689,18 @@ export class TerminalsService implements OnModuleInit {
       if (macAddress === undefined && cleanNullable(dto.macAddress) !== undefined) {
         this.logger.warn(`heartbeat ignored invalid MAC address from terminal ${ownerRef}`)
       }
-      if (macAddress) await this.assertMacAvailable(macAddress, ownerRef)
-      data.macAddress = macAddress === undefined ? undefined : macAddress
+      if (macAddress) {
+        try {
+          await this.assertMacAvailable(macAddress, ownerRef)
+        } catch (error) {
+          if (exceptionErrorCode(error) === 'MAC_ALREADY_BOUND') {
+            this.logger.warn(`heartbeat ignored duplicated MAC address from terminal ${ownerRef}`)
+            return data
+          }
+          throw error
+        }
+      }
+      data.macAddress = macAddress
     }
     return data
   }
