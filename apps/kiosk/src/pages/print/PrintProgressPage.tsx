@@ -28,6 +28,7 @@ import {
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
+import { printUploadPathForSource } from './printMaterialSession'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,8 @@ export function PrintProgressPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as Record<string, unknown> | null
+  const source = state?.source === 'resume' || state?.source === 'document' ? state.source : undefined
+  const uploadPath = printUploadPathForSource(source)
 
   const taskId     = typeof state?.taskId === 'string' ? state.taskId : null
   const useRealApi = API_MODE === 'http' && Boolean(taskId)
@@ -227,7 +230,7 @@ export function PrintProgressPage() {
           <p className="mt-2 text-sm text-gray-500">请从上传文件重新开始打印流程</p>
         </div>
         <button
-          onClick={() => navigate('/print/upload')}
+          onClick={() => navigate(uploadPath)}
           className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
         >
           重新上传文件

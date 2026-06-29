@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
@@ -21,14 +21,16 @@ import {
   FileTextIcon,
   LoaderIcon,
   MonitorSmartphoneIcon,
+  PrinterIcon,
   QrCodeIcon,
+  SparklesIcon,
   UsbIcon,
   XIcon,
 } from 'lucide-react'
 import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { useAuth } from '../../auth/useAuth'
-import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState } from './printMaterialSession'
+import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState, type PrintMaterialSource } from './printMaterialSession'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
@@ -42,8 +44,14 @@ function formatBytes(bytes: number): string {
 
 export function PrintUploadPage() {
   const navigate = useNavigate()
-  const { getToken } = useAuth()
+  const [searchParams] = useSearchParams()
+  const { getToken, isLoggedIn } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
+  const source: PrintMaterialSource = searchParams.get('source') === 'resume' ? 'resume' : 'document'
+  const isResumePrint = source === 'resume'
+  const isDocumentPrint = source === 'document'
+  const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
+  const pageSubtitle = isDocumentPrint ? '通用文档、求职材料或图片上传后打印' : '从我的简历或上传一份简历进入打印'
 
   const [tab, setTab] = useState<UploadTab>('file')
   const [file, setFile] = useState<UploadedFile | null>(null)
@@ -52,11 +60,15 @@ export function PrintUploadPage() {
   // 上传中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading)
 
-  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = [
-    { key: 'file', label: '选择文件', icon: MonitorSmartphoneIcon, note: '桌面验证' },
-    { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, disabled: true, note: '待接入' },
-    { key: 'usb',  label: 'U盘导入',  icon: UsbIcon, disabled: true, note: '待接入 Agent' },
-  ]
+  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = isResumePrint
+    ? [
+        { key: 'file', label: '上传简历', icon: MonitorSmartphoneIcon, note: 'PDF/图片' },
+      ]
+    : [
+        { key: 'file', label: '选择文件', icon: MonitorSmartphoneIcon, note: '桌面验证' },
+        { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, disabled: true, note: '待接入' },
+        { key: 'usb',  label: 'U盘导入',  icon: UsbIcon, disabled: true, note: '待接入 Agent' },
+      ]
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
@@ -78,7 +90,7 @@ export function PrintUploadPage() {
         mimeType: result.mimeType,
       }
       setFile(nextFile)
-      savePrintMaterialSession({ file: nextFile })
+      savePrintMaterialSession({ file: nextFile, source })
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
@@ -92,20 +104,50 @@ export function PrintUploadPage() {
 
   const handleNext = () => {
     if (!file) return
-    navigate('/print/material-check', { state: { file } })
+    navigate('/print/material-check', { state: { file, source } })
   }
 
   return (
     <div className="flex h-full flex-col p-6">
       <PageHeader
-        title="打印服务"
-        subtitle="选择文件上传方式"
+        title={pageTitle}
+        subtitle={pageSubtitle}
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
             返回首页
           </Button>
         }
       />
+
+      {source === 'resume' && (
+        <Card className="mt-6 border-primary-100 bg-primary-50/60 p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
+              <PrinterIcon className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold text-gray-900">先查看账号里的简历记录</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                已生成的简历可继续查看并打印；诊断类记录可查看报告或继续优化。已有电子简历也可以在下方上传后直接打印。
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="h-14 shrink-0 px-6"
+              onClick={() => {
+                if (isLoggedIn) {
+                  navigate('/me/resumes')
+                } else {
+                  navigate('/login', { state: { from: '/print/upload?source=resume' } })
+                }
+              }}
+            >
+              <SparklesIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
+              查看我的简历记录
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Tab bar */}
       <div className="mt-6 flex gap-2">
@@ -191,8 +233,12 @@ export function PrintUploadPage() {
                       <FileTextIcon className="h-8 w-8 text-gray-400" />
                     </div>
                     <div className="text-center">
-                      <p className="text-lg font-medium text-gray-700">点击选择文件</p>
-                      <p className="mt-1.5 text-sm text-gray-400">支持 PDF、图片格式，上传后将先做材料检查</p>
+                      <p className="text-lg font-medium text-gray-700">{source === 'resume' ? '点击选择简历文件' : '点击选择文件'}</p>
+                      <p className="mt-1.5 text-sm text-gray-400">
+                        {source === 'resume'
+                          ? '支持 PDF、图片格式，适合已有电子简历直接打印'
+                          : '支持 PDF、图片格式，上传后将先做材料检查'}
+                      </p>
                     </div>
                   </>
                 )}

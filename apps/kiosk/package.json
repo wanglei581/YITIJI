@@ -20,6 +20,7 @@
     "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs",
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",
     "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs",
+    "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs"
   },
   "dependencies": {

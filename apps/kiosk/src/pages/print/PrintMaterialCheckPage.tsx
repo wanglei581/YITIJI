@@ -25,14 +25,17 @@ import {
 import {
   clearPrintMaterialSession,
   patchPrintMaterialSession,
+  printUploadPathForSource,
   readPrintMaterialSession,
   type MaterialCheckSummary,
+  type PrintMaterialSource,
   type PrintFileState,
   type PrintMaterialSession,
 } from './printMaterialSession'
 
 interface LocationState {
   file?: PrintFileState
+  source?: PrintMaterialSource
 }
 
 type Stage = 'idle' | 'inspection' | 'normalize_a4' | 'pii_scan' | 'review' | 'submitting' | 'done' | 'error'
@@ -278,6 +281,8 @@ export function PrintMaterialCheckPage() {
   const file = sessionFile?.fileId && stateFile?.fileId && sessionFile.fileId === stateFile.fileId
     ? { ...stateFile, ...sessionFile }
     : stateFile ?? sessionFile
+  const source = state?.source ?? session?.source
+  const uploadPath = printUploadPathForSource(source)
 
   const [stage, setStage] = useState<Stage>('idle')
   const [inspectionTask, setInspectionTask] = useState<DocumentProcessTaskView | null>(null)
@@ -474,7 +479,7 @@ export function PrintMaterialCheckPage() {
 
       persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction, materialCheck })
       setStage('done')
-      navigate('/print/preview', { state: { file, materialCheck } })
+      navigate('/print/preview', { state: { file, materialCheck, source } })
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存隐私选择失败，请重试')
       setStage('review')
@@ -491,7 +496,7 @@ export function PrintMaterialCheckPage() {
           <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
           <p className="mt-2 text-sm text-gray-500">请重新上传文件后再进行材料检查</p>
         </div>
-        <Button size="lg" onClick={() => navigate('/print/upload')}>
+        <Button size="lg" onClick={() => navigate(uploadPath)}>
           重新上传文件
         </Button>
       </div>
@@ -504,7 +509,7 @@ export function PrintMaterialCheckPage() {
         title="打印前材料检查"
         subtitle="仅用于本次打印前确认，不向第三方发送"
         actions={
-          <Button size="sm" variant="secondary" disabled={isWorking} onClick={() => navigate('/print/upload')}>
+          <Button size="sm" variant="secondary" disabled={isWorking} onClick={() => navigate(uploadPath)}>
             重新上传
           </Button>
         }
@@ -795,7 +800,7 @@ export function PrintMaterialCheckPage() {
       )}
 
       <div className="mt-6 flex gap-3">
-        <Button variant="secondary" size="lg" className="min-h-[72px] flex-1" disabled={isWorking} onClick={() => navigate('/print/upload')}>
+        <Button variant="secondary" size="lg" className="min-h-[72px] flex-1" disabled={isWorking} onClick={() => navigate(uploadPath)}>
           返回上传
         </Button>
         <Button
