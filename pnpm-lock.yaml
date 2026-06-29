@@ -52,6 +52,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@ai-job-print/refresh':
+        specifier: workspace:*
+        version: link:../../packages/refresh
       '@ai-job-print/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -98,6 +101,9 @@ importers:
 
   apps/kiosk:
     dependencies:
+      '@ai-job-print/refresh':
+        specifier: workspace:*
+        version: link:../../packages/refresh
       '@ai-job-print/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -156,6 +162,9 @@ importers:
 
   apps/partner:
     dependencies:
+      '@ai-job-print/refresh':
+        specifier: workspace:*
+        version: link:../../packages/refresh
       '@ai-job-print/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -235,6 +244,22 @@ importers:
         version: 10.9.2(@swc/core@1.15.40)(@types/node@20.19.41)(typescript@5.9.3)
       typescript:
         specifier: ^5.5.0
+        version: 5.9.3
+
+  packages/refresh:
+    dependencies:
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.19
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.29
+      typescript:
+        specifier: ^5.7.0
         version: 5.9.3
 
   packages/shared:

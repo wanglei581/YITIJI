@@ -22,6 +22,7 @@
     "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs"
   },
   "dependencies": {
+    "@ai-job-print/refresh": "workspace:*",
     "@ai-job-print/shared": "workspace:*",
     "@ai-job-print/ui": "workspace:*",
     "china-division": "^2.7.0",
