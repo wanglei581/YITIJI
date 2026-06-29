@@ -1,5 +1,32 @@
 node_modules
 dist
+coverage
+.tmp
+outputs
 *.zip
 legacy-miaoda
 pnpm-lock.yaml
+
+# Local collaboration/tool workspaces
+.ccg/commander
+.ccg/tasks
+.workbuddy
+.product-pm
+.superpowers
+.worktrees
+其他文档
+
+# Runtime and generated API state
+services/api/data
+services/api/storage
+services/api/src/generated
+services/api/prisma/dev.db
+
+# Local environment and OS files
+.env
+.env.*
+!.env.example
+!**/.env.example
+!.env.template
+!**/.env.template
+.DS_Store

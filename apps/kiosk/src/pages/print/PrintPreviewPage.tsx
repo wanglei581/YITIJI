@@ -24,8 +24,10 @@ import type {
 } from '@ai-job-print/shared'
 import {
   patchPrintMaterialSession,
+  printUploadPathForSource,
   readPrintMaterialSession,
   type MaterialCheckSummary,
+  type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
 
@@ -34,6 +36,7 @@ type PrintFile = PrintFileState
 interface LocationState {
   file: PrintFile
   materialCheck?: MaterialCheckSummary
+  source?: PrintMaterialSource
 }
 
 // 打印机离线时的默认状态（显示"打印机离线"警告并阻止打印）
@@ -267,6 +270,8 @@ export function PrintPreviewPage() {
   const file = locationState?.file ?? restoredSession?.file ?? EMPTY_FILE
   const materialCheck = locationState?.materialCheck ?? restoredSession?.materialCheck
   const restoredPrintParams = restoredSession?.printParams
+  const source = locationState?.source ?? restoredSession?.source
+  const uploadPath = printUploadPathForSource(source)
   const effectivePages = file.pages ?? 1
 
   const { printerName, printer, loading: printerLoading } = usePrinterStatus()
@@ -349,7 +354,7 @@ export function PrintPreviewPage() {
       pagesPerSheet,
     }
     patchPrintMaterialSession({ file, materialCheck, printParams: params })
-    navigate('/print/confirm', { state: { file, params, materialCheck } })
+    navigate('/print/confirm', { state: { file, params, materialCheck, source } })
   }
 
   // Guard: direct URL access without file state — all hooks have already run above
@@ -363,7 +368,7 @@ export function PrintPreviewPage() {
           <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
           <p className="mt-2 text-sm text-gray-500">请重新上传文件后再进行打印设置</p>
         </div>
-        <Button size="lg" onClick={() => navigate('/print/upload')}>
+        <Button size="lg" onClick={() => navigate(uploadPath)}>
           重新上传文件
         </Button>
       </div>

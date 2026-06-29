@@ -19,7 +19,10 @@
     "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs",
     "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs",
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",
-    "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs"
+    "verify:scan-production-guard": "node scripts/verify-scan-production-guard.mjs",
+    "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
+    "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
+    "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

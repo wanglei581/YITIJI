@@ -31,6 +31,7 @@ import {
   SparklesIcon,
   UserCheckIcon,
   WifiIcon,
+  WrenchIcon,
   type LucideIcon,
 } from 'lucide-react'
 import type { SmartCampusModuleKey } from '@ai-job-print/shared'
@@ -298,7 +299,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source?intent=optimize' },
       { title: '简历素材库', icon: BookOpenIcon, disabled: true },
       { title: '职业规划', icon: CompassIcon, to: '/resume/career-plan' },
-      { title: '简历打印', icon: PrinterIcon, to: '/print/upload' },
+      { title: '简历打印', icon: PrinterIcon, to: '/print/upload?source=resume' },
       { title: '求职材料', icon: FileBadge2Icon, disabled: true },
     ],
   },
@@ -332,7 +333,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     icon: PrinterIcon,
     accent: 'cyan',
     tiles: [
-      { title: '文档打印', icon: FileTextIcon, to: '/print/upload' },
+      { title: '文档打印', icon: FileTextIcon, to: '/print/upload?source=document' },
       { title: '证件复印', icon: ClipboardCheckIcon, disabled: true },
       { title: '纸质扫描', icon: ScanLineIcon, to: '/scan/start' },
       { title: '云打印', icon: CloudUploadIcon, disabled: true },
@@ -528,6 +529,32 @@ function SmartCampusHorizontalSection() {
   )
 }
 
+function ToolboxSection() {
+  return (
+    <section
+      aria-label="百宝箱"
+      className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
+    >
+      <div className="flex items-center gap-4 border-b border-slate-100 bg-white px-8 py-6">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700">
+          <WrenchIcon className="h-8 w-8" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-3xl font-extrabold leading-tight text-slate-950">百宝箱</h2>
+          <p className="mt-1 text-base font-semibold text-slate-500">常用工具与扩展服务</p>
+        </div>
+      </div>
+
+      <div className="flex min-h-[168px] items-center justify-center px-8 py-10">
+        <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/78 px-10 py-8 text-center">
+          <p className="text-xl font-extrabold text-slate-700">待配置</p>
+          <p className="mt-2 text-base font-semibold text-slate-400">后续功能上线后将在这里展示</p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function HomePage() {
   return (
     <div className="min-h-full bg-[#eef1f5] pb-8">
@@ -541,6 +568,7 @@ export function HomePage() {
         ))}
       </main>
 
+      <ToolboxSection />
       <SmartCampusHorizontalSection />
 
       <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-slate-500">

@@ -14,6 +14,9 @@ apps/*/vite.config.d.ts
 # Generated artifacts (manual exports / presentations)
 outputs/
 
+# One-off root-level design previews should live under docs/design/ instead.
+/kiosk-home*.html
+
 # Environment
 .env
 .env.local

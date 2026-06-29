@@ -883,7 +883,7 @@ Visual requirements:
 No nested cards.
 Use a full-width page band with constrained inner content.
 Cards are individual activity items only.
-Buttons must not overflow at 21.5-inch portrait width or mobile.
+Buttons must not overflow at 27-inch portrait touch display width or mobile.
 Use lucide icons: GiftIcon, TicketIcon, LandmarkIcon, ChevronRightIcon.
 ```
 
