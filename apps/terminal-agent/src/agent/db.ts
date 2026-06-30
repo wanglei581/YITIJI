@@ -7,10 +7,9 @@
  *   print_tasks     — records completed/failed tasks to prevent re-execution on restart
  *   pending_patches — offline PATCH queue retried by offline-queue.ts
  *
- * Graceful fallback: if better-sqlite3 native module fails to load (e.g. first run
- * before npm rebuild on a new Windows machine), all functions silently no-op and
- * return safe defaults. The agent continues running but won't have restart-idempotency
- * until the DB becomes available.
+ * Fail-closed behavior: if better-sqlite3 native module fails to load (e.g. first
+ * run before npm rebuild on a new Windows machine), printing is disabled instead
+ * of running without restart-idempotency and offline status retry.
  *
  * DB paths:
  *   Windows: %ProgramData%\AIJobPrintAgent\agent.db
@@ -108,11 +107,15 @@ export function openDatabase(): AgentDatabase {
     return db
   } catch (e) {
     warn(
-      `db: better-sqlite3 加载失败，任务状态持久化不可用` +
-        `（仍可运行，但重启后可能重复打印）— ${e instanceof Error ? e.message : String(e)}`,
+      `db: local task database unavailable; printing disabled — ` +
+        `better-sqlite3 加载失败，任务状态持久化不可用 — ${e instanceof Error ? e.message : String(e)}`,
     )
     return null
   }
+}
+
+export function isDatabaseAvailable(db: AgentDatabase): db is SqliteDb {
+  return db !== null
 }
 
 // ── Task idempotency ──────────────────────────────────────────────────────────

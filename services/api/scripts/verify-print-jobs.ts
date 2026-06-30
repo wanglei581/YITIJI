@@ -2,9 +2,9 @@
  * 打印链路 service 级轻量 E2E 验证（P1-B 守门）。
  *
  * 覆盖上线核心打印链路（创建 → claim → 状态回传 → 查询）的关键不变量：
- *   1. 合法签名 fileUrl → 创建 PrintTask(pending)。
+ *   1. 合法签名 fileUrl + 目标终端 → 创建 PrintTask(pending)。
  *   2. 非法 fileUrl（外部地址 / 无签名 / 篡改 sig）→ 400 PRINT_INVALID_FILE_URL（SSRF 防护）。
- *   3. 终端 claim：pending 任务被该终端原子领取（claimed + 绑定 terminalId）；错 agentToken → 401。
+ *   3. 终端 claim：只领取已绑定本终端的 pending 任务；错 agentToken → 401。
  *   4. 状态回传：claimed → printing → completed（含 completedAt）。
  *   5. 终态幂等：重复回传 completed / 终态后再请求 printing 都返回 ack 且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
@@ -86,10 +86,15 @@ async function main() {
     // ── 1. 合法签名 fileUrl → 创建 PrintTask(pending) ──────────────────
     const signed = signFileUrl(fileId, 30 * 60 * 1000)
     const dto1: CreatePrintJobDto = { fileUrl: signed.url, fileMd5: 'sha256-vpj', fileName: '测试简历.pdf' }
-    const created = await printJobs.create(dto1, { ipAddress: '127.0.0.1', userAgent: 'verify', endUserId: null })
+    const created = await printJobs.create(dto1, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'verify',
+      endUserId: null,
+      terminalId,
+    })
     createdTaskIds.push(created.taskId)
     if (created.status === 'pending' && created.taskId.startsWith('ptask_')) {
-      pass('1. 合法签名 fileUrl → 创建任务 pending')
+      pass('1. 合法签名 fileUrl + 目标终端 → 创建任务 pending')
     } else fail(`1. 创建异常: ${JSON.stringify(created)}`)
 
     // ── 2. 非法 fileUrl 拦截（SSRF 防护）──────────────────────────────
@@ -121,11 +126,11 @@ async function main() {
     )
     const claimed = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
     if (claimed.length === 1 && claimed[0].taskId === created.taskId && claimed[0].claimedBy === terminalId && !!claimed[0].fileUrl) {
-      pass('3b. 终端 claim：pending 任务被该终端领取（返回 fileUrl + actionToken）')
+      pass('3b. 终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
     } else fail(`3b. claim 异常: ${JSON.stringify(claimed.map((c) => c.taskId))}`)
     const afterClaim = await prisma.printTask.findUnique({ where: { id: created.taskId } })
     if (afterClaim?.status === 'claimed' && afterClaim.terminalId === terminalId) {
-      pass('3c. claim 后 DB 状态为 claimed 且绑定该终端')
+      pass('3c. claim 后 DB 状态为 claimed 且目标终端保持不变')
     } else fail(`3c. claim 后状态异常: ${afterClaim?.status} / ${afterClaim?.terminalId}`)
 
     // ── 4. 状态回传 printing → completed ──────────────────────────────

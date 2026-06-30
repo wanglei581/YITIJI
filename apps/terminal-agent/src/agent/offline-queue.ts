@@ -18,6 +18,7 @@ import { createApiClient, axiosErrorMessage } from './api-client'
 import {
   getPendingPatches,
   markPatchAttempt,
+  isDatabaseAvailable,
   type AgentDatabase,
   type PendingPatch,
 } from './db'
@@ -116,6 +117,13 @@ async function runRetryLoop(config: AgentConfig, db: AgentDatabase): Promise<voi
  * Returns the NodeJS.Timeout handle; pass to clearInterval() on shutdown.
  */
 export function startOfflineRetry(config: AgentConfig, db: AgentDatabase): NodeJS.Timeout {
+  if (!isDatabaseAvailable(db)) {
+    warn('offline-queue: local task database unavailable; status retry queue disabled')
+    const timer = setInterval(() => undefined, RETRY_INTERVAL_MS)
+    timer.unref()
+    return timer
+  }
+
   log(`offline-queue: starting — interval=${RETRY_INTERVAL_MS / 1000}s, max attempts=${MAX_ATTEMPTS}`)
   const timer = setInterval(() => {
     runRetryLoop(config, db).catch((e) =>

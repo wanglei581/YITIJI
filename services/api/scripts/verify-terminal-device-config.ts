@@ -646,8 +646,8 @@ async function runServiceChecks(): Promise<void> {
     )
     await expectCode(
       () => terminals.patchTaskStatus(taskId, { status: 'printing' }, `Bearer ${tokenA}`, undefined),
-      'TERMINAL_DISABLED',
-      '6c. 停用终端 status 回传 token fallback 被拦截',
+      'TASK_TERMINAL_MISSING',
+      '6c. status 回传缺少 terminalId 时不再允许 token fallback',
     )
 
     const kioskConfig = await terminals.getKioskTerminalConfig(codeA)

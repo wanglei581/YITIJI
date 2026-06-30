@@ -44,10 +44,15 @@ export interface PrintJobStatusResult {
 
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
+  const terminalId = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+  if (!terminalId) {
+    throw new Error('createPrintJob failed: missing terminal id')
+  }
   const res = await fetch(`${API_BASE_URL}/print/jobs`, {
     method:  'POST',
     headers: {
       'Content-Type': 'application/json',
+      'X-Terminal-Id': terminalId,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body:    JSON.stringify(body),

@@ -71,7 +71,7 @@ export interface AgentConfig {
 
 // ── Heartbeat ────────────────────────────────────────────────────────────────
 
-export type TerminalStatus = 'online' | 'offline' | 'error'
+export type TerminalStatus = 'online' | 'offline' | 'error' | 'agent_degraded'
 export type PrinterStatus = 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'
 
 export interface HeartbeatPayload {
@@ -83,6 +83,7 @@ export interface HeartbeatPayload {
   agentVersion: string
   ipAddress: string
   reportedAt: string
+  localTaskDatabaseAvailable?: boolean
 }
 
 export interface HeartbeatResponse {
