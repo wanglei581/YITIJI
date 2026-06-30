@@ -317,7 +317,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: '实习岗位', icon: GraduationCapIcon, to: '/jobs?category=intern' },
       { title: '兼职信息', icon: FileTextIcon, to: '/jobs?category=parttime' },
       { title: '全部岗位', icon: BriefcaseIcon, to: '/jobs' },
-      { title: '岗位大师', icon: BrainCircuitIcon, disabled: true },
+      { title: '岗位大师', icon: BrainCircuitIcon, disabled: Boolean(true) },
     ],
   },
   {
@@ -328,7 +328,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     tiles: [
       { title: '社会招聘会', icon: MapPinIcon, to: '/job-fairs' },
       { title: '校园招聘会', icon: BookOpenIcon, to: '/campus' },
-      { title: '扫码签到', icon: QrCodeIcon, disabled: true },
+      { title: '扫码签到', icon: QrCodeIcon, to: '/job-fairs/checkin' },
     ],
   },
   {
@@ -338,11 +338,11 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     accent: 'cyan',
     tiles: [
       { title: '文档打印', icon: FileTextIcon, to: '/print/upload?source=document' },
-      { title: '证件复印', icon: ClipboardCheckIcon, disabled: true },
+      { title: '证件复印', icon: ClipboardCheckIcon, disabled: Boolean(true) },
       { title: '纸质扫描', icon: ScanLineIcon, to: '/scan/start' },
-      { title: '云打印', icon: CloudUploadIcon, disabled: true },
-      { title: '格式转换', icon: FileType2Icon, disabled: true },
-      { title: '证件照打印', icon: ImageIcon, disabled: true },
+      { title: '云打印', icon: CloudUploadIcon, disabled: Boolean(true) },
+      { title: '格式转换', icon: FileType2Icon, disabled: Boolean(true) },
+      { title: '证件照打印', icon: ImageIcon, disabled: Boolean(true) },
     ],
   },
   {

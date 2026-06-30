@@ -18,6 +18,15 @@ const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon:
   generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录', icon: SparklesIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
   job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: FileSearchIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
   career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: FileSearchIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
+  fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: SparklesIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
+}
+
+const UNKNOWN_KIND_META = {
+  label: 'AI 服务记录',
+  hint: '本人 AI 服务元数据',
+  icon: SparklesIcon,
+  bg: 'bg-gray-50',
+  color: 'text-gray-500',
 }
 
 const STATUS_META: Record<MemberAiRecordItem['status'], { label: string; cls: string }> = {
@@ -106,7 +115,7 @@ export function MyAiRecordsPage() {
 
       <MeListShell
         title="AI服务记录"
-        subtitle="本人 AI 简历、岗位匹配与职业规划服务记录（仅元数据）"
+        subtitle="本人 AI 简历、岗位匹配、职业规划与参会准备服务记录（仅元数据）"
         loginFrom="/me/ai-records"
         isLoggedIn={isLoggedIn}
         state={state}
@@ -114,10 +123,10 @@ export function MyAiRecordsPage() {
         isEmpty={items.length === 0}
         emptyIcon={SparklesIcon}
         emptyTitle="还没有 AI 服务记录"
-        emptyDescription="完成简历诊断、优化、生成或职业规划后，这里会显示记录"
+        emptyDescription="完成简历诊断、优化、生成、职业规划或参会准备后，这里会显示记录"
       >
         {items.map((item) => {
-          const kind = KIND_META[item.kind]
+          const kind = KIND_META[item.kind] ?? UNKNOWN_KIND_META
           const status = STATUS_META[item.status]
           const Icon = kind.icon
           const confirming = confirmId === item.id

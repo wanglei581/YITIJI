@@ -12,6 +12,7 @@ import {
   InfoIcon,
   PrinterIcon,
   QrCodeIcon,
+  SparklesIcon,
   SmartphoneIcon,
   XIcon,
 } from 'lucide-react'
@@ -182,6 +183,10 @@ export function JobFairDetailPage() {
     navigate(`/job-fairs/${fair.id}/materials`)
   }
 
+  const handleVisitPlan = () => {
+    navigate(`/job-fairs/${fair.id}/visit-plan`)
+  }
+
   return (
     <div className="flex h-full flex-col">
       {qr?.kind === 'book' && (
@@ -265,8 +270,8 @@ export function JobFairDetailPage() {
           <VenueGuideTab fairId={fair.id} onGoCompanies={() => setTab('参展企业与岗位')} />
         )}
         {tab === '数据大屏' && (
-          stats ? <FairDataScreen stats={stats} /> : (
-            <EmptyState icon={InfoIcon} title="暂无数据大屏" description="该招聘会暂未录入预计/来源数据" className="py-12" />
+          stats && !stats.isMockData ? <FairDataScreen stats={stats} /> : (
+            <EmptyState icon={InfoIcon} title="暂无真实统计数据" description="该招聘会暂未接入真实来源数据，页面不会展示模拟统计" className="py-12" />
           )
         )}
       </div>
@@ -287,6 +292,10 @@ export function JobFairDetailPage() {
           <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={handlePrintMaterial}>
             <PrinterIcon className="h-5 w-5" />
             打印资料
+          </Button>
+          <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={handleVisitPlan}>
+            <SparklesIcon className="h-5 w-5" />
+            AI准备单
           </Button>
         </div>
       </div>

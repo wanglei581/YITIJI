@@ -424,3 +424,47 @@ export interface CareerPlanPrintResponse {
   signedUrl: string
   expiresAt: string
 }
+
+// ── 招聘会 AI 参会准备单 ───────────────────────────────────────────────────
+// 合规:仅供本人参会准备参考;不含平台内办理结果、不含企业端筛选或邀约状态。
+
+export interface FairVisitPlanFairSnapshot {
+  id: string
+  title: string
+  sourceName: string
+  sourceUrl: string
+  startAt: string
+  endAt: string
+  venue: string
+  city: string
+}
+
+export interface FairVisitPlanResponse {
+  taskId: string
+  status: 'completed' | 'failed'
+  failReason?: string
+  basedOn?: {
+    resume: true
+    fairId: string
+    fairName: string
+    companyCount: number
+    positionCount: number
+  }
+  fair?: FairVisitPlanFairSnapshot
+  summary?: string
+  fairHighlights?: string[]
+  priorityCompanies?: Array<{ companyName: string; reason: string; sourceUrl: string | null }>
+  preparationChecklist?: string[]
+  questionsToAsk?: string[]
+  onsiteTips?: string[]
+  providerName?: string
+}
+
+export interface FairVisitPlanPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+}

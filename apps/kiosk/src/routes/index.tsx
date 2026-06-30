@@ -13,11 +13,13 @@ import { InterviewTipsPage } from '../pages/interview/InterviewTipsPage'
 import { InterviewReportsPage } from '../pages/interview/InterviewReportsPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
+import { FairCheckinPage } from '../pages/job-fairs/FairCheckinPage'
 import { JobFairDetailPage } from '../pages/job-fairs/JobFairDetailPage'
 import { FairCompaniesPage } from '../pages/job-fairs/FairCompaniesPage'
 import { FairCompanyDetailPage } from '../pages/job-fairs/FairCompanyDetailPage'
 import { FairMapPage } from '../pages/job-fairs/FairMapPage'
 import { FairMaterialsPage } from '../pages/job-fairs/FairMaterialsPage'
+import { FairVisitPlanPage } from '../pages/job-fairs/FairVisitPlanPage'
 import { FairStatsPage } from '../pages/job-fairs/FairStatsPage'
 import { JobsPage } from '../pages/jobs/JobsPage'
 import { CompaniesPage } from '../pages/companies/CompaniesPage'
@@ -147,12 +149,14 @@ export const kioskRouter = createBrowserRouter([
       { path: 'companies',                             element: <CompaniesPage /> },
       { path: 'companies/:id',                         element: <CompanyDetailPage /> },
       { path: 'job-fairs',                             element: <JobFairsPage /> },
+      { path: 'job-fairs/checkin',                     element: <FairCheckinPage /> },
       { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
       // 招聘会现场服务（Phase 招聘会数字化）
       { path: 'job-fairs/:id/companies',               element: <FairCompaniesPage /> },
       { path: 'job-fairs/:id/companies/:companyId',    element: <FairCompanyDetailPage /> },
       { path: 'job-fairs/:id/map',                     element: <FairMapPage /> },
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
+      { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
     ],
   },
