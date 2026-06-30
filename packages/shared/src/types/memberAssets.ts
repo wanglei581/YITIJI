@@ -87,9 +87,10 @@ export type ActivityTargetType = 'job' | 'job_fair' | 'policy' | 'company_profil
 
 /**
  * 外部跳转动作（只描述打开了哪类入口，不描述办理结果）：
- * external_apply=岗位/参展企业投递入口；external_appointment=招聘会预约入口；external_open=政策官方入口。
+ * external_apply=岗位/参展企业投递入口；external_appointment=招聘会预约入口；
+ * external_checkin_open=招聘会来源签到入口；external_open=政策官方入口。
  */
-export type ActivityJumpAction = 'external_apply' | 'external_appointment' | 'external_open'
+export type ActivityJumpAction = 'external_apply' | 'external_appointment' | 'external_checkin_open' | 'external_open'
 
 /** 浏览记录条目（目标快照 + 时间，无任何状态字段）。 */
 export interface MemberBrowseLogItem {

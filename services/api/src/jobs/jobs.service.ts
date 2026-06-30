@@ -113,7 +113,7 @@ export interface FairListItemDto {
   id: string; name: string; organizer: string
   startTime: string; endTime: string; venue: string; status: FairStatus
   description?: string; boothCount?: number
-  sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
+  sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; checkinUrl?: string; syncTime: string
   hasManagedData: boolean; managedCompanyCount: number; managedMaterialCount: number
   dataSourceNote: string
   jobCount?: number; theme?: string
@@ -156,7 +156,7 @@ export interface AdminFairDto {
   id: string
   name: string; organizer: string; startTime: string; endTime: string; venue: string
   status: FairStatus; description?: string; boothCount?: number
-  sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
+  sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; checkinUrl?: string; syncTime: string
   reviewStatus: ReviewStatus; publishStatus: PublishStatus
 }
 
@@ -172,7 +172,7 @@ export interface PartnerJobDto {
 export interface PartnerFairDto {
   id: string; externalId: string; name: string; organizer: string
   startTime: string; endTime: string; venue: string; status: FairStatus
-  sourceUrl: string; syncTime: string; reviewStatus: ReviewStatus; publishStatus: PublishStatus
+  sourceUrl: string; checkinUrl?: string; syncTime: string; reviewStatus: ReviewStatus; publishStatus: PublishStatus
   sourceOrgId: string; sourceName: string
   // 阶段1C:编辑表单回填用展示字段(additive,可缺省)
   theme?: string; city?: string; address?: string; description?: string
@@ -322,6 +322,22 @@ function categoryToWorkType(category: string | null): WorkType | undefined {
 
 function fmtSyncTime(d: Date): string {
   return d.toISOString().replace('T', ' ').slice(0, 16)
+}
+
+function normalizeOptionalHttpUrl(value: string | undefined, fieldName: string): string | null | undefined {
+  if (value === undefined) return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  let url: URL
+  try {
+    url = new URL(trimmed)
+  } catch {
+    throw new BadRequestException({ error: { code: 'INVALID_URL', message: `${fieldName} 必须是有效 http(s) 链接` } })
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new BadRequestException({ error: { code: 'INVALID_URL', message: `${fieldName} 必须以 http:// 或 https:// 开头` } })
+  }
+  return trimmed
 }
 
 interface PrismaJobSourceRow {
@@ -537,6 +553,7 @@ interface PrismaJobFairRow {
   externalId: string
   sourceName: string
   sourceUrl: string
+  checkinUrl: string | null
   title: string
   theme: string
   startAt: Date
@@ -604,6 +621,7 @@ function prismaFairToListItem(f: PrismaJobFairRow): FairListItemDto {
     externalId: f.externalId,
     sourceName: f.sourceName,
     sourceUrl: f.sourceUrl,
+    checkinUrl: f.checkinUrl ?? undefined,
     syncTime: fmtSyncTime(f.syncTime),
     hasManagedData: companyCount > 0,
     managedCompanyCount: companyCount,
@@ -636,6 +654,7 @@ function prismaFairToAdminDto(f: PrismaJobFairRow): AdminFairDto {
     externalId: f.externalId,
     sourceName: f.sourceName,
     sourceUrl: f.sourceUrl,
+    checkinUrl: f.checkinUrl ?? undefined,
     syncTime: fmtSyncTime(f.syncTime),
     reviewStatus: f.reviewStatus as ReviewStatus,
     publishStatus: f.publishStatus as PublishStatus,
@@ -653,6 +672,7 @@ function prismaFairToPartnerDto(f: PrismaJobFairRow): PartnerFairDto {
     venue: f.venue,
     status: deriveFairStatus(f.startAt, f.endAt),
     sourceUrl: f.sourceUrl,
+    checkinUrl: f.checkinUrl ?? undefined,
     syncTime: fmtSyncTime(f.syncTime),
     reviewStatus: f.reviewStatus as ReviewStatus,
     publishStatus: f.publishStatus as PublishStatus,
@@ -1645,6 +1665,7 @@ export class JobsService {
     for (const item of dto.items) {
       const startAt = new Date(item.startAt)
       const endAt   = new Date(item.endAt)
+      const checkinUrl = normalizeOptionalHttpUrl(item.checkinUrl, 'checkinUrl')
       if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
         throw new BadRequestException({
           error: { code: 'INVALID_DATETIME', message: `招聘会 ${item.externalId} 的时间格式无效(需 ISO 8601)` },
@@ -1661,6 +1682,7 @@ export class JobsService {
           create: {
             sourceOrgId, externalId: item.externalId, sourceName,
             sourceUrl: item.sourceUrl,
+            checkinUrl,
             title: item.title,
             theme: item.theme ?? 'general',
             startAt, endAt,
@@ -1676,6 +1698,7 @@ export class JobsService {
           },
           update: {
             sourceName, sourceUrl: item.sourceUrl,
+            checkinUrl: normalizeOptionalHttpUrl(item.checkinUrl, 'checkinUrl'),
             title: item.title,
             theme: item.theme ?? 'general',
             startAt, endAt,
@@ -1741,6 +1764,9 @@ export class JobsService {
 
     const startAt = dto.startAt ? new Date(dto.startAt) : fair.startAt
     const endAt   = dto.endAt ? new Date(dto.endAt) : fair.endAt
+    const checkinUrlUpdate = dto.checkinUrl !== undefined
+      ? { checkinUrl: normalizeOptionalHttpUrl(dto.checkinUrl, 'checkinUrl') }
+      : {}
     if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt.getTime() <= startAt.getTime()) {
       throw new BadRequestException({ error: { code: 'INVALID_DATE_RANGE', message: '结束时间必须晚于开始时间' } })
     }
@@ -1758,6 +1784,7 @@ export class JobsService {
         ...(dto.address !== undefined ? { address: dto.address } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
         ...(dto.sourceUrl !== undefined ? { sourceUrl: dto.sourceUrl } : {}),
+        ...checkinUrlUpdate,
         // 状态机:内容修订 → 强制重审
         reviewStatus: 'pending',
         publishStatus: 'draft',
@@ -2056,6 +2083,9 @@ export class JobsService {
       if (mapped.sourceUrl && !mapped.sourceUrl.startsWith('http')) {
         errors.push('sourceUrl 必须以 http 开头')
       }
+      if (mapped.checkinUrl && !mapped.checkinUrl.startsWith('http')) {
+        errors.push('checkinUrl 必须以 http 开头')
+      }
       // date check for fairs
       if (args.dataType === 'fair') {
         if (mapped.startAt && Number.isNaN(Date.parse(mapped.startAt))) {
@@ -2223,6 +2253,7 @@ export class JobsService {
                 sourceOrgId, externalId: mapped.externalId, sourceName,
                 sourceId: batch.sourceId,
                 sourceUrl: mapped.sourceUrl ?? '',
+                checkinUrl: normalizeOptionalHttpUrl(mapped.checkinUrl, 'checkinUrl'),
                 title: mapped.title ?? '',
                 theme: mapped.theme || 'general',
                 startAt, endAt,
@@ -2236,6 +2267,7 @@ export class JobsService {
               },
               update: {
                 sourceName, sourceUrl: mapped.sourceUrl ?? '',
+                checkinUrl: normalizeOptionalHttpUrl(mapped.checkinUrl, 'checkinUrl'),
                 title: mapped.title ?? '',
                 theme: mapped.theme || 'general',
                 startAt, endAt,

@@ -28,6 +28,7 @@ export interface Fair {
   externalId: string
   sourceName: string
   sourceUrl: string
+  checkinUrl: string | null
   title: string
   theme: FairTheme | string
   startAt: string

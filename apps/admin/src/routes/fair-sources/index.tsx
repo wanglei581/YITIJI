@@ -282,6 +282,7 @@ export default function FairSourcesPage() {
             <DetailRow label="来源机构" value={viewing.sourceName} />
             <DetailRow label="外部编号" value={viewing.externalId} />
             <DetailRow label="来源链接" value={viewing.sourceUrl ? <a href={viewing.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">去来源平台查看</a> : '—'} />
+            <DetailRow label="来源签到链接" value={viewing.checkinUrl ? <a href={viewing.checkinUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">查看来源签到入口</a> : '未配置'} />
             <DetailRow label="招聘会名称" value={viewing.name} />
             <DetailRow label="主办方" value={viewing.organizer} />
             <DetailRow label="开始时间" value={viewing.startTime} />

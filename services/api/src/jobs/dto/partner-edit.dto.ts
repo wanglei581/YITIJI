@@ -77,4 +77,7 @@ export class UpdatePartnerFairDto {
 
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(500)
   sourceUrl?: string
+
+  @IsOptional() @IsString() @MaxLength(500)
+  checkinUrl?: string
 }

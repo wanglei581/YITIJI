@@ -13,7 +13,7 @@ import { InterviewTipsPage } from '../pages/interview/InterviewTipsPage'
 import { InterviewReportsPage } from '../pages/interview/InterviewReportsPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
-import { FairCheckinPage } from '../pages/job-fairs/FairCheckinPage'
+import { JobFairCheckinPage } from '../pages/job-fairs/JobFairCheckinPage'
 import { JobFairDetailPage } from '../pages/job-fairs/JobFairDetailPage'
 import { FairCompaniesPage } from '../pages/job-fairs/FairCompaniesPage'
 import { FairCompanyDetailPage } from '../pages/job-fairs/FairCompanyDetailPage'
@@ -149,7 +149,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'companies',                             element: <CompaniesPage /> },
       { path: 'companies/:id',                         element: <CompanyDetailPage /> },
       { path: 'job-fairs',                             element: <JobFairsPage /> },
-      { path: 'job-fairs/checkin',                     element: <FairCheckinPage /> },
+      { path: 'job-fairs/checkin',                     element: <JobFairCheckinPage /> },
       { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
       // 招聘会现场服务（Phase 招聘会数字化）
       { path: 'job-fairs/:id/companies',               element: <FairCompaniesPage /> },

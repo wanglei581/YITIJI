@@ -674,6 +674,7 @@ model JobFair {
   externalId  String
   sourceName  String
   sourceUrl   String
+  checkinUrl  String?  // 来源平台/官方现场签到入口；仅展示二维码，不记录签到结果
   sourceId    String?
   source      JobSource? @relation("FairSource", fields: [sourceId], references: [id])
 

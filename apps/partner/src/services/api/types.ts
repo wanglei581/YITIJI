@@ -108,6 +108,7 @@ export interface PartnerFairRecord {
   venue: string
   status: JobFairStatus
   sourceUrl: string
+  checkinUrl?: string
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
@@ -148,6 +149,7 @@ export interface ImportFairItem {
   address?: string
   description?: string
   sourceUrl: string
+  checkinUrl?: string
   companyCount?: number
   jobCount?: number
 }
@@ -176,6 +178,7 @@ export interface UpdatePartnerFairInput {
   address?: string
   description?: string
   sourceUrl?: string
+  checkinUrl?: string
 }
 
 export interface ImportResult<T> {

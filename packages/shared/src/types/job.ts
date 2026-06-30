@@ -58,6 +58,8 @@ export interface ExternalJobFair extends ExternalJobSource {
   status: JobFairStatus
   description?: string
   boothCount?: number
+  /** 来源平台/官方签到入口。Kiosk 仅用于“扫码前往来源平台签到”，不记录签到结果。 */
+  checkinUrl?: string
   /** 招聘岗位数（快照，卡片"N 个岗位"展示） */
   jobCount?: number
   /** 主题：general 综合 / campus 校园 / campus_corp 校企合作 / industry 行业专场 */

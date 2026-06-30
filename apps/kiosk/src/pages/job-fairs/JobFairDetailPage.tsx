@@ -90,6 +90,7 @@ function QrModal({
 
 type QrState =
   | { kind: 'book' }
+  | { kind: 'checkin' }
   | { kind: 'nav'; url: string }
   | null
 
@@ -157,6 +158,11 @@ export function JobFairDetailPage() {
     setQr({ kind: 'book' })
   }
 
+  const openCheckinQr = () => {
+    if (fair) recordExternalJump(getToken(), 'job_fair', fair.id, 'external_checkin_open')
+    setQr({ kind: 'checkin' })
+  }
+
   if (loading) return <LoadingState className="h-full" />
   if (error || !fair) {
     return (
@@ -199,6 +205,19 @@ export function JobFairDetailPage() {
             { label: '外部编号', value: fair.externalId },
           ]}
           note="请使用手机扫码前往来源平台办理预约，预约由对方平台管理，本系统不参与活动报名流程、不接收简历。"
+          onClose={() => setQr(null)}
+        />
+      )}
+      {qr?.kind === 'checkin' && (
+        <QrModal
+          title="扫码前往来源平台签到"
+          subtitle={fair.name}
+          value={fair.checkinUrl}
+          meta={[
+            { label: '来源机构', value: fair.sourceName },
+            { label: '外部编号', value: fair.externalId },
+          ]}
+          note="请使用手机扫码前往来源平台签到。本系统不记录签到结果，不参与现场入场办理。"
           onClose={() => setQr(null)}
         />
       )}
@@ -293,6 +312,12 @@ export function JobFairDetailPage() {
             <PrinterIcon className="h-5 w-5" />
             打印资料
           </Button>
+          {!isEnded && fair.checkinUrl && (
+            <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={openCheckinQr}>
+              <QrCodeIcon className="h-5 w-5" />
+              扫码签到
+            </Button>
+          )}
           <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={handleVisitPlan}>
             <SparklesIcon className="h-5 w-5" />
             AI准备单

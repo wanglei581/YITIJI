@@ -34,6 +34,7 @@ const TYPE_LABEL: Record<ActivityTargetType, string> = {
 const ACTION_LABEL: Record<ActivityJumpAction, string> = {
   external_apply: '岗位来源入口',
   external_appointment: '招聘会来源入口',
+  external_checkin_open: '招聘会签到来源入口',
   external_open: '官方入口',
 }
 

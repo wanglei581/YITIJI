@@ -60,6 +60,9 @@ export class ImportFairItemDto {
   @IsString() @IsNotEmpty() @MaxLength(500)
   sourceUrl!: string
 
+  @IsOptional() @IsString() @MaxLength(500)
+  checkinUrl?: string
+
   @IsOptional() @IsInt() @Min(0)
   companyCount?: number
 

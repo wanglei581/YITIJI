@@ -132,6 +132,7 @@ export interface AdminFairSourceRecord {
   sourceName: string
   externalId: string
   sourceUrl: string
+  checkinUrl?: string
   name: string
   organizer: string
   startTime: string

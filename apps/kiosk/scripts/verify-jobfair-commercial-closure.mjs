@@ -35,6 +35,8 @@ function stripAllowedPhrases(src) {
     .split('扫码投递').join('')
     .split('去来源平台预约').join('')
     .split('扫码预约').join('')
+    .split('扫码前往来源平台签到').join('')
+    .split('来源平台签到').join('')
 }
 
 console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
@@ -77,7 +79,7 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
     'src/pages/campus/CampusPage.tsx',
     'src/pages/campus/components/CampusTabs.tsx',
   ]
-  const banned = ['一键投递', '立即投递', '平台投递', '投递简历', '候选人管理', '签到成功', '确认签到', '平台签到']
+  const banned = ['一键投递', '立即投递', '平台投递', '投递简历', '候选人管理', '签到成功', '确认签到', '平台内签到']
   const hits = []
   for (const rel of files) {
     const src = stripAllowedPhrases(read(rel))

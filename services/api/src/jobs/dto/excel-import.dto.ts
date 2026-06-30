@@ -53,7 +53,7 @@ export const JOB_REQUIRED_FIELDS: JobStandardField[] = ['externalId', 'title', '
  */
 export const FAIR_STANDARD_FIELDS = [
   'externalId', 'title', 'startAt', 'endAt', 'venue', 'city', 'sourceUrl',
-  'theme', 'address', 'description', 'companyCount', 'jobCount',
+  'checkinUrl', 'theme', 'address', 'description', 'companyCount', 'jobCount',
 ] as const
 export type FairStandardField = typeof FAIR_STANDARD_FIELDS[number]
 
