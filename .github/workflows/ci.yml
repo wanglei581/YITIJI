@@ -161,6 +161,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:job-ai
           pnpm --filter @ai-job-print/api verify:job-data-quality
+          pnpm --filter @ai-job-print/api verify:job-ai-backend
+          pnpm --filter @ai-job-print/api verify:job-ai-privacy
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:companies

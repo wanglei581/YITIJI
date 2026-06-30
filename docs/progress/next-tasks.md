@@ -90,6 +90,7 @@
 - [x] **岗位信息 AI 商用闭环 Task 1：生产真实服务门禁**：后端生产启动门禁已要求 PostgreSQL、Redis、COS、腾讯短信、百度 OCR、`AI_PROVIDER=llm` 和真实 LLM 密钥，拒绝 mock AI、未闭环 AI provider stub、OCR disabled 和缺失 Redis；Kiosk 生产构建已拒绝非 `VITE_API_MODE=http`，避免生产包使用 mockAdapter。已通过 API/Kiosk `verify:production-real-services`、API `verify:production-runtime-gates`、API/Kiosk typecheck 和 `git diff --check`，CI 串行 verify 已接入 API/Kiosk 生产真实服务门禁与 Kiosk 生产构建配置验证。本项不代表岗位 AI 推荐、结果落库、Admin/Partner 看板、live 外部服务或真机验收完成。
 - [x] **岗位信息 AI 商用闭环 Task 2：共享契约与 additive schema**：`packages/shared` 已补岗位质量、标准化字段、岗位 AI 会话、推荐请求/响应和三档参考等级契约；Prisma 已新增 `JobAiSession`、`JobAiRecommendation`、`AiServiceLog`、`UserAiConsent`、`UserDataRequest`、`JobDataQualitySnapshot`，并以可空 / 默认字段扩展 `Job`；SQLite/PostgreSQL 双 migration 均为 additive；`verify:job-ai` 已接入 CI，覆盖双迁移、隐私禁存、匿名 token hash / TTL 和禁止招聘闭环状态。该项不代表推荐接口、真实 LLM 调用、Admin/Partner 看板或生产迁移完成。
 - [x] **岗位信息 AI 商用闭环 Task 3：岗位数据质量与来源可用性**：`JobQualityService` 已计算岗位必填字段、AI-ready 字段、来源 URL 格式、同步过期和有效期，写入 `JobDataQualitySnapshot`；API 导入、Webhook、Excel 确认、Partner 编辑和 JobSync 拉取后都会刷新质量快照；Import DTO 与 Excel 字段白名单已支持学历、经验、技能、福利、薪资上下限、薪资单位和有效期；公开列表对缺失薪资展示“来源平台未提供”。`verify:job-data-quality` 已接入 CI；本地验证覆盖 API typecheck、`verify:job-ai`、`db:pg:sync:check`、临时 SQLite 空库 `verify:job-fit` / `verify:job-sync`。该项不代表 AI 推荐接口、Admin/Partner 质量看板、生产迁移或客户真实数据验收完成。
+- [x] **岗位信息 AI 商用闭环 Task 4 + Task 5 后端底座：Job AI 后端推荐 / 隐私 / 配额 API**：已新增 `JobAiModule` 与 recommendations / explain / match / me sessions 后端 API；推荐只基于 `approved + published` 真实岗位和已授权会员简历解析任务，匿名访问 token 仍只用于任务归属校验，简历推荐在无当前版本 `job_ai` 授权时 fail-closed；explain 未登录 fail-closed。`MemberPrivacyModule` 支持会员授权状态、授权、撤回、本人数据请求和 Admin 处理留痕；Admin 处理写入真实 `AuditLog.id`，`delete` 类型请求 completed 时会物理删除本人 `JobAiSession` 并依赖级联删除推荐明细；`JobAiQuotaService` 使用 Redis 按 member / terminal / IP 做日配额，Redis 异常 fail-closed，超限或异常会回滚已自增维度，配额自然日按北京时间计算。`AiServiceLog` 只存元数据，DB 元数据默认 90 天清理；LLM 输出过滤禁止百分比、录用概率、平台投递、候选人筛选、面试邀约和 Offer 语义，并已覆盖小数百分比。已通过 `verify:job-ai-backend`、`verify:job-ai-privacy`、`verify:job-ai`、API typecheck 和 lint；Antigravity 二次复审 `APPROVE` 且 Critical/Warning 为 0，Claude 审查进程失败未取得有效报告。该项不代表 Kiosk 授权确认 UI、Kiosk AI 推荐页面接线、Admin/Partner 看板、成本用量看板、预生产 live 或真机验收完成。
 
 ## P1：用户文件与简历资产商用闭环后续
 
@@ -118,7 +119,7 @@
 - [ ] **求职材料库 Windows 真机打印验收**：待正式或试运营环境具备 Windows Terminal Agent、奔图打印机和真实出纸条件后，使用求职材料生成的 PDF 从 `/print/confirm` 进入打印任务，验收 Agent claim、驱动出纸、失败恢复、订单状态与异常反馈；该项未完成前不得宣称求职材料库达到真机商用闭环。
 - [ ] **求职材料库二期动态治理设计**：如要开放 Admin 模板 CRUD、Partner 模板申请、版权素材上传、套餐收费或岗位关键词辅助，必须另起独立设计与审查，先补审核流、版权归属、字段白名单、滥用风控和合规文案，再写代码。
 - [ ] **岗位信息页客户数据验收**：用客户真实 API / Excel / Webhook 岗位样本复验标准字段映射、筛选、来源链接、外部编号、同步时间、岗位描述、职责要求、企业关联和收藏 / 浏览 / 外部跳转记录；验收只记录打开来源入口，不记录投递结果。
-- [ ] **岗位信息 AI 商用闭环下一阶段**：按 `docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md` 继续执行 Task 4 Job AI 后端推荐 / 会话 API，基于真实岗位、本人简历元数据和显式用户同意生成推荐会话与推荐结果；推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成真实 LLM/OCR/PostgreSQL/Redis/COS、Admin/Partner 看板、预生产公网浏览器和一体机真机验收前，不得对外宣称 AI 推荐或岗位匹配达到商用完成。
+- [ ] **岗位信息 AI 商用闭环下一阶段**：补 Kiosk 授权确认 UI、Kiosk AI 推荐 / 解读 / 匹配入口、推荐结果历史回看、配额 / 授权错误态、会员隐私中心入口、Admin/Partner 岗位质量与 AI 用量看板、真实 token usage / 成本估算、异常成本告警、预生产公网浏览器验收和一体机真机验收。推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成前台接线、看板、预生产和真机验收前，不得对外宣称 AI 推荐或岗位匹配达到商用完成。
 
 ## P1：工程质量门禁
 

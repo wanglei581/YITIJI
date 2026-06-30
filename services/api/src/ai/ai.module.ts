@@ -76,6 +76,6 @@ import { LlmResumeProvider } from './providers/llm.provider'
     LlmResumeOptimizeService,
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
-  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService],
+  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService],
 })
 export class AiModule {}

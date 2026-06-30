@@ -83,6 +83,7 @@
     "verify:job-ai": "node -r @swc-node/register scripts/verify-job-ai.ts",
     "verify:job-data-quality": "node -r @swc-node/register scripts/verify-job-data-quality.ts",
     "verify:job-ai-backend": "node -r @swc-node/register scripts/verify-job-ai-backend.ts",
+    "verify:job-ai-privacy": "node -r @swc-node/register scripts/verify-job-ai-privacy.ts",
     "db:pg:sync": "node -r @swc-node/register scripts/sync-postgres-schema.ts",
     "db:pg:sync:check": "node -r @swc-node/register scripts/sync-postgres-schema.ts --check",
     "db:pg:generate": "prisma generate --config prisma.postgres.config.ts",

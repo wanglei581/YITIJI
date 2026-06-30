@@ -193,6 +193,26 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.jobDataQualitySnapshot
   }
 
+  get jobAiSession() {
+    return this.client.jobAiSession
+  }
+
+  get jobAiRecommendation() {
+    return this.client.jobAiRecommendation
+  }
+
+  get aiServiceLog() {
+    return this.client.aiServiceLog
+  }
+
+  get userAiConsent() {
+    return this.client.userAiConsent
+  }
+
+  get userDataRequest() {
+    return this.client.userDataRequest
+  }
+
   // ── Phase A-2: 材料处理任务骨架 ─────────────────────────────────────────────
 
   get documentProcessTask() {

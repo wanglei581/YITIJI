@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import type { AiProviderName } from './interfaces/ai-provider.interface'
+import { PrismaService } from '../prisma/prisma.service'
 
 // ============================================================
 // AI 日志服务
@@ -9,7 +10,17 @@ import type { AiProviderName } from './interfaces/ai-provider.interface'
 // - 禁止记录：简历文本、优化建议内容、聊天消息原文、文件名、fileId
 // ============================================================
 
-export type AiOperation = 'parseResume' | 'optimizeResume' | 'generateResume' | 'chatAssistant' | 'classifyIntent'
+const MAX_IN_MEMORY_LOGS = 500
+
+export type AiOperation =
+  | 'parseResume'
+  | 'optimizeResume'
+  | 'generateResume'
+  | 'chatAssistant'
+  | 'classifyIntent'
+  | 'jobRecommend'
+  | 'jobExplain'
+  | 'jobMatch'
 
 export interface AiLogEntry {
   taskId: string
@@ -26,6 +37,8 @@ export interface AiLogEntry {
   estimatedCostCny?: number
   errorCode?: string
   createdAt?: string            // ISO string; set by record() if omitted
+  endUserId?: string | null
+  terminalId?: string | null
   // ❌ 以下字段禁止记录：
   // fileContent / resumeText / chatMessage / suggestions / sections / fileId / fileName
 }
@@ -44,6 +57,9 @@ export interface AdminAiUsage {
     optimizeResume: number
     chatAssistant: number
     classifyIntent: number
+    jobRecommend: number
+    jobExplain: number
+    jobMatch: number
   }
   errorDistribution: Array<{ code: string; count: number }>
   estimatedCostCny: number      // always 0 for mock provider
@@ -56,11 +72,18 @@ export interface AdminAiLogsResult {
 
 @Injectable()
 export class AiLogService {
+  private readonly logger = new Logger(AiLogService.name)
   private readonly logs: AiLogEntry[] = []
+
+  constructor(private readonly prisma: PrismaService) {}
 
   record(entry: Omit<AiLogEntry, 'createdAt'>): void {
     const full: AiLogEntry = { ...entry, createdAt: new Date().toISOString() }
     this.logs.push(full)
+    if (this.logs.length > MAX_IN_MEMORY_LOGS) {
+      this.logs.splice(0, this.logs.length - MAX_IN_MEMORY_LOGS)
+    }
+    void this.persist(full)
     // Phase 7.6: 控制台结构化输出；后续接入 DB 时替换此处
     console.log('[AI-LOG]', JSON.stringify({
       taskId:           full.taskId,
@@ -73,6 +96,26 @@ export class AiLogService {
       errorCode:        full.errorCode,
       createdAt:        full.createdAt,
     }))
+  }
+
+  async persist(entry: AiLogEntry): Promise<void> {
+    // AiServiceLog 仅保存调用元数据；不包含简历原文、完整 prompt/output、签名 URL 或文件名。
+    await this.prisma.aiServiceLog.create({
+      data: {
+        operation: entry.operation,
+        provider: entry.provider,
+        status: entry.status,
+        latencyMs: entry.latencyMs,
+        errorCode: entry.errorCode ?? null,
+        tokenUsageJson: entry.tokenUsage ? JSON.stringify(entry.tokenUsage) : '{}',
+        estimatedCostCny: entry.estimatedCostCny ?? null,
+        endUserId: entry.endUserId ?? null,
+        terminalId: entry.terminalId ?? null,
+      },
+    }).catch((error: unknown) => {
+      const reason = error instanceof Error ? error.message : 'unknown'
+      this.logger.warn(`aiServiceLog.persist_failed operation=${entry.operation} status=${entry.status} reason=${reason}`)
+    })
   }
 
   getUsage(providerName: string): AdminAiUsage {
@@ -89,6 +132,9 @@ export class AiLogService {
       optimizeResume: entries.filter((e) => e.operation === 'optimizeResume').length,
       chatAssistant:  entries.filter((e) => e.operation === 'chatAssistant').length,
       classifyIntent: entries.filter((e) => e.operation === 'classifyIntent').length,
+      jobRecommend:   entries.filter((e) => e.operation === 'jobRecommend').length,
+      jobExplain:     entries.filter((e) => e.operation === 'jobExplain').length,
+      jobMatch:       entries.filter((e) => e.operation === 'jobMatch').length,
     }
 
     const errorCounts: Record<string, number> = {}
