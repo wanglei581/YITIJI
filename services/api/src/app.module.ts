@@ -26,6 +26,7 @@ import { MemberPrintOrdersModule } from './member-print-orders/member-print-orde
 import { MemberNotificationsModule } from './member-notifications/member-notifications.module'
 import { MemberFeedbackModule } from './member-feedback/member-feedback.module'
 import { MaterialsModule } from './materials/materials.module'
+import { JobMaterialsModule } from './job-materials/job-materials.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
@@ -35,6 +36,7 @@ import { ContentModule } from './content/content.module'
 import { StorageModule } from './storage/storage.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { SmartCampusModule } from './smart-campus/smart-campus.module'
+import { UploadSessionsModule } from './upload-sessions/upload-sessions.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
@@ -83,6 +85,7 @@ const redisUrl = process.env['REDIS_URL']
     MemberFeedbackModule,
     MemberPrintOrdersModule,
     MaterialsModule,
+    JobMaterialsModule,
     AiModule,
     FilesModule,
     JobsModule,
@@ -97,6 +100,7 @@ const redisUrl = process.env['REDIS_URL']
     TrtcModule,
     ContentModule,
     SmartCampusModule,
+    UploadSessionsModule,
   ],
   controllers: [HealthController],
   providers: [

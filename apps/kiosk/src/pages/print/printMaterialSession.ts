@@ -13,6 +13,12 @@ export interface PrintFileState {
   mimeType?: string
 }
 
+export type PrintMaterialSource = 'resume' | 'document'
+
+export function printUploadPathForSource(source?: PrintMaterialSource | null): string {
+  return source === 'resume' ? '/print/upload?source=resume' : '/print/upload?source=document'
+}
+
 export interface StoredMaterialTask {
   id: string
   kind: MaterialTaskKind
@@ -47,6 +53,7 @@ export interface MaterialCheckSummary {
 
 export interface PrintMaterialSession {
   file: PrintFileState
+  source?: PrintMaterialSource
   inspectionTask?: StoredMaterialTask
   normalizeTask?: StoredMaterialTask
   piiTask?: StoredMaterialTask
@@ -147,6 +154,7 @@ function toStoredMaterialTask(task: DocumentProcessTaskView | StoredMaterialTask
 function sanitizeSession(next: Omit<PrintMaterialSession, 'updatedAt'>): Omit<PrintMaterialSession, 'updatedAt'> {
   return {
     file: sanitizeFile(next.file),
+    source: next.source,
     inspectionTask: toStoredMaterialTask(next.inspectionTask),
     normalizeTask: toStoredMaterialTask(next.normalizeTask),
     piiTask: toStoredMaterialTask(next.piiTask),

@@ -8,8 +8,10 @@ import { API_MODE } from '../../services/api/client'
 import { createPrintJob } from '../../services/print/printJobsApi'
 import {
   clearPrintMaterialSession,
+  printUploadPathForSource,
   readPrintMaterialSession,
   type MaterialCheckSummary,
+  type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
 
@@ -19,6 +21,7 @@ interface LocationState {
   file: PrintFile
   params: PrintJobParams
   materialCheck?: MaterialCheckSummary
+  source?: PrintMaterialSource
 }
 
 const PRICE_BW = 0.2
@@ -57,6 +60,8 @@ export function PrintConfirmPage() {
   const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
   const params = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
   const materialCheck = state?.materialCheck ?? restoredSession?.materialCheck
+  const source = state?.source ?? restoredSession?.source
+  const uploadPath = printUploadPathForSource(source)
   const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -100,7 +105,7 @@ export function PrintConfirmPage() {
           token:    getToken(),
         })
         clearPrintMaterialSession()
-        navigate('/print/progress', { state: { ...location.state, file, params, taskId } })
+        navigate('/print/progress', { state: { ...location.state, file, params, taskId, source } })
       } catch (err) {
         const msg = err instanceof Error ? err.message : '提交失败，请重试'
         setSubmitError(msg)
@@ -110,7 +115,7 @@ export function PrintConfirmPage() {
     }
     // mock mode or no fileUrl → frontend simulation
     clearPrintMaterialSession()
-    navigate('/print/progress', { state: { ...location.state, file, params } })
+    navigate('/print/progress', { state: { ...location.state, file, params, source } })
   }
 
   // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
@@ -125,7 +130,7 @@ export function PrintConfirmPage() {
           <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
           <p className="mt-2 text-sm text-gray-500">请重新上传文件后再确认打印</p>
         </div>
-        <Button size="lg" onClick={() => navigate('/print/upload')}>
+        <Button size="lg" onClick={() => navigate(uploadPath)}>
           重新上传文件
         </Button>
       </div>

@@ -5,9 +5,11 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
-import { FilesIcon, EyeIcon, Trash2Icon, ClockIcon } from 'lucide-react'
+import { makePrintParams } from '@ai-job-print/shared'
+import { FilesIcon, EyeIcon, Trash2Icon, ClockIcon, PrinterIcon } from 'lucide-react'
 import {
   deleteMyDocument,
   fetchAccessUrl,
@@ -125,12 +127,14 @@ function RetentionConfirmOverlay({
 }
 
 export function MyDocumentsPage() {
+  const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberDocumentItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
+  const [printingId, setPrintingId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [retentionPanelId, setRetentionPanelId] = useState<string | null>(null)
@@ -176,7 +180,7 @@ export function MyDocumentsPage() {
   }, [retentionBusy, retentionPanelId])
 
   const open = async (doc: MemberDocumentItem) => {
-    if (opening || busyId || retentionBusy) return
+    if (opening || printingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
     setOpening(doc.id)
@@ -190,8 +194,34 @@ export function MyDocumentsPage() {
     }
   }
 
+  const print = async (doc: MemberDocumentItem) => {
+    if (opening || printingId || busyId || retentionBusy) return
+    const token = getToken()
+    if (!token) return
+    setPrintingId(doc.id)
+    try {
+      const res = await fetchAccessUrl(doc.previewUrlPath, token)
+      navigate('/print/confirm', {
+        state: {
+          file: {
+            name: doc.filename,
+            size: formatBytes(doc.sizeBytes),
+            pages: null,
+            fileUrl: res.url,
+            mimeType: doc.mimeType,
+          },
+          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+        },
+      })
+    } catch {
+      setHint('打印链接生成失败，可能已到期或被清理')
+    } finally {
+      setPrintingId(null)
+    }
+  }
+
   const remove = async (doc: MemberDocumentItem) => {
-    if (opening || busyId || retentionBusy) return
+    if (opening || printingId || busyId || retentionBusy) return
     if (confirmId !== doc.id) {
       setConfirmId(doc.id)
       return
@@ -212,7 +242,7 @@ export function MyDocumentsPage() {
   }
 
   const submitRetention = async (doc: MemberDocumentItem, policy: SelectableRetentionPolicy) => {
-    if (opening || busyId || retentionBusy) return
+    if (opening || printingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
     setRetentionConfirm(null)
@@ -243,7 +273,7 @@ export function MyDocumentsPage() {
   }
 
   const now = Date.now()
-  const isAnyPending = Boolean(opening || busyId || retentionBusy)
+  const isAnyPending = Boolean(opening || printingId || busyId || retentionBusy)
   const confirmDoc = retentionConfirm ? items.find((item) => item.id === retentionConfirm.fileId) : null
 
   return (
@@ -277,7 +307,10 @@ export function MyDocumentsPage() {
         const confirming = confirmId === doc.id
         const busy = busyId === doc.id
         const openingThis = opening === doc.id
+        const printingThis = printingId === doc.id
+        const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
         const viewDisabled = expired || isAnyPending
+        const printDisabled = expired || !printable || isAnyPending
         const deleteDisabled = isAnyPending
         const policies = selectablePolicies(doc)
         const canChangeRetention = !expired && policies.length > 1
@@ -353,6 +386,21 @@ export function MyDocumentsPage() {
               >
                 <EyeIcon className="h-4 w-4" aria-hidden="true" />
                 {expired ? '已到期' : openingThis ? '打开中' : '查看'}
+              </button>
+              <button
+                type="button"
+                disabled={printDisabled}
+                onClick={() => void print(doc)}
+                title={printable ? '打印文档' : '该文件格式暂不支持打印'}
+                className={[
+                  'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
+                  printDisabled
+                    ? 'cursor-not-allowed border-gray-100 text-gray-300'
+                    : 'border-gray-200 text-gray-600 hover:bg-primary-50 hover:text-primary-600',
+                ].join(' ')}
+              >
+                <PrinterIcon className="h-4 w-4" aria-hidden="true" />
+                {printingThis ? '准备中' : '打印'}
               </button>
               <button
                 type="button"

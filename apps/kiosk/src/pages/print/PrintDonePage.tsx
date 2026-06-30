@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card } from '@ai-job-print/ui'
 import { AlertCircleIcon, CheckCircleIcon, FileTextIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 
 interface PrintFile {
   name:     string
@@ -18,6 +19,7 @@ interface PrintJobState {
   returnUrl?:    string
   returnLabel?:  string
   taskId?:       string
+  source?:       PrintMaterialSource
 }
 
 const DUPLEX_LABEL: Record<string, string> = {
@@ -32,6 +34,7 @@ export function PrintDonePage() {
   const state = (location.state ?? {}) as PrintJobState
 
   const { file, params, success = true, reason, returnUrl, returnLabel } = state
+  const uploadPath = printUploadPathForSource(state.source)
 
   const handleRetry = () => {
     const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason'])
@@ -124,7 +127,7 @@ export function PrintDonePage() {
                 variant="secondary"
                 size="lg"
                 className="flex-1"
-                onClick={() => navigate('/print/upload')}
+                onClick={() => navigate(uploadPath)}
               >
                 继续打印
               </Button>

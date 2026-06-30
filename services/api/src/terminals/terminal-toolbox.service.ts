@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import type {
   KioskAppLaunchModeView,
@@ -13,6 +13,7 @@ import type {
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000
 const MAX_TOOLBOX_ITEMS = 24
 const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: false, items: [] }
+const TOOLBOX_LOGGER = new Logger('TerminalToolboxService')
 const ALLOWED_TOOLBOX_ICONS = new Set(['wrench', 'file-text', 'printer', 'sparkles', 'book-open', 'help-circle'])
 const ALLOWED_APP_PLACEMENTS = new Set<KioskAppPlacementView>(['toolbox', 'smart_campus'])
 const ALLOWED_LAUNCH_MODES = new Set<KioskAppLaunchModeView>([
@@ -148,17 +149,23 @@ function cleanQrImageUrl(value: unknown, required: boolean): string | null {
 }
 
 function cleanReadableExternalUrl(value: unknown): string | null {
+  const rawUrl = cleanText(value, 512)
+  if (!rawUrl) return null
   try {
-    return cleanExternalUrl(value, false)
+    return cleanExternalUrl(rawUrl, false)
   } catch {
+    TOOLBOX_LOGGER.warn('Stored toolbox external URL failed validation and was hidden from public Kiosk config')
     return null
   }
 }
 
 function cleanReadableQrImageUrl(value: unknown): string | null {
+  const rawUrl = cleanText(value, 512)
+  if (!rawUrl) return null
   try {
-    return cleanQrImageUrl(value, false)
+    return cleanQrImageUrl(rawUrl, false)
   } catch {
+    TOOLBOX_LOGGER.warn('Stored toolbox QR image URL failed validation and was hidden from public Kiosk config')
     return null
   }
 }
