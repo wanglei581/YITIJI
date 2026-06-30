@@ -6,7 +6,7 @@ import { getTerminalId } from './screensaver'
 
 const OFF_CONFIG: KioskTerminalConfig = {
   smartCampus: { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] },
-  toolbox: { enabled: false, items: [] },
+  toolbox: { enabled: true, items: [] },
   configVersion: 'mock-off',
   refreshIntervalMs: 5 * 60 * 1000,
   serverTime: new Date(0).toISOString(),

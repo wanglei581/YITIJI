@@ -12,7 +12,7 @@ import type {
 
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000
 const MAX_TOOLBOX_ITEMS = 24
-const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: false, items: [] }
+const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }
 const TOOLBOX_LOGGER = new Logger('TerminalToolboxService')
 const ALLOWED_TOOLBOX_ICONS = new Set(['wrench', 'file-text', 'printer', 'sparkles', 'book-open', 'help-circle'])
 const ALLOWED_APP_PLACEMENTS = new Set<KioskAppPlacementView>(['toolbox', 'smart_campus'])
