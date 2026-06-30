@@ -119,12 +119,20 @@ jobs:
         # finally 清理失败,残留 approved+published 测试招聘会泄漏到公开前台
         # (/campus、/job-fairs)。各脚本已用稳定 tag 在下次运行前预清残留,
         # 但前提仍是串行,切勿改成并行。
+        env:
+          VITE_API_MODE: http
+          VITE_API_BASE_URL: /api/v1
+          VITE_USE_TRTC_CALL: 'true'
+          VITE_TERMINAL_ID: KSK-001
         run: |
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
+          pnpm --filter @ai-job-print/kiosk verify:production-real-services
+          pnpm --filter @ai-job-print/kiosk verify:prod-build-config
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          pnpm --filter @ai-job-print/api verify:production-real-services
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
@@ -151,6 +159,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:job-ai
+          pnpm --filter @ai-job-print/api verify:job-data-quality
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:companies

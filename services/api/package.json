@@ -61,6 +61,7 @@
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
+    "verify:production-real-services": "node -r @swc-node/register scripts/verify-production-real-services.ts",
     "verify:member-login-data-closure": "pnpm run verify:resume-extraction && pnpm run verify:cos:files && pnpm run verify:mock-interview && pnpm run verify:ai-result-ownership && pnpm run verify:resume-optimize && pnpm run verify:job-fit && pnpm run verify:career-plan && pnpm run verify:ocr-baidu && pnpm run verify:production-runtime-gates && pnpm run verify:member-sms-provider-errors && pnpm run verify:member-auth && pnpm run verify:member-assets-c2d && pnpm run verify:member-favorites-benefits && pnpm run verify:activity-logs && pnpm run verify:member-print-orders && pnpm run verify:member-data-retention",
     "verify:fair-company-positions": "node -r @swc-node/register scripts/verify-fair-company-positions.ts",
     "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
