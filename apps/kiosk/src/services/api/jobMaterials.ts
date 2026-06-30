@@ -1,9 +1,15 @@
 import type {
   JobMaterialGenerateInput,
   JobMaterialGenerateResponse,
+  JobMaterialDocumentTemplate,
   JobMaterialTemplate,
+  ResumeTemplate,
 } from '@ai-job-print/shared'
-import { JOB_MATERIAL_TEMPLATES } from '@ai-job-print/shared'
+import {
+  JOB_MATERIAL_TEMPLATES,
+  isJobMaterialDocumentTemplate,
+  isResumeTemplate,
+} from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 import { ApiHttpError } from './httpAdapter'
@@ -54,12 +60,22 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string |
   return parseEnvelope<T>(res, token)
 }
 
-export async function getJobMaterialTemplates(): Promise<JobMaterialTemplate[]> {
+async function getPublishedTemplates(): Promise<JobMaterialTemplate[]> {
   if (API_MODE !== 'http') {
     await new Promise((resolve) => setTimeout(resolve, 120))
     return JOB_MATERIAL_TEMPLATES.filter((template) => template.status === 'published')
   }
   return request<JobMaterialTemplate[]>('/job-materials/templates')
+}
+
+export async function getResumeTemplates(): Promise<ResumeTemplate[]> {
+  const templates = await getPublishedTemplates()
+  return templates.filter(isResumeTemplate)
+}
+
+export async function getJobMaterialTemplates(): Promise<JobMaterialDocumentTemplate[]> {
+  const templates = await getPublishedTemplates()
+  return templates.filter(isJobMaterialDocumentTemplate)
 }
 
 export async function generateJobMaterial(
@@ -72,7 +88,12 @@ export async function generateJobMaterial(
 
   if (API_MODE !== 'http') {
     await new Promise((resolve) => setTimeout(resolve, 600))
-    const template = JOB_MATERIAL_TEMPLATES.find((item) => item.id === input.templateId) ?? JOB_MATERIAL_TEMPLATES[0]
+    const template =
+      JOB_MATERIAL_TEMPLATES.filter(isJobMaterialDocumentTemplate).find((item) => item.id === input.templateId) ??
+      JOB_MATERIAL_TEMPLATES.filter(isJobMaterialDocumentTemplate)[0]
+    if (!template) {
+      throw new ApiHttpError('JOB_MATERIAL_TEMPLATE_NOT_FOUND', '求职材料模板不存在或未发布', 404)
+    }
     const fileId = `mock-job-material-${template.id}`
     return {
       templateId: template.id,
