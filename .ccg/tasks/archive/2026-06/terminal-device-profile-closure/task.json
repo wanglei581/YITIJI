@@ -1,0 +1,12 @@
+{
+  "id": "terminal-device-profile-closure",
+  "title": "收口终端设备档案与 Kiosk 配置候选改动",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend-backend",
+  "currentPhase": "completed",
+  "nextAction": "本地验证、Antigravity 与 Claude 双模型审查均已通过；候选改动已提交为 13fbc1bd，待推送或进入生产验收清单",
+  "createdAt": "2026-06-29T00:00:00Z",
+  "branch": "codex/terminal-device-profile-closure"
+}
