@@ -154,29 +154,34 @@ function runStaticChecks(): void {
   )
   contains(
     '../../apps/kiosk/src/services/api/terminalConfig.ts',
-    ['toolbox: { enabled: false, items: [] }', 'getCachedKioskTerminalConfig'],
-    'E2. Kiosk 统一配置本地默认关闭百宝箱并复用缓存',
+    ['toolbox: { enabled: true, items: [] }', 'getCachedKioskTerminalConfig'],
+    'E2. Kiosk 统一配置本地默认启用百宝箱空占位并复用缓存',
   )
   contains(
     '../../apps/kiosk/src/pages/home/HomePage.tsx',
-    ['if (!config.enabled || items.length === 0) return null', 'getCachedKioskTerminalConfig(terminalId)'],
-    'E3. Kiosk 百宝箱未配置/空配置时整块不渲染且复用统一配置缓存',
+    ['if (!config.enabled) return null', 'getCachedKioskTerminalConfig(terminalId)'],
+    'E3. Kiosk 百宝箱仅显式关闭时整块隐藏且复用统一配置缓存',
   )
   notContainsSource(
     read('../../apps/kiosk/src/pages/home/HomePage.tsx'),
+    ['items.length === 0) return null'],
+    'E3b. Kiosk 百宝箱空配置不得作为整块隐藏条件',
+  )
+  contains(
+    '../../apps/kiosk/src/pages/home/HomePage.tsx',
     ['待配置', '后续功能上线后将在这里展示'],
-    'E4. Kiosk 首页不保留百宝箱空配置占位文案',
+    'E4. Kiosk 首页保留百宝箱空配置占位文案',
   )
   contains(
     'src/terminals/terminal-toolbox.service.ts',
     [
-      'const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: false, items: [] }',
+      'const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }',
       'ALLOWED_TOOLBOX_ROUTE_PATTERNS',
       'KIOSK_EXTERNAL_APP_ALLOWED_HOSTS',
       'TOOLBOX_EXTERNAL_HOST_NOT_ALLOWED',
       'smartCampusItems',
     ],
-    'E5. 后端百宝箱默认关闭并限制 Kiosk 站内路径/外部应用白名单',
+    'E5. 后端百宝箱默认启用空占位并限制 Kiosk 站内路径/外部应用白名单',
   )
   contains(
     '../../apps/admin/src/routes/toolbox/index.tsx',
@@ -340,10 +345,17 @@ async function runServiceChecks(): Promise<void> {
     pass('夹具已创建')
 
     const defaultToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
-    if (!defaultToolbox.enabled && defaultToolbox.items.length === 0 && defaultToolbox.smartCampusItems.length === 0) {
-      pass('0a. 未配置百宝箱的启用终端默认关闭且不下发应用项')
+    if (defaultToolbox.enabled && defaultToolbox.items.length === 0 && defaultToolbox.smartCampusItems.length === 0) {
+      pass('0a. 未配置百宝箱的启用终端默认显示首页占位且不下发应用项')
     } else {
       fail(`0a. 未配置百宝箱默认状态异常: ${JSON.stringify(defaultToolbox)}`)
+    }
+    await toolbox.saveTerminalConfig(codeB, { enabled: false, items: [] }, adminId)
+    const disabledToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
+    if (!disabledToolbox.enabled && disabledToolbox.items.length === 0 && disabledToolbox.smartCampusItems.length === 0) {
+      pass('0a2. 显式关闭百宝箱时整块隐藏且不下发应用项')
+    } else {
+      fail(`0a2. 显式关闭百宝箱状态异常: ${JSON.stringify(disabledToolbox)}`)
     }
     await expectCode(
       () => toolbox.saveTerminalConfig(codeB, {

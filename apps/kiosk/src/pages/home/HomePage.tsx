@@ -680,7 +680,7 @@ function ToolboxSection() {
   const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
   const items = config.enabled ? [...config.items].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
-  if (!config.enabled || items.length === 0) return null
+  if (!config.enabled) return null
 
   return (
     <>
@@ -695,9 +695,18 @@ function ToolboxSection() {
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
-          {items.map((item) => (
-            <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} />
-          ))}
+          {items.length > 0 ? (
+            items.map((item) => (
+              <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} />
+            ))
+          ) : (
+            <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/72 p-6">
+              <span className="block text-xl font-extrabold text-slate-950">待配置</span>
+              <span className="mt-2 block text-sm font-semibold leading-relaxed text-slate-500">
+                后续功能上线后将在这里展示。
+              </span>
+            </div>
+          )}
         </div>
       </section>
       <QrLaunchModal item={qrItem} onClose={() => setQrItem(null)} />

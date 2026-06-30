@@ -2,7 +2,7 @@
  * 首页百宝箱布局守卫。
  *
  * 约束：
- *   A. 首页渲染动态百宝箱模块，但默认关闭 / 空配置不占位。
+ *   A. 首页固定渲染百宝箱模块，空配置保留待配置占位。
  *   B. 百宝箱必须排在智慧校园前面。
  *   C. 智慧校园保留终端开关隐藏逻辑，并能渲染后台投放应用项。
  *
@@ -33,13 +33,14 @@ const smartCampusRender = home.indexOf('<SmartCampusHorizontalSection />')
 
 if (
   home.includes('function ToolboxSection()') &&
-  home.includes('if (!config.enabled || items.length === 0) return null') &&
-  !home.includes('待配置') &&
-  !home.includes('后续功能上线后将在这里展示')
+  home.includes('if (!config.enabled) return null') &&
+  !home.includes('items.length === 0) return null') &&
+  home.includes('待配置') &&
+  home.includes('后续功能上线后将在这里展示')
 ) {
-  pass('A. 首页百宝箱默认关闭或空配置时整块不渲染')
+  pass('A. 首页百宝箱默认启用且空配置保留待配置占位')
 } else {
-  fail('A. 首页百宝箱默认关闭或空配置时必须整块不渲染')
+  fail('A. 首页百宝箱必须默认启用且空配置保留待配置占位')
 }
 
 if (toolboxRender >= 0 && smartCampusRender >= 0 && toolboxRender < smartCampusRender) {
@@ -70,10 +71,10 @@ if (
   fail('D. 智慧校园终端开关隐藏逻辑或投放项渲染缺失')
 }
 
-if (terminalConfig.includes('toolbox: { enabled: false, items: [] }')) {
-  pass('E. Kiosk OFF_CONFIG 默认关闭百宝箱')
+if (terminalConfig.includes('toolbox: { enabled: true, items: [] }')) {
+  pass('E. Kiosk OFF_CONFIG 默认启用百宝箱空占位')
 } else {
-  fail('E. Kiosk OFF_CONFIG 必须默认关闭百宝箱')
+  fail('E. Kiosk OFF_CONFIG 必须默认启用百宝箱空占位')
 }
 
 if (packageJson.includes('"verify:home-toolbox-ui"')) {
