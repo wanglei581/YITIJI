@@ -95,6 +95,8 @@
 - [x] **岗位信息 AI 商用闭环 Task 7：Kiosk 用户侧历史回看 / 隐私授权入口**：`/me/ai-records` 已展示本人岗位 AI 会话元数据，读取真实 `GET /me/job-ai-sessions`，支持本人两步确认删除 `DELETE /me/job-ai-sessions/:id`；`/me/settings` 已展示 `job_ai` 授权状态并支持真实撤回 `POST /me/ai-consents/job_ai/revoke`。前端只展示操作、状态、时间、推荐数量和已发布岗位标题 / 公司，不展示简历原文、提示词或模型原始输出；mock 模式不产生假历史或假撤权结果。后端 `listMine` 已覆盖 explain 历史，并只用 `approved + published` 岗位补齐元数据。新增 `verify:job-ai-history-privacy-ui` 并接入 CI，`verify:job-ai-backend` 已补 explain 历史过滤断言；已通过 Kiosk/API/shared 相关类型、verify、lint、build 与 Antigravity 复审，Claude 按用户要求不作为本轮阻塞。仍不代表 Admin/Partner 看板、真实客户样本、预生产公网或一体机真机验收完成。
 - [x] **岗位信息 AI 商用闭环 Task 8：Admin/Partner 运营看板与后端收口**：Admin AI 服务管理页已展示岗位 AI 调用、真实 token 用量、成本估算、异常告警和岗位来源质量摘要；Partner 岗位页已展示本机构岗位质量、AI 可读就绪率、字段缺失、来源链接异常和同步陈旧统计，后端 `/admin/jobs/quality-summary` 与 `/partner/jobs/quality-summary` 使用真实 `JobDataQualitySnapshot` 聚合，Partner 端按 JWT `orgId` 隔离。复审指出的质量摘要固定 `take:5000` 截断风险已改为按每个 `jobId` 最新 `checkedAt` 快照聚合，`jobMatch` 已透传 LLM provider / tokenUsage 到 `AiServiceLog` 并进入 Admin 成本统计，用户侧不暴露 prompt、简历原文或模型原文。已通过 `verify:job-ai-ops-dashboard`、`verify:job-fit`、Admin/Partner UI verify、API/Admin/Partner typecheck、lint、build；Antigravity 复审 `APPROVE`，Claude wrapper 两次状态 1 未取得有效报告。仍不代表真实客户样本、预生产公网或一体机真机验收完成。
 - [x] **岗位信息 AI 真实验收证据包与静态门禁**：已补 `docs/acceptance/job-info-ai-real-acceptance.md`、`docs/acceptance/job-info-ai-preprod-execution-record.md` 和 `verify:job-info-ai-real-acceptance`，并接入 CI；静态门禁锁定客户真实岗位样本、预生产公网浏览器、一体机真机、证据脱敏、合规红线和禁止过度宣称要求。本项不连接预生产、不写客户数据、不执行硬件动作，不代表真实客户样本、预生产公网或一体机真机验收完成。
+- [x] **岗位信息 AI 预生产只读预检**：2026-07-01 已完成不登录、不写 Redis / DB / COS、不触发 AI 推荐的公网只读预检；预生产 health 为 PostgreSQL，Kiosk `/jobs`、Admin、Partner 静态入口返回 200。阻塞项：公开岗位抽样仍包含演示数据，不能作为客户真实岗位样本；公网 API 对岗位 AI 推荐和 Admin / Partner 岗位质量摘要端点返回 404，说明本地岗位 AI 后端 / 看板端点尚未部署到预生产。该项不代表客户样本、预生产浏览器或真机验收完成。
+- [x] **岗位信息 AI 预生产候选包本地构建预检**：2026-07-01 已从 `14a41ceb` 生成裁剪运行时包并完成本地 install、SQLite / PostgreSQL Prisma client 生成、API / Kiosk / Admin / Partner build；Admin / Partner 岗位 AI UI 静态门禁在裁剪包内通过。API / Kiosk 的 Job AI 静态门禁依赖 `.github/workflows/ci.yml`，不能在默认裁剪运行时包内执行；完整仓库门禁仍需本地执行。本项不代表远端部署、数据库 migration、预生产公网浏览器或真机验收完成。
 
 ## P1：用户文件与简历资产商用闭环后续
 
@@ -123,7 +125,7 @@
 - [ ] **求职材料库 Windows 真机打印验收**：待正式或试运营环境具备 Windows Terminal Agent、奔图打印机和真实出纸条件后，使用求职材料生成的 PDF 从 `/print/confirm` 进入打印任务，验收 Agent claim、驱动出纸、失败恢复、订单状态与异常反馈；该项未完成前不得宣称求职材料库达到真机商用闭环。
 - [ ] **求职材料库二期动态治理设计**：如要开放 Admin 模板 CRUD、Partner 模板申请、版权素材上传、套餐收费或岗位关键词辅助，必须另起独立设计与审查，先补审核流、版权归属、字段白名单、滥用风控和合规文案，再写代码。
 - [ ] **岗位信息页客户数据验收**：用客户真实 API / Excel / Webhook 岗位样本复验标准字段映射、筛选、来源链接、外部编号、同步时间、岗位描述、职责要求、企业关联和收藏 / 浏览 / 外部跳转记录；验收只记录打开来源入口，不记录投递结果。
-- [ ] **岗位信息 AI 商用闭环下一阶段**：补客户真实岗位样本验收、预生产公网浏览器验收和一体机真机验收。推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成客户样本、预生产和真机验收前，不得对外宣称 AI 推荐或岗位匹配达到生产商用完成。
+- [ ] **岗位信息 AI 商用闭环下一阶段**：补客户真实岗位样本验收、预生产公网浏览器验收和一体机真机验收。先解决两个阻塞：① 提供并导入客户真实 API / Excel / Webhook 岗位样本，替换或隔离当前演示岗位；② 将 `14a41ceb` 候选部署到预生产，使 `/api/v1/jobs/ai/recommendations`、`/api/v1/admin/jobs/quality-summary`、`/api/v1/partner/jobs/quality-summary` 不再 404。当前 Codex 环境缺 `PREPROD_HOST` / SSH config / 可复用历史目标，远端上传、DB 备份、migration deploy、PM2 重启和公网端点复验尚未执行。随后再补预生产公网浏览器验收和一体机真机验收。推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成客户样本、预生产和真机验收前，不得对外宣称 AI 推荐或岗位匹配达到生产商用完成。
 
 ## P1：工程质量门禁
 
