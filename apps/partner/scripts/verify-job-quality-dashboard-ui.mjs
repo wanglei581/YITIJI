@@ -43,6 +43,7 @@ mustContain('src/routes/jobs/index.tsx', ['JobQualitySummaryPanel', 'getPartnerJ
 mustContain('src/routes/jobs/components/JobQualitySummaryPanel.tsx', [
   '本机构岗位质量',
   'AI 可读就绪率',
+  '质量巡检待生成',
   '来源链接异常',
   '字段缺失',
   'qualitySummary',

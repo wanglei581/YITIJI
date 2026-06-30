@@ -258,7 +258,7 @@ export default function JobsPage() {
         </div>
       )}
 
-      <JobQualitySummaryPanel qualitySummary={qualitySummary} />
+      <JobQualitySummaryPanel qualitySummary={qualitySummary} jobCount={jobs.length} />
 
       {/* 双行筛选 */}
       <div className="mb-4 space-y-2">
