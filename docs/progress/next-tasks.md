@@ -101,6 +101,7 @@
 - [x] **全局无感数据刷新机制 Partner 首轮推广**：Partner 岗位、招聘会、政策公告三类列表已接入统一 `useRefreshable`，新增 / 编辑抽屉、保存、下架、删除确认期间使用 hard lock；禁止回退到页面内 `load + setState` 的 `verify:partner-refresh-safe` 已补齐。
 - [ ] **全局无感数据刷新机制继续推广**：后续按独立分支接入 Kiosk `/me/*` 资产页；智慧校园和屏保必须在保留各自失败语义后再接入。
 - [ ] **终端设备档案生产验收**：`codex/terminal-device-profile-closure` 代码侧已补终端设备名 / MAC / 摆放位置 / 启停、Admin 编辑、公开 Kiosk config 白名单和停用终端拒绝打印任务；上线前仍需在 PostgreSQL 预生产执行 additive migration、确认无重复 MAC、用 Windows Terminal Agent 真机 register / heartbeat 上报 MAC，并实测 `enabled=false` 后 Kiosk 智慧校园关闭且 Agent 不再 claim 打印任务。
+- [ ] **终端百宝箱动态配置生产验收**：`codex/terminal-device-profile-closure` 代码侧已补 `TerminalToolboxConfig`、Admin `/toolbox` 配置页、Admin 配置接口、Kiosk 首页动态展示、空配置占位、站内路径白名单和审计；上线前仍需在 PostgreSQL 预生产执行 additive migration，通过 Admin 对真实终端保存 1-2 个站内功能项，确认 Kiosk 真实终端刷新后展示且无配置时显示“待配置”占位，并复核未知路径 / 外部 URL 被后端拒绝。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
 

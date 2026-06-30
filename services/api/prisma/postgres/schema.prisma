@@ -1433,6 +1433,20 @@ model TerminalSmartCampusConfig {
   updatedAt   DateTime @updatedAt
 }
 
+// ── TerminalToolboxConfig ────────────────────────────────────────────────────
+// 每个终端的「百宝箱」配置：是否启用 + 功能项(JSON 数组)。
+// terminalId 为自由字符串(不强 FK)：可在终端注册前预置，按 terminalId / terminalCode 查找。
+// Kiosk 公共配置只返回 enabled + items 白名单；不得暴露 MAC、机构、终端档案。
+model TerminalToolboxConfig {
+  id          String   @id @default(cuid())
+  terminalId  String   @unique
+  enabled     Boolean  @default(true)
+  itemsJson   String   @default("[]")
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // ── 用户通知 / 意见反馈(P1 我的页商用闭环)────────────────────────────────────
 // 本域只承接系统服务、打印/文件/AI 工具类通知与设备/流程反馈;不得承接投递、
 // 面试、录用、候选人推荐等招聘闭环状态。

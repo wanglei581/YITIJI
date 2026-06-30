@@ -16,6 +16,7 @@
     "verify:file-retention-ui": "node scripts/verify-file-retention-ui.mjs",
     "verify:legal-retention-copy": "node scripts/verify-legal-retention-copy.mjs",
     "verify:qr-login-ui": "node scripts/verify-qr-login-ui.mjs",
+    "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
     "verify:smart-campus-ui": "node scripts/verify-smart-campus-ui.mjs",
     "verify:member-session-closure": "node scripts/verify-member-session-closure.mjs",
     "verify:prod-build-config": "node scripts/verify-prod-build-config.mjs",

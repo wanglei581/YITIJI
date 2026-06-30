@@ -32,6 +32,7 @@ import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
 import type { KioskTerminalConfigView } from './terminal-config.types'
+import { TerminalToolboxService } from './terminal-toolbox.service'
 import { DEFAULT_SMART_CAMPUS_MODULES, type SmartCampusModules } from '../smart-campus/smart-campus.types'
 
 // ── Task status type ──────────────────────────────────────────────────────────
@@ -343,7 +344,10 @@ function createActionToken(taskId: string, terminalId: string, expiresAt: Date):
 export class TerminalsService implements OnModuleInit {
   private readonly logger = new Logger(TerminalsService.name)
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly toolbox: TerminalToolboxService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     // Only seed test data in non-production environments.
@@ -1025,7 +1029,10 @@ export class TerminalsService implements OnModuleInit {
 
   async getKioskTerminalConfig(terminalRef: string): Promise<KioskTerminalConfigView> {
     const terminal = await this.findTerminalByRef(terminalRef)
-    const smartCampusConfig = await this.findSmartCampusConfigByTerminalRef(terminalRef, terminal)
+    const [smartCampusConfig, toolboxConfig] = await Promise.all([
+      this.findSmartCampusConfigByTerminalRef(terminalRef, terminal),
+      this.toolbox.getPublicConfig(terminalRef, terminal),
+    ])
     const terminalEnabled = terminal?.enabled ?? false
     const smartCampusEnabled = terminalEnabled && !!smartCampusConfig?.enabled
     const serverTime = new Date().toISOString()
@@ -1037,9 +1044,14 @@ export class TerminalsService implements OnModuleInit {
           ? parseSmartCampusModules(smartCampusConfig!.modulesJson)
           : { ...DEFAULT_SMART_CAMPUS_MODULES },
       },
+      toolbox: {
+        enabled: toolboxConfig.enabled,
+        items: toolboxConfig.items,
+      },
       configVersion: [
         terminal?.lastSeenAt.toISOString() ?? 'unregistered',
         smartCampusConfig?.updatedAt.toISOString() ?? 'smart-campus:none',
+        toolboxConfig.version,
       ].join('|'),
       refreshIntervalMs: CONFIG_REFRESH_INTERVAL_MS,
       serverTime,

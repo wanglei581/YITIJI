@@ -6,10 +6,18 @@ import { getTerminalId } from './screensaver'
 
 const OFF_CONFIG: KioskTerminalConfig = {
   smartCampus: { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES } },
+  toolbox: { enabled: true, items: [] },
   configVersion: 'mock-off',
   refreshIntervalMs: 5 * 60 * 1000,
   serverTime: new Date(0).toISOString(),
 }
+
+const DEFAULT_CACHE_TTL_MS = 30_000
+let cachedTerminalId: string | null = null
+let cachedConfig: KioskTerminalConfig | null = null
+let cachedAt = 0
+let inflightTerminalId: string | null = null
+let inflight: Promise<KioskTerminalConfig> | null = null
 
 export async function getKioskTerminalConfig(terminalId: string): Promise<KioskTerminalConfig> {
   if (API_MODE !== 'http') return { ...OFF_CONFIG, serverTime: new Date().toISOString() }
@@ -36,6 +44,31 @@ export async function getKioskTerminalConfig(terminalId: string): Promise<KioskT
     throw new ApiHttpError(code, message, res.status)
   }
   return res.json() as Promise<KioskTerminalConfig>
+}
+
+export async function getCachedKioskTerminalConfig(
+  terminalId: string,
+  maxAgeMs = DEFAULT_CACHE_TTL_MS,
+): Promise<KioskTerminalConfig> {
+  const now = Date.now()
+  if (cachedConfig && cachedTerminalId === terminalId && now - cachedAt <= maxAgeMs) {
+    return cachedConfig
+  }
+  if (inflight && inflightTerminalId === terminalId) return inflight
+
+  inflightTerminalId = terminalId
+  inflight = getKioskTerminalConfig(terminalId)
+    .then((config) => {
+      cachedTerminalId = terminalId
+      cachedConfig = config
+      cachedAt = Date.now()
+      return config
+    })
+    .finally(() => {
+      inflight = null
+      inflightTerminalId = null
+    })
+  return inflight
 }
 
 export { getTerminalId }

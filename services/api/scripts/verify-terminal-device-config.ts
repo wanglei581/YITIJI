@@ -6,7 +6,7 @@
  *   2. Admin 可编辑设备档案/MAC/启停,并写 terminal.profile.update 审计。
  *   3. MAC 地址规范化、非法格式拒绝、唯一冲突拒绝。
  *   4. 停用终端仍可 heartbeat,但 claim/status 被 TERMINAL_DISABLED 拦截。
- *   5. 停用终端的 Kiosk config 强制 smartCampus.enabled=false。
+ *   5. 停用终端的 Kiosk config 强制 smartCampus/toolbox 关闭。
  *   6. 公开 Kiosk config 只返回 Kiosk 必需白名单字段,不泄露设备档案/机构字段。
  *
  * 运行: pnpm --filter @ai-job-print/api verify:terminal-device-config
@@ -19,6 +19,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-terminal-action-secret-0123456789'
@@ -78,6 +79,11 @@ function prepareTempDatabase(): { previousUrl: string | undefined; dbPath: strin
     const migrationSql = read('prisma/migrations/20260629120000_add_terminal_device_profile/migration.sql')
     execFileSync('sqlite3', [dbPath], { input: migrationSql, encoding: 'utf8' })
   }
+  const toolboxTable = execFileSync('sqlite3', [dbPath, 'PRAGMA table_info("TerminalToolboxConfig");'], { encoding: 'utf8' })
+  if (!toolboxTable.includes('|itemsJson|')) {
+    const migrationSql = read('prisma/migrations/20260629123000_add_terminal_toolbox_config/migration.sql')
+    execFileSync('sqlite3', [dbPath], { input: migrationSql, encoding: 'utf8' })
+  }
 
   const previousUrl = process.env.DATABASE_URL
   process.env.DATABASE_URL = `file:${dbPath}`
@@ -110,9 +116,19 @@ function runStaticChecks(): void {
     'A. SQLite Terminal schema 包含设备档案/MAC/启停字段',
   )
   contains(
+    'prisma/schema.prisma',
+    ['model TerminalToolboxConfig', 'enabled     Boolean  @default(true)', 'itemsJson   String   @default("[]")'],
+    'A2. SQLite schema 包含终端百宝箱配置模型',
+  )
+  contains(
     'prisma/postgres/schema.prisma',
     ['macAddress        String?  @unique', 'displayName       String?', 'locationLabel     String?', 'enabled           Boolean  @default(true)'],
     'B. PostgreSQL Terminal schema 包含设备档案/MAC/启停字段',
+  )
+  contains(
+    'prisma/postgres/schema.prisma',
+    ['model TerminalToolboxConfig', 'enabled     Boolean  @default(true)', 'itemsJson   String   @default("[]")'],
+    'B2. PostgreSQL schema 包含终端百宝箱配置模型',
   )
   contains(
     'src/terminals/admin-terminals.controller.ts',
@@ -125,9 +141,34 @@ function runStaticChecks(): void {
     'D. Kiosk 统一终端配置端点存在',
   )
   contains(
+    'src/terminals/admin-toolbox.controller.ts',
+    ["@Get('admin/toolbox/terminals')", "'toolbox_config.update'"],
+    'D2. Admin 百宝箱配置接口和审计存在',
+  )
+  contains(
     '../../apps/kiosk/src/hooks/useSmartCampusConfig.ts',
-    ['getKioskTerminalConfig(terminalId)', 'getSmartCampusConfig(terminalId)'],
-    'E. Kiosk 智慧校园优先走统一配置并保留旧接口回退',
+    ['getCachedKioskTerminalConfig(terminalId)', 'getSmartCampusConfig(terminalId)'],
+    'E. Kiosk 智慧校园优先走统一配置缓存并保留旧接口回退',
+  )
+  contains(
+    '../../apps/kiosk/src/services/api/terminalConfig.ts',
+    ['toolbox: { enabled: true, items: [] }', 'getCachedKioskTerminalConfig'],
+    'E2. Kiosk 统一配置本地默认显示百宝箱占位并复用缓存',
+  )
+  contains(
+    '../../apps/kiosk/src/pages/home/HomePage.tsx',
+    ['if (!config.enabled) return null', 'getCachedKioskTerminalConfig(terminalId)'],
+    'E3. Kiosk 百宝箱仅显式关闭时整块不渲染且复用统一配置缓存',
+  )
+  contains(
+    '../../apps/kiosk/src/pages/home/HomePage.tsx',
+    ['待配置', '后续功能上线后将在这里展示'],
+    'E4. Kiosk 首页保留百宝箱空配置占位文案',
+  )
+  contains(
+    'src/terminals/terminal-toolbox.service.ts',
+    ['const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }', 'ALLOWED_TOOLBOX_ROUTE_PATTERNS', 'INVALID_TOOLBOX_ROUTE'],
+    'E5. 后端百宝箱默认启用占位并限制 Kiosk 站内允许路径',
   )
   contains(
     '../../apps/admin/src/routes/terminals/index.tsx',
@@ -142,8 +183,8 @@ function runStaticChecks(): void {
   )
   notContainsSource(
     publicConfigService,
-    ['terminal:', 'toolbox:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
-    'G. 公开 Kiosk config service 不返回设备档案/机构/预留工具箱字段',
+    ['terminal:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
+    'G. 公开 Kiosk config service 不返回设备档案/机构字段',
   )
   const publicConfigLookup = section(
     'src/terminals/terminals.service.ts',
@@ -157,17 +198,17 @@ function runStaticChecks(): void {
   )
   notContainsSource(
     read('src/terminals/terminal-config.types.ts'),
-    ['KioskTerminalIdentityView', 'terminal:', 'toolbox:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
+    ['KioskTerminalIdentityView', 'terminal:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
     'H. API Kiosk config 类型只保留白名单字段',
   )
   notContainsSource(
     read('../../packages/shared/src/types/device.ts'),
-    ['KioskTerminalIdentity', 'KioskToolboxConfig', 'terminal:', 'toolbox:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
+    ['KioskTerminalIdentity', 'terminal:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
     'I. shared KioskTerminalConfig 类型只保留白名单字段',
   )
   notContainsSource(
     read('../../apps/kiosk/src/services/api/terminalConfig.ts'),
-    ['terminal:', 'toolbox:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
+    ['terminal:', 'displayName:', 'locationLabel:', 'macAddress:', 'orgId:', 'orgName:'],
     'J. Kiosk 本地 OFF_CONFIG 不声明公开配置外字段',
   )
   contains(
@@ -200,7 +241,8 @@ async function runServiceChecks(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
-  const terminals = new TerminalsService(prisma)
+  const toolbox = new TerminalToolboxService(prisma)
+  const terminals = new TerminalsService(prisma, toolbox)
   const adminController = new AdminTerminalsController(terminals, audit)
 
   const suffix = randomBytes(6).toString('hex')
@@ -218,6 +260,7 @@ async function runServiceChecks(): Promise<void> {
     await prisma.printTask.deleteMany({ where: { id: taskId } })
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [tA, tB] } } })
     await prisma.terminalSmartCampusConfig.deleteMany({ where: { terminalId: { in: [codeA, tA, codeB, tB, macKey] } } })
+    await prisma.terminalToolboxConfig.deleteMany({ where: { terminalId: { in: [codeA, tA, codeB, tB, macKey] } } })
     await prisma.auditLog.deleteMany({ where: { actorId: adminId } })
     await prisma.terminal.deleteMany({ where: { id: { in: [tA, tB] } } })
     await prisma.user.deleteMany({ where: { id: adminId } })
@@ -254,6 +297,16 @@ async function runServiceChecks(): Promise<void> {
         updatedBy: adminId,
       },
     })
+    await prisma.terminalToolboxConfig.create({
+      data: {
+        terminalId: codeA,
+        enabled: true,
+        itemsJson: JSON.stringify([
+          { key: 'verify-print', title: '验证打印', description: '站内路径', icon: 'printer', to: '/print/upload', disabled: false, sortOrder: 0 },
+        ]),
+        updatedBy: adminId,
+      },
+    })
     await prisma.printTask.create({
       data: {
         id: taskId,
@@ -265,6 +318,46 @@ async function runServiceChecks(): Promise<void> {
       },
     })
     pass('夹具已创建')
+
+    const defaultToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
+    if (defaultToolbox.enabled && defaultToolbox.items.length === 0) {
+      pass('0a. 未配置百宝箱的启用终端默认展示首页占位')
+    } else {
+      fail(`0a. 未配置百宝箱默认状态异常: ${JSON.stringify(defaultToolbox)}`)
+    }
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{ key: 'bad-admin', title: '后台路径', description: '', icon: 'wrench', to: '/admin', disabled: false, sortOrder: 0 }],
+      }, adminId),
+      'INVALID_TOOLBOX_ROUTE',
+      '0b. 百宝箱拒绝未知 Kiosk 路径',
+    )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{ key: 'bad-external', title: '外部链接', description: '', icon: 'wrench', to: 'https://example.com', disabled: false, sortOrder: 0 }],
+      }, adminId),
+      'INVALID_TOOLBOX_ROUTE',
+      '0c. 百宝箱拒绝外部 URL',
+    )
+    const savedToolbox = await toolbox.saveTerminalConfig(codeB, {
+      enabled: true,
+      items: [{
+        key: 'resume-optimize',
+        title: 'AI简历优化',
+        description: '站内深链',
+        icon: 'sparkles',
+        to: '/resume/source?intent=optimize',
+        disabled: false,
+        sortOrder: 0,
+      }],
+    }, adminId)
+    if (savedToolbox.enabled && savedToolbox.items[0]?.to === '/resume/source?intent=optimize') {
+      pass('0d. 百宝箱允许已上线 Kiosk 站内深链')
+    } else {
+      fail(`0d. 百宝箱合法路径保存异常: ${JSON.stringify(savedToolbox)}`)
+    }
 
     const user = { userId: adminId, role: 'admin' as const, orgId: null }
     const req = { headers: { 'user-agent': 'verify-terminal-device-config' }, ip: '127.0.0.1', requestId: `req-${suffix}` }
@@ -367,16 +460,20 @@ async function runServiceChecks(): Promise<void> {
     )
 
     const kioskConfig = await terminals.getKioskTerminalConfig(codeA)
-    if (!kioskConfig.smartCampus.enabled && kioskConfig.smartCampus.modules.welcome === false) {
-      pass('7. 停用终端 Kiosk config 强制 smartCampus 关闭')
+    if (
+      !kioskConfig.smartCampus.enabled &&
+      kioskConfig.smartCampus.modules.welcome === false &&
+      !kioskConfig.toolbox.enabled &&
+      kioskConfig.toolbox.items.length === 0
+    ) {
+      pass('7. 停用终端 Kiosk config 强制 smartCampus/toolbox 关闭')
     } else {
-      fail(`7. 停用终端 Kiosk config 未关闭: ${JSON.stringify(kioskConfig.smartCampus)}`)
+      fail(`7. 停用终端 Kiosk config 未关闭: ${JSON.stringify(kioskConfig)}`)
     }
 
     const publicBody = JSON.stringify(kioskConfig)
     const forbiddenPublicKeys = [
       '"terminal":',
-      '"toolbox":',
       '"displayName":',
       '"locationLabel":',
       '"macAddress":',
@@ -398,11 +495,21 @@ async function runServiceChecks(): Promise<void> {
         updatedBy: adminId,
       },
     })
+    await prisma.terminalToolboxConfig.create({
+      data: {
+        terminalId: macKey,
+        enabled: true,
+        itemsJson: JSON.stringify([
+          { key: 'mac-hit', title: '不应命中', description: '', icon: 'wrench', to: '/print/upload', disabled: false, sortOrder: 0 },
+        ]),
+        updatedBy: adminId,
+      },
+    })
     const macKeyConfig = await terminals.getKioskTerminalConfig(macKey)
-    if (!macKeyConfig.smartCampus.enabled) {
+    if (!macKeyConfig.smartCampus.enabled && !macKeyConfig.toolbox.enabled && macKeyConfig.toolbox.items.length === 0) {
       pass('9. 公开 Kiosk config 不接受 MAC 作为终端配置查询键')
     } else {
-      fail('9. 公开 Kiosk config 仍可通过 MAC 命中智慧校园配置')
+      fail('9. 公开 Kiosk config 仍可通过 MAC 命中终端配置')
     }
   } finally {
     await cleanup()

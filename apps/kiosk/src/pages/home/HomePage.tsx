@@ -31,17 +31,21 @@ import {
   SparklesIcon,
   UserCheckIcon,
   WifiIcon,
+  WrenchIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { SmartCampusModuleKey } from '@ai-job-print/shared'
+import type { KioskToolboxConfig, KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 
 const HERO_IMAGE = '/assets/kiosk-home-hero-job-fair.png'
+const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
+let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
 
 function useClock() {
   const [now, setNow] = useState(() => new Date())
@@ -528,6 +532,114 @@ function SmartCampusHorizontalSection() {
   )
 }
 
+const TOOLBOX_ICONS: Record<string, LucideIcon> = {
+  wrench: WrenchIcon,
+  'file-text': FileTextIcon,
+  printer: PrinterIcon,
+  sparkles: SparklesIcon,
+  'book-open': BookOpenIcon,
+  'help-circle': HelpCircleIcon,
+}
+
+function useToolboxConfig() {
+  const [config, setConfig] = useState<KioskToolboxConfig>(() => cachedToolboxConfig)
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const terminalId = getTerminalId()
+        const terminalConfig = await getCachedKioskTerminalConfig(terminalId)
+        cachedToolboxConfig = terminalConfig.toolbox
+        if (alive) setConfig(terminalConfig.toolbox)
+      } catch {
+        if (alive) setConfig(cachedToolboxConfig)
+      }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 5 * 60 * 1000)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  return config
+}
+
+function ToolboxItemButton({ item }: { item: KioskToolboxItem }) {
+  const navigate = useNavigate()
+  const Icon = TOOLBOX_ICONS[item.icon] ?? WrenchIcon
+  const disabled = item.disabled || !item.to
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => item.to && !disabled && navigate(item.to)}
+      className={[
+        'relative min-h-[128px] rounded-[24px] border border-slate-200 bg-slate-50/72 p-5 text-left transition-all',
+        disabled
+          ? 'cursor-not-allowed opacity-70'
+          : 'hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_12px_26px_rgba(15,23,42,0.1)] active:translate-y-0',
+      ].join(' ')}
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+        <Icon className="h-6 w-6" aria-hidden="true" />
+      </span>
+      <span className="mt-4 block text-xl font-extrabold text-slate-950">{item.title}</span>
+      <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{item.description}</span>
+      {disabled && (
+        <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+          即将上线
+        </span>
+      )}
+    </button>
+  )
+}
+
+function ToolboxSection() {
+  const config = useToolboxConfig()
+  const items = config.enabled ? [...config.items].sort((a, b) => a.sortOrder - b.sortOrder) : []
+
+  if (!config.enabled) return null
+
+  return (
+    <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/80">
+      <div className="flex items-center gap-4 border-b border-slate-100 px-8 py-5">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-[0_10px_20px_rgba(15,23,42,0.18)]">
+          <PackageIcon className="h-8 w-8" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-3xl font-extrabold leading-tight text-slate-950">百宝箱</h2>
+          <p className="mt-1 text-base font-semibold text-slate-500">按当前设备配置展示扩展服务。</p>
+        </div>
+      </div>
+      <div className="p-6">
+        {items.length === 0 ? (
+          <div className="flex min-h-[132px] items-center justify-between gap-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50/72 px-6 py-5">
+            <div className="min-w-0">
+              <p className="text-xl font-extrabold text-slate-900">待配置</p>
+              <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-500">
+                后续功能上线后将在这里展示
+              </p>
+            </div>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
+              <WrenchIcon className="h-6 w-6" aria-hidden="true" />
+            </span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {items.map((item) => (
+              <ToolboxItemButton key={item.key} item={item} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 export function HomePage() {
   return (
     <div className="min-h-full bg-[#eef1f5] pb-8">
@@ -541,6 +653,7 @@ export function HomePage() {
         ))}
       </main>
 
+      <ToolboxSection />
       <SmartCampusHorizontalSection />
 
       <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-slate-500">

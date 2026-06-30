@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { KioskSmartCampusConfig } from '@ai-job-print/shared'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
 import { getSmartCampusConfig, getTerminalId } from '../services/api/smartCampus'
-import { getKioskTerminalConfig } from '../services/api/terminalConfig'
+import { getCachedKioskTerminalConfig } from '../services/api/terminalConfig'
 
 // 与 screensaver 控制器的"失败保留上次配置（防黑屏）"相反：
 // 智慧校园承载校园专属入口，机器搬离校园后绝不能残留。因此：
@@ -29,7 +29,7 @@ export function useSmartCampusConfig(): KioskSmartCampusConfig {
       try {
         let c: KioskSmartCampusConfig
         try {
-          const terminalConfig = await getKioskTerminalConfig(terminalId)
+          const terminalConfig = await getCachedKioskTerminalConfig(terminalId)
           c = terminalConfig.smartCampus
         } catch {
           c = await getSmartCampusConfig(terminalId)
