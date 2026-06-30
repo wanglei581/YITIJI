@@ -1,0 +1,12 @@
+{
+  "id": "terminal-app-placement-main-sync",
+  "title": "终端应用上架分支同步最新 main 并做验收前预检",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "origin/main 已确认无新提交需要合入；验收前本地预检通过，下一步可按需 push 分支或进入预生产/真机验收",
+  "createdAt": "2026-06-30T13:30:00+08:00",
+  "branch": "codex/terminal-device-profile-closure"
+}
