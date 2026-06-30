@@ -50,6 +50,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
+import { JobQualityService } from '../job-ai/job-quality.service'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
@@ -93,6 +94,8 @@ interface PublishedFairQueryGroup {
 export interface JobListItemDto {
   id: string; title: string; company: string; city: string
   salary?: string; tags: string[]; industry?: string; workType?: WorkType; headcount?: number
+  educationRequirement?: string; experienceRequirement?: string; skills?: string[]; benefits?: string[]
+  salaryMin?: number; salaryMax?: number; salaryUnit?: string; validThrough?: string
   /** DB category 列原值('fulltime' | 'intern' | 'campus' | 'parttime'),供前端类型 chip 显示/筛选对齐 */
   category?: string
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; syncTime: string
@@ -377,6 +380,14 @@ interface PrismaJobRow {
   description:   string | null
   requirements:  string | null
   tagsJson:      string
+  educationRequirement: string | null
+  experienceRequirement: string | null
+  skillsJson: string
+  benefitsJson: string
+  salaryMin: number | null
+  salaryMax: number | null
+  salaryUnit: string | null
+  validThrough: Date | null
   reviewStatus:  string
   publishStatus: string
   reviewedBy:    string | null
@@ -387,6 +398,7 @@ interface PrismaJobRow {
 
 function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
   const rawTags = safeJsonArr(j.tagsJson)
+  const salaryDisplay = formatSalaryDisplay(j)
   return {
     id: j.id, title: j.title, company: j.company, city: j.city,
     salary: j.salary ?? undefined,
@@ -394,13 +406,21 @@ function prismaJobToListItem(j: PrismaJobRow): JobListItemDto {
     industry: extractIndustry(rawTags),
     workType: categoryToWorkType(j.category),
     headcount: undefined,
+    educationRequirement: j.educationRequirement ?? undefined,
+    experienceRequirement: j.experienceRequirement ?? undefined,
+    skills: safeJsonArr(j.skillsJson),
+    benefits: safeJsonArr(j.benefitsJson),
+    salaryMin: j.salaryMin ?? undefined,
+    salaryMax: j.salaryMax ?? undefined,
+    salaryUnit: j.salaryUnit ?? undefined,
+    validThrough: j.validThrough ? j.validThrough.toISOString() : undefined,
     category: j.category ?? undefined,
     sourceOrgId: j.sourceOrgId, externalId: j.externalId,
     sourceName: j.sourceName, sourceUrl: j.sourceUrl,
     syncTime: fmtSyncTime(j.syncTime),
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
-    salaryDisplay: j.salary ?? '薪资面议',
+    salaryDisplay,
     dataSourceNote: `数据来源：${j.sourceName} · 同步于 ${j.syncTime.toISOString().slice(0, 10)} · 仅供参考`,
     companyProfileId: j.companyProfileId ?? null,
   }
@@ -444,6 +464,46 @@ function prismaJobToPartnerDto(j: PrismaJobRow): PartnerJobDto {
     description: j.description ?? undefined,
     requirements: j.requirements ?? undefined,
   }
+}
+
+function formatSalaryDisplay(j: Pick<PrismaJobRow, 'salary' | 'salaryMin' | 'salaryMax' | 'salaryUnit'>): string {
+  if (j.salary?.trim()) return j.salary
+  if (j.salaryMin != null && j.salaryMax != null) return `${j.salaryMin}-${j.salaryMax}${formatSalaryUnit(j.salaryUnit)}`
+  if (j.salaryMin != null) return `${j.salaryMin}起${formatSalaryUnit(j.salaryUnit)}`
+  if (j.salaryMax != null) return `${j.salaryMax}以内${formatSalaryUnit(j.salaryUnit)}`
+  return '来源平台未提供'
+}
+
+function formatSalaryUnit(unit: string | null): string {
+  switch (unit) {
+    case 'monthly': return '元/月'
+    case 'yearly': return '元/年'
+    case 'daily': return '元/天'
+    default: return unit ? `/${unit}` : ''
+  }
+}
+
+function buildJobTags(tags: string[] | undefined, industry?: string): string[] {
+  const result = [...(tags ?? [])].map((tag) => tag.trim()).filter(Boolean)
+  if (industry?.trim()) result.push(buildJobIndustryTag(industry))
+  return [...new Set(result)]
+}
+
+function splitMappedList(value: string | undefined): string[] {
+  if (!value?.trim()) return []
+  return value.split(/[，,;；、\n]/).map((item) => item.trim()).filter(Boolean)
+}
+
+function parseMappedNumber(value: string | undefined): number | null {
+  if (!value?.trim()) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function parseMappedDate(value: string | undefined): Date | null {
+  if (!value?.trim()) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 /**
@@ -653,7 +713,16 @@ export class JobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly jobQuality: JobQualityService,
   ) {}
+
+  private async refreshJobQualitySnapshots(jobIds: string[]): Promise<void> {
+    try {
+      await this.jobQuality.refreshJobQualitySnapshots(jobIds)
+    } catch (error) {
+      this.logger.warn(`refresh job quality snapshots failed: ${error instanceof Error ? error.message : 'unknown'}`)
+    }
+  }
 
   // ── Kiosk:只读 approved+published ───────────────────────────────────────────
 
@@ -1324,6 +1393,7 @@ export class JobsService {
     const sync        = new Date()
 
     const out: PartnerJobDto[] = []
+    const touchedJobIds: string[] = []
     for (const item of items) {
       try {
         const job = await this.prisma.job.upsert({
@@ -1335,7 +1405,15 @@ export class JobsService {
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
             salary: item.salary,
             description: item.description, requirements: item.requirements,
-            tagsJson: JSON.stringify(item.tags ?? []),
+            tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+            educationRequirement: item.educationRequirement,
+            experienceRequirement: item.experienceRequirement,
+            skillsJson: JSON.stringify(item.skills ?? []),
+            benefitsJson: JSON.stringify(item.benefits ?? []),
+            salaryMin: item.salaryMin,
+            salaryMax: item.salaryMax,
+            salaryUnit: item.salaryUnit,
+            validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
             reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
@@ -1345,10 +1423,19 @@ export class JobsService {
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
             salary: item.salary,
             description: item.description, requirements: item.requirements,
-            tagsJson: JSON.stringify(item.tags ?? []),
+            tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+            educationRequirement: item.educationRequirement,
+            experienceRequirement: item.experienceRequirement,
+            skillsJson: JSON.stringify(item.skills ?? []),
+            benefitsJson: JSON.stringify(item.benefits ?? []),
+            salaryMin: item.salaryMin,
+            salaryMax: item.salaryMax,
+            salaryUnit: item.salaryUnit,
+            validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
             syncTime: sync,
           },
         })
+        touchedJobIds.push(job.id)
         out.push(prismaJobToPartnerDto(job))
       } catch (e) {
         this.logger.error(`importJobs upsert failed: orgId=${sourceOrgId} extId=${item.externalId}`, e as Error)
@@ -1368,6 +1455,7 @@ export class JobsService {
     })
 
     this.logger.log(`importJobs: orgId=${sourceOrgId} count=${out.length}`)
+    await this.refreshJobQualitySnapshots(touchedJobIds)
     return { imported: out.length, items: out }
   }
 
@@ -1394,6 +1482,7 @@ export class JobsService {
     const sourceName = org.name
     const sync = new Date()
     const out: PartnerJobDto[] = []
+    const touchedJobIds: string[] = []
 
     for (const item of items) {
       try {
@@ -1406,7 +1495,15 @@ export class JobsService {
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
             salary: item.salary,
             description: item.description, requirements: item.requirements,
-            tagsJson: JSON.stringify(item.tags ?? []),
+            tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+            educationRequirement: item.educationRequirement,
+            experienceRequirement: item.experienceRequirement,
+            skillsJson: JSON.stringify(item.skills ?? []),
+            benefitsJson: JSON.stringify(item.benefits ?? []),
+            salaryMin: item.salaryMin,
+            salaryMax: item.salaryMax,
+            salaryUnit: item.salaryUnit,
+            validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
             reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
@@ -1417,16 +1514,26 @@ export class JobsService {
             category: item.workType ? mapWorkTypeToCategory(item.workType) : undefined,
             salary: item.salary,
             description: item.description, requirements: item.requirements,
-            tagsJson: JSON.stringify(item.tags ?? []),
+            tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+            educationRequirement: item.educationRequirement,
+            experienceRequirement: item.experienceRequirement,
+            skillsJson: JSON.stringify(item.skills ?? []),
+            benefitsJson: JSON.stringify(item.benefits ?? []),
+            salaryMin: item.salaryMin,
+            salaryMax: item.salaryMax,
+            salaryUnit: item.salaryUnit,
+            validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
             syncTime: sync,
           },
         })
+        touchedJobIds.push(job.id)
         out.push(prismaJobToPartnerDto(job))
       } catch (e) {
         this.logger.error(`importJobsFromWebhook upsert failed: orgId=${orgId} extId=${item.externalId}`, e as Error)
         throw new InternalServerErrorException({ error: { code: 'IMPORT_FAILED', message: 'Webhook 导入失败,请稍后重试' } })
       }
     }
+    await this.refreshJobQualitySnapshots(touchedJobIds)
     return { imported: out.length, items: out }
   }
 
@@ -1499,6 +1606,7 @@ export class JobsService {
       targetId: id,
       payload: { changedFields, fromReviewStatus: job.reviewStatus, fromPublishStatus: job.publishStatus },
     })
+    await this.refreshJobQualitySnapshots([updated.id])
     this.logger.log(`updatePartnerJob: id=${id} orgId=${user.orgId} fields=${changedFields.join(',')}`)
     return prismaJobToPartnerDto(updated)
   }
@@ -2060,6 +2168,7 @@ export class JobsService {
     const sourceName  = org.name
     const sync        = new Date()
     const totalValid  = batch.records.length
+    const touchedJobIds: string[] = []
 
     // Fix 3: 事务化写入 — 任一行失败则整批回滚，状态标记 failed
     try {
@@ -2067,7 +2176,7 @@ export class JobsService {
         for (const record of batch.records) {
           const mapped = JSON.parse(record.mappedJson) as Record<string, string>
           if (batch.dataType === 'job') {
-            await tx.job.upsert({
+            const job = await tx.job.upsert({
               where: { sourceOrgId_externalId: { sourceOrgId, externalId: mapped.externalId } },
               create: {
                 sourceOrgId, sourceId: batch.sourceId, externalId: mapped.externalId, sourceName,
@@ -2075,7 +2184,15 @@ export class JobsService {
                 title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
                 salary: mapped.salary || null,
                 description: mapped.description || null, requirements: mapped.requirements || null,
-                tagsJson: '[]',
+                tagsJson: JSON.stringify(buildJobTags([], mapped.industry)),
+                educationRequirement: mapped.educationRequirement || null,
+                experienceRequirement: mapped.experienceRequirement || null,
+                skillsJson: JSON.stringify(splitMappedList(mapped.skills)),
+                benefitsJson: JSON.stringify(splitMappedList(mapped.benefits)),
+                salaryMin: parseMappedNumber(mapped.salaryMin),
+                salaryMax: parseMappedNumber(mapped.salaryMax),
+                salaryUnit: mapped.salaryUnit || null,
+                validThrough: parseMappedDate(mapped.validThrough),
                 reviewStatus: 'pending', publishStatus: 'draft',
                 syncTime: sync,
               },
@@ -2084,9 +2201,19 @@ export class JobsService {
                 title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
                 salary: mapped.salary || null,
                 description: mapped.description || null, requirements: mapped.requirements || null,
+                tagsJson: JSON.stringify(buildJobTags([], mapped.industry)),
+                educationRequirement: mapped.educationRequirement || null,
+                experienceRequirement: mapped.experienceRequirement || null,
+                skillsJson: JSON.stringify(splitMappedList(mapped.skills)),
+                benefitsJson: JSON.stringify(splitMappedList(mapped.benefits)),
+                salaryMin: parseMappedNumber(mapped.salaryMin),
+                salaryMax: parseMappedNumber(mapped.salaryMax),
+                salaryUnit: mapped.salaryUnit || null,
+                validThrough: parseMappedDate(mapped.validThrough),
                 syncTime: sync,
               },
             })
+            touchedJobIds.push(job.id)
           } else {
             const startAt = new Date(mapped.startAt)
             const endAt   = new Date(mapped.endAt)
@@ -2152,6 +2279,10 @@ export class JobsService {
       where: { id: batchId },
       data: { status: 'confirmed', confirmedAt: new Date() },
     })
+
+    if (batch.dataType === 'job') {
+      await this.refreshJobQualitySnapshots(touchedJobIds)
+    }
 
     // T1: 保存/更新该数据源的字段映射规则,供下次导入自动回填。
     // 用本批次实际使用的 mappingJson;空映射不落库(无可复用内容)。

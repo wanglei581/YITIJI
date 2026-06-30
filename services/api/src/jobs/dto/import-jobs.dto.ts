@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsDateString,
   IsIn,
   IsNotEmpty,
   IsNumber,
@@ -48,6 +49,30 @@ export class ImportJobItemDto {
 
   @IsOptional() @IsNumber() @Min(1)
   headcount?: number
+
+  @IsOptional() @IsString() @MaxLength(200)
+  educationRequirement?: string
+
+  @IsOptional() @IsString() @MaxLength(200)
+  experienceRequirement?: string
+
+  @IsOptional() @IsArray() @IsString({ each: true })
+  skills?: string[]
+
+  @IsOptional() @IsArray() @IsString({ each: true })
+  benefits?: string[]
+
+  @IsOptional() @IsNumber()
+  salaryMin?: number
+
+  @IsOptional() @IsNumber()
+  salaryMax?: number
+
+  @IsOptional() @IsString() @MaxLength(50)
+  salaryUnit?: string
+
+  @IsOptional() @IsDateString()
+  validThrough?: string
 }
 
 /**

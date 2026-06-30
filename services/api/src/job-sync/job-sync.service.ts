@@ -4,6 +4,7 @@ import { Queue } from 'bullmq'
 import { PrismaService } from '../prisma/prisma.service'
 import { decryptSecret } from '../common/crypto/secret-cipher'
 import { isSensitiveColumn } from '../jobs/dto/excel-import.dto'
+import { JobQualityService } from '../job-ai/job-quality.service'
 import {
   JOB_SYNC_QUEUE,
   JOB_SYNC_JOB_NAME,
@@ -28,6 +29,14 @@ interface MappedJob {
   requirements?: string
   category?: string  // fulltime/parttime/intern/campus
   tags: string[]
+  educationRequirement?: string
+  experienceRequirement?: string
+  skills: string[]
+  benefits: string[]
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: string
+  validThrough?: Date
 }
 
 interface MappedFair {
@@ -70,6 +79,41 @@ function resolveKeys(stdKey: string, fields?: Record<string, string>, ...fallbac
   return [stdKey, ...fallbacks]
 }
 
+function getStringList(raw: Record<string, unknown>, keys: string[]): string[] {
+  for (const key of keys) {
+    const value = raw[key]
+    if (Array.isArray(value)) {
+      const list = value.map((item) => String(item).trim()).filter(Boolean)
+      if (list.length > 0) return list.slice(0, 30)
+    }
+    if (value != null) {
+      const list = String(value).split(/[，,;；、\n]/).map((item) => item.trim()).filter(Boolean)
+      if (list.length > 0) return list.slice(0, 30)
+    }
+  }
+  return []
+}
+
+function getNumber(raw: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = raw[key]
+    if (value == null || String(value).trim() === '') continue
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function getDate(raw: Record<string, unknown>, keys: string[]): Date | undefined {
+  for (const key of keys) {
+    const value = raw[key]
+    if (value == null || String(value).trim() === '') continue
+    const parsed = new Date(String(value))
+    if (!Number.isNaN(parsed.getTime())) return parsed
+  }
+  return undefined
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Injectable()
@@ -80,6 +124,7 @@ export class JobSyncService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly jobQuality: JobQualityService,
     @Optional() @InjectQueue(JOB_SYNC_QUEUE) private readonly queue?: Queue,
   ) {}
 
@@ -317,6 +362,14 @@ export class JobSyncService {
         requirements: r('requirements', 'qualifications', 'requirement'),
         category:     mapCategory(workType),
         tags,
+        educationRequirement: r('educationRequirement', 'education', 'degree', '学历'),
+        experienceRequirement: r('experienceRequirement', 'experience', 'workExperience', '经验'),
+        skills: getStringList(raw, resolveKeys('skills', fields, 'skillTags', 'requiredSkills', '技能')),
+        benefits: getStringList(raw, resolveKeys('benefits', fields, 'welfare', 'perks', '福利')),
+        salaryMin: getNumber(raw, resolveKeys('salaryMin', fields, 'minSalary', 'salary_min')),
+        salaryMax: getNumber(raw, resolveKeys('salaryMax', fields, 'maxSalary', 'salary_max')),
+        salaryUnit: r('salaryUnit', 'salary_unit', 'payPeriod'),
+        validThrough: getDate(raw, resolveKeys('validThrough', fields, 'expireAt', 'valid_until', 'deadline')),
       },
     }
   }
@@ -389,13 +442,14 @@ export class JobSyncService {
       return stats
     }
 
+    const touchedJobIds: string[] = []
     await this.prisma.$transaction(async (tx) => {
       for (const { item } of valid) {
         const existing = await tx.job.findUnique({
           where: { sourceOrgId_externalId: { sourceOrgId: source.orgId, externalId: item.externalId } },
           select: { id: true },
         })
-        await tx.job.upsert({
+        const job = await tx.job.upsert({
           where: { sourceOrgId_externalId: { sourceOrgId: source.orgId, externalId: item.externalId } },
           create: {
             sourceOrgId: source.orgId, sourceId: source.id, externalId: item.externalId,
@@ -404,6 +458,14 @@ export class JobSyncService {
             salary: item.salary, description: item.description,
             requirements: item.requirements,
             category: item.category, tagsJson: JSON.stringify(item.tags),
+            educationRequirement: item.educationRequirement,
+            experienceRequirement: item.experienceRequirement,
+            skillsJson: JSON.stringify(item.skills),
+            benefitsJson: JSON.stringify(item.benefits),
+            salaryMin: item.salaryMin,
+            salaryMax: item.salaryMax,
+            salaryUnit: item.salaryUnit,
+            validThrough: item.validThrough,
             reviewStatus: 'pending', publishStatus: 'draft', syncTime: sync,
           },
           update: {
@@ -412,16 +474,34 @@ export class JobSyncService {
             salary: item.salary, description: item.description,
             requirements: item.requirements,
             category: item.category, tagsJson: JSON.stringify(item.tags),
+            educationRequirement: item.educationRequirement,
+            experienceRequirement: item.experienceRequirement,
+            skillsJson: JSON.stringify(item.skills),
+            benefitsJson: JSON.stringify(item.benefits),
+            salaryMin: item.salaryMin,
+            salaryMax: item.salaryMax,
+            salaryUnit: item.salaryUnit,
+            validThrough: item.validThrough,
             syncTime: sync,
             // reviewStatus/publishStatus 不覆写，防绕过审核
           },
         })
+        touchedJobIds.push(job.id)
         if (existing) { stats.updated++ } else { stats.added++ }
       }
     })
+    await this.refreshJobQualitySnapshots(touchedJobIds)
 
     if (errors.length) stats.errorSummary = `${errors.length} item(s) skipped: ${errors.slice(0, 3).join('; ')}`
     return stats
+  }
+
+  private async refreshJobQualitySnapshots(jobIds: string[]): Promise<void> {
+    try {
+      await this.jobQuality.refreshJobQualitySnapshots(jobIds)
+    } catch (error) {
+      this.logger.warn(`refresh job quality snapshots failed: ${error instanceof Error ? error.message : 'unknown'}`)
+    }
   }
 
   private async upsertFairs(

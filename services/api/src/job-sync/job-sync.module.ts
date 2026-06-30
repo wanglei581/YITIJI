@@ -7,6 +7,7 @@ import { JobSyncService } from './job-sync.service'
 import { JobSyncScheduler } from './job-sync.scheduler'
 import { JobSyncController } from './job-sync.controller'
 import { JobSyncProcessor } from './job-sync.processor'
+import { JobQualityService } from '../job-ai/job-quality.service'
 
 const redisUrl = process.env['REDIS_URL']
 
@@ -29,6 +30,7 @@ const redisUrl = process.env['REDIS_URL']
   ],
   providers: [
     JobSyncService,
+    JobQualityService,
     JobSyncScheduler,
     ...(redisUrl ? [JobSyncProcessor] : []),
   ],

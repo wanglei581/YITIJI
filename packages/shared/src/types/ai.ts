@@ -318,6 +318,86 @@ export interface JobFitResponse {
   providerName?: string
 }
 
+// ── 岗位信息 AI 推荐 / 解读（商用闭环 Task 2）───────────────────────────────
+// 合规：所有推荐和解读均为「仅供参考」，只服务求职者本人；不包含投递结果、
+// 企业候选人筛选、面试邀约、Offer 或任何招聘闭环状态。
+
+export type JobAiFitLevel = 'reference_high' | 'reference_medium' | 'reference_low'
+
+export interface TargetJobContext {
+  jobId: string
+  title: string
+  company: string
+  sourceName: string
+  sourceUrl: string
+  externalId: string
+  description?: string
+  requirements?: string
+  skills: string[]
+  city: string
+  category?: string
+}
+
+export interface JobRecommendationFilters {
+  city?: string
+  category?: string
+  skills?: string[]
+  sourceOrgId?: string
+}
+
+export interface JobRecommendationRequest {
+  resumeTaskId: string
+  /** 匿名简历结果一次性 accessToken；会员模式下由 Bearer token 鉴权。 */
+  accessToken?: string
+  intent?: {
+    targetTitle?: string
+    city?: string
+    industry?: string
+    keywords?: string[]
+  }
+  filters?: JobRecommendationFilters
+  limit?: number
+}
+
+export interface JobAiSessionDTO {
+  id: string
+  resumeTaskId?: string | null
+  operation: 'recommend' | 'explain' | 'match'
+  status: AiTaskStatus
+  provider?: string | null
+  terminalId?: string | null
+  createdAt: string
+  expiresAt?: string | null
+}
+
+export interface JobAiRecommendationDTO {
+  job: TargetJobContext
+  rank: number
+  fitLevel: JobAiFitLevel
+  summary: string
+  matchPoints: string[]
+  gapPoints: string[]
+  actionChecklist: string[]
+  createdAt: string
+}
+
+export interface JobRecommendationResponse {
+  session: JobAiSessionDTO
+  recommendations: JobAiRecommendationDTO[]
+  disclaimer: '仅供参考'
+}
+
+export interface JobExplainResponse {
+  session: JobAiSessionDTO
+  job: TargetJobContext
+  responsibilities: string[]
+  mustHaveRequirements: string[]
+  niceToHaveRequirements: string[]
+  preparationTips: string[]
+  dataQualityWarning?: string
+  disclaimer: '仅供参考'
+}
+
 // ── 2E 职业规划建议 ──────────────────────────────────────────────────────────
 // 合规:仅供本人参考;无薪资/录用/Offer/通过率承诺;现状画像 evidence 经服务端
 // 防编造校验(必须出自简历原文)。
