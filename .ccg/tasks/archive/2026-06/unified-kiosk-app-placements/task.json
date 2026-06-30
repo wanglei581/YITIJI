@@ -1,0 +1,12 @@
+{
+  "id": "unified-kiosk-app-placements",
+  "title": "统一 Kiosk 应用入口投放到百宝箱与智慧校园",
+  "status": "in_progress",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "提交功能变更并进入生产验收清单",
+  "createdAt": "2026-06-30T12:55:00+08:00",
+  "branch": "codex/terminal-device-profile-closure"
+}
