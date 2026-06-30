@@ -7,7 +7,8 @@
  *   3. MAC 地址规范化、非法格式拒绝、唯一冲突拒绝。
  *   4. 停用终端仍可 heartbeat,但 claim/status 被 TERMINAL_DISABLED 拦截。
  *   5. 停用终端的 Kiosk config 强制 smartCampus/toolbox 关闭。
- *   6. 公开 Kiosk config 只返回 Kiosk 必需白名单字段,不泄露设备档案/机构字段。
+ *   6. 百宝箱/智慧校园应用上架按 placement 拆分,外部应用受域名白名单保护。
+ *   7. 公开 Kiosk config 只返回 Kiosk 必需白名单字段,不泄露设备档案/机构字段。
  *
  * 运行: pnpm --filter @ai-job-print/api verify:terminal-device-config
  */
@@ -23,6 +24,7 @@ import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.servic
 
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-terminal-action-secret-0123456789'
+process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS'] ||= 'trusted.example.com,cdn.example.com'
 
 let staticFailures = 0
 
@@ -152,23 +154,39 @@ function runStaticChecks(): void {
   )
   contains(
     '../../apps/kiosk/src/services/api/terminalConfig.ts',
-    ['toolbox: { enabled: true, items: [] }', 'getCachedKioskTerminalConfig'],
-    'E2. Kiosk 统一配置本地默认显示百宝箱占位并复用缓存',
+    ['toolbox: { enabled: false, items: [] }', 'getCachedKioskTerminalConfig'],
+    'E2. Kiosk 统一配置本地默认关闭百宝箱并复用缓存',
   )
   contains(
     '../../apps/kiosk/src/pages/home/HomePage.tsx',
-    ['if (!config.enabled) return null', 'getCachedKioskTerminalConfig(terminalId)'],
-    'E3. Kiosk 百宝箱仅显式关闭时整块不渲染且复用统一配置缓存',
+    ['if (!config.enabled || items.length === 0) return null', 'getCachedKioskTerminalConfig(terminalId)'],
+    'E3. Kiosk 百宝箱未配置/空配置时整块不渲染且复用统一配置缓存',
   )
-  contains(
-    '../../apps/kiosk/src/pages/home/HomePage.tsx',
+  notContainsSource(
+    read('../../apps/kiosk/src/pages/home/HomePage.tsx'),
     ['待配置', '后续功能上线后将在这里展示'],
-    'E4. Kiosk 首页保留百宝箱空配置占位文案',
+    'E4. Kiosk 首页不保留百宝箱空配置占位文案',
   )
   contains(
     'src/terminals/terminal-toolbox.service.ts',
-    ['const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }', 'ALLOWED_TOOLBOX_ROUTE_PATTERNS', 'INVALID_TOOLBOX_ROUTE'],
-    'E5. 后端百宝箱默认启用占位并限制 Kiosk 站内允许路径',
+    [
+      'const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: false, items: [] }',
+      'ALLOWED_TOOLBOX_ROUTE_PATTERNS',
+      'KIOSK_EXTERNAL_APP_ALLOWED_HOSTS',
+      'TOOLBOX_EXTERNAL_HOST_NOT_ALLOWED',
+      'smartCampusItems',
+    ],
+    'E5. 后端百宝箱默认关闭并限制 Kiosk 站内路径/外部应用白名单',
+  )
+  contains(
+    '../../apps/admin/src/routes/toolbox/index.tsx',
+    ['PLACEMENT_OPTIONS', 'LAUNCH_MODE_OPTIONS', '外部 H5', '小程序码'],
+    'E6. Admin 应用上架表单支持百宝箱/智慧校园和外部应用启动方式',
+  )
+  contains(
+    'src/smart-campus/smart-campus.module.ts',
+    ["import { TerminalsModule } from '../terminals/terminals.module'", 'TerminalsModule'],
+    'E7. SmartCampusModule 装配终端应用上架服务依赖',
   )
   contains(
     '../../apps/admin/src/routes/terminals/index.tsx',
@@ -235,6 +253,7 @@ function runStaticChecks(): void {
 async function runServiceChecks(): Promise<void> {
   const { TerminalsService } = await import('../src/terminals/terminals.service')
   const { AdminTerminalsController } = await import('../src/terminals/admin-terminals.controller')
+  const { SmartCampusService } = await import('../src/smart-campus/smart-campus.service')
 
   console.log('\n=== 终端设备配置 service/controller 级验证 ===')
 
@@ -242,6 +261,7 @@ async function runServiceChecks(): Promise<void> {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const toolbox = new TerminalToolboxService(prisma)
+  const smartCampus = new SmartCampusService(prisma, toolbox)
   const terminals = new TerminalsService(prisma, toolbox)
   const adminController = new AdminTerminalsController(terminals, audit)
 
@@ -320,8 +340,8 @@ async function runServiceChecks(): Promise<void> {
     pass('夹具已创建')
 
     const defaultToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
-    if (defaultToolbox.enabled && defaultToolbox.items.length === 0) {
-      pass('0a. 未配置百宝箱的启用终端默认展示首页占位')
+    if (!defaultToolbox.enabled && defaultToolbox.items.length === 0 && defaultToolbox.smartCampusItems.length === 0) {
+      pass('0a. 未配置百宝箱的启用终端默认关闭且不下发应用项')
     } else {
       fail(`0a. 未配置百宝箱默认状态异常: ${JSON.stringify(defaultToolbox)}`)
     }
@@ -341,22 +361,181 @@ async function runServiceChecks(): Promise<void> {
       'INVALID_TOOLBOX_ROUTE',
       '0c. 百宝箱拒绝外部 URL',
     )
-    const savedToolbox = await toolbox.saveTerminalConfig(codeB, {
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-host',
+          title: '未授权外部应用',
+          description: '',
+          icon: 'wrench',
+          to: null,
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'external_url',
+          externalUrl: 'https://evil.example.com/app',
+          qrImageUrl: null,
+        }],
+      }, adminId),
+      'TOOLBOX_EXTERNAL_HOST_NOT_ALLOWED',
+      '0d. 百宝箱拒绝未加入白名单的外部 H5 域名',
+    )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-route-slash',
+          title: '反斜杠路径',
+          description: '',
+          icon: 'wrench',
+          to: '/\\evil.example.com/app',
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'internal_route',
+          externalUrl: null,
+          qrImageUrl: null,
+        }],
+      }, adminId),
+      'INVALID_TOOLBOX_ROUTE',
+      '0e. 百宝箱拒绝反斜杠伪装站内路径',
+    )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-qr-slash',
+          title: '反斜杠二维码',
+          description: '',
+          icon: 'help-circle',
+          to: null,
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'qr_code',
+          externalUrl: null,
+          qrImageUrl: '/\\evil.example.com/qr.png',
+        }],
+      }, adminId),
+      'INVALID_TOOLBOX_QR_URL',
+      '0f. 百宝箱拒绝反斜杠伪装二维码相对路径',
+    )
+    const staleFieldToolbox = await toolbox.saveTerminalConfig(codeB, {
       enabled: true,
       items: [{
-        key: 'resume-optimize',
-        title: 'AI简历优化',
-        description: '站内深链',
-        icon: 'sparkles',
-        to: '/resume/source?intent=optimize',
+        key: 'stale-url',
+        title: '站内页切换',
+        description: '旧 URL 应忽略',
+        icon: 'wrench',
+        to: '/resume/source',
         disabled: false,
         sortOrder: 0,
+        placements: ['toolbox'],
+        launchMode: 'internal_route',
+        externalUrl: 'https://evil.example.com/stale',
+        qrImageUrl: 'https://evil.example.com/stale-qr.png',
       }],
     }, adminId)
-    if (savedToolbox.enabled && savedToolbox.items[0]?.to === '/resume/source?intent=optimize') {
-      pass('0d. 百宝箱允许已上线 Kiosk 站内深链')
+    const staleItem = staleFieldToolbox.items.find((item) => item.key === 'stale-url')
+    if (staleItem?.to === '/resume/source' && staleItem.externalUrl === null && staleItem.qrImageUrl === null) {
+      pass('0g. 非当前启动方式的残留 URL 字段会被清理且不误拒保存')
     } else {
-      fail(`0d. 百宝箱合法路径保存异常: ${JSON.stringify(savedToolbox)}`)
+      fail(`0g. 残留 URL 字段清理异常: ${JSON.stringify(staleFieldToolbox)}`)
+    }
+    const savedToolbox = await toolbox.saveTerminalConfig(codeB, {
+      enabled: true,
+      items: [
+        {
+          key: 'resume-optimize',
+          title: 'AI简历优化',
+          description: '站内深链',
+          icon: 'sparkles',
+          to: '/resume/source?intent=optimize',
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'internal_route',
+          externalUrl: null,
+          qrImageUrl: null,
+        },
+        {
+          key: 'campus-portal',
+          title: '校园服务号',
+          description: '白名单 H5',
+          icon: 'book-open',
+          to: null,
+          disabled: false,
+          sortOrder: 1,
+          placements: ['smart_campus'],
+          launchMode: 'external_url',
+          externalUrl: 'https://trusted.example.com/campus',
+          qrImageUrl: null,
+        },
+        {
+          key: 'mini-program',
+          title: '校园小程序',
+          description: '扫码进入',
+          icon: 'help-circle',
+          to: null,
+          disabled: false,
+          sortOrder: 2,
+          placements: ['toolbox', 'smart_campus'],
+          launchMode: 'mini_program_qr',
+          externalUrl: null,
+          qrImageUrl: '/api/v1/assets/mini-program.png',
+        },
+      ],
+    }, adminId)
+    if (
+      savedToolbox.enabled &&
+      savedToolbox.items.find((item) => item.key === 'resume-optimize')?.to === '/resume/source?intent=optimize' &&
+      savedToolbox.items.find((item) => item.key === 'campus-portal')?.externalUrl === 'https://trusted.example.com/campus' &&
+      savedToolbox.items.find((item) => item.key === 'mini-program')?.qrImageUrl === '/api/v1/assets/mini-program.png'
+    ) {
+      pass('0h. 百宝箱允许站内深链、白名单外部 H5 和二维码应用配置')
+    } else {
+      fail(`0h. 百宝箱合法应用配置保存异常: ${JSON.stringify(savedToolbox)}`)
+    }
+    const originalAllowedHosts = process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS']
+    process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS'] = 'cdn.example.com'
+    const driftedToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
+    const driftedItem = driftedToolbox.smartCampusItems.find((item) => item.key === 'campus-portal')
+    if (driftedItem && driftedItem.externalUrl === null) {
+      pass('0i. 读取配置遇到外部域名白名单漂移时降级清理单项 URL,不打挂整份配置')
+    } else {
+      fail(`0i. 外部域名白名单漂移读取降级异常: ${JSON.stringify(driftedToolbox)}`)
+    }
+    process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS'] = originalAllowedHosts
+    await prisma.terminalSmartCampusConfig.create({
+      data: {
+        terminalId: codeB,
+        enabled: true,
+        modulesJson: JSON.stringify({ welcome: false, bigdata: false, luggage: false, panorama: false }),
+        updatedBy: adminId,
+      },
+    })
+    const splitConfig = await terminals.getKioskTerminalConfig(codeB)
+    if (
+      splitConfig.toolbox.items.some((item) => item.key === 'resume-optimize') &&
+      splitConfig.toolbox.items.some((item) => item.key === 'mini-program') &&
+      !splitConfig.toolbox.items.some((item) => item.key === 'campus-portal') &&
+      splitConfig.smartCampus.items.some((item) => item.key === 'campus-portal') &&
+      splitConfig.smartCampus.items.some((item) => item.key === 'mini-program')
+    ) {
+      pass('0j. 统一终端配置按 placement 拆分到百宝箱和智慧校园')
+    } else {
+      fail(`0j. 应用 placement 拆分异常: ${JSON.stringify(splitConfig)}`)
+    }
+    const fallbackCampusConfig = await smartCampus.getKioskConfig(codeB)
+    if (
+      fallbackCampusConfig.enabled &&
+      fallbackCampusConfig.items.some((item) => item.key === 'campus-portal') &&
+      fallbackCampusConfig.items.some((item) => item.key === 'mini-program')
+    ) {
+      pass('0k. 智慧校园旧配置端点降级路径也返回后台投放项')
+    } else {
+      fail(`0k. 智慧校园旧配置端点投放项异常: ${JSON.stringify(fallbackCampusConfig)}`)
     }
 
     const user = { userId: adminId, role: 'admin' as const, orgId: null }

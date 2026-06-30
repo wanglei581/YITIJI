@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import type {
+  KioskAppLaunchModeView,
+  KioskAppPlacementView,
   KioskToolboxConfigView,
   KioskToolboxItemView,
   SaveToolboxConfigInput,
@@ -10,8 +12,15 @@ import type {
 
 const ONLINE_THRESHOLD_MS = 2 * 60 * 1000
 const MAX_TOOLBOX_ITEMS = 24
-const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }
+const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: false, items: [] }
 const ALLOWED_TOOLBOX_ICONS = new Set(['wrench', 'file-text', 'printer', 'sparkles', 'book-open', 'help-circle'])
+const ALLOWED_APP_PLACEMENTS = new Set<KioskAppPlacementView>(['toolbox', 'smart_campus'])
+const ALLOWED_LAUNCH_MODES = new Set<KioskAppLaunchModeView>([
+  'internal_route',
+  'external_url',
+  'qr_code',
+  'mini_program_qr',
+])
 const ALLOWED_TOOLBOX_ROUTE_PATTERNS = [
   /^\/assistant(?:[?#].*)?$/,
   /^\/campus(?:[?#].*)?$/,
@@ -54,7 +63,7 @@ function cleanRoute(value: unknown): string | null {
   if (!route.startsWith('/')) {
     throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_ROUTE', message: '百宝箱功能路径必须是站内路径' } })
   }
-  if (route.startsWith('//') || route.includes('://')) {
+  if (route.startsWith('//') || route.includes('://') || route.includes('\\')) {
     throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_ROUTE', message: '百宝箱功能路径不得使用外部链接' } })
   }
   if (!ALLOWED_TOOLBOX_ROUTE_PATTERNS.some((pattern) => pattern.test(route))) {
@@ -68,7 +77,93 @@ function cleanIcon(value: unknown): string {
   return ALLOWED_TOOLBOX_ICONS.has(icon) ? icon : 'wrench'
 }
 
-function normalizeItems(rawItems: unknown): KioskToolboxItemView[] {
+function cleanPlacements(value: unknown): KioskAppPlacementView[] {
+  const raw = Array.isArray(value) ? value : ['toolbox']
+  const placements = raw.filter((item): item is KioskAppPlacementView =>
+    typeof item === 'string' && ALLOWED_APP_PLACEMENTS.has(item as KioskAppPlacementView),
+  )
+  const deduped = [...new Set(placements)]
+  return deduped.length > 0 ? deduped : ['toolbox']
+}
+
+function cleanLaunchMode(value: unknown): KioskAppLaunchModeView {
+  return typeof value === 'string' && ALLOWED_LAUNCH_MODES.has(value as KioskAppLaunchModeView)
+    ? value as KioskAppLaunchModeView
+    : 'internal_route'
+}
+
+function allowedExternalHosts(): Set<string> {
+  const hosts = (process.env.KIOSK_EXTERNAL_APP_ALLOWED_HOSTS ?? '')
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean)
+  return new Set(hosts)
+}
+
+function assertAllowedHttpsUrl(rawUrl: string, code: string, label: string): string {
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    throw new BadRequestException({ error: { code, message: `${label}必须是合法 HTTPS URL` } })
+  }
+  if (url.protocol !== 'https:') {
+    throw new BadRequestException({ error: { code, message: `${label}必须使用 HTTPS` } })
+  }
+  const hosts = allowedExternalHosts()
+  if (!hosts.has(url.hostname.toLowerCase())) {
+    throw new BadRequestException({
+      error: { code: 'TOOLBOX_EXTERNAL_HOST_NOT_ALLOWED', message: `${label}域名未加入 Kiosk 外部应用白名单` },
+    })
+  }
+  return url.toString()
+}
+
+function cleanExternalUrl(value: unknown, required: boolean): string | null {
+  const rawUrl = cleanText(value, 512)
+  if (!rawUrl) {
+    if (required) {
+      throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_EXTERNAL_URL', message: '外部 H5 应用必须填写 HTTPS URL' } })
+    }
+    return null
+  }
+  return assertAllowedHttpsUrl(rawUrl, 'INVALID_TOOLBOX_EXTERNAL_URL', '外部 H5 应用 URL')
+}
+
+function cleanQrImageUrl(value: unknown, required: boolean): string | null {
+  const rawUrl = cleanText(value, 512)
+  if (!rawUrl) {
+    if (required) {
+      throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_QR_URL', message: '二维码应用必须填写二维码图片地址' } })
+    }
+    return null
+  }
+  if (rawUrl.startsWith('/')) {
+    if (rawUrl.startsWith('//') || rawUrl.includes('://') || rawUrl.includes('\\')) {
+      throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_QR_URL', message: '二维码图片地址格式不合法' } })
+    }
+    return rawUrl
+  }
+  return assertAllowedHttpsUrl(rawUrl, 'INVALID_TOOLBOX_QR_URL', '二维码图片地址')
+}
+
+function cleanReadableExternalUrl(value: unknown): string | null {
+  try {
+    return cleanExternalUrl(value, false)
+  } catch {
+    return null
+  }
+}
+
+function cleanReadableQrImageUrl(value: unknown): string | null {
+  try {
+    return cleanQrImageUrl(value, false)
+  } catch {
+    return null
+  }
+}
+
+function normalizeItems(rawItems: unknown, options: { strict: boolean } = { strict: false }): KioskToolboxItemView[] {
   if (!Array.isArray(rawItems)) return []
   const seen = new Set<string>()
   return rawItems.slice(0, MAX_TOOLBOX_ITEMS).map((raw, index) => {
@@ -83,14 +178,28 @@ function normalizeItems(rawItems: unknown): KioskToolboxItemView[] {
       suffix += 1
     }
     seen.add(key)
+    const disabled = Boolean(item.disabled)
+    const launchMode = cleanLaunchMode(item.launchMode)
+    const placements = cleanPlacements(item.placements)
+    const to = launchMode === 'internal_route' ? cleanRoute(item.to) : null
+    const externalUrl = launchMode === 'external_url'
+      ? (options.strict ? cleanExternalUrl(item.externalUrl, !disabled) : cleanReadableExternalUrl(item.externalUrl))
+      : null
+    const qrImageUrl = launchMode === 'qr_code' || launchMode === 'mini_program_qr'
+      ? (options.strict ? cleanQrImageUrl(item.qrImageUrl, !disabled) : cleanReadableQrImageUrl(item.qrImageUrl))
+      : null
     return {
       key,
       title,
       description: cleanText(item.description, 80),
       icon: cleanIcon(item.icon),
-      to: cleanRoute(item.to),
-      disabled: Boolean(item.disabled),
+      to,
+      disabled,
       sortOrder: Number.isInteger(item.sortOrder) ? Number(item.sortOrder) : index,
+      placements,
+      launchMode,
+      externalUrl,
+      qrImageUrl,
     }
   }).filter((item) => item.title.length > 0)
     .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title, 'zh-Hans-CN'))
@@ -120,13 +229,14 @@ export class TerminalToolboxService {
   async getPublicConfig(
     terminalRef: string,
     terminal: TerminalRef | null,
-  ): Promise<KioskToolboxConfigView & { version: string }> {
+  ): Promise<KioskToolboxConfigView & { smartCampusItems: KioskToolboxItemView[]; version: string }> {
     const config = await this.findConfigByTerminalRef(terminalRef, terminal)
     const enabled = Boolean(terminal?.enabled) && (config?.enabled ?? DEFAULT_TOOLBOX.enabled)
     const items = enabled && config ? parseItems(config.itemsJson) : []
     return {
       enabled,
-      items,
+      items: items.filter((item) => (item.placements ?? ['toolbox']).includes('toolbox')),
+      smartCampusItems: items.filter((item) => (item.placements ?? []).includes('smart_campus')),
       version: config?.updatedAt.toISOString() ?? 'toolbox:none',
     }
   }
@@ -135,7 +245,7 @@ export class TerminalToolboxService {
     const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
     const config = await this.findConfigByTerminalRef(terminalId)
     if (!config) {
-      return { terminalId: publicTerminalId, enabled: true, items: [], updatedAt: null }
+      return { terminalId: publicTerminalId, enabled: false, items: [], updatedAt: null }
     }
     return toConfigView(config)
   }
@@ -146,7 +256,7 @@ export class TerminalToolboxService {
     updatedBy: string | null,
   ): Promise<TerminalToolboxConfigView> {
     const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
-    const items = normalizeItems(input.items)
+    const items = normalizeItems(input.items, { strict: true })
     const saved = await this.prisma.terminalToolboxConfig.upsert({
       where: { terminalId: publicTerminalId },
       create: { terminalId: publicTerminalId, enabled: input.enabled, itemsJson: JSON.stringify(items), updatedBy },

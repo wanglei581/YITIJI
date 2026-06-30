@@ -1043,6 +1043,7 @@ export class TerminalsService implements OnModuleInit {
         modules: smartCampusEnabled
           ? parseSmartCampusModules(smartCampusConfig!.modulesJson)
           : { ...DEFAULT_SMART_CAMPUS_MODULES },
+        items: smartCampusEnabled ? toolboxConfig.smartCampusItems : [],
       },
       toolbox: {
         enabled: toolboxConfig.enabled,

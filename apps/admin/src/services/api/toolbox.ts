@@ -66,6 +66,10 @@ const mockAdapter: ToolboxAdminServiceInterface = {
       to: item.to || null,
       disabled: !!item.disabled,
       sortOrder: Number.isInteger(item.sortOrder) ? item.sortOrder : index,
+      placements: item.placements?.length ? item.placements : ['toolbox'],
+      launchMode: item.launchMode ?? 'internal_route',
+      externalUrl: item.externalUrl ?? null,
+      qrImageUrl: item.qrImageUrl ?? null,
     }))
     const config: TerminalToolboxConfigView = {
       terminalId,

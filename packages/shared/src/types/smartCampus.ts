@@ -1,3 +1,5 @@
+import type { KioskAppItem } from './kioskApp'
+
 // ============================================================
 // 智慧校园（按终端开关）共享类型
 //
@@ -39,6 +41,8 @@ export const DEFAULT_SMART_CAMPUS_MODULES: SmartCampusModules = {
 export interface KioskSmartCampusConfig {
   enabled: boolean
   modules: SmartCampusModules
+  /** 后台额外上架到智慧校园专区的应用入口。 */
+  items: KioskAppItem[]
 }
 
 // ── 管理员后台视图 ──────────────────────────────────────────────

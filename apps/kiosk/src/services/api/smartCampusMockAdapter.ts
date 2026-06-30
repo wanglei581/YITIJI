@@ -9,6 +9,6 @@ import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
  */
 export const smartCampusMockAdapter = {
   async getConfig(): Promise<KioskSmartCampusConfig> {
-    return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES } }
+    return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] }
   },
 }

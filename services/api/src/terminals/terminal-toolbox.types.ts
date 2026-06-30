@@ -1,3 +1,7 @@
+export type KioskAppPlacementView = 'toolbox' | 'smart_campus'
+
+export type KioskAppLaunchModeView = 'internal_route' | 'external_url' | 'qr_code' | 'mini_program_qr'
+
 export interface KioskToolboxItemView {
   key: string
   title: string
@@ -6,6 +10,10 @@ export interface KioskToolboxItemView {
   to: string | null
   disabled: boolean
   sortOrder: number
+  placements?: KioskAppPlacementView[]
+  launchMode?: KioskAppLaunchModeView
+  externalUrl?: string | null
+  qrImageUrl?: string | null
 }
 
 export interface KioskToolboxConfigView {

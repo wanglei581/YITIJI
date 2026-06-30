@@ -1,4 +1,5 @@
 import type { KioskSmartCampusConfig } from './smartCampus'
+import type { KioskAppItem } from './kioskApp'
 
 export type DeviceStatus = 'online' | 'offline' | 'error' | 'maintenance' | 'idle' | 'busy'
 
@@ -23,15 +24,7 @@ export interface PrinterStatus {
   errorCode?: string
 }
 
-export interface KioskToolboxItem {
-  key: string
-  title: string
-  description: string
-  icon: string
-  to: string | null
-  disabled: boolean
-  sortOrder: number
-}
+export type KioskToolboxItem = KioskAppItem
 
 export interface KioskToolboxConfig {
   enabled: boolean

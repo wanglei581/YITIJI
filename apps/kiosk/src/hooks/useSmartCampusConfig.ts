@@ -9,7 +9,7 @@ import { getCachedKioskTerminalConfig } from '../services/api/terminalConfig'
 //   - 初始值 / 无 terminalId / 从未成功拉取 → 一律 OFF（模块整张不渲染）
 //   - 不持久化到 localStorage：重启后从 OFF 起步，直到向后端确认
 //   - 仅用进程内 cached 避免同会话内跨页面闪烁；机器搬离校园由后端返回 enabled:false 处理
-const OFF: KioskSmartCampusConfig = { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES } }
+const OFF: KioskSmartCampusConfig = { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] }
 const REFRESH_MS = 5 * 60 * 1000
 
 let cached: KioskSmartCampusConfig | null = null

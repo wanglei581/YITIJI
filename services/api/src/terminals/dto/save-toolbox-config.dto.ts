@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -45,6 +46,26 @@ export class ToolboxItemDto {
   @Min(0)
   @Max(9999)
   sortOrder?: number
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(2)
+  @IsIn(['toolbox', 'smart_campus'], { each: true })
+  placements?: Array<'toolbox' | 'smart_campus'>
+
+  @IsOptional()
+  @IsIn(['internal_route', 'external_url', 'qr_code', 'mini_program_qr'])
+  launchMode?: 'internal_route' | 'external_url' | 'qr_code' | 'mini_program_qr'
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  externalUrl?: string | null
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  qrImageUrl?: string | null
 }
 
 export class SaveToolboxConfigDto {
