@@ -32,6 +32,7 @@ type JobQualityField =
   | typeof JOB_QUALITY_REQUIRED_FIELDS[number]
   | typeof JOB_AI_READY_FIELDS[number]
   | 'sourceUrlFormat'
+  | 'sourceUrlUnreachable'
   | 'syncTimeStale'
   | 'validThroughExpired'
 
@@ -167,23 +168,34 @@ export class JobQualityService {
       },
     })
 
+    const snapshotRows = []
     for (const job of jobs) {
       const evaluated = this.evaluateJobQuality(job)
       const reachability = options.checkReachability && evaluated.sourceUrlFormat === 'valid'
         ? await this.checkSourceUrlReachable(job.sourceUrl)
         : { sourceUrlReachable: evaluated.sourceUrlReachable, lastError: evaluated.lastError }
+      const finalMissingFields = reachability.sourceUrlReachable === false
+        ? [...new Set([...evaluated.missingFields, 'sourceUrlUnreachable' as const])]
+        : evaluated.missingFields
+      const finalQualityLevel = reachability.sourceUrlReachable === false
+        ? 'insufficient'
+        : evaluated.qualityLevel
 
       // JobDataQualitySnapshot intentionally stores metadata only: no resume text,
       // no LLM input/output, no platform delivery/candidate/interview/offer state.
-      await this.prisma.jobDataQualitySnapshot.create({
-        data: {
-          jobId: job.id,
-          sourceOrgId: job.sourceOrgId,
-          missingFieldsJson: JSON.stringify(evaluated.missingFields),
-          qualityLevel: evaluated.qualityLevel,
-          sourceUrlReachable: reachability.sourceUrlReachable,
-          lastError: reachability.lastError,
-        },
+      snapshotRows.push({
+        jobId: job.id,
+        sourceOrgId: job.sourceOrgId,
+        missingFieldsJson: JSON.stringify(finalMissingFields),
+        qualityLevel: finalQualityLevel,
+        sourceUrlReachable: reachability.sourceUrlReachable,
+        lastError: reachability.lastError,
+      })
+    }
+
+    if (snapshotRows.length > 0) {
+      await this.prisma.jobDataQualitySnapshot.createMany({
+        data: snapshotRows,
       })
     }
   }

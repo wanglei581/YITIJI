@@ -113,7 +113,48 @@ function verifyQualityRules(): void {
   }
 }
 
-function main(): void {
+async function verifyReachabilitySnapshotRules(): Promise<void> {
+  const createdRows: Array<{
+    jobId: string
+    missingFieldsJson: string
+    qualityLevel: string
+    sourceUrlReachable: boolean | null
+    lastError: string | null
+  }> = []
+  const service = new JobQualityService({
+    job: {
+      findMany: async () => [
+        {
+          id: 'job-dead-link',
+          ...baseJob(),
+        },
+      ],
+    },
+    jobDataQualitySnapshot: {
+      createMany: async ({ data }: { data: typeof createdRows }) => {
+        createdRows.push(...data)
+        return { count: data.length }
+      },
+    },
+  } as unknown as PrismaService)
+  service.checkSourceUrlReachable = async () => ({ sourceUrlReachable: false, lastError: 'HTTP_404' })
+
+  await service.refreshJobQualitySnapshots(['job-dead-link'], { checkReachability: true })
+  const row = createdRows[0]
+  if (
+    createdRows.length === 1 &&
+    row.qualityLevel === 'insufficient' &&
+    row.sourceUrlReachable === false &&
+    row.lastError === 'HTTP_404' &&
+    row.missingFieldsJson.includes('sourceUrlUnreachable')
+  ) {
+    pass('质量快照:死链可达性失败 → createMany 写入并降级 insufficient')
+  } else {
+    fail(`质量快照:死链可达性失败应降级 insufficient,实际 ${JSON.stringify(createdRows)}`)
+  }
+}
+
+async function main(): Promise<void> {
   console.log('\n=== 岗位数据质量与来源可用性门禁 ===')
 
   const jobQuality = mustExist('src/job-ai/job-quality.service.ts', 'JobQualityService 已创建')
@@ -135,9 +176,11 @@ function main(): void {
       'descriptionOrRequirements',
       'sourceUrlFormat',
       'sourceUrlReachable',
+      'sourceUrlUnreachable',
       'isStale',
       'refreshJobQualitySnapshots',
       'getSourceQualitySummary',
+      'createMany',
       'JobDataQualitySnapshot',
       'qualityLevel',
       'ready',
@@ -251,6 +294,7 @@ function main(): void {
   )
 
   verifyQualityRules()
+  await verifyReachabilitySnapshotRules()
 
   if (failed > 0) {
     console.error(`\n❌ ${failed} 项失败 — 岗位数据质量与来源可用性门禁未通过\n`)
@@ -260,4 +304,7 @@ function main(): void {
   console.log('✅ ALL PASS — 岗位数据质量与来源可用性门禁一致\n')
 }
 
-main()
+main().catch((error) => {
+  console.error(error)
+  process.exit(1)
+})
