@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-29
+> 最后更新：2026-06-30
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -36,6 +36,7 @@
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
 - [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
 - [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收。
+- [ ] 生产运行时环境变量：部署脚本 / PM2 必须显式固定 `NODE_ENV=production`，并在 health / 启动日志验收中确认生产运行时门禁实际生效。
 - [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
 - [ ] 小范围试运营：仅 1 台终端 + 1 台打印机先跑，问题记录按任务闭环处理。
@@ -43,6 +44,21 @@
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
 
 2026-06-22 补充：`codex/file-assets-preprod-integration` 已把用户文件资产商用闭环栈与预生产验收候选合到同一分支，后续预生产/试运营应以该集成候选为基线继续执行；这仍不代表真实生产/试运营执行完成。
+
+## P0：打印扫描首期全功能收口
+
+- [x] **打印扫描板块商用级方案确认与实施总计划**：已输出 `docs/product/print-scan-commercial-plan.md` 和 `docs/superpowers/plans/2026-06-30-print-scan-first-release-full-scope.md`，基于竞品调研、前台体验审计、后端 / Terminal Agent 审计、产品合规审计和 Antigravity 只读审查；2026-06-30 用户确认首期目标调整为全功能商用版本，Claude 复审因本地 Claude Code 会话额度限制未取得有效报告，用户已确认本轮改用 Antigravity 复审即可。Antigravity 修订后复审结论 `APPROVE`，剩余奔图 mode 映射和 Agent claim TTL 建议已补入计划。本项只代表方案与实施计划确认，不代表运行时代码、生产部署或真机验收完成。
+- [ ] **首期安全底座**：打印任务创建时必须绑定目标 `terminalId`，Terminal Agent claim 必须按自身 `terminalId` 过滤；本地 SQLite / `better-sqlite3` 不可用时必须 fail-closed；Admin 必须能看到终端 degraded、离线、打印机异常和状态回传积压。
+- [ ] **首期服务中心与能力开关**：首页“打印扫描”组标题进入 `/print-scan` 服务中心；`/print-scan` 展示文档打印、手机扫码上传、材料包、扫描、证件复印、证件照、U 盘、云上传、格式转换、签名盖章和我的文档 / 打印订单 / 异常反馈；所有能力由 FeatureGate / DeviceCapability / Admin 配置控制，未通过验收时不能创建正式任务。
+- [ ] **首期基础打印闭环**：文档打印、图片打印、简历打印、求职材料打印、招聘会资料打印统一进入真实 `PrintTask`；补任务编号、目标终端、排队 / 已领取 / 打印中 / 完成 / 失败说明、关联反馈和可控重试；不得混用支付状态、打印状态和人工确认状态。
+- [ ] **首期手机扫码上传 / 云上传 / 安全取件**：支持手机扫码上传到当前一体机、会员或一次性会话绑定当前终端、安全取件码或本机确认码；禁止公网远程直控打印机；签名 URL 过期、未确认上传和未取件任务必须自动 expired / 清理。
+- [ ] **首期 AI 文件体检与材料包**：AI 检查尺寸、方向、空白页、清晰度、页数和敏感信息；材料包可从我的简历、我的文档、招聘会资料、求职材料中选择，支持 AI 建议组合、逐项参数、顺序打印、子任务失败单独重试。
+- [ ] **首期真实扫描**：接入 TWAIN / WIA 或扫描目录监听，支持 ADF / 平板、DPI、单双面、PDF / JPG 输出、AI 裁边 / 纠偏 / 去阴影 / 去空白页 / OCR；扫描结果进入高敏短 TTL 文件流，支持保存、打印和删除。
+- [ ] **首期证件复印与证件照**：证件复印支持身份证正反面 A4 合成，默认不长期保存；证件照支持上传照片、抠图、换底色、规格检测、排版 PDF 和打印；身份证 / 证件照采集必须通过“采集 -> 使用 -> 删除 -> 审计”真机验收。
+- [ ] **首期 U 盘导入**：Terminal Agent 只读枚举 U 盘文件，校验扩展名、MIME、大小、隐藏文件和路径；拔出后清理本地缓存；只在用户确认后上传并创建正式 `FileObject`。
+- [ ] **首期格式转换与签名盖章**：Word / 图片 / PDF 转换必须生成真实派生文件后再打印；隐私遮挡必须生成替换文件并由用户确认；签名盖章只作为图形排版能力，必须有“非 CA 电子签”免责声明。
+- [ ] **首期 Admin 商业化和运营后台**：统一任务中心覆盖打印、扫描、复印、证件照、材料包；支持取消、重试、释放卡住任务、人工确认、重新派发；补价格策略、权益券、免费额度、补贴核销、退款 / 异常处理、终端 / 设备能力、文件生命周期、审计和统计看板。
+- [ ] **首期验收门禁**：每个能力必须有前台页面、后端数据模型、Terminal Agent / 外设链路、Admin 管理、数据流、异常处理、审计和 verify；未通过真机、生产链路、隐私删除和合规验收前，不能对外宣称正式生产或试运营完成。
 
 ## P1：渐进式重构首批业务闭环
 
@@ -61,13 +77,19 @@
 - [x] **招聘会 / 校园招聘 Branch 1：列表页本校优先接线**：`JobFairsPage` 调用 `getTerminalId()` 并透传 `getJobFairs(terminalId ? { terminalId } : undefined)`，对齐 `/campus` 已有本校优先排序；新增 `verify-jobfairs-terminal-priority` 防回退脚本，不改 UI、不改后端。
 - [x] **招聘会 / 校园招聘 Branch 2：参展企业外部投递跳转记录**：新增 `fair_company` activity target，限定 `external_apply`；`FairCompanyDetailPage` 使用真实 `SourceUrlQr` 并记录本人外部入口打开；`/me/activity` 支持参展企业记录回跳。
 - [x] **招聘会 / 校园招聘 Branch 3：大页面零行为拆分**：已拆分 `CampusPage`、`JobFairDetailPage`、`FairCompanyDetailPage`，保持路由、接口、文案和行为不变；新增 `verify:jobfair-size` 并接入 `verify:jobfair-ui`，已完成 Claude + Antigravity 双模型审查。
+- [x] **招聘会三入口 AI 商用闭环首批实现**：已完成 P0 真实数据 / 合规防回退、P1 `fair_visit_plan` 参会准备单和来源签到入口。Kiosk 封堵 `aiMatchScore` / AI 百分比分、平台内投递 / 签到结果文案、`isMockData` 统计展示和活动资料签名 URL 过期；后端新增真实 `fair_visit_plan` AI 链路，基于已发布招聘会与本人简历生成准备单，落 `AiResumeResult(kind=fair_visit_plan)`，会员 AI 服务记录可见，PDF 走 `FileObject` + 打印确认链路。`扫码签到` 已接真实 `checkinUrl` 字段、Admin 审核详情、Partner 编辑 / 导入、Excel 白名单、Kiosk `/job-fairs/checkin` 和详情页二维码；Activity 只记录 `external_checkin_open` 打开动作，不记录签到结果。已通过 `verify:jobfair-commercial-closure`、`verify:fair-visit-plan`、`verify:jobfair-checkin`、API/Kiosk/Admin/Partner typecheck；仍需真实 PostgreSQL/COS/LLM 预生产浏览器验收、Windows 真机出纸和公网扫码域名验收。
 - [x] **用户文件保存期限 Branch 2：策略服务与清理门禁**：`FileObject.expiresAt` 支持 `long_term` 的 `null` 语义；会员本人可改本人文件保存期限；原始文件首批仅 3/6 个月，`optimized/derived` 成果物可长期，证件/匿名/系统文件保持短期；补 `verify:file-retention` 与 Admin/Kiosk 可空兼容。
 - [x] **用户文件保存期限 Branch 3：Kiosk 文件保存期限 UI**：`/me/documents` 展示当前保存期限和后端允许策略；本人可设置 3 个月 / 6 个月 / 成果物长期保存，6 个月 / 长期保存自动带当前保存条款版本；保存条款版本由 shared/API 本地副本常量收敛并有防回退验证。
 - [x] **用户文件保存期限 Branch 4：Admin 文件生命周期运营视图**：Admin `/files` 复用现有入口展示保存策略、设置来源、同意时间、长期保存数量和即将到期/待清理统计；新增全库只读 `GET /files/lifecycle-summary`，不受列表 `limit=200` 截断；管理员无保存期限修改入口，查看文件兼容 COS 绝对签名 URL。
 - [x] **用户文件保存期限 Branch 5：COS 生命周期与隐私文案验收**：采集点、帮助中心、隐私政策、Admin 文件横幅统一为短期 / 90 天 / 180 天 / 长期保存口径；新增 COS 生命周期合规文档，明确禁止 Bucket 全局过期规则、`long_term` 防误删人工验收和截图存档；新增 `verify:legal-retention-copy` 与 `verify:cos-lifecycle-policy`。
 - [x] **用户文件与简历资产证据包**：新增 `docs/acceptance/user-file-assets-trial-acceptance.md` 和 `verify:file-assets-trial-acceptance`，把生产/试运营验收拆成 PostgreSQL、COS 私有桶、会员账号、上传原始文件、上传优化后或修改后文件、90 天 / 180 天 / 长期保存、重登查看、删除三态一致、过期清理、`long_term` 防误删、AuditLog 审计和证据脱敏；静态验证只证明证据包完整，不代表真实生产/试运营执行完成。
 - [x] **用户文件资产 + 预生产候选集成**：`codex/file-assets-preprod-integration` 已合并文件资产保存期限栈、生产/试运营证据包、TRTC assistant 生产构建守卫和预生产阶段性记录；后续真实验收应基于该集成候选继续，不再用只含 TRTC guard 的预生产分支替代。
-- [x] **简历素材库 / 求职材料商用闭环整改**：两个既有首页入口已统一进入 `/resume/templates` 求职材料库；内置模板通过 `JobMaterialsModule` 生成真实 PDF 并以会员 `FileObject` 进入 `/me/documents`；我的文档支持重签 URL 后打印；Admin 新增只读 `/job-materials` 运营统计；已补 API/Kiosk/Admin 防回退 verify 和三端 typecheck，并已完成预生产公网浏览器受控会员生成 PDF 到打印确认链路验收。本项不包含动态模板 CRUD、Partner 上传模板、支付套餐、平台投递、正式域名 HTTPS / 真实短信上线 E2E 或 Windows 真机验收。
+- [x] **简历素材库 / 求职材料商用闭环整改**：两个既有首页入口已拆成独立页面：`/resume/templates` 为简历素材库，只展示简历模板/版式素材并引导 AI 简历优化；`/resume/materials` 为求职材料库，保留求职信 / 感谢信 / 作品集封面 / 材料清单生成真实 PDF、会员 `FileObject` 进入 `/me/documents`、我的文档重签 URL 后打印、Admin 只读 `/job-materials` 运营统计。已补 Kiosk 防回退 verify 锁定两个入口不再混用；2026-06-30 已补本地真实 API + Redis + local storage + Playwright Chromium 页面级复验，覆盖 `/login?from=/resume/materials` 会员登录、生成 PDF、进入 `/me/documents`、从我的文档点击打印并到达 `/print/confirm`，测试文件已清理；2026-06-29 预生产公网验收仍是拆分前旧路径 `/resume/templates?tab=materials` 的历史证据，新版独立路径仍需预生产公网复验。本项不包含动态模板 CRUD、Partner 上传模板、支付套餐、平台投递、正式域名 HTTPS / 真实短信上线 E2E 或 Windows 真机验收。
+- [x] **岗位信息页商用级代码侧整改**：Kiosk `/jobs` 已补岗位数据概览、筛选助手、来源机构、热门标签、客户数据接入提示、字段完整度和商用结果卡片；`/jobs/:id` 已补岗位摘要、职责与要求、来源可信区、后续动作、扫码投递和去来源平台投递；新增 `verify:job-info-ui` 防回退。该项只代表代码侧页面闭环增强，仍需客户真实岗位数据样本、预生产公网浏览器和一体机现场触控验收；不得误写为平台投递或招聘闭环完成。
+- [x] **岗位信息 AI 商用闭环开发计划**：已输出 `docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md`，并记录 `.ccg/tasks/job-info-ai-commercial-closure/requirements.md` 与双模型审查摘要；计划明确先做生产禁 mock / 真实服务门禁，再做共享契约、数据库 additive schema、Job AI 后端、Kiosk 求职者优先页面、Admin 数据质量、Partner 来源质量、隐私同意 / 限流 / 删除导出和真实验收。本项仅代表计划完成，不代表运行时代码或商用闭环已完成。
+- [x] **岗位信息 AI 商用闭环 Task 1：生产真实服务门禁**：后端生产启动门禁已要求 PostgreSQL、Redis、COS、腾讯短信、百度 OCR、`AI_PROVIDER=llm` 和真实 LLM 密钥，拒绝 mock AI、未闭环 AI provider stub、OCR disabled 和缺失 Redis；Kiosk 生产构建已拒绝非 `VITE_API_MODE=http`，避免生产包使用 mockAdapter。已通过 API/Kiosk `verify:production-real-services`、API `verify:production-runtime-gates`、API/Kiosk typecheck 和 `git diff --check`，CI 串行 verify 已接入 API/Kiosk 生产真实服务门禁与 Kiosk 生产构建配置验证。本项不代表岗位 AI 推荐、结果落库、Admin/Partner 看板、live 外部服务或真机验收完成。
+- [x] **岗位信息 AI 商用闭环 Task 2：共享契约与 additive schema**：`packages/shared` 已补岗位质量、标准化字段、岗位 AI 会话、推荐请求/响应和三档参考等级契约；Prisma 已新增 `JobAiSession`、`JobAiRecommendation`、`AiServiceLog`、`UserAiConsent`、`UserDataRequest`、`JobDataQualitySnapshot`，并以可空 / 默认字段扩展 `Job`；SQLite/PostgreSQL 双 migration 均为 additive；`verify:job-ai` 已接入 CI，覆盖双迁移、隐私禁存、匿名 token hash / TTL 和禁止招聘闭环状态。该项不代表推荐接口、真实 LLM 调用、Admin/Partner 看板或生产迁移完成。
+- [x] **岗位信息 AI 商用闭环 Task 3：岗位数据质量与来源可用性**：`JobQualityService` 已计算岗位必填字段、AI-ready 字段、来源 URL 格式、同步过期和有效期，写入 `JobDataQualitySnapshot`；API 导入、Webhook、Excel 确认、Partner 编辑和 JobSync 拉取后都会刷新质量快照；Import DTO 与 Excel 字段白名单已支持学历、经验、技能、福利、薪资上下限、薪资单位和有效期；公开列表对缺失薪资展示“来源平台未提供”。`verify:job-data-quality` 已接入 CI；本地验证覆盖 API typecheck、`verify:job-ai`、`db:pg:sync:check`、临时 SQLite 空库 `verify:job-fit` / `verify:job-sync`。该项不代表 AI 推荐接口、Admin/Partner 质量看板、生产迁移或客户真实数据验收完成。
 
 ## P1：用户文件与简历资产商用闭环后续
 
@@ -92,9 +114,11 @@
 - [x] **预生产 Gate 4 浏览器会员路径证据补齐**：2026-06-26 使用真实短信登录路径完成会员页、合成 PDF 上传窗口和 `/me/documents` 会员文件与保存期限截图；证据保存在仓库外 `/Users/wanglei/gate4-evidence/gate4-browser-20260625231841`，包含 `evidence-summary.md`、3 张 Chrome 窗口截图和合成测试 PDF。全程不把完整手机号、验证码、token、cookie、签名 URL 或 COS XML 写入仓库；坏的全屏截图 / Playwright 中间文件已删除；预生产中可见的 `gate4-synthetic-resume.pdf` 测试记录已清理。该项仍不等于完整 Gate 4 浏览器验收、正式生产或试运营完成。
 - [ ] **预生产 Gate 4 剩余浏览器证据补齐**：仍需补 Admin 生命周期视图、签名 URL / 等待窗口、必要时 COS 控制台或 DB 脱敏摘要等剩余证据；执行前必须继续按 runbook 确认仓库外证据目录、地址栏 / 签名 URL / COS XML / 手机号 / token 脱敏规则，以及 Admin 仅筛选本轮测试文件；腾讯短信审核通过后还需用真实短信完成会员登录 E2E，避免把预生产 API/COS/部分浏览器证据误写成正式生产或完整试运营验收。
 - [ ] **AI 简历诊断手机扫码上传联调复验**：本地 API + Redis + `FILE_STORAGE_DRIVER=local` 已通过 `verify:upload-sessions:http`，覆盖创建二维码会话、手机 multipart 上传 synthetic PDF、Kiosk 轮询 / 确认 / 取消、安全门禁、精确错误码、本地测试文件清理、member 真实 JWT + Redis session 成功绑定、匿名 / 其他会员 confirm 越权拒绝、status throttle、已绑定会员文件 cleanup 防误删和手机 token 仅从 fragment 读取；浏览器实际点击 `/resume/source` 可生成二维码且无会话创建错误。脚本默认不触发 `/resume/parse`、OCR 或 AI 配额；运行前必须确认被测 API 进程本身也以 `FILE_STORAGE_DRIVER=local` 启动。后续仍需在域名审核 / HTTPS / 反代 / H5 fallback 就绪后，用预生产或真机隔离对象存储和真实可解析 PDF 跑完整浏览器 E2E，覆盖手机上传真实简历、OCR/AI 诊断成功、报告页回填、会员绑定 / 我的简历资产回看和打印 / 导出入口；另需择期补 `/health` 暴露存储 driver、`EndUser.enabled` 可选会员一致性和 Multer 超限错误码统一。
-- [x] **求职材料库真实浏览器与预生产验收**：已部署 `codex/job-materials-commercial-closure` 的 `64596c18` 运行时包到预生产；远端 `verify:job-materials` 在 PostgreSQL + COS 环境通过，Kiosk/Admin 静态 UI verify 通过，公网浏览器完成 `/resume/templates?tab=materials -> 登录 -> 生成 PDF -> /me/documents -> /print/confirm` 链路。执行中临时切 `SMS_PROVIDER=log`，结束后已回滚 `SMS_PROVIDER=tencent`；本轮受控测试 EndUser、FileObject、AuditLog 和 COS 对象已清理。该验收仍不代表正式生产、正式域名 HTTPS、真实短信上线 E2E、Windows 真机出纸或试运营完成。
+- [x] **求职材料库真实浏览器与预生产验收（拆分前旧路径）**：已部署 `codex/job-materials-commercial-closure` 的 `64596c18` 运行时包到预生产；远端 `verify:job-materials` 在 PostgreSQL + COS 环境通过，Kiosk/Admin 静态 UI verify 通过，公网浏览器完成 `/resume/templates?tab=materials -> 登录 -> 生成 PDF -> /me/documents -> /print/confirm` 链路。执行中临时切 `SMS_PROVIDER=log`，结束后已回滚 `SMS_PROVIDER=tencent`；本轮受控测试 EndUser、FileObject、AuditLog 和 COS 对象已清理。2026-06-30 已将新版入口拆到 `/resume/materials`，因此仍需重新做新版独立路径预生产浏览器复验；该验收仍不代表正式生产、正式域名 HTTPS、真实短信上线 E2E、Windows 真机出纸或试运营完成。
 - [ ] **求职材料库 Windows 真机打印验收**：待正式或试运营环境具备 Windows Terminal Agent、奔图打印机和真实出纸条件后，使用求职材料生成的 PDF 从 `/print/confirm` 进入打印任务，验收 Agent claim、驱动出纸、失败恢复、订单状态与异常反馈；该项未完成前不得宣称求职材料库达到真机商用闭环。
 - [ ] **求职材料库二期动态治理设计**：如要开放 Admin 模板 CRUD、Partner 模板申请、版权素材上传、套餐收费或岗位关键词辅助，必须另起独立设计与审查，先补审核流、版权归属、字段白名单、滥用风控和合规文案，再写代码。
+- [ ] **岗位信息页客户数据验收**：用客户真实 API / Excel / Webhook 岗位样本复验标准字段映射、筛选、来源链接、外部编号、同步时间、岗位描述、职责要求、企业关联和收藏 / 浏览 / 外部跳转记录；验收只记录打开来源入口，不记录投递结果。
+- [ ] **岗位信息 AI 商用闭环下一阶段**：按 `docs/superpowers/plans/2026-06-30-job-info-ai-commercial-closure.md` 继续执行 Task 4 Job AI 后端推荐 / 会话 API，基于真实岗位、本人简历元数据和显式用户同意生成推荐会话与推荐结果；推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成真实 LLM/OCR/PostgreSQL/Redis/COS、Admin/Partner 看板、预生产公网浏览器和一体机真机验收前，不得对外宣称 AI 推荐或岗位匹配达到商用完成。
 
 ## P1：工程质量门禁
 
