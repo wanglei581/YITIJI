@@ -149,10 +149,60 @@ async function verifyExplainRequiresMember(): Promise<void> {
   }
 }
 
+async function verifyExplainRequiresConsent(): Promise<void> {
+  const { JobAiService } = await import('../src/job-ai/job-ai.service')
+  const { ForbiddenException } = await import('@nestjs/common')
+  let contextCalled = false
+  let sessionCreateCalled = false
+  let quotaCalled = false
+  const service = new JobAiService(
+    {
+      jobAiSession: {
+        create: async () => {
+          sessionCreateCalled = true
+          throw new Error('session should not be created before consent')
+        },
+      },
+    } as never,
+    {} as never,
+    {
+      buildTargetJobContext: async () => {
+        contextCalled = true
+        throw new Error('context should not be read before consent')
+      },
+    } as never,
+    {} as never,
+    {} as never,
+    { record: () => undefined } as never,
+    {
+      requireActiveConsent: async () => {
+        throw new ForbiddenException({ error: { code: 'USER_AI_CONSENT_REQUIRED', message: '请先确认 AI 简历分析授权' } })
+      },
+    } as never,
+    { consume: async () => { quotaCalled = true } } as never,
+  )
+  try {
+    await service.explainJob('job-public', { endUserId: 'enduser-without-consent', accessToken: null }, null)
+    fail('运行时:缺少 job_ai 授权时 explain 应拒绝')
+  } catch (error) {
+    if (
+      exceptionCode(error) === 'USER_AI_CONSENT_REQUIRED' &&
+      !contextCalled &&
+      !sessionCreateCalled &&
+      !quotaCalled
+    ) {
+      pass('运行时:缺少 job_ai 授权时 explain 在读岗位/创建 session/扣配额前 fail-closed')
+    } else {
+      fail(`运行时:缺少授权时 explain 异常 code=${exceptionCode(error) ?? (error as Error).message}, contextCalled=${contextCalled}, sessionCreateCalled=${sessionCreateCalled}, quotaCalled=${quotaCalled}`)
+    }
+  }
+}
+
 async function verifyListMinePublishedJobFilter(): Promise<void> {
   const { JobAiService } = await import('../src/job-ai/job-ai.service')
   let countWhere: unknown
   let findManyArgs: unknown
+  let jobFindManyArgs: unknown
   const service = new JobAiService(
     {
       jobAiSession: {
@@ -162,6 +212,24 @@ async function verifyListMinePublishedJobFilter(): Promise<void> {
         },
         findMany: async (args: unknown) => {
           findManyArgs = args
+          return [{
+            id: 'session-explain-owned',
+            resumeTaskId: null,
+            operation: 'explain',
+            status: 'completed',
+            provider: 'llm',
+            terminalId: 'KSK-001',
+            intentJson: JSON.stringify({ jobId: 'job-published' }),
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 3600_000),
+            _count: { recommendations: 0 },
+            recommendations: [],
+          }]
+        },
+      },
+      job: {
+        findMany: async (args: unknown) => {
+          jobFindManyArgs = args
           return []
         },
       },
@@ -175,16 +243,17 @@ async function verifyListMinePublishedJobFilter(): Promise<void> {
     {} as never,
   )
   await service.listMine('enduser-owned', { cursor: null, pageSize: 20 })
-  const serialized = JSON.stringify({ countWhere, findManyArgs })
+  const serialized = JSON.stringify({ countWhere, findManyArgs, jobFindManyArgs })
   if (
+    serialized.includes('"endUserId":"enduser-owned"') &&
     serialized.includes('"recommendations"') &&
-    serialized.includes('"some"') &&
     serialized.includes('"reviewStatus":"approved"') &&
-    serialized.includes('"publishStatus":"published"')
+    serialized.includes('"publishStatus":"published"') &&
+    serialized.includes('"id":{"in":["job-published"]}')
   ) {
-    pass('运行时:listMine 只统计和返回仍关联已发布岗位的会话')
+    pass('运行时:listMine 可返回 explain 会话，并仅用已发布岗位补齐历史元数据')
   } else {
-    fail(`运行时:listMine 缺少已发布岗位过滤: ${serialized}`)
+    fail(`运行时:listMine 历史元数据过滤异常: ${serialized}`)
   }
 }
 
@@ -367,8 +436,10 @@ async function main(): Promise<void> {
       'assertMemberAiRequester',
       'END_USER_AUTH_REQUIRED',
       'PUBLISHED_JOB_WHERE',
-      'recommendations: { some: { job: { is: PUBLISHED_JOB_WHERE } } }',
       'job: { is: PUBLISHED_JOB_WHERE }',
+      'jobIdFromIntentJson',
+      'jobById',
+      'id: { in: jobIds }',
       'AiLogService',
       'recordAiServiceLog',
       'disclaimer',
@@ -526,6 +597,7 @@ async function main(): Promise<void> {
   await verifyConsentFailClosed()
   await verifyDecimalPercentBlocked()
   await verifyExplainRequiresMember()
+  await verifyExplainRequiresConsent()
   await verifyListMinePublishedJobFilter()
   await verifyDeleteMineOwnership()
   await verifyQuotaRollbackOnLlmFailure()

@@ -81,6 +81,24 @@ export interface JobAiRecommendationPayload {
   actionChecklist: string[]
 }
 
+export interface JobAiTokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export interface JobAiRecommendationLlmResult {
+  items: JobAiRecommendationPayload[]
+  provider: string
+  tokenUsage?: JobAiTokenUsage
+}
+
+export interface JobAiExplanationLlmResult {
+  payload: JobAiExplanationPayload
+  provider: string
+  tokenUsage?: JobAiTokenUsage
+}
+
 export interface JobAiSessionWithRecommendations {
   session: JobAiSessionDTO
   recommendations: JobAiRecommendationDTO[]

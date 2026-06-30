@@ -47,7 +47,10 @@ function startStub(): Promise<{ server: Server; url: string }> {
       req.on('data', (c) => { b += c })
       req.on('end', () => {
         res.setHeader('Content-Type', 'application/json')
-        res.end(JSON.stringify({ choices: [{ message: { content: responseQueue.shift() ?? '{}' } }] }))
+        res.end(JSON.stringify({
+          choices: [{ message: { content: responseQueue.shift() ?? '{}' } }],
+          usage: { prompt_tokens: 1200, completion_tokens: 300, total_tokens: 1500 },
+        }))
       })
     })
     server.listen(0, '127.0.0.1', () => {
@@ -139,12 +142,16 @@ async function main() {
 
     // 1. jobId 闭环
     responseQueue.push(vjson())
-    const r1 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    const r1WithUsage = await svc.analyzeWithUsage({ taskId, jobId: jobPub.id }, requester)
+    const r1 = r1WithUsage.response
     if (r1.status !== 'completed' || !('fitLevel' in r1)) fail('1. 应 completed')
     if (r1.job?.sourceName !== '验证人才网' || !r1.job?.sourceUrl) fail('1. 缺岗位来源信息')
+    if (r1WithUsage.provider !== 'llm:deepseek:stub' || r1WithUsage.tokenUsage?.totalTokens !== 1500) {
+      fail('1. analyzeWithUsage 应返回 provider 与 tokenUsage 元数据')
+    }
     const row1 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row1 || row1.accessTokenHash !== tokenHash) fail('1. job_fit 行未继承 parse 归属')
-    pass('1. jobId 闭环：completed + 来源信息 + kind=job_fit 落库继承归属')
+    pass('1. jobId 闭环：completed + 来源信息 + kind=job_fit 落库继承归属 + usage 元数据')
 
     responseQueue.push(vjson())
     const r1b = await svc.analyze({ taskId: memberTaskId, jobId: jobPub.id }, memberRequester)

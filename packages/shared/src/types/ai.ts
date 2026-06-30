@@ -381,6 +381,12 @@ export interface JobAiRecommendationDTO {
   createdAt: string
 }
 
+export interface JobAiSessionListItem {
+  session: JobAiSessionDTO
+  job?: TargetJobContext
+  recommendationCount: number
+}
+
 export interface JobRecommendationResponse {
   session: JobAiSessionDTO
   recommendations: JobAiRecommendationDTO[]

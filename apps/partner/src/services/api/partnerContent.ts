@@ -3,6 +3,7 @@ import { partnerMockAdapter } from './partnerMockAdapter'
 import { partnerHttpAdapter } from './partnerHttpAdapter'
 import type {
   PartnerJobRecord,
+  PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
   ImportJobItem,
@@ -23,6 +24,7 @@ import type {
 
 export type {
   PartnerJobRecord,
+  PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
   ImportJobItem,
@@ -43,6 +45,7 @@ export type {
 
 export interface PartnerContentServiceInterface {
   getPartnerJobs(): Promise<PartnerJobRecord[]>
+  getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]>
   unpublishPartnerJob(id: string): Promise<PartnerJobRecord>
   // 阶段1C:编辑本机构数据(后端强制回 pending+draft 重审)
   updatePartnerJob(id: string, input: UpdatePartnerJobInput): Promise<PartnerJobRecord>
@@ -72,6 +75,7 @@ const adapter: PartnerContentServiceInterface =
   API_MODE === 'http' ? partnerHttpAdapter : partnerMockAdapter
 
 export const getPartnerJobs      = ()              => adapter.getPartnerJobs()
+export const getPartnerJobQualitySummary = () => adapter.getPartnerJobQualitySummary()
 export const unpublishPartnerJob = (id: string)    => adapter.unpublishPartnerJob(id)
 export const updatePartnerJob    = (id: string, input: UpdatePartnerJobInput) =>
   adapter.updatePartnerJob(id, input)

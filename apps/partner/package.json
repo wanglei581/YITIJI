@@ -9,6 +9,7 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
     "verify:partner-refresh-safe": "node scripts/verify-partner-refresh-safe.mjs",
+    "verify:job-quality-dashboard-ui": "node scripts/verify-job-quality-dashboard-ui.mjs",
     "preview": "vite preview --port 5175"
   },
   "dependencies": {

@@ -3,6 +3,7 @@ import { authHeader, redirectToLogin } from '../auth'
 import type {
   PartnerDataSource,
   PartnerJobRecord,
+  PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
   ImportJobItem,
@@ -126,6 +127,8 @@ export const partnerHttpAdapter = {
   // Jobs
   getPartnerJobs: () =>
     get<PartnerJobRecord[]>('/partner/jobs'),
+  getPartnerJobQualitySummary: () =>
+    get<PartnerJobQualitySummary[]>('/partner/jobs/quality-summary'),
   unpublishPartnerJob: (id: string) =>
     patch<PartnerJobRecord>(`/partner/jobs/${id}/publish`, { action: 'unpublish' }),
   // 阶段1C:编辑本机构岗位(后端强制回 pending+draft 重审)

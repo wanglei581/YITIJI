@@ -21,17 +21,23 @@ import {
   MessageSquareIcon,
   XCircleIcon,
   ShieldCheckIcon,
+  AlertTriangleIcon,
+  BriefcaseBusinessIcon,
 } from 'lucide-react'
-import { getAiUsage, getAiLogs } from '../../services/api'
-import type { AdminAiUsage, AdminAiLogEntry, AiOperation, AiLogStatus } from '../../services/api'
+import { getAiUsage, getAiLogs, getAdminJobQualitySummary } from '../../services/api'
+import type { AdminAiUsage, AdminAiLogEntry, AiOperation, AiLogStatus, JobSourceQualitySummary } from '../../services/api'
 
 // ─── 常量映射 ─────────────────────────────────────────────────
 
 const OPERATION_LABELS: Record<AiOperation, string> = {
   parseResume:    '简历解析',
   optimizeResume: '简历优化',
+  generateResume: 'AI 简历生成',
   chatAssistant:  'AI 对话',
   classifyIntent: '意图分类',
+  jobRecommend:   '岗位 AI 推荐',
+  jobExplain:     'AI 岗位解读',
+  jobMatch:       '岗位匹配参考',
 }
 
 const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: string }> = {
@@ -44,13 +50,27 @@ const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: strin
 type OpFilter     = 'all' | AiOperation
 type StatusFilter = 'all' | AiLogStatus
 
-const OP_FILTERS: OpFilter[] = ['all', 'parseResume', 'optimizeResume', 'chatAssistant']
+const OP_FILTERS: OpFilter[] = [
+  'all',
+  'parseResume',
+  'optimizeResume',
+  'generateResume',
+  'chatAssistant',
+  'classifyIntent',
+  'jobRecommend',
+  'jobExplain',
+  'jobMatch',
+]
 const OP_FILTER_LABELS: Record<OpFilter, string> = {
   all:            '全部',
   parseResume:    '简历解析',
   optimizeResume: '简历优化',
+  generateResume: 'AI 简历生成',
   chatAssistant:  'AI 对话',
   classifyIntent: '意图分类',
+  jobRecommend:   '岗位推荐',
+  jobExplain:     '岗位解读',
+  jobMatch:       '匹配参考',
 }
 const STATUS_FILTERS: StatusFilter[] = ['all', 'success', 'failed']
 const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
@@ -89,6 +109,7 @@ function MetricCard({ label, value, note, icon: Icon, iconClass = 'text-primary-
 export default function AiServicesPage() {
   const [usage,        setUsage]        = useState<AdminAiUsage | null>(null)
   const [logs,         setLogs]         = useState<AdminAiLogEntry[]>([])
+  const [qualitySummary, setQualitySummary] = useState<JobSourceQualitySummary[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState<string | null>(null)
   const [opFilter,     setOpFilter]     = useState<OpFilter>('all')
@@ -98,13 +119,15 @@ export default function AiServicesPage() {
     let cancelled = false
     void (async () => {
       try {
-        const [usageData, logsData] = await Promise.all([
+        const [usageData, logsData, qualityData] = await Promise.all([
           getAiUsage(),
           getAiLogs(100),
+          getAdminJobQualitySummary(),
         ])
         if (cancelled) return
         setUsage(usageData)
         setLogs(logsData.entries)
+        setQualitySummary(qualityData)
       } catch {
         if (!cancelled) setError('AI 服务数据加载失败，请刷新重试')
       } finally {
@@ -133,8 +156,24 @@ export default function AiServicesPage() {
   const successRate    = usage.successRate
   const estimatedCost  = `¥${usage.estimatedCostCny.toFixed(2)}`
   const costNote       = usage.estimatedCostCny === 0
-    ? `${usage.providerName} 无真实 token 消耗`
+    ? `${usage.providerName} 暂无已记录 token 成本`
     : '基于 token 用量估算'
+  const jobAiCalls = usage.byOperation.jobRecommend + usage.byOperation.jobExplain + usage.byOperation.jobMatch
+  const jobAiCost = usage.costByOperation.jobRecommend + usage.costByOperation.jobExplain + usage.costByOperation.jobMatch
+  const qualityTotals = qualitySummary.reduce(
+    (acc, item) => ({
+      totalJobs: acc.totalJobs + item.totalJobs,
+      readyJobs: acc.readyJobs + item.readyJobs,
+      partialJobs: acc.partialJobs + item.partialJobs,
+      insufficientJobs: acc.insufficientJobs + item.insufficientJobs,
+      staleJobs: acc.staleJobs + item.staleJobs,
+      brokenSourceUrlJobs: acc.brokenSourceUrlJobs + item.brokenSourceUrlJobs,
+    }),
+    { totalJobs: 0, readyJobs: 0, partialJobs: 0, insufficientJobs: 0, staleJobs: 0, brokenSourceUrlJobs: 0 },
+  )
+  const readyRate = qualityTotals.totalJobs > 0
+    ? Math.round((qualityTotals.readyJobs / qualityTotals.totalJobs) * 1000) / 10
+    : 0
 
   const visibleLogs = logs.filter((l) => {
     if (opFilter !== 'all'     && l.operation !== opFilter)  return false
@@ -144,6 +183,41 @@ export default function AiServicesPage() {
 
   return (
     <Page title="AI 服务管理" subtitle="调用统计 · 元数据日志 · Provider 状态">
+
+      {/* ── 成本告警 ─────────────────────────────────── */}
+      <section aria-label="成本告警" className="mb-6">
+        {usage.alerts.length > 0 ? (
+          <div className="space-y-3">
+            {usage.alerts.map((alert) => (
+              <Card
+                key={alert.code}
+                className={[
+                  'flex items-start gap-3 border p-4',
+                  alert.level === 'critical' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50',
+                ].join(' ')}
+              >
+                <AlertTriangleIcon
+                  className={['mt-0.5 h-5 w-5 shrink-0', alert.level === 'critical' ? 'text-red-500' : 'text-amber-500'].join(' ')}
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className={['text-sm font-semibold', alert.level === 'critical' ? 'text-red-700' : 'text-amber-700'].join(' ')}>
+                    {alert.title}
+                  </p>
+                  <p className={['mt-1 text-sm', alert.level === 'critical' ? 'text-red-600' : 'text-amber-600'].join(' ')}>
+                    {alert.detail}
+                  </p>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="flex items-center gap-3 border-emerald-100 bg-emerald-50 p-4">
+            <ShieldCheckIcon className="h-5 w-5 text-emerald-500" aria-hidden="true" />
+            <p className="text-sm text-emerald-700">成本告警：近 24 小时暂无 AI 成本或失败率异常。</p>
+          </Card>
+        )}
+      </section>
 
       {/* ── 今日概览指标 ─────────────────────────────── */}
       <section aria-label="今日 AI 服务概览">
@@ -205,6 +279,82 @@ export default function AiServicesPage() {
             note="chatAssistant 调用次数"
             icon={MessageSquareIcon}
             iconClass="text-teal-600 bg-teal-50"
+          />
+          <MetricCard
+            label="真实 token 用量"
+            value={usage.tokenUsageTotals.totalTokens.toLocaleString()}
+            note={`${usage.tokenUsageTotals.promptTokens.toLocaleString()} 输入 / ${usage.tokenUsageTotals.completionTokens.toLocaleString()} 输出`}
+            icon={ServerIcon}
+            iconClass="text-indigo-600 bg-indigo-50"
+          />
+        </div>
+      </section>
+
+      {/* ── 岗位 AI 运营 ─────────────────────────────── */}
+      <section aria-label="岗位 AI 运营" className="mt-8">
+        <h2 className="mb-3 text-sm font-medium text-gray-500">岗位 AI 运营</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MetricCard
+            label="岗位 AI 调用"
+            value={jobAiCalls}
+            note="推荐 / 解读 / 匹配参考"
+            icon={BriefcaseBusinessIcon}
+            iconClass="text-sky-600 bg-sky-50"
+          />
+          <MetricCard
+            label="岗位推荐"
+            value={usage.byOperation.jobRecommend}
+            note={`成本 ¥${usage.costByOperation.jobRecommend.toFixed(4)}`}
+            icon={SparklesIcon}
+            iconClass="text-violet-600 bg-violet-50"
+          />
+          <MetricCard
+            label="岗位解读"
+            value={usage.byOperation.jobExplain}
+            note={`成本 ¥${usage.costByOperation.jobExplain.toFixed(4)}`}
+            icon={ScanTextIcon}
+            iconClass="text-blue-600 bg-blue-50"
+          />
+          <MetricCard
+            label="匹配参考"
+            value={usage.byOperation.jobMatch}
+            note={`岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}`}
+            icon={CheckCircleIcon}
+            iconClass="text-emerald-600 bg-emerald-50"
+          />
+        </div>
+      </section>
+
+      {/* ── 岗位来源质量 ─────────────────────────────── */}
+      <section aria-label="岗位来源质量" className="mt-8">
+        <h2 className="mb-3 text-sm font-medium text-gray-500">岗位来源质量</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MetricCard
+            label="来源岗位总量"
+            value={qualityTotals.totalJobs}
+            note={`${qualitySummary.length} 个来源分组`}
+            icon={BriefcaseBusinessIcon}
+          />
+          <MetricCard
+            label="AI 可读就绪率"
+            value={`${readyRate}%`}
+            note={`${qualityTotals.readyJobs} 条 ready`}
+            icon={CheckCircleIcon}
+            iconClass={readyRate >= 90 ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}
+          />
+          <MetricCard
+            label="字段缺失"
+            value={qualityTotals.partialJobs + qualityTotals.insufficientJobs}
+            note="partial / insufficient"
+            icon={AlertTriangleIcon}
+            iconClass="text-amber-600 bg-amber-50"
+          />
+          <MetricCard
+            label="来源链接异常"
+            value={qualityTotals.brokenSourceUrlJobs}
+            note={`${qualityTotals.staleJobs} 条过期或同步陈旧`}
+            icon={XCircleIcon}
+            iconClass="text-red-600 bg-red-50"
           />
         </div>
       </section>

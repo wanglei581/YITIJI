@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
+import { mergeById, replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
@@ -10,7 +10,8 @@ import type {
   PublishStatus,
   UpdatePartnerJobInput,
 } from '../../services/api'
-import { getPartnerJobs, importPartnerJobs, unpublishPartnerJob, updatePartnerJob } from '../../services/api'
+import { getPartnerJobQualitySummary, getPartnerJobs, importPartnerJobs, unpublishPartnerJob, updatePartnerJob } from '../../services/api'
+import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ const REVIEW_FILTERS   = ['全部', '待审核', '审核中', '已通过', '已�
 const CATEGORY_FILTER_MAP: Record<string, JobCategory | null>  = { 全部: null, 全职: 'fulltime', 实习: 'intern', 校招: 'campus', 兼职: 'parttime' }
 const REVIEW_FILTER_MAP:   Record<string, ReviewStatus | null> = { 全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected' }
 const PARTNER_JOBS_REFRESH_KEY = 'partner:jobs'
+const PARTNER_JOB_QUALITY_REFRESH_KEY = 'partner:jobs:quality'
 
 /** DB category('fulltime' 等)→ 编辑表单 workType('full_time' 等)。 */
 const CATEGORY_TO_WORKTYPE: Record<JobCategory, 'full_time' | 'part_time' | 'internship'> = {
@@ -113,8 +115,17 @@ export default function JobsPage() {
       failPolicy: 'keep-last',
     },
   )
+  const { data: qualitySummary = [] } = useRefreshable(
+    PARTNER_JOB_QUALITY_REFRESH_KEY,
+    getPartnerJobQualitySummary,
+    {
+      intervalMs: 60_000,
+      merge: replaceIfChanged,
+      failPolicy: 'keep-last',
+    },
+  )
 
-  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_JOBS_REFRESH_KEY], 'hard')
+  useInteractionLock(editing !== null || saving || busyId !== null, [PARTNER_JOBS_REFRESH_KEY, PARTNER_JOB_QUALITY_REFRESH_KEY], 'hard')
 
   useEffect(() => {
     if (!notice) return
@@ -246,6 +257,8 @@ export default function JobsPage() {
           {notice}
         </div>
       )}
+
+      <JobQualitySummaryPanel qualitySummary={qualitySummary} />
 
       {/* 双行筛选 */}
       <div className="mb-4 space-y-2">

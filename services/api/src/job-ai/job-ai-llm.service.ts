@@ -2,7 +2,10 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
 import type {
   JobAiExplanationPayload,
+  JobAiExplanationLlmResult,
   JobAiRecommendationPayload,
+  JobAiRecommendationLlmResult,
+  JobAiTokenUsage,
   TargetJobContext,
 } from './job-ai.types'
 
@@ -34,7 +37,7 @@ export class JobAiLlmService {
 
   constructor(private readonly config: LlmConfigService) {}
 
-  async recommend(resumePlainText: string, jobs: TargetJobContext[]): Promise<JobAiRecommendationPayload[]> {
+  async recommend(resumePlainText: string, jobs: TargetJobContext[]): Promise<JobAiRecommendationLlmResult> {
     const system =
       '你是求职者本人的岗位筛选助手。只基于简历原文和真实已发布岗位信息，输出岗位推荐参考。' +
       '输出仅供求职者本人参考，不代表录用结果，不做企业候选人筛选。' +
@@ -54,7 +57,7 @@ export class JobAiLlmService {
     ].join('\n')).join('\n\n')
     const user = `【简历原文】\n${resumePlainText.slice(0, 6000)}\n\n【候选岗位】\n${jobLines}`
     const raw = await this.callLlm(system, user, 'jobRecommend')
-    const parsed = parseJson(raw)
+    const parsed = parseJson(raw.text)
     if (!Array.isArray(parsed)) throw unavailable('AI_JOB_RECOMMEND_FAILED', '岗位推荐生成失败，请稍后重试')
     const allowed = new Set(jobs.map((job) => job.jobId))
     const payload = parsed
@@ -62,10 +65,10 @@ export class JobAiLlmService {
       .filter((item): item is JobAiRecommendationPayload => item !== null)
       .slice(0, jobs.length)
     if (payload.length === 0) throw unavailable('AI_JOB_RECOMMEND_FAILED', '岗位推荐生成失败，请稍后重试')
-    return payload
+    return { items: payload, provider: raw.provider, tokenUsage: raw.tokenUsage }
   }
 
-  async explain(job: TargetJobContext): Promise<JobAiExplanationPayload> {
+  async explain(job: TargetJobContext): Promise<JobAiExplanationLlmResult> {
     const system =
       '你是求职者本人的岗位解读助手。只解读真实岗位信息，帮助求职者理解职责、硬性要求、加分项和准备事项。' +
       '输出仅供参考；禁止出现百分比、录用概率、通过率、保面试、保录用、一键投递、立即投递、平台投递。' +
@@ -81,10 +84,10 @@ export class JobAiLlmService {
       `技能=${job.skills.join('、') || '来源平台未提供'}`,
     ].join('\n')
     const raw = await this.callLlm(system, user, 'jobExplain')
-    const parsed = parseJson(raw)
+    const parsed = parseJson(raw.text)
     const payload = this.sanitizeExplanation(parsed)
     if (!payload) throw unavailable('AI_JOB_EXPLAIN_FAILED', '岗位解读生成失败，请稍后重试')
-    return payload
+    return { payload, provider: raw.provider, tokenUsage: raw.tokenUsage }
   }
 
   sanitize(text: string): string {
@@ -131,7 +134,11 @@ export class JobAiLlmService {
     return this.findUnsafeOutputReason(JSON.stringify(candidate)) ? null : candidate
   }
 
-  private async callLlm(system: string, user: string, operation: 'jobRecommend' | 'jobExplain'): Promise<string> {
+  private async callLlm(system: string, user: string, operation: 'jobRecommend' | 'jobExplain'): Promise<{
+    text: string
+    provider: string
+    tokenUsage?: JobAiTokenUsage
+  }> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
@@ -159,10 +166,24 @@ export class JobAiLlmService {
         this.logger.warn(`${operation}.upstream_non_2xx status=${res.status}`)
         throw unavailable('AI_UNAVAILABLE', `AI 模型返回错误 (${res.status})`)
       }
-      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>
+        usage?: {
+          prompt_tokens?: number
+          completion_tokens?: number
+          total_tokens?: number
+          promptTokens?: number
+          completionTokens?: number
+          totalTokens?: number
+        }
+      }
       const reply = data.choices?.[0]?.message?.content?.trim()
       if (!reply) throw unavailable('AI_UNAVAILABLE', 'AI 模型未返回内容')
-      return reply
+      return {
+        text: reply,
+        provider: `llm:${cfg.vendor}:${cfg.model}`,
+        tokenUsage: normalizeTokenUsage(data.usage),
+      }
     } catch (error) {
       if (error instanceof ServiceUnavailableException) throw error
       if (error instanceof Error && error.name === 'AbortError') {
@@ -179,6 +200,27 @@ export class JobAiLlmService {
 
 function unavailable(code: string, message: string): ServiceUnavailableException {
   return new ServiceUnavailableException({ error: { code, message } })
+}
+
+function normalizeTokenUsage(usage: {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  promptTokens?: number
+  completionTokens?: number
+  totalTokens?: number
+} | undefined): JobAiTokenUsage | undefined {
+  if (!usage) return undefined
+  const promptTokens = toNonNegativeInt(usage.prompt_tokens ?? usage.promptTokens)
+  const completionTokens = toNonNegativeInt(usage.completion_tokens ?? usage.completionTokens)
+  const totalTokens = toNonNegativeInt(usage.total_tokens ?? usage.totalTokens) || promptTokens + completionTokens
+  if (totalTokens <= 0) return undefined
+  return { promptTokens, completionTokens, totalTokens }
+}
+
+function toNonNegativeInt(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
 }
 
 function parseJson(raw: string): unknown {

@@ -1,4 +1,5 @@
 import type {
+  JobSourceQualitySummaryDTO,
   ReviewStatus,
   PublishStatus,
   JobFairStatus,
@@ -38,6 +39,7 @@ export type {
 }
 
 export type PartnerSmartCampusTerminal = SmartCampusTerminalView
+export type PartnerJobQualitySummary = JobSourceQualitySummaryDTO
 
 export interface SaveSmartCampusConfigPayload {
   enabled: boolean

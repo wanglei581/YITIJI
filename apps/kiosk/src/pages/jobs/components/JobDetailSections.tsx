@@ -203,13 +203,15 @@ export function JobNextActionsSection({
   sourceCanApply,
   onOpenQr,
   onViewCompany,
-  onGoFit,
+  onExplainAi,
+  onMatchAi,
 }: {
   job: ExternalJobDTO
   sourceCanApply: boolean
   onOpenQr: () => void
   onViewCompany: () => void
-  onGoFit: () => void
+  onExplainAi: () => void
+  onMatchAi: () => void
 }) {
   return (
     <Card className="p-5">
@@ -217,9 +219,10 @@ export function JobNextActionsSection({
         <ArrowRightIcon className="h-4 w-4 text-primary-600" />
         <p className="text-sm font-semibold text-gray-800">后续动作</p>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ActionButton icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
+        <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onMatchAi} />
         <ActionButton icon={QrCodeIcon} label="扫码投递" hint="手机打开来源平台" disabled={!sourceCanApply} onClick={onOpenQr} />
-        <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onGoFit} />
         <ActionButton icon={BuildingIcon} label="查看企业" hint={job.companyProfileId ? job.company : '来源企业未关联'} disabled={!job.companyProfileId} onClick={onViewCompany} />
       </div>
     </Card>

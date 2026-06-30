@@ -2,6 +2,7 @@ import type {
   PartnerDataSource,
   CreateDataSourcePayload,
   PartnerJobRecord,
+  PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
   ImportJobItem,
@@ -152,6 +153,24 @@ export const partnerMockAdapter = {
   async getPartnerJobs(): Promise<PartnerJobRecord[]> {
     await delay()
     return [...PARTNER_JOBS]
+  },
+  async getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]> {
+    await delay()
+    const totalJobs = PARTNER_JOBS.length
+    const readyJobs = PARTNER_JOBS.filter((job) => job.description && job.requirements && job.sourceUrl).length
+    const insufficientJobs = PARTNER_JOBS.filter((job) => !job.sourceUrl).length
+    const partialJobs = Math.max(0, totalJobs - readyJobs - insufficientJobs)
+    return [{
+      sourceOrgId: 'mock-org',
+      sourceId: null,
+      totalJobs,
+      readyJobs,
+      partialJobs,
+      insufficientJobs,
+      staleJobs: 0,
+      brokenSourceUrlJobs: 0,
+      lastCheckedAt: new Date().toISOString(),
+    }]
   },
   async unpublishPartnerJob(id: string): Promise<PartnerJobRecord> {
     await delay()

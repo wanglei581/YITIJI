@@ -284,16 +284,16 @@ export class AiController {
   @Get('admin/ai/usage')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getAiUsage(): AdminAiUsage {
-    return this.logService.getUsage(this.aiService.getProviderName())
+  async getAiUsage(): Promise<AdminAiUsage> {
+    return await this.logService.getUsage(this.aiService.getProviderName())
   }
 
   @Get('admin/ai/logs')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  getAiLogs(@Query('limit') limitStr?: string): AdminAiLogsResult {
+  async getAiLogs(@Query('limit') limitStr?: string): Promise<AdminAiLogsResult> {
     const limit = limitStr !== undefined ? Number(limitStr) : 100
     const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 500) : 100
-    return this.logService.getLogs(safeLimit)
+    return await this.logService.getLogs(safeLimit)
   }
 }

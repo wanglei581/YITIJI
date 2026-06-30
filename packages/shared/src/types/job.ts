@@ -301,6 +301,18 @@ export interface JobDataQualitySnapshotDTO {
   lastError?: string | null
 }
 
+export interface JobSourceQualitySummaryDTO {
+  sourceOrgId: string
+  sourceId: string | null
+  totalJobs: number
+  readyJobs: number
+  partialJobs: number
+  insufficientJobs: number
+  staleJobs: number
+  brokenSourceUrlJobs: number
+  lastCheckedAt: string | null
+}
+
 /**
  * 岗位展示 DTO（/api/v1/jobs 接口响应类型）。
  * 继承 ExternalJob，新增展示友好字段。

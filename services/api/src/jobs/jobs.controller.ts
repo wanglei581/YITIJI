@@ -56,6 +56,7 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { ImportFairsDto } from './dto/import-fairs.dto'
 import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 import { CreateDataSourceDto } from './dto/data-source.dto'
+import { JobQualityService } from '../job-ai/job-quality.service'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -88,6 +89,7 @@ export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
     private readonly adminFairs: AdminFairsService,
+    private readonly jobQuality: JobQualityService,
   ) {}
 
   // ── Kiosk ───────────────────────────────────────────────────────────────────
@@ -223,6 +225,13 @@ export class JobsController {
     return this.jobsService.getAllJobSources()
   }
 
+  @Get('admin/jobs/quality-summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  getAdminJobQualitySummary() {
+    return this.jobQuality.getSourceQualitySummary()
+  }
+
   @Patch('admin/job-sources/:id/review')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -308,6 +317,14 @@ export class JobsController {
   @Roles('partner')
   getPartnerJobs(@CurrentUser() user: AuthedUser) {
     return this.jobsService.getPartnerJobs(user)
+  }
+
+  @Get('partner/jobs/quality-summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerJobQualitySummary(@CurrentUser() user: AuthedUser) {
+    if (!user.orgId) throw new BadRequestException({ error: { code: 'ORG_REQUIRED', message: '合作机构账号未绑定机构' } })
+    return this.jobQuality.getSourceQualitySummary({ sourceOrgId: user.orgId })
   }
 
   /**

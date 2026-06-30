@@ -13,6 +13,7 @@ import { JobAiQuotaService } from './job-ai-quota.service'
 import type { JobAiQuotaContext, JobAiQuotaTicket } from './job-ai-quota.service'
 import type {
   JobAiOperation,
+  JobAiTokenUsage,
   JobAiRequester,
   JobAiSessionDTO,
   JobAiSessionListItem,
@@ -67,7 +68,8 @@ export class JobAiService {
       }
 
       quotaTicket = await this.consumeJobAiQuota('recommend', parse.endUserId, input.terminalId ?? null, quotaContext)
-      const payload = await this.llm.recommend(resumeText, candidates)
+      const llmResult = await this.llm.recommend(resumeText, candidates)
+      const payload = llmResult.items
       const byJob = new Map(payload.map((item) => [item.jobId, item]))
       const rows = candidates
         .filter((job) => byJob.has(job.jobId))
@@ -85,8 +87,8 @@ export class JobAiService {
           }
         })
       if (rows.length > 0) await this.prisma.jobAiRecommendation.createMany({ data: rows })
-      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: 'llm' } })
-      this.recordAiServiceLog(session.id, 'jobRecommend', 'success', startedAt, parse.endUserId, input.terminalId ?? null)
+      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: llmResult.provider } })
+      this.recordAiServiceLog(session.id, 'jobRecommend', 'success', startedAt, parse.endUserId, input.terminalId ?? null, undefined, llmResult.tokenUsage, llmResult.provider)
       const contextById = new Map(candidates.map((job) => [job.jobId, job]))
       return {
         session: this.sessionDto(updated),
@@ -109,6 +111,7 @@ export class JobAiService {
   ) {
     const startedAt = Date.now()
     this.assertMemberAiRequester(requester.endUserId)
+    await this.privacy.requireActiveConsent(requester.endUserId, 'job_ai')
     const job = await this.context.buildTargetJobContext(jobId)
     const session = await this.createSession({
       operation: 'explain',
@@ -122,13 +125,13 @@ export class JobAiService {
     let quotaTicket: JobAiQuotaTicket | null = null
     try {
       quotaTicket = await this.consumeJobAiQuota('explain', requester.endUserId, terminalId, quotaContext)
-      const payload = await this.llm.explain(job)
-      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: 'llm' } })
-      this.recordAiServiceLog(session.id, 'jobExplain', 'success', startedAt, requester.endUserId, terminalId)
+      const llmResult = await this.llm.explain(job)
+      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: llmResult.provider } })
+      this.recordAiServiceLog(session.id, 'jobExplain', 'success', startedAt, requester.endUserId, terminalId, undefined, llmResult.tokenUsage, llmResult.provider)
       return {
         session: this.sessionDto(updated),
         job,
-        ...payload,
+        ...llmResult.payload,
         dataQualityWarning: this.dataQualityWarning(job),
         disclaimer: '仅供参考' as const,
       }
@@ -163,7 +166,8 @@ export class JobAiService {
     let quotaTicket: JobAiQuotaTicket | null = null
     try {
       quotaTicket = await this.consumeJobAiQuota('match', parse.endUserId, terminalId, quotaContext)
-      const result = await this.jobFit.analyze({ taskId: resumeTaskId, jobId }, requester)
+      const fitResult = await this.jobFit.analyzeWithUsage({ taskId: resumeTaskId, jobId }, requester)
+      const result = fitResult.response
       if (result.status !== 'completed') {
         const updated = await this.prisma.jobAiSession.update({
           where: { id: session.id },
@@ -191,8 +195,8 @@ export class JobAiService {
           actionChecklistJson: JSON.stringify(Array.isArray(result.targetedSuggestions) ? result.targetedSuggestions.slice(0, 5) : []),
         },
       })
-      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: 'llm' } })
-      this.recordAiServiceLog(session.id, 'jobMatch', 'success', startedAt, parse.endUserId, terminalId)
+      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: fitResult.provider } })
+      this.recordAiServiceLog(session.id, 'jobMatch', 'success', startedAt, parse.endUserId, terminalId, undefined, fitResult.tokenUsage, fitResult.provider)
       return {
         session: this.sessionDto(updated),
         job,
@@ -211,7 +215,6 @@ export class JobAiService {
     const where = {
       endUserId,
       expiresAt: { gt: new Date() },
-      recommendations: { some: { job: { is: PUBLISHED_JOB_WHERE } } },
     }
     const total = await this.prisma.jobAiSession.count({ where })
     const rows = await this.prisma.jobAiSession.findMany({
@@ -227,9 +230,31 @@ export class JobAiService {
       },
       ...memberPageArgs(page),
     })
+    const jobIds = Array.from(new Set(rows.map((row) => jobIdFromIntentJson(row.intentJson)).filter((id): id is string => Boolean(id))))
+    const jobs = jobIds.length > 0
+      ? await this.prisma.job.findMany({
+        where: { id: { in: jobIds }, ...PUBLISHED_JOB_WHERE },
+        select: {
+          id: true,
+          title: true,
+          company: true,
+          sourceName: true,
+          sourceUrl: true,
+          externalId: true,
+          description: true,
+          requirements: true,
+          skillsJson: true,
+          city: true,
+          category: true,
+        },
+      })
+      : []
+    const jobById = new Map(jobs.map((job) => [job.id, rowToTargetJobContext(job)]))
     return buildMemberPage(rows, page, total, (row): JobAiSessionListItem => ({
       session: this.sessionDto(row),
-      job: row.recommendations[0]?.job ? rowToTargetJobContext(row.recommendations[0].job) : undefined,
+      job: row.recommendations[0]?.job
+        ? rowToTargetJobContext(row.recommendations[0].job)
+        : jobById.get(jobIdFromIntentJson(row.intentJson) ?? ''),
       recommendationCount: row._count.recommendations,
     }))
   }
@@ -389,16 +414,17 @@ export class JobAiService {
     endUserId: string | null,
     terminalId: string | null,
     errorCode?: string,
+    tokenUsage?: JobAiTokenUsage,
+    provider = 'llm',
   ): void {
     this.aiLog.record({
       taskId,
       operation,
-      provider: 'llm',
+      provider,
       status,
       latencyMs: Math.max(0, Date.now() - startedAt),
       errorCode,
-      tokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-      estimatedCostCny: 0,
+      tokenUsage,
       terminalId,
       endUserId,
     })
@@ -512,6 +538,16 @@ function safeJsonList(value: string | null | undefined): string[] {
       : []
   } catch {
     return []
+  }
+}
+
+function jobIdFromIntentJson(value: string | null | undefined): string | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as { jobId?: unknown }
+    return typeof parsed.jobId === 'string' && parsed.jobId.trim() ? parsed.jobId.trim() : null
+  } catch {
+    return null
   }
 }
 

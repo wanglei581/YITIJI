@@ -1,26 +1,35 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJobDTO } from '@ai-job-print/shared'
+import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
 import { getJobs } from '../../services/api'
-import { useFavorites } from '../../favorites/useFavorites'
 import {
-  JobBusinessNote,
-  JobOverviewPanel,
+  getJobAiConsentStatus,
+  getJobAiRecommendations,
+  grantJobAiConsent,
+} from '../../services/api/jobAi'
+import { ApiHttpError } from '../../services/api/httpAdapter'
+import { useAuth } from '../../auth/useAuth'
+import { useFavorites } from '../../favorites/useFavorites'
+import { JobAiConsentModal } from './components/JobAiConsentModal'
+import { JobAiEntryPanel } from './components/JobAiEntryPanel'
+import { JobAiResultPanel } from './components/JobAiResultPanel'
+import { ResumeSelectModal } from './components/ResumeSelectModal'
+import {
   SourceInstitutionPanel,
   TopTagsPanel,
   CompanyGuideEntry,
-  DataReadinessPanel,
 } from './components/JobListInsights'
 import { JobFilterAssistant } from './components/JobFilterAssistant'
 import { JobResultsSection } from './components/JobResultsSection'
-import { buildJobInsights, buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
+import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
 export function JobsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { getToken } = useAuth()
   const { idsOf, toggle: toggleFavorite } = useFavorites()
   const favoriteSet = idsOf('job')
 
@@ -41,6 +50,20 @@ export function JobsPage() {
   })
   const [sourceOrgId, setSourceOrgId] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [showConsent, setShowConsent] = useState(false)
+  const [showResumeSelect, setShowResumeSelect] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiRecommendations, setAiRecommendations] = useState<JobAiRecommendationDTO[] | null>(null)
+  const mountedRef = useRef(false)
+  const aiInFlightRef = useRef(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     const value = searchParams.get('category')
@@ -111,7 +134,6 @@ export function JobsPage() {
   const industryOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.industry)), [facetJobs])
   const sourceCards = useMemo(() => buildSourceCards(facetJobs), [facetJobs])
   const topTags = useMemo(() => buildTopTags(facetJobs), [facetJobs])
-  const insights = useMemo(() => buildJobInsights(facetJobs), [facetJobs])
 
   const displayedJobs = useMemo(
     () => (favoritesOnly ? listJobs.filter((job) => favoriteSet.has(job.id)) : listJobs),
@@ -120,6 +142,7 @@ export function JobsPage() {
 
   const activeSourceName = sourceCards.find((source) => source.orgId === sourceOrgId)?.name
   const hasAnyFilter = hasServerFilter || favoritesOnly
+  const aiRecommendationMode = aiRecommendations !== null
 
   function resetAll() {
     setKeyword('')
@@ -139,8 +162,112 @@ export function JobsPage() {
     setKeyword(tag)
   }
 
+  function requireToken(): string | null {
+    const token = getToken()
+    if (!token) {
+      navigate('/login', { state: { from: '/jobs' } })
+      return null
+    }
+    return token
+  }
+
+  async function startAiRecommend() {
+    if (aiInFlightRef.current || aiLoading) return
+    const token = requireToken()
+    if (!token) return
+    aiInFlightRef.current = true
+    setAiError(null)
+    try {
+      const rows = await getJobAiConsentStatus(token)
+      if (!mountedRef.current) return
+      if (rows.some((row) => row.scope === 'job_ai' && row.granted)) setShowResumeSelect(true)
+      else setShowConsent(true)
+    } catch (err) {
+      if (!mountedRef.current) return
+      setAiError(formatJobAiError(err))
+    } finally {
+      aiInFlightRef.current = false
+    }
+  }
+
+  async function confirmConsent() {
+    if (aiInFlightRef.current || aiLoading) return
+    const token = requireToken()
+    if (!token) return
+    aiInFlightRef.current = true
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      await grantJobAiConsent(token)
+      if (!mountedRef.current) return
+      setShowConsent(false)
+      setShowResumeSelect(true)
+    } catch (err) {
+      if (!mountedRef.current) return
+      setAiError(formatJobAiError(err))
+    } finally {
+      aiInFlightRef.current = false
+      if (mountedRef.current) setAiLoading(false)
+    }
+  }
+
+  async function runAiRecommend(resume: MemberResumeItem) {
+    if (aiInFlightRef.current || aiLoading) return
+    const token = requireToken()
+    if (!token) return
+    aiInFlightRef.current = true
+    setShowResumeSelect(false)
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await getJobAiRecommendations(token, {
+        resumeTaskId: resume.taskId,
+        intent: {
+          targetTitle: debouncedKeyword || undefined,
+          city: city || undefined,
+          industry: industry || undefined,
+          keywords: topTags.slice(0, 4).map((tag) => tag.label),
+        },
+        filters: {
+          city: city || undefined,
+          category: category || undefined,
+          sourceOrgId: sourceOrgId || undefined,
+        },
+        limit: 6,
+      })
+      if (!mountedRef.current) return
+      setAiRecommendations(res.recommendations)
+    } catch (err) {
+      if (!mountedRef.current) return
+      if (err instanceof ApiHttpError && err.code === 'USER_AI_CONSENT_REQUIRED') setShowConsent(true)
+      setAiError(formatJobAiError(err))
+    } finally {
+      aiInFlightRef.current = false
+      if (mountedRef.current) setAiLoading(false)
+    }
+  }
+
+  function clearAiRecommendations() {
+    setAiRecommendations(null)
+    setAiError(null)
+  }
+
   return (
     <div className="flex h-full flex-col">
+      <JobAiConsentModal
+        open={showConsent}
+        loading={aiLoading}
+        error={showConsent ? aiError : null}
+        onConfirm={() => void confirmConsent()}
+        onCancel={() => setShowConsent(false)}
+      />
+      <ResumeSelectModal
+        open={showResumeSelect}
+        token={getToken()}
+        onClose={() => setShowResumeSelect(false)}
+        onSelect={(resume) => void runAiRecommend(resume)}
+        onUpload={() => navigate('/resume/source?intent=diagnose')}
+      />
       <div className="px-6 pt-6">
         <PageHeader
           title="岗位信息"
@@ -163,7 +290,27 @@ export function JobsPage() {
           <ErrorState message={error} onRetry={() => setRetryKey((key) => key + 1)} className="flex-1" />
         ) : (
           <>
-            <JobOverviewPanel insights={insights} displayedCount={displayedJobs.length} />
+            <JobAiEntryPanel
+              title="AI岗位推荐"
+              clearLabel="退出 AI 推荐"
+              loading={aiLoading}
+              hasResult={Boolean(aiRecommendations || aiError)}
+              onStart={() => void startAiRecommend()}
+              onClear={clearAiRecommendations}
+            />
+
+            {(aiLoading || aiError || aiRecommendations) && (
+              <JobAiResultPanel
+                title="AI岗位推荐"
+                loading={aiLoading}
+                error={aiError}
+                recommendations={aiRecommendations ?? undefined}
+                clearLabel="退出 AI 推荐"
+                onRetry={() => void startAiRecommend()}
+                onClear={clearAiRecommendations}
+                onOpenRecommendation={(jobId) => navigate(`/jobs/${jobId}`)}
+              />
+            )}
 
             <JobFilterAssistant
               keyword={keyword}
@@ -187,25 +334,34 @@ export function JobsPage() {
 
             {category !== 'parttime' && <CompanyGuideEntry onOpen={() => navigate('/companies')} />}
 
+            {!aiRecommendationMode && (
+              <JobResultsSection
+                jobs={displayedJobs}
+                favoritesOnly={favoritesOnly}
+                listLoading={listLoading}
+                favoriteSet={favoriteSet}
+                onToggleFavorite={(job) => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
+                onOpen={(job) => navigate(`/jobs/${job.id}`, { state: { job } })}
+              />
+            )}
+
             <SourceInstitutionPanel sources={sourceCards} activeSourceOrgId={sourceOrgId} onSelect={setSourceOrgId} />
 
             <TopTagsPanel tags={topTags} onSelect={selectTag} />
-
-            <DataReadinessPanel insights={insights} />
-
-            <JobBusinessNote />
-
-            <JobResultsSection
-              jobs={displayedJobs}
-              favoritesOnly={favoritesOnly}
-              listLoading={listLoading}
-              favoriteSet={favoriteSet}
-              onToggleFavorite={(job) => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
-              onOpen={(job) => navigate(`/jobs/${job.id}`, { state: { job } })}
-            />
           </>
         )}
       </div>
     </div>
   )
+}
+
+function formatJobAiError(err: unknown): string {
+  if (err instanceof ApiHttpError) {
+    if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
+    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
+    if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
+    if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连接真实后端服务后使用。'
+    return err.message
+  }
+  return err instanceof Error ? err.message : 'AI 辅助暂时不可用，请稍后重试。'
 }

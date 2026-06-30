@@ -201,12 +201,29 @@ export class JobQualityService {
   }
 
   async getSourceQualitySummary(args: { sourceOrgId?: string; sourceId?: string } = {}): Promise<SourceQualitySummaryItem[]> {
-    const snapshots = await this.prisma.jobDataQualitySnapshot.findMany({
+    const latestGroups = await this.prisma.jobDataQualitySnapshot.groupBy({
+      by: ['jobId'],
       where: args.sourceOrgId ? { sourceOrgId: args.sourceOrgId } : {},
-      include: { job: { select: { sourceId: true } } },
-      orderBy: { checkedAt: 'desc' },
-      take: 5_000,
+      _max: { checkedAt: true },
     })
+
+    const latestPairs = latestGroups
+      .map((group) => ({ jobId: group.jobId, checkedAt: group._max.checkedAt }))
+      .filter((pair): pair is { jobId: string; checkedAt: Date } => pair.checkedAt instanceof Date)
+    if (latestPairs.length === 0) return []
+
+    const snapshots = []
+    for (const chunk of chunkArray(latestPairs, 500)) {
+      const rows = await this.prisma.jobDataQualitySnapshot.findMany({
+        where: {
+          ...(args.sourceOrgId ? { sourceOrgId: args.sourceOrgId } : {}),
+          OR: chunk.map((pair) => ({ jobId: pair.jobId, checkedAt: pair.checkedAt })),
+        },
+        include: { job: { select: { sourceId: true } } },
+        orderBy: [{ checkedAt: 'desc' }, { id: 'desc' }],
+      })
+      snapshots.push(...rows)
+    }
 
     const latestByJob = new Map<string, typeof snapshots[number]>()
     for (const snapshot of snapshots) {
@@ -313,4 +330,12 @@ function parseJsonArray(json: string | null): string[] {
   } catch {
     return []
   }
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size))
+  }
+  return chunks
 }

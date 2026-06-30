@@ -26,6 +26,8 @@
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs",
     "verify:job-material-library-ui": "node scripts/verify-job-material-library-ui.mjs",
     "verify:job-info-ui": "node scripts/verify-job-info-ui.mjs",
+    "verify:job-ai-ui": "node scripts/verify-job-ai-ui.mjs",
+    "verify:job-ai-history-privacy-ui": "node scripts/verify-job-ai-history-privacy-ui.mjs",
     "verify:jobfair-commercial-closure": "node scripts/verify-jobfair-commercial-closure.mjs",
     "verify:jobfair-checkin": "node scripts/verify-jobfair-checkin.mjs"
   },

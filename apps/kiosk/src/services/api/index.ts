@@ -1,6 +1,7 @@
 export * from './client'
 export * from './jobFairs'
 export * from './jobs'
+export * from './jobAi'
 export * from './ai'
 export * from './files'
 export * from './uploadSessions'
