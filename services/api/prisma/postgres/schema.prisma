@@ -28,6 +28,10 @@ model Terminal {
   terminalCode      String   @unique
   agentToken        String   @unique
   deviceFingerprint String
+  displayName       String?
+  macAddress        String?  @unique
+  locationLabel     String?
+  enabled           Boolean  @default(true)
   orgId             String?
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   registeredAt      DateTime @default(now())
@@ -37,6 +41,7 @@ model Terminal {
   printTasks PrintTask[]
 
   @@index([orgId])
+  @@index([enabled])
 }
 
 // ── PrintTask ─────────────────────────────────────────────────────────────────

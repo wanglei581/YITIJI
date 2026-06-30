@@ -32,6 +32,7 @@ export type AuditAction =
   | 'smart_campus_config.update'
   | 'partner.smart_campus_config.update'
   | 'terminal.org.update'
+  | 'terminal.profile.update'
   | 'resume.parse_submitted'
   | 'resume.optimize_requested'
   | 'assistant.chat_message'

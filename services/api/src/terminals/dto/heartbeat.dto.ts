@@ -40,5 +40,9 @@ export class HeartbeatDto {
 
   @IsString()
   @IsOptional()
+  macAddress?: string
+
+  @IsString()
+  @IsOptional()
   reportedAt?: string
 }

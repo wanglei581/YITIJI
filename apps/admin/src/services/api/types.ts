@@ -19,6 +19,10 @@ export type TerminalPrinterStatus =
 export interface AdminTerminalRecord {
   id: string
   terminalCode: string
+  displayName: string | null
+  macAddress: string | null
+  locationLabel: string | null
+  enabled: boolean
   orgId: string | null            // 所属机构 id；null = 未绑定
   orgName: string | null          // 所属机构名称
   registeredAt: string            // ISO
@@ -55,6 +59,22 @@ export interface AssignTerminalOrgResult {
   oldOrgId: string | null
   newOrgId: string | null
   orgName: string | null
+}
+
+export interface UpdateTerminalProfileInput {
+  displayName?: string | null
+  macAddress?: string | null
+  locationLabel?: string | null
+  enabled?: boolean
+}
+
+export interface UpdateTerminalProfileResult {
+  terminalId: string
+  terminalCode: string
+  displayName: string | null
+  macAddress: string | null
+  locationLabel: string | null
+  enabled: boolean
 }
 
 // ─── Printers (设备管理 — 打印机视图) ───────────────────────────────────────
