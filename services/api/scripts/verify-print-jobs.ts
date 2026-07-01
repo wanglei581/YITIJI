@@ -72,6 +72,7 @@ async function main() {
       await prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: createdTaskIds } } })
       await prisma.printTask.deleteMany({ where: { id: { in: createdTaskIds } } })
     }
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
   }
 
@@ -82,6 +83,24 @@ async function main() {
       data: { id: terminalId, terminalCode: `VPJ-${suffix}`, agentToken, deviceFingerprint: `fp-${suffix}` },
     })
     pass('终端夹具已创建')
+
+    await terminals.heartbeat(
+      terminalId,
+      {
+        status: 'agent_degraded',
+        printerStatus: 'ok',
+        localTaskDatabaseAvailable: false,
+        agentVersion: 'verify-agent',
+      },
+      `Bearer ${agentToken}`,
+    )
+    const adminTerminals = await terminals.listTerminalsForAdmin()
+    const adminTerminal = adminTerminals.terminals.find((t) => t.id === terminalId)
+    if (adminTerminal?.agentStatus === 'agent_degraded' && adminTerminal.localTaskDatabaseAvailable === false) {
+      pass('0. Agent 降级心跳 → Admin 终端视图可见 agent_degraded / localTaskDatabaseAvailable=false')
+    } else {
+      fail(`0. Agent 降级心跳未进入 Admin 视图: ${JSON.stringify(adminTerminal)}`)
+    }
 
     // ── 1. 合法签名 fileUrl → 创建 PrintTask(pending) ──────────────────
     const signed = signFileUrl(fileId, 30 * 60 * 1000)
@@ -124,14 +143,32 @@ async function main() {
       'AUTH_TOKEN_INVALID',
       '3a. claim 用错 agentToken → 401 AUTH_TOKEN_INVALID',
     )
+    const degradedClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const afterDegradedClaim = await prisma.printTask.findUnique({ where: { id: created.taskId } })
+    if (degradedClaim.length === 0 && afterDegradedClaim?.status === 'pending') {
+      pass('3b. Agent 降级时后端 claim 二道闸门 → 不下发任务且任务保持 pending')
+    } else {
+      fail(`3b. 降级 claim 闸门异常: claimed=${JSON.stringify(degradedClaim)} status=${afterDegradedClaim?.status}`)
+    }
+
+    await terminals.heartbeat(
+      terminalId,
+      {
+        status: 'online',
+        printerStatus: 'ok',
+        localTaskDatabaseAvailable: true,
+        agentVersion: 'verify-agent',
+      },
+      `Bearer ${agentToken}`,
+    )
     const claimed = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
     if (claimed.length === 1 && claimed[0].taskId === created.taskId && claimed[0].claimedBy === terminalId && !!claimed[0].fileUrl) {
-      pass('3b. 终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
-    } else fail(`3b. claim 异常: ${JSON.stringify(claimed.map((c) => c.taskId))}`)
+      pass('3c. Agent 恢复 online 后终端 claim：本终端 pending 任务被领取（返回 fileUrl + actionToken）')
+    } else fail(`3c. claim 异常: ${JSON.stringify(claimed.map((c) => c.taskId))}`)
     const afterClaim = await prisma.printTask.findUnique({ where: { id: created.taskId } })
     if (afterClaim?.status === 'claimed' && afterClaim.terminalId === terminalId) {
-      pass('3c. claim 后 DB 状态为 claimed 且目标终端保持不变')
-    } else fail(`3c. claim 后状态异常: ${afterClaim?.status} / ${afterClaim?.terminalId}`)
+      pass('3d. claim 后 DB 状态为 claimed 且目标终端保持不变')
+    } else fail(`3d. claim 后状态异常: ${afterClaim?.status} / ${afterClaim?.terminalId}`)
 
     // ── 4. 状态回传 printing → completed ──────────────────────────────
     await terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId)

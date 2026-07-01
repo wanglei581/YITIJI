@@ -143,6 +143,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs

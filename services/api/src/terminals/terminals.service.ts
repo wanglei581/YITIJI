@@ -159,6 +159,13 @@ const EXT_TO_MIME: Record<string, string> = {
   '.tiff': 'image/tiff',
 }
 
+const AGENT_HEARTBEAT_STATUSES = new Set(['online', 'offline', 'error', 'agent_degraded'])
+
+function normalizeHeartbeatStatus(status: string | undefined): string | null {
+  if (!status) return null
+  return AGENT_HEARTBEAT_STATUSES.has(status) ? status : null
+}
+
 /** 由原始文件名后缀推断 MIME（无法判断时返回 undefined，交由 Agent 回退）。 */
 function inferMimeFromFileName(fileName: string | undefined): string | undefined {
   if (!fileName) return undefined
@@ -183,6 +190,8 @@ export interface AdminTerminalView {
   lastSeenAt: string // ISO
   online: boolean // lastSeenAt 距今 < 3 分钟 = true
   lastHeartbeatAt: string | null
+  agentStatus: string | null // 'online'|'offline'|'error'|'agent_degraded' 或 null（旧 Agent 未上报）
+  localTaskDatabaseAvailable: boolean | null
   printerStatus: string | null // 'ok'|'offline'|'paper_empty'|'error'|'not_found' 或 null
   agentVersion: string | null
   ipAddress: string | null
@@ -445,7 +454,9 @@ export class TerminalsService implements OnModuleInit {
     await this.prisma.terminalHeartbeat.create({
       data: {
         terminalId,
+        status: normalizeHeartbeatStatus(dto.status),
         printerStatus: dto.printerStatus ?? null,
+        localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
@@ -463,6 +474,11 @@ export class TerminalsService implements OnModuleInit {
     authHeader: string | undefined,
   ): Promise<ClaimTaskResponse[]> {
     await this.findAndValidate(terminalId, authHeader)
+    const canClaim = await this.canTerminalClaimTasks(terminalId)
+    if (!canClaim) {
+      this.logger.warn(`claimTasks: terminal ${terminalId} is agent_degraded/local DB unavailable; returning no tasks`)
+      return []
+    }
 
     const claimExpiry = new Date(Date.now() + 5 * 60 * 1000)
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
@@ -621,6 +637,17 @@ export class TerminalsService implements OnModuleInit {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
+
+  private async canTerminalClaimTasks(terminalId: string): Promise<boolean> {
+    const latestHeartbeat = await this.prisma.terminalHeartbeat.findFirst({
+      where: { terminalId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, localTaskDatabaseAvailable: true },
+    })
+    // 兼容旧 Agent / 新注册未上报心跳的终端：未知状态不拦截，只有明确降级才 fail-closed。
+    if (!latestHeartbeat) return true
+    return latestHeartbeat.status !== 'agent_degraded' && latestHeartbeat.localTaskDatabaseAvailable !== false
+  }
 
   private async findAndValidate(
     terminalId: string,
@@ -856,7 +883,9 @@ export class TerminalsService implements OnModuleInit {
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: {
+            status: true,
             printerStatus: true,
+            localTaskDatabaseAvailable: true,
             agentVersion: true,
             ipAddress: true,
             diskFreeGb: true,
@@ -884,6 +913,8 @@ export class TerminalsService implements OnModuleInit {
         lastSeenAt: lastSeen.toISOString(),
         online: now - lastSeen.getTime() < ONLINE_WINDOW_MS,
         lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
+        agentStatus: hb?.status ?? null,
+        localTaskDatabaseAvailable: hb?.localTaskDatabaseAvailable ?? null,
         printerStatus: hb?.printerStatus ?? null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,

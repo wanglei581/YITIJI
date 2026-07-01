@@ -29,6 +29,8 @@ export interface AdminTerminalRecord {
   lastSeenAt: string              // ISO
   online: boolean                 // lastSeenAt 距今 < 3 分钟 = true
   lastHeartbeatAt: string | null
+  agentStatus: 'online' | 'offline' | 'error' | 'agent_degraded' | string | null
+  localTaskDatabaseAvailable: boolean | null
   printerStatus: TerminalPrinterStatus | string | null
   agentVersion: string | null
   ipAddress: string | null

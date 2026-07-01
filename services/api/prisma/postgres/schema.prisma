@@ -75,14 +75,18 @@ model PrintTask {
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
 
 model TerminalHeartbeat {
-  id            String   @id @default(cuid())
-  terminalId    String
-  terminal      Terminal @relation(fields: [terminalId], references: [id])
-  printerStatus String?
-  agentVersion  String?
-  ipAddress     String?
-  diskFreeGb    Float?
-  createdAt     DateTime @default(now())
+  id                         String   @id @default(cuid())
+  terminalId                 String
+  terminal                   Terminal @relation(fields: [terminalId], references: [id])
+  status                     String?
+  printerStatus              String?
+  localTaskDatabaseAvailable Boolean?
+  agentVersion               String?
+  ipAddress                  String?
+  diskFreeGb                 Float?
+  createdAt                  DateTime @default(now())
+
+  @@index([terminalId, createdAt])
 }
 
 // ── PrintTaskStatusLog ────────────────────────────────────────────────────────

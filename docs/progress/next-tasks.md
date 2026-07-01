@@ -48,7 +48,8 @@
 ## P0：打印扫描首期全功能收口
 
 - [x] **打印扫描板块商用级方案确认与实施总计划**：已输出 `docs/product/print-scan-commercial-plan.md` 和 `docs/superpowers/plans/2026-06-30-print-scan-first-release-full-scope.md`，基于竞品调研、前台体验审计、后端 / Terminal Agent 审计、产品合规审计和 Antigravity 只读审查；2026-06-30 用户确认首期目标调整为全功能商用版本，Claude 复审因本地 Claude Code 会话额度限制未取得有效报告，用户已确认本轮改用 Antigravity 复审即可。Antigravity 修订后复审结论 `APPROVE`，剩余奔图 mode 映射和 Agent claim TTL 建议已补入计划。本项只代表方案与实施计划确认，不代表运行时代码、生产部署或真机验收完成。
-- [ ] **首期安全底座**：打印任务创建时必须绑定目标 `terminalId`，Terminal Agent claim 必须按自身 `terminalId` 过滤；本地 SQLite / `better-sqlite3` 不可用时必须 fail-closed；Admin 必须能看到终端 degraded、离线、打印机异常和状态回传积压。
+- [x] **首期安全底座（代码侧）**：打印任务创建已绑定目标 `terminalId`，Terminal Agent claim 已按自身 `terminalId` 过滤；本地 SQLite / `better-sqlite3` 不可用时 Agent fail-closed；API 已持久化 `agent_degraded` / `localTaskDatabaseAvailable=false` 心跳，Admin 终端页可见降级状态，后端 claim 已增加二道闸门，明确降级时不领取新任务并保持 pending。本项只代表本地代码、迁移和 verify 门禁通过，不代表生产 migration、Windows 真机或扫描 / U 盘验收完成。
+- [ ] **首期安全底座现场验收**：G0 证据包与 CI 防回退已建立，正式域名 / HTTPS 审批暂不作为当前阻塞项；按 `docs/acceptance/print-scan-field-execution-runbook.md` 和 `docs/acceptance/print-scan-first-release-acceptance-package.md` 在 Mac、候选服务器、Windows 一体机 + 奔图真机三段补齐 PS-G1~PS-G4 证据：迁移执行记录、真实出纸任务从 pending / claimed / printing / completed 或 failed 的状态链路、Agent 降级时 Admin 可见且不领取任务、恢复后可继续领取、失败回传和卡住任务释放、敏感文件短 TTL / 删除审计。
 - [ ] **首期服务中心与能力开关**：首页“打印扫描”组标题进入 `/print-scan` 服务中心；`/print-scan` 展示文档打印、手机扫码上传、材料包、扫描、证件复印、证件照、U 盘、云上传、格式转换、签名盖章和我的文档 / 打印订单 / 异常反馈；所有能力由 FeatureGate / DeviceCapability / Admin 配置控制，未通过验收时不能创建正式任务。
 - [ ] **首期基础打印闭环**：文档打印、图片打印、简历打印、求职材料打印、招聘会资料打印统一进入真实 `PrintTask`；补任务编号、目标终端、排队 / 已领取 / 打印中 / 完成 / 失败说明、关联反馈和可控重试；不得混用支付状态、打印状态和人工确认状态。
 - [ ] **首期手机扫码上传 / 云上传 / 安全取件**：支持手机扫码上传到当前一体机、会员或一次性会话绑定当前终端、安全取件码或本机确认码；禁止公网远程直控打印机；签名 URL 过期、未确认上传和未取件任务必须自动 expired / 清理。
