@@ -37,6 +37,7 @@ import {
   defaultRetentionForUpload,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
+import { signFileUrl } from './signing'
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -143,18 +144,23 @@ export class FilesService {
       },
     })
 
-    // 上传响应给 30 分钟签名 URL,覆盖"上传→预览→确认打印"整段触控窗口。
-    const signed = this.storage.getDownloadUrl(
-      {
-        objectKey: record.storageKey,
-        fileId: record.id,
-        filename: record.filename,
-        mimeType: record.mimeType,
-        ttlSeconds: this.storage.signTtlSeconds,
-        disposition: 'inline',
-      },
-      record.bucket,
-    )
+    // Print jobs only accept the API-owned /files/:id/content signature. When
+    // storage is COS, returning a COS presigned URL here makes Kiosk upload ->
+    // create print job fail SSRF validation, so print uploads use the API proxy.
+    const signed =
+      record.purpose === 'print_doc'
+        ? signFileUrl(record.id, this.storage.signTtlSeconds * 1000)
+        : this.storage.getDownloadUrl(
+            {
+              objectKey: record.storageKey,
+              fileId: record.id,
+              filename: record.filename,
+              mimeType: record.mimeType,
+              ttlSeconds: this.storage.signTtlSeconds,
+              disposition: 'inline',
+            },
+            record.bucket,
+          )
     return {
       fileId: record.id,
       filename: record.filename,

@@ -3,6 +3,8 @@
 > 最后更新：2026-07-01
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
+> 2026-07-01 纠偏：`82.157.43.217` 是腾讯云公司网站服务器上的临时预览环境，仅保留为历史 smoke 记录，不作为本项目正式上线 / Windows 真机验收依据。正式验收以百度云项目服务器 `120.48.13.190` 为准：Kiosk `http://120.48.13.190/`，Admin `http://120.48.13.190:8081/`，API `http://120.48.13.190/api/v1`。任何打印扫描真机验收报告必须明确连接百度云项目服务器，不能把腾讯云临时预览 smoke 写成正式验收结论。
+
 ## P0：项目规范化治理
 
 - [x] **P0 治理基线**：保留现有 monorepo，不新建仓库；已新增 `docs/project-structure.md` 与 `.ccg/spec/guides/index.md`。
@@ -40,8 +42,8 @@
 - [x] 真实库打印扫描 preflight（隔离预生产库）：已在服务器当前 monorepo 隔离 PostgreSQL 数据库 `ai_job_print_preprod` 上运行 `verify:print-scan-preflight:postgres`，结果无未完成打印任务 / 订单目标终端异常；该结论仅覆盖新建隔离预生产空库，不代表既有线上 `zlixc-api` 所连生产库、Windows 真机、扫描、证件照或 U 盘验收完成。
 - [x] 预生产部署目录确认：已选择新建并使用独立目录 `/www/wwwroot/ai-job-print-preprod/current` 部署当前 monorepo，不覆盖现有 `/www/wwwroot/zlixc-api`；服务器密码已在聊天中暴露，生产切换前必须轮换或改 SSH key。
 - [x] 预生产 env 与后端启动门禁：隔离目录 `/www/wwwroot/ai-job-print-preprod/current` 已完成依赖安装、typecheck、lint、text-only 前端 build、独立 staging `.env`、PostgreSQL migration、Redis 配置、`db:pg:sync:check`、`verify:production-runtime-gates` 自测、服务器 API build、独立 PM2 `ai-job-print-preprod-api` 启动、本机 health、`verify:print-scan-first-release` 和 `verify:print-scan-preflight:postgres`；现有 `zlixc-api` 仍 online。本项仍不代表 nginx 公网预览、正式生产部署或 Windows 真机完成。
-- [x] 预生产 nginx 预览入口：已新增隔离 nginx vhost，Kiosk `http://82.157.43.217:8897/`、Admin `http://82.157.43.217:8898/`、Partner `http://82.157.43.217:8896/` 可公网访问，三端 `/api/v1/health` 返回 `success=true`、`db=postgres`，静态 JS asset 返回 200；未影响既有 `zlixc-api`。
-- [x] 预生产浏览器功能联调：已用三个 HTTP 预览入口完成真实 Chrome smoke：Kiosk 首页、Admin 登录后 `/orders`、Partner 登录后 dashboard、Kiosk `/print-scan`、`/print/upload?source=document`、直达 `/print/progress` 保护分支；三端 health 为 `success=true`、`db=postgres`，PM2 预生产 API 与既有 `zlixc-api` 均 online。本项仍不是正式 HTTPS、真机出纸或试运营验收。
+- [x] 预生产 nginx 预览入口（腾讯云临时预览历史记录）：曾使用 `82.157.43.217:8897/8898/8896` 做隔离 HTTP 预览；2026-07-01 已纠偏确认 `82.157.43.217` 是腾讯云公司网站服务器上的临时预览环境，仅保留为历史 smoke 记录，不作为本项目正式上线 / Windows 真机验收依据。正式验收以百度云项目服务器 `120.48.13.190` 为准。
+- [x] 预生产浏览器功能联调（腾讯云临时预览历史记录）：该轮 smoke 基于 `82.157.43.217` 三个临时 HTTP 预览入口，仅证明当时 Kiosk 首页、Admin 登录后 `/orders`、Partner 登录后 dashboard、Kiosk `/print-scan`、`/print/upload?source=document`、直达 `/print/progress` 保护分支可在该临时环境打开；不代表百度云项目服务器、正式 HTTPS、Windows 真机出纸或试运营验收。后续浏览器 / 真机验收必须使用 `120.48.13.190` 对应 Kiosk/Admin/API 地址重新执行。
 - [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。验收前必须确认 Kiosk 构建注入正确 `VITE_TERMINAL_ID` 且后台终端已注册并启用；`agent_degraded` 视为本地 Agent DB 降级，需要人工重启 Agent 后复测；真机打印必须由 Kiosk 上传创建真实终端绑定任务，不使用 `ptask_seed_001` 等 seed 任务替代。
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
 - [ ] 小范围试运营：仅 1 台终端 + 1 台打印机先跑，问题记录按任务闭环处理。

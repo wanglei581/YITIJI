@@ -184,7 +184,7 @@ Required behavior:
 
 - [ ] **Step 3: Add failing verify for SQLite fail-closed**
 
-Run: `pnpm --filter @ai-job-print/terminal-agent verify:print-scan-agent`
+Run: `pnpm --filter terminal-agent verify:print-scan-agent`
 
 Expected before implementation: FAIL with message containing `sqlite unavailable must stop print loop`.
 
@@ -206,8 +206,8 @@ pnpm --filter @ai-job-print/api verify:print-scan-first-release
 pnpm --filter @ai-job-print/api verify:print-jobs
 pnpm --filter @ai-job-print/api verify:terminal-device-config
 pnpm --filter @ai-job-print/api typecheck
-pnpm --filter @ai-job-print/terminal-agent verify:print-scan-agent
-pnpm --filter @ai-job-print/terminal-agent typecheck
+pnpm --filter terminal-agent verify:print-scan-agent
+pnpm --filter terminal-agent typecheck
 git diff --check
 ```
 
@@ -540,7 +540,7 @@ Run:
 ```bash
 pnpm --filter @ai-job-print/kiosk verify:scan-production-guard
 pnpm --filter @ai-job-print/api verify:print-scan-first-release
-pnpm --filter @ai-job-print/terminal-agent verify:print-scan-agent
+pnpm --filter terminal-agent verify:print-scan-agent
 pnpm --filter @ai-job-print/api verify:file-retention
 pnpm --filter @ai-job-print/api verify:audit-logs
 git diff --check
@@ -642,9 +642,9 @@ Reject:
 Run:
 
 ```bash
-pnpm --filter @ai-job-print/terminal-agent verify:local-qr-proxy
-pnpm --filter @ai-job-print/terminal-agent verify:direct-http-agents
-pnpm --filter @ai-job-print/terminal-agent verify:print-scan-agent
+pnpm --filter terminal-agent verify:local-qr-proxy
+pnpm --filter terminal-agent verify:direct-http-agents
+pnpm --filter terminal-agent verify:print-scan-agent
 pnpm --filter @ai-job-print/kiosk typecheck
 git diff --check
 ```
