@@ -1,6 +1,6 @@
 # 客户真实岗位样本导入 readiness
 
-> 状态：导入准入与静态门禁已定义；真实客户 API / Excel / Webhook 岗位样本尚未导入。
+> 状态：导入准入与静态门禁已定义；2026-07-01 已完成一次本地 Excel 导入链路验证，但因来源链接为首页级且校招分类源数据不一致，真实客户样本验收仍未通过。
 > 本文件只用于客户样本进入真实验收前的字段、路径和证据准备，不代表客户样本验收完成。
 
 ## 目标
@@ -170,8 +170,29 @@ Kiosk 展示：已复核 / 未复核
 
 ## 当前结论
 
+### 2026-07-01 本地 Excel 导入链路验证
+
+用户提供 `岗位数据导入模板_已填写.xlsx` 后，已在本地 SQLite 中用专用机构 / 数据源隔离导入：
+
+- 机构：`org-customer-job-sample-20260701`
+- 数据源：`src-customer-job-sample-excel-20260701`
+- 导入前备份：`/tmp/ai-job-print-dev-before-job-sample-20260701114004.db`
+- Excel 只读检查：100 行、18 个模板字段全部匹配、无敏感表头、必填字段齐全、无非法 `workType`、`sourceUrl` 均为 http(s)。
+- 导入结果：`preview totalRows=100 validRows=100 invalidRows=0 dupRows=0`，`confirm imported=100`，`SyncLog result=success added=100 error=0`。
+- 审核发布：本地通过 `JobsService.reviewJobSource` / `publishJobSource` 发布 100 条；公开查询按该 `sourceOrgId` 可见 100 条。
+- 质量快照：100 条均为字段完整度 `ready`；该结果不代表来源 URL 可达性或逐条岗位真实性已核验。
+- 公开筛选抽样：北京 25 条、关键词“算法”6 条、实习 13 条、兼职 6 条、全职 81 条、校园招聘 0 条。
+
+本次只能证明本地 Excel 导入、审核发布、公开查询和字段质量快照链路已打通；不能作为真实客户岗位样本验收通过，原因：
+
+- 100 条岗位只有 10 个去重 `sourceUrl`，均为招聘官网或招聘平台首页级链接，不是逐条岗位详情页，用户外跳后仍需二次搜索。
+- 2 条标题含“校招”的岗位在源表 `workType` 填为 `full_time`，系统按源数据落到 `fulltime`；如客户需要校园招聘筛选，应在源表中改为 `campus` / `校招` / `校园招聘`。
+
+进入预生产真实会员浏览器验收前，必须先提供逐条岗位详情 URL，并修正源表中的校招 `workType`。本批数据可以保留为本地导入链路验证批次，但不得写作“客户真实岗位样本验收通过”。
+
 ```text
 客户真实岗位样本导入 readiness：已准备静态门禁
-客户真实岗位样本验收：Not Passed Yet
+本地 Excel 导入链路验证：已执行，通过
+客户真实岗位样本验收：Not Passed Yet（来源链接与校招分类待修正）
 不得对外宣称岗位信息 AI 商用完成
 ```
