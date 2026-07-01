@@ -9,6 +9,8 @@ import type {
   AdminOrganizationOption,
   AdminOrgOptionsResponse,
   AssignTerminalOrgResult,
+  UpdateTerminalProfileInput,
+  UpdateTerminalProfileResult,
   AuditLogListResponse,
   AuditLogListQuery,
   AuditLogRecord,
@@ -28,6 +30,25 @@ const MOCK_ORG_OPTIONS: AdminOrganizationOption[] = [
 // terminalCode → orgId（内存归属，演示用）
 const MOCK_TERMINAL_ORG: Record<string, string | null> = {
   'KSK-001': 'org-uni-001',
+}
+
+const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
+  'KSK-001': {
+    terminalId: 'KSK-001',
+    terminalCode: 'KSK-001',
+    displayName: '一号楼大厅终端',
+    macAddress: 'A8:5E:45:10:00:01',
+    locationLabel: '市南校区 一号楼大厅',
+    enabled: true,
+  },
+  'KSK-002': {
+    terminalId: 'KSK-002',
+    terminalCode: 'KSK-002',
+    displayName: '就业中心终端',
+    macAddress: 'A8:5E:45:10:00:02',
+    locationLabel: '就业指导中心服务区',
+    enabled: true,
+  },
 }
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
@@ -149,16 +170,22 @@ export const adminMockAdapter = {
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
     const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName'>> = [
-      { id: 't1',  terminalCode: 'KSK-001', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
-      { id: 't2',  terminalCode: 'KSK-002', registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
-      { id: 't3',  terminalCode: 'KSK-003', registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
-      { id: 't4',  terminalCode: 'KSK-004', registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
-      { id: 't7',  terminalCode: 'KSK-007', registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
-      { id: 't8',  terminalCode: 'KSK-008', registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
-      { id: 't9',  terminalCode: 'KSK-009', registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          agentVersion: null,     ipAddress: null,          diskFreeGb: null },
-      { id: 't10', terminalCode: 'KSK-010', registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
+      { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
+      { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
+      { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
+      { id: 't4',  terminalCode: 'KSK-004', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
+      { id: 't7',  terminalCode: 'KSK-007', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
+      { id: 't8',  terminalCode: 'KSK-008', displayName: null, macAddress: null, locationLabel: null, enabled: false, registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
+      { id: 't9',  terminalCode: 'KSK-009', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          agentVersion: null,     ipAddress: null,          diskFreeGb: null },
+      { id: 't10', terminalCode: 'KSK-010', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
     ]
-    return { terminals: base.map((t) => ({ ...t, ...mockOrgFields(t.terminalCode) })) }
+    return {
+      terminals: base.map((t) => ({
+        ...t,
+        ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
+        ...mockOrgFields(t.terminalCode),
+      })),
+    }
   },
 
   // ── 终端机构归属（绑定/解绑）mock ─────────────────────────────────────────
@@ -178,6 +205,27 @@ export const adminMockAdapter = {
     }
     MOCK_TERMINAL_ORG[terminalId] = orgId
     return { terminalId, terminalCode: terminalId, oldOrgId, newOrgId: orgId, orgName }
+  },
+
+  async updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult> {
+    await delay()
+    const existing = MOCK_TERMINAL_PROFILE[terminalId] ?? {
+      terminalId,
+      terminalCode: terminalId,
+      displayName: null,
+      macAddress: null,
+      locationLabel: null,
+      enabled: true,
+    }
+    const next: UpdateTerminalProfileResult = {
+      ...existing,
+      displayName: input.displayName === undefined ? existing.displayName : input.displayName,
+      macAddress: input.macAddress === undefined ? existing.macAddress : input.macAddress,
+      locationLabel: input.locationLabel === undefined ? existing.locationLabel : input.locationLabel,
+      enabled: input.enabled === undefined ? existing.enabled : input.enabled,
+    }
+    MOCK_TERMINAL_PROFILE[terminalId] = next
+    return next
   },
 
   async getPrinters(): Promise<AdminPrintersResponse> {

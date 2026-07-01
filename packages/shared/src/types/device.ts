@@ -1,3 +1,6 @@
+import type { KioskSmartCampusConfig } from './smartCampus'
+import type { KioskAppItem } from './kioskApp'
+
 export type DeviceStatus = 'online' | 'offline' | 'error' | 'maintenance' | 'idle' | 'busy'
 
 export interface Device {
@@ -19,4 +22,41 @@ export interface PrinterStatus {
     yellow: number
   }
   errorCode?: string
+}
+
+export type KioskToolboxItem = KioskAppItem
+
+export interface KioskToolboxConfig {
+  enabled: boolean
+  items: KioskToolboxItem[]
+}
+
+export interface TerminalToolboxConfigView {
+  terminalId: string
+  enabled: boolean
+  items: KioskToolboxItem[]
+  updatedAt: string | null
+}
+
+export interface ToolboxTerminalView {
+  terminalId: string
+  terminalCode: string | null
+  orgId?: string | null
+  orgName?: string | null
+  isOnline: boolean
+  config: TerminalToolboxConfigView | null
+}
+
+export interface SaveToolboxConfigInput {
+  enabled: boolean
+  items: KioskToolboxItem[]
+}
+
+/** Kiosk 启动和定时刷新使用的统一终端配置视图。只暴露前台渲染必需白名单字段。 */
+export interface KioskTerminalConfig {
+  smartCampus: KioskSmartCampusConfig
+  toolbox: KioskToolboxConfig
+  configVersion: string
+  refreshIntervalMs: number
+  serverTime: string
 }

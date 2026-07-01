@@ -9,6 +9,8 @@ import type {
   AdminOrgOptionsResponse,
   AdminOrganizationOption,
   AssignTerminalOrgResult,
+  UpdateTerminalProfileInput,
+  UpdateTerminalProfileResult,
   TerminalPrinterStatus,
 } from './types'
 
@@ -20,6 +22,8 @@ export type {
   AdminOrgOptionsResponse,
   AdminOrganizationOption,
   AssignTerminalOrgResult,
+  UpdateTerminalProfileInput,
+  UpdateTerminalProfileResult,
   TerminalPrinterStatus,
 }
 
@@ -28,6 +32,7 @@ interface AdminDeviceServiceInterface {
   getPrinters(): Promise<AdminPrintersResponse>
   getOrgOptions(): Promise<AdminOrgOptionsResponse>
   assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
+  updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult>
 }
 
 const adapter: AdminDeviceServiceInterface =
@@ -45,3 +50,7 @@ export const getOrgOptions = () => adapter.getOrgOptions()
 /** 绑定/解绑终端机构归属(PATCH /admin/terminals/:id/org，orgId=null 解绑)。admin only，写审计。 */
 export const assignTerminalOrg = (terminalId: string, orgId: string | null) =>
   adapter.assignTerminalOrg(terminalId, orgId)
+
+/** 更新终端设备档案/MAC/启停状态(PATCH /admin/terminals/:id/profile)。 */
+export const updateTerminalProfile = (terminalId: string, input: UpdateTerminalProfileInput) =>
+  adapter.updateTerminalProfile(terminalId, input)

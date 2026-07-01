@@ -23,6 +23,10 @@ model Terminal {
   terminalCode      String   @unique
   agentToken        String   @unique
   deviceFingerprint String
+  displayName       String?
+  macAddress        String?  @unique
+  locationLabel     String?
+  enabled           Boolean  @default(true)
   orgId             String?
   org               Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   registeredAt      DateTime @default(now())
@@ -32,6 +36,7 @@ model Terminal {
   printTasks PrintTask[]
 
   @@index([orgId])
+  @@index([enabled])
 }
 
 // ── PrintTask ─────────────────────────────────────────────────────────────────
@@ -1418,6 +1423,20 @@ model TerminalSmartCampusConfig {
   terminalId  String   @unique
   enabled     Boolean  @default(false)
   modulesJson String   @default("{}")
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ── TerminalToolboxConfig ────────────────────────────────────────────────────
+// 每个终端的「百宝箱」配置：是否启用 + 功能项(JSON 数组)。
+// terminalId 为自由字符串(不强 FK)：可在终端注册前预置，按 terminalId / terminalCode 查找。
+// Kiosk 公共配置只返回 enabled + items 白名单；不得暴露 MAC、机构、终端档案。
+model TerminalToolboxConfig {
+  id          String   @id @default(cuid())
+  terminalId  String   @unique
+  enabled     Boolean  @default(true)
+  itemsJson   String   @default("[]")
   updatedBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

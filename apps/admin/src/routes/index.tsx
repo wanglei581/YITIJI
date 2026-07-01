@@ -25,6 +25,7 @@ import AuditPage from './audit'
 import ImportBatchesPage from './import-batches'
 import SyncSourcesPage from './sync-sources'
 import ScreensaverPage from './screensaver'
+import ToolboxPage from './toolbox'
 import SmartCampusPage from './smart-campus'
 import JobMaterialsPage from './job-materials'
 
@@ -64,6 +65,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'import-batches',  element: <ImportBatchesPage /> },
       { path: 'sync-sources',    element: <SyncSourcesPage /> },
       { path: 'screensaver',     element: <ScreensaverPage /> },
+      { path: 'toolbox',         element: <ToolboxPage /> },
       { path: 'smart-campus',    element: <SmartCampusPage /> },
     ],
   },
