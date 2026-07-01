@@ -107,6 +107,31 @@ async function put<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+function getDownloadFileName(contentDisposition: string | null, fallback: string): string {
+  if (!contentDisposition) return fallback
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition)
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1])
+    } catch {
+      return fallback
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(contentDisposition)
+  return plain?.[1] ?? fallback
+}
+
+function saveBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 // ─── Adapter ──────────────────────────────────────────────────────────────────
 
 export const partnerHttpAdapter = {
@@ -155,6 +180,33 @@ export const partnerHttpAdapter = {
     get<PartnerSyncLog[]>('/partner/sync-logs'),
 
   // Excel Import
+  downloadExcelTemplate: async (dataType: 'job' | 'fair') => {
+    const url = new URL(`${API_BASE_URL}/partner/excel/template`, window.location.origin)
+    url.searchParams.set('dataType', dataType)
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ...authHeader(),
+      },
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      let code = `HTTP_${res.status}`
+      let message = res.statusText
+      try {
+        const body = await res.json() as { error?: { code?: string; message?: string } }
+        if (body.error?.code) code = body.error.code
+        if (body.error?.message) message = body.error.message
+      } catch { /* keep defaults */ }
+      if (res.status === 401) redirectToLogin()
+      throw new ApiHttpError(code, message, res.status)
+    }
+    const blob = await res.blob()
+    const fallback = dataType === 'job' ? '岗位数据导入模板.xlsx' : '招聘会数据导入模板.xlsx'
+    saveBlob(blob, getDownloadFileName(res.headers.get('Content-Disposition'), fallback))
+  },
+
   // T1: 读取上次保存的字段映射规则(自动回填)
   getMappingRule: (sourceId: string, dataType: 'job' | 'fair') =>
     get<FieldMappingRuleResult>('/partner/excel/mapping-rule', { sourceId, dataType }),

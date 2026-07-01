@@ -132,12 +132,14 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
+          pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
           pnpm --filter @ai-job-print/api verify:production-real-services
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
+          pnpm --filter @ai-job-print/api verify:partner-excel-template
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:print-jobs
@@ -168,6 +170,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-ai-backend
           pnpm --filter @ai-job-print/api verify:job-ai-privacy
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
+          pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs

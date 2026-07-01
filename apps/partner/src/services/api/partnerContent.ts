@@ -69,6 +69,7 @@ export interface PartnerContentServiceInterface {
   confirmExcelImport(batchId: string): Promise<ExcelConfirmResult>
   cancelExcelImport(batchId: string): Promise<{ success: boolean }>
   getMappingRule(sourceId: string, dataType: 'job' | 'fair'): Promise<FieldMappingRuleResult>
+  downloadExcelTemplate(dataType: 'job' | 'fair'): Promise<void>
 }
 
 const adapter: PartnerContentServiceInterface =
@@ -102,3 +103,5 @@ export const confirmExcelImport = (batchId: string) => adapter.confirmExcelImpor
 export const cancelExcelImport  = (batchId: string) => adapter.cancelExcelImport(batchId)
 export const getMappingRule = (sourceId: string, dataType: 'job' | 'fair') =>
   adapter.getMappingRule(sourceId, dataType)
+export const downloadExcelTemplate = (dataType: 'job' | 'fair') =>
+  adapter.downloadExcelTemplate(dataType)

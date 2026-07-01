@@ -38,6 +38,11 @@
 
 目标：证明客户真实 API / Excel / Webhook 岗位样本进入系统后，可以被后台、合作机构后台和 Kiosk 用同一套真实数据展示，不使用 mock、不生成虚假岗位。
 
+执行前必须先通过客户样本导入 readiness 门禁：
+
+- 字段清单与三条直接导入路径详见：[job-customer-sample-import-readiness.md](./job-customer-sample-import-readiness.md)
+- 本地静态命令：`pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness`
+
 ### 2.1 样本准入
 
 客户样本最小要求：

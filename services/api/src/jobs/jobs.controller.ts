@@ -39,11 +39,13 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import type { Response } from 'express'
 import { JobsService } from './jobs.service'
 import { AdminFairsService } from './admin-fairs.service'
 import { ReviewActionDto } from './dto/review.dto'
@@ -57,6 +59,8 @@ import { ImportFairsDto } from './dto/import-fairs.dto'
 import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 import { CreateDataSourceDto } from './dto/data-source.dto'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
+import { mapJobWorkTypeToCategory } from './work-type'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -68,20 +72,10 @@ function safeInt(value: string | undefined, defaultValue: number, min: number, m
 /**
  * Kiosk 岗位类型筛选既接受 workType('full_time' 等,前端枚举),
  * 也接受 category('fulltime' 等,DB 列值)。这里把 workType 归一到 category。
- * 'campus'(校招)没有对应 workType,前端直接传 category=campus。
+ * 'campus'(校招)可通过 category=campus 或 workType=campus / 校招别名进入同一筛选。
  */
 function mapWorkTypeToCategory(workType: string): string | undefined {
-  switch (workType) {
-    case 'full_time':  return 'fulltime'
-    case 'part_time':  return 'parttime'
-    case 'internship': return 'intern'
-    case 'contract':   return 'fulltime'
-    case 'fulltime':
-    case 'parttime':
-    case 'intern':
-    case 'campus':     return workType
-    default:           return undefined
-  }
+  return mapJobWorkTypeToCategory(workType)
 }
 
 @Controller()
@@ -436,11 +430,31 @@ export class JobsController {
 
   // ── Partner Excel import ─────────────────────────────────────────────────────
   //
+  //   GET  /partner/excel/template?dataType=job|fair → 固定模板下载
   //   GET  /partner/excel/mapping-rule → 上次保存的字段映射(自动回填)
   //   POST /partner/excel/parse    multipart file → columns + sampleRows (stateless)
   //   POST /partner/excel/preview  multipart file + mapping → ImportBatch + preview
   //   POST /partner/excel/:id/confirm → upsert ok rows + SyncLog + 保存映射规则
   //   DELETE /partner/excel/:id   → cancel pending batch
+
+  @Get('partner/excel/template')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  async downloadExcelTemplate(
+    @Query('dataType') dataType: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (dataType !== 'job' && dataType !== 'fair') {
+      throw new BadRequestException({ error: { code: 'INVALID_DATA_TYPE', message: 'dataType 必须为 job 或 fair' } })
+    }
+
+    const buffer = await buildPartnerExcelTemplateBuffer(dataType)
+    const fileName = getPartnerExcelTemplateFileName(dataType)
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${dataType}-template.xlsx"; filename*=UTF-8''${encodeURIComponent(fileName)}`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.send(buffer)
+  }
 
   @Get('partner/excel/mapping-rule')
   @UseGuards(JwtAuthGuard, RolesGuard)

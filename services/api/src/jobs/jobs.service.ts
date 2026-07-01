@@ -54,6 +54,7 @@ import { JobQualityService } from '../job-ai/job-quality.service'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
+import { JOB_WORK_TYPE_VALUES, mapJobWorkTypeToCategory, normalizeJobWorkType, type JobWorkTypeValue } from './work-type'
 
 // ─── Internal types(契约镜像于 packages/shared/src/types/{job,admin}.ts)─────
 //
@@ -523,18 +524,20 @@ function parseMappedDate(value: string | undefined): Date | null {
 }
 
 /**
- * Import DTO 的 workType('full_time' / 'part_time' / 'internship' / 'contract')
+ * Import DTO 的 workType('full_time' / 'part_time' / 'internship' / 'contract' / 'campus')
  * 映射到 Prisma Job.category('fulltime' / 'parttime' / 'intern' / 'campus')。
  * 'contract' 暂归 'fulltime'(接近全职合同制,后续可独立分类)。
  */
-function mapWorkTypeToCategory(workType: string): string {
-  switch (workType) {
-    case 'full_time':  return 'fulltime'
-    case 'part_time':  return 'parttime'
-    case 'internship': return 'intern'
-    case 'contract':   return 'fulltime'
-    default:           return 'fulltime'
-  }
+function mapWorkTypeToCategory(workType: string | undefined): string | undefined {
+  return mapJobWorkTypeToCategory(workType)
+}
+
+function normalizeMappedWorkType(workType: string | undefined): JobWorkTypeValue | undefined {
+  if (!workType?.trim()) return undefined
+  const normalized = normalizeJobWorkType(workType)
+  return typeof normalized === 'string' && (JOB_WORK_TYPE_VALUES as readonly string[]).includes(normalized)
+    ? normalized as JobWorkTypeValue
+    : undefined
 }
 
 // ─── Fair Prisma → 旧 DTO 形状(保持现有前端契约) ──────────────────────────
@@ -2086,6 +2089,14 @@ export class JobsService {
       if (mapped.checkinUrl && !mapped.checkinUrl.startsWith('http')) {
         errors.push('checkinUrl 必须以 http 开头')
       }
+      if (args.dataType === 'job' && mapped.workType?.trim()) {
+        const normalizedWorkType = normalizeMappedWorkType(mapped.workType)
+        if (!normalizedWorkType) {
+          errors.push(`workType 必须为 ${JOB_WORK_TYPE_VALUES.join('、')} 或常见别名`)
+        } else {
+          mapped.workType = normalizedWorkType
+        }
+      }
       // date check for fairs
       if (args.dataType === 'fair') {
         if (mapped.startAt && Number.isNaN(Date.parse(mapped.startAt))) {
@@ -2213,6 +2224,7 @@ export class JobsService {
                 sourceUrl: mapped.sourceUrl ?? '',
                 title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
                 salary: mapped.salary || null,
+                category: mapped.workType ? mapWorkTypeToCategory(mapped.workType) : undefined,
                 description: mapped.description || null, requirements: mapped.requirements || null,
                 tagsJson: JSON.stringify(buildJobTags([], mapped.industry)),
                 educationRequirement: mapped.educationRequirement || null,
@@ -2230,6 +2242,7 @@ export class JobsService {
                 sourceName, sourceUrl: mapped.sourceUrl ?? '',
                 title: mapped.title ?? '', company: mapped.company ?? '', city: mapped.city ?? '',
                 salary: mapped.salary || null,
+                category: mapped.workType ? mapWorkTypeToCategory(mapped.workType) : undefined,
                 description: mapped.description || null, requirements: mapped.requirements || null,
                 tagsJson: JSON.stringify(buildJobTags([], mapped.industry)),
                 educationRequirement: mapped.educationRequirement || null,

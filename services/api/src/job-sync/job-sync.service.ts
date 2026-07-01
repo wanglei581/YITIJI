@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { decryptSecret } from '../common/crypto/secret-cipher'
 import { isSensitiveColumn } from '../jobs/dto/excel-import.dto'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { mapJobWorkTypeToCategory } from '../jobs/work-type'
 import {
   JOB_SYNC_QUEUE,
   JOB_SYNC_JOB_NAME,
@@ -27,6 +28,7 @@ interface MappedJob {
   salary?: string
   description?: string
   requirements?: string
+  industry?: string
   category?: string  // fulltime/parttime/intern/campus
   tags: string[]
   educationRequirement?: string
@@ -54,13 +56,7 @@ interface MappedFair {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function mapCategory(raw: string | undefined): string | undefined {
-  if (!raw) return undefined
-  const r = raw.toLowerCase()
-  if (r.includes('full') || r.includes('全职')) return 'fulltime'
-  if (r.includes('part') || r.includes('兼职')) return 'parttime'
-  if (r.includes('intern') || r.includes('实习')) return 'intern'
-  if (r.includes('contract') || r.includes('合同')) return 'fulltime'
-  return undefined
+  return mapJobWorkTypeToCategory(raw)
 }
 
 function getStr(raw: Record<string, unknown>, keys: string[]): string | undefined {
@@ -92,6 +88,16 @@ function getStringList(raw: Record<string, unknown>, keys: string[]): string[] {
     }
   }
   return []
+}
+
+function buildJobIndustryTag(industry: string): string {
+  return `行业:${industry.trim()}`
+}
+
+function buildJobTags(tags: string[] | undefined, industry?: string): string[] {
+  const result = [...(tags ?? [])].map((tag) => tag.trim()).filter(Boolean)
+  if (industry?.trim()) result.push(buildJobIndustryTag(industry))
+  return [...new Set(result)]
 }
 
 function getNumber(raw: Record<string, unknown>, keys: string[]): number | undefined {
@@ -360,6 +366,7 @@ export class JobSyncService {
         salary:       r('salary', 'salaryRange', 'salary_range', 'pay'),
         description:  r('description', 'job_description', 'jobDescription', 'detail'),
         requirements: r('requirements', 'qualifications', 'requirement'),
+        industry: r('industry', 'industryName', 'industry_name', '行业'),
         category:     mapCategory(workType),
         tags,
         educationRequirement: r('educationRequirement', 'education', 'degree', '学历'),
@@ -457,7 +464,7 @@ export class JobSyncService {
             title: item.title, company: item.company, city: item.city,
             salary: item.salary, description: item.description,
             requirements: item.requirements,
-            category: item.category, tagsJson: JSON.stringify(item.tags),
+            category: item.category, tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
             educationRequirement: item.educationRequirement,
             experienceRequirement: item.experienceRequirement,
             skillsJson: JSON.stringify(item.skills),
@@ -473,7 +480,7 @@ export class JobSyncService {
             title: item.title, company: item.company, city: item.city,
             salary: item.salary, description: item.description,
             requirements: item.requirements,
-            category: item.category, tagsJson: JSON.stringify(item.tags),
+            category: item.category, tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
             educationRequirement: item.educationRequirement,
             experienceRequirement: item.experienceRequirement,
             skillsJson: JSON.stringify(item.skills),
