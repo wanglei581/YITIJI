@@ -1577,6 +1577,29 @@ model TerminalToolboxConfig {
   updatedAt   DateTime @updatedAt
 }
 
+// ── ToolboxLaunchEvent ──────────────────────────────────────────────────────
+// 百宝箱/智慧校园应用匿名运营事件。
+// 合规边界: 不关联 endUserId,不存完整 URL/token/第三方办理结果;targetHost 只能由服务端从
+// 已审核的配置项派生为纯主机名。terminalId 沿用 TerminalToolboxConfig 口径,统一存 terminalCode。
+model ToolboxLaunchEvent {
+  id         String   @id @default(cuid())
+  terminalId String
+  itemKey    String
+  itemTitle  String?
+  launchMode String
+  action     String
+  placement  String?
+  targetHost String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([terminalId, createdAt])
+  @@index([itemKey, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
 // ── 用户通知 / 意见反馈(P1 我的页商用闭环)────────────────────────────────────
 // 本域只承接系统服务、打印/文件/AI 工具类通知与设备/流程反馈;不得承接投递、
 // 面试、录用、候选人推荐等招聘闭环状态。

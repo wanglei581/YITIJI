@@ -5,6 +5,7 @@ import type {
   KioskAppLaunchMode,
   KioskAppPlacement,
   KioskToolboxItem,
+  ToolboxLaunchSummary,
   ToolboxTerminalView,
 } from '@ai-job-print/shared'
 import { toolboxService } from '../../services/api/toolbox'
@@ -43,6 +44,7 @@ function emptyItem(index: number): KioskToolboxItem {
     launchMode: 'internal_route',
     externalUrl: null,
     qrImageUrl: null,
+    qrTargetUrl: null,
   }
 }
 
@@ -53,7 +55,57 @@ function normalizeDraftItem(item: KioskToolboxItem): KioskToolboxItem {
     launchMode: item.launchMode ?? 'internal_route',
     externalUrl: item.externalUrl ?? null,
     qrImageUrl: item.qrImageUrl ?? null,
+    qrTargetUrl: item.qrTargetUrl ?? null,
   }
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat('zh-CN').format(value)
+}
+
+function ToolboxLaunchSummaryCard({ summary }: { summary: ToolboxLaunchSummary | null }) {
+  const metrics = [
+    { label: '7天总事件', value: summary?.totalCount ?? 0 },
+    { label: '外部确认打开', value: summary?.externalConfirmedCount ?? 0 },
+    { label: '二维码展示数', value: summary?.qrShownCount ?? 0 },
+    { label: '外部取消数', value: summary?.externalCancelledCount ?? 0 },
+  ]
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-bold text-gray-900">百宝箱使用概览</h2>
+          <p className="mt-1 text-xs text-gray-500">最近 7 天匿名终端事件统计；二维码展示数不等同于真实扫码完成。</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+          {summary ? `${summary.days} 天窗口` : '加载中'}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <p className="text-xs font-medium text-gray-500">{metric.label}</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">{formatCount(metric.value)}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-xl border border-gray-100 bg-white px-4 py-3">
+        <p className="text-xs font-semibold text-gray-500">Top 功能项</p>
+        {summary?.topItems.length ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {summary.topItems.map((item) => (
+              <span key={item.itemKey} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {item.itemTitle || item.itemKey} · {formatCount(item.count)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-gray-400">暂无使用事件</p>
+        )}
+      </div>
+    </Card>
+  )
 }
 
 function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTerminalView; onSaved: () => void }) {
@@ -186,6 +238,7 @@ function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTerminalVi
                     to: e.target.value === 'internal_route' ? item.to : null,
                     externalUrl: e.target.value === 'external_url' ? item.externalUrl : null,
                     qrImageUrl: e.target.value === 'qr_code' || e.target.value === 'mini_program_qr' ? item.qrImageUrl : null,
+                    qrTargetUrl: e.target.value === 'qr_code' || e.target.value === 'mini_program_qr' ? item.qrTargetUrl : null,
                   })}
                   className="h-10 rounded-lg border border-gray-200 px-3 text-sm"
                 >
@@ -221,6 +274,21 @@ function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTerminalVi
                   禁用
                 </label>
               </div>
+              {(item.launchMode === 'qr_code' || item.launchMode === 'mini_program_qr') && (
+                <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_2.8fr]">
+                  <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs leading-relaxed text-gray-500">
+                    {item.launchMode === 'qr_code'
+                      ? '二维码目标地址用于白名单校验和前台提示，不代表系统已解析二维码图片内容。'
+                      : '小程序目标说明用于前台提示，可填写 AppID、页面路径或服务名称。'}
+                  </div>
+                  <input
+                    value={item.qrTargetUrl ?? ''}
+                    onChange={(e) => patchItem(index, { qrTargetUrl: e.target.value.trim() || null })}
+                    placeholder={item.launchMode === 'qr_code' ? 'https://trusted.example.com/service' : '微信小程序 AppID / 页面路径 / 服务名称'}
+                    className="h-10 rounded-lg border border-gray-200 px-3 text-sm"
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -238,15 +306,21 @@ function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTerminalVi
 
 export default function ToolboxPage() {
   const [terminals, setTerminals] = useState<ToolboxTerminalView[]>([])
+  const [summary, setSummary] = useState<ToolboxLaunchSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = () => {
     setLoading(true)
     setError('')
-    toolboxService
-      .listTerminals()
-      .then((rows) => setTerminals(rows))
+    Promise.all([
+      toolboxService.listTerminals(),
+      toolboxService.getLaunchSummary({ days: 7 }),
+    ])
+      .then(([rows, usage]) => {
+        setTerminals(rows)
+        setSummary(usage)
+      })
       .catch(() => setError('加载终端列表失败'))
       .finally(() => setLoading(false))
   }
@@ -259,6 +333,8 @@ export default function ToolboxPage() {
         <h1 className="text-xl font-bold text-gray-900">百宝箱 / 智慧校园上架</h1>
         <p className="mt-0.5 text-sm text-gray-500">按终端配置应用入口、上架位置和启动方式；外部 H5 / 二维码域名由后端白名单保护。</p>
       </div>
+
+      <ToolboxLaunchSummaryCard summary={summary} />
 
       {loading ? (
         <p className="text-sm text-gray-400">加载中…</p>

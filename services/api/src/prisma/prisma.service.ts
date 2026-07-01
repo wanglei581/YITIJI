@@ -307,6 +307,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalToolboxConfig
   }
 
+  get toolboxLaunchEvent() {
+    return this.client.toolboxLaunchEvent
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

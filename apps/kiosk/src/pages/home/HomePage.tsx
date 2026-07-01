@@ -32,7 +32,6 @@ import {
   UserCheckIcon,
   WifiIcon,
   WrenchIcon,
-  XIcon,
   type LucideIcon,
 } from 'lucide-react'
 import type { KioskToolboxConfig, KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/shared'
@@ -43,6 +42,7 @@ import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api
 import { getMyFavorites } from '../../services/api/memberFavorites'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
+import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
 
 const HERO_IMAGE = '/assets/kiosk-home-hero-job-fair.png'
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
@@ -465,6 +465,7 @@ function SmartCampusHorizontalSection() {
   const navigate = useNavigate()
   const config = useSmartCampusConfig()
   const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
+  const [externalItem, setExternalItem] = useState<KioskToolboxItem | null>(null)
   const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
     .filter((key) => config.modules[key])
     .map((key) => SMART_CAMPUS_TILES[key])
@@ -532,11 +533,12 @@ function SmartCampusHorizontalSection() {
             )
           })}
           {campusItems.map((item) => (
-            <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} accent="blue" />
+            <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} accent="blue" />
           ))}
         </div>
       </section>
-      <QrLaunchModal item={qrItem} onClose={() => setQrItem(null)} />
+      <QrLaunchModal item={qrItem} placement="smart_campus" onClose={() => setQrItem(null)} />
+      <ExternalLaunchModal item={externalItem} placement="smart_campus" onClose={() => setExternalItem(null)} />
     </>
   )
 }
@@ -576,14 +578,19 @@ function useToolboxConfig() {
   return config
 }
 
-function launchKioskAppItem(item: KioskToolboxItem, navigate: ReturnType<typeof useNavigate>, onQr: (item: KioskToolboxItem) => void) {
+function launchKioskAppItem(
+  item: KioskToolboxItem,
+  navigate: ReturnType<typeof useNavigate>,
+  onQr: (item: KioskToolboxItem) => void,
+  onExternal: (item: KioskToolboxItem) => void,
+) {
   const launchMode = item.launchMode ?? 'internal_route'
   if (launchMode === 'internal_route' && item.to) {
     navigate(item.to)
     return
   }
   if (launchMode === 'external_url' && item.externalUrl) {
-    window.location.assign(item.externalUrl)
+    onExternal(item)
     return
   }
   if ((launchMode === 'qr_code' || launchMode === 'mini_program_qr') && item.qrImageUrl) {
@@ -606,40 +613,15 @@ function itemBadge(item: KioskToolboxItem): string | null {
   return null
 }
 
-function QrLaunchModal({ item, onClose }: { item: KioskToolboxItem | null; onClose: () => void }) {
-  if (!item) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 backdrop-blur-sm">
-      <div className="w-[min(420px,100%)] rounded-[28px] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.3)]">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-2xl font-extrabold text-slate-950">{item.title}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500">{item.description || '请扫码继续办理'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 hover:bg-slate-200"
-            aria-label="关闭"
-          >
-            <XIcon className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="mt-6 flex justify-center rounded-[24px] bg-slate-50 p-5">
-          <img src={item.qrImageUrl ?? ''} alt={`${item.title}二维码`} className="h-64 w-64 rounded-2xl object-contain" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function ToolboxItemButton({
   item,
   onQr,
+  onExternal,
   accent = 'slate',
 }: {
   item: KioskToolboxItem
   onQr: (item: KioskToolboxItem) => void
+  onExternal: (item: KioskToolboxItem) => void
   accent?: 'slate' | 'blue'
 }) {
   const navigate = useNavigate()
@@ -651,7 +633,7 @@ function ToolboxItemButton({
     <button
       type="button"
       disabled={disabled}
-      onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr)}
+      onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
       className={[
         'relative min-h-[128px] rounded-[24px] border border-slate-200 bg-slate-50/72 p-5 text-left transition-all',
         disabled
@@ -678,7 +660,8 @@ function ToolboxItemButton({
 function ToolboxSection() {
   const config = useToolboxConfig()
   const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
-  const items = config.enabled ? [...config.items].sort((a, b) => a.sortOrder - b.sortOrder) : []
+  const [externalItem, setExternalItem] = useState<KioskToolboxItem | null>(null)
+  const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
   if (!config.enabled) return null
 
@@ -697,7 +680,7 @@ function ToolboxSection() {
         <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
           {items.length > 0 ? (
             items.map((item) => (
-              <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} />
+              <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
             ))
           ) : (
             <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/72 p-6">
@@ -709,7 +692,8 @@ function ToolboxSection() {
           )}
         </div>
       </section>
-      <QrLaunchModal item={qrItem} onClose={() => setQrItem(null)} />
+      <QrLaunchModal item={qrItem} placement="toolbox" onClose={() => setQrItem(null)} />
+      <ExternalLaunchModal item={externalItem} placement="toolbox" onClose={() => setExternalItem(null)} />
     </>
   )
 }
