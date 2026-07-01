@@ -11,17 +11,29 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { submitResumeParse } from '../../services/api'
 import { saveAiResumeSession } from './aiResumeSession'
+import {
+  RESUME_SCORING_DIMENSIONS,
+  type ResumeScoringDimensionKey,
+  type ResumeTargetContext,
+} from '@ai-job-print/shared'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
 
-const STEPS: { key: Step; label: string; duration: number }[] = [
-  { key: 'reading',    label: '读取上传文件', duration: 800 },
-  { key: 'ocr',        label: '识别可解析文字', duration: 1500 },
-  { key: 'extracting', label: '提取简历结构', duration: 1200 },
-  { key: 'diagnosing', label: '生成诊断报告', duration: 1800 },
+const STEPS: { key: Step; label: string }[] = [
+  { key: 'reading',    label: '读取上传文件' },
+  { key: 'ocr',        label: '识别可解析文字' },
+  { key: 'extracting', label: '提取简历结构' },
+  { key: 'diagnosing', label: '生成诊断报告' },
 ]
 
-const DIMENSIONS = ['基础信息完整度', '教育经历完整度', '实习/项目经历表达', '技能关键词覆盖', '排版可读性']
+const DIMENSIONS = RESUME_SCORING_DIMENSIONS.map((item) => item.label)
+const MIN_STEP_MS = 420
+const DIMENSION_PROGRESS_BY_STEP: Record<Step, number> = {
+  reading: 1,
+  ocr: 2,
+  extracting: 4,
+  diagnosing: DIMENSIONS.length,
+}
 
 const FAIL_REASONS = [
   '文件格式不支持，请重新上传',
@@ -29,6 +41,10 @@ const FAIL_REASONS = [
   '结构提取超时，请稍后重试',
   'AI 诊断服务暂时不可用，请稍后重试',
 ]
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export function ResumeParsePage() {
   const navigate = useNavigate()
@@ -55,13 +71,25 @@ export function ResumeParsePage() {
 
   const navigateSuccess = useCallback(async () => {
     const file = state?.file as { name?: string; format?: string } | undefined
+    const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
+    if (!fileId) {
+      navigateFail('请先上传简历文件，再开始 AI 诊断')
+      return
+    }
+    const selectedDimensions = Array.isArray(state?.selectedDimensions)
+      ? (state.selectedDimensions as ResumeScoringDimensionKey[])
+      : undefined
+    const targetContext = state?.targetContext as ResumeTargetContext | undefined
     try {
+      setCurrent('diagnosing')
       const result = await submitResumeParse(
         {
-          fileId:     typeof state?.fileId === 'string' ? state.fileId : `local-${Date.now()}`,
+          fileId,
           fileName:   file?.name   ?? 'resume.pdf',
           fileFormat: file?.format ?? 'pdf',
           source:     (typeof state?.source === 'string' ? state.source : 'upload') as 'upload' | 'scan' | 'manual',
+          selectedDimensions,
+          targetContext,
         },
         getToken(),
       )
@@ -89,37 +117,31 @@ export function ResumeParsePage() {
 
   useEffect(() => {
     cancelRef.current = false
-
-    const advance = (idx: number) => {
-      if (idx >= STEPS.length) {
-        if (!cancelRef.current) { navigateSuccess() }
+    const run = async () => {
+      setCurrent('reading')
+      await delay(MIN_STEP_MS)
+      if (cancelRef.current) return
+      setCurrent('ocr')
+      if (shouldFail) {
+        navigateFail(failReason)
         return
       }
-      const step = STEPS[idx]
-      const duration =
-        shouldFail && step.key === 'ocr' ? Math.floor(step.duration / 2) : step.duration
-
-      setTimeout(() => {
-        if (cancelRef.current) return
-        if (shouldFail && step.key === 'ocr') {
-          navigateFail(failReason)
-          return
-        }
-        const next = STEPS[idx + 1]
-        if (next) setCurrent(next.key)
-        advance(idx + 1)
-      }, duration)
+      await delay(MIN_STEP_MS)
+      if (cancelRef.current) return
+      setCurrent('extracting')
+      await delay(MIN_STEP_MS)
+      if (!cancelRef.current) await navigateSuccess()
     }
-
-    advance(0)
+    void run()
     return () => { cancelRef.current = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const currentIdx = STEPS.findIndex((s) => s.key === current)
+  const completedDimensionCount = DIMENSION_PROGRESS_BY_STEP[current]
 
   return (
-    <div className="flex h-full flex-col items-center justify-center p-8">
+    <div className="flex h-full flex-col items-center justify-center p-8" role="status" aria-live="polite">
       {/* 状态图标 */}
       <div
         className={[
@@ -142,13 +164,13 @@ export function ResumeParsePage() {
       </p>
 
       {!failed && (
-        <div className="mt-8 grid w-full max-w-3xl grid-cols-5 gap-3">
+        <div className="mt-8 grid w-full max-w-3xl grid-cols-2 gap-3 md:grid-cols-6">
           {DIMENSIONS.map((item, idx) => (
             <div
               key={item}
               className={[
                 'rounded-2xl border px-3 py-3 text-center text-xs font-semibold transition-colors',
-                idx <= Math.min(currentIdx + 1, DIMENSIONS.length - 1) ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-400',
+                idx < completedDimensionCount ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-400',
               ].join(' ')}
             >
               {item}

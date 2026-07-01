@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-29
+> 最后更新：2026-07-01
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -91,7 +91,9 @@
 - [x] **预生产 Gate 4 AI 导出产物补证**：真实 AI 导出产物自动标记 `assetCategory=optimized` / `sourceFileId` 的链路已部署到预生产 `76c06ca8`；自动 Gate 通过 `verify:production-runtime-gates`、`verify:production-db-guard`、`verify:resume-generate`、`verify:file-retention`；真实 COS 补证显示导出文件 digest `34f964913eec`、`assetCategory=optimized`、`sourceMatches=true`、COS HEAD 200、短 TTL 签名 URL 200→403、会员 B 拒绝访问。该项仍不是完整浏览器截图验收、正式生产或试运营完成。
 - [x] **预生产 Gate 4 浏览器会员路径证据补齐**：2026-06-26 使用真实短信登录路径完成会员页、合成 PDF 上传窗口和 `/me/documents` 会员文件与保存期限截图；证据保存在仓库外 `/Users/wanglei/gate4-evidence/gate4-browser-20260625231841`，包含 `evidence-summary.md`、3 张 Chrome 窗口截图和合成测试 PDF。全程不把完整手机号、验证码、token、cookie、签名 URL 或 COS XML 写入仓库；坏的全屏截图 / Playwright 中间文件已删除；预生产中可见的 `gate4-synthetic-resume.pdf` 测试记录已清理。该项仍不等于完整 Gate 4 浏览器验收、正式生产或试运营完成。
 - [ ] **预生产 Gate 4 剩余浏览器证据补齐**：仍需补 Admin 生命周期视图、签名 URL / 等待窗口、必要时 COS 控制台或 DB 脱敏摘要等剩余证据；执行前必须继续按 runbook 确认仓库外证据目录、地址栏 / 签名 URL / COS XML / 手机号 / token 脱敏规则，以及 Admin 仅筛选本轮测试文件；腾讯短信审核通过后还需用真实短信完成会员登录 E2E，避免把预生产 API/COS/部分浏览器证据误写成正式生产或完整试运营验收。
-- [ ] **AI 简历诊断手机扫码上传联调复验**：本地 API + Redis + `FILE_STORAGE_DRIVER=local` 已通过 `verify:upload-sessions:http`，覆盖创建二维码会话、手机 multipart 上传 synthetic PDF、Kiosk 轮询 / 确认 / 取消、安全门禁、精确错误码、本地测试文件清理、member 真实 JWT + Redis session 成功绑定、匿名 / 其他会员 confirm 越权拒绝、status throttle、已绑定会员文件 cleanup 防误删和手机 token 仅从 fragment 读取；浏览器实际点击 `/resume/source` 可生成二维码且无会话创建错误。脚本默认不触发 `/resume/parse`、OCR 或 AI 配额；运行前必须确认被测 API 进程本身也以 `FILE_STORAGE_DRIVER=local` 启动。后续仍需在域名审核 / HTTPS / 反代 / H5 fallback 就绪后，用预生产或真机隔离对象存储和真实可解析 PDF 跑完整浏览器 E2E，覆盖手机上传真实简历、OCR/AI 诊断成功、报告页回填、会员绑定 / 我的简历资产回看和打印 / 导出入口；另需择期补 `/health` 暴露存储 driver、`EndUser.enabled` 可选会员一致性和 Multer 超限错误码统一。
+- [ ] **AI 简历诊断 Phase 1 预生产 / 真机复验**：本地代码已补齐诊断重点维度、目标方向、真实 6 维处理页、无 `local-*` 假 fileId、脱敏审计、无虚假提分和四页商用 UI 收口；本地通过 `verify:resume-diagnosis-context`、`verify:resume-diagnosis-flow-ui`、API / shared / Kiosk typecheck、API lint、Kiosk lint、Kiosk 生产构建和 `verify-real-resume-diagnosis`。后续仍需在预生产 HTTPS / H5 / 隔离对象存储 / 真实 OCR+LLM 环境，用真实可解析 PDF 跑完整浏览器 E2E：手机扫码上传 → 一体机确认 → `/resume/parse` → OCR/AI 诊断成功 → 报告页目标方向回显 → 继续优化 / 岗位匹配参考 / 会员资产回看。
+- [ ] **AI 简历诊断 Phase 2 导出与运维闭环**：另起独立设计与分支补诊断报告 PDF 服务端导出、`FileObject` 入库、我的文档 / 打印入口、隐私授权 consent 版本记录、UploadSession create / upload / confirm / cancel 脱敏审计和 Admin 上传会话监控；不得与 Phase 1 继续混在同一轮。
+- [ ] **AI 简历诊断真机外设闭环**：U盘必须走 Windows Agent 或受控通道，扫描必须走奔图 / Windows 真机扫描与真实 OCR，Word / 图片导出必须服务端真实生成；真机验收前只允许显示待接入或禁用状态，不得包装成已完成能力。
 - [x] **求职材料库真实浏览器与预生产验收**：已部署 `codex/job-materials-commercial-closure` 的 `64596c18` 运行时包到预生产；远端 `verify:job-materials` 在 PostgreSQL + COS 环境通过，Kiosk/Admin 静态 UI verify 通过，公网浏览器完成 `/resume/templates?tab=materials -> 登录 -> 生成 PDF -> /me/documents -> /print/confirm` 链路。执行中临时切 `SMS_PROVIDER=log`，结束后已回滚 `SMS_PROVIDER=tencent`；本轮受控测试 EndUser、FileObject、AuditLog 和 COS 对象已清理。该验收仍不代表正式生产、正式域名 HTTPS、真实短信上线 E2E、Windows 真机出纸或试运营完成。
 - [ ] **求职材料库 Windows 真机打印验收**：待正式或试运营环境具备 Windows Terminal Agent、奔图打印机和真实出纸条件后，使用求职材料生成的 PDF 从 `/print/confirm` 进入打印任务，验收 Agent claim、驱动出纸、失败恢复、订单状态与异常反馈；该项未完成前不得宣称求职材料库达到真机商用闭环。
 - [ ] **求职材料库二期动态治理设计**：如要开放 Admin 模板 CRUD、Partner 模板申请、版权素材上传、套餐收费或岗位关键词辅助，必须另起独立设计与审查，先补审核流、版权归属、字段白名单、滥用风控和合规文案，再写代码。

@@ -15,8 +15,14 @@ import {
   UploadCloudIcon,
   UsbIcon,
 } from 'lucide-react'
+import {
+  RESUME_SCORING_DIMENSIONS,
+  type ResumeScoringDimensionKey,
+  type ResumeTargetContext,
+} from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
 import { UploadSessionQrPanel, type PhoneUploadedResumeFile } from '../upload/components/UploadSessionQrPanel'
+import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
 
@@ -33,14 +39,14 @@ const UPLOAD_OPTIONS: UploadOption[] = [
     type: 'usb',
     label: 'U盘上传',
     description: '从已插入一体机的 U 盘中选择简历文件',
-    helper: '当前通过系统文件选择器读取 U 盘文件；后续可由 Windows Agent 接管盘符直达。',
+    helper: '只读取你主动选择的文件，上传完成后即可拔出 U 盘。',
     icon: UsbIcon,
   },
   {
     type: 'cloud',
     label: '云端上传',
     description: '选择云盘同步目录或本机下载目录中的简历文件',
-    helper: '不保存云盘账号，不直接连接第三方网盘；只上传用户主动选择的本地文件。',
+    helper: '适合先把云盘文件下载到本机目录后选择；不会保存你的云盘账号。',
     icon: CloudUploadIcon,
   },
   {
@@ -52,18 +58,13 @@ const UPLOAD_OPTIONS: UploadOption[] = [
   },
 ]
 
-// 与后端 Phase 1.1 真实报告结构对齐:6 评分维度 + 风险表述提醒 + 修改优先级建议
+// 与后端真实报告结构对齐:6 评分维度 + 风险表述提醒 + 修改优先级建议
 const DIAGNOSIS_DIMENSIONS = [
-  '基础信息完整度',
-  '求职目标清晰度',
-  '经历表达清晰度',
-  '成果量化程度',
-  '岗位关键词覆盖',
-  '版式与可读性',
+  ...RESUME_SCORING_DIMENSIONS.map((item) => item.label),
   '风险表述提醒',
   '修改优先级建议',
 ]
-
+const DEFAULT_SELECTED_DIMENSIONS: ResumeScoringDimensionKey[] = ['keyword', 'quantification', 'experience']
 // ── intent 分流(diagnose / optimize):同一上传链路,不同语义引导 ──────────────
 type ResumeIntent = 'diagnose' | 'optimize'
 
@@ -140,8 +141,33 @@ export function ResumeSourcePage() {
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [genericDiagnosis, setGenericDiagnosis] = useState(false)
+  const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
+  const [targetIndustry, setTargetIndustry] = useState('互联网/科技')
+  const [targetJob, setTargetJob] = useState('')
+  const [targetExperience, setTargetExperience] = useState<ResumeTargetContext['experience']>('应届')
+  const [targetScene, setTargetScene] = useState<ResumeTargetContext['scene']>('校招')
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading || phoneBusy)
+
+  const toggleDimension = (key: ResumeScoringDimensionKey) => {
+    setSelectedDimensions((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key],
+    )
+  }
+
+  const buildTargetContext = (): ResumeTargetContext => {
+    if (genericDiagnosis) return { skipped: true }
+    return {
+      industry: targetIndustry,
+      targetJob: targetJob.trim() || undefined,
+      experience: targetExperience,
+      scene: targetScene,
+      skipped: false,
+    }
+  }
 
   const handleSelect = (option: UploadOption) => {
     setError(null)
@@ -198,6 +224,8 @@ export function ResumeSourcePage() {
         uploadChannel: uploadedFile.channel,
         file: { name: uploadedFile.name, size: uploadedFile.size, format: uploadedFile.format },
         fileId: uploadedFile.fileId,
+        selectedDimensions: genericDiagnosis ? [] : selectedDimensions,
+        targetContext: buildTargetContext(),
       },
     })
   }
@@ -358,6 +386,21 @@ export function ResumeSourcePage() {
             <p>诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
           </div>
         </Card>
+
+        <DiagnosisDirectionForm
+          genericDiagnosis={genericDiagnosis}
+          selectedDimensions={selectedDimensions}
+          targetIndustry={targetIndustry}
+          targetJob={targetJob}
+          targetExperience={targetExperience}
+          targetScene={targetScene}
+          onGenericDiagnosisChange={setGenericDiagnosis}
+          onToggleDimension={toggleDimension}
+          onTargetIndustryChange={setTargetIndustry}
+          onTargetJobChange={setTargetJob}
+          onTargetExperienceChange={setTargetExperience}
+          onTargetSceneChange={setTargetScene}
+        />
       </div>
 
       {error && (

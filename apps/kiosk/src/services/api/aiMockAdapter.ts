@@ -26,11 +26,12 @@ import type { ResumeReadAccess } from './ai'
 
 const MOCK_REPORT: ResumeReport = {
   sections: [
-    { key: 'basic',      label: '基础信息完整度',     score: 8, maxScore: 10 },
-    { key: 'education',  label: '教育经历完整度',     score: 9, maxScore: 10 },
-    { key: 'experience', label: '实习/项目经历表达', score: 6, maxScore: 10 },
-    { key: 'skills',     label: '技能关键词覆盖',     score: 5, maxScore: 10 },
-    { key: 'layout',     label: '排版可读性',         score: 7, maxScore: 10 },
+    { key: 'basic',          label: '基础信息完整度', score: 8, maxScore: 10 },
+    { key: 'objective',      label: '求职目标清晰度', score: 6, maxScore: 10 },
+    { key: 'experience',     label: '经历表达清晰度', score: 6, maxScore: 10 },
+    { key: 'quantification', label: '成果量化程度',   score: 5, maxScore: 10 },
+    { key: 'keyword',        label: '岗位关键词覆盖', score: 5, maxScore: 10 },
+    { key: 'readability',    label: '版式与可读性',   score: 7, maxScore: 10 },
   ],
   suggestions: [
     '项目描述建议使用"负责、主导、实现"等动词开头，尽量量化成果',

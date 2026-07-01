@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
+import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
 import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
@@ -35,6 +35,38 @@ function targetSummary(tc?: ResumeTargetContext): string | null {
   if (tc.skipped) return '通用诊断（未指定方向）'
   const parts = [tc.industry, tc.targetJob, tc.experience, tc.scene].filter(Boolean)
   return parts.length ? parts.join(' · ') : null
+}
+
+function ReportNoticePanel({
+  isDemoReport,
+  extractionNotice,
+}: {
+  isDemoReport: boolean
+  extractionNotice?: ReportState['extractionNotice']
+}) {
+  const notices = [
+    isDemoReport ? COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE : null,
+    '本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。',
+    extractionNotice
+      ? `本简历经文字识别（OCR）提取，识别置信度${
+        extractionNotice.confidence === 'high' ? '较高' : extractionNotice.confidence === 'medium' ? '中等' : '较低'
+      }。${extractionNotice.warnings.length > 0 ? ` ${extractionNotice.warnings.join('；')}。` : ''}`
+      : null,
+  ].filter((item): item is string => Boolean(item))
+
+  return (
+    <Card className="border-primary-100 bg-primary-50/40 p-4">
+      <p className="text-sm font-semibold text-gray-900">报告说明</p>
+      <ul className="mt-2 grid gap-2 text-xs leading-relaxed text-gray-600 md:grid-cols-2">
+        {notices.map((notice) => (
+          <li key={notice} className="flex gap-2">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+            <span>{notice}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
 }
 
 export function ResumeReportPage() {
@@ -177,36 +209,6 @@ export function ResumeReportPage() {
       />
 
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* 演示数据提示：mock 模式或后端 provider=mock 时明确标记，避免把样例报告当真实报告 */}
-        {(API_MODE !== 'http' || providerName === 'mock') && (
-          <ComplianceBanner tone="info">
-            {COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}
-          </ComplianceBanner>
-        )}
-
-        <ComplianceBanner tone="success" title="报告边界">
-          本报告仅基于上传文件中可解析出的内容生成，供本人修改简历时参考；不会发送给企业，也不代表录用、面试或投递结果。
-        </ComplianceBanner>
-
-        {/* Stage 3:扫描件/图片经 OCR 识别 → 如实标注来源与置信度;低置信度提示人工核对 */}
-        {extractionNotice && (
-          <ComplianceBanner tone="info" title={extractionNotice.textSource === 'pdf_ocr' ? '扫描件识别说明' : '图片识别说明'}>
-            本简历经文字识别（OCR）提取，识别置信度
-            {extractionNotice.confidence === 'high' ? '较高' : extractionNotice.confidence === 'medium' ? '中等' : '较低'}。
-            {extractionNotice.warnings.length > 0 ? ` ${extractionNotice.warnings.join('；')}。` : ''}
-          </ComplianceBanner>
-        )}
-
-        {/* 目标方向摘要 */}
-        {summary && (
-          <div className="flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
-            <TargetIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
-            <p className="text-sm text-gray-700">
-              目标方向：<span className="font-medium text-primary-700">{summary}</span>
-            </p>
-          </div>
-        )}
-
         {/* 总分卡片 */}
         <Card className="p-5">
           <div className="flex items-center justify-between">
@@ -216,6 +218,12 @@ export function ResumeReportPage() {
                 <span className="text-xl text-gray-400">/{totalMax}</span>
               </div>
               <p className="mt-1 text-xs text-gray-400">参考评分，由当前 AI 报告分项汇总，不代表真实招聘结果</p>
+              {summary && (
+                <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+                  <TargetIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  目标方向：{summary}
+                </p>
+              )}
             </div>
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
               <CheckCircleIcon className="h-8 w-8 text-primary-600" />
@@ -228,6 +236,11 @@ export function ResumeReportPage() {
           <p className="mb-2 text-sm font-medium text-gray-700">能力雷达图</p>
           <ResumeRadarChart dimensions={radarDimensions} height={280} />
         </Card>
+
+        <ReportNoticePanel
+          isDemoReport={API_MODE !== 'http' || providerName === 'mock'}
+          extractionNotice={extractionNotice}
+        />
 
         {/* 分项得分 */}
         <Card className="p-5">
@@ -245,6 +258,11 @@ export function ResumeReportPage() {
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-gray-100">
                     <div
+                      role="progressbar"
+                      aria-label={`${section.label}得分`}
+                      aria-valuenow={section.score}
+                      aria-valuemin={0}
+                      aria-valuemax={section.maxScore}
                       className="h-full rounded-full bg-primary-500 transition-all"
                       style={{ width: `${pct}%` }}
                     />
