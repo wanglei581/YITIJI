@@ -42,6 +42,24 @@ export interface ResumePriority {
   reason: string
 }
 
+/** AI 简历诊断固定 6 个评分维度（key 为跨端协议，不随 UI 文案漂移）。 */
+export const RESUME_SCORING_DIMENSIONS = [
+  { key: 'basic',          label: '基础信息完整度' },
+  { key: 'objective',      label: '求职目标清晰度' },
+  { key: 'experience',     label: '经历表达清晰度' },
+  { key: 'quantification', label: '成果量化程度' },
+  { key: 'keyword',        label: '岗位关键词覆盖' },
+  { key: 'readability',    label: '版式与可读性' },
+] as const
+
+export type ResumeScoringDimensionKey = typeof RESUME_SCORING_DIMENSIONS[number]['key']
+
+export const RESUME_TARGET_EXPERIENCE_OPTIONS = ['应届', '1-3年', '3-5年', '5年以上'] as const
+export type ResumeTargetExperience = typeof RESUME_TARGET_EXPERIENCE_OPTIONS[number]
+
+export const RESUME_TARGET_SCENE_OPTIONS = ['校招', '社招', '转岗', '招聘会现场'] as const
+export type ResumeTargetScene = typeof RESUME_TARGET_SCENE_OPTIONS[number]
+
 /**
  * 简历诊断报告
  * 合规：分数为参考评估，不代表真实招聘结果
@@ -61,11 +79,9 @@ export interface ResumeReport {
 }
 
 /**
- * 求职目标方向上下文（用户在 /resume/target 选择）
+ * 求职目标方向上下文（用户在 /resume/source 同页设置）
  *
- * 仅用于前端流程内的 location.state 传递与报告/优化页摘要展示，
- * 暂不随 ResumeParseRequest 发送到后端（避免破坏现有 DTO 校验）。
- * 后端支持后再接入。合规：仅用于求职准备方向，不做企业匹配/录用预测。
+ * 合规：仅用于求职准备方向和简历表达诊断，不做企业匹配、录用预测或站内投递结论。
  */
 export interface ResumeTargetContext {
   /** 行业方向（如 互联网/科技、制造业、通用） */
@@ -73,9 +89,9 @@ export interface ResumeTargetContext {
   /** 目标岗位（自由文本，可空） */
   targetJob?: string
   /** 经验级别（应届/1-3年/3-5年/5年以上） */
-  experience?: string
+  experience?: ResumeTargetExperience
   /** 求职场景（校招/社招/转岗/招聘会现场） */
-  scene?: string
+  scene?: ResumeTargetScene
   /** 是否为"暂不指定，通用诊断" */
   skipped?: boolean
 }
@@ -90,6 +106,10 @@ export interface ResumeParseRequest {
   fileFormat: string
   /** 来源方式 */
   source: 'upload' | 'scan' | 'manual'
+  /** 用户选择的重点诊断维度。只影响建议重点，不裁剪后端固定 6 维输出结构。 */
+  selectedDimensions?: ResumeScoringDimensionKey[]
+  /** 目标方向上下文。仅用于本人简历表达诊断，不进入企业侧能力。 */
+  targetContext?: ResumeTargetContext
 }
 
 /** 简历解析响应（后端 → 前端） */

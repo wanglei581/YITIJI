@@ -1,5 +1,12 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
-import type { ResumePriority, ResumeReport, ResumeSection } from '../interfaces/ai-provider.interface'
+import { RESUME_SCORING_DIMENSIONS } from '../interfaces/ai-provider.interface'
+import type {
+  ResumePriority,
+  ResumeReport,
+  ResumeScoringDimensionKey,
+  ResumeSection,
+  ResumeTargetContext,
+} from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
 
@@ -27,15 +34,11 @@ const MAX_ITEM_CHARS = 120
 const MAX_PRIORITY_FOCUS_CHARS = 40
 
 /** 固定 6 评分维度（key 与 mock 对齐，驱动前端雷达图/总分/分项）。 */
-const DIAGNOSIS_DIMENSIONS = [
-  { key: 'basic', label: '基础信息完整度' },
-  { key: 'objective', label: '求职目标清晰度' },
-  { key: 'experience', label: '经历表达清晰度' },
-  { key: 'quantification', label: '成果量化程度' },
-  { key: 'keyword', label: '岗位关键词覆盖' },
-  { key: 'readability', label: '版式与可读性' },
-] as const
+const DIAGNOSIS_DIMENSIONS = RESUME_SCORING_DIMENSIONS
 const DIAGNOSIS_DIMENSION_KEYS = new Set<string>(DIAGNOSIS_DIMENSIONS.map((d) => d.key))
+const DIAGNOSIS_DIMENSION_LABEL_BY_KEY = new Map<string, string>(
+  DIAGNOSIS_DIMENSIONS.map((d) => [d.key, d.label]),
+)
 
 /**
  * 诊断专属合规拦截词（与管理员可配 forbiddenWords 叠加，恒定生效、不依赖后台配置）。
@@ -68,15 +71,78 @@ const DIAGNOSIS_SYSTEM_PROMPT = [
   '6. priorities：2~4 条「修改优先级建议」，按重要性从高到低排序，每条形如 {"focus":"要先改什么","reason":"为什么"}。',
   '7. 不得编造简历中不存在的经历、学历、技能或成果；信息不足时在 suggestions / riskNotes 中如实指出需补充。',
   '8. 「岗位关键词覆盖」只评估简历文本是否覆盖常见岗位表达，不做任何匹配程度类结论或代投 / 推荐类结论。',
-  '9. 不得输出任何招聘结果类结论、匹配程度类结论、代投或推荐类结论、企业筛选类结论，也不得做“保过”类承诺。',
-  '10. 所有内容只服务于求职者本人修改简历参考，不得整段回贴简历原文。',
+  '9. 若收到诊断重点维度或目标方向，只能用于调整 suggestions / priorities 的关注重点与排序；不得裁剪 sections，必须完整 6 维输出。',
+  '10. 目标岗位、行业或场景只用于评估简历表达是否清晰覆盖相关准备方向，不得输出任何招聘结果类结论、匹配程度类结论、代投或推荐类结论、企业筛选类结论，也不得做“保过”类承诺。',
+  '11. 所有内容只服务于求职者本人修改简历参考，不得整段回贴简历原文。',
 ].join('\n')
 
 const RETRY_HINT =
   '上次输出不是合法 JSON。请只返回一个符合要求的 JSON 对象，不要任何多余文字、解释或代码块标记。'
 
-function buildDiagnosisUserPrompt(text: string): string {
-  return `以下是待诊断的简历文本（仅供本次诊断使用）：\n"""\n${text}\n"""\n请按系统要求输出 JSON 诊断结果。`
+export interface ResumeDiagnosisContext {
+  selectedDimensions?: ResumeScoringDimensionKey[]
+  targetContext?: ResumeTargetContext
+}
+
+function cleanText(value: unknown, maxLen: number): string | null {
+  if (typeof value !== 'string') return null
+  const text = [...value]
+    .map((ch) => {
+      const code = ch.charCodeAt(0)
+      return code < 32 || code === 127 ? ' ' : ch
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text ? text.slice(0, maxLen) : null
+}
+
+function uniqueSelectedDimensions(keys?: readonly ResumeScoringDimensionKey[]): ResumeScoringDimensionKey[] {
+  if (!Array.isArray(keys)) return []
+  const out: ResumeScoringDimensionKey[] = []
+  for (const key of keys) {
+    if (!DIAGNOSIS_DIMENSION_KEYS.has(key)) continue
+    if (!out.includes(key)) out.push(key)
+  }
+  return out
+}
+
+function buildDiagnosisContextPrompt(context?: ResumeDiagnosisContext): string {
+  const lines: string[] = []
+  const selected = uniqueSelectedDimensions(context?.selectedDimensions)
+  if (selected.length > 0) {
+    const labels = selected
+      .map((key) => DIAGNOSIS_DIMENSION_LABEL_BY_KEY.get(key))
+      .filter((label): label is string => Boolean(label))
+    lines.push(`重点诊断维度：${labels.join('、')}。请优先在 suggestions / priorities 中覆盖这些重点，但不裁剪 sections，必须完整 6 维输出。`)
+  }
+
+  const target = context?.targetContext
+  if (target) {
+    if (target.skipped) {
+      lines.push('目标方向：用户选择通用诊断（未指定方向）。')
+    } else {
+      const industry = cleanText(target.industry, 40)
+      const targetJob = cleanText(target.targetJob, 80)
+      const experience = cleanText(target.experience, 20)
+      const scene = cleanText(target.scene, 20)
+      const parts = [
+        industry ? `行业方向=${industry}` : '',
+        targetJob ? `目标岗位=${targetJob}` : '',
+        experience ? `经验级别=${experience}` : '',
+        scene ? `求职场景=${scene}` : '',
+      ].filter(Boolean)
+      if (parts.length > 0) {
+        lines.push(`目标方向上下文（仅用于本人简历表达诊断，不做企业匹配或录用预测）：${parts.join('；')}。`)
+      }
+    }
+  }
+
+  return lines.length > 0 ? `${lines.join('\n')}\n` : ''
+}
+
+function buildDiagnosisUserPrompt(text: string, context?: ResumeDiagnosisContext): string {
+  return `${buildDiagnosisContextPrompt(context)}以下是待诊断的简历文本（仅供本次诊断使用）：\n"""\n${text}\n"""\n请按系统要求输出 JSON 诊断结果。`
 }
 
 interface ChatMessage {
@@ -96,7 +162,7 @@ export class LlmResumeService {
    * - 非法 JSON / 维度漂移 → 重试一次；仍失败 → 抛 AI_DIAGNOSIS_INVALID_OUTPUT。
    * - 连接 / HTTP 错误 → 抛 AI_DIAGNOSIS_UNAVAILABLE。
    */
-  async diagnose(extractedText: string): Promise<ResumeReport> {
+  async diagnose(extractedText: string, context?: ResumeDiagnosisContext): Promise<ResumeReport> {
     const apiKey = this.config.getApiKey('resume_diagnosis')
     const cfg = this.config.getConfig('resume_diagnosis')
     if (!apiKey || !cfg.enabled) {
@@ -108,7 +174,7 @@ export class LlmResumeService {
     const text = (extractedText ?? '').slice(0, MAX_DIAGNOSIS_INPUT_CHARS)
     const baseMessages: ChatMessage[] = [
       { role: 'system', content: DIAGNOSIS_SYSTEM_PROMPT },
-      { role: 'user', content: buildDiagnosisUserPrompt(text) },
+      { role: 'user', content: buildDiagnosisUserPrompt(text, context) },
     ]
 
     for (let attempt = 1; attempt <= 2; attempt++) {

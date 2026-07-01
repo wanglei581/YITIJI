@@ -29,6 +29,37 @@ export interface ResumePriority {
   reason: string
 }
 
+/** AI 简历诊断固定 6 个评分维度（key 为跨端协议，不随 UI 文案漂移）。 */
+export const RESUME_SCORING_DIMENSIONS = [
+  { key: 'basic',          label: '基础信息完整度' },
+  { key: 'objective',      label: '求职目标清晰度' },
+  { key: 'experience',     label: '经历表达清晰度' },
+  { key: 'quantification', label: '成果量化程度' },
+  { key: 'keyword',        label: '岗位关键词覆盖' },
+  { key: 'readability',    label: '版式与可读性' },
+] as const
+
+export type ResumeScoringDimensionKey = typeof RESUME_SCORING_DIMENSIONS[number]['key']
+
+export const RESUME_TARGET_EXPERIENCE_OPTIONS = ['应届', '1-3年', '3-5年', '5年以上'] as const
+export type ResumeTargetExperience = typeof RESUME_TARGET_EXPERIENCE_OPTIONS[number]
+
+export const RESUME_TARGET_SCENE_OPTIONS = ['校招', '社招', '转岗', '招聘会现场'] as const
+export type ResumeTargetScene = typeof RESUME_TARGET_SCENE_OPTIONS[number]
+
+/**
+ * 求职目标方向上下文。
+ *
+ * 合规：仅用于求职者本人修改简历参考，不做企业匹配、录用预测或站内投递结论。
+ */
+export interface ResumeTargetContext {
+  industry?: string
+  targetJob?: string
+  experience?: ResumeTargetExperience
+  scene?: ResumeTargetScene
+  skipped?: boolean
+}
+
 /**
  * 诊断报告：评分仅供参考，不代表真实招聘结果。
  *
@@ -50,6 +81,10 @@ export interface ParseResumeInput {
   fileName: string
   fileFormat: string
   source: 'upload' | 'scan' | 'manual'
+  /** 用户选择的重点诊断维度。只影响建议重点，不裁剪后端固定 6 维输出结构。 */
+  selectedDimensions?: ResumeScoringDimensionKey[]
+  /** 目标方向上下文。仅用于本人简历表达诊断，不进入企业侧能力。 */
+  targetContext?: ResumeTargetContext
   /**
    * 服务端提取的简历文本（Phase 1B）。由 AiService 在调 provider 前经
    * ResumeExtractionService 提取后注入；**不来自前端**（前端只发 fileId）。

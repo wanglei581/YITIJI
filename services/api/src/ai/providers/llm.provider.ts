@@ -53,7 +53,10 @@ export class LlmResumeProvider implements AiProvider {
       return { taskId: nextTaskId(), status: 'failed', failReason: '未获取到简历文本，无法生成诊断报告' }
     }
     try {
-      const report: ResumeReport = await this.resumeLlm.diagnose(text)
+      const report: ResumeReport = await this.resumeLlm.diagnose(text, {
+        selectedDimensions: input.selectedDimensions,
+        targetContext: input.targetContext,
+      })
       return { taskId: nextTaskId(), status: 'completed', report }
     } catch (err) {
       return { taskId: nextTaskId(), status: 'failed', failReason: this.failReasonOf(err) }

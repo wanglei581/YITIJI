@@ -59,6 +59,12 @@ function resumeAccessTokenOf(req: ReqLike): string | null {
   return null
 }
 
+function hasTargetContext(dto: ResumeParseRequestDto): boolean {
+  const target = dto.targetContext
+  if (!target || target.skipped) return false
+  return Boolean(target.industry || target.targetJob || target.experience || target.scene)
+}
+
 // ============================================================
 // AI Controller
 //
@@ -121,6 +127,8 @@ export class AiController {
         taskId: result.taskId,
         status: result.status,
         hasEndUser: Boolean(endUser),
+        selectedDimensionCount: dto.selectedDimensions?.length ?? 0,
+        targetContextProvided: hasTargetContext(dto),
         // 仅记录"是否为匿名结果铸了令牌"（布尔），绝不记录明文 token（合规）。
         accessTokenIssued: Boolean(result.accessToken),
       },

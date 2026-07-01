@@ -13,6 +13,7 @@
     "db:seed": "node -r @swc-node/register prisma/seed.ts",
     "db:seed:fairs": "node -r @swc-node/register prisma/seed-fairs.ts",
     "verify:resume-extraction": "node -r @swc-node/register scripts/verify-resume-extraction.ts",
+    "verify:resume-diagnosis-context": "node -r @swc-node/register scripts/verify-resume-diagnosis-context.ts",
     "verify-real-resume-diagnosis": "node -r @swc-node/register scripts/verify-real-resume-diagnosis.ts",
     "verify:upload-sessions": "node -r @swc-node/register scripts/verify-upload-sessions.ts",
     "verify:upload-sessions:http": "node -r @swc-node/register scripts/verify-upload-sessions-http.ts",

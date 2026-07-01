@@ -26,15 +26,6 @@ import { exportGeneratedResume, getResumeOptimize } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
 
-// ============================================================
-// 优化建议页(阶段2B 真实化):
-//   - 新旧对比(modules):before 为简历原文真实片段(服务端校验),after 为优化表达
-//   - 优化版简历(optimizedResume):结构化、可编辑;事实信息均来自原文,AI 不编造
-//   - 导出 PDF 复用 2A 真实链路(pdfkit → FileObject → 签名 URL) → 进打印
-// 合规:不构造假文件进打印链路;评分提升为估算;不输出录用/投递承诺。
-// ============================================================
-
-// 目标方向摘要文本（无方向时返回 null）
 function targetSummary(tc?: ResumeTargetContext): string | null {
   if (!tc) return null
   if (tc.skipped) return '通用诊断（未指定方向）'
@@ -42,26 +33,10 @@ function targetSummary(tc?: ResumeTargetContext): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
-/**
- * 由 before / after 估算"评分提升"。仅基于改动量的粗略估算,
- * UI 必须配"估算,仅供参考"免责文案,不暗示真实通过率。
- */
-function estimateUplift(modules: ResumeOptimizeModule[]): { before: number; after: number } {
-  if (modules.length === 0) return { before: 70, after: 70 }
-  let totalDelta = 0
-  for (const m of modules) {
-    const beforeLen = m.before.length || 1
-    const afterLen = m.after.length || 1
-    const ratio = Math.min(1, Math.abs(afterLen - beforeLen) / beforeLen + 0.15)
-    totalDelta += ratio * 6
-  }
-  const before = 72
-  const after = Math.min(95, Math.round(before + totalDelta))
-  return { before, after }
-}
-
 const taCls =
-  'w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+  'w-full scroll-mt-32 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+
+type LeaveAction = () => void
 
 function SectionTitle({ title }: { title: string }) {
   return (
@@ -78,7 +53,6 @@ export function ResumeOptimizePage() {
   const { getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
 
-  // 刷新后 location.state 丢失：taskId / accessToken 回退到最小会话（Phase C-2A）。
   const session = useMemo(() => readAiResumeSession(), [])
   const queryTaskId = useMemo(() => new URLSearchParams(location.search).get('taskId') ?? undefined, [location.search])
   const stateTaskId = typeof state?.taskId === 'string' ? state.taskId : undefined
@@ -96,10 +70,13 @@ export function ResumeOptimizePage() {
   const [failMsg,  setFailMsg]  = useState<string | null>(null)
 
   const [exporting, setExporting] = useState(false)
+  const [printNavigating, setPrintNavigating] = useState(false)
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
 
-  useBusyLock(exporting)
+  useBusyLock(exporting || printNavigating)
 
   useEffect(() => {
     if (!taskId) {
@@ -109,8 +86,6 @@ export function ResumeOptimizePage() {
       return
     }
     let cancelled = false
-    // 归属 / 令牌门禁（Phase C-1 + C-2A）：登录会员传 token，匿名用户传 accessToken，
-    // 才能读回 / 懒生成本人优化结果；无凭证后端返回 AI_TASK_NOT_FOUND。
     getResumeOptimize(taskId, { token: getToken(), accessToken })
       .then((res) => {
         if (cancelled) return
@@ -122,7 +97,6 @@ export function ResumeOptimizePage() {
             setFailMsg('暂无优化建议，请返回重新解析')
           }
         } else {
-          // 失败态分类:文件 TTL 过期 / 防编造拦截 / 其它,均给明确文案
           const reason = res.failReason ?? ''
           if (reason.includes('重新上传')) {
             setFailMsg('文件已过期，请重新上传简历')
@@ -136,8 +110,6 @@ export function ResumeOptimizePage() {
     return () => { cancelled = true }
   }, [taskId, accessToken, getToken])
 
-  const uplift = useMemo(() => estimateUplift(modules), [modules])
-
   const handleSaveAdvice = () => {
     const advice = modules.map((m) => ({ title: m.title, before: m.before, after: m.after }))
     navigate('/profile', {
@@ -147,6 +119,19 @@ export function ResumeOptimizePage() {
     })
   }
 
+  const requestLeave = (action: LeaveAction) => {
+    if (isDirty && !exported) {
+      setConfirmLeave(() => action)
+      return
+    }
+    action()
+  }
+
+  const markEdited = () => {
+    setIsDirty(true)
+    if (exported) setExported(null)
+  }
+
   const handleExport = async () => {
     if (!optimizedResume) return
     setExporting(true)
@@ -154,6 +139,7 @@ export function ResumeOptimizePage() {
     try {
       const result = await exportGeneratedResume(optimizedResume, taskId, getToken())
       setExported(result)
+      setIsDirty(false)
     } catch (err) {
       setExportError(err instanceof Error ? err.message : '导出失败，请稍后重试')
     } finally {
@@ -162,7 +148,8 @@ export function ResumeOptimizePage() {
   }
 
   const handlePrint = () => {
-    if (!exported?.signedUrl) return
+    if (printNavigating || !exported?.signedUrl) return
+    setPrintNavigating(true)
     navigate('/print/confirm', {
       state: {
         file: {
@@ -222,10 +209,9 @@ export function ResumeOptimizePage() {
       <PageHeader
         title="优化建议"
         subtitle="基于已有内容优化表达(仅供参考)"
-        actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>}
+        actions={<Button size="sm" variant="secondary" onClick={() => requestLeave(() => navigate(-1))}>返回报告</Button>}
       />
 
-      {/* 演示标记:providerName=mock 时明示;接真实 AI 自动消失 */}
       {providerName === 'mock' && (
         <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <FlaskConicalIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -236,7 +222,7 @@ export function ResumeOptimizePage() {
       <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
         <InfoIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
         <p className="text-xs text-gray-400">
-          {COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}评分提升为估算值,不代表真实招聘结果。
+          {COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}页面只展示表达调整参考,不承诺提分或招聘结果。
         </p>
       </div>
 
@@ -249,40 +235,34 @@ export function ResumeOptimizePage() {
         </div>
       )}
 
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* 评分提升卡(估算) */}
+      <div className={[
+        'mt-4 flex flex-1 flex-col gap-4',
+        confirmLeave ? 'overflow-hidden' : 'overflow-y-auto',
+      ].join(' ')}>
         {modules.length > 0 && (
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700">综合评分提升(估算)</p>
-                <div className="mt-1.5 flex items-baseline gap-3">
-                  <span className="text-2xl font-semibold text-gray-400 line-through">{uplift.before}</span>
-                  <span className="text-3xl">→</span>
-                  <span className="text-3xl font-bold text-primary-600">{uplift.after}</span>
-                  <span className="text-sm text-success-fg">
-                    +{uplift.after - uplift.before} 分
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-gray-400">仅基于改动量估算,不代表真实招聘结果</p>
+                <p className="text-sm font-medium text-gray-700">表达调整参考</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">{modules.length} 组可对照修改项</p>
+                <p className="mt-1 text-xs text-gray-400">基于诊断结果与原文片段生成,不展示无依据的分数提升。</p>
               </div>
             </div>
           </Card>
         )}
 
-        {/* 逐模块字符级 diff(before 为原文真实片段,服务端已校验) */}
         {modules.map((mod, idx) => (
           <Card key={`${mod.title}-${idx}`} className="overflow-hidden p-0">
             <div className="border-b border-gray-200 px-5 py-3">
               <p className="text-sm font-semibold text-gray-800">{mod.title}</p>
             </div>
-            <div className="text-xs">
-              <ReactDiffViewer
-                oldValue={mod.before}
-                newValue={mod.after}
-                splitView={true}
-                disableWordDiff={false}
-                hideLineNumbers={true}
+            <div className="text-xs [overflow-wrap:anywhere] [&_pre]:whitespace-pre-wrap">
+                <ReactDiffViewer
+                  oldValue={mod.before}
+                  newValue={mod.after}
+                  splitView={false}
+                  disableWordDiff={false}
+                  hideLineNumbers={true}
                 leftTitle="优化前(摘自原文)"
                 rightTitle="建议参考"
                 useDarkTheme={false}
@@ -291,7 +271,6 @@ export function ResumeOptimizePage() {
           </Card>
         ))}
 
-        {/* 优化版简历(阶段2B):结构化、可编辑;事实信息均来自简历原文 */}
         {optimizedResume && (
           <>
             <Card className="p-6">
@@ -317,10 +296,14 @@ export function ResumeOptimizePage() {
                 <div>
                   <SectionTitle title="个人简介" />
                   <textarea
-                    className={`${taCls} h-20 resize-none`}
+                    className={`${taCls} min-h-24 resize-y`}
                     value={optimizedResume.summary}
                     placeholder="(空)"
-                    onChange={(e) => setOptimizedResume((r) => r ? { ...r, summary: e.target.value.slice(0, 600) } : r)}
+                    onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                    onChange={(e) => {
+                      markEdited()
+                      setOptimizedResume((r) => r ? { ...r, summary: e.target.value.slice(0, 600) } : r)
+                    }}
                   />
                 </div>
 
@@ -337,13 +320,17 @@ export function ResumeOptimizePage() {
                             {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
                           </div>
                           <textarea
-                            className={`${taCls} mt-1.5 h-16 resize-none`}
+                            className={`${taCls} mt-1.5 min-h-20 resize-y`}
                             value={e.description ?? ''}
                             placeholder="(无描述)"
-                            onChange={(ev) => setOptimizedResume((r) => r ? {
-                              ...r,
-                              education: r.education.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                            } : r)}
+                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                            onChange={(ev) => {
+                              markEdited()
+                              setOptimizedResume((r) => r ? {
+                                ...r,
+                                education: r.education.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
+                              } : r)
+                            }}
                           />
                         </div>
                       ))}
@@ -362,12 +349,16 @@ export function ResumeOptimizePage() {
                             {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
                           </div>
                           <textarea
-                            className={`${taCls} mt-1.5 h-20 resize-none`}
+                            className={`${taCls} mt-1.5 min-h-24 resize-y`}
                             value={e.description}
-                            onChange={(ev) => setOptimizedResume((r) => r ? {
-                              ...r,
-                              experience: r.experience.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                            } : r)}
+                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                            onChange={(ev) => {
+                              markEdited()
+                              setOptimizedResume((r) => r ? {
+                                ...r,
+                                experience: r.experience.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
+                              } : r)
+                            }}
                           />
                         </div>
                       ))}
@@ -383,12 +374,16 @@ export function ResumeOptimizePage() {
                         <div key={i}>
                           <p className="text-sm font-semibold text-gray-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
                           <textarea
-                            className={`${taCls} mt-1.5 h-20 resize-none`}
+                            className={`${taCls} mt-1.5 min-h-24 resize-y`}
                             value={p.description}
-                            onChange={(ev) => setOptimizedResume((r) => r ? {
-                              ...r,
-                              projects: r.projects.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                            } : r)}
+                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                            onChange={(ev) => {
+                              markEdited()
+                              setOptimizedResume((r) => r ? {
+                                ...r,
+                                projects: r.projects.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
+                              } : r)
+                            }}
                           />
                         </div>
                       ))}
@@ -463,19 +458,40 @@ export function ResumeOptimizePage() {
             <Button
               size="lg"
               className="flex items-center justify-center gap-2"
-              disabled={!exported.signedUrl}
+              disabled={!exported.signedUrl || printNavigating}
               onClick={handlePrint}
             >
               <PrinterIcon className="h-5 w-5" />
-              去打印优化版
+              {printNavigating ? '正在进入打印确认…' : '去打印优化版'}
             </Button>
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Button size="lg" variant="secondary" onClick={handleSaveAdvice}>保存优化建议</Button>
-          <Button size="lg" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          <Button size="lg" variant="secondary" onClick={() => requestLeave(handleSaveAdvice)}>保存优化建议</Button>
+          <Button size="lg" variant="secondary" onClick={() => requestLeave(() => navigate('/'))}>返回首页</Button>
         </div>
       </div>
+
+      {confirmLeave && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/35 px-6">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <p className="text-lg font-bold text-gray-900">离开前确认</p>
+            <p className="mt-2 text-sm leading-relaxed text-gray-500">
+              你已经修改了优化版简历。未导出 PDF 前离开，本次编辑内容不会保存。
+            </p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button size="lg" variant="secondary" onClick={() => setConfirmLeave(null)}>继续编辑</Button>
+              <Button size="lg" onClick={() => {
+                const action = confirmLeave
+                setConfirmLeave(null)
+                action()
+              }}>
+                确认离开
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
