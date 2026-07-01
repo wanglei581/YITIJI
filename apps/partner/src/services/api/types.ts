@@ -136,7 +136,7 @@ export interface ImportJobItem {
   description?: string
   requirements?: string
   industry?: string
-  workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
+  workType?: 'full_time' | 'part_time' | 'internship' | 'contract' | 'campus'
 }
 
 /** 契约 = 后端 ImportFairItemDto(阶段1C 修正:旧 name/organizer/startTime 形状与后端不符,属死代码遗留)。 */

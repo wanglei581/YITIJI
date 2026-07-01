@@ -4,6 +4,7 @@
 > READ-ONLY PREFLIGHT STARTED：2026-07-01
 > LOCAL CANDIDATE ARTIFACT CHECK：2026-07-01
 > PREPRODUCTION RUNTIME REFRESH EXECUTED：2026-07-01
+> PREPRODUCTION TENCENT SAMPLE GATE EXECUTED：2026-07-01
 > 本文件是脱敏摘要记录，不得填写真实手机号明文、验证码、cookie、JWT、签名 URL、简历正文或密钥。
 > 原始截图、命令日志、SQL 输出、真机照片和打印实物照片必须保存在仓库外证据目录。
 
@@ -63,9 +64,15 @@ Local Candidate Artifact Gate: Passed With Static-Gate Scope Note
 | JAI-D1-04 | Passed | 迁移前创建 PostgreSQL 备份 `<PREPROD_ROOT>/db-backups/pre-job-ai-20260701102308.dump`，大小 `170612` bytes，`pg_restore -l` 可读取目录。 |
 | JAI-D1-05 | Passed | `prisma migrate deploy` 应用 1 个既有 pending additive migration：`20260701092000_add_jobfair_checkin_url`。该 migration 属招聘会 checkin URL，不是岗位 AI 新 schema；最终 `prisma migrate status` 为 up to date。 |
 | JAI-D1-06 | Passed | 切换 `current` symlink 到候选目录并重启 PM2 后，等待 5 秒 health 探测成功。 |
-| JAI-D1-07 | Passed | 切换后 `DEPLOY_SOURCE.txt` 记录 `commit=14a41ceb`、候选包 sha256、API dist tree hash 和 previous release；PM2 `<PREPROD_API_PM2>` online。 |
+| JAI-D1-07 | Passed With Historical Scope | 切换后 `DEPLOY_SOURCE.txt` 记录 `commit=14a41ceb`、候选包 sha256、API dist tree hash 和 previous release；PM2 `<PREPROD_API_PM2>` online。该记录仅属于 D1 早期运行时刷新，最终预生产运行源见 JAI-D2-06 / JAI-G1-09。 |
 | JAI-D1-08 | Passed | 公网 health 返回 `success=true`、`db=postgres`，Kiosk `/jobs`、Admin、Partner 静态入口均返回 HTTP 200。 |
 | JAI-D1-09 | Passed With Runtime Caveat | 在远端运行时包内执行 `verify:production-runtime-gates` 与 `verify:production-db-guard` 静态断言套件并通过；这些脚本校验生产门禁逻辑，不等于 live env 探针。本次 env 脱敏复核显示该预生产实例仍是 `NODE_ENV=staging`、`FILE_STORAGE_DRIVER=local`，且 COS / LLM key 缺失，不能视为完整生产形态 Gate。 |
+| JAI-D2-01 | Passed | 用户授权后，从干净临时 worktree 生成 `5ca81d04` 候选，只包含 Excel `workType -> Job.category` 修复相关 5 个文件；本地通过 `verify:job-customer-sample-readiness`、`verify:job-data-quality`、`verify:job-info-ai-real-acceptance`、API/shared/Partner/Kiosk 类型与构建门禁。 |
+| JAI-D2-02 | Superseded By Final Archive | 早期裁剪运行时包仅作为构建中间证据；最终预生产门禁来源已改为完整 Git 归档 `/srv/tencent-jobs-preprod-full-5ca81d04.tar.gz`，sha256 `5c5a01f7db694e4e06e97028a14a375f3e6e345df2e8fb90852a0012f81106b2`，详见 JAI-G1-09。 |
+| JAI-D2-03 | Passed | 远端候选目录完成 `pnpm install --frozen-lockfile`、API build、Kiosk/Admin/Partner production build；Kiosk/Admin 仅有既有 Vite chunk-size warning。 |
+| JAI-D2-04 | Passed | `prisma migrate deploy` 显示 no pending migrations；本次 workType 修复不含 DDL，不带入打印扫描 / TerminalHeartbeat schema 脏改。 |
+| JAI-D2-05 | Superseded By Final Backup | 早期刷新备份仅作为中间证据；最终部署前 PostgreSQL 备份为 `/srv/ai-job-print-db-backups/pre-tencent-jobs-5ca81d04-20260701163200.dump`，`pg_restore -l` 已确认可读，详见 JAI-G1-09。 |
+| JAI-D2-06 | Passed | 最终预生产运行源为 `commit=5ca81d04`；PM2 online，本机 health 返回 `success=true`、`db=postgres`，完整来源记录见 `/srv/ai-job-print/DEPLOY_SOURCE.txt` 与 JAI-G1-09。 |
 
 判定：
 
@@ -82,20 +89,30 @@ Preproduction Deployment Gate: Passed For Runtime Route Refresh
 
 | 证据 ID | 状态 | 摘要 |
 | --- | --- | --- |
-| JAI-G1-01 | Not Passed Yet | 客户真实岗位样本来源、导入方式、样本数量仍未提供。 |
-| JAI-G1-02 | Blocked | 公开 `/api/v1/jobs?pageSize=100` 抽样 17 条；四要素不缺失，但至少 6 条含演示来源 / 演示标题 / demo externalId，不满足客户真实岗位样本准入。 |
-| JAI-G1-03 | Not Passed Yet | `JobDataQualitySnapshot` ready / partial / insufficient 摘要尚未基于客户真实样本验收。 |
-| JAI-G1-04 | Not Passed Yet | Admin 岗位来源质量摘要尚未用客户真实样本截图或脱敏摘要验收。 |
-| JAI-G1-05 | Not Passed Yet | Partner 本机构岗位质量摘要尚未用客户真实机构样本确认隔离。 |
-| JAI-G1-06 | Not Passed Yet | Kiosk `/jobs` 和 `/jobs/:id` 尚未展示并验收客户真实已发布岗位。 |
+| JAI-G1-01 | Passed With Scope Note | 用户提供 `岗位数据_真实样本_腾讯.xlsx`，样本为 100 条腾讯招聘第三方公开来源岗位；该样本只用于预生产隔离 Gate，进入对外展示前仍需确认数据源授权，或明确标注为第三方公开来源聚合信息。 |
+| JAI-G1-02 | Superseded For Isolated Gate | 早期公开 `/api/v1/jobs?pageSize=100` 抽样仍含演示数据的问题，不再作为本次 `sourceOrgId=org-tencent-real-job-sample-20260701` 隔离样本 Gate 的阻塞；默认公开岗位池仍不得作为客户样本验收依据。 |
+| JAI-G1-03 | Passed | 腾讯样本导入后 `JobDataQualitySnapshot` 摘要为 `ready=58`、`partial=41`、`insufficient=1`；partial 主要缺学历要求，insufficient 为已过期且缺学历要求岗位。 |
+| JAI-G1-04 | Passed For API Summary | Admin 岗位来源质量摘要已用腾讯隔离来源脱敏 API 摘要补证，摘要计数与只读 DB 聚合一致；未保存浏览器截图。 |
+| JAI-G1-05 | Passed For API Summary | Partner 本机构岗位质量摘要已用本机内存 Partner JWT（`role=partner`、`orgId=org-tencent-real-job-sample-20260701`，非真实登录会话）复核机构隔离，返回结果全部属于该机构；未保存浏览器截图。 |
+| JAI-G1-06 | Passed For API/Kiosk Route Check | Kiosk `/jobs?sourceOrgId=org-tencent-real-job-sample-20260701` 和 `category=fulltime` 静态路由返回 HTTP 200；公开 API 详情接口返回第三方公开来源提示、腾讯单岗位详情链接、描述和要求。仍未保存浏览器截图证据。 |
+| JAI-G1-07 | Superseded | 2026-07-01 前置检查发现远端运行包缺 Excel `workType -> category` 修复；用户授权后已刷新到 `5ca81d04` 干净候选，该阻塞已解除。 |
+| JAI-G1-08 | Passed | 腾讯样本已在预生产 PostgreSQL 隔离来源导入：`preview totalRows=100 validRows=100 invalidRows=0 dupRows=0`，`confirm imported=100`，`SyncLog result=success added=100 error=0`；审核发布 100 条后按有效期下架 1 条过期岗位，公开可见 99 条；`category=null` 为 0，`category=fulltime` 为 100，公开全职筛选 99。公开 API 分页复核：sourceOrgId 总数 99、fulltime 总数 99、keyword=AI 总数 32、city=深圳 总数 62。 |
+| JAI-G1-09 | Passed | 2026-07-01 预生产实际刷新到 `commit=5ca81d04`；最终门禁来源为完整 Git 归档 `/srv/tencent-jobs-preprod-full-5ca81d04.tar.gz`，sha256 `5c5a01f7db694e4e06e97028a14a375f3e6e345df2e8fb90852a0012f81106b2`。部署前 PostgreSQL 备份 `/srv/ai-job-print-db-backups/pre-tencent-jobs-5ca81d04-20260701163200.dump` 已用 `pg_restore -l` 确认可读；`migrate deploy` 无 pending migration，PM2 online，health 返回 `success=true` / `db=postgres`。此前裁剪运行时包仅作为构建中间证据，不作为最终门禁来源。 |
+| JAI-G1-10 | Passed | 腾讯真实样本文件 sha256 `3d718828ab91da8e504e7eb4632e18bbfd5a1e8e5626e2fd4ae8842e06141d27`；导入使用一次性脚本写入隔离机构 / 来源，脚本输出仅记录行数、计数、质量等级、城市分布和过期岗位摘要；远端临时 Excel 与一次性导入脚本已删除。 |
+| JAI-G1-11 | Passed | 详情 API 复核首条样本来源 host 为 `careers.tencent.com`，详情返回 `sourceName=腾讯招聘公开来源样本（预生产验证）`、第三方来源提示、`category=fulltime`、`workType=full_time`；匿名 `POST /activity/external-jump` 返回 `recorded=false, reason=LOGIN_REQUIRED`，不写影子跳转记录。 |
+| JAI-G1-12 | Passed | Admin / Partner 岗位质量摘要脱敏 API 补证已执行并于 `2026-07-01T09:06:19Z` 只读复核：预生产运行时为 PostgreSQL；使用预生产主机内 5 分钟短期内存 JWT 调本机 `127.0.0.1` API，不输出 token / secret、不持久化 token、不写 DB。只读 DB 聚合、`GET /admin/jobs/quality-summary` 和 `GET /partner/jobs/quality-summary` 对腾讯隔离来源计数一致：`totalJobs=100`、`readyJobs=58`、`partialJobs=41`、`insufficientJobs=1`、`staleJobs=1`、`brokenSourceUrlJobs=0`、`lastCheckedAt=2026-07-01T08:35:07.589Z`。 |
+| JAI-G1-13 | Passed | Partner 摘要隔离断言通过：本机内存 Partner JWT 的 `orgId=org-tencent-real-job-sample-20260701`，接口只返回该机构 1 条来源摘要；库内 `JobDataQualitySnapshot` 存在 2 个 `sourceOrgId`，其中其它机构快照 100 行，因此不是空集合假阳性；Partner token 缺 `orgId` 调用返回 `400 ORG_REQUIRED`；Admin 摘要包含该腾讯隔离来源。该补证只证明摘要 API / DB 元数据和端点机构边界正确，不代表真实 Partner 登录、真实会员 AI 浏览器、COS/LLM/OCR live 或真机验收完成。 |
 
 判定：
 
 ```text
-Customer Job Sample Gate: Blocked
+Customer Job Sample Gate: Tencent Sample Preproduction Gate Passed / Browser & Hardware Pending
 阻塞项：
-- 未提供客户真实 API / Excel / Webhook 岗位样本。
-- 当前公开岗位抽样仍包含演示数据，不能作为客户真实样本验收。
+- Admin / Partner 岗位质量摘要脱敏 API 摘要已补齐；如后续需要页面级视觉证据，可另补截图，但不再作为本次 API 摘要阻塞项。
+- 公网 Kiosk 浏览器截图或真机触控证据尚未保存。
+- 公网真实会员浏览器链路尚未执行：真实简历、真实 LLM/OCR、AI 推荐 / 解读 / 历史记录 / 授权撤回仍 pending。
+- Windows 一体机、Terminal Agent、Pantum 真机仍未执行。
+- 该批腾讯岗位属于第三方公开来源聚合样本，对外展示前仍需授权确认或清晰标注第三方来源。
 ```
 
 ## Preproduction Browser Gate
@@ -117,6 +134,7 @@ Customer Job Sample Gate: Blocked
 | JAI-G2-06 | Passed | 预生产已从本地候选包刷新到 `14a41ceb`，并完成 DB 备份、migration deploy、PM2 重启和公网 health 复验。 |
 | JAI-G2-07 | Scope Note | 远端裁剪包内 `verify:job-ai-backend` 可能因缺 `.github/workflows/ci.yml` 无法执行，不作为运行时失败；完整仓库静态门禁需本地运行。 |
 | JAI-G2-08 | Blocked For Full Gate | 本次远端 env 脱敏复核显示 `FILE_STORAGE_DRIVER=local`，不满足完整预生产浏览器 Gate 对 COS 私有对象存储的要求。 |
+| JAI-G2-09 | Passed For Public Kiosk Browser | 用户确认只热更新 Kiosk 静态包后，已从部署提交 `5ca81d04` 最小补丁构建并只替换 `/srv/ai-job-print/apps/kiosk/dist`；公网 `/jobs?sourceOrgId=org-tencent-real-job-sample-20260701` 浏览器页面显示 `共 99 个`，Nginx access log 记录 HeadlessChrome 触发带 `sourceOrgId` 的 `/api/v1/jobs` 请求，API 返回 99 条且唯一来源为腾讯隔离机构；详情页展示第三方来源、来源链接、去来源平台投递 / 扫码投递合规文案。 |
 | JAI-G3-01 | Not Passed Yet | 会员登录并进入 `/jobs` 尚未执行。 |
 | JAI-G3-02 | Not Passed Yet | 确认 `job_ai` 授权尚未执行。 |
 | JAI-G3-03 | Not Passed Yet | 选择本人真实已解析简历并生成 AI 推荐尚未执行。 |
@@ -133,6 +151,7 @@ Customer Job Sample Gate: Blocked
 Preproduction Browser Gate: Blocked
 已解除：
 - 岗位 AI 推荐、Admin 岗位质量摘要、Partner 岗位质量摘要公网路由 404 阻塞已解除。
+- Kiosk 公网普通岗位浏览证据已补齐：指定 `sourceOrgId` 页面显示 99 条腾讯隔离来源岗位，并有浏览器触发带参 API 的 Nginx 证据。
 剩余阻塞项：
 - 当前预生产实例仍是 staging + local storage，且 COS / LLM key 缺失，不满足完整浏览器 Gate；因此不得进入真实会员浏览器验收。
 - 未提供真实会员、真实已解析简历和客户真实岗位样本。
@@ -168,8 +187,12 @@ Hardware Gate: Not Passed Yet
 | 证据 ID | 仓库外路径 / 摘要 | 脱敏检查 |
 | --- | --- | --- |
 | JAI-G0 | `pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance` | `脱敏静态门禁通过；不连接预生产、不读取密钥` |
-| JAI-G1 | `PENDING` | `PENDING` |
+| JAI-G1 | `Tencent isolated source API / DB sanitized summary` | `只记录岗位数量、质量等级、来源机构和来源 ID；token / JWT_SECRET 仅在内存使用，未输出、未持久化` |
 | JAI-G2 | `Command evidence kept outside Git; this file stores only sanitized summaries` | `No token, cookie, JWT, signed URL, resume body, DB URL, Redis URL, COS key, SMS key or LLM key recorded` |
+| JAI-G2A | `/srv/ai-job-print/DEPLOY_SOURCE.txt` + `/srv/tencent-jobs-preprod-full-5ca81d04.tar.gz` | `只记录 commit、完整归档 sha、dist hash、previous 目录、备份路径、PM2 / health 摘要；不含连接串或密钥` |
+| JAI-G2B | `Command evidence kept outside Git` | `只含行数、计数、质量等级、城市分布和过期岗位摘要；不含密钥、token、验证码或用户个人数据` |
+| JAI-G2C | `Admin / Partner quality-summary API sanitized JSON` | `只含 orgId、sourceId、质量计数、stale/broken 计数、lastCheckedAt 和隔离断言；Authorization token / JWT_SECRET 在内存中使用且未输出` |
+| JAI-G2D | `Kiosk public browser sourceOrgId evidence` | `只含公网页面截图、Nginx 带参请求摘要和岗位来源计数；不含会员、手机号、token、cookie、签名 URL、简历正文或密钥` |
 | JAI-G3 | `PENDING` | `PENDING` |
 | JAI-H1 | `PENDING` | `PENDING` |
 | JAI-H2 | `PENDING` | `PENDING` |
@@ -193,9 +216,9 @@ Hardware Gate: Not Passed Yet
 
 ```text
 Not Passed Yet
-- 客户真实岗位样本：当前公开抽样含演示数据，未达到 Gate。
-- 预生产公网浏览器：新端点 404 已解除，但当前实例仍是 staging + local storage，COS / LLM key 缺失，真实会员、真实简历、真实客户岗位样本和 Job AI 端到端流程未跑通。
-- 远端部署：预生产运行时已刷新到 14a41ceb；裁剪包内不包含 .github，依赖 CI 文件的静态门禁仍需本地完整仓库执行。
+- 客户真实岗位样本：腾讯真实样本已通过预生产隔离导入 Gate；默认公开岗位池仍可能含历史演示数据，不能作为客户样本验收依据。
+- 预生产公网浏览器：Kiosk 普通岗位列表 / 详情浏览证据已补齐，但当前实例仍是 staging + local storage，COS / LLM key 缺失，真实会员、真实简历、真实客户岗位样本和 Job AI 端到端流程未跑通。
+- 远端部署：预生产岗位样本候选已刷新到 5ca81d04，远端 `verify:job-customer-sample-readiness` 已通过；完整预生产浏览器 Gate 仍受 COS / LLM / 真实会员会话阻塞。
 - 一体机真机：未执行。
 - 生产上线前必须复验：客户样本、预生产真实会话、真实简历、LLM/OCR、Terminal Agent、Pantum 真机出纸。
 ```

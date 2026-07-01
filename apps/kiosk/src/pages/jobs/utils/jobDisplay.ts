@@ -35,6 +35,7 @@ export interface SourceCard {
 
 export interface JobInsights {
   total: number
+  loadedCount: number
   sourceCount: number
   cityCount: number
   industryCount: number
@@ -99,8 +100,9 @@ export function buildTopTags(jobs: ExternalJobDTO[], limit = 12): TagCount[] {
     .slice(0, limit)
 }
 
-export function buildJobInsights(jobs: ExternalJobDTO[]): JobInsights {
-  const total = jobs.length
+export function buildJobInsights(jobs: ExternalJobDTO[], totalOverride?: number): JobInsights {
+  const loadedCount = jobs.length
+  const total = Math.max(totalOverride ?? loadedCount, loadedCount)
   const withSalary = jobs.filter((job) => Boolean(job.salary)).length
   const withRequirement = jobs.filter((job) => Boolean(job.requirements || job.description)).length
   const withSourceUrl = jobs.filter((job) => Boolean(job.sourceUrl)).length
@@ -121,10 +123,11 @@ export function buildJobInsights(jobs: ExternalJobDTO[]): JobInsights {
     ]
     return sum + fields.filter(Boolean).length
   }, 0)
-  const totalFields = Math.max(1, total * 11)
+  const totalFields = Math.max(1, loadedCount * 11)
 
   return {
     total,
+    loadedCount,
     sourceCount: uniqueSorted(jobs.map((job) => job.sourceOrgId)).length,
     cityCount: uniqueSorted(jobs.map((job) => job.city)).length,
     industryCount: uniqueSorted(jobs.map((job) => job.industry)).length,

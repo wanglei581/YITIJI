@@ -16,25 +16,32 @@ import { JobAiEntryPanel } from './components/JobAiEntryPanel'
 import { JobAiResultPanel } from './components/JobAiResultPanel'
 import { ResumeSelectModal } from './components/ResumeSelectModal'
 import {
+  DataReadinessPanel,
+  JobBusinessNote,
+  JobOverviewPanel,
   SourceInstitutionPanel,
   TopTagsPanel,
   CompanyGuideEntry,
 } from './components/JobListInsights'
 import { JobFilterAssistant } from './components/JobFilterAssistant'
 import { JobResultsSection } from './components/JobResultsSection'
-import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
+import { buildJobInsights, buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
 export function JobsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const categoryParam = searchParams.get('category')
+  const sourceOrgIdParam = searchParams.get('sourceOrgId')?.trim() ?? ''
   const { getToken } = useAuth()
   const { idsOf, toggle: toggleFavorite } = useFavorites()
   const favoriteSet = idsOf('job')
 
   const [facetJobs, setFacetJobs] = useState<ExternalJobDTO[]>([])
   const [listJobs, setListJobs] = useState<ExternalJobDTO[]>([])
+  const [facetTotal, setFacetTotal] = useState(0)
+  const [listTotal, setListTotal] = useState(0)
   const [facetLoading, setFacetLoading] = useState(true)
   const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,10 +52,9 @@ export function JobsPage() {
   const [city, setCity] = useState('')
   const [industry, setIndustry] = useState('')
   const [category, setCategory] = useState(() => {
-    const value = searchParams.get('category')
-    return value && VALID_CATEGORIES.has(value) ? value : ''
+    return categoryParam && VALID_CATEGORIES.has(categoryParam) ? categoryParam : ''
   })
-  const [sourceOrgId, setSourceOrgId] = useState('')
+  const [sourceOrgId, setSourceOrgId] = useState(() => sourceOrgIdParam)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
   const [showResumeSelect, setShowResumeSelect] = useState(false)
@@ -66,9 +72,12 @@ export function JobsPage() {
   }, [])
 
   useEffect(() => {
-    const value = searchParams.get('category')
-    setCategory(value && VALID_CATEGORIES.has(value) ? value : '')
-  }, [searchParams])
+    setCategory(categoryParam && VALID_CATEGORIES.has(categoryParam) ? categoryParam : '')
+  }, [categoryParam])
+
+  useEffect(() => {
+    setSourceOrgId(sourceOrgIdParam)
+  }, [sourceOrgIdParam])
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedKeyword(keyword.trim()), 300)
@@ -83,6 +92,7 @@ export function JobsPage() {
       .then((res) => {
         if (cancelled) return
         setFacetJobs(res.data)
+        setFacetTotal(res.pagination.total)
         setFacetLoading(false)
       })
       .catch(() => {
@@ -101,6 +111,7 @@ export function JobsPage() {
     if (facetLoading) return
     if (!hasServerFilter) {
       setListJobs(facetJobs)
+      setListTotal(facetTotal)
       setListLoading(false)
       return
     }
@@ -118,6 +129,7 @@ export function JobsPage() {
       .then((res) => {
         if (cancelled) return
         setListJobs(res.data)
+        setListTotal(res.pagination.total)
         setListLoading(false)
       })
       .catch(() => {
@@ -128,7 +140,7 @@ export function JobsPage() {
     return () => {
       cancelled = true
     }
-  }, [facetLoading, facetJobs, hasServerFilter, debouncedKeyword, city, industry, category, sourceOrgId])
+  }, [facetLoading, facetJobs, facetTotal, hasServerFilter, debouncedKeyword, city, industry, category, sourceOrgId])
 
   const cityOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.city)), [facetJobs])
   const industryOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.industry)), [facetJobs])
@@ -140,7 +152,10 @@ export function JobsPage() {
     [listJobs, favoritesOnly, favoriteSet],
   )
 
-  const activeSourceName = sourceCards.find((source) => source.orgId === sourceOrgId)?.name
+  const insightJobs = hasServerFilter ? listJobs : facetJobs
+  const insightTotal = hasServerFilter ? listTotal : facetTotal
+  const insights = useMemo(() => buildJobInsights(insightJobs, insightTotal), [insightJobs, insightTotal])
+  const activeSourceName = sourceCards.find((source) => source.orgId === sourceOrgId)?.name ?? (sourceOrgId ? '指定来源机构' : undefined)
   const hasAnyFilter = hasServerFilter || favoritesOnly
   const aiRecommendationMode = aiRecommendations !== null
 
@@ -299,6 +314,8 @@ export function JobsPage() {
               onClear={clearAiRecommendations}
             />
 
+            <JobOverviewPanel insights={insights} displayedCount={displayedJobs.length} />
+
             {(aiLoading || aiError || aiRecommendations) && (
               <JobAiResultPanel
                 title="AI岗位推荐"
@@ -332,6 +349,8 @@ export function JobsPage() {
               onReset={resetAll}
             />
 
+            <JobBusinessNote />
+
             {category !== 'parttime' && <CompanyGuideEntry onOpen={() => navigate('/companies')} />}
 
             {!aiRecommendationMode && (
@@ -348,6 +367,8 @@ export function JobsPage() {
             <SourceInstitutionPanel sources={sourceCards} activeSourceOrgId={sourceOrgId} onSelect={setSourceOrgId} />
 
             <TopTagsPanel tags={topTags} onSelect={selectTag} />
+
+            <DataReadinessPanel insights={insights} />
           </>
         )}
       </div>

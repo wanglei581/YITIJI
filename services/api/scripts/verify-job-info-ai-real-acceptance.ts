@@ -151,15 +151,19 @@ function main(): void {
 
   mustContain(nextTasks, [
     '岗位信息 AI 商用闭环下一阶段',
-    '客户真实岗位样本验收',
-    '预生产公网浏览器验收',
+    '客户真实岗位样本授权 / 展示口径',
+    '真实会员 AI 浏览器验收',
     '一体机真机验收',
+    '腾讯真实岗位样本预生产隔离导入 Gate',
+    '岗位信息页客户数据普通浏览验收',
     '不得对外宣称 AI 推荐或岗位匹配达到生产商用完成',
   ], 'next-tasks 明确剩余真实验收且禁止过度宣称')
 
   mustContain(currentProgress, [
     'Task 8 Admin AI 用量 / 成本 / 告警 / 岗位来源质量看板',
-    '后续必须补真实客户岗位样本、预生产公网浏览器验收和一体机真机验收',
+    '腾讯真实岗位样本预生产隔离导入 Gate',
+    'Kiosk 公网普通岗位浏览证据已补齐',
+    '后续必须补真实客户岗位样本、真实会员 + 已解析简历 + LLM/OCR 的岗位 AI 浏览器 E2E，以及 Windows 一体机 / Terminal Agent / Pantum 真机验收',
   ], 'current-progress 保留 Task 8 后续真实验收边界')
 
   mustNotContain(acceptance + executionRecord, [

@@ -23,9 +23,9 @@ export function JobOverviewPanel({
 }) {
   return (
     <section aria-label="岗位数据概览" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <OverviewTile icon={BriefcaseIcon} label="已发布岗位" value={insights.total} hint={`当前显示 ${displayedCount} 个`} />
-      <OverviewTile icon={LayersIcon} label="来源机构" value={insights.sourceCount} hint="客户数据源可追溯" />
-      <OverviewTile icon={MapPinIcon} label="覆盖城市" value={insights.cityCount} hint={`${insights.industryCount} 个行业`} />
+      <OverviewTile icon={BriefcaseIcon} label="已发布岗位" value={insights.total} hint={`当前载入 ${insights.loadedCount} 个 / 显示 ${displayedCount} 个`} />
+      <OverviewTile icon={LayersIcon} label="来源机构" value={insights.sourceCount} hint="按当前载入数据统计" />
+      <OverviewTile icon={MapPinIcon} label="覆盖城市" value={insights.cityCount} hint={`当前载入含 ${insights.industryCount} 个行业`} />
       <OverviewTile icon={ShieldCheckIcon} label="字段完整度" value={`${insights.fieldCompleteness}%`} hint="按可展示字段估算" />
     </section>
   )
@@ -178,9 +178,9 @@ export function DataReadinessPanel({ insights }: { insights: JobInsights }) {
           客户通过 API、Webhook 或 Excel 导入这些字段后，页面会自动进入列表筛选、详情展示、收藏和来源跳转闭环。
         </p>
         <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-          <ReadinessMetric label="薪资可见" value={insights.withSalary} total={insights.total} />
-          <ReadinessMetric label="职责要求" value={insights.withRequirement} total={insights.total} />
-          <ReadinessMetric label="来源链接" value={insights.withSourceUrl} total={insights.total} />
+          <ReadinessMetric label="薪资可见" value={insights.withSalary} total={insights.loadedCount} />
+          <ReadinessMetric label="职责要求" value={insights.withRequirement} total={insights.loadedCount} />
+          <ReadinessMetric label="来源链接" value={insights.withSourceUrl} total={insights.loadedCount} />
         </div>
       </Card>
       <Card padding="none" className="p-5">

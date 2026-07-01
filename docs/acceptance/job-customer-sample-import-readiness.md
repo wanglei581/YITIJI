@@ -197,3 +197,60 @@ Kiosk 展示：已复核 / 未复核
 客户真实岗位样本验收：Not Passed Yet（真实样本未到位，来源链接与校招分类仍需正式数据源修正）
 不得对外宣称岗位信息 AI 商用完成
 ```
+
+### 2026-07-01 腾讯真实岗位样本本地导入链路验证
+
+用户提供 `岗位数据_真实样本_腾讯.xlsx` 后，已在本地 SQLite 中用专用机构 / 数据源隔离导入：
+
+- 机构：`org-tencent-real-job-sample-20260701`
+- 数据源：`src-tencent-real-excel-20260701`
+- 导入前备份：`/tmp/ai-job-print-dev-before-tencent-real-sample-20260701153526.db`
+- Excel 只读检查：100 行、21 个表头；18 个标准字段全部可映射，额外 `来源名称` / `发布时间` / `同步时间` 未映射入库；无敏感表头、必填字段齐全、`workType=fulltime` 已归一化为 `full_time` / `fulltime`。
+- 来源链接：100 条均为 `https://careers.tencent.com/jobdesc.html?postId=...` 逐条岗位详情页；全量 100 条 HTTP GET 抽检均返回 200。
+- 导入结果：`preview totalRows=100 validRows=100 invalidRows=0 dupRows=0`，`confirm imported=100`，`SyncLog result=success added=100 error=0`。
+- 审核发布：本地审核通过 100 条；质量快照发现 1 条岗位 `validThrough=2026-06-27` 已过期，已在本地隔离样本中下架；公开查询按该 `sourceOrgId` 可见 99 条。
+- 质量快照：总样本 100 条中 `ready=58`、`partial=41`、`insufficient=1`。41 条 partial 主要缺 `educationRequirement`，另有 1 条缺 `skills`；1 条 insufficient 为已过期且缺学历要求，已下架。
+- 公开筛选抽样：深圳 63 条、北京 18 条、广州 12 条、上海 6 条、成都 1 条；该统计按导入 100 条口径计算，包含随后下架的 1 条过期深圳岗位，因此预生产公开 `city=深圳` 为 62 条。全职 100 条，校园招聘 / 实习均为 0；标题含 AI / 人工智能 / 算法 / 机器学习 / 大模型关键词 28 条，标题含“产品”56 条。这里的 28 条是标题关键词口径，预生产公开 API `keyword=AI` 为 32 条是接口关键词检索口径，可能覆盖描述 / 要求等字段。
+
+本次可以证明腾讯真实岗位 Excel 样本在本地环境完成“字段校验 → 预览 → 确认导入 → 审核发布 → 过期岗位下架 → 公开查询 → 质量快照 → 来源链接可达性抽检”链路。但仍不能写作完整商用验收完成，原因：
+
+- 本次只在本地 SQLite 执行，未导入预生产 PostgreSQL，也未跑公网浏览器真实会员链路。
+- 腾讯招聘属于第三方公开来源样本；进入预生产或对外展示前，必须确认客户 / 数据源授权，或在前台和验收材料中明确标注为第三方公开来源聚合信息，不得误写成腾讯授权合作数据源。
+- 样本中仍有 41 条字段质量为 `partial`，主要是腾讯源表未提供学历要求；可以展示，但岗位 AI 匹配解释会比 `ready` 数据弱。
+- Windows 一体机 / Terminal Agent / Pantum 真机链路尚未使用该样本复验。
+
+```text
+客户真实岗位样本导入 readiness：已准备静态门禁
+腾讯真实岗位样本本地导入链路验证：已执行，通过（99 条公开可见，1 条过期已下架）
+客户真实岗位样本验收：Local Gate Passed / Preprod & Kiosk Hardware Pending
+不得对外宣称岗位信息 AI 商用完成
+```
+
+### 2026-07-01 腾讯真实岗位样本预生产隔离导入 Gate
+
+用户确认后，已把预生产刷新到包含 Excel `workType -> Job.category` 修复的干净候选，并在 PostgreSQL 中使用同一专用机构 / 数据源隔离导入腾讯样本：
+
+- 候选提交：`5ca81d04`，基于 `5d4b46f7` 仅叠加 Excel `workType -> Job.category` 修复范围。
+- 预生产 release：`<PREPROD_ROOT>/releases/20260701-162226-5ca81d04`。
+- 候选归档：`<PREPROD_ROOT>/artifacts/job-ai-preprod-5ca81d04.tar.gz`，sha256 `e0c38b72db0a37acfe05c6cb57cd168931c3bded3aa85411ac1ebc8cc3b3d77c`。
+- 刷新前备份：`<PREPROD_ROOT>/db-backups/pre-tencent-worktype-20260701162717.dump`，已用 `pg_restore -l` 确认可读。
+- 预生产健康检查：`success=true` / `db=postgres`。
+- 预生产导入结果：`preview totalRows=100 validRows=100 invalidRows=0 dupRows=0`，`confirm imported=100`。
+- 公开查询结果：公开可见 99 条，1 条已过期岗位下架；`category=null` 为 0，`category=fulltime` 为 100，公开 `fulltime` 筛选 99 条。
+- 公开 API 抽样：sourceOrgId 总数 99、fulltime 总数 99、keyword=AI 总数 32、city=深圳 总数 62。
+- 详情抽样：首条岗位返回 `sourceName=腾讯招聘公开来源样本（预生产验证）`、`category=fulltime`、`workType=full_time`、腾讯单岗位详情链接、描述、要求和第三方来源提示。
+- 远端临时 Excel 与一次性导入脚本已清理。
+
+本次可以证明腾讯真实岗位样本已经通过预生产 PostgreSQL 隔离导入 Gate，并解决了此前预生产运行包落后导致的 `category=null` 分类筛选风险。但仍不能写作完整商用验收完成，原因：
+
+- 尚未补 Kiosk 公网浏览器截图或一体机触控证据。
+- 尚未补 Admin / Partner 质量摘要截图或脱敏 API 摘要。
+- 尚未使用真实会员、真实已解析简历、真实 LLM/OCR 跑岗位 AI 推荐 / 解读 / 匹配浏览器 E2E。
+- 腾讯招聘仍属于第三方公开来源样本；进入对外展示前，必须确认客户 / 数据源授权，或明确标注为第三方公开来源聚合信息。
+- Windows 一体机 / Terminal Agent / Pantum 真机链路尚未使用该样本复验。
+
+```text
+腾讯真实岗位样本预生产隔离导入 Gate：已执行，通过
+客户真实岗位样本验收：Preproduction Sample Gate Passed / Browser, AI E2E & Kiosk Hardware Pending
+不得对外宣称岗位信息 AI 商用完成
+```

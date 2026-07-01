@@ -72,7 +72,7 @@ import { JOB_WORK_TYPE_VALUES, mapJobWorkTypeToCategory, normalizeJobWorkType, t
 type ReviewStatus  = 'pending' | 'reviewing' | 'approved' | 'rejected'
 type PublishStatus = 'draft' | 'published' | 'unpublished' | 'expired'
 type FairStatus    = 'upcoming' | 'ongoing' | 'ended'
-type WorkType      = 'full_time' | 'part_time' | 'internship' | 'contract'
+type WorkType      = JobWorkTypeValue
 type ConnStatus    = 'connected' | 'error' | 'disabled'
 type SourceKind    = 'job_platform' | 'hr_company' | 'school' | 'fair_organizer' | 'aggregator' | 'manual'
 type AccessMode    = 'api' | 'excel' | 'csv' | 'json' | 'webhook' | 'manual'
@@ -310,13 +310,13 @@ function displayTags(tags: string[]): string[] {
   return tags.filter((t) => !t.startsWith(INDUSTRY_TAG_PREFIX))
 }
 
-/** DB category 列 → 前端 workType 枚举(campus 校招归 full_time 展示) */
+/** DB category 列 → 前端 workType 枚举 */
 function categoryToWorkType(category: string | null): WorkType | undefined {
   switch (category) {
     case 'fulltime': return 'full_time'
     case 'parttime': return 'part_time'
     case 'intern':   return 'internship'
-    case 'campus':   return 'full_time'
+    case 'campus':   return 'campus'
     default:         return undefined
   }
 }

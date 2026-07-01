@@ -1,6 +1,7 @@
 import { Button, Card, EmptyState } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
-import { BriefcaseIcon, BuildingIcon, ClockIcon, MapPinIcon, StarIcon } from 'lucide-react'
+import { BriefcaseIcon, BuildingIcon, ClockIcon, MapPinIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { isValidSourceUrl } from '../../../lib/url'
 import { CATEGORY_LABEL, CATEGORY_STYLE, formatSync } from '../utils/jobDisplay'
 
 export function JobResultsSection({
@@ -110,6 +111,12 @@ function JobResultCard({
 
       <div className="mt-auto flex items-center gap-1.5 border-t border-neutral-100 pt-3 text-[11px] text-neutral-400">
         <span className="truncate">来源：{job.sourceName}</span>
+        {isValidSourceUrl(job.sourceUrl) && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-primary-600">
+            <QrCodeIcon className="h-3 w-3" />
+            可扫码
+          </span>
+        )}
         <span className="ml-auto flex shrink-0 items-center gap-1">
           <ClockIcon className="h-3 w-3" />
           {formatSync(job.syncTime)}

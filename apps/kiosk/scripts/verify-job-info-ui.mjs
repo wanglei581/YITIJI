@@ -16,22 +16,39 @@ function readDirectory(relativePath) {
 }
 
 const files = {
-  jobsPage: `${read('src/pages/jobs/JobsPage.tsx')}\n${readDirectory('src/pages/jobs/components')}`,
-  detailPage: `${read('src/pages/jobs/JobDetailPage.tsx')}\n${readDirectory('src/pages/jobs/components')}`,
+  jobsPage: read('src/pages/jobs/JobsPage.tsx'),
+  detailPage: read('src/pages/jobs/JobDetailPage.tsx'),
+  components: readDirectory('src/pages/jobs/components'),
+  jobHttpAdapter: read('src/services/api/jobHttpAdapter.ts'),
 }
 
 const required = [
-  ['jobsPage', '岗位数据概览'],
-  ['jobsPage', '岗位筛选助手'],
-  ['jobsPage', '热门岗位标签'],
-  ['jobsPage', '客户数据接入提示'],
-  ['jobsPage', '字段完整度'],
-  ['detailPage', '岗位摘要'],
-  ['detailPage', '职责与要求'],
-  ['detailPage', '来源可信区'],
-  ['detailPage', '后续动作'],
-  ['detailPage', '去来源平台投递'],
-  ['detailPage', '扫码投递'],
+  ['components', '岗位数据概览'],
+  ['jobsPage', 'JobOverviewPanel'],
+  ['components', '岗位筛选助手'],
+  ['jobsPage', 'JobFilterAssistant'],
+  ['components', '热门岗位标签'],
+  ['jobsPage', 'TopTagsPanel'],
+  ['components', '客户数据接入提示'],
+  ['jobsPage', 'DataReadinessPanel'],
+  ['components', '字段完整度'],
+  ['jobsPage', /searchParams\.get\(['"]sourceOrgId['"]\)\?\.trim\(\)/],
+  ['jobsPage', /useState\(\s*\(\s*\)\s*=>\s*sourceOrgIdParam\s*\)/],
+  ['jobsPage', /setSourceOrgId\(\s*sourceOrgIdParam\s*\)/],
+  ['jobsPage', /hasServerFilter[^\n]*sourceOrgId/],
+  ['jobsPage', /getJobs\(\{[\s\S]*?sourceOrgId:\s*sourceOrgId\s*\|\|\s*undefined[\s\S]*?pageSize:\s*100/],
+  ['jobHttpAdapter', /query\.sourceOrgId\s*=\s*params\.sourceOrgId/],
+  ['components', '岗位摘要'],
+  ['components', '职责与要求'],
+  ['components', '来源可信区'],
+  ['components', '后续动作'],
+  ['components', '去来源平台投递'],
+  ['components', '扫码投递'],
+  ['detailPage', 'openSourcePlatform'],
+  ['detailPage', 'isTerminalKiosk'],
+  ['detailPage', 'getTerminalId'],
+  ['components', 'SourceUrlQr value={job.sourceUrl}'],
+  ['components', '放大二维码'],
 ]
 
 const forbidden = [
@@ -45,9 +62,17 @@ const forbidden = [
 
 const failures = []
 
-for (const [fileKey, needle] of required) {
-  if (!files[fileKey].includes(needle)) {
-    failures.push(`${fileKey} missing required marker: ${needle}`)
+function markerLabel(marker) {
+  return marker instanceof RegExp ? marker.toString() : marker
+}
+
+function hasMarker(content, marker) {
+  return marker instanceof RegExp ? marker.test(content) : content.includes(marker)
+}
+
+for (const [fileKey, marker] of required) {
+  if (!hasMarker(files[fileKey], marker)) {
+    failures.push(`${fileKey} missing required marker: ${markerLabel(marker)}`)
   }
 }
 

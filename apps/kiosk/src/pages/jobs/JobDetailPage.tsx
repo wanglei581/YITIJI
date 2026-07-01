@@ -11,6 +11,7 @@ import {
   type JobAiMatchResponse,
 } from '../../services/api/jobAi'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
+import { getTerminalId } from '../../services/api/screensaver'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
@@ -99,10 +100,22 @@ export function JobDetailPage() {
   const currentJob = job
   const favorite = isFavorite('job', currentJob.id)
   const sourceCanApply = isValidSourceUrl(currentJob.sourceUrl)
+  const isTerminalKiosk = Boolean(getTerminalId())
 
   function openSourceQr() {
+    if (!sourceCanApply) return
     recordExternalJump(getToken(), 'job', currentJob.id, 'external_apply')
     setShowQr(true)
+  }
+
+  function openSourcePlatform() {
+    if (!sourceCanApply) return
+    if (isTerminalKiosk) {
+      openSourceQr()
+      return
+    }
+    recordExternalJump(getToken(), 'job', currentJob.id, 'external_apply')
+    window.open(currentJob.sourceUrl, '_blank', 'noopener,noreferrer')
   }
 
   function viewCompany() {
@@ -266,6 +279,7 @@ export function JobDetailPage() {
         <JobNextActionsSection
           job={currentJob}
           sourceCanApply={sourceCanApply}
+          onOpenSource={openSourcePlatform}
           onOpenQr={openSourceQr}
           onViewCompany={viewCompany}
           onExplainAi={() => void startExplain()}
@@ -291,7 +305,7 @@ export function JobDetailPage() {
         )}
       </div>
 
-      <StickyActionBar sourceCanApply={sourceCanApply} onOpenSource={openSourceQr} />
+      <StickyActionBar sourceCanApply={sourceCanApply} onOpenSource={openSourcePlatform} onOpenQr={openSourceQr} />
     </div>
   )
 }

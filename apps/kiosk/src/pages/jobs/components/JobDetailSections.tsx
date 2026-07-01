@@ -201,6 +201,7 @@ export function JobTrustSection({ job, sourceCanApply }: { job: ExternalJobDTO; 
 export function JobNextActionsSection({
   job,
   sourceCanApply,
+  onOpenSource,
   onOpenQr,
   onViewCompany,
   onExplainAi,
@@ -208,6 +209,7 @@ export function JobNextActionsSection({
 }: {
   job: ExternalJobDTO
   sourceCanApply: boolean
+  onOpenSource: () => void
   onOpenQr: () => void
   onViewCompany: () => void
   onExplainAi: () => void
@@ -219,11 +221,27 @@ export function JobNextActionsSection({
         <ArrowRightIcon className="h-4 w-4 text-primary-600" />
         <p className="text-sm font-semibold text-gray-800">后续动作</p>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ActionButton icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
-        <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onMatchAi} />
-        <ActionButton icon={QrCodeIcon} label="扫码投递" hint="手机打开来源平台" disabled={!sourceCanApply} onClick={onOpenQr} />
-        <ActionButton icon={BuildingIcon} label="查看企业" hint={job.companyProfileId ? job.company : '来源企业未关联'} disabled={!job.companyProfileId} onClick={onViewCompany} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_210px]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ActionButton icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
+          <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onMatchAi} />
+          <ActionButton icon={ExternalLinkIcon} label="去来源平台投递" hint="打开第三方岗位页" disabled={!sourceCanApply} onClick={onOpenSource} />
+          <ActionButton icon={BuildingIcon} label="查看企业" hint={job.companyProfileId ? job.company : '来源企业未关联'} disabled={!job.companyProfileId} onClick={onViewCompany} />
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-center">
+          <SourceUrlQr value={job.sourceUrl} size={132} />
+          <p className="mt-3 text-xs font-semibold text-neutral-700">扫码投递</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">手机扫码打开来源平台，本系统不接收简历。</p>
+          <button
+            type="button"
+            disabled={!sourceCanApply}
+            onClick={onOpenQr}
+            className="mt-3 inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-primary-600 px-3 text-xs font-medium text-white disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
+          >
+            <QrCodeIcon className="h-3.5 w-3.5" />
+            放大二维码
+          </button>
+        </div>
       </div>
     </Card>
   )
@@ -259,9 +277,11 @@ function ActionButton({
 export function StickyActionBar({
   sourceCanApply,
   onOpenSource,
+  onOpenQr,
 }: {
   sourceCanApply: boolean
   onOpenSource: () => void
+  onOpenQr: () => void
 }) {
   return (
     <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
@@ -270,7 +290,7 @@ export function StickyActionBar({
           <ExternalLinkIcon className="h-4 w-4" />
           去来源平台投递
         </Button>
-        <Button size="lg" variant="secondary" className="flex items-center gap-2" disabled={!sourceCanApply} onClick={onOpenSource}>
+        <Button size="lg" variant="secondary" className="flex items-center gap-2" disabled={!sourceCanApply} onClick={onOpenQr}>
           <QrCodeIcon className="h-4 w-4" />
           扫码投递
         </Button>

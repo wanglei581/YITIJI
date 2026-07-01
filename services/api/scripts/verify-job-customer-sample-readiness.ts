@@ -217,6 +217,34 @@ function verifyWebhookValidation(): void {
   if (invalidWorkTypeErrors.length > 0) pass('Webhook DTO 拒绝未知 workType，避免静默写成全职')
   else fail('Webhook DTO 应拒绝未知 workType')
 
+  const negatedWorkTypePayload = plainToInstance(WebhookPayloadDto, {
+    items: [{
+      externalId: 'cust-job-002-negated-work-type',
+      title: '非全职运营专员',
+      company: '真实客户科技有限公司',
+      city: '深圳',
+      sourceUrl: 'https://jobs.example.com/cust-job-002-negated-work-type',
+      workType: '非全职',
+    }],
+  })
+  const negatedWorkTypeErrors = validateSync(negatedWorkTypePayload, { whitelist: true, forbidNonWhitelisted: true })
+  if (negatedWorkTypeErrors.length > 0) pass('Webhook DTO 拒绝否定 workType 别名，避免错写 full_time')
+  else fail('Webhook DTO 不得把“非全职”归一化为 full_time')
+
+  const ambiguousWorkTypePayload = plainToInstance(WebhookPayloadDto, {
+    items: [{
+      externalId: 'cust-job-002-ambiguous-work-type',
+      title: '全职实习项目',
+      company: '真实客户科技有限公司',
+      city: '深圳',
+      sourceUrl: 'https://jobs.example.com/cust-job-002-ambiguous-work-type',
+      workType: '全职实习',
+    }],
+  })
+  const ambiguousWorkTypeErrors = validateSync(ambiguousWorkTypePayload, { whitelist: true, forbidNonWhitelisted: true })
+  if (ambiguousWorkTypeErrors.length > 0) pass('Webhook DTO 拒绝复合 workType 别名，避免错写单一 category')
+  else fail('Webhook DTO 不得把“全职实习”静默归一化为单一 category')
+
   const forbiddenPayload = plainToInstance(WebhookPayloadDto, {
     items: [{
       externalId: 'cust-job-003',
@@ -263,6 +291,20 @@ function verifyPartnerApiImportValidation(): void {
   const invalidErrors = validateSync(invalidPayload, { whitelist: true, forbidNonWhitelisted: true })
   if (invalidErrors.length > 0) pass('Partner API DTO 拒绝未知 workType，避免静默写成全职')
   else fail('Partner API DTO 应拒绝未知 workType')
+
+  const negatedPayload = plainToInstance(ImportJobsDto, {
+    items: [{
+      externalId: 'partner-job-negated-work-type',
+      title: '非全职客户运营顾问',
+      company: '真实客户科技有限公司',
+      city: '深圳',
+      sourceUrl: 'https://jobs.example.com/partner-job-negated-work-type',
+      workType: '非全职',
+    }],
+  })
+  const negatedErrors = validateSync(negatedPayload, { whitelist: true, forbidNonWhitelisted: true })
+  if (negatedErrors.length > 0) pass('Partner API DTO 拒绝否定 workType 别名，避免错写 full_time')
+  else fail('Partner API DTO 不得把“非全职”归一化为 full_time')
 }
 
 function assertNoOverclaim(source: string, label: string): void {
@@ -289,6 +331,8 @@ function main(): void {
   const jobsService = readApi('src/jobs/jobs.service.ts')
   const jobSyncService = readApi('src/job-sync/job-sync.service.ts')
   const syncService = readApi('src/sync/sync.service.ts')
+  const sharedJobTypes = readRepo('packages/shared/src/types/job.ts')
+  const partnerTypes = readRepo('apps/partner/src/services/api/types.ts')
   const packageJson = readApi('package.json')
   const ci = readRepo('.github/workflows/ci.yml')
   const readinessDoc = readRepo('docs/acceptance/job-customer-sample-import-readiness.md')
@@ -323,6 +367,7 @@ function main(): void {
   mustContain(workTypeUtil, [
     'JOB_WORK_TYPE_VALUES',
     "'campus'",
+    'WORK_TYPE_ALIAS_GROUPS',
     'normalizeJobWorkType',
     'mapJobWorkTypeToCategory',
     "return 'campus'",
@@ -344,6 +389,8 @@ function main(): void {
     'confirmExcelImport(',
     'mapWorkTypeToCategory(workType: string | undefined)',
     'mapJobWorkTypeToCategory(workType)',
+    'type WorkType      = JobWorkTypeValue',
+    "case 'campus':   return 'campus'",
     'normalizeMappedWorkType',
     'workType 必须为',
     'refreshJobQualitySnapshots(touchedJobIds)',
@@ -362,6 +409,15 @@ function main(): void {
     2,
     'Excel preview/confirm 校验 workType 并持久化到 Job.category,含 campus',
   )
+
+  mustContain(sharedJobTypes, [
+    "'contract' | 'campus'",
+    "category?: 'fulltime' | 'intern' | 'campus' | 'parttime'",
+  ], 'Shared ExternalJobDTO 保留 campus workType / category 契约')
+
+  mustContain(partnerTypes, [
+    "'contract' | 'campus'",
+  ], 'Partner 类型允许 campus workType，避免校招导入/编辑契约漂移')
 
   mustContain(jobSyncService, [
     'isSensitiveColumn',
