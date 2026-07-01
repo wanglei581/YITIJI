@@ -7,6 +7,12 @@ export interface AdminOrderReadonlyPrintSummary {
   pageRange: string | null
 }
 
+export interface AdminOrderReadonlyPrintOperations {
+  canCancel: boolean
+  canReassign: boolean
+  reason: string | null
+}
+
 export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
@@ -42,6 +48,7 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
     createdAt: string
     completedAt: string | null
     errorCode: string | null
+    operations: AdminOrderReadonlyPrintOperations
   }) | null
   statusLogs: AdminOrderStatusLogItem[]
 }

@@ -1,35 +1,46 @@
 /**
  * 首页百宝箱布局守卫。
  *
- * 约束:
- *   A. 首页固定渲染百宝箱占位模块。
+ * 约束：
+ *   A. 首页固定渲染百宝箱模块，空配置保留待配置占位。
  *   B. 百宝箱必须排在智慧校园前面。
- *   C. 智慧校园仍按终端配置关闭时整块不渲染。
+ *   C. 智慧校园保留终端开关隐藏逻辑，并能渲染后台投放应用项。
  *
- * 运行: pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
+ * 运行：pnpm --filter @ai-job-print/kiosk verify:home-toolbox-ui
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const home = readFileSync(join(ROOT, 'src/pages/home/HomePage.tsx'), 'utf8')
+
+function read(rel) {
+  return readFileSync(join(ROOT, rel), 'utf8')
+}
 
 let failed = 0
 function pass(msg) { console.log(`  PASS ${msg}`) }
 function fail(msg) { console.error(`  FAIL ${msg}`); failed++ }
 
+const home = read('src/pages/home/HomePage.tsx')
+const terminalConfig = read('src/services/api/terminalConfig.ts')
+const packageJson = read('package.json')
+
 console.log('\n=== 首页百宝箱布局验证 ===')
 
-const toolboxComponent = home.indexOf('function ToolboxSection()')
-const smartCampusComponent = home.indexOf('function SmartCampusHorizontalSection()')
 const toolboxRender = home.indexOf('<ToolboxSection />')
 const smartCampusRender = home.indexOf('<SmartCampusHorizontalSection />')
 
-if (toolboxComponent >= 0 && home.includes('aria-label="百宝箱"') && home.includes('待配置')) {
-  pass('A. 首页包含固定百宝箱占位模块')
+if (
+  home.includes('function ToolboxSection()') &&
+  home.includes('if (!config.enabled) return null') &&
+  !home.includes('items.length === 0) return null') &&
+  home.includes('待配置') &&
+  home.includes('后续功能上线后将在这里展示')
+) {
+  pass('A. 首页百宝箱默认启用且空配置保留待配置占位')
 } else {
-  fail('A. 首页缺少百宝箱占位模块')
+  fail('A. 首页百宝箱必须默认启用且空配置保留待配置占位')
 }
 
 if (toolboxRender >= 0 && smartCampusRender >= 0 && toolboxRender < smartCampusRender) {
@@ -39,13 +50,37 @@ if (toolboxRender >= 0 && smartCampusRender >= 0 && toolboxRender < smartCampusR
 }
 
 if (
-  smartCampusComponent >= 0 &&
-  home.includes('useSmartCampusConfig()') &&
-  home.includes('if (!config.enabled || enabledTiles.length === 0) return null')
+  home.includes('getCachedKioskTerminalConfig(terminalId)') &&
+  home.includes('terminalConfig.toolbox') &&
+  home.includes('launchKioskAppItem') &&
+  home.includes('QrLaunchModal')
 ) {
-  pass('C. 智慧校园保留终端开关隐藏逻辑')
+  pass('C. 百宝箱从统一终端配置读取并支持站内 / 外部 H5 / 二维码启动方式')
 } else {
-  fail('C. 智慧校园开关隐藏逻辑缺失或被改动')
+  fail('C. 百宝箱统一终端配置或启动方式支持缺失')
+}
+
+if (
+  home.includes('useSmartCampusConfig()') &&
+  home.includes('if (!config.enabled || (enabledTiles.length === 0 && campusItems.length === 0)) return null') &&
+  home.includes('config.items ?? []') &&
+  home.includes('accent="blue"')
+) {
+  pass('D. 智慧校园保留终端开关隐藏逻辑并渲染后台投放应用项')
+} else {
+  fail('D. 智慧校园终端开关隐藏逻辑或投放项渲染缺失')
+}
+
+if (terminalConfig.includes('toolbox: { enabled: true, items: [] }')) {
+  pass('E. Kiosk OFF_CONFIG 默认启用百宝箱空占位')
+} else {
+  fail('E. Kiosk OFF_CONFIG 必须默认启用百宝箱空占位')
+}
+
+if (packageJson.includes('"verify:home-toolbox-ui"')) {
+  pass('F. package.json 注册 verify:home-toolbox-ui')
+} else {
+  fail('F. package.json 缺少 verify:home-toolbox-ui')
 }
 
 console.log('')

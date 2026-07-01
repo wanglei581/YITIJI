@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-06-29
+> 最后更新：2026-07-01
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -36,7 +36,13 @@
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
 - [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
 - [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收。
-- [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。
+- [x] 打印扫描首期安全底座 + 状态运营处理 + preflight 门禁（代码侧）：打印任务创建、领取、状态回写和 Agent 本地库不可用降级已形成 fail-closed 契约；Kiosk 进度页已展示真实状态并处理取消；Admin `/orders` 已支持受状态门控的取消 / 重分配终端；新增 `verify:print-scan-preflight` 只读检查未完成任务 / 订单缺少目标终端或目标不一致。
+- [x] 真实库打印扫描 preflight（隔离预生产库）：已在服务器当前 monorepo 隔离 PostgreSQL 数据库 `ai_job_print_preprod` 上运行 `verify:print-scan-preflight:postgres`，结果无未完成打印任务 / 订单目标终端异常；该结论仅覆盖新建隔离预生产空库，不代表既有线上 `zlixc-api` 所连生产库、Windows 真机、扫描、证件照或 U 盘验收完成。
+- [x] 预生产部署目录确认：已选择新建并使用独立目录 `/www/wwwroot/ai-job-print-preprod/current` 部署当前 monorepo，不覆盖现有 `/www/wwwroot/zlixc-api`；服务器密码已在聊天中暴露，生产切换前必须轮换或改 SSH key。
+- [x] 预生产 env 与后端启动门禁：隔离目录 `/www/wwwroot/ai-job-print-preprod/current` 已完成依赖安装、typecheck、lint、text-only 前端 build、独立 staging `.env`、PostgreSQL migration、Redis 配置、`db:pg:sync:check`、`verify:production-runtime-gates` 自测、服务器 API build、独立 PM2 `ai-job-print-preprod-api` 启动、本机 health、`verify:print-scan-first-release` 和 `verify:print-scan-preflight:postgres`；现有 `zlixc-api` 仍 online。本项仍不代表 nginx 公网预览、正式生产部署或 Windows 真机完成。
+- [x] 预生产 nginx 预览入口：已新增隔离 nginx vhost，Kiosk `http://82.157.43.217:8897/`、Admin `http://82.157.43.217:8898/`、Partner `http://82.157.43.217:8896/` 可公网访问，三端 `/api/v1/health` 返回 `success=true`、`db=postgres`，静态 JS asset 返回 200；未影响既有 `zlixc-api`。
+- [x] 预生产浏览器功能联调：已用三个 HTTP 预览入口完成真实 Chrome smoke：Kiosk 首页、Admin 登录后 `/orders`、Partner 登录后 dashboard、Kiosk `/print-scan`、`/print/upload?source=document`、直达 `/print/progress` 保护分支；三端 health 为 `success=true`、`db=postgres`，PM2 预生产 API 与既有 `zlixc-api` 均 online。本项仍不是正式 HTTPS、真机出纸或试运营验收。
+- [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。验收前必须确认 Kiosk 构建注入正确 `VITE_TERMINAL_ID` 且后台终端已注册并启用；`agent_degraded` 视为本地 Agent DB 降级，需要人工重启 Agent 后复测；真机打印必须由 Kiosk 上传创建真实终端绑定任务，不使用 `ptask_seed_001` 等 seed 任务替代。
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
 - [ ] 小范围试运营：仅 1 台终端 + 1 台打印机先跑，问题记录按任务闭环处理。
 
@@ -105,6 +111,8 @@
 - [ ] P3 拆分候选：`apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` 当前超过 500 行，后续反馈/通知扩展前先拆分表单、列表和详情面板。
 - [x] **全局无感数据刷新机制 Partner 首轮推广**：Partner 岗位、招聘会、政策公告三类列表已接入统一 `useRefreshable`，新增 / 编辑抽屉、保存、下架、删除确认期间使用 hard lock；禁止回退到页面内 `load + setState` 的 `verify:partner-refresh-safe` 已补齐。
 - [ ] **全局无感数据刷新机制继续推广**：后续按独立分支接入 Kiosk `/me/*` 资产页；智慧校园和屏保必须在保留各自失败语义后再接入。
+- [ ] **终端设备档案生产验收**：`codex/terminal-device-profile-closure` 代码侧已补终端设备名 / MAC / 摆放位置 / 启停、Admin 编辑、公开 Kiosk config 白名单和停用终端拒绝打印任务；上线前仍需在 PostgreSQL 预生产执行 additive migration、确认无重复 MAC、用 Windows Terminal Agent 真机 register / heartbeat 上报 MAC，并实测 `enabled=false` 后 Kiosk 智慧校园关闭且 Agent 不再 claim 打印任务。
+- [ ] **终端应用上架生产验收**：`codex/terminal-device-profile-closure` 代码侧已补 `TerminalToolboxConfig`、Admin `/toolbox` 上架页、百宝箱/智慧校园 placement、站内路由、外部 H5、二维码/小程序码、路径/域名白名单和 `toolbox_config.update` 审计；上线前仍需在 PostgreSQL 预生产执行 additive migration，配置 `KIOSK_EXTERNAL_APP_ALLOWED_HOSTS`，通过 Admin 对真实终端保存 1-2 个站内功能项与 1 个白名单外部/二维码项，确认 Kiosk 真实终端刷新后百宝箱无功能项时保留“待配置”占位、有功能项时展示功能卡片，智慧校园开启后投放项展示、关闭后整块消失，并复核未知路径、未白名单外链被后端拒绝。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
 

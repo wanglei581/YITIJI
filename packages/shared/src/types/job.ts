@@ -275,12 +275,36 @@ export interface ImportRecord {
 // Phase 7 DTO — 岗位展示
 // ============================================================
 
+export type JobQualityLevel = 'ready' | 'partial' | 'insufficient'
+
+export interface JobNormalizedFields {
+  educationRequirement?: string
+  experienceRequirement?: string
+  skills?: string[]
+  benefits?: string[]
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: 'monthly' | 'yearly' | 'daily' | string
+  validThrough?: string
+}
+
+export interface JobDataQualitySnapshotDTO {
+  id: string
+  jobId: string
+  sourceOrgId: string
+  missingFields: string[]
+  qualityLevel: JobQualityLevel
+  sourceUrlReachable: boolean | null
+  checkedAt: string
+  lastError?: string | null
+}
+
 /**
  * 岗位展示 DTO（/api/v1/jobs 接口响应类型）。
  * 继承 ExternalJob，新增展示友好字段。
  * 合规说明：不含企业联系方式，不含任何招聘闭环字段。
  */
-export interface ExternalJobDTO extends ExternalJob {
+export interface ExternalJobDTO extends ExternalJob, JobNormalizedFields {
   industry?: string
   /** 格式化薪资展示字符串，如 "8,000–12,000 元/月" */
   salaryDisplay: string

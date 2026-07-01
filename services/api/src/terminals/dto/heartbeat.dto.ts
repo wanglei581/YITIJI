@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator'
+import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator'
 import { Type } from 'class-transformer'
 
 /**
@@ -14,6 +14,10 @@ export class HeartbeatDto {
   @IsString()
   @IsOptional()
   printerStatus?: string
+
+  @IsBoolean()
+  @IsOptional()
+  localTaskDatabaseAvailable?: boolean
 
   @IsNumber()
   @IsOptional()
@@ -37,6 +41,18 @@ export class HeartbeatDto {
   @IsString()
   @IsOptional()
   ipAddress?: string
+
+  @IsString()
+  @IsOptional()
+  macAddress?: string
+
+  @IsString()
+  @IsOptional()
+  displayName?: string
+
+  @IsString()
+  @IsOptional()
+  locationLabel?: string
 
   @IsString()
   @IsOptional()

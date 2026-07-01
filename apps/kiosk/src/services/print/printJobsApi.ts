@@ -11,6 +11,7 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { getTerminalId } from '../api/screensaver'
 import type { PrintJobParams } from '@ai-job-print/shared'
 
 export interface CreatePrintJobInput {
@@ -32,7 +33,7 @@ export interface PrintJobCreated {
 }
 
 /** Backend status values — subset of shared PrintTaskStatus */
-export type BackendJobStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
+export type BackendJobStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed' | 'cancelled'
 
 export interface PrintJobStatusResult {
   taskId:        string
@@ -44,10 +45,12 @@ export interface PrintJobStatusResult {
 
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
+  const terminalId = getTerminalId()
   const res = await fetch(`${API_BASE_URL}/print/jobs`, {
     method:  'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(terminalId ? { 'X-Terminal-Id': terminalId } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body:    JSON.stringify(body),

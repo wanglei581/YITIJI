@@ -46,6 +46,8 @@ function getIpAddress(): string {
 
 export interface HeartbeatOptions {
   config: AgentConfig
+  /** false means the local task DB is unavailable; claim/print loop is disabled. */
+  localTaskDatabaseAvailable?: boolean | (() => boolean)
   /** Called when server sends updated config in heartbeat response. */
   onConfigUpdate?: (patch: Partial<AgentConfig>) => void
   /** Mutable counter incremented on each consecutive failure; reset on success. */
@@ -59,6 +61,9 @@ export interface HeartbeatOptions {
  */
 export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean> {
   const { config, onConfigUpdate, failureCounter } = options
+  const localTaskDatabaseAvailable = typeof options.localTaskDatabaseAvailable === 'function'
+    ? options.localTaskDatabaseAvailable()
+    : options.localTaskDatabaseAvailable ?? true
 
   if (!config.terminalId || !config.agentToken) {
     warn('heartbeat: skipping — not registered yet')
@@ -73,9 +78,10 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
   ])
 
   const payload: HeartbeatPayload = {
-    status: 'online',
-    printerStatus,
+    status: localTaskDatabaseAvailable ? 'online' : 'error',
+    printerStatus: localTaskDatabaseAvailable ? printerStatus : 'agent_degraded',
     diskFreeGB,
+    localTaskDatabaseAvailable,
     agentVersion: config.agentVersion,
     ipAddress: getIpAddress(),
     reportedAt: new Date().toISOString(),

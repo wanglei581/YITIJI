@@ -4,7 +4,7 @@ import { ApiHttpError } from './httpAdapter'
 
 /**
  * 智慧校园配置 HTTP adapter。命中后端 GET /terminals/:id/smart-campus（无登录，只读）。
- * 后端返回裸 KioskSmartCampusConfig（白名单：只含 enabled + modules，不含学生数据）。
+ * 后端返回裸 KioskSmartCampusConfig（白名单：enabled + modules + 上架应用项，不含学生数据）。
  */
 export const smartCampusHttpAdapter = {
   async getConfig(terminalId: string): Promise<KioskSmartCampusConfig> {

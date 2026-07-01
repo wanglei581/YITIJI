@@ -12,6 +12,7 @@
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { AuditService } from '../src/audit/audit.service'
 import { AdminOrdersReadonlyService } from '../src/admin-orders-readonly/admin-orders-readonly.service'
 
 function pass(message: string): void {
@@ -27,7 +28,8 @@ async function main(): Promise<void> {
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
-  const service = new AdminOrdersReadonlyService(prisma)
+  const audit = new AuditService(prisma)
+  const service = new AdminOrdersReadonlyService(prisma, audit)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const terminalId = `t_aor_${suffix}`
@@ -175,6 +177,8 @@ async function main(): Promise<void> {
       detail.print?.fileName === '只读订单验证.pdf' &&
       detail.print.pageRange === '1-2' &&
       detail.print.status === 'completed' &&
+      detail.print.operations.canCancel === false &&
+      detail.print.operations.canReassign === false &&
       detail.statusLogs.length === 2 &&
       detail.statusLogs[1]?.toStatus === 'completed'
     ) {
@@ -205,11 +209,13 @@ async function main(): Promise<void> {
     if (
       serviceShape['updateStatus'] === undefined &&
       serviceShape['refund'] === undefined &&
-      serviceShape['refundOrder'] === undefined
+      serviceShape['refundOrder'] === undefined &&
+      typeof serviceShape['cancelPrintTask'] === 'function' &&
+      typeof serviceShape['reassignPrintTask'] === 'function'
     ) {
-      pass('service exposes no payment/refund/status mutation methods')
+      pass('service exposes no payment/refund/generic status mutation methods; print ops are explicit')
     } else {
-      fail('service unexpectedly exposes mutation methods')
+      fail('service unexpectedly exposes forbidden mutation methods or is missing explicit print ops')
     }
   } finally {
     await cleanup()

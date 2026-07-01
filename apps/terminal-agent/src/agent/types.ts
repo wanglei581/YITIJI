@@ -72,7 +72,7 @@ export interface AgentConfig {
 // ── Heartbeat ────────────────────────────────────────────────────────────────
 
 export type TerminalStatus = 'online' | 'offline' | 'error'
-export type PrinterStatus = 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown'
+export type PrinterStatus = 'ready' | 'offline' | 'error' | 'low_paper' | 'unknown' | 'agent_degraded'
 
 export interface HeartbeatPayload {
   status: TerminalStatus
@@ -80,6 +80,8 @@ export interface HeartbeatPayload {
   printerStatus: PrinterStatus
   /** Free disk space in GB. Phase 8.1B: -1 (real WMI query in Phase 8.1C). */
   diskFreeGB: number
+  /** false means local task DB is unavailable and printing is disabled. */
+  localTaskDatabaseAvailable?: boolean
   agentVersion: string
   ipAddress: string
   reportedAt: string

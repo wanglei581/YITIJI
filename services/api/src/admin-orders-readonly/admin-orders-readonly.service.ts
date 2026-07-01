@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 import type {
   AdminOrderReadonlyDetail,
   AdminOrderReadonlyItem,
   AdminOrderReadonlyPage,
+  AdminOrderReadonlyPrintOperations,
   AdminOrderReadonlyPrintSummary,
   AdminOrderStatusLogItem,
 } from './admin-orders-readonly.types'
@@ -48,6 +50,15 @@ export interface ListAdminOrdersReadonlyParams {
   pageSize: number
 }
 
+export interface AdminPrintOperationContext {
+  actorId: string | null
+  actorRole: string
+  reason?: string | null
+  ipAddress?: string | null
+  userAgent?: string | null
+  requestId?: string | null
+}
+
 const EMPTY_PRINT_SUMMARY: AdminOrderReadonlyPrintSummary = {
   fileName: null,
   copies: null,
@@ -56,6 +67,11 @@ const EMPTY_PRINT_SUMMARY: AdminOrderReadonlyPrintSummary = {
   paperSize: null,
   pageRange: null,
 }
+
+const CANCELABLE_PRINT_STATUSES = new Set(['pending', 'claimed', 'printing'])
+const REASSIGNABLE_PRINT_STATUSES = new Set(['pending', 'failed'])
+const ADMIN_CANCEL_ERROR_CODE = 'ADMIN_CANCELLED'
+const ADMIN_REASSIGN_ERROR_CODE = 'ADMIN_REASSIGNED'
 
 function parseSafePrintSummary(paramsJson: string | null | undefined): AdminOrderReadonlyPrintSummary {
   if (!paramsJson) return { ...EMPTY_PRINT_SUMMARY }
@@ -83,9 +99,40 @@ function parseSafePrintSummary(paramsJson: string | null | undefined): AdminOrde
   }
 }
 
+function cleanReason(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed.slice(0, 200) : null
+}
+
+function operationReason(status: string): string | null {
+  if (status === 'pending') return null
+  if (status === 'claimed') return '任务已被终端领取，可取消；不能重分配，避免双重出纸'
+  if (status === 'printing') return '任务正在出纸，可应急取消；不能重分配，避免双重出纸'
+  if (status === 'failed') return '任务已失败，可重分配到其他在线终端'
+  if (status === 'completed') return '任务已完成，不能取消或重分配'
+  if (status === 'cancelled') return '任务已取消，不能继续操作'
+  return '当前状态不支持运营操作'
+}
+
+function printOperations(status: string): AdminOrderReadonlyPrintOperations {
+  return {
+    canCancel: CANCELABLE_PRINT_STATUSES.has(status),
+    canReassign: REASSIGNABLE_PRINT_STATUSES.has(status),
+    reason: operationReason(status),
+  }
+}
+
+function badRequest(code: string, message: string): BadRequestException {
+  return new BadRequestException({ error: { code, message } })
+}
+
 @Injectable()
 export class AdminOrdersReadonlyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async list(params: ListAdminOrdersReadonlyParams): Promise<AdminOrderReadonlyPage> {
     const where: Record<string, unknown> = {}
@@ -149,6 +196,7 @@ export class AdminOrdersReadonlyService {
             createdAt: row.printTask.createdAt.toISOString(),
             completedAt: row.printTask.completedAt ? row.printTask.completedAt.toISOString() : null,
             errorCode: row.printTask.errorCode,
+            operations: printOperations(row.printTask.status),
           }
         : null,
       statusLogs: statusLogs.map((log): AdminOrderStatusLogItem => ({
@@ -158,6 +206,182 @@ export class AdminOrdersReadonlyService {
         createdAt: log.createdAt.toISOString(),
       })),
     }
+  }
+
+  async cancelPrintTask(id: string, ctx: AdminPrintOperationContext): Promise<AdminOrderReadonlyDetail> {
+    const reason = cleanReason(ctx.reason)
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = (await tx.order.findUnique({
+        where: { id },
+        select: orderSelect(),
+      })) as unknown as OrderRow | null
+      if (!row) {
+        throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: `订单 ${id} 不存在` } })
+      }
+      if (!row.printTask) {
+        throw badRequest('PRINT_TASK_NOT_FOUND', '订单未关联打印任务，无法取消')
+      }
+      const fromStatus = row.printTask.status
+      if (!CANCELABLE_PRINT_STATUSES.has(fromStatus)) {
+        throw badRequest('PRINT_TASK_CANCEL_NOT_ALLOWED', `任务当前状态 ${fromStatus} 不允许取消`)
+      }
+
+      const updated = await tx.printTask.updateMany({
+        where: { id: row.printTask.id, status: fromStatus },
+        data: {
+          status: 'cancelled',
+          errorCode: ADMIN_CANCEL_ERROR_CODE,
+          errorMessage: reason,
+          completedAt: new Date(),
+        },
+      })
+      if (updated.count !== 1) {
+        throw badRequest('PRINT_TASK_STATE_CHANGED', '任务状态已变化，请刷新后重试')
+      }
+
+      await tx.order.updateMany({
+        where: { id: row.id, printTaskId: row.printTask.id },
+        data: { taskStatus: 'cancelled' },
+      })
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId: row.printTask.id,
+          fromStatus,
+          toStatus: 'cancelled',
+          errorCode: ADMIN_CANCEL_ERROR_CODE,
+        },
+      })
+
+      return {
+        orderId: row.id,
+        orderNo: row.orderNo,
+        taskId: row.printTask.id,
+        fromStatus,
+        terminalId: row.printTask.terminalId,
+      }
+    })
+
+    await this.audit.write({
+      actorId: ctx.actorId,
+      actorRole: ctx.actorRole,
+      action: 'print_task.admin_cancel',
+      targetType: 'print_task',
+      targetId: result.taskId,
+      payload: {
+        orderId: result.orderId,
+        orderNo: result.orderNo,
+        fromStatus: result.fromStatus,
+        toStatus: 'cancelled',
+        terminalId: result.terminalId,
+        reason,
+      },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+      requestId: ctx.requestId ?? null,
+    })
+
+    return this.getById(id)
+  }
+
+  async reassignPrintTask(
+    id: string,
+    targetTerminalRef: string,
+    ctx: AdminPrintOperationContext,
+  ): Promise<AdminOrderReadonlyDetail> {
+    const reason = cleanReason(ctx.reason)
+    const terminalRef = targetTerminalRef.trim()
+    if (!terminalRef) {
+      throw badRequest('PRINT_TARGET_TERMINAL_REQUIRED', '重分配必须选择目标终端')
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const [row, targetTerminal] = await Promise.all([
+        tx.order.findUnique({ where: { id }, select: orderSelect() }) as unknown as Promise<OrderRow | null>,
+        tx.terminal.findFirst({
+          where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
+          select: { id: true, terminalCode: true, enabled: true },
+        }),
+      ])
+      if (!row) {
+        throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: `订单 ${id} 不存在` } })
+      }
+      if (!row.printTask) {
+        throw badRequest('PRINT_TASK_NOT_FOUND', '订单未关联打印任务，无法重分配')
+      }
+      if (!targetTerminal) {
+        throw badRequest('PRINT_TARGET_TERMINAL_NOT_FOUND', '目标终端不存在或未注册')
+      }
+      if (!targetTerminal.enabled) {
+        throw badRequest('PRINT_TARGET_TERMINAL_DISABLED', '目标终端已停用，不能接收打印任务')
+      }
+
+      const fromStatus = row.printTask.status
+      if (!REASSIGNABLE_PRINT_STATUSES.has(fromStatus)) {
+        throw badRequest('PRINT_TASK_REASSIGN_NOT_ALLOWED', `任务当前状态 ${fromStatus} 不允许重分配`)
+      }
+
+      const updated = await tx.printTask.updateMany({
+        where: { id: row.printTask.id, status: fromStatus },
+        data: {
+          terminalId: targetTerminal.id,
+          status: 'pending',
+          claimedAt: null,
+          claimExpiry: null,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      })
+      if (updated.count !== 1) {
+        throw badRequest('PRINT_TASK_STATE_CHANGED', '任务状态已变化，请刷新后重试')
+      }
+
+      await tx.order.updateMany({
+        where: { id: row.id, printTaskId: row.printTask.id },
+        data: { terminalId: targetTerminal.id, taskStatus: 'pending' },
+      })
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId: row.printTask.id,
+          fromStatus,
+          toStatus: 'pending',
+          errorCode: ADMIN_REASSIGN_ERROR_CODE,
+        },
+      })
+
+      return {
+        orderId: row.id,
+        orderNo: row.orderNo,
+        taskId: row.printTask.id,
+        fromStatus,
+        oldTerminalId: row.printTask.terminalId,
+        newTerminalId: targetTerminal.id,
+        newTerminalCode: targetTerminal.terminalCode,
+      }
+    })
+
+    await this.audit.write({
+      actorId: ctx.actorId,
+      actorRole: ctx.actorRole,
+      action: 'print_task.admin_reassign',
+      targetType: 'print_task',
+      targetId: result.taskId,
+      payload: {
+        orderId: result.orderId,
+        orderNo: result.orderNo,
+        fromStatus: result.fromStatus,
+        toStatus: 'pending',
+        oldTerminalId: result.oldTerminalId,
+        newTerminalId: result.newTerminalId,
+        newTerminalCode: result.newTerminalCode,
+        reason,
+      },
+      ipAddress: ctx.ipAddress ?? null,
+      userAgent: ctx.userAgent ?? null,
+      requestId: ctx.requestId ?? null,
+    })
+
+    return this.getById(id)
   }
 
   private async lookupLabels(rows: OrderRow[]): Promise<LabelMaps> {

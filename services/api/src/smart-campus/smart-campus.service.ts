@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { TerminalToolboxService } from '../terminals/terminal-toolbox.service'
 import {
   DEFAULT_SMART_CAMPUS_MODULES,
   type KioskSmartCampusConfig,
@@ -51,19 +52,30 @@ function toConfigView(row: ConfigRow): TerminalSmartCampusConfigView {
  *
  * 合规（compliance-boundary.md §九）：
  *   - 本服务不读写任何学生数据；校园大数据本期冻结，bigdata 仅为开关位。
- *   - Kiosk 拉取（getKioskConfig）返回体白名单：只含 enabled + 子模块开关。
+ *   - Kiosk 拉取（getKioskConfig）返回体白名单：只含 enabled + 子模块开关 + 上架应用项。
  */
 @Injectable()
 export class SmartCampusService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly toolbox: TerminalToolboxService,
+  ) {}
 
   // ── Kiosk 拉取（免鉴权，白名单：只含开关，绝不含学生数据）────────────────
   async getKioskConfig(terminalId: string): Promise<KioskSmartCampusConfig> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalId }, { terminalCode: terminalId }] },
+      select: { id: true, terminalCode: true, enabled: true },
+    })
+    if (terminal && !terminal.enabled) {
+      return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] }
+    }
     const config = await this.findConfigByTerminalRef(terminalId)
     if (!config || !config.enabled) {
-      return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES } }
+      return { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] }
     }
-    return { enabled: true, modules: parseModules(config.modulesJson) }
+    const toolboxConfig = await this.toolbox.getPublicConfig(terminalId, terminal)
+    return { enabled: true, modules: parseModules(config.modulesJson), items: toolboxConfig.smartCampusItems }
   }
 
   // ── 管理员 ────────────────────────────────────────────────────────────────

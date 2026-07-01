@@ -29,11 +29,13 @@ if (page.includes('adminOrdersReadonlyService') && !page.includes('listPrintTask
 if (
   service.includes("'/admin/orders'") &&
   service.includes("`/admin/orders/${encodeURIComponent(id)}`") &&
-  !/PATCH|POST|DELETE|updateOrderStatus|refundOrder/.test(service)
+  service.includes('cancelPrintTask') &&
+  service.includes('reassignPrintTask') &&
+  !/PATCH|DELETE|updateOrderStatus|refundOrder/.test(service)
 ) {
-  pass('service exposes GET list/detail only')
+  pass('service exposes GET list/detail plus scoped print ops only')
 } else {
-  fail('service must expose only GET /admin/orders list/detail')
+  fail('service must expose GET /admin/orders list/detail and only scoped print operations')
 }
 
 for (const forbidden of ['标记已支付', '标记支付失败', '标记退款', '确认退款', 'updateOrderStatus', 'refundOrder']) {
@@ -42,15 +44,15 @@ for (const forbidden of ['标记已支付', '标记支付失败', '标记退款'
 pass('orders page has no payment/refund/status mutation actions')
 
 if (
-  page.includes('订单只读视图') &&
+  page.includes('订单与打印运营') &&
   page.includes('支付 / 退款 / 对账域尚未上线') &&
   page.includes('orderNo') &&
   page.includes('payStatus') &&
   page.includes('taskStatus')
 ) {
-  pass('page copy and fields clearly communicate read-only order scope')
+  pass('page copy and fields clearly communicate read-only payment scope and order/task fields')
 } else {
-  fail('page must show read-only scope and order/payment/task fields')
+  fail('page must show payment read-only scope and order/payment/task fields')
 }
 
 console.log('\nALL PASS')

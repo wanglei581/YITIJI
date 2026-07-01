@@ -8,12 +8,16 @@
  */
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
+
+process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-print-terminal-admin-secret-0123456789'
+process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-print-terminal-action-secret-0123456789'
+process.env['FILE_SIGNING_SECRET'] ||= 'verify-print-file-signing-secret-0123456789abcd'
+
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import { PrismaService } from '../src/prisma/prisma.service'
-import { TerminalsService } from '../src/terminals/terminals.service'
 
 const ORDER_NO_PATTERN = /^ORD-\d{8}-[0-9A-F]{10}$/
 
@@ -38,6 +42,9 @@ function fail(message: string): never {
 }
 
 async function main(): Promise<void> {
+  const { TerminalToolboxService } = await import('../src/terminals/terminal-toolbox.service')
+  const { TerminalsService } = await import('../src/terminals/terminals.service')
+
   console.log('\n=== Order model + print-job accounting verification ===')
 
   const prisma = new PrismaService()
@@ -45,7 +52,8 @@ async function main(): Promise<void> {
 
   const audit = new AuditService(prisma)
   const printJobs = new PrintJobsService(prisma, audit)
-  const terminals = new TerminalsService(prisma)
+  const toolbox = new TerminalToolboxService(prisma)
+  const terminals = new TerminalsService(prisma, toolbox)
   const resetExpiredClaims = (
     terminals as unknown as { resetExpiredClaims: () => Promise<void> }
   ).resetExpiredClaims.bind(terminals)
@@ -97,7 +105,7 @@ async function main(): Promise<void> {
         fileName: '匿名打印.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId: null, ipAddress: '127.0.0.1', userAgent: 'verify-order' },
+      { endUserId: null, ipAddress: '127.0.0.1', userAgent: 'verify-order', terminalId },
     )
     taskIds.push(anonymousPrint.taskId)
 
@@ -123,9 +131,9 @@ async function main(): Promise<void> {
       anonymousOrder.payStatus === 'unpaid' &&
       anonymousOrder.taskStatus === 'pending' &&
       anonymousOrder.endUserId === null &&
-      anonymousOrder.terminalId === null
+      anonymousOrder.terminalId === terminalId
     ) {
-      pass('anonymous print creates a pending unpaid print Order with amountCents=0')
+      pass('anonymous print creates a terminal-bound pending unpaid print Order with amountCents=0')
     } else {
       fail(`anonymous order mismatch: ${JSON.stringify(anonymousOrder)}`)
     }
@@ -137,7 +145,7 @@ async function main(): Promise<void> {
         fileName: '会员打印.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId },
+      { endUserId, terminalId },
     )
     taskIds.push(memberPrint.taskId)
 
@@ -157,7 +165,7 @@ async function main(): Promise<void> {
         fileName: '状态镜像.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId: null },
+      { endUserId: null, terminalId },
     )
     taskIds.push(statusPrint.taskId)
     await prisma.printTask.update({
@@ -225,7 +233,7 @@ async function main(): Promise<void> {
         fileName: '超时回收.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId: null },
+      { endUserId: null, terminalId },
     )
     taskIds.push(expiredPrint.taskId)
     await prisma.printTask.update({
@@ -249,11 +257,11 @@ async function main(): Promise<void> {
     })
     if (
       resetTask?.status === 'pending' &&
-      resetTask.terminalId === null &&
+      resetTask.terminalId === terminalId &&
       resetOrder?.taskStatus === 'pending' &&
-      resetOrder.terminalId === null
+      resetOrder.terminalId === terminalId
     ) {
-      pass('resetExpiredClaims mirrors expired tasks back to pending and clears terminalId')
+      pass('resetExpiredClaims mirrors expired tasks back to pending while preserving target terminalId')
     } else {
       fail(`reset mirror mismatch: task=${JSON.stringify(resetTask)} order=${JSON.stringify(resetOrder)}`)
     }

@@ -17,7 +17,7 @@ import type { AgentConfig } from './agent/types'
 import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/qr-login-server'
 // Phase 8.1C additions
 import { acquireLock, releaseLock } from './agent/instance-lock'
-import { openDatabase, type AgentDatabase } from './agent/db'
+import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
 
 const program = new Command()
@@ -69,6 +69,7 @@ program
     // ── Step 5: Start heartbeat ───────────────────────────────────────────
     const heartbeatTimer = startHeartbeat({
       config,
+      localTaskDatabaseAvailable: () => isDatabaseAvailable(db),
       onConfigUpdate: (patch) => {
         if (patch.heartbeatIntervalMs) config.heartbeatIntervalMs = patch.heartbeatIntervalMs
         if (patch.claimIntervalMs) config.claimIntervalMs = patch.claimIntervalMs

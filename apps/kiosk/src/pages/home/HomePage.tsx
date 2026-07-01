@@ -32,17 +32,21 @@ import {
   UserCheckIcon,
   WifiIcon,
   WrenchIcon,
+  XIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { SmartCampusModuleKey } from '@ai-job-print/shared'
+import type { KioskToolboxConfig, KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 
 const HERO_IMAGE = '/assets/kiosk-home-hero-job-fair.png'
+const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
+let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
 
 function useClock() {
   const [now, setNow] = useState(() => new Date())
@@ -297,10 +301,10 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
       { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source?intent=diagnose' },
       { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source?intent=optimize' },
-      { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates?tab=templates' },
+      { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates' },
       { title: '职业规划', icon: CompassIcon, to: '/resume/career-plan' },
       { title: '简历打印', icon: PrinterIcon, to: '/print/upload?source=resume' },
-      { title: '求职材料', icon: FileBadge2Icon, to: '/resume/templates?tab=materials' },
+      { title: '求职材料', icon: FileBadge2Icon, to: '/resume/materials' },
     ],
   },
   {
@@ -460,98 +464,253 @@ const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { d
 function SmartCampusHorizontalSection() {
   const navigate = useNavigate()
   const config = useSmartCampusConfig()
+  const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
   const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
     .filter((key) => config.modules[key])
     .map((key) => SMART_CAMPUS_TILES[key])
     .filter((tile): tile is ServiceTile & { desc: string; color: string; bg: string } => !!tile)
+  const campusItems = [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
 
-  if (!config.enabled || enabledTiles.length === 0) return null
+  if (!config.enabled || (enabledTiles.length === 0 && campusItems.length === 0)) return null
 
   return (
-    <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-blue-200 bg-white shadow-[0_14px_34px_rgba(37,99,235,0.12)]">
-      <div className="flex items-center gap-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-8 py-5">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.24)]">
-          <GraduationCapIcon className="h-8 w-8" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-3xl font-extrabold leading-tight text-slate-950">智慧校园</h2>
-            <span className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-bold text-blue-600">
-              学校端已开启
-            </span>
-          </div>
-          <p className="mt-1 text-base font-semibold text-slate-500">
-            学校专属服务专区，仅校园终端开启时显示；关闭后整块消失，不占首页空白。
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate('/smart-campus')}
-          className="hidden min-h-[52px] shrink-0 items-center gap-1 rounded-2xl bg-white px-5 text-base font-extrabold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 active:bg-blue-100 sm:flex"
-        >
-          进入专区
-          <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
-        {enabledTiles.map((tile) => {
-          const Icon = tile.icon
-          const disabled = tile.disabled || !tile.to
-          return (
-            <button
-              key={tile.title}
-              type="button"
-              disabled={disabled}
-              onClick={() => tile.to && !disabled && navigate(tile.to)}
-              className={[
-                'relative min-h-[128px] overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50/70 p-5 text-left transition-all',
-                disabled
-                  ? 'cursor-not-allowed opacity-70'
-                  : 'hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0',
-              ].join(' ')}
-            >
-              <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tile.bg}`}>
-                <Icon className={`h-6 w-6 ${tile.color}`} aria-hidden="true" />
+    <>
+      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-blue-200 bg-white shadow-[0_14px_34px_rgba(37,99,235,0.12)]">
+        <div className="flex items-center gap-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-8 py-5">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.24)]">
+            <GraduationCapIcon className="h-8 w-8" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-3xl font-extrabold leading-tight text-slate-950">智慧校园</h2>
+              <span className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-bold text-blue-600">
+                学校端已开启
               </span>
-              <span className="mt-4 block text-xl font-extrabold text-slate-950">{tile.title}</span>
-              <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{tile.desc}</span>
-              {disabled && (
-                <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
-                  即将上线
+            </div>
+            <p className="mt-1 text-base font-semibold text-slate-500">
+              学校专属服务专区，仅校园终端开启时显示；关闭后整块消失，不占首页空白。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/smart-campus')}
+            className="hidden min-h-[52px] shrink-0 items-center gap-1 rounded-2xl bg-white px-5 text-base font-extrabold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 active:bg-blue-100 sm:flex"
+          >
+            进入专区
+            <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
+          {enabledTiles.map((tile) => {
+            const Icon = tile.icon
+            const disabled = tile.disabled || !tile.to
+            return (
+              <button
+                key={tile.title}
+                type="button"
+                disabled={disabled}
+                onClick={() => tile.to && !disabled && navigate(tile.to)}
+                className={[
+                  'relative min-h-[128px] overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50/70 p-5 text-left transition-all',
+                  disabled
+                    ? 'cursor-not-allowed opacity-70'
+                    : 'hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0',
+                ].join(' ')}
+              >
+                <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tile.bg}`}>
+                  <Icon className={`h-6 w-6 ${tile.color}`} aria-hidden="true" />
                 </span>
-              )}
-            </button>
-          )
-        })}
+                <span className="mt-4 block text-xl font-extrabold text-slate-950">{tile.title}</span>
+                <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{tile.desc}</span>
+                {disabled && (
+                  <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+                    即将上线
+                  </span>
+                )}
+              </button>
+            )
+          })}
+          {campusItems.map((item) => (
+            <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} accent="blue" />
+          ))}
+        </div>
+      </section>
+      <QrLaunchModal item={qrItem} onClose={() => setQrItem(null)} />
+    </>
+  )
+}
+
+const TOOLBOX_ICONS: Record<string, LucideIcon> = {
+  wrench: WrenchIcon,
+  'file-text': FileTextIcon,
+  printer: PrinterIcon,
+  sparkles: SparklesIcon,
+  'book-open': BookOpenIcon,
+  'help-circle': HelpCircleIcon,
+}
+
+function useToolboxConfig() {
+  const [config, setConfig] = useState<KioskToolboxConfig>(() => cachedToolboxConfig)
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const terminalId = getTerminalId()
+        const terminalConfig = await getCachedKioskTerminalConfig(terminalId)
+        cachedToolboxConfig = terminalConfig.toolbox
+        if (alive) setConfig(terminalConfig.toolbox)
+      } catch {
+        if (alive) setConfig(cachedToolboxConfig)
+      }
+    }
+    void load()
+    const timer = window.setInterval(() => void load(), 5 * 60 * 1000)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  return config
+}
+
+function launchKioskAppItem(item: KioskToolboxItem, navigate: ReturnType<typeof useNavigate>, onQr: (item: KioskToolboxItem) => void) {
+  const launchMode = item.launchMode ?? 'internal_route'
+  if (launchMode === 'internal_route' && item.to) {
+    navigate(item.to)
+    return
+  }
+  if (launchMode === 'external_url' && item.externalUrl) {
+    window.location.assign(item.externalUrl)
+    return
+  }
+  if ((launchMode === 'qr_code' || launchMode === 'mini_program_qr') && item.qrImageUrl) {
+    onQr(item)
+  }
+}
+
+function itemLaunchable(item: KioskToolboxItem): boolean {
+  const launchMode = item.launchMode ?? 'internal_route'
+  if (launchMode === 'internal_route') return !!item.to
+  if (launchMode === 'external_url') return !!item.externalUrl
+  return !!item.qrImageUrl
+}
+
+function itemBadge(item: KioskToolboxItem): string | null {
+  if (item.disabled || !itemLaunchable(item)) return '即将上线'
+  if (item.launchMode === 'external_url') return '外部应用'
+  if (item.launchMode === 'qr_code') return '扫码'
+  if (item.launchMode === 'mini_program_qr') return '小程序'
+  return null
+}
+
+function QrLaunchModal({ item, onClose }: { item: KioskToolboxItem | null; onClose: () => void }) {
+  if (!item) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 backdrop-blur-sm">
+      <div className="w-[min(420px,100%)] rounded-[28px] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.3)]">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-2xl font-extrabold text-slate-950">{item.title}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{item.description || '请扫码继续办理'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 hover:bg-slate-200"
+            aria-label="关闭"
+          >
+            <XIcon className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mt-6 flex justify-center rounded-[24px] bg-slate-50 p-5">
+          <img src={item.qrImageUrl ?? ''} alt={`${item.title}二维码`} className="h-64 w-64 rounded-2xl object-contain" />
+        </div>
       </div>
-    </section>
+    </div>
+  )
+}
+
+function ToolboxItemButton({
+  item,
+  onQr,
+  accent = 'slate',
+}: {
+  item: KioskToolboxItem
+  onQr: (item: KioskToolboxItem) => void
+  accent?: 'slate' | 'blue'
+}) {
+  const navigate = useNavigate()
+  const Icon = TOOLBOX_ICONS[item.icon] ?? WrenchIcon
+  const disabled = item.disabled || !itemLaunchable(item)
+  const badge = itemBadge(item)
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr)}
+      className={[
+        'relative min-h-[128px] rounded-[24px] border border-slate-200 bg-slate-50/72 p-5 text-left transition-all',
+        disabled
+          ? 'cursor-not-allowed opacity-70'
+          : accent === 'blue'
+            ? 'hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0'
+            : 'hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_12px_26px_rgba(15,23,42,0.1)] active:translate-y-0',
+      ].join(' ')}
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+        <Icon className="h-6 w-6" aria-hidden="true" />
+      </span>
+      <span className="mt-4 block text-xl font-extrabold text-slate-950">{item.title}</span>
+      <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{item.description}</span>
+      {badge && (
+        <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+          {badge}
+        </span>
+      )}
+    </button>
   )
 }
 
 function ToolboxSection() {
-  return (
-    <section
-      aria-label="百宝箱"
-      className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-slate-200 bg-white shadow-[0_14px_34px_rgba(15,23,42,0.08)]"
-    >
-      <div className="flex items-center gap-4 border-b border-slate-100 bg-white px-8 py-6">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700">
-          <WrenchIcon className="h-8 w-8" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-3xl font-extrabold leading-tight text-slate-950">百宝箱</h2>
-          <p className="mt-1 text-base font-semibold text-slate-500">常用工具与扩展服务</p>
-        </div>
-      </div>
+  const config = useToolboxConfig()
+  const [qrItem, setQrItem] = useState<KioskToolboxItem | null>(null)
+  const items = config.enabled ? [...config.items].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
-      <div className="flex min-h-[168px] items-center justify-center px-8 py-10">
-        <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/78 px-10 py-8 text-center">
-          <p className="text-xl font-extrabold text-slate-700">待配置</p>
-          <p className="mt-2 text-base font-semibold text-slate-400">后续功能上线后将在这里展示</p>
+  if (!config.enabled) return null
+
+  return (
+    <>
+      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/80">
+        <div className="flex items-center gap-4 border-b border-slate-100 px-8 py-5">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-[0_10px_20px_rgba(15,23,42,0.18)]">
+            <PackageIcon className="h-8 w-8" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-3xl font-extrabold leading-tight text-slate-950">百宝箱</h2>
+            <p className="mt-1 text-base font-semibold text-slate-500">按当前设备配置展示扩展服务。</p>
+          </div>
         </div>
-      </div>
-    </section>
+        <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
+          {items.length > 0 ? (
+            items.map((item) => (
+              <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} />
+            ))
+          ) : (
+            <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/72 p-6">
+              <span className="block text-xl font-extrabold text-slate-950">待配置</span>
+              <span className="mt-2 block text-sm font-semibold leading-relaxed text-slate-500">
+                后续功能上线后将在这里展示。
+              </span>
+            </div>
+          )}
+        </div>
+      </section>
+      <QrLaunchModal item={qrItem} onClose={() => setQrItem(null)} />
+    </>
   )
 }
 

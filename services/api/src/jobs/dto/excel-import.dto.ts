@@ -41,6 +41,8 @@ export class ExcelPreviewDto {
 export const JOB_STANDARD_FIELDS = [
   'externalId', 'title', 'company', 'city', 'sourceUrl',
   'salary', 'description', 'requirements', 'industry', 'workType',
+  'educationRequirement', 'experienceRequirement', 'skills', 'benefits',
+  'salaryMin', 'salaryMax', 'salaryUnit', 'validThrough',
 ] as const
 export type JobStandardField = typeof JOB_STANDARD_FIELDS[number]
 

@@ -8,6 +8,9 @@ export const JOB_MATERIAL_TEMPLATE_TYPES = [
 
 export type JobMaterialTemplateType = typeof JOB_MATERIAL_TEMPLATE_TYPES[number]
 
+export type ResumeTemplateType = Extract<JobMaterialTemplateType, 'resume_template'>
+export type JobMaterialDocumentTemplateType = Exclude<JobMaterialTemplateType, ResumeTemplateType>
+
 export type JobMaterialTemplateStatus = 'published' | 'disabled'
 
 export interface JobMaterialTemplateField {
@@ -30,6 +33,9 @@ export interface JobMaterialTemplate {
   outputFilename: string
   fields: JobMaterialTemplateField[]
 }
+
+export type ResumeTemplate = JobMaterialTemplate & { type: ResumeTemplateType }
+export type JobMaterialDocumentTemplate = JobMaterialTemplate & { type: JobMaterialDocumentTemplateType }
 
 export interface JobMaterialGenerateInput {
   templateId: string
@@ -179,3 +185,11 @@ export const JOB_MATERIAL_TEMPLATES: JobMaterialTemplate[] = [
     fields: COMMON_FIELDS,
   },
 ]
+
+export function isResumeTemplate(template: JobMaterialTemplate): template is ResumeTemplate {
+  return template.type === 'resume_template'
+}
+
+export function isJobMaterialDocumentTemplate(template: JobMaterialTemplate): template is JobMaterialDocumentTemplate {
+  return template.type !== 'resume_template'
+}

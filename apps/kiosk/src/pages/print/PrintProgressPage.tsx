@@ -13,6 +13,7 @@
 //   printing            → step 2 "打印中"
 //   completed           → navigate to /print/done (success)
 //   failed              → navigate to /print/done (failure)
+//   cancelled           → navigate to /print/done (failure)
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -60,6 +61,7 @@ const ERROR_CODE_MESSAGES: Record<string, string> = {
   PRINT_COMMAND_FAILED: '打印执行失败，请稍后重试或联系工作人员',
   UNSUPPORTED_FILE_TYPE: '该文件格式暂不支持打印，请上传 PDF 或 JPG / PNG',
   FILE_NOT_FOUND: '打印文件已失效，请返回重新上传',
+  ADMIN_CANCELLED: '任务已由工作人员取消，请联系工作人员确认后重新发起',
 }
 
 function errorCodeToMessage(code?: string): string | undefined {
@@ -70,6 +72,19 @@ const POLL_INTERVAL_MS = 2000
 const REAL_POLL_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes — guard against Agent never claiming
 
 const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
+
+const BACKEND_STATUS_LABELS: Record<BackendJobStatus, string> = {
+  pending: '待领取',
+  claimed: '已领取',
+  printing: '打印中',
+  completed: '已完成',
+  failed: '失败',
+  cancelled: '已取消',
+}
+
+function formatStatusTime(iso: string | null): string {
+  return iso ? iso.slice(11, 19) : '—'
+}
 
 // ── Status → UI step mapping ──────────────────────────────────────────────────
 
@@ -104,6 +119,10 @@ export function PrintProgressPage() {
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
   const [failed, setFailed]     = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [lastStatus, setLastStatus] = useState<BackendJobStatus | null>(useRealApi ? 'pending' : null)
+  const [lastStatusAt, setLastStatusAt] = useState<string | null>(null)
+  const [lastErrorCode, setLastErrorCode] = useState<string | null>(null)
+  const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null)
   const cancelRef               = useRef(false)
 
   // ── Navigation helpers ────────────────────────────────────────────────────
@@ -139,15 +158,31 @@ export function PrintProgressPage() {
     // Step 0 is already "done" — we submitted before landing here.
     // Start showing step 1 immediately.
     setCurrent('queuing')
+    setLastStatus('pending')
+    setLastStatusAt(null)
+    setLastErrorCode(null)
+    setLastErrorMessage(null)
 
     const tick = async () => {
       if (cancelRef.current) return
       try {
         const result = await getPrintJobStatus(taskId)
         if (cancelRef.current) return
+        setLastStatus(result.status)
+        setLastStatusAt(new Date().toISOString())
+        setLastErrorCode(result.errorCode ?? null)
+        setLastErrorMessage(result.errorMessage ?? null)
 
         if (result.status === 'completed') {
           navigateSuccess()
+          return
+        }
+        if (result.status === 'cancelled') {
+          navigateFail(
+            errorCodeToMessage(result.errorCode) ??
+            result.errorMessage ??
+            '任务已被工作人员取消，请联系工作人员确认后重新发起',
+          )
           return
         }
         if (result.status === 'failed') {
@@ -256,6 +291,12 @@ export function PrintProgressPage() {
           {taskId && (
             <p className="mt-3 text-xs text-gray-400">任务编号：{taskId}</p>
           )}
+          {lastStatus && (
+            <p className="mt-1 text-xs text-gray-400">后端状态：{BACKEND_STATUS_LABELS[lastStatus] ?? lastStatus}</p>
+          )}
+          {lastStatusAt && (
+            <p className="mt-1 text-xs text-gray-400">最近更新：{formatStatusTime(lastStatusAt)}</p>
+          )}
         </div>
         <button
           onClick={() => navigate('/')}
@@ -293,6 +334,36 @@ export function PrintProgressPage() {
           ? '任务已提交，正在等待终端处理…'
           : '请勿离开，任务处理中…'}
       </p>
+
+      {useRealApi && (
+        <div className="mt-5 w-full max-w-sm space-y-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-400">任务编号</span>
+            <span className="truncate font-mono text-xs text-gray-600">{taskId}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-400">后端状态</span>
+            <span className="font-medium text-gray-800">
+              {lastStatus ? BACKEND_STATUS_LABELS[lastStatus] ?? lastStatus : '待领取'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-gray-400">最近更新</span>
+            <span className="font-mono text-xs text-gray-600">{formatStatusTime(lastStatusAt)}</span>
+          </div>
+          {lastErrorCode && (
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-gray-400">异常码</span>
+              <span className="max-w-[220px] text-right font-mono text-xs text-red-500">{lastErrorCode}</span>
+            </div>
+          )}
+          {lastErrorMessage && (
+            <div className="text-right text-xs text-red-500">
+              {errorCodeToMessage(lastErrorCode ?? undefined) ?? lastErrorMessage}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 步骤列表 */}
       <div className="mt-12 w-full max-w-sm space-y-4">
@@ -366,12 +437,6 @@ export function PrintProgressPage() {
         </div>
       )}
 
-      {/* DEV 专用：显示当前任务 ID（real 模式） */}
-      {import.meta.env.DEV && useRealApi && taskId && (
-        <div className="absolute bottom-6 left-0 right-0 text-center">
-          <p className="text-xs text-gray-400">taskId: {taskId}</p>
-        </div>
-      )}
     </div>
   )
 }

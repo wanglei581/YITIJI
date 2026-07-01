@@ -187,6 +187,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiResumeResult
   }
 
+  // ── 岗位 AI / 数据质量治理 ───────────────────────────────────────────────
+
+  get jobDataQualitySnapshot() {
+    return this.client.jobDataQualitySnapshot
+  }
+
   // ── Phase A-2: 材料处理任务骨架 ─────────────────────────────────────────────
 
   get documentProcessTask() {
@@ -275,6 +281,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get terminalSmartCampusConfig() {
     return this.client.terminalSmartCampusConfig
+  }
+
+  get terminalToolboxConfig() {
+    return this.client.terminalToolboxConfig
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────

@@ -89,7 +89,12 @@ export class PrintJobsService {
 
   async create(
     dto: CreatePrintJobDto,
-    ctx: { ipAddress?: string | null; userAgent?: string | null; endUserId?: string | null } = {},
+    ctx: {
+      ipAddress?: string | null
+      userAgent?: string | null
+      endUserId?: string | null
+      terminalId?: string | null
+    } = {},
   ): Promise<PrintJobCreated> {
     const taskId = `ptask_kiosk_${crypto.randomBytes(8).toString('hex')}`
 
@@ -104,6 +109,8 @@ export class PrintJobsService {
         },
       })
     }
+
+    const targetTerminalId = await this.resolveTargetTerminalId(ctx.terminalId)
 
     // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
     // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
@@ -122,6 +129,7 @@ export class PrintJobsService {
       const task = await tx.printTask.create({
         data: {
           id:         taskId,
+          terminalId: targetTerminalId,
           fileUrl:    storedFileUrl,
           endUserId:  ctx.endUserId ?? null,
           // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
@@ -135,6 +143,7 @@ export class PrintJobsService {
           orderNo,
           type:        'print',
           printTaskId: task.id,
+          terminalId:  targetTerminalId,
           endUserId:   ctx.endUserId ?? null,
           // 当前未接真实报价/支付;不伪造页数或金额。
           amountCents: 0,
@@ -159,6 +168,7 @@ export class PrintJobsService {
         hasFileHash: Boolean(dto.fileMd5),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
+        terminalId:   targetTerminalId,
         orderId:     order.id,
         orderNo:     order.orderNo,
       },
@@ -171,6 +181,45 @@ export class PrintJobsService {
       status:    task.status,
       createdAt: task.createdAt.toISOString(),
     }
+  }
+
+  private async resolveTargetTerminalId(rawTerminalId: string | null | undefined): Promise<string> {
+    const terminalRef = rawTerminalId?.trim()
+    if (!terminalRef) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_REQUIRED',
+          message: '创建打印任务必须绑定当前一体机终端',
+        },
+      })
+    }
+
+    const terminal = await this.prisma.terminal.findFirst({
+      where: {
+        OR: [
+          { id: terminalRef },
+          { terminalCode: terminalRef },
+        ],
+      },
+      select: { id: true, enabled: true },
+    })
+    if (!terminal) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_NOT_FOUND',
+          message: '目标一体机终端不存在或未注册',
+        },
+      })
+    }
+    if (!terminal.enabled) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_DISABLED',
+          message: '目标一体机终端已停用，不能创建打印任务',
+        },
+      })
+    }
+    return terminal.id
   }
 
   async getStatus(taskId: string): Promise<PrintJobStatusResult> {

@@ -7,10 +7,10 @@
  *   print_tasks     — records completed/failed tasks to prevent re-execution on restart
  *   pending_patches — offline PATCH queue retried by offline-queue.ts
  *
- * Graceful fallback: if better-sqlite3 native module fails to load (e.g. first run
- * before npm rebuild on a new Windows machine), all functions silently no-op and
- * return safe defaults. The agent continues running but won't have restart-idempotency
- * until the DB becomes available.
+ * Fail-closed: if better-sqlite3 native module fails to load (e.g. first run
+ * before npm rebuild on a new Windows machine), the agent must not claim or print
+ * tasks. Printing without local idempotency can duplicate physical output after
+ * restart, so task-runner treats a null DB as a hard degraded state.
  *
  * DB paths:
  *   Windows: %ProgramData%\AIJobPrintAgent\agent.db
@@ -41,6 +41,7 @@ interface SqliteDb {
 
 /** Live better-sqlite3 Database instance, or null if the native module is unavailable. */
 export type AgentDatabase = SqliteDb | null
+let databaseRuntimeAvailable = true
 
 // ── Public record types ───────────────────────────────────────────────────────
 
@@ -104,27 +105,49 @@ export function openDatabase(): AgentDatabase {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true })
     const db = new DatabaseCtor(dbPath)
     db.exec(SCHEMA_SQL)
+    databaseRuntimeAvailable = true
     log(`db: opened ${dbPath}`)
     return db
   } catch (e) {
+    databaseRuntimeAvailable = false
     warn(
-      `db: better-sqlite3 加载失败，任务状态持久化不可用` +
-        `（仍可运行，但重启后可能重复打印）— ${e instanceof Error ? e.message : String(e)}`,
+      `db: local task database unavailable; printing disabled — ` +
+        `${e instanceof Error ? e.message : String(e)}`,
     )
     return null
   }
+}
+
+export function isDatabaseAvailable(db: AgentDatabase): db is NonNullable<AgentDatabase> {
+  return db !== null && databaseRuntimeAvailable
+}
+
+function logDatabaseRuntimeError(operation: string, error: unknown): void {
+  databaseRuntimeAvailable = false
+  warn(
+    `db: local task database runtime error during ${operation}; ` +
+      `printing safety state may be degraded — ${error instanceof Error ? error.message : String(error)}`,
+  )
 }
 
 // ── Task idempotency ──────────────────────────────────────────────────────────
 
 /**
  * Returns true if the task has already been marked done (completed or failed).
- * Always false when db is null.
+ * Runtime read failures return true as fail-closed: skip printing instead of
+ * risking duplicate physical output when local idempotency cannot be trusted.
+ * Always false when db is null; task-runner never starts in that state.
  */
 export function isTaskDone(db: AgentDatabase, taskId: string): boolean {
   if (!db) return false
-  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
-  return row !== undefined
+  if (!isDatabaseAvailable(db)) return true
+  try {
+    const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
+    return row !== undefined
+  } catch (error) {
+    logDatabaseRuntimeError('isTaskDone', error)
+    return true
+  }
 }
 
 /**
@@ -134,8 +157,14 @@ export function isTaskDone(db: AgentDatabase, taskId: string): boolean {
  */
 export function getTaskLocalStatus(db: AgentDatabase, taskId: string): string | undefined {
   if (!db) return undefined
-  const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
-  return row ? (row['status'] as string) : undefined
+  if (!isDatabaseAvailable(db)) return undefined
+  try {
+    const row = db.prepare('SELECT status FROM print_tasks WHERE taskId = ?').get(taskId)
+    return row ? (row['status'] as string) : undefined
+  } catch (error) {
+    logDatabaseRuntimeError('getTaskLocalStatus', error)
+    return undefined
+  }
 }
 
 /**
@@ -143,13 +172,17 @@ export function getTaskLocalStatus(db: AgentDatabase, taskId: string): string | 
  * No-op when db is null.
  */
 export function markTaskDone(db: AgentDatabase, taskId: string, status: string): void {
-  if (!db) return
+  if (!isDatabaseAvailable(db)) return
   const now = new Date().toISOString()
-  db
-    .prepare(
-      'INSERT OR REPLACE INTO print_tasks (taskId, status, completedAt, createdAt) VALUES (?, ?, ?, ?)',
-    )
-    .run(taskId, status, now, now)
+  try {
+    db
+      .prepare(
+        'INSERT OR REPLACE INTO print_tasks (taskId, status, completedAt, createdAt) VALUES (?, ?, ?, ?)',
+      )
+      .run(taskId, status, now, now)
+  } catch (error) {
+    logDatabaseRuntimeError('markTaskDone', error)
+  }
 }
 
 // ── Offline PATCH queue ───────────────────────────────────────────────────────
@@ -163,25 +196,29 @@ export function enqueuePatch(
   taskId: string,
   payload: PatchStatusPayload,
 ): void {
-  if (!db) return
+  if (!isDatabaseAvailable(db)) return
   const now = new Date().toISOString()
   // First retry after 30s
   const nextRetryAt = new Date(Date.now() + 30_000).toISOString()
-  db
-    .prepare(
-      `INSERT INTO pending_patches
-       (taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt)
-       VALUES (?, ?, ?, ?, 0, ?, ?)`,
-    )
-    .run(
-      taskId,
-      payload.status,
-      payload.errorCode ?? null,
-      payload.errorMessage ?? null,
-      nextRetryAt,
-      now,
-    )
-  warn(`db: PATCH status=${payload.status} for task ${taskId} enqueued for offline retry`)
+  try {
+    db
+      .prepare(
+        `INSERT INTO pending_patches
+         (taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt)
+         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+      )
+      .run(
+        taskId,
+        payload.status,
+        payload.errorCode ?? null,
+        payload.errorMessage ?? null,
+        nextRetryAt,
+        now,
+      )
+    warn(`db: PATCH status=${payload.status} for task ${taskId} enqueued for offline retry`)
+  } catch (error) {
+    logDatabaseRuntimeError('enqueuePatch', error)
+  }
 }
 
 /**
@@ -189,14 +226,19 @@ export function enqueuePatch(
  * Returns [] when db is null.
  */
 export function getPendingPatches(db: AgentDatabase): PendingPatch[] {
-  if (!db) return []
+  if (!isDatabaseAvailable(db)) return []
   const now = new Date().toISOString()
-  return db
-    .prepare(
-      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt
-       FROM pending_patches WHERE nextRetryAt <= ?`,
-    )
-    .all(now) as unknown as PendingPatch[]
+  try {
+    return db
+      .prepare(
+        `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt
+         FROM pending_patches WHERE nextRetryAt <= ?`,
+      )
+      .all(now) as unknown as PendingPatch[]
+  } catch (error) {
+    logDatabaseRuntimeError('getPendingPatches', error)
+    return []
+  }
 }
 
 /**
@@ -213,14 +255,18 @@ export function markPatchAttempt(
   nextRetryAt?: string,
   abandon?: boolean,
 ): void {
-  if (!db) return
-  if (success || abandon) {
-    db.prepare('DELETE FROM pending_patches WHERE id = ?').run(id)
-  } else {
-    db
-      .prepare(
-        'UPDATE pending_patches SET attempts = attempts + 1, nextRetryAt = ? WHERE id = ?',
-      )
-      .run(nextRetryAt ?? new Date(Date.now() + 30_000).toISOString(), id)
+  if (!isDatabaseAvailable(db)) return
+  try {
+    if (success || abandon) {
+      db.prepare('DELETE FROM pending_patches WHERE id = ?').run(id)
+    } else {
+      db
+        .prepare(
+          'UPDATE pending_patches SET attempts = attempts + 1, nextRetryAt = ? WHERE id = ?',
+        )
+        .run(nextRetryAt ?? new Date(Date.now() + 30_000).toISOString(), id)
+    }
+  } catch (error) {
+    logDatabaseRuntimeError('markPatchAttempt', error)
   }
 }

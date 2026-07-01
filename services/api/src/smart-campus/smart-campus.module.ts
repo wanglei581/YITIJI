@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { PrismaModule } from '../prisma/prisma.module'
+import { TerminalsModule } from '../terminals/terminals.module'
 import { SmartCampusController } from './smart-campus.controller'
 import { SmartCampusService } from './smart-campus.service'
 
@@ -9,16 +10,18 @@ import { SmartCampusService } from './smart-campus.service'
  *
  * 提供：
  *   - 管理员：终端列表 + 按终端配置智慧校园开关与子模块开关位（@Roles('admin')，含审计）
- *   - Kiosk：拉取开关 + 子模块开关位（无登录，只读，返回体白名单不含学生数据）
+ *   - Kiosk：拉取开关 + 子模块开关位 + 上架应用项（无登录，只读，返回体白名单不含学生数据）
  *
  * 依赖：
  *   - PrismaModule：落库 TerminalSmartCampusConfig
+ *   - TerminalsModule：复用终端应用上架配置
  *   - JwtModule：JwtAuthGuard 验签
  *   - AuditService（@Global）：管理员写操作审计
  */
 @Module({
   imports: [
     PrismaModule,
+    TerminalsModule,
     JwtVerifierModule,
   ],
   controllers: [SmartCampusController],

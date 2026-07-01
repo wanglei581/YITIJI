@@ -4,7 +4,7 @@
  * 覆盖上线核心打印链路（创建 → claim → 状态回传 → 查询）的关键不变量：
  *   1. 合法签名 fileUrl → 创建 PrintTask(pending)。
  *   2. 非法 fileUrl（外部地址 / 无签名 / 篡改 sig）→ 400 PRINT_INVALID_FILE_URL（SSRF 防护）。
- *   3. 终端 claim：pending 任务被该终端原子领取（claimed + 绑定 terminalId）；错 agentToken → 401。
+ *   3. 终端 claim：只领取绑定到该终端的 pending 任务；错 agentToken → 401。
  *   4. 状态回传：claimed → printing → completed（含 completedAt）。
  *   5. 终态幂等：重复回传 completed / 终态后再请求 printing 都返回 ack 且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
@@ -51,6 +51,7 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
 async function main() {
   // 动态 import：terminals.service 模块级 requireEnv 必须在上面 env 设好后再加载。
   const { TerminalsService } = await import('../src/terminals/terminals.service')
+  const { TerminalToolboxService } = await import('../src/terminals/terminal-toolbox.service')
 
   console.log('\n=== 打印链路 service 级 E2E 验证（P1-B 守门）===')
 
@@ -58,7 +59,8 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const printJobs = new PrintJobsService(prisma, audit)
-  const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
+  const toolbox = new TerminalToolboxService(prisma)
+  const terminals = new TerminalsService(prisma, toolbox) // 不调 onModuleInit，避免 seed + 定时器
 
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vpj_${suffix}`
@@ -86,7 +88,12 @@ async function main() {
     // ── 1. 合法签名 fileUrl → 创建 PrintTask(pending) ──────────────────
     const signed = signFileUrl(fileId, 30 * 60 * 1000)
     const dto1: CreatePrintJobDto = { fileUrl: signed.url, fileMd5: 'sha256-vpj', fileName: '测试简历.pdf' }
-    const created = await printJobs.create(dto1, { ipAddress: '127.0.0.1', userAgent: 'verify', endUserId: null })
+    const created = await printJobs.create(dto1, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'verify',
+      endUserId: null,
+      terminalId,
+    })
     createdTaskIds.push(created.taskId)
     if (created.status === 'pending' && created.taskId.startsWith('ptask_')) {
       pass('1. 合法签名 fileUrl → 创建任务 pending')
@@ -153,6 +160,13 @@ async function main() {
     if (ack2.acknowledged === true && afterIllegal.status === 'completed') {
       pass('5b. 终态后再请求 printing → 幂等 ack，状态仍 completed（终态保护）')
     } else fail(`5b. 终态保护异常: ${afterIllegal.status}`)
+
+    await prisma.printTask.update({ where: { id: created.taskId }, data: { status: 'cancelled' } })
+    const ack3 = await terminals.patchTaskStatus(created.taskId, { status: 'completed' }, `Bearer ${agentToken}`, terminalId)
+    const afterCancelledLateAck = await printJobs.getStatus(created.taskId)
+    if (ack3.acknowledged === true && afterCancelledLateAck.status === 'cancelled') {
+      pass('5c. cancelled 终态后收到终端迟到回写 → 幂等 ack，状态仍 cancelled')
+    } else fail(`5c. cancelled 终态保护异常: ${afterCancelledLateAck.status}`)
 
     // ── 6. 状态查询 404 ───────────────────────────────────────────────
     await expectCode(

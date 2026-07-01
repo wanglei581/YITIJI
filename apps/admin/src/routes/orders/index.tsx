@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { FileTextIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { FileTextIcon, RefreshCwIcon, SearchIcon, XCircleIcon } from 'lucide-react'
 import {
   adminOrdersReadonlyService,
   type AdminOrderReadonlyDetail,
   type AdminOrderReadonlyItem,
 } from '../../services/api/adminOrdersReadonly'
+import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -17,6 +18,7 @@ const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'inf
   printing:  { badge: 'info',    label: '打印中' },
   completed: { badge: 'success', label: '已完成' },
   failed:    { badge: 'error',   label: '失败' },
+  cancelled: { badge: 'default', label: '已取消' },
 }
 
 const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
@@ -33,6 +35,7 @@ const STATUS_FILTERS = [
   { label: '打印中', value: 'printing' },
   { label: '已完成', value: 'completed' },
   { label: '失败', value: 'failed' },
+  { label: '已取消', value: 'cancelled' },
 ] as const
 
 const PAY_FILTERS = [
@@ -65,6 +68,10 @@ export default function OrdersPage() {
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [terminalOptions, setTerminalOptions] = useState<AdminTerminalRecord[]>([])
+  const [reassignTerminalId, setReassignTerminalId] = useState('')
+  const [operationState, setOperationState] = useState<'idle' | 'loading' | 'error' | 'success'>('idle')
+  const [operationMessage, setOperationMessage] = useState('')
   const pageSize = 20
   const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${search}:${page}:${pageSize}`
 
@@ -117,19 +124,81 @@ export default function OrdersPage() {
   const openDetail = async (id: string) => {
     setDetailState('loading')
     setDetail(null)
+    setOperationState('idle')
+    setOperationMessage('')
+    setReassignTerminalId('')
     try {
       const data = await adminOrdersReadonlyService.getById(id)
       setDetail(data)
       setDetailState('ready')
+      if (data.print) {
+        try {
+          const terminals = await getTerminals()
+          setTerminalOptions(terminals.terminals.filter((terminal) => terminal.enabled))
+        } catch {
+          setTerminalOptions([])
+        }
+      }
     } catch {
       setDetailState('error')
+    }
+  }
+
+  const refreshOpenDetail = async (id: string) => {
+    const data = await adminOrdersReadonlyService.getById(id)
+    setDetail(data)
+    return data
+  }
+
+  const handleCancelPrintTask = async () => {
+    if (!detail || !detail.print?.operations.canCancel) return
+    if (!window.confirm(`确认取消打印任务 ${detail.orderNo}？`)) return
+    setOperationState('loading')
+    setOperationMessage('')
+    try {
+      const next = await adminOrdersReadonlyService.cancelPrintTask(detail.id, '后台工作人员取消打印任务')
+      setDetail(next)
+      setOperationState('success')
+      setOperationMessage('打印任务已取消')
+      void refresh()
+    } catch (error) {
+      setOperationState('error')
+      setOperationMessage(error instanceof Error ? error.message : '取消失败，请刷新后重试')
+      void refreshOpenDetail(detail.id).catch(() => undefined)
+    }
+  }
+
+  const handleReassignPrintTask = async () => {
+    if (!detail || !detail.print?.operations.canReassign) return
+    if (!reassignTerminalId) {
+      setOperationState('error')
+      setOperationMessage('请选择目标终端')
+      return
+    }
+    setOperationState('loading')
+    setOperationMessage('')
+    try {
+      const next = await adminOrdersReadonlyService.reassignPrintTask(
+        detail.id,
+        reassignTerminalId,
+        '后台工作人员重分配打印终端',
+      )
+      setDetail(next)
+      setOperationState('success')
+      setOperationMessage('打印任务已重分配到目标终端')
+      setReassignTerminalId('')
+      void refresh()
+    } catch (error) {
+      setOperationState('error')
+      setOperationMessage(error instanceof Error ? error.message : '重分配失败，请刷新后重试')
+      void refreshOpenDetail(detail.id).catch(() => undefined)
     }
   }
 
   return (
     <Page
       title="订单管理"
-      subtitle={`订单只读视图 — 共 ${total} 条`}
+      subtitle={`订单与打印运营 — 共 ${total} 条`}
       actions={
         <button
           onClick={() => void refresh()}
@@ -140,9 +209,9 @@ export default function OrdersPage() {
         </button>
       }
     >
-      {/* 诚实说明:只读订单视图 */}
+      {/* 诚实说明:订单与支付仍只读，打印任务仅开放受限运营动作 */}
       <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
-        当前展示真实订单与打印任务安全元数据。支付 / 退款 / 对账域尚未上线，本页只读展示金额、支付状态和任务状态，不提供标记支付、退款或改状态操作。
+        当前展示真实订单与打印任务安全元数据。支付 / 退款 / 对账域尚未上线，本页不提供标记支付或退款；打印任务仅支持取消与重分配终端两类受控运营动作。
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -266,7 +335,7 @@ export default function OrdersPage() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-gray-900">订单详情 · {detail.orderNo}</h2>
-              <p className="mt-1 text-xs text-gray-400">只读详情，不提供支付、退款或任务状态写入</p>
+              <p className="mt-1 text-xs text-gray-400">支付与退款只读；打印任务按当前状态开放运营处理</p>
             </div>
             <button
               className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
@@ -294,6 +363,60 @@ export default function OrdersPage() {
               }
             />
           </div>
+
+          {detail.print && (
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">打印运营处理</h3>
+                  {detail.print.operations.reason ? (
+                    <p className="mt-1 text-xs text-gray-500">{detail.print.operations.reason}</p>
+                  ) : null}
+                </div>
+                {operationMessage ? (
+                  <p
+                    className={[
+                      'text-xs',
+                      operationState === 'error' ? 'text-red-500' : 'text-emerald-600',
+                    ].join(' ')}
+                  >
+                    {operationMessage}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => void handleCancelPrintTask()}
+                  disabled={!detail.print.operations.canCancel || operationState === 'loading'}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <XCircleIcon className="h-4 w-4" />
+                  取消打印任务
+                </button>
+                <select
+                  value={reassignTerminalId}
+                  onChange={(event) => setReassignTerminalId(event.target.value)}
+                  disabled={!detail.print.operations.canReassign || operationState === 'loading'}
+                  className="min-h-[36px] min-w-[220px] rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-700 outline-none disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <option value="">选择目标终端</option>
+                  {terminalOptions.map((terminal) => (
+                    <option key={terminal.id} value={terminal.id}>
+                      {terminal.terminalCode}{terminal.locationLabel ? ` · ${terminal.locationLabel}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => void handleReassignPrintTask()}
+                  disabled={!detail.print.operations.canReassign || !reassignTerminalId || operationState === 'loading'}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <RefreshCwIcon className="h-4 w-4" />
+                  重分配终端
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-5">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">状态流转</h3>

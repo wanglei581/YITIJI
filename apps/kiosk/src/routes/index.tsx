@@ -57,6 +57,7 @@ import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
 import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
+import { JobMaterialLibraryPage } from '../pages/resume/JobMaterialLibraryPage'
 import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
@@ -134,6 +135,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume/optimize',   element: <ResumeOptimizePage /> },
       { path: 'resume/export',     element: <ResumeExportPage /> },
       { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
+      { path: 'resume/materials',   element: <JobMaterialLibraryPage /> },
       // 扫描流程（Phase 3）
       { path: 'scan/start',        element: <ScanStartPage /> },
       { path: 'scan/settings',     element: <ScanSettingsPage /> },

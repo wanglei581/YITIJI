@@ -11,6 +11,8 @@
  * bigdata 仅为开关位。
  */
 
+import type { KioskToolboxItemView } from '../terminals/terminal-toolbox.types'
+
 export type SmartCampusModuleKey = 'welcome' | 'bigdata' | 'luggage' | 'panorama'
 
 export interface SmartCampusModules {
@@ -30,6 +32,7 @@ export const DEFAULT_SMART_CAMPUS_MODULES: SmartCampusModules = {
 export interface KioskSmartCampusConfig {
   enabled: boolean
   modules: SmartCampusModules
+  items: KioskToolboxItemView[]
 }
 
 export interface TerminalSmartCampusConfigView {

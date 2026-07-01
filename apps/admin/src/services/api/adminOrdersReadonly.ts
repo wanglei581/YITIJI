@@ -35,6 +35,11 @@ export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
     createdAt: string
     completedAt: string | null
     errorCode: string | null
+    operations: {
+      canCancel: boolean
+      canReassign: boolean
+      reason: string | null
+    }
   } | null
   statusLogs: Array<{
     fromStatus: string
@@ -61,6 +66,8 @@ export interface ListAdminOrdersReadonlyParams {
 interface AdminOrdersReadonlyService {
   list(params: ListAdminOrdersReadonlyParams): Promise<AdminOrderReadonlyPage>
   getById(id: string): Promise<AdminOrderReadonlyDetail>
+  cancelPrintTask(id: string, reason?: string): Promise<AdminOrderReadonlyDetail>
+  reassignPrintTask(id: string, terminalId: string, reason?: string): Promise<AdminOrderReadonlyDetail>
 }
 
 async function get<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {
@@ -90,6 +97,32 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
   return res.json() as Promise<T>
 }
 
+async function post<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...authHeader() },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let code = `HTTP_${res.status}`
+    let message = res.statusText
+    try {
+      const parsed = (await res.json()) as { error?: { code?: string; message?: string } }
+      if (parsed.error?.code) code = parsed.error.code
+      if (parsed.error?.message) message = parsed.error.message
+    } catch {
+      /* keep defaults */
+    }
+    if (res.status === 401) {
+      redirectToLogin()
+      throw new ApiHttpError(code || 'AUTH_REQUIRED', '登录已过期', res.status)
+    }
+    throw new ApiHttpError(code, message, res.status)
+  }
+  return res.json() as Promise<T>
+}
+
 const httpAdapter: AdminOrdersReadonlyService = {
   list: (params) =>
     get<AdminOrderReadonlyPage>('/admin/orders', {
@@ -101,6 +134,10 @@ const httpAdapter: AdminOrdersReadonlyService = {
       pageSize: String(params.pageSize),
     }),
   getById: (id) => get<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}`),
+  cancelPrintTask: (id, reason) =>
+    post<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}/cancel`, { reason }),
+  reassignPrintTask: (id, terminalId, reason) =>
+    post<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}/reassign`, { terminalId, reason }),
 }
 
 const now = () => new Date().toISOString()
@@ -136,6 +173,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
     createdAt: now(),
     completedAt: now(),
     errorCode: null,
+    operations: { canCancel: false, canReassign: false, reason: '任务已完成，不能取消或重分配' },
   },
   statusLogs: [
     { fromStatus: 'pending', toStatus: 'claimed', errorCode: null, createdAt: now() },
@@ -152,6 +190,45 @@ const mockAdapter: AdminOrdersReadonlyService = {
   },
   async getById() {
     return MOCK_DETAIL
+  },
+  async cancelPrintTask() {
+    return {
+      ...MOCK_DETAIL,
+      taskStatus: 'cancelled',
+      print: MOCK_DETAIL.print
+        ? {
+            ...MOCK_DETAIL.print,
+            status: 'cancelled',
+            completedAt: now(),
+            errorCode: 'ADMIN_CANCELLED',
+            operations: { canCancel: false, canReassign: false, reason: '任务已取消，不能继续操作' },
+          }
+        : null,
+      statusLogs: [
+        ...MOCK_DETAIL.statusLogs,
+        { fromStatus: MOCK_DETAIL.taskStatus, toStatus: 'cancelled', errorCode: 'ADMIN_CANCELLED', createdAt: now() },
+      ],
+    }
+  },
+  async reassignPrintTask(_id, terminalId) {
+    return {
+      ...MOCK_DETAIL,
+      terminalCode: terminalId,
+      taskStatus: 'pending',
+      print: MOCK_DETAIL.print
+        ? {
+            ...MOCK_DETAIL.print,
+            status: 'pending',
+            completedAt: null,
+            errorCode: null,
+            operations: { canCancel: true, canReassign: true, reason: null },
+          }
+        : null,
+      statusLogs: [
+        ...MOCK_DETAIL.statusLogs,
+        { fromStatus: MOCK_DETAIL.taskStatus, toStatus: 'pending', errorCode: 'ADMIN_REASSIGNED', createdAt: now() },
+      ],
+    }
   },
 }
 

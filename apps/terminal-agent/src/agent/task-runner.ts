@@ -46,6 +46,7 @@ import {
   getTaskLocalStatus,
   markTaskDone,
   enqueuePatch,
+  isDatabaseAvailable,
   type AgentDatabase,
 } from './db'
 
@@ -619,6 +620,9 @@ async function runClaimCycle(
   db: AgentDatabase,
   activeTasks: Set<string>,
 ): Promise<void> {
+  if (!isDatabaseAvailable(db)) {
+    return
+  }
   if (!config.terminalId || !config.agentToken) {
     return // Not registered yet; skip silently
   }
@@ -681,11 +685,23 @@ export interface TaskRunnerOptions {
 export function startTaskRunner(options: TaskRunnerOptions): NodeJS.Timeout {
   const { config, db } = options
   const interval = config.claimIntervalMs ?? 5_000
+  if (!isDatabaseAvailable(db)) {
+    err('task-runner: local task database unavailable; printing disabled')
+    return setInterval(() => undefined, interval)
+  }
   const activeTasks = new Set<string>()
+  let runtimeDbFailureLogged = false
 
   log(`task-runner: starting — interval=${interval}ms`)
 
   return setInterval(() => {
+    if (!isDatabaseAvailable(db)) {
+      if (!runtimeDbFailureLogged) {
+        err('task-runner: local task database became unavailable; claim/print loop disabled')
+        runtimeDbFailureLogged = true
+      }
+      return
+    }
     runClaimCycle(config, db, activeTasks).catch((e) =>
       err(`task-runner: unexpected cycle error — ${e instanceof Error ? e.message : String(e)}`),
     )

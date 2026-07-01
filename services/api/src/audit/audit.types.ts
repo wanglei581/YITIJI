@@ -28,7 +28,9 @@ export type AuditAction =
   | 'data_source.toggle'
   | 'smart_campus_config.update'
   | 'partner.smart_campus_config.update'
+  | 'toolbox_config.update'
   | 'terminal.org.update'
+  | 'terminal.profile.update'
   | 'resume.parse_submitted'
   | 'resume.optimize_requested'
   | 'assistant.chat_message'
@@ -49,6 +51,7 @@ export type AuditTargetType =
   | 'user'
   | 'system'
   | 'smart_campus_config'
+  | 'toolbox_config'
   | 'terminal'
 
 export interface AuditLogRecord {

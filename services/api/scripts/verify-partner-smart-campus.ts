@@ -26,6 +26,11 @@
  * 不污染 seed 数据、不依赖 HTTP server、不 reset dev.db。
  */
 import 'dotenv/config'
+import { execFileSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+import { copyFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 // 直接从 shared 源码相对路径取契约常量（脚本经 swc-node 运行，api 运行期不解析
@@ -34,6 +39,7 @@ import { SCENE_DEFAULT_MODULES, MODULE_LABELS } from '../../../packages/shared/s
 import { PrismaService } from '../src/prisma/prisma.service'
 import { SmartCampusService } from '../src/smart-campus/smart-campus.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { AuditService } from '../src/audit/audit.service'
 import { SaveSmartCampusConfigDto } from '../src/smart-campus/dto/save-smart-campus-config.dto'
@@ -82,6 +88,44 @@ function onlyWelcome(): SaveSmartCampusConfigInput {
 
 const ADMIN_USER_ID = 'test-sc-admin'
 
+function read(rel: string): string {
+  return readFileSync(join(process.cwd(), rel), 'utf8')
+}
+
+function prepareTempDatabase(): { previousUrl: string | undefined; dbPath: string } {
+  const source = join(process.cwd(), 'prisma/dev.db')
+  const dir = join(tmpdir(), `partner-smart-campus-${randomBytes(4).toString('hex')}`)
+  mkdirSync(dir, { recursive: true })
+  const dbPath = join(dir, 'verify.db')
+  copyFileSync(source, dbPath)
+
+  const terminalInfo = execFileSync('sqlite3', [dbPath, 'PRAGMA table_info("Terminal");'], { encoding: 'utf8' })
+  if (!terminalInfo.includes('|enabled|')) {
+    execFileSync('sqlite3', [dbPath], {
+      input: read('prisma/migrations/20260629120000_add_terminal_device_profile/migration.sql'),
+      encoding: 'utf8',
+    })
+  }
+
+  const toolboxInfo = execFileSync('sqlite3', [dbPath, 'PRAGMA table_info("TerminalToolboxConfig");'], { encoding: 'utf8' })
+  if (!toolboxInfo.includes('|itemsJson|')) {
+    execFileSync('sqlite3', [dbPath], {
+      input: read('prisma/migrations/20260629123000_add_terminal_toolbox_config/migration.sql'),
+      encoding: 'utf8',
+    })
+  }
+
+  const previousUrl = process.env.DATABASE_URL
+  process.env.DATABASE_URL = `file:${dbPath}`
+  return { previousUrl, dbPath }
+}
+
+function cleanupTempDatabase(prepared: { previousUrl: string | undefined; dbPath: string }): void {
+  if (prepared.previousUrl === undefined) delete process.env.DATABASE_URL
+  else process.env.DATABASE_URL = prepared.previousUrl
+  rmSync(join(prepared.dbPath, '..'), { recursive: true, force: true })
+}
+
 async function cleanup(prisma: PrismaService): Promise<void> {
   await prisma.terminalSmartCampusConfig.deleteMany({ where: { terminalId: { in: [T_A, T_B, T_ADMIN] } } })
   await prisma.terminal.deleteMany({ where: { id: { in: [T_A, T_B, T_ADMIN] } } })
@@ -92,10 +136,12 @@ async function cleanup(prisma: PrismaService): Promise<void> {
 
 async function main(): Promise<void> {
   console.log('\n=== Partner 智慧校园开关联动 MVP 验证 ===')
+  const prepared = prepareTempDatabase()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
-  const svc = new SmartCampusService(prisma)
-  const terminals = new TerminalsService(prisma) // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
+  const toolbox = new TerminalToolboxService(prisma)
+  const svc = new SmartCampusService(prisma, toolbox)
+  const terminals = new TerminalsService(prisma, toolbox) // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
   const adminOrgs = new AdminOrgsService(prisma, new AuditService(prisma)) // 高校版模板联动：smart_campus 白名单保存验证
 
   let ok = true
@@ -231,6 +277,7 @@ async function main(): Promise<void> {
   } finally {
     await cleanup(prisma)
     await prisma.onModuleDestroy()
+    cleanupTempDatabase(prepared)
   }
   process.exit(ok ? 0 : 1)
 }

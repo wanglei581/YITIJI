@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { KioskScreensaverItem, KioskScreensaverPlaylist } from '@ai-job-print/shared'
+import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
-import { clearAiResumeSession } from '../resume/aiResumeSession'
-import { clearPrintMaterialSession } from '../print/printMaterialSession'
 
 /**
  * 待机宣传屏(全屏路由)。
@@ -28,8 +27,7 @@ export function ScreensaverPage() {
   // 清会员登录态 + 打印材料 / AI 简历最小会话（含匿名 accessToken），
   // 为下一位用户重置内存与 sessionStorage 残留。logout / clear 均幂等。
   useEffect(() => {
-    clearPrintMaterialSession()
-    clearAiResumeSession()
+    clearKioskSensitiveSession()
     logout()
   }, [logout])
 
