@@ -129,11 +129,15 @@ contains('../../apps/admin/src/services/api/toolbox.ts', [
 
 contains('../../apps/admin/src/routes/toolbox/index.tsx', [
   'ToolboxLaunchSummaryCard',
+  'toolboxService.getLaunchSummary({ days: 7 })',
+], 'Admin 百宝箱页面接线最近 7 天统计卡')
+
+contains('../../apps/admin/src/routes/toolbox/components/ToolboxLaunchSummaryCard.tsx', [
   '二维码展示数',
   '外部确认打开',
   'Top 功能项',
-  'toolboxService.getLaunchSummary({ days: 7 })',
-], 'Admin 百宝箱页面展示基础统计且文案不误称真实扫码')
+  '不等同于真实扫码',
+], 'Admin 百宝箱统计卡展示基础统计且文案不误称真实扫码')
 
 console.log('')
 if (failures > 0) {

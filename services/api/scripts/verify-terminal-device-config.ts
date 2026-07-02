@@ -198,9 +198,14 @@ function runStaticChecks(): void {
     'E5b. 百宝箱安全策略包含合规红线文案拦截',
   )
   contains(
-    '../../apps/admin/src/routes/toolbox/index.tsx',
-    ['PLACEMENT_OPTIONS', 'LAUNCH_MODE_OPTIONS', '外部 H5', '小程序码', 'qrTargetUrl', '二维码目标地址'],
-    'E6. Admin 应用上架表单支持百宝箱/智慧校园、外部应用和二维码目标说明',
+    '../../apps/admin/src/routes/toolbox/constants.ts',
+    ['PLACEMENT_OPTIONS', 'LAUNCH_MODE_OPTIONS', '外部 H5', '小程序码'],
+    'E6. Admin 应用上架选项支持百宝箱/智慧校园投放与外部 H5/小程序码启动方式',
+  )
+  contains(
+    '../../apps/admin/src/routes/toolbox/components/TerminalToolboxRow.tsx',
+    ['qrTargetUrl', '扫码目标地址'],
+    'E6a. Admin 终端功能项表单支持二维码目标说明字段',
   )
   contains(
     '../../packages/shared/src/types/kioskApp.ts',
