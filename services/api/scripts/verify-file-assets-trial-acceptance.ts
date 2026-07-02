@@ -365,7 +365,7 @@ if (pendingRuntimeChanges.length > 0) {
   assertIncludesAll(nextTasks, 'next-tasks pending runtime note', [
     '预生产 Gate 4 AI 导出产物补证',
     `真实 AI 导出产物自动标记 \`assetCategory=optimized\` / \`sourceFileId\` 的链路已部署到预生产 \`${aiOutputPreprodCandidate}\``,
-    '预生产 Gate 4 浏览器截图补齐',
+    '预生产 Gate 4 剩余浏览器证据补齐',
   ])
   assertIncludesAll(preprodExecutionRecord, 'preprod execution record pending runtime note', [
     'codex/file-assets-gate4-browser-ai-output',
@@ -387,12 +387,12 @@ if (!aiOutputCandidateInCurrentHistory) {
   assertIncludesAll(progress, 'current-progress refreshed AI output candidate note', [
     `AI 导出产物复验候选 \`${aiOutputPreprodCandidate}\``,
     '真实 AI 导出产物 `optimized/sourceFileId` 链路已在预生产通过自动 Gate 与 COS/DB 脱敏补证',
-    '仍需补 Gate 4 浏览器截图',
+    '剩余浏览器证据仍待补齐',
   ])
   assertIncludesAll(nextTasks, 'next-tasks refreshed AI output candidate note', [
     '预生产 Gate 4 AI 导出产物补证',
     `预生产 \`${aiOutputPreprodCandidate}\``,
-    '预生产 Gate 4 浏览器截图补齐',
+    '预生产 Gate 4 剩余浏览器证据补齐',
   ])
   assertIncludesAll(preprodExecutionRecord, 'preprod execution record refreshed AI output candidate note', [
     `AI 导出产物复验候选 ${aiOutputPreprodCandidate} 已刷新到预生产`,
@@ -612,7 +612,7 @@ assert.ok(
     nextTasks.includes('G3-06 `verify:cos:live` 已通过') &&
     nextTasks.includes('预生产 Gate 4 账号/API 级验收') &&
     nextTasks.includes('预生产 Gate 4 AI 导出产物补证') &&
-    nextTasks.includes('预生产 Gate 4 浏览器截图补齐') &&
+    nextTasks.includes('预生产 Gate 4 剩余浏览器证据补齐') &&
     nextTasks.includes(`真实 AI 导出产物自动标记 \`assetCategory=optimized\` / \`sourceFileId\` 的链路已部署到预生产 \`${aiOutputPreprodCandidate}\``),
   'next-tasks must record Gate 2 passed, COS switch/G3-06 passed, Gate 4 API acceptance passed, AI output recheck passed, and browser evidence still pending',
 )
