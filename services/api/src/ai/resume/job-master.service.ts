@@ -2,8 +2,10 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
+import { FilesService } from '../../files/files.service'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobMasterService, type JobMasterPayload } from './llm-job-master.service'
+import { JobMasterPdfService } from './job-master-pdf.service'
 
 // ============================================================
 // 岗位大师（岗位决策分析台）M1 会话服务。
@@ -70,6 +72,8 @@ export class JobMasterService {
     private readonly prisma: PrismaService,
     private readonly llm: LlmJobMasterService,
     private readonly extraction: ResumeExtractionService,
+    private readonly files: FilesService,
+    private readonly pdf: JobMasterPdfService,
     private readonly audit: AuditService,
   ) {}
 
@@ -163,6 +167,48 @@ export class JobMasterService {
       throw new NotFoundException({ error: { code: 'JOB_MASTER_NOT_FOUND', message: '暂无岗位决策分析，请先发起分析' } })
     }
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobMaster)
+  }
+
+  /** 决策报告 PDF：服务端真实 PDF → FileObject（我的文档）→ 既有打印链路（打印订单）。 */
+  async printReport(taskId: string, requester: JobMasterRequester) {
+    const parse = await this.loadAuthorizedParse(taskId, requester)
+    const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_master' } } })
+    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
+      throw new NotFoundException({ error: { code: 'JOB_MASTER_NOT_FOUND', message: '暂无岗位决策分析，请先发起分析' } })
+    }
+    const stored = JSON.parse(row.payloadJson) as StoredJobMaster
+    const { buffer, pageCount } = await this.pdf.render(
+      { date: new Date(row.updatedAt).toISOString().slice(0, 10) },
+      { job: { title: stored.job.title, company: stored.job.company }, salary: stored.salary, payload: stored.payload },
+    )
+    // 复用 print_doc 用途接入「我的文档 + 打印订单」既有链路（career-plan / mock-interview 同法）；
+    // createdBy 区分来源。新增 job_master_report 专属 FilePurpose 会牵动 file-validation/DTO/object-key，超本卡范围。
+    const uploaded = await this.files.upload({
+      buffer,
+      filename: `岗位决策参考报告.pdf`,
+      mimeType: 'application/pdf',
+      purpose: 'print_doc',
+      uploaderId: null,
+      endUserId: parse.endUserId,
+      createdBy: 'job_master',
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: parse.endUserId ? 'enduser' : 'kiosk',
+      action: 'resume.job_master_print',
+      targetType: 'ai_task',
+      targetId: taskId,
+      payload: { fileId: uploaded.fileId, pageCount },
+      ipAddress: null, userAgent: null, requestId: null,
+    })
+    return {
+      fileId: uploaded.fileId,
+      filename: uploaded.filename,
+      sizeBytes: uploaded.sizeBytes,
+      pageCount,
+      signedUrl: uploaded.signedUrl,
+      expiresAt: uploaded.signedUrlExpiresAt,
+    }
   }
 
   private toResponse(taskId: string, stored: StoredJobMaster) {

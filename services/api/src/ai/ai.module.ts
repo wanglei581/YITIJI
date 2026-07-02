@@ -24,6 +24,7 @@ import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
 import { FairVisitPlanController } from './fair-visit-plan.controller'
 import { LlmJobMasterService } from './resume/llm-job-master.service'
 import { JobMasterService } from './resume/job-master.service'
+import { JobMasterPdfService } from './resume/job-master-pdf.service'
 import { JobMasterController } from './job-master.controller'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
@@ -63,6 +64,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
     FairVisitPlanPdfService,
     LlmJobMasterService,
     JobMasterService,
+    JobMasterPdfService,
     LlmChatService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──

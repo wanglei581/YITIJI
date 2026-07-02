@@ -27,6 +27,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { LlmJobMasterService } from '../src/ai/resume/llm-job-master.service'
 import { JobMasterService } from '../src/ai/resume/job-master.service'
+import { JobMasterPdfService } from '../src/ai/resume/job-master-pdf.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 
 const RESUME_TEXT =
@@ -106,7 +107,14 @@ async function main() {
       return Promise.resolve({ ok: true, fileId, text: record.text, textSource: 'docx', confidence: 'high', charCount: record.text.length })
     },
   }
-  const svc = new JobMasterService(prisma, llm, stubExtraction as never, audit)
+  const pdf = new JobMasterPdfService()
+  const stubFiles = {
+    upload: (args: { buffer: Buffer; filename: string }) => Promise.resolve({
+      fileId: `vjm_file_out`, filename: args.filename, sizeBytes: args.buffer.length,
+      signedUrl: 'http://localhost/test', signedUrlExpiresAt: new Date(Date.now() + 600_000).toISOString(),
+    }),
+  }
+  const svc = new JobMasterService(prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit)
   const assets = new MemberAssetsService(prisma)
 
   const suffix = Date.now().toString(36)
@@ -294,6 +302,16 @@ async function main() {
       if (JSON.stringify(r13).includes(banned)) fail(`13. 输出含越界词: ${banned}`)
     }
     pass('13. 日志脱敏：简历/岗位文本不入日志；输出无投递/概率越界词')
+
+    // 14. 决策报告 PDF 真实渲染 + 打印链路（r13 已在 taskId 落一行 job_master）
+    const printed = await svc.printReport(taskId, requester)
+    if (printed.pageCount < 1 || printed.filename !== '岗位决策参考报告.pdf') fail('14. PDF 元数据不符')
+    const { buffer, pageCount } = await pdf.render(
+      { date: '2026-07-02' },
+      { job: { title: '行政专员', company: '某商贸公司' }, salary: { sourceText: '6k-9k', note: '薪资由来源方提供，仅供参考' }, payload: VALID as never },
+    )
+    if (buffer.slice(0, 4).toString() !== '%PDF' || pageCount < 1) fail('14. 输出不是 PDF')
+    pass(`14. 决策报告 PDF 真实渲染（${buffer.length} bytes, ${pageCount} 页）+ 打印链路返回 FileObject 元数据`)
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {

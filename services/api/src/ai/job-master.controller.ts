@@ -45,7 +45,7 @@ function headerOf(req: ReqLike, name: string): string | null {
  * 归属凭 parse 行门禁（会员 Bearer / 匿名 x-resume-access-token，对齐 C-2A）。
  * 合规：适配度为参考等级（无百分比/录用概率，服务端双层拦截）；薪资只透传来源方
  * 文本；风险定性三档。投递只引导「去来源平台投递」。限流：触发 LLM，公共一体机
- * 单 IP 收紧（对齐 job-fit 6 次/分钟）。报告 PDF 打印端点为 M1 里程碑 3。
+ * 单 IP 收紧（对齐 job-fit 6 次/分钟）。POST :taskId/print 生成决策报告 PDF 进打印链路。
  */
 @Controller('resume/job-master')
 export class JobMasterController {
@@ -73,5 +73,11 @@ export class JobMasterController {
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
     return this.service.getLatest(taskId, await this.requesterOf(req))
+  }
+
+  @Post(':taskId/print')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    return this.service.printReport(taskId, await this.requesterOf(req))
   }
 }
