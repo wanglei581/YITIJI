@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIRM = 'src/pages/print/PrintConfirmPage.tsx'
+const PROGRESS = 'src/pages/print/PrintProgressPage.tsx'
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
 
 let failures = 0
@@ -36,35 +37,36 @@ function expectMatches(source, pattern, message) {
 
 console.log('\n=== Kiosk 打印确认页诚实性守卫 ===')
 
-const src = read(CONFIRM)
+const confirmSrc = read(CONFIRM)
+const progressSrc = read(PROGRESS)
 
 // 1) 读取 API_MODE
 expectMatches(
-  src,
+  confirmSrc,
   /import\s*\{\s*API_MODE\s*\}\s*from\s*'\.\.\/\.\.\/services\/api\/client'/,
   'PrintConfirmPage 读取 API_MODE',
 )
 
 // 2) handleConfirm 以 http 模式作为外层分支
 const httpBranch = /if\s*\(\s*API_MODE\s*===\s*'http'\s*\)\s*\{/
-expectMatches(src, httpBranch, 'handleConfirm 以 API_MODE === http 作为外层分支')
+expectMatches(confirmSrc, httpBranch, 'handleConfirm 以 API_MODE === http 作为外层分支')
 
 // 3) http 分支内:无 fileUrl 先拦截报错并 return(诚实失败)
-const guard = /if\s*\(\s*!file\.fileUrl\s*\)\s*\{[\s\S]{0,240}?setSubmitError\([\s\S]{0,240}?return/
+const guard = /if\s*\(\s*!file\.fileUrl\s*\)\s*\{[^{}]*setSubmitError\([^{}]*return[^{}]*\}/
 expectMatches(
-  src,
+  confirmSrc,
   guard,
   'http 模式无真实 fileUrl 时先 setSubmitError 并 return,不伪造打印成功',
 )
 
 // 位置断言:定位关键锚点
-const httpIndex = src.search(httpBranch)
-const guardIndex = src.search(/if\s*\(\s*!file\.fileUrl\s*\)/)
+const httpIndex = confirmSrc.search(httpBranch)
+const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)/)
 
 // SIM 跳转 = 无 taskId 的 /print/progress 导航
 const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*source\s*\}\s*\}\)/
 const realNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*taskId,\s*source\s*\}\s*\}\)/
-const simIndex = src.search(simNavPattern)
+const simIndex = confirmSrc.search(simNavPattern)
 
 // 4) fileUrl 守卫必须早于 SIM 跳转(结构上 SIM 仅在 http 分支 return 之后可达)
 if (httpIndex >= 0 && guardIndex > httpIndex && simIndex > guardIndex) {
@@ -74,8 +76,35 @@ if (httpIndex >= 0 && guardIndex > httpIndex && simIndex > guardIndex) {
 }
 
 // 5) 真任务跳转带 taskId;SIM 跳转不带 taskId(防误加)
-expectMatches(src, realNavPattern, '真任务跳转携带 taskId 以轮询真实状态')
-expectMatches(src, simNavPattern, 'SIM 跳转不携带 taskId(仅非 http 模式使用)')
+expectMatches(confirmSrc, realNavPattern, '真任务跳转携带 taskId 以轮询真实状态')
+expectMatches(confirmSrc, simNavPattern, 'SIM 跳转不携带 taskId(仅非 http 模式使用)')
+
+// 6) PrintProgressPage:生产 http 模式无 taskId 时也不能走 SIM 动画 / 成功页
+expectMatches(
+  progressSrc,
+  /const\s+isHttpMode\s*=\s*API_MODE\s*===\s*'http'/,
+  'PrintProgressPage 显式区分 http 模式',
+)
+expectMatches(
+  progressSrc,
+  /const\s+useRealApi\s*=\s*isHttpMode\s*&&\s*Boolean\(taskId\)/,
+  'PrintProgressPage 仅有 taskId 时进入真实轮询',
+)
+expectMatches(
+  progressSrc,
+  /const\s+canSimulate\s*=\s*!isHttpMode\s*&&\s*hasFileContext/,
+  'PrintProgressPage SIM 仅允许非 http 模式',
+)
+expectMatches(
+  progressSrc,
+  /if\s*\(\s*useRealApi\s*\|\|\s*!canSimulate\s*\)\s*return/,
+  'PrintProgressPage SIM effect 在 http 无 taskId 时直接返回',
+)
+expectMatches(
+  progressSrc,
+  /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{[\s\S]*?打印任务尚未创建[\s\S]*?返回确认页[\s\S]*?\}/,
+  'PrintProgressPage http 无 taskId 时显示错误态而非伪造成功',
+)
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)
