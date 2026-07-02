@@ -35,6 +35,7 @@ import { LlmResumeGenerateService } from './resume/llm-resume-generate.service'
 import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
+import { ResumeTextService } from './resume/resume-text.service'
 import { LlmResumeProvider } from './providers/llm.provider'
 
 @Module({
@@ -74,6 +75,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
     LlmResumeGenerateService,
     ResumePdfService,
     ResumeDocxService,
+    ResumeTextService,
     // ── 阶段2B AI 简历优化真实化(基于原文,防编造) ──
     LlmResumeOptimizeService,
   ],
