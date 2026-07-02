@@ -38,7 +38,9 @@
 - **冲突风险**:🔴 高。toolbox / job-ai 分支正大改岗位链路;`feature/job-master` M1 会**只读**岗位数据。**排期:必须在 toolbox 岗位相关提交合入 main 之后**,否则大面积合并冲突。
 - **verify 覆盖**:`verify-job-review` / `verify-job-sync` / `verify-jobfair-review` / `verify-jobfair-campus-priority` / `verify-job-favorites-http` / `verify-public-fair-demo-guard`;⚠️ Excel 导入路径 verify 覆盖需实拆前确认(可能存在缺口)。
 
-### N2 · `apps/admin/src/routes/fairs/index.tsx` — 1349 行 🟡
+### N2 · `apps/admin/src/routes/fairs/index.tsx` — 1349 行 ✅ 已完成(2026-07-02)
+
+> 已拆:5 组件 → `fairs/components/`,共享常量/工具 → `fairs/components/shared.ts`;`index.tsx` 回落至 **207 行**(编排级)。typecheck / build / lint 全绿。commit `7da28a51`(N2)。
 
 结构:共享 UI 原子(Field/PrimaryButton/GhostButton/DangerDeleteButton/InlineError,118–196)+ 5 个大组件。
 
@@ -67,7 +69,9 @@
 - **冲突风险**:🔴 **最高**。当前脏分支就是 `codex/terminal-device-profile-closure`,terminal-device / toolbox-config 正是其主战场。**排期:必须等该分支合入 main 后再拆。**
 - **verify 覆盖**:⚠️ **仅 `verify-terminal-device-config` 一个**,且 Agent 运行时链路(心跳/claim)是硬件相邻代码。拆分风险高,须补跨机 E2E,不能只靠 typecheck。
 
-### N4 · `apps/admin/src/routes/companies/index.tsx` — 1116 行 🟡
+### N4 · `apps/admin/src/routes/companies/index.tsx` — 1116 行 ✅ 已完成(2026-07-02)
+
+> 已拆:5 组件 → `companies/components/`,共享常量/工具/表单逻辑 → `companies/components/shared.ts`;`index.tsx` 回落至 **192 行**(合规头注释 + 编排级)。typecheck / build / lint 全绿。commit `fa9ecdbe`(N4)。
 
 结构:共享 UI 原子(Field/PrimaryButton/GhostButton/Switch/InlineError/InlineSuccess/DangerDeleteButton,109–175)+ 段落/抽屉组件。
 
@@ -112,7 +116,9 @@
 
 ## 四、跨文件去重项(§三 反堆砌)
 
-### X1 · Admin 共享 UI 原子重复定义 🟡
+### X1 · Admin 共享 UI 原子重复定义 ✅ 已完成(2026-07-02)
+
+> 已收敛到 `apps/admin/src/components/form/index.tsx` 单一来源(props 取两方并集:`Field.hint` / `DangerDeleteButton.confirmText` 可选);fairs/companies 改为 import。共享默认 `confirmText='确认删除?'`,companies 关联岗位移除处显式 `confirmText='确认移除?'` 保留原文案。未上提 `packages/ui`(缩小范围,留后续独立评估)。commit `77831eaf`(X1)。
 
 `apps/admin/src/routes/fairs/index.tsx` 与 `apps/admin/src/routes/companies/index.tsx` **各自重复定义**了 `Field` / `PrimaryButton` / `GhostButton` / `DangerDeleteButton` / `InlineError`(companies 另有 `Switch` / `InlineSuccess`)。
 
@@ -163,6 +169,6 @@
 
 ## 八、建议执行顺序
 
-1. **X1 + N2/N4**(Admin 前端,🟡,不撞 Kiosk 冻结):优先做,风险可控、收益直观(去重 + 拆分一并完成)。
+1. ✅ **X1 + N2/N4**(Admin 前端,🟡,不撞 Kiosk 冻结):**已完成(2026-07-02)**,commits `77831eaf`/`7da28a51`/`fa9ecdbe`;typecheck/build/lint 全绿,行为/视觉零变化。
 2. **N5 / N6**(materials / admin-fairs 后端,🟡,verify 覆盖较好):次之。
 3. **N1 / N3**(jobs / terminals,🔴):**等 toolbox / terminal-device 分支合入 main 后**再排,期间保持只读监控。
