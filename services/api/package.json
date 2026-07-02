@@ -103,6 +103,7 @@
     "verify:toolbox-preprod-acceptance": "node -r @swc-node/register scripts/verify-toolbox-preprod-acceptance.ts",
     "verify:toolbox-micro-app-platform": "node -r @swc-node/register scripts/verify-toolbox-micro-app-platform.ts",
     "verify:toolbox-review-workflow": "node -r @swc-node/register scripts/verify-toolbox-review-workflow.ts",
+    "verify:toolbox-ai-skill-intents": "node -r @swc-node/register scripts/verify-toolbox-ai-skill-intents.ts",
     "verify:fair-visit-plan": "node -r @swc-node/register scripts/verify-fair-visit-plan.ts",
     "verify:jobfair-checkin": "node -r @swc-node/register scripts/verify-jobfair-checkin.ts"
   },

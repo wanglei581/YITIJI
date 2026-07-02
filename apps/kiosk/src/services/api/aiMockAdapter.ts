@@ -17,6 +17,7 @@ import type {
   ResumeOptimizeResponse,
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSkill,
 } from '@ai-job-print/shared'
 import type { ResumeReadAccess } from './ai'
 
@@ -124,6 +125,29 @@ export const aiMockAdapter = {
 
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
     await delay(500)
+    const sceneReplies: Record<AssistantSkill, Pick<AssistantChatResponse, 'reply' | 'actions'>> = {
+      offer_compare: {
+        reply: '您可以把两个 Offer 的薪资结构、试用期、地点、福利、加班情况和发展机会分别发给我。我会按维度做个人参考对比；请先打码姓名、手机号、公司敏感编号等隐私信息。结果仅供个人参考，不构成录用、入职或法律意见。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '优化简历材料', route: '/resume/source' }],
+      },
+      salary_negotiation: {
+        reply: '请告诉我岗位、当前薪资范围、目标薪资、已有优势和顾虑。我可以帮您准备温和版、直接版和补充材料版话术；内容仅供沟通准备参考，不承诺涨薪或录用结果。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '优化简历材料', route: '/resume/source' }],
+      },
+      hr_qa: {
+        reply: '您可以咨询入职、试用期、社保、公积金、离职、请假等常见 HR 流程问题。我会按常识解释；涉及劳动争议、赔偿、仲裁或合同解除时，请以官方人社窗口、法律援助或专业律师意见为准。',
+        actions: [{ label: '人社专区', route: '/renshi' }],
+      },
+    }
+    const sceneReply = req.skill ? sceneReplies[req.skill] : undefined
+    if (sceneReply) {
+      return {
+        sessionId: req.sessionId ?? `mock-session-${Date.now()}`,
+        reply: sceneReply.reply,
+        intent: 'general',
+        actions: sceneReply.actions,
+      }
+    }
     return {
       sessionId: req.sessionId ?? `mock-session-${Date.now()}`,
       reply: '您好！我是 AI 就业服务助手，可以为您提供简历建议、求职指导和打印帮助。请问有什么需要帮忙的？',

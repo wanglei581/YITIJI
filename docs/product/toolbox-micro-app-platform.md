@@ -1,6 +1,6 @@
 # 百宝箱微应用平台方案
 
-> 状态：规划、第一阶段安全底座、Phase 2 最小治理规则底座、Phase 2B 后端审核发布工作流、Phase 2C Admin 审核发布 UI
+> 状态：规划、第一阶段安全底座、Phase 2 最小治理规则底座、Phase 2B 后端审核发布工作流、Phase 2C Admin 审核发布 UI、首批低风险 AI skill intent 接线
 > 最后更新：2026-07-02
 > 关联：`docs/superpowers/plans/2026-07-01-toolbox-micro-app-platform.md`、`packages/shared/src/types/toolboxMicroApp.ts`
 
@@ -266,3 +266,27 @@ Phase 2C 已把 Phase 2B 的后端审核发布能力接入 Admin 可视化工作
 - 未在 Windows 一体机和真实终端验证 `app:${appKey}` 投影展示与熔断移除。
 - 未完成首批微应用的法务、版权、隐私、文件留存和真机打印验收。
 - 未开放第三方 JS / WASM / 任意外部 skill 包执行。
+
+## 十四、首批低风险 AI skill intent 接线已落地范围
+
+本阶段先接入低风险、无文件上传、无第三方代码执行、无企业闭环的三类首方 AI 技能：
+
+- Offer 对比：`/assistant?intent=offer_compare`
+- 薪资谈判话术：`/assistant?intent=salary_negotiation`
+- HR 知识问答：`/assistant?intent=hr_qa`
+
+已进入代码的能力：
+
+- Kiosk `/assistant` 读取 URL `intent`，展示对应欢迎语、输入提示和免责声明。
+- 前台 `chatWithAssistant` 请求透传受控 `intent`，并标记 `context.source=toolbox_ai_skill`。
+- 共享类型、后端 DTO、AI provider interface 已包含三类受控 intent，后端 DTO 对 intent 做白名单校验。
+- `LlmChatService` 优先使用入口 intent，未传 intent 时继续按用户文本分类；三类技能均注入场景化 system prompt。
+- 前后端 mock 模式已具备场景化回复，便于本地演示和断网联调。
+- 新增 `verify:toolbox-ai-skill-intents`，检查三类 intent、Kiosk 透传、后端 prompt、防回退文案和禁止招聘闭环文案。
+
+合规边界：
+
+- Offer 对比只做个人决策参考，不构成录用、入职或法律意见。
+- 薪资谈判话术只做沟通准备参考，不承诺涨薪或录用结果。
+- HR 知识问答只做常识解释，不构成正式法律意见或官方政策承诺。
+- 预生产与真实模型联调仍需后续单独验收；本阶段不代表微应用商用上线完成。

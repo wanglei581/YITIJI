@@ -169,6 +169,12 @@ export type AssistantIntent =
   | 'policy'   // 政策服务引导
   | 'general'  // 通用问答
 
+/** 百宝箱首方 AI 技能场景；与助手消息分类 intent 保持正交 */
+export type AssistantSkill =
+  | 'offer_compare'       // 百宝箱：Offer 对比
+  | 'salary_negotiation'  // 百宝箱：薪资谈判话术
+  | 'hr_qa'               // 百宝箱：HR 知识问答
+
 /** 助手建议操作（提供路由跳转按钮） */
 export interface AssistantAction {
   label: string
@@ -179,6 +185,8 @@ export interface AssistantAction {
 export interface AssistantChatRequest {
   message: string
   sessionId?: string
+  /** 百宝箱 / 助手入口传入的受控首方技能；为空时后端按消息兜底分类 */
+  skill?: AssistantSkill
   /** 当前页面上下文（如当前模块、设备状态等） */
   context?: Record<string, unknown>
 }

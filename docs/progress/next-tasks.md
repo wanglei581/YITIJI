@@ -152,6 +152,7 @@
 - [x] **百宝箱微应用平台 Phase 2 最小治理规则底座**：已新增纯函数治理文件和共享契约，覆盖状态机、自审批拦截、host active / 过期 / 熔断 / 本机私网检查、红线文案复用、高风险免责声明、外部 H5 开关和发布 gate；`verify:toolbox-micro-app-platform` 已补运行时负向门禁。该项不代表真实数据库表、Admin 审核发布 UI、Kiosk 发布投影或第三方 skill 网关完成。
 - [x] **百宝箱微应用平台 Phase 2B 后端审核发布工作流（代码侧）**：已新增真实 `ToolboxApp` / `ToolboxAppVersion` / `ToolboxAllowedHost` 持久化、Admin 审核发布接口、允许域名治理、AuditLog 摘要、发布 gate、严格投影 dry-run、终端 `TerminalToolboxConfig.itemsJson` 发布投影和熔断移除；新增 `verify:toolbox-review-workflow`。该项不代表 Admin 可视化 UI、预生产 / 生产 migration、真实终端发布投影验收或首批微应用商用上线完成。
 - [x] **百宝箱微应用平台 Phase 2C Admin 审核发布 UI**：Admin `/toolbox` 已补应用目录、版本列表、提交 / 审批 / 驳回 / 发布 / 熔断操作、允许域名待审核 / 激活 / 熔断管理、免责声明展示、blocked reason 和修复建议；后端已补应用 / 版本 / 允许域名只读列表接口，终端配置对 `app:${appKey}` 治理投影项只读，新增 `verify:toolbox-review-ui`。该项不代表预生产 / 生产 migration、真实管理员异人审批、真实终端发布投影或首批微应用商用上线完成。
+- [x] **百宝箱微应用平台首批低风险微应用接线 / AI skill intent 接线（代码侧）**：已接线 Offer 对比、薪资谈判话术、HR 知识问答三类受控 `/assistant?intent=...` 场景，前台展示场景欢迎语 / 免责声明并透传 intent，后端 DTO / LLM 服务优先使用入口 intent，mock 模式可演示，新增 `verify:toolbox-ai-skill-intents`。该项不代表预生产与真实模型联调或微应用商用上线完成。
 - [ ] **百宝箱 TB-G0~TB-G4 预生产验收执行**：按执行包顺序先跑本地静态门禁并创建仓库外证据目录；经用户明确确认后再做预生产只读预检、PostgreSQL 备份与 migration、`KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS` 脱敏复核、Admin 对真实终端配置站内 / 外部 H5 / 二维码项、Kiosk 真机打开外部 H5 / 取消 / 继续 / 二维码展示，并抽样 `ToolboxLaunchEvent` 确认只存纯 host 和匿名 action。未完成 TB-G2~TB-G4 前，不得宣称百宝箱预生产 / 生产验收完成。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
