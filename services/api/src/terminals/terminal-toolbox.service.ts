@@ -22,12 +22,14 @@ const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }
 const TOOLBOX_LOGGER = new Logger('TerminalToolboxService')
 const ALLOWED_TOOLBOX_ICONS = new Set(['wrench', 'file-text', 'printer', 'sparkles', 'book-open', 'help-circle'])
 const ALLOWED_APP_PLACEMENTS = new Set<KioskAppPlacementView>(['toolbox', 'smart_campus'])
+const ALLOWED_APP_RISK_LEVELS = new Set(['low', 'medium', 'high', 'restricted'])
 const TOOLBOX_LAUNCH_ACTIONS: ToolboxLaunchActionView[] = [
   'show_qr',
   'open_external_notice',
   'open_external_confirmed',
   'cancel_external',
 ]
+const terminalToolboxConfigMutationQueue = new Map<string, Promise<void>>()
 const ALLOWED_LAUNCH_MODES = new Set<KioskAppLaunchModeView>([
   'internal_route',
   'external_url',
@@ -62,6 +64,33 @@ interface TerminalRef {
   id: string
   terminalCode: string
   enabled: boolean
+}
+
+export async function withTerminalToolboxConfigMutationLock<T>(
+  reason: string,
+  task: () => Promise<T>,
+): Promise<T> {
+  const key = 'terminal-toolbox-config-items-json'
+  const previous = terminalToolboxConfigMutationQueue.get(key) ?? Promise.resolve()
+  let release!: () => void
+  const current = previous.catch(() => undefined).then(() => new Promise<void>((resolve) => {
+    release = resolve
+  }))
+  terminalToolboxConfigMutationQueue.set(key, current)
+
+  await previous.catch(() => undefined)
+  try {
+    return await task()
+  } finally {
+    release()
+    if (terminalToolboxConfigMutationQueue.get(key) === current) {
+      terminalToolboxConfigMutationQueue.delete(key)
+    }
+    if (reason) {
+      // The reason keeps call sites searchable for the verify gate without leaking request data.
+      void reason
+    }
+  }
 }
 
 function cleanText(value: unknown, maxLength: number): string {
@@ -103,6 +132,15 @@ function cleanLaunchMode(value: unknown): KioskAppLaunchModeView {
   return typeof value === 'string' && ALLOWED_LAUNCH_MODES.has(value as KioskAppLaunchModeView)
     ? value as KioskAppLaunchModeView
     : 'internal_route'
+}
+
+function cleanDisclaimers(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const disclaimers = value
+    .map((item) => cleanText(item, 160))
+    .filter(Boolean)
+    .slice(0, 5)
+  return disclaimers.length > 0 ? disclaimers : undefined
 }
 
 function allowedHostsFromEnv(name: string): Set<string> {
@@ -226,7 +264,7 @@ function validationErrorCode(error: unknown): string {
   return error instanceof Error ? error.name : 'UNKNOWN_ERROR'
 }
 
-function normalizeItems(
+export function normalizeToolboxItemsForConfig(
   rawItems: unknown,
   options: { strict: boolean; preserveInvalidUrls?: boolean } = { strict: false },
 ): KioskToolboxItemView[] {
@@ -245,6 +283,8 @@ function normalizeItems(
       const disabled = Boolean(item.disabled)
       const launchMode = cleanLaunchMode(item.launchMode)
       const placements = cleanPlacements(item.placements)
+      const riskLevel = cleanText(item.riskLevel, 16)
+      const disclaimers = cleanDisclaimers(item.disclaimers)
       const shouldValidateUrls = !options.preserveInvalidUrls
       if (shouldValidateUrls) {
         assertToolboxComplianceCopy(title, description)
@@ -302,6 +342,8 @@ function normalizeItems(
         sortOrder: Number.isInteger(item.sortOrder) ? Number(item.sortOrder) : index,
         placements,
         launchMode,
+        riskLevel: ALLOWED_APP_RISK_LEVELS.has(riskLevel) ? riskLevel as KioskToolboxItemView['riskLevel'] : undefined,
+        disclaimers,
         externalUrl,
         qrImageUrl,
         qrTargetUrl,
@@ -319,7 +361,7 @@ function normalizeItems(
 
 function parseItems(json: string): KioskToolboxItemView[] {
   try {
-    return normalizeItems(JSON.parse(json))
+    return normalizeToolboxItemsForConfig(JSON.parse(json))
   } catch {
     return []
   }
@@ -327,7 +369,7 @@ function parseItems(json: string): KioskToolboxItemView[] {
 
 function parseItemsForAdmin(json: string): KioskToolboxItemView[] {
   try {
-    return normalizeItems(JSON.parse(json), { strict: false, preserveInvalidUrls: true })
+    return normalizeToolboxItemsForConfig(JSON.parse(json), { strict: false, preserveInvalidUrls: true })
   } catch {
     return []
   }
@@ -349,6 +391,19 @@ function toAdminConfigView(row: ConfigRow): TerminalToolboxConfigView {
     items: parseItemsForAdmin(row.itemsJson),
     updatedAt: row.updatedAt.toISOString(),
   }
+}
+
+function mergeGovernedProjectionItems(
+  submittedItems: KioskToolboxItemView[],
+  existingItems: KioskToolboxItemView[],
+): KioskToolboxItemView[] {
+  const manualItems = submittedItems.filter((item) => !item.key.startsWith('app:'))
+  const governedItems = existingItems.filter((item) => item.key.startsWith('app:'))
+  const manualKeys = new Set(manualItems.map((item) => item.key))
+  return [
+    ...manualItems,
+    ...governedItems.filter((item) => !manualKeys.has(item.key)),
+  ].map((item, index) => ({ ...item, sortOrder: index }))
 }
 
 function actionAllowedForItem(action: ToolboxLaunchActionView, item: KioskToolboxItemView): boolean {
@@ -423,11 +478,15 @@ export class TerminalToolboxService {
     updatedBy: string | null,
   ): Promise<TerminalToolboxConfigView> {
     const publicTerminalId = await this.resolvePublicTerminalId(terminalId)
-    const items = normalizeItems(input.items, { strict: true })
-    const saved = await this.prisma.terminalToolboxConfig.upsert({
-      where: { terminalId: publicTerminalId },
-      create: { terminalId: publicTerminalId, enabled: input.enabled, itemsJson: JSON.stringify(items), updatedBy },
-      update: { enabled: input.enabled, itemsJson: JSON.stringify(items), updatedBy },
+    const submittedItems = normalizeToolboxItemsForConfig(input.items, { strict: true })
+    const saved = await withTerminalToolboxConfigMutationLock('saveTerminalConfig', async () => {
+      const existing = await this.prisma.terminalToolboxConfig.findUnique({ where: { terminalId: publicTerminalId } })
+      const items = mergeGovernedProjectionItems(submittedItems, existing ? parseItemsForAdmin(existing.itemsJson) : [])
+      return this.prisma.terminalToolboxConfig.upsert({
+        where: { terminalId: publicTerminalId },
+        create: { terminalId: publicTerminalId, enabled: input.enabled, itemsJson: JSON.stringify(items), updatedBy },
+        update: { enabled: input.enabled, itemsJson: JSON.stringify(items), updatedBy },
+      })
     })
     return toPublicConfigView(saved)
   }

@@ -1,7 +1,7 @@
 # 百宝箱微应用平台方案
 
-> 状态：规划与第一阶段底座
-> 最后更新：2026-07-01
+> 状态：规划、第一阶段安全底座、Phase 2 最小治理规则底座、Phase 2B 后端审核发布工作流
+> 最后更新：2026-07-02
 > 关联：`docs/superpowers/plans/2026-07-01-toolbox-micro-app-platform.md`、`packages/shared/src/types/toolboxMicroApp.ts`
 
 ## 一、结论
@@ -199,3 +199,47 @@ AI 技能包不能让大模型自由生成 URL 或任意外部操作。大模型
 - 新增静态门禁：`verify:toolbox-micro-app-platform`
 
 这一阶段不代表百宝箱微应用平台已商用上线；它代表产品边界、清单模型和防回退口径已进入仓库，可以作为后续后端 / 管理端 / Kiosk 实现的基线。
+
+## 十、Phase 2 最小治理规则底座已落地范围
+
+Phase 2 先落“规则底座”，不直接建表、不新增 Admin / Kiosk 页面、不开放第三方代码或外部 skill 运行。
+
+已进入代码的治理能力：
+
+- 共享契约补齐：`ToolboxAppVersion`、`ToolboxAllowedHost`、host 状态、发布阻断原因、审批元数据。
+- 状态机规则：`planned -> draft -> submitted -> approved -> published`，禁止 `draft -> published` 和 `archived -> published` 等跳审 / 复活路径。
+- 双人审核规则：提交人和审核人不能相同。
+- Host 治理规则：host 必须处于 `active`，不能过期、熔断、待审核或归档；本机 / 私网 IP host 直接拒绝。
+- 发布 gate：未审核、熔断、归档、红线文案、高风险缺免责声明、外部 H5 开关关闭、host 不可用都不得发布。
+- 验证门禁：`verify:toolbox-micro-app-platform` 已覆盖状态机、自审批、host 过期 / 熔断、本机 IP、红线文案、高风险免责声明和外部 H5 开关关闭等负向用例。
+
+仍未完成、不得误宣称：
+
+- 未新增 Admin 应用目录 / 审核发布 UI。
+- 未开放第三方 JS / WASM / 任意 skill 包。
+
+## 十一、Phase 2B 后端审核发布工作流已落地范围
+
+Phase 2B 已把规则底座接入真实后端工作流，但仍不代表生产商用验收完成。
+
+已进入代码的能力：
+
+- 双数据库持久化：SQLite / PostgreSQL schema 和 migration 同步新增 `ToolboxApp`、`ToolboxAppVersion`、`ToolboxAllowedHost`。
+- Admin 后端接口：创建应用、创建版本、提交审核、异人审批、驳回、发布、熔断应用、允许域名 upsert / 审核。
+- 发布投影：已审核版本通过发布 gate 后，转换为 `KioskToolboxItemView` 并写入现有 `TerminalToolboxConfig.itemsJson`，投影 key 统一为 `app:${appKey}`，避免覆盖手工配置项。
+- Fail-closed 顺序：发布前先跑 `evaluateToolboxPublishGate`，再对投影项做 `normalizeToolboxItemsForConfig(..., { strict: true })` dry-run，全部通过后才在事务内更新版本 / 应用状态和终端配置。
+- itemsJson 写入保护：发布、熔断和手工保存终端百宝箱配置共用同进程串行化锁，避免这些路径在单实例内读改写互相覆盖。
+- 熔断移除：应用熔断时从所有终端配置中移除对应 `app:${appKey}` 投影项。
+- Host 双人复核：允许域名 upsert 只能进入 `pending_review`，激活必须走 review 接口，且最近提交人与审核人不能相同；旧数据缺少最近提交人时 fail-closed 拒绝审核。
+- Host 双白名单口径：外部 H5 / 二维码目标域名必须同时进入数据库 `ToolboxAllowedHost(active)` 和运行环境白名单 `KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS`；任一侧缺失都会 fail-closed 拒绝发布。
+- 免责声明投影：高风险 / 受限应用发布时会保留 `riskLevel` 与 `disclaimers` 元数据，供后续 Kiosk 详情 / 弹窗展示使用。
+- 审计留痕：应用创建、版本创建、提交、审批、驳回、发布、熔断、允许域名 upsert / review 均写 `AuditLog` 摘要，不写合同、简历、法律争议原文或第三方办理结果。
+- 验证门禁：新增 `verify:toolbox-review-workflow`，覆盖 schema/migration、防重复规则、投影映射、严格校验和 AuditLog 动作。
+
+仍未完成、不得误宣称：
+
+- 未做 Admin 审核发布 UI。
+- 未执行预生产 / 生产 PostgreSQL migration。
+- 未对真实终端做发布投影验收。
+- 未开放第三方 JS / WASM / 任意 skill 包。
+- 未完成首批微应用的法务、版权、文件留存、支付或真机打印验收。

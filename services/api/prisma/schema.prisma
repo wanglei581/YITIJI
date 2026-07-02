@@ -1577,6 +1577,68 @@ model TerminalToolboxConfig {
   updatedAt   DateTime @updatedAt
 }
 
+// ── ToolboxGovernance ──────────────────────────────────────────────────────
+// 百宝箱微应用审核发布底座。这里只存声明式元数据和版本快照,不承载第三方代码。
+// 发布到终端时由服务端将已审核版本投影到 TerminalToolboxConfig.itemsJson。
+model ToolboxApp {
+  id          String   @id @default(cuid())
+  appKey      String   @unique
+  title       String
+  category    String
+  priority    String
+  status      String
+  riskLevel   String
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions    ToolboxAppVersion[]
+
+  @@index([status])
+  @@index([category])
+}
+
+model ToolboxAppVersion {
+  id              String     @id @default(cuid())
+  appId           String
+  app             ToolboxApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+  version         Int
+  status          String
+  snapshotJson    String
+  submittedBy     String?
+  approvedBy      String?
+  rejectedBy      String?
+  rejectionReason String?
+  createdAt       DateTime   @default(now())
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  publishedAt     DateTime?
+
+  @@unique([appId, version])
+  @@index([appId])
+  @@index([status])
+}
+
+model ToolboxAllowedHost {
+  id         String    @id @default(cuid())
+  host       String
+  purpose    String
+  status     String
+  owner      String
+  reason     String
+  createdBy  String?
+  updatedBy  String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([host, purpose])
+  @@index([status])
+}
+
 // ── ToolboxLaunchEvent ──────────────────────────────────────────────────────
 // 百宝箱/智慧校园应用匿名运营事件。
 // 合规边界: 不关联 endUserId,不存完整 URL/token/第三方办理结果;targetHost 只能由服务端从

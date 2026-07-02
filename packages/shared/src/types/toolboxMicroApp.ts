@@ -48,7 +48,106 @@ export type ToolboxMicroAppStatus =
   | 'suspended'
   | 'archived'
 
+export const TOOLBOX_MICRO_APP_STATUSES = [
+  'planned',
+  'draft',
+  'submitted',
+  'approved',
+  'published',
+  'rejected',
+  'suspended',
+  'archived',
+] as const satisfies readonly ToolboxMicroAppStatus[]
+
 export type ToolboxMicroAppPriority = 'high' | 'medium' | 'low'
+
+export const TOOLBOX_ALLOWED_HOST_STATUSES = [
+  'pending_review',
+  'active',
+  'suspended',
+  'expired',
+  'archived',
+] as const
+
+export type ToolboxAllowedHostStatus = (typeof TOOLBOX_ALLOWED_HOST_STATUSES)[number]
+
+export type ToolboxAllowedHostPurpose = 'web_app' | 'qr_target' | 'asset'
+
+export type ToolboxPublishBlockReason =
+  | 'app_not_approved'
+  | 'app_suspended'
+  | 'app_archived'
+  | 'self_review'
+  | 'host_required'
+  | 'host_not_allowed'
+  | 'host_not_active'
+  | 'host_expired'
+  | 'host_suspended'
+  | 'host_local_or_private'
+  | 'content_blocked'
+  | 'missing_disclaimer'
+  | 'forbidden_capability'
+  | 'external_url_disabled'
+  | 'invalid_target_url'
+
+export interface ToolboxReviewActor {
+  userId: string
+  displayName?: string | null
+  role?: string | null
+}
+
+export interface ToolboxAllowedHost {
+  host: string
+  purpose: ToolboxAllowedHostPurpose
+  status: ToolboxAllowedHostStatus
+  owner: string
+  reason: string
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+  expiresAt?: string | null
+}
+
+export interface ToolboxAllowedHostRecord extends ToolboxAllowedHost {
+  id: string
+  createdBy?: string | null
+  updatedBy?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ToolboxAdminAppView {
+  id: string
+  appKey: string
+  title: string
+  category: ToolboxMicroAppCategory | string
+  priority: ToolboxMicroAppPriority | string
+  status: ToolboxMicroAppStatus | string
+  riskLevel: ToolboxMicroAppRiskLevel | string
+  createdBy?: string | null
+  updatedBy?: string | null
+  createdAt: string
+  updatedAt: string
+  versionCount: number
+  latestVersion?: number | null
+  latestVersionStatus?: ToolboxMicroAppStatus | string | null
+}
+
+export interface ToolboxGovernanceResult {
+  appKey: string
+  version?: number
+  status: ToolboxMicroAppStatus | string
+  affectedTerminalCount?: number
+  projectionKey?: string
+}
+
+export interface ToolboxGovernanceReviewMeta {
+  submittedBy?: string | null
+  submittedAt?: string | null
+  approvedBy?: string | null
+  approvedAt?: string | null
+  suspendedAt?: string | null
+  suspendedReason?: string | null
+}
 
 export interface ToolboxMicroAppDataPolicy {
   retention: 'none' | 'session_only' | 'member_asset'
@@ -61,6 +160,7 @@ export interface ToolboxMicroAppLaunchPolicy {
   entryType: ToolboxMicroAppEntryType
   internalRoute?: string
   externalUrl?: string
+  qrImageUrl?: string
   qrTargetUrl?: string
   assistantIntent?: string
   requiresHostAllowlist: boolean
@@ -82,6 +182,25 @@ export interface ToolboxMicroAppDefinition {
   disclaimers: string[]
   commercialValue: string
   acceptanceGates: string[]
+  submittedBy?: string | null
+  approvedBy?: string | null
+  governance?: ToolboxGovernanceReviewMeta
+}
+
+export interface ToolboxAppVersion {
+  id: string
+  appId: string
+  version: number
+  status: ToolboxMicroAppStatus
+  snapshot: ToolboxMicroAppDefinition
+  submittedBy?: string | null
+  approvedBy?: string | null
+  rejectedBy?: string | null
+  rejectionReason?: string | null
+  createdAt: string
+  submittedAt?: string | null
+  reviewedAt?: string | null
+  publishedAt?: string | null
 }
 
 export const BUILTIN_TOOLBOX_MICRO_APPS = [

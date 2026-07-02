@@ -18,6 +18,8 @@ export interface KioskToolboxItemView {
   sortOrder: number
   placements?: KioskAppPlacementView[]
   launchMode?: KioskAppLaunchModeView
+  riskLevel?: 'low' | 'medium' | 'high' | 'restricted'
+  disclaimers?: string[]
   externalUrl?: string | null
   qrImageUrl?: string | null
   qrTargetUrl?: string | null

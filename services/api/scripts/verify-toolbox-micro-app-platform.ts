@@ -9,8 +9,17 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   BUILTIN_TOOLBOX_MICRO_APPS,
+  TOOLBOX_ALLOWED_HOST_STATUSES,
   TOOLBOX_MICRO_APP_FORBIDDEN_CAPABILITIES,
+  TOOLBOX_MICRO_APP_STATUSES,
 } from '../../../packages/shared/src/types/toolboxMicroApp'
+import {
+  assertDistinctToolboxReviewers,
+  canTransitionToolboxAppStatus,
+  evaluateToolboxHost,
+  evaluateToolboxPublishGate,
+  TOOLBOX_GOVERNANCE_FORBIDDEN_PERMISSIONS,
+} from '../src/terminals/toolbox-governance'
 
 const repoRoot = join(__dirname, '../../..')
 
@@ -21,6 +30,7 @@ const sharedIndexPath = join(repoRoot, 'packages/shared/src/index.ts')
 const apiPackagePath = join(repoRoot, 'services/api/package.json')
 const terminalToolboxServicePath = join(repoRoot, 'services/api/src/terminals/terminal-toolbox.service.ts')
 const toolboxPolicyPath = join(repoRoot, 'services/api/src/terminals/toolbox-policy.ts')
+const toolboxGovernancePath = join(repoRoot, 'services/api/src/terminals/toolbox-governance.ts')
 
 let failed = 0
 
@@ -154,6 +164,131 @@ function assertBuiltinCatalogRuntime(): void {
   if (failed === failedBeforeRuntimeChecks) pass('运行时逐项校验内置微应用默认不开生产、需审核、需免责声明、无禁止能力')
 }
 
+function assertGovernanceRuntime(): void {
+  const failedBeforeRuntimeChecks = failed
+  const now = new Date('2026-07-01T00:00:00.000Z')
+  const activeHost = {
+    host: 'trusted.example.com',
+    purpose: 'web_app' as const,
+    status: 'active' as const,
+    owner: '就业中心',
+    reason: '合作方 H5 入口',
+    reviewedBy: 'reviewer-a',
+    reviewedAt: '2026-06-30T00:00:00.000Z',
+    expiresAt: '2026-12-31T00:00:00.000Z',
+  }
+  const approvedWebApp = {
+    id: 'salary-web',
+    title: '薪资谈判话术',
+    shortDescription: '候选人自用话术练习',
+    category: 'career' as const,
+    priority: 'high' as const,
+    status: 'approved' as const,
+    riskLevel: 'low' as const,
+    permissions: ['external_open'] as const,
+    launch: {
+      entryType: 'web_app' as const,
+      externalUrl: 'https://trusted.example.com/salary',
+      requiresHostAllowlist: true,
+      requiresHumanReview: true,
+      productionEnabledByDefault: false,
+    },
+    dataPolicy: {
+      retention: 'none' as const,
+      thirdPartyDataSharing: 'external_site' as const,
+      sensitiveDataAllowed: false,
+      requiresExplicitConsent: true,
+    },
+    disclaimers: ['第三方页面由服务方负责，平台不注入会员信息。'],
+    commercialValue: '合作方服务入口',
+    acceptanceGates: ['host 白名单', '人工审核'],
+    submittedBy: 'submitter-a',
+    approvedBy: 'reviewer-a',
+  }
+
+  if (!TOOLBOX_MICRO_APP_STATUSES.includes('planned') || !TOOLBOX_MICRO_APP_STATUSES.includes('published')) {
+    fail('共享状态常量必须覆盖 planned 和 published')
+  }
+  if (!TOOLBOX_ALLOWED_HOST_STATUSES.includes('active') || !TOOLBOX_ALLOWED_HOST_STATUSES.includes('suspended')) {
+    fail('共享 host 状态常量必须覆盖 active 和 suspended')
+  }
+  if (JSON.stringify([...TOOLBOX_GOVERNANCE_FORBIDDEN_PERMISSIONS].sort()) !== JSON.stringify([...TOOLBOX_MICRO_APP_FORBIDDEN_CAPABILITIES].sort())) {
+    fail('治理规则禁止能力清单必须与 shared 禁止能力清单保持一致')
+  }
+  if (!canTransitionToolboxAppStatus('planned', 'draft')) fail('planned 应允许进入 draft')
+  if (canTransitionToolboxAppStatus('draft', 'published')) fail('draft 不得跳过审核直接 published')
+  if (canTransitionToolboxAppStatus('archived', 'published')) fail('archived 不得恢复 published')
+
+  try {
+    assertDistinctToolboxReviewers('reviewer-a', 'reviewer-a')
+    fail('提交人与审核人相同必须被拒绝')
+  } catch (error) {
+    const code = error instanceof Error ? error.message : ''
+    if (!code.includes('TOOLBOX_SELF_REVIEW_FORBIDDEN')) fail(`自审批错误码异常: ${code}`)
+  }
+  try {
+    assertDistinctToolboxReviewers('reviewer-a', null)
+    fail('审核人缺失必须被拒绝')
+  } catch (error) {
+    const code = error instanceof Error ? error.message : ''
+    if (!code.includes('TOOLBOX_SELF_REVIEW_FORBIDDEN')) fail(`缺审核人错误码异常: ${code}`)
+  }
+
+  const activeHostGate = evaluateToolboxHost(activeHost, now)
+  if (!activeHostGate.allowed) fail(`active host 应可用: ${JSON.stringify(activeHostGate)}`)
+  const expiredHostGate = evaluateToolboxHost({ ...activeHost, expiresAt: '2026-01-01T00:00:00.000Z' }, now)
+  if (expiredHostGate.reason !== 'host_expired') fail(`过期 host 必须给出 host_expired: ${JSON.stringify(expiredHostGate)}`)
+  const invalidDateHostGate = evaluateToolboxHost({ ...activeHost, expiresAt: 'not-a-date' }, now)
+  if (invalidDateHostGate.reason !== 'host_expired') fail(`非法日期 host 必须 fail-closed 为 host_expired: ${JSON.stringify(invalidDateHostGate)}`)
+  const suspendedHostGate = evaluateToolboxHost({ ...activeHost, status: 'suspended' }, now)
+  if (suspendedHostGate.reason !== 'host_suspended') fail(`熔断 host 必须给出 host_suspended: ${JSON.stringify(suspendedHostGate)}`)
+  const pendingHostGate = evaluateToolboxHost({ ...activeHost, status: 'pending_review' }, now)
+  if (pendingHostGate.reason !== 'host_not_active') fail(`待审核 host 必须给出 host_not_active: ${JSON.stringify(pendingHostGate)}`)
+  const ipv6HostGate = evaluateToolboxHost({ ...activeHost, host: '[::1]' }, now)
+  if (ipv6HostGate.reason !== 'host_local_or_private') fail(`IPv6 本机 host 必须被拒绝: ${JSON.stringify(ipv6HostGate)}`)
+  const integerIpHostGate = evaluateToolboxHost({ ...activeHost, host: '2130706433' }, now)
+  if (integerIpHostGate.reason !== 'host_local_or_private') fail(`整数 IP host 必须被拒绝: ${JSON.stringify(integerIpHostGate)}`)
+  const shortIpHostGate = evaluateToolboxHost({ ...activeHost, host: '127.1' }, now)
+  if (shortIpHostGate.reason !== 'host_local_or_private') fail(`简写 IP host 必须被拒绝: ${JSON.stringify(shortIpHostGate)}`)
+  const octalIpHostGate = evaluateToolboxHost({ ...activeHost, host: '0177.0.0.1' }, now)
+  if (octalIpHostGate.reason !== 'host_local_or_private') fail(`八进制 IP host 必须被拒绝: ${JSON.stringify(octalIpHostGate)}`)
+
+  const allowedGate = evaluateToolboxPublishGate(approvedWebApp, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (!allowedGate.allowed) fail(`已审核且 host 可用应用应允许发布: ${JSON.stringify(allowedGate)}`)
+  const selfReviewGate = evaluateToolboxPublishGate({ ...approvedWebApp, approvedBy: 'submitter-a' }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (selfReviewGate.reason !== 'self_review') fail(`自审批发布必须被拦截: ${JSON.stringify(selfReviewGate)}`)
+  const missingReviewerGate = evaluateToolboxPublishGate({ ...approvedWebApp, approvedBy: null }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (missingReviewerGate.reason !== 'self_review') fail(`缺审核人发布必须被拦截: ${JSON.stringify(missingReviewerGate)}`)
+  const draftGate = evaluateToolboxPublishGate({ ...approvedWebApp, status: 'draft' }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (draftGate.reason !== 'app_not_approved') fail(`未审核应用必须被拦截: ${JSON.stringify(draftGate)}`)
+  const expiredHostPublishGate = evaluateToolboxPublishGate(approvedWebApp, { allowedHosts: [{ ...activeHost, expiresAt: '2026-01-01T00:00:00.000Z' }], now, externalUrlAllowed: true })
+  if (expiredHostPublishGate.reason !== 'host_expired') fail(`过期 host 不得发布: ${JSON.stringify(expiredHostPublishGate)}`)
+  const hostNotAllowedGate = evaluateToolboxPublishGate(approvedWebApp, { allowedHosts: [], now, externalUrlAllowed: true })
+  if (hostNotAllowedGate.reason !== 'host_not_allowed') fail(`未登记 host 不得发布: ${JSON.stringify(hostNotAllowedGate)}`)
+  const invalidTargetGate = evaluateToolboxPublishGate({ ...approvedWebApp, launch: { ...approvedWebApp.launch, externalUrl: 'http://trusted.example.com/salary' } }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (invalidTargetGate.reason !== 'invalid_target_url') fail(`非 HTTPS 目标不得发布: ${JSON.stringify(invalidTargetGate)}`)
+  const missingTargetGate = evaluateToolboxPublishGate({ ...approvedWebApp, launch: { ...approvedWebApp.launch, externalUrl: null } }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (missingTargetGate.reason !== 'host_required') fail(`缺少需白名单目标时必须 host_required: ${JSON.stringify(missingTargetGate)}`)
+  const inactiveHostPublishGate = evaluateToolboxPublishGate(approvedWebApp, { allowedHosts: [{ ...activeHost, status: 'pending_review' }], now, externalUrlAllowed: true })
+  if (inactiveHostPublishGate.reason !== 'host_not_active') fail(`待审核 host 不得发布: ${JSON.stringify(inactiveHostPublishGate)}`)
+  const redLineGate = evaluateToolboxPublishGate({ ...approvedWebApp, title: '平台内一键投递' }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (redLineGate.reason !== 'content_blocked') fail(`红线文案不得发布: ${JSON.stringify(redLineGate)}`)
+  const missingDisclaimerGate = evaluateToolboxPublishGate({ ...approvedWebApp, riskLevel: 'high', disclaimers: [] }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (missingDisclaimerGate.reason !== 'missing_disclaimer') fail(`高风险应用缺免责声明不得发布: ${JSON.stringify(missingDisclaimerGate)}`)
+  const blankDisclaimerGate = evaluateToolboxPublishGate({ ...approvedWebApp, riskLevel: 'high', disclaimers: [' ', ''] }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (blankDisclaimerGate.reason !== 'missing_disclaimer') fail(`高风险应用空白免责声明不得发布: ${JSON.stringify(blankDisclaimerGate)}`)
+  const forbiddenCapabilityGate = evaluateToolboxPublishGate({ ...approvedWebApp, permissions: ['offer_management'] }, { allowedHosts: [activeHost], now, externalUrlAllowed: true })
+  if (forbiddenCapabilityGate.reason !== 'forbidden_capability') fail(`禁止能力不得发布: ${JSON.stringify(forbiddenCapabilityGate)}`)
+  const localHostGate = evaluateToolboxPublishGate({ ...approvedWebApp, launch: { ...approvedWebApp.launch, externalUrl: 'https://127.0.0.1/admin' } }, { allowedHosts: [{ ...activeHost, host: '127.0.0.1' }], now, externalUrlAllowed: true })
+  if (localHostGate.reason !== 'host_local_or_private') fail(`本机/私网 host 不得发布: ${JSON.stringify(localHostGate)}`)
+  const ipv6LocalHostGate = evaluateToolboxPublishGate({ ...approvedWebApp, launch: { ...approvedWebApp.launch, externalUrl: 'https://[::1]/admin' } }, { allowedHosts: [{ ...activeHost, host: '[::1]' }], now, externalUrlAllowed: true })
+  if (ipv6LocalHostGate.reason !== 'host_local_or_private') fail(`IPv6 本机 host 不得发布: ${JSON.stringify(ipv6LocalHostGate)}`)
+  const externalSwitchGate = evaluateToolboxPublishGate(approvedWebApp, { allowedHosts: [activeHost], now, externalUrlAllowed: false })
+  if (externalSwitchGate.reason !== 'external_url_disabled') fail(`外部 H5 开关关闭时不得发布: ${JSON.stringify(externalSwitchGate)}`)
+
+  if (failed === failedBeforeRuntimeChecks) pass('运行时校验 Phase 2 状态机、自审批、host 过期/熔断、红线和发布 gate')
+}
+
 function main(): void {
   console.log('\n=== 百宝箱微应用平台静态门禁 ===')
 
@@ -164,6 +299,7 @@ function main(): void {
   const apiPackage = mustExist(apiPackagePath, 'API package.json 存在')
   const terminalToolboxService = mustExist(terminalToolboxServicePath, '终端百宝箱服务存在')
   const toolboxPolicy = mustExist(toolboxPolicyPath, '百宝箱安全策略存在')
+  const toolboxGovernance = mustExist(toolboxGovernancePath, '百宝箱治理规则存在')
 
   mustContain(productDoc, [
     '百宝箱 = 受控微应用中心 + 场景化服务入口编排 + 首方 AI 技能入口',
@@ -201,6 +337,7 @@ function main(): void {
 
   assertBuiltinCatalog(sharedTypes)
   assertBuiltinCatalogRuntime()
+  assertGovernanceRuntime()
 
   mustMatch(
     sharedIndex,
@@ -226,6 +363,15 @@ function main(): void {
     '面试邀约',
     'offer管理',
   ], '百宝箱安全策略覆盖招聘闭环红线')
+  mustContain(toolboxGovernance, [
+    'TOOLBOX_GOVERNANCE_TRANSITIONS',
+    'assertDistinctToolboxReviewers',
+    'evaluateToolboxPublishGate',
+    'TOOLBOX_GOVERNANCE_FORBIDDEN_PERMISSIONS',
+    'findToolboxComplianceViolation',
+    'host_local_or_private',
+    'missing_disclaimer',
+  ], '百宝箱治理规则覆盖状态机、自审批、host 风险和合规复用')
 
   mustNotContain(`${productDoc}\n${plan}\n${sharedTypes}`, [
     '支持一键投递',
