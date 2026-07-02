@@ -92,6 +92,10 @@ export interface ResumeTargetContext {
   experience?: ResumeTargetExperience
   /** 求职场景（校招/社招/转岗/招聘会现场） */
   scene?: ResumeTargetScene
+  /** 专业方向（自由文本，可空；仅用于本人简历表达诊断/优化重点） */
+  major?: string
+  /** 学历层次（自由文本或枚举文案，如 大专/本科/硕士；可空） */
+  degree?: string
   /** 是否为"暂不指定，通用诊断" */
   skipped?: boolean
 }

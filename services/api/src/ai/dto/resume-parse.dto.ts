@@ -43,6 +43,16 @@ export class ResumeTargetContextDto {
   scene?: ResumeTargetScene
 
   @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  major?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  degree?: string
+
+  @IsOptional()
   @IsBoolean()
   skipped?: boolean
 }

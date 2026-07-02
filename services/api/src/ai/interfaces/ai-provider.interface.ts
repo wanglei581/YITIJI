@@ -57,6 +57,10 @@ export interface ResumeTargetContext {
   targetJob?: string
   experience?: ResumeTargetExperience
   scene?: ResumeTargetScene
+  /** 专业方向（自由文本，可空；仅用于本人简历表达诊断/优化重点） */
+  major?: string
+  /** 学历层次（自由文本或枚举文案，如 大专/本科/硕士；可空） */
+  degree?: string
   skipped?: boolean
 }
 
