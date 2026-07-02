@@ -69,6 +69,15 @@
 - [x] **用户文件资产 + 预生产候选集成**：`codex/file-assets-preprod-integration` 已合并文件资产保存期限栈、生产/试运营证据包、TRTC assistant 生产构建守卫和预生产阶段性记录；后续真实验收应基于该集成候选继续，不再用只含 TRTC guard 的预生产分支替代。
 - [x] **简历素材库 / 求职材料商用闭环整改**：两个既有首页入口已统一进入 `/resume/templates` 求职材料库；内置模板通过 `JobMaterialsModule` 生成真实 PDF 并以会员 `FileObject` 进入 `/me/documents`；我的文档支持重签 URL 后打印；Admin 新增只读 `/job-materials` 运营统计；已补 API/Kiosk/Admin 防回退 verify 和三端 typecheck，并已完成预生产公网浏览器受控会员生成 PDF 到打印确认链路验收。本项不包含动态模板 CRUD、Partner 上传模板、支付套餐、平台投递、正式域名 HTTPS / 真实短信上线 E2E 或 Windows 真机验收。
 
+## P1：工程规模规范化拆分
+
+依据 `docs/reviews/engineering-scale-normalization-backlog.md`(2026-07-02,分支 `codex/normalize-structure-closure`)。每项实拆单独开卡 + 单独 worktree + 行为保持 + verify 门禁 + 双模型 review;🔴 项须等对应在途任务合入 `main` 后再排。
+
+- [x] **T1 拆分 backlog**:只读审计 8 个超阈值文件,产出拆分清单(方向 / 冲突风险 / 排期 / verify 覆盖),零源码改动。
+- [ ] **X1 + N2/N4:Admin 前端去重 + 拆分**(🟡):抽 `fairs/index.tsx`(1349)与 `companies/index.tsx`(1116)重复的共享 UI 原子到公共组件,并拆各自大 Tab / Drawer 为独立文件;依赖 typecheck / build + 1080×1920 浏览器走查。
+- [ ] **N5 / N6:后端服务拆分**(🟡):`materials.service.ts`(850)抽检查处理管线;`admin-fairs.service.ts`(811)抽公司·展区 / 物料·导览子服务;跑对应 `verify-*` + SQLite / PG readiness。
+- [ ] **N1 / N3:核心大文件拆分**(🔴,阻塞待解):`jobs.service.ts`(2316)按公开读取 / 审核 / Partner 导入 / Excel 引擎拆分;`terminals.service.ts`(1182)按 Agent 运行时 / 校验 / Admin 管理拆分。**须等 toolbox / terminal-device 合入 `main` 后**再排;terminals verify 覆盖薄,须补跨机 E2E。
+
 ## P1：用户文件与简历资产商用闭环后续
 
 - [ ] **真实生产/试运营执行**：按用户文件与简历资产证据包，使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理、`long_term` 防误删和审计查询全链路，并留存命令日志、浏览器截图、COS 控制台截图和 DB 抽样。
