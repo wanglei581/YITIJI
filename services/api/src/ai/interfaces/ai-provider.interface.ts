@@ -127,6 +127,12 @@ export interface ParseResumeOutput {
    * 只在 POST /resume/parse 响应中返回一次（DB 只存 accessTokenHash）。会员 parse 不返回。
    */
   accessToken?: string
+  /**
+   * 目标方向上下文（Wave 1 Task 3，additive 可选）：随 parse 结果落库，供优化懒生成时读回
+   * 透传给 optimizeResume 的第 4 参数。仅结构化字段（industry/targetJob/major/degree/
+   * experience/scene/skipped），不含简历原文，不产生新的 PII 留存面。
+   */
+  targetContext?: ResumeTargetContext
 }
 
 // ─── 简历优化类型 ────────────────────────────────────────────

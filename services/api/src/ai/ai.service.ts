@@ -214,7 +214,14 @@ export class AiService {
       }
 
       // fileId 随结果落库(阶段2B):优化时按归属重新提取原文;不透明 id,无 PII
-      const resultWithProvider: ParseResumeOutput = { ...result, providerName: this.provider.name, fileId: input.fileId }
+      // targetContext 随结果落库(Wave 1 Task 3):优化懒生成时读回透传;只落结构化字段,
+      // 绝不落简历原文(extractedText 不写入 result/payload)。
+      const resultWithProvider: ParseResumeOutput = {
+        ...result,
+        providerName: this.provider.name,
+        fileId: input.fileId,
+        ...(input.targetContext ? { targetContext: input.targetContext } : {}),
+      }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
       const isAnonymous = !endUserId
@@ -351,7 +358,7 @@ export class AiService {
         }
       }
 
-      const result = await this.provider.optimizeResume(taskId, parseResult.report, extractedText)
+      const result = await this.provider.optimizeResume(taskId, parseResult.report, extractedText, parseResult.targetContext)
       const withProvider: OptimizeResumeOutput = { ...result, providerName: this.provider.name }
       // 只缓存成功结果:临时性失败(模型抖动/未配置)不落库,用户稍后重试可恢复
       if (withProvider.status === 'completed') {
