@@ -145,6 +145,13 @@
 - [x] **岗位信息页客户数据普通浏览验收**：Kiosk 前台 `/jobs` 和 `/jobs/:id` 已补齐 sourceOrgId 过滤、商业化概览、后端总量 / 当前载入口径、字段完整度、来源机构筛选、详情页常驻二维码、“去来源平台投递 / 扫码投递”和外部入口记录；终端 Kiosk 模式不直接跳出第三方站，回落为扫码办理。2026-07-01 已刷新预生产到含 Excel `workType -> category` 修复的干净候选 `5ca81d04`，并完成腾讯真实岗位样本 PostgreSQL 隔离导入 Gate：公开 99 条、1 条过期下架、`category=null` 为 0、`fulltime` 筛选 99 条，API 已复核 sourceOrgId、城市、全职、AI / 产品关键词和详情来源说明；Admin / Partner 质量摘要脱敏 API 摘要已补齐，Partner 端按机构隔离。随后用户确认只热更新 Kiosk 静态包，已从 `5ca81d04` 最小补丁构建并只替换 `/srv/ai-job-print/apps/kiosk/dist`，公网浏览器访问 `/jobs?sourceOrgId=org-tencent-real-job-sample-20260701` 显示 `共 99 个`，Nginx access log 记录浏览器触发带 `sourceOrgId` 的 API 请求，详情页展示第三方来源和去来源平台 / 扫码投递合规文案；同一链路已补入 `verify:job-info-ui` 并接入 CI，避免后续全量构建回归。进入正式对外展示前仍必须确认客户 / 数据源授权，或明确标注为第三方公开来源聚合信息；验收只记录打开来源入口，不记录投递结果。
 - [ ] **岗位信息 AI 商用闭环下一阶段**：补客户真实岗位样本授权 / 展示口径、真实会员 AI 浏览器验收和一体机真机验收。已解除预生产公网新端点 404、Excel `workType -> category`、腾讯样本预生产隔离导入、Admin / Partner 质量摘要脱敏 API 摘要，以及 Kiosk 公网普通岗位浏览阻塞；下一步用真实会员、真实已解析简历和真实 LLM/OCR 跑 `/jobs` AI 推荐、`/jobs/:id` AI 解读、岗位匹配参考、来源外跳记录、`/me/ai-records` 历史回看和 `/me/settings` 授权撤回。最后补 Windows 一体机、Terminal Agent、Pantum 真机出纸和断网恢复验收。推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成预生产真实会员 AI 浏览器和真机验收前，不得对外宣称 AI 推荐或岗位匹配达到生产商用完成。
 
+## P1：岗位大师后续里程碑（`feature/job-master`，见 [current-progress.md](./current-progress.md)）
+
+- [ ] **M1 集成验收 + 合并**：真实 API + 已诊断简历下走 1080×1920 竖屏全链路（选岗→分析→四段结果→打印确认），真实 key LLM 联调；然后合并 `feature/job-master` 到 `main`。M1 后端 15 检查 `verify:job-master` 与 kiosk 生产构建已本机通过。
+- [ ] **M2 增强**：`JobSalaryStatsService` 站内统计区间（P25/P50/P75 + 样本不足降级）；多岗位（≤3）对比视图；岗位详情页「分析这个岗位」入口改线到 `/jobs/master?jobId=`（+ 防回退 verify），避免与 `/resume/job-fit` 双入口并存（改线前复查 [user-data-flow-matrix.md](../product/user-data-flow-matrix.md) 不堆同义入口）。
+- [ ] **M3 拓展（独立评估，不阻塞 M1/M2）**：无简历用户 RIASEC 兴趣短测评冷启动；职业前景标签（Admin 维护紧缺职业目录数据源，不由 LLM 生成）。
+- [ ] **M-Pay（排 M2 之后）**：岗位大师商业化（免费预览 / 付费完整报告 / 套餐 / 补贴券），复用订单底座，见设计文档 §十。
+
 ## P1：工程质量门禁
 
 - [ ] 每个新任务先写目标、非目标、允许修改文件、验证方式。

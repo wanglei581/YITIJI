@@ -38,6 +38,18 @@
 
 2026-07-03 追加：按第二轮 Claude reviewer 建议，`verify:print-jobs` 第 7 段补一个最易泄露的边界用例（7f/7g）——Agent 回传 `status:'failed'` 且**完全无 `errorCode`、只有原始 `errorMessage`**（失败判定只能靠 `errorMessage` 命中、映射函数拿不到任何码）：断言 DB 仍完整保存原文而 `errorCode` 为空，`getStatus()` 回默认安全文案「打印任务失败，请联系工作人员处理或稍后重试」（`failureReasonForUser` 与兼容 `errorMessage` 一致），响应体不含任何敏感片段。仅改 `services/api/scripts/verify-print-jobs.ts` 测试脚本，未动业务逻辑。重跑 `verify:print-jobs` 7a–7g 全 PASS、api/kiosk `typecheck`、两组 `eslint` 均通过。
 
+## 岗位大师 M1（`feature/job-master` 分支，2026-07-02，尚未合入 `main`）
+
+依据 [plans/2026-07-02-job-master-m1-mvp.md](../superpowers/plans/2026-07-02-job-master-m1-mvp.md) 与 [specs/2026-07-02-job-master-design.md](../superpowers/specs/2026-07-02-job-master-design.md)（方案A），在独立分支 `feature/job-master`（基于干净 `main@eba2dd0f`）落地岗位大师 M1 最小闭环，均每步 typecheck 绿 + 独立 commit（禁用 `git add .`）：
+
+- **后端契约**：`packages/shared` 新增 `JobMaster*` 响应类型（SSOT）；`LlmJobMasterService` 单次结构化调用（适配度 fit + 晋升路径 careerPath + 风险 risks），双层防护栏沿用 job-fit/career-plan（禁词/百分比/薪资承诺/学历自相矛盾全局重试，诱导编造/示例数字建议级过滤，evidence 防编造），mock 失败 fail-closed。
+- **编排 + 记录**：`JobMasterService`（parse 行门禁 → 简历原文重提 → LLM → 落库 `AiResumeResult(kind='job_master')` 24h TTL → 审计）+ `JobMasterController`（`POST /api/v1/resume/job-master`、`GET :taskId`、`POST :taskId/print`，限流 6 次/分钟）；`member-assets` kind 白名单加 `job_master`，进「我的」AI服务记录。`AiResumeResult.kind` 为自由字符串，无需迁移。
+- **报告 PDF + 打印闭环**：`JobMasterPdfService`（A4 五区块 + 固定页脚免责）→ `FileObject(purpose='print_doc', createdBy='job_master')` → 我的文档 + 打印订单（沿用既有链路，未新增 `FilePurpose`）。
+- **Kiosk**：`/jobs/master` 页（复用 JobFit 选岗 + 四段结果卡 + 打印跳 `/print/confirm`）；首页「岗位大师」占位磁贴点亮（`disabled` → `to:/jobs/master`，归岗位信息组，**非新增同义入口**）；`MyAiRecordsPage` 增「岗位决策分析」展示。
+- **验证**：新增 `verify:job-master`（受控 stub LLM 端到端，15 检查含真实 PDF 渲染）本机全通过，已接入主 CI 与 `postgres-readiness` 双 job；shared/api/kiosk typecheck + kiosk 生产构建（2502 模块）+ lint 全绿。
+- **薪资 M1 只透传来源方文本**（`Job.salary`）；站内统计区间、多岗对比、岗位详情页入口改线均属 M2，本轮未做。
+- **待办（不阻塞代码合并）**：1080×1920 竖屏浏览器 analyze→四段结果→打印全链路走查（需真实 API + 已诊断简历；本会话跨 worktree 无法起 preview，故以 `tsc -b` + 生产构建替代静态验证）；真实 key LLM 联调（与 job-fit/career-plan 同为共用 `resume_optimize` 槽，无独立连通脚本）。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |
