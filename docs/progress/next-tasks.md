@@ -74,7 +74,7 @@
 依据 `docs/reviews/engineering-scale-normalization-backlog.md`(2026-07-02,分支 `codex/normalize-structure-closure`)。每项实拆单独开卡 + 单独 worktree + 行为保持 + verify 门禁 + 双模型 review;🔴 项须等对应在途任务合入 `main` 后再排。
 
 - [x] **T1 拆分 backlog**:只读审计 8 个超阈值文件,产出拆分清单(方向 / 冲突风险 / 排期 / verify 覆盖),零源码改动。
-- [x] **X1 + N2/N4:Admin 前端去重 + 拆分**(🟡):已完成(2026-07-02,commits `77831eaf`/`7da28a51`/`fa9ecdbe`)。共享 UI 原子收敛到 `apps/admin/src/components/form/`;`fairs/index.tsx` 1349→207、`companies/index.tsx` 1116→192,大 Tab / Drawer 拆到各自 `components/`(+ `shared.ts` 承载共享常量/工具/表单逻辑)。行为/视觉零变化;typecheck + build(prod env)+ lint 全绿,Vite dev 全模块转换 200。**待补:1080×1920 浏览器人工点选走查 + 双模型 review。**
+- [x] **X1 + N2/N4:Admin 前端去重 + 拆分**(🟡):已完成(2026-07-02,commits `77831eaf`/`7da28a51`/`fa9ecdbe`)。共享 UI 原子收敛到 `apps/admin/src/components/form/`;`fairs/index.tsx` 1349→207、`companies/index.tsx` 1116→192,大 Tab / Drawer 拆到各自 `components/`(+ `shared.ts` 承载共享常量/工具/表单逻辑)。行为/视觉零变化;typecheck + build(prod env)+ lint 全绿,Vite dev 全模块转换 200;双模型 review 已过(antigravity 前端 APPROVE 100/100,零 Critical/Warning)。**待补:1080×1920 浏览器人工点选走查。**
 - [ ] **N5 / N6:后端服务拆分**(🟡):`materials.service.ts`(850)抽检查处理管线;`admin-fairs.service.ts`(811)抽公司·展区 / 物料·导览子服务;跑对应 `verify-*` + SQLite / PG readiness。
 - [ ] **N1 / N3:核心大文件拆分**(🔴,阻塞待解):`jobs.service.ts`(2316)按公开读取 / 审核 / Partner 导入 / Excel 引擎拆分;`terminals.service.ts`(1182)按 Agent 运行时 / 校验 / Admin 管理拆分。**须等 toolbox / terminal-device 合入 `main` 后**再排;terminals verify 覆盖薄,须补跨机 E2E。
 
