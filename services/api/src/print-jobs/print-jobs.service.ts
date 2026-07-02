@@ -15,8 +15,51 @@ export interface PrintJobStatusResult {
   taskId:        string
   status:        string
   errorCode?:    string
+  /**
+   * 兼容字段：旧调用方仍读 `errorMessage`。这里只回**安全用户文案**
+   * （与 failureReasonForUser 一致），**绝不**返回 Terminal Agent 原始 errorMessage
+   * （可能含设备路径、驱动异常、内部堆栈、主机名等排障细节）。
+   */
   errorMessage?: string
+  /** 面向本人的安全中文失败原因；仅在任务失败时给出。 */
+  failureReasonForUser?: string
   completedAt?:  string
+}
+
+/**
+ * 失败错误码 → 面向用户的安全中文文案白名单。
+ *
+ * 用户端只应看到「能做什么 / 找谁处理」的可操作提示，
+ * 不得看到 Agent 原始 errorMessage（设备路径 / 驱动异常 / 内部堆栈 / 主机信息）。
+ * DB 仍保留原始 errorCode/errorMessage 供后台排障（见 getStatus 注释）。
+ */
+const USER_FAILURE_REASONS: Record<string, string> = {
+  DOWNLOAD_HASH_MISMATCH: '文件校验未通过，请返回重新上传后再打印',
+  PRINTER_NOT_FOUND:      '未找到打印机，请联系工作人员检查打印机连接',
+  PRINTER_OFFLINE:        '打印机离线，请联系工作人员检查设备',
+  PAPER_EMPTY:            '打印机缺纸，请联系工作人员补纸',
+  PRINTER_ERROR:          '打印机可能卡纸或发生设备故障，请联系工作人员处理',
+  PRINT_JOB_UNCONFIRMED:  '打印作业未确认完成，请工作人员检查出纸状态',
+  PRINT_TIMEOUT:          '打印超时，请稍后重试',
+  PRINT_COMMAND_FAILED:   '打印执行失败，请稍后重试或联系工作人员',
+  UNSUPPORTED_FILE_TYPE:  '该文件格式暂不支持打印，请上传 PDF 或图片',
+  FILE_NOT_FOUND:         '打印文件已失效，请返回重新上传',
+}
+
+/** 未知错误码 / 仅有原始 errorMessage 时的统一安全兜底文案。 */
+const DEFAULT_USER_FAILURE_REASON = '打印任务失败，请联系工作人员处理或稍后重试'
+
+/**
+ * 纯函数：把内部 errorCode 映射为面向用户的安全中文失败原因。
+ *
+ * 只按**白名单错误码**返回可操作文案；未知错误码或缺失 errorCode → 统一兜底文案。
+ * 永不拼接原始 errorMessage —— 杜绝把 Agent 排障细节透出到用户端。
+ */
+export function failureReasonForUser(errorCode?: string | null): string {
+  if (errorCode && Object.prototype.hasOwnProperty.call(USER_FAILURE_REASONS, errorCode)) {
+    return USER_FAILURE_REASONS[errorCode]
+  }
+  return DEFAULT_USER_FAILURE_REASON
 }
 
 // Default params matching the shared PrintJobParams shape.
@@ -218,11 +261,19 @@ export class PrintJobsService {
         error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
       })
     }
+    // 失败判定：终态 failed，或已落库 errorCode/errorMessage（Agent 回传过失败信息）。
+    // DB 里的原始 task.errorCode / task.errorMessage 保持不动，供后台/排障视图使用；
+    // 用户端只回**安全用户文案**，绝不把 Agent 原始 errorMessage 透出。
+    const hasFailure = task.status === 'failed' || Boolean(task.errorCode) || Boolean(task.errorMessage)
+    const safeReason = hasFailure ? failureReasonForUser(task.errorCode) : undefined
     return {
       taskId:       task.id,
       status:       task.status,
-      errorCode:    task.errorCode    ?? undefined,
-      errorMessage: task.errorMessage ?? undefined,
+      // errorCode 是内部机器码（如 PRINTER_OFFLINE），非排障细节，保留给前端本地映射兜底。
+      errorCode:    task.errorCode ?? undefined,
+      // 兼容字段：只回安全用户文案，不回 task.errorMessage 原文。
+      errorMessage: safeReason,
+      failureReasonForUser: safeReason,
       completedAt:  task.completedAt?.toISOString(),
     }
   }

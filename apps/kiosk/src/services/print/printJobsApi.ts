@@ -38,7 +38,13 @@ export interface PrintJobStatusResult {
   taskId:        string
   status:        BackendJobStatus
   errorCode?:    string
+  /**
+   * 后端已收口为**安全用户文案**（不再是 Agent 原始错误）。展示失败原因时优先用
+   * `failureReasonForUser`，本字段仅作兼容保留，不应直接透出。
+   */
   errorMessage?: string
+  /** 后端下发的安全中文失败原因（仅失败时有值）。前台展示失败原因的首选来源。 */
+  failureReasonForUser?: string
   completedAt?:  string
 }
 

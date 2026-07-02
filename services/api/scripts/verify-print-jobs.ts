@@ -202,6 +202,113 @@ async function main() {
       'PRINT_TASK_NOT_FOUND',
       '6. 查询不存在任务 → 404 PRINT_TASK_NOT_FOUND',
     )
+
+    // ── 7. 失败原因安全口径（不泄露 Agent 原始 errorMessage）────────────
+    // 前置：终端仍 online（section 3 已恢复），失败任务能被本终端 claim。
+
+    // Agent 回传含敏感路径 / 驱动 / 主机名 / 内部堆栈的原始 errorMessage。
+    const RAW_SENSITIVE_MESSAGE =
+      'TWAIN driver fault 0x8007000E at C:\\Windows\\System32\\spool\\drivers\\x64\\3\\PANTUM.DLL ' +
+      'on host KIOSK-PC-01\n    at PrintSpooler.dispatch (spooler.cpp:1423)\n    at Agent.run (agent.ts:88)'
+    const SENSITIVE_FRAGMENTS = [
+      'C:\\', 'spool', 'PANTUM.DLL', 'KIOSK-PC-01', '0x8007', 'spooler.cpp', 'agent.ts',
+    ]
+
+    // 复用 helper：创建 → backdate → claim → 回传 failed（含原始敏感 errorMessage）。
+    async function createClaimAndFail(
+      label: string,
+      backdateIso: string,
+      errorCode: string | undefined,
+      errorMessage: string,
+    ): Promise<string> {
+      const dto: CreatePrintJobDto = {
+        fileUrl:  signFileUrl(fileId, 30 * 60 * 1000).url,
+        fileMd5:  'sha256-vpj-fail',
+        fileName: `${label}.pdf`,
+      }
+      const failCreated = await printJobs.create(dto, { terminalId })
+      createdTaskIds.push(failCreated.taskId)
+      await prisma.printTask.update({
+        where: { id: failCreated.taskId },
+        data:  { createdAt: new Date(backdateIso) },
+      })
+      const claim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+      if (claim.length !== 1 || claim[0].taskId !== failCreated.taskId) {
+        fail(`7 预备(${label}) — 失败任务未被本终端 claim: ${JSON.stringify(claim.map((c) => c.taskId))}`)
+      }
+      await terminals.patchTaskStatus(
+        failCreated.taskId,
+        { status: 'failed', ...(errorCode ? { errorCode } : {}), errorMessage },
+        `Bearer ${agentToken}`,
+        terminalId,
+      )
+      return failCreated.taskId
+    }
+
+    // 7a/7b/7c/7d：已知错误码（白名单）+ 敏感原始 errorMessage。
+    const knownFailId = await createClaimAndFail('失败任务-已知码', '2019-01-01T00:00:00.000Z', 'PRINTER_OFFLINE', RAW_SENSITIVE_MESSAGE)
+
+    // DB 仍完整保留 Agent 原始 errorCode/errorMessage（后台排障可用）。
+    const dbFail = await prisma.printTask.findUnique({ where: { id: knownFailId } })
+    if (dbFail?.status === 'failed' && dbFail.errorCode === 'PRINTER_OFFLINE' && dbFail.errorMessage === RAW_SENSITIVE_MESSAGE) {
+      pass('7a. DB 仍完整保存 Agent 原始 errorCode/errorMessage（后台排障可用）')
+    } else {
+      fail(`7a. DB 未保留原始错误: ${JSON.stringify({ status: dbFail?.status, errorCode: dbFail?.errorCode, errorMessage: dbFail?.errorMessage })}`)
+    }
+
+    // getStatus() 只回白名单安全文案。
+    const userView = await printJobs.getStatus(knownFailId)
+    const safeExpected = '打印机离线，请联系工作人员检查设备'
+    if (userView.failureReasonForUser === safeExpected && userView.errorMessage === safeExpected) {
+      pass('7b. getStatus 已知错误码 → failureReasonForUser/errorMessage 均为白名单安全文案')
+    } else {
+      fail(`7b. 安全文案异常: ${JSON.stringify({ failureReasonForUser: userView.failureReasonForUser, errorMessage: userView.errorMessage })}`)
+    }
+
+    // 关键断言：用户视图**任何字段**都不得包含 Agent 原始敏感片段。
+    const userBlob = JSON.stringify(userView)
+    const leaked = SENSITIVE_FRAGMENTS.filter((frag) => userBlob.includes(frag))
+    if (leaked.length === 0) {
+      pass('7c. getStatus 返回体不含任何 Agent 原始敏感片段（路径/驱动/主机/堆栈）')
+    } else {
+      fail(`7c. 检测到敏感信息泄露: ${leaked.join(', ')} ; blob=${userBlob}`)
+    }
+
+    // errorCode 仍下发（供前端本地映射兜底）。
+    if (userView.errorCode === 'PRINTER_OFFLINE') pass('7d. getStatus 仍返回 errorCode（前端本地映射兜底用）')
+    else fail(`7d. errorCode 未返回: ${userView.errorCode}`)
+
+    // 7e：未知错误码 → 统一默认安全文案，且不泄露原始敏感信息。
+    const unknownFailId = await createClaimAndFail('失败任务-未知码', '2019-01-02T00:00:00.000Z', 'INTERNAL_SEGFAULT_0x1234', RAW_SENSITIVE_MESSAGE)
+    const userView2 = await printJobs.getStatus(unknownFailId)
+    const defaultExpected = '打印任务失败，请联系工作人员处理或稍后重试'
+    const leaked2 = SENSITIVE_FRAGMENTS.filter((frag) => JSON.stringify(userView2).includes(frag))
+    if (userView2.failureReasonForUser === defaultExpected && userView2.errorMessage === defaultExpected && leaked2.length === 0) {
+      pass('7e. 未知错误码 → 默认安全兜底文案，且不泄露原始敏感信息')
+    } else {
+      fail(`7e. 未知错误码兜底异常: ${JSON.stringify({ failureReasonForUser: userView2.failureReasonForUser, errorMessage: userView2.errorMessage, leaked2 })}`)
+    }
+
+    // 7f/7g：完全无 errorCode，Agent 只回原始 errorMessage（最易泄露的场景——
+    // 失败判定只能靠 errorMessage 命中，且映射函数拿不到任何 errorCode）。
+    const noCodeFailId = await createClaimAndFail('失败任务-仅原始文本', '2019-01-03T00:00:00.000Z', undefined, RAW_SENSITIVE_MESSAGE)
+
+    // DB 仍完整保存原始 errorMessage；errorCode 落库为空。
+    const dbNoCode = await prisma.printTask.findUnique({ where: { id: noCodeFailId } })
+    if (dbNoCode?.status === 'failed' && dbNoCode.errorMessage === RAW_SENSITIVE_MESSAGE && !dbNoCode.errorCode) {
+      pass('7f. 仅原始 errorMessage（无 errorCode）→ DB 仍完整保存原文，errorCode 为空')
+    } else {
+      fail(`7f. DB 状态异常: ${JSON.stringify({ status: dbNoCode?.status, errorCode: dbNoCode?.errorCode, errorMessage: dbNoCode?.errorMessage })}`)
+    }
+
+    // getStatus() 无 errorCode 可映射 → 统一默认安全文案，且不泄露原始敏感信息。
+    const userView3 = await printJobs.getStatus(noCodeFailId)
+    const leaked3 = SENSITIVE_FRAGMENTS.filter((frag) => JSON.stringify(userView3).includes(frag))
+    if (userView3.failureReasonForUser === defaultExpected && userView3.errorMessage === defaultExpected && leaked3.length === 0) {
+      pass('7g. 仅原始 errorMessage（无 errorCode）→ getStatus 回默认安全文案，failureReasonForUser/errorMessage 一致且不泄露原文')
+    } else {
+      fail(`7g. 仅原始 errorMessage 兜底异常: ${JSON.stringify({ failureReasonForUser: userView3.failureReasonForUser, errorMessage: userView3.errorMessage, leaked3 })}`)
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
