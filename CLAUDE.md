@@ -772,9 +772,9 @@ Windows Terminal Agent 后续单独开发（第 8 阶段），须遵守：
 - [x] ImportBatch / ImportRecord / FieldMappingRule / MappingValidationError 类型定义
 - [x] 合作机构后台数据源管理页面（Phase 6 P0）
 - [x] 同步日志展示（Phase 6 P0）
-- [ ] Excel 导入 + 字段映射 UI（Phase 6 P1）
-- [ ] 字段映射引擎（服务端）
-- [ ] 管理员后台审核页面
+- [x] Excel 导入 + 字段映射 UI（Phase 6 P1）：Partner `apps/partner/src/routes/sources/ExcelImportModal.tsx` 上传→字段映射→预览→确认四步，含上次映射规则自动回填
+- [x] 字段映射引擎（服务端）：`services/api/src/jobs/jobs.service.ts` 的 `previewExcelImport` / `confirmExcelImport` / `getMappingRule` / `saveMappingRule` + `FieldMappingRule` 模型，端点 `POST /partner/excel/preview`、`POST /partner/excel/confirm`、`GET /partner/excel/mapping-rule`
+- [x] 管理员后台审核页面：Admin `apps/admin/src/routes/{job-sources,fair-sources,policy-sources}/index.tsx` 支持 pending/reviewing/approved/rejected 筛选与审核通过 / 发布动作
 
 ## 19. 重要提醒
 

@@ -322,10 +322,10 @@ interface ImportRecord {
 | P0 | `packages/shared` 类型定义（全量） | ✅ 完成 |
 | P0 | Partner 数据源管理页面（UI） | ✅ 完成 |
 | P0 | Partner 同步日志页面（UI） | ✅ 完成 |
-| P1 | Excel 导入 + 字段映射 UI | 待开发 |
-| P1 | 字段映射引擎（服务端） | 待开发 |
-| P1 | Admin 审核页面（UI） | 待开发 |
-| P2 | API 数据源接入（OAuth2 / api_key） | 待开发 |
-| P2 | 定时同步任务 | 待开发 |
-| P2 | Webhook 实时推送接入 | 待开发 |
+| P1 | Excel 导入 + 字段映射 UI | ✅ 完成（Partner `ExcelImportModal`：上传 / 字段映射 / 预览 / 确认，含上次规则回填） |
+| P1 | 字段映射引擎（服务端） | ✅ 完成（`jobs.service` `previewExcelImport` / `confirmExcelImport` / `getMappingRule` / `saveMappingRule` + `FieldMappingRule` 模型） |
+| P1 | Admin 审核页面（UI） | ✅ 完成（Admin `job-sources` / `fair-sources` / `policy-sources`：pending→reviewing→approved / rejected + 发布动作） |
+| P2 | API 数据源接入（OAuth2 / api_key） | ⚠️ 部分完成（`job-sync.service.fetchJson` 支持 `bearer` / `api_key` / `basic`；`oauth2` 仍未接） |
+| P2 | 定时同步任务 | ✅ 完成（`job-sync.scheduler` `@Cron('0 */30 * * * *')` 按 `syncFreq` 入队到期 API 源，无 Redis 时内联执行） |
+| P2 | Webhook 实时推送接入 | ✅ 完成（`sync.controller` `POST /api/v1/sync/webhook`：HMAC 验签 + 时间窗 + nonce 防重放 + 字段白名单） |
 | P3 | 第三方聚合平台预置适配器 | 待开发 |
