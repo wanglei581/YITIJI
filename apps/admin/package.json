@@ -12,6 +12,8 @@
     "verify:admin-orders-readonly-ui": "node scripts/verify-admin-orders-readonly-ui.mjs",
     "verify:refresh-safe": "node scripts/verify-refresh-safe.mjs",
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
+    "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",
+    "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "preview": "vite preview --port 5174"
   },
   "dependencies": {

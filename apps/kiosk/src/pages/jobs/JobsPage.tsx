@@ -1,130 +1,89 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJobDTO } from '@ai-job-print/shared'
-import {
-  BriefcaseIcon,
-  Building2Icon,
-  BuildingIcon,
-  ChevronRightIcon,
-  ClockIcon,
-  LayersIcon,
-  MapPinIcon,
-  RotateCcwIcon,
-  SearchIcon,
-  StarIcon,
-} from 'lucide-react'
+import { Button, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
 import { getJobs } from '../../services/api'
+import {
+  getJobAiConsentStatus,
+  getJobAiRecommendations,
+  grantJobAiConsent,
+} from '../../services/api/jobAi'
+import { ApiHttpError } from '../../services/api/httpAdapter'
+import { useAuth } from '../../auth/useAuth'
 import { useFavorites } from '../../favorites/useFavorites'
+import { JobAiConsentModal } from './components/JobAiConsentModal'
+import { JobAiEntryPanel } from './components/JobAiEntryPanel'
+import { JobAiResultPanel } from './components/JobAiResultPanel'
+import { ResumeSelectModal } from './components/ResumeSelectModal'
+import {
+  DataReadinessPanel,
+  JobBusinessNote,
+  JobOverviewPanel,
+  SourceInstitutionPanel,
+  TopTagsPanel,
+  CompanyGuideEntry,
+} from './components/JobListInsights'
+import { JobFilterAssistant } from './components/JobFilterAssistant'
+import { JobResultsSection } from './components/JobResultsSection'
+import { buildJobInsights, buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
 
-// 岗位类型 chip → 后端 category 值('' = 全部)
-const TYPE_OPTIONS: { label: string; category: string }[] = [
-  { label: '全部', category: '' },
-  { label: '全职', category: 'fulltime' },
-  { label: '实习', category: 'intern' },
-  { label: '校招', category: 'campus' },
-  { label: '兼职', category: 'parttime' },
-]
-
-const CATEGORY_LABEL: Record<string, string> = {
-  fulltime: '全职',
-  intern: '实习',
-  campus: '校招',
-  parttime: '兼职',
-}
-
-const CATEGORY_STYLE: Record<string, string> = {
-  fulltime: 'bg-blue-50 text-blue-600',
-  intern: 'bg-orange-50 text-orange-600',
-  campus: 'bg-green-50 text-green-600',
-  parttime: 'bg-purple-50 text-purple-600',
-}
-
-function formatSync(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getMonth() + 1}月${d.getDate()}日更新`
-}
-
-const SELECT_CLASS =
-  'h-14 w-full rounded-lg border border-neutral-300 bg-white px-4 text-base text-neutral-800 ' +
-  'focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
-
-interface SourceCard {
-  orgId: string
-  name: string
-  jobCount: number
-  lastUpdate: string
-}
-
-/** 按 sourceOrgId 聚合（来源机构卡片），按岗位数量降序 */
-function buildSourceCards(jobs: ExternalJobDTO[]): SourceCard[] {
-  const map = new Map<string, SourceCard>()
-  for (const job of jobs) {
-    const existing = map.get(job.sourceOrgId)
-    if (existing) {
-      existing.jobCount += 1
-      if (job.syncTime > existing.lastUpdate) existing.lastUpdate = job.syncTime
-    } else {
-      map.set(job.sourceOrgId, {
-        orgId: job.sourceOrgId,
-        name: job.sourceName,
-        jobCount: 1,
-        lastUpdate: job.syncTime,
-      })
-    }
-  }
-  return [...map.values()].sort((a, b) => b.jobCount - a.jobCount)
-}
-
-/** 从全量数据聚合去重的下拉选项（城市 / 行业），按字典序 */
-function uniqueSorted(values: (string | undefined)[]): string[] {
-  return [...new Set(values.filter((v): v is string => !!v))].sort((a, b) => a.localeCompare(b, 'zh'))
-}
-
-// 首页岗位分类瓦片深链支持：/jobs?category=fulltime|intern|campus|parttime（值须在 TYPE_OPTIONS 内）。
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
 export function JobsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const categoryParam = searchParams.get('category')
+  const sourceOrgIdParam = searchParams.get('sourceOrgId')?.trim() ?? ''
+  const { getToken } = useAuth()
   const { idsOf, toggle: toggleFavorite } = useFavorites()
   const favoriteSet = idsOf('job')
 
-  // facet 集合：全量已发布岗位，用于构建筛选项 + 来源机构卡片（不随筛选变化）
   const [facetJobs, setFacetJobs] = useState<ExternalJobDTO[]>([])
-  // 列表集合：按当前筛选条件向后端查询的结果
   const [listJobs, setListJobs] = useState<ExternalJobDTO[]>([])
+  const [facetTotal, setFacetTotal] = useState(0)
+  const [listTotal, setListTotal] = useState(0)
   const [facetLoading, setFacetLoading] = useState(true)
   const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
 
-  // 筛选状态
   const [keyword, setKeyword] = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
   const [city, setCity] = useState('')
   const [industry, setIndustry] = useState('')
   const [category, setCategory] = useState(() => {
-    const c = searchParams.get('category')
-    return c && VALID_CATEGORIES.has(c) ? c : ''
+    return categoryParam && VALID_CATEGORIES.has(categoryParam) ? categoryParam : ''
   })
-  const [sourceOrgId, setSourceOrgId] = useState('')
+  const [sourceOrgId, setSourceOrgId] = useState(() => sourceOrgIdParam)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [showConsent, setShowConsent] = useState(false)
+  const [showResumeSelect, setShowResumeSelect] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiRecommendations, setAiRecommendations] = useState<JobAiRecommendationDTO[] | null>(null)
+  const mountedRef = useRef(false)
+  const aiInFlightRef = useRef(false)
 
-  // 同一路由内 search params 变化时同步首页深链筛选，非法值回退「全部」。
   useEffect(() => {
-    const c = searchParams.get('category')
-    setCategory(c && VALID_CATEGORIES.has(c) ? c : '')
-  }, [searchParams])
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
-  // 关键词去抖（300ms）
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedKeyword(keyword.trim()), 300)
-    return () => clearTimeout(t)
+    setCategory(categoryParam && VALID_CATEGORIES.has(categoryParam) ? categoryParam : '')
+  }, [categoryParam])
+
+  useEffect(() => {
+    setSourceOrgId(sourceOrgIdParam)
+  }, [sourceOrgIdParam])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedKeyword(keyword.trim()), 300)
+    return () => clearTimeout(timer)
   }, [keyword])
 
-  // facet 拉取（挂载 + 重试）：一次拉全量已发布岗位
   useEffect(() => {
     let cancelled = false
     setFacetLoading(true)
@@ -133,6 +92,7 @@ export function JobsPage() {
       .then((res) => {
         if (cancelled) return
         setFacetJobs(res.data)
+        setFacetTotal(res.pagination.total)
         setFacetLoading(false)
       })
       .catch(() => {
@@ -147,14 +107,15 @@ export function JobsPage() {
 
   const hasServerFilter = !!(debouncedKeyword || city || industry || category || sourceOrgId)
 
-  // 列表拉取：有任一服务端筛选 → 走后端真实查询；否则复用 facet 全量
   useEffect(() => {
     if (facetLoading) return
     if (!hasServerFilter) {
       setListJobs(facetJobs)
+      setListTotal(facetTotal)
       setListLoading(false)
       return
     }
+
     let cancelled = false
     setListLoading(true)
     getJobs({
@@ -168,6 +129,7 @@ export function JobsPage() {
       .then((res) => {
         if (cancelled) return
         setListJobs(res.data)
+        setListTotal(res.pagination.total)
         setListLoading(false)
       })
       .catch(() => {
@@ -178,17 +140,24 @@ export function JobsPage() {
     return () => {
       cancelled = true
     }
-  }, [facetLoading, facetJobs, hasServerFilter, debouncedKeyword, city, industry, category, sourceOrgId])
+  }, [facetLoading, facetJobs, facetTotal, hasServerFilter, debouncedKeyword, city, industry, category, sourceOrgId])
 
-  const cityOptions = useMemo(() => uniqueSorted(facetJobs.map((j) => j.city)), [facetJobs])
-  const industryOptions = useMemo(() => uniqueSorted(facetJobs.map((j) => j.industry)), [facetJobs])
+  const cityOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.city)), [facetJobs])
+  const industryOptions = useMemo(() => uniqueSorted(facetJobs.map((job) => job.industry)), [facetJobs])
   const sourceCards = useMemo(() => buildSourceCards(facetJobs), [facetJobs])
+  const topTags = useMemo(() => buildTopTags(facetJobs), [facetJobs])
 
-  // 收藏过滤（登录态来自服务端、匿名来自本机；叠加在后端列表结果之上）
-  const displayed = useMemo(
-    () => (favoritesOnly ? listJobs.filter((j) => favoriteSet.has(j.id)) : listJobs),
+  const displayedJobs = useMemo(
+    () => (favoritesOnly ? listJobs.filter((job) => favoriteSet.has(job.id)) : listJobs),
     [listJobs, favoritesOnly, favoriteSet],
   )
+
+  const insightJobs = hasServerFilter ? listJobs : facetJobs
+  const insightTotal = hasServerFilter ? listTotal : facetTotal
+  const insights = useMemo(() => buildJobInsights(insightJobs, insightTotal), [insightJobs, insightTotal])
+  const activeSourceName = sourceCards.find((source) => source.orgId === sourceOrgId)?.name ?? (sourceOrgId ? '指定来源机构' : undefined)
+  const hasAnyFilter = hasServerFilter || favoritesOnly
+  const aiRecommendationMode = aiRecommendations !== null
 
   function resetAll() {
     setKeyword('')
@@ -200,16 +169,124 @@ export function JobsPage() {
     setFavoritesOnly(false)
   }
 
-  const activeSourceName = sourceCards.find((s) => s.orgId === sourceOrgId)?.name
-  const hasAnyFilter = hasServerFilter || favoritesOnly
+  function selectTag(tag: string) {
+    if (industryOptions.includes(tag)) {
+      setIndustry(tag)
+      return
+    }
+    setKeyword(tag)
+  }
+
+  function requireToken(): string | null {
+    const token = getToken()
+    if (!token) {
+      navigate('/login', { state: { from: '/jobs' } })
+      return null
+    }
+    return token
+  }
+
+  async function startAiRecommend() {
+    if (aiInFlightRef.current || aiLoading) return
+    const token = requireToken()
+    if (!token) return
+    aiInFlightRef.current = true
+    setAiError(null)
+    try {
+      const rows = await getJobAiConsentStatus(token)
+      if (!mountedRef.current) return
+      if (rows.some((row) => row.scope === 'job_ai' && row.granted)) setShowResumeSelect(true)
+      else setShowConsent(true)
+    } catch (err) {
+      if (!mountedRef.current) return
+      setAiError(formatJobAiError(err))
+    } finally {
+      aiInFlightRef.current = false
+    }
+  }
+
+  async function confirmConsent() {
+    if (aiInFlightRef.current || aiLoading) return
+    const token = requireToken()
+    if (!token) return
+    aiInFlightRef.current = true
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      await grantJobAiConsent(token)
+      if (!mountedRef.current) return
+      setShowConsent(false)
+      setShowResumeSelect(true)
+    } catch (err) {
+      if (!mountedRef.current) return
+      setAiError(formatJobAiError(err))
+    } finally {
+      aiInFlightRef.current = false
+      if (mountedRef.current) setAiLoading(false)
+    }
+  }
+
+  async function runAiRecommend(resume: MemberResumeItem) {
+    if (aiInFlightRef.current || aiLoading) return
+    const token = requireToken()
+    if (!token) return
+    aiInFlightRef.current = true
+    setShowResumeSelect(false)
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await getJobAiRecommendations(token, {
+        resumeTaskId: resume.taskId,
+        intent: {
+          targetTitle: debouncedKeyword || undefined,
+          city: city || undefined,
+          industry: industry || undefined,
+          keywords: topTags.slice(0, 4).map((tag) => tag.label),
+        },
+        filters: {
+          city: city || undefined,
+          category: category || undefined,
+          sourceOrgId: sourceOrgId || undefined,
+        },
+        limit: 6,
+      })
+      if (!mountedRef.current) return
+      setAiRecommendations(res.recommendations)
+    } catch (err) {
+      if (!mountedRef.current) return
+      if (err instanceof ApiHttpError && err.code === 'USER_AI_CONSENT_REQUIRED') setShowConsent(true)
+      setAiError(formatJobAiError(err))
+    } finally {
+      aiInFlightRef.current = false
+      if (mountedRef.current) setAiLoading(false)
+    }
+  }
+
+  function clearAiRecommendations() {
+    setAiRecommendations(null)
+    setAiError(null)
+  }
 
   return (
     <div className="flex h-full flex-col">
-      {/* ── 顶部 ─────────────────────────────────────────── */}
+      <JobAiConsentModal
+        open={showConsent}
+        loading={aiLoading}
+        error={showConsent ? aiError : null}
+        onConfirm={() => void confirmConsent()}
+        onCancel={() => setShowConsent(false)}
+      />
+      <ResumeSelectModal
+        open={showResumeSelect}
+        token={getToken()}
+        onClose={() => setShowResumeSelect(false)}
+        onSelect={(resume) => void runAiRecommend(resume)}
+        onUpload={() => navigate('/resume/source?intent=diagnose')}
+      />
       <div className="px-6 pt-6">
         <PageHeader
           title="岗位信息"
-          subtitle="来源：第三方平台 · 官方机构"
+          subtitle="第三方 / 官方来源岗位入口"
           actions={
             <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
               返回首页
@@ -217,294 +294,81 @@ export function JobsPage() {
           }
         />
         <p className="mt-3 text-xs leading-relaxed text-neutral-400">
-          本系统仅展示第三方/官方来源岗位信息，不接收简历、不参与招聘流程，请前往来源平台办理
+          本系统仅展示客户接入并经审核发布的岗位信息，不接收简历、不参与招聘流程，请前往来源平台办理。
         </p>
       </div>
 
-      {/* ── 主体：可滚动 ─────────────────────────────────── */}
       <div className="mt-4 flex flex-1 flex-col gap-6 overflow-y-auto px-6 pb-8">
         {facetLoading ? (
           <LoadingState className="flex-1" />
         ) : error ? (
-          <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
+          <ErrorState message={error} onRetry={() => setRetryKey((key) => key + 1)} className="flex-1" />
         ) : (
           <>
-            {/* ── 筛选栏 ─────────────────────────────────── */}
-            <Card padding="none" className="p-5">
-              {/* 关键词搜索 */}
-              <div className="relative">
-                <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="text"
-                  inputMode="search"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="搜索职位名称、公司或岗位描述"
-                  aria-label="关键词搜索"
-                  className="h-14 w-full rounded-lg border border-neutral-300 bg-white pl-12 pr-4 text-base text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-                />
-              </div>
+            <JobAiEntryPanel
+              title="AI岗位推荐"
+              clearLabel="退出 AI 推荐"
+              loading={aiLoading}
+              hasResult={Boolean(aiRecommendations || aiError)}
+              onStart={() => void startAiRecommend()}
+              onClear={clearAiRecommendations}
+            />
 
-              {/* 城市 + 行业 + 重置 */}
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <select
-                  aria-label="选择城市"
-                  className={SELECT_CLASS}
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                >
-                  <option value="">全部城市</option>
-                  {cityOptions.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+            <JobOverviewPanel insights={insights} displayedCount={displayedJobs.length} />
 
-                <select
-                  aria-label="选择行业"
-                  className={SELECT_CLASS}
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                >
-                  <option value="">全部行业</option>
-                  {industryOptions.map((ind) => (
-                    <option key={ind} value={ind}>
-                      {ind}
-                    </option>
-                  ))}
-                </select>
-
-                <Button size="lg" variant="secondary" className="h-14 w-full" onClick={resetAll}>
-                  <RotateCcwIcon className="mr-2 h-4 w-4" />
-                  重置筛选
-                </Button>
-              </div>
-
-              {/* 岗位类型 */}
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="mr-1 text-sm text-neutral-500">岗位类型</span>
-                {TYPE_OPTIONS.map((opt) => {
-                  const active = category === opt.category
-                  return (
-                    <button
-                      key={opt.label}
-                      onClick={() => setCategory(opt.category)}
-                      className={[
-                        'flex min-h-[48px] shrink-0 items-center rounded-full px-5 text-sm font-medium transition-colors',
-                        active
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-                      ].join(' ')}
-                    >
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* 已应用筛选 + 收藏切换 */}
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-neutral-100 pt-4">
-                <button
-                  onClick={() => setFavoritesOnly((v) => !v)}
-                  aria-pressed={favoritesOnly}
-                  className={[
-                    'flex min-h-[40px] items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
-                    favoritesOnly
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-                  ].join(' ')}
-                >
-                  <StarIcon className={`h-4 w-4 ${favoritesOnly ? 'fill-white' : ''}`} />
-                  只看收藏
-                  {favoriteSet.size > 0 && <span>({favoriteSet.size})</span>}
-                </button>
-
-                {city && <FilterChip text={city} />}
-                {industry && <FilterChip text={industry} />}
-                {category && <FilterChip text={CATEGORY_LABEL[category] ?? category} />}
-                {activeSourceName && <FilterChip text={activeSourceName} />}
-                {debouncedKeyword && <FilterChip text={`“${debouncedKeyword}”`} />}
-
-                {hasAnyFilter && (
-                  <button
-                    onClick={resetAll}
-                    className="ml-auto flex items-center gap-1 text-xs font-medium text-neutral-500 hover:text-neutral-700"
-                  >
-                    <RotateCcwIcon className="h-3.5 w-3.5" />
-                    清空
-                  </button>
-                )}
-              </div>
-            </Card>
-
-            {/* ── 找企业 / 企业展示入口（来源企业导览;兼职页不突出企业专区）── */}
-            {category !== 'parttime' && (
-              <button
-                type="button"
-                onClick={() => navigate('/companies')}
-                className="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/60 px-5 text-left transition-colors hover:bg-primary-100/60 active:bg-primary-100"
-              >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white">
-                  <Building2Icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-semibold text-gray-900">找企业 · 企业展示</span>
-                  <span className="mt-0.5 block text-xs text-gray-500">按地区 / 类型 / 行业浏览来源企业与岗位，本系统不接收简历</span>
-                </span>
-                <ChevronRightIcon className="h-5 w-5 shrink-0 text-primary-400" aria-hidden="true" />
-              </button>
+            {(aiLoading || aiError || aiRecommendations) && (
+              <JobAiResultPanel
+                title="AI岗位推荐"
+                loading={aiLoading}
+                error={aiError}
+                recommendations={aiRecommendations ?? undefined}
+                clearLabel="退出 AI 推荐"
+                onRetry={() => void startAiRecommend()}
+                onClear={clearAiRecommendations}
+                onOpenRecommendation={(jobId) => navigate(`/jobs/${jobId}`)}
+              />
             )}
 
-            {/* ── 本地信息来源 ───────────────────────────── */}
-            <section>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <LayersIcon className="h-5 w-5 text-primary-600" />
-                  <h2 className="text-base font-semibold text-neutral-900">信息来源机构</h2>
-                </div>
-                {sourceOrgId && (
-                  <button
-                    onClick={() => setSourceOrgId('')}
-                    className="text-xs font-medium text-primary-600 hover:text-primary-700"
-                  >
-                    查看全部来源
-                  </button>
-                )}
-              </div>
+            <JobFilterAssistant
+              keyword={keyword}
+              city={city}
+              industry={industry}
+              category={category}
+              favoritesOnly={favoritesOnly}
+              cityOptions={cityOptions}
+              industryOptions={industryOptions}
+              favoriteCount={favoriteSet.size}
+              activeSourceName={activeSourceName}
+              debouncedKeyword={debouncedKeyword}
+              hasAnyFilter={hasAnyFilter}
+              onKeywordChange={setKeyword}
+              onCityChange={setCity}
+              onIndustryChange={setIndustry}
+              onCategoryChange={setCategory}
+              onToggleFavorites={() => setFavoritesOnly((value) => !value)}
+              onReset={resetAll}
+            />
 
-              {sourceCards.length === 0 ? (
-                <Card padding="none" className="p-5 text-sm text-neutral-400">
-                  暂无来源机构
-                </Card>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {sourceCards.map((src) => {
-                    const active = sourceOrgId === src.orgId
-                    return (
-                      <button
-                        key={src.orgId}
-                        onClick={() => setSourceOrgId(active ? '' : src.orgId)}
-                        aria-pressed={active}
-                        className={[
-                          'flex min-h-[110px] flex-col rounded-lg border bg-surface p-4 text-left transition-colors',
-                          active
-                            ? 'border-primary-500 ring-2 ring-primary-100'
-                            : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30',
-                        ].join(' ')}
-                      >
-                        <p className="line-clamp-2 text-sm font-semibold text-neutral-900">{src.name}</p>
-                        <div className="mt-auto flex items-end justify-between pt-2">
-                          <span className="text-sm font-semibold text-primary-600">
-                            {src.jobCount}
-                            <span className="ml-0.5 text-xs font-normal text-neutral-400">个岗位</span>
-                          </span>
-                          <span className="text-[11px] text-neutral-400">{formatSync(src.lastUpdate)}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
+            <JobBusinessNote />
 
-            {/* ── 岗位列表 ───────────────────────────────── */}
-            <section>
-              <div className="mb-3 flex items-center gap-2">
-                <BriefcaseIcon className="h-5 w-5 text-primary-600" />
-                <h2 className="text-base font-semibold text-neutral-900">
-                  {favoritesOnly ? '我的收藏' : '岗位列表'}
-                </h2>
-                <span className="text-sm text-neutral-400">共 {displayed.length} 个</span>
-                {listLoading && <span className="text-xs text-neutral-400">加载中…</span>}
-              </div>
+            {category !== 'parttime' && <CompanyGuideEntry onOpen={() => navigate('/companies')} />}
 
-              {displayed.length === 0 ? (
-                <EmptyState
-                  icon={favoritesOnly ? StarIcon : BriefcaseIcon}
-                  title={favoritesOnly ? '还没有收藏的岗位' : '暂无符合条件的岗位'}
-                  description={
-                    favoritesOnly
-                      ? '在岗位卡片上点击星标即可收藏，方便稍后查看'
-                      : '请尝试调整关键词、城市、行业、类型或来源机构'
-                  }
-                  className="py-12"
-                />
-              ) : (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                  {displayed.map((job) => {
-                    const fav = favoriteSet.has(job.id)
-                    return (
-                      <Card key={job.id} padding="none" className="flex flex-col p-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="min-w-0 flex-1 text-base font-semibold text-neutral-900">{job.title}</p>
-                          <button
-                            onClick={() => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
-                            aria-pressed={fav}
-                            aria-label={fav ? '取消收藏' : '收藏岗位'}
-                            className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 hover:bg-neutral-100"
-                          >
-                            <StarIcon
-                              className={`h-5 w-5 ${fav ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`}
-                            />
-                          </button>
-                        </div>
+            {!aiRecommendationMode && (
+              <JobResultsSection
+                jobs={displayedJobs}
+                favoritesOnly={favoritesOnly}
+                listLoading={listLoading}
+                favoriteSet={favoriteSet}
+                onToggleFavorite={(job) => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
+                onOpen={(job) => navigate(`/jobs/${job.id}`, { state: { job } })}
+              />
+            )}
 
-                        <span className="mt-1 text-sm font-semibold text-primary-600">{job.salaryDisplay}</span>
+            <SourceInstitutionPanel sources={sourceCards} activeSourceOrgId={sourceOrgId} onSelect={setSourceOrgId} />
 
-                        <div className="mt-2 flex items-center gap-1.5 text-sm text-neutral-600">
-                          <BuildingIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-                          <span className="truncate">{job.company}</span>
-                        </div>
+            <TopTagsPanel tags={topTags} onSelect={selectTag} />
 
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
-                          <span className="flex items-center gap-1">
-                            <MapPinIcon className="h-3.5 w-3.5 text-neutral-400" />
-                            {job.city}
-                          </span>
-                          {job.industry && (
-                            <span className="rounded bg-neutral-100 px-2 py-0.5 text-neutral-600">
-                              {job.industry}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                          {job.category && (
-                            <span
-                              className={`rounded px-2 py-0.5 text-xs font-medium ${CATEGORY_STYLE[job.category] ?? 'bg-neutral-100 text-neutral-500'}`}
-                            >
-                              {CATEGORY_LABEL[job.category] ?? job.category}
-                            </span>
-                          )}
-                          {job.tags.map((t) => (
-                            <span key={t} className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-
-                        <div className="mt-3 flex items-center gap-1.5 border-t border-neutral-100 pt-3 text-[11px] text-neutral-400">
-                          <span className="truncate">来源：{job.sourceName}</span>
-                          <span className="ml-auto flex shrink-0 items-center gap-1">
-                            <ClockIcon className="h-3 w-3" />
-                            {formatSync(job.syncTime)}
-                          </span>
-                        </div>
-
-                        <Button
-                          size="md"
-                          className="mt-4 w-full"
-                          onClick={() => navigate(`/jobs/${job.id}`, { state: { job } })}
-                        >
-                          查看详情
-                        </Button>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-            </section>
+            <DataReadinessPanel insights={insights} />
           </>
         )}
       </div>
@@ -512,8 +376,13 @@ export function JobsPage() {
   )
 }
 
-function FilterChip({ text }: { text: string }) {
-  return (
-    <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">{text}</span>
-  )
+function formatJobAiError(err: unknown): string {
+  if (err instanceof ApiHttpError) {
+    if (err.code === 'JOB_AI_QUOTA_EXCEEDED') return '今日 AI 辅助额度已用完，请明天再试。'
+    if (err.code === 'JOB_AI_QUOTA_UNAVAILABLE') return '岗位 AI 配额服务暂不可用，请联系现场工作人员确认服务状态。'
+    if (err.code === 'USER_AI_CONSENT_REQUIRED') return '请先确认岗位 AI 辅助授权。'
+    if (err.code === 'JOB_AI_MOCK_DISABLED') return '岗位 AI 需要连接真实后端服务后使用。'
+    return err.message
+  }
+  return err instanceof Error ? err.message : 'AI 辅助暂时不可用，请稍后重试。'
 }

@@ -1,0 +1,123 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Button, Card, EmptyState } from '@ai-job-print/ui'
+import type { MemberResumeItem } from '@ai-job-print/shared'
+import { CheckCircle2Icon, FileSearchIcon, Loader2Icon, XIcon } from 'lucide-react'
+import { getMyResumes } from '../../../services/api/memberAssets'
+
+export function ResumeSelectModal({
+  open,
+  token,
+  onClose,
+  onSelect,
+  onUpload,
+}: {
+  open: boolean
+  token: string | null
+  onClose: () => void
+  onSelect: (resume: MemberResumeItem) => void
+  onUpload: () => void
+}) {
+  const [items, setItems] = useState<MemberResumeItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !token) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    getMyResumes(token, { pageSize: 50 })
+      .then((page) => {
+        if (!cancelled) setItems(page.items)
+      })
+      .catch(() => {
+        if (!cancelled) setError('简历列表读取失败，请稍后重试')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, token])
+
+  const usable = useMemo(
+    () => items.filter((item) => item.kind === 'parse' && item.status === 'completed'),
+    [items],
+  )
+
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" role="dialog" aria-modal="true">
+      <Card className="relative flex max-h-[86vh] w-[34rem] max-w-full flex-col p-6">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="关闭"
+          className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100"
+        >
+          <XIcon className="h-5 w-5" aria-hidden="true" />
+        </button>
+
+        <h2 className="text-lg font-semibold text-gray-900">选择用于分析的简历</h2>
+        <p className="mt-1 text-sm text-gray-500">仅展示本人已完成诊断的简历元数据，不展示简历原文。</p>
+
+        <div className="mt-4 min-h-[12rem] overflow-y-auto">
+          {loading ? (
+            <div className="flex min-h-[12rem] items-center justify-center gap-2 text-sm text-gray-400">
+              <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" />
+              正在读取本人简历…
+            </div>
+          ) : error ? (
+            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+          ) : usable.length === 0 ? (
+            <EmptyState
+              icon={FileSearchIcon}
+              title="暂无可用于岗位 AI 的简历"
+              description="请先上传简历并完成诊断，再回到岗位信息使用 AI 推荐和匹配参考。"
+              className="py-8"
+            />
+          ) : (
+            <div className="space-y-2">
+              {usable.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelect(item)}
+                  className="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/40"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                    <FileSearchIcon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-gray-900">上传诊断简历</span>
+                    <span className="mt-0.5 block truncate text-xs text-gray-400">
+                      任务 {item.taskId.slice(0, 8)} · {new Date(item.createdAt).toLocaleString('zh-CN')}
+                    </span>
+                  </span>
+                  <CheckCircle2Icon className="h-5 w-5 shrink-0 text-primary-500" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex gap-3">
+          <Button size="lg" variant="secondary" className="h-12 flex-1" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            size="lg"
+            className="h-12 flex-1"
+            onClick={() => {
+              onClose()
+              onUpload()
+            }}
+          >
+            去上传简历
+          </Button>
+        </div>
+      </Card>
+    </div>
+  )
+}

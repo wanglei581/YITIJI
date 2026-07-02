@@ -48,10 +48,10 @@ export class AuditService {
     ipAddress?: string | null
     userAgent?: string | null
     requestId?: string | null
-  }): Promise<void> {
+  }): Promise<string | null> {
     const payloadJson = this.safeStringify(args.payload ?? {})
     try {
-      await this.prisma.auditLog.create({
+      const row = await this.prisma.auditLog.create({
         data: {
           actorId: args.actorId,
           actorRole: args.actorRole,
@@ -64,12 +64,14 @@ export class AuditService {
           requestId: args.requestId ?? null,
         },
       })
+      return row.id
     } catch (err) {
       // 审计写失败属于平台问题,记 ops 日志便于排查,
       // 但绝不抛回上游,避免业务因此回滚。
       this.logger.error(
         `Audit write failed (action=${args.action}, target=${args.targetType}:${args.targetId ?? '-'}): ${(err as Error).message}`,
       )
+      return null
     }
   }
 

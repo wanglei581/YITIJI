@@ -8,6 +8,11 @@ export interface KioskToolboxItemView {
   to: string | null
   disabled: boolean
   sortOrder: number
+  placements?: Array<'toolbox' | 'smart_campus'>
+  launchMode?: 'internal_route' | 'external_url' | 'qr_code' | 'mini_program_qr'
+  externalUrl?: string | null
+  qrImageUrl?: string | null
+  qrTargetUrl?: string | null
 }
 
 export interface KioskToolboxConfigView {

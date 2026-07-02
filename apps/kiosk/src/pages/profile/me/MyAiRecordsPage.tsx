@@ -3,14 +3,16 @@
 // 不展示简历原文 / payload / 诊断正文；删除本人记录走既有硬删与审计链路。
 // ============================================================
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card } from '@ai-job-print/ui'
-import type { MemberAiRecordItem, MemberAiRecordKind } from '@ai-job-print/shared'
+import type { JobAiSessionListItem, MemberAiRecordItem, MemberAiRecordKind } from '@ai-job-print/shared'
 import { FileSearchIcon, SparklesIcon, Trash2Icon, type LucideIcon } from 'lucide-react'
 import { deleteMyAiRecord, getMyAiRecords } from '../../../services/api/memberAssets'
+import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
 import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
+import { JobAiSessionRecords } from './JobAiSessionRecords'
 
 const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon: LucideIcon; bg: string; color: string }> = {
   parse: { label: '简历诊断', hint: '上传简历后的诊断记录', icon: FileSearchIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
@@ -18,6 +20,15 @@ const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon:
   generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录', icon: SparklesIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
   job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: FileSearchIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
   career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: FileSearchIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
+  fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: SparklesIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
+}
+
+const UNKNOWN_KIND_META = {
+  label: 'AI 服务记录',
+  hint: '本人 AI 服务元数据',
+  icon: SparklesIcon,
+  bg: 'bg-gray-50',
+  color: 'text-gray-500',
 }
 
 const STATUS_META: Record<MemberAiRecordItem['status'], { label: string; cls: string }> = {
@@ -39,25 +50,51 @@ function metaLine(item: MemberAiRecordItem): string {
 export function MyAiRecordsPage() {
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberAiRecordItem[]>([])
+  const [jobAiSessions, setJobAiSessions] = useState<JobAiSessionListItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [confirmJobAiSessionId, setConfirmJobAiSessionId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [busyJobAiSessionId, setBusyJobAiSessionId] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  const mountedRef = useRef(false)
+  const loadSeqRef = useRef(0)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      loadSeqRef.current += 1
+    }
+  }, [])
 
   const load = useCallback(() => {
+    const seq = loadSeqRef.current + 1
+    loadSeqRef.current = seq
+
     if (!isLoggedIn) {
       setItems([])
+      setJobAiSessions([])
       setState('ready')
       return
     }
     setState('loading')
-    getMyAiRecords(getToken(), { pageSize: 50 })
-      .then((page) => {
-        setItems(page.items)
+    const token = getToken()
+    Promise.all([
+      getMyAiRecords(token, { pageSize: 50 }),
+      listMyJobAiSessions(token, { pageSize: 50 }),
+    ])
+      .then(([recordsPage, sessionsPage]) => {
+        if (!mountedRef.current || loadSeqRef.current !== seq) return
+        setItems(recordsPage.items)
+        setJobAiSessions(sessionsPage.items)
         setState('ready')
       })
-      .catch(() => setState('error'))
+      .catch(() => {
+        if (!mountedRef.current || loadSeqRef.current !== seq) return
+        setState('error')
+      })
   }, [getToken, isLoggedIn])
 
   useEffect(() => {
@@ -75,6 +112,12 @@ export function MyAiRecordsPage() {
     const t = setTimeout(() => setConfirmId(null), 3500)
     return () => clearTimeout(t)
   }, [confirmId])
+
+  useEffect(() => {
+    if (!confirmJobAiSessionId) return
+    const t = setTimeout(() => setConfirmJobAiSessionId(null), 3500)
+    return () => clearTimeout(t)
+  }, [confirmJobAiSessionId])
 
   const remove = async (recordId: string) => {
     if (confirmId !== recordId) {
@@ -96,6 +139,26 @@ export function MyAiRecordsPage() {
     }
   }
 
+  const removeJobAiSession = async (sessionId: string) => {
+    if (confirmJobAiSessionId !== sessionId) {
+      setConfirmJobAiSessionId(sessionId)
+      return
+    }
+    const token = getToken()
+    if (!token) return
+    setBusyJobAiSessionId(sessionId)
+    try {
+      await deleteMyJobAiSession(token, sessionId)
+      setJobAiSessions((prev) => prev.filter((item) => item.session.id !== sessionId))
+      setConfirmJobAiSessionId(null)
+      setHint('岗位 AI 参考记录已删除')
+    } catch {
+      setHint('删除失败，记录可能已到期或被清理')
+    } finally {
+      setBusyJobAiSessionId(null)
+    }
+  }
+
   return (
     <>
       {hint && (
@@ -106,18 +169,32 @@ export function MyAiRecordsPage() {
 
       <MeListShell
         title="AI服务记录"
-        subtitle="本人 AI 简历、岗位匹配与职业规划服务记录（仅元数据）"
+        subtitle="本人 AI 简历、岗位匹配、职业规划与参会准备服务记录（仅元数据）"
         loginFrom="/me/ai-records"
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={() => setReloadKey((k) => k + 1)}
-        isEmpty={items.length === 0}
+        isEmpty={items.length === 0 && jobAiSessions.length === 0}
         emptyIcon={SparklesIcon}
         emptyTitle="还没有 AI 服务记录"
-        emptyDescription="完成简历诊断、优化、生成或职业规划后，这里会显示记录"
+        emptyDescription="完成简历诊断、优化、岗位 AI 参考、职业规划或参会准备后，这里会显示记录"
       >
+        <JobAiSessionRecords
+          items={jobAiSessions}
+          confirmId={confirmJobAiSessionId}
+          busyId={busyJobAiSessionId}
+          onDelete={(sessionId) => void removeJobAiSession(sessionId)}
+        />
+
+        {items.length > 0 && (
+          <div className="pt-1">
+            <h2 className="text-sm font-semibold text-gray-900">简历与规划 AI 记录</h2>
+            <p className="mt-1 text-xs leading-relaxed text-gray-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容。</p>
+          </div>
+        )}
+
         {items.map((item) => {
-          const kind = KIND_META[item.kind]
+          const kind = KIND_META[item.kind] ?? UNKNOWN_KIND_META
           const status = STATUS_META[item.status]
           const Icon = kind.icon
           const confirming = confirmId === item.id

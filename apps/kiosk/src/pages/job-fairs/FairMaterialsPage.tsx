@@ -29,6 +29,8 @@ export function FairMaterialsPage() {
   const [materials, setMaterials] = useState<FairMaterialDTO[]>([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(false)
+  const [printingId, setPrintingId] = useState<string | null>(null)
+  const [printError, setPrintError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -46,20 +48,34 @@ export function FairMaterialsPage() {
 
   // 2B 安全收口:打印必须基于真实资料文件 —— 带上后端签名 previewUrl(30min TTL),
   // http 模式下创建真实打印任务;无签名 URL(mock 演示)时按钮降级为不可用。
-  const handlePrint = (material: FairMaterialDTO) => {
-    if (!material.previewUrl) return
+  const handlePrint = async (material: FairMaterialDTO) => {
+    if (printingId) return
+    setPrintingId(material.id)
+    setPrintError(null)
+    let latest = material
+    try {
+      const refreshed = await getFairMaterials(fairId)
+      setMaterials(refreshed.data)
+      latest = refreshed.data.find((item) => item.id === material.id) ?? material
+    } catch {
+      setPrintingId(null)
+      setPrintError('文件链接刷新失败，请检查网络后重试')
+      return
+    }
+    setPrintingId(null)
+    if (!latest.previewUrl) return
     navigate('/print/confirm', {
       state: {
         file: {
-          name: material.name,
-          size: formatSize(material.fileSizeKB),
-          pages: material.pageCount > 0 ? material.pageCount : null,
-          fileUrl: material.previewUrl,
+          name: latest.name,
+          size: formatSize(latest.fileSizeKB),
+          pages: latest.pageCount > 0 ? latest.pageCount : null,
+          fileUrl: latest.previewUrl,
           mimeType: 'application/pdf',
         },
         params: makePrintParams({
           copies: 1,
-          duplex: material.pageCount > 1 ? 'double' : 'single',
+          duplex: latest.pageCount > 1 ? 'double' : 'single',
           color: 'bw',
         }),
       },
@@ -89,6 +105,11 @@ export function FairMaterialsPage() {
         <p className="mt-2 text-xs text-gray-400">
           所有资料均可免费打印，请按需取用，节约纸张
         </p>
+        {printError && (
+          <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+            {printError}
+          </p>
+        )}
       </div>
 
       <div className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
@@ -126,12 +147,12 @@ export function FairMaterialsPage() {
                 <Button
                   size="md"
                   className="mt-4 flex w-full items-center justify-center gap-2"
-                  disabled={!mat.previewUrl}
+                  disabled={!mat.previewUrl || printingId !== null}
                   title={mat.previewUrl ? undefined : '演示数据无真实文件,接入后端后可打印'}
                   onClick={() => handlePrint(mat)}
                 >
                   <PrinterIcon className="h-4 w-4" />
-                  {mat.previewUrl ? `免费打印（${mat.pageCount > 0 ? `${mat.pageCount} 页` : '页数以文件为准'}）` : '演示数据暂不可打印'}
+                  {printingId === mat.id ? '正在刷新文件链接…' : printingId ? '请稍候…' : mat.previewUrl ? `免费打印（${mat.pageCount > 0 ? `${mat.pageCount} 页` : '页数以文件为准'}）` : '演示数据暂不可打印'}
                 </Button>
               ) : (
                 <p className="mt-4 text-center text-xs text-gray-400">该资料暂不开放打印</p>

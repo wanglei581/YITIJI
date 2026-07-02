@@ -24,16 +24,22 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
 import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
+import { TerminalToolboxService } from './terminal-toolbox.service'
 import { RegisterTerminalDto } from './dto/register-terminal.dto'
 import { HeartbeatDto } from './dto/heartbeat.dto'
 import { ClaimTasksDto } from './dto/claim-tasks.dto'
 import { PatchTaskStatusDto } from './dto/patch-task-status.dto'
+import { RecordToolboxLaunchEventDto } from './dto/record-toolbox-launch-event.dto'
 
 @Controller()
 export class TerminalsController {
-  constructor(private readonly terminalsService: TerminalsService) {}
+  constructor(
+    private readonly terminalsService: TerminalsService,
+    private readonly toolbox: TerminalToolboxService,
+  ) {}
 
   // ── 1. Register ──────────────────────────────────────────────────────────
   // POST /api/v1/auth/terminal/register
@@ -61,6 +67,18 @@ export class TerminalsController {
   @HttpCode(HttpStatus.OK)
   getTerminalConfig(@Param('terminalId') terminalId: string) {
     return this.terminalsService.getKioskTerminalConfig(terminalId)
+  }
+
+  // POST /api/v1/terminals/:terminalId/toolbox-events
+  // 公开匿名运营事件写入面: 只收 itemKey/action/placement,后端反查配置派生标题/域名。
+  @Post('terminals/:terminalId/toolbox-events')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  recordToolboxLaunchEvent(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: RecordToolboxLaunchEventDto,
+  ) {
+    return this.toolbox.recordLaunchEvent(terminalId, dto)
   }
 
   // ── 3. Claim tasks ───────────────────────────────────────────────────────

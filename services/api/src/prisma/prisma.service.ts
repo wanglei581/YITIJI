@@ -16,6 +16,8 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common'
 import { createPrismaClient, type AppPrismaClient, type DbKind } from './create-client'
 
+export type PrismaTransactionClient = Omit<AppPrismaClient, '$connect' | '$disconnect' | '$on' | '$use' | '$extends'>
+
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name)
@@ -187,6 +189,32 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.aiResumeResult
   }
 
+  // ── 岗位 AI / 数据质量治理 ───────────────────────────────────────────────
+
+  get jobDataQualitySnapshot() {
+    return this.client.jobDataQualitySnapshot
+  }
+
+  get jobAiSession() {
+    return this.client.jobAiSession
+  }
+
+  get jobAiRecommendation() {
+    return this.client.jobAiRecommendation
+  }
+
+  get aiServiceLog() {
+    return this.client.aiServiceLog
+  }
+
+  get userAiConsent() {
+    return this.client.userAiConsent
+  }
+
+  get userDataRequest() {
+    return this.client.userDataRequest
+  }
+
   // ── Phase A-2: 材料处理任务骨架 ─────────────────────────────────────────────
 
   get documentProcessTask() {
@@ -281,10 +309,28 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalToolboxConfig
   }
 
+  get toolboxApp() {
+    return this.client.toolboxApp
+  }
+
+  get toolboxAppVersion() {
+    return this.client.toolboxAppVersion
+  }
+
+  get toolboxAllowedHost() {
+    return this.client.toolboxAllowedHost
+  }
+
+  get toolboxLaunchEvent() {
+    return this.client.toolboxLaunchEvent
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
+  $transaction<R>(fn: (prisma: PrismaTransactionClient) => Promise<R>, options?: { maxWait?: number; timeout?: number; isolationLevel?: unknown }): Promise<R>
+  $transaction<R>(ops: readonly unknown[], options?: { isolationLevel?: unknown }): Promise<R[]>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  $transaction(...args: Parameters<typeof this.client.$transaction>): any {
+  $transaction(...args: any[]): any {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (this.client.$transaction as (...a: any[]) => any)(...args)
   }

@@ -13,6 +13,7 @@ interface PrismaJobFairRow {
   externalId: string
   sourceName: string
   sourceUrl: string
+  checkinUrl: string | null
   title: string
   theme: string
   startAt: Date
@@ -138,6 +139,7 @@ export function mapFair(row: PrismaJobFairRow): Fair {
     externalId: row.externalId,
     sourceName: row.sourceName,
     sourceUrl: row.sourceUrl,
+    checkinUrl: row.checkinUrl,
     title: row.title,
     theme: row.theme,
     startAt: row.startAt.toISOString(),

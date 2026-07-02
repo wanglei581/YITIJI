@@ -27,6 +27,8 @@ import { MemberNotificationsModule } from './member-notifications/member-notific
 import { MemberFeedbackModule } from './member-feedback/member-feedback.module'
 import { MaterialsModule } from './materials/materials.module'
 import { JobMaterialsModule } from './job-materials/job-materials.module'
+import { JobAiModule } from './job-ai/job-ai.module'
+import { MemberPrivacyModule } from './member-privacy/member-privacy.module'
 import { RedisModule } from './common/redis/redis.module'
 import { SyncModule } from './sync/sync.module'
 import { TerminalsModule } from './terminals/terminals.module'
@@ -86,6 +88,8 @@ const redisUrl = process.env['REDIS_URL']
     MemberPrintOrdersModule,
     MaterialsModule,
     JobMaterialsModule,
+    MemberPrivacyModule,
+    JobAiModule,
     AiModule,
     FilesModule,
     JobsModule,

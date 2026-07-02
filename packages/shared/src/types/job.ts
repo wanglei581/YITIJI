@@ -58,6 +58,8 @@ export interface ExternalJobFair extends ExternalJobSource {
   status: JobFairStatus
   description?: string
   boothCount?: number
+  /** 来源平台/官方签到入口。Kiosk 仅用于“扫码前往来源平台签到”，不记录签到结果。 */
+  checkinUrl?: string
   /** 招聘岗位数（快照，卡片"N 个岗位"展示） */
   jobCount?: number
   /** 主题：general 综合 / campus 校园 / campus_corp 校企合作 / industry 行业专场 */
@@ -275,16 +277,52 @@ export interface ImportRecord {
 // Phase 7 DTO — 岗位展示
 // ============================================================
 
+export type JobQualityLevel = 'ready' | 'partial' | 'insufficient'
+
+export interface JobNormalizedFields {
+  educationRequirement?: string
+  experienceRequirement?: string
+  skills?: string[]
+  benefits?: string[]
+  salaryMin?: number
+  salaryMax?: number
+  salaryUnit?: 'monthly' | 'yearly' | 'daily' | string
+  validThrough?: string
+}
+
+export interface JobDataQualitySnapshotDTO {
+  id: string
+  jobId: string
+  sourceOrgId: string
+  missingFields: string[]
+  qualityLevel: JobQualityLevel
+  sourceUrlReachable: boolean | null
+  checkedAt: string
+  lastError?: string | null
+}
+
+export interface JobSourceQualitySummaryDTO {
+  sourceOrgId: string
+  sourceId: string | null
+  totalJobs: number
+  readyJobs: number
+  partialJobs: number
+  insufficientJobs: number
+  staleJobs: number
+  brokenSourceUrlJobs: number
+  lastCheckedAt: string | null
+}
+
 /**
  * 岗位展示 DTO（/api/v1/jobs 接口响应类型）。
  * 继承 ExternalJob，新增展示友好字段。
  * 合规说明：不含企业联系方式，不含任何招聘闭环字段。
  */
-export interface ExternalJobDTO extends ExternalJob {
+export interface ExternalJobDTO extends ExternalJob, JobNormalizedFields {
   industry?: string
   /** 格式化薪资展示字符串，如 "8,000–12,000 元/月" */
   salaryDisplay: string
-  workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
+  workType?: 'full_time' | 'part_time' | 'internship' | 'contract' | 'campus'
   /** 岗位类型原值（DB category 列）：fulltime 全职 / intern 实习 / campus 校招 / parttime 兼职 */
   category?: 'fulltime' | 'intern' | 'campus' | 'parttime'
   headcount?: number

@@ -89,7 +89,12 @@ export class PrintJobsService {
 
   async create(
     dto: CreatePrintJobDto,
-    ctx: { ipAddress?: string | null; userAgent?: string | null; endUserId?: string | null } = {},
+    ctx: {
+      ipAddress?: string | null
+      userAgent?: string | null
+      endUserId?: string | null
+      terminalId?: string | null
+    } = {},
   ): Promise<PrintJobCreated> {
     const taskId = `ptask_kiosk_${crypto.randomBytes(8).toString('hex')}`
 
@@ -108,6 +113,36 @@ export class PrintJobsService {
     // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
     // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
     const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)
+    const terminalRef = ctx.terminalId?.trim()
+    if (!terminalRef) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_REQUIRED',
+          message: '打印任务必须绑定目标终端',
+        },
+      })
+    }
+    const terminal = await this.prisma.terminal.findFirst({
+      where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
+      select: { id: true, enabled: true },
+    })
+    if (!terminal) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_NOT_FOUND',
+          message: '目标终端不存在',
+        },
+      })
+    }
+    if (!terminal.enabled) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_DISABLED',
+          message: '目标终端已停用',
+        },
+      })
+    }
+    const targetTerminalId = terminal.id
 
     // fileName 持久化：PrintTask 当前无独立 fileName 列（本阶段不做 migration，方案②约定）。
     // 折中：把 fileName 落进 paramsJson，使任务详情 / 日志 / DB 中可见文件名。
@@ -123,6 +158,7 @@ export class PrintJobsService {
         data: {
           id:         taskId,
           fileUrl:    storedFileUrl,
+          terminalId: targetTerminalId,
           endUserId:  ctx.endUserId ?? null,
           // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
           fileMd5:    dto.fileMd5 ?? '',
@@ -136,6 +172,7 @@ export class PrintJobsService {
           type:        'print',
           printTaskId: task.id,
           endUserId:   ctx.endUserId ?? null,
+          terminalId:  targetTerminalId,
           // 当前未接真实报价/支付;不伪造页数或金额。
           amountCents: 0,
           payStatus:   'unpaid',
@@ -159,6 +196,7 @@ export class PrintJobsService {
         hasFileHash: Boolean(dto.fileMd5),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
+        terminalId:  targetTerminalId,
         orderId:     order.id,
         orderNo:     order.orderNo,
       },

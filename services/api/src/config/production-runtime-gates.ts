@@ -6,8 +6,10 @@
  *   - FILE_STORAGE_DRIVER 必须为 cos（生产不得回退本地磁盘存储，合规要求落 COS）
  *   - DATABASE_URL 不得为 file: SQLite（委托 assertRuntimeDatabaseAllowed，与现有
  *     verify:production-db-guard 共用同一判定，避免双份口径漂移）
+ *   - REDIS_URL 必须存在（会员会话、队列、幂等和防重放依赖 Redis）
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
- *   - OCR_PROVIDER=baidu 时，百度 OCR 生产参数齐全（避免图片/扫描件简历运行时才失败）
+ *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
+ *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
@@ -18,6 +20,7 @@ export interface ProductionRuntimeEnv {
   JWT_SECRET?: string
   FILE_STORAGE_DRIVER?: string
   DATABASE_URL?: string
+  REDIS_URL?: string
   SMS_PROVIDER?: string
   TENCENT_SMS_SECRET_ID?: string
   TENCENT_SMS_SECRET_KEY?: string
@@ -27,6 +30,9 @@ export interface ProductionRuntimeEnv {
   OCR_PROVIDER?: string
   BAIDU_OCR_API_KEY?: string
   BAIDU_OCR_SECRET_KEY?: string
+  AI_PROVIDER?: string
+  AI_LLM_API_KEY?: string
+  TRTC_LLM_API_KEY?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -70,6 +76,12 @@ export function assertProductionRuntimeGates(
   }
   assertRuntimeDatabaseAllowed(databaseUrl, nodeEnv)
 
+  if (!hasValue(env.REDIS_URL)) {
+    throw new Error(
+      'PRODUCTION_REDIS_URL_MISSING: NODE_ENV=production 时 REDIS_URL 必须配置',
+    )
+  }
+
   const smsProvider = env.SMS_PROVIDER?.trim().toLowerCase()
   if (smsProvider !== 'tencent') {
     throw new Error(
@@ -84,9 +96,26 @@ export function assertProductionRuntimeGates(
   }
 
   const ocrProvider = env.OCR_PROVIDER?.trim().toLowerCase()
-  if (ocrProvider === 'baidu' && (!hasValue(env.BAIDU_OCR_API_KEY) || !hasValue(env.BAIDU_OCR_SECRET_KEY))) {
+  if (ocrProvider !== 'baidu') {
+    throw new Error(
+      `PRODUCTION_OCR_PROVIDER_NOT_BAIDU: NODE_ENV=production 时 OCR_PROVIDER 必须为 baidu（当前: ${ocrProvider || '未设置'}）`,
+    )
+  }
+  if (!hasValue(env.BAIDU_OCR_API_KEY) || !hasValue(env.BAIDU_OCR_SECRET_KEY)) {
     throw new Error(
       'PRODUCTION_BAIDU_OCR_CONFIG_MISSING: OCR_PROVIDER=baidu 时必须配置 BAIDU_OCR_API_KEY 和 BAIDU_OCR_SECRET_KEY',
+    )
+  }
+
+  const aiProvider = env.AI_PROVIDER?.trim().toLowerCase()
+  if (aiProvider !== 'llm') {
+    throw new Error(
+      `PRODUCTION_AI_PROVIDER_NOT_LLM: NODE_ENV=production 时 AI_PROVIDER 必须为 llm（当前: ${aiProvider || '未设置'}）`,
+    )
+  }
+  if (!hasValue(env.AI_LLM_API_KEY) && !hasValue(env.TRTC_LLM_API_KEY)) {
+    throw new Error(
+      'PRODUCTION_LLM_CONFIG_MISSING: AI_PROVIDER=llm 时必须配置 AI_LLM_API_KEY 或 TRTC_LLM_API_KEY',
     )
   }
 }

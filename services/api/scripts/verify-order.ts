@@ -97,7 +97,7 @@ async function main(): Promise<void> {
         fileName: '匿名打印.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId: null, ipAddress: '127.0.0.1', userAgent: 'verify-order' },
+      { endUserId: null, ipAddress: '127.0.0.1', userAgent: 'verify-order', terminalId },
     )
     taskIds.push(anonymousPrint.taskId)
 
@@ -123,9 +123,9 @@ async function main(): Promise<void> {
       anonymousOrder.payStatus === 'unpaid' &&
       anonymousOrder.taskStatus === 'pending' &&
       anonymousOrder.endUserId === null &&
-      anonymousOrder.terminalId === null
+      anonymousOrder.terminalId === terminalId
     ) {
-      pass('anonymous print creates a pending unpaid print Order with amountCents=0')
+      pass('anonymous print creates a terminal-bound pending unpaid print Order with amountCents=0')
     } else {
       fail(`anonymous order mismatch: ${JSON.stringify(anonymousOrder)}`)
     }
@@ -137,15 +137,15 @@ async function main(): Promise<void> {
         fileName: '会员打印.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId },
+      { endUserId, terminalId },
     )
     taskIds.push(memberPrint.taskId)
 
     const memberOrder = await prisma.order.findUnique({
       where: { printTaskId: memberPrint.taskId },
     })
-    if (memberOrder?.endUserId === endUserId && memberOrder.payStatus === 'unpaid') {
-      pass('member endUserId is copied into Order')
+    if (memberOrder?.endUserId === endUserId && memberOrder.payStatus === 'unpaid' && memberOrder.terminalId === terminalId) {
+      pass('member endUserId and target terminalId are copied into Order')
     } else {
       fail(`member order mismatch: ${JSON.stringify(memberOrder)}`)
     }
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
         fileName: '状态镜像.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId: null },
+      { endUserId: null, terminalId },
     )
     taskIds.push(statusPrint.taskId)
     await prisma.printTask.update({
@@ -178,7 +178,7 @@ async function main(): Promise<void> {
       where: { printTaskId: statusPrint.taskId },
     })
     if (claimedOrder?.taskStatus === 'claimed' && claimedOrder.terminalId === terminalId) {
-      pass('claimTasks mirrors taskStatus=claimed and terminalId into Order')
+      pass('claimTasks mirrors taskStatus=claimed and preserves terminalId in Order')
     } else {
       fail(`claimed order mismatch: ${JSON.stringify(claimedOrder)}`)
     }
@@ -225,7 +225,7 @@ async function main(): Promise<void> {
         fileName: '超时回收.pdf',
         params: PRINT_PARAMS,
       },
-      { endUserId: null },
+      { endUserId: null, terminalId },
     )
     taskIds.push(expiredPrint.taskId)
     await prisma.printTask.update({
@@ -249,11 +249,11 @@ async function main(): Promise<void> {
     })
     if (
       resetTask?.status === 'pending' &&
-      resetTask.terminalId === null &&
+      resetTask.terminalId === terminalId &&
       resetOrder?.taskStatus === 'pending' &&
-      resetOrder.terminalId === null
+      resetOrder.terminalId === terminalId
     ) {
-      pass('resetExpiredClaims mirrors expired tasks back to pending and clears terminalId')
+      pass('resetExpiredClaims mirrors expired tasks back to pending and preserves terminalId')
     } else {
       fail(`reset mirror mismatch: task=${JSON.stringify(resetTask)} order=${JSON.stringify(resetOrder)}`)
     }

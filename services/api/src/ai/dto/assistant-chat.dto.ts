@@ -1,5 +1,11 @@
-import { IsString, IsOptional, IsNotEmpty, MaxLength } from 'class-validator'
+import { IsIn, IsString, IsOptional, IsNotEmpty, MaxLength } from 'class-validator'
 import type { ChatOutput } from '../interfaces/ai-provider.interface'
+
+const ASSISTANT_SKILLS = [
+  'offer_compare',
+  'salary_negotiation',
+  'hr_qa',
+] as const
 
 export class AssistantChatRequestDto {
   @IsNotEmpty()
@@ -11,6 +17,11 @@ export class AssistantChatRequestDto {
   @IsString()
   @MaxLength(128)
   sessionId?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(ASSISTANT_SKILLS)
+  skill?: (typeof ASSISTANT_SKILLS)[number]
 
   @IsOptional()
   context?: Record<string, unknown>

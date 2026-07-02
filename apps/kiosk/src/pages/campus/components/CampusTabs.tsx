@@ -28,7 +28,7 @@ import { MapBlock } from '../../job-fairs/components/MapBlock'
 
 type TabKey = 'overview' | 'companies' | 'map' | 'ai' | 'print'
 
-// 活动类型展示映射(真实 theme 字段;替代已移除的违规「AI匹配率」指标)
+// 活动类型展示映射(真实 theme 字段;替代已移除的推荐分指标)
 const THEME_STAT_LABELS: Record<string, string> = {
   campus: '校园双选',
   campus_corp: '校企合作',
@@ -231,9 +231,6 @@ export function OverviewTab({
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  {c.aiMatchScore != null && (
-                    <p className="text-sm font-bold text-emerald-600">AI {c.aiMatchScore}%</p>
-                  )}
                   <p className="mt-0.5 text-xs text-gray-400">{c.positions.length} 个岗位</p>
                 </div>
               </button>

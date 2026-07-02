@@ -1,6 +1,6 @@
 import { API_BASE_URL, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
-import type { AdminAiUsage, AdminAiLogsResult } from './types'
+import type { AdminAiUsage, AdminAiLogsResult, JobSourceQualitySummary } from './types'
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -28,4 +28,7 @@ export const adminAiHttpAdapter = {
 
   getAiLogs: (limit = 100): Promise<AdminAiLogsResult> =>
     get<AdminAiLogsResult>(`/admin/ai/logs?limit=${limit}`),
+
+  getAdminJobQualitySummary: (): Promise<JobSourceQualitySummary[]> =>
+    get<JobSourceQualitySummary[]>('/admin/jobs/quality-summary'),
 }
