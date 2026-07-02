@@ -136,8 +136,9 @@ function main(): void {
     'Offer 对比',
     '薪资谈判话术',
     'HR 知识问答',
-    '预生产与真实模型联调仍需后续单独验收',
-  ], '产品文档记录首批低风险 AI skill 接线范围与未完成边界')
+    '预生产 TAS-G2 真实模型边界探针已通过但仍带注意事项',
+    '不代表真实 Kiosk 浏览器验收、公共终端隐私验收或微应用商用上线完成',
+  ], '产品文档记录首批低风险 AI skill 接线范围、TAS-G2 和未完成边界')
 
   mustContain(`${currentProgress}\n${nextTasks}`, [
     '首批低风险 AI skill intent 接线',

@@ -105,6 +105,7 @@
     "verify:toolbox-review-workflow": "node -r @swc-node/register scripts/verify-toolbox-review-workflow.ts",
     "verify:toolbox-governance-acceptance": "node -r @swc-node/register scripts/verify-toolbox-governance-acceptance.ts",
     "verify:toolbox-ai-skill-intents": "node -r @swc-node/register scripts/verify-toolbox-ai-skill-intents.ts",
+    "verify:toolbox-ai-skill-real-acceptance": "node -r @swc-node/register scripts/verify-toolbox-ai-skill-real-acceptance.ts",
     "verify:fair-visit-plan": "node -r @swc-node/register scripts/verify-fair-visit-plan.ts",
     "verify:jobfair-checkin": "node -r @swc-node/register scripts/verify-jobfair-checkin.ts"
   },

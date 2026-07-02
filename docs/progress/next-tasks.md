@@ -155,6 +155,11 @@
 - [x] **百宝箱微应用平台 Phase 2D G0 真实验收执行包**：已新增微应用审核发布真实验收 Runbook、PENDING 执行记录模板和 `verify:toolbox-governance-acceptance` 静态门禁，覆盖本地门禁、预生产只读预检、PostgreSQL migration、环境白名单、真实管理员异人审批、发布投影、Kiosk 展示、熔断移除和首批低风险微应用接线准备。该项不代表真实预生产验收或商用上线完成。
 - [ ] **百宝箱微应用平台 Phase 2D 真实预生产执行**：经用户单独明确确认后，按 `docs/acceptance/toolbox-micro-app-governance-acceptance.md` 执行 TMG-G1~TMG-G5：预生产只读预检、PostgreSQL 备份与 migration、环境白名单脱敏复核、两个真实管理员账号异人审批、允许域名激活、真实终端发布投影 / Kiosk 展示 / 熔断移除验收。未完成前不得宣称微应用审核发布预生产验收通过。
 - [x] **百宝箱微应用平台首批低风险微应用接线 / AI skill intent 接线（代码侧）**：已接线 Offer 对比、薪资谈判话术、HR 知识问答三类受控 `/assistant?intent=...` 场景，前台展示场景欢迎语 / 免责声明并透传 intent，后端 DTO / LLM 服务优先使用入口 intent，mock 模式可演示，新增 `verify:toolbox-ai-skill-intents`。该项不代表预生产与真实模型联调或微应用商用上线完成。
+- [x] **百宝箱微应用平台首批低风险 AI skill 真实验收**：TAS-G0 本地门禁、TAS-G1 预生产只读预检、SEC-G1 管理员 JWT 暴露收口、SEC-G2 root OS 密码与临时可信 HTTPS、TAS-G2 真实 LLM 边界探针、TAS-G3 Kiosk 浏览器真实链路、TAS-G4 公共终端隐私竞态和 TAS-G5 证据复核已完成。最终浏览器与隐私证据 ID 为 `TAS-G3-G4-20260702-browser-privacy-8329b7ea36a1`，证据目录保存在仓库外 `/tmp/ai-job-print-evidence/toolbox-ai-skill-g3-g4-20260702152600`；完整 prompt、完整模型输出、token、cookie、HAR 未入仓。防回退仍由 `verify:toolbox-ai-skill-real-acceptance` 和 `verify:toolbox-ai-skill-intents` 锁定。本项只代表首批低风险 AI skill 在临时可信 HTTPS 预生产入口完成受控真实验收，不代表 Windows 一体机真机、正式自有域名 HTTPS、正式短信 / 试运营、第三方 skill 包或商用上线完成。
+- [x] **百宝箱 AI skill TAS-G3 Kiosk 浏览器真实链路验收**：已使用可信 HTTPS 和 Playwright Chromium 打开 Offer 对比、薪资谈判话术、HR 知识问答三条 `/assistant?intent=...` 深链，验证场景标题 / 欢迎语、免责声明、发送消息、非法 intent 回落和无招聘平台闭环入口；三类回复均保持合规边界，不包含平台投递闭环承诺。
+- [x] **百宝箱 AI skill TAS-G4 公共终端隐私竞态验收**：已验证三类 skill 切换时旧回复不回写新场景，刷新或返回后不保留旧消息，Network 只留脱敏摘要，并确认 localStorage / sessionStorage 不保存聊天内容。
+- [x] **百宝箱 AI skill TAS-G5 证据复核与上线阻断项收口**：已复核仓库外证据目录脱敏，执行记录已更新，TAS-G3 / TAS-G4 停止条件无残留；正式自有域名 HTTPS、Windows 一体机真机、触控 / 断网 / 重启、正式短信 / 试运营和法务宣传口径仍是后续上线阻断项。
+- [ ] **百宝箱微应用平台高风险 / 复杂微应用接线**：法律风险审查和合同审查必须先过法务评审与文件留存策略；试卷打印和英语模拟练习需先确认版权 / 商标 / 合作方授权、文件留存、真机打印或真实交互验收。
 - [ ] **百宝箱 TB-G0~TB-G4 预生产验收执行**：按执行包顺序先跑本地静态门禁并创建仓库外证据目录；经用户明确确认后再做预生产只读预检、PostgreSQL 备份与 migration、`KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS` 脱敏复核、Admin 对真实终端配置站内 / 外部 H5 / 二维码项、Kiosk 真机打开外部 H5 / 取消 / 继续 / 二维码展示，并抽样 `ToolboxLaunchEvent` 确认只存纯 host 和匿名 action。未完成 TB-G2~TB-G4 前，不得宣称百宝箱预生产 / 生产验收完成。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
