@@ -36,6 +36,7 @@ const MIME_EXTS: Record<string, string[]> = {
   'video/mp4': ['mp4'],
   'video/webm': ['webm'],
   'text/plain': ['txt'],
+  'text/markdown': ['md'],
   'application/json': ['json'],
 }
 
@@ -49,7 +50,8 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
   // 直接进打印流程 → 仅 Agent 能真正出纸的格式
   print_doc: { mimes: PRINTABLE, maxBytes: 20 * MB },
   // 求职者敏感文档(给 AI 解析 / 展示)
-  resume_upload: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
+  // text/plain 与 text/markdown 为服务端生成的简历导出格式(inert 文本,按原 content-type 提供不产生 XSS),故仅在 resume_upload 放宽
+  resume_upload: { mimes: [...PDF_DOC_IMG, 'text/plain', 'text/markdown'], maxBytes: 20 * MB },
   resume_scan: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
   id_scan: { mimes: IMG, maxBytes: 10 * MB },
   cover_letter: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
