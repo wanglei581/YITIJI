@@ -19,6 +19,8 @@ const planPath = join(repoRoot, 'docs/superpowers/plans/2026-07-01-toolbox-micro
 const sharedTypesPath = join(repoRoot, 'packages/shared/src/types/toolboxMicroApp.ts')
 const sharedIndexPath = join(repoRoot, 'packages/shared/src/index.ts')
 const apiPackagePath = join(repoRoot, 'services/api/package.json')
+const terminalToolboxServicePath = join(repoRoot, 'services/api/src/terminals/terminal-toolbox.service.ts')
+const toolboxPolicyPath = join(repoRoot, 'services/api/src/terminals/toolbox-policy.ts')
 
 let failed = 0
 
@@ -160,6 +162,8 @@ function main(): void {
   const sharedTypes = mustExist(sharedTypesPath, '共享微应用类型存在')
   const sharedIndex = mustExist(sharedIndexPath, 'shared index 存在')
   const apiPackage = mustExist(apiPackagePath, 'API package.json 存在')
+  const terminalToolboxService = mustExist(terminalToolboxServicePath, '终端百宝箱服务存在')
+  const toolboxPolicy = mustExist(toolboxPolicyPath, '百宝箱安全策略存在')
 
   mustContain(productDoc, [
     '百宝箱 = 受控微应用中心 + 场景化服务入口编排 + 首方 AI 技能入口',
@@ -204,6 +208,24 @@ function main(): void {
     'shared index 导出 toolboxMicroApp',
   )
   mustContain(apiPackage, ['"verify:toolbox-micro-app-platform"'], 'API package 注册微应用平台门禁脚本')
+  mustContain(terminalToolboxService, [
+    'TOOLBOX_ALLOW_EXTERNAL_URL',
+    'TOOLBOX_EXTERNAL_URL_DISABLED',
+    'TOOLBOX_CONTENT_BLOCKED',
+    'INVALID_TOOLBOX_QR_TARGET_URL',
+    'findToolboxComplianceViolation',
+  ], '终端百宝箱服务包含外部 H5 开关、合规拦截和二维码目标校验')
+  mustContain(toolboxPolicy, [
+    '平台内一键投递',
+    '平台(?:内)?',
+    '企业收简历',
+    '.{0,6}简历',
+    '候选人筛选',
+    '候选人推荐给企业',
+    '.{0,6}推荐.{0,8}',
+    '面试邀约',
+    'offer管理',
+  ], '百宝箱安全策略覆盖招聘闭环红线')
 
   mustNotContain(`${productDoc}\n${plan}\n${sharedTypes}`, [
     '支持一键投递',

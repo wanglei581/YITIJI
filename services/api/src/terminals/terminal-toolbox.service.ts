@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
+import { findToolboxComplianceViolation } from './toolbox-policy'
 import type {
   KioskAppLaunchModeView,
   KioskAppPlacementView,
@@ -121,6 +122,32 @@ function allowedQrTargetHosts(): Set<string> {
   return qrHosts.size > 0 ? qrHosts : allowedExternalHosts()
 }
 
+function isExternalUrlAllowed(): boolean {
+  return process.env['TOOLBOX_ALLOW_EXTERNAL_URL'] === 'true'
+}
+
+function assertExternalUrlEnabled(disabled: boolean, strict: boolean): void {
+  if (isExternalUrlAllowed()) return
+  if (strict && disabled) return
+  throw new BadRequestException({
+    error: {
+      code: 'TOOLBOX_EXTERNAL_URL_DISABLED',
+      message: '外部 H5 应用启动方式在当前环境已禁用',
+    },
+  })
+}
+
+function assertToolboxComplianceCopy(title: string, description: string): void {
+  const violation = findToolboxComplianceViolation(title, description)
+  if (!violation) return
+  throw new BadRequestException({
+    error: {
+      code: 'TOOLBOX_CONTENT_BLOCKED',
+      message: `百宝箱应用标题或描述包含非合规招聘闭环文案: ${violation}`,
+    },
+  })
+}
+
 function assertAllowedHttpsUrl(
   rawUrl: string,
   code: string,
@@ -173,9 +200,14 @@ function cleanQrImageUrl(value: unknown, required: boolean): string | null {
   return assertAllowedHttpsUrl(rawUrl, 'INVALID_TOOLBOX_QR_URL', '二维码图片地址')
 }
 
-function cleanQrTargetUrl(value: unknown, launchMode: KioskAppLaunchModeView): string | null {
+function cleanQrTargetUrl(value: unknown, launchMode: KioskAppLaunchModeView, required: boolean): string | null {
   const rawValue = cleanText(value, 512)
-  if (!rawValue) return null
+  if (!rawValue) {
+    if (required) {
+      throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_QR_TARGET_URL', message: '二维码应用必须填写可审计目标地址' } })
+    }
+    return null
+  }
   if (launchMode === 'qr_code') {
     return assertAllowedHttpsUrl(rawValue, 'INVALID_TOOLBOX_QR_TARGET_URL', '二维码目标地址', allowedQrTargetHosts(), '二维码目标白名单')
   }
@@ -207,12 +239,19 @@ function normalizeItems(
       const item = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
       const title = cleanText(item.title, 32)
       if (!title) continue
+      const description = cleanText(item.description, 80)
       const fallbackKey = title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : `tool-${index + 1}`
       let key = cleanText(item.key, 64) || fallbackKey || `tool-${index + 1}`
       const disabled = Boolean(item.disabled)
       const launchMode = cleanLaunchMode(item.launchMode)
       const placements = cleanPlacements(item.placements)
       const shouldValidateUrls = !options.preserveInvalidUrls
+      if (shouldValidateUrls) {
+        assertToolboxComplianceCopy(title, description)
+        if (launchMode === 'external_url') {
+          assertExternalUrlEnabled(disabled, options.strict)
+        }
+      }
       const to = launchMode === 'internal_route'
         ? shouldValidateUrls
           ? cleanRoute(item.to)
@@ -230,16 +269,19 @@ function normalizeItems(
         : null
       const qrTargetUrl = launchMode === 'qr_code' || launchMode === 'mini_program_qr'
         ? shouldValidateUrls
-          ? cleanQrTargetUrl(item.qrTargetUrl, launchMode)
+          ? cleanQrTargetUrl(item.qrTargetUrl, launchMode, launchMode === 'qr_code' && (options.strict ? !disabled : false))
           : cleanText(item.qrTargetUrl, 512) || null
         : null
 
-      if (!options.strict && !disabled) {
+      if (shouldValidateUrls && !options.strict && !disabled) {
         if (launchMode === 'external_url' && !externalUrl) {
           throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_EXTERNAL_URL', message: '外部 H5 应用必须填写 HTTPS URL' } })
         }
         if ((launchMode === 'qr_code' || launchMode === 'mini_program_qr') && !qrImageUrl) {
           throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_QR_URL', message: '二维码应用必须填写二维码图片地址' } })
+        }
+        if (launchMode === 'qr_code' && !qrTargetUrl) {
+          throw new BadRequestException({ error: { code: 'INVALID_TOOLBOX_QR_TARGET_URL', message: '二维码应用必须填写可审计目标地址' } })
         }
       }
 
@@ -253,7 +295,7 @@ function normalizeItems(
       normalized.push({
         key,
         title,
-        description: cleanText(item.description, 80),
+        description,
         icon: cleanIcon(item.icon),
         to,
         disabled,
