@@ -91,14 +91,17 @@ export function PrintProgressPage() {
   const uploadPath = printUploadPathForSource(source)
 
   const taskId     = typeof state?.taskId === 'string' ? state.taskId : null
-  const useRealApi = API_MODE === 'http' && Boolean(taskId)
+  const isHttpMode = API_MODE === 'http'
+  const useRealApi = isHttpMode && Boolean(taskId)
 
   // 直达守卫：合法流程必带 taskId（真实任务）或 file（mock/上传流程）上下文。
   // 二者皆无 = 用户直接打开 /print/progress，禁止跑模拟动画并伪造"打印成功"。
-  const hasContext = Boolean(taskId) || Boolean((state as { file?: unknown } | null)?.file)
+  const hasFileContext = Boolean((state as { file?: unknown } | null)?.file)
+  const hasContext = Boolean(taskId) || hasFileContext
+  const canSimulate = !isHttpMode && hasFileContext
 
   // simulateFailure — dev/mock only
-  const shouldFail = !useRealApi && state?.simulateFailure === true
+  const shouldFail = canSimulate && state?.simulateFailure === true
   const failReason = typeof state?.failReason === 'string' ? state.failReason : FAIL_REASONS[0]
 
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
@@ -186,7 +189,7 @@ export function PrintProgressPage() {
   // ── SIM mode: setTimeout animation ───────────────────────────────────────
 
   useEffect(() => {
-    if (useRealApi || !hasContext) return
+    if (useRealApi || !canSimulate) return
 
     cancelRef.current = false
 
@@ -212,7 +215,7 @@ export function PrintProgressPage() {
 
     advance(0)
     return () => { cancelRef.current = true }
-  }, [useRealApi, hasContext, navigateFail, navigateSuccess, shouldFail, failReason])
+  }, [useRealApi, canSimulate, navigateFail, navigateSuccess, shouldFail, failReason])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -234,6 +237,28 @@ export function PrintProgressPage() {
           className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
         >
           重新上传文件
+        </button>
+      </div>
+    )
+  }
+
+  // 生产 / http 模式必须依赖真实后端任务。即使存在 file 上下文，
+  // 没有 taskId 也不能回退到 SIM 动画并展示成功。
+  if (isHttpMode && !taskId) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
+          <AlertCircleIcon className="h-10 w-10 text-amber-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-semibold text-gray-900">打印任务尚未创建</p>
+          <p className="mt-2 text-sm text-gray-500">请返回确认页重试</p>
+        </div>
+        <button
+          onClick={() => navigate('/print/confirm', { state })}
+          className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
+        >
+          返回确认页
         </button>
       </div>
     )
@@ -355,7 +380,7 @@ export function PrintProgressPage() {
       </div>
 
       {/* DEV 专用：模拟失败按钮（sim 模式 + 生产构建自动移除） */}
-      {import.meta.env.DEV && !useRealApi && !failed && (
+      {import.meta.env.DEV && canSimulate && !failed && (
         <div className="absolute bottom-24 right-6">
           <button
             onClick={handleDevFail}
