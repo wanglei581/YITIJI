@@ -22,6 +22,9 @@ import { LlmFairVisitPlanService } from './resume/llm-fair-visit-plan.service'
 import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
 import { FairVisitPlanController } from './fair-visit-plan.controller'
+import { LlmJobMasterService } from './resume/llm-job-master.service'
+import { JobMasterService } from './resume/job-master.service'
+import { JobMasterController } from './job-master.controller'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
@@ -39,7 +42,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   imports: [AuthModule, FilesModule],
-  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController, FairVisitPlanController],
+  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController, FairVisitPlanController, JobMasterController],
   providers: [
     AiService,
     AiLogService,
@@ -58,6 +61,8 @@ import { LlmResumeProvider } from './providers/llm.provider'
     LlmFairVisitPlanService,
     FairVisitPlanService,
     FairVisitPlanPdfService,
+    LlmJobMasterService,
+    JobMasterService,
     LlmChatService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──
