@@ -267,6 +267,32 @@ Phase 2C 已把 Phase 2B 的后端审核发布能力接入 Admin 可视化工作
 - 未完成首批微应用的法务、版权、隐私、文件留存和真机打印验收。
 - 未开放第三方 JS / WASM / 任意外部 skill 包执行。
 
+## 十三、Phase 2D G0 真实验收执行包已落地范围
+
+Phase 2D G0 只补齐“怎么验收”的执行标准和静态门禁，不代表真实预生产验收已经执行。
+
+已进入仓库的能力：
+
+- 新增 `docs/acceptance/toolbox-micro-app-governance-acceptance.md`，把微应用审核发布真实验收拆为 TMG-G0 至 TMG-G5：
+  - TMG-G0：本地静态门禁。
+  - TMG-G1：预生产只读预检。
+  - TMG-G2：PostgreSQL migration 与环境白名单复核。
+  - TMG-G3：真实管理员异人审批与域名审核。
+  - TMG-G4：发布投影、Kiosk 展示与熔断移除。
+  - TMG-G5：首批低风险微应用接线准备。
+- 新增 `docs/acceptance/toolbox-micro-app-governance-execution-record.md`，作为未来真实执行的脱敏记录模板，默认全部 `PENDING`。
+- 新增 `verify:toolbox-governance-acceptance`，检查执行包、执行记录、进度文档、禁止能力和过度宣称。
+- 明确首批低风险候选优先级：薪资谈判话术、HR 知识问答、Offer 对比。
+- 明确法律风险审查、合同审查、试卷打印、英语模拟练习仍需法务、版权、文件留存、品牌授权和真机验收，不进入低风险首批。
+
+仍未完成、不得误宣称：
+
+- 未执行预生产 migration。
+- 未创建或使用真实管理员账号完成异人审批。
+- 未在真实终端验证 `app:${appKey}` 发布投影和熔断移除。
+- 未完成首批低风险微应用的真实 Kiosk / Assistant 接线验收。
+- 未开放第三方 JS / WASM / 任意外部 skill 包执行。
+
 ## 十四、首批低风险 AI skill intent 接线已落地范围
 
 本阶段先接入低风险、无文件上传、无第三方代码执行、无企业闭环的三类首方 AI 技能：
