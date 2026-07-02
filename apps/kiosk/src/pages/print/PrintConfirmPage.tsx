@@ -92,8 +92,14 @@ export function PrintConfirmPage() {
   ]
 
   const handleConfirm = async () => {
-    // http mode + real fileUrl → submit a real print job, get a taskId for polling
-    if (API_MODE === 'http' && file.fileUrl) {
+    // 生产/联网模式(http):必须有真实 fileUrl 才能创建真任务并轮询真实打印状态。
+    if (API_MODE === 'http') {
+      // 无真实 fileUrl(如上游 AI 导出未拿到 signedUrl)时,严禁退回下方 SIM 动画伪造
+      // "打印成功"(CLAUDE.md §9:无真实结果不得展示已打印)。拦截并提示重新生成/上传。
+      if (!file.fileUrl) {
+        setSubmitError('打印文件尚未就绪，无法提交打印。请返回重新上传或重新生成文件后再试。')
+        return
+      }
       setSubmitting(true)
       setSubmitError(null)
       try {
@@ -113,7 +119,7 @@ export function PrintConfirmPage() {
       }
       return
     }
-    // mock mode or no fileUrl → frontend simulation
+    // 仅 mock/dev 模式(API_MODE !== 'http')→ 前端模拟动画,用于本地演示,绝不用于生产。
     clearPrintMaterialSession()
     navigate('/print/progress', { state: { ...location.state, file, params, source } })
   }
