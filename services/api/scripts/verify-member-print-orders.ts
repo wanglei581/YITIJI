@@ -10,6 +10,9 @@
  *   5. 不返回敏感字段：结果绝不含 fileUrl / fileMd5 / paramsJson / storageKey / sha256 /
  *      payloadJson / accessTokenHash / errorCode / errorMessage / endUserId / terminalId。
  *   6. 鉴权（EndUserAuthGuard）：匿名 / 错 token / 无会话 → 401；有效 token + 会话 → 通过并注入本人 endUserId。
+ *   7. 失败原因安全口径：失败订单只回后端映射的安全 failureReasonForUser；
+ *      白名单 errorCode → 可读文案；未知 errorCode / 仅有原始 errorMessage → 统一兜底文案；
+ *      非失败订单 failureReasonForUser 为 null；序列化绝不含原始 errorCode / errorMessage。
  *
  * 运行：pnpm verify:member-print-orders
  *
@@ -23,6 +26,8 @@ import type { ExecutionContext } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
+// SSOT：期望的安全失败文案直接取自打印域映射函数，避免在测试里硬编码另一份文案。
+import { failureReasonForUser } from '../src/print-jobs/print-jobs.service'
 
 const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-member-print-orders-${randomUUID().slice(0, 8)}.db`
 if (fallbackDbName) {
@@ -74,13 +79,27 @@ async function main() {
   const userA = `eu_po_a_${suffix}`
   const userB = `eu_po_b_${suffix}`
   const userC = `eu_po_c_${suffix}` // 无任何订单 → 空列表
+const userD = `eu_po_d_${suffix}` // 失败原因安全口径专用
+
   const userD = `eu_po_d_${suffix}` // P0a 支付字段：unpaid / paid / refunded / 无 Order
   const allUserIds = [userA, userB, userC, userD]
 
   // 显式登记本测试创建的 PrintTask id：PrintTask→EndUser 是 onDelete:SetNull（非级联），
   // 删用户不会删任务，必须按 id 显式清理（含匿名任务）。
   const t = (k: string) => `ptask_po_${k}_${suffix}`
+<<<<<<< HEAD
   const taskIds = [t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'), t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder')]
+=======
+  const taskIds = [
+    t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'),
+    t('d_known'), t('d_unknown'), t('d_rawonly'), t('d_ok'),
+  ]
+
+  // Agent 回传的原始 errorMessage（含设备路径 / 驱动 / 主机名等内部细节），绝不可透出到会员端。
+  const RAW_SENSITIVE_MESSAGE =
+    'CUPS backend usb://Canon/LBP2900 failed at /var/spool/cups on host kiosk-prod-07: driver segfault 0xDEADBEEF'
+  const RAW_UNKNOWN_CODE = 'INTERNAL_DRIVER_PANIC_9F'
+>>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
 
   async function cleanup() {
     await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
@@ -93,7 +112,7 @@ async function main() {
     for (const [id, n] of [[userA, '会员A'], [userB, '会员B'], [userC, '会员C'], [userD, '会员D']] as const) {
       await prisma.endUser.create({ data: { id, phoneHash: `po-${id}`, phoneEnc: `po-enc-${id}`, nickname: n } })
     }
-    pass('三个测试会员已创建')
+    pass('四个测试会员已创建')
 
     // 时间锚点：用固定偏移制造确定的 createdAt 倒序（a2 比 a1 新）。
     const base = new Date('2026-06-08T00:00:00.000Z').getTime()
@@ -136,7 +155,41 @@ async function main() {
         status: 'completed', createdAt: at(30), paramsJson: JSON.stringify({ fileName: '匿名.pdf', copies: 1, colorMode: 'color', paperSize: 'A4' }),
       },
     })
-    pass('打印任务夹具已创建（A×3 含1条脏params / B×1 / 匿名×1）')
+    // D 的失败原因专用夹具：DB 内保留原始 errorCode/errorMessage（后台排障用），
+    // 会员端只应看到映射后的安全 failureReasonForUser。
+    // d_known：白名单 errorCode + 敏感原始 message → 可读白名单文案。
+    await prisma.printTask.create({
+      data: {
+        id: t('d_known'), endUserId: userD, fileUrl: 'sig://secret-dk', fileMd5: 'sha256-dk',
+        status: 'failed', createdAt: at(40), errorCode: 'PRINTER_OFFLINE', errorMessage: RAW_SENSITIVE_MESSAGE,
+        paramsJson: JSON.stringify({ fileName: 'D离线.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+      },
+    })
+    // d_unknown：未知 errorCode + 敏感原始 message → 统一兜底文案。
+    await prisma.printTask.create({
+      data: {
+        id: t('d_unknown'), endUserId: userD, fileUrl: 'sig://secret-du', fileMd5: 'sha256-du',
+        status: 'failed', createdAt: at(35), errorCode: RAW_UNKNOWN_CODE, errorMessage: RAW_SENSITIVE_MESSAGE,
+        paramsJson: JSON.stringify({ fileName: 'D未知.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+      },
+    })
+    // d_rawonly：无 errorCode，仅有敏感原始 message → 统一兜底文案（且不透出原文）。
+    await prisma.printTask.create({
+      data: {
+        id: t('d_rawonly'), endUserId: userD, fileUrl: 'sig://secret-dr', fileMd5: 'sha256-dr',
+        status: 'failed', createdAt: at(30), errorMessage: RAW_SENSITIVE_MESSAGE,
+        paramsJson: JSON.stringify({ fileName: 'D仅消息.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+      },
+    })
+    // d_ok：已完成，无错误 → failureReasonForUser 必须为 null。
+    await prisma.printTask.create({
+      data: {
+        id: t('d_ok'), endUserId: userD, fileUrl: 'sig://secret-do', fileMd5: 'sha256-do',
+        status: 'completed', createdAt: at(25), completedAt: at(28),
+        paramsJson: JSON.stringify({ fileName: 'D完成.pdf', copies: 1, colorMode: 'color', paperSize: 'A4' }),
+      },
+    })
+    pass('打印任务夹具已创建（A×3 含1条脏params / B×1 / 匿名×1 / D×4 失败原因）')
 
     const defaultPage = { cursor: null, pageSize: 50 }
 
@@ -171,13 +224,15 @@ async function main() {
     const a2Ok =
       a2.fileName === '求职信.pdf' && a2.copies === 2 && a2.colorMode === 'color' &&
       a2.paperSize === 'A4' && a2.status === 'completed' &&
-      typeof a2.completedAt === 'string' && a2.completedAt.startsWith('2026-06-08')
+      typeof a2.completedAt === 'string' && a2.completedAt.startsWith('2026-06-08') &&
+      a2.failureReasonForUser === null // 已完成订单无失败原因
     const aBad = listA.find((o) => o.id === t('a_bad'))!
     const badOk =
       aBad.fileName === null && aBad.copies === null && aBad.colorMode === null &&
-      aBad.paperSize === null && aBad.status === 'failed' && aBad.completedAt === null
+      aBad.paperSize === null && aBad.status === 'failed' && aBad.completedAt === null &&
+      aBad.failureReasonForUser === failureReasonForUser(null) // failed 但无 errorCode → 统一兜底文案
     if (a2Ok && badOk) {
-      pass('2. 安全字段映射：正常 params 正确解析；损坏 paramsJson 全部安全降级为 null；completedAt 正确')
+      pass('2. 安全字段映射：正常 params 正确解析；损坏 paramsJson 全部安全降级为 null；completedAt 正确；已完成订单失败原因为 null，无码失败订单回兜底文案')
     } else fail(`2. 字段映射异常：a2=${JSON.stringify(a2)} aBad=${JSON.stringify(aBad)}`)
 
     // ── 3. 跨用户隔离 ───────────────────────────────────────────
@@ -195,8 +250,14 @@ async function main() {
     } else fail(`4. 空列表未返回空分页结果：${JSON.stringify(pageC)}`)
 
     // ── 5. 不返回敏感字段 ───────────────────────────────────────
+<<<<<<< HEAD
     const allItems = [...listA, ...listB]
     const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
+=======
+    const listD = (await orders.list(userD, defaultPage)).items
+    const allItems = [...listA, ...listB, ...listD]
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'failureReasonForUser'])
+>>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
@@ -206,11 +267,17 @@ async function main() {
       for (const f of FORBIDDEN_KEYS) {
         if (Object.prototype.hasOwnProperty.call(item, f)) { leak = `敏感键 ${f}`; break }
       }
-      // 兜底：序列化后不得包含任何 fileUrl / fileMd5 原值。
+      // 兜底：序列化后不得包含任何 fileUrl / fileMd5 原值，也不得含原始 errorMessage / 未知 errorCode。
       if (serialized.includes('sig://') || serialized.includes('sha256-')) { leak = '序列化命中 fileUrl/fileMd5 原值'; break }
+      if (serialized.includes(RAW_SENSITIVE_MESSAGE) || serialized.includes('CUPS backend') || serialized.includes('kiosk-prod-07')) { leak = '序列化命中原始 errorMessage'; break }
+      if (serialized.includes(RAW_UNKNOWN_CODE)) { leak = '序列化命中原始未知 errorCode'; break }
       if (leak) break
     }
+<<<<<<< HEAD
     if (!leak) pass('5. 不返回敏感字段：仅白名单键(含 P0a 支付安全字段)，无 fileUrl/fileMd5/paramsJson/内部错误/越权字段')
+=======
+    if (!leak) pass('5. 不返回敏感字段：仅 9 个白名单键，无 fileUrl/fileMd5/paramsJson/errorCode/errorMessage/支付/越权字段')
+>>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
     else fail(`5. 敏感字段泄漏：${leak}`)
 
     // ── 6. 鉴权（EndUserAuthGuard）─────────────────────────────
@@ -233,6 +300,7 @@ async function main() {
     if (allowed === true && injected?.endUserId === userA) pass('6d. 有效会员 token + 会话 → 通过并注入本人 endUserId')
     else fail('6d. 有效会员鉴权未通过或未注入 endUser')
 
+<<<<<<< HEAD
     // ── 7. P0a 支付字段真实化：join Order，诚实字段 + pickupCode 门控 + 无 live 网关来源 ──
     const dPay = { unpaid: t('d_unpaid'), paid: t('d_paid'), refunded: t('d_refunded'), noorder: t('d_noorder') }
     for (const [key, id] of Object.entries(dPay)) {
@@ -269,6 +337,46 @@ async function main() {
     } else {
       fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} noLiveGateway=${noLiveGateway}`)
     }
+=======
+    // ── 7. 失败原因安全口径 ─────────────────────────────────────
+    // DB 仍完整保留原始 errorCode/errorMessage（后台排障用），会员端只回安全映射文案。
+    const dbKnown = await prisma.printTask.findUnique({ where: { id: t('d_known') }, select: { errorCode: true, errorMessage: true } })
+    if (dbKnown?.errorCode === 'PRINTER_OFFLINE' && dbKnown.errorMessage === RAW_SENSITIVE_MESSAGE) {
+      pass('7a. DB 仍完整保存原始 errorCode/errorMessage（后台排障可用）')
+    } else fail(`7a. DB 未保留原始错误：${JSON.stringify(dbKnown)}`)
+
+    const dKnown = listD.find((o) => o.id === t('d_known'))!
+    const dUnknown = listD.find((o) => o.id === t('d_unknown'))!
+    const dRawOnly = listD.find((o) => o.id === t('d_rawonly'))!
+    const dOk = listD.find((o) => o.id === t('d_ok'))!
+
+    // 白名单 errorCode → 对应可读文案（取自 SSOT 映射函数，且绝非原始文案）。
+    if (
+      dKnown.status === 'failed' &&
+      dKnown.failureReasonForUser === failureReasonForUser('PRINTER_OFFLINE') &&
+      dKnown.failureReasonForUser !== RAW_SENSITIVE_MESSAGE
+    ) pass('7b. 白名单 errorCode → 映射为安全可读文案')
+    else fail(`7b. 白名单映射异常：${JSON.stringify(dKnown)}`)
+
+    // 未知 errorCode → 统一兜底文案，且兜底 !== 原始未知码/原始 message。
+    const generic = failureReasonForUser(null)
+    if (
+      dUnknown.failureReasonForUser === generic &&
+      dUnknown.failureReasonForUser !== RAW_UNKNOWN_CODE &&
+      dUnknown.failureReasonForUser !== RAW_SENSITIVE_MESSAGE
+    ) pass('7c. 未知 errorCode → 统一安全兜底文案（不透出原始码/原始 message）')
+    else fail(`7c. 未知码兜底异常：${JSON.stringify(dUnknown)}`)
+
+    // 仅有原始 errorMessage（无 errorCode）→ 统一兜底文案。
+    if (dRawOnly.failureReasonForUser === generic && dRawOnly.status === 'failed')
+      pass('7d. 仅有原始 errorMessage（无 errorCode）→ 统一安全兜底文案')
+    else fail(`7d. 仅消息兜底异常：${JSON.stringify(dRawOnly)}`)
+
+    // 非失败订单 failureReasonForUser 必须为 null。
+    if (dOk.status === 'completed' && dOk.failureReasonForUser === null)
+      pass('7e. 非失败订单 failureReasonForUser 为 null')
+    else fail(`7e. 非失败订单失败原因非 null：${JSON.stringify(dOk)}`)
+>>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

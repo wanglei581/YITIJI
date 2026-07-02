@@ -14,6 +14,9 @@ export interface MemberPrintOrderItem {
   copies: number | null
   colorMode: 'black_white' | 'color' | null
   paperSize: string | null
+// 面向用户的安全失败原因（仅失败订单非 null）；由内部 errorCode 白名单映射，绝不透出原始错误。
+  failureReasonForUser: string | null
+
   // ── 支付字段（P0a，无 live 网关；可选以保持向后兼容）──
   amountCents?: number | null
   payStatus?: OrderPayStatus | null

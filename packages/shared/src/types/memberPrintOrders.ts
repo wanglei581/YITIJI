@@ -32,6 +32,12 @@ export interface MemberPrintOrderItem {
   colorMode: ColorMode | null
   /** 纸张幅面（来自 paramsJson，当前机型固定 A4）；缺省为 null */
   paperSize: string | null
+* 面向用户的安全失败原因（仅失败订单非 null）。
+   * 后端把内部 errorCode 映射为白名单可读文案；未知错误码 / 仅有原始 errorMessage → 统一兜底文案。
+   * 绝不透出原始 errorCode / errorMessage（可能含设备路径 / 驱动 / 主机名 / 内部堆栈）。
+   * 非失败订单为 null。
+  failureReasonForUser: string | null
+
   // ── 支付字段（P0a 支付域，无 live 网关；可选以保持向后兼容）：关联 Order 才有值；历史无 Order 一律 null ──
   /** 金额（分）；无 Order 为 null。 */
   amountCents?: number | null

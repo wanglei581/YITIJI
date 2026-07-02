@@ -231,6 +231,22 @@ export function MyPrintOrdersPage() {
   }, [items, filterKey])
 
   return (
+subtitle="本人打印任务记录（仅本人可见）"
+      {items.map((item) => {
+          <Card
+            className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4 p-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]"
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
+              <PrinterIcon className="h-6 w-6 text-amber-600" aria-hidden="true" />
+              <p className="truncate text-sm font-semibold text-gray-900">{item.fileName ?? '未命名文件'}</p>
+              <p className="mt-0.5 truncate text-xs text-gray-400">{metaLine(item)}</p>
+              {/* 失败订单仅展示后端映射的安全失败原因（绝无原始 errorCode / errorMessage）。 */}
+              {item.status === 'failed' && item.failureReasonForUser && (
+                <p className="mt-1 text-xs text-red-600">{item.failureReasonForUser}</p>
+            <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-amber-100 bg-white px-3 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  <MessageSquareIcon className="h-4 w-4" aria-hidden="true" />
+              <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', status.cls].join(' ')}>
+
     <div className="me-inkdetail me-inkdetail-print-orders h-full">
       <MeListShell
         title="打印订单"
