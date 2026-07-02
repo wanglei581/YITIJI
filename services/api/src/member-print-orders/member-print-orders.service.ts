@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common'
 import type { MemberPrintOrderItem } from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+// 复用打印域 SSOT 的失败原因安全映射（白名单 errorCode → 可读文案；未知 / 缺失 → 统一兜底）。
+// 绝不把原始 errorCode / errorMessage 透出到会员端。
+import { failureReasonForUser as mapFailureReasonForUser } from '../print-jobs/print-jobs.service'
 
 // ============================================================
 // 会员「我的打印订单」服务（Phase C-2C 后续小步，只读）。
@@ -65,13 +68,21 @@ export class MemberPrintOrdersService {
     const where = { endUserId }
     const total = await this.prisma.printTask.count({ where })
     // select 显式收口：只取安全列，连 fileUrl / fileMd5 都不从 DB 读出，杜绝误透传。
+    // errorCode / errorMessage 仅供服务内部判定与映射，绝不进入序列化输出；
+    // 只把映射后的安全 failureReasonForUser 回给会员端。
     const rows = await this.prisma.printTask.findMany({
       where,
-      select: { id: true, status: true, paramsJson: true, createdAt: true, completedAt: true },
+      select: {
+        id: true, status: true, paramsJson: true, createdAt: true, completedAt: true,
+        errorCode: true, errorMessage: true,
+      },
       ...memberPageArgs(page),
     })
     return buildMemberPage(rows, page, total, (r) => {
       const params = parseSafeParams(r.paramsJson)
+      // 失败判定与打印域 getStatus 口径一致：终态 failed，或已落库 errorCode/errorMessage。
+      // 未知 errorCode / 仅有原始 errorMessage → mapFailureReasonForUser 返回统一兜底文案。
+      const hasFailure = r.status === 'failed' || Boolean(r.errorCode) || Boolean(r.errorMessage)
       return {
         id: r.id,
         status: r.status,
@@ -81,6 +92,7 @@ export class MemberPrintOrdersService {
         copies: params.copies,
         colorMode: params.colorMode,
         paperSize: params.paperSize,
+        failureReasonForUser: hasFailure ? mapFailureReasonForUser(r.errorCode) : null,
       }
     })
   }

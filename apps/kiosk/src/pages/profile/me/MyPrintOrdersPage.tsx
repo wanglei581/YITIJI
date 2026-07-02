@@ -92,6 +92,10 @@ export function MyPrintOrdersPage() {
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-gray-900">{item.fileName ?? '未命名文件'}</p>
               <p className="mt-0.5 truncate text-xs text-gray-400">{metaLine(item)}</p>
+              {/* 失败订单仅展示后端映射的安全失败原因（绝无原始 errorCode / errorMessage）。 */}
+              {item.status === 'failed' && item.failureReasonForUser && (
+                <p className="mt-1 text-xs text-red-600">{item.failureReasonForUser}</p>
+              )}
             </div>
             <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
               {canCreateFeedback && (

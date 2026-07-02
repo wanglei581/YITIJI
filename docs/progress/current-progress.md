@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-07-02
+> 最后更新：2026-07-03
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -37,6 +37,8 @@
 2026-07-03 补充：完成「打印失败原因安全口径收口」（承接 PR #114，为「我的」订单失败原因回显做前置合规裁定）。后端 `PrintJobsService.getStatus()` 不再把 Terminal Agent 原始 `errorMessage`（可能含设备路径 / 驱动异常 / 内部堆栈 / 主机名）透给用户端：新增纯函数 `failureReasonForUser(errorCode)` 白名单映射常见错误码为安全中文文案，未知码统一兜底「打印任务失败，请联系工作人员处理或稍后重试」；用户端状态查询新增显式字段 `failureReasonForUser`，兼容字段 `errorMessage` 也只回安全文案（不再回原文）。`PrintTask.errorCode/errorMessage` 原始值仍原样落库供 Admin / 排障使用（未改 Prisma schema）。Kiosk `PrintProgressPage` 失败分支改为优先 `failureReasonForUser` → 本地 errorCode 映射 → 默认文案，不再回退原始 `errorMessage`（前后端双重防御）。`verify:print-jobs` 新增第 7 段（7a–7e）：构造 Agent 回传含敏感路径 / 驱动 / 主机 / 堆栈的失败任务，断言 DB 保留原文但 `getStatus()` 仅回白名单/兜底安全文案且响应体不含任何敏感片段。验证：`verify:print-jobs` 全段 PASS、`@ai-job-print/api` 与 `@ai-job-print/kiosk` `typecheck`、改动 4 文件 `eslint` 均通过；双模型审查（Antigravity 100/100 APPROVE、独立 Claude 子代理 APPROVE，仅 1 条 Info：`errorCode` 仍原样返回但前台只经白名单映射、从不原样展示，符合设计非必修）。范围仅四个允许文件 + 本进度记录，未碰 Prisma schema / Terminal Agent / Admin 排障视图 / 支付 / 真机出纸。仍未做：「我的」订单失败原因回显 UI 与本人可见范围（本次只收口后端安全口径与 Kiosk 打印进度失败文案，UI 侧仍待产品确认）。
 
 2026-07-03 追加：按第二轮 Claude reviewer 建议，`verify:print-jobs` 第 7 段补一个最易泄露的边界用例（7f/7g）——Agent 回传 `status:'failed'` 且**完全无 `errorCode`、只有原始 `errorMessage`**（失败判定只能靠 `errorMessage` 命中、映射函数拿不到任何码）：断言 DB 仍完整保存原文而 `errorCode` 为空，`getStatus()` 回默认安全文案「打印任务失败，请联系工作人员处理或稍后重试」（`failureReasonForUser` 与兼容 `errorMessage` 一致），响应体不含任何敏感片段。仅改 `services/api/scripts/verify-print-jobs.ts` 测试脚本，未动业务逻辑。重跑 `verify:print-jobs` 7a–7g 全 PASS、api/kiosk `typecheck`、两组 `eslint` 均通过。
+
+2026-07-03 追加：完成「我的」订单失败原因回显（承接上条后端安全口径收口，补齐此前标注「仍未做」的会员端 UI）。`MemberPrintOrderItem`（前后端契约 `packages/shared/src/types/memberPrintOrders.ts` + 后端 `member-print-orders.types.ts`）新增 `failureReasonForUser: string | null` 字段。`MemberPrintOrdersService.list()` 现在从 DB 读取 `errorCode/errorMessage` **仅供内部判定**，复用打印域 SSOT 纯函数 `failureReasonForUser(errorCode)` 映射为安全文案后序列化；失败判定口径与 `PrintJobsService.getStatus()` 一致（终态 `failed` 或已落库 `errorCode/errorMessage`），未知码 / 仅有原始 `errorMessage` → 统一兜底文案，非失败订单为 `null`。原始 `errorCode/errorMessage` 绝不进入响应（select 仍不外泄，仅内部使用）。Kiosk `MyPrintOrdersPage` 仅对 `status==='failed'` 且有 `failureReasonForUser` 的订单展示安全文案，从不展示原始错误。`verify:member-print-orders` 扩展：新增会员 D×4 失败夹具（白名单码 / 未知码 / 仅原始 message / 已完成）与第 7 段（7a–7e），断言 DB 保留原文、白名单码映射可读文案、未知码与仅消息回兜底、非失败订单为 `null`，且序列化绝不含原始 `errorMessage`（含 `CUPS backend`/主机名片段）或原始未知 `errorCode`；归属过滤与无泄漏（第 1/3/5 段）继续全 PASS。验证：`verify:member-print-orders` 全 17 项 PASS、`@ai-job-print/api` 与 `@ai-job-print/kiosk` `typecheck`、改动 5 文件 `eslint` 均通过。范围仅前后端契约类型 + member-print-orders service/types + Kiosk `MyPrintOrdersPage` + verify 脚本 + 本进度记录，未碰 Prisma schema / Terminal Agent / Admin 排障视图 / 支付 / 真机出纸。
 
 ## 规范化治理已完成
 
