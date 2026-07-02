@@ -26,6 +26,8 @@
 
 2026-07-02 补充：完成百宝箱首批低风险 AI skill TAS-G3 / TAS-G4 可信 HTTPS 浏览器验收。使用 Playwright Chromium 真实浏览器访问 `https://120.48.13.190.sslip.io`，覆盖 Offer 对比、薪资谈判话术、HR 知识问答三条 `/assistant?intent=...` 深链、非法 intent 回落、页面免责声明、无招聘平台闭环入口、发送 synthetic prompt、skill 切换旧请求不回写新场景、刷新 / 返回不保留消息、localStorage / sessionStorage 不保存聊天内容。证据 ID `TAS-G3-G4-20260702-browser-privacy-8329b7ea36a1`，仓库外证据目录 `/tmp/ai-job-print-evidence/toolbox-ai-skill-g3-g4-20260702152600`。完整 prompt、完整模型输出、token、cookie、HAR 未入仓；临时脚本已脱敏。本项仍不代表 Windows 一体机真机、正式自有域名 HTTPS、试运营或商用上线完成。
 
+2026-07-02 补充：三端 UI 统一定稿「墨青纸感」设计语言，规范文档新增 `docs/design/inkpaper-design-language.md`（色彩令牌 / 三端身份 / 组件规范 / 铺开清单）。原型只保留定稿三件：`.workbuddy/prototypes/` 下 `fusion-youth-preview-v5.html`（Kiosk）、`admin-console-inkpaper-v1.html`（管理员后台第一批 5 页）、`partner-console-inkpaper-v1.html`（机构后台第一批 4 页）+ `assets/`；已按用户要求清理其余 10 个旧风格/旧版本原型（fusion-youth v1–v4、三方向对比稿、homepage-react、youth-tech、final-service-hall、kiosk-home-interactive）。原型仅为设计参考，未触碰 `apps/` 业务代码，UI 冻结口径不变；真实实施须另行确认解冻。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |
