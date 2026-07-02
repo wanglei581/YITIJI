@@ -20,7 +20,9 @@ import {
   ShieldCheckIcon,
 } from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
+import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
+import { useIdleTimer } from '../../hooks/useIdleTimer'
 import {
   type LoginResult,
   MemberApiError,
@@ -32,6 +34,7 @@ import { ScanQrLoginPanel } from './ScanQrLoginPanel'
 
 const PHONE_LENGTH = 11
 const CODE_LENGTH = 6
+const DEFAULT_LOGIN_IDLE_SEC = 180
 
 type LoginTab = 'phone' | 'email' | 'scan'
 type ActiveNumberInput = 'phone' | 'code' | null
@@ -44,6 +47,12 @@ function formatPhone(raw: string): string {
 
 function normalizeDigits(raw: string, maxLength: number): string {
   return raw.replace(/\D/g, '').slice(0, maxLength)
+}
+
+function resolveLoginIdleMs(): number {
+  const raw = Number(import.meta.env.VITE_KIOSK_LOGOUT_IDLE_SEC)
+  const sec = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LOGIN_IDLE_SEC
+  return sec * 1000
 }
 
 function useCountdown() {
@@ -81,10 +90,20 @@ export function LoginPage() {
   const [activeNumberInput, setActiveNumberInput] = useState<ActiveNumberInput>(null)
 
   const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
+  const handleLoginIdle = useCallback(() => {
+    clearKioskSensitiveSession()
+    navigate('/', { replace: true })
+  }, [navigate])
 
   useEffect(() => {
     if (isLoggedIn) navigate(returnTo, { replace: true })
   }, [isLoggedIn, navigate, returnTo])
+
+  useIdleTimer({
+    timeoutMs: resolveLoginIdleMs(),
+    enabled: !loading,
+    onIdle: handleLoginIdle,
+  })
 
   const switchTab = useCallback((next: LoginTab) => {
     setTab(next)

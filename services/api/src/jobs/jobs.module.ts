@@ -5,13 +5,14 @@ import { AdminFairsService } from './admin-fairs.service'
 import { AdminFairsController } from './admin-fairs.controller'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
+import { JobQualityService } from '../job-ai/job-quality.service'
 
 @Module({
   // PrismaModule:供 importJobs 访问 prisma.job / prisma.organization
   // AuthModule:导出 JwtAuthGuard / RolesGuard,partner 导入接口要用
   // StorageService 为 @Global 模块导出,AdminFairsService 直接注入(活动资料落地)
   imports:     [PrismaModule, AuthModule],
-  providers:   [JobsService, AdminFairsService],
+  providers:   [JobsService, AdminFairsService, JobQualityService],
   controllers: [JobsController, AdminFairsController],
   exports:     [JobsService, AdminFairsService],
 })

@@ -46,6 +46,7 @@ import {
   getTaskLocalStatus,
   markTaskDone,
   enqueuePatch,
+  isDatabaseAvailable,
   type AgentDatabase,
 } from './db'
 
@@ -622,6 +623,10 @@ async function runClaimCycle(
   if (!config.terminalId || !config.agentToken) {
     return // Not registered yet; skip silently
   }
+  if (!isDatabaseAvailable(db)) {
+    warn('task-runner: local task database unavailable; printing disabled')
+    return
+  }
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
@@ -682,6 +687,13 @@ export function startTaskRunner(options: TaskRunnerOptions): NodeJS.Timeout {
   const { config, db } = options
   const interval = config.claimIntervalMs ?? 5_000
   const activeTasks = new Set<string>()
+
+  if (!isDatabaseAvailable(db)) {
+    warn('task-runner: local task database unavailable; printing disabled; claim loop not started')
+    const timer = setInterval(() => undefined, interval)
+    timer.unref()
+    return timer
+  }
 
   log(`task-runner: starting — interval=${interval}ms`)
 

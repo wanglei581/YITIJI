@@ -51,6 +51,10 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 
+# Browser verification artifacts
+.playwright-cli/
+test-results/
+
 # Temp
 .tmp
 mavis-workspace/

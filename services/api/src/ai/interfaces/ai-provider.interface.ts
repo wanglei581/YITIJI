@@ -232,7 +232,18 @@ export interface GenerateResumeOutput {
 /**
  * 意图分类：不包含招聘闭环意图（apply/candidate/hr）
  */
-export type AssistantIntent = 'resume' | 'print' | 'job' | 'fair' | 'policy' | 'general'
+export type AssistantIntent =
+  | 'resume'
+  | 'print'
+  | 'job'
+  | 'fair'
+  | 'policy'
+  | 'general'
+
+export type AssistantSkill =
+  | 'offer_compare'
+  | 'salary_negotiation'
+  | 'hr_qa'
 
 export interface AssistantAction {
   label: string
@@ -242,6 +253,7 @@ export interface AssistantAction {
 export interface ChatInput {
   message: string
   sessionId?: string
+  skill?: AssistantSkill
   context?: Record<string, unknown>
 }
 

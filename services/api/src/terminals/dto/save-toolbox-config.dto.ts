@@ -66,6 +66,11 @@ export class ToolboxItemDto {
   @IsString()
   @MaxLength(512)
   qrImageUrl?: string | null
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  qrTargetUrl?: string | null
 }
 
 export class SaveToolboxConfigDto {

@@ -35,12 +35,14 @@ export class PrintJobsController {
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string | undefined,
     @Headers('authorization') authorization: string | undefined,
+    @Headers('x-terminal-id') terminalId: string | undefined,
   ) {
     const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis)
     return this.service.create(dto, {
       ipAddress: ip ?? null,
       userAgent: userAgent ?? null,
       endUserId: endUser?.endUserId ?? null,
+      terminalId: terminalId ?? null,
     })
   }
 

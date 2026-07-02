@@ -3,11 +3,12 @@ import { Button } from '@ai-job-print/ui'
 import {
   CheckCircleIcon,
   ChevronRightIcon,
+  DownloadIcon,
   FileSpreadsheetIcon,
   UploadIcon,
   XIcon,
 } from 'lucide-react'
-import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport, getMappingRule } from '../../services/api'
+import { parseExcel, previewExcel, confirmExcelImport, cancelExcelImport, getMappingRule, downloadExcelTemplate } from '../../services/api'
 import type { ExcelPreviewResult } from '../../services/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,6 +34,14 @@ const JOB_FIELDS = [
   { key: 'requirements', label: '任职要求', required: false },
   { key: 'industry',   label: '行业',     required: false },
   { key: 'workType',   label: '工作类型', required: false },
+  { key: 'educationRequirement', label: '学历要求', required: false },
+  { key: 'experienceRequirement', label: '经验要求', required: false },
+  { key: 'skills',     label: '技能标签', required: false },
+  { key: 'benefits',   label: '福利',     required: false },
+  { key: 'salaryMin',  label: '最低薪资', required: false },
+  { key: 'salaryMax',  label: '最高薪资', required: false },
+  { key: 'salaryUnit', label: '薪资单位', required: false },
+  { key: 'validThrough', label: '有效期', required: false },
 ] as const
 
 const FAIR_FIELDS = [
@@ -43,6 +52,7 @@ const FAIR_FIELDS = [
   { key: 'venue',      label: '举办场馆', required: true  },
   { key: 'city',       label: '城市',     required: true  },
   { key: 'sourceUrl',  label: '来源链接', required: true  },
+  { key: 'checkinUrl', label: '签到链接', required: false },
   { key: 'theme',      label: '主题',     required: false },
   { key: 'address',    label: '详细地址', required: false },
   { key: 'description', label: '活动介绍', required: false },
@@ -100,12 +110,24 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
   const [preview, setPreview]   = useState<ExcelPreviewResult | null>(null)
   const [importedCount, setImportedCount] = useState(0)
   const [loading, setLoading]   = useState(false)
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [error, setError]       = useState('')
   // T1: 是否套用了上次保存的字段映射规则（用于映射步提示）
   const [savedRuleApplied, setSavedRuleApplied] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fields: readonly FieldDef[] = dataType === 'job' ? JOB_FIELDS : FAIR_FIELDS
+
+  const handleDownloadTemplate = async () => {
+    setDownloadingTemplate(true); setError('')
+    try {
+      await downloadExcelTemplate(dataType)
+    } catch (e) {
+      setError((e as Error).message || '模板下载失败，请稍后重试')
+    } finally {
+      setDownloadingTemplate(false)
+    }
+  }
 
   // Step 1 → 2: upload and parse columns
   const handleUpload = async () => {
@@ -214,8 +236,22 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
           {step === 'upload' && (
             <div className="space-y-5">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">数据类型</label>
-                <div className="flex gap-3">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium text-gray-700">数据类型</label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 px-3 text-xs"
+                    onClick={handleDownloadTemplate}
+                    disabled={downloadingTemplate}
+                  >
+                    <DownloadIcon className="h-3.5 w-3.5" />
+                    {downloadingTemplate
+                      ? '下载中...'
+                      : dataType === 'job' ? '下载岗位模板' : '下载招聘会模板'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-3">
                   {(['job', 'fair'] as const).map((t) => (
                     <button
                       key={t}

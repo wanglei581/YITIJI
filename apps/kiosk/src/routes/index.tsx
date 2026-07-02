@@ -13,11 +13,13 @@ import { InterviewTipsPage } from '../pages/interview/InterviewTipsPage'
 import { InterviewReportsPage } from '../pages/interview/InterviewReportsPage'
 import { AssistantPage } from '../pages/assistant/AssistantPage'
 import { JobFairsPage } from '../pages/job-fairs/JobFairsPage'
+import { JobFairCheckinPage } from '../pages/job-fairs/JobFairCheckinPage'
 import { JobFairDetailPage } from '../pages/job-fairs/JobFairDetailPage'
 import { FairCompaniesPage } from '../pages/job-fairs/FairCompaniesPage'
 import { FairCompanyDetailPage } from '../pages/job-fairs/FairCompanyDetailPage'
 import { FairMapPage } from '../pages/job-fairs/FairMapPage'
 import { FairMaterialsPage } from '../pages/job-fairs/FairMaterialsPage'
+import { FairVisitPlanPage } from '../pages/job-fairs/FairVisitPlanPage'
 import { FairStatsPage } from '../pages/job-fairs/FairStatsPage'
 import { JobsPage } from '../pages/jobs/JobsPage'
 import { CompaniesPage } from '../pages/companies/CompaniesPage'
@@ -57,6 +59,7 @@ import { ResumeReportPage } from '../pages/resume/ResumeReportPage'
 import { ResumeOptimizePage } from '../pages/resume/ResumeOptimizePage'
 import { ResumeExportPage } from '../pages/resume/ResumeExportPage'
 import { ResumeTemplateLibraryPage } from '../pages/resume/ResumeTemplateLibraryPage'
+import { JobMaterialLibraryPage } from '../pages/resume/JobMaterialLibraryPage'
 import { HomePage } from '../pages/home/HomePage'
 import { RenshiPage } from '../pages/renshi/RenshiPage'
 import { CampusPage } from '../pages/campus/CampusPage'
@@ -134,6 +137,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'resume/optimize',   element: <ResumeOptimizePage /> },
       { path: 'resume/export',     element: <ResumeExportPage /> },
       { path: 'resume/templates',  element: <ResumeTemplateLibraryPage /> },
+      { path: 'resume/materials',   element: <JobMaterialLibraryPage /> },
       // 扫描流程（Phase 3）
       { path: 'scan/start',        element: <ScanStartPage /> },
       { path: 'scan/settings',     element: <ScanSettingsPage /> },
@@ -145,12 +149,14 @@ export const kioskRouter = createBrowserRouter([
       { path: 'companies',                             element: <CompaniesPage /> },
       { path: 'companies/:id',                         element: <CompanyDetailPage /> },
       { path: 'job-fairs',                             element: <JobFairsPage /> },
+      { path: 'job-fairs/checkin',                     element: <JobFairCheckinPage /> },
       { path: 'job-fairs/:id',                         element: <JobFairDetailPage /> },
       // 招聘会现场服务（Phase 招聘会数字化）
       { path: 'job-fairs/:id/companies',               element: <FairCompaniesPage /> },
       { path: 'job-fairs/:id/companies/:companyId',    element: <FairCompanyDetailPage /> },
       { path: 'job-fairs/:id/map',                     element: <FairMapPage /> },
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
+      { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
     ],
   },

@@ -50,6 +50,8 @@ export interface HeartbeatOptions {
   onConfigUpdate?: (patch: Partial<AgentConfig>) => void
   /** Mutable counter incremented on each consecutive failure; reset on success. */
   failureCounter?: { count: number }
+  /** False when local SQLite task DB is unavailable; printing must be disabled. */
+  localTaskDatabaseAvailable?: boolean
 }
 
 /**
@@ -59,6 +61,7 @@ export interface HeartbeatOptions {
  */
 export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean> {
   const { config, onConfigUpdate, failureCounter } = options
+  const localTaskDatabaseAvailable = options.localTaskDatabaseAvailable ?? true
 
   if (!config.terminalId || !config.agentToken) {
     warn('heartbeat: skipping — not registered yet')
@@ -73,12 +76,13 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
   ])
 
   const payload: HeartbeatPayload = {
-    status: 'online',
+    status: localTaskDatabaseAvailable ? 'online' : 'agent_degraded',
     printerStatus,
     diskFreeGB,
     agentVersion: config.agentVersion,
     ipAddress: getIpAddress(),
     reportedAt: new Date().toISOString(),
+    localTaskDatabaseAvailable,
   }
 
   try {

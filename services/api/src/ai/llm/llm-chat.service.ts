@@ -12,6 +12,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type {
   AssistantAction,
   AssistantIntent,
+  AssistantSkill,
   ChatInput,
   ChatOutput,
 } from '../interfaces/ai-provider.interface'
@@ -44,6 +45,20 @@ const INTENT_ROUTES: Record<AssistantIntent, AssistantAction[]> = {
   general: [],
 }
 
+const SKILL_ACTIONS: Record<AssistantSkill, AssistantAction[]> = {
+  offer_compare: [
+    { label: '查看岗位信息', route: '/jobs' },
+    { label: '优化简历材料', route: '/resume/source' },
+  ],
+  salary_negotiation: [
+    { label: '查看岗位信息', route: '/jobs' },
+    { label: '优化简历材料', route: '/resume/source' },
+  ],
+  hr_qa: [
+    { label: '人社专区', route: '/renshi' },
+  ],
+}
+
 const INTENT_RULES: [RegExp, AssistantIntent][] = [
   [/简历|履历|resume|cv/i,            'resume'],
   [/打印|复印|扫描|print|scan/i,       'print'],
@@ -51,6 +66,34 @@ const INTENT_RULES: [RegExp, AssistantIntent][] = [
   [/招聘会|双选会|人才市场|fair/i,     'fair'],
   [/政策|补贴|社保|落户|人社/i,        'policy'],
 ]
+
+const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
+  offer_compare: [
+    '当前处于百宝箱「Offer 对比」技能场景。',
+    '请帮助用户从薪酬结构、试用期、工作地点、成长空间、稳定性、通勤和风险点等维度做个人决策参考。',
+    '不得承诺录用结果，不得替用户联系企业，不得保存或要求用户提供无关隐私。',
+    '如用户粘贴含姓名、身份证、完整手机号、银行卡等信息，请提醒其打码后再比较。',
+    '结论必须标明仅供个人参考，不构成录用、入职或法律意见。',
+  ].join('\n'),
+  salary_negotiation: [
+    '当前处于百宝箱「薪资谈判话术」技能场景。',
+    '请输出理性、可执行、尊重双方的沟通话术，可按温和版、直接版、补充材料版组织。',
+    '不得承诺涨薪成功，不得鼓励威胁、骚扰、造假、夸大经历或制造虚假竞品 Offer。',
+    '结论必须标明仅供个人沟通准备参考，不构成涨薪或录用承诺。',
+  ].join('\n'),
+  hr_qa: [
+    '当前处于百宝箱「HR 知识问答」技能场景。',
+    '请用通俗语言解释入职、试用期、社保、公积金、离职、请假等常见 HR 流程和劳动常识。',
+    '不得对具体争议给出确定法律结论，不得承诺仲裁、赔偿或维权结果。',
+    '涉及劳动争议、赔偿、合同解除、工伤、仲裁等高风险问题时，应提示咨询官方人社窗口、法律援助或专业律师。',
+    '结论必须标明仅供常识参考，不构成正式法律意见或官方政策承诺。',
+  ].join('\n'),
+}
+
+function buildSkillScopedSystemPrompt(basePrompt: string, skill?: AssistantSkill): string {
+  const scopedPrompt = skill ? SKILL_SCOPED_PROMPTS[skill] : undefined
+  return scopedPrompt ? `${basePrompt}\n\n${scopedPrompt}` : basePrompt
+}
 
 
 function safeLogValue(value: unknown, maxChars = 80): string {
@@ -94,9 +137,10 @@ export class LlmChatService {
     // 取/建会话历史
     const session = this.sessions.get(sessionId) ?? { messages: [], updatedAt: now }
     session.messages.push({ role: 'user', content: input.message })
+    const skill = input.skill
 
     const payloadMessages: ChatMessage[] = [
-      { role: 'system', content: buildGuardedSystemPrompt(cfg) },
+      { role: 'system', content: buildSkillScopedSystemPrompt(buildGuardedSystemPrompt(cfg), skill) },
       ...session.messages.slice(-MAX_HISTORY),
     ]
 
@@ -115,7 +159,7 @@ export class LlmChatService {
     this.sessions.set(sessionId, session)
 
     const intent = classifyIntent(input.message)
-    const actions = INTENT_ROUTES[intent]
+    const actions = skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]
 
     return {
       sessionId,

@@ -12,7 +12,7 @@
 // ============================================================
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import {
   MicIcon,
@@ -27,7 +27,7 @@ import {
   LandmarkIcon,
 } from 'lucide-react'
 import { Button } from '@ai-job-print/ui'
-import type { AssistantAction } from '@ai-job-print/shared'
+import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
 import { chatWithAssistant } from '../../services/api'
 
 // 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
@@ -80,6 +80,42 @@ const KEYWORD_ROUTES: Array<{ kw: readonly string[]; route: string }> = [
   { kw: ['招聘会', '双选会', '人才市场'],             route: '/job-fairs'     },
   { kw: ['人社', '社保', '政策', '补贴'],             route: '/renshi'        },
 ]
+
+type ToolboxAssistantSkill = AssistantSkill
+
+interface ToolboxAssistantScene {
+  title: string
+  welcome: string
+  placeholder: string
+  disclaimer: string
+}
+
+const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssistantScene> = {
+  offer_compare: {
+    title: 'Offer 对比',
+    welcome: '这里是 Offer 对比助手。您可以把 2-3 个 Offer 的薪资结构、试用期、地点、福利、工作强度和发展机会发给我；请先打码姓名、手机号、公司敏感编号等隐私信息。对比结果仅供个人参考，不构成录用、入职或法律意见。',
+    placeholder: '输入 Offer 信息，例如：A 公司年包、地点、福利；B 公司年包、试用期、通勤…',
+    disclaimer: '对比结果仅供个人参考，不构成录用、入职或法律意见',
+  },
+  salary_negotiation: {
+    title: '薪资谈判话术',
+    welcome: '这里是薪资谈判话术助手。您可以告诉我岗位、当前薪资范围、目标薪资、已有优势和顾虑，我会帮您整理温和版、直接版和补充材料版话术；内容仅供沟通准备参考，不承诺涨薪或录用结果。',
+    placeholder: '输入谈薪场景，例如：HR 给 12k，我希望 14k，有两段实习经历…',
+    disclaimer: '话术仅供沟通准备参考，不构成涨薪或录用承诺',
+  },
+  hr_qa: {
+    title: 'HR 知识问答',
+    welcome: '这里是 HR 知识问答助手。您可以咨询入职、试用期、社保、公积金、离职、请假等常见流程问题；涉及劳动争议、赔偿、仲裁或合同解除时，请以官方人社窗口、法律援助或专业律师意见为准。',
+    placeholder: '输入 HR 问题，例如：试用期社保怎么缴？离职证明什么时候开？',
+    disclaimer: '回答仅供常识参考，不构成正式法律意见或官方政策承诺',
+  },
+}
+
+function normalizeToolboxSkill(value: string | null): ToolboxAssistantSkill | undefined {
+  return value === 'offer_compare' || value === 'salary_negotiation' || value === 'hr_qa'
+    ? value
+    : undefined
+}
 
 function getMatchedRoutes(input: string): Set<string> {
   const lower = input.toLowerCase().trim()
@@ -147,7 +183,15 @@ export function AssistantPage() {
 
 function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
   const navigate = useNavigate()
-  const [messages, setMessages] = useState<Message[]>([WELCOME])
+  const [searchParams] = useSearchParams()
+  const toolboxSkill = useMemo(() => normalizeToolboxSkill(searchParams.get('intent')), [searchParams])
+  const toolboxScene = toolboxSkill ? TOOLBOX_ASSISTANT_SCENES[toolboxSkill] : undefined
+  const welcomeMessage = useMemo<Message>(() => (
+    toolboxScene
+      ? { id: `welcome-${toolboxSkill}`, role: 'assistant', text: toolboxScene.welcome }
+      : WELCOME
+  ), [toolboxSkill, toolboxScene])
+  const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
   // AI 正在回复:禁止进入待机宣传屏(评审 bug #1)
@@ -155,6 +199,8 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
 
   const sessionIdRef = useRef(newSessionId())
   const cancelledRef = useRef(false)
+  const previousSkillRef = useRef<ToolboxAssistantSkill | undefined>(toolboxSkill)
+  const requestTokenRef = useRef(0)
   const bottomRef    = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -168,17 +214,36 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
+  useEffect(() => {
+    if (previousSkillRef.current === toolboxSkill) return
+    previousSkillRef.current = toolboxSkill
+    requestTokenRef.current += 1
+    sessionIdRef.current = newSessionId()
+    setMessages([welcomeMessage])
+    setInput('')
+    setLoading(false)
+  }, [toolboxSkill, welcomeMessage])
+
   const handleSend = useCallback(async () => {
     const text = input.trim()
     if (!text || loading) return
+    const requestSessionId = sessionIdRef.current
+    const requestToken = requestTokenRef.current + 1
+    requestTokenRef.current = requestToken
 
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text }])
     setInput('')
     setLoading(true)
 
     try {
-      const resp = await chatWithAssistant({ message: text, sessionId: sessionIdRef.current })
+      const resp = await chatWithAssistant({
+        message: text,
+        sessionId: requestSessionId,
+        skill: toolboxSkill,
+        context: toolboxSkill ? { source: 'toolbox_ai_skill' } : undefined,
+      })
       if (cancelledRef.current) return
+      if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       sessionIdRef.current = resp.sessionId
 
       const safeActions = resp.actions?.filter((a) => isAllowedRoute(a.route))
@@ -188,14 +253,15 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
       ])
     } catch {
       if (cancelledRef.current) return
+      if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
       setMessages((prev) => [
         ...prev,
         { id: `err-${Date.now()}`, role: 'assistant', text: 'AI 服务暂不可用，请稍后再试', isError: true },
       ])
     } finally {
-      if (!cancelledRef.current) setLoading(false)
+      if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
     }
-  }, [input, loading])
+  }, [input, loading, toolboxSkill])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -225,7 +291,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
           <ArrowLeftIcon className="h-4 w-4" />
           返回
         </button>
-        <p className="text-sm font-medium text-gray-700">AI 就业服务助手</p>
+        <p className="text-sm font-medium text-gray-700">{toolboxScene?.title ?? 'AI 就业服务助手'}</p>
         {onSwitchToCall ? (
           <button
             type="button"
@@ -301,7 +367,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入问题，例如：如何优化我的简历？"
+            placeholder={toolboxScene?.placeholder ?? '输入问题，例如：如何优化我的简历？'}
             rows={2}
             disabled={loading}
             className="min-h-[60px] flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3.5 text-base leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:bg-gray-50"
@@ -316,7 +382,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
             <SendHorizontalIcon className="h-6 w-6" />
           </Button>
         </div>
-        <p className="mt-2 text-center text-xs text-gray-400">AI 回复内容仅供参考，不构成正式建议</p>
+        <p className="mt-2 text-center text-xs text-gray-400">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
       </div>
     </div>
   )

@@ -11,7 +11,7 @@
 //   不会把上一账号数据带入下一账号，避免数据串号。
 // ============================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
 
 // 退出 / 切换账号确认弹层：公共终端二次确认，避免误触清空会话。
 function ConfirmOverlay({
@@ -105,10 +106,51 @@ const cardSurface = 'rounded-2xl border border-neutral-200 bg-white px-5 shadow-
 
 export function MySettingsPage() {
   const navigate = useNavigate()
-  const { user, isLoggedIn, logout } = useAuth()
-  const [confirm, setConfirm] = useState<'logout' | 'switch' | null>(null)
+  const { user, isLoggedIn, getToken, logout } = useAuth()
+  const [confirm, setConfirm] = useState<'logout' | 'switch' | 'revokeJobAi' | null>(null)
+  const [jobAiGranted, setJobAiGranted] = useState<boolean | null>(null)
+  const [jobAiLoading, setJobAiLoading] = useState(false)
+  const [jobAiBusy, setJobAiBusy] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
 
   const phoneMasked = user?.phoneMasked ?? ''
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isLoggedIn) {
+      setJobAiGranted(null)
+      setJobAiLoading(false)
+      return
+    }
+    const token = getToken()
+    if (!token) {
+      setJobAiGranted(null)
+      setJobAiLoading(false)
+      return
+    }
+    setJobAiLoading(true)
+    getJobAiConsentStatus(token)
+      .then((rows) => {
+        if (cancelled) return
+        setJobAiGranted(rows.some((row) => row.scope === 'job_ai' && row.granted))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setJobAiGranted(null)
+      })
+      .finally(() => {
+        if (!cancelled) setJobAiLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [getToken, isLoggedIn])
+
+  useEffect(() => {
+    if (!hint) return
+    const t = setTimeout(() => setHint(null), 3000)
+    return () => clearTimeout(t)
+  }, [hint])
 
   // 退出登录：清空内存会话后回到「我的」（游客态）。
   const handleLogout = () => {
@@ -124,8 +166,30 @@ export function MySettingsPage() {
     navigate('/login', { state: { from: '/profile' } })
   }
 
+  const handleRevokeJobAiConsent = async () => {
+    const token = getToken()
+    if (!token) return
+    setJobAiBusy(true)
+    try {
+      await revokeJobAiConsent(token)
+      setJobAiGranted(false)
+      setConfirm(null)
+      setHint('已撤回岗位 AI 授权，再次使用时需要重新确认')
+    } catch {
+      setHint('撤回失败，请稍后重试')
+    } finally {
+      setJobAiBusy(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col px-6 pt-6">
+      {hint && (
+        <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+          {hint}
+        </div>
+      )}
+
       <PageHeader
         title="账号设置"
         subtitle="账号状态 · 会话说明 · 协议与隐私"
@@ -177,6 +241,38 @@ export function MySettingsPage() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {isLoggedIn && (
+            <section aria-label="隐私与 AI 授权管理" className={`${cardSurface} py-5`}>
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50">
+                  <ShieldCheckIcon className="h-5 w-5 text-violet-600" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-gray-900">隐私与 AI 授权管理</p>
+                    <span className={[
+                      'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                      jobAiGranted ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500',
+                    ].join(' ')}>
+                      {jobAiLoading ? '查询中' : jobAiGranted ? '已授权' : '未授权'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    岗位 AI 辅助只用于本人求职准备参考。撤回授权后，再次使用岗位推荐、解读或匹配时需要重新确认；已生成记录可在 AI服务记录中自行删除。
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!jobAiGranted || jobAiLoading || jobAiBusy}
+                  onClick={() => setConfirm('revokeJobAi')}
+                >
+                  撤回授权
+                </Button>
+              </div>
+            </section>
           )}
 
           {/* 会话说明 */}
@@ -260,6 +356,15 @@ export function MySettingsPage() {
           description="将退出当前账号并前往登录页，使用另一手机号登录。当前会话信息会被清除，不会带入下一个账号。"
           confirmLabel="退出并切换"
           onConfirm={handleSwitch}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+      {confirm === 'revokeJobAi' && (
+        <ConfirmOverlay
+          title="撤回岗位 AI 授权"
+          description="撤回后，本终端不会继续基于该授权处理您的简历用于岗位 AI 辅助。再次使用岗位 AI 推荐、解读或匹配时，需要重新确认授权。"
+          confirmLabel="确认撤回"
+          onConfirm={() => void handleRevokeJobAiConsent()}
           onCancel={() => setConfirm(null)}
         />
       )}

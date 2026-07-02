@@ -18,6 +18,7 @@ export class ApiHttpError extends Error {
     public readonly code: string,
     message: string,
     public readonly status: number,
+    public readonly reason?: string,
   ) {
     super(message)
     this.name = 'ApiHttpError'

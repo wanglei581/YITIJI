@@ -82,11 +82,12 @@ interface FairFormState {
   city: string
   address: string
   sourceUrl: string
+  checkinUrl: string
   description: string
 }
 
 const EMPTY_FORM: FairFormState = {
-  title: '', theme: 'general', startAt: '', endAt: '', venue: '', city: '', address: '', sourceUrl: '', description: '',
+  title: '', theme: 'general', startAt: '', endAt: '', venue: '', city: '', address: '', sourceUrl: '', checkinUrl: '', description: '',
 }
 
 function errMsg(e: unknown): string {
@@ -166,6 +167,7 @@ export default function FairsPage() {
       city: f.city ?? '',
       address: f.address ?? '',
       sourceUrl: f.sourceUrl,
+      checkinUrl: f.checkinUrl ?? '',
       description: f.description ?? '',
     })
     setFormError(null)
@@ -187,6 +189,7 @@ export default function FairsPage() {
       city: form.city.trim(),
       address: form.address.trim() || undefined,
       sourceUrl: form.sourceUrl.trim(),
+      checkinUrl: form.checkinUrl.trim(),
       description: form.description.trim() || undefined,
     }
     try {
@@ -203,6 +206,7 @@ export default function FairsPage() {
           address: payload.address,
           description: payload.description,
           sourceUrl: payload.sourceUrl!,
+          checkinUrl: payload.checkinUrl || undefined,
         }])
         setNotice('招聘会已录入,进入待审核;管理员审核通过并发布后,终端才会展示。')
       } else if (editing) {
@@ -278,7 +282,7 @@ export default function FairsPage() {
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
-                {['外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '来源预约链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
+                {['外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '来源预约链接', '来源签到链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
                   <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
                 ))}
               </tr>
@@ -286,7 +290,7 @@ export default function FairsPage() {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-sm text-gray-400">
+                  <td colSpan={12} className="py-12 text-center text-sm text-gray-400">
                     <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
                     当前筛选条件下无招聘会
                   </td>
@@ -313,6 +317,15 @@ export default function FairsPage() {
                         <a href={f.sourceUrl} target="_blank" rel="noreferrer" className="hover:underline">
                           查看来源
                         </a>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                        {f.checkinUrl ? (
+                          <a href={f.checkinUrl} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">
+                            查看签到源
+                          </a>
+                        ) : (
+                          <span className="text-gray-300">未配置</span>
+                        )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{f.syncTime}</td>
                       <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
@@ -410,6 +423,9 @@ export default function FairsPage() {
           </Field>
           <Field label="来源平台预约链接" required>
             <input className={inputCls} placeholder="https://…(求职者跳转外部平台预约)" value={form.sourceUrl} onChange={(e) => setForm((f) => ({ ...f, sourceUrl: e.target.value }))} />
+          </Field>
+          <Field label="来源平台签到链接">
+            <input className={inputCls} placeholder="https://…(现场扫码前往来源平台签到，可选)" value={form.checkinUrl} onChange={(e) => setForm((f) => ({ ...f, checkinUrl: e.target.value }))} />
           </Field>
           <Field label="简介">
             <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />

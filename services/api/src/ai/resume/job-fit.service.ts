@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { ResumeExtractionService } from './resume-extraction.service'
-import { LlmJobFitService, type JobFitPayload } from './llm-job-fit.service'
+import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
 
 // ============================================================
 // 2D 岗位匹配参考会话服务。
@@ -42,6 +42,23 @@ interface StoredJobFit {
   providerName: string
 }
 
+type JobFitCompletedResponse = {
+  taskId: string
+  status: 'completed'
+  job: StoredJobFit['job']
+  providerName: string
+} & JobFitPayload
+
+export interface JobFitAnalyzeWithUsageResult {
+  response: JobFitCompletedResponse | {
+    taskId: string
+    status: 'failed'
+    failReason: string
+  }
+  provider: string
+  tokenUsage?: JobFitTokenUsage
+}
+
 @Injectable()
 export class JobFitService {
   constructor(
@@ -55,6 +72,14 @@ export class JobFitService {
     input: { taskId: string; jobId?: string; manualJob?: { title: string; requirements?: string } },
     requester: JobFitRequester,
   ) {
+    const result = await this.analyzeWithUsage(input, requester)
+    return result.response
+  }
+
+  async analyzeWithUsage(
+    input: { taskId: string; jobId?: string; manualJob?: { title: string; requirements?: string } },
+    requester: JobFitRequester,
+  ): Promise<JobFitAnalyzeWithUsageResult> {
     const parse = await this.loadAuthorizedParse(input.taskId, requester)
 
     // 岗位上下文：二选一
@@ -87,13 +112,17 @@ export class JobFitService {
     }
     if (!resumeText) {
       return {
-        taskId: input.taskId,
-        status: 'failed' as const,
-        failReason: '简历原文已按隐私策略自动清理，请重新上传简历后再分析',
+        response: {
+          taskId: input.taskId,
+          status: 'failed' as const,
+          failReason: '简历原文已按隐私策略自动清理，请重新上传简历后再分析',
+        },
+        provider: 'llm',
       }
     }
 
-    const payload = await this.llm.analyze(resumeText, jobCtx)
+    const llmResult = await this.llm.analyze(resumeText, jobCtx)
+    const payload = llmResult.payload
     const stored: StoredJobFit = { job: jobInfo, payload, providerName: 'llm' }
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     // 同一 parse 任务保留最近一次分析（unique(taskId,kind) → upsert 覆盖）
@@ -121,7 +150,11 @@ export class JobFitService {
       payload: { mode: input.jobId ? 'job' : 'manual', fitLevel: payload.fitLevel, hasEndUser: !!parse.endUserId },
       ipAddress: null, userAgent: null, requestId: null,
     })
-    return this.toResponse(input.taskId, stored)
+    return {
+      response: this.toResponse(input.taskId, stored),
+      provider: llmResult.provider,
+      tokenUsage: llmResult.tokenUsage,
+    }
   }
 
   /** 读回最近一次分析（刷新恢复 / 会员回看）。 */
@@ -134,7 +167,7 @@ export class JobFitService {
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobFit)
   }
 
-  private toResponse(taskId: string, stored: StoredJobFit) {
+  private toResponse(taskId: string, stored: StoredJobFit): JobFitCompletedResponse {
     return {
       taskId,
       status: 'completed' as const,

@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
 import { generateObjectKey } from '../storage/object-key'
@@ -629,7 +629,7 @@ export class AdminFairsService {
     }
 
     // 事务性替换:upsert guide → 清空旧 halls/facilities → 重建
-    await this.prisma.$transaction(async (tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0]) => {
+    await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
       const guide = await tx.fairVenueGuide.upsert({
         where: { jobFairId: fairId },
         create: { jobFairId: fairId, venueName: dto.venueName },

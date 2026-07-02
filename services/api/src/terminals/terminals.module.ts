@@ -6,6 +6,7 @@ import { AdminPrintersController } from './admin-printers.controller'
 import { AdminToolboxController } from './admin-toolbox.controller'
 import { TerminalsService } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
+import { ToolboxGovernanceService } from './toolbox-governance.service'
 
 @Module({
   // JwtModule：AdminTerminalsController 的 JwtAuthGuard 需要 JwtService。
@@ -14,7 +15,7 @@ import { TerminalToolboxService } from './terminal-toolbox.service'
     JwtVerifierModule,
   ],
   controllers: [TerminalsController, AdminTerminalsController, AdminPrintersController, AdminToolboxController],
-  providers: [TerminalsService, TerminalToolboxService],
-  exports: [TerminalsService, TerminalToolboxService],
+  providers: [TerminalsService, TerminalToolboxService, ToolboxGovernanceService],
+  exports: [TerminalsService, TerminalToolboxService, ToolboxGovernanceService],
 })
 export class TerminalsModule {}

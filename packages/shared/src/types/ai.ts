@@ -189,6 +189,12 @@ export type AssistantIntent =
   | 'policy'   // 政策服务引导
   | 'general'  // 通用问答
 
+/** 百宝箱首方 AI 技能场景；与助手消息分类 intent 保持正交 */
+export type AssistantSkill =
+  | 'offer_compare'       // 百宝箱：Offer 对比
+  | 'salary_negotiation'  // 百宝箱：薪资谈判话术
+  | 'hr_qa'               // 百宝箱：HR 知识问答
+
 /** 助手建议操作（提供路由跳转按钮） */
 export interface AssistantAction {
   label: string
@@ -199,6 +205,8 @@ export interface AssistantAction {
 export interface AssistantChatRequest {
   message: string
   sessionId?: string
+  /** 百宝箱 / 助手入口传入的受控首方技能；为空时后端按消息兜底分类 */
+  skill?: AssistantSkill
   /** 当前页面上下文（如当前模块、设备状态等） */
   context?: Record<string, unknown>
 }
@@ -338,6 +346,92 @@ export interface JobFitResponse {
   providerName?: string
 }
 
+// ── 岗位信息 AI 推荐 / 解读（商用闭环 Task 2）───────────────────────────────
+// 合规：所有推荐和解读均为「仅供参考」，只服务求职者本人；不包含投递结果、
+// 企业候选人筛选、面试邀约、Offer 或任何招聘闭环状态。
+
+export type JobAiFitLevel = 'reference_high' | 'reference_medium' | 'reference_low'
+
+export interface TargetJobContext {
+  jobId: string
+  title: string
+  company: string
+  sourceName: string
+  sourceUrl: string
+  externalId: string
+  description?: string
+  requirements?: string
+  skills: string[]
+  city: string
+  category?: string
+}
+
+export interface JobRecommendationFilters {
+  city?: string
+  category?: string
+  skills?: string[]
+  sourceOrgId?: string
+}
+
+export interface JobRecommendationRequest {
+  resumeTaskId: string
+  /** 匿名简历结果一次性 accessToken；会员模式下由 Bearer token 鉴权。 */
+  accessToken?: string
+  intent?: {
+    targetTitle?: string
+    city?: string
+    industry?: string
+    keywords?: string[]
+  }
+  filters?: JobRecommendationFilters
+  limit?: number
+}
+
+export interface JobAiSessionDTO {
+  id: string
+  resumeTaskId?: string | null
+  operation: 'recommend' | 'explain' | 'match'
+  status: AiTaskStatus
+  provider?: string | null
+  terminalId?: string | null
+  createdAt: string
+  expiresAt?: string | null
+}
+
+export interface JobAiRecommendationDTO {
+  job: TargetJobContext
+  rank: number
+  fitLevel: JobAiFitLevel
+  summary: string
+  matchPoints: string[]
+  gapPoints: string[]
+  actionChecklist: string[]
+  createdAt: string
+}
+
+export interface JobAiSessionListItem {
+  session: JobAiSessionDTO
+  job?: TargetJobContext
+  recommendationCount: number
+}
+
+export interface JobRecommendationResponse {
+  session: JobAiSessionDTO
+  recommendations: JobAiRecommendationDTO[]
+  disclaimer: '仅供参考'
+}
+
+export interface JobExplainResponse {
+  session: JobAiSessionDTO
+  job: TargetJobContext
+  responsibilities: string[]
+  mustHaveRequirements: string[]
+  niceToHaveRequirements: string[]
+  preparationTips: string[]
+  dataQualityWarning?: string
+  disclaimer: '仅供参考'
+}
+
 // ── 2E 职业规划建议 ──────────────────────────────────────────────────────────
 // 合规:仅供本人参考;无薪资/录用/Offer/通过率承诺;现状画像 evidence 经服务端
 // 防编造校验(必须出自简历原文)。
@@ -357,6 +451,50 @@ export interface CareerPlanResponse {
 }
 
 export interface CareerPlanPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+}
+
+// ── 招聘会 AI 参会准备单 ───────────────────────────────────────────────────
+// 合规:仅供本人参会准备参考;不含平台内办理结果、不含企业端筛选或邀约状态。
+
+export interface FairVisitPlanFairSnapshot {
+  id: string
+  title: string
+  sourceName: string
+  sourceUrl: string
+  startAt: string
+  endAt: string
+  venue: string
+  city: string
+}
+
+export interface FairVisitPlanResponse {
+  taskId: string
+  status: 'completed' | 'failed'
+  failReason?: string
+  basedOn?: {
+    resume: true
+    fairId: string
+    fairName: string
+    companyCount: number
+    positionCount: number
+  }
+  fair?: FairVisitPlanFairSnapshot
+  summary?: string
+  fairHighlights?: string[]
+  priorityCompanies?: Array<{ companyName: string; reason: string; sourceUrl: string | null }>
+  preparationChecklist?: string[]
+  questionsToAsk?: string[]
+  onsiteTips?: string[]
+  providerName?: string
+}
+
+export interface FairVisitPlanPrintResponse {
   fileId: string
   filename: string
   sizeBytes: number
