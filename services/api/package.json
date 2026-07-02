@@ -74,6 +74,7 @@
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
+    "verify:resume-export-formats": "node -r @swc-node/register scripts/verify-resume-export-formats.ts",
     "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts",
     "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",
     "db:seed:companies": "node -r @swc-node/register prisma/seed-companies.ts",
