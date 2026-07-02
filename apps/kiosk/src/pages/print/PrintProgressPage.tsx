@@ -154,8 +154,12 @@ export function PrintProgressPage() {
           return
         }
         if (result.status === 'failed') {
+          // 失败原因优先用后端下发的安全文案 failureReasonForUser；
+          // 再回退到本地 errorCode 映射；最后默认文案。
+          // 不再回退到 result.errorMessage —— 该字段可能承载 Agent 原始排障细节，
+          // 前台一律不直接透出（后端亦已收口，此处再做一层防御）。
           navigateFail(
-            errorCodeToMessage(result.errorCode) ?? result.errorMessage ?? FAIL_REASONS[0],
+            result.failureReasonForUser ?? errorCodeToMessage(result.errorCode) ?? FAIL_REASONS[0],
           )
           return
         }
