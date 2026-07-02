@@ -67,6 +67,18 @@ export interface JobFitPayload {
   targetedSuggestions: string[]
 }
 
+export interface JobFitTokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export interface JobFitLlmResult {
+  payload: JobFitPayload
+  provider: string
+  tokenUsage?: JobFitTokenUsage
+}
+
 /** 归一化（与 2B 优化一致）：去空白与常见标点后做子串匹配。 */
 function normalizeForMatch(text: string): string {
   return text.replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '')
@@ -100,7 +112,7 @@ export class LlmJobFitService {
 
   constructor(private readonly config: LlmConfigService) {}
 
-  async analyze(resumeText: string, job: JobFitJobContext): Promise<JobFitPayload> {
+  async analyze(resumeText: string, job: JobFitJobContext): Promise<JobFitLlmResult> {
     const sys =
       '你是求职者本人的简历顾问。基于求职者的简历原文与目标岗位信息，输出「岗位匹配度参考」与定向优化建议。' +
       '这只是给求职者本人修改简历、准备投递用的参考，不是招聘评估，不代表录用结果。' +
@@ -130,7 +142,7 @@ export class LlmJobFitService {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const t0 = Date.now()
       const raw = await this.callLlm(sys, user)
-      const parsed = this.parse(raw)
+      const parsed = this.parse(raw.text)
       const payload = this.validate(parsed, resumeText)
       if (!payload) {
         this.logger.warn(`jobfit.invalid attempt=${attempt} ms=${Date.now() - t0}`)
@@ -150,7 +162,7 @@ export class LlmJobFitService {
         continue
       }
       this.logger.log(`jobfit.ok ms=${Date.now() - t0} match=${sanitized.matchPoints.length} gap=${sanitized.gapPoints.length}`)
-      return sanitized
+      return { payload: sanitized, provider: raw.provider, tokenUsage: raw.tokenUsage }
     }
     throw new ServiceUnavailableException({
       error: { code: 'AI_JOB_FIT_FAILED', message: '岗位匹配参考生成失败，请稍后重试' },
@@ -242,7 +254,11 @@ export class LlmJobFitService {
   }
 
   /** 复用 resume_optimize 功能位（同一条"基于简历的定向输出"链路；密钥仅服务端）。 */
-  private async callLlm(system: string, user: string): Promise<string> {
+  private async callLlm(system: string, user: string): Promise<{
+    text: string
+    provider: string
+    tokenUsage?: JobFitTokenUsage
+  }> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
@@ -272,11 +288,46 @@ export class LlmJobFitService {
       this.logger.error(`jobfit.llm upstream_non_2xx status=${res.status}`)
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: {
+        prompt_tokens?: number
+        completion_tokens?: number
+        total_tokens?: number
+        promptTokens?: number
+        completionTokens?: number
+        totalTokens?: number
+      }
+    }
     const reply = data.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
     }
-    return reply
+    return {
+      text: reply,
+      provider: `llm:${cfg.vendor}:${cfg.model}`,
+      tokenUsage: normalizeTokenUsage(data.usage),
+    }
   }
+}
+
+function normalizeTokenUsage(usage: {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  promptTokens?: number
+  completionTokens?: number
+  totalTokens?: number
+} | undefined): JobFitTokenUsage | undefined {
+  if (!usage) return undefined
+  const promptTokens = toNonNegativeInt(usage.prompt_tokens ?? usage.promptTokens)
+  const completionTokens = toNonNegativeInt(usage.completion_tokens ?? usage.completionTokens)
+  const totalTokens = toNonNegativeInt(usage.total_tokens ?? usage.totalTokens) || promptTokens + completionTokens
+  if (totalTokens <= 0) return undefined
+  return { promptTokens, completionTokens, totalTokens }
+}
+
+function toNonNegativeInt(value: unknown): number {
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
 }

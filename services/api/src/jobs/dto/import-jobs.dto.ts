@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsDateString,
   IsIn,
   IsNotEmpty,
   IsNumber,
@@ -10,7 +11,8 @@ import {
   ArrayMinSize,
   Min,
 } from 'class-validator'
-import { Type } from 'class-transformer'
+import { Transform, Type } from 'class-transformer'
+import { JOB_WORK_TYPE_VALUES, normalizeJobWorkType } from '../work-type'
 
 export class ImportJobItemDto {
   @IsString() @IsNotEmpty() @MaxLength(200)
@@ -43,11 +45,35 @@ export class ImportJobItemDto {
   @IsOptional() @IsString() @MaxLength(100)
   industry?: string
 
-  @IsOptional() @IsIn(['full_time', 'part_time', 'internship', 'contract'])
+  @IsOptional() @Transform(({ value }) => normalizeJobWorkType(value)) @IsIn([...JOB_WORK_TYPE_VALUES])
   workType?: string
 
   @IsOptional() @IsNumber() @Min(1)
   headcount?: number
+
+  @IsOptional() @IsString() @MaxLength(200)
+  educationRequirement?: string
+
+  @IsOptional() @IsString() @MaxLength(200)
+  experienceRequirement?: string
+
+  @IsOptional() @IsArray() @IsString({ each: true })
+  skills?: string[]
+
+  @IsOptional() @IsArray() @IsString({ each: true })
+  benefits?: string[]
+
+  @IsOptional() @IsNumber() @Min(0)
+  salaryMin?: number
+
+  @IsOptional() @IsNumber() @Min(0)
+  salaryMax?: number
+
+  @IsOptional() @IsString() @MaxLength(50)
+  salaryUnit?: string
+
+  @IsOptional() @IsDateString()
+  validThrough?: string
 }
 
 /**

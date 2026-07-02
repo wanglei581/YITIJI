@@ -1,4 +1,4 @@
-import type { AdminAiLogEntry, AdminAiUsage, AdminAiLogsResult } from './types'
+import type { AdminAiLogEntry, AdminAiUsage, AdminAiLogsResult, JobSourceQualitySummary } from './types'
 
 // ─── Mock 数据（仅元数据，无简历内容/聊天原文/文件名/fileId）──
 
@@ -40,10 +40,26 @@ function computeUsage(entries: AdminAiLogEntry[]): AdminAiUsage {
     byOperation: {
       parseResume:    entries.filter((e) => e.operation === 'parseResume').length,
       optimizeResume: entries.filter((e) => e.operation === 'optimizeResume').length,
+      generateResume: 0,
       chatAssistant:  entries.filter((e) => e.operation === 'chatAssistant').length,
       classifyIntent: entries.filter((e) => e.operation === 'classifyIntent').length,
+      jobRecommend: 0,
+      jobExplain: 0,
+      jobMatch: 0,
     },
     errorDistribution: Object.entries(errorCounts).map(([code, count]) => ({ code, count })),
+    tokenUsageTotals: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    costByOperation: {
+      parseResume: 0,
+      optimizeResume: 0,
+      generateResume: 0,
+      chatAssistant: 0,
+      classifyIntent: 0,
+      jobRecommend: 0,
+      jobExplain: 0,
+      jobMatch: 0,
+    },
+    alerts: [],
     estimatedCostCny: 0,
   }
 }
@@ -62,5 +78,10 @@ export const adminAiMockAdapter = {
     await delay()
     const entries = MOCK_LOG_ENTRIES.slice(0, limit)
     return { total: MOCK_LOG_ENTRIES.length, entries }
+  },
+
+  async getAdminJobQualitySummary(): Promise<JobSourceQualitySummary[]> {
+    await delay()
+    return []
   },
 }

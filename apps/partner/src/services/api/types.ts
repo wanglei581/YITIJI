@@ -1,4 +1,5 @@
 import type {
+  JobSourceQualitySummaryDTO,
   ReviewStatus,
   PublishStatus,
   JobFairStatus,
@@ -38,6 +39,7 @@ export type {
 }
 
 export type PartnerSmartCampusTerminal = SmartCampusTerminalView
+export type PartnerJobQualitySummary = JobSourceQualitySummaryDTO
 
 export interface SaveSmartCampusConfigPayload {
   enabled: boolean
@@ -108,6 +110,7 @@ export interface PartnerFairRecord {
   venue: string
   status: JobFairStatus
   sourceUrl: string
+  checkinUrl?: string
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
@@ -133,7 +136,7 @@ export interface ImportJobItem {
   description?: string
   requirements?: string
   industry?: string
-  workType?: 'full_time' | 'part_time' | 'internship' | 'contract'
+  workType?: 'full_time' | 'part_time' | 'internship' | 'contract' | 'campus'
 }
 
 /** 契约 = 后端 ImportFairItemDto(阶段1C 修正:旧 name/organizer/startTime 形状与后端不符,属死代码遗留)。 */
@@ -148,6 +151,7 @@ export interface ImportFairItem {
   address?: string
   description?: string
   sourceUrl: string
+  checkinUrl?: string
   companyCount?: number
   jobCount?: number
 }
@@ -176,6 +180,7 @@ export interface UpdatePartnerFairInput {
   address?: string
   description?: string
   sourceUrl?: string
+  checkinUrl?: string
 }
 
 export interface ImportResult<T> {

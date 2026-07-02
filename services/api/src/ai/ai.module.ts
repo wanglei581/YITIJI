@@ -18,6 +18,10 @@ import { LlmCareerPlanService } from './resume/llm-career-plan.service'
 import { CareerPlanService } from './resume/career-plan.service'
 import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
 import { CareerPlanController } from './career-plan.controller'
+import { LlmFairVisitPlanService } from './resume/llm-fair-visit-plan.service'
+import { FairVisitPlanService } from './resume/fair-visit-plan.service'
+import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
+import { FairVisitPlanController } from './fair-visit-plan.controller'
 import { LlmChatService } from './llm/llm-chat.service'
 import { AiConfigController, AiConfigsController } from './llm/ai-config.controller'
 import { AiResultCleanupTask } from './ai-result.cleanup.task'
@@ -35,7 +39,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   imports: [AuthModule, FilesModule],
-  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController],
+  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController, FairVisitPlanController],
   providers: [
     AiService,
     AiLogService,
@@ -51,6 +55,9 @@ import { LlmResumeProvider } from './providers/llm.provider'
     LlmCareerPlanService,
     CareerPlanService,
     CareerPlanPdfService,
+    LlmFairVisitPlanService,
+    FairVisitPlanService,
+    FairVisitPlanPdfService,
     LlmChatService,
     AiResultCleanupTask,
     // ── Phase 1A 简历文字提取 + OCR 底座 ──
@@ -69,6 +76,6 @@ import { LlmResumeProvider } from './providers/llm.provider'
     LlmResumeOptimizeService,
   ],
   // 导出 ResumeExtractionService 供 Phase 1B 的 AiService / 诊断 provider 复用。
-  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService],
+  exports: [AiService, AiLogService, ResumeExtractionService, LlmConfigService, JobFitService, LlmJobFitService],
 })
 export class AiModule {}

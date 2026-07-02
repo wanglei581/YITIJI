@@ -2,6 +2,7 @@ import type {
   PartnerDataSource,
   CreateDataSourcePayload,
   PartnerJobRecord,
+  PartnerJobQualitySummary,
   PartnerFairRecord,
   PartnerSyncLog,
   ImportJobItem,
@@ -19,6 +20,61 @@ import type {
 
 function delay(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 120))
+}
+
+const JOB_TEMPLATE_HEADERS = [
+  '外部ID*',
+  '职位名称*',
+  '公司名称*',
+  '工作城市*',
+  '来源链接*',
+  '薪资范围',
+  '职位描述',
+  '任职要求',
+  '行业',
+  '工作类型',
+  '学历要求',
+  '经验要求',
+  '技能标签',
+  '福利',
+  '最低薪资',
+  '最高薪资',
+  '薪资单位',
+  '有效期',
+]
+
+const FAIR_TEMPLATE_HEADERS = [
+  '外部ID*',
+  '活动名称*',
+  '开始时间*',
+  '结束时间*',
+  '举办场馆*',
+  '城市*',
+  '来源链接*',
+  '签到链接',
+  '主题',
+  '详细地址',
+  '活动介绍',
+  '参展企业数',
+  '岗位数',
+]
+
+function escapeCsvCell(value: string): string {
+  return `"${value.split('"').join('""')}"`
+}
+
+function downloadBlankTemplate(dataType: 'job' | 'fair'): void {
+  const headers = dataType === 'job' ? JOB_TEMPLATE_HEADERS : FAIR_TEMPLATE_HEADERS
+  const csv = `${headers.map(escapeCsvCell).join(',')}\n`
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = dataType === 'job' ? '岗位数据导入模板.csv' : '招聘会数据导入模板.csv'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 
 // ─── T1: 字段映射规则（mock 持久化，镜像后端「confirm 落地」语义）──────────────
@@ -153,6 +209,24 @@ export const partnerMockAdapter = {
     await delay()
     return [...PARTNER_JOBS]
   },
+  async getPartnerJobQualitySummary(): Promise<PartnerJobQualitySummary[]> {
+    await delay()
+    const totalJobs = PARTNER_JOBS.length
+    const readyJobs = PARTNER_JOBS.filter((job) => job.description && job.requirements && job.sourceUrl).length
+    const insufficientJobs = PARTNER_JOBS.filter((job) => !job.sourceUrl).length
+    const partialJobs = Math.max(0, totalJobs - readyJobs - insufficientJobs)
+    return [{
+      sourceOrgId: 'mock-org',
+      sourceId: null,
+      totalJobs,
+      readyJobs,
+      partialJobs,
+      insufficientJobs,
+      staleJobs: 0,
+      brokenSourceUrlJobs: 0,
+      lastCheckedAt: new Date().toISOString(),
+    }]
+  },
   async unpublishPartnerJob(id: string): Promise<PartnerJobRecord> {
     await delay()
     PARTNER_JOBS = PARTNER_JOBS.map((j) =>
@@ -260,6 +334,11 @@ export const partnerMockAdapter = {
   },
 
   // Excel Import (mock)
+  async downloadExcelTemplate(dataType: 'job' | 'fair'): Promise<void> {
+    await delay()
+    downloadBlankTemplate(dataType)
+  },
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async parseExcel(_file: File): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }> {
     await delay()

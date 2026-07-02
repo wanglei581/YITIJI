@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 import {
   ACTIVITY_TARGET_TYPES,
-  JUMP_ACTION_BY_TARGET,
+  JUMP_ACTIONS_BY_TARGET,
   type ActivityJumpAction,
   type ActivityTargetType,
   type MemberBrowseLogItem,
@@ -62,6 +62,7 @@ export class ActivityService {
   private async loadPublishedTarget(
     targetType: ActivityTargetType,
     targetId: string,
+    action?: ActivityJumpAction,
   ): Promise<TargetSnapshot | null> {
     const published = { reviewStatus: 'approved', publishStatus: 'published' }
     if (targetType === 'job') {
@@ -74,9 +75,14 @@ export class ActivityService {
     if (targetType === 'job_fair') {
       const fair = await this.prisma.jobFair.findFirst({
         where: { id: targetId, ...published },
-        select: { title: true, sourceName: true, sourceUrl: true, externalId: true },
+        select: { title: true, sourceName: true, sourceUrl: true, checkinUrl: true, externalId: true },
       })
-      return fair && { targetTitle: fair.title, sourceName: fair.sourceName, sourceUrl: fair.sourceUrl, externalId: fair.externalId }
+      if (!fair) return null
+      if (action === 'external_checkin_open') {
+        if (!fair.checkinUrl) return null
+        return { targetTitle: fair.title, sourceName: fair.sourceName, sourceUrl: fair.checkinUrl, externalId: fair.externalId }
+      }
+      return { targetTitle: fair.title, sourceName: fair.sourceName, sourceUrl: fair.sourceUrl, externalId: fair.externalId }
     }
     if (targetType === 'company_profile') {
       const company = await this.prisma.companyProfile.findFirst({
@@ -155,12 +161,13 @@ export class ActivityService {
   ): Promise<{ recorded: true; id: string }> {
     assertTargetType(targetTypeRaw)
     const targetType = targetTypeRaw
-    if (JUMP_ACTION_BY_TARGET[targetType] !== actionRaw) {
+    if (!JUMP_ACTIONS_BY_TARGET[targetType].includes(actionRaw as ActivityJumpAction)) {
       throw new BadRequestException({
         error: { code: 'ACTIVITY_INVALID_INPUT', message: '跳转动作与目标类型不匹配' },
       })
     }
-    const snapshot = await this.loadPublishedTarget(targetType, targetId)
+    const action = actionRaw as ActivityJumpAction
+    const snapshot = await this.loadPublishedTarget(targetType, targetId, action)
     if (!snapshot) {
       throw new NotFoundException({
         error: { code: 'ACTIVITY_TARGET_NOT_FOUND', message: '记录目标不存在或未发布' },
@@ -171,7 +178,7 @@ export class ActivityService {
         endUserId,
         targetType,
         targetId,
-        action: actionRaw,
+        action,
         ...snapshot,
         terminalId,
         expiresAt: new Date(Date.now() + ttlMs()),

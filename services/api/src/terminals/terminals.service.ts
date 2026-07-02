@@ -159,6 +159,13 @@ const EXT_TO_MIME: Record<string, string> = {
   '.tiff': 'image/tiff',
 }
 
+const AGENT_HEARTBEAT_STATUSES = new Set(['online', 'offline', 'error', 'agent_degraded'])
+
+function normalizeHeartbeatStatus(status: string | undefined): string | null {
+  if (!status) return null
+  return AGENT_HEARTBEAT_STATUSES.has(status) ? status : null
+}
+
 /** 由原始文件名后缀推断 MIME（无法判断时返回 undefined，交由 Agent 回退）。 */
 function inferMimeFromFileName(fileName: string | undefined): string | undefined {
   if (!fileName) return undefined
@@ -183,6 +190,8 @@ export interface AdminTerminalView {
   lastSeenAt: string // ISO
   online: boolean // lastSeenAt 距今 < 3 分钟 = true
   lastHeartbeatAt: string | null
+  agentStatus: string | null // 'online'|'offline'|'error'|'agent_degraded' 或 null（旧 Agent 未上报）
+  localTaskDatabaseAvailable: boolean | null
   printerStatus: string | null // 'ok'|'offline'|'paper_empty'|'error'|'not_found' 或 null
   agentVersion: string | null
   ipAddress: string | null
@@ -445,7 +454,9 @@ export class TerminalsService implements OnModuleInit {
     await this.prisma.terminalHeartbeat.create({
       data: {
         terminalId,
+        status: normalizeHeartbeatStatus(dto.status),
         printerStatus: dto.printerStatus ?? null,
+        localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
@@ -463,6 +474,11 @@ export class TerminalsService implements OnModuleInit {
     authHeader: string | undefined,
   ): Promise<ClaimTaskResponse[]> {
     await this.findAndValidate(terminalId, authHeader)
+    const canClaim = await this.canTerminalClaimTasks(terminalId)
+    if (!canClaim) {
+      this.logger.warn(`claimTasks: terminal ${terminalId} is agent_degraded/local DB unavailable; returning no tasks`)
+      return []
+    }
 
     const claimExpiry = new Date(Date.now() + 5 * 60 * 1000)
     const limit = Math.min(dto.maxTasks, 1) // Phase 8.2A: max 1 per cycle
@@ -473,7 +489,7 @@ export class TerminalsService implements OnModuleInit {
     for (let i = 0; i < limit; i++) {
       const claimed = await this.prisma.$transaction(async (tx) => {
         const task = await tx.printTask.findFirst({
-          where: { status: 'pending' },
+          where: { status: 'pending', terminalId },
           orderBy: { createdAt: 'asc' },
         })
         if (!task) return null
@@ -482,10 +498,9 @@ export class TerminalsService implements OnModuleInit {
         // (PostgreSQL READ COMMITTED: two transactions could both see the same
         // pending task in findFirst; the guard ensures only one update wins)
         const updatedTask = await tx.printTask.update({
-          where: { id: task.id, status: 'pending' },
+          where: { id: task.id, status: 'pending', terminalId },
           data: {
             status: 'claimed',
-            terminalId,
             claimedAt: new Date(),
             claimExpiry,
           },
@@ -529,21 +544,16 @@ export class TerminalsService implements OnModuleInit {
     authHeader: string | undefined,
     terminalIdHeader: string | undefined,
   ): Promise<{ acknowledged: true }> {
-    await this.validateAnyTerminalToken(authHeader, terminalIdHeader)
-
-    // Ownership check: verify the terminal making the request owns this task
-    const terminalId = terminalIdHeader
-    if (terminalId) {
-      const task = await this.prisma.printTask.findUnique({ where: { id: taskId } })
-      if (task && task.terminalId && task.terminalId !== terminalId) {
-        throw new BadRequestException({
-          error: {
-            code: 'TASK_NOT_OWNED',
-            message: `任务 ${taskId} 不属于终端 ${terminalId}`,
-          },
-        })
-      }
+    if (!terminalIdHeader?.trim()) {
+      throw new BadRequestException({
+        error: {
+          code: 'TASK_TERMINAL_MISSING',
+          message: '状态回传必须携带 x-terminal-id header',
+        },
+      })
     }
+    const terminalId = terminalIdHeader.trim()
+    await this.findAndValidate(terminalIdHeader, authHeader)
 
     // Pre-flight: check task exists (optimistic read outside transaction is fine
     // here — the transaction below re-validates with a status guard in WHERE)
@@ -551,6 +561,22 @@ export class TerminalsService implements OnModuleInit {
     if (!preCheck) {
       throw new NotFoundException({
         error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
+      })
+    }
+    if (!preCheck.terminalId) {
+      throw new BadRequestException({
+        error: {
+          code: 'TASK_TERMINAL_MISSING',
+          message: `任务 ${taskId} 未绑定目标终端`,
+        },
+      })
+    }
+    if (preCheck.terminalId !== terminalId) {
+      throw new BadRequestException({
+        error: {
+          code: 'TASK_NOT_OWNED',
+          message: `任务 ${taskId} 不属于终端 ${terminalId}`,
+        },
       })
     }
 
@@ -578,7 +604,7 @@ export class TerminalsService implements OnModuleInit {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (this.prisma.$transaction as any)(async (tx: any) => {
       const updated = await tx.printTask.updateMany({
-        where: { id: taskId, status: preCheck.status },
+        where: { id: taskId, status: preCheck.status, terminalId },
         data: {
           status: dto.status,
           errorCode: dto.errorCode ?? null,
@@ -598,7 +624,7 @@ export class TerminalsService implements OnModuleInit {
         })
         await tx.order.updateMany({
           where: { printTaskId: taskId },
-          data: { taskStatus: dto.status },
+          data: { taskStatus: dto.status, terminalId },
         })
       }
     })
@@ -611,6 +637,17 @@ export class TerminalsService implements OnModuleInit {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
+
+  private async canTerminalClaimTasks(terminalId: string): Promise<boolean> {
+    const latestHeartbeat = await this.prisma.terminalHeartbeat.findFirst({
+      where: { terminalId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, localTaskDatabaseAvailable: true },
+    })
+    // 兼容旧 Agent / 新注册未上报心跳的终端：未知状态不拦截，只有明确降级才 fail-closed。
+    if (!latestHeartbeat) return true
+    return latestHeartbeat.status !== 'agent_degraded' && latestHeartbeat.localTaskDatabaseAvailable !== false
+  }
 
   private async findAndValidate(
     terminalId: string,
@@ -630,34 +667,6 @@ export class TerminalsService implements OnModuleInit {
       })
     }
     if (!options.allowDisabled && !terminal.enabled) {
-      throw new ForbiddenException({
-        error: { code: 'TERMINAL_DISABLED', message: '终端已停用' },
-      })
-    }
-  }
-
-  private async validateAnyTerminalToken(
-    authHeader: string | undefined,
-    terminalIdHeader: string | undefined,
-  ): Promise<void> {
-    const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
-    if (!token) {
-      throw new UnauthorizedException({
-        error: { code: 'AUTH_TOKEN_INVALID', message: '缺少 Authorization header' },
-      })
-    }
-    if (terminalIdHeader) {
-      await this.findAndValidate(terminalIdHeader, authHeader)
-      return
-    }
-    // Fallback: find any terminal with matching token
-    const found = await this.prisma.terminal.findFirst({ where: { agentToken: token } })
-    if (!found) {
-      throw new UnauthorizedException({
-        error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
-      })
-    }
-    if (!found.enabled) {
       throw new ForbiddenException({
         error: { code: 'TERMINAL_DISABLED', message: '终端已停用' },
       })
@@ -771,7 +780,7 @@ export class TerminalsService implements OnModuleInit {
       // Reset claimed tasks whose lease has expired.
       const claimedCount = await tx.printTask.updateMany({
         where: { status: 'claimed', claimExpiry: { lt: now } },
-        data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
+        data: { status: 'pending', claimedAt: null, claimExpiry: null },
       })
 
       // Reset printing tasks stuck for more than 10 minutes (agent crash recovery).
@@ -779,7 +788,7 @@ export class TerminalsService implements OnModuleInit {
       // shortly after being claimed, so claimedAt is a conservative lower bound.
       const printingCount = await tx.printTask.updateMany({
         where: { status: 'printing', claimedAt: { lt: printingTimeout } },
-        data: { status: 'pending', terminalId: null, claimedAt: null, claimExpiry: null },
+        data: { status: 'pending', claimedAt: null, claimExpiry: null },
       })
 
       const resetIds = [...expiredClaimed, ...expiredPrinting].map((task) => task.id)
@@ -787,9 +796,9 @@ export class TerminalsService implements OnModuleInit {
         await tx.order.updateMany({
           where: {
             printTaskId: { in: resetIds },
-            printTask: { is: { status: 'pending', terminalId: null } },
+            printTask: { is: { status: 'pending' } },
           },
-          data: { taskStatus: 'pending', terminalId: null },
+          data: { taskStatus: 'pending' },
         })
       }
 
@@ -874,7 +883,9 @@ export class TerminalsService implements OnModuleInit {
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: {
+            status: true,
             printerStatus: true,
+            localTaskDatabaseAvailable: true,
             agentVersion: true,
             ipAddress: true,
             diskFreeGb: true,
@@ -902,6 +913,8 @@ export class TerminalsService implements OnModuleInit {
         lastSeenAt: lastSeen.toISOString(),
         online: now - lastSeen.getTime() < ONLINE_WINDOW_MS,
         lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
+        agentStatus: hb?.status ?? null,
+        localTaskDatabaseAvailable: hb?.localTaskDatabaseAvailable ?? null,
         printerStatus: hb?.printerStatus ?? null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,

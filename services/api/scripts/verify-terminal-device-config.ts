@@ -25,6 +25,8 @@ import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.servic
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-terminal-admin-secret-0123456789'
 process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-terminal-action-secret-0123456789'
 process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS'] ||= 'trusted.example.com,cdn.example.com'
+process.env['KIOSK_QR_TARGET_ALLOWED_HOSTS'] ||= 'trusted.example.com'
+process.env['TOOLBOX_ALLOW_EXTERNAL_URL'] ||= 'true'
 
 let staticFailures = 0
 
@@ -178,15 +180,42 @@ function runStaticChecks(): void {
       'const DEFAULT_TOOLBOX: KioskToolboxConfigView = { enabled: true, items: [] }',
       'ALLOWED_TOOLBOX_ROUTE_PATTERNS',
       'KIOSK_EXTERNAL_APP_ALLOWED_HOSTS',
+      'KIOSK_QR_TARGET_ALLOWED_HOSTS',
+      'TOOLBOX_ALLOW_EXTERNAL_URL',
+      'TOOLBOX_EXTERNAL_URL_DISABLED',
+      'TOOLBOX_CONTENT_BLOCKED',
       'TOOLBOX_EXTERNAL_HOST_NOT_ALLOWED',
+      'INVALID_TOOLBOX_QR_TARGET_URL',
+      'findToolboxComplianceViolation',
+      'failed validation and was hidden from public Kiosk config',
       'smartCampusItems',
     ],
     'E5. 后端百宝箱默认启用空占位并限制 Kiosk 站内路径/外部应用白名单',
   )
   contains(
+    'src/terminals/toolbox-policy.ts',
+    ['findToolboxComplianceViolation', '平台内一键投递', '平台(?:内)?', '候选人推荐给企业', '.{0,6}推荐.{0,8}', 'offer管理'],
+    'E5b. 百宝箱安全策略包含合规红线文案拦截',
+  )
+  contains(
     '../../apps/admin/src/routes/toolbox/index.tsx',
-    ['PLACEMENT_OPTIONS', 'LAUNCH_MODE_OPTIONS', '外部 H5', '小程序码'],
-    'E6. Admin 应用上架表单支持百宝箱/智慧校园和外部应用启动方式',
+    ['PLACEMENT_OPTIONS', 'LAUNCH_MODE_OPTIONS', '外部 H5', '小程序码', 'qrTargetUrl', '二维码目标地址'],
+    'E6. Admin 应用上架表单支持百宝箱/智慧校园、外部应用和二维码目标说明',
+  )
+  contains(
+    '../../packages/shared/src/types/kioskApp.ts',
+    ['qrTargetUrl?: string | null'],
+    'E6b. shared KioskAppItem 同步声明二维码目标说明字段',
+  )
+  contains(
+    'src/terminals/dto/save-toolbox-config.dto.ts',
+    ['qrTargetUrl?: string | null'],
+    'E6c. API 百宝箱 DTO 接收二维码目标说明字段',
+  )
+  contains(
+    'src/terminals/admin-toolbox.controller.ts',
+    ['qrTargetUrl: item.qrTargetUrl ?? null', 'before:', 'changedItemKeys'],
+    'E6d. Admin 百宝箱保存透传 qrTargetUrl 且审计记录 before/after 摘要',
   )
   contains(
     'src/smart-campus/smart-campus.module.ts',
@@ -357,6 +386,124 @@ async function runServiceChecks(): Promise<void> {
     } else {
       fail(`0a2. 显式关闭百宝箱状态异常: ${JSON.stringify(disabledToolbox)}`)
     }
+    await prisma.terminalToolboxConfig.upsert({
+      where: { terminalId: codeB },
+      create: {
+        terminalId: codeB,
+        enabled: true,
+        itemsJson: JSON.stringify([
+          {
+            key: 'bad-admin-keep',
+            title: '待修复外部应用',
+            description: '',
+            icon: 'wrench',
+            to: null,
+            disabled: false,
+            sortOrder: 0,
+            placements: ['toolbox'],
+            launchMode: 'external_url',
+            externalUrl: 'https://evil.example.com/admin-keep',
+            qrImageUrl: null,
+            qrTargetUrl: null,
+          },
+          {
+            key: 'good-admin-keep',
+            title: '正常站内入口',
+            description: '',
+            icon: 'wrench',
+            to: '/resume/source',
+            disabled: false,
+            sortOrder: 1,
+            placements: ['toolbox'],
+            launchMode: 'internal_route',
+            externalUrl: null,
+            qrImageUrl: null,
+            qrTargetUrl: null,
+          },
+          {
+            key: 'bad-qr-admin-keep',
+            title: '待修复二维码',
+            description: '',
+            icon: 'help-circle',
+            to: null,
+            disabled: false,
+            sortOrder: 2,
+            placements: ['toolbox'],
+            launchMode: 'qr_code',
+            externalUrl: null,
+            qrImageUrl: '/api/v1/assets/qr.png',
+            qrTargetUrl: null,
+          },
+        ]),
+        updatedBy: adminId,
+      },
+      update: {
+        enabled: true,
+        itemsJson: JSON.stringify([
+          {
+            key: 'bad-admin-keep',
+            title: '待修复外部应用',
+            description: '',
+            icon: 'wrench',
+            to: null,
+            disabled: false,
+            sortOrder: 0,
+            placements: ['toolbox'],
+            launchMode: 'external_url',
+            externalUrl: 'https://evil.example.com/admin-keep',
+            qrImageUrl: null,
+            qrTargetUrl: null,
+          },
+          {
+            key: 'good-admin-keep',
+            title: '正常站内入口',
+            description: '',
+            icon: 'wrench',
+            to: '/resume/source',
+            disabled: false,
+            sortOrder: 1,
+            placements: ['toolbox'],
+            launchMode: 'internal_route',
+            externalUrl: null,
+            qrImageUrl: null,
+            qrTargetUrl: null,
+          },
+          {
+            key: 'bad-qr-admin-keep',
+            title: '待修复二维码',
+            description: '',
+            icon: 'help-circle',
+            to: null,
+            disabled: false,
+            sortOrder: 2,
+            placements: ['toolbox'],
+            launchMode: 'qr_code',
+            externalUrl: null,
+            qrImageUrl: '/api/v1/assets/qr.png',
+            qrTargetUrl: null,
+          },
+        ]),
+        updatedBy: adminId,
+      },
+    })
+    const adminReadToolbox = await toolbox.getTerminalConfig(codeB)
+    const adminListToolboxes = await toolbox.listToolboxTerminals()
+    const adminListedToolbox = adminListToolboxes.find((row) => row.terminalId === codeB)
+    const publicReadToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
+    if (
+      adminReadToolbox.items.some((item) => item.key === 'bad-admin-keep' && item.externalUrl === 'https://evil.example.com/admin-keep') &&
+      adminReadToolbox.items.some((item) => item.key === 'bad-qr-admin-keep' && item.qrImageUrl === '/api/v1/assets/qr.png' && item.qrTargetUrl === null) &&
+      adminListedToolbox?.config?.items.some((item) => item.key === 'bad-admin-keep') &&
+      adminListedToolbox?.config?.items.some((item) => item.key === 'bad-qr-admin-keep') &&
+      publicReadToolbox.items.some((item) => item.key === 'good-admin-keep') &&
+      !publicReadToolbox.items.some((item) => item.key === 'bad-admin-keep') &&
+      !publicReadToolbox.items.some((item) => item.key === 'bad-qr-admin-keep') &&
+      !publicReadToolbox.smartCampusItems.some((item) => item.key === 'bad-admin-keep')
+    ) {
+      pass('0a3. Admin 读取保留待修复项且 public 读取仍会隐藏非法项')
+    } else {
+      fail(`0a3. Admin/public 读取语义异常: ${JSON.stringify({ adminReadToolbox, adminListedToolbox, publicReadToolbox })}`)
+    }
     await expectCode(
       () => toolbox.saveTerminalConfig(codeB, {
         enabled: true,
@@ -433,6 +580,174 @@ async function runServiceChecks(): Promise<void> {
       'INVALID_TOOLBOX_QR_URL',
       '0f. 百宝箱拒绝反斜杠伪装二维码相对路径',
     )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-qr-target-host',
+          title: '未授权二维码目标',
+          description: '',
+          icon: 'help-circle',
+          to: null,
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'qr_code',
+          externalUrl: null,
+          qrImageUrl: '/api/v1/assets/qr.png',
+          qrTargetUrl: 'https://evil.example.com/app',
+        }],
+      }, adminId),
+      'TOOLBOX_EXTERNAL_HOST_NOT_ALLOWED',
+      '0f2. 百宝箱拒绝未加入白名单的二维码目标域名',
+    )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-mini-target-protocol',
+          title: '非法小程序目标说明',
+          description: '',
+          icon: 'help-circle',
+          to: null,
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'mini_program_qr',
+          externalUrl: null,
+          qrImageUrl: '/api/v1/assets/mini-program.png',
+          qrTargetUrl: 'data:text/html;base64,PGgxPkJhZDwvaDE+',
+        }],
+      }, adminId),
+      'INVALID_TOOLBOX_QR_TARGET_URL',
+      '0f3. 百宝箱拒绝协议式小程序目标说明',
+    )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-qr-missing-target',
+          title: '缺目标二维码',
+          description: '',
+          icon: 'help-circle',
+          to: null,
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'qr_code',
+          externalUrl: null,
+          qrImageUrl: '/api/v1/assets/qr.png',
+          qrTargetUrl: null,
+        }],
+      }, adminId),
+      'INVALID_TOOLBOX_QR_TARGET_URL',
+      '0f4. 百宝箱二维码应用必须填写可审计目标地址',
+    )
+    await expectCode(
+      () => toolbox.saveTerminalConfig(codeB, {
+        enabled: true,
+        items: [{
+          key: 'bad-compliance-copy',
+          title: '平台内一键投递',
+          description: '禁止把百宝箱做成招聘闭环',
+          icon: 'wrench',
+          to: '/jobs',
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'internal_route',
+        }],
+      }, adminId),
+      'TOOLBOX_CONTENT_BLOCKED',
+      '0f5. 百宝箱拒绝平台内投递等招聘闭环文案',
+    )
+    for (const [title, description] of [
+      ['平台投递', '禁止把百宝箱做成招聘闭环'],
+      ['企业服务入口', '直收个人简历'],
+      ['合作方服务', '一键推荐候选人给企业'],
+    ] as const) {
+      await expectCode(
+        () => toolbox.saveTerminalConfig(codeB, {
+          enabled: true,
+          items: [{
+            key: `bad-compliance-${title}`,
+            title,
+            description,
+            icon: 'wrench',
+            to: '/jobs',
+            disabled: false,
+            sortOrder: 0,
+            placements: ['toolbox'],
+            launchMode: 'internal_route',
+          }],
+        }, adminId),
+        'TOOLBOX_CONTENT_BLOCKED',
+        `0f5a. 百宝箱拒绝招聘闭环变体文案: ${title} / ${description}`,
+      )
+    }
+    const complianceAllowedToolbox = await toolbox.saveTerminalConfig(codeB, {
+      enabled: true,
+      items: [
+        {
+          key: 'offer-compare-safe',
+          title: 'Offer 对比',
+          description: '候选人自用决策参考',
+          icon: 'wrench',
+          to: '/jobs',
+          disabled: false,
+          sortOrder: 0,
+          placements: ['toolbox'],
+          launchMode: 'internal_route',
+        },
+        {
+          key: 'interview-tips-safe',
+          title: '面试通知查询',
+          description: '用户自查提醒，不向企业发起邀约',
+          icon: 'help-circle',
+          to: '/interview/tips',
+          disabled: false,
+          sortOrder: 1,
+          placements: ['toolbox'],
+          launchMode: 'internal_route',
+        },
+      ],
+    }, adminId)
+    if (
+      complianceAllowedToolbox.items.some((item) => item.key === 'offer-compare-safe') &&
+      complianceAllowedToolbox.items.some((item) => item.key === 'interview-tips-safe')
+    ) {
+      pass('0f5b. 百宝箱允许 Offer 对比和候选人侧面试通知查询等合法工具文案')
+    } else {
+      fail(`0f5b. 合法工具文案误拦截: ${JSON.stringify(complianceAllowedToolbox)}`)
+    }
+    const originalExternalSwitch = process.env['TOOLBOX_ALLOW_EXTERNAL_URL']
+    process.env['TOOLBOX_ALLOW_EXTERNAL_URL'] = 'false'
+    try {
+      await expectCode(
+        () => toolbox.saveTerminalConfig(codeB, {
+          enabled: true,
+          items: [{
+            key: 'external-switch-off',
+            title: '外部 H5 禁用验证',
+            description: '',
+            icon: 'book-open',
+            to: null,
+            disabled: false,
+            sortOrder: 0,
+            placements: ['toolbox'],
+            launchMode: 'external_url',
+            externalUrl: 'https://trusted.example.com/campus',
+            qrImageUrl: null,
+            qrTargetUrl: null,
+          }],
+        }, adminId),
+        'TOOLBOX_EXTERNAL_URL_DISABLED',
+        '0f6. 百宝箱外部 H5 受生产硬开关禁用',
+      )
+    } finally {
+      if (originalExternalSwitch === undefined) delete process.env['TOOLBOX_ALLOW_EXTERNAL_URL']
+      else process.env['TOOLBOX_ALLOW_EXTERNAL_URL'] = originalExternalSwitch
+    }
     const staleFieldToolbox = await toolbox.saveTerminalConfig(codeB, {
       enabled: true,
       items: [{
@@ -447,10 +762,11 @@ async function runServiceChecks(): Promise<void> {
         launchMode: 'internal_route',
         externalUrl: 'https://evil.example.com/stale',
         qrImageUrl: 'https://evil.example.com/stale-qr.png',
+        qrTargetUrl: 'https://evil.example.com/stale-target',
       }],
     }, adminId)
     const staleItem = staleFieldToolbox.items.find((item) => item.key === 'stale-url')
-    if (staleItem?.to === '/resume/source' && staleItem.externalUrl === null && staleItem.qrImageUrl === null) {
+    if (staleItem?.to === '/resume/source' && staleItem.externalUrl === null && staleItem.qrImageUrl === null && staleItem.qrTargetUrl === null) {
       pass('0g. 非当前启动方式的残留 URL 字段会被清理且不误拒保存')
     } else {
       fail(`0g. 残留 URL 字段清理异常: ${JSON.stringify(staleFieldToolbox)}`)
@@ -483,6 +799,21 @@ async function runServiceChecks(): Promise<void> {
           launchMode: 'external_url',
           externalUrl: 'https://trusted.example.com/campus',
           qrImageUrl: null,
+          qrTargetUrl: null,
+        },
+        {
+          key: 'policy-qr',
+          title: '政策二维码',
+          description: '白名单二维码目标',
+          icon: 'help-circle',
+          to: null,
+          disabled: false,
+          sortOrder: 2,
+          placements: ['toolbox'],
+          launchMode: 'qr_code',
+          externalUrl: null,
+          qrImageUrl: 'https://cdn.example.com/policy-qr.png',
+          qrTargetUrl: 'https://trusted.example.com/policy',
         },
         {
           key: 'mini-program',
@@ -491,11 +822,12 @@ async function runServiceChecks(): Promise<void> {
           icon: 'help-circle',
           to: null,
           disabled: false,
-          sortOrder: 2,
+          sortOrder: 3,
           placements: ['toolbox', 'smart_campus'],
           launchMode: 'mini_program_qr',
           externalUrl: null,
           qrImageUrl: '/api/v1/assets/mini-program.png',
+          qrTargetUrl: 'AppID: wx-demo/pages/home',
         },
       ],
     }, adminId)
@@ -503,22 +835,43 @@ async function runServiceChecks(): Promise<void> {
       savedToolbox.enabled &&
       savedToolbox.items.find((item) => item.key === 'resume-optimize')?.to === '/resume/source?intent=optimize' &&
       savedToolbox.items.find((item) => item.key === 'campus-portal')?.externalUrl === 'https://trusted.example.com/campus' &&
-      savedToolbox.items.find((item) => item.key === 'mini-program')?.qrImageUrl === '/api/v1/assets/mini-program.png'
+      savedToolbox.items.find((item) => item.key === 'policy-qr')?.qrTargetUrl === 'https://trusted.example.com/policy' &&
+      savedToolbox.items.find((item) => item.key === 'mini-program')?.qrTargetUrl === 'AppID: wx-demo/pages/home'
     ) {
       pass('0h. 百宝箱允许站内深链、白名单外部 H5 和二维码应用配置')
     } else {
       fail(`0h. 百宝箱合法应用配置保存异常: ${JSON.stringify(savedToolbox)}`)
     }
+    const originalExternalSwitchForPublic = process.env['TOOLBOX_ALLOW_EXTERNAL_URL']
+    process.env['TOOLBOX_ALLOW_EXTERNAL_URL'] = 'false'
+    const switchOffPublicToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
+    if (
+      switchOffPublicToolbox.items.some((item) => item.key === 'resume-optimize') &&
+      switchOffPublicToolbox.items.some((item) => item.key === 'policy-qr') &&
+      switchOffPublicToolbox.items.some((item) => item.key === 'mini-program') &&
+      !switchOffPublicToolbox.smartCampusItems.some((item) => item.key === 'campus-portal')
+    ) {
+      pass('0h2. 外部 H5 开关关闭时 public 读取过滤外部项且保留其它健康项')
+    } else {
+      fail(`0h2. 外部 H5 开关关闭 public 读取异常: ${JSON.stringify(switchOffPublicToolbox)}`)
+    }
+    if (originalExternalSwitchForPublic === undefined) delete process.env['TOOLBOX_ALLOW_EXTERNAL_URL']
+    else process.env['TOOLBOX_ALLOW_EXTERNAL_URL'] = originalExternalSwitchForPublic
     const originalAllowedHosts = process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS']
+    const originalQrTargetHosts = process.env['KIOSK_QR_TARGET_ALLOWED_HOSTS']
     process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS'] = 'cdn.example.com'
+    process.env['KIOSK_QR_TARGET_ALLOWED_HOSTS'] = 'cdn.example.com'
     const driftedToolbox = await toolbox.getPublicConfig(codeB, { id: tB, terminalCode: codeB, enabled: true })
     const driftedItem = driftedToolbox.smartCampusItems.find((item) => item.key === 'campus-portal')
-    if (driftedItem && driftedItem.externalUrl === null) {
-      pass('0i. 读取配置遇到外部域名白名单漂移时降级清理单项 URL,不打挂整份配置')
+    const driftedQr = driftedToolbox.items.find((item) => item.key === 'policy-qr')
+    const driftedMini = driftedToolbox.items.find((item) => item.key === 'mini-program')
+    if (!driftedItem && !driftedQr && driftedMini?.qrImageUrl === '/api/v1/assets/mini-program.png') {
+      pass('0i. 读取配置遇到外部域名白名单漂移时整条过滤坏项,保留存量小程序项且不打挂整份配置')
     } else {
-      fail(`0i. 外部域名白名单漂移读取降级异常: ${JSON.stringify(driftedToolbox)}`)
+      fail(`0i. 外部域名白名单漂移读取 fail-closed 异常: ${JSON.stringify(driftedToolbox)}`)
     }
     process.env['KIOSK_EXTERNAL_APP_ALLOWED_HOSTS'] = originalAllowedHosts
+    process.env['KIOSK_QR_TARGET_ALLOWED_HOSTS'] = originalQrTargetHosts
     await prisma.terminalSmartCampusConfig.create({
       data: {
         terminalId: codeB,
@@ -530,6 +883,7 @@ async function runServiceChecks(): Promise<void> {
     const splitConfig = await terminals.getKioskTerminalConfig(codeB)
     if (
       splitConfig.toolbox.items.some((item) => item.key === 'resume-optimize') &&
+      splitConfig.toolbox.items.some((item) => item.key === 'policy-qr') &&
       splitConfig.toolbox.items.some((item) => item.key === 'mini-program') &&
       !splitConfig.toolbox.items.some((item) => item.key === 'campus-portal') &&
       splitConfig.smartCampus.items.some((item) => item.key === 'campus-portal') &&
@@ -646,8 +1000,8 @@ async function runServiceChecks(): Promise<void> {
     )
     await expectCode(
       () => terminals.patchTaskStatus(taskId, { status: 'printing' }, `Bearer ${tokenA}`, undefined),
-      'TERMINAL_DISABLED',
-      '6c. 停用终端 status 回传 token fallback 被拦截',
+      'TASK_TERMINAL_MISSING',
+      '6c. status 回传缺少 terminalId 时不再允许 token fallback',
     )
 
     const kioskConfig = await terminals.getKioskTerminalConfig(codeA)

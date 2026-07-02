@@ -35,6 +35,7 @@ function printerStatusView(status: string | null) {
 // 在线/离线由 online 字段决定(契约 C1:lastSeenAt 距今 < 3 分钟)
 const ONLINE_VIEW = { badge: 'success' as const, label: '在线' }
 const OFFLINE_VIEW = { badge: 'error' as const, label: '离线' }
+const DEGRADED_VIEW = { badge: 'warning' as const, label: '降级' }
 
 const FILTERS = ['全部', '在线', '离线'] as const
 
@@ -53,6 +54,14 @@ function relativeTime(iso: string | null): string {
 function fmtDisk(gb: number | null): string {
   if (gb === null || gb === undefined) return '—'
   return `${gb.toFixed(1)} GB`
+}
+
+function runtimeStatusView(t: AdminTerminalRecord) {
+  if (!t.online) return { ...OFFLINE_VIEW, detail: null }
+  if (t.agentStatus === 'agent_degraded' || t.localTaskDatabaseAvailable === false) {
+    return { ...DEGRADED_VIEW, detail: '本地任务库不可用，已暂停领取打印任务' }
+  }
+  return { ...ONLINE_VIEW, detail: null }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -370,7 +379,7 @@ export default function TerminalsPage() {
                 </tr>
               ) : (
                 paginated.map((t) => {
-                  const onlineView = t.online ? ONLINE_VIEW : OFFLINE_VIEW
+                  const runtimeView = runtimeStatusView(t)
                   const printerView = printerStatusView(t.printerStatus ?? null)
                   return (
                     <tr key={t.id} className="hover:bg-gray-50">
@@ -538,7 +547,14 @@ export default function TerminalsPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3"><StatusBadge status={onlineView.badge} label={onlineView.label} /></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge status={runtimeView.badge} label={runtimeView.label} />
+                          {runtimeView.detail && (
+                            <span className="text-xs text-amber-600">{runtimeView.detail}</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3"><StatusBadge status={printerView.badge} label={printerView.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{t.agentVersion ?? '—'}</td>

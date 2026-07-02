@@ -1,4 +1,4 @@
-import type { ReviewStatus, PublishStatus } from '@ai-job-print/shared'
+import type { JobSourceQualitySummaryDTO, ReviewStatus, PublishStatus } from '@ai-job-print/shared'
 import type { JobFairStatus } from '@ai-job-print/shared'
 import type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery } from '@ai-job-print/shared'
 
@@ -29,6 +29,8 @@ export interface AdminTerminalRecord {
   lastSeenAt: string              // ISO
   online: boolean                 // lastSeenAt 距今 < 3 分钟 = true
   lastHeartbeatAt: string | null
+  agentStatus: 'online' | 'offline' | 'error' | 'agent_degraded' | string | null
+  localTaskDatabaseAvailable: boolean | null
   printerStatus: TerminalPrinterStatus | string | null
   agentVersion: string | null
   ipAddress: string | null
@@ -132,6 +134,7 @@ export interface AdminFairSourceRecord {
   sourceName: string
   externalId: string
   sourceUrl: string
+  checkinUrl?: string
   name: string
   organizer: string
   startTime: string
@@ -148,8 +151,17 @@ export interface AdminFairSourceRecord {
 // ─── Admin AI 服务管理类型 ─────────────────────────────────────
 // 只含元数据，禁止出现简历正文/聊天原文/文件名/fileId
 
-export type AiOperation = 'parseResume' | 'optimizeResume' | 'chatAssistant' | 'classifyIntent'
+export type AiOperation =
+  | 'parseResume'
+  | 'optimizeResume'
+  | 'generateResume'
+  | 'chatAssistant'
+  | 'classifyIntent'
+  | 'jobRecommend'
+  | 'jobExplain'
+  | 'jobMatch'
 export type AiLogStatus = 'success' | 'failed'
+export type JobSourceQualitySummary = JobSourceQualitySummaryDTO
 
 export interface AdminAiLogEntry {
   taskId: string
@@ -159,6 +171,13 @@ export interface AdminAiLogEntry {
   latencyMs: number
   createdAt: string    // ISO string from backend, formatted string from mock
   errorCode?: string
+  tokenUsage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+  estimatedCostCny?: number
+  terminalId?: string | null
 }
 
 export interface AdminAiUsage {
@@ -171,10 +190,26 @@ export interface AdminAiUsage {
   byOperation: {
     parseResume: number
     optimizeResume: number
+    generateResume: number
     chatAssistant: number
     classifyIntent: number
+    jobRecommend: number
+    jobExplain: number
+    jobMatch: number
   }
   errorDistribution: Array<{ code: string; count: number }>
+  tokenUsageTotals: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
+  costByOperation: Record<AiOperation, number>
+  alerts: Array<{
+    level: 'warning' | 'critical'
+    code: string
+    title: string
+    detail: string
+  }>
   estimatedCostCny: number
 }
 

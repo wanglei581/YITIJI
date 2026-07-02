@@ -75,14 +75,18 @@ model PrintTask {
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
 
 model TerminalHeartbeat {
-  id            String   @id @default(cuid())
-  terminalId    String
-  terminal      Terminal @relation(fields: [terminalId], references: [id])
-  printerStatus String?
-  agentVersion  String?
-  ipAddress     String?
-  diskFreeGb    Float?
-  createdAt     DateTime @default(now())
+  id                         String   @id @default(cuid())
+  terminalId                 String
+  terminal                   Terminal @relation(fields: [terminalId], references: [id])
+  status                     String?
+  printerStatus              String?
+  localTaskDatabaseAvailable Boolean?
+  agentVersion               String?
+  ipAddress                  String?
+  diskFreeGb                 Float?
+  createdAt                  DateTime @default(now())
+
+  @@index([terminalId, createdAt])
 }
 
 // ── PrintTaskStatusLog ────────────────────────────────────────────────────────
@@ -176,6 +180,7 @@ model Organization {
   jobFairs   JobFair[]  @relation("FairOrg")
   policyPosts PolicyPost[] @relation("PolicyOrg")
   companyProfiles CompanyProfile[] @relation("CompanyOrg")
+  jobQualitySnapshots JobDataQualitySnapshot[] @relation("JobQualityOrg")
 }
 
 // ── PolicyPost ────────────────────────────────────────────────────────────────
@@ -282,6 +287,10 @@ model EndUser {
   feedbackTickets  FeedbackTicket[]
   notifications    MemberNotification[]
   broadcastReadStates BroadcastReadState[]
+  jobAiSessions   JobAiSession[]
+  aiServiceLogs   AiServiceLog[]
+  aiConsents      UserAiConsent[]
+  dataRequests    UserDataRequest[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────
@@ -375,10 +384,20 @@ model Job {
   description  String?
   requirements String?
   tagsJson     String   @default("[]")
+  educationRequirement String?
+  experienceRequirement String?
+  skillsJson     String   @default("[]")
+  benefitsJson   String   @default("[]")
+  salaryMin      Int?
+  salaryMax      Int?
+  salaryUnit     String?
+  validThrough   DateTime?
 
   // 企业展示关联(可选,展示导览用;岗位本身的来源字段不依赖它)
   companyProfileId String?
   companyProfile   CompanyProfile? @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
+  aiRecommendations JobAiRecommendation[]
+  qualitySnapshots  JobDataQualitySnapshot[]
 
   // 审核/发布
   reviewStatus  String @default("pending")
@@ -664,6 +683,7 @@ model JobFair {
   externalId  String
   sourceName  String
   sourceUrl   String
+  checkinUrl  String?  // 来源平台/官方现场签到入口；仅展示二维码，不记录签到结果
   sourceId    String?
   source      JobSource? @relation("FairSource", fields: [sourceId], references: [id])
 
@@ -1076,6 +1096,121 @@ model AiResumeResult {
   @@index([expiresAt])
 }
 
+// ── Job AI 商用闭环底座 ─────────────────────────────────────────────────────
+// 仅记录求职者本人侧的岗位 AI 会话、推荐明细、服务调用元数据和数据权利请求。
+// 合规边界：不记录平台内投递、企业筛选、面试邀约、Offer 或第三方投递结果。
+// 隐私边界：不存简历原文、不存完整对话、不存模型输入输出全文、不存签名 URL。
+
+model JobAiSession {
+  id              String   @id @default(cuid())
+  endUserId       String?
+  endUser         EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  resumeTaskId    String?
+  operation       String
+  intentJson      String   @default("{}")
+  status          String   @default("pending")
+  provider        String?
+  terminalId      String?
+  accessTokenHash String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt  DateTime?
+
+  recommendations JobAiRecommendation[]
+
+  @@index([endUserId, createdAt])
+  @@index([resumeTaskId])
+  @@index([operation, status])
+  @@index([expiresAt])
+}
+
+model JobAiRecommendation {
+  id                  String       @id @default(cuid())
+  sessionId           String
+  session             JobAiSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  jobId               String
+  job                 Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rank                Int
+  fitLevel            String       // reference_high | reference_medium | reference_low
+  summary             String?
+  matchPointsJson     String       @default("[]")
+  gapPointsJson       String       @default("[]")
+  actionChecklistJson String       @default("[]")
+  createdAt           DateTime     @default(now())
+
+  @@unique([sessionId, jobId])
+  @@index([sessionId, rank])
+  @@index([jobId])
+  @@index([fitLevel])
+}
+
+model AiServiceLog {
+  id               String   @id @default(cuid())
+  operation        String
+  provider         String?
+  status           String
+  latencyMs        Int?
+  errorCode        String?
+  tokenUsageJson   String   @default("{}")
+  estimatedCostCny Float?
+  terminalId       String?
+  endUserId        String?
+  endUser          EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+
+  @@index([operation, createdAt])
+  @@index([status, createdAt])
+  @@index([endUserId])
+}
+
+model UserAiConsent {
+  id             String    @id @default(cuid())
+  endUserId      String
+  endUser        EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  consentVersion String
+  scope          String
+  grantedAt      DateTime  @default(now())
+  revokedAt      DateTime?
+  terminalId     String?
+
+  @@index([endUserId, scope])
+  @@index([revokedAt])
+}
+
+model UserDataRequest {
+  id          String    @id @default(cuid())
+  endUserId   String
+  endUser     EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  requestType String
+  status      String    @default("pending")
+  requestedAt DateTime  @default(now())
+  handledAt   DateTime?
+  handledBy   String?
+  auditRef    String?
+
+  @@index([endUserId, requestType])
+  @@index([status])
+  @@index([requestedAt])
+}
+
+model JobDataQualitySnapshot {
+  id                 String       @id @default(cuid())
+  jobId              String
+  job                Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceOrgId        String
+  sourceOrg          Organization @relation("JobQualityOrg", fields: [sourceOrgId], references: [id], onDelete: Cascade)
+  missingFieldsJson  String       @default("[]")
+  qualityLevel       String
+  sourceUrlReachable Boolean?
+  checkedAt          DateTime     @default(now())
+  lastError          String?
+
+  @@index([jobId])
+  @@index([sourceOrgId])
+  @@index([qualityLevel])
+  @@index([checkedAt])
+}
+
 // ── Favorite ──────────────────────────────────────────────────────────────────
 // Phase C-2C: 会员收藏底座（收藏服务端化，替换 Kiosk 端 localStorage）。
 //
@@ -1445,6 +1580,91 @@ model TerminalToolboxConfig {
   updatedBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ── ToolboxGovernance ──────────────────────────────────────────────────────
+// 百宝箱微应用审核发布底座。这里只存声明式元数据和版本快照,不承载第三方代码。
+// 发布到终端时由服务端将已审核版本投影到 TerminalToolboxConfig.itemsJson。
+model ToolboxApp {
+  id          String   @id @default(cuid())
+  appKey      String   @unique
+  title       String
+  category    String
+  priority    String
+  status      String
+  riskLevel   String
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions    ToolboxAppVersion[]
+
+  @@index([status])
+  @@index([category])
+}
+
+model ToolboxAppVersion {
+  id              String     @id @default(cuid())
+  appId           String
+  app             ToolboxApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+  version         Int
+  status          String
+  snapshotJson    String
+  submittedBy     String?
+  approvedBy      String?
+  rejectedBy      String?
+  rejectionReason String?
+  createdAt       DateTime   @default(now())
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  publishedAt     DateTime?
+
+  @@unique([appId, version])
+  @@index([appId])
+  @@index([status])
+}
+
+model ToolboxAllowedHost {
+  id         String    @id @default(cuid())
+  host       String
+  purpose    String
+  status     String
+  owner      String
+  reason     String
+  createdBy  String?
+  updatedBy  String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([host, purpose])
+  @@index([status])
+}
+
+// ── ToolboxLaunchEvent ──────────────────────────────────────────────────────
+// 百宝箱/智慧校园应用匿名运营事件。
+// 合规边界: 不关联 endUserId,不存完整 URL/token/第三方办理结果;targetHost 只能由服务端从
+// 已审核的配置项派生为纯主机名。terminalId 沿用 TerminalToolboxConfig 口径,统一存 terminalCode。
+model ToolboxLaunchEvent {
+  id         String   @id @default(cuid())
+  terminalId String
+  itemKey    String
+  itemTitle  String?
+  launchMode String
+  action     String
+  placement  String?
+  targetHost String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([terminalId, createdAt])
+  @@index([itemKey, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+  @@index([expiresAt])
 }
 
 // ── 用户通知 / 意见反馈(P1 我的页商用闭环)────────────────────────────────────

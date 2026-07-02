@@ -110,6 +110,10 @@ export class RedisService implements OnModuleDestroy {
     return n
   }
 
+  decr(key: string): Promise<number> {
+    return this.client.decr(key)
+  }
+
   onModuleDestroy(): void {
     this.client.disconnect()
   }

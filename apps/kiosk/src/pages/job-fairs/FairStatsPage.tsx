@@ -68,7 +68,18 @@ export function FairStatsPage() {
   }
 
   if (error || !stats) {
-    return <EmptyState icon={ActivityIcon} title="暂无统计数据" className="h-full" />
+    return <EmptyState icon={ActivityIcon} title="暂无真实统计数据" className="h-full" />
+  }
+
+  if (stats.isMockData) {
+    return (
+      <EmptyState
+        icon={ActivityIcon}
+        title="真实数据正在接入"
+        description="该招聘会暂未接入真实来源统计，商用模式不会展示模拟数据"
+        className="h-full"
+      />
+    )
   }
 
   const checkinRate = stats.totalCompanies > 0
@@ -95,11 +106,6 @@ export function FairStatsPage() {
         <p className="mt-1 text-xs text-gray-400">
           数据更新于 {formatTime(stats.lastUpdated)} · 系统仅记录服务数据，不记录求职者个人信息
         </p>
-        {stats.isMockData && import.meta.env.DEV && (
-          <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            [开发] 当前为模拟数据，生产环境将由真实 API 替换
-          </div>
-        )}
       </div>
 
       <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
