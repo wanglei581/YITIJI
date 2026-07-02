@@ -303,7 +303,10 @@ export interface ResumeGenerateResponse {
   accessToken?: string
 }
 
-/** 导出 PDF 响应:真实 FileObject + 短时签名 URL,可直接进打印链路 */
+/** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0。 */
+export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
+
+/** 导出响应:真实 FileObject + 短时签名 URL,可直接进打印链路(pdf)或下载(docx/txt/md) */
 export interface ResumeGenerateExportResponse {
   fileId: string
   filename: string

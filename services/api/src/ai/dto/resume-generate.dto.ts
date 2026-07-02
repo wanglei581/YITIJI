@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -9,6 +10,15 @@ import {
   ValidateNested,
 } from 'class-validator'
 import { Type } from 'class-transformer'
+
+/**
+ * 简历导出格式(Wave 1 Task 6)。本地字面量联合,镜像
+ * packages/shared/src/types/ai.ts 的 ResumeExportFormat——services/api 走
+ * commonjs + node moduleResolution,与 ESM-only 的 shared 包直接互操作有兼容
+ * 风险,本项目约定后端类型本地镜像(参见 files/file.types.ts 顶部说明)。
+ * 改动需同步两处。
+ */
+export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
 
 /**
  * 阶段2A AI 简历生成 DTO。
@@ -145,4 +155,8 @@ export class ResumeGenerateExportDto {
   /** 关联的生成任务(仅审计溯源用,可缺省) */
   @IsOptional() @IsString() @MaxLength(100)
   taskId?: string
+
+  /** 导出格式,缺省 pdf。docx/txt/md 页数恒为 0。 */
+  @IsOptional() @IsIn(['pdf', 'docx', 'txt', 'md'])
+  format?: ResumeExportFormat
 }

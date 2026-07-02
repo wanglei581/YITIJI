@@ -239,9 +239,9 @@ export class AiController {
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
-    const { taskId, ...resume } = dto
+    const { taskId, format, ...resume } = dto
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId)
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf')
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -250,6 +250,7 @@ export class AiController {
       targetId: result.fileId,
       payload: {
         taskId: taskId ?? null,
+        format: format ?? 'pdf',
         pageCount: result.pageCount,
         sizeBytes: result.sizeBytes,
         hasEndUser: Boolean(requester.endUserId),
