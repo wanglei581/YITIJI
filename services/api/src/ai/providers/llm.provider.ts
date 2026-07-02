@@ -7,6 +7,7 @@ import type {
   ParseResumeOutput,
   ResumeGenerateInput,
   ResumeReport,
+  ResumeTargetContext,
   OptimizeResumeOutput,
   ChatInput,
   ChatOutput,
@@ -79,7 +80,12 @@ export class LlmResumeProvider implements AiProvider {
    * 防编造契约在 LlmResumeOptimizeService 强制(事实串必须出现在原文)。
    * 任何失败都返回 status:'failed' + 明确 failReason,绝不 fallback mock。
    */
-  async optimizeResume(taskId: string, report: ResumeReport, extractedText?: string): Promise<OptimizeResumeOutput> {
+  async optimizeResume(
+    taskId: string,
+    report: ResumeReport,
+    extractedText?: string,
+    targetContext?: ResumeTargetContext,
+  ): Promise<OptimizeResumeOutput> {
     if (!extractedText || !extractedText.trim()) {
       return {
         taskId,
@@ -88,7 +94,7 @@ export class LlmResumeProvider implements AiProvider {
       }
     }
     try {
-      const { optimizedResume, modules } = await this.resumeOptimize.optimize(extractedText, report)
+      const { optimizedResume, modules } = await this.resumeOptimize.optimize(extractedText, report, targetContext)
       return { taskId, status: 'completed', modules, optimizedResume }
     } catch (err) {
       const code = errorCodeOf(err)

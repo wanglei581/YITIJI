@@ -285,8 +285,15 @@ export interface AiProvider {
   /**
    * 简历优化。阶段2B 起 llm provider 需要简历原文(extractedText)做基于事实的优化;
    * 未传原文时 llm provider 诚实失败。mock / stub 实现可忽略该参数。
+   * targetContext(Wave 1 Task 2,additive 可选):目标方向上下文,仅用于引导优化措辞重点
+   * (专业/学历/目标岗位/经验/场景),不得据此新增或改写任何事实字段;事实仍必须来自原文。
    */
-  optimizeResume(taskId: string, report: ResumeReport, extractedText?: string): Promise<OptimizeResumeOutput>
+  optimizeResume(
+    taskId: string,
+    report: ResumeReport,
+    extractedText?: string,
+    targetContext?: ResumeTargetContext,
+  ): Promise<OptimizeResumeOutput>
   chatAssistant(input: ChatInput): Promise<ChatOutput>
   classifyIntent(message: string): Promise<ClassifyIntentOutput>
   /**

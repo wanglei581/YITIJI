@@ -7,6 +7,7 @@ import type {
   ParseResumeOutput,
   ResumeGenerateInput,
   ResumeReport,
+  ResumeTargetContext,
   OptimizeResumeOutput,
   ChatInput,
   ChatOutput,
@@ -90,7 +91,12 @@ export class MockAiProvider implements AiProvider {
     }
   }
 
-  async optimizeResume(taskId: string, _report: ResumeReport): Promise<OptimizeResumeOutput> {
+  async optimizeResume(
+    taskId: string,
+    _report: ResumeReport,
+    _extractedText?: string,
+    _targetContext?: ResumeTargetContext,
+  ): Promise<OptimizeResumeOutput> {
     return {
       taskId,
       status: 'completed',

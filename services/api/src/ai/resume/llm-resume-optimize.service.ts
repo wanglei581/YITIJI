@@ -3,6 +3,7 @@ import type {
   GeneratedResume,
   ResumeOptimizeModule,
   ResumeReport,
+  ResumeTargetContext,
 } from '../interfaces/ai-provider.interface'
 import { LlmConfigService } from '../llm/llm-config.service'
 import { containsForbiddenWord } from '../llm/llm-guard'
@@ -10,7 +11,13 @@ import { containsForbiddenWord } from '../llm/llm-guard'
 // ============================================================
 // LlmResumeOptimizeService — 阶段2B 真实简历优化(单轮、结构化 JSON,OpenAI 兼容)
 //
-// 输入 = 提取的简历原文 + 已有诊断报告;输出 = 结构化优化版简历 + 新旧对比模块。
+// 输入 = 提取的简历原文 + 已有诊断报告 + 可选目标方向上下文(targetContext);
+// 输出 = 结构化优化版简历 + 新旧对比模块。
+//
+// targetContext(Wave 1 Task 2,additive 可选):专业/学历/目标岗位/经验/场景仅用于引导
+// 优化措辞重点(拼进 prompt 的「优化方向」段),不是事实来源——事实字段仍只能来自简历原文,
+// 不得据 targetContext 新增或改写任何学校/公司/学历/证书/经历。字段值当作普通文本处理,
+// 不作为可信 HTML/prompt 指令。
 //
 // 防编造契约(与 2A 生成同级强度,但针对"从原文重组"场景):
 //   - 事实串校验:优化版简历中的 学校 / 公司 / 证书 / 电话 / 邮箱 必须能在
@@ -56,6 +63,7 @@ const OPTIMIZE_SYSTEM_PROMPT = [
   '5. modules 为 2~8 条新旧对比:before 必须是简历原文中真实存在的连续片段(逐字摘录,不要改写),after 是对应的优化表达。',
   '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺;优化只是表达参考,由求职者本人决定是否采纳。',
   '7. 原文信息不足的部分,在对应字段留空即可,不要替用户补内容。',
+  '8. 若收到"优化方向"提示(专业/学历/目标岗位/经验级别/求职场景),只能用于调整措辞重点与用词方向;不得据此新增、替换或"纠正"任何学校、公司、学历、证书、时间段等事实字段——事实字段仍必须逐字来自简历原文。',
 ].join('\n')
 
 const RETRY_HINT =
@@ -71,6 +79,47 @@ export interface OptimizeResult {
   modules: ResumeOptimizeModule[]
 }
 
+/**
+ * 清洗 targetContext 自由文本字段:去控制字符、折叠空白、截断长度。
+ * 仅作为普通文本方向提示塞进 user prompt,不当作可信 HTML/prompt 指令解析。
+ */
+function cleanTargetText(value: unknown, maxLen: number): string {
+  if (typeof value !== 'string') return ''
+  const text = [...value]
+    .map((ch) => {
+      const code = ch.charCodeAt(0)
+      return code < 32 || code === 127 ? ' ' : ch
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return text.slice(0, maxLen)
+}
+
+/**
+ * 把目标方向上下文拼成一段「优化方向」提示,仅用于引导措辞重点。
+ * 红线:不产出任何事实字段,不替代原文;调用方仍必须走既有事实串/承诺词校验。
+ */
+function buildTargetContextPrompt(target?: ResumeTargetContext): string {
+  if (!target || target.skipped) return ''
+  const major = cleanTargetText(target.major, 40)
+  const degree = cleanTargetText(target.degree, 20)
+  const targetJob = cleanTargetText(target.targetJob, 80)
+  const industry = cleanTargetText(target.industry, 40)
+  const experience = cleanTargetText(target.experience, 20)
+  const scene = cleanTargetText(target.scene, 20)
+  const parts = [
+    major ? `专业方向=${major}` : '',
+    degree ? `学历层次=${degree}` : '',
+    targetJob ? `目标岗位=${targetJob}` : '',
+    industry ? `行业方向=${industry}` : '',
+    experience ? `经验级别=${experience}` : '',
+    scene ? `求职场景=${scene}` : '',
+  ].filter(Boolean)
+  if (parts.length === 0) return ''
+  return `优化方向(仅用于调整措辞重点,不得据此新增或改写任何事实字段;事实仍须逐字来自简历原文):${parts.join('；')}\n`
+}
+
 /** 空白/标点归一,用于"事实串是否出现在原文"的鲁棒匹配。 */
 function normalizeForMatch(text: string): string {
   return text.replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '').toLowerCase()
@@ -84,10 +133,11 @@ export class LlmResumeOptimizeService {
 
   /**
    * 基于简历原文 + 诊断报告生成优化版简历与新旧对比。
+   * targetContext(可选):仅拼进「优化方向」提示引导措辞重点,不改变防编造/承诺拦截校验。
    * - 未配置 / 未启用 → AI_PROVIDER_NOT_CONFIGURED(绝不 fallback mock)。
    * - 非法 JSON / 事实串不在原文 / 命中承诺类拦截词 → 重试一次;仍坏 → AI_OPTIMIZE_INVALID_OUTPUT。
    */
-  async optimize(extractedText: string, report: ResumeReport): Promise<OptimizeResult> {
+  async optimize(extractedText: string, report: ResumeReport, targetContext?: ResumeTargetContext): Promise<OptimizeResult> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
@@ -98,9 +148,13 @@ export class LlmResumeOptimizeService {
 
     const text = (extractedText ?? '').slice(0, MAX_INPUT_CHARS)
     const reportBrief = report.sections.map((s) => `${s.label}:${s.score}/${s.maxScore}`).join('、')
+    const directionPrompt = buildTargetContextPrompt(targetContext)
     const baseMessages: ChatMessage[] = [
       { role: 'system', content: OPTIMIZE_SYSTEM_PROMPT },
-      { role: 'user', content: `诊断报告摘要:${reportBrief}\n改进建议:${(report.suggestions ?? []).join(';')}\n\n简历原文:\n${text}` },
+      {
+        role: 'user',
+        content: `${directionPrompt}诊断报告摘要:${reportBrief}\n改进建议:${(report.suggestions ?? []).join(';')}\n\n简历原文:\n${text}`,
+      },
     ]
 
     for (let attempt = 1; attempt <= 2; attempt++) {
