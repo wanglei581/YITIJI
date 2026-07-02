@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-01
+> 最后更新：2026-07-02
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -151,6 +151,7 @@
 - [ ] **百宝箱微应用平台 Phase 1B 管理体验增强**：后续可在 Admin 百宝箱配置页展示 blocked reason / 修复建议，并按真实预生产流量评估是否需要在现有 `@Throttle` 基础上增加 terminalId 维度的专用事件限流；该项不阻塞当前后端安全门禁。
 - [x] **百宝箱微应用平台 Phase 2 最小治理规则底座**：已新增纯函数治理文件和共享契约，覆盖状态机、自审批拦截、host active / 过期 / 熔断 / 本机私网检查、红线文案复用、高风险免责声明、外部 H5 开关和发布 gate；`verify:toolbox-micro-app-platform` 已补运行时负向门禁。该项不代表真实数据库表、Admin 审核发布 UI、Kiosk 发布投影或第三方 skill 网关完成。
 - [x] **百宝箱微应用平台 Phase 2B 后端审核发布工作流（代码侧）**：已新增真实 `ToolboxApp` / `ToolboxAppVersion` / `ToolboxAllowedHost` 持久化、Admin 审核发布接口、允许域名治理、AuditLog 摘要、发布 gate、严格投影 dry-run、终端 `TerminalToolboxConfig.itemsJson` 发布投影和熔断移除；新增 `verify:toolbox-review-workflow`。该项不代表 Admin 可视化 UI、预生产 / 生产 migration、真实终端发布投影验收或首批微应用商用上线完成。
+- [x] **百宝箱微应用平台 Phase 2C Admin 审核发布 UI**：Admin `/toolbox` 已补应用目录、版本列表、提交 / 审批 / 驳回 / 发布 / 熔断操作、允许域名待审核 / 激活 / 熔断管理、免责声明展示、blocked reason 和修复建议；后端已补应用 / 版本 / 允许域名只读列表接口，终端配置对 `app:${appKey}` 治理投影项只读，新增 `verify:toolbox-review-ui`。该项不代表预生产 / 生产 migration、真实管理员异人审批、真实终端发布投影或首批微应用商用上线完成。
 - [ ] **百宝箱 TB-G0~TB-G4 预生产验收执行**：按执行包顺序先跑本地静态门禁并创建仓库外证据目录；经用户明确确认后再做预生产只读预检、PostgreSQL 备份与 migration、`KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS` 脱敏复核、Admin 对真实终端配置站内 / 外部 H5 / 二维码项、Kiosk 真机打开外部 H5 / 取消 / 继续 / 二维码展示，并抽样 `ToolboxLaunchEvent` 确认只存纯 host 和匿名 action。未完成 TB-G2~TB-G4 前，不得宣称百宝箱预生产 / 生产验收完成。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。

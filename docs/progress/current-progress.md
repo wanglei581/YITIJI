@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-07-01
+> 最后更新：2026-07-02
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -155,6 +155,7 @@
 | 2026-07-01 | 百宝箱微应用平台 Phase 1 核心安全补强 | 在现有终端百宝箱配置链路补齐首批安全门禁：`TOOLBOX_ALLOW_EXTERNAL_URL` 默认为关闭，只有显式配置为 `true` 才允许保存和公开下发外部 H5；标题 / 描述拦截平台内投递、企业收简历、候选人筛选、候选人推荐、面试邀约、Offer 管理等招聘闭环文案；`qr_code` 必须填写可审计 `qrTargetUrl` 并走二维码目标域名白名单；Admin 读取仍保留待修复项，Kiosk public 读取继续 fail-closed 隐藏坏项。`verify:terminal-device-config` 新增外部 H5 开关、合规文案和二维码目标负向用例，`verify:toolbox-micro-app-platform` 也加入后端硬规则静态检查；已通过 API typecheck、`verify:terminal-device-config`、`verify:toolbox-micro-app-platform`、`verify:toolbox-launch-events`。本项不代表外部 H5 生产已开放，也不代表第三方代码、外部 skill 包或法律类应用可商用上线。 |
 | 2026-07-01 | 百宝箱微应用平台 Phase 2 最小治理规则底座 | 新增 `services/api/src/terminals/toolbox-governance.ts`，并扩展 `packages/shared/src/types/toolboxMicroApp.ts` 的治理契约，先用纯函数落地状态机、审批隔离、host 可用性和发布 gate，不建 Prisma 表、不新增 Admin / Kiosk UI、不开放第三方代码运行。当前规则覆盖 `planned -> draft -> submitted -> approved -> published`，拒绝 `draft -> published`、`archived -> published`，提交人与审核人不能相同，host 必须 active 且未过期 / 未熔断 / 非本机私网，高风险和受限应用必须有免责声明，红线文案、外部 H5 开关关闭、host 不在白名单或本机 IP 均不得发布。`verify:toolbox-micro-app-platform` 已补运行时负向门禁。该项只代表治理规则和共享契约进入仓库，不代表真实应用目录、审核发布接口、数据库表、Admin 审核 UI、Kiosk 发布投影或第三方 skill 网关完成。 |
 | 2026-07-02 | 百宝箱微应用平台 Phase 2B 后端审核发布工作流 | 在 Phase 2 规则底座上补齐后端持久化和发布闭环：SQLite / PostgreSQL 同步新增 `ToolboxApp`、`ToolboxAppVersion`、`ToolboxAllowedHost` 表和 migration；Admin 后端新增创建应用、创建版本、提交、异人审批、驳回、发布、熔断、允许域名 upsert / review 接口；发布前复用 `evaluateToolboxPublishGate` 并对投影项执行严格 dry-run 校验，发布、熔断和手工保存现有 `TerminalToolboxConfig.itemsJson` 时走同进程串行化保护，降低读改写互相覆盖风险；投影 key 统一为 `app:${appKey}`，熔断时移除对应投影项；显式发布目标必须是真实终端，默认发布覆盖全部启用终端不静默截断；允许域名 upsert 只能进入待审核，激活必须由最近提交人之外的管理员 review；投影保留风险等级和免责声明元数据；所有写动作进入 `AuditLog` 摘要。新增 `verify:toolbox-review-workflow`，本地已通过 API typecheck 和该 verify。本项只代表代码侧后端闭环完成，不代表 Admin 可视化 UI、预生产 / 生产 migration、真实终端发布投影验收、第三方代码运行或首批微应用商用上线完成。 |
+| 2026-07-02 | 百宝箱微应用平台 Phase 2C Admin 审核发布 UI | 在 Admin `/toolbox` 单入口内补齐微应用审核发布工作台：后端新增应用、版本、允许域名三个只读列表接口；Admin service 补齐创建应用、创建版本、提交、审批、驳回、发布、熔断、允许域名提交 / 审核方法，并透出发布 blocked reason；页面拆分为微应用审核发布、域名白名单、终端投放配置三个分段；UI 常驻“不执行第三方代码 / 不桥接第三方设备”边界，高风险 / 受限应用创建版本要求免责声明；允许域名面板区分 DB 审核表和 `TOOLBOX_ALLOW_EXTERNAL_URL` / `KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS` 环境白名单；终端配置对 `app:${appKey}` 治理投影项标记只读，避免绕过审核流程手工修改。新增 Admin `verify:toolbox-review-ui`，并扩展 API `verify:toolbox-review-workflow` 检查列表接口。本项只代表本地代码侧 Admin 审核台闭环完成，不代表预生产 / 生产 migration、真实管理员异人审批、真实终端发布投影、Windows 一体机或首批微应用商用上线完成。 |
 
 ## 当前工作区事实
 
