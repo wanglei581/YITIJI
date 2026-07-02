@@ -36,6 +36,8 @@
 
 2026-07-03 补充：完成「打印失败原因安全口径收口」（承接 PR #114，为「我的」订单失败原因回显做前置合规裁定）。后端 `PrintJobsService.getStatus()` 不再把 Terminal Agent 原始 `errorMessage`（可能含设备路径 / 驱动异常 / 内部堆栈 / 主机名）透给用户端：新增纯函数 `failureReasonForUser(errorCode)` 白名单映射常见错误码为安全中文文案，未知码统一兜底「打印任务失败，请联系工作人员处理或稍后重试」；用户端状态查询新增显式字段 `failureReasonForUser`，兼容字段 `errorMessage` 也只回安全文案（不再回原文）。`PrintTask.errorCode/errorMessage` 原始值仍原样落库供 Admin / 排障使用（未改 Prisma schema）。Kiosk `PrintProgressPage` 失败分支改为优先 `failureReasonForUser` → 本地 errorCode 映射 → 默认文案，不再回退原始 `errorMessage`（前后端双重防御）。`verify:print-jobs` 新增第 7 段（7a–7e）：构造 Agent 回传含敏感路径 / 驱动 / 主机 / 堆栈的失败任务，断言 DB 保留原文但 `getStatus()` 仅回白名单/兜底安全文案且响应体不含任何敏感片段。验证：`verify:print-jobs` 全段 PASS、`@ai-job-print/api` 与 `@ai-job-print/kiosk` `typecheck`、改动 4 文件 `eslint` 均通过；双模型审查（Antigravity 100/100 APPROVE、独立 Claude 子代理 APPROVE，仅 1 条 Info：`errorCode` 仍原样返回但前台只经白名单映射、从不原样展示，符合设计非必修）。范围仅四个允许文件 + 本进度记录，未碰 Prisma schema / Terminal Agent / Admin 排障视图 / 支付 / 真机出纸。仍未做：「我的」订单失败原因回显 UI 与本人可见范围（本次只收口后端安全口径与 Kiosk 打印进度失败文案，UI 侧仍待产品确认）。
 
+2026-07-03 追加：按第二轮 Claude reviewer 建议，`verify:print-jobs` 第 7 段补一个最易泄露的边界用例（7f/7g）——Agent 回传 `status:'failed'` 且**完全无 `errorCode`、只有原始 `errorMessage`**（失败判定只能靠 `errorMessage` 命中、映射函数拿不到任何码）：断言 DB 仍完整保存原文而 `errorCode` 为空，`getStatus()` 回默认安全文案「打印任务失败，请联系工作人员处理或稍后重试」（`failureReasonForUser` 与兼容 `errorMessage` 一致），响应体不含任何敏感片段。仅改 `services/api/scripts/verify-print-jobs.ts` 测试脚本，未动业务逻辑。重跑 `verify:print-jobs` 7a–7g 全 PASS、api/kiosk `typecheck`、两组 `eslint` 均通过。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |

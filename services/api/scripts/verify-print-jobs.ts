@@ -288,6 +288,27 @@ async function main() {
     } else {
       fail(`7e. 未知错误码兜底异常: ${JSON.stringify({ failureReasonForUser: userView2.failureReasonForUser, errorMessage: userView2.errorMessage, leaked2 })}`)
     }
+
+    // 7f/7g：完全无 errorCode，Agent 只回原始 errorMessage（最易泄露的场景——
+    // 失败判定只能靠 errorMessage 命中，且映射函数拿不到任何 errorCode）。
+    const noCodeFailId = await createClaimAndFail('失败任务-仅原始文本', '2019-01-03T00:00:00.000Z', undefined, RAW_SENSITIVE_MESSAGE)
+
+    // DB 仍完整保存原始 errorMessage；errorCode 落库为空。
+    const dbNoCode = await prisma.printTask.findUnique({ where: { id: noCodeFailId } })
+    if (dbNoCode?.status === 'failed' && dbNoCode.errorMessage === RAW_SENSITIVE_MESSAGE && !dbNoCode.errorCode) {
+      pass('7f. 仅原始 errorMessage（无 errorCode）→ DB 仍完整保存原文，errorCode 为空')
+    } else {
+      fail(`7f. DB 状态异常: ${JSON.stringify({ status: dbNoCode?.status, errorCode: dbNoCode?.errorCode, errorMessage: dbNoCode?.errorMessage })}`)
+    }
+
+    // getStatus() 无 errorCode 可映射 → 统一默认安全文案，且不泄露原始敏感信息。
+    const userView3 = await printJobs.getStatus(noCodeFailId)
+    const leaked3 = SENSITIVE_FRAGMENTS.filter((frag) => JSON.stringify(userView3).includes(frag))
+    if (userView3.failureReasonForUser === defaultExpected && userView3.errorMessage === defaultExpected && leaked3.length === 0) {
+      pass('7g. 仅原始 errorMessage（无 errorCode）→ getStatus 回默认安全文案，failureReasonForUser/errorMessage 一致且不泄露原文')
+    } else {
+      fail(`7g. 仅原始 errorMessage 兜底异常: ${JSON.stringify({ failureReasonForUser: userView3.failureReasonForUser, errorMessage: userView3.errorMessage, leaked3 })}`)
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
