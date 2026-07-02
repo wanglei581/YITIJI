@@ -74,7 +74,7 @@ export interface JobMasterPayload {
 
 /** 归一化（与 2B/2D 一致）：去空白与常见标点后做子串匹配。 */
 function normalizeForMatch(text: string): string {
-  return text.replace(/[\s　,，.。;；:：、·\-—()（）]/g, '')
+  return text.replace(/[\s\u3000,，.。;；:：、·\-—()（）]/g, '')
 }
 
 function findViolation(text: string): string | null {
