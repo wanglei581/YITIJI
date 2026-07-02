@@ -535,14 +535,14 @@ export class AiService {
       case 'txt': {
         buffer = Buffer.from(this.resumeText.renderTxt(resume), 'utf-8')
         pageCount = 0
-        mimeType = 'text/plain; charset=utf-8'
+        mimeType = 'text/plain'
         ext = 'txt'
         break
       }
       case 'md': {
         buffer = Buffer.from(this.resumeText.renderMarkdown(resume), 'utf-8')
         pageCount = 0
-        mimeType = 'text/markdown; charset=utf-8'
+        mimeType = 'text/markdown'
         ext = 'md'
         break
       }
