@@ -317,7 +317,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: '实习岗位', icon: GraduationCapIcon, to: '/jobs?category=intern' },
       { title: '兼职信息', icon: FileTextIcon, to: '/jobs?category=parttime' },
       { title: '全部岗位', icon: BriefcaseIcon, to: '/jobs' },
-      { title: '岗位大师', icon: BrainCircuitIcon, disabled: Boolean(true) },
+      { title: '岗位大师', icon: BrainCircuitIcon, to: '/jobs/master' },
     ],
   },
   {
