@@ -151,6 +151,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
@@ -273,5 +274,6 @@ jobs:
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs

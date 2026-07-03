@@ -37,6 +37,7 @@
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
     "verify:pricing": "node -r @swc-node/register scripts/verify-pricing.ts",
+    "verify:payment-flow": "node -r @swc-node/register scripts/verify-payment-flow.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",

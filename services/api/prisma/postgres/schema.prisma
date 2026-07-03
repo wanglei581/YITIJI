@@ -111,7 +111,8 @@ model PrintTaskStatusLog {
 //   - taskStatus 镜像 PrintTask.status,便于 Admin 后续订单页读取;真相源仍是 PrintTask。
 //
 // type:       print | scan | photo | ai(后续预留)
-// payStatus:  unpaid | paid | refunded | failed(当前默认 unpaid,不接支付)
+// payStatus:  unpaid | paying | paid | refunded | failed | closed
+//   （paying/closed 为 C5-2 线上态：出码中 / 超时关单；线下与免费单仍只走 unpaid→paid→refunded）
 // taskStatus: pending | claimed | printing | completed | failed | cancelled(后续预留)
 model Order {
   id      String @id @default(cuid())
@@ -144,6 +145,19 @@ model Order {
   billablePages     Int? // 后端识别的计费页数（绝不信任前端 file.pages）
   billingPageSource String? // 'pdf_lightweight_scan' | 'image_single_page'
 
+  // ── C5-2 线上支付 additive 补列（沙箱通道，无 live 网关）─────────
+  // payChannel: 线上入账通道（本波只允许 sandbox；wechat/alipay 到 C5-6）。与 paymentSource 区分：
+  //   paymentSource 表示资金性质（sandbox=测试通道入账，非真实收款），payChannel 表示通道标识。
+  //   只能由回调成功入账路径写入，Admin 手工动作绝不写。
+  payChannel String?
+  // itemsJson: PricingService 计费明细快照（PrintPriceLine[] JSON），建单时写入定价快照；
+  //   只存计费明细，不引入商品体系；后续改价不影响历史单。
+  itemsJson  String  @default("[]")
+  // expiresAt: 线上支付超时关单时间（首次出码时写入，惰性判定关单）；线下/免费单为 null。
+  expiresAt  DateTime?
+
+  paymentAttempts PaymentAttempt[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -169,6 +183,34 @@ model PriceConfig {
   updatedAt     DateTime @updatedAt
 
   @@index([active])
+}
+
+// ── PaymentAttempt ────────────────────────────────────────────────────────────
+// C5-2 线上支付尝试（每次出码一条）。channel 本波只允许 sandbox（无 live 网关、无商户密钥、
+// 无真实资金交易）；wechat/alipay 到 C5-6 才接真。
+//
+// status: created | pending | success | failed | expired
+//   created 预留给未来渠道「预下单已建、外部凭证未回」的中间态；沙箱出码直接进 pending。
+// (channel, channelTxnNo) 唯一 = 同一渠道流水号只入账一次（回调幂等键；NULL 不参与冲突）。
+// failReason 只存用户可见安全文案；渠道原始错误只进审计 payload，绝不透传给前端。
+model PaymentAttempt {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id])
+  channel       String
+  amountCents   Int // 整数「分」，出码时快照自 Order.amountCents
+  status        String   @default("created")
+  prepayId      String? // 渠道预支付标识（沙箱为服务端生成的假标识）
+  qrCodeContent String? // 屏上动态码内容（沙箱为 sandboxpay:// 假 scheme，UI 必须明示测试通道）
+  channelTxnNo  String? // 渠道支付流水号（回调成功时回填）
+  failReason    String? // 用户可见安全文案
+  expiresAt     DateTime? // 本次动态码有效期（惰性过期）
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([channel, channelTxnNo])
+  @@index([orderId])
+  @@index([status])
 }
 
 // ── Organization ──────────────────────────────────────────────────────────────

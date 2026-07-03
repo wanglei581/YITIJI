@@ -9,20 +9,20 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
 
 /**
- * 保留 webhook 路由的 raw body 供 HMAC 校验。
+ * 保留 webhook / 支付回调路由的 raw body 供 HMAC 校验。
  *
- * Express body-parser 默认 parse 完就丢 raw,但 sync.controller 必须用 raw bytes
- * 重算 HMAC 才能与企业的签名对齐(对 parsed object 重新 JSON.stringify 字段顺序
+ * Express body-parser 默认 parse 完就丢 raw,但 sync.controller 与 payment 回调必须用
+ * raw bytes 重算 HMAC 才能与签名对齐(对 parsed object 重新 JSON.stringify 字段顺序
  * 可能不同,字符级会变,签名失败)。
  *
- * 只对 /api/v1/sync/* 启用,其他路由不背成本。
+ * 只对 /api/v1/sync/* 与 /api/v1/payment/callback/* 启用,其他路由不背成本。
  */
 interface RawBodyRequest extends Request {
   rawBody?: Buffer
 }
-function rawBodyCaptureFor(prefix: string) {
+function rawBodyCaptureFor(prefixes: readonly string[]) {
   return (req: RawBodyRequest, _res: Response, buf: Buffer): void => {
-    if (req.url.startsWith(prefix)) {
+    if (prefixes.some((prefix) => req.url.startsWith(prefix))) {
       req.rawBody = Buffer.from(buf)
     }
   }
@@ -63,11 +63,11 @@ async function bootstrap(): Promise<void> {
     // express 接管 json body parser,带 verify 回调写入 req.rawBody
     bodyParser: false,
   })
-  // 手动装 json parser:对 sync webhook 路径保留 rawBody;其他路由忽略。
+  // 手动装 json parser:对 sync webhook 与支付回调路径保留 rawBody;其他路由忽略。
   // path-prefix 包含 api/v1 因为这是 setGlobalPrefix 之前的原始 url。
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const express = require('express') as typeof import('express')
-  app.use(express.json({ verify: rawBodyCaptureFor('/api/v1/sync/') }))
+  app.use(express.json({ verify: rawBodyCaptureFor(['/api/v1/sync/', '/api/v1/payment/callback/']) }))
   app.use(express.urlencoded({ extended: true }))
   app.setGlobalPrefix('api/v1')
 

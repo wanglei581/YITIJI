@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { P0A_ALLOWED_PAYMENT_SOURCES } from './payment.types'
+import { C52_ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
 
 /** Order 行类型（从 prisma delegate 推导，避免直接 import 生成 client 类型）。 */
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -54,6 +54,8 @@ export function pickupCodeVisibleFor(o: {
  *   重复 markPaid 幂等（同来源直接返回，不重复副作用/审计）。
  * - `paid → refunded`：refundReason 必填、整单退款；置 refundedAt、写 AuditLog；重复 refund 幂等。
  * - 非法转移（refunded/failed→paid、unpaid→refunded、无来源/禁用来源的 paid）→ 明确错误码拒绝，绝不静默。
+ * - C5-2 线上入账另走 markPaidOnline（唯一允许写 paymentSource=sandbox 的路径）；
+ *   本方法（markPaid）继续只放行 offline/free/manual_confirmed，拒绝 sandbox/wechat/alipay/benefit。
  *
  * 诚实标注：free 只能用于 amountCents=0 的免费单；paid 一律带 paymentSource，绝不伪装线上已收款。
  */
@@ -126,6 +128,91 @@ export class OrderStatusService {
       targetType: 'order',
       targetId: orderId,
       payload: { paymentSource, operatorId: operatorId ?? null },
+    })
+
+    return this.requireOrder(orderId)
+  }
+
+  /**
+   * C5-2 线上回调成功入账（唯一允许写 paymentSource=sandbox 的路径）。
+   *
+   * 只能由 OnlinePaymentService.processCallback 在「验签 + 防重放 + 全字段匹配 +
+   * 金额一致」全部通过后调用；Admin / 手工动作绝不走本方法。
+   *
+   * - 合法起点：unpaid / paying；`closed` 仅当 late=true（已存在支付尝试的有效迟到回调）。
+   * - 落库：payStatus=paid + paymentSource=channel + payChannel=channel + paidAt +
+   *   paidBy='online_callback' + 唯一 pickupCode；CAS + 取件码撞码有界重试（同 markPaid）。
+   * - 幂等：已 paid 且 paymentSource=channel → 原样返回，不重复副作用/审计；
+   *   已 paid 但来源不同（如 Admin 已线下确认）→ ORDER_ALREADY_PAID 冲突，绝不覆盖。
+   * - 审计 action=order.mark_paid_online，payload 带 late 标记 —— 迟到回调入账必须可审计
+   *   （C5-4 前不做自动退款，对账时凭 late 识别超时后仍入账的单）。
+   */
+  async markPaidOnline(
+    orderId: string,
+    opts: { channel: PaymentChannel; attemptId: string; channelTxnNo: string; late: boolean },
+  ): Promise<OrderRecord> {
+    const { channel, attemptId, channelTxnNo } = opts
+    if (!(C52_ONLINE_PAYMENT_CHANNELS as readonly string[]).includes(channel)) {
+      // 防御纵深：wechat/alipay/benefit 及任意未知通道在此按名拦截（C5-6 前不放行）。
+      throw new BadRequestException('PAYMENT_CHANNEL_INVALID')
+    }
+
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+
+    // 幂等：同通道已入账原样返回；不同来源已支付（如 Admin 已线下确认）拒绝覆盖。
+    if (order.payStatus === 'paid') {
+      if (order.paymentSource === channel) return order
+      throw new BadRequestException('ORDER_ALREADY_PAID')
+    }
+    // closed 只对迟到回调开放（caller 已确认回调绑定到已存在的 PaymentAttempt 且全字段匹配）。
+    const late = opts.late || order.payStatus === 'closed'
+    const fromStatuses = late ? ['unpaid', 'paying', 'closed'] : ['unpaid', 'paying']
+    if (!fromStatuses.includes(order.payStatus)) {
+      throw new BadRequestException('ORDER_INVALID_TRANSITION') // refunded / failed 不可转 paid
+    }
+
+    let settled = false
+    for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
+      const pickupCode = await this.generateUniquePickupCode()
+      let res: { count: number }
+      try {
+        res = await this.prisma.order.updateMany({
+          where: { id: orderId, payStatus: { in: fromStatuses } }, // compare-and-set
+          data: {
+            payStatus: 'paid',
+            paymentSource: channel,
+            payChannel: channel,
+            paidAt: new Date(),
+            paidBy: 'online_callback',
+            pickupCode,
+          },
+        })
+      } catch (e) {
+        if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试
+        throw e
+      }
+      if (res.count === 0) {
+        const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
+        if (fresh?.payStatus === 'paid' && fresh.paymentSource === channel) return fresh
+        throw new BadRequestException(
+          fresh?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'ORDER_INVALID_TRANSITION',
+        )
+      }
+      settled = true
+      break
+    }
+    if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
+
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'order.mark_paid_online',
+      targetType: 'order',
+      targetId: orderId,
+      // late=true 表示超时关单/尝试过期后的迟到回调仍入账（钱已付，诚实入账优先）；
+      // C5-4 前不自动退款，对账凭此标记追踪。
+      payload: { channel, attemptId, channelTxnNo, late },
     })
 
     return this.requireOrder(orderId)

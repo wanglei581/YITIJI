@@ -234,6 +234,9 @@ export class PrintJobsService {
           amountCents:       quote.amountCents,
           billablePages:     quote.billablePages,
           billingPageSource: quote.billingPageSource,
+          // C5-2：计费明细快照（只存 PricingService 输出的 PrintPriceLine[]，
+          // 不引入商品体系）；下单时定价固化，后续改价不影响历史单。
+          itemsJson:         JSON.stringify(quote.lines),
           // 初始 unpaid + paymentSource=null；免费单在事务后经状态机置 paid+free，
           // 付费单保持 unpaid，绝不包装成线上待支付/已收款。
           payStatus:     'unpaid',

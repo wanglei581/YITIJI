@@ -15,27 +15,42 @@
 /**
  * 订单支付状态（对齐 `Order.payStatus`，schema.prisma 注释）：
  * unpaid → paid → refunded；failed 为异常终态。
+ * C5-2 线上态：`paying`（已出码待支付）/ `closed`（超时关单，可由已存在支付尝试的
+ * 有效迟到回调转 paid，见 OrderStatusService.markPaidOnline）。
+ * 线下与免费单仍只走 unpaid → paid → refunded，不进 paying/closed。
  * 注意：`cancelled` 属于 `Order.taskStatus`，不是 payStatus。
  */
-export type OrderPayStatus = 'unpaid' | 'paid' | 'refunded' | 'failed'
+export type OrderPayStatus = 'unpaid' | 'paying' | 'paid' | 'refunded' | 'failed' | 'closed'
 
 /**
- * 支付来源（P0a 唯一合法取值）——只表示诚实的线下/免费/人工确认，绝不表示线上已收款：
+ * 支付来源 —— 表示资金性质，绝不伪装线上真实收款：
  * - `offline`：线下收款（现金 / 对公 / 其它线下渠道）
  * - `free`：免费单（报价为 0）
  * - `manual_confirmed`：管理员人工确认已收款
+ * - `sandbox`：C5-2 沙箱测试通道入账（**非真实资金**；只能由回调成功入账路径写入，
+ *   Admin mark-paid / 任何手工动作禁止写入；生产环境启动门禁禁用 sandbox Provider）
  *
- * `wechat` / `alipay` / `benefit` 均为未来扩展，**P0a 禁止写入**，故不纳入本联合类型；
- * 待 live 网关（商户进件后）或权益核销（P1）另行评估再扩展。
+ * `wechat` / `alipay` / `benefit` 均为未来扩展（C5-6 / C5-4），**继续按名禁止写入**，
+ * 故不纳入本联合类型；待真实渠道适配或权益核销落地再扩展。
  */
-export type PaymentSource = 'offline' | 'free' | 'manual_confirmed'
+export type PaymentSource = 'offline' | 'free' | 'manual_confirmed' | 'sandbox'
 
-/** P0a 允许写入的 paymentSource 白名单（后端状态机与 verify:order 共用，避免各处硬编码）。 */
+/** P0a 允许写入的 paymentSource 白名单（线下路径状态机与 verify:order 共用，避免各处硬编码）。 */
 export const P0A_ALLOWED_PAYMENT_SOURCES: readonly PaymentSource[] = [
   'offline',
   'free',
   'manual_confirmed',
 ] as const
+
+/**
+ * C5-2 线上支付通道白名单（同时是线上入账 paymentSource 的唯一合法取值）。
+ * 本波只有 sandbox；wechat / alipay 到 C5-6 真实渠道适配才允许出现。
+ */
+export type PaymentChannel = 'sandbox'
+export const C52_ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ['sandbox'] as const
+
+/** 支付尝试状态（对齐 `PaymentAttempt.status`）。 */
+export type PaymentAttemptStatus = 'created' | 'pending' | 'success' | 'failed' | 'expired'
 
 /**
  * 计费页数来源（后端识别，**绝不信任前端 `file.pages`**，见计划 §2.4/§4.4）：
@@ -86,8 +101,9 @@ export interface OrderPaymentView {
   /** 支付状态。 */
   payStatus: OrderPayStatus
   /**
-   * 支付来源；未支付（unpaid/failed）时为 null。
-   * payStatus=paid 时必为 {@link P0A_ALLOWED_PAYMENT_SOURCES} 之一。
+   * 支付来源；未支付（unpaid/paying/failed/closed）时为 null。
+   * payStatus=paid 时必为 {@link P0A_ALLOWED_PAYMENT_SOURCES} 之一，
+   * 或 `sandbox`（C5-2 回调成功入账，测试通道，非真实收款）。
    */
   paymentSource: PaymentSource | null
   /** 支付完成时间（ISO 串）；未支付为 null。 */
