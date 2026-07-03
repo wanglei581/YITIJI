@@ -66,21 +66,23 @@ async function main() {
   const userA = `eu_po_a_${suffix}`
   const userB = `eu_po_b_${suffix}`
   const userC = `eu_po_c_${suffix}` // 无任何订单 → 空列表
-  const allUserIds = [userA, userB, userC]
+  const userD = `eu_po_d_${suffix}` // P0a 支付字段：unpaid / paid / refunded / 无 Order
+  const allUserIds = [userA, userB, userC, userD]
 
   // 显式登记本测试创建的 PrintTask id：PrintTask→EndUser 是 onDelete:SetNull（非级联），
   // 删用户不会删任务，必须按 id 显式清理（含匿名任务）。
   const t = (k: string) => `ptask_po_${k}_${suffix}`
-  const taskIds = [t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon')]
+  const taskIds = [t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'), t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder')]
 
   async function cleanup() {
+    await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: allUserIds } } })
   }
 
   try {
     await cleanup()
-    for (const [id, n] of [[userA, '会员A'], [userB, '会员B'], [userC, '会员C']] as const) {
+    for (const [id, n] of [[userA, '会员A'], [userB, '会员B'], [userC, '会员C'], [userD, '会员D']] as const) {
       await prisma.endUser.create({ data: { id, phoneHash: `po-${id}`, phoneEnc: `po-enc-${id}`, nickname: n } })
     }
     pass('三个测试会员已创建')
@@ -186,7 +188,7 @@ async function main() {
 
     // ── 5. 不返回敏感字段 ───────────────────────────────────────
     const allItems = [...listA, ...listB]
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize'])
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
@@ -200,7 +202,7 @@ async function main() {
       if (serialized.includes('sig://') || serialized.includes('sha256-')) { leak = '序列化命中 fileUrl/fileMd5 原值'; break }
       if (leak) break
     }
-    if (!leak) pass('5. 不返回敏感字段：仅 8 个白名单键，无 fileUrl/fileMd5/paramsJson/支付/越权字段')
+    if (!leak) pass('5. 不返回敏感字段：仅白名单键(含 P0a 支付安全字段)，无 fileUrl/fileMd5/paramsJson/内部错误/越权字段')
     else fail(`5. 敏感字段泄漏：${leak}`)
 
     // ── 6. 鉴权（EndUserAuthGuard）─────────────────────────────
@@ -222,6 +224,43 @@ async function main() {
     const injected = (ctx.switchToHttp().getRequest() as { endUser?: { endUserId: string } }).endUser
     if (allowed === true && injected?.endUserId === userA) pass('6d. 有效会员 token + 会话 → 通过并注入本人 endUserId')
     else fail('6d. 有效会员鉴权未通过或未注入 endUser')
+
+    // ── 7. P0a 支付字段真实化：join Order，诚实字段 + pickupCode 门控 + 无 live 网关来源 ──
+    const dPay = { unpaid: t('d_unpaid'), paid: t('d_paid'), refunded: t('d_refunded'), noorder: t('d_noorder') }
+    for (const [key, id] of Object.entries(dPay)) {
+      await prisma.printTask.create({
+        data: {
+          id, endUserId: userD, fileUrl: `sig://secret-d-${key}`, fileMd5: `sha256-d-${key}`,
+          status: 'pending', createdAt: at(40),
+          paramsJson: JSON.stringify({ fileName: `${key}.pdf`, copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+        },
+      })
+    }
+    const ord8 = suffix.slice(0, 8).toUpperCase()
+    // unpaid 订单故意带 pickupCode（DB 里有值），门控必须隐藏它；paid 可见；refunded 隐藏。
+    await prisma.order.create({ data: { orderNo: `ORD-DU-${ord8}`, type: 'print', printTaskId: dPay.unpaid, endUserId: userD, amountCents: 100, billablePages: 1, billingPageSource: 'pdf_lightweight_scan', payStatus: 'unpaid', paymentSource: null, taskStatus: 'pending', pickupCode: `UNPD${ord8}` } })
+    await prisma.order.create({ data: { orderNo: `ORD-DP-${ord8}`, type: 'print', printTaskId: dPay.paid, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'paid', paymentSource: 'offline', paidAt: at(41), taskStatus: 'pending', pickupCode: `PAID${ord8}` } })
+    await prisma.order.create({ data: { orderNo: `ORD-DR-${ord8}`, type: 'print', printTaskId: dPay.refunded, endUserId: userD, amountCents: 200, billablePages: 2, billingPageSource: 'pdf_lightweight_scan', payStatus: 'refunded', paymentSource: 'offline', paidAt: at(41), refundReason: '测试退款', refundedAt: at(42), taskStatus: 'pending', pickupCode: `RFND${ord8}` } })
+    // dPay.noorder 无 Order
+
+    const listD = (await orders.list(userD, defaultPage)).items
+    const findD = (id: string) => listD.find((x) => x.id === id)
+    const uItem = findD(dPay.unpaid)
+    const pItem = findD(dPay.paid)
+    const rItem = findD(dPay.refunded)
+    const nItem = findD(dPay.noorder)
+
+    const okUnpaid = !!uItem && uItem.amountCents === 100 && uItem.payStatus === 'unpaid' && uItem.paymentSource === null && uItem.billablePages === 1 && uItem.billingPageSource === 'pdf_lightweight_scan' && uItem.pickupCode === null
+    const okPaid = !!pItem && pItem.payStatus === 'paid' && pItem.paymentSource === 'offline' && pItem.amountCents === 200 && typeof pItem.pickupCode === 'string' && (pItem.pickupCode ?? '').length > 0
+    const okRefunded = !!rItem && rItem.payStatus === 'refunded' && rItem.pickupCode === null
+    const okNoOrder = !!nItem && nItem.amountCents === null && nItem.payStatus === null && nItem.paymentSource === null && nItem.billablePages === null && nItem.billingPageSource === null && nItem.pickupCode === null
+    const noLiveGateway = listD.every((x) => x.paymentSource !== 'wechat' && x.paymentSource !== 'alipay')
+
+    if (okUnpaid && okPaid && okRefunded && okNoOrder && noLiveGateway) {
+      pass('7. 支付字段真实化：有 Order 返回诚实字段；无 Order 全 null；unpaid/refunded 隐藏 pickupCode、paid 可见；无微信/支付宝来源')
+    } else {
+      fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} noLiveGateway=${noLiveGateway}`)
+    }
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

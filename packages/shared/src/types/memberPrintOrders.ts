@@ -13,6 +13,7 @@
 // ============================================================
 
 import type { ColorMode, PrintTaskStatus } from './print'
+import type { BillingPageSource, OrderPayStatus, PaymentSource } from './payment'
 
 /** 我的打印订单：会员名下一条打印任务（仅安全元数据）。 */
 export interface MemberPrintOrderItem {
@@ -31,4 +32,17 @@ export interface MemberPrintOrderItem {
   colorMode: ColorMode | null
   /** 纸张幅面（来自 paramsJson，当前机型固定 A4）；缺省为 null */
   paperSize: string | null
+  // ── 支付字段（P0a 支付域，无 live 网关；可选以保持向后兼容）：关联 Order 才有值；历史无 Order 一律 null ──
+  /** 金额（分）；无 Order 为 null。 */
+  amountCents?: number | null
+  /** 支付状态；无 Order 为 null。 */
+  payStatus?: OrderPayStatus | null
+  /** 支付来源（offline/free/manual_confirmed）；未支付/无 Order 为 null。**绝不为微信/支付宝**（未接 live 网关）。 */
+  paymentSource?: PaymentSource | null
+  /** 后端识别的计费页数；无 Order 为 null。 */
+  billablePages?: number | null
+  /** 计费页数来源；无 Order 为 null。 */
+  billingPageSource?: BillingPageSource | null
+  /** 取件凭证码；仅 paid 且未退款、任务未进入完成/取消/失败终态时返回，否则 null。 */
+  pickupCode?: string | null
 }

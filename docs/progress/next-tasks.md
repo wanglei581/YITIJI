@@ -45,6 +45,18 @@
 
 2026-06-22 补充：`codex/file-assets-preprod-integration` 已把用户文件资产商用闭环栈与预生产验收候选合到同一分支，后续预生产/试运营应以该集成候选为基线继续执行；这仍不代表真实生产/试运营执行完成。
 
+## 支付域 C-5（收款 / 计价 / 退款 / 核销）
+
+> 独立分支 `feature/payment-c5`（未合 `main`、未 push、未预生产）。方案：`docs/product/payment-domain-c5-plan-2026-07.md`（§⓪ 命名与波次校准为权威口径）。合规上位：`compliance-boundary.md` §8.4/§8.5/§8.7 + CLAUDE.md §12。商户号已就绪，但 C5-1~C5-5 用沙箱即可完成验收，C5-6 才接 live。`.worktrees/profile-commercial-p0a`（P0a 窗口）视为已被 C5 吸收，不再独立推进同一支付底座。
+
+- [x] **C5-1 数据底座（线下 / 免费 / 人工确认，无 live 网关）**：选择性吸收 codex P0a 底座（`a9d856e6` 已复核）到 `feature/payment-c5`。`Order` 6 additive 列 + `PriceConfig` 表 + 双 additive migration + 开发默认价 seed + `PricingService`（fail-closed 计价）+ `PrintPageCountService`（SSRF 安全后端识别页数）+ `OrderStatusService`（CAS 幂等状态机 + `pickupCode` + 审计）+ Admin `mark-paid`/`refund` 端点 + `/me/print-orders` 支付字段接真。`wechat/alipay/benefit` 本波禁写（状态机 + Admin 端点 + `verify:order` 三处按名断言）。本地全绿：空库 SQLite migrate、`typecheck`/`lint`/`db:pg:sync:check`、`verify:order`/`verify:pricing`/`verify:print-jobs`/`verify:member-print-orders`/`verify:materials-processing`/`verify:admin-orders-readonly`。仅本地 verify 级，未合 `main`、未 push、未预生产、未真机。
+- [ ] **C5-2 计价 + 沙箱线上支付闭环**：`PaymentProvider(sandbox)` + `quote`/下单/出屏上动态码/回调（验签 + 幂等 + 防重放 + 金额一致性）/主动查单 + 线上态状态机（`paying`/`closed` 等）+ `PaymentAttempt` 表 + `Order` 线上补列（`payChannel`/`itemsJson`/`expiresAt` 等，additive 叠加 C5-1）。门禁 `verify:payment-flow`（沙箱模拟成功 / 失败 / 超时 / 重放 / 金额篡改全断言）。
+- [ ] **C5-3 Kiosk 收银 UI**：收银页（价目明细 + 抵扣 + 退款 / 重试规则 + 动态码 + 轮询）+ 履约衔接（`paid` 后才 claim 出纸）。`verify:kiosk-cashier-ui` + 浏览器沙箱付款→打印 E2E。
+- [ ] **C5-4 退款 + 核销**：本人退款（幂等，`Refund` 表）+ 券 / 免费次数 / 会员权益核销（`RedemptionRecord` 幂等 + 审计，免费单也落库）。`verify:refund-idempotent` / `verify:redemption-audit`。
+- [ ] **C5-5 Admin 计费配置 + 订单接真 + 对账**：`PriceConfig` 配置页（改价审计）+ 订单页金额 / 支付状态 / 退款接真 + 对账页 + 审计；`payConfigured:boolean` 不回显密钥。`verify:admin-billing`。
+- [ ] **C5-6 微信 / 支付宝真实渠道适配**：`wechat`/`alipay` Provider 实现 + 生产运行时门禁禁 sandbox；商户凭证只进服务端 env / 加密列（绝不进前端 / 聊天 / 仓库）。沙箱回归 + 商户号 live 冒烟。
+- [ ] **C5-7 商用验收**：全链路（下单→付款→打印→退款→对账）+ 合规复核 + 文档收口；全 verify + 预生产冒烟。
+
 ## P0：打印扫描首期全功能收口
 
 - [x] **打印扫描板块商用级方案确认与实施总计划**：已输出 `docs/product/print-scan-commercial-plan.md` 和 `docs/superpowers/plans/2026-06-30-print-scan-first-release-full-scope.md`，基于竞品调研、前台体验审计、后端 / Terminal Agent 审计、产品合规审计和 Antigravity 只读审查；2026-06-30 用户确认首期目标调整为全功能商用版本，Claude 复审因本地 Claude Code 会话额度限制未取得有效报告，用户已确认本轮改用 Antigravity 复审即可。Antigravity 修订后复审结论 `APPROVE`，剩余奔图 mode 映射和 Agent claim TTL 建议已补入计划。本项只代表方案与实施计划确认，不代表运行时代码、生产部署或真机验收完成。

@@ -11,6 +11,30 @@
 
 ---
 
+## ⓪ 命名与波次校准（2026-07-03 更新，权威口径）
+
+> C5-1 已通过**选择性吸收 codex P0a 支付底座**（`a9d856e6`，已复核）落到 `feature/payment-c5` 完成。为避免本文档把两套命名当并列标准，此节为**唯一权威口径**；下文 §三 的线上模型设计一律按此节重新定位（是 C5-2~C5-4 的 additive 扩展，不是与 C5-1 并列的另一套）。
+
+**唯一价目表 = `PriceConfig`**（`serviceKey / unitCents / unit / active / effectiveFrom`）。下文 §3.5 的 `PriceRule` 名称**作废**，不得再建第二张价目表；运行期价目真相源即 `PriceConfig`（开发默认价由 `price-config.seed` 幂等 seed）。
+
+**C5-1 已交付的 `Order` 支付列**（P0a 命名，全部 additive-nullable）：`paymentSource`（`offline | free | manual_confirmed`）/ `paidAt` / `paidBy` / `pickupCode`(@unique) / `billablePages` / `billingPageSource`。
+
+**C5-1 的 `payStatus` 取值**：`unpaid | paid | refunded | failed`（线下 / 免费 / 人工确认闭环）。`paying / refunding / closed` 等线上中间态在 C5-2+ 引入。
+
+**本波红线**：`paymentSource` 白名单只允许 `offline / free / manual_confirmed`；`wechat / alipay / benefit` **本波禁写**（状态机 + Admin 端点 + `verify:order` 三处按名断言拒绝），线上渠道到 C5-6 才接真。**无 live 网关、无商户密钥、无真实资金交易。**
+
+**下文线上模型的定位**（叠加在 C5-1 baseline 之上，不替换、不并列）：
+
+| 下文原写 | 现定位 |
+|---|---|
+| §3.1 `paidAmountCents / discountCents / payChannel / expiresAt / itemsJson` | C5-2~C5-4 additive 补列（券抵扣 / 线上渠道 / 超时关单 / 定价快照）；C5-1 未建 |
+| §3.2 `PaymentAttempt` | C5-2 线上扫码支付时新增 |
+| §3.3 `Refund` | C5-4 退款域（当前 C5-1 退款走 `OrderStatusService.refund` 整单退款 + 审计，尚无独立退款表） |
+| §3.4 `RedemptionRecord` | C5-4 券 / 权益核销时新增 |
+| §3.5 `PriceRule` | **作废**，已由 `PriceConfig` 实现 |
+
+---
+
 ## 一、目标与非目标
 
 ### 1.1 目标（本域交付）
@@ -58,7 +82,9 @@
 
 ### 3.1 Order（扩展，additive）
 
-沿用现有 `id/orderNo/type/printTaskId/endUserId/terminalId/amountCents/currency/payStatus/taskStatus/refundReason/refundedAt`。新增：
+> ⚠️ 见 §⓪：C5-1 实际交付的 `Order` 支付列是 P0a 命名（`paymentSource/paidAt/paidBy/pickupCode/billablePages/billingPageSource`）。**下列 `paidAmountCents/discountCents/payChannel/expiresAt/itemsJson` 是 C5-2~C5-4 的 additive 补列，C5-1 未建。**
+
+沿用现有 `id/orderNo/type/printTaskId/endUserId/terminalId/amountCents/currency/payStatus/taskStatus/refundReason/refundedAt`。C5-2+ 新增：
 
 - `paidAmountCents Int @default(0)` — 实付（区分应付 `amountCents` 与实付，券/优惠抵扣后）
 - `discountCents Int @default(0)` — 抵扣合计（券 + 会员权益）
@@ -222,7 +248,7 @@ interface PaymentProvider {
 | 波 | 内容 | 门禁 |
 |----|------|------|
 | **C5-0 方案确认** | 本文档 + 用户确认 + 合规复核 | 用户确认 |
-| **C5-1 数据底座** | Order 扩展 + PaymentAttempt/Refund/RedemptionRecord/PriceRule 模型 + 双 additive migration + seed 价目 | 空库 migrate+seed 过；`verify:payment-schema` |
+| **C5-1 数据底座** ✅ **已完成（2026-07-03）** | 提取自 P0a `a9d856e6`（已复核）：`Order` 6 additive 列 + `PriceConfig` 表 + 双 additive migration（`20260703160000_add_payment_foundation`）+ 开发默认价 seed + `PricingService`（fail-closed 计价）+ `PrintPageCountService`（SSRF 安全、后端识别页数）+ `OrderStatusService`（线下/免费/人工确认 CAS 幂等状态机 + pickupCode + 审计）+ Admin `mark-paid`/`refund` 端点 + `/me/print-orders` 支付字段接真 | ✅ 空库 sqlite migrate deploy 过；`db:pg:sync:check` 过；`typecheck`/`lint` 过；`verify:order`/`verify:pricing`/`verify:print-jobs`/`verify:member-print-orders`/`verify:materials-processing`/`verify:admin-orders-readonly` 全 PASS（wechat/alipay/benefit 禁写按名断言） |
 | **C5-2 计价 + 沙箱支付闭环** | PaymentProvider(sandbox) + quote/下单/出码/回调(验签+幂等+防重放)/查单 + 状态机 | `verify:payment-flow`（沙箱模拟支付成功/失败/超时/重放/金额篡改全断言） |
 | **C5-3 Kiosk 收银 UI** | 收银页（价目展示+退款规则+动态码+轮询）+ 履约衔接（paid 后才打印） | `verify:kiosk-cashier-ui`；浏览器 E2E 沙箱付款→打印 |
 | **C5-4 退款 + 核销** | 本人退款(幂等) + 券/免费/权益核销(幂等+审计) + 免费单落库 | `verify:refund-idempotent` / `verify:redemption-audit` |
@@ -230,7 +256,7 @@ interface PaymentProvider {
 | **C5-6 微信/支付宝真实渠道适配** | wechat/alipay Provider 实现 + 生产运行时门禁禁 sandbox | 沙箱回归；真实渠道待商户号 live 冒烟（并行依赖） |
 | **C5-7 商用验收** | 全链路（下单→付款→打印→退款→对账）+ 合规复核 + 文档收口 | 全 verify + 预生产冒烟 |
 
-**真收款依赖（并行，非本域代码）**：微信支付 / 支付宝商户号申请（营业执照 + 审批）。C5-1~C5-5 完全不依赖商户号即可完成并验收；C5-6 的真实 live 冒烟需商户号就绪。
+**真收款依赖（并行，非本域代码）**：微信支付 / 支付宝商户号。**2026-07-03 更新：商户号已就绪**，故 C5-6 的真实 live 冒烟不再被申请周期阻塞。执行顺序不变：C5-2~C5-5 先用沙箱端到端跑通验收，C5-6 再把商户凭证配进**服务端 env / 加密列**（绝不进前端 / 聊天 / 仓库，见 CLAUDE.md §12）做 live 冒烟。
 
 ---
 
