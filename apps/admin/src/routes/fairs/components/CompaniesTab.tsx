@@ -108,7 +108,7 @@ export function CompaniesTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">{companies.length} 家参展企业</p>
+        <p className="text-sm text-neutral-600">{companies.length} 家参展企业</p>
         <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
           <PlusIcon className="h-3.5 w-3.5" />
           新增企业
@@ -118,32 +118,32 @@ export function CompaniesTab({
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead>
               <tr>
                 {['企业名称', '行业', '规模', '招聘标签', '岗位数', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {companies.length === 0 ? (
-                <tr><td colSpan={6} className="py-10 text-center text-xs text-gray-400">暂无参展企业,点击右上角"新增企业"录入</td></tr>
+                <tr><td colSpan={6} className="py-10 text-center text-xs text-neutral-400">暂无参展企业,点击右上角"新增企业"录入</td></tr>
               ) : (
                 companies.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{c.industry ?? '—'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{c.scale ? `${c.scale} 人` : '—'}</td>
+                  <tr key={c.id} className="hover:bg-neutral-50">
+                    <td className="px-4 py-3 font-medium text-neutral-800">{c.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{c.industry ?? '—'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{c.scale ? `${c.scale} 人` : '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {c.hiringTags.length === 0
-                          ? <span className="text-xs text-gray-400">—</span>
+                          ? <span className="text-xs text-neutral-400">—</span>
                           : c.hiringTags.map((t) => (
-                            <span key={t} className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">{t}</span>
+                            <span key={t} className="rounded bg-info-bg px-1.5 py-0.5 text-xs text-info-fg">{t}</span>
                           ))}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{c.jobsCount}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.jobsCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button onClick={() => openEdit(c)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
@@ -160,7 +160,7 @@ export function CompaniesTab({
         </div>
       </Card>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-neutral-400">
         合规说明:企业信息仅用于招聘会现场服务展示,系统不接收求职者简历,不参与招聘闭环。
       </p>
 
@@ -214,21 +214,21 @@ export function CompaniesTab({
           </Field>
 
           {/* ── P1-A② 岗位明细(Kiosk 企业详情岗位列表展示用)── */}
-          <div className="border-t border-gray-100 pt-4">
+          <div className="border-t border-neutral-100 pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-700">岗位明细</p>
+              <p className="text-sm font-medium text-neutral-700">岗位明细</p>
               <GhostButton onClick={addPos}>添加岗位</GhostButton>
             </div>
-            <p className="mt-0.5 text-xs text-gray-400">用于 Kiosk 企业详情岗位列表;仅展示信息,不接收简历、不参与平台内投递。保存即全量替换该企业岗位。</p>
+            <p className="mt-0.5 text-xs text-neutral-400">用于 Kiosk 企业详情岗位列表;仅展示信息,不接收简历、不参与平台内投递。保存即全量替换该企业岗位。</p>
           </div>
           {positions.length === 0 && (
-            <p className="text-xs text-gray-400">暂无岗位;点击「添加岗位」录入(标题必填)。</p>
+            <p className="text-xs text-neutral-400">暂无岗位;点击「添加岗位」录入(标题必填)。</p>
           )}
           {positions.map((pos, i) => (
-            <div key={i} className="space-y-2.5 rounded-lg border border-gray-200 p-3">
+            <div key={i} className="space-y-2.5 rounded-lg border border-neutral-200 p-3">
               <div className="flex items-center gap-2">
                 <input className={`${inputCls} flex-1`} placeholder="岗位标题(必填)" value={pos.title} onChange={(e) => setPos(i, { title: e.target.value })} />
-                <button type="button" className="shrink-0 rounded-md px-2 py-1 text-sm text-red-500 hover:bg-red-50" onClick={() => removePos(i)}>删除</button>
+                <button type="button" className="shrink-0 rounded-md px-2 py-1 text-sm text-error-fg hover:bg-error-bg" onClick={() => removePos(i)}>删除</button>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <Field label="岗位类型">

@@ -18,9 +18,9 @@ function BoothSheet({
   onViewCompany: (companyId: string) => void
 }) {
   const statusColors = {
-    available: 'text-green-600',
-    occupied:  'text-blue-600',
-    reserved:  'text-orange-500',
+    available: 'text-success-fg',
+    occupied:  'text-primary-600',
+    reserved:  'text-warning-fg',
   }
   return (
     <div
@@ -32,30 +32,30 @@ function BoothSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-base font-semibold text-gray-900">展位 {booth.boothNumber}</p>
-          <button onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+          <p className="text-base font-semibold text-neutral-900">展位 {booth.boothNumber}</p>
+          <button onClick={onClose} className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100">
             <XIcon className="h-5 w-5" />
           </button>
         </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-400">所属展区</span>
-            <span className="text-gray-700">{booth.zoneName}</span>
+            <span className="text-neutral-400">所属展区</span>
+            <span className="text-neutral-700">{booth.zoneName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">展位状态</span>
+            <span className="text-neutral-400">展位状态</span>
             <span className={`font-medium ${statusColors[booth.status]}`}>{BOOTH_STATUS_LABELS[booth.status]}</span>
           </div>
           {booth.areaSqm && (
             <div className="flex justify-between">
-              <span className="text-gray-400">展位面积</span>
-              <span className="text-gray-700">{booth.areaSqm} ㎡</span>
+              <span className="text-neutral-400">展位面积</span>
+              <span className="text-neutral-700">{booth.areaSqm} ㎡</span>
             </div>
           )}
           {booth.companyName && (
             <div className="flex justify-between">
-              <span className="text-gray-400">入驻企业</span>
-              <span className="font-medium text-gray-900">{booth.companyName}</span>
+              <span className="text-neutral-400">入驻企业</span>
+              <span className="font-medium text-neutral-900">{booth.companyName}</span>
             </div>
           )}
         </div>
@@ -72,9 +72,9 @@ function BoothSheet({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const BOOTH_CELL_STYLES: Record<string, string> = {
-  available: 'bg-gray-50 border-gray-200 text-gray-400',
-  occupied:  'bg-blue-50 border-blue-200 text-blue-700',
-  reserved:  'bg-orange-50 border-orange-200 text-orange-600',
+  available: 'bg-neutral-50 border-neutral-200 text-neutral-400',
+  occupied:  'bg-primary-50 border-primary-200 text-primary-700',
+  reserved:  'bg-warning-bg border-warning/30 text-warning-fg',
 }
 
 export function FairMapPage() {
@@ -156,22 +156,22 @@ export function FairMapPage() {
               className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 (z === '全部展区' && activeZone === null) || activeZone === z
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               {z}
             </button>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+        <div className="mt-3 flex items-center gap-4 text-xs text-neutral-500">
           <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-blue-200 bg-blue-50" />已入驻
+            <span className="h-3 w-3 rounded border border-primary-200 bg-primary-50" />已入驻
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-orange-200 bg-orange-50" />已预留
+            <span className="h-3 w-3 rounded border border-warning/30 bg-warning-bg" />已预留
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-gray-200 bg-gray-50" />空闲
+            <span className="h-3 w-3 rounded border border-neutral-200 bg-neutral-50" />空闲
           </span>
         </div>
       </div>
@@ -180,15 +180,15 @@ export function FairMapPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {displayedZones.map((zone) => (
             <Card key={zone.id} className="p-3">
-              <p className="text-xs font-medium text-gray-700">{zone.zoneName}</p>
-              {zone.industry && <p className="mt-0.5 text-xs text-gray-400">{zone.industry}</p>}
+              <p className="text-xs font-medium text-neutral-700">{zone.zoneName}</p>
+              {zone.industry && <p className="mt-0.5 text-xs text-neutral-400">{zone.industry}</p>}
               <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-gray-500">{zone.boothCount} 个展位</span>
-                <span className="text-green-600">已签到 {zone.checkedInCount}</span>
+                <span className="text-neutral-500">{zone.boothCount} 个展位</span>
+                <span className="text-success-fg">已签到 {zone.checkedInCount}</span>
               </div>
-              <div className="mt-1.5 h-1 rounded-full bg-gray-100">
+              <div className="mt-1.5 h-1 rounded-full bg-neutral-100">
                 <div
-                  className="h-1 rounded-full bg-green-400"
+                  className="h-1 rounded-full bg-success"
                   style={{ width: `${zone.boothCount > 0 ? (zone.checkedInCount / zone.boothCount) * 100 : 0}%` }}
                 />
               </div>
@@ -197,10 +197,10 @@ export function FairMapPage() {
         </div>
 
         <div>
-          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-gray-700">
-            <MapPinIcon className="h-4 w-4 text-gray-400" />
+          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+            <MapPinIcon className="h-4 w-4 text-neutral-400" />
             展位分布（{displayedBooths.length} 个）
-            <span className="text-xs font-normal text-gray-400">— 点击展位查看详情</span>
+            <span className="text-xs font-normal text-neutral-400">— 点击展位查看详情</span>
           </p>
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
             {displayedBooths.map((booth) => (

@@ -28,7 +28,7 @@ export function Pagination({ total, page, pageSize, onPageChange, onPageSizeChan
         <span className="text-sm text-neutral-500"> 共 <span className="font-medium text-neutral-700">{total}</span> 条</span>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-neutral-400">每页</span>
-          <select value={pageSize} onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }} className="rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 focus:border-primary-300 focus:outline-none">
+          <select value={pageSize} onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }} className="rounded border border-neutral-200 bg-surface px-2 py-1 text-xs text-neutral-600 focus:border-primary-300 focus:outline-none">
             {[10, 20, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
@@ -52,7 +52,7 @@ export function FilterPills({ filters, active, counts, onChange }: FilterPillsPr
   return (
     <div className="flex flex-wrap gap-2">
       {filters.map((f) => (
-        <button key={f} onClick={() => onChange(f)} className={'rounded-full px-4 py-1.5 text-sm font-medium transition-colors ' + (active === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200')}>
+        <button key={f} onClick={() => onChange(f)} className={'rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ' + (active === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')}>
           {f}{counts && counts[f] !== undefined && <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>}
         </button>
       ))}
@@ -84,8 +84,8 @@ export function DataTable<T>({ items, empty, renderRow, renderHeader, page, page
     <div className={className}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-neutral-100 bg-neutral-50">{renderHeader()}</thead>
-          <tbody className="divide-y divide-neutral-100">{items.map((item, index) => renderRow(item, index))}</tbody>
+          <thead>{renderHeader()}</thead>
+          <tbody className="divide-y divide-neutral-900/[0.06]">{items.map((item, index) => renderRow(item, index))}</tbody>
         </table>
       </div>
       <Pagination total={total} page={page} pageSize={pageSize} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />

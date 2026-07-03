@@ -14,9 +14,9 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 
 const TYPE_META: Record<FavoriteTargetType, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  job: { label: '岗位', icon: BriefcaseIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
-  job_fair: { label: '招聘会', icon: CalendarIcon, bg: 'bg-green-50', color: 'text-green-600' },
-  policy: { label: '政策', icon: LandmarkIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
+  job: { label: '岗位', icon: BriefcaseIcon, bg: 'bg-info-bg', color: 'text-info' },
+  job_fair: { label: '招聘会', icon: CalendarIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
+  policy: { label: '政策', icon: LandmarkIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
 }
 
 const TABS: { key: FavoriteTargetType | 'all'; label: string }[] = [
@@ -81,11 +81,11 @@ export function MyFavoritesPage() {
               onClick={() => setTab(t.key)}
               className={[
                 'shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                active ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 ring-1 ring-gray-200',
+                active ? 'bg-primary-600 text-white' : 'bg-white text-neutral-600 ring-1 ring-neutral-200',
               ].join(' ')}
             >
               {t.label}
-              <span className={active ? 'ml-1 text-white/80' : 'ml-1 text-gray-400'}>{count}</span>
+              <span className={active ? 'ml-1 text-white/80' : 'ml-1 text-neutral-400'}>{count}</span>
             </button>
           )
         })}
@@ -109,16 +109,16 @@ export function MyFavoritesPage() {
               key={item.id}
               type="button"
               onClick={() => navigate(detailRoute(item))}
-              className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+              className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-neutral-50 active:bg-neutral-100"
             >
               <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', meta.bg].join(' ')}>
                 <Icon className={['h-6 w-6', meta.color].join(' ')} aria-hidden="true" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-gray-900">{item.title ?? '未命名收藏'}</p>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{meta.label} · 收藏于 {formatTime(item.createdAt)}</p>
+                <p className="truncate text-sm font-semibold text-neutral-900">{item.title ?? '未命名收藏'}</p>
+                <p className="mt-0.5 truncate text-xs text-neutral-400">{meta.label} · 收藏于 {formatTime(item.createdAt)}</p>
               </div>
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-gray-300" aria-hidden="true" />
+              <ChevronRightIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
             </button>
           )
         })

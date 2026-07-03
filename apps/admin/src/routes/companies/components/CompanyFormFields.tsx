@@ -112,8 +112,8 @@ export function CompanyFormFields({ form, onChange }: { form: CompanyFormState; 
       <Field label="来源页面链接" hint="用户从企业详情跳转外部来源平台时使用">
         <input className={inputCls} placeholder="https://…" value={form.sourceUrl} onChange={(e) => set({ sourceUrl: e.target.value })} />
       </Field>
-      <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-        <p className="mb-2 text-xs font-medium text-gray-600">详情页指标开关（关闭或无数据的指标不在一体机展示）</p>
+      <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+        <p className="mb-2 text-xs font-medium text-neutral-600">详情页指标开关（关闭或无数据的指标不在一体机展示）</p>
         <div className="grid grid-cols-2 gap-2">
           <Switch checked={form.showOpenJobCount} onChange={(v) => set({ showOpenJobCount: v })} label="展示来源岗位数" />
           <Switch checked={form.showCity} onChange={(v) => set({ showCity: v })} label="展示所在城市" />

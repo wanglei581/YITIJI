@@ -16,26 +16,26 @@ import { JobAiSessionRecords } from './JobAiSessionRecords'
 
 const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon: LucideIcon; bg: string; color: string }> = {
   parse: { label: '简历诊断', hint: '上传简历后的诊断记录', icon: FileSearchIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
-  optimize: { label: '简历优化', hint: '基于诊断生成的优化建议', icon: SparklesIcon, bg: 'bg-violet-50', color: 'text-violet-600' },
-  generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录', icon: SparklesIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
-  job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: FileSearchIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
-  career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: FileSearchIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
-  fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: SparklesIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
+  optimize: { label: '简历优化', hint: '基于诊断生成的优化建议', icon: SparklesIcon, bg: 'bg-plum-soft', color: 'text-plum' },
+  generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录', icon: SparklesIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
+  job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: FileSearchIcon, bg: 'bg-info-bg', color: 'text-info' },
+  career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: FileSearchIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
+  fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: SparklesIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
 }
 
 const UNKNOWN_KIND_META = {
   label: 'AI 服务记录',
   hint: '本人 AI 服务元数据',
   icon: SparklesIcon,
-  bg: 'bg-gray-50',
-  color: 'text-gray-500',
+  bg: 'bg-neutral-50',
+  color: 'text-neutral-500',
 }
 
 const STATUS_META: Record<MemberAiRecordItem['status'], { label: string; cls: string }> = {
-  pending: { label: '待处理', cls: 'bg-amber-50 text-amber-600' },
-  processing: { label: '处理中', cls: 'bg-blue-50 text-blue-600' },
-  completed: { label: '已完成', cls: 'bg-emerald-50 text-emerald-600' },
-  failed: { label: '失败', cls: 'bg-red-50 text-red-600' },
+  pending: { label: '待处理', cls: 'bg-warning-bg text-warning-fg' },
+  processing: { label: '处理中', cls: 'bg-primary-50 text-primary-600' },
+  completed: { label: '已完成', cls: 'bg-success-bg text-success-fg' },
+  failed: { label: '失败', cls: 'bg-error-bg text-error-fg' },
 }
 
 function shortTaskId(taskId: string): string {
@@ -188,8 +188,8 @@ export function MyAiRecordsPage() {
 
         {items.length > 0 && (
           <div className="pt-1">
-            <h2 className="text-sm font-semibold text-gray-900">简历与规划 AI 记录</h2>
-            <p className="mt-1 text-xs leading-relaxed text-gray-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容。</p>
+            <h2 className="text-sm font-semibold text-neutral-900">简历与规划 AI 记录</h2>
+            <p className="mt-1 text-xs leading-relaxed text-neutral-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容。</p>
           </div>
         )}
 
@@ -205,13 +205,13 @@ export function MyAiRecordsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-gray-900">{kind.label}</p>
+                  <p className="truncate text-sm font-semibold text-neutral-900">{kind.label}</p>
                   <span className={['shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', status.cls].join(' ')}>
                     {status.label}
                   </span>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{kind.hint}</p>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{metaLine(item)}</p>
+                <p className="mt-0.5 truncate text-xs text-neutral-400">{kind.hint}</p>
+                <p className="mt-0.5 truncate text-xs text-neutral-400">{metaLine(item)}</p>
               </div>
               <button
                 type="button"
@@ -222,8 +222,8 @@ export function MyAiRecordsPage() {
                 className={[
                   'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
                   confirming
-                    ? 'border-red-300 bg-red-50 text-red-600'
-                    : 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500',
+                    ? 'border-error/40 bg-error-bg text-error-fg'
+                    : 'border-neutral-200 text-neutral-400 hover:bg-error-bg hover:text-error-fg',
                 ].join(' ')}
               >
                 <Trash2Icon className="h-4 w-4" aria-hidden="true" />
@@ -232,7 +232,7 @@ export function MyAiRecordsPage() {
             </Card>
           )
         })}
-        <p className="mt-1 text-center text-xs text-gray-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容</p>
+        <p className="mt-1 text-center text-xs text-neutral-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容</p>
       </MeListShell>
     </>
   )

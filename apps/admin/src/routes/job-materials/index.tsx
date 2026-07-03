@@ -87,7 +87,7 @@ export default function JobMaterialsPage() {
       </div>
 
       {error && (
-        <Card className="mt-4 border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <Card className="mt-4 border-error/30 bg-error-bg p-4 text-sm text-error-fg">
           {error}
         </Card>
       )}
@@ -112,8 +112,8 @@ export default function JobMaterialsPage() {
                 <tr key={template.id} className="border-t border-neutral-100">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-                        <FileTextIcon className="h-4 w-4 text-blue-600" aria-hidden="true" />
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-info-bg">
+                        <FileTextIcon className="h-4 w-4 text-info-fg" aria-hidden="true" />
                       </span>
                       <span>
                         <span className="block font-semibold text-neutral-900">{template.title}</span>
@@ -123,7 +123,7 @@ export default function JobMaterialsPage() {
                   </td>
                   <td className="px-4 py-3 text-neutral-600">{TYPE_LABELS[template.type]}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                    <span className="rounded-full bg-success-bg px-2 py-1 text-xs font-semibold text-success-fg">
                       {template.status === 'published' ? '已发布' : '已停用'}
                     </span>
                   </td>

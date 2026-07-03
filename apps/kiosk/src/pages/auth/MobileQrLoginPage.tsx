@@ -111,14 +111,14 @@ export function MobileQrLoginPage() {
     <main className="min-h-screen bg-[#f3f5f9] px-5 py-8 text-[#172033]">
       <section className="mx-auto flex w-full max-w-[460px] flex-col">
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#3185ff] via-[#7f65dc] to-[#ff6a3d] text-white shadow-lg shadow-blue-500/20">
+          <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#3185ff] via-[#7f65dc] to-[#ff6a3d] text-white shadow-lg shadow-primary-500/20">
             <SmartphoneIcon className="h-8 w-8" aria-hidden="true" />
           </div>
           <h1 className="mt-4 text-2xl font-bold">手机确认登录</h1>
           <p className="mt-2 text-sm leading-6 text-[#7e8797]">
             输入手机号和短信验证码后，一体机会自动进入会员登录态。
           </p>
-          <div className="mt-4 rounded-[10px] border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold leading-6 text-blue-700">
+          <div className="mt-4 rounded-[10px] border border-primary-100 bg-primary-50 px-4 py-3 text-sm font-semibold leading-6 text-primary-700">
             设备提示：{deviceLabel ?? '正在识别一体机'}
             <br />
             请确认它与你面前的一体机一致，再继续登录。
@@ -167,14 +167,14 @@ export function MobileQrLoginPage() {
           </div>
 
           {notice && (
-            <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-emerald-50 px-4 text-sm font-semibold text-emerald-700">
+            <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-success-bg px-4 text-sm font-semibold text-success-fg">
               <CheckCircle2Icon className="h-4 w-4" aria-hidden="true" />
               {notice}
             </div>
           )}
 
           {error && (
-            <div className="mt-4 rounded-[8px] bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-600">
+            <div className="mt-4 rounded-[8px] bg-error-bg px-4 py-3 text-center text-sm font-semibold text-error-fg">
               {error}
             </div>
           )}
@@ -193,7 +193,7 @@ export function MobileQrLoginPage() {
             type="button"
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="mt-5 min-h-[54px] w-full rounded-[10px] bg-[#1677ff] text-base font-bold text-white shadow-lg shadow-blue-500/20 disabled:cursor-not-allowed disabled:bg-[#a9bdf5]"
+            className="mt-5 min-h-[54px] w-full rounded-[10px] bg-[#1677ff] text-base font-bold text-white shadow-lg shadow-primary-500/20 disabled:cursor-not-allowed disabled:bg-[#a9bdf5]"
           >
             {confirmed ? '已确认，请回到一体机' : loading ? '确认中...' : '确认登录一体机'}
           </button>

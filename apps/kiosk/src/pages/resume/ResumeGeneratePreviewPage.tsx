@@ -39,13 +39,13 @@ interface LocationState {
 }
 
 const taCls =
-  'w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+  'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
 
 function SectionTitle({ title }: { title: string }) {
   return (
     <div className="mb-2 flex items-center gap-2">
       <span className="h-4 w-1 rounded-full bg-primary-600" aria-hidden="true" />
-      <p className="text-base font-semibold text-gray-900">{title}</p>
+      <p className="text-base font-semibold text-neutral-900">{title}</p>
     </div>
   )
 }
@@ -92,7 +92,7 @@ export function ResumeGeneratePreviewPage() {
 
   if (restoring) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-gray-400">
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
         <p className="text-base">正在读取生成结果…</p>
       </div>
     )
@@ -102,8 +102,8 @@ export function ResumeGeneratePreviewPage() {
     // 刷新 / 待机后内存态丢失(公共设备隐私设计):引导重新生成
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-        <AlertCircleIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
-        <p className="text-base text-gray-500">生成结果已清除(公共设备不保留个人信息)</p>
+        <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
+        <p className="text-base text-neutral-500">生成结果已清除(公共设备不保留个人信息)</p>
         <Button size="lg" onClick={() => navigate('/resume/generate')}>重新填写生成</Button>
       </div>
     )
@@ -157,18 +157,18 @@ export function ResumeGeneratePreviewPage() {
           }
         />
         {isMock && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="mt-3 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
             <FlaskConicalIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p>当前为演示模式生成的内容(未接入真实 AI 模型)，仅用于体验流程；正式环境由管理员配置 AI 模型后生效。</p>
           </div>
         )}
         {hints.length > 0 && (
-          <div className="mt-3 rounded-xl bg-orange-50 px-4 py-3">
-            <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-orange-800">
+          <div className="mt-3 rounded-xl bg-warning-bg px-4 py-3">
+            <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-warning-fg">
               <AlertCircleIcon className="h-4 w-4" aria-hidden="true" />
               建议补充(AI 不会替你编造这些内容)
             </p>
-            <ul className="space-y-0.5 pl-5 text-sm text-orange-700">
+            <ul className="space-y-0.5 pl-5 text-sm text-warning-fg">
               {hints.map((h, i) => <li key={i} className="list-disc">{h}</li>)}
             </ul>
           </div>
@@ -179,8 +179,8 @@ export function ResumeGeneratePreviewPage() {
         {/* 简历纸面预览(白底卡,接近 A4 视觉) */}
         <Card className="p-6">
           <div className="border-b-2 border-primary-600 pb-3">
-            <p className="text-2xl font-bold text-gray-900">{resume.basic.name}</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="text-2xl font-bold text-neutral-900">{resume.basic.name}</p>
+            <p className="mt-1 text-sm text-neutral-500">
               {[
                 resume.intention.position ? `求职意向:${resume.intention.position}` : '',
                 resume.intention.city ? `意向城市:${resume.intention.city}` : '',
@@ -208,10 +208,10 @@ export function ResumeGeneratePreviewPage() {
                   {resume.education.map((e, i) => (
                     <div key={i}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm font-semibold text-gray-800">
+                        <p className="text-sm font-semibold text-neutral-800">
                           {[e.school, e.major, e.degree].filter(Boolean).join(' · ')}
                         </p>
-                        {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
+                        {e.period && <p className="shrink-0 text-xs text-neutral-400">{e.period}</p>}
                       </div>
                       <textarea
                         className={`${taCls} mt-1.5 h-16 resize-none`}
@@ -235,8 +235,8 @@ export function ResumeGeneratePreviewPage() {
                   {resume.experience.map((e, i) => (
                     <div key={i}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm font-semibold text-gray-800">{e.company} · {e.role}</p>
-                        {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
+                        <p className="text-sm font-semibold text-neutral-800">{e.company} · {e.role}</p>
+                        {e.period && <p className="shrink-0 text-xs text-neutral-400">{e.period}</p>}
                       </div>
                       <textarea
                         className={`${taCls} mt-1.5 h-20 resize-none`}
@@ -258,7 +258,7 @@ export function ResumeGeneratePreviewPage() {
                 <div className="space-y-3">
                   {resume.projects.map((p, i) => (
                     <div key={i}>
-                      <p className="text-sm font-semibold text-gray-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
+                      <p className="text-sm font-semibold text-neutral-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
                       <textarea
                         className={`${taCls} mt-1.5 h-20 resize-none`}
                         value={p.description}
@@ -287,33 +287,33 @@ export function ResumeGeneratePreviewPage() {
             {resume.certificates.length > 0 && (
               <div>
                 <SectionTitle title="证书 / 资质" />
-                <p className="text-sm text-gray-700">{resume.certificates.join(' · ')}</p>
+                <p className="text-sm text-neutral-700">{resume.certificates.join(' · ')}</p>
               </div>
             )}
           </div>
         </Card>
 
-        <p className="flex items-center gap-1.5 text-xs text-gray-400">
+        <p className="flex items-center gap-1.5 text-xs text-neutral-400">
           <PencilLineIcon className="h-3.5 w-3.5" aria-hidden="true" />
           所有描述均可直接点击修改;事实信息(学校/公司/证书)以你填写的为准,AI 未做任何添加。
         </p>
 
-        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
 
         {exported && (
-          <Card className="border-green-100 bg-green-50/60 p-5">
-            <p className="flex items-center gap-2 text-base font-semibold text-green-800">
+          <Card className="border-success-bg bg-success-bg/60 p-5">
+            <p className="flex items-center gap-2 text-base font-semibold text-success-fg">
               <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
               PDF 已生成
             </p>
-            <p className="mt-1 text-sm text-green-700">
+            <p className="mt-1 text-sm text-success-fg">
               {exported.filename} · {exported.pageCount} 页
               {exported.sizeBytes > 0 ? ` · ${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB` : ''}
             </p>
             {!exported.signedUrl && (
-              <p className="mt-1 text-xs text-amber-700">演示模式未生成真实文件,接入后端后可打印。</p>
+              <p className="mt-1 text-xs text-warning-fg">演示模式未生成真实文件,接入后端后可打印。</p>
             )}
-            <p className="mt-1 flex items-center gap-1 text-xs text-green-700/80">
+            <p className="mt-1 flex items-center gap-1 text-xs text-success-fg/80">
               <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
               文件短期保留后自动清理,本机不长期保存你的简历。
             </p>
@@ -322,7 +322,7 @@ export function ResumeGeneratePreviewPage() {
       </div>
 
       {/* 底部操作条 */}
-      <div className="border-t border-gray-100 px-6 pb-6 pt-3">
+      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           {!exported ? (
             <Button

@@ -33,10 +33,10 @@ interface ReportState {
 }
 
 const LEVEL_META: Record<string, { label: string; cls: string }> = {
-  needs_work: { label: '需要加强', cls: 'bg-orange-50 text-orange-700' },
-  pass: { label: '基础达标', cls: 'bg-blue-50 text-blue-700' },
-  good: { label: '表现良好', cls: 'bg-green-50 text-green-700' },
-  excellent: { label: '表现突出', cls: 'bg-emerald-50 text-emerald-700' },
+  needs_work: { label: '需要加强', cls: 'bg-warning-bg text-warning-fg' },
+  pass: { label: '基础达标', cls: 'bg-primary-50 text-primary-700' },
+  good: { label: '表现良好', cls: 'bg-success-bg text-success-fg' },
+  excellent: { label: '表现突出', cls: 'bg-success-bg text-success-fg' },
 }
 
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
@@ -44,7 +44,7 @@ function Section({ icon: Icon, title, children }: { icon: React.ElementType; tit
     <Card className="p-5">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
       </div>
       {children}
     </Card>
@@ -55,7 +55,7 @@ function Bullets({ items }: { items: string[] }) {
   return (
     <ul className="flex flex-col gap-2">
       {items.map((t) => (
-        <li key={t.slice(0, 24)} className="flex items-start gap-2 text-sm leading-relaxed text-gray-700">
+        <li key={t.slice(0, 24)} className="flex items-start gap-2 text-sm leading-relaxed text-neutral-700">
           <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" aria-hidden="true" />
           {t}
         </li>
@@ -144,11 +144,11 @@ export function InterviewReportPage() {
         {/* 综合表现 */}
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">综合表现概览</h2>
+            <h2 className="text-base font-semibold text-neutral-900">综合表现概览</h2>
             <span className={['rounded-full px-3 py-1 text-sm font-semibold', level.cls].join(' ')}>{level.label}</span>
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-gray-700">{data.report.overall.summary}</p>
-          <p className="mt-2 text-xs text-gray-400">「{level.label}」为本次练习表现等级，不代表录用结果</p>
+          <p className="mt-3 text-sm leading-relaxed text-neutral-700">{data.report.overall.summary}</p>
+          <p className="mt-2 text-xs text-neutral-400">「{level.label}」为本次练习表现等级，不代表录用结果</p>
         </Card>
 
         <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
@@ -160,7 +160,7 @@ export function InterviewReportPage() {
         <Section icon={AlertTriangleIcon} title="风险点与改进建议">
           <ul className="flex flex-col gap-2">
             {data.report.risks.map((t) => (
-              <li key={t.slice(0, 24)} className="flex items-start gap-2 rounded-lg bg-orange-50 px-3 py-2 text-sm leading-relaxed text-orange-800">
+              <li key={t.slice(0, 24)} className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm leading-relaxed text-warning-fg">
                 <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 {t}
               </li>
@@ -171,41 +171,41 @@ export function InterviewReportPage() {
         <Section icon={HelpCircleIcon} title="高频问题预测（建议继续准备）">
           <div className="flex flex-col gap-3">
             {data.report.predictedQuestions.map((q, i) => (
-              <div key={q.question.slice(0, 24)} className="rounded-xl border border-gray-100 bg-gray-50/60 p-3.5">
-                <p className="text-sm font-semibold text-gray-900">{i + 1}. {q.question}</p>
-                <p className="mt-1.5 text-xs text-gray-500">考察点：{q.why}</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-600">回答思路:{q.approach}</p>
+              <div key={q.question.slice(0, 24)} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
+                <p className="text-sm font-semibold text-neutral-900">{i + 1}. {q.question}</p>
+                <p className="mt-1.5 text-xs text-neutral-500">考察点：{q.why}</p>
+                <p className="mt-1 text-xs leading-relaxed text-neutral-600">回答思路:{q.approach}</p>
               </div>
             ))}
           </div>
         </Section>
 
         <Section icon={LightbulbIcon} title="STAR 回答建议">
-          <div className="flex flex-col gap-2 text-sm leading-relaxed text-gray-700">
+          <div className="flex flex-col gap-2 text-sm leading-relaxed text-neutral-700">
             <p><span className="font-semibold text-primary-700">S 情境：</span>{data.report.starAdvice.s}</p>
             <p><span className="font-semibold text-primary-700">T 任务：</span>{data.report.starAdvice.t}</p>
             <p><span className="font-semibold text-primary-700">A 行动：</span>{data.report.starAdvice.a}</p>
             <p><span className="font-semibold text-primary-700">R 结果：</span>{data.report.starAdvice.r}</p>
-            <p className="mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{data.report.starAdvice.reminder}</p>
+            <p className="mt-1 rounded-lg bg-warning-bg px-3 py-2 text-xs text-warning-fg">{data.report.starAdvice.reminder}</p>
           </div>
         </Section>
 
         <Section icon={ClipboardListIcon} title="面试前准备清单">
           <ul className="flex flex-col gap-2">
             {data.report.checklist.map((c) => (
-              <li key={c.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-gray-300 text-[10px] text-transparent" aria-hidden="true">✓</span>
+              <li key={c.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-neutral-700">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-neutral-300 text-[10px] text-transparent" aria-hidden="true">✓</span>
                 {c}
               </li>
             ))}
           </ul>
         </Section>
 
-        {printError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{printError}</p>}
+        {printError && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{printError}</p>}
       </div>
 
       {/* 底部操作 */}
-      <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <div className="flex gap-3">
           <Button size="lg" className="h-14 flex-1 text-base" disabled={printing} onClick={() => void handlePrint()}>
             <PrinterIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />

@@ -38,8 +38,8 @@ interface FeatureInfo {
 const FEATURES: Record<FeatureKey, FeatureInfo> = {
   'id-photo': {
     icon: UserSquareIcon,
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-600',
+    iconBg: 'bg-warning-bg',
+    iconColor: 'text-warning-fg',
     title: '证件照',
     summary: '即将支持常见规格证件照的尺寸排版与打印（一寸 / 二寸 / 小一寸等）。',
     plans: [
@@ -53,8 +53,8 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
   },
   convert: {
     icon: FileType2Icon,
-    iconBg: 'bg-sky-50',
-    iconColor: 'text-sky-600',
+    iconBg: 'bg-info-bg',
+    iconColor: 'text-info',
     title: '格式转换',
     summary: '即将支持常见文档与图片格式互转，方便打印前统一格式。',
     plans: [
@@ -67,8 +67,8 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
   },
   sign: {
     icon: PenToolIcon,
-    iconBg: 'bg-rose-50',
-    iconColor: 'text-rose-600',
+    iconBg: 'bg-error-bg',
+    iconColor: 'text-error-fg',
     title: '签名盖章',
     summary: '即将支持在文件上叠加手写签名或印章图片，用于打印前的版式预览。',
     plans: [
@@ -94,11 +94,11 @@ export function PrintScanFeatureInfoPage() {
   if (!isFeatureKey(key)) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
-          <FileType2Icon className="h-10 w-10 text-gray-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
+          <FileType2Icon className="h-10 w-10 text-neutral-400" />
         </div>
-        <h1 className="mt-6 text-xl font-semibold text-gray-900">未找到该功能</h1>
-        <p className="mt-2 text-sm text-gray-500">请返回打印扫描服务选择可用功能</p>
+        <h1 className="mt-6 text-xl font-semibold text-neutral-900">未找到该功能</h1>
+        <p className="mt-2 text-sm text-neutral-500">请返回打印扫描服务选择可用功能</p>
         <Button className="mt-8" onClick={() => navigate('/print-scan')}>
           返回打印扫描服务
         </Button>
@@ -128,20 +128,20 @@ export function PrintScanFeatureInfoPage() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-gray-900">{info.title}</h2>
-              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+              <h2 className="text-xl font-bold text-neutral-900">{info.title}</h2>
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
                 即将上线
               </span>
             </div>
-            <p className="mt-1 text-sm leading-relaxed text-gray-500">{info.summary}</p>
+            <p className="mt-1 text-sm leading-relaxed text-neutral-500">{info.summary}</p>
           </div>
         </div>
 
         <div className="mt-6">
-          <p className="mb-3 text-sm font-medium text-gray-700">计划支持</p>
+          <p className="mb-3 text-sm font-medium text-neutral-700">计划支持</p>
           <ul className="space-y-2.5">
             {info.plans.map((p) => (
-              <li key={p} className="flex items-start gap-2.5 text-sm text-gray-600">
+              <li key={p} className="flex items-start gap-2.5 text-sm text-neutral-600">
                 <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden="true" />
                 <span>{p}</span>
               </li>
@@ -159,9 +159,9 @@ export function PrintScanFeatureInfoPage() {
         </div>
       )}
       {info.notice === 'esign' && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/70 px-4 py-3">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-gray-600">
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-info-bg bg-info-bg/70 px-4 py-3">
+          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
+          <p className="text-xs leading-relaxed text-neutral-600">
             {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
           </p>
         </div>

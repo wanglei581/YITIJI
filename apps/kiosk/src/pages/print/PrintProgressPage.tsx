@@ -229,12 +229,12 @@ export function PrintProgressPage() {
   if (!hasContext) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
-          <AlertCircleIcon className="h-10 w-10 text-amber-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
+          <AlertCircleIcon className="h-10 w-10 text-warning" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-900">未找到打印任务</p>
-          <p className="mt-2 text-sm text-gray-500">请从上传文件重新开始打印流程</p>
+          <p className="text-lg font-semibold text-neutral-900">未找到打印任务</p>
+          <p className="mt-2 text-sm text-neutral-500">请从上传文件重新开始打印流程</p>
         </div>
         <button
           onClick={() => navigate(uploadPath)}
@@ -251,12 +251,12 @@ export function PrintProgressPage() {
   if (isHttpMode && !taskId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
-          <AlertCircleIcon className="h-10 w-10 text-amber-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
+          <AlertCircleIcon className="h-10 w-10 text-warning" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-900">打印任务尚未创建</p>
-          <p className="mt-2 text-sm text-gray-500">请返回确认页重试</p>
+          <p className="text-lg font-semibold text-neutral-900">打印任务尚未创建</p>
+          <p className="mt-2 text-sm text-neutral-500">请返回确认页重试</p>
         </div>
         <button
           onClick={() => navigate('/print/confirm', { state })}
@@ -272,18 +272,18 @@ export function PrintProgressPage() {
   if (timedOut) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-amber-50">
-          <ClockIcon className="h-12 w-12 text-amber-500" />
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-warning-bg">
+          <ClockIcon className="h-12 w-12 text-warning" />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">处理超时</h1>
-          <p className="mt-3 text-base text-gray-500 max-w-xs">
+          <h1 className="text-2xl font-bold text-neutral-900">处理超时</h1>
+          <p className="mt-3 text-base text-neutral-500 max-w-xs">
             打印终端长时间未响应，任务可能仍在队列中。
             <br />
             请联系工作人员确认打印机状态。
           </p>
           {taskId && (
-            <p className="mt-3 text-xs text-gray-400">任务编号：{taskId}</p>
+            <p className="mt-3 text-xs text-neutral-400">任务编号：{taskId}</p>
           )}
         </div>
         <button
@@ -302,20 +302,20 @@ export function PrintProgressPage() {
       <div
         className={[
           'mb-10 flex h-24 w-24 items-center justify-center rounded-full',
-          failed ? 'bg-red-50' : 'bg-primary-50',
+          failed ? 'bg-error-bg' : 'bg-primary-50',
         ].join(' ')}
       >
         {failed ? (
-          <XCircleIcon className="h-12 w-12 text-red-500" />
+          <XCircleIcon className="h-12 w-12 text-error-fg" />
         ) : (
           <PrinterIcon className="h-12 w-12 text-primary-600" />
         )}
       </div>
 
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="text-2xl font-bold text-neutral-900">
         {failed ? '处理出错' : '正在处理'}
       </h1>
-      <p className="mt-2 text-base text-gray-500">
+      <p className="mt-2 text-base text-neutral-500">
         {failed
           ? '任务遇到问题，即将跳转…'
           : useRealApi
@@ -337,12 +337,12 @@ export function PrintProgressPage() {
                 className={[
                   'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
                   isFailed
-                    ? 'border-red-500 bg-red-500 text-white'
+                    ? 'border-error-fg bg-error text-white'
                     : done
                     ? 'border-primary-600 bg-primary-600 text-white'
                     : active
                     ? 'border-primary-600 bg-white text-primary-600'
-                    : 'border-gray-200 bg-white text-gray-300',
+                    : 'border-neutral-200 bg-white text-neutral-300',
                 ].join(' ')}
               >
                 {isFailed ? (
@@ -361,10 +361,10 @@ export function PrintProgressPage() {
                   className={[
                     'text-base font-medium',
                     isFailed
-                      ? 'text-red-600'
+                      ? 'text-error-fg'
                       : done || active
-                      ? 'text-gray-900'
-                      : 'text-gray-400',
+                      ? 'text-neutral-900'
+                      : 'text-neutral-400',
                   ].join(' ')}
                 >
                   {step.label}
@@ -375,7 +375,7 @@ export function PrintProgressPage() {
                   </p>
                 )}
                 {isFailed && (
-                  <p className="mt-0.5 text-sm text-red-500">任务中断</p>
+                  <p className="mt-0.5 text-sm text-error-fg">任务中断</p>
                 )}
               </div>
             </div>
@@ -388,7 +388,7 @@ export function PrintProgressPage() {
         <div className="absolute bottom-24 right-6">
           <button
             onClick={handleDevFail}
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100"
+            className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
           >
             [DEV] 模拟失败
           </button>
@@ -398,7 +398,7 @@ export function PrintProgressPage() {
       {/* DEV 专用：显示当前任务 ID（real 模式） */}
       {import.meta.env.DEV && useRealApi && taskId && (
         <div className="absolute bottom-6 left-0 right-0 text-center">
-          <p className="text-xs text-gray-400">taskId: {taskId}</p>
+          <p className="text-xs text-neutral-400">taskId: {taskId}</p>
         </div>
       )}
     </div>

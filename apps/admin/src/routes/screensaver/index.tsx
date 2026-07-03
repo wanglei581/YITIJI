@@ -311,6 +311,7 @@ function AssetsTab() {
                 </span>
                 <span className="absolute left-2 top-2">
                   <StatusBadge
+                    dot
                     status={a.status === 'active' ? 'success' : 'default'}
                     label={a.status === 'active' ? '启用' : '停用'}
                   />
@@ -363,7 +364,7 @@ function AssetPreviewModal({ asset, onClose }: { asset: AdAssetView; onClose: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-6" role="dialog" aria-modal="true">
-      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-surface shadow-2xl">
         <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-neutral-900">{asset.title}</p>
@@ -509,6 +510,7 @@ function PlaylistsTab() {
                 <p className="text-xs text-neutral-500">
                   {p.itemCount} 个素材 ·{' '}
                   <StatusBadge
+                    dot
                     status={p.status === 'active' ? 'success' : 'default'}
                     label={p.status === 'active' ? '启用' : '停用'}
                   />
@@ -724,7 +726,7 @@ function TerminalConfigRow({
         <MonitorIcon className="h-5 w-5 text-neutral-400" aria-hidden="true" />
         <div>
           <p className="font-medium text-neutral-800">{terminal.terminalCode ?? terminal.terminalId}</p>
-          <StatusBadge status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
+          <StatusBadge dot status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
         </div>
       </div>
 

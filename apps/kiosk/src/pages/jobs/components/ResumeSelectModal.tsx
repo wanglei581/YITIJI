@@ -54,22 +54,22 @@ export function ResumeSelectModal({
           type="button"
           onClick={onClose}
           aria-label="关闭"
-          className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100"
+          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
         >
           <XIcon className="h-5 w-5" aria-hidden="true" />
         </button>
 
-        <h2 className="text-lg font-semibold text-gray-900">选择用于分析的简历</h2>
-        <p className="mt-1 text-sm text-gray-500">仅展示本人已完成诊断的简历元数据，不展示简历原文。</p>
+        <h2 className="text-lg font-semibold text-neutral-900">选择用于分析的简历</h2>
+        <p className="mt-1 text-sm text-neutral-500">仅展示本人已完成诊断的简历元数据，不展示简历原文。</p>
 
         <div className="mt-4 min-h-[12rem] overflow-y-auto">
           {loading ? (
-            <div className="flex min-h-[12rem] items-center justify-center gap-2 text-sm text-gray-400">
+            <div className="flex min-h-[12rem] items-center justify-center gap-2 text-sm text-neutral-400">
               <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" />
               正在读取本人简历…
             </div>
           ) : error ? (
-            <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+            <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
           ) : usable.length === 0 ? (
             <EmptyState
               icon={FileSearchIcon}
@@ -84,14 +84,14 @@ export function ResumeSelectModal({
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item)}
-                  className="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/40"
+                  className="flex min-h-[64px] w-full items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/40"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
                     <FileSearchIcon className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-gray-900">上传诊断简历</span>
-                    <span className="mt-0.5 block truncate text-xs text-gray-400">
+                    <span className="block truncate text-sm font-semibold text-neutral-900">上传诊断简历</span>
+                    <span className="mt-0.5 block truncate text-xs text-neutral-400">
                       任务 {item.taskId.slice(0, 8)} · {new Date(item.createdAt).toLocaleString('zh-CN')}
                     </span>
                   </span>

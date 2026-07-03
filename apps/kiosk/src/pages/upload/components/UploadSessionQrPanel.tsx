@@ -213,22 +213,22 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
   return (
     <Card className="p-5">
       <div className="flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
           <SmartphoneIcon className="h-6 w-6" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-bold text-gray-900">手机扫码上传</h2>
-            {status?.mode === 'member' && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">会员文件确认后归档</span>}
+            <h2 className="text-xl font-bold text-neutral-900">手机扫码上传</h2>
+            {status?.mode === 'member' && <span className="rounded-full bg-success-bg px-2.5 py-1 text-xs font-bold text-success-fg">会员文件确认后归档</span>}
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-gray-600">
+          <p className="mt-1 text-sm leading-relaxed text-neutral-600">
             手机只负责上传文件；一体机上确认后才进入 AI 诊断或优化流程。
           </p>
         </div>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-[180px_1fr]">
-        <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-gray-200 bg-white">
+        <div className="flex min-h-[180px] items-center justify-center rounded-2xl border border-neutral-200 bg-white">
           {qr && !loading ? (
             <QRCodeSVG value={qr.qrUrl} size={150} level="M" marginSize={1} />
           ) : (
@@ -236,12 +236,12 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col justify-between rounded-2xl bg-gray-50 p-4">
+        <div className="flex min-w-0 flex-col justify-between rounded-2xl bg-neutral-50 p-4">
           <div>
-            <p className="text-sm font-bold text-gray-900">
+            <p className="text-sm font-bold text-neutral-900">
               {uploaded ? '手机端已上传文件' : expired ? '二维码已过期' : '请用手机微信或浏览器扫码'}
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-gray-600">
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">
               {uploaded
                 ? `${uploadedFile?.filename ?? '已上传文件'} · ${formatSize(uploadedFile?.sizeBytes ?? 0)}`
                 : expired
@@ -249,13 +249,13 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
                   : `二维码有效期 ${expiresLabel || '10:00'}，文件最大 10MB。`}
             </p>
             {error && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+              <div className="mt-3 flex items-start gap-2 rounded-xl bg-error-bg px-3 py-2 text-sm font-semibold text-error-fg">
                 <XCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
             )}
             {uploaded && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-success-bg px-3 py-2 text-sm font-semibold text-success-fg">
                 <CheckCircleIcon className="h-4 w-4" aria-hidden="true" />
                 回到一体机确认后继续
               </div>

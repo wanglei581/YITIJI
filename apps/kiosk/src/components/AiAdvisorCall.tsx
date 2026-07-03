@@ -326,7 +326,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
   const ss = String(elapsed % 60).padStart(2, '0')
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-slate-100 to-slate-200">
+    <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-neutral-100 to-neutral-200">
       {/* 声波动画关键帧：放在组件根部渲染一次，避免 Waveform 每次重渲染重复注入 <style> */}
       <style>{`@keyframes aiWave { 0% { transform: scaleY(0.35) } 100% { transform: scaleY(1) } }`}</style>
 
@@ -372,7 +372,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
             onClick={() => void startCall()}
             className="flex flex-col items-center gap-3 group"
           >
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-500 shadow-xl group-active:scale-95 transition-transform">
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-500 shadow-xl group-active:scale-95 transition-transform">
               <PhoneIcon />
             </span>
             <span className="text-white text-base font-medium drop-shadow">点击开始与顾问对话</span>
@@ -382,7 +382,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
 
       {/* 连接中 */}
       {phase === 'connecting' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-900/40 backdrop-blur-sm">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-900/40 backdrop-blur-sm">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/40 border-t-white" />
           <p className="text-sm text-white">正在接通顾问…</p>
         </div>
@@ -390,13 +390,13 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
 
       {/* 错误 */}
       {phase === 'error' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-900/70 px-6 text-center">
-          <p className="text-base font-medium text-red-300">连接失败</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-neutral-900/70 px-6 text-center">
+          <p className="text-base font-medium text-error/40">连接失败</p>
           <p className="text-xs text-white/70 break-all max-w-sm">{errMsg}</p>
           <button
             type="button"
             onClick={onSwitchToText}
-            className="mt-2 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-800"
+            className="mt-2 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-neutral-800"
           >
             改用文字咨询
           </button>
@@ -408,7 +408,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
         <button
           type="button"
           onClick={() => void resumePlay()}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 rounded-full bg-blue-500 px-6 py-3 text-sm font-medium text-white shadow-xl"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 rounded-full bg-primary-500 px-6 py-3 text-sm font-medium text-white shadow-xl"
         >
           点击播放顾问语音
         </button>
@@ -425,7 +425,7 @@ export function AiAdvisorCall({ onSwitchToText, onExit }: AiAdvisorCallProps) {
           {/* 字幕 */}
           <div className="mx-auto mb-4 w-full max-w-md">
             {micBlocked && (
-              <p className="mb-2 rounded-2xl bg-amber-400/20 px-4 py-2 text-center text-xs leading-relaxed text-amber-50 backdrop-blur">
+              <p className="mb-2 rounded-2xl bg-warning/20 px-4 py-2 text-center text-xs leading-relaxed text-warning-bg backdrop-blur">
                 麦克风权限未开启，当前为只听模式。请在浏览器地址栏允许麦克风后刷新页面。
               </p>
             )}
@@ -472,8 +472,8 @@ function ControlButton({
 }) {
   const size = large ? 'h-16 w-16' : 'h-14 w-14'
   const style =
-    tone === 'hangup' ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg' :
-    tone === 'danger' ? 'bg-red-500/30 border border-red-300/50 text-red-100 backdrop-blur' :
+    tone === 'hangup' ? 'bg-error hover:bg-error text-white shadow-lg' :
+    tone === 'danger' ? 'bg-error/30 border border-error/40/50 text-error/20 backdrop-blur' :
     'bg-white/20 border border-white/30 text-white backdrop-blur hover:bg-white/30'
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -492,17 +492,17 @@ function ControlButton({
 
 function StatusDot({ phase, aiState }: { phase: string; aiState: AiState }) {
   const color =
-    phase === 'error' ? 'bg-red-400' :
-    phase === 'connecting' ? 'bg-amber-400' :
+    phase === 'error' ? 'bg-error' :
+    phase === 'connecting' ? 'bg-warning' :
     phase === 'gate' ? 'bg-white/60' :
-    aiState === 'listening' ? 'bg-emerald-400' :
-    aiState === 'speaking'  ? 'bg-blue-400' : 'bg-white/70'
+    aiState === 'listening' ? 'bg-success' :
+    aiState === 'speaking'  ? 'bg-primary-400' : 'bg-white/70'
   return <span className={`h-2 w-2 rounded-full ${color} ${phase === 'live' ? 'animate-pulse' : ''}`} />
 }
 
 function Waveform({ state }: { state: AiState }) {
   const active = state === 'speaking' || state === 'listening'
-  const color  = state === 'speaking' ? 'bg-blue-300' : state === 'listening' ? 'bg-emerald-300' : 'bg-white/40'
+  const color  = state === 'speaking' ? 'bg-primary-300' : state === 'listening' ? 'bg-success/50' : 'bg-white/40'
   const bars   = [4, 7, 11, 16, 11, 7, 4, 7, 11, 16, 11, 7, 4]
   return (
     <div className="flex items-center gap-1">

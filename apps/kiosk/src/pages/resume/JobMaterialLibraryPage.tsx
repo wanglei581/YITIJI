@@ -31,10 +31,10 @@ const TYPE_META: Record<Exclude<JobMaterialTemplateType, 'resume_template'>, {
   color: string
   bg: string
 }> = {
-  cover_letter:        { label: '求职信',     icon: MailIcon,     color: 'text-violet-600',  bg: 'bg-violet-50' },
-  thank_you:           { label: '感谢信',     icon: FileTextIcon, color: 'text-amber-600',   bg: 'bg-amber-50' },
-  portfolio_cover:     { label: '作品集封面', icon: ImageIcon,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  materials_checklist: { label: '材料清单',   icon: FileTextIcon, color: 'text-blue-600',    bg: 'bg-blue-50' },
+  cover_letter:        { label: '求职信',     icon: MailIcon,     color: 'text-plum',  bg: 'bg-plum-soft' },
+  thank_you:           { label: '感谢信',     icon: FileTextIcon, color: 'text-warning-fg',   bg: 'bg-warning-bg' },
+  portfolio_cover:     { label: '作品集封面', icon: ImageIcon,    color: 'text-success-fg', bg: 'bg-success-bg' },
+  materials_checklist: { label: '材料清单',   icon: FileTextIcon, color: 'text-primary-600',    bg: 'bg-primary-50' },
 }
 
 type FormState = JobMaterialDraftForm
@@ -193,7 +193,7 @@ export function JobMaterialLibraryPage() {
         }
       />
 
-      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-700">
+      <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
         本页仅用于个人求职材料整理、生成和打印。岗位申请、预约、投递仍需前往来源平台或官方渠道完成。
       </div>
 
@@ -209,7 +209,7 @@ export function JobMaterialLibraryPage() {
                 'min-h-[46px] rounded-full border px-4 text-sm font-semibold transition-colors',
                 active
                   ? 'border-primary-600 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+                  : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
               ].join(' ')}
             >
               {item}
@@ -239,15 +239,15 @@ export function JobMaterialLibraryPage() {
                         <Icon className={['h-6 w-6', meta.color].join(' ')} aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-gray-900">{template.title}</p>
-                        <p className="text-xs text-gray-400">{meta.label}</p>
+                        <p className="truncate font-semibold text-neutral-900">{template.title}</p>
+                        <p className="text-xs text-neutral-400">{meta.label}</p>
                       </div>
                     </div>
-                    <p className="mt-3 min-h-[44px] text-sm leading-relaxed text-gray-500">{template.description}</p>
-                    <p className="mt-2 text-xs leading-relaxed text-gray-400">{template.recommendedFor}</p>
+                    <p className="mt-3 min-h-[44px] text-sm leading-relaxed text-neutral-500">{template.description}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-neutral-400">{template.recommendedFor}</p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {template.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                        <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
                           {tag}
                         </span>
                       ))}
@@ -269,16 +269,16 @@ export function JobMaterialLibraryPage() {
               <EmptyState icon={FileTextIcon} title="请选择求职材料" />
             ) : (
               <div>
-                <p className="text-base font-semibold text-gray-900">{selected.title}</p>
-                <p className="mt-1 text-sm text-gray-500">生成后会保存到“我的文档”，仅本人可见。</p>
+                <p className="text-base font-semibold text-neutral-900">{selected.title}</p>
+                <p className="mt-1 text-sm text-neutral-500">生成后会保存到“我的文档”，仅本人可见。</p>
                 <div className="mt-4 space-y-3">
                   {selected.fields.map((field) => {
                     const value = form[field.key] ?? ''
-                    const commonClass = 'w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary-500'
+                    const commonClass = 'w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-primary-500'
                     return (
                       <label key={field.key} className="block">
-                        <span className="mb-1 block text-xs font-semibold text-gray-500">
-                          {field.label}{field.required && <span className="text-red-500"> *</span>}
+                        <span className="mb-1 block text-xs font-semibold text-neutral-500">
+                          {field.label}{field.required && <span className="text-error-fg"> *</span>}
                         </span>
                         {field.multiline ? (
                           <textarea
@@ -303,9 +303,9 @@ export function JobMaterialLibraryPage() {
                   })}
                 </div>
 
-                {submitError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{submitError}</p>}
+                {submitError && <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">{submitError}</p>}
                 {generated && (
-                  <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                  <div className="mt-4 rounded-lg border border-success/30 bg-success-bg p-3 text-sm text-success-fg">
                     已生成 {generated.filename}，文件已进入我的文档。
                   </div>
                 )}
@@ -332,7 +332,7 @@ export function JobMaterialLibraryPage() {
         </div>
       )}
 
-      <p className="mt-6 text-center text-xs text-gray-400">
+      <p className="mt-6 text-center text-xs text-neutral-400">
         素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。
       </p>
       <div className="h-2" />

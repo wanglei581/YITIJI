@@ -43,14 +43,14 @@ const STEPS = [
 ] as const
 
 const inputCls =
-  'w-full rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-base text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+  'w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-gray-700">
+      <span className="mb-1.5 block text-sm font-medium text-neutral-700">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -78,14 +78,14 @@ function EntryList<T>({
   return (
     <div className="space-y-4">
       {items.length === 0 && (
-        <p className="rounded-xl bg-gray-50 py-6 text-center text-sm text-gray-400">{emptyHint}</p>
+        <p className="rounded-xl bg-neutral-50 py-6 text-center text-sm text-neutral-400">{emptyHint}</p>
       )}
       {items.map((item, i) => (
         <Card key={i} className="relative p-4">
           <button
             type="button"
             onClick={() => onRemove(i)}
-            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg text-gray-300 hover:bg-red-50 hover:text-red-500"
+            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg text-neutral-300 hover:bg-error-bg hover:text-error-fg"
             aria-label="删除该条"
           >
             <Trash2Icon className="h-5 w-5" />
@@ -97,7 +97,7 @@ function EntryList<T>({
         <button
           type="button"
           onClick={onAdd}
-          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 text-base font-medium text-gray-500 hover:border-primary-300 hover:text-primary-600"
+          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 text-base font-medium text-neutral-500 hover:border-primary-300 hover:text-primary-600"
         >
           <PlusIcon className="h-5 w-5" />
           {addLabel}
@@ -214,7 +214,7 @@ export function ResumeGeneratePage() {
           }
         />
         {/* 防编造 + 隐私说明(合规) */}
-        <div className="mt-3 flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <div className="mt-3 flex items-start gap-2 rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-800">
           <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
             AI 只润色你填写的真实信息，<b>不会替你编造</b>学历、证书、公司或项目经历；没填的内容会提示你补充。
@@ -232,7 +232,7 @@ export function ResumeGeneratePage() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
               <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
             </span>
-            <p className="text-lg font-semibold text-gray-900">{STEPS[step].title}</p>
+            <p className="text-lg font-semibold text-neutral-900">{STEPS[step].title}</p>
           </div>
 
           {step === 0 && (
@@ -412,12 +412,12 @@ export function ResumeGeneratePage() {
         </Card>
 
         {error && (
-          <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
+          <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
         )}
       </div>
 
       {/* 底部操作条 */}
-      <div className="border-t border-gray-100 px-6 pb-6 pt-3">
+      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           <Button
             size="lg"

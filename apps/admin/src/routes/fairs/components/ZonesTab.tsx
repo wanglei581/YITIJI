@@ -62,7 +62,7 @@ export function ZonesTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">{zones.length} 个展区(按排序值升序展示)</p>
+        <p className="text-sm text-neutral-600">{zones.length} 个展区(按排序值升序展示)</p>
         <button onClick={openNew} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
           <PlusIcon className="h-3.5 w-3.5" />
           新增展区
@@ -70,7 +70,7 @@ export function ZonesTab({
       </div>
 
       {zones.length === 0 ? (
-        <Card className="p-10 text-center text-xs text-gray-400">暂无展区,点击右上角"新增展区"录入(如 A区 数字经济 / 现场服务区)</Card>
+        <Card className="p-10 text-center text-xs text-neutral-400">暂无展区,点击右上角"新增展区"录入(如 A区 数字经济 / 现场服务区)</Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {zones.map((z) => (
@@ -78,14 +78,14 @@ export function ZonesTab({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-500">#{z.sortOrder}</span>
-                    <p className="truncate font-medium text-gray-800">{z.name}</p>
+                    <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-500">#{z.sortOrder}</span>
+                    <p className="truncate font-medium text-neutral-800">{z.name}</p>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-neutral-400">
                     {z.category ? ZONE_CATEGORY_LABELS[z.category] ?? z.category : '未分类'}
                     {z.city ? ` · ${z.city}` : ''}
                   </p>
-                  {z.description && <p className="mt-1.5 line-clamp-2 text-xs text-gray-500">{z.description}</p>}
+                  {z.description && <p className="mt-1.5 line-clamp-2 text-xs text-neutral-500">{z.description}</p>}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <button onClick={() => openEdit(z)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
@@ -99,7 +99,7 @@ export function ZonesTab({
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-neutral-400">
         展区信息用于一体机"展位导览"页展示。当前未建展位(booth)级数据模型,导览图展示展区列表与底图,不含展位坐标。
       </p>
 

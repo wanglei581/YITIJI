@@ -65,8 +65,8 @@ export function CompanyGuideEntry({ onOpen }: { onOpen: () => void }) {
         <Building2Icon className="h-5 w-5" aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-base font-semibold text-gray-900">找企业 · 企业展示</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-gray-500">
+        <span className="block text-base font-semibold text-neutral-900">找企业 · 企业展示</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500">
           浏览来源企业、在招岗位和企业详情；本系统不接收简历，办理请去来源平台。
         </span>
       </span>

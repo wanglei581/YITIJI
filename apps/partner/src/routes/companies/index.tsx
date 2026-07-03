@@ -41,8 +41,8 @@ const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' |
 const PUBLISH_MAP: Record<PublishStatus, { dot: string; label: string }> = {
   draft:       { dot: 'bg-orange-400', label: '草稿' },
   published:   { dot: 'bg-green-500',  label: '已发布' },
-  unpublished: { dot: 'bg-gray-300',   label: '已下架' },
-  expired:     { dot: 'bg-gray-300',   label: '已过期' },
+  unpublished: { dot: 'bg-neutral-300',   label: '已下架' },
+  expired:     { dot: 'bg-neutral-300',   label: '已过期' },
 }
 
 const REVIEW_FILTERS = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
@@ -77,14 +77,14 @@ function fmtTime(iso: string): string {
 // ─── Form ─────────────────────────────────────────────────────────────────────
 
 const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-600">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -340,7 +340,7 @@ export default function CompaniesPage() {
     return (
       <Page title="企业资料管理" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-neutral-400">加载中...</p>
         </div>
       </Page>
     )
@@ -350,8 +350,8 @@ export default function CompaniesPage() {
     return (
       <Page title="企业资料管理" subtitle="加载失败">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <Building2Icon className="h-10 w-10 text-gray-200" />
-          <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+          <Building2Icon className="h-10 w-10 text-neutral-200" />
+          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
           <Button size="sm" variant="secondary" className="flex items-center gap-1.5" onClick={load}>
             <RefreshCwIcon className="h-4 w-4" />
             重试
@@ -373,25 +373,25 @@ export default function CompaniesPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
           {notice}
         </div>
       )}
 
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-info-fg">
         企业资料新增/编辑后将回到待审核+草稿状态，须管理员重新审核发布后，终端才会展示。
       </div>
 
       {/* 审核状态筛选 */}
       <div className="mb-4 flex items-center gap-2">
-        <span className="w-14 text-xs text-gray-400">审核状态</span>
+        <span className="w-14 text-xs text-neutral-400">审核状态</span>
         <div className="flex gap-2">
           {REVIEW_FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setReviewFilter(f)}
               className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -405,18 +405,18 @@ export default function CompaniesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead>
               <tr>
                 {['外部编号', '企业名称', '行业', '企业类型', '地区', '招聘会参展', '关联岗位数', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-sm text-gray-400">
-                    <Building2Icon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
+                  <td colSpan={11} className="py-12 text-center text-sm text-neutral-400">
+                    <Building2Icon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
                     {companies.length === 0
                       ? '暂无企业资料,点击右上角「新增企业」录入本机构来源的企业展示信息'
                       : '当前筛选条件下无企业'}
@@ -427,25 +427,25 @@ export default function CompaniesPage() {
                   const review = REVIEW_MAP[c.reviewStatus]
                   const publish = PUBLISH_MAP[c.publishStatus]
                   return (
-                    <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">{c.externalId}</td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{c.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{industryLabel(c.industry) || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{companyTypeLabel(c.companyType) || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{regionText(c) || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{c.fairParticipant ? '参展' : '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{c.linkedJobCount}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{fmtTime(c.syncTime)}</td>
+                    <tr key={c.id} className="hover:bg-neutral-50">
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{c.externalId}</td>
+                      <td className="px-4 py-3 font-medium text-neutral-800">{c.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{industryLabel(c.industry) || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{companyTypeLabel(c.companyType) || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{regionText(c) || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.fairParticipant ? '参展' : '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.linkedJobCount}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{fmtTime(c.syncTime)}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={review.badge} label={review.label} />
+                        <StatusBadge dot status={review.badge} label={review.label} />
                         {c.reviewStatus === 'rejected' && c.rejectReason && (
-                          <p className="mt-1 max-w-[200px] text-xs text-red-500" title={c.rejectReason}>
+                          <p className="mt-1 max-w-[200px] text-xs text-error-fg" title={c.rejectReason}>
                             原因:{c.rejectReason}
                           </p>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600">
                           <span className={`h-1.5 w-1.5 rounded-full ${publish.dot}`} aria-hidden="true" />
                           {publish.label}
                         </span>
@@ -460,7 +460,7 @@ export default function CompaniesPage() {
                           </button>
                           {c.publishStatus === 'published' && (
                             <button
-                              className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
+                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
                               onClick={() => void handleUnpublish(c.id)}
                             >
                               下架
@@ -477,7 +477,7 @@ export default function CompaniesPage() {
         </div>
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-400">
         本后台仅维护来源机构的企业展示资料和本机构岗位的展示性关联，不在本系统内接收求职者简历，不参与招聘闭环。求职者一律通过「去来源平台投递/扫码投递」跳转外部渠道。
       </p>
 
@@ -489,7 +489,7 @@ export default function CompaniesPage() {
         size="md"
         footer={
           <div className="flex justify-end gap-2">
-            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">取消</button>
+            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
             <button onClick={save} disabled={saving || !canSave} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
               {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
             </button>
@@ -497,8 +497,8 @@ export default function CompaniesPage() {
         }
       >
         <div className="space-y-4">
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{formError}</p>}
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
+          <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
             {editing === 'new'
               ? '提交后该企业资料进入待审核+草稿状态;管理员审核通过并发布后,终端才会展示。'
               : '保存后该企业资料将回到待审核+草稿状态;管理员重新审核发布前,终端不展示该企业。外部编号与来源机构不可修改。'}
@@ -506,7 +506,7 @@ export default function CompaniesPage() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="外部编号(externalId)" required={editing === 'new'}>
               <input
-                className={`${inputCls} ${editing !== 'new' ? 'bg-gray-50 text-gray-400' : ''}`}
+                className={`${inputCls} ${editing !== 'new' ? 'bg-neutral-50 text-neutral-400' : ''}`}
                 value={form.externalId}
                 disabled={editing !== 'new'}
                 placeholder="来源系统中的企业唯一编号"
@@ -611,17 +611,17 @@ export default function CompaniesPage() {
             <Field label="关联本机构岗位外部ID(逗号分隔)">
               <input className={inputCls} placeholder="如 UNI-2026-JOB-0041,UNI-2026-JOB-0042" value={form.jobExternalIds} onChange={(e) => setForm((f) => ({ ...f, jobExternalIds: e.target.value }))} />
             </Field>
-            <label className="flex items-center gap-2 pb-2 text-sm text-gray-700">
+            <label className="flex items-center gap-2 pb-2 text-sm text-neutral-700">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                 checked={form.fairParticipant}
                 onChange={(e) => setForm((f) => ({ ...f, fairParticipant: e.target.checked }))}
               />
               招聘会参展企业
             </label>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-neutral-400">
             岗位关联仅按本机构岗位的外部ID做展示性关联，跨机构ID不会生效。企业资料仅作为第三方来源信息展示，本系统不接收简历、不参与招聘闭环。
           </p>
         </div>

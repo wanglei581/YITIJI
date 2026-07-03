@@ -131,9 +131,9 @@ export function EditFairDrawer({
         </Field>
 
         {/* ── P1-A① 大屏 / 地图字段(Kiosk 招聘会详情 / 现场大屏展示用,均为展示参考值)── */}
-        <div className="border-t border-gray-100 pt-4">
-          <p className="text-sm font-medium text-gray-700">大屏 / 地图字段</p>
-          <p className="mt-0.5 text-xs text-gray-400">用于 Kiosk 招聘会详情与现场大屏;均为展示参考值,留空即清空。此处仅填 URL,不上传文件。</p>
+        <div className="border-t border-neutral-100 pt-4">
+          <p className="text-sm font-medium text-neutral-700">大屏 / 地图字段</p>
+          <p className="mt-0.5 text-xs text-neutral-400">用于 Kiosk 招聘会详情与现场大屏;均为展示参考值,留空即清空。此处仅填 URL,不上传文件。</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="导览图 URL">
@@ -160,7 +160,7 @@ export function EditFairDrawer({
         <Field label="求职意向分布">
           <div className="space-y-2">
             {intentRows.length === 0 && (
-              <p className="text-xs text-gray-400">暂无;点击下方「添加一项」录入(标签 + 百分比)。</p>
+              <p className="text-xs text-neutral-400">暂无;点击下方「添加一项」录入(标签 + 百分比)。</p>
             )}
             {intentRows.map((row, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -194,10 +194,10 @@ export function EditFairDrawer({
                     }))
                   }}
                 />
-                <span className="text-sm text-gray-400">%</span>
+                <span className="text-sm text-neutral-400">%</span>
                 <button
                   type="button"
-                  className="shrink-0 rounded-md px-2 py-1 text-sm text-red-500 hover:bg-red-50"
+                  className="shrink-0 rounded-md px-2 py-1 text-sm text-error-fg hover:bg-error-bg"
                   onClick={() => setForm((f) => ({ ...f, seekerIntent: (f.seekerIntent ?? []).filter((_, j) => j !== i) }))}
                 >
                   删除
@@ -209,13 +209,13 @@ export function EditFairDrawer({
                 添加一项
               </GhostButton>
               {intentRows.some((s) => s.label.trim().length > 0) && intentSum !== 100 && (
-                <span className="text-xs text-amber-500">当前合计 {intentSum}%(通常为 100%,不强制)</span>
+                <span className="text-xs text-warning">当前合计 {intentSum}%(通常为 100%,不强制)</span>
               )}
             </div>
           </div>
         </Field>
 
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-neutral-400">
           来源字段(来源机构 / 外部编号 / 来源链接)不可修改,保持数据可溯源。来源机构再次同步时,以来源数据为准,可能覆盖此处人工修订。
         </p>
       </div>
