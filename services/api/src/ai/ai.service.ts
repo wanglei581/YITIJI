@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
-import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput } from './interfaces/ai-provider.interface'
+import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -517,6 +517,7 @@ export class AiService {
     endUserId: string | null,
     sourceFileId: string | null = null,
     format: ResumeExportFormat = 'pdf',
+    layout?: ResumeLayoutSettings,
   ): Promise<{
     fileId: string
     filename: string
@@ -558,7 +559,7 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume)
+        const rendered = await this.resumePdf.render(resume, layout)
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'
