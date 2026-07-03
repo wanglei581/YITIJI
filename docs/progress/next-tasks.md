@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-03
+> 最后更新：2026-07-04
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -161,7 +161,7 @@
 
 ## P1：AI 简历优化商用闭环（6 波）
 
-- [x] **Wave 1 合并与预生产验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。仍未完成：Windows 一体机 + 奔图真机真实出纸、非 PDF 格式转换后打印、收费/语音/岗位 URL/模板填充等后续 Wave。
+- [x] **Wave 1 合并、预生产验收与 PDF 真机打印收口**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。2026-07-04 已补 Windows 一体机 `KSK-001` + `AIJobPrintAgent` 服务模式 + `Pantum CM2800ADN Series` 真机打印：无个人信息测试页和合成简历优化版 PDF 均完成 `pending -> claimed/printing -> completed`，其中合成简历链路覆盖真实诊断/优化、优化版 PDF `printFileUrl`、`PrintTask=ptask_kiosk_4aeb9125b84c4a5c` 和终端 `t_ksk_001`。仍未完成：非 PDF 格式转换后打印、收费/语音/岗位 URL 等后续 Wave；不得据此宣称正式生产上线完成。
 - [x] **Wave 2 排版参数在线编辑 + AI 一键排版**：已通过 PR #125 合入并部署预生产 `2769261b`；优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版/精简通过 `POST /resume/records/:taskId/layout-adjust` 重提原文并复用防编造约束，Kiosk 支持「AI 精简」「AI 调整排版」和「撤销 AI 调整」；预生产真实 LLM、PDF 导出和 `printFileUrl` 安全探针已通过。仍不代表 Windows 真机出纸或非 PDF 格式转换后打印完成。
 - [x] **Wave 3 模板库 → 自动填充排版**：已通过 PR #128 合入并部署预生产 `a885837f`；素材库 `resume_template` 补结构区域与 `resumeLayoutPreset`，PDF 导出接 `templateId` 并按模板 section/default layout 自动填充，Kiosk 优化页可选模板并透传导出；docx/txt/md 忽略模板且不伪造打印。预生产已验证模板列表、非简历模板 PDF 导出拒绝、真实 LLM 上传 / 诊断 / 优化 / 模板 PDF 导出 / `printFileUrl` 安全打印探针；不存在终端 ID 返回 `PRINT_TERMINAL_NOT_FOUND` 且 `PrintTask` 计数前后一致，未创建真实打印任务、未出纸。仍未完成：Admin 模板 CRUD、拖拽编辑、收费、语音、岗位 URL、格式转换、Windows 一体机 + 奔图真机出纸。
 - [ ] **Wave 4 语音生成简历**：设计规格与实施计划已合入，运行时代码候选已在 `codex/resume-voice-wave4-implementation` 完成并通过本地门禁。实现范围：共享 `AsrModule` + `POST /resume/voice/transcribe`，multipart 内存音频 `audio`、4MB 上限、6/min throttle、音频不落 FileObject/COS/DB/日志；Kiosk `/resume/generate` 仅在叙述字段提供语音填写弹窗，复用 `wavRecorder`，单段最多 58 秒，转写结果必须用户确认后才写入表单，高敏短字段仍手填。已通过 `verify:resume-voice-generate`、`verify:resume-diagnosis-flow-ui`、API/Kiosk typecheck、Kiosk lint、Kiosk 生产 build 和 `git diff --check`；下一步是双模型审查、PR/CI/合并，再按预生产 ASR 配置做 live 验收或诚实 disabled 回退验收。未完成：预生产真实 ASR、Windows 一体机麦克风/触控验收、正式生产上线。
