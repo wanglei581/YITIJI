@@ -20,6 +20,7 @@ import type {
   ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
+  ResumeVoiceTranscribeResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
@@ -68,6 +69,7 @@ export interface AiServiceInterface {
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
   submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
   getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse>
+  transcribeResumeVoice(audio: Blob): Promise<ResumeVoiceTranscribeResponse>
   exportGeneratedResume(
     resume: GeneratedResume,
     taskId?: string,
@@ -125,6 +127,10 @@ export const submitResumeGenerate = (input: ResumeGenerateInput, token?: string 
 /** 阶段2A:读取生成结果(登录会员传 token,匿名传 accessToken) */
 export const getResumeGenerate = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeGenerate(taskId, access)
+
+/** Wave 4:简历语音短音频转写。转写结果必须由页面让用户确认后才写入表单。 */
+export const transcribeResumeVoice = (audio: Blob) =>
+  adapter.transcribeResumeVoice(audio)
 
 /**
  * 阶段2A:导出确认后的简历为真实文件(FileObject + 签名 URL,可进打印链路)。

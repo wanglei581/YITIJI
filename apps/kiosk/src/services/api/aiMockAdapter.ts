@@ -12,6 +12,7 @@ import type {
   ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
+  ResumeVoiceTranscribeResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeReport,
@@ -245,6 +246,12 @@ export const aiMockAdapter = {
     // mock 模式不落库,刷新后无历史结果(诚实)
     await delay(80)
     return { taskId: _taskId, status: 'failed', providerName: 'mock', failReason: 'mock 模式不保存生成记录,请重新生成' }
+  },
+
+  async transcribeResumeVoice(_audio: Blob): Promise<ResumeVoiceTranscribeResponse> {
+    void _audio
+    await delay(80)
+    throw new Error('演示模式不支持语音识别，请使用文字输入')
   },
 
   async exportGeneratedResume(
