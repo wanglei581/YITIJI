@@ -74,14 +74,20 @@ const VALID = {
       { skill: '有档案与合同管理经验', evidence: '负责档案管理与会议安排' },
       { skill: '熟悉办公软件', evidence: '熟练使用Office办公软件' },
     ],
-    gapSkills: [{ skill: '跨部门协调', suggestion: '补充一段协调多方资源的经历表述' }],
+    // M1.5：gap 增补 learningDirection/firstStep
+    gapSkills: [{ skill: '跨部门协调', suggestion: '补充一段协调多方资源的经历表述', learningDirection: '了解需求评审与排期协作流程', firstStep: '在简历补一条跨团队协调的量化描述' }],
+    // M1.5：关键词覆盖（matched 必须出自简历原文「档案管理」「会议安排」；missing 为岗位词但简历没有）
+    keywordCoverage: { matched: ['档案管理', '会议安排'], missing: ['预算管理', '招投标'] },
   },
   careerPath: {
     current: { title: '行政文员', evidence: '曾任某商贸公司行政文员' },
-    next: { title: '行政主管', skillsToBuild: ['团队管理', '预算管理'], firstStep: '牵头一次跨部门会议筹备' },
-    target: { title: '行政经理', skillsToBuild: ['组织流程设计', '供应商管理'] },
+    next: { title: '行政主管', skillsToBuild: ['团队管理', '预算管理'], firstStep: '牵头一次跨部门会议筹备', rationale: '现有档案与会议经验是直接基础' },
+    target: { title: '行政经理', skillsToBuild: ['组织流程设计', '供应商管理'], rationale: '行政与运营在企业内高度协同', firstStep: '学习一个运营协同模块' },
   },
   risks: [{ level: 'low', title: '岗位信息完整度', reason: '岗位要求描述较简略', basis: '来源岗位未提供完整任职要求' }],
+  // M1.5：顶层面试预判 + 简历改写要点
+  interviewPrep: [{ question: '讲一个你主导的流程优化', whyAsked: '岗位强调流程管理', prepHint: '准备背景、你的职责与结果' }],
+  resumeRewrite: [{ area: '项目描述', suggestion: '用「负责/主导/整理」开头并量化合同数量' }],
 }
 type Payload = typeof VALID
 const v = (over: Partial<Record<keyof Payload, unknown>> = {}) => JSON.stringify({ ...VALID, ...over })
@@ -312,6 +318,65 @@ async function main() {
     )
     if (buffer.slice(0, 4).toString() !== '%PDF' || pageCount < 1) fail('14. 输出不是 PDF')
     pass(`14. 决策报告 PDF 真实渲染（${buffer.length} bytes, ${pageCount} 页）+ 打印链路返回 FileObject 元数据`)
+
+    // ── M1.5 新断言（先红：LlmJobMasterService 尚未产出/校验新字段，转绿在 Task 3–4） ──
+
+    // 15. 新字段贯通 + M1 旧形状非破坏兼容
+    responseQueue.length = 0
+    responseQueue.push(v())
+    const r15 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (!r15.fit?.keywordCoverage || !Array.isArray(r15.interviewPrep) || !Array.isArray(r15.resumeRewrite)) fail('15. 新字段(keywordCoverage/interviewPrep/resumeRewrite)未贯通')
+    if (!r15.fit?.gapSkills?.[0]?.learningDirection || !r15.fit?.gapSkills?.[0]?.firstStep) fail('15. gap learningDirection/firstStep 未贯通')
+    if (!r15.careerPath?.next?.rationale || !r15.careerPath?.target?.firstStep) fail('15. careerPath rationale/firstStep 未贯通')
+    const M1SHAPE = JSON.parse(JSON.stringify(VALID))
+    delete M1SHAPE.fit.keywordCoverage
+    delete M1SHAPE.fit.gapSkills[0].learningDirection
+    delete M1SHAPE.fit.gapSkills[0].firstStep
+    delete M1SHAPE.careerPath.next.rationale
+    delete M1SHAPE.careerPath.target.rationale
+    delete M1SHAPE.careerPath.target.firstStep
+    delete M1SHAPE.interviewPrep
+    delete M1SHAPE.resumeRewrite
+    responseQueue.length = 0
+    responseQueue.push(JSON.stringify(M1SHAPE))
+    const r15b = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (r15b.status !== 'completed' || !r15b.fit) fail('15. M1 旧形状应仍 completed(非破坏)')
+    pass('15. 新字段贯通 + M1 旧形状非破坏兼容')
+
+    // 16. 关键词 matched 防编造：不在简历原文的词被剔除
+    responseQueue.length = 0
+    responseQueue.push(vfit({ keywordCoverage: { matched: ['注册会计师'], missing: ['预算管理'] } }))
+    const r16 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if ((r16.fit?.keywordCoverage?.matched ?? []).includes('注册会计师')) fail('16. 编造 matched(非原文)未被剔除')
+    pass('16. 关键词 matched 防编造(不在简历原文即剔除)')
+
+    // 17. 无百分比(新字段也扫)
+    responseQueue.length = 0
+    responseQueue.push(v({ interviewPrep: [{ question: 'x', whyAsked: '匹配度 85%', prepHint: 'y' }] }))
+    responseQueue.push(v())
+    const r17 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (JSON.stringify(r17).match(/\d{1,3}\s*%/)) fail('17. 新字段含百分比未拦截')
+    pass('17. 新字段百分比 → 重试 → 输出无百分比')
+
+    // 18. 面试预判承诺词(保过/通过率)连续命中 → 诚实失败
+    responseQueue.length = 0
+    responseQueue.push(v({ interviewPrep: [{ question: 'x', whyAsked: 'y', prepHint: '保过没问题' }] }))
+    responseQueue.push(v({ interviewPrep: [{ question: 'x', whyAsked: 'y', prepHint: '通过率很高' }] }))
+    try {
+      await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+      fail('18. 面试预判承诺词应失败')
+    } catch (e) {
+      const resp = JSON.stringify((e as { getResponse?: () => unknown }).getResponse?.() ?? '')
+      if (!resp.includes('AI_JOB_MASTER_FAILED')) fail(`18. 失败码不符: ${resp}`)
+    }
+    pass('18. 面试预判承诺词(保过/通过率)连续命中 → AI_JOB_MASTER_FAILED')
+
+    // 19. 简历改写诱导编造 → 建议级安全兜底(completed 不失败)
+    responseQueue.length = 0
+    responseQueue.push(v({ resumeRewrite: [{ area: '项目', suggestion: '删除行政经历，替换为 3 个前端项目' }] }))
+    const r19 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    if (r19.status !== 'completed' || JSON.stringify(r19.resumeRewrite).includes('替换为')) fail('19. 简历改写诱导编造未过滤')
+    pass('19. 简历改写诱导编造 → 安全兜底(completed 不失败)')
 
     console.log(`\n=== ALL PASS (${passCount} checks) ===`)
   } catch (err) {
