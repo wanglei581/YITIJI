@@ -56,6 +56,8 @@
 
 2026-07-03 追加：**A 档增强第二批——招聘会收藏 + 现场数据分布图**。① Kiosk 招聘会列表 `JobFairsPage`：每张 FairCard 右上角加收藏星标（复用已支持 `job_fair` 的 `useFavorites`，登录写后端、匿名写本机），筛选行加「只看收藏」陶色 chip（带计数），空态区分"无收藏/无匹配"；② `FairStatsPage` 补两个真实聚合分布图——参展企业行业分布（青玉柱，按已录企业真实聚合 count）+ 求职意向分布（陶土柱，机构录入预计 percent，标注"预计/来源数据·非实时·预计参会 N 人"口径），均"无数据不渲染、不伪造"。**延后项（诚实记录）**：FairCard 参展企业"行业分布小标签"因列表端点 `GET /job-fairs` 不返回 `industryDistribution`（仅 `/stats` 端点返回），需后端 additive 改动才能拿真数据，本批不做、不硬塞假标签。执行中补跑了缺失的招聘会种子（`db:seed:fairs`，dev 库原本 JobFair=0）。验证：kiosk tsc/eslint、jobfair-size/jobfair-ui/jobfair-commercial-closure/jobfair-checkin 四守卫全 PASS、生产 build；浏览器实测——收藏一场后「只看收藏」正确过滤到 1 场；stats 页两分布图真实数据渲染（互联网/IT 6家等、研发技术类 46% 等）。
 
+2026-07-03 追加：**A 档增强第三批——首页「继续上次」横幅**。`HomePage` 新增 `ContinuePanel`（登录态挂载时并发查 `getMyPrintOrders` + `getMyResumes`）：诚实前提=只对真实可恢复任务展示——① 优先级 1：进行中打印任务（status ∈ pending/claimed/printing）→「打印任务进行中 · 文件名 · 状态」→ `/me/print-orders`；② 优先级 2：已诊断未优化的简历（`kind:parse` + `status:completed` + `optimized:false`）→「上次诊断的简历，可继续优化」→ `/resume/optimize?taskId=`；无可恢复任务不渲染，不伪造进度。横幅插在身份卡与服务分组之间，触控按钮 h-16。验证：kiosk tsc/eslint、home-toolbox-ui/resume-diagnosis-flow-ui/production-real-services 守卫、生产 build 全过；浏览器 E2E——插入一条本人真实进行中打印任务（endUserId 绑定登录会员）→ 重新短信登录 → 首页横幅正确显示「我的简历_张三.pdf · 打印中」→ 点「查看进度」直达 `/me/print-orders` → 验证后删除测试数据。注：Kiosk 登录 token 只存内存（公共终端隐私设计），整页刷新会清登录态，属既有正确行为，非本次改动引入。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |

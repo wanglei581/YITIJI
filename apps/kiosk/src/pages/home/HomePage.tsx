@@ -34,12 +34,13 @@ import {
   WrenchIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { KioskToolboxConfig, KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/shared'
+import type { KioskToolboxConfig, KioskToolboxItem, MemberPrintOrderItem, MemberResumeItem, SmartCampusModuleKey } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
+import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
@@ -705,12 +706,103 @@ function ToolboxSection() {
   )
 }
 
+// ─── 继续上次（A档增强）───────────────────────────────────────────────────────
+// 诚实前提：只对「真实可恢复的任务」展示——① 进行中的打印任务（未达终态）；
+// ② 已诊断但尚未优化的简历（下一步）。无可恢复任务不渲染。不伪造进度。
+
+interface ResumeSuggestion {
+  kind: 'print' | 'optimize'
+  title: string
+  detail: string
+  actionLabel: string
+  onGo: () => void
+  icon: LucideIcon
+}
+
+const ACTIVE_PRINT_STATUSES = new Set(['pending', 'claimed', 'printing'])
+const PRINT_STATUS_TEXT: Record<string, string> = {
+  pending: '排队中', claimed: '已领取', printing: '打印中',
+}
+
+function ContinuePanel() {
+  const navigate = useNavigate()
+  const { isLoggedIn, getToken } = useAuth()
+  const [suggestion, setSuggestion] = useState<ResumeSuggestion | null>(null)
+
+  useEffect(() => {
+    if (!isLoggedIn) { setSuggestion(null); return }
+    const token = getToken()
+    if (!token) { setSuggestion(null); return }
+
+    let alive = true
+    Promise.all([
+      getMyPrintOrders(token, { pageSize: 5 }),
+      getMyResumes(token, { pageSize: 5 }),
+    ])
+      .then(([orders, resumes]) => {
+        if (!alive) return
+        // 优先级 1：进行中的打印任务（真实未完成）
+        const activePrint = orders.items.find((o: MemberPrintOrderItem) => ACTIVE_PRINT_STATUSES.has(o.status))
+        if (activePrint) {
+          setSuggestion({
+            kind: 'print',
+            title: '打印任务进行中',
+            detail: `${activePrint.fileName ?? '打印文件'} · ${PRINT_STATUS_TEXT[activePrint.status] ?? activePrint.status}`,
+            actionLabel: '查看进度',
+            onGo: () => navigate('/me/print-orders'),
+            icon: PrinterIcon,
+          })
+          return
+        }
+        // 优先级 2：已诊断但未优化的简历（真实下一步）
+        const diagnosed = resumes.items.find((r: MemberResumeItem) => r.kind === 'parse' && r.status === 'completed' && !r.optimized)
+        if (diagnosed) {
+          setSuggestion({
+            kind: 'optimize',
+            title: '上次诊断的简历，可继续优化',
+            detail: '已完成诊断 · 一键进入 AI 优化，生成可打印版本',
+            actionLabel: '去优化',
+            onGo: () => navigate(`/resume/optimize?taskId=${encodeURIComponent(diagnosed.taskId)}`, { state: { taskId: diagnosed.taskId } }),
+            icon: SparklesIcon,
+          })
+          return
+        }
+        setSuggestion(null)
+      })
+      .catch(() => { if (alive) setSuggestion(null) })
+
+    return () => { alive = false }
+  }, [isLoggedIn, getToken, navigate])
+
+  if (!suggestion) return null
+  const Icon = suggestion.icon
+
+  return (
+    <section className="mx-auto mt-6 w-[min(1320px,calc(100%-64px))]">
+      <div className="flex items-center gap-4 rounded-[24px] border border-primary-200 bg-primary-50/70 px-7 py-5 shadow-[0_8px_24px_rgba(16,48,43,0.06)]">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
+          <Icon className="h-7 w-7" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xl font-bold text-neutral-900">{suggestion.title}</p>
+          <p className="mt-1 truncate text-base text-neutral-500">{suggestion.detail}</p>
+        </div>
+        <Button size="lg" className="h-16 shrink-0 rounded-2xl px-8 text-lg" onClick={suggestion.onGo}>
+          {suggestion.actionLabel}
+          <ChevronRightIcon className="ml-1 h-6 w-6" aria-hidden="true" />
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 export function HomePage() {
   return (
     <div className="min-h-full bg-[#eef1f5] pb-8">
       <KioskTopBar />
       <HeroSection />
       <IdentityPanel />
+      <ContinuePanel />
 
       <main className="mx-auto mt-10 grid w-[min(1320px,calc(100%-64px))] grid-cols-1 gap-8 pb-6 xl:grid-cols-2">
         {SERVICE_GROUPS.map((group) => (
