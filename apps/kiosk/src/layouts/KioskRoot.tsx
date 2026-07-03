@@ -2,6 +2,7 @@ import { KioskLayout, StatusBadge, type KioskTab } from '@ai-job-print/ui'
 import type { DeviceStatus } from '@ai-job-print/shared'
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useScreensaverController } from '../hooks/useScreensaverController'
@@ -26,6 +27,9 @@ function tabToPath(tab: KioskTab): string {
 export function KioskRoot() {
   return (
     <KioskBusyProvider>
+      {/* 墨青纸感图标 sprite（iconfont Symbol）：挂在布局根，
+          虚拟键盘 / 页内通话面板等在任意路由都能引用 #i-* symbol */}
+      <KioskIconSprite />
       <KioskShell />
     </KioskBusyProvider>
   )
