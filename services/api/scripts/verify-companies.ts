@@ -381,7 +381,11 @@ async function main() {
     pass(`14. 正式前端企业页无「演示」字样（${frontFiles.length} 个文件）`)
 
     // ── 15. 后台企业地区录入与旧 filters 链路标注 ──
-    const adminCompaniesPage = readFileSync(join(repoRoot, 'apps/admin/src/routes/companies/index.tsx'), 'utf8')
+    // Admin 企业展示页已拆分为 index.tsx(编排)+ components/*(地区表单落在 CompanyFormFields.tsx)。
+    // 按整目录拼接读取,断言意图(共享行政区划工具 / 级联 select / 原值回显 / 无省份自由文本)与拆分前一致。
+    const adminCompaniesPage = walk(join(repoRoot, 'apps/admin/src/routes/companies'))
+      .map((f) => readFileSync(f, 'utf8'))
+      .join('\n')
     const partnerCompaniesPage = readFileSync(join(repoRoot, 'apps/partner/src/routes/companies/index.tsx'), 'utf8')
     const sharedIndex = readFileSync(join(repoRoot, 'packages/shared/src/index.ts'), 'utf8')
     const controllerDoc = readFileSync(join(repoRoot, 'services/api/src/companies/companies.controller.ts'), 'utf8')

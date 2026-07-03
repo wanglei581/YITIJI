@@ -104,6 +104,15 @@
 - [x] **腾讯真实岗位样本本地导入 Gate**：已用 `岗位数据_真实样本_腾讯.xlsx` 在本地 SQLite 隔离导入 100 条腾讯招聘岗位；100 条来源链接均为 `careers.tencent.com/jobdesc.html?postId=...` 逐条详情页，全量 HTTP GET 复核 100/100 返回 200；预览 / 确认 / 审核 / 发布 / 质量快照链路通过。质量结果为 `ready=58`、`partial=41`、`insufficient=1`，其中 1 条过期岗位已下架，公开可见 99 条；partial 主要缺学历要求，仍可展示但 AI 解读 / 匹配解释质量弱于 ready。该批属于第三方公开来源聚合样本，对外展示前须确认数据源授权或明确标注第三方来源。已通过 `verify:job-customer-sample-readiness`、`verify:job-data-quality`、`verify:job-info-ai-real-acceptance`。本项不代表预生产 PostgreSQL、公网真实会员浏览器或一体机真机验收完成。
 - [x] **腾讯真实岗位样本预生产隔离导入 Gate**：2026-07-01 用户确认后，预生产已刷新到干净候选 `5ca81d04`，最终门禁来源为完整 Git 归档 `/srv/tencent-jobs-preprod-full-5ca81d04.tar.gz`，sha256 `5c5a01f7db694e4e06e97028a14a375f3e6e345df2e8fb90852a0012f81106b2`；远端 health 返回 `success=true` / `db=postgres`，部署前备份 `/srv/ai-job-print-db-backups/pre-tencent-jobs-5ca81d04-20260701163200.dump` 可读。腾讯 Excel sha256 `3d718828ab91da8e504e7eb4632e18bbfd5a1e8e5626e2fd4ae8842e06141d27`，导入前备份 `/srv/ai-job-print-db-backups/pre-tencent-import-5ca81d04-20260701163503.dump`，已在预生产 PostgreSQL 隔离机构 `org-tencent-real-job-sample-20260701` / 来源 `src-tencent-real-excel-20260701` 导入：`preview totalRows=100 validRows=100 invalidRows=0 dupRows=0`、`confirm imported=100`、公开 99 条、1 条过期下架、`category=null` 为 0、`fulltime` 筛选 99 条、质量快照 `ready=58` / `partial=41` / `insufficient=1`。公开 API 已复核 sourceOrgId、fulltime、keyword=AI、city=深圳和详情来源说明；Admin/Partner 质量摘要脱敏 API 摘要已补齐，Partner 返回结果全部属于该隔离机构；远端临时 Excel 与一次性脚本已清理。本项仍不代表公网真实会员 AI 浏览器链路、Kiosk 截图/真机触控、COS/LLM/OCR live、Windows 一体机或 Pantum 真机验收完成。
 
+## P1：工程规模规范化拆分
+
+依据 `docs/reviews/engineering-scale-normalization-backlog.md`(2026-07-02,分支 `codex/normalize-structure-closure`)。每项实拆单独开卡 + 单独 worktree + 行为保持 + verify 门禁 + 双模型 review;🔴 项须等对应在途任务合入 `main` 后再排。
+
+- [x] **T1 拆分 backlog**:只读审计 8 个超阈值文件,产出拆分清单(方向 / 冲突风险 / 排期 / verify 覆盖),零源码改动。
+- [x] **X1 + N2/N4:Admin 前端去重 + 拆分**(🟡):已完成(2026-07-02,commits `77831eaf`/`7da28a51`/`fa9ecdbe`)。共享 UI 原子收敛到 `apps/admin/src/components/form/`;`fairs/index.tsx` 1349→207、`companies/index.tsx` 1116→192,大 Tab / Drawer 拆到各自 `components/`(+ `shared.ts` 承载共享常量/工具/表单逻辑)。行为/视觉零变化;typecheck + build(prod env)+ lint 全绿,Vite dev 全模块转换 200;双模型 review 已过(antigravity 前端 APPROVE 100/100)。收口时对齐一处 verify 路径回归(`verify-companies.ts` #15 因地区表单搬到 `CompanyFormFields.tsx`,改读整目录,§4 边界例外,commit `2f1a51ec`)。已开 **PR #113**(CLEAN),CI `build-and-verify` + `postgres-readiness` 双 job 全绿。**待补:1080×1920 浏览器人工点选走查(合并前)。**
+- [ ] **N5 / N6:后端服务拆分**(🟡):`materials.service.ts`(850)抽检查处理管线;`admin-fairs.service.ts`(811)抽公司·展区 / 物料·导览子服务;跑对应 `verify-*` + SQLite / PG readiness。
+- [ ] **N1 / N3:核心大文件拆分**(🔴,阻塞待解):`jobs.service.ts`(2316)按公开读取 / 审核 / Partner 导入 / Excel 引擎拆分;`terminals.service.ts`(1182)按 Agent 运行时 / 校验 / Admin 管理拆分。**须等 toolbox / terminal-device 合入 `main` 后**再排;terminals verify 覆盖薄,须补跨机 E2E。
+
 ## P1：用户文件与简历资产商用闭环后续
 
 - [ ] **真实生产/试运营执行**：按用户文件与简历资产证据包，使用 PostgreSQL + COS + 会员账号跑上传、设置保存期限、重登查看、删除、过期清理、`long_term` 防误删和审计查询全链路，并留存命令日志、浏览器截图、COS 控制台截图和 DB 抽样。
