@@ -226,7 +226,7 @@ export const JOB_MATERIAL_TEMPLATES: JobMaterialTemplate[] = [
 ]
 
 export function isResumeTemplate(template: JobMaterialTemplate): template is ResumeTemplate {
-  return template.type === 'resume_template'
+  return template.type === 'resume_template' && Boolean(template.resumeLayoutPreset)
 }
 
 export function isJobMaterialDocumentTemplate(template: JobMaterialTemplate): template is JobMaterialDocumentTemplate {

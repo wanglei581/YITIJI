@@ -276,7 +276,8 @@ export class ResumePdfService {
     }
 
     const defaultOrder: ResumeTemplateSectionKey[] = ['summary', 'education', 'experience', 'projects', 'skills', 'certificates']
-    const order = renderOptions.templatePreset?.sectionOrder.filter((sectionKey) => sectionKey !== 'header') ?? defaultOrder
+    const presetOrder = renderOptions.templatePreset?.sectionOrder ?? defaultOrder
+    const order = presetOrder.filter((sectionKey, index, all) => sectionKey !== 'header' && all.indexOf(sectionKey) === index)
     let drewSkills = false
     let drewCertificates = false
     for (const sectionKey of order) {

@@ -120,6 +120,9 @@ async function main(): Promise<void> {
     if (invalidSection) fail(`${sharedTemplate.id} sectionOrder 含非法 section: ${invalidSection}`)
     if (!apiTemplate.resumeLayoutPreset.sectionOrder.includes('header')) fail(`${sharedTemplate.id} sectionOrder 必须包含 header`)
     if (!apiTemplate.resumeLayoutPreset.sectionOrder.includes('experience')) fail(`${sharedTemplate.id} sectionOrder 必须包含 experience`)
+    if (new Set(apiTemplate.resumeLayoutPreset.sectionOrder).size !== apiTemplate.resumeLayoutPreset.sectionOrder.length) {
+      fail(`${sharedTemplate.id} sectionOrder 不得重复`)
+    }
   }
   pass('1. shared/API resume_template 均携带一致的 resumeLayoutPreset')
 
@@ -143,6 +146,7 @@ async function main(): Promise<void> {
   if (!pdfSrc.includes('templatePreset?: ResumeTemplateLayoutPreset')) fail('2d. ResumePdfService 未定义 templatePreset 选项')
   if (!pdfSrc.includes('templatePreset?.sectionOrder')) fail('2d. ResumePdfService 未读取模板 sectionOrder')
   if (!pdfSrc.includes('for (const sectionKey of order)')) fail('2d. ResumePdfService 未按 sectionKey 顺序渲染模板区域')
+  if (!pdfSrc.includes('all.indexOf(sectionKey) === index')) fail('2d. ResumePdfService 未对模板 sectionOrder 去重')
   pass('2d. ResumePdfService 使用模板 preset 控制布局默认值与区域顺序')
 
   const prisma = new PrismaService()
