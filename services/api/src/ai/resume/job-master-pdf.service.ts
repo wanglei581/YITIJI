@@ -135,9 +135,12 @@ export class JobMasterPdfService {
     doc.fontSize(9).fillColor('#6b7280').text(`   依据：${cp.current.evidence}`, { lineGap: 3 })
     doc.fontSize(10.5).fillColor('#111827').text(`1-3年：${cp.next.title}`, { lineGap: 1 })
     if (cp.next.skillsToBuild.length > 0) doc.fontSize(9).fillColor('#6b7280').text(`   待补技能：${cp.next.skillsToBuild.join('、')}`, { lineGap: 1 })
-    doc.fontSize(9).fillColor('#6b7280').text(`   第一步：${cp.next.firstStep}`, { lineGap: 3 })
+    doc.fontSize(9).fillColor('#6b7280').text(`   第一步：${cp.next.firstStep}`, { lineGap: cp.next.rationale ? 1 : 3 })
+    if (cp.next.rationale) doc.fontSize(9).fillColor('#6b7280').text(`   依据：${cp.next.rationale}`, { lineGap: 3 })
     doc.fontSize(10.5).fillColor('#111827').text(`3-5年：${cp.target.title}`, { lineGap: 1 })
-    if (cp.target.skillsToBuild.length > 0) doc.fontSize(9).fillColor('#6b7280').text(`   待补技能：${cp.target.skillsToBuild.join('、')}`, { lineGap: 3 })
+    if (cp.target.skillsToBuild.length > 0) doc.fontSize(9).fillColor('#6b7280').text(`   待补技能：${cp.target.skillsToBuild.join('、')}`, { lineGap: cp.target.rationale || cp.target.firstStep ? 1 : 3 })
+    if (cp.target.rationale) doc.fontSize(9).fillColor('#6b7280').text(`   依据：${cp.target.rationale}`, { lineGap: cp.target.firstStep ? 1 : 3 })
+    if (cp.target.firstStep) doc.fontSize(9).fillColor('#6b7280').text(`   第一步：${cp.target.firstStep}`, { lineGap: 3 })
 
     // 五、风险与建议
     title('五、风险与建议')
