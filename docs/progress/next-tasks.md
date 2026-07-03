@@ -170,6 +170,7 @@
 
 ## P1：工程质量门禁
 
+- [ ] **P0 部署数据安全 DP-GATE 真实执行**：2026-07-03 预生产发生疑似部署回退数据库导致 12:07 后新数据消失，已形成事故记录、追证清单和本地门禁脚本；后续任何预生产 / 生产部署前必须先执行 `deploy:data-safety-gate before` 写入低敏 `AuditLog` canary 并记录核心表 count、`max(createdAt)` 与最新记录锚点基线，部署后执行 `deploy:data-safety-gate after` 验证 canary 仍在、基线锚点仍在、`max(createdAt)` 未回退、核心表 count 下降有 cleanup 日志解释。连续两次部署 DP-GATE 未通过前，依赖持久数据的验收只能降级为“流程可跑、数据持久性未证明”，不得宣称部署流程安全或商用验收完成；部署窗口应停写或低流量，并必须保留完整 deploy evidence log。
 - [ ] 每个新任务先写目标、非目标、允许修改文件、验证方式。
 - [ ] 后续另起分支统一 `docs/product/*` 和历史计划中旧文件 TTL 参考口径；本轮已完成 UI / 隐私政策 / shared copy / 送审材料 / 部署验收文档，产品参考文档历史口径不作为本分支继续扩范围修改。
 - [ ] 超过 30 行 diff 或跨模块任务必须 Claude + Antigravity 双模型审查。
