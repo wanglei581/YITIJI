@@ -7,6 +7,27 @@ export type JobMaterialTemplateType =
 
 export type JobMaterialTemplateStatus = 'published' | 'disabled'
 
+export type ResumeTemplateSectionKey =
+  | 'header'
+  | 'summary'
+  | 'education'
+  | 'experience'
+  | 'projects'
+  | 'skills'
+  | 'certificates'
+
+export interface ResumeTemplateLayoutPreset {
+  style: 'clean' | 'compact' | 'formal'
+  defaultLayout: {
+    fontScale?: 'compact' | 'standard' | 'large'
+    lineSpacing?: 'compact' | 'standard' | 'relaxed'
+    margin?: 'narrow' | 'normal' | 'wide'
+    columns?: 1 | 2
+    accent?: 'blue' | 'green' | 'slate'
+  }
+  sectionOrder: ResumeTemplateSectionKey[]
+}
+
 export interface JobMaterialTemplateField {
   key: 'applicantName' | 'targetRole' | 'targetOrganization' | 'keyStrengths' | 'notes'
   label: string
@@ -26,6 +47,7 @@ export interface JobMaterialTemplateView {
   recommendedFor: string
   outputFilename: string
   fields: JobMaterialTemplateField[]
+  resumeLayoutPreset?: ResumeTemplateLayoutPreset
 }
 
 export interface GenerateJobMaterialInput {

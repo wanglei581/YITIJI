@@ -183,6 +183,10 @@ export class ResumeGenerateExportDto {
   @IsOptional() @IsIn(['pdf', 'docx', 'txt', 'md'])
   format?: ResumeExportFormat
 
+  /** Resume template id(Wave 3): only PDF applies template layout; other formats ignore it. */
+  @IsOptional() @IsString() @MaxLength(80)
+  templateId?: string
+
   /** PDF 排版参数(Wave 2):仅 PDF 消费;docx/txt/md 忽略该字段且不伪造排版效果。 */
   @IsOptional() @IsObject() @ValidateNested() @Type(() => ResumeLayoutDto)
   layout?: ResumeLayoutDto

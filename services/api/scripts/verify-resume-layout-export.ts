@@ -73,8 +73,9 @@ function assertStaticContracts(): void {
   const controllerSrc = readFileSync(join(__dirname, '../src/ai/ai.controller.ts'), 'utf-8')
 
   if (!pdfSrc.includes("ResumeLayoutSettings")) fail('1a. ResumePdfService 未引入 ResumeLayoutSettings')
-  if (!/async render\(resume: GeneratedResume,\s*layout\?: ResumeLayoutSettings\)/.test(pdfSrc)) {
-    fail('1a. ResumePdfService.render 未接收 layout 可选参数')
+  if (!pdfSrc.includes('ResumePdfRenderOptions')) fail('1a. ResumePdfService 未定义 render options')
+  if (!/async render\(resume: GeneratedResume,\s*options\?: ResumeLayoutSettings \| ResumePdfRenderOptions\)/.test(pdfSrc)) {
+    fail('1a. ResumePdfService.render 未兼容 layout/options 可选参数')
   }
   if (!pdfSrc.includes('function resolveLayout')) fail('1b. 未定义 resolveLayout(layout?)')
   if (!pdfSrc.includes('const DEFAULT_MARGIN = MARGIN')) fail('1b. 默认 margin 必须迁移自 Wave 1 MARGIN 常量')
@@ -100,14 +101,14 @@ function assertStaticContracts(): void {
   }
   pass('3. 双栏正文起始 Y 与防无限加页保护已存在')
 
-  if (!/exportGeneratedResume\([\s\S]*format: ResumeExportFormat = 'pdf',\s*layout\?: ResumeLayoutSettings/.test(aiSrc)) {
+  if (!/exportGeneratedResume\([\s\S]*format: ResumeExportFormat = 'pdf',\s*layout\?: ResumeLayoutSettings,\s*templateId\?: string/.test(aiSrc)) {
     fail('4a. AiService.exportGeneratedResume 未接收 layout 可选参数')
   }
-  if (!aiSrc.includes('this.resumePdf.render(resume, layout)')) fail('4a. AiService 未把 layout 透传给 ResumePdfService')
-  if (!controllerSrc.includes('const { taskId, format, layout, ...resume } = dto')) {
+  if (!aiSrc.includes('this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset })')) fail('4a. AiService 未把 layout 透传给 ResumePdfService')
+  if (!controllerSrc.includes('const { taskId, format, layout, templateId, ...resume } = dto')) {
     fail('4b. AiController 导出接口未从 dto 中剥离 layout')
   }
-  if (!controllerSrc.includes("format ?? 'pdf', layout")) fail('4b. AiController 未把 layout 透传给 AiService')
+  if (!controllerSrc.includes("format ?? 'pdf', layout, templateId")) fail('4b. AiController 未把 layout 透传给 AiService')
   pass('4. 导出 controller/service 已透传 layout')
 }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
@@ -21,6 +21,7 @@ import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -578,9 +579,7 @@ export class AiService {
    *   匿名 / system 文件仍走短期保存,且不能被会员转为长期保存。
    * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
    * - FilesService.upload 按 purpose='resume_upload' 的 MIME 白名单校验(见
-   *   files/file-validation.ts PURPOSE_POLICY),txt/md 当前不在白名单内,
-   *   会在 upload 阶段抛 FILE_MIME_NOT_ALLOWED(400)——这是既有安全校验,
-   *   本次改动不放宽/绕过该白名单。
+   *   files/file-validation.ts PURPOSE_POLICY);pdf/docx/txt/md 均为受控导出格式。
    */
   async exportGeneratedResume(
     resume: GeneratedResume,
@@ -588,6 +587,7 @@ export class AiService {
     sourceFileId: string | null = null,
     format: ResumeExportFormat = 'pdf',
     layout?: ResumeLayoutSettings,
+    templateId?: string,
   ): Promise<{
     fileId: string
     filename: string
@@ -599,6 +599,15 @@ export class AiService {
     printFileUrl?: string
   }> {
     this.assertExportFormatAllowed(format)
+    const template = format === 'pdf' && templateId ? findJobMaterialTemplate(templateId) : null
+    if (format === 'pdf' && templateId && (!template || template.status !== 'published' || template.type !== 'resume_template' || !template.resumeLayoutPreset)) {
+      throw new BadRequestException({
+        error: {
+          code: 'AI_RESUME_TEMPLATE_UNSUPPORTED',
+          message: '简历模板不存在、未发布或不支持自动填充',
+        },
+      })
+    }
 
     let buffer: Buffer
     let pageCount: number
@@ -629,7 +638,7 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume, layout)
+        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'

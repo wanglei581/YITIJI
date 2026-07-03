@@ -96,7 +96,7 @@ assertIncludes(optimize, "'md'", 'optimize page offers md export format')
 assertIncludes(optimize, 'Word', 'optimize page labels docx as Word')
 assertIncludes(optimize, 'Markdown', 'optimize page labels md as Markdown')
 assertIncludes(optimize, 'exportFormat', 'optimize page tracks selected export format state')
-assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout)', 'optimize page exports with selected format and layout')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected format and layout')
 assertNotIncludes(optimize, '¥', 'optimize page shows no pricing copy')
 assertNotIncludes(optimize, '付费', 'optimize page shows no paywall copy')
 assertNotIncludes(optimize, '元/', 'optimize page shows no per-unit pricing copy')
@@ -115,7 +115,7 @@ assertIncludes(optimize, "from '../../services/api'", 'optimize page imports res
 
 assertIncludes(aiWrapper, 'format?: ResumeExportFormat', 'api wrapper exportGeneratedResume accepts optional export format')
 assertIncludes(aiWrapper, 'layout?: ResumeLayoutSettings', 'api wrapper exportGeneratedResume accepts optional layout')
-assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout)', 'api wrapper delegates format and layout to the selected adapter')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)', 'api wrapper delegates format and layout to the selected adapter')
 
 // ── Wave2 Task 3:优化页拆分 + 受控排版参数 + PDF layout 导出 ────────────────
 assertIncludes(optimize, 'ResumeLayoutControls', 'optimize page renders layout controls component')
@@ -134,7 +134,7 @@ assertIncludes(layoutControls, '主色', 'layout controls expose accent choices'
 assertIncludes(layoutControls, '单栏', 'layout controls expose single column choice')
 assertIncludes(layoutControls, '双栏', 'layout controls expose double column choice')
 assertIncludes(optimizedEditor, 'GeneratedResume', 'optimized resume editor is typed around GeneratedResume')
-assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout)', 'optimize page exports with selected layout')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected layout')
 assertIncludes(optimize, 'setExported(null)', 'optimize page clears stale export when layout/content changes')
 assertIncludes(optimize, 'printFileUrl', 'optimize page still uses printFileUrl for PDF print path')
 assertNotIncludes(optimize, 'signedUrl || exported.printFileUrl', 'optimize page must not fall back from printFileUrl to signedUrl for printing')
@@ -158,5 +158,24 @@ assertIncludes(httpAdapter, "layout-adjust", 'http adapter posts to layout-adjus
 assertIncludes(httpAdapter, 'ResumeLayoutAdjustResponse', 'http adapter returns typed layout adjust response with warnings')
 assertIncludes(mockAdapter, 'adjustResumeLayoutDraft', 'mock adapter implements layout adjust wrapper')
 assertIncludes(mockAdapter, 'warnings', 'mock adapter returns layout adjust warnings')
+
+// ── Wave3:简历模板库自动填充到优化版导出 ────────────────────────────────
+const jobMaterialsApi = read('src/services/api/jobMaterials.ts')
+
+assertIncludes(jobMaterialsApi, 'getResumeTemplates', 'job materials api exposes resume template list')
+assertIncludes(jobMaterialsApi, 'filter(isResumeTemplate)', 'resume template list only returns resume_template entries')
+assertIncludes(optimize, 'getResumeTemplates', 'optimize page loads resume templates')
+assertIncludes(optimize, 'selectedTemplateId', 'optimize page tracks selected resume template')
+assertIncludes(optimize, 'resumeTemplates.map', 'optimize page renders template choices')
+assertIncludes(optimize, 'handleTemplateChange', 'optimize page clears stale export when template changes')
+assertIncludes(optimize, 'PDF 导出按所选模板自动填充版式', 'optimize page explains PDF template fill scope')
+assertIncludes(optimize, 'Word/TXT/Markdown 保持内容格式导出', 'optimize page does not overpromise non-PDF template printing')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected template id')
+assertIncludes(aiWrapper, 'templateId?: string', 'api wrapper exportGeneratedResume accepts optional templateId')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)', 'api wrapper delegates templateId to selected adapter')
+assertIncludes(httpAdapter, 'templateId?: string', 'http adapter accepts optional templateId')
+assertIncludes(httpAdapter, '...(templateId ? { templateId } : {})', 'http adapter sends templateId only when selected')
+assertIncludes(mockAdapter, '_templateId?: string', 'mock adapter accepts templateId without fabricating files')
+assertNotIncludes(optimize, '一键投递', 'optimize page keeps compliance wording')
 
 console.log('PASS resume diagnosis flow UI verification')

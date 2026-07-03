@@ -163,6 +163,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-export-formats
           pnpm --filter @ai-job-print/api verify:resume-layout-export
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
+          pnpm --filter @ai-job-print/api verify:resume-template-fill
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify-real-resume-diagnosis
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
@@ -255,6 +256,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:resume-layout-export
           pnpm --filter @ai-job-print/api verify:resume-layout-adjust
+          pnpm --filter @ai-job-print/api verify:resume-template-fill
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
