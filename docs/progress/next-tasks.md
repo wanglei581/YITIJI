@@ -148,8 +148,8 @@
 ## P1：AI 简历优化商用闭环（6 波）
 
 - [x] **Wave 1 合并与预生产验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。仍未完成：Windows 一体机 + 奔图真机真实出纸、非 PDF 格式转换后打印、收费/语音/岗位 URL/模板填充等后续 Wave。
-- [ ] **Wave 2 排版参数在线编辑 + AI 一键排版**：代码侧已在 `codex/resume-optimize-wave2-implementation` 完成（待 PR / CI / 合并 / 预生产验收）：优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版/精简通过 `POST /resume/records/:taskId/layout-adjust` 重提原文并复用防编造约束，Kiosk 支持「AI 精简」「AI 调整排版」和「撤销 AI 调整」。下一步：完成双模型审查、开 PR、CI 通过后合并；合并后按独立 runbook 在预生产用真实 LLM 浏览器验收。
-- [ ] **Wave 3 模板库 → 自动填充排版**：素材库模板补结构区域定义，选模板后把结构化简历自动灌入并渲染。
+- [x] **Wave 2 排版参数在线编辑 + AI 一键排版**：已通过 PR #125 合入并部署预生产 `2769261b`；优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版/精简通过 `POST /resume/records/:taskId/layout-adjust` 重提原文并复用防编造约束，Kiosk 支持「AI 精简」「AI 调整排版」和「撤销 AI 调整」；预生产真实 LLM、PDF 导出和 `printFileUrl` 安全探针已通过。仍不代表 Windows 真机出纸或非 PDF 格式转换后打印完成。
+- [ ] **Wave 3 模板库 → 自动填充排版**：代码侧已在 `codex/resume-template-fill-wave3` 完成（待 PR / CI / 合并 / 预生产验收）：素材库 `resume_template` 补结构区域与 `resumeLayoutPreset`，PDF 导出接 `templateId` 并按模板 section/default layout 自动填充，Kiosk 优化页可选模板并透传导出；docx/txt/md 忽略模板且不伪造打印。下一步：完成双模型审查、开 PR、CI 通过后合并；合并后用真实 LLM + 浏览器验证模板选择 → PDF 导出 → 我的文档 / 打印确认链路。
 - [ ] **Wave 4 语音生成简历**：从 worktree 实验代码主干化语音→ASR→结构化草稿→进优化/导出；需 ASR provider 决策、生产 Key、失败兜底、语音不长留隐私处理。
 - [ ] **Wave 5 收费闭环（支付/计费/套餐/券/核销）**：独立立项。计费属性定义、Package/Plan/SKU + PricingRule、支付集成（appSecret 仅服务端、回调验签+幂等）、权益核销、Order 金额真实计算、Admin 价格/额度/退款/账单后台。Wave 1 已预留 `assertExportFormatAllowed` 计费能力位。
 - [ ] **Wave 6 岗位 URL 定向 + 格式转换 + 真机**：岗位 URL 收窄为合作来源白名单/用户手动粘贴 JD（不做任意站抓取）；文档格式转换接真实实现（含 docx/txt/md → PDF 后可打印）；Windows 真机出纸/扫描/U盘验收。
