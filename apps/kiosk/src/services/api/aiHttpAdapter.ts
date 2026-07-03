@@ -14,6 +14,7 @@ import type {
   GeneratedResume,
   ResumeExportFormat,
   ResumeGenerateExportResponse,
+  ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
   ResumeParseRequest,
@@ -155,10 +156,11 @@ export const aiHttpAdapter = {
     taskId?: string,
     token?: string | null,
     format?: ResumeExportFormat,
+    layout?: ResumeLayoutSettings,
   ): Promise<ResumeGenerateExportResponse> {
     return post<ResumeGenerateExportResponse>(
       '/resume/generate/export',
-      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf' },
+      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}) },
       token,
     )
   },

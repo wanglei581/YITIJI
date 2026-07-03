@@ -9,6 +9,7 @@ import type {
   GeneratedResume,
   ResumeExportFormat,
   ResumeGenerateExportResponse,
+  ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
   ResumeParseRequest,
@@ -214,6 +215,7 @@ export const aiMockAdapter = {
     _taskId?: string,
     _token?: string | null,
     format?: ResumeExportFormat,
+    _layout?: ResumeLayoutSettings,
   ): Promise<ResumeGenerateExportResponse> {
     // mock 模式无后端,不构造假文件;返回空 signedUrl,页面会诚实提示
     await delay(400)

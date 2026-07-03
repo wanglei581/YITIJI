@@ -8,9 +8,7 @@ import {
   FileDownIcon,
   FlaskConicalIcon,
   InfoIcon,
-  PencilLineIcon,
   PrinterIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   TargetIcon,
 } from 'lucide-react'
@@ -26,6 +24,9 @@ import { useAuth } from '../../auth/useAuth'
 import { exportGeneratedResume, getResumeOptimize } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
+import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
+import { ResumeLayoutControls } from './components/ResumeLayoutControls'
+import { useResumeLayout } from './hooks/useResumeLayout'
 
 /** 导出格式可选项(Wave1 Task 8):PDF 可直接打印,Word/TXT/Markdown 供下载编辑。 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
@@ -42,19 +43,7 @@ function targetSummary(tc?: ResumeTargetContext): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
-const taCls =
-  'w-full scroll-mt-32 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
-
 type LeaveAction = () => void
-
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <div className="mb-2 flex items-center gap-2">
-      <span className="h-4 w-1 rounded-full bg-primary-600" aria-hidden="true" />
-      <p className="text-base font-semibold text-gray-900">{title}</p>
-    </div>
-  )
-}
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
@@ -85,6 +74,7 @@ export function ResumeOptimizePage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
+  const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
 
   useBusyLock(exporting || printNavigating)
 
@@ -142,12 +132,22 @@ export function ResumeOptimizePage() {
     if (exported) setExported(null)
   }
 
+  const handleResumeChange = (next: GeneratedResume) => {
+    markEdited()
+    setOptimizedResume(next)
+  }
+
+  const handleLayoutChange = (next: typeof layout) => {
+    setLayout(next)
+    markEdited()
+  }
+
   const handleExport = async () => {
     if (!optimizedResume) return
     setExporting(true)
     setExportError(null)
     try {
-      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat)
+      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout)
       setExported(result)
       setIsDirty(false)
     } catch (err) {
@@ -289,148 +289,14 @@ export function ResumeOptimizePage() {
 
         {optimizedResume && (
           <>
-            <Card className="p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-lg font-bold text-gray-900">优化版简历</p>
-                <p className="flex items-center gap-1 text-xs text-gray-400">
-                  <PencilLineIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  可直接点击修改
-                </p>
-              </div>
-              <div className="border-b-2 border-primary-600 pb-3">
-                <p className="text-2xl font-bold text-gray-900">{optimizedResume.basic.name || '(原文未识别到姓名)'}</p>
-                <p className="mt-1 text-sm text-gray-500">
-                  {[
-                    optimizedResume.intention.position ? `求职意向:${optimizedResume.intention.position}` : '',
-                    optimizedResume.basic.phone ? `电话:${optimizedResume.basic.phone}` : '',
-                    optimizedResume.basic.email ? `邮箱:${optimizedResume.basic.email}` : '',
-                  ].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-
-              <div className="mt-4 space-y-5">
-                <div>
-                  <SectionTitle title="个人简介" />
-                  <textarea
-                    className={`${taCls} min-h-24 resize-y`}
-                    value={optimizedResume.summary}
-                    placeholder="(空)"
-                    onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                    onChange={(e) => {
-                      markEdited()
-                      setOptimizedResume((r) => r ? { ...r, summary: e.target.value.slice(0, 600) } : r)
-                    }}
-                  />
-                </div>
-
-                {optimizedResume.education.length > 0 && (
-                  <div>
-                    <SectionTitle title="教育经历" />
-                    <div className="space-y-3">
-                      {optimizedResume.education.map((e, i) => (
-                        <div key={i}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="text-sm font-semibold text-gray-800">
-                              {[e.school, e.major, e.degree].filter(Boolean).join(' · ')}
-                            </p>
-                            {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
-                          </div>
-                          <textarea
-                            className={`${taCls} mt-1.5 min-h-20 resize-y`}
-                            value={e.description ?? ''}
-                            placeholder="(无描述)"
-                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                            onChange={(ev) => {
-                              markEdited()
-                              setOptimizedResume((r) => r ? {
-                                ...r,
-                                education: r.education.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                              } : r)
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.experience.length > 0 && (
-                  <div>
-                    <SectionTitle title="实习 / 工作经历" />
-                    <div className="space-y-3">
-                      {optimizedResume.experience.map((e, i) => (
-                        <div key={i}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="text-sm font-semibold text-gray-800">{e.company} · {e.role}</p>
-                            {e.period && <p className="shrink-0 text-xs text-gray-400">{e.period}</p>}
-                          </div>
-                          <textarea
-                            className={`${taCls} mt-1.5 min-h-24 resize-y`}
-                            value={e.description}
-                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                            onChange={(ev) => {
-                              markEdited()
-                              setOptimizedResume((r) => r ? {
-                                ...r,
-                                experience: r.experience.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                              } : r)
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.projects.length > 0 && (
-                  <div>
-                    <SectionTitle title="项目经历" />
-                    <div className="space-y-3">
-                      {optimizedResume.projects.map((p, i) => (
-                        <div key={i}>
-                          <p className="text-sm font-semibold text-gray-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
-                          <textarea
-                            className={`${taCls} mt-1.5 min-h-24 resize-y`}
-                            value={p.description}
-                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                            onChange={(ev) => {
-                              markEdited()
-                              setOptimizedResume((r) => r ? {
-                                ...r,
-                                projects: r.projects.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                              } : r)
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.skills.length > 0 && (
-                  <div>
-                    <SectionTitle title="技能" />
-                    <div className="flex flex-wrap gap-2">
-                      {optimizedResume.skills.map((s, i) => (
-                        <span key={i} className="rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700">{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.certificates.length > 0 && (
-                  <div>
-                    <SectionTitle title="证书 / 资质" />
-                    <p className="text-sm text-gray-700">{optimizedResume.certificates.join(' · ')}</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <p className="flex items-center gap-1.5 text-xs text-gray-400">
-              <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              优化版中的学校/公司/证书等事实信息均来自你的简历原文,AI 未做任何添加;原文没有的内容保持为空,由你自行补充。
-            </p>
+            <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
+            <OptimizedResumeEditor
+              resume={optimizedResume}
+              onChange={handleResumeChange}
+              layout={layout}
+              previewClassName={previewClassName}
+              previewStyle={previewStyle}
+            />
           </>
         )}
 

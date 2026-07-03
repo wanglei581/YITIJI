@@ -17,6 +17,7 @@ import type {
   GeneratedResume,
   ResumeExportFormat,
   ResumeGenerateExportResponse,
+  ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
   ResumeParseRequest,
@@ -58,6 +59,7 @@ export interface AiServiceInterface {
     taskId?: string,
     token?: string | null,
     format?: ResumeExportFormat,
+    layout?: ResumeLayoutSettings,
   ): Promise<ResumeGenerateExportResponse>
 }
 
@@ -109,4 +111,5 @@ export const exportGeneratedResume = (
   taskId?: string,
   token?: string | null,
   format?: ResumeExportFormat,
-) => adapter.exportGeneratedResume(resume, taskId, token, format)
+  layout?: ResumeLayoutSettings,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout)
