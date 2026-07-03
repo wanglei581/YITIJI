@@ -26,13 +26,17 @@ export async function startWavRecorder(): Promise<WavRecorder> {
     if (timedOut) lateStream.getTracks().forEach((track) => track.stop())
     return lateStream
   })
-  const stream = await Promise.race([
-    getUserMedia,
-    new Promise<never>((_, reject) =>
-      { timeoutId = window.setTimeout(() => { timedOut = true; reject(new Error('MIC_PERMISSION_TIMEOUT')) }, 10_000) },
-    ),
-  ])
-  if (timeoutId !== null) window.clearTimeout(timeoutId)
+  let stream: MediaStream
+  try {
+    stream = await Promise.race([
+      getUserMedia,
+      new Promise<never>((_, reject) =>
+        { timeoutId = window.setTimeout(() => { timedOut = true; reject(new Error('MIC_PERMISSION_TIMEOUT')) }, 10_000) },
+      ),
+    ])
+  } finally {
+    if (timeoutId !== null) window.clearTimeout(timeoutId)
+  }
   const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
   const ctx = new AudioCtx()
   const source = ctx.createMediaStreamSource(stream)
