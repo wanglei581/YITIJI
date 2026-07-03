@@ -113,7 +113,7 @@ export function MaterialsTab({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">{materials.length} 份资料(发布后在一体机"活动资料"页可见)</p>
+        <p className="text-sm text-neutral-600">{materials.length} 份资料(发布后在一体机"活动资料"页可见)</p>
         <button onClick={openUpload} className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">
           <UploadIcon className="h-3.5 w-3.5" />
           上传资料
@@ -123,31 +123,31 @@ export function MaterialsTab({
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['资料名称', '类型', '页数', '大小', '打印次数', '状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {materials.length === 0 ? (
-                <tr><td colSpan={7} className="py-10 text-center text-xs text-gray-400">暂无活动资料,点击右上角"上传资料"(支持 PDF / PNG / JPEG)</td></tr>
+                <tr><td colSpan={7} className="py-10 text-center text-xs text-neutral-400">暂无活动资料,点击右上角"上传资料"(支持 PDF / PNG / JPEG)</td></tr>
               ) : (
                 materials.map((m) => (
-                  <tr key={m.id} className="hover:bg-gray-50">
+                  <tr key={m.id} className="hover:bg-neutral-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <FileTextIcon className="h-4 w-4 shrink-0 text-gray-400" />
-                        <span className="font-medium text-gray-800">{m.name}</span>
+                        <FileTextIcon className="h-4 w-4 shrink-0 text-neutral-400" />
+                        <span className="font-medium text-neutral-800">{m.name}</span>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{MATERIAL_TYPE_LABELS[m.type] ?? m.type}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{m.pageCount > 0 ? `${m.pageCount} 页` : '未填写'}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{formatSize(m.fileSizeKB)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{MATERIAL_TYPE_LABELS[m.type] ?? m.type}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{m.pageCount > 0 ? `${m.pageCount} 页` : '未填写'}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{formatSize(m.fileSizeKB)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <span className="flex items-center gap-1 text-xs text-gray-600">
-                        <PrinterIcon className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="flex items-center gap-1 text-xs text-neutral-600">
+                        <PrinterIcon className="h-3.5 w-3.5 text-neutral-400" />
                         {m.printCount}
                       </span>
                     </td>
@@ -169,7 +169,7 @@ export function MaterialsTab({
                             预览
                           </a>
                         ) : (
-                          <span className="rounded px-2 py-1 text-xs text-gray-300" title="mock 模式无真实文件">预览</span>
+                          <span className="rounded px-2 py-1 text-xs text-neutral-300" title="mock 模式无真实文件">预览</span>
                         )}
                         <button
                           disabled={busyId === m.id}
@@ -194,7 +194,7 @@ export function MaterialsTab({
         </div>
       </Card>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-neutral-400">
         资料文件经服务端校验(PDF / PNG / JPEG,≤20MB),一体机经签名短时链接访问,不暴露存储地址。删除会移除文件并保留删除日志。
       </p>
 
@@ -219,12 +219,12 @@ export function MaterialsTab({
             <input
               type="file"
               accept="application/pdf,image/png,image/jpeg"
-              className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-600 hover:file:bg-primary-100"
+              className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-primary-600 hover:file:bg-primary-100"
               onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
             />
           </Field>
           {uploadFile && (
-            <p className="text-xs text-gray-500">已选择:{uploadFile.name}({formatSize(Math.round(uploadFile.size / 1024))})</p>
+            <p className="text-xs text-neutral-500">已选择:{uploadFile.name}({formatSize(Math.round(uploadFile.size / 1024))})</p>
           )}
           <Field label="资料名称" required>
             <input className={inputCls} value={uploadMeta.name} onChange={(e) => setUploadMeta((m) => ({ ...m, name: e.target.value }))} />
@@ -246,7 +246,7 @@ export function MaterialsTab({
           <Field label="说明(选填)">
             <textarea className={`${inputCls} h-20 resize-none`} value={uploadMeta.description} onChange={(e) => setUploadMeta((m) => ({ ...m, description: e.target.value }))} />
           </Field>
-          <p className="text-xs text-gray-400">上传后默认为草稿,需点击"发布"后一体机才可见。Word 文档请先转为 PDF 再上传。</p>
+          <p className="text-xs text-neutral-400">上传后默认为草稿,需点击"发布"后一体机才可见。Word 文档请先转为 PDF 再上传。</p>
         </div>
       </Drawer>
 
@@ -285,16 +285,16 @@ export function MaterialsTab({
           <Field label="说明">
             <textarea className={`${inputCls} h-20 resize-none`} value={editMeta.description} onChange={(e) => setEditMeta((m) => ({ ...m, description: e.target.value }))} />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-neutral-700">
             <input
               type="checkbox"
               checked={editMeta.allowPrint}
               onChange={(e) => setEditMeta((m) => ({ ...m, allowPrint: e.target.checked }))}
-              className="h-4 w-4 rounded border-gray-300"
+              className="h-4 w-4 rounded border-neutral-300"
             />
             允许在一体机打印
           </label>
-          <p className="text-xs text-gray-400">文件本体不可替换;如需换文件,请删除后重新上传。</p>
+          <p className="text-xs text-neutral-400">文件本体不可替换;如需换文件,请删除后重新上传。</p>
         </div>
       </Drawer>
     </div>

@@ -195,7 +195,7 @@ export default function SyncSourcesPage() {
     return (
       <Page title="API 同步数据源" subtitle="管理 API 拉取模式的数据源及手动触发同步">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-neutral-400">加载中...</p>
         </div>
       </Page>
     )
@@ -205,8 +205,8 @@ export default function SyncSourcesPage() {
     return (
       <Page title="API 同步数据源" subtitle="管理 API 拉取模式的数据源及手动触发同步">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <RefreshCwIcon className="h-10 w-10 text-gray-200" />
-          <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+          <RefreshCwIcon className="h-10 w-10 text-neutral-200" />
+          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
           <button onClick={load} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">
             重试
           </button>
@@ -220,7 +220,7 @@ export default function SyncSourcesPage() {
       title="API 同步数据源"
       subtitle="管理 API 拉取模式的数据源及手动触发同步"
       actions={
-        <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+        <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
           <RefreshCwIcon className="h-3.5 w-3.5" />刷新
         </button>
       }
@@ -234,14 +234,14 @@ export default function SyncSourcesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['数据源名称', '机构 ID', '同步频率', '最后同步', '状态', '配置', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {sources.length === 0 ? (
                 <tr>
                   <td colSpan={7}>
@@ -257,13 +257,13 @@ export default function SyncSourcesPage() {
                 sources.map((s) => {
                   const trigState = triggers[s.id] ?? 'idle'
                   return (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-800">{s.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">{s.orgId.slice(0, 12)}…</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">
+                    <tr key={s.id} className="hover:bg-neutral-50">
+                      <td className="px-4 py-3 font-medium text-neutral-800">{s.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{s.orgId.slice(0, 12)}…</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
                         {FREQ_LABELS[s.syncFreq] ?? s.syncFreq}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         {s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString('zh-CN') : '从未'}
                       </td>
                       <td className="px-4 py-3">
@@ -273,15 +273,15 @@ export default function SyncSourcesPage() {
                             label={s.lastSyncStatus === 'success' ? '成功' : s.lastSyncStatus === 'failed' ? '失败' : s.lastSyncStatus}
                           />
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-neutral-400">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasEndpoint ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasEndpoint ? 'bg-green-50 text-green-600' : 'bg-neutral-100 text-neutral-400'}`}>
                             {s.hasEndpoint ? 'URL ✓' : 'URL —'}
                           </span>
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasCredential ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasCredential ? 'bg-green-50 text-green-600' : 'bg-neutral-100 text-neutral-400'}`}>
                             {s.hasCredential ? '凭证 ✓' : '凭证 —'}
                           </span>
                           <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasResponseConfig ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>
@@ -409,7 +409,7 @@ export default function SyncSourcesPage() {
         </div>
       )}
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-400">
         仅显示 accessMode=api 的数据源。同步结果在合作机构后台 "同步日志" 和 Admin "岗位信息源" 可查看。
       </p>
     </Page>

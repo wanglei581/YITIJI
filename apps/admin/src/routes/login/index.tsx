@@ -48,20 +48,20 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
-      <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
             <ShieldIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">管理员后台登录</h1>
-            <p className="text-xs text-gray-500">AI 求职打印服务终端</p>
+            <h1 className="text-lg font-semibold text-neutral-900">管理员后台登录</h1>
+            <p className="text-xs text-neutral-500">AI 求职打印服务终端</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-gray-700">账号</span>
+            <span className="text-neutral-700">账号</span>
             <input
               type="text"
               autoFocus
@@ -69,19 +69,19 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="h-10 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200"
+              className="h-10 rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200"
             />
           </label>
 
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-gray-700">密码</span>
+            <span className="text-neutral-700">密码</span>
             <input
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="h-10 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200"
+              className="h-10 rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-200"
             />
           </label>
 
@@ -96,7 +96,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-gray-400">
+        <p className="mt-6 text-center text-xs text-neutral-400">
           dev 账号:admin / admin
         </p>
       </div>

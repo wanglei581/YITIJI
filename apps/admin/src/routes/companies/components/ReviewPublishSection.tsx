@@ -34,7 +34,7 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
   return (
     <Card className="space-y-3 p-4">
       <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-gray-700">审核与发布</p>
+        <p className="text-sm font-medium text-neutral-700">审核与发布</p>
         <StatusBadge status={REVIEW_BADGE[detail.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[detail.reviewStatus]?.label ?? detail.reviewStatus} />
         <StatusBadge status={PUBLISH_BADGE[detail.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[detail.publishStatus]?.label ?? detail.publishStatus} />
       </div>
@@ -72,7 +72,7 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
           </GhostButton>
         )}
         {detail.reviewStatus !== 'approved' && detail.publishStatus !== 'published' && (
-          <span className="text-xs text-gray-400">审核通过后才能发布</span>
+          <span className="text-xs text-neutral-400">审核通过后才能发布</span>
         )}
       </div>
       {rejecting && (

@@ -145,7 +145,7 @@ export function AdminLayoutWrapper() {
   // 等 /auth/me 回应再渲染,防 401 时先闪一帧后台 UI
   if (!authChecked) {
     return (
-      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-gray-400">
+      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-neutral-400">
         正在验证身份…
       </div>
     )

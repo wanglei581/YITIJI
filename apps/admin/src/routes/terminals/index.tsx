@@ -462,7 +462,7 @@ export default function TerminalsPage() {
                               disabled={statusSavingId !== null}
                               title="编辑设备档案"
                               aria-label={`编辑 ${t.terminalCode} 设备档案`}
-                              className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-gray-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-neutral-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
                               编辑档案
@@ -522,7 +522,7 @@ export default function TerminalsPage() {
                               disabled={statusSavingId !== null}
                               title="编辑所属机构"
                               aria-label={`编辑 ${t.terminalCode} 所属机构`}
-                              className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-gray-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-neutral-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
                               {t.orgName ? '更改机构' : '绑定机构'}

@@ -103,7 +103,7 @@ export function CreateCompanyDrawer({
           </Field>
         </div>
         <CompanyFormFields form={form} onChange={setForm} />
-        <p className="text-xs text-gray-400">新建企业默认为「待审核 + 草稿」，审核通过并发布后才在一体机展示。</p>
+        <p className="text-xs text-neutral-400">新建企业默认为「待审核 + 草稿」，审核通过并发布后才在一体机展示。</p>
       </div>
     </Drawer>
   )

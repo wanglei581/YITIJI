@@ -57,8 +57,8 @@ function TerminalConfigRow({
           <GraduationCapIcon className="h-5 w-5 text-indigo-600" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900">{terminal.terminalCode ?? terminal.terminalId}</p>
-          <p className="text-xs text-gray-400">{terminal.terminalId}</p>
+          <p className="font-medium text-neutral-900">{terminal.terminalCode ?? terminal.terminalId}</p>
+          <p className="text-xs text-neutral-400">{terminal.terminalId}</p>
         </div>
         <StatusBadge status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
       </div>
@@ -66,7 +66,7 @@ function TerminalConfigRow({
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
         <label className="flex cursor-pointer items-center gap-2">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4" />
-          <span className="text-sm font-medium text-gray-800">启用智慧校园</span>
+          <span className="text-sm font-medium text-neutral-800">启用智慧校园</span>
         </label>
         <div className="h-5 w-px bg-neutral-200" />
         {MODULE_DEFS.map((m) => (
@@ -79,7 +79,7 @@ function TerminalConfigRow({
               title={m.frozen ? '校园大数据本期冻结，不开放配置' : undefined}
               className="h-4 w-4"
             />
-            <span className={`text-sm ${enabled && !m.frozen ? 'text-gray-700' : 'text-gray-400'}`}>
+            <span className={`text-sm ${enabled && !m.frozen ? 'text-neutral-700' : 'text-neutral-400'}`}>
               {m.label}
               {m.note && <span className="ml-1 text-[11px] text-amber-600">（{m.note}）</span>}
             </span>
@@ -91,7 +91,7 @@ function TerminalConfigRow({
         <Button size="sm" onClick={save} disabled={saving}>
           {saving ? '保存中…' : '保存'}
         </Button>
-        {msg && <span className="text-xs text-gray-500">{msg}</span>}
+        {msg && <span className="text-xs text-neutral-500">{msg}</span>}
       </div>
     </Card>
   )
@@ -117,8 +117,8 @@ export default function SmartCampusPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">智慧校园</h1>
-        <p className="mt-0.5 text-sm text-gray-500">按终端开启智慧校园及各子模块；开启后该机器前端首页出现智慧校园入口。</p>
+        <h1 className="text-xl font-bold text-neutral-900">智慧校园</h1>
+        <p className="mt-0.5 text-sm text-neutral-500">按终端开启智慧校园及各子模块；开启后该机器前端首页出现智慧校园入口。</p>
       </div>
 
       {/* 合规提示 */}
@@ -131,11 +131,11 @@ export default function SmartCampusPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-gray-400">加载中…</p>
+        <p className="text-sm text-neutral-400">加载中…</p>
       ) : error ? (
-        <Card className="p-6 text-center text-sm text-gray-500">{error}</Card>
+        <Card className="p-6 text-center text-sm text-neutral-500">{error}</Card>
       ) : terminals.length === 0 ? (
-        <Card className="p-10 text-center text-sm text-gray-500">暂无终端</Card>
+        <Card className="p-10 text-center text-sm text-neutral-500">暂无终端</Card>
       ) : (
         <div className="space-y-4">
           {terminals.map((t) => (

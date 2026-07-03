@@ -31,7 +31,7 @@ const PUBLISH_MAP: Record<PublishStatus, { badge: 'success' | 'warning' | 'defau
 const FAIR_STATUS_STYLES: Record<JobFairStatus, string> = {
   upcoming: 'bg-blue-50 text-blue-600',
   ongoing:  'bg-green-50 text-green-600',
-  ended:    'bg-gray-100 text-gray-500',
+  ended:    'bg-neutral-100 text-neutral-500',
 }
 const FAIR_STATUS_LABELS: Record<JobFairStatus, string> = { upcoming: '未开始', ongoing: '进行中', ended: '已结束' }
 
@@ -46,9 +46,9 @@ const REVIEW_FILTER_MAP: Record<string, ReviewStatus | null> = {
 function DetailRow({ label, value }: { label: string; value?: ReactNode }) {
   if (value === undefined || value === null || value === '') return null
   return (
-    <div className="flex gap-3 border-b border-gray-50 py-2 last:border-0">
-      <span className="w-20 flex-shrink-0 text-xs text-gray-400">{label}</span>
-      <span className="flex-1 break-words text-sm text-gray-700">{value}</span>
+    <div className="flex gap-3 border-b border-neutral-50 py-2 last:border-0">
+      <span className="w-20 flex-shrink-0 text-xs text-neutral-400">{label}</span>
+      <span className="flex-1 break-words text-sm text-neutral-700">{value}</span>
     </div>
   )
 }
@@ -124,7 +124,7 @@ export default function FairSourcesPage() {
     return (
       <Page title="招聘会信息源" subtitle="第三方平台同步招聘会数据管理">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-neutral-400">加载中...</p>
         </div>
       </Page>
     )
@@ -134,8 +134,8 @@ export default function FairSourcesPage() {
     return (
       <Page title="招聘会信息源" subtitle="第三方平台同步招聘会数据管理">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <CalendarIcon className="h-10 w-10 text-gray-200" />
-          <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+          <CalendarIcon className="h-10 w-10 text-neutral-200" />
+          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
         </div>
       </Page>
     )
@@ -168,7 +168,7 @@ export default function FairSourcesPage() {
             key={f}
             onClick={() => { setReviewFilter(f); setPage(1) }}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
             }`}
           >
 {f}
@@ -177,8 +177,8 @@ export default function FairSourcesPage() {
           ))}
         </div>
         <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索招聘会名称..." className="h-8 w-56 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索招聘会名称..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-white pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
         </div>
       </div>
 
@@ -186,14 +186,14 @@ export default function FairSourcesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['来源机构', '外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={11}>
@@ -205,22 +205,22 @@ export default function FairSourcesPage() {
                   const review  = REVIEW_MAP[s.reviewStatus]
                   const publish = PUBLISH_MAP[s.publishStatus]
                   return (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-gray-700">{s.sourceName}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">{s.externalId}</td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{s.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{s.organizer}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                    <tr key={s.id} className="hover:bg-neutral-50">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-700">{s.sourceName}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{s.externalId}</td>
+                      <td className="px-4 py-3 font-medium text-neutral-800">{s.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.organizer}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         <div>{s.startTime}</div>
-                        <div className="text-gray-300">至 {s.endTime.slice(5)}</div>
+                        <div className="text-neutral-300">至 {s.endTime.slice(5)}</div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{s.venue}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">{s.venue}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded px-2 py-0.5 text-xs font-medium ${FAIR_STATUS_STYLES[s.status]}`}>
                           {FAIR_STATUS_LABELS[s.status]}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{s.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.syncTime}</td>
                       <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -262,7 +262,7 @@ export default function FairSourcesPage() {
         <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-400">
         仅展示第三方平台同步的招聘会信息，不参与招聘闭环。
       </p>
 
@@ -273,7 +273,7 @@ export default function FairSourcesPage() {
         size="md"
         footer={
           <div className="flex justify-end">
-            <button onClick={() => setViewing(null)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">关闭</button>
+            <button onClick={() => setViewing(null)} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50">关闭</button>
           </div>
         }
       >
@@ -294,7 +294,7 @@ export default function FairSourcesPage() {
             <DetailRow label="同步时间" value={viewing.syncTime} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
-            <p className="mt-4 text-xs text-gray-400">仅展示第三方来源数据，不参与招聘闭环。资料打印由一体机现场提供，此处为来源审核入口。</p>
+            <p className="mt-4 text-xs text-neutral-400">仅展示第三方来源数据，不参与招聘闭环。资料打印由一体机现场提供，此处为来源审核入口。</p>
           </div>
         )}
       </Drawer>

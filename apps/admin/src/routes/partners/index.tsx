@@ -26,7 +26,7 @@ const PARTNER_TYPE_STYLES: Record<string, string> = {
   public_employment_service: 'bg-green-50 text-green-600',
   licensed_hr_agency:        'bg-purple-50 text-purple-600',
   fair_organizer:            'bg-orange-50 text-orange-600',
-  enterprise_source:         'bg-gray-100 text-gray-600',
+  enterprise_source:         'bg-neutral-100 text-neutral-600',
 }
 
 const SCENE_TEMPLATE_STYLES: Record<string, string> = {
@@ -38,12 +38,12 @@ const SCENE_TEMPLATE_STYLES: Record<string, string> = {
 const STATUS_FILTERS = ['全部', '合作中', '已停用'] as const
 
 const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-600">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </span>
@@ -109,10 +109,10 @@ function ModulesPicker({ value, onChange }: { value: string[]; onChange: (module
   return (
     <div className="grid grid-cols-2 gap-1.5">
       {Object.entries(MODULE_LABELS).map(([key, label]) => (
-        <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-100 px-2.5 py-1.5 text-xs text-gray-700">
+        <label key={key} className="flex items-center gap-2 rounded-lg border border-neutral-100 px-2.5 py-1.5 text-xs text-neutral-700">
           <input
             type="checkbox"
-            className="h-3.5 w-3.5 rounded border-gray-300"
+            className="h-3.5 w-3.5 rounded border-neutral-300"
             checked={value.includes(key)}
             onChange={(e) => onChange(e.target.checked ? [...value, key] : value.filter((m) => m !== key))}
           />
@@ -180,7 +180,7 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
     <Drawer open={open} onClose={onClose} title="新增合作机构" size="md"
       footer={
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} disabled={saving} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">取消</button>
+          <button onClick={onClose} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
           <button onClick={save} disabled={saving || !canSave} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
             {saving ? '创建中…' : '创建机构'}
           </button>
@@ -215,9 +215,9 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
           <ModulesPicker value={form.enabledModules ?? []} onChange={(modules) => setForm((f) => ({ ...f, enabledModules: modules }))} />
         </Field>
 
-        <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input type="checkbox" className="h-4 w-4 rounded border-gray-300" checked={withAccount} onChange={(e) => setWithAccount(e.target.checked)} />
+        <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+            <input type="checkbox" className="h-4 w-4 rounded border-neutral-300" checked={withAccount} onChange={(e) => setWithAccount(e.target.checked)} />
             同时开通机构后台登录账号
           </label>
           {withAccount && (
@@ -233,7 +233,7 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
               <Field label="初始密码(至少 8 位)" required>
                 <input type="password" autoComplete="new-password" className={inputCls} value={account.password} onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))} />
               </Field>
-              <p className="text-xs text-gray-400">密码仅单向提交加密保存,创建后系统不再回显;请线下安全告知机构并提示首次登录后修改。</p>
+              <p className="text-xs text-neutral-400">密码仅单向提交加密保存,创建后系统不再回显;请线下安全告知机构并提示首次登录后修改。</p>
             </div>
           )}
         </div>
@@ -379,16 +379,16 @@ function OrgDetailDrawer({
               { label: '岗位', value: detail.counts.jobs },
               { label: '招聘会', value: detail.counts.fairs },
             ].map(({ label, value }) => (
-              <div key={label} className="rounded-lg bg-gray-50 p-3 text-center">
-                <p className="text-lg font-bold text-gray-800">{value}</p>
-                <p className="text-xs text-gray-500">{label}</p>
+              <div key={label} className="rounded-lg bg-neutral-50 p-3 text-center">
+                <p className="text-lg font-bold text-neutral-800">{value}</p>
+                <p className="text-xs text-neutral-500">{label}</p>
               </div>
             ))}
           </div>
 
           {/* 档案编辑 */}
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-800">机构档案</p>
+            <p className="text-sm font-semibold text-neutral-800">机构档案</p>
             <Field label="机构名称" required>
               <input className={inputCls} value={form.name ?? ''} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             </Field>
@@ -439,12 +439,12 @@ function OrgDetailDrawer({
           </div>
 
           {/* 账号管理 */}
-          <div className="space-y-3 border-t border-gray-100 pt-4">
+          <div className="space-y-3 border-t border-neutral-100 pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-gray-800">机构后台账号</p>
+              <p className="text-sm font-semibold text-neutral-800">机构后台账号</p>
               <button
                 onClick={() => setShowNewAccount((v) => !v)}
-                className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
               >
                 <UserPlusIcon className="h-3.5 w-3.5" />
                 新增账号
@@ -452,7 +452,7 @@ function OrgDetailDrawer({
             </div>
 
             {showNewAccount && (
-              <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <div className="space-y-3 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="登录用户名" required>
                     <input className={inputCls} placeholder="字母数字及 _.-" value={newAccount.username} onChange={(e) => setNewAccount((a) => ({ ...a, username: e.target.value }))} />
@@ -477,14 +477,14 @@ function OrgDetailDrawer({
             )}
 
             {detail.accounts.length === 0 ? (
-              <p className="rounded-lg bg-gray-50 py-6 text-center text-xs text-gray-400">该机构暂无后台账号</p>
+              <p className="rounded-lg bg-neutral-50 py-6 text-center text-xs text-neutral-400">该机构暂无后台账号</p>
             ) : (
-              <div className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+              <div className="divide-y divide-neutral-100 rounded-lg border border-neutral-100">
                 {detail.accounts.map((account) => (
                   <div key={account.id} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800">{account.name}</p>
-                      <p className="font-mono text-xs text-gray-400">{account.username}</p>
+                      <p className="text-sm font-medium text-neutral-800">{account.name}</p>
+                      <p className="font-mono text-xs text-neutral-400">{account.username}</p>
                     </div>
                     <StatusBadge status={account.enabled ? 'success' : 'default'} label={account.enabled ? '启用' : '已停用'} />
                     <button
@@ -519,7 +519,7 @@ function OrgDetailDrawer({
                   onChange={(e) => setResetPassword(e.target.value)}
                 />
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setResetTarget(null)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white">取消</button>
+                  <button onClick={() => setResetTarget(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-white">取消</button>
                   <button
                     onClick={doResetPassword}
                     disabled={saving || resetPassword.length < 8}
@@ -533,7 +533,7 @@ function OrgDetailDrawer({
             )}
           </div>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-neutral-400">
             机构信息编辑、账号操作均记录审计日志。停用机构后:机构账号无法登录、数据导入接口拒绝;已发布数据不自动下架,如需下架请到岗位/招聘会信息源逐条操作。
           </p>
         </div>
@@ -623,14 +623,14 @@ export default function PartnersPage() {
           {/* 双行筛选 */}
           <div className="mb-4 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="w-16 shrink-0 text-xs text-gray-400">合作状态</span>
+              <span className="w-16 shrink-0 text-xs text-neutral-400">合作状态</span>
               <div className="flex gap-2">
                 {STATUS_FILTERS.map((f) => (
                   <button
                     key={f}
                     onClick={() => { setStatusFilter(f); setPage(1) }}
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                      statusFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      statusFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                     }`}
                   >
                     {f}
@@ -640,14 +640,14 @@ export default function PartnersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-16 shrink-0 text-xs text-gray-400">机构类型</span>
+              <span className="w-16 shrink-0 text-xs text-neutral-400">机构类型</span>
               <div className="flex flex-wrap gap-2">
                 {TYPE_FILTERS.map((f) => (
                   <button
                     key={f.label}
                     onClick={() => { setTypeFilter(f.value); setPage(1) }}
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                      typeFilter === f.value ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      typeFilter === f.value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                     }`}
                   >
                     {f.label}
@@ -661,9 +661,9 @@ export default function PartnersPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="搜索机构名称、联系人..."
-                className="h-8 w-64 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                className="h-8 w-64 rounded-lg border border-neutral-200 bg-white pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
               />
-              <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+              <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
             </div>
           </div>
 
@@ -671,14 +671,14 @@ export default function PartnersPage() {
           <Card className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-gray-100 bg-gray-50">
+                <thead className="border-b border-neutral-100 bg-neutral-50">
                   <tr>
                     {['机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '账号', '数据源', '岗位', '招聘会', '加入时间', '操作'].map((h) => (
-                      <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                      <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-neutral-100">
                   {paginated.length === 0 ? (
                     <tr>
                       <td colSpan={12}>
@@ -692,41 +692,41 @@ export default function PartnersPage() {
                     </tr>
                   ) : (
                     paginated.map((o) => (
-                      <tr key={o.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-800">{o.name}</td>
+                      <tr key={o.id} className="hover:bg-neutral-50">
+                        <td className="px-4 py-3 font-medium text-neutral-800">{o.name}</td>
                         <td className="px-4 py-3">
-                          <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${PARTNER_TYPE_STYLES[o.type] ?? 'bg-gray-100 text-gray-600'}`}>
+                          <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${PARTNER_TYPE_STYLES[o.type] ?? 'bg-neutral-100 text-neutral-600'}`}>
                             {PARTNER_TYPE_LABELS[o.type as PartnerType] ?? o.type}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           {o.sceneTemplate ? (
-                            <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${SCENE_TEMPLATE_STYLES[o.sceneTemplate] ?? 'bg-gray-100 text-gray-500'}`}>
+                            <span className={`whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${SCENE_TEMPLATE_STYLES[o.sceneTemplate] ?? 'bg-neutral-100 text-neutral-500'}`}>
                               {SCENE_TEMPLATE_LABELS[o.sceneTemplate as SceneTemplate] ?? o.sceneTemplate}
                             </span>
                           ) : (
-                            <span className="text-xs text-gray-400">未设置</span>
+                            <span className="text-xs text-neutral-400">未设置</span>
                           )}
                         </td>
                         <td className="max-w-56 px-4 py-3">
-                          <span className="line-clamp-2 text-xs text-gray-500">
+                          <span className="line-clamp-2 text-xs text-neutral-500">
                             {o.enabledModules.length > 0
                               ? o.enabledModules.map((m) => MODULE_LABELS[m as keyof typeof MODULE_LABELS] ?? m).join(' · ')
                               : '—'}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                        <td className="whitespace-nowrap px-4 py-3 text-neutral-700">
                           {o.contact ?? '—'}
-                          {o.contactPhone && <span className="ml-1.5 font-mono text-xs text-gray-400">{o.contactPhone}</span>}
+                          {o.contactPhone && <span className="ml-1.5 font-mono text-xs text-neutral-400">{o.contactPhone}</span>}
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={o.enabled ? 'success' : 'error'} label={o.enabled ? '合作中' : '已停用'} />
                         </td>
-                        <td className="px-4 py-3 text-center text-gray-700">{o.counts.accounts}</td>
-                        <td className="px-4 py-3 text-center text-gray-700">{o.counts.sources}</td>
-                        <td className="px-4 py-3 text-center text-gray-700">{o.counts.jobs}</td>
-                        <td className="px-4 py-3 text-center text-gray-700">{o.counts.fairs}</td>
-                        <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{o.createdAt.slice(0, 10)}</td>
+                        <td className="px-4 py-3 text-center text-neutral-700">{o.counts.accounts}</td>
+                        <td className="px-4 py-3 text-center text-neutral-700">{o.counts.sources}</td>
+                        <td className="px-4 py-3 text-center text-neutral-700">{o.counts.jobs}</td>
+                        <td className="px-4 py-3 text-center text-neutral-700">{o.counts.fairs}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{o.createdAt.slice(0, 10)}</td>
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex items-center gap-1.5">
                             <button
@@ -754,7 +754,7 @@ export default function PartnersPage() {
             <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
           </Card>
 
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-3 text-xs text-neutral-400">
             合作机构是外部岗位/招聘会/政策数据的来源方。停用机构 = 该机构账号禁止登录 + 数据导入接口拒绝(已发布数据需到信息源逐条下架)。所有操作记录审计日志;不存在企业招聘端,不接收求职者简历。
           </p>
         </>

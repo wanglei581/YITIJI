@@ -135,48 +135,48 @@ export function ToolboxGovernancePanel({
           百宝箱只允许站内路由、受控 H5、二维码和 AI 技能入口；不执行第三方代码，不桥接第三方设备。高风险能力必须保留免责声明。
         </div>
 
-        <h2 className="mt-5 text-base font-bold text-gray-900">创建微应用</h2>
+        <h2 className="mt-5 text-base font-bold text-neutral-900">创建微应用</h2>
         <div className="mt-3 grid gap-3">
-          <input value={appForm.appKey} onChange={(e) => setAppForm({ ...appForm, appKey: e.target.value.trim().toLowerCase() })} placeholder="app-key，例如 contract-review" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
-          <input value={appForm.title} onChange={(e) => setAppForm({ ...appForm, title: e.target.value })} placeholder="应用名称" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
-          <input value={appForm.shortDescription} onChange={(e) => setAppForm({ ...appForm, shortDescription: e.target.value })} placeholder="一句话说明" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+          <input value={appForm.appKey} onChange={(e) => setAppForm({ ...appForm, appKey: e.target.value.trim().toLowerCase() })} placeholder="app-key，例如 contract-review" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
+          <input value={appForm.title} onChange={(e) => setAppForm({ ...appForm, title: e.target.value })} placeholder="应用名称" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
+          <input value={appForm.shortDescription} onChange={(e) => setAppForm({ ...appForm, shortDescription: e.target.value })} placeholder="一句话说明" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           <div className="grid gap-3 md:grid-cols-3">
-            <select value={appForm.category} onChange={(e) => setAppForm({ ...appForm, category: e.target.value as typeof appForm.category })} className="h-10 rounded-lg border border-gray-200 px-3 text-sm">
+            <select value={appForm.category} onChange={(e) => setAppForm({ ...appForm, category: e.target.value as typeof appForm.category })} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm">
               {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-            <select value={appForm.priority} onChange={(e) => setAppForm({ ...appForm, priority: e.target.value as typeof appForm.priority })} className="h-10 rounded-lg border border-gray-200 px-3 text-sm">
+            <select value={appForm.priority} onChange={(e) => setAppForm({ ...appForm, priority: e.target.value as typeof appForm.priority })} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm">
               {PRIORITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-            <select value={appForm.riskLevel} onChange={(e) => setAppForm({ ...appForm, riskLevel: e.target.value as typeof appForm.riskLevel })} className="h-10 rounded-lg border border-gray-200 px-3 text-sm">
+            <select value={appForm.riskLevel} onChange={(e) => setAppForm({ ...appForm, riskLevel: e.target.value as typeof appForm.riskLevel })} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm">
               {RISK_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </div>
           <Button size="sm" onClick={createApp} disabled={!appForm.appKey || !appForm.title || !appForm.shortDescription}>创建应用</Button>
         </div>
 
-        <h2 className="mt-6 text-base font-bold text-gray-900">创建版本</h2>
+        <h2 className="mt-6 text-base font-bold text-neutral-900">创建版本</h2>
         <div className="mt-3 grid gap-3">
-          <select value={selectedAppKey} onChange={(e) => setSelectedAppKey(e.target.value)} className="h-10 rounded-lg border border-gray-200 px-3 text-sm">
+          <select value={selectedAppKey} onChange={(e) => setSelectedAppKey(e.target.value)} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm">
             {apps.map((app) => <option key={app.appKey} value={app.appKey}>{app.title} · {app.appKey}</option>)}
           </select>
-          <select value={versionForm.entryType} onChange={(e) => setVersionForm({ ...versionForm, entryType: e.target.value as EntryType })} className="h-10 rounded-lg border border-gray-200 px-3 text-sm">
+          <select value={versionForm.entryType} onChange={(e) => setVersionForm({ ...versionForm, entryType: e.target.value as EntryType })} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm">
             <option value="ai_skill">AI 技能</option>
             <option value="internal_route">站内页面</option>
             <option value="web_app">外部 H5</option>
             <option value="qr_code">二维码</option>
             <option value="mini_program_qr">小程序码</option>
           </select>
-          <input value={versionForm.shortDescription} onChange={(e) => setVersionForm({ ...versionForm, shortDescription: e.target.value })} placeholder="版本说明，默认使用应用名称生成" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+          <input value={versionForm.shortDescription} onChange={(e) => setVersionForm({ ...versionForm, shortDescription: e.target.value })} placeholder="版本说明，默认使用应用名称生成" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           {versionEntryIsQr ? (
             <div className="grid gap-3 md:grid-cols-2">
-              <input value={versionForm.qrImageUrl} onChange={(e) => setVersionForm({ ...versionForm, qrImageUrl: e.target.value })} placeholder="二维码图片地址，用于终端展示二维码图片" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
-              <input value={versionForm.qrTargetUrl} onChange={(e) => setVersionForm({ ...versionForm, qrTargetUrl: e.target.value })} placeholder={versionForm.entryType === 'qr_code' ? '扫码目标地址，用于合规审计和运营声明' : '小程序目标说明，用于合规审计和运营声明'} className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input value={versionForm.qrImageUrl} onChange={(e) => setVersionForm({ ...versionForm, qrImageUrl: e.target.value })} placeholder="二维码图片地址，用于终端展示二维码图片" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
+              <input value={versionForm.qrTargetUrl} onChange={(e) => setVersionForm({ ...versionForm, qrTargetUrl: e.target.value })} placeholder={versionForm.entryType === 'qr_code' ? '扫码目标地址，用于合规审计和运营声明' : '小程序目标说明，用于合规审计和运营声明'} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
             </div>
           ) : (
-            <input value={versionForm.target} onChange={(e) => setVersionForm({ ...versionForm, target: e.target.value })} placeholder="站内路由、HTTPS 地址或 assistant intent" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+            <input value={versionForm.target} onChange={(e) => setVersionForm({ ...versionForm, target: e.target.value })} placeholder="站内路由、HTTPS 地址或 assistant intent" className="h-10 rounded-lg border border-neutral-200 px-3 text-sm" />
           )}
-          <textarea value={versionForm.disclaimer} onChange={(e) => setVersionForm({ ...versionForm, disclaimer: e.target.value })} placeholder="免责声明，高风险/受限应用必填" className="min-h-20 rounded-lg border border-gray-200 px-3 py-2 text-sm" />
-          <label className="flex items-center gap-2 text-sm text-gray-600">
+          <textarea value={versionForm.disclaimer} onChange={(e) => setVersionForm({ ...versionForm, disclaimer: e.target.value })} placeholder="免责声明，高风险/受限应用必填" className="min-h-20 rounded-lg border border-neutral-200 px-3 py-2 text-sm" />
+          <label className="flex items-center gap-2 text-sm text-neutral-600">
             <input type="checkbox" checked={versionForm.consent} onChange={(e) => setVersionForm({ ...versionForm, consent: e.target.checked })} className="h-4 w-4" />
             需要用户显式确认
           </label>
@@ -186,15 +186,15 @@ export function ToolboxGovernancePanel({
 
       <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-gray-900">微应用审核发布</h2>
+          <h2 className="text-base font-bold text-neutral-900">微应用审核发布</h2>
           {message && <span className="text-sm font-medium text-red-600">{message}</span>}
         </div>
         <div className="mt-4 space-y-3">
           {apps.map((app) => (
-            <button key={app.appKey} type="button" onClick={() => setSelectedAppKey(app.appKey)} className={`w-full rounded-xl border px-4 py-3 text-left ${selectedAppKey === app.appKey ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+            <button key={app.appKey} type="button" onClick={() => setSelectedAppKey(app.appKey)} className={`w-full rounded-xl border px-4 py-3 text-left ${selectedAppKey === app.appKey ? 'border-blue-200 bg-blue-50' : 'border-neutral-200 bg-white'}`}>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-gray-900">{app.title}</span>
-                <span className="text-xs text-gray-400">{app.appKey}</span>
+                <span className="font-semibold text-neutral-900">{app.title}</span>
+                <span className="text-xs text-neutral-400">{app.appKey}</span>
                 <StatusBadge status={badgeStatus(app.status)} label={STATUS_LABELS[app.status] ?? app.status} />
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{app.riskLevel}</span>
               </div>
@@ -202,21 +202,21 @@ export function ToolboxGovernancePanel({
           ))}
         </div>
 
-        <div className="mt-5 rounded-xl border border-gray-200">
-          <div className="border-b border-gray-100 px-4 py-3">
-            <p className="text-sm font-semibold text-gray-900">{selectedApp?.title ?? '未选择应用'} 版本</p>
-            <input value={terminalIds} onChange={(e) => setTerminalIds(e.target.value)} placeholder="发布终端，逗号分隔；留空=全部启用终端" className="mt-2 h-9 w-full rounded-lg border border-gray-200 px-3 text-xs" />
+        <div className="mt-5 rounded-xl border border-neutral-200">
+          <div className="border-b border-neutral-100 px-4 py-3">
+            <p className="text-sm font-semibold text-neutral-900">{selectedApp?.title ?? '未选择应用'} 版本</p>
+            <input value={terminalIds} onChange={(e) => setTerminalIds(e.target.value)} placeholder="发布终端，逗号分隔；留空=全部启用终端" className="mt-2 h-9 w-full rounded-lg border border-neutral-200 px-3 text-xs" />
           </div>
           {versionLoading ? (
-            <p className="px-4 py-5 text-sm text-gray-400">加载版本中…</p>
+            <p className="px-4 py-5 text-sm text-neutral-400">加载版本中…</p>
           ) : versions.length === 0 ? (
-            <p className="px-4 py-5 text-sm text-gray-400">暂无版本</p>
+            <p className="px-4 py-5 text-sm text-neutral-400">暂无版本</p>
           ) : versions.map((version) => (
-            <div key={version.id} className="border-b border-gray-100 px-4 py-3 last:border-b-0">
+            <div key={version.id} className="border-b border-neutral-100 px-4 py-3 last:border-b-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-gray-900">v{version.version}</span>
+                <span className="font-medium text-neutral-900">v{version.version}</span>
                 <StatusBadge status={badgeStatus(version.status)} label={STATUS_LABELS[version.status] ?? version.status} />
-                <span className="text-xs text-gray-400">{version.snapshot.launch?.entryType}</span>
+                <span className="text-xs text-neutral-400">{version.snapshot.launch?.entryType}</span>
               </div>
               {version.snapshot.disclaimers?.length > 0 && (
                 <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">免责声明：{version.snapshot.disclaimers.join('；')}</p>
@@ -229,10 +229,10 @@ export function ToolboxGovernancePanel({
               </div>
             </div>
           ))}
-          <div className="border-t border-gray-100 px-4 py-3">
-            <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="驳回原因" className="h-9 w-full rounded-lg border border-gray-200 px-3 text-xs" />
+          <div className="border-t border-neutral-100 px-4 py-3">
+            <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="驳回原因" className="h-9 w-full rounded-lg border border-neutral-200 px-3 text-xs" />
             {selectedApp && <Button className="mt-3" size="sm" variant="danger" onClick={() => void runAction(() => toolboxService.suspendApp(selectedApp.appKey), '已执行熔断')}>熔断当前应用</Button>}
-            <p className="mt-2 text-xs text-gray-400">可发布终端数：{terminals.length}。发布失败时会展示 BLOCK_REASON_LABELS 对应的拦截原因。</p>
+            <p className="mt-2 text-xs text-neutral-400">可发布终端数：{terminals.length}。发布失败时会展示 BLOCK_REASON_LABELS 对应的拦截原因。</p>
           </div>
         </div>
       </Card>

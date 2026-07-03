@@ -20,12 +20,12 @@ const FACILITY_TYPES: { value: FairVenueFacilityType; label: string; icon: React
 const HALL_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-orange-500', 'bg-cyan-600', 'bg-rose-500']
 
 const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-600">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </span>
@@ -166,10 +166,10 @@ export function VenueGuideTab({
   if (!draft) {
     return (
       <Card className="flex flex-col items-center gap-4 py-14 text-center">
-        <MapIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
+        <MapIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
         <div>
-          <p className="text-base font-semibold text-gray-700">该招聘会尚未配置场馆导览</p>
-          <p className="mt-1 text-xs text-gray-400">配置展厅布局、企业展位与设施点位后,一体机详情页将显示「场馆导览」</p>
+          <p className="text-base font-semibold text-neutral-700">该招聘会尚未配置场馆导览</p>
+          <p className="mt-1 text-xs text-neutral-400">配置展厅布局、企业展位与设施点位后,一体机详情页将显示「场馆导览」</p>
         </div>
         <button
           onClick={() => setDraft({ venueName: venueDefault, halls: [{ ...EMPTY_HALL, hallCode: 'A', hallName: 'A 厅' }], facilities: [] })}
@@ -190,10 +190,10 @@ export function VenueGuideTab({
     <div className="space-y-4">
       {/* 预览条:A/B/C 厅 + 企业数 */}
       <Card className="p-4">
-        <p className="mb-3 text-sm font-medium text-gray-700">布局预览</p>
+        <p className="mb-3 text-sm font-medium text-neutral-700">布局预览</p>
         <div className="flex flex-wrap items-end gap-3">
           {draft.halls.length === 0 ? (
-            <p className="text-xs text-gray-400">暂无展厅,点击下方「添加展厅」</p>
+            <p className="text-xs text-neutral-400">暂无展厅,点击下方「添加展厅」</p>
           ) : (
             draft.halls.map((h, i) => (
               <div key={i} className="text-center">
@@ -201,7 +201,7 @@ export function VenueGuideTab({
                   <p className="text-lg font-bold">{h.hallCode.toUpperCase() || '?'}</p>
                   <p className="text-[10px] opacity-90">{h.companies.length} 家企业</p>
                 </div>
-                <p className="mt-1 max-w-24 truncate text-[10px] text-gray-500">{h.industryCategory || h.hallName}</p>
+                <p className="mt-1 max-w-24 truncate text-[10px] text-neutral-500">{h.industryCategory || h.hallName}</p>
               </div>
             ))
           )}
@@ -211,7 +211,7 @@ export function VenueGuideTab({
                 const meta = FACILITY_TYPES.find((t) => t.value === f.type)
                 const Icon = meta?.icon ?? InfoIcon
                 return (
-                  <span key={i} className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[10px] text-gray-600">
+                  <span key={i} className="flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-1 text-[10px] text-neutral-600">
                     <Icon className="h-3 w-3" />{f.name}
                   </span>
                 )
@@ -229,14 +229,14 @@ export function VenueGuideTab({
 
       {/* 展厅列表 */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-700">展厅({draft.halls.length})</p>
+        <p className="text-sm font-medium text-neutral-700">展厅({draft.halls.length})</p>
         <button
           onClick={() => {
             const nextCode = String.fromCharCode(65 + draft.halls.length) // A,B,C...
             setDraft((d) => d ? { ...d, halls: [...d.halls, { ...EMPTY_HALL, hallCode: nextCode, hallName: `${nextCode} 厅` }] } : d)
             setEditingHall(draft.halls.length)
           }}
-          className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
         >
           <PlusIcon className="h-3.5 w-3.5" />
           添加展厅
@@ -251,8 +251,8 @@ export function VenueGuideTab({
                   {h.hallCode.toUpperCase() || '?'}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{h.hallName || '(未命名)'}</p>
-                  <p className="text-xs text-gray-400">{h.industryCategory || '未设置行业'} · {h.companies.length} 家企业{h.boothRange ? ` · ${h.boothRange}` : ''}</p>
+                  <p className="text-sm font-semibold text-neutral-800">{h.hallName || '(未命名)'}</p>
+                  <p className="text-xs text-neutral-400">{h.industryCategory || '未设置行业'} · {h.companies.length} 家企业{h.boothRange ? ` · ${h.boothRange}` : ''}</p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
@@ -266,18 +266,18 @@ export function VenueGuideTab({
 
       {/* 设施点位 */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-700">设施点位({draft.facilities.length})</p>
+        <p className="text-sm font-medium text-neutral-700">设施点位({draft.facilities.length})</p>
         <button
           onClick={() => setDraft((d) => d ? { ...d, facilities: [...d.facilities, { type: 'entrance', name: '入口', locationLabel: '', relatedHallCode: '' } as SaveVenueFacilityInput] } : d)}
-          className="flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
         >
           <PlusIcon className="h-3.5 w-3.5" />
           添加设施
         </button>
       </div>
-      <Card className="divide-y divide-gray-100 p-0">
+      <Card className="divide-y divide-neutral-100 p-0">
         {draft.facilities.length === 0 && (
-          <p className="py-6 text-center text-xs text-gray-400">暂无设施点位(入口/服务台/打印点/咨询区)</p>
+          <p className="py-6 text-center text-xs text-neutral-400">暂无设施点位(入口/服务台/打印点/咨询区)</p>
         )}
         {draft.facilities.map((f, i) => (
           <div key={i} className="grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[140px_1fr_1fr_90px_auto] md:items-center">
@@ -310,7 +310,7 @@ export function VenueGuideTab({
         </button>
       </div>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-neutral-400">
         合规说明:场馆导览仅用于会场位置与展区信息展示;企业绑定来自本招聘会参展企业,系统不接收求职者简历,不参与招聘闭环。
       </p>
 
@@ -365,15 +365,15 @@ export function VenueGuideTab({
 
             {/* 企业绑定:只能选本招聘会参展企业 */}
             <div>
-              <p className="mb-2 text-xs font-medium text-gray-600">绑定参展企业({hall.companies.length})</p>
+              <p className="mb-2 text-xs font-medium text-neutral-600">绑定参展企业({hall.companies.length})</p>
               <div className="space-y-2">
                 {hall.companies.map((b, j) => {
                   const company = companies.find((c) => c.id === b.fairCompanyId)
                   return (
-                    <div key={j} className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2">
-                      <p className="min-w-0 flex-1 truncate text-sm text-gray-800">{company?.name ?? b.fairCompanyId}</p>
+                    <div key={j} className="flex items-center gap-2 rounded-lg border border-neutral-100 px-3 py-2">
+                      <p className="min-w-0 flex-1 truncate text-sm text-neutral-800">{company?.name ?? b.fairCompanyId}</p>
                       <input
-                        className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
+                        className="w-24 rounded-lg border border-neutral-200 px-2 py-1.5 text-xs"
                         placeholder="展位号" maxLength={20} value={b.boothNo ?? ''}
                         onChange={(e) => setDraft((d) => d ? {
                           ...d,

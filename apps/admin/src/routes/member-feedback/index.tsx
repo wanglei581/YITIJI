@@ -37,7 +37,7 @@ const STATUS_CLASS: Record<FeedbackStatus, string> = {
   pending: 'bg-amber-50 text-amber-600',
   processing: 'bg-blue-50 text-blue-600',
   replied: 'bg-emerald-50 text-emerald-600',
-  closed: 'bg-gray-100 text-gray-500',
+  closed: 'bg-neutral-100 text-neutral-500',
 }
 
 const CATEGORY_LABEL: Record<FeedbackCategory, string> = {
@@ -159,7 +159,7 @@ export default function MemberFeedbackPage() {
         <button
           type="button"
           onClick={() => void loadList()}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
         >
           <RefreshCwIcon className="h-4 w-4" />
           刷新
@@ -174,14 +174,14 @@ export default function MemberFeedbackPage() {
         <select
           value={status}
           onChange={(event) => setStatus(event.target.value as FeedbackStatus | 'all')}
-          className="h-10 rounded-lg border border-gray-200 px-3 text-sm"
+          className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
         >
           {STATUSES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
         <select
           value={category}
           onChange={(event) => setCategory(event.target.value as FeedbackCategory | 'all')}
-          className="h-10 rounded-lg border border-gray-200 px-3 text-sm"
+          className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
         >
           {CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
         </select>
@@ -194,8 +194,8 @@ export default function MemberFeedbackPage() {
       <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-900">反馈列表</p>
-            <p className="text-xs text-gray-400">{items.length} 条</p>
+            <p className="text-sm font-semibold text-neutral-900">反馈列表</p>
+            <p className="text-xs text-neutral-400">{items.length} 条</p>
           </div>
 
           {listState === 'loading' && <LoadingState className="py-20" />}
@@ -212,13 +212,13 @@ export default function MemberFeedbackPage() {
                   onClick={() => void loadDetail(item.id)}
                   className={[
                     'rounded-lg border p-3 text-left transition-colors',
-                    selectedId === item.id ? 'border-primary-200 bg-primary-50' : 'border-gray-100 hover:bg-gray-50',
+                    selectedId === item.id ? 'border-primary-200 bg-primary-50' : 'border-neutral-100 hover:bg-neutral-50',
                   ].join(' ')}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">{item.title ?? CATEGORY_LABEL[item.category]}</p>
-                      <p className="mt-1 text-xs text-gray-400">
+                      <p className="truncate text-sm font-semibold text-neutral-900">{item.title ?? CATEGORY_LABEL[item.category]}</p>
+                      <p className="mt-1 text-xs text-neutral-400">
                         {item.phoneMasked} · {item.nickname ?? '未设置昵称'} · {fmt(item.createdAt)}
                       </p>
                     </div>
@@ -226,7 +226,7 @@ export default function MemberFeedbackPage() {
                       {STATUS_LABEL[item.status]}
                     </span>
                   </div>
-                  <p className="mt-2 text-xs leading-relaxed text-gray-500">{brief(item.content)}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-neutral-500">{brief(item.content)}</p>
                 </button>
               ))}
             </div>
@@ -243,11 +243,11 @@ export default function MemberFeedbackPage() {
             <div>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-gray-900">{detail.title ?? CATEGORY_LABEL[detail.category]}</p>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="text-lg font-semibold text-neutral-900">{detail.title ?? CATEGORY_LABEL[detail.category]}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
                     {CATEGORY_LABEL[detail.category]} · 创建于 {fmt(detail.createdAt)} · 更新于 {fmt(detail.updatedAt)}
                   </p>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-neutral-500">
                     用户 {detail.phoneMasked} · 联系号码 {detail.contactPhoneMasked ?? '未填写'} · {detail.nickname ?? '未设置昵称'}
                   </p>
                 </div>
@@ -255,7 +255,7 @@ export default function MemberFeedbackPage() {
                   value={detail.status}
                   disabled={submitting}
                   onChange={(event) => void updateStatus(event.target.value as FeedbackStatus)}
-                  className="h-10 rounded-lg border border-gray-200 px-3 text-sm"
+                  className="h-10 rounded-lg border border-neutral-200 px-3 text-sm"
                 >
                   {STATUSES.filter((item) => item.value !== 'all').map((item) => (
                     <option key={item.value} value={item.value}>{item.label}</option>
@@ -263,23 +263,23 @@ export default function MemberFeedbackPage() {
                 </select>
               </div>
 
-              <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed text-gray-700">
+              <div className="mt-4 rounded-lg border border-neutral-100 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-700">
                 {detail.content}
               </div>
 
               <div className="mt-5">
-                <p className="mb-3 text-sm font-semibold text-gray-900">沟通记录</p>
+                <p className="mb-3 text-sm font-semibold text-neutral-900">沟通记录</p>
                 {detail.replies.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">暂无回复记录</div>
+                  <div className="rounded-lg border border-dashed border-neutral-200 py-8 text-center text-sm text-neutral-400">暂无回复记录</div>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {detail.replies.map((item) => (
-                      <div key={item.id} className="rounded-lg border border-gray-100 p-3">
+                      <div key={item.id} className="rounded-lg border border-neutral-100 p-3">
                         <div className="mb-1 flex items-center justify-between gap-3">
-                          <span className="text-xs font-semibold text-gray-600">{REPLY_SENDER_LABEL[item.senderType]}</span>
-                          <span className="text-xs text-gray-400">{fmt(item.createdAt)}</span>
+                          <span className="text-xs font-semibold text-neutral-600">{REPLY_SENDER_LABEL[item.senderType]}</span>
+                          <span className="text-xs text-neutral-400">{fmt(item.createdAt)}</span>
                         </div>
-                        <p className="text-sm leading-relaxed text-gray-700">{item.content}</p>
+                        <p className="text-sm leading-relaxed text-neutral-700">{item.content}</p>
                       </div>
                     ))}
                   </div>
@@ -287,19 +287,19 @@ export default function MemberFeedbackPage() {
               </div>
 
               <form onSubmit={(event) => void submitReply(event)} className="mt-5">
-                <label className="text-sm font-semibold text-gray-900">回复用户</label>
+                <label className="text-sm font-semibold text-neutral-900">回复用户</label>
                 <textarea
                   value={reply}
                   onChange={(event) => setReply(event.target.value)}
                   disabled={detail.status === 'closed' || submitting}
-                  className="mt-2 min-h-[120px] w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-500 disabled:bg-gray-50"
+                  className="mt-2 min-h-[120px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-500 disabled:bg-neutral-50"
                   maxLength={500}
                   placeholder="填写设备状态、文件处理、打印服务或系统维护说明"
                 />
                 <button
                   type="submit"
                   disabled={detail.status === 'closed' || submitting}
-                  className="mt-3 flex h-10 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-gray-300"
+                  className="mt-3 flex h-10 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-neutral-300"
                 >
                   <SendIcon className="h-4 w-4" />
                   {submitting ? '发送中…' : '发送回复'}

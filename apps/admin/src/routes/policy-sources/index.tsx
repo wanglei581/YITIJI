@@ -99,7 +99,7 @@ export default function PolicySourcesPage() {
     return (
       <Page title="政策信息源" subtitle="合作机构提交的政策扶持/公告内容审核与发布">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-neutral-400">加载中...</p>
         </div>
       </Page>
     )
@@ -109,8 +109,8 @@ export default function PolicySourcesPage() {
     return (
       <Page title="政策信息源" subtitle="合作机构提交的政策扶持/公告内容审核与发布">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <ScrollTextIcon className="h-10 w-10 text-gray-200" />
-          <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+          <ScrollTextIcon className="h-10 w-10 text-neutral-200" />
+          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
         </div>
       </Page>
     )
@@ -126,7 +126,7 @@ export default function PolicySourcesPage() {
               key={f}
               onClick={() => { setReviewFilter(f); setPage(1) }}
               className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               {f}
@@ -135,8 +135,8 @@ export default function PolicySourcesPage() {
           ))}
         </div>
         <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索标题、来源机构..." className="h-8 w-56 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索标题、来源机构..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-white pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
         </div>
       </div>
 
@@ -144,14 +144,14 @@ export default function PolicySourcesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['来源机构', '类型', '标题', '分组/标签', '展示日期', '提交时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={9}>
@@ -168,27 +168,27 @@ export default function PolicySourcesPage() {
                   const review  = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
                   const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-gray-700">{r.sourceName}</td>
+                    <tr key={r.id} className="hover:bg-neutral-50">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-700">{r.sourceName}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
                           {KIND_LABELS[r.kind] ?? r.kind}
                         </span>
                       </td>
                       <td className="max-w-80 px-4 py-3">
-                        <p className="font-medium text-gray-800">{r.title}</p>
-                        {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-gray-400">{r.summary}</p>}
+                        <p className="font-medium text-neutral-800">{r.title}</p>
+                        {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
                         {r.reviewStatus === 'rejected' && r.rejectReason && (
                           <p className="mt-0.5 text-xs text-red-500">拒绝原因:{r.rejectReason}</p>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         {r.kind === 'policy_guide'
                           ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—')
                           : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—')}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{r.publishedDate ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{r.syncTime.slice(0, 16).replace('T', ' ')}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{r.syncTime.slice(0, 16).replace('T', ' ')}</td>
                       <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
                       <td className="px-4 py-3">
@@ -208,7 +208,7 @@ export default function PolicySourcesPage() {
                             >
                               确认
                             </button>
-                            <button onClick={() => { setRejectingId(null); setRejectReason('') }} className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100">取消</button>
+                            <button onClick={() => { setRejectingId(null); setRejectReason('') }} className="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100">取消</button>
                           </div>
                         ) : (
                           <div className="flex gap-2">
@@ -245,7 +245,7 @@ export default function PolicySourcesPage() {
         <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-400">
         政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。审核通过并发布后在一体机「政策服务」页展示,所有操作记录审计日志。
       </p>
     </Page>

@@ -13,9 +13,9 @@ export function TerminalToolboxPanel({
   error: string
   onReload: () => void
 }) {
-  if (loading) return <p className="text-sm text-gray-400">加载中…</p>
-  if (error) return <Card className="p-6 text-center text-sm text-gray-500">{error}</Card>
-  if (terminals.length === 0) return <Card className="p-10 text-center text-sm text-gray-500">暂无终端</Card>
+  if (loading) return <p className="text-sm text-neutral-400">加载中…</p>
+  if (error) return <Card className="p-6 text-center text-sm text-neutral-500">{error}</Card>
+  if (terminals.length === 0) return <Card className="p-10 text-center text-sm text-neutral-500">暂无终端</Card>
 
   return (
     <div className="space-y-4">

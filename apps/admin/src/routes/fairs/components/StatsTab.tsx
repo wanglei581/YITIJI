@@ -18,30 +18,30 @@ export function StatsTab({ stats }: { stats: AdminFairStats | null }) {
             <div className={`w-fit rounded-lg p-2 ${accent}`}>
               <Icon className="h-4 w-4" />
             </div>
-            <p className="mt-3 text-xl font-bold text-gray-900">{value}</p>
-            <p className="mt-0.5 text-xs font-medium text-gray-500">{label}</p>
-            <p className="mt-0.5 text-xs text-gray-400">{note}</p>
+            <p className="mt-3 text-xl font-bold text-neutral-900">{value}</p>
+            <p className="mt-0.5 text-xs font-medium text-neutral-500">{label}</p>
+            <p className="mt-0.5 text-xs text-neutral-400">{note}</p>
           </Card>
         ))}
       </div>
 
       <Card className="p-4">
-        <p className="mb-2 text-sm font-medium text-gray-700">来源同步快照(仅供参考,非本系统统计)</p>
+        <p className="mb-2 text-sm font-medium text-neutral-700">来源同步快照(仅供参考,非本系统统计)</p>
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg bg-gray-50 p-3 text-center">
-            <p className="text-lg font-bold text-gray-800">{stats.snapshot.companyCount}</p>
-            <p className="text-xs text-gray-500">来源标称企业数</p>
+          <div className="rounded-lg bg-neutral-50 p-3 text-center">
+            <p className="text-lg font-bold text-neutral-800">{stats.snapshot.companyCount}</p>
+            <p className="text-xs text-neutral-500">来源标称企业数</p>
           </div>
-          <div className="rounded-lg bg-gray-50 p-3 text-center">
-            <p className="text-lg font-bold text-gray-800">{stats.snapshot.jobCount}</p>
-            <p className="text-xs text-gray-500">来源标称岗位数</p>
+          <div className="rounded-lg bg-neutral-50 p-3 text-center">
+            <p className="text-lg font-bold text-neutral-800">{stats.snapshot.jobCount}</p>
+            <p className="text-xs text-neutral-500">来源标称岗位数</p>
           </div>
-          <div className="rounded-lg bg-gray-50 p-3 text-center">
-            <p className="text-lg font-bold text-gray-800">{stats.snapshot.viewCount}</p>
-            <p className="text-xs text-gray-500">终端浏览次数</p>
+          <div className="rounded-lg bg-neutral-50 p-3 text-center">
+            <p className="text-lg font-bold text-neutral-800">{stats.snapshot.viewCount}</p>
+            <p className="text-xs text-neutral-500">终端浏览次数</p>
           </div>
         </div>
-        <p className="mt-3 text-xs text-gray-400">
+        <p className="mt-3 text-xs text-neutral-400">
           系统仅统计服务行为(录入 / 浏览 / 打印),不记录求职者个人信息,不参与招聘闭环。现场签到 / 展位入驻未建数据模型,此处不展示估算数据。
         </p>
       </Card>

@@ -115,7 +115,7 @@ export default function AuditPage() {
       actions={
         <button
           onClick={load}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
         >
           <RefreshCwIcon className="h-3.5 w-3.5" />刷新
         </button>
@@ -123,38 +123,38 @@ export default function AuditPage() {
     >
       {/* 筛选栏 */}
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs text-gray-500">
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
           动作
           <select
             value={action}
             onChange={(e) => { setAction(e.target.value); setPage(1) }}
-            className="h-9 w-44 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-44 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           >
             {ACTION_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-500">
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
           起始时间
           <input
             type="datetime-local"
             value={startAt}
             onChange={(e) => { setStartAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-500">
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
           结束时间
           <input
             type="datetime-local"
             value={endAt}
             onChange={(e) => { setEndAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
         {(action || startAt || endAt) && (
           <button
             onClick={resetFilters}
-            className="h-9 rounded-lg px-3 text-xs font-medium text-gray-500 hover:bg-gray-100"
+            className="h-9 rounded-lg px-3 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
           >
             清除筛选
           </button>
@@ -164,22 +164,22 @@ export default function AuditPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {COLUMNS.map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {loading ? (
                 [0, 1, 2, 3, 4, 5].map((i) => (
                   <tr key={i}>
                     {COLUMNS.map((_, j) => (
                       <td key={j} className="px-4 py-4">
-                        <div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" />
+                        <div className="h-3 w-3/4 animate-pulse rounded bg-neutral-100" />
                       </td>
                     ))}
                   </tr>
@@ -188,7 +188,7 @@ export default function AuditPage() {
                 <tr>
                   <td colSpan={COLUMNS.length}>
                     <div className="flex flex-col items-center gap-3 py-12">
-                      <p className="text-sm text-gray-400">日志加载失败,请稍后重试</p>
+                      <p className="text-sm text-neutral-400">日志加载失败,请稍后重试</p>
                       <button onClick={load} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">
                         重试
                       </button>
@@ -208,27 +208,27 @@ export default function AuditPage() {
                 </tr>
               ) : (
                 items.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">
+                  <tr key={r.id} className="hover:bg-neutral-50">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
                       {new Date(r.createdAt).toLocaleString('zh-CN')}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700">
-                      {r.actorId ?? <span className="text-gray-300">—</span>}
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">
+                      {r.actorId ?? <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={ROLE_BADGE[r.actorRole] ?? 'default'} label={ROLE_LABEL[r.actorRole] ?? r.actorRole} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-700">
                       {ACTION_LABELS[r.action] ?? r.action}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">
-                      <span className="text-gray-400">{r.targetType}</span>
-                      {r.targetId && <span className="ml-1 font-mono text-gray-500">#{r.targetId}</span>}
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
+                      <span className="text-neutral-400">{r.targetType}</span>
+                      {r.targetId && <span className="ml-1 font-mono text-neutral-500">#{r.targetId}</span>}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">
-                      {r.ipAddress ?? <span className="text-gray-300">—</span>}
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">
+                      {r.ipAddress ?? <span className="text-neutral-300">—</span>}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">
                       {r.requestId ?? '—'}
                     </td>
                   </tr>

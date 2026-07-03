@@ -77,20 +77,20 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
 
   return (
     <Card className="space-y-4 p-4">
-      <p className="text-sm font-medium text-gray-700">关联岗位（{detail.linkedJobs.length}）</p>
+      <p className="text-sm font-medium text-neutral-700">关联岗位（{detail.linkedJobs.length}）</p>
       <InlineError message={error} />
       <InlineSuccess message={success} />
 
       {/* 已关联岗位 */}
       {detail.linkedJobs.length === 0 ? (
-        <p className="rounded-lg bg-gray-50 px-3 py-3 text-center text-xs text-gray-400">暂无关联岗位，可在下方搜索同来源机构的已发布岗位进行关联</p>
+        <p className="rounded-lg bg-neutral-50 px-3 py-3 text-center text-xs text-neutral-400">暂无关联岗位，可在下方搜索同来源机构的已发布岗位进行关联</p>
       ) : (
-        <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+        <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-100">
           {detail.linkedJobs.map((j) => (
             <li key={j.id} className="flex items-center gap-2 px-3 py-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-800">{j.title}</p>
-                <p className="text-xs text-gray-400">
+                <p className="truncate text-sm font-medium text-neutral-800">{j.title}</p>
+                <p className="text-xs text-neutral-400">
                   {j.city || '—'} · {j.category ? JOB_CATEGORY_LABELS[j.category] ?? j.category : '—'}
                 </p>
               </div>
@@ -102,8 +102,8 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
       )}
 
       {/* 可关联岗位搜索 */}
-      <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/60 p-3">
-        <p className="text-xs font-medium text-gray-600">添加关联（仅同来源机构、已审核发布的岗位可关联）</p>
+      <div className="space-y-2 rounded-lg border border-neutral-100 bg-neutral-50/60 p-3">
+        <p className="text-xs font-medium text-neutral-600">添加关联（仅同来源机构、已审核发布的岗位可关联）</p>
         <div className="flex gap-2">
           <input
             className={inputCls}
@@ -114,7 +114,7 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
           />
           <button
             onClick={() => void search(keyword)}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
           >
             <SearchIcon className="h-4 w-4" />
             搜索
@@ -123,23 +123,23 @@ export function LinkedJobsSection({ detail, onMutated }: { detail: AdminCompanyD
         {searchState === 'loading' && <LoadingState className="py-6" />}
         {searchState === 'error' && <ErrorState className="py-6" onRetry={() => void search(keyword)} />}
         {searchState === 'ready' && linkable.length === 0 && (
-          <p className="py-4 text-center text-xs text-gray-400">没有可关联的岗位</p>
+          <p className="py-4 text-center text-xs text-neutral-400">没有可关联的岗位</p>
         )}
         {searchState === 'ready' && linkable.length > 0 && (
           <>
-            <ul className="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-lg border border-gray-100 bg-white">
+            <ul className="max-h-56 divide-y divide-neutral-100 overflow-y-auto rounded-lg border border-neutral-100 bg-white">
               {linkable.map((j) => (
                 <li key={j.id}>
-                  <label className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-50">
+                  <label className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-neutral-50">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300"
+                      className="h-4 w-4 rounded border-neutral-300"
                       checked={selected.has(j.id)}
                       onChange={() => toggle(j.id)}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-gray-800">{j.title}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="truncate text-sm text-neutral-800">{j.title}</p>
+                      <p className="text-xs text-neutral-400">
                         {j.city || '—'} · {j.category ? JOB_CATEGORY_LABELS[j.category] ?? j.category : '—'}
                         {j.companyProfileId ? ' · 已关联其他企业，关联后将转移' : ''}
                       </p>
