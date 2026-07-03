@@ -126,7 +126,6 @@ export const aiMockAdapter = {
     }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async adjustResumeLayoutDraft(
     _taskId: string,
     resume: GeneratedResume,
@@ -134,6 +133,8 @@ export const aiMockAdapter = {
     _layout: ResumeLayoutSettings,
     _access?: ResumeReadAccess,
   ): Promise<ResumeLayoutAdjustResponse> {
+    void _layout
+    void _access
     await delay(300)
     const trimSentence = (value: string | undefined, max = 72) => {
       const text = (value ?? '').trim()
@@ -246,7 +247,6 @@ export const aiMockAdapter = {
     return { taskId: _taskId, status: 'failed', providerName: 'mock', failReason: 'mock 模式不保存生成记录,请重新生成' }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async exportGeneratedResume(
     resume: GeneratedResume,
     _taskId?: string,
@@ -254,6 +254,7 @@ export const aiMockAdapter = {
     format?: ResumeExportFormat,
     _layout?: ResumeLayoutSettings,
   ): Promise<ResumeGenerateExportResponse> {
+    void _layout
     // mock 模式无后端,不构造假文件;返回空 signedUrl,页面会诚实提示
     await delay(400)
     const ext = format ?? 'pdf'
