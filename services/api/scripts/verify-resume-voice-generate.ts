@@ -9,6 +9,8 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { BadRequestException } from '@nestjs/common'
+import { AiController } from '../src/ai/ai.controller'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exitCode = 1; throw new Error(m) }
@@ -56,7 +58,10 @@ for (const needle of ['AUDIO_MISSING', 'ASR_FAILED', 'ASR_NOT_CONFIGURED']) {
 if (!controllerSrc.includes('语音转写失败，请改用文字输入')) {
   fail('3. ASR 失败必须提示改用文字输入')
 }
-pass('3. ASR 缺失/失败错误码与文字兜底文案存在')
+if (!controllerSrc.includes('INVALID_AUDIO_FORMAT')) {
+  fail('3. 非 WAV 音频必须被前置拒绝')
+}
+pass('3. ASR 缺失/失败/格式错误码与文字兜底文案存在')
 
 const endpointMatch = controllerSrc.match(/async transcribeResumeVoice[\s\S]*?\n  \}/)
 if (!endpointMatch) fail('4. 未找到 transcribeResumeVoice 方法体')
@@ -68,6 +73,9 @@ for (const forbidden of ['FileObject', 'files.upload', 'upload(', 'signedUrl', '
 }
 if (!endpointBody.includes('this.asr.recognizeWav(audio.buffer)')) {
   fail('4. transcribeResumeVoice 必须只把内存 buffer 交给 AsrService')
+}
+if (endpointBody.includes('ApiResponse.ok(')) {
+  fail('4. transcribeResumeVoice 成功响应必须返回裸 DTO,不得包 ApiResponse 信封')
 }
 pass('4. 转写端点不写 FileObject/COS/signedUrl,只转发内存 buffer')
 
@@ -84,4 +92,33 @@ if (!asrSrc.includes('chars: result.text.length') || !asrSrc.includes('bytes: bu
 }
 pass('5. ASR 日志只记录元数据,不记录转写正文')
 
-console.log('\n=== ALL PASS: Wave 4 简历语音生成门禁 ===')
+async function verifyRuntimeShape() {
+  const wav = Buffer.from('RIFF0000WAVEfmt ')
+  const fakeAsr = {
+    activeProviderName: 'unit-asr',
+    recognizeWav: async () => ({ ok: true, text: '真实转写文本' }),
+  }
+  const controller = new AiController({} as never, {} as never, {} as never, {} as never, {} as never, fakeAsr as never)
+  const ok = await controller.transcribeResumeVoice({ buffer: wav } as Express.Multer.File)
+  if (ok.text !== '真实转写文本' || ok.providerName !== 'unit-asr') {
+    fail('6a. transcribeResumeVoice 成功路径未返回裸 text/providerName DTO')
+  }
+  if ('success' in ok || 'data' in ok) {
+    fail('6b. transcribeResumeVoice 成功路径不得返回 ApiResponse success/data 信封')
+  }
+
+  try {
+    await controller.transcribeResumeVoice({ buffer: Buffer.from('NOPE') } as Express.Multer.File)
+    fail('6c. 非 WAV buffer 必须抛 INVALID_AUDIO_FORMAT')
+  } catch (err) {
+    const response = err instanceof BadRequestException ? err.getResponse() : null
+    if (!JSON.stringify(response).includes('INVALID_AUDIO_FORMAT')) {
+      fail('6c. 非 WAV buffer 未返回 INVALID_AUDIO_FORMAT')
+    }
+  }
+  pass('6. 运行时成功响应为裸 DTO,坏 WAV 被前置拒绝')
+}
+
+void verifyRuntimeShape()
+  .then(() => console.log('\n=== ALL PASS: Wave 4 简历语音生成门禁 ==='))
+  .catch((err) => fail(err instanceof Error ? err.message : '6. 运行时断言失败'))

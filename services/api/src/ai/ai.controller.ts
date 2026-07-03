@@ -2,7 +2,6 @@ import { BadRequestException, Controller, Post, Get, Param, Body, Query, Req, Up
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
-import { ApiResponse } from '../common/dto/api-response.dto'
 import { AsrService } from '../asr/asr.service'
 import { AiService } from './ai.service'
 import type { AiResultRequester } from './ai.service'
@@ -14,7 +13,7 @@ import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
 import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
-import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES } from './dto/resume-voice.dto'
+import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES, type ResumeVoiceTranscribeResponseDto } from './dto/resume-voice.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
 import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
@@ -67,6 +66,12 @@ function hasTargetContext(dto: ResumeParseRequestDto): boolean {
   const target = dto.targetContext
   if (!target || target.skipped) return false
   return Boolean(target.industry || target.targetJob || target.experience || target.scene)
+}
+
+function isWavBuffer(buffer: Buffer): boolean {
+  return buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WAVE'
 }
 
 // ============================================================
@@ -272,9 +277,12 @@ export class AiController {
   @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES } }))
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
-  ) {
+  ): Promise<ResumeVoiceTranscribeResponseDto> {
     if (!audio?.buffer?.length) {
       throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
+    }
+    if (!isWavBuffer(audio.buffer)) {
+      throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
     }
     const result = await this.asr.recognizeWav(audio.buffer)
     if (!result.ok) {
@@ -285,7 +293,11 @@ export class AiController {
         },
       })
     }
-    return ApiResponse.ok({ text: result.text, providerName: this.asr.activeProviderName })
+    const text = result.text?.trim()
+    if (!text) {
+      throw new BadRequestException({ error: { code: 'ASR_FAILED', message: '没有识别到有效文字，请改用文字输入' } })
+    }
+    return { text, providerName: this.asr.activeProviderName }
   }
 
   /**

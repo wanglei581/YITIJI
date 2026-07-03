@@ -18,14 +18,21 @@ export interface WavRecorder {
 export async function startWavRecorder(): Promise<WavRecorder> {
   // 权限请求超时保护:一体机权限框无人响应/被系统静默挂起时,10s 后明确失败,
   // 由调用方回退文字输入(不让界面卡在等待态)。
+  let timedOut = false
+  let timeoutId: number | null = null
+  const getUserMedia = navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+  }).then((lateStream) => {
+    if (timedOut) lateStream.getTracks().forEach((track) => track.stop())
+    return lateStream
+  })
   const stream = await Promise.race([
-    navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
-    }),
+    getUserMedia,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('MIC_PERMISSION_TIMEOUT')), 10_000),
+      { timeoutId = window.setTimeout(() => { timedOut = true; reject(new Error('MIC_PERMISSION_TIMEOUT')) }, 10_000) },
     ),
   ])
+  if (timeoutId !== null) window.clearTimeout(timeoutId)
   const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
   const ctx = new AudioCtx()
   const source = ctx.createMediaStreamSource(stream)
