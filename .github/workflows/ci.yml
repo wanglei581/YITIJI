@@ -139,6 +139,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:smart-campus-ui
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          pnpm --filter @ai-job-print/api verify:deploy-data-safety-gate
           pnpm --filter @ai-job-print/api verify:production-real-services
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
           pnpm --filter @ai-job-print/api verify:partner-excel-template
@@ -147,6 +148,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:order
+          pnpm --filter @ai-job-print/api verify:pricing
+          pnpm --filter @ai-job-print/api verify:member-print-orders
+          pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
@@ -266,5 +270,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:order
+          pnpm --filter @ai-job-print/api verify:pricing
+          pnpm --filter @ai-job-print/api verify:member-print-orders
+          pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs

@@ -129,6 +129,16 @@ model Order {
   refundReason String?
   refundedAt   DateTime?
 
+  // ── P0a 支付域底座（无 live 网关）─────────────────────────────
+  // paymentSource: offline | free | manual_confirmed（payStatus=paid 时必填）；
+  // wechat/alipay/benefit 为未来扩展，本批禁写。诚实标注：线下/免费/人工确认，绝不表示线上已收款。
+  paymentSource     String?
+  paidAt            DateTime?
+  paidBy            String? // 'self' | 操作员标识（manual 时记录）
+  pickupCode        String?   @unique // 取件凭证码，paid 时生成
+  billablePages     Int? // 后端识别的计费页数（绝不信任前端 file.pages）
+  billingPageSource String? // 'pdf_lightweight_scan' | 'image_single_page'
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -138,6 +148,22 @@ model Order {
   @@index([endUserId])
   @@index([terminalId])
   @@index([createdAt])
+}
+
+/// 服务端价目 SSOT（P0a 支付域）。首批仅开发默认价 seed，不对外宣称最终定价；
+/// Admin 价格 CRUD 与正式定价另批。金额整数「分」，绝不用浮点。
+model PriceConfig {
+  id            String   @id @default(cuid())
+  serviceKey    String   @unique // print_bw_page / print_color_page / print_duplex_surcharge / ...
+  unitCents     Int // 单价（分），>= 0
+  unit          String // 'page' | 'copy' | 'item'
+  active        Boolean  @default(true)
+  effectiveFrom DateTime @default(now())
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([active])
 }
 
 // ── Organization ──────────────────────────────────────────────────────────────

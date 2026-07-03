@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
@@ -679,10 +680,6 @@ function readStringParam(params: Record<string, unknown> | undefined, key: strin
   return typeof value === 'string' ? value : undefined
 }
 
-function isSinglePageImage(mimeType: string): boolean {
-  return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp'
-}
-
 function readImageDimensions(buffer: Buffer, mimeType: string): { widthPx: number; heightPx: number } | null {
   if (mimeType === 'image/png') return readPngDimensions(buffer)
   if (mimeType === 'image/jpeg') return readJpegDimensions(buffer)
@@ -732,13 +729,6 @@ function estimateA4Dpi(widthPx: number, heightPx: number): number {
   const portraitDpi = Math.min(widthPx / 8.27, heightPx / 11.69)
   const landscapeDpi = Math.min(widthPx / 11.69, heightPx / 8.27)
   return Math.max(1, Math.round(Math.max(portraitDpi, landscapeDpi)))
-}
-
-function countPdfPages(buffer: Buffer): number | null {
-  const text = buffer.toString('latin1')
-  const matches = text.match(/\/Type\s*\/Page\b/g)
-  if (!matches?.length) return null
-  return matches.length
 }
 
 function limitSnippet(value: string): string {
