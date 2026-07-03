@@ -551,23 +551,44 @@ export interface JobMasterSalaryRef {
 }
 
 /** 适配度分析:三档参考等级 + 可解释命中/差距清单。 */
+/** 关键词覆盖(M1.5):只展示命中/缺失状态,绝不算百分比/匹配率。matched 必须出自简历原文。 */
+export interface JobMasterKeywordCoverage {
+  matched: string[]
+  missing: string[]
+}
+
+/** 面试追问预判(M1.5):练习准备用,不承诺通过率。 */
+export interface JobMasterInterviewPrepItem {
+  question: string
+  whyAsked: string
+  prepHint: string
+}
+
+/** 针对该岗位的简历改写要点(M1.5):只谈表达,不诱导编造。 */
+export interface JobMasterResumeRewriteItem {
+  area: string
+  suggestion: string
+}
+
 export interface JobMasterFit {
   level: JobMasterFitLevel
   summary: string
   /** 已具备项:evidence 出自简历原文(服务端校验) */
   matchedSkills: Array<{ skill: string; evidence: string }>
-  /** 建议补足项:suggestion 只谈准备方向,不编造经历 */
-  gapSkills: Array<{ skill: string; suggestion: string }>
+  /** 建议补足项:suggestion 只谈准备方向,不编造经历;M1.5 可选 learningDirection(方向,不带货)+ firstStep(第一步) */
+  gapSkills: Array<{ skill: string; suggestion: string; learningDirection?: string; firstStep?: string }>
+  /** M1.5:岗位要求关键词命中/缺失(可选) */
+  keywordCoverage?: JobMasterKeywordCoverage
 }
 
 /** 晋升路径模拟:锚定所选岗位的三节点纵向结构(当前 → 1-3年 → 3-5年)。 */
 export interface JobMasterCareerPath {
   /** 当前定位(基于简历,evidence 出自原文) */
   current: { title: string; evidence: string }
-  /** 1-3 年进阶方向 + 待补技能 + 第一步行动 */
-  next: { title: string; skillsToBuild: string[]; firstStep: string }
-  /** 3-5 年目标方向 + 待补技能 */
-  target: { title: string; skillsToBuild: string[] }
+  /** 1-3 年进阶方向 + 待补技能 + 第一步行动;M1.5 可选 rationale(依据) */
+  next: { title: string; skillsToBuild: string[]; firstStep: string; rationale?: string }
+  /** 3-5 年目标方向 + 待补技能;M1.5 可选 rationale(依据)+ firstStep(行动) */
+  target: { title: string; skillsToBuild: string[]; rationale?: string; firstStep?: string }
 }
 
 /** 职业风险标注(M1 基础版:硬门槛风险 / 信息完整度风险)。 */
@@ -590,6 +611,10 @@ export interface JobMasterResponse {
   fit?: JobMasterFit
   careerPath?: JobMasterCareerPath
   risks?: JobMasterRiskItem[]
+  /** M1.5:面试追问预判(可选) */
+  interviewPrep?: JobMasterInterviewPrepItem[]
+  /** M1.5:针对该岗位的简历改写要点(可选) */
+  resumeRewrite?: JobMasterResumeRewriteItem[]
   providerName?: string
 }
 
