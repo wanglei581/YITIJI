@@ -10,6 +10,8 @@ import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
+import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
+import type { AdminMarkPaidDto, AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
@@ -544,6 +546,64 @@ async function main(): Promise<void> {
         item['paymentSource'] === null &&
         (item['payStatus'] === 'unpaid' || item['payStatus'] === 'paid')
       return hasHonestFields
+    })
+
+    // (8) Admin 订单动作 controller（Task 7）：offline/manual_confirmed 可 mark-paid；拒绝 free/wechat/alipay/benefit；
+    //     refund 需 reason；paid→refunded 成功；拒绝 unpaid→refunded；审计写入。状态机复用 OrderStatusService（不重写）。
+    await p0aGuard('AdminOrderActionsController: offline mark-paid + reject free/forbidden + refund reason + paid→refunded + reject unpaid-refund + audited', async () => {
+      const adminCtl = new AdminOrderActionsController(orderStatus)
+      const adminUser = { userId: 'admin-verify', role: 'admin' as const, orgId: null }
+
+      const printA = await printJobs.create({ fileUrl: await seedPdfFixture('adminA', 2), fileMd5: 'sha256-adminA', fileName: 'adminA.pdf', params: PRINT_PARAMS }, { endUserId: null, terminalId })
+      const printB = await printJobs.create({ fileUrl: await seedPdfFixture('adminB', 2), fileMd5: 'sha256-adminB', fileName: 'adminB.pdf', params: PRINT_PARAMS }, { endUserId: null, terminalId })
+      taskIds.push(printA.taskId, printB.taskId)
+      const ordA = await prisma.order.findUnique({ where: { printTaskId: printA.taskId } })
+      const ordB = await prisma.order.findUnique({ where: { printTaskId: printB.taskId } })
+      if (!ordA || !ordB) return false
+
+      // Admin 端点拒绝 free / wechat / alipay / benefit（controller 防御纵深）。
+      let rejectsBadSource = true
+      for (const bad of ['free', 'wechat', 'alipay', 'benefit']) {
+        try {
+          await adminCtl.markPaid(ordA.id, { paymentSource: bad } as unknown as AdminMarkPaidDto, adminUser)
+          rejectsBadSource = false
+        } catch { /* expected */ }
+      }
+
+      const auditBefore = await prisma.auditLog.count({ where: { targetId: ordA.id } })
+      const paid = await adminCtl.markPaid(ordA.id, { paymentSource: 'offline' }, adminUser)
+      const idem = await adminCtl.markPaid(ordA.id, { paymentSource: 'offline' }, adminUser)
+      const auditAfterPaid = await prisma.auditLog.count({ where: { targetId: ordA.id } })
+
+      let rejectsNoReason = false
+      try {
+        await adminCtl.refund(ordA.id, { refundReason: '' } as unknown as AdminRefundDto, adminUser)
+      } catch { rejectsNoReason = true }
+
+      const refunded = await adminCtl.refund(ordA.id, { refundReason: '管理员测试退款' }, adminUser)
+      const auditAfterRefund = await prisma.auditLog.count({ where: { targetId: ordA.id } })
+
+      let rejectsUnpaidRefund = false
+      try {
+        await adminCtl.refund(ordB.id, { refundReason: 'x' }, adminUser)
+      } catch { rejectsUnpaidRefund = true }
+
+      return (
+        rejectsBadSource &&
+        paid.payStatus === 'paid' &&
+        paid.paymentSource === 'offline' &&
+        typeof paid.pickupCode === 'string' &&
+        (paid.pickupCode?.length ?? 0) >= 8 &&
+        idem.payStatus === 'paid' &&
+        idem.pickupCode === paid.pickupCode &&
+        auditAfterPaid - auditBefore === 1 && // 幂等：mark-paid 只写 1 条审计
+        rejectsNoReason &&
+        refunded.payStatus === 'refunded' &&
+        refunded.refundReason === '管理员测试退款' &&
+        !!refunded.refundedAt &&
+        auditAfterRefund - auditAfterPaid === 1 && // refund 写 1 条审计
+        rejectsUnpaidRefund
+      )
     })
 
     if (p0aFailures > 0) {
