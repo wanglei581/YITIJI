@@ -62,14 +62,17 @@ export interface JobMasterPayload {
     level: (typeof FIT_LEVELS)[number]
     summary: string
     matchedSkills: Array<{ skill: string; evidence: string }>
-    gapSkills: Array<{ skill: string; suggestion: string }>
+    gapSkills: Array<{ skill: string; suggestion: string; learningDirection?: string; firstStep?: string }>
+    keywordCoverage?: { matched: string[]; missing: string[] }
   }
   careerPath: {
     current: { title: string; evidence: string }
-    next: { title: string; skillsToBuild: string[]; firstStep: string }
-    target: { title: string; skillsToBuild: string[] }
+    next: { title: string; skillsToBuild: string[]; firstStep: string; rationale?: string }
+    target: { title: string; skillsToBuild: string[]; rationale?: string; firstStep?: string }
   }
   risks: Array<{ level: (typeof RISK_LEVELS)[number]; title: string; reason: string; basis: string }>
+  interviewPrep?: Array<{ question: string; whyAsked: string; prepHint: string }>
+  resumeRewrite?: Array<{ area: string; suggestion: string }>
 }
 
 /** 归一化（与 2B/2D 一致）：去空白与常见标点后做子串匹配。 */
@@ -121,14 +124,21 @@ export class LlmJobMasterService {
       '只做可解释判断，绝不输出「自动化替代概率N%」「离职概率」等强预测数字；岗位关键信息缺失时提示到来源平台核实。' +
       '\n6. 不承诺薪资数字、Offer、通过率；不出现「一键投递/立即投递/平台投递」等表述。' +
       '\n7. 不得出现自相矛盾判断（如「大专但符合本科要求」）；学历/年限不符合时直接说明差距。' +
+      '\n8. fit.gapSkills 每条可加 learningDirection（学习/补强方向，只谈方向，不点名任何具体机构、课程、品牌）与 firstStep（可执行的第一步，不虚构经历）。' +
+      '\n9. fit.keywordCoverage：matched=岗位要求关键词且在简历原文出现的；missing=岗位要求出现但简历没有的；只列词，绝不算任何百分比/匹配率。' +
+      '\n10. interviewPrep（0-4 条）：该岗位可能被追问的点，question+whyAsked（为什么问）+prepHint（准备提示）；只做练习准备，不承诺通过、不出现「保过/通过率」。' +
+      '\n11. resumeRewrite（0-5 条）：针对该岗位的简历表达改写，area（简历哪块）+suggestion（怎么改）；只谈表达，不诱导删除/替换/包装真实经历。' +
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"fit":{"level":"reference_high|reference_medium|reference_low","summary":"2-3 句总评（说明这是参考）",' +
       '"matchedSkills":[{"skill":"匹配技能/经验","evidence":"简历原文摘录(≤60字)"}](1-5 条),' +
-      '"gapSkills":[{"skill":"建议补足项","suggestion":"准备方向"}](0-4 条)},' +
+      '"gapSkills":[{"skill":"建议补足项","suggestion":"准备方向","learningDirection":"学习/补强方向(不点名机构课程)","firstStep":"第一步行动"}](0-4 条),' +
+      '"keywordCoverage":{"matched":["岗位要求且简历原文出现的关键词"],"missing":["岗位要求但简历没有的关键词"]}},' +
       '"careerPath":{"current":{"title":"当前定位","evidence":"简历原文摘录(≤60字)"},' +
-      '"next":{"title":"1-3年进阶方向","skillsToBuild":["待补技能"],"firstStep":"第一步行动"},' +
-      '"target":{"title":"3-5年目标方向","skillsToBuild":["待补技能"]}},' +
-      '"risks":[{"level":"low|medium|high","title":"风险类别","reason":"原因","basis":"依据出处"}](0-4 条)}'
+      '"next":{"title":"1-3年进阶方向","skillsToBuild":["待补技能"],"firstStep":"第一步行动","rationale":"为什么这样走(基于现状)"},' +
+      '"target":{"title":"3-5年目标方向","skillsToBuild":["待补技能"],"rationale":"依据","firstStep":"行动"}},' +
+      '"risks":[{"level":"low|medium|high","title":"风险类别","reason":"原因","basis":"依据出处"}](0-4 条),' +
+      '"interviewPrep":[{"question":"可能被追问的问题","whyAsked":"为什么问","prepHint":"准备提示"}](0-4 条),' +
+      '"resumeRewrite":[{"area":"简历哪块","suggestion":"针对该岗位怎么改"}](0-5 条)}'
 
     const jobText =
       `岗位：${job.title}${job.company ? `（${job.company}）` : ''}\n` +
@@ -163,17 +173,27 @@ export class LlmJobMasterService {
     })
   }
 
-  /** 建议级安全过滤：gapSkills.suggestion / careerPath.next.firstStep 命中高风险表达 → 安全兜底。 */
+  /**
+   * 建议级安全过滤（不触发重试）：诱导编造 / 无依据示例数字 → 安全兜底。
+   * 覆盖 gapSkills 的 suggestion/learningDirection/firstStep、careerPath.next.firstStep、resumeRewrite.suggestion。
+   */
   private sanitizeAdvice(p: JobMasterPayload): JobMasterPayload {
     let filtered = 0
-    const gapSkills = p.fit.gapSkills.map((g) =>
-      isRiskyAdvice(g.suggestion) ? (filtered += 1, { ...g, suggestion: SAFE_FALLBACK }) : g,
-    )
+    const gapSkills = p.fit.gapSkills.map((g) => {
+      let item = g
+      if (isRiskyAdvice(item.suggestion)) { filtered += 1; item = { ...item, suggestion: SAFE_FALLBACK } }
+      if (item.learningDirection && isRiskyAdvice(item.learningDirection)) { filtered += 1; item = { ...item, learningDirection: SAFE_FALLBACK } }
+      if (item.firstStep && isRiskyAdvice(item.firstStep)) { filtered += 1; item = { ...item, firstStep: SAFE_FALLBACK } }
+      return item
+    })
     const next = isRiskyAdvice(p.careerPath.next.firstStep)
       ? (filtered += 1, { ...p.careerPath.next, firstStep: SAFE_FALLBACK })
       : p.careerPath.next
+    const resumeRewrite = p.resumeRewrite?.map((it) =>
+      isRiskyAdvice(it.suggestion) ? (filtered += 1, { ...it, suggestion: SAFE_FALLBACK }) : it,
+    )
     if (filtered > 0) this.logger.warn(`jobmaster.advice_filtered count=${filtered}`)
-    return { ...p, fit: { ...p.fit, gapSkills }, careerPath: { ...p.careerPath, next } }
+    return { ...p, fit: { ...p.fit, gapSkills }, careerPath: { ...p.careerPath, next }, ...(resumeRewrite ? { resumeRewrite } : {}) }
   }
 
   private validate(p: unknown, resumeText: string): JobMasterPayload | null {
@@ -204,9 +224,20 @@ export class LlmJobMasterService {
 
     const gapSkills = (Array.isArray(fitRaw['gapSkills']) ? fitRaw['gapSkills'] : [])
       .map((g) => (g && typeof g === 'object' ? (g as Record<string, unknown>) : {}))
-      .map((g) => ({ skill: cleanStr(g['skill'], 200), suggestion: cleanStr(g['suggestion'], 300) }))
+      .map((g) => {
+        const item: JobMasterPayload['fit']['gapSkills'][number] = { skill: cleanStr(g['skill'], 200), suggestion: cleanStr(g['suggestion'], 300) }
+        const ld = cleanStr(g['learningDirection'], 200); if (ld) item.learningDirection = ld
+        const fs = cleanStr(g['firstStep'], 200); if (fs) item.firstStep = fs
+        return item
+      })
       .filter((g) => g.skill.length > 0 && g.suggestion.length > 0)
       .slice(0, 4)
+
+    // ── 关键词覆盖（M1.5）：matched 必须出自简历原文（防编造）；missing 保留 ──
+    const kcRaw = (fitRaw['keywordCoverage'] ?? {}) as Record<string, unknown>
+    const kcMatched = cleanStrArray(kcRaw['matched'], 40, 12).filter((w) => evidenceInResume(w))
+    const kcMissing = cleanStrArray(kcRaw['missing'], 40, 12).filter((w) => !kcMatched.includes(w))
+    const keywordCoverage = (kcMatched.length || kcMissing.length) ? { matched: kcMatched, missing: kcMissing } : undefined
 
     // ── 晋升路径三节点 ──
     const curRaw = (pathRaw['current'] ?? {}) as Record<string, unknown>
@@ -214,12 +245,15 @@ export class LlmJobMasterService {
     const tgtRaw = (pathRaw['target'] ?? {}) as Record<string, unknown>
     const current = { title: cleanStr(curRaw['title'], 60), evidence: cleanStr(curRaw['evidence'], 120) }
     if (!current.title || !current.evidence || !evidenceInResume(current.evidence)) return null // current 必有真实依据
-    const next = {
+    const next: JobMasterPayload['careerPath']['next'] = {
       title: cleanStr(nextRaw['title'], 60),
       skillsToBuild: cleanStrArray(nextRaw['skillsToBuild'], 60, 3),
       firstStep: cleanStr(nextRaw['firstStep'], 300),
     }
-    const target = { title: cleanStr(tgtRaw['title'], 60), skillsToBuild: cleanStrArray(tgtRaw['skillsToBuild'], 60, 3) }
+    const nextRationale = cleanStr(nextRaw['rationale'], 300); if (nextRationale) next.rationale = nextRationale
+    const target: JobMasterPayload['careerPath']['target'] = { title: cleanStr(tgtRaw['title'], 60), skillsToBuild: cleanStrArray(tgtRaw['skillsToBuild'], 60, 3) }
+    const tgtRationale = cleanStr(tgtRaw['rationale'], 300); if (tgtRationale) target.rationale = tgtRationale
+    const tgtFirstStep = cleanStr(tgtRaw['firstStep'], 300); if (tgtFirstStep) target.firstStep = tgtFirstStep
     if (!next.title || !next.firstStep || !target.title) return null
 
     // ── 风险（0-4 条，空数组合法） ──
@@ -237,7 +271,23 @@ export class LlmJobMasterService {
       )
       .slice(0, 4)
 
-    return { fit: { level: level as JobMasterPayload['fit']['level'], summary, matchedSkills, gapSkills }, careerPath: { current, next, target }, risks }
+    // ── 面试预判 / 简历改写要点（M1.5，可选，空则不带） ──
+    const interviewPrep = (Array.isArray(obj['interviewPrep']) ? obj['interviewPrep'] : [])
+      .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
+      .map((x) => ({ question: cleanStr(x['question'], 200), whyAsked: cleanStr(x['whyAsked'], 200), prepHint: cleanStr(x['prepHint'], 300) }))
+      .filter((x) => x.question.length > 0 && x.prepHint.length > 0)
+      .slice(0, 4)
+    const resumeRewrite = (Array.isArray(obj['resumeRewrite']) ? obj['resumeRewrite'] : [])
+      .map((x) => (x && typeof x === 'object' ? (x as Record<string, unknown>) : {}))
+      .map((x) => ({ area: cleanStr(x['area'], 60), suggestion: cleanStr(x['suggestion'], 300) }))
+      .filter((x) => x.area.length > 0 && x.suggestion.length > 0)
+      .slice(0, 5)
+
+    const result: JobMasterPayload = { fit: { level: level as JobMasterPayload['fit']['level'], summary, matchedSkills, gapSkills }, careerPath: { current, next, target }, risks }
+    if (keywordCoverage) result.fit.keywordCoverage = keywordCoverage
+    if (interviewPrep.length) result.interviewPrep = interviewPrep
+    if (resumeRewrite.length) result.resumeRewrite = resumeRewrite
+    return result
   }
 
   private parse(raw: string): unknown {
