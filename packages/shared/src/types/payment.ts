@@ -37,6 +37,14 @@ export const P0A_ALLOWED_PAYMENT_SOURCES: readonly PaymentSource[] = [
   'manual_confirmed',
 ] as const
 
+/**
+ * 计费页数来源（后端识别，**绝不信任前端 `file.pages`**，见计划 §2.4/§4.4）：
+ * - `pdf_lightweight_scan`：PDF 经后端轻量页数识别（复用 materials.service 能力）
+ * - `image_single_page`：图片按 1 页计
+ * 识别失败 / 未知 MIME / 页数为 0 时后端 fail-closed，拒绝创建付费订单（不回退到前端估算或单页假设）。
+ */
+export type BillingPageSource = 'pdf_lightweight_scan' | 'image_single_page'
+
 /** 单条计费明细（单位：分）。 */
 export interface PrintPriceLine {
   /** 价目项键，如 print_bw_page / print_color_page / print_duplex_surcharge。 */
@@ -71,6 +79,10 @@ export interface OrderPaymentView {
   printTaskId: string | null
   /** 金额（分），>= 0。 */
   amountCents: number
+  /** 计费页数（后端识别，非前端上报）；历史无 Order 或未识别时为 null。 */
+  billablePages: number | null
+  /** 计费页数来源；历史无 Order 或未识别时为 null。 */
+  billingPageSource: BillingPageSource | null
   /** 支付状态。 */
   payStatus: OrderPayStatus
   /**
