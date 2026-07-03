@@ -1,13 +1,12 @@
 // ============================================================
 // AssistantPage — 腾讯 TRTC 实时语音通话（页内嵌入面板版）
 //
-// 2026-07-03 用户确认：取消独立全屏通话页（AiAdvisorCall.tsx 已删除）——
-//   - 进入页面 = 文字对话（不再进页自动通话）
-//   - 点「语音通话」→ 顶栏下方展开页内通话面板（AssistantCallPanel）；
-//     挂断/改用文字 → 面板收起，对话上下文全程保留
-//   - TRTC 会话逻辑在 hooks/useAiAdvisorCallSession.ts（原组件逐行搬移，
-//     卸载自动挂断 + 后端 stop 不持续计费）
-//   - 文字输入接页内拼音虚拟键盘（公共触控终端无物理键盘）
+// 2026-07-03 用户确认的最终形态：
+//   - 进入页面 = 落地页（小青 hero + 语音/文字双模式入口 + 文字咨询）
+//   - 点「语音通话」卡 → 页内展开墨绿通话面板（AssistantCallPanel），
+//     不再有独立全屏通话页；挂断/改用文字 → 面板收起，页面上下文不丢失
+//   - TRTC 会话逻辑在 hooks/useAiAdvisorCallSession.ts（原 AiAdvisorCall
+//     逐行搬移，卸载自动挂断 + 后端 stop 不持续计费）
 //
 // 合规约束：
 //   - 跳转只允许白名单路由，不出现一键投递
@@ -17,22 +16,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import {
-  MicIcon,
-  AlertCircleIcon,
-  SendHorizontalIcon,
-  ZapIcon,
-  ArrowLeftIcon,
-  FileTextIcon,
-  PrinterIcon,
-  BriefcaseIcon,
-  CalendarDaysIcon,
-  LandmarkIcon,
-} from 'lucide-react'
-import { Button } from '@ai-job-print/ui'
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
+import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
+import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
+import './assistant-inkpaper.css'
 
 // 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
@@ -59,23 +48,23 @@ function isAllowedRoute(route: string): boolean {
   return ALLOWED_ROUTE_PREFIXES.some((p) => route === p || route.startsWith(`${p}/`))
 }
 
-// ─── 快捷操作 ─────────────────────────────────────────────
+// ─── 快捷任务（真实既有路由；原型 quick-grid 语汇） ─────────
 
-const SHORTCUTS: AssistantAction[] = [
-  { label: '简历服务',  route: '/resume/source' },
-  { label: '打印文件',  route: '/print/upload'  },
-  { label: '查看岗位',  route: '/jobs'          },
-  { label: '查看招聘会', route: '/job-fairs'    },
-  { label: '政策服务',  route: '/renshi'        },
-]
-
-const SHORTCUT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  '/resume/source': FileTextIcon,
-  '/print/upload':  PrinterIcon,
-  '/jobs':          BriefcaseIcon,
-  '/job-fairs':     CalendarDaysIcon,
-  '/renshi':        LandmarkIcon,
+interface QuickTask {
+  label: string
+  desc: string
+  route: string
+  icon: KioskIconName
+  variant: '' | 'v2' | 'v3' | 'v4'
 }
+
+const QUICK_TASKS: QuickTask[] = [
+  { label: '简历服务', desc: '诊断、优化、打印，一次完成', route: '/resume/source', icon: 'resume', variant: '' },
+  { label: '打印文件', desc: '上传文件，本机直接出纸', route: '/print/upload', icon: 'printer', variant: 'v3' },
+  { label: '查看岗位', desc: '第三方来源岗位，去来源平台投递', route: '/jobs', icon: 'briefcase', variant: 'v2' },
+  { label: '查看招聘会', desc: '查看场次信息，去来源平台预约', route: '/job-fairs', icon: 'fair', variant: 'v4' },
+  { label: '政策服务', desc: '补贴、档案、登记材料指引', route: '/renshi', icon: 'policy', variant: 'v3' },
+]
 
 const KEYWORD_ROUTES: Array<{ kw: readonly string[]; route: string }> = [
   { kw: ['简历', '诊断', '优化', 'resume'],          route: '/resume/source' },
@@ -83,6 +72,14 @@ const KEYWORD_ROUTES: Array<{ kw: readonly string[]; route: string }> = [
   { kw: ['岗位', '工作', '职位', '招聘', '找工作'],  route: '/jobs'          },
   { kw: ['招聘会', '双选会', '人才市场'],             route: '/job-fairs'     },
   { kw: ['人社', '社保', '政策', '补贴'],             route: '/renshi'        },
+]
+
+// ─── 大家都在问（点击即向小青提问，走真实对话链路） ─────────
+
+const FAQ_QUESTIONS = [
+  '应届生没什么经验，简历怎么写工作经历？',
+  '简历打印用什么纸、什么格式比较合适？',
+  '灵活就业社保补贴怎么申请？需要什么材料？',
 ]
 
 type ToolboxAssistantSkill = AssistantSkill
@@ -151,7 +148,7 @@ interface Message {
 const WELCOME: Message = {
   id: 'welcome',
   role: 'assistant',
-  text: '您好！我是 AI 就业服务助手，可以帮您简历诊断、打印文件或查看岗位信息。请问有什么需要帮忙的？',
+  text: '您好！我是小青，可以帮您简历诊断、打印文件或查看岗位信息。请问有什么需要帮忙的？',
 }
 
 // ─── 主组件 ───────────────────────────────────────────────
@@ -160,16 +157,15 @@ export function AssistantPage() {
   return <TextChat voiceAvailable={USE_VOICE_CALL} />
 }
 
-// ─── 文字对话子组件（含页内通话面板 + 虚拟键盘） ────────────
+// ─── 落地页 + 对话 + 页内通话面板 ──────────────────────────
 
 function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
-  const navigate = useNavigate()
-  // 页内通话面板开关：点「语音通话」展开（点击手势满足自动播放策略），
-  // 挂断/再点一次收起（面板卸载即自动挂断 + 后端 stop）。
+  // 页内通话面板开关：点「语音通话」卡展开（点击手势满足自动播放策略），
+  // 挂断 / 改用文字 / 点「文字对话」卡收起（面板卸载即自动挂断 + 后端 stop）。
   const [callActive, setCallActive] = useState(false)
-  // 页内虚拟键盘：点输入框弹出、点别处收起。
+  // 页内虚拟键盘：公共触控终端无物理键盘，点输入框弹出、点别处收起。
   const [keyboardOpen, setKeyboardOpen] = useState(false)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const toolboxSkill = useMemo(() => normalizeToolboxSkill(searchParams.get('intent')), [searchParams])
   const toolboxScene = toolboxSkill ? TOOLBOX_ASSISTANT_SCENES[toolboxSkill] : undefined
@@ -183,12 +179,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const [loading, setLoading]   = useState(false)
   // AI 正在回复:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(loading)
+  useInkRipple('.kassist .mode-btn, .kassist .quick, .kassist .faq, .kassist .action-chip, .kassist .send-btn, .kassist .ka-back')
 
   const sessionIdRef = useRef(newSessionId())
   const cancelledRef = useRef(false)
   const previousSkillRef = useRef<ToolboxAssistantSkill | undefined>(toolboxSkill)
   const requestTokenRef = useRef(0)
   const bottomRef    = useRef<HTMLDivElement>(null)
+  const inputRef     = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     // StrictMode（dev）会 mount→unmount→再 mount：必须在每次 mount 时重置为 false，
@@ -198,8 +196,14 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   }, [])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // block:'nearest'：只滚动对话列表自身，不带动整页跳动
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages, loading])
+
+  // 键盘弹出时把输入框滚到视口中上部，避免被底部键盘遮住
+  useEffect(() => {
+    if (keyboardOpen) inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [keyboardOpen])
 
   useEffect(() => {
     if (previousSkillRef.current === toolboxSkill) return
@@ -211,8 +215,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     setLoading(false)
   }, [toolboxSkill, welcomeMessage])
 
-  const handleSend = useCallback(async () => {
-    const text = input.trim()
+  const sendMessage = useCallback(async (raw: string) => {
+    const text = raw.trim()
     if (!text || loading) return
     const requestSessionId = sessionIdRef.current
     const requestToken = requestTokenRef.current + 1
@@ -248,11 +252,13 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     } finally {
       if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
     }
-  }, [input, loading, toolboxSkill])
+  }, [loading, toolboxSkill])
+
+  const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void handleSend() }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
     },
     [handleSend],
   )
@@ -266,141 +272,231 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const matchedRoutes = useMemo(() => getMatchedRoutes(input), [input])
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50">
+    <div className="kassist">
+      <div className="ka-inner">
 
-      {/* 顶栏 */}
-      <div className="shrink-0 flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-neutral-500 hover:text-neutral-900 text-sm"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
+        {/* 返回 */}
+        <button type="button" className="ka-back" onClick={() => navigate(-1)}>
+          <KIcon name="arrow" />
           返回
         </button>
-        <p className="text-sm font-medium text-neutral-700">{toolboxScene?.title ?? 'AI 就业服务助手'}</p>
-        {voiceAvailable ? (
+
+        {/* ── 小青 hero ── */}
+        <section className="a-hero">
+          <div className="qing-portrait">
+            <span className="live"><i className="dot" aria-hidden="true" />在线</span>
+            <img src="/assets/ai-advisor.png" alt="就业服务顾问小青" />
+          </div>
+          <div className="a-hero-copy">
+            <div className="eyebrow">
+              <KIcon name="sparkle" />
+              就业服务顾问 · 小青
+            </div>
+            <h1>
+              把问题说清楚，
+              <br />
+              再把结果变成材料。
+            </h1>
+            <p>小青负责简历问诊、面试追问、打印前检查和政策问答，回答结果可以保存到对应功能页。</p>
+            <div className="a-pills">
+              {voiceAvailable && (
+                <span className="a-pill">
+                  <KIcon name="mic" />
+                  语音通话在线
+                </span>
+              )}
+              <span className="a-pill">
+                <KIcon name="chat" />
+                文字对话
+              </span>
+              <span className="a-pill">
+                <KIcon name="shield" />
+                结果可保存
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 语音 / 文字 双入口 ── */}
+        <div className={voiceAvailable ? 'mode-toggle' : 'mode-toggle single'}>
+          {voiceAvailable && (
+            <button
+              type="button"
+              className={callActive ? 'mode-btn call on' : 'mode-btn call'}
+              aria-pressed={callActive}
+              onClick={() => setCallActive(true)}
+            >
+              <span className="mbi"><KIcon name="mic" /></span>
+              <div>
+                <strong>语音通话</strong>
+                <span>{callActive ? '通话面板已开启' : '像打电话一样问小青'}</span>
+              </div>
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setCallActive((v) => !v)}
-            aria-pressed={callActive}
-            className={`flex min-h-[48px] items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-              callActive
-                ? 'border-primary-600 bg-primary-600 text-white active:bg-primary-700'
-                : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 active:bg-primary-200'
-            }`}
+            className={callActive ? 'mode-btn text' : 'mode-btn text on'}
+            aria-pressed={!callActive}
+            onClick={() => (callActive ? setCallActive(false) : inputRef.current?.focus())}
           >
-            <MicIcon className="h-4 w-4" />
-            {callActive ? '通话中' : '语音通话'}
+            <span className="mbi"><KIcon name="chat" /></span>
+            <div>
+              <strong>文字对话</strong>
+              <span>打字咨询、留档复看</span>
+            </div>
           </button>
-        ) : <span className="w-12" />}
-      </div>
+        </div>
 
-      {/* 页内语音通话面板：点「语音通话」展开；挂断/改用文字收起 */}
-      {voiceAvailable && callActive && LazyCallPanel && (
-        <Suspense
-          fallback={
-            <section className="acp">
-              <div className="acp-meta">通话模块加载中…</div>
-            </section>
-          }
-        >
-          <LazyCallPanel onEnd={() => setCallActive(false)} />
-        </Suspense>
-      )}
+        {/* ── 页内语音通话面板（点「语音通话」展开；挂断/改用文字收起） ── */}
+        {voiceAvailable && callActive && LazyCallPanel && (
+          <Suspense
+            fallback={
+              <section className="call-panel">
+                <div className="call-meta">通话模块加载中…</div>
+              </section>
+            }
+          >
+            <LazyCallPanel onEnd={() => setCallActive(false)} />
+          </Suspense>
+        )}
 
-      {/* 对话历史 */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="space-y-4">
-          {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
-          {loading && (
-            <div className="flex items-center gap-1.5 w-fit rounded-2xl bg-neutral-100 px-4 py-3">
-              <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.3s]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.15s]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400" />
+        {/* ── 本次咨询 ── */}
+        <section className="panel" aria-live="polite">
+          <div className="panel-head">
+            <h2>{toolboxScene?.title ?? '本次咨询'}</h2>
+            <span className="tag">共享终端 · 离开自动清空</span>
+          </div>
+
+          <div className="chat-list">
+            {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
+            {loading && (
+              <div className="typing" aria-label="小青正在回复">
+                <i /><i /><i />
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {contextActions && contextActions.length > 0 && (
+            <div className="action-chips">
+              {contextActions.map((a) => (
+                <button key={a.route} type="button" className="action-chip" onClick={() => navigate(a.route)}>
+                  {a.label}
+                </button>
+              ))}
             </div>
           )}
-          <div ref={bottomRef} />
-        </div>
-      </div>
 
-      {/* 快捷操作 */}
-      <div className="shrink-0 border-t border-neutral-100 bg-white px-4 pt-2 pb-1">
-        {contextActions && contextActions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {contextActions.map((a) => (
-              <button
-                key={a.route}
-                type="button"
-                onClick={() => navigate(a.route)}
-                className="min-h-[48px] rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 transition-colors"
-              >
-                {a.label}
-              </button>
-            ))}
+          <div className="input-bar">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => !loading && setKeyboardOpen(true)}
+              onClick={() => !loading && setKeyboardOpen(true)}
+              // 公共终端用页内虚拟键盘：抑制系统软键盘，但保留光标可编辑
+              inputMode="none"
+              placeholder={toolboxScene?.placeholder ?? '点这里，用下方键盘输入问题'}
+              rows={1}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="send-btn"
+              onClick={handleSend}
+              disabled={!input.trim() || loading}
+              aria-label="发送消息"
+            >
+              <KIcon name="send" />
+            </button>
           </div>
-        )}
-        <div className="flex flex-wrap items-center gap-1.5 pb-2">
-          <div className="mr-1 flex shrink-0 items-center gap-1">
-            <ZapIcon className="h-3.5 w-3.5 text-warning" />
-            <span className="text-xs font-medium text-neutral-500">快捷入口</span>
+          <p className="disclaimer">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
+        </section>
+
+        {/* ── 快捷任务（真实路由；输入关键词命中时高亮） ── */}
+        <div className="sec-head">
+          <span className="rail" aria-hidden="true" />
+          <div>
+            <h2>快捷任务</h2>
+            <p>点一下直达对应功能页。</p>
           </div>
-          {SHORTCUTS.map((s) => {
-            const Icon = SHORTCUT_ICON_MAP[s.route]
-            return (
-              <button
-                key={s.route}
-                type="button"
-                onClick={() => navigate(s.route)}
-                className={`flex min-h-[48px] items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors border
-                  ${matchedRoutes.has(s.route)
-                    ? 'border-warning/50 bg-warning-bg text-warning-fg'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'}`}
-              >
-                {Icon && <Icon className="h-3.5 w-3.5" />}
-                {s.label}
-              </button>
-            )
-          })}
         </div>
+        <div className="quick-grid">
+          {QUICK_TASKS.map((task) => (
+            <button
+              key={task.route}
+              type="button"
+              className={['quick', task.variant, matchedRoutes.has(task.route) ? 'hit' : '']
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => navigate(task.route)}
+            >
+              <span className="qi"><KIcon name={task.icon} /></span>
+              <div>
+                <strong>{task.label}</strong>
+                <span>{task.desc}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* ── 大家都在问（点击直接发给小青） ── */}
+        <div className="sec-head">
+          <span className="rail slate" aria-hidden="true" />
+          <div>
+            <h2>大家都在问</h2>
+            <p>点击直接向小青提问。</p>
+          </div>
+        </div>
+        <div className="faq-list">
+          {FAQ_QUESTIONS.map((q) => (
+            <button key={q} type="button" className="faq" onClick={() => void sendMessage(q)} disabled={loading}>
+              <span className="q">Q</span>
+              <strong>{q}</strong>
+              <KIcon name="arrow" />
+            </button>
+          ))}
+        </div>
+
+        {/* ── 结果去哪儿 ── */}
+        <div className="sec-head">
+          <span className="rail plum" aria-hidden="true" />
+          <div>
+            <h2>结果去哪儿</h2>
+            <p>咨询结果沉淀到对应功能页。</p>
+          </div>
+        </div>
+        <div className="result-strip">
+          <div className="result-card">
+            <span className="ri"><KIcon name="doc-check" /></span>
+            <strong>存为简历建议</strong>
+            <span>修改建议沉淀到「我的」AI服务记录。</span>
+          </div>
+          <div className="result-card v2">
+            <span className="ri"><KIcon name="receipt" /></span>
+            <strong>生成面试报告</strong>
+            <span>模拟面试问答生成可打印的复盘报告。</span>
+          </div>
+          <div className="result-card v3">
+            <span className="ri"><KIcon name="printer" /></span>
+            <strong>转去打印</strong>
+            <span>改好的简历可直接进入简历打印流程。</span>
+          </div>
+        </div>
+
+        <p className="compliance">
+          <KIcon name="shield" />
+          AI 回复内容仅供参考，不构成正式建议；岗位投递与招聘会预约请前往来源平台完成。
+        </p>
       </div>
 
-      {/* 输入区 */}
-      <div className="shrink-0 border-t border-neutral-200 bg-white p-4">
-        <div className="flex items-end gap-3">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => !loading && setKeyboardOpen(true)}
-            onClick={() => !loading && setKeyboardOpen(true)}
-            // 公共终端用页内虚拟键盘：抑制系统软键盘，但保留光标可编辑
-            inputMode="none"
-            placeholder={toolboxScene?.placeholder ?? '点这里，用屏幕键盘输入问题'}
-            rows={2}
-            disabled={loading}
-            className="min-h-[60px] flex-1 resize-none rounded-xl border border-neutral-300 px-4 py-3.5 text-base leading-relaxed text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20 disabled:bg-neutral-50"
-          />
-          <Button
-            size="lg"
-            onClick={() => void handleSend()}
-            disabled={!input.trim() || loading}
-            aria-label="发送消息"
-            className="h-16 w-16 shrink-0 rounded-xl"
-          >
-            <SendHorizontalIcon className="h-6 w-6" />
-          </Button>
-        </div>
-        <p className="mt-2 text-center text-xs text-neutral-400">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
-      </div>
-
-      {/* 页内悬浮虚拟键盘：点输入框弹出、点别处收起（拼音/英文/符号三模式） */}
+      {/* 页内悬浮虚拟键盘：点输入框弹出、点别处收起 */}
       <KioskKeyboard
         open={keyboardOpen}
         value={input}
         onChange={setInput}
-        onEnter={() => void handleSend()}
+        onEnter={handleSend}
         onClose={() => {
           setKeyboardOpen(false)
           inputRef.current?.blur()
@@ -410,26 +506,41 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   )
 }
 
-// ─── 气泡组件 ─────────────────────────────────────────────
+// ─── 气泡组件（v5 row/bava/bubble 语汇） ─────────────────────
 
 function ChatBubble({ msg }: { msg: Message }) {
   const isUser  = msg.role === 'user'
   const isError = msg.isError === true
+
+  if (isUser) {
+    return (
+      <div className="row me">
+        <span className="bava me"><KIcon name="user" /></span>
+        <div className="bubble me">{msg.text}</div>
+      </div>
+    )
+  }
+
   return (
-    <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
-      <div className={`flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-        <div className={
-          isUser  ? 'rounded-2xl rounded-br-sm bg-primary-600 px-4 py-3 text-sm text-white'
-          : isError ? 'flex items-start gap-2 rounded-2xl rounded-bl-sm bg-error-bg border border-error/30 px-4 py-3 text-sm text-error-fg'
-          : 'rounded-2xl rounded-bl-sm bg-white border border-neutral-200 px-4 py-3 text-sm text-neutral-900'
-        }>
-          {isError && <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-error-fg" />}
+    <div className="row">
+      <span className="bava bot">
+        <img src="/assets/ai-advisor.png" alt="小青" />
+      </span>
+      {isError ? (
+        <div className="bubble err">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v5" />
+            <path d="M12 16.5h.01" />
+          </svg>
           <span>{msg.text}</span>
         </div>
-        {!isUser && !isError && (
-          <p className="mt-1 px-1 text-xs text-neutral-400">内容仅供参考</p>
-        )}
-      </div>
+      ) : (
+        <div className="bubble bot">
+          {msg.text}
+          <span className="ref">内容仅供参考</span>
+        </div>
+      )}
     </div>
   )
 }
