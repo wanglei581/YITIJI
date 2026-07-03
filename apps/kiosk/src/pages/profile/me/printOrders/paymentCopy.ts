@@ -36,10 +36,12 @@ export const BILLING_PAGE_SOURCE_LABEL: Record<NonNullable<MemberPrintOrderItem[
 }
 
 /**
- * 金额（整数分）→ 展示串。0 分显示「免费」；其余整数分拆元/分拼接，
- * 不做浮点除法（避免精度问题）。负数不应出现（后端保证 >= 0），防御性取绝对值前直接原样拼接。
+ * 金额（整数分）→ 展示串。0 分显示「免费」；其余按整数分拆元/分拼接，
+ * 不做浮点除法（避免精度问题）。非整数 / 负数为非法输入（后端保证为 >= 0 的整数），
+ * 返回「—」而非输出异常格式（不编造金额）。
  */
 export function formatAmountCents(amountCents: number): string {
+  if (!Number.isInteger(amountCents) || amountCents < 0) return '—'
   if (amountCents === 0) return '免费'
   const yuan = Math.floor(amountCents / 100)
   const fen = String(amountCents % 100).padStart(2, '0')

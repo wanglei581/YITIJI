@@ -73,6 +73,19 @@ expectMatches(summarySrc, /payStatus\s*===\s*null\s*\?[\s\S]{0,200}?暂无支付
 // 3) pickupCode 只从后端字段渲染，前端不推断、不生成
 expectMatches(pageSrc, /\{item\.pickupCode\s*&&/, '列表卡片取件码提示以 item.pickupCode 真值门控')
 expectMatches(summarySrc, /\{item\.pickupCode\s*&&\s*<PickupCodePanel/, '详单取件码面板以 item.pickupCode 真值门控')
+// 直接断言：每一处 <PickupCodePanel 渲染都必须被 item.pickupCode && 门控（计数相等），
+// 防止未来新增无门控的取件码渲染点绕过单行正则。
+{
+  const panelUses = (summarySrc.match(/<PickupCodePanel/g) || []).length
+  const gatedUses = (summarySrc.match(/item\.pickupCode\s*&&\s*<PickupCodePanel/g) || []).length
+  if (panelUses > 0 && panelUses === gatedUses) {
+    pass(`PickupCodePanel 全部渲染点（${panelUses} 处）均由 item.pickupCode && 门控，无无条件渲染`)
+  } else {
+    fail(`PickupCodePanel 存在未门控渲染：总 ${panelUses} 处，门控 ${gatedUses} 处`)
+  }
+}
+// PickupCodePanel 组件本身：取件码只来自 prop code，不含任何生成/推断逻辑。
+expectMatches(panelSrc, /\{\s*code\s*\}\s*:\s*\{\s*code:\s*string\s*\}/, 'PickupCodePanel 取件码只来自 prop code（非内部生成）')
 for (const [name, src] of all) {
   expectAbsent(src, /^.*pickupCode.*payStatus.*$|^.*payStatus.*pickupCode.*$/m, `${name} 不依据 payStatus 推断取件码可见性（门控在服务端）`)
   expectAbsent(src, /pickupCode\s*=[^=]/, `${name} 不本地赋值 / 生成取件码`)
@@ -111,6 +124,24 @@ for (const [name, src] of all) {
 // 8) 加载更多 / 筛选为真实数据行为
 expectMatches(pageSrc, /\{nextCursor\s*&&/, '加载更多仅在后端返回 nextCursor 时出现')
 expectMatches(pageSrc, /aria-pressed=\{filterKey === f\.key\}/, '状态筛选 chips 带 aria-pressed')
+
+// 9) 客户端筛选空态不误导：筛选非 all 且仍有 nextCursor（未加载完）时提示继续加载，
+//    不把「已加载页无此类」表述成「全量无此类」。
+expectMatches(
+  pageSrc,
+  /filterKey\s*!==\s*'all'\s*&&\s*nextCursor[\s\S]{0,80}?已加载记录中暂无此类/,
+  '客户端筛选空态：未加载完时提示「已加载记录中暂无此类，继续加载」，不误导为全量无记录',
+)
+
+// 10) 加载更多失败有用户可见反馈（不静默吞掉）。
+expectMatches(pageSrc, /setLoadMoreError\(true\)/, 'loadMore 失败置错误态')
+expectMatches(pageSrc, /\{loadMoreError\s*&&[\s\S]{0,120}?加载失败/, 'loadMore 失败展示内联错误提示')
+
+// 11) 触控目标：本页可点击控件不低于 48px（CLAUDE.md §9 硬约束），不得回退到 44px。
+expectAbsent(pageSrc, /min-h-\[44px\]/, '本页无 44px 触控目标（筛选 chips / 反馈 / 详单按钮已统一 ≥48px）')
+
+// 12) 金额非法输入返回「—」，不编造金额。
+expectMatches(copySrc, /!Number\.isInteger\(amountCents\)\s*\|\|\s*amountCents\s*<\s*0\)\s*return\s*'—'/, '金额非整数 / 负数返回「—」，不输出异常格式')
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 「我的打印订单」支付展示诚实性守卫未通过\n`)

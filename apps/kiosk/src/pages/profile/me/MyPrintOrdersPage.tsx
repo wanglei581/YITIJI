@@ -71,6 +71,7 @@ export function MyPrintOrdersPage() {
   const [total, setTotal] = useState(0)
   const [state, setState] = useState<MeListState>('loading')
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [filterKey, setFilterKey] = useState<FilterKey>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -81,6 +82,7 @@ export function MyPrintOrdersPage() {
       return
     }
     setState('loading')
+    setLoadMoreError(false)
     getMyPrintOrders(getToken(), { pageSize: PAGE_SIZE })
       .then((r) => {
         setItems(r.items)
@@ -98,6 +100,7 @@ export function MyPrintOrdersPage() {
   const loadMore = useCallback(() => {
     if (!nextCursor || loadingMore) return
     setLoadingMore(true)
+    setLoadMoreError(false)
     getMyPrintOrders(getToken(), { cursor: nextCursor, pageSize: PAGE_SIZE })
       .then((r) => {
         setItems((prev) => [...prev, ...r.items])
@@ -105,7 +108,8 @@ export function MyPrintOrdersPage() {
         setTotal(r.total)
       })
       .catch(() => {
-        /* 追加失败保持已加载列表不变，用户可再次点击重试 */
+        // 追加失败保持已加载列表不变；显示内联错误提示，用户可再次点击重试。
+        setLoadMoreError(true)
       })
       .finally(() => setLoadingMore(false))
   }, [nextCursor, loadingMore, getToken])
@@ -151,7 +155,7 @@ export function MyPrintOrdersPage() {
             onClick={() => setFilterKey(f.key)}
             aria-pressed={filterKey === f.key}
             className={[
-              'flex min-h-[44px] shrink-0 items-center gap-1 rounded-full px-4 text-sm font-medium transition-colors',
+              'flex min-h-[48px] shrink-0 items-center gap-1 rounded-full px-4 text-sm font-medium transition-colors',
               filterKey === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
             ].join(' ')}
           >
@@ -162,7 +166,11 @@ export function MyPrintOrdersPage() {
       </div>
 
       {filtered.length === 0 && (
-        <Card className="p-6 text-center text-sm text-neutral-500">当前筛选下暂无记录</Card>
+        <Card className="p-6 text-center text-sm text-neutral-500">
+          {filterKey !== 'all' && nextCursor
+            ? '已加载记录中暂无此类，点「加载更多」继续查找'
+            : '当前筛选下暂无记录'}
+        </Card>
       )}
 
       {filtered.map((item) => {
@@ -193,7 +201,7 @@ export function MyPrintOrdersPage() {
                   <button
                     type="button"
                     onClick={() => openFeedback(item.id)}
-                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-warning/20 bg-surface px-3 text-xs font-semibold text-warning-fg transition-colors hover:bg-warning-bg focus:outline-none focus:ring-2 focus:ring-warning/30"
+                    className="inline-flex min-h-[48px] items-center gap-1.5 rounded-xl border border-warning/20 bg-surface px-3 text-xs font-semibold text-warning-fg transition-colors hover:bg-warning-bg focus:outline-none focus:ring-2 focus:ring-warning/30"
                     aria-label={`反馈打印订单 ${item.fileName ?? '未命名订单'}`}
                   >
                     <MessageSquareIcon className="h-4 w-4" aria-hidden="true" />
@@ -205,7 +213,7 @@ export function MyPrintOrdersPage() {
                   onClick={() => setExpandedId(expanded ? null : item.id)}
                   aria-expanded={expanded}
                   aria-label={`${expanded ? '收起' : '查看'}订单详单 ${item.fileName ?? '未命名订单'}`}
-                  className="inline-flex min-h-[44px] items-center gap-1 rounded-xl border border-neutral-200 bg-surface px-3 text-xs font-semibold text-neutral-600 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  className="inline-flex min-h-[48px] items-center gap-1 rounded-xl border border-neutral-200 bg-surface px-3 text-xs font-semibold text-neutral-600 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
                 >
                   详单
                   <ChevronDownIcon
@@ -224,15 +232,22 @@ export function MyPrintOrdersPage() {
       })}
 
       {nextCursor && (
-        <button
-          type="button"
-          onClick={loadMore}
-          disabled={loadingMore}
-          className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 text-sm font-medium text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
-        >
-          {loadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          加载更多（已加载 {items.length} / 共 {total} 条）
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 text-sm font-medium text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
+          >
+            {loadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
+            加载更多（已加载 {items.length} / 共 {total} 条）
+          </button>
+          {loadMoreError && (
+            <p className="text-center text-xs text-error-fg" role="alert">
+              加载失败，请点「加载更多」重试
+            </p>
+          )}
+        </div>
       )}
 
       <p className="mt-1 text-center text-xs text-neutral-400">
