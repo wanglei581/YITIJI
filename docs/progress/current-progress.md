@@ -68,6 +68,8 @@
 
 2026-07-03 追加：**A 档增强第三批——首页「继续上次」横幅**。`HomePage` 新增 `ContinuePanel`（登录态挂载时并发查 `getMyPrintOrders` + `getMyResumes`）：诚实前提=只对真实可恢复任务展示——① 优先级 1：进行中打印任务（status ∈ pending/claimed/printing）→「打印任务进行中 · 文件名 · 状态」→ `/me/print-orders`；② 优先级 2：已诊断未优化的简历（`kind:parse` + `status:completed` + `optimized:false`）→「上次诊断的简历，可继续优化」→ `/resume/optimize?taskId=`；无可恢复任务不渲染，不伪造进度。横幅插在身份卡与服务分组之间，触控按钮 h-16。验证：kiosk tsc/eslint、home-toolbox-ui/resume-diagnosis-flow-ui/production-real-services 守卫、生产 build 全过；浏览器 E2E——插入一条本人真实进行中打印任务（endUserId 绑定登录会员）→ 重新短信登录 → 首页横幅正确显示「我的简历_张三.pdf · 打印中」→ 点「查看进度」直达 `/me/print-orders` → 验证后删除测试数据。注：Kiosk 登录 token 只存内存（公共终端隐私设计），整页刷新会清登录态，属既有正确行为，非本次改动引入。
 
+2026-07-03 追加：**换装+增强分支收口验证 + 合并 main + PR #127 转 MERGEABLE**。① 全量门禁复跑：workspace typecheck 全绿、lint 0 错（kiosk 3 条 warning 与 W0 基线一致，非本轮引入）、三端生产 build 通过、**kiosk 21 守卫 + admin/partner 9 守卫共 30 个全 PASS**。② 期间 main 前进 25 个提交（Codex 简历 wave3 模板填充 / wave4 语音 等 PR #128–#130 合入），`git merge origin/main` 有 2 处冲突：`ResumeOptimizePage.tsx`（我的色彩清扫 × main 的 wave3 重构）取 main 完整逻辑后重新套用 kiosk 色彩清扫规则（gray→neutral / blue→primary / 语义色 token 化），保留 main 的模板/语音功能且配色统一；`current-progress.md` git 自动合并。合并后重跑 typecheck/build/21 守卫全绿。③ `verify:prod-build-config` 在本地因 `.env.local`（gitignored 测试文件，含 localhost API base）+ 分开跑命令曾报 A2 失败；已用 CI 等效方式（移开 .env.local + env 内联导出同 shell 连跑 build+verify）证明 **PASS**，确认为本地测试产物假信号、非代码回归。PR #127 已从 CONFLICTING 转 **MERGEABLE**，含全部换装（W0–W5）+ A 档三批增强共 16 提交，待用户验收合并。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |
