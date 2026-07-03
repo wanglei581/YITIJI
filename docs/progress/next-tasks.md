@@ -136,6 +136,15 @@
 - [x] **岗位信息页客户数据普通浏览验收**：Kiosk 前台 `/jobs` 和 `/jobs/:id` 已补齐 sourceOrgId 过滤、商业化概览、后端总量 / 当前载入口径、字段完整度、来源机构筛选、详情页常驻二维码、“去来源平台投递 / 扫码投递”和外部入口记录；终端 Kiosk 模式不直接跳出第三方站，回落为扫码办理。2026-07-01 已刷新预生产到含 Excel `workType -> category` 修复的干净候选 `5ca81d04`，并完成腾讯真实岗位样本 PostgreSQL 隔离导入 Gate：公开 99 条、1 条过期下架、`category=null` 为 0、`fulltime` 筛选 99 条，API 已复核 sourceOrgId、城市、全职、AI / 产品关键词和详情来源说明；Admin / Partner 质量摘要脱敏 API 摘要已补齐，Partner 端按机构隔离。随后用户确认只热更新 Kiosk 静态包，已从 `5ca81d04` 最小补丁构建并只替换 `/srv/ai-job-print/apps/kiosk/dist`，公网浏览器访问 `/jobs?sourceOrgId=org-tencent-real-job-sample-20260701` 显示 `共 99 个`，Nginx access log 记录浏览器触发带 `sourceOrgId` 的 API 请求，详情页展示第三方来源和去来源平台 / 扫码投递合规文案；同一链路已补入 `verify:job-info-ui` 并接入 CI，避免后续全量构建回归。进入正式对外展示前仍必须确认客户 / 数据源授权，或明确标注为第三方公开来源聚合信息；验收只记录打开来源入口，不记录投递结果。
 - [ ] **岗位信息 AI 商用闭环下一阶段**：补客户真实岗位样本授权 / 展示口径、真实会员 AI 浏览器验收和一体机真机验收。已解除预生产公网新端点 404、Excel `workType -> category`、腾讯样本预生产隔离导入、Admin / Partner 质量摘要脱敏 API 摘要，以及 Kiosk 公网普通岗位浏览阻塞；下一步用真实会员、真实已解析简历和真实 LLM/OCR 跑 `/jobs` AI 推荐、`/jobs/:id` AI 解读、岗位匹配参考、来源外跳记录、`/me/ai-records` 历史回看和 `/me/settings` 授权撤回。最后补 Windows 一体机、Terminal Agent、Pantum 真机出纸和断网恢复验收。推荐结果只能作为求职者参考，不得引入平台投递、候选人筛选、面试邀约、Offer 或向企业推荐候选人。未完成预生产真实会员 AI 浏览器和真机验收前，不得对外宣称 AI 推荐或岗位匹配达到生产商用完成。
 
+## P1：AI 简历优化商用闭环（6 波）
+
+- [ ] **Wave 1 合并与预生产/真机验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已在隔离分支 `worktree-resume-optimize-wave1` 完成代码 + 本地 verify（`verify:resume-export-formats` 等全绿），未合并 `main`。下一步：双模型审查无 Critical 后开 PR → CI → 合并；随后在预生产用真实 LLM + PostgreSQL + COS 跑真实会员 optimize + 四格式导出 + `/me/documents` 浏览器 E2E，Windows 真机对 PDF 出纸验收。未完成前不得宣称商用上线。
+- [ ] **Wave 2 排版参数在线编辑 + AI 一键排版**：优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版对已生成结构化简历重排，仍受防编造约束。另起独立分支与审查。
+- [ ] **Wave 3 模板库 → 自动填充排版**：素材库模板补结构区域定义，选模板后把结构化简历自动灌入并渲染。
+- [ ] **Wave 4 语音生成简历**：从 worktree 实验代码主干化语音→ASR→结构化草稿→进优化/导出；需 ASR provider 决策、生产 Key、失败兜底、语音不长留隐私处理。
+- [ ] **Wave 5 收费闭环（支付/计费/套餐/券/核销）**：独立立项。计费属性定义、Package/Plan/SKU + PricingRule、支付集成（appSecret 仅服务端、回调验签+幂等）、权益核销、Order 金额真实计算、Admin 价格/额度/退款/账单后台。Wave 1 已预留 `assertExportFormatAllowed` 计费能力位。
+- [ ] **Wave 6 岗位 URL 定向 + 格式转换 + 真机**：岗位 URL 收窄为合作来源白名单/用户手动粘贴 JD（不做任意站抓取）；文档格式转换接真实实现（含 docx/txt/md → PDF 后可打印）；Windows 真机出纸/扫描/U盘验收。
+
 ## P1：工程质量门禁
 
 - [ ] 每个新任务先写目标、非目标、允许修改文件、验证方式。
