@@ -48,7 +48,24 @@
 - **Kiosk**：`/jobs/master` 页（复用 JobFit 选岗 + 四段结果卡 + 打印跳 `/print/confirm`）；首页「岗位大师」占位磁贴点亮（`disabled` → `to:/jobs/master`，归岗位信息组，**非新增同义入口**）；`MyAiRecordsPage` 增「岗位决策分析」展示。
 - **验证**：新增 `verify:job-master`（受控 stub LLM 端到端，15 检查含真实 PDF 渲染）本机全通过，已接入主 CI 与 `postgres-readiness` 双 job；shared/api/kiosk typecheck + kiosk 生产构建（2502 模块）+ lint 全绿。
 - **薪资 M1 只透传来源方文本**（`Job.salary`）；站内统计区间、多岗对比、岗位详情页入口改线均属 M2，本轮未做。
-- **待办（不阻塞代码合并）**：1080×1920 竖屏浏览器 analyze→四段结果→打印全链路走查（需真实 API + 已诊断简历；本会话跨 worktree 无法起 preview，故以 `tsc -b` + 生产构建替代静态验证）；真实 key LLM 联调（与 job-fit/career-plan 同为共用 `resume_optimize` 槽，无独立连通脚本）。
+- **待办（不阻塞代码合并）**：1080×1920 竖屏浏览器 analyze→四段结果→打印全链路走查（需真实 API + 已诊断简历；本会话跨 worktree 无法起 preview，故以 `tsc -b` + 生产构建替代静态验证）；真实 key LLM 联调（与 job-fit/career-plan 同为共用 `resume_optimize` 槽，无独立连通脚本）。→ **M1.5 已用真实 DeepSeek 闭掉「真实 key LLM 联调」待办**（见下）。
+
+## 岗位大师 M1.5「决策台深化」（`feature/job-master`，2026-07-03，尚未合入 `main`，未 push）
+
+依据 [specs/2026-07-03-job-master-m1.5-decision-hub-deepening-design.md](../superpowers/specs/2026-07-03-job-master-m1.5-decision-hub-deepening-design.md) 与 [plans/2026-07-03-job-master-m1.5-decision-hub-deepening-plan.md](../superpowers/plans/2026-07-03-job-master-m1.5-decision-hub-deepening-plan.md)，方向「加深不加面」：不新增入口 / 数据模型 / AI 记录类型，只把既有结果做深。子代理逐任务执行，每步独立 commit（禁用 `git add .`）。
+
+- **已完成（静态全绿）**：
+  - **M1.5 类型扩展**（`packages/shared/src/types/ai.ts`）：`JobMasterFit.keywordCoverage{matched,missing}`、`gapSkills[].learningDirection/firstStep`、`careerPath.next/target.rationale`、`target.firstStep`、`JobMasterInterviewPrepItem[]`、`JobMasterResumeRewriteItem[]`，全部**可选非破坏**，M1 结构向后兼容。
+  - **`verify:job-master` 扩到 20 检查**（受控 stub LLM）：新字段流转 + M1 向后兼容 + keywordCoverage 防编造 + 无百分比 + interviewPrep 承诺词 fail + resumeRewrite 安全兜底；本机 20/20 通过。
+  - **LLM schema/prompt/validate**（`llm-job-master.service.ts`）：prompt 新增要求 8–11 与 JSON 契约；`validate()` 对 `keywordCoverage.matched`、`matchedSkills.evidence` 做**简历原文子串**防编造过滤，`sanitizeAdvice()` 覆盖新增建议字段。
+  - **编排透传**（`job-master.service.ts`）：`toResponse()` 透传 `interviewPrep/resumeRewrite`（fit/careerPath 整体透传）。
+  - **PDF 新区块**（`job-master-pdf.service.ts`）：gap 方向/第一步、关键词覆盖（命中/待补，**无比例数字**）、六「面试准备参考」、七「简历改写要点」、careerPath 依据/第一步；页脚免责不变。
+  - **Kiosk 决策台重构**：结果视图拆 7 个单一职责子组件（`apps/kiosk/src/pages/jobs/jobMaster/*`：DecisionSummaryBar / FitSkillMap / GapActionCards / InterviewPrepCard / ResumeRewriteCard / CareerTimeline / RiskCard），视图类型从 shared 派生（`resultTypes.ts`），字段缺失即隐藏对应卡/行；合规按钮拆分为独立「查看岗位」+「去来源平台投递」，绝不合并文案。
+  - **Task 9a 静态验证**：shared/api/kiosk typecheck + kiosk 生产构建 + lint + `verify:job-master` 20/20 全绿。
+- **已本地真实验证（真实 DeepSeek，`resume_optimize` 槽，key 仅服务端 `.env`，未回显 / 未入库）**：匿名 + 会员**双路径**端到端全通——`providerName=llm`、`fit.level=reference_high`、`keywordCoverage.matched` 全部出自简历原文、`interviewPrep`/`resumeRewrite` 真实非空、gap 与 careerPath 新字段真实输出、无百分比 / 无「录用概率 / 通过率 / 一键投递 / 立即投递」、手填岗位薪资「来源平台未提供」（不编造）；打印 PDF 含 8 个 M1.5 区块（关键词覆盖 / 命中 / 待补 / 方向 / 第一步 / 面试准备 / 简历改写 / 依据）；`getLatest`、会员 `/me/ai-records`（见 `job_master`，provider=llm）、`/me/documents`（见「岗位决策参考报告.pdf」）一致。证据落仓库外 `/tmp/ai-job-print-evidence/`（已脱敏，不入库）。
+- **🔲 1080×1920 竖屏浏览器 UI 截图：待补（未完成）**。本会话三条浏览器路径均受限：claude-in-chrome 扩展未连接；computer-use 浏览器仅 read 层（不能驱动/注入结果态）；Claude Preview MCP 从**会话根**（分支 `codex/worktree-state-reconciliation`，无 `/jobs/master` 路由）启动，无法服务本 worktree 构建。须在能直接服务 `feature/job-master` 的环境补做；**不以 API/PDF 证据替代截图**。
+- **合规**：延续三档参考（reference_high/medium/low）+ 固定页脚免责，**无百分比 / 录用概率 / 通过率**，不新增平台内投递闭环，evidence 防编造，手填薪资「来源平台未提供」。
+- **仍属 M2（不进本 PR）**：JobMaster ↔ `JobAiSession` 入口收敛、岗位详情页「分析这个岗位」改线、多岗对比、站内薪资统计、找企业。
 
 ## 规范化治理已完成
 

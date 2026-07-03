@@ -147,7 +147,8 @@
 
 ## P1：岗位大师后续里程碑（`feature/job-master`，见 [current-progress.md](./current-progress.md)）
 
-- [ ] **M1 集成验收 + 合并**：真实 API + 已诊断简历下走 1080×1920 竖屏全链路（选岗→分析→四段结果→打印确认），真实 key LLM 联调；然后合并 `feature/job-master` 到 `main`。M1 后端 15 检查 `verify:job-master` 与 kiosk 生产构建已本机通过。
+- [x] **M1.5「决策台深化」已完成（静态全绿 + 真实 DeepSeek 双路径验证，2026-07-03）**：M1.5 类型扩展（keywordCoverage / gap 方向·第一步 / careerPath 依据·第一步 / interviewPrep / resumeRewrite，全可选非破坏）、`verify:job-master` 扩到 20/20、LLM schema/prompt/validate 简历原文防编造、编排透传、PDF 新区块（六面试准备 / 七简历改写 / 关键词覆盖 / 依据，无比例数字）、Kiosk 结果页拆 7 个单一职责子组件的决策台重构 + 合规按钮拆分。真实 DeepSeek（`resume_optimize` 槽，key 仅服务端 `.env`）匿名 + 会员双路径端到端通过：provider=llm、新字段真实输出、PDF 含 8 个 M1.5 区块、`getLatest` / 会员 `/me/ai-records`（job_master）/ `/me/documents`（岗位决策参考报告.pdf）一致，证据在仓库外 `/tmp/ai-job-print-evidence/`（已脱敏）。**已闭掉 M1 的「真实 key LLM 联调」待办。** 仍未 push / 未转 Ready / 未合并、未跑双模型审查。
+- [ ] **岗位大师合并前唯一剩余验收：1080×1920 竖屏浏览器 UI 截图（待补）**：覆盖入口 `/jobs/master`、决策摘要条、技能地图 + 关键词覆盖、差距行动卡、面试准备卡、简历改写卡、晋升路径时间轴、薪资 / 风险 / 底部操作栏。本会话三条浏览器路径均受限（claude-in-chrome 扩展未连接；computer-use 浏览器仅 read 层不能驱动/注入结果态；Claude Preview MCP 从会话根分支 `codex/worktree-state-reconciliation` 启动、无 `/jobs/master` 路由，无法服务本 worktree 构建），须在能直接服务 `feature/job-master` 的环境补做。**不以 API/PDF 证据替代截图。** 截图完成 + 双模型审查（Task 10）后再决定 Draft→Ready 并合并 `feature/job-master` 到 `main`；M1 后端 `verify:job-master`（现 20 检查）与 kiosk 生产构建已本机通过。
 - [ ] **M2 增强**：`JobSalaryStatsService` 站内统计区间（P25/P50/P75 + 样本不足降级）；多岗位（≤3）对比视图；岗位详情页「分析这个岗位」入口改线到 `/jobs/master?jobId=`（+ 防回退 verify），避免与 `/resume/job-fit` 双入口并存（改线前复查 [user-data-flow-matrix.md](../product/user-data-flow-matrix.md) 不堆同义入口）。
 - [ ] **M3 拓展（独立评估，不阻塞 M1/M2）**：无简历用户 RIASEC 兴趣短测评冷启动；职业前景标签（Admin 维护紧缺职业目录数据源，不由 LLM 生成）。
 - [ ] **M-Pay（排 M2 之后）**：岗位大师商业化（免费预览 / 付费完整报告 / 套餐 / 补贴券），复用订单底座，见设计文档 §十。
