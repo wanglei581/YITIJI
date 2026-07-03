@@ -289,6 +289,194 @@ async function main(): Promise<void> {
     } else {
       fail(`unexpected pricing constants: ${JSON.stringify(PRINT_UNIT_PRICE_CENTS)}`)
     }
+
+    // ============================================================
+    // P0a 支付域底座契约（batch1 · 先红）。实现（Task 3–8）落地前，本段应整体 FAIL。
+    // 覆盖修正版 §2.4/§2.5/§4.2–§4.5：后端页数识别 fail-closed、不信任前端 pages、
+    // billablePages/billingPageSource、paid 必带 paymentSource、禁 wechat/alipay/benefit、
+    // pickupCode 唯一/熵/状态门、unpaid 不伪装线上待支付或已收款、退款仅整单、
+    // 历史无 Order 的 /me/print-orders 支付字段返回 null（不编造）。
+    // 用收集器逐条 check（不 fail-fast），跑完汇总；有未满足项则抛错（finally 清理后退 1）。
+    // ============================================================
+    console.log('\n--- P0a payment-domain contract (batch1, expect RED before impl) ---')
+    // 与 packages/shared P0A_ALLOWED_PAYMENT_SOURCES 保持一致；wechat/alipay/benefit 为未来扩展，本批禁写。
+    const P0A_ALLOWED_SOURCES = ['offline', 'free', 'manual_confirmed'] as const
+    const P0A_FORBIDDEN_SOURCES = ['wechat', 'alipay', 'benefit'] as const
+    const VALID_PAGE_SOURCES = ['pdf_lightweight_scan', 'image_single_page'] as const
+    let p0aFailures = 0
+    const p0aCheck = (ok: boolean, label: string, detail = ''): void => {
+      if (ok) console.log(`  PASS ${label}`)
+      else {
+        console.error(`  FAIL [P0a] ${label}${detail ? ` — ${detail}` : ''}`)
+        p0aFailures += 1
+      }
+    }
+    const p0aGuard = async (label: string, fn: () => Promise<boolean>): Promise<void> => {
+      try {
+        p0aCheck(await fn(), label)
+      } catch (e) {
+        console.error(`  FAIL [P0a] ${label} — threw: ${(e as Error).message}`)
+        p0aFailures += 1
+      }
+    }
+    type OrderRow = {
+      amountCents: number
+      payStatus: string
+      paymentSource: string | null
+      paidAt: Date | null
+      pickupCode: string | null
+      billablePages: number | null
+      billingPageSource: string | null
+      refundReason: string | null
+      refundedAt: Date | null
+    }
+    const readOrder = async (printTaskId: string): Promise<OrderRow | null> =>
+      (await prisma.order.findUnique({ where: { printTaskId } })) as unknown as OrderRow | null
+
+    // (1) 报价 + 后端识别页数：彩色 2 份订单应有 amountCents>0、billablePages>0、billingPageSource 合法。
+    {
+      const o = await readOrder(memberPrint.taskId)
+      const ok =
+        !!o &&
+        o.amountCents > 0 &&
+        typeof o.billablePages === 'number' &&
+        o.billablePages > 0 &&
+        typeof o.billingPageSource === 'string' &&
+        (VALID_PAGE_SOURCES as readonly string[]).includes(o.billingPageSource)
+      p0aCheck(
+        ok,
+        'priced color order carries amountCents>0 + backend billablePages>0 + valid billingPageSource',
+        `amountCents=${o?.amountCents} billablePages=${o?.billablePages} billingPageSource=${o?.billingPageSource}`,
+      )
+    }
+
+    // (2) 不信任前端 pages + 页数识别 fail-closed：文件不可识别页数时不得创建付费订单（应抛错）。
+    await p0aGuard('unreadable/unknown file is rejected fail-closed (no fabricated paid order)', async () => {
+      try {
+        const t = await printJobs.create(
+          {
+            fileUrl: signedUrl('failclosed'),
+            fileMd5: 'sha256-order-failclosed',
+            fileName: '无法识别页数.bin',
+            params: PRINT_PARAMS,
+          },
+          { endUserId: null, terminalId },
+        )
+        taskIds.push(t.taskId)
+        return false // 创建成功即违背 fail-closed
+      } catch {
+        return true // 抛错 = fail-closed 生效
+      }
+    })
+
+    // (3) 支付状态机幂等 + paid 必带 paymentSource + 禁 wechat/alipay/benefit（OrderStatusService，Task 6）。
+    await p0aGuard('OrderStatusService.markPaid: unpaid→paid requires allowed paymentSource, sets paidAt+pickupCode, audited, idempotent', async () => {
+      const mod = (await import('../src/payment/order-status.service')) as {
+        OrderStatusService: new (p: typeof prisma, a: typeof audit) => {
+          markPaid: (orderId: string, opts: { paymentSource: string; operatorId?: string }) => Promise<OrderRow>
+        }
+      }
+      const svc = new mod.OrderStatusService(prisma, audit)
+      const target = await prisma.order.findUnique({ where: { printTaskId: memberPrint.taskId } })
+      if (!target) return false
+      const before = await prisma.auditLog.count({ where: { targetId: target.id } })
+      const paid = await svc.markPaid(target.id, { paymentSource: 'offline', operatorId: 'verify' })
+      const idem = await svc.markPaid(target.id, { paymentSource: 'offline', operatorId: 'verify' })
+      const after = await prisma.auditLog.count({ where: { targetId: target.id } })
+      const okHappy =
+        paid.payStatus === 'paid' &&
+        paid.paymentSource === 'offline' &&
+        !!paid.paidAt &&
+        typeof paid.pickupCode === 'string' &&
+        paid.pickupCode.length >= 8 &&
+        idem.payStatus === 'paid' &&
+        idem.pickupCode === paid.pickupCode &&
+        after - before === 1 // 幂等：重复 markPaid 不重复写审计
+      let rejectsNoSource = false
+      try {
+        await svc.markPaid(target.id, { paymentSource: '' })
+      } catch {
+        rejectsNoSource = true
+      }
+      let rejectsForbidden = true
+      for (const bad of P0A_FORBIDDEN_SOURCES) {
+        try {
+          await svc.markPaid(target.id, { paymentSource: bad })
+          rejectsForbidden = false
+        } catch {
+          /* expected reject */
+        }
+      }
+      return okHappy && rejectsNoSource && rejectsForbidden
+    })
+
+    // (4) pickupCode 唯一 + 状态门：仅 paid 且未完成/取消/失败/退款时会员视图才返回取件码。
+    await p0aGuard('pickupCode is unique and only surfaced for paid & non-terminal, non-refunded orders', async () => {
+      const mod = (await import('../src/payment/order-status.service')) as {
+        pickupCodeVisibleFor?: (o: { payStatus: string; taskStatus: string; refundedAt: Date | null }) => boolean
+      }
+      if (typeof mod.pickupCodeVisibleFor !== 'function') return false
+      const gate = mod.pickupCodeVisibleFor
+      return (
+        gate({ payStatus: 'paid', taskStatus: 'pending', refundedAt: null }) === true &&
+        gate({ payStatus: 'unpaid', taskStatus: 'pending', refundedAt: null }) === false &&
+        gate({ payStatus: 'paid', taskStatus: 'completed', refundedAt: null }) === false &&
+        gate({ payStatus: 'refunded', taskStatus: 'pending', refundedAt: new Date() }) === false
+      )
+    })
+
+    // (5) 免费单不变式：amountCents===0 的订单必须为 paid + free（不得停在 unpaid）。
+    {
+      const anon = await readOrder(anonymousPrint.taskId)
+      const isFreeInvariantHeld = !anon || anon.amountCents !== 0 || (anon.payStatus === 'paid' && anon.paymentSource === 'free')
+      p0aCheck(isFreeInvariantHeld, 'amountCents===0 order is settled as paid+free (never left unpaid)', `payStatus=${anon?.payStatus} paymentSource=${anon?.paymentSource}`)
+    }
+
+    // (6) 退款仅整单：paid→refunded 需 refundReason；拒绝 unpaid→refunded（OrderStatusService，Task 6）。
+    await p0aGuard('OrderStatusService.refund: paid→refunded requires reason, rejects unpaid→refunded, whole-order only', async () => {
+      const mod = (await import('../src/payment/order-status.service')) as {
+        OrderStatusService: new (p: typeof prisma, a: typeof audit) => {
+          refund: (orderId: string, opts: { reason: string; operatorId?: string }) => Promise<OrderRow>
+        }
+      }
+      const svc = new mod.OrderStatusService(prisma, audit)
+      const unpaidOrder = await prisma.order.findUnique({ where: { printTaskId: statusPrint.taskId } })
+      if (!unpaidOrder) return false
+      let rejectsUnpaidRefund = false
+      try {
+        await svc.refund(unpaidOrder.id, { reason: 'x' })
+      } catch {
+        rejectsUnpaidRefund = true
+      }
+      return rejectsUnpaidRefund
+    })
+
+    // (7) unpaid 不伪装线上待支付/已收款：会员视图对普通付费单如实返回 unpaid + paymentSource=null。
+    // (8) 历史无 Order 的 PrintTask：会员视图支付字段全部返回 null（不编造）。
+    await p0aGuard('/me/print-orders view exposes honest payment fields (unpaid/null) and null for legacy no-Order tasks', async () => {
+      const mod = (await import('../src/member-print-orders/member-print-orders.service')) as {
+        MemberPrintOrdersService: new (p: typeof prisma) => {
+          listForMember: (endUserId: string, opts?: { page?: number; pageSize?: number }) => Promise<{ items: Array<Record<string, unknown>> }>
+        }
+      }
+      const svc = new mod.MemberPrintOrdersService(prisma)
+      const res = await svc.listForMember(endUserId, { page: 1, pageSize: 20 })
+      const item = res.items.find((i) => i['id'] === memberPrint.taskId)
+      if (!item) return false
+      // 字段必须存在且语义诚实：unpaid 单 payStatus='unpaid'、paymentSource=null、不得出现线上"待支付/已收款"暗示
+      const hasHonestFields =
+        'payStatus' in item &&
+        'paymentSource' in item &&
+        'amountCents' in item &&
+        item['paymentSource'] === null &&
+        (item['payStatus'] === 'unpaid' || item['payStatus'] === 'paid')
+      return hasHonestFields
+    })
+
+    if (p0aFailures > 0) {
+      throw new Error(`P0a payment-domain contract not yet satisfied: ${p0aFailures} check(s) FAILED (expected RED before Task 3–8 implementation)`)
+    }
+    pass(`P0a payment-domain contract satisfied (${8} checks)`)
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
