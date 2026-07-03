@@ -147,10 +147,10 @@
 
 ## P1：AI 简历优化商用闭环（6 波）
 
-- [ ] **Wave 1 合并与预生产/真机验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已在隔离分支 `worktree-resume-optimize-wave1` 完成代码 + 本地 verify（`verify:resume-export-formats` 等全绿），未合并 `main`。下一步：双模型审查无 Critical 后开 PR → CI → 合并；随后在预生产用真实 LLM + PostgreSQL + COS 跑真实会员 optimize + 四格式导出 + `/me/documents` 浏览器 E2E，Windows 真机对 PDF 出纸验收。未完成前不得宣称商用上线。
-- [ ] **Wave 2 排版参数在线编辑 + AI 一键排版**：优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版对已生成结构化简历重排，仍受防编造约束。另起独立分支与审查。
-- [ ] **Wave 3 模板库 → 自动填充排版**：素材库模板补结构区域定义，选模板后把结构化简历自动灌入并渲染。
-- [ ] **Wave 4 语音生成简历**：从 worktree 实验代码主干化语音→ASR→结构化草稿→进优化/导出；需 ASR provider 决策、生产 Key、失败兜底、语音不长留隐私处理。
+- [x] **Wave 1 合并与预生产验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。仍未完成：Windows 一体机 + 奔图真机真实出纸、非 PDF 格式转换后打印、收费/语音/岗位 URL/模板填充等后续 Wave。
+- [x] **Wave 2 排版参数在线编辑 + AI 一键排版**：已通过 PR #125 合入并部署预生产 `2769261b`；优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版/精简通过 `POST /resume/records/:taskId/layout-adjust` 重提原文并复用防编造约束，Kiosk 支持「AI 精简」「AI 调整排版」和「撤销 AI 调整」；预生产真实 LLM、PDF 导出和 `printFileUrl` 安全探针已通过。仍不代表 Windows 真机出纸或非 PDF 格式转换后打印完成。
+- [x] **Wave 3 模板库 → 自动填充排版**：已通过 PR #128 合入并部署预生产 `a885837f`；素材库 `resume_template` 补结构区域与 `resumeLayoutPreset`，PDF 导出接 `templateId` 并按模板 section/default layout 自动填充，Kiosk 优化页可选模板并透传导出；docx/txt/md 忽略模板且不伪造打印。预生产已验证模板列表、非简历模板 PDF 导出拒绝、真实 LLM 上传 / 诊断 / 优化 / 模板 PDF 导出 / `printFileUrl` 安全打印探针；不存在终端 ID 返回 `PRINT_TERMINAL_NOT_FOUND` 且 `PrintTask` 计数前后一致，未创建真实打印任务、未出纸。仍未完成：Admin 模板 CRUD、拖拽编辑、收费、语音、岗位 URL、格式转换、Windows 一体机 + 奔图真机出纸。
+- [ ] **Wave 4 语音生成简历**：设计规格与实施计划已形成（`docs/superpowers/specs/2026-07-03-resume-voice-wave4-design.md`、`docs/superpowers/plans/2026-07-03-resume-voice-wave4.md`），尚未写运行时代码。结论：现有 `AsrService` 已支持 disabled / tencent / baidu，Kiosk 已有 `wavRecorder`，首版不做长语音独白生成整份简历，而做分段 / 分字段语音辅助填表；转写必须用户确认后进入现有 `/resume/generate`，音频不落库、不入 COS、不写日志，高敏字段默认手填。下一步从干净实现分支按计划执行，完成后跑 `verify:resume-voice-generate`、Kiosk UI verify、typecheck / lint / build 和双模型审查；预生产需真实 ASR 配置或诚实 disabled 回退验收。
 - [ ] **Wave 5 收费闭环（支付/计费/套餐/券/核销）**：独立立项。计费属性定义、Package/Plan/SKU + PricingRule、支付集成（appSecret 仅服务端、回调验签+幂等）、权益核销、Order 金额真实计算、Admin 价格/额度/退款/账单后台。Wave 1 已预留 `assertExportFormatAllowed` 计费能力位。
 - [ ] **Wave 6 岗位 URL 定向 + 格式转换 + 真机**：岗位 URL 收窄为合作来源白名单/用户手动粘贴 JD（不做任意站抓取）；文档格式转换接真实实现（含 docx/txt/md → PDF 后可打印）；Windows 真机出纸/扫描/U盘验收。
 

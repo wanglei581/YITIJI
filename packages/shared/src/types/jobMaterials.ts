@@ -13,6 +13,30 @@ export type JobMaterialDocumentTemplateType = Exclude<JobMaterialTemplateType, R
 
 export type JobMaterialTemplateStatus = 'published' | 'disabled'
 
+export const RESUME_TEMPLATE_SECTION_KEYS = [
+  'header',
+  'summary',
+  'education',
+  'experience',
+  'projects',
+  'skills',
+  'certificates',
+] as const
+
+export type ResumeTemplateSectionKey = typeof RESUME_TEMPLATE_SECTION_KEYS[number]
+
+export interface ResumeTemplateLayoutPreset {
+  style: 'clean' | 'compact' | 'formal'
+  defaultLayout: {
+    fontScale?: 'compact' | 'standard' | 'large'
+    lineSpacing?: 'compact' | 'standard' | 'relaxed'
+    margin?: 'narrow' | 'normal' | 'wide'
+    columns?: 1 | 2
+    accent?: 'blue' | 'green' | 'slate'
+  }
+  sectionOrder: ResumeTemplateSectionKey[]
+}
+
 export interface JobMaterialTemplateField {
   key: 'applicantName' | 'targetRole' | 'targetOrganization' | 'keyStrengths' | 'notes'
   label: string
@@ -32,9 +56,13 @@ export interface JobMaterialTemplate {
   recommendedFor: string
   outputFilename: string
   fields: JobMaterialTemplateField[]
+  resumeLayoutPreset?: ResumeTemplateLayoutPreset
 }
 
-export type ResumeTemplate = JobMaterialTemplate & { type: ResumeTemplateType }
+export type ResumeTemplate = JobMaterialTemplate & {
+  type: ResumeTemplateType
+  resumeLayoutPreset: ResumeTemplateLayoutPreset
+}
 export type JobMaterialDocumentTemplate = JobMaterialTemplate & { type: JobMaterialDocumentTemplateType }
 
 export interface JobMaterialGenerateInput {
@@ -128,6 +156,17 @@ export const JOB_MATERIAL_TEMPLATES: JobMaterialTemplate[] = [
     recommendedFor: '简历诊断、AI 简历优化、现场打印前版式参考',
     outputFilename: '清爽通用简历模板.pdf',
     fields: COMMON_FIELDS,
+    resumeLayoutPreset: {
+      style: 'clean',
+      defaultLayout: {
+        fontScale: 'standard',
+        lineSpacing: 'standard',
+        margin: 'normal',
+        columns: 1,
+        accent: 'blue',
+      },
+      sectionOrder: ['header', 'summary', 'education', 'experience', 'projects', 'skills', 'certificates'],
+    },
   },
   {
     id: 'campus-cover-letter',
@@ -187,7 +226,7 @@ export const JOB_MATERIAL_TEMPLATES: JobMaterialTemplate[] = [
 ]
 
 export function isResumeTemplate(template: JobMaterialTemplate): template is ResumeTemplate {
-  return template.type === 'resume_template'
+  return template.type === 'resume_template' && Boolean(template.resumeLayoutPreset)
 }
 
 export function isJobMaterialDocumentTemplate(template: JobMaterialTemplate): template is JobMaterialDocumentTemplate {

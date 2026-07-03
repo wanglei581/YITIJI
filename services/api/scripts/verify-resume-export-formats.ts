@@ -13,6 +13,8 @@
  *   7. printFileUrl(打印链路专用系统签名 URL,与 signedUrl/COS 下载 URL 隔离):
  *      pdf 返回且匹配 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>;
  *      docx/txt/md 不返回(undefined,不伪造)。
+ *   8. Wave 2 layout 契约:shared 定义 ResumeLayoutSettings;API DTO 定义 ResumeLayoutDto;
+ *      ResumeGenerateExportDto 接收 layout 可选字段,但导出响应不回显 layout。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:resume-export-formats
  */
@@ -119,6 +121,30 @@ async function main(): Promise<void> {
     const optionalMatch = dtoSrc.match(/@IsOptional\(\) @IsIn\(\[[^\]]+\]\)\s*\n\s*format\?:/)
     if (!optionalMatch) fail('1b. format 字段未标注为 @IsOptional(缺省应可省略)')
     pass('1b. format 字段 @IsOptional(缺省场景由 service 层默认 pdf)')
+
+    const sharedSrc = readFileSync(join(__dirname, '../../../packages/shared/src/types/ai.ts'), 'utf-8')
+    if (!sharedSrc.includes('export interface ResumeLayoutSettings')) {
+      fail('1c. shared 未定义 ResumeLayoutSettings')
+    }
+    if (!sharedSrc.includes("export type ResumeLayoutColumns = 1 | 2")) {
+      fail('1c. ResumeLayoutColumns 类型必须只允许 1 | 2')
+    }
+    if (!sharedSrc.includes("export type ResumeLayoutAccent = 'blue' | 'green' | 'slate'")) {
+      fail('1c. ResumeLayoutAccent 必须是受控白名单 blue/green/slate')
+    }
+    if (/interface ResumeGenerateExportResponse[\s\S]*layout\?:/.test(sharedSrc)) {
+      fail('1c. ResumeGenerateExportResponse 不应回显 layout')
+    }
+    pass('1c. shared layout 类型契约正确,导出响应不回显 layout')
+
+    if (!dtoSrc.includes('export class ResumeLayoutDto')) fail('1d. API DTO 未导出 ResumeLayoutDto')
+    if (!dtoSrc.includes("fontScale?: ResumeLayoutFontScale")) fail('1d. ResumeLayoutDto 未包含 fontScale')
+    if (!dtoSrc.includes("lineSpacing?: ResumeLayoutLineSpacing")) fail('1d. ResumeLayoutDto 未包含 lineSpacing')
+    if (!dtoSrc.includes("margin?: ResumeLayoutMargin")) fail('1d. ResumeLayoutDto 未包含 margin')
+    if (!dtoSrc.includes("columns?: ResumeLayoutColumns")) fail('1d. ResumeLayoutDto 未包含 columns')
+    if (!dtoSrc.includes("accent?: ResumeLayoutAccent")) fail('1d. ResumeLayoutDto 未包含 accent')
+    if (!dtoSrc.includes('layout?: ResumeLayoutDto')) fail('1d. ResumeGenerateExportDto 未接入 layout 可选字段')
+    pass('1d. API DTO layout 白名单字段已接入导出请求')
   }
 
   const prisma = new PrismaService()

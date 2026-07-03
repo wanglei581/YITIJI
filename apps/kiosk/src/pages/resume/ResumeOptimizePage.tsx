@@ -8,9 +8,7 @@ import {
   FileDownIcon,
   FlaskConicalIcon,
   InfoIcon,
-  PencilLineIcon,
   PrinterIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   TargetIcon,
 } from 'lucide-react'
@@ -19,13 +17,19 @@ import type {
   ResumeExportFormat,
   ResumeGenerateExportResponse,
   ResumeOptimizeModule,
+  ResumeTemplate,
   ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
-import { exportGeneratedResume, getResumeOptimize } from '../../services/api'
+import { adjustResumeLayoutDraft, exportGeneratedResume, getResumeOptimize } from '../../services/api'
+import type { ResumeLayoutAdjustAction } from '../../services/api'
+import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
+import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
+import { ResumeLayoutControls } from './components/ResumeLayoutControls'
+import { useResumeLayout } from './hooks/useResumeLayout'
 
 /** 导出格式可选项(Wave1 Task 8):PDF 可直接打印,Word/TXT/Markdown 供下载编辑。 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
@@ -42,19 +46,7 @@ function targetSummary(tc?: ResumeTargetContext): string | null {
   return parts.length ? parts.join(' · ') : null
 }
 
-const taCls =
-  'w-full scroll-mt-32 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
-
 type LeaveAction = () => void
-
-function SectionTitle({ title }: { title: string }) {
-  return (
-    <div className="mb-2 flex items-center gap-2">
-      <span className="h-4 w-1 rounded-full bg-primary-600" aria-hidden="true" />
-      <p className="text-base font-semibold text-neutral-900">{title}</p>
-    </div>
-  )
-}
 
 export function ResumeOptimizePage() {
   const navigate = useNavigate()
@@ -83,10 +75,39 @@ export function ResumeOptimizePage() {
   const [exportFormat, setExportFormat] = useState<ResumeExportFormat>('pdf')
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [resumeTemplates, setResumeTemplates] = useState<ResumeTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
+  const [adjusting, setAdjusting] = useState<ResumeLayoutAdjustAction | null>(null)
+  const [lastResumeBeforeAiAdjust, setLastResumeBeforeAiAdjust] = useState<GeneratedResume | null>(null)
+  const [adjustWarnings, setAdjustWarnings] = useState<string[]>([])
+  const [adjustError, setAdjustError] = useState<string | null>(null)
+  const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
+  const aiAdjustDisabled = loading || exporting || !optimizedResume || Boolean(adjusting)
+  const selectedTemplate = useMemo(
+    () => resumeTemplates.find((template) => template.id === selectedTemplateId) ?? null,
+    [resumeTemplates, selectedTemplateId],
+  )
 
-  useBusyLock(exporting || printNavigating)
+  useBusyLock(exporting || printNavigating || Boolean(adjusting))
+
+  useEffect(() => {
+    let cancelled = false
+    getResumeTemplates()
+      .then((templates) => {
+        if (cancelled) return
+        setResumeTemplates(templates)
+        setSelectedTemplateId((current) => {
+          if (current && templates.some((template) => template.id === current)) return current
+          return templates[0]?.id ?? ''
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setResumeTemplates([])
+      })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!taskId) {
@@ -142,12 +163,25 @@ export function ResumeOptimizePage() {
     if (exported) setExported(null)
   }
 
+  const handleResumeChange = (next: GeneratedResume) => {
+    markEdited()
+    setLastResumeBeforeAiAdjust(null)
+    setAdjustWarnings([])
+    setAdjustError(null)
+    setOptimizedResume(next)
+  }
+
+  const handleLayoutChange = (next: typeof layout) => {
+    setLayout(next)
+    markEdited()
+  }
+
   const handleExport = async () => {
     if (!optimizedResume) return
     setExporting(true)
     setExportError(null)
     try {
-      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat)
+      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)
       setExported(result)
       setIsDirty(false)
     } catch (err) {
@@ -157,9 +191,47 @@ export function ResumeOptimizePage() {
     }
   }
 
+  const handleAiAdjust = async (action: ResumeLayoutAdjustAction) => {
+    if (!taskId || !optimizedResume) return
+    const before = optimizedResume
+    setAdjusting(action)
+    setAdjustError(null)
+    try {
+      const result = await adjustResumeLayoutDraft(taskId, optimizedResume, action, layout, {
+        token: getToken(),
+        accessToken,
+      })
+      setLastResumeBeforeAiAdjust(before)
+      setOptimizedResume(result.resume)
+      setAdjustWarnings(result.warnings ?? [])
+      setExported(null)
+      setIsDirty(true)
+    } catch (err) {
+      setAdjustError(err instanceof Error ? err.message : 'AI 调整失败，请稍后重试或继续手动编辑')
+    } finally {
+      setAdjusting(null)
+    }
+  }
+
+  const handleUndoAiAdjust = () => {
+    if (!lastResumeBeforeAiAdjust) return
+    setOptimizedResume(lastResumeBeforeAiAdjust)
+    setLastResumeBeforeAiAdjust(null)
+    setAdjustWarnings([])
+    setAdjustError(null)
+    setExported(null)
+    setIsDirty(true)
+  }
+
   // 切换导出格式后,已导出的旧格式文件不再对应当前选择,需重新导出
   const handleExportFormatChange = (format: ResumeExportFormat) => {
     setExportFormat(format)
+    if (exported) setExported(null)
+  }
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    setExportError(null)
     if (exported) setExported(null)
   }
 
@@ -289,148 +361,98 @@ export function ResumeOptimizePage() {
 
         {optimizedResume && (
           <>
-            <Card className="p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-lg font-bold text-neutral-900">优化版简历</p>
-                <p className="flex items-center gap-1 text-xs text-neutral-400">
-                  <PencilLineIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  可直接点击修改
-                </p>
-              </div>
-              <div className="border-b-2 border-primary-600 pb-3">
-                <p className="text-2xl font-bold text-neutral-900">{optimizedResume.basic.name || '(原文未识别到姓名)'}</p>
-                <p className="mt-1 text-sm text-neutral-500">
-                  {[
-                    optimizedResume.intention.position ? `求职意向:${optimizedResume.intention.position}` : '',
-                    optimizedResume.basic.phone ? `电话:${optimizedResume.basic.phone}` : '',
-                    optimizedResume.basic.email ? `邮箱:${optimizedResume.basic.email}` : '',
-                  ].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-
-              <div className="mt-4 space-y-5">
-                <div>
-                  <SectionTitle title="个人简介" />
-                  <textarea
-                    className={`${taCls} min-h-24 resize-y`}
-                    value={optimizedResume.summary}
-                    placeholder="(空)"
-                    onFocus={(e) => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                    onChange={(e) => {
-                      markEdited()
-                      setOptimizedResume((r) => r ? { ...r, summary: e.target.value.slice(0, 600) } : r)
-                    }}
-                  />
+            <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
+            {resumeTemplates.length > 0 && (
+              <Card className="p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-800">简历模板</p>
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+                      PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出。
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:min-w-[260px]">
+                    {resumeTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        aria-pressed={selectedTemplateId === template.id}
+                        disabled={exporting}
+                        onClick={() => handleTemplateChange(template.id)}
+                        className={[
+                          'min-h-[52px] rounded-xl border px-3 text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
+                          selectedTemplateId === template.id
+                            ? 'border-primary-500 bg-primary-50 text-primary-700'
+                            : 'border-neutral-200 bg-white text-neutral-700',
+                        ].join(' ')}
+                      >
+                        <span className="block text-sm font-semibold">{template.title}</span>
+                        <span className="mt-0.5 block text-xs text-neutral-500">{template.resumeLayoutPreset.style} · {template.recommendedFor}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-
-                {optimizedResume.education.length > 0 && (
-                  <div>
-                    <SectionTitle title="教育经历" />
-                    <div className="space-y-3">
-                      {optimizedResume.education.map((e, i) => (
-                        <div key={i}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="text-sm font-semibold text-neutral-800">
-                              {[e.school, e.major, e.degree].filter(Boolean).join(' · ')}
-                            </p>
-                            {e.period && <p className="shrink-0 text-xs text-neutral-400">{e.period}</p>}
-                          </div>
-                          <textarea
-                            className={`${taCls} mt-1.5 min-h-20 resize-y`}
-                            value={e.description ?? ''}
-                            placeholder="(无描述)"
-                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                            onChange={(ev) => {
-                              markEdited()
-                              setOptimizedResume((r) => r ? {
-                                ...r,
-                                education: r.education.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                              } : r)
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                {selectedTemplate && (
+                  <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-500">
+                    已选择：{selectedTemplate.title}。排版参数会覆盖模板默认值，导出前可继续微调。
+                  </p>
                 )}
-
-                {optimizedResume.experience.length > 0 && (
-                  <div>
-                    <SectionTitle title="实习 / 工作经历" />
-                    <div className="space-y-3">
-                      {optimizedResume.experience.map((e, i) => (
-                        <div key={i}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="text-sm font-semibold text-neutral-800">{e.company} · {e.role}</p>
-                            {e.period && <p className="shrink-0 text-xs text-neutral-400">{e.period}</p>}
-                          </div>
-                          <textarea
-                            className={`${taCls} mt-1.5 min-h-24 resize-y`}
-                            value={e.description}
-                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                            onChange={(ev) => {
-                              markEdited()
-                              setOptimizedResume((r) => r ? {
-                                ...r,
-                                experience: r.experience.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                              } : r)
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.projects.length > 0 && (
-                  <div>
-                    <SectionTitle title="项目经历" />
-                    <div className="space-y-3">
-                      {optimizedResume.projects.map((p, i) => (
-                        <div key={i}>
-                          <p className="text-sm font-semibold text-neutral-800">{p.role ? `${p.name} · ${p.role}` : p.name}</p>
-                          <textarea
-                            className={`${taCls} mt-1.5 min-h-24 resize-y`}
-                            value={p.description}
-                            onFocus={(ev) => ev.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                            onChange={(ev) => {
-                              markEdited()
-                              setOptimizedResume((r) => r ? {
-                                ...r,
-                                projects: r.projects.map((x, idx) => idx === i ? { ...x, description: ev.target.value.slice(0, 1000) } : x),
-                              } : r)
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.skills.length > 0 && (
-                  <div>
-                    <SectionTitle title="技能" />
-                    <div className="flex flex-wrap gap-2">
-                      {optimizedResume.skills.map((s, i) => (
-                        <span key={i} className="rounded-lg bg-primary-50 px-2.5 py-1 text-sm text-primary-700">{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {optimizedResume.certificates.length > 0 && (
-                  <div>
-                    <SectionTitle title="证书 / 资质" />
-                    <p className="text-sm text-neutral-700">{optimizedResume.certificates.join(' · ')}</p>
-                  </div>
-                )}
+              </Card>
+            )}
+            <Card className="p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-800">AI 辅助调整</p>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+                    仅基于当前简历和原文做表达密度调整,不新增经历或事实。
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:min-w-[260px]">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={aiAdjustDisabled}
+                    onClick={() => void handleAiAdjust('condense')}
+                  >
+                    {adjusting === 'condense' ? '正在精简…' : 'AI 精简'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={aiAdjustDisabled}
+                    onClick={() => void handleAiAdjust('reformat')}
+                  >
+                    {adjusting === 'reformat' ? '正在调整…' : 'AI 调整排版'}
+                  </Button>
+                </div>
               </div>
+              {lastResumeBeforeAiAdjust && (
+                <div className="mt-3">
+                  <Button size="sm" variant="secondary" onClick={handleUndoAiAdjust}>
+                    撤销 AI 调整
+                  </Button>
+                </div>
+              )}
+              {adjustWarnings.length > 0 && (
+                <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-primary-700">
+                  {adjustWarnings.slice(0, 3).map((warning, idx) => (
+                    <p key={`${warning}-${idx}`}>{warning}</p>
+                  ))}
+                </div>
+              )}
+              {adjustError && (
+                <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-xs leading-relaxed text-error-fg">
+                  {adjustError}
+                </p>
+              )}
             </Card>
-
-            <p className="flex items-center gap-1.5 text-xs text-neutral-400">
-              <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              优化版中的学校/公司/证书等事实信息均来自你的简历原文,AI 未做任何添加;原文没有的内容保持为空,由你自行补充。
-            </p>
+            <OptimizedResumeEditor
+              resume={optimizedResume}
+              onChange={handleResumeChange}
+              layout={layout}
+              previewClassName={previewClassName}
+              previewStyle={previewStyle}
+            />
           </>
         )}
 

@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
-import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput } from './interfaces/ai-provider.interface'
+import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
 import { OpenAiProvider } from './providers/openai.provider.stub'
 import { ClaudeProvider } from './providers/claude.provider.stub'
@@ -12,14 +12,16 @@ import { AiLogService } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
+import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
-import type { ResumeExportFormat } from './dto/resume-generate.dto'
+import type { ResumeExportFormat, ResumeLayoutAdjustAction } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { findJobMaterialTemplate } from '../job-materials/job-material-templates'
 
 // 简历派生结果留存窗口(CLAUDE.md §11「不长期保存简历」)。
 // MockProvider 阶段 payload 仅诊断评分 / 通用建议文本;接真 provider 后
@@ -397,6 +399,75 @@ export class AiService {
     }
   }
 
+  /**
+   * Wave 2:对已生成的优化版简历做 AI 一键排版/精简。
+   *
+   * 该动作必须先通过 parse 行归属/一次性 token 门禁,再按 parse fileId 重新提取原文。
+   * 原文提取失败时硬失败,绝不退化成“只看 currentResume”继续调模型,避免失去防编造基线。
+   */
+  async adjustResumeLayout(
+    taskId: string,
+    currentResume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    layout: ResumeLayoutSettings | undefined,
+    requester: AiResultRequester = { endUserId: null, accessToken: null },
+  ): Promise<{ resume: GeneratedResume; warnings: string[] }> {
+    const parseResult = await this.loadAuthorizedResult<ParseResumeOutput>(taskId, 'parse', requester)
+    if (!parseResult) {
+      throw new NotFoundException({
+        error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },
+      })
+    }
+    if (this.provider.name !== 'llm') {
+      throw new ServiceUnavailableException({
+        error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: 'AI 简历优化模型尚未配置或未启用，请联系管理员' },
+      })
+    }
+
+    const t0 = Date.now()
+    try {
+      const parseOwner = await this.prisma.aiResumeResult.findUnique({
+        where: { taskId_kind: { taskId, kind: 'parse' } },
+        select: { endUserId: true },
+      })
+      const fileId = parseResult.fileId
+      let originalText: string | undefined
+      if (fileId) {
+        const extraction = await this.resumeExtraction.extractResumeText({
+          fileId,
+          endUserId: parseOwner?.endUserId ?? null,
+        })
+        if (extraction.ok) originalText = extraction.text
+      }
+      if (!originalText) {
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_RESUME_SOURCE_UNAVAILABLE', message: '简历原文已按隐私策略自动清理，请重新上传简历后再调整排版' },
+        })
+      }
+
+      const optimizer = new LlmResumeOptimizeService(this.llmConfig)
+      const result = await optimizer.adjustLayoutDraft({ currentResume, originalText, action, layout })
+      this.logService.record({
+        taskId,
+        provider: this.provider.name,
+        operation: 'adjustResumeLayout',
+        latencyMs: Date.now() - t0,
+        status: 'success',
+      })
+      return result
+    } catch (err) {
+      this.logService.record({
+        taskId,
+        provider: this.provider.name,
+        operation: 'adjustResumeLayout',
+        latencyMs: Date.now() - t0,
+        status: 'failed',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+      })
+      throw err
+    }
+  }
+
   // ── 阶段2A:AI 简历生成(引导式表单 → 只润色不编造)─────────────────────────
 
   /**
@@ -508,15 +579,15 @@ export class AiService {
    *   匿名 / system 文件仍走短期保存,且不能被会员转为长期保存。
    * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
    * - FilesService.upload 按 purpose='resume_upload' 的 MIME 白名单校验(见
-   *   files/file-validation.ts PURPOSE_POLICY),txt/md 当前不在白名单内,
-   *   会在 upload 阶段抛 FILE_MIME_NOT_ALLOWED(400)——这是既有安全校验,
-   *   本次改动不放宽/绕过该白名单。
+   *   files/file-validation.ts PURPOSE_POLICY);pdf/docx/txt/md 均为受控导出格式。
    */
   async exportGeneratedResume(
     resume: GeneratedResume,
     endUserId: string | null,
     sourceFileId: string | null = null,
     format: ResumeExportFormat = 'pdf',
+    layout?: ResumeLayoutSettings,
+    templateId?: string,
   ): Promise<{
     fileId: string
     filename: string
@@ -528,6 +599,15 @@ export class AiService {
     printFileUrl?: string
   }> {
     this.assertExportFormatAllowed(format)
+    const template = format === 'pdf' && templateId ? findJobMaterialTemplate(templateId) : null
+    if (format === 'pdf' && templateId && (!template || template.status !== 'published' || template.type !== 'resume_template' || !template.resumeLayoutPreset)) {
+      throw new BadRequestException({
+        error: {
+          code: 'AI_RESUME_TEMPLATE_UNSUPPORTED',
+          message: '简历模板不存在、未发布或不支持自动填充',
+        },
+      })
+    }
 
     let buffer: Buffer
     let pageCount: number
@@ -558,7 +638,7 @@ export class AiService {
       }
       case 'pdf':
       default: {
-        const rendered = await this.resumePdf.render(resume)
+        const rendered = await this.resumePdf.render(resume, { layout, templatePreset: template?.resumeLayoutPreset })
         buffer = rendered.buffer
         pageCount = rendered.pageCount
         mimeType = 'application/pdf'
