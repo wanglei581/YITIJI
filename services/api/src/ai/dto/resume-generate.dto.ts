@@ -24,6 +24,7 @@ export type ResumeLayoutLineSpacing = 'compact' | 'standard' | 'relaxed'
 export type ResumeLayoutMargin = 'narrow' | 'normal' | 'wide'
 export type ResumeLayoutColumns = 1 | 2
 export type ResumeLayoutAccent = 'blue' | 'green' | 'slate'
+export type ResumeLayoutAdjustAction = 'reformat' | 'condense'
 
 /**
  * 阶段2A AI 简历生成 DTO。
@@ -183,6 +184,43 @@ export class ResumeGenerateExportDto {
   format?: ResumeExportFormat
 
   /** PDF 排版参数(Wave 2):仅 PDF 消费;docx/txt/md 忽略该字段且不伪造排版效果。 */
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => ResumeLayoutDto)
+  layout?: ResumeLayoutDto
+}
+
+export class ResumeLayoutAdjustResumeDto {
+  @IsObject() @ValidateNested() @Type(() => ResumeGenBasicDto)
+  basic!: ResumeGenBasicDto
+
+  @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
+  intention!: ResumeGenIntentionDto
+
+  @IsString() @MaxLength(600)
+  summary!: string
+
+  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenEducationDto)
+  education!: ResumeGenEducationDto[]
+
+  @IsArray() @ArrayMaxSize(8) @ValidateNested({ each: true }) @Type(() => ResumeGenExperienceDto)
+  experience!: ResumeGenExperienceDto[]
+
+  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenProjectDto)
+  projects!: ResumeGenProjectDto[]
+
+  @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(40, { each: true })
+  skills!: string[]
+
+  @IsArray() @ArrayMaxSize(15) @IsString({ each: true }) @MaxLength(60, { each: true })
+  certificates!: string[]
+}
+
+export class ResumeLayoutAdjustDto {
+  @IsObject() @ValidateNested() @Type(() => ResumeLayoutAdjustResumeDto)
+  resume!: ResumeLayoutAdjustResumeDto
+
+  @IsIn(['reformat', 'condense'])
+  action!: ResumeLayoutAdjustAction
+
   @IsOptional() @IsObject() @ValidateNested() @Type(() => ResumeLayoutDto)
   layout?: ResumeLayoutDto
 }

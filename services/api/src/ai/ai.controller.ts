@@ -10,7 +10,7 @@ import { RedisService } from '../common/redis/redis.service'
 import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
-import { ResumeGenerateExportDto, ResumeGenerateRequestDto } from './dto/resume-generate.dto'
+import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
 import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
@@ -173,6 +173,34 @@ export class AiController {
         providerName: this.aiService.getProviderName(),
         status: result.status,
         moduleCount: result.modules?.length ?? 0,
+        hasEndUser: requester.endUserId !== null,
+      },
+      ipAddress: ipOf(req),
+      userAgent: uaOf(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
+  }
+
+  @Post('resume/records/:taskId/layout-adjust')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } }) // 真实 LLM 调整,公共一体机单 IP 收紧
+  async adjustResumeLayout(
+    @Param('taskId') taskId: string,
+    @Body() dto: ResumeLayoutAdjustDto,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'kiosk',
+      action: 'resume.layout_adjusted',
+      targetType: 'ai_task',
+      targetId: taskId,
+      payload: {
+        action: dto.action,
+        layout: dto.layout ? { columns: dto.layout.columns ?? 1, margin: dto.layout.margin ?? 'normal', fontScale: dto.layout.fontScale ?? 'standard', accent: dto.layout.accent ?? 'blue' } : null,
+        warningCount: result.warnings.length,
         hasEndUser: requester.endUserId !== null,
       },
       ipAddress: ipOf(req),

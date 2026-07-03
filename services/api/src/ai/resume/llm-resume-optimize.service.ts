@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import type {
   GeneratedResume,
   ResumeOptimizeModule,
+  ResumeLayoutSettings,
   ResumeReport,
   ResumeTargetContext,
 } from '../interfaces/ai-provider.interface'
@@ -39,6 +40,7 @@ const MAX_DESC_CHARS = 600
 const MAX_SKILL_CHARS = 40
 const MAX_MODULES = 8
 const MAX_MODULE_TEXT_CHARS = 600
+const MAX_WARNING_CHARS = 120
 /** before 片段至少这么长才有对比意义,过短串匹配也容易误判 */
 const MIN_BEFORE_CHARS = 6
 
@@ -69,6 +71,20 @@ const OPTIMIZE_SYSTEM_PROMPT = [
 const RETRY_HINT =
   '上一次输出不符合要求。请严格只输出 JSON;resume 中的学校/公司/证书/联系方式必须逐字来自简历原文;modules 的 before 必须是原文连续片段。'
 
+const LAYOUT_ADJUST_SYSTEM_PROMPT = [
+  '你是「AI 求职打印服务终端」的简历排版与内容微调引擎。你只在用户已确认的结构化简历基础上做表达密度调整。',
+  '严格要求:',
+  '1. 只输出一个 JSON 对象,不要解释、前后缀或代码块标记。',
+  '2. JSON 形如:{"resume":{"basic":{"name":"","phone":"","email":"","city":""},"intention":{"position":"","city":""},"summary":"","education":[{"school":"","major":"","degree":"","period":"","description":""}],"experience":[{"company":"","role":"","period":"","description":""}],"projects":[{"name":"","role":"","description":""}],"skills":[""],"certificates":[""]},"warnings":[""]}。',
+  '3. 不得新增任何学校、公司、岗位、项目、证书、联系方式、时间段或数字;所有事实必须来自原始简历文本或当前结构化简历的字段值。',
+  '4. 不得增加 education/experience/projects/skills/certificates 条目数量;信息不足时保留原字段或精简描述。',
+  '5. action=condense 时压缩 summary/description 字数,保留原数字;action=reformat 时按排版参数调整措辞密度。',
+  '6. 不得输出任何录用、投递、面试邀约、Offer 或通过率类承诺。',
+].join('\n')
+
+const LAYOUT_ADJUST_RETRY_HINT =
+  '上一次输出不符合要求。请只输出 JSON;不得新增条目、事实字段或数字;不得包含录用/投递/面试承诺。'
+
 interface ChatMessage {
   role: 'system' | 'user'
   content: string
@@ -77,6 +93,20 @@ interface ChatMessage {
 export interface OptimizeResult {
   optimizedResume: GeneratedResume
   modules: ResumeOptimizeModule[]
+}
+
+export type ResumeLayoutAdjustAction = 'reformat' | 'condense'
+
+export interface LayoutAdjustInput {
+  currentResume: GeneratedResume
+  originalText: string
+  action: ResumeLayoutAdjustAction
+  layout?: ResumeLayoutSettings
+}
+
+export interface LayoutAdjustResult {
+  resume: GeneratedResume
+  warnings: string[]
 }
 
 /**
@@ -168,6 +198,57 @@ export class LlmResumeOptimizeService {
 
     throw new ServiceUnavailableException({
       error: { code: 'AI_OPTIMIZE_INVALID_OUTPUT', message: 'AI 简历优化服务暂时不可用，请稍后重试' },
+    })
+  }
+
+  /**
+   * 基于当前结构化简历 + 原始简历文本做 AI 一键排版/精简。
+   *
+   * 安全边界:
+   * - 仍复用 resume_optimize 功能级凭证;未配置/未启用时明确失败,不 fallback mock。
+   * - 事实基线 = 原始简历文本 + 当前简历字段值;字段名(JSON key)不作为事实来源。
+   * - 条目数量不得增加;学校/公司/项目/证书/联系方式/数字新增即判非法。
+   */
+  async adjustLayoutDraft(input: LayoutAdjustInput): Promise<LayoutAdjustResult> {
+    const apiKey = this.config.getApiKey('resume_optimize')
+    const cfg = this.config.getConfig('resume_optimize')
+    if (!apiKey || !cfg.enabled) {
+      throw new ServiceUnavailableException({
+        error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: 'AI 简历优化模型尚未配置或未启用，请联系管理员' },
+      })
+    }
+
+    const originalText = (input.originalText ?? '').slice(0, MAX_INPUT_CHARS)
+    if (!originalText.trim()) {
+      throw new ServiceUnavailableException({
+        error: { code: 'AI_RESUME_SOURCE_UNAVAILABLE', message: '简历原文已按隐私策略自动清理，请重新上传简历后再调整排版' },
+      })
+    }
+    const factSource = `${originalText}\n${extractResumeValueText(input.currentResume)}`
+    const layoutHint = buildLayoutHint(input.layout)
+    const actionHint =
+      input.action === 'condense'
+        ? 'action=condense:请精简 summary 与 description,让版面更紧凑,不得丢失原文数字。'
+        : 'action=reformat:请按排版参数调整表达密度和条目措辞,不得新增事实。'
+    const baseMessages: ChatMessage[] = [
+      { role: 'system', content: LAYOUT_ADJUST_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `${actionHint}\n${layoutHint}\n当前结构化简历(JSON,字段名不是事实来源):\n${JSON.stringify(input.currentResume)}\n\n原始简历文本:\n${originalText}`,
+      },
+    ]
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const messages =
+        attempt === 1 ? baseMessages : [...baseMessages, { role: 'system' as const, content: LAYOUT_ADJUST_RETRY_HINT }]
+      const raw = await this.callLlm(cfg.baseURL, apiKey, cfg.model, OPTIMIZE_TEMPERATURE, messages)
+      const result = this.parseLayoutAdjustAndValidate(raw, factSource, cfg.forbiddenWords, input.currentResume)
+      if (result) return result
+      this.logger.warn(`resume layout adjust: invalid output (attempt ${attempt}/2)`)
+    }
+
+    throw new ServiceUnavailableException({
+      error: { code: 'AI_LAYOUT_ADJUST_INVALID_OUTPUT', message: 'AI 排版调整结果包含无法确认的信息，系统已拦截' },
     })
   }
 
@@ -340,6 +421,180 @@ export class LlmResumeOptimizeService {
     }
     return { optimizedResume, modules }
   }
+
+  private parseLayoutAdjustAndValidate(
+    raw: string,
+    factSource: string,
+    forbiddenWords: string[],
+    currentResume: GeneratedResume,
+  ): LayoutAdjustResult | null {
+    const jsonStr = extractJson(raw)
+    if (!jsonStr) return null
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch {
+      return null
+    }
+    if (!parsed || typeof parsed !== 'object') return null
+    const obj = parsed as Record<string, unknown>
+    const rawResume = obj['resume']
+    if (!rawResume || typeof rawResume !== 'object') return null
+    const r = rawResume as Record<string, unknown>
+
+    if (arrayLength(r['education']) > currentResume.education.length) return null
+    if (arrayLength(r['experience']) > currentResume.experience.length) return null
+    if (arrayLength(r['projects']) > currentResume.projects.length) return null
+    if (arrayLength(r['skills']) > currentResume.skills.length) return null
+    if (arrayLength(r['certificates']) > currentResume.certificates.length) return null
+
+    const normFact = normalizeForMatch(factSource)
+    const inFact = (value: string | undefined): boolean => {
+      if (!value || !value.trim()) return true
+      const needle = normalizeForMatch(value)
+      return needle.length > 0 && normFact.includes(needle)
+    }
+    const hasNoNewNumbers = (value: string): boolean => {
+      for (const token of value.match(/\d+(?:\.\d+)?%?/g) ?? []) {
+        if (!normFact.includes(normalizeForMatch(token))) return false
+      }
+      return true
+    }
+    const blocked = [...OPTIMIZE_GUARD_TERMS, ...forbiddenWords]
+    const clean = (value: unknown, maxLen: number): string | null => {
+      if (typeof value !== 'string') return ''
+      const text = value.trim().slice(0, maxLen)
+      if (text && containsForbiddenWord(text, blocked)) return null
+      if (text && !hasNoNewNumbers(text)) return null
+      return text
+    }
+    const fact = (value: string | undefined): boolean => inFact(value) && hasNoNewNumbers(value ?? '')
+
+    const basicRaw = (r['basic'] ?? {}) as Record<string, unknown>
+    const intentionRaw = (r['intention'] ?? {}) as Record<string, unknown>
+    const summary = clean(r['summary'], MAX_SUMMARY_CHARS)
+    if (summary === null) return null
+
+    const name = strOf(basicRaw, 'name', 50)
+    const phone = strOf(basicRaw, 'phone', 30)
+    const email = strOf(basicRaw, 'email', 100)
+    const city = strOf(basicRaw, 'city', 50)
+    const position = strOf(intentionRaw, 'position', 60)
+    const intentionCity = strOf(intentionRaw, 'city', 50)
+    if (!fact(name) || !fact(phone) || !fact(email) || !fact(city) || !fact(position) || !fact(intentionCity)) return null
+
+    const education: GeneratedResume['education'] = []
+    for (const item of asArray(r['education'], currentResume.education.length)) {
+      const school = strOf(item, 'school', 100)
+      if (!school) continue
+      const major = strOf(item, 'major', 60)
+      const degree = strOf(item, 'degree', 20)
+      const period = strOf(item, 'period', 40)
+      if (!fact(school) || !fact(major) || !fact(degree) || !fact(period)) return null
+      const description = clean(item['description'], MAX_DESC_CHARS)
+      if (description === null) return null
+      education.push({ school, major: major || undefined, degree: degree || undefined, period: period || undefined, description: description || undefined })
+    }
+
+    const experience: GeneratedResume['experience'] = []
+    for (const item of asArray(r['experience'], currentResume.experience.length)) {
+      const company = strOf(item, 'company', 100)
+      const role = strOf(item, 'role', 60)
+      if (!company || !role) continue
+      const period = strOf(item, 'period', 40)
+      if (!fact(company) || !fact(role) || !fact(period)) return null
+      const description = clean(item['description'], MAX_DESC_CHARS)
+      if (description === null) return null
+      experience.push({ company, role, period: period || undefined, description })
+    }
+
+    const projects: GeneratedResume['projects'] = []
+    for (const item of asArray(r['projects'], currentResume.projects.length)) {
+      const name = strOf(item, 'name', 100)
+      if (!name) continue
+      const role = strOf(item, 'role', 60)
+      if (!fact(name) || !fact(role)) return null
+      const description = clean(item['description'], MAX_DESC_CHARS)
+      if (description === null) return null
+      projects.push({ name, role: role || undefined, description })
+    }
+
+    const skills: string[] = []
+    for (const skill of asStrArray(r['skills'], currentResume.skills.length)) {
+      const cleaned = clean(skill, MAX_SKILL_CHARS)
+      if (cleaned === null || !fact(cleaned)) return null
+      if (cleaned) skills.push(cleaned)
+    }
+
+    const certificates: string[] = []
+    for (const cert of asStrArray(r['certificates'], currentResume.certificates.length)) {
+      const cleaned = clean(cert, 60)
+      if (cleaned === null || !fact(cleaned)) return null
+      if (cleaned) certificates.push(cleaned)
+    }
+
+    const warnings = asStrArray(obj['warnings'], 5)
+      .map((value) => clean(value, MAX_WARNING_CHARS))
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+
+    return {
+      resume: {
+        basic: {
+          name,
+          phone: phone || undefined,
+          email: email || undefined,
+          city: city || undefined,
+        },
+        intention: {
+          position,
+          city: intentionCity || undefined,
+        },
+        summary,
+        education,
+        experience,
+        projects,
+        skills,
+        certificates,
+      },
+      warnings,
+    }
+  }
+}
+
+function buildLayoutHint(layout?: ResumeLayoutSettings): string {
+  if (!layout) return '排版参数:默认。'
+  const parts = [
+    layout.fontScale ? `字号=${layout.fontScale}` : '',
+    layout.lineSpacing ? `行距=${layout.lineSpacing}` : '',
+    layout.margin ? `页边距=${layout.margin}` : '',
+    layout.columns ? `栏数=${layout.columns}` : '',
+    layout.accent ? `主色=${layout.accent}` : '',
+  ].filter(Boolean)
+  return `排版参数:${parts.join('；') || '默认'}。`
+}
+
+function extractResumeValueText(resume: GeneratedResume): string {
+  const values: string[] = []
+  const collect = (value: unknown) => {
+    if (typeof value === 'string' || typeof value === 'number') {
+      const text = String(value).trim()
+      if (text) values.push(text)
+      return
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) collect(item)
+      return
+    }
+    if (value && typeof value === 'object') {
+      for (const item of Object.values(value)) collect(item)
+    }
+  }
+  collect(resume)
+  return values.join('\n')
+}
+
+function arrayLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0
 }
 
 function asArray(value: unknown, cap: number): Record<string, unknown>[] {

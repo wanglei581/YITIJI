@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import type { AiProvider, AiProviderName, GeneratedResume, GenerateResumeOutput, ParseResumeInput, ParseResumeOutput, OptimizeResumeOutput, ChatInput, ChatOutput, ResumeGenerateInput, ResumeLayoutSettings } from './interfaces/ai-provider.interface'
 import { MockAiProvider } from './providers/mock.provider'
@@ -12,10 +12,11 @@ import { AiLogService } from './ai-log.service'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
+import { LlmResumeOptimizeService } from './resume/llm-resume-optimize.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
 import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
-import type { ResumeExportFormat } from './dto/resume-generate.dto'
+import type { ResumeExportFormat, ResumeLayoutAdjustAction } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
@@ -391,6 +392,75 @@ export class AiService {
         operation: 'optimizeResume',
         latencyMs: Date.now() - t0,
         status:    'failed',
+        errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
+      })
+      throw err
+    }
+  }
+
+  /**
+   * Wave 2:对已生成的优化版简历做 AI 一键排版/精简。
+   *
+   * 该动作必须先通过 parse 行归属/一次性 token 门禁,再按 parse fileId 重新提取原文。
+   * 原文提取失败时硬失败,绝不退化成“只看 currentResume”继续调模型,避免失去防编造基线。
+   */
+  async adjustResumeLayout(
+    taskId: string,
+    currentResume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    layout: ResumeLayoutSettings | undefined,
+    requester: AiResultRequester = { endUserId: null, accessToken: null },
+  ): Promise<{ resume: GeneratedResume; warnings: string[] }> {
+    const parseResult = await this.loadAuthorizedResult<ParseResumeOutput>(taskId, 'parse', requester)
+    if (!parseResult) {
+      throw new NotFoundException({
+        error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请先提交简历解析' },
+      })
+    }
+    if (this.provider.name !== 'llm') {
+      throw new ServiceUnavailableException({
+        error: { code: 'AI_PROVIDER_NOT_CONFIGURED', message: 'AI 简历优化模型尚未配置或未启用，请联系管理员' },
+      })
+    }
+
+    const t0 = Date.now()
+    try {
+      const parseOwner = await this.prisma.aiResumeResult.findUnique({
+        where: { taskId_kind: { taskId, kind: 'parse' } },
+        select: { endUserId: true },
+      })
+      const fileId = parseResult.fileId
+      let originalText: string | undefined
+      if (fileId) {
+        const extraction = await this.resumeExtraction.extractResumeText({
+          fileId,
+          endUserId: parseOwner?.endUserId ?? null,
+        })
+        if (extraction.ok) originalText = extraction.text
+      }
+      if (!originalText) {
+        throw new ServiceUnavailableException({
+          error: { code: 'AI_RESUME_SOURCE_UNAVAILABLE', message: '简历原文已按隐私策略自动清理，请重新上传简历后再调整排版' },
+        })
+      }
+
+      const optimizer = new LlmResumeOptimizeService(this.llmConfig)
+      const result = await optimizer.adjustLayoutDraft({ currentResume, originalText, action, layout })
+      this.logService.record({
+        taskId,
+        provider: this.provider.name,
+        operation: 'adjustResumeLayout',
+        latencyMs: Date.now() - t0,
+        status: 'success',
+      })
+      return result
+    } catch (err) {
+      this.logService.record({
+        taskId,
+        provider: this.provider.name,
+        operation: 'adjustResumeLayout',
+        latencyMs: Date.now() - t0,
+        status: 'failed',
         errorCode: err instanceof Error ? err.constructor.name : 'UNKNOWN',
       })
       throw err
