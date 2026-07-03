@@ -52,6 +52,8 @@
 
 2026-07-03 追加：**W5 Kiosk fusion-youth 换装（token 层 + 全量色彩清扫）完成**。① 新增 `packages/ui/src/styles/fusion-youth.css`（青绿米纸定稿 v4/v5 口径：品牌青 primary 色阶、米纸 canvas/暖白 surface、加深 muted、墨绿 dark、品类色 clay/wheat/plum、触控版大圆角 14/18/26px、宋体 `--font-heading`），仅 `apps/kiosk` 引入；② KioskLayout 底部导航轻量原型化（青玉胶囊活跃态，触控目标 ≥56px 保持）；③ Kiosk 92 个文件全量色彩清扫：gray/slate→neutral、blue/teal→primary、绿系→success、琥珀橙黄→warning(陶)、红粉→error(朱)、紫系→plum(梅)、天蓝青系→info(青蓝)，`.claude/launch.json` 增加 `kiosk-w5`（5276）避开他会话端口占用。验证：kiosk typecheck/lint 0 错、**21 个静态守卫全部 PASS**（含 print-confirm-honest / scan-production-guard / production-real-services 等合规诚实性守卫）、CI 式 env 注入生产 build 通过、1080×1920 竖屏浏览器实测首页（墨绿 hero + 青玉 CTA + 米纸卡片）与岗位信息页（真实 11 条岗位 + 合规文案原样 + 青玉筛选胶囊）渲染正常。合规红线、入口结构、按钮文案零改动。后续：Kiosk 逐页细节精修（品类色微调：政策→麦金、打印→青蓝等）与后台 A 档内容增强并行推进。
 
+2026-07-03 追加：**换装 PR 已开 + A 档增强第一批完成**。① W0–W5 全部换装提交推送 `origin/claude/hungry-cori-9f2406` 并开 PR #127（含零回归证据清单）；Kiosk 关键页巡检（打印扫描/政策/岗位/我的）零视觉缺陷。② A 档第一批（深度提升方案 §4.1/§4.2）：岗位列表新增展示端排序（最新同步默认 / 薪资标注优先——仅重排已载入真实数据，薪资优先按"来源是否提供薪资"排序不伪造数值）；首页登录态统计数字（简历/文档/AI记录/收藏）从纯展示改为点击直达 `/me/*` 对应明细页；核实「岗位描述富文本渲染」详情页已有 `splitTextLines` 实现，不重复开发。验证：kiosk tsc/eslint、job-info-ui / home-toolbox-ui / job-ai-ui 三守卫、生产 build 全过；浏览器 E2E——dev log 短信验证码真实登录 → 首页统计点击 → 直达我的简历页；排序切换 aria-pressed 实测。记忆库已登记换装状态（console-kiosk-theme-waves-pr127），防后续会话用回旧灰蓝类。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |
