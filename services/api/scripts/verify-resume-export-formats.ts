@@ -26,9 +26,8 @@ if (!process.env['FILE_SIGNING_SECRET'] || process.env['FILE_SIGNING_SECRET'].le
 process.env['FILE_STORAGE_DRIVER'] = 'local'
 process.env['AI_PROVIDER'] = 'mock'
 if (!process.env['DATABASE_URL']) {
-  // worktree 若无独立 dev.db,回退只读复用主仓库 dev.db(与 verify-resume-generate 同做法)。
-  process.env['DATABASE_URL'] =
-    'file:/Users/wanglei/AI求职打印服务终端/services/api/prisma/dev.db'
+  // worktree 未显式传入时,回退到本包内 prisma/dev.db(相对定位,不硬编码绝对路径;CLAUDE.md §17)。
+  process.env['DATABASE_URL'] = `file:${join(__dirname, '../prisma/dev.db')}`
 }
 
 import { PrismaService } from '../src/prisma/prisma.service'

@@ -39,7 +39,7 @@ export class ResumeDocxService {
       new Paragraph({
         heading: HeadingLevel.TITLE,
         spacing: { after: 120 },
-        children: [new TextRun({ text: resume.basic.name, bold: true, color: INK, size: 44 })],
+        children: [new TextRun({ text: resume.basic.name || '(未填写姓名)', bold: true, color: INK, size: 44 })],
       }),
     )
 
