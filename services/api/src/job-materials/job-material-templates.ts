@@ -19,6 +19,17 @@ export const JOB_MATERIAL_TEMPLATES: JobMaterialTemplateView[] = [
     recommendedFor: '简历诊断、AI 简历优化、现场打印前版式参考',
     outputFilename: '清爽通用简历模板.pdf',
     fields: [...COMMON_FIELDS],
+    resumeLayoutPreset: {
+      style: 'clean',
+      defaultLayout: {
+        fontScale: 'standard',
+        lineSpacing: 'standard',
+        margin: 'normal',
+        columns: 1,
+        accent: 'blue',
+      },
+      sectionOrder: ['header', 'summary', 'education', 'experience', 'projects', 'skills', 'certificates'],
+    },
   },
   {
     id: 'campus-cover-letter',
