@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
+import { FilterChip } from '../components/FilterChip'
 import { FileTextIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import {
   adminOrdersReadonlyService,
@@ -56,24 +57,6 @@ function amountText(amountCents: number, currency: string): string {
 }
 
 // ─── 原型规范局部件 ───────────────────────────────────────────────────────────
-
-/** 筛选 chip（h-30 圆角胶囊，激活态墨底白字）。 */
-function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        'h-[30px] rounded-full border px-[13px] text-[12.5px] font-bold transition-colors ' +
-        (active
-          ? 'border-neutral-900 bg-neutral-900 text-white'
-          : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')
-      }
-    >
-      {label}
-    </button>
-  )
-}
 
 const TH_CLS = 'whitespace-nowrap border-b border-neutral-900/10 px-2.5 py-2 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500'
 const TD_CLS = 'whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-[11px]'

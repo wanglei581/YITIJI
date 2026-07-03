@@ -3,6 +3,7 @@ import { mergeById, useRefreshable } from '@ai-job-print/refresh'
 import { Card, EmptyState, StatusBadge } from '@ai-job-print/ui'
 import { PrinterIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
 import { Pagination } from '../components/DataTable'
+import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import { getPrinters, type AdminPrinterRecord } from '../../services/api/devices'
 
@@ -16,11 +17,11 @@ const STATUS_MAP: Record<AdminPrinterRecord['status'], { badge: 'success' | 'err
 }
 
 const PAPER_MAP: Record<string, { text: string; color: string }> = {
-  normal:  { text: '正常', color: 'text-green-600' },
-  low:     { text: '偏少', color: 'text-orange-500' },
-  empty:   { text: '已空', color: 'text-red-500' },
-  jam:     { text: '卡纸', color: 'text-red-500' },
-  unknown: { text: '未上报', color: 'text-gray-400' },
+  normal:  { text: '正常', color: 'text-success-fg' },
+  low:     { text: '偏少', color: 'text-warning-fg' },
+  empty:   { text: '已空', color: 'text-error-fg' },
+  jam:     { text: '卡纸', color: 'text-error-fg' },
+  unknown: { text: '未上报', color: 'text-neutral-500' },
 }
 
 const FILTERS = ['全部', '在线', '离线', '故障'] as const
@@ -106,54 +107,50 @@ export default function PrintersPage() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-sm text-neutral-500">打印机状态来自 Windows Terminal Agent 心跳上报</p>
-        <button
-          onClick={() => void refresh()}
-          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
-        >
-          <RefreshCwIcon className="h-3.5 w-3.5" />
-          刷新
-        </button>
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+      {/* 工具条：搜索 + 状态 chips + 刷新 */}
+      <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
+        <div className="flex h-[34px] min-w-[240px] items-center gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3">
+          <SearchIcon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
           <input
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="搜索名称、终端、SN…"
-            className="h-9 rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-neutral-900 outline-none placeholder:text-neutral-500"
           />
         </div>
-        <div className="flex gap-2">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => handleFilterChange(f)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                filter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
-            >
-              {f}
-              <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-            </button>
-          ))}
+        {FILTERS.map((f) => (
+          <FilterChip
+            key={f}
+            active={filter === f}
+            label={f}
+            count={counts[f]}
+            onClick={() => handleFilterChange(f)}
+          />
+        ))}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[12.5px] text-neutral-500">状态来自 Terminal Agent 心跳上报</span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 transition-colors hover:bg-neutral-50"
+          >
+            <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            刷新
+          </button>
         </div>
       </div>
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
               <tr>
                 {['设备名称', '型号', 'SN', '绑定终端', '状态', '当前任务', '碳粉余量', '纸张状态', '故障信息', '最近同步'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {loading ? (
                 [0, 1, 2, 3, 4].map((i) => (
                   <tr key={i}>
@@ -166,8 +163,8 @@ export default function PrintersPage() {
                 <tr>
                   <td colSpan={10}>
                     <div className="flex flex-col items-center gap-3 py-12">
-                      <p className="text-sm text-neutral-400">{errorMessage}</p>
-                      <button onClick={() => void refresh()} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
+                      <p className="text-sm text-neutral-500">{errorMessage}</p>
+                      <button onClick={() => void refresh()} className="rounded-[9px] bg-primary-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-primary-700">重试</button>
                     </div>
                   </td>
                 </tr>
@@ -185,36 +182,51 @@ export default function PrintersPage() {
                   const s = STATUS_MAP[p.status]
                   const paper = PAPER_MAP[p.paperStatus ?? 'unknown'] ?? PAPER_MAP.unknown
                   return (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-800">
+                    <tr key={p.id} className="transition-colors hover:bg-neutral-50">
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-neutral-900">
                         <div className="flex items-center gap-2">
-                          <PrinterIcon className="h-4 w-4 text-gray-400" />
+                          <PrinterIcon className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                           {p.name}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{p.model ?? '未上报'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{p.serialNumber ?? '未上报'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">{p.terminalCode}</td>
-                      <td className="px-4 py-3"><StatusBadge status={s.badge} label={s.label} /></td>
-                      <td className="px-4 py-3 text-xs text-gray-600">
-                        {p.currentTask ?? <span className="text-gray-300">空闲</span>}
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{p.model ?? '未上报'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{p.serialNumber ?? '未上报'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">{p.terminalCode}</td>
+                      <td className="px-4 py-3"><StatusBadge dot status={s.badge} label={s.label} /></td>
+                      <td className="px-4 py-3 text-xs text-neutral-700">
+                        {p.currentTask ?? <span className="text-neutral-400">空闲</span>}
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
-                        {p.tonerLevel === null ? '未上报' : `${p.tonerLevel}%`}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {p.tonerLevel === null ? (
+                          <span className="text-xs text-neutral-500">未上报</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="h-1.5 w-[52px] overflow-hidden rounded-full bg-neutral-100">
+                              <span
+                                className={
+                                  'block h-full rounded-full ' +
+                                  (p.tonerLevel < 20 ? 'bg-gradient-to-r from-[#c9764a] to-[#9e5330]' : 'bg-primary-600')
+                                }
+                                style={{ width: `${Math.max(0, Math.min(100, p.tonerLevel))}%` }}
+                              />
+                            </span>
+                            <span className="text-xs tabular-nums text-neutral-500">{p.tonerLevel}%</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-medium ${paper.color}`}>{paper.text}</span>
+                        <span className={`text-xs font-semibold ${paper.color}`}>{paper.text}</span>
                         {p.paperTrayLevel !== null && (
-                          <span className="ml-1 text-xs text-gray-400">({p.paperTrayLevel}张)</span>
+                          <span className="ml-1 text-xs tabular-nums text-neutral-500">({p.paperTrayLevel}张)</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {p.fault
-                          ? <span className="text-red-500">{p.fault}</span>
-                          : <span className="text-gray-300">—</span>
+                          ? <span className="font-semibold text-error-fg">{p.fault}</span>
+                          : <span className="text-neutral-400">—</span>
                         }
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{relativeTime(p.lastSyncAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-neutral-500">{relativeTime(p.lastSyncAt)}</td>
                     </tr>
                   )
                 })

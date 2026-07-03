@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
-import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon } from 'lucide-react'
+import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon, SearchIcon } from 'lucide-react'
 import { Pagination, useTableState } from '../components/DataTable'
+import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import {
   getTerminals,
@@ -300,42 +301,46 @@ export default function TerminalsPage() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">共 {total} 台终端</p>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索编号、设备名、MAC、位置、IP..." className="h-8 w-80 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-            <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-          </div>
-          <button onClick={() => void refresh()} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
-            <RefreshCwIcon className="h-3.5 w-3.5" />刷新
+      {/* 工具条：搜索 + 状态 chips + 刷新 */}
+      <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
+        <div className="flex h-[34px] min-w-[280px] items-center gap-2 rounded-[9px] border border-neutral-900/10 bg-surface px-3">
+          <SearchIcon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索编号、设备名、MAC、位置、IP..."
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-neutral-900 outline-none placeholder:text-neutral-500"
+          />
+        </div>
+        {FILTERS.map((f) => (
+          <FilterChip
+            key={f}
+            active={filter === f}
+            label={f}
+            count={counts[f]}
+            onClick={() => { setFilter(f); setPage(1) }}
+          />
+        ))}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[12.5px] text-neutral-500">共 {total} 台终端</span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-xs font-bold text-neutral-700 transition-colors hover:bg-neutral-50"
+          >
+            <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />刷新
           </button>
         </div>
-      </div>
-
-      {/* 筛选标签 */}
-      <div className="mb-4 flex gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => { setFilter(f); setPage(1) }}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              filter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {f}
-            <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-          </button>
-        ))}
       </div>
 
       {/* 归属保存提示 */}
       {notice && (
         <div
-          className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
+          className={`mb-3 rounded-[9px] border px-4 py-3 text-sm ${
             notice.type === 'success'
-              ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-              : 'border-red-100 bg-red-50 text-red-700'
+              ? 'border-success/20 bg-success-bg text-success-fg'
+              : 'border-error/20 bg-error-bg text-error-fg'
           }`}
         >
           {notice.text}
@@ -345,20 +350,20 @@ export default function TerminalsPage() {
       {/* 表格 */}
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
               <tr>
                 {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {loading ? (
                 [0, 1, 2, 3, 4].map((i) => (
                   <tr key={i}>
                     {Array.from({ length: TABLE_COLS }).map((_, j) => (
-                      <td key={j} className="px-4 py-4"><div className="h-3 w-3/4 animate-pulse rounded bg-gray-100" /></td>
+                      <td key={j} className="px-3 py-4"><div className="h-3 w-3/4 animate-pulse rounded bg-neutral-100" /></td>
                     ))}
                   </tr>
                 ))
@@ -366,8 +371,8 @@ export default function TerminalsPage() {
                 <tr>
                   <td colSpan={TABLE_COLS}>
                     <div className="flex flex-col items-center gap-3 py-12">
-                      <p className="text-sm text-gray-400">终端数据加载失败,请稍后重试</p>
-                      <button onClick={() => void refresh()} className="rounded-lg bg-primary-600 px-4 py-1.5 text-xs text-white hover:bg-primary-700">重试</button>
+                      <p className="text-sm text-neutral-500">终端数据加载失败,请稍后重试</p>
+                      <button onClick={() => void refresh()} className="rounded-[9px] bg-primary-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-primary-700">重试</button>
                     </div>
                   </td>
                 </tr>
@@ -382,8 +387,8 @@ export default function TerminalsPage() {
                   const runtimeView = runtimeStatusView(t)
                   const printerView = printerStatusView(t.printerStatus ?? null)
                   return (
-                    <tr key={t.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-700">{t.terminalCode}</td>
+                    <tr key={t.id} className="hover:bg-neutral-50">
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">{t.terminalCode}</td>
                       <td className="min-w-[260px] px-4 py-3 text-xs">
                         {profileEditingId === t.id ? (
                           <div className="space-y-2">
@@ -393,14 +398,14 @@ export default function TerminalsPage() {
                                 onChange={(e) => setProfileDraft((d) => ({ ...d, displayName: e.target.value }))}
                                 disabled={profileSaving}
                                 placeholder="设备名称"
-                                className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                                className="h-7 rounded-md border border-neutral-200 px-2 text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
                               />
                               <input
                                 value={profileDraft.macAddress ?? ''}
                                 onChange={(e) => setProfileDraft((d) => ({ ...d, macAddress: e.target.value }))}
                                 disabled={profileSaving}
                                 placeholder="MAC 地址"
-                                className="h-7 rounded-md border border-gray-200 px-2 font-mono text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                                className="h-7 rounded-md border border-neutral-200 px-2 font-mono text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
                               />
                             </div>
                             <input
@@ -408,16 +413,16 @@ export default function TerminalsPage() {
                               onChange={(e) => setProfileDraft((d) => ({ ...d, locationLabel: e.target.value }))}
                               disabled={profileSaving}
                               placeholder="摆放位置"
-                              className="h-7 w-full rounded-md border border-gray-200 px-2 text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                              className="h-7 w-full rounded-md border border-neutral-200 px-2 text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
                             />
                             <div className="flex items-center justify-between gap-2">
-                              <label className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                              <label className="inline-flex items-center gap-1.5 text-xs text-neutral-500">
                                 <input
                                   type="checkbox"
                                   checked={profileDraft.enabled ?? true}
                                   onChange={(e) => setProfileDraft((d) => ({ ...d, enabled: e.target.checked }))}
                                   disabled={profileSaving}
-                                  className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600"
+                                  className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600"
                                 />
                                 启用终端
                               </label>
@@ -438,7 +443,7 @@ export default function TerminalsPage() {
                                   disabled={profileSaving}
                                   title="取消"
                                   aria-label="取消"
-                                  className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                  className="flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-50"
                                 >
                                   <XIcon className="h-3.5 w-3.5" />
                                 </button>
@@ -448,8 +453,8 @@ export default function TerminalsPage() {
                         ) : (
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate font-medium text-gray-800">{t.displayName || '未命名终端'}</p>
-                              <p className="mt-0.5 max-w-[220px] truncate text-gray-400">{t.locationLabel || '未设置摆放位置'}</p>
+                              <p className="truncate font-medium text-neutral-900">{t.displayName || '未命名终端'}</p>
+                              <p className="mt-0.5 max-w-[220px] truncate text-neutral-500">{t.locationLabel || '未设置摆放位置'}</p>
                             </div>
                             <button
                               type="button"
@@ -457,7 +462,7 @@ export default function TerminalsPage() {
                               disabled={statusSavingId !== null}
                               title="编辑设备档案"
                               aria-label={`编辑 ${t.terminalCode} 设备档案`}
-                              className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-gray-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
                               编辑档案
@@ -465,7 +470,7 @@ export default function TerminalsPage() {
                           </div>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{t.macAddress ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.macAddress ?? '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs">
                         {editingId === t.id ? (
                           <div className="flex items-center gap-1.5">
@@ -473,7 +478,7 @@ export default function TerminalsPage() {
                               value={editValue}
                               onChange={(e) => setEditValue(e.target.value)}
                               disabled={saving}
-                              className="h-7 max-w-[180px] rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                              className="h-7 max-w-[180px] rounded-md border border-neutral-200 bg-surface px-2 text-xs text-neutral-700 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600/15"
                               aria-label={`设置 ${t.terminalCode} 所属机构`}
                             >
                               <option value="">未绑定（解绑）</option>
@@ -497,7 +502,7 @@ export default function TerminalsPage() {
                               disabled={saving}
                               title="取消"
                               aria-label="取消"
-                              className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-50"
                             >
                               <XIcon className="h-3.5 w-3.5" />
                             </button>
@@ -505,11 +510,11 @@ export default function TerminalsPage() {
                         ) : (
                           <div className="flex items-center gap-2">
                             {t.orgName ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-blue-600">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-info-fg">
                                 <Building2Icon className="h-3 w-3" />{t.orgName}
                               </span>
                             ) : (
-                              <span className="text-gray-400">未绑定</span>
+                              <span className="text-neutral-500">未绑定</span>
                             )}
                             <button
                               type="button"
@@ -517,7 +522,7 @@ export default function TerminalsPage() {
                               disabled={statusSavingId !== null}
                               title="编辑所属机构"
                               aria-label={`编辑 ${t.terminalCode} 所属机构`}
-                              className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 bg-surface px-2 text-xs font-medium text-gray-600 hover:border-primary-600/40 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <PencilIcon className="h-3.5 w-3.5" />
                               {t.orgName ? '更改机构' : '绑定机构'}
@@ -527,7 +532,7 @@ export default function TerminalsPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <StatusBadge status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} />
+                          <StatusBadge dot status={t.enabled ? 'success' : 'error'} label={t.enabled ? '启用' : '停用'} />
                           <button
                             type="button"
                             onClick={() => toggleTerminalStatus(t)}
@@ -535,8 +540,8 @@ export default function TerminalsPage() {
                             aria-label={`${t.enabled ? '停用' : '启用'} ${t.terminalCode}`}
                             className={`inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
                               t.enabled
-                                ? 'border-red-100 bg-white text-red-600 hover:bg-red-50'
-                                : 'border-emerald-100 bg-white text-emerald-600 hover:bg-emerald-50'
+                                ? 'border-error/20 bg-surface text-error-fg hover:bg-error-bg'
+                                : 'border-success/20 bg-surface text-success-fg hover:bg-success-bg'
                             }`}
                           >
                             {statusSavingId === t.id
@@ -549,18 +554,18 @@ export default function TerminalsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">
-                          <StatusBadge status={runtimeView.badge} label={runtimeView.label} />
+                          <StatusBadge dot status={runtimeView.badge} label={runtimeView.label} />
                           {runtimeView.detail && (
-                            <span className="text-xs text-amber-600">{runtimeView.detail}</span>
+                            <span className="text-xs text-warning-fg">{runtimeView.detail}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3"><StatusBadge status={printerView.badge} label={printerView.label} /></td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{t.agentVersion ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-500">{t.ipAddress ?? '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{fmtDisk(t.diskFreeGb)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{t.registeredAt ? new Date(t.registeredAt).toLocaleDateString('zh-CN') : '—'}</td>
+                      <td className="px-4 py-3"><StatusBadge dot status={printerView.badge} label={printerView.label} /></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.agentVersion ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.ipAddress ?? '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{fmtDisk(t.diskFreeGb)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{t.registeredAt ? new Date(t.registeredAt).toLocaleDateString('zh-CN') : '—'}</td>
                     </tr>
                   )
                 })
@@ -571,14 +576,14 @@ export default function TerminalsPage() {
         <Pagination total={total} page={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(1) }} />
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-500">
         终端在线状态、打印机状态、版本、IP、磁盘均来自 Windows Terminal Agent 的心跳上报
         {API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}
       </p>
-      <p className="mt-1 text-xs text-gray-400">
+      <p className="mt-1 text-xs text-neutral-500">
         「所属机构」决定该终端归哪所学校；学校账号在合作机构后台只能配置归属本校的智慧校园开关。绑定/解绑仅管理员可操作，变更写入审计日志。
       </p>
-      <p className="mt-1 text-xs text-gray-400">
+      <p className="mt-1 text-xs text-neutral-500">
         「设备档案」用于商用部署的机器识别和权限绑定；MAC 地址建议由 Terminal Agent 上报，也可由管理员人工校正。停用终端后，Kiosk 统一配置会关闭敏感模块。
       </p>
     </>
