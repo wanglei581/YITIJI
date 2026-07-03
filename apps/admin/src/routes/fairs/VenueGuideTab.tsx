@@ -27,7 +27,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -47,7 +47,7 @@ function TwoStepDelete({ onConfirm, label = '' }: { onConfirm: () => void; label
       type="button"
       onClick={() => { if (arming) { setArming(false); onConfirm() } else setArming(true) }}
       className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-        arming ? 'bg-red-600 text-white hover:bg-red-700' : 'text-red-500 hover:bg-red-50'
+        arming ? 'bg-error text-white hover:bg-error/90' : 'text-error-fg hover:bg-error-bg'
       }`}
     >
       {arming ? '确认删除?' : <><Trash2Icon className="h-3.5 w-3.5" />{label}</>}
@@ -275,7 +275,7 @@ export function VenueGuideTab({
           添加设施
         </button>
       </div>
-      <Card className="divide-y divide-neutral-100 p-0">
+      <Card className="divide-y divide-neutral-900/[0.06] p-0">
         {draft.facilities.length === 0 && (
           <p className="py-6 text-center text-xs text-neutral-400">暂无设施点位(入口/服务台/打印点/咨询区)</p>
         )}
@@ -296,8 +296,8 @@ export function VenueGuideTab({
         ))}
       </Card>
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
-      {savedAt && !error && <p className="rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">已保存,一体机刷新后即可看到最新导览。</p>}
+      {error && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
+      {savedAt && !error && <p className="rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">已保存,一体机刷新后即可看到最新导览。</p>}
 
       <div className="flex items-center justify-between">
         <TwoStepDelete label="删除整个导览配置" onConfirm={() => void removeGuide()} />
@@ -411,7 +411,7 @@ export function VenueGuideTab({
                   ))}
               </select>
               {companies.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">本招聘会还没有参展企业,请先在「参展企业」标签页录入。</p>
+                <p className="mt-1 text-xs text-warning-fg">本招聘会还没有参展企业,请先在「参展企业」标签页录入。</p>
               )}
             </div>
           </div>

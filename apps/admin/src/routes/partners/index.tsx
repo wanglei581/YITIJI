@@ -22,15 +22,15 @@ import {
 // ─── 展示常量 ─────────────────────────────────────────────────────────────────
 
 const PARTNER_TYPE_STYLES: Record<string, string> = {
-  school_employment_center:  'bg-blue-50 text-blue-600',
-  public_employment_service: 'bg-green-50 text-green-600',
+  school_employment_center:  'bg-info-bg text-info-fg',
+  public_employment_service: 'bg-success-bg text-success-fg',
   licensed_hr_agency:        'bg-purple-50 text-purple-600',
-  fair_organizer:            'bg-orange-50 text-orange-600',
+  fair_organizer:            'bg-warning-bg text-warning-fg',
   enterprise_source:         'bg-neutral-100 text-neutral-600',
 }
 
 const SCENE_TEMPLATE_STYLES: Record<string, string> = {
-  school:               'bg-blue-50 text-blue-500',
+  school:               'bg-info-bg text-info',
   public_employment:    'bg-teal-50 text-teal-600',
   licensed_hr_service:  'bg-purple-50 text-purple-500',
 }
@@ -45,7 +45,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -54,7 +54,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 function InlineError({ message }: { message: string | null }) {
   if (!message) return null
-  return <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{message}</p>
+  return <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{message}</p>
 }
 
 function errMsg(e: unknown): string {
@@ -479,14 +479,14 @@ function OrgDetailDrawer({
             {detail.accounts.length === 0 ? (
               <p className="rounded-lg bg-neutral-50 py-6 text-center text-xs text-neutral-400">该机构暂无后台账号</p>
             ) : (
-              <div className="divide-y divide-neutral-100 rounded-lg border border-neutral-100">
+              <div className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
                 {detail.accounts.map((account) => (
                   <div key={account.id} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-neutral-800">{account.name}</p>
                       <p className="font-mono text-xs text-neutral-400">{account.username}</p>
                     </div>
-                    <StatusBadge status={account.enabled ? 'success' : 'default'} label={account.enabled ? '启用' : '已停用'} />
+                    <StatusBadge dot status={account.enabled ? 'success' : 'default'} label={account.enabled ? '启用' : '已停用'} />
                     <button
                       onClick={() => { setResetTarget(account); setResetPassword('') }}
                       className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
@@ -497,8 +497,8 @@ function OrgDetailDrawer({
                     <TwoStepButton
                       label={account.enabled ? '停用' : '启用'}
                       confirmLabel={account.enabled ? '确认停用?' : '确认启用?'}
-                      className={account.enabled ? 'text-orange-500 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
-                      confirmClassName={account.enabled ? 'bg-orange-500 text-white' : 'bg-green-600 text-white'}
+                      className={account.enabled ? 'text-warning-fg hover:bg-warning-bg' : 'text-success-fg hover:bg-success-bg'}
+                      confirmClassName={account.enabled ? 'bg-warning text-white' : 'bg-success text-white'}
                       onConfirm={() => void toggleAccount(account)}
                       disabled={accountBusy === account.id}
                     />
@@ -508,8 +508,8 @@ function OrgDetailDrawer({
             )}
 
             {resetTarget && (
-              <div className="space-y-3 rounded-lg border border-amber-100 bg-amber-50 p-3">
-                <p className="text-xs font-medium text-amber-800">重置「{resetTarget.name}({resetTarget.username})」的登录密码</p>
+              <div className="space-y-3 rounded-lg border border-warning/20 bg-warning-bg p-3">
+                <p className="text-xs font-medium text-warning-fg">重置「{resetTarget.name}({resetTarget.username})」的登录密码</p>
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -519,16 +519,16 @@ function OrgDetailDrawer({
                   onChange={(e) => setResetPassword(e.target.value)}
                 />
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setResetTarget(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-white">取消</button>
+                  <button onClick={() => setResetTarget(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-surface">取消</button>
                   <button
                     onClick={doResetPassword}
                     disabled={saving || resetPassword.length < 8}
-                    className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                    className="rounded-lg bg-warning px-3 py-1.5 text-xs font-medium text-white hover:bg-warning/90 disabled:opacity-50"
                   >
                     确认重置
                   </button>
                 </div>
-                <p className="text-xs text-amber-700">新密码仅单向提交,系统不回显;请线下安全告知。</p>
+                <p className="text-xs text-warning-fg">新密码仅单向提交,系统不回显;请线下安全告知。</p>
               </div>
             )}
           </div>
@@ -630,7 +630,7 @@ export default function PartnersPage() {
                     key={f}
                     onClick={() => { setStatusFilter(f); setPage(1) }}
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                      statusFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      statusFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
                     }`}
                   >
                     {f}
@@ -647,7 +647,7 @@ export default function PartnersPage() {
                     key={f.label}
                     onClick={() => { setTypeFilter(f.value); setPage(1) }}
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                      typeFilter === f.value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      typeFilter === f.value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
                     }`}
                   >
                     {f.label}
@@ -661,7 +661,7 @@ export default function PartnersPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="搜索机构名称、联系人..."
-                className="h-8 w-64 rounded-lg border border-neutral-200 bg-white pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+                className="h-8 w-64 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
               />
               <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
             </div>
@@ -671,14 +671,14 @@ export default function PartnersPage() {
           <Card className="overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-neutral-100 bg-neutral-50">
+                <thead>
                   <tr>
                     {['机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '账号', '数据源', '岗位', '招聘会', '加入时间', '操作'].map((h) => (
-                      <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                      <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-100">
+                <tbody className="divide-y divide-neutral-900/[0.06]">
                   {paginated.length === 0 ? (
                     <tr>
                       <td colSpan={12}>
@@ -720,7 +720,7 @@ export default function PartnersPage() {
                           {o.contactPhone && <span className="ml-1.5 font-mono text-xs text-neutral-400">{o.contactPhone}</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <StatusBadge status={o.enabled ? 'success' : 'error'} label={o.enabled ? '合作中' : '已停用'} />
+                          <StatusBadge dot status={o.enabled ? 'success' : 'error'} label={o.enabled ? '合作中' : '已停用'} />
                         </td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.accounts}</td>
                         <td className="px-4 py-3 text-center text-neutral-700">{o.counts.sources}</td>
@@ -738,8 +738,8 @@ export default function PartnersPage() {
                             <TwoStepButton
                               label={o.enabled ? '停用' : '启用'}
                               confirmLabel={o.enabled ? '确认停用?' : '确认启用?'}
-                              className={o.enabled ? 'text-orange-500 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'}
-                              confirmClassName={o.enabled ? 'bg-orange-500 text-white' : 'bg-green-600 text-white'}
+                              className={o.enabled ? 'text-warning-fg hover:bg-warning-bg' : 'text-success-fg hover:bg-success-bg'}
+                              confirmClassName={o.enabled ? 'bg-warning text-white' : 'bg-success text-white'}
                               onConfirm={() => void toggleOrg(o)}
                               disabled={busyId === o.id}
                             />

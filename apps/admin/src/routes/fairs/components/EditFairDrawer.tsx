@@ -197,7 +197,7 @@ export function EditFairDrawer({
                 <span className="text-sm text-neutral-400">%</span>
                 <button
                   type="button"
-                  className="shrink-0 rounded-md px-2 py-1 text-sm text-red-500 hover:bg-red-50"
+                  className="shrink-0 rounded-md px-2 py-1 text-sm text-error-fg hover:bg-error-bg"
                   onClick={() => setForm((f) => ({ ...f, seekerIntent: (f.seekerIntent ?? []).filter((_, j) => j !== i) }))}
                 >
                   删除
@@ -209,7 +209,7 @@ export function EditFairDrawer({
                 添加一项
               </GhostButton>
               {intentRows.some((s) => s.label.trim().length > 0) && intentSum !== 100 && (
-                <span className="text-xs text-amber-500">当前合计 {intentSum}%(通常为 100%,不强制)</span>
+                <span className="text-xs text-warning">当前合计 {intentSum}%(通常为 100%,不强制)</span>
               )}
             </div>
           </div>

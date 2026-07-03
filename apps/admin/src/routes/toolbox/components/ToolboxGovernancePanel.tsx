@@ -131,7 +131,7 @@ export function ToolboxGovernancePanel({
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_1.35fr]">
       <Card className="p-5">
-        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
+        <div className="rounded-xl border border-warning/20 bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
           百宝箱只允许站内路由、受控 H5、二维码和 AI 技能入口；不执行第三方代码，不桥接第三方设备。高风险能力必须保留免责声明。
         </div>
 
@@ -187,15 +187,15 @@ export function ToolboxGovernancePanel({
       <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-bold text-neutral-900">微应用审核发布</h2>
-          {message && <span className="text-sm font-medium text-red-600">{message}</span>}
+          {message && <span className="text-sm font-medium text-error-fg">{message}</span>}
         </div>
         <div className="mt-4 space-y-3">
           {apps.map((app) => (
-            <button key={app.appKey} type="button" onClick={() => setSelectedAppKey(app.appKey)} className={`w-full rounded-xl border px-4 py-3 text-left ${selectedAppKey === app.appKey ? 'border-blue-200 bg-blue-50' : 'border-neutral-200 bg-white'}`}>
+            <button key={app.appKey} type="button" onClick={() => setSelectedAppKey(app.appKey)} className={`w-full rounded-xl border px-4 py-3 text-left ${selectedAppKey === app.appKey ? 'border-info/30 bg-info-bg' : 'border-neutral-200 bg-surface'}`}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-neutral-900">{app.title}</span>
                 <span className="text-xs text-neutral-400">{app.appKey}</span>
-                <StatusBadge status={badgeStatus(app.status)} label={STATUS_LABELS[app.status] ?? app.status} />
+                <StatusBadge dot status={badgeStatus(app.status)} label={STATUS_LABELS[app.status] ?? app.status} />
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{app.riskLevel}</span>
               </div>
             </button>
@@ -215,7 +215,7 @@ export function ToolboxGovernancePanel({
             <div key={version.id} className="border-b border-neutral-100 px-4 py-3 last:border-b-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-neutral-900">v{version.version}</span>
-                <StatusBadge status={badgeStatus(version.status)} label={STATUS_LABELS[version.status] ?? version.status} />
+                <StatusBadge dot status={badgeStatus(version.status)} label={STATUS_LABELS[version.status] ?? version.status} />
                 <span className="text-xs text-neutral-400">{version.snapshot.launch?.entryType}</span>
               </div>
               {version.snapshot.disclaimers?.length > 0 && (

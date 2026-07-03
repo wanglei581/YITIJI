@@ -115,7 +115,7 @@ export default function AuditPage() {
       actions={
         <button
           onClick={load}
-          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
+          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
         >
           <RefreshCwIcon className="h-3.5 w-3.5" />刷新
         </button>
@@ -128,7 +128,7 @@ export default function AuditPage() {
           <select
             value={action}
             onChange={(e) => { setAction(e.target.value); setPage(1) }}
-            className="h-9 w-44 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 w-44 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           >
             {ACTION_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
@@ -139,7 +139,7 @@ export default function AuditPage() {
             type="datetime-local"
             value={startAt}
             onChange={(e) => { setStartAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
@@ -148,7 +148,7 @@ export default function AuditPage() {
             type="datetime-local"
             value={endAt}
             onChange={(e) => { setEndAt(e.target.value); setPage(1) }}
-            className="h-9 rounded-lg border border-neutral-200 bg-white px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
+            className="h-9 rounded-lg border border-neutral-200 bg-surface px-2 text-sm text-neutral-700 focus:border-primary-300 focus:outline-none"
           />
         </label>
         {(action || startAt || endAt) && (
@@ -164,16 +164,16 @@ export default function AuditPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {COLUMNS.map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {loading ? (
                 [0, 1, 2, 3, 4, 5].map((i) => (
                   <tr key={i}>
@@ -216,7 +216,7 @@ export default function AuditPage() {
                       {r.actorId ?? <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={ROLE_BADGE[r.actorRole] ?? 'default'} label={ROLE_LABEL[r.actorRole] ?? r.actorRole} />
+                      <StatusBadge dot status={ROLE_BADGE[r.actorRole] ?? 'default'} label={ROLE_LABEL[r.actorRole] ?? r.actorRole} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-700">
                       {ACTION_LABELS[r.action] ?? r.action}

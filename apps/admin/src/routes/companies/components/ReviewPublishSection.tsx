@@ -35,11 +35,11 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
     <Card className="space-y-3 p-4">
       <div className="flex items-center gap-2">
         <p className="text-sm font-medium text-neutral-700">审核与发布</p>
-        <StatusBadge status={REVIEW_BADGE[detail.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[detail.reviewStatus]?.label ?? detail.reviewStatus} />
-        <StatusBadge status={PUBLISH_BADGE[detail.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[detail.publishStatus]?.label ?? detail.publishStatus} />
+        <StatusBadge dot status={REVIEW_BADGE[detail.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[detail.reviewStatus]?.label ?? detail.reviewStatus} />
+        <StatusBadge dot status={PUBLISH_BADGE[detail.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[detail.publishStatus]?.label ?? detail.publishStatus} />
       </div>
       {detail.reviewStatus === 'rejected' && detail.rejectReason && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">拒绝原因：{detail.rejectReason}</p>
+        <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">拒绝原因：{detail.rejectReason}</p>
       )}
       <InlineError message={error} />
       <InlineSuccess message={success} />
@@ -76,7 +76,7 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
         )}
       </div>
       {rejecting && (
-        <div className="space-y-2 rounded-lg border border-red-100 bg-red-50/50 p-3">
+        <div className="space-y-2 rounded-lg border border-error/20 bg-error-bg/50 p-3">
           <Field label="拒绝原因" required>
             <textarea
               className={`${inputCls} h-16 resize-none`}
@@ -90,7 +90,7 @@ export function ReviewPublishSection({ detail, onMutated }: { detail: AdminCompa
             <button
               disabled={busy || !rejectReason.trim()}
               onClick={() => void run(() => companiesAdminService.reviewCompany(detail.id, 'reject', rejectReason.trim()), '已拒绝，企业回到草稿状态')}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               确认拒绝
             </button>

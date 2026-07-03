@@ -35,8 +35,8 @@ const STATUS_LABEL: Record<AdminBenefitActivityStatus, string> = {
 
 const STATUS_CLASS: Record<AdminBenefitActivityStatus, string> = {
   draft: 'bg-neutral-100 text-neutral-500',
-  published: 'bg-emerald-50 text-emerald-600',
-  ended: 'bg-amber-50 text-amber-600',
+  published: 'bg-success-bg text-success-fg',
+  ended: 'bg-warning-bg text-warning-fg',
 }
 
 function fmt(iso: string | null): string {
@@ -198,11 +198,11 @@ export default function BenefitActivitiesPage() {
         </button>
       }
     >
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         权益活动只发放本终端服务权益、打印额度或政策信息提示；不接支付、不做套餐购买、不生成招聘会报名或签到凭证。
       </div>
 
-      {message && <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">{message}</div>}
+      {message && <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Card className="p-4">
@@ -245,7 +245,7 @@ export default function BenefitActivitiesPage() {
                         </button>
                       )}
                       {item.status === 'published' && (
-                        <button type="button" onClick={() => void end(item)} className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white">
+                        <button type="button" onClick={() => void end(item)} className="rounded-lg bg-warning px-3 py-1.5 text-xs font-semibold text-white">
                           下架
                         </button>
                       )}

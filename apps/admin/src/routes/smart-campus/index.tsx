@@ -60,7 +60,7 @@ function TerminalConfigRow({
           <p className="font-medium text-neutral-900">{terminal.terminalCode ?? terminal.terminalId}</p>
           <p className="text-xs text-neutral-400">{terminal.terminalId}</p>
         </div>
-        <StatusBadge status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
+        <StatusBadge dot status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -81,7 +81,7 @@ function TerminalConfigRow({
             />
             <span className={`text-sm ${enabled && !m.frozen ? 'text-neutral-700' : 'text-neutral-400'}`}>
               {m.label}
-              {m.note && <span className="ml-1 text-[11px] text-amber-600">（{m.note}）</span>}
+              {m.note && <span className="ml-1 text-[11px] text-warning-fg">（{m.note}）</span>}
             </span>
           </label>
         ))}
@@ -122,9 +122,9 @@ export default function SmartCampusPage() {
       </div>
 
       {/* 合规提示 */}
-      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-amber-900">
+      <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
+        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-warning-fg">
           一期由平台运营代配置。<span className="font-semibold">校园大数据</span>需先取得学校书面授权 + 数据处理协议，且只接聚合脱敏统计，
           本期前端仅为占位、不展示真实数据（详见合规边界 §九）。未开启任何子模块时无法启用。
         </p>

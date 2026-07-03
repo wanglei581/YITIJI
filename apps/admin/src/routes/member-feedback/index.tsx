@@ -34,9 +34,9 @@ const STATUS_LABEL: Record<FeedbackStatus, string> = {
 }
 
 const STATUS_CLASS: Record<FeedbackStatus, string> = {
-  pending: 'bg-amber-50 text-amber-600',
-  processing: 'bg-blue-50 text-blue-600',
-  replied: 'bg-emerald-50 text-emerald-600',
+  pending: 'bg-warning-bg text-warning-fg',
+  processing: 'bg-info-bg text-info-fg',
+  replied: 'bg-success-bg text-success-fg',
   closed: 'bg-neutral-100 text-neutral-500',
 }
 
@@ -166,7 +166,7 @@ export default function MemberFeedbackPage() {
         </button>
       }
     >
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         页面只展示脱敏号码。回复内容请围绕设备状态、文件处理、打印服务和系统维护说明。
       </div>
 
@@ -188,7 +188,7 @@ export default function MemberFeedbackPage() {
       </div>
 
       {message && (
-        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">{message}</div>
+        <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>
       )}
 
       <div className="grid gap-4 xl:grid-cols-[420px_1fr]">

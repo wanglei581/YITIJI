@@ -5,10 +5,10 @@ import { type AdminFairStats } from '../../../services/api/fairsAdmin'
 export function StatsTab({ stats }: { stats: AdminFairStats | null }) {
   if (!stats) return <LoadingState className="py-16" />
   const cards = [
-    { label: '参展企业(已录入)', value: stats.companyTotal,        note: '本系统已录入的企业卡片数',  icon: BuildingIcon,  accent: 'text-blue-600 bg-blue-50' },
+    { label: '参展企业(已录入)', value: stats.companyTotal,        note: '本系统已录入的企业卡片数',  icon: BuildingIcon,  accent: 'text-info-fg bg-info-bg' },
     { label: '展区',             value: stats.zoneTotal,           note: '导览展区数量',              icon: MapPinIcon,    accent: 'text-teal-600 bg-teal-50' },
     { label: '活动资料',         value: stats.materialTotal,       note: `已发布 ${stats.materialPublished} 份`, icon: FileTextIcon, accent: 'text-purple-600 bg-purple-50' },
-    { label: '资料打印次数',     value: stats.materialPrintCount,  note: '一体机打印活动资料次数',    icon: PrinterIcon,   accent: 'text-orange-500 bg-orange-50' },
+    { label: '资料打印次数',     value: stats.materialPrintCount,  note: '一体机打印活动资料次数',    icon: PrinterIcon,   accent: 'text-warning-fg bg-warning-bg' },
   ]
   return (
     <div className="space-y-4">

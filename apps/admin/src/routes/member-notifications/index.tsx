@@ -21,9 +21,9 @@ const CATEGORY_LABEL: Record<SystemBroadcastCategory, string> = {
 }
 
 const CATEGORY_CLASS: Record<SystemBroadcastCategory, string> = {
-  system: 'bg-blue-50 text-blue-600',
-  maintenance: 'bg-amber-50 text-amber-600',
-  notice: 'bg-emerald-50 text-emerald-600',
+  system: 'bg-info-bg text-info-fg',
+  maintenance: 'bg-warning-bg text-warning-fg',
+  notice: 'bg-success-bg text-success-fg',
 }
 
 function fmt(iso: string): string {
@@ -111,12 +111,12 @@ export default function MemberNotificationsPage() {
         </button>
       }
     >
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         广播内容用于系统维护、设备服务、文件处理和打印服务说明；后端会拦截不合规内容并在此显示错误。
       </div>
 
       {message && (
-        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">{message}</div>
+        <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>
       )}
 
       <div className="grid gap-4 xl:grid-cols-[380px_1fr]">

@@ -220,28 +220,28 @@ export default function SyncSourcesPage() {
       title="API 同步数据源"
       subtitle="管理 API 拉取模式的数据源及手动触发同步"
       actions={
-        <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
+        <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
           <RefreshCwIcon className="h-3.5 w-3.5" />刷新
         </button>
       }
     >
       {/* 说明 */}
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         Worker 每 30 分钟自动检查 syncFreq 到期的数据源。此页可手动触发单个源立即同步。
-        {API_MODE !== 'http' && <span className="ml-2 font-medium text-blue-500">（当前为 mock 模式，触发操作仅模拟）</span>}
+        {API_MODE !== 'http' && <span className="ml-2 font-medium text-info">（当前为 mock 模式，触发操作仅模拟）</span>}
       </div>
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['数据源名称', '机构 ID', '同步频率', '最后同步', '状态', '配置', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {sources.length === 0 ? (
                 <tr>
                   <td colSpan={7}>
@@ -269,6 +269,7 @@ export default function SyncSourcesPage() {
                       <td className="px-4 py-3">
                         {s.lastSyncStatus ? (
                           <StatusBadge
+                            dot
                             status={STATUS_BADGE[s.lastSyncStatus] ?? 'default'}
                             label={s.lastSyncStatus === 'success' ? '成功' : s.lastSyncStatus === 'failed' ? '失败' : s.lastSyncStatus}
                           />
@@ -278,13 +279,13 @@ export default function SyncSourcesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1.5">
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasEndpoint ? 'bg-green-50 text-green-600' : 'bg-neutral-100 text-neutral-400'}`}>
+                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasEndpoint ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-400'}`}>
                             {s.hasEndpoint ? 'URL ✓' : 'URL —'}
                           </span>
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasCredential ? 'bg-green-50 text-green-600' : 'bg-neutral-100 text-neutral-400'}`}>
+                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasCredential ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-400'}`}>
                             {s.hasCredential ? '凭证 ✓' : '凭证 —'}
                           </span>
-                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasResponseConfig ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>
+                          <span className={`rounded px-1.5 py-0.5 text-xs ${s.hasResponseConfig ? 'bg-success-bg text-success-fg' : 'bg-warning-bg text-warning-fg'}`}>
                             {s.hasResponseConfig ? '映射 ✓' : '映射 auto'}
                           </span>
                         </div>
@@ -302,8 +303,8 @@ export default function SyncSourcesPage() {
                             disabled={trigState === 'loading' || !s.enabled || !s.hasEndpoint}
                             onClick={() => handleTrigger(s.id)}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                              trigState === 'ok'    ? 'bg-green-50 text-green-600' :
-                              trigState === 'error' ? 'bg-red-50 text-red-500' :
+                              trigState === 'ok'    ? 'bg-success-bg text-success-fg' :
+                              trigState === 'error' ? 'bg-error-bg text-error-fg' :
                               'bg-primary-50 text-primary-600 hover:bg-primary-100'
                             }`}
                             title={!s.hasEndpoint ? '请先配置 endpoint' : !s.enabled ? '数据源已停用' : ''}
@@ -329,7 +330,7 @@ export default function SyncSourcesPage() {
         <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setConfigSrc(null)} />
       )}
       {configSrc && (
-        <div className="fixed inset-y-0 right-0 z-50 flex w-[440px] flex-col bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-y-0 right-0 z-50 flex w-[440px] flex-col bg-surface shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
             <p className="text-sm font-semibold text-neutral-800">Configure response mapping</p>
             <button onClick={() => setConfigSrc(null)} className="rounded p-1 hover:bg-neutral-100 text-neutral-400">x</button>
@@ -382,7 +383,7 @@ export default function SyncSourcesPage() {
                   />
                   <button
                     onClick={() => setConfigDraft((d) => ({ ...d, fields: d.fields.filter((_, ii) => ii !== i) }))}
-                    className="text-xs text-red-400 hover:text-red-600"
+                    className="text-xs text-error-fg hover:text-error-fg"
                   >
                     Del
                   </button>
@@ -392,7 +393,7 @@ export default function SyncSourcesPage() {
                 <p className="text-xs text-neutral-400">No mappings - auto-detect mode</p>
               )}
             </div>
-            {configErr && <p className="text-xs text-red-500">{configErr}</p>}
+            {configErr && <p className="text-xs text-error-fg">{configErr}</p>}
           </div>
           <div className="border-t border-neutral-100 px-5 py-3 flex justify-end gap-2">
             <button onClick={() => setConfigSrc(null)} className="rounded px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100">

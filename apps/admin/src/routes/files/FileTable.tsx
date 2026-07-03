@@ -49,14 +49,14 @@ export function FileTable({
     <Card className="overflow-hidden p-0">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-neutral-100 bg-neutral-50">
+          <thead>
             <tr>
               {headers.map((h) => (
-                <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody className="divide-y divide-neutral-900/[0.06]">
             {loading ? (
               [0, 1, 2, 3, 4].map((i) => (
                 <tr key={i}>
@@ -92,21 +92,21 @@ export function FileTable({
                     <td className="max-w-[140px] truncate whitespace-nowrap px-4 py-3 text-xs text-neutral-600" title={v.user}>{v.user}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{v.source}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{v.size}</td>
-                    <td className="px-4 py-3"><StatusBadge status={v.sensitiveBadge} label={v.sensitiveLabel} /></td>
+                    <td className="px-4 py-3"><StatusBadge dot status={v.sensitiveBadge} label={v.sensitiveLabel} /></td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
                       <div className="font-medium">{retentionPolicyLabel(v.raw.retentionPolicy)}</div>
                       <div className="text-neutral-400">{assetCategoryLabel(v.raw.assetCategory)} · {ownerTypeLabel(v.raw.ownerType)}</div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                       {retentionSetByLabel(v.raw.retentionSetBy)}
-                      {v.raw.retentionLockedReason && <div className="mt-1 text-red-500">{v.raw.retentionLockedReason}</div>}
+                      {v.raw.retentionLockedReason && <div className="mt-1 text-error-fg">{v.raw.retentionLockedReason}</div>}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                       {fmtDate(v.raw.retentionConsentAt, '-')}
                       {v.raw.retentionConsentVersion && <div className="mt-1 text-neutral-400">{v.raw.retentionConsentVersion}</div>}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={clean.badge} label={clean.label} />
+                      <StatusBadge dot status={clean.badge} label={clean.label} />
                       <div className="mt-1 whitespace-nowrap text-xs text-neutral-400">{v.cleanPolicy}</div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -114,7 +114,7 @@ export function FileTable({
                         {isAlive ? (
                           <>
                             <button disabled={rowBusy} onClick={() => onView(v.raw.id)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:opacity-40">查看文件</button>
-                            <button disabled={rowBusy} onClick={() => onDelete(v.raw.id, v.name)} className="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-40">手动删除</button>
+                            <button disabled={rowBusy} onClick={() => onDelete(v.raw.id, v.name)} className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-40">手动删除</button>
                           </>
                         ) : (
                           <span className="px-2 py-1 text-xs text-neutral-300">已清理</span>

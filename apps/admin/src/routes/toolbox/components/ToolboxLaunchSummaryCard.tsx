@@ -29,7 +29,7 @@ export function ToolboxLaunchSummaryCard({ summary }: { summary: ToolboxLaunchSu
           </div>
         ))}
       </div>
-      <div className="mt-4 rounded-xl border border-neutral-100 bg-white px-4 py-3">
+      <div className="mt-4 rounded-xl border border-neutral-100 bg-surface px-4 py-3">
         <p className="text-xs font-semibold text-neutral-500">Top 功能项</p>
         {summary?.topItems.length ? (
           <div className="mt-2 flex flex-wrap gap-2">

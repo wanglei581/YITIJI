@@ -93,7 +93,7 @@ export default function CompaniesPage() {
           />
           <button
             onClick={() => setKeyword(keywordInput.trim())}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
           >
             <SearchIcon className="h-4 w-4" />
             搜索
@@ -119,14 +119,14 @@ export default function CompaniesPage() {
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-neutral-100 bg-neutral-50">
+              <thead>
                 <tr>
                   {['企业名称', '来源机构', '地区', '行业', '类型', '审核状态', '发布状态', '关联岗位', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-100">
+              <tbody className="divide-y divide-neutral-900/[0.06]">
                 {rows.map((c) => (
                   <tr key={c.id} className="cursor-pointer hover:bg-neutral-50" onClick={() => setSelectedId(c.id)}>
                     <td className="px-4 py-3">
@@ -143,10 +143,10 @@ export default function CompaniesPage() {
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{industryLabel(c.industry)}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{companyTypeLabel(c.companyType)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <StatusBadge status={REVIEW_BADGE[c.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[c.reviewStatus]?.label ?? c.reviewStatus} />
+                      <StatusBadge dot status={REVIEW_BADGE[c.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[c.reviewStatus]?.label ?? c.reviewStatus} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <StatusBadge status={PUBLISH_BADGE[c.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[c.publishStatus]?.label ?? c.publishStatus} />
+                      <StatusBadge dot status={PUBLISH_BADGE[c.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[c.publishStatus]?.label ?? c.publishStatus} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.linkedJobCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">

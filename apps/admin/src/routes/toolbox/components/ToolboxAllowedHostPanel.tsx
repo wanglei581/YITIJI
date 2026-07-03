@@ -55,7 +55,7 @@ export function ToolboxAllowedHostPanel({
         <div>
           <h2 className="text-base font-bold text-neutral-900">允许域名</h2>
           <p className="mt-1 text-sm text-neutral-500">DB 审核表负责业务审批；环境白名单由服务端配置控制，此处只读展示口径。</p>
-          <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-800">
+          <div className="mt-3 rounded-xl border border-info/20 bg-info-bg px-4 py-3 text-xs leading-relaxed text-info-fg">
             环境白名单：TOOLBOX_ALLOW_EXTERNAL_URL、KIOSK_EXTERNAL_APP_ALLOWED_HOSTS、KIOSK_QR_TARGET_ALLOWED_HOSTS。DB 与 env 双门禁同时满足后，外部 H5 或二维码目标才允许发布。
           </div>
 
@@ -81,11 +81,11 @@ export function ToolboxAllowedHostPanel({
             {hosts.length === 0 ? (
               <p className="rounded-xl border border-dashed border-neutral-200 px-4 py-6 text-center text-sm text-neutral-400">暂无域名</p>
             ) : hosts.map((host) => (
-              <div key={host.id} className="rounded-xl border border-neutral-200 bg-white px-4 py-3">
+              <div key={host.id} className="rounded-xl border border-neutral-200 bg-surface px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-neutral-900">{host.host}</span>
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">{host.purpose}</span>
-                  <StatusBadge status={badgeStatus(host.status)} label={STATUS_LABELS[host.status] ?? host.status} />
+                  <StatusBadge dot status={badgeStatus(host.status)} label={STATUS_LABELS[host.status] ?? host.status} />
                 </div>
                 <p className="mt-2 text-xs text-neutral-500">{host.owner} · {host.reason}</p>
                 {host.expiresAt && <p className="mt-1 text-xs text-neutral-400">过期：{host.expiresAt}</p>}

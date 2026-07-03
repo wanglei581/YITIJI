@@ -118,14 +118,14 @@ export function CompaniesTab({
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['企业名称', '行业', '规模', '招聘标签', '岗位数', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {companies.length === 0 ? (
                 <tr><td colSpan={6} className="py-10 text-center text-xs text-neutral-400">暂无参展企业,点击右上角"新增企业"录入</td></tr>
               ) : (
@@ -139,7 +139,7 @@ export function CompaniesTab({
                         {c.hiringTags.length === 0
                           ? <span className="text-xs text-neutral-400">—</span>
                           : c.hiringTags.map((t) => (
-                            <span key={t} className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-600">{t}</span>
+                            <span key={t} className="rounded bg-info-bg px-1.5 py-0.5 text-xs text-info-fg">{t}</span>
                           ))}
                       </div>
                     </td>
@@ -228,7 +228,7 @@ export function CompaniesTab({
             <div key={i} className="space-y-2.5 rounded-lg border border-neutral-200 p-3">
               <div className="flex items-center gap-2">
                 <input className={`${inputCls} flex-1`} placeholder="岗位标题(必填)" value={pos.title} onChange={(e) => setPos(i, { title: e.target.value })} />
-                <button type="button" className="shrink-0 rounded-md px-2 py-1 text-sm text-red-500 hover:bg-red-50" onClick={() => removePos(i)}>删除</button>
+                <button type="button" className="shrink-0 rounded-md px-2 py-1 text-sm text-error-fg hover:bg-error-bg" onClick={() => removePos(i)}>删除</button>
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 <Field label="岗位类型">

@@ -113,7 +113,7 @@ export default function FairsPage() {
                   className={`rounded-xl border p-4 text-left transition-all ${
                     selectedId === fair.id
                       ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
-                      : 'border-neutral-200 bg-white hover:border-neutral-300'
+                      : 'border-neutral-200 bg-surface hover:border-neutral-300'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -125,8 +125,8 @@ export default function FairsPage() {
                   <p className="mt-1.5 text-xs text-neutral-400">{fair.venue} · {fair.city}</p>
                   <p className="mt-0.5 text-xs text-neutral-400">{fmtDateTime(fair.startAt)}</p>
                   <div className="mt-2 flex items-center gap-1.5">
-                    <StatusBadge status={REVIEW_BADGE[fair.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[fair.reviewStatus]?.label ?? fair.reviewStatus} />
-                    <StatusBadge status={PUBLISH_BADGE[fair.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[fair.publishStatus]?.label ?? fair.publishStatus} />
+                    <StatusBadge dot status={REVIEW_BADGE[fair.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[fair.reviewStatus]?.label ?? fair.reviewStatus} />
+                    <StatusBadge dot status={PUBLISH_BADGE[fair.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[fair.publishStatus]?.label ?? fair.publishStatus} />
                     <span className="ml-auto text-xs text-neutral-400">
                       企业 {fair.counts.companies} · 展区 {fair.counts.zones} · 资料 {fair.counts.materials}
                     </span>

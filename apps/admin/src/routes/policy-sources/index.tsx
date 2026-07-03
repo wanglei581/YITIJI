@@ -125,8 +125,8 @@ export default function PolicySourcesPage() {
             <button
               key={f}
               onClick={() => { setReviewFilter(f); setPage(1) }}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
+                reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -135,7 +135,7 @@ export default function PolicySourcesPage() {
           ))}
         </div>
         <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索标题、来源机构..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-white pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索标题、来源机构..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
           <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
         </div>
       </div>
@@ -144,14 +144,14 @@ export default function PolicySourcesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['来源机构', '类型', '标题', '分组/标签', '展示日期', '提交时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={9}>
@@ -171,7 +171,7 @@ export default function PolicySourcesPage() {
                     <tr key={r.id} className="hover:bg-neutral-50">
                       <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-700">{r.sourceName}</td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-info-bg text-info-fg' : 'bg-purple-50 text-purple-600'}`}>
                           {KIND_LABELS[r.kind] ?? r.kind}
                         </span>
                       </td>
@@ -179,7 +179,7 @@ export default function PolicySourcesPage() {
                         <p className="font-medium text-neutral-800">{r.title}</p>
                         {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
                         {r.reviewStatus === 'rejected' && r.rejectReason && (
-                          <p className="mt-0.5 text-xs text-red-500">拒绝原因:{r.rejectReason}</p>
+                          <p className="mt-0.5 text-xs text-error-fg">拒绝原因:{r.rejectReason}</p>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
@@ -189,14 +189,14 @@ export default function PolicySourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{r.syncTime.slice(0, 16).replace('T', ' ')}</td>
-                      <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
-                      <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="px-4 py-3">
                         {rejectingId === r.id ? (
                           <div className="flex items-center gap-1.5">
                             <input
                               autoFocus
-                              className="h-7 w-40 rounded border border-red-200 px-2 text-xs focus:border-red-400 focus:outline-none"
+                              className="h-7 w-40 rounded border border-error/30 px-2 text-xs focus:border-red-400 focus:outline-none"
                               placeholder="拒绝原因(必填)"
                               value={rejectReason}
                               onChange={(e) => setRejectReason(e.target.value)}
@@ -204,7 +204,7 @@ export default function PolicySourcesPage() {
                             <button
                               onClick={() => handleReject(r.id)}
                               disabled={!rejectReason.trim()}
-                              className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                              className="rounded bg-error px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
                             >
                               确认
                             </button>
@@ -214,10 +214,10 @@ export default function PolicySourcesPage() {
                           <div className="flex gap-2">
                             {(r.reviewStatus === 'pending' || r.reviewStatus === 'reviewing') && (
                               <>
-                                <button className="rounded px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50" onClick={() => handleApprove(r.id)}>
+                                <button className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg" onClick={() => handleApprove(r.id)}>
                                   审核通过
                                 </button>
-                                <button className="rounded px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-50" onClick={() => { setRejectingId(r.id); setRejectReason('') }}>
+                                <button className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg" onClick={() => { setRejectingId(r.id); setRejectReason('') }}>
                                   拒绝
                                 </button>
                               </>
@@ -228,7 +228,7 @@ export default function PolicySourcesPage() {
                               </button>
                             )}
                             {r.publishStatus === 'published' && (
-                              <button className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50" onClick={() => handleUnpublish(r.id)}>
+                              <button className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg" onClick={() => handleUnpublish(r.id)}>
                                 下架
                               </button>
                             )}

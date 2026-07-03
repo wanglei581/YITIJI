@@ -81,7 +81,7 @@ export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTer
           <p className="font-medium text-neutral-900">{terminal.terminalCode ?? terminal.terminalId}</p>
           <p className="text-xs text-neutral-400">{terminal.terminalId}</p>
         </div>
-        <StatusBadge status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
+        <StatusBadge dot status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -108,7 +108,7 @@ export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTer
             return (
               <div key={item.key} className="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                 {isGovernedItem && (
-                  <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
+                  <div className="mb-3 rounded-lg border border-success/20 bg-success-bg px-3 py-2 text-xs font-medium text-success-fg">
                     治理发布项：由微应用审核发布流程生成，只能通过审核台发布、熔断或重新投放。
                   </div>
                 )}
@@ -118,13 +118,13 @@ export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTer
                   <select value={item.icon} onChange={(e) => patchItem(index, { icon: e.target.value })} disabled={isGovernedItem} className="h-10 rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-slate-100">
                     {ICON_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </select>
-                  <button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} disabled={isGovernedItem} className="flex h-10 w-10 items-center justify-center rounded-lg text-neutral-400 hover:bg-white hover:text-red-500 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400" aria-label="删除功能">
+                  <button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} disabled={isGovernedItem} className="flex h-10 w-10 items-center justify-center rounded-lg text-neutral-400 hover:bg-surface hover:text-error-fg disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-neutral-400" aria-label="删除功能">
                     <Trash2Icon className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
 
                 <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr_1.8fr_auto]">
-                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-white px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 bg-surface px-3 py-2">
                     {PLACEMENT_OPTIONS.map((option) => (
                       <label key={option.value} className="flex items-center gap-2 text-sm text-neutral-600">
                         <input type="checkbox" checked={(item.placements ?? ['toolbox']).includes(option.value)} onChange={(e) => togglePlacement(index, option.value, e.target.checked)} disabled={isGovernedItem} className="h-4 w-4" />
@@ -155,7 +155,7 @@ export function TerminalToolboxRow({ terminal, onSaved }: { terminal: ToolboxTer
                 </div>
                 {isQrLaunchMode && (
                   <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1.8fr_auto]">
-                    <span className="flex h-10 items-center rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-600">扫码目标地址</span>
+                    <span className="flex h-10 items-center rounded-lg border border-neutral-200 bg-surface px-3 text-sm text-neutral-600">扫码目标地址</span>
                     <input value={item.qrTargetUrl ?? ''} onChange={(e) => {
                       const value = e.target.value.trim() || null
                       patchItem(index, { qrTargetUrl: value })

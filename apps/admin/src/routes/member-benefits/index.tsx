@@ -33,9 +33,9 @@ const STATUS_LABEL: Record<AdminBenefitGrantItem['status'], string> = {
 }
 
 const STATUS_CLASS: Record<AdminBenefitGrantItem['status'], string> = {
-  active: 'bg-emerald-50 text-emerald-600',
+  active: 'bg-success-bg text-success-fg',
   used_up: 'bg-neutral-100 text-neutral-500',
-  expired: 'bg-amber-50 text-amber-600',
+  expired: 'bg-warning-bg text-warning-fg',
   revoked: 'bg-rose-50 text-rose-600',
 }
 
@@ -168,7 +168,7 @@ export default function MemberBenefitsPage() {
         )
       }
     >
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         权益只代表本终端服务与打印辅助。政策资格提示只作官方入口与材料指引，不代办、不承诺办理结果；页面不展示明文手机号。
       </div>
 
@@ -186,15 +186,15 @@ export default function MemberBenefitsPage() {
       </form>
 
       {message && (
-        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">{message}</div>
+        <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>
       )}
 
       {selectedUser && (
         <div className="mb-4 grid gap-4 xl:grid-cols-[360px_1fr]">
           <Card className="p-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                <ShieldCheckIcon className="h-5 w-5 text-emerald-600" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success-bg">
+                <ShieldCheckIcon className="h-5 w-5 text-success-fg" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-neutral-900">{selectedUser.phoneMasked}</p>

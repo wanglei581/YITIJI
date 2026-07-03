@@ -123,14 +123,14 @@ export function MaterialsTab({
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['资料名称', '类型', '页数', '大小', '打印次数', '状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {materials.length === 0 ? (
                 <tr><td colSpan={7} className="py-10 text-center text-xs text-neutral-400">暂无活动资料,点击右上角"上传资料"(支持 PDF / PNG / JPEG)</td></tr>
               ) : (
@@ -153,6 +153,7 @@ export function MaterialsTab({
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge
+                        dot
                         status={PUBLISH_BADGE[m.publishStatus]?.status ?? 'default'}
                         label={PUBLISH_BADGE[m.publishStatus]?.label ?? m.publishStatus}
                       />
@@ -175,7 +176,7 @@ export function MaterialsTab({
                           disabled={busyId === m.id}
                           onClick={() => void togglePublish(m)}
                           className={`rounded px-2 py-1 text-xs font-medium disabled:opacity-50 ${
-                            m.publishStatus === 'published' ? 'text-orange-500 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'
+                            m.publishStatus === 'published' ? 'text-warning-fg hover:bg-warning-bg' : 'text-success-fg hover:bg-success-bg'
                           }`}
                         >
                           {m.publishStatus === 'published' ? '下架' : '发布'}

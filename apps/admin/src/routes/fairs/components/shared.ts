@@ -43,8 +43,8 @@ export const PUBLISH_BADGE: Record<string, { status: 'success' | 'warning' | 'er
 
 export type FairTimeStatus = 'upcoming' | 'ongoing' | 'ended'
 export const TIME_STATUS_STYLES: Record<FairTimeStatus, string> = {
-  upcoming: 'bg-blue-50 text-blue-600',
-  ongoing:  'bg-green-50 text-green-600',
+  upcoming: 'bg-info-bg text-info-fg',
+  ongoing:  'bg-success-bg text-success-fg',
   ended:    'bg-neutral-100 text-neutral-400',
 }
 export const TIME_STATUS_LABELS: Record<FairTimeStatus, string> = { upcoming: '未开始', ongoing: '进行中', ended: '已结束' }

@@ -186,17 +186,17 @@ export default function AiConfigPage() {
                   onClick={() => onFeatureChange(feature.key)}
                   className={`rounded-lg border p-3 text-left transition-colors ${selectedFeature === feature.key
                     ? 'border-primary-400 bg-primary-50'
-                    : 'border-neutral-200 bg-white hover:bg-neutral-50'}`}
+                    : 'border-neutral-200 bg-surface hover:bg-neutral-50'}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-neutral-900">{feature.label}</span>
                     <div className="flex items-center gap-1.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
                         {configured ? '配置可用' : '未启用'}
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-orange-50 text-orange-700'}`}
+                        ? 'bg-info-bg text-info-fg'
+                        : 'bg-warning-bg text-warning-fg'}`}
                       >
                         {feature.status === 'active' ? '已接入' : '后续接入'}
                       </span>
@@ -229,7 +229,7 @@ export default function AiConfigPage() {
               </div>
             </div>
             <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium
-              ${cfg?.enabled && cfg?.apiKeyConfigured ? 'bg-green-50 text-green-700' : 'bg-neutral-100 text-neutral-500'}`}>
+              ${cfg?.enabled && cfg?.apiKeyConfigured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
               {cfg?.enabled && cfg?.apiKeyConfigured ? '已启用' : '未启用'}
             </span>
           </div>
@@ -249,7 +249,7 @@ export default function AiConfigPage() {
                   className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors
                     ${vendor === p.vendor
                       ? 'border-primary-400 bg-primary-50 text-primary-700'
-                      : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+                      : 'border-neutral-200 bg-surface text-neutral-600 hover:bg-neutral-50'}`}
                 >
                   {p.label}
                 </button>
@@ -285,7 +285,7 @@ export default function AiConfigPage() {
                 <KeyRoundIcon className="h-3.5 w-3.5" />
                 API Key
                 {cfg?.apiKeyConfigured && (
-                  <span className="ml-1 rounded bg-green-50 px-1.5 py-0.5 text-[11px] text-green-600">已配置</span>
+                  <span className="ml-1 rounded bg-success-bg px-1.5 py-0.5 text-[11px] text-success-fg">已配置</span>
                 )}
               </span>
             </label>
@@ -376,13 +376,13 @@ export default function AiConfigPage() {
 
         {/* 测试结果 */}
         {testResult && (
-          <Card className={`p-4 ${testResult.ok ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'}`}>
+          <Card className={`p-4 ${testResult.ok ? 'border-success/30 bg-success-bg/50' : 'border-error/30 bg-error-bg/50'}`}>
             <div className="flex items-start gap-2">
               {testResult.ok
-                ? <CheckCircle2Icon className="h-5 w-5 shrink-0 text-green-600" />
-                : <XCircleIcon className="h-5 w-5 shrink-0 text-red-500" />}
+                ? <CheckCircle2Icon className="h-5 w-5 shrink-0 text-success-fg" />
+                : <XCircleIcon className="h-5 w-5 shrink-0 text-error-fg" />}
               <div className="text-sm">
-                <p className={`font-medium ${testResult.ok ? 'text-green-700' : 'text-red-700'}`}>
+                <p className={`font-medium ${testResult.ok ? 'text-success-fg' : 'text-error-fg'}`}>
                   {testResult.ok ? '连通正常' : '连通失败'}
                 </p>
                 <p className="mt-0.5 text-neutral-600">
@@ -393,7 +393,7 @@ export default function AiConfigPage() {
           </Card>
         )}
 
-        {error && cfg && <p className="text-sm text-red-600">{error}</p>}
+        {error && cfg && <p className="text-sm text-error-fg">{error}</p>}
 
         {/* 操作 */}
         <div className="flex items-center gap-3">
@@ -403,7 +403,7 @@ export default function AiConfigPage() {
           <Button variant="outline" onClick={() => void onTest()} disabled={testing}>
             {testing ? '测试中…' : '保存并测试连通'}
           </Button>
-          {savedTip && <span className="text-sm text-green-600">✓ 已保存</span>}
+          {savedTip && <span className="text-sm text-success-fg">✓ 已保存</span>}
         </div>
       </div>
     </Page>
