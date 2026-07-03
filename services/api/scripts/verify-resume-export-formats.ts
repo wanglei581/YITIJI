@@ -87,8 +87,8 @@ const DECOY_STRINGS = ['诱饵编造公司', '诱饵编造大学', '诱饵编造
 const FORMAT_EXPECT: Record<ResumeExportFormat, { mime: string; ext: string }> = {
   pdf: { mime: 'application/pdf', ext: 'pdf' },
   docx: { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext: 'docx' },
-  txt: { mime: 'text/plain; charset=utf-8', ext: 'txt' },
-  md: { mime: 'text/markdown; charset=utf-8', ext: 'md' },
+  txt: { mime: 'text/plain', ext: 'txt' },
+  md: { mime: 'text/markdown', ext: 'md' },
 }
 
 async function main(): Promise<void> {
