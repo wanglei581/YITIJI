@@ -225,6 +225,26 @@ export interface GeneratedResume {
   certificates: string[]
 }
 
+/**
+ * Wave 2:优化版简历 PDF 受控排版参数。
+ *
+ * 本地类型副本须与 packages/shared/src/types/ai.ts 的 ResumeLayoutSettings 同步；
+ * services/api 直接 import ESM-only shared 包存在 CJS 兼容风险,沿用本模块本地镜像约定。
+ */
+export type ResumeLayoutFontScale = 'compact' | 'standard' | 'large'
+export type ResumeLayoutLineSpacing = 'compact' | 'standard' | 'relaxed'
+export type ResumeLayoutMargin = 'narrow' | 'normal' | 'wide'
+export type ResumeLayoutColumns = 1 | 2
+export type ResumeLayoutAccent = 'blue' | 'green' | 'slate'
+
+export interface ResumeLayoutSettings {
+  fontScale?: ResumeLayoutFontScale
+  lineSpacing?: ResumeLayoutLineSpacing
+  margin?: ResumeLayoutMargin
+  columns?: ResumeLayoutColumns
+  accent?: ResumeLayoutAccent
+}
+
 export interface GenerateResumeOutput {
   taskId: string
   status: AiTaskStatus
