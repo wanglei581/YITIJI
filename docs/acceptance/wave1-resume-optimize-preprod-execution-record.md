@@ -47,19 +47,26 @@
 
 ## 三、测试数据处置
 
-当前仅做 SELECT 范围确认，未执行 DELETE。
+2026-07-04 已按精确 ID 清理本轮真机验收测试数据。清理前再次 SELECT 确认范围，随后先删除 4 个对象存储文件，再删除数据库中对应业务测试行；清理后复核为 0。
 
-命中测试数据：
+清理范围：
 
 - `PrintTask`：3 行，均 `completed`，均绑定 `t_ksk_001`。
+- `Order`：3 行，均为上述打印任务关联的 0 元测试订单。
 - `FileObject`：4 行，均为匿名测试文件；其中两行为 `print_doc/original` 受控测试页，两行为合成简历 `resume_upload` 源文件与优化版 PDF。
 - `AiResumeResult`：`taskId=llm-ai-1783098434497-1` 的 `parse` / `optimize` 两行。
 
-处置口径：
+执行结果：
 
-- 可保留这些匿名测试数据作为验收证据，等待 TTL / 生命周期清理。
-- 如需清理，必须先再次 SELECT 确认只命中上述测试 ID，再删除；不得按会员账号、时间范围或 purpose 泛删。
-- COS 对象如无专用删除工具，避免只删 DB 造成对象孤儿；可按生命周期策略清理。
+- 对象存储删除：4 个对象已通过服务端 `StorageService.deleteObject(storageKey, bucket)` 删除，避免只删 DB 造成 COS 孤儿对象。
+- 数据库删除：`Order=3`、`PrintTaskStatusLog=6`、`PrintTask=3`、`AiResumeResult=2`、`FileObject=4`。
+- 删除后复核：上述精确 ID 范围内 `PrintTask=0`、`Order=0`、`FileObject=0`、`AiResumeResult=0`。
+- 临时清理脚本已从服务器移除；未输出密钥、签名 URL、access token、storageKey 全路径或简历正文。
+
+边界：
+
+- 本次只清理本轮验收精确 ID，不按会员账号、时间范围或 purpose 泛删。
+- `AuditLog` 等审计记录不作为业务测试数据清理目标，保留用于操作追溯。
 
 ## 四、完成口径
 
