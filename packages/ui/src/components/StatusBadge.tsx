@@ -22,15 +22,20 @@ const badgeVariants = cva(
 export interface StatusBadgeProps extends VariantProps<typeof badgeVariants> {
   label: string
   className?: string
+  /** 在文字前渲染 6px 当前色圆点（墨青纸感后台规范）。默认关闭，不影响既有页面。 */
+  dot?: boolean
 }
 
-export function StatusBadge({ status, label, className }: StatusBadgeProps) {
+export function StatusBadge({ status, label, className, dot = false }: StatusBadgeProps) {
   return (
     <span
       role="status"
       aria-label={label}
-      className={cn(badgeVariants({ status }), className)}
+      className={cn(badgeVariants({ status }), dot && 'gap-1.5', className)}
     >
+      {dot && (
+        <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+      )}
       {label}
     </span>
   )
