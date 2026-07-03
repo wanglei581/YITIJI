@@ -22,11 +22,21 @@ function assertNotIncludes(src, marker, label) {
   console.log(`PASS ${label}`)
 }
 
+function assertCountAtLeast(src, marker, min, label) {
+  const count = src.split(marker).length - 1
+  if (count < min) throw new Error(`${label}: expected at least ${min} ${marker}, got ${count}`)
+  console.log(`PASS ${label}`)
+}
+
 const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const diagnosisForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
 const parse = read('src/pages/resume/ResumeParsePage.tsx')
 const report = read('src/pages/resume/ResumeReportPage.tsx')
 const optimize = read('src/pages/resume/ResumeOptimizePage.tsx')
+const generate = read('src/pages/resume/ResumeGeneratePage.tsx')
+const resumeVoiceButton = read('src/pages/resume/components/ResumeVoiceInputButton.tsx')
+const resumeVoiceDialog = read('src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx')
+const wavRecorder = read('src/utils/wavRecorder.ts')
 const layoutControls = readOptional('src/pages/resume/components/ResumeLayoutControls.tsx')
 const optimizedEditor = readOptional('src/pages/resume/components/OptimizedResumeEditor.tsx')
 const layoutHook = readOptional('src/pages/resume/hooks/useResumeLayout.ts')
@@ -177,5 +187,36 @@ assertIncludes(httpAdapter, 'templateId?: string', 'http adapter accepts optiona
 assertIncludes(httpAdapter, '...(templateId ? { templateId } : {})', 'http adapter sends templateId only when selected')
 assertIncludes(mockAdapter, '_templateId?: string', 'mock adapter accepts templateId without fabricating files')
 assertNotIncludes(optimize, '一键投递', 'optimize page keeps compliance wording')
+
+// ── Wave4:语音生成简历文本(字段级转写 + 人工确认) ─────────────────────
+assertIncludes(generate, 'ResumeVoiceInputButton', 'generate page renders resume voice input buttons')
+assertIncludes(generate, 'appendVoiceText', 'generate page appends confirmed voice transcripts into existing text')
+assertIncludes(generate, 'label="在校情况"', 'generate page offers voice input for education narrative')
+assertIncludes(generate, 'label="工作内容"', 'generate page offers voice input for work narrative')
+assertIncludes(generate, 'label="项目内容"', 'generate page offers voice input for project narrative')
+assertIncludes(generate, 'label="技能"', 'generate page offers voice input for skills narrative')
+assertIncludes(generate, 'label="证书资质"', 'generate page offers voice input for certificates narrative')
+assertIncludes(generate, 'label="自我评价"', 'generate page offers voice input for self introduction narrative')
+assertCountAtLeast(generate, '<ResumeVoiceInputButton', 6, 'generate page limits voice entry to narrative fields')
+assertNotIncludes(generate, 'localStorage', 'generate page does not persist voice transcripts locally')
+assertNotIncludes(generate, 'sessionStorage', 'generate page does not persist voice transcripts in session storage')
+
+assertIncludes(resumeVoiceButton, 'ResumeTranscriptConfirmDialog', 'voice button opens confirmation dialog before writing text')
+assertIncludes(resumeVoiceButton, '语音填写', 'voice button uses clear voice input copy')
+assertIncludes(resumeVoiceButton, 'onConfirm(text)', 'voice button writes only confirmed transcript text')
+
+assertIncludes(resumeVoiceDialog, 'MAX_RECORD_SECONDS = 58', 'voice dialog caps one recording below short ASR limit')
+assertIncludes(resumeVoiceDialog, 'startWavRecorder', 'voice dialog reuses in-memory wav recorder')
+assertIncludes(resumeVoiceDialog, 'transcribeResumeVoice(audio)', 'voice dialog calls resume voice transcription adapter')
+assertIncludes(resumeVoiceDialog, '语音仅用于本次转写，不保存原始音频', 'voice dialog shows privacy warning')
+assertIncludes(resumeVoiceDialog, '确认写入', 'voice dialog requires explicit confirmation before writing')
+assertIncludes(resumeVoiceDialog, 'cancelRecorder()', 'voice dialog releases recorder on close/cancel/unmount')
+assertNotIncludes(resumeVoiceDialog, 'localStorage', 'voice dialog does not use localStorage')
+assertNotIncludes(resumeVoiceDialog, 'sessionStorage', 'voice dialog does not use sessionStorage')
+assertNotIncludes(resumeVoiceDialog, 'FileObject', 'voice dialog does not create file records')
+assertNotIncludes(resumeVoiceDialog, 'signedUrl', 'voice dialog does not expose signed URLs')
+assertIncludes(wavRecorder, 'MIC_PERMISSION_TIMEOUT', 'wav recorder times out stalled microphone permission prompts')
+assertIncludes(wavRecorder, 'timedOut', 'wav recorder tracks late microphone permission resolution')
+assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.stop())', 'wav recorder releases late microphone streams after timeout')
 
 console.log('PASS resume diagnosis flow UI verification')

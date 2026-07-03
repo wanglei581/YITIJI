@@ -78,6 +78,7 @@
     "verify:resume-layout-export": "node -r @swc-node/register scripts/verify-resume-layout-export.ts",
     "verify:resume-layout-adjust": "node -r @swc-node/register scripts/verify-resume-layout-adjust.ts",
     "verify:resume-template-fill": "node -r @swc-node/register scripts/verify-resume-template-fill.ts",
+    "verify:resume-voice-generate": "node -r @swc-node/register scripts/verify-resume-voice-generate.ts",
     "verify:resume-optimize": "node -r @swc-node/register scripts/verify-resume-optimize.ts",
     "verify:jobfair-venue-guide": "node -r @swc-node/register scripts/verify-jobfair-venue-guide.ts",
     "db:seed:companies": "node -r @swc-node/register prisma/seed-companies.ts",
