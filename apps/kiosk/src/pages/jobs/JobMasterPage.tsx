@@ -1,12 +1,12 @@
 // ============================================================
-// 岗位大师（岗位决策分析台）M1。
+// 岗位大师（岗位决策分析台）M1.5 决策台深化。
 //
-// 入口①首页「岗位大师」磁贴。流程：选择系统内已发布岗位或手填目标岗位 →
-// 单次分析（适配度双栏 + 薪资参考 + 晋升路径三节点 + 风险）→ 竖屏四段结果卡 →
-// 打印《岗位决策参考报告》(真实 PDF → 我的文档 → 打印链路)。
-// 简历来源：诊断 taskId/accessToken（location.state / query / 会话）。
-// 合规：适配度仅参考等级(无百分比/录用承诺);薪资只透传来源方文本;投递只引导
-// 「去来源平台投递」;失败诚实提示,不产假结果。
+// 入口①首页「岗位大师」磁贴。流程：选岗（站内已发布岗位或手填）→ 单次分析 →
+// 竖屏结果页（决策摘要条 / 技能地图 / 差距行动 / 面试准备 / 简历改写 / 晋升路径 /
+// 薪资 / 风险）→ 打印《岗位决策参考报告》。结果各卡在 jobMaster/ 子组件内实现，
+// 本页只做选岗 + 结果编排 + 轻交互 + 合规按钮拆分。
+// 合规：适配度仅三档参考等级（无百分比/录用承诺）；薪资只透传来源方文本；
+// 「查看岗位」与「去来源平台投递」为两个独立按钮，不合并；失败诚实提示不产假结果。
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react'
@@ -17,40 +17,31 @@ import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   ArrowRightIcon,
-  BrainCircuitIcon,
   BriefcaseIcon,
   CheckCircle2Icon,
   CoinsIcon,
   ExternalLinkIcon,
   Loader2Icon,
-  PencilLineIcon,
   PrinterIcon,
   SearchIcon,
-  ShieldAlertIcon,
   TargetIcon,
-  TrendingUpIcon,
 } from 'lucide-react'
 import { getJobs } from '../../services/api'
 import { analyzeJobMaster, getLatestJobMaster, printJobMaster } from '../../services/api/jobMaster'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from '../resume/aiResumeSession'
+import { DecisionSummaryBar } from './jobMaster/DecisionSummaryBar'
+import { FitSkillMap } from './jobMaster/FitSkillMap'
+import { GapActionCards } from './jobMaster/GapActionCards'
+import { InterviewPrepCard } from './jobMaster/InterviewPrepCard'
+import { ResumeRewriteCard } from './jobMaster/ResumeRewriteCard'
+import { CareerTimeline } from './jobMaster/CareerTimeline'
+import { RiskCard } from './jobMaster/RiskCard'
 
 interface PageState {
   taskId?: string
   accessToken?: string
-}
-
-const FIT_META: Record<string, { label: string; cls: string }> = {
-  reference_high: { label: '参考匹配度：较高', cls: 'bg-green-50 text-green-700' },
-  reference_medium: { label: '参考匹配度：中等', cls: 'bg-blue-50 text-blue-700' },
-  reference_low: { label: '参考匹配度：偏低', cls: 'bg-orange-50 text-orange-700' },
-}
-
-const RISK_META: Record<string, { label: string; cls: string }> = {
-  low: { label: '关注度：较低', cls: 'bg-green-50 text-green-700' },
-  medium: { label: '关注度：需注意', cls: 'bg-amber-50 text-amber-700' },
-  high: { label: '关注度：需谨慎', cls: 'bg-red-50 text-red-700' },
 }
 
 export function JobMasterPage() {
@@ -175,10 +166,18 @@ export function JobMasterPage() {
     }
   }
 
-  // ── 结果视图（竖屏四段卡）──────────────────────────────────────────────────
+  // ── 结果视图（编排 jobMaster/ 子组件 + 轻交互 + 合规按钮拆分）─────────────────
   if (result) {
-    const fit = FIT_META[result.fit?.level ?? ''] ?? FIT_META['reference_medium']
-    const cp = result.careerPath
+    const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const sections: Array<{ id: string; label: string }> = []
+    if (result.fit) sections.push({ id: 'jm-fit', label: '适配度' })
+    if (result.fit?.gapSkills?.length) sections.push({ id: 'jm-gap', label: '差距行动' })
+    if (result.interviewPrep?.length) sections.push({ id: 'jm-interview', label: '面试准备' })
+    if (result.resumeRewrite?.length) sections.push({ id: 'jm-resume', label: '简历改写' })
+    if (result.careerPath) sections.push({ id: 'jm-path', label: '晋升路径' })
+    sections.push({ id: 'jm-risk', label: '风险' })
+    // 站内岗位且有来源：才出「查看岗位」「去来源平台投递」两个独立按钮（手填无来源不出）
+    const showSource = Boolean(result.job?.sourceUrl && selectedJob?.id)
     return (
       <div className="flex h-full flex-col px-6 pt-6">
         <PageHeader
@@ -188,54 +187,33 @@ export function JobMasterPage() {
         />
         <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
           <ComplianceBanner tone="info">
-            以下内容仅为帮助你决策与准备投递的参考，不代表任何招聘结果或薪酬承诺；本平台不提供投递功能，投递请前往岗位来源平台。
+            以下内容仅为帮助你决策与准备的参考，不代表任何招聘结果或薪酬承诺；本平台不提供投递功能，投递请前往岗位来源平台。
           </ComplianceBanner>
 
-          {/* 一、适配度 + 概要 */}
-          <Card className="p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BrainCircuitIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-                <h2 className="text-base font-semibold text-gray-900">岗位适配度</h2>
-              </div>
-              <span className={['rounded-full px-3 py-1 text-sm font-semibold', fit.cls].join(' ')}>{fit.label}</span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-gray-700">{result.fit?.summary}</p>
-            <div className="mt-4 grid grid-cols-1 gap-3">
-              <div>
-                <div className="mb-2 flex items-center gap-1.5">
-                  <CheckCircle2Icon className="h-4 w-4 text-green-600" aria-hidden="true" />
-                  <span className="text-sm font-semibold text-gray-800">已具备</span>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {(result.fit?.matchedSkills ?? []).map((m) => (
-                    <div key={m.skill.slice(0, 24)} className="rounded-xl bg-green-50/60 px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">{m.skill}</p>
-                      <p className="mt-1 text-xs text-gray-500">原文依据：“{m.evidence}”</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {(result.fit?.gapSkills ?? []).length > 0 && (
-                <div>
-                  <div className="mb-2 flex items-center gap-1.5">
-                    <TrendingUpIcon className="h-4 w-4 text-orange-500" aria-hidden="true" />
-                    <span className="text-sm font-semibold text-gray-800">建议补足</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {(result.fit?.gapSkills ?? []).map((g) => (
-                      <div key={g.skill.slice(0, 24)} className="rounded-xl bg-orange-50/60 px-4 py-3">
-                        <p className="text-sm font-medium text-gray-900">{g.skill}</p>
-                        <p className="mt-1 text-xs leading-relaxed text-gray-600">{g.suggestion}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
+          <DecisionSummaryBar
+            jobTitle={result.job?.title ?? '目标岗位'}
+            company={result.job?.company}
+            fitLevel={result.fit?.level}
+            summary={result.fit?.summary}
+            sections={sections}
+            onJump={jump}
+          />
 
-          {/* 二、薪资参考（只透传来源方文本） */}
+          {result.fit && <div id="jm-fit"><FitSkillMap fit={result.fit} /></div>}
+          {result.fit?.gapSkills?.length ? <div id="jm-gap"><GapActionCards gapSkills={result.fit.gapSkills} /></div> : null}
+          {result.interviewPrep?.length ? (
+            <div id="jm-interview">
+              <InterviewPrepCard items={result.interviewPrep} onPracticeInterview={() => navigate('/interview/setup')} />
+            </div>
+          ) : null}
+          {result.resumeRewrite?.length ? (
+            <div id="jm-resume">
+              <ResumeRewriteCard items={result.resumeRewrite} onOptimizeResume={() => navigate('/resume/optimize', { state: { taskId, accessToken } })} />
+            </div>
+          ) : null}
+          {result.careerPath && <div id="jm-path"><CareerTimeline careerPath={result.careerPath} /></div>}
+
+          {/* 薪资参考卡（只透传来源方文本） */}
           <Card className="p-5">
             <div className="mb-2 flex items-center gap-2">
               <CoinsIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />
@@ -247,69 +225,28 @@ export function JobMasterPage() {
             {result.salary?.note && <p className="mt-1 text-xs text-gray-500">{result.salary.note}</p>}
           </Card>
 
-          {/* 三、晋升路径三节点 */}
-          {cp && (
-            <Card className="p-5">
-              <div className="mb-3 flex items-center gap-2">
-                <TargetIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-                <h2 className="text-base font-semibold text-gray-900">晋升路径参考</h2>
-              </div>
-              <ol className="flex flex-col gap-3">
-                <li className="rounded-xl bg-gray-50 px-4 py-3">
-                  <p className="text-xs font-semibold text-gray-400">当前</p>
-                  <p className="text-sm font-medium text-gray-900">{cp.current.title}</p>
-                  <p className="mt-1 text-xs text-gray-500">依据：{cp.current.evidence}</p>
-                </li>
-                <li className="rounded-xl bg-primary-50/60 px-4 py-3">
-                  <p className="text-xs font-semibold text-primary-500">1-3 年</p>
-                  <p className="text-sm font-medium text-gray-900">{cp.next.title}</p>
-                  {cp.next.skillsToBuild.length > 0 && <p className="mt-1 text-xs text-gray-600">待补技能：{cp.next.skillsToBuild.join('、')}</p>}
-                  <p className="mt-1 text-xs text-gray-600">第一步：{cp.next.firstStep}</p>
-                </li>
-                <li className="rounded-xl bg-primary-50/60 px-4 py-3">
-                  <p className="text-xs font-semibold text-primary-500">3-5 年</p>
-                  <p className="text-sm font-medium text-gray-900">{cp.target.title}</p>
-                  {cp.target.skillsToBuild.length > 0 && <p className="mt-1 text-xs text-gray-600">待补技能：{cp.target.skillsToBuild.join('、')}</p>}
-                </li>
-              </ol>
-            </Card>
-          )}
+          <div id="jm-risk"><RiskCard risks={result.risks ?? []} /></div>
 
-          {/* 四、风险与建议 */}
+          {/* 下一步 / 来源与合规动作 */}
           <Card className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <ShieldAlertIcon className="h-4 w-4 text-red-500" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-gray-900">风险与建议</h2>
-            </div>
-            {(result.risks ?? []).length === 0 ? (
-              <p className="text-sm text-gray-500">未发现明显硬性门槛风险；仍建议到来源平台核实岗位完整信息。</p>
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                {(result.risks ?? []).map((r) => {
-                  const rm = RISK_META[r.level] ?? RISK_META['medium']
-                  return (
-                    <div key={r.title.slice(0, 24)} className="rounded-xl bg-gray-50 px-4 py-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900">{r.title}</p>
-                        <span className={['rounded-full px-2.5 py-0.5 text-xs font-semibold', rm.cls].join(' ')}>{rm.label}</span>
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-gray-600">{r.reason}</p>
-                      <p className="mt-1 text-xs text-gray-400">依据：{r.basis}</p>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </Card>
-
-          {result.job?.sourceName && (
-            <Card className="p-5">
-              <p className="text-xs text-gray-400">
+            <h2 className="text-base font-semibold text-gray-900">下一步</h2>
+            {result.job?.sourceName && (
+              <p className="mt-1 text-xs text-gray-400">
                 岗位来源：{result.job.sourceName}{result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
               </p>
-              <p className="mt-1 text-sm text-gray-600">准备好之后，请前往来源平台完成投递。</p>
-            </Card>
-          )}
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" className="min-h-[48px]" onClick={() => navigate('/resume/career-plan', { state: { taskId, accessToken } })}>去职业规划</Button>
+              {showSource && (
+                <>
+                  <Button size="sm" variant="secondary" className="min-h-[48px]" onClick={() => navigate(`/jobs/${selectedJob?.id}`)}>查看岗位</Button>
+                  <Button size="sm" variant="secondary" className="min-h-[48px]" onClick={() => navigate(`/jobs/${selectedJob?.id}`)}>
+                    <ExternalLinkIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />去来源平台投递
+                  </Button>
+                </>
+              )}
+            </div>
+          </Card>
 
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
         </div>
@@ -323,15 +260,9 @@ export function JobMasterPage() {
                 <><PrinterIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />打印决策报告</>
               )}
             </Button>
-            {result.job?.sourceUrl && selectedJob?.id ? (
-              <Button size="lg" variant="secondary" className="h-14 flex-1 text-base" onClick={() => navigate(`/jobs/${selectedJob.id}`)}>
-                <ExternalLinkIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />去来源平台投递
-              </Button>
-            ) : (
-              <Button size="lg" variant="secondary" className="h-14 flex-1 text-base" onClick={() => navigate('/resume/optimize', { state: { taskId, accessToken } })}>
-                <PencilLineIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />去优化简历
-              </Button>
-            )}
+            <Button size="lg" variant="secondary" className="h-14 flex-1 text-base" onClick={() => { setResult(null); setError(null) }}>
+              换个岗位再分析
+            </Button>
           </div>
         </div>
       </div>
