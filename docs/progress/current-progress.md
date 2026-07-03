@@ -228,6 +228,8 @@
 
 ## 当前工作区事实
 
+| 2026-07-03 | `codex/deploy-data-safety-gate` | 固化预生产部署不丢数据 DP-GATE 代码门禁：新增可执行 `deploy:data-safety-gate` 脚本，`before` 模式在低敏 `AuditLog` 写入 `action='deploy.canary'` canary，并记录核心表 count、`max(createdAt)` 与最新记录锚点基线；`after` 模式只读确认 canary 仍存在、基线锚点记录仍存在、核心表 count 未无解释下降、`max(createdAt)` 未回退；新增 `verify:deploy-data-safety-gate` 覆盖成功路径、canary 丢失、锚点丢失、count 下降需 cleanup 解释、`max(createdAt)` 回退硬失败，并接入 CI 串行 verify。本项只代表本地脚本与静态门禁固化，不代表预生产已经真实执行 DP-GATE，也不解除 2026-07-03 P0 部署数据安全追证阻塞；部署窗口仍应停写或低流量，DP-GATE 不替代完整 deploy evidence log。 |
+
 主工作区：`/Users/wanglei/AI求职打印服务终端`。当前 `main == origin/main`（具体 tip 以 `git rev-parse main` / `git rev-parse origin/main` 为准），工作区干净，worktree 只剩主仓；远程 head 只剩 `origin/main`。本 docs 分支合入并清理后，本地分支也只剩 `main`。后续治理、迁移和清理默认继续从干净 `main` 或独立 worktree 启动，不再以任何旧落后分叉作为治理基线。
 
 当前特殊 worktree / 分支边界：
