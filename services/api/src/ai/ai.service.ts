@@ -579,9 +579,7 @@ export class AiService {
    *   匿名 / system 文件仍走短期保存,且不能被会员转为长期保存。
    * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
    * - FilesService.upload 按 purpose='resume_upload' 的 MIME 白名单校验(见
-   *   files/file-validation.ts PURPOSE_POLICY),txt/md 当前不在白名单内,
-   *   会在 upload 阶段抛 FILE_MIME_NOT_ALLOWED(400)——这是既有安全校验,
-   *   本次改动不放宽/绕过该白名单。
+   *   files/file-validation.ts PURPOSE_POLICY);pdf/docx/txt/md 均为受控导出格式。
    */
   async exportGeneratedResume(
     resume: GeneratedResume,
