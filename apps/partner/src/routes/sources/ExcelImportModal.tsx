@@ -81,7 +81,7 @@ function StepBar({ current }: { current: Step }) {
         return (
           <div key={s.id} className="flex items-center">
             <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold
-              ${done   ? 'bg-green-500 text-white' :
+              ${done   ? 'bg-success text-white' :
                 active ? 'bg-primary-600 text-white' :
                          'bg-neutral-200 text-neutral-500'}`}>
               {done ? <CheckCircleIcon className="h-4 w-4" /> : i + 1}
@@ -213,7 +213,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-2xl rounded-2xl bg-surface shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-4">
           <div>
@@ -285,7 +285,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                 >
                   {file ? (
                     <>
-                      <FileSpreadsheetIcon className="h-10 w-10 text-green-500" />
+                      <FileSpreadsheetIcon className="h-10 w-10 text-success" />
                       <p className="mt-2 font-medium text-neutral-800">{file.name}</p>
                       <p className="text-xs text-neutral-400">{(file.size / 1024).toFixed(1)} KB · 点击更换</p>
                     </>
@@ -299,7 +299,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                 </div>
               </div>
 
-              <div className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+              <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-xs text-warning-fg">
                 只接受岗位/招聘会展示字段，导入后默认"待审核 + 草稿"，由管理员审核发布后才展示。
               </div>
             </div>
@@ -318,7 +318,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               )}
               <div className="max-h-64 overflow-y-auto rounded-xl border border-neutral-100">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-neutral-100 bg-neutral-50">
+                  <thead>
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">标准字段</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">对应 Excel 列</th>
@@ -329,7 +329,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                       <tr key={f.key} className="hover:bg-neutral-50">
                         <td className="px-4 py-2">
                           <span className="font-medium text-neutral-800">{f.label}</span>
-                          {f.required && <span className="ml-1 text-red-500">*</span>}
+                          {f.required && <span className="ml-1 text-error-fg">*</span>}
                         </td>
                         <td className="px-4 py-2">
                           <select
@@ -357,9 +357,9 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: '有效行', count: preview.validRows,   color: 'text-green-600 bg-green-50 border-green-100' },
-                  { label: '无效行', count: preview.invalidRows, color: 'text-red-600 bg-red-50 border-red-100' },
-                  { label: '重复行', count: preview.dupRows,     color: 'text-amber-600 bg-amber-50 border-amber-100' },
+                  { label: '有效行', count: preview.validRows,   color: 'text-success-fg bg-success-bg border-success/20' },
+                  { label: '无效行', count: preview.invalidRows, color: 'text-error-fg bg-error-bg border-error/20' },
+                  { label: '重复行', count: preview.dupRows,     color: 'text-warning-fg bg-warning-bg border-warning/20' },
                 ].map((s) => (
                   <div key={s.label} className={`rounded-xl border p-4 text-center ${s.color}`}>
                     <div className="text-2xl font-bold">{s.count}</div>
@@ -370,10 +370,10 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
 
               {/* Sample invalid rows */}
               {preview.sampleInvalid.length > 0 && (
-                <div className="rounded-lg border border-red-100 bg-red-50 p-3">
-                  <p className="mb-2 text-xs font-medium text-red-700">无效行示例（共 {preview.invalidRows} 行将被跳过）</p>
+                <div className="rounded-lg border border-error/20 bg-error-bg p-3">
+                  <p className="mb-2 text-xs font-medium text-error-fg">无效行示例（共 {preview.invalidRows} 行将被跳过）</p>
                   {preview.sampleInvalid.map((r) => (
-                    <div key={r.rowIndex} className="mb-1 text-xs text-red-600">
+                    <div key={r.rowIndex} className="mb-1 text-xs text-error-fg">
                       第 {r.rowIndex} 行：{r.errors.join('；')}
                     </div>
                   ))}
@@ -381,13 +381,13 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               )}
 
               {preview.dupRows > 0 && (
-                <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
                   {preview.dupRows} 行与已有数据重复，导入时将刷新展示字段，不覆盖审核/发布状态。
                 </div>
               )}
 
               {preview.validRows === 0 && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <div className="rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-xs text-error-fg">
                   没有可导入的有效行，请检查字段映射后重新预览。
                 </div>
               )}
@@ -397,17 +397,17 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
           {/* ── Step 4: done ── */}
           {step === 'done' && (
             <div className="flex flex-col items-center justify-center py-8">
-              <CheckCircleIcon className="h-14 w-14 text-green-500" />
+              <CheckCircleIcon className="h-14 w-14 text-success" />
               <h3 className="mt-4 text-lg font-semibold text-neutral-900">导入成功</h3>
               <p className="mt-1 text-sm text-neutral-500">
-                已成功导入 <span className="font-bold text-green-600">{importedCount}</span> 条数据，
+                已成功导入 <span className="font-bold text-success-fg">{importedCount}</span> 条数据，
                 默认待审核状态，请联系管理员审核发布。
               </p>
             </div>
           )}
 
           {error && (
-            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+            <div className="mt-4 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</div>
           )}
         </div>
 

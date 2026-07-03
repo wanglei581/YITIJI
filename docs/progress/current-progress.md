@@ -48,6 +48,8 @@
 
 2026-07-03 追加：**W3/W4 第一步——双后台旧灰阶类全量清扫**。Admin 41 个文件 + Partner 13 个文件的 `gray-N → neutral-N` 同明度机械映射（纯类名替换，零逻辑改动），消除冷灰与纸色底的冲突；Admin 29 页 + Partner 13 页全部与墨青纸感基调协调。验证：两端 typecheck / lint / 生产 build 全过，浏览器抽查 Admin 岗位信息源页（13 条真实数据 + 审核徽章）与 Partner 岗位信息管理页（7 条真实岗位 + 质量面板）渲染正常。待做：剩余页面的结构级细修（表头规范/chips 统一/圆点徽章/彩色语义类 token 化）按批次继续。
 
+2026-07-03 追加：**W3/W4 第二步——双后台结构规范全域统一**。Admin 37 文件 + Partner 若干文件批量规范化：① 筛选 chips 全域换墨底胶囊规范（激活墨底白字、描边悬停青玉）；② 表头统一原型规范（11.5px 粗体字距 + 墨线底边）、divide 分隔线 token 化；③ `StatusBadge` 全域启用圆点样式，并修复三字中文在徽章内竖排换行的 bug（基类加 `whitespace-nowrap`，Kiosk 无视觉影响）；④ 语义色全量 token 化（red/green/emerald→error/success、amber/orange→warning、blue→info、`bg-white`→`bg-surface`）；展馆分区六色分类色板（数据可视化用途）保留。验证：admin/partner/ui/kiosk typecheck、两端 lint 与生产 build 全过；浏览器实测 Admin 岗位信息源页（墨底胶囊 + 圆点徽章 + 原型表头 + 真实 13 条数据）、招聘会管理页（诚实空态）、Partner 工作台（陶色审核提示条）。至此双后台 42 页的 token/色彩/结构三层规范全部落地；后续为逐页内容级增强（A 档明细字段/下一步引导等，见 page-depth-enhancement-plan §四）与 Kiosk W5。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |

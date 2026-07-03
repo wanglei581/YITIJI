@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
-      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-surface p-8 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
             <Building2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
@@ -82,7 +82,7 @@ export default function LoginPage() {
           </label>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <div className="rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-xs text-error-fg">
               {error}
             </div>
           )}

@@ -16,10 +16,10 @@ import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
 const CATEGORY_MAP: Record<JobCategory, { label: string; style: string }> = {
-  fulltime: { label: '全职', style: 'bg-blue-50 text-blue-600'     },
+  fulltime: { label: '全职', style: 'bg-info-bg text-info-fg'     },
   intern:   { label: '实习', style: 'bg-purple-50 text-purple-600' },
-  campus:   { label: '校招', style: 'bg-green-50 text-green-600'   },
-  parttime: { label: '兼职', style: 'bg-orange-50 text-orange-600' },
+  campus:   { label: '校招', style: 'bg-success-bg text-success-fg'   },
+  parttime: { label: '兼职', style: 'bg-warning-bg text-warning-fg' },
 }
 
 const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
@@ -30,8 +30,8 @@ const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' |
 }
 
 const PUBLISH_MAP: Record<PublishStatus, { dot: string; label: string }> = {
-  draft:       { dot: 'bg-orange-400', label: '待发布' },
-  published:   { dot: 'bg-green-500',  label: '已发布' },
+  draft:       { dot: 'bg-warning', label: '待发布' },
+  published:   { dot: 'bg-success',  label: '已发布' },
   unpublished: { dot: 'bg-neutral-300',   label: '已下架' },
   expired:     { dot: 'bg-neutral-300',   label: '已过期' },
 }
@@ -65,7 +65,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -253,7 +253,7 @@ export default function JobsPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
           {notice}
         </div>
       )}
@@ -270,7 +270,7 @@ export default function JobsPage() {
                 key={f}
                 onClick={() => setCategoryFilter(f)}
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                  categoryFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  categoryFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
                 }`}
               >
                 {f}
@@ -286,7 +286,7 @@ export default function JobsPage() {
                 key={f}
                 onClick={() => setReviewFilter(f)}
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                  reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
                 }`}
               >
                 {f}
@@ -301,14 +301,14 @@ export default function JobsPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['外部编号', '岗位标题', '公司', '城市', '类型', '来源链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-sm text-neutral-400">
@@ -338,7 +338,7 @@ export default function JobsPage() {
                         </a>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{j.syncTime}</td>
-                      <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600">
                           <span className={`h-1.5 w-1.5 rounded-full ${publish.dot}`} aria-hidden="true" />
@@ -356,7 +356,7 @@ export default function JobsPage() {
                           {j.publishStatus === 'published' && (
                             <button
                               disabled={busyId === j.id}
-                              className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
+                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
                               onClick={() => void handleUnpublish(j.id)}
                             >
                               {busyId === j.id ? '处理中…' : '下架'}
@@ -393,9 +393,9 @@ export default function JobsPage() {
         }
       >
         <div className="space-y-4">
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{formError}</p>}
+          {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
           {editing !== 'new' && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
               保存后该岗位将重新进入待审核状态;审核通过并重新发布前,终端不展示该条数据。外部编号与来源机构不可修改。
             </p>
           )}

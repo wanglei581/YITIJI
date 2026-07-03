@@ -26,10 +26,10 @@ function resolveWebhookUrl(webhookUrl?: string): string {
 // 接入方式(AccessMode):描述"用什么方式拉取数据"。
 // sourceKind(数据由谁提供)留待 B1 阶段加入列与筛选。
 const ACCESS_MODE_STYLE: Record<AccessMode, { label: string; style: string }> = {
-  api:     { label: 'API',     style: 'bg-blue-50 text-blue-600'     },
-  excel:   { label: 'Excel',   style: 'bg-green-50 text-green-600'   },
-  csv:     { label: 'CSV',     style: 'bg-green-50 text-green-600'   },
-  json:    { label: 'JSON',    style: 'bg-green-50 text-green-600'   },
+  api:     { label: 'API',     style: 'bg-info-bg text-info-fg'     },
+  excel:   { label: 'Excel',   style: 'bg-success-bg text-success-fg'   },
+  csv:     { label: 'CSV',     style: 'bg-success-bg text-success-fg'   },
+  json:    { label: 'JSON',    style: 'bg-success-bg text-success-fg'   },
   webhook: { label: 'Webhook', style: 'bg-purple-50 text-purple-600' },
   manual:  { label: '手动',    style: 'bg-neutral-100 text-neutral-600'    },
 }
@@ -137,7 +137,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
               type="button"
               onClick={() => { setMode(option.value); setCreated(null); setError('') }}
               className={`min-h-[96px] rounded-xl border p-4 text-left transition ${
-                active ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-100' : 'border-neutral-200 bg-white hover:border-neutral-300'
+                active ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-100' : 'border-neutral-200 bg-surface hover:border-neutral-300'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -168,7 +168,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
           </div>
 
           {mode === 'api' && (
-            <div className="space-y-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+            <div className="space-y-4 rounded-xl border border-info/20 bg-info-bg/40 p-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-neutral-700">Endpoint</label>
                 <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-300 px-3 font-mono text-sm focus:border-primary-500 focus:outline-none" placeholder="https://api.example.com/v1/jobs" />
@@ -208,20 +208,20 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
                 <label className="mb-1 block text-sm font-medium text-neutral-700">自定义密钥（可选）</label>
                 <input value={credential} onChange={(e) => setCredential(e.target.value)} className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-500 focus:outline-none" placeholder="留空则由系统自动生成" type="password" />
               </div>
-              <div className="rounded-lg bg-white px-4 py-3 text-xs text-neutral-500">
+              <div className="rounded-lg bg-surface px-4 py-3 text-xs text-neutral-500">
                 签名规则：<span className="font-mono">HMAC-SHA256(secret, timestamp + '.' + rawBody)</span>，请求必须携带 timestamp / nonce / signature。
               </div>
             </div>
           )}
 
           {mode === 'excel' && (
-            <div className="rounded-xl border border-green-100 bg-green-50/40 p-4 text-sm text-neutral-700">
+            <div className="rounded-xl border border-success/20 bg-success-bg/40 p-4 text-sm text-neutral-700">
               创建 Excel 数据源后，可继续使用下方字段映射、导入预览和待审核流程。Excel 不需要接口凭证。
             </div>
           )}
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+            <div className="rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</div>
           )}
 
           <div className="flex justify-end gap-3">
@@ -233,20 +233,20 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
         </div>
 
         <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-5">
-          <DatabaseIcon className="h-9 w-9 rounded-full bg-white p-2 text-neutral-400" />
+          <DatabaseIcon className="h-9 w-9 rounded-full bg-surface p-2 text-neutral-400" />
           <h3 className="mt-4 font-semibold text-neutral-900">接入结果</h3>
           {!created ? (
             <p className="mt-2 text-sm leading-6 text-neutral-500">创建后这里会显示数据源 ID、接收地址或配置状态。敏感密钥只显示一次。</p>
           ) : (
             <div className="mt-4 space-y-3 text-sm">
-              <div className="rounded-lg bg-white p-3">
+              <div className="rounded-lg bg-surface p-3">
                 <div className="text-xs text-neutral-400">数据源 ID</div>
                 <div className="mt-1 font-mono text-xs text-neutral-700">{created.id}</div>
               </div>
               {created.webhookUrl && (() => {
                 const fullUrl = resolveWebhookUrl(created.webhookUrl)
                 return (
-                  <div className="rounded-lg bg-white p-3">
+                  <div className="rounded-lg bg-surface p-3">
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-neutral-400">Webhook 接收地址</div>
                       <button type="button" onClick={() => copy(fullUrl)} className="text-xs text-primary-600">复制</button>
@@ -256,12 +256,12 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
                 )
               })()}
               {created.webhookSecretOnce && (
-                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                <div className="rounded-lg border border-warning/30 bg-warning-bg p-3">
                   <div className="flex items-center justify-between">
-                    <div className="text-xs font-medium text-orange-700">签名密钥（仅显示一次）</div>
-                    <button type="button" onClick={() => copy(created.webhookSecretOnce)} className="flex items-center gap-1 text-xs text-orange-700"><CopyIcon className="h-3 w-3" />复制</button>
+                    <div className="text-xs font-medium text-warning-fg">签名密钥（仅显示一次）</div>
+                    <button type="button" onClick={() => copy(created.webhookSecretOnce)} className="flex items-center gap-1 text-xs text-warning-fg"><CopyIcon className="h-3 w-3" />复制</button>
                   </div>
-                  <div className="mt-1 break-all font-mono text-xs text-orange-800">{created.webhookSecretOnce}</div>
+                  <div className="mt-1 break-all font-mono text-xs text-warning-fg">{created.webhookSecretOnce}</div>
                 </div>
               )}
             </div>
@@ -362,14 +362,14 @@ export default function SourcesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['数据源名称', '接入方式', '说明', '同步频率', '最近同步', '连接状态', '成功数', '失败数', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {sources.map((s) => {
                 const st   = ACCESS_MODE_STYLE[s.accessMode]
                 const conn = CONN_MAP[s.connStatus]
@@ -385,13 +385,13 @@ export default function SourcesPage() {
                       <span className={`rounded px-2 py-0.5 text-xs font-medium ${st.style}`}>{st.label}</span>
                     </td>
                     <td className="max-w-xs px-4 py-3 text-xs text-neutral-500">
-                      <span className={s.connStatus === 'error' ? 'text-red-500' : ''}>{s.description}</span>
+                      <span className={s.connStatus === 'error' ? 'text-error-fg' : ''}>{s.description}</span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{FREQ_LABELS[s.syncFreq]}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.lastSyncTime}</td>
-                    <td className="px-4 py-3"><StatusBadge status={conn.badge} label={conn.label} /></td>
-                    <td className="px-4 py-3 text-center font-medium text-green-600">{s.successCount}</td>
-                    <td className="px-4 py-3 text-center font-medium text-red-500">{s.failCount}</td>
+                    <td className="px-4 py-3"><StatusBadge dot status={conn.badge} label={conn.label} /></td>
+                    <td className="px-4 py-3 text-center font-medium text-success-fg">{s.successCount}</td>
+                    <td className="px-4 py-3 text-center font-medium text-error-fg">{s.failCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="flex gap-2">
                         {/* 「测试连接」已移除:后端暂无连通性测试端点,不放死按钮(审计修复) */}
@@ -416,8 +416,8 @@ export default function SourcesPage() {
                         <button
                           className={`rounded px-2 py-1 text-xs font-medium ${
                             s.connStatus === 'disabled'
-                              ? 'text-green-600 hover:bg-green-50'
-                              : 'text-orange-500 hover:bg-orange-50'
+                              ? 'text-success-fg hover:bg-success-bg'
+                              : 'text-warning-fg hover:bg-warning-bg'
                           }`}
                           type="button"
                           onClick={() => handleToggle(s.id)}

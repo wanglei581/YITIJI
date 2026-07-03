@@ -15,8 +15,8 @@ import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartne
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
 const FAIR_STATUS_MAP: Record<JobFairStatus, { style: string; label: string }> = {
-  upcoming: { style: 'bg-blue-50 text-blue-600',   label: '未开始' },
-  ongoing:  { style: 'bg-green-50 text-green-600', label: '进行中' },
+  upcoming: { style: 'bg-info-bg text-info-fg',   label: '未开始' },
+  ongoing:  { style: 'bg-success-bg text-success-fg', label: '进行中' },
   ended:    { style: 'bg-neutral-100 text-neutral-500',  label: '已结束' },
 }
 
@@ -55,7 +55,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -255,7 +255,7 @@ export default function FairsPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
           {notice}
         </div>
       )}
@@ -266,8 +266,8 @@ export default function FairsPage() {
           <button
             key={f}
             onClick={() => setStatusFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              statusFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+            className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
+              statusFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
             }`}
           >
             {f}
@@ -280,14 +280,14 @@ export default function FairsPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '来源预约链接', '来源签到链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="py-12 text-center text-sm text-neutral-400">
@@ -328,8 +328,8 @@ export default function FairsPage() {
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{f.syncTime}</td>
-                      <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
-                      <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-2">
                           <button
@@ -341,7 +341,7 @@ export default function FairsPage() {
                           {f.publishStatus === 'published' && (
                             <button
                               disabled={busyId === f.id}
-                              className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
+                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
                               onClick={() => void handleUnpublish(f.id)}
                             >
                               {busyId === f.id ? '处理中…' : '下架'}
@@ -378,9 +378,9 @@ export default function FairsPage() {
         }
       >
         <div className="space-y-4">
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{formError}</p>}
+          {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
           {editing !== 'new' && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
               保存后该招聘会将重新进入待审核状态;审核通过并重新发布前,终端不展示该条数据。外部编号与来源机构不可修改。
             </p>
           )}

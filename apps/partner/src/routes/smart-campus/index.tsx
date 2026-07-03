@@ -48,7 +48,7 @@ function SwitchPill({ state, disabled = false, onClick, title }: { state: Switch
       aria-label={state === 'on' ? '已开启' : '已关闭'}
     >
       <span
-        className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+        className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-surface transition-transform ${
           state === 'on' ? 'translate-x-[18px]' : 'translate-x-0.5'
         }`}
       />
@@ -193,17 +193,17 @@ function TerminalsPanel() {
         <h2 className="text-lg font-bold text-neutral-900">终端开关</h2>
         <p className="mt-0.5 text-sm text-neutral-500">开启后该机器前端首页显示「智慧校园」模块；关闭即整张隐藏。</p>
       </div>
-      <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-4 py-3">
-        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-blue-900">
+      <div className="flex items-start gap-2 rounded-lg border border-info/20 bg-info-bg/60 px-4 py-3">
+        <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-info-fg" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-info-fg">
           学校账号只能查看和配置归属本校的终端。校园大数据本期冻结，机构端不可开启；保存后 Kiosk 首页会按终端配置显示或隐藏「智慧校园」。
         </p>
       </div>
       {error ? (
-        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="rounded-lg border border-error/20 bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</div>
       ) : null}
       {savedHint && !error ? (
-        <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div className="rounded-lg border border-success/20 bg-success-bg px-4 py-3 text-sm text-success-fg">
           已保存，Kiosk 刷新首页或下一轮拉取（约 5 分钟）后生效。
         </div>
       ) : null}
@@ -220,7 +220,7 @@ function TerminalsPanel() {
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-sm text-neutral-500">正在加载终端配置…</td>
@@ -234,7 +234,7 @@ function TerminalsPanel() {
                   <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-900">{terminal.terminalCode ?? terminal.terminalId}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{terminal.orgName ?? '本机构'}</td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <StatusBadge status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
+                    <StatusBadge dot status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
                   </td>
                   {MODULE_HEADERS.map((header) => (
                     <td key={`${terminal.terminalId}-${header.key}`} className="px-4 py-3 text-center">
@@ -297,15 +297,15 @@ export default function SmartCampusPage() {
       subtitle="合作机构（学校）后台管理区 · 终端开关按 orgId 隔离已联动 Kiosk"
     >
       <div className="space-y-5">
-        <Card className="border-blue-100 bg-blue-50/50 p-5">
+        <Card className="border-info/20 bg-info-bg/50 p-5">
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface text-info-fg shadow-sm">
               <GraduationCapIcon className="h-6 w-6" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold text-neutral-900">智慧校园 · 终端开关已联动</h2>
-                <StatusBadge status="success" label="终端开关已联动" />
+                <StatusBadge dot status="success" label="终端开关已联动" />
               </div>
               <p className="mt-1 text-sm leading-6 text-neutral-600">
                 「终端开关」已接通后端：学校账号按 orgId 隔离，只配置归属本校的终端，保存即联动 Kiosk 首页智慧校园显隐。迎新内容 / 使用统计在内容模型与统计管线接入前显示「未开放」，不展示任何示例数据；校园大数据本期严格冻结。
@@ -326,9 +326,9 @@ export default function SmartCampusPage() {
         {activeTab === 'orientation' && <OrientationPanel />}
         {activeTab === 'usage' && <UsagePanel />}
 
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-          <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-amber-900">
+        <div className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-bg/70 px-4 py-3">
+          <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
+          <p className="text-xs leading-relaxed text-warning-fg">
             「终端开关」已接通真实后端（含机构隔离与审计）。「迎新内容 / 使用统计」在内容模型与统计回传补齐前显示「未开放」真实空态，不展示任何示例数据；「校园大数据」本期严格冻结。
           </p>
         </div>

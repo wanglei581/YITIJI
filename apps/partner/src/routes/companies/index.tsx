@@ -84,7 +84,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -373,12 +373,12 @@ export default function CompaniesPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
           {notice}
         </div>
       )}
 
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-3 text-sm text-info-fg">
         企业资料新增/编辑后将回到待审核+草稿状态，须管理员重新审核发布后，终端才会展示。
       </div>
 
@@ -391,7 +391,7 @@ export default function CompaniesPage() {
               key={f}
               onClick={() => setReviewFilter(f)}
               className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                reviewFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -405,14 +405,14 @@ export default function CompaniesPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['外部编号', '企业名称', '行业', '企业类型', '地区', '招聘会参展', '关联岗位数', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-12 text-center text-sm text-neutral-400">
@@ -437,9 +437,9 @@ export default function CompaniesPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.linkedJobCount}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{fmtTime(c.syncTime)}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={review.badge} label={review.label} />
+                        <StatusBadge dot status={review.badge} label={review.label} />
                         {c.reviewStatus === 'rejected' && c.rejectReason && (
-                          <p className="mt-1 max-w-[200px] text-xs text-red-500" title={c.rejectReason}>
+                          <p className="mt-1 max-w-[200px] text-xs text-error-fg" title={c.rejectReason}>
                             原因:{c.rejectReason}
                           </p>
                         )}
@@ -460,7 +460,7 @@ export default function CompaniesPage() {
                           </button>
                           {c.publishStatus === 'published' && (
                             <button
-                              className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50"
+                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
                               onClick={() => void handleUnpublish(c.id)}
                             >
                               下架
@@ -497,8 +497,8 @@ export default function CompaniesPage() {
         }
       >
         <div className="space-y-4">
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{formError}</p>}
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
+          <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
             {editing === 'new'
               ? '提交后该企业资料进入待审核+草稿状态;管理员审核通过并发布后,终端才会展示。'
               : '保存后该企业资料将回到待审核+草稿状态;管理员重新审核发布前,终端不展示该企业。外部编号与来源机构不可修改。'}

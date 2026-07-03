@@ -8,7 +8,7 @@ import { getSyncLogs } from '../../services/api'
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
 const DATA_TYPE_MAP: Record<SyncDataType, { label: string; style: string }> = {
-  job:    { label: '岗位',   style: 'bg-blue-50 text-blue-600'     },
+  job:    { label: '岗位',   style: 'bg-info-bg text-info-fg'     },
   fair:   { label: '招聘会', style: 'bg-purple-50 text-purple-600' },
   policy: { label: '政策',   style: 'bg-teal-50 text-teal-600'     },
 }
@@ -83,8 +83,8 @@ export default function SyncLogsPage() {
           <button
             key={f}
             onClick={() => setResultFilter(f)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              resultFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+            className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
+              resultFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
             }`}
           >
             {f}
@@ -97,14 +97,14 @@ export default function SyncLogsPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-100 bg-neutral-50">
+            <thead>
               <tr>
                 {['日志编号', '数据源', '类型', '成功数', '失败数', '重复数', '异常字段', '失败原因', '结果', '同步时间', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-12 text-center text-sm text-neutral-400">
@@ -123,20 +123,20 @@ export default function SyncLogsPage() {
                       <td className="px-4 py-3">
                         <span className={`rounded px-2 py-0.5 text-xs font-medium ${dt.style}`}>{dt.label}</span>
                       </td>
-                      <td className="px-4 py-3 text-center font-medium text-green-600">{l.addedCount}</td>
-                      <td className="px-4 py-3 text-center font-medium text-red-500">{l.errorCount}</td>
+                      <td className="px-4 py-3 text-center font-medium text-success-fg">{l.addedCount}</td>
+                      <td className="px-4 py-3 text-center font-medium text-error-fg">{l.errorCount}</td>
                       <td className="px-4 py-3 text-center text-neutral-500">{l.dupCount}</td>
                       <td className="px-4 py-3 text-xs">
                         {l.errorFields
-                          ? <span className="font-mono text-orange-500">{l.errorFields}</span>
+                          ? <span className="font-mono text-warning-fg">{l.errorFields}</span>
                           : <span className="text-neutral-300">—</span>}
                       </td>
                       <td className="max-w-xs px-4 py-3 text-xs text-neutral-500">
                         {l.errorDetail
-                          ? <span className="line-clamp-2 text-red-500">{l.errorDetail}</span>
+                          ? <span className="line-clamp-2 text-error-fg">{l.errorDetail}</span>
                           : <span className="text-neutral-300">—</span>}
                       </td>
-                      <td className="px-4 py-3"><StatusBadge status={res.badge} label={res.label} /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={res.badge} label={res.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{l.syncTime}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         {/* 「重试」已移除:后端暂无按日志重放端点,失败数据请修正后重新导入(审计修复) */}
@@ -178,13 +178,13 @@ export default function SyncLogsPage() {
               {detail.errorFields && (
                 <div>
                   <p className="mb-1 text-xs text-neutral-400">异常字段</p>
-                  <code className="block break-all rounded bg-orange-50 px-3 py-2 font-mono text-xs text-orange-600">{detail.errorFields}</code>
+                  <code className="block break-all rounded bg-warning-bg px-3 py-2 font-mono text-xs text-warning-fg">{detail.errorFields}</code>
                 </div>
               )}
               {detail.errorDetail && (
                 <div>
                   <p className="mb-1 text-xs text-neutral-400">失败原因(完整)</p>
-                  <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">{detail.errorDetail}</p>
+                  <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-error-bg px-3 py-2 text-xs leading-relaxed text-error-fg">{detail.errorDetail}</p>
                 </div>
               )}
               <p className="pt-1 text-xs text-neutral-400">失败数据请在来源侧修正后重新导入;Excel 来源可在「数据源管理」重新上传。</p>
