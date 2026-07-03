@@ -17,12 +17,14 @@ import type {
   ResumeExportFormat,
   ResumeGenerateExportResponse,
   ResumeOptimizeModule,
+  ResumeTemplate,
   ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { adjustResumeLayoutDraft, exportGeneratedResume, getResumeOptimize } from '../../services/api'
 import type { ResumeLayoutAdjustAction } from '../../services/api'
+import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
 import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
@@ -73,6 +75,8 @@ export function ResumeOptimizePage() {
   const [exportFormat, setExportFormat] = useState<ResumeExportFormat>('pdf')
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [resumeTemplates, setResumeTemplates] = useState<ResumeTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
   const [adjusting, setAdjusting] = useState<ResumeLayoutAdjustAction | null>(null)
@@ -81,8 +85,29 @@ export function ResumeOptimizePage() {
   const [adjustError, setAdjustError] = useState<string | null>(null)
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
   const aiAdjustDisabled = loading || exporting || !optimizedResume || Boolean(adjusting)
+  const selectedTemplate = useMemo(
+    () => resumeTemplates.find((template) => template.id === selectedTemplateId) ?? null,
+    [resumeTemplates, selectedTemplateId],
+  )
 
   useBusyLock(exporting || printNavigating || Boolean(adjusting))
+
+  useEffect(() => {
+    let cancelled = false
+    getResumeTemplates()
+      .then((templates) => {
+        if (cancelled) return
+        setResumeTemplates(templates)
+        setSelectedTemplateId((current) => {
+          if (current && templates.some((template) => template.id === current)) return current
+          return templates[0]?.id ?? ''
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setResumeTemplates([])
+      })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!taskId) {
@@ -156,7 +181,7 @@ export function ResumeOptimizePage() {
     setExporting(true)
     setExportError(null)
     try {
-      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout)
+      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)
       setExported(result)
       setIsDirty(false)
     } catch (err) {
@@ -201,6 +226,12 @@ export function ResumeOptimizePage() {
   // 切换导出格式后,已导出的旧格式文件不再对应当前选择,需重新导出
   const handleExportFormatChange = (format: ResumeExportFormat) => {
     setExportFormat(format)
+    if (exported) setExported(null)
+  }
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplateId(templateId)
+    setExportError(null)
     if (exported) setExported(null)
   }
 
@@ -331,6 +362,43 @@ export function ResumeOptimizePage() {
         {optimizedResume && (
           <>
             <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
+            {resumeTemplates.length > 0 && (
+              <Card className="p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">简历模板</p>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                      PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出。
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:min-w-[260px]">
+                    {resumeTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        aria-pressed={selectedTemplateId === template.id}
+                        disabled={exporting}
+                        onClick={() => handleTemplateChange(template.id)}
+                        className={[
+                          'min-h-[52px] rounded-xl border px-3 text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
+                          selectedTemplateId === template.id
+                            ? 'border-primary-500 bg-primary-50 text-primary-700'
+                            : 'border-gray-200 bg-white text-gray-700',
+                        ].join(' ')}
+                      >
+                        <span className="block text-sm font-semibold">{template.title}</span>
+                        <span className="mt-0.5 block text-xs text-gray-500">{template.resumeLayoutPreset.style} · {template.recommendedFor}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {selectedTemplate && (
+                  <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-500">
+                    已选择：{selectedTemplate.title}。排版参数会覆盖模板默认值，导出前可继续微调。
+                  </p>
+                )}
+              </Card>
+            )}
             <Card className="p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>

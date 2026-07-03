@@ -209,10 +209,11 @@ export const aiHttpAdapter = {
     token?: string | null,
     format?: ResumeExportFormat,
     layout?: ResumeLayoutSettings,
+    templateId?: string,
   ): Promise<ResumeGenerateExportResponse> {
     return post<ResumeGenerateExportResponse>(
       '/resume/generate/export',
-      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}) },
+      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf', ...(layout ? { layout } : {}), ...(templateId ? { templateId } : {}) },
       token,
     )
   },

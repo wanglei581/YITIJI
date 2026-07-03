@@ -74,6 +74,7 @@ export interface AiServiceInterface {
     token?: string | null,
     format?: ResumeExportFormat,
     layout?: ResumeLayoutSettings,
+    templateId?: string,
   ): Promise<ResumeGenerateExportResponse>
 }
 
@@ -135,4 +136,5 @@ export const exportGeneratedResume = (
   token?: string | null,
   format?: ResumeExportFormat,
   layout?: ResumeLayoutSettings,
-) => adapter.exportGeneratedResume(resume, taskId, token, format, layout)
+  templateId?: string,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)
