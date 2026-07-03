@@ -46,6 +46,10 @@ export class AsrService {
     return (process.env['ASR_PROVIDER'] ?? 'disabled').trim().toLowerCase()
   }
 
+  get activeProviderName(): string {
+    return this.providerName
+  }
+
   private get baseUrl(): string {
     return (process.env['BAIDU_ASR_BASE_URL'] ?? 'https://aip.baidubce.com').replace(/\/$/, '')
   }

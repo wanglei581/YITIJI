@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 import { AuthModule } from '../auth/auth.module'
 import { FilesModule } from '../files/files.module'
+import { AsrModule } from '../asr/asr.module'
 import { AiController } from './ai.controller'
 import { AiService } from './ai.service'
 import { AiLogService } from './ai-log.service'
@@ -40,7 +41,7 @@ import { LlmResumeProvider } from './providers/llm.provider'
 
 @Module({
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
-  imports: [AuthModule, FilesModule],
+  imports: [AuthModule, FilesModule, AsrModule],
   controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController, FairVisitPlanController],
   providers: [
     AiService,
