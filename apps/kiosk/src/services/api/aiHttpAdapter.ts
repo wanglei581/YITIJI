@@ -12,6 +12,7 @@
 
 import type {
   GeneratedResume,
+  ResumeExportFormat,
   ResumeGenerateExportResponse,
   ResumeGenerateInput,
   ResumeGenerateResponse,
@@ -149,7 +150,16 @@ export const aiHttpAdapter = {
     return get<ResumeGenerateResponse>(`/resume/generate/${taskId}`, access)
   },
 
-  async exportGeneratedResume(resume: GeneratedResume, taskId?: string, token?: string | null): Promise<ResumeGenerateExportResponse> {
-    return post<ResumeGenerateExportResponse>('/resume/generate/export', { ...resume, ...(taskId ? { taskId } : {}) }, token)
+  async exportGeneratedResume(
+    resume: GeneratedResume,
+    taskId?: string,
+    token?: string | null,
+    format?: ResumeExportFormat,
+  ): Promise<ResumeGenerateExportResponse> {
+    return post<ResumeGenerateExportResponse>(
+      '/resume/generate/export',
+      { ...resume, ...(taskId ? { taskId } : {}), format: format ?? 'pdf' },
+      token,
+    )
   },
 }

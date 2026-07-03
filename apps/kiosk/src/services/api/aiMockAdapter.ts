@@ -7,6 +7,7 @@
 
 import type {
   GeneratedResume,
+  ResumeExportFormat,
   ResumeGenerateExportResponse,
   ResumeGenerateInput,
   ResumeGenerateResponse,
@@ -208,14 +209,20 @@ export const aiMockAdapter = {
   },
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async exportGeneratedResume(resume: GeneratedResume, _taskId?: string, _token?: string | null): Promise<ResumeGenerateExportResponse> {
-    // mock 模式无后端,不构造假 PDF 文件;返回空 signedUrl,页面会诚实提示
+  async exportGeneratedResume(
+    resume: GeneratedResume,
+    _taskId?: string,
+    _token?: string | null,
+    format?: ResumeExportFormat,
+  ): Promise<ResumeGenerateExportResponse> {
+    // mock 模式无后端,不构造假文件;返回空 signedUrl,页面会诚实提示
     await delay(400)
+    const ext = format ?? 'pdf'
     return {
       fileId: `mock-resume-${Date.now()}`,
-      filename: `AI简历_${resume.basic.name || '求职者'}.pdf`,
+      filename: `AI简历_${resume.basic.name || '求职者'}.${ext}`,
       sizeBytes: 0,
-      pageCount: 1,
+      pageCount: ext === 'pdf' ? 1 : 0,
       signedUrl: '',
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     }

@@ -13,6 +13,9 @@ import { LlmConfigService } from './llm/llm-config.service'
 import { LlmChatService } from './llm/llm-chat.service'
 import { ResumeExtractionService } from './resume/resume-extraction.service'
 import { ResumePdfService } from './resume/resume-pdf.service'
+import { ResumeDocxService } from './resume/resume-docx.service'
+import { ResumeTextService } from './resume/resume-text.service'
+import type { ResumeExportFormat } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
@@ -107,6 +110,10 @@ export class AiService {
     private readonly files: FilesService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    // ── Wave 1 Task 6:置于构造函数末尾,避免打乱既有位置参数调用点
+    // (services/api/scripts/verify-*.ts 里 new AiService(...) 按位置传参)。
+    private readonly resumeDocx: ResumeDocxService,
+    private readonly resumeText: ResumeTextService,
   ) {
     const rawName = process.env['AI_PROVIDER'] ?? 'mock'
     if (!(KNOWN_PROVIDERS as readonly string[]).includes(rawName)) {
@@ -214,7 +221,14 @@ export class AiService {
       }
 
       // fileId 随结果落库(阶段2B):优化时按归属重新提取原文;不透明 id,无 PII
-      const resultWithProvider: ParseResumeOutput = { ...result, providerName: this.provider.name, fileId: input.fileId }
+      // targetContext 随结果落库(Wave 1 Task 3):优化懒生成时读回透传;只落结构化字段,
+      // 绝不落简历原文(extractedText 不写入 result/payload)。
+      const resultWithProvider: ParseResumeOutput = {
+        ...result,
+        providerName: this.provider.name,
+        fileId: input.fileId,
+        ...(input.targetContext ? { targetContext: input.targetContext } : {}),
+      }
       // Phase C-2A：匿名 parse（无会员归属）铸造一次性访问令牌。
       // DB 只存 SHA-256 hash；明文 token 只随本次响应返回一次。会员 parse 不铸 token。
       const isAnonymous = !endUserId
@@ -351,7 +365,7 @@ export class AiService {
         }
       }
 
-      const result = await this.provider.optimizeResume(taskId, parseResult.report, extractedText)
+      const result = await this.provider.optimizeResume(taskId, parseResult.report, extractedText, parseResult.targetContext)
       const withProvider: OptimizeResumeOutput = { ...result, providerName: this.provider.name }
       // 只缓存成功结果:临时性失败(模型抖动/未配置)不落库,用户稍后重试可恢复
       if (withProvider.status === 'completed') {
@@ -474,24 +488,80 @@ export class AiService {
   }
 
   /**
-   * 导出用户确认后的简历为真实 PDF(进 FileObject + 签名 URL + 账号资产保存策略)。
+   * 导出格式计费门禁(Wave 1 Task 6)。
+   *
+   * Wave 1 阶段恒放行(所有格式对所有请求者一律允许),不做任何拦截。
+   * Wave 5 引入计费能力后,在此按 format / 请求者会员状态 / 额度挂真实门禁
+   * (额度不足 → 抛业务异常,由 controller 转 4xx),调用位置(export 入口)已就位。
+   */
+  private assertExportFormatAllowed(_format: ResumeExportFormat): void {
+    // Wave 1：恒放行，无计费/额度校验。
+  }
+
+  /**
+   * 导出用户确认后的简历为真实文件(进 FileObject + 签名 URL + 账号资产保存策略)。
    *
    * - 内容 = 用户在预览页确认/编辑后的最终简历(用户自己的资料,允许人工修改)。
+   * - format 支持 pdf/docx/txt/md(Wave 1 Task 6);缺省 pdf。docx/txt/md 无分页概念,pageCount 恒为 0。
    * - assetCategory='optimized';登录会员默认 90 天,可由本人按规则延长。
    *   匿名 / system 文件仍走短期保存,且不能被会员转为长期保存。
    * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
+   * - FilesService.upload 按 purpose='resume_upload' 的 MIME 白名单校验(见
+   *   files/file-validation.ts PURPOSE_POLICY),txt/md 当前不在白名单内,
+   *   会在 upload 阶段抛 FILE_MIME_NOT_ALLOWED(400)——这是既有安全校验,
+   *   本次改动不放宽/绕过该白名单。
    */
   async exportGeneratedResume(
     resume: GeneratedResume,
     endUserId: string | null,
     sourceFileId: string | null = null,
+    format: ResumeExportFormat = 'pdf',
   ): Promise<{ fileId: string; filename: string; sizeBytes: number; pageCount: number; signedUrl: string; expiresAt: string }> {
-    const { buffer, pageCount } = await this.resumePdf.render(resume)
+    this.assertExportFormatAllowed(format)
+
+    let buffer: Buffer
+    let pageCount: number
+    let mimeType: string
+    let ext: string
+    switch (format) {
+      case 'docx': {
+        const rendered = await this.resumeDocx.render(resume)
+        buffer = rendered.buffer
+        pageCount = 0
+        mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ext = 'docx'
+        break
+      }
+      case 'txt': {
+        buffer = Buffer.from(this.resumeText.renderTxt(resume), 'utf-8')
+        pageCount = 0
+        mimeType = 'text/plain'
+        ext = 'txt'
+        break
+      }
+      case 'md': {
+        buffer = Buffer.from(this.resumeText.renderMarkdown(resume), 'utf-8')
+        pageCount = 0
+        mimeType = 'text/markdown'
+        ext = 'md'
+        break
+      }
+      case 'pdf':
+      default: {
+        const rendered = await this.resumePdf.render(resume)
+        buffer = rendered.buffer
+        pageCount = rendered.pageCount
+        mimeType = 'application/pdf'
+        ext = 'pdf'
+        break
+      }
+    }
+
     const safeName = (resume.basic.name || '求职者').replace(/[\\/:*?"<>|\s]/g, '').slice(0, 20) || '求职者'
     const uploaded = await this.files.upload({
       buffer,
-      filename: `AI简历_${safeName}.pdf`,
-      mimeType: 'application/pdf',
+      filename: `AI简历_${safeName}.${ext}`,
+      mimeType,
       purpose: 'resume_upload',
       uploaderId: null,
       endUserId,

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type {
   GeneratedResume,
+  ResumeExportFormat,
   ResumeGenerateExportResponse,
   ResumeOptimizeModule,
   ResumeTargetContext,
@@ -25,6 +26,14 @@ import { useAuth } from '../../auth/useAuth'
 import { exportGeneratedResume, getResumeOptimize } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
+
+/** 导出格式可选项(Wave1 Task 8):PDF 可直接打印,Word/TXT/Markdown 供下载编辑。 */
+const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'docx', label: 'Word' },
+  { value: 'txt', label: 'TXT' },
+  { value: 'md', label: 'Markdown' },
+]
 
 function targetSummary(tc?: ResumeTargetContext): string | null {
   if (!tc) return null
@@ -71,6 +80,7 @@ export function ResumeOptimizePage() {
 
   const [exporting, setExporting] = useState(false)
   const [printNavigating, setPrintNavigating] = useState(false)
+  const [exportFormat, setExportFormat] = useState<ResumeExportFormat>('pdf')
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
@@ -137,7 +147,7 @@ export function ResumeOptimizePage() {
     setExporting(true)
     setExportError(null)
     try {
-      const result = await exportGeneratedResume(optimizedResume, taskId, getToken())
+      const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat)
       setExported(result)
       setIsDirty(false)
     } catch (err) {
@@ -147,8 +157,14 @@ export function ResumeOptimizePage() {
     }
   }
 
+  // 切换导出格式后,已导出的旧格式文件不再对应当前选择,需重新导出
+  const handleExportFormatChange = (format: ResumeExportFormat) => {
+    setExportFormat(format)
+    if (exported) setExported(null)
+  }
+
   const handlePrint = () => {
-    if (printNavigating || !exported?.signedUrl) return
+    if (printNavigating || !exported?.signedUrl || exportFormat !== 'pdf') return
     setPrintNavigating(true)
     navigate('/print/confirm', {
       state: {
@@ -424,14 +440,15 @@ export function ResumeOptimizePage() {
           <Card className="border-green-100 bg-green-50/60 p-5">
             <p className="flex items-center gap-2 text-base font-semibold text-green-800">
               <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
-              优化版 PDF 已生成
+              优化版{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'} 已生成
             </p>
             <p className="mt-1 text-sm text-green-700">
-              {exported.filename} · {exported.pageCount} 页
+              {exported.filename}
+              {exported.pageCount > 0 ? ` · ${exported.pageCount} 页` : ''}
               {exported.sizeBytes > 0 ? ` · ${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB` : ''}
             </p>
             {!exported.signedUrl && (
-              <p className="mt-1 text-xs text-amber-700">演示模式未生成真实文件,接入后端后可打印。</p>
+              <p className="mt-1 text-xs text-amber-700">演示模式未生成真实文件,接入后端后可下载或打印。</p>
             )}
             <p className="mt-1 text-xs text-green-700/80">文件短期保留后自动清理,本机不长期保存你的简历。</p>
           </Card>
@@ -439,6 +456,30 @@ export function ResumeOptimizePage() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
+        {optimizedResume && (
+          <div>
+            <p className="mb-2 text-xs font-semibold text-gray-500">导出格式</p>
+            <div className="grid grid-cols-4 gap-2">
+              {EXPORT_FORMAT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={exportFormat === option.value}
+                  disabled={exporting}
+                  onClick={() => handleExportFormatChange(option.value)}
+                  className={[
+                    'min-h-[48px] rounded-xl border px-2 text-sm font-semibold transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
+                    exportFormat === option.value
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white text-gray-600',
+                  ].join(' ')}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {optimizedResume && !exported && (
           <Button
             size="lg"
@@ -447,7 +488,7 @@ export function ResumeOptimizePage() {
             onClick={() => void handleExport()}
           >
             <FileDownIcon className="h-5 w-5" />
-            {exporting ? '正在生成 PDF…' : '确认优化版,导出 PDF'}
+            {exporting ? '正在生成文件…' : `确认优化版,导出 ${EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'}`}
           </Button>
         )}
         {exported && (
@@ -455,15 +496,28 @@ export function ResumeOptimizePage() {
             <Button size="lg" variant="secondary" disabled={exporting} onClick={() => void handleExport()}>
               重新导出
             </Button>
-            <Button
-              size="lg"
-              className="flex items-center justify-center gap-2"
-              disabled={!exported.signedUrl || printNavigating}
-              onClick={handlePrint}
-            >
-              <PrinterIcon className="h-5 w-5" />
-              {printNavigating ? '正在进入打印确认…' : '去打印优化版'}
-            </Button>
+            {exportFormat === 'pdf' ? (
+              <Button
+                size="lg"
+                className="flex items-center justify-center gap-2"
+                disabled={!exported.signedUrl || printNavigating}
+                onClick={handlePrint}
+              >
+                <PrinterIcon className="h-5 w-5" />
+                {printNavigating ? '正在进入打印确认…' : '去打印优化版'}
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                variant="secondary"
+                className="flex items-center justify-center gap-2"
+                disabled={!exported.signedUrl}
+                onClick={() => exported.signedUrl && window.open(exported.signedUrl, '_blank', 'noopener')}
+              >
+                <FileDownIcon className="h-5 w-5" />
+                下载{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label}
+              </Button>
+            )}
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">

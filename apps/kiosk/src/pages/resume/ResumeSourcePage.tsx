@@ -147,6 +147,9 @@ export function ResumeSourcePage() {
   const [targetJob, setTargetJob] = useState('')
   const [targetExperience, setTargetExperience] = useState<ResumeTargetContext['experience']>('应届')
   const [targetScene, setTargetScene] = useState<ResumeTargetContext['scene']>('校招')
+  // 目标维度补充(可选):专业与学历,仅用于本人简历表达诊断/优化重点参考
+  const [targetMajor, setTargetMajor] = useState('')
+  const [targetDegree, setTargetDegree] = useState('')
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading || phoneBusy)
 
@@ -165,6 +168,8 @@ export function ResumeSourcePage() {
       targetJob: targetJob.trim() || undefined,
       experience: targetExperience,
       scene: targetScene,
+      major: targetMajor.trim() || undefined,
+      degree: targetDegree.trim() || undefined,
       skipped: false,
     }
   }
@@ -401,6 +406,35 @@ export function ResumeSourcePage() {
           onTargetExperienceChange={setTargetExperience}
           onTargetSceneChange={setTargetScene}
         />
+
+        <Card className="p-5">
+          <p className="text-sm font-bold text-gray-900">补充方向（可选）</p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500">
+            补充专业和学历，仅用于本人简历表达诊断/优化重点参考，不影响是否可以诊断。
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-500">专业</span>
+              <input
+                value={targetMajor}
+                disabled={genericDiagnosis}
+                onChange={(e) => setTargetMajor(e.target.value.slice(0, 60))}
+                placeholder="例如：计算机科学与技术"
+                className="mt-1 h-12 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-gray-50"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-gray-500">学历</span>
+              <input
+                value={targetDegree}
+                disabled={genericDiagnosis}
+                onChange={(e) => setTargetDegree(e.target.value.slice(0, 30))}
+                placeholder="例如：本科、硕士、大专"
+                className="mt-1 h-12 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-gray-50"
+              />
+            </label>
+          </div>
+        </Card>
       </div>
 
       {error && (

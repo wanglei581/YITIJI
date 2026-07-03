@@ -92,6 +92,10 @@ export interface ResumeTargetContext {
   experience?: ResumeTargetExperience
   /** 求职场景（校招/社招/转岗/招聘会现场） */
   scene?: ResumeTargetScene
+  /** 专业方向（自由文本，可空；仅用于本人简历表达诊断/优化重点） */
+  major?: string
+  /** 学历层次（自由文本或枚举文案，如 大专/本科/硕士；可空） */
+  degree?: string
   /** 是否为"暂不指定，通用诊断" */
   skipped?: boolean
 }
@@ -299,7 +303,10 @@ export interface ResumeGenerateResponse {
   accessToken?: string
 }
 
-/** 导出 PDF 响应:真实 FileObject + 短时签名 URL,可直接进打印链路 */
+/** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0。 */
+export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
+
+/** 导出响应:真实 FileObject + 短时签名 URL,可直接进打印链路(pdf)或下载(docx/txt/md) */
 export interface ResumeGenerateExportResponse {
   fileId: string
   filename: string

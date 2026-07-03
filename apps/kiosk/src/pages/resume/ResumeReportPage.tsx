@@ -378,7 +378,7 @@ export function ResumeReportPage() {
         <Button
           size="lg"
           className="flex flex-1 items-center gap-2"
-          onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken } })}
+          onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext } })}
         >
           <SparklesIcon className="h-4 w-4" />
           {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}

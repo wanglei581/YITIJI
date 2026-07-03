@@ -57,6 +57,10 @@ export interface ResumeTargetContext {
   targetJob?: string
   experience?: ResumeTargetExperience
   scene?: ResumeTargetScene
+  /** 专业方向（自由文本，可空；仅用于本人简历表达诊断/优化重点） */
+  major?: string
+  /** 学历层次（自由文本或枚举文案，如 大专/本科/硕士；可空） */
+  degree?: string
   skipped?: boolean
 }
 
@@ -123,6 +127,12 @@ export interface ParseResumeOutput {
    * 只在 POST /resume/parse 响应中返回一次（DB 只存 accessTokenHash）。会员 parse 不返回。
    */
   accessToken?: string
+  /**
+   * 目标方向上下文（Wave 1 Task 3，additive 可选）：随 parse 结果落库，供优化懒生成时读回
+   * 透传给 optimizeResume 的第 4 参数。仅结构化字段（industry/targetJob/major/degree/
+   * experience/scene/skipped），不含简历原文，不产生新的 PII 留存面。
+   */
+  targetContext?: ResumeTargetContext
 }
 
 // ─── 简历优化类型 ────────────────────────────────────────────
@@ -281,8 +291,15 @@ export interface AiProvider {
   /**
    * 简历优化。阶段2B 起 llm provider 需要简历原文(extractedText)做基于事实的优化;
    * 未传原文时 llm provider 诚实失败。mock / stub 实现可忽略该参数。
+   * targetContext(Wave 1 Task 2,additive 可选):目标方向上下文,仅用于引导优化措辞重点
+   * (专业/学历/目标岗位/经验/场景),不得据此新增或改写任何事实字段;事实仍必须来自原文。
    */
-  optimizeResume(taskId: string, report: ResumeReport, extractedText?: string): Promise<OptimizeResumeOutput>
+  optimizeResume(
+    taskId: string,
+    report: ResumeReport,
+    extractedText?: string,
+    targetContext?: ResumeTargetContext,
+  ): Promise<OptimizeResumeOutput>
   chatAssistant(input: ChatInput): Promise<ChatOutput>
   classifyIntent(message: string): Promise<ClassifyIntentOutput>
   /**
