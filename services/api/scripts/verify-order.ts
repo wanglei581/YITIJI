@@ -526,26 +526,33 @@ async function main(): Promise<void> {
       return rejectsUnpaidRefund
     })
 
-    // (7) unpaid 不伪装线上待支付/已收款：会员视图对普通付费单如实返回 unpaid + paymentSource=null。
-    // (8) 历史无 Order 的 PrintTask：会员视图支付字段全部返回 null（不编造）。
-    await p0aGuard('/me/print-orders view exposes honest payment fields (unpaid/null) and null for legacy no-Order tasks', async () => {
+    // (7) /me/print-orders 支付字段真实化：list() join Order，返回诚实支付字段，无 live 网关来源。
+    //     memberPrint 订单在 check(3) 已被 markPaid('offline')；断言 paid+offline+金额/页数 + 无微信/支付宝。
+    await p0aGuard('/me/print-orders exposes honest payment fields via list() (no live-gateway source)', async () => {
       const mod = (await import('../src/member-print-orders/member-print-orders.service')) as {
         MemberPrintOrdersService: new (p: typeof prisma) => {
-          listForMember: (endUserId: string, opts?: { page?: number; pageSize?: number }) => Promise<{ items: Array<Record<string, unknown>> }>
+          list: (endUserId: string, page: { cursor: string | null; pageSize: number }) => Promise<{ items: Array<Record<string, unknown>> }>
         }
       }
       const svc = new mod.MemberPrintOrdersService(prisma)
-      const res = await svc.listForMember(endUserId, { page: 1, pageSize: 20 })
+      const res = await svc.list(endUserId, { cursor: null, pageSize: 50 })
       const item = res.items.find((i) => i['id'] === memberPrint.taskId)
       if (!item) return false
-      // 字段必须存在且语义诚实：unpaid 单 payStatus='unpaid'、paymentSource=null、不得出现线上"待支付/已收款"暗示
-      const hasHonestFields =
+      return (
         'payStatus' in item &&
         'paymentSource' in item &&
         'amountCents' in item &&
-        item['paymentSource'] === null &&
-        (item['payStatus'] === 'unpaid' || item['payStatus'] === 'paid')
-      return hasHonestFields
+        'billablePages' in item &&
+        'billingPageSource' in item &&
+        'pickupCode' in item &&
+        item['payStatus'] === 'paid' &&
+        item['paymentSource'] === 'offline' &&
+        item['paymentSource'] !== 'wechat' &&
+        item['paymentSource'] !== 'alipay' &&
+        item['amountCents'] === 200 &&
+        item['billablePages'] === 2 &&
+        item['billingPageSource'] === 'pdf_lightweight_scan'
+      )
     })
 
     // (8) Admin 订单动作 controller（Task 7）：offline/manual_confirmed 可 mark-paid；拒绝 free/wechat/alipay/benefit；
