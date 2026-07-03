@@ -1,6 +1,6 @@
 # 我的页商用闭环 · 第一批实施计划（P0a / P0b / P1）
 
-> **For agentic workers:** 本文件是「我的页商用闭环第一批」的实施计划与准入。执行前必读 `CLAUDE.md`、`AGENTS.md`、`.ccg/spec/guides/index.md`、`docs/compliance/compliance-boundary.md`。每批独立分支 + 独立 worktree，从干净 `origin/main` 开始，禁用 `git add .`，>30 行 diff 双模型审查。**本轮只落计划文档；用户确认本文件后才开 P0a worktree。**
+> **For agentic workers:** 本文件是「我的页商用闭环第一批」的实施计划与准入。执行前必读 `CLAUDE.md`、`AGENTS.md`、`.ccg/spec/guides/index.md`、`docs/compliance/compliance-boundary.md`。每批独立分支 + 独立 worktree，从干净 `origin/main` 开始，禁用 `git add .`，>30 行 diff 双模型审查。**本轮先审查、修正计划并等待用户确认；确认前不得继续扩大运行时代码实现。**
 
 **Goal（第一批）：** 补齐「我的页商用闭环」当前唯一的真实缺口——**打印订单的真实计费与支付状态域（C-5 支付域后端底座，无 live 网关）**，并在此之上真实化我的页订单详单/电子凭证，最后补权益核销落库。
 
@@ -12,10 +12,10 @@
 
 ## 0. 基线与执行方式
 
-- **基线**：干净 `origin/main`（撰写时 `b90d737b`；P0a worktree 实开于其后的 `d922071d`，PR #123 合入后）。会话根 `codex/worktree-state-reconciliation`（脏）不作为基线，本计划所引事实以 `origin/main` 规范版本 + 实际源码核实为准。
+- **基线**：干净 `origin/main`（撰写时 `b90d737b`；P0a worktree 实开于其后的 `d922071d`，PR #123 合入后）。会话根 `codex/worktree-state-reconciliation` 不作为基线，本计划所引事实以 `origin/main` 规范版本 + 实际源码核实为准。
 - **不在 `feature/job-master` 上做**（该分支冻结，PR #117 Draft）。task.json 里 `feature/interview-setup-redesign` 为 2026-06-18 旧引用，**弃用**。
-- **分支/worktree**：本批只开 **P0a** 一个独立 worktree/分支（从干净 `origin/main`）。P0b、P1 各自到执行时再从当时干净 `origin/main`（或含 P0a 的最新 `main`）另开，独立验证、独立审查。
-- **确认门**：计划已经用户确认（2026-07-03：选项 ①、顺序 P0a→P0b→P1、§8 三项已定为决策）。P0a 独立 worktree/分支 `codex/profile-commercial-p0a-payment-foundation` 已从干净 `origin/main` 开出，本文件作为首个 docs commit 带入。
+- **分支/worktree**：P0a 独立 worktree/分支 `codex/profile-commercial-p0a-payment-foundation` 已从干净 `origin/main` 开出；复核时仅有计划提交和一处未提交的 shared 类型草稿，不得在本计划重新确认前继续扩展实现。P0b、P1 各自到执行时再从当时干净 `origin/main`（或含 P0a 的最新 `main`）另开，独立验证、独立审查。
+- **确认门**：2026-07-03 双模型计划审查结论为 `REQUEST_CHANGES`。本文件已吸收必须修改项；用户确认本修正版后，才允许继续 P0a Task 1/2。确认前不新增 schema、migration、controller、service 或 UI 代码。
 
 ---
 
@@ -40,6 +40,8 @@
 1. **支付边界＝选项 ①**：真实后端底座 + 线下/免费诚实档。**第一批不接微信/支付宝 Native live 网关，不录入商户密钥，不执行真实资金交易**；live 网关等商户进件、密钥、真机收款齐备后另开独立任务。
 2. **顺序＝P0a → P0b → P1**（P0b 依赖 P0a 的真实金额/状态机；P1 是平台 credit，不解决订单金额缺口，排 P0b 后）。
 3. **诚实标注（硬约束）**：线下/免费档不得伪装成线上支付成功；只要 `payStatus=paid`，必须同时记录并返回**支付来源** `paymentSource ∈ {offline, free, manual_confirmed}`（`wechat`/`alipay`/`benefit` 均为未来扩展预留，本批禁止写入），避免被理解为微信/支付宝已真实收款。
+4. **计价时点与页数来源（硬约束）**：P0a 不信任前端 `file.pages`。后端从签名 `fileUrl` 解析 `fileId`，读取 `FileObject` 与对象存储内容，复用/抽取现有 `materials.service` 的 PDF 轻量页数识别能力；图片按 1 页计。页数识别失败、文件不可读、非支持 MIME 或页数为 0 时 **fail-closed**，拒绝创建付费订单，不回退到前端估算或单页假设。
+5. **收款路径（硬约束）**：无 live 网关期间，本批只支持两类 paid 流转：`amountCents=0` 的免费单自动 `paid+free`；以及操作员线下收款后通过 Admin 后端端点 `mark-paid` 进入 `paid+offline/manual_confirmed`。P0a/P0b 均不得暗示会员已经可以自助微信/支付宝支付。
 
 ---
 
@@ -47,7 +49,7 @@
 
 **红线（每批 verify 需断言）**：不补假闭环；「我的」不扩成第二首页、`ProfilePage` 只入口+概览；**禁恢复 `AccountAssetsPanel`/账号资产聚合**；禁虚假补贴/结果文案（到账/已发放/保录用/保面试/通过率）；券=平台 credit 非政府补贴/非真实收款；**只对 打印/AI/材料 计费，绝不对岗位结果或候选人数据计费**；`/me/*` 全走 `EndUserAuthGuard`+本人 `endUserId`，Admin 写动作写 `AuditLog`；合规按钮文案白名单不变；UI 冻结（A 档=既有骨架内真实化可做，B 档=新区块/改信息架构需用户逐项解冻）。
 
-**本批明确不做**：微信/支付宝 live 网关与商户密钥、会员套餐/tier、招聘会扫码凭证、账号注销、AI 助手会话落库、新增任何我的页入口或首页磁贴。
+**本批明确不做**：微信/支付宝 live 网关与商户密钥、Kiosk 自助支付页、Admin 前端收款按钮、会员套餐/tier、招聘会扫码凭证、账号注销、AI 助手会话落库、新增任何我的页入口或首页磁贴。普通付费单在 P0a 只能是 `unpaid`，直到操作员线下确认；P0b 必须如实展示，不得把 `unpaid` 包装成“待线上支付”或“已收款”。
 
 ---
 
@@ -56,7 +58,7 @@
 ### 4.1 功能归位声明
 - **业务闭环**：让 `Order` 真实有金额 + 支付/退款状态机，成为支付域 C-5 的最小安全底座；支撑 P0b 我的页订单/凭证真实化。
 - **涉及层与目录**：
-  - 后端 `services/api`：新增 `src/payment/`（pricing service + order-status 状态机 service + admin 订单动作 controller）；改 `src/print-jobs/print-jobs.service.ts`（建单接真实报价）；`prisma/schema.prisma`（additive）+ SQLite/PG 双 migration；`scripts/verify-order.ts` 扩展。
+	  - 后端 `services/api`：新增 `src/payment/`（pricing service + order-status 状态机 service + admin 订单动作 controller）；新增/抽取 PDF 页数识别纯函数（从 `materials.service` 私有 `countPdfPages` 拆出复用）；改 `src/print-jobs/print-jobs.service.ts` 与 `print-jobs.module.ts`（建单接后端页数识别和真实报价，注入存储能力）；`prisma/schema.prisma`（additive）+ SQLite/PG 双 migration；`scripts/verify-order.ts` 扩展。
   - 共享类型 `packages/shared`：`PaymentSource` union、`OrderView`/报价 DTO（SSOT，不在各端硬拷贝）。
   - 前端/终端/共享 UI：**不涉及**。
 - **不涉及层**：apps/kiosk、apps/admin、apps/partner、apps/terminal-agent、packages/ui。
@@ -68,41 +70,46 @@
 - **`Order` 追加字段**（全部可空/带默认，向后兼容）：
   - `paymentSource String?` —— 取值 `offline | free | manual_confirmed`（`wechat|alipay|benefit` 均为未来扩展预留，本批禁写）。**约束：`payStatus=paid` ⇒ `paymentSource` 必须为上述三者之一，且非空。**
   - `paidAt DateTime?`、`paidBy String?`（`self`/操作员标识，manual 时记录）。
-  - `pickupCode String?`（取件凭证码，`paid` 时生成；P0b 展示）。
+  - `pickupCode String? @unique`（取件凭证码，`paid` 时生成；8 位以上随机 base32/数字大写混合，碰撞重试；P0b 仅在安全条件满足时展示）。
+  - `billablePages Int?`、`billingPageSource String?`（`pdf_lightweight_scan | image_single_page`），记录后端识别出的计费页数；识别失败则不创建订单。
   - 复用既有 `amountCents`、`payStatus`、`refundReason`、`refundedAt`。
 
 ### 4.3 状态机（payStatus，幂等）
 - `unpaid → paid`：要求 `paymentSource ∈ {offline, free, manual_confirmed}`；置 `paidAt`、生成 `pickupCode`；写 `AuditLog`。
 - `unpaid → cancelled`：置 `taskStatus=cancelled`（预留，可选）。
 - `unpaid → failed`。
-- `paid → refunded`：要求 `refundReason` 非空；置 `refundedAt`；写 `AuditLog`。
-- **幂等**：重复同态转移返回当前态、不重复副作用/审计；非法转移（如 `unpaid→refunded`、无 `paymentSource` 的 `paid`）以明确错误码拒绝。
+- `paid → refunded`：整单退款，要求 `refundReason` 非空；置 `refundedAt`；写 `AuditLog`。本批不做部分退款、退款金额拆分或真实资金原路退回。
+- **幂等**：重复同态转移返回当前态、不重复副作用/审计。实现必须使用事务内条件更新（例如 `updateMany where payStatus='unpaid'` 命中行数判定）或等价 compare-and-set，避免并发重复生成取件码/重复审计；非法转移（如 `unpaid→refunded`、无 `paymentSource` 的 `paid`）以明确错误码拒绝。
 - **免费单**：报价为 0（本批仅限零价/测试场景）→ 建单即 `payStatus=paid` + `paymentSource=free`。**P0a 不接权益**；「权益全额覆盖」如何映射 free/来源留 P1 评估。
+- **凭证安全**：`pickupCode` 只能在 `payStatus='paid'` 且 `taskStatus` 非 `completed/cancelled/failed`、且未退款时由后端返回；`unpaid/refunded/cancelled/failed/completed` 均不得在会员接口返回可用取件码。
 
 ### 4.4 计费接线
-- `print-jobs.service.ts` 建单时经 `PricingService` 按打印参数（页数/彩黑/单双面/份数）计算 `amountCents`（替换硬编码 0）；`amountCents=0` 时按免费单落 `paid+free`，否则 `unpaid`。
+- `print-jobs.service.ts` 建单时先调用后端 `PrintPageCountService`：通过已验证签名 `fileUrl -> fileId` 读取 `FileObject`，再经 `StorageService.getObject` 读取文件内容；PDF 复用抽取后的 `countPdfPages(buffer)`，图片按 1 页。失败、未知 MIME、页数为 null/0 时直接 400（如 `PRINT_PAGE_COUNT_UNAVAILABLE`），不创建 `PrintTask` / `Order`。
+- `PricingService` 按后端识别页数、`copies`、`colorMode`、`duplex`、`pagesPerSheet` 计算 `billablePages` / `amountCents`（替换硬编码 0）。`PriceConfig` 是唯一服务端价目 SSOT；现有 `PRINT_UNIT_PRICE_CENTS` 只能作为 seed/兼容来源，verify 必须断言两者不会漂移或明确退役常量。
+- `amountCents=0` 时按免费单落 `paid+free`，否则创建 `unpaid` 普通付费单，等待操作员线下确认；本批没有 Kiosk 自助支付路径。
 - **诚实标注**：任何 `paid` 都带 `paymentSource`；本批 service 层禁止把 `paymentSource` 写成 `wechat/alipay`；返回给上层的 `OrderView` 必含 `paymentSource`，供 P0b 显示「线下收款/免费/人工确认」而非「微信/支付宝已支付」。
 
 ### 4.5 后端端点（无 live 网关）
 - 内部：建单报价（上述）。
 - Admin 线下/人工：`POST /admin/orders/:id/mark-paid`（body `paymentSource ∈ {offline, manual_confirmed}`，审计）、`POST /admin/orders/:id/refund`（body `refundReason`，审计）。仅后端端点 + verify 覆盖；**apps/admin 前端调用 UI 不在 P0a**（后续批）。
-- 会员只读：`/me/print-orders`(既有) 响应补 `amountCents/payStatus/paymentSource/pickupCode`（只读，P0b 消费）。
+- 会员只读：`/me/print-orders`(既有) 响应补 `amountCents/payStatus/paymentSource/pickupCode/billablePages`（只读，P0b 消费）。该接口必须联查 `Order`，但对历史 `PrintTask` 无 `Order` 的行返回 `null` 支付字段，不报错、不编造。
 
 ### 4.6 TDD 任务序（先红后绿，每步独立 commit）
-1. `packages/shared`：加 `PaymentSource` union + `OrderView`/报价 DTO；shared typecheck。
-2. `scripts/verify-order.ts`：**先写失败断言**——报价非 0、`paid` 必带 `paymentSource`、拒绝无来源的 `paid`、`paymentSource` 本批不得为 `wechat/alipay`、退款仅从 `paid` 且需 `refundReason`、幂等转移、免费单=`paid+free`、mark-paid/refund 写审计。运行确认 FAIL。
-3. `schema.prisma` + 双 migration（SQLite `prisma migrate` / PG）：加 `PriceConfig`、`Order` 追加字段；`db:pg:sync:check` 通过。
-4. `PricingService` + seed 默认价；单测/verify 报价路径转绿。
-5. `OrderStatusService`（状态机 + 幂等 + 审计）；`print-jobs.service.ts` 建单接报价。
-6. Admin 订单动作 controller（mark-paid/refund，Admin auth + 审计）。
-7. `/me/print-orders` 响应补字段（只读）。
-8. `verify:order` 全绿（含新断言）+ API typecheck/lint + 空库 `prisma db push` + verify。
+1. `packages/shared`：加 `PaymentSource` union + `OrderPaymentView`/报价 DTO；shared typecheck。本步骤已有未提交草稿，继续前需先复核并按本修正版补齐/收窄。
+2. `scripts/verify-order.ts`：**先写失败断言**——后端页数识别失败 fail-closed、不信任前端页数、报价非 0、`paid` 必带 `paymentSource`、拒绝无来源的 `paid`、`paymentSource` 本批不得为 `wechat/alipay/benefit`、退款仅从 `paid` 且需 `refundReason`、幂等转移、免费单=`paid+free`、pickupCode 唯一/非低熵/非法状态不返回、mark-paid/refund 写审计。运行确认 FAIL。
+3. `schema.prisma` + 双 migration（SQLite `prisma migrate` / PG）：加 `PriceConfig`、`Order` 追加字段；新增 `PrismaService.priceConfig` delegate；`db:pg:sync:check` 通过。
+4. 抽取 PDF 页数识别 helper + `PrintPageCountService`，`PrintJobsModule` 注入存储能力；verify 页数来源路径转绿。
+5. `PricingService` + seed 默认价；确保 `PriceConfig` 是服务端价目 SSOT，旧 `PRINT_UNIT_PRICE_CENTS` 不再作为运行时真相源或有同步断言。
+6. `OrderStatusService`（状态机 + compare-and-set 幂等 + pickupCode 生成/碰撞重试 + 审计）；`print-jobs.service.ts` 建单接页数识别和报价。
+7. Admin 订单动作 controller（mark-paid/refund，Admin auth + 审计；无 Admin UI）。
+8. `/me/print-orders` 响应补字段（只读，Order join + 无 Order 兜底）。
+9. `verify:order` 全绿（含新断言）+ `verify:member-print-orders` 相关新增断言 + API typecheck/lint + 空库 `prisma db push` + verify。
 
 ### 4.7 验证命令
-`pnpm --filter @ai-job-print/api verify:order`、`pnpm --filter @ai-job-print/api db:pg:sync:check`、`pnpm --filter @ai-job-print/api typecheck`、`pnpm --filter @ai-job-print/api lint`、空库 `prisma db push` 后跑 verify、`git diff --check`。CI 保持 SQLite 主 job + `postgres-readiness` 双 job 绿。>30 行 diff → Claude + Antigravity 双模型审查。
+`pnpm --filter @ai-job-print/api verify:order`、`pnpm --filter @ai-job-print/api verify:member-print-orders`、`pnpm --filter @ai-job-print/api db:pg:sync:check`、`pnpm --filter @ai-job-print/api typecheck`、`pnpm --filter @ai-job-print/api lint`、空库 `prisma db push` 后跑 verify、`git diff --check`。CI 保持 SQLite 主 job + `postgres-readiness` 双 job 绿。>30 行 diff → Claude + Antigravity 双模型审查。
 
 ### 4.8 文件预算
-`print-jobs.service.ts` 改动前先查行数（>500 需评估拆分）；新增 payment service 单一职责、各自 <300 行；不把状态机/报价/controller 堆进同一文件。
+`print-jobs.service.ts` 当前约 280 行，可做少量编排接线，但页数识别、报价、状态机必须拆到独立 service/helper；新增 payment service 单一职责、各自 <300 行；不把状态机/报价/controller 堆进同一文件。
 
 ### 4.9 docs 同步
 `docs/progress/current-progress.md`（支付域 C-5 底座落地、live 网关待商户资质，诚实档口径）、`docs/progress/next-tasks.md`（P0a 完成、P0b 待接、live 网关另立任务）。
@@ -113,12 +120,14 @@
 
 > 到执行时再从当时干净 `main` 另开 worktree，并展开为逐步 TDD。以下为准入定义。
 
-- **功能归位声明**：`/me/print-orders` 展示真实 份数/彩黑/单双面/页数/`amountCents`/`payStatus`/`paymentSource`/取件码 + 状态筛选 + 「再打一份」复用既有打印链路；退款状态与状态变更通知接线。**支付来源如实显示「线下收款/免费/人工确认」，不显示「微信/支付宝已支付」。**
-- **涉及层**：前端 `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx`（改动前查行数，超 500 先拆表单/列表/详情）+ 其 service adapter；必要的 `packages/shared` 只读 DTO。**复用 P0a 后端，不加后端业务逻辑。**
+- **功能归位声明**：`/me/print-orders` 展示真实 份数/彩黑/单双面/页数/`amountCents`/`payStatus`/`paymentSource`/取件码状态 + 状态筛选 + 「再打一份」复用既有打印链路；退款状态与状态变更通知接线。**支付来源如实显示「线下收款/免费/人工确认」，不显示「微信/支付宝已支付」。**
+- **涉及层**：前端 `apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx`（当前约 118 行，可在 A 档内增加列表摘要 + 页面内 Drawer/Modal 详单；超 500 再拆表单/列表/详情）+ 其 service adapter；必要的 `packages/shared` 只读 DTO。**复用 P0a 后端，不加后端业务逻辑。**
 - **不涉及层**：services（除只读适配）、admin、partner、terminal-agent、packages/ui。
-- **不做**：新增入口/卡片（A 档冻结内）、B 档信息架构改动、恢复 `AccountAssetsPanel`。
+- **不做**：新增入口/卡片（A 档冻结内）、B 档信息架构改动、恢复 `AccountAssetsPanel`、Kiosk 自助支付。
+- **关键行为**：`/me/print-orders` 后端必须 join `Order`；历史无 `Order` 的 `PrintTask` 支付字段返回 `null` 并沿用安全元数据。`pickupCode` 只在后端判定可展示时返回；前端不得自行从其他字段推导取件码。「再打一份」必须创建新的 `PrintTask` + 新 `Order`，重新进入页数识别/报价流程，绝不复用或重置旧订单。
+- **触控 A 档约束**：所有按钮/筛选热区不小于 48px；取件码可用时使用 >=24px 大字号或大容器展示；已完成/已退款/已取消/失败的凭证区域置灰，文案为「凭证已使用」或「凭证已失效」。
 - **触碰**：打印 ✅只读展示 / 支付 ✅只读状态+凭证 / auth ✅本人 token；db/file/sms/AI ❌。
-- **验证**：`verify:member-print-orders`（扩详单/凭证/筛选/来源诚实文案）、Kiosk typecheck/lint/build、**1080×1920 竖屏浏览器走查**、双模型审查。
+- **验证**：`verify:member-print-orders`（扩详单/凭证/筛选/来源诚实文案、无 Order 兜底、不可展示 pickupCode 状态）、Kiosk typecheck/lint/build、**1080×1920 竖屏浏览器走查**、双模型审查。
 - **docs 同步**：`current-progress.md`、`user-data-flow-matrix.md`（订单页真实化，入口不变）。
 
 ---
@@ -141,7 +150,7 @@
 
 | 批次 | 真实闭环 | 关键 verify | 触碰支付资金？ | 前置依赖 |
 |---|---|---|---|---|
-| P0a | 订单计费+支付/退款状态机（无 live 网关） | `verify:order`(扩) + `db:pg:sync:check` | ❌ 无真实扣款（仅线下/免费/人工档） | 无（干净 main） |
+| P0a | 后端页数识别 + 订单计费 + 支付/退款状态机（无 live 网关） | `verify:order`(扩) + `verify:member-print-orders`(字段安全) + `db:pg:sync:check` | ❌ 无真实扣款（仅线下/免费/人工档） | 无（干净 main） |
 | P0b | 我的页订单详单+电子凭证真实化 | `verify:member-print-orders`(扩) + 竖屏走查 | ❌ 只读展示 | P0a |
 | P1 | 权益核销落库+点位扣减 | `verify:benefit-activities`(扩) | ❌ 平台 credit | 可独立（排 P0b 后） |
 
@@ -154,4 +163,4 @@
 2. **Admin mark-paid/refund UI**：P0a 只做**后端端点 + verify**，不做 Admin 前端 UI；Admin 前端联动**另批**，不混入 P0a。
 3. **benefit 支付来源**：P0a **不新增 `paymentSource=benefit`**，只允许 `{offline, free, manual_confirmed}`；`wechat`/`alipay`/`benefit` 均为未来扩展，**不得在 P0a 写入**。P1 做权益核销时再评估「权益全额覆盖」如何与 free/来源关联。
 
-> **状态：计划已确认，P0a 执行中。** P0a worktree/分支 `codex/profile-commercial-p0a-payment-foundation` 已从干净 `origin/main`（`d922071d`）开出；本文件为首个 docs commit。按 §4 执行：Task 1 shared 类型 → Task 2 verify 红测 →（Task 3 schema/migration 前停下复核）。不 push，除非用户另行确认。
+> **状态：计划修正版待用户确认。** P0a worktree/分支 `codex/profile-commercial-p0a-payment-foundation` 已从干净 `origin/main`（`d922071d`）开出；当前仅允许保留计划提交和已存在的 shared 类型草稿。用户确认本修正版后，按 §4 执行：Task 1 shared 类型收口 → Task 2 verify 红测 →（Task 3 schema/migration 前停下复核）。不 push，除非用户另行确认。
