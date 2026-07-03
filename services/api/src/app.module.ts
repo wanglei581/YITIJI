@@ -12,6 +12,7 @@ import { JobSyncModule } from './job-sync/job-sync.module'
 import { OrgsModule } from './orgs/orgs.module'
 import { PoliciesModule } from './policies/policies.module'
 import { AdminOpsModule } from './admin-ops/admin-ops.module'
+import { AdminOrderActionsModule } from './payment/admin-order-actions.module'
 import { AdminOrdersReadonlyModule } from './admin-orders-readonly/admin-orders-readonly.module'
 import { MemberAuthModule } from './member-auth/member-auth.module'
 import { HealthController } from './common/health.controller'
@@ -98,6 +99,7 @@ const redisUrl = process.env['REDIS_URL']
     PoliciesModule,
     AdminOpsModule,
     AdminOrdersReadonlyModule,
+    AdminOrderActionsModule,
     SyncModule,
     TerminalsModule,
     PrintJobsModule,

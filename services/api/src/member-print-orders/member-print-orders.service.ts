@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common'
 import type { MemberPrintOrderItem } from './member-print-orders.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
+import { pickupCodeVisibleFor } from '../payment/order-status.service'
+import type { OrderPayStatus, PaymentSource } from '../payment/payment.types'
+import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 
 // ============================================================
 // 会员「我的打印订单」服务（Phase C-2C 后续小步，只读）。
@@ -67,11 +70,36 @@ export class MemberPrintOrdersService {
     // select 显式收口：只取安全列，连 fileUrl / fileMd5 都不从 DB 读出，杜绝误透传。
     const rows = await this.prisma.printTask.findMany({
       where,
-      select: { id: true, status: true, paramsJson: true, createdAt: true, completedAt: true },
+      // 只取安全列 + 关联 Order 的支付安全字段（绝不取 fileUrl / fileMd5）。
+      select: {
+        id: true,
+        status: true,
+        paramsJson: true,
+        createdAt: true,
+        completedAt: true,
+        order: {
+          select: {
+            amountCents: true,
+            payStatus: true,
+            paymentSource: true,
+            billablePages: true,
+            billingPageSource: true,
+            pickupCode: true,
+            taskStatus: true,
+            refundedAt: true,
+          },
+        },
+      },
       ...memberPageArgs(page),
     })
     return buildMemberPage(rows, page, total, (r) => {
       const params = parseSafeParams(r.paramsJson)
+      const order = r.order
+      // 取件码门控：仅 paid 且未退款、任务未进入完成/取消/失败终态时返回；其余（unpaid/refunded/终态）一律 null。
+      const pickupCode =
+        order && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
+          ? order.pickupCode
+          : null
       return {
         id: r.id,
         status: r.status,
@@ -81,6 +109,13 @@ export class MemberPrintOrdersService {
         copies: params.copies,
         colorMode: params.colorMode,
         paperSize: params.paperSize,
+        // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
+        amountCents: order ? order.amountCents : null,
+        payStatus: order ? (order.payStatus as OrderPayStatus) : null,
+        paymentSource: order ? (order.paymentSource as PaymentSource | null) : null,
+        billablePages: order ? order.billablePages : null,
+        billingPageSource: order ? (order.billingPageSource as BillingPageSource | null) : null,
+        pickupCode,
       }
     })
   }

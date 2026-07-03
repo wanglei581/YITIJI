@@ -24,7 +24,13 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-print-file-signing-secret-0123456
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
+import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { signFileUrl } from '../src/files/signing'
+import { OrderStatusService } from '../src/payment/order-status.service'
+import { PricingService } from '../src/payment/pricing.service'
+import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { StorageService } from '../src/storage/storage.service'
+import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.dto'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -57,23 +63,38 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
-  const printJobs = new PrintJobsService(prisma, audit)
+  const storage = new StorageService()
+  const printJobs = new PrintJobsService(
+    prisma,
+    audit,
+    new PrintPageCountService(prisma, storage),
+    new PricingService(prisma),
+    new OrderStatusService(prisma, audit),
+  )
   const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
 
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vpj_${suffix}`
   const agentToken = `vpj-agent-token-${suffix}`
   const fileId = `file_vpj_${suffix}`
+  const storageKey = `verify/print-jobs/${fileId}.pdf`
   const createdTaskIds: string[] = []
 
   async function cleanup() {
     if (createdTaskIds.length) {
+      const orders = await prisma.order.findMany({ where: { printTaskId: { in: createdTaskIds } }, select: { id: true } })
+      await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orders.map((o) => o.id) } } })
+      await prisma.order.deleteMany({ where: { printTaskId: { in: createdTaskIds } } })
       await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdTaskIds } } })
       await prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: createdTaskIds } } })
       await prisma.printTask.deleteMany({ where: { id: { in: createdTaskIds } } })
     }
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
+    // 计费接线后新增的真实 fixture / 价目清理。
+    await prisma.fileObject.deleteMany({ where: { id: fileId } })
+    await storage.deleteObject(storageKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
   }
 
   try {
@@ -83,6 +104,23 @@ async function main() {
       data: { id: terminalId, terminalCode: `VPJ-${suffix}`, agentToken, deviceFingerprint: `fp-${suffix}` },
     })
     pass('终端夹具已创建')
+
+    // 计费接线后 create() 需真实 FileObject + 存储内容识别页数 + PriceConfig 报价（否则 fail-closed）。
+    await seedDevDefaultPriceConfig(prisma)
+    const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
+    await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: fileId,
+        storageKey,
+        filename: 'vpj.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: '',
+        purpose: 'print_source',
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
 
     await terminals.heartbeat(
       terminalId,

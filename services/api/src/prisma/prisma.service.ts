@@ -73,6 +73,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.order
   }
 
+  // ── P0a payment foundation ─────────────────────────────────────────────────
+
+  get priceConfig() {
+    return this.client.priceConfig
+  }
+
   // ── Phase 0b ───────────────────────────────────────────────────────────────
 
   get organization() {
