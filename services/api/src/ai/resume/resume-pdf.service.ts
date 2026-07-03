@@ -78,7 +78,7 @@ function resolveLayout(layout?: ResumeLayoutSettings): ResumePdfLayoutConfig {
   const margin = layout?.margin === 'narrow' ? 36 : layout?.margin === 'wide' ? 60 : DEFAULT_MARGIN
   const fontScale = layout?.fontScale === 'compact' ? 0.92 : layout?.fontScale === 'large' ? 1.08 : DEFAULT_FONT_SCALE
   const lineGap = layout?.lineSpacing === 'compact' ? 1.5 : layout?.lineSpacing === 'relaxed' ? 4 : DEFAULT_LINE_GAP
-  const accent = layout?.accent ? ACCENT_COLORS[layout.accent] : DEFAULT_ACCENT
+  const accent = layout?.accent ? ACCENT_COLORS[layout.accent] || DEFAULT_ACCENT : DEFAULT_ACCENT
   const columns = layout?.columns === 2 ? 2 : 1
   return { margin, contentWidth: PAGE.width - margin * 2, fontScale, lineGap, accent, columns }
 }
@@ -175,6 +175,7 @@ export class ResumePdfService {
     const xForColumn = () => cfg.margin + column * (columnWidth + columnGap)
     const resetX = () => { doc.x = xForColumn() }
     const ensureSpace = (minHeight = 80) => {
+      if (cfg.columns === 1) return
       if (doc.y + minHeight <= PAGE.height - cfg.margin) return
       const columnAvailableHeight = PAGE.height - cfg.margin - bodyStartY
       if (minHeight > columnAvailableHeight || doc.y === bodyStartY) return
@@ -202,7 +203,7 @@ export class ResumePdfService {
     const entryHead = (left: string, right?: string) => {
       ensureSpace(36)
       const y = doc.y
-      const rightWidth = Math.min(110, Math.max(80, columnWidth * 0.35))
+      const rightWidth = cfg.columns === 1 ? 130 : Math.min(110, Math.max(80, columnWidth * 0.35))
       doc.fillColor(ink).fontSize(fs(11.5)).text(left, xForColumn(), y, { width: columnWidth - rightWidth })
       if (right) {
         doc.fillColor(sub).fontSize(fs(10)).text(right, xForColumn() + columnWidth - rightWidth, y, { width: rightWidth, align: 'right' })

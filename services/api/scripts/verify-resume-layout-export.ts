@@ -81,11 +81,14 @@ function assertStaticContracts(): void {
   if (!pdfSrc.includes('const DEFAULT_LINE_GAP = 2.5')) fail('1b. 默认 lineGap 必须等于 Wave 1 当前 2.5')
   if (!pdfSrc.includes("const DEFAULT_ACCENT = '#2563eb'")) fail('1b. 默认 accent 必须等于 Wave 1 当前 #2563eb')
   if (!pdfSrc.includes('const DEFAULT_FONT_SCALE = 1')) fail('1b. 默认 fontScale 必须为 1')
+  if (!pdfSrc.includes('cfg.columns === 1 ? 130')) fail('1c. 默认单栏 entryHead 右侧时间列必须保持 Wave 1 的 130pt')
+  if (!pdfSrc.includes('if (cfg.columns === 1) return')) fail('1c. 默认单栏不得引入 Wave 1 没有的主动分页')
   pass('1. PDF renderer layout 签名与默认值迁移契约已满足')
 
   if (!pdfSrc.includes("green: '#047857'") || !pdfSrc.includes("slate: '#475569'")) {
     fail('2. 主色白名单色表缺失 green/slate')
   }
+  if (!pdfSrc.includes('ACCENT_COLORS[layout.accent] || DEFAULT_ACCENT')) fail('2. 无效 accent 必须回退默认主色')
   if (/buffer.*#047857|#047857.*buffer/i.test(pdfSrc)) fail('2. 不得依赖 PDF raw buffer 字面量验证颜色')
   pass('2. 主色验证基于源码白名单/resolveLayout,不依赖 raw PDF buffer 字面量')
 
