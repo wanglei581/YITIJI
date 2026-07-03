@@ -1,0 +1,1039 @@
+/* ============================================================
+   后台登录页（Admin / Partner 同构不同色）
+   视觉对齐 .workbuddy/prototypes/login-trio-v1.html ② ③
+   （fusion-youth v5 语汇：墨青纸感 + 印刷工艺层）
+   仅表现层样式；接口与登录逻辑见 index.tsx
+   ============================================================ */
+
+.clogin {
+  --paper: #f4f1e8;
+  --paper-2: #efeadd;
+  --surface: #fffdf8;
+  --surface-2: #f7f4ec;
+  --ink: #10302b;
+  --ink-2: #2c4a43;
+  --muted: #5d6b63;
+  --line: rgba(16, 48, 43, 0.1);
+  --line-2: rgba(16, 48, 43, 0.06);
+  --red: #c14a34;
+  --red-soft: #f6e3de;
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --shadow: 0 14px 40px rgba(16, 48, 43, 0.08);
+  --r-lg: 26px;
+  --r-sm: 14px;
+
+  /* 主题色（默认 Admin 青绿；.clogin--partner 覆盖为陶土） */
+  --acc: #1f9e86;
+  --acc-deep: #157a67;
+  --acc-soft: #e2f2ec;
+  --acc-text: #157a67;
+  --acc-glow: rgba(31, 158, 134, 0.45);
+  --left-grad: linear-gradient(122deg, #0c2f29 0%, #124b41 52%, #1c7a67 100%);
+  --cta-grad: linear-gradient(150deg, #10302b 10%, #1c463d);
+  --cta-shadow: 0 12px 26px rgba(16, 48, 43, 0.22);
+  --em: #8fe3cd;
+  --left-sub: rgba(226, 247, 239, 0.62);
+  --left-body: rgba(226, 247, 239, 0.75);
+  --dot: #46d6b4;
+  --dot-halo: rgba(70, 214, 180, 0.16);
+  --logo-grad: linear-gradient(160deg, #fdfbf4, #dff2ea);
+
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.clogin--partner {
+  --acc: #b8683c;
+  --acc-deep: #9e5330;
+  --acc-soft: #f4e8dd;
+  --acc-text: #9e5330;
+  --acc-glow: rgba(184, 104, 60, 0.45);
+  --left-grad: linear-gradient(122deg, #2b1a10 0%, #56331d 52%, #9e5330 100%);
+  --cta-grad: linear-gradient(150deg, #56331d 10%, #7c4525);
+  --cta-shadow: 0 12px 26px rgba(86, 51, 29, 0.28);
+  --em: #f5c9a4;
+  --left-sub: rgba(247, 236, 226, 0.66);
+  --left-body: rgba(247, 236, 226, 0.78);
+  --dot: #f5c9a4;
+  --dot-halo: rgba(245, 201, 164, 0.16);
+  --logo-grad: linear-gradient(160deg, #fdfbf4, #f3e3d3);
+}
+
+/* 印刷工艺层：纸纹 + 噪点 */
+.clogin::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(0deg, rgba(16, 48, 43, 0.018) 0 1px, transparent 1px 5px);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.12));
+}
+.clogin::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+.clogin .serif {
+  font-family: var(--font-serif);
+  letter-spacing: 0.01em;
+}
+
+@keyframes clogin-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 按钮内的装饰图标不拦截点击，命中目标始终是按钮本体 */
+.clogin button svg {
+  pointer-events: none;
+}
+
+/* ── 触控涟漪 ── */
+.clogin .ripple-host {
+  position: relative;
+  overflow: hidden;
+}
+.clogin .ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+  transform: scale(0);
+  animation: clogin-rip 520ms ease-out forwards;
+}
+@keyframes clogin-rip {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* ── 左栏 ── */
+.clogin .c-left {
+  position: relative;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  color: #f2faf6;
+  background: var(--left-grad);
+  padding: 40px 46px;
+  z-index: 1;
+}
+@media (min-width: 1024px) {
+  .clogin .c-left {
+    display: flex;
+    flex: 0 0 clamp(400px, 40vw, 560px);
+  }
+}
+.clogin .c-left::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  pointer-events: none;
+  background: repeating-linear-gradient(58deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 46px);
+}
+.clogin .deco-ring {
+  position: absolute;
+  right: -70px;
+  top: -70px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.clogin .vert {
+  position: absolute;
+  right: 30px;
+  top: 46px;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.42em;
+  font-size: 12px;
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.42);
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  padding-left: 12px;
+}
+.clogin .c-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.clogin .c-logo {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  flex: 0 0 auto;
+  background: var(--logo-grad);
+  color: var(--acc-deep);
+  box-shadow: inset 0 -5px 12px rgba(16, 48, 43, 0.1);
+}
+.clogin .c-brand strong {
+  display: block;
+  font-size: 17.5px;
+  font-weight: 800;
+}
+.clogin .c-brand span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--left-sub);
+  letter-spacing: 0.04em;
+}
+.clogin .c-tagline {
+  position: relative;
+  margin-top: 84px;
+}
+.clogin .c-tagline h1 {
+  margin: 0;
+  font-size: clamp(30px, 2.6vw, 38px);
+  line-height: 1.42;
+  font-weight: 900;
+  animation: clogin-in 280ms ease-out both;
+}
+.clogin .c-tagline h1 em {
+  font-style: normal;
+  color: var(--em);
+}
+.clogin .c-tagline p {
+  margin: 16px 0 0;
+  font-size: 14.5px;
+  line-height: 1.8;
+  color: var(--left-body);
+  max-width: 390px;
+  animation: clogin-in 280ms ease-out 60ms both;
+}
+
+/* 终端剪影插画 + 数据流 */
+.clogin .c-illus {
+  position: relative;
+  margin-top: auto;
+  height: 230px;
+}
+.clogin .c-kioskshape {
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  width: 126px;
+  height: 218px;
+}
+.clogin .c-kioskshape .screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 162px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+.clogin .c-kioskshape .screen::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  top: 17px;
+  height: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--em) 55%, transparent);
+}
+.clogin .c-kioskshape .screen::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  right: 38px;
+  top: 36px;
+  height: 86px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
+}
+.clogin .c-kioskshape .stand {
+  position: absolute;
+  bottom: 11px;
+  left: 50%;
+  width: 32px;
+  height: 46px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+}
+.clogin .c-kioskshape .base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 90px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.clogin .c-kioskshape .beam {
+  position: absolute;
+  top: 25px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: -4px;
+  background: var(--dot);
+  box-shadow: 0 0 0 5px var(--dot-halo);
+  animation: clogin-breath 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+@keyframes clogin-breath {
+  from {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+.clogin .c-flow {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  width: 100%;
+  height: 100%;
+}
+.clogin .c-flow path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 7;
+}
+.clogin .c-flow circle {
+  fill: var(--dot);
+}
+.clogin .c-flow .mv {
+  animation: clogin-flow 4.2s linear infinite;
+}
+.clogin .c-flow .mv.d2 {
+  animation-delay: 1.4s;
+}
+.clogin .c-flow .mv.d3 {
+  animation-delay: 2.8s;
+}
+@keyframes clogin-flow {
+  from {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  to {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* ── 右侧表单区 ── */
+.clogin .c-right {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  padding: 48px 20px 56px;
+}
+.clogin .c-card {
+  width: 100%;
+  max-width: 524px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: 46px 50px 40px;
+  animation: clogin-in 280ms ease-out 100ms both;
+}
+.clogin .c-card.shake {
+  animation: clogin-shake 360ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes clogin-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-9px);
+  }
+  45% {
+    transform: translateX(7px);
+  }
+  70% {
+    transform: translateX(-4px);
+  }
+  88% {
+    transform: translateX(2px);
+  }
+}
+.clogin .folio {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px dashed var(--line);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+}
+.clogin .folio b {
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.clogin .c-card h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 900;
+}
+.clogin .c-card .sub {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* 登录方式切换 */
+.clogin .c-mode {
+  display: flex;
+  gap: 4px;
+  width: fit-content;
+  margin-top: 20px;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+}
+.clogin .c-mode button {
+  height: 42px;
+  padding: 0 24px;
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 760;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.clogin .c-mode button.on {
+  color: #fff;
+  background: linear-gradient(150deg, var(--acc) 0%, var(--acc-deep));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--acc-deep) 24%, transparent);
+}
+.clogin .c-pane {
+  animation: clogin-in 220ms ease-out both;
+}
+
+/* 字段 */
+.clogin .c-field {
+  margin-top: 25px;
+}
+.clogin .c-field label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 780;
+  color: var(--ink-2);
+  margin-bottom: 9px;
+}
+.clogin .fno {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--acc-text);
+  margin-right: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.clogin .c-inputwrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 58px;
+  padding: 0 18px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1.6px solid var(--line);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.clogin .c-inputwrap .lead {
+  color: var(--muted);
+  flex: 0 0 auto;
+  transition: color 150ms ease;
+}
+.clogin .c-inputwrap input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 15.5px;
+  font-weight: 620;
+  color: var(--ink);
+}
+.clogin .c-inputwrap input::placeholder {
+  color: rgba(93, 107, 99, 0.5);
+  font-weight: 500;
+}
+.clogin .c-inputwrap::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: -1.6px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--acc);
+  transition: left 220ms ease-out, right 220ms ease-out;
+}
+.clogin .c-inputwrap:focus-within {
+  border-color: var(--acc-glow);
+  background: var(--surface);
+}
+.clogin .c-inputwrap:focus-within::after {
+  left: 12px;
+  right: 12px;
+}
+.clogin .c-inputwrap:focus-within .lead {
+  color: var(--acc-text);
+}
+.clogin .c-eye {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-right: -6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.clogin .c-eye:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* 记住账号 / 忘记密码行 */
+.clogin .c-row2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+.clogin .c-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+  min-height: 42px;
+}
+.clogin .c-remember .box {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.6px solid var(--line);
+  background: var(--surface);
+  color: #fff;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.clogin .c-remember.checked .box {
+  background: var(--acc);
+  border-color: var(--acc);
+}
+.clogin .c-remember .box svg {
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+.clogin .c-remember.checked .box svg {
+  opacity: 1;
+  transform: scale(1);
+}
+.clogin .c-forgot {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 13.5px;
+  font-weight: 720;
+  color: var(--acc-text);
+  cursor: pointer;
+}
+
+/* 验证码内嵌发送按钮 */
+.clogin .c-send {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 16px;
+  margin-right: -7px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(150deg, var(--acc) 0%, var(--acc-deep));
+  font-size: 13px;
+  font-weight: 760;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease;
+  font-variant-numeric: tabular-nums;
+}
+.clogin .c-send:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+.clogin .c-send:not(:disabled):active {
+  transform: scale(0.97);
+}
+.clogin .c-send:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.clogin .c-hint {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.clogin .c-hint svg {
+  color: var(--acc-text);
+  flex: 0 0 auto;
+}
+
+/* 协议行 */
+.clogin .c-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+.clogin .c-agree .box {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 6px;
+  border: 1.6px solid var(--line);
+  background: var(--surface);
+  flex: 0 0 auto;
+  color: #fff;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.clogin .c-agree.checked .box {
+  background: var(--acc);
+  border-color: var(--acc);
+}
+.clogin .c-agree .box svg {
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+.clogin .c-agree.checked .box svg {
+  opacity: 1;
+  transform: scale(1);
+}
+.clogin .c-agree .doclink {
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font-size: inherit;
+  color: var(--acc-text);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+/* 错误条 */
+.clogin .c-error {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--red-soft);
+  border: 1px solid rgba(193, 74, 52, 0.22);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 720;
+  animation: clogin-in 220ms ease-out both;
+}
+.clogin .c-error svg {
+  flex: 0 0 auto;
+}
+
+/* 主按钮 */
+.clogin .c-cta {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 26px;
+  width: 100%;
+  height: 60px;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: #fff;
+  background: var(--cta-grad);
+  box-shadow: var(--cta-shadow);
+  font-size: 16.5px;
+  font-weight: 780;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+.clogin .c-cta:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+.clogin .c-cta:not(:disabled):active {
+  transform: scale(0.99);
+}
+.clogin .c-cta:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.clogin .c-cta .load {
+  display: none;
+  gap: 7px;
+  justify-content: center;
+  align-items: center;
+}
+.clogin .c-cta.loading .label {
+  display: none;
+}
+.clogin .c-cta.loading .load {
+  display: flex;
+}
+.clogin .c-cta .load i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--em);
+  animation: clogin-dots 900ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.clogin .c-cta .load i:nth-child(2) {
+  animation-delay: 150ms;
+}
+.clogin .c-cta .load i:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes clogin-dots {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* 卡脚 / 页脚 */
+.clogin .c-cardfoot {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.clogin .c-legal {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: rgba(93, 107, 99, 0.75);
+  padding: 0 16px;
+}
+
+/* ── 弹层（找回密码 / 手机号验证 / 协议） ── */
+.clogin .c-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(16, 48, 43, 0.3);
+  backdrop-filter: blur(4px);
+}
+.clogin .c-modal-card {
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding: 28px 30px 26px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 36px 100px rgba(16, 48, 43, 0.28);
+  animation: clogin-sheet 220ms ease-out both;
+}
+.clogin .c-modal-card.wide {
+  max-width: 560px;
+}
+@keyframes clogin-sheet {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.clogin .c-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.clogin .c-modal-head h3 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+.clogin .c-modal-head p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.clogin .close-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--ink);
+  flex: 0 0 auto;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.clogin .close-btn:hover {
+  background: var(--paper-2);
+}
+.clogin .close-btn:active {
+  transform: scale(0.95);
+}
+.clogin .c-modal-card .c-field {
+  margin-top: 18px;
+}
+.clogin .c-modal-card .c-cta {
+  margin-top: 20px;
+  height: 48px;
+  font-size: 14px;
+}
+.clogin .c-modal-foot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.clogin .c-modal-foot b {
+  color: var(--ink-2);
+  font-weight: 800;
+}
+.clogin .c-resend {
+  margin-top: 12px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 720;
+  color: var(--acc-text);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.clogin .c-resend:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* 协议弹层正文 */
+.clogin .c-doc {
+  margin-top: 16px;
+}
+.clogin .c-doc h4 {
+  margin: 18px 0 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.clogin .c-doc p {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.clogin .c-doc-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 4px;
+  width: fit-content;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+}
+.clogin .c-doc-tabs button {
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 760;
+  color: var(--muted);
+  cursor: pointer;
+}
+.clogin .c-doc-tabs button.on {
+  color: #fff;
+  background: linear-gradient(150deg, var(--acc) 0%, var(--acc-deep));
+}
+
+/* ── 成功过场 ── */
+.clogin .c-success {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.clogin .c-success .wipe {
+  position: absolute;
+  inset: 0;
+  background: var(--left-grad);
+  transform: translateX(-101%);
+  animation: clogin-wipe 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes clogin-wipe {
+  to {
+    transform: translateX(0);
+  }
+}
+.clogin .c-success .inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  animation: clogin-fade 200ms ease-out 340ms both;
+}
+@keyframes clogin-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.clogin .c-success .box {
+  text-align: center;
+  color: #f2faf6;
+}
+.clogin .c-success svg.check {
+  width: 74px;
+  height: 74px;
+}
+.clogin .c-success svg.check path {
+  stroke: var(--em);
+  stroke-width: 7;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: clogin-check 320ms ease-out 420ms both;
+}
+@keyframes clogin-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.clogin .c-success .inner p {
+  margin: 14px 0 0;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+/* 窄屏：卡片内边距收紧，避免手机上留白过厚 */
+@media (max-width: 640px) {
+  .clogin .c-card {
+    padding: 30px 24px 28px;
+  }
+  .clogin .c-card h2 {
+    font-size: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clogin *,
+  .clogin *::before,
+  .clogin *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

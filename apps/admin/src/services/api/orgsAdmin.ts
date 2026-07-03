@@ -18,6 +18,8 @@ export interface AdminOrgAccount {
   username: string
   name: string
   enabled: boolean
+  phoneMasked: string | null
+  phoneVerifiedAt: string | null
   createdAt: string
 }
 
@@ -43,6 +45,7 @@ export interface OrgAccountInput {
   username: string
   password: string
   name: string
+  phone: string
 }
 
 export interface CreateOrgInput {
@@ -132,7 +135,16 @@ let seq = 100
 const nextId = (p: string) => `${p}-mock-${++seq}`
 
 const mockAccounts: (AdminOrgAccount & { orgId: string })[] = [
-  { id: 'acc-mock-1', orgId: 'org-mock-1', username: 'hr_center', name: '李老师', enabled: true, createdAt: now() },
+  {
+    id: 'acc-mock-1',
+    orgId: 'org-mock-1',
+    username: 'hr_center',
+    name: '李老师',
+    enabled: true,
+    phoneMasked: '139****0001',
+    phoneVerifiedAt: now(),
+    createdAt: now(),
+  },
 ]
 
 const mockOrgs: Omit<AdminOrgListItem, 'counts'>[] = [
@@ -172,7 +184,16 @@ const mockAdapter: OrgsAdminServiceInterface = {
     }
     mockOrgs.unshift(org)
     if (input.account) {
-      mockAccounts.push({ id: nextId('acc'), orgId: org.id, username: input.account.username, name: input.account.name, enabled: true, createdAt: now() })
+      mockAccounts.push({
+        id: nextId('acc'),
+        orgId: org.id,
+        username: input.account.username,
+        name: input.account.name,
+        enabled: true,
+        phoneMasked: `${input.account.phone.slice(0, 3)}****${input.account.phone.slice(7)}`,
+        phoneVerifiedAt: null,
+        createdAt: now(),
+      })
     }
     return this.getOrgDetail(org.id)
   },
@@ -193,7 +214,16 @@ const mockAdapter: OrgsAdminServiceInterface = {
     if (mockAccounts.some((a) => a.username === input.username)) {
       throw new ApiHttpError('USERNAME_TAKEN', `用户名 ${input.username} 已存在`, 409)
     }
-    const account = { id: nextId('acc'), orgId, username: input.username, name: input.name, enabled: true, createdAt: now() }
+    const account = {
+      id: nextId('acc'),
+      orgId,
+      username: input.username,
+      name: input.name,
+      enabled: true,
+      phoneMasked: `${input.phone.slice(0, 3)}****${input.phone.slice(7)}`,
+      phoneVerifiedAt: null,
+      createdAt: now(),
+    }
     mockAccounts.push(account)
     return account
   },

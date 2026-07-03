@@ -28,6 +28,9 @@ import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { AuthService } from '../src/auth/auth.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
+process.env['DATABASE_URL'] ||= 'file:./prisma/dev.db'
+process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-admin-orgs-secret-32-bytes-ok'
+
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
 
@@ -55,8 +58,15 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
-  const svc = new AdminOrgsService(prisma, audit)
-  const auth = new AuthService(new JwtService({ secret: 'verify-admin-orgs-test-secret' }), prisma)
+  const redis = { del: async () => 1 } as never
+  const auth = new AuthService(
+    new JwtService({ secret: 'verify-admin-orgs-test-secret' }),
+    prisma,
+    redis,
+    {} as never,
+    audit,
+  )
+  const svc = new AdminOrgsService(prisma, audit, redis)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const adminRow = await prisma.user.create({
@@ -65,6 +75,7 @@ async function main() {
   const admin: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
 
   const username = `vao_partner_${suffix}`
+  const phone = `139${Date.now().toString().slice(-8)}`
   const passwordV1 = `InitPass_${suffix}`
   const passwordV2 = `ResetPass_${suffix}`
   let orgId = ''
@@ -92,7 +103,7 @@ async function main() {
           contactPhone: '0532-12345678',
           sceneTemplate: 'public_employment',
           enabledModules: ['print_scan', 'policy_service', 'job_info'],
-          account: { username, password: passwordV1, name: '机构账号' },
+          account: { username, password: passwordV1, name: '机构账号', phone },
         },
         admin,
       )
@@ -101,9 +112,10 @@ async function main() {
       const userRow = await prisma.user.findUnique({ where: { username } })
       if (!userRow || userRow.role !== 'partner' || userRow.orgId !== orgId) fail('1. 账号 role/orgId 错误')
       if (userRow.passwordHash === passwordV1 || !userRow.passwordHash.startsWith('$2')) fail('1. 密码未 bcrypt 哈希')
-      const login = await auth.login(username, passwordV1)
+      if (!userRow.phoneHash || !userRow.phoneEnc || userRow.phoneVerifiedAt) fail('1. 登录手机号未绑定或被错误标为已验证')
+      const login = await auth.login(username, passwordV1, 'partner')
       if (login.user.orgId !== orgId) fail('1. 初始账号无法登录')
-      pass('1. 创建机构 + 初始账号(bcrypt + 可登录,orgId 正确)')
+      pass('1. 创建机构 + 初始账号(bcrypt + 可登录,orgId 正确 + 手机号待验证)')
     }
 
     // ── 2. 响应不泄密 ──────────────────────────────────────────────────────
@@ -138,9 +150,9 @@ async function main() {
     // ── 4. 机构授权启停 → 登录闸 ───────────────────────────────────────────
     {
       await svc.setOrgStatus(orgId, 'disable', admin)
-      await expectCode(() => auth.login(username, passwordV1), 'AUTH_LOGIN_FAILED', '4a. 机构停用后账号登录被拒')
+      await expectCode(() => auth.login(username, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '4a. 机构停用后账号登录被拒')
       await svc.setOrgStatus(orgId, 'enable', admin)
-      await auth.login(username, passwordV1)
+      await auth.login(username, passwordV1, 'partner')
       pass('4b. 机构恢复后登录恢复')
     }
 
@@ -149,28 +161,33 @@ async function main() {
       const detail = await svc.getOrgDetail(orgId)
       const accountId = detail.accounts[0].id
       await svc.setAccountStatus(orgId, accountId, 'disable', admin)
-      await expectCode(() => auth.login(username, passwordV1), 'AUTH_LOGIN_FAILED', '5a. 账号停用后登录被拒')
+      await expectCode(() => auth.login(username, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '5a. 账号停用后登录被拒')
       await svc.setAccountStatus(orgId, accountId, 'enable', admin)
-      await auth.login(username, passwordV1)
+      await auth.login(username, passwordV1, 'partner')
       pass('5b. 账号恢复后登录恢复')
 
       // ── 6. 重置密码 ──────────────────────────────────────────────────────
       await svc.resetAccountPassword(orgId, accountId, passwordV2, admin)
-      await expectCode(() => auth.login(username, passwordV1), 'AUTH_LOGIN_FAILED', '6a. 旧密码失效')
-      await auth.login(username, passwordV2)
+      await expectCode(() => auth.login(username, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '6a. 旧密码失效')
+      await auth.login(username, passwordV2, 'partner')
       pass('6b. 新密码可登录')
     }
 
     // ── 7. 用户名冲突 ──────────────────────────────────────────────────────
     await expectCode(
-      () => svc.createAccount(orgId, { username, password: 'AnotherPass123', name: '重复账号' }, admin),
+      () => svc.createAccount(orgId, { username, password: 'AnotherPass123', name: '重复账号', phone: `138${Date.now().toString().slice(-8)}` }, admin),
       'USERNAME_TAKEN',
       '7. 重复用户名 → USERNAME_TAKEN',
     )
 
     // ── 8. 计数 ────────────────────────────────────────────────────────────
     {
-      await svc.createAccount(orgId, { username: `${username}_2`, password: 'AnotherPass123', name: '第二账号' }, admin)
+      await svc.createAccount(orgId, {
+        username: `${username}_2`,
+        password: 'AnotherPass123',
+        name: '第二账号',
+        phone: `137${Date.now().toString().slice(-8)}`,
+      }, admin)
       const list = await svc.listOrgs()
       const hit = list.find((o) => o.id === orgId)
       if (!hit || hit.counts.accounts !== 2) fail(`8. accounts 计数错误: ${hit?.counts.accounts}`)
@@ -324,11 +341,11 @@ async function main() {
       await svc.listOrgs()
       await svc.getOrgDetail(legacyOrgId)
       await svc.getOwnProfile({ userId: 'legacy-partner', role: 'partner', orgId: legacyOrgId })
-      await auth.login(legacyUsername, legacyPassword)
+      await auth.login(legacyUsername, legacyPassword, 'partner')
       await svc.setOrgStatus(legacyOrgId, 'disable', admin)
-      await expectCode(() => auth.login(legacyUsername, legacyPassword), 'AUTH_LOGIN_FAILED', '10h. 历史机构停用仍走既有登录闸')
+      await expectCode(() => auth.login(legacyUsername, legacyPassword, 'partner'), 'AUTH_LOGIN_FAILED', '10h. 历史机构停用仍走既有登录闸')
       await svc.setOrgStatus(legacyOrgId, 'enable', admin)
-      await auth.login(legacyUsername, legacyPassword)
+      await auth.login(legacyUsername, legacyPassword, 'partner')
       pass('10i. 历史不合规机构读取 / 登录 / 启停 grandfather 放行')
 
       const renamed = await svc.updateOrg(legacyOrgId, { contact: '历史联系人' }, admin)
