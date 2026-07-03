@@ -23,7 +23,7 @@ import type {
   AssistantChatRequest,
   AssistantChatResponse,
 } from '@ai-job-print/shared'
-import type { ResumeReadAccess } from './ai'
+import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
@@ -120,6 +120,44 @@ async function post<T>(path: string, body: unknown, token?: string | null): Prom
   return res.json() as Promise<T>
 }
 
+async function postWithAccess<T>(path: string, body: unknown, access?: ResumeReadAccess): Promise<T> {
+  const ac = new AbortController()
+  const timerId = setTimeout(() => ac.abort(), TIMEOUT_MS)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...accessHeaders(access),
+      },
+      credentials: 'include',
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    })
+  } catch (err) {
+    clearTimeout(timerId)
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiHttpError('REQUEST_TIMEOUT', `请求超时（${TIMEOUT_MS / 1000}s）`, 408)
+    }
+    throw err
+  }
+  clearTimeout(timerId)
+  if (!res.ok) {
+    let code    = 'UNKNOWN_ERROR'
+    let message = `HTTP ${res.status}`
+    try {
+      const body2 = (await res.json()) as { error?: { code?: string; message?: string } }
+      code    = body2.error?.code    ?? code
+      message = body2.error?.message ?? message
+    } catch { /* keep defaults */ }
+    if (isMemberSessionInvalidError(res.status, code, Boolean(access?.token))) notifyMemberSessionExpired(access?.token ?? undefined)
+    throw new ApiHttpError(code, message, res.status)
+  }
+  return res.json() as Promise<T>
+}
+
 // ──────────────────────────────────────────────────────────────
 // HTTP Adapter 对象
 // ──────────────────────────────────────────────────────────────
@@ -135,6 +173,20 @@ export const aiHttpAdapter = {
 
   async getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse> {
     return get<ResumeOptimizeResponse>(`/resume/records/${taskId}/optimize`, access)
+  },
+
+  async adjustResumeLayoutDraft(
+    taskId: string,
+    resume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    layout: ResumeLayoutSettings,
+    access?: ResumeReadAccess,
+  ): Promise<ResumeLayoutAdjustResponse> {
+    return postWithAccess<ResumeLayoutAdjustResponse>(
+      `/resume/records/${taskId}/layout-adjust`,
+      { resume, action, layout },
+      access,
+    )
   },
 
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {

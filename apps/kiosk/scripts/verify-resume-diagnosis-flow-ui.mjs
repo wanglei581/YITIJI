@@ -65,7 +65,7 @@ assertIncludes(report, 'aria-valuenow', 'report section bars expose current scor
 assertNotIncludes(optimize, 'estimateUplift', 'optimize page removes fake uplift estimator')
 assertNotIncludes(optimize, '综合评分提升', 'optimize page removes fake numeric score uplift card')
 assertIncludes(optimize, '表达调整参考', 'optimize page uses qualitative improvement language')
-assertIncludes(optimize, 'useBusyLock(exporting || printNavigating)', 'optimize page prevents standby during export or print navigation')
+assertIncludes(optimize, 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimize page prevents standby during export, print navigation or AI adjustment')
 assertIncludes(optimize, 'printNavigating', 'optimize page locks repeated print navigation')
 assertIncludes(optimize, 'confirmLeave', 'optimize page protects edited resume content before leaving')
 assertIncludes(optimize, 'splitView={false}', 'optimize diff uses touch-safe inline comparison')
@@ -111,7 +111,7 @@ const aiWrapper = read('src/services/api/ai.ts')
 
 assertNotIncludes(optimize, "from '../../services/api/aiHttpAdapter'", 'optimize page does not import http adapter directly')
 assertNotIncludes(optimize, "from '../../services/api/aiMockAdapter'", 'optimize page does not import mock adapter directly')
-assertIncludes(optimize, "import { exportGeneratedResume, getResumeOptimize } from '../../services/api'", 'optimize page imports exportGeneratedResume from the api wrapper barrel')
+assertIncludes(optimize, "from '../../services/api'", 'optimize page imports resume actions from the api wrapper barrel')
 
 assertIncludes(aiWrapper, 'format?: ResumeExportFormat', 'api wrapper exportGeneratedResume accepts optional export format')
 assertIncludes(aiWrapper, 'layout?: ResumeLayoutSettings', 'api wrapper exportGeneratedResume accepts optional layout')
@@ -138,5 +138,25 @@ assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToke
 assertIncludes(optimize, 'setExported(null)', 'optimize page clears stale export when layout/content changes')
 assertIncludes(optimize, 'printFileUrl', 'optimize page still uses printFileUrl for PDF print path')
 assertNotIncludes(optimize, 'signedUrl || exported.printFileUrl', 'optimize page must not fall back from printFileUrl to signedUrl for printing')
+
+// ── Wave2 Task 5:AI 一键精简 / 调整排版接线 ────────────────────────────────
+assertIncludes(optimize, 'AI 精简', 'optimize page exposes AI condense action')
+assertIncludes(optimize, 'AI 调整排版', 'optimize page exposes AI reformat action')
+assertIncludes(optimize, '撤销 AI 调整', 'optimize page can undo AI adjustment')
+assertIncludes(optimize, 'adjustResumeLayoutDraft', 'optimize page calls the unified layout adjust wrapper')
+assertNotIncludes(optimize, "from '../../services/api/aiHttpAdapter'", 'optimize page does not directly import http adapter for layout adjust')
+assertNotIncludes(optimize, "from '../../services/api/aiMockAdapter'", 'optimize page does not directly import mock adapter for layout adjust')
+assertIncludes(optimize, 'loading || exporting || !optimizedResume', 'AI adjust buttons are disabled while busy or no resume')
+assertIncludes(optimize, 'lastResumeBeforeAiAdjust', 'AI adjustment keeps an undo snapshot')
+assertIncludes(optimize, 'adjustWarnings', 'AI adjustment warnings are displayed separately')
+assertIncludes(optimize, 'setAdjustWarnings(result.warnings ?? [])', 'layout adjust warnings are handled as UI hints')
+assertNotIncludes(optimize, '录用概率', 'optimize page does not promise hiring results')
+
+assertIncludes(aiWrapper, 'adjustResumeLayoutDraft', 'api wrapper exposes layout adjust function')
+assertIncludes(aiWrapper, "action: ResumeLayoutAdjustAction", 'api wrapper uses typed layout adjust action')
+assertIncludes(httpAdapter, "layout-adjust", 'http adapter posts to layout-adjust endpoint')
+assertIncludes(httpAdapter, 'ResumeLayoutAdjustResponse', 'http adapter returns typed layout adjust response with warnings')
+assertIncludes(mockAdapter, 'adjustResumeLayoutDraft', 'mock adapter implements layout adjust wrapper')
+assertIncludes(mockAdapter, 'warnings', 'mock adapter returns layout adjust warnings')
 
 console.log('PASS resume diagnosis flow UI verification')

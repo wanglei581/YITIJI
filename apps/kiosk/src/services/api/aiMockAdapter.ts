@@ -21,7 +21,7 @@ import type {
   AssistantChatResponse,
   AssistantSkill,
 } from '@ai-job-print/shared'
-import type { ResumeReadAccess } from './ai'
+import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 
 // ──────────────────────────────────────────────────────────────
 // Mock 数据（原 ResumeParsePage.mockReport / ResumeOptimizePage.OPTIMIZE_MODULES）
@@ -123,6 +123,43 @@ export const aiMockAdapter = {
         skills: ['JavaScript', 'React', 'CSS'],
         certificates: [],
       },
+    }
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async adjustResumeLayoutDraft(
+    _taskId: string,
+    resume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    _layout: ResumeLayoutSettings,
+    _access?: ResumeReadAccess,
+  ): Promise<ResumeLayoutAdjustResponse> {
+    await delay(300)
+    const trimSentence = (value: string | undefined, max = 72) => {
+      const text = (value ?? '').trim()
+      return text.length > max ? `${text.slice(0, max).replace(/[，,。.\s]+$/, '')}。` : text
+    }
+    const adjusted: GeneratedResume = {
+      ...resume,
+      summary: action === 'condense' ? trimSentence(resume.summary, 64) : resume.summary,
+      education: resume.education.map((item) => ({
+        ...item,
+        description: action === 'condense' ? trimSentence(item.description, 60) : item.description,
+      })),
+      experience: resume.experience.map((item) => ({
+        ...item,
+        description: action === 'condense' ? trimSentence(item.description, 76) : item.description,
+      })),
+      projects: resume.projects.map((item) => ({
+        ...item,
+        description: action === 'condense' ? trimSentence(item.description, 68) : item.description,
+      })),
+      skills: [...resume.skills],
+      certificates: [...resume.certificates],
+    }
+    return {
+      resume: adjusted,
+      warnings: [action === 'condense' ? '已按演示规则压缩描述长度。' : '已按演示规则保留事实并调整表达密度。'],
     }
   },
 

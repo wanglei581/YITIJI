@@ -21,7 +21,8 @@ import type {
 } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
-import { exportGeneratedResume, getResumeOptimize } from '../../services/api'
+import { adjustResumeLayoutDraft, exportGeneratedResume, getResumeOptimize } from '../../services/api'
+import type { ResumeLayoutAdjustAction } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
 import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
@@ -74,9 +75,14 @@ export function ResumeOptimizePage() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState<LeaveAction | null>(null)
+  const [adjusting, setAdjusting] = useState<ResumeLayoutAdjustAction | null>(null)
+  const [lastResumeBeforeAiAdjust, setLastResumeBeforeAiAdjust] = useState<GeneratedResume | null>(null)
+  const [adjustWarnings, setAdjustWarnings] = useState<string[]>([])
+  const [adjustError, setAdjustError] = useState<string | null>(null)
   const { layout, setLayout, previewClassName, previewStyle } = useResumeLayout()
+  const aiAdjustDisabled = loading || exporting || !optimizedResume || Boolean(adjusting)
 
-  useBusyLock(exporting || printNavigating)
+  useBusyLock(exporting || printNavigating || Boolean(adjusting))
 
   useEffect(() => {
     if (!taskId) {
@@ -134,6 +140,9 @@ export function ResumeOptimizePage() {
 
   const handleResumeChange = (next: GeneratedResume) => {
     markEdited()
+    setLastResumeBeforeAiAdjust(null)
+    setAdjustWarnings([])
+    setAdjustError(null)
     setOptimizedResume(next)
   }
 
@@ -155,6 +164,38 @@ export function ResumeOptimizePage() {
     } finally {
       setExporting(false)
     }
+  }
+
+  const handleAiAdjust = async (action: ResumeLayoutAdjustAction) => {
+    if (!taskId || !optimizedResume) return
+    const before = optimizedResume
+    setAdjusting(action)
+    setAdjustError(null)
+    try {
+      const result = await adjustResumeLayoutDraft(taskId, optimizedResume, action, layout, {
+        token: getToken(),
+        accessToken,
+      })
+      setLastResumeBeforeAiAdjust(before)
+      setOptimizedResume(result.resume)
+      setAdjustWarnings(result.warnings ?? [])
+      setExported(null)
+      setIsDirty(true)
+    } catch (err) {
+      setAdjustError(err instanceof Error ? err.message : 'AI 调整失败，请稍后重试或继续手动编辑')
+    } finally {
+      setAdjusting(null)
+    }
+  }
+
+  const handleUndoAiAdjust = () => {
+    if (!lastResumeBeforeAiAdjust) return
+    setOptimizedResume(lastResumeBeforeAiAdjust)
+    setLastResumeBeforeAiAdjust(null)
+    setAdjustWarnings([])
+    setAdjustError(null)
+    setExported(null)
+    setIsDirty(true)
   }
 
   // 切换导出格式后,已导出的旧格式文件不再对应当前选择,需重新导出
@@ -290,6 +331,53 @@ export function ResumeOptimizePage() {
         {optimizedResume && (
           <>
             <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
+            <Card className="p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">AI 辅助调整</p>
+                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    仅基于当前简历和原文做表达密度调整,不新增经历或事实。
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:min-w-[260px]">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={aiAdjustDisabled}
+                    onClick={() => void handleAiAdjust('condense')}
+                  >
+                    {adjusting === 'condense' ? '正在精简…' : 'AI 精简'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={aiAdjustDisabled}
+                    onClick={() => void handleAiAdjust('reformat')}
+                  >
+                    {adjusting === 'reformat' ? '正在调整…' : 'AI 调整排版'}
+                  </Button>
+                </div>
+              </div>
+              {lastResumeBeforeAiAdjust && (
+                <div className="mt-3">
+                  <Button size="sm" variant="secondary" onClick={handleUndoAiAdjust}>
+                    撤销 AI 调整
+                  </Button>
+                </div>
+              )}
+              {adjustWarnings.length > 0 && (
+                <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-primary-700">
+                  {adjustWarnings.slice(0, 3).map((warning, idx) => (
+                    <p key={`${warning}-${idx}`}>{warning}</p>
+                  ))}
+                </div>
+              )}
+              {adjustError && (
+                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
+                  {adjustError}
+                </p>
+              )}
+            </Card>
             <OptimizedResumeEditor
               resume={optimizedResume}
               onChange={handleResumeChange}
