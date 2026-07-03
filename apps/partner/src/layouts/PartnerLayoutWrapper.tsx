@@ -107,14 +107,11 @@ export function PartnerLayoutWrapper() {
       // 通知角标:暂无机构通知数据源,不展示假数字(审计修复)
       headerActions={
         <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-sm font-medium text-gray-800">{user?.name ?? '当前用户'}</p>
-            <p className="text-xs text-gray-500">{user ? ROLE_LABEL[user.role] : ''}</p>
-          </div>
+          {/* 用户名/角色已移至侧栏底部用户区(PartnerLayout side-user),顶栏不再重复展示 */}
           <button
             type="button"
             onClick={logout}
-            className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100 active:bg-gray-200"
+            className="flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
             aria-label="退出登录"
           >
             <LogOutIcon className="h-4 w-4" aria-hidden="true" />

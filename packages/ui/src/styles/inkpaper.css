@@ -1,0 +1,99 @@
+/*
+ * Inkpaper Theme Overrides — 墨青纸感（Admin / Partner 后台专用）
+ *
+ * Import AFTER tokens.css and BEFORE "tailwindcss" in the app's index.css:
+ *   @import "@ai-job-print/ui/styles/tokens.css";
+ *   @import "@ai-job-print/ui/styles/inkpaper.css";
+ *   @import "tailwindcss";
+ *
+ * Kiosk 不引入本文件，保持原有主题不受影响。
+ * 色值来源：.workbuddy/prototypes/admin-console-inkpaper-v1.html 定稿原型。
+ */
+
+@theme {
+  /* ── Brand: Primary（青玉） ───────────────────────────────── */
+  --color-primary-50:  #f2f9f6;
+  --color-primary-100: #e2f2ec;   /* --teal-soft */
+  --color-primary-200: #c8e7db;
+  --color-primary-300: #a0d5c2;
+  --color-primary-400: #62bda1;
+  --color-primary-500: #35ab8e;
+  --color-primary-600: #1f9e86;   /* --teal, main brand */
+  --color-primary-700: #157a67;   /* --teal-deep */
+  --color-primary-800: #126250;
+  --color-primary-900: #0f4f42;
+  --color-primary-950: #093429;
+
+  /* ── Semantic: Success（青玉承载正向状态） ─────────────────── */
+  --color-success:     #1f9e86;
+  --color-success-bg:  #e2f2ec;
+  --color-success-fg:  #157a67;
+
+  /* ── Semantic: Warning（陶） ──────────────────────────────── */
+  --color-warning:     #b8683c;
+  --color-warning-bg:  #f4e8dd;
+  --color-warning-fg:  #9e5330;
+
+  /* ── Semantic: Error（朱） ────────────────────────────────── */
+  --color-error:       #c14a34;
+  --color-error-bg:    #f6e3de;
+  --color-error-fg:    #ad3d2a;
+
+  /* ── Semantic: Info（石青） ───────────────────────────────── */
+  --color-info:        #3f68b0;
+  --color-info-bg:     #e5edf4;
+  --color-info-fg:     #35608f;
+
+  /* ── Semantic: Neutral（纸灰 → 墨青） ─────────────────────── */
+  --color-neutral-50:  #f7f4ec;
+  --color-neutral-100: #efeadd;
+  --color-neutral-200: #e2dccb;
+  --color-neutral-300: #cfc9b6;
+  --color-neutral-400: #8b968e;
+  --color-neutral-500: #5d6b63;   /* --muted */
+  --color-neutral-600: #4b5850;
+  --color-neutral-700: #3c4a43;
+  --color-neutral-800: #273a34;
+  --color-neutral-900: #10302b;   /* --ink */
+
+  /* ── Dark Surface（墨绿侧栏） ─────────────────────────────── */
+  --color-dark:        #10302b;
+  --color-dark-hover:  #1b3b34;
+  --color-dark-active: #245045;
+  --color-dark-border: #2a4a43;
+
+  /* ── Surface / Background（纸） ───────────────────────────── */
+  --color-canvas:  #f4f1e8;   /* --paper */
+  --color-surface: #fffdf8;   /* --surface */
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+
+  /* ── Border Radius（纸感圆角，lg/xl 略放大） ──────────────── */
+  --radius-lg: 0.875rem;   /* 14px — cards */
+  --radius-xl: 1.125rem;   /* 18px — large panels, modals */
+
+  /* ── Shadows（低饱和墨绿投影） ────────────────────────────── */
+  --shadow-sm: 0 6px 18px rgba(16, 48, 43, 0.05);
+  --shadow-md: 0 14px 40px rgba(16, 48, 43, 0.08);
+}
+
+/*
+ * 共用组件的换肤间接层：
+ * PageHeader 等 Kiosk 共用组件通过 var(--font-heading, inherit) 取标题字体，
+ * 该变量只在引入本文件的应用中定义 → Kiosk 不受影响。
+ */
+:root {
+  --font-heading: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+}
+
+/* 纸纹：极淡的横向罗纹，铺在页面底色上 */
+@layer base {
+  body {
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(16, 48, 43, 0.015) 0 1px,
+      transparent 1px 5px
+    );
+  }
+}

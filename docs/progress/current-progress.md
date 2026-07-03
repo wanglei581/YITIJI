@@ -40,6 +40,8 @@
 
 2026-07-03 追加：按第二轮 Claude reviewer 建议，`verify:print-jobs` 第 7 段补一个最易泄露的边界用例（7f/7g）——Agent 回传 `status:'failed'` 且**完全无 `errorCode`、只有原始 `errorMessage`**（失败判定只能靠 `errorMessage` 命中、映射函数拿不到任何码）：断言 DB 仍完整保存原文而 `errorCode` 为空，`getStatus()` 回默认安全文案「打印任务失败，请联系工作人员处理或稍后重试」（`failureReasonForUser` 与兼容 `errorMessage` 一致），响应体不含任何敏感片段。仅改 `services/api/scripts/verify-print-jobs.ts` 测试脚本，未动业务逻辑。重跑 `verify:print-jobs` 7a–7g 全 PASS、api/kiosk `typecheck`、两组 `eslint` 均通过。
 
+2026-07-03 补充：完成**双后台墨青纸感换装 W1（token 层 + 框架层，纯样式）**，执行方案见 `docs/product/commercial-closure-and-console-redesign-plan-2026-07.md`（分支 `claude/hungry-cori-9f2406`）。改动：① 新增 `packages/ui/src/styles/inkpaper.css`（@theme 覆写：青玉 primary 色阶、纸色 canvas/surface、暖调 neutral、墨绿 dark 侧栏、陶/朱/石青语义色、宋体 `--font-serif`、纸感圆角与低饱和阴影、纸纹 body 底纹），仅 `apps/admin` 与 `apps/partner` 的 index.css 引入，**Kiosk 不引入、零文件改动、视觉不变**；② `AdminLayout`（admin/partner 专用）按定稿原型重塑：品牌区、分组标签、青玉活跃胶囊导航、侧栏底部用户区、60px 顶栏；`PageHeader` 标题字体走 `var(--font-heading, inherit)` 间接层（Kiosk 未定义该变量自动回退继承）；③ 两端 LayoutWrapper 顶栏去除与侧栏重复的用户名/角色展示，保留告警铃/退出。由于全部后台页面经语义 token 类取色，token 覆写使 Admin 29 模块 + Partner 13 模块整体换色，无需逐页改。验证：workspace typecheck 全绿；lint 0 错误（kiosk 3 条既有 warning 与基线一致）；admin/partner/kiosk 生产 build（CI 式 env 注入）全过；浏览器实测 admin（种子账号）与 partner（partner1）真实登录，工作台/设备管理等页真实数据渲染、Tab/筛选/表格/分页交互无回归，截图对照原型一致。附带环境事实：本 worktree 首次搭建本地开发环境时发现 SQLite migrations 落后于 schema（`Organization.contactPhone` 缺列，`prisma migrate deploy` 后 seed 失败），本地以 `prisma db push` 对齐后 seed 通过——该 schema/migration 漂移待后续核实是否影响其他新环境初始化。W2（Admin 高频 5 页逐页对照原型精修 + A 档补齐）待用户验收 W1 后继续。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |

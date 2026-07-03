@@ -78,22 +78,22 @@ export function AdminLayout({
         {/* Brand */}
         <div
           className={cn(
-            'flex h-14 shrink-0 items-center gap-3 border-b border-neutral-800',
-            collapsed ? 'justify-center px-3' : 'px-4',
+            'flex h-[70px] shrink-0 items-center gap-3',
+            collapsed ? 'justify-center px-3' : 'px-5',
           )}
         >
           {appLogo
             ? <div className="shrink-0">{appLogo}</div>
             : (
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-600">
-                <span className="text-[11px] font-bold leading-none text-white">AI</span>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-gradient-to-br from-[#fdfbf4] to-[#dff2ea]">
+                <span className="text-[13px] font-extrabold leading-none text-primary-700">AI</span>
               </div>
             )
           }
           {!collapsed && (
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{appName}</p>
-              <p className="truncate text-[10px] text-neutral-500">AI求职打印服务终端</p>
+              <p className="truncate text-[15px] font-extrabold text-white">{appName}</p>
+              <p className="mt-0.5 truncate text-[11px] text-[#9dc4b6]">AI求职打印服务终端</p>
             </div>
           )}
         </div>
@@ -111,8 +111,8 @@ export function AdminLayout({
                 <li key={item.key}>
                   {/* Group label */}
                   {showGroup && (
-                    <div className={cn('px-3 pb-1', index === 0 ? 'pt-1' : 'pt-4')}>
-                      <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                    <div className={cn('px-3 pb-1.5', index === 0 ? 'pt-1' : 'pt-4')}>
+                      <span className="text-[11px] font-bold tracking-[0.08em] text-[#8fb5a7]">
                         {item.group}
                       </span>
                     </div>
@@ -128,22 +128,14 @@ export function AdminLayout({
                       }
                     }}
                     className={cn(
-                      'relative flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
+                      'relative flex w-full items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13.5px] font-semibold transition-colors',
                       active
-                        ? 'bg-neutral-800 text-white'
-                        : 'text-neutral-400 hover:bg-dark-hover/60 hover:text-neutral-200',
+                        ? 'bg-primary-600 text-white'
+                        : 'text-[#c6ddd3] hover:bg-white/[0.07] hover:text-white',
                       collapsed && 'justify-center px-2',
                     )}
                   >
-                    {/* Left accent bar for active state */}
-                    {active && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-primary-400"
-                      />
-                    )}
-
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <Icon className="h-4 w-4 shrink-0 opacity-85" aria-hidden="true" />
 
                     {!collapsed && (
                       <span className="flex-1 truncate">{item.label}</span>
@@ -152,10 +144,10 @@ export function AdminLayout({
                     {!collapsed && item.badge != null && (
                       <span
                         className={cn(
-                          'rounded-full px-1.5 py-px text-[10px] font-semibold leading-tight',
+                          'inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-extrabold leading-none',
                           typeof item.badge === 'number' && item.badge > 0
                             ? 'bg-error text-white'
-                            : 'bg-neutral-700 text-neutral-300',
+                            : 'bg-white/10 text-[#c6ddd3]',
                         )}
                       >
                         {item.badge}
@@ -168,14 +160,40 @@ export function AdminLayout({
           </ul>
         </nav>
 
+        {/* User block（原型 side-user：头像 + 姓名 + 角色） */}
+        {(userName ?? userRole) && (
+          <div
+            className={cn(
+              'flex shrink-0 items-center gap-2.5 border-t border-white/10',
+              collapsed ? 'justify-center px-3 py-3' : 'px-5 py-3.5',
+            )}
+          >
+            <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-primary-600">
+              <span className="text-sm font-extrabold text-white">
+                {(userName ?? '管')[0]}
+              </span>
+            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                {userName && (
+                  <p className="truncate text-[13px] font-semibold text-white">{userName}</p>
+                )}
+                {userRole && (
+                  <p className="mt-0.5 truncate text-[11px] text-white/60">{userRole}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Collapse toggle */}
         {onCollapseChange && (
-          <div className="border-t border-neutral-800 p-2">
+          <div className="border-t border-white/10 p-2">
             <button
               type="button"
               aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
               onClick={() => onCollapseChange(!collapsed)}
-              className="flex w-full items-center justify-center rounded-md p-2 text-neutral-500 hover:bg-dark-hover hover:text-neutral-300"
+              className="flex w-full items-center justify-center rounded-[9px] p-2 text-[#8fb5a7] hover:bg-white/[0.07] hover:text-white"
             >
               {collapsed
                 ? <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -190,7 +208,7 @@ export function AdminLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-6">
+        <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-7">
           {/* Left placeholder (can be used for breadcrumbs) */}
           <div />
 
@@ -258,7 +276,7 @@ export function AdminLayout({
         </header>
 
         {/* Page content — scrollable */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto px-7 pb-8 pt-6">
           {children}
         </main>
       </div>
