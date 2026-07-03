@@ -10,9 +10,15 @@ import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
+import { OrderStatusService } from '../src/payment/order-status.service'
+import { PricingService } from '../src/payment/pricing.service'
+import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
+import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
+import { StorageService } from '../src/storage/storage.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
 
 const ORDER_NO_PATTERN = /^ORD-\d{8}-[0-9A-F]{10}$/
@@ -44,7 +50,11 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
 
   const audit = new AuditService(prisma)
-  const printJobs = new PrintJobsService(prisma, audit)
+  const storage = new StorageService()
+  const pageCount = new PrintPageCountService(prisma, storage)
+  const pricing = new PricingService(prisma)
+  const orderStatus = new OrderStatusService(prisma, audit)
+  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus)
   const terminals = new TerminalsService(prisma)
   const resetExpiredClaims = (
     terminals as unknown as { resetExpiredClaims: () => Promise<void> }
@@ -55,10 +65,39 @@ async function main(): Promise<void> {
   const terminalToken = randomBytes(16).toString('hex')
   const endUserId = `eu_order_${suffix}`
   const taskIds: string[] = []
+  const fixtureFileIds: string[] = []
+  const fixtureStorageKeys: string[] = []
 
+  // 签名有效但**无 FileObject** 的 URL：用于 fail-closed 检查（页数识别拿不到内容 → 拒绝建单）。
   const signedUrl = (label: string) => signFileUrl(`f_order_${suffix}_${label}`, 60_000).url
 
+  // 真实文件 fixture：写入 FileObject + StorageService 对象；PDF 含 pageCount 个 /Type /Page，可被 page counter 真实识别。
+  async function seedPdfFixture(label: string, pageCount: number): Promise<string> {
+    const fileId = `f_order_${suffix}_${label}`
+    const storageKey = `verify/order/${fileId}.pdf`
+    const pdfBytes = Buffer.from(`%PDF-1.4\n${'1 0 obj\n<< /Type /Page >>\nendobj\n'.repeat(pageCount)}%%EOF\n`)
+    await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: fileId,
+        storageKey,
+        filename: `${label}.pdf`,
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: '',
+        purpose: 'print_source',
+        bucket: LOCAL_BUCKET_SENTINEL,
+      },
+    })
+    fixtureFileIds.push(fileId)
+    fixtureStorageKeys.push(storageKey)
+    return signFileUrl(fileId, 60_000).url
+  }
+
   async function cleanup(): Promise<void> {
+    const createdOrders = await prisma.order.findMany({ where: { printTaskId: { in: taskIds } }, select: { id: true } })
+    const orderIds = createdOrders.map((o) => o.id)
+    await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } })
     await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
@@ -67,6 +106,12 @@ async function main(): Promise<void> {
     })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     await prisma.endUser.deleteMany({ where: { id: endUserId } })
+    // 真实 fixture 清理：删 FileObject + 存储对象 + 本 verify 用的开发默认价目（避免污染后续检查）。
+    await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
+    for (const key of fixtureStorageKeys) {
+      await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    }
+    await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
   }
 
   try {
@@ -88,11 +133,13 @@ async function main(): Promise<void> {
         nickname: '订单验证会员',
       },
     })
+    // 开发默认价目 seed（create() 会经 PricingService 读取 PriceConfig；未 seed 则 fail-closed）。
+    await seedDevDefaultPriceConfig(prisma)
     pass('test fixtures created')
 
     const anonymousPrint = await printJobs.create(
       {
-        fileUrl: signedUrl('anonymous'),
+        fileUrl: await seedPdfFixture('anonymous', 2),
         fileMd5: 'sha256-order-anonymous',
         fileName: '匿名打印.pdf',
         params: PRINT_PARAMS,
@@ -118,21 +165,25 @@ async function main(): Promise<void> {
       anonymousOrder &&
       ORDER_NO_PATTERN.test(anonymousOrder.orderNo) &&
       anonymousOrder.type === 'print' &&
-      anonymousOrder.amountCents === 0 &&
+      anonymousOrder.amountCents === 200 && // 2 页 × 2 份 × 彩色 50 分
+      anonymousOrder.billablePages === 2 &&
+      anonymousOrder.billingPageSource === 'pdf_lightweight_scan' &&
       anonymousOrder.currency === 'CNY' &&
       anonymousOrder.payStatus === 'unpaid' &&
+      anonymousOrder.paymentSource === null &&
+      anonymousOrder.pickupCode === null &&
       anonymousOrder.taskStatus === 'pending' &&
       anonymousOrder.endUserId === null &&
       anonymousOrder.terminalId === terminalId
     ) {
-      pass('anonymous print creates a terminal-bound pending unpaid print Order with amountCents=0')
+      pass('anonymous print creates a terminal-bound unpaid Order priced from backend page-count (2 pages × 2 copies color = 200 cents; no fabricated pickupCode)')
     } else {
       fail(`anonymous order mismatch: ${JSON.stringify(anonymousOrder)}`)
     }
 
     const memberPrint = await printJobs.create(
       {
-        fileUrl: signedUrl('member'),
+        fileUrl: await seedPdfFixture('member', 2),
         fileMd5: 'sha256-order-member',
         fileName: '会员打印.pdf',
         params: PRINT_PARAMS,
@@ -152,7 +203,7 @@ async function main(): Promise<void> {
 
     const statusPrint = await printJobs.create(
       {
-        fileUrl: signedUrl('status'),
+        fileUrl: await seedPdfFixture('status', 2),
         fileMd5: 'sha256-order-status',
         fileName: '状态镜像.pdf',
         params: PRINT_PARAMS,
@@ -220,7 +271,7 @@ async function main(): Promise<void> {
 
     const expiredPrint = await printJobs.create(
       {
-        fileUrl: signedUrl('expired'),
+        fileUrl: await seedPdfFixture('expired', 2),
         fileMd5: 'sha256-order-expired',
         fileName: '超时回收.pdf',
         params: PRINT_PARAMS,
@@ -299,8 +350,7 @@ async function main(): Promise<void> {
     // 用收集器逐条 check（不 fail-fast），跑完汇总；有未满足项则抛错（finally 清理后退 1）。
     // ============================================================
     console.log('\n--- P0a payment-domain contract (batch1, expect RED before impl) ---')
-    // 与 packages/shared P0A_ALLOWED_PAYMENT_SOURCES 保持一致；wechat/alipay/benefit 为未来扩展，本批禁写。
-    const P0A_ALLOWED_SOURCES = ['offline', 'free', 'manual_confirmed'] as const
+    // wechat/alipay/benefit 为未来扩展，本批 markPaid 必须拒绝（对齐 packages/shared P0A_ALLOWED_PAYMENT_SOURCES）。
     const P0A_FORBIDDEN_SOURCES = ['wechat', 'alipay', 'benefit'] as const
     const VALID_PAGE_SOURCES = ['pdf_lightweight_scan', 'image_single_page'] as const
     let p0aFailures = 0
@@ -425,12 +475,35 @@ async function main(): Promise<void> {
       )
     })
 
-    // (5) 免费单不变式：amountCents===0 的订单必须为 paid + free（不得停在 unpaid）。
-    {
-      const anon = await readOrder(anonymousPrint.taskId)
-      const isFreeInvariantHeld = !anon || anon.amountCents !== 0 || (anon.payStatus === 'paid' && anon.paymentSource === 'free')
-      p0aCheck(isFreeInvariantHeld, 'amountCents===0 order is settled as paid+free (never left unpaid)', `payStatus=${anon?.payStatus} paymentSource=${anon?.paymentSource}`)
-    }
+    // (5) 免费单真实覆盖：临时把 print_bw_page 单价置 0，走真实 create() → 状态机应落 paid+free+paidAt+pickupCode。
+    // 不 mock page counter、不加测试后门、不信任前端 pages；用后还原价目。
+    await p0aGuard('free order (amountCents=0) settled paid+free with paidAt + pickupCode', async () => {
+      await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: 0 } })
+      try {
+        const freePrint = await printJobs.create(
+          {
+            fileUrl: await seedPdfFixture('free', 1),
+            fileMd5: 'sha256-order-free',
+            fileName: '免费单.pdf',
+            params: { ...PRINT_PARAMS, colorMode: 'black_white' as const, copies: 1 },
+          },
+          { endUserId: null, terminalId },
+        )
+        taskIds.push(freePrint.taskId)
+        const o = await readOrder(freePrint.taskId)
+        return (
+          !!o &&
+          o.amountCents === 0 &&
+          o.payStatus === 'paid' &&
+          o.paymentSource === 'free' &&
+          !!o.paidAt &&
+          typeof o.pickupCode === 'string' &&
+          o.pickupCode.length >= 8
+        )
+      } finally {
+        await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { unitCents: PRINT_UNIT_PRICE_CENTS.black_white } })
+      }
+    })
 
     // (6) 退款仅整单：paid→refunded 需 refundReason；拒绝 unpaid→refunded（OrderStatusService，Task 6）。
     await p0aGuard('OrderStatusService.refund: paid→refunded requires reason, rejects unpaid→refunded, whole-order only', async () => {

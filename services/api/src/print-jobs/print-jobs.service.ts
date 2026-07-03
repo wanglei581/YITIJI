@@ -3,7 +3,10 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
+import { OrderStatusService } from '../payment/order-status.service'
+import { PricingService } from '../payment/pricing.service'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
+import { PrintPageCountService } from './print-page-count.service'
 
 export interface PrintJobCreated {
   taskId:    string
@@ -128,6 +131,9 @@ export class PrintJobsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly pageCount: PrintPageCountService,
+    private readonly pricing: PricingService,
+    private readonly orderStatus: OrderStatusService,
   ) {}
 
   async create(
@@ -187,6 +193,14 @@ export class PrintJobsService {
     }
     const targetTerminalId = terminal.id
 
+    // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
+    // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。
+    const { billablePages, billingPageSource } = await this.pageCount.resolveBillablePages(dto.fileUrl)
+    // 报价：金额只由 PricingService 依 PriceConfig 计算（**不信任前端 amount**）；无 active 价目 / 异常 → fail-closed。
+    const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
+    const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'
+    const quote = await this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
+
     // fileName 持久化：PrintTask 当前无独立 fileName 列（本阶段不做 migration，方案②约定）。
     // 折中：把 fileName 落进 paramsJson，使任务详情 / 日志 / DB 中可见文件名。
     // Agent 端 parseParams 会原样带上该字段，print() 忽略未知键，无副作用。
@@ -216,14 +230,25 @@ export class PrintJobsService {
           printTaskId: task.id,
           endUserId:   ctx.endUserId ?? null,
           terminalId:  targetTerminalId,
-          // 当前未接真实报价/支付;不伪造页数或金额。
-          amountCents: 0,
-          payStatus:   'unpaid',
-          taskStatus:  task.status,
+          // 金额由 PricingService 依 PriceConfig 计算(不信任前端)；页数为后端识别。
+          amountCents:       quote.amountCents,
+          billablePages:     quote.billablePages,
+          billingPageSource: quote.billingPageSource,
+          // 初始 unpaid + paymentSource=null；免费单在事务后经状态机置 paid+free，
+          // 付费单保持 unpaid，绝不包装成线上待支付/已收款。
+          payStatus:     'unpaid',
+          paymentSource: null,
+          taskStatus:    task.status,
         },
       })
       return { task, order }
     })
+
+    // 免费单（报价为 0，如 0 价项）：经状态机置 paid + paymentSource=free + paidAt + pickupCode + 审计，
+    // 不伪造真实收款；付费单保持 unpaid + paymentSource=null。
+    if (quote.amountCents === 0) {
+      await this.orderStatus.markPaid(order.id, { paymentSource: 'free' })
+    }
 
     // HIGH-3 (审计)：记录打印任务创建。actor 为匿名 Kiosk（无登录态），
     // 只记 fileId / 文件名 / 参数摘要 —— 不写文件正文、不写签名 URL（含 sig）等敏感串。
