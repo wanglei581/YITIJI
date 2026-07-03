@@ -15,6 +15,7 @@
 
 import type {
   GeneratedResume,
+  ResumeExportFormat,
   ResumeGenerateExportResponse,
   ResumeGenerateInput,
   ResumeGenerateResponse,
@@ -52,7 +53,12 @@ export interface AiServiceInterface {
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
   submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
   getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse>
-  exportGeneratedResume(resume: GeneratedResume, taskId?: string, token?: string | null): Promise<ResumeGenerateExportResponse>
+  exportGeneratedResume(
+    resume: GeneratedResume,
+    taskId?: string,
+    token?: string | null,
+    format?: ResumeExportFormat,
+  ): Promise<ResumeGenerateExportResponse>
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -94,6 +100,13 @@ export const submitResumeGenerate = (input: ResumeGenerateInput, token?: string 
 export const getResumeGenerate = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeGenerate(taskId, access)
 
-/** 阶段2A:导出确认后的简历为真实 PDF(FileObject + 签名 URL,可进打印链路) */
-export const exportGeneratedResume = (resume: GeneratedResume, taskId?: string, token?: string | null) =>
-  adapter.exportGeneratedResume(resume, taskId, token)
+/**
+ * 阶段2A:导出确认后的简历为真实文件(FileObject + 签名 URL,可进打印链路)。
+ * Wave1 Task 8:新增可选 format 参数,支持 pdf/docx/txt/md 多格式导出(默认 pdf)。
+ */
+export const exportGeneratedResume = (
+  resume: GeneratedResume,
+  taskId?: string,
+  token?: string | null,
+  format?: ResumeExportFormat,
+) => adapter.exportGeneratedResume(resume, taskId, token, format)

@@ -23,21 +23,9 @@ import type {
 } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
-import { getResumeOptimize } from '../../services/api'
-import { API_MODE } from '../../services/api/client'
-import { aiHttpAdapter } from '../../services/api/aiHttpAdapter'
-import { aiMockAdapter } from '../../services/api/aiMockAdapter'
+import { exportGeneratedResume, getResumeOptimize } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
-
-// exportGeneratedResume 的多格式导出参数(format)为 Wave1 Task 8 新增第 4 参;
-// 公共 barrel (services/api/ai.ts) 的 AiServiceInterface 包装函数签名不在本任务
-// 允许改动文件列表内,故此处直接按 API_MODE 选择 adapter,绕开未升级的包装函数。
-// 两个 adapter 的 exportGeneratedResume 实际签名与 AiServiceInterface 结构兼容
-// (仅追加可选参数),不影响 barrel 其他调用方。
-const exportGeneratedResume = API_MODE === 'http'
-  ? aiHttpAdapter.exportGeneratedResume
-  : aiMockAdapter.exportGeneratedResume
 
 /** 导出格式可选项(Wave1 Task 8):PDF 可直接打印,Word/TXT/Markdown 供下载编辑。 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [

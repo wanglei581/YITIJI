@@ -93,4 +93,14 @@ assertNotIncludes(optimize, '元/', 'optimize page shows no per-unit pricing cop
 assertIncludes(httpAdapter, 'format?: ResumeExportFormat', 'http adapter accepts optional export format')
 assertIncludes(httpAdapter, 'format ?? ', 'http adapter defaults export format to pdf when omitted')
 
+// ── Wave1 wrapper-consistency fix:导出格式必须走统一 API wrapper,不直连 adapter ──
+const aiWrapper = read('src/services/api/ai.ts')
+
+assertNotIncludes(optimize, "from '../../services/api/aiHttpAdapter'", 'optimize page does not import http adapter directly')
+assertNotIncludes(optimize, "from '../../services/api/aiMockAdapter'", 'optimize page does not import mock adapter directly')
+assertIncludes(optimize, "import { exportGeneratedResume, getResumeOptimize } from '../../services/api'", 'optimize page imports exportGeneratedResume from the api wrapper barrel')
+
+assertIncludes(aiWrapper, 'format?: ResumeExportFormat', 'api wrapper exportGeneratedResume accepts optional export format')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format)', 'api wrapper delegates format to the selected adapter')
+
 console.log('PASS resume diagnosis flow UI verification')
