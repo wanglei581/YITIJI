@@ -75,14 +75,14 @@ export function Drawer({
       {/* 主体 */}
       <div
         className={cn(
-          'relative flex h-full flex-col bg-white shadow-xl',
+          'relative flex h-full flex-col bg-surface shadow-xl',
           SIZE_PX[size],
           className,
         )}
       >
         {title && (
           <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
-            <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
+            <h2 className="text-base font-semibold text-neutral-900 [font-family:var(--font-heading,inherit)]">{title}</h2>
             <button
               type="button"
               onClick={onClose}

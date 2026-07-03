@@ -93,7 +93,7 @@ export default function CompaniesPage() {
           />
           <button
             onClick={() => setKeyword(keywordInput.trim())}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
           >
             <SearchIcon className="h-4 w-4" />
             搜索
@@ -119,36 +119,36 @@ export default function CompaniesPage() {
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
+              <thead>
                 <tr>
                   {['企业名称', '来源机构', '地区', '行业', '类型', '审核状态', '发布状态', '关联岗位', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-neutral-900/[0.06]">
                 {rows.map((c) => (
-                  <tr key={c.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedId(c.id)}>
+                  <tr key={c.id} className="cursor-pointer hover:bg-neutral-50" onClick={() => setSelectedId(c.id)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Building2Icon className="h-4 w-4 shrink-0 text-gray-400" />
+                        <Building2Icon className="h-4 w-4 shrink-0 text-neutral-400" />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-gray-800">{c.name}</p>
-                          {c.fairParticipant && <p className="text-xs text-gray-400">招聘会参展</p>}
+                          <p className="truncate font-medium text-neutral-800">{c.name}</p>
+                          {c.fairParticipant && <p className="text-xs text-neutral-400">招聘会参展</p>}
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{c.sourceName}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{regionLabel(c)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{industryLabel(c.industry)}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{companyTypeLabel(c.companyType)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{c.sourceName}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{regionLabel(c)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{industryLabel(c.industry)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{companyTypeLabel(c.companyType)}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <StatusBadge status={REVIEW_BADGE[c.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[c.reviewStatus]?.label ?? c.reviewStatus} />
+                      <StatusBadge dot status={REVIEW_BADGE[c.reviewStatus]?.status ?? 'default'} label={REVIEW_BADGE[c.reviewStatus]?.label ?? c.reviewStatus} />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <StatusBadge status={PUBLISH_BADGE[c.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[c.publishStatus]?.label ?? c.publishStatus} />
+                      <StatusBadge dot status={PUBLISH_BADGE[c.publishStatus]?.status ?? 'default'} label={PUBLISH_BADGE[c.publishStatus]?.label ?? c.publishStatus} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{c.linkedJobCount}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{c.linkedJobCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <button
                         onClick={(e) => {
@@ -168,7 +168,7 @@ export default function CompaniesPage() {
         </Card>
       )}
 
-      <p className="mt-6 text-xs text-gray-400">
+      <p className="mt-6 text-xs text-neutral-400">
         企业展示模块仅提供来源企业信息与岗位导览：展示来源机构提供并经审核的企业资料；系统不接收求职者简历，不参与招聘闭环。
       </p>
 

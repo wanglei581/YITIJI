@@ -1,0 +1,92 @@
+/*
+ * Fusion-Youth Theme Overrides — 青绿米纸（Kiosk 一体机前台专用）
+ *
+ * Import AFTER tokens.css and BEFORE "tailwindcss" in apps/kiosk/src/index.css:
+ *   @import "@ai-job-print/ui/styles/tokens.css";
+ *   @import "@ai-job-print/ui/styles/fusion-youth.css";
+ *   @import "tailwindcss";
+ *
+ * Admin / Partner 使用 inkpaper.css（同源色系，后台版）；本文件为 Kiosk 触控版：
+ * 圆角更大（触控亲和）、品类色更全（麦金/梅）。
+ * 色值来源：.workbuddy/prototypes/fusion-youth-preview-v5.html 定稿原型（v4 口径 + v5 对比度加深）。
+ */
+
+@theme {
+  /* ── Brand: Primary（品牌青） ─────────────────────────────── */
+  --color-primary-50:  #f2f9f6;
+  --color-primary-100: #e2f2ec;   /* --teal-soft */
+  --color-primary-200: #c8e7db;
+  --color-primary-300: #a0d5c2;
+  --color-primary-400: #62bda1;
+  --color-primary-500: #35ab8e;
+  --color-primary-600: #1f9e86;   /* --teal */
+  --color-primary-700: #157a67;   /* --teal-deep */
+  --color-primary-800: #126250;
+  --color-primary-900: #0f4f42;
+  --color-primary-950: #093429;
+
+  /* ── Semantic ─────────────────────────────────────────────── */
+  --color-success:     #1f9e86;
+  --color-success-bg:  #e2f2ec;
+  --color-success-fg:  #157a67;
+
+  --color-warning:     #b8683c;   /* 陶土 */
+  --color-warning-bg:  #f4e8dd;
+  --color-warning-fg:  #9e5330;
+
+  --color-error:       #c14a34;
+  --color-error-bg:    #f6e3de;
+  --color-error-fg:    #ad3d2a;
+
+  --color-info:        #3f68b0;   /* 青蓝：打印/设备 */
+  --color-info-bg:     #e5edf4;
+  --color-info-fg:     #35608f;
+
+  /* ── Neutral（纸灰 → 墨绿） ───────────────────────────────── */
+  --color-neutral-50:  #f7f4ec;
+  --color-neutral-100: #efeadd;
+  --color-neutral-200: #e2dccb;
+  --color-neutral-300: #cfc9b6;
+  --color-neutral-400: #8b968e;
+  --color-neutral-500: #5d6b63;   /* --muted（v4 加深，27寸一米距离可读） */
+  --color-neutral-600: #4b5850;
+  --color-neutral-700: #3c4a43;
+  --color-neutral-800: #273a34;
+  --color-neutral-900: #10302b;   /* --ink */
+
+  /* ── Dark Surface（墨绿顶栏/深底） ────────────────────────── */
+  --color-dark:        #10302b;
+  --color-dark-hover:  #1b3b34;
+  --color-dark-active: #245045;
+  --color-dark-border: #2a4a43;
+
+  /* ── 品类色（fusion-youth 特有：招聘会/政策/权益板块） ─────── */
+  --color-clay:        #b8683c;   /* 陶土橙：招聘会/来源 */
+  --color-clay-soft:   #f4e8dd;
+  --color-wheat:       #a9781f;   /* 麦金：政策 */
+  --color-wheat-soft:  #f2ead6;
+  --color-plum:        #7a5a86;   /* 梅：权益/AI记录 */
+  --color-plum-soft:   #efe7f1;
+
+  /* ── Surface / Background（米纸） ─────────────────────────── */
+  --color-canvas:  #f4f1e8;   /* --paper */
+  --color-surface: #fffdf8;   /* 偏暖白，非纯白，降 AI 感 */
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+
+  /* ── Border Radius（触控版，比后台更圆润） ────────────────── */
+  --radius-md: 0.875rem;   /* 14px — 原型 r-sm */
+  --radius-lg: 1.125rem;   /* 18px — 原型 r-md */
+  --radius-xl: 1.625rem;   /* 26px — 原型 r-lg */
+
+  /* ── Shadows（低饱和墨绿投影） ────────────────────────────── */
+  --shadow-sm: 0 6px 18px rgba(16, 48, 43, 0.06);
+  --shadow-md: 0 14px 40px rgba(16, 48, 43, 0.08);
+  --shadow-lg: 0 26px 64px rgba(16, 48, 43, 0.12);
+}
+
+/* 共用组件换肤间接层：PageHeader 等经 var(--font-heading) 取标题字体 */
+:root {
+  --font-heading: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+}

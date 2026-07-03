@@ -14,8 +14,9 @@ export function PageHeader({ title, subtitle, actions, className, size = 'defaul
   return (
     <div className={cn('flex items-center justify-between border-b border-neutral-200 pb-4', className)}>
       <div>
+        {/* 标题字体走 --font-heading 间接层：引入 inkpaper.css 的后台显示宋体，Kiosk 未定义该变量时回退继承字体 */}
         <h1 className={cn(
-          'font-semibold text-neutral-900',
+          'font-semibold text-neutral-900 [font-family:var(--font-heading,inherit)]',
           size === 'large' ? 'text-2xl' : 'text-xl',
         )}>
           {title}

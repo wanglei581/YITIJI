@@ -56,14 +56,14 @@ function ChipRow({
 }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="mt-2.5 shrink-0 text-xs font-medium text-gray-400">{label}</span>
+      <span className="mt-2.5 shrink-0 text-xs font-medium text-neutral-400">{label}</span>
       <div className="flex flex-1 flex-wrap gap-1.5">
         <button
           type="button"
           onClick={() => onChange('')}
           className={[
             'min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors',
-            active === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+            active === '' ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
           ].join(' ')}
         >
           不限
@@ -75,7 +75,7 @@ function ChipRow({
             onClick={() => onChange(active === o.value ? '' : o.value)}
             className={[
               'min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors',
-              active === o.value ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+              active === o.value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
             ].join(' ')}
           >
             {o.text}
@@ -97,21 +97,21 @@ function CompanyCard({ company, onDetail, onJobs }: {
   const industryLabel = labelOfIndustry(company.industry)
   const region = [company.province, company.city, company.district].filter(Boolean).join(' · ')
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="flex flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
         {company.logoUrl ? (
-          <img src={company.logoUrl} alt={`${company.name} logo`} className="h-12 w-12 shrink-0 rounded-lg border border-gray-100 object-cover" />
+          <img src={company.logoUrl} alt={`${company.name} logo`} className="h-12 w-12 shrink-0 rounded-lg border border-neutral-100 object-cover" />
         ) : (
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
             <BuildingIcon className="h-6 w-6" aria-hidden="true" />
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold text-gray-900">{company.name}</p>
+          <p className="truncate text-base font-semibold text-neutral-900">{company.name}</p>
           <div className="mt-1 flex flex-wrap gap-1">
-            {typeLabel && <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-600">{typeLabel}</span>}
-            {industryLabel && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">{industryLabel}</span>}
-            {company.fairParticipant && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">招聘会参展</span>}
+            {typeLabel && <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-medium text-primary-600">{typeLabel}</span>}
+            {industryLabel && <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{industryLabel}</span>}
+            {company.fairParticipant && <span className="rounded bg-warning-bg px-1.5 py-0.5 text-[11px] font-medium text-warning-fg">招聘会参展</span>}
           </div>
         </div>
         {company.openJobCount > 0 && (
@@ -119,15 +119,15 @@ function CompanyCard({ company, onDetail, onJobs }: {
         )}
       </div>
 
-      <p className="mt-2 text-xs text-gray-400">
+      <p className="mt-2 text-xs text-neutral-400">
         来源：{company.sourceName}
         {region && <span className="ml-2 inline-flex items-center gap-0.5"><MapPinIcon className="h-3 w-3" aria-hidden="true" />{region}</span>}
       </p>
       {company.description && (
-        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-gray-600">{company.description}</p>
+        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-neutral-600">{company.description}</p>
       )}
       {company.repJobTitles.length > 0 && (
-        <p className="mt-1.5 truncate text-xs text-gray-500">代表岗位：{company.repJobTitles.join('、')}</p>
+        <p className="mt-1.5 truncate text-xs text-neutral-500">代表岗位：{company.repJobTitles.join('、')}</p>
       )}
 
       <div className="mt-3 flex gap-2">
@@ -142,7 +142,7 @@ function CompanyCard({ company, onDetail, onJobs }: {
           type="button"
           onClick={onJobs}
           disabled={company.openJobCount === 0}
-          className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg bg-primary-600 text-sm font-semibold text-white active:bg-primary-700 disabled:bg-gray-200 disabled:text-gray-400"
+          className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg bg-primary-600 text-sm font-semibold text-white active:bg-primary-700 disabled:bg-neutral-200 disabled:text-neutral-400"
         >
           查看来源岗位
         </button>
@@ -257,7 +257,7 @@ export function CompaniesPage() {
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       aria-label={placeholder}
-      className="min-h-[48px] flex-1 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 disabled:bg-gray-50 disabled:text-gray-400"
+      className="min-h-[48px] flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 disabled:bg-neutral-50 disabled:text-neutral-400"
     >
       <option value="">{placeholder}</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -277,13 +277,13 @@ export function CompaniesPage() {
       />
 
       {/* 搜索 */}
-      <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4">
-        <SearchIcon className="h-5 w-5 shrink-0 text-gray-300" aria-hidden="true" />
+      <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4">
+        <SearchIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
         <input
           value={keywordInput}
           onChange={(e) => setKeywordInput(e.target.value)}
           placeholder="搜索企业名称、岗位关键词…"
-          className="min-h-[52px] flex-1 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-300"
+          className="min-h-[52px] flex-1 bg-transparent text-sm text-neutral-800 outline-none placeholder:text-neutral-300"
         />
       </div>
 
@@ -295,7 +295,7 @@ export function CompaniesPage() {
       </div>
 
       {/* 筛选 chips */}
-      <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-4">
         <ChipRow label="类型" options={typeOpts} active={companyType} onChange={setCompanyType} />
         <ChipRow label="行业" options={industryOpts} active={industry} onChange={setIndustry} />
         <ChipRow label="招聘" options={recruitOpts} active={recruitType} onChange={setRecruitType} />
@@ -318,7 +318,7 @@ export function CompaniesPage() {
       {/* 合规说明 */}
       <div className="flex items-start gap-2 rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-3">
         <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-gray-500">
+        <p className="text-xs leading-relaxed text-neutral-500">
           本页仅展示来源机构提供的企业与岗位信息，本系统不接收简历，不参与招聘流程。
         </p>
       </div>
@@ -337,7 +337,7 @@ export function CompaniesPage() {
         />
       ) : (
         <>
-          <p className="text-xs text-gray-400">共 {total} 家来源企业</p>
+          <p className="text-xs text-neutral-400">共 {total} 家来源企业</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {items.map((c) => (
               <CompanyCard
@@ -353,7 +353,7 @@ export function CompaniesPage() {
               type="button"
               onClick={loadMore}
               disabled={loadingMore}
-              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-60"
+              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 text-sm font-medium text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
             >
               {loadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
               加载更多
@@ -363,7 +363,7 @@ export function CompaniesPage() {
         </>
       )}
 
-      <p className="flex items-center justify-center gap-1.5 pb-2 text-center text-xs text-gray-400">
+      <p className="flex items-center justify-center gap-1.5 pb-2 text-center text-xs text-neutral-400">
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
         投递请前往岗位详情，通过「去来源平台投递 / 扫码投递」在来源平台办理
       </p>

@@ -1,6 +1,8 @@
-import { Controller, Post, Get, Param, Body, Query, Req, UseGuards } from '@nestjs/common'
+import { BadRequestException, Controller, Post, Get, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
+import { AsrService } from '../asr/asr.service'
 import { AiService } from './ai.service'
 import type { AiResultRequester } from './ai.service'
 import { AiLogService } from './ai-log.service'
@@ -10,7 +12,8 @@ import { RedisService } from '../common/redis/redis.service'
 import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
-import { ResumeGenerateExportDto, ResumeGenerateRequestDto } from './dto/resume-generate.dto'
+import { ResumeGenerateExportDto, ResumeGenerateRequestDto, ResumeLayoutAdjustDto } from './dto/resume-generate.dto'
+import { RESUME_VOICE_AUDIO_FIELD, RESUME_VOICE_MAX_AUDIO_BYTES, type ResumeVoiceTranscribeResponseDto } from './dto/resume-voice.dto'
 import type { ResumeOptimizeResponseDto } from './dto/resume-optimize.dto'
 import { AssistantChatRequestDto } from './dto/assistant-chat.dto'
 import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
@@ -65,6 +68,12 @@ function hasTargetContext(dto: ResumeParseRequestDto): boolean {
   return Boolean(target.industry || target.targetJob || target.experience || target.scene)
 }
 
+function isWavBuffer(buffer: Buffer): boolean {
+  return buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WAVE'
+}
+
 // ============================================================
 // AI Controller
 //
@@ -86,6 +95,7 @@ export class AiController {
     private readonly audit: AuditService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly asr: AsrService,
   ) {}
 
   /**
@@ -182,6 +192,34 @@ export class AiController {
     return result
   }
 
+  @Post('resume/records/:taskId/layout-adjust')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } }) // 真实 LLM 调整,公共一体机单 IP 收紧
+  async adjustResumeLayout(
+    @Param('taskId') taskId: string,
+    @Body() dto: ResumeLayoutAdjustDto,
+    @Req() req: ReqLike,
+  ) {
+    const requester = await this.resolveAiResultRequester(req)
+    const result = await this.aiService.adjustResumeLayout(taskId, dto.resume, dto.action, dto.layout, requester)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'kiosk',
+      action: 'resume.layout_adjusted',
+      targetType: 'ai_task',
+      targetId: taskId,
+      payload: {
+        action: dto.action,
+        layout: dto.layout ? { columns: dto.layout.columns ?? 1, margin: dto.layout.margin ?? 'normal', fontScale: dto.layout.fontScale ?? 'standard', accent: dto.layout.accent ?? 'blue' } : null,
+        warningCount: result.warnings.length,
+        hasEndUser: requester.endUserId !== null,
+      },
+      ipAddress: ipOf(req),
+      userAgent: uaOf(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
+  }
+
   /**
    * 阶段2A — 提交 AI 简历生成(引导式表单)。
    *
@@ -229,6 +267,40 @@ export class AiController {
   }
 
   /**
+   * Wave 4 — 简历语音转写。
+   *
+   * 仅内存接收短 WAV 音频并转发 ASR provider；不写 FileObject / COS / DB / 日志正文。
+   * 调用方必须让用户确认转写文本后再写入简历生成表单。
+   */
+  @Post('resume/voice/transcribe')
+  @Throttle({ default: { ttl: 60_000, limit: 6 } })
+  @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES } }))
+  async transcribeResumeVoice(
+    @UploadedFile() audio: Express.Multer.File | undefined,
+  ): Promise<ResumeVoiceTranscribeResponseDto> {
+    if (!audio?.buffer?.length) {
+      throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
+    }
+    if (!isWavBuffer(audio.buffer)) {
+      throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
+    }
+    const result = await this.asr.recognizeWav(audio.buffer)
+    if (!result.ok) {
+      throw new BadRequestException({
+        error: {
+          code: result.errorCode ?? 'ASR_FAILED',
+          message: result.errorMessage ?? '语音转写失败，请改用文字输入',
+        },
+      })
+    }
+    const text = result.text?.trim()
+    if (!text) {
+      throw new BadRequestException({ error: { code: 'ASR_FAILED', message: '没有识别到有效文字，请改用文字输入' } })
+    }
+    return { text, providerName: this.asr.activeProviderName }
+  }
+
+  /**
    * 阶段2A — 导出确认后的简历为真实 PDF(FileObject + 签名 URL + 既有清理策略)。
    * 审计只放元数据(fileId/页数/大小),绝不包含简历内容。
    */
@@ -239,9 +311,9 @@ export class AiController {
     @Req() req: ReqLike,
   ) {
     const requester = await this.resolveAiResultRequester(req)
-    const { taskId, format, ...resume } = dto
+    const { taskId, format, layout, templateId, ...resume } = dto
     const sourceFileId = await this.aiService.resolveExportSourceFileId(taskId, requester)
-    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf')
+    const result = await this.aiService.exportGeneratedResume(resume, requester.endUserId, sourceFileId, format ?? 'pdf', layout, templateId)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -251,6 +323,8 @@ export class AiController {
       payload: {
         taskId: taskId ?? null,
         format: format ?? 'pdf',
+        templateId: templateId ?? null,
+        layout: layout ? { columns: layout.columns ?? 1, margin: layout.margin ?? 'normal', fontScale: layout.fontScale ?? 'standard', accent: layout.accent ?? 'blue' } : null,
         pageCount: result.pageCount,
         sizeBytes: result.sizeBytes,
         hasEndUser: Boolean(requester.endUserId),

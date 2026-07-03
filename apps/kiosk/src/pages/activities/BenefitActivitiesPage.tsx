@@ -17,10 +17,10 @@ import { formatTime } from '../profile/assets/format'
 type PageState = 'loading' | 'ready' | 'error'
 
 const TYPE_META: Record<BenefitActivityType, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-rose-50', color: 'text-rose-600' },
-  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
-  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
-  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
+  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-error-bg', color: 'text-error-fg' },
+  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
+  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
+  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
 }
 
 const SOURCE_LABEL: Record<BenefitActivitySourceType, string> = {
@@ -92,7 +92,7 @@ export function BenefitActivitiesPage() {
         }
       />
 
-      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-700">
+      <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
         权益活动只用于本终端服务与打印辅助。政策资格提示只提供官方入口和材料指引；招聘会相关活动不生成报名、签到或投递凭证。
       </div>
 
@@ -124,15 +124,15 @@ export function BenefitActivitiesPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">{SOURCE_LABEL[item.sourceType]}</span>
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">{meta.label}</span>
+                          <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{SOURCE_LABEL[item.sourceType]}</span>
+                          <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{meta.label}</span>
                         </div>
-                        <h2 className="mt-2 text-base font-semibold leading-snug text-gray-900">{item.title}</h2>
-                        {item.description && <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-gray-500">{item.description}</p>}
+                        <h2 className="mt-2 text-base font-semibold leading-snug text-neutral-900">{item.title}</h2>
+                        {item.description && <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-neutral-500">{item.description}</p>}
                       </div>
                     </div>
 
-                    <div className="mt-auto space-y-2 text-xs text-gray-400">
+                    <div className="mt-auto space-y-2 text-xs text-neutral-400">
                       <p>{validity(item)}</p>
                       <p>
                         {stockLabel(item)}

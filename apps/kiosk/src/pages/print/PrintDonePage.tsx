@@ -50,20 +50,20 @@ export function PrintDonePage() {
       <div
         className={[
           'mb-8 flex h-24 w-24 items-center justify-center rounded-full',
-          success ? 'bg-green-50' : 'bg-red-50',
+          success ? 'bg-success-bg' : 'bg-error-bg',
         ].join(' ')}
       >
         {success ? (
-          <CheckCircleIcon className="h-14 w-14 text-green-600" />
+          <CheckCircleIcon className="h-14 w-14 text-success-fg" />
         ) : (
-          <AlertCircleIcon className="h-14 w-14 text-red-500" />
+          <AlertCircleIcon className="h-14 w-14 text-error-fg" />
         )}
       </div>
 
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="text-2xl font-bold text-neutral-900">
         {success ? '打印完成' : '打印失败'}
       </h1>
-      <p className="mt-2 text-base text-gray-500">
+      <p className="mt-2 text-base text-neutral-500">
         {success
           ? '请从出纸口取走文件'
           : (reason ?? '打印任务未能完成，请重试或联系工作人员')}
@@ -72,37 +72,37 @@ export function PrintDonePage() {
       {/* Summary card */}
       {file && params && (
         <Card className="mt-8 w-full max-w-sm p-5">
-          <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-3 border-b border-neutral-100 pb-4">
             <div
               className={[
                 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                success ? 'bg-primary-50' : 'bg-red-50',
+                success ? 'bg-primary-50' : 'bg-error-bg',
               ].join(' ')}
             >
               <FileTextIcon
-                className={['h-5 w-5', success ? 'text-primary-600' : 'text-red-500'].join(' ')}
+                className={['h-5 w-5', success ? 'text-primary-600' : 'text-error-fg'].join(' ')}
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-900">{file.name}</p>
-              <p className="text-xs text-gray-500">
+              <p className="truncate text-sm font-medium text-neutral-900">{file.name}</p>
+              <p className="text-xs text-neutral-500">
                 {file.pages} 页 · {file.size}
               </p>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
-            <span className="text-gray-500">份数</span>
-            <span className="text-right font-medium text-gray-900">{params.copies} 份</span>
-            <span className="text-gray-500">打印面</span>
-            <span className="text-right font-medium text-gray-900">
+            <span className="text-neutral-500">份数</span>
+            <span className="text-right font-medium text-neutral-900">{params.copies} 份</span>
+            <span className="text-neutral-500">打印面</span>
+            <span className="text-right font-medium text-neutral-900">
               {DUPLEX_LABEL[params.duplex] ?? params.duplex}
             </span>
-            <span className="text-gray-500">色彩</span>
-            <span className="text-right font-medium text-gray-900">
+            <span className="text-neutral-500">色彩</span>
+            <span className="text-right font-medium text-neutral-900">
               {params.colorMode === 'color' ? '彩色' : '黑白'}
             </span>
-            <span className="text-gray-500">质量</span>
-            <span className="text-right font-medium text-gray-900">
+            <span className="text-neutral-500">质量</span>
+            <span className="text-right font-medium text-neutral-900">
               {params.quality === 'draft' ? '草稿' : params.quality === 'high' ? '高质量' : '标准'}
             </span>
           </div>

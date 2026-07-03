@@ -9,8 +9,10 @@ import type {
   GeneratedResume,
   ResumeExportFormat,
   ResumeGenerateExportResponse,
+  ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
+  ResumeVoiceTranscribeResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeReport,
@@ -20,7 +22,7 @@ import type {
   AssistantChatResponse,
   AssistantSkill,
 } from '@ai-job-print/shared'
-import type { ResumeReadAccess } from './ai'
+import type { ResumeLayoutAdjustAction, ResumeLayoutAdjustResponse, ResumeReadAccess } from './ai'
 
 // ──────────────────────────────────────────────────────────────
 // Mock 数据（原 ResumeParsePage.mockReport / ResumeOptimizePage.OPTIMIZE_MODULES）
@@ -125,6 +127,44 @@ export const aiMockAdapter = {
     }
   },
 
+  async adjustResumeLayoutDraft(
+    _taskId: string,
+    resume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    _layout: ResumeLayoutSettings,
+    _access?: ResumeReadAccess,
+  ): Promise<ResumeLayoutAdjustResponse> {
+    void _layout
+    void _access
+    await delay(300)
+    const trimSentence = (value: string | undefined, max = 72) => {
+      const text = (value ?? '').trim()
+      return text.length > max ? `${text.slice(0, max).replace(/[，,。.\s]+$/, '')}。` : text
+    }
+    const adjusted: GeneratedResume = {
+      ...resume,
+      summary: action === 'condense' ? trimSentence(resume.summary, 64) : resume.summary,
+      education: resume.education.map((item) => ({
+        ...item,
+        description: action === 'condense' ? trimSentence(item.description, 60) : item.description,
+      })),
+      experience: resume.experience.map((item) => ({
+        ...item,
+        description: action === 'condense' ? trimSentence(item.description, 76) : item.description,
+      })),
+      projects: resume.projects.map((item) => ({
+        ...item,
+        description: action === 'condense' ? trimSentence(item.description, 68) : item.description,
+      })),
+      skills: [...resume.skills],
+      certificates: [...resume.certificates],
+    }
+    return {
+      resume: adjusted,
+      warnings: [action === 'condense' ? '已按演示规则压缩描述长度。' : '已按演示规则保留事实并调整表达密度。'],
+    }
+  },
+
   async chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse> {
     await delay(500)
     const sceneReplies: Record<AssistantSkill, Pick<AssistantChatResponse, 'reply' | 'actions'>> = {
@@ -208,13 +248,22 @@ export const aiMockAdapter = {
     return { taskId: _taskId, status: 'failed', providerName: 'mock', failReason: 'mock 模式不保存生成记录,请重新生成' }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async transcribeResumeVoice(_audio: Blob): Promise<ResumeVoiceTranscribeResponse> {
+    void _audio
+    await delay(80)
+    throw new Error('演示模式不支持语音识别，请使用文字输入')
+  },
+
   async exportGeneratedResume(
     resume: GeneratedResume,
     _taskId?: string,
     _token?: string | null,
     format?: ResumeExportFormat,
+    _layout?: ResumeLayoutSettings,
+    _templateId?: string,
   ): Promise<ResumeGenerateExportResponse> {
+    void _layout
+    void _templateId
     // mock 模式无后端,不构造假文件;返回空 signedUrl,页面会诚实提示
     await delay(400)
     const ext = format ?? 'pdf'

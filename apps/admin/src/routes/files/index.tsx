@@ -126,9 +126,9 @@ export default function FilesPage() {
       </div>
 
       {(highSensitiveCount > 0 || expiredPending > 0) && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm">
-          <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-          <div className="text-orange-700">
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 py-3 text-sm">
+          <ShieldAlertIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" />
+          <div className="text-warning-fg">
             {highSensitiveCount > 0 && <span>{highSensitiveCount} 个高敏感文件仍在有效期内；</span>}
             {expiredPending > 0 && <span>{expiredPending} 个文件已过期待清理。</span>}
           </div>
@@ -136,23 +136,23 @@ export default function FilesPage() {
       )}
 
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-500">当前列表 {total} 个文件；顶部统计为全库只读口径</p>
+        <p className="text-sm text-neutral-500">当前列表 {total} 个文件；顶部统计为全库只读口径</p>
         <div className="flex items-center gap-2">
           <button
             onClick={handleCleanupExpired}
             disabled={cleaning}
-            className="flex items-center gap-1.5 rounded-lg border border-orange-200 bg-white px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-warning/30 bg-surface px-3 py-1.5 text-xs text-warning-fg hover:bg-warning-bg disabled:opacity-50"
           >
             <Trash2Icon className="h-3.5 w-3.5" />{cleaning ? '清理中...' : '清理过期文件'}
           </button>
-          <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
+          <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
             <RefreshCwIcon className="h-3.5 w-3.5" />刷新
           </button>
         </div>
       </div>
 
       {notice && (
-        <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-xs text-gray-600">{notice}</div>
+        <div className="mb-3 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-neutral-600">{notice}</div>
       )}
 
       <div className="mb-4 space-y-2">
@@ -163,13 +163,13 @@ export default function FilesPage() {
           ['保存策略', RETENTION_FILTERS, retentionFilter, setRetentionFilter],
         ].map(([label, options, selected, setter]) => (
           <div key={label as string} className="flex items-center gap-2">
-            <span className="w-14 text-xs text-gray-400">{label as string}</span>
+            <span className="w-14 text-xs text-neutral-400">{label as string}</span>
             <div className="flex flex-wrap gap-2">
               {(options as readonly string[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => resetPage(setter as (value: string) => void, f)}
-                  className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${selected === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${selected === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'}`}
                 >
                   {f}
                 </button>
@@ -178,8 +178,8 @@ export default function FilesPage() {
           </div>
         ))}
         <div className="relative mt-2">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索文件名、用户..." className="h-8 w-64 rounded-lg border border-gray-200 bg-white pl-8 pr-3 text-xs text-gray-700 placeholder-gray-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索文件名、用户..." className="h-8 w-64 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
+          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
         </div>
       </div>
 
@@ -199,8 +199,8 @@ export default function FilesPage() {
         onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
       />
 
-      <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">
-        <p className="font-medium text-gray-600">文件安全合规说明</p>
+      <div className="mt-4 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
+        <p className="font-medium text-neutral-600">文件安全合规说明</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5">
           <li>身份证、简历、求职信等敏感文件按保存策略自动清理；长期保存只适用于用户确认后的成果物</li>
           <li>管理员「查看文件」走后端临时签名 URL（短有效期），「手动删除」「清理过期文件」均物理删除并写入日志审计，不可撤销</li>

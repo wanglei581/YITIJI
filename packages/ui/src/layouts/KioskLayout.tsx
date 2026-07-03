@@ -60,7 +60,7 @@ export function KioskLayout({
       {!hideBottomNav && (
       <nav
         aria-label="主导航"
-        className="flex h-20 shrink-0 items-center border-t border-neutral-200 bg-surface"
+        className="flex h-20 shrink-0 items-center gap-2 border-t border-neutral-200 bg-surface px-4 py-1.5"
       >
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = activeTab === key
@@ -72,15 +72,15 @@ export function KioskLayout({
               aria-current={active ? 'page' : undefined}
               onClick={() => onTabChange?.(key)}
               className={cn(
-                /* touch target: full nav height (80px) × 1/3 width */
-                'flex flex-1 flex-col items-center justify-center gap-1 py-2 transition-colors',
+                /* touch target: nav 高度扣除 padding 后 ≥ 56px × 1/3 宽 */
+                'flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-[18px] transition-colors',
                 active
-                  ? 'bg-primary-50/70 text-primary-600'
-                  : 'text-neutral-400 hover:bg-neutral-50 hover:text-neutral-600 active:text-neutral-700',
+                  ? 'bg-primary-100 font-bold text-primary-700'
+                  : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 active:text-neutral-700',
               )}
             >
               <Icon className="h-6 w-6" aria-hidden="true" />
-              <span className="text-xs font-medium">{label}</span>
+              <span className="text-xs font-semibold">{label}</span>
             </button>
           )
         })}

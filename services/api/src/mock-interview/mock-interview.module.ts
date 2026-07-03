@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from '../ai/ai.module'
 import { FilesModule } from '../files/files.module'
+import { AsrModule } from '../asr/asr.module'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberMockInterviewController, MockInterviewController } from './mock-interview.controller'
 import { MockInterviewService } from './mock-interview.service'
 import { MockInterviewLlmService } from './mock-interview-llm.service'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
-import { AsrService } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
 
 /**
@@ -20,6 +20,7 @@ import { TtsService } from './asr/tts.service'
 @Module({
   imports: [
     AiModule,
+    AsrModule,
     FilesModule,
     JwtModule.registerAsync({
       useFactory: () => {
@@ -32,6 +33,6 @@ import { TtsService } from './asr/tts.service'
     }),
   ],
   controllers: [MockInterviewController, MemberMockInterviewController],
-  providers: [MockInterviewService, MockInterviewLlmService, InterviewReportPdfService, AsrService, TtsService, EndUserAuthGuard],
+  providers: [MockInterviewService, MockInterviewLlmService, InterviewReportPdfService, TtsService, EndUserAuthGuard],
 })
 export class MockInterviewModule {}

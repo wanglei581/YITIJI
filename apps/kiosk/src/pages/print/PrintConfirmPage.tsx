@@ -129,12 +129,12 @@ export function PrintConfirmPage() {
   if (!state?.file && !restoredSession?.file) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
-          <AlertCircleIcon className="h-10 w-10 text-amber-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
+          <AlertCircleIcon className="h-10 w-10 text-warning" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
-          <p className="mt-2 text-sm text-gray-500">请重新上传文件后再确认打印</p>
+          <p className="text-lg font-semibold text-neutral-900">未找到文件信息</p>
+          <p className="mt-2 text-sm text-neutral-500">请重新上传文件后再确认打印</p>
         </div>
         <Button size="lg" onClick={() => navigate(uploadPath)}>
           重新上传文件
@@ -162,8 +162,8 @@ export function PrintConfirmPage() {
             <FileTextIcon className="h-6 w-6 text-primary-600" />
           </div>
           <div className="min-w-0">
-            <p className="truncate font-medium text-gray-900">{file.name}</p>
-            <p className="mt-0.5 text-sm text-gray-500">{file.size}</p>
+            <p className="truncate font-medium text-neutral-900">{file.name}</p>
+            <p className="mt-0.5 text-sm text-neutral-500">{file.size}</p>
           </div>
         </Card>
 
@@ -172,11 +172,11 @@ export function PrintConfirmPage() {
           <table className="w-full">
             <tbody>
               {summaryRows.map(({ label, value }, i) => (
-                <tr key={label} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="border-b border-gray-100 px-5 py-3.5 text-sm text-gray-500">
+                <tr key={label} className={i % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                  <td className="border-b border-neutral-100 px-5 py-3.5 text-sm text-neutral-500">
                     {label}
                   </td>
-                  <td className="border-b border-gray-100 px-5 py-3.5 text-right text-sm font-medium text-gray-900">
+                  <td className="border-b border-neutral-100 px-5 py-3.5 text-right text-sm font-medium text-neutral-900">
                     {value}
                   </td>
                 </tr>
@@ -190,8 +190,8 @@ export function PrintConfirmPage() {
             className={[
               'p-5',
               materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
-                ? 'border-amber-200 bg-amber-50'
-                : 'border-green-200 bg-green-50',
+                ? 'border-warning/30 bg-warning-bg'
+                : 'border-success/30 bg-success-bg',
             ].join(' ')}
           >
             <div className="flex items-start gap-3">
@@ -199,7 +199,7 @@ export function PrintConfirmPage() {
                 <InfoIcon
                   className={[
                     'h-5 w-5',
-                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-600' : 'text-green-600',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-warning-fg' : 'text-success-fg',
                   ].join(' ')}
                 />
               </div>
@@ -207,7 +207,7 @@ export function PrintConfirmPage() {
                 <p
                   className={[
                     'font-semibold',
-                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-950' : 'text-green-950',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-warning-fg' : 'text-success-fg',
                   ].join(' ')}
                 >
                   隐私检查摘要{materialCheck.mode === 'demo' ? '（流程演示）' : ''}
@@ -215,7 +215,7 @@ export function PrintConfirmPage() {
                 <p
                   className={[
                     'mt-1 text-sm leading-relaxed',
-                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-amber-800' : 'text-green-800',
+                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-warning-fg' : 'text-success-fg',
                   ].join(' ')}
                 >
                   {materialCheck.mode === 'demo' ? '已完成打印前材料检查流程演示' : '已完成打印前材料检查'}；
@@ -232,41 +232,41 @@ export function PrintConfirmPage() {
         {/* Usage + cost */}
         <Card className="p-5">
           <div className="grid grid-cols-2 gap-y-2.5 text-sm">
-            <span className="text-gray-500">总打印面</span>
-            <span className="text-right font-medium text-gray-900">{totalFaces} 面</span>
-            <span className="text-gray-500">预计用纸</span>
-            <span className="text-right font-medium text-gray-900">{sheetsUsed} 张</span>
+            <span className="text-neutral-500">总打印面</span>
+            <span className="text-right font-medium text-neutral-900">{totalFaces} 面</span>
+            <span className="text-neutral-500">预计用纸</span>
+            <span className="text-right font-medium text-neutral-900">{sheetsUsed} 张</span>
           </div>
 
           {paperSaved > 0 && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">
               <InfoIcon className="h-4 w-4 shrink-0" />
               双面打印比单面节省 {paperSaved} 张纸
             </div>
           )}
 
-          <div className="mt-4 flex items-baseline justify-between border-t border-gray-100 pt-4">
+          <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
             <div>
-              <p className="text-sm text-gray-700 font-medium">预计费用</p>
-              <p className="mt-0.5 text-xs text-gray-400">
+              <p className="text-sm text-neutral-700 font-medium">预计费用</p>
+              <p className="mt-0.5 text-xs text-neutral-400">
                 ¥{pricePerFace.toFixed(1)}/面（{params.colorMode === 'color' ? '彩色' : '黑白'}）× {totalFaces} 面
               </p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold text-gray-900">¥{totalPrice}</span>
-              <p className="mt-0.5 text-xs text-gray-400">实际以机器计费为准</p>
+              <span className="text-2xl font-bold text-neutral-900">¥{totalPrice}</span>
+              <p className="mt-0.5 text-xs text-neutral-400">实际以机器计费为准</p>
             </div>
           </div>
 
           {params.colorMode === 'color' && (
-            <p className="mt-3 text-xs text-amber-600">彩色效果以设备支持和当前耗材状态为准</p>
+            <p className="mt-3 text-xs text-warning-fg">彩色效果以设备支持和当前耗材状态为准</p>
           )}
         </Card>
       </div>
 
       {/* Submit error */}
       {submitError && (
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">
           <AlertCircleIcon className="h-4 w-4 shrink-0" />
           <span>{submitError}</span>
         </div>

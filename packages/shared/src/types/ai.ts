@@ -303,8 +303,28 @@ export interface ResumeGenerateResponse {
   accessToken?: string
 }
 
+export interface ResumeVoiceTranscribeResponse {
+  text: string
+  providerName: string
+}
+
 /** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0。 */
 export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
+
+/** Wave 2:优化版简历 PDF 受控排版参数。所有字段 additive optional,缺省等价 Wave 1 PDF。 */
+export type ResumeLayoutFontScale = 'compact' | 'standard' | 'large'
+export type ResumeLayoutLineSpacing = 'compact' | 'standard' | 'relaxed'
+export type ResumeLayoutMargin = 'narrow' | 'normal' | 'wide'
+export type ResumeLayoutColumns = 1 | 2
+export type ResumeLayoutAccent = 'blue' | 'green' | 'slate'
+
+export interface ResumeLayoutSettings {
+  fontScale?: ResumeLayoutFontScale
+  lineSpacing?: ResumeLayoutLineSpacing
+  margin?: ResumeLayoutMargin
+  columns?: ResumeLayoutColumns
+  accent?: ResumeLayoutAccent
+}
 
 /** 导出响应:真实 FileObject + 短时签名 URL,可直接进打印链路(pdf)或下载(docx/txt/md) */
 export interface ResumeGenerateExportResponse {

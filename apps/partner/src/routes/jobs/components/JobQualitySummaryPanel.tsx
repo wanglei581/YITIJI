@@ -50,17 +50,17 @@ export function JobQualitySummaryPanel({ qualitySummary, jobCount }: Props) {
   return (
     <Card className="mb-4 border-sky-100 bg-sky-50/60 p-4">
       <div className="flex flex-wrap items-start gap-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-sky-600">
           <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-semibold text-gray-900">本机构岗位质量</h2>
-            <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-sky-700">
+            <h2 className="text-sm font-semibold text-neutral-900">本机构岗位质量</h2>
+            <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-sky-700">
               {hasSnapshot ? `AI 可读就绪率 ${readyRate}%` : '质量巡检待生成'}
             </span>
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500">
+          <p className="mt-1 text-xs leading-relaxed text-neutral-500">
             {hasSnapshot
               ? '质量摘要来自已落库的岗位字段与来源链接巡检，只用于改进岗位展示完整度，不包含个人服务记录。'
               : '当前已有岗位数据，但尚未生成质量巡检快照；完成后台质量任务后会展示 AI 可读就绪率和来源链接问题。'}
@@ -79,15 +79,15 @@ export function JobQualitySummaryPanel({ qualitySummary, jobCount }: Props) {
 
 function Metric({ label, value, note, icon }: { label: string; value: number; note: string; icon?: 'warning' | 'link' }) {
   const Icon = icon === 'link' ? LinkIcon : icon === 'warning' ? AlertTriangleIcon : CheckCircleIcon
-  const iconClass = icon === 'warning' ? 'text-amber-500' : icon === 'link' ? 'text-red-500' : 'text-emerald-500'
+  const iconClass = icon === 'warning' ? 'text-warning' : icon === 'link' ? 'text-error-fg' : 'text-success'
   return (
-    <div className="rounded-lg bg-white p-3">
+    <div className="rounded-lg bg-surface p-3">
       <div className="flex items-center gap-2">
         <Icon className={`h-4 w-4 ${iconClass}`} aria-hidden="true" />
-        <span className="text-xs text-gray-500">{label}</span>
+        <span className="text-xs text-neutral-500">{label}</span>
       </div>
-      <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-gray-400">{note}</p>
+      <p className="mt-1 text-lg font-semibold text-neutral-900">{value}</p>
+      <p className="mt-0.5 text-xs leading-relaxed text-neutral-400">{note}</p>
     </div>
   )
 }

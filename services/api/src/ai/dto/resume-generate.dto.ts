@@ -19,6 +19,12 @@ import { Type } from 'class-transformer'
  * 改动需同步两处。
  */
 export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
+export type ResumeLayoutFontScale = 'compact' | 'standard' | 'large'
+export type ResumeLayoutLineSpacing = 'compact' | 'standard' | 'relaxed'
+export type ResumeLayoutMargin = 'narrow' | 'normal' | 'wide'
+export type ResumeLayoutColumns = 1 | 2
+export type ResumeLayoutAccent = 'blue' | 'green' | 'slate'
+export type ResumeLayoutAdjustAction = 'reformat' | 'condense'
 
 /**
  * 阶段2A AI 简历生成 DTO。
@@ -126,6 +132,23 @@ export class ResumeGenerateRequestDto {
   selfIntro?: string
 }
 
+export class ResumeLayoutDto {
+  @IsOptional() @IsIn(['compact', 'standard', 'large'])
+  fontScale?: ResumeLayoutFontScale
+
+  @IsOptional() @IsIn(['compact', 'standard', 'relaxed'])
+  lineSpacing?: ResumeLayoutLineSpacing
+
+  @IsOptional() @IsIn(['narrow', 'normal', 'wide'])
+  margin?: ResumeLayoutMargin
+
+  @IsOptional() @IsIn([1, 2])
+  columns?: ResumeLayoutColumns
+
+  @IsOptional() @IsIn(['blue', 'green', 'slate'])
+  accent?: ResumeLayoutAccent
+}
+
 /** 导出 PDF:内容 = 用户在预览页确认/编辑后的最终简历(summary 为已润色文本)。 */
 export class ResumeGenerateExportDto {
   @IsObject() @ValidateNested() @Type(() => ResumeGenBasicDto)
@@ -159,4 +182,49 @@ export class ResumeGenerateExportDto {
   /** 导出格式,缺省 pdf。docx/txt/md 页数恒为 0。 */
   @IsOptional() @IsIn(['pdf', 'docx', 'txt', 'md'])
   format?: ResumeExportFormat
+
+  /** Resume template id(Wave 3): only PDF applies template layout; other formats ignore it. */
+  @IsOptional() @IsString() @MaxLength(80)
+  templateId?: string
+
+  /** PDF 排版参数(Wave 2):仅 PDF 消费;docx/txt/md 忽略该字段且不伪造排版效果。 */
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => ResumeLayoutDto)
+  layout?: ResumeLayoutDto
+}
+
+export class ResumeLayoutAdjustResumeDto {
+  @IsObject() @ValidateNested() @Type(() => ResumeGenBasicDto)
+  basic!: ResumeGenBasicDto
+
+  @IsObject() @ValidateNested() @Type(() => ResumeGenIntentionDto)
+  intention!: ResumeGenIntentionDto
+
+  @IsString() @MaxLength(600)
+  summary!: string
+
+  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenEducationDto)
+  education!: ResumeGenEducationDto[]
+
+  @IsArray() @ArrayMaxSize(8) @ValidateNested({ each: true }) @Type(() => ResumeGenExperienceDto)
+  experience!: ResumeGenExperienceDto[]
+
+  @IsArray() @ArrayMaxSize(6) @ValidateNested({ each: true }) @Type(() => ResumeGenProjectDto)
+  projects!: ResumeGenProjectDto[]
+
+  @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) @MaxLength(40, { each: true })
+  skills!: string[]
+
+  @IsArray() @ArrayMaxSize(15) @IsString({ each: true }) @MaxLength(60, { each: true })
+  certificates!: string[]
+}
+
+export class ResumeLayoutAdjustDto {
+  @IsObject() @ValidateNested() @Type(() => ResumeLayoutAdjustResumeDto)
+  resume!: ResumeLayoutAdjustResumeDto
+
+  @IsIn(['reformat', 'condense'])
+  action!: ResumeLayoutAdjustAction
+
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => ResumeLayoutDto)
+  layout?: ResumeLayoutDto
 }

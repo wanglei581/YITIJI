@@ -44,8 +44,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'account',
     icon: LogInIcon,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
+    iconBg: 'bg-primary-50',
+    iconColor: 'text-primary-600',
     title: '登录与账号',
     items: [
       {
@@ -67,8 +67,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'resume',
     icon: SparklesIcon,
-    iconBg: 'bg-violet-50',
-    iconColor: 'text-violet-600',
+    iconBg: 'bg-plum-soft',
+    iconColor: 'text-plum',
     title: 'AI 简历服务',
     items: [
       {
@@ -85,8 +85,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'print',
     icon: PrinterIcon,
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-600',
+    iconBg: 'bg-warning-bg',
+    iconColor: 'text-warning-fg',
     title: '文档打印与扫描',
     items: [
       {
@@ -104,8 +104,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'policy',
     icon: LandmarkIcon,
-    iconBg: 'bg-emerald-50',
-    iconColor: 'text-emerald-600',
+    iconBg: 'bg-success-bg',
+    iconColor: 'text-success-fg',
     title: '政策服务',
     items: [
       {
@@ -118,8 +118,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'jobs',
     icon: BriefcaseIcon,
-    iconBg: 'bg-sky-50',
-    iconColor: 'text-sky-600',
+    iconBg: 'bg-info-bg',
+    iconColor: 'text-info',
     title: '招聘会与岗位信息',
     items: [
       {
@@ -132,8 +132,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'records',
     icon: FilesIcon,
-    iconBg: 'bg-indigo-50',
-    iconColor: 'text-indigo-600',
+    iconBg: 'bg-plum-soft',
+    iconColor: 'text-plum',
     title: '我的记录',
     items: [
       {
@@ -146,8 +146,8 @@ const SECTIONS: HelpSection[] = [
   {
     key: 'privacy',
     icon: ShieldCheckIcon,
-    iconBg: 'bg-cyan-50',
-    iconColor: 'text-cyan-600',
+    iconBg: 'bg-info-bg',
+    iconColor: 'text-info',
     title: '隐私与文件留存',
     items: [
       {
@@ -166,27 +166,27 @@ const SECTIONS: HelpSection[] = [
 function QaRow({ item, onNavigate }: { item: QA; onNavigate: (route: string) => void }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="border-t border-gray-100 first:border-t-0">
+    <div className="border-t border-neutral-100 first:border-t-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="flex min-h-[56px] w-full items-center gap-3 py-3.5 text-left"
       >
-        <span className="min-w-0 flex-1 text-sm font-semibold text-gray-800">{item.q}</span>
+        <span className="min-w-0 flex-1 text-sm font-semibold text-neutral-800">{item.q}</span>
         <ChevronRightIcon
-          className={['h-4 w-4 shrink-0 text-gray-400 transition-transform', open ? 'rotate-90' : ''].join(' ')}
+          className={['h-4 w-4 shrink-0 text-neutral-400 transition-transform', open ? 'rotate-90' : ''].join(' ')}
           aria-hidden="true"
         />
       </button>
       {open && (
         <div className="pb-4">
-          <p className="text-sm leading-relaxed text-gray-600">{item.a}</p>
+          <p className="text-sm leading-relaxed text-neutral-600">{item.a}</p>
           {item.link && (
             <button
               type="button"
               onClick={() => onNavigate(item.link!.route)}
-              className="mt-3 flex min-h-[44px] items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-primary-600 hover:bg-gray-50 active:bg-gray-100"
+              className="mt-3 flex min-h-[44px] items-center gap-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm font-semibold text-primary-600 hover:bg-neutral-50 active:bg-neutral-100"
             >
               {item.link.label}
               <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -234,7 +234,7 @@ export function HelpCenterPage() {
                   <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', section.iconBg].join(' ')}>
                     <Icon className={['h-5 w-5', section.iconColor].join(' ')} aria-hidden="true" />
                   </span>
-                  <h2 className="text-base font-bold text-gray-900">{section.title}</h2>
+                  <h2 className="text-base font-bold text-neutral-900">{section.title}</h2>
                 </div>
                 <div>
                   {section.items.map((item) => (
@@ -245,7 +245,7 @@ export function HelpCenterPage() {
             )
           })}
 
-          <p className="px-2 text-center text-xs leading-relaxed text-gray-400">
+          <p className="px-2 text-center text-xs leading-relaxed text-neutral-400">
             如需更多帮助，请联系现场工作人员。本终端仅提供信息与打印辅助服务，办理结果以官方/来源平台为准。
           </p>
         </div>

@@ -7,9 +7,9 @@ import { BuildingIcon, BriefcaseIcon, MapPinIcon, SearchIcon } from 'lucide-reac
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
 
 const CHECKIN_STYLES = {
-  checked_in: 'bg-green-50 text-green-700',
-  pending:    'bg-yellow-50 text-yellow-700',
-  absent:     'bg-gray-100 text-gray-400',
+  checked_in: 'bg-success-bg text-success-fg',
+  pending:    'bg-warning-bg text-warning-fg',
+  absent:     'bg-neutral-100 text-neutral-400',
 }
 const CHECKIN_LABELS = {
   checked_in: '已签到',
@@ -93,13 +93,13 @@ export function FairCompaniesPage() {
           }
         />
         <div className="relative mt-4">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索企业名称或行业..."
-            className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm text-gray-700 placeholder-gray-400 focus:border-primary-400 focus:outline-none"
+            className="w-full rounded-xl border border-neutral-200 bg-white py-3 pl-10 pr-4 text-sm text-neutral-700 placeholder-neutral-400 focus:border-primary-400 focus:outline-none"
           />
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -110,7 +110,7 @@ export function FairCompaniesPage() {
               className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 zoneFilter === z
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
               {z}
@@ -122,7 +122,7 @@ export function FairCompaniesPage() {
       <div className="mt-3 flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
         {filtered.length === 0 ? (
           <div className="flex flex-1 items-center justify-center py-16">
-            <p className="text-sm text-gray-400">无匹配企业</p>
+            <p className="text-sm text-neutral-400">无匹配企业</p>
           </div>
         ) : (
           filtered.map((company) => (
@@ -130,18 +130,18 @@ export function FairCompaniesPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{company.companyName}</p>
-                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">
+                    <p className="font-semibold text-neutral-900">{company.companyName}</p>
+                    <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">
                       {COMPANY_SCALE_SHORT[company.scale]}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-gray-500">{company.industry}</p>
+                  <p className="mt-0.5 text-xs text-neutral-500">{company.industry}</p>
                 </div>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${CHECKIN_STYLES[company.checkinStatus]}`}>
                   {CHECKIN_LABELS[company.checkinStatus]}
                 </span>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
                 {company.boothNumber && (
                   <span className="flex items-center gap-1">
                     <MapPinIcon className="h-3.5 w-3.5" />
@@ -156,7 +156,7 @@ export function FairCompaniesPage() {
                 )}
               </div>
               {company.description && (
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-gray-400">
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-neutral-400">
                   {company.description}
                 </p>
               )}
@@ -175,7 +175,7 @@ export function FairCompaniesPage() {
         )}
       </div>
 
-      <p className="px-6 pb-4 text-xs text-gray-400">
+      <p className="px-6 pb-4 text-xs text-neutral-400">
         系统仅展示参展企业信息，如需办理请扫码前往来源平台，系统不参与招聘闭环。
       </p>
     </div>

@@ -1,4 +1,5 @@
 @import "@ai-job-print/ui/styles/tokens.css";
+@import "@ai-job-print/ui/styles/inkpaper.css";
 @import "tailwindcss";
 @source "../../../packages/ui/src";
 @source "../../../packages/shared/src";

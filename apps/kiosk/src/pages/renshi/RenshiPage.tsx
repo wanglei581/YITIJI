@@ -190,8 +190,8 @@ const SOCIAL_GUIDES: SocialGuide[] = [
   {
     key: 'query',
     icon: ShieldCheckIcon,
-    iconBg: 'bg-blue-50',
-    iconColor: 'text-blue-600',
+    iconBg: 'bg-primary-50',
+    iconColor: 'text-primary-600',
     title: '参保信息查询',
     desc: '查询社保参保状态、缴费年限、账户余额',
     steps: ['手机扫码进入官方平台', '实名认证（首次需要）', '选择"参保证明"或"缴费记录"', '在线查看或下载'],
@@ -200,8 +200,8 @@ const SOCIAL_GUIDES: SocialGuide[] = [
   {
     key: 'proof',
     icon: ClipboardListIcon,
-    iconBg: 'bg-green-50',
-    iconColor: 'text-green-600',
+    iconBg: 'bg-success-bg',
+    iconColor: 'text-success-fg',
     title: '参保证明打印',
     desc: '打印参保证明、缴纳记录用于贷款、落户等',
     steps: ['携带身份证原件', '前往就业服务大厅 A 区', '3号综合服务窗口提交申请', '当场出具盖章证明'],
@@ -210,8 +210,8 @@ const SOCIAL_GUIDES: SocialGuide[] = [
   {
     key: 'medical',
     icon: HelpCircleIcon,
-    iconBg: 'bg-cyan-50',
-    iconColor: 'text-cyan-600',
+    iconBg: 'bg-info-bg',
+    iconColor: 'text-info',
     title: '医保异地就医备案',
     desc: '跨省/跨市就医前需完成备案方可报销',
     steps: ['下载"国家医保服务平台"App', '登录后选择"异地就医备案"', '填写就医地和就诊医院信息', '提交审核（1个工作日内）'],
@@ -220,8 +220,8 @@ const SOCIAL_GUIDES: SocialGuide[] = [
   {
     key: 'card',
     icon: UserCheckIcon,
-    iconBg: 'bg-indigo-50',
-    iconColor: 'text-indigo-600',
+    iconBg: 'bg-plum-soft',
+    iconColor: 'text-plum',
     title: '社保卡办理/补换',
     desc: '首次申领、挂失补办、换新社保卡',
     steps: ['携带身份证前往合作银行', '填写社保卡申请表', '工作人员采集信息', '15个工作日内领取或邮寄'],
@@ -246,8 +246,8 @@ const REGISTER_ITEMS: RegisterItem[] = [
   {
     key: 'unemployment',
     icon: ScrollTextIcon,
-    iconBg: 'bg-red-50',
-    iconColor: 'text-red-600',
+    iconBg: 'bg-error-bg',
+    iconColor: 'text-error-fg',
     title: '失业登记',
     purpose: '领取失业保险金、享受就业援助服务的前提',
     location: '户籍所在地（或常住地）就业服务大厅',
@@ -256,8 +256,8 @@ const REGISTER_ITEMS: RegisterItem[] = [
   {
     key: 'employment',
     icon: UserCheckIcon,
-    iconBg: 'bg-green-50',
-    iconColor: 'text-green-600',
+    iconBg: 'bg-success-bg',
+    iconColor: 'text-success-fg',
     title: '就业创业登记',
     purpose: '享受就业扶持政策、计入社会保障就业档案',
     location: '就业服务大厅综合受理窗口',
@@ -266,8 +266,8 @@ const REGISTER_ITEMS: RegisterItem[] = [
   {
     key: 'archive',
     icon: BookOpenIcon,
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-700',
+    iconBg: 'bg-warning-bg',
+    iconColor: 'text-warning-fg',
     title: '人事档案转移',
     purpose: '档案迁移至新工作单位或人才中心托管',
     location: '人才服务中心档案窗口（需预约）',
@@ -277,22 +277,22 @@ const REGISTER_ITEMS: RegisterItem[] = [
 
 /** 公告标签展示元信息（数据本体来自后端 PolicyPost kind=notice）。 */
 const CATEGORY_META: Record<string, { label: string; color: string }> = {
-  policy: { label: '政策', color: 'bg-amber-100 text-amber-800' },
-  announcement: { label: '公告', color: 'bg-green-100 text-green-700' },
-  notice: { label: '通知', color: 'bg-blue-100 text-blue-700' },
-  recruitment: { label: '招募', color: 'bg-orange-100 text-orange-700' },
+  policy: { label: '政策', color: 'bg-warning/20 text-warning-fg' },
+  announcement: { label: '公告', color: 'bg-success-bg text-success-fg' },
+  notice: { label: '通知', color: 'bg-primary-100 text-primary-700' },
+  recruitment: { label: '招募', color: 'bg-warning-bg text-warning-fg' },
 }
 
 const TAG_TONE: Record<TagTone, string> = {
-  amber: 'bg-amber-100 text-amber-800',
-  slate: 'bg-slate-100 text-slate-600',
+  amber: 'bg-warning/20 text-warning-fg',
+  slate: 'bg-neutral-100 text-neutral-600',
 }
 
 // 复用按钮样式：金/amber 仅做轻底色描边，不大面积铺色（visual-design-spec §15.6）。
 const BTN_OFFICIAL =
-  'flex min-h-[48px] items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-800 hover:bg-amber-100'
+  'flex min-h-[48px] items-center gap-2 rounded-lg border border-warning/50 bg-warning-bg px-4 text-sm font-semibold text-warning-fg hover:bg-warning/20'
 const BTN_PRINT =
-  'flex min-h-[48px] items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50'
+  'flex min-h-[48px] items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50'
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -305,15 +305,15 @@ function OfficialEntryQrOverlay({ title, url, onClose }: { title: string; url: s
         <button
           onClick={onClose}
           aria-label="关闭"
-          className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
+          className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full text-neutral-400 hover:bg-neutral-100"
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="text-center text-base font-semibold text-gray-800">扫码打开官方入口</p>
-        <p className="mt-1 truncate text-center text-xs text-gray-400">{title}</p>
+        <p className="text-center text-base font-semibold text-neutral-800">扫码打开官方入口</p>
+        <p className="mt-1 truncate text-center text-xs text-neutral-400">{title}</p>
         <div className="mt-5 flex justify-center"><SourceUrlQr value={url} size={196} /></div>
-        <p className="mt-3 break-all rounded-lg bg-gray-50 px-3 py-2 text-center text-[11px] text-gray-500">{url}</p>
-        <p className="mt-4 text-xs leading-relaxed text-gray-500">
+        <p className="mt-3 break-all rounded-lg bg-neutral-50 px-3 py-2 text-center text-[11px] text-neutral-500">{url}</p>
+        <p className="mt-4 text-xs leading-relaxed text-neutral-500">
           请使用手机扫码前往官方平台办理。办理结果以官方平台为准，本系统仅提供信息入口和材料服务。
         </p>
       </div>
@@ -330,7 +330,7 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
   ]
 
   return (
-    <div className="flex gap-1 rounded-xl border border-gray-200 bg-gray-100 p-1">
+    <div className="flex gap-1 rounded-xl border border-neutral-200 bg-neutral-100 p-1">
       {tabs.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
@@ -340,8 +340,8 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
           className={[
             'flex min-h-[52px] flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-sm transition-colors',
             active === key
-              ? 'bg-white font-semibold text-amber-800 shadow-sm'
-              : 'font-medium text-gray-500 hover:text-gray-700',
+              ? 'bg-white font-semibold text-warning-fg shadow-sm'
+              : 'font-medium text-neutral-500 hover:text-neutral-700',
           ].join(' ')}
         >
           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -356,8 +356,8 @@ function TabBar({ active, onChange }: { active: TabKey; onChange: (k: TabKey) =>
 function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k: AudienceKey) => void }) {
   return (
     <div>
-      <p className="text-base font-semibold text-gray-900">先选你的情况</p>
-      <p className="mt-0.5 text-xs text-gray-500">选择身份后，下方自动筛出更相关的政策事项；通用事项始终展示。</p>
+      <p className="text-base font-semibold text-neutral-900">先选你的情况</p>
+      <p className="mt-0.5 text-xs text-neutral-500">选择身份后，下方自动筛出更相关的政策事项；通用事项始终展示。</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => {
           const activeChip = value === key
@@ -370,8 +370,8 @@ function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k:
               className={[
                 'flex min-h-[48px] min-w-[120px] flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm transition-colors',
                 activeChip
-                  ? 'border-amber-300 bg-amber-50 font-semibold text-amber-800'
-                  : 'border-gray-200 bg-white font-medium text-gray-600 hover:border-gray-300',
+                  ? 'border-warning/50 bg-warning-bg font-semibold text-warning-fg'
+                  : 'border-neutral-200 bg-white font-medium text-neutral-600 hover:border-neutral-300',
               ].join(' ')}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -392,20 +392,20 @@ function DetailList({ icon: Icon, iconColor, title, items, ordered }: {
   ordered?: boolean
 }) {
   return (
-    <section className="rounded-xl bg-gray-50 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+    <section className="rounded-xl bg-neutral-50 p-4">
+      <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
         <Icon className={`h-4 w-4 ${iconColor}`} aria-hidden="true" />
         {title}
       </p>
       <ul className="mt-2.5 flex flex-col gap-2">
         {items.map((text, i) => (
-          <li key={i} className="flex gap-2 text-sm leading-relaxed text-gray-600">
+          <li key={i} className="flex gap-2 text-sm leading-relaxed text-neutral-600">
             {ordered ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warning/20 text-xs font-bold text-warning-fg">
                 {i + 1}
               </span>
             ) : (
-              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
             )}
             {text}
           </li>
@@ -449,7 +449,7 @@ function PolicyPanel({
       <AudienceFilter value={audience} onChange={onAudienceChange} />
 
       {sourceLine && (
-        <p className="flex items-center gap-2 text-xs text-gray-400">
+        <p className="flex items-center gap-2 text-xs text-neutral-400">
           <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {sourceLine}
         </p>
@@ -470,39 +470,39 @@ function PolicyPanel({
             const hasOfficial = Boolean(item.officialUrl && isValidSourceUrl(item.officialUrl))
             const fav = isFavorite('policy', item.id)
             return (
-              <article key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <article key={item.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-2">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${TAG_TONE[item.tagTone]}`}>
                     {item.tagLabel}
                   </span>
-                  {item.updatedAt && <span className="ml-auto text-xs text-gray-400">更新 {item.updatedAt}</span>}
+                  {item.updatedAt && <span className="ml-auto text-xs text-neutral-400">更新 {item.updatedAt}</span>}
                 </div>
-                <p className="mt-2 text-lg font-semibold leading-snug text-gray-900">{item.title}</p>
+                <p className="mt-2 text-lg font-semibold leading-snug text-neutral-900">{item.title}</p>
                 {item.summary && (
-                  <p className={['mt-1 text-sm leading-relaxed text-gray-500', itemOpen ? '' : 'line-clamp-2'].join(' ')}>
+                  <p className={['mt-1 text-sm leading-relaxed text-neutral-500', itemOpen ? '' : 'line-clamp-2'].join(' ')}>
                     {item.summary}
                   </p>
                 )}
-                <p className="mt-1.5 text-xs text-gray-400">来源：{item.sourceName}</p>
+                <p className="mt-1.5 text-xs text-neutral-400">来源：{item.sourceName}</p>
 
                 {itemOpen && (
                   <div className="mt-3 flex flex-col gap-3">
                     {hasStructured ? (
                       <>
                         {item.conditions && (
-                          <DetailList icon={BadgeCheckIcon} iconColor="text-emerald-600" title="先看是否符合" items={item.conditions} />
+                          <DetailList icon={BadgeCheckIcon} iconColor="text-success-fg" title="先看是否符合" items={item.conditions} />
                         )}
                         {item.materials && (
-                          <DetailList icon={ListChecksIcon} iconColor="text-amber-700" title="需要准备材料" items={item.materials} />
+                          <DetailList icon={ListChecksIcon} iconColor="text-warning-fg" title="需要准备材料" items={item.materials} />
                         )}
                         {item.steps && (
-                          <DetailList icon={ChevronRightIcon} iconColor="text-amber-700" title="建议办理路径" items={item.steps} ordered />
+                          <DetailList icon={ChevronRightIcon} iconColor="text-warning-fg" title="建议办理路径" items={item.steps} ordered />
                         )}
                       </>
                     ) : (
                       item.content && (
-                        <div className="rounded-xl bg-gray-50 px-4 py-3">
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{item.content}</p>
+                        <div className="rounded-xl bg-neutral-50 px-4 py-3">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">{item.content}</p>
                         </div>
                       )
                     )}
@@ -519,15 +519,15 @@ function PolicyPanel({
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400">办理结果以官方平台为准，本系统仅提供信息说明、材料清单与打印辅助。</p>
+                    <p className="text-xs text-neutral-400">办理结果以官方平台为准，本系统仅提供信息说明、材料清单与打印辅助。</p>
                   </div>
                 )}
 
-                <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3">
+                <div className="mt-3 flex items-center gap-2 border-t border-neutral-100 pt-3">
                   <button
                     type="button"
                     onClick={() => toggleItem(item)}
-                    className="flex min-h-[48px] items-center gap-1 rounded-lg px-2 text-sm font-medium text-gray-600 hover:text-amber-800"
+                    className="flex min-h-[48px] items-center gap-1 rounded-lg px-2 text-sm font-medium text-neutral-600 hover:text-warning-fg"
                   >
                     {itemOpen ? '收起' : '查看条件 / 材料'}
                     <ChevronRightIcon
@@ -541,7 +541,7 @@ function PolicyPanel({
                     aria-label={fav ? '取消收藏' : '收藏政策'}
                     className={[
                       'ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
-                      fav ? 'bg-rose-50 text-rose-500' : 'text-gray-300 hover:text-rose-400',
+                      fav ? 'bg-error-bg text-error-fg' : 'text-neutral-300 hover:text-error',
                     ].join(' ')}
                   >
                     <HeartIcon className={fav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
@@ -563,7 +563,7 @@ function SocialPanel({ onComingSoon }: { onComingSoon: (action: string) => void 
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="flex items-center gap-2 text-xs text-gray-400">
+      <p className="flex items-center gap-2 text-xs text-neutral-400">
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
         数据来源：国家社会保险公共服务平台 · 同步时间：2026-05-18
       </p>
@@ -572,24 +572,24 @@ function SocialPanel({ onComingSoon }: { onComingSoon: (action: string) => void 
         {SOCIAL_GUIDES.map((guide) => {
           const Icon = guide.icon
           return (
-            <div key={guide.key} className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div key={guide.key} className="flex flex-col rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
               <div className="flex items-start gap-4">
                 <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${guide.iconBg}`}>
                   <Icon className={`h-6 w-6 ${guide.iconColor}`} aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-lg font-semibold text-gray-900">{guide.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-gray-500">{guide.desc}</p>
+                  <p className="text-lg font-semibold text-neutral-900">{guide.title}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-neutral-500">{guide.desc}</p>
                 </div>
               </div>
 
               <ol className="mt-4 flex flex-col gap-2">
                 {guide.steps.map((step, i) => (
                   <li key={i} className="flex items-start gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warning/20 text-xs font-bold text-warning-fg">
                       {i + 1}
                     </span>
-                    <span className="text-sm text-gray-600">{step}</span>
+                    <span className="text-sm text-neutral-600">{step}</span>
                   </li>
                 ))}
               </ol>
@@ -622,7 +622,7 @@ function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string) => voi
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="flex items-center gap-2 text-xs text-gray-400">
+      <p className="flex items-center gap-2 text-xs text-neutral-400">
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
         数据来源：市就业服务中心 · 同步时间：2026-05-10
       </p>
@@ -630,28 +630,28 @@ function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string) => voi
       {REGISTER_ITEMS.map((item) => {
         const Icon = item.icon
         return (
-          <div key={item.key} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div key={item.key} className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
             <div className="flex items-start gap-4">
               <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${item.iconBg}`}>
                 <Icon className={`h-6 w-6 ${item.iconColor}`} aria-hidden="true" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-semibold text-gray-900">{item.title}</p>
-                <p className="mt-1 text-sm text-gray-500">{item.purpose}</p>
+                <p className="text-lg font-semibold text-neutral-900">{item.title}</p>
+                <p className="mt-1 text-sm text-neutral-500">{item.purpose}</p>
               </div>
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">办理地点</p>
-                <p className="mt-1.5 text-sm font-medium text-gray-700">{item.location}</p>
+              <div className="rounded-xl bg-neutral-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">办理地点</p>
+                <p className="mt-1.5 text-sm font-medium text-neutral-700">{item.location}</p>
               </div>
-              <div className="rounded-xl bg-gray-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">所需材料</p>
+              <div className="rounded-xl bg-neutral-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">所需材料</p>
                 <ul className="mt-1.5 flex flex-col gap-1">
                   {item.materials.map((m, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                      <ChevronRightIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden="true" />
+                    <li key={i} className="flex items-start gap-2 text-sm text-neutral-700">
+                      <ChevronRightIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
                       {m}
                     </li>
                   ))}
@@ -705,7 +705,7 @@ function NoticePanel({
   return (
     <div className="flex flex-col gap-3">
       {sourceLine && (
-        <p className="flex items-center gap-2 text-xs text-gray-400">
+        <p className="flex items-center gap-2 text-xs text-neutral-400">
           <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {sourceLine}
         </p>
@@ -716,19 +716,19 @@ function NoticePanel({
         const isOpen = expandedId === notice.id
         const hasDetail = Boolean(notice.content || notice.externalUrl)
         return (
-          <div key={notice.id} className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+          <div key={notice.id} className="rounded-xl border border-neutral-200 bg-white px-5 py-4 shadow-sm">
             <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-50">
-                <FileTextIcon className="h-5 w-5 text-gray-500" aria-hidden="true" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-50">
+                <FileTextIcon className="h-5 w-5 text-neutral-500" aria-hidden="true" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.color}`}>{meta.label}</span>
-                  <span className="text-xs text-gray-400">{notice.sourceName}</span>
+                  <span className="text-xs text-neutral-400">{notice.sourceName}</span>
                 </div>
-                <p className="mt-1.5 text-base font-medium leading-snug text-gray-800">{notice.title}</p>
-                {notice.summary && <p className="mt-1 text-sm text-gray-500">{notice.summary}</p>}
-                {notice.publishedDate && <p className="mt-1 text-xs text-gray-400">发布时间：{notice.publishedDate}</p>}
+                <p className="mt-1.5 text-base font-medium leading-snug text-neutral-800">{notice.title}</p>
+                {notice.summary && <p className="mt-1 text-sm text-neutral-500">{notice.summary}</p>}
+                {notice.publishedDate && <p className="mt-1 text-xs text-neutral-400">发布时间：{notice.publishedDate}</p>}
               </div>
               {hasDetail && (
                 <button
@@ -737,7 +737,7 @@ function NoticePanel({
                     setExpandedId(isOpen ? null : notice.id)
                     if (!isOpen) onOpened(notice)
                   }}
-                  className="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                  className="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-3 text-sm font-medium text-neutral-600 hover:bg-neutral-100"
                 >
                   {isOpen ? '收起' : '查看详情'}
                   <ChevronRightIcon
@@ -749,12 +749,12 @@ function NoticePanel({
             </div>
 
             {isOpen && (
-              <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3">
+              <div className="mt-4 rounded-xl bg-neutral-50 px-4 py-3">
                 {notice.content && (
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{notice.content}</p>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700">{notice.content}</p>
                 )}
                 {notice.externalUrl && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
                     <ArrowUpRightIcon className="h-3.5 w-3.5" aria-hidden="true" />
                     官方入口：{notice.externalUrl}（请通过官方渠道访问办理）
                   </p>
@@ -765,7 +765,7 @@ function NoticePanel({
                     扫码打开官方入口
                   </button>
                 )}
-                <p className="mt-2 text-xs text-gray-400">以上内容仅作展示说明，具体政策以官方发布为准。</p>
+                <p className="mt-2 text-xs text-neutral-400">以上内容仅作展示说明，具体政策以官方发布为准。</p>
               </div>
             )}
           </div>
@@ -787,11 +787,11 @@ function PrintPackBanner() {
   ]
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-5 py-5">
+    <div className="rounded-xl border border-warning/30 bg-warning-bg/70 px-5 py-5">
       <div className="mb-4 flex items-center gap-2">
-        <PrinterIcon className="h-4 w-4 text-amber-700" aria-hidden="true" />
-        <span className="text-sm font-semibold text-amber-900">常用材料打印包</span>
-        <span className="ml-auto text-xs text-amber-700/80">只打印清单与指引，不上传或代办高敏材料</span>
+        <PrinterIcon className="h-4 w-4 text-warning-fg" aria-hidden="true" />
+        <span className="text-sm font-semibold text-warning-fg">常用材料打印包</span>
+        <span className="ml-auto text-xs text-warning-fg/80">只打印清单与指引，不上传或代办高敏材料</span>
       </div>
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {packs.map(({ label, pages, icon: Icon }) => (
@@ -799,11 +799,11 @@ function PrintPackBanner() {
             key={label}
             type="button"
             onClick={() => navigate('/print/upload')}
-            className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-lg border border-amber-100 bg-white px-3 py-4 text-center hover:bg-amber-50 active:bg-amber-100"
+            className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-lg border border-warning/20 bg-white px-3 py-4 text-center hover:bg-warning-bg active:bg-warning/20"
           >
-            <Icon className="h-5 w-5 text-amber-700" aria-hidden="true" />
-            <span className="text-sm font-medium leading-snug text-gray-800">{label}</span>
-            <span className="text-xs text-gray-400">{pages}</span>
+            <Icon className="h-5 w-5 text-warning-fg" aria-hidden="true" />
+            <span className="text-sm font-medium leading-snug text-neutral-800">{label}</span>
+            <span className="text-xs text-neutral-400">{pages}</span>
           </button>
         ))}
       </div>
@@ -905,18 +905,18 @@ export function RenshiPage() {
       <PageHeader title="政策服务" subtitle="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" />
 
       {/* 合规边界：仅信息指引 + 直达 AI 助手政策问答 */}
-      <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
-        <ShieldCheckIcon className="h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+      <div className="flex flex-wrap items-start gap-3 rounded-xl border border-warning/30 bg-warning-bg px-4 py-3.5">
+        <ShieldCheckIcon className="h-5 w-5 shrink-0 text-warning-fg" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-amber-900">仅信息指引 · 不代办</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
+          <p className="text-sm font-semibold text-warning-fg">仅信息指引 · 不代办</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-warning-fg">
             只做政策说明、材料清单、官方入口与打印辅助；不代申请、不承诺补贴到账，不保存身份证 / 银行卡 / 社保等材料。
           </p>
         </div>
         <button
           type="button"
           onClick={() => navigate('/assistant')}
-          className="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+          className="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-lg border border-warning/50 bg-white px-3 text-sm font-semibold text-warning-fg hover:bg-warning/20"
         >
           <MessageCircleQuestionIcon className="h-4 w-4" aria-hidden="true" />
           问 AI 助手
@@ -936,7 +936,7 @@ export function RenshiPage() {
       <PrintPackBanner />
 
       {/* 合规页脚 */}
-      <p className="pb-2 text-center text-xs leading-relaxed text-gray-400">
+      <p className="pb-2 text-center text-xs leading-relaxed text-neutral-400">
         政策与公告内容仅作展示说明，具体以官方发布为准。如需办理具体业务，请前往对应窗口或扫码访问官方平台。
       </p>
     </div>

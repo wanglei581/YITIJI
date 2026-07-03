@@ -15,12 +15,12 @@ import { CalendarDaysIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from 'luci
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 // 城市着色调色板（固定类名，保证 Tailwind 不被 purge）
 const DOT_COLORS = [
-  'bg-blue-500',
-  'bg-emerald-500',
-  'bg-orange-500',
-  'bg-violet-500',
-  'bg-rose-500',
-  'bg-cyan-500',
+  'bg-primary-500',
+  'bg-success',
+  'bg-warning',
+  'bg-plum',
+  'bg-error',
+  'bg-info',
 ]
 
 function pad(n: number) {
@@ -117,7 +117,7 @@ export function FairCalendarPopover({
           'flex min-h-[48px] items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
           selectedDate
             ? 'bg-primary-600 text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
         ].join(' ')}
       >
         <CalendarDaysIcon className="h-4 w-4" />
@@ -141,18 +141,18 @@ export function FairCalendarPopover({
         <>
           {/* 外部点击折叠 */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+          <div className="absolute right-0 z-50 mt-2 w-80 rounded-2xl border border-neutral-200 bg-white p-4 shadow-xl">
             {/* 月份导航 */}
             <div className="flex items-center justify-between">
               <button
                 type="button"
                 onClick={prevMonth}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
                 aria-label="上个月"
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
-              <span className="text-base font-semibold text-gray-900">
+              <span className="text-base font-semibold text-neutral-900">
                 {view.y}年{view.m + 1}月
               </span>
               <div className="flex items-center gap-1">
@@ -166,7 +166,7 @@ export function FairCalendarPopover({
                 <button
                   type="button"
                   onClick={nextMonth}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
                   aria-label="下个月"
                 >
                   <ChevronRightIcon className="h-5 w-5" />
@@ -175,9 +175,9 @@ export function FairCalendarPopover({
             </div>
 
             {/* 星期表头 */}
-            <div className="mt-3 grid grid-cols-7 text-center text-xs text-gray-400">
+            <div className="mt-3 grid grid-cols-7 text-center text-xs text-neutral-400">
               {WEEKDAYS.map((w, i) => (
-                <div key={w} className={i === 0 || i === 6 ? 'text-rose-400' : ''}>
+                <div key={w} className={i === 0 || i === 6 ? 'text-error' : ''}>
                   {w}
                 </div>
               ))}
@@ -206,8 +206,8 @@ export function FairCalendarPopover({
                           : isToday
                             ? 'font-semibold text-primary-600 ring-1 ring-primary-200'
                             : mark
-                              ? 'font-medium text-gray-900 hover:bg-gray-100'
-                              : 'text-gray-400 hover:bg-gray-50',
+                              ? 'font-medium text-neutral-900 hover:bg-neutral-100'
+                              : 'text-neutral-400 hover:bg-neutral-50',
                       ].join(' ')}
                     >
                       {day}
@@ -224,7 +224,7 @@ export function FairCalendarPopover({
                                 isSelected
                                   ? 'bg-white'
                                   : city === '__'
-                                    ? 'bg-rose-500'
+                                    ? 'bg-error'
                                     : cityColor(city)
                               }`}
                             />
@@ -236,9 +236,9 @@ export function FairCalendarPopover({
               })}
             </div>
 
-            <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 text-xs text-gray-500">
+            <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3 text-xs text-neutral-500">
               <span>
-                本月 <span className="font-semibold text-gray-900">{monthFairCount}</span> 场招聘会
+                本月 <span className="font-semibold text-neutral-900">{monthFairCount}</span> 场招聘会
               </span>
               {selectedDate && (
                 <button

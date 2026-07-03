@@ -30,12 +30,12 @@ const DATA_TYPE_LABEL: Record<string, string> = { job: '岗位', fair: '招聘�
 function PendingReviewCallout({ count, onView }: { count: number; onView: () => void }) {
   if (count === 0) return null
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-warning/30 bg-warning-bg px-5 py-4">
       <div className="flex items-center gap-3">
-        <AlertCircleIcon className="h-5 w-5 shrink-0 text-orange-500" aria-hidden="true" />
+        <AlertCircleIcon className="h-5 w-5 shrink-0 text-warning-fg" aria-hidden="true" />
         <div>
-          <p className="text-sm font-semibold text-orange-800">有 {count} 条数据待管理员审核</p>
-          <p className="mt-0.5 text-xs text-orange-600">
+          <p className="text-sm font-semibold text-warning-fg">有 {count} 条数据待管理员审核</p>
+          <p className="mt-0.5 text-xs text-warning-fg">
             数据提交后需经管理员审核，通过后才会在终端展示
           </p>
         </div>
@@ -43,7 +43,7 @@ function PendingReviewCallout({ count, onView }: { count: number; onView: () => 
       <Button
         variant="outline"
         size="sm"
-        className="shrink-0 whitespace-nowrap border-orange-300 text-orange-700 hover:bg-orange-100"
+        className="shrink-0 whitespace-nowrap border-warning/40 text-warning-fg hover:bg-warning-bg"
         onClick={onView}
       >
         去查看
@@ -58,7 +58,7 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
     {
       label: '已上传岗位', value: data.jobs.total,
       note: `已发布 ${data.jobs.published} · 待审核 ${data.jobs.pending}`,
-      icon: BriefcaseIcon, iconClass: 'bg-blue-50 text-blue-600', path: '/jobs',
+      icon: BriefcaseIcon, iconClass: 'bg-info-bg text-info-fg', path: '/jobs',
     },
     {
       label: '已上传招聘会', value: data.fairs.total,
@@ -68,17 +68,17 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
     {
       label: '政策公告', value: data.policies.total,
       note: `已发布 ${data.policies.published} · 待审核 ${data.policies.pending}`,
-      icon: ScrollTextIcon, iconClass: 'bg-emerald-50 text-emerald-600', path: '/policy',
+      icon: ScrollTextIcon, iconClass: 'bg-success-bg text-success-fg', path: '/policy',
     },
     {
       label: '已发布数据', value: data.jobs.published + data.fairs.published + data.policies.published,
       note: `岗位 ${data.jobs.published} + 招聘会 ${data.fairs.published} + 政策 ${data.policies.published}`,
-      icon: CheckCircleIcon, iconClass: 'bg-green-50 text-green-600', path: '/jobs',
+      icon: CheckCircleIcon, iconClass: 'bg-success-bg text-success-fg', path: '/jobs',
     },
     {
       label: '待审核数据', value: data.pendingTotal,
       note: data.pendingTotal > 0 ? '等待管理员审核' : '当前无待审核',
-      icon: ClockIcon, iconClass: 'bg-orange-50 text-orange-500', path: '/jobs',
+      icon: ClockIcon, iconClass: 'bg-warning-bg text-warning-fg', path: '/jobs',
     },
     {
       label: '数据源', value: data.sources.total,
@@ -88,7 +88,7 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
   ]
   return (
     <section aria-label="数据概览">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-400">
         数据概览
       </h2>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -102,9 +102,9 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-500">{m.label}</p>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-gray-900">{m.value}</p>
-                  <p className="mt-1 text-[10px] text-gray-400">{m.note}</p>
+                  <p className="text-xs text-neutral-500">{m.label}</p>
+                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-neutral-900">{m.value}</p>
+                  <p className="mt-1 text-[10px] text-neutral-400">{m.note}</p>
                 </div>
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${m.iconClass}`}>
                   <Icon className="h-5 w-5" aria-hidden="true" />
@@ -122,7 +122,7 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
   return (
     <section aria-label="最近同步记录">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
           最近同步记录
         </h2>
         <button
@@ -145,33 +145,33 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead>
               <tr>
                 {['数据源', '类型', '新增/更新/失败', '结果', '同步时间'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-gray-500">
+                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-neutral-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-900/[0.06]">
               {data.recentSyncs.map((s) => {
                 const cfg = RESULT_CONFIG[s.status] ?? { label: s.status, badge: 'warning' as const }
                 return (
-                  <tr key={s.id} className="transition-colors hover:bg-gray-50">
-                    <td className="px-5 py-3.5 font-medium text-gray-800">{s.source}</td>
+                  <tr key={s.id} className="transition-colors hover:bg-neutral-50">
+                    <td className="px-5 py-3.5 font-medium text-neutral-800">{s.source}</td>
                     <td className="px-5 py-3.5">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                         {DATA_TYPE_LABEL[s.dataType] ?? s.dataType}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 tabular-nums text-gray-700">
-                      {s.addedCount} / {s.updatedCount} / <span className={s.errorCount > 0 ? 'text-red-500' : ''}>{s.errorCount}</span>
+                    <td className="px-5 py-3.5 tabular-nums text-neutral-700">
+                      {s.addedCount} / {s.updatedCount} / <span className={s.errorCount > 0 ? 'text-error-fg' : ''}>{s.errorCount}</span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <StatusBadge status={cfg.badge} label={cfg.label} />
+                      <StatusBadge dot status={cfg.badge} label={cfg.label} />
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-gray-400">{s.syncTime}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-neutral-400">{s.syncTime}</td>
                   </tr>
                 )
               })}

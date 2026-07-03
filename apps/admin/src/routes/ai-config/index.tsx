@@ -159,8 +159,8 @@ export default function AiConfigPage() {
   if (loading) return <Page title="AI大模型"><LoadingState /></Page>
   if (error && !cfg) return <Page title="AI大模型"><ErrorState message={error} onRetry={load} /></Page>
 
-  const labelCls = 'block text-sm font-medium text-gray-700 mb-1.5'
-  const inputCls = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20'
+  const labelCls = 'block text-sm font-medium text-neutral-700 mb-1.5'
+  const inputCls = 'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20'
 
   return (
     <Page
@@ -172,8 +172,8 @@ export default function AiConfigPage() {
         {/* 功能选择 */}
         <Card className="p-4">
           <div className="mb-3">
-            <p className="text-sm font-medium text-gray-900">功能配置</p>
-            <p className="mt-1 text-xs text-gray-500">已接入功能会被运行链路消费；planned 功能可先保存配置，但当前不会影响线上流程。</p>
+            <p className="text-sm font-medium text-neutral-900">功能配置</p>
+            <p className="mt-1 text-xs text-neutral-500">已接入功能会被运行链路消费；planned 功能可先保存配置，但当前不会影响线上流程。</p>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             {features.map((feature) => {
@@ -186,27 +186,27 @@ export default function AiConfigPage() {
                   onClick={() => onFeatureChange(feature.key)}
                   className={`rounded-lg border p-3 text-left transition-colors ${selectedFeature === feature.key
                     ? 'border-primary-400 bg-primary-50'
-                    : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                    : 'border-neutral-200 bg-surface hover:bg-neutral-50'}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-gray-900">{feature.label}</span>
+                    <span className="text-sm font-medium text-neutral-900">{feature.label}</span>
                     <div className="flex items-center gap-1.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${configured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
                         {configured ? '配置可用' : '未启用'}
                       </span>
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${feature.status === 'active'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-orange-50 text-orange-700'}`}
+                        ? 'bg-info-bg text-info-fg'
+                        : 'bg-warning-bg text-warning-fg'}`}
                       >
                         {feature.status === 'active' ? '已接入' : '后续接入'}
                       </span>
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
-                  <p className="mt-1 text-[11px] text-gray-400">
+                  <p className="mt-1 text-xs text-neutral-500">{feature.description}</p>
+                  <p className="mt-1 text-[11px] text-neutral-400">
                     {featureConfig ? `${featureConfig.vendor} · ${featureConfig.model} · ${featureConfig.baseURL}` : feature.runtimeNote}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-gray-400">
+                  <p className="mt-0.5 text-[11px] text-neutral-400">
                     API Key：{featureConfig?.apiKeyConfigured ? '已配置' : '未配置'} · {feature.runtimeNote}
                   </p>
                 </button>
@@ -221,15 +221,15 @@ export default function AiConfigPage() {
             <div className="flex items-center gap-2.5">
               <SparklesIcon className="h-5 w-5 text-primary-600" />
               <div>
-                <p className="text-sm font-medium text-gray-900">当前功能模型：{currentFeature?.label ?? selectedFeature}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-medium text-neutral-900">当前功能模型：{currentFeature?.label ?? selectedFeature}</p>
+                <p className="text-xs text-neutral-500">
                   {currentPreset?.label ?? vendor} · {cfg?.model}
                   {cfg?.enabled ? '' : '（未启用，相关功能会明确失败或走既有默认应答）'}
                 </p>
               </div>
             </div>
             <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium
-              ${cfg?.enabled && cfg?.apiKeyConfigured ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              ${cfg?.enabled && cfg?.apiKeyConfigured ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500'}`}>
               {cfg?.enabled && cfg?.apiKeyConfigured ? '已启用' : '未启用'}
             </span>
           </div>
@@ -249,7 +249,7 @@ export default function AiConfigPage() {
                   className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors
                     ${vendor === p.vendor
                       ? 'border-primary-400 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                      : 'border-neutral-200 bg-surface text-neutral-600 hover:bg-neutral-50'}`}
                 >
                   {p.label}
                 </button>
@@ -285,7 +285,7 @@ export default function AiConfigPage() {
                 <KeyRoundIcon className="h-3.5 w-3.5" />
                 API Key
                 {cfg?.apiKeyConfigured && (
-                  <span className="ml-1 rounded bg-green-50 px-1.5 py-0.5 text-[11px] text-green-600">已配置</span>
+                  <span className="ml-1 rounded bg-success-bg px-1.5 py-0.5 text-[11px] text-success-fg">已配置</span>
                 )}
               </span>
             </label>
@@ -314,7 +314,7 @@ export default function AiConfigPage() {
               rows={5}
               className={`${inputCls} resize-none leading-relaxed`}
             />
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-neutral-400">
               {currentFeature?.allowCustomSystemPrompt === false
                 ? '此功能 v1 不会把管理员自定义 System Prompt 喂给运行链路；服务端会强制固定结构化提示词，避免破坏 JSON 契约。'
                 : '建议保留合规红线说明，避免引导用户在本系统内完成招聘闭环。'}
@@ -336,7 +336,7 @@ export default function AiConfigPage() {
               className={`${inputCls} resize-none leading-relaxed`}
               placeholder="限定 AI 助手只能回答哪些领域的问题"
             />
-            <p className="mt-1 text-xs text-gray-400">超出该范围的问题，将由系统提示词要求模型拒绝并回到本终端服务范围。</p>
+            <p className="mt-1 text-xs text-neutral-400">超出该范围的问题，将由系统提示词要求模型拒绝并回到本终端服务范围。</p>
           </div>
 
           {/* 禁用词 */}
@@ -349,7 +349,7 @@ export default function AiConfigPage() {
               className={`${inputCls} resize-none leading-relaxed`}
               placeholder="每行一个词，也支持用逗号分隔"
             />
-            <p className="mt-1 text-xs text-gray-400">模型回复命中任一禁用词时，后端会替换为范围内兜底回复；简历诊断中仍作用于 suggestions。</p>
+            <p className="mt-1 text-xs text-neutral-400">模型回复命中任一禁用词时，后端会替换为范围内兜底回复；简历诊断中仍作用于 suggestions。</p>
           </div>
 
           {/* 温度 + 启用 */}
@@ -362,30 +362,30 @@ export default function AiConfigPage() {
                 onChange={(e) => setTemperature(Number(e.target.value))}
                 className="w-full accent-primary-600"
               />
-              <div className="flex justify-between text-[11px] text-gray-400">
+              <div className="flex justify-between text-[11px] text-neutral-400">
                 <span>严谨 0</span><span>发散 1.5</span>
               </div>
             </div>
             <label className="flex items-center gap-2 cursor-pointer pt-5">
               <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)}
                      className="h-5 w-5 rounded accent-primary-600" />
-              <span className="text-sm font-medium text-gray-700">启用当前功能模型</span>
+              <span className="text-sm font-medium text-neutral-700">启用当前功能模型</span>
             </label>
           </div>
         </Card>
 
         {/* 测试结果 */}
         {testResult && (
-          <Card className={`p-4 ${testResult.ok ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'}`}>
+          <Card className={`p-4 ${testResult.ok ? 'border-success/30 bg-success-bg/50' : 'border-error/30 bg-error-bg/50'}`}>
             <div className="flex items-start gap-2">
               {testResult.ok
-                ? <CheckCircle2Icon className="h-5 w-5 shrink-0 text-green-600" />
-                : <XCircleIcon className="h-5 w-5 shrink-0 text-red-500" />}
+                ? <CheckCircle2Icon className="h-5 w-5 shrink-0 text-success-fg" />
+                : <XCircleIcon className="h-5 w-5 shrink-0 text-error-fg" />}
               <div className="text-sm">
-                <p className={`font-medium ${testResult.ok ? 'text-green-700' : 'text-red-700'}`}>
+                <p className={`font-medium ${testResult.ok ? 'text-success-fg' : 'text-error-fg'}`}>
                   {testResult.ok ? '连通正常' : '连通失败'}
                 </p>
-                <p className="mt-0.5 text-gray-600">
+                <p className="mt-0.5 text-neutral-600">
                   {testResult.ok ? testResult.reply : testResult.error}
                 </p>
               </div>
@@ -393,7 +393,7 @@ export default function AiConfigPage() {
           </Card>
         )}
 
-        {error && cfg && <p className="text-sm text-red-600">{error}</p>}
+        {error && cfg && <p className="text-sm text-error-fg">{error}</p>}
 
         {/* 操作 */}
         <div className="flex items-center gap-3">
@@ -403,7 +403,7 @@ export default function AiConfigPage() {
           <Button variant="outline" onClick={() => void onTest()} disabled={testing}>
             {testing ? '测试中…' : '保存并测试连通'}
           </Button>
-          {savedTip && <span className="text-sm text-green-600">✓ 已保存</span>}
+          {savedTip && <span className="text-sm text-success-fg">✓ 已保存</span>}
         </div>
       </div>
     </Page>

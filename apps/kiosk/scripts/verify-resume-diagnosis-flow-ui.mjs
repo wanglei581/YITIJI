@@ -4,6 +4,14 @@ function read(path) {
   return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 }
 
+function readOptional(path) {
+  try {
+    return read(path)
+  } catch {
+    return ''
+  }
+}
+
 function assertIncludes(src, marker, label) {
   if (!src.includes(marker)) throw new Error(`${label}: missing ${marker}`)
   console.log(`PASS ${label}`)
@@ -14,11 +22,24 @@ function assertNotIncludes(src, marker, label) {
   console.log(`PASS ${label}`)
 }
 
+function assertCountAtLeast(src, marker, min, label) {
+  const count = src.split(marker).length - 1
+  if (count < min) throw new Error(`${label}: expected at least ${min} ${marker}, got ${count}`)
+  console.log(`PASS ${label}`)
+}
+
 const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const diagnosisForm = read('src/pages/resume/components/DiagnosisDirectionForm.tsx')
 const parse = read('src/pages/resume/ResumeParsePage.tsx')
 const report = read('src/pages/resume/ResumeReportPage.tsx')
 const optimize = read('src/pages/resume/ResumeOptimizePage.tsx')
+const generate = read('src/pages/resume/ResumeGeneratePage.tsx')
+const resumeVoiceButton = read('src/pages/resume/components/ResumeVoiceInputButton.tsx')
+const resumeVoiceDialog = read('src/pages/resume/components/ResumeTranscriptConfirmDialog.tsx')
+const wavRecorder = read('src/utils/wavRecorder.ts')
+const layoutControls = readOptional('src/pages/resume/components/ResumeLayoutControls.tsx')
+const optimizedEditor = readOptional('src/pages/resume/components/OptimizedResumeEditor.tsx')
+const layoutHook = readOptional('src/pages/resume/hooks/useResumeLayout.ts')
 const mockAdapter = read('src/services/api/aiMockAdapter.ts')
 
 assertIncludes(source, 'selectedDimensions', 'source page tracks diagnosis focus dimensions')
@@ -54,7 +75,7 @@ assertIncludes(report, 'aria-valuenow', 'report section bars expose current scor
 assertNotIncludes(optimize, 'estimateUplift', 'optimize page removes fake uplift estimator')
 assertNotIncludes(optimize, '综合评分提升', 'optimize page removes fake numeric score uplift card')
 assertIncludes(optimize, '表达调整参考', 'optimize page uses qualitative improvement language')
-assertIncludes(optimize, 'useBusyLock(exporting || printNavigating)', 'optimize page prevents standby during export or print navigation')
+assertIncludes(optimize, 'useBusyLock(exporting || printNavigating || Boolean(adjusting))', 'optimize page prevents standby during export, print navigation or AI adjustment')
 assertIncludes(optimize, 'printNavigating', 'optimize page locks repeated print navigation')
 assertIncludes(optimize, 'confirmLeave', 'optimize page protects edited resume content before leaving')
 assertIncludes(optimize, 'splitView={false}', 'optimize diff uses touch-safe inline comparison')
@@ -85,22 +106,117 @@ assertIncludes(optimize, "'md'", 'optimize page offers md export format')
 assertIncludes(optimize, 'Word', 'optimize page labels docx as Word')
 assertIncludes(optimize, 'Markdown', 'optimize page labels md as Markdown')
 assertIncludes(optimize, 'exportFormat', 'optimize page tracks selected export format state')
-assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat)', 'optimize page exports with selected format')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected format and layout')
 assertNotIncludes(optimize, '¥', 'optimize page shows no pricing copy')
 assertNotIncludes(optimize, '付费', 'optimize page shows no paywall copy')
 assertNotIncludes(optimize, '元/', 'optimize page shows no per-unit pricing copy')
 
 assertIncludes(httpAdapter, 'format?: ResumeExportFormat', 'http adapter accepts optional export format')
+assertIncludes(httpAdapter, 'layout?: ResumeLayoutSettings', 'http adapter accepts optional layout')
 assertIncludes(httpAdapter, 'format ?? ', 'http adapter defaults export format to pdf when omitted')
+assertIncludes(httpAdapter, '...(layout ? { layout } : {})', 'http adapter sends layout only when provided')
 
 // ── Wave1 wrapper-consistency fix:导出格式必须走统一 API wrapper,不直连 adapter ──
 const aiWrapper = read('src/services/api/ai.ts')
 
 assertNotIncludes(optimize, "from '../../services/api/aiHttpAdapter'", 'optimize page does not import http adapter directly')
 assertNotIncludes(optimize, "from '../../services/api/aiMockAdapter'", 'optimize page does not import mock adapter directly')
-assertIncludes(optimize, "import { exportGeneratedResume, getResumeOptimize } from '../../services/api'", 'optimize page imports exportGeneratedResume from the api wrapper barrel')
+assertIncludes(optimize, "from '../../services/api'", 'optimize page imports resume actions from the api wrapper barrel')
 
 assertIncludes(aiWrapper, 'format?: ResumeExportFormat', 'api wrapper exportGeneratedResume accepts optional export format')
-assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format)', 'api wrapper delegates format to the selected adapter')
+assertIncludes(aiWrapper, 'layout?: ResumeLayoutSettings', 'api wrapper exportGeneratedResume accepts optional layout')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)', 'api wrapper delegates format and layout to the selected adapter')
+
+// ── Wave2 Task 3:优化页拆分 + 受控排版参数 + PDF layout 导出 ────────────────
+assertIncludes(optimize, 'ResumeLayoutControls', 'optimize page renders layout controls component')
+assertIncludes(optimize, 'OptimizedResumeEditor', 'optimize page renders extracted structured resume editor')
+assertIncludes(optimize, 'useResumeLayout', 'optimize page uses layout hook')
+assertIncludes(layoutHook, 'DEFAULT_RESUME_LAYOUT', 'layout hook defines default resume layout')
+assertIncludes(layoutHook, 'fontScale', 'layout hook tracks font scale')
+assertIncludes(layoutHook, 'lineSpacing', 'layout hook tracks line spacing')
+assertIncludes(layoutHook, 'margin', 'layout hook tracks margin')
+assertIncludes(layoutHook, 'columns', 'layout hook tracks columns')
+assertIncludes(layoutHook, 'accent', 'layout hook tracks accent')
+assertIncludes(layoutControls, '字号', 'layout controls expose font scale choices')
+assertIncludes(layoutControls, '行距', 'layout controls expose line spacing choices')
+assertIncludes(layoutControls, '页边距', 'layout controls expose margin choices')
+assertIncludes(layoutControls, '主色', 'layout controls expose accent choices')
+assertIncludes(layoutControls, '单栏', 'layout controls expose single column choice')
+assertIncludes(layoutControls, '双栏', 'layout controls expose double column choice')
+assertIncludes(optimizedEditor, 'GeneratedResume', 'optimized resume editor is typed around GeneratedResume')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected layout')
+assertIncludes(optimize, 'setExported(null)', 'optimize page clears stale export when layout/content changes')
+assertIncludes(optimize, 'printFileUrl', 'optimize page still uses printFileUrl for PDF print path')
+assertNotIncludes(optimize, 'signedUrl || exported.printFileUrl', 'optimize page must not fall back from printFileUrl to signedUrl for printing')
+
+// ── Wave2 Task 5:AI 一键精简 / 调整排版接线 ────────────────────────────────
+assertIncludes(optimize, 'AI 精简', 'optimize page exposes AI condense action')
+assertIncludes(optimize, 'AI 调整排版', 'optimize page exposes AI reformat action')
+assertIncludes(optimize, '撤销 AI 调整', 'optimize page can undo AI adjustment')
+assertIncludes(optimize, 'adjustResumeLayoutDraft', 'optimize page calls the unified layout adjust wrapper')
+assertNotIncludes(optimize, "from '../../services/api/aiHttpAdapter'", 'optimize page does not directly import http adapter for layout adjust')
+assertNotIncludes(optimize, "from '../../services/api/aiMockAdapter'", 'optimize page does not directly import mock adapter for layout adjust')
+assertIncludes(optimize, 'loading || exporting || !optimizedResume', 'AI adjust buttons are disabled while busy or no resume')
+assertIncludes(optimize, 'lastResumeBeforeAiAdjust', 'AI adjustment keeps an undo snapshot')
+assertIncludes(optimize, 'adjustWarnings', 'AI adjustment warnings are displayed separately')
+assertIncludes(optimize, 'setAdjustWarnings(result.warnings ?? [])', 'layout adjust warnings are handled as UI hints')
+assertNotIncludes(optimize, '录用概率', 'optimize page does not promise hiring results')
+
+assertIncludes(aiWrapper, 'adjustResumeLayoutDraft', 'api wrapper exposes layout adjust function')
+assertIncludes(aiWrapper, "action: ResumeLayoutAdjustAction", 'api wrapper uses typed layout adjust action')
+assertIncludes(httpAdapter, "layout-adjust", 'http adapter posts to layout-adjust endpoint')
+assertIncludes(httpAdapter, 'ResumeLayoutAdjustResponse', 'http adapter returns typed layout adjust response with warnings')
+assertIncludes(mockAdapter, 'adjustResumeLayoutDraft', 'mock adapter implements layout adjust wrapper')
+assertIncludes(mockAdapter, 'warnings', 'mock adapter returns layout adjust warnings')
+
+// ── Wave3:简历模板库自动填充到优化版导出 ────────────────────────────────
+const jobMaterialsApi = read('src/services/api/jobMaterials.ts')
+
+assertIncludes(jobMaterialsApi, 'getResumeTemplates', 'job materials api exposes resume template list')
+assertIncludes(jobMaterialsApi, 'filter(isResumeTemplate)', 'resume template list only returns resume_template entries')
+assertIncludes(optimize, 'getResumeTemplates', 'optimize page loads resume templates')
+assertIncludes(optimize, 'selectedTemplateId', 'optimize page tracks selected resume template')
+assertIncludes(optimize, 'resumeTemplates.map', 'optimize page renders template choices')
+assertIncludes(optimize, 'handleTemplateChange', 'optimize page clears stale export when template changes')
+assertIncludes(optimize, 'PDF 导出按所选模板自动填充版式', 'optimize page explains PDF template fill scope')
+assertIncludes(optimize, 'Word/TXT/Markdown 保持内容格式导出', 'optimize page does not overpromise non-PDF template printing')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)', 'optimize page exports with selected template id')
+assertIncludes(aiWrapper, 'templateId?: string', 'api wrapper exportGeneratedResume accepts optional templateId')
+assertIncludes(aiWrapper, 'adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)', 'api wrapper delegates templateId to selected adapter')
+assertIncludes(httpAdapter, 'templateId?: string', 'http adapter accepts optional templateId')
+assertIncludes(httpAdapter, '...(templateId ? { templateId } : {})', 'http adapter sends templateId only when selected')
+assertIncludes(mockAdapter, '_templateId?: string', 'mock adapter accepts templateId without fabricating files')
+assertNotIncludes(optimize, '一键投递', 'optimize page keeps compliance wording')
+
+// ── Wave4:语音生成简历文本(字段级转写 + 人工确认) ─────────────────────
+assertIncludes(generate, 'ResumeVoiceInputButton', 'generate page renders resume voice input buttons')
+assertIncludes(generate, 'appendVoiceText', 'generate page appends confirmed voice transcripts into existing text')
+assertIncludes(generate, 'label="在校情况"', 'generate page offers voice input for education narrative')
+assertIncludes(generate, 'label="工作内容"', 'generate page offers voice input for work narrative')
+assertIncludes(generate, 'label="项目内容"', 'generate page offers voice input for project narrative')
+assertIncludes(generate, 'label="技能"', 'generate page offers voice input for skills narrative')
+assertIncludes(generate, 'label="证书资质"', 'generate page offers voice input for certificates narrative')
+assertIncludes(generate, 'label="自我评价"', 'generate page offers voice input for self introduction narrative')
+assertCountAtLeast(generate, '<ResumeVoiceInputButton', 6, 'generate page limits voice entry to narrative fields')
+assertNotIncludes(generate, 'localStorage', 'generate page does not persist voice transcripts locally')
+assertNotIncludes(generate, 'sessionStorage', 'generate page does not persist voice transcripts in session storage')
+
+assertIncludes(resumeVoiceButton, 'ResumeTranscriptConfirmDialog', 'voice button opens confirmation dialog before writing text')
+assertIncludes(resumeVoiceButton, '语音填写', 'voice button uses clear voice input copy')
+assertIncludes(resumeVoiceButton, 'onConfirm(text)', 'voice button writes only confirmed transcript text')
+
+assertIncludes(resumeVoiceDialog, 'MAX_RECORD_SECONDS = 58', 'voice dialog caps one recording below short ASR limit')
+assertIncludes(resumeVoiceDialog, 'startWavRecorder', 'voice dialog reuses in-memory wav recorder')
+assertIncludes(resumeVoiceDialog, 'transcribeResumeVoice(audio)', 'voice dialog calls resume voice transcription adapter')
+assertIncludes(resumeVoiceDialog, '语音仅用于本次转写，不保存原始音频', 'voice dialog shows privacy warning')
+assertIncludes(resumeVoiceDialog, '确认写入', 'voice dialog requires explicit confirmation before writing')
+assertIncludes(resumeVoiceDialog, 'cancelRecorder()', 'voice dialog releases recorder on close/cancel/unmount')
+assertNotIncludes(resumeVoiceDialog, 'localStorage', 'voice dialog does not use localStorage')
+assertNotIncludes(resumeVoiceDialog, 'sessionStorage', 'voice dialog does not use sessionStorage')
+assertNotIncludes(resumeVoiceDialog, 'FileObject', 'voice dialog does not create file records')
+assertNotIncludes(resumeVoiceDialog, 'signedUrl', 'voice dialog does not expose signed URLs')
+assertIncludes(wavRecorder, 'MIC_PERMISSION_TIMEOUT', 'wav recorder times out stalled microphone permission prompts')
+assertIncludes(wavRecorder, 'timedOut', 'wav recorder tracks late microphone permission resolution')
+assertIncludes(wavRecorder, 'lateStream.getTracks().forEach((track) => track.stop())', 'wav recorder releases late microphone streams after timeout')
 
 console.log('PASS resume diagnosis flow UI verification')

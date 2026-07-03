@@ -42,6 +42,20 @@
       ],
       "port": 5275,
       "autoPort": false
+    },
+    {
+      "name": "kiosk-w5",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@ai-job-print/kiosk",
+        "exec",
+        "vite",
+        "--port",
+        "5276"
+      ],
+      "port": 5276,
+      "autoPort": false
     }
   ]
 }

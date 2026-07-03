@@ -24,8 +24,8 @@ export function PendingTaskBanner({ onContinue }: { onContinue: () => void }) {
           <ScanLineIcon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-bold text-gray-900">本次服务记录</h2>
-          <p className="mt-0.5 truncate text-xs text-gray-500">本次服务产生的记录，可继续查看</p>
+          <h2 className="text-sm font-bold text-neutral-900">本次服务记录</h2>
+          <p className="mt-0.5 truncate text-xs text-neutral-500">本次服务产生的记录，可继续查看</p>
         </div>
         <button
           type="button"
@@ -60,10 +60,10 @@ export function ProfileSessionRecords({
   return (
     <section aria-label="本次服务记录" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-medium text-gray-500">本次服务记录</h2>
-        <span className="text-xs text-gray-400">仅本次会话</span>
+        <h2 className="text-sm font-medium text-neutral-500">本次服务记录</h2>
+        <span className="text-xs text-neutral-400">仅本次会话</span>
       </div>
-      <div className={`${cardSurface} divide-y divide-gray-100 px-4`}>
+      <div className={`${cardSurface} divide-y divide-neutral-100 px-4`}>
         {resumes.map((r) => (
           <SessionRow
             key={r.id}
@@ -80,8 +80,8 @@ export function ProfileSessionRecords({
           <SessionRow
             key={s.id}
             icon={FileInputIcon}
-            iconBg="bg-cyan-50"
-            iconColor="text-cyan-600"
+            iconBg="bg-info-bg"
+            iconColor="text-info"
             name={s.name}
             meta={`扫描 · ${s.pages} 页 · ${s.size} · ${formatTime(s.savedAt)}`}
             onPrint={() => onPrintFile(s)}
@@ -92,8 +92,8 @@ export function ProfileSessionRecords({
           <SessionRow
             key={a.id}
             icon={SparklesIcon}
-            iconBg="bg-violet-50"
-            iconColor="text-violet-600"
+            iconBg="bg-plum-soft"
+            iconColor="text-plum"
             name={`${a.label} · ${a.fileName}`}
             meta={`AI · ${a.detail} · ${formatTime(a.createdAt)}`}
             onDelete={() => onDeleteAiRecord(a.id)}
@@ -127,8 +127,8 @@ function SessionRow({
         <Icon className={['h-5 w-5', iconColor].join(' ')} aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-gray-900">{name}</p>
-        <p className="truncate text-xs text-gray-400">{meta}</p>
+        <p className="truncate text-sm font-medium text-neutral-900">{name}</p>
+        <p className="truncate text-xs text-neutral-400">{meta}</p>
       </div>
       {onPrint && <RowIconButton icon={PrinterIcon} title="打印" onClick={onPrint} />}
       <RowIconButton icon={Trash2Icon} title="删除" tone="danger" onClick={onDelete} />

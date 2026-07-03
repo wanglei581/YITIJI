@@ -5,22 +5,22 @@ import type {
 } from '../../services/api'
 
 export const PURPOSE_META: Record<AdminFilePurpose, { label: string; style: string; source: string }> = {
-  resume_upload:        { label: '简历上传',   style: 'bg-blue-50 text-blue-600',     source: '用户上传' },
+  resume_upload:        { label: '简历上传',   style: 'bg-info-bg text-info-fg',     source: '用户上传' },
   resume_scan:          { label: '简历扫描',   style: 'bg-purple-50 text-purple-600', source: '扫描仪'   },
-  id_scan:              { label: '身份证',     style: 'bg-red-50 text-red-600',       source: '扫描仪'   },
-  print_doc:            { label: '打印文档',   style: 'bg-gray-100 text-gray-600',    source: '打印上传' },
-  fair_material:        { label: '招聘会资料', style: 'bg-green-50 text-green-600',    source: '机构上传' },
-  cover_letter:         { label: '求职信',     style: 'bg-blue-50 text-blue-600',     source: '用户上传' },
+  id_scan:              { label: '身份证',     style: 'bg-error-bg text-error-fg',       source: '扫描仪'   },
+  print_doc:            { label: '打印文档',   style: 'bg-neutral-100 text-neutral-600',    source: '打印上传' },
+  fair_material:        { label: '招聘会资料', style: 'bg-success-bg text-success-fg',    source: '机构上传' },
+  cover_letter:         { label: '求职信',     style: 'bg-info-bg text-info-fg',     source: '用户上传' },
   partner_profile:      { label: '机构资料',   style: 'bg-teal-50 text-teal-600',     source: '机构上传' },
   partner_image:        { label: '岗位图片',   style: 'bg-teal-50 text-teal-600',     source: '机构上传' },
   partner_video:        { label: '机构视频',   style: 'bg-teal-50 text-teal-600',     source: '机构上传' },
-  job_fair_material:    { label: '招聘会资料', style: 'bg-green-50 text-green-600',    source: '机构上传' },
-  screensaver_material: { label: '宣传屏素材', style: 'bg-amber-50 text-amber-600',   source: '运营上传' },
-  admin_upload:         { label: '管理员上传', style: 'bg-gray-100 text-gray-600',    source: '管理员'   },
-  temp:                 { label: '临时文件',   style: 'bg-gray-100 text-gray-500',    source: '临时'     },
+  job_fair_material:    { label: '招聘会资料', style: 'bg-success-bg text-success-fg',    source: '机构上传' },
+  screensaver_material: { label: '宣传屏素材', style: 'bg-warning-bg text-amber-600',   source: '运营上传' },
+  admin_upload:         { label: '管理员上传', style: 'bg-neutral-100 text-neutral-600',    source: '管理员'   },
+  temp:                 { label: '临时文件',   style: 'bg-neutral-100 text-neutral-500',    source: '临时'     },
 }
 
-const PURPOSE_FALLBACK = { label: '其他文件', style: 'bg-gray-100 text-gray-500', source: '其他' }
+const PURPOSE_FALLBACK = { label: '其他文件', style: 'bg-neutral-100 text-neutral-500', source: '其他' }
 
 export const SENSITIVE_UI: Record<AdminFileSensitive, { key: 'high' | 'medium' | 'low'; badge: 'error' | 'warning' | 'default'; label: string }> = {
   highly_sensitive: { key: 'high',   badge: 'error',   label: '高敏感' },

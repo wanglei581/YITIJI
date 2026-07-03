@@ -15,12 +15,12 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 
 const STATUS_META: Record<MemberPrintOrderItem['status'], { label: string; cls: string }> = {
-  pending: { label: '待处理', cls: 'bg-amber-50 text-amber-600' },
-  claimed: { label: '已接单', cls: 'bg-blue-50 text-blue-600' },
-  printing: { label: '打印中', cls: 'bg-blue-50 text-blue-600' },
-  completed: { label: '已完成', cls: 'bg-emerald-50 text-emerald-600' },
-  failed: { label: '失败', cls: 'bg-red-50 text-red-600' },
-  cancelled: { label: '已取消', cls: 'bg-gray-100 text-gray-500' },
+  pending: { label: '待处理', cls: 'bg-warning-bg text-warning-fg' },
+  claimed: { label: '已接单', cls: 'bg-primary-50 text-primary-600' },
+  printing: { label: '打印中', cls: 'bg-primary-50 text-primary-600' },
+  completed: { label: '已完成', cls: 'bg-success-bg text-success-fg' },
+  failed: { label: '失败', cls: 'bg-error-bg text-error-fg' },
+  cancelled: { label: '已取消', cls: 'bg-neutral-100 text-neutral-500' },
 }
 
 function metaLine(item: MemberPrintOrderItem): string {
@@ -86,19 +86,19 @@ export function MyPrintOrdersPage() {
             key={item.id}
             className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4 p-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]"
           >
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50">
-              <PrinterIcon className="h-6 w-6 text-amber-600" aria-hidden="true" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-warning-bg">
+              <PrinterIcon className="h-6 w-6 text-warning-fg" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-gray-900">{item.fileName ?? '未命名文件'}</p>
-              <p className="mt-0.5 truncate text-xs text-gray-400">{metaLine(item)}</p>
+              <p className="truncate text-sm font-semibold text-neutral-900">{item.fileName ?? '未命名文件'}</p>
+              <p className="mt-0.5 truncate text-xs text-neutral-400">{metaLine(item)}</p>
             </div>
             <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
               {canCreateFeedback && (
                 <button
                   type="button"
                   onClick={() => openFeedback(item.id)}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-amber-100 bg-white px-3 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-warning/20 bg-white px-3 text-xs font-semibold text-warning-fg transition-colors hover:bg-warning-bg focus:outline-none focus:ring-2 focus:ring-warning/30"
                   aria-label={`反馈打印订单 ${item.fileName ?? '未命名订单'}`}
                 >
                   <MessageSquareIcon className="h-4 w-4" aria-hidden="true" />
@@ -112,7 +112,7 @@ export function MyPrintOrdersPage() {
           </Card>
         )
       })}
-      <p className="mt-1 text-center text-xs text-gray-400">仅展示本人打印任务的安全信息，不含文件内容与金额</p>
+      <p className="mt-1 text-center text-xs text-neutral-400">仅展示本人打印任务的安全信息，不含文件内容与金额</p>
     </MeListShell>
   )
 }

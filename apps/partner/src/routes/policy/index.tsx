@@ -38,14 +38,14 @@ const PUBLISH_MAP: Record<string, { badge: 'success' | 'warning' | 'default'; la
 const PARTNER_POLICIES_REFRESH_KEY = 'partner:policies'
 
 const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-600">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-error-fg">*</span>}
       </span>
       {children}
     </label>
@@ -201,7 +201,7 @@ export default function PolicyPage() {
     return (
       <Page title="政策公告" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-neutral-400">加载中...</p>
         </div>
       </Page>
     )
@@ -211,8 +211,8 @@ export default function PolicyPage() {
     return (
       <Page title="政策公告" subtitle="加载失败">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <FileTextIcon className="h-10 w-10 text-gray-200" />
-          <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+          <FileTextIcon className="h-10 w-10 text-neutral-200" />
+          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
         </div>
       </Page>
     )
@@ -230,7 +230,7 @@ export default function PolicyPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
           {notice}
         </div>
       )}
@@ -246,39 +246,39 @@ export default function PolicyPage() {
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50">
+              <thead>
                 <tr>
                   {['类型', '标题', '分组/标签', '展示日期', '审核状态', '发布状态', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-neutral-900/[0.06]">
                 {rows.map((r) => {
                   const review = REVIEW_MAP[r.reviewStatus] ?? REVIEW_MAP.pending
                   const publish = PUBLISH_MAP[r.publishStatus] ?? PUBLISH_MAP.draft
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50">
+                    <tr key={r.id} className="hover:bg-neutral-50">
                       <td className="whitespace-nowrap px-4 py-3">
-                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${r.kind === 'policy_guide' ? 'bg-info-bg text-info-fg' : 'bg-purple-50 text-purple-600'}`}>
                           {KIND_LABELS[r.kind] ?? r.kind}
                         </span>
                       </td>
                       <td className="max-w-96 px-4 py-3">
-                        <p className="font-medium text-gray-800">{r.title}</p>
-                        {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-gray-400">{r.summary}</p>}
+                        <p className="font-medium text-neutral-800">{r.title}</p>
+                        {r.summary && <p className="mt-0.5 line-clamp-1 text-xs text-neutral-400">{r.summary}</p>}
                         {r.reviewStatus === 'rejected' && r.rejectReason && (
-                          <p className="mt-0.5 text-xs text-red-500">拒绝原因:{r.rejectReason}(修改后将重新提审)</p>
+                          <p className="mt-0.5 text-xs text-error-fg">拒绝原因:{r.rejectReason}(修改后将重新提审)</p>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         {r.kind === 'policy_guide'
                           ? (r.audience ? AUDIENCE_LABELS[r.audience] ?? r.audience : '—')
                           : (r.category ? CATEGORY_LABELS[r.category] ?? r.category : '—')}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">{r.publishedDate ?? '—'}</td>
-                      <td className="px-4 py-3"><StatusBadge status={review.badge} label={review.label} /></td>
-                      <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{r.publishedDate ?? '—'}</td>
+                      <td className="px-4 py-3"><StatusBadge dot status={review.badge} label={review.label} /></td>
+                      <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <button onClick={() => openEdit(r)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">
@@ -288,7 +288,7 @@ export default function PolicyPage() {
                             <button
                               disabled={busyId === r.id}
                               onClick={() => void handleUnpublish(r.id)}
-                              className="rounded px-2 py-1 text-xs font-medium text-orange-500 hover:bg-orange-50 disabled:opacity-50"
+                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg disabled:opacity-50"
                             >
                               下架
                             </button>
@@ -297,7 +297,7 @@ export default function PolicyPage() {
                             disabled={busyId === r.id}
                             onClick={() => void handleDelete(r.id)}
                             className={`rounded px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                              deletingId === r.id ? 'bg-red-600 text-white hover:bg-red-700' : 'text-red-500 hover:bg-red-50'
+                              deletingId === r.id ? 'bg-error text-white hover:bg-error/90' : 'text-error-fg hover:bg-error-bg'
                             }`}
                           >
                             {deletingId === r.id ? '确认删除?' : <Trash2Icon className="h-3.5 w-3.5" />}
@@ -313,7 +313,7 @@ export default function PolicyPage() {
         </Card>
       )}
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-400">
         政策内容为 info-only:仅政策说明、材料清单与官方入口;不承诺补贴到账、不代申请。提交后需管理员审核通过并发布,才会在一体机「政策服务」页展示。
       </p>
 
@@ -325,7 +325,7 @@ export default function PolicyPage() {
         size="md"
         footer={
           <div className="flex justify-end gap-2">
-            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">取消</button>
+            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
             <button onClick={save} disabled={saving || !canSave} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
               {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
             </button>
@@ -333,9 +333,9 @@ export default function PolicyPage() {
         }
       >
         <div className="space-y-4">
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{formError}</p>}
+          {formError && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{formError}</p>}
           {editing !== 'new' && (
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
               保存后该内容将重新进入待审核状态;审核通过并重新发布前,终端不展示。
             </p>
           )}
@@ -375,7 +375,7 @@ export default function PolicyPage() {
               <input type="date" className={inputCls} value={form.publishedDate} onChange={(e) => setForm((f) => ({ ...f, publishedDate: e.target.value }))} />
             </Field>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-neutral-400">
             合规提示:内容仅做政策说明与官方入口指引;请勿出现"补贴必到账""代为申请"等承诺性表述,此类内容审核将不予通过。
           </p>
         </div>

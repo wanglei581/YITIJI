@@ -4,11 +4,20 @@ import { BriefcaseIcon, BuildingIcon, ClockIcon, MapPinIcon, QrCodeIcon, StarIco
 import { isValidSourceUrl } from '../../../lib/url'
 import { CATEGORY_LABEL, CATEGORY_STYLE, formatSync } from '../utils/jobDisplay'
 
+const SORT_OPTIONS = [
+  { value: 'latest', label: '最新同步' },
+  { value: 'salary_first', label: '薪资标注优先' },
+] as const
+
+export type JobSortMode = (typeof SORT_OPTIONS)[number]['value']
+
 export function JobResultsSection({
   jobs,
   favoritesOnly,
   listLoading,
   favoriteSet,
+  sortMode,
+  onSortChange,
   onToggleFavorite,
   onOpen,
 }: {
@@ -16,16 +25,38 @@ export function JobResultsSection({
   favoritesOnly: boolean
   listLoading: boolean
   favoriteSet: Set<string>
+  sortMode: JobSortMode
+  onSortChange: (mode: JobSortMode) => void
   onToggleFavorite: (job: ExternalJobDTO) => void
   onOpen: (job: ExternalJobDTO) => void
 }) {
   return (
     <section>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <BriefcaseIcon className="h-5 w-5 text-primary-600" />
         <h2 className="text-base font-semibold text-neutral-900">{favoritesOnly ? '我的收藏' : '岗位列表'}</h2>
         <span className="text-sm text-neutral-400">共 {jobs.length} 个</span>
         {listLoading && <span className="text-xs text-neutral-400">加载中...</span>}
+        {/* 展示端排序：仅重排已载入数据；薪资标注优先=来源提供薪资的岗位排前，不伪造数值 */}
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-xs text-neutral-500">排序</span>
+          {SORT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={sortMode === option.value}
+              onClick={() => onSortChange(option.value)}
+              className={
+                'h-12 min-w-[48px] rounded-full border px-4 text-sm font-semibold transition-colors ' +
+                (sortMode === option.value
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : 'border-neutral-200 bg-surface text-neutral-600 active:bg-neutral-50')
+              }
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {jobs.length === 0 ? (
@@ -73,7 +104,7 @@ function JobResultCard({
           aria-label={favorite ? '取消收藏' : '收藏岗位'}
           className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 hover:bg-neutral-100"
         >
-          <StarIcon className={`h-5 w-5 ${favorite ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`} />
+          <StarIcon className={`h-5 w-5 ${favorite ? 'fill-warning text-warning' : 'text-neutral-300'}`} />
         </button>
       </div>
 

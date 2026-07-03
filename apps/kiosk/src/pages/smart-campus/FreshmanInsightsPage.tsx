@@ -24,8 +24,8 @@ export function FreshmanInsightsPage() {
     <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">校园大数据</h1>
-          <p className="mt-0.5 text-sm text-gray-500">迎新报到聚合统计</p>
+          <h1 className="text-xl font-bold text-neutral-900">校园大数据</h1>
+          <p className="mt-0.5 text-sm text-neutral-500">迎新报到聚合统计</p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => navigate('/smart-campus')}>
           返回
@@ -33,12 +33,12 @@ export function FreshmanInsightsPage() {
       </div>
 
       <Card className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-          <LockIcon className="h-8 w-8 text-gray-400" aria-hidden="true" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
+          <LockIcon className="h-8 w-8 text-neutral-400" aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">校园大数据暂未开放</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-gray-500">
+          <h2 className="text-lg font-semibold text-neutral-900">校园大数据暂未开放</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-neutral-500">
             该功能需在取得学校书面授权与数据处理协议、且仅接入聚合脱敏统计后才会开放。
             开放前本终端不展示任何统计数据，也不采集任何个人信息。
           </p>
@@ -48,9 +48,9 @@ export function FreshmanInsightsPage() {
         </Button>
       </Card>
 
-      <div className="mt-5 flex items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-indigo-900">
+      <div className="mt-5 flex items-start gap-2 rounded-xl border border-plum-soft bg-plum-soft/60 px-4 py-3">
+        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-plum" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-plum">
           合规边界：校园大数据若上线，仅展示<span className="font-semibold">聚合统计</span>，绝不含任何个人身份信息，
           也不在本终端采集任何个人信息。
         </p>

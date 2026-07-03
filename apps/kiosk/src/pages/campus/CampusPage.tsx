@@ -39,7 +39,7 @@ import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './compone
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-white/20', text: 'text-white' },
-  ongoing:  { label: '进行中', bg: 'bg-emerald-400/90', text: 'text-white' },
+  ongoing:  { label: '进行中', bg: 'bg-success/90', text: 'text-white' },
   ended:    { label: '已结束', bg: 'bg-white/20', text: 'text-white/80' },
 }
 
@@ -107,21 +107,21 @@ function QrModal({
       <div className="relative w-80 rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100"
+          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
           aria-label="关闭"
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="text-center text-base font-semibold text-gray-800">{title}</p>
-        {subtitle && <p className="mt-1 line-clamp-1 text-center text-sm text-gray-500">{subtitle}</p>}
+        <p className="text-center text-base font-semibold text-neutral-800">{title}</p>
+        {subtitle && <p className="mt-1 line-clamp-1 text-center text-sm text-neutral-500">{subtitle}</p>}
         <div className="mt-5 flex justify-center">
           <SourceUrlQr value={value} size={180} />
         </div>
         {meta && meta.length > 0 && (
-          <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
+          <div className="mt-5 space-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
             {meta.map((m) => (
               <div key={m.label} className="flex justify-between">
-                <span className="text-gray-400">{m.label}</span>
+                <span className="text-neutral-400">{m.label}</span>
                 <span className="font-medium">{m.value}</span>
               </div>
             ))}
@@ -129,7 +129,7 @@ function QrModal({
         )}
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-          <p className="text-xs leading-relaxed text-gray-500">{note}</p>
+          <p className="text-xs leading-relaxed text-neutral-500">{note}</p>
         </div>
       </div>
     </div>
@@ -235,7 +235,7 @@ export function CampusPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-gray-50">
+    <div className="flex h-full flex-col bg-neutral-50">
       {qr?.kind === 'book' && (
         <QrModal
           title="扫码前往来源平台预约"
@@ -260,7 +260,7 @@ export function CampusPage() {
       )}
 
       {/* ── Hero（蓝色渐变大图）─────────────────────────────────── */}
-      <div className="relative shrink-0 bg-gradient-to-br from-blue-600 via-blue-600 to-blue-500 px-5 pb-5 pt-6 text-white">
+      <div className="relative shrink-0 bg-gradient-to-br from-primary-600 via-primary-600 to-primary-500 px-5 pb-5 pt-6 text-white">
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={() => navigate('/')}
@@ -292,7 +292,7 @@ export function CampusPage() {
       </div>
 
       {/* ── Tab 栏 ─────────────────────────────────────────────── */}
-      <div className="flex shrink-0 border-b border-gray-100 bg-white">
+      <div className="flex shrink-0 border-b border-neutral-100 bg-white">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key
           return (
@@ -301,7 +301,7 @@ export function CampusPage() {
               onClick={() => setTab(key)}
               className={[
                 'relative flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
-                active ? 'text-primary-600' : 'text-gray-400 hover:text-gray-600',
+                active ? 'text-primary-600' : 'text-neutral-400 hover:text-neutral-600',
               ].join(' ')}
             >
               <Icon className="h-5 w-5" />

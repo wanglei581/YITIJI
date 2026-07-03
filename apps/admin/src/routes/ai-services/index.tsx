@@ -96,9 +96,9 @@ function MetricCard({ label, value, note, icon: Icon, iconClass = 'text-primary-
         <Icon className="h-5 w-5" aria-hidden="true" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="mt-0.5 text-xl font-semibold text-gray-900">{value}</p>
-        {note && <p className="mt-0.5 text-xs text-gray-400">{note}</p>}
+        <p className="text-xs text-neutral-500">{label}</p>
+        <p className="mt-0.5 text-xl font-semibold text-neutral-900">{value}</p>
+        {note && <p className="mt-0.5 text-xs text-neutral-400">{note}</p>}
       </div>
     </Card>
   )
@@ -193,18 +193,18 @@ export default function AiServicesPage() {
                 key={alert.code}
                 className={[
                   'flex items-start gap-3 border p-4',
-                  alert.level === 'critical' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50',
+                  alert.level === 'critical' ? 'border-error/30 bg-error-bg' : 'border-warning/30 bg-warning-bg',
                 ].join(' ')}
               >
                 <AlertTriangleIcon
-                  className={['mt-0.5 h-5 w-5 shrink-0', alert.level === 'critical' ? 'text-red-500' : 'text-amber-500'].join(' ')}
+                  className={['mt-0.5 h-5 w-5 shrink-0', alert.level === 'critical' ? 'text-error-fg' : 'text-warning'].join(' ')}
                   aria-hidden="true"
                 />
                 <div>
-                  <p className={['text-sm font-semibold', alert.level === 'critical' ? 'text-red-700' : 'text-amber-700'].join(' ')}>
+                  <p className={['text-sm font-semibold', alert.level === 'critical' ? 'text-error-fg' : 'text-warning-fg'].join(' ')}>
                     {alert.title}
                   </p>
-                  <p className={['mt-1 text-sm', alert.level === 'critical' ? 'text-red-600' : 'text-amber-600'].join(' ')}>
+                  <p className={['mt-1 text-sm', alert.level === 'critical' ? 'text-error-fg' : 'text-warning-fg'].join(' ')}>
                     {alert.detail}
                   </p>
                 </div>
@@ -212,16 +212,16 @@ export default function AiServicesPage() {
             ))}
           </div>
         ) : (
-          <Card className="flex items-center gap-3 border-emerald-100 bg-emerald-50 p-4">
-            <ShieldCheckIcon className="h-5 w-5 text-emerald-500" aria-hidden="true" />
-            <p className="text-sm text-emerald-700">成本告警：近 24 小时暂无 AI 成本或失败率异常。</p>
+          <Card className="flex items-center gap-3 border-success/20 bg-success-bg p-4">
+            <ShieldCheckIcon className="h-5 w-5 text-success" aria-hidden="true" />
+            <p className="text-sm text-success-fg">成本告警：近 24 小时暂无 AI 成本或失败率异常。</p>
           </Card>
         )}
       </section>
 
       {/* ── 今日概览指标 ─────────────────────────────── */}
       <section aria-label="今日 AI 服务概览">
-        <h2 className="mb-3 text-sm font-medium text-gray-500">今日概览</h2>
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">今日概览</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MetricCard
             label="AI 调用总次数"
@@ -234,21 +234,21 @@ export default function AiServicesPage() {
             value={`${successRate}%`}
             note={`${usage.successCount} 次成功 / ${usage.failCount} 次失败`}
             icon={CheckCircleIcon}
-            iconClass={successRate >= 95 ? 'text-green-600 bg-green-50' : 'text-orange-500 bg-orange-50'}
+            iconClass={successRate >= 95 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
           />
           <MetricCard
             label="平均响应时间"
             value={`${usage.avgLatencyMs} ms`}
             note="仅计入成功请求"
             icon={ClockIcon}
-            iconClass="text-blue-600 bg-blue-50"
+            iconClass="text-info-fg bg-info-bg"
           />
           <MetricCard
             label="预估成本"
             value={estimatedCost}
             note={costNote}
             icon={BanknoteIcon}
-            iconClass="text-gray-500 bg-gray-100"
+            iconClass="text-neutral-500 bg-neutral-100"
           />
         </div>
 
@@ -292,7 +292,7 @@ export default function AiServicesPage() {
 
       {/* ── 岗位 AI 运营 ─────────────────────────────── */}
       <section aria-label="岗位 AI 运营" className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-gray-500">岗位 AI 运营</h2>
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">岗位 AI 运营</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MetricCard
             label="岗位 AI 调用"
@@ -313,21 +313,21 @@ export default function AiServicesPage() {
             value={usage.byOperation.jobExplain}
             note={`成本 ¥${usage.costByOperation.jobExplain.toFixed(4)}`}
             icon={ScanTextIcon}
-            iconClass="text-blue-600 bg-blue-50"
+            iconClass="text-info-fg bg-info-bg"
           />
           <MetricCard
             label="匹配参考"
             value={usage.byOperation.jobMatch}
             note={`岗位 AI 总成本 ¥${jobAiCost.toFixed(4)}`}
             icon={CheckCircleIcon}
-            iconClass="text-emerald-600 bg-emerald-50"
+            iconClass="text-success-fg bg-success-bg"
           />
         </div>
       </section>
 
       {/* ── 岗位来源质量 ─────────────────────────────── */}
       <section aria-label="岗位来源质量" className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-gray-500">岗位来源质量</h2>
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">岗位来源质量</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <MetricCard
             label="来源岗位总量"
@@ -340,21 +340,21 @@ export default function AiServicesPage() {
             value={`${readyRate}%`}
             note={`${qualityTotals.readyJobs} 条 ready`}
             icon={CheckCircleIcon}
-            iconClass={readyRate >= 90 ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}
+            iconClass={readyRate >= 90 ? 'text-success-fg bg-success-bg' : 'text-warning-fg bg-warning-bg'}
           />
           <MetricCard
             label="字段缺失"
             value={qualityTotals.partialJobs + qualityTotals.insufficientJobs}
             note="partial / insufficient"
             icon={AlertTriangleIcon}
-            iconClass="text-amber-600 bg-amber-50"
+            iconClass="text-warning-fg bg-warning-bg"
           />
           <MetricCard
             label="来源链接异常"
             value={qualityTotals.brokenSourceUrlJobs}
             note={`${qualityTotals.staleJobs} 条过期或同步陈旧`}
             icon={XCircleIcon}
-            iconClass="text-red-600 bg-red-50"
+            iconClass="text-error-fg bg-error-bg"
           />
         </div>
       </section>
@@ -362,17 +362,17 @@ export default function AiServicesPage() {
       {/* ── 失败原因统计 ──────────────────────────────── */}
       {usage.errorDistribution.length > 0 && (
         <section aria-label="失败原因统计" className="mt-8">
-          <h2 className="mb-3 text-sm font-medium text-gray-500">失败原因分布</h2>
+          <h2 className="mb-3 text-sm font-medium text-neutral-500">失败原因分布</h2>
           <Card className="p-5">
             <div className="flex flex-wrap gap-3">
               {usage.errorDistribution.map((r) => (
                 <div
                   key={r.code}
-                  className="flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-2"
+                  className="flex items-center gap-2 rounded-lg border border-error/20 bg-error-bg px-4 py-2"
                 >
-                  <XCircleIcon className="h-4 w-4 text-red-500" aria-hidden="true" />
-                  <span className="text-sm font-medium text-red-700">{r.code}</span>
-                  <span className="text-sm text-red-500">{r.count} 次</span>
+                  <XCircleIcon className="h-4 w-4 text-error-fg" aria-hidden="true" />
+                  <span className="text-sm font-medium text-error-fg">{r.code}</span>
+                  <span className="text-sm text-error-fg">{r.count} 次</span>
                 </div>
               ))}
             </div>
@@ -383,9 +383,9 @@ export default function AiServicesPage() {
       {/* ── 最近调用日志 ──────────────────────────────── */}
       <section aria-label="最近 AI 调用日志" className="mt-8">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="text-sm font-medium text-gray-500">最近调用日志</h2>
+          <h2 className="text-sm font-medium text-neutral-500">最近调用日志</h2>
           <div className="ml-auto flex flex-wrap gap-2">
-            <div className="flex rounded-lg border border-gray-200 bg-white text-sm">
+            <div className="flex rounded-lg border border-neutral-200 bg-surface text-sm">
               {OP_FILTERS.map((f) => (
                 <button
                   key={f}
@@ -394,14 +394,14 @@ export default function AiServicesPage() {
                   className={`px-3 py-1.5 first:rounded-l-lg last:rounded-r-lg ${
                     opFilter === f
                       ? 'bg-primary-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      : 'text-neutral-600 hover:bg-neutral-50'
                   }`}
                 >
                   {OP_FILTER_LABELS[f]}
                 </button>
               ))}
             </div>
-            <div className="flex rounded-lg border border-gray-200 bg-white text-sm">
+            <div className="flex rounded-lg border border-neutral-200 bg-surface text-sm">
               {STATUS_FILTERS.map((f) => (
                 <button
                   key={f}
@@ -410,7 +410,7 @@ export default function AiServicesPage() {
                   className={`px-3 py-1.5 first:rounded-l-lg last:rounded-r-lg ${
                     statusFilter === f
                       ? 'bg-primary-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-50'
+                      : 'text-neutral-600 hover:bg-neutral-50'
                   }`}
                 >
                   {STATUS_FILTER_LABELS[f]}
@@ -423,7 +423,7 @@ export default function AiServicesPage() {
         <Card className="overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
+              <thead className="border-b border-neutral-100 bg-neutral-50 text-xs text-neutral-500">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Task ID</th>
                   <th className="px-4 py-3 text-left font-medium">服务类型</th>
@@ -433,20 +433,20 @@ export default function AiServicesPage() {
                   <th className="px-4 py-3 text-left font-medium">时间</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-neutral-50">
                 {visibleLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-neutral-400">
                       暂无匹配记录
                     </td>
                   </tr>
                 ) : (
                   visibleLogs.map((log) => (
-                    <tr key={log.taskId} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                    <tr key={log.taskId} className="hover:bg-neutral-50/50">
+                      <td className="px-4 py-3 font-mono text-xs text-neutral-500">
                         {log.taskId.slice(0, 28)}{log.taskId.length > 28 ? '…' : ''}
                       </td>
-                      <td className="px-4 py-3 text-gray-700">
+                      <td className="px-4 py-3 text-neutral-700">
                         {OPERATION_LABELS[log.operation]}
                       </td>
                       <td className="px-4 py-3">
@@ -456,19 +456,20 @@ export default function AiServicesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge
+                          dot
                           status={STATUS_MAP[log.status].badge}
                           label={STATUS_MAP[log.status].label}
                         />
                         {log.errorCode && (
-                          <code className="ml-2 text-xs text-gray-400">{log.errorCode}</code>
+                          <code className="ml-2 text-xs text-neutral-400">{log.errorCode}</code>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-gray-600">
+                      <td className="px-4 py-3 text-right font-mono text-xs text-neutral-600">
                         {log.latencyMs >= 1000
                           ? `${(log.latencyMs / 1000).toFixed(1)}s`
                           : `${log.latencyMs}ms`}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">
                         {log.createdAt}
                       </td>
                     </tr>
@@ -482,11 +483,11 @@ export default function AiServicesPage() {
 
       {/* ── 合规说明 ──────────────────────────────────── */}
       <section aria-label="合规说明" className="mt-8">
-        <Card className="flex items-start gap-3 border-blue-100 bg-blue-50 p-4">
-          <ShieldCheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-500" aria-hidden="true" />
-          <div className="text-sm text-blue-700">
+        <Card className="flex items-start gap-3 border-info/20 bg-info-bg p-4">
+          <ShieldCheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-info" aria-hidden="true" />
+          <div className="text-sm text-info-fg">
             <p className="font-medium">数据合规说明</p>
-            <ul className="mt-1 list-inside list-disc space-y-1 text-blue-600">
+            <ul className="mt-1 list-inside list-disc space-y-1 text-info-fg">
               <li>
                 AI 日志仅记录元数据（taskId / Provider / 响应时间 / 状态 / 错误码），
                 不保存完整简历内容和聊天原文

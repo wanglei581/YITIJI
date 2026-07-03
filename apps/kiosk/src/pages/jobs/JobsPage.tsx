@@ -56,6 +56,7 @@ export function JobsPage() {
   })
   const [sourceOrgId, setSourceOrgId] = useState(() => sourceOrgIdParam)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [sortMode, setSortMode] = useState<'latest' | 'salary_first'>('latest')
   const [showConsent, setShowConsent] = useState(false)
   const [showResumeSelect, setShowResumeSelect] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -147,10 +148,22 @@ export function JobsPage() {
   const sourceCards = useMemo(() => buildSourceCards(facetJobs), [facetJobs])
   const topTags = useMemo(() => buildTopTags(facetJobs), [facetJobs])
 
-  const displayedJobs = useMemo(
-    () => (favoritesOnly ? listJobs.filter((job) => favoriteSet.has(job.id)) : listJobs),
-    [listJobs, favoritesOnly, favoriteSet],
-  )
+  const displayedJobs = useMemo(() => {
+    const base = favoritesOnly ? listJobs.filter((job) => favoriteSet.has(job.id)) : listJobs
+    // 展示端排序：只对已载入的真实数据重排，不改变筛选查询本身
+    const time = (iso: string) => {
+      const value = Date.parse(iso)
+      return Number.isNaN(value) ? 0 : value
+    }
+    return [...base].sort((a, b) => {
+      if (sortMode === 'salary_first') {
+        // 薪资标注完整的岗位优先（不伪造薪资，仅按"来源是否提供"排序）
+        const diff = (b.salary ? 1 : 0) - (a.salary ? 1 : 0)
+        if (diff !== 0) return diff
+      }
+      return time(b.syncTime) - time(a.syncTime)
+    })
+  }, [listJobs, favoritesOnly, favoriteSet, sortMode])
 
   const insightJobs = hasServerFilter ? listJobs : facetJobs
   const insightTotal = hasServerFilter ? listTotal : facetTotal
@@ -359,6 +372,8 @@ export function JobsPage() {
                 favoritesOnly={favoritesOnly}
                 listLoading={listLoading}
                 favoriteSet={favoriteSet}
+                sortMode={sortMode}
+                onSortChange={setSortMode}
                 onToggleFavorite={(job) => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
                 onOpen={(job) => navigate(`/jobs/${job.id}`, { state: { job } })}
               />

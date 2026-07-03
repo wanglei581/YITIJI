@@ -17,8 +17,10 @@ import type {
   GeneratedResume,
   ResumeExportFormat,
   ResumeGenerateExportResponse,
+  ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
+  ResumeVoiceTranscribeResponse,
   ResumeParseRequest,
   ResumeParseResponse,
   ResumeOptimizeResponse,
@@ -45,19 +47,36 @@ export interface ResumeReadAccess {
   accessToken?: string | null
 }
 
+export type ResumeLayoutAdjustAction = 'reformat' | 'condense'
+
+export interface ResumeLayoutAdjustResponse {
+  resume: GeneratedResume
+  warnings: string[]
+}
+
 export interface AiServiceInterface {
   submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
   getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse>
+  adjustResumeLayoutDraft(
+    taskId: string,
+    resume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    layout: ResumeLayoutSettings,
+    access?: ResumeReadAccess,
+  ): Promise<ResumeLayoutAdjustResponse>
   chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
   submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
   getResumeGenerate(taskId: string, access?: ResumeReadAccess): Promise<ResumeGenerateResponse>
+  transcribeResumeVoice(audio: Blob): Promise<ResumeVoiceTranscribeResponse>
   exportGeneratedResume(
     resume: GeneratedResume,
     taskId?: string,
     token?: string | null,
     format?: ResumeExportFormat,
+    layout?: ResumeLayoutSettings,
+    templateId?: string,
   ): Promise<ResumeGenerateExportResponse>
 }
 
@@ -88,6 +107,15 @@ export const getResumeRecord = (taskId: string, access?: ResumeReadAccess) =>
 export const getResumeOptimize = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeOptimize(taskId, access)
 
+/** Wave 2:AI 一键精简 / 调整排版（不新增事实，后端按 taskId 重新提取原文校验）。 */
+export const adjustResumeLayoutDraft = (
+  taskId: string,
+  resume: GeneratedResume,
+  action: ResumeLayoutAdjustAction,
+  layout: ResumeLayoutSettings,
+  access?: ResumeReadAccess,
+) => adapter.adjustResumeLayoutDraft(taskId, resume, action, layout, access)
+
 /** 向 AI 助手发送消息（意图分类 + 引导跳转） */
 export const chatWithAssistant = (req: AssistantChatRequest) =>
   adapter.chatWithAssistant(req)
@@ -100,6 +128,10 @@ export const submitResumeGenerate = (input: ResumeGenerateInput, token?: string 
 export const getResumeGenerate = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeGenerate(taskId, access)
 
+/** Wave 4:简历语音短音频转写。转写结果必须由页面让用户确认后才写入表单。 */
+export const transcribeResumeVoice = (audio: Blob) =>
+  adapter.transcribeResumeVoice(audio)
+
 /**
  * 阶段2A:导出确认后的简历为真实文件(FileObject + 签名 URL,可进打印链路)。
  * Wave1 Task 8:新增可选 format 参数,支持 pdf/docx/txt/md 多格式导出(默认 pdf)。
@@ -109,4 +141,6 @@ export const exportGeneratedResume = (
   taskId?: string,
   token?: string | null,
   format?: ResumeExportFormat,
-) => adapter.exportGeneratedResume(resume, taskId, token, format)
+  layout?: ResumeLayoutSettings,
+  templateId?: string,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout, templateId)

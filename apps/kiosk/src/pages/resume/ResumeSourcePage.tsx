@@ -267,8 +267,8 @@ export function ResumeSourcePage() {
               <SparklesIcon className="h-6 w-6" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold text-gray-900">{copy.infoTitle}</h2>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">{copy.infoBody}</p>
+              <h2 className="text-xl font-bold text-neutral-900">{copy.infoTitle}</h2>
+              <p className="mt-1 text-sm leading-relaxed text-neutral-600">{copy.infoBody}</p>
               {intent === 'optimize' && (
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {OPTIMIZE_FLOW_STEPS.map((step, i) => (
@@ -293,8 +293,8 @@ export function ResumeSourcePage() {
             <SparklesIcon className="h-6 w-6" aria-hidden="true" />
           </div>
           <div className="flex-1">
-            <p className="text-lg font-bold text-gray-900">没有电子简历？AI 帮你生成一份</p>
-            <p className="mt-0.5 text-sm text-gray-500">填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</p>
+            <p className="text-lg font-bold text-neutral-900">没有电子简历？AI 帮你生成一份</p>
+            <p className="mt-0.5 text-sm text-neutral-500">填写真实信息 → AI 润色排版 → 导出 PDF 当场打印（不编造任何经历）</p>
           </div>
           <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
         </button>
@@ -315,20 +315,20 @@ export function ResumeSourcePage() {
                 'disabled:cursor-not-allowed disabled:opacity-60',
                 isSelected
                   ? 'border-primary-500 bg-white ring-4 ring-primary-100'
-                  : 'border-gray-200 bg-white hover:border-primary-200 hover:bg-primary-50/30 active:bg-primary-50',
+                  : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/30 active:bg-primary-50',
               ].join(' ')}
             >
               <div className="flex items-center gap-4">
-                <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', isSelected ? 'bg-primary-100' : 'bg-gray-100'].join(' ')}>
-                  <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-gray-500'].join(' ')} />
+                <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', isSelected ? 'bg-primary-100' : 'bg-neutral-100'].join(' ')}>
+                  <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-neutral-500'].join(' ')} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={['text-xl font-bold', isSelected ? 'text-primary-700' : 'text-gray-900'].join(' ')}>{option.label}</p>
-                  <p className="mt-1 text-sm font-medium text-gray-600">{option.description}</p>
+                  <p className={['text-xl font-bold', isSelected ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{option.label}</p>
+                  <p className="mt-1 text-sm font-medium text-neutral-600">{option.description}</p>
                 </div>
                 {isSelected && <CheckCircleIcon className="h-6 w-6 shrink-0 text-primary-600" aria-hidden="true" />}
               </div>
-              <p className="mt-4 text-xs leading-relaxed text-gray-400">{option.helper}</p>
+              <p className="mt-4 text-xs leading-relaxed text-neutral-400">{option.helper}</p>
             </button>
           )
           })}
@@ -345,17 +345,17 @@ export function ResumeSourcePage() {
               'flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
               uploadedFile
                 ? 'border-primary-300 bg-primary-50/35'
-                : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
+                : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
               uploading ? 'cursor-not-allowed opacity-70' : '',
             ].join(' ')}
           >
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
               {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
             </div>
-            <p className="mt-4 text-2xl font-extrabold text-gray-900">
+            <p className="mt-4 text-2xl font-extrabold text-neutral-900">
               {uploadedFile ? uploadedFile.name : '点击上传文件'}
             </p>
-            <p className="mt-2 text-base font-medium text-gray-500">
+            <p className="mt-2 text-base font-medium text-neutral-500">
               {uploadedFile
                 ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
                   uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
@@ -364,7 +364,7 @@ export function ResumeSourcePage() {
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {SUPPORTED_FORMATS.map((format) => (
-                <span key={format} className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-500">
+                <span key={format} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
                   {format}
                 </span>
               ))}
@@ -375,18 +375,18 @@ export function ResumeSourcePage() {
         <Card className="p-5">
           <div className="flex items-center gap-2">
             <ShieldCheckIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-            <p className="text-base font-bold text-gray-900">
+            <p className="text-base font-bold text-neutral-900">
               {intent === 'optimize' ? '优化前将先完成以下诊断(必要步骤)' : '诊断报告包含以下内容'}
             </p>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
             {DIAGNOSIS_DIMENSIONS.map((item) => (
-              <div key={item} className="flex min-h-[64px] items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 px-3 text-center text-sm font-semibold text-gray-700">
+              <div key={item} className="flex min-h-[64px] items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-50 px-3 text-center text-sm font-semibold text-neutral-700">
                 {item}
               </div>
             ))}
           </div>
-          <div className="mt-4 flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
+          <div className="mt-4 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
             <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p>诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
           </div>
@@ -408,29 +408,29 @@ export function ResumeSourcePage() {
         />
 
         <Card className="p-5">
-          <p className="text-sm font-bold text-gray-900">补充方向（可选）</p>
-          <p className="mt-1 text-xs leading-relaxed text-gray-500">
+          <p className="text-sm font-bold text-neutral-900">补充方向（可选）</p>
+          <p className="mt-1 text-xs leading-relaxed text-neutral-500">
             补充专业和学历，仅用于本人简历表达诊断/优化重点参考，不影响是否可以诊断。
           </p>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <label className="block">
-              <span className="text-xs font-semibold text-gray-500">专业</span>
+              <span className="text-xs font-semibold text-neutral-500">专业</span>
               <input
                 value={targetMajor}
                 disabled={genericDiagnosis}
                 onChange={(e) => setTargetMajor(e.target.value.slice(0, 60))}
                 placeholder="例如：计算机科学与技术"
-                className="mt-1 h-12 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-gray-50"
+                className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
               />
             </label>
             <label className="block">
-              <span className="text-xs font-semibold text-gray-500">学历</span>
+              <span className="text-xs font-semibold text-neutral-500">学历</span>
               <input
                 value={targetDegree}
                 disabled={genericDiagnosis}
                 onChange={(e) => setTargetDegree(e.target.value.slice(0, 30))}
                 placeholder="例如：本科、硕士、大专"
-                className="mt-1 h-12 w-full rounded-xl border border-gray-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-gray-50"
+                className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
               />
             </label>
           </div>

@@ -95,17 +95,17 @@ function RetentionConfirmOverlay({
         className="w-[23rem] max-w-full rounded-2xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <p id="retention-confirm-title" className="text-base font-semibold text-gray-900">
+        <p id="retention-confirm-title" className="text-base font-semibold text-neutral-900">
           确认{RETENTION_LABELS[policy]}
         </p>
-        <p id="retention-confirm-desc" className="mt-2 text-sm leading-relaxed text-gray-500">
+        <p id="retention-confirm-desc" className="mt-2 text-sm leading-relaxed text-neutral-500">
           {retentionConfirmText(policy)}点击“同意并保存”即表示你已知悉文件保存期限说明。
         </p>
         <div className="mt-5 flex gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="flex h-12 flex-1 items-center justify-center rounded-lg border border-gray-200 text-sm font-medium text-gray-600"
+            className="flex h-12 flex-1 items-center justify-center rounded-lg border border-neutral-200 text-sm font-medium text-neutral-600"
           >
             取消
           </button>
@@ -317,17 +317,17 @@ export function MyDocumentsPage() {
         const retentionOpen = retentionPanelId === doc.id
         return (
           <Card key={doc.id} className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50">
-              <FilesIcon className="h-6 w-6 text-blue-600" aria-hidden="true" />
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50">
+              <FilesIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-gray-900">{doc.filename}</p>
-              <p className="mt-0.5 truncate text-xs text-gray-400">
+              <p className="truncate text-sm font-semibold text-neutral-900">{doc.filename}</p>
+              <p className="mt-0.5 truncate text-xs text-neutral-400">
                 {formatBytes(doc.sizeBytes)} · {formatTime(doc.createdAt)}
                 {doc.expiresAt === null ? ' · 长期保存' : expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-2 py-1 font-medium text-gray-500">
+                <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-1 font-medium text-neutral-500">
                   <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
                   {retentionLabel(doc.retentionPolicy, doc.expiresAt)}
                 </span>
@@ -338,7 +338,7 @@ export function MyDocumentsPage() {
                     onClick={() => setRetentionPanelId(retentionOpen ? null : doc.id)}
                     className={[
                       'rounded-full px-2 py-1 font-medium transition-colors',
-                      isAnyPending ? 'cursor-not-allowed text-gray-300' : 'bg-blue-50 text-blue-600 hover:bg-blue-100',
+                      isAnyPending ? 'cursor-not-allowed text-neutral-300' : 'bg-primary-50 text-primary-600 hover:bg-primary-100',
                     ].join(' ')}
                   >
                     修改保存期限
@@ -361,8 +361,8 @@ export function MyDocumentsPage() {
                           active
                             ? 'border-primary-200 bg-primary-50 text-primary-600'
                             : isAnyPending
-                              ? 'cursor-not-allowed border-gray-100 text-gray-300'
-                              : 'border-gray-200 text-gray-600 hover:bg-primary-50 hover:text-primary-600',
+                              ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
+                              : 'border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:text-primary-600',
                         ].join(' ')}
                       >
                         {retentionButtonBusy ? '保存中' : RETENTION_LABELS[policy]}
@@ -380,8 +380,8 @@ export function MyDocumentsPage() {
                 className={[
                   'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
                   viewDisabled
-                    ? 'cursor-not-allowed border-gray-100 text-gray-300'
-                    : 'border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600',
+                    ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
+                    : 'border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:text-primary-600',
                 ].join(' ')}
               >
                 <EyeIcon className="h-4 w-4" aria-hidden="true" />
@@ -395,8 +395,8 @@ export function MyDocumentsPage() {
                 className={[
                   'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
                   printDisabled
-                    ? 'cursor-not-allowed border-gray-100 text-gray-300'
-                    : 'border-gray-200 text-gray-600 hover:bg-primary-50 hover:text-primary-600',
+                    ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
+                    : 'border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:text-primary-600',
                 ].join(' ')}
               >
                 <PrinterIcon className="h-4 w-4" aria-hidden="true" />
@@ -411,10 +411,10 @@ export function MyDocumentsPage() {
                 className={[
                   'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
                   deleteDisabled
-                    ? 'cursor-not-allowed border-gray-100 text-gray-300'
+                    ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
                     : confirming
-                      ? 'border-red-300 bg-red-50 text-red-600'
-                      : 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500',
+                      ? 'border-error/40 bg-error-bg text-error-fg'
+                      : 'border-neutral-200 text-neutral-400 hover:bg-error-bg hover:text-error-fg',
                 ].join(' ')}
               >
                 <Trash2Icon className="h-4 w-4" aria-hidden="true" />
@@ -424,7 +424,7 @@ export function MyDocumentsPage() {
           </Card>
         )
       })}
-      <p className="mt-1 text-center text-xs text-gray-400">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</p>
+      <p className="mt-1 text-center text-xs text-neutral-400">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</p>
     </MeListShell>
   )
 }

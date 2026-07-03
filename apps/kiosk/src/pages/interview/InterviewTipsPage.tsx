@@ -135,9 +135,9 @@ export function InterviewTipsPage() {
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ClipboardListIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-gray-900">面试前准备清单</h2>
+              <h2 className="text-base font-semibold text-neutral-900">面试前准备清单</h2>
             </div>
-            <span className="text-xs text-gray-400">{checked.size}/{CHECKLIST.length} 已完成</span>
+            <span className="text-xs text-neutral-400">{checked.size}/{CHECKLIST.length} 已完成</span>
           </div>
           <div className="flex flex-col gap-1.5">
             {CHECKLIST.map((item, i) => {
@@ -149,15 +149,15 @@ export function InterviewTipsPage() {
                   onClick={() => toggleCheck(i)}
                   className={[
                     'flex min-h-[56px] items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
-                    done ? 'border-primary-200 bg-primary-50/60' : 'border-gray-100 bg-white hover:border-gray-200',
+                    done ? 'border-primary-200 bg-primary-50/60' : 'border-neutral-100 bg-white hover:border-neutral-200',
                   ].join(' ')}
                 >
                   {done
                     ? <CheckSquareIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
-                    : <SquareIcon className="mt-0.5 h-5 w-5 shrink-0 text-gray-300" aria-hidden="true" />}
+                    : <SquareIcon className="mt-0.5 h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />}
                   <span>
-                    <span className={['block text-sm font-semibold', done ? 'text-primary-700' : 'text-gray-900'].join(' ')}>{item.title}</span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-gray-500">{item.desc}</span>
+                    <span className={['block text-sm font-semibold', done ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{item.title}</span>
+                    <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500">{item.desc}</span>
                   </span>
                 </button>
               )
@@ -169,30 +169,30 @@ export function InterviewTipsPage() {
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <HelpCircleIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-gray-900">高频问题应对</h2>
+            <h2 className="text-base font-semibold text-neutral-900">高频问题应对</h2>
           </div>
           <div className="flex flex-col gap-2">
             {FAQS.map((f, i) => {
               const open = openFaq === i
               return (
-                <div key={f.q} className="overflow-hidden rounded-xl border border-gray-100">
+                <div key={f.q} className="overflow-hidden rounded-xl border border-neutral-100">
                   <button
                     type="button"
                     onClick={() => setOpenFaq(open ? null : i)}
                     className="flex min-h-[52px] w-full items-center justify-between gap-3 bg-white px-4 py-3 text-left"
                   >
-                    <span className="text-sm font-semibold text-gray-900">“{f.q}”</span>
+                    <span className="text-sm font-semibold text-neutral-900">“{f.q}”</span>
                     <ChevronDownIcon
-                      className={['h-4 w-4 shrink-0 text-gray-400 transition-transform', open ? 'rotate-180' : ''].join(' ')}
+                      className={['h-4 w-4 shrink-0 text-neutral-400 transition-transform', open ? 'rotate-180' : ''].join(' ')}
                       aria-hidden="true"
                     />
                   </button>
                   {open && (
-                    <div className="flex flex-col gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-3 text-xs leading-relaxed">
-                      <p><span className="font-semibold text-gray-700">考察什么：</span><span className="text-gray-600">{f.examine}</span></p>
-                      <p><span className="font-semibold text-gray-700">回答结构：</span><span className="text-gray-600">{f.structure}</span></p>
-                      <p><span className="font-semibold text-red-600">常见错误：</span><span className="text-gray-600">{f.mistake}</span></p>
-                      <p><span className="font-semibold text-primary-700">建议：</span><span className="text-gray-600">{f.tip}</span></p>
+                    <div className="flex flex-col gap-2 border-t border-neutral-100 bg-neutral-50/60 px-4 py-3 text-xs leading-relaxed">
+                      <p><span className="font-semibold text-neutral-700">考察什么：</span><span className="text-neutral-600">{f.examine}</span></p>
+                      <p><span className="font-semibold text-neutral-700">回答结构：</span><span className="text-neutral-600">{f.structure}</span></p>
+                      <p><span className="font-semibold text-error-fg">常见错误：</span><span className="text-neutral-600">{f.mistake}</span></p>
+                      <p><span className="font-semibold text-primary-700">建议：</span><span className="text-neutral-600">{f.tip}</span></p>
                     </div>
                   )}
                 </div>
@@ -205,18 +205,18 @@ export function InterviewTipsPage() {
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <LightbulbIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-gray-900">行为面试技巧（STAR 法则）</h2>
+            <h2 className="text-base font-semibold text-neutral-900">行为面试技巧（STAR 法则）</h2>
           </div>
-          <p className="mb-3 text-xs leading-relaxed text-gray-500">
+          <p className="mb-3 text-xs leading-relaxed text-neutral-500">
             被问到「讲一段经历」类问题时，用 STAR 四步把事情讲清楚，比泛泛而谈更有说服力。
           </p>
           <div className="flex flex-col gap-2">
             {STAR.map((s) => (
-              <div key={s.k} className="flex items-start gap-3 rounded-xl bg-gray-50/80 px-4 py-3">
+              <div key={s.k} className="flex items-start gap-3 rounded-xl bg-neutral-50/80 px-4 py-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-600 text-sm font-bold text-white">{s.k}</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{s.name}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-gray-600">{s.desc}</p>
+                  <p className="text-sm font-semibold text-neutral-900">{s.name}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{s.desc}</p>
                 </div>
               </div>
             ))}
@@ -227,16 +227,16 @@ export function InterviewTipsPage() {
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <MicIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-gray-900">自我介绍结构建议</h2>
+            <h2 className="text-base font-semibold text-neutral-900">自我介绍结构建议</h2>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             {INTRO_STRUCTURES.map((it) => (
-              <div key={it.duration} className="rounded-xl border border-gray-100 bg-white p-3.5">
+              <div key={it.duration} className="rounded-xl border border-neutral-100 bg-white p-3.5">
                 <p className="mb-2 text-sm font-bold text-primary-700">{it.duration}版</p>
                 <ol className="flex flex-col gap-1.5">
                   {it.points.map((p, i) => (
-                    <li key={p} className="flex items-start gap-1.5 text-xs leading-relaxed text-gray-600">
-                      <span className="font-semibold text-gray-400">{i + 1}.</span>
+                    <li key={p} className="flex items-start gap-1.5 text-xs leading-relaxed text-neutral-600">
+                      <span className="font-semibold text-neutral-400">{i + 1}.</span>
                       {p}
                     </li>
                   ))}
@@ -248,7 +248,7 @@ export function InterviewTipsPage() {
       </div>
 
       {/* 底部 CTA */}
-      <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <div className="flex gap-3">
           <Button size="lg" className="h-14 flex-1 text-base" onClick={() => navigate('/interview/setup')}>
             开始模拟面试
@@ -258,7 +258,7 @@ export function InterviewTipsPage() {
           </Button>
         </div>
         {/* 打印准备清单：完成模拟面试后报告自带准备清单且可打印，此处不放未接线的死按钮 */}
-        <p className="mt-2 text-center text-[11px] text-gray-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
+        <p className="mt-2 text-center text-[11px] text-neutral-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
       </div>
     </div>
   )

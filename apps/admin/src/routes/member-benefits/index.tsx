@@ -33,9 +33,9 @@ const STATUS_LABEL: Record<AdminBenefitGrantItem['status'], string> = {
 }
 
 const STATUS_CLASS: Record<AdminBenefitGrantItem['status'], string> = {
-  active: 'bg-emerald-50 text-emerald-600',
-  used_up: 'bg-gray-100 text-gray-500',
-  expired: 'bg-amber-50 text-amber-600',
+  active: 'bg-success-bg text-success-fg',
+  used_up: 'bg-neutral-100 text-neutral-500',
+  expired: 'bg-warning-bg text-warning-fg',
   revoked: 'bg-rose-50 text-rose-600',
 }
 
@@ -160,7 +160,7 @@ export default function MemberBenefitsPage() {
           <button
             type="button"
             onClick={() => void loadItems(selectedUser.endUserId)}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
           >
             <RefreshCwIcon className="h-4 w-4" />
             刷新
@@ -168,7 +168,7 @@ export default function MemberBenefitsPage() {
         )
       }
     >
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         权益只代表本终端服务与打印辅助。政策资格提示只作官方入口与材料指引，不代办、不承诺办理结果；页面不展示明文手机号。
       </div>
 
@@ -177,7 +177,7 @@ export default function MemberBenefitsPage() {
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
           placeholder="输入会员手机号精确搜索"
-          className="h-11 w-80 rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary-500"
+          className="h-11 w-80 rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500"
         />
         <button type="submit" className="flex h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white">
           <SearchIcon className="h-4 w-4" />
@@ -186,60 +186,60 @@ export default function MemberBenefitsPage() {
       </form>
 
       {message && (
-        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">{message}</div>
+        <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>
       )}
 
       {selectedUser && (
         <div className="mb-4 grid gap-4 xl:grid-cols-[360px_1fr]">
           <Card className="p-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
-                <ShieldCheckIcon className="h-5 w-5 text-emerald-600" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success-bg">
+                <ShieldCheckIcon className="h-5 w-5 text-success-fg" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-900">{selectedUser.phoneMasked}</p>
-                <p className="mt-0.5 text-xs text-gray-500">{selectedUser.nickname ?? '未设置昵称'} · {selectedUser.enabled ? '账号启用' : '账号停用'}</p>
+                <p className="text-sm font-semibold text-neutral-900">{selectedUser.phoneMasked}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{selectedUser.nickname ?? '未设置昵称'} · {selectedUser.enabled ? '账号启用' : '账号停用'}</p>
               </div>
             </div>
 
             <form onSubmit={(event) => void submitGrant(event)} className="mt-4 space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-500">权益类型</label>
+                <label className="text-xs font-medium text-neutral-500">权益类型</label>
                 <select
                   value={benefitType}
                   onChange={(event) => handleTypeChange(event.target.value as AdminBenefitType)}
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm"
+                  className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm"
                 >
                   {BENEFIT_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label} · {type.desc}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500">来源</label>
+                <label className="text-xs font-medium text-neutral-500">来源</label>
                 <select
                   value={sourceType}
                   onChange={(event) => setSourceType(event.target.value as AdminBenefitSourceType)}
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm"
+                  className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm"
                 >
                   {SOURCE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500">标题</label>
-                <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm" maxLength={80} />
+                <label className="text-xs font-medium text-neutral-500">标题</label>
+                <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" maxLength={80} />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500">说明</label>
+                <label className="text-xs font-medium text-neutral-500">说明</label>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  className="mt-1 min-h-[84px] w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="mt-1 min-h-[84px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
                   maxLength={500}
                   placeholder={benefitType === 'subsidy_eligibility_hint' ? '仅填写官方入口、材料清单、资格提示等 info-only 文案' : '填写使用范围和现场规则'}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-500">额度</label>
+                  <label className="text-xs font-medium text-neutral-500">额度</label>
                   <input
                     value={quantityTotal}
                     onChange={(event) => setQuantityTotal(event.target.value)}
@@ -247,18 +247,18 @@ export default function MemberBenefitsPage() {
                     type="number"
                     min={1}
                     max={9999}
-                    className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm disabled:bg-gray-50"
+                    className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm disabled:bg-neutral-50"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-500">有效期至</label>
-                  <input value={validUntil} onChange={(event) => setValidUntil(event.target.value)} type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm" />
+                  <label className="text-xs font-medium text-neutral-500">有效期至</label>
+                  <input value={validUntil} onChange={(event) => setValidUntil(event.target.value)} type="datetime-local" className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm" />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={submitting || !selectedUser.enabled}
-                className="h-11 w-full rounded-lg bg-primary-600 text-sm font-semibold text-white disabled:bg-gray-300"
+                className="h-11 w-full rounded-lg bg-primary-600 text-sm font-semibold text-white disabled:bg-neutral-300"
               >
                 {submitting ? '发放中…' : `发放${selectedType.label}`}
               </button>
@@ -266,7 +266,7 @@ export default function MemberBenefitsPage() {
           </Card>
 
           <Card className="p-4">
-            <p className="mb-3 text-sm font-semibold text-gray-900">权益记录</p>
+            <p className="mb-3 text-sm font-semibold text-neutral-900">权益记录</p>
             {state === 'loading' && <LoadingState className="py-16" />}
             {state === 'error' && <ErrorState className="py-16" onRetry={() => selectedUser && void loadItems(selectedUser.endUserId)} />}
             {state === 'ready' && items.length === 0 && (
@@ -275,26 +275,26 @@ export default function MemberBenefitsPage() {
             {state === 'ready' && items.length > 0 && (
               <div className="flex flex-col gap-3">
                 {items.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-gray-100 p-3">
+                  <div key={item.id} className="rounded-lg border border-neutral-100 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">{item.title}</p>
-                        <p className="mt-1 text-xs text-gray-400">{item.phoneMasked} · {item.sourceType} · 创建于 {fmt(item.createdAt)}</p>
+                        <p className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
+                        <p className="mt-1 text-xs text-neutral-400">{item.phoneMasked} · {item.sourceType} · 创建于 {fmt(item.createdAt)}</p>
                       </div>
                       <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', STATUS_CLASS[item.status]].join(' ')}>
                         {STATUS_LABEL[item.status]}
                       </span>
                     </div>
-                    {item.description && <p className="mt-2 text-xs leading-relaxed text-gray-500">{item.description}</p>}
+                    {item.description && <p className="mt-2 text-xs leading-relaxed text-neutral-500">{item.description}</p>}
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-neutral-400">
                         额度 {item.quantityRemaining ?? '—'} / {item.quantityTotal ?? '—'} · 有效期至 {fmt(item.validUntil)}
                       </p>
                       <button
                         type="button"
                         disabled={item.status !== 'active'}
                         onClick={() => void revoke(item)}
-                        className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 disabled:cursor-not-allowed disabled:text-gray-300"
+                        className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:cursor-not-allowed disabled:text-neutral-300"
                       >
                         撤销
                       </button>

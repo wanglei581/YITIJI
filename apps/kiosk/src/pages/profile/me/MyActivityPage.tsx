@@ -115,11 +115,11 @@ export function MyActivityPage() {
               onClick={() => setTab(t.key)}
               className={[
                 'shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                active ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 ring-1 ring-gray-200',
+                active ? 'bg-primary-600 text-white' : 'bg-white text-neutral-600 ring-1 ring-neutral-200',
               ].join(' ')}
             >
               {t.label}
-              <span className={active ? 'ml-1 text-white/80' : 'ml-1 text-gray-400'}>{t.count}</span>
+              <span className={active ? 'ml-1 text-white/80' : 'ml-1 text-neutral-400'}>{t.count}</span>
             </button>
           )
         })}
@@ -135,8 +135,8 @@ export function MyActivityPage() {
             <ActivityRow
               key={it.id}
               icon={EyeIcon}
-              iconBg="bg-sky-50"
-              iconColor="text-sky-600"
+              iconBg="bg-info-bg"
+              iconColor="text-info"
               title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
               meta={`浏览 · ${TYPE_LABEL[it.targetType]}${it.sourceName ? ` · ${it.sourceName}` : ''} · ${formatTime(it.createdAt)}`}
               onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
@@ -152,8 +152,8 @@ export function MyActivityPage() {
           <ActivityRow
             key={it.id}
             icon={ExternalLinkIcon}
-            iconBg="bg-teal-50"
-            iconColor="text-teal-600"
+            iconBg="bg-primary-50"
+            iconColor="text-primary-600"
             title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
             meta={`打开${actionLabel(it.action, it.targetType)} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
             onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
@@ -161,7 +161,7 @@ export function MyActivityPage() {
         ))
       )}
 
-      <p className="mt-1 text-center text-xs text-gray-400">仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录</p>
+      <p className="mt-1 text-center text-xs text-neutral-400">仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录</p>
     </MeListShell>
   )
 }
@@ -185,16 +185,16 @@ function ActivityRow({
     <button
       type="button"
       onClick={onTap}
-      className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+      className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-neutral-50 active:bg-neutral-100"
     >
       <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', iconBg].join(' ')}>
         <Icon className={['h-6 w-6', iconColor].join(' ')} aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
-        <p className="mt-0.5 truncate text-xs text-gray-400">{meta}</p>
+        <p className="truncate text-sm font-semibold text-neutral-900">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-neutral-400">{meta}</p>
       </div>
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-gray-300" aria-hidden="true" />
+      <ChevronRightIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
     </button>
   )
 }

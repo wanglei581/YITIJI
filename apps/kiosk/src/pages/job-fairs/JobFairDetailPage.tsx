@@ -26,9 +26,9 @@ import { useFavorites } from '../../favorites/useFavorites'
 import { useAuth } from '../../auth/useAuth'
 
 const STATUS_CONFIG = {
-  upcoming: { label: '未开始', bg: 'bg-blue-50',  text: 'text-blue-600' },
-  ongoing:  { label: '进行中', bg: 'bg-green-50', text: 'text-green-700' },
-  ended:    { label: '已结束', bg: 'bg-gray-100', text: 'text-gray-400' },
+  upcoming: { label: '未开始', bg: 'bg-primary-50',  text: 'text-primary-600' },
+  ongoing:  { label: '进行中', bg: 'bg-success-bg', text: 'text-success-fg' },
+  ended:    { label: '已结束', bg: 'bg-neutral-100', text: 'text-neutral-400' },
 }
 
 const TABS = ['详情与特色', '参展企业与岗位', '场馆导览', '数据大屏'] as const
@@ -56,21 +56,21 @@ function QrModal({
       <div className="relative w-80 rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100"
+          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
           aria-label="关闭"
         >
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="text-center text-base font-semibold text-gray-800">{title}</p>
-        {subtitle && <p className="mt-1 line-clamp-1 text-center text-sm text-gray-500">{subtitle}</p>}
+        <p className="text-center text-base font-semibold text-neutral-800">{title}</p>
+        {subtitle && <p className="mt-1 line-clamp-1 text-center text-sm text-neutral-500">{subtitle}</p>}
         <div className="mt-5 flex justify-center">
           <SourceUrlQr value={value} size={180} />
         </div>
         {meta && meta.length > 0 && (
-          <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
+          <div className="mt-5 space-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
             {meta.map((m) => (
               <div key={m.label} className="flex justify-between">
-                <span className="text-gray-400">{m.label}</span>
+                <span className="text-neutral-400">{m.label}</span>
                 <span className="font-medium">{m.value}</span>
               </div>
             ))}
@@ -78,7 +78,7 @@ function QrModal({
         )}
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-          <p className="text-xs leading-relaxed text-gray-500">{note}</p>
+          <p className="text-xs leading-relaxed text-neutral-500">{note}</p>
         </div>
       </div>
     </div>
@@ -234,8 +234,8 @@ export function JobFairDetailPage() {
       {/* 头部 */}
       <div className="flex items-start justify-between gap-3 px-6 pb-3 pt-6">
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold text-gray-900">{fair.name}</h1>
-          <p className="mt-0.5 text-xs text-gray-400">{fair.sourceName}</p>
+          <h1 className="truncate text-lg font-bold text-neutral-900">{fair.name}</h1>
+          <p className="mt-0.5 text-xs text-neutral-400">{fair.sourceName}</p>
         </div>
         {/* 收藏(C-2D):仅兴趣标记,登录走 /me/favorites,匿名存本机;不涉及任何预约/投递闭环 */}
         <button
@@ -244,7 +244,7 @@ export function JobFairDetailPage() {
           aria-label={isFav ? '取消收藏' : '收藏招聘会'}
           className={[
             'flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors',
-            isFav ? 'border-rose-200 bg-rose-50 text-rose-500' : 'border-gray-200 bg-white text-gray-400 hover:text-rose-400',
+            isFav ? 'border-error/30 bg-error-bg text-error-fg' : 'border-neutral-200 bg-white text-neutral-400 hover:text-error',
           ].join(' ')}
         >
           <HeartIcon className={isFav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
@@ -255,14 +255,14 @@ export function JobFairDetailPage() {
       </div>
 
       {/* Tab 栏 */}
-      <div className="flex gap-1 border-b border-gray-100 px-6">
+      <div className="flex gap-1 border-b border-neutral-100 px-6">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={[
               'relative min-h-[44px] px-3 text-sm font-medium transition-colors',
-              tab === t ? 'text-primary-600' : 'text-gray-500 hover:text-gray-700',
+              tab === t ? 'text-primary-600' : 'text-neutral-500 hover:text-neutral-700',
             ].join(' ')}
           >
             {t}
@@ -296,7 +296,7 @@ export function JobFairDetailPage() {
       </div>
 
       {/* 底部操作条 */}
-      <div className="border-t border-gray-100 px-6 pb-6 pt-3">
+      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           {!isEnded ? (
             <Button size="lg" className="flex flex-1 items-center justify-center gap-2" onClick={openBookingQr}>

@@ -52,8 +52,8 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'scan',
     icon: ScanLineIcon,
-    iconBg: 'bg-emerald-50',
-    iconColor: 'text-emerald-600',
+    iconBg: 'bg-success-bg',
+    iconColor: 'text-success-fg',
     title: '材料扫描',
     description: '纸质材料扫描成 PDF / 图片存档',
     to: '/scan/start',
@@ -63,8 +63,8 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'photo-print',
     icon: ImageIcon,
-    iconBg: 'bg-violet-50',
-    iconColor: 'text-violet-600',
+    iconBg: 'bg-plum-soft',
+    iconColor: 'text-plum',
     title: '照片打印',
     description: '上传 JPG / PNG 照片打印',
     to: '/print/upload',
@@ -74,8 +74,8 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'id-photo',
     icon: UserSquareIcon,
-    iconBg: 'bg-amber-50',
-    iconColor: 'text-amber-600',
+    iconBg: 'bg-warning-bg',
+    iconColor: 'text-warning-fg',
     title: '证件照',
     description: '常见规格证件照排版打印',
     to: '/print-scan/feature/id-photo',
@@ -84,8 +84,8 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'convert',
     icon: FileType2Icon,
-    iconBg: 'bg-sky-50',
-    iconColor: 'text-sky-600',
+    iconBg: 'bg-info-bg',
+    iconColor: 'text-info',
     title: '格式转换',
     description: '文档与图片格式互转',
     to: '/print-scan/feature/convert',
@@ -94,8 +94,8 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'sign',
     icon: PenToolIcon,
-    iconBg: 'bg-rose-50',
-    iconColor: 'text-rose-600',
+    iconBg: 'bg-error-bg',
+    iconColor: 'text-error-fg',
     title: '签名盖章',
     description: '在文件上叠加签名 / 印章图片',
     to: '/print-scan/feature/sign',
@@ -140,16 +140,16 @@ export function PrintScanHomePage() {
                 <Icon className={['h-7 w-7', cap.iconColor].join(' ')} aria-hidden="true" />
               </div>
               <div className="mt-3 flex items-center gap-2">
-                <h3 className="text-lg font-semibold text-gray-900">{cap.title}</h3>
+                <h3 className="text-lg font-semibold text-neutral-900">{cap.title}</h3>
                 {!cap.available && (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
                     即将上线
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-sm leading-relaxed text-gray-500">{cap.description}</p>
+              <p className="mt-1 text-sm leading-relaxed text-neutral-500">{cap.description}</p>
               {cap.note ? (
-                <p className="mt-1 flex-1 text-xs leading-relaxed text-amber-600">{cap.note}</p>
+                <p className="mt-1 flex-1 text-xs leading-relaxed text-warning-fg">{cap.note}</p>
               ) : (
                 <div className="flex-1" />
               )}
@@ -163,9 +163,9 @@ export function PrintScanHomePage() {
       </div>
 
       {/* 非 CA 电子签说明 */}
-      <div className="mt-6 flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/70 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-gray-600">
+      <div className="mt-6 flex items-start gap-2 rounded-lg border border-info-bg bg-info-bg/70 px-4 py-3">
+        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-neutral-600">
           {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
         </p>
       </div>

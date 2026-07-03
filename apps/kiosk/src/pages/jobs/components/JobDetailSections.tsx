@@ -31,26 +31,26 @@ export function QrOverlay({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="relative w-[22rem] max-w-full rounded-2xl bg-white p-7 shadow-xl" onClick={(event) => event.stopPropagation()}>
-        <button onClick={onClose} aria-label="关闭" className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100">
+        <button onClick={onClose} aria-label="关闭" className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100">
           <XIcon className="h-5 w-5" />
         </button>
 
-        <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台投递</p>
+        <p className="text-center text-base font-semibold text-neutral-800">扫码前往来源平台投递</p>
 
         <div className="mt-5 flex justify-center">
           <SourceUrlQr value={job.sourceUrl} size={196} />
         </div>
 
-        {valid && <p className="mt-3 break-all rounded-lg bg-gray-50 px-3 py-2 text-center text-[11px] text-gray-500">{job.sourceUrl}</p>}
+        {valid && <p className="mt-3 break-all rounded-lg bg-neutral-50 px-3 py-2 text-center text-[11px] text-neutral-500">{job.sourceUrl}</p>}
 
-        <div className="mt-4 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
+        <div className="mt-4 space-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
           <InfoRow label="来源机构" value={job.sourceName} />
           <InfoRow label="外部编号" value={job.externalId} mono />
         </div>
 
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-          <p className="text-xs leading-relaxed text-gray-500">
+          <p className="text-xs leading-relaxed text-neutral-500">
             请使用手机扫码前往来源平台办理投递，本系统不接收简历、不参与招聘流程。
           </p>
         </div>
@@ -77,7 +77,7 @@ export function JobSummarySection({
             <SparklesIcon className="h-4 w-4" />
             岗位摘要
           </div>
-          <h2 className="text-xl font-bold leading-snug text-gray-900">{job.title}</h2>
+          <h2 className="text-xl font-bold leading-snug text-neutral-900">{job.title}</h2>
         </div>
         <button
           onClick={onToggleFavorite}
@@ -85,18 +85,18 @@ export function JobSummarySection({
           aria-label={favorite ? '取消收藏' : '收藏岗位'}
           className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
         >
-          <StarIcon className={`h-4 w-4 ${favorite ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`} />
+          <StarIcon className={`h-4 w-4 ${favorite ? 'fill-warning text-warning' : 'text-neutral-300'}`} />
           {favorite ? '已收藏' : '收藏'}
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-gray-600">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-neutral-600">
         <span className="flex items-center gap-1.5">
-          <BuildingIcon className="h-4 w-4 text-gray-400" />
+          <BuildingIcon className="h-4 w-4 text-neutral-400" />
           {job.company}
         </span>
         <span className="flex items-center gap-1.5">
-          <MapPinIcon className="h-4 w-4 text-gray-400" />
+          <MapPinIcon className="h-4 w-4 text-neutral-400" />
           {job.city}
         </span>
       </div>
@@ -110,12 +110,12 @@ export function JobSummarySection({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {job.category && (
-          <span className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium ${CATEGORY_STYLE[job.category] ?? 'bg-gray-100 text-gray-500'}`}>
+          <span className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium ${CATEGORY_STYLE[job.category] ?? 'bg-neutral-100 text-neutral-500'}`}>
             {CATEGORY_LABEL[job.category] ?? job.category}
           </span>
         )}
         {job.tags.map((tag) => (
-          <span key={tag} className="flex items-center gap-1 rounded bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">
+          <span key={tag} className="flex items-center gap-1 rounded bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">
             <TagIcon className="h-3 w-3" />
             {tag}
           </span>
@@ -142,7 +142,7 @@ export function JobDescriptionSection({ job }: { job: ExternalJobDTO }) {
     <Card className="p-5">
       <div className="mb-4 flex items-center gap-2">
         <FileSearchIcon className="h-4 w-4 text-primary-600" />
-        <p className="text-sm font-semibold text-gray-800">职责与要求</p>
+        <p className="text-sm font-semibold text-neutral-800">职责与要求</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -156,18 +156,18 @@ export function JobDescriptionSection({ job }: { job: ExternalJobDTO }) {
 function TextList({ title, items, fallback }: { title: string; items: string[]; fallback: string }) {
   return (
     <div className="rounded-lg bg-neutral-50 p-4">
-      <p className="mb-3 text-sm font-medium text-gray-700">{title}</p>
+      <p className="mb-3 text-sm font-medium text-neutral-700">{title}</p>
       {items.length > 0 ? (
         <ul className="space-y-2">
           {items.slice(0, 8).map((item) => (
-            <li key={item} className="flex gap-2 text-sm leading-relaxed text-gray-600">
+            <li key={item} className="flex gap-2 text-sm leading-relaxed text-neutral-600">
               <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
               <span>{item}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm leading-relaxed text-gray-500">{fallback}</p>
+        <p className="text-sm leading-relaxed text-neutral-500">{fallback}</p>
       )}
     </div>
   )
@@ -178,7 +178,7 @@ export function JobTrustSection({ job, sourceCanApply }: { job: ExternalJobDTO; 
     <Card className="p-5">
       <div className="mb-4 flex items-center gap-2">
         <ShieldCheckIcon className="h-4 w-4 text-primary-600" />
-        <p className="text-sm font-semibold text-gray-800">来源可信区</p>
+        <p className="text-sm font-semibold text-neutral-800">来源可信区</p>
       </div>
 
       <div className="space-y-2">
@@ -189,9 +189,9 @@ export function JobTrustSection({ job, sourceCanApply }: { job: ExternalJobDTO; 
       </div>
 
       <div className="mt-4 rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-3">
-        <p className="text-xs leading-relaxed text-gray-500">
+        <p className="text-xs leading-relaxed text-neutral-500">
           本岗位来自第三方/官方来源，本系统不接收简历、不参与招聘流程。
-          <span className="mt-1 block text-gray-400">{job.dataSourceNote}</span>
+          <span className="mt-1 block text-neutral-400">{job.dataSourceNote}</span>
         </p>
       </div>
     </Card>
@@ -219,7 +219,7 @@ export function JobNextActionsSection({
     <Card className="p-5">
       <div className="mb-4 flex items-center gap-2">
         <ArrowRightIcon className="h-4 w-4 text-primary-600" />
-        <p className="text-sm font-semibold text-gray-800">后续动作</p>
+        <p className="text-sm font-semibold text-neutral-800">后续动作</p>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_210px]">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -268,8 +268,8 @@ function ActionButton({
       className="min-h-[76px] rounded-lg border border-neutral-200 bg-white px-4 py-3 text-left transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Icon className="h-5 w-5 text-primary-600" />
-      <span className="mt-2 block text-sm font-semibold text-gray-900">{label}</span>
-      <span className="mt-0.5 block text-xs text-gray-400">{hint}</span>
+      <span className="mt-2 block text-sm font-semibold text-neutral-900">{label}</span>
+      <span className="mt-0.5 block text-xs text-neutral-400">{hint}</span>
     </button>
   )
 }
@@ -316,9 +316,9 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between gap-4 text-sm">
-      <span className="shrink-0 text-gray-400">{label}</span>
+      <span className="shrink-0 text-neutral-400">{label}</span>
       <span className={[
-        'text-right text-gray-700',
+        'text-right text-neutral-700',
         mono ? 'font-mono text-xs' : '',
         wrap ? 'break-all text-xs' : '',
       ].join(' ')}>
