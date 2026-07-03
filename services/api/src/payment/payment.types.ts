@@ -11,6 +11,19 @@
  */
 import type { BillingPageSource } from '../print-jobs/print-page-count.types'
 
+/** 订单支付状态（对齐 `Order.payStatus`）。注意 `cancelled` 属 `Order.taskStatus`，不是 payStatus。 */
+export type OrderPayStatus = 'unpaid' | 'paid' | 'refunded' | 'failed'
+
+/**
+ * 支付来源（P0a 唯一合法取值）——只表示诚实的线下 / 免费 / 人工确认，绝不表示线上已收款：
+ * offline（线下收款）/ free（免费单）/ manual_confirmed（管理员人工确认）。
+ * `wechat` / `alipay` / `benefit` 为未来扩展，**本批禁止写入**。
+ */
+export type PaymentSource = 'offline' | 'free' | 'manual_confirmed'
+
+/** P0a 允许写入的 paymentSource 白名单（状态机与 verify 共用，避免各处硬编码）。 */
+export const P0A_ALLOWED_PAYMENT_SOURCES: readonly PaymentSource[] = ['offline', 'free', 'manual_confirmed'] as const
+
 /** 单条计费明细（单位：分）。 */
 export interface PrintPriceLine {
   /** 价目项键，如 print_bw_page / print_color_page。 */
