@@ -1,10 +1,13 @@
 // ============================================================
-// AssistantPage — Phase 9.5 腾讯 TRTC 实时语音通话版
+// AssistantPage — 腾讯 TRTC 实时语音通话（页内嵌入面板版）
 //
-// 两种模式：
-//   call  - 腾讯 TRTC 对话式 AI（照片背景 + 实时语音）
-//           进入页面自动通话，切换/离开自动挂断（组件卸载即清理）
-//   text  - 文字对话（降级 / 用户主动切换）
+// 2026-07-03 用户确认：取消独立全屏通话页（AiAdvisorCall.tsx 已删除）——
+//   - 进入页面 = 文字对话（不再进页自动通话）
+//   - 点「语音通话」→ 顶栏下方展开页内通话面板（AssistantCallPanel）；
+//     挂断/改用文字 → 面板收起，对话上下文全程保留
+//   - TRTC 会话逻辑在 hooks/useAiAdvisorCallSession.ts（原组件逐行搬移，
+//     卸载自动挂断 + 后端 stop 不持续计费）
+//   - 文字输入接页内拼音虚拟键盘（公共触控终端无物理键盘）
 //
 // 合规约束：
 //   - 跳转只允许白名单路由，不出现一键投递
@@ -28,6 +31,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@ai-job-print/ui'
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
+import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { chatWithAssistant } from '../../services/api'
 
 // 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
@@ -37,11 +41,11 @@ if (import.meta.env.DEV && !USE_VOICE_CALL) {
   console.warn('[assistant] 数字人未启用：本地联调数字人需设置 VITE_USE_TRTC_CALL=true。')
 }
 
-// 条件式懒加载：VITE_USE_TRTC_CALL=false 时 Vite 完全排除 AiAdvisorCall 及其 trtc-sdk-v5 依赖
+// 条件式懒加载：VITE_USE_TRTC_CALL=false 时 Vite 完全排除通话面板及其 trtc-sdk-v5 依赖
 // Vite 在构建时将 import.meta.env.VITE_USE_TRTC_CALL 替换为字面字符串，Rollup 再做死代码消除
-const LazyAiAdvisorCall = USE_VOICE_CALL
+const LazyCallPanel = USE_VOICE_CALL
   ? lazy(() =>
-      import('../../components/AiAdvisorCall').then((m) => ({ default: m.AiAdvisorCall })),
+      import('./AssistantCallPanel').then((m) => ({ default: m.AssistantCallPanel })),
     )
   : null
 
@@ -153,36 +157,19 @@ const WELCOME: Message = {
 // ─── 主组件 ───────────────────────────────────────────────
 
 export function AssistantPage() {
-  const navigate = useNavigate()
-
-  const [mode, setMode] = useState<'call' | 'text'>(USE_VOICE_CALL ? 'call' : 'text')
-
-  // ── 通话模式：渲染 TRTC 组件（懒加载，flag 关闭时 trtc chunk 不进构建）──
-  if (mode === 'call' && LazyAiAdvisorCall) {
-    return (
-      <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center bg-neutral-900">
-            <p className="text-sm text-neutral-400">通话模块加载中…</p>
-          </div>
-        }
-      >
-        <LazyAiAdvisorCall
-          onSwitchToText={() => setMode('text')}
-          onExit={() => navigate(-1)}
-        />
-      </Suspense>
-    )
-  }
-
-  // ── 文字模式 ──────────────────────────────────────────────
-  return <TextChat onSwitchToCall={USE_VOICE_CALL ? () => setMode('call') : undefined} />
+  return <TextChat voiceAvailable={USE_VOICE_CALL} />
 }
 
-// ─── 文字对话子组件 ────────────────────────────────────────
+// ─── 文字对话子组件（含页内通话面板 + 虚拟键盘） ────────────
 
-function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
+function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const navigate = useNavigate()
+  // 页内通话面板开关：点「语音通话」展开（点击手势满足自动播放策略），
+  // 挂断/再点一次收起（面板卸载即自动挂断 + 后端 stop）。
+  const [callActive, setCallActive] = useState(false)
+  // 页内虚拟键盘：点输入框弹出、点别处收起。
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const [searchParams] = useSearchParams()
   const toolboxSkill = useMemo(() => normalizeToolboxSkill(searchParams.get('intent')), [searchParams])
   const toolboxScene = toolboxSkill ? TOOLBOX_ASSISTANT_SCENES[toolboxSkill] : undefined
@@ -292,17 +279,35 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
           返回
         </button>
         <p className="text-sm font-medium text-neutral-700">{toolboxScene?.title ?? 'AI 就业服务助手'}</p>
-        {onSwitchToCall ? (
+        {voiceAvailable ? (
           <button
             type="button"
-            onClick={onSwitchToCall}
-            className="flex min-h-[48px] items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100 active:bg-primary-200 transition-colors"
+            onClick={() => setCallActive((v) => !v)}
+            aria-pressed={callActive}
+            className={`flex min-h-[48px] items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              callActive
+                ? 'border-primary-600 bg-primary-600 text-white active:bg-primary-700'
+                : 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 active:bg-primary-200'
+            }`}
           >
             <MicIcon className="h-4 w-4" />
-            语音通话
+            {callActive ? '通话中' : '语音通话'}
           </button>
         ) : <span className="w-12" />}
       </div>
+
+      {/* 页内语音通话面板：点「语音通话」展开；挂断/改用文字收起 */}
+      {voiceAvailable && callActive && LazyCallPanel && (
+        <Suspense
+          fallback={
+            <section className="acp">
+              <div className="acp-meta">通话模块加载中…</div>
+            </section>
+          }
+        >
+          <LazyCallPanel onEnd={() => setCallActive(false)} />
+        </Suspense>
+      )}
 
       {/* 对话历史 */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -364,10 +369,15 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
       <div className="shrink-0 border-t border-neutral-200 bg-white p-4">
         <div className="flex items-end gap-3">
           <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={toolboxScene?.placeholder ?? '输入问题，例如：如何优化我的简历？'}
+            onFocus={() => !loading && setKeyboardOpen(true)}
+            onClick={() => !loading && setKeyboardOpen(true)}
+            // 公共终端用页内虚拟键盘：抑制系统软键盘，但保留光标可编辑
+            inputMode="none"
+            placeholder={toolboxScene?.placeholder ?? '点这里，用屏幕键盘输入问题'}
             rows={2}
             disabled={loading}
             className="min-h-[60px] flex-1 resize-none rounded-xl border border-neutral-300 px-4 py-3.5 text-base leading-relaxed text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20 disabled:bg-neutral-50"
@@ -384,6 +394,18 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
         </div>
         <p className="mt-2 text-center text-xs text-neutral-400">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
       </div>
+
+      {/* 页内悬浮虚拟键盘：点输入框弹出、点别处收起（拼音/英文/符号三模式） */}
+      <KioskKeyboard
+        open={keyboardOpen}
+        value={input}
+        onChange={setInput}
+        onEnter={() => void handleSend()}
+        onClose={() => {
+          setKeyboardOpen(false)
+          inputRef.current?.blur()
+        }}
+      />
     </div>
   )
 }

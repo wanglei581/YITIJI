@@ -16,6 +16,8 @@
 - 删除、ignore、大文件外部归档、主工作区物料迁入前必须先确认并双模型审查。
 - 岗位 / 招聘会 / 政策继续只做第三方或官方来源信息入口；项目不是招聘平台。
 
+2026-07-03 补充：完成墨青纸感换装「阶段 1 · 独特增量迁移」（分支 `feature/inkpaper-stage1-unique`，基于 main `1a2ea75e`；来源为另一 worktree 提交 `a11fb9ea` 的择优搬移，与 main 已合入的全站换装 `68241007`/登录页 `867f5488` 不冲突）。内容：① 图标系统 `components/kiosk-icon/`（47 个 iconfont Symbol 双色图标，sprite 挂 KioskRoot）；② 拼音虚拟键盘 `components/kiosk-keyboard/`（悬浮全键盘，中文拼音候选/英文/符号三模式，离线精简词库）并接入助手页输入框（inputMode=none、点弹点收）；③ **AI 助手语音通话改页内嵌入面板**——删除全屏页 `AiAdvisorCall.tsx`，TRTC 会话逻辑逐行搬入 `hooks/useAiAdvisorCallSession.ts`（已核对 main 侧对原组件的改动仅 30 行 className 换色、零逻辑差异），新增 `AssistantCallPanel.tsx` + 自包含 `.acp` 样式，进页默认文字对话、点「语音通话」页内展开、挂断/卸载自动 exitRoom+后端 stop。范围收窄：未动登录页/HomePage 整体/ProfilePage/Campus/Companies/Help 等 main 已铺开页面。验证：tsc 0 错、lint 仅 2 条 main 既有 warning、生产构建通过；浏览器实测 键盘「jianli→简历→上屏→点外收起」闭环、通话面板**真实接通腾讯云**（通话中→无麦克风降级只听→挂断→后端日志「已启动/已结束」成对，计费即停）。真机麦克风双向对话仍需预生产/真机验收。
+
 2026-07-02 补充：完成百宝箱微应用平台首批低风险 AI skill intent 接线（代码侧）。Kiosk `/assistant` 已支持从百宝箱进入 `Offer 对比`、`薪资谈判话术`、`HR 知识问答` 三类受控场景，前台透传 `offer_compare` / `salary_negotiation` / `hr_qa`，后端 DTO / LLM 服务优先使用入口 intent 并注入合规边界，前后端 mock 可演示。新增 `verify:toolbox-ai-skill-intents` 防回退。本项不代表预生产与真实模型联调完成，也不代表微应用商用上线完成。
 
 2026-07-02 补充：完成百宝箱首批低风险 AI skill 真实验收执行包（文档与静态门禁）。新增 `docs/acceptance/toolbox-ai-skill-real-acceptance.md`、`docs/acceptance/toolbox-ai-skill-real-execution-record.md` 和 `verify:toolbox-ai-skill-real-acceptance`，覆盖本地门禁、预生产只读预检、真实 LLM 边界探针、Kiosk 浏览器链路、公共终端隐私竞态和上线阻断项。该执行包创建时尚未执行预生产真实模型联调；后续 TAS-G2 已完成，见本页后续记录。当前仍未执行真实 Kiosk 浏览器验收或真实终端验收；不得宣称首批 AI skill 商用上线完成。
