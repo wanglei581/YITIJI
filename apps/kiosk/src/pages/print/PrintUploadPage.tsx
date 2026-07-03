@@ -126,8 +126,8 @@ export function PrintUploadPage() {
               <PrinterIcon className="h-7 w-7" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-gray-900">先查看账号里的简历记录</p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
+              <p className="text-lg font-bold text-neutral-900">先查看账号里的简历记录</p>
+              <p className="mt-1 text-sm leading-relaxed text-neutral-600">
                 已生成的简历可继续查看并打印；诊断类记录可查看报告或继续优化。已有电子简历也可以在下方上传后直接打印。
               </p>
             </div>
@@ -158,10 +158,10 @@ export function PrintUploadPage() {
             onClick={() => { if (!disabled) { setTab(key); setFile(null); setUploadError(null) } }}
             className={[
               'flex flex-1 min-h-[56px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
-              disabled ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300' :
+              disabled ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300' :
               tab === key
                 ? 'border-primary-600 bg-primary-50 text-primary-600'
-                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700',
+                : 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700',
             ].join(' ')}
           >
             <Icon className="h-5 w-5" />
@@ -177,7 +177,7 @@ export function PrintUploadPage() {
           <div className="flex flex-1 flex-col gap-3">
             {/* A2 mode banner */}
             {API_MODE === 'http' && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
                 <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>桌面浏览器验证模式 — 生产 Kiosk 将切换为 Agent 文件中转（A1）</span>
               </div>
@@ -194,7 +194,7 @@ export function PrintUploadPage() {
 
             {/* Upload error */}
             {uploadError && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
                 <AlertCircleIcon className="h-4 w-4 shrink-0" />
                 {uploadError}
               </div>
@@ -206,35 +206,35 @@ export function PrintUploadPage() {
                   <FileTextIcon className="h-6 w-6 text-primary-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium text-gray-900">{file.name}</p>
-                  <p className="mt-0.5 text-sm text-gray-500">{file.size} · 页数待识别</p>
+                  <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                  <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 页数待识别</p>
                 </div>
                 <button
                   onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-gray-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
                 >
-                  <XIcon className="h-4 w-4 text-gray-400" />
+                  <XIcon className="h-4 w-4 text-neutral-400" />
                 </button>
               </Card>
             ) : (
               <button
                 onClick={handleSelectClick}
                 disabled={uploading}
-                className="flex flex-1 w-full flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-gray-300 bg-white hover:border-primary-400 hover:bg-primary-50 transition-colors min-h-[200px] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex flex-1 w-full flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-neutral-300 bg-white hover:border-primary-400 hover:bg-primary-50 transition-colors min-h-[200px] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {uploading ? (
                   <>
                     <LoaderIcon className="h-10 w-10 animate-spin text-primary-400" />
-                    <p className="text-base font-medium text-gray-600">上传中…</p>
+                    <p className="text-base font-medium text-neutral-600">上传中…</p>
                   </>
                 ) : (
                   <>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-                      <FileTextIcon className="h-8 w-8 text-gray-400" />
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
+                      <FileTextIcon className="h-8 w-8 text-neutral-400" />
                     </div>
                     <div className="text-center">
-                      <p className="text-lg font-medium text-gray-700">{source === 'resume' ? '点击选择简历文件' : '点击选择文件'}</p>
-                      <p className="mt-1.5 text-sm text-gray-400">
+                      <p className="text-lg font-medium text-neutral-700">{source === 'resume' ? '点击选择简历文件' : '点击选择文件'}</p>
+                      <p className="mt-1.5 text-sm text-neutral-400">
                         {source === 'resume'
                           ? '支持 PDF、图片格式，适合已有电子简历直接打印'
                           : '支持 PDF、图片格式，上传后将先做材料检查'}
@@ -249,35 +249,35 @@ export function PrintUploadPage() {
 
         {tab === 'qr' && (
           <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
-            <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-gray-100">
-              <QrCodeIcon className="h-24 w-24 text-gray-300" />
+            <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-neutral-100">
+              <QrCodeIcon className="h-24 w-24 text-neutral-300" />
             </div>
             <div className="text-center">
-              <p className="text-lg font-medium text-gray-800">请用手机扫码上传</p>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="text-lg font-medium text-neutral-800">请用手机扫码上传</p>
+              <p className="mt-2 text-sm text-neutral-500">
                 扫描二维码后在手机端选择文件，
                 <br />
                 上传完成后此处将自动显示文件
               </p>
             </div>
-            <p className="text-sm text-gray-400">（扫码上传功能开发中）</p>
+            <p className="text-sm text-neutral-400">（扫码上传功能开发中）</p>
           </Card>
         )}
 
         {tab === 'usb' && (
           <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">
-              <UsbIcon className="h-10 w-10 text-gray-400" />
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
+              <UsbIcon className="h-10 w-10 text-neutral-400" />
             </div>
             <div className="text-center">
-              <p className="text-lg font-medium text-gray-800">请插入 U 盘</p>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="text-lg font-medium text-neutral-800">请插入 U 盘</p>
+              <p className="mt-2 text-sm text-neutral-500">
                 连接后系统将自动读取 U 盘内文件，
                 <br />
                 请确保文件格式为 PDF 或图片
               </p>
             </div>
-            <p className="text-sm text-gray-400">（U 盘导入通过 Terminal Agent 中转，开发中）</p>
+            <p className="text-sm text-neutral-400">（U 盘导入通过 Terminal Agent 中转，开发中）</p>
           </Card>
         )}
       </div>

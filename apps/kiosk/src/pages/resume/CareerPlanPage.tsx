@@ -40,7 +40,7 @@ function Section({ icon: Icon, title, children }: { icon: React.ElementType; tit
     <Card className="p-5">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
       </div>
       {children}
     </Card>
@@ -123,9 +123,9 @@ export function CareerPlanPage() {
   if (!taskId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-        <CompassIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
-        <p className="text-base font-semibold text-gray-900">先上传简历，再生成职业规划</p>
-        <p className="max-w-md text-center text-sm text-gray-500">
+        <CompassIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
+        <p className="text-base font-semibold text-neutral-900">先上传简历，再生成职业规划</p>
+        <p className="max-w-md text-center text-sm text-neutral-500">
           职业规划基于你的真实简历生成；完成简历诊断后，还可结合岗位匹配参考与模拟面试表现，建议会更具体
         </p>
         <Button size="lg" className="h-14 px-8" onClick={() => navigate('/resume/source?intent=diagnose')}>
@@ -137,7 +137,7 @@ export function CareerPlanPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-gray-400">
+      <div className="flex h-full items-center justify-center gap-2 text-neutral-400">
         <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" />
         正在加载…
       </div>
@@ -159,16 +159,16 @@ export function CareerPlanPage() {
           </ComplianceBanner>
 
           <Card className="p-5">
-            <h2 className="text-base font-semibold text-gray-900">总览</h2>
-            <p className="mt-2 text-sm leading-relaxed text-gray-700">{plan.summary}</p>
+            <h2 className="text-base font-semibold text-neutral-900">总览</h2>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-700">{plan.summary}</p>
           </Card>
 
           <Section icon={UserRoundCheckIcon} title="现状画像（含简历原文依据）">
             <div className="flex flex-col gap-2.5">
               {(plan.currentSnapshot ?? []).map((c) => (
-                <div key={c.point.slice(0, 24)} className="rounded-xl bg-gray-50/80 px-4 py-3">
-                  <p className="text-sm font-medium text-gray-900">{c.point}</p>
-                  <p className="mt-1 text-xs text-gray-500">依据：“{c.evidence}”</p>
+                <div key={c.point.slice(0, 24)} className="rounded-xl bg-neutral-50/80 px-4 py-3">
+                  <p className="text-sm font-medium text-neutral-900">{c.point}</p>
+                  <p className="mt-1 text-xs text-neutral-500">依据：“{c.evidence}”</p>
                 </div>
               ))}
             </div>
@@ -179,8 +179,8 @@ export function CareerPlanPage() {
               {(plan.directions ?? []).map((d, i) => (
                 <div key={d.title} className="rounded-xl border border-primary-100 bg-primary-50/40 p-4">
                   <p className="text-sm font-bold text-primary-800">{i + 1}. {d.title}</p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-gray-600">为什么适合：{d.why}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-700"><span className="font-semibold">第一步：</span>{d.firstStep}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-neutral-600">为什么适合：{d.why}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-700"><span className="font-semibold">第一步：</span>{d.firstStep}</p>
                 </div>
               ))}
             </div>
@@ -189,11 +189,11 @@ export function CareerPlanPage() {
           <Section icon={TargetIcon} title="技能提升计划">
             <div className="flex flex-col gap-2">
               {(plan.skillPlan ?? []).map((s) => (
-                <div key={s.skill} className="flex items-start gap-3 rounded-xl bg-gray-50/80 px-4 py-3">
+                <div key={s.skill} className="flex items-start gap-3 rounded-xl bg-neutral-50/80 px-4 py-3">
                   <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-primary-700 shadow-sm">{s.timeframe}</span>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{s.skill}</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-gray-600">{s.action}</p>
+                    <p className="text-sm font-medium text-neutral-900">{s.skill}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{s.action}</p>
                   </div>
                 </div>
               ))}
@@ -203,8 +203,8 @@ export function CareerPlanPage() {
           <Section icon={ClipboardListIcon} title="近期行动清单">
             <ul className="flex flex-col gap-2">
               {(plan.actionChecklist ?? []).map((a) => (
-                <li key={a.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-gray-300" aria-hidden="true" />
+                <li key={a.slice(0, 24)} className="flex items-start gap-2.5 text-sm leading-relaxed text-neutral-700">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border border-neutral-300" aria-hidden="true" />
                   {a}
                 </li>
               ))}
@@ -213,7 +213,7 @@ export function CareerPlanPage() {
 
           {/* CTA 串联（结果页链路，不新增首页入口） */}
           <Card className="p-4">
-            <p className="mb-2 text-xs font-medium text-gray-500">继续下一步</p>
+            <p className="mb-2 text-xs font-medium text-neutral-500">继续下一步</p>
             <div className="grid grid-cols-3 gap-2">
               <Button variant="secondary" className="h-12" onClick={() => navigate('/resume/optimize', { state: { taskId, accessToken } })}>
                 <PencilLineIcon className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -230,10 +230,10 @@ export function CareerPlanPage() {
             </div>
           </Card>
 
-          {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+        <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
           <div className="flex gap-3">
             <Button size="lg" className="h-14 flex-1 text-base" disabled={printing} onClick={() => void handlePrint()}>
               <PrinterIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
@@ -266,26 +266,26 @@ export function CareerPlanPage() {
               <CompassIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">将为你生成</h2>
-              <ul className="mt-2 flex flex-col gap-1.5 text-sm text-gray-600">
+              <h2 className="text-lg font-bold text-neutral-900">将为你生成</h2>
+              <ul className="mt-2 flex flex-col gap-1.5 text-sm text-neutral-600">
                 <li>· 现状画像（每条附简历原文依据，不编造）</li>
                 <li>· 1-3 个发展方向建议与第一步行动</li>
                 <li>· 分阶段技能提升计划</li>
                 <li>· 近期可执行行动清单（可打印带走）</li>
               </ul>
-              <p className="mt-3 text-xs text-gray-400">
+              <p className="mt-3 text-xs text-neutral-400">
                 如你已做过岗位匹配参考或模拟面试，本次规划会自动结合这些表现，建议更具体；没有也可直接生成。
               </p>
             </div>
           </div>
         </Card>
         {error && (
-          <div className="rounded-xl bg-red-50 px-4 py-3">
-            <p className="text-sm text-red-600">{error}</p>
+          <div className="rounded-xl bg-error-bg px-4 py-3">
+            <p className="text-sm text-error-fg">{error}</p>
           </div>
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="h-14 w-full text-base" disabled={generating} onClick={() => void handleGenerate()}>
           {generating ? (
             <>

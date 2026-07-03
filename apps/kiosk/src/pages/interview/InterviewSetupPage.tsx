@@ -75,7 +75,7 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
       onClick={onClick}
       className={[
         'min-h-[52px] rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors',
-        active ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300',
+        active ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300',
         className,
       ].join(' ')}
     >
@@ -89,8 +89,8 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: s
     <div className="mb-4 flex items-start gap-2">
       <Icon className="mt-0.5 h-5 w-5 text-primary-600" aria-hidden="true" />
       <div>
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-        {desc && <p className="mt-0.5 text-xs text-gray-500">{desc}</p>}
+        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
+        {desc && <p className="mt-0.5 text-xs text-neutral-500">{desc}</p>}
       </div>
     </div>
   )
@@ -98,9 +98,9 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: s
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="max-w-[13rem] text-right text-sm font-semibold text-gray-900">{value}</span>
+    <div className="flex items-start justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
+      <span className="text-sm text-neutral-500">{label}</span>
+      <span className="max-w-[13rem] text-right text-sm font-semibold text-neutral-900">{value}</span>
     </div>
   )
 }
@@ -208,7 +208,7 @@ export function InterviewSetupPage() {
                 {INTERVIEWERS.map((it) => (
                   <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)} className="text-left">
                     <span className="block font-semibold">{it.label}</span>
-                    <span className="mt-0.5 block text-xs font-normal leading-relaxed text-gray-500">{it.desc}</span>
+                    <span className="mt-0.5 block text-xs font-normal leading-relaxed text-neutral-500">{it.desc}</span>
                   </OptionButton>
                 ))}
               </div>
@@ -216,7 +216,7 @@ export function InterviewSetupPage() {
                 {DIFFICULTIES.map((d) => (
                   <OptionButton key={d.key} active={difficulty === d.key} onClick={() => setDifficulty(d.key)} className="text-center">
                     <span className="block font-semibold">{d.label}</span>
-                    <span className="mt-0.5 block text-[11px] font-normal leading-tight text-gray-500">{d.desc}</span>
+                    <span className="mt-0.5 block text-[11px] font-normal leading-tight text-neutral-500">{d.desc}</span>
                   </OptionButton>
                 ))}
               </div>
@@ -240,8 +240,8 @@ export function InterviewSetupPage() {
                 className={[
                   'mt-4 min-h-[56px] w-full rounded-xl border px-4 text-base focus:outline-none focus:ring-2',
                   positionReady
-                    ? 'border-gray-200 focus:border-primary-500 focus:ring-primary-100'
-                    : 'border-orange-200 bg-orange-50/40 focus:border-orange-400 focus:ring-orange-100',
+                    ? 'border-neutral-200 focus:border-primary-500 focus:ring-primary-100'
+                    : 'border-warning/30 bg-warning-bg/40 focus:border-warning focus:ring-warning-bg',
                 ].join(' ')}
               />
               <div className="mt-3 flex flex-wrap gap-2">
@@ -250,7 +250,7 @@ export function InterviewSetupPage() {
                     key={p}
                     type="button"
                     onClick={() => { setPosition(p); setError(null) }}
-                    className="min-h-[40px] rounded-full bg-gray-100 px-4 text-sm text-gray-600 hover:bg-gray-200"
+                    className="min-h-[40px] rounded-full bg-neutral-100 px-4 text-sm text-neutral-600 hover:bg-neutral-200"
                   >
                     {p}
                   </button>
@@ -274,7 +274,7 @@ export function InterviewSetupPage() {
                   {DURATIONS.map((d) => (
                     <OptionButton key={d.key} active={duration === d.key} onClick={() => setDuration(d.key)} className="text-left">
                       <span className="block font-semibold">{d.label}</span>
-                      <span className="mt-0.5 block text-xs font-normal text-gray-500">{d.desc}</span>
+                      <span className="mt-0.5 block text-xs font-normal text-neutral-500">{d.desc}</span>
                     </OptionButton>
                   ))}
                 </div>
@@ -290,7 +290,7 @@ export function InterviewSetupPage() {
                     type="button"
                     onClick={() => setResumeFile(null)}
                     aria-label="移除简历"
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 hover:bg-white"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-neutral-400 hover:bg-white"
                   >
                     <XIcon className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -301,7 +301,7 @@ export function InterviewSetupPage() {
                     {uploading ? <Loader2Icon className="mr-2 h-4 w-4 animate-spin" /> : <FileTextIcon className="mr-2 h-4 w-4" aria-hidden="true" />}
                     上传简历
                   </Button>
-                  <div className="flex min-h-[56px] items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 text-sm text-gray-500">
+                  <div className="flex min-h-[56px] items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-4 text-sm text-neutral-500">
                     不上传也可以开始练习
                   </div>
                 </div>
@@ -320,9 +320,9 @@ export function InterviewSetupPage() {
             <Card className="p-5">
               <div className="mb-4 flex items-center gap-2">
                 <CheckCircle2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-                <h2 className="text-base font-semibold text-gray-900">本次练习摘要</h2>
+                <h2 className="text-base font-semibold text-neutral-900">本次练习摘要</h2>
               </div>
-              <div className="rounded-xl border border-gray-100 bg-gray-50 px-4">
+              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4">
                 <SummaryRow label="面试官类型" value={interviewerLabel} />
                 <SummaryRow label="行业" value={industry} />
                 <SummaryRow label="目标岗位" value={positionReady ? position.trim() : '待填写'} />
@@ -332,12 +332,12 @@ export function InterviewSetupPage() {
                 <SummaryRow label="使用简历" value={resumeFile ? resumeFile.name : '不使用简历'} />
               </div>
               {!positionReady && (
-                <div className="mt-4 flex items-start gap-2 rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+                <div className="mt-4 flex items-start gap-2 rounded-xl border border-warning-bg bg-warning-bg px-4 py-3 text-sm text-warning-fg">
                   <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   请填写目标岗位后开始模拟面试。
                 </div>
               )}
-              <div className="mt-4 rounded-xl border border-gray-100 px-4 py-3 text-xs leading-relaxed text-gray-500">
+              <div className="mt-4 rounded-xl border border-neutral-100 px-4 py-3 text-xs leading-relaxed text-neutral-500">
                 报告将基于你的问题回答、跳过记录和确认后的转写文本生成，仅供本人练习复盘。
               </div>
             </Card>
@@ -345,11 +345,11 @@ export function InterviewSetupPage() {
         </div>
 
         {error && (
-          <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p>
+          <p className="mt-4 rounded-xl bg-error-bg px-4 py-3 text-sm font-medium text-error-fg">{error}</p>
         )}
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="h-14 w-full text-base" disabled={creating || uploading} onClick={() => void handleStart()}>
           {creating ? (
             <>

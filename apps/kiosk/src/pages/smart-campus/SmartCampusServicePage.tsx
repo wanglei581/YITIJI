@@ -115,11 +115,11 @@ export function SmartCampusServicePage() {
   if (!isServiceKey(key)) {
     return (
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-          <PartyPopperIcon className="h-8 w-8 text-gray-400" aria-hidden="true" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
+          <PartyPopperIcon className="h-8 w-8 text-neutral-400" aria-hidden="true" />
         </div>
-        <h1 className="mt-5 text-lg font-semibold text-gray-900">未找到该服务</h1>
-        <p className="mt-1.5 text-sm text-gray-500">请返回智慧校园选择可用服务</p>
+        <h1 className="mt-5 text-lg font-semibold text-neutral-900">未找到该服务</h1>
+        <p className="mt-1.5 text-sm text-neutral-500">请返回智慧校园选择可用服务</p>
         <Button size="lg" className="mt-7" onClick={() => navigate('/smart-campus')}>
           返回智慧校园
         </Button>
@@ -134,8 +134,8 @@ export function SmartCampusServicePage() {
     <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{info.title}</h1>
-          <p className="mt-0.5 text-sm text-gray-500">{info.subtitle}</p>
+          <h1 className="text-xl font-bold text-neutral-900">{info.title}</h1>
+          <p className="mt-0.5 text-sm text-neutral-500">{info.subtitle}</p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => navigate('/smart-campus')}>
           返回
@@ -143,9 +143,9 @@ export function SmartCampusServicePage() {
       </div>
 
       {/* 合规来源条 */}
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-emerald-900">
+      <div className="mb-5 flex items-start gap-2 rounded-xl border border-success-bg bg-success-bg/60 px-4 py-3">
+        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-success-fg">
           校方官方信息入口，仅展示与指引，<span className="font-semibold">不在本终端采集任何个人信息</span>；
           实际办理请前往现场服务窗口或学校官方自助平台。
         </p>
@@ -154,12 +154,12 @@ export function SmartCampusServicePage() {
       {/* 服务概览 */}
       <Card className="mb-4 p-5">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-indigo-50">
-            <Icon className="h-8 w-8 text-indigo-600" aria-hidden="true" />
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
+            <Icon className="h-8 w-8 text-plum" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-gray-900">{info.title}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-gray-500">{info.summary}</p>
+            <h2 className="text-lg font-bold text-neutral-900">{info.title}</h2>
+            <p className="mt-1 text-sm leading-relaxed text-neutral-500">{info.summary}</p>
           </div>
         </div>
       </Card>
@@ -167,13 +167,13 @@ export function SmartCampusServicePage() {
       {/* 办理事项 / 开通内容 */}
       <Card className="mb-4 p-5">
         <div className="mb-3 flex items-center gap-2">
-          <ClipboardListIcon className="h-4 w-4 text-indigo-600" aria-hidden="true" />
-          <p className="text-sm font-semibold text-gray-700">{info.itemsTitle}</p>
+          <ClipboardListIcon className="h-4 w-4 text-plum" aria-hidden="true" />
+          <p className="text-sm font-semibold text-neutral-700">{info.itemsTitle}</p>
         </div>
         <ul className="space-y-2.5">
           {info.items.map((item) => (
-            <li key={item} className="flex items-start gap-2.5 text-sm text-gray-600">
-              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" aria-hidden="true" />
+            <li key={item} className="flex items-start gap-2.5 text-sm text-neutral-600">
+              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-plum" aria-hidden="true" />
               <span>{item}</span>
             </li>
           ))}
@@ -182,11 +182,11 @@ export function SmartCampusServicePage() {
 
       {/* 所需材料 */}
       <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">所需材料</p>
+        <p className="mb-3 text-sm font-semibold text-neutral-700">所需材料</p>
         <ul className="space-y-2.5">
           {info.materials.map((m) => (
-            <li key={m} className="flex items-start gap-2.5 text-sm text-gray-600">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" aria-hidden="true" />
+            <li key={m} className="flex items-start gap-2.5 text-sm text-neutral-600">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-300" aria-hidden="true" />
               <span>{m}</span>
             </li>
           ))}
@@ -195,28 +195,28 @@ export function SmartCampusServicePage() {
 
       {/* 办理地点 */}
       <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">办理地点</p>
+        <p className="mb-3 text-sm font-semibold text-neutral-700">办理地点</p>
         <div className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2.5">
-          <MapPinIcon className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
-          <p className="text-sm text-gray-800">{info.location}</p>
+          <MapPinIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+          <p className="text-sm text-neutral-800">{info.location}</p>
         </div>
       </Card>
 
       {/* 现场办理提示 */}
-      <div className="mb-2 flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50/70 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-amber-900">{info.note}</p>
+      <div className="mb-2 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning-bg/70 px-4 py-3">
+        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-warning-fg">{info.note}</p>
       </div>
 
       {/* 顺带导向迎新指引（真实可达页面），避免死路 */}
       <button
         type="button"
         onClick={() => navigate('/smart-campus/welcome')}
-        className="mt-2 flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-indigo-200 active:bg-indigo-50"
+        className="mt-2 flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-plum/30 active:bg-plum-soft"
       >
-        <PartyPopperIcon className="h-5 w-5 shrink-0 text-indigo-600" aria-hidden="true" />
-        <span className="flex-1 text-sm font-medium text-gray-800">查看迎新报到指引</span>
-        <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+        <PartyPopperIcon className="h-5 w-5 shrink-0 text-plum" aria-hidden="true" />
+        <span className="flex-1 text-sm font-medium text-neutral-800">查看迎新报到指引</span>
+        <ChevronRightIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
       </button>
 
       <div className="h-2" />

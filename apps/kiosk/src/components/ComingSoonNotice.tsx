@@ -34,18 +34,18 @@ export function useComingSoonNotice() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50">
-            <InfoIcon className="h-5 w-5 text-blue-600" aria-hidden="true" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50">
+            <InfoIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-base font-semibold text-gray-900">功能即将上线</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{message}</p>
+            <p className="text-base font-semibold text-neutral-900">功能即将上线</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-neutral-600">{message}</p>
           </div>
           <button
             type="button"
             onClick={close}
             aria-label="关闭"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100"
           >
             <XIcon className="h-5 w-5" aria-hidden="true" />
           </button>

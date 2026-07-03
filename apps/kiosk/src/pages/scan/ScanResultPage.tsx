@@ -81,21 +81,21 @@ export function ScanResultPage() {
       <div
         className={[
           'mb-8 flex h-24 w-24 items-center justify-center rounded-full',
-          success ? 'bg-green-50' : 'bg-red-50',
+          success ? 'bg-success-bg' : 'bg-error-bg',
         ].join(' ')}
       >
         {success ? (
-          <CheckCircleIcon className="h-14 w-14 text-green-600" />
+          <CheckCircleIcon className="h-14 w-14 text-success-fg" />
         ) : (
-          <AlertCircleIcon className="h-14 w-14 text-red-500" />
+          <AlertCircleIcon className="h-14 w-14 text-error-fg" />
         )}
       </div>
 
       {/* 标题 / 描述 */}
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="text-2xl font-bold text-neutral-900">
         {success ? '扫描完成' : '扫描失败'}
       </h1>
-      <p className="mt-2 text-base text-gray-500">
+      <p className="mt-2 text-base text-neutral-500">
         {success
           ? '文件已生成，请选择下一步操作'
           : (reason ?? '扫描任务未能完成，请重试或联系工作人员')}
@@ -109,8 +109,8 @@ export function ScanResultPage() {
               <FileTextIcon className="h-5 w-5 text-primary-600" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-gray-900">{file.name}</p>
-              <p className="text-xs text-gray-500">
+              <p className="truncate text-sm font-medium text-neutral-900">{file.name}</p>
+              <p className="text-xs text-neutral-500">
                 {file.pages} 页 · {file.size} · {file.format}
               </p>
             </div>

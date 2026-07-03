@@ -49,8 +49,8 @@ export default function ToolboxPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">百宝箱 / 微应用治理</h1>
-          <p className="mt-0.5 text-sm text-gray-500">审核发布微应用、维护域名双白名单，并保留终端投放配置能力。</p>
+          <h1 className="text-xl font-bold text-neutral-900">百宝箱 / 微应用治理</h1>
+          <p className="mt-0.5 text-sm text-neutral-500">审核发布微应用、维护域名双白名单，并保留终端投放配置能力。</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {tabs.map((tab) => (

@@ -135,13 +135,13 @@ export function ProfilePage() {
 
       {/* 提示 toast */}
       {toastMsg && (
-        <div className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-green-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-success px-5 py-2.5 text-sm font-medium text-white shadow-lg">
           <CheckCircleIcon className="h-4 w-4 shrink-0" />
           {toastMsg}
           <button
             onClick={() => setToastMsg(null)}
             aria-label="关闭提示"
-            className="ml-1 rounded-full p-0.5 hover:bg-green-500"
+            className="ml-1 rounded-full p-0.5 hover:bg-success"
           >
             <XIcon className="h-3.5 w-3.5" />
           </button>
@@ -167,7 +167,7 @@ export function ProfilePage() {
       )}
 
       {/* 合规说明 — 诚实化：我的页只做入口与概览；游客仅本次会话 */}
-      <p className="text-center text-xs leading-relaxed text-gray-400">
+      <p className="text-center text-xs leading-relaxed text-neutral-400">
         {isLoggedIn
           ? '本人数据仅本人可见，留存到期后自动清理；各类记录将逐步归位到对应业务页面'
           : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人服务概览'}

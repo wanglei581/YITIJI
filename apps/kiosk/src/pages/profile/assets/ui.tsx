@@ -17,15 +17,15 @@ export function RowIconButton({
 }) {
   const toneCls =
     tone === 'danger'
-      ? 'text-gray-400 hover:bg-red-50 hover:text-red-500'
-      : 'text-gray-500 hover:bg-gray-50'
+      ? 'text-neutral-400 hover:bg-error-bg hover:text-error-fg'
+      : 'text-neutral-500 hover:bg-neutral-50'
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
       aria-label={title}
-      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 ${toneCls}`}
+      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-neutral-200 ${toneCls}`}
     >
       <Icon className="h-5 w-5" aria-hidden="true" />
     </button>

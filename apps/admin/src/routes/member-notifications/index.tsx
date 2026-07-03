@@ -21,9 +21,9 @@ const CATEGORY_LABEL: Record<SystemBroadcastCategory, string> = {
 }
 
 const CATEGORY_CLASS: Record<SystemBroadcastCategory, string> = {
-  system: 'bg-blue-50 text-blue-600',
-  maintenance: 'bg-amber-50 text-amber-600',
-  notice: 'bg-emerald-50 text-emerald-600',
+  system: 'bg-info-bg text-info-fg',
+  maintenance: 'bg-warning-bg text-warning-fg',
+  notice: 'bg-success-bg text-success-fg',
 }
 
 function fmt(iso: string): string {
@@ -104,35 +104,35 @@ export default function MemberNotificationsPage() {
         <button
           type="button"
           onClick={() => void load()}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50"
         >
           <RefreshCwIcon className="h-4 w-4" />
           刷新
         </button>
       }
     >
-      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
         广播内容用于系统维护、设备服务、文件处理和打印服务说明；后端会拦截不合规内容并在此显示错误。
       </div>
 
       {message && (
-        <div className="mb-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">{message}</div>
+        <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-4 py-2.5 text-sm text-warning-fg">{message}</div>
       )}
 
       <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
         <Card className="p-4">
           <div className="mb-3 flex items-center gap-2">
             <PlusIcon className="h-4 w-4 text-primary-600" />
-            <p className="text-sm font-semibold text-gray-900">创建广播</p>
+            <p className="text-sm font-semibold text-neutral-900">创建广播</p>
           </div>
 
           <form onSubmit={(event) => void create(event)} className="space-y-3">
             <div>
-              <label className="text-xs font-medium text-gray-500">分类</label>
+              <label className="text-xs font-medium text-neutral-500">分类</label>
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value as SystemBroadcastCategory)}
-                className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm"
+                className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm"
               >
                 {CATEGORIES.map((item) => (
                   <option key={item.value} value={item.value}>{item.label} · {item.hint}</option>
@@ -140,30 +140,30 @@ export default function MemberNotificationsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">标题</label>
+              <label className="text-xs font-medium text-neutral-500">标题</label>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="mt-1 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-primary-500"
+                className="mt-1 h-10 w-full rounded-lg border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500"
                 maxLength={80}
                 placeholder="例如：系统维护提醒"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">内容</label>
+              <label className="text-xs font-medium text-neutral-500">内容</label>
               <textarea
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
-                className="mt-1 min-h-[150px] w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-primary-500"
+                className="mt-1 min-h-[150px] w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-primary-500"
                 maxLength={800}
                 placeholder="填写系统维护、设备服务、文件处理或打印服务说明"
               />
-              <p className="mt-1 text-right text-xs text-gray-400">{content.length} / 800</p>
+              <p className="mt-1 text-right text-xs text-neutral-400">{content.length} / 800</p>
             </div>
             <button
               type="submit"
               disabled={submitting}
-              className="flex h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-gray-300"
+              className="flex h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:bg-neutral-300"
             >
               <MegaphoneIcon className="h-4 w-4" />
               {submitting ? '提交中…' : '创建广播'}
@@ -173,8 +173,8 @@ export default function MemberNotificationsPage() {
 
         <Card className="p-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-900">广播列表</p>
-            <p className="text-xs text-gray-400">{items.length} 条</p>
+            <p className="text-sm font-semibold text-neutral-900">广播列表</p>
+            <p className="text-xs text-neutral-400">{items.length} 条</p>
           </div>
 
           {state === 'loading' && <LoadingState className="py-24" />}
@@ -185,31 +185,31 @@ export default function MemberNotificationsPage() {
           {state === 'ready' && items.length > 0 && (
             <div className="flex flex-col gap-3">
               {items.map((item) => (
-                <div key={item.id} className={['rounded-lg border p-4', item.deletedAt ? 'border-gray-100 bg-gray-50' : 'border-gray-100'].join(' ')}>
+                <div key={item.id} className={['rounded-lg border p-4', item.deletedAt ? 'border-neutral-100 bg-neutral-50' : 'border-neutral-100'].join(' ')}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-gray-900">{item.title}</p>
+                        <p className="truncate text-sm font-semibold text-neutral-900">{item.title}</p>
                         <span className={['rounded-full px-2.5 py-1 text-xs font-medium', CATEGORY_CLASS[item.category]].join(' ')}>
                           {CATEGORY_LABEL[item.category]}
                         </span>
                         {item.deletedAt && (
-                          <span className="rounded-full bg-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500">已撤回</span>
+                          <span className="rounded-full bg-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-500">已撤回</span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs text-gray-400">创建于 {fmt(item.createdAt)}{item.deletedAt ? ` · 撤回于 ${fmt(item.deletedAt)}` : ''}</p>
+                      <p className="mt-1 text-xs text-neutral-400">创建于 {fmt(item.createdAt)}{item.deletedAt ? ` · 撤回于 ${fmt(item.deletedAt)}` : ''}</p>
                     </div>
                     <button
                       type="button"
                       disabled={submitting || Boolean(item.deletedAt)}
                       onClick={() => void remove(item)}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 disabled:cursor-not-allowed disabled:text-gray-300"
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 disabled:cursor-not-allowed disabled:text-neutral-300"
                     >
                       <Trash2Icon className="h-3.5 w-3.5" />
                       撤回
                     </button>
                   </div>
-                  <p className={['mt-3 whitespace-pre-wrap text-sm leading-relaxed', item.deletedAt ? 'text-gray-400' : 'text-gray-600'].join(' ')}>
+                  <p className={['mt-3 whitespace-pre-wrap text-sm leading-relaxed', item.deletedAt ? 'text-neutral-400' : 'text-neutral-600'].join(' ')}>
                     {item.content}
                   </p>
                 </div>

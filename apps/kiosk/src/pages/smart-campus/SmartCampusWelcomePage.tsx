@@ -53,8 +53,8 @@ export function SmartCampusWelcomePage() {
     <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">迎新系统</h1>
-          <p className="mt-0.5 text-sm text-gray-500">报到指引与入学准备</p>
+          <h1 className="text-xl font-bold text-neutral-900">迎新系统</h1>
+          <p className="mt-0.5 text-sm text-neutral-500">报到指引与入学准备</p>
         </div>
         <Button size="sm" variant="secondary" onClick={() => navigate('/smart-campus')}>
           返回
@@ -62,9 +62,9 @@ export function SmartCampusWelcomePage() {
       </div>
 
       {/* 合规来源条 */}
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-emerald-900">
+      <div className="mb-5 flex items-start gap-2 rounded-xl border border-success-bg bg-success-bg/60 px-4 py-3">
+        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" aria-hidden="true" />
+        <p className="text-xs leading-relaxed text-success-fg">
           校方官方信息入口，仅展示与指引，<span className="font-semibold">不在本终端采集任何个人信息</span>；
           报到登记请前往学校官方系统办理。
         </p>
@@ -72,16 +72,16 @@ export function SmartCampusWelcomePage() {
 
       {/* 报到流程 */}
       <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">报到流程</p>
+        <p className="mb-3 text-sm font-semibold text-neutral-700">报到流程</p>
         <ol className="space-y-3">
           {FLOW_STEPS.map((step, i) => (
             <li key={step.title} className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-600">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-plum-soft text-sm font-bold text-plum">
                 {i + 1}
               </span>
               <div>
-                <p className="text-sm font-medium text-gray-900">{step.title}</p>
-                <p className="mt-0.5 text-xs text-gray-500">{step.sub}</p>
+                <p className="text-sm font-medium text-neutral-900">{step.title}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{step.sub}</p>
               </div>
             </li>
           ))}
@@ -90,14 +90,14 @@ export function SmartCampusWelcomePage() {
 
       {/* 办事窗口 */}
       <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-gray-700">办事窗口</p>
+        <p className="mb-3 text-sm font-semibold text-neutral-700">办事窗口</p>
         <div className="grid grid-cols-2 gap-2">
           {SERVICE_WINDOWS.map((w) => (
             <div key={w.name} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2">
-              <MapPinIcon className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+              <MapPinIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
               <div>
-                <p className="text-sm text-gray-800">{w.name}</p>
-                <p className="text-[11px] text-gray-400">{w.loc}</p>
+                <p className="text-sm text-neutral-800">{w.name}</p>
+                <p className="text-[11px] text-neutral-400">{w.loc}</p>
               </div>
             </div>
           ))}
@@ -121,15 +121,15 @@ export function SmartCampusWelcomePage() {
                 className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-primary-200 active:bg-primary-50"
               >
                 <Icon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
-                <span className="flex-1 text-sm font-medium text-gray-800">{entry.label}</span>
-                <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                <span className="flex-1 text-sm font-medium text-neutral-800">{entry.label}</span>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
               </button>
             )
           })}
         </div>
       </Card>
 
-      <p className="px-1 pt-1 text-[11px] text-gray-400">
+      <p className="px-1 pt-1 text-[11px] text-neutral-400">
         报到登记、缴费等请以学校官方系统为准；本终端仅提供信息指引与求职打印服务。
       </p>
 

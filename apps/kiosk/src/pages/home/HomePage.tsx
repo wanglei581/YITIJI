@@ -34,12 +34,13 @@ import {
   WrenchIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { KioskToolboxConfig, KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/shared'
+import type { KioskToolboxConfig, KioskToolboxItem, MemberPrintOrderItem, MemberResumeItem, SmartCampusModuleKey } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
+import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
@@ -70,31 +71,31 @@ function KioskTopBar() {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center border-b border-white/70 bg-white/92 px-8 shadow-sm backdrop-blur">
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
           <PrinterIcon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-lg font-bold leading-none text-slate-950">AI求职打印一体机</p>
-          <p className="mt-1 text-xs font-medium text-slate-500">求职材料 · 招聘会 · 打印扫描</p>
+          <p className="text-lg font-bold leading-none text-neutral-900">AI求职打印一体机</p>
+          <p className="mt-1 text-xs font-medium text-neutral-500">求职材料 · 招聘会 · 打印扫描</p>
         </div>
       </div>
 
       <div className="ml-auto flex items-center gap-5">
-        <div className="hidden items-center gap-3 text-sm font-medium text-slate-500 sm:flex">
+        <div className="hidden items-center gap-3 text-sm font-medium text-neutral-500 sm:flex">
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
             <PrinterIcon className="h-4 w-4" aria-hidden="true" />
             打印机
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
             <WifiIcon className="h-4 w-4" aria-hidden="true" />
             网络
           </span>
         </div>
-        <div className="border-l border-slate-200 pl-5 text-right">
-          <p className="text-xl font-bold leading-none tabular-nums text-slate-950">{time}</p>
-          <p className="mt-1 text-xs font-medium text-slate-500">{date}</p>
+        <div className="border-l border-neutral-200 pl-5 text-right">
+          <p className="text-xl font-bold leading-none tabular-nums text-neutral-900">{time}</p>
+          <p className="mt-1 text-xs font-medium text-neutral-500">{date}</p>
         </div>
       </div>
     </header>
@@ -161,11 +162,11 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
 function HeroSection() {
   return (
     <section
-      className="relative min-h-[300px] overflow-hidden bg-slate-900 bg-cover bg-center"
+      className="relative min-h-[300px] overflow-hidden bg-neutral-900 bg-cover bg-center"
       style={{ backgroundImage: `url(${HERO_IMAGE})` }}
       aria-label="AI求职打印一体机欢迎区"
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/74 via-slate-900/36 to-slate-900/8" />
+      <div className="absolute inset-0 bg-gradient-to-r from-neutral-900/74 via-neutral-900/36 to-neutral-900/8" />
       <div className="relative flex min-h-[300px] items-center px-10">
         <div className="flex items-center gap-6">
           <span className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 text-white shadow-lg ring-1 ring-white/25 backdrop-blur">
@@ -192,28 +193,35 @@ function IdentityPanel() {
 
   if (isLoggedIn) {
     const initial = displayName.replace(/\s/g, '').slice(0, 1) || '我'
-    const cells: { label: string; value: string }[] = [
-      { label: '简历', value: loading || !stats ? '-' : String(stats.resumes) },
-      { label: '文档', value: loading || !stats ? '-' : String(stats.documents) },
-      { label: 'AI记录', value: loading || !stats ? '-' : String(stats.aiRecords) },
-      { label: '收藏', value: loading || !stats ? '-' : String(stats.favorites) },
+    // A档增强:统计数字点击直达本人对应明细页(原为纯展示)
+    const cells: { label: string; value: string; href: string }[] = [
+      { label: '简历', value: loading || !stats ? '-' : String(stats.resumes), href: '/me/resumes' },
+      { label: '文档', value: loading || !stats ? '-' : String(stats.documents), href: '/me/documents' },
+      { label: 'AI记录', value: loading || !stats ? '-' : String(stats.aiRecords), href: '/me/ai-records' },
+      { label: '收藏', value: loading || !stats ? '-' : String(stats.favorites), href: '/me/favorites' },
     ]
 
     return (
       <section className="relative z-10 -mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-blue-50 text-3xl font-bold text-blue-600 ring-4 ring-slate-100">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-primary-50 text-3xl font-bold text-primary-600 ring-4 ring-neutral-100">
           {initial}
         </div>
         <div className="ml-6 min-w-0 flex-1">
-          <p className="truncate text-3xl font-extrabold leading-tight text-slate-950">{displayName}</p>
-          <p className="mt-2 text-lg font-semibold text-slate-500">可查看本人的简历、文档、AI记录和收藏</p>
+          <p className="truncate text-3xl font-extrabold leading-tight text-neutral-900">{displayName}</p>
+          <p className="mt-2 text-lg font-semibold text-neutral-500">可查看本人的简历、文档、AI记录和收藏</p>
         </div>
-        <div className="mr-6 grid w-[360px] grid-cols-4 divide-x divide-slate-100">
+        <div className="mr-6 grid w-[360px] grid-cols-4 divide-x divide-neutral-100">
           {cells.map((cell) => (
-            <div key={cell.label} className="text-center">
-              <p className="text-3xl font-extrabold tabular-nums text-slate-950">{cell.value}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-500">{cell.label}</p>
-            </div>
+            <button
+              key={cell.label}
+              type="button"
+              onClick={() => navigate(cell.href)}
+              aria-label={`查看我的${cell.label}`}
+              className="min-h-[64px] rounded-xl text-center transition-colors hover:bg-neutral-50 active:bg-primary-50"
+            >
+              <p className="text-3xl font-extrabold tabular-nums text-neutral-900">{cell.value}</p>
+              <p className="mt-1 text-sm font-semibold text-neutral-500">{cell.label}</p>
+            </button>
           ))}
         </div>
         <div className="flex shrink-0 gap-3">
@@ -231,14 +239,14 @@ function IdentityPanel() {
 
   return (
     <section className="relative z-10 -mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
-      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-300 ring-4 ring-slate-100">
+      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-neutral-50 text-neutral-300 ring-4 ring-neutral-100">
         <UserCheckIcon className="h-14 w-14" aria-hidden="true" />
       </div>
       <div className="ml-7 min-w-0 flex-1">
-        <p className="text-3xl font-extrabold leading-tight text-slate-950">
+        <p className="text-3xl font-extrabold leading-tight text-neutral-900">
           {guestMode ? '当前为匿名使用' : '欢迎来到求职服务终端'}
         </p>
-        <p className="mt-2 text-lg font-semibold text-slate-500">
+        <p className="mt-2 text-lg font-semibold text-neutral-500">
           {guestMode ? '本次服务记录仅在当前会话中保留' : '登录后可查看更多专属权益和历史服务记录'}
         </p>
       </div>
@@ -247,7 +255,7 @@ function IdentityPanel() {
           <button
             type="button"
             onClick={continueAsGuest}
-            className="h-16 rounded-2xl px-7 text-lg font-bold text-slate-500 transition-colors hover:bg-slate-50 active:bg-slate-100"
+            className="h-16 rounded-2xl px-7 text-lg font-bold text-neutral-500 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
           >
             先使用
           </button>
@@ -255,7 +263,7 @@ function IdentityPanel() {
         <button
           type="button"
           onClick={goLogin}
-          className="flex h-16 min-w-[320px] items-center justify-center rounded-2xl bg-blue-600 px-9 text-2xl font-extrabold text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] transition-colors hover:bg-blue-700 active:bg-blue-800"
+          className="flex h-16 min-w-[320px] items-center justify-center rounded-2xl bg-primary-600 px-9 text-2xl font-extrabold text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] transition-colors hover:bg-primary-700 active:bg-primary-800"
         >
           立即登录 / 注册
           <ChevronRightIcon className="ml-3 h-8 w-8" aria-hidden="true" />
@@ -282,13 +290,13 @@ interface ServiceGroup {
 }
 
 const ACCENT: Record<ServiceGroup['accent'], { text: string; border: string; iconBg: string }> = {
-  blue: { text: 'text-blue-600', border: 'border-blue-200', iconBg: 'bg-blue-50' },
-  green: { text: 'text-emerald-600', border: 'border-emerald-200', iconBg: 'bg-emerald-50' },
-  orange: { text: 'text-orange-600', border: 'border-orange-200', iconBg: 'bg-orange-50' },
-  cyan: { text: 'text-cyan-600', border: 'border-cyan-200', iconBg: 'bg-cyan-50' },
-  purple: { text: 'text-violet-600', border: 'border-violet-200', iconBg: 'bg-violet-50' },
+  blue: { text: 'text-primary-600', border: 'border-primary-200', iconBg: 'bg-primary-50' },
+  green: { text: 'text-success-fg', border: 'border-success/30', iconBg: 'bg-success-bg' },
+  orange: { text: 'text-warning-fg', border: 'border-warning/30', iconBg: 'bg-warning-bg' },
+  cyan: { text: 'text-info', border: 'border-info/30', iconBg: 'bg-info-bg' },
+  purple: { text: 'text-plum', border: 'border-plum/30', iconBg: 'bg-plum-soft' },
   // 政策服务功能色：金/amber（visual-design-spec §14.2/§15.4）。
-  amber: { text: 'text-amber-700', border: 'border-amber-200', iconBg: 'bg-amber-50' },
+  amber: { text: 'text-warning-fg', border: 'border-warning/30', iconBg: 'bg-warning-bg' },
 }
 
 const SERVICE_GROUPS: ServiceGroup[] = [
@@ -383,18 +391,18 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Servic
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
       className={[
-        'group relative flex min-h-[130px] flex-col items-center justify-center gap-4 rounded-[22px] border border-slate-200 bg-slate-50/78 px-3 text-center shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition-all',
+        'group relative flex min-h-[130px] flex-col items-center justify-center gap-4 rounded-[22px] border border-neutral-200 bg-neutral-50/78 px-3 text-center shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition-all',
         disabled
           ? 'cursor-not-allowed opacity-64'
-          : 'hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_12px_24px_rgba(15,23,42,0.1)] active:translate-y-0',
+          : 'hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white hover:shadow-[0_12px_24px_rgba(15,23,42,0.1)] active:translate-y-0',
       ].join(' ')}
     >
       <span className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${colors.border} bg-white`}>
         <Icon className={`h-7 w-7 ${colors.text}`} aria-hidden="true" />
       </span>
-      <span className="text-xl font-extrabold leading-tight text-slate-950">{tile.title}</span>
+      <span className="text-xl font-extrabold leading-tight text-neutral-900">{tile.title}</span>
       {disabled && (
-        <span className="absolute right-3 top-3 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+        <span className="absolute right-3 top-3 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-400 shadow-sm">
           即将上线
         </span>
       )}
@@ -409,7 +417,7 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
 
   return (
-    <section className="rounded-[34px] bg-white p-9 shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/80">
+    <section className="rounded-[34px] bg-white p-9 shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-neutral-200/80">
       <button
         type="button"
         onClick={() => enabledFirst?.to && navigate(enabledFirst.to)}
@@ -419,8 +427,8 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
           <Icon className={`h-10 w-10 ${colors.text}`} aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-3xl font-extrabold leading-tight tracking-normal text-slate-950 lg:text-4xl">{group.title}</span>
-          <span className="mt-2 block text-xl font-bold leading-tight text-slate-500 lg:text-2xl">{group.subtitle}</span>
+          <span className="block text-3xl font-extrabold leading-tight tracking-normal text-neutral-900 lg:text-4xl">{group.title}</span>
+          <span className="mt-2 block text-xl font-bold leading-tight text-neutral-500 lg:text-2xl">{group.subtitle}</span>
         </span>
       </button>
 
@@ -440,24 +448,24 @@ const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { d
     desc: '报到流程、办事窗口、入学材料打印',
     icon: PartyPopperIcon,
     to: '/smart-campus/welcome',
-    color: 'text-blue-600',
-    bg: 'bg-blue-50',
+    color: 'text-primary-600',
+    bg: 'bg-primary-50',
   },
   luggage: {
     title: '行李帮运',
     desc: '校方合作服务入口、服务点与路线说明',
     icon: PackageIcon,
     to: '/smart-campus/service/luggage',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
+    color: 'text-success-fg',
+    bg: 'bg-success-bg',
   },
   panorama: {
     title: 'VR校园',
     desc: '校园全景、路线导览、重点场馆介绍',
     icon: ScanFaceIcon,
     to: '/smart-campus/service/panorama',
-    color: 'text-violet-600',
-    bg: 'bg-violet-50',
+    color: 'text-plum',
+    bg: 'bg-plum-soft',
   },
 }
 
@@ -476,26 +484,26 @@ function SmartCampusHorizontalSection() {
 
   return (
     <>
-      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-blue-200 bg-white shadow-[0_14px_34px_rgba(37,99,235,0.12)]">
-        <div className="flex items-center gap-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 px-8 py-5">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.24)]">
+      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-primary-200 bg-white shadow-[0_14px_34px_rgba(37,99,235,0.12)]">
+        <div className="flex items-center gap-4 border-b border-primary-100 bg-gradient-to-r from-primary-50 to-info-bg px-8 py-5">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.24)]">
             <GraduationCapIcon className="h-8 w-8" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-3xl font-extrabold leading-tight text-slate-950">智慧校园</h2>
-              <span className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-bold text-blue-600">
+              <h2 className="text-3xl font-extrabold leading-tight text-neutral-900">智慧校园</h2>
+              <span className="rounded-full border border-primary-200 bg-white px-3 py-1 text-xs font-bold text-primary-600">
                 学校端已开启
               </span>
             </div>
-            <p className="mt-1 text-base font-semibold text-slate-500">
+            <p className="mt-1 text-base font-semibold text-neutral-500">
               学校专属服务专区，仅校园终端开启时显示；关闭后整块消失，不占首页空白。
             </p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/smart-campus')}
-            className="hidden min-h-[52px] shrink-0 items-center gap-1 rounded-2xl bg-white px-5 text-base font-extrabold text-blue-600 shadow-sm transition-colors hover:bg-blue-50 active:bg-blue-100 sm:flex"
+            className="hidden min-h-[52px] shrink-0 items-center gap-1 rounded-2xl bg-white px-5 text-base font-extrabold text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:bg-primary-100 sm:flex"
           >
             进入专区
             <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
@@ -513,19 +521,19 @@ function SmartCampusHorizontalSection() {
                 disabled={disabled}
                 onClick={() => tile.to && !disabled && navigate(tile.to)}
                 className={[
-                  'relative min-h-[128px] overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50/70 p-5 text-left transition-all',
+                  'relative min-h-[128px] overflow-hidden rounded-[24px] border border-neutral-200 bg-neutral-50/70 p-5 text-left transition-all',
                   disabled
                     ? 'cursor-not-allowed opacity-70'
-                    : 'hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0',
+                    : 'hover:-translate-y-0.5 hover:border-primary-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0',
                 ].join(' ')}
               >
                 <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tile.bg}`}>
                   <Icon className={`h-6 w-6 ${tile.color}`} aria-hidden="true" />
                 </span>
-                <span className="mt-4 block text-xl font-extrabold text-slate-950">{tile.title}</span>
-                <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{tile.desc}</span>
+                <span className="mt-4 block text-xl font-extrabold text-neutral-900">{tile.title}</span>
+                <span className="mt-1 block text-sm font-semibold leading-relaxed text-neutral-500">{tile.desc}</span>
                 {disabled && (
-                  <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+                  <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-400 shadow-sm">
                     即将上线
                   </span>
                 )}
@@ -635,21 +643,21 @@ function ToolboxItemButton({
       disabled={disabled}
       onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
       className={[
-        'relative min-h-[128px] rounded-[24px] border border-slate-200 bg-slate-50/72 p-5 text-left transition-all',
+        'relative min-h-[128px] rounded-[24px] border border-neutral-200 bg-neutral-50/72 p-5 text-left transition-all',
         disabled
           ? 'cursor-not-allowed opacity-70'
           : accent === 'blue'
-            ? 'hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0'
-            : 'hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_12px_26px_rgba(15,23,42,0.1)] active:translate-y-0',
+            ? 'hover:-translate-y-0.5 hover:border-primary-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0'
+            : 'hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white hover:shadow-[0_12px_26px_rgba(15,23,42,0.1)] active:translate-y-0',
       ].join(' ')}
     >
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-700">
         <Icon className="h-6 w-6" aria-hidden="true" />
       </span>
-      <span className="mt-4 block text-xl font-extrabold text-slate-950">{item.title}</span>
-      <span className="mt-1 block text-sm font-semibold leading-relaxed text-slate-500">{item.description}</span>
+      <span className="mt-4 block text-xl font-extrabold text-neutral-900">{item.title}</span>
+      <span className="mt-1 block text-sm font-semibold leading-relaxed text-neutral-500">{item.description}</span>
       {badge && (
-        <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-400 shadow-sm">
+        <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-400 shadow-sm">
           {badge}
         </span>
       )}
@@ -667,14 +675,14 @@ function ToolboxSection() {
 
   return (
     <>
-      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/80">
-        <div className="flex items-center gap-4 border-b border-slate-100 px-8 py-5">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-[0_10px_20px_rgba(15,23,42,0.18)]">
+      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-neutral-200/80">
+        <div className="flex items-center gap-4 border-b border-neutral-100 px-8 py-5">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-neutral-900 text-white shadow-[0_10px_20px_rgba(15,23,42,0.18)]">
             <PackageIcon className="h-8 w-8" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-3xl font-extrabold leading-tight text-slate-950">百宝箱</h2>
-            <p className="mt-1 text-base font-semibold text-slate-500">按当前设备配置展示扩展服务。</p>
+            <h2 className="text-3xl font-extrabold leading-tight text-neutral-900">百宝箱</h2>
+            <p className="mt-1 text-base font-semibold text-neutral-500">按当前设备配置展示扩展服务。</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
@@ -683,9 +691,9 @@ function ToolboxSection() {
               <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
             ))
           ) : (
-            <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/72 p-6">
-              <span className="block text-xl font-extrabold text-slate-950">待配置</span>
-              <span className="mt-2 block text-sm font-semibold leading-relaxed text-slate-500">
+            <div className="rounded-[24px] border border-dashed border-neutral-200 bg-neutral-50/72 p-6">
+              <span className="block text-xl font-extrabold text-neutral-900">待配置</span>
+              <span className="mt-2 block text-sm font-semibold leading-relaxed text-neutral-500">
                 后续功能上线后将在这里展示。
               </span>
             </div>
@@ -698,12 +706,103 @@ function ToolboxSection() {
   )
 }
 
+// ─── 继续上次（A档增强）───────────────────────────────────────────────────────
+// 诚实前提：只对「真实可恢复的任务」展示——① 进行中的打印任务（未达终态）；
+// ② 已诊断但尚未优化的简历（下一步）。无可恢复任务不渲染。不伪造进度。
+
+interface ResumeSuggestion {
+  kind: 'print' | 'optimize'
+  title: string
+  detail: string
+  actionLabel: string
+  onGo: () => void
+  icon: LucideIcon
+}
+
+const ACTIVE_PRINT_STATUSES = new Set(['pending', 'claimed', 'printing'])
+const PRINT_STATUS_TEXT: Record<string, string> = {
+  pending: '排队中', claimed: '已领取', printing: '打印中',
+}
+
+function ContinuePanel() {
+  const navigate = useNavigate()
+  const { isLoggedIn, getToken } = useAuth()
+  const [suggestion, setSuggestion] = useState<ResumeSuggestion | null>(null)
+
+  useEffect(() => {
+    if (!isLoggedIn) { setSuggestion(null); return }
+    const token = getToken()
+    if (!token) { setSuggestion(null); return }
+
+    let alive = true
+    Promise.all([
+      getMyPrintOrders(token, { pageSize: 5 }),
+      getMyResumes(token, { pageSize: 5 }),
+    ])
+      .then(([orders, resumes]) => {
+        if (!alive) return
+        // 优先级 1：进行中的打印任务（真实未完成）
+        const activePrint = orders.items.find((o: MemberPrintOrderItem) => ACTIVE_PRINT_STATUSES.has(o.status))
+        if (activePrint) {
+          setSuggestion({
+            kind: 'print',
+            title: '打印任务进行中',
+            detail: `${activePrint.fileName ?? '打印文件'} · ${PRINT_STATUS_TEXT[activePrint.status] ?? activePrint.status}`,
+            actionLabel: '查看进度',
+            onGo: () => navigate('/me/print-orders'),
+            icon: PrinterIcon,
+          })
+          return
+        }
+        // 优先级 2：已诊断但未优化的简历（真实下一步）
+        const diagnosed = resumes.items.find((r: MemberResumeItem) => r.kind === 'parse' && r.status === 'completed' && !r.optimized)
+        if (diagnosed) {
+          setSuggestion({
+            kind: 'optimize',
+            title: '上次诊断的简历，可继续优化',
+            detail: '已完成诊断 · 一键进入 AI 优化，生成可打印版本',
+            actionLabel: '去优化',
+            onGo: () => navigate(`/resume/optimize?taskId=${encodeURIComponent(diagnosed.taskId)}`, { state: { taskId: diagnosed.taskId } }),
+            icon: SparklesIcon,
+          })
+          return
+        }
+        setSuggestion(null)
+      })
+      .catch(() => { if (alive) setSuggestion(null) })
+
+    return () => { alive = false }
+  }, [isLoggedIn, getToken, navigate])
+
+  if (!suggestion) return null
+  const Icon = suggestion.icon
+
+  return (
+    <section className="mx-auto mt-6 w-[min(1320px,calc(100%-64px))]">
+      <div className="flex items-center gap-4 rounded-[24px] border border-primary-200 bg-primary-50/70 px-7 py-5 shadow-[0_8px_24px_rgba(16,48,43,0.06)]">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
+          <Icon className="h-7 w-7" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xl font-bold text-neutral-900">{suggestion.title}</p>
+          <p className="mt-1 truncate text-base text-neutral-500">{suggestion.detail}</p>
+        </div>
+        <Button size="lg" className="h-16 shrink-0 rounded-2xl px-8 text-lg" onClick={suggestion.onGo}>
+          {suggestion.actionLabel}
+          <ChevronRightIcon className="ml-1 h-6 w-6" aria-hidden="true" />
+        </Button>
+      </div>
+    </section>
+  )
+}
+
 export function HomePage() {
   return (
     <div className="min-h-full bg-[#eef1f5] pb-8">
       <KioskTopBar />
       <HeroSection />
       <IdentityPanel />
+      <ContinuePanel />
 
       <main className="mx-auto mt-10 grid w-[min(1320px,calc(100%-64px))] grid-cols-1 gap-8 pb-6 xl:grid-cols-2">
         {SERVICE_GROUPS.map((group) => (
@@ -714,7 +813,7 @@ export function HomePage() {
       <ToolboxSection />
       <SmartCampusHorizontalSection />
 
-      <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-slate-500">
+      <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-neutral-500">
         <BotIcon className="h-4 w-4" aria-hidden="true" />
         岗位和招聘会仅作为第三方/官方来源信息入口，投递与预约请前往来源平台完成。
       </div>

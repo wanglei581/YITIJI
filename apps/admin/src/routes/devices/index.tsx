@@ -26,8 +26,9 @@ export default function DevicesPage() {
   }
 
   return (
-    <Page title="设备管理" subtitle="终端、打印机与外设的集中视图">
-      <div className="mb-5 inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+    <Page title="设备管理" subtitle="终端 / 打印机 / 外设统一管理 · 状态每 30 秒由 Terminal Agent 心跳上报">
+      {/* 原型下划线式 Tab */}
+      <div className="mb-4 flex gap-1 border-b-[1.6px] border-neutral-900/[0.06]">
         {TABS.map(({ key, label, icon: Icon }) => {
           const selected = key === active
           return (
@@ -36,15 +37,19 @@ export default function DevicesPage() {
               type="button"
               onClick={() => setActive(key)}
               className={[
-                'flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
-                selected
-                  ? 'bg-primary-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50',
+                'relative flex items-center gap-1.5 px-4 pb-3 pt-2.5 text-sm font-bold transition-colors',
+                selected ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-700',
               ].join(' ')}
               aria-pressed={selected}
             >
               <Icon className="h-4 w-4" aria-hidden="true" />
               {label}
+              {selected && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-3 -bottom-[1.6px] h-[3px] rounded-sm bg-primary-600"
+                />
+              )}
             </button>
           )
         })}

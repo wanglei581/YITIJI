@@ -26,7 +26,7 @@ function OptionGrid({ options, onPick }: { options: string[]; onPick: (v: string
         <button
           key={o}
           onClick={() => onPick(o)}
-          className="flex min-h-[44px] items-center justify-center rounded-lg bg-gray-50 px-2 text-center text-sm text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-700 active:bg-primary-100"
+          className="flex min-h-[44px] items-center justify-center rounded-lg bg-neutral-50 px-2 text-center text-sm text-neutral-700 transition-colors hover:bg-primary-50 hover:text-primary-700 active:bg-primary-100"
         >
           {o}
         </button>
@@ -80,7 +80,7 @@ export function RegionPicker({
         onClick={openPicker}
         className={[
           'flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
-          hasSelection ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+          hasSelection ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
         ].join(' ')}
       >
         <MapPinIcon className="h-4 w-4" />
@@ -103,23 +103,23 @@ export function RegionPicker({
           >
             {/* 头部 */}
             <div className="flex items-center justify-between">
-              <p className="text-base font-semibold text-gray-800">选择地区</p>
-              <button onClick={() => setOpen(false)} className="rounded-full p-1 text-gray-400 hover:bg-gray-100" aria-label="关闭">
+              <p className="text-base font-semibold text-neutral-800">选择地区</p>
+              <button onClick={() => setOpen(false)} className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100" aria-label="关闭">
                 <XIcon className="h-5 w-5" />
               </button>
             </div>
 
             {/* 面包屑 */}
             <div className="mt-2 flex flex-wrap items-center gap-1 text-sm">
-              <button onClick={() => setStage('province')} className={stage === 'province' ? 'font-semibold text-primary-600' : 'text-gray-500'}>
+              <button onClick={() => setStage('province')} className={stage === 'province' ? 'font-semibold text-primary-600' : 'text-neutral-500'}>
                 省/直辖市
               </button>
               {(stage === 'city' || stage === 'district') && draftProvince && (
                 <>
-                  <ChevronRightIcon className="h-3.5 w-3.5 text-gray-300" />
+                  <ChevronRightIcon className="h-3.5 w-3.5 text-neutral-300" />
                   <button
                     onClick={() => !isMunicipality(draftProvince) && setStage('city')}
-                    className={stage === 'city' ? 'font-semibold text-primary-600' : 'text-gray-500'}
+                    className={stage === 'city' ? 'font-semibold text-primary-600' : 'text-neutral-500'}
                   >
                     {draftProvince}
                   </button>
@@ -127,7 +127,7 @@ export function RegionPicker({
               )}
               {stage === 'district' && draftCity && draftCity !== '市辖区' && (
                 <>
-                  <ChevronRightIcon className="h-3.5 w-3.5 text-gray-300" />
+                  <ChevronRightIcon className="h-3.5 w-3.5 text-neutral-300" />
                   <span className="font-semibold text-primary-600">{draftCity}</span>
                 </>
               )}
@@ -138,13 +138,13 @@ export function RegionPicker({
               {stage !== 'province' && (
                 <button
                   onClick={() => setStage(stage === 'district' && !isMunicipality(draftProvince) ? 'city' : 'province')}
-                  className="flex items-center gap-0.5 rounded-lg bg-gray-100 px-2.5 py-1.5 text-sm text-gray-600"
+                  className="flex items-center gap-0.5 rounded-lg bg-neutral-100 px-2.5 py-1.5 text-sm text-neutral-600"
                 >
                   <ChevronLeftIcon className="h-4 w-4" />返回
                 </button>
               )}
               {stage === 'province' && (
-                <button onClick={() => apply({})} className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+                <button onClick={() => apply({})} className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600">
                   全部地区
                 </button>
               )}

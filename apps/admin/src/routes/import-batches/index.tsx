@@ -111,7 +111,7 @@ export default function ImportBatchesPage() {
     return (
       <Page title="Excel 导入记录" subtitle="合作机构 Excel 批量导入的历史批次">
         <Card className="flex h-40 items-center justify-center">
-          <span className="text-sm text-red-500">加载失败，请刷新重试</span>
+          <span className="text-sm text-error-fg">加载失败，请刷新重试</span>
         </Card>
       </Page>
     )
@@ -128,7 +128,7 @@ export default function ImportBatchesPage() {
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="搜索文件名、机构名、数据源…"
-            className="h-9 w-72 rounded-lg border border-neutral-200 bg-white pl-9 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20"
+            className="h-9 w-72 rounded-lg border border-neutral-200 bg-surface pl-9 pr-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20"
           />
         </div>
 
@@ -139,7 +139,7 @@ export default function ImportBatchesPage() {
               key={f}
               onClick={() => handleStatusChange(f)}
               className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                statusFlt === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                statusFlt === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -178,16 +178,16 @@ export default function ImportBatchesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-neutral-100 bg-neutral-50">
+              <thead>
                 <tr>
                   {['机构', '数据源', '文件名', '类型', '总行数', '有效', '无效', '重复', '状态', '创建时间', '确认时间', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-100">
+              <tbody className="divide-y divide-neutral-900/[0.06]">
                 {paged.map((b) => {
                   const s = STATUS_MAP[b.status]
                   return (
@@ -200,7 +200,7 @@ export default function ImportBatchesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          <FileSpreadsheetIcon className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
+                          <FileSpreadsheetIcon className="h-3.5 w-3.5 flex-shrink-0 text-success" />
                           <span className="max-w-[200px] truncate text-xs text-neutral-700" title={b.fileName}>
                             {b.fileName}
                           </span>
@@ -209,7 +209,7 @@ export default function ImportBatchesPage() {
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                           b.dataType === 'job'
-                            ? 'bg-blue-50 text-blue-700'
+                            ? 'bg-info-bg text-info-fg'
                             : 'bg-purple-50 text-purple-700'
                         }`}>
                           {DATA_TYPE_LABEL[b.dataType]}
@@ -218,17 +218,17 @@ export default function ImportBatchesPage() {
                       <td className="px-4 py-3 text-center text-sm font-medium text-neutral-700">
                         {b.totalRows}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-green-600">
+                      <td className="px-4 py-3 text-center text-sm font-medium text-success-fg">
                         {b.validRows}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-red-500">
+                      <td className="px-4 py-3 text-center text-sm font-medium text-error-fg">
                         {b.invalidRows > 0 ? b.invalidRows : <span className="text-neutral-300">0</span>}
                       </td>
-                      <td className="px-4 py-3 text-center text-sm font-medium text-amber-500">
+                      <td className="px-4 py-3 text-center text-sm font-medium text-warning">
                         {b.dupRows > 0 ? b.dupRows : <span className="text-neutral-300">0</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={s.badge} label={s.label} />
+                        <StatusBadge dot status={s.badge} label={s.label} />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         {fmtDate(b.createdAt)}

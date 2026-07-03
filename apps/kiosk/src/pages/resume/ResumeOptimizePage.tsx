@@ -267,7 +267,7 @@ export function ResumeOptimizePage() {
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
             <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
           </div>
-          <p className="text-base text-gray-500">正在生成优化建议…</p>
+          <p className="text-base text-neutral-500">正在生成优化建议…</p>
         </div>
       </div>
     )
@@ -282,8 +282,8 @@ export function ResumeOptimizePage() {
           actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>}
         />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-          <AlertCircleIcon className="h-14 w-14 text-gray-300" />
-          <p className="text-base text-gray-500">{failMsg}</p>
+          <AlertCircleIcon className="h-14 w-14 text-neutral-300" />
+          <p className="text-base text-neutral-500">{failMsg}</p>
           <Button size="lg" onClick={() => navigate('/resume/source?intent=optimize')}>
             重新上传简历
           </Button>
@@ -301,15 +301,15 @@ export function ResumeOptimizePage() {
       />
 
       {providerName === 'mock' && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="mt-4 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
           <FlaskConicalIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>{COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}</p>
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5">
-        <InfoIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-        <p className="text-xs text-gray-400">
+      <div className="mt-4 flex items-center gap-2 rounded-lg bg-neutral-50 px-4 py-2.5">
+        <InfoIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+        <p className="text-xs text-neutral-400">
           {COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}页面只展示表达调整参考,不承诺提分或招聘结果。
         </p>
       </div>
@@ -317,7 +317,7 @@ export function ResumeOptimizePage() {
       {summary && (
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
           <TargetIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-neutral-700">
             目标方向：<span className="font-medium text-primary-700">{summary}</span>
           </p>
         </div>
@@ -331,9 +331,9 @@ export function ResumeOptimizePage() {
           <Card className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700">表达调整参考</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{modules.length} 组可对照修改项</p>
-                <p className="mt-1 text-xs text-gray-400">基于诊断结果与原文片段生成,不展示无依据的分数提升。</p>
+                <p className="text-sm font-medium text-neutral-700">表达调整参考</p>
+                <p className="mt-1 text-2xl font-bold text-neutral-900">{modules.length} 组可对照修改项</p>
+                <p className="mt-1 text-xs text-neutral-400">基于诊断结果与原文片段生成,不展示无依据的分数提升。</p>
               </div>
             </div>
           </Card>
@@ -341,8 +341,8 @@ export function ResumeOptimizePage() {
 
         {modules.map((mod, idx) => (
           <Card key={`${mod.title}-${idx}`} className="overflow-hidden p-0">
-            <div className="border-b border-gray-200 px-5 py-3">
-              <p className="text-sm font-semibold text-gray-800">{mod.title}</p>
+            <div className="border-b border-neutral-200 px-5 py-3">
+              <p className="text-sm font-semibold text-neutral-800">{mod.title}</p>
             </div>
             <div className="text-xs [overflow-wrap:anywhere] [&_pre]:whitespace-pre-wrap">
                 <ReactDiffViewer
@@ -366,8 +366,8 @@ export function ResumeOptimizePage() {
               <Card className="p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">简历模板</p>
-                    <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                    <p className="text-sm font-semibold text-neutral-800">简历模板</p>
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-500">
                       PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出。
                     </p>
                   </div>
@@ -383,17 +383,17 @@ export function ResumeOptimizePage() {
                           'min-h-[52px] rounded-xl border px-3 text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
                           selectedTemplateId === template.id
                             ? 'border-primary-500 bg-primary-50 text-primary-700'
-                            : 'border-gray-200 bg-white text-gray-700',
+                            : 'border-neutral-200 bg-white text-neutral-700',
                         ].join(' ')}
                       >
                         <span className="block text-sm font-semibold">{template.title}</span>
-                        <span className="mt-0.5 block text-xs text-gray-500">{template.resumeLayoutPreset.style} · {template.recommendedFor}</span>
+                        <span className="mt-0.5 block text-xs text-neutral-500">{template.resumeLayoutPreset.style} · {template.recommendedFor}</span>
                       </button>
                     ))}
                   </div>
                 </div>
                 {selectedTemplate && (
-                  <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-500">
+                  <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-500">
                     已选择：{selectedTemplate.title}。排版参数会覆盖模板默认值，导出前可继续微调。
                   </p>
                 )}
@@ -402,8 +402,8 @@ export function ResumeOptimizePage() {
             <Card className="p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">AI 辅助调整</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                  <p className="text-sm font-semibold text-neutral-800">AI 辅助调整</p>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-500">
                     仅基于当前简历和原文做表达密度调整,不新增经历或事实。
                   </p>
                 </div>
@@ -441,7 +441,7 @@ export function ResumeOptimizePage() {
                 </div>
               )}
               {adjustError && (
-                <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
+                <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-xs leading-relaxed text-error-fg">
                   {adjustError}
                 </p>
               )}
@@ -456,23 +456,23 @@ export function ResumeOptimizePage() {
           </>
         )}
 
-        {exportError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{exportError}</p>}
+        {exportError && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{exportError}</p>}
 
         {exported && (
-          <Card className="border-green-100 bg-green-50/60 p-5">
-            <p className="flex items-center gap-2 text-base font-semibold text-green-800">
+          <Card className="border-success-bg bg-success-bg/60 p-5">
+            <p className="flex items-center gap-2 text-base font-semibold text-success-fg">
               <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
               优化版{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'} 已生成
             </p>
-            <p className="mt-1 text-sm text-green-700">
+            <p className="mt-1 text-sm text-success-fg">
               {exported.filename}
               {exported.pageCount > 0 ? ` · ${exported.pageCount} 页` : ''}
               {exported.sizeBytes > 0 ? ` · ${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB` : ''}
             </p>
             {!exported.signedUrl && (
-              <p className="mt-1 text-xs text-amber-700">演示模式未生成真实文件,接入后端后可下载或打印。</p>
+              <p className="mt-1 text-xs text-warning-fg">演示模式未生成真实文件,接入后端后可下载或打印。</p>
             )}
-            <p className="mt-1 text-xs text-green-700/80">文件短期保留后自动清理,本机不长期保存你的简历。</p>
+            <p className="mt-1 text-xs text-success-fg/80">文件短期保留后自动清理,本机不长期保存你的简历。</p>
           </Card>
         )}
       </div>
@@ -480,7 +480,7 @@ export function ResumeOptimizePage() {
       <div className="mt-6 flex flex-col gap-3">
         {optimizedResume && (
           <div>
-            <p className="mb-2 text-xs font-semibold text-gray-500">导出格式</p>
+            <p className="mb-2 text-xs font-semibold text-neutral-500">导出格式</p>
             <div className="grid grid-cols-4 gap-2">
               {EXPORT_FORMAT_OPTIONS.map((option) => (
                 <button
@@ -493,7 +493,7 @@ export function ResumeOptimizePage() {
                     'min-h-[48px] rounded-xl border px-2 text-sm font-semibold transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
                     exportFormat === option.value
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 bg-white text-gray-600',
+                      : 'border-neutral-200 bg-white text-neutral-600',
                   ].join(' ')}
                 >
                   {option.label}
@@ -549,10 +549,10 @@ export function ResumeOptimizePage() {
       </div>
 
       {confirmLeave && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/35 px-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-6">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-lg font-bold text-gray-900">离开前确认</p>
-            <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            <p className="text-lg font-bold text-neutral-900">离开前确认</p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-500">
               你已经修改了优化版简历。未导出 PDF 前离开，本次编辑内容不会保存。
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3">

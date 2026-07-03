@@ -24,11 +24,11 @@ export function JobAiEntryPanel({
             <SparklesIcon className="h-6 w-6" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-gray-500">
+            <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
+            <p className="mt-1 text-sm leading-relaxed text-neutral-500">
               基于本人已完成诊断的简历和已发布真实岗位生成参考建议。
             </p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-400">
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-400">
               <span className="inline-flex items-center gap-1">
                 <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 不向企业共享简历

@@ -83,7 +83,7 @@ export function ResumeTemplateLibraryPage() {
         }
       />
 
-      <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-700">
+      <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
         本页仅用于个人简历素材查看、版式参考和简历优化引导。岗位申请、预约、投递仍需前往来源平台或官方渠道完成。
       </div>
 
@@ -99,7 +99,7 @@ export function ResumeTemplateLibraryPage() {
                 'min-h-[46px] rounded-full border px-4 text-sm font-semibold transition-colors',
                 active
                   ? 'border-primary-600 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
+                  : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
               ].join(' ')}
             >
               {item}
@@ -127,15 +127,15 @@ export function ResumeTemplateLibraryPage() {
                         <LayoutTemplateIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-gray-900">{template.title}</p>
-                        <p className="text-xs text-gray-400">简历模板</p>
+                        <p className="truncate font-semibold text-neutral-900">{template.title}</p>
+                        <p className="text-xs text-neutral-400">简历模板</p>
                       </div>
                     </div>
-                    <p className="mt-3 min-h-[44px] text-sm leading-relaxed text-gray-500">{template.description}</p>
-                    <p className="mt-2 text-xs leading-relaxed text-gray-400">{template.recommendedFor}</p>
+                    <p className="mt-3 min-h-[44px] text-sm leading-relaxed text-neutral-500">{template.description}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-neutral-400">{template.recommendedFor}</p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {template.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                        <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
                           {tag}
                         </span>
                       ))}
@@ -157,8 +157,8 @@ export function ResumeTemplateLibraryPage() {
               <EmptyState icon={BookOpenIcon} title="请选择简历素材" />
             ) : (
               <div>
-                <p className="text-base font-semibold text-gray-900">{selected.title}</p>
-                <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                <p className="text-base font-semibold text-neutral-900">{selected.title}</p>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-500">
                   简历模板需要结合你的简历内容生成正式成果物。请选择“用于简历优化”进入现有 AI 简历链路。
                 </p>
                 <Button size="lg" className="mt-5 w-full" onClick={handleUseResumeTemplate}>
@@ -170,7 +170,7 @@ export function ResumeTemplateLibraryPage() {
         </div>
       )}
 
-      <p className="mt-6 text-center text-xs text-gray-400">
+      <p className="mt-6 text-center text-xs text-neutral-400">
         素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。
       </p>
       <div className="h-2" />

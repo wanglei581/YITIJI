@@ -96,8 +96,8 @@ export function CompanyDetailDrawer({
         <div className="space-y-4">
           {/* 来源信息（合规：可溯源，不可修改） */}
           <Card className="p-4">
-            <p className="mb-2 text-sm font-medium text-gray-700">来源信息（不可修改，保持数据可溯源）</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
+            <p className="mb-2 text-sm font-medium text-neutral-700">来源信息（不可修改，保持数据可溯源）</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-neutral-500">
               <p>来源机构：{detail.sourceName}</p>
               <p>外部编号：{detail.externalId}</p>
               <p>同步时间：{fmtDateTime(detail.syncTime)}</p>
@@ -109,7 +109,7 @@ export function CompanyDetailDrawer({
 
           {/* 展示信息编辑 */}
           <Card className="space-y-4 p-4">
-            <p className="text-sm font-medium text-gray-700">展示信息</p>
+            <p className="text-sm font-medium text-neutral-700">展示信息</p>
             <InlineError message={saveError} />
             <InlineSuccess message={saveSuccess} />
             <CompanyFormFields form={form} onChange={setForm} />
@@ -117,7 +117,7 @@ export function CompanyDetailDrawer({
 
           <LinkedJobsSection detail={detail} onMutated={mutated} />
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-neutral-400">
             企业展示仅作为来源企业与岗位的导览信息；系统不接收求职者简历，求职者通过既有「去来源平台投递 / 扫码投递」入口跳转外部来源平台。所有修改操作均记录审计日志。
           </p>
         </div>

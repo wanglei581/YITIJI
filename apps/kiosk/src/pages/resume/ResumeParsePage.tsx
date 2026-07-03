@@ -146,20 +146,20 @@ export function ResumeParsePage() {
       <div
         className={[
           'mb-10 flex h-24 w-24 items-center justify-center rounded-full',
-          failed ? 'bg-red-50' : 'bg-primary-50',
+          failed ? 'bg-error-bg' : 'bg-primary-50',
         ].join(' ')}
       >
         {failed ? (
-          <XCircleIcon className="h-12 w-12 text-red-500" />
+          <XCircleIcon className="h-12 w-12 text-error-fg" />
         ) : (
           <SparklesIcon className="h-12 w-12 text-primary-600" />
         )}
       </div>
 
-      <h1 className="text-2xl font-bold text-gray-900">
+      <h1 className="text-2xl font-bold text-neutral-900">
         {failed ? '解析出错' : 'AI 正在分析'}
       </h1>
-      <p className="mt-2 text-base text-gray-500">
+      <p className="mt-2 text-base text-neutral-500">
         {failed ? '任务遇到问题，即将跳转…' : '正在读取你上传的简历文件，请稍候…'}
       </p>
 
@@ -170,7 +170,7 @@ export function ResumeParsePage() {
               key={item}
               className={[
                 'rounded-2xl border px-3 py-3 text-center text-xs font-semibold transition-colors',
-                idx < completedDimensionCount ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-400',
+                idx < completedDimensionCount ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-400',
               ].join(' ')}
             >
               {item}
@@ -192,12 +192,12 @@ export function ResumeParsePage() {
                 className={[
                   'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
                   isFailed
-                    ? 'border-red-500 bg-red-500 text-white'
+                    ? 'border-error-fg bg-error text-white'
                     : done
                     ? 'border-primary-600 bg-primary-600 text-white'
                     : active
                     ? 'border-primary-600 bg-white text-primary-600'
-                    : 'border-gray-200 bg-white text-gray-300',
+                    : 'border-neutral-200 bg-white text-neutral-300',
                 ].join(' ')}
               >
                 {isFailed ? (
@@ -216,10 +216,10 @@ export function ResumeParsePage() {
                   className={[
                     'text-base font-medium',
                     isFailed
-                      ? 'text-red-600'
+                      ? 'text-error-fg'
                       : done || active
-                      ? 'text-gray-900'
-                      : 'text-gray-400',
+                      ? 'text-neutral-900'
+                      : 'text-neutral-400',
                   ].join(' ')}
                 >
                   {step.label}
@@ -228,7 +228,7 @@ export function ResumeParsePage() {
                   <p className="mt-0.5 animate-pulse text-sm text-primary-600">处理中…</p>
                 )}
                 {isFailed && (
-                  <p className="mt-0.5 text-sm text-red-500">任务中断</p>
+                  <p className="mt-0.5 text-sm text-error-fg">任务中断</p>
                 )}
               </div>
             </div>
@@ -241,7 +241,7 @@ export function ResumeParsePage() {
         <div className="absolute bottom-24 right-6">
           <button
             onClick={handleDevFail}
-            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-600 hover:bg-red-100"
+            className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
           >
             [DEV] 模拟失败
           </button>

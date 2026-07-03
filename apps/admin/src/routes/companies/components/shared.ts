@@ -71,7 +71,7 @@ export function errMsg(e: unknown): string {
 }
 
 export const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 // ─── 表单状态与字段（编辑 / 新增共用）─────────────────────────────────────────
 
