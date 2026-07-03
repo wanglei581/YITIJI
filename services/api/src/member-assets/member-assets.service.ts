@@ -121,7 +121,10 @@ export class MemberAssetsService {
       id: r.id,
       taskId: r.taskId,
       // generate 必须如实展示为「生成」，绝不冒充「解析」（C-2D 验收点）。
-      kind: r.kind === 'optimize' || r.kind === 'generate' || r.kind === 'job_fit' || r.kind === 'career_plan' || r.kind === 'fair_visit_plan' ? r.kind : ('parse' as const),
+      kind:
+        r.kind === 'optimize' || r.kind === 'generate' || r.kind === 'job_fit' || r.kind === 'career_plan' || r.kind === 'fair_visit_plan' || r.kind === 'job_master'
+          ? r.kind
+          : ('parse' as const),
       status: r.status,
       provider: r.provider,
       createdAt: r.createdAt.toISOString(),

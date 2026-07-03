@@ -26,8 +26,8 @@ export interface MemberAssetPage<T> {
   nextCursor: string | null
 }
 
-/** AI 服务记录种类：解析 / 优化 / 生成（AI 生成简历绝不展示为「简历解析」）。 */
-export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate' | 'job_fit' | 'career_plan' | 'fair_visit_plan'
+/** AI 服务记录种类：解析 / 优化 / 生成 / 岗位匹配 / 职业规划 / 参会准备 / 岗位大师（AI 生成简历绝不展示为「简历解析」）。 */
+export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate' | 'job_fit' | 'career_plan' | 'fair_visit_plan' | 'job_master'
 
 /** 我的简历：会员名下简历资产（上传解析 parse / AI 生成 generate，一条 = 一个任务，仅元数据）。 */
 export interface MemberResumeItem {

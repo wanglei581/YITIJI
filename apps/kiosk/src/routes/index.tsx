@@ -25,6 +25,7 @@ import { JobsPage } from '../pages/jobs/JobsPage'
 import { CompaniesPage } from '../pages/companies/CompaniesPage'
 import { CompanyDetailPage } from '../pages/companies/CompanyDetailPage'
 import { JobDetailPage } from '../pages/jobs/JobDetailPage'
+import { JobMasterPage } from '../pages/jobs/JobMasterPage'
 import { ScanStartPage } from '../pages/scan/ScanStartPage'
 import { ScanSettingsPage } from '../pages/scan/ScanSettingsPage'
 import { ScanProgressPage } from '../pages/scan/ScanProgressPage'
@@ -145,6 +146,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'scan/result',       element: <ScanResultPage /> },
       // 岗位 / 招聘会（Phase 4）
       { path: 'jobs',                                  element: <JobsPage /> },
+      { path: 'jobs/master',                           element: <JobMasterPage /> },
       { path: 'jobs/:id',                              element: <JobDetailPage /> },
       { path: 'companies',                             element: <CompaniesPage /> },
       { path: 'companies/:id',                         element: <CompanyDetailPage /> },

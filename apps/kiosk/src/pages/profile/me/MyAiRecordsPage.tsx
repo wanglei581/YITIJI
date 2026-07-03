@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card } from '@ai-job-print/ui'
 import type { JobAiSessionListItem, MemberAiRecordItem, MemberAiRecordKind } from '@ai-job-print/shared'
-import { FileSearchIcon, SparklesIcon, Trash2Icon, type LucideIcon } from 'lucide-react'
+import { BrainCircuitIcon, FileSearchIcon, SparklesIcon, Trash2Icon, type LucideIcon } from 'lucide-react'
 import { deleteMyAiRecord, getMyAiRecords } from '../../../services/api/memberAssets'
 import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
 import { useAuth } from '../../../auth/useAuth'
@@ -21,6 +21,7 @@ const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon:
   job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: FileSearchIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
   career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: FileSearchIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
   fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: SparklesIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
+  job_master: { label: '岗位决策分析', hint: '岗位大师决策参考报告', icon: BrainCircuitIcon, bg: 'bg-indigo-50', color: 'text-indigo-600' },
 }
 
 const UNKNOWN_KIND_META = {

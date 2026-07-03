@@ -502,3 +502,103 @@ export interface FairVisitPlanPrintResponse {
   signedUrl: string
   expiresAt: string
 }
+
+// ── 岗位大师(岗位决策分析台) M1 ──────────────────────────────────────────────
+// 契约源(SSOT)。设计:docs/superpowers/specs/2026-07-02-job-master-design.md。
+// 合规(硬约束,双层防线,继承 job-fit/career-plan):
+// - 适配度只用三档参考等级(reference_high/medium/low)+ 可解释命中项;绝无百分比/
+//   录用概率/通过率/「精准命中」。
+// - 薪资 M1 只透传来源方提供文本(Job.salary),缺失显示「来源平台未提供」;不自建
+//   预测模型;站内统计区间留 M2。
+// - 风险只用定性三档(level)+ reason + basis(依据出处);无「自动化替代概率 N%」类
+//   强预测强焦虑数字。
+// - careerPath.current / fit.matchedSkills 的 evidence 必须出自简历原文(服务端
+//   防编造校验);gapSkills 只谈准备方向,不编造经历。
+// - 行动仅限合规白名单:查看岗位 / 去来源平台投递 / 扫码投递 / 打印报告 / 去优化简历。
+
+/** 适配度参考等级(非量化承诺;沿用 job-fit 语义)。 */
+export type JobMasterFitLevel = 'reference_high' | 'reference_medium' | 'reference_low'
+
+/** 职业风险定性三档(无概率/无百分比;仅表达关注程度)。 */
+export type JobMasterRiskLevel = 'low' | 'medium' | 'high'
+
+export interface JobMasterRequest {
+  /** 简历解析任务 id(凭会员 token 或匿名 accessToken 读回原文) */
+  taskId: string
+  /** 二选一:系统内已发布岗位 id */
+  jobId?: string
+  /** 二选一:手填目标岗位 */
+  manualJob?: { title: string; requirements?: string }
+}
+
+/** 岗位摘要(jobId 模式含来源信息,用于「去来源平台投递」引导)。 */
+export interface JobMasterJobInfo {
+  title: string
+  company: string | null
+  sourceName: string | null
+  sourceUrl: string | null
+  externalId: string | null
+}
+
+/** 薪资参考(M1 只透传来源方文本;站内统计区间留 M2)。 */
+export interface JobMasterSalaryRef {
+  /** 来源方提供的薪资文本(Job.salary);手填岗位或缺失为 null → 前端显示「来源平台未提供」 */
+  sourceText: string | null
+  /** 站内统计区间占位(M2);M1 恒为 null */
+  internalStats: null
+  /** 展示口径说明(如「来源方提供,仅供参考」) */
+  note: string
+}
+
+/** 适配度分析:三档参考等级 + 可解释命中/差距清单。 */
+export interface JobMasterFit {
+  level: JobMasterFitLevel
+  summary: string
+  /** 已具备项:evidence 出自简历原文(服务端校验) */
+  matchedSkills: Array<{ skill: string; evidence: string }>
+  /** 建议补足项:suggestion 只谈准备方向,不编造经历 */
+  gapSkills: Array<{ skill: string; suggestion: string }>
+}
+
+/** 晋升路径模拟:锚定所选岗位的三节点纵向结构(当前 → 1-3年 → 3-5年)。 */
+export interface JobMasterCareerPath {
+  /** 当前定位(基于简历,evidence 出自原文) */
+  current: { title: string; evidence: string }
+  /** 1-3 年进阶方向 + 待补技能 + 第一步行动 */
+  next: { title: string; skillsToBuild: string[]; firstStep: string }
+  /** 3-5 年目标方向 + 待补技能 */
+  target: { title: string; skillsToBuild: string[] }
+}
+
+/** 职业风险标注(M1 基础版:硬门槛风险 / 信息完整度风险)。 */
+export interface JobMasterRiskItem {
+  /** 定性三档严重度(无概率/无百分比) */
+  level: JobMasterRiskLevel
+  /** 风险类别名,如「学历硬门槛」「岗位信息完整度」 */
+  title: string
+  reason: string
+  /** 依据出处(岗位要求原文 / 信息缺失说明) */
+  basis: string
+}
+
+export interface JobMasterResponse {
+  taskId: string
+  status: 'completed' | 'failed'
+  failReason?: string
+  job?: JobMasterJobInfo
+  salary?: JobMasterSalaryRef
+  fit?: JobMasterFit
+  careerPath?: JobMasterCareerPath
+  risks?: JobMasterRiskItem[]
+  providerName?: string
+}
+
+/** 决策报告 PDF 打印响应(真实 FileObject + 短时签名 URL,进打印链路)。 */
+export interface JobMasterPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  signedUrl: string
+  expiresAt: string
+}
