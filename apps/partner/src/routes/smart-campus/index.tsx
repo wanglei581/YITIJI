@@ -82,7 +82,7 @@ function SmartCampusTabs({ active, onChange }: { active: SmartCampusTab; onChang
               type="button"
               onClick={() => onChange(tab.key)}
               className={`flex h-12 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors ${
-                selected ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                selected ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'
               }`}
             >
               <Icon className="h-4 w-4" aria-hidden="true" />
@@ -99,12 +99,12 @@ function SmartCampusTabs({ active, onChange }: { active: SmartCampusTab; onChang
 function NotOpenState({ title, reason }: { title: string; reason: string }) {
   return (
     <Card className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-        <LockIcon className="h-7 w-7 text-gray-400" aria-hidden="true" />
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100">
+        <LockIcon className="h-7 w-7 text-neutral-400" aria-hidden="true" />
       </div>
       <div>
-        <p className="text-base font-semibold text-gray-900">{title}</p>
-        <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-gray-500">{reason}</p>
+        <p className="text-base font-semibold text-neutral-900">{title}</p>
+        <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-neutral-500">{reason}</p>
       </div>
     </Card>
   )
@@ -190,8 +190,8 @@ function TerminalsPanel() {
   return (
     <section className="space-y-4" aria-label="终端开关">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">终端开关</h2>
-        <p className="mt-0.5 text-sm text-gray-500">开启后该机器前端首页显示「智慧校园」模块；关闭即整张隐藏。</p>
+        <h2 className="text-lg font-bold text-neutral-900">终端开关</h2>
+        <p className="mt-0.5 text-sm text-neutral-500">开启后该机器前端首页显示「智慧校园」模块；关闭即整张隐藏。</p>
       </div>
       <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-4 py-3">
         <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" aria-hidden="true" />
@@ -210,7 +210,7 @@ function TerminalsPanel() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-gray-500">
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
               <tr>
                 <th className="whitespace-nowrap px-4 py-3 font-medium">终端编码</th>
                 <th className="whitespace-nowrap px-4 py-3 font-medium">位置</th>
@@ -223,16 +223,16 @@ function TerminalsPanel() {
             <tbody className="divide-y divide-neutral-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">正在加载终端配置…</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-neutral-500">正在加载终端配置…</td>
                 </tr>
               ) : terminals.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">暂无归属本机构的终端，请先由平台管理员完成终端归属指派。</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-neutral-500">暂无归属本机构的终端，请先由平台管理员完成终端归属指派。</td>
                 </tr>
               ) : terminals.map((terminal) => (
-                <tr key={terminal.terminalId} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-gray-900">{terminal.terminalCode ?? terminal.terminalId}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{terminal.orgName ?? '本机构'}</td>
+                <tr key={terminal.terminalId} className="hover:bg-neutral-50">
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-neutral-900">{terminal.terminalCode ?? terminal.terminalId}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-neutral-600">{terminal.orgName ?? '本机构'}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <StatusBadge status={terminal.isOnline ? 'success' : 'default'} label={terminal.isOnline ? '在线' : '离线'} />
                   </td>
@@ -252,7 +252,7 @@ function TerminalsPanel() {
           </table>
         </div>
       </Card>
-      <p className="text-xs text-gray-400">提示：终端归属由平台管理员维护；机构端保存动作会写入审计日志，便于追踪配置变更。</p>
+      <p className="text-xs text-neutral-400">提示：终端归属由平台管理员维护；机构端保存动作会写入审计日志，便于追踪配置变更。</p>
     </section>
   )
 }
@@ -261,8 +261,8 @@ function OrientationPanel() {
   return (
     <section className="space-y-4" aria-label="迎新内容管理">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">迎新内容管理</h2>
-        <p className="mt-0.5 text-sm text-gray-500">维护报到流程、办事窗口、官方链接，提交后经平台审核上终端。</p>
+        <h2 className="text-lg font-bold text-neutral-900">迎新内容管理</h2>
+        <p className="mt-0.5 text-sm text-neutral-500">维护报到流程、办事窗口、官方链接，提交后经平台审核上终端。</p>
       </div>
       <NotOpenState
         title="迎新内容管理尚未开放"
@@ -276,8 +276,8 @@ function UsagePanel() {
   return (
     <section className="space-y-4" aria-label="使用统计">
       <div>
-        <h2 className="text-lg font-bold text-gray-900">使用统计</h2>
-        <p className="mt-0.5 text-sm text-gray-500">平台生成回传，反映本校终端上智慧校园功能的使用情况，不含个人信息。</p>
+        <h2 className="text-lg font-bold text-neutral-900">使用统计</h2>
+        <p className="mt-0.5 text-sm text-neutral-500">平台生成回传，反映本校终端上智慧校园功能的使用情况，不含个人信息。</p>
       </div>
       <NotOpenState
         title="使用统计尚未开放"
@@ -304,10 +304,10 @@ export default function SmartCampusPage() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold text-gray-900">智慧校园 · 终端开关已联动</h2>
+                <h2 className="text-base font-semibold text-neutral-900">智慧校园 · 终端开关已联动</h2>
                 <StatusBadge status="success" label="终端开关已联动" />
               </div>
-              <p className="mt-1 text-sm leading-6 text-gray-600">
+              <p className="mt-1 text-sm leading-6 text-neutral-600">
                 「终端开关」已接通后端：学校账号按 orgId 隔离，只配置归属本校的终端，保存即联动 Kiosk 首页智慧校园显隐。迎新内容 / 使用统计在内容模型与统计管线接入前显示「未开放」，不展示任何示例数据；校园大数据本期严格冻结。
               </p>
             </div>
@@ -316,10 +316,10 @@ export default function SmartCampusPage() {
 
         <SmartCampusTabs active={activeTab} onChange={setActiveTab} />
 
-        <div className="flex items-center gap-2 text-xs text-gray-400">
+        <div className="flex items-center gap-2 text-xs text-neutral-400">
           <span>智慧校园</span>
           <span>/</span>
-          <span className="font-medium text-gray-700">{activeLabel}</span>
+          <span className="font-medium text-neutral-700">{activeLabel}</span>
         </div>
 
         {activeTab === 'terminals' && <TerminalsPanel />}

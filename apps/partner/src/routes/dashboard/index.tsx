@@ -88,7 +88,7 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
   ]
   return (
     <section aria-label="数据概览">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-400">
         数据概览
       </h2>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -102,9 +102,9 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-gray-500">{m.label}</p>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-gray-900">{m.value}</p>
-                  <p className="mt-1 text-[10px] text-gray-400">{m.note}</p>
+                  <p className="text-xs text-neutral-500">{m.label}</p>
+                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-neutral-900">{m.value}</p>
+                  <p className="mt-1 text-[10px] text-neutral-400">{m.note}</p>
                 </div>
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${m.iconClass}`}>
                   <Icon className="h-5 w-5" aria-hidden="true" />
@@ -122,7 +122,7 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
   return (
     <section aria-label="最近同步记录">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
           最近同步记录
         </h2>
         <button
@@ -145,33 +145,33 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
           />
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['数据源', '类型', '新增/更新/失败', '结果', '同步时间'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-gray-500">
+                  <th key={h} className="whitespace-nowrap px-5 py-3 text-left text-xs font-medium text-neutral-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {data.recentSyncs.map((s) => {
                 const cfg = RESULT_CONFIG[s.status] ?? { label: s.status, badge: 'warning' as const }
                 return (
-                  <tr key={s.id} className="transition-colors hover:bg-gray-50">
-                    <td className="px-5 py-3.5 font-medium text-gray-800">{s.source}</td>
+                  <tr key={s.id} className="transition-colors hover:bg-neutral-50">
+                    <td className="px-5 py-3.5 font-medium text-neutral-800">{s.source}</td>
                     <td className="px-5 py-3.5">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                         {DATA_TYPE_LABEL[s.dataType] ?? s.dataType}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 tabular-nums text-gray-700">
+                    <td className="px-5 py-3.5 tabular-nums text-neutral-700">
                       {s.addedCount} / {s.updatedCount} / <span className={s.errorCount > 0 ? 'text-red-500' : ''}>{s.errorCount}</span>
                     </td>
                     <td className="px-5 py-3.5">
                       <StatusBadge status={cfg.badge} label={cfg.label} />
                     </td>
-                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-gray-400">{s.syncTime}</td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-xs tabular-nums text-neutral-400">{s.syncTime}</td>
                   </tr>
                 )
               })}

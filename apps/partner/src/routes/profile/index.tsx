@@ -109,13 +109,13 @@ export default function ProfilePage() {
               <Building2Icon className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">{profile.name}</h2>
-              <p className="text-sm text-gray-500">{ORG_TYPE_LABELS[profile.type] ?? profile.type}</p>
+              <h2 className="text-base font-semibold text-neutral-900">{profile.name}</h2>
+              <p className="text-sm text-neutral-500">{ORG_TYPE_LABELS[profile.type] ?? profile.type}</p>
             </div>
           </div>
           <div className="space-y-3 text-sm">
-            <Row label="联系人" value={profile.contact || <span className="text-gray-400">未填写</span>} />
-            <Row label="联系电话" value={profile.contactPhone || <span className="text-gray-400">未填写</span>} />
+            <Row label="联系人" value={profile.contact || <span className="text-neutral-400">未填写</span>} />
+            <Row label="联系电话" value={profile.contactPhone || <span className="text-neutral-400">未填写</span>} />
             <Row
               label="合作状态"
               value={
@@ -130,12 +130,12 @@ export default function ProfilePage() {
 
         {/* 接入概况（真实计数） */}
         <Card className="p-6">
-          <h3 className="mb-3 text-sm font-medium text-gray-700">接入概况</h3>
+          <h3 className="mb-3 text-sm font-medium text-neutral-700">接入概况</h3>
           <div className="space-y-3 text-sm">
             <Row label="数据源" value={`${profile.sourceCount} 个`} />
             <Row label="机构账号" value={`${profile.accountCount} 个`} />
           </div>
-          <p className="mt-4 rounded-lg bg-gray-50 px-3 py-2.5 text-xs leading-relaxed text-gray-500">
+          <p className="mt-4 rounded-lg bg-neutral-50 px-3 py-2.5 text-xs leading-relaxed text-neutral-500">
             机构名称、类型、场景模板与启用模块由平台管理员维护；如需调整请联系管理员。
             本页仅支持机构自助修改联系人与联系电话。
           </p>
@@ -145,8 +145,8 @@ export default function ProfilePage() {
       {/* 场景与模块配置（真实数据） */}
       <Card className="mt-6 p-6">
         <div className="mb-4 flex items-center gap-2">
-          <SettingsIcon className="h-4 w-4 text-gray-400" />
-          <h3 className="text-sm font-medium text-gray-700">场景与模块配置</h3>
+          <SettingsIcon className="h-4 w-4 text-neutral-400" />
+          <h3 className="text-sm font-medium text-neutral-700">场景与模块配置</h3>
           {profile.sceneTemplate && (
             <span className="ml-auto rounded bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-600">
               {(SCENE_TEMPLATE_LABELS as Record<string, string>)[profile.sceneTemplate] ?? profile.sceneTemplate}
@@ -155,9 +155,9 @@ export default function ProfilePage() {
         </div>
 
         <div className="mb-3">
-          <p className="mb-2 text-xs text-gray-400">当前启用模块</p>
+          <p className="mb-2 text-xs text-neutral-400">当前启用模块</p>
           {profile.enabledModules.length === 0 ? (
-            <p className="text-xs text-gray-400">暂未配置启用模块，请联系平台管理员开通</p>
+            <p className="text-xs text-neutral-400">暂未配置启用模块，请联系平台管理员开通</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {profile.enabledModules.map((m) => (
@@ -169,12 +169,12 @@ export default function ProfilePage() {
           )}
         </div>
 
-        <div className="mt-4 rounded-lg bg-gray-50 p-3">
+        <div className="mt-4 rounded-lg bg-neutral-50 p-3">
           <div className="mb-1.5 flex items-center gap-1.5">
-            <LockIcon className="h-3.5 w-3.5 text-gray-400" />
-            <span className="text-xs font-medium text-gray-500">合规限制 — 永久禁用功能</span>
+            <LockIcon className="h-3.5 w-3.5 text-neutral-400" />
+            <span className="text-xs font-medium text-neutral-500">合规限制 — 永久禁用功能</span>
           </div>
-          <p className="mb-2 text-xs text-gray-400">以下功能属于招聘闭环，无论任何配置均不允许启用：</p>
+          <p className="mb-2 text-xs text-neutral-400">以下功能属于招聘闭环，无论任何配置均不允许启用：</p>
           <div className="flex flex-wrap gap-1.5">
             {PROHIBITED_MODULES.map((m) => (
               <span key={m} className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-400 line-through">
@@ -185,40 +185,40 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      <p className="mt-4 text-xs text-gray-400">如需修改合作状态或模块配置，请联系平台管理员</p>
+      <p className="mt-4 text-xs text-neutral-400">如需修改合作状态或模块配置，请联系平台管理员</p>
 
       {/* 编辑联系方式抽屉 */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
           <Card className="w-full max-w-md p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900">编辑联系方式</h3>
+              <h3 className="text-base font-semibold text-neutral-900">编辑联系方式</h3>
               <button
                 type="button"
                 onClick={() => setEditing(false)}
                 aria-label="关闭"
-                className="rounded p-1 text-gray-400 hover:bg-gray-100"
+                className="rounded p-1 text-neutral-400 hover:bg-neutral-100"
               >
                 <XIcon className="h-4 w-4" />
               </button>
             </div>
             <div className="space-y-4">
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-600">联系人</span>
+                <span className="mb-1 block text-neutral-600">联系人</span>
                 <input
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
                   maxLength={50}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
                 />
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block text-gray-600">联系电话</span>
+                <span className="mb-1 block text-neutral-600">联系电话</span>
                 <input
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
                   maxLength={30}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
                 />
               </label>
               {saveError && <p className="text-xs text-red-500">{saveError}</p>}
@@ -241,8 +241,8 @@ export default function ProfilePage() {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center gap-4">
-      <span className="w-16 shrink-0 text-gray-400">{label}</span>
-      <span className="text-gray-700">{value}</span>
+      <span className="w-16 shrink-0 text-neutral-400">{label}</span>
+      <span className="text-neutral-700">{value}</span>
     </div>
   )
 }

@@ -83,14 +83,14 @@ function StepBar({ current }: { current: Step }) {
             <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold
               ${done   ? 'bg-green-500 text-white' :
                 active ? 'bg-primary-600 text-white' :
-                         'bg-gray-200 text-gray-500'}`}>
+                         'bg-neutral-200 text-neutral-500'}`}>
               {done ? <CheckCircleIcon className="h-4 w-4" /> : i + 1}
             </div>
-            <span className={`ml-1.5 text-xs font-medium ${active ? 'text-gray-900' : 'text-gray-400'}`}>
+            <span className={`ml-1.5 text-xs font-medium ${active ? 'text-neutral-900' : 'text-neutral-400'}`}>
               {s.label}
             </span>
             {i < STEPS.length - 1 && (
-              <ChevronRightIcon className="mx-2 h-4 w-4 text-gray-300" />
+              <ChevronRightIcon className="mx-2 h-4 w-4 text-neutral-300" />
             )}
           </div>
         )
@@ -215,18 +215,18 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
+        <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Excel 导入</h2>
-            <p className="mt-0.5 text-xs text-gray-500">数据源：{sourceName}</p>
+            <h2 className="text-base font-semibold text-neutral-900">Excel 导入</h2>
+            <p className="mt-0.5 text-xs text-neutral-500">数据源：{sourceName}</p>
           </div>
-          <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600">
+          <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600">
             <XIcon className="h-5 w-5" />
           </button>
         </div>
 
         {/* Step bar */}
-        <div className="border-b border-gray-100 px-6 py-3">
+        <div className="border-b border-neutral-100 px-6 py-3">
           <StepBar current={step} />
         </div>
 
@@ -237,7 +237,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
             <div className="space-y-5">
               <div>
                 <div className="mb-1 flex items-center justify-between gap-3">
-                  <label className="block text-sm font-medium text-gray-700">数据类型</label>
+                  <label className="block text-sm font-medium text-neutral-700">数据类型</label>
                   <Button
                     variant="outline"
                     size="sm"
@@ -258,7 +258,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                       type="button"
                       onClick={() => setDataType(t)}
                       className={`rounded-lg border px-5 py-2 text-sm font-medium transition ${
-                        dataType === t ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                        dataType === t ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
                       }`}
                     >
                       {t === 'job' ? '岗位数据' : '招聘会数据'}
@@ -268,7 +268,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">选择 Excel 文件</label>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">选择 Excel 文件</label>
                 <input
                   ref={fileRef}
                   type="file"
@@ -280,20 +280,20 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   }}
                 />
                 <div
-                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-8 hover:border-primary-300 hover:bg-primary-50/30"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-8 hover:border-primary-300 hover:bg-primary-50/30"
                   onClick={() => fileRef.current?.click()}
                 >
                   {file ? (
                     <>
                       <FileSpreadsheetIcon className="h-10 w-10 text-green-500" />
-                      <p className="mt-2 font-medium text-gray-800">{file.name}</p>
-                      <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB · 点击更换</p>
+                      <p className="mt-2 font-medium text-neutral-800">{file.name}</p>
+                      <p className="text-xs text-neutral-400">{(file.size / 1024).toFixed(1)} KB · 点击更换</p>
                     </>
                   ) : (
                     <>
-                      <UploadIcon className="h-10 w-10 text-gray-300" />
-                      <p className="mt-2 text-sm text-gray-500">点击选择或拖入 Excel 文件（.xlsx / .xls / .csv）</p>
-                      <p className="mt-1 text-xs text-gray-400">第一行为表头，数据从第二行开始</p>
+                      <UploadIcon className="h-10 w-10 text-neutral-300" />
+                      <p className="mt-2 text-sm text-neutral-500">点击选择或拖入 Excel 文件（.xlsx / .xls / .csv）</p>
+                      <p className="mt-1 text-xs text-neutral-400">第一行为表头，数据从第二行开始</p>
                     </>
                   )}
                 </div>
@@ -308,7 +308,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
           {/* ── Step 2: mapping ── */}
           {step === 'mapping' && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-neutral-600">
                 检测到 {columns.length} 列。请将 Excel 列名映射到标准字段。
               </p>
               {savedRuleApplied && (
@@ -316,26 +316,26 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   已套用该数据源上次保存的字段映射，可直接微调。确认导入后将更新为本次映射。
                 </div>
               )}
-              <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100">
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-neutral-100">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-gray-100 bg-gray-50">
+                  <thead className="border-b border-neutral-100 bg-neutral-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">标准字段</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">对应 Excel 列</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">标准字段</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">对应 Excel 列</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-neutral-50">
                     {fields.map((f) => (
-                      <tr key={f.key} className="hover:bg-gray-50">
+                      <tr key={f.key} className="hover:bg-neutral-50">
                         <td className="px-4 py-2">
-                          <span className="font-medium text-gray-800">{f.label}</span>
+                          <span className="font-medium text-neutral-800">{f.label}</span>
                           {f.required && <span className="ml-1 text-red-500">*</span>}
                         </td>
                         <td className="px-4 py-2">
                           <select
                             value={mapping[f.key] ?? ''}
                             onChange={(e) => setMapping((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                            className="h-8 w-full rounded-lg border border-gray-200 px-2 text-xs focus:border-primary-400 focus:outline-none"
+                            className="h-8 w-full rounded-lg border border-neutral-200 px-2 text-xs focus:border-primary-400 focus:outline-none"
                           >
                             <option value="">— 不映射 —</option>
                             {columns.map((col) => (
@@ -398,8 +398,8 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
           {step === 'done' && (
             <div className="flex flex-col items-center justify-center py-8">
               <CheckCircleIcon className="h-14 w-14 text-green-500" />
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">导入成功</h3>
-              <p className="mt-1 text-sm text-gray-500">
+              <h3 className="mt-4 text-lg font-semibold text-neutral-900">导入成功</h3>
+              <p className="mt-1 text-sm text-neutral-500">
                 已成功导入 <span className="font-bold text-green-600">{importedCount}</span> 条数据，
                 默认待审核状态，请联系管理员审核发布。
               </p>
@@ -412,8 +412,8 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
-          <p className="text-xs text-gray-400">
+        <div className="flex items-center justify-between border-t border-neutral-100 px-6 py-4">
+          <p className="text-xs text-neutral-400">
             {step === 'preview' && preview ? `共 ${preview.totalRows} 行 · 将导入 ${preview.validRows} 行` : ''}
           </p>
           <div className="flex gap-3">

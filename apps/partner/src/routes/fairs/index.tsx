@@ -17,7 +17,7 @@ import { getPartnerFairs, importPartnerFairs, unpublishPartnerFair, updatePartne
 const FAIR_STATUS_MAP: Record<JobFairStatus, { style: string; label: string }> = {
   upcoming: { style: 'bg-blue-50 text-blue-600',   label: '未开始' },
   ongoing:  { style: 'bg-green-50 text-green-600', label: '进行中' },
-  ended:    { style: 'bg-gray-100 text-gray-500',  label: '已结束' },
+  ended:    { style: 'bg-neutral-100 text-neutral-500',  label: '已结束' },
 }
 
 const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
@@ -48,12 +48,12 @@ const THEME_OPTIONS = [
 ] as const
 
 const inputCls =
-  'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
+  'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-gray-600">
+      <span className="mb-1 block text-xs font-medium text-neutral-600">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </span>
@@ -226,7 +226,7 @@ export default function FairsPage() {
     return (
       <Page title="招聘会信息管理" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-gray-400">加载中...</p>
+          <p className="text-sm text-neutral-400">加载中...</p>
         </div>
       </Page>
     )
@@ -236,8 +236,8 @@ export default function FairsPage() {
     return (
       <Page title="招聘会信息管理" subtitle="加载失败">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <CalendarIcon className="h-10 w-10 text-gray-200" />
-          <p className="text-sm text-gray-400">加载失败，请稍后重试</p>
+          <CalendarIcon className="h-10 w-10 text-neutral-200" />
+          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
         </div>
       </Page>
     )
@@ -267,7 +267,7 @@ export default function FairsPage() {
             key={f}
             onClick={() => setStatusFilter(f)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              statusFilter === f ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              statusFilter === f ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
             }`}
           >
             {f}
@@ -280,18 +280,18 @@ export default function FairsPage() {
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 bg-gray-50">
+            <thead className="border-b border-neutral-100 bg-neutral-50">
               <tr>
                 {['外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '来源预约链接', '来源签到链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-neutral-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-sm text-gray-400">
-                    <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-gray-200" />
+                  <td colSpan={12} className="py-12 text-center text-sm text-neutral-400">
+                    <CalendarIcon className="mx-auto mb-2 h-8 w-8 text-neutral-200" />
                     当前筛选条件下无招聘会
                   </td>
                 </tr>
@@ -301,15 +301,15 @@ export default function FairsPage() {
                   const review  = REVIEW_MAP[f.reviewStatus]
                   const publish = PUBLISH_MAP[f.publishStatus]
                   return (
-                    <tr key={f.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-400">{f.externalId}</td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{f.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{f.organizer}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                    <tr key={f.id} className="hover:bg-neutral-50">
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{f.externalId}</td>
+                      <td className="px-4 py-3 font-medium text-neutral-800">{f.name}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{f.organizer}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         <div>{f.startTime.slice(0, 16).replace('T', ' ')}</div>
-                        <div className="text-gray-300">至 {f.endTime.slice(5, 16).replace('T', ' ')}</div>
+                        <div className="text-neutral-300">至 {f.endTime.slice(5, 16).replace('T', ' ')}</div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{f.venue}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">{f.venue}</td>
                       <td className="px-4 py-3">
                         <span className={`rounded px-2 py-0.5 text-xs font-medium ${fs.style}`}>{fs.label}</span>
                       </td>
@@ -324,10 +324,10 @@ export default function FairsPage() {
                             查看签到源
                           </a>
                         ) : (
-                          <span className="text-gray-300">未配置</span>
+                          <span className="text-neutral-300">未配置</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-400">{f.syncTime}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{f.syncTime}</td>
                       <td className="px-4 py-3"><StatusBadge status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -358,7 +358,7 @@ export default function FairsPage() {
         </div>
       </Card>
 
-      <p className="mt-3 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-neutral-400">
         本后台仅管理来源数据，不在本系统内接收求职者简历，不参与招聘闭环。编辑或新增的招聘会需经管理员重新审核后才会在终端展示;现场活动资料由管理员在运营后台维护。
       </p>
 
@@ -370,7 +370,7 @@ export default function FairsPage() {
         size="md"
         footer={
           <div className="flex justify-end gap-2">
-            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">取消</button>
+            <button onClick={() => setEditing(null)} disabled={saving} className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50">取消</button>
             <button onClick={save} disabled={saving || !canSave} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
               {saving ? '保存中…' : editing === 'new' ? '提交审核' : '保存并重新提审'}
             </button>
@@ -430,7 +430,7 @@ export default function FairsPage() {
           <Field label="简介">
             <textarea className={`${inputCls} h-24 resize-none`} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           </Field>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-neutral-400">
             招聘会仅作为第三方/官方来源信息展示,求职者通过"去来源平台预约/扫码预约"跳转,本系统不接收报名信息。
           </p>
         </div>
