@@ -220,6 +220,9 @@ export class JobMasterService {
       fit: stored.payload.fit,
       careerPath: stored.payload.careerPath,
       risks: stored.payload.risks,
+      // M1.5 顶层字段透传（fit/careerPath 内新字段已随整体透传）
+      interviewPrep: stored.payload.interviewPrep,
+      resumeRewrite: stored.payload.resumeRewrite,
       providerName: stored.providerName,
     }
   }
