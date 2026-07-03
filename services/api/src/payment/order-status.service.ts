@@ -21,6 +21,16 @@ function randomPickupCode(): string {
   return out
 }
 
+/** 判断是否为 pickupCode 唯一约束冲突（Prisma P2002）。markPaid 的 update data 中唯一带唯一索引的列即 pickupCode。 */
+function isPickupCodeUniqueConflict(e: unknown): boolean {
+  const err = e as { code?: string; meta?: { target?: unknown } }
+  if (err?.code !== 'P2002') return false
+  const target = err.meta?.target
+  if (typeof target === 'string') return target.includes('pickupCode')
+  if (Array.isArray(target)) return target.some((t) => String(t).includes('pickupCode'))
+  return true // 缺 meta 时按 pickupCode 冲突处理（本更新唯一可能冲突的列）
+}
+
 /**
  * 取件码可见性门（P0a）：仅 `paid`、未退款、且任务未进入 completed/cancelled/failed 终态时，
  * 后端才可向会员返回可用取件码。其它状态一律不返回（unpaid / refunded / 终态）。
@@ -76,23 +86,37 @@ export class OrderStatusService {
       throw new BadRequestException('FREE_REQUIRES_ZERO_AMOUNT')
     }
 
-    const pickupCode = await this.generateUniquePickupCode()
-    const res = await this.prisma.order.updateMany({
-      where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set：只在仍为 unpaid 时命中
-      data: {
-        payStatus: 'paid',
-        paymentSource,
-        paidAt: new Date(),
-        paidBy: operatorId ?? 'system',
-        pickupCode,
-      },
-    })
-    if (res.count === 0) {
-      // 并发竞态：他人已支付。重读；若已 paid 则幂等返回，否则非法转移。
-      const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
-      if (fresh?.payStatus === 'paid') return fresh
-      throw new BadRequestException('ORDER_INVALID_TRANSITION')
+    // CAS 落库 + 取件码唯一冲突有界重试：预检后仍可能与并发请求撞码（唯一索引拦截抛 P2002），
+    // 仅该情况换码重试；CAS 未命中(count=0)与其它错误不重试、不吞。耗尽仍撞码 → 明确错误码，不落 500。
+    let settled = false
+    for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
+      const pickupCode = await this.generateUniquePickupCode()
+      let res: { count: number }
+      try {
+        res = await this.prisma.order.updateMany({
+          where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set：只在仍为 unpaid 时命中
+          data: {
+            payStatus: 'paid',
+            paymentSource,
+            paidAt: new Date(),
+            paidBy: operatorId ?? 'system',
+            pickupCode,
+          },
+        })
+      } catch (e) {
+        if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试
+        throw e // 其它错误照抛，不吞
+      }
+      if (res.count === 0) {
+        // 并发竞态（非取件码冲突）：他人已支付则幂等返回，否则非法转移，不重试。
+        const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
+        if (fresh?.payStatus === 'paid') return fresh
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
+      }
+      settled = true
+      break
     }
+    if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
 
     await this.audit.write({
       // actorId 是 User 外键；操作员身份放 payload，避免非 User 标识触发外键约束（服务级动作 actorRole=system）。
