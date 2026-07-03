@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-07-02
+> 最后更新：2026-07-03
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -39,6 +39,8 @@
 2026-07-03 补充：完成「打印失败原因安全口径收口」（承接 PR #114，为「我的」订单失败原因回显做前置合规裁定）。后端 `PrintJobsService.getStatus()` 不再把 Terminal Agent 原始 `errorMessage`（可能含设备路径 / 驱动异常 / 内部堆栈 / 主机名）透给用户端：新增纯函数 `failureReasonForUser(errorCode)` 白名单映射常见错误码为安全中文文案，未知码统一兜底「打印任务失败，请联系工作人员处理或稍后重试」；用户端状态查询新增显式字段 `failureReasonForUser`，兼容字段 `errorMessage` 也只回安全文案（不再回原文）。`PrintTask.errorCode/errorMessage` 原始值仍原样落库供 Admin / 排障使用（未改 Prisma schema）。Kiosk `PrintProgressPage` 失败分支改为优先 `failureReasonForUser` → 本地 errorCode 映射 → 默认文案，不再回退原始 `errorMessage`（前后端双重防御）。`verify:print-jobs` 新增第 7 段（7a–7e）：构造 Agent 回传含敏感路径 / 驱动 / 主机 / 堆栈的失败任务，断言 DB 保留原文但 `getStatus()` 仅回白名单/兜底安全文案且响应体不含任何敏感片段。验证：`verify:print-jobs` 全段 PASS、`@ai-job-print/api` 与 `@ai-job-print/kiosk` `typecheck`、改动 4 文件 `eslint` 均通过；双模型审查（Antigravity 100/100 APPROVE、独立 Claude 子代理 APPROVE，仅 1 条 Info：`errorCode` 仍原样返回但前台只经白名单映射、从不原样展示，符合设计非必修）。范围仅四个允许文件 + 本进度记录，未碰 Prisma schema / Terminal Agent / Admin 排障视图 / 支付 / 真机出纸。仍未做：「我的」订单失败原因回显 UI 与本人可见范围（本次只收口后端安全口径与 Kiosk 打印进度失败文案，UI 侧仍待产品确认）。
 
 2026-07-03 追加：按第二轮 Claude reviewer 建议，`verify:print-jobs` 第 7 段补一个最易泄露的边界用例（7f/7g）——Agent 回传 `status:'failed'` 且**完全无 `errorCode`、只有原始 `errorMessage`**（失败判定只能靠 `errorMessage` 命中、映射函数拿不到任何码）：断言 DB 仍完整保存原文而 `errorCode` 为空，`getStatus()` 回默认安全文案「打印任务失败，请联系工作人员处理或稍后重试」（`failureReasonForUser` 与兼容 `errorMessage` 一致），响应体不含任何敏感片段。仅改 `services/api/scripts/verify-print-jobs.ts` 测试脚本，未动业务逻辑。重跑 `verify:print-jobs` 7a–7g 全 PASS、api/kiosk `typecheck`、两组 `eslint` 均通过。
+
+2026-07-03 补充：三端登录页 UI 与内部账号手机号认证商用闭环已在隔离分支 `codex/login-trio-commercial-auth` 完成代码侧接线和本地验证：Admin / Partner 登录页接入密码登录、短信验证码登录、忘记密码重置、本人手机号验证、协议勾选拦截；Kiosk 登录页同步协议约束并保持会员认证域；后端新增内部账号手机号 hash/encrypt/verified 字段、内部 OTP 服务、短信登录、重置密码三段式流程、JWT tokenVersion 失效、机构/账号禁用后的 session 缓存失效和 verify 门禁。部署注意事项：该分支新增迁移尚未应用到任何长期库，上预生产或生产必须先对目标 PostgreSQL 执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`；Codex 本地 SQLite `dev.db` 是 `db push` 建库，没有迁移基线。SQLite 空库仍有历史迁移链缺 `Organization.contactPhone` 的遗留坑，若新建 SQLite dev 库跑 seed 需手动补列；生产 PostgreSQL 迁移链干净，不受影响。候选提交必须包含 `services/api/scripts/verify-internal-auth-phone.ts` 和 `services/api/scripts/backfill-internal-user-phone.ts`，否则 CI/上线门禁会缺内部手机号认证验证。管理员/机构账号使用手机号验证码登录的前提是账号已绑定并完成本人验证手机号；种子 admin 未绑定手机号，只能密码登录，这是预期行为，不是缺陷。
 
 ## 规范化治理已完成
 

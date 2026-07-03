@@ -8,10 +8,12 @@ import { API_BASE_URL } from '../api/client'
 const STORAGE_KEY = 'partner_auth_v1'
 
 export interface AuthedUser {
-  id:    string
-  name:  string
-  role:  'admin' | 'partner' | 'kiosk'
-  orgId: string | null
+  id:           string
+  name:         string
+  role:         'admin' | 'partner' | 'kiosk'
+  orgId:        string | null
+  phoneMasked?: string
+  phoneVerifiedAt?: string | null
 }
 
 interface AuthState {
@@ -33,6 +35,12 @@ function readState(): AuthState | null {
 
 function writeState(state: AuthState): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* ignore */ }
+}
+
+function mergeStoredUser(partial: Partial<AuthedUser>): void {
+  const state = readState()
+  if (!state) return
+  writeState({ token: state.token, user: { ...state.user, ...partial } })
 }
 
 export function getToken(): string | null {
@@ -104,24 +112,85 @@ export type LoginResult =
   | { ok: true; user: AuthedUser }
   | { ok: false; code: string; message: string }
 
-export async function login(username: string, password: string): Promise<LoginResult> {
-  const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login', { username, password })
+function ensurePartnerSession(data: { token: string; user: AuthedUser }): LoginResult {
+  if (data.user.role !== 'partner') {
+    clearAuth()
+    return { ok: false, code: 'AUTH_PORTAL_FORBIDDEN', message: '当前账号无权登录合作机构后台' }
+  }
+  writeState({ token: data.token, user: data.user })
+  return { ok: true, user: data.user }
+}
+
+export async function login(loginId: string, password: string): Promise<LoginResult> {
+  const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login', { loginId, password, portal: 'partner' })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
-  writeState({ token: r.data.token, user: r.data.user })
-  return { ok: true, user: r.data.user }
+  return ensurePartnerSession(r.data)
+}
+
+export async function sendLoginSmsCode(phone: string): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ sent: true; cooldownSeconds: number }>('/auth/sms-code', {
+    phone,
+    purpose: 'login',
+    portal: 'partner',
+  })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true, cooldownSeconds: r.data.cooldownSeconds }
+}
+
+export async function loginWithSms(phone: string, code: string): Promise<LoginResult> {
+  const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login/sms', { phone, code, portal: 'partner' })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return ensurePartnerSession(r.data)
+}
+
+export async function startPasswordReset(loginIdOrPhone: string): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ sent: true; cooldownSeconds: number }>('/auth/password/reset/start', { loginIdOrPhone })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true, cooldownSeconds: r.data.cooldownSeconds }
+}
+
+export async function verifyPasswordReset(loginIdOrPhone: string, code: string): Promise<{ ok: true; resetTicket: string } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ resetTicket: string }>('/auth/password/reset/verify', { loginIdOrPhone, code })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true, resetTicket: r.data.resetTicket }
+}
+
+export async function completePasswordReset(resetTicket: string, newPassword: string): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ success: true }>('/auth/password/reset/complete', { resetTicket, newPassword })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true }
+}
+
+export async function sendOwnPhoneCode(): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ sent: true; cooldownSeconds: number }>('/auth/phone/code', {})
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true, cooldownSeconds: r.data.cooldownSeconds }
+}
+
+export async function verifyOwnPhone(code: string): Promise<{ ok: true; phoneVerifiedAt: string } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ phoneMasked: string; phoneVerifiedAt: string }>('/auth/phone/verify', { code })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  mergeStoredUser({ phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt })
+  return { ok: true, phoneVerifiedAt: r.data.phoneVerifiedAt }
 }
 
 export async function verifyToken(): Promise<AuthedUser | null> {
   if (!getToken()) return null
   const r = await getJson<AuthedUser>('/auth/me')
   if (r.ok) {
-    const u = r.data as unknown as { userId: string; role: AuthedUser['role']; orgId: string | null }
+    const u = r.data as unknown as { userId: string; role: AuthedUser['role']; orgId: string | null; phoneMasked?: string; phoneVerifiedAt?: string | null }
     const cur = getUser()
     const normalized: AuthedUser = {
       id:    u.userId,
       name:  cur?.name ?? '当前用户',
       role:  u.role,
       orgId: u.orgId,
+      phoneMasked: u.phoneMasked ?? cur?.phoneMasked,
+      phoneVerifiedAt: u.phoneVerifiedAt ?? cur?.phoneVerifiedAt ?? null,
+    }
+    if (normalized.role !== 'partner') {
+      clearAuth()
+      return null
     }
     const tok = getToken()
     if (tok) writeState({ token: tok, user: normalized })

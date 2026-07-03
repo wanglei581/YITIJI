@@ -35,6 +35,11 @@ export function encryptPhone(phone: string): string {
   return encryptSecret(normalizePhone(phone))
 }
 
+/** 解密手机号。只能在服务端内部用于短信下发,不得返回 API 或写日志。 */
+export function decryptPhone(phoneEnc: string): string {
+  return decryptSecret(phoneEnc)
+}
+
 /** 脱敏:138****1234。非 11 位一律返回掩码,绝不回明文。 */
 export function maskPhone(phone: string): string {
   const p = normalizePhone(phone)

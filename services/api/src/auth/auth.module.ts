@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
+import { createSmsSender, SMS_SENDER } from '../member-auth/sms/sms-sender'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { InternalOtpService } from './internal-otp.service'
 
 const JWT_TTL = '24h'
 
@@ -27,7 +29,13 @@ const JWT_TTL = '24h'
     }),
   ],
   controllers: [AuthController],
-  providers:   [AuthService, JwtAuthGuard, RolesGuard],
-  exports:     [JwtModule, JwtAuthGuard, RolesGuard],
+  providers:   [
+    AuthService,
+    InternalOtpService,
+    JwtAuthGuard,
+    RolesGuard,
+    { provide: SMS_SENDER, useFactory: createSmsSender },
+  ],
+  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService],
 })
 export class AuthModule {}

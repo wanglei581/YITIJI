@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-02
+> 最后更新：2026-07-03
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -32,9 +32,11 @@
 
 - [ ] 生产域名与 HTTPS：完成域名解析、证书、nginx 反代、上传限制和自动续期。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
+- [ ] 三端登录 / 内部账号手机号认证部署：上线目标库必须先执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`，再跑 `pnpm --filter @ai-job-print/api verify:internal-auth-phone`；提交候选必须包含 `verify-internal-auth-phone.ts`、`backfill-internal-user-phone.ts` 和双 Prisma 迁移目录。Codex 本地 SQLite `dev.db` 由 `db push` 创建无迁移基线；如新建 SQLite 空库跑 seed 遇到历史缺列，需手动补 `Organization.contactPhone`，生产 PostgreSQL 不受该遗留问题影响。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
 - [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
+- [ ] 管理员 / 机构手机号登录验收：只有已绑定且完成本人手机号验证的管理员或机构账号允许短信验证码登录；种子 admin 未绑定手机号，只能密码登录，属于预期行为。历史账号上线前需走 Admin 开账号录入手机号并由本人验证，或按审计要求运行 `backfill-internal-user-phone.ts`。
 - [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收；AI 简历相关功能先运行 `pnpm --filter @ai-job-print/api verify:llm-connectivity`。2026-06-30 本地已换入有效 DeepSeek key，并通过本地运行时配置同步 active LLM 功能；`verify:llm-connectivity -- --all` 已覆盖 `assistant_chat` / `resume_diagnosis` / `resume_generate` / `resume_optimize` / `mock_interview` 全部通过。后续仍需在预生产 / 生产环境分别注入有效密钥并做 live 冒烟，不得复用聊天中暴露过的旧 key。
 - [ ] 生产运行时环境变量：部署脚本 / PM2 必须显式固定 `NODE_ENV=production`，并在 health / 启动日志验收中确认生产运行时门禁实际生效。
 - [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。

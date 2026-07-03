@@ -50,7 +50,7 @@ async function login(username: string, password: string): Promise<string> {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, portal: 'partner' }),
   })
   const json = (await res.json()) as { data?: { token?: string }; error?: unknown }
   if (!res.ok || !json.data?.token) throw new Error(`login failed ${username}: ${res.status} ${JSON.stringify(json)}`)
