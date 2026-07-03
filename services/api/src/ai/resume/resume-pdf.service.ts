@@ -2,6 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { existsSync } from 'fs'
 import PDFDocument from 'pdfkit'
 import type { GeneratedResume, ResumeLayoutSettings } from '../interfaces/ai-provider.interface'
+import type { ResumeTemplateLayoutPreset, ResumeTemplateSectionKey } from '../../job-materials/job-materials.types'
 
 // ============================================================
 // ResumePdfService — 阶段2A 简历 PDF 渲染(服务端真实产物)
@@ -92,6 +93,15 @@ export interface RenderedResumePdf {
   pageCount: number
 }
 
+export interface ResumePdfRenderOptions {
+  layout?: ResumeLayoutSettings
+  templatePreset?: ResumeTemplateLayoutPreset
+}
+
+function isRenderOptions(value: ResumeLayoutSettings | ResumePdfRenderOptions | undefined): value is ResumePdfRenderOptions {
+  return Boolean(value && ('layout' in value || 'templatePreset' in value))
+}
+
 @Injectable()
 export class ResumePdfService {
   private readonly logger = new Logger(ResumePdfService.name)
@@ -128,8 +138,9 @@ export class ResumePdfService {
   }
 
   /** 渲染简历 PDF(A4 受控排版)。返回 buffer + 页数。 */
-  async render(resume: GeneratedResume, layout?: ResumeLayoutSettings): Promise<RenderedResumePdf> {
-    const cfg = resolveLayout(layout)
+  async render(resume: GeneratedResume, options?: ResumeLayoutSettings | ResumePdfRenderOptions): Promise<RenderedResumePdf> {
+    const renderOptions = isRenderOptions(options) ? options : { layout: options }
+    const cfg = resolveLayout({ ...renderOptions.templatePreset?.defaultLayout, ...renderOptions.layout })
     const doc = new PDFDocument({
       size: 'A4',
       margins: { top: cfg.margin, bottom: cfg.margin, left: cfg.margin, right: cfg.margin },
@@ -218,11 +229,14 @@ export class ResumePdfService {
       resetX()
     }
 
-    if (resume.summary.trim()) {
+    const drawSummary = () => {
+      if (!resume.summary.trim()) return
       section('个人简介')
       body(resume.summary)
     }
-    if (resume.education.length > 0) {
+
+    const drawEducation = () => {
+      if (resume.education.length === 0) return
       section('教育经历')
       for (const e of resume.education) {
         entryHead([e.school, e.major, e.degree].filter(Boolean).join(' · '), e.period)
@@ -230,27 +244,54 @@ export class ResumePdfService {
         else doc.moveDown(0.3)
       }
     }
-    if (resume.experience.length > 0) {
+
+    const drawExperience = () => {
+      if (resume.experience.length === 0) return
       section('实习 / 工作经历')
       for (const e of resume.experience) {
         entryHead(`${e.company} · ${e.role}`, e.period)
         if (e.description.trim()) body(e.description)
       }
     }
-    if (resume.projects.length > 0) {
+
+    const drawProjects = () => {
+      if (resume.projects.length === 0) return
       section('项目经历')
       for (const p of resume.projects) {
         entryHead(p.role ? `${p.name} · ${p.role}` : p.name)
         if (p.description.trim()) body(p.description)
       }
     }
-    if (resume.skills.length > 0) {
+
+    const drawSkills = () => {
+      if (resume.skills.length === 0) return
       section('技能')
       body(resume.skills.join('  ·  '))
     }
-    if (resume.certificates.length > 0) {
+
+    const drawCertificates = () => {
+      if (resume.certificates.length === 0) return
       section('证书 / 资质')
       body(resume.certificates.join('  ·  '))
+    }
+
+    const defaultOrder: ResumeTemplateSectionKey[] = ['summary', 'education', 'experience', 'projects', 'skills', 'certificates']
+    const order = renderOptions.templatePreset?.sectionOrder.filter((sectionKey) => sectionKey !== 'header') ?? defaultOrder
+    let drewSkills = false
+    let drewCertificates = false
+    for (const sectionKey of order) {
+      if (sectionKey === 'summary') drawSummary()
+      if (sectionKey === 'education') drawEducation()
+      if (sectionKey === 'experience') drawExperience()
+      if (sectionKey === 'projects') drawProjects()
+      if (sectionKey === 'skills' && !drewSkills) {
+        drawSkills()
+        drewSkills = true
+      }
+      if (sectionKey === 'certificates' && !drewCertificates) {
+        drawCertificates()
+        drewCertificates = true
+      }
     }
 
     // 页数必须在 end() 前取:bufferPages 的页在 end 时刷出,之后 range 为空
