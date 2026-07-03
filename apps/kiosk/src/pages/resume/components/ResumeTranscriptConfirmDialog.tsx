@@ -106,7 +106,17 @@ export function ResumeTranscriptConfirmDialog({
   }
 
   useEffect(() => {
-    return () => cancelRecorder()
+    return () => {
+      if (recorderRef.current) {
+        recorderRef.current.cancel()
+        recorderRef.current = null
+      }
+      if (intervalRef.current !== null) {
+        window.clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      startedAtRef.current = null
+    }
   }, [])
 
   const recording = status === 'recording'
