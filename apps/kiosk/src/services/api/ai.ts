@@ -17,6 +17,7 @@ import type {
   GeneratedResume,
   ResumeExportFormat,
   ResumeGenerateExportResponse,
+  ResumeLayoutSettings,
   ResumeGenerateInput,
   ResumeGenerateResponse,
   ResumeParseRequest,
@@ -45,10 +46,24 @@ export interface ResumeReadAccess {
   accessToken?: string | null
 }
 
+export type ResumeLayoutAdjustAction = 'reformat' | 'condense'
+
+export interface ResumeLayoutAdjustResponse {
+  resume: GeneratedResume
+  warnings: string[]
+}
+
 export interface AiServiceInterface {
   submitResumeParse(req: ResumeParseRequest, token?: string | null): Promise<ResumeParseResponse>
   getResumeRecord(taskId: string, access?: ResumeReadAccess): Promise<ResumeParseResponse>
   getResumeOptimize(taskId: string, access?: ResumeReadAccess): Promise<ResumeOptimizeResponse>
+  adjustResumeLayoutDraft(
+    taskId: string,
+    resume: GeneratedResume,
+    action: ResumeLayoutAdjustAction,
+    layout: ResumeLayoutSettings,
+    access?: ResumeReadAccess,
+  ): Promise<ResumeLayoutAdjustResponse>
   chatWithAssistant(req: AssistantChatRequest): Promise<AssistantChatResponse>
   // ── 阶段2A AI 简历生成(只润色用户提供的信息,不编造)──
   submitResumeGenerate(input: ResumeGenerateInput, token?: string | null): Promise<ResumeGenerateResponse>
@@ -58,6 +73,7 @@ export interface AiServiceInterface {
     taskId?: string,
     token?: string | null,
     format?: ResumeExportFormat,
+    layout?: ResumeLayoutSettings,
   ): Promise<ResumeGenerateExportResponse>
 }
 
@@ -88,6 +104,15 @@ export const getResumeRecord = (taskId: string, access?: ResumeReadAccess) =>
 export const getResumeOptimize = (taskId: string, access?: ResumeReadAccess) =>
   adapter.getResumeOptimize(taskId, access)
 
+/** Wave 2:AI 一键精简 / 调整排版（不新增事实，后端按 taskId 重新提取原文校验）。 */
+export const adjustResumeLayoutDraft = (
+  taskId: string,
+  resume: GeneratedResume,
+  action: ResumeLayoutAdjustAction,
+  layout: ResumeLayoutSettings,
+  access?: ResumeReadAccess,
+) => adapter.adjustResumeLayoutDraft(taskId, resume, action, layout, access)
+
 /** 向 AI 助手发送消息（意图分类 + 引导跳转） */
 export const chatWithAssistant = (req: AssistantChatRequest) =>
   adapter.chatWithAssistant(req)
@@ -109,4 +134,5 @@ export const exportGeneratedResume = (
   taskId?: string,
   token?: string | null,
   format?: ResumeExportFormat,
-) => adapter.exportGeneratedResume(resume, taskId, token, format)
+  layout?: ResumeLayoutSettings,
+) => adapter.exportGeneratedResume(resume, taskId, token, format, layout)

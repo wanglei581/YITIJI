@@ -147,8 +147,8 @@
 
 ## P1：AI 简历优化商用闭环（6 波）
 
-- [ ] **Wave 1 合并与预生产/真机验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已在隔离分支 `worktree-resume-optimize-wave1` 完成代码 + 本地 verify（`verify:resume-export-formats` 等全绿），未合并 `main`。下一步：双模型审查无 Critical 后开 PR → CI → 合并；随后在预生产用真实 LLM + PostgreSQL + COS 跑真实会员 optimize + 四格式导出 + `/me/documents` 浏览器 E2E，Windows 真机对 PDF 出纸验收。未完成前不得宣称商用上线。
-- [ ] **Wave 2 排版参数在线编辑 + AI 一键排版**：优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版对已生成结构化简历重排，仍受防编造约束。另起独立分支与审查。
+- [x] **Wave 1 合并与预生产验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。仍未完成：Windows 一体机 + 奔图真机真实出纸、非 PDF 格式转换后打印、收费/语音/岗位 URL/模板填充等后续 Wave。
+- [ ] **Wave 2 排版参数在线编辑 + AI 一键排版**：代码侧已在 `codex/resume-optimize-wave2-implementation` 完成（待 PR / CI / 合并 / 预生产验收）：优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版/精简通过 `POST /resume/records/:taskId/layout-adjust` 重提原文并复用防编造约束，Kiosk 支持「AI 精简」「AI 调整排版」和「撤销 AI 调整」。下一步：完成双模型审查、开 PR、CI 通过后合并；合并后按独立 runbook 在预生产用真实 LLM 浏览器验收。
 - [ ] **Wave 3 模板库 → 自动填充排版**：素材库模板补结构区域定义，选模板后把结构化简历自动灌入并渲染。
 - [ ] **Wave 4 语音生成简历**：从 worktree 实验代码主干化语音→ASR→结构化草稿→进优化/导出；需 ASR provider 决策、生产 Key、失败兜底、语音不长留隐私处理。
 - [ ] **Wave 5 收费闭环（支付/计费/套餐/券/核销）**：独立立项。计费属性定义、Package/Plan/SKU + PricingRule、支付集成（appSecret 仅服务端、回调验签+幂等）、权益核销、Order 金额真实计算、Admin 价格/额度/退款/账单后台。Wave 1 已预留 `assertExportFormatAllowed` 计费能力位。

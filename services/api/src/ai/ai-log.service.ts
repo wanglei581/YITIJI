@@ -15,6 +15,7 @@ const MAX_IN_MEMORY_LOGS = 500
 export type AiOperation =
   | 'parseResume'
   | 'optimizeResume'
+  | 'adjustResumeLayout'
   | 'generateResume'
   | 'chatAssistant'
   | 'classifyIntent'
@@ -55,6 +56,7 @@ export interface AdminAiUsage {
   byOperation: {
     parseResume: number
     optimizeResume: number
+    adjustResumeLayout: number
     generateResume: number
     chatAssistant: number
     classifyIntent: number
@@ -86,6 +88,7 @@ export interface AdminAiLogsResult {
 const OPERATIONS: AiOperation[] = [
   'parseResume',
   'optimizeResume',
+  'adjustResumeLayout',
   'generateResume',
   'chatAssistant',
   'classifyIntent',
