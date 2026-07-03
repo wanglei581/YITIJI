@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-03
+> 最后更新：2026-07-04
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -49,11 +49,11 @@
 
 ## 支付域 C-5（收款 / 计价 / 退款 / 核销）
 
-> C5-1 已随 PR #134 合入 `main`（2026-07-03，merge commit `dab6ab2f`；后续波次从最新 `main` 开独立分支推进，未预生产）。方案：`docs/product/payment-domain-c5-plan-2026-07.md`（§⓪ 命名与波次校准为权威口径）。合规上位：`compliance-boundary.md` §8.4/§8.5/§8.7 + CLAUDE.md §12。商户号已就绪，但 C5-1~C5-5 用沙箱即可完成验收，C5-6 才接 live。`.worktrees/profile-commercial-p0a`（P0a 窗口）视为已被 C5 吸收，不再独立推进同一支付底座。
+> C5-1 已随 PR #134 合入 `main`（`dab6ab2f`），旧 `feature/payment-c5` 分支已删除；一波一 PR，后续每波从最新 `main` 新建独立分支（C5-2 = `feature/payment-c5-2`）。方案：`docs/product/payment-domain-c5-plan-2026-07.md`（§⓪ 命名与波次校准为权威口径）。合规上位：`compliance-boundary.md` §8.4/§8.5/§8.7 + CLAUDE.md §12。商户号已就绪，但 C5-1~C5-5 用沙箱即可完成验收，C5-6 才接 live。`.worktrees/profile-commercial-p0a`（P0a 窗口）视为已被 C5 吸收，不再独立推进同一支付底座。
 
 - [x] **C5-1 数据底座（线下 / 免费 / 人工确认，无 live 网关）**：选择性吸收 codex P0a 底座（`a9d856e6` 已复核）到 `feature/payment-c5`。`Order` 6 additive 列 + `PriceConfig` 表 + 双 additive migration + 开发默认价 seed + `PricingService`（fail-closed 计价）+ `PrintPageCountService`（SSRF 安全后端识别页数）+ `OrderStatusService`（CAS 幂等状态机 + `pickupCode` + 审计）+ Admin `mark-paid`/`refund` 端点 + `/me/print-orders` 支付字段接真。`wechat/alipay/benefit` 本波禁写（状态机 + Admin 端点 + `verify:order` 三处按名断言）。本地全绿：空库 SQLite migrate、`typecheck`/`lint`/`db:pg:sync:check`、`verify:order`/`verify:pricing`/`verify:print-jobs`/`verify:member-print-orders`/`verify:materials-processing`/`verify:admin-orders-readonly`。已随 PR #134 合入 `main`（2026-07-03）；未预生产、未真机。
 - [x] **P0b 我的页订单详单 / 电子凭证前端真实化（Kiosk，零后端）**：分支 `feature/payment-c5-p0b`（从 `main dab6ab2f` 起）。`/me/print-orders` 接真 C5-1 支付安全字段：卡片支付概要行（金额整数分展示 / `unpaid`→「待现场确认」/ `paid`→「已支付」+ 来源「线下收款 / 免费 / 人工确认」/ `refunded`→「已退款」/ `failed`→「支付异常」）、展开式详单（金额 / 支付状态 / 计费页数 + 来源说明）、取件码电子凭证面板（仅后端返回 `pickupCode` 时渲染，前端不推断不生成）、历史无 Order 显示「暂无支付信息」、任务状态筛选 chips（客户端过滤已加载数据）+ 游标「加载更多」（已加载 n / 共 total）。「再打一份」不做订单侧直连（`PrintTask` 无可重签文件源），只做「去我的文档再打印」诚实引导（新任务新订单）。新增 `verify:member-print-orders-ui` 静态守卫并接入 CI。全文件无微信 / 支付宝文案；不新增我的页入口、不碰后端 / shared / Prisma。验证：新守卫全 PASS、kiosk typecheck/lint/生产 build、相邻守卫回归、后端 `verify:member-print-orders` 回归 13 PASS、1080×1920 真实登录浏览器走查（6 种支付状态 + 筛选 + 加载更多 + 取件码 + 空态，测试数据已清理）。
-- [ ] **C5-2 计价 + 沙箱线上支付闭环**：`PaymentProvider(sandbox)` + `quote`/下单/出屏上动态码/回调（验签 + 幂等 + 防重放 + 金额一致性）/主动查单 + 线上态状态机（`paying`/`closed` 等）+ `PaymentAttempt` 表 + `Order` 线上补列（`payChannel`/`itemsJson`/`expiresAt` 等，additive 叠加 C5-1）。门禁 `verify:payment-flow`（沙箱模拟成功 / 失败 / 超时 / 重放 / 金额篡改全断言）。
+- [x] **C5-2 计价 + 沙箱线上支付闭环**（2026-07-03，分支 `feature/payment-c5-2`，代码 + 本地 verify 级）：`PaymentAttempt` 表 + `Order` 线上补列（`payChannel`/`itemsJson`/`expiresAt`，additive 叠加 C5-1）+ 双 migration；`PaymentProvider(sandbox)`（fail-closed 工厂：缺密钥 / 生产 sandbox / 未知渠道启动即拒）+ 出码 / 轮询 / 回调（验签绑定 `POST+path` + 5min 时间窗 + nonce 防重放 + 全字段匹配 + 金额一致 + `(channel,channelTxnNo)` 幂等入账）/ 沙箱模拟端点（仅非生产）；线上态 `paying`/`closed`，`closed→paid` 仅限已存在尝试的有效迟到回调（审计 `late=true`）；`paymentSource=sandbox` 只经回调成功路径写入，Admin 端点与 `wechat/alipay/benefit` 禁写不变。门禁 `verify:payment-flow`（54 PASS，成功 / 失败 / 超时 / 重放 / 金额篡改 / 伪造回调 / 跨路径签名 / 线下回归全断言）已接双 CI。主动查单接口位留在 `PaymentProvider.queryPayment?`（C5-6 真实渠道实现；sandbox 无外部账本，不伪造能力）。未合 `main`、未预生产、未真机。
 - [ ] **C5-3 Kiosk 收银 UI**：收银页（价目明细 + 抵扣 + 退款 / 重试规则 + 动态码 + 轮询）+ 履约衔接（`paid` 后才 claim 出纸）。`verify:kiosk-cashier-ui` + 浏览器沙箱付款→打印 E2E。
 - [ ] **C5-4 退款 + 核销**：本人退款（幂等，`Refund` 表）+ 券 / 免费次数 / 会员权益核销（`RedemptionRecord` 幂等 + 审计，免费单也落库）。`verify:refund-idempotent` / `verify:redemption-audit`。
 - [ ] **C5-5 Admin 计费配置 + 订单接真 + 对账**：`PriceConfig` 配置页（改价审计）+ 订单页金额 / 支付状态 / 退款接真 + 对账页 + 审计；`payConfigured:boolean` 不回显密钥。`verify:admin-billing`。
@@ -162,7 +162,7 @@
 
 ## P1：AI 简历优化商用闭环（6 波）
 
-- [x] **Wave 1 合并与预生产验收**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。仍未完成：Windows 一体机 + 奔图真机真实出纸、非 PDF 格式转换后打印、收费/语音/岗位 URL/模板填充等后续 Wave。
+- [x] **Wave 1 合并、预生产验收与 PDF 真机打印收口**：Wave 1（优化目标维度结构化 + docx/txt/md 导出 + 统一 wrapper）已通过 PR #121 合入 `main`；预生产验收 runbook PR #122 已合入；后续 hotfix PR #123 已修复 PDF 打印确认必须使用系统 HMAC `printFileUrl` 的问题并部署到预生产 `d922071d`。RW1-G1 / RW1-G2 / RW1-G3 已完成：真实 LLM、PostgreSQL、COS、OCR、四格式导出、会员 `/me/documents` 和 PDF 打印确认安全探针均通过。2026-07-04 已补 Windows 一体机 `KSK-001` + `AIJobPrintAgent` 服务模式 + `Pantum CM2800ADN Series` 真机打印：无个人信息测试页和合成简历优化版 PDF 均完成 `pending -> claimed/printing -> completed`，其中合成简历链路覆盖真实诊断/优化、优化版 PDF `printFileUrl`、`PrintTask=ptask_kiosk_4aeb9125b84c4a5c` 和终端 `t_ksk_001`。仍未完成：非 PDF 格式转换后打印、收费/语音/岗位 URL 等后续 Wave；不得据此宣称正式生产上线完成。
 - [x] **Wave 2 排版参数在线编辑 + AI 一键排版**：已通过 PR #125 合入并部署预生产 `2769261b`；优化预览页支持字号/行距/页边距/主色/单双栏参数化，PDF 渲染读参数；AI 一键排版/精简通过 `POST /resume/records/:taskId/layout-adjust` 重提原文并复用防编造约束，Kiosk 支持「AI 精简」「AI 调整排版」和「撤销 AI 调整」；预生产真实 LLM、PDF 导出和 `printFileUrl` 安全探针已通过。仍不代表 Windows 真机出纸或非 PDF 格式转换后打印完成。
 - [x] **Wave 3 模板库 → 自动填充排版**：已通过 PR #128 合入并部署预生产 `a885837f`；素材库 `resume_template` 补结构区域与 `resumeLayoutPreset`，PDF 导出接 `templateId` 并按模板 section/default layout 自动填充，Kiosk 优化页可选模板并透传导出；docx/txt/md 忽略模板且不伪造打印。预生产已验证模板列表、非简历模板 PDF 导出拒绝、真实 LLM 上传 / 诊断 / 优化 / 模板 PDF 导出 / `printFileUrl` 安全打印探针；不存在终端 ID 返回 `PRINT_TERMINAL_NOT_FOUND` 且 `PrintTask` 计数前后一致，未创建真实打印任务、未出纸。仍未完成：Admin 模板 CRUD、拖拽编辑、收费、语音、岗位 URL、格式转换、Windows 一体机 + 奔图真机出纸。
 - [ ] **Wave 4 语音生成简历**：设计规格与实施计划已合入，运行时代码候选已在 `codex/resume-voice-wave4-implementation` 完成并通过本地门禁。实现范围：共享 `AsrModule` + `POST /resume/voice/transcribe`，multipart 内存音频 `audio`、4MB 上限、6/min throttle、音频不落 FileObject/COS/DB/日志；Kiosk `/resume/generate` 仅在叙述字段提供语音填写弹窗，复用 `wavRecorder`，单段最多 58 秒，转写结果必须用户确认后才写入表单，高敏短字段仍手填。已通过 `verify:resume-voice-generate`、`verify:resume-diagnosis-flow-ui`、API/Kiosk typecheck、Kiosk lint、Kiosk 生产 build 和 `git diff --check`；下一步是双模型审查、PR/CI/合并，再按预生产 ASR 配置做 live 验收或诚实 disabled 回退验收。未完成：预生产真实 ASR、Windows 一体机麦克风/触控验收、正式生产上线。
@@ -171,6 +171,7 @@
 
 ## P1：工程质量门禁
 
+- [ ] **P0 部署数据安全 DP-GATE 真实执行**：2026-07-03 预生产发生疑似部署回退数据库导致 12:07 后新数据消失，已形成事故记录、追证清单和本地门禁脚本；后续任何预生产 / 生产部署前必须先执行 `deploy:data-safety-gate before` 写入低敏 `AuditLog` canary 并记录核心表 count、`max(createdAt)` 与最新记录锚点基线，部署后执行 `deploy:data-safety-gate after` 验证 canary 仍在、基线锚点仍在、`max(createdAt)` 未回退、核心表 count 下降有 cleanup 日志解释。连续两次部署 DP-GATE 未通过前，依赖持久数据的验收只能降级为“流程可跑、数据持久性未证明”，不得宣称部署流程安全或商用验收完成；部署窗口应停写或低流量，并必须保留完整 deploy evidence log。
 - [ ] 每个新任务先写目标、非目标、允许修改文件、验证方式。
 - [ ] 后续另起分支统一 `docs/product/*` 和历史计划中旧文件 TTL 参考口径；本轮已完成 UI / 隐私政策 / shared copy / 送审材料 / 部署验收文档，产品参考文档历史口径不作为本分支继续扩范围修改。
 - [ ] 超过 30 行 diff 或跨模块任务必须 Claude + Antigravity 双模型审查。

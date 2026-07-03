@@ -27,11 +27,20 @@
 
 | 下文原写 | 现定位 |
 |---|---|
-| §3.1 `paidAmountCents / discountCents / payChannel / expiresAt / itemsJson` | C5-2~C5-4 additive 补列（券抵扣 / 线上渠道 / 超时关单 / 定价快照）；C5-1 未建 |
-| §3.2 `PaymentAttempt` | C5-2 线上扫码支付时新增 |
-| §3.3 `Refund` | C5-4 退款域（当前 C5-1 退款走 `OrderStatusService.refund` 整单退款 + 审计，尚无独立退款表） |
+| §3.1 `paidAmountCents / discountCents / payChannel / expiresAt / itemsJson` | `payChannel`/`itemsJson`/`expiresAt` **已随 C5-2 落地**；`paidAmountCents`/`discountCents`（券抵扣）留 C5-4 |
+| §3.2 `PaymentAttempt` | **已随 C5-2 落地**（含 `expiresAt` 码有效期列 + `(channel, channelTxnNo)` 幂等唯一键） |
+| §3.3 `Refund` | C5-4 退款域（当前退款走 `OrderStatusService.refund` 整单退款 + 审计，尚无独立退款表） |
 | §3.4 `RedemptionRecord` | C5-4 券 / 权益核销时新增 |
 | §3.5 `PriceRule` | **作废**，已由 `PriceConfig` 实现 |
+
+**C5-2 设计决策定版（2026-07-03，经用户硬约束确认）**：
+
+1. `paymentSource` 新增 `sandbox` 取值（诚实标注测试通道入账，非真实收款），**只能由回调成功入账路径**（`OrderStatusService.markPaidOnline`）写入；Admin mark-paid 仍只允许 `offline/manual_confirmed`，`wechat/alipay/benefit` 继续按名拒绝（`verify:payment-flow` 覆盖）。
+2. `payStatus` 增线上态 `paying`（已出码）/ `closed`（超时关单，惰性判定，不引入后台任务）。**`closed → paid` 仅限「已存在 `PaymentAttempt` 的有效迟到回调」**：`attemptId/prepayId/orderId/channel/amountCents` 全字段匹配缺一即拒，任意 closed 订单不可能被伪造回调打成 paid；迟到入账审计 `order.mark_paid_online` 带 `late=true`（C5-4 前不自动退款，对账凭此追踪）。
+3. 回调验签 base 为 `POST\n/api/v1/payment/callback/:channel\ntimestamp\nnonce\nrawBody`，**签名绑定渠道回调路径**，同一签名不能跨路径 / 跨渠道复用。
+4. fail-closed：`PAYMENT_PROVIDER=sandbox` 时 `SANDBOX_PAYMENT_SECRET` 缺失/过短启动即拒；生产配 sandbox 双重拦截（工厂 + production-runtime-gates）；未知渠道取值（含 wechat/alipay）启动即拒，**C5-6 前不引入任何 live 商户密钥**。
+5. `Order.itemsJson` 建单时快照 `PricingService` 计费明细（`PrintPriceLine[]`），只存计费明细、不引入商品体系；C5-3 收银 UI 只读它。
+6. `PaymentProvider.queryPayment?` 为可选接口位：主动查单兜底在 C5-6 真实渠道（有外部账本）时实现；sandbox 的真相源即本库 DB，不做假查单、不伪造能力。
 
 ---
 
@@ -249,7 +258,7 @@ interface PaymentProvider {
 |----|------|------|
 | **C5-0 方案确认** | 本文档 + 用户确认 + 合规复核 | 用户确认 |
 | **C5-1 数据底座** ✅ **已完成（2026-07-03）** | 提取自 P0a `a9d856e6`（已复核）：`Order` 6 additive 列 + `PriceConfig` 表 + 双 additive migration（`20260703160000_add_payment_foundation`）+ 开发默认价 seed + `PricingService`（fail-closed 计价）+ `PrintPageCountService`（SSRF 安全、后端识别页数）+ `OrderStatusService`（线下/免费/人工确认 CAS 幂等状态机 + pickupCode + 审计）+ Admin `mark-paid`/`refund` 端点 + `/me/print-orders` 支付字段接真 | ✅ 空库 sqlite migrate deploy 过；`db:pg:sync:check` 过；`typecheck`/`lint` 过；`verify:order`/`verify:pricing`/`verify:print-jobs`/`verify:member-print-orders`/`verify:materials-processing`/`verify:admin-orders-readonly` 全 PASS（wechat/alipay/benefit 禁写按名断言） |
-| **C5-2 计价 + 沙箱支付闭环** | PaymentProvider(sandbox) + quote/下单/出码/回调(验签+幂等+防重放)/查单 + 状态机 | `verify:payment-flow`（沙箱模拟支付成功/失败/超时/重放/金额篡改全断言） |
+| **C5-2 沙箱线上支付闭环** ✅ **已完成（2026-07-03，分支 `feature/payment-c5-2`，本地 verify 级）** | `PaymentAttempt` 表 + `Order` 补列（`payChannel`/`itemsJson`/`expiresAt`）+ 双 additive migration（`20260703210000_add_payment_attempt_online`）+ `PaymentProvider` 抽象 + `SandboxPaymentProvider`（HMAC 验签绑定 `POST+回调路径`）+ fail-closed 工厂 + `OnlinePaymentService`（出码/回调/轮询/惰性过期）+ `markPaidOnline`（唯一写 `paymentSource=sandbox` 的路径）+ 生产禁 sandbox 门禁 + 沙箱模拟端点（仅非生产） | ✅ `verify:payment-flow` 54 PASS（成功/失败/超时/重放/金额篡改/伪造回调/跨路径签名/closed 迟到入账/线下回归全断言）已接双 CI；空库 migrate deploy / 全仓 typecheck / lint / `db:pg:sync:check` / 既有 6 个支付相关 verify 回归全过 |
 | **C5-3 Kiosk 收银 UI** | 收银页（价目展示+退款规则+动态码+轮询）+ 履约衔接（paid 后才打印） | `verify:kiosk-cashier-ui`；浏览器 E2E 沙箱付款→打印 |
 | **C5-4 退款 + 核销** | 本人退款(幂等) + 券/免费/权益核销(幂等+审计) + 免费单落库 | `verify:refund-idempotent` / `verify:redemption-audit` |
 | **C5-5 Admin 计费配置 + 订单接真 + 对账** | PriceRule 配置页 + 订单页金额接真 + 对账页 + 审计 | `verify:admin-billing` |

@@ -79,6 +79,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.priceConfig
   }
 
+  // ── C5-2 online payment (sandbox) ──────────────────────────────────────────
+
+  get paymentAttempt() {
+    return this.client.paymentAttempt
+  }
+
   // ── Phase 0b ───────────────────────────────────────────────────────────────
 
   get organization() {
