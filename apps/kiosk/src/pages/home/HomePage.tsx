@@ -192,11 +192,12 @@ function IdentityPanel() {
 
   if (isLoggedIn) {
     const initial = displayName.replace(/\s/g, '').slice(0, 1) || '我'
-    const cells: { label: string; value: string }[] = [
-      { label: '简历', value: loading || !stats ? '-' : String(stats.resumes) },
-      { label: '文档', value: loading || !stats ? '-' : String(stats.documents) },
-      { label: 'AI记录', value: loading || !stats ? '-' : String(stats.aiRecords) },
-      { label: '收藏', value: loading || !stats ? '-' : String(stats.favorites) },
+    // A档增强:统计数字点击直达本人对应明细页(原为纯展示)
+    const cells: { label: string; value: string; href: string }[] = [
+      { label: '简历', value: loading || !stats ? '-' : String(stats.resumes), href: '/me/resumes' },
+      { label: '文档', value: loading || !stats ? '-' : String(stats.documents), href: '/me/documents' },
+      { label: 'AI记录', value: loading || !stats ? '-' : String(stats.aiRecords), href: '/me/ai-records' },
+      { label: '收藏', value: loading || !stats ? '-' : String(stats.favorites), href: '/me/favorites' },
     ]
 
     return (
@@ -210,10 +211,16 @@ function IdentityPanel() {
         </div>
         <div className="mr-6 grid w-[360px] grid-cols-4 divide-x divide-neutral-100">
           {cells.map((cell) => (
-            <div key={cell.label} className="text-center">
+            <button
+              key={cell.label}
+              type="button"
+              onClick={() => navigate(cell.href)}
+              aria-label={`查看我的${cell.label}`}
+              className="min-h-[64px] rounded-xl text-center transition-colors hover:bg-neutral-50 active:bg-primary-50"
+            >
               <p className="text-3xl font-extrabold tabular-nums text-neutral-900">{cell.value}</p>
               <p className="mt-1 text-sm font-semibold text-neutral-500">{cell.label}</p>
-            </div>
+            </button>
           ))}
         </div>
         <div className="flex shrink-0 gap-3">
