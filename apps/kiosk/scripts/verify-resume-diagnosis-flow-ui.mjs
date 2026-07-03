@@ -67,4 +67,30 @@ assertIncludes(mockAdapter, "key: 'readability'", 'mock adapter uses readability
 assertNotIncludes(mockAdapter, "key: 'education'", 'mock adapter no longer returns old education dimension')
 assertNotIncludes(mockAdapter, "key: 'layout'", 'mock adapter no longer returns old layout dimension')
 
+// ── Wave1 Task 8:目标维度(专业/学历)输入 + 优化版多格式导出入口 ──────────
+const httpAdapter = read('src/services/api/aiHttpAdapter.ts')
+
+assertIncludes(source, 'targetMajor', 'source page tracks major input')
+assertIncludes(source, 'targetDegree', 'source page tracks degree input')
+assertIncludes(source, 'major: targetMajor', 'source page merges major into target context')
+assertIncludes(source, 'degree: targetDegree', 'source page merges degree into target context')
+
+assertIncludes(report, "navigate('/resume/optimize'", 'report page navigates to optimize page')
+assertIncludes(report, 'targetContext: state.targetContext', 'report page forwards targetContext into optimize navigate state')
+
+assertIncludes(optimize, "'pdf'", 'optimize page offers pdf export format')
+assertIncludes(optimize, "'docx'", 'optimize page offers docx export format')
+assertIncludes(optimize, "'txt'", 'optimize page offers txt export format')
+assertIncludes(optimize, "'md'", 'optimize page offers md export format')
+assertIncludes(optimize, 'Word', 'optimize page labels docx as Word')
+assertIncludes(optimize, 'Markdown', 'optimize page labels md as Markdown')
+assertIncludes(optimize, 'exportFormat', 'optimize page tracks selected export format state')
+assertIncludes(optimize, 'exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat)', 'optimize page exports with selected format')
+assertNotIncludes(optimize, '¥', 'optimize page shows no pricing copy')
+assertNotIncludes(optimize, '付费', 'optimize page shows no paywall copy')
+assertNotIncludes(optimize, '元/', 'optimize page shows no per-unit pricing copy')
+
+assertIncludes(httpAdapter, 'format?: ResumeExportFormat', 'http adapter accepts optional export format')
+assertIncludes(httpAdapter, 'format ?? ', 'http adapter defaults export format to pdf when omitted')
+
 console.log('PASS resume diagnosis flow UI verification')
