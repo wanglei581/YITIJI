@@ -65,6 +65,19 @@ for (const [name, src] of all) {
   expectAbsent(src, /微信|支付宝|wechat|alipay/i, `${name} 不出现微信 / 支付宝（线上渠道未接入）`)
 }
 
+// 1b) C5-2 类型扩展（PaymentSource +sandbox；OrderPayStatus +paying/closed）容错回退：
+//     映射用 Partial（不被迫穷举 C5-2 线上态），消费端经 helper 回退中性文案，
+//     绝不 crash、不伪装已支付/失败、不把 sandbox 测试渠道对用户展示。
+expectMatches(copySrc, /PAYMENT_SOURCE_LABEL:\s*Partial</, 'PAYMENT_SOURCE_LABEL 用 Partial（sandbox 等未命中不显来源提示）')
+expectMatches(copySrc, /PAY_STATUS_META:\s*Partial</, 'PAY_STATUS_META 用 Partial（不穷举 C5-2 线上态）')
+expectMatches(copySrc, /PAY_STATUS_FALLBACK\s*=\s*\{\s*label:\s*'处理中'/, '未识别支付状态回退中性文案「处理中」')
+expectMatches(copySrc, /PAY_STATUS_META\[status\]\s*\?\?\s*PAY_STATUS_FALLBACK/, 'payStatusMeta 对未识别状态回退，不返回 undefined（不 crash）')
+for (const [name, src] of [[PAGE, pageSrc], [SUMMARY, summarySrc]]) {
+  expectMatches(src, /payStatusMeta\(/, `${name} 经 payStatusMeta helper 取状态（容错回退）`)
+  expectAbsent(src, /PAY_STATUS_META\[/, `${name} 不直接索引 PAY_STATUS_META（Partial 下会 crash）`)
+  expectAbsent(src, /PAYMENT_SOURCE_LABEL\[/, `${name} 不直接索引 PAYMENT_SOURCE_LABEL（经 helper 取，sandbox 安全回退）`)
+}
+
 // 2) 诚实状态文案：unpaid 与历史无 Order
 expectMatches(copySrc, /unpaid:\s*\{\s*label:\s*'待现场确认'/, 'payStatus unpaid → 待现场确认（不写线上支付渠道）')
 expectMatches(pageSrc, /payStatus\s*==\s*null\)\s*return\s*'暂无支付信息'/, '列表卡片：无 Order（payStatus 为 null）→ 暂无支付信息')

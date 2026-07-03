@@ -20,7 +20,7 @@ import { useAuth } from '../../../auth/useAuth'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
-import { formatAmountCents, PAY_STATUS_META, PAYMENT_SOURCE_LABEL } from './printOrders/paymentCopy'
+import { formatAmountCents, paymentSourceLabel, payStatusMeta } from './printOrders/paymentCopy'
 
 const PAGE_SIZE = 20
 
@@ -58,8 +58,9 @@ function paymentLine(item: MemberPrintOrderItem): string {
   if (item.payStatus == null) return '暂无支付信息'
   const parts: string[] = []
   if (typeof item.amountCents === 'number') parts.push(formatAmountCents(item.amountCents))
-  const source = item.paymentSource ? `（${PAYMENT_SOURCE_LABEL[item.paymentSource]}）` : ''
-  parts.push(`${PAY_STATUS_META[item.payStatus].label}${source}`)
+  const sourceLabel = item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined
+  const source = sourceLabel ? `（${sourceLabel}）` : ''
+  parts.push(`${payStatusMeta(item.payStatus).label}${source}`)
   return parts.join(' · ')
 }
 

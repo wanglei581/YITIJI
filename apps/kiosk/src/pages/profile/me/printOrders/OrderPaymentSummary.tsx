@@ -15,7 +15,7 @@
 import { useNavigate } from 'react-router-dom'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 import { FileTextIcon } from 'lucide-react'
-import { BILLING_PAGE_SOURCE_LABEL, formatAmountCents, PAY_STATUS_META, PAYMENT_SOURCE_LABEL } from './paymentCopy'
+import { BILLING_PAGE_SOURCE_LABEL, formatAmountCents, paymentSourceLabel, payStatusMeta } from './paymentCopy'
 import { PickupCodePanel } from './PickupCodePanel'
 
 function DetailRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -46,8 +46,8 @@ export function OrderPaymentSummary({ item }: { item: MemberPrintOrderItem }) {
           {typeof item.amountCents === 'number' && <DetailRow label="金额" value={formatAmountCents(item.amountCents)} />}
           <DetailRow
             label="支付状态"
-            value={PAY_STATUS_META[payStatus].label}
-            hint={item.paymentSource ? PAYMENT_SOURCE_LABEL[item.paymentSource] : undefined}
+            value={payStatusMeta(payStatus).label}
+            hint={item.paymentSource ? paymentSourceLabel(item.paymentSource) : undefined}
           />
           {typeof item.billablePages === 'number' && (
             <DetailRow
