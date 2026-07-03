@@ -10,6 +10,8 @@
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
  *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
  *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
+ *   - PAYMENT_PROVIDER 不得为 sandbox（生产禁止沙箱支付通道；真实渠道到 C5-6，
+ *     此前生产保持未设置/disabled = 线上支付关闭）
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
@@ -33,6 +35,7 @@ export interface ProductionRuntimeEnv {
   AI_PROVIDER?: string
   AI_LLM_API_KEY?: string
   TRTC_LLM_API_KEY?: string
+  PAYMENT_PROVIDER?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -116,6 +119,15 @@ export function assertProductionRuntimeGates(
   if (!hasValue(env.AI_LLM_API_KEY) && !hasValue(env.TRTC_LLM_API_KEY)) {
     throw new Error(
       'PRODUCTION_LLM_CONFIG_MISSING: AI_PROVIDER=llm 时必须配置 AI_LLM_API_KEY 或 TRTC_LLM_API_KEY',
+    )
+  }
+
+  // C5-2：生产禁止沙箱支付通道（测试通道绝不能在生产入账）。未设置/disabled = 线上支付关闭，放行；
+  // wechat/alipay 等真实渠道取值到 C5-6 才引入（届时由 Provider 工厂校验凭证齐全）。
+  const paymentProvider = env.PAYMENT_PROVIDER?.trim().toLowerCase()
+  if (paymentProvider === 'sandbox') {
+    throw new Error(
+      'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN: NODE_ENV=production 时 PAYMENT_PROVIDER 不得为 sandbox（真实渠道到 C5-6；此前生产保持未设置或 disabled）',
     )
   }
 }
