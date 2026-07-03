@@ -31,12 +31,12 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 
 const CATEGORY_META: Record<string, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  print: { label: '打印', icon: PrinterIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
-  ai: { label: 'AI服务', icon: SparklesIcon, bg: 'bg-violet-50', color: 'text-violet-600' },
-  feedback: { label: '反馈', icon: MessageSquareIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
-  maintenance: { label: '维护', icon: FileTextIcon, bg: 'bg-gray-100', color: 'text-gray-600' },
-  notice: { label: '公告', icon: BellIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
-  system: { label: '系统', icon: BellIcon, bg: 'bg-sky-50', color: 'text-sky-600' },
+  print: { label: '打印', icon: PrinterIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
+  ai: { label: 'AI服务', icon: SparklesIcon, bg: 'bg-plum-soft', color: 'text-plum' },
+  feedback: { label: '反馈', icon: MessageSquareIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
+  maintenance: { label: '维护', icon: FileTextIcon, bg: 'bg-neutral-100', color: 'text-neutral-600' },
+  notice: { label: '公告', icon: BellIcon, bg: 'bg-info-bg', color: 'text-info' },
+  system: { label: '系统', icon: BellIcon, bg: 'bg-info-bg', color: 'text-info' },
 }
 
 export function MyNotificationsPage() {
@@ -140,7 +140,7 @@ export function MyNotificationsPage() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex rounded-full bg-white p-1 ring-1 ring-gray-200">
+        <div className="flex rounded-full bg-white p-1 ring-1 ring-neutral-200">
           {[
             { key: false, label: '全部' },
             { key: true, label: '未读' },
@@ -151,7 +151,7 @@ export function MyNotificationsPage() {
               onClick={() => setUnreadOnly(tab.key)}
               className={[
                 'min-h-[40px] rounded-full px-4 text-sm font-medium transition-colors',
-                unreadOnly === tab.key ? 'bg-primary-600 text-white' : 'text-gray-500',
+                unreadOnly === tab.key ? 'bg-primary-600 text-white' : 'text-neutral-500',
               ].join(' ')}
             >
               {tab.label}
@@ -197,18 +197,18 @@ export function MyNotificationsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     {!item.isRead && <span className="h-2 w-2 rounded-full bg-primary-600" aria-label="未读" />}
-                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">{item.title}</p>
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-900">{item.title}</p>
+                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
                       {meta.label}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm leading-6 text-gray-600">{item.content}</p>
-                  <p className="mt-2 text-xs text-gray-400">{formatTime(item.createdAt)}</p>
+                  <p className="mt-1 text-sm leading-6 text-neutral-600">{item.content}</p>
+                  <p className="mt-2 text-xs text-neutral-400">{formatTime(item.createdAt)}</p>
                   {feedbackRelated && (
                     <button
                       type="button"
                       onClick={() => navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)}
-                      className="mt-3 inline-flex min-h-[40px] items-center gap-1 rounded-full bg-blue-50 px-3 text-sm font-medium text-blue-600 active:bg-blue-100"
+                      className="mt-3 inline-flex min-h-[40px] items-center gap-1 rounded-full bg-primary-50 px-3 text-sm font-medium text-primary-600 active:bg-primary-100"
                     >
                       查看相关反馈
                       <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />

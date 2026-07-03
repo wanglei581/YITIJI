@@ -31,7 +31,7 @@ function ToggleGroup<T extends string | number>({
   disabledValues?: T[]
 }) {
   return (
-    <div className="flex overflow-hidden rounded-lg border border-gray-200">
+    <div className="flex overflow-hidden rounded-lg border border-neutral-200">
       {options.map((opt) => {
         const isDisabled = disabledValues?.includes(opt.value)
         const isActive = value === opt.value
@@ -43,10 +43,10 @@ function ToggleGroup<T extends string | number>({
             className={[
               'flex-1 py-3 text-sm font-medium transition-colors',
               isDisabled
-                ? 'cursor-not-allowed bg-gray-50 text-gray-300'
+                ? 'cursor-not-allowed bg-neutral-50 text-neutral-300'
                 : isActive
                 ? 'bg-primary-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-50',
+                : 'bg-white text-neutral-600 hover:bg-neutral-50',
             ].join(' ')}
           >
             {opt.label}
@@ -96,7 +96,7 @@ export function ScanSettingsPage() {
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
         {/* 扫描来源 */}
         <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-gray-700">扫描来源</p>
+          <p className="mb-3 text-sm font-medium text-neutral-700">扫描来源</p>
           <ToggleGroup<Source>
             options={[
               { value: 'flatbed', label: '平板' },
@@ -106,10 +106,10 @@ export function ScanSettingsPage() {
             onChange={handleSourceChange}
           />
           {source === 'flatbed' && (
-            <p className="mt-2 text-xs text-gray-400">请将文件正面朝下放置在扫描仪玻璃上</p>
+            <p className="mt-2 text-xs text-neutral-400">请将文件正面朝下放置在扫描仪玻璃上</p>
           )}
           {source === 'adf' && (
-            <p className="mt-2 flex items-center gap-2 text-xs text-orange-500">
+            <p className="mt-2 flex items-center gap-2 text-xs text-warning-fg">
               <AlertCircleIcon className="h-3.5 w-3.5 shrink-0" />
               请将文件整齐放入 ADF 进纸口
             </p>
@@ -118,7 +118,7 @@ export function ScanSettingsPage() {
 
         {/* 页数模式 */}
         <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-gray-700">页数模式</p>
+          <p className="mb-3 text-sm font-medium text-neutral-700">页数模式</p>
           <ToggleGroup<PageMode>
             options={[
               { value: 'single', label: '单页' },
@@ -132,7 +132,7 @@ export function ScanSettingsPage() {
 
         {/* 色彩模式 */}
         <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-gray-700">色彩模式</p>
+          <p className="mb-3 text-sm font-medium text-neutral-700">色彩模式</p>
           <ToggleGroup<Color>
             options={[
               { value: 'color', label: '彩色' },
@@ -146,7 +146,7 @@ export function ScanSettingsPage() {
 
         {/* 分辨率 */}
         <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-gray-700">分辨率</p>
+          <p className="mb-3 text-sm font-medium text-neutral-700">分辨率</p>
           <ToggleGroup<Dpi>
             options={[
               { value: 300, label: '300 DPI' },
@@ -155,20 +155,20 @@ export function ScanSettingsPage() {
             value={dpi}
             onChange={setDpi}
           />
-          <p className="mt-2 text-xs text-gray-400">普通文档 300 DPI 即可，照片或图片可选 600 DPI</p>
+          <p className="mt-2 text-xs text-neutral-400">普通文档 300 DPI 即可，照片或图片可选 600 DPI</p>
         </Card>
 
         {/* 输出格式 + 合规说明 */}
         <Card className="p-5">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-700">输出格式</p>
-            <span className="rounded bg-gray-100 px-2.5 py-1 text-sm font-medium text-gray-600">
+            <p className="text-sm font-medium text-neutral-700">输出格式</p>
+            <span className="rounded bg-neutral-100 px-2.5 py-1 text-sm font-medium text-neutral-600">
               PDF
             </span>
           </div>
           <div className="mt-3 flex items-start gap-2">
-            <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
-            <p className="text-xs text-gray-400">
+            <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
+            <p className="text-xs text-neutral-400">
               {scanUnavailable
                 ? '当前生产模式未接入本机扫描 Agent，扫描服务暂不开放。'
                 : '扫描由本机服务处理，不依赖网络'}

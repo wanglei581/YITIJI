@@ -61,10 +61,10 @@ export function MeListShell({
       <div className="mt-4 flex-1 overflow-y-auto pb-8">
         {!isLoggedIn ? (
           <Card className="flex flex-col items-center gap-4 p-10 text-center">
-            <LogInIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
+            <LogInIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
             <div>
-              <p className="text-base font-semibold text-gray-900">登录后查看本人记录</p>
-              <p className="mt-1 text-sm text-gray-500">本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细</p>
+              <p className="text-base font-semibold text-neutral-900">登录后查看本人记录</p>
+              <p className="mt-1 text-sm text-neutral-500">本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细</p>
             </div>
             <Button
               size="lg"

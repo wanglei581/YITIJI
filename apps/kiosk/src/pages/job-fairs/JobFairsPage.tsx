@@ -25,12 +25,12 @@ import { matchesRegion, type RegionSelection } from '../../lib/regions'
 
 // 来源品牌渐变（按来源名 hash 取色，复刻参考图彩色大卡；class 为字面量，Tailwind 不 purge）
 const GRADIENTS = [
-  'from-blue-500 to-indigo-600',
-  'from-violet-500 to-purple-600',
-  'from-orange-400 to-amber-500',
-  'from-teal-500 to-cyan-600',
-  'from-rose-500 to-pink-600',
-  'from-sky-500 to-blue-600',
+  'from-primary-500 to-plum',
+  'from-plum to-plum',
+  'from-warning to-warning',
+  'from-primary-500 to-info',
+  'from-error-fg to-plum',
+  'from-info to-primary-600',
 ]
 function gradOf(s: string) {
   let h = 0
@@ -39,8 +39,8 @@ function gradOf(s: string) {
 }
 
 const STATUS_DOT = {
-  upcoming: { label: '即将开始', dot: 'bg-amber-300' },
-  ongoing:  { label: '进行中',   dot: 'bg-emerald-300' },
+  upcoming: { label: '即将开始', dot: 'bg-warning/50' },
+  ongoing:  { label: '进行中',   dot: 'bg-success/50' },
   ended:    { label: '已结束',   dot: 'bg-white/50' },
 }
 
@@ -68,19 +68,19 @@ function BookingQrOverlay({ fair, onClose }: { fair: ExternalJobFairDTO; onClose
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="relative w-80 rounded-2xl bg-white p-7 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100" aria-label="关闭">
+        <button onClick={onClose} className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100" aria-label="关闭">
           <XIcon className="h-5 w-5" />
         </button>
-        <p className="text-center text-base font-semibold text-gray-800">扫码前往来源平台预约</p>
-        <p className="mt-1 line-clamp-1 text-center text-sm text-gray-500">{fair.name}</p>
+        <p className="text-center text-base font-semibold text-neutral-800">扫码前往来源平台预约</p>
+        <p className="mt-1 line-clamp-1 text-center text-sm text-neutral-500">{fair.name}</p>
         <div className="mt-5 flex justify-center"><SourceUrlQr value={fair.sourceUrl} size={180} /></div>
-        <div className="mt-5 space-y-1.5 rounded-lg bg-gray-50 px-4 py-3 text-xs text-gray-500">
-          <div className="flex justify-between"><span className="text-gray-400">来源机构</span><span className="font-medium">{fair.sourceName}</span></div>
-          <div className="flex justify-between"><span className="text-gray-400">外部编号</span><span className="font-mono">{fair.externalId}</span></div>
+        <div className="mt-5 space-y-1.5 rounded-lg bg-neutral-50 px-4 py-3 text-xs text-neutral-500">
+          <div className="flex justify-between"><span className="text-neutral-400">来源机构</span><span className="font-medium">{fair.sourceName}</span></div>
+          <div className="flex justify-between"><span className="text-neutral-400">外部编号</span><span className="font-mono">{fair.externalId}</span></div>
         </div>
         <div className="mt-4 flex items-start gap-2">
           <SmartphoneIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
-          <p className="text-xs leading-relaxed text-gray-500">
+          <p className="text-xs leading-relaxed text-neutral-500">
             请使用手机扫码前往来源平台办理预约，预约由对方平台管理，本系统不参与活动报名流程、不接收简历。
           </p>
         </div>
@@ -94,12 +94,12 @@ function BookingQrOverlay({ fair, onClose }: { fair: ExternalJobFairDTO; onClose
 function Stepper() {
   const steps = ['选地区', '浏览列表', '扫码预约']
   return (
-    <div className="flex items-center gap-1 rounded-xl border border-gray-100 bg-white px-4 py-3">
+    <div className="flex items-center gap-1 rounded-xl border border-neutral-100 bg-white px-4 py-3">
       {steps.map((s, i) => (
         <div key={s} className="flex flex-1 items-center">
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">{i + 1}</span>
-          <span className="ml-1.5 text-sm font-medium text-gray-700">{s}</span>
-          {i < steps.length - 1 && <span className="mx-2 h-px flex-1 bg-gray-200" />}
+          <span className="ml-1.5 text-sm font-medium text-neutral-700">{s}</span>
+          {i < steps.length - 1 && <span className="mx-2 h-px flex-1 bg-neutral-200" />}
         </div>
       ))}
     </div>
@@ -127,7 +127,7 @@ function FairCard({
   const companyCount = fair.hasManagedData ? fair.managedCompanyCount : fair.boothCount ?? 0
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-neutral-100 shadow-sm">
       {/* 渐变头部 */}
       <div className={`bg-gradient-to-br ${grad} p-5 text-white ${isEnded ? 'opacity-80 saturate-50' : ''}`}>
         <div className="flex items-start justify-between gap-2">
@@ -158,8 +158,8 @@ function FairCard({
 
       {/* 白底信息区 */}
       <div className="space-y-3 bg-white p-5">
-        <div className="flex items-start gap-1.5 text-sm text-gray-700">
-          <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+        <div className="flex items-start gap-1.5 text-sm text-neutral-700">
+          <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" />
           <span className="min-w-0 flex-1">{fair.city ? `${fair.city} · ` : ''}{fair.venue}</span>
         </div>
         <div className="flex items-center justify-between">
@@ -169,13 +169,13 @@ function FairCard({
                 <span key={i} className={`h-6 w-6 rounded-full border-2 border-white bg-gradient-to-br ${GRADIENTS[i]}`} />
               ))}
             </div>
-            <span className="flex items-center gap-1 text-sm text-gray-600">
-              <Building2Icon className="h-4 w-4 text-gray-400" />{companyCount} 家企业
+            <span className="flex items-center gap-1 text-sm text-neutral-600">
+              <Building2Icon className="h-4 w-4 text-neutral-400" />{companyCount} 家企业
             </span>
           </div>
           <div className="flex flex-wrap justify-end gap-1">
             {tags.slice(0, 3).map((t) => (
-              <span key={t} className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-500">{t}</span>
+              <span key={t} className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{t}</span>
             ))}
           </div>
         </div>
@@ -191,11 +191,11 @@ function FairCard({
             <QrCodeIcon className="h-4 w-4" />扫码预约
           </button>
         ) : (
-          <div className="flex flex-[2] items-center justify-center rounded-lg bg-gray-100 py-3 text-sm font-medium text-gray-400">活动已结束</div>
+          <div className="flex flex-[2] items-center justify-center rounded-lg bg-neutral-100 py-3 text-sm font-medium text-neutral-400">活动已结束</div>
         )}
         <button
           onClick={onDetail}
-          className="flex flex-1 items-center justify-center gap-0.5 rounded-lg border border-gray-200 py-3 text-sm font-semibold text-gray-700 active:bg-gray-50"
+          className="flex flex-1 items-center justify-center gap-0.5 rounded-lg border border-neutral-200 py-3 text-sm font-semibold text-neutral-700 active:bg-neutral-50"
         >
           详情<ChevronRightIcon className="h-4 w-4" />
         </button>
@@ -261,12 +261,12 @@ export function JobFairsPage() {
         {/* 搜索 */}
         <div className="mt-4">
           <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索招聘会、企业、地点"
-              className="h-12 w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-4 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:bg-white focus:outline-none"
+              className="h-12 w-full rounded-full border border-neutral-200 bg-neutral-50 pl-9 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none"
             />
           </div>
         </div>
@@ -285,7 +285,7 @@ export function JobFairsPage() {
               onClick={() => setStatusFilter(s)}
               className={[
                 'flex min-h-[44px] shrink-0 items-center rounded-full px-4 text-sm font-medium transition-colors',
-                statusFilter === s ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
+                statusFilter === s ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
               ].join(' ')}
             >
               {s}
@@ -304,7 +304,7 @@ export function JobFairsPage() {
           <ErrorState message="加载失败，请稍后重试" onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
         ) : (
           <>
-            <p className="mb-3 text-sm text-gray-500">
+            <p className="mb-3 text-sm text-neutral-500">
               共 <span className="font-semibold text-primary-600">{visible.length}</span> 场招聘会
             </p>
             {visible.length === 0 ? (
@@ -327,8 +327,8 @@ export function JobFairsPage() {
       </div>
 
       {/* 合规说明 */}
-      <div className="border-t border-gray-100 px-6 py-2">
-        <p className="flex items-center gap-1.5 text-xs text-gray-400">
+      <div className="border-t border-neutral-100 px-6 py-2">
+        <p className="flex items-center gap-1.5 text-xs text-neutral-400">
           <UsersIcon className="h-3.5 w-3.5" />
           本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台
         </p>

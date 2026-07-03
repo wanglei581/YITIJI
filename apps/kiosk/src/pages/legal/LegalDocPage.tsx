@@ -130,21 +130,21 @@ export function LegalDocPage() {
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
               <Icon className="h-5 w-5" aria-hidden="true" />
             </span>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-neutral-500">
               请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。
             </p>
           </div>
           {meta.sections.map((s) => (
             <section key={s.title} className="mb-5">
-              <h2 className="mb-2 text-base font-bold text-gray-900">{s.title}</h2>
+              <h2 className="mb-2 text-base font-bold text-neutral-900">{s.title}</h2>
               {s.paragraphs.map((para) => (
-                <p key={para.slice(0, 16)} className="mb-2 text-sm leading-relaxed text-gray-700">
+                <p key={para.slice(0, 16)} className="mb-2 text-sm leading-relaxed text-neutral-700">
                   {para}
                 </p>
               ))}
             </section>
           ))}
-          <p className="mt-6 border-t border-gray-100 pt-4 text-xs leading-relaxed text-gray-400">
+          <p className="mt-6 border-t border-neutral-100 pt-4 text-xs leading-relaxed text-neutral-400">
             本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准。
           </p>
         </div>

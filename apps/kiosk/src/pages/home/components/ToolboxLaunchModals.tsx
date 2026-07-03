@@ -30,7 +30,7 @@ function ModalShell({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-6 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/45 px-6 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -65,28 +65,28 @@ export function QrLaunchModal({
     <ModalShell onClose={onClose}>
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-2xl font-extrabold text-slate-950">{item.title}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{item.description || '请扫码继续办理'}</p>
+          <p className="text-2xl font-extrabold text-neutral-900">{item.title}</p>
+          <p className="mt-1 text-sm font-semibold text-neutral-500">{item.description || '请扫码继续办理'}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 hover:bg-slate-200"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
           aria-label="关闭"
         >
           <XIcon className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
-      <div className="mt-6 flex justify-center rounded-[24px] bg-slate-50 p-5">
+      <div className="mt-6 flex justify-center rounded-[24px] bg-neutral-50 p-5">
         <img src={item.qrImageUrl ?? ''} alt={`${item.title}二维码`} className="h-64 w-64 rounded-2xl object-contain" />
       </div>
-      <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold leading-relaxed text-amber-900">
+      <div className="mt-4 rounded-2xl border border-warning/20 bg-warning-bg px-4 py-3 text-sm font-semibold leading-relaxed text-warning-fg">
         {label ? (
           <p>运营方声明目标：{label}</p>
         ) : (
           <p>请确认二维码来源可信后再继续办理。</p>
         )}
-        <p className="mt-1 text-xs font-medium text-amber-800">
+        <p className="mt-1 text-xs font-medium text-warning-fg">
           请优先在本人手机上完成第三方服务操作。本终端不记录你在第三方页面的办理结果。
         </p>
       </div>
@@ -122,28 +122,28 @@ export function ExternalLaunchModal({
   return (
     <ModalShell onClose={closeWithCancel} width="w-[min(520px,100%)]">
       <div className="flex items-start gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-warning-bg text-warning-fg">
           <ShieldAlertIcon className="h-7 w-7" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-2xl font-extrabold leading-tight text-slate-950">即将进入第三方服务</p>
-          <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-500">
+          <p className="text-2xl font-extrabold leading-tight text-neutral-900">即将进入第三方服务</p>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-neutral-500">
             {item.title} 由外部服务方提供，目标域名：{label}
           </p>
         </div>
         <button
           type="button"
           onClick={closeWithCancel}
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 hover:bg-slate-200"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
           aria-label="关闭"
         >
           <XIcon className="h-5 w-5" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold leading-relaxed text-amber-900">
+      <div className="mt-5 rounded-2xl border border-warning/20 bg-warning-bg px-4 py-3 text-sm font-semibold leading-relaxed text-warning-fg">
         <p>本系统不收集你在第三方页面输入的信息，也不记录第三方办理结果。</p>
-        <p className="mt-1 text-xs font-medium text-amber-800">
+        <p className="mt-1 text-xs font-medium text-warning-fg">
           如需输入账号、验证码、身份证号或支付信息，建议改用本人手机办理。
         </p>
       </div>

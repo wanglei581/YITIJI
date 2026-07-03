@@ -8,12 +8,12 @@ import { FileTextIcon, PrinterIcon } from 'lucide-react'
 import { getFairMaterials, getJobFairById } from '../../services/api'
 
 const TYPE_STYLES: Record<string, string> = {
-  schedule:     'bg-blue-50 text-blue-600',
-  venue_map:    'bg-teal-50 text-teal-600',
-  company_list: 'bg-purple-50 text-purple-600',
-  position_list:'bg-green-50 text-green-600',
-  brochure:     'bg-orange-50 text-orange-600',
-  other:        'bg-gray-100 text-gray-500',
+  schedule:     'bg-primary-50 text-primary-600',
+  venue_map:    'bg-primary-50 text-primary-600',
+  company_list: 'bg-plum-soft text-plum',
+  position_list:'bg-success-bg text-success-fg',
+  brochure:     'bg-warning-bg text-warning-fg',
+  other:        'bg-neutral-100 text-neutral-500',
 }
 
 function formatSize(kb: number) {
@@ -102,11 +102,11 @@ export function FairMaterialsPage() {
             </Button>
           }
         />
-        <p className="mt-2 text-xs text-gray-400">
+        <p className="mt-2 text-xs text-neutral-400">
           所有资料均可免费打印，请按需取用，节约纸张
         </p>
         {printError && (
-          <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+          <p className="mt-2 rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">
             {printError}
           </p>
         )}
@@ -123,17 +123,17 @@ export function FairMaterialsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{mat.name}</p>
+                    <p className="font-semibold text-neutral-900">{mat.name}</p>
                     <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${TYPE_STYLES[mat.type] ?? TYPE_STYLES.other}`}>
                       {FAIR_MATERIAL_TYPE_LABELS[mat.type]}
                     </span>
                   </div>
                   {mat.description && (
-                    <p className="mt-1 text-xs text-gray-500">{mat.description}</p>
+                    <p className="mt-1 text-xs text-neutral-500">{mat.description}</p>
                   )}
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-neutral-500">
                 <span className="flex items-center gap-1">
                   <FileTextIcon className="h-3.5 w-3.5" />
                   {mat.pageCount} 页 · {formatSize(mat.fileSizeKB)}
@@ -155,7 +155,7 @@ export function FairMaterialsPage() {
                   {printingId === mat.id ? '正在刷新文件链接…' : printingId ? '请稍候…' : mat.previewUrl ? `免费打印（${mat.pageCount > 0 ? `${mat.pageCount} 页` : '页数以文件为准'}）` : '演示数据暂不可打印'}
                 </Button>
               ) : (
-                <p className="mt-4 text-center text-xs text-gray-400">该资料暂不开放打印</p>
+                <p className="mt-4 text-center text-xs text-neutral-400">该资料暂不开放打印</p>
               )}
             </Card>
           ))

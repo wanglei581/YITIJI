@@ -72,20 +72,20 @@ export function ScanStartPage() {
                 'w-full rounded-xl border-2 p-5 text-left transition-colors',
                 isSelected
                   ? 'border-primary-600 bg-primary-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50',
+                  : 'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50',
               ].join(' ')}
             >
               <div className="flex items-center gap-4">
                 <div
                   className={[
                     'flex h-14 w-14 shrink-0 items-center justify-center rounded-xl',
-                    isSelected ? 'bg-primary-100' : 'bg-gray-100',
+                    isSelected ? 'bg-primary-100' : 'bg-neutral-100',
                   ].join(' ')}
                 >
                   <Icon
                     className={[
                       'h-7 w-7',
-                      isSelected ? 'text-primary-600' : 'text-gray-500',
+                      isSelected ? 'text-primary-600' : 'text-neutral-500',
                     ].join(' ')}
                   />
                 </div>
@@ -93,12 +93,12 @@ export function ScanStartPage() {
                   <p
                     className={[
                       'text-lg font-semibold',
-                      isSelected ? 'text-primary-700' : 'text-gray-900',
+                      isSelected ? 'text-primary-700' : 'text-neutral-900',
                     ].join(' ')}
                   >
                     {label}
                   </p>
-                  <p className="mt-0.5 text-sm text-gray-500">{description}</p>
+                  <p className="mt-0.5 text-sm text-neutral-500">{description}</p>
                 </div>
               </div>
             </button>

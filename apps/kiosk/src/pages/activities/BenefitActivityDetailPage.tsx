@@ -10,10 +10,10 @@ import { formatTime } from '../profile/assets/format'
 type PageState = 'loading' | 'ready' | 'error'
 
 const TYPE_META: Record<BenefitActivityType, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-rose-50', color: 'text-rose-600' },
-  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
-  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
-  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
+  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-error-bg', color: 'text-error-fg' },
+  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
+  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
+  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
 }
 
 const SOURCE_LABEL: Record<BenefitActivitySourceType, string> = {
@@ -119,44 +119,44 @@ export function BenefitActivityDetailPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">{SOURCE_LABEL[item.sourceType]}</span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">{TYPE_META[item.benefitType].label}</span>
-                    {item.claimed && <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600">已领取</span>}
+                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{SOURCE_LABEL[item.sourceType]}</span>
+                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{TYPE_META[item.benefitType].label}</span>
+                    {item.claimed && <span className="rounded-full bg-success-bg px-2.5 py-1 text-xs font-medium text-success-fg">已领取</span>}
                   </div>
-                  <h1 className="mt-3 text-xl font-bold leading-snug text-gray-900">{item.title}</h1>
-                  {item.description && <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.description}</p>}
+                  <h1 className="mt-3 text-xl font-bold leading-snug text-neutral-900">{item.title}</h1>
+                  {item.description && <p className="mt-2 text-sm leading-relaxed text-neutral-600">{item.description}</p>}
                 </div>
               </div>
             </Card>
 
             <Card className="p-5">
-              <h2 className="text-sm font-semibold text-gray-900">权益内容</h2>
+              <h2 className="text-sm font-semibold text-neutral-900">权益内容</h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-gray-50 p-3">
-                  <p className="text-xs text-gray-400">权益额度</p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{quantityText(item)}</p>
+                <div className="rounded-xl bg-neutral-50 p-3">
+                  <p className="text-xs text-neutral-400">权益额度</p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-900">{quantityText(item)}</p>
                 </div>
-                <div className="rounded-xl bg-gray-50 p-3">
-                  <p className="text-xs text-gray-400">活动有效期</p>
-                  <p className="mt-1 text-sm font-semibold text-gray-900">{validity(item)}</p>
+                <div className="rounded-xl bg-neutral-50 p-3">
+                  <p className="text-xs text-neutral-400">活动有效期</p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-900">{validity(item)}</p>
                 </div>
               </div>
               {item.rulesText && (
-                <div className="mt-4 rounded-xl border border-gray-100 p-3">
-                  <p className="text-xs font-medium text-gray-500">活动规则</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-gray-600">{item.rulesText}</p>
+                <div className="mt-4 rounded-xl border border-neutral-100 p-3">
+                  <p className="text-xs font-medium text-neutral-500">活动规则</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-neutral-600">{item.rulesText}</p>
                 </div>
               )}
             </Card>
 
-            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-relaxed text-blue-700">
+            <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
               {item.benefitType === 'subsidy_eligibility_hint'
                 ? '本活动仅提供政策资格提示、材料说明和官方入口指引，具体申请、审核和结果以官方渠道为准。'
                 : '权益仅用于本终端服务与打印辅助，不代表招聘会报名、签到、投递结果、面试或录用承诺。'}
             </div>
 
             {message && (
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              <div className="rounded-xl border border-success-bg bg-success-bg px-4 py-3 text-sm font-medium text-success-fg">
                 {message}
               </div>
             )}

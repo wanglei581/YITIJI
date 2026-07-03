@@ -133,14 +133,14 @@ export function ScanQrLoginPanel({
       </p>
 
       {notice && (
-        <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-emerald-50 px-4 text-sm font-semibold text-emerald-700">
+        <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-success-bg px-4 text-sm font-semibold text-success-fg">
           <CheckCircle2Icon className="h-4 w-4" aria-hidden="true" />
           {notice}
         </div>
       )}
 
       {error && (
-        <div className="mt-4 rounded-[8px] bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-600">
+        <div className="mt-4 rounded-[8px] bg-error-bg px-4 py-3 text-center text-sm font-semibold text-error-fg">
           {error}
         </div>
       )}
@@ -158,7 +158,7 @@ export function ScanQrLoginPanel({
         <button
           type="button"
           onClick={onUsePhoneLogin}
-          className="min-h-[44px] rounded-[8px] bg-[#edf5ff] px-5 text-sm font-bold text-[#1677ff] transition-colors active:bg-blue-100"
+          className="min-h-[44px] rounded-[8px] bg-[#edf5ff] px-5 text-sm font-bold text-[#1677ff] transition-colors active:bg-primary-100"
         >
           使用手机号登录
         </button>

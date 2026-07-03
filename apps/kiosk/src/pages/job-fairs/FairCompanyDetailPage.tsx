@@ -106,7 +106,7 @@ export function FairCompanyDetailPage() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-gray-400">加载中...</p>
+        <p className="text-sm text-neutral-400">加载中...</p>
       </div>
     )
   }
@@ -114,8 +114,8 @@ export function FairCompanyDetailPage() {
   if (error || !company) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-        <BuildingIcon className="h-12 w-12 text-gray-200" />
-        <p className="text-sm text-gray-400">企业数据未找到</p>
+        <BuildingIcon className="h-12 w-12 text-neutral-200" />
+        <p className="text-sm text-neutral-400">企业数据未找到</p>
         <Button variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
           返回企业列表
         </Button>
@@ -128,7 +128,7 @@ export function FairCompanyDetailPage() {
       {showQr && <QrOverlay companyName={company.companyName} sourceUrl={company.sourceUrl} onClose={() => setShowQr(false)} />}
 
       {/* Page header */}
-      <div className="border-b border-gray-100 bg-white px-6 pt-4 pb-3">
+      <div className="border-b border-neutral-100 bg-white px-6 pt-4 pb-3">
         <PageHeader
           title={company.companyName}
           subtitle={`展位 ${company.boothNumber ?? '—'} · ${company.industry}`}
@@ -163,9 +163,9 @@ export function FairCompanyDetailPage() {
         />
 
         <div className="flex items-center justify-between text-sm">
-          <p className="font-medium text-gray-700">
+          <p className="font-medium text-neutral-700">
             招聘岗位
-            <span className="ml-1.5 text-gray-400">
+            <span className="ml-1.5 text-neutral-400">
               ({filteredPositions.length} / {company.positions.length})
             </span>
           </p>
@@ -183,9 +183,9 @@ export function FairCompanyDetailPage() {
         )}
 
         {/* Compliance footer */}
-        <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-4 py-3">
-          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
-          <p className="text-xs leading-relaxed text-gray-400">
+        <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3">
+          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
+          <p className="text-xs leading-relaxed text-neutral-400">
             {company.applyNote}。本系统仅展示招聘会现场企业与岗位信息，不接收简历，不参与招聘闭环。
             如需投递请扫码前往来源平台或现场前往展位咨询。
           </p>

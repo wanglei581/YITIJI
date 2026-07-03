@@ -73,7 +73,7 @@ function JobResultCard({
           aria-label={favorite ? '取消收藏' : '收藏岗位'}
           className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 hover:bg-neutral-100"
         >
-          <StarIcon className={`h-5 w-5 ${favorite ? 'fill-amber-400 text-amber-400' : 'text-neutral-300'}`} />
+          <StarIcon className={`h-5 w-5 ${favorite ? 'fill-warning text-warning' : 'text-neutral-300'}`} />
         </button>
       </div>
 

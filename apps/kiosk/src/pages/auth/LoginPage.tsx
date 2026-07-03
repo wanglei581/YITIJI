@@ -222,7 +222,7 @@ export function LoginPage() {
 function LoginHeader() {
   return (
     <header className="flex flex-col items-center text-center">
-      <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[18px] bg-gradient-to-br from-[#3185ff] via-[#7f65dc] to-[#ff6a3d] text-[1.7rem] font-bold text-white shadow-lg shadow-blue-500/20">
+      <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[18px] bg-gradient-to-br from-[#3185ff] via-[#7f65dc] to-[#ff6a3d] text-[1.7rem] font-bold text-white shadow-lg shadow-primary-500/20">
         AI
       </div>
       <h1 className="mt-4 text-[1.55rem] font-bold leading-tight text-[#172033]">欢迎登录</h1>
@@ -318,7 +318,7 @@ function PhoneLoginPanel({
       <label className="block text-sm font-semibold text-[#1e293b]">手机号</label>
       <div
         className={`mt-3 flex min-h-[56px] items-center rounded-[10px] border bg-white px-4 shadow-sm transition-colors ${
-          activeInput === 'phone' ? 'border-[#1677ff] ring-2 ring-blue-100' : 'border-[#dfe4ec]'
+          activeInput === 'phone' ? 'border-[#1677ff] ring-2 ring-primary-100' : 'border-[#dfe4ec]'
         }`}
       >
         <PhoneIcon className="mr-3 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
@@ -343,7 +343,7 @@ function PhoneLoginPanel({
       <div className="mt-3 flex gap-3">
         <div
           className={`flex min-h-[56px] flex-1 items-center rounded-[10px] border bg-white px-4 shadow-sm transition-colors ${
-            activeInput === 'code' ? 'border-[#1677ff] ring-2 ring-blue-100' : 'border-[#dfe4ec]'
+            activeInput === 'code' ? 'border-[#1677ff] ring-2 ring-primary-100' : 'border-[#dfe4ec]'
           }`}
         >
           <ShieldCheckIcon className="mr-3 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
@@ -369,21 +369,21 @@ function PhoneLoginPanel({
           type="button"
           onClick={onSendCode}
           disabled={!canSend}
-          className="min-h-[56px] min-w-[122px] rounded-[10px] bg-white px-5 text-sm font-bold text-[#1677ff] shadow-sm transition-colors active:bg-blue-50 disabled:cursor-not-allowed disabled:bg-[#e9edf3] disabled:text-[#a1a8b5]"
+          className="min-h-[56px] min-w-[122px] rounded-[10px] bg-white px-5 text-sm font-bold text-[#1677ff] shadow-sm transition-colors active:bg-primary-50 disabled:cursor-not-allowed disabled:bg-[#e9edf3] disabled:text-[#a1a8b5]"
         >
           {loading ? '发送中' : countdown > 0 ? `${countdown}s` : '获取验证码'}
         </button>
       </div>
 
       {notice && (
-        <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-emerald-50 text-sm font-semibold text-emerald-700">
+        <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-success-bg text-sm font-semibold text-success-fg">
           <CheckCircle2Icon className="h-4 w-4" aria-hidden="true" />
           {notice}
         </div>
       )}
 
       {error && (
-        <div className="mt-4 rounded-[8px] bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-600">
+        <div className="mt-4 rounded-[8px] bg-error-bg px-4 py-3 text-center text-sm font-semibold text-error-fg">
           {error}
         </div>
       )}
@@ -410,7 +410,7 @@ function PhoneLoginPanel({
         type="button"
         onClick={onLogin}
         disabled={!canLogin}
-        className="mt-5 min-h-[56px] w-full rounded-[10px] bg-gradient-to-r from-[#1687ff] to-[#12aeea] text-base font-bold text-white shadow-lg shadow-blue-500/20 transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:from-[#a9bdf5] disabled:to-[#a9bdf5]"
+        className="mt-5 min-h-[56px] w-full rounded-[10px] bg-gradient-to-r from-[#1687ff] to-[#12aeea] text-base font-bold text-white shadow-lg shadow-primary-500/20 transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:from-[#a9bdf5] disabled:to-[#a9bdf5]"
       >
         {loading ? '登录中...' : '立即登录'}
       </button>
@@ -440,7 +440,7 @@ function VirtualNumberPad({
 }) {
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
   const keyBase =
-    'flex min-h-[72px] items-center justify-center rounded-[10px] border border-[#e4e8f0] bg-[#f8fafc] shadow-sm transition-colors active:bg-blue-50 disabled:opacity-40'
+    'flex min-h-[72px] items-center justify-center rounded-[10px] border border-[#e4e8f0] bg-[#f8fafc] shadow-sm transition-colors active:bg-primary-50 disabled:opacity-40'
 
   return (
     <div className="mt-5 rounded-[10px] border border-[#dfe4ec] bg-white p-3 shadow-sm">
@@ -546,7 +546,7 @@ function FooterActions({ onHome }: { onHome: () => void }) {
         <button
           type="button"
           onClick={onHome}
-          className="flex min-h-[54px] items-center gap-3 rounded-[10px] px-5 text-left transition-colors active:bg-orange-50"
+          className="flex min-h-[54px] items-center gap-3 rounded-[10px] px-5 text-left transition-colors active:bg-warning-bg"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#ff6a3d] text-white">
             <HomeIcon className="h-5 w-5" aria-hidden="true" />

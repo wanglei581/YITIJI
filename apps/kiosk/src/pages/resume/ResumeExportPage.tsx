@@ -64,8 +64,8 @@ export function ResumeExportPage() {
       hint: '已采纳 AI 优化建议整理，打印前请核对最终内容',
       fileName: `${baseName}_优化版.pdf`,
       icon: SparklesIcon,
-      iconBg: 'bg-violet-50',
-      iconColor: 'text-violet-600',
+      iconBg: 'bg-plum-soft',
+      iconColor: 'text-plum',
       badge: '采纳建议',
     })
   }
@@ -76,8 +76,8 @@ export function ResumeExportPage() {
       hint: '参考评分与可执行建议',
       fileName: `诊断报告_${baseName}.pdf`,
       icon: ClipboardListIcon,
-      iconBg: 'bg-amber-50',
-      iconColor: 'text-amber-600',
+      iconBg: 'bg-warning-bg',
+      iconColor: 'text-warning-fg',
     })
   }
 
@@ -123,14 +123,14 @@ export function ResumeExportPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{item.title}</p>
+                    <p className="font-semibold text-neutral-900">{item.title}</p>
                     {item.badge && (
-                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                      <span className="rounded-full bg-plum-soft px-2 py-0.5 text-xs font-medium text-plum">
                         {item.badge}
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-sm text-gray-500">{item.hint}</p>
+                  <p className="mt-0.5 truncate text-sm text-neutral-500">{item.hint}</p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
@@ -157,7 +157,7 @@ export function ResumeExportPage() {
         })}
       </div>
 
-      <p className="mt-4 text-center text-xs text-gray-400">
+      <p className="mt-4 text-center text-xs text-neutral-400">
         {COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE}
       </p>
 

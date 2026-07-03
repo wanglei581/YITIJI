@@ -41,20 +41,20 @@ const CATEGORY_OPTIONS: { value: FeedbackCategory; label: string; hint: string }
 ]
 
 const CATEGORY_META: Record<FeedbackCategory, { label: string; bg: string; color: string; icon: LucideIcon }> = {
-  device: { label: '设备使用', bg: 'bg-sky-50', color: 'text-sky-600', icon: MessageSquareIcon },
-  print: { label: '打印服务', bg: 'bg-amber-50', color: 'text-amber-600', icon: MessageSquareIcon },
-  file_process: { label: '文件处理', bg: 'bg-blue-50', color: 'text-blue-600', icon: MessageSquareIcon },
-  general: { label: '一般建议', bg: 'bg-emerald-50', color: 'text-emerald-600', icon: MessageSquareIcon },
+  device: { label: '设备使用', bg: 'bg-info-bg', color: 'text-info', icon: MessageSquareIcon },
+  print: { label: '打印服务', bg: 'bg-warning-bg', color: 'text-warning-fg', icon: MessageSquareIcon },
+  file_process: { label: '文件处理', bg: 'bg-primary-50', color: 'text-primary-600', icon: MessageSquareIcon },
+  general: { label: '一般建议', bg: 'bg-success-bg', color: 'text-success-fg', icon: MessageSquareIcon },
 }
 
 const STATUS_META: Record<FeedbackStatus, { label: string; cls: string }> = {
-  pending: { label: '已提交', cls: 'bg-amber-50 text-amber-600' },
-  processing: { label: '处理中', cls: 'bg-blue-50 text-blue-600' },
-  replied: { label: '已回复', cls: 'bg-emerald-50 text-emerald-600' },
-  closed: { label: '已关闭', cls: 'bg-gray-100 text-gray-500' },
+  pending: { label: '已提交', cls: 'bg-warning-bg text-warning-fg' },
+  processing: { label: '处理中', cls: 'bg-primary-50 text-primary-600' },
+  replied: { label: '已回复', cls: 'bg-success-bg text-success-fg' },
+  closed: { label: '已关闭', cls: 'bg-neutral-100 text-neutral-500' },
 }
 
-const inputCls = 'w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
+const inputCls = 'w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
 
 interface FormState {
   category: FeedbackCategory
@@ -250,15 +250,15 @@ export function MyFeedbackPage() {
           <Card className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">提交反馈</h2>
-                <p className="mt-1 text-sm text-gray-500">请描述设备、打印、文件处理或页面建议</p>
+                <h2 className="text-base font-semibold text-neutral-900">提交反馈</h2>
+                <p className="mt-1 text-sm text-neutral-500">请描述设备、打印、文件处理或页面建议</p>
               </div>
-              <PlusIcon className="h-5 w-5 text-gray-300" aria-hidden="true" />
+              <PlusIcon className="h-5 w-5 text-neutral-300" aria-hidden="true" />
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-gray-500">分类</span>
+                <span className="text-xs font-medium text-neutral-500">分类</span>
                 <select
                   className={inputCls}
                   value={form.category}
@@ -271,10 +271,10 @@ export function MyFeedbackPage() {
                     </option>
                   ))}
                 </select>
-                {relatedPrintTaskId && <span className="text-xs text-amber-600">关联打印订单时固定为打印服务</span>}
+                {relatedPrintTaskId && <span className="text-xs text-warning-fg">关联打印订单时固定为打印服务</span>}
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-gray-500">联系电话（选填）</span>
+                <span className="text-xs font-medium text-neutral-500">联系电话（选填）</span>
                 <input
                   className={inputCls}
                   value={form.contactPhone}
@@ -287,14 +287,14 @@ export function MyFeedbackPage() {
             </div>
 
             {relatedPrintTaskId && (
-              <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-                <p className="text-xs font-semibold text-amber-700">已关联打印订单</p>
-                <p className="mt-1 break-all text-xs text-amber-600">{relatedPrintTaskId}</p>
+              <div className="mt-3 rounded-xl border border-warning/20 bg-warning-bg px-4 py-3">
+                <p className="text-xs font-semibold text-warning-fg">已关联打印订单</p>
+                <p className="mt-1 break-all text-xs text-warning-fg">{relatedPrintTaskId}</p>
               </div>
             )}
 
             <label className="mt-3 flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-gray-500">标题（选填）</span>
+              <span className="text-xs font-medium text-neutral-500">标题（选填）</span>
               <input
                 className={inputCls}
                 value={form.title}
@@ -305,7 +305,7 @@ export function MyFeedbackPage() {
             </label>
 
             <label className="mt-3 flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-gray-500">反馈内容</span>
+              <span className="text-xs font-medium text-neutral-500">反馈内容</span>
               <textarea
                 className={`${inputCls} min-h-[112px] resize-none`}
                 value={form.content}
@@ -316,7 +316,7 @@ export function MyFeedbackPage() {
             </label>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-gray-400">{CATEGORY_OPTIONS.find((i) => i.value === form.category)?.hint}</p>
+              <p className="text-xs text-neutral-400">{CATEGORY_OPTIONS.find((i) => i.value === form.category)?.hint}</p>
               <Button disabled={busy === 'submit'} onClick={() => void submit()}>
                 <SendIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
                 提交反馈
@@ -327,8 +327,8 @@ export function MyFeedbackPage() {
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
             <Card className="p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-gray-900">我的反馈</h2>
-                <span className="text-xs text-gray-400">{totalLabel}</span>
+                <h2 className="text-base font-semibold text-neutral-900">我的反馈</h2>
+                <span className="text-xs text-neutral-400">{totalLabel}</span>
               </div>
               {items.length === 0 ? (
                 <EmptyState
@@ -338,7 +338,7 @@ export function MyFeedbackPage() {
                   className="py-12"
                 />
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-neutral-100">
                   {items.map((item) => (
                     <FeedbackRow
                       key={item.id}
@@ -390,22 +390,22 @@ function FeedbackRow({
       onClick={onOpen}
       className={[
         'flex w-full items-center gap-3 py-3 text-left transition-colors',
-        active ? 'bg-primary-50/70 px-3' : 'hover:bg-gray-50',
+        active ? 'bg-primary-50/70 px-3' : 'hover:bg-neutral-50',
       ].join(' ')}
     >
       <div className={['flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', category.bg].join(' ')}>
         <Icon className={['h-5 w-5', category.color].join(' ')} aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-gray-900">{item.title || item.content}</p>
-        <p className="mt-0.5 truncate text-xs text-gray-400">
+        <p className="truncate text-sm font-semibold text-neutral-900">{item.title || item.content}</p>
+        <p className="mt-0.5 truncate text-xs text-neutral-400">
           {category.label} · {formatTime(item.updatedAt)}
         </p>
       </div>
       <span className={['shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', status.cls].join(' ')}>
         {status.label}
       </span>
-      <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-300" aria-hidden="true" />
+      <ChevronRightIcon className="h-4 w-4 shrink-0 text-neutral-300" aria-hidden="true" />
     </button>
   )
 }
@@ -449,21 +449,21 @@ function FeedbackDetailPanel({
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium text-gray-400">{category.label}</p>
-          <h2 className="mt-1 text-base font-semibold text-gray-900">{detail.title || '未填写标题'}</h2>
-          <p className="mt-1 text-xs text-gray-400">提交于 {formatTime(detail.createdAt)}</p>
+          <p className="text-xs font-medium text-neutral-400">{category.label}</p>
+          <h2 className="mt-1 text-base font-semibold text-neutral-900">{detail.title || '未填写标题'}</h2>
+          <p className="mt-1 text-xs text-neutral-400">提交于 {formatTime(detail.createdAt)}</p>
         </div>
         <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', status.cls].join(' ')}>
           {status.label}
         </span>
       </div>
 
-      <div className="mt-4 rounded-xl bg-gray-50 p-3 text-sm leading-6 text-gray-700">{detail.content}</div>
+      <div className="mt-4 rounded-xl bg-neutral-50 p-3 text-sm leading-6 text-neutral-700">{detail.content}</div>
 
       <div className="mt-4 flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-gray-900">沟通记录</h3>
+        <h3 className="text-sm font-semibold text-neutral-900">沟通记录</h3>
         {detail.replies.length === 0 ? (
-          <p className="rounded-xl bg-gray-50 px-3 py-4 text-sm text-gray-500">暂无补充描述或回复</p>
+          <p className="rounded-xl bg-neutral-50 px-3 py-4 text-sm text-neutral-500">暂无补充描述或回复</p>
         ) : (
           detail.replies.map((reply) => <ReplyBubble key={reply.id} reply={reply} />)
         )}
@@ -471,7 +471,7 @@ function FeedbackDetailPanel({
 
       {canWrite && (
         <label className="mt-4 flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-gray-500">补充描述</span>
+          <span className="text-xs font-medium text-neutral-500">补充描述</span>
           <textarea
             className={`${inputCls} min-h-[88px] resize-none`}
             value={replyContent}
@@ -495,7 +495,7 @@ function FeedbackDetailPanel({
             关闭反馈
           </Button>
         ) : (
-          <span className="inline-flex min-h-[40px] items-center gap-1 rounded-full bg-gray-100 px-3 text-sm font-medium text-gray-500">
+          <span className="inline-flex min-h-[40px] items-center gap-1 rounded-full bg-neutral-100 px-3 text-sm font-medium text-neutral-500">
             <XCircleIcon className="h-4 w-4" aria-hidden="true" />
             已关闭
           </span>
@@ -508,14 +508,14 @@ function FeedbackDetailPanel({
 function ReplyBubble({ reply }: { reply: FeedbackReplyItem }) {
   const fromUser = reply.senderType === 'user'
   return (
-    <div className={['rounded-xl px-3 py-2', fromUser ? 'bg-primary-50' : 'bg-gray-50'].join(' ')}>
+    <div className={['rounded-xl px-3 py-2', fromUser ? 'bg-primary-50' : 'bg-neutral-50'].join(' ')}>
       <div className="flex items-center justify-between gap-2">
-        <span className={['text-xs font-medium', fromUser ? 'text-primary-600' : 'text-gray-500'].join(' ')}>
+        <span className={['text-xs font-medium', fromUser ? 'text-primary-600' : 'text-neutral-500'].join(' ')}>
           {fromUser ? '我的补充' : '服务回复'}
         </span>
-        <span className="text-xs text-gray-400">{formatTime(reply.createdAt)}</span>
+        <span className="text-xs text-neutral-400">{formatTime(reply.createdAt)}</span>
       </div>
-      <p className="mt-1 text-sm leading-6 text-gray-700">{reply.content}</p>
+      <p className="mt-1 text-sm leading-6 text-neutral-700">{reply.content}</p>
     </div>
   )
 }

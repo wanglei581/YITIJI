@@ -92,10 +92,10 @@ export function InterviewReportsPage() {
       <div className="mt-4 flex-1 overflow-y-auto pb-8">
         {!isLoggedIn ? (
           <Card className="flex flex-col items-center gap-4 p-10 text-center">
-            <FileSearchIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
+            <FileSearchIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
             <div>
-              <p className="text-base font-semibold text-gray-900">登录后可保存练习报告</p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="text-base font-semibold text-neutral-900">登录后可保存练习报告</p>
+              <p className="mt-1 text-sm text-neutral-500">
                 游客模式的练习报告短期有效（约 2 小时）；登录后报告保存 7 天，可随时回看与打印
               </p>
             </div>
@@ -127,12 +127,12 @@ export function InterviewReportsPage() {
           <div className="flex flex-col gap-3">
             {items.map((it) => (
               <Card key={it.sessionId} className="flex items-center gap-4 p-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50">
-                  <FileSearchIcon className="h-6 w-6 text-violet-600" aria-hidden="true" />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
+                  <FileSearchIcon className="h-6 w-6 text-plum" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">{it.position} · {it.interviewerLabel}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">
+                  <p className="truncate text-sm font-semibold text-neutral-900">{it.position} · {it.interviewerLabel}</p>
+                  <p className="mt-0.5 text-xs text-neutral-400">
                     {it.industry} · {it.durationMin} 分钟练习 · {formatTime(it.createdAt)}
                   </p>
                 </div>
@@ -155,8 +155,8 @@ export function InterviewReportsPage() {
                   className={[
                     'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
                     confirmId === it.sessionId
-                      ? 'border-red-300 bg-red-50 text-red-600'
-                      : 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-500',
+                      ? 'border-error/40 bg-error-bg text-error-fg'
+                      : 'border-neutral-200 text-neutral-400 hover:bg-error-bg hover:text-error-fg',
                   ].join(' ')}
                 >
                   <Trash2Icon className="h-4 w-4" aria-hidden="true" />
@@ -164,7 +164,7 @@ export function InterviewReportsPage() {
                 </button>
               </Card>
             ))}
-            <p className="mt-1 text-center text-xs text-gray-400">报告保存 7 天后自动清理；删除为物理删除并留删除日志</p>
+            <p className="mt-1 text-center text-xs text-neutral-400">报告保存 7 天后自动清理；删除为物理删除并留删除日志</p>
           </div>
         )}
       </div>

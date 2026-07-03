@@ -124,9 +124,9 @@ function previewKindForFile(file: PrintFile): 'pdf' | 'image' | 'unsupported' | 
 function SectionHead({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 py-1">
-      <div className="h-px flex-1 bg-gray-100" />
-      <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{children}</p>
-      <div className="h-px flex-1 bg-gray-100" />
+      <div className="h-px flex-1 bg-neutral-100" />
+      <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{children}</p>
+      <div className="h-px flex-1 bg-neutral-100" />
     </div>
   )
 }
@@ -134,7 +134,7 @@ function SectionHead({ children }: { children: React.ReactNode }) {
 function ParamCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Card className="p-5">
-      <p className="mb-3 text-sm font-medium text-gray-700">{label}</p>
+      <p className="mb-3 text-sm font-medium text-neutral-700">{label}</p>
       {children}
     </Card>
   )
@@ -155,7 +155,7 @@ function ToggleGroup({
     <div
       className={[
         'flex overflow-hidden rounded-lg border',
-        disabled ? 'border-gray-100 opacity-50' : 'border-gray-200',
+        disabled ? 'border-neutral-100 opacity-50' : 'border-neutral-200',
       ].join(' ')}
     >
       {options.map((opt) => (
@@ -168,7 +168,7 @@ function ToggleGroup({
             'flex h-12 flex-1 items-center justify-center text-sm font-medium transition-colors',
             value === opt.value
               ? 'bg-primary-600 text-white'
-              : 'bg-white text-gray-600 active:bg-gray-100',
+              : 'bg-white text-neutral-600 active:bg-neutral-100',
           ].join(' ')}
         >
           {opt.label}
@@ -180,9 +180,9 @@ function ToggleGroup({
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-right text-sm font-semibold text-gray-900">{value}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
+      <span className="text-sm text-neutral-500">{label}</span>
+      <span className="text-right text-sm font-semibold text-neutral-900">{value}</span>
     </div>
   )
 }
@@ -192,7 +192,7 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative flex h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+      <div className="relative flex h-56 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
         {previewKind === 'pdf' && (
           <iframe
             title={`${file.name} 预览`}
@@ -210,11 +210,11 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
         {(previewKind === 'unsupported' || previewKind === 'unavailable') && (
           <div className="flex w-full flex-col items-center justify-center gap-4 px-5 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm">
-              <FileTextIcon className="h-8 w-8 text-gray-300" />
+              <FileTextIcon className="h-8 w-8 text-neutral-300" />
             </div>
             <div>
-              <p className="break-all text-sm font-semibold text-gray-800">{file.name}</p>
-              <p className="mt-2 text-xs leading-5 text-gray-500">
+              <p className="break-all text-sm font-semibold text-neutral-800">{file.name}</p>
+              <p className="mt-2 text-xs leading-5 text-neutral-500">
                 {previewKind === 'unavailable'
                   ? '当前没有可嵌入的预览地址，通常出现在离线演示、签名链接过期或文件仍在上传处理中。'
                   : '当前文件类型暂不支持浏览器内直接预览，可继续设置打印参数，打印前请核对文件名和页数。'}
@@ -223,14 +223,14 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
           </div>
         )}
         {previewKind !== 'unavailable' && (
-          <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-gray-600 shadow-sm">
+          <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-xs font-medium text-neutral-600 shadow-sm">
             <EyeIcon className="h-3.5 w-3.5" />
             预览
           </div>
         )}
       </div>
 
-      <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700">
+      <div className="rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs leading-5 text-primary-700">
         PDF 和图片可在左侧预览；Word 文档需后续接入转换服务后才能页内预览。若只看到文件图标，请确认文件链接未过期，或返回重新上传。
       </div>
     </div>
@@ -248,11 +248,11 @@ function InfoSection({
 }) {
   return (
     <Card className="overflow-hidden">
-      <div className="flex min-h-[56px] w-full items-center justify-center gap-2 px-5 text-sm font-semibold text-gray-900">
-        <span className={['h-4 w-1 rounded-full', accent === 'primary' ? 'bg-primary-600' : 'bg-amber-500'].join(' ')} />
+      <div className="flex min-h-[56px] w-full items-center justify-center gap-2 px-5 text-sm font-semibold text-neutral-900">
+        <span className={['h-4 w-1 rounded-full', accent === 'primary' ? 'bg-primary-600' : 'bg-warning'].join(' ')} />
         {title}
       </div>
-      <div className="border-t border-gray-100 p-5">{children}</div>
+      <div className="border-t border-neutral-100 p-5">{children}</div>
     </Card>
   )
 }
@@ -361,12 +361,12 @@ export function PrintPreviewPage() {
   if (!locationState?.file && !restoredSession?.file) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-amber-50">
-          <AlertTriangleIcon className="h-10 w-10 text-amber-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
+          <AlertTriangleIcon className="h-10 w-10 text-warning" />
         </div>
         <div className="text-center">
-          <p className="text-lg font-semibold text-gray-900">未找到文件信息</p>
-          <p className="mt-2 text-sm text-gray-500">请重新上传文件后再进行打印设置</p>
+          <p className="text-lg font-semibold text-neutral-900">未找到文件信息</p>
+          <p className="mt-2 text-sm text-neutral-500">请重新上传文件后再进行打印设置</p>
         </div>
         <Button size="lg" onClick={() => navigate(uploadPath)}>
           重新上传文件
@@ -391,7 +391,7 @@ export function PrintPreviewPage() {
         {/* ── Left: file preview ─────────────────────────────────────────── */}
         <div className="flex flex-col gap-3">
           <FilePreviewPanel file={file} />
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-neutral-500">
             {formatPageCount(file.pages)} · {file.size}
           </p>
           {materialCheck && (
@@ -399,8 +399,8 @@ export function PrintPreviewPage() {
               className={[
                 'rounded-lg border px-3 py-2 text-center text-xs font-medium',
                 materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
-                  ? 'border-amber-100 bg-amber-50 text-amber-700'
-                  : 'border-green-100 bg-green-50 text-green-700',
+                  ? 'border-warning/20 bg-warning-bg text-warning-fg'
+                  : 'border-success-bg bg-success-bg text-success-fg',
               ].join(' ')}
             >
               {materialCheck.mode === 'demo' ? '材料检查流程演示完成' : '已完成隐私检查'} · 遮挡 {materialCheck.redactedCount} 项
@@ -417,24 +417,24 @@ export function PrintPreviewPage() {
             <div
               className={[
                 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                printer.isOnline ? 'bg-green-50' : 'bg-red-50',
+                printer.isOnline ? 'bg-success-bg' : 'bg-error-bg',
               ].join(' ')}
             >
               {printer.isOnline ? (
-                <PrinterIcon className="h-5 w-5 text-green-600" />
+                <PrinterIcon className="h-5 w-5 text-success-fg" />
               ) : (
-                <WifiOffIcon className="h-5 w-5 text-red-500" />
+                <WifiOffIcon className="h-5 w-5 text-error-fg" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-gray-900">
+              <p className="truncate text-sm font-medium text-neutral-900">
                 {printerLoading ? '检测设备中…' : printerName}
               </p>
-              <p className={['text-xs', printer.isOnline ? 'text-green-600' : 'text-red-500'].join(' ')}>
+              <p className={['text-xs', printer.isOnline ? 'text-success-fg' : 'text-error-fg'].join(' ')}>
                 {printerLoading ? '请稍候' : printer.isOnline ? '在线' : '离线'}
               </p>
             </div>
-            {!printerLoading && printer.isOnline && <CheckCircleIcon className="h-5 w-5 shrink-0 text-green-500" />}
+            {!printerLoading && printer.isOnline && <CheckCircleIcon className="h-5 w-5 shrink-0 text-success" />}
           </Card>
 
           {/* Warning / info chips */}
@@ -446,10 +446,10 @@ export function PrintPreviewPage() {
                   className={[
                     'flex items-start gap-2.5 rounded-lg px-4 py-3 text-sm',
                     w.level === 'error'
-                      ? 'bg-red-50 text-red-700'
+                      ? 'bg-error-bg text-error-fg'
                       : w.level === 'warn'
-                      ? 'bg-amber-50 text-amber-700'
-                      : 'bg-blue-50 text-blue-700',
+                      ? 'bg-warning-bg text-warning-fg'
+                      : 'bg-primary-50 text-primary-700',
                   ].join(' ')}
                 >
                   {w.level === 'info' ? (
@@ -472,20 +472,20 @@ export function PrintPreviewPage() {
                 type="button"
                 disabled={copies <= 1}
                 onClick={() => setCopies(Math.max(1, copies - 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+                className="flex h-12 w-12 items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40"
               >
-                <MinusIcon className="h-5 w-5 text-gray-600" />
+                <MinusIcon className="h-5 w-5 text-neutral-600" />
               </button>
-              <span className="w-16 text-center text-2xl font-bold text-gray-900">{copies}</span>
+              <span className="w-16 text-center text-2xl font-bold text-neutral-900">{copies}</span>
               <button
                 type="button"
                 disabled={copies >= 99}
                 onClick={() => setCopies(Math.min(99, copies + 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+                className="flex h-12 w-12 items-center justify-center rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40"
               >
-                <PlusIcon className="h-5 w-5 text-gray-600" />
+                <PlusIcon className="h-5 w-5 text-neutral-600" />
               </button>
-              <span className="text-sm text-gray-400">（最多 99 份）</span>
+              <span className="text-sm text-neutral-400">（最多 99 份）</span>
             </div>
           </ParamCard>
 
@@ -499,11 +499,11 @@ export function PrintPreviewPage() {
               value={colorMode}
               onChange={(v) => setColorMode(v as ColorMode)}
             />
-            <p className="mt-2 text-xs text-gray-400">
+            <p className="mt-2 text-xs text-neutral-400">
               黑白 ¥{PRICE_BW.toFixed(1)}/面 · 彩色 ¥{PRICE_COLOR.toFixed(1)}/面
             </p>
             {colorMode === 'color' && (
-              <p className="mt-1 text-xs text-amber-600">
+              <p className="mt-1 text-xs text-warning-fg">
                 彩色效果以设备支持和当前耗材状态为准
               </p>
             )}
@@ -520,7 +520,7 @@ export function PrintPreviewPage() {
               value={duplex}
               onChange={(v) => setDuplex(v as DuplexMode)}
             />
-            <p className="mt-2 text-xs text-gray-400">
+            <p className="mt-2 text-xs text-neutral-400">
               长边翻转适合纵向文档，短边翻转适合横向文档
             </p>
           </ParamCard>
@@ -577,12 +577,12 @@ export function PrintPreviewPage() {
                   className={[
                     'h-12 w-full rounded-lg border px-4 text-sm outline-none transition-colors',
                     rangeError
-                      ? 'border-red-400 bg-red-50 focus:border-red-500'
-                      : 'border-gray-200 focus:border-primary-500',
+                      ? 'border-error bg-error-bg focus:border-error-fg'
+                      : 'border-neutral-200 focus:border-primary-500',
                   ].join(' ')}
                 />
                 {rangeError && (
-                  <p className="mt-1.5 text-xs text-red-500">请输入页面范围，例：1-3, 5, 7-9</p>
+                  <p className="mt-1.5 text-xs text-error-fg">请输入页面范围，例：1-3, 5, 7-9</p>
                 )}
               </div>
             )}
@@ -590,7 +590,7 @@ export function PrintPreviewPage() {
 
           {/* Paper — read only */}
           <ParamCard label="纸张规格">
-            <div className="flex h-12 items-center rounded-lg border border-gray-100 bg-gray-50 px-4 text-sm text-gray-500">
+            <div className="flex h-12 items-center rounded-lg border border-neutral-100 bg-neutral-50 px-4 text-sm text-neutral-500">
               A4（210 × 297 mm）— 仅支持 A4
             </div>
           </ParamCard>
@@ -609,7 +609,7 @@ export function PrintPreviewPage() {
             <InfoRow label="预计用纸" value={`${sheetsUsed} 张`} />
 
             {paperSaved > 0 && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-700">
+              <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">
                 <InfoIcon className="h-4 w-4 shrink-0" />
                 双面打印比单面节省 {paperSaved} 张纸
               </div>
@@ -625,14 +625,14 @@ export function PrintPreviewPage() {
               value={`${file.pages ?? effectivePages} × ${copies} = ${totalFaces}`}
             />
             <InfoRow label="打印费用" value={`¥${totalPrice}`} />
-            <InfoRow label="优惠券抵扣" value={<span className="font-medium text-gray-400">请选择优惠券</span>} />
-            <div className="mt-4 flex items-baseline justify-between border-t border-gray-100 pt-4">
-              <p className="text-sm text-gray-500">
+            <InfoRow label="优惠券抵扣" value={<span className="font-medium text-neutral-400">请选择优惠券</span>} />
+            <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
+              <p className="text-sm text-neutral-500">
                 实际以机器计费为准
               </p>
               <div className="flex items-baseline gap-1">
-                <span className="text-xs font-medium text-gray-500">实付金额</span>
-                <span className="text-xl font-bold text-gray-900">¥{totalPrice}</span>
+                <span className="text-xs font-medium text-neutral-500">实付金额</span>
+                <span className="text-xl font-bold text-neutral-900">¥{totalPrice}</span>
               </div>
             </div>
           </Card>
@@ -641,8 +641,8 @@ export function PrintPreviewPage() {
             title="价格说明"
             accent="primary"
           >
-            <div className="overflow-hidden rounded-lg border border-gray-100">
-              <div className="grid grid-cols-4 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500">
+            <div className="overflow-hidden rounded-lg border border-neutral-100">
+              <div className="grid grid-cols-4 bg-neutral-50 px-3 py-2 text-xs font-semibold text-neutral-500">
                 <span>打印类型</span>
                 <span>规格</span>
                 <span>黑白</span>
@@ -654,8 +654,8 @@ export function PrintPreviewPage() {
                 ['照片打印', '6寸 光面纸', '—', '待接入'],
                 ['铜版纸简历', 'A4 铜版纸', '待接入', '待接入'],
               ].map(([type, spec, bw, color]) => (
-                <div key={type} className="grid grid-cols-4 border-t border-gray-100 px-3 py-2 text-xs text-gray-700">
-                  <span className="font-medium text-gray-900">{type}</span>
+                <div key={type} className="grid grid-cols-4 border-t border-neutral-100 px-3 py-2 text-xs text-neutral-700">
+                  <span className="font-medium text-neutral-900">{type}</span>
                   <span>{spec}</span>
                   <span>{bw}</span>
                   <span className="font-semibold text-primary-600">{color}</span>
@@ -668,7 +668,7 @@ export function PrintPreviewPage() {
             title="打印须知"
             accent="amber"
           >
-            <ol className="space-y-3 text-sm text-gray-600">
+            <ol className="space-y-3 text-sm text-neutral-600">
               {[
                 '上传文件需清晰完整，当前支持 PDF、JPG、PNG；Word 页内预览和转换能力后续接入。',
                 '左侧可预览 PDF 和图片；如果无法预览，请检查签名链接是否过期，或返回重新上传。',
@@ -676,7 +676,7 @@ export function PrintPreviewPage() {
                 '打印完成后请从出纸口取件，如有质量问题请联系现场工作人员。',
               ].map((item, index) => (
                 <li key={item} className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warning text-xs font-bold text-white">
                     {index + 1}
                   </span>
                   <span className="leading-6">{item}</span>

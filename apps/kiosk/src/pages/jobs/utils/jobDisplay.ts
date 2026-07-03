@@ -16,10 +16,10 @@ export const CATEGORY_LABEL: Record<string, string> = {
 }
 
 export const CATEGORY_STYLE: Record<string, string> = {
-  fulltime: 'bg-blue-50 text-blue-600',
-  intern: 'bg-orange-50 text-orange-600',
-  campus: 'bg-green-50 text-green-600',
-  parttime: 'bg-purple-50 text-purple-600',
+  fulltime: 'bg-primary-50 text-primary-600',
+  intern: 'bg-warning-bg text-warning-fg',
+  campus: 'bg-success-bg text-success-fg',
+  parttime: 'bg-plum-soft text-plum',
 }
 
 export const SELECT_CLASS =

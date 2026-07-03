@@ -33,7 +33,7 @@ export function MapBlock({
     return <iframe src={src} title={`${venue}位置地图`} className={`${cls} border-0`} loading="lazy" />
   }
   return (
-    <div className={`${cls} flex flex-col items-center justify-center gap-1.5 bg-gray-50 text-gray-400`}>
+    <div className={`${cls} flex flex-col items-center justify-center gap-1.5 bg-neutral-50 text-neutral-400`}>
       <MapPinIcon className="h-7 w-7" />
       <span className="text-xs">暂无地图，可扫码在手机查看</span>
     </div>

@@ -162,8 +162,8 @@ export function AssistantPage() {
     return (
       <Suspense
         fallback={
-          <div className="flex h-full items-center justify-center bg-gray-900">
-            <p className="text-sm text-gray-400">通话模块加载中…</p>
+          <div className="flex h-full items-center justify-center bg-neutral-900">
+            <p className="text-sm text-neutral-400">通话模块加载中…</p>
           </div>
         }
       >
@@ -279,24 +279,24 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
   const matchedRoutes = useMemo(() => getMatchedRoutes(input), [input])
 
   return (
-    <div className="flex h-full flex-col bg-gray-50">
+    <div className="flex h-full flex-col bg-neutral-50">
 
       {/* 顶栏 */}
-      <div className="shrink-0 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+      <div className="shrink-0 flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 text-sm"
+          className="flex items-center gap-1.5 text-neutral-500 hover:text-neutral-900 text-sm"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           返回
         </button>
-        <p className="text-sm font-medium text-gray-700">{toolboxScene?.title ?? 'AI 就业服务助手'}</p>
+        <p className="text-sm font-medium text-neutral-700">{toolboxScene?.title ?? 'AI 就业服务助手'}</p>
         {onSwitchToCall ? (
           <button
             type="button"
             onClick={onSwitchToCall}
-            className="flex min-h-[48px] items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 active:bg-blue-200 transition-colors"
+            className="flex min-h-[48px] items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100 active:bg-primary-200 transition-colors"
           >
             <MicIcon className="h-4 w-4" />
             语音通话
@@ -309,10 +309,10 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
         <div className="space-y-4">
           {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
           {loading && (
-            <div className="flex items-center gap-1.5 w-fit rounded-2xl bg-gray-100 px-4 py-3">
-              <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.3s]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:-0.15s]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400" />
+            <div className="flex items-center gap-1.5 w-fit rounded-2xl bg-neutral-100 px-4 py-3">
+              <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.3s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400 [animation-delay:-0.15s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-neutral-400" />
             </div>
           )}
           <div ref={bottomRef} />
@@ -320,7 +320,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
       </div>
 
       {/* 快捷操作 */}
-      <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-2 pb-1">
+      <div className="shrink-0 border-t border-neutral-100 bg-white px-4 pt-2 pb-1">
         {contextActions && contextActions.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2">
             {contextActions.map((a) => (
@@ -328,7 +328,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
                 key={a.route}
                 type="button"
                 onClick={() => navigate(a.route)}
-                className="min-h-[48px] rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                className="min-h-[48px] rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 transition-colors"
               >
                 {a.label}
               </button>
@@ -337,7 +337,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
         )}
         <div className="flex flex-wrap items-center gap-1.5 pb-2">
           <div className="mr-1 flex shrink-0 items-center gap-1">
-            <ZapIcon className="h-3.5 w-3.5 text-amber-400" />
+            <ZapIcon className="h-3.5 w-3.5 text-warning" />
             <span className="text-xs font-medium text-neutral-500">快捷入口</span>
           </div>
           {SHORTCUTS.map((s) => {
@@ -349,8 +349,8 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
                 onClick={() => navigate(s.route)}
                 className={`flex min-h-[48px] items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors border
                   ${matchedRoutes.has(s.route)
-                    ? 'border-amber-300 bg-amber-50 text-amber-700'
-                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+                    ? 'border-warning/50 bg-warning-bg text-warning-fg'
+                    : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100'}`}
               >
                 {Icon && <Icon className="h-3.5 w-3.5" />}
                 {s.label}
@@ -361,7 +361,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
       </div>
 
       {/* 输入区 */}
-      <div className="shrink-0 border-t border-gray-200 bg-white p-4">
+      <div className="shrink-0 border-t border-neutral-200 bg-white p-4">
         <div className="flex items-end gap-3">
           <textarea
             value={input}
@@ -370,7 +370,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
             placeholder={toolboxScene?.placeholder ?? '输入问题，例如：如何优化我的简历？'}
             rows={2}
             disabled={loading}
-            className="min-h-[60px] flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3.5 text-base leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 disabled:bg-gray-50"
+            className="min-h-[60px] flex-1 resize-none rounded-xl border border-neutral-300 px-4 py-3.5 text-base leading-relaxed text-neutral-900 placeholder:text-neutral-400 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20 disabled:bg-neutral-50"
           />
           <Button
             size="lg"
@@ -382,7 +382,7 @@ function TextChat({ onSwitchToCall }: { onSwitchToCall?: () => void }) {
             <SendHorizontalIcon className="h-6 w-6" />
           </Button>
         </div>
-        <p className="mt-2 text-center text-xs text-gray-400">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
+        <p className="mt-2 text-center text-xs text-neutral-400">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
       </div>
     </div>
   )
@@ -397,15 +397,15 @@ function ChatBubble({ msg }: { msg: Message }) {
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div className={`flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={
-          isUser  ? 'rounded-2xl rounded-br-sm bg-blue-600 px-4 py-3 text-sm text-white'
-          : isError ? 'flex items-start gap-2 rounded-2xl rounded-bl-sm bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700'
-          : 'rounded-2xl rounded-bl-sm bg-white border border-gray-200 px-4 py-3 text-sm text-gray-900'
+          isUser  ? 'rounded-2xl rounded-br-sm bg-primary-600 px-4 py-3 text-sm text-white'
+          : isError ? 'flex items-start gap-2 rounded-2xl rounded-bl-sm bg-error-bg border border-error/30 px-4 py-3 text-sm text-error-fg'
+          : 'rounded-2xl rounded-bl-sm bg-white border border-neutral-200 px-4 py-3 text-sm text-neutral-900'
         }>
-          {isError && <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />}
+          {isError && <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-error-fg" />}
           <span>{msg.text}</span>
         </div>
         {!isUser && !isError && (
-          <p className="mt-1 px-1 text-xs text-gray-400">内容仅供参考</p>
+          <p className="mt-1 px-1 text-xs text-neutral-400">内容仅供参考</p>
         )}
       </div>
     </div>

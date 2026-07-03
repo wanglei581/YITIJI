@@ -35,9 +35,9 @@ interface PageState {
 }
 
 const FIT_META: Record<string, { label: string; cls: string }> = {
-  reference_high: { label: '匹配参考：较高', cls: 'bg-green-50 text-green-700' },
-  reference_medium: { label: '匹配参考：中等', cls: 'bg-blue-50 text-blue-700' },
-  reference_low: { label: '匹配参考：偏低', cls: 'bg-orange-50 text-orange-700' },
+  reference_high: { label: '匹配参考：较高', cls: 'bg-success-bg text-success-fg' },
+  reference_medium: { label: '匹配参考：中等', cls: 'bg-primary-50 text-primary-700' },
+  reference_low: { label: '匹配参考：偏低', cls: 'bg-warning-bg text-warning-fg' },
 }
 
 export function JobFitPage() {
@@ -103,8 +103,8 @@ export function JobFitPage() {
   if (!taskId) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-        <AlertCircleIcon className="h-10 w-10 text-gray-300" aria-hidden="true" />
-        <p className="text-base text-gray-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
+        <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
+        <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
         <Button size="lg" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
       </div>
     )
@@ -114,7 +114,7 @@ export function JobFitPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
         <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
-        <p className="text-base text-gray-500">正在恢复岗位匹配报告…</p>
+        <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
       </div>
     )
   }
@@ -163,22 +163,22 @@ export function JobFitPage() {
 
           <Card className="p-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-900">综合参考</h2>
+              <h2 className="text-base font-semibold text-neutral-900">综合参考</h2>
               <span className={['rounded-full px-3 py-1 text-sm font-semibold', fit.cls].join(' ')}>{fit.label}</span>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-gray-700">{result.summary}</p>
+            <p className="mt-3 text-sm leading-relaxed text-neutral-700">{result.summary}</p>
           </Card>
 
           <Card className="p-5">
             <div className="mb-3 flex items-center gap-2">
-              <CheckCircle2Icon className="h-4 w-4 text-green-600" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-gray-900">匹配点（含简历原文依据）</h2>
+              <CheckCircle2Icon className="h-4 w-4 text-success-fg" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-neutral-900">匹配点（含简历原文依据）</h2>
             </div>
             <div className="flex flex-col gap-2.5">
               {(result.matchPoints ?? []).map((m) => (
-                <div key={m.point.slice(0, 24)} className="rounded-xl bg-green-50/60 px-4 py-3">
-                  <p className="text-sm font-medium text-gray-900">{m.point}</p>
-                  <p className="mt-1 text-xs text-gray-500">原文依据：“{m.evidence}”</p>
+                <div key={m.point.slice(0, 24)} className="rounded-xl bg-success-bg/60 px-4 py-3">
+                  <p className="text-sm font-medium text-neutral-900">{m.point}</p>
+                  <p className="mt-1 text-xs text-neutral-500">原文依据：“{m.evidence}”</p>
                 </div>
               ))}
             </div>
@@ -186,14 +186,14 @@ export function JobFitPage() {
 
           <Card className="p-5">
             <div className="mb-3 flex items-center gap-2">
-              <TrendingUpIcon className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-gray-900">差距与准备建议</h2>
+              <TrendingUpIcon className="h-4 w-4 text-warning-fg" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-neutral-900">差距与准备建议</h2>
             </div>
             <div className="flex flex-col gap-2.5">
               {(result.gapPoints ?? []).map((g) => (
-                <div key={g.gap.slice(0, 24)} className="rounded-xl bg-orange-50/60 px-4 py-3">
-                  <p className="text-sm font-medium text-gray-900">{g.gap}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-600">{g.suggestion}</p>
+                <div key={g.gap.slice(0, 24)} className="rounded-xl bg-warning-bg/60 px-4 py-3">
+                  <p className="text-sm font-medium text-neutral-900">{g.gap}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-neutral-600">{g.suggestion}</p>
                 </div>
               ))}
             </div>
@@ -202,11 +202,11 @@ export function JobFitPage() {
           <Card className="p-5">
             <div className="mb-3 flex items-center gap-2">
               <PencilLineIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-gray-900">简历定向优化建议</h2>
+              <h2 className="text-base font-semibold text-neutral-900">简历定向优化建议</h2>
             </div>
             <ul className="flex flex-col gap-2">
               {(result.targetedSuggestions ?? []).map((s) => (
-                <li key={s.slice(0, 24)} className="flex items-start gap-2 text-sm leading-relaxed text-gray-700">
+                <li key={s.slice(0, 24)} className="flex items-start gap-2 text-sm leading-relaxed text-neutral-700">
                   <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" aria-hidden="true" />
                   {s}
                 </li>
@@ -216,15 +216,15 @@ export function JobFitPage() {
 
           {result.job?.sourceName && (
             <Card className="p-5">
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-neutral-400">
                 岗位来源：{result.job.sourceName}{result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
               </p>
-              <p className="mt-1 text-sm text-gray-600">准备好之后，请前往来源平台完成投递。</p>
+              <p className="mt-1 text-sm text-neutral-600">准备好之后，请前往来源平台完成投递。</p>
             </Card>
           )}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+        <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
           <div className="flex gap-3">
             <Button
               size="lg"
@@ -272,7 +272,7 @@ export function JobFitPage() {
           <button
             type="button"
             onClick={() => setTab('pick')}
-            className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'pick' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-600'].join(' ')}
+            className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'pick' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
           >
             <BriefcaseIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
             从岗位信息选择
@@ -280,7 +280,7 @@ export function JobFitPage() {
           <button
             type="button"
             onClick={() => setTab('manual')}
-            className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'manual' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-600'].join(' ')}
+            className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'manual' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
           >
             <TargetIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
             手填目标岗位
@@ -290,21 +290,21 @@ export function JobFitPage() {
         {tab === 'pick' ? (
           <Card className="p-4">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-300" aria-hidden="true" />
+              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-300" aria-hidden="true" />
               <input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder="搜索岗位名称 / 公司"
-                className="min-h-[48px] w-full rounded-xl border border-gray-200 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
+                className="min-h-[48px] w-full rounded-xl border border-neutral-200 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
               />
             </div>
             <div className="mt-3 flex flex-col gap-2">
               {jobsLoading ? (
-                <p className="flex items-center gap-2 py-6 text-sm text-gray-400">
+                <p className="flex items-center gap-2 py-6 text-sm text-neutral-400">
                   <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />正在加载岗位…
                 </p>
               ) : jobs.length === 0 ? (
-                <p className="py-6 text-center text-sm text-gray-400">没有找到岗位，可切换「手填目标岗位」</p>
+                <p className="py-6 text-center text-sm text-neutral-400">没有找到岗位，可切换「手填目标岗位」</p>
               ) : (
                 jobs.map((j) => {
                   const active = selectedJob?.id === j.id
@@ -313,11 +313,11 @@ export function JobFitPage() {
                       key={j.id}
                       type="button"
                       onClick={() => setSelectedJob(j)}
-                      className={['flex min-h-[56px] items-center justify-between rounded-xl border px-4 py-3 text-left', active ? 'border-primary-500 bg-primary-50' : 'border-gray-100 bg-white hover:border-gray-200'].join(' ')}
+                      className={['flex min-h-[56px] items-center justify-between rounded-xl border px-4 py-3 text-left', active ? 'border-primary-500 bg-primary-50' : 'border-neutral-100 bg-white hover:border-neutral-200'].join(' ')}
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-gray-900">{j.title}</span>
-                        <span className="mt-0.5 block truncate text-xs text-gray-500">{j.company} · 来源：{j.sourceName}</span>
+                        <span className="block truncate text-sm font-semibold text-neutral-900">{j.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-neutral-500">{j.company} · 来源：{j.sourceName}</span>
                       </span>
                       {active && <CheckCircle2Icon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />}
                     </button>
@@ -333,7 +333,7 @@ export function JobFitPage() {
               onChange={(e) => setManualTitle(e.target.value)}
               maxLength={50}
               placeholder="目标岗位名称，如：行政专员"
-              className="min-h-[52px] w-full rounded-xl border border-gray-200 px-4 text-base focus:border-primary-500 focus:outline-none"
+              className="min-h-[52px] w-full rounded-xl border border-neutral-200 px-4 text-base focus:border-primary-500 focus:outline-none"
             />
             <textarea
               value={manualReq}
@@ -341,15 +341,15 @@ export function JobFitPage() {
               maxLength={2000}
               rows={5}
               placeholder="可粘贴岗位 JD / 任职要求（选填，提供后参考更有针对性）"
-              className="mt-2 w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm leading-relaxed focus:border-primary-500 focus:outline-none"
+              className="mt-2 w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 text-sm leading-relaxed focus:border-primary-500 focus:outline-none"
             />
           </Card>
         )}
 
-        {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="h-14 w-full text-base" disabled={analyzing} onClick={() => void handleAnalyze()}>
           {analyzing ? (
             <>

@@ -112,13 +112,13 @@ export function ProfileHeader({
 
   return (
     <div className={`flex items-center gap-4 ${cardSurface} px-6 py-5`}>
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gray-100">
-        <UserRoundIcon className="h-8 w-8 text-gray-400" aria-hidden="true" />
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-neutral-100">
+        <UserRoundIcon className="h-8 w-8 text-neutral-400" aria-hidden="true" />
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="text-xl font-bold text-gray-900">游客</p>
-        <p className="mt-1 text-sm text-gray-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
+        <p className="text-xl font-bold text-neutral-900">游客</p>
+        <p className="mt-1 text-sm text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
       </div>
 
       <Button size="lg" onClick={onLogin} className="flex h-14 shrink-0 items-center gap-1 px-5 text-base">

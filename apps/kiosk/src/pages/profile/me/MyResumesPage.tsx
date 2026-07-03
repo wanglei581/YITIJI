@@ -23,10 +23,10 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 
 const STATUS_META: Record<MemberResumeItem['status'], { label: string; cls: string }> = {
-  pending: { label: '待处理', cls: 'bg-amber-50 text-amber-600' },
-  processing: { label: '处理中', cls: 'bg-blue-50 text-blue-600' },
-  completed: { label: '已完成', cls: 'bg-emerald-50 text-emerald-600' },
-  failed: { label: '失败', cls: 'bg-red-50 text-red-600' },
+  pending: { label: '待处理', cls: 'bg-warning-bg text-warning-fg' },
+  processing: { label: '处理中', cls: 'bg-primary-50 text-primary-600' },
+  completed: { label: '已完成', cls: 'bg-success-bg text-success-fg' },
+  failed: { label: '失败', cls: 'bg-error-bg text-error-fg' },
 }
 
 const KIND_META: Record<MemberResumeItem['kind'], { label: string; hint: string; icon: LucideIcon; bg: string; color: string }> = {
@@ -41,18 +41,18 @@ const KIND_META: Record<MemberResumeItem['kind'], { label: string; hint: string;
     label: 'AI 生成简历',
     hint: 'AI 引导生成的简历版本',
     icon: SparklesIcon,
-    bg: 'bg-violet-50',
-    color: 'text-violet-600',
+    bg: 'bg-plum-soft',
+    color: 'text-plum',
   },
 }
 
-const UNKNOWN_STATUS = { label: '未知状态', cls: 'bg-gray-50 text-gray-600' }
+const UNKNOWN_STATUS = { label: '未知状态', cls: 'bg-neutral-50 text-neutral-600' }
 const UNKNOWN_KIND = {
   label: '简历记录',
   hint: '本人简历服务记录',
   icon: FileTextIcon,
-  bg: 'bg-gray-50',
-  color: 'text-gray-600',
+  bg: 'bg-neutral-50',
+  color: 'text-neutral-600',
 }
 
 function shortTaskId(taskId: string | null | undefined): string {
@@ -149,18 +149,18 @@ export function MyResumesPage() {
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-gray-900">{kind.label}</p>
+                  <p className="truncate text-sm font-semibold text-neutral-900">{kind.label}</p>
                   <span className={['shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', status.cls].join(' ')}>
                     {status.label}
                   </span>
                   {item.kind === 'parse' && (
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
                       {item.optimized ? '已生成优化版' : '未优化'}
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{kind.hint}</p>
-                <p className="mt-0.5 truncate text-xs text-gray-400">{metaLine(item)}</p>
+                <p className="mt-0.5 truncate text-xs text-neutral-400">{kind.hint}</p>
+                <p className="mt-0.5 truncate text-xs text-neutral-400">{metaLine(item)}</p>
               </div>
               <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 md:col-span-1 md:justify-start">
                 {item.kind === 'parse' ? (
@@ -206,7 +206,7 @@ export function MyResumesPage() {
         })
       )}
       {items.length > 0 && (
-        <p className="mt-1 text-center text-xs text-gray-400">
+        <p className="mt-1 text-center text-xs text-neutral-400">
           仅展示本人简历元数据；原始简历短留存，到期后无法恢复，不向企业提供或投递
           {total > items.length ? `；当前显示最近 ${items.length} / ${total} 条` : ''}
         </p>
@@ -240,8 +240,8 @@ function ActionButton({
       className={[
         'inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-100',
         disabled
-          ? 'cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300'
-          : 'border-gray-200 bg-white text-gray-600 hover:bg-primary-50 hover:text-primary-700',
+          ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300'
+          : 'border-neutral-200 bg-white text-neutral-600 hover:bg-primary-50 hover:text-primary-700',
       ].join(' ')}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />

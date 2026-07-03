@@ -13,17 +13,17 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 
 const TYPE_META: Record<BenefitType, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-rose-50', color: 'text-rose-600' },
-  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-emerald-50', color: 'text-emerald-600' },
-  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-amber-50', color: 'text-amber-600' },
-  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-blue-50', color: 'text-blue-600' },
+  coupon: { label: '优惠券', icon: TicketIcon, bg: 'bg-error-bg', color: 'text-error-fg' },
+  free_quota: { label: '免费次数', icon: GiftIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
+  package_entitlement: { label: '服务额度', icon: PackageIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
+  subsidy_eligibility_hint: { label: '政策资格提示', icon: LandmarkIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
 }
 
 const STATUS_META: Record<BenefitStatus, { label: string; cls: string }> = {
-  active: { label: '可用', cls: 'bg-emerald-50 text-emerald-600' },
-  used_up: { label: '已用完', cls: 'bg-gray-100 text-gray-500' },
-  expired: { label: '已过期', cls: 'bg-amber-50 text-amber-600' },
-  revoked: { label: '已撤销', cls: 'bg-rose-50 text-rose-600' },
+  active: { label: '可用', cls: 'bg-success-bg text-success-fg' },
+  used_up: { label: '已用完', cls: 'bg-neutral-100 text-neutral-500' },
+  expired: { label: '已过期', cls: 'bg-warning-bg text-warning-fg' },
+  revoked: { label: '已撤销', cls: 'bg-error-bg text-error-fg' },
 }
 
 function quantityLine(item: MemberBenefitItem): string {
@@ -88,12 +88,12 @@ export function MyBenefitsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">{type.label}</span>
+                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{type.label}</span>
                   <span className={['rounded-full px-2.5 py-1 text-xs font-medium', status.cls].join(' ')}>{status.label}</span>
                 </div>
-                <p className="mt-2 text-sm font-semibold text-gray-900">{item.title}</p>
-                {item.description && <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.description}</p>}
-                <p className="mt-2 text-xs text-gray-400">
+                <p className="mt-2 text-sm font-semibold text-neutral-900">{item.title}</p>
+                {item.description && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{item.description}</p>}
+                <p className="mt-2 text-xs text-neutral-400">
                   {quantityLine(item)} · {validityLine(item)}
                 </p>
               </div>
@@ -101,7 +101,7 @@ export function MyBenefitsPage() {
           </Card>
         )
       })}
-      <p className="mt-1 text-center text-xs leading-relaxed text-gray-400">
+      <p className="mt-1 text-center text-xs leading-relaxed text-neutral-400">
         权益仅用于本终端服务与打印辅助；政策资格提示只提供信息指引，具体办理与结果以官方平台为准。
       </p>
     </MeListShell>

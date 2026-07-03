@@ -50,6 +50,8 @@
 
 2026-07-03 追加：**W3/W4 第二步——双后台结构规范全域统一**。Admin 37 文件 + Partner 若干文件批量规范化：① 筛选 chips 全域换墨底胶囊规范（激活墨底白字、描边悬停青玉）；② 表头统一原型规范（11.5px 粗体字距 + 墨线底边）、divide 分隔线 token 化；③ `StatusBadge` 全域启用圆点样式，并修复三字中文在徽章内竖排换行的 bug（基类加 `whitespace-nowrap`，Kiosk 无视觉影响）；④ 语义色全量 token 化（red/green/emerald→error/success、amber/orange→warning、blue→info、`bg-white`→`bg-surface`）；展馆分区六色分类色板（数据可视化用途）保留。验证：admin/partner/ui/kiosk typecheck、两端 lint 与生产 build 全过；浏览器实测 Admin 岗位信息源页（墨底胶囊 + 圆点徽章 + 原型表头 + 真实 13 条数据）、招聘会管理页（诚实空态）、Partner 工作台（陶色审核提示条）。至此双后台 42 页的 token/色彩/结构三层规范全部落地；后续为逐页内容级增强（A 档明细字段/下一步引导等，见 page-depth-enhancement-plan §四）与 Kiosk W5。
 
+2026-07-03 追加：**W5 Kiosk fusion-youth 换装（token 层 + 全量色彩清扫）完成**。① 新增 `packages/ui/src/styles/fusion-youth.css`（青绿米纸定稿 v4/v5 口径：品牌青 primary 色阶、米纸 canvas/暖白 surface、加深 muted、墨绿 dark、品类色 clay/wheat/plum、触控版大圆角 14/18/26px、宋体 `--font-heading`），仅 `apps/kiosk` 引入；② KioskLayout 底部导航轻量原型化（青玉胶囊活跃态，触控目标 ≥56px 保持）；③ Kiosk 92 个文件全量色彩清扫：gray/slate→neutral、blue/teal→primary、绿系→success、琥珀橙黄→warning(陶)、红粉→error(朱)、紫系→plum(梅)、天蓝青系→info(青蓝)，`.claude/launch.json` 增加 `kiosk-w5`（5276）避开他会话端口占用。验证：kiosk typecheck/lint 0 错、**21 个静态守卫全部 PASS**（含 print-confirm-honest / scan-production-guard / production-real-services 等合规诚实性守卫）、CI 式 env 注入生产 build 通过、1080×1920 竖屏浏览器实测首页（墨绿 hero + 青玉 CTA + 米纸卡片）与岗位信息页（真实 11 条岗位 + 合规文案原样 + 青玉筛选胶囊）渲染正常。合规红线、入口结构、按钮文案零改动。后续：Kiosk 逐页细节精修（品类色微调：政策→麦金、打印→青蓝等）与后台 A 档内容增强并行推进。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |

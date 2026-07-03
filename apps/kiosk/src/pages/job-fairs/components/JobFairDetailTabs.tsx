@@ -31,7 +31,7 @@ import {
 import { getFairVenueGuide } from '../../../services/api'
 
 // 参展企业头像配色（按企业名 hash）
-const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-orange-500', 'bg-rose-500', 'bg-emerald-500', 'bg-cyan-600', 'bg-indigo-500', 'bg-slate-700']
+const AVATAR_COLORS = ['bg-primary-500', 'bg-plum', 'bg-warning', 'bg-error', 'bg-success', 'bg-info', 'bg-plum', 'bg-neutral-700']
 function avatarColor(s: string) {
   let h = 0
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
@@ -94,7 +94,7 @@ function MapBlock({ lat, lng, mapImageUrl, venue }: { lat?: number; lng?: number
     return <iframe src={src} title={`${venue}位置地图`} className={`${cls} border-0`} loading="lazy" />
   }
   return (
-    <div className={`${cls} flex flex-col items-center justify-center gap-1.5 bg-gray-50 text-gray-400`}>
+    <div className={`${cls} flex flex-col items-center justify-center gap-1.5 bg-neutral-50 text-neutral-400`}>
       <MapPinIcon className="h-7 w-7" />
       <span className="text-xs">暂无地图，可扫码在手机查看</span>
     </div>
@@ -124,35 +124,35 @@ export function DetailsTab({
           {/* 左：信息 */}
           <div className="flex flex-col">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="flex-1 text-xl font-bold text-gray-900">{fair.name}</h2>
+              <h2 className="flex-1 text-xl font-bold text-neutral-900">{fair.name}</h2>
               <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
             </div>
-            <p className="mt-1 text-sm text-gray-500">主办方：{fair.organizer}</p>
-            <div className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-              <CalendarIcon className="h-4 w-4 shrink-0 text-gray-400" />
-              <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-gray-400">–</span>{formatDateTime(fair.endTime)}</span>
+            <p className="mt-1 text-sm text-neutral-500">主办方：{fair.organizer}</p>
+            <div className="mt-3 flex items-center gap-2 text-sm text-neutral-700">
+              <CalendarIcon className="h-4 w-4 shrink-0 text-neutral-400" />
+              <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-neutral-400">–</span>{formatDateTime(fair.endTime)}</span>
             </div>
             {/* 信息 pill 行（地点 / 预计参会 / 参展企业） */}
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                <MapPinIcon className="h-4 w-4 text-orange-500" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                <MapPinIcon className="h-4 w-4 text-warning-fg" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}
               </span>
               {fair.expectedAttendance != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
                   <UsersIcon className="h-4 w-4 text-primary-500" />预计参会 <b className="font-semibold">{fair.expectedAttendance.toLocaleString()}</b> 人
                 </span>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                <BuildingIcon className="h-4 w-4 text-emerald-500" />参展企业 <b className="font-semibold">{fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)}</b> 家
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                <BuildingIcon className="h-4 w-4 text-success" />参展企业 <b className="font-semibold">{fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)}</b> 家
               </span>
             </div>
             {/* 详细地址与交通指引（复刻参考图左栏） */}
             <div className="mt-4">
-              <p className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-neutral-700">
                 <NavigationIcon className="h-4 w-4 text-primary-500" />详细地址与交通指引
               </p>
-              {fair.address && <p className="mt-1.5 text-sm text-gray-600">{fair.address}</p>}
-              {fair.trafficInfo && <p className="mt-1 text-sm leading-relaxed text-gray-500">{fair.trafficInfo}</p>}
+              {fair.address && <p className="mt-1.5 text-sm text-neutral-600">{fair.address}</p>}
+              {fair.trafficInfo && <p className="mt-1 text-sm leading-relaxed text-neutral-500">{fair.trafficInfo}</p>}
             </div>
             {navUrl && (
               <Button size="md" variant="outline" className="mt-4 flex w-fit items-center justify-center gap-2" onClick={onNav}>
@@ -161,34 +161,34 @@ export function DetailsTab({
             )}
           </div>
           {/* 右：地图 */}
-          <div className="overflow-hidden rounded-xl border border-gray-100">
+          <div className="overflow-hidden rounded-xl border border-neutral-100">
             <MapBlock lat={fair.latitude} lng={fair.longitude} mapImageUrl={fair.mapImageUrl} venue={fair.venue} />
           </div>
         </div>
         {fair.description && (
-          <p className="mt-4 border-t border-gray-100 pt-4 text-sm leading-relaxed text-gray-600">{fair.description}</p>
+          <p className="mt-4 border-t border-neutral-100 pt-4 text-sm leading-relaxed text-neutral-600">{fair.description}</p>
         )}
       </Card>
 
       {/* 各市区创新特色展区（复刻参考图：图标 + 城市角标 + 标题 + 描述） */}
       {featuredZones.length > 0 && (
         <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-gray-800">
+          <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-neutral-800">
             <SparklesIcon className="h-4 w-4 text-primary-500" />
             各市区创新特色展区
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {featuredZones.map((z) => (
-              <div key={z.id} className="relative rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-md">
+              <div key={z.id} className="relative rounded-xl border border-neutral-100 bg-white p-4 transition-shadow hover:shadow-md">
                 {z.city && (
                   <span className="absolute right-4 top-4 text-xs font-medium text-primary-500">{z.city}</span>
                 )}
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50">
                   <MonitorIcon className="h-6 w-6 text-primary-600" />
                 </span>
-                <p className="mt-3 pr-12 text-base font-semibold text-gray-900">{z.zoneName}</p>
+                <p className="mt-3 pr-12 text-base font-semibold text-neutral-900">{z.zoneName}</p>
                 {z.description && (
-                  <p className="mt-2 text-sm leading-relaxed text-gray-500">{z.description}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">{z.description}</p>
                 )}
               </div>
             ))}
@@ -199,23 +199,23 @@ export function DetailsTab({
       {/* 现场服务入口（展馆导览 / 活动资料） */}
       {fair.hasManagedData && (
         <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-gray-700">现场服务</p>
+          <p className="mb-3 text-sm font-medium text-neutral-700">现场服务</p>
           <div className="grid grid-cols-2 gap-2">
             <button
-              className="flex items-center gap-2 rounded-xl bg-gray-50 p-3 text-left transition-colors hover:bg-primary-50"
+              className="flex items-center gap-2 rounded-xl bg-neutral-50 p-3 text-left transition-colors hover:bg-primary-50"
               onClick={() => navigate(`/job-fairs/${fair.id}/map`)}
             >
               <MapIcon className="h-5 w-5 text-primary-500" />
-              <span className="text-sm font-medium text-gray-700">展馆导览</span>
-              <ChevronRightIcon className="ml-auto h-4 w-4 text-gray-300" />
+              <span className="text-sm font-medium text-neutral-700">展馆导览</span>
+              <ChevronRightIcon className="ml-auto h-4 w-4 text-neutral-300" />
             </button>
             <button
-              className="flex items-center gap-2 rounded-xl bg-gray-50 p-3 text-left transition-colors hover:bg-primary-50"
+              className="flex items-center gap-2 rounded-xl bg-neutral-50 p-3 text-left transition-colors hover:bg-primary-50"
               onClick={() => navigate(`/job-fairs/${fair.id}/materials`)}
             >
               <FileTextIcon className="h-5 w-5 text-primary-500" />
-              <span className="text-sm font-medium text-gray-700">活动资料</span>
-              <span className="ml-auto text-xs text-gray-400">{fair.managedMaterialCount} 份</span>
+              <span className="text-sm font-medium text-neutral-700">活动资料</span>
+              <span className="ml-auto text-xs text-neutral-400">{fair.managedMaterialCount} 份</span>
             </button>
           </div>
         </Card>
@@ -223,29 +223,29 @@ export function DetailsTab({
 
       {/* 数据来源（合规必展示） */}
       <Card className="p-5">
-        <p className="mb-3 text-sm font-medium text-gray-700">数据来源</p>
-        <div className="space-y-2 text-sm text-gray-600">
+        <p className="mb-3 text-sm font-medium text-neutral-700">数据来源</p>
+        <div className="space-y-2 text-sm text-neutral-600">
           <div className="flex justify-between">
-            <span className="text-gray-400">来源机构</span>
+            <span className="text-neutral-400">来源机构</span>
             <span>{fair.sourceName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">同步时间</span>
+            <span className="text-neutral-400">同步时间</span>
             <span>{formatSync(fair.syncTime)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">外部编号</span>
+            <span className="text-neutral-400">外部编号</span>
             <span className="font-mono text-xs">{fair.externalId}</span>
           </div>
         </div>
-        <p className="mt-3 text-xs text-gray-400">{fair.dataSourceNote}</p>
+        <p className="mt-3 text-xs text-neutral-400">{fair.dataSourceNote}</p>
       </Card>
 
       {/* 合规提示 */}
       {fair.status !== 'ended' && (
-        <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-4 py-3">
-          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
-          <p className="text-xs leading-relaxed text-gray-400">
+        <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3">
+          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
+          <p className="text-xs leading-relaxed text-neutral-400">
             预约请点击底部「扫码预约」，使用手机前往来源平台办理。本系统仅展示第三方来源信息，不参与活动报名流程。
           </p>
         </div>
@@ -293,25 +293,25 @@ export function CompaniesTab({ fairId, companies }: { fairId: string; companies:
     <div className="grid gap-4 lg:grid-cols-3">
       {/* 左：参展企业汇编 */}
       <Card className="p-5 lg:col-span-1">
-        <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-gray-800">
+        <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-neutral-800">
           <BuildingIcon className="h-5 w-5 text-primary-500" />
           参展企业汇编
-          <span className="ml-auto text-xs font-normal text-gray-400">{companies.length} 家</span>
+          <span className="ml-auto text-xs font-normal text-neutral-400">{companies.length} 家</span>
         </p>
         <div className="space-y-3">
           {companies.map((c) => (
             <button
               key={c.id}
               onClick={() => navigate(`/job-fairs/${fairId}/companies/${c.id}`)}
-              className="flex w-full items-start gap-3 rounded-xl border border-gray-100 bg-white p-3 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
+              className="flex w-full items-start gap-3 rounded-xl border border-neutral-100 bg-white p-3 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/30"
             >
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-bold text-white ${avatarColor(c.companyName)}`}>
                 {c.companyName.slice(0, 1)}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-gray-900">{c.companyName}</p>
-                <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">{industryLabel(c.industry)}</span>
-                {c.description && <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-400">{c.description}</p>}
+                <p className="truncate text-sm font-semibold text-neutral-900">{c.companyName}</p>
+                <span className="mt-1 inline-block rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">{industryLabel(c.industry)}</span>
+                {c.description && <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-neutral-400">{c.description}</p>}
               </div>
             </button>
           ))}
@@ -321,32 +321,32 @@ export function CompaniesTab({ fairId, companies }: { fairId: string; companies:
       {/* 右：招聘岗位 */}
       <Card className="p-5 lg:col-span-2">
         <div className="mb-3 flex items-center justify-between">
-          <p className="flex items-center gap-1.5 text-base font-semibold text-gray-800">
-            <BriefcaseIcon className="h-5 w-5 text-emerald-500" />
+          <p className="flex items-center gap-1.5 text-base font-semibold text-neutral-800">
+            <BriefcaseIcon className="h-5 w-5 text-success" />
             招聘岗位
-            <span className="ml-1 text-xs font-normal text-gray-400">{visiblePositions.length} 个</span>
+            <span className="ml-1 text-xs font-normal text-neutral-400">{visiblePositions.length} 个</span>
           </p>
           {/* 全部分类 下拉 */}
           <div className="relative">
             <button
               onClick={() => setCatOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+              className="flex items-center gap-1.5 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50"
             >
-              <FilterIcon className="h-3.5 w-3.5 text-gray-400" />
+              <FilterIcon className="h-3.5 w-3.5 text-neutral-400" />
               {category}
-              <ChevronDownIcon className="h-4 w-4 text-gray-400" />
+              <ChevronDownIcon className="h-4 w-4 text-neutral-400" />
             </button>
             {catOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setCatOpen(false)} />
-                <div className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-gray-100 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-neutral-100 bg-white py-1 shadow-lg">
                   {categories.map((c) => (
                     <button
                       key={c}
                       onClick={() => { setCategory(c); setCatOpen(false) }}
                       className={[
                         'block w-full px-3 py-2 text-left text-sm',
-                        category === c ? 'bg-primary-50 font-medium text-primary-700' : 'text-gray-600 hover:bg-gray-50',
+                        category === c ? 'bg-primary-50 font-medium text-primary-700' : 'text-neutral-600 hover:bg-neutral-50',
                       ].join(' ')}
                     >
                       {c}
@@ -360,17 +360,17 @@ export function CompaniesTab({ fairId, companies }: { fairId: string; companies:
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visiblePositions.map((p) => (
-            <div key={`${p.companyId}-${p.id}`} className="rounded-xl border border-gray-100 bg-white p-4 transition-shadow hover:shadow-sm">
+            <div key={`${p.companyId}-${p.id}`} className="rounded-xl border border-neutral-100 bg-white p-4 transition-shadow hover:shadow-sm">
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900">{p.title}</p>
-                {p.salary && <span className="shrink-0 text-sm font-bold text-rose-500">{p.salary}</span>}
+                <p className="text-sm font-semibold text-neutral-900">{p.title}</p>
+                {p.salary && <span className="shrink-0 text-sm font-bold text-error-fg">{p.salary}</span>}
               </div>
-              <p className="mt-1.5 flex items-center gap-1 text-xs text-gray-500">
-                <BuildingIcon className="h-3.5 w-3.5 text-gray-400" />
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-neutral-500">
+                <BuildingIcon className="h-3.5 w-3.5 text-neutral-400" />
                 {p.companyName}
               </p>
               <div className="mt-3 flex items-center justify-between">
-                <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{p.category}</span>
+                <span className="rounded bg-success-bg px-2 py-0.5 text-xs font-medium text-success-fg">{p.category}</span>
                 <button
                   onClick={() => navigate(`/job-fairs/${fairId}/companies/${p.companyId}`)}
                   className="flex items-center gap-0.5 text-xs font-medium text-primary-600"
@@ -392,12 +392,12 @@ export function CompaniesTab({ fairId, companies }: { fairId: string; companies:
 // 合规:只做会场位置导览与展区/企业/岗位信息查看;投递、预约一律前往来源平台办理。
 
 const HALL_BLOCK_COLORS = [
-  'from-blue-500 to-blue-600',
-  'from-violet-500 to-violet-600',
-  'from-emerald-500 to-emerald-600',
-  'from-orange-400 to-orange-500',
-  'from-cyan-500 to-cyan-600',
-  'from-rose-500 to-rose-600',
+  'from-primary-500 to-primary-600',
+  'from-plum to-plum',
+  'from-success to-success-fg',
+  'from-warning to-warning-fg',
+  'from-info to-info',
+  'from-error-fg to-error-fg',
 ]
 
 const FACILITY_META: Record<string, { label: string; icon: typeof InfoIcon }> = {
@@ -454,8 +454,8 @@ export function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoC
       <Card className="overflow-hidden p-5">
         <div className="mb-4 flex items-center gap-2">
           <NavigationIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-          <p className="text-sm font-semibold text-gray-800">{guide.venueName} · 会场布局</p>
-          <p className="ml-auto text-xs text-gray-400">点击展厅查看详情</p>
+          <p className="text-sm font-semibold text-neutral-800">{guide.venueName} · 会场布局</p>
+          <p className="ml-auto text-xs text-neutral-400">点击展厅查看详情</p>
         </div>
         {/* 轻 3D:perspective + rotateX,选中展厅抬升高亮 */}
         <div className="flex flex-wrap justify-center gap-5 py-3" style={{ perspective: '700px' }}>
@@ -481,13 +481,13 @@ export function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoC
                   <p className="text-3xl font-extrabold leading-none">{h.hallCode}</p>
                   <p className="mt-1 text-xs font-medium opacity-90">{h.companyCount} 家企业</p>
                   {h.boothRange && (
-                    <span className="absolute -bottom-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-gray-600 shadow-sm">
+                    <span className="absolute -bottom-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-neutral-600 shadow-sm">
                       {h.boothRange}
                     </span>
                   )}
                 </div>
-                <p className={`mt-3 text-sm font-semibold ${active ? 'text-primary-700' : 'text-gray-700'}`}>{h.hallName}</p>
-                <p className="max-w-32 truncate text-xs text-gray-400">{h.industryCategory ?? ''}</p>
+                <p className={`mt-3 text-sm font-semibold ${active ? 'text-primary-700' : 'text-neutral-700'}`}>{h.hallName}</p>
+                <p className="max-w-32 truncate text-xs text-neutral-400">{h.industryCategory ?? ''}</p>
               </button>
             )
           })}
@@ -495,16 +495,16 @@ export function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoC
 
         {/* 设施点位 */}
         {guide.facilities.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-neutral-100 pt-3">
             {guide.facilities.map((f) => {
               const meta = FACILITY_META[f.type] ?? FACILITY_META.serviceDesk
               const Icon = meta.icon
               return (
-                <span key={f.id} className="flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1.5 text-xs text-gray-600">
+                <span key={f.id} className="flex items-center gap-1.5 rounded-full bg-neutral-50 px-3 py-1.5 text-xs text-neutral-600">
                   <Icon className="h-3.5 w-3.5 text-primary-500" aria-hidden="true" />
                   <span className="font-medium">{f.name}</span>
-                  {f.locationLabel && <span className="text-gray-400">· {f.locationLabel}</span>}
-                  {f.relatedHallCode && <span className="rounded bg-white px-1 text-[10px] font-semibold text-gray-500">{f.relatedHallCode} 厅</span>}
+                  {f.locationLabel && <span className="text-neutral-400">· {f.locationLabel}</span>}
+                  {f.relatedHallCode && <span className="rounded bg-white px-1 text-[10px] font-semibold text-neutral-500">{f.relatedHallCode} 厅</span>}
                 </span>
               )
             })}
@@ -517,27 +517,27 @@ export function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoC
         <Card className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-base font-bold text-gray-900">{activeHall.hallName} · {activeHall.industryCategory ?? '综合展区'}</p>
-              {activeHall.description && <p className="mt-1 text-sm text-gray-500">{activeHall.description}</p>}
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="text-base font-bold text-neutral-900">{activeHall.hallName} · {activeHall.industryCategory ?? '综合展区'}</p>
+              {activeHall.description && <p className="mt-1 text-sm text-neutral-500">{activeHall.description}</p>}
+              <p className="mt-1 text-xs text-neutral-400">
                 {activeHall.boothRange ? `展位 ${activeHall.boothRange} · ` : ''}共 {activeHall.companyCount} 家企业
               </p>
             </div>
           </div>
 
           {activeHall.companies.length === 0 ? (
-            <p className="mt-4 rounded-xl bg-gray-50 py-6 text-center text-sm text-gray-400">该展厅暂未录入企业</p>
+            <p className="mt-4 rounded-xl bg-neutral-50 py-6 text-center text-sm text-neutral-400">该展厅暂未录入企业</p>
           ) : (
             <div className="mt-4 space-y-2.5">
               {activeHall.companies.map((c) => (
-                <div key={c.companyId} className="rounded-2xl border border-gray-100 p-3.5">
+                <div key={c.companyId} className="rounded-2xl border border-neutral-100 p-3.5">
                   <div className="flex items-center gap-3">
                     <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-base font-bold text-white ${avatarColor(c.companyName)}`}>
                       {c.companyName.slice(0, 1)}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-900">{c.companyName}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="truncate text-sm font-semibold text-neutral-900">{c.companyName}</p>
+                      <p className="text-xs text-neutral-400">
                         {c.industry ? `${industryLabel(c.industry)} · ` : ''}
                         {c.jobCount > 0 ? `${c.jobCount} 个岗位` : '岗位待录入'}
                       </p>
@@ -549,9 +549,9 @@ export function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoC
                   {c.jobTitles.length > 0 && (
                     <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-14">
                       {c.jobTitles.map((t) => (
-                        <span key={t} className="rounded bg-gray-50 px-2 py-0.5 text-xs text-gray-600">{t}</span>
+                        <span key={t} className="rounded bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">{t}</span>
                       ))}
-                      {c.jobCount > c.jobTitles.length && <span className="text-xs text-gray-400">等 {c.jobCount} 个岗位</span>}
+                      {c.jobCount > c.jobTitles.length && <span className="text-xs text-neutral-400">等 {c.jobCount} 个岗位</span>}
                       <button
                         onClick={onGoCompanies}
                         className="ml-auto flex min-h-[36px] items-center gap-0.5 rounded-lg px-2 text-xs font-medium text-primary-600 hover:bg-primary-50"
@@ -568,7 +568,7 @@ export function VenueGuideTab({ fairId, onGoCompanies }: { fairId: string; onGoC
         </Card>
       )}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-neutral-400">
         场馆导览信息由主办方/管理员提供,仅供现场参考;岗位投递请前往来源平台办理。
       </p>
     </div>

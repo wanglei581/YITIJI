@@ -120,7 +120,7 @@ export function JobFilterAssistant({
           aria-pressed={favoritesOnly}
           className={[
             'flex min-h-[40px] items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
-            favoritesOnly ? 'bg-amber-500 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
+            favoritesOnly ? 'bg-warning text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
           ].join(' ')}
         >
           <StarIcon className={`h-4 w-4 ${favoritesOnly ? 'fill-white' : ''}`} />
