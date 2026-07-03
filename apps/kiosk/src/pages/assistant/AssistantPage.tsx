@@ -297,7 +297,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               <br />
               再把结果变成材料。
             </h1>
-            <p>小青负责简历问诊、面试追问、打印前检查和政策问答，回答结果可以保存到对应功能页。</p>
+            <p>小青负责简历问诊、面试追问、打印前检查和政策问答；问答内容仅在本次会话内参考，如需形成简历、面试报告或打印材料，请进入对应功能页生成和保存。</p>
             <div className="a-pills">
               {voiceAvailable && (
                 <span className="a-pill">
@@ -311,7 +311,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               </span>
               <span className="a-pill">
                 <KIcon name="shield" />
-                结果可保存
+                仅本次会话参考
               </span>
             </div>
           </div>
@@ -342,7 +342,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             <span className="mbi"><KIcon name="chat" /></span>
             <div>
               <strong>文字对话</strong>
-              <span>打字咨询、留档复看</span>
+              <span>打字咨询、离开自动清空</span>
             </div>
           </button>
         </div>
@@ -464,30 +464,30 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           <span className="rail plum" aria-hidden="true" />
           <div>
             <h2>结果去哪儿</h2>
-            <p>咨询结果沉淀到对应功能页。</p>
+            <p>助手问答仅本次会话内参考；正式材料请到对应功能页生成和保存。</p>
           </div>
         </div>
         <div className="result-strip">
           <div className="result-card">
             <span className="ri"><KIcon name="doc-check" /></span>
-            <strong>存为简历建议</strong>
-            <span>修改建议沉淀到「我的」AI服务记录。</span>
+            <strong>去简历服务</strong>
+            <span>问答建议仅供参考；简历需到「简历服务」按流程生成和保存。</span>
           </div>
           <div className="result-card v2">
             <span className="ri"><KIcon name="receipt" /></span>
-            <strong>生成面试报告</strong>
-            <span>模拟面试问答生成可打印的复盘报告。</span>
+            <strong>去模拟面试</strong>
+            <span>面试复盘报告需到「模拟面试」功能生成和保存，助手不直接出报告。</span>
           </div>
           <div className="result-card v3">
             <span className="ri"><KIcon name="printer" /></span>
-            <strong>转去打印</strong>
-            <span>改好的简历可直接进入简历打印流程。</span>
+            <strong>去打印</strong>
+            <span>纸质材料需到「打印」功能生成和输出，助手问答不直接出件。</span>
           </div>
         </div>
 
         <p className="compliance">
           <KIcon name="shield" />
-          AI 回复内容仅供参考，不构成正式建议；岗位投递与招聘会预约请前往来源平台完成。
+          AI 助手问答仅本次会话内参考，不构成正式建议；如需形成简历、面试报告或打印材料，请进入对应功能页生成和保存；岗位投递与招聘会预约请前往来源平台完成。
         </p>
       </div>
 
