@@ -106,8 +106,18 @@ export class JobMasterPdfService {
       doc.fontSize(10.5).fillColor('#9a3412').text('建议补足（✗）')
       payload.fit.gapSkills.forEach((g) => {
         doc.fontSize(10).fillColor('#111827').text(`· ${g.skill}`, { lineGap: 1 })
-        doc.fontSize(9).fillColor('#6b7280').text(`   建议：${g.suggestion}`, { lineGap: 3 })
+        doc.fontSize(9).fillColor('#6b7280').text(`   建议：${g.suggestion}`, { lineGap: g.learningDirection || g.firstStep ? 1 : 3 })
+        if (g.learningDirection) doc.fontSize(9).fillColor('#6b7280').text(`   方向：${g.learningDirection}`, { lineGap: 1 })
+        if (g.firstStep) doc.fontSize(9).fillColor('#6b7280').text(`   第一步：${g.firstStep}`, { lineGap: 3 })
       })
+    }
+    // 关键词覆盖（M1.5，数据存在才渲染；只列命中/待补，不算比率）
+    const kc = payload.fit.keywordCoverage
+    if (kc && (kc.matched.length || kc.missing.length)) {
+      doc.moveDown(0.2)
+      doc.fontSize(10.5).fillColor('#111827').text('关键词覆盖')
+      if (kc.matched.length) doc.fontSize(9).fillColor('#065f46').text(`   命中：${kc.matched.join('、')}`, { lineGap: 1 })
+      if (kc.missing.length) doc.fontSize(9).fillColor('#9a3412').text(`   待补：${kc.missing.join('、')}`, { lineGap: 3 })
     }
 
     // 三、薪资参考（只透传来源方文本）
@@ -139,6 +149,23 @@ export class JobMasterPdfService {
         doc.fontSize(9.5).fillColor('#374151').text(`   ${r.reason}`, { lineGap: 1 })
         doc.fontSize(9).fillColor('#6b7280').text(`   依据：${r.basis}`, { lineGap: 3 })
       })
+    }
+
+    // 六、面试准备（M1.5，数据存在才渲染）
+    if (payload.interviewPrep?.length) {
+      title('六、面试准备参考')
+      payload.interviewPrep.forEach((it) => {
+        doc.fontSize(10.5).fillColor('#111827').text(`· ${it.question}`, { lineGap: 1 })
+        if (it.whyAsked) doc.fontSize(9).fillColor('#6b7280').text(`   为什么问：${it.whyAsked}`, { lineGap: 1 })
+        doc.fontSize(9).fillColor('#6b7280').text(`   准备：${it.prepHint}`, { lineGap: 3 })
+      })
+    }
+
+    // 七、简历改写要点（M1.5，数据存在才渲染）
+    if (payload.resumeRewrite?.length) {
+      title('七、简历改写要点')
+      payload.resumeRewrite.forEach((it) =>
+        doc.fontSize(10).fillColor('#374151').text(`· ${it.area}：${it.suggestion}`, { lineGap: 3 }))
     }
 
     // 页脚免责（固定）
