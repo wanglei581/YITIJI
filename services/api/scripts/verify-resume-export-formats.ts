@@ -10,6 +10,9 @@
  *   4. 防编造回归:夹具外的诱饵事实串(诱饵公司名/诱饵学校名)不得出现在任何格式输出中。
  *   5. 合规:四格式渲染输出不得出现承诺/越界词(保录用/内推/一键投递等)。
  *   6. assertExportFormatAllowed 对四种合法 format 均放行(Wave 1 恒放行,不误加计费拦截)。
+ *   7. printFileUrl(打印链路专用系统签名 URL,与 signedUrl/COS 下载 URL 隔离):
+ *      pdf 返回且匹配 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>;
+ *      docx/txt/md 不返回(undefined,不伪造)。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:resume-export-formats
  */
@@ -191,6 +194,24 @@ async function main(): Promise<void> {
         fail(`2. [${format}] filename 扩展名不匹配: ${fileRow!.filename}`)
       }
       pass(`2. [${format}] 导出成功:fileId/signedUrl 均返回;FileObject optimized/endUserId/createdBy/mimeType/扩展名均正确`)
+
+      // ── 7. printFileUrl:仅 pdf 返回系统 HMAC content URL,docx/txt/md 不伪造 ──
+      // 打印链路(/print/jobs)只接受 signFileUrl 生成的系统签名 URL,不接受 COS 下载 signedUrl
+      // (见 services/api/src/files/signing.ts + PrintJobsService.create 的 SSRF 防护校验,
+      // 已由 verify:print-jobs 覆盖"非系统签名 URL 被拒")。
+      if (format === 'pdf') {
+        const printUrlPattern = /^\/api\/v1\/files\/[^/]+\/content\?expires=\d+&sig=[0-9a-f]+$/
+        if (!exported.printFileUrl) fail('7. [pdf] 未返回 printFileUrl')
+        if (!printUrlPattern.test(exported.printFileUrl!)) {
+          fail(`7. [pdf] printFileUrl 格式不匹配系统签名 URL 正则,实际: ${exported.printFileUrl}`)
+        }
+        pass('7. [pdf] printFileUrl 已返回且匹配系统 HMAC content URL 格式')
+      } else {
+        if (exported.printFileUrl !== undefined) {
+          fail(`7. [${format}] 不应返回 printFileUrl,实际: ${exported.printFileUrl}`)
+        }
+        pass(`7. [${format}] 未返回 printFileUrl(docx/txt/md 无分页概念,不进打印链路)`)
+      }
 
       // ── 3. 渲染字节非空 + 格式特征字节/字符 ─────────────────────────────
       const buf = await storage.getObject(fileRow!.storageKey)

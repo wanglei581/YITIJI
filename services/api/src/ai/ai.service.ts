@@ -17,6 +17,7 @@ import { ResumeDocxService } from './resume/resume-docx.service'
 import { ResumeTextService } from './resume/resume-text.service'
 import type { ResumeExportFormat } from './dto/resume-generate.dto'
 import { canAccessFile, FilesService } from '../files/files.service'
+import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 
@@ -516,7 +517,16 @@ export class AiService {
     endUserId: string | null,
     sourceFileId: string | null = null,
     format: ResumeExportFormat = 'pdf',
-  ): Promise<{ fileId: string; filename: string; sizeBytes: number; pageCount: number; signedUrl: string; expiresAt: string }> {
+  ): Promise<{
+    fileId: string
+    filename: string
+    sizeBytes: number
+    pageCount: number
+    signedUrl: string
+    expiresAt: string
+    /** 系统 HMAC content URL(signFileUrl 生成),仅 pdf 导出返回,供 /print/jobs 打印使用;docx/txt/md 无此字段。 */
+    printFileUrl?: string
+  }> {
     this.assertExportFormatAllowed(format)
 
     let buffer: Buffer
@@ -569,6 +579,12 @@ export class AiService {
       sourceFileId,
       createdBy: 'ai_resume_generate',
     })
+
+    // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl
+    // (PrintJobsService.create 会拒绝非系统签名 URL,详见 files/signing.ts)。
+    // 仅 pdf 计算;docx/txt/md 无分页概念,也不进打印链路,保持 undefined 不伪造。
+    const printFileUrl = format === 'pdf' ? signFileUrl(uploaded.fileId).url : undefined
+
     return {
       fileId: uploaded.fileId,
       filename: uploaded.filename,
@@ -576,6 +592,7 @@ export class AiService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
+      ...(printFileUrl ? { printFileUrl } : {}),
     }
   }
 

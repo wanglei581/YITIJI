@@ -164,7 +164,7 @@ export function ResumeOptimizePage() {
   }
 
   const handlePrint = () => {
-    if (printNavigating || !exported?.signedUrl || exportFormat !== 'pdf') return
+    if (printNavigating || !exported?.printFileUrl || exportFormat !== 'pdf') return
     setPrintNavigating(true)
     navigate('/print/confirm', {
       state: {
@@ -175,7 +175,7 @@ export function ResumeOptimizePage() {
             : `${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB`,
           pages: exported.pageCount,
           fileId: exported.fileId,
-          fileUrl: exported.signedUrl,
+          fileUrl: exported.printFileUrl,
           mimeType: 'application/pdf',
         },
         params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
@@ -500,11 +500,11 @@ export function ResumeOptimizePage() {
               <Button
                 size="lg"
                 className="flex items-center justify-center gap-2"
-                disabled={!exported.signedUrl || printNavigating}
+                disabled={!exported.printFileUrl || printNavigating}
                 onClick={handlePrint}
               >
                 <PrinterIcon className="h-5 w-5" />
-                {printNavigating ? '正在进入打印确认…' : '去打印优化版'}
+                {printNavigating ? '正在进入打印确认…' : exported.printFileUrl ? '去打印优化版' : '打印链接未就绪'}
               </Button>
             ) : (
               <Button

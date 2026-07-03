@@ -312,10 +312,12 @@ export interface ResumeGenerateExportResponse {
   filename: string
   sizeBytes: number
   pageCount: number
-  /** 短时签名下载 URL(inline),用于预览/打印/扫码下载 */
+  /** 短时签名下载 URL(inline),用于预览/扫码下载。不可用于 /print/jobs(打印服务只接受系统 HMAC content URL) */
   signedUrl: string
   /** 签名 URL 过期时间(ISO) */
   expiresAt: string
+  /** 系统 HMAC content URL(signFileUrl 生成,形如 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>),仅 PDF 导出返回,供 /print/jobs 打印使用;docx/txt/md 无此字段 */
+  printFileUrl?: string
 }
 
 // ── 2D 目标岗位定向优化 + 岗位匹配度参考 ─────────────────────────────────────
