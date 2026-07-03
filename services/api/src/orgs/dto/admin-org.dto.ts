@@ -42,6 +42,9 @@ export class OrgAccountInputDto {
 
   @IsString() @IsNotEmpty() @MaxLength(50)
   name!: string
+
+  @Matches(/^1[3-9]\d{9}$/, { message: '必须是有效的中国大陆手机号' })
+  phone!: string
 }
 
 export class CreateOrgDto {

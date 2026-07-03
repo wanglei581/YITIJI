@@ -258,7 +258,7 @@ async function main() {
     const internalJwt = new JwtService({ secret: jwtSecret })
     const memberJwt = new JwtService({ secret: jwtSecret, signOptions: { expiresIn: '30m', audience: 'enduser' } })
     const endUserGuard = new EndUserAuthGuard(memberJwt, redis, prisma)
-    const internalGuard = new JwtAuthGuard(internalJwt)
+    const internalGuard = new JwtAuthGuard(internalJwt, prisma, redis)
 
     // 10a: 内部 token（无 aud）→ EndUserAuthGuard 必须拒
     const internalToken = internalJwt.sign({ sub: 'op-1', role: 'admin', orgId: null })
@@ -270,7 +270,7 @@ async function main() {
     // 10b: enduser token（aud=enduser）→ 内部 JwtAuthGuard 必须拒
     const memberToken = memberJwt.sign({ sub: 'eu-1' }, { jwtid: 'sess-x' })
     let rejectedB = false
-    try { internalGuard.canActivate(mockCtx(`Bearer ${memberToken}`)) } catch { rejectedB = true }
+    try { await internalGuard.canActivate(mockCtx(`Bearer ${memberToken}`)) } catch { rejectedB = true }
     if (rejectedB) pass('内部 JwtAuthGuard 拒绝 enduser token')
     else fail('内部 JwtAuthGuard 未拒绝 enduser token')
 

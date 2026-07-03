@@ -1,5 +1,11 @@
+// ScanQrLoginPanel — 手机扫码确认一体机登录
+//
+// 真实链路：本机 Terminal Agent 创建登录票据 → 手机扫码打开 H5 完成手机号验证 →
+// 本机轮询到 confirmed 后 claim 登录。二维码为单通道 H5 链接（微信/相机扫码均可打开），
+// 不区分微信/支付宝通道。视觉对齐 login-trio-v1 原型 ① 扫码面板（样式见 ./login.css）。
+
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle2Icon, QrCodeIcon, RefreshCwIcon } from 'lucide-react'
+import { CircleCheckIcon, QrCodeIcon, RefreshCwIcon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import type { LoginResult } from '../../services/auth/memberAuthApi'
 import { MemberApiError } from '../../services/auth/memberAuthApi'
@@ -20,10 +26,14 @@ interface QrLoginState {
 
 export function ScanQrLoginPanel({
   returnTo,
+  agreed,
+  onAgreementRequired,
   onLoginSuccess,
   onUsePhoneLogin,
 }: {
   returnTo: string
+  agreed: boolean
+  onAgreementRequired: () => void
   onLoginSuccess: (result: LoginResult) => void
   onUsePhoneLogin: () => void
 }) {
@@ -32,10 +42,18 @@ export function ScanQrLoginPanel({
   const [claiming, setClaiming] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [displaySeconds, setDisplaySeconds] = useState<number | null>(null)
   const claimingRef = useRef(false)
 
   const refresh = useCallback(async () => {
     if (loading) return
+    if (!agreed) {
+      setQr(null)
+      setNotice(null)
+      setError('请先勾选用户服务协议和隐私政策')
+      onAgreementRequired()
+      return
+    }
     setLoading(true)
     setClaiming(false)
     claimingRef.current = false
@@ -61,13 +79,33 @@ export function ScanQrLoginPanel({
     } finally {
       setLoading(false)
     }
-  }, [loading, returnTo])
+  }, [agreed, loading, onAgreementRequired, returnTo])
 
   useEffect(() => {
     void refresh()
   // refresh intentionally runs once on mount for the current returnTo.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 用户在扫码页勾选协议后自动生成二维码，免去再点一次「刷新」。
+  useEffect(() => {
+    if (agreed && !qr && !loading) void refresh()
+  // only re-run when agreement flips; refresh identity churn would retry-loop on failure.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agreed])
+
+  // 展示用的秒级倒计时：以轮询返回的 expiresInSeconds 为准，本地每秒递减补帧。
+  useEffect(() => {
+    setDisplaySeconds(qr ? qr.expiresInSeconds : null)
+  }, [qr])
+  useEffect(() => {
+    if (displaySeconds === null || displaySeconds <= 0) return undefined
+    const timer = window.setTimeout(
+      () => setDisplaySeconds((s) => (s === null ? null : Math.max(0, s - 1))),
+      1000,
+    )
+    return () => window.clearTimeout(timer)
+  }, [displaySeconds])
 
   useEffect(() => {
     if (!qr?.ticketId) return undefined
@@ -87,6 +125,14 @@ export function ScanQrLoginPanel({
           setClaiming(true)
           setNotice('手机已确认，正在登录一体机...')
           const claimed = await claimQrLoginViaLocalAgent(qr.ticketId)
+          if (!agreed) {
+            setNotice(null)
+            setError('请先勾选用户服务协议和隐私政策')
+            onAgreementRequired()
+            setClaiming(false)
+            claimingRef.current = false
+            return
+          }
           onLoginSuccess(claimed)
         } catch (err) {
           const message = err instanceof MemberApiError ? err.message : '扫码登录失败，请刷新二维码重试'
@@ -102,66 +148,93 @@ export function ScanQrLoginPanel({
     }, 2000)
 
     return () => window.clearInterval(timer)
-  }, [onLoginSuccess, qr?.ticketId])
+  }, [agreed, onAgreementRequired, onLoginSuccess, qr?.ticketId])
+
+  const showScanline = !!qr && qr.status === 'pending' && !loading
 
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center text-center">
-      <div className="flex w-full max-w-[360px] items-center justify-center rounded-[8px] bg-[#e9edf3] p-1">
-        <div className="min-h-[40px] w-full rounded-[8px] bg-white px-4 py-2 text-sm font-bold text-[#1677ff] shadow-sm">
-          手机扫码登录
+    <div className="k-pane">
+      <div className="k-scan">
+        <div className="k-qrwrap">
+          <div className="k-qrframe">
+            <span className="corner tl" />
+            <span className="corner tr" />
+            <span className="corner bl" />
+            <span className="corner br" />
+            {loading && <span style={{ fontSize: 15, fontWeight: 650, color: 'var(--muted)' }}>二维码生成中…</span>}
+            {!loading && qr?.qrValue && <QRCodeSVG value={qr.qrValue} size={252} level="M" marginSize={1} />}
+            {!loading && !qr?.qrValue && <QrCodeIcon size={72} color="rgba(16,48,43,0.18)" aria-hidden="true" />}
+            {showScanline && <div className="scanline" />}
+          </div>
+          <div className="k-qrmeta">
+            {qr && displaySeconds !== null && displaySeconds > 0 ? (
+              <span>
+                二维码 <b>{displaySeconds}</b>s 后过期
+              </span>
+            ) : qr ? (
+              <span>二维码已过期，请刷新</span>
+            ) : (
+              <span>二维码有效期 3 分钟</span>
+            )}
+            <button type="button" className="k-refresh ripple-host" onClick={() => void refresh()} disabled={loading || claiming}>
+              <RefreshCwIcon size={15} aria-hidden="true" />
+              {claiming ? '登录中…' : loading ? '刷新中…' : '刷新'}
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-8 flex h-[184px] w-[184px] items-center justify-center rounded-[18px] border-2 border-[#1677ff] bg-white shadow-sm">
-        {loading && <span className="text-sm font-semibold text-[#98a2b3]">生成中...</span>}
-        {!loading && qr?.qrValue && <QRCodeSVG value={qr.qrValue} size={142} level="M" marginSize={1} />}
-        {!loading && !qr?.qrValue && <QrCodeIcon className="h-16 w-16 text-[#c6ceda]" aria-hidden="true" />}
-      </div>
+        <div className="k-scan-right">
+          <div className="k-steps">
+            <div className="k-step">
+              <div className="rail-v">
+                <span className="no">1</span>
+                <span className="vline" />
+              </div>
+              <div className="txt">
+                打开手机<b>相机</b>或微信「扫一扫」，扫描左侧二维码
+              </div>
+            </div>
+            <div className="k-step">
+              <div className="rail-v">
+                <span className="no">2</span>
+                <span className="vline" />
+              </div>
+              <div className="txt">
+                在手机页面输入<b>手机号和短信验证码</b>完成验证
+              </div>
+            </div>
+            <div className="k-step">
+              <div className="rail-v">
+                <span className="no">3</span>
+              </div>
+              <div className="txt">
+                本机自动进入登录态，<b>无需再操作屏幕</b>
+              </div>
+            </div>
+          </div>
 
-      <p className="mt-4 text-base font-bold text-[#1e293b]">用手机扫描二维码</p>
-      <p className="mt-1 text-sm text-[#7e8797]">
-        {qr?.status === 'confirmed'
-          ? '手机已确认，正在登录一体机'
-          : qr?.expiresInSeconds && qr.expiresInSeconds > 0
-            ? `二维码剩余 ${qr.expiresInSeconds} 秒`
-            : error
-              ? '请刷新二维码或使用手机号登录'
-              : '二维码有效期 3 分钟'}
-      </p>
-      <p className="mt-2 max-w-[460px] text-xs leading-5 text-[#98a2b3]">
-        手机上输入手机号和短信验证码后，本机会自动进入会员登录态；本机服务不可用时可继续使用手机号登录。
-      </p>
+          {notice && (
+            <div className="k-notice" role="status">
+              <CircleCheckIcon size={20} aria-hidden="true" />
+              <span>{notice}</span>
+            </div>
+          )}
+          {error && (
+            <div className="k-error" role="alert">
+              <span>{error}</span>
+            </div>
+          )}
 
-      {notice && (
-        <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-success-bg px-4 text-sm font-semibold text-success-fg">
-          <CheckCircle2Icon className="h-4 w-4" aria-hidden="true" />
-          {notice}
+          <button type="button" className="k-scan-fallback ripple-host" onClick={onUsePhoneLogin}>
+            <SmartphoneIcon size={16} aria-hidden="true" />
+            本机服务不可用？改用手机号登录
+          </button>
+
+          <div className="k-scan-note">
+            <ShieldCheckIcon size={19} aria-hidden="true" />
+            <span>登录凭证只保存在本终端本机，离开前请在「我的」中退出登录。</span>
+          </div>
         </div>
-      )}
-
-      {error && (
-        <div className="mt-4 rounded-[8px] bg-error-bg px-4 py-3 text-center text-sm font-semibold text-error-fg">
-          {error}
-        </div>
-      )}
-
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={loading || claiming}
-          className="flex min-h-[44px] items-center gap-2 rounded-[8px] border border-[#dfe4ec] bg-white px-5 text-sm font-semibold text-[#667085] shadow-sm transition-colors active:bg-neutral-50 disabled:cursor-not-allowed disabled:text-[#a1a8b5]"
-        >
-          <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />
-          {claiming ? '登录中...' : loading ? '刷新中...' : '刷新二维码'}
-        </button>
-        <button
-          type="button"
-          onClick={onUsePhoneLogin}
-          className="min-h-[44px] rounded-[8px] bg-[#edf5ff] px-5 text-sm font-bold text-[#1677ff] transition-colors active:bg-primary-100"
-        >
-          使用手机号登录
-        </button>
       </div>
     </div>
   )

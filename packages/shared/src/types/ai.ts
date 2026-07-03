@@ -303,6 +303,11 @@ export interface ResumeGenerateResponse {
   accessToken?: string
 }
 
+export interface ResumeVoiceTranscribeResponse {
+  text: string
+  providerName: string
+}
+
 /** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0。 */
 export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
 

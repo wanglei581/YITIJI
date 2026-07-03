@@ -7,7 +7,7 @@ import {
   SCENE_TEMPLATE_LABELS,
 } from '@ai-job-print/shared'
 import { Card, Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { Building2Icon, KeyRoundIcon, PlusIcon, UserPlusIcon } from 'lucide-react'
+import { Building2Icon, KeyRoundIcon, PlusIcon, SmartphoneIcon, UserPlusIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { Pagination, useTableState } from '../components/DataTable'
 import {
@@ -130,7 +130,7 @@ const EMPTY_CREATE: CreateOrgInput = { name: '', type: 'public_employment_servic
 function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState<CreateOrgInput>(EMPTY_CREATE)
   const [withAccount, setWithAccount] = useState(false)
-  const [account, setAccount] = useState({ username: '', password: '', name: '' })
+  const [account, setAccount] = useState({ username: '', password: '', name: '', phone: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -138,7 +138,7 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
     if (open) {
       setForm(EMPTY_CREATE)
       setWithAccount(false)
-      setAccount({ username: '', password: '', name: '' })
+      setAccount({ username: '', password: '', name: '', phone: '' })
       setError(null)
     }
   }, [open])
@@ -154,7 +154,11 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
 
   const canSave =
     form.name.trim().length > 0 &&
-    (!withAccount || (account.username.trim().length >= 3 && account.password.length >= 8 && account.name.trim().length > 0))
+    (!withAccount ||
+      (account.username.trim().length >= 3 &&
+        account.password.length >= 8 &&
+        account.name.trim().length > 0 &&
+        /^1[3-9]\d{9}$/.test(account.phone)))
 
   const save = async () => {
     setSaving(true)
@@ -165,7 +169,14 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
         name: form.name.trim(),
         contact: form.contact?.trim() || undefined,
         contactPhone: form.contactPhone?.trim() || undefined,
-        account: withAccount ? { username: account.username.trim(), password: account.password, name: account.name.trim() } : undefined,
+        account: withAccount
+          ? {
+              username: account.username.trim(),
+              password: account.password,
+              name: account.name.trim(),
+              phone: account.phone,
+            }
+          : undefined,
       })
       onCreated()
       onClose()
@@ -230,6 +241,14 @@ function CreateOrgDrawer({ open, onClose, onCreated }: { open: boolean; onClose:
                   <input className={inputCls} value={account.name} onChange={(e) => setAccount((a) => ({ ...a, name: e.target.value }))} />
                 </Field>
               </div>
+              <Field label="登录手机号" required>
+                <input
+                  className={inputCls}
+                  inputMode="numeric"
+                  value={account.phone}
+                  onChange={(e) => setAccount((a) => ({ ...a, phone: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+                />
+              </Field>
               <Field label="初始密码(至少 8 位)" required>
                 <input type="password" autoComplete="new-password" className={inputCls} value={account.password} onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))} />
               </Field>
@@ -262,7 +281,7 @@ function OrgDetailDrawer({
   const [error, setError] = useState<string | null>(null)
   // 账号管理状态
   const [showNewAccount, setShowNewAccount] = useState(false)
-  const [newAccount, setNewAccount] = useState({ username: '', password: '', name: '' })
+  const [newAccount, setNewAccount] = useState({ username: '', password: '', name: '', phone: '' })
   const [resetTarget, setResetTarget] = useState<AdminOrgAccount | null>(null)
   const [resetPassword, setResetPassword] = useState('')
   const [accountBusy, setAccountBusy] = useState<string | null>(null)
@@ -325,9 +344,10 @@ function OrgDetailDrawer({
         username: newAccount.username.trim(),
         password: newAccount.password,
         name: newAccount.name.trim(),
+        phone: newAccount.phone,
       })
       setShowNewAccount(false)
-      setNewAccount({ username: '', password: '', name: '' })
+      setNewAccount({ username: '', password: '', name: '', phone: '' })
       await load()
       onChanged()
     } catch (e) {
@@ -457,17 +477,31 @@ function OrgDetailDrawer({
                   <Field label="登录用户名" required>
                     <input className={inputCls} placeholder="字母数字及 _.-" value={newAccount.username} onChange={(e) => setNewAccount((a) => ({ ...a, username: e.target.value }))} />
                   </Field>
-                  <Field label="账号姓名" required>
-                    <input className={inputCls} value={newAccount.name} onChange={(e) => setNewAccount((a) => ({ ...a, name: e.target.value }))} />
-                  </Field>
-                </div>
-                <Field label="初始密码(至少 8 位)" required>
+                <Field label="账号姓名" required>
+                  <input className={inputCls} value={newAccount.name} onChange={(e) => setNewAccount((a) => ({ ...a, name: e.target.value }))} />
+                </Field>
+              </div>
+              <Field label="登录手机号" required>
+                <input
+                  className={inputCls}
+                  inputMode="numeric"
+                  value={newAccount.phone}
+                  onChange={(e) => setNewAccount((a) => ({ ...a, phone: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
+                />
+              </Field>
+              <Field label="初始密码(至少 8 位)" required>
                   <input type="password" autoComplete="new-password" className={inputCls} value={newAccount.password} onChange={(e) => setNewAccount((a) => ({ ...a, password: e.target.value }))} />
                 </Field>
                 <div className="flex justify-end">
                   <button
                     onClick={addAccount}
-                    disabled={saving || newAccount.username.trim().length < 3 || newAccount.password.length < 8 || !newAccount.name.trim()}
+                    disabled={
+                      saving ||
+                      newAccount.username.trim().length < 3 ||
+                      newAccount.password.length < 8 ||
+                      !newAccount.name.trim() ||
+                      !/^1[3-9]\d{9}$/.test(newAccount.phone)
+                    }
                     className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
                   >
                     创建账号
@@ -485,8 +519,18 @@ function OrgDetailDrawer({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-neutral-800">{account.name}</p>
                       <p className="font-mono text-xs text-neutral-400">{account.username}</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-neutral-500">
+                        <SmartphoneIcon className="h-3.5 w-3.5" />
+                        {account.phoneMasked ?? '未绑定手机号'}
+                      </p>
                     </div>
                     <StatusBadge dot status={account.enabled ? 'success' : 'default'} label={account.enabled ? '启用' : '已停用'} />
+                    <StatusBadge dot status={account.phoneVerifiedAt ? 'success' : 'warning'} label={account.phoneVerifiedAt ? '手机号已验证' : '待验证'} />
+                    {!account.phoneVerifiedAt && account.phoneMasked && (
+                      <span className="max-w-[130px] text-xs leading-5 text-neutral-400">
+                        账号本人登录后验证
+                      </span>
+                    )}
                     <button
                       onClick={() => { setResetTarget(account); setResetPassword('') }}
                       className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
@@ -531,6 +575,7 @@ function OrgDetailDrawer({
                 <p className="text-xs text-warning-fg">新密码仅单向提交,系统不回显;请线下安全告知。</p>
               </div>
             )}
+
           </div>
 
           <p className="text-xs text-neutral-400">

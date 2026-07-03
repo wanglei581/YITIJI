@@ -2,22 +2,25 @@
 //
 // 路由：/login（顶级路由，不嵌套在 KioskRoot 内）
 // 会话：通过 useAuth().login() 写入纯内存 AuthContext，不写任何浏览器存储
-// 已接入：手机号 + 短信验证码
+// 已接入：手机号 + 短信验证码（未注册手机号验证后自动创建账号）
 // 已接入：手机扫描二维码确认一体机登录（claimToken 只保存在 Terminal Agent 本机代理）
+// 邮箱登录为预留入口，未接入前只展示说明，不伪造流程。
 //
-// 公共一体机无系统软键盘：手机号 / 验证码输入框 readOnly + inputMode="none"，
-// 全部由页面内嵌虚拟数字键盘驱动（触控区对齐 KioskNumPad 标准）。
+// 公共一体机无系统软键盘：手机号 / 验证码全部由页面内嵌虚拟数字键盘驱动。
+// 视觉对齐 .workbuddy/prototypes/login-trio-v1.html ①（样式见 ./login.css）。
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeftIcon,
-  CheckCircle2Icon,
+  CheckIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
   HomeIcon,
   MailIcon,
-  PhoneIcon,
-  QrCodeIcon,
+  ScanLineIcon,
   ShieldCheckIcon,
+  SmartphoneIcon,
+  UserRoundIcon,
 } from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
 import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
@@ -31,22 +34,23 @@ import {
 } from '../../services/auth/memberAuthApi'
 import { getMemberAuthDeviceId } from '../../services/auth/memberAuthDevice'
 import { ScanQrLoginPanel } from './ScanQrLoginPanel'
+import './login.css'
 
 const PHONE_LENGTH = 11
 const CODE_LENGTH = 6
 const DEFAULT_LOGIN_IDLE_SEC = 180
+const SUCCESS_OVERLAY_MS = 950
+const RING_CIRCUMFERENCE = 59.7
 
-type LoginTab = 'phone' | 'email' | 'scan'
-type ActiveNumberInput = 'phone' | 'code' | null
+type LoginTab = 'phone' | 'scan' | 'email'
+type ActiveNumberInput = 'phone' | 'code'
+
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
 function formatPhone(raw: string): string {
   if (raw.length <= 3) return raw
   if (raw.length <= 7) return `${raw.slice(0, 3)} ${raw.slice(3)}`
   return `${raw.slice(0, 3)} ${raw.slice(3, 7)} ${raw.slice(7)}`
-}
-
-function normalizeDigits(raw: string, maxLength: number): string {
-  return raw.replace(/\D/g, '').slice(0, maxLength)
 }
 
 function resolveLoginIdleMs(): number {
@@ -57,6 +61,7 @@ function resolveLoginIdleMs(): number {
 
 function useCountdown() {
   const [seconds, setSeconds] = useState(0)
+  const [total, setTotal] = useState(60)
 
   useEffect(() => {
     if (seconds <= 0) return undefined
@@ -64,7 +69,56 @@ function useCountdown() {
     return () => window.clearTimeout(timer)
   }, [seconds])
 
-  return { seconds, start: setSeconds }
+  const start = useCallback((value: number) => {
+    setTotal(value > 0 ? value : 60)
+    setSeconds(value)
+  }, [])
+
+  return { seconds, total, start }
+}
+
+/** 触控涟漪：命中 .ripple-host 的元素按压时扩散水纹（纯视觉，事件委托） */
+function useRipple(rootRef: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return undefined
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null
+      const host = target?.closest?.('.ripple-host') as HTMLElement | null
+      if (!host || (host as HTMLButtonElement).disabled) return
+      const rect = host.getBoundingClientRect()
+      const rip = document.createElement('span')
+      rip.className = 'ripple'
+      const size = Math.max(rect.width, rect.height) * 1.6
+      rip.style.width = `${size}px`
+      rip.style.height = `${size}px`
+      rip.style.left = `${e.clientX - rect.left - size / 2}px`
+      rip.style.top = `${e.clientY - rect.top - size / 2}px`
+      host.appendChild(rip)
+      window.setTimeout(() => rip.remove(), 540)
+    }
+    root.addEventListener('pointerdown', onDown)
+    return () => root.removeEventListener('pointerdown', onDown)
+  }, [rootRef])
+}
+
+function useClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 15000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const date = `${now.getMonth() + 1}月${now.getDate()}日 · ${WEEKDAYS[now.getDay()]}`
+  return { time, date }
+}
+
+interface MemberLoginPayload {
+  id: string
+  phoneMasked: string
+  nickname: string | null
+  token: string
+  method: 'phone'
 }
 
 export function LoginPage() {
@@ -72,6 +126,8 @@ export function LoginPage() {
   const location = useLocation()
   const { login, isLoggedIn } = useAuth()
   const countdown = useCountdown()
+  const rootRef = useRef<HTMLDivElement>(null)
+  useRipple(rootRef)
 
   const fromState = (location.state as { from?: unknown } | null)?.from
   const queryFrom = new URLSearchParams(location.search).get('from')
@@ -84,10 +140,15 @@ export function LoginPage() {
   const [tab, setTab] = useState<LoginTab>('phone')
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
+  const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const [activeNumberInput, setActiveNumberInput] = useState<ActiveNumberInput>(null)
+  const [activeInput, setActiveInput] = useState<ActiveNumberInput>('phone')
+  const prevPhoneLenRef = useRef(0)
+  const [shaking, setShaking] = useState(false)
+  const [successVisible, setSuccessVisible] = useState(false)
+  const pendingLoginRef = useRef<MemberLoginPayload | null>(null)
 
   const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
   const handleLoginIdle = useCallback(() => {
@@ -101,19 +162,92 @@ export function LoginPage() {
 
   useIdleTimer({
     timeoutMs: resolveLoginIdleMs(),
-    enabled: !loading,
+    enabled: !loading && !successVisible,
     onIdle: handleLoginIdle,
   })
+
+  const raiseError = useCallback((message: string) => {
+    setNotice(null)
+    setError(message)
+    setShaking(true)
+    window.setTimeout(() => setShaking(false), 400)
+  }, [])
+
+  // 手机号刚好补满 11 位时自动切到验证码（只在 10→11 的输入瞬间触发，
+  // 重新点回手机号框修改时不会被弹走）
+  useEffect(() => {
+    if (prevPhoneLenRef.current < PHONE_LENGTH && phone.length === PHONE_LENGTH) {
+      setActiveInput('code')
+    }
+    prevPhoneLenRef.current = phone.length
+  }, [phone])
+
+  /* 数字键盘统一走函数式更新：快速连点也不会因渲染批处理丢键 */
+  const handleDigit = useCallback(
+    (digit: string) => {
+      if (activeInput === 'code') {
+        setCode((prev) => (prev.length < CODE_LENGTH ? prev + digit : prev))
+        return
+      }
+      setPhone((prev) => (prev + digit).slice(0, PHONE_LENGTH))
+    },
+    [activeInput],
+  )
+
+  const handleDelete = useCallback(() => {
+    if (activeInput === 'code') {
+      if (code.length === 0) setActiveInput('phone')
+      else setCode((prev) => prev.slice(0, -1))
+      return
+    }
+    setPhone((prev) => prev.slice(0, -1))
+  }, [activeInput, code.length])
+
+  const handleClear = useCallback(() => {
+    if (activeInput === 'code') setCode('')
+    else setPhone('')
+  }, [activeInput])
 
   const switchTab = useCallback((next: LoginTab) => {
     setTab(next)
     setError(null)
     setNotice(null)
-    setActiveNumberInput(next === 'phone' ? 'phone' : null)
+    if (next === 'phone') setActiveInput('phone')
   }, [])
 
+  const requireMemberAgreement = useCallback(() => {
+    raiseError('请先阅读并同意用户服务协议和隐私政策')
+  }, [raiseError])
+
+  /** 登录成功统一收口：先播 ≤1s 成功过场，再写入会话（isLoggedIn 生效后自动跳转） */
+  const finishWithSuccess = useCallback(
+    (res: LoginResult) => {
+      pendingLoginRef.current = {
+        id: res.user.id,
+        phoneMasked: res.user.phoneMasked,
+        nickname: res.user.nickname,
+        token: res.token,
+        method: 'phone',
+      }
+      setError(null)
+      setNotice(null)
+      setSuccessVisible(true)
+      window.setTimeout(() => {
+        if (pendingLoginRef.current) {
+          login(pendingLoginRef.current)
+          pendingLoginRef.current = null
+        }
+      }, SUCCESS_OVERLAY_MS)
+    },
+    [login],
+  )
+
   const handleSendCode = useCallback(async () => {
-    if (phone.length !== PHONE_LENGTH || loading) return
+    if (phone.length !== PHONE_LENGTH || loading || countdown.seconds > 0) return
+    if (!agreed) {
+      requireMemberAgreement()
+      return
+    }
     setLoading(true)
     setError(null)
     setNotice(null)
@@ -122,342 +256,389 @@ export function LoginPage() {
       const res = await sendSmsCode(phone, deviceId)
       countdown.start(res.cooldownSeconds > 0 ? res.cooldownSeconds : 60)
       setNotice(`验证码已发送至 ${formatPhone(phone)}`)
+      setActiveInput('code')
     } catch (e) {
-      setError(e instanceof MemberApiError ? e.message : '发送失败，请重试')
+      raiseError(e instanceof MemberApiError ? e.message : '发送失败，请重试')
     } finally {
       setLoading(false)
     }
-  }, [phone, loading, countdown])
+  }, [phone, loading, agreed, countdown, raiseError, requireMemberAgreement])
 
   const handleLogin = useCallback(async () => {
     if (phone.length !== PHONE_LENGTH || code.length !== CODE_LENGTH || loading) return
+    if (!agreed) {
+      requireMemberAgreement()
+      return
+    }
     setLoading(true)
     setError(null)
     setNotice(null)
     try {
       const deviceId = getMemberAuthDeviceId()
       const res = await memberLogin(phone, code, deviceId)
-      login({
-        id: res.user.id,
-        phoneMasked: res.user.phoneMasked,
-        nickname: res.user.nickname,
-        token: res.token,
-        method: 'phone',
-      })
+      finishWithSuccess(res)
     } catch (e) {
-      setError(e instanceof MemberApiError ? e.message : '验证失败，请重试')
+      raiseError(e instanceof MemberApiError ? e.message : '验证失败，请重试')
       setCode('')
     } finally {
       setLoading(false)
     }
-  }, [code, phone, loading, login])
+  }, [code, phone, loading, agreed, finishWithSuccess, raiseError, requireMemberAgreement])
 
-  const handleQrLoginSuccess = useCallback((res: LoginResult) => {
-    login({
-      id: res.user.id,
-      phoneMasked: res.user.phoneMasked,
-      nickname: res.user.nickname,
-      token: res.token,
-      method: 'phone',
-    })
-  }, [login])
+  const handleQrLoginSuccess = useCallback(
+    (res: LoginResult) => {
+      if (!agreed) {
+        requireMemberAgreement()
+        return
+      }
+      finishWithSuccess(res)
+    },
+    [agreed, finishWithSuccess, requireMemberAgreement],
+  )
+
+  const clock = useClock()
+  const idleSeconds = Math.round(resolveLoginIdleMs() / 1000)
+  const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
 
   return (
-    <div className="min-h-screen bg-[#f3f5f9] text-neutral-900">
-      <button
-        type="button"
-        onClick={goToReturn}
-        className="fixed left-5 top-5 z-10 flex min-h-[56px] min-w-[56px] items-center justify-center rounded-2xl text-neutral-700 transition-colors hover:bg-white active:bg-neutral-100"
-        aria-label="返回"
-      >
-        <ArrowLeftIcon className="h-6 w-6" aria-hidden="true" />
-      </button>
+    <div className="klogin" ref={rootRef}>
+      <header className="topbar">
+        <span className="brand-mark">AI</span>
+        <div className="brand-copy">
+          <strong>AI求职打印一体机</strong>
+          <span>登录 · 保存你的服务记录</span>
+        </div>
+        <button type="button" className="back-home ripple-host" onClick={goToReturn}>
+          <HomeIcon size={17} aria-hidden="true" />
+          {returnTo === '/' ? '返回首页' : '返 回'}
+        </button>
+      </header>
 
-      <main className="mx-auto flex min-h-screen w-full max-w-[1280px] flex-col px-5 pb-6 pt-14">
-        <LoginHeader />
+      <section className="login-screen">
+        <div className="login-inner">
+          {terminalName && (
+            <div className="mast">
+              <span>就业服务自助终端</span>
+              <i />
+              <span>{terminalName}</span>
+            </div>
+          )}
 
-        <section className="mt-7 rounded-[8px] bg-[#e9edf3] p-1 shadow-inner">
-          <div className="grid grid-cols-3 gap-1">
-            <TabButton active={tab === 'phone'} icon={<PhoneIcon className="h-4 w-4" />} label="手机号" onClick={() => switchTab('phone')} />
-            <TabButton active={tab === 'email'} icon={<MailIcon className="h-4 w-4" />} label="邮箱" onClick={() => switchTab('email')} />
-            <TabButton active={tab === 'scan'} icon={<QrCodeIcon className="h-4 w-4" />} label="扫码" onClick={() => switchTab('scan')} />
+          <section className="hero">
+            <div className="hero-copy">
+              <div className="hero-eyebrow">
+                <ShieldCheckIcon size={17} aria-hidden="true" />
+                就业服务 · 一体机自助办理
+              </div>
+              <h1 className="serif">
+                登录后，简历和记录
+                <br />
+                都替你存好
+              </h1>
+              <p>AI 简历报告、打印订单、岗位与招聘会浏览记录自动保存到「我的」，下次来直接继续。</p>
+            </div>
+            <div className="hero-clock">
+              <div className="time">{clock.time}</div>
+              <div className="date">{clock.date}</div>
+            </div>
+          </section>
+
+          <section className={`login-card${shaking ? ' shake' : ''}`}>
+            <div className="folio">
+              <span>
+                <b>会员登录</b>
+              </span>
+              <span>凭证仅存本机 · 离开请退出</span>
+            </div>
+            <div className="card-head">
+              <span className="chi">
+                <UserRoundIcon size={28} aria-hidden="true" />
+              </span>
+              <div>
+                <h3 className="serif">选择登录方式</h3>
+                <p>手机号验证码或手机扫码，全程不超过 3 步</p>
+              </div>
+            </div>
+
+            <div className="k-tabs">
+              <button
+                type="button"
+                className={`k-tab ripple-host${tab === 'phone' ? ' on' : ''}`}
+                onClick={() => switchTab('phone')}
+              >
+                <SmartphoneIcon size={22} aria-hidden="true" />
+                手机号
+              </button>
+              <button
+                type="button"
+                className={`k-tab ripple-host${tab === 'scan' ? ' on' : ''}`}
+                onClick={() => switchTab('scan')}
+              >
+                <ScanLineIcon size={22} aria-hidden="true" />
+                扫码登录
+              </button>
+              <button
+                type="button"
+                className={`k-tab ripple-host${tab === 'email' ? ' on' : ''}`}
+                onClick={() => switchTab('email')}
+              >
+                <MailIcon size={22} aria-hidden="true" />
+                邮箱
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className={`k-agree${agreed ? ' checked' : ''}`}
+              onClick={() => setAgreed((v) => !v)}
+              role="checkbox"
+              aria-checked={agreed}
+            >
+              <span className="box">
+                <CheckIcon size={18} aria-hidden="true" />
+              </span>
+              <span>
+                我已阅读并同意
+                <span
+                  className="doclink"
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigate('/legal/terms')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navigate('/legal/terms')
+                  }}
+                >
+                  《用户服务协议》
+                </span>
+                与
+                <span
+                  className="doclink"
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigate('/legal/privacy')
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navigate('/legal/privacy')
+                  }}
+                >
+                  《隐私政策》
+                </span>
+              </span>
+            </button>
+
+            {tab === 'phone' && (
+              <PhoneLoginPane
+                phone={phone}
+                code={code}
+                loading={loading}
+                countdown={countdown.seconds}
+                countdownTotal={countdown.total}
+                activeInput={activeInput}
+                onActiveInputChange={setActiveInput}
+                onDigit={handleDigit}
+                onDelete={handleDelete}
+                onClear={handleClear}
+                onSendCode={() => void handleSendCode()}
+                onLogin={() => void handleLogin()}
+                notice={notice}
+                error={error}
+              />
+            )}
+
+            {tab === 'scan' && (
+              <>
+                <ScanQrLoginPanel
+                  returnTo={returnTo}
+                  agreed={agreed}
+                  onAgreementRequired={requireMemberAgreement}
+                  onUsePhoneLogin={() => switchTab('phone')}
+                  onLoginSuccess={handleQrLoginSuccess}
+                />
+                {error && (
+                  <div className="k-error" role="alert">
+                    <CircleAlertIcon size={20} aria-hidden="true" />
+                    <span>{error}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {tab === 'email' && <EmailReservedPane />}
+          </section>
+
+          <div className="push-bottom" />
+
+          <div className="k-helpline">
+            <span>
+              无操作 <b>{idleSeconds}</b> 秒后自动返回首页
+            </span>
           </div>
-        </section>
+          <div className="compliance">
+            <ShieldCheckIcon size={15} aria-hidden="true" />
+            登录仅用于保存你的简历、订单与浏览记录；敏感文件设有效期并自动清理，本终端不向任何企业提供简历。
+          </div>
+        </div>
+      </section>
 
-        <section className="mt-7 flex flex-1 flex-col">
-          {tab === 'phone' && (
-            <PhoneLoginPanel
-              phone={phone}
-              code={code}
-              loading={loading}
-              countdown={countdown.seconds}
-              error={error}
-              notice={notice}
-              onPhoneChange={(value) => setPhone(normalizeDigits(value, PHONE_LENGTH))}
-              onCodeChange={(value) => setCode(normalizeDigits(value, CODE_LENGTH))}
-              activeInput={activeNumberInput}
-              onActiveInputChange={setActiveNumberInput}
-              onSendCode={handleSendCode}
-              onLogin={handleLogin}
-            />
-          )}
-
-          {tab === 'email' && <EmailReservedPanel />}
-
-          {tab === 'scan' && (
-            <ScanQrLoginPanel
-              returnTo={returnTo}
-              onUsePhoneLogin={() => switchTab('phone')}
-              onLoginSuccess={handleQrLoginSuccess}
-            />
-          )}
-        </section>
-
-        <FooterActions onHome={goToReturn} />
-      </main>
+      {successVisible && (
+        <div className="k-success" role="status">
+          <span className="inkdot" />
+          <div className="check-wrap">
+            <div className="check-circle">
+              <svg className="check" viewBox="0 0 100 100" aria-hidden="true">
+                <path d="M24 52 44 72 78 30" />
+              </svg>
+            </div>
+          </div>
+          <div className="msg serif">登录成功，正在进入…</div>
+        </div>
+      )}
     </div>
   )
 }
 
-function LoginHeader() {
-  return (
-    <header className="flex flex-col items-center text-center">
-      <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[18px] bg-gradient-to-br from-[#3185ff] via-[#7f65dc] to-[#ff6a3d] text-[1.7rem] font-bold text-white shadow-lg shadow-primary-500/20">
-        AI
-      </div>
-      <h1 className="mt-4 text-[1.55rem] font-bold leading-tight text-[#172033]">欢迎登录</h1>
-      <p className="mt-1 text-sm font-medium text-[#8b95a7]">AI求职打印一体机</p>
-    </header>
-  )
-}
-
-function TabButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex min-h-[44px] items-center justify-center gap-2 rounded-[8px] text-sm font-semibold transition-all ${
-        active
-          ? 'bg-white text-[#1677ff] shadow-[0_2px_10px_rgba(31,42,68,0.14)]'
-          : 'text-[#7e8797] hover:bg-white/50 active:bg-white/70'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  )
-}
-
-function PhoneLoginPanel({
+function PhoneLoginPane({
   phone,
   code,
   loading,
   countdown,
-  error,
-  notice,
-  onPhoneChange,
-  onCodeChange,
+  countdownTotal,
   activeInput,
   onActiveInputChange,
+  onDigit,
+  onDelete,
+  onClear,
   onSendCode,
   onLogin,
+  notice,
+  error,
 }: {
   phone: string
   code: string
   loading: boolean
   countdown: number
-  error: string | null
-  notice: string | null
-  onPhoneChange: (value: string) => void
-  onCodeChange: (value: string) => void
+  countdownTotal: number
   activeInput: ActiveNumberInput
   onActiveInputChange: (input: ActiveNumberInput) => void
+  onDigit: (digit: string) => void
+  onDelete: () => void
+  onClear: () => void
   onSendCode: () => void
   onLogin: () => void
+  notice: string | null
+  error: string | null
 }) {
   const canSend = phone.length === PHONE_LENGTH && countdown === 0 && !loading
   const canLogin = phone.length === PHONE_LENGTH && code.length === CODE_LENGTH && !loading
-  const keyboardTarget = activeInput ?? 'phone'
-
-  const updateActiveValue = (next: string) => {
-    if (keyboardTarget === 'code') {
-      onCodeChange(normalizeDigits(next, CODE_LENGTH))
-      return
-    }
-    onPhoneChange(normalizeDigits(next, PHONE_LENGTH))
-  }
-
-  const handleKeyboardDigit = (digit: string) => {
-    if (keyboardTarget === 'code') {
-      if (code.length < CODE_LENGTH) onCodeChange(code + digit)
-      return
-    }
-    if (phone.length < PHONE_LENGTH) onPhoneChange(phone + digit)
-  }
-
-  const handleKeyboardDelete = () => {
-    if (keyboardTarget === 'code') {
-      onCodeChange(code.slice(0, -1))
-      return
-    }
-    onPhoneChange(phone.slice(0, -1))
-  }
+  const ringOffset = countdownTotal > 0 ? RING_CIRCUMFERENCE * (1 - countdown / countdownTotal) : 0
+  const activeValue = activeInput === 'code' ? code : phone
 
   return (
-    <div className="mx-auto w-full max-w-[1220px]">
-      <label className="block text-sm font-semibold text-[#1e293b]">手机号</label>
-      <div
-        className={`mt-3 flex min-h-[56px] items-center rounded-[10px] border bg-white px-4 shadow-sm transition-colors ${
-          activeInput === 'phone' ? 'border-[#1677ff] ring-2 ring-primary-100' : 'border-[#dfe4ec]'
-        }`}
-      >
-        <PhoneIcon className="mr-3 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
-        <span className="mr-3 border-r border-[#e1e6ef] pr-3 text-sm font-semibold text-[#8a94a6]">+86</span>
-        <input
-          type="text"
-          readOnly
-          inputMode="none"
-          name="kiosk-member-phone"
-          autoComplete="off"
-          value={phone}
-          onChange={(e) => onPhoneChange(e.target.value)}
-          onFocus={() => onActiveInputChange('phone')}
-          onClick={() => onActiveInputChange('phone')}
-          placeholder="请输入手机号"
-          className="min-w-0 flex-1 cursor-pointer bg-transparent text-base font-semibold text-[#172033] outline-none placeholder:text-[#a1a8b5]"
-          aria-label="手机号"
-        />
+    <div className="k-pane">
+      <div className="field-label">
+        <b className="fno">01</b>手机号 <i>未注册的手机号验证后将自动创建账号</i>
       </div>
+      <button
+        type="button"
+        className={`k-input${activeInput === 'phone' ? ' focus' : ''}`}
+        onClick={() => onActiveInputChange('phone')}
+        aria-label="手机号"
+      >
+        <SmartphoneIcon size={22} aria-hidden="true" />
+        {phone ? <span>{formatPhone(phone)}</span> : <span className="ph">使用下方键盘输入 11 位手机号</span>}
+        {activeInput === 'phone' && phone.length < PHONE_LENGTH && <span className="caret" />}
+        <span
+          role="button"
+          aria-disabled={!canSend}
+          className="k-send ripple-host"
+          style={!canSend ? { opacity: 0.42, boxShadow: 'none', cursor: 'default' } : undefined}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (canSend) onSendCode()
+          }}
+        >
+          {countdown > 0 && (
+            <svg className="ring" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="bg" cx="12" cy="12" r="9.5" />
+              <circle
+                cx="12"
+                cy="12"
+                r="9.5"
+                strokeDasharray={RING_CIRCUMFERENCE}
+                strokeDashoffset={ringOffset}
+              />
+            </svg>
+          )}
+          <span>{loading && countdown === 0 ? '发送中' : countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}</span>
+        </span>
+      </button>
 
-      <label className="mt-6 block text-sm font-semibold text-[#1e293b]">验证码</label>
-      <div className="mt-3 flex gap-3">
-        <div
-          className={`flex min-h-[56px] flex-1 items-center rounded-[10px] border bg-white px-4 shadow-sm transition-colors ${
-            activeInput === 'code' ? 'border-[#1677ff] ring-2 ring-primary-100' : 'border-[#dfe4ec]'
-          }`}
-        >
-          <ShieldCheckIcon className="mr-3 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
-          <input
-            type="text"
-            readOnly
-            inputMode="none"
-            name="kiosk-member-code"
-            autoComplete="off"
-            value={code}
-            onChange={(e) => onCodeChange(e.target.value)}
-            onFocus={() => onActiveInputChange('code')}
-            onClick={() => onActiveInputChange('code')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onLogin()
-            }}
-            placeholder="6位验证码"
-            className="min-w-0 flex-1 cursor-pointer bg-transparent text-base font-semibold tracking-[0.18em] text-[#172033] outline-none placeholder:tracking-normal placeholder:text-[#a1a8b5]"
-            aria-label="验证码"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={onSendCode}
-          disabled={!canSend}
-          className="min-h-[56px] min-w-[122px] rounded-[10px] bg-white px-5 text-sm font-bold text-[#1677ff] shadow-sm transition-colors active:bg-primary-50 disabled:cursor-not-allowed disabled:bg-[#e9edf3] disabled:text-[#a1a8b5]"
-        >
-          {loading ? '发送中' : countdown > 0 ? `${countdown}s` : '获取验证码'}
-        </button>
+      <div className="field-label">
+        <b className="fno">02</b>短信验证码 <i>输入 6 位数字，5 分钟内有效</i>
+      </div>
+      <div
+        className="k-cells"
+        onClick={() => onActiveInputChange('code')}
+        role="button"
+        tabIndex={0}
+        aria-label="短信验证码"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onActiveInputChange('code')
+        }}
+      >
+        {Array.from({ length: CODE_LENGTH }, (_, i) => {
+          const filled = i < code.length
+          const next = activeInput === 'code' && i === code.length
+          return (
+            <div key={i} className={`k-cell${filled ? ' filled' : ''}${next ? ' next' : ''}`}>
+              {filled && <span>{code[i]}</span>}
+            </div>
+          )
+        })}
       </div>
 
       {notice && (
-        <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-success-bg text-sm font-semibold text-success-fg">
-          <CheckCircle2Icon className="h-4 w-4" aria-hidden="true" />
-          {notice}
+        <div className="k-notice" role="status">
+          <CircleCheckIcon size={20} aria-hidden="true" />
+          <span>{notice}</span>
         </div>
       )}
-
       {error && (
-        <div className="mt-4 rounded-[8px] bg-error-bg px-4 py-3 text-center text-sm font-semibold text-error-fg">
-          {error}
+        <div className="k-error" role="alert">
+          <CircleAlertIcon size={20} aria-hidden="true" />
+          <span>{error}</span>
         </div>
-      )}
-
-      {activeInput && (
-        <VirtualNumberPad
-          label={activeInput === 'phone' ? '输入手机号' : '输入验证码'}
-          value={activeInput === 'phone' ? phone : code}
-          onDigit={handleKeyboardDigit}
-          onDelete={handleKeyboardDelete}
-          onClear={() => updateActiveValue('')}
-          onConfirm={() => {
-            if (activeInput === 'phone') {
-              if (phone.length === PHONE_LENGTH) onActiveInputChange('code')
-              return
-            }
-            if (canLogin) onLogin()
-          }}
-          confirmLabel={activeInput === 'phone' ? '下一步' : '完成'}
-        />
       )}
 
       <button
         type="button"
-        onClick={onLogin}
+        className={`k-cta ripple-host${loading ? ' loading' : ''}`}
         disabled={!canLogin}
-        className="mt-5 min-h-[56px] w-full rounded-[10px] bg-gradient-to-r from-[#1687ff] to-[#12aeea] text-base font-bold text-white shadow-lg shadow-primary-500/20 transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:from-[#a9bdf5] disabled:to-[#a9bdf5]"
+        onClick={onLogin}
       >
-        {loading ? '登录中...' : '立即登录'}
+        <span className="label">登 录</span>
+        <span className="load">
+          <i />
+          <i />
+          <i />
+        </span>
       </button>
-    </div>
-  )
-}
 
-// 内嵌虚拟数字键盘：触控区对齐既有 KioskNumPad 标准——
-// 数字 / 0 / 删除 / 清空键 min-h ≥ 72px，确认键 min-h ≥ 56px；
-// 用 onPointerDown + preventDefault 即时响应，避免触摸时只读输入框失焦闪烁。
-function VirtualNumberPad({
-  label,
-  value,
-  onDigit,
-  onDelete,
-  onClear,
-  onConfirm,
-  confirmLabel,
-}: {
-  label: string
-  value: string
-  onDigit: (digit: string) => void
-  onDelete: () => void
-  onClear: () => void
-  onConfirm: () => void
-  confirmLabel: string
-}) {
-  const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
-  const keyBase =
-    'flex min-h-[72px] items-center justify-center rounded-[10px] border border-[#e4e8f0] bg-[#f8fafc] shadow-sm transition-colors active:bg-primary-50 disabled:opacity-40'
-
-  return (
-    <div className="mt-5 rounded-[10px] border border-[#dfe4ec] bg-white p-3 shadow-sm">
-      <div className="mb-3 flex min-h-[28px] items-center justify-between px-1">
-        <span className="text-sm font-bold text-[#172033]">{label}</span>
-        <span className="text-xs font-medium text-[#98a2b3]">触控数字键盘</span>
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        {digits.map((digit) => (
+      <div className="k-numpad">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
           <button
             key={digit}
             type="button"
+            className="k-key ripple-host"
             onPointerDown={(e) => {
               e.preventDefault()
               onDigit(digit)
             }}
-            className={`${keyBase} text-xl font-bold text-[#172033]`}
             aria-label={digit}
           >
             {digit}
@@ -465,125 +646,52 @@ function VirtualNumberPad({
         ))}
         <button
           type="button"
+          className="k-key fn ripple-host"
+          disabled={activeValue.length === 0}
           onPointerDown={(e) => {
             e.preventDefault()
             onClear()
           }}
-          disabled={value.length === 0}
-          className={`${keyBase} text-sm font-bold text-[#667085]`}
           aria-label="清空"
         >
           清空
         </button>
         <button
           type="button"
+          className="k-key ripple-host"
           onPointerDown={(e) => {
             e.preventDefault()
             onDigit('0')
           }}
-          className={`${keyBase} text-xl font-bold text-[#172033]`}
           aria-label="0"
         >
           0
         </button>
         <button
           type="button"
+          className="k-key fn ripple-host"
           onPointerDown={(e) => {
             e.preventDefault()
             onDelete()
           }}
-          disabled={value.length === 0}
-          className={`${keyBase} text-sm font-bold text-[#667085]`}
           aria-label="删除"
         >
           删除
         </button>
       </div>
-      <button
-        type="button"
-        onPointerDown={(e) => {
-          e.preventDefault()
-          onConfirm()
-        }}
-        className="mt-3 flex min-h-[56px] w-full items-center justify-center rounded-[10px] bg-[#1677ff] text-base font-bold text-white shadow-sm transition-colors active:bg-[#0d63d9]"
-        aria-label={confirmLabel}
-      >
-        {confirmLabel}
-      </button>
     </div>
   )
 }
 
-function EmailReservedPanel() {
+// 邮箱登录预留：后端尚未提供邮箱验证码服务，只展示说明，不伪造登录流程。
+function EmailReservedPane() {
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col items-center justify-center text-center">
-      <div className="flex h-20 w-20 items-center justify-center rounded-[18px] bg-white text-[#1677ff] shadow-sm">
-        <MailIcon className="h-9 w-9" aria-hidden="true" />
-      </div>
-      <h2 className="mt-5 text-xl font-bold text-[#172033]">邮箱登录待接入</h2>
-      <p className="mt-2 max-w-[420px] text-sm leading-6 text-[#7e8797]">
-        当前会员账号体系先使用手机号验证码。邮箱登录入口已预留，后续接入邮箱验证码服务后开放。
-      </p>
+    <div className="k-pane k-reserved">
+      <span className="chi">
+        <MailIcon size={34} aria-hidden="true" />
+      </span>
+      <h4 className="serif">邮箱登录暂未开放</h4>
+      <p>当前会员账号使用手机号验证码登录。邮箱登录入口已预留，接入邮箱验证码服务后开放，请先使用手机号或扫码登录。</p>
     </div>
-  )
-}
-
-// 页脚：回首页 + 注册/协议/隐私说明。注册与协议尚无独立页面，点击给诚实提示，
-// 不保留无响应按钮（CLAUDE.md 诚实化原则）。
-function FooterActions({ onHome }: { onHome: () => void }) {
-  const navigate = useNavigate()
-  const [hint, setHint] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!hint) return
-    const t = window.setTimeout(() => setHint(null), 3200)
-    return () => window.clearTimeout(t)
-  }, [hint])
-
-  return (
-    <footer className="mt-8">
-      <div className="flex min-h-[64px] items-center justify-center rounded-[10px] border border-[#dfe4ec] bg-white shadow-sm">
-        <button
-          type="button"
-          onClick={onHome}
-          className="flex min-h-[54px] items-center gap-3 rounded-[10px] px-5 text-left transition-colors active:bg-warning-bg"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#ff6a3d] text-white">
-            <HomeIcon className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span>
-            <span className="block text-sm font-bold text-[#172033]">回到首页</span>
-            <span className="block text-xs text-[#8b95a7]">返回平台主页</span>
-          </span>
-        </button>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-[#8b95a7]">
-        <button
-          type="button"
-          onClick={() => setHint('首次使用手机号验证码登录将自动创建账号，无需单独注册')}
-          className="min-h-[36px] px-1 font-semibold text-[#ff6a3d]"
-        >
-          立即注册
-        </button>
-        <span>登录即代表同意</span>
-        <button
-          type="button"
-          onClick={() => navigate('/legal/terms')}
-          className="min-h-[36px] px-1 font-semibold text-[#1677ff]"
-        >
-          《用户服务协议》
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/legal/privacy')}
-          className="min-h-[36px] px-1 font-semibold text-[#1677ff]"
-        >
-          《隐私政策》
-        </button>
-      </div>
-
-      {hint && <p className="mt-2 text-center text-xs font-medium text-[#667085]">{hint}</p>}
-    </footer>
   )
 }

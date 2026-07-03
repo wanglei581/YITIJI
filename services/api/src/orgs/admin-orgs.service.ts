@@ -11,6 +11,8 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { encryptPhone, hashPhone, maskPhoneFromEnc, normalizePhone } from '../common/crypto/phone-identity'
+import { RedisService } from '../common/redis/redis.service'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 
 // ============================================================
@@ -119,6 +121,8 @@ export interface AdminOrgAccount {
   username: string
   name: string
   enabled: boolean
+  phoneMasked: string | null
+  phoneVerifiedAt: string | null
   createdAt: string
 }
 
@@ -195,6 +199,26 @@ function mapOrg(
   }
 }
 
+function mapAccount(u: {
+  id: string
+  username: string
+  name: string
+  enabled: boolean
+  phoneEnc: string | null
+  phoneVerifiedAt: Date | null
+  createdAt: Date
+}): AdminOrgAccount {
+  return {
+    id: u.id,
+    username: u.username,
+    name: u.name,
+    enabled: u.enabled,
+    phoneMasked: u.phoneEnc ? maskPhoneFromEnc(u.phoneEnc) : null,
+    phoneVerifiedAt: u.phoneVerifiedAt?.toISOString() ?? null,
+    createdAt: u.createdAt.toISOString(),
+  }
+}
+
 @Injectable()
 export class AdminOrgsService {
   private readonly logger = new Logger(AdminOrgsService.name)
@@ -202,6 +226,7 @@ export class AdminOrgsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly redis: RedisService,
   ) {}
 
   // ── 机构列表 / 详情 ─────────────────────────────────────────────────────────
@@ -229,7 +254,15 @@ export class AdminOrgsService {
         // 绝不 select passwordHash
         users: {
           orderBy: { createdAt: 'asc' },
-          select: { id: true, username: true, name: true, enabled: true, createdAt: true },
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            enabled: true,
+            phoneEnc: true,
+            phoneVerifiedAt: true,
+            createdAt: true,
+          },
         },
       },
     })
@@ -241,13 +274,7 @@ export class AdminOrgsService {
         jobs: o._count.jobs,
         fairs: o._count.jobFairs,
       }),
-      accounts: o.users.map((u) => ({
-        id: u.id,
-        username: u.username,
-        name: u.name,
-        enabled: u.enabled,
-        createdAt: u.createdAt.toISOString(),
-      })),
+      accounts: o.users.map(mapAccount),
     }
   }
 
@@ -263,6 +290,7 @@ export class AdminOrgsService {
       if (exists) {
         throw new ConflictException({ error: { code: 'USERNAME_TAKEN', message: `用户名 ${dto.account.username} 已存在` } })
       }
+      await this.assertPhoneAvailable(dto.account.phone)
     }
 
     const orgId = `org_${randomUUID().replace(/-/g, '').slice(0, 20)}`
@@ -281,6 +309,7 @@ export class AdminOrgsService {
 
     if (dto.account) {
       const passwordHash = await bcrypt.hash(dto.account.password, 10)
+      const normalizedPhone = normalizePhone(dto.account.phone)
       const account = await this.prisma.user.create({
         data: {
           username: dto.account.username,
@@ -288,10 +317,16 @@ export class AdminOrgsService {
           name: dto.account.name,
           role: 'partner',
           orgId,
+          phoneHash: hashPhone(normalizedPhone),
+          phoneEnc: encryptPhone(normalizedPhone),
         },
       })
       // 审计只记 username,绝不记密码 / hash
-      await this.writeAudit(admin, 'org.account.create', orgId, { accountId: account.id, username: account.username })
+      await this.writeAudit(admin, 'org.account.create', orgId, {
+        accountId: account.id,
+        username: account.username,
+        phoneMasked: mapAccount(account).phoneMasked,
+      })
     }
 
     this.logger.log(`createOrg: id=${orgId} by=${admin.userId}`)
@@ -348,6 +383,7 @@ export class AdminOrgsService {
         fromEnabled: org.enabled,
         toEnabled,
       })
+      await this.invalidateOrgSessions(orgId)
     }
     return this.getOrgDetail(orgId)
   }
@@ -356,7 +392,7 @@ export class AdminOrgsService {
 
   async createAccount(
     orgId: string,
-    input: { username: string; password: string; name: string },
+    input: { username: string; password: string; name: string; phone: string },
     admin: AuthedUser,
   ): Promise<AdminOrgAccount> {
     await this.assertOrgExists(orgId)
@@ -364,18 +400,27 @@ export class AdminOrgsService {
     if (exists) {
       throw new ConflictException({ error: { code: 'USERNAME_TAKEN', message: `用户名 ${input.username} 已存在` } })
     }
+    await this.assertPhoneAvailable(input.phone)
     const passwordHash = await bcrypt.hash(input.password, 10)
+    const normalizedPhone = normalizePhone(input.phone)
     const account = await this.prisma.user.create({
-      data: { username: input.username, passwordHash, name: input.name, role: 'partner', orgId },
+      data: {
+        username: input.username,
+        passwordHash,
+        name: input.name,
+        role: 'partner',
+        orgId,
+        phoneHash: hashPhone(normalizedPhone),
+        phoneEnc: encryptPhone(normalizedPhone),
+      },
     })
-    await this.writeAudit(admin, 'org.account.create', orgId, { accountId: account.id, username: account.username })
-    return {
-      id: account.id,
+    const mapped = mapAccount(account)
+    await this.writeAudit(admin, 'org.account.create', orgId, {
+      accountId: account.id,
       username: account.username,
-      name: account.name,
-      enabled: account.enabled,
-      createdAt: account.createdAt.toISOString(),
-    }
+      phoneMasked: mapped.phoneMasked,
+    })
+    return mapped
   }
 
   async setAccountStatus(
@@ -388,20 +433,18 @@ export class AdminOrgsService {
     const toEnabled = action === 'enable'
     const updated = account.enabled === toEnabled
       ? account
-      : await this.prisma.user.update({ where: { id: accountId }, data: { enabled: toEnabled } })
+      : await this.prisma.user.update({
+          where: { id: accountId },
+          data: { enabled: toEnabled, tokenVersion: { increment: 1 } },
+        })
     if (account.enabled !== toEnabled) {
       await this.writeAudit(admin, toEnabled ? 'org.account.enable' : 'org.account.disable', orgId, {
         accountId,
         username: account.username,
       })
+      await this.invalidateAccountSession(accountId)
     }
-    return {
-      id: updated.id,
-      username: updated.username,
-      name: updated.name,
-      enabled: updated.enabled,
-      createdAt: updated.createdAt.toISOString(),
-    }
+    return mapAccount(updated)
   }
 
   async resetAccountPassword(
@@ -412,7 +455,11 @@ export class AdminOrgsService {
   ): Promise<{ success: true }> {
     const account = await this.assertAccountInOrg(orgId, accountId)
     const passwordHash = await bcrypt.hash(password, 10)
-    await this.prisma.user.update({ where: { id: accountId }, data: { passwordHash } })
+    await this.prisma.user.update({
+      where: { id: accountId },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
+    })
+    await this.invalidateAccountSession(accountId)
     // 审计绝不含密码 / hash
     await this.writeAudit(admin, 'org.account.reset_password', orgId, { accountId, username: account.username })
     return { success: true }
@@ -488,6 +535,13 @@ export class AdminOrgsService {
     return org
   }
 
+  private async assertPhoneAvailable(phone: string): Promise<void> {
+    const exists = await this.prisma.user.findUnique({ where: { phoneHash: hashPhone(phone) } })
+    if (exists) {
+      throw new ConflictException({ error: { code: 'PHONE_ALREADY_BOUND', message: '该手机号已绑定其他账号' } })
+    }
+  }
+
   private async assertAccountInOrg(orgId: string, accountId: string) {
     await this.assertOrgExists(orgId)
     const account = await this.prisma.user.findFirst({ where: { id: accountId, orgId, role: 'partner' } })
@@ -495,6 +549,19 @@ export class AdminOrgsService {
       throw new NotFoundException({ error: { code: 'ACCOUNT_NOT_FOUND', message: `Account ${accountId} not found in org ${orgId}` } })
     }
     return account
+  }
+
+  private sessionStateKey(userId: string): string {
+    return `internal:session-state:${userId}`
+  }
+
+  private async invalidateAccountSession(userId: string): Promise<void> {
+    await this.redis.del(this.sessionStateKey(userId))
+  }
+
+  private async invalidateOrgSessions(orgId: string): Promise<void> {
+    const users = await this.prisma.user.findMany({ where: { orgId }, select: { id: true } })
+    await Promise.all(users.map((user) => this.invalidateAccountSession(user.id)))
   }
 
   private async writeAudit(admin: AuthedUser, action: string, orgId: string, payload: Record<string, unknown>): Promise<void> {

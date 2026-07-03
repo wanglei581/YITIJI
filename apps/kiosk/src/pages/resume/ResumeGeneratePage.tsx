@@ -31,6 +31,7 @@ import {
 import { submitResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
+import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 
 const STEPS = [
   { title: '基本信息', description: '姓名与联系方式' },
@@ -109,6 +110,10 @@ function EntryList<T>({
 const EMPTY_EDU: ResumeGenEducation = { school: '', major: '', degree: '', period: '' }
 const EMPTY_EXP: ResumeGenExperience = { company: '', role: '', period: '', description: '' }
 const EMPTY_PROJ: ResumeGenProject = { name: '', role: '', description: '' }
+
+function appendVoiceText(current: string | undefined, transcript: string): string {
+  return [current?.trim(), transcript.trim()].filter(Boolean).join('\n')
+}
 
 export function ResumeGeneratePage() {
   const navigate = useNavigate()
@@ -297,6 +302,13 @@ export function ResumeGeneratePage() {
                   <div className="md:col-span-2">
                     <Field label="在校情况(选填,AI 会帮你润色)">
                       <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 主修课程、成绩排名、获奖情况" value={e.description ?? ''} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, description: ev.target.value } : x))} />
+                      <div className="mt-2 flex justify-end">
+                        <ResumeVoiceInputButton
+                          label="在校情况"
+                          disabled={generating}
+                          onConfirm={(text) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
+                        />
+                      </div>
                     </Field>
                   </div>
                 </div>
@@ -328,6 +340,13 @@ export function ResumeGeneratePage() {
                   <div className="md:col-span-2">
                     <Field label="做了什么(写真实内容,AI 会帮你润色)">
                       <textarea className={`${inputCls} h-24 resize-none`} placeholder="如 负责的工作内容、用到的工具、取得的成果(有数字写数字)" value={e.description} onChange={(ev) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, description: ev.target.value } : x))} />
+                      <div className="mt-2 flex justify-end">
+                        <ResumeVoiceInputButton
+                          label="工作内容"
+                          disabled={generating}
+                          onConfirm={(text) => setExperience((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
+                        />
+                      </div>
                     </Field>
                   </div>
                 </div>
@@ -354,6 +373,13 @@ export function ResumeGeneratePage() {
                   <div className="md:col-span-2">
                     <Field label="项目内容(写真实内容,AI 会帮你润色)">
                       <textarea className={`${inputCls} h-24 resize-none`} value={p.description} onChange={(ev) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, description: ev.target.value } : x))} />
+                      <div className="mt-2 flex justify-end">
+                        <ResumeVoiceInputButton
+                          label="项目内容"
+                          disabled={generating}
+                          onConfirm={(text) => setProjects((list) => list.map((x, idx) => idx === i ? { ...x, description: appendVoiceText(x.description, text) } : x))}
+                        />
+                      </div>
                     </Field>
                   </div>
                 </div>
@@ -365,12 +391,21 @@ export function ResumeGeneratePage() {
             <div className="space-y-4">
               <Field label="技能(用逗号或换行分隔)">
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 JavaScript, Excel, 英语六级" value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
+                <div className="mt-2 flex justify-end">
+                  <ResumeVoiceInputButton label="技能" disabled={generating} onConfirm={(text) => setSkillsText((current) => appendVoiceText(current, text))} />
+                </div>
               </Field>
               <Field label="证书 / 资质(用逗号或换行分隔;只填真实持有的)">
                 <textarea className={`${inputCls} h-20 resize-none`} placeholder="如 普通话二级甲等, 机动车驾驶证 C1" value={certsText} onChange={(e) => setCertsText(e.target.value)} />
+                <div className="mt-2 flex justify-end">
+                  <ResumeVoiceInputButton label="证书资质" disabled={generating} onConfirm={(text) => setCertsText((current) => appendVoiceText(current, text))} />
+                </div>
               </Field>
               <Field label="自我评价草稿(选填,AI 会基于它润色个人简介)">
                 <textarea className={`${inputCls} h-24 resize-none`} value={selfIntro} onChange={(e) => setSelfIntro(e.target.value)} />
+                <div className="mt-2 flex justify-end">
+                  <ResumeVoiceInputButton label="自我评价" disabled={generating} onConfirm={(text) => setSelfIntro((current) => appendVoiceText(current, text))} />
+                </div>
               </Field>
             </div>
           )}

@@ -83,4 +83,5 @@ export class AdminOrgsController {
   ) {
     return this.orgs.resetAccountPassword(id, accountId, dto.password, user)
   }
+
 }
