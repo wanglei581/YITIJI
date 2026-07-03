@@ -54,6 +54,8 @@
 
 2026-07-03 追加：**换装 PR 已开 + A 档增强第一批完成**。① W0–W5 全部换装提交推送 `origin/claude/hungry-cori-9f2406` 并开 PR #127（含零回归证据清单）；Kiosk 关键页巡检（打印扫描/政策/岗位/我的）零视觉缺陷。② A 档第一批（深度提升方案 §4.1/§4.2）：岗位列表新增展示端排序（最新同步默认 / 薪资标注优先——仅重排已载入真实数据，薪资优先按"来源是否提供薪资"排序不伪造数值）；首页登录态统计数字（简历/文档/AI记录/收藏）从纯展示改为点击直达 `/me/*` 对应明细页；核实「岗位描述富文本渲染」详情页已有 `splitTextLines` 实现，不重复开发。验证：kiosk tsc/eslint、job-info-ui / home-toolbox-ui / job-ai-ui 三守卫、生产 build 全过；浏览器 E2E——dev log 短信验证码真实登录 → 首页统计点击 → 直达我的简历页；排序切换 aria-pressed 实测。记忆库已登记换装状态（console-kiosk-theme-waves-pr127），防后续会话用回旧灰蓝类。
 
+2026-07-03 追加：**A 档增强第二批——招聘会收藏 + 现场数据分布图**。① Kiosk 招聘会列表 `JobFairsPage`：每张 FairCard 右上角加收藏星标（复用已支持 `job_fair` 的 `useFavorites`，登录写后端、匿名写本机），筛选行加「只看收藏」陶色 chip（带计数），空态区分"无收藏/无匹配"；② `FairStatsPage` 补两个真实聚合分布图——参展企业行业分布（青玉柱，按已录企业真实聚合 count）+ 求职意向分布（陶土柱，机构录入预计 percent，标注"预计/来源数据·非实时·预计参会 N 人"口径），均"无数据不渲染、不伪造"。**延后项（诚实记录）**：FairCard 参展企业"行业分布小标签"因列表端点 `GET /job-fairs` 不返回 `industryDistribution`（仅 `/stats` 端点返回），需后端 additive 改动才能拿真数据，本批不做、不硬塞假标签。执行中补跑了缺失的招聘会种子（`db:seed:fairs`，dev 库原本 JobFair=0）。验证：kiosk tsc/eslint、jobfair-size/jobfair-ui/jobfair-commercial-closure/jobfair-checkin 四守卫全 PASS、生产 build；浏览器实测——收藏一场后「只看收藏」正确过滤到 1 场；stats 页两分布图真实数据渲染（互联网/IT 6家等、研发技术类 46% 等）。
+
 ## 规范化治理已完成
 
 | 日期 | 分支 / 提交 | 结论 |

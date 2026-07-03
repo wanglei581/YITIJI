@@ -12,12 +12,14 @@ import {
   QrCodeIcon,
   SearchIcon,
   SmartphoneIcon,
+  StarIcon,
   UsersIcon,
   XIcon,
 } from 'lucide-react'
 import { getJobFairs, getTerminalId } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
+import { useFavorites } from '../../favorites/useFavorites'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { FairCalendarPopover } from './components/FairCalendarPopover'
 import { RegionPicker } from './components/RegionPicker'
@@ -110,11 +112,15 @@ function Stepper() {
 
 function FairCard({
   fair,
+  favorite,
+  onToggleFavorite,
   onBook,
   onDetail,
   onMap,
 }: {
   fair: ExternalJobFairDTO
+  favorite: boolean
+  onToggleFavorite: () => void
   onBook: () => void
   onDetail: () => void
   onMap: () => void
@@ -132,11 +138,21 @@ function FairCard({
       <div className={`bg-gradient-to-br ${grad} p-5 text-white ${isEnded ? 'opacity-80 saturate-50' : ''}`}>
         <div className="flex items-start justify-between gap-2">
           <span className="rounded-md bg-white/20 px-2 py-0.5 text-xs font-medium backdrop-blur-sm">{fair.sourceName}</span>
-          {fair.hasManagedData && (
-            <button onClick={onMap} className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium hover:bg-white/25">
-              <MapIcon className="h-3.5 w-3.5" />场馆导览
+          <div className="flex items-center gap-1.5">
+            {fair.hasManagedData && (
+              <button onClick={onMap} className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium hover:bg-white/25">
+                <MapIcon className="h-3.5 w-3.5" />场馆导览
+              </button>
+            )}
+            <button
+              onClick={onToggleFavorite}
+              aria-label={favorite ? '取消收藏' : '收藏招聘会'}
+              aria-pressed={favorite}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30"
+            >
+              <StarIcon className={`h-4 w-4 ${favorite ? 'fill-white text-white' : 'text-white'}`} />
             </button>
-          )}
+          </div>
         </div>
         <div className="mt-2 flex items-center gap-1.5">
           {fair.status === 'upcoming' && <span className="rounded bg-white/25 px-1.5 py-0.5 text-[11px] font-semibold">NEW</span>}
@@ -217,7 +233,10 @@ export function JobFairsPage() {
   const [error,        setError]        = useState(false)
   const [retryKey,     setRetryKey]     = useState(0)
   const [qrFair,       setQrFair]       = useState<ExternalJobFairDTO | null>(null)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   const { getToken } = useAuth()
+  const { idsOf, toggle: toggleFavorite } = useFavorites()
+  const favoriteSet = idsOf('job_fair')
 
   // 外部跳转记录(P1):只记录「打开来源平台预约入口」;预约结果以来源平台为准,本系统不记录。
   const openBookingQr = (fair: ExternalJobFairDTO) => {
@@ -239,13 +258,14 @@ export function JobFairsPage() {
     const statusVal = statusFilter === '全部' ? null : STATUS_FILTER_MAP[statusFilter]
     const q = query.trim()
     return fairs.filter((f) => {
+      if (favoritesOnly && !favoriteSet.has(f.id)) return false
       if (statusVal && f.status !== statusVal) return false
       if (!matchesRegion(f, region)) return false
       if (selectedDate && dateKey(f.startTime) !== selectedDate) return false
       if (q && !`${f.name}${f.organizer}${f.venue}${f.city ?? ''}`.includes(q)) return false
       return true
     })
-  }, [fairs, statusFilter, region, selectedDate, query])
+  }, [fairs, statusFilter, region, selectedDate, query, favoritesOnly, favoriteSet])
 
   return (
     <div className="flex h-full flex-col">
@@ -277,7 +297,7 @@ export function JobFairsPage() {
           <FairCalendarPopover fairs={fairs} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
         </div>
 
-        {/* 状态筛选 */}
+        {/* 状态筛选 + 只看收藏 */}
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {ALL_STATUS.map((s) => (
             <button
@@ -291,6 +311,18 @@ export function JobFairsPage() {
               {s}
             </button>
           ))}
+          <button
+            onClick={() => setFavoritesOnly((v) => !v)}
+            aria-pressed={favoritesOnly}
+            className={[
+              'flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
+              favoritesOnly ? 'bg-warning text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
+            ].join(' ')}
+          >
+            <StarIcon className={`h-4 w-4 ${favoritesOnly ? 'fill-white' : ''}`} />
+            只看收藏
+            {favoriteSet.size > 0 && <span className="text-xs opacity-80">{favoriteSet.size}</span>}
+          </button>
         </div>
 
         {/* 步骤条 */}
@@ -308,13 +340,20 @@ export function JobFairsPage() {
               共 <span className="font-semibold text-primary-600">{visible.length}</span> 场招聘会
             </p>
             {visible.length === 0 ? (
-              <EmptyState icon={CalendarIcon} title="没有符合条件的招聘会" description="请调整搜索、地区、状态或日期筛选" className="flex-1" />
+              <EmptyState
+                icon={favoritesOnly ? StarIcon : CalendarIcon}
+                title={favoritesOnly ? '还没有收藏的招聘会' : '没有符合条件的招聘会'}
+                description={favoritesOnly ? '在招聘会卡片上点击星标即可收藏，方便稍后查看' : '请调整搜索、地区、状态或日期筛选'}
+                className="flex-1"
+              />
             ) : (
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 {visible.map((fair) => (
                   <FairCard
                     key={fair.id}
                     fair={fair}
+                    favorite={favoriteSet.has(fair.id)}
+                    onToggleFavorite={() => toggleFavorite({ type: 'job_fair', id: fair.id, title: fair.name })}
                     onBook={() => openBookingQr(fair)}
                     onDetail={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}
                     onMap={() => navigate(`/job-fairs/${fair.id}/map`)}

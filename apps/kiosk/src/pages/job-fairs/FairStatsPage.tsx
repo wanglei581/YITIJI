@@ -195,6 +195,66 @@ export function FairStatsPage() {
             </div>
           )}
         </Card>
+
+        {/* 参展企业行业分布（真实聚合已录企业，柱状图；无数据不渲染，不伪造） */}
+        {stats.industryDistribution.length > 0 && (
+          <Card className="p-5">
+            <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+              <BuildingIcon className="h-4 w-4 text-neutral-400" />
+              参展企业行业分布
+              <span className="ml-auto text-xs font-normal text-neutral-400">按已录 {stats.totalCompanies} 家企业聚合</span>
+            </p>
+            <div className="space-y-2.5">
+              {(() => {
+                const maxCount = Math.max(...stats.industryDistribution.map((slice) => slice.count), 1)
+                return stats.industryDistribution.map((slice) => (
+                  <div key={slice.label}>
+                    <div className="flex items-center justify-between text-xs text-neutral-600">
+                      <span className="font-medium">{slice.label}</span>
+                      <span className="tabular-nums text-neutral-500">{slice.count} 家</span>
+                    </div>
+                    <div className="mt-1 h-2 rounded-full bg-neutral-100">
+                      <div
+                        className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all"
+                        style={{ width: `${Math.round((slice.count / maxCount) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              })()}
+            </div>
+          </Card>
+        )}
+
+        {/* 求职意向分布（机构录入预计值，横向占比；标注来源口径，非实时） */}
+        {stats.seekerIntent.length > 0 && (
+          <Card className="p-5">
+            <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+              <UsersIcon className="h-4 w-4 text-neutral-400" />
+              求职意向分布
+            </p>
+            <p className="mb-3 text-xs text-neutral-400">
+              {stats.dataSourceLabel}
+              {stats.expectedAttendance != null && ` · 预计参会 ${stats.expectedAttendance.toLocaleString()} 人`}
+            </p>
+            <div className="space-y-2.5">
+              {stats.seekerIntent.map((slice) => (
+                <div key={slice.label}>
+                  <div className="flex items-center justify-between text-xs text-neutral-600">
+                    <span className="font-medium">{slice.label}</span>
+                    <span className="tabular-nums text-neutral-500">{slice.percent}%</span>
+                  </div>
+                  <div className="mt-1 h-2 rounded-full bg-neutral-100">
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-warning to-warning-fg transition-all"
+                      style={{ width: `${Math.max(0, Math.min(100, slice.percent))}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   )
