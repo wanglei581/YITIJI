@@ -1418,6 +1418,9 @@ model RedemptionRecord {
   idempotencyKey String   @unique // 本批 hash(benefitGrantId + serviceType + serviceRefId)
   createdAt      DateTime @default(now())
 
+  // 一产物一核销硬不变量：同一服务产物（serviceType+serviceRefId）只能被核销一次，
+  // 即使换不同权益（不同 idempotencyKey）也不行。DB 唯一约束防并发绕过（PG READ COMMITTED）。
+  @@unique([serviceType, serviceRefId])
   @@index([endUserId])
   @@index([benefitRef])
 }

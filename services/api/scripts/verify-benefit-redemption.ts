@@ -167,6 +167,42 @@ async function main() {
     if (noMoney && allRecords.length === 2 && redeemAudits === 2) {
       pass('12. 全量核销记录 orderId=null/amountCents=0（券≠资金）；审计仅真实扣减写（2 条），回放/被拒不写')
     } else fail(`12. 无金额/审计异常：records=${allRecords.length} noMoney=${noMoney} audits=${redeemAudits}`)
+
+    // ── 13. DB 层「一产物一核销」唯一约束（并发绕过的最终防线）──
+    //     直插同一 (serviceType,serviceRefId)、不同 idempotencyKey → 应命中 @@unique 唯一冲突。
+    const s13 = `task-db-inv-${s}`
+    await prisma.redemptionRecord.create({ data: { endUserId: userA, kind: 'coupon', benefitRef: 'x', serviceType: 'resume_optimize', serviceRefId: s13, quantity: 1, amountCents: 0, idempotencyKey: `k13a-${s}` } })
+    let dbGuardOk = false
+    try {
+      await prisma.redemptionRecord.create({ data: { endUserId: userA, kind: 'coupon', benefitRef: 'y', serviceType: 'resume_optimize', serviceRefId: s13, quantity: 1, amountCents: 0, idempotencyKey: `k13b-${s}` } })
+    } catch (e) {
+      dbGuardOk = (e as { code?: string }).code === 'P2002' || /unique/i.test((e as Error).message)
+    }
+    await prisma.redemptionRecord.deleteMany({ where: { serviceRefId: s13 } })
+    if (dbGuardOk) pass('13. DB @@unique([serviceType,serviceRefId]) 拒绝同产物不同 key 二次核销（并发最终防线）')
+    else fail('13. DB 唯一约束未生效：同产物不同 idempotencyKey 竟可二次插入')
+
+    // ── 14. validFrom 未到生效 → BENEFIT_NOT_STARTED ──
+    const gFuture = await mkGrant('future', { benefitType: 'coupon', quantityTotal: 1, quantityRemaining: 1, validFrom: new Date(Date.now() + 24 * 60 * 60 * 1000) })
+    await expectReject('BENEFIT_NOT_STARTED', '14. validFrom 未到 → BENEFIT_NOT_STARTED', () =>
+      svc.redeem({ endUserId: userA, benefitGrantId: gFuture, serviceType: 'resume_optimize', serviceRefId: 'task-future' }))
+
+    // ── 15. replay 归属校验：B 用 A 已核销的 key（同 grantId+ref）回放 → 拒，不泄露他人核销 ──
+    await expectReject('BENEFIT_GRANT_NOT_FOUND', '15. B 回放 A 已核销的 key → BENEFIT_GRANT_NOT_FOUND（归属校验覆盖 replay）', () =>
+      svc.redeem({ endUserId: userB, benefitGrantId: gQuota, serviceType: 'resume_optimize', serviceRefId: 'task-1' }))
+
+    // ── 16. 同 key 并发：额度恰扣 1、记录恰 1 条、无双扣（并发收敛/回放正确）──
+    const gConc = await mkGrant('conc', { benefitType: 'free_quota', quantityTotal: 1, quantityRemaining: 1 })
+    const concResults = await Promise.allSettled([
+      svc.redeem({ endUserId: userA, benefitGrantId: gConc, serviceType: 'resume_optimize', serviceRefId: 'task-conc' }),
+      svc.redeem({ endUserId: userA, benefitGrantId: gConc, serviceType: 'resume_optimize', serviceRefId: 'task-conc' }),
+    ])
+    const concFulfilled = concResults.filter((r) => r.status === 'fulfilled').length
+    const gConcAfter = await prisma.benefitGrant.findUnique({ where: { id: gConc } })
+    const concRecords = await prisma.redemptionRecord.count({ where: { serviceType: 'resume_optimize', serviceRefId: 'task-conc' } })
+    if (gConcAfter?.quantityRemaining === 0 && gConcAfter.status === 'used_up' && concRecords === 1 && concFulfilled >= 1) {
+      pass('16. 同 key 并发：额度恰扣 1、记录恰 1 条、无双扣')
+    } else fail(`16. 并发异常：remaining=${gConcAfter?.quantityRemaining} status=${gConcAfter?.status} records=${concRecords} fulfilled=${concFulfilled}`)
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

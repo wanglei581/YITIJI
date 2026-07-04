@@ -40,7 +40,7 @@ export class BenefitRedemptionService {
   ) {}
 
   async redeem(params: RedeemBenefitParams): Promise<RedeemBenefitResult> {
-    const { benefitGrantId, serviceType, serviceRefId } = params
+    const { endUserId, benefitGrantId, serviceType, serviceRefId } = params
     if (!serviceRefId || !serviceRefId.trim()) {
       // 调用方必须提供稳定的服务产物 id；空值会污染幂等键，直接拒绝，不兜底造 id。
       throw new BadRequestException({ error: { code: 'REDEEM_SERVICE_REF_REQUIRED', message: '缺少服务产物标识' } })
@@ -52,9 +52,18 @@ export class BenefitRedemptionService {
     try {
       return await this.redeemOnce(params, idempotencyKey)
     } catch (error) {
-      // 并发回放：另一请求已写入同 idempotencyKey（本请求扣减已随事务回滚）→ 读回既有记录返回幂等。
+      // 并发收敛（统一在此处理，覆盖 DB 唯一约束击穿窗口）：
+      // - 同 idempotencyKey 并发（同权益同产物，含最后 1 份 CAS 输家得 used_up）：赢家已按本 key 落记录
+      //   → replayIfPresent 命中且归属为本人 → 返回幂等回放，不二次扣。
+      // - 一产物一核销唯一约束命中（不同权益并发核销同一 serviceType+serviceRefId）：本 key 无记录
+      //   → replay 落空且仍是唯一冲突 → 归一为 BENEFIT_OUTPUT_ALREADY_REDEEMED（事务已回滚扣减）。
+      // - 其余（越权 / 类型 / 状态 / 有效期 / 额度校验拒绝）：透传原始错误。
+      const replay = await this.replayIfPresent(idempotencyKey, endUserId)
+      if (replay) return replay
       if (isUniqueError(error)) {
-        return await this.loadExisting(idempotencyKey, benefitGrantId)
+        throw new ConflictException({
+          error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该服务已使用其他权益核销，不能重复核销' },
+        })
       }
       throw error
     }
@@ -67,6 +76,10 @@ export class BenefitRedemptionService {
       // ① 幂等快路径：同 (grant+service+ref) 已存在 → 回放，不扣减。
       const existing = await tx.redemptionRecord.findUnique({ where: { idempotencyKey } })
       if (existing) {
+        // 归属硬约束：replay 也必须校验本人，绝不把他人核销结果回放给非本人（不泄露 + 不越权）。
+        if (existing.endUserId !== endUserId) {
+          throw new NotFoundException({ error: { code: 'BENEFIT_GRANT_NOT_FOUND', message: '权益不存在或不属于本人' } })
+        }
         const grant = await tx.benefitGrant.findUnique({ where: { id: benefitGrantId } })
         return { record: existing, grant, idempotent: true, decremented: false }
       }
@@ -93,6 +106,9 @@ export class BenefitRedemptionService {
         throw new ConflictException({ error: { code: 'BENEFIT_NOT_ACTIVE', message: '权益当前不可用' } })
       }
       const now = new Date()
+      if (grant.validFrom && grant.validFrom.getTime() > now.getTime()) {
+        throw new ConflictException({ error: { code: 'BENEFIT_NOT_STARTED', message: '权益未到生效时间' } })
+      }
       if (grant.validUntil && grant.validUntil.getTime() < now.getTime()) {
         throw new ConflictException({ error: { code: 'BENEFIT_EXPIRED', message: '权益已过期' } })
       }
@@ -170,17 +186,17 @@ export class BenefitRedemptionService {
     }
   }
 
-  /** 并发回放兜底：按 idempotencyKey 读回赢家记录 + 当前权益快照。 */
-  private async loadExisting(idempotencyKey: string, benefitGrantId: string): Promise<RedeemBenefitResult> {
+  /**
+   * 并发回放：按 idempotencyKey 读回赢家记录。仅当记录存在**且归属为本人**时返回幂等回放，
+   * 否则返回 null（让调用方透传原始错误——不存在则非本 key 冲突，不属本人则不泄露他人核销）。
+   */
+  private async replayIfPresent(idempotencyKey: string, endUserId: string): Promise<RedeemBenefitResult | null> {
     const record = await this.prisma.redemptionRecord.findUnique({ where: { idempotencyKey } })
-    const grant = await this.prisma.benefitGrant.findUnique({ where: { id: benefitGrantId } })
-    if (!record) {
-      // 理论不可达（isUniqueError 已保证存在）；防御性抛出，不静默造数据。
-      throw new ConflictException({ error: { code: 'REDEEM_CONFLICT', message: '核销冲突，请重试' } })
-    }
+    if (!record || record.endUserId !== endUserId) return null
+    const grant = await this.prisma.benefitGrant.findUnique({ where: { id: record.benefitRef } })
     return {
       redemptionRecordId: record.id,
-      benefitGrantId,
+      benefitGrantId: record.benefitRef,
       quantityRemaining: grant?.quantityRemaining ?? null,
       status: grant?.status ?? 'active',
       idempotent: true,

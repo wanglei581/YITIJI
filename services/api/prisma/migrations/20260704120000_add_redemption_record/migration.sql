@@ -21,6 +21,9 @@ CREATE TABLE "RedemptionRecord" (
 -- CreateIndex
 CREATE UNIQUE INDEX "RedemptionRecord_idempotencyKey_key" ON "RedemptionRecord"("idempotencyKey");
 
+-- CreateIndex（一产物一核销硬不变量：同一 serviceType+serviceRefId 只能核销一次，防并发绕过）
+CREATE UNIQUE INDEX "RedemptionRecord_serviceType_serviceRefId_key" ON "RedemptionRecord"("serviceType", "serviceRefId");
+
 -- CreateIndex
 CREATE INDEX "RedemptionRecord_endUserId_idx" ON "RedemptionRecord"("endUserId");
 

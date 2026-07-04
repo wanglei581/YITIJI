@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Post, Get, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { BadRequestException, Controller, Post, Get, Header, Param, Body, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
@@ -170,7 +170,9 @@ export class AiController {
   // benefitGrantId（可选，P1 权益核销）：会员在此按次核销一项本人权益（coupon/free_quota/
   // package_entitlement），serviceRefId 用稳定的 taskId → 幂等键 = hash(grant:resume_optimize:taskId)，
   // 同一优化产物只扣一次。核销为纯平台 credit 消费，不碰 Order/金额（券≠资金，见 §8.5 / C5-4 分工）。
+  // no-store：本端点可触发权益核销状态变更（benefitGrantId），禁止中间层缓存吞掉真实核销结果。
   @Get('resume/records/:taskId/optimize')
+  @Header('Cache-Control', 'no-store')
   async getResumeOptimize(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
