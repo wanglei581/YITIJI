@@ -146,6 +146,8 @@ model Refund {
 
 ### 3.4 RedemptionRecord（新增）——券/免费/权益核销，幂等+审计
 
+> **⚠️ 落地分工（2026-07-04 定，权威口径）**：`RedemptionRecord` **不由 C5-4 首建**，而由「我的页商用闭环 P1 权益核销」（分支 `feature/benefit-redemption-p1`）**先落地为核销 SSOT**，本表即那一批建的**唯一**核销账本。P1 批只写「平台 credit / 无 Order」子集：`benefitRef=benefitGrantId`，并按服务点位需要补 `serviceType`/`serviceRefId`/`quantity` 字段；`orderId` 恒 null、`amountCents` 恒 0（券=平台 credit，非资金、非收款）。**C5-4 在同一张 `RedemptionRecord` 上 additive 扩展**：回填 `orderId`、写 `amountCents` 抵扣额、加 `POST /orders/:id/redeem` 与 Order 免费单联动；**不得重建第二套 `BenefitRedemption`/`RedemptionRecord` 账本**（违反 §8.1「禁两套并列标准」）。下方 model 为 C5-4 视角的最终形态（含 orderId/amountCents），P1 批交付的是其子集 + `serviceType`/`serviceRefId`/`quantity`；`idempotencyKey` 语义在 P1 批为 `hash(benefitGrantId + serviceType + serviceRefId)`（对齐 §8.5「同一成果不重复扣同一权益」），C5-4 接 Order 后按 `hash(kind + benefitRef + orderId)` 归一。
+
 ```
 model RedemptionRecord {
   id            String   @id @default(cuid())
