@@ -20,6 +20,7 @@ import type { AssistantChatResponseDto } from './dto/assistant-chat.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 
 interface ReqLike {
   requestId?: string
@@ -96,6 +97,7 @@ export class AiController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly asr: AsrService,
+    private readonly benefitRedemption: BenefitRedemptionService,
   ) {}
 
   /**
@@ -165,13 +167,35 @@ export class AiController {
     return this.aiService.getResumeRecord(taskId, requester)
   }
 
+  // benefitGrantId（可选，P1 权益核销）：会员在此按次核销一项本人权益（coupon/free_quota/
+  // package_entitlement），serviceRefId 用稳定的 taskId → 幂等键 = hash(grant:resume_optimize:taskId)，
+  // 同一优化产物只扣一次。核销为纯平台 credit 消费，不碰 Order/金额（券≠资金，见 §8.5 / C5-4 分工）。
   @Get('resume/records/:taskId/optimize')
   async getResumeOptimize(
     @Param('taskId') taskId: string,
     @Req() req: ReqLike,
+    @Query('benefitGrantId') benefitGrantId?: string,
   ): Promise<ResumeOptimizeResponseDto> {
     const requester = await this.resolveAiResultRequester(req)
     const result = await this.aiService.getResumeOptimize(taskId, requester)
+
+    // 权益核销：仅当优化结果真实生成（completed）且显式传入 benefitGrantId 时才核销；
+    // 核销要求登录会员（权益属本人），匿名传 grantId 直接拒绝。核销失败会抛出（AI 结果已落库，不浪费算力）。
+    const grantId = benefitGrantId?.trim()
+    if (grantId) {
+      if (!requester.endUserId) {
+        throw new BadRequestException({ error: { code: 'REDEEM_REQUIRES_LOGIN', message: '权益核销需登录会员账号' } })
+      }
+      if (result.status === 'completed') {
+        await this.benefitRedemption.redeem({
+          endUserId: requester.endUserId,
+          benefitGrantId: grantId,
+          serviceType: 'resume_optimize',
+          serviceRefId: taskId,
+        })
+      }
+    }
+
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -184,6 +208,7 @@ export class AiController {
         status: result.status,
         moduleCount: result.modules?.length ?? 0,
         hasEndUser: requester.endUserId !== null,
+        benefitRedeemed: Boolean(grantId) && result.status === 'completed',
       },
       ipAddress: ipOf(req),
       userAgent: uaOf(req),

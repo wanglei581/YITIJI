@@ -64,11 +64,20 @@ export class BenefitRedemptionService {
     const { endUserId, benefitGrantId, serviceType, serviceRefId } = params
 
     const outcome = await this.prisma.$transaction(async (tx) => {
-      // ① 幂等快路径：同 key 已存在 → 回放，不扣减。
+      // ① 幂等快路径：同 (grant+service+ref) 已存在 → 回放，不扣减。
       const existing = await tx.redemptionRecord.findUnique({ where: { idempotencyKey } })
       if (existing) {
         const grant = await tx.benefitGrant.findUnique({ where: { id: benefitGrantId } })
         return { record: existing, grant, idempotent: true, decremented: false }
+      }
+
+      // ①b 一产物一核销：同一服务产物（serviceType+serviceRefId）已被**其他权益**核销 → 拒绝二次消费
+      //     （同权益已在 ① 命中；此处命中的必是不同 grant，防止一次优化产物同时吃掉两个权益）。
+      const redeemedForOutput = await tx.redemptionRecord.findFirst({ where: { serviceType, serviceRefId } })
+      if (redeemedForOutput) {
+        throw new ConflictException({
+          error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该服务已使用其他权益核销，不能重复核销' },
+        })
       }
 
       // ② 读 grant + 校验归属 / 类型 / 状态 / 有效期 / 额度。
