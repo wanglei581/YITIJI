@@ -23,12 +23,13 @@ import {
   RepeatIcon,
   ShieldCheckIcon,
   ShieldQuestionIcon,
-  SmartphoneIcon,
-  UserRoundIcon,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { KIcon } from '../../../components/kiosk-icon'
+import { useInkRipple } from '../../../hooks/useInkRipple'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
+import './me-detail-inkpaper.css'
 
 // 退出 / 切换账号确认弹层：公共终端二次确认，避免误触清空会话。
 function ConfirmOverlay({
@@ -51,7 +52,7 @@ function ConfirmOverlay({
         aria-modal="true"
         aria-labelledby="account-action-title"
         aria-describedby="account-action-desc"
-        className="w-[22rem] max-w-full rounded-2xl bg-white p-6 shadow-xl"
+        className="me-dialog w-[22rem] max-w-full p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <p id="account-action-title" className="text-base font-semibold text-neutral-900">{title}</p>
@@ -88,7 +89,7 @@ function LinkRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[64px] w-full items-center gap-3 border-t border-neutral-100 py-3.5 text-left first:border-t-0"
+      className="me-link-row me-ripple"
     >
       <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', iconBg].join(' ')}>
         <Icon className={['h-5 w-5', iconColor].join(' ')} aria-hidden="true" />
@@ -102,7 +103,7 @@ function LinkRow({
   )
 }
 
-const cardSurface = 'rounded-2xl border border-neutral-200 bg-white px-5 shadow-sm'
+const cardSurface = 'me-card px-5'
 
 export function MySettingsPage() {
   const navigate = useNavigate()
@@ -112,6 +113,7 @@ export function MySettingsPage() {
   const [jobAiLoading, setJobAiLoading] = useState(false)
   const [jobAiBusy, setJobAiBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
+  useInkRipple('.me-inkdetail .me-ripple')
 
   const phoneMasked = user?.phoneMasked ?? ''
 
@@ -183,32 +185,33 @@ export function MySettingsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="me-inkdetail me-inkdetail-settings flex h-full flex-col">
       {hint && (
-        <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
           {hint}
         </div>
       )}
 
       <PageHeader
+        className="me-page-header"
         title="账号设置"
         subtitle="账号状态 · 会话说明 · 协议与隐私"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
+          <Button size="sm" variant="secondary" className="me-ripple me-back-button" onClick={() => navigate('/profile')}>
             返回我的
           </Button>
         }
       />
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="me-detail-scroll mt-4 flex-1 overflow-y-auto pb-8">
         <div className="flex flex-col gap-4">
           {/* 账号状态 */}
           {isLoggedIn ? (
             <div className={`${cardSurface} py-5`}>
               <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
-                  <SmartphoneIcon className="h-7 w-7" aria-hidden="true" />
-                </div>
+                <span className="me-account-avatar me-tone-teal">
+                  <KIcon name="phone" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-lg font-bold text-neutral-900">{phoneMasked || '已登录用户'}</p>
@@ -224,16 +227,16 @@ export function MySettingsPage() {
           ) : (
             <div className={`${cardSurface} py-5`}>
               <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-400">
-                  <UserRoundIcon className="h-7 w-7" aria-hidden="true" />
-                </div>
+                <span className="me-account-avatar me-tone-slate">
+                  <KIcon name="user" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-lg font-bold text-neutral-900">游客</p>
                   <p className="mt-1 text-sm text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
                 </div>
                 <Button
                   size="lg"
-                  className="flex h-12 shrink-0 items-center gap-1 px-4"
+                  className="me-ripple flex h-12 shrink-0 items-center gap-1 px-4"
                   onClick={() => navigate('/login', { state: { from: '/me/settings' } })}
                 >
                   <LogInIcon className="h-5 w-5" aria-hidden="true" />
@@ -247,7 +250,7 @@ export function MySettingsPage() {
             <section aria-label="隐私与 AI 授权管理" className={`${cardSurface} py-5`}>
               <div className="flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
-                  <ShieldCheckIcon className="h-5 w-5 text-plum" aria-hidden="true" />
+                  <KIcon name="shield" className="h-5 w-5 text-plum" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -266,6 +269,7 @@ export function MySettingsPage() {
                 <Button
                   size="sm"
                   variant="secondary"
+                  className="me-ripple"
                   disabled={!jobAiGranted || jobAiLoading || jobAiBusy}
                   onClick={() => setConfirm('revokeJobAi')}
                 >
@@ -276,7 +280,7 @@ export function MySettingsPage() {
           )}
 
           {/* 会话说明 */}
-          <Card className="flex items-start gap-3 p-5">
+          <Card className="me-card flex items-start gap-3 p-5">
             <ShieldCheckIcon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-neutral-900">公共终端会话说明</p>
@@ -320,7 +324,7 @@ export function MySettingsPage() {
               <button
                 type="button"
                 onClick={() => setConfirm('logout')}
-                className="flex min-h-[64px] w-full items-center gap-3 border-t border-neutral-100 py-3.5 text-left"
+                className="me-link-row me-ripple"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-error-bg">
                   <LogOutIcon className="h-5 w-5 text-error-fg" aria-hidden="true" />
@@ -332,7 +336,7 @@ export function MySettingsPage() {
           )}
 
           {/* 暂不开放说明（诚实化：避免被误以为可改资料 / 注销） */}
-          <div className="flex items-start gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 px-5 py-4">
+          <div className="me-note flex items-start gap-3 px-5 py-4">
             <ShieldQuestionIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
             <p className="text-xs leading-relaxed text-neutral-500">
               昵称修改、手机号换绑、账号注销等功能暂未开放。如需协助，请联系现场工作人员。
