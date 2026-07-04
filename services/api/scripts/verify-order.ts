@@ -11,6 +11,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
+import { RefundService } from '../src/payment/refund.service'
 import type { AdminMarkPaidDto, AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -100,6 +101,8 @@ async function main(): Promise<void> {
     const createdOrders = await prisma.order.findMany({ where: { printTaskId: { in: taskIds } }, select: { id: true } })
     const orderIds = createdOrders.map((o) => o.id)
     await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } })
+    // C5-4：先删 Refund（FK RESTRICT）再删 Order。
+    await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } })
     await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
@@ -558,7 +561,9 @@ async function main(): Promise<void> {
     // (8) Admin 订单动作 controller（Task 7）：offline/manual_confirmed 可 mark-paid；拒绝 free/wechat/alipay/benefit；
     //     refund 需 reason；paid→refunded 成功；拒绝 unpaid→refunded；审计写入。状态机复用 OrderStatusService（不重写）。
     await p0aGuard('AdminOrderActionsController: offline mark-paid + reject free/forbidden + refund reason + paid→refunded + reject unpaid-refund + audited', async () => {
-      const adminCtl = new AdminOrderActionsController(orderStatus)
+      // C5-4：Admin 退款走 RefundService（offline 退款不调 provider，故 provider=null 足够）。
+      const refundService = new RefundService(prisma, audit, null)
+      const adminCtl = new AdminOrderActionsController(orderStatus, refundService)
       const adminUser = { userId: 'admin-verify', role: 'admin' as const, orgId: null }
 
       const printA = await printJobs.create({ fileUrl: await seedPdfFixture('adminA', 2), fileMd5: 'sha256-adminA', fileName: 'adminA.pdf', params: PRINT_PARAMS }, { endUserId: null, terminalId })
@@ -605,10 +610,12 @@ async function main(): Promise<void> {
         idem.pickupCode === paid.pickupCode &&
         auditAfterPaid - auditBefore === 1 && // 幂等：mark-paid 只写 1 条审计
         rejectsNoReason &&
-        refunded.payStatus === 'refunded' &&
-        refunded.refundReason === '管理员测试退款' &&
-        !!refunded.refundedAt &&
-        auditAfterRefund - auditAfterPaid === 1 && // refund 写 1 条审计
+        // C5-4：RefundService 返回 RefundResultView（Refund 账本 + 订单态）。
+        refunded.order.payStatus === 'refunded' &&
+        refunded.refund.reason === '管理员测试退款' &&
+        refunded.refund.status === 'success' &&
+        !!refunded.order.refundedAt &&
+        auditAfterRefund - auditAfterPaid === 1 && // refund 写 1 条审计（refund.created）
         rejectsUnpaidRefund
       )
     })

@@ -125,10 +125,13 @@ model Order {
   endUserId  String?
   terminalId String?
 
-  // 整数「分」存储,绝不用浮点。当前不接真实支付,amountCents 恒为 0。
+  // 整数「分」存储,绝不用浮点。C5-2 起接真报价（PricingService），amountCents = 应付金额（>=0）。
   amountCents Int    @default(0)
   currency    String @default("CNY")
 
+  // payStatus 取值：unpaid | paying | paid | refunding | partial_refunded | refunded | closed | failed
+  //   （refunding/partial_refunded 为 C5-4 退款域态；partial_refunded 本波仅类型/状态机预留，不接部分退款动作。
+  //    C5-3 出纸门控：只有 paid 可 claim；refunding/partial_refunded/refunded 一律不放行出纸。）
   payStatus  String @default("unpaid")
   taskStatus String @default("pending")
 
@@ -156,7 +159,15 @@ model Order {
   // expiresAt: 线上支付超时关单时间（首次出码时写入，惰性判定关单）；线下/免费单为 null。
   expiresAt  DateTime?
 
+  // ── C5-4 退款 / 核销 additive 补列（沙箱，无 live 网关）─────────────
+  // discountCents: 券/会员权益核销抵扣合计（分，>=0）；全额核销单 = amountCents，Order 置 paid(free/voucher)。
+  //   核销账本落既有 RedemptionRecord（回填 orderId/amountCents），不新建第二套账本。
+  discountCents Int @default(0)
+  // refundedAmountCents: 已退金额累计（分，>=0）；全额退款 = 实付额。partial_refunded 场景本波仅预留，不接部分退款动作。
+  refundedAmountCents Int @default(0)
+
   paymentAttempts PaymentAttempt[]
+  refunds         Refund[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -209,6 +220,32 @@ model PaymentAttempt {
   updatedAt     DateTime @updatedAt
 
   @@unique([channel, channelTxnNo])
+  @@index([orderId])
+  @@index([status])
+}
+
+// ── Refund ────────────────────────────────────────────────────────────────────
+// C5-4 退款域（沙箱，无 live 网关，无真实资金）。不挂靠 PrintTask（退款按订单域建模）。
+//
+// refundNo 为幂等键（唯一）：同一 refundNo 重复请求返回既有退款记录，绝不重复出款/重复审计。
+// channel: 退款执行渠道标识 —— sandbox（走 SandboxPaymentProvider.refund）/ offline / manual_confirmed
+//   （线下/人工退款不调 provider）/ free / voucher（免费/权益单退款仅置态，不动资金、不恢复 BenefitGrant 额度）。
+// status: pending | success | failed。本波全额退款为主；amountCents 记录本次退款额（预留部分退款，本波不接动作）。
+// channelRefundNo: 渠道退款流水号（sandbox 为服务端生成的假标识；offline/free 为 null）。
+model Refund {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  refundNo        String   @unique // 幂等键
+  amountCents     Int // 本次退款额（分，>=0）
+  status          String   @default("pending") // pending | success | failed
+  reason          String?
+  channel         String // sandbox | offline | manual_confirmed | free | voucher
+  channelRefundNo String? // 渠道退款流水号（sandbox 假标识；线下/免费单为 null）
+  operatorId      String? // 操作员标识（Admin/服务端；写入审计 payload，非 User 外键）
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   @@index([orderId])
   @@index([status])
 }

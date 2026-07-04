@@ -218,6 +218,81 @@ export class OrderStatusService {
     return this.requireOrder(orderId)
   }
 
+  /**
+   * C5-4 核销入账（全额券/免费次数/权益抵扣，**唯一允许写 paymentSource='voucher' 的路径**）。
+   *
+   * 只能由 BenefitRedemptionService.redeemForOrder 在核销账本（RedemptionRecord）落库后调用；
+   * Admin / markPaid / markPaidOnline 绝不写 voucher。
+   *
+   * - 合法起点：unpaid（付费单）；要求 discountCents >= order.amountCents（**全额核销**，本波不接部分抵扣）。
+   * - 落库：payStatus=paid + paymentSource='voucher' + payChannel='voucher' + discountCents(=应付) + paidAt +
+   *   paidBy='redemption' + 唯一 pickupCode；CAS + 取件码撞码有界重试（同 markPaid）。
+   * - 幂等：已 paid 且 paymentSource='voucher' → 原样返回；已 paid 但来源不同 → 冲突拒绝。
+   * - 诚实标注：voucher = 平台券/权益抵扣，**非真实资金收款**；免费单同样落 Order + 审计。
+   */
+  async markPaidByRedemption(
+    orderId: string,
+    opts: { discountCents: number; benefitRef: string; operatorId?: string },
+  ): Promise<OrderRecord> {
+    const { discountCents, benefitRef } = opts
+
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+
+    if (order.payStatus === 'paid') {
+      if (order.paymentSource === 'voucher') return order
+      throw new BadRequestException('ORDER_ALREADY_PAID')
+    }
+    if (order.payStatus !== 'unpaid') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+    // 全额核销：抵扣额必须 >= 应付；部分抵扣（<应付）本波不接（留结账用券 UI 波）。
+    if (!Number.isInteger(discountCents) || discountCents < order.amountCents) {
+      throw new BadRequestException('REDEEM_REQUIRES_FULL_COVERAGE')
+    }
+
+    let settled = false
+    for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
+      const pickupCode = await this.generateUniquePickupCode()
+      let res: { count: number }
+      try {
+        res = await this.prisma.order.updateMany({
+          where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set
+          data: {
+            payStatus: 'paid',
+            paymentSource: 'voucher',
+            payChannel: 'voucher',
+            discountCents: order.amountCents, // 全额抵扣（净应付 0）
+            paidAt: new Date(),
+            paidBy: 'redemption',
+            pickupCode,
+          },
+        })
+      } catch (e) {
+        if (isPickupCodeUniqueConflict(e)) continue // 取件码唯一冲突 → 换码重试
+        throw e
+      }
+      if (res.count === 0) {
+        const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
+        if (fresh?.payStatus === 'paid' && fresh.paymentSource === 'voucher') return fresh
+        throw new BadRequestException(fresh?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'ORDER_INVALID_TRANSITION')
+      }
+      settled = true
+      break
+    }
+    if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
+
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'order.mark_paid_redemption',
+      targetType: 'order',
+      targetId: orderId,
+      // voucher = 平台券/权益抵扣，非真实资金；benefitRef 记录来源权益，便于对账与追溯。
+      payload: { paymentSource: 'voucher', discountCents: order.amountCents, benefitRef, operatorId: opts.operatorId ?? null },
+    })
+
+    return this.requireOrder(orderId)
+  }
+
   async refund(orderId: string, opts: { reason: string; operatorId?: string }): Promise<OrderRecord> {
     const reason = opts.reason?.trim()
     if (!reason) throw new BadRequestException('REFUND_REASON_REQUIRED')

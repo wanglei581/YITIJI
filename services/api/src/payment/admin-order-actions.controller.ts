@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { AdminMarkPaidDto, AdminRefundDto } from './dto/order-action.dto'
 import { OrderStatusService } from './order-status.service'
+import { RefundService } from './refund.service'
 
 // Admin 端点只放行线下/人工确认；free 只由 0 元建单自动产生，绝不经 Admin 手动置 free；
 // wechat/alipay/benefit 为未来扩展，禁止写入。
@@ -21,7 +22,10 @@ const ADMIN_ALLOWED_PAYMENT_SOURCES = ['offline', 'manual_confirmed'] as const
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin')
 export class AdminOrderActionsController {
-  constructor(private readonly orderStatus: OrderStatusService) {}
+  constructor(
+    private readonly orderStatus: OrderStatusService,
+    private readonly refundService: RefundService,
+  ) {}
 
   @Post('admin/orders/:id/mark-paid')
   async markPaid(
@@ -36,12 +40,14 @@ export class AdminOrderActionsController {
     return this.orderStatus.markPaid(id, { paymentSource: body.paymentSource, operatorId: user.userId })
   }
 
+  // C5-4：Admin 退款走 canonical RefundService（Refund 账本 + sandbox provider 退款 + 幂等 + 审计）。
+  // refundNo 缺省按订单派生（一单一退幂等）；仅 admin auth/role 放行，绝不新增匿名/会员自助退款入口。
   @Post('admin/orders/:id/refund')
   async refund(
     @Param('id') id: string,
     @Body() body: AdminRefundDto,
     @CurrentUser() user: AuthedUser,
   ) {
-    return this.orderStatus.refund(id, { reason: body.refundReason, operatorId: user.userId })
+    return this.refundService.refund(id, { reason: body.refundReason, operatorId: user.userId })
   }
 }

@@ -18,6 +18,8 @@ import type {
   PaymentProvider,
   QrPaymentCreateInput,
   QrPaymentCreateResult,
+  RefundExecuteInput,
+  RefundExecuteResult,
 } from '../payment-provider.types'
 
 export const SANDBOX_TIMESTAMP_HEADER = 'x-pay-timestamp'
@@ -83,6 +85,17 @@ export class SandboxPaymentProvider implements PaymentProvider {
       `&order=${encodeURIComponent(input.orderNo)}` +
       `&amount=${input.amountCents}`
     return { prepayId, qrCodeContent }
+  }
+
+  /**
+   * 沙箱退款（C5-4）：假通道，不动外部资金，返回服务端生成的假 channelRefundNo + success。
+   * 幂等由业务层（RefundService）按 refundNo 保证；本方法无副作用、可安全重试。
+   * 生产运行时门禁 + 工厂已禁用 sandbox，故本方法不可能在生产触达真实资金。
+   */
+  async refund(input: RefundExecuteInput): Promise<RefundExecuteResult> {
+    // 假流水号自描述、明示沙箱，不指向任何真实退款账本；绑定 refundNo 便于对照。
+    const channelRefundNo = `sbx_refund_${input.refundNo}_${randomBytes(6).toString('hex')}`
+    return { channelRefundNo, status: 'success' }
   }
 
   async verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult> {

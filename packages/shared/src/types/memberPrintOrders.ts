@@ -45,4 +45,9 @@ export interface MemberPrintOrderItem {
   billingPageSource?: BillingPageSource | null
   /** 取件凭证码；仅 paid 且未退款、任务未进入完成/取消/失败终态时返回，否则 null。 */
   pickupCode?: string | null
+  // ── C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）：无 Order 一律 null ──
+  /** 已退金额累计（分）；未退款为 0，无 Order 为 null。 */
+  refundedAmountCents?: number | null
+  /** 券/权益核销抵扣额（分）；无抵扣为 0，无 Order 为 null。券=平台 credit，非资金。 */
+  discountCents?: number | null
 }

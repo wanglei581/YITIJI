@@ -87,6 +87,9 @@ export class MemberPrintOrdersService {
             pickupCode: true,
             taskStatus: true,
             refundedAt: true,
+            // C5-4 只读退款/核销字段（会员只读展示；无任何操作入口）。
+            refundedAmountCents: true,
+            discountCents: true,
           },
         },
       },
@@ -116,6 +119,9 @@ export class MemberPrintOrdersService {
         billablePages: order ? order.billablePages : null,
         billingPageSource: order ? (order.billingPageSource as BillingPageSource | null) : null,
         pickupCode,
+        // C5-4 只读：已退金额 / 券抵扣额（历史无 Order 为 null）。券=平台 credit 非资金。
+        refundedAmountCents: order ? order.refundedAmountCents : null,
+        discountCents: order ? order.discountCents : null,
       }
     })
   }

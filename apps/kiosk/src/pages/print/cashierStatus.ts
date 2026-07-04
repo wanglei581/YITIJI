@@ -62,8 +62,10 @@ export function deriveCashierView(
   if (payStatus === 'paid') {
     return { phase: 'paid', title: '支付成功', hint: '正在进入打印，请稍候…', tone: 'success', showQr: false, canReissue: false, canProceed: true }
   }
-  if (payStatus === 'refunded') {
-    return { phase: 'refunded', title: '订单已退款', hint: '该订单已退款；如需打印请返回重新发起。', tone: 'error', showQr: false, canReissue: false, canProceed: false }
+  if (payStatus === 'refunded' || payStatus === 'refunding' || payStatus === 'partial_refunded') {
+    // C5-4：退款中 / 已退款 / 部分退款一律终态展示，绝不放行进入出纸/取件（canProceed=false）。
+    const title = payStatus === 'refunding' ? '订单退款处理中' : '订单已退款'
+    return { phase: 'refunded', title, hint: '该订单已进入退款流程；如需打印请返回重新发起。', tone: 'error', showQr: false, canReissue: false, canProceed: false }
   }
   if (payStatus === 'closed') {
     return { phase: 'closed', title: '订单已超时关闭', hint: '支付超时，订单已关闭，请返回重新发起打印。', tone: 'warning', showQr: false, canReissue: false, canProceed: false }

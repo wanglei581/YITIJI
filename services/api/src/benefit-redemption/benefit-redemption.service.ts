@@ -8,10 +8,13 @@ import {
 import { Prisma } from '../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { OrderStatusService } from '../payment/order-status.service'
 import {
   REDEEMABLE_BENEFIT_TYPES,
   type RedeemBenefitParams,
   type RedeemBenefitResult,
+  type RedeemForOrderParams,
+  type RedeemForOrderResult,
 } from './benefit-redemption.types'
 
 // ============================================================
@@ -37,6 +40,7 @@ export class BenefitRedemptionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly orderStatus: OrderStatusService,
   ) {}
 
   async redeem(params: RedeemBenefitParams): Promise<RedeemBenefitResult> {
@@ -66,6 +70,74 @@ export class BenefitRedemptionService {
         })
       }
       throw error
+    }
+  }
+
+  /**
+   * C5-4 订单核销：券/免费次数/权益**全额抵扣一个未支付订单**，联动免费单。
+   *
+   * 复用同一核销账本（RedemptionRecord，serviceType='order_redeem' / serviceRefId=orderId）
+   * 与同一幂等/一产物一核销/CAS/审计机制（**不重建第二套账本**）；随后 markPaidByRedemption
+   * 将订单置 paid(voucher)（幂等）。全额抵扣（本波不接部分抵扣）。
+   *
+   * 幂等：同订单同权益重复调用 → RedemptionRecord 回放 + markPaidByRedemption 幂等，不二次扣。
+   * 一单一核销：`@@unique([serviceType,serviceRefId])` 保证同一订单只被核销一次（换权益也拒）。
+   */
+  async redeemForOrder(params: RedeemForOrderParams): Promise<RedeemForOrderResult> {
+    const { endUserId, orderId, benefitGrantId } = params
+
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: '订单不存在' } })
+    // 归属：只允许本人订单核销（endUserId 来自已认证会员）。
+    if (order.endUserId && order.endUserId !== endUserId) {
+      throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: '订单不存在或不属于本人' } })
+    }
+
+    // 幂等 / 一单一核销前置：该订单是否已被核销（@@unique([serviceType,serviceRefId])）。
+    //   核销成功后订单即 paid(voucher)，故重复调用必先落这里，不会被下方 unpaid 门误拒。
+    const existing = await this.prisma.redemptionRecord.findFirst({ where: { serviceType: 'order_redeem', serviceRefId: orderId } })
+    if (existing) {
+      // 同权益 + 本人 → 幂等回放（订单已 paid(voucher)）。
+      if (existing.endUserId === endUserId && existing.benefitRef === benefitGrantId) {
+        return { orderId, redemptionRecordId: existing.id, payStatus: order.payStatus, discountCents: existing.amountCents, idempotent: true }
+      }
+      // 不同权益（或非本人）核销同一订单 → 一单一核销拒绝，绝不二次消费。
+      throw new ConflictException({ error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该订单已用其他权益核销，不能重复核销' } })
+    }
+
+    // 只对未支付付费单首次核销；已支付（线上/线下/免费）/退款态不核销。
+    if (order.payStatus !== 'unpaid') {
+      throw new BadRequestException({ error: { code: 'ORDER_NOT_REDEEMABLE', message: '订单当前不可核销抵扣' } })
+    }
+    if (order.amountCents <= 0) {
+      throw new BadRequestException({ error: { code: 'REDEEM_NOT_REQUIRED', message: '免费单无需核销' } })
+    }
+
+    const discountCents = order.amountCents // 全额核销（本波不接部分抵扣）
+
+    // ① 核销账本（order-linked）：serviceType='order_redeem' / serviceRefId=orderId → 一单一核销。
+    const redeem = await this.redeem({
+      endUserId,
+      benefitGrantId,
+      serviceType: 'order_redeem',
+      serviceRefId: orderId,
+      orderId,
+      amountCents: discountCents,
+    })
+
+    // ② 免费单联动：全额核销 → Order 置 paid(voucher) + pickupCode + 审计（幂等，可安全重试收敛）。
+    const paidOrder = await this.orderStatus.markPaidByRedemption(orderId, {
+      discountCents,
+      benefitRef: benefitGrantId,
+      operatorId: endUserId,
+    })
+
+    return {
+      orderId,
+      redemptionRecordId: redeem.redemptionRecordId,
+      payStatus: paidOrder.payStatus,
+      discountCents,
+      idempotent: redeem.idempotent,
     }
   }
 
@@ -135,16 +207,17 @@ export class BenefitRedemptionService {
       }
 
       // ⑤ 落核销记录（唯一 idempotencyKey；并发丢失方在此命中 P2002 → 事务回滚）。
+      //    order-linked（C5-4）：orderId + amountCents 由 params 回填；服务点位（resume）缺省 null/0。
       const record = await tx.redemptionRecord.create({
         data: {
           endUserId,
-          orderId: null, // 本批恒 null（平台 credit，无 Order）
+          orderId: params.orderId ?? null, // 服务点位恒 null；C5-4 订单核销回填 orderId
           kind: grant.benefitType,
           benefitRef: benefitGrantId,
           serviceType,
           serviceRefId,
           quantity: 1,
-          amountCents: 0, // 本批恒 0（非资金）
+          amountCents: params.amountCents ?? 0, // 服务点位恒 0（非资金）；C5-4 写抵扣额
           idempotencyKey,
         },
       })
@@ -171,6 +244,9 @@ export class BenefitRedemptionService {
           serviceType,
           serviceRefId,
           kind: outcome.record.kind,
+          // C5-4 order-linked：审计带 orderId + 抵扣额，便于对账（非资金，券=平台 credit）。
+          orderId: params.orderId ?? null,
+          amountCents: params.amountCents ?? 0,
           quantityRemaining: outcome.grant?.quantityRemaining ?? null,
           status: outcome.grant?.status ?? 'active',
         },
