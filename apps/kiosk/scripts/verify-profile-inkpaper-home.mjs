@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url'
 //
 // 目标：
 // 1. ProfilePage 主入口继续保持已合入的墨青纸感结构，不回退；
-// 2. 仅允许 /me/settings、/me/benefits、/me/favorites 做低风险视觉换装；
-// 3. /me/ai-records 已由独立守卫覆盖；/me/documents、/me/print-orders 等高风险明细页不能被本批触碰。
+// 2. 允许 /me/settings、/me/benefits、/me/favorites、/me/ai-records 做已守卫的低风险视觉换装；
+// 3. 允许已确认的 /me/print-orders 状态自动刷新小步；
+// 4. /me/documents 和未声明的 /me/print-orders 子模块不能被本守卫覆盖。
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -233,7 +234,7 @@ expectMatches(aiRecordsPage, /className="me-inkdetail/, 'AI服务记录使用 .m
 expectIncludes(aiRecordsPage, 'deleteMyAiRecord', 'AI服务记录保留本人 AI 记录删除接口')
 expectIncludes(jobAiRecords, '删除岗位 AI 参考记录', '岗位 AI 参考记录保留删除操作文案')
 
-// 5) Diff 范围守卫：本批只允许三个低风险明细页、局部 CSS 和本 verify 被修改。
+// 5) Diff 范围守卫：只允许本守卫覆盖的低风险明细换装文件 + 打印订单状态自动刷新小步文件。
 let changedFiles = []
 try {
   changedFiles = listChangedFiles()
@@ -244,7 +245,7 @@ try {
   }
   fail('范围守卫无法比对 origin/main 或读取未跟踪文件，禁止静默通过')
 }
-const allowedChanged = new Set([
+const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
@@ -254,6 +255,16 @@ const allowedChanged = new Set([
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
   'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',
 ])
+const allowedPrintOrderRefreshChanged = new Set([
+  'apps/kiosk/scripts/verify-member-print-orders-ui.mjs',
+  'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/statusRefresh.ts',
+  'docs/product/user-data-flow-matrix.md',
+  'docs/progress/current-progress.md',
+  'docs/progress/next-tasks.md',
+  'docs/superpowers/plans/2026-07-04-print-status-tracking-ui.md',
+])
+const allowedChanged = new Set([...allowedLowRiskInkpaperChanged, ...allowedPrintOrderRefreshChanged])
 const profileRelatedChanged = changedFiles.filter(
   (file) =>
     file.startsWith('apps/kiosk/src/pages/profile/') ||
@@ -261,18 +272,27 @@ const profileRelatedChanged = changedFiles.filter(
 )
 const unexpectedChanged = profileRelatedChanged.filter((file) => !allowedChanged.has(file))
 if (unexpectedChanged.length === 0) {
-  pass('Profile 相关 diff 仅修改低风险明细页与对应局部守卫')
+  pass('Profile 相关 diff 仅修改低风险明细页、打印订单状态刷新小步与对应局部守卫')
 } else {
   fail(`Profile 相关 diff 出现范围外变更：${unexpectedChanged.join(', ')}`)
 }
 
-const forbiddenMeChanged = changedFiles.filter((file) =>
-  /^apps\/kiosk\/src\/pages\/profile\/me\/(MyDocumentsPage|MyPrintOrdersPage|printOrders\/)/.test(file),
-)
+const forbiddenMeChanged = changedFiles.filter((file) => {
+  if (/^apps\/kiosk\/src\/pages\/profile\/me\/MyDocumentsPage/.test(file)) {
+    return true
+  }
+  if (file === 'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') {
+    return !allowedPrintOrderRefreshChanged.has(file)
+  }
+  if (/^apps\/kiosk\/src\/pages\/profile\/me\/printOrders\//.test(file)) {
+    return !allowedPrintOrderRefreshChanged.has(file)
+  }
+  return false
+})
 if (forbiddenMeChanged.length === 0) {
-  pass('本批未触碰 /me/documents、/me/print-orders')
+  pass('本批未触碰 /me/documents，且 /me/print-orders 仅限状态刷新小步')
 } else {
-  fail(`本批禁止触碰高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
+  fail(`本批禁止触碰未声明的高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
 }
 
 const forbiddenProfileChanged = changedFiles.filter((file) =>
@@ -299,4 +319,4 @@ if (failures > 0) {
   process.exit(1)
 }
 
-console.log('✅ ALL PASS — Profile 主入口与低风险 /me 明细页墨青纸感换装范围保持符合预期\n')
+console.log('✅ ALL PASS — Profile 主入口、低风险 /me 明细页与打印订单状态刷新小步范围保持符合预期\n')
