@@ -1,0 +1,73 @@
+{
+  "purpose": "Static acceptance fixture for /me/print-orders logged-in smoke review. This file is not imported by runtime code.",
+  "response": {
+    "items": [
+      {
+        "id": "print-task-paid-pending",
+        "status": "pending",
+        "fileName": "resume-paid.pdf",
+        "createdAt": "2026-07-04T09:00:00.000Z",
+        "completedAt": null,
+        "copies": 2,
+        "colorMode": "color",
+        "paperSize": "A4",
+        "amountCents": 200,
+        "payStatus": "paid",
+        "paymentSource": "offline",
+        "billablePages": 2,
+        "billingPageSource": "pdf_lightweight_scan",
+        "pickupCode": "PICK20260704"
+      },
+      {
+        "id": "print-task-unpaid",
+        "status": "pending",
+        "fileName": "resume-unpaid.pdf",
+        "createdAt": "2026-07-04T09:05:00.000Z",
+        "completedAt": null,
+        "copies": 1,
+        "colorMode": "black_white",
+        "paperSize": "A4",
+        "amountCents": 20,
+        "payStatus": "unpaid",
+        "paymentSource": null,
+        "billablePages": 1,
+        "billingPageSource": "pdf_lightweight_scan",
+        "pickupCode": null
+      },
+      {
+        "id": "print-task-refunded",
+        "status": "printing",
+        "fileName": "resume-refunded.png",
+        "createdAt": "2026-07-04T09:10:00.000Z",
+        "completedAt": null,
+        "copies": 1,
+        "colorMode": "black_white",
+        "paperSize": "A4",
+        "amountCents": 20,
+        "payStatus": "refunded",
+        "paymentSource": "manual_confirmed",
+        "billablePages": 1,
+        "billingPageSource": "image_single_page",
+        "pickupCode": null
+      },
+      {
+        "id": "print-task-without-order",
+        "status": "completed",
+        "fileName": "legacy-resume.pdf",
+        "createdAt": "2026-07-04T08:30:00.000Z",
+        "completedAt": "2026-07-04T08:35:00.000Z",
+        "copies": 1,
+        "colorMode": "black_white",
+        "paperSize": "A4",
+        "amountCents": null,
+        "payStatus": null,
+        "paymentSource": null,
+        "billablePages": null,
+        "billingPageSource": null,
+        "pickupCode": null
+      }
+    ],
+    "nextCursor": "cursor-after-smoke-page",
+    "total": 8
+  }
+}

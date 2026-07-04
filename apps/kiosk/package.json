@@ -31,6 +31,7 @@
     "verify:profile-activity-inkpaper": "node scripts/verify-profile-activity-inkpaper.mjs",
     "verify:profile-documents-inkpaper": "node scripts/verify-profile-documents-inkpaper.mjs",
     "verify:profile-print-orders-inkpaper": "node scripts/verify-profile-print-orders-inkpaper.mjs",
+    "verify:profile-print-orders-login-smoke": "node scripts/verify-profile-print-orders-login-smoke.mjs",
     "verify:profile-commercial-first-batch": "node scripts/verify-profile-commercial-first-batch.mjs",
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
     "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
