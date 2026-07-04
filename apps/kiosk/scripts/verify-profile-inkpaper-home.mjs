@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = join(root, '..', '..')
 const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8')
 
 let failures = 0
@@ -34,6 +35,74 @@ function expectMatches(source, pattern, message) {
 function expectAbsent(source, pattern, message) {
   if (!pattern.test(source)) pass(message)
   else fail(`${message} — forbidden pattern ${pattern} matched`)
+}
+function git(args) {
+  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+}
+function canResolveGitRef(ref) {
+  try {
+    git(['rev-parse', '--verify', `${ref}^{commit}`])
+    return true
+  } catch {
+    return false
+  }
+}
+function fetchRemoteBaseRef(baseRef) {
+  git(['fetch', '--no-tags', '--depth=1', 'origin', `${baseRef}:refs/remotes/origin/${baseRef}`])
+}
+function canResolveMergeBase(baseRef) {
+  try {
+    git(['merge-base', baseRef, 'HEAD'])
+    return true
+  } catch {
+    return false
+  }
+}
+function ensureMergeBase(baseRef) {
+  if (canResolveMergeBase(baseRef)) {
+    return
+  }
+
+  git(['fetch', '--no-tags', '--deepen=50', 'origin'])
+  if (!canResolveMergeBase(baseRef)) {
+    throw new Error(`无法解析 ${baseRef}...HEAD 的 merge-base`)
+  }
+}
+function resolveDiffBase() {
+  const githubBaseRef = process.env.GITHUB_BASE_REF?.trim()
+  if (githubBaseRef) {
+    const githubBase = `origin/${githubBaseRef}`
+    if (!canResolveGitRef(githubBase)) {
+      fetchRemoteBaseRef(githubBaseRef)
+    }
+    if (canResolveGitRef(githubBase)) {
+      return githubBase
+    }
+  }
+
+  if (canResolveGitRef('origin/main')) {
+    return 'origin/main'
+  }
+
+  throw new Error('无法解析 diff base：origin/main 不存在，且 GITHUB_BASE_REF 未提供或无法获取')
+}
+function listChangedFiles() {
+  const diffBase = resolveDiffBase()
+  ensureMergeBase(diffBase)
+  const committed = git(['diff', '--name-only', `${diffBase}...HEAD`])
+    .split('\n')
+    .filter(Boolean)
+  const unstaged = git(['diff', '--name-only'])
+    .split('\n')
+    .filter(Boolean)
+  const staged = git(['diff', '--cached', '--name-only'])
+    .split('\n')
+    .filter(Boolean)
+  const untracked = git(['ls-files', '--others', '--exclude-standard'])
+    .split('\n')
+    .filter(Boolean)
+
+  return [...new Set([...committed, ...unstaged, ...staged, ...untracked])]
 }
 
 console.log('\n=== Profile 主入口墨青纸感换装守卫 ===')
@@ -159,16 +228,12 @@ expectIncludes(settingsPage, '昵称修改、手机号换绑、账号注销等�
 // 5) Diff 范围守卫：本批只允许三个低风险明细页、局部 CSS 和本 verify 被修改。
 let changedFiles = []
 try {
-  const repoRoot = join(root, '..', '..')
-  const tracked = execSync('git diff --name-only origin/main', { cwd: repoRoot, encoding: 'utf8' })
-    .split('\n')
-    .filter(Boolean)
-  const untracked = execSync('git ls-files --others --exclude-standard', { cwd: repoRoot, encoding: 'utf8' })
-    .split('\n')
-    .filter(Boolean)
-  changedFiles = [...new Set([...tracked, ...untracked])]
-} catch {
+  changedFiles = listChangedFiles()
+} catch (error) {
   changedFiles = ['<git-scope-unavailable>']
+  if (error instanceof Error) {
+    console.error(`  ${error.message}`)
+  }
   fail('范围守卫无法比对 origin/main 或读取未跟踪文件，禁止静默通过')
 }
 const allowedChanged = new Set([
