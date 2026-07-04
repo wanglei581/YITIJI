@@ -23,6 +23,7 @@ interface PrintJobState {
   returnLabel?:  string
   taskId?:       string
   orderId?:      string
+  paymentSessionToken?: string
   source?:       PrintMaterialSource
 }
 
@@ -44,11 +45,11 @@ export function PrintDonePage() {
   // （paid + 未退款 + 任务未进终态），前端只透传后端返回值，不自行编造。
   const [pickupCode, setPickupCode] = useState<string | null>(null)
   useEffect(() => {
-    if (!success || API_MODE !== 'http' || !state.orderId) return
+    if (!success || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) return
     let cancelled = false
     void (async () => {
       try {
-        const s = await getPayStatus(state.orderId as string)
+        const s = await getPayStatus({ orderId: state.orderId as string, paymentSessionToken: state.paymentSessionToken })
         if (!cancelled) setPickupCode(s.pickupCode)
       } catch {
         /* 取不到取件码不阻断完成页展示；仅不显示凭证码 */
@@ -57,7 +58,7 @@ export function PrintDonePage() {
     return () => {
       cancelled = true
     }
-  }, [success, state.orderId])
+  }, [success, state.orderId, state.paymentSessionToken])
 
   const handleRetry = () => {
     const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason'])

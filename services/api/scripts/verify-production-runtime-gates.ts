@@ -20,6 +20,7 @@ const PROD_OK: Env = {
   BAIDU_OCR_SECRET_KEY: 'baidu-secret-key',
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
+  PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
 }
 const REQUIRED_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
@@ -206,6 +207,18 @@ function main(): void {
   expectAllowed(
     { ...PROD_OK, AI_LLM_API_KEY: undefined, TRTC_LLM_API_KEY: 'trtc-llm-api-key' },
     '生产环境允许 TRTC_LLM_API_KEY 作为 LLM 密钥兼容项',
+  )
+
+  // 生产环境：短期支付会话签名密钥必须独立配置，不能回退 JWT / 文件签名密钥
+  expectRejected(
+    { ...PROD_OK, PAYMENT_SESSION_SECRET: undefined },
+    'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID',
+    '生产环境拒绝缺失 PAYMENT_SESSION_SECRET',
+  )
+  expectRejected(
+    { ...PROD_OK, PAYMENT_SESSION_SECRET: 'too-short' },
+    'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID',
+    '生产环境拒绝过短 PAYMENT_SESSION_SECRET（<32）',
   )
 
   console.log('\n=== ALL PASS ===')

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { OrderStatusService } from '../payment/order-status.service'
+import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from '../payment/payment-session-token'
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
@@ -32,6 +33,8 @@ export interface PrintJobCreated {
   billablePages: number
   /** 计费页数来源。 */
   billingPageSource: BillingPageSource
+  /** 短期支付会话 token（只授权本次订单出码 / 轮询；不含文件 URL 或密钥）。 */
+  paymentSessionToken: string
 }
 
 export interface PrintJobStatusResult {
@@ -220,6 +223,7 @@ export class PrintJobsService {
     const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
     const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'
     const quote = await this.pricing.quotePrint({ billablePages, billingPageSource, copies, colorMode })
+    assertPaymentSessionSecretConfigured()
 
     // fileName 持久化：PrintTask 当前无独立 fileName 列（本阶段不做 migration，方案②约定）。
     // 折中：把 fileName 落进 paramsJson，使任务详情 / 日志 / DB 中可见文件名。
@@ -307,6 +311,13 @@ export class PrintJobsService {
       priceLines:        quote.lines,
       billablePages:     quote.billablePages,
       billingPageSource: quote.billingPageSource,
+      paymentSessionToken: createPaymentSessionToken({
+        orderId:     order.id,
+        orderNo:     order.orderNo,
+        terminalId:  targetTerminalId,
+        amountCents: order.amountCents,
+        printTaskId: task.id,
+      }),
     }
   }
 

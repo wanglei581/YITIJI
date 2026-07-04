@@ -10,6 +10,7 @@
  *   全字段匹配，缺一即拒；不存在的尝试/任意 closed 订单绝不可能被伪造回调打成 paid。
  * - paymentSource=sandbox 只经 OrderStatusService.markPaidOnline 写入；线下三路径不经过本服务。
  * - 支付状态只改支付域（Order.payStatus / PaymentAttempt），绝不改 PrintTask.status。
+ * - 出码/轮询必须携带打印建单时服务端签发的短期 payment session token；orderId 不能单独授权。
  */
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { randomBytes } from 'crypto'
@@ -17,6 +18,7 @@ import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { OrderStatusService, pickupCodeVisibleFor } from './order-status.service'
+import { verifyPaymentSessionToken } from './payment-session-token'
 import { PAYMENT_PROVIDER_TOKEN } from './payment-provider.factory'
 import { buildPaymentCallbackPath, type PaymentCallbackEvent, type PaymentProvider } from './payment-provider.types'
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
@@ -101,11 +103,13 @@ export class OnlinePaymentService {
   }
 
   /** 出码：为付费订单创建（或复用未过期的）支付尝试，返回屏上动态码内容。 */
-  async createPayAttempt(orderId: string): Promise<PayAttemptView> {
+  async createPayAttempt(orderId: string, paymentSessionToken: string | undefined): Promise<PayAttemptView> {
+    this.requirePaymentSessionHeader(paymentSessionToken)
     const provider = this.requireProvider()
 
     let order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+    this.requirePaymentSession(order, paymentSessionToken)
     // 免费单不出码：0 元单走 markPaid(free) 路径，绝不为其生成支付码。
     if (order.amountCents <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
 
@@ -167,9 +171,11 @@ export class OnlinePaymentService {
   }
 
   /** 支付状态查询（Kiosk 轮询用），含惰性过期/关单。 */
-  async getPayStatus(orderId: string): Promise<PayStatusView> {
+  async getPayStatus(orderId: string, paymentSessionToken: string | undefined): Promise<PayStatusView> {
+    this.requirePaymentSessionHeader(paymentSessionToken)
     let order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+    this.requirePaymentSession(order, paymentSessionToken)
     order = await this.applyLazyExpiry(order)
 
     const latest = await this.prisma.paymentAttempt.findFirst({
@@ -392,6 +398,21 @@ export class OnlinePaymentService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
     return order
+  }
+
+  private requirePaymentSession(order: OrderRecord, paymentSessionToken: string | undefined): void {
+    const result = verifyPaymentSessionToken(paymentSessionToken, {
+      orderId:     order.id,
+      orderNo:     order.orderNo,
+      terminalId:  order.terminalId,
+      amountCents: order.amountCents,
+      printTaskId: order.printTaskId,
+    })
+    if (!result.ok) throw new UnauthorizedException(result.code)
+  }
+
+  private requirePaymentSessionHeader(paymentSessionToken: string | undefined): void {
+    if (!paymentSessionToken?.trim()) throw new UnauthorizedException('PAYMENT_SESSION_REQUIRED')
   }
 
   private toAttemptView(attempt: AttemptRecord, order: OrderRecord): PayAttemptView {

@@ -123,6 +123,7 @@ export function PrintConfirmPage() {
           orderNo:     created.orderNo,
           amountCents: created.amountCents,
           priceLines:  created.priceLines,
+          paymentSessionToken: created.paymentSessionToken,
         }
         if (created.amountCents > 0 && created.payStatus !== 'paid') {
           navigate('/print/cashier', { state: nextState })

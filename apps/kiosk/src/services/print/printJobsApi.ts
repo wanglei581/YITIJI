@@ -49,6 +49,8 @@ export interface PrintJobCreated {
   billablePages: number
   /** 计费页数来源。 */
   billingPageSource: BillingPageSource
+  /** 短期支付会话 token：只用于本次订单出码 / 支付状态查询。 */
+  paymentSessionToken: string
 }
 
 /** Backend status values — subset of shared PrintTaskStatus */
