@@ -1,51 +1,32 @@
-import { Button } from '@ai-job-print/ui'
-import {
-  BookOpenIcon,
-  BotIcon,
-  BrainCircuitIcon,
-  BriefcaseBusinessIcon,
-  BriefcaseIcon,
-  Building2Icon,
-  ChevronRightIcon,
-  ClipboardCheckIcon,
-  CloudUploadIcon,
-  CompassIcon,
-  FileBadge2Icon,
-  FileSearchIcon,
-  FileTextIcon,
-  FileType2Icon,
-  GraduationCapIcon,
-  HeadphonesIcon,
-  HelpCircleIcon,
-  ImageIcon,
-  LandmarkIcon,
-  LightbulbIcon,
-  MapPinIcon,
-  MonitorPlayIcon,
-  PackageIcon,
-  PartyPopperIcon,
-  PrinterIcon,
-  QrCodeIcon,
-  ScanFaceIcon,
-  ScanLineIcon,
-  SparklesIcon,
-  UserCheckIcon,
-  WifiIcon,
-  WrenchIcon,
-  type LucideIcon,
-} from 'lucide-react'
-import type { KioskToolboxConfig, KioskToolboxItem, MemberPrintOrderItem, MemberResumeItem, SmartCampusModuleKey } from '@ai-job-print/shared'
+// 首页 · 墨青纸感（inkpaper）视觉迁移
+//
+// 视觉：对齐定稿原型 .workbuddy/prototypes/fusion-youth-preview-v5.html 首页屏
+//（墨绿顶栏 + Hero 实时时钟 + 身份条叠压 + 分类卡/子入口 + 合规脚注）。
+// 样式集中在 home-inkpaper.css（.khome 作用域），图标走 kiosk-icon Symbol sprite。
+//
+// 本轮口径（2026-07-04 视觉迁移 + 保功能）：只换视觉皮肤，不回退 main 既有能力——
+// ContinuePanel（继续上次）、可点击统计直达明细页、现有入口数量 / 路由 / 业务分组、
+// intent 分流、登录态统计、百宝箱 / 智慧校园动态配置、合规文案全部保持不变。
+import type {
+  KioskToolboxConfig,
+  KioskToolboxItem,
+  MemberPrintOrderItem,
+  MemberResumeItem,
+  SmartCampusModuleKey,
+} from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
+import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
+import { useInkRipple } from '../../hooks/useInkRipple'
+import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
-import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
+import './home-inkpaper.css'
 
-const HERO_IMAGE = '/assets/kiosk-home-hero-job-fair.png'
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
 let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
 
@@ -61,42 +42,30 @@ function useClock() {
   const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()]
   return {
     time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
-    date: `${week} ${pad(now.getMonth() + 1)}/${pad(now.getDate())}`,
+    date: `${pad(now.getMonth() + 1)}月${now.getDate()}日 · ${week}`,
   }
 }
 
+/* ── 顶栏（v5 topbar 语汇：墨绿条 + 品牌徽标 + 状态药丸；时钟只在 Hero） ── */
 function KioskTopBar() {
-  const { time, date } = useClock()
-
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center border-b border-white/70 bg-white/92 px-8 shadow-sm backdrop-blur">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
-          <PrinterIcon className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div>
-          <p className="text-lg font-bold leading-none text-neutral-900">AI求职打印一体机</p>
-          <p className="mt-1 text-xs font-medium text-neutral-500">求职材料 · 招聘会 · 打印扫描</p>
-        </div>
+    <header className="k-top">
+      <span className="k-mark">
+        <KIcon name="logo" />
+      </span>
+      <div className="k-brand">
+        <strong>AI求职打印一体机</strong>
+        <span>求职材料 · 招聘会 · 打印扫描</span>
       </div>
-
-      <div className="ml-auto flex items-center gap-5">
-        <div className="hidden items-center gap-3 text-sm font-medium text-neutral-500 sm:flex">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
-            <PrinterIcon className="h-4 w-4" aria-hidden="true" />
-            打印机
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
-            <WifiIcon className="h-4 w-4" aria-hidden="true" />
-            网络
-          </span>
-        </div>
-        <div className="border-l border-neutral-200 pl-5 text-right">
-          <p className="text-xl font-bold leading-none tabular-nums text-neutral-900">{time}</p>
-          <p className="mt-1 text-xs font-medium text-neutral-500">{date}</p>
-        </div>
+      <div className="k-status">
+        <span className="k-pill">
+          <i className="k-dot" aria-hidden="true" />
+          打印机在线
+        </span>
+        <span className="k-pill">
+          <KIcon name="wifi" />
+          网络正常
+        </span>
       </div>
     </header>
   )
@@ -159,30 +128,33 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
   return { stats, loading }
 }
 
+/* ── Hero（v5 首页 Hero：深绿渐变 + 斜纹 + 装饰圆环 + 实时时钟） ── */
 function HeroSection() {
+  const { time, date } = useClock()
+
   return (
-    <section
-      className="relative min-h-[300px] overflow-hidden bg-neutral-900 bg-cover bg-center"
-      style={{ backgroundImage: `url(${HERO_IMAGE})` }}
-      aria-label="AI求职打印一体机欢迎区"
-    >
-      <div className="absolute inset-0 bg-gradient-to-r from-neutral-900/74 via-neutral-900/36 to-neutral-900/8" />
-      <div className="relative flex min-h-[300px] items-center px-10">
-        <div className="flex items-center gap-6">
-          <span className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 text-white shadow-lg ring-1 ring-white/25 backdrop-blur">
-            <PrinterIcon className="h-12 w-12" aria-hidden="true" />
-          </span>
-          <div className="text-white">
-            <p className="text-2xl font-semibold leading-none text-white/90">您好，欢迎使用</p>
-            <h1 className="mt-4 text-5xl font-extrabold leading-tight tracking-normal">AI求职打印一体机</h1>
-            <p className="mt-4 text-xl font-medium text-white/82">简历服务、岗位信息、招聘会服务、打印扫描一站办理</p>
-          </div>
+    <section className="hero" aria-label="AI求职打印一体机欢迎区">
+      <div className="hero-copy">
+        <div className="hero-eyebrow">
+          <KIcon name="logo" />
+          就业服务 · 一体机自助办理
         </div>
+        <h1>
+          简历、打印、岗位信息
+          <br />
+          一趟办完
+        </h1>
+        <p>今天能办的事都在下面，点开对应卡片直接进入；登录后本次记录自动保存到「我的」。</p>
+      </div>
+      <div className="hero-clock" aria-label="当前时间">
+        <div className="time">{time}</div>
+        <div className="date">{date}</div>
       </div>
     </section>
   )
 }
 
+/* ── 身份条（登录态显示统计，统计格可点击直达明细；未登录显示引导） ── */
 function IdentityPanel() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -193,196 +165,201 @@ function IdentityPanel() {
 
   if (isLoggedIn) {
     const initial = displayName.replace(/\s/g, '').slice(0, 1) || '我'
-    // A档增强:统计数字点击直达本人对应明细页(原为纯展示)
+    // A 档增强：统计数字点击直达本人对应明细页（保留 main 能力，不做纯展示）
     const cells: { label: string; value: string; href: string }[] = [
-      { label: '简历', value: loading || !stats ? '-' : String(stats.resumes), href: '/me/resumes' },
-      { label: '文档', value: loading || !stats ? '-' : String(stats.documents), href: '/me/documents' },
-      { label: 'AI记录', value: loading || !stats ? '-' : String(stats.aiRecords), href: '/me/ai-records' },
-      { label: '收藏', value: loading || !stats ? '-' : String(stats.favorites), href: '/me/favorites' },
+      { label: '简历', value: loading || !stats ? '—' : String(stats.resumes), href: '/me/resumes' },
+      { label: '文档', value: loading || !stats ? '—' : String(stats.documents), href: '/me/documents' },
+      { label: 'AI记录', value: loading || !stats ? '—' : String(stats.aiRecords), href: '/me/ai-records' },
+      { label: '收藏', value: loading || !stats ? '—' : String(stats.favorites), href: '/me/favorites' },
     ]
 
     return (
-      <section className="relative z-10 -mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-primary-50 text-3xl font-bold text-primary-600 ring-4 ring-neutral-100">
-          {initial}
+      <section className="identity" aria-label="登录状态">
+        <div className="id-ava">{initial}</div>
+        <div className="id-copy">
+          <span className="id-kicker">
+            <i className="k-dot" aria-hidden="true" />
+            已登录
+          </span>
+          <strong>{displayName}</strong>
+          <p>可查看本人的简历、文档、AI记录和收藏</p>
         </div>
-        <div className="ml-6 min-w-0 flex-1">
-          <p className="truncate text-3xl font-extrabold leading-tight text-neutral-900">{displayName}</p>
-          <p className="mt-2 text-lg font-semibold text-neutral-500">可查看本人的简历、文档、AI记录和收藏</p>
-        </div>
-        <div className="mr-6 grid w-[360px] grid-cols-4 divide-x divide-neutral-100">
+        <div className="id-stats">
           {cells.map((cell) => (
             <button
               key={cell.label}
               type="button"
+              className="id-stat"
               onClick={() => navigate(cell.href)}
               aria-label={`查看我的${cell.label}`}
-              className="min-h-[64px] rounded-xl text-center transition-colors hover:bg-neutral-50 active:bg-primary-50"
             >
-              <p className="text-3xl font-extrabold tabular-nums text-neutral-900">{cell.value}</p>
-              <p className="mt-1 text-sm font-semibold text-neutral-500">{cell.label}</p>
+              <b>{cell.value}</b>
+              <span>{cell.label}</span>
             </button>
           ))}
         </div>
-        <div className="flex shrink-0 gap-3">
-          <Button variant="secondary" size="lg" className="h-16 rounded-2xl px-6 text-lg" onClick={() => logout()}>
+        <div className="id-actions">
+          <button type="button" className="btn ghost" onClick={() => logout()}>
             退出
-          </Button>
-          <Button size="lg" className="h-16 rounded-2xl px-8 text-lg" onClick={() => navigate('/profile')}>
+          </button>
+          <button type="button" className="btn primary lg" onClick={() => navigate('/profile')}>
             进入我的
-            <ChevronRightIcon className="ml-1 h-6 w-6" aria-hidden="true" />
-          </Button>
+            <KIcon name="arrow" />
+          </button>
         </div>
       </section>
     )
   }
 
   return (
-    <section className="relative z-10 -mt-16 mx-auto flex w-[min(1180px,calc(100%-64px))] items-center rounded-[28px] border border-white/80 bg-white px-9 py-7 shadow-[0_18px_42px_rgba(15,23,42,0.14)]">
-      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-neutral-50 text-neutral-300 ring-4 ring-neutral-100">
-        <UserCheckIcon className="h-14 w-14" aria-hidden="true" />
+    <section className="identity" aria-label="登录状态">
+      <div className="id-ava">
+        <KIcon name="user" />
       </div>
-      <div className="ml-7 min-w-0 flex-1">
-        <p className="text-3xl font-extrabold leading-tight text-neutral-900">
-          {guestMode ? '当前为匿名使用' : '欢迎来到求职服务终端'}
-        </p>
-        <p className="mt-2 text-lg font-semibold text-neutral-500">
-          {guestMode ? '本次服务记录仅在当前会话中保留' : '登录后可查看更多专属权益和历史服务记录'}
+      <div className="id-copy">
+        <span className="id-kicker">
+          <i className="k-dot" aria-hidden="true" />
+          {guestMode ? '匿名使用中' : '未登录 · 可先体验'}
+        </span>
+        <strong>{guestMode ? '当前为匿名使用' : '登录后保存报告、订单和来源记录'}</strong>
+        <p>
+          {guestMode
+            ? '本次服务记录仅在当前会话中保留'
+            : '游客可直接使用大部分功能；登录后结果会保存到对应功能页，方便下次继续。'}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="id-actions">
         {!guestMode && (
-          <button
-            type="button"
-            onClick={continueAsGuest}
-            className="h-16 rounded-2xl px-7 text-lg font-bold text-neutral-500 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
-          >
-            先使用
+          <button type="button" className="btn ghost" onClick={continueAsGuest}>
+            游客体验
           </button>
         )}
-        <button
-          type="button"
-          onClick={goLogin}
-          className="flex h-16 min-w-[320px] items-center justify-center rounded-2xl bg-primary-600 px-9 text-2xl font-extrabold text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] transition-colors hover:bg-primary-700 active:bg-primary-800"
-        >
+        <button type="button" className="btn primary lg cta" onClick={goLogin}>
           立即登录 / 注册
-          <ChevronRightIcon className="ml-3 h-8 w-8" aria-hidden="true" />
+          <KIcon name="arrow" />
         </button>
       </div>
     </section>
   )
 }
 
+/* ── 服务分组（路由 / intent / 分组顺序与换装前完全一致；视觉换 v5 cat-card/sub 语汇） ── */
 interface ServiceTile {
   title: string
-  icon: LucideIcon
+  icon: KioskIconName
   to?: string
   state?: Record<string, unknown>
   disabled?: boolean
 }
 
+type Accent = 'teal' | 'clay' | 'slate' | 'wheat' | 'plum' | 'tool'
+
 interface ServiceGroup {
   title: string
   subtitle: string
-  icon: LucideIcon
-  accent: 'blue' | 'green' | 'orange' | 'cyan' | 'purple' | 'amber'
+  icon: KioskIconName
+  accent: Accent
+  span2?: boolean
+  cols2?: boolean
+  badge?: { icon: KioskIconName; label: string }
   tiles: ServiceTile[]
-}
-
-const ACCENT: Record<ServiceGroup['accent'], { text: string; border: string; iconBg: string }> = {
-  blue: { text: 'text-primary-600', border: 'border-primary-200', iconBg: 'bg-primary-50' },
-  green: { text: 'text-success-fg', border: 'border-success/30', iconBg: 'bg-success-bg' },
-  orange: { text: 'text-warning-fg', border: 'border-warning/30', iconBg: 'bg-warning-bg' },
-  cyan: { text: 'text-info', border: 'border-info/30', iconBg: 'bg-info-bg' },
-  purple: { text: 'text-plum', border: 'border-plum/30', iconBg: 'bg-plum-soft' },
-  // 政策服务功能色：金/amber（visual-design-spec §14.2/§15.4）。
-  amber: { text: 'text-warning-fg', border: 'border-warning/30', iconBg: 'bg-warning-bg' },
 }
 
 const SERVICE_GROUPS: ServiceGroup[] = [
   {
     title: 'AI简历服务',
-    subtitle: '智能打造，高薪之选',
-    icon: BriefcaseBusinessIcon,
-    accent: 'blue',
+    subtitle: '诊断、优化、打印，一次完成',
+    icon: 'resume',
+    accent: 'teal',
+    span2: true,
+    badge: { icon: 'star', label: '推荐先做' },
     tiles: [
       // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
-      { title: 'AI简历诊断', icon: FileSearchIcon, to: '/resume/source?intent=diagnose' },
-      { title: 'AI简历优化', icon: SparklesIcon, to: '/resume/source?intent=optimize' },
-      { title: '简历素材库', icon: BookOpenIcon, to: '/resume/templates' },
-      { title: '职业规划', icon: CompassIcon, to: '/resume/career-plan' },
-      { title: '简历打印', icon: PrinterIcon, to: '/print/upload?source=resume' },
-      { title: '求职材料', icon: FileBadge2Icon, to: '/resume/materials' },
+      { title: 'AI简历诊断', icon: 'doc-check', to: '/resume/source?intent=diagnose' },
+      { title: 'AI简历优化', icon: 'sparkle', to: '/resume/source?intent=optimize' },
+      { title: '简历素材库', icon: 'book', to: '/resume/templates' },
+      { title: '职业规划', icon: 'compass', to: '/resume/career-plan' },
+      { title: '简历打印', icon: 'printer', to: '/print/upload?source=resume' },
+      { title: '求职材料', icon: 'briefcase', to: '/resume/materials' },
     ],
   },
   {
     title: '岗位信息',
-    subtitle: '海量机会，精准匹配',
-    icon: BriefcaseIcon,
-    accent: 'green',
+    subtitle: '第三方来源岗位，去来源平台投递',
+    icon: 'briefcase',
+    accent: 'clay',
     tiles: [
-      { title: '全职岗位', icon: Building2Icon, to: '/jobs?category=fulltime' },
-      { title: '实习岗位', icon: GraduationCapIcon, to: '/jobs?category=intern' },
-      { title: '兼职信息', icon: FileTextIcon, to: '/jobs?category=parttime' },
-      { title: '全部岗位', icon: BriefcaseIcon, to: '/jobs' },
-      { title: '岗位大师', icon: BrainCircuitIcon, disabled: Boolean(true) },
+      { title: '全职岗位', icon: 'briefcase', to: '/jobs?category=fulltime' },
+      { title: '实习岗位', icon: 'campus', to: '/jobs?category=intern' },
+      { title: '兼职信息', icon: 'clock', to: '/jobs?category=parttime' },
+      { title: '全部岗位', icon: 'files', to: '/jobs' },
+      { title: '找企业', icon: 'shield', to: '/companies' },
+      { title: '岗位大师', icon: 'star', disabled: Boolean(true) },
     ],
   },
   {
     title: '招聘会',
-    subtitle: '校招社招，现场直达',
-    icon: MapPinIcon,
-    accent: 'orange',
+    subtitle: '查看场次信息，去来源平台预约',
+    icon: 'pin',
+    accent: 'wheat',
     tiles: [
-      { title: '社会招聘会', icon: MapPinIcon, to: '/job-fairs' },
-      { title: '校园招聘会', icon: BookOpenIcon, to: '/campus' },
-      { title: '扫码签到', icon: QrCodeIcon, to: '/job-fairs/checkin' },
+      { title: '社会招聘会', icon: 'pin', to: '/job-fairs' },
+      { title: '校园招聘会', icon: 'campus', to: '/campus' },
+      { title: '扫码签到', icon: 'qr', to: '/job-fairs/checkin' },
     ],
   },
   {
     title: '打印扫描',
-    subtitle: '随时随地，极速出纸',
-    icon: PrinterIcon,
-    accent: 'cyan',
+    subtitle: '上传或扫描，本机直接出纸',
+    icon: 'printer',
+    accent: 'slate',
     tiles: [
-      { title: '文档打印', icon: FileTextIcon, to: '/print/upload?source=document' },
-      { title: '证件复印', icon: ClipboardCheckIcon, disabled: Boolean(true) },
-      { title: '纸质扫描', icon: ScanLineIcon, to: '/scan/start' },
-      { title: '云打印', icon: CloudUploadIcon, disabled: Boolean(true) },
-      { title: '格式转换', icon: FileType2Icon, disabled: Boolean(true) },
-      { title: '证件照打印', icon: ImageIcon, disabled: Boolean(true) },
+      { title: '文档打印', icon: 'printer', to: '/print/upload?source=document' },
+      { title: '证件复印', icon: 'files', disabled: Boolean(true) },
+      { title: '纸质扫描', icon: 'scan', to: '/scan/start' },
+      { title: '云打印', icon: 'cloud', disabled: Boolean(true) },
+      { title: '格式转换', icon: 'swap', disabled: Boolean(true) },
+      { title: '证件照打印', icon: 'user', disabled: Boolean(true) },
     ],
   },
   {
     title: 'AI面试训练',
     subtitle: '模拟练习，仅供参考',
-    icon: HeadphonesIcon,
-    accent: 'purple',
+    icon: 'headset',
+    accent: 'plum',
     tiles: [
-      { title: '模拟面试', icon: MonitorPlayIcon, to: '/interview/setup' },
-      { title: '面试技巧', icon: LightbulbIcon, to: '/interview/tips' },
-      { title: '面试报告', icon: FileSearchIcon, to: '/interview/reports' },
+      { title: '模拟面试', icon: 'mic', to: '/interview/setup' },
+      { title: '面试技巧', icon: 'bulb', to: '/interview/tips' },
+      { title: '面试报告', icon: 'doc-check', to: '/interview/reports' },
     ],
   },
   {
     // 合规:补贴类只做政策说明/材料清单/官方入口/申请指引(info-only),
     // 不出现"快申/申请"等暗示平台内办理的表述。
     title: '政策服务',
-    subtitle: '权威解读，办事指引',
-    icon: BookOpenIcon,
-    accent: 'amber',
+    subtitle: '政策查询与办事材料指引',
+    icon: 'policy',
+    accent: 'wheat',
+    span2: true,
     tiles: [
-      { title: '就业政策', icon: HelpCircleIcon, to: '/renshi?tab=policy' },
-      { title: '补贴指引', icon: LandmarkIcon, to: '/renshi?tab=social' },
-      { title: '档案/登记', icon: FileBadge2Icon, to: '/renshi?tab=register' },
+      { title: '就业政策', icon: 'policy', to: '/renshi?tab=policy' },
+      { title: '补贴指引', icon: 'ticket', to: '/renshi?tab=social' },
+      { title: '档案 / 登记', icon: 'files', to: '/renshi?tab=register' },
     ],
   },
 ]
 
-function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: ServiceGroup['accent'] }) {
+const SUB_ACCENT: Record<Accent, string> = {
+  teal: '',
+  clay: 'clay',
+  slate: 'slate',
+  wheat: 'wheat',
+  plum: 'plum',
+  tool: '',
+}
+
+function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
   const navigate = useNavigate()
-  const Icon = tile.icon
-  const colors = ACCENT[accent]
   const disabled = tile.disabled || !tile.to
 
   return (
@@ -390,20 +367,17 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Servic
       type="button"
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
-      className={[
-        'group relative flex min-h-[130px] flex-col items-center justify-center gap-4 rounded-[22px] border border-neutral-200 bg-neutral-50/78 px-3 text-center shadow-[0_6px_14px_rgba(15,23,42,0.06)] transition-all',
-        disabled
-          ? 'cursor-not-allowed opacity-64'
-          : 'hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white hover:shadow-[0_12px_24px_rgba(15,23,42,0.1)] active:translate-y-0',
-      ].join(' ')}
+      className={['sub', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
     >
-      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl border ${colors.border} bg-white`}>
-        <Icon className={`h-7 w-7 ${colors.text}`} aria-hidden="true" />
+      <span className="si">
+        <KIcon name={tile.icon} />
       </span>
-      <span className="text-xl font-extrabold leading-tight text-neutral-900">{tile.title}</span>
-      {disabled && (
-        <span className="absolute right-3 top-3 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-400 shadow-sm">
-          即将上线
+      <span className="label">{tile.title}</span>
+      {disabled ? (
+        <span className="soon">即将上线</span>
+      ) : (
+        <span className="arrow">
+          <KIcon name="arrow" />
         </span>
       )}
     </button>
@@ -412,27 +386,38 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Servic
 
 function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   const navigate = useNavigate()
-  const Icon = group.icon
-  const colors = ACCENT[group.accent]
   const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
 
   return (
-    <section className="rounded-[34px] bg-white p-9 shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-neutral-200/80">
-      <button
-        type="button"
+    <section className={group.span2 ? 'cat-card span2' : 'cat-card'}>
+      <div
+        className="cat-head tap"
+        role="button"
+        tabIndex={0}
         onClick={() => enabledFirst?.to && navigate(enabledFirst.to)}
-        className="flex w-full items-center gap-6 text-left"
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && enabledFirst?.to) navigate(enabledFirst.to)
+        }}
       >
-        <span className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl border ${colors.border} bg-white`}>
-          <Icon className={`h-10 w-10 ${colors.text}`} aria-hidden="true" />
+        <span className={`cat-icon ${group.accent}`}>
+          <KIcon name={group.icon} />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-3xl font-extrabold leading-tight tracking-normal text-neutral-900 lg:text-4xl">{group.title}</span>
-          <span className="mt-2 block text-xl font-bold leading-tight text-neutral-500 lg:text-2xl">{group.subtitle}</span>
-        </span>
-      </button>
+        <div className="cat-title">
+          <h3>{group.title}</h3>
+          <p>{group.subtitle}</p>
+        </div>
+        {group.badge && (
+          <span className="cat-badge">
+            <KIcon name={group.badge.icon} />
+            {group.badge.label}
+          </span>
+        )}
+      </div>
 
-      <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-3">
+      <div
+        className={group.cols2 ? 'sub-grid cols2' : 'sub-grid'}
+        style={group.span2 ? { gridTemplateColumns: `repeat(${Math.min(group.tiles.length, 6)}, 1fr)` } : undefined}
+      >
         {group.tiles.map((tile) => (
           <ServiceTileButton key={tile.title} tile={tile} accent={group.accent} />
         ))}
@@ -441,31 +426,126 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   )
 }
 
+// ─── 继续上次（保留 main 的真实可恢复任务面板；仅换 inkpaper 视觉）───────────────
+// 诚实前提：只对「真实可恢复的任务」展示——① 进行中的打印任务（未达终态）；
+// ② 已诊断但尚未优化的简历（下一步）。无可恢复任务不渲染。不伪造进度。
+interface ResumeSuggestion {
+  kind: 'print' | 'optimize'
+  title: string
+  detail: string
+  actionLabel: string
+  onGo: () => void
+  icon: KioskIconName
+}
+
+const ACTIVE_PRINT_STATUSES = new Set(['pending', 'claimed', 'printing'])
+const PRINT_STATUS_TEXT: Record<string, string> = {
+  pending: '排队中',
+  claimed: '已领取',
+  printing: '打印中',
+}
+
+function ContinuePanel() {
+  const navigate = useNavigate()
+  const { isLoggedIn, getToken } = useAuth()
+  const [suggestion, setSuggestion] = useState<ResumeSuggestion | null>(null)
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setSuggestion(null)
+      return
+    }
+    const token = getToken()
+    if (!token) {
+      setSuggestion(null)
+      return
+    }
+
+    let alive = true
+    Promise.all([getMyPrintOrders(token, { pageSize: 5 }), getMyResumes(token, { pageSize: 5 })])
+      .then(([orders, resumes]) => {
+        if (!alive) return
+        // 优先级 1：进行中的打印任务（真实未完成）
+        const activePrint = orders.items.find((o: MemberPrintOrderItem) => ACTIVE_PRINT_STATUSES.has(o.status))
+        if (activePrint) {
+          setSuggestion({
+            kind: 'print',
+            title: '打印任务进行中',
+            detail: `${activePrint.fileName ?? '打印文件'} · ${PRINT_STATUS_TEXT[activePrint.status] ?? activePrint.status}`,
+            actionLabel: '查看进度',
+            onGo: () => navigate('/me/print-orders'),
+            icon: 'printer',
+          })
+          return
+        }
+        // 优先级 2：已诊断但未优化的简历（真实下一步）
+        const diagnosed = resumes.items.find(
+          (r: MemberResumeItem) => r.kind === 'parse' && r.status === 'completed' && !r.optimized,
+        )
+        if (diagnosed) {
+          setSuggestion({
+            kind: 'optimize',
+            title: '上次诊断的简历，可继续优化',
+            detail: '已完成诊断 · 一键进入 AI 优化，生成可打印版本',
+            actionLabel: '去优化',
+            onGo: () =>
+              navigate(`/resume/optimize?taskId=${encodeURIComponent(diagnosed.taskId)}`, {
+                state: { taskId: diagnosed.taskId },
+              }),
+            icon: 'sparkle',
+          })
+          return
+        }
+        setSuggestion(null)
+      })
+      .catch(() => {
+        if (alive) setSuggestion(null)
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [isLoggedIn, getToken, navigate])
+
+  if (!suggestion) return null
+
+  return (
+    <section className="continue" aria-label="继续上次">
+      <span className="c-icon">
+        <KIcon name={suggestion.icon} />
+      </span>
+      <div className="c-copy">
+        <strong>{suggestion.title}</strong>
+        <p>{suggestion.detail}</p>
+      </div>
+      <button type="button" className="btn primary lg" onClick={suggestion.onGo}>
+        {suggestion.actionLabel}
+        <KIcon name="arrow" />
+      </button>
+    </section>
+  )
+}
+
+/* ── 智慧校园（整行 cat-card；后台开关联动，关闭不渲染，逻辑不变） ── */
 // 校园大数据（bigdata）本期严格冻结：不在此列出入口卡，后端开关亦强制 false。
-const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { desc: string; color: string; bg: string }>> = {
+const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { desc: string }>> = {
   welcome: {
     title: '迎新服务',
     desc: '报到流程、办事窗口、入学材料打印',
-    icon: PartyPopperIcon,
+    icon: 'campus',
     to: '/smart-campus/welcome',
-    color: 'text-primary-600',
-    bg: 'bg-primary-50',
   },
   luggage: {
     title: '行李帮运',
     desc: '校方合作服务入口、服务点与路线说明',
-    icon: PackageIcon,
+    icon: 'route',
     to: '/smart-campus/service/luggage',
-    color: 'text-success-fg',
-    bg: 'bg-success-bg',
   },
   panorama: {
     title: 'VR校园',
     desc: '校园全景、路线导览、重点场馆介绍',
-    icon: ScanFaceIcon,
+    icon: 'eye',
     to: '/smart-campus/service/panorama',
-    color: 'text-plum',
-    bg: 'bg-plum-soft',
   },
 }
 
@@ -477,69 +557,39 @@ function SmartCampusHorizontalSection() {
   const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
     .filter((key) => config.modules[key])
     .map((key) => SMART_CAMPUS_TILES[key])
-    .filter((tile): tile is ServiceTile & { desc: string; color: string; bg: string } => !!tile)
+    .filter((tile): tile is ServiceTile & { desc: string } => !!tile)
   const campusItems = [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
 
   if (!config.enabled || (enabledTiles.length === 0 && campusItems.length === 0)) return null
 
   return (
     <>
-      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] border border-primary-200 bg-white shadow-[0_14px_34px_rgba(37,99,235,0.12)]">
-        <div className="flex items-center gap-4 border-b border-primary-100 bg-gradient-to-r from-primary-50 to-info-bg px-8 py-5">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.24)]">
-            <GraduationCapIcon className="h-8 w-8" aria-hidden="true" />
+      <section className="cat-card span2">
+        <div
+          className="cat-head tap"
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/smart-campus')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') navigate('/smart-campus')
+          }}
+        >
+          <span className="cat-icon slate">
+            <KIcon name="campus" />
           </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-3xl font-extrabold leading-tight text-neutral-900">智慧校园</h2>
-              <span className="rounded-full border border-primary-200 bg-white px-3 py-1 text-xs font-bold text-primary-600">
-                学校端已开启
-              </span>
-            </div>
-            <p className="mt-1 text-base font-semibold text-neutral-500">
-              学校专属服务专区，仅校园终端开启时显示；关闭后整块消失，不占首页空白。
-            </p>
+          <div className="cat-title">
+            <h3>智慧校园</h3>
+            <p>学校专属服务专区，仅校园终端开启时显示</p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/smart-campus')}
-            className="hidden min-h-[52px] shrink-0 items-center gap-1 rounded-2xl bg-white px-5 text-base font-extrabold text-primary-600 shadow-sm transition-colors hover:bg-primary-50 active:bg-primary-100 sm:flex"
-          >
-            进入专区
-            <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
-          </button>
+          <span className="cat-badge">
+            <KIcon name="check" />
+            学校端已开启
+          </span>
         </div>
-
-        <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
-          {enabledTiles.map((tile) => {
-            const Icon = tile.icon
-            const disabled = tile.disabled || !tile.to
-            return (
-              <button
-                key={tile.title}
-                type="button"
-                disabled={disabled}
-                onClick={() => tile.to && !disabled && navigate(tile.to)}
-                className={[
-                  'relative min-h-[128px] overflow-hidden rounded-[24px] border border-neutral-200 bg-neutral-50/70 p-5 text-left transition-all',
-                  disabled
-                    ? 'cursor-not-allowed opacity-70'
-                    : 'hover:-translate-y-0.5 hover:border-primary-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0',
-                ].join(' ')}
-              >
-                <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tile.bg}`}>
-                  <Icon className={`h-6 w-6 ${tile.color}`} aria-hidden="true" />
-                </span>
-                <span className="mt-4 block text-xl font-extrabold text-neutral-900">{tile.title}</span>
-                <span className="mt-1 block text-sm font-semibold leading-relaxed text-neutral-500">{tile.desc}</span>
-                {disabled && (
-                  <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-400 shadow-sm">
-                    即将上线
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        <div className="sub-grid">
+          {enabledTiles.map((tile) => (
+            <ServiceTileButton key={tile.title} tile={tile} accent="slate" />
+          ))}
           {campusItems.map((item) => (
             <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} accent="blue" />
           ))}
@@ -551,13 +601,14 @@ function SmartCampusHorizontalSection() {
   )
 }
 
-const TOOLBOX_ICONS: Record<string, LucideIcon> = {
-  wrench: WrenchIcon,
-  'file-text': FileTextIcon,
-  printer: PrinterIcon,
-  sparkles: SparklesIcon,
-  'book-open': BookOpenIcon,
-  'help-circle': HelpCircleIcon,
+/* ── 百宝箱（终端配置驱动；逻辑不变，视觉换 cat-card/sub 语汇） ── */
+const TOOLBOX_ICONS: Record<string, KioskIconName> = {
+  wrench: 'toolbox',
+  'file-text': 'files',
+  printer: 'printer',
+  sparkles: 'sparkle',
+  'book-open': 'book',
+  'help-circle': 'help',
 }
 
 function useToolboxConfig() {
@@ -633,7 +684,6 @@ function ToolboxItemButton({
   accent?: 'slate' | 'blue'
 }) {
   const navigate = useNavigate()
-  const Icon = TOOLBOX_ICONS[item.icon] ?? WrenchIcon
   const disabled = item.disabled || !itemLaunchable(item)
   const badge = itemBadge(item)
 
@@ -642,23 +692,18 @@ function ToolboxItemButton({
       type="button"
       disabled={disabled}
       onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
-      className={[
-        'relative min-h-[128px] rounded-[24px] border border-neutral-200 bg-neutral-50/72 p-5 text-left transition-all',
-        disabled
-          ? 'cursor-not-allowed opacity-70'
-          : accent === 'blue'
-            ? 'hover:-translate-y-0.5 hover:border-primary-200 hover:bg-white hover:shadow-[0_12px_26px_rgba(37,99,235,0.12)] active:translate-y-0'
-            : 'hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white hover:shadow-[0_12px_26px_rgba(15,23,42,0.1)] active:translate-y-0',
-      ].join(' ')}
+      className={['sub', accent === 'blue' ? 'slate' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      title={item.description}
     >
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-700">
-        <Icon className="h-6 w-6" aria-hidden="true" />
+      <span className="si">
+        <KIcon name={TOOLBOX_ICONS[item.icon] ?? 'toolbox'} />
       </span>
-      <span className="mt-4 block text-xl font-extrabold text-neutral-900">{item.title}</span>
-      <span className="mt-1 block text-sm font-semibold leading-relaxed text-neutral-500">{item.description}</span>
-      {badge && (
-        <span className="absolute right-4 top-4 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-neutral-400 shadow-sm">
-          {badge}
+      <span className="label">{item.title}</span>
+      {badge ? (
+        <span className="soon">{badge}</span>
+      ) : (
+        <span className="arrow">
+          <KIcon name="arrow" />
         </span>
       )}
     </button>
@@ -671,34 +716,38 @@ function ToolboxSection() {
   const [externalItem, setExternalItem] = useState<KioskToolboxItem | null>(null)
   const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
+  // 用户口径（2026-07-03）：百宝箱常驻首页；未配置工具时显示「待配置」空态。
+  // 仅当终端配置整体关闭 toolbox 时才隐藏（与换装前行为一致）。
   if (!config.enabled) return null
 
   return (
     <>
-      <section className="mx-auto mt-8 w-[min(1320px,calc(100%-64px))] overflow-hidden rounded-[34px] bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] ring-1 ring-neutral-200/80">
-        <div className="flex items-center gap-4 border-b border-neutral-100 px-8 py-5">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-neutral-900 text-white shadow-[0_10px_20px_rgba(15,23,42,0.18)]">
-            <PackageIcon className="h-8 w-8" aria-hidden="true" />
+      <section className="cat-card span2">
+        <div className="cat-head">
+          <span className="cat-icon tool">
+            <KIcon name="toolbox" />
           </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-3xl font-extrabold leading-tight text-neutral-900">百宝箱</h2>
-            <p className="mt-1 text-base font-semibold text-neutral-500">按当前设备配置展示扩展服务。</p>
+          <div className="cat-title">
+            <h3>百宝箱</h3>
+            <p>本机已配置的扩展服务，经审核后上架</p>
           </div>
+          <span className="cat-badge muted">
+            <KIcon name="shield" />
+            已审核
+          </span>
         </div>
-        <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 xl:grid-cols-4">
-          {items.length > 0 ? (
-            items.map((item) => (
+        {items.length > 0 ? (
+          <div className="sub-grid">
+            {items.map((item) => (
               <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
-            ))
-          ) : (
-            <div className="rounded-[24px] border border-dashed border-neutral-200 bg-neutral-50/72 p-6">
-              <span className="block text-xl font-extrabold text-neutral-900">待配置</span>
-              <span className="mt-2 block text-sm font-semibold leading-relaxed text-neutral-500">
-                后续功能上线后将在这里展示。
-              </span>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="cat-empty">
+            <strong>待配置</strong>
+            <p>后续功能上线后将在这里展示。</p>
+          </div>
+        )}
       </section>
       <QrLaunchModal item={qrItem} placement="toolbox" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="toolbox" onClose={() => setExternalItem(null)} />
@@ -706,116 +755,42 @@ function ToolboxSection() {
   )
 }
 
-// ─── 继续上次（A档增强）───────────────────────────────────────────────────────
-// 诚实前提：只对「真实可恢复的任务」展示——① 进行中的打印任务（未达终态）；
-// ② 已诊断但尚未优化的简历（下一步）。无可恢复任务不渲染。不伪造进度。
-
-interface ResumeSuggestion {
-  kind: 'print' | 'optimize'
-  title: string
-  detail: string
-  actionLabel: string
-  onGo: () => void
-  icon: LucideIcon
-}
-
-const ACTIVE_PRINT_STATUSES = new Set(['pending', 'claimed', 'printing'])
-const PRINT_STATUS_TEXT: Record<string, string> = {
-  pending: '排队中', claimed: '已领取', printing: '打印中',
-}
-
-function ContinuePanel() {
-  const navigate = useNavigate()
-  const { isLoggedIn, getToken } = useAuth()
-  const [suggestion, setSuggestion] = useState<ResumeSuggestion | null>(null)
-
-  useEffect(() => {
-    if (!isLoggedIn) { setSuggestion(null); return }
-    const token = getToken()
-    if (!token) { setSuggestion(null); return }
-
-    let alive = true
-    Promise.all([
-      getMyPrintOrders(token, { pageSize: 5 }),
-      getMyResumes(token, { pageSize: 5 }),
-    ])
-      .then(([orders, resumes]) => {
-        if (!alive) return
-        // 优先级 1：进行中的打印任务（真实未完成）
-        const activePrint = orders.items.find((o: MemberPrintOrderItem) => ACTIVE_PRINT_STATUSES.has(o.status))
-        if (activePrint) {
-          setSuggestion({
-            kind: 'print',
-            title: '打印任务进行中',
-            detail: `${activePrint.fileName ?? '打印文件'} · ${PRINT_STATUS_TEXT[activePrint.status] ?? activePrint.status}`,
-            actionLabel: '查看进度',
-            onGo: () => navigate('/me/print-orders'),
-            icon: PrinterIcon,
-          })
-          return
-        }
-        // 优先级 2：已诊断但未优化的简历（真实下一步）
-        const diagnosed = resumes.items.find((r: MemberResumeItem) => r.kind === 'parse' && r.status === 'completed' && !r.optimized)
-        if (diagnosed) {
-          setSuggestion({
-            kind: 'optimize',
-            title: '上次诊断的简历，可继续优化',
-            detail: '已完成诊断 · 一键进入 AI 优化，生成可打印版本',
-            actionLabel: '去优化',
-            onGo: () => navigate(`/resume/optimize?taskId=${encodeURIComponent(diagnosed.taskId)}`, { state: { taskId: diagnosed.taskId } }),
-            icon: SparklesIcon,
-          })
-          return
-        }
-        setSuggestion(null)
-      })
-      .catch(() => { if (alive) setSuggestion(null) })
-
-    return () => { alive = false }
-  }, [isLoggedIn, getToken, navigate])
-
-  if (!suggestion) return null
-  const Icon = suggestion.icon
-
-  return (
-    <section className="mx-auto mt-6 w-[min(1320px,calc(100%-64px))]">
-      <div className="flex items-center gap-4 rounded-[24px] border border-primary-200 bg-primary-50/70 px-7 py-5 shadow-[0_8px_24px_rgba(16,48,43,0.06)]">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
-          <Icon className="h-7 w-7" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-xl font-bold text-neutral-900">{suggestion.title}</p>
-          <p className="mt-1 truncate text-base text-neutral-500">{suggestion.detail}</p>
-        </div>
-        <Button size="lg" className="h-16 shrink-0 rounded-2xl px-8 text-lg" onClick={suggestion.onGo}>
-          {suggestion.actionLabel}
-          <ChevronRightIcon className="ml-1 h-6 w-6" aria-hidden="true" />
-        </Button>
-      </div>
-    </section>
-  )
-}
-
 export function HomePage() {
+  useInkRipple('.khome .sub, .khome .btn, .khome .id-stat')
+
   return (
-    <div className="min-h-full bg-[#eef1f5] pb-8">
+    <div className="khome">
       <KioskTopBar />
-      <HeroSection />
-      <IdentityPanel />
-      <ContinuePanel />
 
-      <main className="mx-auto mt-10 grid w-[min(1320px,calc(100%-64px))] grid-cols-1 gap-8 pb-6 xl:grid-cols-2">
-        {SERVICE_GROUPS.map((group) => (
-          <ServiceGroupCard key={group.title} group={group} />
-        ))}
-      </main>
+      <div className="khome-inner">
+        <HeroSection />
+        <IdentityPanel />
+        <ContinuePanel />
+      </div>
 
-      <ToolboxSection />
-      <SmartCampusHorizontalSection />
+      <div className="khome-inner">
+        <div className="sec-head">
+          <span className="rail" aria-hidden="true" />
+          <div>
+            <h2>今天可以办理</h2>
+            <p>点按钮直接进入对应功能，操作不超过 3 步。</p>
+          </div>
+        </div>
 
-      <div className="mx-auto mt-2 flex w-[min(1320px,calc(100%-64px))] items-center justify-center gap-2 rounded-2xl bg-white/62 px-5 py-3 text-sm font-medium text-neutral-500">
-        <BotIcon className="h-4 w-4" aria-hidden="true" />
-        岗位和招聘会仅作为第三方/官方来源信息入口，投递与预约请前往来源平台完成。
+        <main className="home-grid">
+          {SERVICE_GROUPS.map((group) => (
+            <ServiceGroupCard key={group.title} group={group} />
+          ))}
+          <ToolboxSection />
+          <SmartCampusHorizontalSection />
+        </main>
+      </div>
+
+      <div className="khome-inner">
+        <p className="compliance">
+          <KIcon name="shield" />
+          岗位和招聘会仅作为第三方 / 官方来源信息入口，投递与预约请前往来源平台完成。
+        </p>
       </div>
     </div>
   )
