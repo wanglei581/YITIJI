@@ -540,6 +540,258 @@
   color: #fffdf8;
 }
 
+.me-inkdetail-print-orders .me-tab {
+  min-height: 48px;
+}
+
+.me-inkdetail-print-orders .me-print-refresh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.me-inkdetail-print-orders .me-print-spin {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #236f52;
+}
+
+.me-inkdetail-print-orders .me-print-live-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #2d8461;
+  box-shadow: 0 0 0 5px rgba(45, 132, 97, 0.12);
+}
+
+.me-inkdetail-print-orders .me-print-filter-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.me-inkdetail-print-orders .me-print-order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 253, 248, 0.9);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.me-inkdetail-print-orders .me-print-order-main {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.me-inkdetail-print-orders .me-print-payment-line {
+  margin-top: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.me-inkdetail-print-orders .me-print-pickup-chip {
+  gap: 4px;
+  background: rgba(45, 132, 97, 0.13);
+  color: #236f52;
+}
+
+.me-inkdetail-print-orders .me-print-pickup-chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+.me-inkdetail-print-orders .me-print-order-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.me-inkdetail-print-orders .me-print-order-action,
+.me-inkdetail-print-orders .me-print-load-more,
+.me-inkdetail-print-orders .me-print-document-action {
+  position: relative;
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  overflow: hidden;
+  border: 1px solid rgba(16, 48, 43, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 253, 248, 0.8);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.me-inkdetail-print-orders .me-print-order-action {
+  padding: 0 13px;
+}
+
+.me-inkdetail-print-orders .me-print-order-action:hover,
+.me-inkdetail-print-orders .me-print-load-more:hover,
+.me-inkdetail-print-orders .me-print-document-action:hover {
+  border-color: rgba(16, 48, 43, 0.24);
+  background: rgba(16, 48, 43, 0.08);
+  color: var(--ink);
+}
+
+.me-inkdetail-print-orders .me-print-order-action:active,
+.me-inkdetail-print-orders .me-print-load-more:active,
+.me-inkdetail-print-orders .me-print-document-action:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+.me-inkdetail-print-orders .me-print-order-action svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.me-inkdetail-print-orders .me-print-load-more {
+  width: 100%;
+  border-style: dashed;
+  padding: 0 16px;
+}
+
+.me-inkdetail-print-orders .me-print-load-more:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.me-inkdetail-print-orders .me-payment-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid rgba(16, 48, 43, 0.1);
+  padding-top: 14px;
+}
+
+.me-inkdetail-print-orders .me-payment-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.me-inkdetail-print-orders .me-payment-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.me-inkdetail-print-orders .me-payment-row strong {
+  min-width: 0;
+  color: var(--ink);
+  text-align: right;
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.me-inkdetail-print-orders .me-payment-row em {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.me-inkdetail-print-orders .me-payment-empty {
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.me-inkdetail-print-orders .me-payment-empty span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.me-inkdetail-print-orders .me-pickup-panel {
+  border: 1px solid rgba(45, 132, 97, 0.22);
+  border-radius: 22px;
+  background: rgba(220, 238, 230, 0.68);
+  padding: 18px;
+  text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 253, 248, 0.76);
+}
+
+.me-inkdetail-print-orders .me-pickup-panel p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #236f52;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.me-inkdetail-print-orders .me-pickup-panel p svg {
+  width: 16px;
+  height: 16px;
+}
+
+.me-inkdetail-print-orders .me-pickup-panel strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 30px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.24em;
+}
+
+.me-inkdetail-print-orders .me-pickup-panel span {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.me-inkdetail-print-orders .me-print-document-action {
+  width: 100%;
+  padding: 0 16px;
+}
+
+.me-inkdetail-print-orders .me-print-document-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.me-inkdetail-print-orders .me-print-document-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .me-toast {
   border-radius: 999px;
   background: rgba(16, 48, 43, 0.94);
@@ -623,5 +875,33 @@
 
   .me-inkdetail-documents .me-doc-actions > button {
     flex: 1 1 112px;
+  }
+
+  .me-inkdetail-print-orders .me-print-order-main {
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: flex-start;
+  }
+
+  .me-inkdetail-print-orders .me-print-order-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .me-inkdetail-print-orders .me-print-order-actions > button {
+    flex: 1 1 104px;
+  }
+
+  .me-inkdetail-print-orders .me-payment-row {
+    align-items: flex-start;
+  }
+
+  .me-inkdetail-print-orders .me-payment-row strong {
+    overflow-wrap: anywhere;
+  }
+
+  .me-inkdetail-print-orders .me-pickup-panel strong {
+    font-size: 28px;
+    letter-spacing: 0.18em;
   }
 }

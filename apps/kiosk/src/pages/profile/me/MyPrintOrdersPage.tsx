@@ -12,11 +12,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card } from '@ai-job-print/ui'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 import { ChevronDownIcon, Loader2Icon, MessageSquareIcon, PrinterIcon, TicketIcon } from 'lucide-react'
 import { getMyPrintOrders } from '../../../services/api/memberPrintOrders'
 import { useAuth } from '../../../auth/useAuth'
+import { KIcon } from '../../../components/kiosk-icon'
+import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
@@ -28,17 +29,18 @@ import {
   mergePrintOrderRefresh,
   nextPrintOrdersPollDelay,
 } from './printOrders/statusRefresh'
+import './me-detail-inkpaper.css'
 
 const PAGE_SIZE = 20
 const MAX_REFRESH_PAGE_SIZE = 50
 
 const STATUS_META: Record<MemberPrintOrderItem['status'], { label: string; cls: string }> = {
-  pending: { label: '排队中', cls: 'bg-warning-bg text-warning-fg' },
-  claimed: { label: '已领取', cls: 'bg-primary-50 text-primary-600' },
-  printing: { label: '打印中', cls: 'bg-primary-50 text-primary-600' },
-  completed: { label: '已完成', cls: 'bg-success-bg text-success-fg' },
-  failed: { label: '失败', cls: 'bg-error-bg text-error-fg' },
-  cancelled: { label: '已取消', cls: 'bg-neutral-100 text-neutral-500' },
+  pending: { label: '排队中', cls: 'me-status is-warning' },
+  claimed: { label: '已领取', cls: 'me-status is-active' },
+  printing: { label: '打印中', cls: 'me-status is-active' },
+  completed: { label: '已完成', cls: 'me-status is-active' },
+  failed: { label: '失败', cls: 'me-status is-danger' },
+  cancelled: { label: '已取消', cls: 'me-status is-muted' },
 }
 
 /** 任务状态筛选（客户端过滤已加载数据；「进行中」= pending/claimed/printing）。 */
@@ -89,6 +91,7 @@ export function MyPrintOrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const itemsRef = useRef(items)
   const loadingMoreRef = useRef(loadingMore)
+  useInkRipple('.me-inkdetail .me-ripple')
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
@@ -228,150 +231,159 @@ export function MyPrintOrdersPage() {
   }, [items, filterKey])
 
   return (
-    <MeListShell
-      title="打印订单"
-      subtitle="本人打印任务与订单记录（仅本人可见）"
-      loginFrom="/me/print-orders"
-      isLoggedIn={isLoggedIn}
-      state={state}
-      onRetry={() => setReloadKey((k) => k + 1)}
-      isEmpty={items.length === 0}
-      emptyIcon={PrinterIcon}
-      emptyTitle="还没有打印订单"
-      emptyDescription="完成一次打印后，这里会显示你的打印记录"
-    >
-      {/* 任务状态筛选（对已加载数据过滤，计数为已加载条数） */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {STATUS_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilterKey(f.key)}
-            aria-pressed={filterKey === f.key}
-            className={[
-              'flex min-h-[48px] shrink-0 items-center gap-1 rounded-full px-4 text-sm font-medium transition-colors',
-              filterKey === f.key ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
-            ].join(' ')}
-          >
-            {f.label}
-            {filterCounts[f.key] > 0 && <span className="text-xs opacity-80">{filterCounts[f.key]}</span>}
-          </button>
-        ))}
-      </div>
+    <div className="me-inkdetail me-inkdetail-print-orders h-full">
+      <MeListShell
+        title="打印订单"
+        subtitle="本人打印任务与订单记录（仅本人可见）"
+        loginFrom="/me/print-orders"
+        isLoggedIn={isLoggedIn}
+        state={state}
+        onRetry={() => setReloadKey((k) => k + 1)}
+        isEmpty={items.length === 0}
+        emptyIcon={PrinterIcon}
+        emptyTitle="还没有打印订单"
+        emptyDescription="完成一次打印后，这里会显示你的打印记录"
+      >
+        <section className="me-detail-summary" aria-label="打印订单概览">
+          <span className="me-summary-icon me-tone-teal" aria-hidden="true">
+            <KIcon name="printer" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p>打印记录</p>
+            <strong>{total}</strong>
+            <span>只展示本人打印任务与订单安全信息；支付状态和金额以真实订单数据为准</span>
+          </div>
+          <div className="me-summary-mini" aria-label="打印订单状态数量">
+            <span>已加载 {items.length}</span>
+            <span>进行中 {activeOrderCount}</span>
+            <span>筛选 {filtered.length}</span>
+          </div>
+        </section>
 
-      {hasActivePrintOrders(items) && (
-        <div
-          className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-xs font-medium text-primary-700"
-        >
-          {autoRefreshChecking ? (
-            <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <span className="h-2 w-2 rounded-full bg-primary-600" aria-hidden="true" />
-          )}
-          {autoRefreshFailed ? (
-            <span role="status" aria-live="polite">
-              自动刷新失败，稍后自动重试；当前列表已保留
-            </span>
-          ) : (
-            <span>
-              {autoRefreshChecking
-                ? '正在同步进行中任务…'
-                : autoRefreshSyncedAt
-                ? `进行中任务自动更新中，上次同步 ${formatTime(autoRefreshSyncedAt)}`
-                : '进行中任务每 5 秒自动更新'}
-            </span>
-          )}
+        {/* 任务状态筛选（对已加载数据过滤，计数为已加载条数） */}
+        <div className="me-tabbar">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilterKey(f.key)}
+              aria-pressed={filterKey === f.key}
+              className={['me-ripple me-tab', filterKey === f.key ? 'is-active' : ''].join(' ')}
+            >
+              {f.label}
+              {filterCounts[f.key] > 0 && <span className="text-xs opacity-80">{filterCounts[f.key]}</span>}
+            </button>
+          ))}
         </div>
-      )}
 
-      {filtered.length === 0 && (
-        <Card className="p-6 text-center text-sm text-neutral-500">
-          {filterKey !== 'all' && nextCursor
-            ? '已加载记录中暂无此类，点「加载更多」继续查找'
-            : '当前筛选下暂无记录'}
-        </Card>
-      )}
+        {hasActivePrintOrders(items) && (
+          <div className="me-note me-print-refresh">
+            {autoRefreshChecking ? (
+              <Loader2Icon className="me-print-spin animate-spin" aria-hidden="true" />
+            ) : (
+              <span className="me-print-live-dot" aria-hidden="true" />
+            )}
+            {autoRefreshFailed ? (
+              <span role="status" aria-live="polite">
+                自动刷新失败，稍后自动重试；当前列表已保留
+              </span>
+            ) : (
+              <span>
+                {autoRefreshChecking
+                  ? '正在同步进行中任务…'
+                  : autoRefreshSyncedAt
+                    ? `进行中任务自动更新中，上次同步 ${formatTime(autoRefreshSyncedAt)}`
+                    : '进行中任务每 5 秒自动更新'}
+              </span>
+            )}
+          </div>
+        )}
 
-      {filtered.map((item) => {
-        const status = STATUS_META[item.status]
-        const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
-        const expanded = expandedId === item.id
-        return (
-          <Card key={item.id} className="flex flex-col gap-3 p-4">
-            <div className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-warning-bg">
-                <PrinterIcon className="h-6 w-6 text-warning-fg" aria-hidden="true" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-neutral-900">{item.fileName ?? '未命名文件'}</p>
-                <p className="mt-0.5 truncate text-xs text-neutral-400">{metaLine(item)}</p>
-                <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-neutral-500">
-                  {paymentLine(item)}
-                  {item.pickupCode && (
-                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
-                      <TicketIcon className="h-3 w-3" aria-hidden="true" />
-                      取件码
-                    </span>
+        {filtered.length === 0 && (
+          <div className="me-empty-card me-print-filter-empty">
+            {filterKey !== 'all' && nextCursor ? '已加载记录中暂无此类，点「加载更多」继续查找' : '当前筛选下暂无记录'}
+          </div>
+        )}
+
+        {filtered.map((item) => {
+          const status = STATUS_META[item.status]
+          const canCreateFeedback = item.status === 'completed' || item.status === 'failed'
+          const expanded = expandedId === item.id
+          return (
+            <div key={item.id} className="me-print-order-card">
+              <div className="me-print-order-main">
+                <span className="me-row-icon me-tone-wheat" aria-hidden="true">
+                  <KIcon name="printer" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="me-row-title">{item.fileName ?? '未命名文件'}</p>
+                  <p className="me-row-meta">{metaLine(item)}</p>
+                  <p className="me-print-payment-line">
+                    <span>{paymentLine(item)}</span>
+                    {item.pickupCode && (
+                      <span className="me-chip me-print-pickup-chip">
+                        <TicketIcon aria-hidden="true" />
+                        取件码
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="me-print-order-actions">
+                  {canCreateFeedback && (
+                    <button
+                      type="button"
+                      onClick={() => openFeedback(item.id)}
+                      className="me-ripple me-print-order-action"
+                      aria-label={`反馈打印订单 ${item.fileName ?? '未命名订单'}`}
+                    >
+                      <MessageSquareIcon aria-hidden="true" />
+                      反馈
+                    </button>
                   )}
-                </p>
-              </div>
-              <div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
-                {canCreateFeedback && (
                   <button
                     type="button"
-                    onClick={() => openFeedback(item.id)}
-                    className="inline-flex min-h-[48px] items-center gap-1.5 rounded-xl border border-warning/20 bg-surface px-3 text-xs font-semibold text-warning-fg transition-colors hover:bg-warning-bg focus:outline-none focus:ring-2 focus:ring-warning/30"
-                    aria-label={`反馈打印订单 ${item.fileName ?? '未命名订单'}`}
+                    onClick={() => setExpandedId(expanded ? null : item.id)}
+                    aria-expanded={expanded}
+                    aria-label={`${expanded ? '收起' : '查看'}订单详单 ${item.fileName ?? '未命名订单'}`}
+                    className="me-ripple me-print-order-action"
                   >
-                    <MessageSquareIcon className="h-4 w-4" aria-hidden="true" />
-                    反馈
+                    详单
+                    <ChevronDownIcon
+                      className={['transition-transform', expanded ? 'rotate-180' : ''].join(' ')}
+                      aria-hidden="true"
+                    />
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(expanded ? null : item.id)}
-                  aria-expanded={expanded}
-                  aria-label={`${expanded ? '收起' : '查看'}订单详单 ${item.fileName ?? '未命名订单'}`}
-                  className="inline-flex min-h-[48px] items-center gap-1 rounded-xl border border-neutral-200 bg-surface px-3 text-xs font-semibold text-neutral-600 transition-colors hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-300"
-                >
-                  详单
-                  <ChevronDownIcon
-                    className={['h-4 w-4 transition-transform', expanded ? 'rotate-180' : ''].join(' ')}
-                    aria-hidden="true"
-                  />
-                </button>
-                <span className={['shrink-0 rounded-full px-2.5 py-1 text-xs font-medium', status.cls].join(' ')}>
-                  {status.label}
-                </span>
+                  <span className={status.cls}>{status.label}</span>
+                </div>
               </div>
+              {expanded && <OrderPaymentSummary item={item} />}
             </div>
-            {expanded && <OrderPaymentSummary item={item} />}
-          </Card>
-        )
-      })}
+          )
+        })}
 
-      {nextCursor && (
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 text-sm font-medium text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
-          >
-            {loadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            加载更多（已加载 {items.length} / 共 {total} 条）
-          </button>
-          {loadMoreError && (
-            <p className="text-center text-xs text-error-fg" role="alert">
-              加载失败，请点「加载更多」重试
-            </p>
-          )}
-        </div>
-      )}
+        {nextCursor && (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="me-ripple me-print-load-more"
+            >
+              {loadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              加载更多（已加载 {items.length} / 共 {total} 条）
+            </button>
+            {loadMoreError && (
+              <p className="text-center text-xs text-error-fg" role="alert">
+                加载失败，请点「加载更多」重试
+              </p>
+            )}
+          </div>
+        )}
 
-      <p className="mt-1 text-center text-xs text-neutral-400">
-        仅展示本人打印任务与订单的安全信息，不含文件内容；金额与支付状态为真实订单数据
-      </p>
-    </MeListShell>
+        <p className="me-legal-note">
+          仅展示本人打印任务与订单的安全信息，不含文件内容；金额与支付状态为真实订单数据
+        </p>
+      </MeListShell>
+    </div>
   )
 }

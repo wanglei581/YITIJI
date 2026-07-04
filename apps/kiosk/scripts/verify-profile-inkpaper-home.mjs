@@ -286,7 +286,22 @@ const allowedPrintOrderRefreshChanged = new Set([
   'docs/progress/next-tasks.md',
   'docs/superpowers/plans/2026-07-04-print-status-tracking-ui.md',
 ])
-const allowedChanged = new Set([...allowedLowRiskInkpaperChanged, ...allowedPrintOrderRefreshChanged])
+const allowedPrintOrdersInkpaperChanged = new Set([
+  'apps/kiosk/package.json',
+  'apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs',
+  'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
+  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+  'apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs',
+  'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
+  'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+])
+const allowedChanged = new Set([
+  ...allowedLowRiskInkpaperChanged,
+  ...allowedPrintOrderRefreshChanged,
+  ...allowedPrintOrdersInkpaperChanged,
+])
 const profileRelatedChanged = changedFiles.filter(
   (file) =>
     file.startsWith('apps/kiosk/src/pages/profile/') ||
@@ -301,15 +316,15 @@ if (unexpectedChanged.length === 0) {
 
 const forbiddenMeChanged = changedFiles.filter((file) => {
   if (file === 'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') {
-    return !allowedPrintOrderRefreshChanged.has(file)
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
   }
   if (/^apps\/kiosk\/src\/pages\/profile\/me\/printOrders\//.test(file)) {
-    return !allowedPrintOrderRefreshChanged.has(file)
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
   }
   return false
 })
 if (forbiddenMeChanged.length === 0) {
-  pass('/me/documents 已由专属守卫覆盖，/me/print-orders 仍仅限状态刷新小步')
+  pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖或仅限状态刷新小步')
 } else {
   fail(`本批禁止触碰未声明的高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
 }
