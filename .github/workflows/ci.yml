@@ -130,6 +130,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
+          pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-resumes-notifications-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-ai-records-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-activity-inkpaper
