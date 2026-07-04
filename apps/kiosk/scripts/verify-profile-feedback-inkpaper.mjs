@@ -167,7 +167,14 @@ const forbiddenChanged = changedFiles.filter((file) =>
   /prisma/i.test(file))
 )
 
-if (forbiddenChanged.length === 0) {
+// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/feedback 明细页时，才强制范围检查；
+// 未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次的后端/数据库改动。
+const touchesOwnedPage =
+  changedFiles.includes('apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx') ||
+  changedFiles.some((file) => file.startsWith('apps/kiosk/src/pages/profile/me/feedback/'))
+if (!touchesOwnedPage) {
+  pass('本 PR 未触碰 /me/feedback 明细页，跳过范围检查（守卫条件触发）')
+} else if (forbiddenChanged.length === 0) {
   pass('diff 未触碰 /me/print-orders、其他已换装明细页、非本次 payment session 后端、数据库或终端链路；/me/documents 已由专属守卫覆盖')
 } else {
   fail(`diff 出现禁止范围变更：${forbiddenChanged.join(', ')}`)

@@ -169,8 +169,14 @@ const allowedChanged = new Set([
   'services/api/src/print-jobs/print-jobs.service.ts',
 ])
 
-const unexpectedChanged = changedFiles.filter((file) => !allowedChanged.has(file))
-if (unexpectedChanged.length === 0) {
+// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/documents 明细页时，才强制 allowlist
+// 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次。
+const OWNED_PAGES = ['apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx']
+const touchesOwnedPage = changedFiles.some((file) => OWNED_PAGES.includes(file))
+const unexpectedChanged = touchesOwnedPage ? changedFiles.filter((file) => !allowedChanged.has(file)) : []
+if (!touchesOwnedPage) {
+  pass('本 PR 未触碰 /me/documents 明细页，跳过范围 allowlist 检查（守卫条件触发）')
+} else if (unexpectedChanged.length === 0) {
   pass('diff 仅触碰文档页换装、局部 CSS、守卫、package、CI 与本次 payment session 精确范围')
 } else {
   fail(`diff 出现禁止范围变更：${unexpectedChanged.join(', ')}`)

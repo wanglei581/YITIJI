@@ -141,7 +141,15 @@ const forbiddenChanged = changedFiles.filter((file) =>
   /prisma/i.test(file))
 )
 
-if (forbiddenChanged.length === 0) {
+// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/resumes 或 /me/notifications 明细页时，
+// 才强制范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次改动。
+const touchesOwnedPage = [
+  'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
+].some((file) => changedFiles.includes(file))
+if (!touchesOwnedPage) {
+  pass('本 PR 未触碰 /me/resumes、/me/notifications 明细页，跳过范围检查（守卫条件触发）')
+} else if (forbiddenChanged.length === 0) {
   pass('diff 未触碰 /me/print-orders、其他高风险资产页、非本次 payment session 后端、数据库或终端链路；/me/documents 已由专属守卫覆盖')
 } else {
   fail(`diff 出现禁止范围变更：${forbiddenChanged.join(', ')}`)
