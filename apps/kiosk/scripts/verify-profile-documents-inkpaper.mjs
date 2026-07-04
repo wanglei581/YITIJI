@@ -151,6 +151,7 @@ const allowedChanged = new Set([
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/services/print/paymentApi.ts',
   'apps/kiosk/src/services/print/printJobsApi.ts',
+  'docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md',
   'docs/progress/current-progress.md',
   'services/api/scripts/verify-kiosk-cashier-ui.ts',
   'services/api/scripts/verify-payment-flow.ts',
