@@ -287,6 +287,20 @@
   padding: 18px;
 }
 
+.me-inkdetail .me-section-copy h2 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.me-inkdetail .me-section-copy p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
 .me-chip,
 .me-status {
   display: inline-flex;
@@ -350,6 +364,34 @@
   font-size: 12px;
   line-height: 1.65;
   color: var(--muted);
+}
+
+.me-inkdetail .me-delete-button {
+  display: inline-flex;
+  min-height: 44px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(16, 48, 43, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 253, 248, 0.76);
+  padding: 0 13px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.me-inkdetail .me-delete-button:hover,
+.me-inkdetail .me-delete-button.is-confirm {
+  border-color: rgba(168, 65, 62, 0.28);
+  background: rgba(168, 65, 62, 0.12);
+  color: #9a3d3a;
+}
+
+.me-inkdetail .me-delete-button:active {
+  transform: translateY(1px) scale(0.995);
 }
 
 .me-toast {

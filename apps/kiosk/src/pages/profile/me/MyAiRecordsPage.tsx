@@ -6,36 +6,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card } from '@ai-job-print/ui'
 import type { JobAiSessionListItem, MemberAiRecordItem, MemberAiRecordKind } from '@ai-job-print/shared'
-import { FileSearchIcon, SparklesIcon, Trash2Icon, type LucideIcon } from 'lucide-react'
+import { SparklesIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyAiRecord, getMyAiRecords } from '../../../services/api/memberAssets'
 import { deleteMyJobAiSession, listMyJobAiSessions } from '../../../services/api/jobAi'
 import { useAuth } from '../../../auth/useAuth'
+import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
+import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { JobAiSessionRecords } from './JobAiSessionRecords'
+import './me-detail-inkpaper.css'
 
-const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon: LucideIcon; bg: string; color: string }> = {
-  parse: { label: '简历诊断', hint: '上传简历后的诊断记录', icon: FileSearchIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
-  optimize: { label: '简历优化', hint: '基于诊断生成的优化建议', icon: SparklesIcon, bg: 'bg-plum-soft', color: 'text-plum' },
-  generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录', icon: SparklesIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
-  job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: FileSearchIcon, bg: 'bg-info-bg', color: 'text-info' },
-  career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: FileSearchIcon, bg: 'bg-success-bg', color: 'text-success-fg' },
-  fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: SparklesIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
+const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon: KioskIconName; tone: string }> = {
+  parse: { label: '简历诊断', hint: '上传简历后的诊断记录', icon: 'doc-check', tone: 'teal' },
+  optimize: { label: '简历优化', hint: '基于诊断生成的优化建议', icon: 'sparkle', tone: 'rose' },
+  generate: { label: 'AI 简历生成', hint: 'AI 引导生成的简历记录', icon: 'resume', tone: 'teal' },
+  job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: 'briefcase', tone: 'slate' },
+  career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: 'route', tone: 'wheat' },
+  fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: 'fair', tone: 'wheat' },
 }
 
 const UNKNOWN_KIND_META = {
   label: 'AI 服务记录',
   hint: '本人 AI 服务元数据',
-  icon: SparklesIcon,
-  bg: 'bg-neutral-50',
-  color: 'text-neutral-500',
+  icon: 'sparkle' as KioskIconName,
+  tone: 'slate',
 }
 
 const STATUS_META: Record<MemberAiRecordItem['status'], { label: string; cls: string }> = {
-  pending: { label: '待处理', cls: 'bg-warning-bg text-warning-fg' },
-  processing: { label: '处理中', cls: 'bg-primary-50 text-primary-600' },
-  completed: { label: '已完成', cls: 'bg-success-bg text-success-fg' },
-  failed: { label: '失败', cls: 'bg-error-bg text-error-fg' },
+  pending: { label: '待处理', cls: 'is-warning' },
+  processing: { label: '处理中', cls: 'is-muted' },
+  completed: { label: '已完成', cls: 'is-active' },
+  failed: { label: '失败', cls: 'is-danger' },
 }
 
 function shortTaskId(taskId: string): string {
@@ -60,6 +62,7 @@ export function MyAiRecordsPage() {
   const [hint, setHint] = useState<string | null>(null)
   const mountedRef = useRef(false)
   const loadSeqRef = useRef(0)
+  useInkRipple('.me-inkdetail .me-ripple')
 
   useEffect(() => {
     mountedRef.current = true
@@ -159,10 +162,15 @@ export function MyAiRecordsPage() {
     }
   }
 
+  const totalCount = items.length + jobAiSessions.length
+  const completedCount =
+    items.filter((item) => item.status === 'completed').length +
+    jobAiSessions.filter((item) => item.session.status === 'completed').length
+
   return (
-    <>
+    <div className="me-inkdetail me-inkdetail-ai-records h-full">
       {hint && (
-        <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
           {hint}
         </div>
       )}
@@ -179,6 +187,21 @@ export function MyAiRecordsPage() {
         emptyTitle="还没有 AI 服务记录"
         emptyDescription="完成简历诊断、优化、岗位 AI 参考、职业规划或参会准备后，这里会显示记录"
       >
+        <section className="me-detail-summary" aria-label="AI 服务记录概览">
+          <span className="me-summary-icon me-tone-teal" aria-hidden="true">
+            <KIcon name="robot" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p>AI 服务记录</p>
+            <strong>{totalCount}</strong>
+            <span>仅展示本人服务元数据，不展示简历原文、诊断正文或模型原始输出</span>
+          </div>
+          <div className="me-summary-mini" aria-label="AI 服务记录状态数量">
+            <span>已完成 {completedCount}</span>
+            <span>处理中 {totalCount - completedCount}</span>
+          </div>
+        </section>
+
         <JobAiSessionRecords
           items={jobAiSessions}
           confirmId={confirmJobAiSessionId}
@@ -187,31 +210,31 @@ export function MyAiRecordsPage() {
         />
 
         {items.length > 0 && (
-          <div className="pt-1">
-            <h2 className="text-sm font-semibold text-neutral-900">简历与规划 AI 记录</h2>
-            <p className="mt-1 text-xs leading-relaxed text-neutral-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容。</p>
+          <div className="me-section-copy">
+            <h2>简历与规划 AI 记录</h2>
+            <p>仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容。</p>
           </div>
         )}
 
         {items.map((item) => {
           const kind = KIND_META[item.kind] ?? UNKNOWN_KIND_META
           const status = STATUS_META[item.status]
-          const Icon = kind.icon
           const confirming = confirmId === item.id
           return (
-            <Card key={item.id} className="flex items-center gap-4 p-4">
-              <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', kind.bg].join(' ')}>
-                <Icon className={['h-6 w-6', kind.color].join(' ')} aria-hidden="true" />
-              </div>
+            <Card key={item.id} className="me-benefit-card me-ripple">
+              <div className="flex items-center gap-4">
+              <span className={['me-row-icon', `me-tone-${kind.tone}`].join(' ')} aria-hidden="true">
+                <KIcon name={kind.icon} />
+              </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-neutral-900">{kind.label}</p>
-                  <span className={['shrink-0 rounded-full px-2 py-0.5 text-xs font-medium', status.cls].join(' ')}>
+                  <span className="me-chip">{kind.label}</span>
+                  <span className={['me-status', status.cls].join(' ')}>
                     {status.label}
                   </span>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-neutral-400">{kind.hint}</p>
-                <p className="mt-0.5 truncate text-xs text-neutral-400">{metaLine(item)}</p>
+                <p className="me-row-title mt-2">{kind.hint}</p>
+                <p className="me-row-meta">{metaLine(item)}</p>
               </div>
               <button
                 type="button"
@@ -220,20 +243,21 @@ export function MyAiRecordsPage() {
                 title={confirming ? '再次点击确认删除' : '删除'}
                 aria-label={confirming ? '再次点击确认删除 AI 服务记录' : '删除 AI 服务记录'}
                 className={[
-                  'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
+                  'me-delete-button me-ripple',
                   confirming
-                    ? 'border-error/40 bg-error-bg text-error-fg'
-                    : 'border-neutral-200 text-neutral-400 hover:bg-error-bg hover:text-error-fg',
+                    ? 'is-confirm'
+                    : '',
                 ].join(' ')}
               >
                 <Trash2Icon className="h-4 w-4" aria-hidden="true" />
                 {confirming && <span className="ml-1">确认删除</span>}
               </button>
+              </div>
             </Card>
           )
         })}
-        <p className="mt-1 text-center text-xs text-neutral-400">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容</p>
+        <p className="me-legal-note">仅展示本人 AI 服务元数据，不展示简历原文、诊断正文或文件内容</p>
       </MeListShell>
-    </>
+    </div>
   )
 }
