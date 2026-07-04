@@ -22,12 +22,20 @@
  * service 读写路径只依赖 prisma；guard 用最小桩注入 jwt / redis，确定性验证鉴权分支。
  */
 import 'dotenv/config'
+import { execFileSync } from 'child_process'
 import { randomUUID } from 'crypto'
+import { rmSync } from 'fs'
 import type { ExecutionContext } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MemberFavoritesService } from '../src/member-favorites/member-favorites.service'
 import { MemberBenefitsService } from '../src/member-benefits/member-benefits.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
+
+const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-member-favorites-benefits-${randomUUID().slice(0, 8)}.db`
+if (fallbackDbName) {
+  process.env['DATABASE_URL'] = `file:./prisma/${fallbackDbName}`
+  prepareFallbackDb()
+}
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -288,6 +296,7 @@ async function main() {
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
+    cleanupFallbackDb()
   }
 
   console.log('\nALL PASS')
@@ -296,5 +305,25 @@ async function main() {
 main().catch((error: unknown) => {
   console.error('\nFatal error:', (error as Error).message)
   console.error((error as Error).stack)
+  cleanupFallbackDb()
   process.exit(1)
 })
+
+function cleanupFallbackDb(): void {
+  if (!fallbackDbName) return
+  for (const suffix of ['', '-wal', '-shm']) {
+    rmSync(`prisma/${fallbackDbName}${suffix}`, { force: true })
+  }
+}
+
+function prepareFallbackDb(): void {
+  try {
+    execFileSync('pnpm', ['exec', 'prisma', 'db', 'push'], { stdio: 'pipe' })
+  } catch (error) {
+    const details = (error as { stdout?: Buffer; stderr?: Buffer })
+    console.error(details.stdout?.toString() ?? '')
+    console.error(details.stderr?.toString() ?? '')
+    cleanupFallbackDb()
+    throw error
+  }
+}
