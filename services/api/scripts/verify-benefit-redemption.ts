@@ -228,6 +228,7 @@ async function initFallbackDb(): Promise<void> {
       `CREATE INDEX "BenefitGrant_endUserId_idx" ON "BenefitGrant"("endUserId")`,
       `CREATE TABLE "RedemptionRecord" ("id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT, "orderId" TEXT, "kind" TEXT NOT NULL, "benefitRef" TEXT NOT NULL, "serviceType" TEXT NOT NULL, "serviceRefId" TEXT NOT NULL, "quantity" INTEGER NOT NULL DEFAULT 1, "amountCents" INTEGER NOT NULL DEFAULT 0, "idempotencyKey" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "RedemptionRecord_idempotencyKey_key" ON "RedemptionRecord"("idempotencyKey")`,
+      `CREATE UNIQUE INDEX "RedemptionRecord_serviceType_serviceRefId_key" ON "RedemptionRecord"("serviceType","serviceRefId")`,
       `CREATE INDEX "RedemptionRecord_endUserId_idx" ON "RedemptionRecord"("endUserId")`,
       `CREATE INDEX "RedemptionRecord_benefitRef_idx" ON "RedemptionRecord"("benefitRef")`,
     ])

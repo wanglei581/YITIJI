@@ -137,6 +137,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:profile-documents-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-print-orders-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-commercial-first-batch
+          pnpm --filter @ai-job-print/api verify:profile-commercial-first-batch-acceptance
           pnpm --filter @ai-job-print/kiosk verify:kiosk-shell-active-nav
           pnpm --filter @ai-job-print/kiosk verify:prod-build-config
           pnpm --filter @ai-job-print/kiosk verify:job-info-ui
