@@ -103,6 +103,7 @@
 | 2026-06-21 | `codex/profile-page-split` / 本分支 | 完成我的页商用闭环 Branch 1：`ProfilePage.tsx` 从 595 行拆到 177 行，入口、路由、文案和行为保持不变。 |
 | 2026-06-21 | `codex/profile-me-ai-records-page` / 本分支 | 完成我的页商用闭环 Branch 2：新增 `/me/ai-records` 元数据页，Profile「AI服务记录」入口已从 `/assistant` 修正为 `/me/ai-records`。 |
 | 2026-06-21 | `codex/profile-print-feedback-link` / 本分支 | 完成我的页商用闭环 Branch 3：打印订单可跳转关联反馈，提交携带 `relatedPrintTaskId`，并补齐打印订单分页 verify 正路径。 |
+| 2026-07-04 | `codex/profile-commercial-batch1-20260704` / 本分支 | 完成「我的」账户与服务入口第一批验证门禁收口：双模型分析确认 P0a/P0b/P1/P2 业务功能已落地，本轮未新增业务能力；修复 3 个后端 verify 临时 SQLite `User` 表字段漂移，并让 `verify:member-print-orders` / `verify:member-favorites-benefits` 在无 `DATABASE_URL` 的干净环境下自动创建并清理临时库。已通过 Kiosk 入口 / 打印订单 UI 守卫和 API 权益、活动、反馈通知、打印订单、收藏权益验证；套餐、支付、招聘会扫码凭证、真实短信和 Windows 真机仍按后续独立域验收。 |
 | 2026-06-21 | `codex/ai-resume-assets-closure-plan` / 本分支 | 完成下一组业务闭环计划：确认 `/me/resumes` 页面缺失是 AI 简历资产闭环首个真实缺口，先计划和文档修正，不直接改运行时代码。 |
 | 2026-06-21 | `codex/me-resumes-page` / 本分支 | 完成 AI 简历资产闭环 Branch 1：新增 `/me/resumes` 本人简历元数据页，Profile「我的简历」入口已从上传页改为本人简历页。 |
 | 2026-06-21 | `codex/me-resumes-actions-hardening` / 本分支 | 完成 AI 简历资产闭环 Branch 2：`/me/resumes` 四类动作支持 `taskId + member token` 恢复，岗位匹配回看复用 `getLatestJobFit`，并避免会员任务串用匿名 accessToken。 |

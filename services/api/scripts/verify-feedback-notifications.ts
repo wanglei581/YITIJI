@@ -223,8 +223,11 @@ async function initFallbackDb(): Promise<void> {
   const client = createClient({ url: process.env['DATABASE_URL']! })
   try {
     await client.batch([
-      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE "User" ("id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT, "phoneVerifiedAt" DATETIME, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME, "enabled" BOOLEAN NOT NULL DEFAULT true, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "User_username_key" ON "User"("username")`,
+      `CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash")`,
+      `CREATE INDEX "User_orgId_idx" ON "User"("orgId")`,
+      `CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt")`,
       `CREATE TABLE "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
       `CREATE TABLE "AuditLog" ("id" TEXT NOT NULL PRIMARY KEY, "actorId" TEXT, "actorRole" TEXT NOT NULL, "action" TEXT NOT NULL, "targetType" TEXT NOT NULL, "targetId" TEXT, "payloadJson" TEXT NOT NULL DEFAULT '{}', "ipAddress" TEXT, "userAgent" TEXT, "requestId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
