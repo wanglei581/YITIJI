@@ -5,20 +5,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState } from '@ai-job-print/ui'
+import { Card, EmptyState } from '@ai-job-print/ui'
 import {
   BellIcon,
-  CheckCheckIcon,
-  CheckIcon,
   ChevronRightIcon,
-  FileTextIcon,
-  MessageSquareIcon,
-  PrinterIcon,
-  SparklesIcon,
-  Trash2Icon,
-  type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../../../auth/useAuth'
+import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
+import { useInkRipple } from '../../../hooks/useInkRipple'
 import { API_MODE } from '../../../services/api/client'
 import {
   deleteMyNotification,
@@ -29,14 +23,15 @@ import {
 } from '../../../services/api/memberNotifications'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
+import './me-detail-inkpaper.css'
 
-const CATEGORY_META: Record<string, { label: string; icon: LucideIcon; bg: string; color: string }> = {
-  print: { label: '打印', icon: PrinterIcon, bg: 'bg-warning-bg', color: 'text-warning-fg' },
-  ai: { label: 'AI服务', icon: SparklesIcon, bg: 'bg-plum-soft', color: 'text-plum' },
-  feedback: { label: '反馈', icon: MessageSquareIcon, bg: 'bg-primary-50', color: 'text-primary-600' },
-  maintenance: { label: '维护', icon: FileTextIcon, bg: 'bg-neutral-100', color: 'text-neutral-600' },
-  notice: { label: '公告', icon: BellIcon, bg: 'bg-info-bg', color: 'text-info' },
-  system: { label: '系统', icon: BellIcon, bg: 'bg-info-bg', color: 'text-info' },
+const CATEGORY_META: Record<string, { label: string; icon: KioskIconName; tone: string }> = {
+  print: { label: '打印', icon: 'printer', tone: 'wheat' },
+  ai: { label: 'AI服务', icon: 'sparkle', tone: 'teal' },
+  feedback: { label: '反馈', icon: 'feedback', tone: 'rose' },
+  maintenance: { label: '维护', icon: 'files', tone: 'slate' },
+  notice: { label: '公告', icon: 'bell', tone: 'clay' },
+  system: { label: '系统', icon: 'bell', tone: 'clay' },
 }
 
 export function MyNotificationsPage() {
@@ -49,6 +44,7 @@ export function MyNotificationsPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  useInkRipple('.me-inkdetail .me-ripple')
 
   const canUseRemote = API_MODE === 'http' && Boolean(getToken())
 
@@ -125,123 +121,149 @@ export function MyNotificationsPage() {
   }
 
   return (
-    <MeListShell
-      title="消息通知"
-      subtitle="本人设备、打印、文件与服务消息"
-      loginFrom="/me/notifications"
-      isLoggedIn={isLoggedIn}
-      state={state}
-      onRetry={refresh}
-    >
-      {hint && (
-        <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
-          {hint}
-        </div>
-      )}
+    <div className="me-inkdetail me-inkdetail-notifications h-full">
+      <MeListShell
+        title="消息通知"
+        subtitle="本人设备、打印、文件与服务消息"
+        loginFrom="/me/notifications"
+        isLoggedIn={isLoggedIn}
+        state={state}
+        onRetry={refresh}
+      >
+        {hint && (
+          <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
+            {hint}
+          </div>
+        )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex rounded-full bg-white p-1 ring-1 ring-neutral-200">
-          {[
-            { key: false, label: '全部' },
-            { key: true, label: '未读' },
-          ].map((tab) => (
-            <button
-              key={String(tab.key)}
-              type="button"
-              onClick={() => setUnreadOnly(tab.key)}
-              className={[
-                'min-h-[40px] rounded-full px-4 text-sm font-medium transition-colors',
-                unreadOnly === tab.key ? 'bg-primary-600 text-white' : 'text-neutral-500',
-              ].join(' ')}
-            >
-              {tab.label}
-              {tab.key && unreadCount > 0 && <span className="ml-1">{unreadCount}</span>}
-            </button>
-          ))}
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!canUseRemote || unreadCount === 0 || busyId === 'all'}
-          onClick={() => void markAllRead()}
-        >
-          <CheckCheckIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-          全部已读
-        </Button>
-      </div>
+        <section className="me-detail-summary" aria-label="消息通知概览">
+          <span className="me-summary-icon me-tone-clay" aria-hidden="true">
+            <KIcon name="bell" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p>消息中心</p>
+            <strong>{unreadCount}</strong>
+            <span>未读消息来自本人设备、打印、文件与服务状态</span>
+          </div>
+          <div className="me-summary-mini" aria-label="消息状态">
+            <span>当前 {items.length}</span>
+            <span>{canUseRemote ? '已连接' : '待登录'}</span>
+          </div>
+        </section>
 
-      {!canUseRemote ? (
-        <Card className="p-4">
-          <EmptyState
-            icon={BellIcon}
-            title="当前没有可读取的消息"
-            description="连接真实服务并登录后，这里会显示本人消息"
-            className="py-12"
-          />
-        </Card>
-      ) : items.length === 0 ? (
-        <Card className="p-4">
-          <EmptyState icon={BellIcon} title={visibleEmptyText} description="设备和服务状态有更新时会显示在这里" className="py-12" />
-        </Card>
-      ) : (
-        items.map((item) => {
-          const meta = CATEGORY_META[item.category] ?? CATEGORY_META.system
-          const Icon = meta.icon
-          const feedbackRelated = item.relatedType === 'feedback_ticket' && item.relatedId
-          return (
-            <Card key={`${item.kind}-${item.id}`} className="p-4">
-              <div className="flex items-start gap-4">
-                <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', meta.bg].join(' ')}>
-                  <Icon className={['h-6 w-6', meta.color].join(' ')} aria-hidden="true" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {!item.isRead && <span className="h-2 w-2 rounded-full bg-primary-600" aria-label="未读" />}
-                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-neutral-900">{item.title}</p>
-                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                      {meta.label}
-                    </span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="me-tabbar">
+            {[
+              { key: false, label: '全部' },
+              { key: true, label: '未读' },
+            ].map((tab) => {
+              const active = unreadOnly === tab.key
+              return (
+                <button
+                  key={String(tab.key)}
+                  type="button"
+                  onClick={() => setUnreadOnly(tab.key)}
+                  className={['me-tab me-ripple', active ? 'is-active' : ''].join(' ')}
+                  aria-pressed={active}
+                >
+                  {tab.label}
+                  {tab.key && unreadCount > 0 && <span>{unreadCount}</span>}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            disabled={!canUseRemote || unreadCount === 0 || busyId === 'all'}
+            onClick={() => void markAllRead()}
+            className={[
+              'me-ripple inline-flex min-h-[44px] items-center gap-1.5 overflow-hidden rounded-full border px-4 text-sm font-bold transition-colors',
+              !canUseRemote || unreadCount === 0 || busyId === 'all'
+                ? 'cursor-not-allowed border-[rgba(16,48,43,0.08)] bg-[rgba(16,48,43,0.04)] text-[color:var(--muted)] opacity-55'
+                : 'border-[rgba(16,48,43,0.12)] bg-[rgba(255,253,248,0.82)] text-[color:var(--ink-2)] hover:bg-[rgba(16,48,43,0.08)]',
+            ].join(' ')}
+          >
+            <span className="inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
+              <KIcon name="check" />
+            </span>
+            全部已读
+          </button>
+        </div>
+
+        {!canUseRemote ? (
+          <Card className="me-empty-card">
+            <EmptyState
+              icon={BellIcon}
+              title="当前没有可读取的消息"
+              description="连接真实服务并登录后，这里会显示本人消息"
+              className="py-12"
+            />
+          </Card>
+        ) : items.length === 0 ? (
+          <Card className="me-empty-card">
+            <EmptyState icon={BellIcon} title={visibleEmptyText} description="设备和服务状态有更新时会显示在这里" className="py-12" />
+          </Card>
+        ) : (
+          items.map((item) => {
+            const meta = CATEGORY_META[item.category] ?? CATEGORY_META.system
+            const feedbackRelated = item.relatedType === 'feedback_ticket' && item.relatedId
+            return (
+              <Card key={`${item.kind}-${item.id}`} className="me-benefit-card">
+                <div className="flex items-start gap-4">
+                  <span className={['me-row-icon', `me-tone-${meta.tone}`].join(' ')} aria-hidden="true">
+                    <KIcon name={meta.icon} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!item.isRead && <span className="h-2 w-2 rounded-full bg-[color:var(--ink)]" aria-label="未读" />}
+                      <span className="me-row-title min-w-0 flex-1">{item.title}</span>
+                      <span className="me-chip">{meta.label}</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-[color:var(--ink-2)]">{item.content}</p>
+                    <p className="mt-2 text-xs text-[color:var(--muted)]">{formatTime(item.createdAt)}</p>
+                    {feedbackRelated && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)}
+                        className="me-ripple mt-3 inline-flex min-h-[40px] items-center gap-1 overflow-hidden rounded-full border border-[rgba(16,48,43,0.1)] bg-[rgba(16,48,43,0.07)] px-3 text-sm font-bold text-[color:var(--ink-2)]"
+                      >
+                        查看相关反馈
+                        <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
                   </div>
-                  <p className="mt-1 text-sm leading-6 text-neutral-600">{item.content}</p>
-                  <p className="mt-2 text-xs text-neutral-400">{formatTime(item.createdAt)}</p>
-                  {feedbackRelated && (
+                </div>
+                <div className="mt-4 flex justify-end gap-2">
+                  {!item.isRead && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)}
-                      className="mt-3 inline-flex min-h-[40px] items-center gap-1 rounded-full bg-primary-50 px-3 text-sm font-medium text-primary-600 active:bg-primary-100"
+                      disabled={busyId === `read-${item.kind}-${item.id}`}
+                      onClick={() => void markRead(item)}
+                      className="me-delete-button me-ripple"
                     >
-                      查看相关反馈
-                      <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+                      <span className="mr-1.5 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
+                        <KIcon name="check" />
+                      </span>
+                      已读
                     </button>
                   )}
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end gap-2">
-                {!item.isRead && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busyId === `read-${item.kind}-${item.id}`}
-                    onClick={() => void markRead(item)}
+                  <button
+                    type="button"
+                    disabled={busyId === `delete-${item.kind}-${item.id}`}
+                    onClick={() => void remove(item)}
+                    className="me-delete-button me-ripple"
                   >
-                    <CheckIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                    已读
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyId === `delete-${item.kind}-${item.id}`}
-                  onClick={() => void remove(item)}
-                >
-                  <Trash2Icon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  删除
-                </Button>
-              </div>
-            </Card>
-          )
-        })
-      )}
-    </MeListShell>
+                    <span className="mr-1.5 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
+                      <KIcon name="close" />
+                    </span>
+                    删除
+                  </button>
+                </div>
+              </Card>
+            )
+          })
+        )}
+      </MeListShell>
+    </div>
   )
 }

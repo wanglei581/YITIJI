@@ -258,6 +258,8 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
