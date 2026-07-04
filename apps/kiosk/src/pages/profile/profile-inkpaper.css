@@ -704,6 +704,7 @@
 @media (max-width: 900px) {
   .kprofile {
     padding-top: 18px;
+    overflow-x: hidden;
   }
 
   .kprofile .kp-inner {
@@ -729,6 +730,134 @@
 
   .kprofile .account-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .kprofile {
+    padding: 18px 0 72px;
+  }
+
+  .kprofile .kp-inner {
+    width: calc(100% - 28px);
+  }
+
+  .kprofile .p-hero {
+    border-radius: 24px;
+    padding: 24px 20px;
+  }
+
+  .kprofile .p-hero.with-pending {
+    padding-bottom: 34px;
+  }
+
+  .kprofile .p-hero::after {
+    right: -78px;
+    top: -84px;
+    width: 210px;
+    height: 210px;
+  }
+
+  .kprofile .p-top {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
+  }
+
+  .kprofile .p-ava {
+    width: 76px;
+    height: 76px;
+    border-radius: 22px;
+    font-size: 32px;
+  }
+
+  .kprofile .p-ava.guest svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .kprofile .p-id {
+    min-width: 0;
+  }
+
+  .kprofile .p-kicker {
+    max-width: 100%;
+    min-height: 26px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .kprofile .p-id h1 {
+    font-size: 25px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .kprofile .p-id p {
+    max-width: none;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
+
+  .kprofile .p-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .kprofile .p-btn {
+    min-height: 54px;
+    padding: 0 22px;
+    font-size: 16px;
+  }
+
+  .kprofile .p-iconbtn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .kprofile .p-stats,
+  .kprofile .entry-grid,
+  .kprofile .chip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kprofile .account-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kprofile .sec-head {
+    margin-top: 30px;
+  }
+
+  .kprofile .sec-head h2 {
+    font-size: 24px;
+    line-height: 1.22;
+  }
+
+  .kprofile .entry,
+  .kprofile .chip-row,
+  .kprofile .account {
+    min-width: 0;
+  }
+
+  .kprofile .entry {
+    min-height: 126px;
+    padding: 18px 16px;
+  }
+
+  .kprofile .chip-row {
+    padding: 12px 14px;
+  }
+
+  .kprofile .chip-row strong {
+    min-width: 0;
+  }
+
+  .kprofile .compliance {
+    align-items: flex-start;
+    text-align: left;
   }
 }
 
