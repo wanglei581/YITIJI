@@ -175,6 +175,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ai-result-ownership
           pnpm --filter @ai-job-print/api verify:llm-guard
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
+          pnpm --filter @ai-job-print/api verify:benefit-redemption
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
