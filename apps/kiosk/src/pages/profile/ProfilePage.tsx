@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CheckCircleIcon, XIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { KIcon } from '../../components/kiosk-icon'
+import { useInkRipple } from '../../hooks/useInkRipple'
 import { useMemberProfileOverview } from './assets/useMemberProfileOverview'
 import { ProfileEntrySection } from './components/ProfileEntrySection'
 import { ProfileHeader } from './components/ProfileHeader'
 import { PendingTaskBanner, ProfileSessionRecords } from './components/ProfileSessionRecords'
 import { SECTIONS } from './profileEntries'
 import type { AIRecord, Entry, IncomingState, ResumeItem, ScanItem } from './profileTypes'
+import './profile-inkpaper.css'
 
 // 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
 // 诚实化与合规约束：
@@ -24,6 +26,7 @@ export function ProfilePage() {
   const location = useLocation()
   const { user, isLoggedIn, displayName, logout, getToken } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
+  useInkRipple('.kprofile .entry, .kprofile .chip-row, .kprofile .account, .kprofile .p-btn, .kprofile .p-iconbtn')
 
   // ── 本次会话记录（仅来自 location.state，不伪造数量）──────────────
   const [resumes, setResumes] = useState<ResumeItem[]>(() =>
@@ -116,62 +119,61 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="relative flex min-h-full flex-col gap-4 bg-[#eef2f7] p-6 pb-24">
-      {/* ── 顶部个人信息区 ── */}
-      <ProfileHeader
-        isLoggedIn={isLoggedIn}
-        displayName={headerDisplayName}
-        phoneMasked={headerPhoneMasked}
-        stats={headerStats}
-        statsLoading={statsLoading}
-        reserveBannerSpace={isLoggedIn && hasSessionRecords}
-        onLogin={goLogin}
-        onLogout={logout}
-        onOpenSettings={() => navigate('/me/settings')}
-        onOpenNotifications={() => navigate('/me/notifications')}
-      />
-
-      {isLoggedIn && hasSessionRecords && <PendingTaskBanner onContinue={continuePendingTask} />}
-
-      {/* 提示 toast */}
-      {toastMsg && (
-        <div className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-success px-5 py-2.5 text-sm font-medium text-white shadow-lg">
-          <CheckCircleIcon className="h-4 w-4 shrink-0" />
-          {toastMsg}
-          <button
-            onClick={() => setToastMsg(null)}
-            aria-label="关闭提示"
-            className="ml-1 rounded-full p-0.5 hover:bg-success"
-          >
-            <XIcon className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* ── 分区入口（九宫格）── */}
-      {SECTIONS.map((section) => (
-        <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
-      ))}
-
-      {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}
-      {hasSessionRecords && (
-        <ProfileSessionRecords
-          resumes={resumes}
-          scans={scans}
-          aiRecords={aiRecords}
-          onPrintFile={printFile}
-          onDeleteResume={(id) => setResumes((prev) => prev.filter((x) => x.id !== id))}
-          onDeleteScan={(id) => setScans((prev) => prev.filter((x) => x.id !== id))}
-          onDeleteAiRecord={(id) => setAiRecords((prev) => prev.filter((x) => x.id !== id))}
+    <div className="kprofile">
+      <div className="kp-inner">
+        {/* ── 顶部个人信息区 ── */}
+        <ProfileHeader
+          isLoggedIn={isLoggedIn}
+          displayName={headerDisplayName}
+          phoneMasked={headerPhoneMasked}
+          stats={headerStats}
+          statsLoading={statsLoading}
+          reserveBannerSpace={isLoggedIn && hasSessionRecords}
+          onLogin={goLogin}
+          onLogout={logout}
+          onOpenSettings={() => navigate('/me/settings')}
+          onOpenNotifications={() => navigate('/me/notifications')}
         />
-      )}
 
-      {/* 合规说明 — 诚实化：我的页只做入口与概览；游客仅本次会话 */}
-      <p className="text-center text-xs leading-relaxed text-neutral-400">
-        {isLoggedIn
-          ? '本人数据仅本人可见，留存到期后自动清理；各类记录将逐步归位到对应业务页面'
-          : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人服务概览'}
-      </p>
+        {isLoggedIn && hasSessionRecords && <PendingTaskBanner onContinue={continuePendingTask} />}
+
+        {/* 提示 toast */}
+        {toastMsg && (
+          <div className="kp-toast" role="status">
+            <KIcon name="check" />
+            {toastMsg}
+            <button type="button" onClick={() => setToastMsg(null)} aria-label="关闭提示" className="close">
+              <KIcon name="close" />
+            </button>
+          </div>
+        )}
+
+        {/* ── 分区入口 ── */}
+        {SECTIONS.map((section) => (
+          <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
+        ))}
+
+        {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}
+        {hasSessionRecords && (
+          <ProfileSessionRecords
+            resumes={resumes}
+            scans={scans}
+            aiRecords={aiRecords}
+            onPrintFile={printFile}
+            onDeleteResume={(id) => setResumes((prev) => prev.filter((x) => x.id !== id))}
+            onDeleteScan={(id) => setScans((prev) => prev.filter((x) => x.id !== id))}
+            onDeleteAiRecord={(id) => setAiRecords((prev) => prev.filter((x) => x.id !== id))}
+          />
+        )}
+
+        {/* 合规说明 — 诚实化：我的页只做入口与概览；游客仅本次会话 */}
+        <p className="compliance">
+          <KIcon name="shield" />
+          {isLoggedIn
+            ? '本人数据仅本人可见，留存到期后自动清理；各类记录将逐步归位到对应业务页面'
+            : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人服务概览'}
+        </p>
+      </div>
     </div>
   )
 }

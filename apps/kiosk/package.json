@@ -24,6 +24,7 @@
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
     "verify:member-print-orders-ui": "node scripts/verify-member-print-orders-ui.mjs",
+    "verify:profile-inkpaper-home": "node scripts/verify-profile-inkpaper-home.mjs",
     "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs",
     "verify:job-material-library-ui": "node scripts/verify-job-material-library-ui.mjs",

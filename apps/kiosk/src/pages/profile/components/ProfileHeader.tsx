@@ -1,16 +1,8 @@
-import { Button } from '@ai-job-print/ui'
-import {
-  BadgeCheckIcon,
-  BellIcon,
-  GraduationCapIcon,
-  LogInIcon,
-  SettingsIcon,
-  TargetIcon,
-  UserRoundIcon,
-} from 'lucide-react'
+import { KIcon } from '../../../components/kiosk-icon'
 import type { ProfileHeaderStats } from '../profileTypes'
 
-const cardSurface = 'rounded-2xl border border-neutral-200 bg-white shadow-sm'
+// p-hero（墨青纸感）：米纸卡 + 装饰圆环 + 宋体名字 + 概览统计。
+// 诚实化口径不变：统计取服务端真实 total，null 显示「—」；不编造完整度。
 
 export function ProfileHeader({
   isLoggedIn,
@@ -39,93 +31,61 @@ export function ProfileHeader({
 }) {
   if (isLoggedIn) {
     return (
-      <section
-        className={[
-          '-mx-6 -mt-6 rounded-b-[28px] bg-gradient-to-br from-[#1677ff] via-[#1687ff] to-[#0f8cff] px-6 pt-8 text-white shadow-sm',
-          reserveBannerSpace ? 'pb-16' : 'pb-8',
-        ].join(' ')}
-      >
-        <div className="flex min-h-[44px] items-center justify-between">
-          <h1 className="text-xl font-bold">我的主页</h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              aria-label="账号设置"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
-            >
-              <SettingsIcon className="h-5 w-5" aria-hidden="true" />
+      <section className={reserveBannerSpace ? 'p-hero with-pending' : 'p-hero'} aria-label="账号概览">
+        <div className="p-top">
+          <div className="p-ava">{avatarInitial(displayName)}</div>
+          <div className="p-id">
+            <span className="p-kicker">
+              <i className="dot" aria-hidden="true" />
+              已登录 · {phoneMasked || '手机号已绑定'}
+            </span>
+            <h1>{displayName}</h1>
+            <p>本人简历、文档、打印订单与来源收藏都在下方入口，明细在对应功能页查看。</p>
+          </div>
+          <div className="p-actions">
+            <button type="button" className="p-iconbtn" aria-label="消息通知" onClick={onOpenNotifications}>
+              <KIcon name="bell" />
             </button>
-            <button
-              type="button"
-              onClick={onOpenNotifications}
-              aria-label="消息通知"
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/15 active:bg-white/24"
-            >
-              <BellIcon className="h-5 w-5" aria-hidden="true" />
+            <button type="button" className="p-iconbtn" aria-label="账号设置" onClick={onOpenSettings}>
+              <KIcon name="settings" />
+            </button>
+            <button type="button" className="p-btn ghost" onClick={onLogout}>
+              退出登录
             </button>
           </div>
         </div>
 
-        <div className="mt-6 flex items-start gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-white/35 bg-white/18 text-2xl font-bold shadow-inner">
-            {avatarInitial(displayName)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-2xl font-bold leading-tight">{displayName}</p>
-              <span className="inline-flex min-h-[24px] items-center gap-1 rounded-full bg-white/18 px-2.5 text-xs font-semibold text-white ring-1 ring-white/20">
-                <BadgeCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                已登录
-              </span>
-            </div>
-            <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white/85">
-              <GraduationCapIcon className="h-4 w-4" aria-hidden="true" />
-              会员账号
-              <span className="text-white/45">|</span>
-              {phoneMasked || '手机号已绑定'}
-            </p>
-            <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white/85">
-              <TargetIcon className="h-4 w-4" aria-hidden="true" />
-              账号资料能力逐步开放中
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="hidden min-h-[40px] shrink-0 rounded-full bg-white/15 px-4 text-sm font-semibold text-white ring-1 ring-white/20 active:bg-white/25 sm:inline-flex sm:items-center"
-          >
-            退出登录
-          </button>
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-white/18 bg-white/8 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]">
-          <div className="grid grid-cols-3 divide-x divide-white/16 text-center">
-            <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
-            <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
-            <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
-          </div>
+        <div className="p-stats">
+          <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
+          <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
+          <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
         </div>
       </section>
     )
   }
 
   return (
-    <div className={`flex items-center gap-4 ${cardSurface} px-6 py-5`}>
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-neutral-100">
-        <UserRoundIcon className="h-8 w-8 text-neutral-400" aria-hidden="true" />
+    <section className="p-hero" aria-label="登录引导">
+      <div className="p-top">
+        <div className="p-ava guest">
+          <KIcon name="user" />
+        </div>
+        <div className="p-id">
+          <span className="p-kicker">
+            <i className="dot" aria-hidden="true" />
+            游客 · 仅本次会话
+          </span>
+          <h1>登录后绑定本人服务记录</h1>
+          <p>登录后用于绑定本人服务记录，仅本次会话有效；游客记录离开后自动清空。</p>
+        </div>
+        <div className="p-actions">
+          <button type="button" className="p-btn primary" onClick={onLogin}>
+            <KIcon name="phone" />
+            手机号登录
+          </button>
+        </div>
       </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-xl font-bold text-neutral-900">游客</p>
-        <p className="mt-1 text-sm text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
-      </div>
-
-      <Button size="lg" onClick={onLogin} className="flex h-14 shrink-0 items-center gap-1 px-5 text-base">
-        <LogInIcon className="h-5 w-5" aria-hidden="true" />
-        手机号登录
-      </Button>
-    </div>
+    </section>
   )
 }
 
@@ -133,17 +93,11 @@ export function ProfileHeader({
 function ProfileStat({ value, label, loading }: { value: number | null; label: string; loading: boolean }) {
   const unloaded = value === null
   return (
-    <div className="px-2" aria-label={`${label}：${unloaded ? (loading ? '加载中' : '暂无数据') : value}`}>
-      <p
-        className={[
-          'text-2xl font-bold leading-none',
-          unloaded ? 'text-white/55' : '',
-          unloaded && loading ? 'motion-safe:animate-pulse' : '',
-        ].join(' ')}
-      >
+    <div className="p-stat" aria-label={`${label}：${unloaded ? (loading ? '加载中' : '暂无数据') : value}`}>
+      <b className={[unloaded ? 'unloaded' : '', unloaded && loading ? 'pulse' : ''].filter(Boolean).join(' ')}>
         {unloaded ? '—' : value}
-      </p>
-      <p className="mt-2 text-xs font-semibold text-white/78">{label}</p>
+      </b>
+      <span>{label}</span>
     </div>
   )
 }

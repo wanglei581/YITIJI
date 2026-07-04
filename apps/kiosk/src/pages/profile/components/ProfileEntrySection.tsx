@@ -1,44 +1,71 @@
+import { KIcon } from '../../../components/kiosk-icon'
 import type { Entry, EntrySectionData } from '../profileTypes'
 
-const cardSurface = 'rounded-2xl border border-neutral-200 bg-white shadow-sm'
+// 分区渲染（墨青纸感）：sec-head + 三种布局。
+// 点击行为由 onTap 统一处理，确保 route / 建设中 / 本次记录逻辑仍归 ProfilePage。
 
-// 入口格子：触控区 ≥72px（实际 min-h-[92px] + 内边距），彩色浅底图标 + 标签。无卡片套卡片。
-function EntryCell({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
-  const { icon: Icon, iconBg, iconColor, label, tag } = entry
+function GridEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
   return (
-    <button
-      type="button"
-      onClick={() => onTap(entry)}
-      className="flex min-h-[92px] flex-col items-center justify-start gap-2 rounded-xl px-1.5 py-3 text-center transition-colors hover:bg-neutral-50 active:bg-neutral-100"
-    >
-      <span className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl', iconBg].join(' ')}>
-        <Icon className={['h-6 w-6', iconColor].join(' ')} aria-hidden="true" />
+    <button type="button" className="entry" onClick={() => onTap(entry)}>
+      <span className={`ei ${entry.tone}`}>
+        <KIcon name={entry.icon} />
       </span>
-      <span className="text-xs font-medium leading-tight text-neutral-700">{label}</span>
-      {tag && (
-        <span
-          className={[
-            'rounded-full px-1.5 py-px text-[10px] font-medium',
-            tag === '建设中' ? 'bg-neutral-100 text-neutral-400' : 'bg-primary-50 text-primary-600',
-          ].join(' ')}
-        >
-          {tag}
+      <strong>{entry.label}</strong>
+      {entry.desc && <span className="desc">{entry.desc}</span>}
+      {entry.tag && <span className={entry.tag === '本次记录' ? 'badge session' : 'badge'}>{entry.tag}</span>}
+    </button>
+  )
+}
+
+function ChipEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
+  return (
+    <button type="button" className="chip-row" onClick={() => onTap(entry)}>
+      <span className={`ei ${entry.tone}`}>
+        <KIcon name={entry.icon} />
+      </span>
+      <strong>{entry.label}</strong>
+      {entry.tag ? (
+        <span className={entry.tag === '本次记录' ? 'badge session' : 'badge'}>{entry.tag}</span>
+      ) : (
+        <span className="arrow">
+          <KIcon name="arrow" />
         </span>
       )}
     </button>
   )
 }
 
-export function ProfileEntrySection({ section, onTap }: { section: EntrySectionData; onTap: (e: Entry) => void }) {
+function AccountEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
   return (
-    <section aria-label={section.title} className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-neutral-500">{section.title}</h2>
-      <div className={`${cardSurface} p-3 sm:p-4`}>
-        <div className="grid grid-cols-3 gap-1 sm:gap-2 md:grid-cols-4 lg:grid-cols-5">
-          {section.entries.map((e) => (
-            <EntryCell key={e.label} entry={e} onTap={onTap} />
-          ))}
+    <button type="button" className="account" onClick={() => onTap(entry)}>
+      <span className="aci">
+        <KIcon name={entry.icon} />
+      </span>
+      <strong>{entry.label}</strong>
+      {entry.tag && <span className="badge">{entry.tag}</span>}
+    </button>
+  )
+}
+
+export function ProfileEntrySection({ section, onTap }: { section: EntrySectionData; onTap: (e: Entry) => void }) {
+  const gridClass =
+    section.layout === 'grid' ? 'entry-grid' : section.layout === 'chips' ? 'chip-grid' : 'account-grid'
+
+  return (
+    <section aria-label={section.title} className="kp-section">
+      <div className="sec-head">
+        <span className={section.rail && section.rail !== 'teal' ? `rail ${section.rail}` : 'rail'} aria-hidden="true" />
+        <div>
+          <h2>{section.title}</h2>
+          {section.subtitle && <p>{section.subtitle}</p>}
         </div>
+      </div>
+      <div className={gridClass}>
+        {section.entries.map((e) => {
+          if (section.layout === 'grid') return <GridEntry key={e.label} entry={e} onTap={onTap} />
+          if (section.layout === 'chips') return <ChipEntry key={e.label} entry={e} onTap={onTap} />
+          return <AccountEntry key={e.label} entry={e} onTap={onTap} />
+        })}
       </div>
     </section>
   )
