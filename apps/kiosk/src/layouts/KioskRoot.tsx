@@ -10,7 +10,7 @@ import { useIdleLogout } from '../auth/useIdleLogout'
 
 function getActiveTab(pathname: string): KioskTab {
   if (pathname.startsWith('/assistant')) return 'assistant'
-  if (pathname.startsWith('/profile')) return 'profile'
+  if (pathname.startsWith('/profile') || pathname === '/me' || pathname.startsWith('/me/')) return 'profile'
   return 'home'
 }
 

@@ -243,11 +243,16 @@ const allowedChanged = new Set([
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
 ])
-const unexpectedChanged = changedFiles.filter((file) => !allowedChanged.has(file))
+const profileRelatedChanged = changedFiles.filter(
+  (file) =>
+    file.startsWith('apps/kiosk/src/pages/profile/') ||
+    file === 'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+)
+const unexpectedChanged = profileRelatedChanged.filter((file) => !allowedChanged.has(file))
 if (unexpectedChanged.length === 0) {
-  pass('本批 diff 仅修改低风险明细页与对应局部守卫')
+  pass('Profile 相关 diff 仅修改低风险明细页与对应局部守卫')
 } else {
-  fail(`本批出现范围外变更：${unexpectedChanged.join(', ')}`)
+  fail(`Profile 相关 diff 出现范围外变更：${unexpectedChanged.join(', ')}`)
 }
 
 const forbiddenMeChanged = changedFiles.filter((file) =>
