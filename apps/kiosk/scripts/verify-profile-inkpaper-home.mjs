@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url'
 // 2. 允许 /me/settings、/me/benefits、/me/favorites、/me/ai-records 做已守卫的低风险视觉换装；
 // 3. 允许 /me/activity 做已守卫的低风险视觉换装；
 // 4. 允许已确认的 /me/print-orders 状态自动刷新小步；
-// 5. /me/documents 已有专属守卫；未声明的 /me/print-orders 子模块不能被本守卫覆盖。
+// 5. /me/documents 已有专属守卫；/me/print-orders 仅允许专属守卫和登录态 smoke fixture；
+//    未声明的 /me/print-orders 子模块不能被本守卫覆盖。
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -287,14 +288,18 @@ const allowedPrintOrderRefreshChanged = new Set([
   'docs/superpowers/plans/2026-07-04-print-status-tracking-ui.md',
 ])
 const allowedPrintOrdersInkpaperChanged = new Set([
+  '.github/workflows/ci.yml',
+  'docs/acceptance/member-print-orders-login-smoke.md',
   'apps/kiosk/package.json',
   'apps/kiosk/scripts/verify-profile-print-orders-inkpaper.mjs',
+  'apps/kiosk/scripts/verify-profile-print-orders-login-smoke.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
   'apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs',
   'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
   'apps/kiosk/src/pages/profile/me/printOrders/OrderPaymentSummary.tsx',
   'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
+  'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
 ])
 const allowedChanged = new Set([
