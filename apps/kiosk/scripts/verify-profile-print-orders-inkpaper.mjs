@@ -160,8 +160,15 @@ const allowedChanged = new Set([
   'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
 ])
 
-const unexpectedChanged = changedFiles.filter((file) => !allowedChanged.has(file))
-if (unexpectedChanged.length === 0) {
+// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/print-orders 明细页（或其 printOrders 子组件）时，
+// 才强制 allowlist 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次改动。
+const touchesOwnedPage =
+  changedFiles.includes('apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') ||
+  changedFiles.some((file) => file.startsWith('apps/kiosk/src/pages/profile/me/printOrders/'))
+const unexpectedChanged = touchesOwnedPage ? changedFiles.filter((file) => !allowedChanged.has(file)) : []
+if (!touchesOwnedPage) {
+  pass('本 PR 未触碰 /me/print-orders 明细页，跳过范围 allowlist 检查（守卫条件触发）')
+} else if (unexpectedChanged.length === 0) {
   pass('diff 仅触碰打印订单页视觉收口、局部 CSS、必要守卫、package 和 CI')
 } else {
   fail(`diff 出现禁止范围变更：${unexpectedChanged.join(', ')}`)

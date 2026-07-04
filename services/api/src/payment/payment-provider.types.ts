@@ -61,11 +61,34 @@ export type CallbackVerifyResult =
   | { ok: true; event: PaymentCallbackEvent }
   | { ok: false; code: string }
 
+/** 退款执行输入（C5-4）：全部来自服务端落库数据（Order + Refund 记录），绝不信任前端金额。 */
+export interface RefundExecuteInput {
+  orderId: string
+  orderNo: string
+  /** 幂等键（服务端生成的退款单号）；同一 refundNo 只出款一次由业务层保证。 */
+  refundNo: string
+  /** 本次退款额（分，>=0），快照自服务端 Refund 记录。 */
+  amountCents: number
+}
+
+export interface RefundExecuteResult {
+  /** 渠道退款流水号（沙箱为服务端生成的假标识；无真实资金）。 */
+  channelRefundNo: string
+  status: 'success' | 'failed'
+}
+
 export interface PaymentProvider {
   readonly channel: PaymentChannel
   createQrPayment(input: QrPaymentCreateInput): Promise<QrPaymentCreateResult>
   /** 验签（含时间窗 + path/channel 绑定）+ 报文解析归一化。失败返回明确错误码，绝不静默放行。 */
   verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult>
+  /**
+   * 执行退款（C5-4）。**只对本通道已入账（sandbox paid）的订单调用**；
+   * 线下（offline/manual_confirmed）/免费/权益单不经此路径（由业务层判定）。
+   * 沙箱为假通道：不动外部资金，返回服务端生成的假 channelRefundNo + success。
+   * C5-6 真实渠道接入时实现真实退款 API（验签/幂等/对账另批）。
+   */
+  refund(input: RefundExecuteInput): Promise<RefundExecuteResult>
   /**
    * 主动查单兜底（回调丢失时对渠道账本查询）。C5-6 真实渠道接入时实现；
    * sandbox 无外部账本（DB 即真相源），不实现 —— 不伪造能力。

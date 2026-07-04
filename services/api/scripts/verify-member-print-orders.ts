@@ -196,7 +196,7 @@ async function main() {
 
     // ── 5. 不返回敏感字段 ───────────────────────────────────────
     const allItems = [...listA, ...listB]
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode'])
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {

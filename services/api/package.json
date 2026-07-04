@@ -41,6 +41,8 @@
     "verify:pricing": "node -r @swc-node/register scripts/verify-pricing.ts",
     "verify:payment-flow": "node -r @swc-node/register scripts/verify-payment-flow.ts",
     "verify:kiosk-cashier-ui": "node -r @swc-node/register scripts/verify-kiosk-cashier-ui.ts",
+    "verify:refund-idempotent": "node -r @swc-node/register scripts/verify-refund-idempotent.ts",
+    "verify:redemption-audit": "node -r @swc-node/register scripts/verify-redemption-audit.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
