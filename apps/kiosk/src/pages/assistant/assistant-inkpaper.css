@@ -1,0 +1,1059 @@
+/*
+ * AI助手页（文字模式）· 墨青纸感 1:1 还原样式
+ * 严格镜像定稿原型 fusion-youth-preview-v5.html 的 assistant 屏语汇。
+ * 全部类名限定在 .kassist 作用域；只承载视觉，
+ * 通话（TRTC）、会话隔离、intent 场景、白名单 action 等逻辑不变。
+ */
+
+.kassist {
+  --paper: #f4f1e8;
+  --paper-2: #efeadd;
+  --surface: #fffdf8;
+  --surface-2: #f7f4ec;
+  --ink: #10302b;
+  --ink-2: #2c4a43;
+  --muted: #5d6b63;
+  --line: rgba(16, 48, 43, 0.1);
+  --line-2: rgba(16, 48, 43, 0.06);
+  --teal: #1f9e86;
+  --teal-deep: #157a67;
+  --teal-soft: #e2f2ec;
+  --wheat: #a9781f;
+  --wheat-soft: #f2ead6;
+  --slate: #3f68b0;
+  --slate-soft: #e5edf4;
+  --plum: #7a5a86;
+  --plum-soft: #efe7f1;
+  --red: #c14a34;
+  --red-soft: #f6e3de;
+  --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --shadow-sm: 0 6px 18px rgba(16, 48, 43, 0.06);
+  --shadow: 0 14px 40px rgba(16, 48, 43, 0.08);
+  --r-lg: 26px;
+  --r-md: 18px;
+  --r-sm: 14px;
+
+  position: relative;
+  min-height: 100%;
+  padding: 26px 0 44px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 4%, rgba(31, 158, 134, 0.05), transparent 26%),
+    linear-gradient(160deg, #e8e3d6 0%, #f3efe4 46%, #e6ece7 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.kassist::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(0deg, rgba(16, 48, 43, 0.016) 0 1px, transparent 1px 5px);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.08));
+}
+.kassist > * {
+  position: relative;
+  z-index: 1;
+}
+/* #135 拼音键盘（KioskKeyboard，.kkb）是 .kassist 直接子元素，会被上面的
+ * `.kassist > *` 兜底降级为 position: relative（掉到滚动页最底、点输入框后在屏外）。
+ * 这里以更高特异度恢复 kiosk-keyboard.css 里 .kkb 的 fixed 吸底与层级，
+ * 不改 KioskKeyboard.tsx / kiosk-keyboard.css，仅在助手页作用域内做兼容。 */
+.kassist > .kkb {
+  position: fixed;
+  z-index: 61;
+}
+.kassist .ka-inner {
+  width: min(1320px, calc(100% - 64px));
+  margin: 0 auto;
+}
+
+/* 返回 chip */
+.kassist .ka-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-sm);
+  font-size: 15px;
+  font-weight: 720;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.kassist .ka-back:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+.kassist .ka-back:active {
+  transform: scale(0.97);
+}
+.kassist .ka-back svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(180deg);
+}
+
+/* ── a-hero：米纸浅底 + 小青真人照片 ── */
+.kassist .a-hero {
+  position: relative;
+  overflow: hidden;
+  margin-top: 16px;
+  border-radius: 30px;
+  padding: 34px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  display: flex;
+  gap: 26px;
+  align-items: center;
+}
+.kassist .a-hero::after {
+  content: '';
+  position: absolute;
+  right: -60px;
+  bottom: -80px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(16, 48, 43, 0.06);
+  pointer-events: none;
+}
+.kassist .qing-portrait {
+  width: 168px;
+  height: 200px;
+  border-radius: 26px;
+  flex: 0 0 auto;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #e6f2ec, #d3e6dd);
+  box-shadow: var(--shadow);
+}
+.kassist .qing-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.kassist .qing-portrait .live {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(16, 48, 43, 0.62);
+  color: #eafff8;
+  font-size: 12px;
+  font-weight: 750;
+}
+.kassist .live .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #46d6b4;
+  box-shadow: 0 0 0 3px rgba(70, 214, 180, 0.18);
+}
+.kassist .a-hero-copy {
+  flex: 1;
+  min-width: 0;
+}
+.kassist .a-hero-copy .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--teal-deep);
+  font-size: 15px;
+  font-weight: 760;
+}
+.kassist .a-hero-copy .eyebrow svg {
+  width: 17px;
+  height: 17px;
+}
+.kassist .a-hero-copy h1 {
+  margin: 12px 0 0;
+  font-family: var(--serif);
+  font-size: 34px;
+  line-height: 1.28;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.kassist .a-hero-copy p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 15.5px;
+  line-height: 1.55;
+  max-width: 520px;
+}
+.kassist .a-pills {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kassist .a-pill {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.kassist .a-pill svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* ── 语音 / 文字 双入口 ── */
+.kassist .mode-toggle {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.kassist .mode-toggle.single {
+  grid-template-columns: 1fr;
+}
+.kassist .mode-btn {
+  position: relative;
+  overflow: hidden;
+  height: 96px;
+  border-radius: 22px;
+  border: 1.6px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 24px;
+  text-align: left;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.kassist .mode-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+.kassist .mode-btn:active {
+  transform: scale(0.98);
+}
+.kassist .mode-btn .mbi {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.kassist .mode-btn .mbi svg {
+  width: 27px;
+  height: 27px;
+}
+.kassist .mode-btn strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.kassist .mode-btn span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.kassist .mode-btn.call {
+  background: linear-gradient(150deg, var(--ink), #1b453c);
+  border-color: transparent;
+}
+.kassist .mode-btn.call strong {
+  color: #fff;
+}
+.kassist .mode-btn.call span {
+  color: #b9d6cd;
+}
+.kassist .mode-btn.call .mbi {
+  background: rgba(255, 255, 255, 0.16);
+}
+.kassist .mode-btn.call .mbi svg {
+  color: #8fe3cd;
+}
+.kassist .mode-btn.text .mbi {
+  background: linear-gradient(150deg, var(--teal), var(--teal-deep));
+}
+.kassist .mode-btn.text.on {
+  border-color: rgba(31, 158, 134, 0.45);
+  box-shadow: 0 0 0 4px rgba(31, 158, 134, 0.08);
+}
+
+/* ── 页内语音通话面板（v5 call-panel 语汇） ── */
+.kassist .mode-btn.call.on {
+  box-shadow: 0 0 0 4px rgba(31, 158, 134, 0.22);
+}
+.kassist .call-panel {
+  margin-top: 18px;
+  padding: 32px;
+  border-radius: 28px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(168deg, #0e352e 0%, #17604f 72%, #1f8a72 100%);
+  box-shadow: var(--shadow);
+  animation: kaRise 280ms ease-out both;
+}
+.kassist .call-ava {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #d7f3e9, #b7ddd0);
+  overflow: hidden;
+}
+.kassist .call-ava img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.kassist .call-ava::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  animation: kaPulseRing 2.2s ease-out infinite;
+}
+.kassist .call-ava.static::after {
+  animation: none;
+  opacity: 0.4;
+}
+@keyframes kaPulseRing {
+  0% {
+    transform: scale(0.94);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.16);
+    opacity: 0;
+  }
+}
+.kassist .call-meta {
+  margin-top: 16px;
+  font-size: 14.5px;
+  color: #bdf0e2;
+  font-weight: 720;
+}
+.kassist .call-meta.err {
+  color: #ffb4a4;
+}
+.kassist .call-errmsg {
+  margin: 10px auto 0;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(234, 255, 248, 0.72);
+  word-break: break-all;
+}
+.kassist .call-timer {
+  margin-top: 4px;
+  font-size: 32px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+/* 声纹：通话态主视觉锚点，静音/安静时暂停（.quiet） */
+.kassist .wave {
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.kassist .wave i {
+  width: 7px;
+  border-radius: 4px;
+  background: #8fe3cd;
+  animation: kaWv 1.15s ease-in-out infinite;
+}
+.kassist .wave i:nth-child(1) { height: 22px; animation-delay: 0s; }
+.kassist .wave i:nth-child(2) { height: 44px; animation-delay: 0.12s; }
+.kassist .wave i:nth-child(3) { height: 66px; animation-delay: 0.24s; }
+.kassist .wave i:nth-child(4) { height: 84px; animation-delay: 0.06s; }
+.kassist .wave i:nth-child(5) { height: 58px; animation-delay: 0.3s; }
+.kassist .wave i:nth-child(6) { height: 76px; animation-delay: 0.18s; }
+.kassist .wave i:nth-child(7) { height: 40px; animation-delay: 0.36s; }
+.kassist .wave i:nth-child(8) { height: 60px; animation-delay: 0.09s; }
+.kassist .wave i:nth-child(9) { height: 30px; animation-delay: 0.27s; }
+.kassist .wave i:nth-child(10) { height: 18px; animation-delay: 0.15s; }
+@keyframes kaWv {
+  0%,
+  100% {
+    transform: scaleY(0.45);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+.kassist .wave.quiet i {
+  animation-play-state: paused;
+  transform: scaleY(0.3);
+  opacity: 0.45;
+}
+.kassist .call-resume {
+  margin: 6px auto 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 26px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 780;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+.kassist .call-resume:active {
+  transform: scale(0.96);
+}
+.kassist .caption {
+  margin: 18px auto 0;
+  max-width: 720px;
+  min-height: 56px;
+  padding: 16px 22px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: #eafff8;
+  text-align: left;
+}
+.kassist .caption b {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #93e6cf;
+  margin-bottom: 5px;
+}
+.kassist .caption .mic-warn {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: #ffe3b0;
+}
+.kassist .caption .ref {
+  display: block;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: rgba(234, 255, 248, 0.55);
+}
+.kassist .call-controls {
+  margin-top: 22px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+}
+.kassist .call-btn {
+  position: relative;
+  overflow: hidden;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  transition: background 150ms ease, transform 150ms ease;
+}
+.kassist .call-btn svg {
+  width: 27px;
+  height: 27px;
+}
+.kassist .call-btn:hover {
+  transform: translateY(-2px);
+}
+.kassist .call-btn:active {
+  transform: scale(0.96);
+}
+.kassist .call-btn.muted {
+  background: #fff;
+  color: var(--ink);
+}
+.kassist .call-btn.hangup {
+  width: auto;
+  padding: 0 30px;
+  border-radius: 32px;
+  background: #c14a34;
+  font-size: 16px;
+  font-weight: 780;
+}
+.kassist .call-btn.hangup svg {
+  width: 22px;
+  height: 22px;
+  transform: rotate(135deg);
+}
+.kassist .call-note {
+  margin: 18px 0 0;
+  font-size: 12.5px;
+  color: rgba(233, 255, 248, 0.6);
+  line-height: 1.6;
+}
+
+/* ── 对话面板 ── */
+.kassist .panel {
+  margin-top: 18px;
+  padding: 26px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-sm);
+}
+.kassist .panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kassist .panel-head h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 820;
+  letter-spacing: 0.01em;
+}
+.kassist .panel-head .tag {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 650;
+}
+.kassist .chat-list {
+  margin-top: 20px;
+  max-height: 560px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scrollbar-width: none;
+}
+.kassist .chat-list::-webkit-scrollbar {
+  width: 0;
+}
+.kassist .row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.kassist .row.me {
+  flex-direction: row-reverse;
+}
+.kassist .bava {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.kassist .bava.bot {
+  background: var(--teal-soft);
+}
+.kassist .bava.bot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.kassist .bava.me {
+  background: var(--ink);
+  color: #8fe3cd;
+}
+.kassist .bava.me svg {
+  width: 24px;
+  height: 24px;
+}
+.kassist .bubble {
+  max-width: 78%;
+  padding: 16px 18px;
+  border-radius: 20px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.kassist .bubble.bot {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-bottom-left-radius: 6px;
+}
+.kassist .bubble.me {
+  background: linear-gradient(150deg, var(--ink), #1b453c);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+.kassist .bubble.err {
+  background: var(--red-soft);
+  border: 1px solid rgba(193, 74, 52, 0.22);
+  color: var(--red);
+  border-bottom-left-radius: 6px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.kassist .bubble.err svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+.kassist .bubble .ref {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9aa7a0;
+}
+.kassist .typing {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border-bottom-left-radius: 6px;
+  background: var(--surface-2);
+  width: fit-content;
+}
+.kassist .typing i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: kaDots 900ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.kassist .typing i:nth-child(2) {
+  animation-delay: 150ms;
+}
+.kassist .typing i:nth-child(3) {
+  animation-delay: 300ms;
+}
+@keyframes kaDots {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* action chips（白名单跳转） */
+.kassist .action-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.kassist .action-chip {
+  position: relative;
+  overflow: hidden;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  border: 1px solid rgba(31, 158, 134, 0.25);
+  color: var(--teal-deep);
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease;
+}
+.kassist .action-chip:hover {
+  background: #d3ece2;
+}
+.kassist .action-chip:active {
+  transform: scale(0.96);
+}
+
+/* 输入条 */
+.kassist .input-bar {
+  margin-top: 20px;
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 22px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.kassist .input-bar:focus-within {
+  border-color: rgba(31, 158, 134, 0.45);
+  background: var(--surface);
+}
+.kassist .input-bar textarea {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  outline: none;
+  resize: none;
+  padding: 8px 0;
+}
+.kassist .input-bar textarea::placeholder {
+  color: var(--muted);
+}
+.kassist .send-btn {
+  position: relative;
+  overflow: hidden;
+  width: 50px;
+  height: 50px;
+  border-radius: 15px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(150deg, var(--teal) 0%, var(--teal-deep));
+  box-shadow: 0 8px 18px rgba(21, 122, 103, 0.24);
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+.kassist .send-btn svg {
+  width: 22px;
+  height: 22px;
+}
+.kassist .send-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+}
+.kassist .send-btn:not(:disabled):active {
+  transform: scale(0.95);
+}
+.kassist .send-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+.kassist .disclaimer {
+  margin: 12px 4px 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ── 区块标题（rail 变体） ── */
+.kassist .sec-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 34px 4px 16px;
+}
+.kassist .sec-head .rail {
+  width: 5px;
+  height: 26px;
+  border-radius: 3px;
+  background: linear-gradient(var(--teal), var(--teal-deep));
+  flex: 0 0 auto;
+}
+.kassist .sec-head .rail.slate {
+  background: linear-gradient(#3f68b0, #2f5789);
+}
+.kassist .sec-head .rail.plum {
+  background: linear-gradient(#7a5a86, #5f4569);
+}
+.kassist .sec-head h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 27px;
+  font-weight: 820;
+  letter-spacing: 0.01em;
+}
+.kassist .sec-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+/* ── 快捷任务 ── */
+.kassist .quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.kassist .quick {
+  position: relative;
+  overflow: hidden;
+  min-height: 96px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 18px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.kassist .quick:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: rgba(31, 158, 134, 0.28);
+}
+.kassist .quick:active {
+  transform: scale(0.98);
+}
+.kassist .quick.hit {
+  border-color: rgba(31, 158, 134, 0.55);
+  box-shadow: 0 0 0 4px rgba(31, 158, 134, 0.1);
+}
+.kassist .quick .qi {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+}
+.kassist .quick .qi svg {
+  width: 25px;
+  height: 25px;
+}
+.kassist .quick.v2 .qi {
+  background: var(--slate-soft);
+  color: #35608f;
+}
+.kassist .quick.v3 .qi {
+  background: var(--wheat-soft);
+  color: #8a6416;
+}
+.kassist .quick.v4 .qi {
+  background: var(--plum-soft);
+  color: var(--plum);
+}
+.kassist .quick strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 780;
+  color: var(--ink);
+}
+.kassist .quick span {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ── 大家都在问 ── */
+.kassist .faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kassist .faq {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 56px;
+  padding: 17px 20px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.kassist .faq:hover {
+  transform: translateX(3px);
+  box-shadow: var(--shadow);
+}
+.kassist .faq:active {
+  transform: scale(0.99);
+}
+.kassist .faq .q {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  font-size: 15px;
+  font-weight: 850;
+}
+.kassist .faq strong {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 680;
+  color: var(--ink-2);
+}
+.kassist .faq svg {
+  width: 18px;
+  height: 18px;
+  color: #b3c2ba;
+}
+
+/* ── 结果去哪儿 ── */
+.kassist .result-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.kassist .result-card {
+  padding: 22px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-sm);
+}
+.kassist .result-card .ri {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+}
+.kassist .result-card .ri svg {
+  width: 24px;
+  height: 24px;
+}
+.kassist .result-card.v2 .ri {
+  background: var(--plum-soft);
+  color: var(--plum);
+}
+.kassist .result-card.v3 .ri {
+  background: var(--slate-soft);
+  color: #35608f;
+}
+.kassist .result-card strong {
+  display: block;
+  font-size: 16.5px;
+  font-weight: 780;
+  color: var(--ink);
+}
+.kassist .result-card span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── 合规脚注 ── */
+.kassist .compliance {
+  margin: 30px 4px 0;
+  padding: 16px 20px;
+  text-align: center;
+  color: #7a857e;
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.kassist .compliance svg {
+  width: 15px;
+  height: 15px;
+  color: var(--wheat);
+  flex: 0 0 auto;
+}
+
+/* ── 涟漪 + 入场 ── */
+.kassist .k-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(31, 158, 134, 0.22) 0%, rgba(31, 158, 134, 0.1) 40%, transparent 70%);
+  transform: scale(0);
+  animation: kRipA 520ms ease-out forwards;
+}
+.kassist .mode-btn.call .k-ripple,
+.kassist .send-btn .k-ripple {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+}
+@keyframes kRipA {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes kaRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.kassist .a-hero {
+  animation: kaRise 280ms ease-out both;
+}
+.kassist .mode-toggle {
+  animation: kaRise 280ms ease-out 60ms both;
+}
+.kassist .panel {
+  animation: kaRise 280ms ease-out 110ms both;
+}
+
+@media (max-width: 900px) {
+  .kassist .a-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .kassist .quick-grid,
+  .kassist .result-strip {
+    grid-template-columns: 1fr;
+  }
+  .kassist .mode-toggle {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kassist *,
+  .kassist *::before,
+  .kassist *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
