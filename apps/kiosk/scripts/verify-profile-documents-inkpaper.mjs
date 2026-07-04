@@ -152,6 +152,7 @@ const allowedChanged = new Set([
   'apps/kiosk/src/services/print/paymentApi.ts',
   'apps/kiosk/src/services/print/printJobsApi.ts',
   'docs/progress/current-progress.md',
+  'docs/progress/next-tasks.md',
   'services/api/scripts/verify-kiosk-cashier-ui.ts',
   'services/api/scripts/verify-payment-flow.ts',
   'services/api/scripts/verify-production-real-services.ts',
