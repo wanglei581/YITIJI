@@ -19,6 +19,7 @@ const PROD_OK: Env = {
   BAIDU_OCR_SECRET_KEY: 'baidu-secret-key',
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
+  PAYMENT_SESSION_SECRET: 'ci-production-payment-session-secret-0123456789',
 }
 
 function expectAllowed(env: Env, label: string): void {

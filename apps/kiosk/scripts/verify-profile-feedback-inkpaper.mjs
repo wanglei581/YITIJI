@@ -141,7 +141,18 @@ try {
 }
 
 const forbiddenChanged = changedFiles.filter((file) =>
-  [
+  ![
+    'services/api/scripts/verify-kiosk-cashier-ui.ts',
+    'services/api/scripts/verify-payment-flow.ts',
+    'services/api/scripts/verify-production-real-services.ts',
+    'services/api/scripts/verify-production-runtime-gates.ts',
+    'services/api/src/config/production-runtime-gates.ts',
+    'services/api/src/payment/online-payment.service.ts',
+    'services/api/src/payment/payment-session-token.ts',
+    'services/api/src/payment/payment.controller.ts',
+    'services/api/src/print-jobs/print-jobs.service.ts',
+  ].includes(file) &&
+  ([
     'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
@@ -155,11 +166,11 @@ const forbiddenChanged = changedFiles.filter((file) =>
   /^apps\/kiosk\/src\/pages\/profile\/me\/printOrders\//.test(file) ||
   /^apps\/kiosk\/src\/pages\/(assistant|campus|companies|help)\//.test(file) ||
   /^services\/|^packages\/shared\/|^apps\/terminal-agent\//.test(file) ||
-  /prisma/i.test(file)
+  /prisma/i.test(file))
 )
 
 if (forbiddenChanged.length === 0) {
-  pass('diff 未触碰 /me/print-orders、其他已换装明细页、后端、数据库或终端链路；/me/documents 已由专属守卫覆盖')
+  pass('diff 未触碰 /me/print-orders、其他已换装明细页、非本次 payment session 后端、数据库或终端链路；/me/documents 已由专属守卫覆盖')
 } else {
   fail(`diff 出现禁止范围变更：${forbiddenChanged.join(', ')}`)
 }

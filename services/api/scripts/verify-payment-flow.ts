@@ -26,6 +26,7 @@ import { AdminOrderActionsController } from '../src/payment/admin-order-actions.
 import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
+import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
@@ -175,6 +176,18 @@ async function main(): Promise<void> {
     return order.id
   }
 
+  async function paymentSessionFor(orderId: string): Promise<string> {
+    const order = await prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) fail(`missing order ${orderId}`)
+    return createPaymentSessionToken({
+      orderId: order.id,
+      orderNo: order.orderNo,
+      terminalId: order.terminalId,
+      amountCents: order.amountCents,
+      printTaskId: order.printTaskId,
+    })
+  }
+
   async function cleanup(): Promise<void> {
     const printOrders = await prisma.order.findMany({ where: { printTaskId: { in: taskIds } }, select: { id: true } })
     const allOrderIds = [...orderIds, ...printOrders.map((o) => o.id)]
@@ -227,8 +240,14 @@ async function main(): Promise<void> {
       { endUserId: null, terminalId },
     )
     taskIds.push(printed.taskId)
+    const paymentSessionA = printed.paymentSessionToken
     const orderA = await prisma.order.findUnique({ where: { printTaskId: printed.taskId } })
     if (!orderA) fail('print flow did not create Order')
+    if (typeof paymentSessionA === 'string' && paymentSessionA.startsWith('pst_v1.')) {
+      pass('print job creation returns short-lived payment session token')
+    } else {
+      fail(`print job did not return payment session token: ${JSON.stringify(printed)}`)
+    }
     const items = JSON.parse(orderA.itemsJson) as Array<Record<string, unknown>>
     if (
       Array.isArray(items) &&
@@ -244,7 +263,26 @@ async function main(): Promise<void> {
     }
 
     // ── (2) 出码：attempt pending + 动态码 + 订单 paying + 幂等复用 ─────────
-    const attemptViewA = await payment.createPayAttempt(orderA.id)
+    await expectCode('pay attempt rejects missing payment session token (PAYMENT_SESSION_REQUIRED)', 'PAYMENT_SESSION_REQUIRED', () =>
+      payment.createPayAttempt(orderA.id, ''),
+    )
+    const wrongOrderId = await makeOrder(999)
+    const wrongPaymentSession = await paymentSessionFor(wrongOrderId)
+    await expectCode('pay attempt rejects another order payment session token (PAYMENT_SESSION_MISMATCH)', 'PAYMENT_SESSION_MISMATCH', () =>
+      payment.createPayAttempt(orderA.id, wrongPaymentSession),
+    )
+    const wrongPrintTaskSession = createPaymentSessionToken({
+      orderId: orderA.id,
+      orderNo: orderA.orderNo,
+      terminalId: orderA.terminalId,
+      amountCents: orderA.amountCents,
+      printTaskId: `ptask_wrong_${suffix}`,
+    })
+    await expectCode('pay attempt rejects same-order session with wrong printTask binding (PAYMENT_SESSION_MISMATCH)', 'PAYMENT_SESSION_MISMATCH', () =>
+      payment.createPayAttempt(orderA.id, wrongPrintTaskSession),
+    )
+
+    const attemptViewA = await payment.createPayAttempt(orderA.id, paymentSessionA)
     if (
       attemptViewA.status === 'pending' &&
       attemptViewA.qrCodeContent?.startsWith('sandboxpay://qr?') &&
@@ -257,7 +295,7 @@ async function main(): Promise<void> {
     } else {
       fail(`unexpected attempt view: ${JSON.stringify(attemptViewA)}`)
     }
-    const attemptViewA2 = await payment.createPayAttempt(orderA.id)
+    const attemptViewA2 = await payment.createPayAttempt(orderA.id, paymentSessionA)
     if (attemptViewA2.attemptId === attemptViewA.attemptId) {
       pass('repeated pay request reuses the pending unexpired attempt (idempotent issuing)')
     } else {
@@ -271,11 +309,12 @@ async function main(): Promise<void> {
 
     // ── (3) 免费单拒绝出码 + Provider 未配置拒绝 ────────────────────────────
     const freeOrderId = await makeOrder(0)
+    const freePaymentSession = await paymentSessionFor(freeOrderId)
     await expectCode('zero-amount order cannot issue a pay QR (PAY_NOT_REQUIRED)', 'PAY_NOT_REQUIRED', () =>
-      payment.createPayAttempt(freeOrderId),
+      payment.createPayAttempt(freeOrderId, freePaymentSession),
     )
     await expectCode('provider-disabled service refuses to issue QR (ONLINE_PAYMENT_DISABLED)', 'ONLINE_PAYMENT_DISABLED', () =>
-      paymentDisabled.createPayAttempt(orderA.id),
+      paymentDisabled.createPayAttempt(orderA.id, paymentSessionA),
     )
 
     // ── (4) 回调成功入账（验签 + 全字段匹配 + 金额一致）────────────────────
@@ -323,7 +362,13 @@ async function main(): Promise<void> {
       fail(`mark_paid_online audit unexpected: ${JSON.stringify(paidAudits.map((a) => a.payloadJson))}`)
     }
 
-    const statusViewA = await payment.getPayStatus(orderA.id)
+    await expectCode('pay-status rejects missing payment session token (PAYMENT_SESSION_REQUIRED)', 'PAYMENT_SESSION_REQUIRED', () =>
+      payment.getPayStatus(orderA.id, ''),
+    )
+    await expectCode('pay-status rejects another order payment session token (PAYMENT_SESSION_MISMATCH)', 'PAYMENT_SESSION_MISMATCH', () =>
+      payment.getPayStatus(orderA.id, wrongPaymentSession),
+    )
+    const statusViewA = await payment.getPayStatus(orderA.id, paymentSessionA)
     if (statusViewA.payStatus === 'paid' && statusViewA.pickupCode === paidA.pickupCode && statusViewA.attempt?.status === 'success') {
       pass('pay-status view exposes paid state and gated pickupCode')
     } else {
@@ -363,7 +408,8 @@ async function main(): Promise<void> {
 
     // ── (6) 金额篡改与字段不匹配（伪造回调不可能入账）──────────────────────
     const orderBId = await makeOrder(300)
-    const attemptViewB = await payment.createPayAttempt(orderBId)
+    const paymentSessionB = await paymentSessionFor(orderBId)
+    const attemptViewB = await payment.createPayAttempt(orderBId, paymentSessionB)
     const attemptB = await prisma.paymentAttempt.findUnique({ where: { id: attemptViewB.attemptId } })
     if (!attemptB?.prepayId) fail('attempt B missing prepayId')
     const basePayloadB = {
@@ -424,7 +470,7 @@ async function main(): Promise<void> {
     } else {
       fail(`attempt_failed audit missing/incomplete: ${failAudit?.payloadJson}`)
     }
-    const attemptViewB2 = await payment.createPayAttempt(orderBId)
+    const attemptViewB2 = await payment.createPayAttempt(orderBId, paymentSessionB)
     if (attemptViewB2.attemptId !== attemptB.id && attemptViewB2.status === 'pending') {
       pass('order can re-issue a fresh attempt after failure')
     } else {
@@ -435,7 +481,7 @@ async function main(): Promise<void> {
     const past = new Date(Date.now() - 60_000)
     await prisma.paymentAttempt.update({ where: { id: attemptViewB2.attemptId }, data: { expiresAt: past } })
     await prisma.order.update({ where: { id: orderBId }, data: { expiresAt: past } })
-    const statusViewB = await payment.getPayStatus(orderBId)
+    const statusViewB = await payment.getPayStatus(orderBId, paymentSessionB)
     const attemptB2Expired = await prisma.paymentAttempt.findUnique({ where: { id: attemptViewB2.attemptId } })
     if (statusViewB.payStatus === 'closed' && attemptB2Expired?.status === 'expired') {
       pass('lazy expiry marks stale attempt expired and times the order out to closed')
@@ -443,7 +489,7 @@ async function main(): Promise<void> {
       fail(`lazy expiry mismatch: order=${statusViewB.payStatus} attempt=${attemptB2Expired?.status}`)
     }
     await expectCode('closed order refuses new pay attempts (ORDER_CLOSED)', 'ORDER_CLOSED', () =>
-      payment.createPayAttempt(orderBId),
+      payment.createPayAttempt(orderBId, paymentSessionB),
     )
 
     // ── (9) closed → paid：仅「已存在 attempt 的有效迟到回调」可入账 ────────
@@ -496,7 +542,8 @@ async function main(): Promise<void> {
 
     // ── (10) 沙箱模拟端点：走同一验签路径；生产 404 ─────────────────────────
     const orderHId = await makeOrder(120)
-    const attemptViewH = await payment.createPayAttempt(orderHId)
+    const paymentSessionH = await paymentSessionFor(orderHId)
+    const attemptViewH = await payment.createPayAttempt(orderHId, paymentSessionH)
     const resSim = await payment.simulateSandboxCallback({ attemptId: attemptViewH.attemptId, result: 'success' })
     const orderH = await prisma.order.findUnique({ where: { id: orderHId } })
     if (resSim.ok && orderH?.payStatus === 'paid' && orderH.paymentSource === 'sandbox') {
@@ -595,7 +642,11 @@ async function main(): Promise<void> {
       BAIDU_OCR_SECRET_KEY: 'x',
       AI_PROVIDER: 'llm',
       AI_LLM_API_KEY: 'x',
+      PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
     }
+    expectThrowSync('production runtime gates reject missing PAYMENT_SESSION_SECRET', 'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID', () =>
+      assertProductionRuntimeGates({ ...prodEnvBase, PAYMENT_SESSION_SECRET: undefined }),
+    )
     expectThrowSync('production runtime gates reject PAYMENT_PROVIDER=sandbox', 'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN', () =>
       assertProductionRuntimeGates({ ...prodEnvBase, PAYMENT_PROVIDER: 'sandbox' }),
     )

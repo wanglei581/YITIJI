@@ -23,6 +23,7 @@ interface PrintJobState {
   returnLabel?:  string
   taskId?:       string
   orderId?:      string
+  paymentSessionToken?: string
   source?:       PrintMaterialSource
 }
 
@@ -43,21 +44,27 @@ export function PrintDonePage() {
   // C5-3：paid 后展示取件凭证码。取件码可见性完全由后端 pickupCodeVisibleFor 决定
   // （paid + 未退款 + 任务未进终态），前端只透传后端返回值，不自行编造。
   const [pickupCode, setPickupCode] = useState<string | null>(null)
+  const [pickupCodeError, setPickupCodeError] = useState<string | null>(null)
   useEffect(() => {
-    if (!success || API_MODE !== 'http' || !state.orderId) return
+    if (!success || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) return
     let cancelled = false
     void (async () => {
       try {
-        const s = await getPayStatus(state.orderId as string)
-        if (!cancelled) setPickupCode(s.pickupCode)
+        const s = await getPayStatus({ orderId: state.orderId as string, paymentSessionToken: state.paymentSessionToken })
+        if (!cancelled) {
+          setPickupCode(s.pickupCode)
+          setPickupCodeError(null)
+        }
       } catch {
-        /* 取不到取件码不阻断完成页展示；仅不显示凭证码 */
+        if (!cancelled) {
+          setPickupCodeError('取件凭证暂时无法读取，请联系工作人员核验订单')
+        }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [success, state.orderId])
+  }, [success, state.orderId, state.paymentSessionToken])
 
   const handleRetry = () => {
     const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason'])
@@ -105,6 +112,14 @@ export function PrintDonePage() {
           <p className="mt-2 text-center text-xs text-neutral-500">
             如需现场核验取件，请出示此凭证码
           </p>
+        </Card>
+      )}
+      {success && pickupCodeError && (
+        <Card className="mt-6 w-full max-w-sm border-warning/30 bg-warning-bg p-4 text-warning-fg">
+          <div className="flex items-start gap-2 text-sm">
+            <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{pickupCodeError}</p>
+          </div>
         </Card>
       )}
 

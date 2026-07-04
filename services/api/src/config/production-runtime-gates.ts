@@ -10,6 +10,8 @@
  *   - SMS_PROVIDER 必须为 tencent，且腾讯短信生产参数齐全（生产不得日志打印验证码）
  *   - OCR_PROVIDER 必须为 baidu，且百度 OCR 生产参数齐全（生产不得关闭真实简历识别）
  *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
+ *   - PAYMENT_SESSION_SECRET 必须存在且长度 >= 32（打印建单后签发短期支付会话 token，
+ *     生产不得回退 JWT_SECRET / FILE_SIGNING_SECRET）
  *   - PAYMENT_PROVIDER 不得为 sandbox（生产禁止沙箱支付通道；真实渠道到 C5-6，
  *     此前生产保持未设置/disabled = 线上支付关闭）
  *
@@ -35,10 +37,12 @@ export interface ProductionRuntimeEnv {
   AI_PROVIDER?: string
   AI_LLM_API_KEY?: string
   TRTC_LLM_API_KEY?: string
+  PAYMENT_SESSION_SECRET?: string
   PAYMENT_PROVIDER?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
+const MIN_PAYMENT_SESSION_SECRET_LENGTH = 32
 const REQUIRED_TENCENT_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
   'TENCENT_SMS_SECRET_KEY',
@@ -119,6 +123,13 @@ export function assertProductionRuntimeGates(
   if (!hasValue(env.AI_LLM_API_KEY) && !hasValue(env.TRTC_LLM_API_KEY)) {
     throw new Error(
       'PRODUCTION_LLM_CONFIG_MISSING: AI_PROVIDER=llm 时必须配置 AI_LLM_API_KEY 或 TRTC_LLM_API_KEY',
+    )
+  }
+
+  const paymentSessionSecret = env.PAYMENT_SESSION_SECRET
+  if (!paymentSessionSecret || paymentSessionSecret.length < MIN_PAYMENT_SESSION_SECRET_LENGTH) {
+    throw new Error(
+      `PRODUCTION_PAYMENT_SESSION_SECRET_INVALID: NODE_ENV=production 时 PAYMENT_SESSION_SECRET 必须存在且长度 >= ${MIN_PAYMENT_SESSION_SECRET_LENGTH} 字符`,
     )
   }
 

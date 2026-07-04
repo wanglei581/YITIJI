@@ -16,6 +16,11 @@
 import { API_BASE_URL } from '../api/client'
 import type { PayAttemptView, PayStatusView } from '@ai-job-print/shared'
 
+export interface PaymentSessionInput {
+  orderId: string
+  paymentSessionToken?: string | null
+}
+
 async function readError(res: Response): Promise<string> {
   const text = await res.text().catch(() => '')
   // 尝试解出后端错误码（{ error: { code } } 或 { message }），失败则回退原文。
@@ -31,19 +36,25 @@ async function readError(res: Response): Promise<string> {
   return text || `HTTP ${res.status}`
 }
 
+function paymentSessionHeaders(input: PaymentSessionInput): Record<string, string> {
+  return input.paymentSessionToken ? { 'x-payment-session-token': input.paymentSessionToken } : {}
+}
+
 /** 出码：为付费订单创建（或幂等复用未过期的）支付尝试，返回屏上动态码内容。 */
-export async function createPayAttempt(orderId: string): Promise<PayAttemptView> {
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/pay`, {
+export async function createPayAttempt(input: PaymentSessionInput): Promise<PayAttemptView> {
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
   })
   if (!res.ok) throw new Error(`createPayAttempt failed: ${res.status} ${await readError(res)}`)
   return res.json() as Promise<PayAttemptView>
 }
 
 /** 查询支付状态（收银页轮询用）；paid 且可见时返回 pickupCode。 */
-export async function getPayStatus(orderId: string): Promise<PayStatusView> {
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/pay-status`)
+export async function getPayStatus(input: PaymentSessionInput): Promise<PayStatusView> {
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay-status`, {
+    headers: paymentSessionHeaders(input),
+  })
   if (!res.ok) throw new Error(`getPayStatus failed: ${res.status} ${await readError(res)}`)
   return res.json() as Promise<PayStatusView>
 }

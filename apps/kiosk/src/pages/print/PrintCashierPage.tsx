@@ -28,6 +28,7 @@ interface CashierLocationState {
   orderNo?: string
   amountCents?: number
   priceLines?: PrintPriceLine[]
+  paymentSessionToken?: string
   taskId?: string
   file?: unknown
   params?: PrintJobParams
@@ -69,6 +70,7 @@ export function PrintCashierPage() {
   const state = useMemo(() => (location.state ?? {}) as CashierLocationState, [location.state])
 
   const orderId = typeof state.orderId === 'string' ? state.orderId : null
+  const paymentSessionToken = typeof state.paymentSessionToken === 'string' ? state.paymentSessionToken : null
   const amountCents = typeof state.amountCents === 'number' ? state.amountCents : null
   const priceLines = Array.isArray(state.priceLines) ? state.priceLines : []
   const uploadPath = printUploadPathForSource(state.source)
@@ -90,10 +92,10 @@ export function PrintCashierPage() {
 
   // ── 出码（建/幂等复用支付尝试）──
   const issue = useCallback(async () => {
-    if (!orderId) return
+    if (!orderId || !paymentSessionToken) return
     setIssuing(true)
     try {
-      const res = await createPayAttempt(orderId)
+      const res = await createPayAttempt({ orderId, paymentSessionToken })
       if (cancelRef.current) return
       setSnapshot({
         payStatus: res.orderPayStatus,
@@ -107,25 +109,25 @@ export function PrintCashierPage() {
     } finally {
       if (!cancelRef.current) setIssuing(false)
     }
-  }, [orderId])
+  }, [orderId, paymentSessionToken])
 
   // 首次进入：出码一次。
   useEffect(() => {
-    if (API_MODE !== 'http' || !orderId || amountCents === null || amountCents <= 0) return
+    if (API_MODE !== 'http' || !orderId || !paymentSessionToken || amountCents === null || amountCents <= 0) return
     cancelRef.current = false
     void issue()
     return () => {
       cancelRef.current = true
     }
-  }, [orderId, amountCents, issue])
+  }, [orderId, paymentSessionToken, amountCents, issue])
 
   // ── 轮询支付状态 ──
   useEffect(() => {
-    if (API_MODE !== 'http' || !orderId) return
+    if (API_MODE !== 'http' || !orderId || !paymentSessionToken) return
     const tick = async () => {
       if (cancelRef.current) return
       try {
-        const s = await getPayStatus(orderId)
+        const s = await getPayStatus({ orderId, paymentSessionToken })
         if (cancelRef.current) return
         setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
         if (s.payStatus === 'paid') proceedToPrint()
@@ -136,7 +138,7 @@ export function PrintCashierPage() {
     void tick()
     const timer = setInterval(() => void tick(), POLL_INTERVAL_MS)
     return () => clearInterval(timer)
-  }, [orderId, proceedToPrint])
+  }, [orderId, paymentSessionToken, proceedToPrint])
 
   // 1s 心跳：驱动倒计时 + 动态码过期本地即时翻面（不必等下次轮询）。
   useEffect(() => {
@@ -167,8 +169,8 @@ export function PrintCashierPage() {
       if (!attemptId) return
       try {
         await simulateSandboxPayment(attemptId, result)
-        if (orderId) {
-          const s = await getPayStatus(orderId)
+        if (orderId && paymentSessionToken) {
+          const s = await getPayStatus({ orderId, paymentSessionToken })
           setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
           if (s.payStatus === 'paid') proceedToPrint()
         }
@@ -176,7 +178,7 @@ export function PrintCashierPage() {
         setIssueError(err instanceof Error ? err.message : '模拟支付失败')
       }
     },
-    [snapshot, orderId, proceedToPrint],
+    [snapshot, orderId, paymentSessionToken, proceedToPrint],
   )
 
   // ── 守卫：直达 / 非法进入 ──
@@ -187,6 +189,16 @@ export function PrintCashierPage() {
         hint="请从上传文件重新开始打印流程"
         actionLabel="重新上传文件"
         onAction={() => navigate(uploadPath)}
+      />
+    )
+  }
+  if (!paymentSessionToken) {
+    return (
+      <GuardScreen
+        title="支付会话已失效"
+        hint="请返回确认页重新创建订单"
+        actionLabel="返回确认页"
+        onAction={() => navigate('/print/confirm', { state })}
       />
     )
   }

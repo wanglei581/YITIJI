@@ -3,7 +3,8 @@
  *
  * 直接调用生产 service（不起 HTTP server），断言 C5-3 的关键不变量：
  *  1. 建单响应契约（收银衔接）：付费单返回 orderId / orderNo / amountCents>0 / payStatus=unpaid /
- *     priceLines 计费明细 / billablePages / billingPageSource；免费单 amountCents=0 且 payStatus=paid。
+ *     priceLines 计费明细 / billablePages / billingPageSource / paymentSessionToken；
+ *     免费单 amountCents=0 且 payStatus=paid。
  *  2. **出纸门控（PRINT_REQUIRE_PAID_BEFORE_CLAIM=true）**：付费单未支付时 claim **不下发**、任务保持 pending。
  *  3. 沙箱模拟支付成功 → 订单 paid + pickupCode → 同一任务变为可 claim（出纸放行）。
  *  4. 无关联 Order 的任务（seed/历史/直连）在门控开启下仍可 claim（order:null 放行）。
@@ -34,6 +35,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
+import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
@@ -162,6 +164,7 @@ async function main(): Promise<void> {
     assert(paid.payStatus === 'unpaid', `1d. 付费单建单 payStatus=unpaid（实际 ${paid.payStatus}）`)
     assert(Array.isArray(paid.priceLines) && paid.priceLines.length >= 1 && paid.priceLines[0].subtotalCents === 40, '1e. 建单响应含计费明细 priceLines')
     assert(paid.billablePages === 2 && typeof paid.billingPageSource === 'string', '1f. 建单响应含后端识别页数与来源')
+    assert(typeof paid.paymentSessionToken === 'string' && paid.paymentSessionToken.startsWith('pst_v1.'), '1g. 建单响应含短期 paymentSessionToken')
 
     // ── (2) 出纸门控开启：未支付单 claim 不下发、任务保持 pending ────────────
     await backdate(paid.taskId)
@@ -171,21 +174,32 @@ async function main(): Promise<void> {
     assert(paidTaskAfter?.status === 'pending', '2b. 未支付任务保持 pending（未被领取出纸）')
 
     // ── (3) 沙箱模拟支付成功 → paid + pickupCode → 同一任务可 claim ─────────
-    const attempt = await payment.createPayAttempt(paid.orderId)
-    assert(attempt.qrCodeContent?.startsWith('sandboxpay://') ?? false, '3a. 出码返回 sandbox 屏上动态码')
+    await expectCode('3a. 缺失 paymentSessionToken 时拒绝出码', 'PAYMENT_SESSION_REQUIRED', () => payment.createPayAttempt(paid.orderId, ''))
+    const wrongPaymentSession = createPaymentSessionToken({
+      orderId: paid.orderId,
+      orderNo: paid.orderNo,
+      terminalId,
+      amountCents: paid.amountCents,
+      printTaskId: `ptask_wrong_${suffix}`,
+    })
+    await expectCode('3b. printTaskId 错绑的 paymentSessionToken 被拒绝', 'PAYMENT_SESSION_MISMATCH', () =>
+      payment.createPayAttempt(paid.orderId, wrongPaymentSession),
+    )
+    const attempt = await payment.createPayAttempt(paid.orderId, paid.paymentSessionToken)
+    assert(attempt.qrCodeContent?.startsWith('sandboxpay://') ?? false, '3c. 出码返回 sandbox 屏上动态码')
     const orderPaying = await prisma.order.findUnique({ where: { id: paid.orderId } })
-    assert(orderPaying?.payStatus === 'paying', '3b. 出码后订单进入 paying')
+    assert(orderPaying?.payStatus === 'paying', '3d. 出码后订单进入 paying')
     await payment.simulateSandboxCallback({ attemptId: attempt.attemptId, result: 'success' })
     const orderPaid = await prisma.order.findUnique({ where: { id: paid.orderId } })
-    assert(orderPaid?.payStatus === 'paid' && orderPaid.paymentSource === 'sandbox', '3c. 模拟支付成功 → 订单 paid（paymentSource=sandbox）')
-    assert(typeof orderPaid?.pickupCode === 'string' && (orderPaid?.pickupCode?.length ?? 0) > 0, '3d. paid 后生成取件码 pickupCode')
+    assert(orderPaid?.payStatus === 'paid' && orderPaid.paymentSource === 'sandbox', '3e. 模拟支付成功 → 订单 paid（paymentSource=sandbox）')
+    assert(typeof orderPaid?.pickupCode === 'string' && (orderPaid?.pickupCode?.length ?? 0) > 0, '3f. paid 后生成取件码 pickupCode')
     // 支付回调不改 PrintTask.status（解耦）。
     const paidTaskStillPending = await prisma.printTask.findUnique({ where: { id: paid.taskId } })
-    assert(paidTaskStillPending?.status === 'pending', '3e. 支付回调不改 PrintTask.status（仍 pending，未被支付域触碰）')
+    assert(paidTaskStillPending?.status === 'pending', '3g. 支付回调不改 PrintTask.status（仍 pending，未被支付域触碰）')
     const claimPaid = await claimOne()
-    assert(claimPaid.length === 1 && claimPaid[0].taskId === paid.taskId, '3f. 支付后同一任务可 claim（出纸放行）')
+    assert(claimPaid.length === 1 && claimPaid[0].taskId === paid.taskId, '3h. 支付后同一任务可 claim（出纸放行）')
     const paidTaskClaimed = await prisma.printTask.findUnique({ where: { id: paid.taskId } })
-    assert(paidTaskClaimed?.status === 'claimed', '3g. claim 后 PrintTask 变 claimed')
+    assert(paidTaskClaimed?.status === 'claimed', '3i. claim 后 PrintTask 变 claimed')
 
     // ── (4) 无关联 Order 的任务在门控开启下仍可 claim（seed/历史放行）────────
     const legacyTaskId = `ptask_cashier_legacy_${suffix}`
@@ -208,7 +222,7 @@ async function main(): Promise<void> {
     )
     taskIds.push(free.taskId)
     assert(free.amountCents === 0 && free.payStatus === 'paid', `5a. 免费单 amountCents=0 且 payStatus=paid（实际 ${free.amountCents}/${free.payStatus}）`)
-    await expectCode('5b. 免费单出码被拒 PAY_NOT_REQUIRED', 'PAY_NOT_REQUIRED', () => payment.createPayAttempt(free.orderId))
+    await expectCode('5b. 免费单出码被拒 PAY_NOT_REQUIRED', 'PAY_NOT_REQUIRED', () => payment.createPayAttempt(free.orderId, free.paymentSessionToken))
     await backdate(free.taskId)
     const claimFree = await claimOne()
     assert(claimFree.length === 1 && claimFree[0].taskId === free.taskId, '5c. 免费单（已 paid+free）门控开启下可 claim')
@@ -227,15 +241,16 @@ async function main(): Promise<void> {
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true' // 复位
 
     // ── (7) pay-status 取件码可见性 ────────────────────────────────────────
-    const paidStatus = await payment.getPayStatus(paid.orderId)
-    assert(paidStatus.payStatus === 'paid' && typeof paidStatus.pickupCode === 'string' && (paidStatus.pickupCode?.length ?? 0) > 0, '7a. paid 订单 pay-status 返回 pickupCode')
+    await expectCode('7a. 缺失 paymentSessionToken 时拒绝查支付状态', 'PAYMENT_SESSION_REQUIRED', () => payment.getPayStatus(paid.orderId, ''))
+    const paidStatus = await payment.getPayStatus(paid.orderId, paid.paymentSessionToken)
+    assert(paidStatus.payStatus === 'paid' && typeof paidStatus.pickupCode === 'string' && (paidStatus.pickupCode?.length ?? 0) > 0, '7b. paid 订单 pay-status 返回 pickupCode')
     const unpaid = await printJobs.create(
       { fileUrl: await seedPdf('unpaid', 1), fileMd5: 'sha256-cash-unpaid', fileName: '未支付.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
     )
     taskIds.push(unpaid.taskId)
-    const unpaidStatus = await payment.getPayStatus(unpaid.orderId)
-    assert(unpaidStatus.pickupCode === null && unpaidStatus.payStatus === 'unpaid', '7b. 未支付订单 pay-status 不返回 pickupCode')
+    const unpaidStatus = await payment.getPayStatus(unpaid.orderId, unpaid.paymentSessionToken)
+    assert(unpaidStatus.pickupCode === null && unpaidStatus.payStatus === 'unpaid', '7c. 未支付订单 pay-status 不返回 pickupCode')
 
     console.log(`\n  ✅ verify:kiosk-cashier-ui 全部通过（${passed} checks）`)
   } finally {

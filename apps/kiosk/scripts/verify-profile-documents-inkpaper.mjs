@@ -135,20 +135,37 @@ try {
 }
 
 const allowedChanged = new Set([
+  '.env.example',
   '.github/workflows/ci.yml',
   'apps/kiosk/package.json',
+  'apps/kiosk/scripts/verify-print-confirm-honest.mjs',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
   'apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs',
   'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
+  'apps/kiosk/src/pages/print/PrintCashierPage.tsx',
+  'apps/kiosk/src/pages/print/PrintConfirmPage.tsx',
+  'apps/kiosk/src/pages/print/PrintDonePage.tsx',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+  'apps/kiosk/src/services/print/paymentApi.ts',
+  'apps/kiosk/src/services/print/printJobsApi.ts',
+  'docs/progress/current-progress.md',
+  'services/api/scripts/verify-kiosk-cashier-ui.ts',
+  'services/api/scripts/verify-payment-flow.ts',
+  'services/api/scripts/verify-production-real-services.ts',
+  'services/api/scripts/verify-production-runtime-gates.ts',
+  'services/api/src/config/production-runtime-gates.ts',
+  'services/api/src/payment/online-payment.service.ts',
+  'services/api/src/payment/payment-session-token.ts',
+  'services/api/src/payment/payment.controller.ts',
+  'services/api/src/print-jobs/print-jobs.service.ts',
 ])
 
 const unexpectedChanged = changedFiles.filter((file) => !allowedChanged.has(file))
 if (unexpectedChanged.length === 0) {
-  pass('diff 仅触碰文档页换装、局部 CSS、守卫、package 和 CI')
+  pass('diff 仅触碰文档页换装、局部 CSS、守卫、package、CI 与本次 payment session 精确范围')
 } else {
   fail(`diff 出现禁止范围变更：${unexpectedChanged.join(', ')}`)
 }

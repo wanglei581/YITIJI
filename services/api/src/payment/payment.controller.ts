@@ -7,7 +7,7 @@
 //   POST /payment/sandbox/simulate    沙箱模拟支付（仅非生产 + sandbox Provider）
 //
 // 鉴权口径：与 print-jobs controller 一致（kiosk 匿名层，cuid 不可猜）；
-// C5-3 收银 UI 波再按会话收紧。回调端点靠签名鉴权，不走登录态。
+// 出码/轮询必须携带打印建单返回的 x-payment-session-token。回调端点靠签名鉴权，不走登录态。
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Req } from '@nestjs/common'
 import type { Request } from 'express'
 import { SandboxSimulateDto } from './dto/online-payment.dto'
@@ -24,13 +24,13 @@ export class PaymentController {
 
   @Post('orders/:id/pay')
   @HttpCode(HttpStatus.OK)
-  async createPayAttempt(@Param('id') id: string) {
-    return this.onlinePayment.createPayAttempt(id)
+  async createPayAttempt(@Param('id') id: string, @Headers('x-payment-session-token') paymentSessionToken: string | undefined) {
+    return this.onlinePayment.createPayAttempt(id, paymentSessionToken)
   }
 
   @Get('orders/:id/pay-status')
-  async getPayStatus(@Param('id') id: string) {
-    return this.onlinePayment.getPayStatus(id)
+  async getPayStatus(@Param('id') id: string, @Headers('x-payment-session-token') paymentSessionToken: string | undefined) {
+    return this.onlinePayment.getPayStatus(id, paymentSessionToken)
   }
 
   @Post('payment/callback/:channel')
