@@ -1,0 +1,426 @@
+/*
+ * /me/settings、/me/benefits、/me/favorites 低风险明细页 · 墨青纸感局部样式。
+ * 仅在 .me-inkdetail 作用域生效，不改共享 MeListShell，避免影响文档 / AI记录 / 打印订单页。
+ */
+
+.me-inkdetail {
+  --paper: #f4f1e8;
+  --paper-2: #efeadd;
+  --card: #fffdf8;
+  --ink: #10302b;
+  --ink-2: #2c4a43;
+  --muted: #789088;
+  --line: rgba(27, 69, 60, 0.14);
+  --shadow: 0 18px 42px rgba(39, 55, 49, 0.12);
+  position: relative;
+  isolation: isolate;
+  min-height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(210, 232, 218, 0.78), transparent 30%),
+    radial-gradient(circle at 88% 4%, rgba(233, 207, 153, 0.42), transparent 26%),
+    linear-gradient(180deg, var(--paper), var(--paper-2));
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.me-inkdetail::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(16, 48, 43, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 48, 43, 0.026) 1px, transparent 1px);
+  background-size: 18px 18px, 18px 18px;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.22));
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.22));
+}
+
+.me-inkdetail > * {
+  position: relative;
+  z-index: 1;
+}
+
+.me-inkdetail > .flex,
+.me-inkdetail-settings {
+  padding: 24px;
+}
+
+.me-inkdetail:not(.me-inkdetail-settings) > .flex > div:first-child,
+.me-inkdetail .me-page-header {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 253, 248, 0.72);
+  box-shadow: 0 12px 30px rgba(39, 55, 49, 0.1);
+  padding: 16px 18px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.me-inkdetail h1 {
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.me-inkdetail:not(.me-inkdetail-settings) > .flex > div:first-child p,
+.me-inkdetail .me-page-header p {
+  color: var(--ink-2);
+}
+
+.me-inkdetail > .flex > .mt-4,
+.me-inkdetail .me-detail-scroll {
+  margin-top: 16px;
+  padding-right: 2px;
+}
+
+.me-inkdetail .me-back-button,
+.me-inkdetail:not(.me-inkdetail-settings) > .flex > div:first-child button {
+  border-radius: 999px;
+  border: 1px solid rgba(16, 48, 43, 0.12);
+  background: rgba(255, 253, 248, 0.82);
+  color: var(--ink);
+  box-shadow: 0 8px 18px rgba(16, 48, 43, 0.08);
+}
+
+.me-detail-summary,
+.me-card,
+.me-empty-card,
+.me-benefit-card,
+.me-dialog {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: var(--shadow);
+}
+
+.me-detail-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.me-detail-summary > div:not(.me-summary-mini) > p,
+.me-detail-summary > div:not(.me-summary-mini) > strong,
+.me-detail-summary > div:not(.me-summary-mini) > span {
+  display: block;
+}
+
+.me-detail-summary > div:not(.me-summary-mini) > p {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.me-detail-summary > div:not(.me-summary-mini) > strong {
+  margin-top: 2px;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.me-detail-summary > div:not(.me-summary-mini) > span {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.me-summary-icon,
+.me-account-avatar,
+.me-row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+
+.me-summary-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 20px;
+}
+
+.me-summary-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.me-summary-mini {
+  display: grid;
+  min-width: 112px;
+  gap: 6px;
+}
+
+.me-summary-mini span {
+  display: block;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(16, 48, 43, 0.07);
+  padding: 6px 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.me-tabbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+}
+
+.me-tab {
+  position: relative;
+  min-height: 44px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 48, 43, 0.12);
+  background: rgba(255, 253, 248, 0.82);
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+  transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.me-tab span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.me-tab.is-active {
+  background: var(--ink);
+  color: #fffdf8;
+  transform: translateY(-1px);
+}
+
+.me-tab.is-active span {
+  color: rgba(255, 253, 248, 0.72);
+}
+
+.me-detail-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 253, 248, 0.88);
+  padding: 16px;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(39, 55, 49, 0.08);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.me-detail-row:hover,
+.me-benefit-card:hover {
+  border-color: rgba(16, 48, 43, 0.24);
+  box-shadow: 0 16px 32px rgba(39, 55, 49, 0.12);
+  transform: translateY(-1px);
+}
+
+.me-detail-row:active,
+.me-benefit-card:active,
+.me-tab:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+.me-row-icon,
+.me-account-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 18px;
+}
+
+.me-account-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+}
+
+.me-row-icon svg,
+.me-account-avatar svg {
+  width: 25px;
+  height: 25px;
+}
+
+.me-row-title {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-row-meta {
+  margin-top: 4px;
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-row-arrow {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: rgba(16, 48, 43, 0.26);
+}
+
+.me-benefit-card,
+.me-empty-card {
+  padding: 18px;
+}
+
+.me-chip,
+.me-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.me-chip {
+  background: rgba(16, 48, 43, 0.07);
+  color: var(--ink-2);
+}
+
+.me-status.is-active {
+  background: rgba(45, 132, 97, 0.13);
+  color: #236f52;
+}
+
+.me-status.is-muted {
+  background: rgba(16, 48, 43, 0.07);
+  color: var(--muted);
+}
+
+.me-status.is-warning {
+  background: rgba(195, 142, 48, 0.16);
+  color: #85611f;
+}
+
+.me-status.is-danger {
+  background: rgba(168, 65, 62, 0.14);
+  color: #9a3d3a;
+}
+
+.me-link-row {
+  display: flex;
+  min-height: 64px;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border-top: 1px solid rgba(16, 48, 43, 0.09);
+  padding: 14px 0;
+  text-align: left;
+}
+
+.me-link-row:first-child {
+  border-top: 0;
+}
+
+.me-note {
+  border: 1px solid rgba(16, 48, 43, 0.1);
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.58);
+}
+
+.me-legal-note {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.me-toast {
+  border-radius: 999px;
+  background: rgba(16, 48, 43, 0.94);
+  color: #fffdf8;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 16px 30px rgba(16, 48, 43, 0.2);
+}
+
+.me-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.me-inkdetail .k-ripple {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  background: rgba(42, 111, 98, 0.2);
+  transform: scale(0);
+  animation: kRip 560ms ease-out forwards;
+}
+
+@keyframes kRip {
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+.me-tone-teal {
+  background: #dceee6;
+  color: #246556;
+}
+
+.me-tone-slate {
+  background: #e5e8e4;
+  color: #4d655d;
+}
+
+.me-tone-wheat {
+  background: #f1dfb7;
+  color: #85611f;
+}
+
+.me-tone-rose {
+  background: #edd6d0;
+  color: #9a4e45;
+}
+
+.me-tone-clay {
+  background: #ead7bd;
+  color: #8a5d2b;
+}
+
+@media (max-width: 720px) {
+  .me-inkdetail > .flex,
+  .me-inkdetail-settings {
+    padding: 16px;
+  }
+
+  .me-detail-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .me-summary-mini {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  }
+}
