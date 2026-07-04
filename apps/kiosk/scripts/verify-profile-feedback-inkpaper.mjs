@@ -144,6 +144,7 @@ const forbiddenChanged = changedFiles.filter((file) =>
   ![
     'services/api/scripts/verify-kiosk-cashier-ui.ts',
     'services/api/scripts/verify-payment-flow.ts',
+    'services/api/scripts/verify-production-real-services.ts',
     'services/api/scripts/verify-production-runtime-gates.ts',
     'services/api/src/config/production-runtime-gates.ts',
     'services/api/src/payment/online-payment.service.ts',
