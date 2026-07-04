@@ -11,7 +11,12 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
-import type { PrintJobParams } from '@ai-job-print/shared'
+import type {
+  BillingPageSource,
+  OrderPayStatus,
+  PrintJobParams,
+  PrintPriceLine,
+} from '@ai-job-print/shared'
 
 export interface CreatePrintJobInput {
   fileUrl:   string
@@ -29,6 +34,21 @@ export interface PrintJobCreated {
   taskId:    string
   status:    string
   createdAt: string
+  // ── C5-3 收银/履约衔接（后端 additive 返回；镜像 print-jobs.service PrintJobCreated）──
+  /** 关联订单 id（收银出码 / 支付轮询用；不可猜 cuid，鉴权口径同 taskId）。 */
+  orderId:   string
+  /** 运营订单号（展示用）。 */
+  orderNo:   string
+  /** 应付金额（分），>= 0；0 表示免费单（已 paid）。Kiosk 据此分流：>0 进收银页，==0 直接履约。 */
+  amountCents: number
+  /** 建单即时支付状态：付费单 `unpaid`，免费单 `paid`（free）。 */
+  payStatus: OrderPayStatus
+  /** 计费明细快照（收银页「价目明细」展示）。 */
+  priceLines: PrintPriceLine[]
+  /** 后端识别的计费页数。 */
+  billablePages: number
+  /** 计费页数来源。 */
+  billingPageSource: BillingPageSource
 }
 
 /** Backend status values — subset of shared PrintTaskStatus */

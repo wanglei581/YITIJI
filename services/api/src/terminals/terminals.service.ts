@@ -48,6 +48,23 @@ const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
 
 const CONFIG_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
+/**
+ * C5-3 出纸门控（paid 后才 claim 出纸）。
+ *
+ * 决策口径（本波）：默认**关闭**，不静默改变现有生产/预生产打印行为（那里暂无 live 支付）；
+ * 由环境变量 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true` 显式开启（C5-3 verify / CI / 商用验收使用）。
+ *
+ * 开启后：claim 只领取「已 `paid` 或**无关联 Order**（seed / 历史 / 直连测试任务）」的 pending 任务。
+ * 唯一建 PrintTask 的生产路径 `PrintJobsService.create` 必在同事务建 Order，故「无 Order」只对
+ * seed/历史成立，对其放行是安全的。付费单在支付前保持 pending 但**不被领取**，绝不出纸。
+ *
+ * 与支付域解耦（plan §219 / CLAUDE §12）：门控只**读** `Order.payStatus`，绝不改 `PrintTask.status`；
+ * 支付回调也绝不碰打印状态。每次调用读 env，便于 verify 逐用例切换。
+ */
+function requirePaidBeforeClaim(): boolean {
+  return process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] === 'true'
+}
+
 function cleanNullable(value: string | null | undefined): string | null | undefined {
   if (value === null) return null
   if (value === undefined) return undefined
@@ -485,11 +502,22 @@ export class TerminalsService implements OnModuleInit {
 
     const results: ClaimTaskResponse[] = []
 
+    // C5-3 出纸门控：开启时只领取「已 paid 或无关联 Order」的 pending 任务；付费未支付单不出纸。
+    // 只读 payStatus，不改 PrintTask.status（与支付域解耦）。默认关闭 → 行为与 C5-3 前一致。
+    const paidGate = requirePaidBeforeClaim()
+    const claimableWhere = paidGate
+      ? {
+          status: 'pending' as const,
+          terminalId,
+          OR: [{ order: { is: null } }, { order: { is: { payStatus: 'paid' } } }],
+        }
+      : { status: 'pending' as const, terminalId }
+
     // Atomic claim: find first pending task and claim it in a transaction
     for (let i = 0; i < limit; i++) {
       const claimed = await this.prisma.$transaction(async (tx) => {
         const task = await tx.printTask.findFirst({
-          where: { status: 'pending', terminalId },
+          where: claimableWhere,
           orderBy: { createdAt: 'asc' },
         })
         if (!task) return null

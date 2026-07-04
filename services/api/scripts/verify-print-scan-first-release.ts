@@ -112,10 +112,22 @@ function main(): void {
   )
 
   const claimBlock = section(terminalsService, 'async claimTasks', '// ── 4. Patch task status')
+  // 注：C5-3 起 findFirst 的 where 抽成 claimableWhere（叠加出纸门控），但仍按 terminalId + pending 收窄；
+  // update 守卫（含 id + status + terminalId）保持不变，双重防越取仍在。
   mustContain(
     claimBlock,
-    ["where: { status: 'pending', terminalId }", "where: { id: task.id, status: 'pending', terminalId }"],
+    [
+      'where: claimableWhere',
+      "{ status: 'pending' as const, terminalId }",
+      "where: { id: task.id, status: 'pending', terminalId }",
+    ],
     'claim must filter pending tasks by terminalId',
+  )
+  // C5-3 出纸门控：门控开启时只领取「已 paid 或无 Order」的 pending 任务（付费未支付单不出纸）。
+  mustContain(
+    claimBlock,
+    ['requirePaidBeforeClaim()', "order: { is: { payStatus: 'paid' } }", 'order: { is: null }'],
+    'C5-3 出纸门控：claim 开启时仅领取已 paid 或无 Order 的 pending 任务',
   )
   mustContain(
     claimBlock,

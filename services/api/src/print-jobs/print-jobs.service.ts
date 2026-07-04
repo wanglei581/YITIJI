@@ -5,13 +5,33 @@ import { AuditService } from '../audit/audit.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { OrderStatusService } from '../payment/order-status.service'
 import { PricingService } from '../payment/pricing.service'
+import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
 import { PrintPageCountService } from './print-page-count.service'
+import type { BillingPageSource } from './print-page-count.types'
 
 export interface PrintJobCreated {
   taskId:    string
   status:    string
   createdAt: string
+  // ── C5-3 收银/履约衔接（additive；只回安全计费/支付元数据，无文件原文/签名 URL）──
+  //
+  // orderId 与 taskId 同为不可猜 cuid，Kiosk 匿名层鉴权口径一致（见 payment.controller 注释）；
+  // Kiosk 据 amountCents 分流：>0 进收银页出码支付，==0（免费单，已 paid+free）直接进履约。
+  /** 关联订单 id（收银出码 / 支付状态轮询用）。 */
+  orderId:   string
+  /** 运营订单号（展示用）。 */
+  orderNo:   string
+  /** 应付金额（分），后端计价，>= 0；0 表示免费单。 */
+  amountCents: number
+  /** 建单即时支付状态：付费单 `unpaid`，免费单经状态机置 `paid`（free）。 */
+  payStatus: OrderPayStatus
+  /** 计费明细快照（收银页「价目明细」展示用；即 Order.itemsJson 内容）。 */
+  priceLines: PrintPriceLine[]
+  /** 后端识别的计费页数（绝不信任前端）。 */
+  billablePages: number
+  /** 计费页数来源。 */
+  billingPageSource: BillingPageSource
 }
 
 export interface PrintJobStatusResult {
@@ -279,6 +299,14 @@ export class PrintJobsService {
       taskId:    task.id,
       status:    task.status,
       createdAt: task.createdAt.toISOString(),
+      // C5-3：付费单 unpaid（Kiosk 进收银页出码），免费单已由上方 markPaid(free) 置 paid。
+      orderId:           order.id,
+      orderNo:           order.orderNo,
+      amountCents:       quote.amountCents,
+      payStatus:         (quote.amountCents === 0 ? 'paid' : 'unpaid') as OrderPayStatus,
+      priceLines:        quote.lines,
+      billablePages:     quote.billablePages,
+      billingPageSource: quote.billingPageSource,
     }
   }
 

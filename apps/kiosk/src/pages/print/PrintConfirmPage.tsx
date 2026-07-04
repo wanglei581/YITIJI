@@ -103,7 +103,7 @@ export function PrintConfirmPage() {
       setSubmitting(true)
       setSubmitError(null)
       try {
-        const { taskId } = await createPrintJob({
+        const created = await createPrintJob({
           fileUrl:  file.fileUrl,
           fileMd5:  file.fileMd5,
           fileName: file.name,
@@ -111,7 +111,24 @@ export function PrintConfirmPage() {
           token:    getToken(),
         })
         clearPrintMaterialSession()
-        navigate('/print/progress', { state: { ...location.state, file, params, taskId, source } })
+        // C5-3：付费单先进收银页出码支付；免费单（amountCents=0，已 paid+free）直接进履约。
+        // orderId/amountCents/priceLines 透传给收银页与「完成」页（后者据 orderId 取 paid 后 pickupCode）。
+        const nextState = {
+          ...location.state,
+          file,
+          params,
+          source,
+          taskId:      created.taskId,
+          orderId:     created.orderId,
+          orderNo:     created.orderNo,
+          amountCents: created.amountCents,
+          priceLines:  created.priceLines,
+        }
+        if (created.amountCents > 0 && created.payStatus !== 'paid') {
+          navigate('/print/cashier', { state: nextState })
+        } else {
+          navigate('/print/progress', { state: nextState })
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : '提交失败，请重试'
         setSubmitError(msg)
