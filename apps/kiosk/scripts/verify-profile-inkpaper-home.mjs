@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 // 目标：
 // 1. ProfilePage 主入口继续保持已合入的墨青纸感结构，不回退；
 // 2. 仅允许 /me/settings、/me/benefits、/me/favorites 做低风险视觉换装；
-// 3. /me/ai-records 已由独立守卫覆盖；/me/documents、/me/print-orders 等高风险明细页不能被本批触碰。
+// 3. /me/ai-records、/me/activity 已由独立守卫覆盖；/me/documents、/me/print-orders 等高风险明细页不能被本批触碰。
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -120,6 +120,7 @@ const benefitsPage = read('src/pages/profile/me/MyBenefitsPage.tsx')
 const settingsPage = read('src/pages/profile/me/MySettingsPage.tsx')
 const aiRecordsPage = read('src/pages/profile/me/MyAiRecordsPage.tsx')
 const jobAiRecords = read('src/pages/profile/me/JobAiSessionRecords.tsx')
+const activityPage = read('src/pages/profile/me/MyActivityPage.tsx')
 const packageJson = read('package.json')
 
 // 1) 主入口必须使用墨青纸感局部样式和涟漪，不外溢到 /me 明细页。
@@ -233,6 +234,13 @@ expectMatches(aiRecordsPage, /className="me-inkdetail/, 'AI服务记录使用 .m
 expectIncludes(aiRecordsPage, 'deleteMyAiRecord', 'AI服务记录保留本人 AI 记录删除接口')
 expectIncludes(jobAiRecords, '删除岗位 AI 参考记录', '岗位 AI 参考记录保留删除操作文案')
 
+expectIncludes(activityPage, "import './me-detail-inkpaper.css'", '浏览与跳转记录引入明细页局部 CSS')
+expectIncludes(activityPage, "useInkRipple('.me-inkdetail", '浏览与跳转记录只在 .me-inkdetail 作用域启用涟漪')
+expectMatches(activityPage, /className="me-inkdetail/, '浏览与跳转记录使用 .me-inkdetail 根作用域')
+expectIncludes(activityPage, 'getMyBrowseLogs', '浏览与跳转记录保留浏览记录真实 API 拉取')
+expectIncludes(activityPage, 'getMyJumpLogs', '浏览与跳转记录保留外部跳转真实 API 拉取')
+expectIncludes(activityPage, '投递 / 预约结果以来源平台为准，本系统不记录', '浏览与跳转记录保留投递/预约边界文案')
+
 // 5) Diff 范围守卫：本批只允许三个低风险明细页、局部 CSS 和本 verify 被修改。
 let changedFiles = []
 try {
@@ -250,9 +258,11 @@ const allowedChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx',
+  'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
   'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',
+  'apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs',
 ])
 const profileRelatedChanged = changedFiles.filter(
   (file) =>
