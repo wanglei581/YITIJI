@@ -96,7 +96,7 @@ assertNotContains(
   ['用于简历优化', 'getResumeTemplates', '清爽通用简历模板'],
   'Job material page does not expose resume template optimization flow',
 )
-assertContains('src/pages/profile/me/MyDocumentsPage.tsx', 'PrinterIcon', 'MyDocuments exposes print action')
+assertContains('src/pages/profile/me/MyDocumentsPage.tsx', 'name="printer"', 'MyDocuments exposes print action')
 assertContains('src/pages/profile/me/MyDocumentsPage.tsx', "navigate('/print/confirm'", 'MyDocuments reuses print confirm route')
 assertNotContains(
   'src/pages/resume/JobMaterialLibraryPage.tsx',

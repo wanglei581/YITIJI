@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
 import type { FileRetentionPolicy, FileRetentionUpdateRequest, MemberDocumentItem } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
-import { FilesIcon, EyeIcon, Trash2Icon, ClockIcon, PrinterIcon } from 'lucide-react'
+import { FilesIcon, Trash2Icon } from 'lucide-react'
 import {
   deleteMyDocument,
   fetchAccessUrl,
@@ -18,8 +18,11 @@ import {
   updateMyDocumentRetention,
 } from '../../../services/api/memberAssets'
 import { useAuth } from '../../../auth/useAuth'
+import { KIcon } from '../../../components/kiosk-icon'
+import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
+import './me-detail-inkpaper.css'
 
 function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '—'
@@ -92,20 +95,20 @@ function RetentionConfirmOverlay({
         aria-modal="true"
         aria-labelledby="retention-confirm-title"
         aria-describedby="retention-confirm-desc"
-        className="w-[23rem] max-w-full rounded-2xl bg-white p-6 shadow-xl"
+        className="me-dialog me-retention-dialog w-[23rem] max-w-full p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <p id="retention-confirm-title" className="text-base font-semibold text-neutral-900">
+        <p id="retention-confirm-title" className="text-base font-semibold text-[color:var(--ink)]">
           确认{RETENTION_LABELS[policy]}
         </p>
-        <p id="retention-confirm-desc" className="mt-2 text-sm leading-relaxed text-neutral-500">
+        <p id="retention-confirm-desc" className="mt-2 text-sm leading-relaxed text-[color:var(--ink-2)]">
           {retentionConfirmText(policy)}点击“同意并保存”即表示你已知悉文件保存期限说明。
         </p>
         <div className="mt-5 flex gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="flex h-12 flex-1 items-center justify-center rounded-lg border border-neutral-200 text-sm font-medium text-neutral-600"
+            className="me-ripple me-dialog-button"
           >
             取消
           </button>
@@ -113,10 +116,7 @@ function RetentionConfirmOverlay({
             type="button"
             disabled={busy}
             onClick={onConfirm}
-            className={[
-              'flex h-12 flex-1 items-center justify-center rounded-lg text-sm font-semibold text-white',
-              busy ? 'cursor-not-allowed bg-primary-300' : 'bg-primary-600',
-            ].join(' ')}
+            className={['me-ripple me-dialog-button primary', busy ? 'is-disabled' : ''].join(' ')}
           >
             {busy ? '保存中' : '同意并保存'}
           </button>
@@ -140,6 +140,7 @@ export function MyDocumentsPage() {
   const [retentionPanelId, setRetentionPanelId] = useState<string | null>(null)
   const [retentionBusy, setRetentionBusy] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
   const [retentionConfirm, setRetentionConfirm] = useState<{ fileId: string; policy: SelectableRetentionPolicy } | null>(null)
+  useInkRipple('.me-inkdetail .me-ripple')
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
@@ -277,154 +278,148 @@ export function MyDocumentsPage() {
   const confirmDoc = retentionConfirm ? items.find((item) => item.id === retentionConfirm.fileId) : null
 
   return (
-    <MeListShell
-      title="我的文档"
-      subtitle="本人保存的文档（仅本人可见，到期自动清理）"
-      loginFrom="/me/documents"
-      isLoggedIn={isLoggedIn}
-      state={state}
-      onRetry={() => setReloadKey((k) => k + 1)}
-      isEmpty={items.length === 0}
-      emptyIcon={FilesIcon}
-      emptyTitle="还没有文档"
-      emptyDescription="保存简历 / 打印材料等文档后，这里会显示你的文档记录"
-    >
-      {hint && (
-        <div role="status" className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full bg-neutral-900/90 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
-          {hint}
-        </div>
-      )}
-      {retentionConfirm && confirmDoc && (
-        <RetentionConfirmOverlay
-          policy={retentionConfirm.policy}
-          onCancel={() => setRetentionConfirm(null)}
-          onConfirm={() => void submitRetention(confirmDoc, retentionConfirm.policy)}
-          busy={retentionBusy?.fileId === retentionConfirm.fileId}
-        />
-      )}
-      {items.map((doc) => {
-        const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
-        const confirming = confirmId === doc.id
-        const busy = busyId === doc.id
-        const openingThis = opening === doc.id
-        const printingThis = printingId === doc.id
-        const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
-        const viewDisabled = expired || isAnyPending
-        const printDisabled = expired || !printable || isAnyPending
-        const deleteDisabled = isAnyPending
-        const policies = selectablePolicies(doc)
-        const canChangeRetention = !expired && policies.length > 1
-        const retentionOpen = retentionPanelId === doc.id
-        return (
-          <Card key={doc.id} className="flex items-center gap-4 p-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50">
-              <FilesIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-neutral-900">{doc.filename}</p>
-              <p className="mt-0.5 truncate text-xs text-neutral-400">
-                {formatBytes(doc.sizeBytes)} · {formatTime(doc.createdAt)}
-                {doc.expiresAt === null ? ' · 长期保存' : expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                <span className="inline-flex items-center gap-1 rounded-full bg-neutral-50 px-2 py-1 font-medium text-neutral-500">
-                  <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {retentionLabel(doc.retentionPolicy, doc.expiresAt)}
-                </span>
-                {canChangeRetention && (
-                  <button
-                    type="button"
-                    disabled={isAnyPending}
-                    onClick={() => setRetentionPanelId(retentionOpen ? null : doc.id)}
-                    className={[
-                      'rounded-full px-2 py-1 font-medium transition-colors',
-                      isAnyPending ? 'cursor-not-allowed text-neutral-300' : 'bg-primary-50 text-primary-600 hover:bg-primary-100',
-                    ].join(' ')}
-                  >
-                    修改保存期限
-                  </button>
+    <div className="me-inkdetail me-inkdetail-documents h-full">
+      <MeListShell
+        title="我的文档"
+        subtitle="本人保存的文档（仅本人可见，到期自动清理）"
+        loginFrom="/me/documents"
+        isLoggedIn={isLoggedIn}
+        state={state}
+        onRetry={() => setReloadKey((k) => k + 1)}
+        isEmpty={items.length === 0}
+        emptyIcon={FilesIcon}
+        emptyTitle="还没有文档"
+        emptyDescription="保存简历 / 打印材料等文档后，这里会显示你的文档记录"
+      >
+        {hint && (
+          <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
+            {hint}
+          </div>
+        )}
+        {retentionConfirm && confirmDoc && (
+          <RetentionConfirmOverlay
+            policy={retentionConfirm.policy}
+            onCancel={() => setRetentionConfirm(null)}
+            onConfirm={() => void submitRetention(confirmDoc, retentionConfirm.policy)}
+            busy={retentionBusy?.fileId === retentionConfirm.fileId}
+          />
+        )}
+        <section className="me-detail-summary" aria-label="文档概览">
+          <span className="me-summary-icon me-tone-slate" aria-hidden="true">
+            <KIcon name="files" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p>文档资产</p>
+            <strong>{items.length}</strong>
+            <span>查看和打印时才换取短期访问链接；到期或删除后不可恢复</span>
+          </div>
+          <div className="me-summary-mini" aria-label="文档状态数量">
+            <span>可用 {items.filter((doc) => doc.expiresAt === null || new Date(doc.expiresAt).getTime() >= now).length}</span>
+            <span>长期 {items.filter((doc) => doc.expiresAt === null).length}</span>
+            <span>到期 {items.filter((doc) => doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now).length}</span>
+          </div>
+        </section>
+        {items.map((doc) => {
+          const expired = doc.expiresAt !== null && new Date(doc.expiresAt).getTime() < now
+          const confirming = confirmId === doc.id
+          const busy = busyId === doc.id
+          const openingThis = opening === doc.id
+          const printingThis = printingId === doc.id
+          const printable = doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'
+          const viewDisabled = expired || isAnyPending
+          const printDisabled = expired || !printable || isAnyPending
+          const deleteDisabled = isAnyPending
+          const policies = selectablePolicies(doc)
+          const canChangeRetention = !expired && policies.length > 1
+          const retentionOpen = retentionPanelId === doc.id
+          return (
+            <Card key={doc.id} className="me-document-card">
+              <span className="me-row-icon me-tone-slate" aria-hidden="true">
+                <KIcon name="files" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="me-row-title">{doc.filename}</p>
+                <p className="me-row-meta">
+                  {formatBytes(doc.sizeBytes)} · {formatTime(doc.createdAt)}
+                  {doc.expiresAt === null ? ' · 长期保存' : expired ? ' · 已到期' : ` · 有效期至 ${formatTime(doc.expiresAt)}`}
+                </p>
+                <div className="me-doc-chips">
+                  <span className={['me-chip', expired ? 'is-danger' : ''].join(' ')}>
+                    <KIcon name="clock" />
+                    {retentionLabel(doc.retentionPolicy, doc.expiresAt)}
+                  </span>
+                  {canChangeRetention && (
+                    <button
+                      type="button"
+                      disabled={isAnyPending}
+                      onClick={() => setRetentionPanelId(retentionOpen ? null : doc.id)}
+                      className={['me-ripple me-doc-retention-toggle', isAnyPending ? 'is-disabled' : ''].join(' ')}
+                    >
+                      修改保存期限
+                    </button>
+                  )}
+                </div>
+                {retentionOpen && canChangeRetention && (
+                  <div className="me-doc-retention-options">
+                    {policies.map((policy) => {
+                      const active = policy === doc.retentionPolicy || (policy === 'long_term' && doc.expiresAt === null)
+                      const retentionButtonBusy = retentionBusy?.fileId === doc.id && retentionBusy.policy === policy
+                      return (
+                        <button
+                          key={policy}
+                          type="button"
+                          disabled={isAnyPending || active}
+                          onClick={() => selectRetention(doc, policy)}
+                          className={[
+                            'me-ripple me-doc-retention-option',
+                            active ? 'is-active' : '',
+                            isAnyPending ? 'is-disabled' : '',
+                          ].join(' ')}
+                        >
+                          {retentionButtonBusy ? '保存中' : RETENTION_LABELS[policy]}
+                        </button>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
-              {retentionOpen && canChangeRetention && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {policies.map((policy) => {
-                    const active = policy === doc.retentionPolicy || (policy === 'long_term' && doc.expiresAt === null)
-                    const retentionButtonBusy = retentionBusy?.fileId === doc.id && retentionBusy.policy === policy
-                    return (
-                      <button
-                        key={policy}
-                        type="button"
-                        disabled={isAnyPending || active}
-                        onClick={() => selectRetention(doc, policy)}
-                        className={[
-                          'h-9 rounded-lg border px-3 text-xs font-semibold transition-colors',
-                          active
-                            ? 'border-primary-200 bg-primary-50 text-primary-600'
-                            : isAnyPending
-                              ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
-                              : 'border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:text-primary-600',
-                        ].join(' ')}
-                      >
-                        {retentionButtonBusy ? '保存中' : RETENTION_LABELS[policy]}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                disabled={viewDisabled}
-                onClick={() => void open(doc)}
-                className={[
-                  'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
-                  viewDisabled
-                    ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
-                    : 'border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:text-primary-600',
-                ].join(' ')}
-              >
-                <EyeIcon className="h-4 w-4" aria-hidden="true" />
-                {expired ? '已到期' : openingThis ? '打开中' : '查看'}
-              </button>
-              <button
-                type="button"
-                disabled={printDisabled}
-                onClick={() => void print(doc)}
-                title={printable ? '打印文档' : '该文件格式暂不支持打印'}
-                className={[
-                  'flex h-12 shrink-0 items-center gap-1 rounded-lg border px-4 text-sm font-medium transition-colors',
-                  printDisabled
-                    ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
-                    : 'border-neutral-200 text-neutral-600 hover:bg-primary-50 hover:text-primary-600',
-                ].join(' ')}
-              >
-                <PrinterIcon className="h-4 w-4" aria-hidden="true" />
-                {printingThis ? '准备中' : '打印'}
-              </button>
-              <button
-                type="button"
-                disabled={deleteDisabled}
-                onClick={() => void remove(doc)}
-                title={confirming ? '再次点击确认删除' : '删除'}
-                aria-label={confirming ? `再次点击确认删除文档 ${doc.filename}` : `删除文档 ${doc.filename}`}
-                className={[
-                  'flex h-12 shrink-0 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors',
-                  deleteDisabled
-                    ? 'cursor-not-allowed border-neutral-100 text-neutral-300'
-                    : confirming
-                      ? 'border-error/40 bg-error-bg text-error-fg'
-                      : 'border-neutral-200 text-neutral-400 hover:bg-error-bg hover:text-error-fg',
-                ].join(' ')}
-              >
-                <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-                {busy ? <span className="ml-1">删除中</span> : confirming && <span className="ml-1">确认删除</span>}
-              </button>
-            </div>
-          </Card>
-        )
-      })}
-      <p className="mt-1 text-center text-xs text-neutral-400">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</p>
-    </MeListShell>
+              <div className="me-doc-actions">
+                <button
+                  type="button"
+                  disabled={viewDisabled}
+                  onClick={() => void open(doc)}
+                  className={['me-ripple me-doc-action', viewDisabled ? 'is-disabled' : ''].join(' ')}
+                >
+                  <KIcon name="eye" />
+                  {expired ? '已到期' : openingThis ? '打开中' : '查看'}
+                </button>
+                <button
+                  type="button"
+                  disabled={printDisabled}
+                  onClick={() => void print(doc)}
+                  title={printable ? '打印文档' : '该文件格式暂不支持打印'}
+                  className={['me-ripple me-doc-action', printDisabled ? 'is-disabled' : ''].join(' ')}
+                >
+                  <KIcon name="printer" />
+                  {printingThis ? '准备中' : '打印'}
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteDisabled}
+                  onClick={() => void remove(doc)}
+                  title={confirming ? '再次点击确认删除' : '删除'}
+                  aria-label={confirming ? `再次点击确认删除文档 ${doc.filename}` : `删除文档 ${doc.filename}`}
+                  className={['me-ripple me-delete-button', confirming ? 'is-confirm' : '', deleteDisabled ? 'is-disabled' : ''].join(' ')}
+                >
+                  <Trash2Icon className="h-4 w-4" aria-hidden="true" />
+                  {busy ? <span className="ml-1">删除中</span> : confirming && <span className="ml-1">确认删除</span>}
+                </button>
+              </div>
+            </Card>
+          )
+        })}
+        <p className="me-legal-note">文件仅本人可查看和打印；访问链接短期有效，保存期限以文件卡片为准；原始简历/求职材料默认 90 天，AI 优化成果确认后可长期保存</p>
+      </MeListShell>
+    </div>
   )
 }
