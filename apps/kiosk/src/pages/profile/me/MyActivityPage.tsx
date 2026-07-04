@@ -19,8 +19,11 @@ import type {
 import { ChevronRightIcon, ExternalLinkIcon, EyeIcon } from 'lucide-react'
 import { getMyBrowseLogs, getMyJumpLogs } from '../../../services/api/activity'
 import { useAuth } from '../../../auth/useAuth'
+import { KIcon, type KioskIconName } from '../../../components/kiosk-icon'
+import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
+import './me-detail-inkpaper.css'
 
 const TYPE_LABEL: Record<ActivityTargetType, string> = {
   job: '岗位',
@@ -67,6 +70,7 @@ export function MyActivityPage() {
   const [jumps, setJumps] = useState<MemberJumpLogItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
   const [reloadKey, setReloadKey] = useState(0)
+  useInkRipple('.me-inkdetail .me-ripple')
 
   const tab: 'browse' | 'jump' = searchParams.get('tab') === 'jump' ? 'jump' : 'browse'
   const setTab = (next: 'browse' | 'jump') => setSearchParams(next === 'jump' ? { tab: 'jump' } : {}, { replace: true })
@@ -97,86 +101,97 @@ export function MyActivityPage() {
   ]
 
   return (
-    <MeListShell
-      title="浏览与跳转记录"
-      subtitle="本人浏览过的、以及打开过来源平台 / 官方入口的记录（仅本人可见）"
-      loginFrom="/me/activity"
-      isLoggedIn={isLoggedIn}
-      state={state}
-      onRetry={() => setReloadKey((k) => k + 1)}
-    >
-      <div className="flex gap-2">
-        {tabs.map((t) => {
-          const active = tab === t.key
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={[
-                'shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors',
-                active ? 'bg-primary-600 text-white' : 'bg-white text-neutral-600 ring-1 ring-neutral-200',
-              ].join(' ')}
-            >
-              {t.label}
-              <span className={active ? 'ml-1 text-white/80' : 'ml-1 text-neutral-400'}>{t.count}</span>
-            </button>
-          )
-        })}
-      </div>
+    <div className="me-inkdetail me-inkdetail-activity h-full">
+      <MeListShell
+        title="浏览与跳转记录"
+        subtitle="本人浏览过的、以及打开过来源平台 / 官方入口的记录（仅本人可见）"
+        loginFrom="/me/activity"
+        isLoggedIn={isLoggedIn}
+        state={state}
+        onRetry={() => setReloadKey((k) => k + 1)}
+      >
+        <section className="me-detail-summary" aria-label="浏览与跳转记录概览">
+          <span className="me-summary-icon me-tone-slate" aria-hidden="true">
+            <KIcon name="clock" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p>访问足迹</p>
+            <strong>{browse.length + jumps.length}</strong>
+            <span>只记录浏览与打开来源入口动作，不记录投递或预约结果</span>
+          </div>
+          <div className="me-summary-mini" aria-label="浏览与跳转记录数量">
+            <span>浏览 {browse.length}</span>
+            <span>跳转 {jumps.length}</span>
+          </div>
+        </section>
 
-      {tab === 'browse' ? (
-        browse.length === 0 ? (
-          <Card className="p-4">
-            <EmptyState icon={EyeIcon} title="还没有浏览记录" description="浏览岗位 / 招聘会 / 政策 / 企业后，这里会显示你的浏览记录" className="py-12" />
+        <div className="me-tabbar">
+          {tabs.map((t) => {
+            const active = tab === t.key
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={['me-tab me-ripple', active ? 'is-active' : ''].join(' ')}
+                aria-pressed={active}
+              >
+                {t.label}
+                <span>{t.count}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {tab === 'browse' ? (
+          browse.length === 0 ? (
+            <Card className="me-empty-card">
+              <EmptyState icon={EyeIcon} title="还没有浏览记录" description="浏览岗位 / 招聘会 / 政策 / 企业后，这里会显示你的浏览记录" className="py-12" />
+            </Card>
+          ) : (
+            browse.map((it) => (
+              <ActivityRow
+                key={it.id}
+                icon="eye"
+                tone="slate"
+                title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
+                meta={`浏览 · ${TYPE_LABEL[it.targetType]}${it.sourceName ? ` · ${it.sourceName}` : ''} · ${formatTime(it.createdAt)}`}
+                onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
+              />
+            ))
+          )
+        ) : jumps.length === 0 ? (
+          <Card className="me-empty-card">
+            <EmptyState icon={ExternalLinkIcon} title="还没有跳转记录" description="打开岗位 / 招聘会 / 政策的来源平台或官方入口后，这里会显示记录" className="py-12" />
           </Card>
         ) : (
-          browse.map((it) => (
+          jumps.map((it) => (
             <ActivityRow
               key={it.id}
-              icon={EyeIcon}
-              iconBg="bg-info-bg"
-              iconColor="text-info"
+              icon="external"
+              tone="teal"
               title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
-              meta={`浏览 · ${TYPE_LABEL[it.targetType]}${it.sourceName ? ` · ${it.sourceName}` : ''} · ${formatTime(it.createdAt)}`}
+              meta={`打开${actionLabel(it.action, it.targetType)} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
               onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
             />
           ))
-        )
-      ) : jumps.length === 0 ? (
-        <Card className="p-4">
-          <EmptyState icon={ExternalLinkIcon} title="还没有跳转记录" description="打开岗位 / 招聘会 / 政策的来源平台或官方入口后，这里会显示记录" className="py-12" />
-        </Card>
-      ) : (
-        jumps.map((it) => (
-          <ActivityRow
-            key={it.id}
-            icon={ExternalLinkIcon}
-            iconBg="bg-primary-50"
-            iconColor="text-primary-600"
-            title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
-            meta={`打开${actionLabel(it.action, it.targetType)} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
-            onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
-          />
-        ))
-      )}
+        )}
 
-      <p className="mt-1 text-center text-xs text-neutral-400">仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录</p>
-    </MeListShell>
+        <p className="me-legal-note">仅记录本人浏览与打开来源入口的行为；投递 / 预约结果以来源平台为准，本系统不记录</p>
+      </MeListShell>
+    </div>
   )
 }
 
 function ActivityRow({
-  icon: Icon,
-  iconBg,
-  iconColor,
+  icon,
+  tone,
   title,
   meta,
   onTap,
 }: {
-  icon: typeof EyeIcon
-  iconBg: string
-  iconColor: string
+  icon: KioskIconName
+  tone: string
   title: string
   meta: string
   onTap: () => void
@@ -185,16 +200,16 @@ function ActivityRow({
     <button
       type="button"
       onClick={onTap}
-      className="flex w-full items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-neutral-50 active:bg-neutral-100"
+      className="me-detail-row me-ripple"
     >
-      <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', iconBg].join(' ')}>
-        <Icon className={['h-6 w-6', iconColor].join(' ')} aria-hidden="true" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-neutral-900">{title}</p>
-        <p className="mt-0.5 truncate text-xs text-neutral-400">{meta}</p>
-      </div>
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+      <span className={['me-row-icon', `me-tone-${tone}`].join(' ')} aria-hidden="true">
+        <KIcon name={icon} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="me-row-title">{title}</span>
+        <span className="me-row-meta">{meta}</span>
+      </span>
+      <ChevronRightIcon className="me-row-arrow" aria-hidden="true" />
     </button>
   )
 }
