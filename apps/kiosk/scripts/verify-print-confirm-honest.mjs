@@ -144,6 +144,11 @@ expectMatches(
   /getPayStatus\(\{\s*orderId:\s*state\.orderId\s+as\s+string,\s*paymentSessionToken:\s*state\.paymentSessionToken\s*\}\)/,
   'PrintDonePage 查询取件码时携带 paymentSessionToken',
 )
+expectMatches(
+  doneSrc,
+  /setPickupCodeError\('取件凭证暂时无法读取，请联系工作人员核验订单'\)/,
+  'PrintDonePage 取件码查询失败时显式提示工作人员核验，不静默隐藏',
+)
 
 // 7) PrintProgressPage:生产 http 模式无 taskId 时也不能走 SIM 动画 / 成功页
 expectMatches(
