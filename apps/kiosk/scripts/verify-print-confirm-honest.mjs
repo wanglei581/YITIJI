@@ -14,7 +14,10 @@ import { fileURLToPath } from 'node:url'
 // 本守卫静态断言:PrintConfirmPage.handleConfirm 在 http 模式下,
 //   1) 以 `if (API_MODE === 'http')` 作为外层分支;
 //   2) 无真实 fileUrl 时先 setSubmitError + return 拦截,绝不落入 SIM;
-//   3) 无 taskId 的 SIM 跳转只存在于 http 分支 return 之后(即仅非 http 模式可达)。
+//   3) 真实建单后按 amountCents 分流(C5-3 收银):付费单(>0/unpaid)进 /print/cashier,
+//      免费/已付单(0/paid+free)进真实 /print/progress;两分支共用 nextState
+//      (必带 taskId + orderId),绝不落入 SIM;
+//   4) 无 taskId 的 SIM 跳转只存在于 http 分支 return 之后(即仅非 http 模式可达)。
 // ============================================================
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -63,20 +66,33 @@ expectMatches(
 const httpIndex = confirmSrc.search(httpBranch)
 const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)/)
 
-// SIM 跳转 = 无 taskId 的 /print/progress 导航
+// SIM 跳转 = 无 taskId 的 /print/progress 导航(仅非 http mock 模式使用)
 const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*source\s*\}\s*\}\)/
-const realNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*taskId,\s*source\s*\}\s*\}\)/
 const simIndex = confirmSrc.search(simNavPattern)
 
-// 4) fileUrl 守卫必须早于 SIM 跳转(结构上 SIM 仅在 http 分支 return 之后可达)
-if (httpIndex >= 0 && guardIndex > httpIndex && simIndex > guardIndex) {
-  pass('SIM 假进度跳转位于 http 分支与 fileUrl 守卫之后,http 模式不可达')
+// C5-3:http 真实建单后按 amountCents 分流,两分支共用 nextState(履约状态载体)。
+// nextState 必须携带 taskId(真实轮询)与 orderId(收银出码/取件码)。
+const nextStateHasTaskId = /const\s+nextState\s*=\s*\{[\s\S]*?taskId:\s*created\.taskId[\s\S]*?\}/
+const nextStateHasOrderId = /const\s+nextState\s*=\s*\{[\s\S]*?orderId:\s*created\.orderId[\s\S]*?\}/
+// 付费单(amountCents>0 且未 paid)分流到收银页;免费/已付单进真实 progress。两者都携带 nextState。
+const cashierBranchPattern = /created\.amountCents\s*>\s*0[\s\S]*?navigate\('\/print\/cashier',\s*\{\s*state:\s*nextState\s*\}\)/
+const realProgressPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*nextState\s*\}\)/
+const cashierIndex = confirmSrc.search(/navigate\('\/print\/cashier'/)
+
+// 4) fileUrl 守卫必须早于 cashier / 真实 progress / SIM 跳转
+//    (结构上真实建单跳转与 SIM 均在 http 分支 !file.fileUrl 守卫之后)
+if (httpIndex >= 0 && guardIndex > httpIndex && cashierIndex > guardIndex && simIndex > guardIndex) {
+  pass('cashier / 真实 progress / SIM 跳转均位于 http 分支与 fileUrl 守卫之后,http 模式不伪造成功')
 } else {
-  fail('SIM 假进度跳转必须晚于 http 分支及 !file.fileUrl 守卫,避免 http 模式落入伪造成功')
+  fail('cashier / 真实 progress / SIM 跳转必须晚于 http 分支及 !file.fileUrl 守卫')
 }
 
-// 5) 真任务跳转带 taskId;SIM 跳转不带 taskId(防误加)
-expectMatches(confirmSrc, realNavPattern, '真任务跳转携带 taskId 以轮询真实状态')
+// 5) C5-3 真实建单跳转:cashier 分流 + 免费/已付走真实 progress;状态载体 nextState 携带 taskId + orderId。
+expectMatches(confirmSrc, cashierBranchPattern, 'C5-3 付费单(amountCents>0)分流到 /print/cashier')
+expectMatches(confirmSrc, realProgressPattern, 'C5-3 免费/已付单进入真实 /print/progress(携带 nextState)')
+expectMatches(confirmSrc, nextStateHasTaskId, '真实建单跳转 state 携带 taskId 以轮询真实状态')
+expectMatches(confirmSrc, nextStateHasOrderId, 'C5-3 真实建单跳转 state 携带 orderId(收银/取件)')
+// SIM 跳转不带 taskId(防误加,仅非 http 模式使用)
 expectMatches(confirmSrc, simNavPattern, 'SIM 跳转不携带 taskId(仅非 http 模式使用)')
 
 // 6) PrintProgressPage:生产 http 模式无 taskId 时也不能走 SIM 动画 / 成功页

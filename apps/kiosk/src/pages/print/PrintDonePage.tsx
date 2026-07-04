@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card } from '@ai-job-print/ui'
-import { AlertCircleIcon, CheckCircleIcon, FileTextIcon } from 'lucide-react'
+import { AlertCircleIcon, CheckCircleIcon, FileTextIcon, TicketIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { API_MODE } from '../../services/api/client'
+import { getPayStatus } from '../../services/print/paymentApi'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 
 interface PrintFile {
@@ -19,6 +22,7 @@ interface PrintJobState {
   returnUrl?:    string
   returnLabel?:  string
   taskId?:       string
+  orderId?:      string
   source?:       PrintMaterialSource
 }
 
@@ -35,6 +39,25 @@ export function PrintDonePage() {
 
   const { file, params, success = true, reason, returnUrl, returnLabel } = state
   const uploadPath = printUploadPathForSource(state.source)
+
+  // C5-3：paid 后展示取件凭证码。取件码可见性完全由后端 pickupCodeVisibleFor 决定
+  // （paid + 未退款 + 任务未进终态），前端只透传后端返回值，不自行编造。
+  const [pickupCode, setPickupCode] = useState<string | null>(null)
+  useEffect(() => {
+    if (!success || API_MODE !== 'http' || !state.orderId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const s = await getPayStatus(state.orderId as string)
+        if (!cancelled) setPickupCode(s.pickupCode)
+      } catch {
+        /* 取不到取件码不阻断完成页展示；仅不显示凭证码 */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [success, state.orderId])
 
   const handleRetry = () => {
     const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason'])
@@ -68,6 +91,22 @@ export function PrintDonePage() {
           ? '请从出纸口取走文件'
           : (reason ?? '打印任务未能完成，请重试或联系工作人员')}
       </p>
+
+      {/* 取件凭证码（paid 后由后端下发；仅可见时展示） */}
+      {success && pickupCode && (
+        <Card className="mt-6 w-full max-w-sm border-primary-200 bg-primary-50 p-5">
+          <div className="flex items-center gap-2 text-sm text-primary-700">
+            <TicketIcon className="h-4 w-4" />
+            取件凭证码
+          </div>
+          <p className="mt-2 text-center font-mono text-3xl font-bold tracking-widest text-primary-700">
+            {pickupCode}
+          </p>
+          <p className="mt-2 text-center text-xs text-neutral-500">
+            如需现场核验取件，请出示此凭证码
+          </p>
+        </Card>
+      )}
 
       {/* Summary card */}
       {file && params && (

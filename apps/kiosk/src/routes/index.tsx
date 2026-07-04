@@ -33,6 +33,7 @@ import { PrintUploadPage } from '../pages/print/PrintUploadPage'
 import { PrintMaterialCheckPage } from '../pages/print/PrintMaterialCheckPage'
 import { PrintPreviewPage } from '../pages/print/PrintPreviewPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
+import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
@@ -123,6 +124,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
+      { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },
       { path: 'print/done',        element: <PrintDonePage /> },
       // AI简历服务（Phase 3）：服务中心中间页（ResumeHomePage）已移除，首页瓦片直达各功能。
