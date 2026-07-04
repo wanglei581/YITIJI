@@ -10,7 +10,7 @@
 // - 「再打一份」不从订单侧直连，详单内引导「去我的文档再打印」（新任务新订单）。
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@ai-job-print/ui'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
@@ -21,12 +21,20 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import { OrderPaymentSummary } from './printOrders/OrderPaymentSummary'
 import { formatAmountCents, paymentSourceLabel, payStatusMeta } from './printOrders/paymentCopy'
+import {
+  MEMBER_ORDERS_POLL_MS,
+  hasActivePrintOrders,
+  isActivePrintStatus,
+  mergePrintOrderRefresh,
+  nextPrintOrdersPollDelay,
+} from './printOrders/statusRefresh'
 
 const PAGE_SIZE = 20
+const MAX_REFRESH_PAGE_SIZE = 50
 
 const STATUS_META: Record<MemberPrintOrderItem['status'], { label: string; cls: string }> = {
-  pending: { label: '待处理', cls: 'bg-warning-bg text-warning-fg' },
-  claimed: { label: '已接单', cls: 'bg-primary-50 text-primary-600' },
+  pending: { label: '排队中', cls: 'bg-warning-bg text-warning-fg' },
+  claimed: { label: '已领取', cls: 'bg-primary-50 text-primary-600' },
   printing: { label: '打印中', cls: 'bg-primary-50 text-primary-600' },
   completed: { label: '已完成', cls: 'bg-success-bg text-success-fg' },
   failed: { label: '失败', cls: 'bg-error-bg text-error-fg' },
@@ -73,9 +81,14 @@ export function MyPrintOrdersPage() {
   const [state, setState] = useState<MeListState>('loading')
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState(false)
+  const [autoRefreshFailed, setAutoRefreshFailed] = useState(false)
+  const [autoRefreshChecking, setAutoRefreshChecking] = useState(false)
+  const [autoRefreshSyncedAt, setAutoRefreshSyncedAt] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [filterKey, setFilterKey] = useState<FilterKey>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const itemsRef = useRef(items)
+  const loadingMoreRef = useRef(loadingMore)
 
   const load = useCallback(() => {
     if (!isLoggedIn) {
@@ -114,6 +127,86 @@ export function MyPrintOrdersPage() {
       })
       .finally(() => setLoadingMore(false))
   }, [nextCursor, loadingMore, getToken])
+
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
+
+  useEffect(() => {
+    loadingMoreRef.current = loadingMore
+  }, [loadingMore])
+
+  const activeOrderCount = useMemo(
+    () => items.slice(0, MAX_REFRESH_PAGE_SIZE).filter((item) => isActivePrintStatus(item.status)).length,
+    [items],
+  )
+
+  useEffect(() => {
+    if (!isLoggedIn || activeOrderCount === 0 || typeof document === 'undefined') return
+
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let delay = MEMBER_ORDERS_POLL_MS
+    let inFlight = false
+
+    const clearTimer = () => {
+      if (timer) {
+        clearTimeout(timer)
+        timer = null
+      }
+    }
+
+    const schedule = (ms: number) => {
+      clearTimer()
+      timer = setTimeout(() => void tick(), ms)
+    }
+
+    const tick = async () => {
+      if (cancelled || inFlight) return
+      if (document.visibilityState !== 'visible' || loadingMoreRef.current) {
+        schedule(delay)
+        return
+      }
+
+      inFlight = true
+      setAutoRefreshChecking(true)
+      try {
+        const refreshPageSize = Math.min(MAX_REFRESH_PAGE_SIZE, Math.max(PAGE_SIZE, itemsRef.current.length))
+        const r = await getMyPrintOrders(getToken(), { pageSize: refreshPageSize })
+        if (cancelled) return
+        setItems((prev) => mergePrintOrderRefresh(prev, r.items))
+        setTotal(r.total)
+        setAutoRefreshFailed(false)
+        setAutoRefreshSyncedAt(new Date().toISOString())
+        delay = MEMBER_ORDERS_POLL_MS
+      } catch {
+        if (cancelled) return
+        setAutoRefreshFailed(true)
+        delay = nextPrintOrdersPollDelay(delay)
+      } finally {
+        inFlight = false
+        if (!cancelled) {
+          setAutoRefreshChecking(false)
+          schedule(delay)
+        }
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      clearTimer()
+      void tick()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    schedule(MEMBER_ORDERS_POLL_MS)
+
+    return () => {
+      cancelled = true
+      clearTimer()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [activeOrderCount, getToken, isLoggedIn])
 
   const openFeedback = useCallback(
     (printTaskId: string) => {
@@ -165,6 +258,31 @@ export function MyPrintOrdersPage() {
           </button>
         ))}
       </div>
+
+      {hasActivePrintOrders(items) && (
+        <div
+          className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-xs font-medium text-primary-700"
+        >
+          {autoRefreshChecking ? (
+            <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <span className="h-2 w-2 rounded-full bg-primary-600" aria-hidden="true" />
+          )}
+          {autoRefreshFailed ? (
+            <span role="status" aria-live="polite">
+              自动刷新失败，稍后自动重试；当前列表已保留
+            </span>
+          ) : (
+            <span>
+              {autoRefreshChecking
+                ? '正在同步进行中任务…'
+                : autoRefreshSyncedAt
+                ? `进行中任务自动更新中，上次同步 ${formatTime(autoRefreshSyncedAt)}`
+                : '进行中任务每 5 秒自动更新'}
+            </span>
+          )}
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <Card className="p-6 text-center text-sm text-neutral-500">
