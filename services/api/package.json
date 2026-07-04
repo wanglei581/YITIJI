@@ -36,6 +36,7 @@
     "verify:benefit-redemption": "node -r @swc-node/register scripts/verify-benefit-redemption.ts",
     "verify:feedback-notifications": "node -r @swc-node/register scripts/verify-feedback-notifications.ts",
     "verify:member-print-orders": "node -r @swc-node/register scripts/verify-member-print-orders.ts",
+    "verify:profile-commercial-first-batch-acceptance": "node -r @swc-node/register scripts/verify-profile-commercial-first-batch-acceptance.ts",
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
     "verify:pricing": "node -r @swc-node/register scripts/verify-pricing.ts",
     "verify:payment-flow": "node -r @swc-node/register scripts/verify-payment-flow.ts",

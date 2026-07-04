@@ -152,8 +152,12 @@ const allowedChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/PickupCodePanel.tsx',
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+  'docs/acceptance/profile-commercial-preprod-redeploy-and-acceptance.md',
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
+  'services/api/package.json',
+  'services/api/scripts/verify-benefit-redemption.ts',
+  'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
 ])
 
 const unexpectedChanged = changedFiles.filter((file) => !allowedChanged.has(file))
