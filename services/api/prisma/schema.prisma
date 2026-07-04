@@ -1393,6 +1393,33 @@ model BenefitClaim {
   @@index([activityId, createdAt])
 }
 
+// ── RedemptionRecord ─────────────────────────────────────────────────────────
+// 权益核销账本（P1「我的页权益核销」先落 SSOT；C5-4 additive 扩展 Order 抵扣，禁重建第二套账本）。
+//
+// 本批只用「平台 credit / 无 Order」子集：benefitRef=BenefitGrant.id，核销时扣 BenefitGrant.quantityRemaining；
+// orderId 恒 null、amountCents 恒 0（券=平台 credit，非资金、非收款、不承诺补贴到账）。
+// idempotencyKey = hash(benefitGrantId + serviceType + serviceRefId)：同一权益用于同一服务产物只扣一次
+// （对齐 compliance §8.5「同一成果不重复扣同一权益」）。endUserId/benefitRef/orderId 无 FK，保留多态扩展位供 C5-4。
+model RedemptionRecord {
+  id             String   @id @default(cuid())
+  endUserId      String?
+  orderId        String? // 本批恒 null；C5-4 回填 Order 抵扣
+  kind           String // BenefitType 可核销子集：coupon | free_quota | package_entitlement
+  benefitRef     String // 本批 = BenefitGrant.id
+  serviceType    String // 服务点位维度，如 resume_optimize
+  serviceRefId   String // 服务产物稳定 id（本批 = resume taskId）
+  quantity       Int      @default(1)
+  amountCents    Int      @default(0) // 本批恒 0（平台 credit 非资金）；C5-4 写抵扣额
+  idempotencyKey String   @unique // 本批 hash(benefitGrantId + serviceType + serviceRefId)
+  createdAt      DateTime @default(now())
+
+  // 一产物一核销硬不变量：同一服务产物（serviceType+serviceRefId）只能被核销一次，
+  // 即使换不同权益（不同 idempotencyKey）也不行。DB 唯一约束防并发绕过（PG READ COMMITTED）。
+  @@unique([serviceType, serviceRefId])
+  @@index([endUserId])
+  @@index([benefitRef])
+}
+
 model AuditLog {
   id         String  @id @default(cuid())
   actorId    String?
