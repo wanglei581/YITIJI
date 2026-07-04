@@ -25,6 +25,7 @@
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
     "verify:member-print-orders-ui": "node scripts/verify-member-print-orders-ui.mjs",
     "verify:profile-inkpaper-home": "node scripts/verify-profile-inkpaper-home.mjs",
+    "verify:profile-resumes-notifications-inkpaper": "node scripts/verify-profile-resumes-notifications-inkpaper.mjs",
     "verify:profile-ai-records-inkpaper": "node scripts/verify-profile-ai-records-inkpaper.mjs",
     "verify:profile-activity-inkpaper": "node scripts/verify-profile-activity-inkpaper.mjs",
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
