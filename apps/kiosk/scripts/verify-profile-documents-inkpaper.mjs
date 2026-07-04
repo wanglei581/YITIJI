@@ -139,6 +139,7 @@ const allowedChanged = new Set([
   '.github/workflows/ci.yml',
   'apps/kiosk/package.json',
   'apps/kiosk/scripts/verify-print-confirm-honest.mjs',
+  'apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
