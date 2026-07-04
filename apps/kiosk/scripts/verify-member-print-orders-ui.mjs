@@ -25,7 +25,16 @@ const PAGE = 'src/pages/profile/me/MyPrintOrdersPage.tsx'
 const COPY = 'src/pages/profile/me/printOrders/paymentCopy.ts'
 const SUMMARY = 'src/pages/profile/me/printOrders/OrderPaymentSummary.tsx'
 const PANEL = 'src/pages/profile/me/printOrders/PickupCodePanel.tsx'
+const REFRESH = 'src/pages/profile/me/printOrders/statusRefresh.ts'
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8')
+const readOptional = (relativePath) => {
+  try {
+    return read(relativePath)
+  } catch {
+    fail(`${relativePath} 存在（我的打印订单自动刷新 helper）`)
+    return ''
+  }
+}
 
 let failures = 0
 function pass(message) {
@@ -50,11 +59,13 @@ const pageSrc = read(PAGE)
 const copySrc = read(COPY)
 const summarySrc = read(SUMMARY)
 const panelSrc = read(PANEL)
+const refreshSrc = readOptional(REFRESH)
 const all = [
   [PAGE, pageSrc],
   [COPY, copySrc],
   [SUMMARY, summarySrc],
   [PANEL, panelSrc],
+  [REFRESH, refreshSrc],
 ]
 
 // 1) 支付来源文案白名单（SSOT 在 paymentCopy.ts）
@@ -155,6 +166,24 @@ expectAbsent(pageSrc, /min-h-\[44px\]/, '本页无 44px 触控目标（筛选 ch
 
 // 12) 金额非法输入返回「—」，不编造金额。
 expectMatches(copySrc, /!Number\.isInteger\(amountCents\)\s*\|\|\s*amountCents\s*<\s*0\)\s*return\s*'—'/, '金额非整数 / 负数返回「—」，不输出异常格式')
+
+// 13) 打印任务状态自动刷新：只追踪进行中打印状态，按 id 合并，不覆盖已加载分页。
+expectMatches(refreshSrc, /MEMBER_ORDERS_POLL_MS\s*=\s*5000/, '自动刷新基础间隔为 5 秒（列表页低于进度页实时性）')
+expectMatches(refreshSrc, /MEMBER_ORDERS_POLL_MAX_MS\s*=\s*60000/, '自动刷新失败退避封顶 60 秒')
+expectMatches(refreshSrc, /ACTIVE_PRINT_STATUSES[\s\S]{0,240}'pending'[\s\S]{0,80}'claimed'[\s\S]{0,80}'printing'/, '自动刷新 active 状态仅包含 pending / claimed / printing')
+expectMatches(refreshSrc, /freshById\s*=\s*new Map\(\s*freshFirstPage\.map\(\(item\)\s*=>\s*\[item\.id,\s*item\]\)\s*\)/, '刷新合并以 id 建 Map，不按数组位置覆盖')
+expectMatches(refreshSrc, /return\s+\[\s*\.\.\.newItems[\s\S]{0,80}\.\.\.mergedItems\s*\]/, '刷新合并保留已加载分页并前插新首屏项')
+expectMatches(refreshSrc, /Math\.min\(MEMBER_ORDERS_POLL_MAX_MS,\s*currentDelay\s*\*\s*2\)/, '刷新失败采用有上限的指数退避')
+expectMatches(pageSrc, /setItems\(\(prev\)\s*=>\s*mergePrintOrderRefresh\(prev,\s*r\.items\)\)/, '轮询成功按 id 合并，不 setItems(r.items) 覆盖已加载分页')
+expectMatches(pageSrc, /clearTimeout\(timer\)/, '轮询 effect cleanup 清理 timeout')
+expectMatches(pageSrc, /removeEventListener\('visibilitychange'/, '轮询 effect cleanup 移除 visibilitychange 监听')
+expectMatches(pageSrc, /document\.visibilityState\s*!==\s*'visible'/, '页面不可见时暂停自动刷新')
+expectMatches(pageSrc, /let\s+inFlight\s*=\s*false[\s\S]{0,300}cancelled\s*\|\|\s*inFlight[\s\S]{0,1000}inFlight\s*=\s*false/, '轮询有 in-flight 闸门，避免快速切换页面产生并发请求')
+expectMatches(pageSrc, /items\.slice\(0,\s*MAX_REFRESH_PAGE_SIZE\)\.filter/, 'active 统计限制在本轮可刷新的前 50 条，避免深分页 active 无限轮询')
+expectMatches(pageSrc, /setAutoRefreshFailed\(true\)/, '轮询失败只进入自动刷新提示态，不覆盖既有列表')
+expectMatches(pageSrc, /<span role="status" aria-live="polite">[\s\S]{0,80}自动刷新失败/, '自动刷新失败提示对读屏播报')
+expectAbsent(pageSrc, /<div[\s\S]{0,180}aria-live="polite"[\s\S]{0,180}autoRefreshChecking/, '常规 5 秒刷新文案不使用 aria-live，避免读屏反复播报')
+expectAbsent(pageSrc + refreshSrc, /failureReasonForUser|errorCode|errorMessage/, '本轮不在我的打印订单页回显失败原因或内部错误字段')
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 「我的打印订单」支付展示诚实性守卫未通过\n`)
