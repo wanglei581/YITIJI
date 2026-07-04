@@ -153,7 +153,6 @@ const forbiddenChanged = changedFiles.filter((file) =>
     'services/api/src/print-jobs/print-jobs.service.ts',
   ].includes(file) &&
   ([
-    'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
     'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
@@ -171,7 +170,7 @@ const forbiddenChanged = changedFiles.filter((file) =>
 )
 
 if (forbiddenChanged.length === 0) {
-  pass('diff 未触碰 /me/documents、/me/print-orders、其他已换装明细页、非本次 payment session 后端、数据库或终端链路')
+  pass('diff 未触碰 /me/print-orders、其他已换装明细页、非本次 payment session 后端、数据库或终端链路；/me/documents 已由专属守卫覆盖')
 } else {
   fail(`diff 出现禁止范围变更：${forbiddenChanged.join(', ')}`)
 }

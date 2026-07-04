@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 // 2. 允许 /me/settings、/me/benefits、/me/favorites、/me/ai-records 做已守卫的低风险视觉换装；
 // 3. 允许 /me/activity 做已守卫的低风险视觉换装；
 // 4. 允许已确认的 /me/print-orders 状态自动刷新小步；
-// 5. /me/documents 和未声明的 /me/print-orders 子模块不能被本守卫覆盖。
+// 5. /me/documents 已有专属守卫；未声明的 /me/print-orders 子模块不能被本守卫覆盖。
 // ============================================================
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -268,11 +268,14 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+  'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-activity-inkpaper.mjs',
+  'apps/kiosk/scripts/verify-profile-resumes-notifications-inkpaper.mjs',
 ])
 const allowedPrintOrderRefreshChanged = new Set([
   'apps/kiosk/scripts/verify-member-print-orders-ui.mjs',
@@ -297,9 +300,6 @@ if (unexpectedChanged.length === 0) {
 }
 
 const forbiddenMeChanged = changedFiles.filter((file) => {
-  if (/^apps\/kiosk\/src\/pages\/profile\/me\/MyDocumentsPage/.test(file)) {
-    return true
-  }
   if (file === 'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') {
     return !allowedPrintOrderRefreshChanged.has(file)
   }
@@ -309,7 +309,7 @@ const forbiddenMeChanged = changedFiles.filter((file) => {
   return false
 })
 if (forbiddenMeChanged.length === 0) {
-  pass('本批未触碰 /me/documents，且 /me/print-orders 仅限状态刷新小步')
+  pass('/me/documents 已由专属守卫覆盖，/me/print-orders 仍仅限状态刷新小步')
 } else {
   fail(`本批禁止触碰未声明的高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
 }

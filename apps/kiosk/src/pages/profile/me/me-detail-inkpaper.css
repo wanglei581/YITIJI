@@ -394,6 +394,152 @@
   transform: translateY(1px) scale(0.995);
 }
 
+.me-inkdetail .me-delete-button.is-disabled {
+  cursor: not-allowed;
+  border-color: rgba(16, 48, 43, 0.08);
+  background: rgba(16, 48, 43, 0.04);
+  color: rgba(120, 144, 136, 0.58);
+}
+
+.me-inkdetail-documents .me-document-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 253, 248, 0.9);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.me-inkdetail-documents .me-doc-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.me-inkdetail-documents .me-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.me-inkdetail-documents .me-chip.is-danger {
+  background: rgba(168, 65, 62, 0.14);
+  color: #9a3d3a;
+}
+
+.me-inkdetail-documents .me-doc-retention-toggle,
+.me-inkdetail-documents .me-doc-retention-option,
+.me-inkdetail-documents .me-doc-action,
+.me-inkdetail-documents .me-dialog-button {
+  position: relative;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(16, 48, 43, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.8);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.me-inkdetail-documents .me-doc-retention-toggle {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.me-inkdetail-documents .me-doc-retention-toggle:hover,
+.me-inkdetail-documents .me-doc-retention-option:hover,
+.me-inkdetail-documents .me-doc-action:hover,
+.me-inkdetail-documents .me-dialog-button:hover {
+  border-color: rgba(16, 48, 43, 0.24);
+  background: rgba(16, 48, 43, 0.08);
+  color: var(--ink);
+}
+
+.me-inkdetail-documents .me-doc-retention-toggle:active,
+.me-inkdetail-documents .me-doc-retention-option:active,
+.me-inkdetail-documents .me-doc-action:active,
+.me-inkdetail-documents .me-dialog-button:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+.me-inkdetail-documents .me-doc-retention-toggle.is-disabled,
+.me-inkdetail-documents .me-doc-retention-option.is-disabled,
+.me-inkdetail-documents .me-doc-action.is-disabled,
+.me-inkdetail-documents .me-dialog-button.is-disabled {
+  cursor: not-allowed;
+  border-color: rgba(16, 48, 43, 0.08);
+  background: rgba(16, 48, 43, 0.04);
+  color: rgba(120, 144, 136, 0.58);
+}
+
+.me-inkdetail-documents .me-doc-retention-options {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.me-inkdetail-documents .me-doc-retention-option {
+  min-height: 38px;
+  padding: 0 13px;
+  font-size: 12px;
+}
+
+.me-inkdetail-documents .me-doc-retention-option.is-active {
+  border-color: rgba(42, 111, 98, 0.24);
+  background: rgba(45, 132, 97, 0.13);
+  color: #236f52;
+}
+
+.me-inkdetail-documents .me-doc-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.me-inkdetail-documents .me-doc-action {
+  gap: 6px;
+  padding: 0 15px;
+}
+
+.me-inkdetail-documents .me-doc-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.me-inkdetail-documents .me-retention-dialog {
+  background: rgba(255, 253, 248, 0.96);
+  box-shadow: 0 28px 58px rgba(16, 48, 43, 0.22);
+}
+
+.me-inkdetail-documents .me-dialog-button {
+  flex: 1 1 0;
+  border-radius: 16px;
+}
+
+.me-inkdetail-documents .me-dialog-button.primary {
+  border-color: transparent;
+  background: var(--ink);
+  color: #fffdf8;
+}
+
+.me-inkdetail-documents .me-dialog-button.primary:hover {
+  background: #164239;
+  color: #fffdf8;
+}
+
 .me-toast {
   border-radius: 999px;
   background: rgba(16, 48, 43, 0.94);
@@ -464,5 +610,18 @@
     width: 100%;
     min-width: 0;
     grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  }
+
+  .me-inkdetail-documents .me-document-card {
+    flex-direction: column;
+  }
+
+  .me-inkdetail-documents .me-doc-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .me-inkdetail-documents .me-doc-actions > button {
+    flex: 1 1 112px;
   }
 }
