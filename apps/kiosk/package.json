@@ -29,6 +29,7 @@
     "verify:profile-resumes-notifications-inkpaper": "node scripts/verify-profile-resumes-notifications-inkpaper.mjs",
     "verify:profile-ai-records-inkpaper": "node scripts/verify-profile-ai-records-inkpaper.mjs",
     "verify:profile-activity-inkpaper": "node scripts/verify-profile-activity-inkpaper.mjs",
+    "verify:profile-documents-inkpaper": "node scripts/verify-profile-documents-inkpaper.mjs",
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
     "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs",
