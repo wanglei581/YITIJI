@@ -270,6 +270,116 @@ Copy-Item (Join-Path $EvidenceRoot "PS-G1\agent-foreground.log") (Join-Path $Evi
 - 出纸前不得把任务标记为 `completed`。
 - 出纸照片必须仓库外保存并遮挡任何个人信息。
 
+### 7.3 Windows PrintService 硬证据补强
+
+适用场景：云端任务链路显示 `backend completed`、Agent 本地库显示完成、Agent 日志显示 download / hash / print / patch completed，但现场没有同步保存 PrintService 事件、打印队列、spool 元数据、设备日志、照片或计数器证据时，必须补跑本节。已完成的 `ptask_kiosk_d984636a0f04a23a` 只能作为系统链路完成证据；因上一轮 `Microsoft-Windows-PrintService/Operational` 未启用，且 Agent 队列监控出现 `job not found in queue after 5 polls; treating as completed`，不得据此宣称物理出纸已确认。
+
+先做只读状态检查，不改变 Windows 配置：
+
+```powershell
+$EvidenceRoot = "C:\ai-job-print-evidence"
+New-Item -ItemType Directory -Force -Path (Join-Path $EvidenceRoot "PS-G3") | Out-Null
+wevtutil gl Microsoft-Windows-PrintService/Operational 2>&1 |
+  Tee-Object "C:\ai-job-print-evidence\PS-G3\printservice-operational-status-before.log"
+```
+
+如果 `enabled: false`，以下命令属于 Windows 事件日志配置变更，必须先取得现场操作负责人批准，并记录批准人、时间和原因。未获批准时不要执行，只能把本轮判定写为“必须现场确认”：
+
+```powershell
+wevtutil sl Microsoft-Windows-PrintService/Operational /e:true
+wevtutil sl Microsoft-Windows-PrintService/Operational /ms:16777216
+```
+
+在触发下一次 Kiosk / API 打印任务前，先打开队列轮询窗口。`$TaskId` 可先填待补强的任务 ID；如果现场创建新任务，必须替换成新任务 ID。`$PrinterName` 必须使用 `list-printers` 或 `Get-Printer` 看到的真实识别名。
+
+```powershell
+$EvidenceRoot = "C:\ai-job-print-evidence"
+$TaskId = "ptask_kiosk_d984636a0f04a23a"
+$PrinterName = "Pantum CM2800ADN Series"
+$ProbeStart = Get-Date
+$ProbeStartPath = Join-Path $EvidenceRoot "PS-G3\probe-start-time.log"
+$ProbeStart.ToString("o") | Tee-Object $ProbeStartPath
+$PrintJobLog = Join-Path $EvidenceRoot "PS-G3\printjob-poll-$TaskId.log"
+
+1..60 | ForEach-Object {
+  $Poll = $_
+  $PollTime = (Get-Date).ToString("o")
+  $Jobs = @(Get-PrintJob -PrinterName $PrinterName -ErrorAction SilentlyContinue)
+  if ($Jobs.Count -eq 0) {
+    [pscustomobject]@{
+      Poll = $Poll; PollTime = $PollTime; ID = $null; Name = "<no print job>";
+      JobStatus = "none"; Position = $null; SubmittedTime = $null; Size = $null; TotalPages = $null
+    }
+  } else {
+    $Jobs | Select-Object @{Name="Poll"; Expression={$Poll}},
+      @{Name="PollTime"; Expression={$PollTime}},
+      ID, Name, JobStatus, Position, SubmittedTime, Size, TotalPages
+  }
+  Start-Sleep -Milliseconds 500
+} | Format-Table -AutoSize | Out-String -Width 240 | Tee-Object $PrintJobLog
+```
+
+同时打开 spool 元数据轮询窗口。只记录 `$env:WINDIR\System32\spool\PRINTERS` 下文件的名称、大小、时间和扩展名；禁止复制、打开或导出 `.SPL` / `.SHD` 内容。
+
+```powershell
+$EvidenceRoot = "C:\ai-job-print-evidence"
+$TaskId = "ptask_kiosk_d984636a0f04a23a"
+$SpoolDir = Join-Path $env:WINDIR "System32\spool\PRINTERS"
+$SpoolLog = Join-Path $EvidenceRoot "PS-G3\spool-poll-$TaskId.log"
+
+1..60 | ForEach-Object {
+  $Poll = $_
+  $PollTime = (Get-Date).ToString("o")
+  $Files = @(Get-ChildItem $SpoolDir -Force -ErrorAction SilentlyContinue)
+  if ($Files.Count -eq 0) {
+    [pscustomobject]@{
+      Poll = $Poll; PollTime = $PollTime; Name = "<no spool metadata>";
+      Extension = $null; Length = $null; CreationTimeUtc = $null; LastWriteTimeUtc = $null
+    }
+  } else {
+    $Files | Select-Object @{Name="Poll"; Expression={$Poll}},
+      @{Name="PollTime"; Expression={$PollTime}},
+      Name, Extension, Length, CreationTimeUtc, LastWriteTimeUtc
+  }
+  Start-Sleep -Milliseconds 500
+} | Format-Table -AutoSize | Out-String -Width 240 | Tee-Object $SpoolLog
+```
+
+任务结束后导出 PrintService 事件。必须使用打印任务触发前记录的 `$ProbeStart`，并只筛选当前打印机、任务 ID 或文档名可关联的事件：
+
+```powershell
+$EvidenceRoot = "C:\ai-job-print-evidence"
+$TaskId = "ptask_kiosk_d984636a0f04a23a"
+$PrinterName = "Pantum CM2800ADN Series"
+if (!$ProbeStart) {
+  $ProbeStartPath = Join-Path $EvidenceRoot "PS-G3\probe-start-time.log"
+  if (Test-Path $ProbeStartPath) {
+    $ProbeStart = [DateTime]::Parse((Get-Content $ProbeStartPath -Raw).Trim())
+  } else {
+    throw "ProbeStart is missing. Set `$ProbeStart = Get-Date before starting the print probe, or provide PS-G3\probe-start-time.log."
+  }
+}
+$PrintServiceLog = Join-Path $EvidenceRoot "PS-G3\printservice-task-filtered.log"
+
+Get-WinEvent -FilterHashtable @{
+  LogName = "Microsoft-Windows-PrintService/Operational"
+  StartTime = $ProbeStart
+} -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.Message -like "*$PrinterName*" -or
+    $_.Message -like "*$TaskId*"
+  } |
+  Select-Object TimeCreated, Id, ProviderName, LevelDisplayName, Message |
+  Format-List | Tee-Object $PrintServiceLog
+```
+
+判定标准：
+
+- 系统链路完成：后端任务状态为 `completed`，Agent 本地 DB 记录为 `completed`，Agent 日志可对应同一任务的 download / hash / print / patch completed。
+- Windows 打印事件证据：`Microsoft-Windows-PrintService/Operational` 在 `$ProbeStart` 之后存在可关联到 `$PrinterName`、`$TaskId` 或测试文档名的事件。
+- 物理出纸硬证据：现场目视确认、摄像头录像、打印机计数器变化或设备日志至少一种能证明真实纸张输出。
+- 必须现场确认：PrintService/Operational 未启用、队列过快导致 60 次轮询仍捕获不到、奔图驱动处于 Retained / 保留状态、或 PrintService 事件无法关联到当前任务 / 打印机 / 文档时，不得仅凭系统链路完成宣称物理出纸。
+
 ## 八、Agent 降级 / 恢复演练（PS-G3）
 
 目标：安全模拟本地任务库不可用，不破坏真实 `%ProgramData%\AIJobPrintAgent\agent.db`。

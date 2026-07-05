@@ -6,7 +6,7 @@
  * 之后执行，因为它会同时检查环境变量和 dist 产物。
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadEnv } from 'vite'
 
@@ -14,6 +14,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(ROOT, 'dist')
 const ASSETS = join(DIST, 'assets')
 const loadedEnv = loadEnv(process.env.MODE ?? 'production', ROOT, '')
+const forbiddenDevSandboxPaymentLabels = ['[DEV] 沙箱模拟', '模拟支付成功']
+const distTextExtensions = new Set(['.html', '.js', '.css', '.map', '.json', '.txt'])
 
 let failed = 0
 function pass(message) {
@@ -59,6 +61,18 @@ function readRequired(file, label) {
   }
   pass(label)
   return readFileSync(file, 'utf8')
+}
+
+function readDistTextFiles(directory) {
+  if (!existsSync(directory)) return []
+
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name)
+    if (entry.isDirectory()) return readDistTextFiles(path)
+    if (!entry.isFile()) return []
+    if (!distTextExtensions.has(extname(entry.name))) return []
+    return [{ path, src: readFileSync(path, 'utf8') }]
+  })
 }
 
 console.log('\n=== Kiosk 生产构建配置 / 数字人产物验证 ===')
@@ -116,6 +130,22 @@ if (!existsSync(ASSETS)) {
       if (terminalId && aiAdvisorAsset.src.includes(terminalId)) pass('C5 终端 ID 已写入数字人产物')
       else fail('C5 数字人产物未包含当前 VITE_TERMINAL_ID，可能检查的不是本次构建产物')
     }
+  }
+}
+
+if (existsSync(DIST)) {
+  const exposedDevSandboxLabels = readDistTextFiles(DIST).flatMap(({ path, src }) =>
+    forbiddenDevSandboxPaymentLabels
+      .filter((label) => src.includes(label))
+      .map((label) => `${path}: ${label}`),
+  )
+
+  if (exposedDevSandboxLabels.length === 0) {
+    pass('D1 生产产物未暴露 DEV 沙箱支付按钮文案')
+  } else {
+    fail(
+      `D1 production kiosk bundle must not expose DEV sandbox payment buttons — ${exposedDevSandboxLabels.join(', ')}`,
+    )
   }
 }
 
