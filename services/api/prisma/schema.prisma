@@ -89,6 +89,9 @@ model PrintTask {
   order      Order?
 
   @@index([endUserId])
+  @@index([status, terminalId, createdAt])
+  @@index([status, claimExpiry])
+  @@index([status, claimedAt])
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
@@ -118,6 +121,8 @@ model PrintTaskStatusLog {
   toStatus   String
   errorCode  String?
   createdAt  DateTime  @default(now())
+
+  @@index([taskId, createdAt])
 }
 
 // ── Order ───────────────────────────────────────────────────────────────────
