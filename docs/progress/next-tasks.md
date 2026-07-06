@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-04
+> 最后更新：2026-07-06
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -35,6 +35,17 @@
 - [ ] 三端登录 / 内部账号手机号认证部署：上线目标库必须先执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`，再跑 `pnpm --filter @ai-job-print/api verify:internal-auth-phone`；提交候选必须包含 `verify-internal-auth-phone.ts`、`backfill-internal-user-phone.ts` 和双 Prisma 迁移目录。Codex 本地 SQLite `dev.db` 由 `db push` 创建无迁移基线；如新建 SQLite 空库跑 seed 遇到历史缺列，需手动补 `Organization.contactPhone`，生产 PostgreSQL 不受该遗留问题影响。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
+- [x] 预生产 Kiosk 上传→打印 URL 契约复验：runtime hotfix 已安全切到 `/srv/ai-job-print`，health 为 `db=postgres`，`db:pg:sync:check`、`DP-GATE after(warnings=0)`、远端 `verify:kiosk-upload-print-contract` 与 `verify:print-jobs` 均通过；真实 `/files/kiosk-upload` 返回内部 HMAC `signedUrl`，外部 COS URL 仍被 `/print/jobs` 拒绝为 `PRINT_INVALID_FILE_URL`。
+- [x] 预生产打印价目配置补齐 + 完整建单探针：已补 active `print_bw_page=100` / `print_color_page=300` 非正式验收价目，DP-GATE before/after 通过且 `warnings=0`，health 为 `db=postgres`；真实 `/api/v1/files/kiosk-upload → /api/v1/print/jobs` 带 `x-terminal-id: t_ksk_001` 返回 HTTP 201，`taskId=ptask_kiosk_d984636a0f04a23a`、`orderId=cmr6h5riv000kaoa8kx1ku481`、`amountCents=100`、`billablePages=1`、`payStatus=unpaid`。
+- [x] 预生产 Terminal Agent claim + 状态回传：只读预检确认 `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 未设置，`t_ksk_001/KSK-001` online、打印机 `ready`、本地任务库可用；任务 `ptask_kiosk_d984636a0f04a23a` 已由 Agent claim 并回传 `completed`，订单 `cmr6h5riv000kaoa8kx1ku481` 的 `taskStatus=completed`。
+- [x] 预生产真实打印系统链路补强：旧任务 `ptask_kiosk_d984636a0f04a23a` 已完成后端、Agent 本地 DB、Agent 日志、队列 / spool 无错误链路证明；新任务 `ptask_kiosk_dd4a9a4210a8dc17` 进一步补齐 Windows PrintService Operational 事件证据。
+- [x] 现场物理出纸最终确认：2026-07-06 已用仓库外证据包 `physical-print-20260706101346/evidence-summary.md` 记录直接烟测与 Kiosk 正式端点链路均使 `Pantum CM2800ADN Series` 计数器递增（27→28、28→29），并有 Windows PrintService Event ID 307 / 842；未附目视照片 / 视频，因此结论基于计数器 + PrintService，如现场实际未看到纸张应改判失败。
+- [x] Windows 一体机下一次 probe 前置检查：`AIJobPrintAgent` 服务 Running/Automatic，`Pantum CM2800ADN Series` 由 Windows 与 terminal-agent 识别，`PrinterStatus=Normal`，PrintService Operational 已启用，公网 API health 正常。
+- [x] 服务器侧旧 active/pending 打印任务只读确认：`t_ksk_001` 的 `pending/claimed/printing` active 任务为 0 行；最近任务均为 `completed`，没有会被 Agent 抢走的旧 active 任务。
+- [ ] 打印运营模式决策 + 运行时复验：C5-6 live 支付完成前，推荐首台试运营使用免费模式；若必须正价，只能采用有人值守线下收款 + Admin mark-paid + `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`。代码侧 claim 门禁已存在，但当前预生产曾未设置该变量，试运营前必须按 `docs/operations/print-rollout-deployment-matrix.md` 的 FREE_MODE 门禁复核 0 元 active 价目、支付 disabled、paid-before-claim 开启和同源内部 HMAC URL 契约。
+- [x] 打印部署矩阵与本地守卫：已按 `docs/superpowers/plans/2026-07-04-print-rollout-ops-closure.md` 补 `docs/operations/print-rollout-deployment-matrix.md`、Windows PrintService 硬证据 runbook、API unsafe rollout 静态守卫 `verify:print-rollout-config` 和 Kiosk 生产包 DEV 沙箱按钮守卫；本地验证通过。
+- [x] 下一次 Kiosk 打印 probe：已完成且只创建 1 个任务 `ptask_kiosk_dd4a9a4210a8dc17`；后端最终 `completed`，`orderId=cmr7uffju022aaoa8jyn0ltba`、`orderNo=ORD-20260705-09B19C1DC9`；PrintService 目标时间附近记录 `Job 21`、`21:45:08`、`Pantum USB001`、`1 页`、`Win32 0x0`；最终打印队列为空，未见错误作业。实际提交走正式 API 链路 `/files/kiosk-upload` + `/print/jobs`，未改 DB、未清队列、未删 Agent 本地 DB、未重启 Agent。当前预生产价目仍是非正式验收价，且任务为 unpaid 完成，不能按商用收费口径宣称通过。
+- [x] G4/G5 复测后续处理：2026-07-06 `PS-G4-20260706-105325` 首次上传成功但 `/print/jobs` 返回 400；服务器只读缩圈已排除 active 价目缺失、COS 读取失败和 G4 PDF 轻量页数识别失败。`HttpExceptionFilter` 诊断热修已部署预生产并验证：缺失文件签名诊断请求返回 `PRINT_PAGE_COUNT_UNAVAILABLE` + `requestId=c6892d6d-17b1-43c8-a5d8-0779eedeeff5`，不再遮蔽机器码。热修后真实复测曾成功建单 `ptask_kiosk_74ee1da48ed051e1` / `ORD-20260706-2F2B3DF20E`，但因 `t_ksk_001` 在 11:48 后停止 heartbeat/claim，恢复时文件 URL 已过期，最终回传 `failed/PRINT_COMMAND_FAILED`（401）。该 G4 任务已冻结为诊断样本，禁止重试、手动 claim、清理或继续作为出纸复验对象。随后受控 G5 在 Agent 在线且 active 任务为 0 时新建 `ptask_kiosk_f05cd3c160ec55c6` / `ORD-20260706-DFC018281B`，已由 `t_ksk_001` claim 并回传 `completed`；现场补证目录 `C:\ai-job-print-evidence\PS-G5-EVIDENCE-20260706-130544` 显示 `AIJobPrintAgent` Running / Automatic，`Pantum CM2800ADN Series` Normal、USB001、JobCount=0、队列无残留，PrintService Event 307 / 842 记录 Job 26、1 页、Win32 `0x0`，且现场确认有纸。本项已闭环为本轮新增物理出纸证据；剩余不再是打印链路问题，而是打印运营模式决策 + FREE_MODE / 有人值守 mark-paid 运行时复验。
 - [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
 - [ ] 管理员 / 机构手机号登录验收：只有已绑定且完成本人手机号验证的管理员或机构账号允许短信验证码登录；种子 admin 未绑定手机号，只能密码登录，属于预期行为。历史账号上线前需走 Admin 开账号录入手机号并由本人验证，或按审计要求运行 `backfill-internal-user-phone.ts`。
 - [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收；AI 简历相关功能先运行 `pnpm --filter @ai-job-print/api verify:llm-connectivity`。2026-06-30 本地已换入有效 DeepSeek key，并通过本地运行时配置同步 active LLM 功能；`verify:llm-connectivity -- --all` 已覆盖 `assistant_chat` / `resume_diagnosis` / `resume_generate` / `resume_optimize` / `mock_interview` 全部通过。后续仍需在预生产 / 生产环境分别注入有效密钥并做 live 冒烟，不得复用聊天中暴露过的旧 key。
