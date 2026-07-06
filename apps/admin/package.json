@@ -14,7 +14,8 @@
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
     "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
-    "preview": "vite preview --port 5174"
+    "preview": "vite preview --port 5174",
+    "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",
