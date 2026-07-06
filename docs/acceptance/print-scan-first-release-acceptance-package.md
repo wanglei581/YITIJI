@@ -11,7 +11,8 @@
 - `PS-G3-PAPER-01`：2026-07-06 计数器 + Windows PrintService 最小硬证据已对齐，见仓库外 `physical-print-20260706101346/evidence-summary.md`。
 - `PS-G3-RO-01`：2026-07-06 G5 只读复核显示 `ptask_kiosk_f05cd3c160ec55c6` 的系统链路 / Agent / Windows PrintService / 计数器旁证对齐。
 - `PS-G3-PHYS-01`：2026-07-06 用户提供 `G5 Second Print Probe` 纸张照片并确认该纸确由 `Pantum CM2800ADN Series / USB001` 出纸托盘取出；照片已保存到仓库外 `PS-G3-PHYS-01-physical-paper-observation-20260706151035`，人工可见物理出纸补证已完成。
-- Gate 3 仍为 `Not Passed Yet`：终端隔离、降级 / 恢复、错终端拒绝、隐私删除和异常恢复等演练尚未完整补齐；扫描链路、U 盘导入、断网 / 重启恢复仍需另行验收。
+- `PS-G3-DEGREC-01`：2026-07-06 受控停止 `AIJobPrintAgent` 后临时把 `C:\ProgramData\AIJobPrintAgent\agent.db` 替换为同名目录，前台 Agent 记录本地任务库不可用且打印禁用，降级心跳 acknowledged；恢复原 `agent.db` 后记录 `db: opened`、`agent ready`、恢复心跳 acknowledged，公开只读 `printer-status` 返回 `printerStatus=ready` / `isOnline=true`。证据目录为仓库外 `PS-G3-DEGREC-20260706155258`。该项只证明 Agent 端降级 / 恢复运行证据，不替代 Admin 截图、降级期间 pending 任务保护或恢复后真实领单验收。
+- Gate 3 仍为 `Not Passed Yet`：终端隔离、降级期间 pending 任务保护、Admin 降级可见性、错终端拒绝、隐私删除和异常恢复等演练尚未完整补齐；扫描链路、U 盘导入、断网 / 重启恢复仍需另行验收。
 
 ## 目标
 
@@ -99,17 +100,17 @@ Gate 2 Deployment And Migration: Not Passed Yet
 | PS-G3-PAPER-01 | Passed (Conditional) | 真实纸张输出需由现场目视、摄像头、打印机计数器或设备日志至少一种证明 | 仓库外证据包 `<PRIVATE_EVIDENCE_DIR>/physical-print-20260706101346/evidence-summary.md` 记录打印机计数器 27→28、28→29，且 PrintService Event ID 307 / 842 可关联 `Pantum CM2800ADN Series` / `USB001`；如现场实际未看到纸张，应立即改判 failed |
 | PS-G3-RO-01 | Evidence Aligned | G5 `ptask_kiosk_f05cd3c160ec55c6` 只读证据显示系统链路 / Agent / Windows PrintService / 计数器旁证对齐；人工可见物理出纸由 `PS-G3-PHYS-01` 单独补证 | `PS-G5-EVIDENCE-20260706-130544` / `PS-G4-AGENT-RESUME-20260706-125509` / `PS-G5` |
 | PS-G3-PHYS-01 | Passed | 用户确认照片中的 G5 无个人信息测试页确由目标打印机 `Pantum CM2800ADN Series / USB001` 出纸托盘取出；观察记录已包含观察人、时间、任务 ID、照片证据编号、遮挡说明、PrintService / 计数器 / Agent 日志证据编号 | `PS-G3-PHYS-01-physical-paper-observation-20260706151035` |
-| PS-G3-DEG-01 | Not Passed Yet | 模拟本地任务库不可用后，心跳为 `agent_degraded` 且 `localTaskDatabaseAvailable=false` | `<PRIVATE_EVIDENCE_DIR>/PS-G3-DEG-01-agent-degraded-<timestamp>.png` |
-| PS-G3-DEG-02 | Not Passed Yet | Agent 降级期间后端 claim 返回空任务，目标任务保持 `pending` | `<PRIVATE_EVIDENCE_DIR>/PS-G3-DEG-02-claim-empty-pending-<timestamp>.log` |
-| PS-G3-REC-01 | Not Passed Yet | 恢复本地任务库后，Agent 上报 online 并可继续领取同一终端任务 | `<PRIVATE_EVIDENCE_DIR>/PS-G3-REC-01-recovery-claim-<timestamp>.log` |
+| PS-G3-DEG-01 | Agent Runtime Evidence Aligned; Admin Pending | 受控把 `agent.db` 替换为同名目录后，Agent 日志显示 `local task database unavailable; printing disabled`，降级心跳 acknowledged；源码契约将该状态上报为 `agent_degraded` / `localTaskDatabaseAvailable=false`，但本轮未补 Admin 截图 | `PS-G3-DEGREC-20260706155258` |
+| PS-G3-DEG-02 | Partial; Pending-Task Check Still Required | 降级 Agent 日志显示 `claim loop not started`，没有领取打印任务；本轮未创建或保留 pending 任务验证后端 claim 空返回与任务保持 pending | `PS-G3-DEGREC-20260706155258` |
+| PS-G3-REC-01 | Partial; Recovery Heartbeat Passed | 恢复原 `agent.db` 后，Agent 日志显示 `db: opened`、`agent ready`、`task-runner: starting` 和恢复心跳 acknowledged；公开只读 `printer-status` 返回 `printerStatus=ready` / `isOnline=true`。本轮未用同一终端 pending 任务验证恢复后真实领单 | `PS-G3-DEGREC-20260706155258` |
 | PS-G3-NEG-01 | Not Passed Yet | 错终端状态回传被拒，命中 `TASK_NOT_OWNED` 或等效错误 | `<PRIVATE_EVIDENCE_DIR>/PS-G3-NEG-01-wrong-terminal-rejected-<timestamp>.log` |
 
 判定：
 
 ```text
 Gate 3 Field Print Safety Base: Not Passed Yet
-已确认：物理出纸最小硬证据已通过，G5 只读证据链与 PS-G3-PHYS-01 照片补证已对齐。
-阻塞项：终端隔离、Agent 降级 / 恢复、错终端回传拒绝等完整安全底座现场演练仍未全部完成。
+已确认：物理出纸最小硬证据已通过，G5 只读证据链与 PS-G3-PHYS-01 照片补证已对齐；Agent 本地任务库不可用时 fail-closed 和恢复后心跳正常已有运行证据。
+阻塞项：终端隔离、降级期间 pending 任务保护、Admin 降级可见性、恢复后真实领单、错终端回传拒绝等完整安全底座现场演练仍未全部完成。
 ```
 
 ## Gate 4：隐私删除与异常恢复
