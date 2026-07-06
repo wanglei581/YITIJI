@@ -270,6 +270,91 @@ Copy-Item (Join-Path $EvidenceRoot "PS-G1\agent-foreground.log") (Join-Path $Evi
 - 出纸前不得把任务标记为 `completed`。
 - 出纸照片必须仓库外保存并遮挡任何个人信息。
 
+### 7.3 已完成任务只读复核与人工出纸补证
+
+适用场景：任务已发生，且当前只允许复核证据、不能再次打印、不能重启 Agent、不能修改配置、不能写数据库。该步骤用于补齐类似 G5 `ptask_kiosk_f05cd3c160ec55c6` 的只读证据链和人工物理出纸确认。
+
+只读复核范围：
+
+- Windows PrintService 事件：Event ID 307 / 842、打印机、端口、页数、Win32 返回码。
+- Agent 日志：`claimed -> printing -> print success -> completed` 或失败链路。
+- 本地 Agent DB：只读查询任务状态，不执行更新、删除或 vacuum。
+- 打印机计数器：`TotalPagesPrinted` / `TotalJobsPrinted` 前后差异。
+- 现场人工记录：是否实际看到纸张、照片证据编号、观察人和时间。
+
+禁止动作：
+
+- 不执行 `pnpm --filter terminal-agent print` 或任何会提交新打印作业的命令。
+- 不重启 `AIJobPrintAgent`，不安装 / 卸载服务，不清空队列。
+- 不修改 `agent-config.json`、环境变量、注册 token、打印机默认设置或驱动配置。
+- 不对 API、PostgreSQL、SQLite、Redis、COS 写入任何数据。
+
+Windows 只读发现证据目录：
+
+```powershell
+$Root = "C:\ai-job-print-evidence"
+
+Get-ChildItem $Root -Directory -Recurse -ErrorAction SilentlyContinue |
+  Where-Object { $_.Name -like "physical-print*" -or $_.Name -like "PS-G3*" -or $_.Name -like "PS-G5*" } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object LastWriteTime, FullName
+
+Get-ChildItem $Root -File -Recurse -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.Name -match "summary|printservice|counter|pages|spool|queue|ptask_kiosk_ba7c9537d0b62957|ptask_kiosk_f05cd3c160ec55c6"
+  } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object LastWriteTime, Length, FullName
+```
+
+如找到候选目录，仅列目录内容，不打开或修改运行时文件：
+
+```powershell
+Get-ChildItem "<候选目录完整路径>" -Recurse |
+  Select-Object LastWriteTime, Length, FullName
+```
+
+人工物理出纸补证要求：
+
+- 现场人员必须确认纸张来自目标打印机 `Pantum CM2800ADN Series` 和端口 `USB001` 所在设备。
+- 照片只拍无个人信息的测试页或遮挡内容后的纸张；不得拍入真实简历、手机号、验证码、token、完整签名 URL、人员面部或设备序列号。
+- 观察记录至少包含：任务 ID、观察时间、观察人、打印机识别名、端口、纸张页数、照片证据编号、是否看到纸张。
+- 如果只读证据显示 PrintService / 计数器已对齐，但 `PhysicalPaperSeen=无法远程确认`，结论只能写“系统链路 / Agent / PrintService / 计数器旁证已对齐；人工物理出纸仍待补证”。
+
+`PS-G3-PHYS-01` 现场最小执行步骤：
+
+1. 不操作电脑、不点打印、不重启 Agent，只到目标奔图打印机旁边确认是否有本次无个人信息测试页或已遮挡内容的纸张。
+2. 确认纸张来自本机 `Pantum CM2800ADN Series / USB001`，并核对页数是否与 PrintService / 计数器证据一致。
+3. 拍摄纸张照片或现场视频，遮挡所有个人信息、人员面部、设备序列号、二维码、完整 URL 和 token。
+4. 将照片保存到仓库外私有证据目录，命名为 `PS-G3-PHYS-01-physical-paper-observation-<timestamp>` 或同等编号。
+5. 按下面模板填写观察记录；如果现场无法确认纸张来源或照片无法脱敏，保持 `Not Passed Yet`。
+
+`PS-G3-PHYS-01` 现场观察记录模板：
+
+```markdown
+# PS-G3-PHYS-01 现场人工物理出纸观察记录
+
+- 观察日期时间：
+- 观察人：
+- 任务 ID：
+- 证据目录 ID：
+- 打印机 Windows 识别名：
+- 端口：
+- 现场看到纸张：是 / 否
+- 纸张页数：
+- 纸张内容类型：无个人信息测试页 / 已遮挡敏感内容 / 其它
+- 照片证据编号：
+- 照片脱敏说明：
+- PrintService 证据编号：
+- 计数器证据编号：
+- Agent 日志证据编号：
+- 结论：
+  - [ ] 人工可见物理出纸已确认
+  - [ ] 人工可见物理出纸未确认，需继续补证
+
+备注：
+```
+
 ## 八、Agent 降级 / 恢复演练（PS-G3）
 
 目标：安全模拟本地任务库不可用，不破坏真实 `%ProgramData%\AIJobPrintAgent\agent.db`。
