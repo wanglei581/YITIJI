@@ -29,6 +29,7 @@ import type {
   QrPaymentCreateResult,
   RefundExecuteInput,
   RefundExecuteResult,
+  RefundNotifyVerifyResult,
   RefundQueryResult,
 } from '../payment-provider.types'
 import { buildPaymentCallbackPath } from '../payment-provider.types'
@@ -214,7 +215,13 @@ export class WechatPayProvider implements PaymentProvider {
     return { prepayId: input.attemptId, qrCodeContent: codeUrl }
   }
 
-  async verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult> {
+  /**
+   * APIv3 通知公共段：header 校验 → 时间窗 → serial 命中 → 验签（先于一切解析）→
+   * 外层 JSON → resource AES-256-GCM 解密。支付回调与退款结果通知共用（口径一致，防漂移）。
+   */
+  private verifyAndDecryptNotify(
+    ctx: PaymentCallbackContext,
+  ): { ok: true; payload: Record<string, unknown>; nonce: string; timestampMs: number } | { ok: false; code: string } {
     const timestamp = headerValue(ctx.headers, WECHAT_TIMESTAMP_HEADER)
     const nonce = headerValue(ctx.headers, WECHAT_NONCE_HEADER)
     const signature = headerValue(ctx.headers, WECHAT_SIGNATURE_HEADER)
@@ -255,12 +262,19 @@ export class WechatPayProvider implements PaymentProvider {
     )
     if (!decrypted) return { ok: false, code: 'CALLBACK_RESOURCE_DECRYPT_FAILED' }
 
-    let txn: Record<string, unknown>
+    let payload: Record<string, unknown>
     try {
-      txn = JSON.parse(decrypted) as Record<string, unknown>
+      payload = JSON.parse(decrypted) as Record<string, unknown>
     } catch {
       return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' }
     }
+    return { ok: true, payload, nonce, timestampMs }
+  }
+
+  async verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult> {
+    const base = this.verifyAndDecryptNotify(ctx)
+    if (!base.ok) return base
+    const { payload: txn, nonce, timestampMs } = base
 
     // 交易归属校验：解密报文中的商户/应用必须是本商户（防跨商户报文错投）。
     if (asString(txn['mchid']) !== this.cfg.mchid || asString(txn['appid']) !== this.cfg.appid) {
@@ -382,6 +396,51 @@ export class WechatPayProvider implements PaymentProvider {
       return { status: 'unknown', channelRefundNo: asString(resp['refund_id']) }
     }
     return { status, channelRefundNo: asString(resp['refund_id']) }
+  }
+
+  /**
+   * 退款结果异步通知（商户平台「退款结果回调通知 URL」）验签+解密+归一化。
+   * 与支付回调共用 verifyAndDecryptNotify（同一验签/时间窗/serial/解密口径）；
+   * 报文差异：解密后为退款对象（out_refund_no/refund_id/refund_status/amount.refund），
+   * **无 appid 字段**，归属只校验 mchid；SUCCESS→success，CLOSED/ABNORMAL→failed，
+   * 其它/未知 refund_status 一律拒绝（绝不猜测入账）。
+   */
+  async verifyRefundNotify(ctx: PaymentCallbackContext): Promise<RefundNotifyVerifyResult> {
+    const base = this.verifyAndDecryptNotify(ctx)
+    if (!base.ok) return base
+    const { payload: refund, nonce, timestampMs } = base
+
+    if (asString(refund['mchid']) !== this.cfg.mchid) return { ok: false, code: 'CALLBACK_MERCHANT_MISMATCH' }
+
+    const refundNo = asString(refund['out_refund_no'])
+    const outTradeNo = asString(refund['out_trade_no'])
+    if (!refundNo || !outTradeNo) return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' }
+
+    const rawStatus = asString(refund['refund_status'])
+    let status: 'success' | 'failed'
+    if (rawStatus === 'SUCCESS') status = 'success'
+    else if (rawStatus === 'CLOSED' || rawStatus === 'ABNORMAL') status = 'failed'
+    else return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' } // 未知状态：拒绝，绝不猜测
+
+    const amount = refund['amount'] as { refund?: unknown } | undefined
+    const refundAmountCents =
+      typeof amount?.refund === 'number' && Number.isInteger(amount.refund) && amount.refund >= 0 ? amount.refund : null
+    // SUCCESS 必须齐备退款金额（业务层比对依据），缺失拒绝。
+    if (status === 'success' && refundAmountCents === null) return { ok: false, code: 'CALLBACK_PAYLOAD_INVALID' }
+
+    return {
+      ok: true,
+      event: {
+        channel: this.channel,
+        refundNo,
+        outTradeNo,
+        channelRefundNo: asString(refund['refund_id']),
+        status,
+        refundAmountCents,
+        nonce,
+        timestampMs,
+      },
+    }
   }
 
   callbackAck(): CallbackAck {

@@ -105,6 +105,26 @@ export interface RefundQueryResult {
   channelRefundNo: string | null
 }
 
+/** 退款结果异步通知归一化事件（wechat REFUND.SUCCESS/CLOSED/ABNORMAL 通知解析后）。 */
+export interface RefundNotifyEvent {
+  channel: string
+  /** 渠道 out_refund_no = 本系统 Refund.refundNo（RFD-<orderNo>）。 */
+  refundNo: string
+  /** 原支付单 out_trade_no（= attemptId），交叉核对用。 */
+  outTradeNo: string
+  /** 渠道退款流水号 refund_id。 */
+  channelRefundNo: string | null
+  /** SUCCESS→success；CLOSED/ABNORMAL→failed（渠道明确不会再退）。 */
+  status: 'success' | 'failed'
+  /** 本次退款额（分）；业务层必须与 Refund.amountCents 比对，不符拒绝。 */
+  refundAmountCents: number | null
+  /** 防重放 nonce（签名头 nonce）。 */
+  nonce: string
+  timestampMs: number
+}
+
+export type RefundNotifyVerifyResult = { ok: true; event: RefundNotifyEvent } | { ok: false; code: string }
+
 /** 主动查单归一化结果（reconcile 兜底入账用；amountCents/channelTxnNo 缺失时不得入账）。 */
 export interface PaymentQueryResult {
   /** paid=渠道账本确认已收款；pending=等待支付；failed/closed=不会再成功；unknown=渠道无此单/暂不可判。 */
@@ -141,6 +161,12 @@ export interface PaymentProvider {
    * alipay `alipay.trade.fastpay.refund.query`）。sandbox 同步完成，不实现。
    */
   queryRefund?(input: { refundNo: string; outTradeNo?: string | null }): Promise<RefundQueryResult>
+  /**
+   * 退款结果异步通知验签+解密+归一化（wechat 商户平台「退款结果回调通知 URL」）。
+   * 与支付回调同一验签/解密口径（验签先于解析、时间窗、serial 命中、AES-256-GCM）；
+   * 注意退款通知报文无 appid，归属只校验 mchid。仅 wechat 实现。
+   */
+  verifyRefundNotify?(ctx: PaymentCallbackContext): Promise<RefundNotifyVerifyResult>
   /**
    * 主动查单兜底（回调丢失/延迟时对渠道账本查询，reconcile 复用与回调完全相同的幂等入账路径）。
    * wechat / alipay 实现；sandbox 无外部账本（DB 即真相源），不实现 —— 不伪造能力。

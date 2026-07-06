@@ -25,11 +25,12 @@
  *     且 voucher/free 退款**不恢复 BenefitGrant 额度**。
  * - 全额退款为主；`partial_refunded` 与部分退款动作仅预留，不接。
  */
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { ReplayGuard } from '../sync/replay-guard'
 import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
-import type { PaymentProvider, RefundExecuteInput, RefundExecuteResult } from './payment-provider.types'
+import { buildPaymentCallbackPath, type PaymentProvider, type RefundExecuteInput, type RefundExecuteResult } from './payment-provider.types'
 
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 type RefundRecord = NonNullable<Awaited<ReturnType<PrismaService['refund']['findUnique']>>>
@@ -95,13 +96,142 @@ function isDefinitiveChannelRejection(e: unknown): boolean {
   return false // fetch/超时/连接异常等传输层错误：结果不可知
 }
 
+/** 退款通知验签/时间窗/解密类失败 → 401；其余业务校验失败 → 400（与支付回调同分类口径）。 */
+const UNAUTHORIZED_NOTIFY_CODES = new Set([
+  'CALLBACK_HEADER_MISSING',
+  'CALLBACK_TIMESTAMP_INVALID',
+  'CALLBACK_TIMESTAMP_EXPIRED',
+  'CALLBACK_NONCE_INVALID',
+  'CALLBACK_SIGNATURE_INVALID',
+  'CALLBACK_SERIAL_MISMATCH',
+  'CALLBACK_RESOURCE_DECRYPT_FAILED',
+  'CALLBACK_MERCHANT_MISMATCH',
+])
+
 @Injectable()
 export class RefundService {
+  /** 退款通知 nonce 防重放（5min 窗口，与支付回调同一实现）。 */
+  private readonly notifyReplay = new ReplayGuard()
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Inject(PAYMENT_PROVIDER_TOKEN) private readonly registry: PaymentProviderRegistry,
   ) {}
+
+  /**
+   * 微信退款结果异步通知入口（商户平台「退款结果回调通知 URL」；无登录态，靠验签鉴权）。
+   *
+   * 验签+解密（provider，验签先于一切解析）→ nonce 防重放 → out_refund_no 匹配本系统
+   * Refund.refundNo（RFD-<orderNo>）→ 通道/金额交叉核对 → 幂等状态机：
+   * - SUCCESS：pending→success + 订单 refunding→refunded（与查证收敛同一完成语义）；
+   *   若本地曾错判 failed（渠道账本为准）→ 修复为 success（审计带 repairedFromFailed）；
+   *   已 success → 幂等返回，不重复副作用/审计。
+   * - CLOSED/ABNORMAL：pending→failed + 订单回 paid（可同号重试）；已 failed 幂等；
+   *   **已 success 绝不回退**（冲突拒绝）。
+   * - 未知 out_refund_no：拒绝，不改任何订单。
+   * - 全程不触碰 PrintTask。
+   */
+  async processWechatRefundNotify(
+    rawBody: Buffer | undefined,
+    headers: Record<string, string | string[] | undefined>,
+  ): Promise<{ ok: true; idempotent?: boolean }> {
+    const provider = this.registry.get('wechat')
+    if (!provider?.verifyRefundNotify) throw new BadRequestException('REFUND_NOTIFY_CHANNEL_UNSUPPORTED')
+    if (!rawBody || rawBody.length === 0) throw new BadRequestException('CALLBACK_RAW_BODY_MISSING')
+
+    const verified = await provider.verifyRefundNotify({
+      channel: 'wechat',
+      path: buildPaymentCallbackPath('wechat'), // 验签 base 不含 path（APIv3 口径），此处仅补全上下文形参
+      rawBody,
+      headers,
+    })
+    if (!verified.ok) {
+      if (UNAUTHORIZED_NOTIFY_CODES.has(verified.code)) throw new UnauthorizedException(verified.code)
+      throw new BadRequestException(verified.code)
+    }
+    const event = verified.event
+
+    // 验签通过后才登记 nonce（未签名垃圾请求不得污染 nonce 池）。
+    if (!this.notifyReplay.register(event.nonce, 'refund-notify:wechat', event.timestampMs)) {
+      throw new UnauthorizedException('CALLBACK_REPLAY')
+    }
+
+    const refund = await this.prisma.refund.findUnique({ where: { refundNo: event.refundNo } })
+    if (!refund) throw new BadRequestException('REFUND_NOTIFY_UNKNOWN_REFUND') // 不误改任何订单
+    if (refund.channel !== 'wechat') throw new BadRequestException('REFUND_NOTIFY_CHANNEL_MISMATCH')
+    // 金额交叉核对：通知退款额必须与本地退款记录一致（SUCCESS 必带金额，provider 已保证）。
+    if (event.status === 'success' && event.refundAmountCents !== refund.amountCents) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'refund.notify_amount_mismatch',
+        targetType: 'order',
+        targetId: refund.orderId,
+        payload: { refundNo: refund.refundNo, notifyAmountCents: event.refundAmountCents, localAmountCents: refund.amountCents },
+      })
+      throw new BadRequestException('REFUND_NOTIFY_AMOUNT_MISMATCH')
+    }
+
+    if (event.status === 'success') {
+      if (refund.status === 'success') return { ok: true, idempotent: true }
+      const repairedFromFailed = refund.status === 'failed'
+      // 完成（与查证收敛同一语义）：CAS 同事务，渠道账本为准 —— 曾错判 failed 的记录一并修复。
+      const { completed } = await this.prisma.$transaction(async (tx) => {
+        const casRefund = await tx.refund.updateMany({
+          where: { id: refund.id, status: { in: ['pending', 'failed'] } },
+          data: { status: 'success', channelRefundNo: event.channelRefundNo ?? refund.channelRefundNo },
+        })
+        if (casRefund.count === 0) return { completed: false } // 并发下他方已完成
+        await tx.order.updateMany({
+          where: { id: refund.orderId, payStatus: { in: ['refunding', 'paid'] } },
+          data: {
+            payStatus: 'refunded',
+            refundedAt: new Date(),
+            refundReason: refund.reason,
+            refundedAmountCents: refund.amountCents,
+          },
+        })
+        const o = await tx.order.findUnique({ where: { id: refund.orderId } })
+        if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
+        if (o.payStatus !== 'refunded') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+        return { completed: true }
+      })
+      if (!completed) return { ok: true, idempotent: true }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'refund.created',
+        targetType: 'order',
+        targetId: refund.orderId,
+        payload: {
+          refundNo: refund.refundNo,
+          channel: 'wechat',
+          amountCents: refund.amountCents,
+          channelRefundNo: event.channelRefundNo ?? refund.channelRefundNo,
+          operatorId: null,
+          benefitRestored: false,
+          viaRefundNotify: true, // 由渠道退款通知完成（对账区分：通知/查证/同步三条完成来源）
+          ...(repairedFromFailed ? { repairedFromFailed: true } : {}),
+        },
+      })
+      return { ok: true }
+    }
+
+    // CLOSED / ABNORMAL：渠道明确不会再退。
+    if (refund.status === 'success') throw new BadRequestException('REFUND_NOTIFY_STATE_CONFLICT') // 绝不回退已退款
+    if (refund.status === 'failed') return { ok: true, idempotent: true }
+    await this.rollbackRefundFailure(refund.id, refund.orderId, event.channelRefundNo)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'refund.channel_error',
+      targetType: 'order',
+      targetId: refund.orderId,
+      payload: { refundNo: refund.refundNo, channel: 'wechat', errorCode: 'REFUND_NOTIFY_CLOSED', viaRefundNotify: true },
+    })
+    return { ok: true }
+  }
 
   /**
    * 全额退款。refundNo 缺省时按订单派生 `RFD-<orderNo>`（一单一退，天然幂等）。

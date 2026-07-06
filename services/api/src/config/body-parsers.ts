@@ -10,7 +10,11 @@
  */
 import type { Request, Response } from 'express'
 
-export const RAW_BODY_JSON_PREFIXES = ['/api/v1/sync/', '/api/v1/payment/callback/'] as const
+export const RAW_BODY_JSON_PREFIXES = [
+  '/api/v1/sync/',
+  '/api/v1/payment/callback/',
+  '/api/v1/payment/wechat/refund-notify', // 微信退款结果通知（APIv3 验签必须基于原始字节）
+] as const
 export const RAW_BODY_URLENCODED_PREFIXES = ['/api/v1/payment/callback/'] as const
 
 export interface RawBodyRequest extends Request {
