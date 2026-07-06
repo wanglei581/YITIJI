@@ -79,6 +79,16 @@ export interface UpdateTerminalProfileResult {
   enabled: boolean
 }
 
+// ── 终端授权绑定码（一次性）────────────────────────────────────────────────────
+
+/** POST /admin/terminals/:id/bind-code 返回。明文 bindCode 仅在本响应中返回一次。 */
+export interface TerminalBindCodeCreated {
+  terminalId: string
+  terminalCode: string
+  bindCode: string
+  expiresAt: string
+}
+
 // ─── Printers (设备管理 — 打印机视图) ───────────────────────────────────────
 
 export type AdminPrinterStatus = 'online' | 'offline' | 'error'

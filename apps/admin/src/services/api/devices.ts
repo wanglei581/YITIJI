@@ -11,6 +11,7 @@ import type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  TerminalBindCodeCreated,
   TerminalPrinterStatus,
 } from './types'
 
@@ -24,6 +25,7 @@ export type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  TerminalBindCodeCreated,
   TerminalPrinterStatus,
 }
 
@@ -33,6 +35,7 @@ interface AdminDeviceServiceInterface {
   getOrgOptions(): Promise<AdminOrgOptionsResponse>
   assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
   updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult>
+  createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
 }
 
 const adapter: AdminDeviceServiceInterface =
@@ -54,3 +57,7 @@ export const assignTerminalOrg = (terminalId: string, orgId: string | null) =>
 /** 更新终端设备档案/MAC/启停状态(PATCH /admin/terminals/:id/profile)。 */
 export const updateTerminalProfile = (terminalId: string, input: UpdateTerminalProfileInput) =>
   adapter.updateTerminalProfile(terminalId, input)
+
+/** 生成一次性终端绑定码(POST /admin/terminals/:id/bind-code)。明文只在响应里返回一次。 */
+export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) =>
+  adapter.createTerminalBindCode(terminalId, ttlMinutes)

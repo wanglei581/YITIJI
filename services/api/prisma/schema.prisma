@@ -34,9 +34,33 @@ model Terminal {
 
   heartbeats TerminalHeartbeat[]
   printTasks PrintTask[]
+  bindCodes  TerminalBindCode[]
 
   @@index([orgId])
   @@index([enabled])
+}
+
+// ── TerminalBindCode ─────────────────────────────────────────────────────────
+// 管理员后台生成的一次性终端绑定码。
+// Windows 新主机用绑定码换取 terminalId + agentToken，避免在 Windows 端保存 adminSecret。
+// bindCode 明文只在创建响应中返回一次；数据库仅保存 SHA-256 hash。
+model TerminalBindCode {
+  id           String    @id @default(cuid())
+  terminalId   String
+  terminal     Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  terminalCode String
+  codeHash     String    @unique
+  createdBy    String?
+  expiresAt    DateTime
+  usedAt       DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([terminalId])
+  @@index([terminalCode])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@index([revokedAt])
 }
 
 // ── PrintTask ─────────────────────────────────────────────────────────────────
