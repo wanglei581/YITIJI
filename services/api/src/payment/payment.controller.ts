@@ -8,6 +8,8 @@
 //   POST /orders/:id/pay/reconcile  主动查单兜底（回调丢失时按渠道账本核实；同幂等入账路径）
 //   POST /payment/callback/:channel   渠道回调（验签+防重放+幂等+金额一致性；需 rawBody；
 //                                     应答按渠道要求渲染：alipay 纯文本 success / wechat JSON）
+//   POST /payment/wechat/refund-notify  微信退款结果异步通知（商户平台「退款结果回调通知 URL」；
+//                                     无登录态，APIv3 验签+解密鉴权；需 rawBody；幂等）
 //   POST /payment/sandbox/simulate    沙箱模拟支付（仅非生产 + sandbox Provider）
 //
 // 鉴权口径：与 print-jobs controller 一致（kiosk 匿名层，cuid 不可猜）；
@@ -17,8 +19,9 @@ import type { Request, Response } from 'express'
 import { CreatePayAttemptDto, SandboxSimulateDto } from './dto/online-payment.dto'
 import { OnlinePaymentService } from './online-payment.service'
 import { PricingService } from './pricing.service'
+import { RefundService } from './refund.service'
 
-/** main.ts 的 express.json verify 钩子对 /api/v1/payment/callback/ 前缀写入 rawBody。 */
+/** main.ts 的 express verify 钩子对 body-parsers 白名单前缀写入 rawBody。 */
 interface RawBodyRequest extends Request {
   rawBody?: Buffer
 }
@@ -28,7 +31,21 @@ export class PaymentController {
   constructor(
     private readonly onlinePayment: OnlinePaymentService,
     private readonly pricing: PricingService,
+    private readonly refunds: RefundService,
   ) {}
+
+  // POST /api/v1/payment/wechat/refund-notify — 微信退款结果异步通知。
+  // 无 JWT（商户平台直调），鉴权=APIv3 验签+解密；rawBody 由 body-parsers 白名单捕获；
+  // 幂等：重复通知安全返回；校验失败抛 4xx → 微信按其策略重试。成功应答 {code:SUCCESS}。
+  @Post('payment/wechat/refund-notify')
+  @HttpCode(HttpStatus.OK)
+  async wechatRefundNotify(
+    @Req() req: RawBodyRequest,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    await this.refunds.processWechatRefundNotify(req.rawBody, headers)
+    return { code: 'SUCCESS', message: '成功' }
+  }
 
   @Get('payment/channels')
   getChannels() {
