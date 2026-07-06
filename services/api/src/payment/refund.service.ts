@@ -371,6 +371,37 @@ export class RefundService {
   }
 
   /**
+   * 后台自动收敛入口（W-C part2b：调度器调用；关闭 W-B codex M1 的运营卡单风险）。
+   * 扫出**真实渠道**的 pending Refund（受理中/结果不可知的退款），逐笔走同一
+   * `convergePendingRefund` 查证收敛——与人工重复调用完全相同的幂等路径，绝不二次出款。
+   *
+   * 只处理 wechat/alipay（有 queryRefund 能力）；单笔收敛异常/明确失败（抛 REFUND_CHANNEL_FAILED）
+   * 不阻断其它笔，计入 failed 计数。返回批处理统计供调度器记录日志。
+   */
+  async convergeStalePendingRefunds(opts?: { limit?: number }): Promise<{ scanned: number; refunded: number; stillPending: number; failed: number }> {
+    const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 500)
+    const pendings = await this.prisma.refund.findMany({
+      where: { status: 'pending', channel: { in: ['wechat', 'alipay'] } },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    })
+    let refunded = 0
+    let stillPending = 0
+    let failed = 0
+    for (const r of pendings) {
+      try {
+        const view = await this.convergePendingRefund(r, 'system_auto_converge')
+        if (view.refund.status === 'success') refunded += 1
+        else stillPending += 1
+      } catch {
+        // convergePendingRefund 在明确失败时抛 REFUND_CHANNEL_FAILED（已回滚 paid，可后续人工/自动重试）。
+        failed += 1
+      }
+    }
+    return { scanned: pendings.length, refunded, stillPending, failed }
+  }
+
+  /**
    * 真实渠道 pending 退款收敛（同 refundNo 重复请求触发）。向渠道 queryRefund 查证：
    * - success → 补完成（唯一完成路径，CAS 幂等）；
    * - failed（明确 ABNORMAL/CLOSED）→ 回滚 paid 可重试；

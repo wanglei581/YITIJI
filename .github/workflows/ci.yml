@@ -172,6 +172,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:redemption-audit
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
+          pnpm --filter @ai-job-print/api verify:refund-convergence
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
@@ -306,6 +307,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:redemption-audit
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
+          pnpm --filter @ai-job-print/api verify:refund-convergence
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
