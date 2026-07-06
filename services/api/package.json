@@ -43,6 +43,7 @@
     "verify:kiosk-cashier-ui": "node -r @swc-node/register scripts/verify-kiosk-cashier-ui.ts",
     "verify:refund-idempotent": "node -r @swc-node/register scripts/verify-refund-idempotent.ts",
     "verify:redemption-audit": "node -r @swc-node/register scripts/verify-redemption-audit.ts",
+    "verify:http-exception-filter": "node -r @swc-node/register scripts/verify-http-exception-filter.ts",
     "verify:kiosk-upload-print-contract": "node -r @swc-node/register scripts/verify-kiosk-upload-print-contract.ts",
     "verify:print-rollout-config": "node -r @swc-node/register scripts/verify-print-rollout-config.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",

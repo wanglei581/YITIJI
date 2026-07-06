@@ -2,6 +2,10 @@ import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from
 import type { Request, Response } from 'express'
 import type { ErrorResponseBody } from '../dto/api-response.dto'
 
+function isMachineErrorCode(value: string): boolean {
+  return /^[A-Z][A-Z0-9_]+$/.test(value)
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -19,7 +23,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const body = exception.getResponse()
 
       if (typeof body === 'string') {
-        message = body
+        if (isMachineErrorCode(body)) {
+          code = body
+          message = body
+        }
       } else if (typeof body === 'object' && body !== null) {
         const b = body as Record<string, unknown>
 
@@ -33,11 +40,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
             details = (err['details'] as unknown[]).filter((d): d is string => typeof d === 'string')
           }
         } else if (typeof errField === 'string') {
-          code = errField
+          const bodyMessage = b['message']
+          if (typeof bodyMessage === 'string' && isMachineErrorCode(bodyMessage)) {
+            code = bodyMessage
+            message = bodyMessage
+          } else {
+            code = errField
+          }
         }
 
-        // Fallback: body.message (NestJS built-in format)
-        if (code === 'INTERNAL_SERVER_ERROR' && typeof b['message'] === 'string') {
+        // Fallback: only expose machine codes from NestJS/custom shorthand bodies.
+        // Human-readable raw messages may contain internal details.
+        if (code === 'INTERNAL_SERVER_ERROR' && typeof b['message'] === 'string' && isMachineErrorCode(b['message'])) {
+          code = b['message']
           message = b['message']
         }
       }

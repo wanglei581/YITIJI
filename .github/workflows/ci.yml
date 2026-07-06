@@ -167,6 +167,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:redemption-audit
+          pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:screensaver-content
@@ -296,6 +297,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:redemption-audit
+          pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:job-review
