@@ -26,7 +26,7 @@
 - Agent 本地任务库不可用时必须 fail-closed，并上报 `agent_degraded` 与 `localTaskDatabaseAvailable=false`。
 - Admin 能看到降级状态和运维提示。
 - 后端二道闸门在最新心跳明确降级时不下发新任务，任务保持 `pending`。
-- Agent 恢复后，同一终端可以继续领取被保护的任务。
+- Agent 恢复后，同一终端可以继续领取符合当前支付 / 免费模式门禁的 paid 或 allowed pending 任务。
 
 ## 非目标
 

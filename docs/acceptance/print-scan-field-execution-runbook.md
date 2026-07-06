@@ -437,6 +437,8 @@ Get-WinEvent -FilterHashtable @{
 
 目标：安全模拟本地任务库不可用，不破坏真实 `%ProgramData%\AIJobPrintAgent\agent.db`。
 
+当前运行时边界（2026-07-06 复核）：Admin 订单动作端点只有 `POST /admin/orders/:id/mark-paid` 和 `POST /admin/orders/:id/refund`，订单与打印任务运营视图分别为 `GET /admin/orders`、`GET /admin/orders/:id`、`GET /admin/print-tasks`；当前源码没有正式 `cancel` / `reassign` 写端点。现场恢复领单验收不得调用不存在的取消 / 重分配路由，也不得把 404 当作功能异常。
+
 执行前先停止第六节 PowerShell 窗口 A 中的正常 Agent（按 `Ctrl+C`），并确认没有同一 `terminalId` 的 Agent 仍在运行。否则正常 Agent 会继续上报 `online`，与降级演练窗口交替覆盖心跳，导致 Admin 观察结果不可靠。
 
 PowerShell 窗口 B：
@@ -493,7 +495,7 @@ pnpm --filter terminal-agent agent 2>&1 | Tee-Object (Join-Path $EvidenceRoot "P
 
 - 降级期间不领取新任务。
 - 恢复后心跳回到 online。
-- 同一终端可以继续领取自己的 pending 任务。
+- 同一终端可以继续领取符合当前支付 / 免费模式门禁的 paid 或 allowed pending 任务。若测试任务是 `unpaid` 且 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`，恢复后保持 `pending` 属于安全行为，不计为恢复领单失败，也不能作为恢复领单通过证据。
 
 ## 九、隐私删除与异常恢复（PS-G4）
 
