@@ -32,6 +32,7 @@
 
 - [ ] 生产域名与 HTTPS：完成域名解析、证书、nginx 反代、上传限制和自动续期。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
+- [ ] **zyidai.cn 数据库高负载加固生产执行**：代码侧候选 `codex/db-load-hardening-zyidai-20260706` 已准备 PrintTask / PrintTaskStatusLog 热路径索引、双轨 migration、`verify:db-load-indexes` 和 `docs/device/postgres-load-hardening-runbook.md`；生产执行前必须先经用户确认，按 runbook 做只读预检、备份、低峰 migration 或 `CREATE INDEX CONCURRENTLY`、`pg_stat_statements` 观测、PostgreSQL 参数 / PgBouncer / PM2 cluster 调整和压测验收。未执行前不得宣称 zyidai.cn 已完成数据库高并发加固。
 - [ ] 三端登录 / 内部账号手机号认证部署：上线目标库必须先执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`，再跑 `pnpm --filter @ai-job-print/api verify:internal-auth-phone`；提交候选必须包含 `verify-internal-auth-phone.ts`、`backfill-internal-user-phone.ts` 和双 Prisma 迁移目录。Codex 本地 SQLite `dev.db` 由 `db push` 创建无迁移基线；如新建 SQLite 空库跑 seed 遇到历史缺列，需手动补 `Organization.contactPhone`，生产 PostgreSQL 不受该遗留问题影响。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
