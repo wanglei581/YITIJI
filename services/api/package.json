@@ -132,7 +132,10 @@
     "verify:fair-visit-plan": "node -r @swc-node/register scripts/verify-fair-visit-plan.ts",
     "verify:jobfair-checkin": "node -r @swc-node/register scripts/verify-jobfair-checkin.ts",
     "verify:payment-real-channels": "node -r @swc-node/register scripts/verify-payment-real-channels.ts",
-    "verify:refund-real-channels": "node -r @swc-node/register scripts/verify-refund-real-channels.ts"
+    "verify:refund-real-channels": "node -r @swc-node/register scripts/verify-refund-real-channels.ts",
+    "verify:admin-billing": "node -r @swc-node/register scripts/verify-admin-billing.ts",
+    "verify:reconciliation": "node -r @swc-node/register scripts/verify-reconciliation.ts",
+    "verify:refund-convergence": "node -r @swc-node/register scripts/verify-refund-convergence.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

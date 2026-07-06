@@ -15,6 +15,7 @@
     "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
+    "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs",
     "preview": "vite preview --port 5174"
   },
   "dependencies": {

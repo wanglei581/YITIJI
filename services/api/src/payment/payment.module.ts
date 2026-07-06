@@ -4,6 +4,7 @@ import { OrderStatusService } from './order-status.service'
 import { PaymentController } from './payment.controller'
 import { PAYMENT_PROVIDER_TOKEN, resolvePaymentProviders } from './payment-provider.factory'
 import { PricingService } from './pricing.service'
+import { RefundConvergenceTask } from './refund-convergence.task'
 import { RefundService } from './refund.service'
 
 /**
@@ -13,6 +14,7 @@ import { RefundService } from './refund.service'
  *   + PaymentController（pay / pay-status / callback / sandbox simulate）。
  * - C5-4：RefundService（canonical 退款，Refund 账本 + sandbox provider 退款 + refunding→refunded 状态机）。
  * - C5-6：多通道注册表（sandbox / wechat / alipay，互斥规则见工厂）+ reconcile 主动查单 + channels 端点。
+ * - W-C：RefundConvergenceTask（退款 pending 自动收敛 cron，env 门控，复用 RefundService）。
  * PrismaService / AuditService 为全局，无需在此 import。
  */
 @Module({
@@ -22,6 +24,7 @@ import { RefundService } from './refund.service'
     OrderStatusService,
     OnlinePaymentService,
     RefundService,
+    RefundConvergenceTask,
     // 启动期解析注册表（fail-closed）：sandbox 缺密钥 / 生产配 sandbox / 真实通道缺配置 /
     // sandbox 与真实通道混配 / 未知取值 → 直接拒绝启动。
     { provide: PAYMENT_PROVIDER_TOKEN, useFactory: () => resolvePaymentProviders(process.env) },

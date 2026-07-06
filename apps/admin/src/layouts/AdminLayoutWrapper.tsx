@@ -26,6 +26,7 @@ import {
   ShieldIcon,
   SparklesIcon,
   UsersIcon,
+  WalletIcon,
 } from 'lucide-react'
 import { getUser, logout, verifyToken, type AuthedUser } from '../services/auth'
 import { adminOpsService } from '../services/api/adminOps'
@@ -42,6 +43,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/toolbox':      'toolbox',
   '/smart-campus': 'smart-campus',
   '/orders':       'orders',
+  '/billing':      'billing',
   '/files':        'files',
   '/job-materials': 'job-materials',
   '/ai-services':  'ai-services',
@@ -86,6 +88,7 @@ const NAV_ITEMS: NavItem[] = [
   // badge 不再硬编码:告警数为实时派生,进入页面即见真实数量
   { key: 'alerts',       label: '告警中心',     icon: AlertTriangleIcon, href: KEY_TO_PATH.alerts },
   { key: 'orders',       label: '订单管理',     icon: FileTextIcon,        group: '业务管理', href: KEY_TO_PATH.orders },
+  { key: 'billing',      label: '计费与对账',   icon: WalletIcon, href: KEY_TO_PATH.billing },
   { key: 'files',        label: '文件管理',     icon: FolderIcon, href: KEY_TO_PATH.files },
   { key: 'job-materials', label: '求职材料库',   icon: FileTextIcon, href: KEY_TO_PATH['job-materials'] },
   { key: 'ai-services',  label: 'AI服务管理',   icon: BotIcon, href: KEY_TO_PATH['ai-services'] },

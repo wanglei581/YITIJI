@@ -145,6 +145,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:job-info-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
+          pnpm --filter @ai-job-print/admin verify:admin-billing-ui
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -170,6 +171,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:redemption-audit
+          pnpm --filter @ai-job-print/api verify:admin-billing
+          pnpm --filter @ai-job-print/api verify:reconciliation
+          pnpm --filter @ai-job-print/api verify:refund-convergence
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
@@ -302,6 +306,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:redemption-audit
+          pnpm --filter @ai-job-print/api verify:admin-billing
+          pnpm --filter @ai-job-print/api verify:reconciliation
+          pnpm --filter @ai-job-print/api verify:refund-convergence
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
