@@ -525,6 +525,30 @@ async function main(): Promise<void> {
     }
     wechatRefundQueryResponse = { body: { status: 'PROCESSING' } }
 
+    // ── (W4a) wechat 渠道 429 限流（瞬态 4xx，结果不可知）→ 保持 pending 收敛（第二轮审查 High）──
+    const W4a = await makePaidOrder('w4a', 'wechat')
+    wechatRefundCreateResponse = { httpStatus: 429 }
+    const w4aView = await refundService.refund(W4a.orderId, { reason: '用户申请退款' })
+    if (
+      w4aView.refund.status === 'pending' &&
+      (await orderState(W4a.orderId)).payStatus === 'refunding' &&
+      (await auditCount('refund.channel_ambiguous', W4a.orderId)) === 1
+    ) {
+      pass('渠道 429 限流（瞬态 4xx）：保持 pending+refunding（绝不判失败）')
+    } else {
+      fail(`transient 429 mishandled: ${JSON.stringify({ status: w4aView.refund.status })}`)
+    }
+    const w4aRefundId = `wxrfd_429_${randomBytes(6).toString('hex')}`
+    wechatRefundQueryResponse = { body: { status: 'SUCCESS', refund_id: w4aRefundId } }
+    wechatRefundCreateResponse = {}
+    const w4aDone = await refundService.refund(W4a.orderId, { reason: '重复请求' })
+    if (w4aDone.refund.status === 'success' && (await orderState(W4a.orderId)).payStatus === 'refunded') {
+      pass('429 后查证收敛到 refunded')
+    } else {
+      fail('429 convergence failed')
+    }
+    wechatRefundQueryResponse = { body: { status: 'PROCESSING' } }
+
     // ── (W4b) wechat 渠道 4xx 明确业务拒绝 → failed 回滚 + channel_error 审计 ──
     const W4b = await makePaidOrder('w4b', 'wechat')
     wechatRefundCreateResponse = { httpStatus: 400 }

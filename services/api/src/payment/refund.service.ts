@@ -79,12 +79,18 @@ function isDefinitiveChannelRejection(e: unknown): boolean {
   // 渠道返回了可解析的业务错误码（providers 统一以 *_CHANNEL_ERROR: <code> 抛出）。
   if (msg.includes('CHANNEL_ERROR:')) {
     if (/HTTP_5\d\d/.test(msg)) return false // 5xx：渠道内部错误，结果不可知
-    // 渠道自述「结果未知/请同参数重试」的业务码：wechat SYSTEM_ERROR / alipay code=20000。
-    if (msg.includes('SYSTEM_ERROR') || /CHANNEL_ERROR:\s*20000\b/.test(msg)) return false
+    // 瞬态 4xx（第二轮审查 High 修复）：408 超时 / 409 冲突 / 425 too-early / 429 限流 ——
+    // 请求可能已被渠道受理或稍后可重试，均按结果不可知处理，绝不回滚为明确失败。
+    if (/HTTP_(408|409|425|429)\b/.test(msg)) return false
+    // 渠道自述「结果未知/请同参数重试/频控」的业务码：wechat SYSTEM_ERROR、FREQUENCY_LIMITED /
+    // alipay code=20000。
+    if (msg.includes('SYSTEM_ERROR') || msg.includes('FREQUENCY_LIMITED') || /CHANNEL_ERROR:\s*20000\b/.test(msg)) {
+      return false
+    }
     if (msg.includes('RESPONSE_NOT_JSON') || msg.includes('RESPONSE_NODE_MISSING') || msg.includes('RESPONSE_SIGN_INVALID')) {
       return false // 响应损坏/不可验签：请求可能已被处理，结果不可知
     }
-    return true // 4xx / 明确业务 sub_code：渠道明确拒绝，未出款
+    return true // 其余 4xx / 明确业务 sub_code：渠道明确拒绝，未出款
   }
   return false // fetch/超时/连接异常等传输层错误：结果不可知
 }
@@ -138,20 +144,27 @@ export class RefundService {
     // ③ 阶段一：CAS paid→refunding + 建 Refund(pending)。refundNo 唯一兜底并发幂等。
     let refund: RefundRecord
     try {
-      refund = await this.prisma.$transaction(async (tx) => {
+      const staged = await this.prisma.$transaction(async (tx) => {
         const cas = await tx.order.updateMany({
           where: { id: orderId, payStatus: 'paid' },
           data: { payStatus: 'refunding' },
         })
         if (cas.count === 0) {
+          // 同 refundNo 并发竞态（第二轮审查 M2 修复）：先发方可能刚过①闸建好同号记录 ——
+          // 幂等返回既有记录，而不是对合法重试方报 ORDER_ALREADY_REFUNDED。
+          const raced = await tx.refund.findUnique({ where: { refundNo } })
+          if (raced) return { record: raced, raced: true as const }
           const fresh = await tx.order.findUnique({ where: { id: orderId } })
           if (fresh && ALREADY_REFUND_STATES.has(fresh.payStatus)) throw new BadRequestException('ORDER_ALREADY_REFUNDED')
           throw new BadRequestException('ORDER_INVALID_TRANSITION')
         }
-        return tx.refund.create({
+        const record = await tx.refund.create({
           data: { orderId, refundNo, amountCents, status: 'pending', reason, channel, operatorId: opts.operatorId ?? null },
         })
+        return { record, raced: false as const }
       })
+      if (staged.raced) return this.toView(staged.record, await this.requireOrder(orderId), true)
+      refund = staged.record
     } catch (e) {
       if (isRefundNoConflict(e)) {
         const ex = await this.prisma.refund.findUnique({ where: { refundNo } })
@@ -341,11 +354,19 @@ export class RefundService {
     throw new BadRequestException(code)
   }
 
-  /** 退款明确失败统一回滚：Refund→failed、订单 refunding→paid，同事务（审查 M1：防半状态）。 */
+  /**
+   * 退款明确失败统一回滚：Refund pending→failed 命中时才回滚订单 refunding→paid，同事务
+   * （第一轮 M1：防半状态；第二轮 L1：CAS 未命中说明记录已被他方推进，不得把订单拉回 paid）。
+   */
   private async rollbackRefundFailure(refundId: string, orderId: string, channelRefundNo: string | null): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await tx.refund.updateMany({ where: { id: refundId, status: 'pending' }, data: { status: 'failed', channelRefundNo } })
-      await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: { payStatus: 'paid' } })
+      const cas = await tx.refund.updateMany({
+        where: { id: refundId, status: 'pending' },
+        data: { status: 'failed', channelRefundNo },
+      })
+      if (cas.count > 0) {
+        await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: { payStatus: 'paid' } })
+      }
     })
   }
 
