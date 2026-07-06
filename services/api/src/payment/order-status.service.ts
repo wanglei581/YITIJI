@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { C52_ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
+import { ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
 
 /** Order 行类型（从 prisma delegate 推导，避免直接 import 生成 client 类型）。 */
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -152,8 +152,9 @@ export class OrderStatusService {
     opts: { channel: PaymentChannel; attemptId: string; channelTxnNo: string; late: boolean },
   ): Promise<OrderRecord> {
     const { channel, attemptId, channelTxnNo } = opts
-    if (!(C52_ONLINE_PAYMENT_CHANNELS as readonly string[]).includes(channel)) {
-      // 防御纵深：wechat/alipay/benefit 及任意未知通道在此按名拦截（C5-6 前不放行）。
+    if (!(ONLINE_PAYMENT_CHANNELS as readonly string[]).includes(channel)) {
+      // 防御纵深：benefit / offline 及任意未知通道在此按名拦截；
+      // 白名单 = sandbox / wechat / alipay（C5-6），且只有本方法可写这些 paymentSource。
       throw new BadRequestException('PAYMENT_CHANNEL_INVALID')
     }
 

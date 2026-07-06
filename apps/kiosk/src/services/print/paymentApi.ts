@@ -14,11 +14,19 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
-import type { PayAttemptView, PayStatusView } from '@ai-job-print/shared'
+import type { PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
 
 export interface PaymentSessionInput {
   orderId: string
   paymentSessionToken?: string | null
+}
+
+/** 查询服务端已启用的支付通道（无密钥信息；收银页据此渲染通道选择）。 */
+export async function fetchPaymentChannels(): Promise<string[]> {
+  const res = await fetch(`${API_BASE_URL}/payment/channels`)
+  if (!res.ok) throw new Error(`fetchPaymentChannels failed: ${res.status} ${await readError(res)}`)
+  const body = (await res.json()) as PaymentChannelsView
+  return Array.isArray(body.channels) ? body.channels.map(String) : []
 }
 
 async function readError(res: Response): Promise<string> {
@@ -40,14 +48,31 @@ function paymentSessionHeaders(input: PaymentSessionInput): Record<string, strin
   return input.paymentSessionToken ? { 'x-payment-session-token': input.paymentSessionToken } : {}
 }
 
-/** 出码：为付费订单创建（或幂等复用未过期的）支付尝试，返回屏上动态码内容。 */
-export async function createPayAttempt(input: PaymentSessionInput): Promise<PayAttemptView> {
+/**
+ * 出码：为付费订单创建（或幂等复用未过期的）支付尝试，返回屏上动态码内容。
+ * `channel` 只能取服务端已启用通道（fetchPaymentChannels）；多通道时必须显式指定。
+ */
+export async function createPayAttempt(input: PaymentSessionInput & { channel?: string }): Promise<PayAttemptView> {
   const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+    body: JSON.stringify(input.channel ? { channel: input.channel } : {}),
   })
   if (!res.ok) throw new Error(`createPayAttempt failed: ${res.status} ${await readError(res)}`)
   return res.json() as Promise<PayAttemptView>
+}
+
+/**
+ * 主动查单兜底（C5-6）：回调丢失/延迟时按渠道账本核实（服务端限最小间隔）。
+ * 只有真实渠道支持；sandbox 返回 RECONCILE_UNSUPPORTED。绝不据此在前端伪造已支付。
+ */
+export async function reconcilePayment(input: PaymentSessionInput): Promise<PayStatusView> {
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/pay/reconcile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+  })
+  if (!res.ok) throw new Error(`reconcilePayment failed: ${res.status} ${await readError(res)}`)
+  return res.json() as Promise<PayStatusView>
 }
 
 /** 查询支付状态（收银页轮询用）；paid 且可见时返回 pickupCode。 */

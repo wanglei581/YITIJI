@@ -36,6 +36,20 @@ export interface CashierView {
   canProceed: boolean
 }
 
+/** 通道展示名（C5-6：真实渠道品牌文案；sandbox 必须明示测试通道）。 */
+export const PAY_CHANNEL_LABEL: Record<string, string> = {
+  sandbox: '测试支付通道',
+  wechat: '微信支付',
+  alipay: '支付宝',
+}
+
+/** 待扫码提示（按通道给出真实指引；sandbox 必须明示非真实收款，不伪装线上收款）。 */
+function awaitingScanHint(channel: string | null): string {
+  if (channel === 'wechat') return '请打开微信「扫一扫」，扫描下方二维码完成支付。'
+  if (channel === 'alipay') return '请打开支付宝「扫一扫」，扫描下方二维码完成支付。'
+  return '请使用手机扫描下方动态码完成支付（测试支付通道，非真实收款）。'
+}
+
 /** 金额（分）→ 人民币展示串。整数分，绝不浮点误差累积。 */
 export function formatCents(cents: number): string {
   const safe = Number.isFinite(cents) ? Math.round(cents) : 0
@@ -82,7 +96,7 @@ export function deriveCashierView(
     return {
       phase: 'awaiting_scan',
       title: '请扫码支付',
-      hint: '请使用手机扫描下方动态码完成支付（测试支付通道，非真实收款）。',
+      hint: awaitingScanHint(attempt?.channel ?? null),
       tone: 'info',
       showQr: true,
       canReissue: false,

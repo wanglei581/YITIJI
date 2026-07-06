@@ -42,11 +42,13 @@ export type OrderPayStatus =
  *   Admin mark-paid / 任何手工动作禁止写入；生产环境启动门禁禁用 sandbox Provider）
  * - `voucher`：C5-4 券 / 免费次数 / 会员权益**全额核销单**入账（**非资金**；只能由核销路径
  *   `OrderStatusService.markPaidByRedemption` 写入，Admin mark-paid / markPaidOnline 禁写）
+ * - `wechat` / `alipay`：C5-6 真实渠道线上收款（**真实资金**；只能由
+ *   `OrderStatusService.markPaidOnline` 在回调验签/查单确认全部通过后写入，
+ *   Admin mark-paid / markPaid / markPaidByRedemption 一律按名拒绝）
  *
- * `wechat` / `alipay` / `benefit` 均为未来扩展（C5-6），**继续按名禁止写入**，
- * 故不纳入本联合类型；待真实渠道适配再扩展。
+ * `benefit` 仍为未来扩展占位，**继续按名禁止写入**，不纳入本联合类型。
  */
-export type PaymentSource = 'offline' | 'free' | 'manual_confirmed' | 'sandbox' | 'voucher'
+export type PaymentSource = 'offline' | 'free' | 'manual_confirmed' | 'sandbox' | 'voucher' | 'wechat' | 'alipay'
 
 /** P0a 允许写入的 paymentSource 白名单（**markPaid 线下路径**专用；sandbox/voucher 各有独立入账路径，禁经 markPaid 写）。 */
 export const P0A_ALLOWED_PAYMENT_SOURCES: readonly PaymentSource[] = [
@@ -56,11 +58,16 @@ export const P0A_ALLOWED_PAYMENT_SOURCES: readonly PaymentSource[] = [
 ] as const
 
 /**
- * C5-2 线上支付通道白名单（同时是线上入账 paymentSource 的唯一合法取值）。
- * 本波只有 sandbox；wechat / alipay 到 C5-6 真实渠道适配才允许出现。
+ * 线上支付通道白名单（同时是线上入账 paymentSource 的唯一合法取值集）。
+ * - `sandbox`：C5-2 测试通道（非真实资金；生产启动门禁禁用）。
+ * - `wechat` / `alipay`：C5-6 真实渠道（微信 Native 动态码 / 支付宝当面付 precreate）。
+ * 运行时实际可用通道由服务端 `PAYMENT_PROVIDER` 配置决定（未配置的通道 fail-closed 拒绝），
+ * 本类型只是全集；sandbox 与真实通道互斥，绝不混跑。
  */
-export type PaymentChannel = 'sandbox'
-export const C52_ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ['sandbox'] as const
+export type PaymentChannel = 'sandbox' | 'wechat' | 'alipay'
+export const ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ['sandbox', 'wechat', 'alipay'] as const
+/** @deprecated C5-2 旧名；C5-6 起等价于 {@link ONLINE_PAYMENT_CHANNELS}，留作兼容引用。 */
+export const C52_ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ONLINE_PAYMENT_CHANNELS
 
 /** 支付尝试状态（对齐 `PaymentAttempt.status`）。 */
 export type PaymentAttemptStatus = 'created' | 'pending' | 'success' | 'failed' | 'expired'

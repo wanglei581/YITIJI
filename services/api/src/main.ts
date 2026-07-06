@@ -3,30 +3,13 @@ import 'dotenv/config'
 import { NestFactory } from '@nestjs/core'
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
-import type { Request, Response } from 'express'
 import helmet from 'helmet'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
+import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
 
-/**
- * 保留 webhook / 支付回调路由的 raw body 供 HMAC 校验。
- *
- * Express body-parser 默认 parse 完就丢 raw,但 sync.controller 与 payment 回调必须用
- * raw bytes 重算 HMAC 才能与签名对齐(对 parsed object 重新 JSON.stringify 字段顺序
- * 可能不同,字符级会变,签名失败)。
- *
- * 只对 /api/v1/sync/* 与 /api/v1/payment/callback/* 启用,其他路由不背成本。
- */
-interface RawBodyRequest extends Request {
-  rawBody?: Buffer
-}
-function rawBodyCaptureFor(prefixes: readonly string[]) {
-  return (req: RawBodyRequest, _res: Response, buf: Buffer): void => {
-    if (prefixes.some((prefix) => req.url.startsWith(prefix))) {
-      req.rawBody = Buffer.from(buf)
-    }
-  }
-}
+// rawBody 捕获与 body parser 装配已抽到 config/body-parsers.ts（与 verify 脚本共用，
+// 防真实入口与测试口径漂移 —— C5-6 双模型审查修复的守护点）。
 
 /**
  * 把 class-validator 的嵌套 ValidationError[] 扁平为路径化字符串数组。
@@ -63,12 +46,11 @@ async function bootstrap(): Promise<void> {
     // express 接管 json body parser,带 verify 回调写入 req.rawBody
     bodyParser: false,
   })
-  // 手动装 json parser:对 sync webhook 与支付回调路径保留 rawBody;其他路由忽略。
+  // 手动装 json + urlencoded parser：对 sync webhook 与支付回调路径保留 rawBody（alipay notify
+  // 是 form-urlencoded，两个 parser 都必须挂 verify —— C5-6 双模型审查修复）。装配实现与
+  // verify 脚本共用 config/body-parsers.ts，防真实入口与测试口径漂移。
   // path-prefix 包含 api/v1 因为这是 setGlobalPrefix 之前的原始 url。
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const express = require('express') as typeof import('express')
-  app.use(express.json({ verify: rawBodyCaptureFor(['/api/v1/sync/', '/api/v1/payment/callback/']) }))
-  app.use(express.urlencoded({ extended: true }))
+  installBodyParsers(app)
   app.setGlobalPrefix('api/v1')
 
   // Helmet：设置安全响应头（CSP / X-Frame-Options / HSTS 等）。

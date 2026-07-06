@@ -15,7 +15,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { PrismaService } from '../prisma/prisma.service'
-import { PAYMENT_PROVIDER_TOKEN } from './payment-provider.factory'
+import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
 import type { PaymentProvider } from './payment-provider.types'
 
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
@@ -58,7 +58,7 @@ export class RefundService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Inject(PAYMENT_PROVIDER_TOKEN) private readonly provider: PaymentProvider | null,
+    @Inject(PAYMENT_PROVIDER_TOKEN) private readonly registry: PaymentProviderRegistry,
   ) {}
 
   /**
@@ -119,7 +119,7 @@ export class RefundService {
     // ④ 阶段二：执行退款。sandbox 调 provider；offline/manual_confirmed/free/voucher 不调 provider。
     let channelRefundNo: string | null = null
     if (PROVIDER_REFUND_CHANNELS.has(channel)) {
-      const provider = this.requireProvider()
+      const provider = this.requireProvider(channel)
       const res = await provider.refund({ orderId: order.id, orderNo: order.orderNo, refundNo, amountCents })
       channelRefundNo = res.channelRefundNo
       if (res.status !== 'success') {
@@ -157,9 +157,10 @@ export class RefundService {
     return this.toView(finalRefund ?? refund, order, false)
   }
 
-  private requireProvider(): PaymentProvider {
-    if (!this.provider) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
-    return this.provider
+  private requireProvider(channel: string): PaymentProvider {
+    const provider = this.registry.get(channel)
+    if (!provider) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
+    return provider
   }
 
   private async requireOrder(orderId: string): Promise<OrderRecord> {

@@ -32,20 +32,26 @@ export type OrderPayStatus =
  * 支付来源 —— 表示资金性质，绝不伪装线上真实收款：
  * offline（线下收款）/ free（免费单）/ manual_confirmed（管理员人工确认）/
  * sandbox（C5-2 沙箱测试通道入账，**非真实资金**，只能由回调成功入账路径写入）/
- * voucher（C5-4 券/免费次数/权益全额核销单，**非资金**，只能由核销路径 markPaidByRedemption 写入）。
- * `wechat` / `alipay` / `benefit` 为未来扩展（C5-6），**继续按名禁止写入**。
+ * voucher（C5-4 券/免费次数/权益全额核销单，**非资金**，只能由核销路径 markPaidByRedemption 写入）/
+ * wechat / alipay（C5-6 真实渠道线上收款，**真实资金**，只能由 markPaidOnline 在
+ * 回调验签/查单确认全部通过后写入；markPaid / markPaidByRedemption 一律按名拒绝）。
+ * `benefit` 仍为未来扩展占位，**继续按名禁止写入**。
  */
-export type PaymentSource = 'offline' | 'free' | 'manual_confirmed' | 'sandbox' | 'voucher'
+export type PaymentSource = 'offline' | 'free' | 'manual_confirmed' | 'sandbox' | 'voucher' | 'wechat' | 'alipay'
 
 /** P0a 允许写入的 paymentSource 白名单（**markPaid 线下路径**专用，voucher/sandbox 各有独立入账路径，禁经 markPaid 写）。 */
 export const P0A_ALLOWED_PAYMENT_SOURCES: readonly PaymentSource[] = ['offline', 'free', 'manual_confirmed'] as const
 
 /**
- * C5-2 线上支付通道白名单（同时是线上入账 paymentSource 的唯一合法取值）。
- * 本波只有 sandbox；wechat / alipay 到 C5-6 真实渠道适配才允许出现。
+ * 线上支付通道白名单（同时是线上入账 paymentSource 的唯一合法取值集）。
+ * sandbox = C5-2 测试通道（非真实资金；生产禁用）；wechat / alipay = C5-6 真实渠道。
+ * 运行时实际可用通道由 `PAYMENT_PROVIDER` 配置决定（未配置通道 fail-closed 拒绝）；
+ * sandbox 与真实通道互斥，绝不混跑。
  */
-export type PaymentChannel = 'sandbox'
-export const C52_ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ['sandbox'] as const
+export type PaymentChannel = 'sandbox' | 'wechat' | 'alipay'
+export const ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ['sandbox', 'wechat', 'alipay'] as const
+/** @deprecated C5-2 旧名；C5-6 起等价于 {@link ONLINE_PAYMENT_CHANNELS}，留作兼容引用。 */
+export const C52_ONLINE_PAYMENT_CHANNELS: readonly PaymentChannel[] = ONLINE_PAYMENT_CHANNELS
 
 /** 支付尝试状态（对齐 `PaymentAttempt.status`）。 */
 export type PaymentAttemptStatus = 'created' | 'pending' | 'success' | 'failed' | 'expired'

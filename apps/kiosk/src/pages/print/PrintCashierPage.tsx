@@ -1,13 +1,16 @@
 // ============================================================
-// PrintCashierPage — C5-3 Kiosk 收银 / 支付状态轮询
+// PrintCashierPage — C5-3 Kiosk 收银 / 支付状态轮询（C5-6 扩微信/支付宝真实通道）
 //
 // 流程（仅 API_MODE==='http'，付费单 amountCents>0）：
-//   进入本页 → POST /orders/:id/pay 出码 → 展示价目明细 + 屏上动态码
-//   → 每 2.5s 轮询 GET /orders/:id/pay-status → paid → 进入 /print/progress 履约。
+//   进入本页 → GET /payment/channels 取已启用通道（多通道时用户显式选择）
+//   → POST /orders/:id/pay 出码 → 展示价目明细 + 屏上动态码
+//   → 每 2.5s 轮询 GET /orders/:id/pay-status → paid → 进入 /print/progress 履约；
+//   真实通道另提供「已支付但未跳转？」reconcile 兜底（服务端按渠道账本核实，限最小间隔）。
 //
 // 合规硬约束（CLAUDE.md §9/§12 + 决策 3）：
 // - 仅 paid 才允许进入出纸/取件（deriveCashierView.canProceed）；unpaid/paying/closed/refunded 不放行。
-// - 沙箱为**测试支付通道**，页面明示；DEV 构建才渲染「模拟支付」控件，生产构建自动移除。
+// - sandbox 为**测试支付通道**，页面明示「非真实收款」；wechat/alipay 展示真实品牌指引。
+// - DEV 构建且当前尝试为 sandbox 时才渲染「模拟支付」控件，生产构建自动移除；真实通道无任何模拟入口。
 // - 不自助退款（C5-4）：仅静态展示退款/重试规则文案，不放假的退款入口。
 // ============================================================
 
@@ -15,12 +18,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon, LoaderIcon, RefreshCwIcon, ShieldCheckIcon } from 'lucide-react'
+import { AlertCircleIcon, InfoIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
-import { createPayAttempt, getPayStatus, simulateSandboxPayment } from '../../services/print/paymentApi'
-import { deriveCashierView, formatCents, type CashierView } from './cashierStatus'
+import {
+  createPayAttempt,
+  fetchPaymentChannels,
+  getPayStatus,
+  reconcilePayment,
+  simulateSandboxPayment,
+} from '../../services/print/paymentApi'
+import { deriveCashierView, formatCents, PAY_CHANNEL_LABEL, type CashierView } from './cashierStatus'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 
 interface CashierLocationState {
@@ -39,7 +48,13 @@ interface CashierLocationState {
 /** 支付尝试快照（出码响应与轮询响应共用的最小形态，喂给 deriveCashierView）。 */
 type Snapshot = {
   payStatus: string
-  attempt: { attemptId: string; status: 'created' | 'pending' | 'success' | 'failed' | 'expired'; qrCodeContent: string | null; expiresAt: string | null } | null
+  attempt: {
+    attemptId: string
+    channel: string
+    status: 'created' | 'pending' | 'success' | 'failed' | 'expired'
+    qrCodeContent: string | null
+    expiresAt: string | null
+  } | null
 }
 
 const POLL_INTERVAL_MS = 2500
@@ -79,6 +94,10 @@ export function PrintCashierPage() {
   const [issueError, setIssueError] = useState<string | null>(null)
   const [issuing, setIssuing] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  /** 服务端已启用通道；null=加载中。多通道时用户显式选择后才出码。 */
+  const [channels, setChannels] = useState<string[] | null>(null)
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
+  const [reconciling, setReconciling] = useState(false)
   const navigatedRef = useRef(false)
   const cancelRef = useRef(false)
 
@@ -90,36 +109,73 @@ export function PrintCashierPage() {
     navigate('/print/progress', { state: { ...state } })
   }, [navigate, state])
 
-  // ── 出码（建/幂等复用支付尝试）──
-  const issue = useCallback(async () => {
-    if (!orderId || !paymentSessionToken) return
-    setIssuing(true)
-    try {
-      const res = await createPayAttempt({ orderId, paymentSessionToken })
-      if (cancelRef.current) return
-      setSnapshot({
-        payStatus: res.orderPayStatus,
-        attempt: { attemptId: res.attemptId, status: res.status, qrCodeContent: res.qrCodeContent, expiresAt: res.expiresAt },
-      })
-      setIssueError(null)
-    } catch (err) {
-      if (cancelRef.current) return
-      // 出码失败不阻断轮询（订单可能已 paid/closed，轮询会反映真实状态）；仅提示。
-      setIssueError(err instanceof Error ? err.message : '出码失败，请重试')
-    } finally {
-      if (!cancelRef.current) setIssuing(false)
-    }
-  }, [orderId, paymentSessionToken])
+  // ── 出码（建/幂等复用支付尝试；channel 只能取服务端已启用通道）──
+  const issue = useCallback(
+    async (channel: string) => {
+      if (!orderId || !paymentSessionToken) return
+      setIssuing(true)
+      try {
+        const res = await createPayAttempt({ orderId, paymentSessionToken, channel })
+        if (cancelRef.current) return
+        setSnapshot({
+          payStatus: res.orderPayStatus,
+          attempt: {
+            attemptId: res.attemptId,
+            channel: res.channel,
+            status: res.status,
+            qrCodeContent: res.qrCodeContent,
+            expiresAt: res.expiresAt,
+          },
+        })
+        setIssueError(null)
+      } catch (err) {
+        if (cancelRef.current) return
+        // 出码失败不阻断轮询（订单可能已 paid/closed，轮询会反映真实状态）；仅提示。
+        setIssueError(err instanceof Error ? err.message : '出码失败，请重试')
+      } finally {
+        if (!cancelRef.current) setIssuing(false)
+      }
+    },
+    [orderId, paymentSessionToken],
+  )
 
-  // 首次进入：出码一次。
+  // 首次进入：取已启用通道 → 默认选第一个 → 出码。
   useEffect(() => {
     if (API_MODE !== 'http' || !orderId || !paymentSessionToken || amountCents === null || amountCents <= 0) return
     cancelRef.current = false
-    void issue()
+    void (async () => {
+      try {
+        const list = await fetchPaymentChannels()
+        if (cancelRef.current) return
+        setChannels(list)
+        const first = list[0] ?? null
+        setSelectedChannel(first)
+        if (first) {
+          await issue(first)
+        } else {
+          setIssueError('线上支付未开通，请联系现场工作人员')
+        }
+      } catch (err) {
+        if (cancelRef.current) return
+        setChannels([])
+        setIssueError(err instanceof Error ? err.message : '获取支付通道失败')
+      }
+    })()
     return () => {
       cancelRef.current = true
     }
   }, [orderId, paymentSessionToken, amountCents, issue])
+
+  // 切换支付通道：立即为所选通道出码（旧通道未过期尝试留在服务端，仍可被其回调正常入账）。
+  const switchChannel = useCallback(
+    (channel: string) => {
+      if (channel === selectedChannel || issuing) return
+      setSelectedChannel(channel)
+      setSnapshot(null)
+      void issue(channel)
+    },
+    [selectedChannel, issuing, issue],
+  )
 
   // ── 轮询支付状态 ──
   useEffect(() => {
@@ -159,9 +215,29 @@ export function PrintCashierPage() {
   }, [view, expiresAt, nowMs])
 
   const handleReissue = useCallback(() => {
+    if (!selectedChannel) return
     setSnapshot(null)
-    void issue()
-  }, [issue])
+    void issue(selectedChannel)
+  }, [issue, selectedChannel])
+
+  // ── reconcile 兜底（仅真实通道）：回调丢失/延迟时按渠道账本核实；绝不在前端伪造已支付 ──
+  const handleReconcile = useCallback(async () => {
+    if (!orderId || !paymentSessionToken || reconciling) return
+    setReconciling(true)
+    try {
+      const s = await reconcilePayment({ orderId, paymentSessionToken })
+      if (cancelRef.current) return
+      setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
+      if (s.payStatus === 'paid') proceedToPrint()
+      else setIssueError(null)
+    } catch (err) {
+      if (cancelRef.current) return
+      const msg = err instanceof Error ? err.message : ''
+      setIssueError(msg.includes('RECONCILE_TOO_FREQUENT') ? '核实过于频繁，请稍候几秒再试' : '暂未查到支付结果，请稍候或继续等待自动确认')
+    } finally {
+      if (!cancelRef.current) setReconciling(false)
+    }
+  }, [orderId, paymentSessionToken, reconciling, proceedToPrint])
 
   const devSimulate = useCallback(
     async (result: 'success' | 'failed') => {
@@ -265,12 +341,35 @@ export function PrintCashierPage() {
           </div>
         </Card>
 
+        {/* 支付通道选择（多通道时显式选择；触控目标 ≥56px） */}
+        {channels !== null && channels.length > 1 && (
+          <div className="flex gap-3">
+            {channels.map((ch) => (
+              <button
+                key={ch}
+                onClick={() => switchChannel(ch)}
+                disabled={issuing}
+                className={[
+                  'min-h-[56px] flex-1 rounded-xl border-2 px-4 text-base font-semibold transition-colors',
+                  selectedChannel === ch
+                    ? 'border-primary-600 bg-primary-50 text-primary-700'
+                    : 'border-neutral-200 bg-white text-neutral-600',
+                ].join(' ')}
+              >
+                {PAY_CHANNEL_LABEL[ch] ?? ch}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* 状态 + 动态码 */}
         <Card className="flex flex-col items-center gap-4 p-6">
           {!view ? (
             <div className="flex flex-col items-center gap-3 py-8 text-neutral-500">
               <LoaderIcon className="h-8 w-8 animate-spin text-primary-600" />
-              <p className="text-sm">{issuing ? '正在生成支付码…' : '正在获取支付状态…'}</p>
+              <p className="text-sm">
+                {channels === null ? '正在获取支付通道…' : issuing ? '正在生成支付码…' : '正在获取支付状态…'}
+              </p>
             </div>
           ) : (
             <>
@@ -286,13 +385,29 @@ export function PrintCashierPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-neutral-400">
                     <ShieldCheckIcon className="h-3.5 w-3.5" />
-                    测试支付通道 · 非真实收款
+                    {snapshot?.attempt?.channel === 'sandbox'
+                      ? '测试支付通道 · 非真实收款'
+                      : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
                   </div>
                   {remainSec !== null && (
                     <p className="text-xs text-neutral-400">支付码有效期剩余 {remainSec} 秒</p>
                   )}
                 </div>
               )}
+
+              {/* reconcile 兜底（仅真实通道，等待扫码/回调阶段可用）：按渠道账本核实，不伪造状态 */}
+              {view.phase === 'awaiting_scan' &&
+                snapshot?.attempt?.channel !== undefined &&
+                snapshot.attempt.channel !== 'sandbox' && (
+                  <button
+                    onClick={() => void handleReconcile()}
+                    disabled={reconciling}
+                    className="flex min-h-[48px] items-center gap-2 rounded-lg border border-neutral-200 px-4 text-sm text-neutral-600"
+                  >
+                    <SearchCheckIcon className={['h-4 w-4', reconciling ? 'animate-pulse' : ''].join(' ')} />
+                    {reconciling ? '正在向支付渠道核实…' : '已完成支付但未跳转？点此核实'}
+                  </button>
+                )}
 
               {canReissue && (
                 <Button variant="secondary" size="lg" disabled={issuing} onClick={handleReissue}>
@@ -322,8 +437,8 @@ export function PrintCashierPage() {
           </div>
         )}
 
-        {/* DEV 专用：沙箱模拟支付（生产构建自动移除） */}
-        {import.meta.env.DEV && snapshot?.attempt?.attemptId && !canProceed && (
+        {/* DEV 专用：沙箱模拟支付（生产构建自动移除；仅 sandbox 尝试渲染，真实通道无任何模拟入口） */}
+        {import.meta.env.DEV && snapshot?.attempt?.attemptId && snapshot.attempt.channel === 'sandbox' && !canProceed && (
           <div className="flex gap-2 rounded-lg border border-dashed border-warning/40 bg-warning-bg/40 p-3">
             <span className="self-center text-xs text-warning-fg">[DEV] 沙箱模拟</span>
             <button

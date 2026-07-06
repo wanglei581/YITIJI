@@ -27,7 +27,7 @@ import type { AdminMarkPaidDto } from '../src/payment/dto/order-action.dto'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
-import { resolvePaymentProvider } from '../src/payment/payment-provider.factory'
+import { PaymentProviderRegistry, resolvePaymentProvider } from '../src/payment/payment-provider.factory'
 import { buildPaymentCallbackPath } from '../src/payment/payment-provider.types'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
@@ -125,8 +125,8 @@ async function main(): Promise<void> {
   const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus)
   const provider = new SandboxPaymentProvider(VERIFY_SECRET)
-  const payment = new OnlinePaymentService(prisma, audit, orderStatus, provider)
-  const paymentDisabled = new OnlinePaymentService(prisma, audit, orderStatus, null)
+  const payment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([provider]))
+  const paymentDisabled = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([]))
   const adminCtl = new AdminOrderActionsController(orderStatus)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
@@ -588,7 +588,9 @@ async function main(): Promise<void> {
       )
     }
     const orderF2Id = await makeOrder(80)
-    for (const badChannel of ['wechat', 'alipay', 'benefit', 'offline']) {
+    // C5-6 起 wechat / alipay 进入 markPaidOnline 白名单（仅回调/查单确认路径调用）；
+    // benefit / offline / 未知通道继续按名拒绝。
+    for (const badChannel of ['benefit', 'offline', 'voucher', 'free']) {
       await expectCode(`markPaidOnline rejects channel=${badChannel} by name`, 'PAYMENT_CHANNEL_INVALID', () =>
         orderStatus.markPaidOnline(orderF2Id, {
           channel: badChannel as never,
@@ -606,8 +608,30 @@ async function main(): Promise<void> {
     expectThrowSync('sandbox provider with short secret fails closed', 'SANDBOX_PAYMENT_SECRET_INVALID', () =>
       resolvePaymentProvider({ PAYMENT_PROVIDER: 'sandbox', SANDBOX_PAYMENT_SECRET: 'short' } as NodeJS.ProcessEnv),
     )
-    expectThrowSync('live channel values are refused before C5-6 (PAYMENT_PROVIDER_INVALID)', 'PAYMENT_PROVIDER_INVALID', () =>
+    // C5-6：真实通道取值合法，但缺关键配置必须 fail-closed（绝不带残缺配置跑真实资金通道）。
+    expectThrowSync('wechat without notify base fails closed', 'PAYMENT_NOTIFY_BASE_URL_MISSING', () =>
       resolvePaymentProvider({ PAYMENT_PROVIDER: 'wechat' } as NodeJS.ProcessEnv),
+    )
+    expectThrowSync('wechat with notify base but missing merchant config fails closed', 'WECHAT_PAY_CONFIG_INVALID', () =>
+      resolvePaymentProvider({
+        PAYMENT_PROVIDER: 'wechat',
+        PAYMENT_NOTIFY_BASE_URL: 'https://pay.example.com',
+      } as NodeJS.ProcessEnv),
+    )
+    expectThrowSync('alipay missing merchant config fails closed', 'ALIPAY_CONFIG_INVALID', () =>
+      resolvePaymentProvider({
+        PAYMENT_PROVIDER: 'alipay',
+        PAYMENT_NOTIFY_BASE_URL: 'https://pay.example.com',
+      } as NodeJS.ProcessEnv),
+    )
+    expectThrowSync('unknown provider value refused (PAYMENT_PROVIDER_INVALID)', 'PAYMENT_PROVIDER_INVALID', () =>
+      resolvePaymentProvider({ PAYMENT_PROVIDER: 'paypal' } as NodeJS.ProcessEnv),
+    )
+    expectThrowSync('sandbox must not mix with real channels', 'PAYMENT_PROVIDER_SANDBOX_EXCLUSIVE', () =>
+      resolvePaymentProvider({
+        PAYMENT_PROVIDER: 'sandbox,wechat',
+        SANDBOX_PAYMENT_SECRET: VERIFY_SECRET,
+      } as NodeJS.ProcessEnv),
     )
     expectThrowSync('production + sandbox provider refuses to start (factory guard)', 'PAYMENT_PROVIDER_SANDBOX_FORBIDDEN_IN_PRODUCTION', () =>
       resolvePaymentProvider({
@@ -643,6 +667,7 @@ async function main(): Promise<void> {
       AI_PROVIDER: 'llm',
       AI_LLM_API_KEY: 'x',
       PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
+      PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true', // C5-6：生产必须显式声明
     }
     expectThrowSync('production runtime gates reject missing PAYMENT_SESSION_SECRET', 'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID', () =>
       assertProductionRuntimeGates({ ...prodEnvBase, PAYMENT_SESSION_SECRET: undefined }),
