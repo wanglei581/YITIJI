@@ -42,7 +42,8 @@
     "verify:job-ai-ui": "node scripts/verify-job-ai-ui.mjs",
     "verify:job-ai-history-privacy-ui": "node scripts/verify-job-ai-history-privacy-ui.mjs",
     "verify:jobfair-commercial-closure": "node scripts/verify-jobfair-commercial-closure.mjs",
-    "verify:jobfair-checkin": "node scripts/verify-jobfair-checkin.mjs"
+    "verify:jobfair-checkin": "node scripts/verify-jobfair-checkin.mjs",
+    "verify:price-single-source": "node scripts/verify-price-single-source.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

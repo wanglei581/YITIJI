@@ -80,3 +80,23 @@ export interface PrintPriceQuote {
   billingPageSource: BillingPageSource
   lines: PrintPriceLine[]
 }
+
+/** 公开价目单项（W-A：`GET /print/price-config`；只含安全展示字段）。 */
+export interface PrintPriceConfigItem {
+  /** 价目项键，如 print_bw_page / print_color_page。 */
+  serviceKey: string
+  /** 单价（分），>= 0。 */
+  unitCents: number
+  /** 计价单位：'page' | 'copy' | 'item'。 */
+  unit: string
+  description: string | null
+}
+
+/**
+ * 公开价目视图（W-A 价格真相源统一）：Kiosk 预览/确认页展示价的唯一来源。
+ * `billingEnabled` 为政企 E1「整机免费模式」预留位（当前恒 true）。
+ */
+export interface PrintPriceConfigView {
+  billingEnabled: boolean
+  items: PrintPriceConfigItem[]
+}
