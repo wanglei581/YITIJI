@@ -220,7 +220,9 @@ export class AlipayProvider implements PaymentProvider {
     const code = asString(node['code'])
     if (code !== '10000') {
       // sub_code 可记录（无敏感材料）；错误信息绝不含密钥/配置。
-      throw new Error(`ALIPAY_CHANNEL_ERROR: ${asString(node['sub_code']) ?? code ?? 'UNKNOWN'}`)
+      // 始终携带 code：code=20000（服务不可用/处理超时）表示**结果不可知**，
+      // 退款域分类器据此保持 pending 收敛，绝不按明确失败回滚。
+      throw new Error(`ALIPAY_CHANNEL_ERROR: ${code ?? 'UNKNOWN'} ${asString(node['sub_code']) ?? ''}`.trimEnd())
     }
     return node
   }

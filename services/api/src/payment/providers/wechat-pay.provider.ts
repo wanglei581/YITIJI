@@ -188,8 +188,10 @@ export class WechatPayProvider implements PaymentProvider {
     }
     if (!res.ok) {
       // 渠道错误码可记录（无敏感材料）；绝不把商户配置回显进错误信息。
-      const code = asString(parsed['code']) ?? `HTTP_${res.status}`
-      throw new Error(`WECHAT_PAY_CHANNEL_ERROR: ${code}`)
+      // 始终携带 HTTP 状态：退款域按「明确拒绝 vs 结果不可知」分类依赖 5xx 标记
+      //（如 500+SYSTEM_ERROR = 渠道要求同参数重试，绝不能按明确失败回滚）。
+      const code = asString(parsed['code'])
+      throw new Error(`WECHAT_PAY_CHANNEL_ERROR: HTTP_${res.status}${code ? ` ${code}` : ''}`)
     }
     return parsed
   }

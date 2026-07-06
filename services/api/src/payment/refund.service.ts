@@ -3,20 +3,27 @@
  *
  * 退款按订单域建模（不挂靠 PrintTask）；落 Refund 账本 + 状态机 paid → refunding → refunded。
  *
- * 硬约束（对齐用户定版 + compliance §8.4/§8.7）：
- * - `refundNo` 幂等键：同一 refundNo 重复请求返回既有退款记录，**绝不重复出款、绝不重复审计**
- *   （渠道侧同样以 refundNo 作 out_refund_no / out_request_no 幂等，双层防重复出款）。
- * - 只有 `paid` 单可退；unpaid/paying/closed/failed → 拒；refunded/partial_refunded → 拒（已退）。
+ * 硬约束（对齐用户定版 + compliance §8.4/§8.7 + W-B 双模型审查修复）：
+ * - `refundNo` 幂等键：同一 refundNo 重复请求绝不重复出款/审计；渠道侧同样以 refundNo 作
+ *   out_refund_no / out_request_no 幂等（双层防重复出款）。**任何重试/重发一律沿用同一
+ *   refundNo**——绝不为重试换号（换号=渠道视角的第二笔退款）。
+ * - 只有 `paid` 单可发起退款；unpaid/paying/closed/failed → 拒；refunded/partial_refunded → 拒。
+ * - 渠道结果三分法（W-B 审查 H1 根因修复）：
+ *   · **明确成功** → refunded；
+ *   · **明确拒绝**（渠道业务错误码 / 4xx / ABNORMAL）→ Refund failed + 订单回 paid，
+ *     可经同号重试路径重新发起；
+ *   · **结果不可知**（超时 / 5xx / 网络异常 / 响应验签失败 / 受理中 PROCESSING）→
+ *     Refund 保持 pending + 订单保持 refunding，**绝不判失败也绝不假报成功**，
+ *     后续同号请求经查证（queryRefund）收敛：成功补完成 / 明确失败回滚 /
+ *     渠道查无此单（请求可能从未到达）→ 同号重发。
  * - 退款执行渠道由 Order.paymentSource 决定：
- *   · `sandbox` → SandboxPaymentProvider.refund（假通道，无外部资金）；
- *   · `wechat` / `alipay`（W-B）→ 真实渠道原路退回；发起前必须定位到该单的 success
- *     PaymentAttempt（out_trade_no），缺失 fail-closed 拒绝；wechat 受理中（processing）
- *     保持 Refund pending + 订单 refunding，重复调用经 queryRefund 收敛，**绝不假报已退款**；
- *   · `offline` / `manual_confirmed` → **不调 provider**（人工/线下退款，系统只记录状态 + 审计）；
- *   · `free` / `voucher` → **不调 provider**（免费/权益单无资金），且**不恢复 BenefitGrant 额度**。
+ *   · `sandbox` → 假通道（无外部资金）；
+ *   · `wechat` / `alipay` → 真实渠道原路退回；发起前必须唯一定位该单 success
+ *     PaymentAttempt（缺失/多条均 fail-closed），且退款额必须等于渠道实收
+ *     （discountCents 非 0 拒绝——线上入账单当前不可能有抵扣，防御性断言）；
+ *   · `offline` / `manual_confirmed` / `free` / `voucher` → 不调 provider（只记状态 + 审计），
+ *     且 voucher/free 退款**不恢复 BenefitGrant 额度**。
  * - 全额退款为主；`partial_refunded` 与部分退款动作仅预留，不接。
- * - 渠道请求异常（网络/渠道错误）按失败回滚 paid 可重试；若渠道实际已受理，重试同
- *   refundNo 由渠道幂等兜住；极端不一致由 W-C 对账核销（审计留痕，诚实标注）。
  */
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
@@ -29,6 +36,8 @@ type RefundRecord = NonNullable<Awaited<ReturnType<PrismaService['refund']['find
 
 /** 退款执行需调 provider 的资金通道（W-B 起含真实渠道）。 */
 const PROVIDER_REFUND_CHANNELS = new Set(['sandbox', 'wechat', 'alipay'])
+/** 需要「原单定位 + 查证收敛 + 同号重试」语义的真实资金渠道。 */
+const REAL_REFUND_CHANNELS = new Set(['wechat', 'alipay'])
 /** 全部合法退款渠道（= 合法 paymentSource 集合）。 */
 const REFUNDABLE_SOURCES = new Set(['sandbox', 'wechat', 'alipay', 'offline', 'manual_confirmed', 'free', 'voucher'])
 /** 已退款/退款中态：拒绝重复退款（不同 refundNo 也拒，靠订单态兜底）。 */
@@ -59,6 +68,27 @@ function isRefundNoConflict(e: unknown): boolean {
   return true
 }
 
+/**
+ * 渠道异常分类（W-B 审查 H1 修复）：只有「渠道明确给出业务判定」才算明确拒绝；
+ * 超时/网络异常/5xx/响应不可解析或验签失败 → 结果不可知（资金可能已动），保持 pending 收敛。
+ */
+function isDefinitiveChannelRejection(e: unknown): boolean {
+  const msg = (e as Error)?.message ?? ''
+  // 发起前的本地输入校验失败：未发出任何请求，必然明确失败。
+  if (msg.includes('REFUND_INPUT_MISSING')) return true
+  // 渠道返回了可解析的业务错误码（providers 统一以 *_CHANNEL_ERROR: <code> 抛出）。
+  if (msg.includes('CHANNEL_ERROR:')) {
+    if (/HTTP_5\d\d/.test(msg)) return false // 5xx：渠道内部错误，结果不可知
+    // 渠道自述「结果未知/请同参数重试」的业务码：wechat SYSTEM_ERROR / alipay code=20000。
+    if (msg.includes('SYSTEM_ERROR') || /CHANNEL_ERROR:\s*20000\b/.test(msg)) return false
+    if (msg.includes('RESPONSE_NOT_JSON') || msg.includes('RESPONSE_NODE_MISSING') || msg.includes('RESPONSE_SIGN_INVALID')) {
+      return false // 响应损坏/不可验签：请求可能已被处理，结果不可知
+    }
+    return true // 4xx / 明确业务 sub_code：渠道明确拒绝，未出款
+  }
+  return false // fetch/超时/连接异常等传输层错误：结果不可知
+}
+
 @Injectable()
 export class RefundService {
   constructor(
@@ -69,7 +99,8 @@ export class RefundService {
 
   /**
    * 全额退款。refundNo 缺省时按订单派生 `RFD-<orderNo>`（一单一退，天然幂等）。
-   * 显式传不同 refundNo 时，订单态 CAS 仍防重复退款（已退 → ORDER_ALREADY_REFUNDED）。
+   * 同 refundNo 重复请求：success/非渠道 failed → 幂等返回；真实渠道 pending → 查证收敛；
+   * 真实渠道 failed → 同号重试（H2 修复：明确拒绝后的合法重试路径，渠道幂等兜底）。
    */
   async refund(
     orderId: string,
@@ -78,21 +109,21 @@ export class RefundService {
     const reason = opts.reason?.trim()
     if (!reason) throw new BadRequestException('REFUND_REASON_REQUIRED')
 
-    let order = await this.requireOrder(orderId)
+    const order = await this.requireOrder(orderId)
     const refundNo = opts.refundNo?.trim() || `RFD-${order.orderNo}`
 
-    // ① 幂等：同 refundNo 已存在 → 原样返回，绝不重复出款/审计。
-    // W-B：真实渠道的 pending 记录（wechat 受理中）重复请求时向渠道查证收敛——
-    // 成功补完成、明确失败回滚 paid 可重试、仍受理中/不可判原样返回；绝不重复出款。
+    // ① 幂等门：同 refundNo 已存在。
     const existing = await this.prisma.refund.findUnique({ where: { refundNo } })
     if (existing) {
-      if (existing.status === 'pending' && existing.channel !== 'sandbox' && PROVIDER_REFUND_CHANNELS.has(existing.channel)) {
-        return this.convergePendingRefund(existing, opts.operatorId)
+      if (REAL_REFUND_CHANNELS.has(existing.channel)) {
+        // 真实渠道 pending（受理中/结果不可知）→ 查证收敛；failed（明确拒绝）→ 同号重试。
+        if (existing.status === 'pending') return this.convergePendingRefund(existing, opts.operatorId)
+        if (existing.status === 'failed') return this.retryFailedRefund(existing, opts.operatorId)
       }
-      return this.toView(existing, await this.requireOrder(orderId), true)
+      return this.toView(existing, await this.requireOrder(existing.orderId), true)
     }
 
-    // ② 状态门：只有 paid 可退。
+    // ② 状态门：只有 paid 可发起。
     if (order.payStatus !== 'paid') {
       if (ALREADY_REFUND_STATES.has(order.payStatus)) throw new BadRequestException('ORDER_ALREADY_REFUNDED')
       throw new BadRequestException('ORDER_NOT_REFUNDABLE') // unpaid / paying / closed / failed
@@ -129,112 +160,203 @@ export class RefundService {
       throw e
     }
 
-    // ④ 阶段二：执行退款。sandbox/wechat/alipay 调 provider；offline/manual_confirmed/free/voucher 不调。
-    let channelRefundNo: string | null = null
+    // ④ 阶段二：provider 通道执行渠道退款（三分法）；非 provider 通道直接完成。
     if (PROVIDER_REFUND_CHANNELS.has(channel)) {
-      const provider = this.requireProvider(channel)
-      const providerInput: RefundExecuteInput = { orderId: order.id, orderNo: order.orderNo, refundNo, amountCents }
-      if (channel !== 'sandbox') {
-        // 真实渠道（W-B）：必须定位到该单的 success 支付尝试（out_trade_no）才可原路退回；
-        // 缺失即 fail-closed（wechat/alipay 入账单必有 success attempt，缺失=数据异常，人工介入）。
-        const srcAttempt = await this.prisma.paymentAttempt.findFirst({
-          where: { orderId: order.id, channel, status: 'success' },
-          orderBy: { createdAt: 'desc' },
-        })
-        if (!srcAttempt) {
-          await this.rollbackRefundFailure(refund.id, orderId, null)
-          throw new BadRequestException('REFUND_SOURCE_ATTEMPT_MISSING')
-        }
-        providerInput.orderAmountCents = order.amountCents
-        providerInput.outTradeNo = srcAttempt.id
-        providerInput.channelTxnNo = srcAttempt.channelTxnNo
-      }
+      return this.executeProviderRefund(refund, opts.operatorId)
+    }
+    return this.completePendingRefund(refund, null, opts.operatorId, { converged: false })
+  }
 
-      let res: RefundExecuteResult
-      try {
-        res = await provider.refund(providerInput)
-      } catch (e) {
-        // 渠道异常按失败回滚（订单回 paid 可重试；渠道侧同 refundNo 幂等兜住重复出款）。
-        // 渠道原始错误只进审计，不透传给调用方。
-        await this.rollbackRefundFailure(refund.id, orderId, null)
+  // ── 内部：渠道执行 / 完成 / 回滚 / 收敛 / 重试 ─────────────────────────────
+
+  /**
+   * 对 pending Refund 执行渠道退款（主流程 ④、同号重试、查证 unknown 同号重发共用）。
+   * 前置：Refund=pending、订单=refunding。渠道结果三分法处置（见文件头注释）。
+   */
+  private async executeProviderRefund(refund: RefundRecord, operatorId?: string): Promise<RefundResultView> {
+    const order = await this.requireOrder(refund.orderId)
+    const channel = refund.channel
+    const provider = this.requireProvider(channel)
+    const providerInput: RefundExecuteInput = {
+      orderId: order.id,
+      orderNo: order.orderNo,
+      refundNo: refund.refundNo,
+      amountCents: refund.amountCents,
+    }
+
+    if (REAL_REFUND_CHANNELS.has(channel)) {
+      // 真实渠道：唯一定位 success 支付尝试（out_trade_no）。缺失/多条均 fail-closed（数据异常，
+      // 人工介入）——多条 success 意味着可能存在双重扣款，按最新一条盲退会漏掉另一笔（审查 M5）。
+      const successAttempts = await this.prisma.paymentAttempt.findMany({
+        where: { orderId: order.id, channel, status: 'success' },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (successAttempts.length === 0) {
+        return this.blockRefund(refund, 'REFUND_SOURCE_ATTEMPT_MISSING', operatorId)
+      }
+      if (successAttempts.length > 1) {
+        return this.blockRefund(refund, 'REFUND_SOURCE_AMBIGUOUS', operatorId)
+      }
+      const src = successAttempts[0] as NonNullable<(typeof successAttempts)[0]>
+      // 金额口径（审查 M2）：真实渠道退款额必须 = 渠道实收 = 尝试快照 = 订单应付；
+      // 线上入账单当前不可能有抵扣（voucher 全额核销不经渠道），discount 非 0 即异常。
+      if (order.discountCents !== 0 || refund.amountCents !== order.amountCents || src.amountCents !== refund.amountCents) {
+        return this.blockRefund(refund, 'REFUND_AMOUNT_BASIS_UNSUPPORTED', operatorId)
+      }
+      providerInput.orderAmountCents = order.amountCents
+      providerInput.outTradeNo = src.id
+      providerInput.channelTxnNo = src.channelTxnNo
+    }
+
+    let res: RefundExecuteResult
+    try {
+      res = await provider.refund(providerInput)
+    } catch (e) {
+      const errorCode = ((e as Error).message ?? 'UNKNOWN').slice(0, 160)
+      if (isDefinitiveChannelRejection(e)) {
+        // 渠道明确拒绝：未出款，回滚 paid（可同号重试）；原始错误只进审计。
+        await this.rollbackRefundFailure(refund.id, refund.orderId, null)
         await this.audit.write({
           actorId: null,
           actorRole: 'system',
           action: 'refund.channel_error',
           targetType: 'order',
-          targetId: orderId,
-          payload: { refundNo, channel, errorCode: ((e as Error).message ?? 'UNKNOWN').slice(0, 160) },
+          targetId: refund.orderId,
+          payload: { refundNo: refund.refundNo, channel, errorCode, operatorId: operatorId ?? null },
         })
         throw new BadRequestException('REFUND_CHANNEL_FAILED')
       }
-      channelRefundNo = res.channelRefundNo
-
-      if (res.status === 'failed') {
-        await this.rollbackRefundFailure(refund.id, orderId, channelRefundNo)
-        throw new BadRequestException('REFUND_CHANNEL_FAILED')
-      }
-      if (res.status === 'processing') {
-        // wechat 异步受理中：保持 Refund pending + 订单 refunding，绝不假报已退款；
-        // 后续重复调用同 refundNo 经 ① 的 queryRefund 收敛路径补完成/回滚。
-        if (channelRefundNo) {
-          await this.prisma.refund.update({ where: { id: refund.id }, data: { channelRefundNo } })
-        }
-        await this.audit.write({
-          actorId: null,
-          actorRole: 'system',
-          action: 'refund.processing',
-          targetType: 'order',
-          targetId: orderId,
-          payload: { refundNo, channel, channelRefundNo, operatorId: opts.operatorId ?? null },
-        })
-        const pendingRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
-        return this.toView(pendingRefund ?? refund, await this.requireOrder(orderId), false)
-      }
+      // 结果不可知（超时/5xx/网络/响应不可验签）：渠道可能已受理——保持 pending+refunding，
+      // **绝不判失败**（判失败即账实不符 + 换号重试就是二次出款，审查 H1）；
+      // 后续同号请求经 queryRefund 收敛或同号重发。
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'refund.channel_ambiguous',
+        targetType: 'order',
+        targetId: refund.orderId,
+        payload: { refundNo: refund.refundNo, channel, errorCode, operatorId: operatorId ?? null },
+      })
+      const pendingRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
+      return this.toView(pendingRefund ?? refund, await this.requireOrder(refund.orderId), false)
     }
 
-    // ⑤ 阶段三：CAS refunding→refunded + 回填 Refund success + refundedAmountCents。
-    order = await this.prisma.$transaction(async (tx) => {
-      await tx.refund.update({ where: { id: refund.id }, data: { status: 'success', channelRefundNo } })
-      const cas = await tx.order.updateMany({
-        where: { id: orderId, payStatus: 'refunding' },
-        data: { payStatus: 'refunded', refundedAt: new Date(), refundReason: reason, refundedAmountCents: amountCents },
+    if (res.status === 'failed') {
+      await this.rollbackRefundFailure(refund.id, refund.orderId, res.channelRefundNo)
+      throw new BadRequestException('REFUND_CHANNEL_FAILED')
+    }
+    if (res.status === 'processing') {
+      // 受理中：保持 pending+refunding，绝不假报已退款；同号请求经查证收敛。
+      if (res.channelRefundNo) {
+        await this.prisma.refund.updateMany({ where: { id: refund.id, status: 'pending' }, data: { channelRefundNo: res.channelRefundNo } })
+      }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'refund.processing',
+        targetType: 'order',
+        targetId: refund.orderId,
+        payload: { refundNo: refund.refundNo, channel, channelRefundNo: res.channelRefundNo, operatorId: operatorId ?? null },
       })
-      if (cas.count === 0) throw new BadRequestException('ORDER_INVALID_TRANSITION')
-      const o = await tx.order.findUnique({ where: { id: orderId } })
-      if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
-      return o
-    })
+      const pendingRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
+      return this.toView(pendingRefund ?? refund, await this.requireOrder(refund.orderId), false)
+    }
 
-    await this.audit.write({
-      actorId: null,
-      actorRole: 'system',
-      action: 'refund.created',
-      targetType: 'order',
-      targetId: orderId,
-      // benefitRestored=false：免费/权益单退款本波只记状态，绝不恢复 BenefitGrant 额度。
-      payload: { refundNo, channel, amountCents, paymentSource, channelRefundNo, operatorId: opts.operatorId ?? null, benefitRestored: false },
-    })
-
-    const finalRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
-    return this.toView(finalRefund ?? refund, order, false)
-  }
-
-  private requireProvider(channel: string): PaymentProvider {
-    const provider = this.registry.get(channel)
-    if (!provider) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
-    return provider
-  }
-
-  /** 退款失败/异常统一回滚：Refund 置 failed、订单 refunding→paid（可重试）。 */
-  private async rollbackRefundFailure(refundId: string, orderId: string, channelRefundNo: string | null): Promise<void> {
-    await this.prisma.refund.update({ where: { id: refundId }, data: { status: 'failed', channelRefundNo } })
-    await this.prisma.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: { payStatus: 'paid' } })
+    return this.completePendingRefund(refund, res.channelRefundNo, operatorId, { converged: false })
   }
 
   /**
-   * W-B：真实渠道 pending 退款收敛（重复调用同 refundNo 时触发）。
-   * 向渠道 queryRefund 查证：success → 补完成（同阶段⑤语义 + 单次 refund.created 审计）；
-   * failed → 回滚 paid 可重试；processing/unknown/查证异常 → 原样返回，不动状态、不重复出款。
+   * 完成退款（唯一完成路径；主流程/收敛/重试共用）：CAS pending→success +
+   * refunding→refunded 同事务；CAS 未命中 → 他方已完成，幂等返回不重复审计（审查 M3）。
+   */
+  private async completePendingRefund(
+    refund: RefundRecord,
+    channelRefundNo: string | null,
+    operatorId: string | undefined,
+    flags: { converged: boolean },
+  ): Promise<RefundResultView> {
+    const finalChannelRefundNo = channelRefundNo ?? refund.channelRefundNo
+    const { completed, order } = await this.prisma.$transaction(async (tx) => {
+      const casRefund = await tx.refund.updateMany({
+        where: { id: refund.id, status: 'pending' },
+        data: { status: 'success', channelRefundNo: finalChannelRefundNo },
+      })
+      if (casRefund.count === 0) {
+        // 并发完成竞态：他方已把这笔退款收敛完成 → 幂等返回（不再改订单、不重复审计）。
+        const o = await tx.order.findUnique({ where: { id: refund.orderId } })
+        if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
+        return { completed: false, order: o }
+      }
+      await tx.order.updateMany({
+        where: { id: refund.orderId, payStatus: 'refunding' },
+        data: {
+          payStatus: 'refunded',
+          refundedAt: new Date(),
+          refundReason: refund.reason,
+          refundedAmountCents: refund.amountCents,
+        },
+      })
+      const o = await tx.order.findUnique({ where: { id: refund.orderId } })
+      if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
+      if (o.payStatus !== 'refunded') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+      return { completed: true, order: o }
+    })
+
+    if (completed) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'refund.created',
+        targetType: 'order',
+        targetId: refund.orderId,
+        // benefitRestored=false：免费/权益单退款只记状态，绝不恢复 BenefitGrant 额度。
+        payload: {
+          refundNo: refund.refundNo,
+          channel: refund.channel,
+          amountCents: refund.amountCents,
+          paymentSource: order.paymentSource,
+          channelRefundNo: finalChannelRefundNo,
+          operatorId: operatorId ?? null,
+          benefitRestored: false,
+          ...(flags.converged ? { convergedFromProcessing: true } : {}),
+        },
+      })
+    }
+
+    const freshRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
+    return this.toView(freshRefund ?? refund, order, !completed)
+  }
+
+  /** 前置守卫拦截（原单缺失/多条/金额口径异常）：回滚 + 审计 + 明确错误码（人工介入）。 */
+  private async blockRefund(refund: RefundRecord, code: string, operatorId?: string): Promise<never> {
+    await this.rollbackRefundFailure(refund.id, refund.orderId, null)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'refund.blocked',
+      targetType: 'order',
+      targetId: refund.orderId,
+      payload: { refundNo: refund.refundNo, channel: refund.channel, code, operatorId: operatorId ?? null },
+    })
+    throw new BadRequestException(code)
+  }
+
+  /** 退款明确失败统一回滚：Refund→failed、订单 refunding→paid，同事务（审查 M1：防半状态）。 */
+  private async rollbackRefundFailure(refundId: string, orderId: string, channelRefundNo: string | null): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.refund.updateMany({ where: { id: refundId, status: 'pending' }, data: { status: 'failed', channelRefundNo } })
+      await tx.order.updateMany({ where: { id: orderId, payStatus: 'refunding' }, data: { payStatus: 'paid' } })
+    })
+  }
+
+  /**
+   * 真实渠道 pending 退款收敛（同 refundNo 重复请求触发）。向渠道 queryRefund 查证：
+   * - success → 补完成（唯一完成路径，CAS 幂等）；
+   * - failed（明确 ABNORMAL/CLOSED）→ 回滚 paid 可重试；
+   * - processing → 原样返回；
+   * - unknown（渠道查无此单——原请求可能从未到达，审查 M4）→ **同号重发** provider.refund
+   *   （渠道以 out_refund_no/out_request_no 幂等，重发绝不二次出款）；
+   * - 查证网络异常 → 原样返回，下次再收敛。
    */
   private async convergePendingRefund(refund: RefundRecord, operatorId?: string): Promise<RefundResultView> {
     const order = await this.requireOrder(refund.orderId)
@@ -248,56 +370,64 @@ export class RefundService {
     const q = await provider
       .queryRefund({ refundNo: refund.refundNo, outTradeNo: srcAttempt?.id ?? null })
       .catch(() => null) // 查证网络异常：保持现状，下次再收敛
-    if (!q || q.status === 'unknown' || q.status === 'processing') {
+    if (!q || q.status === 'processing') {
       return this.toView(refund, order, true)
     }
     if (q.status === 'failed') {
       await this.rollbackRefundFailure(refund.id, refund.orderId, q.channelRefundNo)
       throw new BadRequestException('REFUND_CHANNEL_FAILED')
     }
+    if (q.status === 'unknown') {
+      // 渠道查无此单：原退款请求可能从未到达渠道 —— 同号重发（渠道幂等，绝不二次出款）。
+      return this.executeProviderRefund(refund, operatorId)
+    }
+    return this.completePendingRefund(refund, q.channelRefundNo, operatorId, { converged: true })
+  }
 
-    // success：补完成（与主流程阶段⑤同语义；CAS 幂等，重复收敛不重复副作用/审计）。
-    const finalChannelRefundNo = q.channelRefundNo ?? refund.channelRefundNo
-    const completedOrder = await this.prisma.$transaction(async (tx) => {
-      await tx.refund.update({
-        where: { id: refund.id, status: 'pending' },
-        data: { status: 'success', channelRefundNo: finalChannelRefundNo },
+  /**
+   * 真实渠道 failed 退款的同号重试（审查 H2 修复）：明确拒绝后允许再次发起
+   * （运营处理完拒绝原因后重试，如余额不足充值后）。**沿用同一 refundNo**，
+   * 渠道幂等保证与「其实已出款」的极端错判也不会二次出款。
+   */
+  private async retryFailedRefund(refund: RefundRecord, operatorId?: string): Promise<RefundResultView> {
+    const order = await this.requireOrder(refund.orderId)
+    if (order.payStatus !== 'paid') {
+      // failed 记录 + 非 paid 订单：状态异常（如已被另一 refundNo 退掉），原样返回不动。
+      return this.toView(refund, order, true)
+    }
+    // CAS：订单 paid→refunding + 记录 failed→pending，同事务；任一未命中即并发竞态，放弃本次重试。
+    const reopened = await this.prisma.$transaction(async (tx) => {
+      const casOrder = await tx.order.updateMany({
+        where: { id: refund.orderId, payStatus: 'paid' },
+        data: { payStatus: 'refunding' },
       })
-      await tx.order.updateMany({
-        where: { id: refund.orderId, payStatus: 'refunding' },
-        data: {
-          payStatus: 'refunded',
-          refundedAt: new Date(),
-          refundReason: refund.reason,
-          refundedAmountCents: refund.amountCents,
-        },
+      if (casOrder.count === 0) return false
+      const casRefund = await tx.refund.updateMany({
+        where: { id: refund.id, status: 'failed' },
+        data: { status: 'pending' },
       })
-      const o = await tx.order.findUnique({ where: { id: refund.orderId } })
-      if (!o) throw new NotFoundException('ORDER_NOT_FOUND')
-      if (o.payStatus !== 'refunded') throw new BadRequestException('ORDER_INVALID_TRANSITION')
-      return o
+      if (casRefund.count === 0) throw new BadRequestException('REFUND_STATE_CONFLICT')
+      return true
     })
-
+    if (!reopened) {
+      return this.toView(refund, await this.requireOrder(refund.orderId), true)
+    }
     await this.audit.write({
       actorId: null,
       actorRole: 'system',
-      action: 'refund.created',
+      action: 'refund.retried',
       targetType: 'order',
       targetId: refund.orderId,
-      payload: {
-        refundNo: refund.refundNo,
-        channel: refund.channel,
-        amountCents: refund.amountCents,
-        paymentSource: completedOrder.paymentSource,
-        channelRefundNo: finalChannelRefundNo,
-        operatorId: operatorId ?? null,
-        benefitRestored: false,
-        convergedFromProcessing: true, // 由受理中收敛完成（对账时区分同步/异步路径）
-      },
+      payload: { refundNo: refund.refundNo, channel: refund.channel, operatorId: operatorId ?? null },
     })
+    const pendingRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
+    return this.executeProviderRefund(pendingRefund ?? refund, operatorId)
+  }
 
-    const freshRefund = await this.prisma.refund.findUnique({ where: { id: refund.id } })
-    return this.toView(freshRefund ?? refund, completedOrder, false)
+  private requireProvider(channel: string): PaymentProvider {
+    const provider = this.registry.get(channel)
+    if (!provider) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
+    return provider
   }
 
   private async requireOrder(orderId: string): Promise<OrderRecord> {

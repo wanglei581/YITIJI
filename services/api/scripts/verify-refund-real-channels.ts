@@ -11,9 +11,13 @@
  * - wechat 受理中（PROCESSING）：保持 Refund pending + 订单 refunding（**绝不假报已退款**），
  *   审计 refund.processing；重复调用经 queryRefund 收敛——仍受理中原样返回、
  *   SUCCESS 补完成（refund.created 带 convergedFromProcessing）、再重复幂等。
- * - wechat 渠道拒绝（ABNORMAL）/ 渠道 HTTP 异常：Refund failed + 订单回 paid 可重试 +
- *   REFUND_CHANNEL_FAILED；渠道异常另有 refund.channel_error 审计（原始错误只进审计）。
- * - 真实渠道缺 success 支付尝试：REFUND_SOURCE_ATTEMPT_MISSING fail-closed + 回滚。
+ * - 渠道结果三分法（双模型审查 H1 修复）：
+ *   · 明确拒绝（ABNORMAL / 4xx 业务码）→ failed + 回滚 paid + refund.channel_error 审计，
+ *     且可**同号重试**（H2 修复：refund.retried 审计 + 重新走渠道，渠道幂等兜底）；
+ *   · 结果不可知（HTTP 5xx/超时）→ 保持 pending+refunding + refund.channel_ambiguous 审计，
+ *     **绝不判失败**；查证 unknown（渠道查无此单）时**同号重发**收敛到 refunded。
+ * - 前置守卫 fail-closed（refund.blocked 审计）：缺 success 尝试 REFUND_SOURCE_ATTEMPT_MISSING /
+ *   多条 success 尝试 REFUND_SOURCE_AMBIGUOUS / 金额口径异常 REFUND_AMOUNT_BASIS_UNSUPPORTED。
  * - alipay 同步成功：alipay.trade.refund 报文（out_request_no=refundNo / refund_amount 元串）
  *   → refunded；渠道错误 → 回滚 paid。
  * - 回归：offline 退款不调 provider（假网关零请求）；退款绝不改 PrintTask.status。
@@ -98,7 +102,7 @@ const NOTIFY_BASE = 'https://kiosk-pay.verify.test'
 
 // ── 假网关（渠道侧账本，可按场景切换响应）────────────────────────────────────
 let wechatRefundCreateResponse: { httpStatus?: number; body?: Record<string, unknown> } = {}
-let wechatRefundQueryResponse: Record<string, unknown> = { status: 'PROCESSING' }
+let wechatRefundQueryResponse: { httpStatus?: number; body?: Record<string, unknown> } = { body: { status: 'PROCESSING' } }
 let alipayRefundNode: Record<string, unknown> = { code: '10000', msg: 'Success' }
 let lastWechatRefundCreate: Record<string, unknown> | null = null
 let lastAlipayRefundBiz: Record<string, unknown> | null = null
@@ -131,7 +135,9 @@ function startFakeGateway(): Promise<{ server: Server; port: number }> {
         lastWechatRefundCreate = JSON.parse(body) as Record<string, unknown>
         if (wechatRefundCreateResponse.httpStatus && wechatRefundCreateResponse.httpStatus >= 400) {
           res.writeHead(wechatRefundCreateResponse.httpStatus, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ code: 'SYSTEM_ERROR', message: 'verify simulated failure' }))
+          // 5xx 用 SYSTEM_ERROR（渠道自述结果未知）；4xx 用 PARAM_ERROR（明确业务拒绝）
+          const code = wechatRefundCreateResponse.httpStatus >= 500 ? 'SYSTEM_ERROR' : 'PARAM_ERROR'
+          res.end(JSON.stringify({ code, message: 'verify simulated failure' }))
           return
         }
         res.writeHead(200, { 'content-type': 'application/json' })
@@ -139,8 +145,13 @@ function startFakeGateway(): Promise<{ server: Server; port: number }> {
         return
       }
       if (req.method === 'GET' && url.startsWith('/v3/refund/domestic/refunds/')) {
+        if (wechatRefundQueryResponse.httpStatus && wechatRefundQueryResponse.httpStatus >= 400) {
+          res.writeHead(wechatRefundQueryResponse.httpStatus, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ code: 'RESOURCE_NOT_EXISTS', message: 'not found' }))
+          return
+        }
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(wechatRefundQueryResponse))
+        res.end(JSON.stringify(wechatRefundQueryResponse.body ?? {}))
         return
       }
       if (req.method === 'POST' && url.startsWith('/alipay/gateway.do')) {
@@ -425,14 +436,14 @@ async function main(): Promise<void> {
     } else {
       fail(`wechat processing mishandled: ${JSON.stringify({ status: w2View.refund.status, payStatus: w2Order.payStatus })}`)
     }
-    wechatRefundQueryResponse = { status: 'PROCESSING', refund_id: w2RefundId }
+    wechatRefundQueryResponse = { body: { status: 'PROCESSING', refund_id: w2RefundId } }
     const w2Still = await refundService.refund(W2.orderId, { reason: '重复请求' })
     if (w2Still.idempotent && w2Still.refund.status === 'pending' && (await orderState(W2.orderId)).payStatus === 'refunding') {
       pass('收敛查证仍受理中：原样返回，不动状态、不重复出款')
     } else {
       fail('processing convergence changed state prematurely')
     }
-    wechatRefundQueryResponse = { status: 'SUCCESS', refund_id: w2RefundId }
+    wechatRefundQueryResponse = { body: { status: 'SUCCESS', refund_id: w2RefundId } }
     const w2Done = await refundService.refund(W2.orderId, { reason: '重复请求' })
     const w2DoneOrder = await orderState(W2.orderId)
     if (
@@ -451,7 +462,7 @@ async function main(): Promise<void> {
       fail('post-convergence repeat not idempotent')
     }
 
-    // ── (W3) wechat 渠道拒绝（ABNORMAL）→ 回滚可重试 ─────────────────────
+    // ── (W3) wechat 渠道明确拒绝（ABNORMAL）→ 回滚 → 同号重试成功（H2 修复）──
     const W3 = await makePaidOrder('w3', 'wechat')
     wechatRefundCreateResponse = { body: { status: 'ABNORMAL', refund_id: 'wxrfd_abn' } }
     await expectCode('wechat 渠道拒绝 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
@@ -460,24 +471,73 @@ async function main(): Promise<void> {
     const w3Order = await orderState(W3.orderId)
     const w3Refund = await refundRow(`RFD-${W3.orderNo}`)
     if (w3Order.payStatus === 'paid' && w3Refund?.status === 'failed') {
-      pass('渠道拒绝后：Refund failed + 订单回 paid（可重试）')
+      pass('渠道拒绝后：Refund failed + 订单回 paid')
     } else {
       fail(`wechat reject rollback failed: ${JSON.stringify({ pay: w3Order.payStatus, refund: w3Refund?.status })}`)
     }
+    // H2：failed 后同号重试必须真正重新走渠道并可完成（不被幂等门短路卡死）
+    const w3RetryRefundId = `wxrfd_retry_${randomBytes(6).toString('hex')}`
+    wechatRefundCreateResponse = { body: { status: 'SUCCESS', refund_id: w3RetryRefundId } }
+    const w3GatewayBefore = gatewayRequestCount
+    const w3Retry = await refundService.refund(W3.orderId, { reason: '重试退款', operatorId: 'verify-admin' })
+    if (
+      w3Retry.refund.status === 'success' &&
+      w3Retry.refund.channelRefundNo === w3RetryRefundId &&
+      gatewayRequestCount > w3GatewayBefore &&
+      lastWechatRefundCreate?.['out_refund_no'] === `RFD-${W3.orderNo}` &&
+      (await orderState(W3.orderId)).payStatus === 'refunded' &&
+      (await auditCount('refund.retried', W3.orderId)) === 1 &&
+      (await auditCount('refund.created', W3.orderId)) === 1
+    ) {
+      pass('failed 同号重试：重新走渠道（同 out_refund_no）→ refunded + refund.retried/created 各 1 条')
+    } else {
+      fail(`failed retry mismatch: ${JSON.stringify(w3Retry)}`)
+    }
 
-    // ── (W4) wechat 渠道 HTTP 异常 → 回滚 + channel_error 审计 ────────────
+    // ── (W4) wechat 渠道 HTTP 5xx（结果不可知）→ 保持 pending，unknown 同号重发收敛（H1/M4 修复）──
     const W4 = await makePaidOrder('w4', 'wechat')
     wechatRefundCreateResponse = { httpStatus: 500 }
-    await expectCode('wechat 渠道 HTTP 异常 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
-      refundService.refund(W4.orderId, { reason: '用户申请退款' }),
+    const w4View = await refundService.refund(W4.orderId, { reason: '用户申请退款' })
+    if (
+      w4View.refund.status === 'pending' &&
+      (await orderState(W4.orderId)).payStatus === 'refunding' &&
+      (await auditCount('refund.channel_ambiguous', W4.orderId)) === 1
+    ) {
+      pass('渠道 5xx（结果不可知）：保持 pending+refunding（绝不判失败）+ refund.channel_ambiguous 审计')
+    } else {
+      fail(`ambiguous 5xx mishandled: ${JSON.stringify({ status: w4View.refund.status })}`)
+    }
+    // 查证 404（渠道查无此单=原请求未到达）→ 同号重发 → 本次成功 → refunded
+    const w4RefundId = `wxrfd_reissue_${randomBytes(6).toString('hex')}`
+    wechatRefundQueryResponse = { httpStatus: 404 }
+    wechatRefundCreateResponse = { body: { status: 'SUCCESS', refund_id: w4RefundId } }
+    const w4Done = await refundService.refund(W4.orderId, { reason: '重复请求' })
+    if (
+      w4Done.refund.status === 'success' &&
+      w4Done.refund.channelRefundNo === w4RefundId &&
+      lastWechatRefundCreate?.['out_refund_no'] === `RFD-${W4.orderNo}` &&
+      (await orderState(W4.orderId)).payStatus === 'refunded' &&
+      (await auditCount('refund.created', W4.orderId)) === 1
+    ) {
+      pass('查证 unknown → 同号重发（渠道幂等）→ refunded + refund.created 恰 1 条')
+    } else {
+      fail(`unknown reissue failed: ${JSON.stringify(w4Done)}`)
+    }
+    wechatRefundQueryResponse = { body: { status: 'PROCESSING' } }
+
+    // ── (W4b) wechat 渠道 4xx 明确业务拒绝 → failed 回滚 + channel_error 审计 ──
+    const W4b = await makePaidOrder('w4b', 'wechat')
+    wechatRefundCreateResponse = { httpStatus: 400 }
+    await expectCode('wechat 渠道 4xx 明确拒绝 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
+      refundService.refund(W4b.orderId, { reason: '用户申请退款' }),
     )
     if (
-      (await orderState(W4.orderId)).payStatus === 'paid' &&
-      (await auditCount('refund.channel_error', W4.orderId)) === 1
+      (await orderState(W4b.orderId)).payStatus === 'paid' &&
+      (await auditCount('refund.channel_error', W4b.orderId)) === 1
     ) {
-      pass('渠道异常：回滚 paid + refund.channel_error 审计（原始错误只进审计）')
+      pass('渠道 4xx：回滚 paid + refund.channel_error 审计（原始错误只进审计）')
     } else {
-      fail('wechat channel error not audited or rollback failed')
+      fail('wechat 4xx not audited or rollback failed')
     }
     wechatRefundCreateResponse = {}
 
@@ -499,8 +559,44 @@ async function main(): Promise<void> {
     await expectCode('缺 success 支付尝试的 wechat 单 → REFUND_SOURCE_ATTEMPT_MISSING', 'REFUND_SOURCE_ATTEMPT_MISSING', () =>
       refundService.refund(w5Order.id, { reason: '数据异常单' }),
     )
-    if ((await orderState(w5Order.id)).payStatus === 'paid') pass('缺原单 fail-closed 后订单回 paid（人工介入处理）')
-    else fail('W5 rollback failed')
+    if (
+      (await orderState(w5Order.id)).payStatus === 'paid' &&
+      (await auditCount('refund.blocked', w5Order.id)) === 1
+    ) {
+      pass('缺原单 fail-closed：订单回 paid + refund.blocked 审计（人工介入处理）')
+    } else {
+      fail('W5 rollback/audit failed')
+    }
+
+    // ── (W6) 多条 success 尝试（疑似双重扣款）→ 盲退拦截（审查 M5）──────────
+    const W6 = await makePaidOrder('w6', 'wechat')
+    await prisma.paymentAttempt.create({
+      data: {
+        orderId: W6.orderId,
+        channel: 'wechat',
+        amountCents: 200,
+        status: 'success',
+        prepayId: `pa_dup_${suffix}`,
+        channelTxnNo: `wxtxn_dup_${randomBytes(6).toString('hex')}`,
+      },
+    })
+    await expectCode('同单多条 success 尝试 → REFUND_SOURCE_AMBIGUOUS（拒绝盲退）', 'REFUND_SOURCE_AMBIGUOUS', () =>
+      refundService.refund(W6.orderId, { reason: '疑似双重扣款单' }),
+    )
+    if ((await orderState(W6.orderId)).payStatus === 'paid' && (await auditCount('refund.blocked', W6.orderId)) === 1) {
+      pass('多原单拦截后订单回 paid + refund.blocked 审计')
+    } else {
+      fail('W6 rollback/audit failed')
+    }
+
+    // ── (W7) 金额口径异常（discount≠0 的线上单）→ 拦截（审查 M2）────────────
+    const W7 = await makePaidOrder('w7', 'wechat')
+    await prisma.order.update({ where: { id: W7.orderId }, data: { discountCents: 50 } })
+    await expectCode('线上单 discount≠0 → REFUND_AMOUNT_BASIS_UNSUPPORTED（退款额必须=渠道实收）', 'REFUND_AMOUNT_BASIS_UNSUPPORTED', () =>
+      refundService.refund(W7.orderId, { reason: '金额口径异常单' }),
+    )
+    if ((await orderState(W7.orderId)).payStatus === 'paid') pass('金额口径拦截后订单回 paid')
+    else fail('W7 rollback failed')
 
     // ── (A1) alipay 同步退款成功 ─────────────────────────────────────────
     const A1 = await makePaidOrder('a1', 'alipay')
