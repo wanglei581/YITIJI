@@ -11,6 +11,7 @@
 当前有效原则：
 
 - 一窗口 = 一任务 = 一分支。
+- Mac / Windows 双设备并行开发时，必须先在 `docs/progress/next-tasks.md` 登记任务分支、负责人/设备、允许修改范围、禁止修改范围、验证要求和移交要求；不得两台设备同时在同一功能分支或同一核心文件上开发。
 - 禁止 `git add .`，所有暂存必须显式列路径。
 - `apps/`、`services/`、`packages/` 属运行时代码，规范化任务默认不触碰。
 - 删除、ignore、大文件外部归档、主工作区物料迁入前必须先确认并双模型审查。
@@ -110,6 +111,7 @@
 
 | 日期 | 分支 / 提交 | 结论 |
 | --- | --- | --- |
+| 2026-07-06 | 双设备并行协作规则收口 / 本地文档更新 | 已将 Mac + Windows 同时开发的隔离规则写入 `docs/decisions/ai-collaboration-rules.md`，并在 `docs/progress/next-tasks.md` 增加任务登记模板；后续双方按“每任务一分支、开工先登记、完成同步 current-progress + next-tasks、Windows 真机结论由 Windows 验证”执行。本次只更新协作和进度文档，不改运行时代码。 |
 | 2026-06-20 | `codex/project-normalization-p0` / `de212131` | 建立目录治理基线：`docs/project-structure.md`、`.ccg/spec/guides/index.md`、AGENTS/CLAUDE 入口同步。 |
 | 2026-06-20 | `codex/project-normalization-p0` / `940e7485` | 输出主工作区分类规则，确认不新建仓库、不整包迁移、不直接清理主工作区。 |
 | 2026-06-20 | `codex/project-normalization-p0` / `f54eacd3` | 固化 Codex + Claude + Antigravity 协作模式：Claude 做只读草案，Codex 落盘验证，双模型复审中高风险。 |
