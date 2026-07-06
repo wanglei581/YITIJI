@@ -2,7 +2,7 @@
 import { API_BASE_URL, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
-export type LlmVendor = 'deepseek' | 'qwen' | 'minimax'
+export type LlmVendor = 'deepseek' | 'qwen' | 'minimax' | 'yuren'
 export type AiModelFeatureKey =
   | 'assistant_chat'
   | 'resume_diagnosis'

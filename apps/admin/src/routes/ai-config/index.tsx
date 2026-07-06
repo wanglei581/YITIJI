@@ -240,7 +240,7 @@ export default function AiConfigPage() {
           {/* 厂商 */}
           <div>
             <label className={labelCls}>模型厂商</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {presets.map((p) => (
                 <button
                   key={p.vendor}
