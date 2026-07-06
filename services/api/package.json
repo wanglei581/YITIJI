@@ -39,6 +39,7 @@
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:print-doc-upload-url": "node -r @swc-node/register scripts/verify-print-doc-upload-url.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
+    "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
     "verify:print-scan-preflight": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts",
     "verify:print-scan-preflight:postgres": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts --require-postgres",
     "verify:screensaver-content": "node -r @swc-node/register scripts/verify-screensaver-content.ts",

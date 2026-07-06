@@ -61,6 +61,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalHeartbeat
   }
 
+  get terminalBindCode() {
+    return this.client.terminalBindCode
+  }
+
   get printTaskStatusLog() {
     return this.client.printTaskStatusLog
   }

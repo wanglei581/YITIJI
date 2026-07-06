@@ -26,11 +26,13 @@ import {
   Logger,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { AuditService } from '../audit/audit.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
+import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { KioskTerminalConfigView } from './terminal-config.types'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { DEFAULT_SMART_CAMPUS_MODULES, type SmartCampusModules } from '../smart-campus/smart-campus.types'
@@ -47,6 +49,20 @@ const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
 }
 
 const CONFIG_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+const DEFAULT_BIND_CODE_TTL_MINUTES = 10
+const BIND_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+
+function hashBindCode(code: string): string {
+  return crypto.createHash('sha256').update(code.trim(), 'utf8').digest('hex')
+}
+
+function makeBindCode(): string {
+  let out = ''
+  for (let i = 0; i < 20; i++) {
+    out += BIND_CODE_ALPHABET[crypto.randomInt(0, BIND_CODE_ALPHABET.length)]
+  }
+  return out
+}
 
 function cleanNullable(value: string | null | undefined): string | null | undefined {
   if (value === null) return null
@@ -224,6 +240,20 @@ export interface UpdateTerminalProfileResult {
   enabled: boolean
 }
 
+export interface TerminalBindCodeCreated {
+  terminalId: string
+  terminalCode: string
+  bindCode: string
+  expiresAt: string
+}
+
+export interface TerminalBindCodeExchangeResult {
+  terminalId: string
+  terminalCode: string
+  terminalToken: string
+  expiresAt: string
+}
+
 export interface AdminPrinterView {
   id: string
   terminalId: string
@@ -355,6 +385,7 @@ export class TerminalsService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly toolbox: TerminalToolboxService,
+    private readonly audit: AuditService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -413,6 +444,156 @@ export class TerminalsService implements OnModuleInit {
 
     this.logger.log(`register: terminalId=${terminal.id} code=${dto.terminalCode}`)
     return { terminalId: terminal.id, terminalToken: agentToken, expiresAt }
+  }
+
+  /**
+   * Admin 生成一次性绑定码。明文 bindCode 只在本响应返回一次；DB 仅保存 hash。
+   * 绑定码用于 Windows 新主机换取 terminalToken，避免把 adminSecret 放到设备侧。
+   */
+  async createBindCode(
+    terminalRef: string,
+    actorId: string | null,
+    ttlMinutes = DEFAULT_BIND_CODE_TTL_MINUTES,
+  ): Promise<TerminalBindCodeCreated> {
+    const terminal = await this.prisma.terminal.findFirst({
+      where: this.terminalRefWhere(terminalRef),
+      select: { id: true, terminalCode: true, enabled: true },
+    })
+    if (!terminal) {
+      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+    }
+    if (!terminal.enabled) {
+      throw new BadRequestException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用，不能生成绑定码' } })
+    }
+
+    const ttl = Math.min(60, Math.max(1, Math.round(ttlMinutes || DEFAULT_BIND_CODE_TTL_MINUTES)))
+    const now = new Date()
+    const expiresAt = new Date(Date.now() + ttl * 60 * 1000)
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const bindCode = makeBindCode()
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.terminalBindCode.updateMany({
+            where: {
+              terminalId: terminal.id,
+              usedAt: null,
+              revokedAt: null,
+              expiresAt: { gt: now },
+            },
+            data: { revokedAt: now },
+          })
+          await tx.terminalBindCode.create({
+            data: {
+              terminalId: terminal.id,
+              terminalCode: terminal.terminalCode,
+              codeHash: hashBindCode(bindCode),
+              createdBy: actorId,
+              expiresAt,
+            },
+          })
+        })
+        return {
+          terminalId: terminal.id,
+          terminalCode: terminal.terminalCode,
+          bindCode,
+          expiresAt: expiresAt.toISOString(),
+        }
+      } catch (error) {
+        if (attempt === 2) throw error
+      }
+    }
+
+    throw new Error('Failed to create terminal bind code')
+  }
+
+  /** Agent 用一次性绑定码换取 terminalToken。成功后旧 token 立即失效。 */
+  async exchangeBindCode(dto: ExchangeTerminalBindCodeDto): Promise<TerminalBindCodeExchangeResult> {
+    const codeHash = hashBindCode(dto.bindCode)
+    const now = new Date()
+    const agentToken = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
+    const macAddress = normalizeMacAddress(dto.macAddress)
+    const locationLabel = cleanNullable(dto.locationLabel)
+    const displayName = cleanNullable(dto.displayName)
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const bind = await tx.terminalBindCode.findUnique({
+        where: { codeHash },
+        include: { terminal: { select: { id: true, terminalCode: true, enabled: true } } },
+      })
+      if (!bind) {
+        throw new UnauthorizedException({ error: { code: 'BIND_CODE_INVALID', message: '绑定码无效' } })
+      }
+      if (bind.revokedAt) {
+        throw new UnauthorizedException({ error: { code: 'BIND_CODE_REVOKED', message: '绑定码已撤销' } })
+      }
+      if (bind.usedAt) {
+        throw new UnauthorizedException({ error: { code: 'BIND_CODE_USED', message: '绑定码已使用' } })
+      }
+      if (bind.expiresAt <= now) {
+        throw new UnauthorizedException({ error: { code: 'BIND_CODE_EXPIRED', message: '绑定码已过期' } })
+      }
+      if (!bind.terminal.enabled) {
+        throw new ForbiddenException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用，不能绑定' } })
+      }
+
+      if (macAddress) {
+        const found = await tx.terminal.findFirst({ where: { macAddress }, select: { id: true, terminalCode: true } })
+        if (found && found.id !== bind.terminalId) {
+          throw new BadRequestException({ error: { code: 'MAC_ALREADY_BOUND', message: `MAC 地址已绑定到终端 ${found.terminalCode}` } })
+        }
+      }
+
+      const consumed = await tx.terminalBindCode.updateMany({
+        where: {
+          id: bind.id,
+          usedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { usedAt: now },
+      })
+      if (consumed.count !== 1) {
+        throw new UnauthorizedException({ error: { code: 'BIND_CODE_USED', message: '绑定码已使用' } })
+      }
+
+      const terminal = await tx.terminal.update({
+        where: { id: bind.terminalId },
+        data: {
+          agentToken,
+          deviceFingerprint: dto.deviceFingerprint,
+          ...(displayName !== undefined ? { displayName } : {}),
+          ...(macAddress !== undefined ? { macAddress } : {}),
+          ...(locationLabel !== undefined ? { locationLabel } : {}),
+        },
+        select: { id: true, terminalCode: true },
+      })
+      return terminal
+    })
+
+    this.logger.log(`bind-code exchange: terminalId=${result.id} code=${result.terminalCode}`)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'terminal-agent',
+      action: 'terminal.bind_code.exchange',
+      targetType: 'terminal',
+      targetId: result.terminalCode,
+      payload: {
+        terminalCode: result.terminalCode,
+        displayName,
+        macAddress,
+        locationLabel,
+        agentVersion: cleanNullable(dto.agentVersion) ?? null,
+        deviceFingerprintPrefix: dto.deviceFingerprint.slice(0, 12),
+      },
+    })
+    return {
+      terminalId: result.id,
+      terminalCode: result.terminalCode,
+      terminalToken: agentToken,
+      expiresAt,
+    }
   }
 
   // ── 2. Heartbeat ─────────────────────────────────────────────────────────────

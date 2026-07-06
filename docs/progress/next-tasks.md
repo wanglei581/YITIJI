@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-01
+> 最后更新：2026-07-06
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 > 2026-07-01 纠偏：`82.157.43.217` 是腾讯云公司网站服务器上的临时预览环境，仅保留为历史 smoke 记录，不作为本项目正式上线 / Windows 真机验收依据。正式验收以百度云项目服务器 `120.48.13.190` 为准：Kiosk `http://120.48.13.190/`，Admin `http://120.48.13.190:8081/`，API `http://120.48.13.190/api/v1`。任何打印扫描真机验收报告必须明确连接百度云项目服务器，不能把腾讯云临时预览 smoke 写成正式验收结论。
@@ -44,9 +44,20 @@
 - [x] 预生产 env 与后端启动门禁：隔离目录 `/www/wwwroot/ai-job-print-preprod/current` 已完成依赖安装、typecheck、lint、text-only 前端 build、独立 staging `.env`、PostgreSQL migration、Redis 配置、`db:pg:sync:check`、`verify:production-runtime-gates` 自测、服务器 API build、独立 PM2 `ai-job-print-preprod-api` 启动、本机 health、`verify:print-scan-first-release` 和 `verify:print-scan-preflight:postgres`；现有 `zlixc-api` 仍 online。本项仍不代表 nginx 公网预览、正式生产部署或 Windows 真机完成。
 - [x] 预生产 nginx 预览入口（腾讯云临时预览历史记录）：曾使用 `82.157.43.217:8897/8898/8896` 做隔离 HTTP 预览；2026-07-01 已纠偏确认 `82.157.43.217` 是腾讯云公司网站服务器上的临时预览环境，仅保留为历史 smoke 记录，不作为本项目正式上线 / Windows 真机验收依据。正式验收以百度云项目服务器 `120.48.13.190` 为准。
 - [x] 预生产浏览器功能联调（腾讯云临时预览历史记录）：该轮 smoke 基于 `82.157.43.217` 三个临时 HTTP 预览入口，仅证明当时 Kiosk 首页、Admin 登录后 `/orders`、Partner 登录后 dashboard、Kiosk `/print-scan`、`/print/upload?source=document`、直达 `/print/progress` 保护分支可在该临时环境打开；不代表百度云项目服务器、正式 HTTPS、Windows 真机出纸或试运营验收。后续浏览器 / 真机验收必须使用 `120.48.13.190` 对应 Kiosk/Admin/API 地址重新执行。
-- [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。验收前必须确认 Kiosk 构建注入正确 `VITE_TERMINAL_ID` 且后台终端已注册并启用；`agent_degraded` 视为本地 Agent DB 降级，需要人工重启 Agent 后复测；真机打印必须由 Kiosk 上传创建真实终端绑定任务，不使用 `ptask_seed_001` 等 seed 任务替代。
+- [ ] Windows 真机：Terminal Agent、奔图打印机、打印真实出纸、扫描链路、断网/重启恢复逐项记录。2026-07-06 已完成 Windows PDF 物理打印补证：直接烟测、Kiosk 同源代理正式端点链路、PS-G5 二次 PDF 样本均通过 `Pantum CM2800ADN Series` / `USB001` 打印 1 页，PrintService 有 Event ID 307 / 842，Windows PrintQueue 计数器累计 `TotalPagesPrinted 27 -> 30`。其中 PS-G5 任务 `ptask_kiosk_638475ac307beb0c` / `ORD-20260706-7B04908AD7` 由另一个可访问远程 API 的智能体仅调用 `/files/kiosk-upload -> /print/jobs` 下发，未启动 `terminal-agent agent`、未运行 claim loop；状态流转 `pending -> claimed -> printing -> completed`，现场人工反馈“已出纸”，满足“后端 completed + PrintService 有事件 + 现场确认出纸”。该结果只关闭“PDF 样张真实出纸 + Agent claim/printing/completed + 计数器/PrintService + 现场出纸确认”子项；仍不等于 Windows 真机整体验收通过。现场补验必须使用 `codex/print-scan-windows-acceptance` 当前验收候选 `0aa97b8`，不得继续要求 HEAD 为原始候选基线 `06287e11`；Windows 端先执行 `git fetch origin`、`git switch codex/print-scan-windows-acceptance`、`git pull --ff-only`，并确认 `git rev-parse --short HEAD` 输出 `0aa97b8`。验收地址固定为 Kiosk `http://120.48.13.190/`、Admin `http://120.48.13.190:8081/`、API `http://120.48.13.190/api/v1`。验收前必须确认 Kiosk 构建注入正确 `VITE_TERMINAL_ID` 且后台终端已注册并启用；`agent_degraded` 视为本地 Agent DB 降级，需要人工重启 Agent 后复测；真机打印必须由真实 Kiosk 页面上传创建真实终端绑定任务，不使用 `ptask_seed_001` 等 seed 任务替代。后续至少补验：真实 Kiosk 页面人工上传 PDF 1 单、PNG/JPG 打印 1 单，逐单记录 `taskId` / `orderNo`，肉眼或摄像头确认真实出纸、页数、方向、清晰度、彩色/黑白，核对 Kiosk 进度页最终状态与 Admin `/orders` 状态一致，并补测离线、取消、失败、Agent 重启、`agent_degraded` 中至少两个异常场景。扫描继续标记为“未完成 / 待单独任务”，不得写通过。PS-G5 暴露 `amountCents=100`、`payStatus=unpaid` 仍被 claim 并 completed，免费/付费试运营配置口径与支付门禁上线前需单独收口。
+
+  Windows 现场补验返回报告最少包含：Git（branch、commit）、Server（Kiosk/Admin/API 地址）、PDF 打印（taskId、orderNo、是否真实出纸、页数/方向/清晰度、Kiosk 最终状态、Admin 最终状态）、图片打印（taskId、orderNo、是否真实出纸、页数/方向/清晰度、Kiosk 最终状态、Admin 最终状态）、异常场景（至少两个场景与结果）、扫描（未完成/成功、阻塞点）、结论（是否可回 Mac 收口、仍需修复的问题）。判断标准不变：PDF 和图片没有真实出纸，不能回 Mac 写最终通过；Kiosk 和 Admin 状态不一致，也不能收口。
 - [ ] 法务合规：用户协议、隐私政策、AI 免责声明、招聘信息来源免责声明审定。
 - [ ] 小范围试运营：仅 1 台终端 + 1 台打印机先跑，问题记录按任务闭环处理。
+
+## P0：商用 Windows Terminal Agent 授权闭环（2026-07-05 收尾）
+
+- [x] **生产 Agent 一键加固脚本**：新增 `apps/terminal-agent/scripts/install-production-agent.ps1`，固定远程 API、校验打印机、DPAPI 加密 token、安装/启动 Windows 服务并验证远程心跳；当前会话安全验证通过。
+- [x] **生产 Agent onboarding 文档**：新增 `docs/device/production-agent-onboarding.md`，约定云端作为唯一任务源、禁止 production 指向 localhost、并说明 `AGENT_PROFILE=local-debug` 是唯一允许本地 API 调试的显式开关。
+- [x] **一次性终端绑定码后端接口**：`TerminalBindCode` SQLite/PostgreSQL additive migration 已部署到本地库；`POST /api/v1/admin/terminals/:terminalId/bind-code` 与 `POST /api/v1/auth/terminal/exchange-bind-code` 已接入；安装脚本新增 `-BindCode` 用绑定码换 token 路径；绑定码固定 20 位可视字符，同终端重新生成会撤销旧的未使用/未过期绑定码；新增 `verify:terminal-bind-code` 锁定 hash 落库、审计不写明文、旧码撤销、兑换后标记 used 和 DPAPI 安装脚本路径；`verify:terminal-bind-code`、`db:pg:sync:check`、API typecheck + lint 通过。
+- [x] **Admin UI 接入绑定码按钮**：终端管理页已在每行“编辑档案”旁增加「生成绑定码」入口，停用终端禁用；弹窗已拆到 `TerminalBindCodeDialog.tsx`，包含 TTL 选择、明文 bindCode 显示 + 可复制 + 倒计时、预设 `install-production-agent.ps1` 命令模板；命令模板使用真实 PowerShell 反引号续行，并含 `-BindCode/-PrinterName`；适配 `http` / `mock` 双模式；新增 `verify:admin-terminal-bind-code-ui` 静态门禁，断言 devices/http/mock 出口、按钮/弹窗出现、命令示例与“bindCode 不入日志/审计”等防回退项；Admin typecheck + lint 通过。
+- [x] **本地调试 production 互斥保护**：Terminal Agent `agent` 启动时已接入 `assertAgentProfileAllowsApiBaseUrl`；发现 `apiBaseUrl` 指向 `localhost` / `127.0.0.1` / `::1` / `0.0.0.0` 时默认拒绝启动，只有显式 `AGENT_PROFILE=local-debug` 才允许本地调试；新增 `verify:agent-profile-guard` 防回退，并通过 Terminal Agent typecheck / build / verify。
+- [ ] **正式生产与真机验收**：当前绑定码 API 仅在本地 SQLite 自测通过；正式上线前需要在 PostgreSQL 预生产复跑绑定码生成/兑换/撤销/审计，并通过 Windows 真机 `install-production-agent.ps1 -BindCode` 完成首次授权并出纸。
 
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
 

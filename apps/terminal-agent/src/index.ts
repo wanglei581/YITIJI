@@ -10,6 +10,7 @@ import { print as printUnified } from './printer/print'
 import { PrintResult } from './printer/types'
 // Phase 8.1B agent modules
 import { loadConfig } from './agent/config-manager'
+import { assertAgentProfileAllowsApiBaseUrl } from './agent/profile-guard'
 import { registerOrLoad } from './agent/registration'
 import { startHeartbeat } from './agent/heartbeat'
 import { startTaskRunner } from './agent/task-runner'
@@ -55,6 +56,12 @@ program
       process.exit(1)
     }
     log(`config loaded — terminal="${config.terminalCode}"  api=${config.apiBaseUrl}`)
+    try {
+      assertAgentProfileAllowsApiBaseUrl(config)
+    } catch (e) {
+      err(`${e instanceof Error ? e.message : String(e)}`)
+      process.exit(1)
+    }
 
     // ── Step 4: Register or load existing credentials ─────────────────────
     try {

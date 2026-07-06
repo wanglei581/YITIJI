@@ -10,7 +10,7 @@
 // 消费方：Agent3 admin 设备页。响应字段/类型必须严格匹配契约 C1。
 // ============================================================
 
-import { Body, Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -22,10 +22,12 @@ import {
   type AdminTerminalView,
   type AdminOrganizationOption,
   type AssignTerminalOrgResult,
+  type TerminalBindCodeCreated,
   type UpdateTerminalProfileResult,
 } from './terminals.service'
 import { AssignTerminalOrgDto } from './dto/assign-terminal-org.dto'
 import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
+import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
 
 interface AuditReq {
   headers: Record<string, string | string[] | undefined>
@@ -54,6 +56,35 @@ export class AdminTerminalsController {
   @Get('org-options')
   async orgOptions(): Promise<ApiResponse<{ organizations: AdminOrganizationOption[] }>> {
     return ApiResponse.ok(await this.terminalsService.listOrganizationOptions())
+  }
+
+  // POST /api/v1/admin/terminals/:terminalId/bind-code
+  // 生成一次性绑定码；明文仅在本响应返回一次。
+  @Post(':terminalId/bind-code')
+  async createBindCode(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: CreateTerminalBindCodeDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<TerminalBindCodeCreated>> {
+    const result = await this.terminalsService.createBindCode(terminalId, user.userId, dto.ttlMinutes)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'terminal.bind_code.create',
+      targetType: 'terminal',
+      targetId: result.terminalCode,
+      payload: {
+        terminalCode: result.terminalCode,
+        expiresAt: result.expiresAt,
+        // 绝不写 bindCode 明文到审计日志。
+        bindCodeReturnedOnce: true,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
   }
 
   // PATCH /api/v1/admin/terminals/:terminalId/org

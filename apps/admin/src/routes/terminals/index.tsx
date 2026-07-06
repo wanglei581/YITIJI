@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
-import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon } from 'lucide-react'
+import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon, KeyRoundIcon } from 'lucide-react'
 import { Pagination, useTableState } from '../components/DataTable'
 import { API_MODE } from '../../services/api/client'
 import {
@@ -13,6 +13,7 @@ import {
   type AdminOrganizationOption,
   type UpdateTerminalProfileInput,
 } from '../../services/api/devices'
+import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 
 const TABLE_COLS = 12
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
@@ -71,6 +72,8 @@ export default function TerminalsPage() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  // 一次性绑定码弹窗状态；生成/倒计时/复制逻辑在 TerminalBindCodeDialog 内部。
+  const [bindCodeTerminal, setBindCodeTerminal] = useState<AdminTerminalRecord | null>(null)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
 
@@ -100,6 +103,15 @@ export default function TerminalsPage() {
     [TERMINALS_REFRESH_KEY],
     'hard',
   )
+
+  function openBindCodeModal(t: AdminTerminalRecord) {
+    if (statusSavingId !== null || !t.enabled) return
+    setBindCodeTerminal(t)
+    setNotice(null)
+  }
+  function closeBindCodeModal() {
+    setBindCodeTerminal(null)
+  }
 
   const terminals = useMemo(
     () => (terminalData?.terminals ?? []).map((terminal) => {
@@ -442,17 +454,30 @@ export default function TerminalsPage() {
                               <p className="truncate font-medium text-gray-800">{t.displayName || '未命名终端'}</p>
                               <p className="mt-0.5 max-w-[220px] truncate text-gray-400">{t.locationLabel || '未设置摆放位置'}</p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => startProfileEdit(t)}
-                              disabled={statusSavingId !== null}
-                              title="编辑设备档案"
-                              aria-label={`编辑 ${t.terminalCode} 设备档案`}
-                              className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <PencilIcon className="h-3.5 w-3.5" />
-                              编辑档案
-                            </button>
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openBindCodeModal(t)}
+                                disabled={statusSavingId !== null || !t.enabled}
+                                title={t.enabled ? '生成一次性绑定码（用于 Windows 新主机授权）' : '停用终端不可生成绑定码'}
+                                aria-label={`为 ${t.terminalCode} 生成一次性绑定码`}
+                                className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-primary-200 bg-primary-50 px-2 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <KeyRoundIcon className="h-3.5 w-3.5" />
+                                生成绑定码
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => startProfileEdit(t)}
+                                disabled={statusSavingId !== null}
+                                title="编辑设备档案"
+                                aria-label={`编辑 ${t.terminalCode} 设备档案`}
+                                className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <PencilIcon className="h-3.5 w-3.5" />
+                                编辑档案
+                              </button>
+                            </div>
                           </div>
                         )}
                       </td>
@@ -565,6 +590,14 @@ export default function TerminalsPage() {
       <p className="mt-1 text-xs text-gray-400">
         「设备档案」用于商用部署的机器识别和权限绑定；MAC 地址建议由 Terminal Agent 上报，也可由管理员人工校正。停用终端后，Kiosk 统一配置会关闭敏感模块。
       </p>
+
+      {bindCodeTerminal ? (
+        <TerminalBindCodeDialog
+          terminal={bindCodeTerminal}
+          onClose={closeBindCodeModal}
+          onNotice={setNotice}
+        />
+      ) : null}
     </>
   )
 }

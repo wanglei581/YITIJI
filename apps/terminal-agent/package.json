@@ -13,6 +13,7 @@
     "verify:direct-http-agents": "ts-node scripts/verify-direct-http-agents.ts",
     "verify:local-qr-proxy": "ts-node scripts/verify-local-qr-proxy.ts",
     "verify:printer-config": "node scripts/verify-printer-config.mjs",
+    "verify:agent-profile-guard": "node scripts/verify-agent-profile-guard.mjs",
     "verify:print-scan-agent": "node scripts/verify-print-scan-agent.mjs"
   },
   "dependencies": {

@@ -13,6 +13,7 @@
     "verify:admin-print-ops-ui": "node scripts/verify-admin-print-ops-ui.mjs",
     "verify:refresh-safe": "node scripts/verify-refresh-safe.mjs",
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
+    "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
