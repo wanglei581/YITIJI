@@ -192,8 +192,6 @@ export class AlipayProvider implements PaymentProvider {
     } catch {
       throw new Error('ALIPAY_CHANNEL_ERROR: RESPONSE_NOT_JSON')
     }
-    const node = outer[responseKey] as Record<string, unknown> | undefined
-    if (!node) throw new Error('ALIPAY_CHANNEL_ERROR: RESPONSE_NODE_MISSING')
 
     // 响应验签（基于原文子串）；未带签名或验签失败一律 fail-closed。
     const sign = asString(outer['sign'])
@@ -207,6 +205,16 @@ export class AlipayProvider implements PaymentProvider {
       }
     }
     if (!verified) throw new Error('ALIPAY_CHANNEL_ERROR: RESPONSE_SIGN_INVALID')
+
+    // 业务节点必须从「验签通过的原文子串」解析 —— 与验签视图字节级同源；
+    // 绝不使用 outer[responseKey]（响应含重复 key 时 JSON.parse 取后者，会造成
+    // 验签视图与解析视图分离，C5-6 双模型审查 High 修复）。
+    let node: Record<string, unknown>
+    try {
+      node = JSON.parse(rawNode as string) as Record<string, unknown>
+    } catch {
+      throw new Error('ALIPAY_CHANNEL_ERROR: RESPONSE_NODE_MISSING')
+    }
 
     const code = asString(node['code'])
     if (code !== '10000') {

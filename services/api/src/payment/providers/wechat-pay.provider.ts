@@ -141,7 +141,10 @@ export class WechatPayProvider implements PaymentProvider {
     if (!cfg.platformPublicKeyId?.trim()) missing.push('platformPublicKeyId')
     if (!cfg.notifyBaseUrl?.trim()) missing.push('notifyBaseUrl')
     if (!cfg.apiBaseUrl?.trim()) missing.push('apiBaseUrl')
-    if ((cfg.apiV3Key ?? '').length !== APIV3_KEY_LENGTH) missing.push(`apiV3Key(须 ${APIV3_KEY_LENGTH} 字节)`)
+    // 按字节长校验（AES-256 要求 32 字节密钥；JS 字符长度对非 ASCII 会失真）
+    if (Buffer.byteLength(cfg.apiV3Key ?? '', 'utf8') !== APIV3_KEY_LENGTH) {
+      missing.push(`apiV3Key(须 ${APIV3_KEY_LENGTH} 字节)`)
+    }
     if (missing.length > 0) {
       throw new Error(`WECHAT_PAY_CONFIG_INVALID: 缺失/非法配置项 ${missing.join(', ')}（密钥只存服务端 env，见 .env.example）`)
     }

@@ -31,9 +31,11 @@ if (process.env['NODE_ENV'] === 'production') {
 }
 
 import 'dotenv/config'
+import express from 'express'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
 import { createSign, generateKeyPairSync, randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
+import { installBodyParsers } from '../src/config/body-parsers'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
@@ -701,6 +703,88 @@ async function main(): Promise<void> {
       pass('alipay TRADE_CLOSED：尝试 failed（安全文案，不透传渠道原文）+ 订单回 unpaid 可重试')
     } else {
       fail(`TRADE_CLOSED mishandled: ${JSON.stringify({ attemptCState, orderCState })}`)
+    }
+
+    // ── (5b) 真实 HTTP 栈回调入口（body-parser 装配守护，C5-6 双模型审查修复项）────
+    // 用与生产 main.ts 完全相同的 installBodyParsers（json + urlencoded 均挂 rawBody verify）
+    // 起真实 express 服务：alipay form-urlencoded / wechat json 回调都必须在 HTTP 层拿到
+    // rawBody 并成功验签入账 —— 堵住「service 级测试绕过 body-parser 掩盖生产装配缺口」。
+    const httpApp = express()
+    installBodyParsers(httpApp)
+    httpApp.post('/api/v1/payment/callback/:channel', (req, res) => {
+      void (async () => {
+        try {
+          const result = await payment.processCallback(
+            req.params['channel'] as string,
+            (req as { rawBody?: Buffer }).rawBody,
+            req.headers as Record<string, string | string[] | undefined>,
+          )
+          if (result.ack) res.set('content-type', result.ack.contentType).send(result.ack.body)
+          else res.json({ ok: true })
+        } catch (e) {
+          res.status(400).send((e as Error).message)
+        }
+      })()
+    })
+    const httpEntry: Server = await new Promise((resolve) => {
+      const s = httpApp.listen(0, '127.0.0.1', () => resolve(s))
+    })
+    const entryAddr = httpEntry.address()
+    const entryPort = typeof entryAddr === 'object' && entryAddr ? entryAddr.port : 0
+    try {
+      // alipay：form-urlencoded 经真实 HTTP 栈入账
+      const IA = await makePrintOrder('orderHttpAli')
+      const attemptIA = await payment.createPayAttempt(IA.orderId, IA.token, 'alipay')
+      const httpAliCb = buildAlipayNotify({
+        params: {
+          out_trade_no: attemptIA.attemptId,
+          trade_no: `alitxn_http_${randomBytes(6).toString('hex')}`,
+          trade_status: 'TRADE_SUCCESS',
+          total_amount: '2.00',
+          passback_params: encodeURIComponent(JSON.stringify({ orderId: IA.orderId })),
+        },
+      })
+      const aliHttpRes = await fetch(`http://127.0.0.1:${entryPort}${ALI_CALLBACK_PATH}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: httpAliCb.rawBody,
+      })
+      const aliHttpText = await aliHttpRes.text()
+      if (aliHttpRes.status === 200 && aliHttpText === 'success' && (await orderState(IA.orderId)).payStatus === 'paid') {
+        pass('HTTP 栈 alipay form-urlencoded 回调：rawBody 捕获 + 验签入账 + 纯文本 success 应答')
+      } else {
+        fail(`HTTP alipay callback failed: ${aliHttpRes.status} ${aliHttpText}`)
+      }
+
+      // wechat：json 经真实 HTTP 栈入账
+      const IW = await makePrintOrder('orderHttpWx')
+      const attemptIW = await payment.createPayAttempt(IW.orderId, IW.token, 'wechat')
+      const httpWxCb = buildWechatCallback({
+        txn: wechatTxn({
+          out_trade_no: attemptIW.attemptId,
+          attach: JSON.stringify({ orderId: IW.orderId }),
+          amount: { total: 200, currency: 'CNY' },
+          transaction_id: `wxtxn_http_${randomBytes(6).toString('hex')}`,
+        }),
+      })
+      const wxHttpRes = await fetch(`http://127.0.0.1:${entryPort}${WX_CALLBACK_PATH}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...httpWxCb.headers },
+        body: httpWxCb.rawBody,
+      })
+      const wxHttpBody = (await wxHttpRes.json().catch(() => ({}))) as { code?: string }
+      if (wxHttpRes.status === 200 && wxHttpBody.code === 'SUCCESS' && (await orderState(IW.orderId)).payStatus === 'paid') {
+        pass('HTTP 栈 wechat json 回调：rawBody 捕获 + 验签解密入账 + JSON SUCCESS 应答')
+      } else {
+        fail(`HTTP wechat callback failed: ${wxHttpRes.status} ${JSON.stringify(wxHttpBody)}`)
+      }
+
+      // 两单入账后立即领取，保持后续 claim 断言的确定性
+      const httpClaims = new Set([await claimOnce(), await claimOnce()])
+      if (httpClaims.has(IA.taskId) && httpClaims.has(IW.taskId)) pass('HTTP 入账订单任务可 claim')
+      else fail(`http-paid claims mismatch: ${[...httpClaims].join(',')}`)
+    } finally {
+      httpEntry.close()
     }
 
     // ── (6) reconcile 主动查单兜底 ────────────────────────────────────────

@@ -101,7 +101,12 @@ export class OnlinePaymentService {
   private readonly qrTtlSeconds = ttlSecondsFromEnv('PAYMENT_QR_TTL_SECONDS', DEFAULT_QR_TTL_SECONDS)
   private readonly orderTtlSeconds = ttlSecondsFromEnv('PAYMENT_ORDER_TTL_SECONDS', DEFAULT_ORDER_TTL_SECONDS)
 
-  /** reconcile 主动查单的最小间隔（毫秒）：防止持会话 token 的客户端高频打渠道查单 API。 */
+  /**
+   * reconcile 主动查单的最小间隔（毫秒）：防止持会话 token 的客户端高频打渠道查单 API。
+   * 诚实边界：进程内 Map（与 ReplayGuard 同级语义）——多实例/重启后不共享；当前部署为
+   * 单实例 PM2，多实例化时应升级为 Redis 级限流（已记录在 C5-6 审查结论，非入账安全依赖：
+   * 入账正确性由验签 + 金额比对 + (channel,channelTxnNo) 唯一索引保证，与限流无关）。
+   */
   private static readonly RECONCILE_MIN_INTERVAL_MS = 3000
   private readonly reconcileLastAt = new Map<string, number>()
 
@@ -445,7 +450,17 @@ export class OnlinePaymentService {
       attempt.status === 'expired' ||
       Boolean(order.expiresAt && order.expiresAt.getTime() < now)
 
-    // 先订单入账（CAS 幂等，唯一允许写 paymentSource=sandbox 的路径），再回填尝试；
+    // 渠道流水号跨尝试冲突预检（C5-6 双模型审查 High 修复）：(channel, channelTxnNo)
+    // 唯一索引兜底发生在「订单已入账、attempt 回填」之后 —— 若同一流水号已被其它尝试
+    // 占用，先入账再冲突会留下 paid 订单 + 未回填尝试的半状态。改单前先按名拒绝；
+    // 预检后的并发窗口仍由唯一索引兜底（P2002 → CALLBACK_TXN_ALREADY_USED）。
+    const txnHolder = await this.prisma.paymentAttempt.findFirst({
+      where: { channel, channelTxnNo, id: { not: attempt.id } },
+      select: { id: true },
+    })
+    if (txnHolder) throw new BadRequestException('CALLBACK_TXN_ALREADY_USED')
+
+    // 先订单入账（CAS 幂等，线上通道 paymentSource 的唯一写入路径），再回填尝试；
     // 若回填前崩溃，渠道重试回调会再次幂等走到这里补齐。
     await this.orderStatus.markPaidOnline(order.id, { channel, attemptId: attempt.id, channelTxnNo, late })
 
