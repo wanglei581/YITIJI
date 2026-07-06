@@ -3,7 +3,7 @@
 //
 // Two modes:
 //   REAL  — state.taskId is set (API_MODE=http, real job submitted)
-//           Polls GET /api/v1/print/jobs/:taskId every 2s.
+//           Polls GET /api/v1/print/jobs/:taskId every 1s.
 //           Maps backend status → UI steps.
 //   SIM   — no taskId (mock mode or virtual file from W5 enterprise flow)
 //           Same setTimeout-based animation as before.
@@ -68,8 +68,8 @@ function errorCodeToMessage(code?: string): string | undefined {
   return code ? ERROR_CODE_MESSAGES[code] : undefined
 }
 
-const POLL_INTERVAL_MS = 2000
-const REAL_POLL_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes — guard against Agent never claiming
+const POLL_INTERVAL_MS = 1000
+const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes — guard against Agent never claiming without false timeout
 
 const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
 
