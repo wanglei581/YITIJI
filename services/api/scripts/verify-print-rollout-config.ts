@@ -51,6 +51,24 @@ function section(source: string, start: string, end: string, label: string): str
   return source.slice(startIndex, endIndex)
 }
 
+function sectionAny(source: string, starts: readonly string[], end: string, label: string): string {
+  const matchedStarts: string[] = []
+  for (const start of starts) {
+    const startIndex = source.indexOf(start)
+    if (startIndex < 0) continue
+    matchedStarts.push(start)
+    const endIndex = source.indexOf(end, startIndex + start.length)
+    if (endIndex < 0) continue
+    return source.slice(startIndex, endIndex)
+  }
+  if (matchedStarts.length > 0) {
+    fail(`${label}: 已定位起点 ${matchedStarts.join(' / ')}，但无法定位终点 ${end}`)
+    return ''
+  }
+  fail(`${label}: 无法定位任一起点 ${starts.join(' / ')}`)
+  return ''
+}
+
 function main(): void {
   console.log('\n=== Print rollout safety static guard ===')
 
@@ -99,10 +117,10 @@ function main(): void {
     'claim query must pass claimableWhere into printTask.findFirst()',
   )
 
-  const sandboxProviderBranch = section(
+  const sandboxProviderBranch = sectionAny(
     paymentProviderFactory,
-    "raw === 'sandbox'",
-    'return new SandboxPaymentProvider',
+    ["raw === 'sandbox'", "channel === 'sandbox'"],
+    'new SandboxPaymentProvider',
     'PaymentProviderFactory sandbox branch',
   )
   check(
@@ -117,7 +135,10 @@ function main(): void {
   check(
     /nodeEnv\s*!==\s*['"]production['"]\)\s*return/.test(productionRuntimeGates)
       && /PAYMENT_PROVIDER/.test(productionRuntimeGates)
-      && /paymentProvider\s*===\s*['"]sandbox['"]/.test(productionRuntimeGates)
+      && (
+        /paymentProvider\s*===\s*['"]sandbox['"]/.test(productionRuntimeGates)
+        || /paymentChannels\.includes\(\s*['"]sandbox['"]\s*\)/.test(productionRuntimeGates)
+      )
       && /PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN/.test(productionRuntimeGates)
       && /throw new Error/.test(productionRuntimeGates),
     'production runtime gates reject PAYMENT_PROVIDER=sandbox in production',
