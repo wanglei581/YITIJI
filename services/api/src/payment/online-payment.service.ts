@@ -1,16 +1,18 @@
 /**
- * C5-2 线上支付业务层（沙箱通道，无 live 网关）。
+ * 线上支付业务层（C5-2 沙箱底座；C5-6 扩 wechat / alipay 真实渠道 + 主动查单兜底）。
  *
- * 职责：出码（建 PaymentAttempt）、回调处理（验签 → 防重放 → 全字段匹配 → 金额一致 → 幂等入账）、
- * 支付状态查询（含惰性过期/关单）。渠道协议细节在 PaymentProvider；订单状态转移在 OrderStatusService。
+ * 职责：出码（建 PaymentAttempt，多通道选择）、回调处理（验签 → 防重放 → 全字段匹配 →
+ * 金额一致 → 幂等入账）、支付状态查询（含惰性过期/关单）、reconcile 主动查单兜底。
+ * 渠道协议细节在 PaymentProvider；订单状态转移在 OrderStatusService。
  *
  * 安全底线（CLAUDE.md §12 口径）：
  * - 回调必须验签 + 时间窗 + nonce 防重放 + 金额一致性；处理幂等（同一渠道流水号只入账一次）。
  * - 回调只能把「已存在的 PaymentAttempt」打成 success —— attemptId/prepayId/orderId/channel/amountCents
  *   全字段匹配，缺一即拒；不存在的尝试/任意 closed 订单绝不可能被伪造回调打成 paid。
- * - paymentSource=sandbox 只经 OrderStatusService.markPaidOnline 写入；线下三路径不经过本服务。
+ * - paymentSource ∈ {sandbox, wechat, alipay} 只经 OrderStatusService.markPaidOnline 写入
+ *   （回调成功 / reconcile 渠道账本确认两条路径，均复用同一幂等入账）；线下三路径不经过本服务。
  * - 支付状态只改支付域（Order.payStatus / PaymentAttempt），绝不改 PrintTask.status。
- * - 出码/轮询必须携带打印建单时服务端签发的短期 payment session token；orderId 不能单独授权。
+ * - 出码/轮询/查单必须携带打印建单时服务端签发的短期 payment session token；orderId 不能单独授权。
  */
 import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { randomBytes } from 'crypto'
@@ -19,10 +21,15 @@ import { PrismaService } from '../prisma/prisma.service'
 import { ReplayGuard } from '../sync/replay-guard'
 import { OrderStatusService, pickupCodeVisibleFor } from './order-status.service'
 import { verifyPaymentSessionToken } from './payment-session-token'
-import { PAYMENT_PROVIDER_TOKEN } from './payment-provider.factory'
-import { buildPaymentCallbackPath, type PaymentCallbackEvent, type PaymentProvider } from './payment-provider.types'
+import { PAYMENT_PROVIDER_TOKEN, PaymentProviderRegistry } from './payment-provider.factory'
+import {
+  buildPaymentCallbackPath,
+  type CallbackAck,
+  type PaymentCallbackEvent,
+  type PaymentProvider,
+} from './payment-provider.types'
 import { SandboxPaymentProvider } from './providers/sandbox-payment.provider'
-import type { PaymentAttemptStatus, PaymentChannel } from './payment.types'
+import { ONLINE_PAYMENT_CHANNELS, type PaymentAttemptStatus, type PaymentChannel } from './payment.types'
 
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
 type AttemptRecord = NonNullable<Awaited<ReturnType<PrismaService['paymentAttempt']['findUnique']>>>
@@ -34,13 +41,16 @@ const DEFAULT_ORDER_TTL_SECONDS = 900
 /** 用户可见的失败安全文案 —— 渠道原始错误只进审计，绝不透传。 */
 const SAFE_FAIL_TEXT = '支付未完成，请重新发起支付'
 
-/** 验签/时间窗类失败 → 401；其余业务校验失败 → 400。 */
+/** 验签/时间窗/解密类失败 → 401；其余业务校验失败 → 400。 */
 const UNAUTHORIZED_CALLBACK_CODES = new Set([
   'CALLBACK_HEADER_MISSING',
   'CALLBACK_TIMESTAMP_INVALID',
   'CALLBACK_TIMESTAMP_EXPIRED',
   'CALLBACK_NONCE_INVALID',
   'CALLBACK_SIGNATURE_INVALID',
+  'CALLBACK_SERIAL_MISMATCH', // wechat：回调声明的验签材料不命中配置公钥 ID
+  'CALLBACK_RESOURCE_DECRYPT_FAILED', // wechat：APIv3 密钥解不开 resource（密钥不符/报文被改）
+  'CALLBACK_MERCHANT_MISMATCH', // 跨商户/跨应用报文错投
 ])
 
 function ttlSecondsFromEnv(key: string, fallback: number): number {
@@ -76,6 +86,8 @@ export interface PayStatusView {
   pickupCode: string | null
   attempt: {
     attemptId: string
+    /** 本次尝试的支付通道（Kiosk 据此渲染通道态与品牌文案）。 */
+    channel: string
     status: PaymentAttemptStatus
     qrCodeContent: string | null
     expiresAt: string | null
@@ -89,23 +101,52 @@ export class OnlinePaymentService {
   private readonly qrTtlSeconds = ttlSecondsFromEnv('PAYMENT_QR_TTL_SECONDS', DEFAULT_QR_TTL_SECONDS)
   private readonly orderTtlSeconds = ttlSecondsFromEnv('PAYMENT_ORDER_TTL_SECONDS', DEFAULT_ORDER_TTL_SECONDS)
 
+  /** reconcile 主动查单的最小间隔（毫秒）：防止持会话 token 的客户端高频打渠道查单 API。 */
+  private static readonly RECONCILE_MIN_INTERVAL_MS = 3000
+  private readonly reconcileLastAt = new Map<string, number>()
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly orderStatus: OrderStatusService,
-    @Inject(PAYMENT_PROVIDER_TOKEN) private readonly provider: PaymentProvider | null,
+    @Inject(PAYMENT_PROVIDER_TOKEN) private readonly registry: PaymentProviderRegistry,
   ) {}
 
-  private requireProvider(): PaymentProvider {
-    // 未配置线上支付时明确拒绝，绝不伪装可支付。
-    if (!this.provider) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
-    return this.provider
+  /** 当前已启用通道（Kiosk 收银页据此渲染通道选择；无任何密钥信息）。 */
+  availableChannels(): PaymentChannel[] {
+    return this.registry.channels()
+  }
+
+  /**
+   * 解析本次出码使用的通道：显式指定必须已启用；未指定时单通道直接用、
+   * 多通道要求显式选择（绝不替用户默认选真实资金通道）。
+   */
+  private requireChannel(channel: string | undefined): PaymentProvider {
+    if (this.registry.size === 0) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
+    if (channel !== undefined) {
+      if (!(ONLINE_PAYMENT_CHANNELS as readonly string[]).includes(channel)) {
+        throw new BadRequestException('PAY_CHANNEL_INVALID')
+      }
+      const provider = this.registry.get(channel)
+      if (!provider) throw new BadRequestException('PAY_CHANNEL_NOT_ENABLED')
+      return provider
+    }
+    const channels = this.registry.channels()
+    const only = channels.length === 1 ? channels[0] : undefined
+    if (!only) throw new BadRequestException('PAY_CHANNEL_REQUIRED')
+    const provider = this.registry.get(only)
+    if (!provider) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
+    return provider
   }
 
   /** 出码：为付费订单创建（或复用未过期的）支付尝试，返回屏上动态码内容。 */
-  async createPayAttempt(orderId: string, paymentSessionToken: string | undefined): Promise<PayAttemptView> {
+  async createPayAttempt(
+    orderId: string,
+    paymentSessionToken: string | undefined,
+    channel?: string,
+  ): Promise<PayAttemptView> {
     this.requirePaymentSessionHeader(paymentSessionToken)
-    const provider = this.requireProvider()
+    const provider = this.requireChannel(channel)
 
     let order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
@@ -199,12 +240,99 @@ export class OnlinePaymentService {
       attempt: latest
         ? {
             attemptId: latest.id,
+            channel: latest.channel,
             status: latest.status as PaymentAttemptStatus,
             qrCodeContent: latest.qrCodeContent,
             expiresAt: latest.expiresAt?.toISOString() ?? null,
           }
         : null,
     }
+  }
+
+  /**
+   * 主动查单兜底（C5-6）：回调丢失/延迟时按渠道账本核实，**复用与回调完全相同的幂等入账路径**。
+   *
+   * - 鉴权与轮询同口径（payment session token）；有最小间隔限流，防高频打渠道 API。
+   * - 只信渠道账本：channel 返回 paid 且流水号/金额齐备、金额与服务端快照一致才入账；
+   *   pending/closed/failed/unknown 一律不改支付状态（惰性过期仍由 applyLazyExpiry 处理）。
+   * - sandbox 无外部账本（不实现 queryPayment）→ RECONCILE_UNSUPPORTED，不伪造能力。
+   */
+  async reconcilePayment(orderId: string, paymentSessionToken: string | undefined): Promise<PayStatusView> {
+    this.requirePaymentSessionHeader(paymentSessionToken)
+    let order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+    this.requirePaymentSession(order, paymentSessionToken)
+
+    if (order.payStatus !== 'paid') {
+      const now = Date.now()
+      const last = this.reconcileLastAt.get(order.id) ?? 0
+      if (now - last < OnlinePaymentService.RECONCILE_MIN_INTERVAL_MS) {
+        throw new BadRequestException('RECONCILE_TOO_FREQUENT')
+      }
+      this.reconcileLastAt.set(order.id, now)
+      // 有界清理：防 Map 无界增长（保留近 1000 单足够 Kiosk 场景）。
+      if (this.reconcileLastAt.size > 1000) {
+        const oldest = this.reconcileLastAt.keys().next().value
+        if (oldest) this.reconcileLastAt.delete(oldest)
+      }
+
+      order = await this.applyLazyExpiry(order)
+      // 已出码（prepayId 非空）的最近一次尝试才有渠道单可查；expired 也查（迟到支付兜底）。
+      const attempt = await this.prisma.paymentAttempt.findFirst({
+        where: { orderId: order.id, prepayId: { not: null }, status: { in: ['pending', 'expired', 'success'] } },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (attempt && attempt.status !== 'success') {
+        const provider = this.registry.get(attempt.channel)
+        if (!provider) throw new BadRequestException('PAY_CHANNEL_NOT_ENABLED')
+        if (!provider.queryPayment) throw new BadRequestException('RECONCILE_UNSUPPORTED')
+
+        const queried = await provider.queryPayment({ attemptId: attempt.id, orderId: order.id })
+        if (queried.status === 'paid') {
+          // 金额一致性双重比对（渠道账本 = 尝试快照 = 订单应付），任何不一致拒绝入账并可审计。
+          if (
+            queried.channelTxnNo &&
+            queried.amountCents !== null &&
+            queried.amountCents === attempt.amountCents &&
+            queried.amountCents === order.amountCents
+          ) {
+            const late =
+              order.payStatus === 'closed' ||
+              attempt.status === 'expired' ||
+              Boolean(order.expiresAt && order.expiresAt.getTime() < Date.now())
+            await this.handleSuccess(attempt.channel as PaymentChannel, attempt, order, {
+              channelTxnNo: queried.channelTxnNo,
+            })
+            await this.audit.write({
+              actorId: null,
+              actorRole: 'system',
+              action: 'payment.reconciled',
+              targetType: 'payment_attempt',
+              targetId: attempt.id,
+              payload: { orderId: order.id, channel: attempt.channel, channelTxnNo: queried.channelTxnNo, late },
+            })
+          } else {
+            await this.audit.write({
+              actorId: null,
+              actorRole: 'system',
+              action: 'payment.reconcile_amount_mismatch',
+              targetType: 'payment_attempt',
+              targetId: attempt.id,
+              payload: {
+                orderId: order.id,
+                channel: attempt.channel,
+                queriedAmountCents: queried.amountCents,
+                expectedAmountCents: order.amountCents,
+              },
+            })
+            throw new BadRequestException('RECONCILE_AMOUNT_MISMATCH')
+          }
+        }
+        // pending / closed / failed / unknown：不改支付状态，返回当前真实状态。
+      }
+    }
+
+    return this.getPayStatus(orderId, paymentSessionToken)
   }
 
   /**
@@ -215,10 +343,12 @@ export class OnlinePaymentService {
     channel: string,
     rawBody: Buffer | undefined,
     headers: Record<string, string | string[] | undefined>,
-  ): Promise<{ ok: true; idempotent?: boolean }> {
-    const provider = this.requireProvider()
-    if (channel !== provider.channel) throw new BadRequestException('CALLBACK_CHANNEL_UNSUPPORTED')
+  ): Promise<{ ok: true; idempotent?: boolean; ack: CallbackAck | null }> {
+    if (this.registry.size === 0) throw new BadRequestException('ONLINE_PAYMENT_DISABLED')
+    const provider = this.registry.get(channel)
+    if (!provider) throw new BadRequestException('CALLBACK_CHANNEL_UNSUPPORTED')
     if (!rawBody || rawBody.length === 0) throw new BadRequestException('CALLBACK_RAW_BODY_MISSING')
+    const ack = provider.callbackAck?.() ?? null
 
     const path = buildPaymentCallbackPath(channel)
     const verified = await provider.verifyAndParseCallback({ channel, path, rawBody, headers })
@@ -232,6 +362,9 @@ export class OnlinePaymentService {
     if (!this.replay.register(event.nonce, `payment:${channel}`, event.timestampMs)) {
       throw new UnauthorizedException('CALLBACK_REPLAY')
     }
+
+    // 中间态通知（如 alipay WAIT_BUYER_PAY）：验签合法但无需变更状态 —— 只 ack，不动订单/尝试。
+    if (event.result === 'ignored') return { ok: true, idempotent: true, ack }
 
     // 全字段匹配（硬约束）：回调只能命中「已存在的 PaymentAttempt」，
     // attemptId / channel / prepayId / orderId / amountCents 缺一不可。
@@ -248,18 +381,27 @@ export class OnlinePaymentService {
     const order = attempt.order
     if (order.amountCents !== event.amountCents) throw new BadRequestException('CALLBACK_AMOUNT_MISMATCH')
 
-    if (event.result === 'success') return this.handleSuccess(channel as PaymentChannel, attempt, order, event)
-    return this.handleFailure(channel, attempt, order, event)
+    if (event.result === 'success') {
+      const res = await this.handleSuccess(channel as PaymentChannel, attempt, order, {
+        channelTxnNo: event.channelTxnNo,
+      })
+      return { ...res, ack }
+    }
+    const res = await this.handleFailure(channel, attempt, order, event)
+    return { ...res, ack }
   }
 
   /**
    * 沙箱模拟支付（仅开发/联调）：按库内 attempt 真实数据构造签名合法的回调，
    * 走与真实回调完全相同的验签/匹配/入账路径。生产环境不存在此能力。
    */
-  async simulateSandboxCallback(input: { attemptId: string; result: 'success' | 'failed' }): Promise<{ ok: true; idempotent?: boolean }> {
+  async simulateSandboxCallback(input: {
+    attemptId: string
+    result: 'success' | 'failed'
+  }): Promise<{ ok: true; idempotent?: boolean }> {
     if (process.env['NODE_ENV'] === 'production') throw new NotFoundException()
-    const provider = this.requireProvider()
-    if (!(provider instanceof SandboxPaymentProvider)) throw new BadRequestException('SANDBOX_ONLY')
+    const provider = this.registry.get('sandbox')
+    if (!provider || !(provider instanceof SandboxPaymentProvider)) throw new BadRequestException('SANDBOX_ONLY')
 
     const attempt = await this.prisma.paymentAttempt.findUnique({ where: { id: input.attemptId } })
     if (!attempt) throw new NotFoundException('PAYMENT_ATTEMPT_NOT_FOUND')
@@ -281,13 +423,14 @@ export class OnlinePaymentService {
 
   // ── 内部 ──────────────────────────────────────────────────────────────
 
+  /** 成功入账（回调与 reconcile 查单共用的唯一路径）：CAS 幂等，同一渠道流水号绝不入账两次。 */
   private async handleSuccess(
     channel: PaymentChannel,
     attempt: AttemptRecord,
     order: OrderRecord,
-    event: PaymentCallbackEvent,
+    opts: { channelTxnNo: string | null },
   ): Promise<{ ok: true; idempotent?: boolean }> {
-    const channelTxnNo = event.channelTxnNo as string // provider 已保证 success 必带
+    const channelTxnNo = opts.channelTxnNo as string // 调用方已保证 success 必带
     // 幂等：同一尝试 + 同一渠道流水号的重复成功回调，不重复副作用。
     if (attempt.status === 'success') {
       if (attempt.channelTxnNo === channelTxnNo) return { ok: true, idempotent: true }

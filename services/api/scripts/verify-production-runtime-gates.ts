@@ -21,6 +21,8 @@ const PROD_OK: Env = {
   AI_PROVIDER: 'llm',
   AI_LLM_API_KEY: 'llm-api-key',
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
+  // C5-6：生产必须显式声明 paid-before-claim（缺省即拒启动）
+  PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
 }
 const REQUIRED_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
@@ -219,6 +221,48 @@ function main(): void {
     { ...PROD_OK, PAYMENT_SESSION_SECRET: 'too-short' },
     'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID',
     '生产环境拒绝过短 PAYMENT_SESSION_SECRET（<32）',
+  )
+
+  // 生产环境：支付通道门禁（C5-2 沙箱禁产 + C5-6 真实通道）
+  expectRejected(
+    { ...PROD_OK, PAYMENT_PROVIDER: 'sandbox' },
+    'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN',
+    '生产环境拒绝 PAYMENT_PROVIDER=sandbox',
+  )
+  expectRejected(
+    { ...PROD_OK, PAYMENT_PROVIDER: 'wechat,sandbox' },
+    'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN',
+    '生产环境拒绝逗号列表中混入 sandbox',
+  )
+  expectAllowed(
+    { ...PROD_OK, PAYMENT_PROVIDER: 'wechat,alipay', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true' },
+    '生产环境允许 wechat,alipay 真实通道（凭证齐全性由 Provider 工厂另行 fail-closed 校验）',
+  )
+
+  // 生产环境：paid-before-claim 必须显式声明（C5-6）
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PAID_BEFORE_CLAIM: undefined },
+    'PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED',
+    '生产环境拒绝未显式声明 PRINT_REQUIRE_PAID_BEFORE_CLAIM',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'yes' },
+    'PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED',
+    '生产环境拒绝非 true|false 取值',
+  )
+  expectAllowed(
+    { ...PROD_OK, PAYMENT_PROVIDER: 'disabled', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
+    '生产环境线上支付关闭时允许显式声明 false（线下收款模式）',
+  )
+  expectRejected(
+    { ...PROD_OK, PAYMENT_PROVIDER: 'wechat', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
+    'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED',
+    '启用真实支付通道时强制 paid-before-claim=true（先付后印）',
+  )
+  expectRejected(
+    { ...PROD_OK, PAYMENT_PROVIDER: 'alipay', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
+    'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED',
+    'alipay 通道同样强制先付后印',
   )
 
   console.log('\n=== ALL PASS ===')

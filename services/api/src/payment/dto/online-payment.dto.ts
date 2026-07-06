@@ -1,4 +1,14 @@
-import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator'
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+
+/**
+ * 出码请求体（C5-6 多通道）：只允许选择服务端已启用的通道；
+ * 金额/订单字段一律来自服务端落库数据，请求体不接受。
+ */
+export class CreatePayAttemptDto {
+  @IsOptional()
+  @IsIn(['sandbox', 'wechat', 'alipay'])
+  channel?: 'sandbox' | 'wechat' | 'alipay'
+}
 
 /**
  * 沙箱模拟支付请求体（仅开发/联调；生产环境端点直接 404）。

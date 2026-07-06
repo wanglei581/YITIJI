@@ -31,6 +31,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
+import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { RefundService } from '../src/payment/refund.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -90,9 +91,9 @@ async function main(): Promise<void> {
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
   const realProvider = new SandboxPaymentProvider(SECRET)
-  const onlinePayment = new OnlinePaymentService(prisma, audit, orderStatus, realProvider)
+  const onlinePayment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([realProvider]))
   const spy = new SpyProvider(realProvider, prisma)
-  const refundService = new RefundService(prisma, audit, spy)
+  const refundService = new RefundService(prisma, audit, new PaymentProviderRegistry([spy]))
   const printJobs = new PrintJobsService(prisma, audit, new PrintPageCountService(prisma, storage), pricing, orderStatus)
   const redemption = new BenefitRedemptionService(prisma, audit, orderStatus)
   const terminals = new TerminalsService(prisma)

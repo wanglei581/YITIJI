@@ -17,14 +17,14 @@
 import type { OrderPayStatus, PaymentAttemptStatus, PaymentSource, PaymentChannel } from './payment'
 
 /**
- * 出码响应视图（`POST /orders/:id/pay`）。
+ * 出码响应视图（`POST /orders/:id/pay`，body 可选 channel 选择已启用通道）。
  * 为付费订单创建（或幂等复用未过期的）支付尝试，返回屏上动态码内容。
  */
 export interface PayAttemptView {
   attemptId: string
   orderId: string
   orderNo: string
-  /** 支付通道；本波只有 `sandbox`（测试通道）。 */
+  /** 支付通道：sandbox（测试通道）/ wechat / alipay（C5-6 真实渠道）。 */
   channel: PaymentChannel | string
   amountCents: number
   /** 支付尝试状态。 */
@@ -59,8 +59,15 @@ export interface PayStatusView {
   /** 最近一次支付尝试摘要；无尝试为 null。 */
   attempt: {
     attemptId: string
+    /** 本次尝试的支付通道（C5-6：sandbox / wechat / alipay；Kiosk 据此渲染品牌文案）。 */
+    channel: PaymentChannel | string
     status: PaymentAttemptStatus
     qrCodeContent: string | null
     expiresAt: string | null
   } | null
+}
+
+/** GET /payment/channels 响应：服务端已启用的支付通道（无任何密钥信息）。 */
+export interface PaymentChannelsView {
+  channels: (PaymentChannel | string)[]
 }

@@ -12,8 +12,10 @@
  *   - AI_PROVIDER 必须为 llm，且真实 LLM 密钥齐全（生产不得回退 mock / stub provider）
  *   - PAYMENT_SESSION_SECRET 必须存在且长度 >= 32（打印建单后签发短期支付会话 token，
  *     生产不得回退 JWT_SECRET / FILE_SIGNING_SECRET）
- *   - PAYMENT_PROVIDER 不得为 sandbox（生产禁止沙箱支付通道；真实渠道到 C5-6，
- *     此前生产保持未设置/disabled = 线上支付关闭）
+ *   - PAYMENT_PROVIDER 不得含 sandbox（生产禁止沙箱支付通道；wechat/alipay 真实渠道
+ *     由 Provider 工厂启动期校验凭证齐全，缺一拒启动）
+ *   - PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须显式声明 true|false（C5-6：未支付订单能否被
+ *     claim 出纸是显式部署决策）；启用 wechat/alipay 时必须为 true（先付后印）
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
@@ -39,6 +41,7 @@ export interface ProductionRuntimeEnv {
   TRTC_LLM_API_KEY?: string
   PAYMENT_SESSION_SECRET?: string
   PAYMENT_PROVIDER?: string
+  PRINT_REQUIRE_PAID_BEFORE_CLAIM?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -133,12 +136,32 @@ export function assertProductionRuntimeGates(
     )
   }
 
-  // C5-2：生产禁止沙箱支付通道（测试通道绝不能在生产入账）。未设置/disabled = 线上支付关闭，放行；
-  // wechat/alipay 等真实渠道取值到 C5-6 才引入（届时由 Provider 工厂校验凭证齐全）。
-  const paymentProvider = env.PAYMENT_PROVIDER?.trim().toLowerCase()
-  if (paymentProvider === 'sandbox') {
+  // C5-2/C5-6：生产禁止沙箱支付通道（测试通道绝不能在生产入账）。未设置/disabled = 线上支付关闭，放行；
+  // wechat / alipay（可逗号并列）为 C5-6 真实渠道，凭证齐全性由 Provider 工厂启动期校验（fail-closed）。
+  const paymentProvider = env.PAYMENT_PROVIDER?.trim().toLowerCase() ?? ''
+  const paymentChannels = paymentProvider && paymentProvider !== 'disabled'
+    ? paymentProvider.split(',').map((s) => s.trim()).filter(Boolean)
+    : []
+  if (paymentChannels.includes('sandbox')) {
     throw new Error(
-      'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN: NODE_ENV=production 时 PAYMENT_PROVIDER 不得为 sandbox（真实渠道到 C5-6；此前生产保持未设置或 disabled）',
+      'PRODUCTION_PAYMENT_PROVIDER_SANDBOX_FORBIDDEN: NODE_ENV=production 时 PAYMENT_PROVIDER 不得含 sandbox（生产只允许 disabled / wechat / alipay）',
+    )
+  }
+  const realChannelEnabled = paymentChannels.some((c) => c === 'wechat' || c === 'alipay')
+
+  // C5-6 paid-before-claim 门禁「按部署环境显式开启」：
+  // - 生产必须**显式**声明 PRINT_REQUIRE_PAID_BEFORE_CLAIM=true|false，不允许沉默缺省 ——
+  //   缺省 false 会让付费单未支付即被 Agent claim 出纸，这类资金风险必须是显式决策。
+  // - 启用真实支付通道（wechat/alipay）时必须为 true：收真钱就必须先付后印，无豁免。
+  const paidBeforeClaim = env.PRINT_REQUIRE_PAID_BEFORE_CLAIM?.trim()
+  if (paidBeforeClaim !== 'true' && paidBeforeClaim !== 'false') {
+    throw new Error(
+      'PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED: NODE_ENV=production 时必须显式设置 PRINT_REQUIRE_PAID_BEFORE_CLAIM=true|false（未支付订单是否禁止 claim 出纸必须是显式部署决策）',
+    )
+  }
+  if (realChannelEnabled && paidBeforeClaim !== 'true') {
+    throw new Error(
+      'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED: 启用真实支付通道（wechat/alipay）时 PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须为 true（先付后印，服务端门禁）',
     )
   }
 }

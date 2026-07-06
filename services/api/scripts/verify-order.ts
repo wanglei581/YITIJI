@@ -12,6 +12,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
 import { RefundService } from '../src/payment/refund.service'
+import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import type { AdminMarkPaidDto, AdminRefundDto } from '../src/payment/dto/order-action.dto'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -561,8 +562,8 @@ async function main(): Promise<void> {
     // (8) Admin 订单动作 controller（Task 7）：offline/manual_confirmed 可 mark-paid；拒绝 free/wechat/alipay/benefit；
     //     refund 需 reason；paid→refunded 成功；拒绝 unpaid→refunded；审计写入。状态机复用 OrderStatusService（不重写）。
     await p0aGuard('AdminOrderActionsController: offline mark-paid + reject free/forbidden + refund reason + paid→refunded + reject unpaid-refund + audited', async () => {
-      // C5-4：Admin 退款走 RefundService（offline 退款不调 provider，故 provider=null 足够）。
-      const refundService = new RefundService(prisma, audit, null)
+      // C5-4：Admin 退款走 RefundService（offline 退款不调 provider，故空注册表足够）。
+      const refundService = new RefundService(prisma, audit, new PaymentProviderRegistry([]))
       const adminCtl = new AdminOrderActionsController(orderStatus, refundService)
       const adminUser = { userId: 'admin-verify', role: 'admin' as const, orgId: null }
 
