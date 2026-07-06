@@ -116,7 +116,9 @@ expectMatches(
 )
 expectMatches(
   paymentApiSrc,
-  /createPayAttempt\(input:\s*PaymentSessionInput\)/,
+  // C5-6 起入参扩展可选 channel（PaymentSessionInput & { channel?: string }）；
+  // 守卫不变量不变：入参必须是包含 paymentSessionToken 的 PaymentSessionInput 对象。
+  /createPayAttempt\(input:\s*PaymentSessionInput\b/,
   'createPayAttempt 只能通过包含 token 的对象调用',
 )
 expectMatches(
@@ -131,7 +133,8 @@ expectMatches(
 )
 expectMatches(
   cashierSrc,
-  /createPayAttempt\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/,
+  // C5-6 起出码额外携带 channel；守卫不变量不变：出码调用必须携带 paymentSessionToken。
+  /createPayAttempt\(\{\s*orderId,\s*paymentSessionToken\s*,\s*channel\s*\}\)/,
   'PrintCashierPage 出码时携带 paymentSessionToken',
 )
 expectMatches(

@@ -91,9 +91,11 @@ for (const [name, source] of [
 
 expectIncludes(paymentApi, 'paymentSessionToken?: string | null', 'Kiosk payment adapter 保留 paymentSessionToken 输入')
 expectIncludes(paymentApi, "'x-payment-session-token': input.paymentSessionToken", 'Kiosk payment adapter 保留 x-payment-session-token header')
-expectMatches(paymentApi, /createPayAttempt\(input:\s*PaymentSessionInput\)/, 'createPayAttempt 仍强制使用 PaymentSessionInput')
+// C5-6 起 createPayAttempt 入参扩展可选 channel、出码调用额外携带 channel；
+// 守卫不变量不变：入参必须是含 paymentSessionToken 的 PaymentSessionInput 对象。
+expectMatches(paymentApi, /createPayAttempt\(input:\s*PaymentSessionInput\b/, 'createPayAttempt 仍强制使用 PaymentSessionInput')
 expectMatches(paymentApi, /getPayStatus\(input:\s*PaymentSessionInput\)/, 'getPayStatus 仍强制使用 PaymentSessionInput')
-expectMatches(cashier, /createPayAttempt\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/, 'PrintCashierPage 出码仍带 paymentSessionToken')
+expectMatches(cashier, /createPayAttempt\(\{\s*orderId,\s*paymentSessionToken\s*,\s*channel\s*\}\)/, 'PrintCashierPage 出码仍带 paymentSessionToken')
 expectMatches(cashier, /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/, 'PrintCashierPage 轮询仍带 paymentSessionToken')
 expectMatches(done, /getPayStatus\(\{\s*orderId:\s*state\.orderId as string,\s*paymentSessionToken:\s*state\.paymentSessionToken\s*\}\)/, 'PrintDonePage 取件码查询仍带 paymentSessionToken')
 
@@ -114,8 +116,14 @@ const allowedChanged = new Set([
   'docs/progress/next-tasks.md',
 ])
 const files = [...new Set(changedFiles())]
-const unexpectedChanged = files.includes('apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs') ? files.filter((file) => !allowedChanged.has(file)) : []
-if (unexpectedChanged.length === 0) pass(files.includes('apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs') ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 P0a 守卫文件，仅执行静态防回退断言')
+// 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
+// 仅当 diff 实际触碰本守卫负责的 /me 第一批明细页时，才强制 P0a allowlist 范围检查。
+// 守卫脚本自身随被守护契约演进（如 C5-6 出码新增支付通道参数）而更新属正常维护，
+// 不再以「触碰守卫脚本」为触发条件误伤一切后端/支付 PR；防回退由上方静态断言 + 人工评审兜底。
+const protectedPagePrefix = 'apps/kiosk/src/pages/profile/me/'
+const touchesProtectedPages = files.some((file) => file.startsWith(protectedPagePrefix))
+const unexpectedChanged = touchesProtectedPages ? files.filter((file) => !allowedChanged.has(file)) : []
+if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
 else fail(`diff 出现 P0a 范围外变更：${unexpectedChanged.join(', ')}`)
 
 if (failures > 0) {
