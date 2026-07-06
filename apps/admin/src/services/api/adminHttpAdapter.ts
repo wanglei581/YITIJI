@@ -10,6 +10,7 @@ import type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  TerminalBindCodeCreated,
   AuditLogListResponse,
   AuditLogListQuery,
 } from './types'
@@ -85,6 +86,33 @@ async function patchData<T>(path: string, body: unknown): Promise<T> {
   return res.data
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let code = `HTTP_${res.status}`
+    let message = res.statusText
+    try {
+      const errBody = await res.json() as { error?: { code?: string; message?: string } }
+      if (errBody.error?.code) code = errBody.error.code
+      if (errBody.error?.message) message = errBody.error.message
+    } catch { /* keep defaults */ }
+    handleAuthFailure(res.status, code)
+    throw new ApiHttpError(code, message, res.status)
+  }
+  return res.json() as Promise<T>
+}
+
+/** POST 到以 ApiResponse<T>({ data: T }) 包装的端点，统一拆 .data。 */
+async function postData<T>(path: string, body: unknown): Promise<T> {
+  const res = await post<{ data: T }>(path, body)
+  return res.data
+}
+
 export const adminHttpAdapter = {
   getJobSources: () =>
     get<AdminJobSourceRecord[]>('/admin/job-sources'),
@@ -120,6 +148,13 @@ export const adminHttpAdapter = {
 
   updateTerminalProfile: (terminalId: string, input: UpdateTerminalProfileInput) =>
     patchData<UpdateTerminalProfileResult>(`/admin/terminals/${encodeURIComponent(terminalId)}/profile`, input),
+
+  // ── 一次性终端绑定码（admin only，明文只返回一次）──────────────────────────
+  createTerminalBindCode: (terminalId: string, ttlMinutes?: number) =>
+    postData<TerminalBindCodeCreated>(
+      `/admin/terminals/${encodeURIComponent(terminalId)}/bind-code`,
+      ttlMinutes ? { ttlMinutes } : {},
+    ),
 
   getPrinters: () =>
     getData<AdminPrintersResponse>('/admin/printers'),

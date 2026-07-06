@@ -11,6 +11,7 @@ import type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  TerminalBindCodeCreated,
   AuditLogListResponse,
   AuditLogListQuery,
   AuditLogRecord,
@@ -230,6 +231,19 @@ export const adminMockAdapter = {
     return next
   },
 
+  // ── mock：一次性绑定码（仅用于前端 demo，不模拟真实 agentToken 流转） ──
+  async createTerminalBindCode(terminalId: string, ttlMinutes = 10): Promise<TerminalBindCodeCreated> {
+    await delay()
+    const profile = MOCK_TERMINAL_PROFILE[terminalId]
+    const terminalCode = profile?.terminalCode ?? terminalId
+    if (profile && profile.enabled === false) {
+      throw new ApiHttpError('TERMINAL_DISABLED', '终端已停用，不能生成绑定码', 400)
+    }
+    const bindCode = mockBindCode()
+    const expiresAt = new Date(Date.now() + Math.max(1, Math.min(60, ttlMinutes)) * 60_000).toISOString()
+    return { terminalId, terminalCode, bindCode, expiresAt }
+  },
+
   async getPrinters(): Promise<AdminPrintersResponse> {
     await delay()
     const terminals = (await this.getTerminals()).terminals
@@ -289,6 +303,16 @@ function toMockPrinterStatus(online: boolean, printerStatus: string | null): Adm
   if (!online) return 'offline'
   if (!printerStatus || printerStatus === 'unknown') return 'offline'
   return printerStatus === 'ok' ? 'online' : 'error'
+}
+
+function mockBindCode(): string {
+  // 20 位的可视码：去掉易混淆字符 (0 O I L 1)，避免操作员复制时误读。
+  const pool = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+  let out = ''
+  for (let i = 0; i < 20; i++) {
+    out += pool.charAt(Math.floor(Math.random() * pool.length))
+  }
+  return out
 }
 
 function toMockPrinterFault(online: boolean, printerStatus: string | null): string | null {
