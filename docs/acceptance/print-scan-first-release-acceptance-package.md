@@ -13,6 +13,7 @@
 - `PS-G3-PHYS-01`：2026-07-06 用户提供 `G5 Second Print Probe` 纸张照片并确认该纸确由 `Pantum CM2800ADN Series / USB001` 出纸托盘取出；照片已保存到仓库外 `PS-G3-PHYS-01-physical-paper-observation-20260706151035`，人工可见物理出纸补证已完成。
 - `PS-G3-DEGREC-01`：2026-07-06 受控停止 `AIJobPrintAgent` 后临时把 `C:\ProgramData\AIJobPrintAgent\agent.db` 替换为同名目录，前台 Agent 记录本地任务库不可用且打印禁用，降级心跳 acknowledged；恢复原 `agent.db` 后记录 `db: opened`、`agent ready`、恢复心跳 acknowledged，公开只读 `printer-status` 返回 `printerStatus=ready` / `isOnline=true`。证据目录为仓库外 `PS-G3-DEGREC-20260706155258`。该项只证明 Agent 端降级 / 恢复运行证据，不替代 Admin 截图、降级期间 pending 任务保护或恢复后真实领单验收。
 - `PS-G3-DEG-02-LP`：2026-07-06 在仓库外 `C:\tmp\ai-job-print-evidence\PS-G3-DEG-02-memory-probe-20260706163452` 运行内存级探针：使用真实 `TerminalsService` 与 fake Prisma，不停止 Agent、不调用打印机、不写任何数据库；结果显示 `agent_degraded` + `localTaskDatabaseAvailable=false` 时 `claimTasks()` 返回空且任务保持 `pending`，恢复 `online` 后同一 pending 任务可被 claim。该项只证明后端代码路径，不替代现场真实 API / DB pending 任务演练。
+- `PS-G3-NEG-01-LP`：2026-07-06 本地 `verify:print-jobs` 新增错终端状态回传断言：第二终端使用自身 token 回传第一终端任务 `printing` 被拒为 `TASK_NOT_OWNED`，任务仍保持 `claimed` 且目标 `terminalId` 不变。该项只证明本地 service 级防回退，不替代现场真实 API / DB 错终端回传演练。
 - Gate 3 仍为 `Not Passed Yet`：终端隔离、现场真实 API / DB pending 任务保护、Admin 降级截图、错终端拒绝、隐私删除和异常恢复等演练尚未完整补齐；扫描链路、U 盘导入、断网 / 重启恢复仍需另行验收。
 
 ## 目标
@@ -104,14 +105,14 @@ Gate 2 Deployment And Migration: Not Passed Yet
 | PS-G3-DEG-01 | Agent Runtime Evidence Aligned; Admin Pending | 受控把 `agent.db` 替换为同名目录后，Agent 日志显示 `local task database unavailable; printing disabled`，降级心跳 acknowledged；源码契约将该状态上报为 `agent_degraded` / `localTaskDatabaseAvailable=false`，但本轮未补 Admin 截图 | `PS-G3-DEGREC-20260706155258` |
 | PS-G3-DEG-02 | Partial; Code Path Probe Passed, Field API/DB Pending | 降级 Agent 日志显示 `claim loop not started`，没有领取打印任务；内存级探针使用真实 `TerminalsService` 证明最新心跳为 `agent_degraded` / `localTaskDatabaseAvailable=false` 时后端 `claimTasks()` 返回空且任务保持 `pending`。尚未在现场真实 API / DB 中创建或保留 pending 任务复验 | `PS-G3-DEGREC-20260706155258` / `PS-G3-DEG-02-memory-probe-20260706163452` |
 | PS-G3-REC-01 | Partial; Recovery Heartbeat + Code Path Probe Passed | 恢复原 `agent.db` 后，Agent 日志显示 `db: opened`、`agent ready`、`task-runner: starting` 和恢复心跳 acknowledged；公开只读 `printer-status` 返回 `printerStatus=ready` / `isOnline=true`。内存级探针显示恢复 `online` 后同一 pending 任务可被 claim；尚未用现场真实 pending 任务验证恢复后真实领单 | `PS-G3-DEGREC-20260706155258` / `PS-G3-DEG-02-memory-probe-20260706163452` |
-| PS-G3-NEG-01 | Not Passed Yet | 错终端状态回传被拒，命中 `TASK_NOT_OWNED` 或等效错误 | `<PRIVATE_EVIDENCE_DIR>/PS-G3-NEG-01-wrong-terminal-rejected-<timestamp>.log` |
+| PS-G3-NEG-01 | Partial; Service Guard Passed, Field API/DB Pending | 本地 service 级 `verify:print-jobs` 已覆盖错终端状态回传被拒：第二终端用自身 token 回传第一终端任务 `printing` 命中 `TASK_NOT_OWNED`，任务仍保持 `claimed` 且目标 `terminalId` 不变；尚未在现场真实 API / DB 中复验 | `services/api verify:print-jobs` / `<PRIVATE_EVIDENCE_DIR>/PS-G3-NEG-01-wrong-terminal-rejected-<timestamp>.log` |
 
 判定：
 
 ```text
 Gate 3 Field Print Safety Base: Not Passed Yet
-已确认：物理出纸最小硬证据已通过，G5 只读证据链与 PS-G3-PHYS-01 照片补证已对齐；Agent 本地任务库不可用时 fail-closed 和恢复后心跳正常已有运行证据；后端 claim 二道闸门与恢复后可 claim 的代码路径已有内存级探针补证。
-阻塞项：终端隔离、现场真实 API / DB pending 任务保护、Admin 降级截图、恢复后真实领单、错终端回传拒绝等完整安全底座现场演练仍未全部完成。
+已确认：物理出纸最小硬证据已通过，G5 只读证据链与 PS-G3-PHYS-01 照片补证已对齐；Agent 本地任务库不可用时 fail-closed 和恢复后心跳正常已有运行证据；后端 claim 二道闸门与恢复后可 claim 的代码路径已有内存级探针补证；错终端状态回传拒绝已有本地 service 级防回退。
+阻塞项：终端隔离、现场真实 API / DB pending 任务保护、Admin 降级截图、恢复后真实领单、现场真实 API / DB 错终端回传拒绝等完整安全底座现场演练仍未全部完成。
 ```
 
 ## Gate 4：隐私删除与异常恢复

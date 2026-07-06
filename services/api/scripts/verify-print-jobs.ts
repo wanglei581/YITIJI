@@ -76,6 +76,8 @@ async function main() {
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vpj_${suffix}`
   const agentToken = `vpj-agent-token-${suffix}`
+  const otherTerminalId = `term_vpj_other_${suffix}`
+  const otherAgentToken = `vpj-other-agent-token-${suffix}`
   const fileId = `file_vpj_${suffix}`
   const storageKey = `verify/print-jobs/${fileId}.pdf`
   const createdTaskIds: string[] = []
@@ -89,8 +91,8 @@ async function main() {
       await prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: createdTaskIds } } })
       await prisma.printTask.deleteMany({ where: { id: { in: createdTaskIds } } })
     }
-    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
-    await prisma.terminal.deleteMany({ where: { id: terminalId } })
+    await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: [terminalId, otherTerminalId] } } })
+    await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId] } } })
     // 计费接线后新增的真实 fixture / 价目清理。
     await prisma.fileObject.deleteMany({ where: { id: fileId } })
     await storage.deleteObject(storageKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
@@ -102,6 +104,14 @@ async function main() {
 
     await prisma.terminal.create({
       data: { id: terminalId, terminalCode: `VPJ-${suffix}`, agentToken, deviceFingerprint: `fp-${suffix}` },
+    })
+    await prisma.terminal.create({
+      data: {
+        id: otherTerminalId,
+        terminalCode: `VPJ-OTHER-${suffix}`,
+        agentToken: otherAgentToken,
+        deviceFingerprint: `fp-other-${suffix}`,
+      },
     })
     pass('终端夹具已创建')
 
@@ -207,6 +217,18 @@ async function main() {
     if (afterClaim?.status === 'claimed' && afterClaim.terminalId === terminalId) {
       pass('3d. claim 后 DB 状态为 claimed 且目标终端保持不变')
     } else fail(`3d. claim 后状态异常: ${afterClaim?.status} / ${afterClaim?.terminalId}`)
+
+    await expectCode(
+      () => terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${otherAgentToken}`, otherTerminalId),
+      'TASK_NOT_OWNED',
+      '3e. 错终端状态回传 → 400 TASK_NOT_OWNED',
+    )
+    const afterWrongTerminalPatch = await prisma.printTask.findUnique({ where: { id: created.taskId } })
+    if (afterWrongTerminalPatch?.status === 'claimed' && afterWrongTerminalPatch.terminalId === terminalId) {
+      pass('3f. 错终端回传被拒后任务仍保持 claimed 且目标终端不变')
+    } else {
+      fail(`3f. 错终端回传后状态异常: ${afterWrongTerminalPatch?.status} / ${afterWrongTerminalPatch?.terminalId}`)
+    }
 
     // ── 4. 状态回传 printing → completed ──────────────────────────────
     await terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId)
