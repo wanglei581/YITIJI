@@ -57,6 +57,7 @@ test-results/
 
 # Temp
 .tmp
+/tmp/
 mavis-workspace/
 .mavis/
 .opencode/
@@ -74,6 +75,11 @@ mavis-workspace/
 
 # Runtime-generated API state（含 ai-model-config.json 的 apiKeyEncrypted 等密钥材料，不入仓库）
 services/api/data/
+dump.rdb
+
+# Terminal Agent local runtime config backups / production hardening snapshots
+/apps/terminal-agent/config/agent-config.json.bak.*
+/apps/terminal-agent/config/agent-config.json.before-*
 
 # docs 下的二进制文档（如机器生成 / 外部 .docx）不入库，结论沉淀为同名 .md
 docs/**/*.docx

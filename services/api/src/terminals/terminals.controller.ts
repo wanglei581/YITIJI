@@ -29,6 +29,7 @@ import type { Response } from 'express'
 import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { RegisterTerminalDto } from './dto/register-terminal.dto'
+import { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import { HeartbeatDto } from './dto/heartbeat.dto'
 import { ClaimTasksDto } from './dto/claim-tasks.dto'
 import { PatchTaskStatusDto } from './dto/patch-task-status.dto'
@@ -47,6 +48,14 @@ export class TerminalsController {
   @HttpCode(HttpStatus.OK)
   register(@Body() dto: RegisterTerminalDto) {
     return this.terminalsService.register(dto)
+  }
+
+  // POST /api/v1/auth/terminal/exchange-bind-code
+  // Windows 新主机用一次性绑定码换取 terminalToken；不需要、不允许携带 adminSecret。
+  @Post('auth/terminal/exchange-bind-code')
+  @HttpCode(HttpStatus.OK)
+  exchangeBindCode(@Body() dto: ExchangeTerminalBindCodeDto) {
+    return this.terminalsService.exchangeBindCode(dto)
   }
 
   // ── 2. Heartbeat ─────────────────────────────────────────────────────────
