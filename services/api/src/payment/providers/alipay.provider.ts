@@ -29,6 +29,7 @@ import type {
   QrPaymentCreateResult,
   RefundExecuteInput,
   RefundExecuteResult,
+  RefundQueryResult,
 } from '../payment-provider.types'
 import { buildPaymentCallbackPath } from '../payment-provider.types'
 
@@ -343,9 +344,43 @@ export class AlipayProvider implements PaymentProvider {
     return { status: 'unknown', channelTxnNo: null, amountCents: null }
   }
 
-  /** C5-6 明确不碰退款：真实渠道退款留待后续退款批次，绝不假装成功。 */
-  async refund(_input: RefundExecuteInput): Promise<RefundExecuteResult> {
-    throw new Error('REFUND_CHANNEL_NOT_IMPLEMENTED: alipay 真实渠道退款不在 C5-6 范围（不碰退款/C5-4），留待后续批次')
+  /**
+   * 真实退款（W-B）：alipay.trade.refund（**同步**接口）。
+   * `out_request_no = refundNo`（渠道级幂等：同号重复请求不重复出款）；
+   * fund_change='Y' → 本次真实出款成功；'N' → 该退款请求此前已成功（幂等命中），同样视为 success。
+   * 渠道错误（非 10000）由 call() 抛 ALIPAY_CHANNEL_ERROR，业务层按失败回滚。
+   */
+  async refund(input: RefundExecuteInput): Promise<RefundExecuteResult> {
+    if (!input.outTradeNo) {
+      // fail-closed：缺原单定位绝不盲发退款请求（业务层应传成功尝试的 attemptId）。
+      throw new Error('ALIPAY_REFUND_INPUT_MISSING: 缺少 outTradeNo，拒绝发起渠道退款')
+    }
+    const node = await this.call('alipay.trade.refund', {
+      out_trade_no: input.outTradeNo,
+      refund_amount: centsToYuan(input.amountCents),
+      out_request_no: input.refundNo,
+    })
+    return { channelRefundNo: asString(node['trade_no']), status: 'success' }
+  }
+
+  /** 退款查证（W-B）：alipay.trade.fastpay.refund.query（processing 收敛/对账兜底用）。 */
+  async queryRefund(input: { refundNo: string; outTradeNo?: string | null }): Promise<RefundQueryResult> {
+    if (!input.outTradeNo) return { status: 'unknown', channelRefundNo: null }
+    let node: Record<string, unknown>
+    try {
+      node = await this.call('alipay.trade.fastpay.refund.query', {
+        out_trade_no: input.outTradeNo,
+        out_request_no: input.refundNo,
+      })
+    } catch (e) {
+      if ((e as Error).message?.includes('ACQ.TRADE_NOT_EXIST')) return { status: 'unknown', channelRefundNo: null }
+      throw e
+    }
+    // refund_status=REFUND_SUCCESS → 成功；查得记录但无该字段 → 受理中/不可判（绝不假报成功）。
+    const refundStatus = asString(node['refund_status'])
+    if (refundStatus === 'REFUND_SUCCESS') return { status: 'success', channelRefundNo: asString(node['trade_no']) }
+    const hasRecord = asString(node['out_request_no']) === input.refundNo
+    return { status: hasRecord ? 'processing' : 'unknown', channelRefundNo: asString(node['trade_no']) }
   }
 
   /** 支付宝要求异步通知成功应答为纯文本 `success`，否则按失败重试。 */
