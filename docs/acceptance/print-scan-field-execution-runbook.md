@@ -380,6 +380,59 @@ Get-WinEvent -FilterHashtable @{
 - 物理出纸硬证据：现场目视确认、摄像头录像、打印机计数器变化或设备日志至少一种能证明真实纸张输出。
 - 必须现场确认：PrintService/Operational 未启用、队列过快导致 60 次轮询仍捕获不到、奔图驱动处于 Retained / 保留状态、或 PrintService 事件无法关联到当前任务 / 打印机 / 文档时，不得仅凭系统链路完成宣称物理出纸。
 
+### 7.4 已完成任务只读复核与照片补证
+
+适用场景：任务已经发生，且当前只允许复核证据、不能再次打印、不能重启 Agent、不能修改配置、不能写数据库。该步骤用于补齐类似 G5 `ptask_kiosk_f05cd3c160ec55c6` 的只读证据链和人工物理出纸确认。
+
+只读复核范围：
+
+- Windows PrintService 事件：Event ID 307 / 842、打印机、端口、页数、Win32 返回码。
+- Agent 日志：同一任务的 `claimed -> printing -> print success -> completed` 或失败链路。
+- 本地 Agent DB：只读查询任务状态，不执行更新、删除或 vacuum。
+- 打印机计数器：`TotalPagesPrinted` / `TotalJobsPrinted` 前后差异。
+- 现场人工记录：是否实际看到纸张、照片证据编号、观察人和时间。
+
+禁止动作：
+
+- 不执行 `pnpm --filter terminal-agent print` 或任何会提交新打印作业的命令。
+- 不重启 `AIJobPrintAgent`，不安装 / 卸载服务，不清空队列。
+- 不修改 `agent-config.json`、环境变量、注册 token、打印机默认设置或驱动配置。
+- 不对 API、PostgreSQL、SQLite、Redis、COS 写入任何数据。
+
+`PS-G3-PHYS-01` 现场最小补证步骤：
+
+1. 不操作电脑、不点打印、不重启 Agent，只到目标奔图打印机旁确认是否有本次无个人信息测试页或已遮挡内容的纸张。
+2. 确认纸张来自本机 `Pantum CM2800ADN Series / USB001`，并核对页数是否与 PrintService / 计数器证据一致。
+3. 拍摄纸张照片或现场视频，遮挡所有个人信息、人员面部、设备序列号、二维码、完整 URL 和 token。
+4. 将照片保存到仓库外私有证据目录，命名为 `PS-G3-PHYS-01-physical-paper-observation-<timestamp>` 或同等编号。
+5. 填写观察记录；如果现场无法确认纸张来源或照片无法脱敏，保持 `Not Passed Yet`。
+
+`PS-G3-PHYS-01` 现场观察记录模板：
+
+```markdown
+# PS-G3-PHYS-01 现场人工物理出纸观察记录
+
+- 观察日期时间：
+- 观察人：
+- 任务 ID：
+- 证据目录 ID：
+- 打印机 Windows 识别名：
+- 端口：
+- 现场看到纸张：是 / 否
+- 纸张页数：
+- 纸张内容类型：无个人信息测试页 / 已遮挡敏感内容 / 其它
+- 照片证据编号：
+- 照片脱敏说明：
+- PrintService 证据编号：
+- 计数器证据编号：
+- Agent 日志证据编号：
+- 结论：
+  - [ ] 人工可见物理出纸已确认
+  - [ ] 人工可见物理出纸未确认，需继续补证
+
+备注：
+```
+
 ## 八、Agent 降级 / 恢复演练（PS-G3）
 
 目标：安全模拟本地任务库不可用，不破坏真实 `%ProgramData%\AIJobPrintAgent\agent.db`。
