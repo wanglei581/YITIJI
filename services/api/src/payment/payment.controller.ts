@@ -2,6 +2,7 @@
 //
 // 端点（全局前缀 /api/v1）：
 //   GET  /payment/channels        当前启用的支付通道（无密钥信息；Kiosk 渲染通道选择用）
+//   GET  /print/price-config      公开只读价目（W-A；Kiosk 展示价唯一来源，匿名可读）
 //   POST /orders/:id/pay          出码（建/复用支付尝试，返回屏上动态码内容；body 可选 channel）
 //   GET  /orders/:id/pay-status   Kiosk 轮询支付状态（含惰性过期/关单）
 //   POST /orders/:id/pay/reconcile  主动查单兜底（回调丢失时按渠道账本核实；同幂等入账路径）
@@ -15,6 +16,7 @@ import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Req,
 import type { Request, Response } from 'express'
 import { CreatePayAttemptDto, SandboxSimulateDto } from './dto/online-payment.dto'
 import { OnlinePaymentService } from './online-payment.service'
+import { PricingService } from './pricing.service'
 
 /** main.ts 的 express.json verify 钩子对 /api/v1/payment/callback/ 前缀写入 rawBody。 */
 interface RawBodyRequest extends Request {
@@ -23,11 +25,22 @@ interface RawBodyRequest extends Request {
 
 @Controller()
 export class PaymentController {
-  constructor(private readonly onlinePayment: OnlinePaymentService) {}
+  constructor(
+    private readonly onlinePayment: OnlinePaymentService,
+    private readonly pricing: PricingService,
+  ) {}
 
   @Get('payment/channels')
   getChannels() {
     return { channels: this.onlinePayment.availableChannels() }
+  }
+
+  // GET /api/v1/print/price-config — 公开只读价目（W-A 价格真相源统一）。
+  // Kiosk 预览/确认页展示价的唯一来源（匿名可读，只含安全展示字段，无任何密钥/成本信息）；
+  // 无 active 价目时 fail-closed 抛错，前端显示「价格暂不可用」，绝不回退硬编码价。
+  @Get('print/price-config')
+  async getPrintPriceConfig() {
+    return this.pricing.listActivePriceConfig()
   }
 
   @Post('orders/:id/pay')

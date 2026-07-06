@@ -30,6 +30,12 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
+import {
+  estimatePrintCents,
+  formatPriceCents,
+  unitCentsFor,
+  usePrintPriceConfig,
+} from '../../services/print/priceConfigApi'
 
 type PrintFile = PrintFileState
 
@@ -92,9 +98,6 @@ function usePrinterStatus(): { printerName: string; printer: PrinterStatus; load
 
   return { printerName, printer, loading }
 }
-
-const PRICE_BW = 0.2
-const PRICE_COLOR = 0.5
 
 function formatPageCount(pages: number | null): string {
   return pages === null ? '页数待识别' : `共 ${pages} 页`
@@ -333,8 +336,12 @@ export function PrintPreviewPage() {
     return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
   }, [effectivePages, pagesPerSheet, copies, duplex])
 
-  const pricePerFace = colorMode === 'color' ? PRICE_COLOR : PRICE_BW
-  const totalPrice = (totalFaces * pricePerFace).toFixed(2)
+  // ── 展示价（W-A：唯一来源=服务端价目；估价口径与服务端一致=单价×内容页×份数）──
+  const priceCfg = usePrintPriceConfig()
+  const unitCents = unitCentsFor(priceCfg.config, colorMode)
+  const bwUnitCents = unitCentsFor(priceCfg.config, 'black_white')
+  const colorUnitCents = unitCentsFor(priceCfg.config, 'color')
+  const estimateCents = estimatePrintCents(priceCfg.config, { pages: file.pages, copies, colorMode })
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   const handleNext = () => {
@@ -500,7 +507,9 @@ export function PrintPreviewPage() {
               onChange={(v) => setColorMode(v as ColorMode)}
             />
             <p className="mt-2 text-xs text-neutral-400">
-              黑白 ¥{PRICE_BW.toFixed(1)}/面 · 彩色 ¥{PRICE_COLOR.toFixed(1)}/面
+              {bwUnitCents === null || colorUnitCents === null
+                ? '价格以收银台显示为准'
+                : `黑白 ${formatPriceCents(bwUnitCents)}/页 · 彩色 ${formatPriceCents(colorUnitCents)}/页`}
             </p>
             {colorMode === 'color' && (
               <p className="mt-1 text-xs text-warning-fg">
@@ -619,22 +628,47 @@ export function PrintPreviewPage() {
           <SectionHead>费用明细</SectionHead>
 
           <Card className="p-5">
-            <InfoRow label="单价" value={`¥${pricePerFace.toFixed(2)} / 面`} />
-            <InfoRow
-              label="页数 × 份数"
-              value={`${file.pages ?? effectivePages} × ${copies} = ${totalFaces}`}
-            />
-            <InfoRow label="打印费用" value={`¥${totalPrice}`} />
-            <InfoRow label="优惠券抵扣" value={<span className="font-medium text-neutral-400">请选择优惠券</span>} />
-            <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
-              <p className="text-sm text-neutral-500">
-                实际以机器计费为准
-              </p>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xs font-medium text-neutral-500">实付金额</span>
-                <span className="text-xl font-bold text-neutral-900">¥{totalPrice}</span>
+            {priceCfg.status === 'error' ? (
+              // 取价失败 fail-closed：不显示任何估价，绝不回退硬编码价；实际金额在收银台由服务端计算展示。
+              <div className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-3 text-sm text-warning-fg">
+                <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                价格暂不可用，可继续操作，实付金额以收银台显示为准。
               </div>
-            </div>
+            ) : (
+              <>
+                <InfoRow
+                  label="单价"
+                  value={
+                    unitCents === null
+                      ? '获取中…'
+                      : `${formatPriceCents(unitCents)} / 页（${colorMode === 'color' ? '彩色' : '黑白'}）`
+                  }
+                />
+                <InfoRow
+                  label="计费页数 × 份数"
+                  value={
+                    file.pages === null
+                      ? '页数待识别，以实际识别为准'
+                      : `${file.pages} 页 × ${copies} 份`
+                  }
+                />
+                <InfoRow
+                  label="打印费用"
+                  value={estimateCents === null ? '以收银台金额为准' : formatPriceCents(estimateCents)}
+                />
+                <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
+                  <p className="text-sm text-neutral-500">
+                    按内容页计费，双面/多页合一不影响计费页数；实付以收银台为准
+                  </p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xs font-medium text-neutral-500">预估金额</span>
+                    <span className="text-xl font-bold text-neutral-900">
+                      {estimateCents === null ? '—' : formatPriceCents(estimateCents)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
           </Card>
 
           <InfoSection
@@ -649,7 +683,12 @@ export function PrintPreviewPage() {
                 <span>彩色</span>
               </div>
               {[
-                ['文档/简历', 'A4 普通纸', '¥0.20/面', '¥0.50/面'],
+                [
+                  '文档/简历',
+                  'A4 普通纸',
+                  bwUnitCents === null ? '—' : `${formatPriceCents(bwUnitCents)}/页`,
+                  colorUnitCents === null ? '—' : `${formatPriceCents(colorUnitCents)}/页`,
+                ],
                 ['证件照', '1寸/2寸标准版', '—', '待接入'],
                 ['照片打印', '6寸 光面纸', '—', '待接入'],
                 ['铜版纸简历', 'A4 铜版纸', '待接入', '待接入'],

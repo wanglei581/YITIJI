@@ -103,6 +103,28 @@ export interface PrintPriceBreakdown {
   amountCents: number
 }
 
+/** 公开价目单项（W-A：`GET /print/price-config` 响应；只含安全展示字段）。 */
+export interface PrintPriceConfigItem {
+  /** 价目项键，如 print_bw_page / print_color_page。 */
+  serviceKey: string
+  /** 单价（分），>= 0。 */
+  unitCents: number
+  /** 计价单位：'page' | 'copy' | 'item'。 */
+  unit: string
+  description: string | null
+}
+
+/**
+ * 公开价目视图（W-A 价格真相源统一）：Kiosk 预览/确认页展示价的**唯一来源**——
+ * 前端不得再持有任何硬编码单价常量（守卫断言）。计费口径与 PricingService 一致：
+ * 按**内容页**计价（unitCents × billablePages × copies），双面/多页合一不影响计费页数。
+ * `billingEnabled` 为政企 E1「整机免费模式」预留位（当前恒 true；false 时前端不渲染价格/支付 UI）。
+ */
+export interface PrintPriceConfigView {
+  billingEnabled: boolean
+  items: PrintPriceConfigItem[]
+}
+
 /**
  * 订单支付/退款侧安全视图：`Order` 的支付相关字段（Admin 动作与后续 /me 只读消费共用）。
  * 只含安全元数据，绝不含文件原文 / 签名 URL / 内部堆栈等敏感字段。

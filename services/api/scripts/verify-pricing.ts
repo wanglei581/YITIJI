@@ -120,6 +120,49 @@ async function main(): Promise<void> {
     await assertThrows('quotePrint fail-closed when PriceConfig missing', () =>
       pricing.quotePrint({ billablePages: 1, billingPageSource: 'pdf_lightweight_scan', copies: 1, colorMode: 'color' }),
     )
+
+    // 8) W-A：公开价目视图（Kiosk 预览/确认页展示价唯一来源）
+    await seedDevDefaultPriceConfig(prisma)
+    const view = await pricing.listActivePriceConfig()
+    const vBw = view.items.find((i) => i.serviceKey === 'print_bw_page')
+    const vColor = view.items.find((i) => i.serviceKey === 'print_color_page')
+    if (
+      view.billingEnabled === true &&
+      vBw?.unitCents === PRINT_UNIT_PRICE_CENTS.black_white &&
+      vColor?.unitCents === PRINT_UNIT_PRICE_CENTS.color &&
+      vBw.unit === 'page' &&
+      vColor.unit === 'page'
+    ) {
+      pass('listActivePriceConfig exposes seeded bw/color prices with billingEnabled=true')
+    } else {
+      fail(`price-config view mismatch: ${JSON.stringify(view)}`)
+    }
+    // 只含安全展示字段（无 id/时间戳/内部字段泄漏）
+    const viewKeys = Object.keys(vBw as Record<string, unknown>).sort()
+    if (JSON.stringify(viewKeys) === JSON.stringify(['description', 'serviceKey', 'unit', 'unitCents'])) {
+      pass('price-config view contains only safe display fields')
+    } else {
+      fail(`unexpected view fields: ${viewKeys.join(',')}`)
+    }
+    // inactive 项不出现在公开视图
+    await prisma.priceConfig.update({ where: { serviceKey: 'print_color_page' }, data: { active: false } })
+    const view2 = await pricing.listActivePriceConfig()
+    if (!view2.items.some((i) => i.serviceKey === 'print_color_page')) {
+      pass('inactive price rows are excluded from public view')
+    } else {
+      fail('inactive price row leaked into public view')
+    }
+    // fail-closed：无任何 active 价目 → 抛错（仅当整表确无其它 active 行时可严格断言）
+    await prisma.priceConfig.update({ where: { serviceKey: 'print_bw_page' }, data: { active: false } })
+    const remainingActive = await prisma.priceConfig.count({ where: { active: true } })
+    if (remainingActive === 0) {
+      await assertThrows('listActivePriceConfig fail-closed when no active price rows', () =>
+        pricing.listActivePriceConfig(),
+      )
+    } else {
+      pass(`listActivePriceConfig fail-closed assertion skipped (${remainingActive} unrelated active rows in shared dev DB)`)
+    }
+    await seedDevDefaultPriceConfig(prisma) // 复位
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
