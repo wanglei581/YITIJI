@@ -72,20 +72,37 @@ export type CallbackVerifyResult =
   | { ok: true; event: PaymentCallbackEvent }
   | { ok: false; code: string }
 
-/** 退款执行输入（C5-4）：全部来自服务端落库数据（Order + Refund 记录），绝不信任前端金额。 */
+/** 退款执行输入（C5-4 定义，W-B 扩真实渠道字段）：全部来自服务端落库数据，绝不信任前端金额。 */
 export interface RefundExecuteInput {
   orderId: string
   orderNo: string
-  /** 幂等键（服务端生成的退款单号）；同一 refundNo 只出款一次由业务层保证。 */
+  /** 幂等键（服务端生成的退款单号，即渠道 out_refund_no / out_request_no）；同一 refundNo 只出款一次。 */
   refundNo: string
   /** 本次退款额（分，>=0），快照自服务端 Refund 记录。 */
   amountCents: number
+  /** 订单原始应付（分）——wechat 退款 API 要求 amount.total（W-B additive；sandbox 忽略）。 */
+  orderAmountCents?: number
+  /** 原支付尝试的 out_trade_no（= attemptId）；真实渠道按原单定位退款（W-B additive）。 */
+  outTradeNo?: string | null
+  /** 原渠道支付流水号（W-B additive；备用定位键）。 */
+  channelTxnNo?: string | null
 }
 
 export interface RefundExecuteResult {
-  /** 渠道退款流水号（沙箱为服务端生成的假标识；无真实资金）。 */
-  channelRefundNo: string
-  status: 'success' | 'failed'
+  /** 渠道退款流水号（沙箱为服务端生成的假标识；真实渠道为 refund_id / trade_no，可能暂缺）。 */
+  channelRefundNo: string | null
+  /**
+   * success=渠道确认退款完成；failed=渠道明确拒绝；
+   * processing=渠道受理中（wechat 异步退款常态）——业务层保持 Refund pending +
+   * 订单 refunding，经 queryRefund 收敛，**绝不把受理中假报为已退款**。
+   */
+  status: 'success' | 'failed' | 'processing'
+}
+
+/** 退款查证归一化结果（processing 收敛用）。 */
+export interface RefundQueryResult {
+  status: 'success' | 'failed' | 'processing' | 'unknown'
+  channelRefundNo: string | null
 }
 
 /** 主动查单归一化结果（reconcile 兜底入账用；amountCents/channelTxnNo 缺失时不得入账）。 */
@@ -110,13 +127,20 @@ export interface PaymentProvider {
   /** 验签（含时间窗 + path/channel 绑定）+ 报文解析归一化。失败返回明确错误码，绝不静默放行。 */
   verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult>
   /**
-   * 执行退款（C5-4）。**只对本通道已入账的订单调用**；
+   * 执行退款（C5-4 定义，W-B 接真实渠道）。**只对本通道已入账的订单调用**；
    * 线下（offline/manual_confirmed）/免费/权益单不经此路径（由业务层判定）。
-   * 沙箱为假通道：不动外部资金，返回服务端生成的假 channelRefundNo + success。
-   * wechat / alipay 真实退款 API 属 C5-6 明确排除范围（不碰退款/C5-4），
-   * 实现必须抛明确错误码 fail-closed，绝不假装退款成功 —— 留待后续退款批次。
+   * - sandbox：假通道，不动外部资金，返回假 channelRefundNo + success。
+   * - wechat：`/v3/refund/domestic/refunds`，`out_refund_no=refundNo` 渠道级幂等；
+   *   受理中返回 processing（异步退款常态），由 queryRefund 收敛。
+   * - alipay：`alipay.trade.refund`（同步），`out_request_no=refundNo` 幂等。
+   * 渠道明确拒绝返回 failed；**绝不把受理中/失败假报为已退款**。
    */
   refund(input: RefundExecuteInput): Promise<RefundExecuteResult>
+  /**
+   * 退款查证（W-B）：processing 退款单的收敛依据（wechat 按 out_refund_no 查退款单 /
+   * alipay `alipay.trade.fastpay.refund.query`）。sandbox 同步完成，不实现。
+   */
+  queryRefund?(input: { refundNo: string; outTradeNo?: string | null }): Promise<RefundQueryResult>
   /**
    * 主动查单兜底（回调丢失/延迟时对渠道账本查询，reconcile 复用与回调完全相同的幂等入账路径）。
    * wechat / alipay 实现；sandbox 无外部账本（DB 即真相源），不实现 —— 不伪造能力。

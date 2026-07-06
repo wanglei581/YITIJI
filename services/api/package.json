@@ -43,6 +43,9 @@
     "verify:kiosk-cashier-ui": "node -r @swc-node/register scripts/verify-kiosk-cashier-ui.ts",
     "verify:refund-idempotent": "node -r @swc-node/register scripts/verify-refund-idempotent.ts",
     "verify:redemption-audit": "node -r @swc-node/register scripts/verify-redemption-audit.ts",
+    "verify:http-exception-filter": "node -r @swc-node/register scripts/verify-http-exception-filter.ts",
+    "verify:kiosk-upload-print-contract": "node -r @swc-node/register scripts/verify-kiosk-upload-print-contract.ts",
+    "verify:print-rollout-config": "node -r @swc-node/register scripts/verify-print-rollout-config.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
@@ -126,6 +129,7 @@
     "verify:fair-visit-plan": "node -r @swc-node/register scripts/verify-fair-visit-plan.ts",
     "verify:jobfair-checkin": "node -r @swc-node/register scripts/verify-jobfair-checkin.ts",
     "verify:payment-real-channels": "node -r @swc-node/register scripts/verify-payment-real-channels.ts",
+    "verify:refund-real-channels": "node -r @swc-node/register scripts/verify-refund-real-channels.ts",
     "verify:admin-billing": "node -r @swc-node/register scripts/verify-admin-billing.ts",
     "verify:reconciliation": "node -r @swc-node/register scripts/verify-reconciliation.ts"
   },

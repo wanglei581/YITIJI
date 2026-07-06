@@ -13,7 +13,9 @@
  * - 商户私钥 / APIv3 密钥 / 平台公钥只经服务端 env（内联 PEM 或文件路径）加载；
  *   本文件绝不打印任何密钥材料；Kiosk / Agent / 前端一律不得持有。
  * - 金额一律整数「分」；回调金额与服务端快照的双重比对在业务层完成。
- * - 退款属 C5-6 明确排除范围：refund() 抛明确错误码 fail-closed，绝不假装退款成功。
+ * - 退款（W-B）：`/v3/refund/domestic/refunds`，`out_refund_no=refundNo` 渠道级幂等；
+ *   SUCCESS→success / PROCESSING→processing（经 queryRefund 收敛）/ 其它→failed，
+ *   绝不把受理中假报为已退款。
  */
 import { createCipheriv, createDecipheriv, createSign, createVerify, randomBytes } from 'crypto'
 import type {
@@ -27,6 +29,7 @@ import type {
   QrPaymentCreateResult,
   RefundExecuteInput,
   RefundExecuteResult,
+  RefundQueryResult,
 } from '../payment-provider.types'
 import { buildPaymentCallbackPath } from '../payment-provider.types'
 
@@ -185,8 +188,10 @@ export class WechatPayProvider implements PaymentProvider {
     }
     if (!res.ok) {
       // 渠道错误码可记录（无敏感材料）；绝不把商户配置回显进错误信息。
-      const code = asString(parsed['code']) ?? `HTTP_${res.status}`
-      throw new Error(`WECHAT_PAY_CHANNEL_ERROR: ${code}`)
+      // 始终携带 HTTP 状态：退款域按「明确拒绝 vs 结果不可知」分类依赖 5xx 标记
+      //（如 500+SYSTEM_ERROR = 渠道要求同参数重试，绝不能按明确失败回滚）。
+      const code = asString(parsed['code'])
+      throw new Error(`WECHAT_PAY_CHANNEL_ERROR: HTTP_${res.status}${code ? ` ${code}` : ''}`)
     }
     return parsed
   }
@@ -331,9 +336,52 @@ export class WechatPayProvider implements PaymentProvider {
     return { status: 'unknown', channelTxnNo: null, amountCents: null }
   }
 
-  /** C5-6 明确不碰退款：真实渠道退款留待后续退款批次，绝不假装成功。 */
-  async refund(_input: RefundExecuteInput): Promise<RefundExecuteResult> {
-    throw new Error('REFUND_CHANNEL_NOT_IMPLEMENTED: wechat 真实渠道退款不在 C5-6 范围（不碰退款/C5-4），留待后续批次')
+  /** wechat 退款状态 → 归一化（受理中绝不假报成功）。 */
+  private static mapRefundStatus(status: string | null): 'success' | 'failed' | 'processing' {
+    if (status === 'SUCCESS') return 'success'
+    if (status === 'PROCESSING') return 'processing'
+    return 'failed' // ABNORMAL / CLOSED / 未知：按失败处理（由业务层回滚可重试）
+  }
+
+  /**
+   * 真实退款（W-B）：POST /v3/refund/domestic/refunds。
+   * `out_refund_no = refundNo`（渠道级幂等：同号重复请求不会重复出款）；
+   * amount.refund = 本次退款额、amount.total = 订单原始应付（均整数分，来自服务端落库数据）。
+   */
+  async refund(input: RefundExecuteInput): Promise<RefundExecuteResult> {
+    if (!input.outTradeNo || input.orderAmountCents === undefined) {
+      // fail-closed：缺原单定位/原始金额绝不盲发退款请求（业务层应传成功尝试的 attemptId）。
+      throw new Error('WECHAT_REFUND_INPUT_MISSING: 缺少 outTradeNo / orderAmountCents，拒绝发起渠道退款')
+    }
+    const resp = await this.request('POST', '/v3/refund/domestic/refunds', {
+      out_trade_no: input.outTradeNo,
+      out_refund_no: input.refundNo,
+      amount: { refund: input.amountCents, total: input.orderAmountCents, currency: 'CNY' },
+    })
+    return {
+      channelRefundNo: asString(resp['refund_id']),
+      status: WechatPayProvider.mapRefundStatus(asString(resp['status'])),
+    }
+  }
+
+  /** 退款查证（W-B）：GET /v3/refund/domestic/refunds/{out_refund_no}，processing 收敛依据。 */
+  async queryRefund(input: { refundNo: string; outTradeNo?: string | null }): Promise<RefundQueryResult> {
+    let resp: Record<string, unknown>
+    try {
+      resp = await this.request('GET', `/v3/refund/domestic/refunds/${encodeURIComponent(input.refundNo)}`)
+    } catch (e) {
+      if ((e as Error).message?.includes('RESOURCE_NOT_EXISTS') || (e as Error).message?.includes('HTTP_404')) {
+        return { status: 'unknown', channelRefundNo: null }
+      }
+      throw e
+    }
+    const status = WechatPayProvider.mapRefundStatus(asString(resp['status']))
+    // 查证接口的未知状态按 unknown 处理（不回滚不完成，等下次查证），仅明确 ABNORMAL/CLOSED 判失败。
+    const raw = asString(resp['status'])
+    if (status === 'failed' && raw !== 'ABNORMAL' && raw !== 'CLOSED') {
+      return { status: 'unknown', channelRefundNo: asString(resp['refund_id']) }
+    }
+    return { status, channelRefundNo: asString(resp['refund_id']) }
   }
 
   callbackAck(): CallbackAck {

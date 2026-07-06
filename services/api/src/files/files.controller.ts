@@ -35,7 +35,7 @@ import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
 import { CreateUploadIntentDto } from './dto/create-upload-intent.dto'
 import { UpdateRetentionDto } from './dto/update-retention.dto'
-import { verifyFileSignature, verifyRawUploadSignature } from './signing'
+import { signFileUrl, verifyFileSignature, verifyRawUploadSignature } from './signing'
 import type {
   FilePurpose,
   FileSensitiveLevel,
@@ -52,6 +52,8 @@ import type {
 
 /** 本地代理直传单文件上限(防内存打爆;COS 直传不经此路径)。 */
 const RAW_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
+/** Kiosk 上传响应需覆盖“上传→预览→确认打印”触控窗口，本次取 30 分钟签名 TTL。 */
+const KIOSK_UPLOAD_SIGNED_URL_TTL_MS = 30 * 60 * 1000
 
 /**
  * 路由表(全路径加 /api/v1 前缀):
@@ -128,6 +130,7 @@ export class FilesController {
       uploaderId: null,
       endUserId: endUser?.endUserId ?? null,
     })
+    const printSigned = signFileUrl(res.fileId, KIOSK_UPLOAD_SIGNED_URL_TTL_MS)
     await this.audit.write({
       actorId: null,
       actorRole: 'kiosk',
@@ -145,7 +148,11 @@ export class FilesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return ApiResponse.ok(res)
+    return ApiResponse.ok({
+      ...res,
+      signedUrl: printSigned.url,
+      signedUrlExpiresAt: printSigned.expiresAt.toISOString(),
+    })
   }
 
   // ── 直传意图 + 完成 ──────────────────────────────────────────────────────

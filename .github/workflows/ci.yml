@@ -128,6 +128,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:price-single-source
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
           pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper
@@ -167,9 +168,13 @@ jobs:
           pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
+          pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:redemption-audit
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
+          pnpm --filter @ai-job-print/api verify:http-exception-filter
+          pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
+          pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:screensaver-content
           pnpm --filter @ai-job-print/api verify:audit-logs
           pnpm --filter @ai-job-print/api verify:ai-config
@@ -297,8 +302,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
+          pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:redemption-audit
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
+          pnpm --filter @ai-job-print/api verify:http-exception-filter
+          pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
+          pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs

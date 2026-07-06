@@ -5,6 +5,12 @@ import { AlertCircleIcon, FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-reac
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
+import {
+  estimatePrintCents,
+  formatPriceCents,
+  unitCentsFor,
+  usePrintPriceConfig,
+} from '../../services/print/priceConfigApi'
 import { createPrintJob } from '../../services/print/printJobsApi'
 import {
   clearPrintMaterialSession,
@@ -23,9 +29,6 @@ interface LocationState {
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
 }
-
-const PRICE_BW = 0.2
-const PRICE_COLOR = 0.5
 
 const DUPLEX_LABEL: Record<string, string> = {
   simplex: '单面',
@@ -73,8 +76,15 @@ export function PrintConfirmPage() {
     return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
   }, [effectivePages, params])
 
-  const pricePerFace = params.colorMode === 'color' ? PRICE_COLOR : PRICE_BW
-  const totalPrice = (totalFaces * pricePerFace).toFixed(2)
+  // ── 展示价（W-A：唯一来源=服务端价目；估价口径与服务端一致=单价×内容页×份数）──
+  // 实际扣款金额由服务端建单时计算（绝不信任前端）；付费单进收银台必见真实金额。
+  const priceCfg = usePrintPriceConfig()
+  const unitCents = unitCentsFor(priceCfg.config, params.colorMode)
+  const estimateCents = estimatePrintCents(priceCfg.config, {
+    pages: file.pages,
+    copies: params.copies,
+    colorMode: params.colorMode,
+  })
 
   const summaryRows = [
     { label: '文件名称', value: file.name },
@@ -267,12 +277,18 @@ export function PrintConfirmPage() {
             <div>
               <p className="text-sm text-neutral-700 font-medium">预计费用</p>
               <p className="mt-0.5 text-xs text-neutral-400">
-                ¥{pricePerFace.toFixed(1)}/面（{params.colorMode === 'color' ? '彩色' : '黑白'}）× {totalFaces} 面
+                {priceCfg.status === 'error' || unitCents === null
+                  ? '价格暂不可用，实付以收银台显示为准'
+                  : file.pages === null
+                    ? `${formatPriceCents(unitCents)}/页（${params.colorMode === 'color' ? '彩色' : '黑白'}）× 页数待识别`
+                    : `${formatPriceCents(unitCents)}/页（${params.colorMode === 'color' ? '彩色' : '黑白'}）× ${file.pages} 页 × ${params.copies} 份`}
               </p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-bold text-neutral-900">¥{totalPrice}</span>
-              <p className="mt-0.5 text-xs text-neutral-400">实际以机器计费为准</p>
+              <span className="text-2xl font-bold text-neutral-900">
+                {estimateCents === null ? '—' : formatPriceCents(estimateCents)}
+              </span>
+              <p className="mt-0.5 text-xs text-neutral-400">按内容页计费，实付以收银台为准</p>
             </div>
           </div>
 
