@@ -70,6 +70,7 @@ async function main() {
 
   async function cleanup() {
     if (createdTaskIds.length) {
+      await prisma.order.deleteMany({ where: { printTaskId: { in: createdTaskIds } } })
       await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdTaskIds } } })
       await prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: createdTaskIds } } })
       await prisma.printTask.deleteMany({ where: { id: { in: createdTaskIds } } })
@@ -169,6 +170,57 @@ async function main() {
     } else fail(`5c. cancelled 终态保护异常: ${afterCancelledLateAck.status}`)
 
     // ── 6. 状态查询 404 ───────────────────────────────────────────────
+    const unpaidPaidPrint = await printJobs.create(
+      {
+        fileUrl: signed.url,
+        fileMd5: 'sha256-vpj-unpaid-paid',
+        fileName: 'payment-gate.pdf',
+      },
+      {
+        ipAddress: '127.0.0.1',
+        userAgent: 'verify',
+        endUserId: null,
+        terminalId,
+      },
+    )
+    createdTaskIds.push(unpaidPaidPrint.taskId)
+    await prisma.printTask.update({
+      where: { id: unpaidPaidPrint.taskId },
+      data: { createdAt: new Date('2020-01-02T00:00:00.000Z') },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: unpaidPaidPrint.taskId },
+      data: { amountCents: 100, payStatus: 'unpaid', taskStatus: 'pending' },
+    })
+
+    const blockedByPayment = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const blockedTask = await prisma.printTask.findUnique({ where: { id: unpaidPaidPrint.taskId } })
+    const blockedOrder = await prisma.order.findUnique({ where: { printTaskId: unpaidPaidPrint.taskId } })
+    if (
+      blockedByPayment.length === 0 &&
+      blockedTask?.status === 'pending' &&
+      blockedOrder?.taskStatus === 'pending' &&
+      blockedOrder.amountCents === 100 &&
+      blockedOrder.payStatus === 'unpaid'
+    ) {
+      pass('5d. amountCents>0 且 payStatus=unpaid 的打印订单不会被 claim')
+    } else {
+      fail(
+        `5d. payment gate failed: claimed=${JSON.stringify(blockedByPayment)} task=${JSON.stringify(blockedTask)} order=${JSON.stringify(blockedOrder)}`,
+      )
+    }
+
+    await prisma.order.updateMany({
+      where: { printTaskId: unpaidPaidPrint.taskId },
+      data: { payStatus: 'paid' },
+    })
+    const claimedAfterPaid = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (claimedAfterPaid.length === 1 && claimedAfterPaid[0].taskId === unpaidPaidPrint.taskId) {
+      pass('5e. amountCents>0 且 payStatus=paid 的打印订单可以被 claim')
+    } else {
+      fail(`5e. paid order claim failed: ${JSON.stringify(claimedAfterPaid)}`)
+    }
+
     await expectCode(
       () => printJobs.getStatus(`ptask_nonexistent_${suffix}`),
       'PRINT_TASK_NOT_FOUND',

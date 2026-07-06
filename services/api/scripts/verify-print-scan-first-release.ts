@@ -69,6 +69,16 @@ contains(
   ["where: { status: 'pending', terminalId }", "where: { id: task.id, status: 'pending', terminalId }"],
   'claim must filter pending tasks by terminalId',
 )
+contains(
+  claimBlock,
+  ['isPrintOrderClaimable', 'amountCents', 'payStatus'],
+  'claim must block amountCents>0 print orders until payStatus=paid',
+)
+contains(
+  terminalsService,
+  ['function isPrintOrderClaimable', 'amountCents <= 0', "payStatus === 'paid'"],
+  'payment gate helper must allow free orders and require paid status for positive-amount orders',
+)
 notContains(
   claimBlock,
   ["terminalId,\n            claimedAt"],

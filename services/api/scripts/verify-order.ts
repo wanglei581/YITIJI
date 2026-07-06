@@ -266,6 +266,66 @@ async function main(): Promise<void> {
       fail(`reset mirror mismatch: task=${JSON.stringify(resetTask)} order=${JSON.stringify(resetOrder)}`)
     }
 
+    const unpaidPaidPrint = await printJobs.create(
+      {
+        fileUrl: signedUrl('payment-gate'),
+        fileMd5: 'sha256-order-payment-gate',
+        fileName: 'payment-gate.pdf',
+        params: PRINT_PARAMS,
+      },
+      { endUserId: null, terminalId },
+    )
+    taskIds.push(unpaidPaidPrint.taskId)
+    await prisma.printTask.update({
+      where: { id: unpaidPaidPrint.taskId },
+      data: { createdAt: new Date(1) },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: unpaidPaidPrint.taskId },
+      data: { amountCents: 100, payStatus: 'unpaid', taskStatus: 'pending' },
+    })
+
+    const blockedClaim = await terminals.claimTasks(
+      terminalId,
+      { maxTasks: 1 },
+      `Bearer ${terminalToken}`,
+    )
+    const blockedTask = await prisma.printTask.findUnique({ where: { id: unpaidPaidPrint.taskId } })
+    const blockedOrder = await prisma.order.findUnique({
+      where: { printTaskId: unpaidPaidPrint.taskId },
+    })
+    if (
+      blockedClaim.length === 0 &&
+      blockedTask?.status === 'pending' &&
+      blockedOrder?.taskStatus === 'pending' &&
+      blockedOrder.amountCents === 100 &&
+      blockedOrder.payStatus === 'unpaid'
+    ) {
+      pass('claimTasks blocks amountCents>0 unpaid print orders before physical printing')
+    } else {
+      fail(
+        `unpaid paid-order gate mismatch: claimed=${JSON.stringify(blockedClaim)} task=${JSON.stringify(blockedTask)} order=${JSON.stringify(blockedOrder)}`,
+      )
+    }
+
+    await prisma.order.updateMany({
+      where: { printTaskId: unpaidPaidPrint.taskId },
+      data: { payStatus: 'paid' },
+    })
+    const paidClaim = await terminals.claimTasks(
+      terminalId,
+      { maxTasks: 1 },
+      `Bearer ${terminalToken}`,
+    )
+    const paidOrder = await prisma.order.findUnique({
+      where: { printTaskId: unpaidPaidPrint.taskId },
+    })
+    if (paidClaim[0]?.taskId === unpaidPaidPrint.taskId && paidOrder?.taskStatus === 'claimed') {
+      pass('claimTasks allows amountCents>0 paid print orders and mirrors claimed into Order')
+    } else {
+      fail(`paid order claim mismatch: claim=${JSON.stringify(paidClaim)} order=${JSON.stringify(paidOrder)}`)
+    }
+
     const bareTaskId = `ptask_bare_${suffix}`
     taskIds.push(bareTaskId)
     await prisma.printTask.create({

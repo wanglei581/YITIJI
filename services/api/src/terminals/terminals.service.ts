@@ -128,6 +128,12 @@ function shouldSeedPrintTask(): boolean {
   return nodeEnv === 'development' || nodeEnv === 'test'
 }
 
+function isPrintOrderClaimable(order: { amountCents: number; payStatus: string } | null): boolean {
+  if (!order) return true
+  if (order.amountCents <= 0) return true
+  return order.payStatus === 'paid'
+}
+
 // ── PrintJobParams ────────────────────────────────────────────────────────────
 
 interface PrintJobParams {
@@ -657,14 +663,18 @@ export class TerminalsService implements OnModuleInit {
 
     const results: ClaimTaskResponse[] = []
 
-    // Atomic claim: find first pending task and claim it in a transaction
+    // Atomic claim: find first pending task and claim it in a transaction.
+    // Payment gate keeps FIFO: an unpaid paid order stays pending and blocks
+    // later tasks for this terminal until it is paid/cancelled/handled upstream.
     for (let i = 0; i < limit; i++) {
       const claimed = await this.prisma.$transaction(async (tx) => {
         const task = await tx.printTask.findFirst({
           where: { status: 'pending', terminalId },
           orderBy: { createdAt: 'asc' },
+          include: { order: { select: { amountCents: true, payStatus: true } } },
         })
         if (!task) return null
+        if (!isPrintOrderClaimable(task.order)) return null
 
         // status guard in WHERE prevents double-claim under concurrent requests
         // (PostgreSQL READ COMMITTED: two transactions could both see the same
