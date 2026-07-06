@@ -5,6 +5,7 @@ export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
   type: string
+  printTaskId: string | null
   ownerType: 'member' | 'anonymous'
   userLabel: string
   terminalCode: string | null
@@ -109,6 +110,7 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   id: 'ord_mock_1',
   orderNo: 'ORD-20260625-MOCKREAD',
   type: 'print',
+  printTaskId: 'pt-mock-1',
   ownerType: 'member',
   userLabel: '演示会员',
   terminalCode: 'KSK-001',

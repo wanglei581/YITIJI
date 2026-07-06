@@ -194,6 +194,7 @@ export class AdminOrdersReadonlyService {
       id: row.id,
       orderNo: row.orderNo,
       type: row.type,
+      printTaskId: row.printTaskId,
       ownerType,
       userLabel: ownerType === 'member' ? (nickname && nickname.length > 0 ? nickname : '会员') : '游客',
       terminalCode: effectiveTerminalId ? labels.terminalCodes.get(effectiveTerminalId) ?? null : null,

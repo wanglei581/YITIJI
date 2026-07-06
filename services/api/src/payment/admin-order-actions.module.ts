@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module'
 import { AdminBillingController } from './admin-billing.controller'
 import { AdminBillingService } from './admin-billing.service'
 import { AdminOrderActionsController } from './admin-order-actions.controller'
+import { AdminPrintOrderActionsService } from './admin-print-order-actions.service'
 import { PaymentModule } from './payment.module'
 import { ReconciliationService } from './reconciliation.service'
 
@@ -15,6 +16,6 @@ import { ReconciliationService } from './reconciliation.service'
 @Module({
   imports: [AuthModule, PaymentModule],
   controllers: [AdminOrderActionsController, AdminBillingController],
-  providers: [AdminBillingService, ReconciliationService],
+  providers: [AdminBillingService, AdminPrintOrderActionsService, ReconciliationService],
 })
 export class AdminOrderActionsModule {}

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 const root = process.cwd()
 const pagePath = join(root, 'src/routes/orders/index.tsx')
 const servicePath = join(root, 'src/services/api/adminOrdersReadonly.ts')
+const actionsPath = join(root, 'src/services/api/adminOrderActions.ts')
 
 function pass(message) {
   console.log(`  PASS ${message}`)
@@ -17,11 +18,13 @@ function fail(message) {
 console.log('\n=== Admin orders read-only UI verification ===')
 
 if (!existsSync(servicePath)) fail('adminOrdersReadonly service is missing')
+if (!existsSync(actionsPath)) fail('adminOrderActions service is missing')
 const page = readFileSync(pagePath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
+const actions = readFileSync(actionsPath, 'utf8')
 
 if (page.includes('adminOrdersReadonlyService') && !page.includes('listPrintTasks')) {
-  pass('orders page uses the read-only order service, not print task fallback')
+  pass('orders page uses the order service, not print task fallback')
 } else {
   fail('orders page should use adminOrdersReadonlyService and avoid listPrintTasks')
 }
@@ -42,8 +45,28 @@ for (const forbidden of ['标记已支付', '标记支付失败', '标记退款'
 pass('orders page has no payment/refund/status mutation actions')
 
 if (
-  page.includes('订单只读视图') &&
-  page.includes('支付 / 退款 / 对账域尚未上线') &&
+  page.includes('adminOrderActionsService') &&
+  page.includes('cancelPendingOrder') &&
+  page.includes('reassignPendingOrder') &&
+  page.includes("detail.taskStatus === 'pending'") &&
+  page.includes('getTerminals') &&
+  page.includes('<select') &&
+  page.includes('targetTerminalRef') &&
+  !page.includes('window.prompt') &&
+  /\/admin\/orders\/.*\/cancel/.test(actions) &&
+  /\/admin\/orders\/.*\/reassign/.test(actions) &&
+  actions.includes('/cancel') &&
+  actions.includes('/reassign') &&
+  !/mark-paid|refund|PATCH|DELETE/.test(actions)
+) {
+  pass('orders page exposes only pending cancel/reassign Admin actions')
+} else {
+  fail('orders page must expose only pending cancel/reassign actions')
+}
+
+if (
+  page.includes('订单运营视图') &&
+  page.includes('pending 打印任务支持受限取消 / 重分配') &&
   page.includes('orderNo') &&
   page.includes('payStatus') &&
   page.includes('taskStatus')

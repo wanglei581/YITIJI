@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator'
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
 
 /**
  * Admin 线下/人工确认收款请求体（P0a，无 live 网关）。
@@ -16,4 +16,23 @@ export class AdminRefundDto {
   @IsNotEmpty()
   @MaxLength(500)
   refundReason!: string
+}
+
+export class AdminCancelPrintOrderDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string
+}
+
+export class AdminReassignPrintOrderDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  terminalId!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string
 }

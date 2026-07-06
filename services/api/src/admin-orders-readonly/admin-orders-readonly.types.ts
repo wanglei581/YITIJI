@@ -11,6 +11,7 @@ export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
   type: string
+  printTaskId: string | null
   ownerType: 'member' | 'anonymous'
   userLabel: string
   terminalCode: string | null

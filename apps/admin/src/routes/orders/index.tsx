@@ -4,11 +4,13 @@ import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-j
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { FileTextIcon, RefreshCwIcon, SearchIcon } from 'lucide-react'
+import { adminOrderActionsService } from '../../services/api/adminOrderActions'
 import {
   adminOrdersReadonlyService,
   type AdminOrderReadonlyDetail,
   type AdminOrderReadonlyItem,
 } from '../../services/api/adminOrdersReadonly'
+import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -75,6 +77,10 @@ function Info({ label, value }: { label: string; value: string }) {
 export default function OrdersPage() {
   const [detail, setDetail] = useState<AdminOrderReadonlyDetail | null>(null)
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'error' | 'ready'>('idle')
+  const [actionState, setActionState] = useState<'idle' | 'running'>('idle')
+  const [actionError, setActionError] = useState('')
+  const [terminals, setTerminals] = useState<AdminTerminalRecord[]>([])
+  const [targetTerminalRef, setTargetTerminalRef] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [payStatus, setPayStatus] = useState('')
   const [searchDraft, setSearchDraft] = useState('')
@@ -132,9 +138,20 @@ export default function OrdersPage() {
   const openDetail = async (id: string) => {
     setDetailState('loading')
     setDetail(null)
+    setActionError('')
     try {
-      const data = await adminOrdersReadonlyService.getById(id)
+      const [data, terminalData] = await Promise.all([
+        adminOrdersReadonlyService.getById(id),
+        getTerminals().catch(() => ({ terminals: [] })),
+      ])
+      const enabledTerminals = terminalData.terminals.filter((terminal) => terminal.enabled)
       setDetail(data)
+      setTerminals(enabledTerminals)
+      setTargetTerminalRef(
+        enabledTerminals.find((terminal) => terminal.terminalCode !== data.terminalCode)?.terminalCode ??
+        enabledTerminals[0]?.terminalCode ??
+        '',
+      )
       setDetailState('ready')
     } catch {
       setDetailState('error')
@@ -144,12 +161,55 @@ export default function OrdersPage() {
   const closeDetail = () => {
     setDetail(null)
     setDetailState('idle')
+    setActionError('')
+    setTargetTerminalRef('')
+  }
+
+  const refreshDetail = async (id: string) => {
+    const data = await adminOrdersReadonlyService.getById(id)
+    setDetail(data)
+    return data
+  }
+
+  const cancelPendingOrder = async () => {
+    if (!detail || detail.taskStatus !== 'pending' || !detail.printTaskId) return
+    if (!window.confirm(`确定取消订单 ${detail.orderNo}？仅 pending 任务可取消，支付状态不会被修改。`)) return
+    setActionState('running')
+    setActionError('')
+    try {
+      await adminOrderActionsService.cancelOrder(detail.id, 'admin order page cancellation')
+      await refreshDetail(detail.id)
+      await refresh()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : '取消失败，请稍后重试')
+    } finally {
+      setActionState('idle')
+    }
+  }
+
+  const reassignPendingOrder = async () => {
+    if (!detail || detail.taskStatus !== 'pending' || !detail.printTaskId) return
+    if (!targetTerminalRef) {
+      setActionError('请选择一个已启用终端')
+      return
+    }
+    setActionState('running')
+    setActionError('')
+    try {
+      await adminOrderActionsService.reassignOrder(detail.id, targetTerminalRef, 'admin order page reassign')
+      await refreshDetail(detail.id)
+      await refresh()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : '重分配失败，请稍后重试')
+    } finally {
+      setActionState('idle')
+    }
   }
 
   return (
     <Page
       title="订单管理"
-      subtitle={`打印 / 扫描订单只读视图 · 状态由 Terminal Agent 回报落库 · 共 ${total} 条`}
+      subtitle={`打印 / 扫描订单运营视图 · 状态由 Terminal Agent 回报落库 · 共 ${total} 条`}
       actions={
         <button
           type="button"
@@ -161,9 +221,9 @@ export default function OrdersPage() {
         </button>
       }
     >
-      {/* 诚实说明:只读订单视图 */}
+      {/* 诚实说明:订单运营视图 */}
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        当前展示真实订单与打印任务安全元数据。支付 / 退款 / 对账域尚未上线，本页只读展示金额、支付状态和任务状态，不提供标记支付、退款或改状态操作。
+        当前展示真实订单与打印任务安全元数据。pending 打印任务支持受限取消 / 重分配；支付 / 退款仍走独立后台端点，不在本页直接操作。
       </div>
 
       <section className="overflow-hidden rounded-lg border border-neutral-900/[0.06] bg-surface shadow-sm">
@@ -294,7 +354,7 @@ export default function OrdersPage() {
         {detailState === 'error' && <ErrorState className="py-16" onRetry={closeDetail} />}
         {detailState === 'ready' && detail && (
           <>
-            <p className="text-xs text-neutral-500">只读详情，不提供支付、退款或任务状态写入。</p>
+            <p className="text-xs text-neutral-500">订单详情仅展示安全元数据；pending 打印任务可由管理员取消或改派终端。</p>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Info label="订单类型" value={detail.type} />
               <Info label="金额" value={amountText(detail.amountCents, detail.currency)} />
@@ -316,6 +376,47 @@ export default function OrdersPage() {
                 }
               />
             </div>
+
+            {detail.printTaskId && detail.taskStatus === 'pending' ? (
+              <div className="mb-4 rounded-[9px] border border-neutral-900/10 bg-neutral-50 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={actionState === 'running'}
+                    onClick={() => void cancelPendingOrder()}
+                    className="inline-flex h-8 items-center rounded-lg border border-error-fg/30 bg-white px-3 text-[12.5px] font-bold text-error-fg transition-colors hover:bg-error-bg disabled:opacity-50"
+                  >
+                    取消任务
+                  </button>
+                  <button
+                    type="button"
+                    disabled={actionState === 'running' || !targetTerminalRef}
+                    onClick={() => void reassignPendingOrder()}
+                    className="inline-flex h-8 items-center rounded-lg border border-primary-600/30 bg-white px-3 text-[12.5px] font-bold text-primary-700 transition-colors hover:bg-primary-50 disabled:opacity-50"
+                  >
+                    重分配终端
+                  </button>
+                  <select
+                    value={targetTerminalRef}
+                    onChange={(event) => setTargetTerminalRef(event.target.value)}
+                    disabled={actionState === 'running'}
+                    className="h-8 min-w-[180px] rounded-lg border border-neutral-900/10 bg-white px-2 text-[12.5px] font-semibold text-neutral-700 outline-none transition-colors focus:border-primary-600/40 disabled:opacity-50"
+                    aria-label="选择重分配目标终端"
+                  >
+                    {terminals.length === 0 ? <option value="">暂无已启用终端</option> : null}
+                    {terminals.map((terminal) => (
+                      <option key={terminal.id} value={terminal.terminalCode}>
+                        {terminal.terminalCode}{terminal.locationLabel ? ` · ${terminal.locationLabel}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[12px] text-neutral-500">
+                    可用终端 {terminals.length} 台；当前 {detail.terminalCode ?? '未绑定'}
+                  </span>
+                </div>
+                {actionError ? <p className="mt-2 text-[12px] font-semibold text-error-fg">{actionError}</p> : null}
+              </div>
+            ) : null}
 
             <h3 className="mb-2 mt-5 text-[12.5px] font-extrabold text-neutral-700 [font-family:var(--font-heading,inherit)]">
               状态流转

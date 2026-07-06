@@ -172,6 +172,7 @@ async function main(): Promise<void> {
     const detail = await service.getById(orderId)
     if (
       detail.id === orderId &&
+      detail.printTaskId === taskId &&
       detail.print?.fileName === '只读订单验证.pdf' &&
       detail.print.pageRange === '1-2' &&
       detail.print.status === 'completed' &&

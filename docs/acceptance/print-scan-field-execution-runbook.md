@@ -437,7 +437,7 @@ Get-WinEvent -FilterHashtable @{
 
 目标：安全模拟本地任务库不可用，不破坏真实 `%ProgramData%\AIJobPrintAgent\agent.db`。
 
-当前运行时边界（2026-07-06 复核）：Admin 订单动作端点只有 `POST /admin/orders/:id/mark-paid` 和 `POST /admin/orders/:id/refund`，订单与打印任务运营视图分别为 `GET /admin/orders`、`GET /admin/orders/:id`、`GET /admin/print-tasks`；当前源码没有正式 `cancel` / `reassign` 写端点。现场恢复领单验收不得调用不存在的取消 / 重分配路由，也不得把 404 当作功能异常。
+当前运行时边界（2026-07-06 复核）：Admin 订单动作端点包含 `POST /admin/orders/:id/mark-paid`、`POST /admin/orders/:id/refund`，本分支新增 `POST /admin/orders/:id/cancel` 与 `POST /admin/orders/:id/reassign`，后两者仅允许 `pending` 打印订单；订单与打印任务运营视图分别为 `GET /admin/orders`、`GET /admin/orders/:id`、`GET /admin/print-tasks`。现场恢复领单验收仍必须在候选部署后带 Admin 鉴权复验这些动作，不能把本地 verify 等同于生产可用。
 
 执行前先停止第六节 PowerShell 窗口 A 中的正常 Agent（按 `Ctrl+C`），并确认没有同一 `terminalId` 的 Agent 仍在运行。否则正常 Agent 会继续上报 `online`，与降级演练窗口交替覆盖心跳，导致 Admin 观察结果不可靠。
 

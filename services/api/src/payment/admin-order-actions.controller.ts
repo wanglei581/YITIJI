@@ -3,7 +3,13 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
-import { AdminMarkPaidDto, AdminRefundDto } from './dto/order-action.dto'
+import {
+  AdminCancelPrintOrderDto,
+  AdminMarkPaidDto,
+  AdminReassignPrintOrderDto,
+  AdminRefundDto,
+} from './dto/order-action.dto'
+import { AdminPrintOrderActionsService } from './admin-print-order-actions.service'
 import { OrderStatusService } from './order-status.service'
 import { RefundService } from './refund.service'
 
@@ -25,6 +31,7 @@ export class AdminOrderActionsController {
   constructor(
     private readonly orderStatus: OrderStatusService,
     private readonly refundService: RefundService,
+    private readonly printOrderActions: AdminPrintOrderActionsService,
   ) {}
 
   @Post('admin/orders/:id/mark-paid')
@@ -49,5 +56,27 @@ export class AdminOrderActionsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.refundService.refund(id, { reason: body.refundReason, operatorId: user.userId })
+  }
+
+  @Post('admin/orders/:id/cancel')
+  async cancelPrintOrder(
+    @Param('id') id: string,
+    @Body() body: AdminCancelPrintOrderDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.printOrderActions.cancelOrder(id, { reason: body.reason, operatorId: user.userId })
+  }
+
+  @Post('admin/orders/:id/reassign')
+  async reassignPrintOrder(
+    @Param('id') id: string,
+    @Body() body: AdminReassignPrintOrderDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.printOrderActions.reassignOrder(id, {
+      terminalId: body.terminalId,
+      reason: body.reason,
+      operatorId: user.userId,
+    })
   }
 }
