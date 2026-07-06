@@ -1,4 +1,15 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
+import { IsBoolean, IsInt, IsISO8601, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
+
+/** 对账报表查询（可选时间窗；不传则全量）。 */
+export class AdminReconciliationQueryDto {
+  @IsOptional()
+  @IsISO8601()
+  from?: string
+
+  @IsOptional()
+  @IsISO8601()
+  to?: string
+}
 
 /**
  * Admin 改价请求体（W-C 计费配置）。
