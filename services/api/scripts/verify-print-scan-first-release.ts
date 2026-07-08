@@ -87,6 +87,8 @@ function main(): void {
   const prismaSchema = read('prisma/schema.prisma')
   const adminTypes = read('../../apps/admin/src/services/api/types.ts')
   const adminTerminalsPage = read('../../apps/admin/src/routes/terminals/index.tsx')
+  const adminPackageJson = read('../../apps/admin/package.json')
+  const adminPrintOpsVerify = read('../../apps/admin/scripts/verify-admin-print-ops-visibility-ui.mjs')
   const ciWorkflow = read('../../.github/workflows/ci.yml')
   const acceptancePackage = read('../../docs/acceptance/print-scan-first-release-acceptance-package.md')
   const fieldRunbook = read('../../docs/acceptance/print-scan-field-execution-runbook.md')
@@ -196,6 +198,26 @@ function main(): void {
     'Admin terminals page must show degraded Agent state instead of healthy online',
   )
 
+  mustContain(
+    adminPackageJson,
+    ['verify:admin-print-ops-visibility-ui'],
+    'Admin package must expose print ops visibility UI verification',
+  )
+
+  mustContain(
+    adminPrintOpsVerify,
+    [
+      "agentStatus === 'agent_degraded'",
+      'localTaskDatabaseAvailable === false',
+      '本地任务库不可用，已暂停领取打印任务',
+      'orders page exposes failed status, error code, and status transition log',
+      'order readonly service keeps file URL/hash out of Admin ops visibility payload',
+      'orders page exposes only pending manual cancel/reassign handling',
+      'Admin order actions adapter is limited to cancel/reassign endpoints',
+    ],
+    'Admin print ops visibility verify must guard degraded state, failure reason, manual handling, and file metadata privacy',
+  )
+
   const heartbeatModel = section(prismaSchema, 'model TerminalHeartbeat', '// ── PrintTaskStatusLog')
   mustContain(
     heartbeatModel,
@@ -205,7 +227,10 @@ function main(): void {
 
   mustContain(
     ciWorkflow,
-    ['pnpm --filter @ai-job-print/api verify:print-scan-first-release'],
+    [
+      'pnpm --filter @ai-job-print/api verify:print-scan-first-release',
+      'pnpm --filter @ai-job-print/admin verify:admin-print-ops-visibility-ui',
+    ],
     'CI must run print-scan first-release safety verification to prevent regressions',
   )
 
@@ -220,6 +245,9 @@ function main(): void {
       'PS-G3-DEG-01',
       'PS-G3-REC-01',
       'PS-G4-01',
+      'PS-G4-04',
+      'Code Guard Passed; Field Screenshot/Manual Record Pending',
+      'verify:admin-print-ops-visibility-ui',
       'terminalId',
       'agent_degraded',
       'localTaskDatabaseAvailable=false',
