@@ -18,6 +18,7 @@
 - `PS-G3-NEG-01-LP`：2026-07-06 本地 `verify:print-jobs` 新增错终端状态回传断言：第二终端使用自身 token 回传第一终端任务 `printing` 被拒为 `TASK_NOT_OWNED`，任务仍保持 `claimed` 且目标 `terminalId` 不变。该项只证明本地 service 级防回退，不替代现场真实 API / DB 错终端回传演练。
 - `PS-G3-OPS-01-LP`：2026-07-06 本地代码 / verify 级补齐 Admin pending 打印订单受限运维动作：`POST /admin/orders/:id/cancel` 仅取消 `pending` 打印订单并同步 `Order.taskStatus=cancelled`，`POST /admin/orders/:id/reassign` 仅把 `pending` 打印订单改派到已启用终端；`verify:admin-print-order-actions` 覆盖 pending 取消、pending 重分配、claimed/completed 拒绝、disabled/missing terminal 拒绝、状态日志和审计不泄露文件 URL / hash。该项不替代候选部署后的现场 Admin 鉴权 / DB 复验。
 - `PS-G4-02-LP`：2026-07-08 本地 `verify:print-jobs` 新增 stuck `printing` 任务回收断言：超时 printing 任务回到 `pending` 后仍保留原目标 `terminalId`，对应 `Order.terminalId` / `taskStatus` 同步保持一致；错误终端继续 claim 返回空，原目标终端可重新领取。该项只证明本地 service 级防回退，不替代现场真实 API / DB 卡住任务释放演练。
+- `PS-G4-03-LP`：2026-07-08 本地 `verify:print-scan-agent` 新增 Agent 防误报 completed 静态断言：重启后发现本地 `spooled` 中间态时跳过重打并回传 `failed + PRINT_JOB_UNCONFIRMED`，离线时进入 pending patch 重试队列；Pantum `Printing, Retained` 监控超时也回传 `PRINT_JOB_UNCONFIRMED`，WMI 层保持 `retained` 为未确认状态，不映射为 `completed` 或 `paper_empty`。该项只证明本地 Agent 代码防回退，不替代现场断网 / 断电恢复演练。
 - Gate 3 仍为 `Not Passed Yet`：终端隔离、Admin 降级截图、恢复后 paid / allowed 任务真实领单、现场真实 API / DB 错终端拒绝、隐私删除和异常恢复等演练尚未完整补齐；扫描链路、U 盘导入、断网 / 重启恢复仍需另行验收。
 
 ## 目标
@@ -127,15 +128,15 @@ Gate 3 Field Print Safety Base: Not Passed Yet
 | --- | --- | --- | --- |
 | PS-G4-01 | Not Passed Yet | 打印完成或失败后，本地临时文件按 TTL 清理，无法继续打开用户文件 | `<PRIVATE_EVIDENCE_DIR>/PS-G4-01-local-cache-cleanup-<timestamp>.log` |
 | PS-G4-02 | Code Guard Passed; Field Pending | 本地 `verify:print-jobs` 已覆盖 stuck `printing` 任务回收：释放后仍保留目标 `terminalId`，错误终端不能领取，原目标终端可重新领取；尚未在现场真实 API / DB 中复验 | `services/api verify:print-jobs` / `<PRIVATE_EVIDENCE_DIR>/PS-G4-02-stuck-task-release-<timestamp>.log` |
-| PS-G4-03 | Not Passed Yet | 断网 / 断电恢复不会把未出纸任务标记为 completed | `<PRIVATE_EVIDENCE_DIR>/PS-G4-03-offline-recovery-<timestamp>.md` |
+| PS-G4-03 | Code Guard Passed; Field Pending | 本地 `verify:print-scan-agent` 已覆盖 spooled 重启补偿和 Pantum Retained 超时不误报 completed：未确认结果回传 `failed + PRINT_JOB_UNCONFIRMED`，离线时进入 pending patch 重试队列；尚未在现场断网 / 断电中复验 | `terminal-agent verify:print-scan-agent` / `<PRIVATE_EVIDENCE_DIR>/PS-G4-03-offline-recovery-<timestamp>.md` |
 | PS-G4-04 | Not Passed Yet; Admin Degraded Static Evidence + Runbook Only | Admin 可见失败原因、降级状态、恢复状态和人工处理记录；当前仅确认 Admin 终端页具备降级状态展示代码，且 Runbook 已补受控截图步骤，尚未取得现场截图和人工处理记录 | `<PRIVATE_EVIDENCE_DIR>/PS-G4-04-admin-ops-visibility-<timestamp>.png` |
 
 判定：
 
 ```text
 Gate 4 Privacy And Recovery: Not Passed Yet
-已确认：stuck printing 任务释放保留目标 terminalId、错误终端不能领取、原目标终端可重新领取已有本地 service 级防回退。
-阻塞项：尚未执行高敏文件 TTL 删除、卡住任务释放、断网 / 断电恢复和 Admin 运维可见性现场验收；PS-G4-02 仍需现场真实 API / DB 证据后才能判通过。
+已确认：stuck printing 任务释放保留目标 terminalId、错误终端不能领取、原目标终端可重新领取已有本地 service 级防回退；Agent spooled 重启补偿和 Pantum Retained 超时均已由本地静态门禁锁定为 PRINT_JOB_UNCONFIRMED，不误报 completed。
+阻塞项：尚未执行高敏文件 TTL 删除、卡住任务释放、断网 / 断电恢复和 Admin 运维可见性现场验收；PS-G4-02 / PS-G4-03 仍需现场真实 API / DB / Windows 证据后才能判通过。
 ```
 
 ## 停止条件

@@ -30,6 +30,8 @@ const taskRunner = read('src/agent/task-runner.ts')
 const heartbeat = read('src/agent/heartbeat.ts')
 const types = read('src/agent/types.ts')
 const index = read('src/index.ts')
+const wmi = read('src/agent/wmi.ts')
+const printerTypes = read('src/printer/types.ts')
 
 mustContain(
   db,
@@ -59,6 +61,46 @@ mustContain(
   index,
   ['isDatabaseAvailable(db)', 'localTaskDatabaseAvailable'],
   'agent entrypoint must wire db availability into heartbeat',
+)
+
+mustContain(
+  taskRunner,
+  [
+    "localStatus === 'spooled'",
+    "'PRINT_JOB_UNCONFIRMED'",
+    "patch('failed', 'PRINT_JOB_UNCONFIRMED'",
+    'enqueuePatch(db, task.taskId, { status: \'failed\', errorCode: \'PRINT_JOB_UNCONFIRMED\'',
+  ],
+  'spooled restart recovery must not report completed; it must fail unconfirmed and queue retry if offline',
+)
+
+mustContain(
+  taskRunner,
+  [
+    'let seenRetainedOnce = false',
+    "case 'retained'",
+    'seenRetainedOnce = true',
+    'if (seenRetainedOnce)',
+    "errorCode: 'PRINT_JOB_UNCONFIRMED'",
+    "rawStatus: 'Printing, Retained (timeout)'",
+  ],
+  'Pantum retained timeout must be treated as unconfirmed instead of completed',
+)
+
+mustContain(
+  wmi,
+  [
+    "'retained'",
+    "flags.includes('retained')",
+    'Do NOT map to \'completed\' or \'paper_empty\' here',
+  ],
+  'WMI monitor must keep Retained as an indeterminate state',
+)
+
+mustContain(
+  printerTypes,
+  ["'PRINT_JOB_UNCONFIRMED'"],
+  'terminal-agent print error codes must include PRINT_JOB_UNCONFIRMED',
 )
 
 if (failed > 0) {

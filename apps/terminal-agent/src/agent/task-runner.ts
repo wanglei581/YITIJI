@@ -350,7 +350,7 @@ async function executeTask(
 
       // ── Step 4.5: Immediately write 'spooled' to local DB ─────────────
       // N5 guarantee: if Agent crashes during post-spooling monitoring, restart
-      // will see 'spooled' → skip reprint → reconcile as completed (conservative).
+      // will see 'spooled' → skip reprint → report PRINT_JOB_UNCONFIRMED.
       // INSERT OR REPLACE so a later markTaskDone('completed'/'failed') can overwrite.
       try {
         markTaskDone(db, task.taskId, 'spooled')
@@ -367,7 +367,7 @@ async function executeTask(
       // Windows spooler accepted the job (SumatraPDF already exited).
       // PaperOut requires 2 consecutive confirmations to guard against transient
       // driver state flicker.
-      // On timeout / job not found: conservative completed (no false failures).
+      // Retained timeout is unconfirmed; job-not-found / normal timeout remains conservative.
       const monitorOutcome = await monitorPrintJob(
         resolvedPrinter,
         task.taskId,

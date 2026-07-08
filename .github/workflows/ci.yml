@@ -162,6 +162,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
+          pnpm --filter terminal-agent verify:print-scan-agent
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
