@@ -72,6 +72,9 @@ async function main() {
     new OrderStatusService(prisma, audit),
   )
   const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
+  const resetExpiredClaims = (
+    terminals as unknown as { resetExpiredClaims: () => Promise<void> }
+  ).resetExpiredClaims.bind(terminals)
 
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vpj_${suffix}`
@@ -228,6 +231,61 @@ async function main() {
       pass('3f. 错终端回传被拒后任务仍保持 claimed 且目标终端不变')
     } else {
       fail(`3f. 错终端回传后状态异常: ${afterWrongTerminalPatch?.status} / ${afterWrongTerminalPatch?.terminalId}`)
+    }
+
+    const stuckCreated = await printJobs.create(
+      {
+        fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+        fileMd5: 'sha256-vpj-stuck',
+        fileName: '卡住任务.pdf',
+      },
+      { terminalId },
+    )
+    createdTaskIds.push(stuckCreated.taskId)
+    await prisma.printTask.update({
+      where: { id: stuckCreated.taskId },
+      data: {
+        status: 'printing',
+        terminalId,
+        claimedAt: new Date(Date.now() - 11 * 60 * 1000),
+        claimExpiry: new Date(Date.now() - 10 * 60 * 1000),
+      },
+    })
+    await prisma.order.updateMany({
+      where: { printTaskId: stuckCreated.taskId },
+      data: { taskStatus: 'printing', terminalId },
+    })
+    await resetExpiredClaims()
+    const resetStuckTask = await prisma.printTask.findUnique({ where: { id: stuckCreated.taskId } })
+    const resetStuckOrder = await prisma.order.findUnique({ where: { printTaskId: stuckCreated.taskId } })
+    if (
+      resetStuckTask?.status === 'pending' &&
+      resetStuckTask.terminalId === terminalId &&
+      resetStuckOrder?.taskStatus === 'pending' &&
+      resetStuckOrder.terminalId === terminalId
+    ) {
+      pass('3g. stuck printing 回收 → 任务回到 pending 且保留目标终端')
+    } else {
+      fail(`3g. stuck printing 回收异常: task=${JSON.stringify(resetStuckTask)} order=${JSON.stringify(resetStuckOrder)}`)
+    }
+
+    const wrongTerminalAfterReset = await terminals.claimTasks(otherTerminalId, { maxTasks: 1 }, `Bearer ${otherAgentToken}`)
+    const afterWrongClaimReset = await prisma.printTask.findUnique({ where: { id: stuckCreated.taskId } })
+    if (
+      wrongTerminalAfterReset.length === 0 &&
+      afterWrongClaimReset?.status === 'pending' &&
+      afterWrongClaimReset.terminalId === terminalId
+    ) {
+      pass('3h. stuck 回收后错误终端仍不能领取，目标终端不变')
+    } else {
+      fail(`3h. stuck 回收后错终端领取异常: claimed=${JSON.stringify(wrongTerminalAfterReset)} task=${JSON.stringify(afterWrongClaimReset)}`)
+    }
+
+    const sameTerminalAfterReset = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    if (sameTerminalAfterReset.length === 1 && sameTerminalAfterReset[0].taskId === stuckCreated.taskId) {
+      pass('3i. stuck 回收后只有原目标终端可重新领取')
+    } else {
+      fail(`3i. stuck 回收后原终端重新领取异常: ${JSON.stringify(sameTerminalAfterReset.map((task) => task.taskId))}`)
     }
 
     // ── 4. 状态回传 printing → completed ──────────────────────────────

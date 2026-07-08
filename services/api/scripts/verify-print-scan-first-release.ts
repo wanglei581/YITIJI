@@ -158,6 +158,11 @@ function main(): void {
     ["status: 'claimed'", 'claimExpiry: { lt: now }', "status: 'pending'"],
     'claim TTL reset must keep lease recovery behavior',
   )
+  mustContain(
+    resetBlock,
+    ["status: 'printing'", 'claimedAt: { lt: printingTimeout }', "status: 'pending'"],
+    'stuck printing recovery must reset stale printing tasks for same-terminal retry',
+  )
 
   mustContain(
     terminalsService,

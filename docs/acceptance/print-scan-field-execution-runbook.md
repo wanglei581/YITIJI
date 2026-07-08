@@ -439,6 +439,38 @@ Get-WinEvent -FilterHashtable @{
 
 当前运行时边界（2026-07-06 复核）：Admin 订单动作端点包含 `POST /admin/orders/:id/mark-paid`、`POST /admin/orders/:id/refund`，本分支新增 `POST /admin/orders/:id/cancel` 与 `POST /admin/orders/:id/reassign`，后两者仅允许 `pending` 打印订单；订单与打印任务运营视图分别为 `GET /admin/orders`、`GET /admin/orders/:id`、`GET /admin/print-tasks`。现场恢复领单验收仍必须在候选部署后带 Admin 鉴权复验这些动作，不能把本地 verify 等同于生产可用。
 
+### 8.1 Admin 降级现场截图补证（受控）
+
+目标：补齐 `PS-G3-ADMIN-01` / `PS-G4-04` 的现场 Admin 可见性截图，只证明运营后台能看见 `agent_degraded` 与本地任务库不可用提示；不触发打印、不清队列、不写数据库、不改生产配置。
+
+执行前只读预检：
+
+1. 确认当前没有正在处理的打印任务：目标终端无 `pending` / `claimed` / `printing` 任务，Windows 打印队列和 spool 目录为空。
+2. 确认 `AIJobPrintAgent`、打印机和 API 均处于健康状态：服务 `Running`，打印机 `ready` / `isOnline=true`，Admin 终端页能看到目标终端。
+3. 确认 Admin 页面只展示目标终端或已完成脱敏过滤；如果页面会暴露手机号、token、真实用户文件、签名 URL、完整 IP、设备序列号或其它无关真实用户信息，先停止截图。
+4. 新建仓库外证据目录，例如 `<PRIVATE_EVIDENCE_DIR>\PS-G3-ADMIN-01-<timestamp>`；原始截图和日志不得复制进 Git。
+
+授权要求：
+
+- 停止 Agent、临时替换 `agent.db`、启动前台降级 Agent 均属于现场运行状态变更，必须先取得现场负责人明确授权，并在证据摘要中记录授权人、时间、原因和执行人。
+- 如果未获得授权，本节只允许记录“Admin 降级现场截图待补”；不得为了截图临时制造降级。
+
+截图步骤：
+
+1. 打开 Admin 终端页，优先使用当前部署真实入口中的 `/devices?tab=terminals` 或 `/terminals`；只保留目标终端所在区域，裁掉地址栏 query、cookie、token、签名 URL 和无关用户信息。
+2. 执行下方受控降级步骤，让目标终端心跳进入 `agent_degraded` 且 `localTaskDatabaseAvailable=false`。
+3. 截图必须能看到目标终端和文案“本地任务库不可用，已暂停领取打印任务”，保存为 `PS-G3-ADMIN-01-degraded-terminal-view-<timestamp>.png` 或同等编号。
+4. 同步保存一份脱敏摘要 `PS-G3-ADMIN-01-summary-<timestamp>.md`，只记录终端逻辑编号、截图证据编号、降级字段、恢复结果和停止条件是否触发；不得记录 Admin token、cookie、完整 URL、真实用户文件或个人信息。
+5. 完成立即按“恢复”步骤还原 Agent，并再次确认 `printer-status` 返回 `ready` / `isOnline=true`，服务为 `Running`，打印队列与 spool 为空。
+
+停止条件：
+
+- 预检发现 active 打印任务、队列 / spool 非空、无法确认目标终端、或页面无法脱敏。
+- 降级期间出现任务被领取、任务状态异常推进、Admin 看不到 `agent_degraded` / 本地任务库不可用提示。
+- 恢复后 Agent 未回到 online、打印机不是 ready、或队列出现未知作业。
+
+触发任一停止条件时，本轮只记录失败 / 待补，不继续做恢复后领单、打印或其它异常演练。
+
 执行前先停止第六节 PowerShell 窗口 A 中的正常 Agent（按 `Ctrl+C`），并确认没有同一 `terminalId` 的 Agent 仍在运行。否则正常 Agent 会继续上报 `online`，与降级演练窗口交替覆盖心跳，导致 Admin 观察结果不可靠。
 
 PowerShell 窗口 B：
