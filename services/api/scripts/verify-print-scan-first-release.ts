@@ -82,6 +82,7 @@ function main(): void {
 
   const printJobsService = read('src/print-jobs/print-jobs.service.ts')
   const printJobsController = read('src/print-jobs/print-jobs.controller.ts')
+  const printJobsVerify = read('scripts/verify-print-jobs.ts')
   const terminalsService = read('src/terminals/terminals.service.ts')
   const printJobsApi = read('../../apps/kiosk/src/services/print/printJobsApi.ts')
   const prismaSchema = read('prisma/schema.prisma')
@@ -172,6 +173,21 @@ function main(): void {
     'backend must keep degraded Agent claim gate as defense-in-depth',
   )
 
+  mustContain(
+    printJobsVerify,
+    [
+      "process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'",
+      'unpaidGateClaim.length === 0',
+      "paidGateOrder?.payStatus === 'unpaid'",
+      "orderStatus.markPaid(paidGateOrder.id, { paymentSource: 'offline'",
+      'wrongPaidGateClaim.length === 0',
+      'paidGateClaim.length === 1',
+      "paidGateOrderAfterClaim?.payStatus === 'paid'",
+      '恢复 online 后 paid 任务在 paid-before-claim=true 下可由原目标终端领取',
+    ],
+    'verify:print-jobs must guard recovery claim semantics under paid-before-claim',
+  )
+
   const heartbeatBlock = section(terminalsService, 'async heartbeat', '// ── 3. Claim tasks')
   mustContain(
     heartbeatBlock,
@@ -244,6 +260,7 @@ function main(): void {
       'PS-G3-BIND-01',
       'PS-G3-DEG-01',
       'PS-G3-REC-01',
+      'Recovery Service + Paid-Claim Code Guard Passed, Field Paid/Allowed Claim Pending',
       'PS-G4-01',
       'PS-G4-04',
       'Code Guard Passed; Field Screenshot/Manual Record Pending',

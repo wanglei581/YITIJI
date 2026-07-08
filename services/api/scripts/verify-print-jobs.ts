@@ -64,12 +64,13 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
+  const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(
     prisma,
     audit,
     new PrintPageCountService(prisma, storage),
     new PricingService(prisma),
-    new OrderStatusService(prisma, audit),
+    orderStatus,
   )
   const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
   const resetExpiredClaims = (
@@ -84,6 +85,7 @@ async function main() {
   const fileId = `file_vpj_${suffix}`
   const storageKey = `verify/print-jobs/${fileId}.pdf`
   const createdTaskIds: string[] = []
+  const originalPaidBeforeClaim = process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
 
   async function cleanup() {
     if (createdTaskIds.length) {
@@ -288,6 +290,58 @@ async function main() {
       fail(`3i. stuck 回收后原终端重新领取异常: ${JSON.stringify(sameTerminalAfterReset.map((task) => task.taskId))}`)
     }
 
+    const paidGateCreated = await printJobs.create(
+      {
+        fileUrl: signFileUrl(fileId, 30 * 60 * 1000).url,
+        fileMd5: 'sha256-vpj-paid-gate',
+        fileName: '恢复后付费门禁任务.pdf',
+      },
+      { terminalId },
+    )
+    createdTaskIds.push(paidGateCreated.taskId)
+    await prisma.printTask.update({
+      where: { id: paidGateCreated.taskId },
+      data: { createdAt: new Date('2019-01-04T00:00:00.000Z') },
+    })
+    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
+    const unpaidGateClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const unpaidGateTask = await prisma.printTask.findUnique({ where: { id: paidGateCreated.taskId } })
+    const paidGateOrder = await prisma.order.findUnique({ where: { printTaskId: paidGateCreated.taskId } })
+    if (
+      paidGateCreated.amountCents > 0 &&
+      paidGateCreated.payStatus === 'unpaid' &&
+      unpaidGateClaim.length === 0 &&
+      unpaidGateTask?.status === 'pending' &&
+      paidGateOrder?.payStatus === 'unpaid'
+    ) {
+      pass('3j. 恢复 online + paid-before-claim=true 时 unpaid 任务仍保持 pending，不被领取')
+    } else {
+      fail(`3j. paid-before-claim unpaid 闸门异常: created=${JSON.stringify(paidGateCreated)} claim=${JSON.stringify(unpaidGateClaim)} task=${JSON.stringify(unpaidGateTask)} order=${JSON.stringify(paidGateOrder)}`)
+    }
+    if (!paidGateOrder) fail('3k. paid-before-claim 预备：未找到关联订单')
+    await orderStatus.markPaid(paidGateOrder.id, { paymentSource: 'offline', operatorId: 'verify-print-jobs' })
+    const wrongPaidGateClaim = await terminals.claimTasks(otherTerminalId, { maxTasks: 1 }, `Bearer ${otherAgentToken}`)
+    const paidGateTaskAfterWrong = await prisma.printTask.findUnique({ where: { id: paidGateCreated.taskId } })
+    if (wrongPaidGateClaim.length === 0 && paidGateTaskAfterWrong?.status === 'pending') {
+      pass('3k. paid 后错终端仍不能领取恢复任务')
+    } else {
+      fail(`3k. paid 后错终端领取异常: claim=${JSON.stringify(wrongPaidGateClaim)} task=${JSON.stringify(paidGateTaskAfterWrong)}`)
+    }
+    const paidGateClaim = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const paidGateOrderAfterClaim = await prisma.order.findUnique({ where: { printTaskId: paidGateCreated.taskId } })
+    if (
+      paidGateClaim.length === 1 &&
+      paidGateClaim[0].taskId === paidGateCreated.taskId &&
+      paidGateOrderAfterClaim?.payStatus === 'paid' &&
+      paidGateOrderAfterClaim.taskStatus === 'claimed'
+    ) {
+      pass('3l. 恢复 online 后 paid 任务在 paid-before-claim=true 下可由原目标终端领取')
+    } else {
+      fail(`3l. paid 后原终端领取异常: claim=${JSON.stringify(paidGateClaim)} order=${JSON.stringify(paidGateOrderAfterClaim)}`)
+    }
+    if (originalPaidBeforeClaim === undefined) delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
+    else process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = originalPaidBeforeClaim
+
     // ── 4. 状态回传 printing → completed ──────────────────────────────
     await terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId)
     const afterPrinting = await printJobs.getStatus(created.taskId)
@@ -428,6 +482,8 @@ async function main() {
       fail(`7g. 仅原始 errorMessage 兜底异常: ${JSON.stringify({ failureReasonForUser: userView3.failureReasonForUser, errorMessage: userView3.errorMessage, leaked3 })}`)
     }
   } finally {
+    if (originalPaidBeforeClaim === undefined) delete process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
+    else process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = originalPaidBeforeClaim
     await cleanup()
     await prisma.onModuleDestroy()
   }
