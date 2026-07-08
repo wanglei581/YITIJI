@@ -360,6 +360,7 @@ export default function OrdersPage() {
               <Info label="金额" value={amountText(detail.amountCents, detail.currency)} />
               <Info label="支付状态" value={PAY_STATUS_MAP[detail.payStatus]?.label ?? detail.payStatus} />
               <Info label="任务状态" value={STATUS_MAP[detail.taskStatus]?.label ?? detail.taskStatus} />
+              <Info label="错误码" value={detail.print?.errorCode ?? detail.errorCode ?? '—'} />
               <Info label="用户" value={`${OWNER_LABELS[detail.ownerType]} · ${detail.userLabel}`} />
               <Info label="终端" value={detail.terminalCode ?? '—'} />
               <Info label="文件名" value={detail.print?.fileName ?? '未记录'} />
