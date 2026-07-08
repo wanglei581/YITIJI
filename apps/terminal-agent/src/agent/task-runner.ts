@@ -60,6 +60,39 @@ function getTempDir(): string {
   return base
 }
 
+const TEMP_FILE_TTL_MS = 60 * 60 * 1000
+const TEMP_CLEANUP_INTERVAL_MS = 10 * 60 * 1000
+let lastTempCleanupAt = 0
+
+function isAgentTempFile(fileName: string): boolean {
+  return fileName.startsWith('task_') || (fileName.startsWith('print_') && fileName.endsWith('.pdf'))
+}
+
+function cleanupStaleTempFiles(): void {
+  const tempDir = getTempDir()
+  const expiresBefore = Date.now() - TEMP_FILE_TTL_MS
+  try {
+    const entries = fs.readdirSync(tempDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (!entry.isFile() || !isAgentTempFile(entry.name)) continue
+      const filePath = path.join(tempDir, entry.name)
+      const stat = fs.statSync(filePath)
+      if (stat.mtimeMs >= expiresBefore) continue
+      fs.unlinkSync(filePath)
+      log(`temp-cleanup: deleted stale temp file ${entry.name}`)
+    }
+  } catch (e) {
+    warn(`temp-cleanup: cleanup failed — ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
+function maybeCleanupStaleTempFiles(): void {
+  const now = Date.now()
+  if (now - lastTempCleanupAt < TEMP_CLEANUP_INTERVAL_MS) return
+  lastTempCleanupAt = now
+  cleanupStaleTempFiles()
+}
+
 // ── Download + MD5 ────────────────────────────────────────────────────────────
 
 async function downloadFile(fileUrl: string, destPath: string): Promise<void> {
@@ -620,6 +653,10 @@ async function runClaimCycle(
   db: AgentDatabase,
   activeTasks: Set<string>,
 ): Promise<void> {
+  if (activeTasks.size === 0) {
+    maybeCleanupStaleTempFiles()
+  }
+
   if (!config.terminalId || !config.agentToken) {
     return // Not registered yet; skip silently
   }
@@ -687,6 +724,8 @@ export function startTaskRunner(options: TaskRunnerOptions): NodeJS.Timeout {
   const { config, db } = options
   const interval = config.claimIntervalMs ?? 5_000
   const activeTasks = new Set<string>()
+
+  cleanupStaleTempFiles()
 
   if (!isDatabaseAvailable(db)) {
     warn('task-runner: local task database unavailable; printing disabled; claim loop not started')

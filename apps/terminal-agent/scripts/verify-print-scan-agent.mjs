@@ -46,6 +46,30 @@ mustContain(
 )
 
 mustContain(
+  taskRunner,
+  [
+    'TEMP_FILE_TTL_MS = 60 * 60 * 1000',
+    "fileName.startsWith('task_')",
+    "fileName.startsWith('print_') && fileName.endsWith('.pdf')",
+    'cleanupStaleTempFiles()',
+    'maybeCleanupStaleTempFiles()',
+    'fs.unlinkSync(filePath)',
+  ],
+  'task runner must TTL-clean stale task downloads and image conversion PDFs after crashes',
+)
+
+mustContain(
+  taskRunner,
+  [
+    'finally',
+    'fs.existsSync(tempFilePath)',
+    'fs.unlinkSync(tempFilePath)',
+    'temp file deleted',
+  ],
+  'task runner must delete downloaded task temp file in finally after completion or failure',
+)
+
+mustContain(
   heartbeat,
   ['localTaskDatabaseAvailable', 'agent_degraded'],
   'heartbeat must report degraded state when local task db is unavailable',
