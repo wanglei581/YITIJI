@@ -89,6 +89,7 @@ function buildWechatProvider(env: NodeJS.ProcessEnv): WechatPayProvider {
     platformPublicKeyId: env['WECHAT_PAY_PUBLIC_KEY_ID']?.trim() ?? '',
     notifyBaseUrl: requireNotifyBaseUrl(env),
     apiBaseUrl: env['WECHAT_PAY_API_BASE']?.trim() || WECHAT_API_BASE_DEFAULT,
+    codePayStoreOutId: env['WECHAT_PAY_CODEPAY_STORE_OUT_ID']?.trim(),
   })
 }
 

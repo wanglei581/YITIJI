@@ -3,6 +3,7 @@
 //
 // Thin fetch wrappers around（全局前缀 /api/v1）：
 //   POST /orders/:id/pay              — 出码（建/幂等复用支付尝试，返回屏上动态码）
+//   POST /orders/:id/code-pay         — 扫用户付款码；付款码仅随本次请求提交
 //   GET  /orders/:id/pay-status       — 轮询支付状态（含惰性过期/关单、paid 后 pickupCode）
 //   POST /payment/sandbox/simulate    — 沙箱模拟支付（**仅非生产**；DEV 构建 + 后端非 production 才可用）
 //
@@ -14,7 +15,7 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
-import type { PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
+import type { CodePayAttemptView, PayAttemptView, PayStatusView, PaymentChannelsView } from '@ai-job-print/shared'
 
 export interface PaymentSessionInput {
   orderId: string
@@ -60,6 +61,19 @@ export async function createPayAttempt(input: PaymentSessionInput & { channel?: 
   })
   if (!res.ok) throw new Error(`createPayAttempt failed: ${res.status} ${await readError(res)}`)
   return res.json() as Promise<PayAttemptView>
+}
+
+/** 商户扫用户付款码。付款码不会在前端服务层缓存、拼入 URL 或写入错误信息。 */
+export async function createCodePayAttempt(
+  input: PaymentSessionInput & { channel?: string; authCode: string },
+): Promise<CodePayAttemptView> {
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(input.orderId)}/code-pay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...paymentSessionHeaders(input) },
+    body: JSON.stringify({ ...(input.channel ? { channel: input.channel } : {}), authCode: input.authCode }),
+  })
+  if (!res.ok) throw new Error(`createCodePayAttempt failed: ${res.status} ${await readError(res)}`)
+  return res.json() as Promise<CodePayAttemptView>
 }
 
 /**

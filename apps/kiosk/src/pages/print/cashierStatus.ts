@@ -15,6 +15,7 @@ import type { PayStatusView } from '@ai-job-print/shared'
 
 export type CashierPhase =
   | 'awaiting_scan' // paying + 动态码有效 → 展示 QR 等待扫码
+  | 'awaiting_code_confirmation' // 付款码已提交，等待用户输密码/渠道确认
   | 'expired' // 动态码过期/缺失 → 允许重新出码
   | 'paid' // 已支付 → 进入履约
   | 'failed' // 支付失败 → 允许重新出码 / 返回
@@ -92,6 +93,17 @@ export function deriveCashierView(
   if (attempt?.status === 'failed') {
     return { phase: 'failed', title: '支付未完成', hint: '支付未成功，可点击「重新出码」再试。', tone: 'error', showQr: false, canReissue: true, canProceed: false }
   }
+  if (attempt && !attempt.qrCodeContent && attempt.status === 'expired') {
+    return {
+      phase: 'awaiting_code_confirmation',
+      title: '支付状态待核实',
+      hint: '付款码支付可能仍在渠道处理中，请先核实支付结果，勿重复扫码。',
+      tone: 'warning',
+      showQr: false,
+      canReissue: false,
+      canProceed: false,
+    }
+  }
   if (attemptHasLiveCode(attempt, nowMs)) {
     return {
       phase: 'awaiting_scan',
@@ -99,6 +111,17 @@ export function deriveCashierView(
       hint: awaitingScanHint(attempt?.channel ?? null),
       tone: 'info',
       showQr: true,
+      canReissue: false,
+      canProceed: false,
+    }
+  }
+  if (attempt?.status === 'pending' && !attempt.qrCodeContent) {
+    return {
+      phase: 'awaiting_code_confirmation',
+      title: '支付处理中',
+      hint: '请按手机提示完成验证，支付结果会自动确认。',
+      tone: 'info',
+      showQr: false,
       canReissue: false,
       canProceed: false,
     }

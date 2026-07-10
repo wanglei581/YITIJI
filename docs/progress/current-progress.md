@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-07-06
+> 最后更新：2026-07-10
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -15,6 +15,10 @@
 - `apps/`、`services/`、`packages/` 属运行时代码，规范化任务默认不触碰。
 - 删除、ignore、大文件外部归档、主工作区物料迁入前必须先确认并双模型审查。
 - 岗位 / 招聘会 / 政策继续只做第三方或官方来源信息入口；项目不是招聘平台。
+
+2026-07-10 补充：完成**C5-8 扫码器付款码支付适配（代码 + 本地模拟验收级）**，独立分支 `codex/scanner-codepay-payment-20260708` 基于含微信退款回调的 `b8263be2`。Kiosk 收银页新增「屏上收款码 / 扫付款码」两种互斥方式：先选方式再创建 PaymentAttempt，已存在 created/pending 尝试时锁定方式与通道，避免二维码和付款码并行扣款；USB HID 扫码器输入付款码后的回车提交表单，手动输入仅接受 18 位数字；`USERPAYING` 等中间态沿用 `pay-status` 轮询与真实渠道 reconcile，`paid` 后沿用既有进入打印进度页的链路。API 新增 `POST /orders/:id/code-pay`，仍强制 payment-session token；付款码只在本次 Provider 请求内存在，不写 `PaymentAttempt`、AuditLog 或错误响应。微信实现使用官方 `/v3/pay/transactions/codepay`，必须带 `scene_info.store_info.out_id`，新增仅服务端 env `WECHAT_PAY_CODEPAY_STORE_OUT_ID`；缺失或非法时在发渠道请求前拒绝，屏上二维码支付不受影响；同步 SUCCESS 必须带渠道流水号和金额且与 Order.amountCents 一致才走既有幂等 `markPaidOnline`。新增 `verify:payment-codepay`（11 checks，内存状态机 + 本地假网关）：会话/付款码校验、sandbox paid、付款码不落持久化/审计、活动二维码阻断并行付款码、微信场景信息/金额校验、缺门店配置不发请求；shared/api/kiosk typecheck、api/kiosk lint、带生产门禁变量的 Kiosk build 已通过。未合 main、未部署、未用真实扫码器或真实微信付款码扣款，不得据此宣称 live 付款码支付验收完成；现场验收还需商户后台开通付款码支付、服务器配置门店编码并用 1 分钱实测。
+
+2026-07-10 更正：`verify:payment-codepay` 已扩展为 **17 checks**，新增「过期尝试必须先查账，不得叠加付款码」「渠道 SUCCESS 金额异常保持 pending 待核实」「未知渠道结果 / 本地入账异常保持 pending」「并发付款码请求只能 CAS 抢占一个可扣款尝试」「渠道明确 closed/failed 后释放付款码尝试可重新扫码」断言；二维码出码服务端也改为全局活动尝试互斥，不再只靠 Kiosk UI 防止微信/支付宝双通道并行；Kiosk 对付款码 `USERPAYING` 每 3.5 秒自动调用既有 reconcile，手动核实按钮仍保留；该门禁已接入双 CI job。
 
 2026-07-06 补充：完成**支付域 W-A 价格真相源统一（代码 + 本地 verify 级）**，分支 `feature/payment-w-a`（PR #170 已合入 main `4ac3ab43`）。背景：全仓支付触点盘点（见 `docs/product/payment-commercial-adaptation-plan-2026-07.md` §一）确认无第二套支付闭环，但发现两处真实价格冲突——① Kiosk 预览/确认页各自硬编码 `PRICE_BW=0.2/PRICE_COLOR=0.5`，与服务端 `PriceConfig` 双真相源（Admin 改价后展示价≠扣款价）；② **前端估价「按面」（÷pagesPerSheet）与服务端计费「按内容页」公式不一致**——用户选多页合一时确认页显示价低于实际扣款价（当天即存在的价格误导）。交付：**服务端** `PricingService.listActivePriceConfig()` + 公开只读 `GET /print/price-config`（只回 active 项安全字段；`billingEnabled` 为政企 E1 免费模式预留位；无 active 价目 fail-closed）；shared/api 双写 `PrintPriceConfigItem/View` 契约。**Kiosk** 新增 `services/print/priceConfigApi.ts`（`usePrintPriceConfig` hook + `estimatePrintCents` 与服务端同源公式=单价×内容页×份数 + `formatPriceCents` 整数分；DEMO 价目仅 mock 演示模式可达，http 取价失败进 error 态**绝不回退硬编码/假价**）；预览页费用明细/色彩单价提示/价格说明表、确认页预计费用全部改服务端取价渲染，页数未识别或取价失败显示「以收银台金额为准」不给假总价；删除两页硬编码常量；**删除预览页假的「请选择优惠券」占位入口**（C5-4 定版无用券 UI，不伪造能力）。顺手修复：`.env.example` 补 `PAYMENT_SESSION_SECRET` 样板条目（生产门禁已强制但样板缺失，运维文档起草时发现）。**验证（本地全绿）**：新守卫 `verify:price-single-source`（17 checks：全 kiosk src 无硬编码单价/两页接真 hook+同源估价/不再按面乘价/失败态诚实提示/无假优惠券入口/DEMO 仅 mock 可达/服务端契约存在）接入 CI build-and-verify；`verify:pricing` 扩公开视图断言（safe 字段白名单/inactive 排除/fail-closed）；回归 payment-flow/payment-real-channels/kiosk-cashier-ui/order/print-jobs/member-print-orders + kiosk print-confirm-honest/profile-commercial-first-batch/member-print-orders-ui/production-real-services 守卫 + kiosk 生产 build + prod-build-config 全 PASS；shared/api/kiosk typecheck、lint 0 error。**随波入库（草案）**：W-D 运维线三份草案 `docs/device/payment-production-env-checklist.md`（生产 env 逐项+错误配置对照）/`nginx-https-payment-callback-draft.md`（443 反代+禁止改写 body 黑名单）/`merchant-onboarding-checklist.md`（微信/支付宝开通七步+1 分钱冒烟自查表），均标注「草案，未经真机/真实商户验证」，17 项待确认已列。已合入 main（PR #170）。
 

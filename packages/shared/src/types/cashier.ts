@@ -40,6 +40,16 @@ export interface PayAttemptView {
 }
 
 /**
+ * 付款码支付响应（`POST /orders/:id/code-pay`）。
+ * 不含付款码、渠道原文错误或任何密钥；`paying` 时由既有 pay-status/reconcile 收敛。
+ */
+export interface CodePayAttemptView {
+  status: 'success' | 'paying' | 'failed'
+  attemptId: string
+  failReason: string | null
+}
+
+/**
  * 支付状态轮询视图（`GET /orders/:id/pay-status`）。
  * 含后端惰性过期/关单结果；`pickupCode` 仅 paid 且可见时返回。
  */

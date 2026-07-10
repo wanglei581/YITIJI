@@ -168,6 +168,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
+          pnpm --filter @ai-job-print/api verify:payment-codepay
           pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
@@ -304,6 +305,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
+          pnpm --filter @ai-job-print/api verify:payment-codepay
           pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels

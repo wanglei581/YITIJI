@@ -16,13 +16,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { QRCodeSVG } from 'qrcode.react'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
+import { AlertCircleIcon, InfoIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import {
+  createCodePayAttempt,
   createPayAttempt,
   fetchPaymentChannels,
   getPayStatus,
@@ -30,6 +30,7 @@ import {
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
 import { deriveCashierView, formatCents, PAY_CHANNEL_LABEL, type CashierView } from './cashierStatus'
+import { CashierPaymentPanel, type CashierSnapshot, type PaymentMethod } from './CashierPaymentPanel'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 
 interface CashierLocationState {
@@ -45,31 +46,13 @@ interface CashierLocationState {
   [k: string]: unknown
 }
 
-/** 支付尝试快照（出码响应与轮询响应共用的最小形态，喂给 deriveCashierView）。 */
-type Snapshot = {
-  payStatus: string
-  attempt: {
-    attemptId: string
-    channel: string
-    status: 'created' | 'pending' | 'success' | 'failed' | 'expired'
-    qrCodeContent: string | null
-    expiresAt: string | null
-  } | null
-}
-
 const POLL_INTERVAL_MS = 2500
+const CODE_PAY_RECONCILE_INTERVAL_MS = 3500
 
 const SERVICE_KEY_LABEL: Record<string, string> = {
   print_bw_page: '黑白打印',
   print_color_page: '彩色打印',
   print_duplex_surcharge: '双面附加',
-}
-
-const TONE_BOX: Record<CashierView['tone'], string> = {
-  info: 'border-primary-200 bg-primary-50 text-primary-700',
-  success: 'border-success/30 bg-success-bg text-success-fg',
-  warning: 'border-warning/30 bg-warning-bg text-warning-fg',
-  error: 'border-error/30 bg-error-bg text-error-fg',
 }
 
 function lineLabel(line: PrintPriceLine): string {
@@ -90,16 +73,20 @@ export function PrintCashierPage() {
   const priceLines = Array.isArray(state.priceLines) ? state.priceLines : []
   const uploadPath = printUploadPathForSource(state.source)
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const [snapshot, setSnapshot] = useState<CashierSnapshot | null>(null)
   const [issueError, setIssueError] = useState<string | null>(null)
   const [issuing, setIssuing] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
   /** 服务端已启用通道；null=加载中。多通道时用户显式选择后才出码。 */
   const [channels, setChannels] = useState<string[] | null>(null)
   const [selectedChannel, setSelectedChannel] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
+  const [authCode, setAuthCode] = useState('')
+  const [codeSubmitting, setCodeSubmitting] = useState(false)
   const [reconciling, setReconciling] = useState(false)
   const navigatedRef = useRef(false)
   const cancelRef = useRef(false)
+  const lastCodePayReconcileAtRef = useRef(0)
 
   const proceedToPrint = useCallback(() => {
     if (navigatedRef.current) return
@@ -139,7 +126,7 @@ export function PrintCashierPage() {
     [orderId, paymentSessionToken],
   )
 
-  // 首次进入：取已启用通道 → 默认选第一个 → 出码。
+  // 首次进入只取通道。用户先选支付方式再建尝试，避免二维码与付款码同时可支付。
   useEffect(() => {
     if (API_MODE !== 'http' || !orderId || !paymentSessionToken || amountCents === null || amountCents <= 0) return
     cancelRef.current = false
@@ -150,9 +137,7 @@ export function PrintCashierPage() {
         setChannels(list)
         const first = list[0] ?? null
         setSelectedChannel(first)
-        if (first) {
-          await issue(first)
-        } else {
+        if (!first) {
           setIssueError('线上支付未开通，请联系现场工作人员')
         }
       } catch (err) {
@@ -166,16 +151,93 @@ export function PrintCashierPage() {
     }
   }, [orderId, paymentSessionToken, amountCents, issue])
 
-  // 切换支付通道：立即为所选通道出码（旧通道未过期尝试留在服务端，仍可被其回调正常入账）。
+  const hasActivePaymentAttempt = snapshot?.attempt?.status === 'created' || snapshot?.attempt?.status === 'pending'
+
+  // 切换通道只能在未发起支付前进行，避免两个通道同时处于可扣款状态。
   const switchChannel = useCallback(
     (channel: string) => {
-      if (channel === selectedChannel || issuing) return
+      if (channel === selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt) return
       setSelectedChannel(channel)
       setSnapshot(null)
-      void issue(channel)
+      setPaymentMethod(null)
+      setIssueError(null)
     },
-    [selectedChannel, issuing, issue],
+    [selectedChannel, issuing, codeSubmitting, hasActivePaymentAttempt],
   )
+
+  const selectPaymentMethod = useCallback(
+    (method: PaymentMethod) => {
+      if (!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt) return
+      if (method === 'code' && selectedChannel === 'alipay') {
+        setIssueError('当前支付通道暂不支持扫付款码，请选择屏上收款码')
+        return
+      }
+      setPaymentMethod(method)
+      setSnapshot(null)
+      setIssueError(null)
+      if (method === 'qr') void issue(selectedChannel)
+    },
+    [selectedChannel, issuing, codeSubmitting, hasActivePaymentAttempt, issue],
+  )
+
+  const submitCodePayment = useCallback(async () => {
+    if (!orderId || !paymentSessionToken || !selectedChannel || codeSubmitting) return
+    const submittedCode = authCode.trim()
+    if (!/^\d{18}$/.test(submittedCode)) {
+      setIssueError('请输入 18 位数字付款码')
+      return
+    }
+    setCodeSubmitting(true)
+    setIssueError(null)
+    try {
+      const result = await createCodePayAttempt({
+        orderId,
+        paymentSessionToken,
+        channel: selectedChannel,
+        authCode: submittedCode,
+      })
+      setAuthCode('')
+      if (result.status === 'success') {
+        if (cancelRef.current) return
+        setSnapshot({
+          payStatus: 'paid',
+          attempt: {
+            attemptId: result.attemptId,
+            channel: selectedChannel,
+            status: 'success',
+            qrCodeContent: null,
+            expiresAt: null,
+          },
+        })
+        // 服务端只有完成金额校验并幂等入账后才返回 success，直接进入打印进度，避免成功后的状态查询网络抖动阻塞用户。
+        proceedToPrint()
+        return
+      }
+      setSnapshot({
+        payStatus: result.status === 'paying' ? 'paying' : 'unpaid',
+        attempt: {
+          attemptId: result.attemptId,
+          channel: selectedChannel,
+          status: result.status === 'paying' ? 'pending' : 'failed',
+          qrCodeContent: null,
+          expiresAt: null,
+        },
+      })
+      if (result.status === 'failed') setIssueError(result.failReason ?? '支付未完成，请重新扫码')
+    } catch (error) {
+      setAuthCode('')
+      const message = error instanceof Error ? error.message : ''
+      setIssueError(
+        message.includes('PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED')
+          ? '检测到上一笔支付待核实，请先等待自动确认或点击核实'
+          : message.includes('PAYMENT_ATTEMPT_PENDING')
+            ? '已有支付正在处理中，请勿重复扫码'
+            : '付款码支付未完成，请重新扫码',
+      )
+    } finally {
+      if (!cancelRef.current) setCodeSubmitting(false)
+    }
+  }, [orderId, paymentSessionToken, selectedChannel, authCode, codeSubmitting, proceedToPrint])
 
   // ── 轮询支付状态 ──
   useEffect(() => {
@@ -187,6 +249,25 @@ export function PrintCashierPage() {
         if (cancelRef.current) return
         setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
         if (s.payStatus === 'paid') proceedToPrint()
+        // 付款码 USERPAYING 没有屏上二维码可等待回调，按服务端最小间隔主动查账；
+        // 只对无 qrCodeContent 的真实通道尝试，二维码支付仍保持原轮询/手动核实行为。
+        const shouldReconcileCodePay =
+          s.payStatus !== 'paid' &&
+          s.attempt?.status === 'pending' &&
+          !s.attempt.qrCodeContent &&
+          s.attempt.channel !== 'sandbox' &&
+          Date.now() - lastCodePayReconcileAtRef.current >= CODE_PAY_RECONCILE_INTERVAL_MS
+        if (shouldReconcileCodePay) {
+          lastCodePayReconcileAtRef.current = Date.now()
+          try {
+            const reconciled = await reconcilePayment({ orderId, paymentSessionToken })
+            if (cancelRef.current) return
+            setSnapshot({ payStatus: reconciled.payStatus, attempt: reconciled.attempt })
+            if (reconciled.payStatus === 'paid') proceedToPrint()
+          } catch {
+            // 自动查单失败不覆盖当前状态；下一周期继续以服务端限流为准重试。
+          }
+        }
       } catch {
         /* 网络抖动：保留上次快照，下个周期重试，不伪造状态 */
       }
@@ -203,8 +284,8 @@ export function PrintCashierPage() {
   }, [])
 
   const view = useMemo<CashierView | null>(
-    () => (snapshot ? deriveCashierView(snapshot, nowMs) : null),
-    [snapshot, nowMs],
+    () => (snapshot && (paymentMethod !== null || snapshot.attempt) ? deriveCashierView(snapshot, nowMs) : null),
+    [snapshot, paymentMethod, nowMs],
   )
 
   const qrContent = view?.showQr ? snapshot?.attempt?.qrCodeContent ?? null : null
@@ -217,8 +298,9 @@ export function PrintCashierPage() {
   const handleReissue = useCallback(() => {
     if (!selectedChannel) return
     setSnapshot(null)
-    void issue(selectedChannel)
-  }, [issue, selectedChannel])
+    setIssueError(null)
+    if (paymentMethod === 'qr') void issue(selectedChannel)
+  }, [issue, paymentMethod, selectedChannel])
 
   // ── reconcile 兜底（仅真实通道）：回调丢失/延迟时按渠道账本核实；绝不在前端伪造已支付 ──
   const handleReconcile = useCallback(async () => {
@@ -303,6 +385,7 @@ export function PrintCashierPage() {
   const total = formatCents(amountCents)
   const canProceed = view?.canProceed ?? false
   const canReissue = view?.canReissue ?? false
+  const canUseCodePay = selectedChannel !== 'alipay'
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -348,7 +431,7 @@ export function PrintCashierPage() {
               <button
                 key={ch}
                 onClick={() => switchChannel(ch)}
-                disabled={issuing}
+                disabled={issuing || codeSubmitting || hasActivePaymentAttempt}
                 className={[
                   'min-h-[56px] flex-1 rounded-xl border-2 px-4 text-base font-semibold transition-colors',
                   selectedChannel === ch
@@ -362,64 +445,52 @@ export function PrintCashierPage() {
           </div>
         )}
 
-        {/* 状态 + 动态码 */}
-        <Card className="flex flex-col items-center gap-4 p-6">
-          {!view ? (
-            <div className="flex flex-col items-center gap-3 py-8 text-neutral-500">
-              <LoaderIcon className="h-8 w-8 animate-spin text-primary-600" />
-              <p className="text-sm">
-                {channels === null ? '正在获取支付通道…' : issuing ? '正在生成支付码…' : '正在获取支付状态…'}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className={['w-full rounded-lg border px-4 py-3 text-center text-sm', TONE_BOX[view.tone]].join(' ')}>
-                <p className="font-semibold">{view.title}</p>
-                <p className="mt-1 leading-relaxed">{view.hint}</p>
-              </div>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => selectPaymentMethod('qr')}
+            disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
+            className={[
+              'min-h-[56px] rounded-lg border-2 px-4 text-base font-semibold transition-colors',
+              paymentMethod === 'qr' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
+            ].join(' ')}
+          >
+            屏上收款码
+          </button>
+          <button
+            type="button"
+            onClick={() => selectPaymentMethod('code')}
+            disabled={!selectedChannel || !canUseCodePay || issuing || codeSubmitting || hasActivePaymentAttempt}
+            className={[
+              'flex min-h-[56px] items-center justify-center gap-2 rounded-lg border-2 px-4 text-base font-semibold transition-colors',
+              paymentMethod === 'code' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
+            ].join(' ')}
+          >
+            <ScanLineIcon className="h-5 w-5" />
+            扫付款码
+          </button>
+        </div>
 
-              {qrContent && (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="rounded-xl border border-neutral-200 bg-white p-4">
-                    <QRCodeSVG value={qrContent} size={220} level="M" marginSize={1} />
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-neutral-400">
-                    <ShieldCheckIcon className="h-3.5 w-3.5" />
-                    {snapshot?.attempt?.channel === 'sandbox'
-                      ? '测试支付通道 · 非真实收款'
-                      : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
-                  </div>
-                  {remainSec !== null && (
-                    <p className="text-xs text-neutral-400">支付码有效期剩余 {remainSec} 秒</p>
-                  )}
-                </div>
-              )}
-
-              {/* reconcile 兜底（仅真实通道，等待扫码/回调阶段可用）：按渠道账本核实，不伪造状态 */}
-              {view.phase === 'awaiting_scan' &&
-                snapshot?.attempt?.channel !== undefined &&
-                snapshot.attempt.channel !== 'sandbox' && (
-                  <button
-                    onClick={() => void handleReconcile()}
-                    disabled={reconciling}
-                    className="flex min-h-[48px] items-center gap-2 rounded-lg border border-neutral-200 px-4 text-sm text-neutral-600"
-                  >
-                    <SearchCheckIcon className={['h-4 w-4', reconciling ? 'animate-pulse' : ''].join(' ')} />
-                    {reconciling ? '正在向支付渠道核实…' : '已完成支付但未跳转？点此核实'}
-                  </button>
-                )}
-
-              {canReissue && (
-                <Button variant="secondary" size="lg" disabled={issuing} onClick={handleReissue}>
-                  <span className="flex items-center gap-2">
-                    <RefreshCwIcon className={['h-4 w-4', issuing ? 'animate-spin' : ''].join(' ')} />
-                    重新出码
-                  </span>
-                </Button>
-              )}
-            </>
-          )}
-        </Card>
+        <CashierPaymentPanel
+          paymentMethod={paymentMethod}
+          snapshot={snapshot}
+          view={view}
+          channelsLoading={channels === null}
+          issuing={issuing}
+          codeSubmitting={codeSubmitting}
+          authCode={authCode}
+          qrContent={qrContent}
+          remainSec={remainSec}
+          reconciling={reconciling}
+          canReissue={canReissue}
+          isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
+          canProceed={canProceed}
+          onAuthCodeChange={setAuthCode}
+          onSubmitCode={() => void submitCodePayment()}
+          onReconcile={() => void handleReconcile()}
+          onReissue={handleReissue}
+          onSimulateSandbox={(result) => void devSimulate(result)}
+        />
 
         {/* 退款 / 重试规则（静态说明；不自助退款，C5-4）*/}
         <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3 text-xs leading-relaxed text-neutral-500">
@@ -437,24 +508,6 @@ export function PrintCashierPage() {
           </div>
         )}
 
-        {/* DEV 专用：沙箱模拟支付（生产构建自动移除；仅 sandbox 尝试渲染，真实通道无任何模拟入口） */}
-        {import.meta.env.DEV && snapshot?.attempt?.attemptId && snapshot.attempt.channel === 'sandbox' && !canProceed && (
-          <div className="flex gap-2 rounded-lg border border-dashed border-warning/40 bg-warning-bg/40 p-3">
-            <span className="self-center text-xs text-warning-fg">[DEV] 沙箱模拟</span>
-            <button
-              onClick={() => void devSimulate('success')}
-              className="rounded-md border border-success/40 bg-success-bg px-3 py-1.5 text-xs text-success-fg"
-            >
-              模拟支付成功
-            </button>
-            <button
-              onClick={() => void devSimulate('failed')}
-              className="rounded-md border border-error/40 bg-error-bg px-3 py-1.5 text-xs text-error-fg"
-            >
-              模拟支付失败
-            </button>
-          </div>
-        )}
       </div>
 
       {/* 底部动作 */}

@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 
 /**
  * 出码请求体（C5-6 多通道）：只允许选择服务端已启用的通道；
@@ -8,6 +8,18 @@ export class CreatePayAttemptDto {
   @IsOptional()
   @IsIn(['sandbox', 'wechat', 'alipay'])
   channel?: 'sandbox' | 'wechat' | 'alipay'
+}
+
+export class CreateCodePayAttemptDto {
+  @IsOptional()
+  @IsIn(['sandbox', 'wechat', 'alipay'])
+  channel?: 'sandbox' | 'wechat' | 'alipay'
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{18}$/)
+  @MaxLength(18)
+  authCode!: string
 }
 
 /**

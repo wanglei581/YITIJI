@@ -34,6 +34,32 @@ export interface QrPaymentCreateResult {
   qrCodeContent: string
 }
 
+/** 付款码支付输入：authCode 只允许请求内短暂使用，禁止落库/审计/日志。 */
+export interface CodePaymentCreateInput {
+  orderId: string
+  orderNo: string
+  attemptId: string
+  /** 线下设备标识，仅用于渠道场景信息。 */
+  terminalId: string | null
+  /** 整数「分」，快照自 Order.amountCents。 */
+  amountCents: number
+  /** 用户微信/支付宝付款码；业务层和 Provider 都必须做格式校验。 */
+  authCode: string
+}
+
+export interface CodePaymentCreateResult {
+  /** success=已扣款；paying=用户输密码/处理中；failed=明确失败。 */
+  status: 'success' | 'paying' | 'failed'
+  /** 渠道支付流水号；success 时必填。 */
+  channelTxnNo: string | null
+  /** 与二维码路径兼容：付款码支付统一使用 out_trade_no=attemptId。 */
+  prepayId: string | null
+  /** 同步成功回包中的渠道金额；success 时必须与订单金额一致。 */
+  amountCents: number | null
+  /** 安全文案；不得包含 authCode、密钥、签名串或渠道完整原文。 */
+  failReason: string | null
+}
+
 /** 回调验签上下文：path 参与签名 base（绑定回调路径，防同一签名跨路径复用）。 */
 export interface PaymentCallbackContext {
   /** 路由 path param 中的渠道名。 */
@@ -144,6 +170,11 @@ export interface CallbackAck {
 export interface PaymentProvider {
   readonly channel: PaymentChannel
   createQrPayment(input: QrPaymentCreateInput): Promise<QrPaymentCreateResult>
+  /**
+   * 付款码支付（商户扫用户付款码，主扫模式）。同步返回渠道受理结果；
+   * `paying` 状态由现有 queryPayment/reconcile 路径收敛。Provider 禁止持久化 authCode。
+   */
+  createCodePayment?(input: CodePaymentCreateInput): Promise<CodePaymentCreateResult>
   /** 验签（含时间窗 + path/channel 绑定）+ 报文解析归一化。失败返回明确错误码，绝不静默放行。 */
   verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult>
   /**
