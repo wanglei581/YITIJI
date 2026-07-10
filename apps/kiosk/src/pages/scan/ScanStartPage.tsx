@@ -50,10 +50,9 @@ export function ScanStartPage() {
         }
       />
 
-      {/* 本页去掉 http 模式整体禁用；下游 Settings/Progress/Result 页的硬件门禁在后续任务中逐个解开 */}
       <div className="mt-4">
         <ComplianceBanner tone="info" title="扫描说明">
-          {COMPLIANCE_COPY.KIOSK_SCAN_DEMO_NOTICE}
+          {COMPLIANCE_COPY.KIOSK_SCAN_HARDWARE_NOTICE}
         </ComplianceBanner>
       </div>
 

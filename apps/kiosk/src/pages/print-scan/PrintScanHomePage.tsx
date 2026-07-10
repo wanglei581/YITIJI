@@ -41,7 +41,7 @@ interface Capability {
   to: string
   state?: Record<string, unknown>
   available: boolean
-  /** 可选的诚实说明（如材料扫描为流程演示，真机需 Agent） */
+  /** 可选的诚实说明（当前无卡片使用，为未来需要标注硬件依赖/使用限制的能力保留） */
   note?: string
 }
 
@@ -75,7 +75,6 @@ const CAPABILITIES: Capability[] = [
     description: '纸质材料扫描成 PDF / 图片存档',
     to: '/scan/start',
     available: true,
-    note: '流程演示，真机扫描需连接 Terminal Agent',
   },
   {
     key: 'photo-print',
