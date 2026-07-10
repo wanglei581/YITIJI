@@ -71,6 +71,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.printTaskStatusLog
   }
 
+  get scanTask() {
+    return this.client.scanTask
+  }
+
   // ── Order model foundation ─────────────────────────────────────────────────
 
   get order() {
