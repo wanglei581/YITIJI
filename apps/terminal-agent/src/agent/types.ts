@@ -41,6 +41,11 @@ export interface AgentConfig {
    * Do not rely on a code default; deployment must fill this value explicitly.
    */
   printerName: string
+  /**
+   * 打印机"扫描到 SMB/FTP 共享目录"对应的本地可访问路径（映射盘符或 UNC 路径）。
+   * 显式配置，不给默认值；未配置时扫描监听整体不启动，不影响其余 Agent 功能。
+   */
+  scanWatchFolder?: string
   /** Agent version echoed in heartbeat. e.g. "0.2.0" */
   agentVersion: string
   /** Heartbeat interval in ms. Default: 30000. May be overridden by server response. */
