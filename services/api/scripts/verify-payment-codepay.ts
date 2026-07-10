@@ -60,10 +60,12 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   makeOrder: (amountCents: number) => { order: Order; token: string }
   attempts: Map<string, Attempt>
   audits: Array<Record<string, unknown>>
+  findManyCalls: Array<Record<string, unknown>>
 } {
   const orders = new Map<string, Order>()
   const attempts = new Map<string, Attempt>()
   const audits: Array<Record<string, unknown>> = []
+  const findManyCalls: Array<Record<string, unknown>> = []
 
   const prisma = {
     order: {
@@ -118,6 +120,20 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
         return { count: 1 }
       },
       findUnique: async ({ where }: { where: { id: string } }) => attempts.get(where.id) ?? null,
+      findMany: async ({ where, take, ...rest }: { where: Record<string, unknown>; take?: number; [key: string]: unknown }) => {
+        findManyCalls.push({ where, take, ...rest })
+        const status = where['status'] as { in?: string[] } | undefined
+        return [...attempts.values()]
+          .filter((attempt) => {
+            if (status?.in && !status.in.includes(attempt.status)) return false
+            if (where['qrCodeContent'] === null && attempt.qrCodeContent !== null) return false
+            if (where['prepayId']?.['not'] === null && attempt.prepayId === null) return false
+            if (where['channel']?.['not'] === 'sandbox' && attempt.channel === 'sandbox') return false
+            return true
+          })
+          .slice(0, take)
+          .map((attempt) => ({ orderId: attempt.orderId }))
+      },
       count: async () => 0,
     },
   }
@@ -161,7 +177,7 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
       }),
     }
   }
-  return { payment, makeOrder, attempts, audits }
+  return { payment, makeOrder, attempts, audits, findManyCalls }
 }
 
 async function verifyWechatProvider(): Promise<void> {
@@ -233,6 +249,31 @@ async function verifyWechatProvider(): Promise<void> {
     })
     if (rejected.status === 'failed' && calls === 1) pass('wechat codepay refuses missing store configuration before a channel request')
     else fail('wechat codepay attempted a request without store configuration')
+
+    const priorNodeEnv = process.env['NODE_ENV']
+    const priorAutoConverge = process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
+    process.env['NODE_ENV'] = 'production'
+    delete process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
+    try {
+      const productionRejected = await wechat.createCodePayment({
+        orderId: 'order-codepay-verify-3',
+        orderNo: 'ORD-CODEPAY-VERIFY-3',
+        attemptId: 'attempt-codepay-verify-3',
+        terminalId: 'terminal-codepay-verify',
+        amountCents: 100,
+        authCode: AUTH_CODE,
+      })
+      if (productionRejected.status === 'failed' && calls === 1) {
+        pass('production codepay refuses to charge until automatic convergence is explicitly enabled')
+      } else {
+        fail('production codepay attempted a request without automatic convergence')
+      }
+    } finally {
+      if (priorNodeEnv === undefined) delete process.env['NODE_ENV']
+      else process.env['NODE_ENV'] = priorNodeEnv
+      if (priorAutoConverge === undefined) delete process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
+      else process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] = priorAutoConverge
+    }
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -244,6 +285,8 @@ function verifyKioskContract(): void {
   const paymentApi = readFileSync(join(repoRoot, 'apps/kiosk/src/services/print/paymentApi.ts'), 'utf8')
   const cashier = readFileSync(join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8')
   const panel = readFileSync(join(repoRoot, 'apps/kiosk/src/pages/print/CashierPaymentPanel.tsx'), 'utf8')
+  const convergenceTask = readFileSync(join(repoRoot, 'services/api/src/payment/code-payment-convergence.task.ts'), 'utf8')
+  const paymentModule = readFileSync(join(repoRoot, 'services/api/src/payment/payment.module.ts'), 'utf8')
   if (
     /@Post\('orders\/:id\/code-pay'\)/.test(controller) &&
     /createCodePayAttempt/.test(paymentApi) &&
@@ -263,6 +306,16 @@ function verifyKioskContract(): void {
     pass('cashier exposes mutually exclusive QR/code-pay controls, auto-reconciles USERPAYING, and submits scanner Enter through a form')
   } else {
     fail('cashier code-pay controls missing')
+  }
+  if (
+    /PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED/.test(convergenceTask) &&
+    /CronExpression\.EVERY_MINUTE/.test(convergenceTask) &&
+    /convergeStaleCodePayments/.test(convergenceTask) &&
+    /CodePaymentConvergenceTask/.test(paymentModule)
+  ) {
+    pass('server-side code-payment convergence task is env-gated and registered in the payment module')
+  } else {
+    fail('server-side code-payment convergence task missing')
   }
 }
 
@@ -368,6 +421,10 @@ async function main(): Promise<void> {
     } else {
       fail('unknown channel result must remain pending')
     }
+    unknownAttempt!.status = 'expired'
+    await expectCode('expired code payment blocks QR issuance until reconciliation', 'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED', () =>
+      unknownFixture.payment.createPayAttempt(unknown.order.id, unknown.token, 'sandbox'),
+    )
 
     class ClosedCodePaySandboxProvider extends SandboxPaymentProvider {
       override async createCodePayment(input: Parameters<SandboxPaymentProvider['createCodePayment']>[0]) {
@@ -378,6 +435,9 @@ async function main(): Promise<void> {
         return { status: 'closed' as const, channelTxnNo: null, amountCents: null }
       }
     }
+    class ClosedCodePayWechatProvider extends ClosedCodePaySandboxProvider {
+      override readonly channel = 'wechat' as const
+    }
     const closedFixture = createFixture(new ClosedCodePaySandboxProvider(SESSION_SECRET))
     const closed = closedFixture.makeOrder(100)
     const closedCreated = await closedFixture.payment.createCodePayAttempt(closed.order.id, closed.token, AUTH_CODE)
@@ -387,6 +447,27 @@ async function main(): Promise<void> {
       pass('terminal channel non-payment releases a pending code-payment attempt for a new scan')
     } else {
       fail('terminal channel non-payment must release the code-payment attempt')
+    }
+
+    const cronFixture = createFixture(new ClosedCodePayWechatProvider(SESSION_SECRET))
+    const cronOrder = cronFixture.makeOrder(100)
+    const cronCreated = await cronFixture.payment.createCodePayAttempt(cronOrder.order.id, cronOrder.token, AUTH_CODE)
+    const qrOnlyOrder = cronFixture.makeOrder(100)
+    await cronFixture.payment.createPayAttempt(qrOnlyOrder.order.id, qrOnlyOrder.token, 'wechat')
+    const cronResult = await cronFixture.payment.convergeStaleCodePayments({ limit: 10 })
+    const cronAttempt = cronFixture.attempts.get(cronCreated.attemptId)
+    const cronQuery = cronFixture.findManyCalls.at(-1)
+    if (
+      cronResult.scanned === 1 &&
+      cronResult.released === 1 &&
+      cronAttempt?.status === 'failed' &&
+      cronOrder.order.payStatus === 'unpaid' &&
+      cronQuery?.['distinct'] === undefined &&
+      JSON.stringify(cronQuery?.['orderBy']) === JSON.stringify({ createdAt: 'asc' })
+    ) {
+      pass('server-side code-payment convergence releases a terminal non-payment without a Kiosk session')
+    } else {
+      fail(`code-payment convergence mismatch: ${JSON.stringify({ cronResult, cronOrder: cronOrder.order, cronAttempt })}`)
     }
 
     class SuccessPersistenceFailureSandboxProvider extends SandboxPaymentProvider {

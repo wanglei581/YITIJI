@@ -227,6 +227,15 @@ export class WechatPayProvider implements PaymentProvider {
     if (!/^\d{18}$/.test(input.authCode)) {
       return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码格式无效' }
     }
+    if (process.env['NODE_ENV'] === 'production' && process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] !== 'true') {
+      return {
+        status: 'failed',
+        channelTxnNo: null,
+        prepayId: null,
+        amountCents: null,
+        failReason: '付款码支付自动核验未启用，请联系工作人员',
+      }
+    }
     const storeOutId = this.cfg.codePayStoreOutId?.trim()
     if (!storeOutId || !/^[A-Za-z0-9]{1,64}$/.test(storeOutId)) {
       return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码支付未配置，请联系工作人员' }
