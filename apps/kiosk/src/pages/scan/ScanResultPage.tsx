@@ -1,7 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
-import { API_MODE } from '../../services/api/client'
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -14,10 +13,13 @@ import {
 type ScanType = 'resume' | 'id' | 'document'
 
 interface ScannedFile {
+  fileId: string
+  fileUrl: string
   name: string
   size: string
-  pages: number
+  pages: number | null
   format: 'PDF'
+  mimeType?: string
 }
 
 interface ScanResultState {
@@ -48,29 +50,29 @@ export function ScanResultPage() {
   }
 
   const handlePrint = () => {
-    if (API_MODE === 'http') return
     if (!file) return
     navigate('/print/confirm', {
       state: {
-        file: { name: file.name, size: file.size, pages: file.pages },
+        file: { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, pages: file.pages, mimeType: file.mimeType },
         params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
       },
     })
   }
 
   const handleSave = () => {
-    if (API_MODE === 'http') return
-    navigate('/profile', { state: { savedFile: file, savedAt: new Date().toISOString() } })
+    if (!file) return
+    navigate('/me/documents')
   }
 
   const handleResumeAI = () => {
-    if (API_MODE === 'http') return
+    if (!file) return
     navigate('/resume/parse', {
       state: {
         source: 'scan',
-        file: file
-          ? { name: file.name, size: file.size, format: file.format }
-          : { name: '扫描简历.pdf', size: '-', format: 'PDF' },
+        // ResumeParsePage 只读顶层 state.fileId 发起解析请求，file 内的 fileId/fileUrl
+        // 仅用于展示；与 ResumeSourcePage 的既有上传流程保持同一 state 契约。
+        fileId: file.fileId,
+        file: { fileId: file.fileId, fileUrl: file.fileUrl, name: file.name, size: file.size, format: file.format },
       },
     })
   }
@@ -111,7 +113,8 @@ export function ScanResultPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-neutral-900">{file.name}</p>
               <p className="text-xs text-neutral-500">
-                {file.pages} 页 · {file.size} · {file.format}
+                {file.pages != null ? `${file.pages} 页 · ` : ''}
+                {file.size} · {file.format}
               </p>
             </div>
           </div>
@@ -121,34 +124,30 @@ export function ScanResultPage() {
       {/* 操作按钮 */}
       {success ? (
         <div className="mt-8 grid w-full max-w-sm grid-cols-2 gap-3">
-          {/* 2B 安全收口:扫描硬件未接入,http 模式无真实文件,禁止假文件进打印链路 */}
           <Button
             size="lg"
             variant="secondary"
             className="flex items-center gap-2"
-            disabled={API_MODE === 'http'}
-            title={API_MODE === 'http' ? '扫描硬件接入后开放真实打印' : undefined}
+            disabled={!file}
             onClick={handlePrint}
           >
             <PrinterIcon className="h-4 w-4" />
-            {API_MODE === 'http' ? '打印(硬件接入后开放)' : '直接打印'}
+            直接打印
           </Button>
           <Button
             size="lg"
             variant="secondary"
             className="flex items-center gap-2"
-            disabled={API_MODE === 'http'}
-            title={API_MODE === 'http' ? '扫描硬件接入后开放真实保存' : undefined}
+            disabled={!file}
             onClick={handleSave}
           >
             <SaveIcon className="h-4 w-4" />
-            {API_MODE === 'http' ? '保存(硬件接入后开放)' : '保存文档'}
+            保存文档
           </Button>
           <Button
             size="lg"
             variant={scanType === 'resume' ? 'primary' : 'secondary'}
-            disabled={scanType !== 'resume' || API_MODE === 'http'}
-            title={API_MODE === 'http' ? '扫描硬件接入后开放真实识别' : undefined}
+            disabled={scanType !== 'resume' || !file}
             className="flex items-center gap-2"
             onClick={handleResumeAI}
           >
