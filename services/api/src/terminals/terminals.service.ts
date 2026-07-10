@@ -842,7 +842,19 @@ export class TerminalsService implements OnModuleInit {
   }
 
   async validateTerminalToken(terminalId: string, authHeader: string | undefined): Promise<void> {
-    await this.findAndValidate(terminalId, authHeader)
+    await this.assertAgentAuthorized(terminalId, authHeader)
+  }
+
+  /**
+   * 供其它模块（如 ScanTasksService）复用的 Agent 鉴权校验，
+   * 委托给既有的 findAndValidate，避免重复实现 token 校验逻辑。
+   */
+  async assertAgentAuthorized(
+    terminalId: string,
+    authHeader: string | undefined,
+    options: { allowDisabled?: boolean } = {},
+  ): Promise<void> {
+    await this.findAndValidate(terminalId, authHeader, options)
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
