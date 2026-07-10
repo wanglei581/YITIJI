@@ -13,6 +13,7 @@ import type {
 } from '../files/file.types'
 import { FilesService } from '../files/files.service'
 import { defaultRetentionForUpload } from '../files/retention-policy'
+import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
 import type {
@@ -45,6 +46,8 @@ export interface UploadSessionFileView {
   mimeType: string
   sha256: string
   fileExpiresAt: string | null
+  /** 仅 print_doc 用途在 confirm 时签发：本系统 HMAC 签名内容 URL，供打印任务创建使用。 */
+  fileUrl?: string | null
 }
 
 export interface UploadSessionStatusResponse {
@@ -88,9 +91,12 @@ interface StoredUploadSession {
 const SESSION_TTL_SECONDS = 10 * 60
 const SESSION_RETAIN_AFTER_EXPIRE_SECONDS = 60
 const UPLOAD_LOCK_TTL_SECONDS = 30
-const MAX_PHONE_RESUME_BYTES = 10 * 1024 * 1024
+const MAX_SESSION_UPLOAD_BYTES = 10 * 1024 * 1024
+/** print_doc confirm 签发的内容 URL 有效期,与 kiosk-upload 的 30 分钟 TTL 保持一致(覆盖手机确认到建单的窗口)。 */
+const PRINT_UPLOAD_URL_TTL_MS = 30 * 60 * 1000
 const SESSION_PREFIX = 'upload_session:'
 const UPLOAD_LOCK_PREFIX = 'upload_session_upload_lock:'
+const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set(['resume_upload', 'print_doc'])
 
 @Injectable()
 export class UploadSessionsService {
@@ -101,8 +107,8 @@ export class UploadSessionsService {
   ) {}
 
   async create(input: CreateUploadSessionInput): Promise<UploadSessionCreateResponse> {
-    if (input.purpose !== 'resume_upload') {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_PURPOSE_UNSUPPORTED', message: '当前仅支持简历上传会话' } })
+    if (!SUPPORTED_UPLOAD_SESSION_PURPOSES.has(input.purpose)) {
+      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_PURPOSE_UNSUPPORTED', message: '当前用途不支持扫码上传会话' } })
     }
     if (input.mode === 'member' && !input.endUserId) {
       throw new UnauthorizedException({ error: { code: 'MEMBER_AUTH_REQUIRED', message: '会员上传会话需要先在终端登录' } })
@@ -158,10 +164,10 @@ export class UploadSessionsService {
     file: Express.Multer.File
   }): Promise<UploadSessionStatusResponse> {
     if (!args.file) {
-      throw new BadRequestException({ error: { code: 'FILE_REQUIRED', message: '请选择要上传的简历文件' } })
+      throw new BadRequestException({ error: { code: 'FILE_REQUIRED', message: '请选择要上传的文件' } })
     }
-    if (args.file.size > MAX_PHONE_RESUME_BYTES || args.file.buffer.length > MAX_PHONE_RESUME_BYTES) {
-      throw new BadRequestException({ error: { code: 'FILE_TOO_LARGE', message: '手机扫码上传简历不能超过 10MB' } })
+    if (args.file.size > MAX_SESSION_UPLOAD_BYTES || args.file.buffer.length > MAX_SESSION_UPLOAD_BYTES) {
+      throw new BadRequestException({ error: { code: 'FILE_TOO_LARGE', message: '手机扫码上传文件不能超过 10MB' } })
     }
 
     const record = this.markExpired(await this.load(args.sessionId))
@@ -200,7 +206,7 @@ export class UploadSessionsService {
       try {
         file = await this.files.upload({
           buffer: args.file.buffer,
-          filename: args.file.originalname || 'resume.pdf',
+          filename: args.file.originalname || (latest.purpose === 'print_doc' ? 'document.pdf' : 'resume.pdf'),
           mimeType: args.file.mimetype,
           purpose: latest.purpose,
           uploaderId: null,
@@ -249,6 +255,10 @@ export class UploadSessionsService {
         ...record.file,
         fileExpiresAt: boundFile.expiresAt ? boundFile.expiresAt.toISOString() : null,
       }
+    }
+    if (record.purpose === 'print_doc') {
+      const signed = signFileUrl(confirmedFile.fileId, PRINT_UPLOAD_URL_TTL_MS)
+      confirmedFile = { ...confirmedFile, fileUrl: signed.url }
     }
 
     const confirmed: StoredUploadSession = {

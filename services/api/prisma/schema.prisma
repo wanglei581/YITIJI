@@ -35,6 +35,7 @@ model Terminal {
   heartbeats TerminalHeartbeat[]
   printTasks PrintTask[]
   bindCodes  TerminalBindCode[]
+  scanTasks  ScanTask[]
 
   @@index([orgId])
   @@index([enabled])
@@ -92,6 +93,34 @@ model PrintTask {
   @@index([status, terminalId, createdAt])
   @@index([status, claimExpiry])
   @@index([status, claimedAt])
+}
+
+// ── ScanTask ──────────────────────────────────────────────────────────────────
+// 首期真实扫描：Kiosk 发起一个"等待中"的扫描会话，Terminal Agent 监听打印机
+// 扫描到 SMB 共享目录产生的文件，按"该终端最早一条 waiting 任务"完成匹配。
+// 不支持多终端共享同一打印机并发扫描（当前部署为单终端单打印机）。
+model ScanTask {
+  id               String    @id @default(cuid())
+  terminalId       String
+  terminal         Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  scanType         String    // 'resume' | 'id' | 'document'
+  status           String    @default("waiting")
+  // waiting -> matched -> completed
+  //         -> expired（超时未匹配，惰性转换）
+  //         -> cancelled（用户主动取消）
+  //         -> failed（匹配后建档失败）
+  endUserId        String?
+  endUser          EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  fileId           String?
+  matchedFileMtime DateTime?
+  errorCode        String?
+  errorMessage     String?
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([terminalId, status, createdAt])
+  @@index([endUserId])
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
@@ -426,6 +455,7 @@ model EndUser {
   aiServiceLogs   AiServiceLog[]
   aiConsents      UserAiConsent[]
   dataRequests    UserDataRequest[]
+  scanTasks       ScanTask[]
 }
 
 // ── JobSource ─────────────────────────────────────────────────────────────────

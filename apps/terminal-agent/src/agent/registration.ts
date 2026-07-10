@@ -5,8 +5,8 @@
  *   POST /auth/terminal/register
  *
  * On first startup (no terminalId/agentToken in config):
- *   1. Compute device fingerprint (SHA-256 of hostname + first non-internal MAC address)
- *   2. POST /auth/terminal/register with terminalCode + deviceFingerprint + adminSecret
+ *   1. Compute device fingerprint (SHA-256 of hostname + all non-internal MAC addresses)
+ *   2. POST /auth/terminal/register with terminalCode + deviceFingerprint + macAddress + adminSecret
  *   3. Persist terminalId + agentToken (= terminalToken) to config file
  *
  * On subsequent startups (terminalId/agentToken already available):
@@ -17,6 +17,9 @@
  *   - adminSecret is now optional; it is cleared from config.json after registration.
  *   - agentToken is stored DPAPI-encrypted in agent.token (not in config.json).
  *   - deviceFingerprint is a non-reversible hash; no PII.
+ *   - macAddress (added for 终端设备档案) is sent in the clear — it is a hardware
+ *     identifier used for Admin-side duplicate-terminal detection, not a secret;
+ *     the backend normalizes/validates format and enforces uniqueness.
  */
 
 import os from 'os'
@@ -26,16 +29,9 @@ import { createApiClient, axiosErrorMessage } from './api-client'
 import { persistRegistration } from './config-manager'
 import { log } from '../logger'
 
-/**
- * Compute a stable device fingerprint:
- *   SHA-256( hostname + ":" + sorted non-internal MAC addresses )
- *
- * Falls back to hostname-only hash if no MACs are found (e.g., during testing).
- */
-function deviceFingerprint(): string {
-  const hostname = os.hostname()
+/** Sorted, de-duplicated non-internal MAC addresses across all network adapters. */
+function nonInternalMacAddresses(): string[] {
   const macs: string[] = []
-
   const interfaces = os.networkInterfaces()
   for (const ifaces of Object.values(interfaces)) {
     if (!ifaces) continue
@@ -46,9 +42,28 @@ function deviceFingerprint(): string {
     }
   }
   macs.sort()
+  return macs
+}
 
-  const raw = `${hostname}:${macs.join(',') || 'no-mac'}`
+/**
+ * Compute a stable device fingerprint:
+ *   SHA-256( hostname + ":" + sorted non-internal MAC addresses )
+ *
+ * Falls back to hostname-only hash if no MACs are found (e.g., during testing).
+ */
+function deviceFingerprint(): string {
+  const hostname = os.hostname()
+  const raw = `${hostname}:${nonInternalMacAddresses().join(',') || 'no-mac'}`
   return crypto.createHash('sha256').update(raw, 'utf-8').digest('hex')
+}
+
+/**
+ * Real (non-hashed) MAC address of the primary non-internal adapter, reported
+ * to Terminal.macAddress (Admin 终端设备档案 / 唯一性校验). Undefined when no
+ * non-internal adapter is found (e.g. a machine with only loopback).
+ */
+function primaryMacAddress(): string | undefined {
+  return nonInternalMacAddresses()[0]
 }
 
 /**
@@ -78,6 +93,7 @@ export async function registerOrLoad(config: AgentConfig): Promise<AgentConfig> 
   const body: RegistrationRequest = {
     terminalCode: config.terminalCode,
     deviceFingerprint: deviceFingerprint(),
+    macAddress: primaryMacAddress(),
     adminSecret: config.adminSecret,
   }
 

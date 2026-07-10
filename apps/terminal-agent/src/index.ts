@@ -13,6 +13,7 @@ import { loadConfig } from './agent/config-manager'
 import { assertAgentProfileAllowsApiBaseUrl } from './agent/profile-guard'
 import { registerOrLoad } from './agent/registration'
 import { startHeartbeat } from './agent/heartbeat'
+import { startScanWatcher } from './agent/scan-watcher'
 import { startTaskRunner } from './agent/task-runner'
 import type { AgentConfig } from './agent/types'
 import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/qr-login-server'
@@ -83,6 +84,7 @@ program
         if (patch.claimIntervalMs) config.claimIntervalMs = patch.claimIntervalMs
       },
     })
+    const scanWatcherHandle = startScanWatcher(config)
 
     // ── Step 6: Start claim / print loop ──────────────────────────────────
     const claimTimer = startTaskRunner({ config, db })
@@ -107,6 +109,7 @@ program
       clearInterval(claimTimer)
       clearInterval(offlineRetryTimer)
       void qrLocalServer?.close()
+      void scanWatcherHandle?.stop()
       releaseLock()
       process.exit(0)
     }

@@ -8,7 +8,7 @@
  *   - status: always 'online' (if we can reach the server, we're online)
  *   - printerStatus: real Win32_Printer WMI query (Phase 8.2B); 'unknown' on macOS
  *   - diskFreeGB: real Get-PSDrive C: query (Phase 8.2B); -1 on macOS
- *   - agentVersion, ipAddress, reportedAt
+ *   - agentVersion, ipAddress, macAddress, reportedAt
  *
  * On server response:
  *   - acknowledged: true → log OK
@@ -40,6 +40,26 @@ function getIpAddress(): string {
     }
   }
   return '127.0.0.1'
+}
+
+/**
+ * Return the first non-internal MAC address, or undefined if none found.
+ * Reported on every heartbeat (not just registration) so 终端设备档案 backfills
+ * for terminals registered before macAddress reporting existed; backend
+ * treats the reporting terminal's own already-bound MAC as a no-op, not a
+ * conflict (see terminals.service.ts assertMacAvailable ownerRef check).
+ */
+function getMacAddress(): string | undefined {
+  const interfaces = os.networkInterfaces()
+  for (const ifaces of Object.values(interfaces)) {
+    if (!ifaces) continue
+    for (const addr of ifaces) {
+      if (!addr.internal && addr.mac && addr.mac !== '00:00:00:00:00:00') {
+        return addr.mac
+      }
+    }
+  }
+  return undefined
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -81,6 +101,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     diskFreeGB,
     agentVersion: config.agentVersion,
     ipAddress: getIpAddress(),
+    macAddress: getMacAddress(),
     reportedAt: new Date().toISOString(),
     localTaskDatabaseAvailable,
   }

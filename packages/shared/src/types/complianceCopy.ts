@@ -67,11 +67,11 @@ export const COMPLIANCE_COPY = {
   KIOSK_PRINT_SCAN_ESIGN_NOTICE: '签名盖章仅用于个人材料整理与打印辅助，不提供 CA 电子签、电子认证或合同签署服务；仅为图片合成预览，不具备法律认证效力，正式法律文件请通过具备资质的电子签名服务办理。',
 
   /**
-   * Kiosk 材料扫描流程演示说明(灰/橙色提示)。
-   * 真机扫描依赖一体机 + Terminal Agent(TWAIN/扫描到 SMB,Phase 8.2),
-   * 当前前端为流程演示,不能让用户误解为已接真机。
+   * Kiosk 材料扫描说明(蓝色 info 提示)。
+   * 真实扫描依赖一体机打印机 + Terminal Agent(扫描到 SMB 共享目录并自动投递),
+   * 该依赖是硬件前置条件，不是"页面为演示"——提示措辞不应让用户误解为功能未实现。
    */
-  KIOSK_SCAN_DEMO_NOTICE: '当前页面用于流程演示；真机扫描需在一体机连接 Terminal Agent 后使用。',
+  KIOSK_SCAN_HARDWARE_NOTICE: '扫描前请确认一体机打印机与 Terminal Agent 已连接；扫描完成后系统会自动获取电子版文件。',
 
   /**
    * Kiosk/30 校企合作主页顶部横幅(蓝色 info,严肃合规声明)。

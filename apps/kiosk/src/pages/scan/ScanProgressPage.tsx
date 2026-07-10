@@ -1,231 +1,162 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import {
-  AlertCircleIcon,
-  CheckIcon,
-  CircleDotIcon,
-  ClockIcon,
-  ScanIcon,
-  XCircleIcon,
-} from 'lucide-react'
+import { AlertCircleIcon, ScanIcon, XCircleIcon } from 'lucide-react'
+import { Button } from '@ai-job-print/ui'
+import type { ScanSessionFileView } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { API_MODE } from '../../services/api/client'
+import { useAuth } from '../../auth/useAuth'
+import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
+import { ApiHttpError } from '../../services/api/httpAdapter'
 
-type Step = 'init' | 'scanning' | 'generating'
 type ScanType = 'resume' | 'id' | 'document'
-type Source = 'flatbed' | 'adf'
 
-const FAIL_REASONS = [
-  '扫描仪未就绪，请检查连接或联系工作人员',
-  '扫描仪进纸失败，请重新放置文件',
-  '扫描超时，请稍后重试',
-  'PDF 生成失败，请重试',
-]
-const SCAN_HARDWARE_UNAVAILABLE_REASON =
-  '当前生产模式未接入本机扫描 Agent，扫描服务暂不开放；请联系工作人员使用已验收的扫描方案。'
-
-const SCAN_TYPE_LABELS: Record<ScanType, string> = {
-  resume: '简历',
-  id: '证件',
-  document: '文档',
+interface LocationState {
+  scanTaskId?: string
+  scanType?: ScanType
 }
 
-function buildSteps(source: Source): { key: Step; label: string; duration: number }[] {
-  return [
-    { key: 'init',       label: '初始化扫描仪', duration: 700 },
-    { key: 'scanning',   label: '扫描原件',     duration: source === 'adf' ? 2000 : 3000 },
-    { key: 'generating', label: '生成 PDF',     duration: 1500 },
-  ]
-}
+const POLL_INTERVAL_MS = 2000
 
-function mockFile(scanType: ScanType) {
-  const now = new Date()
-  const ts = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-    '_',
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0'),
-  ].join('')
-  const pages = Math.floor(Math.random() * 5) + 1
-  const sizeKb = pages * 120 + Math.floor(Math.random() * 80)
+/** 组装扫描结果页需要的 file 展示对象，poll 成功路径与取消时的补查路径共用，避免字段映射写两遍。 */
+function buildResultFileState(file: ScanSessionFileView) {
   return {
-    name: `${SCAN_TYPE_LABELS[scanType]}_${ts}.pdf`,
-    size: sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`,
-    pages,
+    fileId: file.fileId,
+    fileUrl: file.fileUrl,
+    name: file.filename,
+    size: formatSize(file.sizeBytes),
+    mimeType: file.mimeType,
+    pages: null,
     format: 'PDF' as const,
   }
 }
 
 export function ScanProgressPage() {
-  // 扫描进行中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(true)
-
   const navigate = useNavigate()
   const location = useLocation()
-  // Keep state as-is (possibly null) so useCallback deps stay stable
-  const state = location.state as Record<string, unknown> | null
+  const { getToken } = useAuth()
+  const state = (location.state ?? {}) as LocationState
+  const scanTaskId = state.scanTaskId
+  const scanType = state.scanType ?? 'document'
 
-  const scanType = (state?.scanType as ScanType) ?? 'document'
-  const source = (state?.source as Source) ?? 'flatbed'
-  const shouldFail = state?.simulateFailure === true
-  const failReason = typeof state?.failReason === 'string' ? (state.failReason as string) : FAIL_REASONS[0]
-  const useSimulatedScan = API_MODE !== 'http'
-
-  const steps = buildSteps(source)
-
-  const [current, setCurrent] = useState<Step>('init')
-  const [failed, setFailed] = useState(false)
-  const cancelRef = useRef(false)
-
-  const navigateFail = useCallback(
-    (reason: string) => {
-      setFailed(true)
-      setTimeout(() => {
-        navigate('/scan/result', { state: { ...state, success: false, reason } })
-      }, 700)
-    },
-    [navigate, state],
-  )
-
-  const navigateSuccess = useCallback(() => {
-    if (!useSimulatedScan) {
-      navigateFail(SCAN_HARDWARE_UNAVAILABLE_REASON)
-      return
-    }
-    const file = mockFile(scanType)
-    navigate('/scan/result', { state: { ...state, success: true, file } })
-  }, [navigate, navigateFail, state, scanType, useSimulatedScan])
-
-  const handleDevFail = useCallback(() => {
-    cancelRef.current = true
-    navigateFail(FAIL_REASONS[0])
-  }, [navigateFail])
+  const [error, setError] = useState<string | null>(null)
+  const cancellingRef = useRef(false)
 
   useEffect(() => {
-    cancelRef.current = false
-
-    const advance = (idx: number) => {
-      if (idx >= steps.length) {
-        if (!cancelRef.current) navigateSuccess()
-        return
-      }
-      const step = steps[idx]
-      const duration =
-        shouldFail && step.key === 'scanning' ? Math.floor(step.duration / 2) : step.duration
-
-      setTimeout(() => {
-        if (cancelRef.current) return
-        if (shouldFail && step.key === 'scanning') {
-          navigateFail(failReason)
-          return
-        }
-        const next = steps[idx + 1]
-        if (next) setCurrent(next.key)
-        advance(idx + 1)
-      }, duration)
+    if (!scanTaskId) {
+      navigate('/scan/start', { replace: true })
+      return undefined
     }
 
-    advance(0)
-    return () => { cancelRef.current = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    let stopped = false
+    let timer: number | undefined
 
-  const currentIdx = steps.findIndex((s) => s.key === current)
+    // 只在上一次 poll 完全落地（成功导航返回，或失败已安排重试）之后才安排下一次，
+    // 不用固定 setInterval——网络变慢时固定间隔会让多个请求堆叠并发，而不是退避。
+    const scheduleNext = () => {
+      if (stopped) return
+      timer = window.setTimeout(() => void poll(), POLL_INTERVAL_MS)
+    }
+
+    const poll = async () => {
+      try {
+        const status = await getScanSessionStatus(scanTaskId, getToken())
+        if (stopped) return
+        if (status.status === 'completed' && status.file) {
+          navigate('/scan/result', {
+            replace: true,
+            state: { scanType, success: true, file: buildResultFileState(status.file) },
+          })
+          return
+        }
+        if (status.status === 'expired') {
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
+          return
+        }
+        if (status.status === 'failed') {
+          navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: status.errorMessage ?? '扫描处理失败，请重试' } })
+          return
+        }
+        if (status.status === 'cancelled') {
+          navigate('/scan/start', { replace: true })
+          return
+        }
+        scheduleNext()
+      } catch (err) {
+        if (!stopped) {
+          setError(err instanceof Error ? err.message : '查询扫描状态失败')
+          scheduleNext()
+        }
+      }
+    }
+
+    void poll()
+    return () => {
+      stopped = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanTaskId])
+
+  const handleCancel = async () => {
+    if (!scanTaskId || cancellingRef.current) return
+    cancellingRef.current = true
+    try {
+      await cancelScanSession(scanTaskId, getToken())
+      navigate('/scan/start', { replace: true })
+    } catch (err) {
+      // 取消请求送达时任务恰好已经完成(Agent 并发投递刚好抢先完成，后端会返回
+      // SCAN_TASK_ALREADY_COMPLETED)：不能静默当作"已取消"丢弃这份真实扫描出的文件——
+      // 尤其匿名会话下，这是找回它的唯一机会。补查一次真实状态，能拿到文件就直接进
+      // 结果页；查不到、或补查本身失败、或是网络错误等其它取消失败原因，则退回默认
+      // 路径，不阻塞用户。
+      const code = err instanceof ApiHttpError ? err.code : undefined
+      if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
+        try {
+          const latest = await getScanSessionStatus(scanTaskId, getToken())
+          if (latest.status === 'completed' && latest.file) {
+            navigate('/scan/result', {
+              replace: true,
+              state: { scanType, success: true, file: buildResultFileState(latest.file) },
+            })
+            return
+          }
+        } catch {
+          // 补查状态也失败了，退回默认路径，不阻塞用户
+        }
+      }
+      navigate('/scan/start', { replace: true })
+    }
+  }
 
   return (
     <div className="flex h-full flex-col items-center justify-center p-8">
-      {/* 状态图标 */}
-      <div
-        className={[
-          'mb-10 flex h-24 w-24 items-center justify-center rounded-full',
-          failed ? 'bg-error-bg' : 'bg-primary-50',
-        ].join(' ')}
-      >
-        {failed ? (
-          <XCircleIcon className="h-12 w-12 text-error-fg" />
-        ) : (
-          <ScanIcon className="h-12 w-12 text-primary-600" />
-        )}
+      <div className="mb-10 flex h-24 w-24 items-center justify-center rounded-full bg-primary-50">
+        <ScanIcon className="h-12 w-12 animate-pulse text-primary-600" />
       </div>
 
-      <h1 className="text-2xl font-bold text-neutral-900">
-        {failed ? '处理出错' : '正在扫描'}
-      </h1>
-      <p className="mt-2 text-base text-neutral-500">
-        {failed ? '任务遇到问题，即将跳转…' : '请勿移动文件，扫描中…'}
-      </p>
+      <h1 className="text-2xl font-bold text-neutral-900">等待打印机端扫描完成</h1>
+      <p className="mt-2 text-base text-neutral-500">请在打印机上完成操作，本页会自动检测结果</p>
 
-      {/* 步骤列表 */}
-      <div className="mt-12 w-full max-w-sm space-y-4">
-        {steps.map((step, idx) => {
-          const done = idx < currentIdx
-          const active = idx === currentIdx
-          const isFailed = failed && active
-
-          return (
-            <div key={step.key} className="flex items-center gap-4">
-              <div
-                className={[
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                  isFailed
-                    ? 'border-error-fg bg-error text-white'
-                    : done
-                    ? 'border-primary-600 bg-primary-600 text-white'
-                    : active
-                    ? 'border-primary-600 bg-white text-primary-600'
-                    : 'border-neutral-200 bg-white text-neutral-300',
-                ].join(' ')}
-              >
-                {isFailed ? (
-                  <AlertCircleIcon className="h-5 w-5" />
-                ) : done ? (
-                  <CheckIcon className="h-5 w-5" />
-                ) : active ? (
-                  <CircleDotIcon className="h-5 w-5" />
-                ) : (
-                  <ClockIcon className="h-5 w-5" />
-                )}
-              </div>
-
-              <div className="flex-1">
-                <p
-                  className={[
-                    'text-base font-medium',
-                    isFailed
-                      ? 'text-error-fg'
-                      : done || active
-                      ? 'text-neutral-900'
-                      : 'text-neutral-400',
-                  ].join(' ')}
-                >
-                  {step.label}
-                </p>
-                {active && !failed && (
-                  <p className="mt-0.5 animate-pulse text-sm text-primary-600">处理中…</p>
-                )}
-                {isFailed && (
-                  <p className="mt-0.5 text-sm text-error-fg">任务中断</p>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* DEV 专用：模拟失败按钮，生产构建自动移除 */}
-      {import.meta.env.DEV && !failed && (
-        <div className="absolute bottom-24 right-6">
-          <button
-            onClick={handleDevFail}
-            className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
-          >
-            [DEV] 模拟失败
-          </button>
+      {error && (
+        <div className="mt-6 flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">
+          <AlertCircleIcon className="h-4 w-4 shrink-0" />
+          {error}
         </div>
       )}
+
+      <div className="mt-10">
+        <Button variant="secondary" size="lg" onClick={handleCancel}>
+          <XCircleIcon className="mr-2 h-4 w-4" />
+          取消扫描
+        </Button>
+      </div>
     </div>
   )
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

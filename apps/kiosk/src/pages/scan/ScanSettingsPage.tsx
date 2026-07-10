@@ -1,188 +1,159 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon } from 'lucide-react'
-import { API_MODE } from '../../services/api/client'
+import { AlertCircleIcon, LoaderIcon } from 'lucide-react'
+import type { ScanSessionCreateResponse } from '@ai-job-print/shared'
+import { useAuth } from '../../auth/useAuth'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { getTerminalId } from '../../services/api/screensaver'
+import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
 
 type ScanType = 'resume' | 'id' | 'document'
-type Source = 'flatbed' | 'adf'
-type PageMode = 'single' | 'multi'
-type Color = 'color' | 'gray' | 'bw'
-type Dpi = 300 | 600
 
 interface LocationState {
   scanType?: ScanType
 }
 
-interface ToggleOption<T> {
-  value: T
-  label: string
-}
-
-function ToggleGroup<T extends string | number>({
-  options,
-  value,
-  onChange,
-  disabledValues,
-}: {
-  options: ToggleOption<T>[]
-  value: T
-  onChange: (v: T) => void
-  disabledValues?: T[]
-}) {
-  return (
-    <div className="flex overflow-hidden rounded-lg border border-neutral-200">
-      {options.map((opt) => {
-        const isDisabled = disabledValues?.includes(opt.value)
-        const isActive = value === opt.value
-        return (
-          <button
-            key={String(opt.value)}
-            disabled={isDisabled}
-            onClick={() => onChange(opt.value)}
-            className={[
-              'flex-1 py-3 text-sm font-medium transition-colors',
-              isDisabled
-                ? 'cursor-not-allowed bg-neutral-50 text-neutral-300'
-                : isActive
-                ? 'bg-primary-600 text-white'
-                : 'bg-white text-neutral-600 hover:bg-neutral-50',
-            ].join(' ')}
-          >
-            {opt.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 export function ScanSettingsPage() {
+  // 用户此时会离开触屏走到打印机操作,期间不能被待机宣传屏/闲置登出打断(参考 ScanProgressPage)
+  useBusyLock(true)
+
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = (location.state ?? {}) as LocationState
   const scanType = state.scanType ?? 'document'
-  const scanUnavailable = API_MODE === 'http'
 
-  const [source, setSource] = useState<Source>('flatbed')
-  const [pageMode, setPageMode] = useState<PageMode>('single')
-  const [color, setColor] = useState<Color>('color')
-  const [dpi, setDpi] = useState<Dpi>(300)
+  const [instructions, setInstructions] = useState<string[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [starting, setStarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [scanTaskId, setScanTaskId] = useState<string | null>(null)
 
-  const handleSourceChange = (v: Source) => {
-    setSource(v)
-    if (v === 'adf') setPageMode('multi')
+  // 标记任务是否已成功交给下一步(进入 /scan/progress),交给下一步后卸载清理不应再取消该任务
+  const confirmedRef = useRef(false)
+  // 用 ref（而非 effect 内局部变量）跨越 StrictMode 的 mount→unmount→mount 双调用保存已创建的任务ID，
+  // 否则第一次(被丢弃的)调用在 cleanup 时还拿不到 id，之后 resolve 时又被自己的 cancelled 挡住，
+  // 会导致创建了一个后端任务却永远没人取消它（孤儿任务）。
+  const createdIdRef = useRef<string | null>(null)
+  // 用共享 promise ref 跨越 StrictMode 双调用，确保只真正发起一次 createScanSession 网络请求，
+  // 而不是每次 effect 调用都各自 fire 一个新请求（否则一次访问会在后端建两条任务记录）。
+  const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
+  // 代际计数器：区分"当前仍然有效的 effect 调用"与"StrictMode 丢弃的上一次调用"。
+  // 只有代际匹配时才允许在 resolve/cleanup 时执行取消逻辑，避免把仍在使用中的真实会话误取消。
+  const generationRef = useRef(0)
+
+  useEffect(() => {
+    const myGeneration = ++generationRef.current
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = createScanSession({ scanType, terminalId: getTerminalId() }, getToken())
+    }
+
+    sessionPromiseRef.current
+      .then((created) => {
+        createdIdRef.current = created.scanTaskId
+        if (cancelled) {
+          // 这次 effect 调用在请求完成前就已经被清理。如果它仍是"当前有效"的那次调用
+          // (不是被 StrictMode 丢弃的第一次调用),说明用户在任务创建完成前就已经离开且未确认，
+          // cleanup 触发时还不知道任务ID、来不及取消，这里补一次尽力取消。
+          if (generationRef.current === myGeneration && !confirmedRef.current) {
+            void cancelScanSession(created.scanTaskId, getToken()).catch(() => undefined)
+          }
+          return
+        }
+        setInstructions(created.instructions)
+        setScanTaskId(created.scanTaskId)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : '创建扫描任务失败，请重试')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+      // StrictMode 丢弃的那次调用的 cleanup 是 no-op：真正的取消交给上面 .then 里的代际检查处理，
+      // 避免这里对刚创建、马上要被第二次(真实)调用继续使用的会话误取消。
+      // 这里刻意读取 ref 的最新值（而非某次渲染时的快照）来判断"我是否仍是最新一次调用"，
+      // 因此忽略 exhaustive-deps 关于 ref 在 cleanup 里可能已变化的告警。
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (generationRef.current !== myGeneration) return
+      // 组件卸载时,如果任务已创建但还没交给下一步(比如用户没点确认就离开了),
+      // 尽力取消,避免孤儿 waiting 任务在有效期内被下一个物理扫描误匹配到别的用户。
+      if (createdIdRef.current && !confirmedRef.current) {
+        void cancelScanSession(createdIdRef.current, getToken()).catch(() => undefined)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleBack = () => {
+    if (scanTaskId && !confirmedRef.current) {
+      void cancelScanSession(scanTaskId, getToken()).catch(() => {
+        // best-effort：任务会在过期后自然结束，这里不阻塞用户返回
+      })
+    }
+    navigate(-1)
   }
 
   const handleConfirm = () => {
-    if (scanUnavailable) return
-    navigate('/scan/progress', {
-      state: { scanType, source, pageMode, color, dpi },
-    })
+    if (!scanTaskId || starting) return
+    confirmedRef.current = true
+    setStarting(true)
+    navigate('/scan/progress', { state: { scanTaskId, scanType } })
   }
 
   return (
     <div className="flex h-full flex-col p-6">
       <PageHeader
         title="扫描设置"
-        subtitle="请配置扫描参数"
+        subtitle="请按下方指引在打印机上操作"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
+          <Button size="sm" variant="secondary" onClick={handleBack}>
             上一步
           </Button>
         }
       />
 
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* 扫描来源 */}
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-neutral-700">扫描来源</p>
-          <ToggleGroup<Source>
-            options={[
-              { value: 'flatbed', label: '平板' },
-              { value: 'adf', label: 'ADF 自动输稿器' },
-            ]}
-            value={source}
-            onChange={handleSourceChange}
-          />
-          {source === 'flatbed' && (
-            <p className="mt-2 text-xs text-neutral-400">请将文件正面朝下放置在扫描仪玻璃上</p>
-          )}
-          {source === 'adf' && (
-            <p className="mt-2 flex items-center gap-2 text-xs text-warning-fg">
-              <AlertCircleIcon className="h-3.5 w-3.5 shrink-0" />
-              请将文件整齐放入 ADF 进纸口
-            </p>
-          )}
-        </Card>
+        {loading && (
+          <Card className="flex items-center gap-3 p-5">
+            <LoaderIcon className="h-5 w-5 animate-spin text-primary-500" />
+            <p className="text-sm text-neutral-600">正在创建扫描任务…</p>
+          </Card>
+        )}
 
-        {/* 页数模式 */}
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-neutral-700">页数模式</p>
-          <ToggleGroup<PageMode>
-            options={[
-              { value: 'single', label: '单页' },
-              { value: 'multi', label: '多页' },
-            ]}
-            value={pageMode}
-            onChange={setPageMode}
-            disabledValues={source === 'adf' ? ['single'] : undefined}
-          />
-        </Card>
+        {error && (
+          <Card className="flex items-center gap-2 border-error/30 bg-error-bg p-5">
+            <AlertCircleIcon className="h-4 w-4 shrink-0 text-error-fg" />
+            <p className="text-sm text-error-fg">{error}</p>
+          </Card>
+        )}
 
-        {/* 色彩模式 */}
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-neutral-700">色彩模式</p>
-          <ToggleGroup<Color>
-            options={[
-              { value: 'color', label: '彩色' },
-              { value: 'gray', label: '灰度' },
-              { value: 'bw', label: '黑白' },
-            ]}
-            value={color}
-            onChange={setColor}
-          />
-        </Card>
-
-        {/* 分辨率 */}
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-neutral-700">分辨率</p>
-          <ToggleGroup<Dpi>
-            options={[
-              { value: 300, label: '300 DPI' },
-              { value: 600, label: '600 DPI' },
-            ]}
-            value={dpi}
-            onChange={setDpi}
-          />
-          <p className="mt-2 text-xs text-neutral-400">普通文档 300 DPI 即可，照片或图片可选 600 DPI</p>
-        </Card>
-
-        {/* 输出格式 + 合规说明 */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-neutral-700">输出格式</p>
-            <span className="rounded bg-neutral-100 px-2.5 py-1 text-sm font-medium text-neutral-600">
-              PDF
-            </span>
-          </div>
-          <div className="mt-3 flex items-start gap-2">
-            <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
-            <p className="text-xs text-neutral-400">
-              {scanUnavailable
-                ? '当前生产模式未接入本机扫描 Agent，扫描服务暂不开放。'
-                : '扫描由本机服务处理，不依赖网络'}
-            </p>
-          </div>
-        </Card>
+        {instructions && (
+          <Card className="p-5">
+            <p className="mb-3 text-sm font-medium text-neutral-700">请到打印机操作面板依次操作</p>
+            <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed text-neutral-700">
+              {instructions.map((step, idx) => (
+                <li key={idx}>{step}</li>
+              ))}
+            </ol>
+          </Card>
+        )}
       </div>
 
       <div className="mt-6 flex gap-3">
-        <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
+        <Button variant="secondary" size="lg" className="flex-1" onClick={handleBack}>
           返回
         </Button>
-        <Button size="lg" className="flex-1" disabled={scanUnavailable} onClick={handleConfirm}>
-          {scanUnavailable ? '真机扫描待接入' : '开始扫描'}
+        <Button size="lg" className="flex-1" disabled={!scanTaskId || starting} onClick={handleConfirm}>
+          我已在打印机上操作，开始等待
         </Button>
       </div>
     </div>

@@ -1,4 +1,6 @@
 import 'reflect-metadata'
+process.env['FILE_SIGNING_SECRET'] ||= 'verify-upload-sessions-secret-0123456789-abcdef'
+
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
@@ -383,6 +385,62 @@ async function main(): Promise<void> {
     })
     await service.cancel(session.sessionId, session.controlToken)
     assert.equal(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null, 'bound member file must not be deleted by abandoned cleanup')
+  }
+
+  {
+    const { service } = makeService()
+    await expectRejects(
+      () => service.create({ purpose: 'admin_upload', mode: 'temporary', channel: 'phone_h5', uploadUrl: 'http://localhost:5173/upload/phone' }),
+      BadRequestException,
+      'unsupported purpose rejected at session creation',
+    )
+  }
+
+  {
+    // print_doc: confirm 必须签发本系统 HMAC 内容 URL,供打印任务创建复用(kiosk-upload 同款契约)。
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'doc.pdf' }) })
+    const confirmed = await service.confirm(session.sessionId, session.controlToken)
+    assert.equal(confirmed.status, 'confirmed')
+    assert.match(confirmed.file.fileUrl ?? '', /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/, 'print_doc confirm must return a signed content URL')
+  }
+
+  {
+    // resume_upload 维持原契约:confirm 不应携带 fileUrl(打印域专属字段不应外溢到简历流程)。
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const confirmed = await service.confirm(session.sessionId, session.controlToken)
+    assert.equal(confirmed.file.fileUrl, undefined, 'resume_upload confirm must not carry a print fileUrl')
+  }
+
+  {
+    // print_doc + member: 仍走同一 bindMemberFile 归属逻辑,但 print_doc 不在 90 天默认名单内,应落短 TTL。
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'print_doc',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_1',
+    })
+    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'doc.pdf' }) })
+    const confirmed = await service.confirm(session.sessionId, session.controlToken, 'member_1')
+    assert.match(confirmed.file.fileUrl ?? '', /^\/api\/v1\/files\//, 'print_doc member confirm must also carry a signed fileUrl')
+    const bound = prisma.files.get(uploaded.file!.fileId)
+    assert.equal(bound?.endUserId, 'member_1')
+    assert.equal(bound?.retentionPolicy, 'system_short', 'print_doc must not get the 90-day resume retention default even when bound to a member')
   }
 
   {

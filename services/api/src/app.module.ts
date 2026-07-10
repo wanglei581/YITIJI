@@ -40,6 +40,7 @@ import { StorageModule } from './storage/storage.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { SmartCampusModule } from './smart-campus/smart-campus.module'
 import { UploadSessionsModule } from './upload-sessions/upload-sessions.module'
+import { ScanTasksModule } from './scan-tasks/scan-tasks.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
@@ -107,6 +108,7 @@ const redisUrl = process.env['REDIS_URL']
     ContentModule,
     SmartCampusModule,
     UploadSessionsModule,
+    ScanTasksModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -4,7 +4,10 @@ import { AlertCircleIcon, CheckCircleIcon, FileTextIcon, Loader2Icon, ShieldChec
 import { Button, Card } from '@ai-job-print/ui'
 import { uploadPhoneSessionFile } from '../../services/api/uploadSessions'
 
-const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
+const RESUME_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
+// print_doc 服务端 MIME 白名单只有 PDF/JPG/PNG(见 services/api file-validation.ts PRINTABLE),
+// doc/docx/webp 上传后会被服务端拒绝,故手机端 accept 也收窄,避免选中后才失败。
+const PRINT_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
 const MAX_BYTES = 10 * 1024 * 1024
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -20,16 +23,20 @@ export function PhoneUploadPage() {
   const hashParams = useMemo(() => new URLSearchParams(location.hash.replace(/^#/, '')), [location.hash])
   const sessionId = hashParams.get('sessionId')?.trim() ?? ''
   const uploadToken = hashParams.get('token')?.trim() ?? ''
+  // purpose 仅决定手机端文案,真正的会话用途以服务端存储为准,这里不做任何鉴权判断。
+  const isPrintDoc = hashParams.get('purpose')?.trim() === 'print_doc'
   const [state, setState] = useState<UploadState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [fileLabel, setFileLabel] = useState<string | null>(null)
 
+  const fileNoun = isPrintDoc ? '文件' : '简历文件'
+  const accept = isPrintDoc ? PRINT_DOC_ACCEPT : RESUME_ACCEPT
   const ready = Boolean(sessionId && uploadToken)
   const pageTitle = useMemo(() => {
     if (!ready) return '上传链接无效'
     if (state === 'success') return '上传完成'
-    return '上传简历文件'
-  }, [ready, state])
+    return `上传${fileNoun}`
+  }, [fileNoun, ready, state])
 
   const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -56,7 +63,7 @@ export function PhoneUploadPage() {
         file,
       })
       setState('success')
-      setMessage('手机端已上传，请回到一体机上确认使用这份简历。')
+      setMessage(`手机端已上传，请回到一体机上确认使用这份${fileNoun}。`)
     } catch (err) {
       setState('error')
       setMessage(err instanceof Error ? err.message : '上传失败，请重新扫码或稍后重试。')
@@ -77,7 +84,7 @@ export function PhoneUploadPage() {
         <Card className="mt-4 p-5">
           <div className="flex items-start gap-3 rounded-2xl bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-800">
             <ShieldCheckIcon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-            <p>手机页面只使用一次性上传令牌，不会获取一体机上的会员登录态。请只上传自己的简历文件。</p>
+            <p>手机页面只使用一次性上传令牌，不会获取一体机上的会员登录态。请只上传自己的{fileNoun}。</p>
           </div>
 
           <label
@@ -90,8 +97,8 @@ export function PhoneUploadPage() {
           >
             <input
               type="file"
-              aria-label="选择简历文件"
-              accept={ACCEPT}
+              aria-label={`选择${fileNoun}`}
+              accept={accept}
               className="hidden"
               disabled={!ready || state === 'uploading'}
               onChange={handleFile}
@@ -106,10 +113,10 @@ export function PhoneUploadPage() {
               )}
             </div>
             <p className="mt-4 text-xl font-bold">
-              {state === 'uploading' ? '正在上传...' : state === 'success' ? '已上传到一体机' : '选择简历文件'}
+              {state === 'uploading' ? '正在上传...' : state === 'success' ? '已上传到一体机' : `选择${fileNoun}`}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-              支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。
+              {isPrintDoc ? '支持 PDF / JPG / PNG，单个文件最大 10MB。' : '支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。'}
             </p>
             {fileLabel && (
               <div className="mt-4 flex items-center gap-2 rounded-2xl bg-neutral-50 px-3 py-2 text-sm font-semibold text-neutral-700">
