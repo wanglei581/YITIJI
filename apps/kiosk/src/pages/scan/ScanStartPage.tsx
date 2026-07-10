@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Button, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { CreditCardIcon, FileTextIcon, ScanIcon } from 'lucide-react'
-import { API_MODE } from '../../services/api/client'
 
 type ScanType = 'resume' | 'id' | 'document'
 
@@ -38,7 +37,6 @@ const SCAN_TYPES: ScanTypeOption[] = [
 export function ScanStartPage() {
   const navigate = useNavigate()
   const [selected, setSelected] = useState<ScanType | null>(null)
-  const scanUnavailable = API_MODE === 'http'
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -52,12 +50,10 @@ export function ScanStartPage() {
         }
       />
 
-      {/* 流程演示说明：真机扫描需一体机 + Terminal Agent */}
+      {/* 本页去掉 http 模式整体禁用；下游 Settings/Progress/Result 页的硬件门禁在后续任务中逐个解开 */}
       <div className="mt-4">
-        <ComplianceBanner tone="warning" title={scanUnavailable ? '真机扫描待接入' : '流程演示'}>
-          {scanUnavailable
-            ? '当前生产模式未接入本机扫描 Agent，扫描服务暂不开放；请联系工作人员使用已验收的扫描方案。'
-            : COMPLIANCE_COPY.KIOSK_SCAN_DEMO_NOTICE}
+        <ComplianceBanner tone="info" title="扫描说明">
+          {COMPLIANCE_COPY.KIOSK_SCAN_DEMO_NOTICE}
         </ComplianceBanner>
       </div>
 
@@ -110,10 +106,10 @@ export function ScanStartPage() {
         <Button
           size="lg"
           className="w-full"
-          disabled={selected === null || scanUnavailable}
+          disabled={selected === null}
           onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}
         >
-          {scanUnavailable ? '真机扫描待接入' : '下一步'}
+          下一步
         </Button>
       </div>
     </div>
