@@ -137,7 +137,8 @@
     "verify:admin-billing": "node -r @swc-node/register scripts/verify-admin-billing.ts",
     "verify:reconciliation": "node -r @swc-node/register scripts/verify-reconciliation.ts",
     "verify:refund-convergence": "node -r @swc-node/register scripts/verify-refund-convergence.ts",
-    "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts"
+    "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
+    "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
