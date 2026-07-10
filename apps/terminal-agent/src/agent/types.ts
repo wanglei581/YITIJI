@@ -82,6 +82,8 @@ export interface HeartbeatPayload {
   diskFreeGB: number
   agentVersion: string
   ipAddress: string
+  /** Real (non-hashed) MAC address of the primary non-internal adapter; backend normalizes format. */
+  macAddress?: string
   reportedAt: string
   localTaskDatabaseAvailable?: boolean
 }
@@ -147,6 +149,8 @@ export interface PatchStatusResponse {
 export interface RegistrationRequest {
   terminalCode: string
   deviceFingerprint: string
+  /** Real (non-hashed) MAC address of the primary non-internal adapter; backend normalizes format. */
+  macAddress?: string
   adminSecret: string
 }
 
