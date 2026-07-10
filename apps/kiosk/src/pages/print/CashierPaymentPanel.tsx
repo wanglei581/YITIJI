@@ -1,7 +1,11 @@
+import { lazy, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
 import { Button, Card } from '@ai-job-print/ui'
 import { PAY_CHANNEL_LABEL, type CashierView } from './cashierStatus'
+
+// 生产包不能含 DEV 沙箱按钮文案或模拟支付入口；Vite 会在 production 将此分支完全裁掉。
+const DevSandboxControls = import.meta.env.DEV ? lazy(() => import('./DevSandboxControls')) : null
 
 export type PaymentMethod = 'qr' | 'code'
 
@@ -160,22 +164,10 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
         </>
       )}
       </Card>
-      {isDevSandbox && !canProceed && (
-        <div className="flex gap-2 rounded-lg border border-dashed border-warning/40 bg-warning-bg/40 p-3">
-          <span className="self-center text-xs text-warning-fg">[DEV] 沙箱模拟</span>
-          <button
-            onClick={() => onSimulateSandbox('success')}
-            className="rounded-md border border-success/40 bg-success-bg px-3 py-1.5 text-xs text-success-fg"
-          >
-            模拟支付成功
-          </button>
-          <button
-            onClick={() => onSimulateSandbox('failed')}
-            className="rounded-md border border-error/40 bg-error-bg px-3 py-1.5 text-xs text-error-fg"
-          >
-            模拟支付失败
-          </button>
-        </div>
+      {isDevSandbox && !canProceed && DevSandboxControls && (
+        <Suspense fallback={null}>
+          <DevSandboxControls onSimulate={onSimulateSandbox} />
+        </Suspense>
       )}
     </>
   )
