@@ -30,6 +30,7 @@ import {
 import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { useAuth } from '../../auth/useAuth'
+import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState, type PrintMaterialSource } from './printMaterialSession'
 
 type UploadTab = 'file' | 'qr' | 'usb'
@@ -53,12 +54,14 @@ export function PrintUploadPage() {
   const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
   const pageSubtitle = isDocumentPrint ? '通用文档、求职材料或图片上传后打印' : '从我的简历或上传一份简历进入打印'
 
-  const [tab, setTab] = useState<UploadTab>('file')
+  const initialTab: UploadTab = !isResumePrint && searchParams.get('tab') === 'qr' ? 'qr' : 'file'
+  const [tab, setTab] = useState<UploadTab>(initialTab)
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  // 上传中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(uploading)
+  const [qrBusy, setQrBusy] = useState(false)
+  // 上传中或扫码会话进行中:禁止进入待机宣传屏(评审 bug #1)
+  useBusyLock(uploading || qrBusy)
 
   const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = isResumePrint
     ? [
@@ -66,7 +69,7 @@ export function PrintUploadPage() {
       ]
     : [
         { key: 'file', label: '选择文件', icon: MonitorSmartphoneIcon, note: '桌面验证' },
-        { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, disabled: true, note: '待接入' },
+        { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, note: '手机/浏览器' },
         { key: 'usb',  label: 'U盘导入',  icon: UsbIcon, disabled: true, note: '待接入 Agent' },
       ]
 
@@ -100,6 +103,25 @@ export function PrintUploadPage() {
 
   const handleSelectClick = () => {
     inputRef.current?.click()
+  }
+
+  const handleQrUploaded = (uploaded: PhoneUploadedFile) => {
+    if (!uploaded.fileUrl) {
+      setUploadError('文件签名链接生成失败，请刷新二维码重试')
+      return
+    }
+    setUploadError(null)
+    const nextFile: UploadedFile = {
+      name: uploaded.name,
+      size: uploaded.size,
+      pages: null,
+      fileId: uploaded.fileId,
+      fileUrl: uploaded.fileUrl,
+      fileMd5: uploaded.sha256 ?? '',
+      mimeType: uploaded.mimeType,
+    }
+    setFile(nextFile)
+    savePrintMaterialSession({ file: nextFile, source })
   }
 
   const handleNext = () => {
@@ -248,20 +270,39 @@ export function PrintUploadPage() {
         )}
 
         {tab === 'qr' && (
-          <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
-            <div className="flex h-48 w-48 items-center justify-center rounded-xl bg-neutral-100">
-              <QrCodeIcon className="h-24 w-24 text-neutral-300" />
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-medium text-neutral-800">请用手机扫码上传</p>
-              <p className="mt-2 text-sm text-neutral-500">
-                扫描二维码后在手机端选择文件，
-                <br />
-                上传完成后此处将自动显示文件
-              </p>
-            </div>
-            <p className="text-sm text-neutral-400">（扫码上传功能开发中）</p>
-          </Card>
+          <div className="flex flex-1 flex-col gap-3">
+            {uploadError && (
+              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
+                <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                {uploadError}
+              </div>
+            )}
+            {file && (
+              <Card className="flex items-center gap-4 p-5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
+                  <FileTextIcon className="h-6 w-6 text-primary-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                  <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 已确认，可点击下方"下一步"</p>
+                </div>
+                <button
+                  onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
+                >
+                  <XIcon className="h-4 w-4 text-neutral-400" />
+                </button>
+              </Card>
+            )}
+            <UploadSessionQrPanel
+              purpose="print_doc"
+              title="手机扫码上传"
+              description="手机或其他联网设备打开链接上传文件；一体机上确认后自动填入本次打印任务。"
+              confirmLabel="确认使用这份文件"
+              onUploaded={handleQrUploaded}
+              onBusyChange={setQrBusy}
+            />
+          </div>
         )}
 
         {tab === 'usb' && (

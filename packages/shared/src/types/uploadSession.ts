@@ -26,6 +26,8 @@ export interface UploadSessionFileView {
   mimeType: string
   sha256: string
   fileExpiresAt: string | null
+  /** 仅 print_doc 用途在 confirm 时签发：本系统 HMAC 签名内容 URL，供打印任务创建使用。 */
+  fileUrl?: string | null
 }
 
 export interface UploadSessionStatusResponse {

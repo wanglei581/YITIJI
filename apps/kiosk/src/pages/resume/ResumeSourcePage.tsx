@@ -21,7 +21,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import { kioskUploadFile } from '../../services/api'
-import { UploadSessionQrPanel, type PhoneUploadedResumeFile } from '../upload/components/UploadSessionQrPanel'
+import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
@@ -214,7 +214,7 @@ export function ResumeSourcePage() {
     }
   }
 
-  const handlePhoneUploaded = (file: PhoneUploadedResumeFile) => {
+  const handlePhoneUploaded = (file: PhoneUploadedFile) => {
     setUploadedFile(file)
     setError(null)
   }

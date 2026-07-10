@@ -119,11 +119,13 @@ export function uploadPhoneSessionFile(args: {
   )
 }
 
-export function buildPhoneUploadUrl(uploadUrl: string, sessionId: string, uploadToken: string): string {
+export function buildPhoneUploadUrl(uploadUrl: string, sessionId: string, uploadToken: string, purpose?: string): string {
   const url = new URL(uploadUrl, window.location.origin)
   const fragment = new URLSearchParams()
   fragment.set('sessionId', sessionId)
   fragment.set('token', uploadToken)
+  // purpose 仅用于手机端文案展示,不参与鉴权(会话真正的 purpose 由服务端存储决定)。
+  if (purpose) fragment.set('purpose', purpose)
   url.hash = fragment.toString()
   return url.toString()
 }

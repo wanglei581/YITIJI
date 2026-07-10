@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { CheckCircleIcon, Loader2Icon, RefreshCwIcon, SmartphoneIcon, XCircleIcon } from 'lucide-react'
-import type { UploadSessionStatusResponse } from '@ai-job-print/shared'
+import type { FilePurpose, UploadSessionStatusResponse } from '@ai-job-print/shared'
 import { Button, Card } from '@ai-job-print/ui'
 import { useAuth } from '../../../auth/useAuth'
 import { getTerminalId } from '../../../services/api/screensaver'
@@ -13,16 +13,25 @@ import {
   getUploadSessionStatus,
 } from '../../../services/api/uploadSessions'
 
-export interface PhoneUploadedResumeFile {
+export interface PhoneUploadedFile {
   name: string
   size: string
   format: string
   fileId: string
   channel: 'phone'
+  mimeType?: string
+  sha256?: string
+  /** 仅 print_doc 用途携带:本系统签名内容 URL,供打印任务创建复用。 */
+  fileUrl?: string
 }
 
 interface UploadSessionQrPanelProps {
-  onUploaded: (file: PhoneUploadedResumeFile) => void
+  /** 会话用途,决定后端存储与保留策略;默认沿用既有简历上传行为。 */
+  purpose?: FilePurpose
+  title?: string
+  description?: string
+  confirmLabel?: string
+  onUploaded: (file: PhoneUploadedFile) => void
   onBusyChange?: (busy: boolean) => void
 }
 
@@ -58,11 +67,11 @@ function apiErrorCode(error: unknown): string | null {
   return null
 }
 
-function expiredStatus(qr: QrState, current: UploadSessionStatusResponse | null): UploadSessionStatusResponse {
+function expiredStatus(qr: QrState, current: UploadSessionStatusResponse | null, purpose: FilePurpose): UploadSessionStatusResponse {
   return {
     sessionId: qr.sessionId,
     status: 'expired',
-    purpose: current?.purpose ?? 'resume_upload',
+    purpose: current?.purpose ?? purpose,
     mode: current?.mode ?? 'temporary',
     file: current?.file ?? null,
     requiresKioskConfirmation: current?.requiresKioskConfirmation ?? false,
@@ -70,7 +79,14 @@ function expiredStatus(qr: QrState, current: UploadSessionStatusResponse | null)
   }
 }
 
-export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSessionQrPanelProps) {
+export function UploadSessionQrPanel({
+  purpose = 'resume_upload',
+  title = '手机扫码上传',
+  description = '手机只负责上传文件；一体机上确认后才进入 AI 诊断或优化流程。',
+  confirmLabel = '确认使用这份简历',
+  onUploaded,
+  onBusyChange,
+}: UploadSessionQrPanelProps) {
   const { getToken, isLoggedIn } = useAuth()
   const pollFailuresRef = useRef(0)
   const [qr, setQr] = useState<QrState | null>(null)
@@ -102,7 +118,7 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
       const memberMode = Boolean(token && isLoggedIn)
       let effectiveMemberMode = memberMode
       const created = await createUploadSession({
-        purpose: 'resume_upload',
+        purpose,
         mode: memberMode ? 'member' : 'temporary',
         channel: 'phone_h5',
         terminalId: getTerminalId() || null,
@@ -110,25 +126,25 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
         if (!memberMode || apiErrorCode(err) !== 'MEMBER_AUTH_REQUIRED') throw err
         effectiveMemberMode = false
         const fallback = await createUploadSession({
-          purpose: 'resume_upload',
+          purpose,
           mode: 'temporary',
           channel: 'phone_h5',
           terminalId: getTerminalId() || null,
         })
-        setError('会员登录已过期，已切换为临时上传；本次文件仅用于当前诊断，不会自动归档到会员账号。')
+        setError('会员登录已过期，已切换为临时上传；本次文件仅用于当前操作，不会自动归档到会员账号。')
         return fallback
       })
       setQr({
         sessionId: created.sessionId,
         uploadToken: created.uploadToken,
         controlToken: created.controlToken,
-        qrUrl: buildPhoneUploadUrl(created.uploadUrl, created.sessionId, created.uploadToken),
+        qrUrl: buildPhoneUploadUrl(created.uploadUrl, created.sessionId, created.uploadToken, purpose),
         expiresAt: created.expiresAt,
       })
       setStatus({
         sessionId: created.sessionId,
         status: 'pending',
-        purpose: 'resume_upload',
+        purpose,
         mode: effectiveMemberMode ? 'member' : 'temporary',
         file: null,
         requiresKioskConfirmation: effectiveMemberMode,
@@ -139,7 +155,7 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
     } finally {
       setLoading(false)
     }
-  }, [getToken, isLoggedIn])
+  }, [getToken, isLoggedIn, purpose])
 
   useEffect(() => {
     void refresh()
@@ -159,7 +175,7 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
           pollFailuresRef.current += 1
           const code = apiErrorCode(err)
           if (code === 'UPLOAD_SESSION_NOT_FOUND' || code === 'UPLOAD_SESSION_EXPIRED' || pollFailuresRef.current >= 3) {
-            setStatus((current) => expiredStatus(qr, current))
+            setStatus((current) => expiredStatus(qr, current, purpose))
             setError(code === 'UPLOAD_SESSION_NOT_FOUND' || code === 'UPLOAD_SESSION_EXPIRED'
               ? '二维码已过期，请刷新后重新上传。'
               : '二维码状态获取失败，请刷新二维码重试。')
@@ -169,7 +185,7 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
         })
     }, 2000)
     return () => window.clearInterval(timer)
-  }, [qr, status?.status])
+  }, [qr, status?.status, purpose])
 
   const handleConfirm = async () => {
     if (!status?.file || !qr || confirming) return
@@ -184,6 +200,9 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
         format: inferFormat(file.mimeType || file.filename),
         fileId: file.fileId,
         channel: 'phone',
+        mimeType: file.mimeType,
+        sha256: file.sha256,
+        fileUrl: file.fileUrl ?? undefined,
       })
       setStatus({ ...status, status: 'confirmed', file })
     } catch (err) {
@@ -218,11 +237,11 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-bold text-neutral-900">手机扫码上传</h2>
+            <h2 className="text-xl font-bold text-neutral-900">{title}</h2>
             {status?.mode === 'member' && <span className="rounded-full bg-success-bg px-2.5 py-1 text-xs font-bold text-success-fg">会员文件确认后归档</span>}
           </div>
           <p className="mt-1 text-sm leading-relaxed text-neutral-600">
-            手机只负责上传文件；一体机上确认后才进入 AI 诊断或优化流程。
+            {description}
           </p>
         </div>
       </div>
@@ -273,7 +292,7 @@ export function UploadSessionQrPanel({ onUploaded, onBusyChange }: UploadSession
               </Button>
             )}
             <Button size="sm" disabled={!uploaded || confirming} onClick={handleConfirm}>
-              {confirming ? '确认中...' : '确认使用这份简历'}
+              {confirming ? '确认中...' : confirmLabel}
             </Button>
           </div>
         </div>

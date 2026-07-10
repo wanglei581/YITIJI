@@ -267,6 +267,8 @@ interface ServiceGroup {
   cols2?: boolean
   badge?: { icon: KioskIconName; label: string }
   tiles: ServiceTile[]
+  /** 组标题点击目标；未设置时沿用原逻辑（跳到第一个可用子项）。 */
+  titleTo?: string
 }
 
 const SERVICE_GROUPS: ServiceGroup[] = [
@@ -317,6 +319,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     subtitle: '上传或扫描，本机直接出纸',
     icon: 'printer',
     accent: 'slate',
+    titleTo: '/print-scan',
     tiles: [
       { title: '文档打印', icon: 'printer', to: '/print/upload?source=document' },
       { title: '证件复印', icon: 'files', disabled: Boolean(true) },
@@ -391,6 +394,7 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent
 function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   const navigate = useNavigate()
   const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
+  const titleTarget = group.titleTo ?? enabledFirst?.to
 
   return (
     <section className={group.span2 ? 'cat-card span2' : 'cat-card'}>
@@ -398,9 +402,9 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
         className="cat-head tap"
         role="button"
         tabIndex={0}
-        onClick={() => enabledFirst?.to && navigate(enabledFirst.to)}
+        onClick={() => titleTarget && navigate(titleTarget)}
         onKeyDown={(e) => {
-          if ((e.key === 'Enter' || e.key === ' ') && enabledFirst?.to) navigate(enabledFirst.to)
+          if ((e.key === 'Enter' || e.key === ' ') && titleTarget) navigate(titleTarget)
         }}
       >
         <span className={`cat-icon ${group.accent}`}>

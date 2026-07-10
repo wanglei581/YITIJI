@@ -6,7 +6,7 @@ export type UploadSessionStatus = 'pending' | 'uploading' | 'uploaded' | 'confir
 export type UploadSessionChannel = 'phone_h5'
 
 export class CreateUploadSessionDto {
-  @IsIn(['resume_upload'])
+  @IsIn(['resume_upload', 'print_doc'])
   purpose!: FilePurpose
 
   @IsIn(['temporary', 'member'])
