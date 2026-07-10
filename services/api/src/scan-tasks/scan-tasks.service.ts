@@ -136,7 +136,10 @@ export class ScanTasksService {
 
     const effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
     if (effectiveStatus === 'expired' && task.status === 'waiting') {
-      await this.prisma.scanTask.update({ where: { id: scanTaskId }, data: { status: 'expired' } })
+      // CAS：只在仍是 waiting 时落盘过期状态，避免与并发的 cancel()/deliverScanFile() 竞态时
+      // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
+      // 返回给调用方的 effectiveStatus 已经是按 expiresAt 纯计算得出，不依赖这次落盘是否成功。
+      await this.prisma.scanTask.updateMany({ where: { id: scanTaskId, status: 'waiting' }, data: { status: 'expired' } })
     }
 
     let file: ScanTaskFileView | null = null

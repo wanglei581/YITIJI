@@ -93,13 +93,9 @@ class FakePrisma {
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       return candidates[0] ?? null
     },
-    update: async ({ where, data }: { where: { id: string }; data: Partial<StoredScanTask> }) => {
-      const current = this.scanTasksById.get(where.id)
-      if (!current) throw new Error(`scan task not found: ${where.id}`)
-      const next = { ...current, ...data, updatedAt: new Date() }
-      this.scanTasksById.set(where.id, next)
-      return next
-    },
+    // 服务层所有写路径都必须走 CAS 的 updateMany（无条件 update 会绕开状态匹配检查），
+    // 这里刻意不提供 update() 方法——如果服务代码回退到无条件 update，测试会直接因方法不存在而报错，
+    // 而不是悄悄通过。
     updateMany: async ({
       where,
       data,
@@ -256,6 +252,32 @@ async function main(): Promise<void> {
       () => service.deliverScanFile({ terminalId: 't_1', buffer: Buffer.from('x'), filename: 'late.pdf', mimeType: 'application/pdf' }),
       ConflictException,
       'expired task must not be matched',
+    )
+  }
+
+  {
+    // getStatus() 的懒过期落盘必须 CAS（只在仍是 waiting 时才写 expired）。
+    // 模拟竞态：读到 waiting + 已过期之后、落盘之前，另一个并发请求的 cancel() 抢先把
+    // 任务改成了 cancelled——落盘时必须因为状态已不是 waiting 而放弃写入，
+    // 不能无条件覆盖回 expired，抹掉真实的取消结果。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    const task = prisma.scanTasksById.get(created.scanTaskId)!
+    prisma.scanTasksById.set(created.scanTaskId, { ...task, expiresAt: new Date(Date.now() - 1000) })
+
+    const originalUpdateMany = prisma.scanTask.updateMany.bind(prisma.scanTask)
+    prisma.scanTask.updateMany = (async (args: Parameters<typeof originalUpdateMany>[0]) => {
+      const current = prisma.scanTasksById.get(created.scanTaskId)!
+      prisma.scanTasksById.set(created.scanTaskId, { ...current, status: 'cancelled' })
+      return originalUpdateMany(args)
+    }) as typeof originalUpdateMany
+
+    await service.getStatus(created.scanTaskId, null)
+
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.status,
+      'cancelled',
+      'lazy-expire write must not clobber a concurrently cancelled task back to expired',
     )
   }
 
