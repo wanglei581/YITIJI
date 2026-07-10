@@ -470,25 +470,11 @@ async function main(): Promise<void> {
     if (attemptA2.attemptId === attemptA.attemptId) pass('同通道重复出码幂等复用未过期尝试')
     else fail('wechat attempt not reused')
 
-    const attemptAli = await payment.createPayAttempt(A.orderId, A.token, 'alipay')
-    if (
-      attemptAli.channel === 'alipay' &&
-      attemptAli.attemptId !== attemptA.attemptId &&
-      attemptAli.qrCodeContent?.startsWith('https://qr.alipay.com/')
-    ) {
-      pass('切换 alipay 出码：独立 attempt + precreate qr_code')
-    } else {
-      fail(`alipay attempt mismatch: ${JSON.stringify(attemptAli)}`)
-    }
-    if (
-      lastAlipayPrecreateBiz?.['out_trade_no'] === attemptAli.attemptId &&
-      lastAlipayPrecreateBiz?.['total_amount'] === '2.00' &&
-      JSON.parse(decodeURIComponent(String(lastAlipayPrecreateBiz?.['passback_params'] ?? '')))?.orderId === A.orderId
-    ) {
-      pass('alipay precreate 报文：out_trade_no=attemptId + total_amount 元串 + passback 回带 orderId')
-    } else {
-      fail(`alipay precreate payload mismatch: ${JSON.stringify(lastAlipayPrecreateBiz)}`)
-    }
+    await expectCode('活动微信二维码阻断切换支付宝出码（禁止同单并行可扣款）', 'PAYMENT_ATTEMPT_PENDING', () =>
+      payment.createPayAttempt(A.orderId, A.token, 'alipay'),
+    )
+    if (lastAlipayPrecreateBiz === null) pass('活动微信二维码时不向支付宝创建第二笔渠道订单')
+    else fail(`alipay precreate must not run while wechat attempt is pending: ${JSON.stringify(lastAlipayPrecreateBiz)}`)
 
     // ── (2) paid-before-claim：unpaid 绝不出纸 ────────────────────────────
     if ((await claimOnce()) === null && (await taskStatus(A.taskId)) === 'pending') {

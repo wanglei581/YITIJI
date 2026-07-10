@@ -74,6 +74,21 @@ export interface PayAttemptView {
   orderExpiresAt: string | null
 }
 
+export interface CodePayAttemptView {
+  status: 'success' | 'paying' | 'failed'
+  attemptId: string
+  failReason: string | null
+}
+
+export interface CodePaymentConvergenceResult {
+  scanned: number
+  paid: number
+  released: number
+  stillPending: number
+  skipped: number
+  failed: number
+}
+
 export interface PayStatusView {
   orderId: string
   orderNo: string
@@ -166,13 +181,27 @@ export class OnlinePaymentService {
       throw new BadRequestException('ORDER_INVALID_TRANSITION') // refunded / failed
     }
 
-    // 幂等出码：已有未过期的 pending 尝试直接复用，不重复建。
+    // 同一订单只能有一个未完成的可扣款尝试。相同通道的二维码可幂等复用；
+    // 付款码、另一通道二维码或正在创建的尝试一律阻断，不能靠 Kiosk UI 单独防双扣。
     const now = Date.now()
     const existing = await this.prisma.paymentAttempt.findFirst({
-      where: { orderId: order.id, channel: provider.channel, status: 'pending', expiresAt: { gt: new Date(now) } },
+      where: {
+        orderId: order.id,
+        OR: [
+          { status: { in: ['created', 'pending'] }, expiresAt: { gt: new Date(now) } },
+          // 付款码过期不代表渠道绝对未扣款。必须先查单收敛，不能改发二维码造成双扣。
+          { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
     })
-    if (existing) return this.toAttemptView(existing, order)
+    if (existing) {
+      if (existing.status === 'expired') throw new BadRequestException('PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED')
+      if (existing.channel === provider.channel && existing.status === 'pending' && existing.qrCodeContent) {
+        return this.toAttemptView(existing, order)
+      }
+      throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+    }
 
     // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容；
     // 渠道出码失败时行保持 created 并随 expiresAt 惰性过期，不留下可支付的半成品。
@@ -214,6 +243,148 @@ export class OnlinePaymentService {
     })
 
     return this.toAttemptView(pendingAttempt, freshOrder)
+  }
+
+  /**
+   * 付款码支付（商户扫用户付款码）。付款码只在当前请求中传给 Provider，绝不落库、审计或日志。
+   * 同一订单已有未完成支付尝试时拒绝并要求先完成/过期，避免二维码与付款码并行导致重复扣款。
+   */
+  async createCodePayAttempt(
+    orderId: string,
+    paymentSessionToken: string | undefined,
+    authCode: string,
+    channel?: string,
+  ): Promise<CodePayAttemptView> {
+    this.requirePaymentSessionHeader(paymentSessionToken)
+    if (!/^\d{18}$/.test(authCode)) throw new BadRequestException('AUTH_CODE_INVALID')
+    const provider = this.requireChannel(channel)
+    if (!provider.createCodePayment) throw new BadRequestException('CODE_PAYMENT_NOT_SUPPORTED')
+
+    let order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+    this.requirePaymentSession(order, paymentSessionToken)
+    if (order.amountCents <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
+
+    order = await this.applyLazyExpiry(order)
+    if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+    if (order.payStatus === 'closed') throw new BadRequestException('ORDER_CLOSED')
+    if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') throw new BadRequestException('ORDER_INVALID_TRANSITION')
+
+    const now = Date.now()
+    const existing = await this.prisma.paymentAttempt.findFirst({
+      where: {
+        orderId: order.id,
+        status: { in: ['created', 'pending', 'expired'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (existing) {
+      // expired 也可能是渠道迟到入账，必须先查账，绝不在同一订单叠加另一笔付款码扣款。
+      throw new BadRequestException(existing.status === 'expired' ? 'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED' : 'PAYMENT_ATTEMPT_PENDING')
+    }
+    // 订单状态既是支付生命周期，也是本次付款码的互斥锁。先 CAS 抢占 unpaid → paying，
+    // 两个请求即使都在上面的 findFirst 看见空结果，也只能有一个继续创建可扣款尝试。
+    if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+    const reserved = await this.prisma.order.updateMany({
+      where: { id: order.id, payStatus: 'unpaid' },
+      data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
+    })
+    if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+
+    let attempt: AttemptRecord
+    try {
+      attempt = await this.prisma.paymentAttempt.create({
+        data: {
+          orderId: order.id,
+          channel: provider.channel,
+          amountCents: order.amountCents,
+          status: 'created',
+          expiresAt: new Date(now + this.qrTtlSeconds * 1000),
+        },
+      })
+    } catch (error) {
+      // 本地建尝试失败时尚未调用渠道，可以安全释放本次 CAS 占位。
+      await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
+      throw error
+    }
+    const freshOrder = await this.requireOrder(order.id)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'payment.code_attempt_created',
+      targetType: 'payment_attempt',
+      targetId: attempt.id,
+      payload: { orderId: order.id, orderNo: order.orderNo, channel: provider.channel, amountCents: order.amountCents },
+    })
+
+    let result: Awaited<ReturnType<NonNullable<PaymentProvider['createCodePayment']>>>
+    try {
+      result = await provider.createCodePayment({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        attemptId: attempt.id,
+        terminalId: order.terminalId,
+        amountCents: order.amountCents,
+        authCode,
+      })
+    } catch {
+      // Provider 抛出异常时结果不可知（可能已被渠道受理），必须查单收敛，不能回退 unpaid。
+      result = { status: 'paying', channelTxnNo: null, prepayId: attempt.id, amountCents: null, failReason: '支付结果待核实，请稍候' }
+    }
+
+    if (result.status === 'success' && result.channelTxnNo && result.amountCents === order.amountCents) {
+      await this.prisma.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: { status: 'pending', prepayId: result.prepayId ?? attempt.id, failReason: null },
+      })
+      try {
+        await this.handleSuccess(provider.channel, attempt, freshOrder, { channelTxnNo: result.channelTxnNo })
+        return { status: 'success', attemptId: attempt.id, failReason: null }
+      } catch {
+        // 渠道已明确成功但本地入账未完成：保持 pending，让 pay-status/reconcile 通过 attempt 查单收敛，禁止用户重复付款。
+        return { status: 'paying', attemptId: attempt.id, failReason: '支付结果待核实，请稍候' }
+      }
+    }
+
+    const successIncomplete =
+      result.status === 'success' && (result.channelTxnNo === null || result.amountCents !== order.amountCents)
+    if (result.status === 'paying' || successIncomplete) {
+      await this.prisma.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: 'pending',
+          prepayId: result.prepayId ?? attempt.id,
+          ...(successIncomplete ? { failReason: '支付结果校验失败，请联系工作人员' } : {}),
+        },
+      })
+      if (successIncomplete) {
+        await this.audit.write({
+          actorId: null,
+          actorRole: 'system',
+          action: 'payment.code_attempt_amount_mismatch',
+          targetType: 'payment_attempt',
+          targetId: attempt.id,
+          payload: { orderId: order.id, channel: provider.channel },
+        })
+      }
+      return { status: 'paying', attemptId: attempt.id, failReason: null }
+    }
+
+    const failReason = result.failReason ?? SAFE_FAIL_TEXT
+    await this.prisma.paymentAttempt.update({
+      where: { id: attempt.id },
+      data: { status: 'failed', prepayId: result.prepayId ?? attempt.id, failReason },
+    })
+    await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'payment.code_attempt_failed',
+      targetType: 'payment_attempt',
+      targetId: attempt.id,
+      payload: { orderId: order.id, channel: provider.channel },
+    })
+    return { status: 'failed', attemptId: attempt.id, failReason }
   }
 
   /** 支付状态查询（Kiosk 轮询用），含惰性过期/关单。 */
@@ -282,62 +453,51 @@ export class OnlinePaymentService {
       }
 
       order = await this.applyLazyExpiry(order)
-      // 已出码（prepayId 非空）的最近一次尝试才有渠道单可查；expired 也查（迟到支付兜底）。
-      const attempt = await this.prisma.paymentAttempt.findFirst({
-        where: { orderId: order.id, prepayId: { not: null }, status: { in: ['pending', 'expired', 'success'] } },
-        orderBy: { createdAt: 'desc' },
-      })
-      if (attempt && attempt.status !== 'success') {
-        const provider = this.registry.get(attempt.channel)
-        if (!provider) throw new BadRequestException('PAY_CHANNEL_NOT_ENABLED')
-        if (!provider.queryPayment) throw new BadRequestException('RECONCILE_UNSUPPORTED')
-
-        const queried = await provider.queryPayment({ attemptId: attempt.id, orderId: order.id })
-        if (queried.status === 'paid') {
-          // 金额一致性双重比对（渠道账本 = 尝试快照 = 订单应付），任何不一致拒绝入账并可审计。
-          if (
-            queried.channelTxnNo &&
-            queried.amountCents !== null &&
-            queried.amountCents === attempt.amountCents &&
-            queried.amountCents === order.amountCents
-          ) {
-            const late =
-              order.payStatus === 'closed' ||
-              attempt.status === 'expired' ||
-              Boolean(order.expiresAt && order.expiresAt.getTime() < Date.now())
-            await this.handleSuccess(attempt.channel as PaymentChannel, attempt, order, {
-              channelTxnNo: queried.channelTxnNo,
-            })
-            await this.audit.write({
-              actorId: null,
-              actorRole: 'system',
-              action: 'payment.reconciled',
-              targetType: 'payment_attempt',
-              targetId: attempt.id,
-              payload: { orderId: order.id, channel: attempt.channel, channelTxnNo: queried.channelTxnNo, late },
-            })
-          } else {
-            await this.audit.write({
-              actorId: null,
-              actorRole: 'system',
-              action: 'payment.reconcile_amount_mismatch',
-              targetType: 'payment_attempt',
-              targetId: attempt.id,
-              payload: {
-                orderId: order.id,
-                channel: attempt.channel,
-                queriedAmountCents: queried.amountCents,
-                expectedAmountCents: order.amountCents,
-              },
-            })
-            throw new BadRequestException('RECONCILE_AMOUNT_MISMATCH')
-          }
-        }
-        // pending / closed / failed / unknown：不改支付状态，返回当前真实状态。
-      }
+      await this.reconcileLatestPaymentAttempt(order)
     }
 
     return this.getPayStatus(orderId, paymentSessionToken)
+  }
+
+  /**
+   * 付款码自动收敛：只处理没有屏上二维码的真实渠道尝试。即使 Kiosk 已退出或尝试过期，
+   * 仍以渠道账本为准终态化；不经 payment-session token，不能暴露为 HTTP 入口。
+   */
+  async convergeStaleCodePayments({ limit }: { limit: number }): Promise<CodePaymentConvergenceResult> {
+    const boundedLimit = Math.max(1, Math.min(limit, 100))
+    const candidates = await this.prisma.paymentAttempt.findMany({
+      where: {
+        channel: { not: 'sandbox' },
+        qrCodeContent: null,
+        prepayId: { not: null },
+        status: { in: ['pending', 'expired'] },
+      },
+      select: { orderId: true },
+      orderBy: { createdAt: 'asc' },
+      // 先按时间取有限窗口，再在进程内去重，避开 PostgreSQL DISTINCT ON 的排序约束。
+      take: boundedLimit * 5,
+    })
+    const result: CodePaymentConvergenceResult = { scanned: 0, paid: 0, released: 0, stillPending: 0, skipped: 0, failed: 0 }
+    const orderIds = [...new Set(candidates.map((candidate) => candidate.orderId))].slice(0, boundedLimit)
+    for (const orderId of orderIds) {
+      result.scanned += 1
+      try {
+        let order = await this.prisma.order.findUnique({ where: { id: orderId } })
+        if (!order || order.payStatus === 'paid') {
+          result.skipped += 1
+          continue
+        }
+        order = await this.applyLazyExpiry(order)
+        const outcome = await this.reconcileLatestPaymentAttempt(order, { rejectAmountMismatch: false })
+        if (outcome === 'paid') result.paid += 1
+        else if (outcome === 'released') result.released += 1
+        else if (outcome === 'pending') result.stillPending += 1
+        else result.skipped += 1
+      } catch {
+        result.failed += 1
+      }
+    }
+    return result
   }
 
   /**
@@ -571,6 +731,83 @@ export class OnlinePaymentService {
 
   private requirePaymentSessionHeader(paymentSessionToken: string | undefined): void {
     if (!paymentSessionToken?.trim()) throw new UnauthorizedException('PAYMENT_SESSION_REQUIRED')
+  }
+
+  /** 手动查单和付款码 cron 共用：渠道明确终态才释放，unknown/pending 永远保持互斥。 */
+  private async reconcileLatestPaymentAttempt(
+    order: OrderRecord,
+    opts: { rejectAmountMismatch?: boolean } = {},
+  ): Promise<'paid' | 'released' | 'pending' | 'skipped'> {
+    const attempt = await this.prisma.paymentAttempt.findFirst({
+      where: { orderId: order.id, prepayId: { not: null }, status: { in: ['pending', 'expired', 'success'] } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!attempt || attempt.status === 'success') return 'skipped'
+    const provider = this.registry.get(attempt.channel)
+    if (!provider) throw new BadRequestException('PAY_CHANNEL_NOT_ENABLED')
+    if (!provider.queryPayment) throw new BadRequestException('RECONCILE_UNSUPPORTED')
+
+    const queried = await provider.queryPayment({ attemptId: attempt.id, orderId: order.id })
+    if (queried.status === 'paid') {
+      if (
+        queried.channelTxnNo &&
+        queried.amountCents !== null &&
+        queried.amountCents === attempt.amountCents &&
+        queried.amountCents === order.amountCents
+      ) {
+        const late =
+          order.payStatus === 'closed' ||
+          attempt.status === 'expired' ||
+          Boolean(order.expiresAt && order.expiresAt.getTime() < Date.now())
+        await this.handleSuccess(attempt.channel as PaymentChannel, attempt, order, { channelTxnNo: queried.channelTxnNo })
+        await this.audit.write({
+          actorId: null,
+          actorRole: 'system',
+          action: 'payment.reconciled',
+          targetType: 'payment_attempt',
+          targetId: attempt.id,
+          payload: { orderId: order.id, channel: attempt.channel, channelTxnNo: queried.channelTxnNo, late },
+        })
+        return 'paid'
+      }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'payment.reconcile_amount_mismatch',
+        targetType: 'payment_attempt',
+        targetId: attempt.id,
+        payload: {
+          orderId: order.id,
+          channel: attempt.channel,
+          queriedAmountCents: queried.amountCents,
+          expectedAmountCents: order.amountCents,
+        },
+      })
+      if (opts.rejectAmountMismatch !== false) throw new BadRequestException('RECONCILE_AMOUNT_MISMATCH')
+      return 'pending'
+    }
+    if (queried.status === 'closed' || queried.status === 'failed') {
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attempt.id, status: { in: ['pending', 'expired'] } },
+        data: { status: 'failed', failReason: SAFE_FAIL_TEXT },
+      })
+      const stillPending = await this.prisma.paymentAttempt.count({
+        where: { orderId: order.id, status: 'pending', expiresAt: { gt: new Date() }, id: { not: attempt.id } },
+      })
+      if (stillPending === 0) {
+        await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
+      }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'payment.reconcile_terminal_failure',
+        targetType: 'payment_attempt',
+        targetId: attempt.id,
+        payload: { orderId: order.id, channel: attempt.channel, status: queried.status },
+      })
+      return 'released'
+    }
+    return 'pending'
   }
 
   private toAttemptView(attempt: AttemptRecord, order: OrderRecord): PayAttemptView {

@@ -21,6 +21,8 @@ import { createCipheriv, createDecipheriv, createSign, createVerify, randomBytes
 import type {
   CallbackAck,
   CallbackVerifyResult,
+  CodePaymentCreateInput,
+  CodePaymentCreateResult,
   PaymentCallbackContext,
   PaymentCallbackEvent,
   PaymentProvider,
@@ -61,6 +63,8 @@ export interface WechatPayProviderConfig {
   notifyBaseUrl: string
   /** 渠道网关 base；默认官方，verify 脚本可指向本地假网关。 */
   apiBaseUrl: string
+  /** 付款码支付线下门店商户编码；未配置时拒绝该方式，不影响屏上二维码支付。 */
+  codePayStoreOutId?: string
 }
 
 /** 回调验签 base（与微信支付平台侧构造一致；verify 脚本模拟渠道侧时共用，避免口径漂移）。 */
@@ -121,6 +125,10 @@ function headerValue(headers: PaymentCallbackContext['headers'], name: string): 
 
 function asString(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null
+}
+
+function asPositiveInteger(v: unknown): number | null {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null
 }
 
 /** 微信 trade_state → 归一化结果。中间态（NOTPAY/USERPAYING/ACCEPT）绝不误判为失败。 */
@@ -213,6 +221,75 @@ export class WechatPayProvider implements PaymentProvider {
     if (!codeUrl) throw new Error('WECHAT_PAY_CHANNEL_ERROR: CODE_URL_MISSING')
     // Native 无独立 prepay_id：prepayId 统一取 out_trade_no（= attemptId），回调回带同值。
     return { prepayId: input.attemptId, qrCodeContent: codeUrl }
+  }
+
+  async createCodePayment(input: CodePaymentCreateInput): Promise<CodePaymentCreateResult> {
+    if (!/^\d{18}$/.test(input.authCode)) {
+      return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码格式无效' }
+    }
+    if (process.env['NODE_ENV'] === 'production' && process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] !== 'true') {
+      return {
+        status: 'failed',
+        channelTxnNo: null,
+        prepayId: null,
+        amountCents: null,
+        failReason: '付款码支付自动核验未启用，请联系工作人员',
+      }
+    }
+    const storeOutId = this.cfg.codePayStoreOutId?.trim()
+    if (!storeOutId || !/^[A-Za-z0-9]{1,64}$/.test(storeOutId)) {
+      return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码支付未配置，请联系工作人员' }
+    }
+
+    let resp: Record<string, unknown>
+    try {
+      resp = await this.request('POST', '/v3/pay/transactions/codepay', {
+        appid: this.cfg.appid,
+        mchid: this.cfg.mchid,
+        description: `打印服务订单 ${input.orderNo}`,
+        out_trade_no: input.attemptId,
+        attach: JSON.stringify({ orderId: input.orderId }),
+        payer: { auth_code: input.authCode },
+        amount: { total: input.amountCents, currency: 'CNY' },
+        scene_info: {
+          ...(input.terminalId ? { device_id: input.terminalId.slice(0, 32) } : {}),
+          store_info: { out_id: storeOutId },
+        },
+      })
+    } catch (e) {
+      const msg = (e as Error).message ?? ''
+      if (msg.includes('USERPAYING')) {
+        // 用户可能已经看到密码确认页；这是未决状态，不是拒绝，不能让订单回 unpaid 后再次扣款。
+        return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '请在手机上完成支付验证' }
+      }
+      if (msg.includes('AUTHCODE') || msg.includes('AUTH_CODE')) {
+        return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码无效或已过期' }
+      }
+      if (msg.includes('NOTENOUGH') || msg.includes('BALANCE')) {
+        return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '余额不足，请换卡或重试' }
+      }
+      // 5xx、超时或网络中断的结果不可知：渠道可能已经受理，必须保留 pending 交给查单收敛，不能回退 unpaid 允许再次扣款。
+      const status = Number(msg.match(/HTTP_(\d{3})/)?.[1] ?? 0)
+      if (status === 0 || status >= 500) {
+        return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付结果待核实，请稍候' }
+      }
+      return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '支付未完成，请重试' }
+    }
+
+    const state = asString(resp['trade_state'])
+    const txnNo = asString(resp['transaction_id'])
+    const amountCents = asPositiveInteger((resp['amount'] as Record<string, unknown> | undefined)?.['total'])
+    if (state === 'SUCCESS') {
+      if (!txnNo || amountCents === null) {
+        // 渠道已表明 SUCCESS，但关键字段缺失时绝不回退为失败/未支付；保留 pending 交给查单收敛。
+        return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付结果待核实，请联系工作人员' }
+      }
+      return { status: 'success', channelTxnNo: txnNo, prepayId: input.attemptId, amountCents, failReason: null }
+    }
+    if (state === 'USERPAYING' || state === 'NOTPAY' || state === 'ACCEPT') {
+      return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: null }
+    }
+    return { status: 'failed', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付未完成，请重试' }
   }
 
   /**

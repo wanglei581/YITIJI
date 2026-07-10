@@ -16,7 +16,7 @@
 // 出码/轮询/查单必须携带打印建单返回的 x-payment-session-token。回调端点靠签名鉴权，不走登录态。
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { CreatePayAttemptDto, SandboxSimulateDto } from './dto/online-payment.dto'
+import { CreateCodePayAttemptDto, CreatePayAttemptDto, SandboxSimulateDto } from './dto/online-payment.dto'
 import { OnlinePaymentService } from './online-payment.service'
 import { PricingService } from './pricing.service'
 import { RefundService } from './refund.service'
@@ -68,6 +68,16 @@ export class PaymentController {
     @Body() dto: CreatePayAttemptDto,
   ) {
     return this.onlinePayment.createPayAttempt(id, paymentSessionToken, dto?.channel)
+  }
+
+  @Post('orders/:id/code-pay')
+  @HttpCode(HttpStatus.OK)
+  async createCodePayAttempt(
+    @Param('id') id: string,
+    @Headers('x-payment-session-token') paymentSessionToken: string | undefined,
+    @Body() dto: CreateCodePayAttemptDto,
+  ) {
+    return this.onlinePayment.createCodePayAttempt(id, paymentSessionToken, dto.authCode, dto.channel)
   }
 
   @Get('orders/:id/pay-status')

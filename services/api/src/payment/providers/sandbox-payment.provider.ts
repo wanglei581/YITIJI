@@ -16,6 +16,8 @@ import type {
   PaymentCallbackContext,
   PaymentCallbackEvent,
   PaymentProvider,
+  CodePaymentCreateInput,
+  CodePaymentCreateResult,
   QrPaymentCreateInput,
   QrPaymentCreateResult,
   RefundExecuteInput,
@@ -85,6 +87,19 @@ export class SandboxPaymentProvider implements PaymentProvider {
       `&order=${encodeURIComponent(input.orderNo)}` +
       `&amount=${input.amountCents}`
     return { prepayId, qrCodeContent }
+  }
+
+  async createCodePayment(input: CodePaymentCreateInput): Promise<CodePaymentCreateResult> {
+    if (!/^\d{18}$/.test(input.authCode)) {
+      return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码格式无效' }
+    }
+    return {
+      status: 'success',
+      channelTxnNo: `sbx_code_${randomBytes(8).toString('hex')}`,
+      prepayId: input.attemptId,
+      amountCents: input.amountCents,
+      failReason: null,
+    }
   }
 
   /**

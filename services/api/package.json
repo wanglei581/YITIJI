@@ -40,6 +40,7 @@
     "verify:order": "node -r @swc-node/register scripts/verify-order.ts",
     "verify:pricing": "node -r @swc-node/register scripts/verify-pricing.ts",
     "verify:payment-flow": "node -r @swc-node/register scripts/verify-payment-flow.ts",
+    "verify:payment-codepay": "node -r @swc-node/register scripts/verify-payment-codepay.ts",
     "verify:kiosk-cashier-ui": "node -r @swc-node/register scripts/verify-kiosk-cashier-ui.ts",
     "verify:refund-idempotent": "node -r @swc-node/register scripts/verify-refund-idempotent.ts",
     "verify:redemption-audit": "node -r @swc-node/register scripts/verify-redemption-audit.ts",
