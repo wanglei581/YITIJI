@@ -369,9 +369,12 @@ export class PrintJobsService {
       })
     }
     // 失败判定：终态 failed，或已落库 errorCode/errorMessage（Agent 回传过失败信息）。
+    // cancelled 是受控关闭，不得因其运维 errorCode 伪装成设备打印失败。
     // DB 里的原始 task.errorCode / task.errorMessage 保持不动，供后台/排障视图使用；
     // 用户端只回**安全用户文案**，绝不把 Agent 原始 errorMessage 透出。
-    const hasFailure = task.status === 'failed' || Boolean(task.errorCode) || Boolean(task.errorMessage)
+    const hasFailure = task.status !== 'cancelled' && (
+      task.status === 'failed' || Boolean(task.errorCode) || Boolean(task.errorMessage)
+    )
     const safeReason = hasFailure ? failureReasonForUser(task.errorCode) : undefined
     return {
       taskId:       task.id,

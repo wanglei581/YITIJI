@@ -49,6 +49,8 @@
     "verify:print-rollout-config": "node -r @swc-node/register scripts/verify-print-rollout-config.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
+    "verify:legacy-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-legacy-pending-print-task-disposition.ts",
+    "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
     "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
     "verify:print-scan-preflight": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts",
