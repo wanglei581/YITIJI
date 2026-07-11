@@ -276,8 +276,10 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。
 - [ ] QR 登录本地桥接端口与 Kiosk 构建变量一致：Agent `localApiPort` / `localApiAllowedOrigins` 与 Kiosk `VITE_TERMINAL_AGENT_LOCAL_URL`、实际 Kiosk Origin 完全匹配。
 - [ ] 如 Kiosk 使用 HTTPS 页面，已实测浏览器不会因 mixed content / Private Network Access 阻断 `http://127.0.0.1:<localApiPort>`；若被阻断，扫码登录不得宣称可用，需改为受信本地桥接方案或现场允许的本地访问策略。
-- [ ] localAuthToken/actionToken 校验有效。
-- [ ] Token 过期、nonce 重放、action 不匹配时拒绝。
+- [ ] U 盘导入本地桥接令牌一致：Agent `agent-config.json` 的 `localApiBridgeToken` 与 Kiosk 构建变量 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 完全一致（安装时一起生成/下发，不走网络协商）；未配置时 `/local/usb/*` 全部路由 fail-closed 403，Kiosk `usb` tab 应保持禁用并显示"本机未配置"，不得强行放行。
+- [ ] `/local/usb/*` 令牌校验有效：错误/缺失令牌返回 403（`LOCAL_USB_BRIDGE_TOKEN_INVALID`），Origin 不在白名单返回 403（`LOCAL_USB_ORIGIN_FORBIDDEN`）。
+- [ ] U 盘 `safeId` 一次性消费有效：同一 `safeId` 二次调用 `/local/usb/upload` 返回 410（`LOCAL_USB_FILE_EXPIRED`），刷新文件列表后旧 `safeId` 全部失效。
+- [ ] 真实插入 U 盘后 `detectRemovableDrive()` 能正确识别盘符与卷标（win32 CIM/PowerShell 路径，未在开发环境验证过，属本清单新增待验收项）。
 - [ ] 页面展示设备状态与 Agent 上报一致。
 
 ### 5.6 真机打印验收

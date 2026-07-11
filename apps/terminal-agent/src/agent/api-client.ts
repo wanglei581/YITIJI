@@ -19,6 +19,15 @@ import https from 'https'
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios'
 import { warn } from '../logger'
 
+/**
+ * Per-request opt-out of the automatic retry interceptor.
+ * Required for non-replayable request bodies (e.g. form-data streams — the
+ * stream is consumed on first send, a retry would submit an empty body) and
+ * for non-idempotent uploads where a lost response must surface as an honest
+ * error instead of a silent duplicate submission.
+ */
+export const NO_RETRY_CONFIG = { _noRetry: true } as const
+
 export function createDirectHttpAgents(): Pick<AxiosRequestConfig, 'httpAgent' | 'httpsAgent'> {
   return {
     httpAgent: new http.Agent({ keepAlive: false }),
@@ -64,8 +73,9 @@ export function createApiClient(
   instance.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
-      const config = error.config as (typeof error.config & { _retryCount?: number }) | undefined
+      const config = error.config as (typeof error.config & { _retryCount?: number; _noRetry?: boolean }) | undefined
       if (!config) return Promise.reject(error)
+      if (config._noRetry) return Promise.reject(error)
 
       const status = error.response?.status
       const isRetryable = !error.response || (typeof status === 'number' && status >= 500)
