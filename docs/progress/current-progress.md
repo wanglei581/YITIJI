@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-07-10
+> 最后更新：2026-07-11
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -15,6 +15,14 @@
 - `apps/`、`services/`、`packages/` 属运行时代码，规范化任务默认不触碰。
 - 删除、ignore、大文件外部归档、主工作区物料迁入前必须先确认并双模型审查。
 - 岗位 / 招聘会 / 政策继续只做第三方或官方来源信息入口；项目不是招聘平台。
+
+2026-07-11 补充：完成**AI 文件体检真实化（代码 + 本地 verify + 真实全栈联调级，分支 `feature/material-check-real`，未合并）**——打印扫描路线图轨道 C 拆分后的第一部分（轨道 C 原计划含"AI 文件体检"+"材料包"，评估后两者是独立子系统，本轮只做前者；材料包留独立立项）。背景：Kiosk `/print/material-check` 页面的 `pii_scan`（隐私片段检查）此前只是模拟——只查文件名正则，从不读文件真实内容，页面已诚实标注"流程演示"。
+
+**交付**：① `pii_scan` 改真实内容扫描——PDF 优先走 `unpdf` 文字层（born-digital，零 OCR 成本），抽不到才逐页渲染 + 复用简历诊断已有的 `OcrService`（百度 OCR）；新增 DOCX 支持（复用 `mammoth`，与简历提取同一模式）；结果四态诚实区分：`real`（真实扫描完成）/ `skipped_non_document`（按 `contentCategory=photo` 提示跳过，非文档类不需要）/ `degraded`（该扫但 OCR 不可用/失败）/ `unsupported_format`（如旧版 .doc，完全没有提取路径）——`degraded`/`unsupported_format` 绝不冒充"扫描完成 0 命中"。设计阶段发现一个真实信号断链：`PrintScanHomePage`"照片打印"卡片想传 `category:'photo'`，但 `PrintUploadPage` 从未读取，导致"按用途跳过照片扫描"这个决定原本在代码里根本落不了地，本轮一并修复（新增 `contentCategory` 会话字段，高风险 purpose 如 `resume_upload`/`id_scan` 永远真实扫描，不接受跳过提示）。② 新增空白页检测（PDF 逐页低分辨率渲染 + 像素占比判定，图片自身直接判定），提示不阻断 `canPrint`。③ PII 查重 bug 修复：查重键从"掩码后 snippet"改为"原始匹配值"（不同真实值掩码后可能撞车，静默丢真实命中）。④ `materials.service.ts` 一度涨到 924 行超过 800 行治理红线，拆出 `pii-scan.util.ts`（PII 扫描纯函数）。
+
+**Critical 安全事件与处置**（本轮最重要的一段过程）：全分支复审 + 写测试阶段发现 `detectBlankPages` 对任意用户上传的原始图片字节直接调用 `@napi-rs/canvas` 的原生 `loadImage()`，畸形/截断图片会**直接 SIGSEGV 整个 Node 进程**（不是可捕获的 JS 异常，`try/catch` 完全防不住）——这是一个匿名可达（含手机扫码上传）、任何一体机用户都能触发的公开可利用拒绝服务漏洞。第一版"文件完整性预检"启发式（校验 PNG/JPEG 尾部标记）被独立复审证明可被"追加几个已知字节绕过"（100% 复现，PNG/JPEG 均可绕过）；`worker_threads` 方案也被证伪——它和主线程共享同一操作系统进程，原生崩溃照样打挂整个服务，真正隔离需要 `child_process`，超出本轮合理范围。最终处置：**彻底移除原始上传图片这条空白页检测路径**（改为无条件返回"无空白页"，不再尝试用启发式挡任意攻击者可控字节），只保留 PDF 渲染分支（内容来自本服务自己的 `canvas.toBuffer()`，非攻击者可控字节，结构上不可绕过）。独立复审用与绕过第一版完全相同手法的恶意 buffer，通过真实 `inspection` 流程 + `loadImage` 调用次数插桩验证，确认二版修复后 `loadImage` 在原始图片路径上**结构性不可达**（不是"更难触发"，是"根本没有代码路径能到达"），漏洞确认收口。**顺带发现一个不在本轮处理范围内的系统性问题**：`FileObject.mimeType` 全程由客户端声明，从未做真实字节魔数校验，已记为独立跟进项。
+
+**验证**：`verify:materials-processing` 真实 Prisma+StorageService（非 FakePrisma）49 项全 PASS，含四态覆盖、DOCX 真实解析、SIGSEGV 复现向量的回归测试；关键修复均做过 mutation-testing（故意改坏代码确认测试真的会红）；本地 `npx prisma migrate deploy`（沙箱环境 `db push` 的 schema engine 会报错，`migrate deploy` 不受影响，此前"无法起真实本地库"的结论需要修正）真正建库后，另起真实 API 服务端口 3010 + 真实 Kiosk `VITE_API_MODE=http` 做了一次完整全栈联调（非仅 mock 模式）：真实 PDF（内嵌手机号/邮箱）→ 真实 `kiosk-upload` → 真实 `pii_scan` → 真实命中 2 条、正确掩码落库；`contentCategory=photo` 真实触发 `skipped_non_document`；真实 `inspection` 对同一份 PDF 正确识别页数，且空白页检测对"页面绝大部分是空白、左上角一行小字"的真实渲染内容给出了正确的 `BLANK_PAGE_SUSPECTED` 提示——不是针对合成测试图的断言，是对真实 pdfjs 渲染结果的真实判定。四包 typecheck/lint 全绿，13 个 commit，`git diff --check` 无尾随空白。**未验证/未完成**：材料包/多文件选择完全未做（独立子问题）；`normalize_a4`/`pii_redact` 仍是评估态 stub，未产出真实文件；`materials.service.ts` 目前 821 行，仍在 800 行治理红线之上，复审建议下次触碰此文件前先按 `pii-scan.util.ts` 的既有拆分模式再拆一次；`FileObject.mimeType` 客户端可声明、无魔数校验的系统性缺口未处理；未合并 `main`。
 
 2026-07-10 补充：**文档滞后修正**——核实 git 历史确认 `feature/payment-w-c`（含 part1/2a/2b/2b-2 全部内容）已随 **PR #174**（merge commit `3b1577b2`）合入 `main`；下方 2026-07-06 W-C 条目中「未合 main」表述已过时，见该条末尾更新括注。另确认 **微信退款结果回调通知接口**（`POST /payment/wechat/refund-notify`，#175，merge commit `b8263be2`）已合入 `main`：新增无 JWT 公网端点供微信商户平台「退款结果回调通知 URL」直接配置，`WechatPayProvider.verifyAndDecryptNotify()`（header 校验→时间窗→serial 命中→验签先于解析→AES-256-GCM 解密，支付/退款通知共用同一验签路径）+ `verifyRefundNotify()`（mchid 归属校验、`refund_status` 三态归一）+ `RefundService.processWechatRefundNotify()`（nonce 防重放、`out_refund_no` 匹配本系统 `Refund.refundNo`、金额交叉核对、幂等状态机、已 success 绝不被 CLOSED 回退、全程不触碰 `PrintTask.status`）；`verify:wechat-refund-notify`（14 checks）已进双 CI。本项仍未接真实商户凭证 / 域名 HTTPS，回调 URL 尚未在微信商户平台实际配置生效。
 
