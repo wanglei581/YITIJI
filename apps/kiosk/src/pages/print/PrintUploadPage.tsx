@@ -13,7 +13,7 @@
 // ============================================================
 
 import { useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
@@ -45,10 +45,14 @@ function formatBytes(bytes: number): string {
 
 export function PrintUploadPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const source: PrintMaterialSource = searchParams.get('source') === 'resume' ? 'resume' : 'document'
+  // PrintScanHomePage 的"照片打印"卡片通过 router state 传 category: 'photo'；
+  // 用于控制真实 PII 扫描是否可以按内容类别跳过（见 materials.service.ts 的 contentCategory 网关）。
+  const contentCategory = (location.state as { category?: 'photo' } | null)?.category === 'photo' ? 'photo' : undefined
   const isResumePrint = source === 'resume'
   const isDocumentPrint = source === 'document'
   const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
@@ -93,7 +97,7 @@ export function PrintUploadPage() {
         mimeType: result.mimeType,
       }
       setFile(nextFile)
-      savePrintMaterialSession({ file: nextFile, source })
+      savePrintMaterialSession({ file: nextFile, source, contentCategory })
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
@@ -121,11 +125,12 @@ export function PrintUploadPage() {
       mimeType: uploaded.mimeType,
     }
     setFile(nextFile)
-    savePrintMaterialSession({ file: nextFile, source })
+    savePrintMaterialSession({ file: nextFile, source, contentCategory })
   }
 
   const handleNext = () => {
     if (!file) return
+    savePrintMaterialSession({ file, source, contentCategory })
     navigate('/print/material-check', { state: { file, source } })
   }
 

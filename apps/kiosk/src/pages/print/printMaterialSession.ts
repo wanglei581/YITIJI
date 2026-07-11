@@ -51,9 +51,13 @@ export interface MaterialCheckSummary {
   mode: 'checked' | 'demo'
 }
 
+export type PrintMaterialContentCategory = 'photo'
+
 export interface PrintMaterialSession {
   file: PrintFileState
   source?: PrintMaterialSource
+  /** 来自入口页面传递的内容类别提示（目前只有 'photo'），用于控制真实 PII 扫描是否可跳过。 */
+  contentCategory?: PrintMaterialContentCategory
   inspectionTask?: StoredMaterialTask
   normalizeTask?: StoredMaterialTask
   piiTask?: StoredMaterialTask
@@ -155,6 +159,7 @@ function sanitizeSession(next: Omit<PrintMaterialSession, 'updatedAt'>): Omit<Pr
   return {
     file: sanitizeFile(next.file),
     source: next.source,
+    contentCategory: next.contentCategory,
     inspectionTask: toStoredMaterialTask(next.inspectionTask),
     normalizeTask: toStoredMaterialTask(next.normalizeTask),
     piiTask: toStoredMaterialTask(next.piiTask),
