@@ -3,6 +3,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
 import type { FilePurpose } from '../files/file.types'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
+import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
@@ -80,6 +81,8 @@ type InspectionSummary = {
   warnings: string[]
   messages: InspectionMessage[]
   imageQuality?: ImageQualitySummary
+  /** 疑似空白页的页码（1-based）；提示性质，不影响 canPrint。 */
+  blankPageNumbers?: number[]
 }
 
 type NormalizeA4Summary = InspectionSummary & {
@@ -325,14 +328,24 @@ export class MaterialsService {
       const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
       const pageCount = countPdfPages(buffer)
       const warnings = pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : []
+      const messages: InspectionMessage[] = pageCount === null
+        ? [{ code: 'PDF_PAGE_COUNT_NOT_DETECTED', severity: 'warning', text: '暂未识别 PDF 页数，以实际打印为准' }]
+        : [{ code: 'PDF_PAGE_COUNT_DETECTED', severity: 'info', text: 'PDF 页数已完成基础识别' }]
+      const blankPageNumbers = await this.detectBlankPages(buffer, sourceFile.mimeType)
+      if (blankPageNumbers.length > 0) {
+        messages.push({
+          code: 'BLANK_PAGE_SUSPECTED',
+          severity: 'warning',
+          text: `第 ${blankPageNumbers.join('、')} 页可能为空白页，如非有意留白请检查原文件`,
+        })
+      }
       return {
         pageCount,
         pageCountSource: 'pdf_lightweight_scan',
         canPrint: true,
         warnings,
-        messages: pageCount === null
-          ? [{ code: 'PDF_PAGE_COUNT_NOT_DETECTED', severity: 'warning', text: '暂未识别 PDF 页数，以实际打印为准' }]
-          : [{ code: 'PDF_PAGE_COUNT_DETECTED', severity: 'info', text: 'PDF 页数已完成基础识别' }],
+        messages,
+        blankPageNumbers: blankPageNumbers.length > 0 ? blankPageNumbers : undefined,
       }
     } catch {
       return {
@@ -374,26 +387,32 @@ export class MaterialsService {
         quality: estimatedDpiForA4 >= 150 ? 'ok' : 'low',
       }
       const lowResolution = imageQuality.quality === 'low'
+      const messages: InspectionMessage[] = [
+        baseMessage,
+        lowResolution
+          ? {
+              code: 'IMAGE_RESOLUTION_LOW_FOR_A4',
+              severity: 'warning',
+              text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI，清晰度可能不足`,
+            }
+          : {
+              code: 'IMAGE_RESOLUTION_OK_FOR_A4',
+              severity: 'info',
+              text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI`,
+            },
+      ]
+      const blankPageNumbers = await this.detectBlankPages(buffer, sourceFile.mimeType)
+      if (blankPageNumbers.length > 0) {
+        messages.push({ code: 'BLANK_PAGE_SUSPECTED', severity: 'warning', text: '该图片可能为空白/纯色图，如非有意留白请检查原文件' })
+      }
       return {
         pageCount: 1,
         pageCountSource: 'image_single_page',
         canPrint: true,
         imageQuality,
         warnings: lowResolution ? ['IMAGE_RESOLUTION_LOW_FOR_A4'] : [],
-        messages: [
-          baseMessage,
-          lowResolution
-            ? {
-                code: 'IMAGE_RESOLUTION_LOW_FOR_A4',
-                severity: 'warning',
-                text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI，清晰度可能不足`,
-              }
-            : {
-                code: 'IMAGE_RESOLUTION_OK_FOR_A4',
-                severity: 'info',
-                text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI`,
-              },
-        ],
+        messages,
+        blankPageNumbers: blankPageNumbers.length > 0 ? blankPageNumbers : undefined,
       }
     } catch {
       return {
@@ -407,6 +426,64 @@ export class MaterialsService {
         ],
       }
     }
+  }
+
+  /**
+   * 检测疑似空白页：PDF 逐页低分辨率渲染判定，图片直接判定自身。
+   * 提示性质，不阻断打印；与 pii_scan 各自独立渲染，不跨任务共享结果（见设计文档 §5）。
+   */
+  private async detectBlankPages(buffer: Buffer, mimeType: string): Promise<number[]> {
+    const BLANK_WHITE_RGB_THRESHOLD = 250
+    const BLANK_PIXEL_RATIO_THRESHOLD = 0.99
+    const BLANK_RENDER_SCALE = 0.3
+
+    const isPageBlank = async (pngBuffer: Buffer): Promise<boolean> => {
+      const { loadImage, createCanvas } = await import('@napi-rs/canvas')
+      const image = await loadImage(pngBuffer)
+      const canvas = createCanvas(image.width, image.height)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(image, 0, 0)
+      const { data } = ctx.getImageData(0, 0, image.width, image.height)
+      let whitePixels = 0
+      const totalPixels = data.length / 4
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]!
+        const g = data[i + 1]!
+        const b = data[i + 2]!
+        if (r > BLANK_WHITE_RGB_THRESHOLD && g > BLANK_WHITE_RGB_THRESHOLD && b > BLANK_WHITE_RGB_THRESHOLD) {
+          whitePixels += 1
+        }
+      }
+      return totalPixels > 0 && whitePixels / totalPixels >= BLANK_PIXEL_RATIO_THRESHOLD
+    }
+
+    if (mimeType === 'application/pdf') {
+      try {
+        const rendered = await openPdfForRender(buffer)
+        try {
+          const blankPages: number[] = []
+          for (let pageNo = 1; pageNo <= rendered.totalPages; pageNo += 1) {
+            const img = await rendered.renderPage(pageNo, BLANK_RENDER_SCALE)
+            if (await isPageBlank(img)) blankPages.push(pageNo)
+          }
+          return blankPages
+        } finally {
+          await rendered.destroy().catch(() => undefined)
+        }
+      } catch {
+        return []
+      }
+    }
+
+    if (isSinglePageImage(mimeType)) {
+      try {
+        return (await isPageBlank(buffer)) ? [1] : []
+      } catch {
+        return []
+      }
+    }
+
+    return []
   }
 
   private async evaluateNormalizeA4(sourceFile: SourceFileRecord): Promise<NormalizeA4Summary> {
