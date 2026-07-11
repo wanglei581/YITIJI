@@ -591,39 +591,45 @@ async function main() {
       fail(`Unknown-page PDF normalize_a4 expected canNormalize=false, got ${JSON.stringify(unknownPdfNormalizeChecks)}`)
     }
 
-    // ── pii_scan 四态覆盖：real / skipped_non_document / degraded / unsupported_format ──────
+    // ── pii_scan 结果态覆盖：real / partial / degraded / unsupported_format ──────────────────
+    //    'skipped_non_document' 这个 mode 已随 CR-2 修复被彻底移除写入路径（不存在任何
+    //    createTask() 调用能再产出它）；本脚本不再构造该场景，只有前端仍保留读取兼容分支
+    //    （见 apps/kiosk/src/pages/print/PrintMaterialCheckPage.tsx 的 piiScanModeCopy 注释），
+    //    服务于修复上线前创建、TASK_TTL_HOURS 内仍可能被读到的存量任务。
 
-    // A. 非高风险用途 + contentCategory=photo → 直接跳过，OCR 绝不应被调用（复用 imageFileId，
-    //    走共享 strict-no-ocr 的 materials 实例；若误触发 OCR，strictNoOcr 会立即 fail() 退出）。
-    const skippedTask = await materials.createTask(
+    // A. CR-2 回归：contentCategory=photo 曾经是"客户端声称这是照片就能跳过真实扫描"的口子，
+    //    现已彻底删除。无论客户端怎么声称 contentCategory，单页图片都必须真实走 OCR 抽取——
+    //    这里验证 OCR 确实被调用、且结果是诚实的 mode=real（而不是被跳过）。
+    const contentCategoryOcr = makeFakeOcr(async () => ({ ok: true, text: textSample, confidence: 'high' as const }))
+    const materialsContentCategoryOcr = new MaterialsService(prisma, storage, contentCategoryOcr.ocr)
+    const photoClaimTask = await materialsContentCategoryOcr.createTask(
       { kind: 'pii_scan', sourceFileId: imageFileId, params: { contentCategory: 'photo' } },
       { kind: 'anonymous' },
     )
-    if (skippedTask.result?.['mode'] === 'skipped_non_document' && skippedTask.result?.['findingCount'] === 0) {
-      pass('A. Non-high-risk purpose + contentCategory=photo → mode=skipped_non_document, OCR never invoked')
+    if (photoClaimTask.result?.['mode'] === 'real' && contentCategoryOcr.calls() >= 1) {
+      pass('A. contentCategory=photo no longer skips real scan — OCR is invoked and mode=real regardless of the client-supplied claim')
     } else {
-      fail(`A. Expected mode=skipped_non_document/findingCount=0, got ${JSON.stringify(skippedTask.result)}`)
+      fail(`A. Expected contentCategory=photo to still trigger a real scan (mode=real, OCR called), got ${JSON.stringify(photoClaimTask.result)} (ocr calls=${contentCategoryOcr.calls()})`)
     }
 
-    // B. 高风险用途即使传 contentCategory=photo 也不能跳过（覆盖 HIGH_RISK_PII_PURPOSES 的
-    //    永久回归测试；此前只在 Task 2 code review 时人工验证过一次，这里落成可执行断言）。
+    // B. 现在被 A 覆盖：既然所有 purpose（含高风险 resume_upload 等）都统一走真实扫描、
+    //    不再有任何基于 contentCategory 的跳过分支，"高风险用途不能被跳过"不再是一个需要
+    //    单独验证的特例，而是 A 断言的自然推论。保留这条作为额外的确认性数据点（换一个
+    //    高风险 purpose + 已落盘的真实文件），不代表还存在需要单独覆盖的分支逻辑。
     const highRiskPhotoTask = await materialsRealOcr.createTask(
       { kind: 'pii_scan', sourceFileId: ownedFileId, params: { contentCategory: 'photo' } },
       { kind: 'member', endUserId: ownerId },
     )
     if (highRiskPhotoTask.result?.['mode'] === 'real') {
-      pass('B. High-risk purpose overrides contentCategory=photo skip — real scan still attempted')
+      pass('B. High-risk purpose + contentCategory=photo → still a real scan (subsumed by A, kept as a confirming data point)')
     } else {
-      fail(`B. Expected high-risk purpose to bypass the photo skip, got ${JSON.stringify(highRiskPhotoTask.result)}`)
+      fail(`B. Expected high-risk purpose to still get a real scan, got ${JSON.stringify(highRiskPhotoTask.result)}`)
     }
 
-    // B2. Critical 回归：print_doc 用途 + PDF 文件（非图片）+ contentCategory=photo 冒充 →
-    //     不能被当作照片跳过。这是安全审查发现的具体绕过场景：客户端只要在"照片打印"
-    //     入口选一个 PDF 就能让 contentCategory=photo 生效，从而让明显不是图片的文件跳过
-    //     真实 PII 扫描。修复后 canSkipAsPhoto 额外要求 isSinglePageImage(mimeType)，
-    //     PDF 必然落回真实抽取路径（mode 可能是 real/degraded，取决于抽取结果，但绝不可能
-    //     是 skipped_non_document）。复用已有 pdfFileId（purpose=print_doc, mimeType=
-    //     application/pdf），走 materialsRealOcr 以覆盖该文件走 OCR 兜底渲染路径的情况。
+    // B2. print_doc 用途 + PDF 文件（非图片）+ contentCategory=photo 冒充 → 依然不会产出
+    //     skipped_non_document（该 mode 值已不存在任何写入路径，不再只是针对 PDF 的一个
+    //     特例收窄）。复用已有 pdfFileId（purpose=print_doc, mimeType=application/pdf），
+    //     走 materialsRealOcr 覆盖该文件走 OCR 兜底渲染路径的情况。
     const pdfPhotoBypassTask = await materialsRealOcr.createTask(
       { kind: 'pii_scan', sourceFileId: pdfFileId, params: { contentCategory: 'photo' } },
       { kind: 'anonymous' },
@@ -631,7 +637,7 @@ async function main() {
     if (pdfPhotoBypassTask.result?.['mode'] !== 'skipped_non_document') {
       pass(`B2. print_doc + PDF + contentCategory=photo does NOT skip real scan (mode=${pdfPhotoBypassTask.result?.['mode']})`)
     } else {
-      fail(`B2. Expected PDF-through-photo-entry bypass to be blocked, got mode=skipped_non_document (${JSON.stringify(pdfPhotoBypassTask.result)})`)
+      fail(`B2. Expected the skip path to be fully removed, got mode=skipped_non_document (${JSON.stringify(pdfPhotoBypassTask.result)})`)
     }
 
     // C. OCR 失败 → mode=degraded，绝不伪造 0 命中以外的任何结果，不落库任何 finding。
@@ -948,10 +954,16 @@ async function main() {
       } else {
         fail(`J. Expected unpdf.extractText to be skipped for a >50-declared-page PDF, but it was called ${unpdfExtractTextCalls} time(s)`)
       }
-      if (bigPageTask.result?.['mode'] === 'real' && bigPageOcr.calls() >= 1 && bigPageOcr.calls() <= 5) {
-        pass('J. 跳过 extractText 后正确落入已有页数上限的 OCR 渲染兜底路径并干净完成（未挂起/未崩溃，OCR 调用数受 PII_SCAN_MAX_OCR_PAGES=5 约束）')
+      if (
+        bigPageTask.result?.['mode'] === 'partial' &&
+        bigPageOcr.calls() >= 1 &&
+        bigPageOcr.calls() <= 5 &&
+        bigPageTask.result?.['scannedPages'] === 5 &&
+        bigPageTask.result?.['totalPages'] === 60
+      ) {
+        pass('J. 跳过 extractText 后落入已有页数上限的 OCR 渲染兜底路径并干净完成（未挂起/未崩溃，OCR 调用数受 PII_SCAN_MAX_OCR_PAGES=5 约束），且诚实报告 mode=partial（scannedPages=5/totalPages=60），不冒充完整扫描')
       } else {
-        fail(`J. Expected bounded OCR fallback with mode=real, got ${JSON.stringify(bigPageTask.result)} (ocr calls=${bigPageOcr.calls()})`)
+        fail(`J. Expected bounded OCR fallback with mode=partial (scannedPages=5, totalPages=60), got ${JSON.stringify(bigPageTask.result)} (ocr calls=${bigPageOcr.calls()})`)
       }
     } finally {
       unpdfSpyModule.extractText = originalUnpdfExtractText

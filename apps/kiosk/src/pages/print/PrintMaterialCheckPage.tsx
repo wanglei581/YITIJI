@@ -222,9 +222,12 @@ function isDemoTask(task: DocumentProcessTaskView | null): boolean {
 
 /**
  * pii_scan 完成后的诚实结果态文案。
- * 后端四态（见 materials.service.ts / pii-scan.util.ts）：
- * - 'real'：真实扫描完成，命中结果走 findings 列表展示，这里不需要额外文案。
- * - 'skipped_non_document'：按 contentCategory=photo 提示跳过（非文档类文件不需要隐私扫描）。
+ * 后端 mode 取值（见 materials.service.ts / pii-scan.util.ts）：
+ * - 'real'：真实扫描完成且覆盖了文档全部页面，命中结果走 findings 列表展示，这里不需要额外文案。
+ * - 'partial'：扫描版 PDF 页数超过 OCR 页数上限，只扫描了前 N 页（共 M 页），即使 0 命中也
+ *   不能当作"已确认无风险"，必须诚实提示人工确认剩余页面。
+ * - 'skipped_non_document'：历史遗留态，contentCategory=photo 跳过口子已在服务端移除；仅为兼容
+ *   修复上线前、TASK_TTL_HOURS 窗口内可能仍被读取到的存量任务而保留此文案分支。
  * - 'degraded'：本该真实扫描但 OCR 不可用/失败，诚实告知需人工确认，不是"演示"。
  * - 'unsupported_format'：该文件格式完全没有内容提取路径（如旧版 .doc），诚实告知，不是"演示"。
  */
@@ -233,6 +236,16 @@ function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string;
   if (mode === 'skipped_non_document') return { label: '该文件类型无需隐私扫描', tone: 'neutral' }
   if (mode === 'degraded') return { label: '内容扫描暂不可用，请人工确认文件不含敏感信息', tone: 'warning' }
   if (mode === 'unsupported_format') return { label: '该文件格式暂不支持内容扫描，请人工确认文件不含敏感信息', tone: 'warning' }
+  if (mode === 'partial') {
+    const scannedPages = task?.result?.['scannedPages']
+    const totalPages = task?.result?.['totalPages']
+    const scannedLabel = typeof scannedPages === 'number' ? scannedPages : '部分'
+    const totalLabel = typeof totalPages === 'number' ? totalPages : '全部'
+    return {
+      label: `本次仅检查了前 ${scannedLabel} 页（共 ${totalLabel} 页），请人工确认其余页面不含敏感信息`,
+      tone: 'warning',
+    }
+  }
   if (mode === 'real') return null
   return null
 }

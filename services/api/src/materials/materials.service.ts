@@ -152,48 +152,47 @@ export class MaterialsService {
     })
 
     if (kind === 'pii_scan') {
-      const contentCategory = readStringParam(params, 'contentCategory')
-      // 只有 purpose === 'print_doc' 且真的是单页图片格式时，contentCategory=photo 这个客户端
-      // 提示才被接受——不能只看"不是高风险 purpose"，否则任何调用方对着任意非高风险文件
-      // 声称 photo 都能跳过真实扫描。魔数级别的文件类型校验不在这里做（那是上传管线的
-      // 通用信任边界问题，超出本次修复范围），这里只是不让一个明显不是图片的文件
-      // （比如 mimeType 是 application/pdf）被 contentCategory=photo 提示跳过。
-      const canSkipAsPhoto =
-        sourceFile.purpose === 'print_doc' &&
-        isSinglePageImage(sourceFile.mimeType) &&
-        contentCategory === 'photo'
-      if (canSkipAsPhoto) {
+      // 曾经存在的 contentCategory=photo 跳过口子已彻底移除：contentCategory 是客户端可控的
+      // 请求参数，服务端从未真正校验过图片内容是否真的是"非文档照片"，任何调用方（篡改的前端 /
+      // 直接调 API / 重放 sessionStorage）都能靠声称 photo 让真实 PII 扫描完全不执行。
+      // pii_scan 现在对任意 purpose / mimeType / contentCategory 一律尝试真实抽取，不再有任何
+      // 跳过路径。'skipped_non_document' 这个 mode 值仍保留在类型/前端展示逻辑里，只是为了兼容
+      // TASK_TTL_HOURS 内、修复上线前用旧代码路径创建、此刻仍可能被读取到的存量任务。
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
+      const extraction = buffer
+        ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
+        : { pages: [], outcome: 'degraded' as const, truncated: false as const }
+      if (extraction.outcome === 'unsupported_format') {
         await this.prisma.documentProcessTask.update({
           where: { id: task.id },
-          data: { resultJson: JSON.stringify({ mode: 'skipped_non_document', findingCount: 0 }) },
+          data: { resultJson: JSON.stringify({ mode: 'unsupported_format', findingCount: 0 }) },
+        })
+      } else if (extraction.outcome === 'degraded') {
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: { resultJson: JSON.stringify({ mode: 'degraded', findingCount: 0 }) },
         })
       } else {
-        const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
-        const extraction = buffer
-          ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
-          : { pages: [], outcome: 'degraded' as const }
-        if (extraction.outcome === 'unsupported_format') {
-          await this.prisma.documentProcessTask.update({
-            where: { id: task.id },
-            data: { resultJson: JSON.stringify({ mode: 'unsupported_format', findingCount: 0 }) },
-          })
-        } else if (extraction.outcome === 'degraded') {
-          await this.prisma.documentProcessTask.update({
-            where: { id: task.id },
-            data: { resultJson: JSON.stringify({ mode: 'degraded', findingCount: 0 }) },
-          })
-        } else {
-          const findings = buildPiiFindingsFromPages(extraction.pages)
-          if (findings.length > 0) {
-            await this.prisma.piiFinding.createMany({
-              data: findings.map((finding) => ({ ...finding, taskId: task.id })),
-            })
-          }
-          await this.prisma.documentProcessTask.update({
-            where: { id: task.id },
-            data: { resultJson: JSON.stringify({ mode: 'real', findingCount: findings.length }) },
+        const findings = buildPiiFindingsFromPages(extraction.pages)
+        if (findings.length > 0) {
+          await this.prisma.piiFinding.createMany({
+            data: findings.map((finding) => ({ ...finding, taskId: task.id })),
           })
         }
+        // 页数受 PII_SCAN_MAX_OCR_PAGES 截断的扫描件：即使命中数为 0，也不能报告为完整扫描
+        // （mode: 'real'）——那会让"page 6+ 才出现的 PII 未被看过"冒充"已确认无风险"。
+        const resultJson = extraction.truncated
+          ? {
+              mode: 'partial' as const,
+              findingCount: findings.length,
+              scannedPages: extraction.scannedPages,
+              totalPages: extraction.totalPages,
+            }
+          : { mode: 'real' as const, findingCount: findings.length }
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: { resultJson: JSON.stringify(resultJson) },
+        })
       }
     }
 
@@ -701,11 +700,6 @@ function assertSupportedTaskParams(kind: MaterialTaskKind, params: Record<string
   const targetPaperSize = params['targetPaperSize']
   if (targetPaperSize === undefined || targetPaperSize === 'A4') return
   throw new BadRequestException({ error: { code: 'MATERIAL_TARGET_PAPER_UNSUPPORTED', message: '本期仅支持 A4 规范化评估' } })
-}
-
-function readStringParam(params: Record<string, unknown> | undefined, key: string): string | undefined {
-  const value = params?.[key]
-  return typeof value === 'string' ? value : undefined
 }
 
 function readImageDimensions(buffer: Buffer, mimeType: string): { widthPx: number; heightPx: number } | null {

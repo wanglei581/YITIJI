@@ -52,8 +52,13 @@ function formatBytes(bytes: number): string {
 // 入口卡片（"照片打印" vs "文档打印"）只能表达用户点了哪个入口，不能证明用户最终选中的
 // 文件真的是图片——用户仍可能在"照片打印"入口里通过拖拽或系统文件对话框选中 PDF。
 // 这里以实际上传结果的 mimeType 为准做二次校验，只有入口信号 + 真实 mimeType 都指向
-// 图片时，才把 contentCategory=photo 传给后端；否则传 undefined，让后端按默认路径
-// 真实扫描（后端 materials.service.ts 的 canSkipAsPhoto 同样会再校验一次，双重防御）。
+// 图片时，才把 contentCategory=photo 传给后端；否则传 undefined。
+//
+// 安全说明（CR-2 修复后已更新）：contentCategory=photo 曾经能让后端 pii_scan 跳过真实扫描
+// （materials.service.ts 的 canSkipAsPhoto），但该跳过口子已被彻底移除——contentCategory
+// 现在对是否执行真实扫描没有任何影响，pii_scan 对任意文件都会真实抽取。这里继续做
+// mimeType 二次校验只是为了让 contentCategory 这个审计字段本身更准确，不再是"防绕过"意义
+// 上的双重防御。
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 function resolveContentCategory(

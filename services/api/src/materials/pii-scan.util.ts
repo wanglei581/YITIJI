@@ -69,6 +69,11 @@ export type PiiFindingDraft = {
  * - outcome: 'ok' —— 成功提取到文本（可能为空字符串，交由正则匹配阶段判定有无命中）。
  * - outcome: 'degraded' —— 尝试提取但失败（解析异常 / OCR 失败 / 渲染异常）。
  * - outcome: 'unsupported_format' —— 该 MIME 完全没有提取路径。
+ *
+ * outcome: 'ok' 时额外带 truncated 标记：扫描版 PDF 逐页 OCR 渲染受 PII_SCAN_MAX_OCR_PAGES
+ * 页数上限约束，若文档实际页数超过该上限，truncated=true（并附 scannedPages/totalPages），
+ * 调用方不得把这种"只看过前 N 页"的结果当作"完整扫描、可放心报告 0 命中"。
+ * DOCX、单页图片、born-digital 文字层三条路径读的是整份输入，永远 truncated=false。
  */
 export async function extractTextForPiiScan(
   buffer: Buffer,
@@ -77,6 +82,10 @@ export async function extractTextForPiiScan(
 ): Promise<{
   pages: Array<{ pageNumber: number | null; text: string }>
   outcome: 'ok' | 'degraded' | 'unsupported_format'
+  truncated: boolean
+  /** 仅当 truncated=true 时有意义：实际完成 OCR 的页数 / 文档声明的总页数。 */
+  scannedPages?: number
+  totalPages?: number
 }> {
   if (mimeType === 'application/pdf') {
     let rawText = ''
@@ -85,7 +94,7 @@ export async function extractTextForPiiScan(
     try {
       pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
     } catch {
-      return { pages: [], outcome: 'degraded' }
+      return { pages: [], outcome: 'degraded', truncated: false }
     }
     const declaredPageCount = (pdf as { numPages?: number }).numPages ?? 0
     if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
@@ -94,7 +103,7 @@ export async function extractTextForPiiScan(
         totalPages = extracted.totalPages
         rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
       } catch {
-        return { pages: [], outcome: 'degraded' }
+        return { pages: [], outcome: 'degraded', truncated: false }
       }
     } else {
       // 声明页数为 0（无法判断）或超过上限：跳过无界的 extractText，
@@ -102,7 +111,7 @@ export async function extractTextForPiiScan(
       totalPages = declaredPageCount
     }
     if (rawText.trim().length >= MIN_TEXT_CHARS_FOR_BORN_DIGITAL) {
-      return { pages: [{ pageNumber: null, text: rawText }], outcome: 'ok' }
+      return { pages: [{ pageNumber: null, text: rawText }], outcome: 'ok', truncated: false }
     }
     // 文字层为空/极少 → 扫描件，逐页渲染 + OCR
     const pagesToRender = Math.min(Math.max(totalPages, 1), PII_SCAN_MAX_OCR_PAGES)
@@ -113,35 +122,43 @@ export async function extractTextForPiiScan(
         for (let pageNo = 1; pageNo <= pagesToRender; pageNo += 1) {
           const img = await rendered.renderPage(pageNo, PII_SCAN_OCR_RENDER_SCALE)
           const ocrResult = await ocr.recognize({ buffer: img, mimeType: 'image/png' })
-          if (!ocrResult.ok) return { pages: [], outcome: 'degraded' }
+          if (!ocrResult.ok) return { pages: [], outcome: 'degraded', truncated: false }
           pages.push({ pageNumber: pageNo, text: ocrResult.text ?? '' })
         }
       } finally {
         await rendered.destroy().catch(() => undefined)
       }
     } catch {
-      return { pages: [], outcome: 'degraded' }
+      return { pages: [], outcome: 'degraded', truncated: false }
     }
-    return { pages, outcome: 'ok' }
+    // totalPages 为声明/实际页数（born-digital 分支已从 extracted.totalPages 或 declaredPageCount
+    // 取得）；若超过本次实际渲染 OCR 的页数，说明文档还有未被扫描到的页面，不能上报为完整扫描。
+    const truncated = totalPages > pagesToRender
+    return {
+      pages,
+      outcome: 'ok',
+      truncated,
+      ...(truncated ? { scannedPages: pagesToRender, totalPages } : {}),
+    }
   }
 
   if (mimeType === DOCX_MIME) {
     try {
       const result = await mammoth.extractRawText({ buffer })
-      return { pages: [{ pageNumber: null, text: result.value ?? '' }], outcome: 'ok' }
+      return { pages: [{ pageNumber: null, text: result.value ?? '' }], outcome: 'ok', truncated: false }
     } catch {
-      return { pages: [], outcome: 'degraded' }
+      return { pages: [], outcome: 'degraded', truncated: false }
     }
   }
 
   if (isSinglePageImage(mimeType)) {
     const ocrResult = await ocr.recognize({ buffer, mimeType })
-    if (!ocrResult.ok) return { pages: [], outcome: 'degraded' }
-    return { pages: [{ pageNumber: 1, text: ocrResult.text ?? '' }], outcome: 'ok' }
+    if (!ocrResult.ok) return { pages: [], outcome: 'degraded', truncated: false }
+    return { pages: [{ pageNumber: 1, text: ocrResult.text ?? '' }], outcome: 'ok', truncated: false }
   }
 
   // 没有任何提取路径的格式（如旧版 .doc）：诚实返回 unsupported_format，不冒充"扫描完成 0 命中"。
-  return { pages: [], outcome: 'unsupported_format' }
+  return { pages: [], outcome: 'unsupported_format', truncated: false }
 }
 
 export function buildPiiFindingsFromPages(pages: Array<{ pageNumber: number | null; text: string }>): PiiFindingDraft[] {
