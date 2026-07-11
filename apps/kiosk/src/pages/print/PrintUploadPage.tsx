@@ -16,7 +16,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
@@ -42,7 +42,13 @@ import {
 } from '../../services/files/usbImportApi'
 import { useAuth } from '../../auth/useAuth'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
-import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState, type PrintMaterialSource } from './printMaterialSession'
+import {
+  clearPrintMaterialSession,
+  savePrintMaterialSession,
+  type PrintFileState,
+  type PrintMaterialContentCategory,
+  type PrintMaterialSource,
+} from './printMaterialSession'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
@@ -54,12 +60,38 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// 入口卡片（"照片打印" vs "文档打印"）只能表达用户点了哪个入口，不能证明用户最终选中的
+// 文件真的是图片——用户仍可能在"照片打印"入口里通过拖拽或系统文件对话框选中 PDF。
+// 这里以实际上传结果的 mimeType 为准做二次校验，只有入口信号 + 真实 mimeType 都指向
+// 图片时，才把 contentCategory=photo 传给后端；否则传 undefined。
+//
+// 安全说明（CR-2 修复后已更新）：contentCategory=photo 曾经能让后端 pii_scan 跳过真实扫描
+// （materials.service.ts 的 canSkipAsPhoto），但该跳过口子已被彻底移除——contentCategory
+// 现在对是否执行真实扫描没有任何影响，pii_scan 对任意文件都会真实抽取。这里继续做
+// mimeType 二次校验只是为了让 contentCategory 这个审计字段本身更准确，不再是"防绕过"意义
+// 上的双重防御。
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function resolveContentCategory(
+  entryContentCategory: PrintMaterialContentCategory | undefined,
+  mimeType: string | undefined,
+): PrintMaterialContentCategory | undefined {
+  if (entryContentCategory !== 'photo') return undefined
+  if (!mimeType || !IMAGE_MIME_TYPES.has(mimeType)) return undefined
+  return 'photo'
+}
+
 export function PrintUploadPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const source: PrintMaterialSource = searchParams.get('source') === 'resume' ? 'resume' : 'document'
+  // PrintScanHomePage 的"照片打印"卡片通过 router state 传 category: 'photo'；
+  // 仅作为 pii_scan 任务的审计字段随请求持久化，不再驱动是否跳过真实扫描
+  // （materials.service.ts 已移除 contentCategory 跳过口子，所有图片一律真实扫描）。
+  const contentCategory = (location.state as { category?: 'photo' } | null)?.category === 'photo' ? 'photo' : undefined
   const isResumePrint = source === 'resume'
   const isDocumentPrint = source === 'document'
   const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
@@ -158,7 +190,7 @@ export function PrintUploadPage() {
         mimeType: result.mimeType,
       }
       setFile(nextFile)
-      savePrintMaterialSession({ file: nextFile, source })
+      savePrintMaterialSession({ file: nextFile, source, contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType) })
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
@@ -186,7 +218,7 @@ export function PrintUploadPage() {
       mimeType: uploaded.mimeType,
     }
     setFile(nextFile)
-    savePrintMaterialSession({ file: nextFile, source })
+    savePrintMaterialSession({ file: nextFile, source, contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType) })
   }
 
   const handleUsbFileSelect = async (safeId: string) => {
@@ -205,7 +237,11 @@ export function PrintUploadPage() {
         mimeType: result.mimeType,
       }
       setFile(nextFile)
-      savePrintMaterialSession({ file: nextFile, source })
+      savePrintMaterialSession({
+        file: nextFile,
+        source,
+        contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType),
+      })
     } catch (err) {
       setUsbError(err instanceof Error ? err.message : 'U 盘文件导入失败，请重试')
       // 该 safeId 在 Agent 侧多半已因一次性消费失效,刷新列表让用户重选。
@@ -218,6 +254,7 @@ export function PrintUploadPage() {
 
   const handleNext = () => {
     if (!file) return
+    savePrintMaterialSession({ file, source, contentCategory: resolveContentCategory(contentCategory, file.mimeType) })
     navigate('/print/material-check', { state: { file, source } })
   }
 
@@ -301,7 +338,7 @@ export function PrintUploadPage() {
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept={contentCategory === 'photo' ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'}
               className="sr-only"
               onChange={handleFileChange}
             />
