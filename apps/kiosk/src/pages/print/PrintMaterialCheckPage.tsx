@@ -322,6 +322,7 @@ export function PrintMaterialCheckPage() {
       ? '需核对版式'
       : '评估信息不完整'
   const requiresFormatReview = inspectionSummary?.canPrint === false
+  const piiModeCopy = useMemo(() => piiScanModeCopy(piiTask), [piiTask])
   const canContinue = stage === 'review' && allDecided && !requiresFormatReview
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
 
@@ -527,7 +528,7 @@ export function PrintMaterialCheckPage() {
     <div className="flex h-full flex-col p-6">
       <PageHeader
         title="打印前材料检查"
-        subtitle="仅用于本次打印前确认，不向第三方发送"
+        subtitle="仅用于本次打印前确认；扫描件/图片内容可能通过第三方 OCR 服务识别文字"
         actions={
           <Button size="sm" variant="secondary" disabled={isWorking} onClick={() => navigate(uploadPath)}>
             重新上传
@@ -568,7 +569,7 @@ export function PrintMaterialCheckPage() {
           <CheckStep label="隐私片段检查" active={stage === 'pii_scan'} done={!!piiTask} />
 
           <div className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-800">
-            仅用于本次打印前确认，不向第三方发送。页面只展示隐私片段，不展示完整原文。
+            仅用于本次打印前确认；文档文字层可本地读取，扫描件/图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段，不展示完整原文。
           </div>
         </div>
 
@@ -607,29 +608,34 @@ export function PrintMaterialCheckPage() {
 
           {stage === 'review' && (
             <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="mb-4 flex items-center justify-between rounded-lg border border-success-bg bg-success-bg px-5 py-4">
+              <div
+                className={[
+                  'mb-4 flex items-center justify-between rounded-lg border px-5 py-4',
+                  piiModeCopy ? 'border-warning/30 bg-warning-bg' : 'border-success-bg bg-success-bg',
+                ].join(' ')}
+              >
                 <div className="flex items-center gap-3">
-                  <CheckCircleIcon className="h-6 w-6 text-success-fg" />
+                  {piiModeCopy ? (
+                    <AlertCircleIcon className="h-6 w-6 text-warning-fg" />
+                  ) : (
+                    <CheckCircleIcon className="h-6 w-6 text-success-fg" />
+                  )}
                   <div>
-                    <p className="font-semibold text-success-fg">检查完成</p>
-                    <p className="mt-0.5 text-sm text-success-fg">
-                      {findings.length > 0 ? `发现 ${findings.length} 个需确认片段` : '未发现需要确认的隐私片段'}
+                    <p className={['font-semibold', piiModeCopy ? 'text-warning-fg' : 'text-success-fg'].join(' ')}>
+                      {piiModeCopy ? piiModeCopy.label : '检查完成'}
+                    </p>
+                    <p className={['mt-0.5 text-sm', piiModeCopy ? 'text-warning-fg' : 'text-success-fg'].join(' ')}>
+                      {piiModeCopy
+                        ? '如文件包含隐私信息，请打印前自行确认'
+                        : findings.length > 0
+                          ? `发现 ${findings.length} 个需确认片段`
+                          : '未发现需要确认的隐私片段'}
                     </p>
                   </div>
                 </div>
                 {(isDemoTask(inspectionTask) || isDemoTask(piiTask)) && (
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-neutral-500">
                     流程演示
-                  </span>
-                )}
-                {!isDemoTask(piiTask) && piiScanModeCopy(piiTask) && (
-                  <span
-                    className={[
-                      'rounded-full px-3 py-1 text-xs font-medium',
-                      piiScanModeCopy(piiTask)!.tone === 'warning' ? 'bg-warning-bg text-warning-fg' : 'bg-white text-neutral-500',
-                    ].join(' ')}
-                  >
-                    {piiScanModeCopy(piiTask)!.label}
                   </span>
                 )}
               </div>
@@ -724,15 +730,25 @@ export function PrintMaterialCheckPage() {
 
               {findings.length === 0 ? (
                 <Card className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-                  <ShieldCheckIcon className="h-16 w-16 text-success" />
+                  {requiresFormatReview || !piiModeCopy ? (
+                    <ShieldCheckIcon className="h-16 w-16 text-success" />
+                  ) : (
+                    <AlertCircleIcon className="h-16 w-16 text-warning-fg" />
+                  )}
                   <div className="text-center">
                     <p className="text-xl font-semibold text-neutral-900">
-                      {requiresFormatReview ? '请重新上传文件后继续' : '可以继续设置打印参数'}
+                      {requiresFormatReview
+                        ? '请重新上传文件后继续'
+                        : piiModeCopy
+                          ? '该文件的隐私内容未能扫描，请人工确认后继续'
+                          : '可以继续设置打印参数'}
                     </p>
                     <p className="mt-2 text-sm text-neutral-500">
                       {requiresFormatReview
                         ? '材料体检提示当前文件暂不可继续打印，请返回上传页重新选择文件'
-                        : '本次检查未发现需要确认的隐私片段，后续请继续核对打印参数'}
+                        : piiModeCopy
+                          ? piiModeCopy.label
+                          : '本次检查未发现需要确认的隐私片段，后续请继续核对打印参数'}
                     </p>
                   </div>
                 </Card>
