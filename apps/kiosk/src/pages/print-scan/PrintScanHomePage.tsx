@@ -12,9 +12,16 @@
 // 范围：不改 AI 简历服务、岗位、招聘会、后台。
 // ============================================================
 
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
-import { COMPLIANCE_COPY } from '@ai-job-print/shared'
+import {
+  COMPLIANCE_COPY,
+  canCreateFormalPrintScanTask,
+  type PrintScanCapabilityKey,
+  type PrintScanCapabilityStatus,
+} from '@ai-job-print/shared'
+import { getConfiguredCapabilities, type ConfiguredCapabilityMap } from '../../services/api/printScanCapabilities'
 import {
   ChevronRightIcon,
   FilesIcon,
@@ -43,6 +50,8 @@ interface Capability {
   available: boolean
   /** 可选的诚实说明（当前无卡片使用，为未来需要标注硬件依赖/使用限制的能力保留） */
   note?: string
+  /** 不可用时的角标文案。默认「即将上线」；被管理员开关关闭时为「暂不可用」。 */
+  unavailableBadge?: string
 }
 
 const CAPABILITIES: Capability[] = [
@@ -119,6 +128,25 @@ const CAPABILITIES: Capability[] = [
   },
 ]
 
+// 卡片 → 能力开关键映射（Admin「打印扫描运维 → 设备能力」配置后覆盖硬编码默认）。
+// photo-print 无独立能力键（本质走文档打印流程），保持硬编码不受开关控制。
+const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
+  'doc-print': 'document_print',
+  'phone-upload': 'phone_upload',
+  scan: 'scan',
+  'id-photo': 'id_photo',
+  convert: 'format_convert',
+  sign: 'signature_stamp',
+}
+
+const CAPABILITY_STATUS_NOTES: Record<PrintScanCapabilityStatus, string | null> = {
+  available: null,
+  testing: '测试中，暂未对用户开放',
+  maintenance: '维护中，暂时不可用',
+  unsupported: '本终端不支持该能力',
+  not_verified: '待验收，暂未开放',
+}
+
 interface QuickLink {
   key: string
   icon: React.ComponentType<{ className?: string }>
@@ -154,6 +182,42 @@ const QUICK_LINKS: QuickLink[] = [
 
 export function PrintScanHomePage() {
   const navigate = useNavigate()
+  const [configured, setConfigured] = useState<ConfiguredCapabilityMap>({})
+
+  useEffect(() => {
+    let cancelled = false
+    void getConfiguredCapabilities().then((map) => {
+      if (!cancelled) setConfigured(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // 管理员配置过的能力键覆盖硬编码默认；未配置键保持保守默认。
+  // available 只由服务端 status==='available' 决定（fail-closed），
+  // 覆盖为不可用时卡片改跳能力说明页，避免用户进入必然失败的流程。
+  const capabilities = useMemo<Capability[]>(
+    () =>
+      CAPABILITIES.map((cap) => {
+        const key = CARD_CAPABILITY_KEY[cap.key]
+        const override = key ? configured[key] : undefined
+        if (!override) return cap
+        const available = canCreateFormalPrintScanTask(override.status)
+        // 被关停时：本就指向说明页的卡片保留说明页入口；原本直达流程的卡片
+        // 置为不可点（to=''），避免把用户带进必然失败的流程或错误的"未找到"页。
+        const disabledTo = cap.to.startsWith('/print-scan/feature/') ? cap.to : ''
+        return {
+          ...cap,
+          available,
+          to: available ? cap.to : disabledTo,
+          state: available ? cap.state : undefined,
+          note: available ? cap.note : (override.note ?? CAPABILITY_STATUS_NOTES[override.status] ?? cap.note),
+          unavailableBadge: available ? cap.unavailableBadge : '暂不可用',
+        }
+      }),
+    [configured],
+  )
 
   return (
     <div className="flex h-full flex-col overflow-y-auto p-6">
@@ -176,13 +240,16 @@ export function PrintScanHomePage() {
 
       {/* 6 个能力入口 */}
       <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-        {CAPABILITIES.map((cap) => {
+        {capabilities.map((cap) => {
           const Icon = cap.icon
           return (
             <button
               key={cap.key}
               type="button"
-              onClick={() => navigate(cap.to, cap.state ? { state: cap.state } : undefined)}
+              onClick={() => {
+                if (!cap.to) return
+                navigate(cap.to, cap.state ? { state: cap.state } : undefined)
+              }}
               className="flex min-h-[160px] flex-col rounded-xl border border-neutral-200 bg-white p-5 text-left shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50/40 active:bg-primary-100/40"
             >
               <div className={['flex h-14 w-14 items-center justify-center rounded-xl', cap.iconBg].join(' ')}>
@@ -192,7 +259,7 @@ export function PrintScanHomePage() {
                 <h3 className="text-lg font-semibold text-neutral-900">{cap.title}</h3>
                 {!cap.available && (
                   <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                    即将上线
+                    {cap.unavailableBadge ?? '即将上线'}
                   </span>
                 )}
               </div>
@@ -203,8 +270,14 @@ export function PrintScanHomePage() {
                 <div className="flex-1" />
               )}
               <div className="mt-2 flex min-h-[28px] items-center gap-0.5 text-sm font-semibold text-primary-600">
-                <span>{cap.available ? '进入' : '了解详情'}</span>
-                <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+                {cap.to ? (
+                  <>
+                    <span>{cap.available ? '进入' : '了解详情'}</span>
+                    <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+                  </>
+                ) : (
+                  <span className="text-neutral-400">暂不可用</span>
+                )}
               </div>
             </button>
           )

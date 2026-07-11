@@ -5,6 +5,7 @@ import LoginPage from './login'
 import DashboardPage from './dashboard'
 import DevicesPage from './devices'
 import OrdersPage from './orders'
+import PrintScanOpsPage from './print-scan'
 import BillingPage from './billing'
 import FilesPage from './files'
 import AiServicesPage from './ai-services'
@@ -45,6 +46,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'printers',     element: <Navigate to="/devices?tab=printers"    replace /> },
       { path: 'peripherals',  element: <Navigate to="/devices?tab=peripherals" replace /> },
       { path: 'orders',       element: <OrdersPage /> },
+      { path: 'print-scan',   element: <PrintScanOpsPage /> },
       { path: 'billing',      element: <BillingPage /> },
       { path: 'files',        element: <FilesPage /> },
       { path: 'job-materials', element: <JobMaterialsPage /> },

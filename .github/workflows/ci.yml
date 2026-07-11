@@ -158,6 +158,9 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
           pnpm --filter @ai-job-print/admin verify:admin-billing-ui
+          pnpm --filter @ai-job-print/admin verify:admin-print-scan-ui
+          pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
+          pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -175,6 +178,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:admin-print-scan
+          pnpm --filter @ai-job-print/api verify:admin-ops
+          pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
@@ -313,6 +319,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
