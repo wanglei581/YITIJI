@@ -96,6 +96,7 @@ async function main() {
   const nonBlankImageFileId = `file_mat_nonblank_${suffix}`
   const blankPdfFileId = `file_mat_blankpdf_${suffix}`
   const nonBlankPdfFileId = `file_mat_nonblankpdf_${suffix}`
+  const bigPageCountFileId = `file_mat_bigpage_${suffix}`
   const testFileIds = [
     ownedFileId,
     anonymousFileId,
@@ -109,6 +110,7 @@ async function main() {
     nonBlankImageFileId,
     blankPdfFileId,
     nonBlankPdfFileId,
+    bigPageCountFileId,
   ]
   const ownedObjectKey = `verify/materials/${ownedFileId}.png`
   const imageObjectKey = `verify/materials/${imageFileId}.png`
@@ -121,6 +123,7 @@ async function main() {
   const nonBlankImageObjectKey = `verify/materials/${nonBlankImageFileId}.png`
   const blankPdfObjectKey = `verify/materials/${blankPdfFileId}.pdf`
   const nonBlankPdfObjectKey = `verify/materials/${nonBlankPdfFileId}.pdf`
+  const bigPageCountObjectKey = `verify/materials/${bigPageCountFileId}.pdf`
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
   const textSample = '请联系 13800138000 或 zhangsan@example.com，身份证 110101199001011234，地址 青岛市市南区测试路 1 号。'
@@ -872,6 +875,71 @@ async function main() {
       fail(`I. Non-blank rendered PDF unexpectedly reported BLANK_PAGE_SUSPECTED, got ${JSON.stringify(nonBlankPdfChecks)}`)
     }
 
+    // J. 回归测试：extractTextForPiiScan() 的 MAX_BORN_DIGITAL_EXTRACT_PAGES 防护此前无任何
+    //    测试覆盖（mutation testing 证实：还原该防护后无任何既有测试失败）。unpdf.extractText()
+    //    内部对 pdf.numPages 做 Array.from + Promise.all、不设上限；本接口匿名可达，一份体积
+    //    很小但声明超大页数的恶意 PDF 可借此让服务端做无界 CPU/内存工作。
+    //
+    //    构造方式：不 mock 整个 unpdf 库，而是构造一份 pdfjs 会诚实报告
+    //    numPages=60（> 50 阈值）的真实、合法 PDF —— Pages 字典的 /Kids 数组重复引用同一个
+    //    真实 Page 对象 60 次，/Count 与 Kids.length 一致（pdfjs 的 checkLastPage 校验只会
+    //    纠正 Count 与实际 Kids 遍历数不一致的情况，两者一致时不会被纠正），
+    //    因此拿到的 numPages 不是伪造值，是 pdfjs 真实解析结果——体积仍只有几百字节。
+    //
+    //    观测手段：monkey-patch require('unpdf') 导出对象上的 extractText。services/api 是
+    //    commonjs + node10 resolution，本脚本与 pii-scan.util.ts 的 require('unpdf') 解析到
+    //    同一个被 Node 缓存的模块对象，patch 对两侧同时可见——这只是在观察一个已存在的真实
+    //    模块边界调用是否发生，不是伪造整个 unpdf 的行为（其余 unpdf API、pdfjs 渲染路径仍是
+    //    真实实现）。
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const unpdfSpyModule = require('unpdf') as { extractText: (...args: unknown[]) => Promise<unknown> }
+    const originalUnpdfExtractText = unpdfSpyModule.extractText
+    let unpdfExtractTextCalls = 0
+    unpdfSpyModule.extractText = async (...args: unknown[]) => {
+      unpdfExtractTextCalls += 1
+      return originalUnpdfExtractText(...args)
+    }
+    try {
+      const bigPageCountPdfBytes = buildDeclaredBigPageCountPdf(60)
+      const bigPageCountPut = await storage.putObject(bigPageCountObjectKey, bigPageCountPdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+      await prisma.fileObject.create({
+        data: {
+          id: bigPageCountFileId,
+          storageKey: bigPageCountObjectKey,
+          bucket: LOCAL_BUCKET_SENTINEL,
+          region: LOCAL_REGION_SENTINEL,
+          filename: 'declared-60-pages.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: bigPageCountPut.sizeBytes,
+          sha256: bigPageCountPut.sha256,
+          purpose: 'print_doc',
+          sensitiveLevel: 'normal',
+          expiresAt,
+          endUserId: null,
+          ownerType: 'system',
+          ownerId: null,
+        },
+      })
+      const bigPageOcr = makeFakeOcr(async () => ({ ok: true, text: 'ocr-fallback-text', confidence: 'high' as const }))
+      const materialsBigPageOcr = new MaterialsService(prisma, storage, bigPageOcr.ocr)
+      const bigPageTask = await materialsBigPageOcr.createTask(
+        { kind: 'pii_scan', sourceFileId: bigPageCountFileId, params: {} },
+        { kind: 'anonymous' },
+      )
+      if (unpdfExtractTextCalls === 0) {
+        pass('J. PDF 声明页数(60) 超过 MAX_BORN_DIGITAL_EXTRACT_PAGES(50) 时，born-digital 文字层抽取 unpdf.extractText 从未被调用')
+      } else {
+        fail(`J. Expected unpdf.extractText to be skipped for a >50-declared-page PDF, but it was called ${unpdfExtractTextCalls} time(s)`)
+      }
+      if (bigPageTask.result?.['mode'] === 'real' && bigPageOcr.calls() >= 1 && bigPageOcr.calls() <= 5) {
+        pass('J. 跳过 extractText 后正确落入已有页数上限的 OCR 渲染兜底路径并干净完成（未挂起/未崩溃，OCR 调用数受 PII_SCAN_MAX_OCR_PAGES=5 约束）')
+      } else {
+        fail(`J. Expected bounded OCR fallback with mode=real, got ${JSON.stringify(bigPageTask.result)} (ocr calls=${bigPageOcr.calls()})`)
+      }
+    } finally {
+      unpdfSpyModule.extractText = originalUnpdfExtractText
+    }
+
     await prisma.documentProcessTask.update({
       where: { id: anonymousTask.id },
       data: { expiresAt: new Date(Date.now() - 60_000) },
@@ -898,6 +966,7 @@ async function main() {
     await storage.deleteObject(nonBlankImageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(blankPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(nonBlankPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(bigPageCountObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 
@@ -960,6 +1029,37 @@ function buildSinglePagePdf(content: string): Buffer {
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>',
     `<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`,
+  ]
+  let bodyStr = header
+  const offsets: number[] = []
+  objects.forEach((obj, idx) => {
+    offsets.push(Buffer.byteLength(bodyStr, 'utf8'))
+    bodyStr += `${idx + 1} 0 obj\n${obj}\nendobj\n`
+  })
+  const xrefStart = Buffer.byteLength(bodyStr, 'utf8')
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  offsets.forEach((off) => {
+    xref += `${String(off).padStart(10, '0')} 00000 n \n`
+  })
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
+  return Buffer.from(bodyStr + xref + trailer, 'utf8')
+}
+
+// ── 真实、pdfjs 会诚实报告 numPages=count 的最小 PDF（用于 MAX_BORN_DIGITAL_EXTRACT_PAGES
+//    回归测试）：/Pages 字典的 /Kids 数组重复引用同一个真实 Page 对象 count 次，/Count 与
+//    Kids.length 一致。pdfjs 的 checkLastPage 校验只在 /Count 与实际遍历到的 Kids 数不一致
+//    时才把 numPages 纠正为实际遍历数（已用 node -e 探针验证：若只声明 /Count 而 /Kids 只有
+//    1 个真实条目，pdfjs 会打印 "invalid /Pages tree /Count" 警告并把 numPages 纠正回 1——
+//    这里让两者一致，因此拿到的 numPages 是 pdfjs 真实解析结果，不是伪造值）───────────────
+
+function buildDeclaredBigPageCountPdf(count: number): Buffer {
+  const header = '%PDF-1.4\n'
+  const kidsRefs = Array.from({ length: count }, () => '3 0 R').join(' ')
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Pages /Kids [${kidsRefs}] /Count ${count} >>`,
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>',
+    '<< /Length 0 >>\nstream\n\nendstream',
   ]
   let bodyStr = header
   const offsets: number[] = []
