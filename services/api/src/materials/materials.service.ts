@@ -1,6 +1,9 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
+import type { FilePurpose } from '../files/file.types'
+import { OcrService } from '../ai/resume/ocr/ocr.service'
+import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
@@ -14,9 +17,36 @@ import type {
   PiiFindingView,
 } from './materials.types'
 
+/**
+ * unpdf 提供 CJS 构建；services/api 是 commonjs + node10 resolution，
+ * 不读 exports 的 types 字段，故用 require + 本地最小类型签名规避类型解析问题
+ * （做法与 resume-extraction.service.ts 一致）。
+ */
+interface UnpdfApi {
+  getDocumentProxy(data: Uint8Array): Promise<unknown>
+  extractText(
+    pdf: unknown,
+    options?: { mergePages?: boolean },
+  ): Promise<{ totalPages: number; text: string | string[] }>
+}
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const unpdf = require('unpdf') as UnpdfApi
+
 const TASK_TTL_HOURS = 24
 const MAX_SNIPPET_CHARS = 32
 const RAW_TEXT_PARAM_KEYS = new Set(['textsample', 'text', 'rawtext', 'fulltext', 'content', 'documenttext'])
+
+/** 这些用途天然高风险（简历/证件），必须真实扫描，不接受任何跳过提示。 */
+const HIGH_RISK_PII_PURPOSES: readonly FilePurpose[] = ['resume_upload', 'resume_scan', 'id_scan', 'cover_letter']
+/** 低于此字符数视为"没有可用文字层"，判定为扫描件走 OCR（与 resume-extraction.service.ts 同一阈值概念）。 */
+const MIN_TEXT_CHARS_FOR_BORN_DIGITAL = 30
+/** 扫描版 PDF 最多渲染识别的页数（控费 + 控时延）。 */
+const PII_SCAN_MAX_OCR_PAGES = (() => {
+  const n = Number(process.env['PII_SCAN_MAX_OCR_PAGES'])
+  return Number.isInteger(n) && n > 0 && n <= 10 ? n : 5
+})()
+/** OCR 渲染缩放（与 resume-extraction.service.ts 保持一致的清晰度/体积权衡）。 */
+const PII_SCAN_OCR_RENDER_SCALE = 2
 
 type TaskRecord = {
   id: string
@@ -112,6 +142,7 @@ export class MaterialsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly ocr: OcrService,
   ) {}
 
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
@@ -142,19 +173,34 @@ export class MaterialsService {
     })
 
     if (kind === 'pii_scan') {
-      const findings = buildSimulatedPiiFindings({
-        filename: sourceFile.filename,
-        textSample: readStringParam(dto.params, 'textSample'),
-      })
-      if (findings.length > 0) {
-        await this.prisma.piiFinding.createMany({
-          data: findings.map((finding) => ({ ...finding, taskId: task.id })),
+      const contentCategory = readStringParam(dto.params, 'contentCategory')
+      const isHighRiskPurpose = HIGH_RISK_PII_PURPOSES.includes(sourceFile.purpose as FilePurpose)
+      if (!isHighRiskPurpose && contentCategory === 'photo') {
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: { resultJson: JSON.stringify({ mode: 'skipped_non_document', findingCount: 0 }) },
         })
+      } else {
+        const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
+        const extraction = buffer ? await this.extractTextForPiiScan(buffer, sourceFile.mimeType) : { pages: [], degraded: true }
+        if (extraction.degraded) {
+          await this.prisma.documentProcessTask.update({
+            where: { id: task.id },
+            data: { resultJson: JSON.stringify({ mode: 'degraded', findingCount: 0 }) },
+          })
+        } else {
+          const findings = buildPiiFindingsFromPages(extraction.pages)
+          if (findings.length > 0) {
+            await this.prisma.piiFinding.createMany({
+              data: findings.map((finding) => ({ ...finding, taskId: task.id })),
+            })
+          }
+          await this.prisma.documentProcessTask.update({
+            where: { id: task.id },
+            data: { resultJson: JSON.stringify({ mode: 'real', findingCount: findings.length }) },
+          })
+        }
       }
-      await this.prisma.documentProcessTask.update({
-        where: { id: task.id },
-        data: { resultJson: JSON.stringify({ mode: 'simulated', findingCount: findings.length }) },
-      })
     }
 
     const view = await this.getTask(task.id, accessToken ? { ...requester, accessToken } : requester)
@@ -268,7 +314,7 @@ export class MaterialsService {
       }
     }
     if (kind === 'pii_scan') {
-      return { status: 'completed', result: { mode: 'simulated', findingCount: 0 } }
+      return { status: 'completed', result: { mode: 'pending_real_scan', findingCount: 0 } }
     }
     if (kind === 'pii_redact') {
       const redaction = await this.evaluatePiiRedaction(sourceFile, params, requester)
@@ -384,6 +430,63 @@ export class MaterialsService {
     }
   }
 
+  /**
+   * 为 pii_scan 提取可用于正则匹配的文本内容。
+   * PDF 优先走 unpdf 文字层（born-digital，零 OCR 成本）；抽不到有效文字（扫描件/图片型 PDF）
+   * 才逐页渲染 + OCR。图片直接 OCR。OCR 不可用/失败时诚实返回 degraded，不静默编造结果。
+   */
+  private async extractTextForPiiScan(
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<{
+    pages: Array<{ pageNumber: number | null; text: string }>
+    degraded: boolean
+  }> {
+    if (mimeType === 'application/pdf') {
+      let rawText = ''
+      let totalPages = 0
+      try {
+        const pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+        const extracted = await unpdf.extractText(pdf, { mergePages: true })
+        totalPages = extracted.totalPages
+        rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+      } catch {
+        return { pages: [], degraded: true }
+      }
+      if (rawText.trim().length >= MIN_TEXT_CHARS_FOR_BORN_DIGITAL) {
+        return { pages: [{ pageNumber: null, text: rawText }], degraded: false }
+      }
+      // 文字层为空/极少 → 扫描件，逐页渲染 + OCR
+      const pagesToRender = Math.min(Math.max(totalPages, 1), PII_SCAN_MAX_OCR_PAGES)
+      const pages: Array<{ pageNumber: number | null; text: string }> = []
+      try {
+        const rendered = await openPdfForRender(buffer)
+        try {
+          for (let pageNo = 1; pageNo <= pagesToRender; pageNo += 1) {
+            const img = await rendered.renderPage(pageNo, PII_SCAN_OCR_RENDER_SCALE)
+            const ocrResult = await this.ocr.recognize({ buffer: img, mimeType: 'image/png' })
+            if (!ocrResult.ok) return { pages: [], degraded: true }
+            pages.push({ pageNumber: pageNo, text: ocrResult.text ?? '' })
+          }
+        } finally {
+          await rendered.destroy().catch(() => undefined)
+        }
+      } catch {
+        return { pages: [], degraded: true }
+      }
+      return { pages, degraded: false }
+    }
+
+    if (isSinglePageImage(mimeType)) {
+      const ocrResult = await this.ocr.recognize({ buffer, mimeType })
+      if (!ocrResult.ok) return { pages: [], degraded: true }
+      return { pages: [{ pageNumber: 1, text: ocrResult.text ?? '' }], degraded: false }
+    }
+
+    // 不支持的 MIME：既不是可扫描的错误，也没有可扫描的内容——按无命中处理，不算降级。
+    return { pages: [], degraded: false }
+  }
+
   private async evaluateNormalizeA4(sourceFile: SourceFileRecord): Promise<NormalizeA4Summary> {
     const inspection = await this.inspectSourceFile(sourceFile)
     const canNormalize = inspection.pageCountSource === 'image_single_page' ||
@@ -487,84 +590,64 @@ export class MaterialsService {
   }
 }
 
-function buildSimulatedPiiFindings(args: { filename: string; textSample?: string }): Array<{
+type PiiFindingDraft = {
   type: string
   label: string
   pageNumber: number | null
   snippet: string | null
   confidence: number
   action: PiiFindingAction
-}> {
-  const text = [args.filename, args.textSample ?? ''].filter(Boolean).join('\n')
-  const findings: Array<{
-    type: string
-    label: string
-    pageNumber: number | null
-    snippet: string | null
-    confidence: number
-    action: PiiFindingAction
-  }> = []
+}
+
+function buildPiiFindingsFromPages(pages: Array<{ pageNumber: number | null; text: string }>): PiiFindingDraft[] {
+  const findings: PiiFindingDraft[] = []
   const seen = new Set<string>()
 
-  collectMatches(text, /(?:^|[^\d])((?:\+?86[- ]?)?1[3-9]\d{9})(?!\d)/g, (value) => ({
-    type: 'phone',
-    label: '手机号',
-    pageNumber: null,
-    snippet: maskPiiSnippet('phone', value),
-    confidence: 0.95,
-    action: 'pending' as const,
-  })).forEach((finding) => {
+  const pushUnique = (finding: PiiFindingDraft) => {
     const key = `${finding.type}:${finding.snippet}`
     if (!seen.has(key)) {
       seen.add(key)
       findings.push(finding)
     }
-  })
+  }
 
-  collectMatches(text, /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, (value) => ({
-    type: 'email',
-    label: '邮箱',
-    pageNumber: null,
-    snippet: maskPiiSnippet('email', value),
-    confidence: 0.93,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
+  for (const { pageNumber, text } of pages) {
+    collectMatches(text, /(?:^|[^\d])((?:\+?86[- ]?)?1[3-9]\d{9})(?!\d)/g, (value) => ({
+      type: 'phone',
+      label: '手机号',
+      pageNumber,
+      snippet: maskPiiSnippet('phone', value),
+      confidence: 0.95,
+      action: 'pending' as const,
+    })).forEach(pushUnique)
 
-  collectMatches(text, /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g, (value) => ({
-    type: 'id_card',
-    label: '身份证号',
-    pageNumber: null,
-    snippet: maskPiiSnippet('id_card', value),
-    confidence: 0.9,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
+    collectMatches(text, /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, (value) => ({
+      type: 'email',
+      label: '邮箱',
+      pageNumber,
+      snippet: maskPiiSnippet('email', value),
+      confidence: 0.93,
+      action: 'pending' as const,
+    })).forEach(pushUnique)
 
-  collectMatches(text, /([\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[\u4e00-\u9fa5A-Za-z0-9\s-]{0,24}号?)/g, (value) => ({
-    type: 'address',
-    label: '地址',
-    pageNumber: null,
-    snippet: maskPiiSnippet('address', value),
-    confidence: 0.78,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
+    collectMatches(text, /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g, (value) => ({
+      type: 'id_card',
+      label: '身份证号',
+      pageNumber,
+      snippet: maskPiiSnippet('id_card', value),
+      confidence: 0.9,
+      action: 'pending' as const,
+    })).forEach(pushUnique)
+
+    collectMatches(text, /([\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[\u4e00-\u9fa5A-Za-z0-9\s-]{0,24}号?)/g, (value) => ({
+      type: 'address',
+      label: '地址',
+      pageNumber,
+      snippet: maskPiiSnippet('address', value),
+      confidence: 0.78,
+      action: 'pending' as const,
+    })).forEach(pushUnique)
+  }
 
   return findings
 }
@@ -658,7 +741,7 @@ function allowedParamKeys(kind: MaterialTaskKind): string[] {
     case 'normalize_a4':
       return ['targetPaperSize', 'source']
     case 'pii_scan':
-      return ['textSample', 'scanScope']
+      return ['textSample', 'scanScope', 'contentCategory']
     case 'pii_redact':
       return ['decisionTaskId']
     case 'bundle_render':
