@@ -31,13 +31,6 @@ import {
   isPurpose,
 } from './file-validation'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
-
-/**
- * COS 直传 completeUpload 阶段允许整读回嗅探的对象大小上限。
- * StorageService 暂无 Range 读取,超过此值的对象(admin_upload / screensaver_material
- * 等 purpose 允许非视频文件到 500MB)跳过嗅探,避免把数百 MB 读进内存。
- */
-const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
 import {
   RetentionPolicyError,
   allowedPoliciesForFile,
@@ -45,6 +38,13 @@ import {
   defaultRetentionForUpload,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
+
+/**
+ * COS 直传 completeUpload 阶段允许整读回嗅探的对象大小上限。
+ * StorageService 暂无 Range 读取,超过此值的对象(admin_upload / screensaver_material
+ * 等 purpose 允许非视频文件到 500MB)跳过嗅探,避免把数百 MB 读进内存。
+ */
+export const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -97,7 +97,8 @@ export class FilesService {
     if (!validation.ok) {
       throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
     }
-    // 魔数校验:真实字节必须与声明 MIME 一致(mimeType 不再纯客户端声明)。
+    // 魔数校验:真实字节须与声明 MIME 签名级一致(降低纯客户端声明的混淆空间;
+    // 非结构级证明,能力边界见 content-sniff.ts 文件头注释)。
     const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
     if (!sniff.ok) {
       this.logger.warn(`Upload content mismatch (purpose=${args.purpose}, declared=${args.mimeType}): ${sniff.reason}`)
@@ -357,7 +358,7 @@ export class FilesService {
     if (!validation.ok) {
       throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
     }
-    // 魔数校验:真实字节必须与意图阶段声明的 MIME 一致。
+    // 魔数校验:真实字节须与意图阶段声明的 MIME 签名级一致(非结构级证明)。
     const sniff = sniffDeclaredMimeMismatch(buffer, record.mimeType)
     if (!sniff.ok) {
       this.logger.warn(`Raw-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`)

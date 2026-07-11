@@ -12,6 +12,11 @@ const repoRoot = join(ROOT, '../..')
 const files = [
   join(ROOT, 'src/pages/legal/LegalDocPage.tsx'),
   join(ROOT, 'src/pages/help/HelpCenterPage.tsx'),
+  // 2026-07-11 起纳入:两个打印页含隐私检查/第三方 OCR 相关文案,
+  // 须同受"不转发第三方"类旧承诺回退守卫覆盖(刻意不扩大到全 src/pages,
+  // 避免其他 mustNotMatch 留存口径在无关页面误报)。
+  join(ROOT, 'src/pages/print/PrintConfirmPage.tsx'),
+  join(ROOT, 'src/pages/print/PrintPreviewPage.tsx'),
   join(repoRoot, 'packages/shared/src/types/complianceCopy.ts'),
   join(repoRoot, 'docs/compliance/launch-review-submissions.md'),
 ]
