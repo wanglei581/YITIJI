@@ -300,7 +300,8 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: '兼职信息', icon: 'clock', to: '/jobs?category=parttime' },
       { title: '全部岗位', icon: 'files', to: '/jobs' },
       { title: '找企业', icon: 'shield', to: '/companies' },
-      { title: '岗位大师', icon: 'star', disabled: Boolean(true) },
+      // 2026-07-11：按 IA 整合审计 §3⑧ 拍板执行——复用既有「岗位匹配参考」（2D）能力，不新增独立路由/页面。
+      { title: '岗位大师', icon: 'star', to: '/resume/job-fit' },
     ],
   },
   {
