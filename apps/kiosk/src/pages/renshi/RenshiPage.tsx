@@ -73,12 +73,12 @@ export function RenshiPage() {
     [policies],
   )
 
-  /** 数据来源说明：取真实来源机构名 + 最近同步时间，绝不硬编码机构名。 */
+  /** 数据来源说明：库内政策取真实来源机构名 + 最近同步时间；内置指引单独表述，避免被误认为同步内容。 */
   const sourceLine = (() => {
-    if (policies.length === 0) return '政策事项含内置办事指引模板；标注「政策发布」的为合作机构发布、管理员审核内容'
+    if (policies.length === 0) return '当前展示内置办事指引（整理参考，以官方发布为准）；标注「政策发布」的为合作机构发布、管理员审核内容'
     const names = [...new Set(policies.map((p) => p.sourceName))].slice(0, 2).join('、')
     const latest = policies.map((p) => p.syncTime).sort().at(-1)?.slice(0, 10) ?? ''
-    return `数据来源：${names} · 更新于 ${latest} · 含内置办事指引模板 · 仅供参考`
+    return `「政策发布」来源：${names} · 同步于 ${latest}；其余为内置办事指引（整理参考，以官方发布为准）`
   })()
 
   const renderPolicyTab = () => {

@@ -25,7 +25,6 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     steps: ['阅读本地政策口径与申报时间', '按学校或官方平台要求准备材料', '通过官方入口或学校渠道提交', '等待官方审核结果'],
     officialUrl: 'https://gjzwfw.www.gov.cn/col/col1110/',
     sourceName: '综合整理 · 国家政务服务平台口径',
-    updatedAt: '2026-06-10',
   },
   {
     id: 'builtin-flexible-social',
@@ -38,8 +37,7 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     materials: ['身份证明', '就业 / 失业登记信息', '灵活就业承诺或证明', '社保缴费记录', '本人银行卡'],
     steps: ['先完成就业 / 失业登记', '确认社保缴费记录', '准备并核对材料清单', '扫码进入官方平台申请或查询'],
     officialUrl: 'https://hrss.qingdao.gov.cn/',
-    sourceName: '综合整理 · 本地就业创业专区口径',
-    updatedAt: '2026-06-06',
+    sourceName: '综合整理 · 官方入口示例：青岛人社（其他地区请查询当地人社平台）',
   },
   {
     id: 'builtin-housing-talent',
@@ -52,8 +50,7 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     materials: ['身份证明', '毕业证 / 学位证', '劳动合同或就业证明', '社保缴纳证明', '住房或租赁相关材料（按当地要求）'],
     steps: ['确认所在城市与毕业时间', '查看官方事项说明', '准备学历与就业材料', '扫码进入官方入口办理或查询'],
     officialUrl: 'https://hrsswb.qingdao.gov.cn/qddbbl/pages/gx.html',
-    sourceName: '综合整理 · 人才服务入口口径',
-    updatedAt: '2026-06-08',
+    sourceName: '综合整理 · 官方入口示例：青岛人才服务（其他地区请查询当地平台）',
   },
   {
     id: 'builtin-skill-training',
@@ -67,7 +64,6 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     steps: ['查询本地培训目录', '确认培训机构与补贴标准', '完成培训 / 评价', '通过官方平台申领或查询'],
     officialUrl: 'https://www.12333.gov.cn/job/?channel=12333',
     sourceName: '综合整理 · 人社培训补贴口径',
-    updatedAt: '2026-05-26',
   },
   {
     id: 'builtin-startup-loan',
@@ -80,8 +76,7 @@ export const BUILTIN_GUIDES: PolicyItem[] = [
     materials: ['身份证明', '营业执照或创业主体材料', '社保缴费记录', '场地租赁或经营材料', '银行账户信息（按官方要求）'],
     steps: ['确认创业主体与政策类型', '准备经营与社保材料', '扫码进入官方入口', '线下或线上按官方流程提交'],
     officialUrl: 'https://hrss.qingdao.gov.cn/',
-    sourceName: '综合整理 · 就业创业补贴清单口径',
-    updatedAt: '2026-05-20',
+    sourceName: '综合整理 · 官方入口示例：青岛人社（其他地区请查询当地人社平台）',
   },
 ]
 
@@ -119,7 +114,7 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     iconColor: 'text-success-fg',
     title: '参保证明打印',
     desc: '打印参保证明、缴纳记录用于贷款、落户等',
-    steps: ['携带身份证原件', '前往就业服务大厅 A 区', '3号综合服务窗口提交申请', '当场出具盖章证明'],
+    steps: ['官方平台可在线查询并下载电子参保证明', '需要纸质盖章证明时，携带身份证前往当地社保经办窗口', '具体窗口与出证方式以当地社保机构公布为准'],
     entryLabel: '打印申请材料',
   },
   {
@@ -128,9 +123,9 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     iconBg: 'bg-info-bg',
     iconColor: 'text-info',
     title: '医保异地就医备案',
-    desc: '跨省/跨市就医前需完成备案方可报销',
-    steps: ['下载"国家医保服务平台"App', '登录后选择"异地就医备案"', '填写就医地和就诊医院信息', '提交审核（1个工作日内）'],
-    entryLabel: '扫码备案',
+    desc: '跨省异地就医建议提前备案；报销规则以医保部门规定为准',
+    steps: ['通过"国家医保服务平台"App 或小程序办理备案', '登录后选择"异地就医备案"', '填写就医地和参保信息提交申请', '审核方式与时长以平台提示为准'],
+    entryLabel: '扫码打开国家医保服务平台',
     officialUrl: 'https://fuwu.nhsa.gov.cn/',
   },
   {
@@ -140,7 +135,7 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     iconColor: 'text-plum',
     title: '社保卡办理/补换',
     desc: '首次申领、挂失补办、换新社保卡',
-    steps: ['携带身份证前往合作银行', '填写社保卡申请表', '工作人员采集信息', '15个工作日内领取或邮寄'],
+    steps: ['携带身份证前往合作银行或社保经办网点', '填写社保卡申请表', '工作人员采集信息', '制卡领卡周期以银行 / 社保机构告知为准'],
     entryLabel: '打印申请表',
   },
 ]
@@ -167,7 +162,7 @@ export const REGISTER_ITEMS: RegisterItem[] = [
     title: '失业登记',
     purpose: '领取失业保险金、享受就业援助服务的前提',
     location: '户籍所在地（或常住地）就业服务大厅',
-    materials: ['居民身份证原件及复印件', '户口本（或居住证）', '解除/终止劳动合同证明', '本人银行卡', '1寸白底证件照 2 张'],
+    materials: ['居民身份证原件及复印件', '户口本（或居住证）', '解除/终止劳动合同证明', '本人银行卡', '证件照（规格与张数按当地要求）'],
   },
   {
     key: 'employment',
@@ -177,7 +172,7 @@ export const REGISTER_ITEMS: RegisterItem[] = [
     title: '就业创业登记',
     purpose: '享受就业扶持政策、计入社会保障就业档案',
     location: '就业服务大厅综合受理窗口',
-    materials: ['居民身份证原件及复印件', '劳动合同（就业）或营业执照（创业）', '1寸证件照 1 张（如变更信息）'],
+    materials: ['居民身份证原件及复印件', '劳动合同（就业）或营业执照（创业）', '证件照（如需变更信息，规格按当地要求）'],
   },
   {
     key: 'archive',
@@ -186,7 +181,7 @@ export const REGISTER_ITEMS: RegisterItem[] = [
     iconColor: 'text-warning-fg',
     title: '人事档案转移',
     purpose: '档案迁移至新工作单位或人才中心托管',
-    location: '人才服务中心档案窗口（需预约）',
+    location: '人才服务中心档案窗口（是否需预约以当地为准）',
     materials: ['居民身份证原件', '接收单位档案接收函（盖章）', '原存档机构出具的档案清单'],
   },
 ]

@@ -15,9 +15,12 @@
  */
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
+import { validate } from 'class-validator'
+import { plainToInstance } from 'class-transformer'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PoliciesService } from '../src/policies/policies.service'
+import { CreatePolicyPostDto, POLICY_AUDIENCES } from '../src/policies/dto/policy.dto'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
@@ -43,6 +46,21 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
 
 async function main() {
   console.log('\n=== 阶段1D 政策服务验证 ===')
+
+  // ── 0. DTO 白名单（class-validator 层;Service 直调会绕过,须单独断言）────────
+  {
+    if (!(POLICY_AUDIENCES as readonly string[]).includes('flexible')) fail('0a. POLICY_AUDIENCES 缺 flexible')
+    const okDto = plainToInstance(CreatePolicyPostDto, {
+      kind: 'policy_guide', title: 'DTO白名单验证', audience: 'flexible',
+    })
+    if ((await validate(okDto)).length === 0) pass('0a. DTO 接受 audience=flexible')
+    else fail('0a. DTO 应接受 audience=flexible')
+    const badDto = plainToInstance(CreatePolicyPostDto, {
+      kind: 'policy_guide', title: 'DTO白名单验证', audience: 'not_a_real_audience',
+    })
+    if ((await validate(badDto)).some((e) => e.property === 'audience')) pass('0b. DTO 拒绝非法 audience')
+    else fail('0b. DTO 应拒绝非法 audience')
+  }
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()

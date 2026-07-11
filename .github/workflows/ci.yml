@@ -152,6 +152,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-shell-active-nav
           pnpm --filter @ai-job-print/kiosk verify:prod-build-config
           pnpm --filter @ai-job-print/kiosk verify:job-info-ui
+          pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
           pnpm --filter @ai-job-print/admin verify:admin-billing-ui
@@ -225,6 +226,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs
+          pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:resume-extraction
 
@@ -305,6 +307,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs
+          pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d

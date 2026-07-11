@@ -348,7 +348,7 @@ model Organization {
 //   'policy_guide'  政策扶持条目(Kiosk 政策 Tab,按 audience 人群分组展示)
 //   'notice'        政策公告(Kiosk 公告 Tab,按 category 标签展示)
 // audience(kind=policy_guide):
-//   'graduate' 应届高校毕业生 | 'migrant' 返乡务工人员 | 'hardship' 困难群体 | 'startup' 创业扶持 | 'general'
+//   'graduate' 应届高校毕业生 | 'flexible' 灵活就业人员 | 'migrant' 返乡务工人员 | 'hardship' 困难群体 | 'startup' 创业扶持 | 'general'
 // category(kind=notice):
 //   'policy' 政策 | 'announcement' 公告 | 'notice' 通知 | 'recruitment' 招募
 //
