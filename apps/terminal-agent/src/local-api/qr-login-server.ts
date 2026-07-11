@@ -3,7 +3,7 @@ import { URL } from 'url'
 import axios from 'axios'
 import FormData from 'form-data'
 import type { AgentConfig } from '../agent/types'
-import { createApiClient } from '../agent/api-client'
+import { createApiClient, NO_RETRY_CONFIG } from '../agent/api-client'
 import { log, warn } from '../logger'
 import { consumeUsbFile, getUsbStatus, refreshUsbFileList } from '../usb/usb-files'
 import { allowedOrigins, isLocalBridgeTokenValid, isOriginAllowed } from './origin-guard'
@@ -160,13 +160,13 @@ async function handleUsbRoute(
   }
 
   if (req.method === 'GET' && url.pathname === '/local/usb/status') {
-    const status: LocalUsbStatusResponse = getUsbStatus()
+    const status: LocalUsbStatusResponse = await getUsbStatus()
     sendEnvelope(res, 200, status, origin)
     return
   }
 
   if (req.method === 'GET' && url.pathname === '/local/usb/files') {
-    const result = refreshUsbFileList()
+    const result = await refreshUsbFileList()
     const files: LocalUsbFileItem[] = result.files
     const response: LocalUsbListResponse = { present: result.present, driveLabel: result.driveLabel, files }
     sendEnvelope(res, 200, response, origin)
@@ -187,7 +187,7 @@ async function handleUsbUpload(
   origin: string,
   client: ReturnType<typeof createApiClient>,
 ): Promise<void> {
-  const body = await readJsonBody<LocalUsbUploadRequest>(req)
+  const body = await readJsonBody<LocalUsbUploadRequest>(req, 'usb')
   const safeId = typeof body.safeId === 'string' ? body.safeId : ''
   if (!safeId) {
     sendJson(res, 400, { code: 'LOCAL_USB_SAFE_ID_REQUIRED', message: '缺少要导入的文件标识' }, origin)
@@ -209,8 +209,11 @@ async function handleUsbUpload(
 
   let uploaded: BackendKioskUploadResult
   try {
+    // form-data 流一次发送后即被消费,自动重试会提交空体;上传也非幂等
+    // (响应丢失时重试会重复落文件),所以这里显式禁用 api-client 的自动重试。
     const response = await client.post<ApiEnvelope<BackendKioskUploadResult>>('/files/kiosk-upload', form, {
       headers: form.getHeaders(),
+      ...NO_RETRY_CONFIG,
     })
     uploaded = response.data.data
   } catch (error) {
@@ -306,14 +309,15 @@ async function handleClaim(
   sendEnvelope(res, 200, response.data.data, origin)
 }
 
-async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
+async function readJsonBody<T>(req: IncomingMessage, context: 'qr' | 'usb' = 'qr'): Promise<T> {
+  const prefix = context === 'usb' ? 'LOCAL_USB' : 'LOCAL_QR'
   let bytes = 0
   const chunks: Buffer[] = []
   for await (const chunk of req) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
     bytes += buffer.length
     if (bytes > MAX_BODY_BYTES) {
-      throw { status: 413, error: { code: 'LOCAL_QR_BODY_TOO_LARGE', message: '请求体过大' } } satisfies LocalApiException
+      throw { status: 413, error: { code: `${prefix}_BODY_TOO_LARGE`, message: '请求体过大' } } satisfies LocalApiException
     }
     chunks.push(buffer)
   }
@@ -322,10 +326,10 @@ async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
   try {
     parsed = JSON.parse(Buffer.concat(chunks).toString('utf-8')) as unknown
   } catch {
-    throw { status: 400, error: { code: 'LOCAL_QR_BAD_JSON', message: '请求 JSON 格式无效' } } satisfies LocalApiException
+    throw { status: 400, error: { code: `${prefix}_BAD_JSON`, message: '请求 JSON 格式无效' } } satisfies LocalApiException
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw { status: 400, error: { code: 'LOCAL_QR_BAD_JSON', message: '请求 JSON 必须是对象' } } satisfies LocalApiException
+    throw { status: 400, error: { code: `${prefix}_BAD_JSON`, message: '请求 JSON 必须是对象' } } satisfies LocalApiException
   }
   return parsed as T
 }

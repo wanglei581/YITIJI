@@ -97,8 +97,10 @@ export function PrintUploadPage() {
 
   // U 盘状态轮询:仅在 usb tab 激活、本机已配置令牌、且尚未选定文件时才轮询,
   // 避免在其它 tab 停留时对 Agent 发起无意义请求。
+  // 上传进行中也必须暂停轮询:每次 /local/usb/files 都会整体重建一次性 safeId
+  // 注册表,若上传期间继续轮询,正在消费的 safeId 会被下一轮刷新作废(410 竞态)。
   useEffect(() => {
-    if (tab !== 'usb' || !usbConfigured || file) return undefined
+    if (tab !== 'usb' || !usbConfigured || file || usbUploading) return undefined
     let cancelled = false
 
     const poll = async () => {
@@ -122,13 +124,19 @@ export function PrintUploadPage() {
       }
     }
 
-    void poll()
-    const timer = window.setInterval(() => void poll(), 2000)
+    // 自调度 setTimeout 而非 setInterval:上一轮 poll 完成后才排下一轮,
+    // Agent 响应慢时不会产生并发轮询叠加。
+    let timer: number | undefined
+    const loop = async () => {
+      await poll()
+      if (!cancelled) timer = window.setTimeout(() => void loop(), 2000)
+    }
+    void loop()
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [tab, usbConfigured, file])
+  }, [tab, usbConfigured, file, usbUploading])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]

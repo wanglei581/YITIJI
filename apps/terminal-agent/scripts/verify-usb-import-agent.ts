@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startQrLoginLocalServer } from '../src/local-api/qr-login-server'
@@ -63,8 +63,14 @@ async function startBackendStub(): Promise<{
       })
 
       if (req.method === 'POST' && req.url === '/api/v1/files/kiosk-upload') {
-        assert.ok(body.includes('print_doc'), 'multipart body must carry purpose=print_doc')
-        assert.ok(body.includes('usb-sample.pdf'), 'multipart body must carry the original filename')
+        const contentType = req.headers['content-type'] ?? ''
+        assert.match(String(contentType), /^multipart\/form-data; boundary=/, 'forwarded upload must be multipart with a boundary')
+        const text = body.toString('utf-8')
+        assert.ok(text.includes('name="file"'), 'multipart body must carry the file field under name="file"')
+        assert.ok(text.includes('filename="usb-sample.pdf"'), 'multipart body must carry the original filename')
+        assert.ok(text.includes('Content-Type: application/pdf'), 'multipart file part must declare the guessed mime type')
+        assert.ok(text.includes('%PDF-1.4 sample'), 'multipart body must carry the real file bytes')
+        assert.ok(text.includes('name="purpose"') && text.includes('print_doc'), 'multipart body must carry purpose=print_doc')
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({
           success: true,
@@ -119,7 +125,11 @@ async function callJson<T>(
 
 // ── Part 1: usb-files.ts 直接单元验证（真实临时目录，不经 HTTP） ────────────
 
-function verifyUsbFilesUnit(): void {
+async function verifyUsbFilesUnit(): Promise<void> {
+  // 大小上限必须独立断言为后端 kiosk-upload 实际生效值（proxy 模式 PROXY_MAX_BYTES=15MB），
+  // 不能只用实现导出的常量自证：实现改错成 20MB/30MB 时这里必须失败。
+  assert.equal(MAX_USB_FILE_BYTES, 15 * 1024 * 1024, 'USB size cap must match backend kiosk-upload proxy limit (15MB)')
+
   const dir = mkdtempSync(join(tmpdir(), 'usb-import-verify-'))
   try {
     writeFileSync(join(dir, 'resume.pdf'), '%PDF-1.4 valid document')
@@ -129,6 +139,10 @@ function verifyUsbFilesUnit(): void {
     writeFileSync(join(dir, '$RECYCLE.BIN.pdf'), 'dollar-prefixed must be filtered out')
     writeFileSync(join(dir, 'secret-hidden.pdf'), 'windows-hidden must be filtered out via provider')
     writeFileSync(join(dir, 'oversized.png'), Buffer.alloc(MAX_USB_FILE_BYTES + 1024, 1))
+    // 符号链接指向盘外文件:枚举必须拒绝(lstat 非常规文件),防链接把读取导向 U 盘外
+    const outsideTarget = join(tmpdir(), 'usb-import-verify-outside.pdf')
+    writeFileSync(outsideTarget, '%PDF-1.4 outside the drive')
+    symlinkSync(outsideTarget, join(dir, 'link-escape.pdf'))
 
     // enumerateDriveFiles: 纯 fs 枚举，扩展名白名单 + 命名黑名单，尚未应用隐藏文件过滤
     const raw = enumerateDriveFiles(dir)
@@ -136,13 +150,13 @@ function verifyUsbFilesUnit(): void {
     assert.deepEqual(
       rawNames,
       ['photo.jpg', 'resume.pdf', 'secret-hidden.pdf'].sort(),
-      'enumerateDriveFiles must keep only whitelisted extensions and drop dotfiles/$-prefixed/oversized/unsupported names',
+      'enumerateDriveFiles must keep only whitelisted extensions and drop dotfiles/$-prefixed/oversized/unsupported/symlink names',
     )
 
     // refreshUsbFileList: 注入假驱动 + 假隐藏文件 provider，验证隐藏文件过滤生效、safeId 生成
     const driveProvider = (): UsbDriveInfo => ({ rootPath: dir, label: 'TEST-USB' })
     const hiddenNamesProvider = () => new Set(['secret-hidden.pdf'])
-    const listed = refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    const listed = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
     assert.equal(listed.present, true)
     assert.equal(listed.driveLabel, 'TEST-USB')
     const listedNames = listed.files.map((f) => f.filename).sort()
@@ -160,31 +174,40 @@ function verifyUsbFilesUnit(): void {
     const replay = consumeUsbFile(target!.safeId)
     assert.equal(replay, null, 'safeId must not be reusable after first consume (replay must fail)')
 
+    // 枚举与读取之间文件被替换（大小变化）:消费必须拒绝
+    const swapped = listed.files.find((f) => f.filename === 'photo.jpg')
+    assert.ok(swapped, 'photo.jpg must be present in the listing')
+    writeFileSync(join(dir, 'photo.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x01]))
+    const swappedConsume = consumeUsbFile(swapped!.safeId)
+    assert.equal(swappedConsume, null, 'consume must reject a file whose size changed since enumeration')
+
     // refreshUsbFileList 重新枚举必须让旧一轮 safeId 全部失效（哪怕文件本身还在）
-    const otherTarget = listed.files.find((f) => f.filename === 'photo.jpg')!
-    refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    const listedAgain = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    const otherTarget = listedAgain.files.find((f) => f.filename === 'photo.jpg')!
+    await refreshUsbFileList(driveProvider, hiddenNamesProvider)
     const staleConsume = consumeUsbFile(otherTarget.safeId)
     assert.equal(staleConsume, null, 'safeId from a previous listing snapshot must be invalidated by a fresh refresh')
 
     // getUsbStatus 轻量查询不触碰注册表
     resetUsbRegistryForTest()
-    const listed2 = refreshUsbFileList(driveProvider, hiddenNamesProvider)
+    const listed2 = await refreshUsbFileList(driveProvider, hiddenNamesProvider)
     const anyId = listed2.files[0]!.safeId
-    const status = getUsbStatus(driveProvider)
+    const status = await getUsbStatus(driveProvider)
     assert.equal(status.present, true)
     assert.equal(status.driveLabel, 'TEST-USB')
     const stillConsumable = consumeUsbFile(anyId)
     assert.ok(stillConsumable, 'getUsbStatus must not invalidate safeIds issued by the prior refresh')
 
     // 无驱动时的行为
-    const noDrive = refreshUsbFileList(() => null)
+    const noDrive = await refreshUsbFileList(() => null)
     assert.deepEqual(noDrive, { present: false, driveLabel: null, files: [] })
-    assert.deepEqual(getUsbStatus(() => null), { present: false, driveLabel: null })
+    assert.deepEqual(await getUsbStatus(() => null), { present: false, driveLabel: null })
 
-    console.log('PASS usb-files.ts unit checks (enumeration whitelist / hidden filter / one-time safeId)')
+    console.log('PASS usb-files.ts unit checks (enumeration whitelist / hidden filter / one-time safeId / size re-check)')
   } finally {
     resetUsbRegistryForTest()
     rmSync(dir, { recursive: true, force: true })
+    rmSync(join(tmpdir(), 'usb-import-verify-outside.pdf'), { force: true })
   }
 }
 
@@ -257,6 +280,20 @@ async function verifyLocalHttpRoutes(): Promise<void> {
     assert.equal(files.json.data.present, false)
     assert.deepEqual(files.json.data.files, [])
 
+    // upload：JSON 非法 → 400 且错误码是 USB 专属（不是复用 QR 的 LOCAL_QR_BAD_JSON）
+    const badJsonResponse = await fetch(`${localBase}/local/usb/upload`, {
+      method: 'POST',
+      headers: {
+        Origin: ALLOWED_ORIGIN,
+        'X-Local-Bridge-Token': BRIDGE_TOKEN,
+        'Content-Type': 'application/json',
+      },
+      body: '{not-json',
+    })
+    assert.equal(badJsonResponse.status, 400)
+    const badJson = (await badJsonResponse.json()) as { error: { code: string } }
+    assert.equal(badJson.error.code, 'LOCAL_USB_BAD_JSON')
+
     // upload：safeId 缺失 → 400
     const missingSafeId = await callJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/usb/upload`,
@@ -281,7 +318,7 @@ async function verifyLocalHttpRoutes(): Promise<void> {
     const dir = mkdtempSync(join(tmpdir(), 'usb-import-verify-upload-'))
     try {
       writeFileSync(join(dir, 'usb-sample.pdf'), '%PDF-1.4 sample')
-      const listed = refreshUsbFileList(() => ({ rootPath: dir, label: 'UPLOAD-TEST' }), () => new Set())
+      const listed = await refreshUsbFileList(() => ({ rootPath: dir, label: 'UPLOAD-TEST' }), () => new Set())
       const target = listed.files.find((f) => f.filename === 'usb-sample.pdf')
       assert.ok(target, 'fixture file must appear in the injected listing')
 
@@ -319,6 +356,55 @@ async function verifyLocalHttpRoutes(): Promise<void> {
   }
 }
 
+// ── Part 3: Agent 侧未配置令牌 → 整个 /local/usb/* 分支 fail-closed ──────────
+// （Part 2 只测了客户端漏传/传错 header；这里测服务端根本没配置令牌的实例，
+//   即使客户端带上"正确"的令牌也必须 403，且 QR 路由不受影响。）
+
+async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
+  const backend = await startBackendStub()
+  const config: AgentConfig = {
+    apiBaseUrl: backend.baseUrl,
+    terminalCode: 'T-LOCAL-USB-NOTOKEN',
+    printerName: 'Test Printer',
+    agentVersion: 'verify',
+    terminalId: 'terminal-usb-2',
+    agentToken: 'agent-token-secret',
+    localApiPort: 0,
+    localApiAllowedOrigins: [ALLOWED_ORIGIN],
+    // localApiBridgeToken 故意不配置
+  }
+
+  const handle = startQrLoginLocalServer(config)
+  assert.ok(handle, 'local server should start even without a bridge token')
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  const address = handle.server.address()
+  assert.ok(typeof address === 'object' && address, 'local server must expose an address')
+  const localBase = `http://127.0.0.1:${address.port}`
+
+  try {
+    const denied = await callJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/usb/status`,
+      'GET',
+      { origin: ALLOWED_ORIGIN, bridgeToken: BRIDGE_TOKEN },
+    )
+    assert.equal(denied.status, 403, 'unconfigured bridge token must fail closed even with a client-side token')
+    assert.equal(denied.json.error.code, 'LOCAL_USB_BRIDGE_TOKEN_INVALID')
+
+    // QR 路由不受未配置 USB 令牌影响（错误码属于 QR 分支自身逻辑，而非被 403 挡下）
+    const qr = await callJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/qr-login/create`,
+      'POST',
+      { origin: ALLOWED_ORIGIN, body: {} },
+    )
+    assert.notEqual(qr.json.error?.code, 'LOCAL_USB_BRIDGE_TOKEN_INVALID', 'QR routes must not be gated by the USB bridge token')
+
+    console.log('PASS unconfigured-token instance fail-closed checks (server-side missing token → 403, QR unaffected)')
+  } finally {
+    await handle.close()
+    await backend.close()
+  }
+}
+
 // ── 未覆盖事项声明（不得静默假装已验证） ─────────────────────────────────────
 
 function verifyPlatformGapDisclosure(): void {
@@ -330,8 +416,9 @@ function verifyPlatformGapDisclosure(): void {
 }
 
 async function main(): Promise<void> {
-  verifyUsbFilesUnit()
+  await verifyUsbFilesUnit()
   await verifyLocalHttpRoutes()
+  await verifyUnconfiguredTokenFailClosed()
   verifyPlatformGapDisclosure()
   console.log('verify-usb-import-agent: ok')
 }
