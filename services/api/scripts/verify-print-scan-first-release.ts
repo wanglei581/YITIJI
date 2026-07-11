@@ -39,17 +39,21 @@ function mustNotMatch(source: string, pattern: RegExp, message: string): void {
   fail(`${message}，不应匹配: ${match[0].replace(/\s+/g, ' ').slice(0, 160)}`)
 }
 
-function assertNoOverclaim(source: string, message: string): void {
-  const allowedQualifiers = /(不代表|不等于|不得|不能|禁止|尚未|未执行|未完成|未通过|待现场|待补齐|仍需|需要|否|Not Passed Yet|PENDING|Blocked|阻塞|只代表|写成)/
-  const patterns = [
-    /Windows\s*真机[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
-    /真实扫描[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
-    /U\s*盘[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
-    /打印扫描[^。\n|]{0,40}(商用全闭环|生产完成|试运营完成|可上线|可商用)/,
-    /小范围试运营[^。\n|]{0,40}(已通过|通过|完成|已完成|可进入|允许进入)/,
-    /全部\s*Gate[^。\n|]{0,40}(已通过|通过|完成|已完成)/,
-  ]
-  const offenders = source
+// 诚实待办/免责限定词：命中这些词的分句不算过度宣称。
+// 「仍需」「有待」是同义变体（仍需…完成 / 有待…完成），需要同步维护避免只堵一个漏一个。
+const OVERCLAIM_ALLOWED_QUALIFIERS =
+  /(不代表|不等于|不得|不能|禁止|尚未|未执行|未完成|未通过|待现场|待补齐|仍需|有待|需要|否|Not Passed Yet|PENDING|Blocked|阻塞|只代表|写成)/
+const OVERCLAIM_PATTERNS = [
+  /Windows\s*真机[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
+  /真实扫描[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
+  /U\s*盘[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
+  /打印扫描[^。\n|]{0,40}(商用全闭环|生产完成|试运营完成|可上线|可商用)/,
+  /小范围试运营[^。\n|]{0,40}(已通过|通过|完成|已完成|可进入|允许进入)/,
+  /全部\s*Gate[^。\n|]{0,40}(已通过|通过|完成|已完成)/,
+]
+
+function findOverclaimOffenders(source: string): { index: number; line: string }[] {
+  return source
     .split(/\r?\n/)
     .map((line, index) => ({ index: index + 1, line: line.trim() }))
     .filter(({ line }) => line.length > 0)
@@ -60,7 +64,14 @@ function assertNoOverclaim(source: string, message: string): void {
         .filter((segment) => segment.length > 0)
         .map((segment) => ({ index, line: segment })),
     )
-    .filter(({ line }) => patterns.some((pattern) => pattern.test(line)) && !allowedQualifiers.test(line))
+    .filter(
+      ({ line }) =>
+        OVERCLAIM_PATTERNS.some((pattern) => pattern.test(line)) && !OVERCLAIM_ALLOWED_QUALIFIERS.test(line),
+    )
+}
+
+function assertNoOverclaim(source: string, message: string): void {
+  const offenders = findOverclaimOffenders(source)
 
   if (offenders.length === 0) {
     pass(message)
@@ -68,6 +79,43 @@ function assertNoOverclaim(source: string, message: string): void {
   }
 
   fail(`${message}，疑似过度宣称: ${offenders.map(({ index, line }) => `L${index}: ${line}`).join(' | ')}`)
+}
+
+// 回归覆盖：assertNoOverclaim 的正则逻辑不依赖真实文档内容，用合成用例锁定行为，
+// 防止未来再出现「诚实待办表述被误伤」或「真正过度宣称被放过」。
+function assertOverclaimHeuristicFixtures(): void {
+  const shouldFlag = [
+    'Windows 真机已完成验收。',
+    '真实扫描已通过验收测试。',
+    'U盘打印已完成联调。',
+    '打印扫描商用全闭环生产完成。',
+    '小范围试运营已通过验收。',
+    '全部 Gate 已通过。',
+  ]
+  const shouldNotFlag = [
+    // 2026-07-10 曾在 docs/progress/current-progress.md 触发误判的真实句子
+    'PostgreSQL 预生产 migration 执行、真机 register/heartbeat 实测、`enabled=false` 行为验收仍需在 Windows 真机 + 预生产环境完成，未预生产、未真机。',
+    'Windows 真机验收有待完成。',
+    '真实扫描仍需在真机上完成验收。',
+    'U盘打印仍需真机验收完成。',
+    '小范围试运营仍需完成现场验收。',
+    '全部 Gate 仍需完成。',
+  ]
+
+  const missedFlags = shouldFlag.filter((s) => findOverclaimOffenders(s).length === 0)
+  const falsePositives = shouldNotFlag.filter((s) => findOverclaimOffenders(s).length > 0)
+
+  if (missedFlags.length === 0 && falsePositives.length === 0) {
+    pass('assertNoOverclaim 回归用例：过度宣称仍被拦截，诚实待办表述不被误伤')
+    return
+  }
+
+  if (missedFlags.length > 0) {
+    fail(`assertNoOverclaim 回归失败，漏判疑似过度宣称: ${missedFlags.join(' | ')}`)
+  }
+  if (falsePositives.length > 0) {
+    fail(`assertNoOverclaim 回归失败，误伤诚实待办表述: ${falsePositives.join(' | ')}`)
+  }
 }
 
 function section(source: string, start: string, end: string): string {
@@ -257,6 +305,8 @@ function main(): void {
     acceptancePackage + '\n' + fieldRunbook + '\n' + currentProgress + '\n' + nextTasks,
     'print-scan docs must not overclaim Windows hardware, real scan, USB, production, or trial-operation completion',
   )
+
+  assertOverclaimHeuristicFixtures()
 
   if (failed > 0) {
     console.error(`\nverify-print-scan-first-release failed: ${failed} issue(s)`)
