@@ -250,7 +250,7 @@ export function PrintConfirmPage() {
                   遮挡 {materialCheck.redactedCount} 项，保留 {materialCheck.keptCount} 项。
                   {materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
                     ? '当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续。'
-                    : '本次打印前选择已记录，仅用于本次确认，不向第三方发送。'}
+                    : '本次打印前选择已记录，仅用于本次确认。'}
                 </p>
               </div>
             </div>
