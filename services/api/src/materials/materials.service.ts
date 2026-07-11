@@ -3,7 +3,6 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
 import type { FilePurpose } from '../files/file.types'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
-import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
@@ -16,37 +15,10 @@ import type {
   PiiFindingAction,
   PiiFindingView,
 } from './materials.types'
-
-/**
- * unpdf 提供 CJS 构建；services/api 是 commonjs + node10 resolution，
- * 不读 exports 的 types 字段，故用 require + 本地最小类型签名规避类型解析问题
- * （做法与 resume-extraction.service.ts 一致）。
- */
-interface UnpdfApi {
-  getDocumentProxy(data: Uint8Array): Promise<unknown>
-  extractText(
-    pdf: unknown,
-    options?: { mergePages?: boolean },
-  ): Promise<{ totalPages: number; text: string | string[] }>
-}
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const unpdf = require('unpdf') as UnpdfApi
+import { buildPiiFindingsFromPages, extractTextForPiiScan, HIGH_RISK_PII_PURPOSES } from './pii-scan.util'
 
 const TASK_TTL_HOURS = 24
-const MAX_SNIPPET_CHARS = 32
 const RAW_TEXT_PARAM_KEYS = new Set(['textsample', 'text', 'rawtext', 'fulltext', 'content', 'documenttext'])
-
-/** 这些用途天然高风险（简历/证件），必须真实扫描，不接受任何跳过提示。 */
-const HIGH_RISK_PII_PURPOSES: readonly FilePurpose[] = ['resume_upload', 'resume_scan', 'id_scan', 'cover_letter']
-/** 低于此字符数视为"没有可用文字层"，判定为扫描件走 OCR（与 resume-extraction.service.ts 同一阈值概念）。 */
-const MIN_TEXT_CHARS_FOR_BORN_DIGITAL = 30
-/** 扫描版 PDF 最多渲染识别的页数（控费 + 控时延）。 */
-const PII_SCAN_MAX_OCR_PAGES = (() => {
-  const n = Number(process.env['PII_SCAN_MAX_OCR_PAGES'])
-  return Number.isInteger(n) && n > 0 && n <= 10 ? n : 5
-})()
-/** OCR 渲染缩放（与 resume-extraction.service.ts 保持一致的清晰度/体积权衡）。 */
-const PII_SCAN_OCR_RENDER_SCALE = 2
 
 type TaskRecord = {
   id: string
@@ -173,7 +145,7 @@ export class MaterialsService {
     })
 
     if (kind === 'pii_scan') {
-      const contentCategory = readStringParam(dto.params, 'contentCategory')
+      const contentCategory = readStringParam(params, 'contentCategory')
       const isHighRiskPurpose = HIGH_RISK_PII_PURPOSES.includes(sourceFile.purpose as FilePurpose)
       if (!isHighRiskPurpose && contentCategory === 'photo') {
         await this.prisma.documentProcessTask.update({
@@ -182,8 +154,15 @@ export class MaterialsService {
         })
       } else {
         const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
-        const extraction = buffer ? await this.extractTextForPiiScan(buffer, sourceFile.mimeType) : { pages: [], degraded: true }
-        if (extraction.degraded) {
+        const extraction = buffer
+          ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
+          : { pages: [], outcome: 'degraded' as const }
+        if (extraction.outcome === 'unsupported_format') {
+          await this.prisma.documentProcessTask.update({
+            where: { id: task.id },
+            data: { resultJson: JSON.stringify({ mode: 'unsupported_format', findingCount: 0 }) },
+          })
+        } else if (extraction.outcome === 'degraded') {
           await this.prisma.documentProcessTask.update({
             where: { id: task.id },
             data: { resultJson: JSON.stringify({ mode: 'degraded', findingCount: 0 }) },
@@ -430,63 +409,6 @@ export class MaterialsService {
     }
   }
 
-  /**
-   * 为 pii_scan 提取可用于正则匹配的文本内容。
-   * PDF 优先走 unpdf 文字层（born-digital，零 OCR 成本）；抽不到有效文字（扫描件/图片型 PDF）
-   * 才逐页渲染 + OCR。图片直接 OCR。OCR 不可用/失败时诚实返回 degraded，不静默编造结果。
-   */
-  private async extractTextForPiiScan(
-    buffer: Buffer,
-    mimeType: string,
-  ): Promise<{
-    pages: Array<{ pageNumber: number | null; text: string }>
-    degraded: boolean
-  }> {
-    if (mimeType === 'application/pdf') {
-      let rawText = ''
-      let totalPages = 0
-      try {
-        const pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
-        const extracted = await unpdf.extractText(pdf, { mergePages: true })
-        totalPages = extracted.totalPages
-        rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
-      } catch {
-        return { pages: [], degraded: true }
-      }
-      if (rawText.trim().length >= MIN_TEXT_CHARS_FOR_BORN_DIGITAL) {
-        return { pages: [{ pageNumber: null, text: rawText }], degraded: false }
-      }
-      // 文字层为空/极少 → 扫描件，逐页渲染 + OCR
-      const pagesToRender = Math.min(Math.max(totalPages, 1), PII_SCAN_MAX_OCR_PAGES)
-      const pages: Array<{ pageNumber: number | null; text: string }> = []
-      try {
-        const rendered = await openPdfForRender(buffer)
-        try {
-          for (let pageNo = 1; pageNo <= pagesToRender; pageNo += 1) {
-            const img = await rendered.renderPage(pageNo, PII_SCAN_OCR_RENDER_SCALE)
-            const ocrResult = await this.ocr.recognize({ buffer: img, mimeType: 'image/png' })
-            if (!ocrResult.ok) return { pages: [], degraded: true }
-            pages.push({ pageNumber: pageNo, text: ocrResult.text ?? '' })
-          }
-        } finally {
-          await rendered.destroy().catch(() => undefined)
-        }
-      } catch {
-        return { pages: [], degraded: true }
-      }
-      return { pages, degraded: false }
-    }
-
-    if (isSinglePageImage(mimeType)) {
-      const ocrResult = await this.ocr.recognize({ buffer, mimeType })
-      if (!ocrResult.ok) return { pages: [], degraded: true }
-      return { pages: [{ pageNumber: 1, text: ocrResult.text ?? '' }], degraded: false }
-    }
-
-    // 不支持的 MIME：既不是可扫描的错误，也没有可扫描的内容——按无命中处理，不算降级。
-    return { pages: [], degraded: false }
-  }
-
   private async evaluateNormalizeA4(sourceFile: SourceFileRecord): Promise<NormalizeA4Summary> {
     const inspection = await this.inspectSourceFile(sourceFile)
     const canNormalize = inspection.pageCountSource === 'image_single_page' ||
@@ -590,68 +512,6 @@ export class MaterialsService {
   }
 }
 
-type PiiFindingDraft = {
-  type: string
-  label: string
-  pageNumber: number | null
-  snippet: string | null
-  confidence: number
-  action: PiiFindingAction
-}
-
-function buildPiiFindingsFromPages(pages: Array<{ pageNumber: number | null; text: string }>): PiiFindingDraft[] {
-  const findings: PiiFindingDraft[] = []
-  const seen = new Set<string>()
-
-  const pushUnique = (finding: PiiFindingDraft) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  }
-
-  for (const { pageNumber, text } of pages) {
-    collectMatches(text, /(?:^|[^\d])((?:\+?86[- ]?)?1[3-9]\d{9})(?!\d)/g, (value) => ({
-      type: 'phone',
-      label: '手机号',
-      pageNumber,
-      snippet: maskPiiSnippet('phone', value),
-      confidence: 0.95,
-      action: 'pending' as const,
-    })).forEach(pushUnique)
-
-    collectMatches(text, /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, (value) => ({
-      type: 'email',
-      label: '邮箱',
-      pageNumber,
-      snippet: maskPiiSnippet('email', value),
-      confidence: 0.93,
-      action: 'pending' as const,
-    })).forEach(pushUnique)
-
-    collectMatches(text, /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g, (value) => ({
-      type: 'id_card',
-      label: '身份证号',
-      pageNumber,
-      snippet: maskPiiSnippet('id_card', value),
-      confidence: 0.9,
-      action: 'pending' as const,
-    })).forEach(pushUnique)
-
-    collectMatches(text, /([\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[\u4e00-\u9fa5A-Za-z0-9\s-]{0,24}号?)/g, (value) => ({
-      type: 'address',
-      label: '地址',
-      pageNumber,
-      snippet: maskPiiSnippet('address', value),
-      confidence: 0.78,
-      action: 'pending' as const,
-    })).forEach(pushUnique)
-  }
-
-  return findings
-}
-
 function buildPiiRedactionSummary(args: {
   decisionTaskId: string | null
   findings: Array<{ action: string }>
@@ -682,16 +542,6 @@ function buildPiiRedactionSummary(args: {
     warnings,
     messages,
   }
-}
-
-function collectMatches<T>(text: string, regex: RegExp, toFinding: (value: string) => T): T[] {
-  const findings: T[] = []
-  let match: RegExpExecArray | null
-  while ((match = regex.exec(text)) !== null) {
-    const value = match[1]
-    if (value) findings.push(toFinding(value))
-  }
-  return findings
 }
 
 function sanitizeParams(value: unknown, kind: MaterialTaskKind): Record<string, unknown> {
@@ -812,60 +662,6 @@ function estimateA4Dpi(widthPx: number, heightPx: number): number {
   const portraitDpi = Math.min(widthPx / 8.27, heightPx / 11.69)
   const landscapeDpi = Math.min(widthPx / 11.69, heightPx / 8.27)
   return Math.max(1, Math.round(Math.max(portraitDpi, landscapeDpi)))
-}
-
-function limitSnippet(value: string): string {
-  return value.length > MAX_SNIPPET_CHARS ? value.slice(0, MAX_SNIPPET_CHARS) : value
-}
-
-/**
- * 服务端落库前掩码 PII 片段（M1）。
- *
- * DB 与 API 返回的 snippet 不再包含完整手机号 / 邮箱 / 身份证号 / 地址原文，
- * 仅保留供用户辨识类型的最小片段。前端 maskSnippet 作为二次防护，但不依赖前端。
- */
-function maskPiiSnippet(type: string, raw: string): string {
-  const value = raw.trim()
-  if (!value) return ''
-  let masked: string
-  if (type === 'phone') masked = maskPhone(value)
-  else if (type === 'email') masked = maskEmail(value)
-  else if (type === 'id_card') masked = maskIdCard(value)
-  else if (type === 'address') masked = maskAddress(value)
-  else masked = maskGeneric(value)
-  return limitSnippet(masked)
-}
-
-function maskPhone(value: string): string {
-  const digits = value.replace(/\D/g, '')
-  const core = digits.length > 11 ? digits.slice(-11) : digits
-  if (core.length < 7) return `${core.slice(0, 1)}****`
-  return `${core.slice(0, 3)}****${core.slice(-4)}`
-}
-
-function maskEmail(value: string): string {
-  const at = value.indexOf('@')
-  if (at <= 0) return maskGeneric(value)
-  const domain = value.slice(at + 1)
-  return `${value.slice(0, 1)}***@${domain}`
-}
-
-function maskIdCard(value: string): string {
-  const v = value.toUpperCase()
-  if (v.length <= 6) return `${v.slice(0, 1)}****`
-  return `${v.slice(0, 3)}****${v.slice(-2)}`
-}
-
-function maskAddress(value: string): string {
-  // 保留到第一个行政级别字（省/市/区/县）为止，遮住后续街道、门牌等详细段。
-  const match = value.match(/[省市区县]/)
-  if (match && match.index !== undefined) return `${value.slice(0, match.index + 1)}****`
-  return `${value.slice(0, 2)}****`
-}
-
-function maskGeneric(value: string): string {
-  if (value.length <= 4) return `${value.slice(0, 1)}**`
-  return `${value.slice(0, 2)}***${value.slice(-2)}`
 }
 
 function toTaskView(task: TaskRecord): DocumentProcessTaskView {
