@@ -1,10 +1,18 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common'
 import PDFDocument from 'pdfkit'
+import { createHash } from 'crypto'
 import type { ConvertImageSource, ConvertImagesResponse } from './print-conversion.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
+import { RedisService } from '../common/redis/redis.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { countPdfPages } from '../files/file-page-count.util'
 import { readImageDimensions } from './image-dimensions.util'
@@ -17,6 +25,8 @@ const MAX_TOTAL_PIXELS = 200_000_000
 const PROXY_MAX_OUTPUT_BYTES = 15 * 1024 * 1024
 const OUTPUT_URL_TTL_MS = 30 * 60 * 1000
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png'])
+const IDEMPOTENCY_LOCK_TTL_SECONDS = 120
+const IDEMPOTENCY_RESULT_TTL_SECONDS = 600
 
 const PAGE_WIDTH_PT = 595.28 // A4
 const PAGE_HEIGHT_PT = 841.89
@@ -32,13 +42,15 @@ export class PrintConversionService {
     private readonly storage: StorageService,
     private readonly audit: AuditService,
     private readonly files: FilesService,
+    private readonly redis: RedisService,
   ) {}
 
   async convertImagesToPdf(args: {
     sources: ConvertImageSource[]
     endUserId: string | null
+    idempotencyKey?: string | null
   }): Promise<ConvertImagesResponse> {
-    const { sources, endUserId } = args
+    const { sources, endUserId, idempotencyKey } = args
 
     if (sources.length < 1) {
       throw new BadRequestException({ error: { code: 'CONVERT_INPUT_INVALID', message: '请至少选择一张图片' } })
@@ -51,6 +63,69 @@ export class PrintConversionService {
       throw new BadRequestException({ error: { code: 'CONVERT_INPUT_INVALID', message: '图片列表存在重复项' } })
     }
 
+    const idemKey = idempotencyKey ? this.idempotencyRedisKey(idempotencyKey, endUserId) : null
+    const fingerprint = fingerprintSources(sources)
+
+    if (idemKey) {
+      const cached = await this.claimIdempotency(idemKey, fingerprint)
+      if (cached) return cached
+    }
+
+    try {
+      const result = await this.doConvert(sources, endUserId)
+      if (idemKey) {
+        await this.redis.setEx(
+          idemKey,
+          IDEMPOTENCY_RESULT_TTL_SECONDS,
+          JSON.stringify({ status: 'completed', fingerprint, ...result }),
+        )
+      }
+      return result
+    } catch (err) {
+      if (idemKey) await this.redis.del(idemKey)
+      throw err
+    }
+  }
+
+  private idempotencyRedisKey(idempotencyKey: string, endUserId: string | null): string {
+    return `print-conversion:idem:${endUserId ?? 'guest'}:${idempotencyKey}`
+  }
+
+  /** 返回非 null 表示命中已完成的历史结果（重新签发新的 printFileUrl）；抛异常表示冲突；返回 null 表示可以继续新流程。 */
+  private async claimIdempotency(idemKey: string, fingerprint: string): Promise<ConvertImagesResponse | null> {
+    const claimed = await this.redis.setNxEx(
+      idemKey,
+      JSON.stringify({ status: 'in_progress', fingerprint }),
+      IDEMPOTENCY_LOCK_TTL_SECONDS,
+    )
+    if (claimed) return null
+
+    const raw = await this.redis.get(idemKey)
+    if (!raw) return null // 极端竞态：占位刚好过期，按新请求继续
+
+    const state = JSON.parse(raw) as { status: 'in_progress' | 'completed'; fingerprint: string } & Partial<ConvertImagesResponse>
+    if (state.fingerprint !== fingerprint) {
+      throw new ConflictException({
+        error: { code: 'IDEMPOTENCY_KEY_REUSED', message: '该请求标识已用于另一批图片，请更换标识重试' },
+      })
+    }
+    if (state.status === 'in_progress') {
+      throw new ConflictException({
+        error: { code: 'CONVERSION_IN_PROGRESS', message: '上一次生成仍在进行中，请稍候重试' },
+      })
+    }
+    // completed：重新签发 URL，不重复生成。
+    const printSigned = signFileUrl(state.fileId!, OUTPUT_URL_TTL_MS)
+    return {
+      fileId: state.fileId!,
+      printFileUrl: printSigned.url,
+      fileMd5: state.fileMd5!,
+      sizeBytes: state.sizeBytes!,
+      pages: state.pages!,
+    }
+  }
+
+  private async doConvert(sources: ConvertImageSource[], endUserId: string | null): Promise<ConvertImagesResponse> {
     const validated: ValidatedSource[] = []
     let totalBytes = 0
     let totalPixels = 0
@@ -178,6 +253,12 @@ export class PrintConversionService {
       doc.end()
     })
   }
+}
+
+function fingerprintSources(sources: ConvertImageSource[]): string {
+  return createHash('sha256')
+    .update(sources.map((s) => s.fileId).join('|'))
+    .digest('hex')
 }
 
 function parseFileAccessUrl(url: string): { fileId: string; expires: string; sig: string } | null {
