@@ -442,10 +442,10 @@ export class MaterialsService {
     const BLANK_PIXEL_RATIO_THRESHOLD = 0.99
     const BLANK_RENDER_SCALE = 0.3
 
-    const isPageBlank = async (imageBuffer: Buffer, imageMimeType: string): Promise<boolean> => {
-      if (!looksLikeCompleteImage(imageBuffer, imageMimeType)) return false
+    const isPageBlank = async (pngBuffer: Buffer): Promise<boolean> => {
+      if (!looksLikeCompleteImage(pngBuffer)) return false
       const { loadImage, createCanvas } = await import('@napi-rs/canvas')
-      const image = await loadImage(imageBuffer)
+      const image = await loadImage(pngBuffer)
       const canvas = createCanvas(image.width, image.height)
       const ctx = canvas.getContext('2d')
       ctx.drawImage(image, 0, 0)
@@ -471,7 +471,7 @@ export class MaterialsService {
           const pagesToScan = Math.min(rendered.totalPages, BLANK_SCAN_MAX_PAGES)
           for (let pageNo = 1; pageNo <= pagesToScan; pageNo += 1) {
             const img = await rendered.renderPage(pageNo, BLANK_RENDER_SCALE)
-            if (await isPageBlank(img, 'image/png')) blankPages.push(pageNo)
+            if (await isPageBlank(img)) blankPages.push(pageNo)
           }
           return blankPages
         } finally {
@@ -483,11 +483,15 @@ export class MaterialsService {
     }
 
     if (isSinglePageImage(mimeType)) {
-      try {
-        return (await isPageBlank(buffer, mimeType)) ? [1] : []
-      } catch {
-        return []
-      }
+      // 已知问题（Critical，已复现两次）：对任意用户上传的原始图片字节直接调用
+      // @napi-rs/canvas 的原生 loadImage() 有 SIGSEGV 风险（整进程崩溃，JS try/catch
+      // 完全防不住），且尝试过的"文件完整性预检"启发式已被证明可以被少量已知字节
+      // 绕过（不是真正的结构校验）。在有真正的进程级隔离方案（如 child_process 里
+      // 单独解码）之前，直接跳过对原始上传图片的空白页检测——这是唯一能真正
+      // 消除该崩溃面的办法，而不是继续叠加更多可被绕过的启发式检查。
+      // PDF 渲染分支不受影响：那条路径的 PNG 是本服务自己 canvas.toBuffer() 生成的，
+      // 不是攻击者可控字节，仍然安全，继续保留空白页检测。
+      return []
     }
 
     return []
@@ -743,45 +747,17 @@ function isJpegStartOfFrame(marker: number | undefined): boolean {
 }
 
 /**
- * 轻量"文件是否完整"预检：在把 buffer 交给 @napi-rs/canvas 的原生 loadImage() 之前先做。
- * 背景（Critical，已复现确认）：loadImage() 对不完整/畸形图片可能直接 SIGSEGV 整个进程，
- * 而不是抛可捕获的 JS 异常——try/catch 完全防不住原生崩溃。这里用最基本的"文件尾部是否
- * 有该格式的结束标记"做预检，不完整就直接跳过检测（返回未发现空白页），不去解码。
- * 注意：这只挡住"截断/不完整文件"这一类已复现的崩溃触发方式，不保证挡住所有可能让原生
- * 解码器崩溃的畸形输入——如果未来发现别的崩溃模式，需要更彻底的方案（例如把解码放进
- * worker_thread 隔离），本轮先做这个成本最低、能挡住已知问题的版本。
+ * 轻量"文件是否完整"预检：只用于 PDF 渲染出的 PNG（本服务自己生成，非攻击者可控字节），
+ * 作为防御性兜底，不是安全边界本身——渲染管线正常情况下不会产出不完整的 PNG，
+ * 这里只是多一道保险。原始上传图片的空白页检测已整体移除，见 detectBlankPages。
  */
-function looksLikeCompleteImage(buffer: Buffer, mimeType: string): boolean {
+function looksLikeCompleteImage(buffer: Buffer): boolean {
   const MIN_PLAUSIBLE_BYTES = 100
   if (buffer.length < MIN_PLAUSIBLE_BYTES) return false
-
-  if (mimeType === 'image/png') {
-    const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex')
-    if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return false
-    // 合法 PNG 必须以 IEND chunk 收尾；截断文件（比如只有签名+IHDR）不会有这段。
-    const tail = buffer.subarray(-16).toString('ascii')
-    return tail.includes('IEND')
-  }
-
-  if (mimeType === 'image/jpeg') {
-    if (buffer[0] !== 0xff || buffer[1] !== 0xd8) return false
-    // 合法 JPEG 以 EOI 标记 (FF D9) 结尾；个别编码器后面可能有极少量 padding，放宽到看最后 4 字节。
-    const tail = buffer.subarray(-4)
-    for (let i = 0; i < tail.length - 1; i += 1) {
-      if (tail[i] === 0xff && tail[i + 1] === 0xd9) return true
-    }
-    return false
-  }
-
-  if (mimeType === 'image/webp') {
-    const header = buffer.subarray(0, 12).toString('ascii')
-    // WEBP 是基于 chunk 的可变长格式，完整性没有 PNG/JPEG 那样简单的尾部标记；
-    // 这里只做头部合法性 + 最小体积检查，覆盖不了所有截断场景，但能挡住本次复现的
-    // "只有几十字节头部" 这类极端情况。
-    return header.startsWith('RIFF') && header.includes('WEBP')
-  }
-
-  return false
+  const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex')
+  if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return false
+  const tail = buffer.subarray(-16).toString('ascii')
+  return tail.includes('IEND')
 }
 
 function estimateA4Dpi(widthPx: number, heightPx: number): number {

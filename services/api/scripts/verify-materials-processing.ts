@@ -94,6 +94,8 @@ async function main() {
   const docxFileId = `file_mat_docx_${suffix}`
   const blankImageFileId = `file_mat_blank_${suffix}`
   const nonBlankImageFileId = `file_mat_nonblank_${suffix}`
+  const blankPdfFileId = `file_mat_blankpdf_${suffix}`
+  const nonBlankPdfFileId = `file_mat_nonblankpdf_${suffix}`
   const testFileIds = [
     ownedFileId,
     anonymousFileId,
@@ -105,6 +107,8 @@ async function main() {
     docxFileId,
     blankImageFileId,
     nonBlankImageFileId,
+    blankPdfFileId,
+    nonBlankPdfFileId,
   ]
   const ownedObjectKey = `verify/materials/${ownedFileId}.png`
   const imageObjectKey = `verify/materials/${imageFileId}.png`
@@ -115,6 +119,8 @@ async function main() {
   const docxObjectKey = `verify/materials/${docxFileId}.docx`
   const blankImageObjectKey = `verify/materials/${blankImageFileId}.png`
   const nonBlankImageObjectKey = `verify/materials/${nonBlankImageFileId}.png`
+  const blankPdfObjectKey = `verify/materials/${blankPdfFileId}.pdf`
+  const nonBlankPdfObjectKey = `verify/materials/${nonBlankPdfFileId}.pdf`
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
   const textSample = '请联系 13800138000 或 zhangsan@example.com，身份证 110101199001011234，地址 青岛市市南区测试路 1 号。'
@@ -725,7 +731,11 @@ async function main() {
       fail(`E. Expected mode=real with a phone finding from real DOCX text, got ${JSON.stringify(docxTask.result)}`)
     }
 
-    // ── 空白页检测：真实、可解码的 PNG（非法/最小 stub 会在 canvas 解码阶段静默 fail-open）──────
+    // ── 空白页检测：raw 上传图片分支已整体禁用（见 materials.service.ts detectBlankPages 的
+    //    SIGSEGV-可绕过修复），这里的 blank/non-blank PNG fixture 现在只用于验证「即使内容
+    //    真的空白，raw-image 分支也绝不会再触发检测」这一回归断言；真正的检测能力验证
+    //    移到下面的 PDF-render 分支（H/I），因为那条路径的 PNG 是本服务自己 canvas 生成的，
+    //    不是攻击者可控字节，仍然安全，功能也仍然保留 ──────────────────────────────────
 
     const blankPngBytes = makeBlankWhitePng(64, 64)
     const blankPut = await storage.putObject(blankImageObjectKey, blankPngBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
@@ -774,10 +784,10 @@ async function main() {
     )
     const blankChecks = (blankInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
     const blankMessages = Array.isArray(blankChecks['messages']) ? (blankChecks['messages'] as Array<Record<string, unknown>>) : []
-    if (blankMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED') && blankChecks['canPrint'] === true) {
-      pass('F. Blank white PNG inspection surfaces a BLANK_PAGE_SUSPECTED message without blocking canPrint')
+    if (!blankMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED')) {
+      pass('F. Raw uploaded blank white PNG never triggers blank-page detection (raw-image branch intentionally disabled)')
     } else {
-      fail(`F. Expected a BLANK_PAGE_SUSPECTED message for a blank white PNG, got ${JSON.stringify(blankChecks)}`)
+      fail(`F. Expected NO blank-page detection for a raw-uploaded PNG (branch disabled), got ${JSON.stringify(blankChecks)}`)
     }
 
     const nonBlankInspectionTask = await materials.createTask(
@@ -787,9 +797,79 @@ async function main() {
     const nonBlankChecks = (nonBlankInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
     const nonBlankMessages = Array.isArray(nonBlankChecks['messages']) ? (nonBlankChecks['messages'] as Array<Record<string, unknown>>) : []
     if (!nonBlankMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED')) {
-      pass('G. Fully black (non-blank) PNG inspection does not report BLANK_PAGE_SUSPECTED')
+      pass('G. Raw uploaded non-blank PNG also never triggers blank-page detection (same disabled branch)')
     } else {
-      fail(`G. Non-blank PNG unexpectedly reported BLANK_PAGE_SUSPECTED, got ${JSON.stringify(nonBlankChecks)}`)
+      fail(`G. Non-blank PNG unexpectedly reported blank-page detection, got ${JSON.stringify(nonBlankChecks)}`)
+    }
+
+    // ── H/I：PDF-render 分支的空白页检测能力仍然保留（该路径的 PNG 是本服务自己
+    //    canvas.toBuffer() 生成的，不是攻击者可控字节），用真实可渲染的单页 PDF 验证 ────────
+
+    const blankPdfBytes = buildSinglePagePdf('')
+    const blankPdfPut = await storage.putObject(blankPdfObjectKey, blankPdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: blankPdfFileId,
+        storageKey: blankPdfObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'blank-page.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: blankPdfPut.sizeBytes,
+        sha256: blankPdfPut.sha256,
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    const nonBlankPdfBytes = buildSinglePagePdf('0 0 0 rg\n0 0 200 200 re\nf')
+    const nonBlankPdfPut = await storage.putObject(nonBlankPdfObjectKey, nonBlankPdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: nonBlankPdfFileId,
+        storageKey: nonBlankPdfObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'non-blank-page.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: nonBlankPdfPut.sizeBytes,
+        sha256: nonBlankPdfPut.sha256,
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+
+    const blankPdfInspectionTask = await materials.createTask(
+      { kind: 'inspection', sourceFileId: blankPdfFileId, params: { purpose: 'print_check' } },
+      { kind: 'anonymous' },
+    )
+    const blankPdfChecks = (blankPdfInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    const blankPdfMessages = Array.isArray(blankPdfChecks['messages']) ? (blankPdfChecks['messages'] as Array<Record<string, unknown>>) : []
+    if (blankPdfMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED') && blankPdfChecks['canPrint'] === true) {
+      pass('H. Genuinely blank single-page PDF (real pdfjs render) surfaces BLANK_PAGE_SUSPECTED without blocking canPrint')
+    } else {
+      fail(`H. Expected a BLANK_PAGE_SUSPECTED message for a genuinely blank rendered PDF page, got ${JSON.stringify(blankPdfChecks)}`)
+    }
+
+    const nonBlankPdfInspectionTask = await materials.createTask(
+      { kind: 'inspection', sourceFileId: nonBlankPdfFileId, params: { purpose: 'print_check' } },
+      { kind: 'anonymous' },
+    )
+    const nonBlankPdfChecks = (nonBlankPdfInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    const nonBlankPdfMessages = Array.isArray(nonBlankPdfChecks['messages'])
+      ? (nonBlankPdfChecks['messages'] as Array<Record<string, unknown>>)
+      : []
+    if (!nonBlankPdfMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED')) {
+      pass('I. Genuinely non-blank single-page PDF (real pdfjs render) does not report BLANK_PAGE_SUSPECTED')
+    } else {
+      fail(`I. Non-blank rendered PDF unexpectedly reported BLANK_PAGE_SUSPECTED, got ${JSON.stringify(nonBlankPdfChecks)}`)
     }
 
     await prisma.documentProcessTask.update({
@@ -816,6 +896,8 @@ async function main() {
     await storage.deleteObject(docxObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(blankImageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(nonBlankImageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(blankPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(nonBlankPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 
@@ -881,6 +963,32 @@ function makeNonBlankPng(width: number, height: number): Buffer {
   ctx.fillStyle = '#000000'
   ctx.fillRect(0, 0, width, height)
   return canvas.toBuffer('image/png')
+}
+
+// ── 真实、可被 pdfjs 渲染的单页 PDF（用于 detectBlankPages 的 PDF 分支测试；内容用矩形
+//    填充而非文字，避免依赖 pdfjs 的 standard-font 资源解析，渲染结果可靠区分黑/白）───────
+
+function buildSinglePagePdf(content: string): Buffer {
+  const header = '%PDF-1.4\n'
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(content, 'utf8')} >>\nstream\n${content}\nendstream`,
+  ]
+  let bodyStr = header
+  const offsets: number[] = []
+  objects.forEach((obj, idx) => {
+    offsets.push(Buffer.byteLength(bodyStr, 'utf8'))
+    bodyStr += `${idx + 1} 0 obj\n${obj}\nendobj\n`
+  })
+  const xrefStart = Buffer.byteLength(bodyStr, 'utf8')
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  offsets.forEach((off) => {
+    xref += `${String(off).padStart(10, '0')} 00000 n \n`
+  })
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
+  return Buffer.from(bodyStr + xref + trailer, 'utf8')
 }
 
 // ── 手搓最小 DOCX（stored ZIP，CRC32 用 Node 内置 zlib.crc32）——与
