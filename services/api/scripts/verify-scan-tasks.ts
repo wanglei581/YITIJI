@@ -32,6 +32,15 @@ interface StoredFileObject {
   deletedAt: Date | null
 }
 
+/**
+ * 最小合法 PDF 字节(魔数 %PDF 开头)。真实 FilesService.upload 现在做魔数校验
+ * (files/content-sniff.ts),扫描投递 fixture 与真机行为保持同款字节形态。
+ * 按仓库测试惯例本地复制 helper(参考 verify-admin-fairs.ts 的 tinyPdf)。
+ */
+function tinyPdf(): Buffer {
+  return Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'latin1')
+}
+
 /** 兼容真实 Prisma 调用形态：status 既可能是裸字符串，也可能是 `{ in: [...] }`（cancel() 的 CAS 用后者）。 */
 type StatusMatcher = string | { in: string[] }
 
@@ -223,7 +232,7 @@ async function main(): Promise<void> {
     // 没有等待中任务时投递必须 409 ConflictException（不得误建档，也不能静默吞掉文件）
     const { service } = makeService()
     await expectRejects(
-      () => service.deliverScanFile({ terminalId: 't_1', buffer: Buffer.from('x'), filename: 'stray.pdf', mimeType: 'application/pdf' }),
+      () => service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'stray.pdf', mimeType: 'application/pdf' }),
       ConflictException,
       'no waiting task rejected',
     )
@@ -235,7 +244,7 @@ async function main(): Promise<void> {
     const first = await service.create(dto, null)
     await new Promise((r) => setTimeout(r, 5))
     const second = await service.create(dto, null)
-    const delivered = await service.deliverScanFile({ terminalId: 't_1', buffer: Buffer.from('x'), filename: 'a.pdf', mimeType: 'application/pdf' })
+    const delivered = await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
     assert.equal(delivered.scanTaskId, first.scanTaskId, 'must match the oldest waiting task, not the newest')
     void second
   }
@@ -249,7 +258,7 @@ async function main(): Promise<void> {
     const status = await service.getStatus(created.scanTaskId, null)
     assert.equal(status.status, 'expired')
     await expectRejects(
-      () => service.deliverScanFile({ terminalId: 't_1', buffer: Buffer.from('x'), filename: 'late.pdf', mimeType: 'application/pdf' }),
+      () => service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'late.pdf', mimeType: 'application/pdf' }),
       ConflictException,
       'expired task must not be matched',
     )
@@ -295,7 +304,7 @@ async function main(): Promise<void> {
     // 已完成任务不能取消（cancel() 在 CAS 之前就做了 completed 前置检查）
     const { service } = makeService()
     const created = await service.create(dto, null)
-    await service.deliverScanFile({ terminalId: 't_1', buffer: Buffer.from('x'), filename: 'a.pdf', mimeType: 'application/pdf' })
+    await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
     await expectRejects(() => service.cancel(created.scanTaskId, null), BadRequestException, 'completed task cannot be cancelled')
   }
 
@@ -310,7 +319,7 @@ async function main(): Promise<void> {
     // scanType -> FilePurpose 映射正确（id 扫描必须落 id_scan，不能落成通用 print_doc）
     const { service, prisma } = makeService()
     const created = await service.create({ scanType: 'id', terminalId: 't_1' }, null)
-    const delivered = await service.deliverScanFile({ terminalId: 't_1', buffer: Buffer.from('x'), filename: 'id.pdf', mimeType: 'application/pdf' })
+    const delivered = await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'id.pdf', mimeType: 'application/pdf' })
     const file = prisma.filesById.get(delivered.fileId)
     assert.equal(file?.purpose, 'id_scan')
     void created
@@ -322,7 +331,7 @@ async function main(): Promise<void> {
     const created = await service.create({ scanType: 'resume', terminalId: 't_1' }, null)
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
-      buffer: Buffer.from('x'),
+      buffer: tinyPdf(),
       filename: 'resume.pdf',
       mimeType: 'application/pdf',
     })
@@ -358,7 +367,7 @@ async function main(): Promise<void> {
       () =>
         service.deliverScanFile({
           terminalId: 't_1',
-          buffer: Buffer.from('x'),
+          buffer: tinyPdf(),
           filename: 'broken.pdf',
           mimeType: 'application/pdf',
         }),
@@ -396,7 +405,7 @@ async function main(): Promise<void> {
     const second = await service.create(dto, null)
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
-      buffer: Buffer.from('x'),
+      buffer: tinyPdf(),
       filename: 'fresh.pdf',
       mimeType: 'application/pdf',
     })
@@ -427,7 +436,7 @@ async function main(): Promise<void> {
       () =>
         service.deliverScanFile({
           terminalId: 't_1',
-          buffer: Buffer.from('x'),
+          buffer: tinyPdf(),
           filename: 'race.pdf',
           mimeType: 'application/pdf',
         }),
