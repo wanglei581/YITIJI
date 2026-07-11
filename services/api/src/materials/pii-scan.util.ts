@@ -37,6 +37,15 @@ const PII_SCAN_MAX_OCR_PAGES = (() => {
 })()
 /** OCR 渲染缩放（与 resume-extraction.service.ts 保持一致的清晰度/体积权衡）。 */
 const PII_SCAN_OCR_RENDER_SCALE = 2
+/**
+ * born-digital 文字层抽取（unpdf.extractText）允许尝试的最大声明页数。
+ *
+ * unpdf.extractText() 内部对 pdf.numPages 做 Array.from + Promise.all，不设任何上限；
+ * 本接口匿名可达，一份体积很小但声明超大页数的恶意 PDF 可借此让服务端做无界 CPU/内存工作。
+ * 超过此阈值直接跳过文字层抽取（rawText 保持 ''），自动落入下面已有页数上限
+ * （PII_SCAN_MAX_OCR_PAGES）的 OCR 渲染兜底路径。
+ */
+const MAX_BORN_DIGITAL_EXTRACT_PAGES = 50
 
 export type PiiFindingDraft = {
   type: string
@@ -72,13 +81,25 @@ export async function extractTextForPiiScan(
   if (mimeType === 'application/pdf') {
     let rawText = ''
     let totalPages = 0
+    let pdf: unknown
     try {
-      const pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
-      const extracted = await unpdf.extractText(pdf, { mergePages: true })
-      totalPages = extracted.totalPages
-      rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+      pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
     } catch {
       return { pages: [], outcome: 'degraded' }
+    }
+    const declaredPageCount = (pdf as { numPages?: number }).numPages ?? 0
+    if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
+      try {
+        const extracted = await unpdf.extractText(pdf, { mergePages: true })
+        totalPages = extracted.totalPages
+        rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+      } catch {
+        return { pages: [], outcome: 'degraded' }
+      }
+    } else {
+      // 声明页数为 0（无法判断）或超过上限：跳过无界的 extractText，
+      // rawText 保持 '' 会自动走下面 OCR 渲染兜底路径（该路径自带页数上限）。
+      totalPages = declaredPageCount
     }
     if (rawText.trim().length >= MIN_TEXT_CHARS_FOR_BORN_DIGITAL) {
       return { pages: [{ pageNumber: null, text: rawText }], outcome: 'ok' }
