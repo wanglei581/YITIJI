@@ -20,6 +20,11 @@ import { buildPiiFindingsFromPages, extractTextForPiiScan, HIGH_RISK_PII_PURPOSE
 
 const TASK_TTL_HOURS = 24
 const RAW_TEXT_PARAM_KEYS = new Set(['textsample', 'text', 'rawtext', 'fulltext', 'content', 'documenttext'])
+/** 空白页检测最多扫描的页数（控时延，避免大文档在请求路径里同步渲染太久）。 */
+const BLANK_SCAN_MAX_PAGES = (() => {
+  const n = Number(process.env['BLANK_SCAN_MAX_PAGES'])
+  return Number.isInteger(n) && n > 0 && n <= 50 ? n : 20
+})()
 
 type TaskRecord = {
   id: string
@@ -462,7 +467,8 @@ export class MaterialsService {
         const rendered = await openPdfForRender(buffer)
         try {
           const blankPages: number[] = []
-          for (let pageNo = 1; pageNo <= rendered.totalPages; pageNo += 1) {
+          const pagesToScan = Math.min(rendered.totalPages, BLANK_SCAN_MAX_PAGES)
+          for (let pageNo = 1; pageNo <= pagesToScan; pageNo += 1) {
             const img = await rendered.renderPage(pageNo, BLANK_RENDER_SCALE)
             if (await isPageBlank(img)) blankPages.push(pageNo)
           }
