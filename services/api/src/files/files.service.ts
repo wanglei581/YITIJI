@@ -31,6 +31,13 @@ import {
   isPurpose,
 } from './file-validation'
 import { sniffDeclaredMimeMismatch } from './content-sniff'
+
+/**
+ * COS 直传 completeUpload 阶段允许整读回嗅探的对象大小上限。
+ * StorageService 暂无 Range 读取,超过此值的对象(admin_upload / screensaver_material
+ * 等 purpose 允许非视频文件到 500MB)跳过嗅探,避免把数百 MB 读进内存。
+ */
+const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
 import {
   RetentionPolicyError,
   allowedPoliciesForFile,
@@ -304,11 +311,10 @@ export class FilesService {
     }
 
     // 魔数校验(直传路径:客户端字节直达对象存储,服务端此前从未看过内容)。
-    // 边界:StorageService 没有 ranged/partial read,getObject 会把整个对象读进内存;
-    // 视频类 purpose 上限 500MB,整读会引入新的内存风险,本轮明确豁免 video/*
-    // (COS 直传视频暂不嗅探,属已披露残留;待存储接口支持 Range 读取后收口)。
-    // 非视频类型上限 30MB(见 PURPOSE_POLICY),整读可接受。
-    if (!record.mimeType.startsWith('video/')) {
+    // 边界:StorageService 没有 ranged/partial read,getObject 会把整个对象读进内存,
+    // 故嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
+    // 本轮明确豁免(属已披露残留;待存储接口支持 Range 读取后收口)。
+    if (!record.mimeType.startsWith('video/') && head.sizeBytes <= DIRECT_UPLOAD_SNIFF_MAX_BYTES) {
       const bytes = await this.storage.getObject(record.storageKey, record.bucket)
       const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
       if (!sniff.ok) {
