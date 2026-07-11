@@ -9,10 +9,11 @@
 //   - 管理员写入的审计由 controller 负责（复用 AuditService 惯例）。
 // ============================================================
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import {
   PRINT_SCAN_CAPABILITY_KEYS,
   PRINT_SCAN_CAPABILITY_STATUSES,
+  canCreateFormalPrintScanTask,
   type PrintScanCapabilityKey,
   type PrintScanCapabilityStatus,
   type TerminalCapabilityView,
@@ -108,6 +109,29 @@ export class TerminalCapabilitiesService {
         updatedAt: row.updatedAt.toISOString(),
       },
     }
+  }
+
+  /**
+   * 服务端能力门禁（最终真相源，Kiosk UI 只是体验层）：
+   *   - 管理员配置过该终端该能力且状态非 available（含 DB 脏值归 not_verified）
+   *     → 拒绝创建用户正式任务；
+   *   - 未配置行 = 管理员未接管 → 放行，保持既有已验证闭环在部署后不中断。
+   * 直达路由、绕过 Kiosk 的 API 调用同样被本门禁拦截。
+   */
+  async assertUserTaskAllowed(terminalId: string, capabilityKey: PrintScanCapabilityKey): Promise<void> {
+    const row = await this.prisma.terminalCapability.findUnique({
+      where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
+      select: { status: true, note: true },
+    })
+    if (!row) return
+    const status = this.asStatus(row.status)
+    if (canCreateFormalPrintScanTask(status)) return
+    throw new ForbiddenException({
+      error: {
+        code: 'CAPABILITY_UNAVAILABLE',
+        message: row.note ? `该终端当前不提供此服务：${row.note}` : '该终端当前不提供此服务，请咨询现场工作人员',
+      },
+    })
   }
 
   /** DB 中出现枚举外的脏值时按 fail-closed 归入 not_verified，不放大成可用。 */

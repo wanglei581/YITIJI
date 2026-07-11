@@ -14,6 +14,7 @@
 
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { signFileUrl } from '../files/signing'
 import {
   IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
   type PrintScanTaskType,
@@ -24,6 +25,23 @@ import type {
   AdminPrintScanTaskItem,
   AdminPrintScanTaskPage,
 } from './admin-print-scan.types'
+
+// 与 print-jobs.service 的 PRINT_JOB_FILE_URL_TTL_MS 同口径：重试后 Agent claim
+// 前需要一个未过期的下载链接。
+const RETRY_FILE_URL_TTL_MS = 30 * 60 * 1000
+
+// 退款相关的 payStatus（含部分退款/退款中）：这些订单重试出纸会造成"退了钱还出纸"。
+const REFUND_PAY_STATUSES = new Set(['refunding', 'partial_refunded', 'refunded'])
+
+/** 从我方 create 落库的签名 URL 中解析 fileId（仅路径解析；来源是本服务写入的可信值）。 */
+function parsePrintFileId(fileUrl: string): string | null {
+  try {
+    const u = new URL(fileUrl, 'http://internal.local')
+    return u.pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
 
 const ALL_TASK_TYPES: readonly PrintScanTaskType[] = [
   'print',
@@ -224,7 +242,7 @@ export class AdminPrintScanService {
   private async retryPrintTask(taskId: string): Promise<AdminPrintScanActionResult> {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, fileUrl: true, order: { select: { payStatus: true } } },
     })
     if (!task) {
       throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
@@ -234,12 +252,42 @@ export class AdminPrintScanService {
         error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '仅失败状态的打印任务可以重试' },
       })
     }
+    // 已退款/退款中订单重试会造成"退了钱还出纸"，明确拒绝。
+    if (task.order && REFUND_PAY_STATUSES.has(task.order.payStatus)) {
+      throw new ConflictException({
+        error: { code: 'PRINT_SCAN_RETRY_REFUNDED', message: '该任务的订单已退款或退款中，不能重试出纸' },
+      })
+    }
+    // 失败任务多半已超过 30 分钟签名 TTL，原 fileUrl 重排后 Agent 必然下载失败：
+    // 校验文件仍存在（未被隐私策略清理）并重新签发下载链接。
+    const fileId = parsePrintFileId(task.fileUrl)
+    if (!fileId) {
+      throw new ConflictException({
+        error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件链接无法解析，无法重试' },
+      })
+    }
+    const file = await this.prisma.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
+    if (!file || file.deletedAt) {
+      throw new ConflictException({
+        error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件已按隐私策略清理，无法重试' },
+      })
+    }
+    const { url: freshFileUrl } = signFileUrl(fileId, RETRY_FILE_URL_TTL_MS)
 
     await this.prisma.$transaction(async (tx) => {
       // CAS：并发下只有仍处于 failed 的任务会被重置；数量为 0 视为状态已被他人变更。
+      // 同步重签 fileUrl、清空 failed 时写入的 completedAt。
       const updated = await tx.printTask.updateMany({
         where: { id: taskId, status: 'failed' },
-        data: { status: 'pending', claimedAt: null, claimExpiry: null, errorCode: null, errorMessage: null },
+        data: {
+          status: 'pending',
+          claimedAt: null,
+          claimExpiry: null,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+          fileUrl: freshFileUrl,
+        },
       })
       if (updated.count !== 1) {
         throw new ConflictException({

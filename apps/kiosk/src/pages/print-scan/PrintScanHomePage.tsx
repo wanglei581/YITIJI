@@ -129,10 +129,14 @@ const CAPABILITIES: Capability[] = [
 ]
 
 // 卡片 → 能力开关键映射（Admin「打印扫描运维 → 设备能力」配置后覆盖硬编码默认）。
-// photo-print 无独立能力键（本质走文档打印流程），保持硬编码不受开关控制。
+// photo-print 走文档打印流程（服务端按 document_print 门禁），因此服从同一开关。
+// 注意：本覆盖只是体验层——服务端创建任务边界有权威门禁
+// （TerminalCapabilitiesService.assertUserTaskAllowed），本页拉取失败时的回落
+// 不会放大真实可用性，最终由服务端拒绝并给出诚实错误。
 const CARD_CAPABILITY_KEY: Partial<Record<string, PrintScanCapabilityKey>> = {
   'doc-print': 'document_print',
   'phone-upload': 'phone_upload',
+  'photo-print': 'document_print',
   scan: 'scan',
   'id-photo': 'id_photo',
   convert: 'format_convert',

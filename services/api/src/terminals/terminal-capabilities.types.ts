@@ -72,6 +72,11 @@ export const IMPLEMENTED_PRINT_SCAN_TASK_TYPES: readonly PrintScanTaskType[] = [
 
 export const canCreateFormalPrintScanTask = (status: PrintScanCapabilityStatus): boolean => status === 'available'
 
+export const canAccessTestingPrintScanCapability = (
+  status: PrintScanCapabilityStatus,
+  context: 'ordinary_user' | 'tester' | 'admin' | 'maintenance',
+): boolean => status === 'testing' && context !== 'ordinary_user'
+
 export interface TerminalCapabilityView {
   capabilityKey: PrintScanCapabilityKey
   status: PrintScanCapabilityStatus

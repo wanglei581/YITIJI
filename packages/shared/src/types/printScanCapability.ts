@@ -1,7 +1,9 @@
 // ── 打印扫描首期：能力开关与任务类型共享契约（计划 Task 2 Step 1-3 子集） ────
 // 见 docs/superpowers/plans/2026-06-30-print-scan-first-release-full-scope.md。
-// 能力状态是 fail-closed 语义：只有显式 'available' 才允许普通用户创建正式任务；
-// 'testing' 仅测试/运维语境可见；其余状态一律不可用。
+// 能力状态是 fail-closed 语义：管理员配置过的能力，只有显式 'available' 才允许
+// 普通用户创建正式任务（服务端 TerminalCapabilitiesService.assertUserTaskAllowed
+// 在任务创建边界强制执行，Kiosk UI 只是体验层）；'testing' 仅测试/运维语境可见；
+// 其余状态一律不可用。未配置行 = 管理员未接管，服务端放行既有已验证闭环。
 
 export type PrintScanCapabilityKey =
   | 'document_print'

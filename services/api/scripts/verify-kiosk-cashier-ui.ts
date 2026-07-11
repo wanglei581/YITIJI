@@ -31,6 +31,7 @@ if (process.env['NODE_ENV'] === 'production') {
 }
 
 import { PrismaService } from '../src/prisma/prisma.service'
+import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
-  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus)
+  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const provider = new SandboxPaymentProvider(SANDBOX_SECRET)
   const payment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([provider]))
   const terminals = new TerminalsService(prisma) // 不调 onModuleInit（避免 seed + 定时器）

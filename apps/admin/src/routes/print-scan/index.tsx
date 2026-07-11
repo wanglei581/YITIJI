@@ -8,7 +8,7 @@
 //   商业化控制 — 定价/权益复用既有 billing、benefit 页面入口；补贴标签与退款
 //               异常工作流当前未建设，如实标注。
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -161,16 +161,21 @@ function TaskCenter() {
 
   const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
 
+  // 请求序号防竞态：快速切换类型/筛选时，旧的慢响应不得覆盖新状态。
+  const loadSeq = useRef(0)
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
     try {
       const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize: 20 })
+      if (seq !== loadSeq.current) return
       setData(result)
     } catch (e) {
+      if (seq !== loadSeq.current) return
       setError(e instanceof Error ? e.message : '加载失败')
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [taskType, status, page])
 
@@ -178,14 +183,17 @@ function TaskCenter() {
     void load()
   }, [load])
 
+  const detailSeq = useRef(0)
   const openDetail = async (item: AdminPrintScanTaskItem) => {
+    const seq = ++detailSeq.current
     setDetailOpen(true)
     setDetail(null)
     setActionError(null)
     try {
-      setDetail(await adminPrintScanService.getTaskDetail(item.type, item.taskId))
+      const result = await adminPrintScanService.getTaskDetail(item.type, item.taskId)
+      if (seq === detailSeq.current) setDetail(result)
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : '详情加载失败')
+      if (seq === detailSeq.current) setActionError(e instanceof Error ? e.message : '详情加载失败')
     }
   }
 
@@ -197,10 +205,17 @@ function TaskCenter() {
     setActionError(null)
     try {
       await adminPrintScanService.applyTaskAction(detail.type, detail.taskId, action)
-      setDetail(await adminPrintScanService.getTaskDetail(detail.type, detail.taskId))
-      await load()
     } catch (e) {
       setActionError(e instanceof Error ? e.message : '操作失败')
+      setActionBusy(false)
+      return
+    }
+    // 动作已在服务端执行成功；刷新失败必须与"操作失败"区分，避免管理员重复操作。
+    try {
+      setDetail(await adminPrintScanService.getTaskDetail(detail.type, detail.taskId))
+      await load()
+    } catch {
+      setActionError('操作已执行成功，但页面刷新失败，请手动刷新查看最新状态')
     } finally {
       setActionBusy(false)
     }
@@ -432,16 +447,22 @@ function CapabilityCenter() {
     })()
   }, [])
 
+  // 请求序号防竞态：快速切换终端时，A 终端的慢响应不得覆盖 B 终端的列表
+  // （否则后续保存会把 A 的状态误写到 B）。
+  const capSeq = useRef(0)
   const loadCapabilities = useCallback(async (tid: string) => {
+    const seq = ++capSeq.current
     setLoading(true)
     setError(null)
     try {
       const res = await adminPrintScanService.listCapabilities(tid)
+      if (seq !== capSeq.current) return
       setCapabilities(res.capabilities)
     } catch (e) {
+      if (seq !== capSeq.current) return
       setError(e instanceof Error ? e.message : '能力配置加载失败')
     } finally {
-      setLoading(false)
+      if (seq === capSeq.current) setLoading(false)
     }
   }, [])
 
@@ -511,7 +532,7 @@ function CapabilityCenter() {
                 <th className="px-4 py-2.5 font-bold">能力</th>
                 <th className="px-4 py-2.5 font-bold">当前状态</th>
                 <th className="px-4 py-2.5 font-bold">调整为</th>
-                <th className="px-4 py-2.5 font-bold">备注</th>
+                <th className="px-4 py-2.5 font-bold">备注（用户可见）</th>
                 <th className="px-4 py-2.5 font-bold">更新时间</th>
               </tr>
             </thead>
@@ -568,7 +589,7 @@ function CapabilityRow({
           value={note}
           maxLength={200}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="如：真机已验收 / 送修中"
+          placeholder="将展示给一体机用户，如：送修中"
           className="h-8 w-44 rounded-lg border border-neutral-900/15 bg-surface px-2 text-[12.5px] text-neutral-800"
         />
       </td>
@@ -594,7 +615,7 @@ function CommercialControls() {
     {
       icon: WalletIcon,
       title: '定价管理',
-      desc: '打印/扫描等服务单价、启停由计费页统一管理（唯一合法改价路径）。',
+      desc: '打印服务单价、启停由计费页统一管理（唯一合法改价路径）；扫描等其他能力的计费尚未建设。',
       to: '/billing',
       linkLabel: '前往计费与对账',
     },
