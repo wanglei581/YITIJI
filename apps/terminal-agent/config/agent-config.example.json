@@ -11,5 +11,6 @@
   "localApiAllowedOrigins": [
     "http://localhost:5173",
     "http://127.0.0.1:5173"
-  ]
+  ],
+  "localApiBridgeToken": "change-me-generate-a-random-secret-and-match-VITE_TERMINAL_AGENT_BRIDGE_TOKEN"
 }

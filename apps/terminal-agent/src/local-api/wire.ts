@@ -35,3 +35,14 @@ export interface BackendQrClaimResult {
   token: string
   user: MemberUser
 }
+
+/** POST /files/kiosk-upload 响应（Agent 以 purpose=print_doc 转发 U 盘文件时复用）。 */
+export interface BackendKioskUploadResult {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  mimeType: string
+  sha256: string
+  signedUrl?: string
+  signedUrlExpiresAt?: string
+}
