@@ -144,6 +144,7 @@ const PRINT_URL_CONTRACT_CHANGED = new Set([
   'services/api/scripts/verify-fair-visit-plan.ts',
   'services/api/scripts/verify-job-materials.ts',
   'services/api/scripts/verify-jobfair-venue-guide.ts',
+  'services/api/scripts/verify-print-scan-first-release.ts',
   'services/api/src/ai/resume/career-plan.service.ts',
   'services/api/src/ai/resume/fair-visit-plan.service.ts',
   'services/api/src/files/file-validation.ts',
