@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = join(root, '..', '..')
 const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8')
+const readRepo = (relativePath) => readFileSync(join(repoRoot, relativePath), 'utf8')
+const ciWorkflow = readRepo('.github/workflows/ci.yml')
 
 let failures = 0
 function pass(message) {
@@ -109,6 +111,12 @@ function listChangedFiles() {
 }
 
 console.log('\n=== Profile 主入口墨青纸感换装守卫 ===')
+
+expectMatches(
+  ciWorkflow,
+  /uses:\s*actions\/checkout@v4\s*\n\s*with:\s*\n\s*fetch-depth:\s*0/,
+  'CI checkout 获取完整 Git 历史，范围守卫可计算 merge-base',
+)
 
 const profile = read('src/pages/profile/ProfilePage.tsx')
 const header = read('src/pages/profile/components/ProfileHeader.tsx')
