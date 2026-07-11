@@ -20,6 +20,12 @@ import type { OcrService } from '../src/ai/resume/ocr/ocr.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/storage.interface'
 
+/** 与 pii-scan.util.ts 内部同名常量保持一致的解析公式，避免测试假设与实际生效配置脱节。 */
+const EXPECTED_PII_SCAN_MAX_OCR_PAGES = (() => {
+  const n = Number(process.env['PII_SCAN_MAX_OCR_PAGES'])
+  return Number.isInteger(n) && n > 0 && n <= 10 ? n : 5
+})()
+
 function pass(message: string) {
   console.log(`  PASS ${message}`)
 }
@@ -957,13 +963,13 @@ async function main() {
       if (
         bigPageTask.result?.['mode'] === 'partial' &&
         bigPageOcr.calls() >= 1 &&
-        bigPageOcr.calls() <= 5 &&
-        bigPageTask.result?.['scannedPages'] === 5 &&
+        bigPageOcr.calls() <= EXPECTED_PII_SCAN_MAX_OCR_PAGES &&
+        bigPageTask.result?.['scannedPages'] === EXPECTED_PII_SCAN_MAX_OCR_PAGES &&
         bigPageTask.result?.['totalPages'] === 60
       ) {
-        pass('J. 跳过 extractText 后落入已有页数上限的 OCR 渲染兜底路径并干净完成（未挂起/未崩溃，OCR 调用数受 PII_SCAN_MAX_OCR_PAGES=5 约束），且诚实报告 mode=partial（scannedPages=5/totalPages=60），不冒充完整扫描')
+        pass(`J. 跳过 extractText 后落入已有页数上限的 OCR 渲染兜底路径并干净完成（未挂起/未崩溃，OCR 调用数受 PII_SCAN_MAX_OCR_PAGES=${EXPECTED_PII_SCAN_MAX_OCR_PAGES} 约束），且诚实报告 mode=partial（scannedPages=${EXPECTED_PII_SCAN_MAX_OCR_PAGES}/totalPages=60），不冒充完整扫描`)
       } else {
-        fail(`J. Expected bounded OCR fallback with mode=partial (scannedPages=5, totalPages=60), got ${JSON.stringify(bigPageTask.result)} (ocr calls=${bigPageOcr.calls()})`)
+        fail(`J. Expected bounded OCR fallback with mode=partial (scannedPages=${EXPECTED_PII_SCAN_MAX_OCR_PAGES}, totalPages=60), got ${JSON.stringify(bigPageTask.result)} (ocr calls=${bigPageOcr.calls()})`)
       }
     } finally {
       unpdfSpyModule.extractText = originalUnpdfExtractText

@@ -78,7 +78,8 @@ export function PrintUploadPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const source: PrintMaterialSource = searchParams.get('source') === 'resume' ? 'resume' : 'document'
   // PrintScanHomePage 的"照片打印"卡片通过 router state 传 category: 'photo'；
-  // 用于控制真实 PII 扫描是否可以按内容类别跳过（见 materials.service.ts 的 contentCategory 网关）。
+  // 仅作为 pii_scan 任务的审计字段随请求持久化，不再驱动是否跳过真实扫描
+  // （materials.service.ts 已移除 contentCategory 跳过口子，所有图片一律真实扫描）。
   const contentCategory = (location.state as { category?: 'photo' } | null)?.category === 'photo' ? 'photo' : undefined
   const isResumePrint = source === 'resume'
   const isDocumentPrint = source === 'document'

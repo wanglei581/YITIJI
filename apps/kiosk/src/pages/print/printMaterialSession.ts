@@ -56,7 +56,7 @@ export type PrintMaterialContentCategory = 'photo'
 export interface PrintMaterialSession {
   file: PrintFileState
   source?: PrintMaterialSource
-  /** 来自入口页面传递的内容类别提示（目前只有 'photo'），用于控制真实 PII 扫描是否可跳过。 */
+  /** 来自入口页面传递的内容类别提示（目前只有 'photo'）；仅作为审计字段随 pii_scan 请求持久化，不影响是否真实扫描。 */
   contentCategory?: PrintMaterialContentCategory
   inspectionTask?: StoredMaterialTask
   normalizeTask?: StoredMaterialTask
