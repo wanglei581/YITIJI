@@ -26,6 +26,10 @@ import { convertImagesToPdf } from '../../services/api/printConversion'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 
 const MAX_IMAGES = 20
+// 必须与后端 services/api/src/print-conversion/print-conversion.service.ts 的
+// MAX_SINGLE_IMAGE_BYTES 保持一致：本机上传通道（/files/kiosk-upload）允许到 15MB，
+// 但格式转换单张图片超过此值会在生成 PDF 时才被拒绝；这里提前校验避免无效上传。
+const MAX_SINGLE_IMAGE_BYTES = 10 * 1024 * 1024
 
 interface SelectedImage {
   fileId: string
@@ -73,6 +77,10 @@ export function ConvertImagesPage() {
     if (!selected) return
     if (!['image/jpeg', 'image/png'].includes(selected.type)) {
       setError('仅支持 JPG / PNG 图片')
+      return
+    }
+    if (selected.size > MAX_SINGLE_IMAGE_BYTES) {
+      setError(`图片大小不能超过 ${formatBytes(MAX_SINGLE_IMAGE_BYTES)}，请压缩后重试`)
       return
     }
     setUploading(true)
