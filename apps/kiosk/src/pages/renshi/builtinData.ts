@@ -115,7 +115,7 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     title: '参保证明打印',
     desc: '打印参保证明、缴纳记录用于贷款、落户等',
     steps: ['官方平台可在线查询并下载电子参保证明', '需要纸质盖章证明时，携带身份证前往当地社保经办窗口', '具体窗口与出证方式以当地社保机构公布为准'],
-    entryLabel: '打印申请材料',
+    entryLabel: '上传自备材料打印',
   },
   {
     key: 'medical',
@@ -136,7 +136,7 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     title: '社保卡办理/补换',
     desc: '首次申领、挂失补办、换新社保卡',
     steps: ['携带身份证前往合作银行或社保经办网点', '填写社保卡申请表', '工作人员采集信息', '制卡领卡周期以银行 / 社保机构告知为准'],
-    entryLabel: '打印申请表',
+    entryLabel: '上传自备材料打印',
   },
 ]
 

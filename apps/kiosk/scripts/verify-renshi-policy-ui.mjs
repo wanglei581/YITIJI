@@ -30,10 +30,11 @@ const policyPanel = read('src/pages/renshi/PolicyPanel.tsx')
 const socialPanel = read('src/pages/renshi/SocialPanel.tsx')
 const registerPanel = read('src/pages/renshi/RegisterPanel.tsx')
 const noticePanel = read('src/pages/renshi/NoticePanel.tsx')
+const components = read('src/pages/renshi/components.tsx')
 const home = read('src/pages/home/HomePage.tsx')
 const packageJson = read('package.json')
 
-const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel
+const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components
 
 console.log('\n=== 政策服务页真实性契约验证 ===')
 
@@ -95,19 +96,76 @@ if (home.includes("{ title: '社保指南', icon: 'ticket', to: '/renshi?tab=soc
   fail('F. 首页政策服务子入口必须与 Tab 一一对应（社保指南→tab=social）')
 }
 
-// G. 越界文案。「不代办 / 不代申请」属合规声明，允许出现；只拦截无否定前缀的裸承诺词。
-const banned = ['一键投递', '立即投递', '平台投递', '代办', '保证到账', '免申即享', '已到账', '代申请']
-const bare = banned.filter((w) => new RegExp(`(?<!不)${w}`).test(allRenshi))
-if (bare.length === 0) {
+// G. 越界文案。「不代办 / 不代申请」属合规声明；其余代办表述一律视为正向承诺。
+const unsafePatterns = [
+  /一键投递/,
+  /立即投递/,
+  /平台投递/,
+  /保证到账/,
+  /免申即享/,
+  /已到账/,
+]
+const safeServiceClaimPrefix = /(?:^|[，。；！？、\n\s])(?:不|不会|不得|禁止|无需|无须)(?:上传或|提供|支持|开展|承接|进行|为用户|为求职者)?$/
+function hasUnsafeServiceClaim(text) {
+  for (const match of text.matchAll(/代申请|代办/g)) {
+    const prefix = text.slice(Math.max(0, (match.index ?? 0) - 12), match.index)
+    if (!safeServiceClaimPrefix.test(prefix)) return true
+  }
+  return false
+}
+const unsafe = unsafePatterns.filter((pattern) => pattern.test(allRenshi)).map((pattern) => pattern.source)
+if (hasUnsafeServiceClaim(allRenshi)) unsafe.push('未被否定的代办/代申请')
+if (unsafe.length === 0) {
   pass('G. 无越界承诺文案（代办/保证到账/免申即享/一键投递等）')
 } else {
-  fail(`G. 出现越界文案：${bare.join('、')}`)
+  fail(`G. 出现越界文案模式：${unsafe.join('、')}`)
+}
+const allowedServiceClaims = ['不代办', '不上传或代办高敏材料', '不代申请']
+const forbiddenServiceClaims = ['本平台可代办', '我们代办相关事项', '平台可代申请']
+if (allowedServiceClaims.every((text) => !hasUnsafeServiceClaim(text)) && forbiddenServiceClaims.every(hasUnsafeServiceClaim)) {
+  pass('G2. 代办文案守卫正反例契约通过')
+} else {
+  fail('G2. 代办文案守卫必须放过否定声明并拦截所有正向承诺')
 }
 
 if (packageJson.includes('"verify:renshi-policy-ui"')) {
   pass('H. package.json 注册 verify:renshi-policy-ui')
 } else {
   fail('H. package.json 缺少 verify:renshi-policy-ui')
+}
+
+// I. 通用上传页不能伪装成系统已内置的材料、表单或指引单。
+const fakePrintAssets = ['失业登记申请表', '就业登记申请表', '社保查询操作指引', '创业担保贷款材料清单']
+const misleadingPrintLabels = ['常用材料打印包', '打印材料清单', '打印申请材料', '打印申请表']
+const hasPageClaim = /\b(?:pages?|pageCount)\s*[:=]/.test(allRenshi) || /(?:共|合计)\s*\d+\s*页/.test(allRenshi)
+if (fakePrintAssets.every((name) => !allRenshi.includes(name)) && !hasPageClaim) {
+  pass('I1. 无虚构的具名打印资产或页数')
+} else {
+  fail('I1. 通用上传入口不得伪装成系统已内置的具名打印资产或虚构页数')
+}
+const honestUploadButtonPattern = /<button\b(?:(?!<\/button>)[\s\S])*?onClick=\{\(\) => navigate\('\/print\/upload'\)\}(?:(?!<\/button>)[\s\S])*?上传自备材料打印(?:(?!<\/button>)[\s\S])*?<\/button>/
+const socialUploadButtonPattern = /<button\b(?:(?!<\/button>)[\s\S])*?onClick=\{\(\) => navigate\('\/print\/upload'\)\}(?:(?!<\/button>)[\s\S])*?\{guide\.entryLabel\}(?:(?!<\/button>)[\s\S])*?<\/button>/
+const stripNonVisibleComments = (source) => source.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
+const hasHonestUploadButton = (source) => honestUploadButtonPattern.test(stripNonVisibleComments(source))
+const socialEntryLabels = [...builtinData.matchAll(/entryLabel:\s*'([^']+)'/g)].map((match) => match[1])
+const uploadRouteCount = (allRenshi.match(/navigate\('\/print\/upload'\)/g) ?? []).length
+const honestPanelEntries =
+  hasHonestUploadButton(policyPanel) &&
+  hasHonestUploadButton(registerPanel) &&
+  socialUploadButtonPattern.test(stripNonVisibleComments(socialPanel)) &&
+  socialEntryLabels.length > 0 &&
+  socialEntryLabels.every((label) => label.includes('扫码') || label === '上传自备材料打印') &&
+  uploadRouteCount === 3
+if (misleadingPrintLabels.every((label) => !allRenshi.includes(label)) && honestPanelEntries) {
+  pass('I2. 保留的通用打印入口明确要求用户上传自备材料')
+} else {
+  fail('I2. /print/upload 入口必须使用「上传自备材料打印」等诚实文案')
+}
+const miswiredUploadFixture = `<button onClick={() => navigate('/print/upload')}>直接打印{/* 上传自备材料打印 */}</button>`
+if (!hasHonestUploadButton(miswiredUploadFixture)) {
+  pass('I3. 路由与诚实文案绑定在同一按钮内')
+} else {
+  fail('I3. 注释或相邻文案不得掩盖错误的 /print/upload 按钮标签')
 }
 
 console.log('')

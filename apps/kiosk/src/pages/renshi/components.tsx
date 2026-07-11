@@ -1,13 +1,10 @@
-import { useNavigate } from 'react-router-dom'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import {
   CheckCircle2Icon,
   ClipboardListIcon,
   FileTextIcon,
-  PrinterIcon,
   ScrollTextIcon,
   ShieldCheckIcon,
-  UserCheckIcon,
   XIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -131,41 +128,5 @@ export function DetailList({ icon: Icon, iconColor, title, items, ordered }: {
         ))}
       </ul>
     </section>
-  )
-}
-
-// ─── 常用材料打印包 ─────────────────────────────────────────────────────────────
-
-export function PrintPackBanner() {
-  const navigate = useNavigate()
-  const packs = [
-    { label: '失业登记申请表', pages: '1页', icon: ScrollTextIcon },
-    { label: '就业登记申请表', pages: '1页', icon: UserCheckIcon },
-    { label: '社保查询操作指引', pages: '2页', icon: ShieldCheckIcon },
-    { label: '创业担保贷款材料清单', pages: '1页', icon: ClipboardListIcon },
-  ]
-
-  return (
-    <div className="rounded-xl border border-warning/30 bg-warning-bg/70 px-5 py-5">
-      <div className="mb-4 flex items-center gap-2">
-        <PrinterIcon className="h-4 w-4 text-warning-fg" aria-hidden="true" />
-        <span className="text-sm font-semibold text-warning-fg">常用材料打印包</span>
-        <span className="ml-auto text-xs text-warning-fg/80">只打印清单与指引，不上传或代办高敏材料</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        {packs.map(({ label, pages, icon: Icon }) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => navigate('/print/upload')}
-            className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-lg border border-warning/20 bg-white px-3 py-4 text-center hover:bg-warning-bg active:bg-warning/20"
-          >
-            <Icon className="h-5 w-5 text-warning-fg" aria-hidden="true" />
-            <span className="text-sm font-medium leading-snug text-neutral-800">{label}</span>
-            <span className="text-xs text-neutral-400">{pages}</span>
-          </button>
-        ))}
-      </div>
-    </div>
   )
 }

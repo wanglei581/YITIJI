@@ -7,7 +7,7 @@ import { useAuth } from '../../auth/useAuth'
 import { MessageCircleQuestionIcon, ShieldCheckIcon } from 'lucide-react'
 import { fromPublished, getInitialTab, type AudienceKey, type PolicyItem, type TabKey } from './shared'
 import { BUILTIN_GUIDES } from './builtinData'
-import { OfficialEntryQrOverlay, PrintPackBanner, TabBar } from './components'
+import { OfficialEntryQrOverlay, TabBar } from './components'
 import { PolicyPanel } from './PolicyPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
@@ -134,9 +134,6 @@ export function RenshiPage() {
       {activeTab === 'notice' && renderNoticeTab()}
       {activeTab === 'social' && <SocialPanel onOfficialEntry={(title, url) => setQrEntry({ title, url })} />}
       {activeTab === 'register' && <RegisterPanel />}
-
-      {/* 常用材料打印包 */}
-      <PrintPackBanner />
 
       {/* 合规页脚 */}
       <p className="pb-2 text-center text-xs leading-relaxed text-neutral-400">

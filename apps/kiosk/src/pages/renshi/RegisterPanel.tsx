@@ -50,7 +50,7 @@ export function RegisterPanel() {
             <div className="mt-4 flex flex-wrap gap-2.5">
               <button type="button" onClick={() => navigate('/print/upload')} className={BTN_PRINT}>
                 <PrinterIcon className="h-4 w-4" aria-hidden="true" />
-                打印材料清单
+                上传自备材料打印
               </button>
             </div>
           </div>

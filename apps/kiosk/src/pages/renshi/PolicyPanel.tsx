@@ -113,7 +113,7 @@ export function PolicyPanel({
                     <div className="flex flex-wrap gap-2.5">
                       <button type="button" onClick={() => navigate('/print/upload')} className={BTN_PRINT}>
                         <PrinterIcon className="h-4 w-4" aria-hidden="true" />
-                        打印材料清单
+                        上传自备材料打印
                       </button>
                       {hasOfficial && (
                         <button type="button" onClick={() => onOfficialEntry(item)} className={BTN_OFFICIAL}>
