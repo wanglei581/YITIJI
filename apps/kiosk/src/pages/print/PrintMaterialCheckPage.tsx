@@ -217,7 +217,24 @@ function countDecisions(decisions: Record<string, PiiFindingAction>): { keptCoun
 
 function isDemoTask(task: DocumentProcessTaskView | null): boolean {
   const mode = task?.result?.['mode']
-  return mode === 'mock' || mode === 'skeleton' || mode === 'simulated'
+  return mode === 'mock' || mode === 'skeleton'
+}
+
+/**
+ * pii_scan 完成后的诚实结果态文案。
+ * 后端四态（见 materials.service.ts / pii-scan.util.ts）：
+ * - 'real'：真实扫描完成，命中结果走 findings 列表展示，这里不需要额外文案。
+ * - 'skipped_non_document'：按 contentCategory=photo 提示跳过（非文档类文件不需要隐私扫描）。
+ * - 'degraded'：本该真实扫描但 OCR 不可用/失败，诚实告知需人工确认，不是"演示"。
+ * - 'unsupported_format'：该文件格式完全没有内容提取路径（如旧版 .doc），诚实告知，不是"演示"。
+ */
+function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string; tone: 'neutral' | 'warning' } | null {
+  const mode = task?.result?.['mode']
+  if (mode === 'skipped_non_document') return { label: '该文件类型无需隐私扫描', tone: 'neutral' }
+  if (mode === 'degraded') return { label: '内容扫描暂不可用，请人工确认文件不含敏感信息', tone: 'warning' }
+  if (mode === 'unsupported_format') return { label: '该文件格式暂不支持内容扫描，请人工确认文件不含敏感信息', tone: 'warning' }
+  if (mode === 'real') return null
+  return null
 }
 
 function CheckStep({
@@ -386,7 +403,10 @@ export function PrintMaterialCheckPage() {
         pii = await createMaterialTask({
           kind: 'pii_scan',
           sourceFileId: file.fileId,
-          params: { scanScope: 'print_preview' },
+          params: {
+            scanScope: 'print_preview',
+            ...(session?.contentCategory ? { contentCategory: session.contentCategory } : {}),
+          },
         }, token)
       }
       persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: pii })
@@ -600,6 +620,16 @@ export function PrintMaterialCheckPage() {
                 {(isDemoTask(inspectionTask) || isDemoTask(piiTask)) && (
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-neutral-500">
                     流程演示
+                  </span>
+                )}
+                {!isDemoTask(piiTask) && piiScanModeCopy(piiTask) && (
+                  <span
+                    className={[
+                      'rounded-full px-3 py-1 text-xs font-medium',
+                      piiScanModeCopy(piiTask)!.tone === 'warning' ? 'bg-warning-bg text-warning-fg' : 'bg-white text-neutral-500',
+                    ].join(' ')}
+                  >
+                    {piiScanModeCopy(piiTask)!.label}
                   </span>
                 )}
               </div>
