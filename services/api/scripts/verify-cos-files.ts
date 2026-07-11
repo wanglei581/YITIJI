@@ -47,6 +47,16 @@ async function expectThrow(fn: () => Promise<unknown>, msg: string) {
     pass(msg)
   }
 }
+async function expectThrowCode(fn: () => Promise<unknown>, code: string, msg: string) {
+  try {
+    await fn()
+    fail(`${msg}(预期抛错但未抛)`)
+  } catch (err) {
+    const body = (err as { getResponse?: () => unknown }).getResponse?.() as { error?: { code?: string } } | undefined
+    if (body?.error?.code === code) pass(msg)
+    else fail(`${msg}(错误码 ${body?.error?.code ?? '(无)'} ≠ ${code})`)
+  }
+}
 
 async function main() {
   console.log('\n=== COS 文件服务 E2E(本地后端)===')
@@ -133,7 +143,9 @@ async function main() {
 
     // ── C. 机构文件隔离 ─────────────────────────────────────────────────
     console.log('\n[C] 机构文件隔离')
-    const img = Buffer.from('\xff\xd8\xff jpeg ' + sfx)
+    // 真 JPEG 魔数(FF D8 FF)。注意不能用 Buffer.from('\xff…')(默认 utf8 会把
+    // U+00FF 编成 C3 BF,过不了魔数校验)。
+    const img = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from(' jpeg ' + sfx)])
     const pf = await files.upload({
       buffer: img,
       filename: 'job.jpg',
@@ -191,6 +203,36 @@ async function main() {
       physicallyGone = true
     }
     ok(physicallyGone, '软删后物理对象已回收')
+
+    // ── F. 魔数校验(content-sniff):声明 MIME 必须与真实字节一致 ─────────
+    console.log('\n[F] 上传魔数校验(FILE_CONTENT_MISMATCH)')
+    const baseArgs = { purpose: 'resume_upload' as const, uploaderId: null, endUserId: null }
+    await expectThrowCode(
+      () => files.upload({ ...baseArgs, buffer: Buffer.from('plain text, definitely not a pdf'), filename: 'fake.pdf', mimeType: 'application/pdf' }),
+      'FILE_CONTENT_MISMATCH',
+      '文本字节伪装 application/pdf 被拒(FILE_CONTENT_MISMATCH)',
+    )
+    const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n', 'latin1')
+    await expectThrowCode(
+      () => files.upload({ ...baseArgs, buffer: pdfBytes, filename: 'fake.png', mimeType: 'image/png' }),
+      'FILE_CONTENT_MISMATCH',
+      'PDF 字节伪装 image/png 被拒',
+    )
+    await expectThrowCode(
+      () => files.upload({ ...baseArgs, buffer: pdfBytes, filename: 'fake.txt', mimeType: 'text/plain' }),
+      'FILE_CONTENT_MISMATCH',
+      'PDF 字节伪装 text/plain 被拒(二进制走私文本声明)',
+    )
+    const realPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('png payload ' + sfx),
+    ])
+    const pngUp = await files.upload({ ...baseArgs, buffer: realPng, filename: 'real.png', mimeType: 'image/png' })
+    createdFileIds.push(pngUp.fileId)
+    pass('真 PNG 声明 image/png 正常通过')
+    const txtUp = await files.upload({ ...baseArgs, buffer: Buffer.from('纯文本简历导出 ' + sfx, 'utf8'), filename: 'resume.txt', mimeType: 'text/plain' })
+    createdFileIds.push(txtUp.fileId)
+    pass('纯文本声明 text/plain(purpose=resume_upload)正常通过')
   } finally {
     await prisma.fileObject.deleteMany({ where: { id: { in: createdFileIds } } })
     await prisma.user.deleteMany({ where: { id: { in: [p1, admin1] } } })

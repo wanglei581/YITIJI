@@ -4,6 +4,9 @@
  * 评审 bug 防护(用户锁定范围:MIME 校验 + 文件签名/魔数校验 + 类型白名单 + 大小限制):
  *   仅凭 Content-Type 头不可信(可伪造),必须用文件头字节再确认真实类型,
  *   防止可执行文件改名后上传。
+ *
+ * TODO(收敛): 魔数判定逻辑与 files/content-sniff.ts(FileObject 管线共享嗅探器)
+ * 重复;未来以 content-sniff.ts 为唯一实现收敛,本轮刻意不改行为。
  */
 
 export type AdMediaKind = 'image' | 'video'
