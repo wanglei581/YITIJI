@@ -96,6 +96,8 @@ export interface SocialGuide {
   desc: string
   steps: string[]
   entryLabel: string
+  /** 真实官方入口；未配置则不渲染扫码按钮（不出现占位交互）。 */
+  officialUrl?: string
 }
 
 export const SOCIAL_GUIDES: SocialGuide[] = [
@@ -108,6 +110,7 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     desc: '查询社保参保状态、缴费年限、账户余额',
     steps: ['手机扫码进入官方平台', '实名认证（首次需要）', '选择"参保证明"或"缴费记录"', '在线查看或下载'],
     entryLabel: '扫码查询',
+    officialUrl: 'https://si.12333.gov.cn/',
   },
   {
     key: 'proof',
@@ -128,6 +131,7 @@ export const SOCIAL_GUIDES: SocialGuide[] = [
     desc: '跨省/跨市就医前需完成备案方可报销',
     steps: ['下载"国家医保服务平台"App', '登录后选择"异地就医备案"', '填写就医地和就诊医院信息', '提交审核（1个工作日内）'],
     entryLabel: '扫码备案',
+    officialUrl: 'https://fuwu.nhsa.gov.cn/',
   },
   {
     key: 'card',

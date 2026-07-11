@@ -12,7 +12,7 @@ import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
 export type PolicyKind = 'policy_guide' | 'notice'
-export type PolicyAudience = 'graduate' | 'migrant' | 'hardship' | 'startup' | 'general'
+export type PolicyAudience = 'graduate' | 'flexible' | 'migrant' | 'hardship' | 'startup' | 'general'
 export type PolicyCategory = 'policy' | 'announcement' | 'notice' | 'recruitment'
 
 export interface PartnerPolicyRecord {

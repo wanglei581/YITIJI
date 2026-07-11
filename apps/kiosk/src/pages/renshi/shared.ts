@@ -4,6 +4,7 @@ import {
   Building2Icon,
   GraduationCapIcon,
   HeartHandshakeIcon,
+  MapPinIcon,
   UsersIcon,
   type LucideIcon,
 } from 'lucide-react'
@@ -18,13 +19,14 @@ export function getInitialTab(searchParams: URLSearchParams): TabKey {
   return tab && VALID_TABS.has(tab as TabKey) ? (tab as TabKey) : 'policy'
 }
 
-/** 政策匹配筛选：身份分组。'all' 显示全部；'general' 为通用事项（任何身份都展示）。 */
-export type AudienceKey = 'all' | 'graduate' | 'flexible' | 'startup' | 'hardship'
+/** 政策匹配筛选：身份分组，与后端 POLICY_AUDIENCES 对齐。'all' 显示全部；'general' 为通用事项（任何身份都展示）。 */
+export type AudienceKey = 'all' | 'graduate' | 'flexible' | 'migrant' | 'startup' | 'hardship'
 
 export const AUDIENCE_CHIPS: { key: AudienceKey; label: string; icon: LucideIcon }[] = [
   { key: 'all', label: '全部', icon: UsersIcon },
   { key: 'graduate', label: '高校毕业生', icon: GraduationCapIcon },
   { key: 'flexible', label: '灵活就业', icon: BriefcaseIcon },
+  { key: 'migrant', label: '返乡务工', icon: MapPinIcon },
   { key: 'startup', label: '创业人员', icon: Building2Icon },
   { key: 'hardship', label: '困难群体', icon: HeartHandshakeIcon },
 ]
@@ -51,7 +53,7 @@ export interface PolicyItem {
 
 /** 后端发布政策 → 统一展示模型。审核发布内容为准，内置模板为补充。 */
 export function fromPublished(p: PolicyPostView): PolicyItem {
-  const known = ['graduate', 'flexible', 'startup', 'hardship']
+  const known = ['graduate', 'flexible', 'migrant', 'startup', 'hardship']
   const audiences = p.audience && known.includes(p.audience) ? [p.audience] : ['general']
   return {
     id: p.id,

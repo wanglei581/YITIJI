@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
-import { useComingSoonNotice } from '../../components/ComingSoonNotice'
 import { getPublishedPolicies, type PolicyPostView } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
@@ -21,17 +20,19 @@ export function RenshiPage() {
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabKey>(() => getInitialTab(searchParams))
   const [audience, setAudience] = useState<AudienceKey>('all')
-  const { notify, overlay } = useComingSoonNotice()
   const { getToken } = useAuth()
 
   // P1 浏览/跳转记录：fire-and-forget，失败不影响浏览与官方入口打开；匿名不上报。
+  // 内置指引（builtin-*）不在政策库中，服务端会拒绝记录，前端直接跳过。
   const [qrEntry, setQrEntry] = useState<{ title: string; url: string } | null>(null)
+  const isBuiltin = (id: string) => id.startsWith('builtin-')
   const handlePolicyItemOpened = (item: PolicyItem) => {
+    if (isBuiltin(item.id)) return
     recordBrowse(getToken(), 'policy', item.id)
   }
   const handlePolicyItemEntry = (item: PolicyItem) => {
     if (!item.officialUrl) return
-    recordExternalJump(getToken(), 'policy', item.id, 'external_open')
+    if (!isBuiltin(item.id)) recordExternalJump(getToken(), 'policy', item.id, 'external_open')
     setQrEntry({ title: item.title, url: item.officialUrl })
   }
   const handleNoticeOpened = (policy: PolicyPostView) => {
@@ -103,7 +104,6 @@ export function RenshiPage() {
 
   return (
     <div className="flex flex-col gap-5 p-6">
-      {overlay}
       {qrEntry && <OfficialEntryQrOverlay title={qrEntry.title} url={qrEntry.url} onClose={() => setQrEntry(null)} />}
       <PageHeader title="政策服务" subtitle="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" />
 
@@ -132,8 +132,8 @@ export function RenshiPage() {
       {/* Tab 面板 */}
       {activeTab === 'policy' && renderPolicyTab()}
       {activeTab === 'notice' && renderNoticeTab()}
-      {activeTab === 'social' && <SocialPanel onComingSoon={notify} />}
-      {activeTab === 'register' && <RegisterPanel onComingSoon={notify} />}
+      {activeTab === 'social' && <SocialPanel onOfficialEntry={(title, url) => setQrEntry({ title, url })} />}
+      {activeTab === 'register' && <RegisterPanel />}
 
       {/* 常用材料打印包 */}
       <PrintPackBanner />

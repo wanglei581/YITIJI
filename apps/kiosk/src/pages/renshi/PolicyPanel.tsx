@@ -69,7 +69,9 @@ export function PolicyPanel({
             const itemOpen = openId === item.id
             const hasStructured = Boolean(item.conditions || item.materials || item.steps)
             const hasOfficial = Boolean(item.officialUrl && isValidSourceUrl(item.officialUrl))
-            const fav = isFavorite('policy', item.id)
+            // 内置指引不在政策库中，服务端收藏会拒绝（仅接受已审核发布条目），不渲染收藏按钮。
+            const canFavorite = !item.id.startsWith('builtin-')
+            const fav = canFavorite && isFavorite('policy', item.id)
             return (
               <article key={item.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -136,17 +138,19 @@ export function PolicyPanel({
                       aria-hidden="true"
                     />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}
-                    aria-label={fav ? '取消收藏' : '收藏政策'}
-                    className={[
-                      'ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
-                      fav ? 'bg-error-bg text-error-fg' : 'text-neutral-300 hover:text-error',
-                    ].join(' ')}
-                  >
-                    <HeartIcon className={fav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
-                  </button>
+                  {canFavorite && (
+                    <button
+                      type="button"
+                      onClick={() => toggleFavorite({ type: 'policy', id: item.id, title: item.title })}
+                      aria-label={fav ? '取消收藏' : '收藏政策'}
+                      className={[
+                        'ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
+                        fav ? 'bg-error-bg text-error-fg' : 'text-neutral-300 hover:text-error',
+                      ].join(' ')}
+                    >
+                      <HeartIcon className={fav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               </article>
             )

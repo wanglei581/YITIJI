@@ -1,18 +1,18 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRightIcon, InfoIcon, PrinterIcon, QrCodeIcon } from 'lucide-react'
-import { BTN_OFFICIAL, BTN_PRINT } from './shared'
+import { ChevronRightIcon, InfoIcon, PrinterIcon } from 'lucide-react'
+import { BTN_PRINT } from './shared'
 import { REGISTER_ITEMS } from './builtinData'
 
-// ─── Panel: 就业登记 ─────────────────────────────────────────────────────────
+// ─── Panel: 就业登记（内置办事指引；线下办理，无线上预约入口时不渲染占位按钮）───
 
-export function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string) => void }) {
+export function RegisterPanel() {
   const navigate = useNavigate()
 
   return (
     <div className="flex flex-col gap-4">
       <p className="flex items-center gap-2 text-xs text-neutral-400">
         <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        数据来源：市就业服务中心 · 同步时间：2026-05-10
+        内置办事指引 · 办理地点与材料以当地就业服务机构公布为准
       </p>
 
       {REGISTER_ITEMS.map((item) => {
@@ -51,10 +51,6 @@ export function RegisterPanel({ onComingSoon }: { onComingSoon: (action: string)
               <button type="button" onClick={() => navigate('/print/upload')} className={BTN_PRINT}>
                 <PrinterIcon className="h-4 w-4" aria-hidden="true" />
                 打印材料清单
-              </button>
-              <button type="button" onClick={() => onComingSoon('扫码预约')} className={BTN_OFFICIAL}>
-                <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
-                扫码预约
               </button>
             </div>
           </div>
