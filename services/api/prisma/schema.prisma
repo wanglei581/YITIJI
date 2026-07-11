@@ -65,8 +65,8 @@ model TerminalBindCode {
 }
 
 // ── PrintTask ─────────────────────────────────────────────────────────────────
-// status values: "pending" | "claimed" | "printing" | "completed" | "failed"
-// Terminal states (completed / failed) must never be overwritten.
+// status values: "pending" | "claimed" | "printing" | "completed" | "failed" | "cancelled"
+// Terminal states (completed / failed / cancelled) must never be overwritten.
 
 model PrintTask {
   id           String    @id
