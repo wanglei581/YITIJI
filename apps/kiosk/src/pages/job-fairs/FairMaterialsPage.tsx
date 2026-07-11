@@ -5,7 +5,8 @@ import type { FairMaterialDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import { FileTextIcon, PrinterIcon } from 'lucide-react'
-import { getFairMaterials, getJobFairById } from '../../services/api'
+import { getFairMaterials, getJobFairById, prepareFairMaterialPrint } from '../../services/api'
+import { API_MODE } from '../../services/api/client'
 
 const TYPE_STYLES: Record<string, string> = {
   schedule:     'bg-primary-50 text-primary-600',
@@ -46,40 +47,36 @@ export function FairMaterialsPage() {
     return () => { cancelled = true }
   }, [fairId])
 
-  // 2B 安全收口:打印必须基于真实资料文件 —— 带上后端签名 previewUrl(30min TTL),
-  // http 模式下创建真实打印任务;无签名 URL(mock 演示)时按钮降级为不可用。
+  // 打印时由后端按需把 FairMaterial 转为短期 FileObject，只消费内部 HMAC printFileUrl。
   const handlePrint = async (material: FairMaterialDTO) => {
     if (printingId) return
     setPrintingId(material.id)
     setPrintError(null)
-    let latest = material
     try {
-      const refreshed = await getFairMaterials(fairId)
-      setMaterials(refreshed.data)
-      latest = refreshed.data.find((item) => item.id === material.id) ?? material
-    } catch {
-      setPrintingId(null)
-      setPrintError('文件链接刷新失败，请检查网络后重试')
-      return
-    }
-    setPrintingId(null)
-    if (!latest.previewUrl) return
-    navigate('/print/confirm', {
-      state: {
-        file: {
-          name: latest.name,
-          size: formatSize(latest.fileSizeKB),
-          pages: latest.pageCount > 0 ? latest.pageCount : null,
-          fileUrl: latest.previewUrl,
-          mimeType: 'application/pdf',
+      const printable = await prepareFairMaterialPrint(fairId, material.id)
+      if (!printable.printFileUrl) throw new Error('打印链接未就绪')
+      navigate('/print/confirm', {
+        state: {
+          file: {
+            name: printable.filename,
+            size: formatSize(Math.max(1, Math.round(printable.sizeBytes / 1024))),
+            pages: printable.pageCount > 0 ? printable.pageCount : null,
+            fileId: printable.fileId,
+            fileUrl: printable.printFileUrl,
+            mimeType: printable.mimeType,
+          },
+          params: makePrintParams({
+            copies: 1,
+            duplex: printable.pageCount > 1 ? 'double' : 'single',
+            color: 'bw',
+          }),
         },
-        params: makePrintParams({
-          copies: 1,
-          duplex: latest.pageCount > 1 ? 'double' : 'single',
-          color: 'bw',
-        }),
-      },
-    })
+      })
+    } catch (error) {
+      setPrintError(error instanceof Error ? error.message : '打印文件准备失败，请稍后重试')
+    } finally {
+      setPrintingId(null)
+    }
   }
 
   if (loading) {
@@ -147,12 +144,12 @@ export function FairMaterialsPage() {
                 <Button
                   size="md"
                   className="mt-4 flex w-full items-center justify-center gap-2"
-                  disabled={!mat.previewUrl || printingId !== null}
-                  title={mat.previewUrl ? undefined : '演示数据无真实文件,接入后端后可打印'}
+                  disabled={API_MODE !== 'http' || printingId !== null}
+                  title={API_MODE !== 'http' ? '演示模式未生成真实招聘会资料文件，暂不可打印' : undefined}
                   onClick={() => handlePrint(mat)}
                 >
                   <PrinterIcon className="h-4 w-4" />
-                  {printingId === mat.id ? '正在刷新文件链接…' : printingId ? '请稍候…' : mat.previewUrl ? `免费打印（${mat.pageCount > 0 ? `${mat.pageCount} 页` : '页数以文件为准'}）` : '演示数据暂不可打印'}
+                  {printingId === mat.id ? '正在准备打印文件…' : printingId ? '请稍候…' : API_MODE !== 'http' ? '演示模式暂不可打印' : `免费打印（${mat.pageCount > 0 ? `${mat.pageCount} 页` : '页数以文件为准'}）`}
                 </Button>
               ) : (
                 <p className="mt-4 text-center text-xs text-neutral-400">该资料暂不开放打印</p>

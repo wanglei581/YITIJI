@@ -248,9 +248,12 @@ async function main() {
     // ── 9. 建议单 PDF ─────────────────────────────────────────────────────────
     const printed = await svc.printPlan(taskAnon, anonReq)
     if (printed.pageCount < 1 || printed.filename !== '职业规划建议单.pdf') fail('9. PDF 元数据不符')
+    if (!/^\/api\/v1\/files\/[^/]+\/content\?expires=\d+&sig=[0-9a-f]+$/.test(printed.printFileUrl ?? '')) {
+      fail(`9. printFileUrl 不是内部 HMAC URL: ${printed.printFileUrl}`)
+    }
     const { buffer } = await pdf.render({ date: '2026-06-12', basedOn: { resume: true, jobFit: null, interview: null } }, VALID)
     if (buffer.slice(0, 4).toString() !== '%PDF') fail('9. 输出不是 PDF')
-    pass(`9. 建议单 PDF 真实渲染（${buffer.length} bytes）+ 打印链路返回 FileObject 元数据`)
+    pass(`9. 建议单 PDF 真实渲染（${buffer.length} bytes）+ 打印链路返回内部 HMAC URL`)
 
     // ── 10. 日志脱敏 ──────────────────────────────────────────────────────────
     const joined = capturedLogs.join('\n')

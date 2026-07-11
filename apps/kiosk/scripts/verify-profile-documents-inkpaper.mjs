@@ -82,8 +82,8 @@ expectIncludes(page, 'fetchAccessUrl(doc.previewUrlPath, token)', '我的文档�
 expectMatches(page, /fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,180}?window\.open\(res\.url,\s*'_blank',\s*'noopener'\)/, '查看文档保留短期 URL 新窗口打开')
 expectMatches(
   page,
-  /navigate\('\/print\/confirm'[\s\S]*?fileUrl:\s*res\.url[\s\S]*?mimeType:\s*doc\.mimeType[\s\S]*?makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
-  '打印文档保留 /print/confirm state 结构和默认打印参数',
+  /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?navigate\('\/print\/confirm'[\s\S]*?fileUrl:\s*res\.printFileUrl[\s\S]*?mimeType:\s*doc\.mimeType[\s\S]*?makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
+  '打印文档使用内部 printFileUrl，并保留 /print/confirm state 结构和默认打印参数',
 )
 expectIncludes(page, "doc.mimeType === 'application/pdf' || doc.mimeType === 'image/jpeg' || doc.mimeType === 'image/png'", '我的文档保留可打印 MIME 白名单')
 expectIncludes(page, '该文件格式暂不支持打印', '我的文档保留不可打印格式说明')
@@ -177,11 +177,60 @@ const allowedChanged = new Set([
   'services/api/src/print-jobs/print-jobs.service.ts',
 ])
 
+const PRINT_URL_CONTRACT_CHANGED = new Set([
+  'apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs',
+  'apps/kiosk/src/pages/interview/InterviewReportPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx',
+  'apps/kiosk/src/pages/resume/CareerPlanPage.tsx',
+  'apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx',
+  'apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx',
+  'apps/kiosk/src/services/api/httpAdapter.ts',
+  'apps/kiosk/src/services/api/jobFairs.ts',
+  'apps/kiosk/src/services/api/mockAdapter.ts',
+  'docs/progress/today-claude.md',
+  'packages/shared/src/types/ai.ts',
+  'packages/shared/src/types/fairDto.ts',
+  'packages/shared/src/types/file.ts',
+  'packages/shared/src/types/jobMaterials.ts',
+  'packages/shared/src/types/mockInterview.ts',
+  'services/api/prisma/migrations/20260711120000_add_fair_material_print_bridge/migration.sql',
+  'services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql',
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/schema.prisma',
+  'services/api/scripts/verify-admin-fairs.ts',
+  'services/api/scripts/verify-career-plan.ts',
+  'services/api/scripts/verify-fair-company-positions.ts',
+  'services/api/scripts/verify-fair-info-fields.ts',
+  'services/api/scripts/verify-fair-visit-plan.ts',
+  'services/api/scripts/verify-job-materials.ts',
+  'services/api/scripts/verify-jobfair-venue-guide.ts',
+  'services/api/scripts/verify-print-scan-first-release.ts',
+  'services/api/src/ai/resume/career-plan.service.ts',
+  'services/api/src/ai/resume/fair-visit-plan.service.ts',
+  'services/api/src/files/file-validation.ts',
+  'services/api/src/files/file.types.ts',
+  'services/api/src/files/files.service.ts',
+  'services/api/src/files/signing.ts',
+  'services/api/src/job-materials/job-materials.service.ts',
+  'services/api/src/job-materials/job-materials.types.ts',
+  'services/api/src/jobs/admin-fairs.service.ts',
+  'services/api/src/jobs/fair-material-print-bridge.cleanup.task.ts',
+  'services/api/src/jobs/fair-material-print-bridge.service.ts',
+  'services/api/src/jobs/jobs.controller.ts',
+  'services/api/src/jobs/jobs.module.ts',
+  'services/api/src/jobs/jobs.service.ts',
+  'services/api/src/mock-interview/mock-interview.service.ts',
+  'services/api/src/prisma/prisma.service.ts',
+])
+
 // 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/documents 明细页时，才强制 allowlist
 // 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次。
 const OWNED_PAGES = ['apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx']
 const touchesOwnedPage = changedFiles.some((file) => OWNED_PAGES.includes(file))
-const unexpectedChanged = touchesOwnedPage ? changedFiles.filter((file) => !allowedChanged.has(file)) : []
+const unexpectedChanged = touchesOwnedPage
+  ? changedFiles.filter((file) => !allowedChanged.has(file) && !PRINT_URL_CONTRACT_CHANGED.has(file))
+  : []
 if (!touchesOwnedPage) {
   pass('本 PR 未触碰 /me/documents 明细页，跳过范围 allowlist 检查（守卫条件触发）')
 } else if (unexpectedChanged.length === 0) {

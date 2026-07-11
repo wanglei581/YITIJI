@@ -99,6 +99,7 @@ export function CareerPlanPage() {
     setError(null)
     try {
       const file = await printCareerPlan(taskId, { token: getToken(), accessToken })
+      if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       navigate('/print/confirm', {
         state: {
           file: {
@@ -106,7 +107,7 @@ export function CareerPlanPage() {
             size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
             pages: file.pageCount,
             fileId: file.fileId,
-            fileUrl: file.signedUrl || undefined,
+            fileUrl: file.printFileUrl,
             mimeType: 'application/pdf',
           },
           params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),

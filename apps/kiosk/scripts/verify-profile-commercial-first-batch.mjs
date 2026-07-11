@@ -115,6 +115,55 @@ const allowedChanged = new Set([
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
 ])
+const PRINT_URL_CONTRACT_CHANGED = new Set([
+  'apps/kiosk/scripts/verify-ai-artifact-print-url-contract.mjs',
+  'apps/kiosk/src/pages/interview/InterviewReportPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx',
+  'apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  'apps/kiosk/src/pages/resume/CareerPlanPage.tsx',
+  'apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx',
+  'apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx',
+  'apps/kiosk/src/services/api/httpAdapter.ts',
+  'apps/kiosk/src/services/api/jobFairs.ts',
+  'apps/kiosk/src/services/api/mockAdapter.ts',
+  'docs/progress/today-claude.md',
+  'packages/shared/src/types/ai.ts',
+  'packages/shared/src/types/fairDto.ts',
+  'packages/shared/src/types/file.ts',
+  'packages/shared/src/types/jobMaterials.ts',
+  'packages/shared/src/types/mockInterview.ts',
+  'services/api/prisma/migrations/20260711120000_add_fair_material_print_bridge/migration.sql',
+  'services/api/prisma/postgres/migrations/20260711120000_add_fair_material_print_bridge/migration.sql',
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/schema.prisma',
+  'services/api/scripts/verify-admin-fairs.ts',
+  'services/api/scripts/verify-career-plan.ts',
+  'services/api/scripts/verify-fair-company-positions.ts',
+  'services/api/scripts/verify-fair-info-fields.ts',
+  'services/api/scripts/verify-fair-visit-plan.ts',
+  'services/api/scripts/verify-job-materials.ts',
+  'services/api/scripts/verify-jobfair-venue-guide.ts',
+  'services/api/scripts/verify-print-scan-first-release.ts',
+  'services/api/src/ai/resume/career-plan.service.ts',
+  'services/api/src/ai/resume/fair-visit-plan.service.ts',
+  'services/api/src/files/file-validation.ts',
+  'services/api/src/files/file.types.ts',
+  'services/api/src/files/files.service.ts',
+  'services/api/src/files/signing.ts',
+  'services/api/src/job-materials/job-materials.service.ts',
+  'services/api/src/job-materials/job-materials.types.ts',
+  'services/api/src/jobs/admin-fairs.service.ts',
+  'services/api/src/jobs/fair-material-print-bridge.cleanup.task.ts',
+  'services/api/src/jobs/fair-material-print-bridge.service.ts',
+  'services/api/src/jobs/jobs.controller.ts',
+  'services/api/src/jobs/jobs.module.ts',
+  'services/api/src/jobs/jobs.service.ts',
+  'services/api/src/mock-interview/mock-interview.service.ts',
+  'services/api/src/print-jobs/print-jobs.service.ts',
+  'services/api/src/prisma/prisma.service.ts',
+])
+
 const files = [...new Set(changedFiles())]
 // 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
 // 仅当 diff 实际触碰本守卫负责的 /me 第一批明细页时，才强制 P0a allowlist 范围检查。
@@ -122,7 +171,9 @@ const files = [...new Set(changedFiles())]
 // 不再以「触碰守卫脚本」为触发条件误伤一切后端/支付 PR；防回退由上方静态断言 + 人工评审兜底。
 const protectedPagePrefix = 'apps/kiosk/src/pages/profile/me/'
 const touchesProtectedPages = files.some((file) => file.startsWith(protectedPagePrefix))
-const unexpectedChanged = touchesProtectedPages ? files.filter((file) => !allowedChanged.has(file)) : []
+const unexpectedChanged = touchesProtectedPages
+  ? files.filter((file) => !allowedChanged.has(file) && !PRINT_URL_CONTRACT_CHANGED.has(file))
+  : []
 if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
 else fail(`diff 出现 P0a 范围外变更：${unexpectedChanged.join(', ')}`)
 

@@ -22,6 +22,7 @@ export interface ValidationErr {
   message: string
 }
 export type ValidationResult = ValidationOk | ValidationErr
+export type UploadValidationMode = 'proxy' | 'intent'
 
 const MB = 1024 * 1024
 
@@ -115,7 +116,7 @@ export function validateUpload(args: {
   mimeType: string
   filename: string
   sizeBytes: number
-  mode: 'proxy' | 'intent'
+  mode: UploadValidationMode
 }): ValidationResult {
   if (!isPurpose(args.purpose)) {
     return { ok: false, code: 'FILE_PURPOSE_INVALID', message: `不支持的文件用途: ${args.purpose}` }

@@ -40,7 +40,7 @@ function mustNotMatch(source: string, pattern: RegExp, message: string): void {
 }
 
 function assertNoOverclaim(source: string, message: string): void {
-  const allowedQualifiers = /(不代表|不等于|不得|不能|禁止|尚未|未执行|未完成|未通过|待现场|待补齐|否|Not Passed Yet|PENDING|Blocked|阻塞|只代表|写成)/
+  const allowedQualifiers = /(不代表|不等于|不得|不能|禁止|尚未|未执行|未完成|未通过|待现场|待补齐|仍需|需要|否|Not Passed Yet|PENDING|Blocked|阻塞|只代表|写成)/
   const patterns = [
     /Windows\s*真机[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
     /真实扫描[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,

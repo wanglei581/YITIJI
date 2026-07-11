@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-10
+> 最后更新：2026-07-11
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -29,6 +29,8 @@
 - [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
 
 ## P0：上线前真实验收
+
+- [ ] **合并并部署 AI / 求职产物 `printFileUrl` 契约修复**：候选分支 `codex/ai-artifact-print-url-contract-20260711` 已完成本地 TDD 与安全回归，覆盖 AI 简历生成、模拟面试报告、职业规划、求职材料、招聘会参会准备单、我的文档和招聘会资料。招聘会资料通过可复用、可撤销 `FairMaterialPrintBridge` 映射到标准短期 `FileObject`，保留 PrintJobs HMAC/SSRF 白名单；本地已覆盖 15–20MiB、单飞并发、内容篡改、撤销、活跃任务履约保留和旧 URL 禁止新建任务。独立审查已无 Critical/High；待用户决定后提交、合并，并在预生产先执行双数据库 additive migration，再用无个人信息 PDF 验证内部 HMAC URL 可进入 `/print/jobs`，外部 COS URL 仍返回 `PRINT_INVALID_FILE_URL`，已撤销 bridge URL 返回 `PRINT_FILE_REVOKED`，且探针不产生错误任务或真实出纸。
 
 - [ ] 生产域名与 HTTPS：完成域名解析、证书、nginx 反代、上传限制和自动续期。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。

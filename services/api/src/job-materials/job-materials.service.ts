@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
+import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { findJobMaterialTemplate, JOB_MATERIAL_TEMPLATES, listPublishedJobMaterialTemplates } from './job-material-templates'
 import { JobMaterialPdfService } from './job-material-pdf.service'
@@ -83,6 +84,7 @@ export class JobMaterialsService {
       sizeBytes: uploaded.sizeBytes,
       pageCount: rendered.pageCount,
       signedUrl: uploaded.signedUrl,
+      printFileUrl: signFileUrl(uploaded.fileId).url,
       signedUrlExpiresAt: uploaded.signedUrlExpiresAt,
       fileExpiresAt: uploaded.fileExpiresAt,
       previewUrlPath: `/files/${uploaded.fileId}/preview-url`,

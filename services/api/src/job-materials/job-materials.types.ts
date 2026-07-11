@@ -69,6 +69,8 @@ export interface JobMaterialGenerateView {
   sizeBytes: number
   pageCount: number
   signedUrl: string
+  /** 系统 HMAC content URL，仅供 /print/jobs 使用。 */
+  printFileUrl?: string
   signedUrlExpiresAt: string
   fileExpiresAt: string | null
   previewUrlPath: string

@@ -202,20 +202,21 @@ export function MyDocumentsPage() {
     setPrintingId(doc.id)
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
+      if (!res.printFileUrl) throw new Error('打印链接未就绪')
       navigate('/print/confirm', {
         state: {
           file: {
             name: doc.filename,
             size: formatBytes(doc.sizeBytes),
             pages: null,
-            fileUrl: res.url,
+            fileUrl: res.printFileUrl,
             mimeType: doc.mimeType,
           },
           params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
         },
       })
-    } catch {
-      setHint('打印链接生成失败，可能已到期或被清理')
+    } catch (error) {
+      setHint(error instanceof Error ? error.message : '打印链接生成失败，可能已到期或被清理')
     } finally {
       setPrintingId(null)
     }

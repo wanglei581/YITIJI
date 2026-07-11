@@ -167,6 +167,16 @@ export interface FairMaterialDTO {
   updatedAt?: string
 }
 
+/** 招聘会资料按需打印桥接响应；只在用户点击打印时生成短期派生 FileObject。 */
+export interface FairMaterialPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  mimeType: string
+  pageCount: number
+  printFileUrl: string
+}
+
 // ──────────────────────────────────────────────────────────────
 // FairLiveStatsDTO
 // ──────────────────────────────────────────────────────────────

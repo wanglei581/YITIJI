@@ -8,6 +8,7 @@ import {
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { StorageService } from '../storage/storage.service'
+
 import { generateObjectKey } from '../storage/object-key'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
@@ -16,6 +17,7 @@ import { signFairMaterialPreviewUrl, signFairMaterialUrl } from './fair-material
 import type { UpdateFairInfoDto, SaveFairCompanyDto, SaveFairCompanyPositionDto, SaveFairZoneDto, UpdateFairMaterialDto } from './dto/admin-fair.dto'
 import type { SaveVenueGuideDto } from './dto/venue-guide.dto'
 import type { PublishAction } from './dto/publish.dto'
+import { FairMaterialPrintBridgeService, type FairMaterialPrintView } from './fair-material-print-bridge.service'
 
 // ============================================================
 // AdminFairsService — 阶段1A:Admin 招聘会管理(内容维护)
@@ -180,6 +182,7 @@ export class AdminFairsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly storage: StorageService,
+    private readonly printBridges: FairMaterialPrintBridgeService,
   ) {}
 
   // ── 招聘会列表 / 详情 / 基本信息 ───────────────────────────────────────────
@@ -466,6 +469,7 @@ export class AdminFairsService {
         ...(dto.allowPrint !== undefined ? { allowPrint: dto.allowPrint } : {}),
       },
     })
+    if (dto.allowPrint === false) await this.printBridges.revokeForMaterial(materialId, 'printing_disabled')
     await this.writeFairAudit(user, 'fair.material.update', fairId, { materialId })
     return mapMaterial(updated, signFairMaterialPreviewUrl(updated.id))
   }
@@ -477,6 +481,7 @@ export class AdminFairsService {
       where: { id: materialId },
       data: { publishStatus: toStatus },
     })
+    if (action === 'unpublish') await this.printBridges.revokeForMaterial(materialId, 'material_unpublished')
     await this.writeFairAudit(user, 'fair.material.publish', fairId, {
       materialId,
       action,
@@ -489,6 +494,7 @@ export class AdminFairsService {
   /** 删除资料:物理删对象 + 软删行(保留删除审计线索,符合 CLAUDE.md §11 删除留痕)。 */
   async deleteMaterial(fairId: string, materialId: string, user: AuthedUser): Promise<{ success: true }> {
     const material = await this.assertMaterialInFair(fairId, materialId)
+    await this.printBridges.revokeForMaterial(materialId, 'material_deleted')
     if (!material.storageKey.startsWith('pending:')) {
       await this.storage.deleteObject(material.storageKey).catch((e: unknown) => {
         // 对象缺失不阻断删除(可能已被清理);其余错误记日志后继续软删
@@ -555,6 +561,14 @@ export class AdminFairsService {
       page,
       pageSize,
     }
+  }
+
+  /**
+   * 将独立 FairMaterial 转为可复用的短期派生 FileObject，供 PrintJobs 统一验签与计费。
+   * 不复用 materialId 冒充 fileId，也不放宽 PrintJobs 的 /files/:id/content 白名单。
+   */
+  async prepareFairMaterialPrint(fairId: string, materialId: string): Promise<FairMaterialPrintView> {
+    return this.printBridges.prepare(fairId, materialId)
   }
 
   /** 签名内容流读取(签名已在 controller 验过)。 */

@@ -182,6 +182,46 @@ export class PrintJobsService {
       })
     }
 
+    // 招聘会资料 bridge 被下架/禁打/删除后，已确认任务可保留文件继续履约；
+    // 旧 HMAC URL 不得借该保留窗口创建新任务。此检查只收紧已验签的标准 FileObject 路径。
+    const revokedFairMaterialBridge = await this.prisma.fairMaterialPrintBridge.findFirst({
+      where: { fileObjectId: fileId, revokedAt: { not: null } },
+      select: { id: true },
+    })
+    if (revokedFairMaterialBridge) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_FILE_REVOKED',
+          message: '打印文件已撤销，请返回资料页重新选择可打印文件',
+        },
+      })
+    }
+
+    // 即使招聘会状态更新与 bridge 撤销并发，建单仍须实时 fail-closed。
+    // 不接受 FairMaterial URL，只对已验签的标准 FileObject 检查其 bridge 来源状态。
+    const bridgeSource = await this.prisma.fairMaterialPrintBridge.findFirst({
+      where: { fileObjectId: fileId },
+      include: { material: { include: { jobFair: true } } },
+    })
+    if (
+      bridgeSource && (
+        bridgeSource.status !== 'ready' ||
+        bridgeSource.revokedAt ||
+        bridgeSource.material.deletedAt ||
+        !bridgeSource.material.allowPrint ||
+        bridgeSource.material.publishStatus !== 'published' ||
+        bridgeSource.material.jobFair.reviewStatus !== 'approved' ||
+        bridgeSource.material.jobFair.publishStatus !== 'published'
+      )
+    ) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_FILE_REVOKED',
+          message: '打印文件已撤销，请返回资料页重新选择可打印文件',
+        },
+      })
+    }
+
     // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
     // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
     const { url: storedFileUrl } = signFileUrl(fileId, PRINT_JOB_FILE_URL_TTL_MS)

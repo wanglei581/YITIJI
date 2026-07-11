@@ -92,6 +92,8 @@ export interface InterviewPrintResponse {
   pageCount: number
   signedUrl: string
   expiresAt: string
+  /** 系统 HMAC content URL，仅供 /print/jobs 使用；signedUrl 只用于预览/下载。 */
+  printFileUrl?: string
 }
 
 export interface MemberInterviewItem {

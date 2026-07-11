@@ -734,6 +734,7 @@ model FileObject {
 
   sourceDocumentTasks DocumentProcessTask[] @relation("DocumentProcessSourceFile")
   resultDocumentTasks DocumentProcessTask[] @relation("DocumentProcessResultFile")
+  fairMaterialPrintBridges FairMaterialPrintBridge[]
 
   @@index([uploaderId])
   @@index([endUserId])
@@ -1031,9 +1032,41 @@ model FairMaterial {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  printBridges FairMaterialPrintBridge[]
+
   @@index([jobFairId])
   @@index([publishStatus])
   @@index([deletedAt])
+}
+
+// ── FairMaterialPrintBridge ──────────────────────────────────────────────────
+// 招聘会运营资料 → PrintJobs 标准 FileObject 的短期桥接。
+// status: creating | ready | revoked | expired | failed
+// activeKey 仅在 creating/ready 时非空并唯一，作为跨进程 single-flight 锁；撤销后置空，
+// 允许同一 materialId+sourceSha256 在后续重新发布时建立新一代桥接。
+model FairMaterialPrintBridge {
+  id             String       @id @default(cuid())
+  materialId     String
+  material       FairMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  fileObjectId   String?      @unique
+  fileObject     FileObject?  @relation(fields: [fileObjectId], references: [id], onDelete: SetNull)
+
+  sourceSha256   String
+  sourceSizeBytes Int
+  sourceMimeType String
+  activeKey      String?      @unique
+  status         String       @default("creating")
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokeReason   String?
+  leaseUntil     DateTime?
+  leaseToken     String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([materialId, sourceSha256, status])
+  @@index([status, expiresAt])
+  @@index([leaseUntil])
 }
 
 // ── FairVenueGuide ───────────────────────────────────────────────────────────

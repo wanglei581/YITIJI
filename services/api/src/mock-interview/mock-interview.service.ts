@@ -4,6 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
+import { signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
 import { MockInterviewLlmService, type InterviewReportPayload } from './mock-interview-llm.service'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
@@ -302,6 +303,7 @@ export class MockInterviewService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
+      printFileUrl: signFileUrl(uploaded.fileId).url,
     }
   }
 

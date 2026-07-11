@@ -22,6 +22,7 @@
     "verify:production-real-services": "node scripts/verify-production-real-services.mjs",
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
+    "verify:ai-artifact-print-url-contract": "node scripts/verify-ai-artifact-print-url-contract.mjs",
     "verify:member-print-orders-ui": "node scripts/verify-member-print-orders-ui.mjs",
     "verify:profile-inkpaper-home": "node scripts/verify-profile-inkpaper-home.mjs",
     "verify:profile-feedback-inkpaper": "node scripts/verify-profile-feedback-inkpaper.mjs",

@@ -56,6 +56,19 @@ export function verifyFileSignature(fileId: string, expires: string, sig: string
 }
 
 /**
+ * 仅解析本系统 content URL 中的文件 ID，不验签、不访问存储。
+ * 用于已持久化 PrintTask 的内部关联；新建任务仍必须调用 verifyFileSignature。
+ */
+export function parseContentFileId(fileUrl: string): string | null {
+  try {
+    const pathname = new URL(fileUrl, 'http://internal.local').pathname
+    return pathname.match(/\/files\/([^/]+)\/content$/)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * 原始字节直传签名(本地后端 upload-intent 用)。
  *
  * COS 后端的 upload-intent 直接返回 COS 预签名 PUT URL;本地后端没有 COS,

@@ -56,6 +56,8 @@ mustContain(
     'loadAuthorizedParse',
     'extractResumeText',
     'files.upload',
+    'signFileUrl',
+    'printFileUrl',
     'fair.visit_plan',
   ],
   '2. Service 基于已发布招聘会 + 本人简历生成、落库、审计、打印',

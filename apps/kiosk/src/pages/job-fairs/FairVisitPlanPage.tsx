@@ -98,6 +98,7 @@ export function FairVisitPlanPage() {
     setError(null)
     try {
       const file = await printFairVisitPlan(fairId, taskId, { token: getToken(), accessToken })
+      if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
       navigate('/print/confirm', {
         state: {
           file: {
@@ -105,7 +106,7 @@ export function FairVisitPlanPage() {
             size: formatSize(file.sizeBytes),
             pages: file.pageCount,
             fileId: file.fileId,
-            fileUrl: file.signedUrl || undefined,
+            fileUrl: file.printFileUrl,
             mimeType: 'application/pdf',
           },
           params: makePrintParams({ copies: 1, duplex: file.pageCount > 1 ? 'double' : 'single', color: 'bw' }),
