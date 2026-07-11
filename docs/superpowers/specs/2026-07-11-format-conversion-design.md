@@ -166,9 +166,10 @@ CONVERT_IMAGE_DIMENSIONS_INVALID
 CONVERT_TOTAL_LIMIT_EXCEEDED
 CONVERT_OUTPUT_TOO_LARGE
 CONVERSION_IN_PROGRESS
-CONVERT_STORAGE_UNAVAILABLE
 CONVERT_FAILED
 ```
+
+**2026-07-11 实现落地更正**：`CONVERT_STORAGE_UNAVAILABLE` 最终未实现——`storage.getObject()` 读取失败未单独包裹为结构化错误码，走全局 `HttpExceptionFilter` 兜底为通用 `500 INTERNAL_SERVER_ERROR`（不泄露存储路径/内部细节，安全性不受影响，仅错误信息不够具体）。实现时新增了 `IDEMPOTENCY_KEY_REUSED`（同 key 不同图片列表冲突，见 §3.7）作为补充。
 
 所有错误响应不包含存储路径、COS 响应正文、签名 URL 或堆栈信息。
 
