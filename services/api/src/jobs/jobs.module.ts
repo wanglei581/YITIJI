@@ -6,13 +6,16 @@ import { AdminFairsController } from './admin-fairs.controller'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { FilesModule } from '../files/files.module'
+import { FairMaterialPrintBridgeService } from './fair-material-print-bridge.service'
+import { FairMaterialPrintBridgeCleanupTask } from './fair-material-print-bridge.cleanup.task'
 
 @Module({
   // PrismaModule:供 importJobs 访问 prisma.job / prisma.organization
   // AuthModule:导出 JwtAuthGuard / RolesGuard,partner 导入接口要用
   // StorageService 为 @Global 模块导出,AdminFairsService 直接注入(活动资料落地)
-  imports:     [PrismaModule, AuthModule],
-  providers:   [JobsService, AdminFairsService, JobQualityService],
+  imports:     [PrismaModule, AuthModule, FilesModule],
+  providers:   [JobsService, AdminFairsService, JobQualityService, FairMaterialPrintBridgeService, FairMaterialPrintBridgeCleanupTask],
   controllers: [JobsController, AdminFairsController],
   exports:     [JobsService, AdminFairsService],
 })

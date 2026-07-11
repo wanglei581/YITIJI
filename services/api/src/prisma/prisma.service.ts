@@ -153,6 +153,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.fairMaterial
   }
 
+  get fairMaterialPrintBridge() {
+    return this.client.fairMaterialPrintBridge
+  }
+
   // ── 招聘会场馆导览 ─────────────────────────────────────────────────────────
 
   get mockInterviewSession() {

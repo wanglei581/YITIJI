@@ -1,3 +1,14 @@
+# 2026-07-11 AI / 求职产物 printFileUrl 契约修复（Hermes）
+
+- 独立分支：`codex/ai-artifact-print-url-contract-20260711`，基线 `origin/main=69fed4fc`。
+- TDD RED：新守卫 28 项失败，覆盖 shared、API 签名生成、Kiosk 消费和缺 URL 阻断。
+- GREEN：AI 产物、我的文档和招聘会资料入口统一只向打印链路传内部 HMAC `printFileUrl`；COS `signedUrl` 仅预览/下载；求职材料 mock 打印按钮诚实禁用。
+- 招聘会资料：新增 SQLite/PostgreSQL 双 additive `FairMaterialPrintBridge`，60 分钟派生 FileObject 复用、lease + 唯一 activeKey single-flight、20MiB 内部受信任桥接、源大小/魔数/MIME/SHA-256 复核；下架/禁打/删除撤销 bridge，活跃任务保留履约文件，旧 HMAC URL 不可借保留窗口创建新任务。
+- 安全回归：`verify:admin-fairs` 覆盖 15MiB+1、20MiB、并发、篡改、撤销/履约；`verify:print-jobs` 继续拒绝外部、缺签名和篡改 URL；相关 SQLite 运行时 verify、三端 typecheck、lint/build、SQLite/PG Prisma generate 均通过。
+- 最终短复审：APPROVE，Critical/High/Medium 均为 0；边界仍为未 commit/push/merge/deploy，后续合并后才执行预生产安全探针。
+
+---
+
 # 2026-06-04 L2-2 member-auth 后端骨干重建(Claude)
 
 ## 分支

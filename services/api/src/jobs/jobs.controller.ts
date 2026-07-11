@@ -45,6 +45,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
 import { JobsService } from './jobs.service'
 import { AdminFairsService } from './admin-fairs.service'
@@ -188,6 +189,16 @@ export class JobsController {
     const page     = safeInt(pageStr, 1, 1, 10_000)
     const pageSize = safeInt(sizeStr, 20, 1, 100)
     return this.adminFairs.getPublishedFairMaterials(id, page, pageSize)
+  }
+
+  /** 按需把已发布、允许打印的活动资料转换为标准短期 FileObject。 */
+  @Post('job-fairs/:id/materials/:materialId/print-url')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  prepareFairMaterialPrint(
+    @Param('id') id: string,
+    @Param('materialId') materialId: string,
+  ) {
+    return this.adminFairs.prepareFairMaterialPrint(id, materialId)
   }
 
   /**

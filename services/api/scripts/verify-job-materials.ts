@@ -120,8 +120,12 @@ async function verifyRuntimeClosure(): Promise<void> {
       requestId: `verify-${suffix}`,
     })
     fileId = generated.fileId
-    if (generated.signedUrl && generated.previewUrlPath === `/files/${fileId}/preview-url`) {
-      pass('Runtime generation returns signed URL and preview path')
+    if (
+      generated.signedUrl &&
+      /^\/api\/v1\/files\/[^/]+\/content\?expires=\d+&sig=[0-9a-f]+$/.test(generated.printFileUrl ?? '') &&
+      generated.previewUrlPath === `/files/${fileId}/preview-url`
+    ) {
+      pass('Runtime generation returns download URL, internal HMAC print URL and preview path')
     } else {
       fail(`Runtime generation returned unsafe metadata: ${JSON.stringify(generated)}`)
     }

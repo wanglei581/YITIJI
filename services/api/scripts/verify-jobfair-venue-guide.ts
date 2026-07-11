@@ -30,7 +30,9 @@ process.env['FILE_STORAGE_DRIVER'] = 'local'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
+import { FilesService } from '../src/files/files.service'
 import { AdminFairsService } from '../src/jobs/admin-fairs.service'
+import { FairMaterialPrintBridgeService } from '../src/jobs/fair-material-print-bridge.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
 
@@ -65,7 +67,9 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
-  const svc = new AdminFairsService(prisma, audit, storage)
+  const files = new FilesService(prisma, audit, storage)
+  const bridge = new FairMaterialPrintBridgeService(prisma, storage, files)
+  const svc = new AdminFairsService(prisma, audit, storage, bridge)
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)

@@ -114,6 +114,8 @@ export interface SignedUrlResponse {
 export interface FileAccessUrlResponse {
   fileId: string
   url: string
+  /** 系统 HMAC content URL，仅供 /print/jobs 使用；url 只用于预览/下载。 */
+  printFileUrl?: string
   expiresAt: string
   /** 'inline'(预览)| 'attachment'(下载)。 */
   disposition: 'inline' | 'attachment'

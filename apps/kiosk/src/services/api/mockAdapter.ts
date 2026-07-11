@@ -17,6 +17,7 @@ import type {
   FairZoneDTO,
   FairBoothDTO,
   FairMaterialDTO,
+  FairMaterialPrintResponse,
   FairLiveStatsDTO,
   FairVenueGuideDTO,
   FairZoneBreakdown,
@@ -258,6 +259,12 @@ export const mockJobFairAdapter = {
       .filter((m) => m.publishStatus === 'published')
       .map(toMaterialDTO)
     return makePaginated(materials)
+  },
+
+  async prepareFairMaterialPrint(_fairId: string, _materialId: string): Promise<FairMaterialPrintResponse> {
+    void _fairId
+    void _materialId
+    throw new Error('演示模式未生成真实招聘会资料文件，暂不可打印')
   },
 
   // 场馆导览:导览数据由 Admin 配置/后端 seed 提供,mock 模式诚实返回空态,不前端硬编码

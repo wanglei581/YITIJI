@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
+import { API_MODE } from '../../services/api/client'
 import {
   clearJobMaterialDraft,
   readJobMaterialDraft,
@@ -160,14 +161,14 @@ export function JobMaterialLibraryPage() {
   }
 
   const printGenerated = (file: JobMaterialGenerateResponse) => {
-    if (!file.signedUrl) return
+    if (!file.printFileUrl) return
     navigate('/print/confirm', {
       state: {
         file: {
           name: file.filename,
           size: formatBytes(file.sizeBytes),
           pages: file.pageCount > 0 ? file.pageCount : null,
-          fileUrl: file.signedUrl,
+          fileUrl: file.printFileUrl,
           mimeType: file.mimeType,
         },
         params: makePrintParams({
@@ -306,7 +307,12 @@ export function JobMaterialLibraryPage() {
                 {submitError && <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">{submitError}</p>}
                 {generated && (
                   <div className="mt-4 rounded-lg border border-success/30 bg-success-bg p-3 text-sm text-success-fg">
-                    已生成 {generated.filename}，文件已进入我的文档。
+                    {API_MODE === 'http'
+                      ? `已生成 ${generated.filename}，文件已进入我的文档。`
+                      : `已生成 ${generated.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。`}
+                    {!generated.printFileUrl && API_MODE === 'http' && (
+                      <p className="mt-1 text-xs text-warning-fg">打印链接未就绪，请重新生成后再试。</p>
+                    )}
                   </div>
                 )}
 
@@ -316,10 +322,22 @@ export function JobMaterialLibraryPage() {
                   </Button>
                   {generated && (
                     <div className="grid grid-cols-2 gap-2">
-                      <Button size="md" variant="secondary" onClick={() => navigate('/me/documents')}>
+                      <Button
+                        size="md"
+                        variant="secondary"
+                        disabled={API_MODE !== 'http'}
+                        title={API_MODE !== 'http' ? '演示模式未保存真实文件' : undefined}
+                        onClick={() => navigate('/me/documents')}
+                      >
                         查看我的文档
                       </Button>
-                      <Button size="md" className="flex items-center justify-center gap-1.5" onClick={() => printGenerated(generated)}>
+                      <Button
+                        size="md"
+                        className="flex items-center justify-center gap-1.5"
+                        disabled={!generated.printFileUrl}
+                        title={!generated.printFileUrl ? (API_MODE !== 'http' ? '演示模式未生成真实文件，暂不可打印' : '打印链接未就绪，请重新生成后再试') : undefined}
+                        onClick={() => printGenerated(generated)}
+                      >
                         <PrinterIcon className="h-4 w-4" />
                         打印材料
                       </Button>

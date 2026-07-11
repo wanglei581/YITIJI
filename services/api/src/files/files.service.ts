@@ -29,6 +29,7 @@ import {
   PURPOSE_POLICY,
   validateUpload,
   isPurpose,
+  type UploadValidationMode,
 } from './file-validation'
 import {
   RetentionPolicyError,
@@ -37,6 +38,7 @@ import {
   defaultRetentionForUpload,
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
+import { parseContentFileId, signFileUrl } from './signing'
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -78,13 +80,17 @@ export class FilesService {
     actorRole?: UserRole | null
     actorOrgId?: string | null
     createdBy?: string | null
+    /** 仅服务端内部调用可设 intent；外部 multipart 调用省略时固定为 proxy(15MB)。 */
+    validationMode?: UploadValidationMode
+    /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
+    expiresAtOverride?: Date
   }): Promise<FileUploadResponse> {
     const validation = validateUpload({
       purpose: args.purpose,
       mimeType: args.mimeType,
       filename: args.filename,
       sizeBytes: args.buffer.length,
-      mode: 'proxy',
+      mode: args.validationMode ?? 'proxy',
     })
     if (!validation.ok) {
       throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
@@ -104,6 +110,9 @@ export class FilesService {
       ownerType: owner.ownerType,
       endUserId: args.endUserId ?? null,
     })
+    if (args.expiresAtOverride && (!Number.isFinite(args.expiresAtOverride.getTime()) || args.expiresAtOverride.getTime() <= Date.now())) {
+      throw new BadRequestException({ error: { code: 'FILE_EXPIRY_INVALID', message: '文件到期时间无效' } })
+    }
     const objectKey = generateObjectKey({
       purpose: args.purpose,
       ownerType: owner.ownerType as ObjKeyOwnerType,
@@ -135,7 +144,7 @@ export class FilesService {
         createdBy: args.createdBy ?? args.uploaderId ?? null,
         assetCategory: args.assetCategory ?? 'original',
         sourceFileId: args.sourceFileId ?? null,
-        expiresAt: retention.expiresAt,
+        expiresAt: args.expiresAtOverride ?? retention.expiresAt,
         retentionPolicy: retention.retentionPolicy,
         retentionSetBy: retention.retentionSetBy,
         retentionConsentAt: retention.retentionConsentAt,
@@ -365,6 +374,7 @@ export class FilesService {
       response: {
         fileId: record.id,
         url: signed.url,
+        printFileUrl: signFileUrl(record.id).url,
         expiresAt: signed.expiresAt.toISOString(),
         disposition,
       },
@@ -501,6 +511,11 @@ export class FilesService {
     return this._delete(fileId, deletedBy, reason)
   }
 
+  /** 服务端生命周期任务删除系统派生文件；不暴露给 controller。 */
+  async systemDelete(fileId: string, reason: string): Promise<FileMetadata> {
+    return this._delete(fileId, 'system', reason)
+  }
+
   /** 会员本人修改文件保存期限。Admin 代改留给后续独立审批/锁定通道。 */
   async updateRetention(
     fileId: string,
@@ -579,6 +594,13 @@ export class FilesService {
     const byPurpose: Record<string, number> = {}
     for (const f of expired) {
       try {
+        const bridge = await this.prisma.fairMaterialPrintBridge.findFirst({
+          where: { fileObjectId: f.id },
+          select: { id: true, status: true, revokedAt: true },
+        })
+        if (bridge && await this.hasActivePrintTaskForFile(f.id)) {
+          continue
+        }
         await this.storage.deleteObject(f.storageKey, f.bucket)
         await this.prisma.fileObject.update({
           where: { id: f.id },
@@ -589,6 +611,12 @@ export class FilesService {
             status: 'deleted',
           },
         })
+        if (bridge && bridge.status === 'ready' && !bridge.revokedAt) {
+          await this.prisma.fairMaterialPrintBridge.update({
+            where: { id: bridge.id },
+            data: { activeKey: null, status: 'expired', revokedAt: now, revokeReason: 'file_expired_cleanup' },
+          })
+        }
         deletedIds.push(f.id)
         bySensitiveLevel[f.sensitiveLevel] = (bySensitiveLevel[f.sensitiveLevel] ?? 0) + 1
         byPurpose[f.purpose] = (byPurpose[f.purpose] ?? 0) + 1
@@ -629,6 +657,14 @@ export class FilesService {
 
   private resolveSensitiveLevel(purpose: FilePurpose, explicit?: FileSensitiveLevel): FileSensitiveLevel {
     return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
+  }
+
+  private async hasActivePrintTaskForFile(fileId: string): Promise<boolean> {
+    const tasks = await this.prisma.printTask.findMany({
+      where: { status: { in: ['pending', 'claimed', 'printing'] } },
+      select: { fileUrl: true },
+    })
+    return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
   }
 
   private async requireAlive(fileId: string) {

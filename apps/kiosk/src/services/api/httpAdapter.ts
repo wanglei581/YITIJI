@@ -21,6 +21,7 @@ import type {
   FairZoneDTO,
   FairBoothDTO,
   FairMaterialDTO,
+  FairMaterialPrintResponse,
   FairLiveStatsDTO,
   FairVenueGuideDTO,
 } from '@ai-job-print/shared'
@@ -75,8 +76,25 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
   return res.json() as Promise<T>
 }
 
-// ──────────────────────────────────────────────────────────────
-// 后端 wire 形状 → 展示 DTO 的字段对齐
+async function post<T>(path: string): Promise<T> {
+  const url = new URL(`${API_BASE_URL}${path}`, window.location.origin)
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    let code = 'UNKNOWN_ERROR'
+    let message = `HTTP ${res.status}`
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } }
+      code = body.error?.code ?? code
+      message = body.error?.message ?? message
+    } catch { /* keep defaults */ }
+    throw new ApiHttpError(code, message, res.status)
+  }
+  return res.json() as Promise<T>
+}
 //
 // 后端 FairCompany / FairZone 子端点返回的是"精简 Prisma 镜像"
 // （name / industry:null / jobsCount / category ...），而 Kiosk 页面读取的是
@@ -271,6 +289,10 @@ export const httpJobFairAdapter = {
 
   async getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>> {
     return get<PaginatedResponse<FairMaterialDTO>>(`/job-fairs/${fairId}/materials`)
+  },
+
+  async prepareFairMaterialPrint(fairId: string, materialId: string): Promise<FairMaterialPrintResponse> {
+    return post<FairMaterialPrintResponse>(`/job-fairs/${fairId}/materials/${materialId}/print-url`)
   },
 
   async getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>> {

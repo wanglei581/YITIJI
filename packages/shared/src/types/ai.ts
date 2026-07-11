@@ -486,6 +486,8 @@ export interface CareerPlanPrintResponse {
   pageCount: number
   signedUrl: string
   expiresAt: string
+  /** 系统 HMAC content URL，仅供 /print/jobs 使用；signedUrl 只用于预览/下载。 */
+  printFileUrl?: string
 }
 
 // ── 招聘会 AI 参会准备单 ───────────────────────────────────────────────────
@@ -530,4 +532,6 @@ export interface FairVisitPlanPrintResponse {
   pageCount: number
   signedUrl: string
   expiresAt: string
+  /** 系统 HMAC content URL，仅供 /print/jobs 使用；signedUrl 只用于预览/下载。 */
+  printFileUrl?: string
 }

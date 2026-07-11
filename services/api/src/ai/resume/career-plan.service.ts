@@ -3,6 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
 import { FilesService } from '../../files/files.service'
+import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from './llm-career-plan.service'
 import { CareerPlanPdfService } from './career-plan-pdf.service'
@@ -194,6 +195,7 @@ export class CareerPlanService {
       pageCount,
       signedUrl: uploaded.signedUrl,
       expiresAt: uploaded.signedUrlExpiresAt,
+      printFileUrl: signFileUrl(uploaded.fileId).url,
     }
   }
 

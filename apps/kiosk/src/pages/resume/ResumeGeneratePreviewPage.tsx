@@ -126,7 +126,7 @@ export function ResumeGeneratePreviewPage() {
   }
 
   const handlePrint = () => {
-    if (!exported) return
+    if (!exported?.printFileUrl) return
     navigate('/print/confirm', {
       state: {
         file: {
@@ -136,7 +136,7 @@ export function ResumeGeneratePreviewPage() {
             : `${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB`,
           pages: exported.pageCount,
           fileId: exported.fileId,
-          fileUrl: exported.signedUrl || undefined,
+          fileUrl: exported.printFileUrl,
           mimeType: 'application/pdf',
         },
         params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
@@ -310,8 +310,8 @@ export function ResumeGeneratePreviewPage() {
               {exported.filename} · {exported.pageCount} 页
               {exported.sizeBytes > 0 ? ` · ${Math.max(1, Math.round(exported.sizeBytes / 1024))} KB` : ''}
             </p>
-            {!exported.signedUrl && (
-              <p className="mt-1 text-xs text-warning-fg">演示模式未生成真实文件,接入后端后可打印。</p>
+            {!exported.printFileUrl && (
+              <p className="mt-1 text-xs text-warning-fg">{exported.signedUrl ? '打印链接未就绪，请重新导出后再试。' : '演示模式未生成真实文件，暂不可打印。'}</p>
             )}
             <p className="mt-1 flex items-center gap-1 text-xs text-success-fg/80">
               <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -342,7 +342,7 @@ export function ResumeGeneratePreviewPage() {
               <Button
                 size="lg"
                 className="flex flex-[2] items-center justify-center gap-2"
-                disabled={!exported.signedUrl}
+                disabled={!exported.printFileUrl}
                 onClick={handlePrint}
               >
                 <PrinterIcon className="h-5 w-5" />

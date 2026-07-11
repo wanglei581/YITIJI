@@ -24,6 +24,7 @@
 
 import {
   Injectable,
+  Optional,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
@@ -51,6 +52,7 @@ import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptSecret, generateWebhookSecret } from '../common/crypto/secret-cipher'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { FairMaterialPrintBridgeService } from './fair-material-print-bridge.service'
 import { mapFair, mapFairCompany, mapFairZone } from './fair.mapper'
 import type { FairDetailResponse, FairCompany, FairZone } from './fair.types'
 import type { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
@@ -737,6 +739,7 @@ export class JobsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly jobQuality: JobQualityService,
+    @Optional() private readonly printBridges?: FairMaterialPrintBridgeService,
   ) {}
 
   private async refreshJobQualitySnapshots(jobIds: string[]): Promise<void> {
@@ -1270,6 +1273,9 @@ export class JobsService {
       where: { id },
       data: { publishStatus: toStatus },
     })
+    if (action === 'unpublish') {
+      await this.printBridges?.revokeForFair(id, 'fair_unpublished')
+    }
     await this.audit.write({
       actorId: user.userId,
       actorRole: 'admin',
