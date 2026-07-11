@@ -82,7 +82,8 @@ const RAW_CONTAINER_SIGNATURES: SignatureMatcher[] = [
 
 // 真实 DOCX 的 ZIP 条目名(word/document.xml 等)以未压缩 ASCII 出现在
 // local-file header 与 central directory 中;XLSX 是 xl/、PPTX 是 ppt/。
-// 全 buffer 扫一遍即可(docx 相关 purpose 上限 20MB,单次 includes 可接受)。
+// 全 buffer 扫一遍即可:实际被嗅探的 buffer 受 proxy 15MB / 直传回读 32MB
+// (DIRECT_UPLOAD_SNIFF_MAX_BYTES)门限约束,单次 includes 可接受。
 const DOCX_ENTRY_MARK = Buffer.from('word/', 'latin1')
 // 旧版 Word 二进制强制存在的 OLE 流名(UTF-16LE);XLS 是 Workbook、PPT 是
 // PowerPoint Document。只查流名存在性,不遍历 OLE 目录结构。
