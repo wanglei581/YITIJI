@@ -230,6 +230,9 @@ function isDemoTask(task: DocumentProcessTaskView | null): boolean {
  *   修复上线前、TASK_TTL_HOURS 窗口内可能仍被读取到的存量任务而保留此文案分支。
  * - 'degraded'：本该真实扫描但 OCR 不可用/失败，诚实告知需人工确认，不是"演示"。
  * - 'unsupported_format'：该文件格式完全没有内容提取路径（如旧版 .doc），诚实告知，不是"演示"。
+ * - 其余未知取值一律 fail-closed 显示警告：旧后端在 TASK_TTL_HOURS 窗口内的存量任务
+ *   （如历史 'simulated'）或未来新增 mode，都不允许静默呈现为"真实扫描完成"。
+ *   'mock'/'skeleton' 例外——它们由 isDemoTask 的"流程演示"徽标单独诚实标注。
  */
 function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string; tone: 'neutral' | 'warning' } | null {
   const mode = task?.result?.['mode']
@@ -247,7 +250,8 @@ function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string;
     }
   }
   if (mode === 'real') return null
-  return null
+  if (isDemoTask(task)) return null
+  return { label: '本次隐私检查结果状态未知，请人工确认文件不含敏感信息', tone: 'warning' }
 }
 
 function CheckStep({
