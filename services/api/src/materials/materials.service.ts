@@ -442,9 +442,10 @@ export class MaterialsService {
     const BLANK_PIXEL_RATIO_THRESHOLD = 0.99
     const BLANK_RENDER_SCALE = 0.3
 
-    const isPageBlank = async (pngBuffer: Buffer): Promise<boolean> => {
+    const isPageBlank = async (imageBuffer: Buffer, imageMimeType: string): Promise<boolean> => {
+      if (!looksLikeCompleteImage(imageBuffer, imageMimeType)) return false
       const { loadImage, createCanvas } = await import('@napi-rs/canvas')
-      const image = await loadImage(pngBuffer)
+      const image = await loadImage(imageBuffer)
       const canvas = createCanvas(image.width, image.height)
       const ctx = canvas.getContext('2d')
       ctx.drawImage(image, 0, 0)
@@ -470,7 +471,7 @@ export class MaterialsService {
           const pagesToScan = Math.min(rendered.totalPages, BLANK_SCAN_MAX_PAGES)
           for (let pageNo = 1; pageNo <= pagesToScan; pageNo += 1) {
             const img = await rendered.renderPage(pageNo, BLANK_RENDER_SCALE)
-            if (await isPageBlank(img)) blankPages.push(pageNo)
+            if (await isPageBlank(img, 'image/png')) blankPages.push(pageNo)
           }
           return blankPages
         } finally {
@@ -483,7 +484,7 @@ export class MaterialsService {
 
     if (isSinglePageImage(mimeType)) {
       try {
-        return (await isPageBlank(buffer)) ? [1] : []
+        return (await isPageBlank(buffer, mimeType)) ? [1] : []
       } catch {
         return []
       }
@@ -739,6 +740,48 @@ function isJpegStartOfFrame(marker: number | undefined): boolean {
     marker === 0xc5 || marker === 0xc6 || marker === 0xc7 ||
     marker === 0xc9 || marker === 0xca || marker === 0xcb ||
     marker === 0xcd || marker === 0xce || marker === 0xcf
+}
+
+/**
+ * 轻量"文件是否完整"预检：在把 buffer 交给 @napi-rs/canvas 的原生 loadImage() 之前先做。
+ * 背景（Critical，已复现确认）：loadImage() 对不完整/畸形图片可能直接 SIGSEGV 整个进程，
+ * 而不是抛可捕获的 JS 异常——try/catch 完全防不住原生崩溃。这里用最基本的"文件尾部是否
+ * 有该格式的结束标记"做预检，不完整就直接跳过检测（返回未发现空白页），不去解码。
+ * 注意：这只挡住"截断/不完整文件"这一类已复现的崩溃触发方式，不保证挡住所有可能让原生
+ * 解码器崩溃的畸形输入——如果未来发现别的崩溃模式，需要更彻底的方案（例如把解码放进
+ * worker_thread 隔离），本轮先做这个成本最低、能挡住已知问题的版本。
+ */
+function looksLikeCompleteImage(buffer: Buffer, mimeType: string): boolean {
+  const MIN_PLAUSIBLE_BYTES = 100
+  if (buffer.length < MIN_PLAUSIBLE_BYTES) return false
+
+  if (mimeType === 'image/png') {
+    const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex')
+    if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return false
+    // 合法 PNG 必须以 IEND chunk 收尾；截断文件（比如只有签名+IHDR）不会有这段。
+    const tail = buffer.subarray(-16).toString('ascii')
+    return tail.includes('IEND')
+  }
+
+  if (mimeType === 'image/jpeg') {
+    if (buffer[0] !== 0xff || buffer[1] !== 0xd8) return false
+    // 合法 JPEG 以 EOI 标记 (FF D9) 结尾；个别编码器后面可能有极少量 padding，放宽到看最后 4 字节。
+    const tail = buffer.subarray(-4)
+    for (let i = 0; i < tail.length - 1; i += 1) {
+      if (tail[i] === 0xff && tail[i + 1] === 0xd9) return true
+    }
+    return false
+  }
+
+  if (mimeType === 'image/webp') {
+    const header = buffer.subarray(0, 12).toString('ascii')
+    // WEBP 是基于 chunk 的可变长格式，完整性没有 PNG/JPEG 那样简单的尾部标记；
+    // 这里只做头部合法性 + 最小体积检查，覆盖不了所有截断场景，但能挡住本次复现的
+    // "只有几十字节头部" 这类极端情况。
+    return header.startsWith('RIFF') && header.includes('WEBP')
+  }
+
+  return false
 }
 
 function estimateA4Dpi(widthPx: number, heightPx: number): number {
