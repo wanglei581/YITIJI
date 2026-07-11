@@ -31,7 +31,13 @@ import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { useAuth } from '../../auth/useAuth'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
-import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState, type PrintMaterialSource } from './printMaterialSession'
+import {
+  clearPrintMaterialSession,
+  savePrintMaterialSession,
+  type PrintFileState,
+  type PrintMaterialContentCategory,
+  type PrintMaterialSource,
+} from './printMaterialSession'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
@@ -41,6 +47,22 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// 入口卡片（"照片打印" vs "文档打印"）只能表达用户点了哪个入口，不能证明用户最终选中的
+// 文件真的是图片——用户仍可能在"照片打印"入口里通过拖拽或系统文件对话框选中 PDF。
+// 这里以实际上传结果的 mimeType 为准做二次校验，只有入口信号 + 真实 mimeType 都指向
+// 图片时，才把 contentCategory=photo 传给后端；否则传 undefined，让后端按默认路径
+// 真实扫描（后端 materials.service.ts 的 canSkipAsPhoto 同样会再校验一次，双重防御）。
+const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+function resolveContentCategory(
+  entryContentCategory: PrintMaterialContentCategory | undefined,
+  mimeType: string | undefined,
+): PrintMaterialContentCategory | undefined {
+  if (entryContentCategory !== 'photo') return undefined
+  if (!mimeType || !IMAGE_MIME_TYPES.has(mimeType)) return undefined
+  return 'photo'
 }
 
 export function PrintUploadPage() {
@@ -97,7 +119,7 @@ export function PrintUploadPage() {
         mimeType: result.mimeType,
       }
       setFile(nextFile)
-      savePrintMaterialSession({ file: nextFile, source, contentCategory })
+      savePrintMaterialSession({ file: nextFile, source, contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType) })
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
@@ -125,12 +147,12 @@ export function PrintUploadPage() {
       mimeType: uploaded.mimeType,
     }
     setFile(nextFile)
-    savePrintMaterialSession({ file: nextFile, source, contentCategory })
+    savePrintMaterialSession({ file: nextFile, source, contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType) })
   }
 
   const handleNext = () => {
     if (!file) return
-    savePrintMaterialSession({ file, source, contentCategory })
+    savePrintMaterialSession({ file, source, contentCategory: resolveContentCategory(contentCategory, file.mimeType) })
     navigate('/print/material-check', { state: { file, source } })
   }
 
@@ -214,7 +236,7 @@ export function PrintUploadPage() {
             <input
               ref={inputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept={contentCategory === 'photo' ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'}
               className="sr-only"
               onChange={handleFileChange}
             />

@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
-import type { FilePurpose } from '../files/file.types'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
 import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
@@ -16,7 +15,7 @@ import type {
   PiiFindingAction,
   PiiFindingView,
 } from './materials.types'
-import { buildPiiFindingsFromPages, extractTextForPiiScan, HIGH_RISK_PII_PURPOSES } from './pii-scan.util'
+import { buildPiiFindingsFromPages, extractTextForPiiScan } from './pii-scan.util'
 
 const TASK_TTL_HOURS = 24
 const RAW_TEXT_PARAM_KEYS = new Set(['textsample', 'text', 'rawtext', 'fulltext', 'content', 'documenttext'])
@@ -154,8 +153,16 @@ export class MaterialsService {
 
     if (kind === 'pii_scan') {
       const contentCategory = readStringParam(params, 'contentCategory')
-      const isHighRiskPurpose = HIGH_RISK_PII_PURPOSES.includes(sourceFile.purpose as FilePurpose)
-      if (!isHighRiskPurpose && contentCategory === 'photo') {
+      // 只有 purpose === 'print_doc' 且真的是单页图片格式时，contentCategory=photo 这个客户端
+      // 提示才被接受——不能只看"不是高风险 purpose"，否则任何调用方对着任意非高风险文件
+      // 声称 photo 都能跳过真实扫描。魔数级别的文件类型校验不在这里做（那是上传管线的
+      // 通用信任边界问题，超出本次修复范围），这里只是不让一个明显不是图片的文件
+      // （比如 mimeType 是 application/pdf）被 contentCategory=photo 提示跳过。
+      const canSkipAsPhoto =
+        sourceFile.purpose === 'print_doc' &&
+        isSinglePageImage(sourceFile.mimeType) &&
+        contentCategory === 'photo'
+      if (canSkipAsPhoto) {
         await this.prisma.documentProcessTask.update({
           where: { id: task.id },
           data: { resultJson: JSON.stringify({ mode: 'skipped_non_document', findingCount: 0 }) },

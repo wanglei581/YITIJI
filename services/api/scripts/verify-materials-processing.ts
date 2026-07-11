@@ -617,6 +617,23 @@ async function main() {
       fail(`B. Expected high-risk purpose to bypass the photo skip, got ${JSON.stringify(highRiskPhotoTask.result)}`)
     }
 
+    // B2. Critical 回归：print_doc 用途 + PDF 文件（非图片）+ contentCategory=photo 冒充 →
+    //     不能被当作照片跳过。这是安全审查发现的具体绕过场景：客户端只要在"照片打印"
+    //     入口选一个 PDF 就能让 contentCategory=photo 生效，从而让明显不是图片的文件跳过
+    //     真实 PII 扫描。修复后 canSkipAsPhoto 额外要求 isSinglePageImage(mimeType)，
+    //     PDF 必然落回真实抽取路径（mode 可能是 real/degraded，取决于抽取结果，但绝不可能
+    //     是 skipped_non_document）。复用已有 pdfFileId（purpose=print_doc, mimeType=
+    //     application/pdf），走 materialsRealOcr 以覆盖该文件走 OCR 兜底渲染路径的情况。
+    const pdfPhotoBypassTask = await materialsRealOcr.createTask(
+      { kind: 'pii_scan', sourceFileId: pdfFileId, params: { contentCategory: 'photo' } },
+      { kind: 'anonymous' },
+    )
+    if (pdfPhotoBypassTask.result?.['mode'] !== 'skipped_non_document') {
+      pass(`B2. print_doc + PDF + contentCategory=photo does NOT skip real scan (mode=${pdfPhotoBypassTask.result?.['mode']})`)
+    } else {
+      fail(`B2. Expected PDF-through-photo-entry bypass to be blocked, got mode=skipped_non_document (${JSON.stringify(pdfPhotoBypassTask.result)})`)
+    }
+
     // C. OCR 失败 → mode=degraded，绝不伪造 0 命中以外的任何结果，不落库任何 finding。
     const degradedOcrPngBytes = makeBlankWhitePng(4, 4)
     const degradedPut = await storage.putObject(degradedOcrImageObjectKey, degradedOcrPngBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
