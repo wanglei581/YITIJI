@@ -58,6 +58,9 @@ function findOverclaimOffenders(source: string): { index: number; line: string }
     .map((line, index) => ({ index: index + 1, line: line.trim() }))
     .filter(({ line }) => line.length > 0)
     .flatMap(({ index, line }) =>
+      // 顿号「、」刻意不参与切分：文档主流诚实句式是「不代表 A 已完成、B 已通过、C 已完成」，
+      // 否定词统辖整个顿号列举，切开会把列举项与否定词切断造成大面积误伤（实测 20 处）。
+      // 代价是「X 已完成、Y 仍需补验」这类混合极性句会被整句豁免——已知盲区，本脚本是绊网不是证明系统。
       line
         .split(/[|。；;，,]/)
         .map((segment) => segment.trim())
@@ -100,6 +103,9 @@ function assertOverclaimHeuristicFixtures(): void {
     'U盘打印仍需真机验收完成。',
     '小范围试运营仍需完成现场验收。',
     '全部 Gate 仍需完成。',
+    // 否定词统辖顿号列举的惯用句式：验收/进度文档大量使用，锁定「、」不得加入分句切分符，
+    // 否则列举项与开头的「不代表」被切断，此句会炸出 4 处误伤。
+    '本文件不代表生产迁移已执行、Windows 真机完整验收已通过、真实扫描已完成、U 盘导入已完成、奔图彩色 mode 已确认或小范围试运营已完成。',
   ]
 
   const missedFlags = shouldFlag.filter((s) => findOverclaimOffenders(s).length === 0)
