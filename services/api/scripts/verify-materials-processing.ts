@@ -910,21 +910,6 @@ main().catch((error: unknown) => {
   process.exit(1)
 })
 
-function buildPngHeader(width: number, height: number): Buffer {
-  const header = Buffer.alloc(33)
-  Buffer.from('89504e470d0a1a0a', 'hex').copy(header, 0)
-  header.writeUInt32BE(13, 8)
-  header.write('IHDR', 12, 'ascii')
-  header.writeUInt32BE(width, 16)
-  header.writeUInt32BE(height, 20)
-  header[24] = 8
-  header[25] = 2
-  header[26] = 0
-  header[27] = 0
-  header[28] = 0
-  return header
-}
-
 // ── fake OCR 边界（只 fake ocr.recognize，materials.service 真实抽取/正则匹配逻辑不受影响）──
 
 type FakeOcrResult = {
