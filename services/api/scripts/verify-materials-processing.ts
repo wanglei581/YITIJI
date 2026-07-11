@@ -10,10 +10,13 @@
  *   pnpm --filter @ai-job-print/api verify:materials-processing
  */
 import 'dotenv/config'
+import zlib from 'node:zlib'
 import { randomUUID } from 'crypto'
+import { createCanvas } from '@napi-rs/canvas'
 import { BadRequestException, ForbiddenException, GoneException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MaterialsService } from '../src/materials/materials.service'
+import type { OcrService } from '../src/ai/resume/ocr/ocr.service'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/storage.interface'
 
@@ -70,7 +73,13 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const storage = new StorageService()
-  const materials = new MaterialsService(prisma, storage)
+  // 共享实例只用于不涉及真实抽取的路径（inspection/normalize_a4/pii_redact/ownership 等）；
+  // 若某条路径意外触发 OCR，立即在这里失败，而不是悄悄返回貌似合理的假结果。
+  const strictNoOcr: Pick<OcrService, 'recognize'> = {
+    recognize: async () =>
+      fail('unexpected OCR call on the shared materials instance (a specific test path should have used its own FakeOcrService)'),
+  }
+  const materials = new MaterialsService(prisma, storage, strictNoOcr as unknown as OcrService)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const ownerId = `eu_mat_owner_${suffix}`
@@ -80,10 +89,32 @@ async function main() {
   const imageFileId = `file_mat_image_${suffix}`
   const pdfFileId = `file_mat_pdf_${suffix}`
   const unknownPdfFileId = `file_mat_pdf_unknown_${suffix}`
-  const testFileIds = [ownedFileId, anonymousFileId, imageFileId, pdfFileId, unknownPdfFileId]
+  const degradedOcrImageFileId = `file_mat_degraded_${suffix}`
+  const unsupportedFormatFileId = `file_mat_unsupported_${suffix}`
+  const docxFileId = `file_mat_docx_${suffix}`
+  const blankImageFileId = `file_mat_blank_${suffix}`
+  const nonBlankImageFileId = `file_mat_nonblank_${suffix}`
+  const testFileIds = [
+    ownedFileId,
+    anonymousFileId,
+    imageFileId,
+    pdfFileId,
+    unknownPdfFileId,
+    degradedOcrImageFileId,
+    unsupportedFormatFileId,
+    docxFileId,
+    blankImageFileId,
+    nonBlankImageFileId,
+  ]
+  const ownedObjectKey = `verify/materials/${ownedFileId}.png`
   const imageObjectKey = `verify/materials/${imageFileId}.png`
   const pdfObjectKey = `verify/materials/${pdfFileId}.pdf`
   const unknownPdfObjectKey = `verify/materials/${unknownPdfFileId}.pdf`
+  const degradedOcrImageObjectKey = `verify/materials/${degradedOcrImageFileId}.png`
+  const unsupportedFormatObjectKey = `verify/materials/${unsupportedFormatFileId}.doc`
+  const docxObjectKey = `verify/materials/${docxFileId}.docx`
+  const blankImageObjectKey = `verify/materials/${blankImageFileId}.png`
+  const nonBlankImageObjectKey = `verify/materials/${nonBlankImageFileId}.png`
   const now = new Date()
   const expiresAt = new Date(now.getTime() + 60 * 60 * 1000)
   const textSample = '请联系 13800138000 或 zhangsan@example.com，身份证 110101199001011234，地址 青岛市市南区测试路 1 号。'
@@ -110,14 +141,21 @@ async function main() {
     })
     pass('EndUsers created')
 
+    // M2: ownedFileId 现在需要真实落盘的字节 —— pii_scan 走 extractTextForPiiScan 真实读文件，
+    // 不再吃 params.textSample。这里用一张真实（哪怕内容无意义）的 PNG 承载，交由 FakeOcrService
+    // 的 recognize() 返回 textSample 文本，驱动真实的正则匹配/去重流程（只 fake OCR 这一层边界）。
+    const ownedPngBytes = makeBlankWhitePng(4, 4)
+    const ownedPut = await storage.putObject(ownedObjectKey, ownedPngBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {
         id: ownedFileId,
-        storageKey: `verify/materials/${ownedFileId}.pdf`,
-        filename: 'resume-13800138000.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 256,
-        sha256: 'c'.repeat(64),
+        storageKey: ownedObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'resume-13800138000.png',
+        mimeType: 'image/png',
+        sizeBytes: ownedPut.sizeBytes,
+        sha256: ownedPut.sha256,
         purpose: 'resume_upload',
         sensitiveLevel: 'sensitive',
         expiresAt,
@@ -142,7 +180,12 @@ async function main() {
         ownerId: null,
       },
     })
-    const imageBytes = buildPngHeader(800, 600)
+    // M3: 之前用的 buildPngHeader() 只有 IHDR chunk（无 IDAT/IEND），Task 3 引入
+    // detectBlankPages() 后，inspection/normalize_a4 会真实调用 @napi-rs/canvas 的 loadImage()
+    // 去解码它 —— 这类截断 PNG 会导致原生层直接 SIGSEGV（进程崩溃，JS try/catch 完全拦不住），
+    // 而不是 briefing 假设的"抛出可捕获异常后 fail-open"。改用真实、完整、可解码的 PNG
+    // （宽高不变，不影响下面既有的 800×600 / low-DPI 断言）。
+    const imageBytes = makeNonBlankPng(800, 600)
     const imagePut = await storage.putObject(imageObjectKey, imageBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
     await prisma.fileObject.create({
       data: {
@@ -204,7 +247,13 @@ async function main() {
     })
     pass('FileObjects created')
 
-    const task = await materials.createTask(
+    // 专用 MaterialsService 实例：只 fake OCR 这一层边界，真实走 extractTextForPiiScan →
+    // buildPiiFindingsFromPages 正则匹配/去重管线（与 verify-scan-tasks.ts 的 FakeFilesService
+    // 同一原则：fake the boundary, not the logic）。
+    const textSampleOcr = makeFakeOcr(async () => ({ ok: true, text: textSample, confidence: 'high' as const }))
+    const materialsRealOcr = new MaterialsService(prisma, storage, textSampleOcr.ocr)
+
+    const task = await materialsRealOcr.createTask(
       { kind: 'pii_scan', sourceFileId: ownedFileId, params: sensitiveParams },
       { kind: 'member', endUserId: ownerId },
     )
@@ -218,8 +267,12 @@ async function main() {
       findingTypes.has('email') &&
       findingTypes.has('id_card') &&
       findingTypes.has('address')
-    ) pass('PII scan generated simulated phone/email/id-card/address findings')
+    ) pass('PII scan generated real phone/email/id-card/address findings via extractTextForPiiScan + fake-OCR boundary')
     else fail(`Expected phone/email/id-card/address PII findings, got ${JSON.stringify([...findingTypes])}`)
+    if (task.result?.['mode'] === 'real') pass('PII scan resultJson.mode === "real" for a real, successfully-scanned document')
+    else fail(`Expected resultJson.mode === 'real', got ${JSON.stringify(task.result)}`)
+    if (textSampleOcr.calls() >= 1) pass('PII scan on ownedFileId actually invoked the fake OCR boundary')
+    else fail('Expected the fake OCR to have been called for ownedFileId pii_scan')
     if (task.piiFindings?.every((f) => !f.snippet || f.snippet.length <= 32)) pass('PII snippets are capped at 32 chars')
     else fail('PII finding snippet exceeded 32 chars')
 
@@ -302,7 +355,7 @@ async function main() {
       fail(`PII redact evaluation expected settled decisions and no output file, got ${JSON.stringify(redactionChecks)}`)
     }
 
-    const pendingPiiTask = await materials.createTask(
+    const pendingPiiTask = await materialsRealOcr.createTask(
       { kind: 'pii_scan', sourceFileId: ownedFileId, params: sensitiveParams },
       { kind: 'member', endUserId: ownerId },
     )
@@ -358,11 +411,19 @@ async function main() {
       fail(`Expected unavailable PDF to set canPrint=false, got ${JSON.stringify(unavailableChecks)}`)
     }
 
-    const anonymousPiiTask = await materials.createTask(
-      { kind: 'pii_scan', sourceFileId: anonymousFileId, params: { textSample } },
+    // M2: anonymousFileId 故意保持"字节不可用"（用于上面的 SOURCE_FILE_BYTES_UNAVAILABLE 断言），
+    // 不能再借它做真实 PII 抽取。改用同样匿名归属、但已有真实落盘字节的 imageFileId，
+    // 经 materialsRealOcr（fake OCR 返回 textSample）驱动真实抽取管线，同时保留匿名 token 授权语义验证。
+    const anonymousPiiTask = await materialsRealOcr.createTask(
+      { kind: 'pii_scan', sourceFileId: imageFileId, params: {} },
       { kind: 'anonymous' },
     )
     if (!anonymousPiiTask.accessToken) fail('Anonymous PII scan should return access token')
+    if (anonymousPiiTask.result?.['mode'] === 'real' && (anonymousPiiTask.piiFindings?.length ?? 0) > 0) {
+      pass('Anonymous PII scan on real image content produced real findings (mode=real)')
+    } else {
+      fail(`Anonymous PII scan expected mode=real with findings, got ${JSON.stringify(anonymousPiiTask.result)}`)
+    }
     const anonymousPiiDecisions = (anonymousPiiTask.piiFindings ?? []).map((finding, index) => ({
       findingId: finding.id,
       action: index === 0 ? 'redact' as const : 'keep' as const,
@@ -374,18 +435,18 @@ async function main() {
     )
     await expectForbidden('Anonymous PII redact without decision task token is rejected', () =>
       materials.createTask(
-        { kind: 'pii_redact', sourceFileId: anonymousFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+        { kind: 'pii_redact', sourceFileId: imageFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
         { kind: 'anonymous' },
       ),
     )
     await expectForbidden('Anonymous PII redact with wrong decision task token is rejected', () =>
       materials.createTask(
-        { kind: 'pii_redact', sourceFileId: anonymousFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+        { kind: 'pii_redact', sourceFileId: imageFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
         { kind: 'anonymous', accessToken: 'wrong-token' },
       ),
     )
     const anonymousRedactionTask = await materials.createTask(
-      { kind: 'pii_redact', sourceFileId: anonymousFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
+      { kind: 'pii_redact', sourceFileId: imageFileId, params: { decisionTaskId: anonymousPiiSettled.id } },
       { kind: 'anonymous', accessToken: anonymousPiiTask.accessToken },
     )
     const anonymousRedactionChecks = (anonymousRedactionTask.result?.['checks'] ?? {}) as Record<string, unknown>
@@ -521,6 +582,216 @@ async function main() {
       fail(`Unknown-page PDF normalize_a4 expected canNormalize=false, got ${JSON.stringify(unknownPdfNormalizeChecks)}`)
     }
 
+    // ── pii_scan 四态覆盖：real / skipped_non_document / degraded / unsupported_format ──────
+
+    // A. 非高风险用途 + contentCategory=photo → 直接跳过，OCR 绝不应被调用（复用 imageFileId，
+    //    走共享 strict-no-ocr 的 materials 实例；若误触发 OCR，strictNoOcr 会立即 fail() 退出）。
+    const skippedTask = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: imageFileId, params: { contentCategory: 'photo' } },
+      { kind: 'anonymous' },
+    )
+    if (skippedTask.result?.['mode'] === 'skipped_non_document' && skippedTask.result?.['findingCount'] === 0) {
+      pass('A. Non-high-risk purpose + contentCategory=photo → mode=skipped_non_document, OCR never invoked')
+    } else {
+      fail(`A. Expected mode=skipped_non_document/findingCount=0, got ${JSON.stringify(skippedTask.result)}`)
+    }
+
+    // B. 高风险用途即使传 contentCategory=photo 也不能跳过（覆盖 HIGH_RISK_PII_PURPOSES 的
+    //    永久回归测试；此前只在 Task 2 code review 时人工验证过一次，这里落成可执行断言）。
+    const highRiskPhotoTask = await materialsRealOcr.createTask(
+      { kind: 'pii_scan', sourceFileId: ownedFileId, params: { contentCategory: 'photo' } },
+      { kind: 'member', endUserId: ownerId },
+    )
+    if (highRiskPhotoTask.result?.['mode'] === 'real') {
+      pass('B. High-risk purpose overrides contentCategory=photo skip — real scan still attempted')
+    } else {
+      fail(`B. Expected high-risk purpose to bypass the photo skip, got ${JSON.stringify(highRiskPhotoTask.result)}`)
+    }
+
+    // C. OCR 失败 → mode=degraded，绝不伪造 0 命中以外的任何结果，不落库任何 finding。
+    const degradedOcrPngBytes = makeBlankWhitePng(4, 4)
+    const degradedPut = await storage.putObject(degradedOcrImageObjectKey, degradedOcrPngBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: degradedOcrImageFileId,
+        storageKey: degradedOcrImageObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'degraded-ocr.png',
+        mimeType: 'image/png',
+        sizeBytes: degradedPut.sizeBytes,
+        sha256: degradedPut.sha256,
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    const failingOcr = makeFakeOcr(async () => ({ ok: false, errorCode: 'OCR_FAILED', errorMessage: 'mock OCR provider failure' }))
+    const materialsFailingOcr = new MaterialsService(prisma, storage, failingOcr.ocr)
+    const degradedTask = await materialsFailingOcr.createTask(
+      { kind: 'pii_scan', sourceFileId: degradedOcrImageFileId, params: {} },
+      { kind: 'anonymous' },
+    )
+    const degradedFindings = await prisma.piiFinding.findMany({ where: { taskId: degradedTask.id } })
+    if (
+      degradedTask.result?.['mode'] === 'degraded' &&
+      degradedTask.result?.['findingCount'] === 0 &&
+      degradedFindings.length === 0
+    ) {
+      pass('C. OCR failure → mode=degraded, zero findings persisted (never fabricated)')
+    } else {
+      fail(`C. Expected mode=degraded/findingCount=0/no persisted findings, got ${JSON.stringify(degradedTask.result)} (${degradedFindings.length} persisted)`)
+    }
+
+    // D. 完全没有提取路径的格式（如旧版 .doc）→ mode=unsupported_format，OCR 绝不应被调用。
+    const unsupportedBytes = Buffer.from('this pretends to be a legacy .doc binary payload', 'utf8')
+    const unsupportedPut = await storage.putObject(unsupportedFormatObjectKey, unsupportedBytes, 'application/msword', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: unsupportedFormatFileId,
+        storageKey: unsupportedFormatObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'legacy-resume.doc',
+        mimeType: 'application/msword',
+        sizeBytes: unsupportedPut.sizeBytes,
+        sha256: unsupportedPut.sha256,
+        purpose: 'resume_upload',
+        sensitiveLevel: 'sensitive',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    const unsupportedTask = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: unsupportedFormatFileId, params: {} },
+      { kind: 'anonymous' },
+    )
+    const unsupportedFindings = await prisma.piiFinding.findMany({ where: { taskId: unsupportedTask.id } })
+    if (
+      unsupportedTask.result?.['mode'] === 'unsupported_format' &&
+      unsupportedTask.result?.['findingCount'] === 0 &&
+      unsupportedFindings.length === 0
+    ) {
+      pass('D. Legacy .doc (no extraction path) → mode=unsupported_format, OCR never invoked, zero findings')
+    } else {
+      fail(`D. Expected mode=unsupported_format/findingCount=0, got ${JSON.stringify(unsupportedTask.result)}`)
+    }
+
+    // E. DOCX 真实支持：走真实 mammoth.extractRawText() 提取路径（不 mock mammoth 模块本身，
+    //    只手搓一份 mammoth 真正能解析的最小合法 docx），全程不需要 OCR。
+    const docxPiiPhone = '13711112222'
+    const docxBytes = buildDocx([
+      `姓名：李四`,
+      `联系电话：${docxPiiPhone}`,
+      '求职意向：后端工程师',
+    ])
+    const docxPut = await storage.putObject(
+      docxObjectKey,
+      docxBytes,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      LOCAL_BUCKET_SENTINEL,
+    )
+    await prisma.fileObject.create({
+      data: {
+        id: docxFileId,
+        storageKey: docxObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'resume.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sizeBytes: docxPut.sizeBytes,
+        sha256: docxPut.sha256,
+        purpose: 'resume_upload',
+        sensitiveLevel: 'sensitive',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    const docxTask = await materials.createTask(
+      { kind: 'pii_scan', sourceFileId: docxFileId, params: {} },
+      { kind: 'anonymous' },
+    )
+    const docxFindingTypes = new Set((docxTask.piiFindings ?? []).map((finding) => finding.type))
+    if (docxTask.result?.['mode'] === 'real' && docxFindingTypes.has('phone')) {
+      pass('E. DOCX real mammoth.extractRawText() path finds real phone PII, mode=real, no OCR needed')
+    } else {
+      fail(`E. Expected mode=real with a phone finding from real DOCX text, got ${JSON.stringify(docxTask.result)}`)
+    }
+
+    // ── 空白页检测：真实、可解码的 PNG（非法/最小 stub 会在 canvas 解码阶段静默 fail-open）──────
+
+    const blankPngBytes = makeBlankWhitePng(64, 64)
+    const blankPut = await storage.putObject(blankImageObjectKey, blankPngBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: blankImageFileId,
+        storageKey: blankImageObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'blank-page.png',
+        mimeType: 'image/png',
+        sizeBytes: blankPut.sizeBytes,
+        sha256: blankPut.sha256,
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+    const nonBlankPngBytes = makeNonBlankPng(64, 64)
+    const nonBlankPut = await storage.putObject(nonBlankImageObjectKey, nonBlankPngBytes, 'image/png', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: nonBlankImageFileId,
+        storageKey: nonBlankImageObjectKey,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'non-blank-page.png',
+        mimeType: 'image/png',
+        sizeBytes: nonBlankPut.sizeBytes,
+        sha256: nonBlankPut.sha256,
+        purpose: 'print_doc',
+        sensitiveLevel: 'normal',
+        expiresAt,
+        endUserId: null,
+        ownerType: 'system',
+        ownerId: null,
+      },
+    })
+
+    const blankInspectionTask = await materials.createTask(
+      { kind: 'inspection', sourceFileId: blankImageFileId, params: { purpose: 'print_check' } },
+      { kind: 'anonymous' },
+    )
+    const blankChecks = (blankInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    const blankMessages = Array.isArray(blankChecks['messages']) ? (blankChecks['messages'] as Array<Record<string, unknown>>) : []
+    if (blankMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED') && blankChecks['canPrint'] === true) {
+      pass('F. Blank white PNG inspection surfaces a BLANK_PAGE_SUSPECTED message without blocking canPrint')
+    } else {
+      fail(`F. Expected a BLANK_PAGE_SUSPECTED message for a blank white PNG, got ${JSON.stringify(blankChecks)}`)
+    }
+
+    const nonBlankInspectionTask = await materials.createTask(
+      { kind: 'inspection', sourceFileId: nonBlankImageFileId, params: { purpose: 'print_check' } },
+      { kind: 'anonymous' },
+    )
+    const nonBlankChecks = (nonBlankInspectionTask.result?.['checks'] ?? {}) as Record<string, unknown>
+    const nonBlankMessages = Array.isArray(nonBlankChecks['messages']) ? (nonBlankChecks['messages'] as Array<Record<string, unknown>>) : []
+    if (!nonBlankMessages.some((m) => m['code'] === 'BLANK_PAGE_SUSPECTED')) {
+      pass('G. Fully black (non-blank) PNG inspection does not report BLANK_PAGE_SUSPECTED')
+    } else {
+      fail(`G. Non-blank PNG unexpectedly reported BLANK_PAGE_SUSPECTED, got ${JSON.stringify(nonBlankChecks)}`)
+    }
+
     await prisma.documentProcessTask.update({
       where: { id: anonymousTask.id },
       data: { expiresAt: new Date(Date.now() - 60_000) },
@@ -536,9 +807,15 @@ async function main() {
     await prisma.documentProcessTask.deleteMany({ where: { sourceFileId: { in: testFileIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: testFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [ownerId, otherId] } } })
+    await storage.deleteObject(ownedObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(imageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(pdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await storage.deleteObject(unknownPdfObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(degradedOcrImageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(unsupportedFormatObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(docxObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(blankImageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await storage.deleteObject(nonBlankImageObjectKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 
@@ -564,4 +841,141 @@ function buildPngHeader(width: number, height: number): Buffer {
   header[27] = 0
   header[28] = 0
   return header
+}
+
+// ── fake OCR 边界（只 fake ocr.recognize，materials.service 真实抽取/正则匹配逻辑不受影响）──
+
+type FakeOcrResult = {
+  ok: boolean
+  text?: string
+  confidence?: 'high' | 'medium' | 'low'
+  errorCode?: string
+  errorMessage?: string
+}
+
+function makeFakeOcr(
+  impl: (input: { buffer: Buffer; mimeType: string }) => Promise<FakeOcrResult>,
+): { ocr: OcrService; calls: () => number } {
+  let count = 0
+  const recognize = async (input: { buffer: Buffer; mimeType: string }): Promise<FakeOcrResult> => {
+    count += 1
+    return impl(input)
+  }
+  return { ocr: { recognize } as unknown as OcrService, calls: () => count }
+}
+
+// ── 真实、可被 @napi-rs/canvas 解码的 PNG（用于空白页检测测试；不可复用 buildPngHeader，
+//    后者只有 IHDR chunk、没有 IDAT/IEND，真实 canvas 解码会直接抛错）─────────────────────
+
+function makeBlankWhitePng(width: number, height: number): Buffer {
+  const canvas = createCanvas(width, height)
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+  return canvas.toBuffer('image/png')
+}
+
+function makeNonBlankPng(width: number, height: number): Buffer {
+  const canvas = createCanvas(width, height)
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(0, 0, width, height)
+  return canvas.toBuffer('image/png')
+}
+
+// ── 手搓最小 DOCX（stored ZIP，CRC32 用 Node 内置 zlib.crc32）——与
+//    verify-resume-extraction.ts 的 buildDocx 同一实现，供 mammoth.extractRawText 真实解析 ──
+
+function crc32(buf: Buffer): number {
+  return zlib.crc32(buf) >>> 0
+}
+
+function buildZip(entries: { name: string; data: Buffer }[]): Buffer {
+  const localChunks: Buffer[] = []
+  const centralChunks: Buffer[] = []
+  let offset = 0
+  for (const e of entries) {
+    const nameBuf = Buffer.from(e.name, 'utf8')
+    const data = e.data
+    const crc = crc32(data)
+
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50, 0)
+    local.writeUInt16LE(20, 4)
+    local.writeUInt16LE(0, 6)
+    local.writeUInt16LE(0, 8) // stored
+    local.writeUInt16LE(0, 10)
+    local.writeUInt16LE(0, 12)
+    local.writeUInt32LE(crc, 14)
+    local.writeUInt32LE(data.length, 18)
+    local.writeUInt32LE(data.length, 22)
+    local.writeUInt16LE(nameBuf.length, 26)
+    local.writeUInt16LE(0, 28)
+    localChunks.push(local, nameBuf, data)
+
+    const cd = Buffer.alloc(46)
+    cd.writeUInt32LE(0x02014b50, 0)
+    cd.writeUInt16LE(20, 4)
+    cd.writeUInt16LE(20, 6)
+    cd.writeUInt16LE(0, 8)
+    cd.writeUInt16LE(0, 10) // stored
+    cd.writeUInt16LE(0, 12)
+    cd.writeUInt16LE(0, 14)
+    cd.writeUInt32LE(crc, 16)
+    cd.writeUInt32LE(data.length, 20)
+    cd.writeUInt32LE(data.length, 24)
+    cd.writeUInt16LE(nameBuf.length, 28)
+    cd.writeUInt16LE(0, 30)
+    cd.writeUInt16LE(0, 32)
+    cd.writeUInt16LE(0, 34)
+    cd.writeUInt16LE(0, 36)
+    cd.writeUInt32LE(0, 38)
+    cd.writeUInt32LE(offset, 42)
+    centralChunks.push(cd, nameBuf)
+
+    offset += 30 + nameBuf.length + data.length
+  }
+  const centralStart = offset
+  const centralSize = centralChunks.reduce((n, c) => n + c.length, 0)
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(0, 4)
+  eocd.writeUInt16LE(0, 6)
+  eocd.writeUInt16LE(entries.length, 8)
+  eocd.writeUInt16LE(entries.length, 10)
+  eocd.writeUInt32LE(centralSize, 12)
+  eocd.writeUInt32LE(centralStart, 16)
+  eocd.writeUInt16LE(0, 20)
+  return Buffer.concat([...localChunks, ...centralChunks, eocd])
+}
+
+function xmlEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function buildDocx(paragraphs: string[]): Buffer {
+  const body = paragraphs
+    .map((p) => `<w:p><w:r><w:t xml:space="preserve">${xmlEscape(p)}</w:t></w:r></w:p>`)
+    .join('')
+  const documentXml =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+    `<w:body>${body}</w:body></w:document>`
+  const contentTypes =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+    `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+    `<Default Extension="xml" ContentType="application/xml"/>` +
+    `<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>` +
+    `</Types>`
+  const rels =
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>` +
+    `</Relationships>`
+  return buildZip([
+    { name: '[Content_Types].xml', data: Buffer.from(contentTypes, 'utf8') },
+    { name: '_rels/.rels', data: Buffer.from(rels, 'utf8') },
+    { name: 'word/document.xml', data: Buffer.from(documentXml, 'utf8') },
+  ])
 }
