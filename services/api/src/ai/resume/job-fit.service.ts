@@ -1,9 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
+import { FilesService } from '../../files/files.service'
+import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmJobFitService, type JobFitPayload, type JobFitTokenUsage } from './llm-job-fit.service'
+import { JobFitPdfService } from './job-fit-pdf.service'
 
 // ============================================================
 // 2D 岗位匹配参考会话服务。
@@ -75,12 +78,43 @@ export interface JobFitAnalyzeWithUsageResult {
 
 @Injectable()
 export class JobFitService {
+  private readonly files: FilesService
+  private readonly pdf: JobFitPdfService
+  private readonly audit: AuditService
+
+  constructor(
+    prisma: PrismaService,
+    llm: LlmJobFitService,
+    extraction: ResumeExtractionService,
+    audit: AuditService,
+  )
+  constructor(
+    prisma: PrismaService,
+    llm: LlmJobFitService,
+    extraction: ResumeExtractionService,
+    files: FilesService,
+    pdf: JobFitPdfService,
+    audit: AuditService,
+  )
   constructor(
     private readonly prisma: PrismaService,
     private readonly llm: LlmJobFitService,
     private readonly extraction: ResumeExtractionService,
-    private readonly audit: AuditService,
-  ) {}
+    @Inject(FilesService) filesOrAudit: FilesService | AuditService,
+    @Inject(JobFitPdfService) pdfOrAudit?: JobFitPdfService,
+    @Inject(AuditService) audit?: AuditService,
+  ) {
+    // 兼容既有服务级回归脚本的四参构造；Nest 运行时始终注入 Files/PDF/Audit。
+    if (audit) {
+      this.files = filesOrAudit as FilesService
+      this.pdf = pdfOrAudit as JobFitPdfService
+      this.audit = audit
+      return
+    }
+    this.files = null as unknown as FilesService
+    this.pdf = null as unknown as JobFitPdfService
+    this.audit = filesOrAudit as AuditService
+  }
 
   async analyze(
     input: { taskId: string; jobId?: string; manualJob?: { title: string; requirements?: string } },
@@ -183,6 +217,53 @@ export class JobFitService {
       throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
     }
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobFit)
+  }
+
+  /** 服务端报告生成后只交付内部 HMAC printFileUrl；收费与确认仍由既有 /print/confirm 承担。 */
+  async printReport(taskId: string, requester: JobFitRequester) {
+    const parse = await this.authorizeParseForJobFit(taskId, requester)
+    const row = await this.prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) {
+      throw new NotFoundException({ error: { code: 'JOB_FIT_NOT_FOUND', message: '暂无分析结果，请先发起岗位匹配参考' } })
+    }
+
+    const stored = JSON.parse(row.payloadJson) as StoredJobFit
+    const { buffer, pageCount } = await this.pdf.render(
+      {
+        date: new Date(row.updatedAt).toISOString().slice(0, 10),
+        job: stored.job,
+        // 旧缓存没有该可选字段时，PDF 明示降级而不是补造关键词。
+        decisionSupport: stored.payload.decisionSupport,
+      },
+      stored.payload,
+    )
+    const uploaded = await this.files.upload({
+      buffer,
+      filename: '岗位匹配决策报告.pdf',
+      mimeType: 'application/pdf',
+      purpose: 'print_doc',
+      uploaderId: null,
+      endUserId: parse.endUserId,
+      createdBy: 'job_fit',
+    })
+    await this.audit.write({
+      actorId: null,
+      actorRole: parse.endUserId ? 'enduser' : 'kiosk',
+      action: 'resume.job_fit_print',
+      targetType: 'ai_task',
+      targetId: taskId,
+      payload: { fileId: uploaded.fileId, pageCount },
+      ipAddress: null,
+      userAgent: null,
+      requestId: null,
+    })
+    return {
+      fileId: uploaded.fileId,
+      filename: uploaded.filename,
+      sizeBytes: uploaded.sizeBytes,
+      pageCount,
+      printFileUrl: signFileUrl(uploaded.fileId).url,
+    }
   }
 
   /**

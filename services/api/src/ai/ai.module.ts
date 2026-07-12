@@ -14,6 +14,7 @@ import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmJobFitService } from './resume/llm-job-fit.service'
 import { JobFitService } from './resume/job-fit.service'
+import { JobFitPdfService } from './resume/job-fit-pdf.service'
 import { LlmCareerPlanService } from './resume/llm-career-plan.service'
 import { CareerPlanService } from './resume/career-plan.service'
 import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
@@ -56,6 +57,7 @@ import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemptio
     LlmConfigService,
     LlmJobFitService,
     JobFitService,
+    JobFitPdfService,
     LlmCareerPlanService,
     CareerPlanService,
     CareerPlanPdfService,
