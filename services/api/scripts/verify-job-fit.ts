@@ -380,7 +380,7 @@ async function main() {
     console.error(err instanceof Error ? err.message : err)
   } finally {
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: [taskId, memberTaskId] } } }).catch(() => undefined)
-    await prisma.auditLog.deleteMany({ where: { targetId: taskId } }).catch(() => undefined)
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: [taskId, memberTaskId] } } }).catch(() => undefined)
     await prisma.job.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.organization.deleteMany({ where: { id: orgId } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: endUserA } }).catch(() => undefined)
