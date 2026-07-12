@@ -1,10 +1,9 @@
-// 首页 · 墨青纸感（inkpaper）视觉迁移
+// 首页 · 青序 LightFlow（service-desk）视觉迁移
 //
-// 视觉：对齐定稿原型 .workbuddy/prototypes/fusion-youth-preview-v5.html 首页屏
-//（墨绿顶栏 + Hero 实时时钟 + 身份条叠压 + 分类卡/子入口 + 合规脚注）。
-// 样式集中在 home-inkpaper.css（.khome 作用域），图标走 kiosk-icon Symbol sprite。
+// 样式按页面壳层、服务入口、续办信息与响应式拆分，由 home-service-desk.css 聚合；
+// 图标继续走 kiosk-icon Symbol sprite。
 //
-// 本轮口径（2026-07-04 视觉迁移 + 保功能）：只换视觉皮肤，不回退 main 既有能力——
+// 本轮口径：只换视觉皮肤，不回退 main 既有能力——
 // ContinuePanel（继续上次）、可点击统计直达明细页、现有入口数量 / 路由 / 业务分组、
 // intent 分流、登录态统计、百宝箱 / 智慧校园动态配置均保持不变。
 // 诚实化（2026-07-04）：首页「登录后保存」类文案改为真实口径——登录后可在「我的」查看
@@ -27,7 +26,7 @@ import { getMyFavorites } from '../../services/api/memberFavorites'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
-import './home-inkpaper.css'
+import './home-service-desk.css'
 
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
 let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
@@ -48,7 +47,7 @@ function useClock() {
   }
 }
 
-/* ── 顶栏（v5 topbar 语汇：墨绿条 + 品牌徽标 + 状态药丸；时钟只在 Hero） ── */
+/* ── 顶栏（LightFlow 白色服务台 + 品牌徽标 + 状态药丸；时钟只在 Hero） ── */
 function KioskTopBar() {
   return (
     <header className="k-top">
@@ -130,7 +129,7 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
   return { stats, loading }
 }
 
-/* ── Hero（v5 首页 Hero：深绿渐变 + 斜纹 + 装饰圆环 + 实时时钟） ── */
+/* ── Hero（LightFlow 浅冰蓝服务台 + 实时时钟） ── */
 function HeroSection() {
   const { time, date } = useClock()
 
@@ -247,7 +246,7 @@ function IdentityPanel() {
   )
 }
 
-/* ── 服务分组（路由 / intent / 分组顺序与换装前完全一致；视觉换 v5 cat-card/sub 语汇） ── */
+/* ── 服务分组（路由 / intent / 分组顺序与换装前完全一致；仅替换视觉） ── */
 interface ServiceTile {
   title: string
   icon: KioskIconName
@@ -436,7 +435,7 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   )
 }
 
-// ─── 继续上次（保留 main 的真实可恢复任务面板；仅换 inkpaper 视觉）───────────────
+// ─── 继续上次（保留 main 的真实可恢复任务面板；仅换 LightFlow 视觉）───────────────
 // 诚实前提：只对「真实可恢复的任务」展示——① 进行中的打印任务（未达终态）；
 // ② 已诊断但尚未优化的简历（下一步）。无可恢复任务不渲染。不伪造进度。
 interface ResumeSuggestion {
