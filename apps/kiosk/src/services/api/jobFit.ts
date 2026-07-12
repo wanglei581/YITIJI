@@ -6,7 +6,7 @@
 // 合规：结果为参考等级，无任何百分比/录用承诺；投递只引导「去来源平台投递」。
 // ============================================================
 
-import type { JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
+import type { JobFitPrintResponse, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
 
@@ -71,4 +71,12 @@ export function getLatestJobFit(taskId: string, access: JobFitAccess): Promise<J
     return Promise.reject(new JobFitApiError('MOCK_MODE', '演示模式不提供岗位匹配参考', 0))
   }
   return call<JobFitResponse>(`/resume/job-fit/${encodeURIComponent(taskId)}`, access)
+}
+
+/** 岗位匹配决策报告：服务端生成 PDF，只交给既有打印确认链路。 */
+export function printJobFit(taskId: string, access: JobFitAccess): Promise<JobFitPrintResponse> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new JobFitApiError('MOCK_MODE', '演示模式不生成真实打印文件', 0))
+  }
+  return call<JobFitPrintResponse>(`/resume/job-fit/${encodeURIComponent(taskId)}/print`, access, { method: 'POST' })
 }

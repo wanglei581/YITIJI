@@ -385,6 +385,7 @@ async function main(): Promise<void> {
   const moduleFile = mustExist('src/job-ai/job-ai.module.ts', 'JobAiModule 已创建')
   const controller = mustExist('src/job-ai/job-ai.controller.ts', 'JobAiController 已创建')
   const service = mustExist('src/job-ai/job-ai.service.ts', 'JobAiService 已创建')
+  const governed = mustExist('src/job-ai/governed-job-fit.service.ts', 'GovernedJobFitService 已创建')
   const llm = mustExist('src/job-ai/job-ai-llm.service.ts', 'JobAiLlmService 已创建')
   const context = mustExist('src/job-ai/job-context.service.ts', 'JobContextService 已创建')
   const quota = mustExist('src/job-ai/job-ai-quota.service.ts', 'JobAiQuotaService 已创建')
@@ -396,7 +397,7 @@ async function main(): Promise<void> {
   const packageJson = read('package.json')
   const ci = read('../../.github/workflows/ci.yml')
 
-  mustContain(moduleFile, ['JobAiController', 'JobAiService', 'JobAiLlmService', 'JobContextService', 'JobFitService'], 'JobAiModule 注册 controller/service 并复用 JobFitService')
+  mustContain(moduleFile, ['JobAiController', 'JobAiService', 'GovernedJobFitService', 'JobAiLlmService', 'JobContextService', 'JobFitService'], 'JobAiModule 注册 controller/service 并复用 JobFitService')
   mustContain(appModule, ['JobAiModule'], 'AppModule 接入 JobAiModule')
 
   mustContain(
@@ -411,7 +412,7 @@ async function main(): Promise<void> {
       '@Delete',
       'return ApiResponse.ok(await this.service.recommendations',
       'return ApiResponse.ok(await this.service.explainJob',
-      'return ApiResponse.ok(await this.service.matchJob',
+      'return ApiResponse.ok(await this.governed.matchForMember',
       'x-resume-access-token',
       'headerOf(req, \'x-resume-access-token\')',
     ],
@@ -453,6 +454,12 @@ async function main(): Promise<void> {
       'select: {',
     ],
     'JobAiService 使用真实已发布岗位、字段投影、用户同意校验、沉淀会话/推荐/日志并复用 JobFitService',
+  )
+
+  mustContain(
+    governed,
+    ['authorizeParseForJobFit', 'requireActiveAnonymousJobFitConsent', 'requireActiveConsent', 'JobAiQuotaService', 'jobAiSession', 'jobAiRecommendation', "operation: 'jobMatch'"],
+    'GovernedJobFitService 统一 match 的 consent、配额、会话、推荐与可观测性',
   )
 
   mustContain(
@@ -573,7 +580,7 @@ async function main(): Promise<void> {
   mustContain(ci, ['verify:job-ai-backend'], 'CI 串行 verify 接入岗位 AI 后端门禁')
 
   mustNotContain(
-    [controller, service, llm, context, aiLog].join('\n'),
+    [controller, service, governed, llm, context, aiLog].join('\n'),
     [
       'resumeText:',
       'resumeContent',

@@ -1308,6 +1308,11 @@ model AiResumeResult {
   // 数据库只存 hash;读取时凭 x-resume-access-token header 校验(timingSafeEqual)。
   // 会员结果该列为 null(归属仍按 endUserId 本人校验);迁移前历史匿名行为 null → 读取 fail-closed。
   accessTokenHash String?
+  // 匿名岗位匹配的 parse 绑定授权（不复用会员 UserAiConsent）。
+  // 三列随 parse 的 TTL 和数据权利删除一同清理，避免形成独立长期同意记录。
+  jobAiConsentVersion   String?
+  jobAiConsentGrantedAt DateTime?
+  jobAiConsentRevokedAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   // 留存治理(CLAUDE.md §11「不长期保存简历」):简历派生结果到期即清理。
