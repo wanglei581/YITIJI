@@ -23,7 +23,7 @@ import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
 import { JobFitService } from '../src/ai/resume/job-fit.service'
 
 const RESUME_TEXT = '张某某，本科，行政管理专业。曾任某商贸公司行政文员，负责档案管理与会议安排，整理合同文件300余份_简历标记RSME。熟练使用Office办公软件。'
-const JOB_DESC = '负责公司日常行政事务、档案与合同管理_岗位标记JOBD'
+const JOB_DESC = '负责公司日常行政事务、档案与合同管理、跨部门协调_岗位标记JOBD'
 
 let passCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
@@ -72,7 +72,7 @@ const VALID = {
 }
 const M1_5_DECISION_SUPPORT = {
   analysisVersion: 'job_fit_m1_5',
-  keywordCoverage: { matched: ['档案管理'], missing: ['预算管理'] },
+  keywordCoverage: { matched: ['档案管理'], missing: ['跨部门协调'] },
 } as const
 const vjson = (over: Record<string, unknown> = {}) => JSON.stringify({ ...VALID, ...over })
 
@@ -176,7 +176,7 @@ async function main() {
       m15Violations.push('decisionSupport.keywordCoverage.matched 未保留 M1.5 决策字段')
     }
     const missingKeywords = r1M15.decisionSupport?.keywordCoverage?.missing
-    if (!Array.isArray(missingKeywords) || !missingKeywords.includes('预算管理')) {
+    if (!Array.isArray(missingKeywords) || !missingKeywords.includes('跨部门协调')) {
       m15Violations.push('decisionSupport.keywordCoverage.missing 未保留 M1.5 决策字段')
     }
     if (row1.provider !== 'llm:deepseek:stub') {
@@ -226,7 +226,7 @@ async function main() {
     responseQueue.push(vjson({
       decisionSupport: {
         analysisVersion: 'job_fit_m1_5',
-        keywordCoverage: { matched: ['注册会计师'], missing: ['预算管理'] },
+        keywordCoverage: { matched: ['注册会计师'], missing: ['跨部门协调'] },
       },
     }))
     responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
