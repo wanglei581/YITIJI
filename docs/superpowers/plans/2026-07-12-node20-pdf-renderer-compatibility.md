@@ -38,5 +38,5 @@
 
 - [x] Run API typecheck, API lint, and `git diff --check`; review only the four scoped source/docs files.
 - [x] Request Claude and Antigravity read-only reviews; both were invoked, but neither returned a valid final report and are recorded as unavailable rather than approvals.
-- [ ] After an explicit staging authorization, back up and update only `pdf-page-renderer.ts` plus the two OCR verify scripts, run the Node 20 no-network rendering probe, then run `verify:ocr-baidu-live` with the synthetic document.
+- [x] After an explicit staging authorization, back up and update only `pdf-page-renderer.ts` plus the two OCR verify scripts, run the Node 20 no-network rendering probe, then run `verify:ocr-baidu-live` with the synthetic document.
 - [ ] Commit the scoped change as `fix: support PDF rendering on Node 20`.

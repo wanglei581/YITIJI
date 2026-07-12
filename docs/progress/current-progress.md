@@ -6,6 +6,8 @@
 
 2026-07-12 预生产收口：已把 CI 全绿的 `fba6b414` 部署到 `/srv/ai-job-print`；切换前完成独立 staging 全仓生产构建、PostgreSQL 自定义格式备份并以 `pg_restore -l` 校验，执行唯一 additive migration `20260711150000_add_terminal_capability` 与 `db:pg:sync:check`，PM2 reload 后 health 返回 `db=postgres`，旧 release 保留在独立回滚目录。随后通过 `maintenance:dispose-legacy-pending-print-tasks` 受控关闭 3 条经只读复核的历史匿名未领取任务：`ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。三条均为 `cancelled` 并带 `LEGACY_PENDING_TASK_DISPOSED`；两条关联订单仅将 `taskStatus` 改为 `cancelled`，支付事实分别保持 `unpaid`、`closed`；每条恰有一条 `pending→cancelled` 状态日志和系统管理员审计，冻结筛选条件下剩余 pending 为 0。未直改表、未使用 `failed`、未触发出纸。
 
+2026-07-12 预生产 OCR 渲染兼容补丁：分支 `codex/fix-ocr-live-render-20260712` 的 `29c90fdc`、`667ead64`、`fef6379e` 已作为**受控 overlay** 更新到 `/srv/ai-job-print`（基础发布仍为 `bddae4f7`，服务器 `DEPLOY_OVERLAY.txt` 记录候选提交、文件范围与备份）。根因是 Node 20.20.2 缺少 `ArrayBuffer.prototype.transferToFixedLength`，使 unpdf/pdfjs 把页面渲染降级为空白 PNG；`pdf-page-renderer` 现在只在原生 API 缺失时安装固定长度内容拷贝兼容层。预生产已通过离线 `verify:ocr-baidu` 14 项、Node 20 源码与编译 `dist` 非空 PNG 探针，以及真实百度 OCR 直接识别和图片型 PDF `pdf_ocr` 全链路（均为 high）。API PM2 reload 后 health 返回 `db=postgres`，并仍指向 `/srv/ai-job-print/services/api/dist/main.js`；历史 `ptask_seed_001` 仍为 `pending` 但 `terminalId=NULL`，领取查询强制按终端 ID 过滤，未领取或触发出纸。该结果仅为预生产 overlay 与合成样张验收，**未合并 main、未部署正式生产、未用真实用户简历验收**；Claude 与 Antigravity 审查均已请求但未获得有效最终报告，不能计作双模型批准。
+
 ## 当前阶段
 
 项目进入“上线前收口 + 项目规范化治理 + 渐进式重构准备”阶段。当前不做全量重写，也不在旧结构里继续堆功能；采用现有仓库、干净 worktree、按业务闭环渐进迁移的方式推进。
