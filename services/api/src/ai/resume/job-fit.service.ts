@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, timingSafeEqual } from 'crypto'
 import { PrismaService } from '../../prisma/prisma.service'
 import { AuditService } from '../../audit/audit.service'
@@ -138,7 +138,11 @@ export class JobFitService {
     const llmResult = await this.llm.analyze(resumeText, jobCtx)
     const payload = llmResult.payload
     const stored: StoredJobFit = { job: jobInfo, payload, providerName: llmResult.provider }
-    const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
+    // 派生结果的保留期不能超过其 parse 行；两种 TTL 取更短者。
+    const expiresAt = new Date(Math.min(
+      parse.expiresAt.getTime(),
+      Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000,
+    ))
     // 同一 parse 任务保留最近一次分析（unique(taskId,kind) → upsert 覆盖）
     await this.prisma.aiResumeResult.upsert({
       where: { taskId_kind: { taskId: input.taskId, kind: 'job_fit' } },
@@ -250,6 +254,20 @@ export class JobFitService {
     return this.consentStatus(taskId, { ...parse, jobAiConsentRevokedAt: revokedAt })
   }
 
+  /**
+   * 供 GovernedJobFitService 使用的匿名 deep-analysis 门禁。它仅消费已经
+   * authorize 的 parse 元数据，不读取 payload，也绝不替代会员 UserAiConsent。
+   */
+  requireActiveAnonymousJobFitConsent(parse: AuthorizedJobFitParse): void {
+    if (this.hasActiveAnonymousJobFitConsent(parse)) return
+    throw new ForbiddenException({
+      error: {
+        code: 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED',
+        message: '请确认岗位匹配授权后再进行深度分析',
+      },
+    })
+  }
+
   private toResponse(taskId: string, stored: StoredJobFit): JobFitCompletedResponse {
     return {
       taskId,
@@ -305,6 +323,6 @@ export class JobFitService {
     try {
       fileId = (JSON.parse(row?.payloadJson ?? '{}') as { fileId?: string }).fileId ?? null
     } catch { /* fileId 缺失走诚实失败分支 */ }
-    return { endUserId: parse.endUserId, accessTokenHash: parse.accessTokenHash, fileId }
+    return { endUserId: parse.endUserId, accessTokenHash: parse.accessTokenHash, expiresAt: parse.expiresAt, fileId }
   }
 }

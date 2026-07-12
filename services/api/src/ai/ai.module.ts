@@ -14,7 +14,6 @@ import { ZhipuProvider } from './providers/zhipu.provider.stub'
 import { LlmConfigService } from './llm/llm-config.service'
 import { LlmJobFitService } from './resume/llm-job-fit.service'
 import { JobFitService } from './resume/job-fit.service'
-import { JobFitController } from './job-fit.controller'
 import { LlmCareerPlanService } from './resume/llm-career-plan.service'
 import { CareerPlanService } from './resume/career-plan.service'
 import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
@@ -44,7 +43,7 @@ import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemptio
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule],
-  controllers: [AiController, AiConfigController, AiConfigsController, JobFitController, CareerPlanController, FairVisitPlanController],
+  controllers: [AiController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController],
   providers: [
     AiService,
     AiLogService,

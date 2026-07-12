@@ -6,6 +6,8 @@ import { Type } from 'class-transformer'
 import { RedisService } from '../common/redis/redis.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { JobFitService } from './resume/job-fit.service'
+import { GovernedJobFitService } from '../job-ai/governed-job-fit.service'
+import type { JobAiQuotaContext } from '../job-ai/job-ai-quota.service'
 
 // ── DTO（全局 forbidNonWhitelisted）─────────────────────────────────────────
 
@@ -35,6 +37,8 @@ export class JobFitConsentDto {
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
+  ip?: string
+  socket?: { remoteAddress?: string }
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -42,6 +46,20 @@ function headerOf(req: ReqLike, name: string): string | null {
   if (typeof v === 'string' && v.trim()) return v.trim()
   if (Array.isArray(v) && v[0]) return v[0].trim()
   return null
+}
+
+function terminalIdOf(req: ReqLike): string | null {
+  return headerOf(req, 'x-terminal-id')?.slice(0, 64) ?? null
+}
+
+function ipOf(req: ReqLike): string | null {
+  const forwarded = headerOf(req, 'x-forwarded-for')
+  if (forwarded) return forwarded.split(',')[0]?.trim().slice(0, 64) ?? null
+  return req.ip ?? req.socket?.remoteAddress ?? null
+}
+
+function quotaContextOf(req: ReqLike, requester: { endUserId: string | null }): JobAiQuotaContext {
+  return { member: requester.endUserId, terminal: terminalIdOf(req), ip: ipOf(req) }
 }
 
 /**
@@ -57,6 +75,7 @@ export class JobFitController {
     private readonly service: JobFitService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly governed: GovernedJobFitService,
   ) {}
 
   private async requesterOf(req: ReqLike) {
@@ -88,7 +107,8 @@ export class JobFitController {
     if (!dto.jobId && !dto.manualJob) {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
-    return this.service.analyze(dto, await this.requesterOf(req))
+    const requester = await this.requesterOf(req)
+    return this.governed.analyzeForJobFit(dto, requester, quotaContextOf(req, requester))
   }
 
   @Post('consent')

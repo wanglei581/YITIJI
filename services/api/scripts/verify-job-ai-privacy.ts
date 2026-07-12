@@ -60,6 +60,7 @@ async function main(): Promise<void> {
   const privacyTypes = mustExist('src/member-privacy/member-privacy.types.ts', 'MemberPrivacy types 已创建')
   const quotaService = mustExist('src/job-ai/job-ai-quota.service.ts', 'JobAiQuotaService 已创建')
   const jobAiService = read('src/job-ai/job-ai.service.ts')
+  const governedJobFit = mustExist('src/job-ai/governed-job-fit.service.ts', 'GovernedJobFitService 已创建')
   const jobAiController = read('src/job-ai/job-ai.controller.ts')
   const prisma = read('src/prisma/prisma.service.ts')
   const appModule = read('src/app.module.ts')
@@ -184,10 +185,24 @@ async function main(): Promise<void> {
       'consumeJobAiQuota',
       'createSession',
       'llm.recommend',
-      'jobFit.analyze',
+      'this.governed.matchForMember',
       'llm.explain',
     ],
-    'JobAiService 在会话创建和 LLM 调用前接入 consent + quota',
+    'JobAiService 的 recommendations/explain 保持 consent + quota，match 委托治理服务',
+  )
+
+  mustContain(
+    governedJobFit,
+    [
+      'authorizeParseForJobFit',
+      'requireActiveAnonymousJobFitConsent',
+      'requireActiveConsent',
+      "this.quota.consume('match'",
+      "operation: 'match'",
+      'this.quota.rollback',
+      "operation: 'jobMatch'",
+    ],
+    'GovernedJobFitService 在会话创建和 LLM 调用前接入 consent + quota',
   )
 
   mustContain(prisma, ['get userDataRequest()'], 'PrismaService 暴露 userDataRequest delegate')
@@ -196,7 +211,7 @@ async function main(): Promise<void> {
   mustContain(ci, ['verify:job-ai-privacy'], 'CI 串行 verify 接入岗位 AI 隐私门禁')
 
   mustNotContain(
-    [memberController, adminController, privacyService, quotaService, jobAiService].join('\n'),
+    [memberController, adminController, privacyService, quotaService, jobAiService, governedJobFit].join('\n'),
     [
       'resumeText:',
       'resumeContent',

@@ -44,6 +44,7 @@ type HarnessOptions = {
   llmFails?: boolean
   jobFitFails?: boolean
   anonymousConsent?: 'active' | 'revoked' | 'legacy'
+  memberConsent?: 'active' | 'missing'
 }
 
 function harness(GovernedJobFitService: GovernedConstructor, options: HarnessOptions = {}): Harness {
@@ -117,7 +118,13 @@ function harness(GovernedJobFitService: GovernedConstructor, options: HarnessOpt
     prisma, jobFit,
     { buildTargetJobContext: async (jobId: string) => ({ jobId, title: '系统岗位' }) },
     { record: (entry: Record<string, unknown>) => { logs.push(entry) } },
-    { requireActiveConsent: async () => undefined },
+    {
+      requireActiveConsent: async () => {
+        if (options.memberConsent === 'missing') {
+          throw { getResponse: () => ({ error: { code: 'USER_AI_CONSENT_REQUIRED' } }) }
+        }
+      },
+    },
     quota,
   )
   return {
@@ -145,6 +152,21 @@ async function rejects(call: () => Promise<unknown>): Promise<boolean> {
     return false
   } catch {
     return true
+  }
+}
+
+async function rejectionCode(call: () => Promise<unknown>): Promise<string | null> {
+  try {
+    await call()
+    return null
+  } catch (error) {
+    const response = error && typeof error === 'object' && typeof (error as { getResponse?: unknown }).getResponse === 'function'
+      ? (error as { getResponse: () => unknown }).getResponse()
+      : null
+    const nested = response && typeof response === 'object' ? (response as { error?: unknown }).error : null
+    return nested && typeof nested === 'object' && typeof (nested as { code?: unknown }).code === 'string'
+      ? (nested as { code: string }).code
+      : null
   }
 }
 
@@ -326,14 +348,25 @@ async function checkGovernedBehavior(rootDir: string, governedRel: string, repor
     }
 
     const anonymousMember = harness(Constructor)
-    const anonymousMemberRejected = await rejects(() => anonymousMember.service.matchForMember!.call(anonymousMember.service, {
+    const anonymousMemberCode = await rejectionCode(() => anonymousMember.service.matchForMember!.call(anonymousMember.service, {
       jobId: 'runtime-system-job', resumeTaskId: 'runtime-anonymous-member-match', requester: { endUserId: null, accessToken: 'runtime-token' },
       terminalId: 'runtime-terminal', quotaContext: { member: null, terminal: 'runtime-terminal', ip: '198.51.100.21' },
     }))
-    if (!anonymousMemberRejected || anonymousMember.sessions.length || anonymousMember.quotaAttempts || anonymousMember.analyzeCalls) {
-      reporter.fail('内存 harness：matchForMember 收到匿名 requester 必须在 session/quota/LLM 前拒绝')
+    if (anonymousMemberCode !== 'USER_AI_CONSENT_REQUIRED' || anonymousMember.sessions.length || anonymousMember.quotaAttempts || anonymousMember.analyzeCalls) {
+      reporter.fail('内存 harness：matchForMember 收到匿名 requester 必须以原 USER_AI_CONSENT_REQUIRED 403 在 session/quota/LLM 前拒绝')
     } else {
-      reporter.pass('内存 harness：matchForMember 拒绝匿名 requester，未产生副作用')
+      reporter.pass('内存 harness：matchForMember 保持匿名 USER_AI_CONSENT_REQUIRED 且未产生副作用')
+    }
+
+    const missingMemberConsent = harness(Constructor, { memberConsent: 'missing' })
+    const missingMemberCode = await rejectionCode(() => missingMemberConsent.service.matchForMember!.call(missingMemberConsent.service, {
+      jobId: 'runtime-system-job', resumeTaskId: 'runtime-member-consent-missing', requester: { endUserId: 'runtime-member', accessToken: null },
+      terminalId: 'runtime-terminal', quotaContext: { member: 'runtime-member', terminal: 'runtime-terminal', ip: '198.51.100.22' },
+    }))
+    if (missingMemberCode !== 'USER_AI_CONSENT_REQUIRED' || missingMemberConsent.sessions.length || missingMemberConsent.quotaAttempts || missingMemberConsent.analyzeCalls) {
+      reporter.fail('内存 harness：会员缺少 job_ai consent 必须在 session/quota/LLM 前 fail-closed')
+    } else {
+      reporter.pass('内存 harness：会员缺少 job_ai consent 在副作用前 fail-closed')
     }
 
     const quotaFailure = harness(Constructor, { quotaFails: true })
