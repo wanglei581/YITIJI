@@ -39,7 +39,11 @@ export const FAIR_MATERIAL_MAX_BYTES = 20 * 1024 * 1024
 /** 允许的资料 MIME(可打印格式;Word 需先转 PDF 再上传)。 */
 const MATERIAL_ALLOWED_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg'])
 
-/** 魔数校验:防 MIME 伪装。 */
+/**
+ * 魔数校验:防 MIME 伪装。
+ * TODO(收敛): 与 files/content-sniff.ts(FileObject 管线共享嗅探器)逻辑重复;
+ * 未来以 content-sniff.ts 为唯一实现收敛,本轮刻意不改行为。
+ */
 function sniffMaterialMime(buffer: Buffer): string | null {
   if (buffer.length >= 4 && buffer.subarray(0, 4).toString('latin1') === '%PDF') return 'application/pdf'
   if (buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return 'image/png'

@@ -65,6 +65,19 @@ class NapiCanvasFactory {
   }
 }
 
+/**
+ * PDF 页面渲染的最大画布尺寸/像素总量上限（防御性）。
+ * viewport 宽高由 PDF 自己声明的 MediaBox × scale 决定，对本函数的调用方而言完全不可控——
+ * 一份很小的恶意 PDF 可以声明巨大的页面尺寸，触发原生 canvas 分配巨量内存。
+ * 超出上限时不渲染，抛出明确错误，交给调用方既有的 try/catch 按失败处理，
+ * 而不是让原生层自己决定怎么应对一次异常大的分配请求。
+ *
+ * 正常简历页面（A4 @ scale 2 约 1190x1684px，见 resume-extraction.service.ts
+ * OCR_PDF_RENDER_SCALE 注释）远低于该上限，不影响真实业务场景。
+ */
+const MAX_RENDER_DIMENSION_PX = 6000
+const MAX_RENDER_TOTAL_PIXELS = 24_000_000
+
 export interface RenderedPdf {
   totalPages: number
   /** 渲染指定页（1-based）为 PNG buffer。 */
@@ -87,7 +100,16 @@ export async function openPdfForRender(buffer: Buffer): Promise<RenderedPdf> {
       const page = await doc.getPage(pageNumber)
       try {
         const viewport = page.getViewport({ scale })
-        const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
+        const width = Math.ceil(viewport.width)
+        const height = Math.ceil(viewport.height)
+        if (
+          width <= 0 || height <= 0 ||
+          width > MAX_RENDER_DIMENSION_PX || height > MAX_RENDER_DIMENSION_PX ||
+          width * height > MAX_RENDER_TOTAL_PIXELS
+        ) {
+          throw new Error(`PDF page render dimensions out of bounds: ${width}x${height}`)
+        }
+        const canvas = createCanvas(width, height)
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
         return canvas.toBuffer('image/png')
       } finally {

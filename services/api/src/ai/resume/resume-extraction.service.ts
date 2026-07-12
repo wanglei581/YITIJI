@@ -44,6 +44,9 @@ const OCR_PDF_MAX_PAGES = (() => {
 })()
 /** 渲染缩放（A4 在 scale=2 下约 1190×1684px，足够 OCR 且控制图片体积）。 */
 const OCR_PDF_RENDER_SCALE = 2
+/** 文字层抽取（unpdf.extractText）最多处理的声明页数上限（防匿名可达端点被恶意"PDF 炸弹"——
+ * 小体积但声明超大页数的 PDF——拖住；超出后跳过文字层抽取，直接走已有页数上限的扫描件 OCR 兜底）。 */
+const MAX_BORN_DIGITAL_EXTRACT_PAGES = 50
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 const DOC_MIME = 'application/msword'
@@ -156,11 +159,9 @@ export class ResumeExtractionService {
   ): Promise<ResumeExtractionResult> {
     let rawText = ''
     let pageCount: number | undefined
+    let pdf: unknown
     try {
-      const pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
-      const extracted = await unpdf.extractText(pdf, { mergePages: true })
-      pageCount = extracted.totalPages
-      rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+      pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
     } catch {
       return this.fail(
         fileId,
@@ -168,6 +169,25 @@ export class ResumeExtractionService {
         'PDF 解析失败，请确认文件未损坏后重试',
         startedAt,
       )
+    }
+    const declaredPageCount = (pdf as { numPages?: number }).numPages ?? 0
+    if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
+      try {
+        const extracted = await unpdf.extractText(pdf, { mergePages: true })
+        pageCount = extracted.totalPages
+        rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
+      } catch {
+        return this.fail(
+          fileId,
+          'UNSUPPORTED_FILE_TYPE',
+          'PDF 解析失败，请确认文件未损坏后重试',
+          startedAt,
+        )
+      }
+    } else {
+      // 声明页数为 0（无法判断）或超过上限：跳过无界的 extractText，
+      // rawText 保持 '' 会自动走下面 OCR 渲染兜底路径（该路径自带页数上限）。
+      pageCount = declaredPageCount
     }
     // 文字层为空 / 极少 → 扫描件：OCR 已配置则走受控页数渲染识别，否则明确失败（不编造）
     if (this.meaningfulLen(rawText) < MIN_TEXT_CHARS) {
