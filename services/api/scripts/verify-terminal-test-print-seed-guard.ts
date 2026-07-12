@@ -79,16 +79,29 @@ async function main(): Promise<void> {
     }> {
       const upserts: SeedUpsertInput[] = []
       await withEnv(env, async () => {
-        const prisma = {
-          printTask: {
-            upsert: async (input: SeedUpsertInput) => {
-              upserts.push(input)
-              return input
-            },
-          },
-        } as unknown as PrismaService
+        const createdIntervals: Array<ReturnType<typeof setInterval>> = []
+        const originalSetInterval = globalThis.setInterval
+        globalThis.setInterval = ((...args: Parameters<typeof originalSetInterval>) => {
+          const interval = originalSetInterval(...args)
+          createdIntervals.push(interval)
+          return interval
+        }) as typeof globalThis.setInterval
 
-        await new TerminalsService(prisma, null as never, null as never).onModuleInit()
+        try {
+          const prisma = {
+            printTask: {
+              upsert: async (input: SeedUpsertInput) => {
+                upserts.push(input)
+                return input
+              },
+            },
+          } as unknown as PrismaService
+
+          await new TerminalsService(prisma, null as never, null as never).onModuleInit()
+        } finally {
+          for (const interval of createdIntervals) clearInterval(interval)
+          globalThis.setInterval = originalSetInterval
+        }
       })
       return { upserts }
     }
