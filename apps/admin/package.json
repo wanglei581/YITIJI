@@ -14,6 +14,7 @@
     "verify:refresh-safe": "node scripts/verify-refresh-safe.mjs",
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
     "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",
+    "verify:service-desk-dashboard-ui": "node scripts/verify-service-desk-dashboard-ui.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
     "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs",
