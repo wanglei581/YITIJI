@@ -322,20 +322,40 @@ async function main(): Promise<void> {
     )
   }
 
+  /**
+   * 清理：覆盖本脚本产生的全部审计（order / print_task / payment_attempt 三个 targetType，
+   * AuditLog.targetId 非外键、删除实体不会级联）；每步尽力执行、错误汇总后抛出——
+   * 清理失败绝不静默通过（共享库纪律）。
+   */
   const cleanup = async (): Promise<void> => {
-    await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } }).catch(() => undefined)
-    await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => undefined)
-    await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => undefined)
-    await prisma.order.deleteMany({ where: { id: { in: orderIds } } }).catch(() => undefined)
-    await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } }).catch(() => undefined)
-    await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
-    await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } }).catch(() => undefined)
-    for (const key of fixtureStorageKeys) {
-      await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    const errors: string[] = []
+    const step = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
+      try {
+        await fn()
+      } catch (e) {
+        errors.push(`${label}: ${(e as Error)?.message ?? String(e)}`)
+      }
     }
-    await closeGateway().catch(() => undefined)
+    const attemptIds = (
+      await prisma.paymentAttempt.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }).catch(() => [])
+    ).map((a) => a.id)
+    await step('auditLog(order)', () => prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } }))
+    await step('auditLog(print_task)', () => prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: taskIds } } }))
+    await step('auditLog(payment_attempt)', () => prisma.auditLog.deleteMany({ where: { targetType: 'payment_attempt', targetId: { in: attemptIds } } }))
+    await step('refund', () => prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } }))
+    await step('paymentAttempt', () => prisma.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } }))
+    await step('order', () => prisma.order.deleteMany({ where: { id: { in: orderIds } } }))
+    await step('printTask', () => prisma.printTask.deleteMany({ where: { id: { in: taskIds } } }))
+    await step('terminal', () => prisma.terminal.deleteMany({ where: { id: terminalId } }))
+    await step('fileObject', () => prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } }))
+    for (const key of fixtureStorageKeys) {
+      await step(`storage(${key})`, () => storage.deleteObject(key, LOCAL_BUCKET_SENTINEL))
+    }
+    await step('gateway', () => closeGateway())
+    if (errors.length > 0) throw new VerifyFailure(`  FAIL cleanup 未完全成功（共享库可能残留）：${errors.join('；')}`)
   }
 
+  let runError: unknown = null
   try {
     await prisma.terminal.create({
       data: { id: terminalId, terminalCode: `KSK-WXRR-${suffix}`, agentToken: `agt_wxrr_${suffix}`, deviceFingerprint: 'verify-wxrr' },
@@ -436,10 +456,19 @@ async function main(): Promise<void> {
     }
 
     console.log(`\n✅ ALL PASS（${passCount} 项组合断言 + 链路静默守卫）— C5-6 微信退款端到端组合回归通过\n`)
-  } finally {
-    await cleanup()
-    await prisma.onModuleDestroy()
+  } catch (e) {
+    runError = e
   }
+  // 清理错误不得掩盖原始断言错误，也不得阻断 prisma 断连；两类错误均不静默。
+  let cleanupError: unknown = null
+  try {
+    await cleanup()
+  } catch (e) {
+    cleanupError = e
+  }
+  await prisma.onModuleDestroy().catch(() => undefined)
+  if (runError) throw runError
+  if (cleanupError) throw cleanupError
 }
 
 main().catch((e) => {
