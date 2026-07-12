@@ -77,7 +77,7 @@ export class MemberAssetsService {
 
   /** 我的文档：本人 FileObject（仅元数据 + 临时访问端点路径，无文件内容）。 */
   async listDocuments(endUserId: string, page: MemberPageQuery): Promise<MemberAssetPage<MemberDocumentItem>> {
-    const where = isVisibleMemberFileWhere(endUserId, new Date())
+    const where = { ...isVisibleMemberFileWhere(endUserId, new Date()), purpose: { not: 'signature_image' } }
     const total = await this.prisma.fileObject.count({ where })
     const rows = await this.prisma.fileObject.findMany({
       where,

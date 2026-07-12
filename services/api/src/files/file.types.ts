@@ -30,6 +30,7 @@ export type FilePurpose =
   | 'screensaver_material' // 待机宣传屏素材
   | 'admin_upload'         // 管理员通用上传
   | 'temp'                 // 临时 / 匿名上传
+  | 'signature_image'      // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
 
 export type FileSensitiveLevel = 'normal' | 'sensitive' | 'highly_sensitive'
 
