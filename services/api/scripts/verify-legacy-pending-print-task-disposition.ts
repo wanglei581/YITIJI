@@ -10,6 +10,7 @@ import 'dotenv/config'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
+import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import {
   AdminLegacyPendingPrintTaskDispositionService,
   LEGACY_PENDING_PRINT_TASK_CUTOFF,
@@ -276,7 +277,8 @@ async function main(): Promise<void> {
       null as never,
       null as never,
       null as never,
-      null as never
+      null as never,
+      new TerminalCapabilitiesService(prisma),
     )
     const cancelledStatus = await printJobs.getStatus(unpaidTaskId)
     if (

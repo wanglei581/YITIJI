@@ -113,4 +113,60 @@ if (layout.includes("'/print-scan'") && layout.includes('打印扫描运维')) {
   fail('sidebar nav entry 打印扫描运维 must be registered')
 }
 
+// 6. 动作后的 refresh 必须区分 failed/stale：旧 A 闭包不能覆盖切换后的 B 查询，也不能把 stale 误报成失败。
+if (
+  page.includes("const queryKey = [taskType, status, String(page)].join('\\u0000')") &&
+  page.includes('const queryKeyRef = useRef(queryKey)') &&
+  page.includes('queryKeyRef.current = queryKey') &&
+  page.includes("Promise<'success' | 'failed' | 'stale'>") &&
+  page.includes('const requestQueryKey = queryKey') &&
+  page.includes("return 'stale'") &&
+  page.includes('const actionQueryKey = queryKeyRef.current') &&
+  page.includes('if (actionQueryKey !== queryKeyRef.current) return') &&
+  page.includes("if (refreshResult === 'failed')") &&
+  page.includes('操作已执行成功，但页面刷新失败，请手动刷新查看最新状态')
+) {
+  pass('task action treats stale refresh as neutral and only reports real refresh failures')
+} else {
+  fail('task action must guard old query closures and distinguish failed from stale refresh')
+}
+
+// 7. 保存请求必须同时绑定 sequence + terminal：A 的 success/catch/finally 都不得污染切到 B 后的 UI。
+if (
+  page.includes('const saveSeq = useRef(0)') &&
+  page.includes('saveSeq.current += 1') &&
+  page.includes('const requestSeq = ++saveSeq.current') &&
+  page.includes('const requestedTerminalId = terminalId') &&
+  page.includes('updateCapability(requestedTerminalId, key') &&
+  page.includes('const isCurrentSaveRequest = () =>') &&
+  page.includes('saveSeq.current === requestSeq') &&
+  page.includes('terminalIdRef.current === requestedTerminalId') &&
+  page.includes('if (!isCurrentSaveRequest()) return') &&
+  (page.match(/if \(isCurrentSaveRequest\(\)\) \{/g)?.length ?? 0) >= 2 &&
+  page.includes('setSavingKey(null)') &&
+  page.includes('setSaveError(null)')
+) {
+  pass('capability save invalidates old terminal requests and guards success/catch/finally')
+} else {
+  fail('capability save must use sequence + terminal guards for success/catch/finally')
+}
+
+// 8. 用户切换终端的同一事件帧必须清空 A 的保存/能力 UI、失效旧加载请求并更新 ref，再更新 terminalId。
+const switchTerminalBlock = page.match(/const switchTerminal = \(nextTerminalId: string\) => \{[\s\S]*?\n  \}\n\n  const save/)?.[0] ?? ''
+if (
+  switchTerminalBlock.includes('saveSeq.current += 1') &&
+  switchTerminalBlock.includes('capSeq.current += 1') &&
+  switchTerminalBlock.includes('terminalIdRef.current = nextTerminalId') &&
+  switchTerminalBlock.includes('setSavingKey(null)') &&
+  switchTerminalBlock.includes('setSaveError(null)') &&
+  switchTerminalBlock.includes('setCapabilities(null)') &&
+  switchTerminalBlock.includes('setLoading(true)') &&
+  switchTerminalBlock.includes('setTerminalId(nextTerminalId)') &&
+  page.includes('onChange={(e) => switchTerminal(e.target.value)}')
+) {
+  pass('terminal selection synchronously invalidates old save/load/UI state before terminalId changes')
+} else {
+  fail('terminal selection must invalidate old save/load/UI state before changing terminalId')
+}
+
 console.log('\nverify-admin-print-scan-ui: ok')

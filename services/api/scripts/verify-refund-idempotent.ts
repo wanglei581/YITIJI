@@ -10,7 +10,8 @@
  *  5. voucher（券/权益全额核销单）退款 **不调 provider、不恢复 BenefitGrant 额度**（quantityRemaining 不变），
  *     审计 payload benefitRestored=false。
  *  6. unpaid / paying / closed 不可退款 → ORDER_NOT_REFUNDABLE。
- *  7. C5-3 出纸门控回归：refunded / refunding 订单的打印任务**不可 claim**（只有 paid 放行）。
+ *  7. C5-3 出纸门控回归：即使 paid 门控关闭，refunded / refunding 订单的打印任务也**不可 claim**。
+ *  8. 已 claimed / printing 的订单不得开始或重开退款，防止退款与出纸并发。
  *
  * 运行：pnpm --filter @ai-job-print/api verify:refund-idempotent
  */
@@ -36,6 +37,7 @@ import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { RefundService } from '../src/payment/refund.service'
+import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { PricingService } from '../src/payment/pricing.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
@@ -64,6 +66,15 @@ async function expectCode(label: string, code: string, fn: () => Promise<unknown
     return fail(`${label} — 期望 ${code}，实际: ${msg}`)
   }
   fail(`${label} — 期望 ${code}，但未抛`)
+}
+
+function nestErrorCode(error: unknown): string | undefined {
+  const candidate = error as { getResponse?: () => unknown; response?: unknown }
+  const response = typeof candidate.getResponse === 'function' ? candidate.getResponse() : candidate.response
+  const code = response && typeof response === 'object'
+    ? (response as { error?: { code?: unknown } }).error?.code
+    : undefined
+  return typeof code === 'string' ? code : undefined
 }
 
 /** spy provider：包裹沙箱，统计 refund 调用 + 在 refund 瞬间快照订单态（证明 refunding 中间态）。 */
@@ -96,6 +107,7 @@ async function main(): Promise<void> {
   const onlinePayment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([realProvider]))
   const spy = new SpyProvider(realProvider, prisma)
   const refundService = new RefundService(prisma, audit, new PaymentProviderRegistry([spy]))
+  const adminPrintScan = new AdminPrintScanService(prisma)
   const printJobs = new PrintJobsService(prisma, audit, new PrintPageCountService(prisma, storage), pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const redemption = new BenefitRedemptionService(prisma, audit, orderStatus)
   const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
@@ -250,8 +262,72 @@ async function main(): Promise<void> {
     await prisma.order.update({ where: { id: oClosed }, data: { payStatus: 'closed' } })
     await expectCode('6c. closed 不可退款 → ORDER_NOT_REFUNDABLE', 'ORDER_NOT_REFUNDABLE', () => refundService.refund(oClosed, { reason: 'x' }))
 
-    // ── (7) C5-3 出纸门控回归：refunded / refunding 不可 claim ──────────────
+    // 订单领取/出纸后必须拒绝退款：退款是停止出纸的唯一状态序列点，不能在已领取后才切到 refunding。
+    const oClaimed = await makeOrder(50)
+    await paySandbox(oClaimed)
+    await prisma.order.update({ where: { id: oClaimed }, data: { taskStatus: 'claimed' } })
+    await expectCode('6d. 已领取订单不可开始退款 → ORDER_TASK_IN_PROGRESS', 'ORDER_TASK_IN_PROGRESS',
+      () => refundService.refund(oClaimed, { reason: '已领取退款拒绝' }))
+
+    // failed 的真实渠道退款同号重开也必须遵循相同的任务状态守卫。
+    const oPrinting = await makeOrder(50)
+    await paySandbox(oPrinting)
+    await prisma.order.update({ where: { id: oPrinting }, data: { taskStatus: 'printing' } })
+    const failedRefundNo = `RFD-FAILED-PRINTING-${suffix}`
+    await prisma.refund.create({
+      data: { orderId: oPrinting, refundNo: failedRefundNo, amountCents: 50, status: 'failed', reason: '渠道明确拒绝', channel: 'wechat' },
+    })
+    await expectCode('6e. 出纸中订单不可重开 failed 退款 → ORDER_TASK_IN_PROGRESS', 'ORDER_TASK_IN_PROGRESS',
+      () => refundService.refund(oPrinting, { refundNo: failedRefundNo, reason: '同号重开' }))
+
+    // ── (7) retry ↔ refund 竞态：Order 是共同状态序列点，退款态不可出纸 ─────
     await terminals.heartbeat(terminalId, { status: 'online', printerStatus: 'ok', localTaskDatabaseAvailable: true, agentVersion: 'verify-refund' }, `Bearer ${agentToken}`)
+    const retryRefundRace = await printJobs.create(
+      { fileUrl: await seedPdf('retry-refund-race'), fileName: 'retry-refund-race.pdf', params: { copies: 1, colorMode: 'black_white' } },
+      { terminalId },
+    )
+    taskIds.push(retryRefundRace.taskId)
+    await paySandbox(retryRefundRace.orderId)
+    await prisma.$transaction([
+      prisma.printTask.update({
+        where: { id: retryRefundRace.taskId },
+        data: { status: 'failed', errorCode: 'PRINTER_ERROR', errorMessage: 'race fixture' },
+      }),
+      prisma.order.update({ where: { id: retryRefundRace.orderId }, data: { taskStatus: 'failed' } }),
+    ])
+    const [retryRaceResult, refundRaceResult] = await Promise.allSettled([
+      adminPrintScan.applyAction('print', retryRefundRace.taskId, 'retry'),
+      refundService.refund(retryRefundRace.orderId, { reason: 'retry-refund 竞态验证' }),
+    ])
+    const retryWon = retryRaceResult.status === 'fulfilled'
+    const retryRejectedForRefund =
+      retryRaceResult.status === 'rejected' &&
+      nestErrorCode(retryRaceResult.reason) === 'PRINT_SCAN_RETRY_REFUNDED'
+    assert(
+      refundRaceResult.status === 'fulfilled' && (retryWon || retryRejectedForRefund),
+      '7a. retry/refund 并行只接受安全线性化结果（retry 成功或因退款拒绝）',
+    )
+    const [raceTaskAfter, raceOrderAfter] = await Promise.all([
+      prisma.printTask.findUnique({ where: { id: retryRefundRace.taskId } }),
+      prisma.order.findUnique({ where: { id: retryRefundRace.orderId } }),
+    ])
+    const safeLinearization =
+      (retryWon && raceTaskAfter?.status === 'pending' && raceOrderAfter?.taskStatus === 'pending') ||
+      (retryRejectedForRefund && raceTaskAfter?.status === 'failed' && raceOrderAfter?.taskStatus === 'failed')
+    assert(
+      safeLinearization && raceOrderAfter?.payStatus === 'refunded',
+      '7b. retry/refund 最终仅落入退款先或 retry 先的安全状态',
+    )
+    const previousPaidGate = process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM']
+    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
+    const claimRefundRace = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = previousPaidGate
+    assert(
+      claimRefundRace.length === 0 && raceOrderAfter?.payStatus === 'refunded',
+      '7c. refund 态订单在 PRINT_REQUIRE_PAID_BEFORE_CLAIM=false 时仍不可 claim',
+    )
+
+    // ── (8) C5-3 出纸门控回归：退款态始终不可 claim ───────────────────────
     const created = await printJobs.create({ fileUrl: await seedPdf('gate'), fileName: 'g.pdf', params: { copies: 1, colorMode: 'black_white' } }, { terminalId })
     taskIds.push(created.taskId)
     await prisma.printTask.update({ where: { id: created.taskId }, data: { createdAt: new Date('2020-01-01T00:00:00.000Z') } })
@@ -259,13 +335,34 @@ async function main(): Promise<void> {
     // 先证明 paid 可 claim（门控放行基线），随后退款后不可 claim。
     await refundService.refund(created.orderId, { reason: '门控回归退款' })
     const claimRefunded = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-    assert(claimRefunded.length === 0 && (await prisma.printTask.findUnique({ where: { id: created.taskId } }))?.status === 'pending', '7a. refunded 订单的打印任务不可 claim（只有 paid 放行）')
+    assert(claimRefunded.length === 0 && (await prisma.printTask.findUnique({ where: { id: created.taskId } }))?.status === 'pending', '8a. refunded 订单的打印任务不可 claim（只有 paid 放行）')
     // 直接置 refunding 再验（部分退款/退款中态同样不放行）。
     const created2 = await printJobs.create({ fileUrl: await seedPdf('gate2'), fileName: 'g2.pdf', params: { copies: 1, colorMode: 'black_white' } }, { terminalId })
     taskIds.push(created2.taskId)
     await prisma.order.update({ where: { id: created2.orderId }, data: { payStatus: 'refunding' } })
     const claimRefunding = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
-    assert(claimRefunding.length === 0, '7b. refunding 订单的打印任务不可 claim')
+    assert(claimRefunding.length === 0, '8b. refunding 订单的打印任务不可 claim')
+
+    // 付费门控默认关闭只放行未支付历史单，不得放宽退款态的拒领规则。
+    const unpaidWhenPaidGateDisabled = await printJobs.create(
+      { fileUrl: await seedPdf('gate-unpaid'), fileName: 'gate-unpaid.pdf', params: { copies: 1, colorMode: 'black_white' } },
+      { terminalId },
+    )
+    taskIds.push(unpaidWhenPaidGateDisabled.taskId)
+    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
+    const claimWithPaidGateDisabled = await terminals.claimTasks(terminalId, { maxTasks: 1 }, `Bearer ${agentToken}`)
+    const [afterRefundedClaim, afterRefundingClaim] = await Promise.all([
+      prisma.printTask.findUnique({ where: { id: created.taskId } }),
+      prisma.printTask.findUnique({ where: { id: created2.taskId } }),
+    ])
+    assert(
+      claimWithPaidGateDisabled.length === 1 &&
+        claimWithPaidGateDisabled[0]?.taskId === unpaidWhenPaidGateDisabled.taskId &&
+        afterRefundedClaim?.status === 'pending' &&
+        afterRefundingClaim?.status === 'pending',
+      '8c. PRINT_REQUIRE_PAID_BEFORE_CLAIM=false 时退款态仍不可 claim，未支付订单保持可 claim',
+    )
+    process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
 
     console.log(`\n  ✅ verify:refund-idempotent 全部通过（${passed} checks）`)
   } finally {
