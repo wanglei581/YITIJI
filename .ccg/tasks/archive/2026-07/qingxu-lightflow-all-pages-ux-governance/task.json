@@ -1,0 +1,12 @@
+{
+  "id": "qingxu-lightflow-all-pages-ux-governance",
+  "title": "青序 LightFlow 三端全页面 UX 治理与分波计划",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend-docs",
+  "currentPhase": "completed",
+  "nextAction": "在新独立窗口从最新 origin/main 执行 UI-0/UI-1 第一批代表页计划",
+  "createdAt": "2026-07-12T00:00:00+08:00",
+  "branch": "codex/qingxu-lightflow-ux-governance-20260712"
+}
