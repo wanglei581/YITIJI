@@ -2,7 +2,7 @@
 
 > 适用范围：微信（Native/付款码）与支付宝线上支付的退款异常处置、每日对账巡检、以及 FREE_MODE → 付费模式切换的前置检查。
 > 权威代码口径：`services/api/src/payment/refund.service.ts`（状态机与三分法）、`reconciliation.service.ts`（差异码）、`refund-convergence.task.ts`（自动收敛）。
-> 回归门禁：`verify:wechat-refund-regression`（端到端四场景）+ 既有 5 个退款/对账 verify，均在双 CI。
+> 回归门禁：`verify:wechat-refund-regression`（3 组场景、6 项组合断言）+ 既有 5 个退款/对账 verify，均在双 CI。
 > 上位文档：`docs/product/payment-commercial-adaptation-plan-2026-07.md`（波次与 DoD）、`docs/operations/print-rollout-deployment-matrix.md`（运营模式门禁）。
 
 ---
