@@ -135,10 +135,7 @@ export class LlmJobFitService {
       '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位。跨岗位差距较大时，应建议"如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配的岗位"。' +
       '\n6. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
       '\n7. 不得出现自相矛盾判断（如"大专但符合本科要求"）。学历、年限、技能不符合岗位要求时，直接说明差距（如"学历不符合要求：岗位要求本科及以上，当前简历为大专学历"）。' +
-      '\n8. decisionSupport 为可选 M1.5 决策辅助；输出时 analysisVersion 必须为 job_fit_m1_5。keywordCoverage.matched 只列简历原文或岗位文本中有依据的关键词；missing 只列该岗位的待补充关键词。' +
-      '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位；跨岗位差距较大时，应建议“如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配岗位”。' +
-      '\n6. 不得给出无依据的示例数字（例如“100份/月”“3次/周”“提升30%”）；只能说“补充你实际处理的数量、频次或结果”。' +
-      '\n7. 不得出现自相矛盾判断，例如“大专但符合本科要求”；学历、年限、技能不符合时要直接说差距。' +
+      '\n8. decisionSupport 为可选 M1.5 决策辅助；输出时 analysisVersion 必须为 job_fit_m1_5。keywordCoverage.matched 只列同时出现在简历原文与岗位文本中的关键词；missing 只列岗位文本中出现且简历尚未具备的关键词。' +
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"fitLevel":"reference_high|reference_medium|reference_low","summary":"2-3 句总评（说明这是参考）",' +
       '"matchPoints":[{"point":"与岗位要求的匹配点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
@@ -256,9 +253,8 @@ export class LlmJobFitService {
   }
 
   /**
-   * M1.5 是可选增量：旧模型缺失该对象时不补默认值。matched 是正向匹配结论，
-   * 因此必须至少能从简历或岗位文本找到依据；missing 是岗位待补充项，保留模型
-   * 基于岗位上下文给出的关键词，不要求出现在简历中。
+   * M1.5 是可选增量：旧模型缺失该对象时不补默认值。matched 必须同时出自
+   * 简历与岗位要求；missing 必须出自岗位要求且尚未出现在简历。公司名不是岗位要求。
    */
   private validateDecisionSupport(
     value: unknown,
@@ -284,21 +280,26 @@ export class LlmJobFitService {
           .map((keyword) => keyword.trim().slice(0, 80)),
       ),
     ]
-    const sourceText = normalizeForMatch(
-      [resumeText, job.title, job.company, job.description, job.requirements]
+    const normalizedResume = normalizeForMatch(resumeText)
+    const normalizedJob = normalizeForMatch(
+      [job.title, job.description, job.requirements]
         .filter((part): part is string => typeof part === 'string')
         .join('\n'),
     )
     const matched = cleanKeywords(coverage.matched).filter((keyword) => {
       const needle = normalizeForMatch(keyword)
-      return needle.length > 0 && sourceText.includes(needle)
+      return needle.length > 0 && normalizedResume.includes(needle) && normalizedJob.includes(needle)
+    })
+    const missing = cleanKeywords(coverage.missing).filter((keyword) => {
+      const needle = normalizeForMatch(keyword)
+      return needle.length > 0 && normalizedJob.includes(needle) && !normalizedResume.includes(needle)
     })
 
     return {
       analysisVersion: 'job_fit_m1_5',
       keywordCoverage: {
         matched,
-        missing: cleanKeywords(coverage.missing),
+        missing,
       },
     }
   }
