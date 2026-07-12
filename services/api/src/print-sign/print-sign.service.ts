@@ -34,6 +34,9 @@ const IDEMPOTENCY_RESULT_TTL_SECONDS = 600
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,80}$/
 const MEMBER_RATE_LIMIT_PER_MINUTE = 3
 
+// eslint-disable-next-line no-control-regex -- 刻意匹配控制字符以剔除
+const FILENAME_UNSAFE_CHARS = new RegExp('[\\\\/\\u0000-\\u001f\\u007f]', 'g')
+
 /** 授权确认文案版本：改 Kiosk 勾选文案时必须同步 bump，审计据此追溯用户当时看到的内容。 */
 const AUTHORIZATION_NOTICE_VERSION = '2026-07-12.v1'
 
@@ -457,7 +460,7 @@ function maxSensitiveLevel(a: FileSensitiveLevel, b: FileSensitiveLevel): FileSe
 /** 文件名净化：去扩展名/路径分隔/控制字符，截断，空则回退。 */
 function sanitizeBaseName(filename: string): string {
   const base = filename.replace(/\.[Pp][Dd][Ff]$/, '')
-  const cleaned = base.replace(/[\\/ -]/g, '').replace(/\s+/g, ' ').trim()
+  const cleaned = base.replace(FILENAME_UNSAFE_CHARS, '').replace(/\s+/g, ' ').trim()
   return cleaned.length > 0 ? cleaned.slice(0, 80) : 'document'
 }
 
