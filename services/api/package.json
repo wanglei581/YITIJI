@@ -142,6 +142,7 @@
     "verify:reconciliation": "node -r @swc-node/register scripts/verify-reconciliation.ts",
     "verify:refund-convergence": "node -r @swc-node/register scripts/verify-refund-convergence.ts",
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
+    "verify:wechat-refund-regression": "node -r @swc-node/register scripts/verify-wechat-refund-regression.ts",
     "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts"
   },
   "dependencies": {
