@@ -110,6 +110,7 @@
     "verify:ocr-baidu-live": "node -r @swc-node/register scripts/verify-ocr-baidu-live.ts",
     "verify:mock-interview": "node -r @swc-node/register scripts/verify-mock-interview.ts",
     "verify:job-fit": "node -r @swc-node/register scripts/verify-job-fit.ts",
+    "verify:job-fit-governance": "node -r @swc-node/register scripts/verify-job-fit-governance.ts",
     "verify:job-ai": "node -r @swc-node/register scripts/verify-job-ai.ts",
     "verify:job-data-quality": "node -r @swc-node/register scripts/verify-job-data-quality.ts",
     "verify:job-ai-backend": "node -r @swc-node/register scripts/verify-job-ai-backend.ts",
