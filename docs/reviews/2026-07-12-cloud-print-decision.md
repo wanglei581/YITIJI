@@ -2,7 +2,7 @@
 
 > 关联文档：[user-data-flow-matrix.md](../product/user-data-flow-matrix.md) §3.4/§二 | [home-entry-closure-plan-2026-07-11.md](./home-entry-closure-plan-2026-07-11.md) 发现①⑤ | [ia-consolidation-audit-2026-07-03.md](./ia-consolidation-audit-2026-07-03.md) §3⑧ | [print-scan-commercial-plan.md](../product/print-scan-commercial-plan.md) | [next-tasks.md](../progress/next-tasks.md)
 >
-> 性质：**产品取舍决策评估文档**。按 2026-07-11 首页核查发现⑤的要求，对首页「云打印」disabled 占位卡片走与「岗位大师」（§3⑧）同等的正式取舍流程。**本文档不改任何首页/路由/业务代码；最终决策权在用户，本轮只提供经外部评审的选项与推荐。**
+> 性质：**产品取舍决策评估 + 拍板 + 执行记录**。按 2026-07-11 首页核查发现⑤的要求，对首页「云打印」disabled 占位卡片走与「岗位大师」（§3⑧）同等的正式取舍流程。§一~§六为**决策前评估**（评估阶段未改任何代码，决策权在用户）；用户已于 2026-07-12 拍板 D1=b 并授权本窗口执行，执行记录见附录。**§二事实基础与 §一的行号/现状描述均为决策前基线**——执行后「云打印」磁贴已删除（原 HomePage.tsx:328 位置现为决策注释）。
 >
 > 评审状态：已经外部 Codex（architect 角色，只读）实读仓库评审，判定"需修改后采纳"；本稿已吸收其全部 8 条必改项（含新增候选 E、候选 C 安全释放架构约束、`cloud_upload` 词汇债披露），评审原文要点与采纳记录见附录。
 
@@ -16,7 +16,7 @@
 
 本文档即为该正式取舍决策的评估材料。
 
-## 二、事实基础（本轮逐条核实 + Codex 只读复核，均可在仓库复查）
+## 二、事实基础（本轮逐条核实 + Codex 只读复核；**决策前基线**，行号以拍板前 `9d48322b` 基点为准）
 
 | # | 事实 | 出处 |
 |---|---|---|
@@ -178,9 +178,10 @@
   - **D3 → 现在收口阶段立即执行**：删除占位是信息架构纠偏而非新功能，不减少任何已实现能力；上线前完成删除+视觉回归的成本低于上线后调整。执行方式=另开独立小任务，仅删磁贴+同步指定文档，跑 typecheck/lint/build/相关 verify/三类视口走查，不顺手治理其他代码。
   - **D4 → 并入 `phone_upload`（分阶段迁移）**：与初稿倾向不同，已在 §六 D4 行如实记录两案分歧，留用户裁定。
   - 一句话建议："现在删掉'云打印'占位，把现有能力统一归入文档打印；C/E 仅保留为过门槛后立项的二期候选，`cloud_upload` 兼容迁移并入 `phone_upload`，优先确保首台终端安全上线。"
-- 2026-07-12（拍板与执行）：**用户拍板 D1=b（删除磁贴）、D2=是、D3=本窗口立即执行、D4=并入 `phone_upload`（独立后续任务）**。选项 b 已按 §四执行影响面清单执行完毕：
+- 2026-07-12（拍板与执行）：**用户拍板 D1=b（删除磁贴）、D2=是、D3=本窗口立即执行、D4=并入 `phone_upload`（独立后续任务）**。选项 b 已按 §四执行影响面清单完成下列已记录的验证范围：
   - 代码：[HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx) 删除「云打印」磁贴一行并留决策注释（打印扫描组 6→5 磁贴）；未触碰 `cloud` 图标定义与 `cloud_upload` 能力键。
   - 文档同步：matrix §3.4 行改写 + §六占位清单行、ia-consolidation-audit §2.1、phase-a-checklist 第4项、home-entry-closure-plan 发现⑤、current-progress 更新记录、next-tasks 新增 P2 二期候选条目（含准入门槛与 F13 约束）与 P1 `cloud_upload` 迁移条目。
-  - 验证结果：Kiosk `typecheck` ✅；`eslint HomePage.tsx` ✅ 0 error；生产 build（`VITE_API_MODE=http` 等守卫变量齐备）✅；`verify:home-toolbox-ui` ✅ ALL PASS；`verify:smart-campus-ui` ✅ ALL PASS；mock 模式浏览器走查 540×960 竖屏 / 375×812 窄屏 / 桌面视口 ✅——打印扫描组 5 磁贴渲染正常（第二行 2 项自然留白，无塌陷），"即将上线"角标恰 2 个（证件复印/证件照打印），控制台无报错。
+  - 验证结果：Kiosk `typecheck` ✅；eslint（**仅 targeted `HomePage.tsx`**，非全量 lint）✅ 0 error；生产 build（`VITE_API_MODE=http` 等守卫变量齐备）✅；`verify:home-toolbox-ui` ✅ ALL PASS；`verify:smart-campus-ui` ✅ ALL PASS；mock 模式浏览器走查 540×960 竖屏 / 375×812 窄屏 / 桌面视口 ✅——打印扫描组 5 磁贴渲染正常（第二行 2 项自然留白，无塌陷），"即将上线"角标恰 2 个（证件复印/证件照打印），控制台无报错。截图目视级确认：组内磁贴等高（min-height 92px 网格未受删除影响）、触控目标明显大于 48px、首页整页滚动正常；未做键盘焦点顺序与像素级量测（走查为截图目视级，非自动化断言）。
   - **两项 pre-existing 失败（均与本改动无关，已各派独立修复任务，均不在 GitHub CI）**：① `verify:print-entry-source-split` 在干净树上即失败（断言 PrintUploadPage 的 `savePrintMaterialSession({ file: nextFile, source })` 字符串漂移，前 5 条含 HomePage 相关断言全 PASS）；② `verify:terminal-device-config` 静态 28 项全 PASS，动态段因脚本以 2 参构造 3 参的 `AdminTerminalsController`（Task 10 后漂移）而失败。
+- 2026-07-12（第三轮，执行后收尾审查）：执行提交 `e42bfe74` 送外部 Codex（analyzer 角色，只读）收尾审查。结论：**代码 diff 通过**（确认仅删磁贴一行+注释，5 磁贴分组逻辑正确、`titleTo` 不依赖 `enabledFirst`、CSS 3 列不塌陷）；文档判定"需修改"，4 条必改项已全部采纳修正：① 本文档头部性质与事实表时态改为"决策前基线"标注；② current-progress 验证表述改准（targeted eslint；两个失败 verify 明确标注 pre-existing + 已派单）；③ 执行记录收窄"执行完毕"表述并补记截图目视级观察（等高/触控/滚动）与未做项（键盘焦点/像素量测）；④ 被本次触及的 matrix §六与 audit/checklist 行中 U盘/格式转换的既有状态漂移已顺行更正。建议项采纳情况：P1 迁移条目已补"未承诺交付日期"；"首页不再含云打印磁贴"静态防回退断言建议留给已派发的 `verify:print-entry-source-split` 修复任务实施；`docs/device/windows-terminal-agent-design.md` 中"云打印"术语澄清**未执行**（该文件不在本任务允许清单，其"云打印"专指预留的奔图云 API 架构语义，与被删的首页入口无关——留作后续文档收口的可选小项）。
 - 本轮除上述受控执行外未修改其他业务代码；决策文档与执行改动承载于独立分支 `docs/cloud-print-decision`（基于 origin/main `9d48322b`）。

@@ -267,7 +267,7 @@
 
 ## P1：`cloud_upload` 能力键并入 `phone_upload`（词汇债治理，2026-07-12 已拍板方向，未排期执行）
 
-- [ ] **分阶段迁移，独立任务执行，禁止随其他改动顺手做**：`phone_upload` 与 `cloud_upload` 双能力键并存于 `packages/shared/src/types/printScanCapability.ts`、`services/api/src/terminals/terminal-capabilities.types.ts`、`apps/admin/src/routes/print-scan/index.tsx` 三处，而两者语义相同（2026-07-10 云上传范围收窄声明）。用户已拍板（2026-07-12，D4）：并入 `phone_upload`。执行步骤：① 双读映射（读取时 `cloud_upload` 视同 `phone_upload`）→ ② 盘点并回填存量 `TerminalCapability` 数据库配置 → ③ Admin 侧加弃用告警 → ④ 确认无引用后移除旧键。未来「远程提交·到店取件」若立项应新增准确能力键（如 `remote_submit`/`terminal_release`），不复用 `cloud_upload`。依据与背景：`docs/reviews/2026-07-12-cloud-print-decision.md` §六 D4。
+- [ ] **分阶段迁移，独立任务执行，禁止随其他改动顺手做**：`phone_upload` 与 `cloud_upload` 双能力键并存于 `packages/shared/src/types/printScanCapability.ts`、`services/api/src/terminals/terminal-capabilities.types.ts`、`apps/admin/src/routes/print-scan/index.tsx` 三处，而两者语义相同（2026-07-10 云上传范围收窄声明）。用户已拍板（2026-07-12，D4）：并入 `phone_upload`。执行步骤：① 双读映射（读取时 `cloud_upload` 视同 `phone_upload`）→ ② 盘点并回填存量 `TerminalCapability` 数据库配置 → ③ Admin 侧加弃用告警 → ④ 确认无引用后移除旧键。未来「远程提交·到店取件」若立项应新增准确能力键（如 `remote_submit`/`terminal_release`），不复用 `cloud_upload`。**未承诺交付日期；启动前仍需按 CLAUDE.md §8.1 做独立范围确认。**依据与背景：`docs/reviews/2026-07-12-cloud-print-decision.md` §六 D4。
 
 ## P2：商用二期候选（候选未立项，过门槛后才可立项）
 
