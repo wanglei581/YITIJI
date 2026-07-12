@@ -16,7 +16,7 @@ import {
  */
 
 export const POLICY_KINDS = ['policy_guide', 'notice'] as const
-export const POLICY_AUDIENCES = ['graduate', 'migrant', 'hardship', 'startup', 'general'] as const
+export const POLICY_AUDIENCES = ['graduate', 'flexible', 'migrant', 'hardship', 'startup', 'general'] as const
 export const POLICY_CATEGORIES = ['policy', 'announcement', 'notice', 'recruitment'] as const
 
 export class CreatePolicyPostDto {
