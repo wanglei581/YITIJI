@@ -9,7 +9,7 @@
 
 ## 一、核心不变量（读懂再操作）
 
-1. **退款只有一个入口**：Admin 登录后 `POST /admin/orders/:id/refund`（走 `RefundService`）。禁止直改数据库、禁止绕过服务改 `Order.payStatus` / `Refund.status`。
+1. **退款只有一个入口**：`POST /admin/orders/:id/refund`（JWT + admin 角色，走 `RefundService`）。**Admin 订单页当前为只读，无退款按钮**——本 SOP 中所有「发起/重试退款」均指由运维人员持 admin 凭证调用该受控 API（或后续接线的 Admin 操作入口）。禁止直改数据库、禁止绕过服务改 `Order.payStatus` / `Refund.status`。
 2. **一单一退款号**：`refundNo = RFD-<orderNo>`。**任何重试都用同号**（渠道以 `out_refund_no` 幂等，同号绝不二次出款）；**换号重试 = 可能双倍退款，绝对禁止**。
 3. **渠道结果三分法**：
    - **明确成功**（SUCCESS）→ `refunded`（终态）；
@@ -26,7 +26,7 @@
 | 差异码 | 含义 | 处置 |
 |---|---|---|
 | `STUCK_REFUNDING` | 退款中订单超 30 分钟无进展 | 按 §三 处置 |
-| `PAID_WITHOUT_SUCCESS_ATTEMPT` | 订单已付但无成功支付尝试 | 核对是否 Admin mark-paid / redeem 场景；否则升级排查 |
+| `PAID_WITHOUT_SUCCESS_ATTEMPT` | **线上通道**（wechat/alipay/sandbox）paid 单无成功支付尝试 | 升级排查（线下 mark-paid / 核销单不产生此差异，若出现即异常） |
 | `REFUND_SUCCESS_ORDER_NOT_REFUNDED` | 退款成功但订单状态未同步 | 记录 orderId 升级处理，禁止手改库 |
 | `REFUND_AMOUNT_MISMATCH` | 订单退款额与成功退款记录之和不符 | 升级排查（可能部分退款/历史数据），禁止手改库 |
 | `ORDER_REFUNDED_WITHOUT_REFUND_ROW` | 账实不符：订单已退款但无退款记录 | 按 §五「退款缺失」排查树 B 型处理 |
@@ -36,7 +36,7 @@
 ## 三、STUCK_REFUNDING 处置（超龄退款中）
 
 1. **先看自动收敛是否开启**：生产 env `REFUND_AUTO_CONVERGE_ENABLED=true` 时，定时任务每 10 分钟对 pending 退款向渠道查证收敛（查证成功补完成、明确失败回滚、查无此单同号重发）。已开启 → 等一个周期后复查对账，多数 STUCK 自愈。
-2. 未开启或未自愈：Admin 对该订单**再次发起同一退款**（同号幂等，等价手动收敛）：
+2. 未开启或未自愈：由运维持 admin 凭证对该订单**再次调用退款 API**（同号幂等，等价手动收敛）：
    - 返回成功 → 已收敛为 `refunded`，复查对账清零；
    - 返回 `REFUND_CHANNEL_FAILED` → 渠道明确拒绝，订单已回 `paid`；查明拒绝原因（审计 `refund.channel_error` 有渠道原始错误）后可同号重试；
    - 仍 pending → 渠道仍受理中或查证网络异常，记录后下一巡检周期复查；连续 24h 不收敛升级处理。
@@ -52,11 +52,11 @@
 
 ## 五、退款缺失排查树（用户称「没收到退款」）
 
-先在 Admin 订单页查该单状态与 Refund 记录，按三型分流：
+先查该单状态与 Refund 记录（Admin 订单页当前只展示订单级 `refundedAt/refundReason`，Refund 明细与 `channelRefundNo` 需查询数据库只读副本或由开发协助查询），按三型分流：
 
 - **A 型：本地有 Refund 且 `success`** → 渠道已确认退回。让用户核对原支付账户（微信零钱/银行卡到账有延迟）；仍未到账则用 `channelRefundNo` 在商户平台查退款单，向渠道客服追进度。
 - **B 型：订单 `refunded` 但无 Refund 记录**（对账 `ORDER_REFUNDED_WITHOUT_REFUND_ROW`）→ 账实不符，多为绕过系统的手工操作造成。在商户平台按订单号查是否真实出款：已出款→补记事件说明留档；未出款→该单状态失真，升级处理，禁止再次直接改状态。
-- **C 型：本地 Refund 停 `pending`，商户平台查无此退款单** → 原请求可能从未到达渠道。Admin 同号再次发起退款（系统会查证 unknown 后**同号重发**），成功后复查对账。
+- **C 型：本地 Refund 停 `pending`，商户平台查无此退款单** → 原请求可能从未到达渠道。同号再次调用退款 API（系统会查证 unknown 后**同号重发**），成功后复查对账。
 - 收到「未知退款单」告警（`REFUND_NOTIFY_UNKNOWN_REFUND`）：系统已拒绝且不改任何本地单；若频繁出现，核对是否有人在商户平台手工退款（回归 B 型）。
 
 ## 六、FREE_MODE → 付费模式切换前置检查（决策：首台试运营用 FREE_MODE）
@@ -64,11 +64,11 @@
 切换到 live 付费模式前，逐项确认：
 
 1. `docs/operations/print-rollout-deployment-matrix.md` 付费模式门禁全项通过（`PAYMENT_PROVIDER` 真实通道、`PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`、正式价目）。
-2. `REFUND_AUTO_CONVERGE_ENABLED=true` 已在生产 env 显式开启并见 PM2 日志有收敛任务心跳。
+2. `REFUND_AUTO_CONVERGE_ENABLED=true` 已在生产 env 显式开启（注意：收敛任务**仅在扫到 pending 退款时输出日志**，空闲期无日志属正常，不能以"无日志"判定未生效；可用一笔受控 pending 单验证）。
 3. 本 SOP 已指派到具体值守人；对账巡检从「每日」起步。
-4. 1 分钱 live 冒烟：支付 → Admin 退款 → 退款回调 → 对账无差异（2026-07-08 已有首例通过记录，换环境/换凭证后须重做）。
+4. 1 分钱 live 冒烟：支付 → 退款 → 退款回调 → 对账无差异，并在 `docs/progress/` 留正式验收记录；换环境/换凭证后须重做。
 5. 商户平台退款权限、可用余额、回调 URL（https 公网 `PAYMENT_NOTIFY_BASE_URL`）复核；密钥按 `docs/device/secret-rotation-runbook.md` 管理。
 
 ## 七、留档要求
 
-每次异常处置在工单/运营记录中登记：orderId、refundNo、现象（差异码/用户反馈）、处置动作、结果、操作人。系统侧审计（`refund.created/retried/blocked/channel_error/channel_ambiguous/notify_amount_mismatch`）已自动留痕，人工记录用于对外口径与复盘。
+每次异常处置在工单/运营记录中登记：orderId、refundNo、现象（差异码/用户反馈）、处置动作、结果、操作人。系统侧审计（`refund.created/processing/retried/blocked/channel_error/channel_ambiguous/notify_amount_mismatch`）已自动留痕，人工记录用于对外口径与复盘。
