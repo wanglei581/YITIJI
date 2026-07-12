@@ -17,6 +17,13 @@ import {
   type RedeemForOrderResult,
 } from './benefit-redemption.types'
 
+type OrderRedemptionOutcome = {
+  record: { id: string; amountCents: number; kind: string }
+  order: NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
+  grant: { quantityRemaining: number; status: string } | null
+  idempotent: boolean
+}
+
 // ============================================================
 // 权益核销服务（P1「我的页权益核销」，核销 SSOT）。
 //
@@ -31,7 +38,8 @@ import {
 //   → ⑤create RedemptionRecord（唯一键并发保护）。
 //   并发下丢失方 create 命中 P2002 → 整个事务回滚（扣减撤销）→ 外层按幂等回放返回赢家记录。
 //
-// 合规红线：券=平台 credit，非资金、非收款；本批 orderId 恒 null、amountCents 恒 0，不碰 Order/支付；
+// 合规红线：券=平台 credit，非资金、非收款；简历等服务点位 orderId 恒 null、amountCents 恒 0；
+//   订单核销仅可在同一事务内将 Order 置为 paid(voucher)，不能把权益账本和支付状态拆开。
 //   subsidy_eligibility_hint（不在 REDEEMABLE 白名单）一律拒核销；endUserId 只用已认证本人，杜绝越权。
 // ============================================================
 
@@ -77,67 +85,176 @@ export class BenefitRedemptionService {
    * C5-4 订单核销：券/免费次数/权益**全额抵扣一个未支付订单**，联动免费单。
    *
    * 复用同一核销账本（RedemptionRecord，serviceType='order_redeem' / serviceRefId=orderId）
-   * 与同一幂等/一产物一核销/CAS/审计机制（**不重建第二套账本**）；随后 markPaidByRedemption
-   * 将订单置 paid(voucher)（幂等）。全额抵扣（本波不接部分抵扣）。
+   * 与同一幂等/一产物一核销/CAS/审计机制（**不重建第二套账本**）；订单置 paid(voucher)、
+   * 权益扣减与账本记录必须在同一个事务内提交。全额抵扣（本波不接部分抵扣）。
    *
    * 幂等：同订单同权益重复调用 → RedemptionRecord 回放 + markPaidByRedemption 幂等，不二次扣。
    * 一单一核销：`@@unique([serviceType,serviceRefId])` 保证同一订单只被核销一次（换权益也拒）。
    */
   async redeemForOrder(params: RedeemForOrderParams): Promise<RedeemForOrderResult> {
     const { endUserId, orderId, benefitGrantId } = params
+    const idempotencyKey = createHash('sha256')
+      .update(`${benefitGrantId}:order_redeem:${orderId}`)
+      .digest('hex')
 
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
-    if (!order) throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: '订单不存在' } })
-    // 归属：只允许本人订单核销（endUserId 来自已认证会员）。
-    if (order.endUserId && order.endUserId !== endUserId) {
-      throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: '订单不存在或不属于本人' } })
-    }
+    let outcome: OrderRedemptionOutcome
 
-    // 幂等 / 一单一核销前置：该订单是否已被核销（@@unique([serviceType,serviceRefId])）。
-    //   核销成功后订单即 paid(voucher)，故重复调用必先落这里，不会被下方 unpaid 门误拒。
-    const existing = await this.prisma.redemptionRecord.findFirst({ where: { serviceType: 'order_redeem', serviceRefId: orderId } })
-    if (existing) {
-      // 同权益 + 本人 → 幂等回放（订单已 paid(voucher)）。
-      if (existing.endUserId === endUserId && existing.benefitRef === benefitGrantId) {
-        return { orderId, redemptionRecordId: existing.id, payStatus: order.payStatus, discountCents: existing.amountCents, idempotent: true }
+    try {
+      outcome = await this.prisma.$transaction(async (tx) => {
+        const order = await tx.order.findUnique({ where: { id: orderId } })
+        if (!order || order.endUserId !== endUserId) {
+          throw new NotFoundException({ error: { code: 'ORDER_NOT_FOUND', message: '订单不存在或不属于本人' } })
+        }
+
+        // 同订单核销记录优先于支付状态：同一权益 + 本人可安全回放；不同权益一律拒绝。
+        const existing = await tx.redemptionRecord.findFirst({
+          where: { serviceType: 'order_redeem', serviceRefId: orderId },
+        })
+        if (existing) {
+          if (existing.endUserId === endUserId && existing.benefitRef === benefitGrantId) {
+            return { record: existing, order, grant: null, idempotent: true }
+          }
+          throw new ConflictException({
+            error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该订单已用其他权益核销，不能重复核销' },
+          })
+        }
+
+        // 只对未支付付费单首次核销；paying/paid/closed/refunded 均不能在支付通道旁路扣权益。
+        if (order.payStatus !== 'unpaid') {
+          throw new BadRequestException({ error: { code: 'ORDER_NOT_REDEEMABLE', message: '订单当前不可核销抵扣' } })
+        }
+        if (order.amountCents <= 0) {
+          throw new BadRequestException({ error: { code: 'REDEEM_NOT_REQUIRED', message: '免费单无需核销' } })
+        }
+
+        const grant = await tx.benefitGrant.findUnique({ where: { id: benefitGrantId } })
+        if (!grant || grant.endUserId !== endUserId) {
+          throw new NotFoundException({ error: { code: 'BENEFIT_GRANT_NOT_FOUND', message: '权益不存在或不属于本人' } })
+        }
+        if (!(REDEEMABLE_BENEFIT_TYPES as readonly string[]).includes(grant.benefitType)) {
+          throw new BadRequestException({ error: { code: 'BENEFIT_NOT_REDEEMABLE', message: '该权益类型不支持核销' } })
+        }
+        if (grant.status !== 'active') {
+          throw new ConflictException({ error: { code: 'BENEFIT_NOT_ACTIVE', message: '权益当前不可用' } })
+        }
+        const now = new Date()
+        if (grant.validFrom && grant.validFrom.getTime() > now.getTime()) {
+          throw new ConflictException({ error: { code: 'BENEFIT_NOT_STARTED', message: '权益未到生效时间' } })
+        }
+        if (grant.validUntil && grant.validUntil.getTime() < now.getTime()) {
+          throw new ConflictException({ error: { code: 'BENEFIT_EXPIRED', message: '权益已过期' } })
+        }
+        if (grant.quantityRemaining === null) {
+          throw new BadRequestException({ error: { code: 'BENEFIT_NOT_QUANTIFIED', message: '该权益无可核销额度' } })
+        }
+
+        // 先获取订单唯一结算锁；后续任何 grant / 账本写入都在同一事务内，失败会完整回滚。
+        const settledOrder = await this.orderStatus.settleRedemptionInTransaction(tx, orderId, {
+          discountCents: order.amountCents,
+          benefitRef: benefitGrantId,
+          operatorId: endUserId,
+        })
+        const updated = await tx.benefitGrant.updateMany({
+          where: { id: benefitGrantId, status: 'active', quantityRemaining: { gt: 0 } },
+          data: { quantityRemaining: { decrement: 1 } },
+        })
+        if (updated.count !== 1) {
+          throw new ConflictException({ error: { code: 'BENEFIT_USED_UP', message: '权益次数已用完' } })
+        }
+
+        const after = await tx.benefitGrant.findUnique({ where: { id: benefitGrantId } })
+        const remaining = after?.quantityRemaining ?? 0
+        let status = after?.status ?? 'active'
+        if (remaining <= 0) {
+          status = (await tx.benefitGrant.update({
+            where: { id: benefitGrantId },
+            data: { status: 'used_up' },
+          })).status
+        }
+        const record = await tx.redemptionRecord.create({
+          data: {
+            endUserId,
+            orderId,
+            kind: grant.benefitType,
+            benefitRef: benefitGrantId,
+            serviceType: 'order_redeem',
+            serviceRefId: orderId,
+            quantity: 1,
+            amountCents: order.amountCents,
+            idempotencyKey,
+          },
+        })
+
+        return { record, order: settledOrder, grant: { quantityRemaining: remaining, status }, idempotent: false }
+      })
+    } catch (error) {
+      // 并发输家：仅当同一订单、同一权益、同一归属的已提交记录存在时才回放；
+      // 不能把他人订单或另一张权益的核销结果当作成功返回。
+      const replay = await this.replayOrderRedemptionIfPresent(params)
+      if (replay) return replay
+      if (isUniqueError(error)) {
+        throw new ConflictException({
+          error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该订单已用其他权益核销，不能重复核销' },
+        })
       }
-      // 不同权益（或非本人）核销同一订单 → 一单一核销拒绝，绝不二次消费。
-      throw new ConflictException({ error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该订单已用其他权益核销，不能重复核销' } })
+      throw error
     }
 
-    // 只对未支付付费单首次核销；已支付（线上/线下/免费）/退款态不核销。
-    if (order.payStatus !== 'unpaid') {
-      throw new BadRequestException({ error: { code: 'ORDER_NOT_REDEEMABLE', message: '订单当前不可核销抵扣' } })
+    if (!outcome.idempotent) {
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'end_user',
+        action: 'benefit.redeem',
+        targetType: 'BenefitGrant',
+        targetId: benefitGrantId,
+        payload: {
+          endUserId,
+          redemptionRecordId: outcome.record.id,
+          serviceType: 'order_redeem',
+          serviceRefId: orderId,
+          kind: outcome.record.kind,
+          orderId,
+          amountCents: outcome.record.amountCents,
+          quantityRemaining: outcome.grant?.quantityRemaining ?? null,
+          status: outcome.grant?.status ?? 'active',
+        },
+      })
+      await this.orderStatus.writeRedemptionSettlementAudit(orderId, outcome.order, {
+        discountCents: outcome.record.amountCents,
+        benefitRef: benefitGrantId,
+        operatorId: endUserId,
+      })
     }
-    if (order.amountCents <= 0) {
-      throw new BadRequestException({ error: { code: 'REDEEM_NOT_REQUIRED', message: '免费单无需核销' } })
-    }
-
-    const discountCents = order.amountCents // 全额核销（本波不接部分抵扣）
-
-    // ① 核销账本（order-linked）：serviceType='order_redeem' / serviceRefId=orderId → 一单一核销。
-    const redeem = await this.redeem({
-      endUserId,
-      benefitGrantId,
-      serviceType: 'order_redeem',
-      serviceRefId: orderId,
-      orderId,
-      amountCents: discountCents,
-    })
-
-    // ② 免费单联动：全额核销 → Order 置 paid(voucher) + pickupCode + 审计（幂等，可安全重试收敛）。
-    const paidOrder = await this.orderStatus.markPaidByRedemption(orderId, {
-      discountCents,
-      benefitRef: benefitGrantId,
-      operatorId: endUserId,
-    })
 
     return {
       orderId,
-      redemptionRecordId: redeem.redemptionRecordId,
-      payStatus: paidOrder.payStatus,
-      discountCents,
-      idempotent: redeem.idempotent,
+      redemptionRecordId: outcome.record.id,
+      payStatus: outcome.order.payStatus,
+      discountCents: outcome.record.amountCents,
+      idempotent: outcome.idempotent,
+    }
+  }
+
+  /** 订单核销的并发回放；先校验订单归属，避免从核销账本泄漏他人结果。 */
+  private async replayOrderRedemptionIfPresent(params: RedeemForOrderParams): Promise<RedeemForOrderResult | null> {
+    const { endUserId, orderId, benefitGrantId } = params
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order || order.endUserId !== endUserId) return null
+    const record = await this.prisma.redemptionRecord.findFirst({
+      where: { serviceType: 'order_redeem', serviceRefId: orderId },
+    })
+    if (!record) return null
+    if (record.endUserId !== endUserId || record.benefitRef !== benefitGrantId) {
+      throw new ConflictException({
+        error: { code: 'BENEFIT_OUTPUT_ALREADY_REDEEMED', message: '该订单已用其他权益核销，不能重复核销' },
+      })
+    }
+    return {
+      orderId,
+      redemptionRecordId: record.id,
+      payStatus: order.payStatus,
+      discountCents: record.amountCents,
+      idempotent: true,
     }
   }
 

@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   const grantIds: string[] = []
   let seq = 0
 
-  async function makeOrder(amountCents: number, owner = endUserId): Promise<string> {
+  async function makeOrder(amountCents: number, owner: string | null = endUserId): Promise<string> {
     seq += 1
     const o = await prisma.order.create({
       data: { orderNo: `ORD-REDEEM-${suffix}-${seq}`, type: 'print', amountCents, payStatus: amountCents === 0 ? 'unpaid' : 'unpaid', taskStatus: 'pending', endUserId: owner },
@@ -132,11 +132,74 @@ async function main(): Promise<void> {
     const g4c = await makeGrant(1)
     await expectCode('4c. 非本人订单核销 → ORDER_NOT_FOUND', 'ORDER_NOT_FOUND',
       () => redemption.redeemForOrder({ endUserId, orderId: oOther, benefitGrantId: g4c }))
+    // 匿名订单没有可证明的本人归属，会员权益不得借订单 ID 结算它。
+    const oAnonymous = await makeOrder(60, null)
+    const g4d = await makeGrant(1)
+    await expectCode('4d. 匿名订单核销 → ORDER_NOT_FOUND', 'ORDER_NOT_FOUND',
+      () => redemption.redeemForOrder({ endUserId, orderId: oAnonymous, benefitGrantId: g4d }))
 
     // ── (5) voucher 入账防御纵深：markPaid 拒 voucher ──────────────────────
     const oGuard = await makeOrder(50)
     await expectCode('5. markPaid 拒 voucher（voucher 只经 markPaidByRedemption 写入）', 'PAYMENT_SOURCE_INVALID',
       () => orderStatus.markPaid(oGuard, { paymentSource: 'voucher' as unknown as 'offline' }))
+
+    // ── (6) 并发结算：核销提交后不得再被普通线下入账拆开 ────────────────────
+    const oSettlementRace = await makeOrder(100)
+    const gSettlementRace = await makeGrant(1)
+    let resumeBenefitAudit: (() => void) | undefined
+    let enteredBenefitAudit: (() => void) | undefined
+    const benefitAuditEntered = new Promise<void>((resolve) => { enteredBenefitAudit = resolve })
+    const resumeGate = new Promise<void>((resolve) => { resumeBenefitAudit = resolve })
+    const originalAuditWrite = audit.write.bind(audit)
+    audit.write = async (args) => {
+      if (args.action === 'benefit.redeem') {
+        enteredBenefitAudit?.()
+        await resumeGate
+      }
+      return originalAuditWrite(args)
+    }
+
+    const concurrentRedemption = redemption.redeemForOrder({
+      endUserId,
+      orderId: oSettlementRace,
+      benefitGrantId: gSettlementRace,
+    })
+    try {
+      await benefitAuditEntered
+      let offlineError: unknown
+      try {
+        await orderStatus.markPaid(oSettlementRace, { paymentSource: 'offline', operatorId: 'verify' })
+      } catch (error) {
+        offlineError = error
+      }
+      resumeBenefitAudit?.()
+
+      let redemptionError: unknown
+      try {
+        await concurrentRedemption
+      } catch (error) {
+        redemptionError = error
+      }
+
+      const racedOrder = await prisma.order.findUnique({ where: { id: oSettlementRace } })
+      const racedRecordCount = await prisma.redemptionRecord.count({ where: { orderId: oSettlementRace } })
+      const racedGrant = await prisma.benefitGrant.findUnique({ where: { id: gSettlementRace } })
+      const consistent = racedOrder?.paymentSource === 'voucher' && racedRecordCount === 1 && racedGrant?.quantityRemaining === 0
+      if (consistent && offlineError && errCode(offlineError).includes('ORDER_ALREADY_PAID') && !redemptionError) {
+        pass('6. 核销先提交时线下结算明确冲突，订单、权益与核销账本保持同一结算来源')
+      } else {
+        throw new Error(
+          `并发结算不一致：paymentSource=${racedOrder?.paymentSource ?? 'null'}，` +
+          `records=${racedRecordCount}，quantityRemaining=${racedGrant?.quantityRemaining ?? 'null'}，` +
+          `offline=${offlineError ? errCode(offlineError) : 'resolved'}，` +
+          `redeem=${redemptionError ? errCode(redemptionError) : 'resolved'}`,
+        )
+      }
+    } finally {
+      resumeBenefitAudit?.()
+      audit.write = originalAuditWrite
+      await concurrentRedemption.catch(() => undefined)
+    }
 
     console.log(`\n  ✅ verify:redemption-audit 全部通过（${passed} checks）`)
   } finally {

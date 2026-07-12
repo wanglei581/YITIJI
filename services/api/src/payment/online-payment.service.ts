@@ -203,17 +203,29 @@ export class OnlinePaymentService {
       throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
     }
 
-    // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容；
-    // 渠道出码失败时行保持 created 并随 expiresAt 惰性过期，不留下可支付的半成品。
+    // 订单状态既是支付生命周期，也是本次出码的互斥锁。CAS 预留和 created 尝试必须同一事务提交：
+    // 不能暴露「已 paying、但还没有 Attempt」的窗口，否则第二请求的惰性过期可能错误释放预留。
+    // Provider 调用仍在事务外，绝不把外部 I/O 包进数据库事务。
+    if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
     const attemptExpiresAt = new Date(now + this.qrTtlSeconds * 1000)
-    const attempt = await this.prisma.paymentAttempt.create({
-      data: {
-        orderId: order.id,
-        channel: provider.channel,
-        amountCents: order.amountCents, // 金额快照自服务端订单，绝不信任前端
-        status: 'created',
-        expiresAt: attemptExpiresAt,
-      },
+    const attempt = await this.prisma.$transaction(async (tx) => {
+      const reserved = await tx.order.updateMany({
+        where: { id: order.id, payStatus: 'unpaid' },
+        data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
+      })
+      if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+
+      // 先建行（status=created，占位）再向渠道出码，最后回填 pending + 码内容；
+      // 本地建行失败时由事务回滚 CAS 预留；渠道出码失败仍保留 created 以便惰性过期收敛。
+      return tx.paymentAttempt.create({
+        data: {
+          orderId: order.id,
+          channel: provider.channel,
+          amountCents: order.amountCents, // 金额快照自服务端订单，绝不信任前端
+          status: 'created',
+          expiresAt: attemptExpiresAt,
+        },
+      })
     })
     const qr = await provider.createQrPayment({
       orderId: order.id,
@@ -226,11 +238,6 @@ export class OnlinePaymentService {
       data: { status: 'pending', prepayId: qr.prepayId, qrCodeContent: qr.qrCodeContent },
     })
 
-    // 订单进入 paying；首次出码时写入超时关单时间（已在 paying 则保持原 expiresAt）。
-    await this.prisma.order.updateMany({
-      where: { id: order.id, payStatus: 'unpaid' },
-      data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
-    })
     const freshOrder = await this.requireOrder(order.id)
 
     await this.audit.write({
@@ -282,18 +289,17 @@ export class OnlinePaymentService {
       // expired 也可能是渠道迟到入账，必须先查账，绝不在同一订单叠加另一笔付款码扣款。
       throw new BadRequestException(existing.status === 'expired' ? 'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED' : 'PAYMENT_ATTEMPT_PENDING')
     }
-    // 订单状态既是支付生命周期，也是本次付款码的互斥锁。先 CAS 抢占 unpaid → paying，
-    // 两个请求即使都在上面的 findFirst 看见空结果，也只能有一个继续创建可扣款尝试。
+    // 订单 CAS 预留和 created 尝试同一事务提交，避免暴露无 Attempt 的 paying 窗口；
+    // 外部付款码渠道调用严格在事务外，不能拉长数据库锁。
     if (order.payStatus === 'paying') throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
-    const reserved = await this.prisma.order.updateMany({
-      where: { id: order.id, payStatus: 'unpaid' },
-      data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
-    })
-    if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
+    const attempt = await this.prisma.$transaction(async (tx) => {
+      const reserved = await tx.order.updateMany({
+        where: { id: order.id, payStatus: 'unpaid' },
+        data: { payStatus: 'paying', expiresAt: order.expiresAt ?? new Date(now + this.orderTtlSeconds * 1000) },
+      })
+      if (reserved.count !== 1) throw new BadRequestException('PAYMENT_ATTEMPT_PENDING')
 
-    let attempt: AttemptRecord
-    try {
-      attempt = await this.prisma.paymentAttempt.create({
+      return tx.paymentAttempt.create({
         data: {
           orderId: order.id,
           channel: provider.channel,
@@ -302,11 +308,7 @@ export class OnlinePaymentService {
           expiresAt: new Date(now + this.qrTtlSeconds * 1000),
         },
       })
-    } catch (error) {
-      // 本地建尝试失败时尚未调用渠道，可以安全释放本次 CAS 占位。
-      await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
-      throw error
-    }
+    })
     const freshOrder = await this.requireOrder(order.id)
     await this.audit.write({
       actorId: null,
@@ -683,7 +685,7 @@ export class OnlinePaymentService {
    * 惰性过期（不引入后台任务）：
    * 1) 过期的 created/pending 尝试 → expired；
    * 2) 订单超时（expiresAt 已过且仍 unpaid/paying）→ closed；
-   * 3) paying 但已无未过期 pending 尝试 → 回 unpaid（可重新出码）。
+   * 3) paying 但已无未过期 created/pending 尝试 → 回 unpaid（可重新出码）。
    */
   private async applyLazyExpiry(order: OrderRecord): Promise<OrderRecord> {
     const now = new Date()
@@ -702,7 +704,7 @@ export class OnlinePaymentService {
 
     if (order.payStatus === 'paying') {
       const alive = await this.prisma.paymentAttempt.count({
-        where: { orderId: order.id, status: 'pending', expiresAt: { gt: now } },
+        where: { orderId: order.id, status: { in: ['created', 'pending'] }, expiresAt: { gt: now } },
       })
       if (alive === 0) {
         await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
