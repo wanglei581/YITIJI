@@ -1,5 +1,6 @@
 /**
 <<<<<<< HEAD
+<<<<<<< HEAD
  * verify:wechat-refund-regression — 微信退款回调 × 对账异常口径回归门禁
  *
  * 背景：`verify:wechat-refund-notify` 已覆盖验签/解密/幂等/状态机（rawBody 完整性用「篡改
@@ -35,29 +36,29 @@ import { resolvePaymentProviders } from '../src/payment/payment-provider.factory
 import { ReconciliationService } from '../src/payment/reconciliation.service'
 =======
  * C5-6 后续回归门禁（verify:wechat-refund-regression）——微信退款端到端串联回归。
+=======
+ * C5-6 后续回归门禁（verify:wechat-refund-regression）——微信退款端到端组合回归。
+>>>>>>> 5f9fc980 (fix(payment): C5-6 回归门禁按复审收缩为方案 B + 隔离加固 + SOP 校准)
  *
- * 定位（反堆砌口径）：单点断言归属既有五脚本（refund-idempotent / refund-real-channels /
- * wechat-refund-notify / refund-convergence / reconciliation），本脚本**不重复单点**，
- * 只锁定跨脚本的端到端组合链路——即 C5-6 验收语言的四场景在真实运营时序下的串联：
+ * 定位（反堆砌口径，Codex 复审后收缩为方案 B）：单点断言归属既有五脚本
+ * （refund-idempotent / refund-real-channels / wechat-refund-notify / refund-convergence /
+ * reconciliation），本脚本只对**跨脚本组合链路**计 PASS；链路中间步骤（其单点语义已被
+ * 既有脚本覆盖）只做静默守卫（断链即失败，不计 check、不重复报告）。
  *
- * R1 STUCK_REFUNDING 全生命周期（cron 收敛入口）：
- *    渠道 5xx（结果不可知）→ pending+refunding → 新鲜 refunding 不误报 STUCK →
- *    超龄后对账检出 STUCK_REFUNDING → convergeStalePendingRefunds()（定时任务同一入口）
- *    查证 SUCCESS 补完成 → refunded → 对账复核 STUCK 清零、无差异残留。
- * R2 渠道明确失败 → 对账不残留 → 同号重试成功：
- *    4xx 明确拒绝 → failed+回滚 paid → 对账不把回滚单误报 STUCK/差异 →
- *    同号重试 SUCCESS → refunded → 对账无差异。
- * R3 重复/乱序退款通知 × 收敛互不重复出款：
- *    PROCESSING 造 pending → 退款通知 SUCCESS 完成（viaRefundNotify）→
- *    同 payload 重复通知幂等 → 迟到 CLOSED 通知不回退（STATE_CONFLICT）→
- *    再跑 convergeStalePendingRefunds() 零渠道请求、不二次出款。
- * R4 退款缺失三型排查链（SOP 排查树的机器口径）：
- *    4a 通知未知 out_refund_no → 拒绝且不误改任何本地单；
- *    4b 账实不符（refunded 无 Refund 行）→ 对账检出 ORDER_REFUNDED_WITHOUT_REFUND_ROW；
- *    4c 渠道查无此单（原请求未到达）→ 手动重复 refund() 同号重发 → refunded。
+ * 计数的 6 项组合断言：
+ * R1a 新鲜 refunding 单不被对账误报 STUCK（负向组合：三分法「结果不可知」×对账阈值）；
+ * R1c 超龄 STUCK 单经 convergeStalePendingRefunds()（cron 同一入口）查证补完成，且本轮
+ *     恰扫描 1 条（隔离前置已保证无外部 pending）；
+ * R1d 收敛后对账复核：STUCK 清零、本单零差异残留；
+ * R2b 渠道明确失败回滚 paid 后，即使超龄视角对账也零残留（failed ≠ stuck）；
+ * R2c 同号重试成功 → refunded 且对账零差异；
+ * R3d 退款通知完成后，批量收敛零扫描、零渠道请求、不重复入账（通知/查证两条完成路径互斥）。
  *
- * 手段与 verify:refund-real-channels 相同：本地 RSA 密钥 + 假网关，Provider 走生产同源
- * 签名/验签/解密代码路径；无真实商户凭证、无真实资金。
+ * 边界声明：假网关按 out_refund_no 路由响应、不校验出站请求签名——本门禁锁定的是
+ * 状态机×对账×收敛的组合正确性；出站签名正确性不在本门禁范围（与既有渠道类 verify 同口径）。
+ * 共享库隔离：任何批量收敛调用前先探测非本脚本的 pending 真实渠道退款，存在即安全失败，
+ * 绝不对外部残留应用本脚本的网关响应。
+ *
  * 运行：pnpm --filter @ai-job-print/api verify:wechat-refund-regression
  */
 process.env['TERMINAL_ADMIN_SECRET'] ||= 'verify-wxrr-terminal-admin-secret-0123456789'
@@ -120,19 +121,30 @@ import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 
 let passCount = 0
+class VerifyFailure extends Error {}
 function pass(message: string): void {
   passCount += 1
   console.log(`  PASS ${message}`)
 }
+/** 抛异常而非 process.exit：保证 finally/cleanup 必然执行（共享库不留残留）。 */
 function fail(message: string): never {
+<<<<<<< HEAD
   console.error(`  FAIL ${message}`)
 >>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
   process.exit(1)
+=======
+  throw new VerifyFailure(`  FAIL ${message}`)
+>>>>>>> 5f9fc980 (fix(payment): C5-6 回归门禁按复审收缩为方案 B + 隔离加固 + SOP 校准)
 }
-async function expectCode(label: string, code: string, fn: () => Promise<unknown>): Promise<void> {
+/** 链路中间静默守卫：断链即失败，但不计 check、不输出 PASS（单点语义归属既有脚本）。 */
+function guard(cond: boolean, message: string): void {
+  if (!cond) fail(`[链路守卫] ${message}`)
+}
+async function expectCodeGuard(code: string, label: string, fn: () => Promise<unknown>): Promise<void> {
   try {
     await fn()
   } catch (e) {
+<<<<<<< HEAD
 <<<<<<< HEAD
     const m = (e as Error)?.message ?? String(e)
     if (m.includes(code)) return pass(label)
@@ -162,11 +174,14 @@ function buildRefundNotify(payload: Record<string, unknown>): { rawBody: Buffer;
   const rawBody = Buffer.from(
     JSON.stringify({ id: randomUUID(), event_type: 'REFUND.SUCCESS', resource_type: 'encrypt-resource', resource }),
 =======
+=======
+    if (e instanceof VerifyFailure) throw e
+>>>>>>> 5f9fc980 (fix(payment): C5-6 回归门禁按复审收缩为方案 B + 隔离加固 + SOP 校准)
     const msg = (e as Error)?.message ?? String(e)
-    if (msg.includes(code)) return pass(label)
-    fail(`${label} — expected error ${code}, got: ${msg}`)
+    guard(msg.includes(code), `${label} — expected ${code}, got: ${msg}`)
+    return
   }
-  fail(`${label} — expected error ${code}, but resolved`)
+  fail(`[链路守卫] ${label} — expected error ${code}, but resolved`)
 }
 
 // ── 渠道侧密钥（仅本脚本内存）────────────────────────────────────────────────
@@ -185,11 +200,13 @@ const WX_MCHID = '1900000001'
 const WX_APPID = 'wx0000000000000001'
 const WX_SERIAL = 'PUB_KEY_ID_WXRR_VERIFY_0001'
 
-// ── 假网关（渠道侧账本，可按场景切换响应）────────────────────────────────────
-let refundCreateResponse: { httpStatus?: number; body?: Record<string, unknown> } = {}
-let refundQueryResponse: { httpStatus?: number; body?: Record<string, unknown> } = { body: { status: 'PROCESSING' } }
+// ── 假网关：按 out_refund_no 路由响应；未知退款号一律 PROCESSING（绝不改变外部状态）──
+type GatewayResponse = { httpStatus?: number; body?: Record<string, unknown> }
+const refundCreateByNo = new Map<string, GatewayResponse>()
+const refundQueryByNo = new Map<string, GatewayResponse>()
 let lastRefundCreate: Record<string, unknown> | null = null
 let gatewayRequestCount = 0
+const SAFE_DEFAULT: GatewayResponse = { body: { status: 'PROCESSING' } }
 
 async function readBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
@@ -203,31 +220,30 @@ function startFakeGateway(): Promise<{ server: Server; port: number }> {
       gatewayRequestCount += 1
       const url = req.url ?? ''
       const body = await readBody(req)
+      const respond = (r: GatewayResponse, notFoundCode = 'PARAM_ERROR'): void => {
+        if (r.httpStatus && r.httpStatus >= 400) {
+          res.writeHead(r.httpStatus, { 'content-type': 'application/json' })
+          const code = r.httpStatus >= 500 ? 'SYSTEM_ERROR' : r.httpStatus === 404 ? 'RESOURCE_NOT_EXISTS' : notFoundCode
+          res.end(JSON.stringify({ code, message: 'wxrr simulated' }))
+          return
+        }
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(r.body ?? {}))
+      }
       if (req.method === 'POST' && url === '/v3/pay/transactions/native') {
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ code_url: `weixin://wxpay/bizpayurl?pr=wxrr_${randomBytes(4).toString('hex')}` }))
         return
       }
       if (req.method === 'POST' && url === '/v3/refund/domestic/refunds') {
-        lastRefundCreate = JSON.parse(body) as Record<string, unknown>
-        if (refundCreateResponse.httpStatus && refundCreateResponse.httpStatus >= 400) {
-          res.writeHead(refundCreateResponse.httpStatus, { 'content-type': 'application/json' })
-          const code = refundCreateResponse.httpStatus >= 500 ? 'SYSTEM_ERROR' : 'PARAM_ERROR'
-          res.end(JSON.stringify({ code, message: 'wxrr simulated failure' }))
-          return
-        }
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(refundCreateResponse.body ?? {}))
+        const parsed = JSON.parse(body) as Record<string, unknown>
+        lastRefundCreate = parsed
+        respond(refundCreateByNo.get(String(parsed['out_refund_no'])) ?? SAFE_DEFAULT)
         return
       }
       if (req.method === 'GET' && url.startsWith('/v3/refund/domestic/refunds/')) {
-        if (refundQueryResponse.httpStatus && refundQueryResponse.httpStatus >= 400) {
-          res.writeHead(refundQueryResponse.httpStatus, { 'content-type': 'application/json' })
-          res.end(JSON.stringify({ code: 'RESOURCE_NOT_EXISTS', message: 'not found' }))
-          return
-        }
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(refundQueryResponse.body ?? {}))
+        const no = decodeURIComponent(url.slice('/v3/refund/domestic/refunds/'.length).split('?')[0] ?? '')
+        respond(refundQueryByNo.get(no) ?? SAFE_DEFAULT)
         return
       }
       res.writeHead(404, { 'content-type': 'application/json' })
@@ -245,7 +261,7 @@ function startFakeGateway(): Promise<{ server: Server; port: number }> {
   })
 }
 
-// ── 支付/退款报文构造（渠道侧签名，与生产验签路径同源）──────────────────────
+// ── 报文构造（渠道侧签名，与生产验签/解密路径同源）──────────────────────────
 function signedNotify(rawJson: Record<string, unknown>, eventType: string): { rawBody: Buffer; headers: Record<string, string> } {
   const resource = encryptWechatCallbackResource(JSON.stringify(rawJson), APIV3_KEY)
   const rawBody = Buffer.from(
@@ -296,9 +312,13 @@ async function main(): Promise<void> {
 const STUCK_AGE_MS = 31 * 60 * 1000 // 对账 STUCK_REFUNDING 阈值 30min，取 31min 视角
 
 async function main(): Promise<void> {
-  console.log('\n=== C5-6 wechat refund regression（端到端串联回归）===')
+  console.log('\n=== C5-6 wechat refund regression（端到端组合回归）===')
 
   const { server, port } = await startFakeGateway()
+  const closeGateway = () =>
+    new Promise<void>((resolve) => {
+      server.close(() => resolve())
+    })
   const wechatProvider = new WechatPayProvider({
     mchid: WX_MCHID,
     appid: WX_APPID,
@@ -402,9 +422,9 @@ async function main(): Promise<void> {
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_wxrr_${suffix}`
   const taskIds: string[] = []
+  const orderIds: string[] = []
   const fixtureFileIds: string[] = []
   const fixtureStorageKeys: string[] = []
-  const fabricatedOrderIds: string[] = []
 
   async function seedPdfFixture(label: string): Promise<string> {
     const fileId = `f_wxrr_${suffix}_${label}`
@@ -429,7 +449,7 @@ async function main(): Promise<void> {
   }
 
   /** 建打印单并经真实回调路径打成 paid（channel=wechat）。 */
-  async function makePaidOrder(label: string): Promise<{ orderId: string; orderNo: string; refundNo: string; taskId: string; attemptId: string; amountCents: number }> {
+  async function makePaidOrder(label: string): Promise<{ orderId: string; orderNo: string; refundNo: string; attemptId: string; amountCents: number }> {
     const printed = await printJobs.create(
       { fileUrl: await seedPdfFixture(label), fileMd5: `sha256-wxrr-${label}`, fileName: `${label}.pdf`, params: PRINT_PARAMS },
       { endUserId: null, terminalId },
@@ -437,6 +457,7 @@ async function main(): Promise<void> {
     taskIds.push(printed.taskId)
     const order = await prisma.order.findUnique({ where: { printTaskId: printed.taskId } })
     if (!order || !printed.paymentSessionToken) fail(`makePaidOrder(${label}) setup failed`)
+    orderIds.push(order.id)
     const attempt = await payment.createPayAttempt(order.id, printed.paymentSessionToken, 'wechat')
     const cb = buildPayCallback({
       mchid: WX_MCHID,
@@ -449,8 +470,8 @@ async function main(): Promise<void> {
     })
     await payment.processCallback('wechat', cb.rawBody, cb.headers)
     const paid = await prisma.order.findUnique({ where: { id: order.id } })
-    if (paid?.payStatus !== 'paid') fail(`makePaidOrder(${label}): not paid`)
-    return { orderId: order.id, orderNo: order.orderNo, refundNo: `RFD-${order.orderNo}`, taskId: printed.taskId, attemptId: attempt.attemptId, amountCents: order.amountCents }
+    guard(paid?.payStatus === 'paid', `makePaidOrder(${label}): not paid`)
+    return { orderId: order.id, orderNo: order.orderNo, refundNo: `RFD-${order.orderNo}`, attemptId: attempt.attemptId, amountCents: order.amountCents }
   }
 
   const orderState = async (orderId: string) => {
@@ -465,24 +486,44 @@ async function main(): Promise<void> {
     const rep = await reconciliation.report({ nowMs })
     return rep.discrepancies.some((d) => d.code === 'STUCK_REFUNDING' && d.orderId === orderId)
   }
-  const anyDiscrepancy = async (orderId: string, nowMs: number) => {
+  const discrepancyCodes = async (orderId: string, nowMs: number) => {
     const rep = await reconciliation.report({ nowMs })
     return rep.discrepancies.filter((d) => d.orderId === orderId).map((d) => d.code)
   }
+  /**
+   * 共享库隔离前置：convergeStalePendingRefunds 是无范围条件的全表批处理入口
+   * （cron 生产语义即如此）。调用前必须确认库内不存在**非本脚本**的真实渠道 pending
+   * 退款；存在即安全失败——绝不让本脚本的假网关响应作用于外部残留。
+   */
+  const assertNoForeignPending = async (where: string): Promise<void> => {
+    const foreign = await prisma.refund.findMany({
+      where: { status: 'pending', channel: { in: ['wechat', 'alipay'] }, orderId: { notIn: orderIds } },
+      select: { refundNo: true },
+      take: 5,
+    })
+    guard(
+      foreign.length === 0,
+      `${where}: 共享库存在非本脚本的 pending 真实渠道退款（${foreign.map((f) => f.refundNo).join('、')}）。为避免批量收敛误处理外部数据，本脚本安全终止；请先清理残留（多为上游 verify 异常中断）。`,
+    )
+  }
 
   const cleanup = async (): Promise<void> => {
-    await prisma.refund.deleteMany({ where: { order: { is: { terminalId } } } })
-    await prisma.paymentAttempt.deleteMany({ where: { order: { is: { terminalId } } } })
-    await prisma.order.deleteMany({ where: { terminalId } })
-    await prisma.order.deleteMany({ where: { id: { in: fabricatedOrderIds } } })
-    await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
-    await prisma.terminal.deleteMany({ where: { id: terminalId } })
-    await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
+    await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } }).catch(() => undefined)
+    await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => undefined)
+    await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } }).catch(() => undefined)
+    await prisma.order.deleteMany({ where: { id: { in: orderIds } } }).catch(() => undefined)
+    await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } }).catch(() => undefined)
+    await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } }).catch(() => undefined)
     for (const key of fixtureStorageKeys) {
       await storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     }
+<<<<<<< HEAD
     server.close()
 >>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
+=======
+    await closeGateway().catch(() => undefined)
+>>>>>>> 5f9fc980 (fix(payment): C5-6 回归门禁按复审收缩为方案 B + 隔离加固 + SOP 校准)
   }
 
   try {
@@ -563,119 +604,102 @@ async function main(): Promise<void> {
 =======
       data: { id: terminalId, terminalCode: `KSK-WXRR-${suffix}`, agentToken: `agt_wxrr_${suffix}`, deviceFingerprint: 'verify-wxrr' },
     })
-    await seedDevDefaultPriceConfig(prisma)
-    pass('test fixtures created')
+    await seedDevDefaultPriceConfig(prisma) // 支付域 verify 既有共用前置：幂等写入开发默认价目
+    console.log('  · fixtures ready（不计 check）')
 
     // ══ R1 STUCK_REFUNDING 全生命周期（产生 → 检出 → cron 收敛 → 复核清零）══
     const R1 = await makePaidOrder('r1')
-    refundCreateResponse = { httpStatus: 500 }
+    refundCreateByNo.set(R1.refundNo, { httpStatus: 500 })
     const r1View = await refundService.refund(R1.orderId, { reason: '用户申请退款', operatorId: 'verify-admin' })
-    if (r1View.refund.status !== 'pending' || (await orderState(R1.orderId)).payStatus !== 'refunding') {
-      fail('R1 setup: 5xx 未形成 pending+refunding')
-    }
+    guard(r1View.refund.status === 'pending' && (await orderState(R1.orderId)).payStatus === 'refunding', 'R1 setup: 5xx 未形成 pending+refunding')
     if (!(await stuckHit(R1.orderId, Date.now()))) {
-      pass('R1a. 新鲜 refunding 单不被对账误报 STUCK_REFUNDING（30 分钟阈值内）')
+      pass('R1a. 新鲜 refunding 单不被对账误报 STUCK_REFUNDING（三分法「结果不可知」×30 分钟阈值组合）')
     } else {
       fail('R1a. fresh refunding misreported as STUCK')
     }
-    if (await stuckHit(R1.orderId, Date.now() + STUCK_AGE_MS)) {
-      pass('R1b. 超龄后对账检出 STUCK_REFUNDING（命中本单 orderId）')
-    } else {
-      fail('R1b. aged refunding not detected as STUCK')
-    }
+    guard(await stuckHit(R1.orderId, Date.now() + STUCK_AGE_MS), 'R1 链路: 超龄未被对账检出 STUCK（单点归属 verify:reconciliation）')
     const r1RefundId = `wxrfd_r1_${randomBytes(6).toString('hex')}`
-    refundQueryResponse = { body: { status: 'SUCCESS', refund_id: r1RefundId } }
-    refundCreateResponse = {}
+    refundQueryByNo.set(R1.refundNo, { body: { status: 'SUCCESS', refund_id: r1RefundId } })
+    await assertNoForeignPending('R1c 收敛前')
     const r1Stats = await refundService.convergeStalePendingRefunds({ limit: 100 })
     const r1Refund = await refundRow(R1.refundNo)
     if (
-      r1Stats.refunded >= 1 &&
+      r1Stats.scanned === 1 &&
+      r1Stats.refunded === 1 &&
       r1Refund?.status === 'success' &&
       r1Refund.channelRefundNo === r1RefundId &&
       (await orderState(R1.orderId)).payStatus === 'refunded' &&
       (await auditCount('refund.created', R1.orderId)) === 1
     ) {
-      pass('R1c. convergeStalePendingRefunds（cron 同一入口）查证 SUCCESS 补完成 → refunded + refund.created 恰 1 条')
+      pass('R1c. convergeStalePendingRefunds（cron 同一入口，scanned 恰 1）查证 SUCCESS 补完成 → refunded + refund.created 恰 1 条')
     } else {
       fail(`R1c. cron convergence failed: ${JSON.stringify({ r1Stats, status: r1Refund?.status })}`)
     }
-    if (!(await stuckHit(R1.orderId, Date.now() + STUCK_AGE_MS)) && (await anyDiscrepancy(R1.orderId, Date.now())).length === 0) {
+    if (!(await stuckHit(R1.orderId, Date.now() + STUCK_AGE_MS)) && (await discrepancyCodes(R1.orderId, Date.now())).length === 0) {
       pass('R1d. 收敛后对账复核：STUCK 清零且本单无任何差异残留')
     } else {
       fail('R1d. post-convergence reconciliation still dirty')
     }
-    refundQueryResponse = { body: { status: 'PROCESSING' } }
 
-    // ══ R2 渠道明确失败 → 对账不残留 → 同号重试成功 ══════════════════════
+    // ══ R2 渠道明确失败 → 对账不残留 → 同号重试后仍零差异 ═══════════════════
     const R2 = await makePaidOrder('r2')
-    refundCreateResponse = { httpStatus: 400 }
-    await expectCode('R2a. 渠道 4xx 明确拒绝 → REFUND_CHANNEL_FAILED', 'REFUND_CHANNEL_FAILED', () =>
+    refundCreateByNo.set(R2.refundNo, { httpStatus: 400 })
+    await expectCodeGuard('REFUND_CHANNEL_FAILED', 'R2 setup: 渠道 4xx 明确拒绝（单点归属 verify:refund-real-channels）', () =>
       refundService.refund(R2.orderId, { reason: '用户申请退款' }),
     )
-    const r2Codes = await anyDiscrepancy(R2.orderId, Date.now() + STUCK_AGE_MS)
+    const r2Codes = await discrepancyCodes(R2.orderId, Date.now() + STUCK_AGE_MS)
     if ((await orderState(R2.orderId)).payStatus === 'paid' && r2Codes.length === 0) {
-      pass('R2b. 明确失败回滚 paid 后：即使超龄视角，对账也无 STUCK/差异残留（failed ≠ stuck）')
+      pass('R2b. 明确失败回滚 paid 后：即使超龄视角，对账零 STUCK/差异残留（failed ≠ stuck）')
     } else {
       fail(`R2b. rollback left reconciliation residue: ${JSON.stringify(r2Codes)}`)
     }
     const r2RefundId = `wxrfd_r2_${randomBytes(6).toString('hex')}`
-    refundCreateResponse = { body: { status: 'SUCCESS', refund_id: r2RefundId } }
+    refundCreateByNo.set(R2.refundNo, { body: { status: 'SUCCESS', refund_id: r2RefundId } })
     const r2Retry = await refundService.refund(R2.orderId, { reason: '重试退款', operatorId: 'verify-admin' })
     if (
       r2Retry.refund.status === 'success' &&
       lastRefundCreate?.['out_refund_no'] === R2.refundNo &&
       (await orderState(R2.orderId)).payStatus === 'refunded' &&
-      (await anyDiscrepancy(R2.orderId, Date.now())).length === 0
+      (await discrepancyCodes(R2.orderId, Date.now())).length === 0
     ) {
-      pass('R2c. 同号重试成功 → refunded，对账无差异（同 out_refund_no 渠道幂等）')
+      pass('R2c. 同号重试成功 → refunded 且对账零差异（同 out_refund_no 渠道幂等 × 对账口径组合）')
     } else {
       fail('R2c. retry-after-failure chain broken')
     }
 
-    // ══ R3 重复/乱序退款通知 × cron 收敛互不重复出款 ══════════════════════
+    // ══ R3 退款通知完成 × 批量收敛互斥（不重复出款）═════════════════════════
     const R3 = await makePaidOrder('r3')
     const r3RefundId = `wxrfd_r3_${randomBytes(6).toString('hex')}`
-    refundCreateResponse = { body: { status: 'PROCESSING', refund_id: r3RefundId } }
+    refundCreateByNo.set(R3.refundNo, { body: { status: 'PROCESSING', refund_id: r3RefundId } })
     await refundService.refund(R3.orderId, { reason: '用户申请退款' })
-    if ((await refundRow(R3.refundNo))?.status !== 'pending') fail('R3 setup: PROCESSING 未形成 pending')
-    const r3NotifyPayload = {
+    guard((await refundRow(R3.refundNo))?.status === 'pending', 'R3 setup: PROCESSING 未形成 pending')
+    const r3Notify = buildRefundNotify({
       mchid: WX_MCHID,
       out_trade_no: R3.attemptId,
       out_refund_no: R3.refundNo,
       refund_id: r3RefundId,
       refund_status: 'SUCCESS',
       amount: { refund: R3.amountCents, total: R3.amountCents },
-    }
-    const r3Notify = buildRefundNotify(r3NotifyPayload)
+    })
     await refundService.processWechatRefundNotify(r3Notify.rawBody, r3Notify.headers)
-    if (
-      (await refundRow(R3.refundNo))?.status === 'success' &&
-      (await orderState(R3.orderId)).payStatus === 'refunded' &&
-      (await auditCount('refund.created', R3.orderId)) === 1
-    ) {
-      pass('R3a. pending 单由渠道退款通知完成（viaRefundNotify 路径）→ refunded')
-    } else {
-      fail('R3a. refund notify did not complete pending refund')
-    }
-    const r3Dup = buildRefundNotify(r3NotifyPayload) // 同 payload 新 nonce（渠道重发场景）
-    const r3DupResult = await refundService.processWechatRefundNotify(r3Dup.rawBody, r3Dup.headers)
-    if (r3DupResult.idempotent === true && (await auditCount('refund.created', R3.orderId)) === 1) {
-      pass('R3b. 渠道重发同一 SUCCESS 通知：幂等，不重复入账/审计')
-    } else {
-      fail('R3b. duplicate notify not idempotent')
-    }
-    const r3Closed = buildRefundNotify({ ...r3NotifyPayload, refund_status: 'CLOSED' })
-    await expectCode('R3c. 迟到 CLOSED 通知不回退已 SUCCESS 单 → REFUND_NOTIFY_STATE_CONFLICT', 'REFUND_NOTIFY_STATE_CONFLICT', () =>
-      refundService.processWechatRefundNotify(r3Closed.rawBody, r3Closed.headers),
+    guard(
+      (await refundRow(R3.refundNo))?.status === 'success' && (await orderState(R3.orderId)).payStatus === 'refunded',
+      'R3 链路: 退款通知未完成 pending 单（单点归属 verify:wechat-refund-notify）',
     )
+    await assertNoForeignPending('R3d 收敛前')
     const r3GatewayBefore = gatewayRequestCount
     const r3Stats = await refundService.convergeStalePendingRefunds({ limit: 100 })
-    if (gatewayRequestCount === r3GatewayBefore && r3Stats.refunded === 0 && (await auditCount('refund.created', R3.orderId)) === 1) {
-      pass('R3d. 通知完成后 cron 收敛零渠道请求、不二次出款（通知/查证两条完成路径互斥幂等）')
+    if (
+      r3Stats.scanned === 0 &&
+      gatewayRequestCount === r3GatewayBefore &&
+      (await auditCount('refund.created', R3.orderId)) === 1
+    ) {
+      pass('R3d. 通知完成后批量收敛零扫描、零渠道请求、不重复入账（通知/查证两条完成路径互斥幂等）')
     } else {
       fail(`R3d. convergence after notify not inert: ${JSON.stringify(r3Stats)}`)
     }
 
+<<<<<<< HEAD
     // ══ R4 退款缺失三型排查链 ═════════════════════════════════════════════
     // 4a 通知未知 out_refund_no：拒绝且不误改任何本地单
     const r4aNotify = buildRefundNotify({
@@ -740,6 +764,9 @@ async function main(): Promise<void> {
 
     console.log(`\n✅ ALL PASS（${passCount} checks）— C5-6 微信退款端到端回归通过\n`)
 >>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
+=======
+    console.log(`\n✅ ALL PASS（${passCount} 项组合断言 + 链路静默守卫）— C5-6 微信退款端到端组合回归通过\n`)
+>>>>>>> 5f9fc980 (fix(payment): C5-6 回归门禁按复审收缩为方案 B + 隔离加固 + SOP 校准)
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
@@ -748,9 +775,13 @@ async function main(): Promise<void> {
 
 main().catch((e) => {
 <<<<<<< HEAD
+<<<<<<< HEAD
   console.error(e)
 =======
   console.error('  FAIL uncaught:', e)
 >>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
+=======
+  console.error(e instanceof VerifyFailure ? e.message : `  FAIL uncaught: ${String(e)}`)
+>>>>>>> 5f9fc980 (fix(payment): C5-6 回归门禁按复审收缩为方案 B + 隔离加固 + SOP 校准)
   process.exit(1)
 })
