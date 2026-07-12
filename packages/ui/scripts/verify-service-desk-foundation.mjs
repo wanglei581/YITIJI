@@ -165,7 +165,7 @@ includesAll(publicIndex, [
 
 const css = await read('src/styles/service-desk.css')
 assert.equal(
-  /(^|[},]\s*)(?::root|html|body)(?:\s|[,{])/m.test(css),
+  /(^|[},])\s*(?::root|html|body)(?:\s|[,{])/m.test(css),
   false,
   'service-desk.css must not contain unscoped :root, html, or body selectors',
 )
@@ -214,18 +214,40 @@ includesAll(css, [
   '@media (prefers-reduced-motion: reduce)',
 ], 'service-desk.css')
 
-const hookSelectors = [
-  ['.ui-kiosk-shell', "[data-visual-theme='service-desk'].ui-kiosk-shell"],
-  ['.ui-kiosk-nav', "[data-visual-theme='service-desk'] .ui-kiosk-nav"],
-  ['.ui-admin-sidebar', "[data-visual-theme='service-desk'] .ui-admin-sidebar"],
-  ['.ui-admin-topbar', "[data-visual-theme='service-desk'] .ui-admin-topbar"],
-  ['.ui-admin-content', "[data-visual-theme='service-desk'] .ui-admin-content"],
+const hookContracts = [
+  {
+    legacySelector: '.ui-kiosk-shell',
+    scopedSelector: "[data-visual-theme='service-desk'].ui-kiosk-shell",
+    variables: ['--ui-kiosk-shell-background'],
+  },
+  {
+    legacySelector: '.ui-kiosk-nav',
+    scopedSelector: "[data-visual-theme='service-desk'] .ui-kiosk-nav",
+    variables: ['--ui-kiosk-nav-background', '--ui-kiosk-nav-border'],
+  },
+  {
+    legacySelector: '.ui-admin-sidebar',
+    scopedSelector: "[data-visual-theme='service-desk'] .ui-admin-sidebar",
+    variables: ['--ui-admin-sidebar-background', '--ui-admin-sidebar-foreground'],
+  },
+  {
+    legacySelector: '.ui-admin-topbar',
+    scopedSelector: "[data-visual-theme='service-desk'] .ui-admin-topbar",
+    variables: ['--ui-admin-topbar-background', '--ui-admin-topbar-border'],
+  },
+  {
+    legacySelector: '.ui-admin-content',
+    scopedSelector: "[data-visual-theme='service-desk'] .ui-admin-content",
+    variables: ['--ui-admin-content-background', '--ui-admin-content-gap'],
+  },
 ]
-for (const [legacySelector, scopedSelector] of hookSelectors) {
+for (const { legacySelector, scopedSelector, variables } of hookContracts) {
   const legacyDeclarations = parseDeclarations(extractCssRule(css, legacySelector), legacySelector)
   const scopedDeclarations = parseDeclarations(extractCssRule(css, scopedSelector), scopedSelector)
-  assert.ok(legacyDeclarations.size > 0, `${legacySelector} must define legacy variables`)
-  assert.ok(scopedDeclarations.size > 0, `${scopedSelector} must override service-desk variables`)
+  for (const variable of variables) {
+    assert.ok(legacyDeclarations.has(variable), `${legacySelector} must define ${variable}`)
+    assert.ok(scopedDeclarations.has(variable), `${scopedSelector} must override ${variable}`)
+  }
 }
 
 for (const app of ['kiosk', 'admin', 'partner']) {
