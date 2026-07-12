@@ -45,6 +45,7 @@
 - [ ] LLM/DeepSeek 或其他模型 API Key 已使用生产专用 Key。
 - [ ] 短信签名/模板审核通过后再启用真实短信。
 - [ ] 所有密钥只写入服务器环境变量/配置中心，不写入前端、不写入仓库、不写入日志。
+- [ ] 生产/预生产环境的 seed 内部账号默认口令（`admin` / `partner1` / `partner2`，明文写在 `services/api/prisma/seed.ts`）已全部轮换为强密码或直接禁用账号；公网可达的后台登录页不得挂任何仓库内可见的默认口令（2026-07-12 发现预生产按 runbook 跑过 seed 后此风险真实存在，已列为 P0 待处置：轮换命令已备好，待用户亲手执行后本项才可勾选）。
 
 ### 2.3 合规前置
 
@@ -476,6 +477,13 @@ typecheck（6 包）/ lint（4 端，0 error）/ build（5 包）全绿；verify
 - Gate 4（账号 / API 级）PASSED WITH NOTES：受控 MEMBER_A / MEMBER_B / 临时 Admin 经真实 HTTP API + PostgreSQL + Redis + COS 完成会员登录、原始文件上传、默认 90 天、设置 180 天、原始件长期保存拒绝、签名 URL、跨账号 403、删除三态、过期清理、Admin 生命周期汇总；真实 AI 导出产物自动标记 `assetCategory=optimized` + `sourceFileId` 已补 COS/DB 脱敏证据。临时将 `SMS_PROVIDER=log` 执行后已回滚 `tencent`。
 - 临时 HTTPS：30 天自签 + hosts 映射（`kiosk/admin/partner.preprod.local`）可返回 HTTP/2 200 与 `db=postgres` health。
 - Gate 4（浏览器会员路径）PARTIAL PASSED WITH NOTES：2026-06-26 使用真实短信登录路径补齐会员页、合成 PDF 上传窗口和 `/me/documents` 会员文件与保存期限截图；证据保存到仓库外 `/Users/wanglei/gate4-evidence/gate4-browser-20260625231841`，坏的全屏截图 / Playwright 中间文件已删除，预生产中可见的 `gate4-synthetic-resume.pdf` 测试记录已清理。该项只覆盖会员浏览器路径，不等于完整 Gate 4、正式生产或试运营完成。
+
+### 2026-07-12 增补：候选刷新至 material-check 落地版 + Gate 3 复跑通过
+
+- 预生产已刷新部署 `fba6b414`（AI 文件体检真实化 + 上传魔数校验 + U盘导入 + 支付 W-C 全链落地提交，`DEPLOY_SOURCE.txt` 2026-07-12T07:22:51Z）；三端公网 health 均 `db=postgres`。
+- Gate 3 在预生产 PG + 隔离 COS 桶上复跑 9/9 通过（`production-runtime-gates` / `production-db-guard` / `file-retention` / `file-lifecycle-summary` / `member-assets-c2d` / `audit-logs` / `resume-generate` + 新增门禁 `materials-processing` / `cos:files` 57 项含魔数正反断言）；日志 `/srv/gate3-rerun-fba6b414-20260712164355.log`，抽查无密钥/token 泄漏。
+- 指定法务/留存文案防回退检查通过：`verify:legal-retention-copy` ALL PASS（覆盖范围为该脚本指定的法务/合规文案文件及固定防回退条件，非全仓文案审查）；另 16 禁词 × 5 源码目录精筛零真实违规。法务送审必须使用含「第三方 OCR / AI 服务」诚实披露口径的当前 main 文本，不得使用旧「不转发第三方」文案。
+- 新增 P0 发现：seed 默认口令风险（见 §2.2 新增项），处置方式为服务器侧轮换脚本由用户亲手执行，密码不经聊天/仓库。
 
 ### 仍待完成（正式生产 P0 阻塞，正文 §八 复选框不勾）
 
