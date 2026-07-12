@@ -90,6 +90,21 @@ assert.equal(
   'package.json must export ./styles/*',
 )
 
+const ciWorkflow = await read('.github/workflows/ci.yml', repoRoot)
+assert.ok(
+  ciWorkflow.includes("tracked=$(git ls-files .ccg/tasks | grep -Ev '^\\.ccg/tasks/archive/' || true)"),
+  'CI guard must reject active .ccg/tasks state while allowing the required archive records',
+)
+includesAll(ciWorkflow, [
+  'name: LightFlow UI static contracts',
+  'otherTracked=$(git ls-files .ccg/commander .product-pm .workbuddy .superpowers .worktrees opc-doc)',
+  "tracked=\"$tracked${tracked:+$'\\n'}$otherTracked\"",
+  'pnpm --filter @ai-job-print/ui verify:service-desk-foundation',
+  'pnpm --filter @ai-job-print/kiosk verify:home-service-desk',
+  'pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui',
+  'pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui',
+], 'CI workflow')
+
 const visualTheme = await read('src/theme/visualTheme.ts')
 assert.deepEqual(
   extractStringLiteralUnion(visualTheme, 'VisualTheme'),

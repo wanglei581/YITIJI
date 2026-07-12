@@ -1,0 +1,35 @@
+{
+  "id": "lightflow-ci-verify-integration-20260712",
+  "title": "将青序 LightFlow 第一批静态 verify 接入 CI",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "ci",
+  "currentPhase": "completed",
+  "nextAction": "归档任务；等待用户视觉验收与后续 UI-2 单独授权",
+  "createdAt": "2026-07-12T13:31:00Z",
+  "branch": "codex/qingxu-lightflow-ui01-first-batch-20260712",
+  "scope": {
+    "allowed": [
+      ".github/workflows/ci.yml",
+      "packages/ui/scripts/verify-service-desk-foundation.mjs",
+      "docs/progress/current-progress.md",
+      "docs/progress/next-tasks.md",
+      ".ccg/tasks/lightflow-ci-verify-integration-20260712/**"
+    ],
+    "forbidden": [
+      "apps/**/src/**",
+      "services/**",
+      "packages/shared/**",
+      "apps/terminal-agent/**",
+      "ProfilePage and /me/*"
+    ]
+  },
+  "verification": [
+    "RED: pnpm --filter @ai-job-print/ui verify:service-desk-foundation",
+    "GREEN: pnpm --filter @ai-job-print/ui verify:service-desk-foundation",
+    "all four LightFlow verify package scripts",
+    "CI YAML parse",
+    "git diff --check"
+  ]
+}
