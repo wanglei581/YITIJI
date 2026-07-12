@@ -1,11 +1,14 @@
 // ============================================================
-// TerminalCapabilitiesService — 打印扫描首期能力开关（Task 10 Step 3）
+// TerminalCapabilitiesService — 打印扫描首期能力开关（Task 10 Step 3 + Task 11 模式）
 //
 // 语义（对齐 packages/shared/types/printScanCapability.ts）：
 //   - 每终端 × 能力键至多一行配置；未配置行 = 管理员未接管，Kiosk 按各自
 //     保守默认处理（configured=false 明确下发，不伪装成已配置）。
-//   - fail-closed：只有 status='available' 允许普通用户创建正式任务；
-//     该判断由共享 canCreateFormalPrintScanTask 承担，本服务只管配置存取。
+//   - 管理员配置过的能力：只有 status='available' 允许普通用户创建正式任务
+//     （共享 canCreateFormalPrintScanTask 承担该判断）。
+//   - 未配置行的门禁语义由 PRINT_SCAN_CAPABILITY_MODE 决定（managed=放行既有
+//     闭环 / strict=fail-closed 拒绝），进程内解析一次并缓存，与生产启动门禁
+//     （config/production-runtime-gates.ts）共用同一 env、不允许运行期漂移。
 //   - 管理员写入的审计由 controller 负责（复用 AuditService 惯例）。
 // ============================================================
 
@@ -27,6 +30,25 @@ export interface UpsertCapabilityResult {
 }
 
 const MAX_NOTE_LENGTH = 200
+
+export type PrintScanCapabilityMode = 'managed' | 'strict'
+
+// 进程内解析一次并缓存：门禁语义在启动门禁校验通过后不允许随 process.env
+// 运行期变化而漂移；非法/缺省取值归 managed（生产缺省已被启动门禁拒绝）。
+let cachedCapabilityMode: PrintScanCapabilityMode | null = null
+
+export function resolvePrintScanCapabilityMode(): PrintScanCapabilityMode {
+  if (cachedCapabilityMode === null) {
+    cachedCapabilityMode =
+      process.env['PRINT_SCAN_CAPABILITY_MODE']?.trim().toLowerCase() === 'strict' ? 'strict' : 'managed'
+  }
+  return cachedCapabilityMode
+}
+
+/** 仅供 verify 脚本在用例之间切换/还原模式；传 null 恢复按 env 重新解析。 */
+export function setPrintScanCapabilityModeForTest(mode: PrintScanCapabilityMode | null): void {
+  cachedCapabilityMode = mode
+}
 
 @Injectable()
 export class TerminalCapabilitiesService {
@@ -121,17 +143,13 @@ export class TerminalCapabilitiesService {
    *       strict = 未配置行 fail-closed 拒绝（全部能力必须显式验收后配置）。
    * 直达路由、绕过 Kiosk 的 API 调用同样被本门禁拦截。
    */
-  async assertUserTaskAllowed(
-    terminalId: string,
-    capabilityKey: PrintScanCapabilityKey,
-    mode: string | undefined = process.env['PRINT_SCAN_CAPABILITY_MODE'],
-  ): Promise<void> {
+  async assertUserTaskAllowed(terminalId: string, capabilityKey: PrintScanCapabilityKey): Promise<void> {
     const row = await this.prisma.terminalCapability.findUnique({
       where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
       select: { status: true, note: true },
     })
     if (!row) {
-      if (mode?.trim().toLowerCase() === 'strict') {
+      if (resolvePrintScanCapabilityMode() === 'strict') {
         throw new ForbiddenException({
           error: {
             code: 'CAPABILITY_NOT_CONFIGURED',

@@ -116,7 +116,7 @@ Gate 3 Field Print Safety Base: Not Passed Yet
 
 ```text
 Gate 4 Privacy And Recovery: Not Passed Yet
-阻塞项：尚未执行高敏文件 TTL 删除、卡住任务释放、断网 / 断电恢复和 Admin 运维可见性现场验收。
+阻塞项：尚未执行高敏文件 TTL 删除、卡住任务释放、断网 / 断电恢复、Admin 运维可见性和 Admin 审计抽样（PS-G4-05）现场验收。
 ```
 
 ## 停止条件

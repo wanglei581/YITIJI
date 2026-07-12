@@ -14,7 +14,7 @@
 import 'dotenv/config'
 import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
-import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { TerminalCapabilitiesService, setPrintScanCapabilityModeForTest } from '../src/terminals/terminal-capabilities.service'
 import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import { signFileUrl } from '../src/files/signing'
@@ -44,6 +44,27 @@ async function expectHttpError(fn: () => Promise<unknown>, status: number, label
     fail(`${label} — 期望 HTTP ${status}，实际 ${String(got ?? e)}`)
   }
   fail(`${label} — 期望抛出 HTTP ${status}，实际未抛错`)
+}
+
+/** 精确断言 HTTP 状态 + 业务错误码（防止任意同状态错误蒙混过关）。 */
+async function expectHttpErrorCode(
+  fn: () => Promise<unknown>,
+  status: number,
+  code: string,
+  label: string,
+): Promise<void> {
+  try {
+    await fn()
+  } catch (e) {
+    const got = (e as { getStatus?: () => number }).getStatus?.()
+    const body = (e as { getResponse?: () => unknown }).getResponse?.() as
+      | { error?: { code?: string } }
+      | undefined
+    const gotCode = body?.error?.code
+    if (got === status && gotCode === code) { pass(label); return }
+    fail(`${label} — 期望 HTTP ${status}+${code}，实际 ${String(got)}+${String(gotCode)}`)
+  }
+  fail(`${label} — 期望抛出 HTTP ${status}（${code}），实际未抛错`)
 }
 
 async function main() {
@@ -273,14 +294,18 @@ async function main() {
     pass('并发 retry CAS：两个并发请求恰好一个成功')
 
     // ── 4. 服务端能力门禁（C-1 + Task 11 模式语义）──────────────────────────
+    // 显式钉住模式再断言：不读运行机器的 .env（在合法配置为 strict 的机器上
+    // 跑本脚本不得误报），用例间用测试专用开关切换，结束后还原。
+    setPrintScanCapabilityModeForTest('managed')
     await capabilities.assertUserTaskAllowed(terminalId, 'document_print')
-    pass('未配置能力 + 默认(managed)模式 → 门禁放行（保持既有闭环不断服）')
-    await capabilities.assertUserTaskAllowed(terminalId, 'document_print', 'managed')
-    pass('未配置能力 + 显式 managed → 门禁放行')
-    await expectHttpError(
-      () => capabilities.assertUserTaskAllowed(terminalId, 'document_print', 'strict'),
-      403, '未配置能力 + strict 模式 → 门禁 fail-closed 403（CAPABILITY_NOT_CONFIGURED）',
+    pass('未配置能力 + managed 模式 → 门禁放行（保持既有闭环不断服）')
+    setPrintScanCapabilityModeForTest('strict')
+    await expectHttpErrorCode(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'document_print'),
+      403, 'CAPABILITY_NOT_CONFIGURED',
+      '未配置能力 + strict 模式 → 门禁 fail-closed 403（错误码精确断言）',
     )
+    setPrintScanCapabilityModeForTest('managed')
     await capabilities.upsert(terminalId, 'document_print', 'maintenance', '维护', 'admin_1')
     await expectHttpError(() => capabilities.assertUserTaskAllowed(terminalId, 'document_print'), 403, '配置为 maintenance → 门禁 403')
     await prisma.terminalCapability.update({
@@ -289,8 +314,11 @@ async function main() {
     })
     await expectHttpError(() => capabilities.assertUserTaskAllowed(terminalId, 'document_print'), 403, 'DB 脏状态 → 门禁 fail-closed 403')
     await capabilities.upsert(terminalId, 'document_print', 'available', undefined, 'admin_1')
+    setPrintScanCapabilityModeForTest('managed')
     await capabilities.assertUserTaskAllowed(terminalId, 'document_print')
-    await capabilities.assertUserTaskAllowed(terminalId, 'document_print', 'strict')
+    setPrintScanCapabilityModeForTest('strict')
+    await capabilities.assertUserTaskAllowed(terminalId, 'document_print')
+    setPrintScanCapabilityModeForTest('managed')
     pass('配置为 available → managed/strict 两种模式下门禁均放行')
 
     // 真实集成：ScanTasksService.create 在 scan 配为非 available 时拒绝
@@ -324,6 +352,7 @@ async function main() {
 
     console.log('\n✅ ALL PASS — Task 10 admin print-scan invariants hold')
   } finally {
+    setPrintScanCapabilityModeForTest(null)
     // 清理本脚本创建的数据（依赖 Terminal onDelete: Cascade 清 capability/scan/print）
     await prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdPrintTaskIds } } }).catch(() => undefined)
