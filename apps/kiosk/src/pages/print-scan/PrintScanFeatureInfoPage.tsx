@@ -1,8 +1,8 @@
 // ============================================================
 // PrintScanFeatureInfoPage — 打印扫描能力 MVP 说明页
-//   路由：/print-scan/feature/:key（key = id-photo | convert | sign）
+//   路由：/print-scan/feature/:key（key = id-photo | sign）
 //
-// 第一阶段这三项（证件照 / 格式转换 / 签名盖章）只做可点击的说明页，
+// 第一阶段这两项（证件照 / 签名盖章）只做可点击的说明页，
 // 介绍能力规划 + 当前可用替代路径 + 合规声明，不做完整实现。
 //
 // 合规：证件照=敏感文件清理提示；签名盖章=非 CA 电子签声明。
@@ -19,7 +19,7 @@ import {
   UserSquareIcon,
 } from 'lucide-react'
 
-type FeatureKey = 'id-photo' | 'convert' | 'sign'
+type FeatureKey = 'id-photo' | 'sign'
 
 interface FeatureInfo {
   icon: React.ComponentType<{ className?: string }>
@@ -51,20 +51,6 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
     fallbackLabel: '先用照片打印',
     fallbackTo: '/print/upload',
   },
-  convert: {
-    icon: FileType2Icon,
-    iconBg: 'bg-info-bg',
-    iconColor: 'text-info',
-    title: '格式转换',
-    summary: '即将支持常见文档与图片格式互转，方便打印前统一格式。',
-    plans: [
-      'Word / 图片 → PDF',
-      'PDF → 图片（逐页）',
-      '转换后直接进入打印流程',
-    ],
-    fallbackLabel: '先去文档打印',
-    fallbackTo: '/print/upload',
-  },
   sign: {
     icon: PenToolIcon,
     iconBg: 'bg-error-bg',
@@ -83,7 +69,7 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
 }
 
 function isFeatureKey(k: string | undefined): k is FeatureKey {
-  return k === 'id-photo' || k === 'convert' || k === 'sign'
+  return k === 'id-photo' || k === 'sign'
 }
 
 export function PrintScanFeatureInfoPage() {
