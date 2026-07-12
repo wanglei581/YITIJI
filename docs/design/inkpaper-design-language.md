@@ -1,10 +1,10 @@
 # 墨青纸感（Ink-Paper）统一设计语言
 
-> **状态：历史设计记录，已因 2026-07-11 用户方向决策退出未来视觉标准。** 用户已确认三端后续采用蓝白服务台视觉，详细口径见待全文审阅生效的 [蓝白服务台三端商用 UX 迁移设计规范](../superpowers/specs/2026-07-11-service-desk-commercial-ux-migration-design.md)。正文保留用于追溯；现有运行时代码在分批迁移前可维护，但不得继续以本文作为新页面、重设计或验收依据。
+> **状态：历史设计记录，已因 2026-07-11 用户方向决策退出未来视觉标准。** 用户已确认三端后续采用青序 LightFlow，详细口径见已生效的 [青序 LightFlow 三端商用 UX 迁移设计规范](../superpowers/specs/2026-07-11-service-desk-commercial-ux-migration-design.md)。正文保留用于追溯；现有运行时代码在分批迁移前可维护，但不得继续以本文作为新页面、重设计或验收依据。
 > 2026-07-02 定稿。适用范围：Kiosk 一体机前台（fusion-youth 系列）、管理员后台（apps/admin）、合作机构后台（apps/partner）。
 > 本文曾是三端 UI 铺开依据；按 CLAUDE.md §9，合规硬约束仍以 docs/compliance/ 为准。
 > 原型基准：`.workbuddy/prototypes/fusion-youth-preview-v5.html`（Kiosk）、`admin-console-inkpaper-v1.html`（管理员）、`partner-console-inkpaper-v1.html`（机构）。
-> 原型文件属于本地历史参考，不作为仓库交付物；未来正式落地以用户审阅生效后的蓝白服务台规范和后续明确批准的实施任务为准。
+> 原型文件属于本地历史参考，不作为仓库交付物；未来正式落地以青序 LightFlow 规范和后续明确批准的实施任务为准。
 
 ## 1. 设计立场（为什么是它）
 

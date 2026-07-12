@@ -1,10 +1,10 @@
-# Blue-White Service Desk UI-0/UI-1 First Batch Implementation Plan
+# 青序 LightFlow UI-0/UI-1 第一批实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` for inline execution. Do not use subagents unless the user explicitly authorizes delegation.
 
-**Goal:** 在不改变业务逻辑、路由、API、权限、认证、支付、打印和数据契约的前提下，建立蓝白服务台共享视觉基础，并完成 Kiosk 首页、Admin 工作台、Partner 岗位管理三个正式代表页的第一批迁移。
+**Goal:** 在不改变业务逻辑、路由、API、权限、认证、支付、打印和数据契约的前提下，建立青序 LightFlow 共享视觉基础，并完成 Kiosk 首页、Admin 工作台、Partner 岗位管理三个正式代表页的第一批迁移。
 
-**Architecture:** 新主题采用 `[data-visual-theme="service-desk"]` 作用域和 `touch / compact / comfortable` 三种密度。旧全局主题暂时保留给未迁移路由；只有本批三个代表页由路由壳层显式启用新主题。每个代表页单独提交、单独验证、可单独回滚，全部通过后才允许制定 UI-2 扩展计划。
+**Architecture:** 青序 LightFlow 在工程中继续采用 `[data-visual-theme="service-desk"]` 作用域和 `touch / compact / comfortable` 三种密度。旧全局主题暂时保留给未迁移路由；只有本批三个代表页由路由壳层显式启用新主题。每个代表页单独提交、单独验证、可单独回滚，全部通过后才允许制定 UI-2 扩展计划。
 
 **Tech Stack:** React 18、TypeScript、Vite 6、Tailwind CSS 4、`@ai-job-print/ui`、Node `.mjs` 静态 verify、真实 HTTP API 浏览器验收。
 
