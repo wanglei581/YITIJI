@@ -49,6 +49,20 @@ function metaLine(item: MemberAiRecordItem): string {
   return `${item.provider} · 任务 ${shortTaskId(item.taskId)} · ${formatTime(item.createdAt)}${expires}`
 }
 
+/**
+ * 已完成 job_fit 结果已承担同次 match 的可回看元数据，避免同一次分析出现两条成功记录。
+ * 失败/处理中及 recommend/explain 会话仍保留，不能被成功结果掩盖。
+ */
+function shouldDisplayJobAiSession(
+  session: JobAiSessionListItem,
+  completedJobFitTaskIds: Set<string>,
+): boolean {
+  return session.session.operation !== 'match'
+    || session.session.status !== 'completed'
+    || !session.session.resumeTaskId
+    || !completedJobFitTaskIds.has(session.session.resumeTaskId)
+}
+
 export function MyAiRecordsPage() {
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberAiRecordItem[]>([])
@@ -91,7 +105,12 @@ export function MyAiRecordsPage() {
       .then(([recordsPage, sessionsPage]) => {
         if (!mountedRef.current || loadSeqRef.current !== seq) return
         setItems(recordsPage.items)
-        setJobAiSessions(sessionsPage.items)
+        const completedJobFitTaskIds = new Set(
+          recordsPage.items
+            .filter((item) => item.kind === 'job_fit' && item.status === 'completed')
+            .map((item) => item.taskId),
+        )
+        setJobAiSessions(sessionsPage.items.filter((session) => shouldDisplayJobAiSession(session, completedJobFitTaskIds)))
         setState('ready')
       })
       .catch(() => {
@@ -122,17 +141,22 @@ export function MyAiRecordsPage() {
     return () => clearTimeout(t)
   }, [confirmJobAiSessionId])
 
-  const remove = async (recordId: string) => {
-    if (confirmId !== recordId) {
-      setConfirmId(recordId)
+  const remove = async (record: MemberAiRecordItem) => {
+    if (confirmId !== record.id) {
+      setConfirmId(record.id)
       return
     }
     const token = getToken()
     if (!token) return
-    setBusyId(recordId)
+    setBusyId(record.id)
     try {
-      const result = await deleteMyAiRecord(token, recordId)
-      setItems((prev) => prev.filter((item) => item.id !== recordId))
+      const result = await deleteMyAiRecord(token, record.id)
+      setItems((prev) => prev.filter((item) => item.id !== record.id))
+      if (record.kind === 'job_fit') {
+        setJobAiSessions((prev) => prev.filter((item) => !(
+          item.session.operation === 'match' && item.session.resumeTaskId === record.taskId
+        )))
+      }
       setConfirmId(null)
       setHint(result.deletedCount > 1 ? '记录及关联优化结果已删除' : '记录已删除')
     } catch {
@@ -239,7 +263,7 @@ export function MyAiRecordsPage() {
               <button
                 type="button"
                 disabled={busyId === item.id}
-                onClick={() => void remove(item.id)}
+                onClick={() => void remove(item)}
                 title={confirming ? '再次点击确认删除' : '删除'}
                 aria-label={confirming ? '再次点击确认删除 AI 服务记录' : '删除 AI 服务记录'}
                 className={[

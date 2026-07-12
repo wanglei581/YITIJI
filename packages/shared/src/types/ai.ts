@@ -388,6 +388,15 @@ export interface JobFitResponse {
   decisionSupport?: JobFitDecisionSupport
 }
 
+/** 岗位匹配决策报告打印文件；只允许内部 HMAC printFileUrl 进入既有打印确认链路。 */
+export interface JobFitPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  pageCount: number
+  printFileUrl: string
+}
+
 // ── 岗位信息 AI 推荐 / 解读（商用闭环 Task 2）───────────────────────────────
 // 合规：所有推荐和解读均为「仅供参考」，只服务求职者本人；不包含投递结果、
 // 企业候选人筛选、面试邀约、Offer 或任何招聘闭环状态。

@@ -6,6 +6,8 @@
 
 2026-07-12 预生产收口：已把 CI 全绿的 `fba6b414` 部署到 `/srv/ai-job-print`；切换前完成独立 staging 全仓生产构建、PostgreSQL 自定义格式备份并以 `pg_restore -l` 校验，执行唯一 additive migration `20260711150000_add_terminal_capability` 与 `db:pg:sync:check`，PM2 reload 后 health 返回 `db=postgres`，旧 release 保留在独立回滚目录。随后通过 `maintenance:dispose-legacy-pending-print-tasks` 受控关闭 3 条经只读复核的历史匿名未领取任务：`ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。三条均为 `cancelled` 并带 `LEGACY_PENDING_TASK_DISPOSED`；两条关联订单仅将 `taskStatus` 改为 `cancelled`，支付事实分别保持 `unpaid`、`closed`；每条恰有一条 `pending→cancelled` 状态日志和系统管理员审计，冻结筛选条件下剩余 pending 为 0。未直改表、未使用 `failed`、未触发出纸。
 
+2026-07-12 岗位大师 → 2D 岗位匹配 M1.5 整合（**本地候选，未 push / 未提 PR / 未部署**）：维持唯一 `/resume/job-fit` IA，不新增 `/jobs/master`、`job_master` 或第二套结果页 / 数据记录；将候选分支的决策台展示收敛为现有契约真实可支撑的摘要、匹配依据 / 可选关键词、差距行动和简历改写四块，面试预测、晋升路径和风险判断因无真实字段而不渲染。后端已由 `GovernedJobFitService` 复用会员 consent、匿名 parse 绑定授权、配额、会话和 `AiServiceLog`；`job_fit` 删除与隐私数据删除均覆盖关联 match 会话。结果页打印调用 `POST /resume/job-fit/:taskId/print`，只把内部 HMAC `printFileUrl` 交给既有 `/print/confirm`，不修改价格、订单、支付或 paid-before-claim；恢复结果只可「查看岗位」进入既有 `/jobs/:id`，不直接外跳。Kiosk M1.5 门禁、AI 产物打印 URL 门禁、shared / Kiosk typecheck、Kiosk lint（仅既存 Fast Refresh warning）和生产变量构建均通过；1080×1920 本地夹具浏览器结果态无页面脚本错误。仍待 CI 全量回归与可用的 Claude + Antigravity 双模型审查；不代表真实会员、LLM、预生产打印或 Windows 真机验收。
+
 ## 当前阶段
 
 项目进入“上线前收口 + 项目规范化治理 + 渐进式重构准备”阶段。当前不做全量重写，也不在旧结构里继续堆功能；采用现有仓库、干净 worktree、按业务闭环渐进迁移的方式推进。

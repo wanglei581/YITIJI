@@ -143,6 +143,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
+          pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui
           pnpm --filter @ai-job-print/kiosk verify:legal-retention-copy
           pnpm --filter @ai-job-print/kiosk verify:price-single-source
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
