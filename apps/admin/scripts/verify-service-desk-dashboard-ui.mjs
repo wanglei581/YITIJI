@@ -19,6 +19,14 @@ function count(source, token) {
   return source.split(token).length - 1
 }
 
+function compact(source) {
+  return source.replace(/\s+/g, ' ').trim()
+}
+
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+}
+
 console.log('\n=== Admin service-desk dashboard UI verification ===')
 
 check(
@@ -49,16 +57,41 @@ const realCalls = [
   'adminOpsService.listPrintTasks({ page: 1, pageSize: 5 })',
   'adminOpsService.listAlerts()',
 ]
+const promiseStart = loadBlock.indexOf('Promise.all([')
+const promiseEnd = loadBlock.indexOf('\n    ])', promiseStart)
+const promiseBlock =
+  promiseStart >= 0 && promiseEnd > promiseStart
+    ? loadBlock.slice(promiseStart, promiseEnd + '\n    ])'.length)
+    : ''
+const expectedPromiseBlock = `Promise.all([
+  ${realCalls.join(',\n  ')},
+])`
+const mappingStart = loadBlock.indexOf('setData({')
+const mappingEnd = loadBlock.indexOf('\n        })', mappingStart)
+const mappingBlock =
+  mappingStart >= 0 && mappingEnd > mappingStart
+    ? loadBlock.slice(mappingStart, mappingEnd + '\n        }'.length)
+    : ''
+const expectedMappingBlock = `setData({
+  terminals: terminalRes.terminals,
+  printers: printerRes.printers,
+  jobSources,
+  fairSources,
+  files,
+  aiUsage,
+  auditLogs: auditRes.items,
+  printTasks: printTaskPage.data,
+  printTaskTotal: printTaskPage.pagination.total,
+  alerts: alertsRes.data,
+}`
 
 check(
-  loadBlock.includes('Promise.all([') &&
+  compact(promiseBlock) === compact(expectedPromiseBlock) &&
     realCalls.every((call) => count(loadBlock, call) === 1) &&
     /\.then\(\(\[terminalRes, printerRes, jobSources, fairSources, files, aiUsage, auditRes, printTaskPage, alertsRes\]\) => \{/.test(
       loadBlock,
     ) &&
-    loadBlock.includes('printTasks: printTaskPage.data') &&
-    loadBlock.includes('printTaskTotal: printTaskPage.pagination.total') &&
-    loadBlock.includes('alerts: alertsRes.data'),
+    compact(mappingBlock) === compact(expectedMappingBlock),
   'dashboard preserves the nine real service calls and their response mapping',
 )
 
@@ -69,6 +102,18 @@ check(
     dashboard.includes('title="工作台数据加载失败"') &&
     dashboard.includes('onRetry={load}'),
   'dashboard preserves loading, failure, and retry recovery semantics',
+)
+
+check(
+  /useEffect\(\(\) => \{\s*load\(\)\s*\}, \[load\]\)/.test(dashboard) &&
+    count(dashboard, 'load()') === 1 &&
+    /<button\s+type="button"\s+onClick=\{load\}\s+disabled=\{loading\}[\s\S]*?<RefreshCwIcon[\s\S]*?刷新\s*<\/button>/.test(
+      dashboard,
+    ) &&
+    count(dashboard, 'onClick={load}') === 1 &&
+    /<ErrorState[\s\S]*?title="工作台数据加载失败"[\s\S]*?onRetry=\{load\}[\s\S]*?\/>/.test(dashboard) &&
+    count(dashboard, 'onRetry={load}') === 1,
+  'initial load, refresh action, and error retry all retain the load callback chain',
 )
 
 const requiredPrintStatuses = [
@@ -88,7 +133,7 @@ check(
   dashboard.includes('if (nums.length === 0) return null') &&
     dashboard.includes('{toner !== null && (') &&
     dashboard.includes('{paper !== null && (') &&
-    !/label:\s*['"](?:收入|营收|真实金额)/.test(dashboard),
+    !/\u6536入|营收|金额|GMV|[¥￥]|人民币/i.test(stripComments(dashboard)),
   'unknown metrics stay unknown and the dashboard adds no amount or revenue KPI',
 )
 
