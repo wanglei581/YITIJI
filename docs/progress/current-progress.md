@@ -6,6 +6,8 @@
 
 2026-07-12 预生产收口：已把 CI 全绿的 `fba6b414` 部署到 `/srv/ai-job-print`；切换前完成独立 staging 全仓生产构建、PostgreSQL 自定义格式备份并以 `pg_restore -l` 校验，执行唯一 additive migration `20260711150000_add_terminal_capability` 与 `db:pg:sync:check`，PM2 reload 后 health 返回 `db=postgres`，旧 release 保留在独立回滚目录。随后通过 `maintenance:dispose-legacy-pending-print-tasks` 受控关闭 3 条经只读复核的历史匿名未领取任务：`ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。三条均为 `cancelled` 并带 `LEGACY_PENDING_TASK_DISPOSED`；两条关联订单仅将 `taskStatus` 改为 `cancelled`，支付事实分别保持 `unpaid`、`closed`；每条恰有一条 `pending→cancelled` 状态日志和系统管理员审计，冻结筛选条件下剩余 pending 为 0。未直改表、未使用 `failed`、未触发出纸。
 
+2026-07-12 更正与预生产准入审计：AI / 求职产物内部 `printFileUrl` 契约已由 PR #177（`77ae2c1f`）squash 合入 main；原候选分支与该 PR 的最终树完全一致，不存在待集成运行时代码。当前预生产 release 为 `bddae4f7`，包含 `FairMaterialPrintBridge`，PostgreSQL `prisma migrate status` 确认全部 26 个 migration 已应用（包括 `20260711120000_add_fair_material_print_bridge`），并在服务器执行 `verify:ai-artifact-print-url-contract` 全部通过。尚无正式记录证明当前预生产已完成招聘会资料 bridge 的动态无出纸探针；该探针仍须用无个人信息夹具验证内部 URL 建单、外部 COS URL 拒绝、已撤销 bridge URL 返回 `PRINT_FILE_REVOKED`，且不触发真实出纸。
+
 ## 当前阶段
 
 项目进入“上线前收口 + 项目规范化治理 + 渐进式重构准备”阶段。当前不做全量重写，也不在旧结构里继续堆功能；采用现有仓库、干净 worktree、按业务闭环渐进迁移的方式推进。

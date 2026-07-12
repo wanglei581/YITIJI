@@ -31,7 +31,7 @@
 ## P0：上线前真实验收
 
 - [x] **历史 pending PrintTask 受控关闭（一次性运维）**：2026-07-12 已部署 `fba6b414`，完成 PostgreSQL 备份、additive migration、PM2/health 复核后，以系统管理员审计身份通过 `maintenance:dispose-legacy-pending-print-tasks` 处置 `ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。事前只读确认三条均为冻结时间前匿名未领取 `pending`，订单仅 `unpaid/closed`；事后均为 `cancelled` + `LEGACY_PENDING_TASK_DISPOSED`，两条订单支付事实不变且 `taskStatus=cancelled`，每条恰有一条 pending→cancelled 状态日志与 Admin 审计，剩余匹配 pending 为 0。未直改表、未使用 `failed`、未触发出纸。
-- [ ] **合并并部署 AI / 求职产物 `printFileUrl` 契约修复**：候选分支 `codex/ai-artifact-print-url-contract-20260711` 已完成本地 TDD 与安全回归，覆盖 AI 简历生成、模拟面试报告、职业规划、求职材料、招聘会参会准备单、我的文档和招聘会资料。招聘会资料通过可复用、可撤销 `FairMaterialPrintBridge` 映射到标准短期 `FileObject`，保留 PrintJobs HMAC/SSRF 白名单；本地已覆盖 15–20MiB、单飞并发、内容篡改、撤销、活跃任务履约保留和旧 URL 禁止新建任务。独立审查已无 Critical/High；待用户决定后提交、合并，并在预生产先执行双数据库 additive migration，再用无个人信息 PDF 验证内部 HMAC URL 可进入 `/print/jobs`，外部 COS URL 仍返回 `PRINT_INVALID_FILE_URL`，已撤销 bridge URL 返回 `PRINT_FILE_REVOKED`，且探针不产生错误任务或真实出纸。
+- [ ] **AI / 求职产物 `printFileUrl` 契约动态无出纸验收**：PR #177 已合入 main，当前预生产 release `bddae4f7` 已包含 `FairMaterialPrintBridge`；双 schema migration 已就绪且服务器静态契约守卫全绿。剩余仅用无个人信息夹具做动态探针：内部 HMAC `printFileUrl` 可进入 `/print/jobs` 但绑定不存在终端或受控方式确保不出纸；外部 COS URL 必须返回 `PRINT_INVALID_FILE_URL`；已撤销 bridge URL 必须返回 `PRINT_FILE_REVOKED`；探针产生的数据须按精确 ID 清理并复核，不能影响真实订单、活跃任务或打印机。
 
 - [ ] 生产域名与 HTTPS：完成域名解析、证书、nginx 反代、上传限制和自动续期。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
