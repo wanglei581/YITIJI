@@ -171,6 +171,38 @@ function buildTextPdf(lines: string[]): Buffer {
   return Buffer.from(bodyStr + xref + trailer, 'utf8')
 }
 
+// ── 真实、pdfjs 会诚实报告 numPages=count 的最小 PDF（用于 MAX_BORN_DIGITAL_EXTRACT_PAGES
+//    回归测试，与 verify-materials-processing.ts 的 buildDeclaredBigPageCountPdf 同一实现）：
+//    /Pages 字典的 /Kids 数组重复引用同一个真实 Page 对象 count 次，/Count 与 Kids.length
+//    一致。pdfjs 的 checkLastPage 校验只在 /Count 与实际遍历到的 Kids 数不一致时才把
+//    numPages 纠正为实际遍历数（已用 node -e 探针验证：仅声明 /Count 而 /Kids 只有 1 个真实
+//    条目时，pdfjs 会打印 "invalid /Pages tree /Count" 警告并把 numPages 纠正回 1）——这里
+//    让两者一致，因此拿到的 numPages 是 pdfjs 真实解析结果，不是伪造值，PDF 体积仍只有几百字节。
+
+function buildDeclaredBigPageCountPdf(count: number): Buffer {
+  const header = '%PDF-1.4\n'
+  const kidsRefs = Array.from({ length: count }, () => '3 0 R').join(' ')
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Pages /Kids [${kidsRefs}] /Count ${count} >>`,
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>',
+    '<< /Length 0 >>\nstream\n\nendstream',
+  ]
+  let bodyStr = header
+  const offsets: number[] = []
+  objects.forEach((obj, idx) => {
+    offsets.push(Buffer.byteLength(bodyStr, 'utf8'))
+    bodyStr += `${idx + 1} 0 obj\n${obj}\nendobj\n`
+  })
+  const xrefStart = Buffer.byteLength(bodyStr, 'utf8')
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  offsets.forEach((off) => {
+    xref += `${String(off).padStart(10, '0')} 00000 n \n`
+  })
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
+  return Buffer.from(bodyStr + xref + trailer, 'utf8')
+}
+
 // ── 验证主流程 ──────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -276,6 +308,13 @@ async function main(): Promise<void> {
     purpose: 'resume_upload',
     endUserId: 'enduser-a',
   })
+  fixtures.set('big-page-1', {
+    buffer: buildDeclaredBigPageCountPdf(60),
+    mimeType: PDF_MIME,
+    filename: 'declared-60-pages.pdf',
+    purpose: 'resume_upload',
+    endUserId: null,
+  })
 
   // 1) DOCX 提取
   const r1 = await service.extractResumeText({ fileId: 'docx-1' })
@@ -362,6 +401,44 @@ async function main(): Promise<void> {
   )
   delete process.env['TENCENT_OCR_SECRET_ID']
   delete process.env['TENCENT_OCR_SECRET_KEY']
+
+  // 12)（回归测试）extractPdf() 的 MAX_BORN_DIGITAL_EXTRACT_PAGES 防护此前无任何测试覆盖
+  //     （mutation testing 证实：还原该防护后无任何既有测试失败）。unpdf.extractText() 内部
+  //     对 pdf.numPages 做 Array.from + Promise.all、不设上限；本接口匿名可达，一份体积很小
+  //     但声明超大页数的恶意 PDF 可借此让服务端做无界 CPU/内存工作。声明页数(60) 超过 50 阈值
+  //     时必须跳过 born-digital 文字层抽取，直接落入 OCR_PROVIDER=disabled 时既有的诚实失败
+  //     路径（PDF_TEXT_EMPTY），不做无界工作、不挂起、不崩溃。
+  //
+  //     观测手段：monkey-patch require('unpdf') 导出对象上的 extractText。services/api 是
+  //     commonjs + node10 resolution，本脚本与 resume-extraction.service.ts 的
+  //     require('unpdf') 解析到同一个被 Node 缓存的模块对象，patch 对两侧同时可见——这只是
+  //     在观察一个已存在的真实模块边界调用是否发生，不是伪造整个 unpdf 的行为（getDocumentProxy
+  //     仍是真实实现，big-page-1 fixture 也是 pdfjs 会诚实解析出 numPages=60 的合法 PDF，
+  //     见 buildDeclaredBigPageCountPdf 上方注释）。
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const unpdfSpyModule = require('unpdf') as { extractText: (...args: unknown[]) => Promise<unknown> }
+  const originalUnpdfExtractText = unpdfSpyModule.extractText
+  let unpdfExtractTextCalls = 0
+  unpdfSpyModule.extractText = async (...args: unknown[]) => {
+    unpdfExtractTextCalls += 1
+    return originalUnpdfExtractText(...args)
+  }
+  try {
+    process.env['OCR_PROVIDER'] = 'disabled'
+    const ocrDisabledForBigPage = new OcrService(new DisabledOcrProvider(), new TencentOcrProvider(), new BaiduOcrProvider())
+    const svcBigPage = new ResumeExtractionService(fakeFiles as never, ocrDisabledForBigPage)
+    const r12 = await svcBigPage.extractResumeText({ fileId: 'big-page-1' })
+    assert(
+      unpdfExtractTextCalls === 0,
+      '12a. PDF 声明页数(60) 超过 MAX_BORN_DIGITAL_EXTRACT_PAGES(50) 时，born-digital 文字层抽取 unpdf.extractText 从未被调用',
+    )
+    assert(
+      !r12.ok && r12.errorCode === 'PDF_TEXT_EMPTY' && r12.text === undefined,
+      `12b. 跳过 extractText 后落入既有 OCR-disabled 诚实失败路径（PDF_TEXT_EMPTY），流程干净完成、未挂起未崩溃，got ${JSON.stringify(r12)}`,
+    )
+  } finally {
+    unpdfSpyModule.extractText = originalUnpdfExtractText
+  }
 
   console.log('\n=== ALL PASS ===\n')
 }

@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
+import { OcrService } from '../ai/resume/ocr/ocr.service'
+import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
@@ -13,10 +15,15 @@ import type {
   PiiFindingAction,
   PiiFindingView,
 } from './materials.types'
+import { buildPiiFindingsFromPages, extractTextForPiiScan } from './pii-scan.util'
 
 const TASK_TTL_HOURS = 24
-const MAX_SNIPPET_CHARS = 32
 const RAW_TEXT_PARAM_KEYS = new Set(['textsample', 'text', 'rawtext', 'fulltext', 'content', 'documenttext'])
+/** 空白页检测最多扫描的页数（控时延，避免大文档在请求路径里同步渲染太久）。 */
+const BLANK_SCAN_MAX_PAGES = (() => {
+  const n = Number(process.env['BLANK_SCAN_MAX_PAGES'])
+  return Number.isInteger(n) && n > 0 && n <= 50 ? n : 20
+})()
 
 type TaskRecord = {
   id: string
@@ -78,6 +85,8 @@ type InspectionSummary = {
   warnings: string[]
   messages: InspectionMessage[]
   imageQuality?: ImageQualitySummary
+  /** 疑似空白页的页码（1-based）；提示性质，不影响 canPrint。 */
+  blankPageNumbers?: number[]
 }
 
 type NormalizeA4Summary = InspectionSummary & {
@@ -112,6 +121,7 @@ export class MaterialsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly ocr: OcrService,
   ) {}
 
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
@@ -142,19 +152,48 @@ export class MaterialsService {
     })
 
     if (kind === 'pii_scan') {
-      const findings = buildSimulatedPiiFindings({
-        filename: sourceFile.filename,
-        textSample: readStringParam(dto.params, 'textSample'),
-      })
-      if (findings.length > 0) {
-        await this.prisma.piiFinding.createMany({
-          data: findings.map((finding) => ({ ...finding, taskId: task.id })),
+      // 曾经存在的 contentCategory=photo 跳过口子已彻底移除：contentCategory 是客户端可控的
+      // 请求参数，服务端从未真正校验过图片内容是否真的是"非文档照片"，任何调用方（篡改的前端 /
+      // 直接调 API / 重放 sessionStorage）都能靠声称 photo 让真实 PII 扫描完全不执行。
+      // pii_scan 现在对任意 purpose / mimeType / contentCategory 一律尝试真实抽取，不再有任何
+      // 跳过路径。'skipped_non_document' 这个 mode 值仍保留在类型/前端展示逻辑里，只是为了兼容
+      // TASK_TTL_HOURS 内、修复上线前用旧代码路径创建、此刻仍可能被读取到的存量任务。
+      const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket).catch(() => null)
+      const extraction = buffer
+        ? await extractTextForPiiScan(buffer, sourceFile.mimeType, this.ocr)
+        : { pages: [], outcome: 'degraded' as const, truncated: false as const }
+      if (extraction.outcome === 'unsupported_format') {
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: { resultJson: JSON.stringify({ mode: 'unsupported_format', findingCount: 0 }) },
+        })
+      } else if (extraction.outcome === 'degraded') {
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: { resultJson: JSON.stringify({ mode: 'degraded', findingCount: 0 }) },
+        })
+      } else {
+        const findings = buildPiiFindingsFromPages(extraction.pages)
+        if (findings.length > 0) {
+          await this.prisma.piiFinding.createMany({
+            data: findings.map((finding) => ({ ...finding, taskId: task.id })),
+          })
+        }
+        // 页数受 PII_SCAN_MAX_OCR_PAGES 截断的扫描件：即使命中数为 0，也不能报告为完整扫描
+        // （mode: 'real'）——那会让"page 6+ 才出现的 PII 未被看过"冒充"已确认无风险"。
+        const resultJson = extraction.truncated
+          ? {
+              mode: 'partial' as const,
+              findingCount: findings.length,
+              scannedPages: extraction.scannedPages,
+              totalPages: extraction.totalPages,
+            }
+          : { mode: 'real' as const, findingCount: findings.length }
+        await this.prisma.documentProcessTask.update({
+          where: { id: task.id },
+          data: { resultJson: JSON.stringify(resultJson) },
         })
       }
-      await this.prisma.documentProcessTask.update({
-        where: { id: task.id },
-        data: { resultJson: JSON.stringify({ mode: 'simulated', findingCount: findings.length }) },
-      })
     }
 
     const view = await this.getTask(task.id, accessToken ? { ...requester, accessToken } : requester)
@@ -268,7 +307,7 @@ export class MaterialsService {
       }
     }
     if (kind === 'pii_scan') {
-      return { status: 'completed', result: { mode: 'simulated', findingCount: 0 } }
+      return { status: 'completed', result: { mode: 'pending_real_scan', findingCount: 0 } }
     }
     if (kind === 'pii_redact') {
       const redaction = await this.evaluatePiiRedaction(sourceFile, params, requester)
@@ -300,14 +339,24 @@ export class MaterialsService {
       const buffer = await this.storage.getObject(sourceFile.storageKey, sourceFile.bucket)
       const pageCount = countPdfPages(buffer)
       const warnings = pageCount === null ? ['PDF_PAGE_COUNT_NOT_DETECTED'] : []
+      const messages: InspectionMessage[] = pageCount === null
+        ? [{ code: 'PDF_PAGE_COUNT_NOT_DETECTED', severity: 'warning', text: '暂未识别 PDF 页数，以实际打印为准' }]
+        : [{ code: 'PDF_PAGE_COUNT_DETECTED', severity: 'info', text: 'PDF 页数已完成基础识别' }]
+      const blankPageNumbers = await this.detectBlankPages(buffer, sourceFile.mimeType)
+      if (blankPageNumbers.length > 0) {
+        messages.push({
+          code: 'BLANK_PAGE_SUSPECTED',
+          severity: 'warning',
+          text: `第 ${blankPageNumbers.join('、')} 页可能为空白页，如非有意留白请检查原文件`,
+        })
+      }
       return {
         pageCount,
         pageCountSource: 'pdf_lightweight_scan',
         canPrint: true,
         warnings,
-        messages: pageCount === null
-          ? [{ code: 'PDF_PAGE_COUNT_NOT_DETECTED', severity: 'warning', text: '暂未识别 PDF 页数，以实际打印为准' }]
-          : [{ code: 'PDF_PAGE_COUNT_DETECTED', severity: 'info', text: 'PDF 页数已完成基础识别' }],
+        messages,
+        blankPageNumbers: blankPageNumbers.length > 0 ? blankPageNumbers : undefined,
       }
     } catch {
       return {
@@ -349,26 +398,32 @@ export class MaterialsService {
         quality: estimatedDpiForA4 >= 150 ? 'ok' : 'low',
       }
       const lowResolution = imageQuality.quality === 'low'
+      const messages: InspectionMessage[] = [
+        baseMessage,
+        lowResolution
+          ? {
+              code: 'IMAGE_RESOLUTION_LOW_FOR_A4',
+              severity: 'warning',
+              text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI，清晰度可能不足`,
+            }
+          : {
+              code: 'IMAGE_RESOLUTION_OK_FOR_A4',
+              severity: 'info',
+              text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI`,
+            },
+      ]
+      const blankPageNumbers = await this.detectBlankPages(buffer, sourceFile.mimeType)
+      if (blankPageNumbers.length > 0) {
+        messages.push({ code: 'BLANK_PAGE_SUSPECTED', severity: 'warning', text: '该图片可能为空白/纯色图，如非有意留白请检查原文件' })
+      }
       return {
         pageCount: 1,
         pageCountSource: 'image_single_page',
         canPrint: true,
         imageQuality,
         warnings: lowResolution ? ['IMAGE_RESOLUTION_LOW_FOR_A4'] : [],
-        messages: [
-          baseMessage,
-          lowResolution
-            ? {
-                code: 'IMAGE_RESOLUTION_LOW_FOR_A4',
-                severity: 'warning',
-                text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI，清晰度可能不足`,
-              }
-            : {
-                code: 'IMAGE_RESOLUTION_OK_FOR_A4',
-                severity: 'info',
-                text: `图片像素 ${dimensions.widthPx}×${dimensions.heightPx}，按 A4 打印估算约 ${estimatedDpiForA4} DPI`,
-              },
-        ],
+        messages,
+        blankPageNumbers: blankPageNumbers.length > 0 ? blankPageNumbers : undefined,
       }
     } catch {
       return {
@@ -382,6 +437,70 @@ export class MaterialsService {
         ],
       }
     }
+  }
+
+  /**
+   * 检测疑似空白页：PDF 逐页低分辨率渲染判定，图片直接判定自身。
+   * 提示性质，不阻断打印；与 pii_scan 各自独立渲染，不跨任务共享结果（见设计文档 §5）。
+   */
+  private async detectBlankPages(buffer: Buffer, mimeType: string): Promise<number[]> {
+    const BLANK_WHITE_RGB_THRESHOLD = 250
+    const BLANK_PIXEL_RATIO_THRESHOLD = 0.99
+    const BLANK_RENDER_SCALE = 0.3
+
+    const isPageBlank = async (pngBuffer: Buffer): Promise<boolean> => {
+      if (!looksLikeCompleteImage(pngBuffer)) return false
+      const { loadImage, createCanvas } = await import('@napi-rs/canvas')
+      const image = await loadImage(pngBuffer)
+      const canvas = createCanvas(image.width, image.height)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(image, 0, 0)
+      const { data } = ctx.getImageData(0, 0, image.width, image.height)
+      let whitePixels = 0
+      const totalPixels = data.length / 4
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]!
+        const g = data[i + 1]!
+        const b = data[i + 2]!
+        if (r > BLANK_WHITE_RGB_THRESHOLD && g > BLANK_WHITE_RGB_THRESHOLD && b > BLANK_WHITE_RGB_THRESHOLD) {
+          whitePixels += 1
+        }
+      }
+      return totalPixels > 0 && whitePixels / totalPixels >= BLANK_PIXEL_RATIO_THRESHOLD
+    }
+
+    if (mimeType === 'application/pdf') {
+      try {
+        const rendered = await openPdfForRender(buffer)
+        try {
+          const blankPages: number[] = []
+          const pagesToScan = Math.min(rendered.totalPages, BLANK_SCAN_MAX_PAGES)
+          for (let pageNo = 1; pageNo <= pagesToScan; pageNo += 1) {
+            const img = await rendered.renderPage(pageNo, BLANK_RENDER_SCALE)
+            if (await isPageBlank(img)) blankPages.push(pageNo)
+          }
+          return blankPages
+        } finally {
+          await rendered.destroy().catch(() => undefined)
+        }
+      } catch {
+        return []
+      }
+    }
+
+    if (isSinglePageImage(mimeType)) {
+      // 已知问题（Critical，已复现两次）：对任意用户上传的原始图片字节直接调用
+      // @napi-rs/canvas 的原生 loadImage() 有 SIGSEGV 风险（整进程崩溃，JS try/catch
+      // 完全防不住），且尝试过的"文件完整性预检"启发式已被证明可以被少量已知字节
+      // 绕过（不是真正的结构校验）。在有真正的进程级隔离方案（如 child_process 里
+      // 单独解码）之前，直接跳过对原始上传图片的空白页检测——这是唯一能真正
+      // 消除该崩溃面的办法，而不是继续叠加更多可被绕过的启发式检查。
+      // PDF 渲染分支不受影响：那条路径的 PNG 是本服务自己 canvas.toBuffer() 生成的，
+      // 不是攻击者可控字节，仍然安全，继续保留空白页检测。
+      return []
+    }
+
+    return []
   }
 
   private async evaluateNormalizeA4(sourceFile: SourceFileRecord): Promise<NormalizeA4Summary> {
@@ -487,88 +606,6 @@ export class MaterialsService {
   }
 }
 
-function buildSimulatedPiiFindings(args: { filename: string; textSample?: string }): Array<{
-  type: string
-  label: string
-  pageNumber: number | null
-  snippet: string | null
-  confidence: number
-  action: PiiFindingAction
-}> {
-  const text = [args.filename, args.textSample ?? ''].filter(Boolean).join('\n')
-  const findings: Array<{
-    type: string
-    label: string
-    pageNumber: number | null
-    snippet: string | null
-    confidence: number
-    action: PiiFindingAction
-  }> = []
-  const seen = new Set<string>()
-
-  collectMatches(text, /(?:^|[^\d])((?:\+?86[- ]?)?1[3-9]\d{9})(?!\d)/g, (value) => ({
-    type: 'phone',
-    label: '手机号',
-    pageNumber: null,
-    snippet: maskPiiSnippet('phone', value),
-    confidence: 0.95,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
-
-  collectMatches(text, /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, (value) => ({
-    type: 'email',
-    label: '邮箱',
-    pageNumber: null,
-    snippet: maskPiiSnippet('email', value),
-    confidence: 0.93,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
-
-  collectMatches(text, /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g, (value) => ({
-    type: 'id_card',
-    label: '身份证号',
-    pageNumber: null,
-    snippet: maskPiiSnippet('id_card', value),
-    confidence: 0.9,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
-
-  collectMatches(text, /([\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[\u4e00-\u9fa5A-Za-z0-9\s-]{0,24}号?)/g, (value) => ({
-    type: 'address',
-    label: '地址',
-    pageNumber: null,
-    snippet: maskPiiSnippet('address', value),
-    confidence: 0.78,
-    action: 'pending' as const,
-  })).forEach((finding) => {
-    const key = `${finding.type}:${finding.snippet}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(finding)
-    }
-  })
-
-  return findings
-}
-
 function buildPiiRedactionSummary(args: {
   decisionTaskId: string | null
   findings: Array<{ action: string }>
@@ -599,16 +636,6 @@ function buildPiiRedactionSummary(args: {
     warnings,
     messages,
   }
-}
-
-function collectMatches<T>(text: string, regex: RegExp, toFinding: (value: string) => T): T[] {
-  const findings: T[] = []
-  let match: RegExpExecArray | null
-  while ((match = regex.exec(text)) !== null) {
-    const value = match[1]
-    if (value) findings.push(toFinding(value))
-  }
-  return findings
 }
 
 function sanitizeParams(value: unknown, kind: MaterialTaskKind): Record<string, unknown> {
@@ -658,7 +685,7 @@ function allowedParamKeys(kind: MaterialTaskKind): string[] {
     case 'normalize_a4':
       return ['targetPaperSize', 'source']
     case 'pii_scan':
-      return ['textSample', 'scanScope']
+      return ['textSample', 'scanScope', 'contentCategory']
     case 'pii_redact':
       return ['decisionTaskId']
     case 'bundle_render':
@@ -673,11 +700,6 @@ function assertSupportedTaskParams(kind: MaterialTaskKind, params: Record<string
   const targetPaperSize = params['targetPaperSize']
   if (targetPaperSize === undefined || targetPaperSize === 'A4') return
   throw new BadRequestException({ error: { code: 'MATERIAL_TARGET_PAPER_UNSUPPORTED', message: '本期仅支持 A4 规范化评估' } })
-}
-
-function readStringParam(params: Record<string, unknown> | undefined, key: string): string | undefined {
-  const value = params?.[key]
-  return typeof value === 'string' ? value : undefined
 }
 
 function readImageDimensions(buffer: Buffer, mimeType: string): { widthPx: number; heightPx: number } | null {
@@ -725,64 +747,24 @@ function isJpegStartOfFrame(marker: number | undefined): boolean {
     marker === 0xcd || marker === 0xce || marker === 0xcf
 }
 
+/**
+ * 轻量"文件是否完整"预检：只用于 PDF 渲染出的 PNG（本服务自己生成，非攻击者可控字节），
+ * 作为防御性兜底，不是安全边界本身——渲染管线正常情况下不会产出不完整的 PNG，
+ * 这里只是多一道保险。原始上传图片的空白页检测已整体移除，见 detectBlankPages。
+ */
+function looksLikeCompleteImage(buffer: Buffer): boolean {
+  const MIN_PLAUSIBLE_BYTES = 100
+  if (buffer.length < MIN_PLAUSIBLE_BYTES) return false
+  const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex')
+  if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return false
+  const tail = buffer.subarray(-16).toString('ascii')
+  return tail.includes('IEND')
+}
+
 function estimateA4Dpi(widthPx: number, heightPx: number): number {
   const portraitDpi = Math.min(widthPx / 8.27, heightPx / 11.69)
   const landscapeDpi = Math.min(widthPx / 11.69, heightPx / 8.27)
   return Math.max(1, Math.round(Math.max(portraitDpi, landscapeDpi)))
-}
-
-function limitSnippet(value: string): string {
-  return value.length > MAX_SNIPPET_CHARS ? value.slice(0, MAX_SNIPPET_CHARS) : value
-}
-
-/**
- * 服务端落库前掩码 PII 片段（M1）。
- *
- * DB 与 API 返回的 snippet 不再包含完整手机号 / 邮箱 / 身份证号 / 地址原文，
- * 仅保留供用户辨识类型的最小片段。前端 maskSnippet 作为二次防护，但不依赖前端。
- */
-function maskPiiSnippet(type: string, raw: string): string {
-  const value = raw.trim()
-  if (!value) return ''
-  let masked: string
-  if (type === 'phone') masked = maskPhone(value)
-  else if (type === 'email') masked = maskEmail(value)
-  else if (type === 'id_card') masked = maskIdCard(value)
-  else if (type === 'address') masked = maskAddress(value)
-  else masked = maskGeneric(value)
-  return limitSnippet(masked)
-}
-
-function maskPhone(value: string): string {
-  const digits = value.replace(/\D/g, '')
-  const core = digits.length > 11 ? digits.slice(-11) : digits
-  if (core.length < 7) return `${core.slice(0, 1)}****`
-  return `${core.slice(0, 3)}****${core.slice(-4)}`
-}
-
-function maskEmail(value: string): string {
-  const at = value.indexOf('@')
-  if (at <= 0) return maskGeneric(value)
-  const domain = value.slice(at + 1)
-  return `${value.slice(0, 1)}***@${domain}`
-}
-
-function maskIdCard(value: string): string {
-  const v = value.toUpperCase()
-  if (v.length <= 6) return `${v.slice(0, 1)}****`
-  return `${v.slice(0, 3)}****${v.slice(-2)}`
-}
-
-function maskAddress(value: string): string {
-  // 保留到第一个行政级别字（省/市/区/县）为止，遮住后续街道、门牌等详细段。
-  const match = value.match(/[省市区县]/)
-  if (match && match.index !== undefined) return `${value.slice(0, match.index + 1)}****`
-  return `${value.slice(0, 2)}****`
-}
-
-function maskGeneric(value: string): string {
-  if (value.length <= 4) return `${value.slice(0, 1)}**`
-  return `${value.slice(0, 2)}***${value.slice(-2)}`
 }
 
 function toTaskView(task: TaskRecord): DocumentProcessTaskView {
