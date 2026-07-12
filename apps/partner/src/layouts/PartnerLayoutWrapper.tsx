@@ -99,6 +99,8 @@ export function PartnerLayoutWrapper() {
       orgName={orgName}
       navItems={NAV_ITEMS}
       activeKey={activeKey}
+      visualTheme={activeKey === 'jobs' ? 'service-desk' : 'legacy'}
+      density="comfortable"
       onNavChange={(key) => navigate(KEY_TO_PATH[key] ?? '/')}
       collapsed={collapsed}
       onCollapseChange={setCollapsed}

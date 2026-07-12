@@ -16,10 +16,10 @@ import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
 const CATEGORY_MAP: Record<JobCategory, { label: string; style: string }> = {
-  fulltime: { label: '全职', style: 'bg-info-bg text-info-fg'     },
-  intern:   { label: '实习', style: 'bg-purple-50 text-purple-600' },
-  campus:   { label: '校招', style: 'bg-success-bg text-success-fg'   },
-  parttime: { label: '兼职', style: 'bg-warning-bg text-warning-fg' },
+  fulltime: { label: '全职', style: 'bg-[var(--sd-category-blue-bg)] text-[var(--sd-category-blue-fg)]' },
+  intern: { label: '实习', style: 'bg-[var(--sd-category-lavender-bg)] text-[var(--sd-category-lavender-fg)]' },
+  campus: { label: '校招', style: 'bg-[var(--sd-category-mint-bg)] text-[var(--sd-category-mint-fg)]' },
+  parttime: { label: '兼职', style: 'bg-[var(--sd-category-orange-bg)] text-[var(--sd-category-orange-fg)]' },
 }
 
 const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
@@ -40,6 +40,8 @@ const CATEGORY_FILTERS = ['全部', '全职', '实习', '校招', '兼职'] as c
 const REVIEW_FILTERS   = ['全部', '待审核', '审核中', '已通过', '已拒绝'] as const
 const CATEGORY_FILTER_MAP: Record<string, JobCategory | null>  = { 全部: null, 全职: 'fulltime', 实习: 'intern', 校招: 'campus', 兼职: 'parttime' }
 const REVIEW_FILTER_MAP:   Record<string, ReviewStatus | null> = { 全部: null, 待审核: 'pending', 审核中: 'reviewing', 已通过: 'approved', 已拒绝: 'rejected' }
+const FILTER_SELECTED_CLASS = 'border-primary-600 bg-primary-600 text-white'
+const FILTER_IDLE_CLASS = 'border-neutral-200 bg-surface text-neutral-700 hover:border-primary-600/40'
 const PARTNER_JOBS_REFRESH_KEY = 'partner:jobs'
 const PARTNER_JOB_QUALITY_REFRESH_KEY = 'partner:jobs:quality'
 
@@ -269,8 +271,8 @@ export default function JobsPage() {
               <button
                 key={f}
                 onClick={() => setCategoryFilter(f)}
-                className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                  categoryFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                  categoryFilter === f ? FILTER_SELECTED_CLASS : FILTER_IDLE_CLASS
                 }`}
               >
                 {f}
@@ -285,8 +287,8 @@ export default function JobsPage() {
               <button
                 key={f}
                 onClick={() => setReviewFilter(f)}
-                className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                  reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                className={`rounded-full border px-3 py-1 text-sm font-medium transition-colors ${
+                  reviewFilter === f ? FILTER_SELECTED_CLASS : FILTER_IDLE_CLASS
                 }`}
               >
                 {f}
