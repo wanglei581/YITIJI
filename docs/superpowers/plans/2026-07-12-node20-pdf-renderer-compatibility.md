@@ -37,6 +37,6 @@
 - Modify: `docs/superpowers/plans/2026-07-12-node20-pdf-renderer-compatibility.md`
 
 - [x] Run API typecheck, API lint, and `git diff --check`; review only the four scoped source/docs files.
-- [x] Request Claude and Antigravity read-only reviews; both were invoked, but neither returned a valid final report and are recorded as unavailable rather than approvals.
+- [x] Request Claude and Antigravity read-only reviews; both final reports approved with no Critical. Claude records a non-blocking follow-up: CI runs Node 22, so Node 20's real PDF rendering fallback still needs separate automated coverage.
 - [x] After an explicit staging authorization, back up and update only `pdf-page-renderer.ts` plus the two OCR verify scripts, run the Node 20 no-network rendering probe, then run `verify:ocr-baidu-live` with the synthetic document.
-- [ ] Commit the scoped change as `fix: support PDF rendering on Node 20`.
+- [x] Commit the scoped change as `fix: support PDF rendering on Node 20` (`667ead64`), then record staging proof (`6c71dd82`).
