@@ -178,4 +178,9 @@
   - **D3 → 现在收口阶段立即执行**：删除占位是信息架构纠偏而非新功能，不减少任何已实现能力；上线前完成删除+视觉回归的成本低于上线后调整。执行方式=另开独立小任务，仅删磁贴+同步指定文档，跑 typecheck/lint/build/相关 verify/三类视口走查，不顺手治理其他代码。
   - **D4 → 并入 `phone_upload`（分阶段迁移）**：与初稿倾向不同，已在 §六 D4 行如实记录两案分歧，留用户裁定。
   - 一句话建议："现在删掉'云打印'占位，把现有能力统一归入文档打印；C/E 仅保留为过门槛后立项的二期候选，`cloud_upload` 兼容迁移并入 `phone_upload`，优先确保首台终端安全上线。"
-- 本轮全程未修改任何首页/路由/业务代码；决策文档承载于独立分支 `docs/cloud-print-decision`（基于 origin/main `9d48322b`）。
+- 2026-07-12（拍板与执行）：**用户拍板 D1=b（删除磁贴）、D2=是、D3=本窗口立即执行、D4=并入 `phone_upload`（独立后续任务）**。选项 b 已按 §四执行影响面清单执行完毕：
+  - 代码：[HomePage.tsx](../../apps/kiosk/src/pages/home/HomePage.tsx) 删除「云打印」磁贴一行并留决策注释（打印扫描组 6→5 磁贴）；未触碰 `cloud` 图标定义与 `cloud_upload` 能力键。
+  - 文档同步：matrix §3.4 行改写 + §六占位清单行、ia-consolidation-audit §2.1、phase-a-checklist 第4项、home-entry-closure-plan 发现⑤、current-progress 更新记录、next-tasks 新增 P2 二期候选条目（含准入门槛与 F13 约束）与 P1 `cloud_upload` 迁移条目。
+  - 验证结果：Kiosk `typecheck` ✅；`eslint HomePage.tsx` ✅ 0 error；生产 build（`VITE_API_MODE=http` 等守卫变量齐备）✅；`verify:home-toolbox-ui` ✅ ALL PASS；`verify:smart-campus-ui` ✅ ALL PASS；mock 模式浏览器走查 540×960 竖屏 / 375×812 窄屏 / 桌面视口 ✅——打印扫描组 5 磁贴渲染正常（第二行 2 项自然留白，无塌陷），"即将上线"角标恰 2 个（证件复印/证件照打印），控制台无报错。
+  - **两项 pre-existing 失败（均与本改动无关，已各派独立修复任务，均不在 GitHub CI）**：① `verify:print-entry-source-split` 在干净树上即失败（断言 PrintUploadPage 的 `savePrintMaterialSession({ file: nextFile, source })` 字符串漂移，前 5 条含 HomePage 相关断言全 PASS）；② `verify:terminal-device-config` 静态 28 项全 PASS，动态段因脚本以 2 参构造 3 参的 `AdminTerminalsController`（Task 10 后漂移）而失败。
+- 本轮除上述受控执行外未修改其他业务代码；决策文档与执行改动承载于独立分支 `docs/cloud-print-decision`（基于 origin/main `9d48322b`）。

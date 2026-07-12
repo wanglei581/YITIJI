@@ -265,6 +265,14 @@
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
 
+## P1：`cloud_upload` 能力键并入 `phone_upload`（词汇债治理，2026-07-12 已拍板方向，未排期执行）
+
+- [ ] **分阶段迁移，独立任务执行，禁止随其他改动顺手做**：`phone_upload` 与 `cloud_upload` 双能力键并存于 `packages/shared/src/types/printScanCapability.ts`、`services/api/src/terminals/terminal-capabilities.types.ts`、`apps/admin/src/routes/print-scan/index.tsx` 三处，而两者语义相同（2026-07-10 云上传范围收窄声明）。用户已拍板（2026-07-12，D4）：并入 `phone_upload`。执行步骤：① 双读映射（读取时 `cloud_upload` 视同 `phone_upload`）→ ② 盘点并回填存量 `TerminalCapability` 数据库配置 → ③ Admin 侧加弃用告警 → ④ 确认无引用后移除旧键。未来「远程提交·到店取件」若立项应新增准确能力键（如 `remote_submit`/`terminal_release`），不复用 `cloud_upload`。依据与背景：`docs/reviews/2026-07-12-cloud-print-decision.md` §六 D4。
+
+## P2：商用二期候选（候选未立项，过门槛后才可立项）
+
+- **远程提交·到店取件（含 follow-me 跨终端释放形态）**（2026-07-12 记录，D2 拍板"是"）：用户不在终端旁时经手机 H5/小程序上传下单、（可选）在线支付、获取取件码，到店输码确认后本机出纸；follow-me 形态为"文件存入我的文档、到任一允许终端登录释放"。**候选，未立项，未承诺交付**。准入门槛（全部满足后才可启动立项评估）：① Phase 0 上线收口验收完成；② 支付与退款链路生产稳定；③ 释放状态机通过安全设计评审。**硬性架构约束（立项时不可绕过）**：Agent 会自动 claim 目标终端 pending 任务（`terminals.service.ts` claimTasks 按 `{status:'pending', terminalId}` 认领），远程订单**不得直接落成 pending `PrintTask`**，必须有 `awaiting_release` 类状态或"到店输码后才创建 PrintTask"的编排；远程只入队等待释放，出纸必须到店确认（`print-scan-commercial-plan.md` "不能公网远程直控打印机"）；须绑定会员手机号防匿名滥用、取件码防爆破、释放幂等。follow-me 形态以多网点部署需求成立为前提，比到店取件更后置。完整评估见 `docs/reviews/2026-07-12-cloud-print-decision.md` §三候选 C/E。立项时按 CLAUDE.md §8.1 先写范围声明再动代码，入口命名按真实能力定（不叫"云打印"）。
+
 ## 待用户确认
 
 - [x] 是否确认后续每个业务闭环都独立分支、独立验证、双模型审查后再推进。
