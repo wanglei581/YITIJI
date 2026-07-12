@@ -121,6 +121,45 @@ expectMatches(responsive, /@media[^{}]*390px[^{}]*700px/, '响应式样式显式
 expectMatches(responsive, /@media[^{}]*1080px[^{}]*1920px/, '响应式样式显式覆盖 1080x1920')
 expectMatches(responsive, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, '响应式样式支持 reduced motion')
 
+const compact390 = cssRule(responsive, '@media (width: 390px)')
+const compact390x844 = cssRule(responsive, '@media (width: 390px) and (height: 844px)')
+const compact390x700 = cssRule(responsive, '@media (width: 390px) and (max-height: 700px)')
+expect(compact390.length > 0, '390px 通用紧凑规则独立于视口高度')
+expectMatches(cssRule(compact390, '.khome .k-brand span'), /display:\s*none/, '390px 隐藏品牌副标题')
+expectMatches(
+  cssRule(compact390, '.khome .k-pill'),
+  /min-width:\s*48px[\s\S]*?font-size:\s*0/,
+  '390px 状态药丸保留触控宽度并隐藏文字',
+)
+expectMatches(cssRule(compact390, '.khome .hero h1'), /font-size:\s*33px/, '390px Hero 标题使用紧凑字号')
+expectMatches(cssRule(compact390, '.khome .cat-title h3'), /font-size:\s*19px/, '390px 服务标题使用紧凑字号')
+expectMatches(
+  cssRule(compact390, '.khome .id-actions'),
+  /width:\s*100%[\s\S]*?margin:\s*0/,
+  '390px 身份操作区占满可用宽度',
+)
+expectMatches(
+  cssRule(compact390, '.khome .id-actions .btn'),
+  /flex:\s*1[\s\S]*?min-width:\s*0/,
+  '390px 身份按钮可等分收缩且不产生最小宽度溢出',
+)
+expectMatches(cssRule(compact390, '.khome .btn.cta'), /min-width:\s*0/, '390px 登录主 CTA 取消桌面最小宽度')
+expectMatches(
+  compact390,
+  /\.khome \.sub-grid,\s*\.khome \.cat-card\.span2 \.sub-grid\s*\{[^}]*grid-template-columns:\s*1fr 1fr\s*!important/,
+  '390px 服务子入口保持两列紧凑网格',
+)
+expectMatches(cssRule(compact390x844, '.khome .identity'), /margin-top:\s*-12px/, '390x844 仅补充高屏 identity 叠压差异')
+expectMatches(cssRule(compact390x700, '.khome .k-top'), /position:\s*relative/, '390x700 补充短屏非 sticky 顶栏差异')
+expectMatches(cssRule(compact390x700, '.khome .hero p'), /display:\s*none/, '390x700 补充短屏 Hero 说明隐藏差异')
+expectMatches(cssRule(compact390x700, '.khome .identity'), /margin-top:\s*10px/, '390x700 补充短屏 identity 间距差异')
+for (const selector of ['.khome .k-pill', '.khome .id-actions', '.khome .id-actions .btn', '.khome .btn.cta']) {
+  expect(
+    !compact390x844.includes(selector) && !compact390x700.includes(selector),
+    `${selector} 防溢出合同只定义在 390px 通用规则中`,
+  )
+}
+
 for (const token of [
   '--sd-color-canvas',
   '--sd-color-surface',
