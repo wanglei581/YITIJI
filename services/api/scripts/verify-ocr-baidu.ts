@@ -177,6 +177,7 @@ async function main() {
       const liveSource = readFileSync(join(__dirname, 'verify-ocr-baidu-live.ts'), 'utf8')
       if (!/\bopenPdfForRender\s*\(/.test(liveSource)) fail('0. live OCR verify 必须调用 openPdfForRender')
       if (/\brenderPageAsImage\s*\(/.test(liveSource)) fail('0. live OCR verify 不得调用不兼容的 renderPageAsImage')
+      if (!/\breadContentForEndUser\s*[:(]/.test(liveSource)) fail('0. live OCR verify stub 必须实现受控文件读取')
       pass('0. live OCR verify 复用兼容 PDF 渲染器，禁止回退 renderPageAsImage')
     }
 

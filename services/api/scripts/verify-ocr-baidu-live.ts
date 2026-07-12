@@ -95,6 +95,8 @@ async function main() {
   const stubFiles = {
     readContent: () =>
       Promise.resolve({ buffer: scanned, mimeType: 'application/pdf', filename: 'scan.pdf', purpose: 'resume_upload' }),
+    readContentForEndUser: () =>
+      Promise.resolve({ buffer: scanned, mimeType: 'application/pdf', filename: 'scan.pdf', purpose: 'resume_upload' }),
   }
   const extraction = new ResumeExtractionService(
     stubFiles as never,
