@@ -21,7 +21,8 @@ import { MemberAssetsService } from '../src/member-assets/member-assets.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
-function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
+let failed = 0
+function fail(m: string): void { failed += 1; console.error(`  FAIL ${m}`) }
 
 function errCode(e: unknown): string | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
@@ -46,6 +47,119 @@ function mockCtx(headers: Record<string, string>): ExecutionContext {
   return { switchToHttp: () => ({ getRequest: () => req }) } as unknown as ExecutionContext
 }
 
+type MemberDeleteBranch = 'parse' | 'job_fit'
+type MemberDeleteQuery = {
+  scope: 'transaction' | 'direct'
+  delegate: 'aiResumeResult' | 'jobAiSession'
+  where: Record<string, unknown>
+}
+type MemberDeleteRun = {
+  calls: string[]
+  queries: MemberDeleteQuery[]
+  pendingDeletes: string[]
+  committedDeletes: string[]
+}
+
+type TransactionMode = 'success' | 'before_callback_rollback' | 'after_callback_rollback'
+
+function createMemberDeleteRun(branch: MemberDeleteBranch, transactionMode: TransactionMode): {
+  prisma: object
+  state: MemberDeleteRun
+} {
+  const state: MemberDeleteRun = { calls: [], queries: [], pendingDeletes: [], committedDeletes: [] }
+  const row = {
+    id: `member-delete-${branch}`,
+    taskId: `member-delete-task-${branch}`,
+    kind: branch,
+  }
+  const recordDelete = (scope: MemberDeleteQuery['scope'], delegate: MemberDeleteQuery['delegate']) => async (args: { where: Record<string, unknown> }) => {
+    state.calls.push(`${scope}.${delegate}.deleteMany`)
+    state.queries.push({ scope, delegate, where: args.where })
+    if (scope === 'transaction') state.pendingDeletes.push(`${scope}.${delegate}`)
+    else state.committedDeletes.push(`${scope}.${delegate}`)
+    return { count: delegate === 'aiResumeResult' ? (branch === 'parse' ? 4 : 1) : (branch === 'parse' ? 3 : 1) }
+  }
+  const transactionClient = {
+    aiResumeResult: { deleteMany: recordDelete('transaction', 'aiResumeResult') },
+    jobAiSession: { deleteMany: recordDelete('transaction', 'jobAiSession') },
+  }
+  const prisma = {
+    $transaction: async (callback: (tx: typeof transactionClient) => Promise<unknown>) => {
+      state.calls.push('transaction.begin')
+      if (transactionMode === 'before_callback_rollback') {
+        state.calls.push('transaction.rollback')
+        throw new Error('simulated member asset transaction rollback before callback')
+      }
+      try {
+        const result = await callback(transactionClient)
+        if (transactionMode === 'after_callback_rollback') {
+          throw new Error('simulated member asset transaction rollback after callback')
+        }
+        state.calls.push('transaction.commit')
+        state.committedDeletes.push(...state.pendingDeletes)
+        state.pendingDeletes.length = 0
+        return result
+      } catch (error) {
+        state.calls.push('transaction.rollback')
+        state.pendingDeletes.length = 0
+        throw error
+      }
+    },
+    aiResumeResult: {
+      findFirst: async () => row,
+      deleteMany: recordDelete('direct', 'aiResumeResult'),
+    },
+    jobAiSession: { deleteMany: recordDelete('direct', 'jobAiSession') },
+  }
+  return { prisma, state }
+}
+
+function hasWhere(query: MemberDeleteQuery | undefined, expected: Record<string, unknown>): boolean {
+  return JSON.stringify(query?.where) === JSON.stringify(expected)
+}
+
+async function verifyMemberAssetDeletionTransaction(branch: MemberDeleteBranch): Promise<void> {
+  const success = createMemberDeleteRun(branch, 'success')
+  const service = new MemberAssetsService(success.prisma as never)
+  await service.deleteAiRecord('member-delete-owner', `member-delete-${branch}`)
+
+  const resultQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult')
+  const sessionQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'jobAiSession')
+  const expectedResultWhere = branch === 'parse'
+    ? { endUserId: 'member-delete-owner', taskId: `member-delete-task-${branch}` }
+    : { endUserId: 'member-delete-owner', id: `member-delete-${branch}` }
+  const expectedSessionWhere = branch === 'parse'
+    ? { endUserId: 'member-delete-owner', resumeTaskId: `member-delete-task-${branch}` }
+    : { endUserId: 'member-delete-owner', resumeTaskId: `member-delete-task-${branch}`, operation: 'match' }
+  const usesTransactionClient =
+    success.state.calls.includes('transaction.begin') &&
+    success.state.calls.includes('transaction.commit') &&
+    success.state.calls.includes('transaction.aiResumeResult.deleteMany') &&
+    success.state.calls.includes('transaction.jobAiSession.deleteMany') &&
+    !success.state.calls.some((call) => call.startsWith('direct.')) &&
+    hasWhere(resultQuery, expectedResultWhere) &&
+    hasWhere(sessionQuery, expectedSessionWhere)
+  if (usesTransactionClient) {
+    pass(`14.${branch} 删除通过 $transaction callback 的 tx 同时删结果和会话，过滤范围正确`)
+  } else {
+    fail(`14.${branch} 删除必须通过 $transaction callback 的 tx 同时删结果和会话 calls=${success.state.calls.join(',')} queries=${JSON.stringify(success.state.queries)}`)
+  }
+
+  const rollback = createMemberDeleteRun(branch, 'after_callback_rollback')
+  const rollbackService = new MemberAssetsService(rollback.prisma as never)
+  let thrown = false
+  try {
+    await rollbackService.deleteAiRecord('member-delete-owner', `member-delete-${branch}`)
+  } catch (error) {
+    thrown = (error as Error).message === 'simulated member asset transaction rollback after callback'
+  }
+  if (thrown && rollback.state.calls.includes('transaction.rollback') && !rollback.state.calls.includes('transaction.commit') && rollback.state.pendingDeletes.length === 0 && rollback.state.committedDeletes.length === 0) {
+    pass(`15.${branch} callback 执行后 transaction rollback 仍不提交 AiResumeResult 或 JobAiSession 删除`)
+  } else {
+    fail(`15.${branch} callback 后 rollback 不得提交删除 thrown=${thrown} calls=${rollback.state.calls.join(',')} pending=${rollback.state.pendingDeletes.join(',')} committed=${rollback.state.committedDeletes.join(',')}`)
+  }
+}
+
 async function main() {
   console.log('\n=== Phase C-2B 会员资产中心只读 API 归属验证 ===')
 
@@ -64,13 +178,18 @@ async function main() {
   const taskA = `ma_task_a_${suffix}`       // A 的简历（parse + optimize）
   const taskAExpired = `ma_task_aexp_${suffix}` // A 的过期 parse（应被排除）
   const taskB = `ma_task_b_${suffix}`       // B 的简历
-  const allTaskIds = [taskA, taskAExpired, taskB]
+  const taskJobFit = `ma_task_jobfit_${suffix}`
+  // AiResumeResult 的 taskId + kind 为全局唯一；B 的 job_fit / career_plan sentinel 用独立任务，
+  // 但其 match session 仍与 A 的 taskJobFit 相同，专测 endUserId 不能被级联越权忽略。
+  const taskJobFitOtherUser = `ma_task_jobfit_other_${suffix}`
+  const allTaskIds = [taskA, taskAExpired, taskB, taskJobFit, taskJobFitOtherUser]
   const fileA = `ma_file_a_${suffix}`
   const fileADeleted = `ma_file_adel_${suffix}`
   const fileB = `ma_file_b_${suffix}`
   const allFileIds = [fileA, fileADeleted, fileB]
 
   async function cleanup() {
+    await prisma.jobAiSession.deleteMany({ where: { resumeTaskId: { in: allTaskIds } } })
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: allTaskIds } } })
     await prisma.fileObject.deleteMany({ where: { id: { in: allFileIds } } })
     await prisma.endUser.deleteMany({ where: { id: { in: [userA, userB, userC] } } })
@@ -85,11 +204,27 @@ async function main() {
     pass('三个测试会员已创建')
 
     // ── A 的 AiResumeResult：parse(未过期) + optimize(同 taskId) + 过期 parse ──
-    await prisma.aiResumeResult.create({ data: { taskId: taskA, kind: 'parse', status: 'completed', payloadJson: JSON.stringify({ report: { secret: 'RESUME-RAW-A' } }), provider: 'mock', expiresAt: future, endUserId: userA } })
+    const rowParseA = await prisma.aiResumeResult.create({ data: { taskId: taskA, kind: 'parse', status: 'completed', payloadJson: JSON.stringify({ report: { secret: 'RESUME-RAW-A' } }), provider: 'mock', expiresAt: future, endUserId: userA } })
     await prisma.aiResumeResult.create({ data: { taskId: taskA, kind: 'optimize', status: 'completed', payloadJson: JSON.stringify({ modules: [{ after: 'RESUME-RAW-A-OPT' }] }), provider: 'mock', expiresAt: future, endUserId: userA } })
+    await prisma.aiResumeResult.create({ data: { taskId: taskA, kind: 'job_fit', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userA } })
+    await prisma.aiResumeResult.create({ data: { taskId: taskA, kind: 'career_plan', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userA } })
     await prisma.aiResumeResult.create({ data: { taskId: taskAExpired, kind: 'parse', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: past, endUserId: userA } })
     // ── B 的 parse ──
     await prisma.aiResumeResult.create({ data: { taskId: taskB, kind: 'parse', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userB } })
+    const rowJobFitParseA = await prisma.aiResumeResult.create({ data: { taskId: taskJobFit, kind: 'parse', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userA } })
+    const rowJobFitA = await prisma.aiResumeResult.create({ data: { taskId: taskJobFit, kind: 'job_fit', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userA } })
+    const rowCareerPlanA = await prisma.aiResumeResult.create({ data: { taskId: taskJobFit, kind: 'career_plan', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userA } })
+    const rowJobFitB = await prisma.aiResumeResult.create({ data: { taskId: taskJobFitOtherUser, kind: 'job_fit', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userB } })
+    const rowCareerPlanB = await prisma.aiResumeResult.create({ data: { taskId: taskJobFitOtherUser, kind: 'career_plan', status: 'completed', payloadJson: '{}', provider: 'mock', expiresAt: future, endUserId: userB } })
+    await prisma.jobAiSession.createMany({ data: [
+      { endUserId: userA, resumeTaskId: taskA, operation: 'match', status: 'completed', expiresAt: future },
+      { endUserId: userA, resumeTaskId: taskA, operation: 'recommend', status: 'completed', expiresAt: future },
+      { endUserId: userA, resumeTaskId: taskA, operation: 'explain', status: 'completed', expiresAt: future },
+      { endUserId: userA, resumeTaskId: taskJobFit, operation: 'match', status: 'completed', expiresAt: future },
+      { endUserId: userA, resumeTaskId: taskJobFit, operation: 'recommend', status: 'completed', expiresAt: future },
+      { endUserId: userA, resumeTaskId: taskJobFit, operation: 'explain', status: 'completed', expiresAt: future },
+      { endUserId: userB, resumeTaskId: taskJobFit, operation: 'match', status: 'completed', expiresAt: future },
+    ] })
 
     // ── A 的文件：active(未过期) + 软删 ──；B 的文件 ──
     await prisma.fileObject.create({ data: { id: fileA, storageKey: `ma/${fileA}.pdf`, filename: '简历A.pdf', mimeType: 'application/pdf', sizeBytes: 1234, sha256: 'SHA-A-SECRET', purpose: 'resume', expiresAt: future, endUserId: userA, ownerType: 'user', ownerId: userA, status: 'active' } })
@@ -98,7 +233,7 @@ async function main() {
 
     // ── 1. 本人可读 ──────────────────────────────────────────────
     const resA = (await svc.listResumes(userA, firstPage)).items
-    if (resA.length === 1 && resA[0].taskId === taskA && resA[0].optimized === true) pass('1. 本人可读简历：A 得到 1 条 parse，optimized=true（过期 parse 已排除）')
+    if (resA.length === 2 && resA.some((row) => row.taskId === taskA && row.optimized) && resA.some((row) => row.taskId === taskJobFit && !row.optimized)) pass('1. 本人可读简历：A 得到 2 条未过期 parse，优化状态正确')
     else fail(`1. A 简历列表异常：${JSON.stringify(resA)}`)
 
     const docA = (await svc.listDocuments(userA, firstPage)).items
@@ -106,7 +241,7 @@ async function main() {
     else fail(`2. A 文档列表异常：${JSON.stringify(docA)}`)
 
     const aiA = (await svc.listAiRecords(userA, firstPage)).items
-    if (aiA.length === 2 && aiA.every((r) => r.taskId === taskA) && new Set(aiA.map((r) => r.kind)).size === 2) pass('3. 本人可读 AI 记录：A 得到 parse+optimize 2 条（过期已排除）')
+    if (aiA.length === 7 && aiA.every((r) => r.taskId === taskA || r.taskId === taskJobFit)) pass('3. 本人可读 AI 记录：A 得到全部未过期派生记录')
     else fail(`3. A AI 记录异常：${JSON.stringify(aiA)}`)
 
     // ── 2. 跨用户隔离（双向）─────────────────────────────────────
@@ -160,9 +295,60 @@ async function main() {
     const injected = (ctx.switchToHttp().getRequest() as { endUser?: { endUserId: string } }).endUser
     if (allowed === true && injected?.endUserId === userA) pass('10. 有效会员 token + 会话 → 通过并注入本人 endUserId')
     else fail('10. 有效会员鉴权未通过或未注入 endUser')
+
+    // ── 7. 删除 parse：删除同 task 的所有派生结果和全部会话，文件仍由文档资产管理 ──
+    await svc.deleteAiRecord(userA, rowParseA.id)
+    const parseCascade = await prisma.aiResumeResult.count({ where: { endUserId: userA, taskId: taskA } })
+    const parseSessions = await prisma.jobAiSession.count({ where: { endUserId: userA, resumeTaskId: taskA } })
+    const fileAfterParseDelete = await prisma.fileObject.findUnique({ where: { id: fileA }, select: { id: true } })
+    const parseExplainSessions = await prisma.jobAiSession.count({ where: { endUserId: userA, resumeTaskId: taskA, operation: 'explain' } })
+    if (parseCascade === 0 && parseSessions === 0 && parseExplainSessions === 0 && fileAfterParseDelete?.id === fileA) {
+      pass('11. 删除 parse：同 taskId 全 kind 与 match/recommend/explain 全会话删除，FileObject 保持存活')
+    } else {
+      fail(`11. parse 级联不完整 results=${parseCascade} allSessions=${parseSessions} explain=${parseExplainSessions} file=${fileAfterParseDelete?.id ?? 'missing'}`)
+    }
+
+    // ── 8. 删除 job_fit：仅删除该结果和对应 match 会话，不能吞掉同任务其它资产 ──
+    await svc.deleteAiRecord(userA, rowJobFitA.id)
+    const jobFitRow = await prisma.aiResumeResult.findUnique({ where: { id: rowJobFitA.id }, select: { id: true } })
+    const jobFitParse = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId: taskJobFit, kind: 'parse' } }, select: { id: true } })
+    const jobFitCareerPlanA = await prisma.aiResumeResult.findUnique({ where: { id: rowCareerPlanA.id }, select: { id: true } })
+    const jobFitRowB = await prisma.aiResumeResult.findUnique({ where: { id: rowJobFitB.id }, select: { id: true } })
+    const jobFitCareerPlanB = await prisma.aiResumeResult.findUnique({ where: { id: rowCareerPlanB.id }, select: { id: true } })
+    const matchSessions = await prisma.jobAiSession.count({ where: { endUserId: userA, resumeTaskId: taskJobFit, operation: 'match' } })
+    const recommendSessions = await prisma.jobAiSession.count({ where: { endUserId: userA, resumeTaskId: taskJobFit, operation: 'recommend' } })
+    const explainSessions = await prisma.jobAiSession.count({ where: { endUserId: userA, resumeTaskId: taskJobFit, operation: 'explain' } })
+    const otherMemberMatchSessions = await prisma.jobAiSession.count({ where: { endUserId: userB, resumeTaskId: taskJobFit, operation: 'match' } })
+    const fileAfterJobFitDelete = await prisma.fileObject.findUnique({ where: { id: fileA }, select: { id: true } })
+    if (!jobFitRow && jobFitParse && jobFitCareerPlanA && jobFitRowB && jobFitCareerPlanB && matchSessions === 0 && recommendSessions === 1 && explainSessions === 1 && otherMemberMatchSessions === 1 && fileAfterJobFitDelete?.id === fileA) {
+      pass("12. 删除 job_fit：只删本人 job_fit+match，career_plan/recommend/explain/他人结果与会话保持")
+    } else {
+      fail(`12. job_fit 级联异常 ownRow=${Boolean(jobFitRow)} ownParse=${Boolean(jobFitParse)} ownCareer=${Boolean(jobFitCareerPlanA)} otherJobFit=${Boolean(jobFitRowB)} otherCareer=${Boolean(jobFitCareerPlanB)} ownMatch=${matchSessions} ownRecommend=${recommendSessions} ownExplain=${explainSessions} otherMatch=${otherMemberMatchSessions} file=${fileAfterJobFitDelete?.id ?? 'missing'}`)
+    }
+
+    // ── 9. 未知/他人 ID 保持不泄露的统一 404，且不能误删本人数据 ──
+    for (const [recordId, label] of [['missing-record', '未知记录'], [rowJobFitParseA.id, '他人记录']] as const) {
+      try {
+        await svc.deleteAiRecord(userB, recordId)
+        fail(`13. ${label}应统一拒绝`)
+      } catch (error) {
+        if (errCode(error) !== 'MEMBER_RECORD_NOT_FOUND') fail(`13. ${label}错误码不一致: ${errCode(error)}`)
+      }
+    }
+    const ownedRowStillExists = await prisma.aiResumeResult.findUnique({ where: { id: rowJobFitParseA.id }, select: { id: true } })
+    if (!ownedRowStillExists) fail('13. 他人删除失败后本人记录不应消失')
+    else pass('13. 未知/他人 recordId 统一 MEMBER_RECORD_NOT_FOUND 且不删除数据')
+
+    await verifyMemberAssetDeletionTransaction('parse')
+    await verifyMemberAssetDeletionTransaction('job_fit')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
+  }
+
+  if (failed > 0) {
+    console.error(`\n❌ ${failed} 项失败 — 会员资产删除治理未通过\n`)
+    process.exit(1)
   }
 
   console.log('\nALL PASS')
