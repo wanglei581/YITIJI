@@ -150,8 +150,8 @@
 
 首批业务闭环不按目录搬家，按可验收业务流推进。
 
-- [x] **岗位大师 → 2D 岗位匹配 M1.5 代码与预生产 API/数据验收**：PR #200（merge commit `f70024f7`）保留唯一 `/resume/job-fit`、`AiResumeResult(kind=job_fit)` 与 `JobAiService` 治理；实际预生产 `3c565b42` 已验证 migration、PostgreSQL health、匿名/会员 fail-closed、真实会员 LLM/会话/用量、内部 HMAC `printFileUrl`、外部 URL 拒绝、零订单/零出纸、删除级联与精确夹具清理。本地匿名授权 UI 修复补齐显式同意、仅一次重试、撤回与会员引导；前端授权请求只携带 `x-resume-access-token`，CI 执行 M1.5 UI 与 API 打印守卫。本项不代表预生产浏览器、支付、确认页、外跳、物理出纸或 Windows 真机完成。
-- [ ] **岗位大师 → 2D 岗位匹配 M1.5 浏览器与真机验收**：部署包含匿名授权 UI 修复的受控预生产后，以无个人信息匿名夹具验证拒绝→弹窗→明确同意→单次分析、取消不授权、撤回后再次 fail-closed、1080×1920 控制台无错误；再独立执行既有 `/print/confirm`、支付及 Windows Terminal Agent/Pantum 真机链路。不得使用真实用户数据，不新增 `/jobs/master`、不直接外跳或物理出纸。
+- [x] **岗位大师 → 2D 岗位匹配 M1.5 代码与预生产 API/数据验收**：PR #200（merge commit `f70024f7`）保留唯一 `/resume/job-fit`、`AiResumeResult(kind=job_fit)` 与 `JobAiService` 治理；实际预生产 `3c565b42` 已验证 migration、PostgreSQL health、匿名/会员 fail-closed、真实会员 LLM/会话/用量、内部 HMAC `printFileUrl`、外部 URL 拒绝、零订单/零出纸、删除级联与精确夹具清理。PR #210 的匿名授权 Kiosk UI 已作为受控静态 overlay `2618b6c9` 部署：`build-and-verify` 与 `postgres-readiness` 均通过，切换前后 active print task=0、未迁移数据库/重启 PM2；公网 `1080×1920` 合成路由浏览器回归覆盖弹窗、取消、同意后单次重试和撤回。该回归不写预生产数据、不调用 LLM/打印，不替代真实匿名夹具验收。
+- [ ] **岗位大师 → 2D 岗位匹配 M1.5 真实浏览器与真机验收**：以无个人信息匿名夹具在已部署的 Kiosk 静态包上验证真实 API 的拒绝→弹窗→明确同意→单次真实分析、取消不授权、撤回后再次 fail-closed，并确认控制台除预期 HTTP 状态外无错误；再独立执行既有 `/print/confirm`、支付及 Windows Terminal Agent/Pantum 真机链路。不得使用真实用户数据，不新增 `/jobs/master`、不直接外跳或物理出纸。
 
 - [x] **我的页商用闭环计划与准入**：已输出 `docs/superpowers/plans/2026-06-21-profile-commercial-closure.md` 和 `docs/reviews/profile-commercial-closure-planning.md`；目标从“做出闭环”修正为“收口计划、拆分准入和首批执行任务定义”。
 - [x] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；`ProfilePage.tsx` 已降到 177 行，入口、路由、文案和行为保持不变。
