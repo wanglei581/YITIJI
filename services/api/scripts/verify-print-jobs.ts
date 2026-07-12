@@ -22,6 +22,7 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-print-terminal-action-se
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-print-file-signing-secret-0123456789abcd'
 
 import { PrismaService } from '../src/prisma/prisma.service'
+import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -70,6 +71,7 @@ async function main() {
     new PrintPageCountService(prisma, storage),
     new PricingService(prisma),
     new OrderStatusService(prisma, audit),
+    new TerminalCapabilitiesService(prisma),
   )
   const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
 

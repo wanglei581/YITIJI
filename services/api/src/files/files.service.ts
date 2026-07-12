@@ -31,6 +31,7 @@ import {
   isPurpose,
   type UploadValidationMode,
 } from './file-validation'
+import { sniffDeclaredMimeMismatch } from './content-sniff'
 import {
   RetentionPolicyError,
   allowedPoliciesForFile,
@@ -39,6 +40,13 @@ import {
 } from './retention-policy'
 import { summarizeFileLifecycleRows } from './lifecycle-summary'
 import { parseContentFileId, signFileUrl } from './signing'
+
+/**
+ * COS 直传 completeUpload 阶段允许整读回嗅探的对象大小上限。
+ * StorageService 暂无 Range 读取,超过此值的对象(admin_upload / screensaver_material
+ * 等 purpose 允许非视频文件到 500MB)跳过嗅探,避免把数百 MB 读进内存。
+ */
+export const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
 
 /**
  * 文件请求者(下载 / 预览 / 删除鉴权用)。
@@ -94,6 +102,15 @@ export class FilesService {
     })
     if (!validation.ok) {
       throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
+    }
+    // 魔数校验:真实字节须与声明 MIME 签名级一致(降低纯客户端声明的混淆空间;
+    // 非结构级证明,能力边界见 content-sniff.ts 文件头注释)。
+    const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
+    if (!sniff.ok) {
+      this.logger.warn(`Upload content mismatch (purpose=${args.purpose}, declared=${args.mimeType}): ${sniff.reason}`)
+      throw new BadRequestException({
+        error: { code: 'FILE_CONTENT_MISMATCH', message: '文件内容与声明的类型不一致，请检查文件后重新上传' },
+      })
     }
 
     const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
@@ -303,6 +320,24 @@ export class FilesService {
       throw new BadRequestException({ error: { code: 'FILE_TOO_LARGE', message: '上传文件超出大小上限,已拒绝' } })
     }
 
+    // 魔数校验(直传路径:客户端字节直达对象存储,服务端此前从未看过内容)。
+    // 边界:StorageService 没有 ranged/partial read,getObject 会把整个对象读进内存,
+    // 故嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
+    // 本轮明确豁免(属已披露残留;待存储接口支持 Range 读取后收口)。
+    if (!record.mimeType.startsWith('video/') && head.sizeBytes <= DIRECT_UPLOAD_SNIFF_MAX_BYTES) {
+      const bytes = await this.storage.getObject(record.storageKey, record.bucket)
+      const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
+      if (!sniff.ok) {
+        // 与上方超限分支同款处理:物理删除 + quarantined,不让伪装文件留存。
+        this.logger.warn(`Direct-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`)
+        await this.storage.deleteObject(record.storageKey, record.bucket).catch(() => undefined)
+        await this.prisma.fileObject.update({ where: { id: fileId }, data: { status: 'quarantined' } })
+        throw new BadRequestException({
+          error: { code: 'FILE_CONTENT_MISMATCH', message: '文件内容与声明的类型不一致，请检查文件后重新上传' },
+        })
+      }
+    }
+
     const updated = await this.prisma.fileObject.update({
       where: { id: fileId },
       data: { sizeBytes: head.sizeBytes, status: 'active' },
@@ -331,6 +366,14 @@ export class FilesService {
     })
     if (!validation.ok) {
       throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
+    }
+    // 魔数校验:真实字节须与意图阶段声明的 MIME 签名级一致(非结构级证明)。
+    const sniff = sniffDeclaredMimeMismatch(buffer, record.mimeType)
+    if (!sniff.ok) {
+      this.logger.warn(`Raw-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`)
+      throw new BadRequestException({
+        error: { code: 'FILE_CONTENT_MISMATCH', message: '文件内容与声明的类型不一致，请检查文件后重新上传' },
+      })
     }
     const put = await this.storage.putObject(record.storageKey, buffer, record.mimeType, record.bucket)
     await this.prisma.fileObject.update({

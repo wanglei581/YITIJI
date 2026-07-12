@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "verify:admin-file-lifecycle-ui": "node scripts/verify-admin-file-lifecycle.mjs",
     "verify:admin-orders-readonly-ui": "node scripts/verify-admin-orders-readonly-ui.mjs",
+    "verify:admin-print-scan-ui": "node scripts/verify-admin-print-scan-ui.mjs",
     "verify:refresh-safe": "node scripts/verify-refresh-safe.mjs",
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
     "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",

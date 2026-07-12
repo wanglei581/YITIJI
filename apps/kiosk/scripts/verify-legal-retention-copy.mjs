@@ -12,6 +12,11 @@ const repoRoot = join(ROOT, '../..')
 const files = [
   join(ROOT, 'src/pages/legal/LegalDocPage.tsx'),
   join(ROOT, 'src/pages/help/HelpCenterPage.tsx'),
+  // 2026-07-11 起纳入:两个打印页含隐私检查/第三方 OCR 相关文案,
+  // 须同受"不转发第三方"类旧承诺回退守卫覆盖(刻意不扩大到全 src/pages,
+  // 避免其他 mustNotMatch 留存口径在无关页面误报)。
+  join(ROOT, 'src/pages/print/PrintConfirmPage.tsx'),
+  join(ROOT, 'src/pages/print/PrintPreviewPage.tsx'),
   join(repoRoot, 'packages/shared/src/types/complianceCopy.ts'),
   join(repoRoot, 'docs/compliance/launch-review-submissions.md'),
 ]
@@ -35,7 +40,9 @@ const combined = files.map((file) => readFileSync(file, 'utf8')).join('\n')
 
 console.log('\n=== Kiosk 隐私与文件留存文案验证 ===')
 
-for (const marker of ['90 天', '180 天', '长期保存', '短期', '不进入简历库', '不转发任何第三方']) {
+// 2026-07-11：原"不转发任何第三方"承诺不属实（识别/分析实际使用第三方 OCR / AI 服务），
+// 文案已改为诚实披露；此处 marker 同步改为守护"第三方 OCR"披露不被静默删除。
+for (const marker of ['90 天', '180 天', '长期保存', '短期', '不进入简历库', '第三方 OCR']) {
   mustContain(combined, marker, `文案包含 ${marker}`)
 }
 
@@ -49,6 +56,7 @@ mustNotMatch(combined, /通常\s*1\s*小时内/, '不得保留旧通常 1 小时
 mustNotMatch(combined, /默认\s*24\s*小时/, '不得保留旧默认 24 小时口径')
 mustNotMatch(combined, /原始简历[^。；;\n]*长期保存/, '不得暗示原始简历可长期保存')
 mustNotMatch(combined, /简历和求职材料[^。；;\n]*长期保存/, '不得把简历和求职材料统称为可长期保存')
+mustNotMatch(combined, /不转发(任何)?第三方|不向第三方发送/, '不得恢复"不转发第三方"类不实承诺(实际使用第三方 OCR/AI 服务)')
 
 if (failed > 0) {
   console.error(`\n=== FAILED (${failed} 项) ===`)

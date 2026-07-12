@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService } from '../files/files.service'
+import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl } from '../files/signing'
 import type { FilePurpose } from '../files/file.types'
 import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
@@ -89,6 +90,7 @@ export class ScanTasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
+    private readonly capabilities: TerminalCapabilitiesService,
   ) {}
 
   async create(
@@ -106,6 +108,10 @@ export class ScanTasksService {
     if (!terminal.enabled) {
       throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_DISABLED', message: '目标终端已停用' } })
     }
+
+    // Task 10 服务端能力门禁：管理员把该终端 scan 配为非 available 时拒绝创建
+    // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
+    await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
 
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
     const task = await this.prisma.scanTask.create({
