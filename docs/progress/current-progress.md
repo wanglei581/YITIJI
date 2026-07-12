@@ -1,8 +1,10 @@
 # 当前开发进度
 
-> 最后更新：2026-07-11
+> 最后更新：2026-07-12
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
+
+2026-07-12 预生产收口：已把 CI 全绿的 `fba6b414` 部署到 `/srv/ai-job-print`；切换前完成独立 staging 全仓生产构建、PostgreSQL 自定义格式备份并以 `pg_restore -l` 校验，执行唯一 additive migration `20260711150000_add_terminal_capability` 与 `db:pg:sync:check`，PM2 reload 后 health 返回 `db=postgres`，旧 release 保留在独立回滚目录。随后通过 `maintenance:dispose-legacy-pending-print-tasks` 受控关闭 3 条经只读复核的历史匿名未领取任务：`ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。三条均为 `cancelled` 并带 `LEGACY_PENDING_TASK_DISPOSED`；两条关联订单仅将 `taskStatus` 改为 `cancelled`，支付事实分别保持 `unpaid`、`closed`；每条恰有一条 `pending→cancelled` 状态日志和系统管理员审计，冻结筛选条件下剩余 pending 为 0。未直改表、未使用 `failed`、未触发出纸。
 
 ## 当前阶段
 
