@@ -55,6 +55,15 @@ export interface JobFitJobContext {
   requirements?: string | null
 }
 
+/** 与 @ai-job-print/shared 的 JobFitDecisionSupport 保持同一可选响应契约。 */
+export interface JobFitDecisionSupport {
+  analysisVersion: 'job_fit_m1_5'
+  keywordCoverage?: {
+    matched: string[]
+    missing: string[]
+  }
+}
+
 export interface JobFitPayload {
   /** 参考等级（非量化承诺）：reference_high / reference_medium / reference_low */
   fitLevel: 'reference_high' | 'reference_medium' | 'reference_low'
@@ -65,6 +74,8 @@ export interface JobFitPayload {
   gapPoints: Array<{ gap: string; suggestion: string }>
   /** 简历定向优化建议（表达层面） */
   targetedSuggestions: string[]
+  /** M1.5 可选决策辅助；旧模型不输出时保持缺失。 */
+  decisionSupport?: JobFitDecisionSupport
 }
 
 export interface JobFitTokenUsage {
@@ -124,14 +135,13 @@ export class LlmJobFitService {
       '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位。跨岗位差距较大时，应建议"如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配的岗位"。' +
       '\n6. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
       '\n7. 不得出现自相矛盾判断（如"大专但符合本科要求"）。学历、年限、技能不符合岗位要求时，直接说明差距（如"学历不符合要求：岗位要求本科及以上，当前简历为大专学历"）。' +
-      '\n5. 不得建议用户删除、替换、包装真实经历来伪装成目标岗位；跨岗位差距较大时，应建议“如确有相关学习/项目/证书，请补充真实经历，否则优先选择更匹配岗位”。' +
-      '\n6. 不得给出无依据的示例数字（例如“100份/月”“3次/周”“提升30%”）；只能说“补充你实际处理的数量、频次或结果”。' +
-      '\n7. 不得出现自相矛盾判断，例如“大专但符合本科要求”；学历、年限、技能不符合时要直接说差距。' +
+      '\n8. decisionSupport 为可选 M1.5 决策辅助；输出时 analysisVersion 必须为 job_fit_m1_5。keywordCoverage.matched 只列同时出现在简历原文与岗位文本中的关键词；missing 只列岗位文本中出现且简历尚未具备的关键词。' +
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"fitLevel":"reference_high|reference_medium|reference_low","summary":"2-3 句总评（说明这是参考）",' +
       '"matchPoints":[{"point":"与岗位要求的匹配点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
       '"gapPoints":[{"gap":"与岗位要求的差距","suggestion":"表达/准备建议"}](1-4 条),' +
-      '"targetedSuggestions":["针对该岗位修改简历的具体建议"](2-5 条)}'
+      '"targetedSuggestions":["针对该岗位修改简历的具体建议"](2-5 条),' +
+      '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]}}(可选)}'
 
     const jobText =
       `岗位：${job.title}${job.company ? `（${job.company}）` : ''}\n` +
@@ -143,7 +153,7 @@ export class LlmJobFitService {
       const t0 = Date.now()
       const raw = await this.callLlm(sys, user)
       const parsed = this.parse(raw.text)
-      const payload = this.validate(parsed, resumeText)
+      const payload = this.validate(parsed, resumeText, job)
       if (!payload) {
         this.logger.warn(`jobfit.invalid attempt=${attempt} ms=${Date.now() - t0}`)
         continue
@@ -192,7 +202,7 @@ export class LlmJobFitService {
 
   // ── 校验 ──────────────────────────────────────────────────────────────────
 
-  private validate(p: Partial<JobFitPayload> | null, resumeText: string): JobFitPayload | null {
+  private validate(p: Partial<JobFitPayload> | null, resumeText: string, job: JobFitJobContext): JobFitPayload | null {
     if (!p) return null
     const levels = ['reference_high', 'reference_medium', 'reference_low']
     if (!levels.includes(p.fitLevel ?? '') || typeof p.summary !== 'string' || !p.summary.trim()) return null
@@ -230,12 +240,67 @@ export class LlmJobFitService {
       .slice(0, 5)
     if (targetedSuggestions.length === 0) targetedSuggestions.push(safeAdviceFallback())
 
+    const decisionSupport = this.validateDecisionSupport(p.decisionSupport, resumeText, job)
+
     return {
       fitLevel: p.fitLevel as JobFitPayload['fitLevel'],
       summary: p.summary.trim().slice(0, 500),
       matchPoints,
       gapPoints,
       targetedSuggestions,
+      ...(decisionSupport ? { decisionSupport } : {}),
+    }
+  }
+
+  /**
+   * M1.5 是可选增量：旧模型缺失该对象时不补默认值。matched 必须同时出自
+   * 简历与岗位要求；missing 必须出自岗位要求且尚未出现在简历。公司名不是岗位要求。
+   */
+  private validateDecisionSupport(
+    value: unknown,
+    resumeText: string,
+    job: JobFitJobContext,
+  ): JobFitDecisionSupport | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+    const support = value as { analysisVersion?: unknown; keywordCoverage?: unknown }
+    if (support.analysisVersion !== 'job_fit_m1_5') return undefined
+    if (!support.keywordCoverage || typeof support.keywordCoverage !== 'object' || Array.isArray(support.keywordCoverage)) {
+      return { analysisVersion: 'job_fit_m1_5' }
+    }
+
+    const coverage = support.keywordCoverage as { matched?: unknown; missing?: unknown }
+    if (!Array.isArray(coverage.matched) || !Array.isArray(coverage.missing)) {
+      return { analysisVersion: 'job_fit_m1_5' }
+    }
+
+    const cleanKeywords = (keywords: unknown[]): string[] => [
+      ...new Set(
+        keywords
+          .filter((keyword): keyword is string => typeof keyword === 'string' && keyword.trim().length > 0)
+          .map((keyword) => keyword.trim().slice(0, 80)),
+      ),
+    ]
+    const normalizedResume = normalizeForMatch(resumeText)
+    const normalizedJob = normalizeForMatch(
+      [job.title, job.description, job.requirements]
+        .filter((part): part is string => typeof part === 'string')
+        .join('\n'),
+    )
+    const matched = cleanKeywords(coverage.matched).filter((keyword) => {
+      const needle = normalizeForMatch(keyword)
+      return needle.length > 0 && normalizedResume.includes(needle) && normalizedJob.includes(needle)
+    })
+    const missing = cleanKeywords(coverage.missing).filter((keyword) => {
+      const needle = normalizeForMatch(keyword)
+      return needle.length > 0 && normalizedJob.includes(needle) && !normalizedResume.includes(needle)
+    })
+
+    return {
+      analysisVersion: 'job_fit_m1_5',
+      keywordCoverage: {
+        matched,
+        missing,
+      },
     }
   }
 
