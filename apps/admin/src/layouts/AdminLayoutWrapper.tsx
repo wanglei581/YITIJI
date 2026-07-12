@@ -161,7 +161,7 @@ export function AdminLayoutWrapper() {
     <AdminLayout
       navItems={NAV_ITEMS}
       activeKey={activeKey}
-      visualTheme={activeKey === 'dashboard' ? 'service-desk' : 'legacy'}
+      visualTheme={location.pathname === '/' ? 'service-desk' : 'legacy'}
       density="compact"
       onNavChange={(key) => navigate(KEY_TO_PATH[key] ?? '/')}
       collapsed={collapsed}

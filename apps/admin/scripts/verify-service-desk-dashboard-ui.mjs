@@ -27,6 +27,14 @@ function stripComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 }
 
+function evaluateVisualTheme(expression, pathname, activeKey) {
+  try {
+    return Function('location', 'activeKey', `return (${expression})`)({ pathname }, activeKey)
+  } catch {
+    return undefined
+  }
+}
+
 console.log('\n=== Admin service-desk dashboard UI verification ===')
 
 check(
@@ -35,12 +43,29 @@ check(
   'package script points to the service-desk dashboard verifier',
 )
 
+const visualThemeExpression = layout.match(/visualTheme=\{([^}\n]+)\}/)?.[1]
+
 check(
-  /visualTheme=\{activeKey === ['"]dashboard['"] \? ['"]service-desk['"] : ['"]legacy['"]\}/.test(layout) &&
+  /visualTheme=\{location\.pathname === ['"]\/['"] \? ['"]service-desk['"] : ['"]legacy['"]\}/.test(layout) &&
     /density=['"]compact['"]/.test(layout) &&
     count(layout, 'visualTheme=') === 1 &&
     count(layout, 'density=') === 1,
-  'AdminLayout opts only the dashboard route into service-desk with compact density',
+  'AdminLayout scopes service-desk compact density to the exact dashboard pathname',
+)
+
+const visualThemeCases = [
+  { pathname: '/', activeKey: 'dashboard', expected: 'service-desk' },
+  { pathname: '/alerts/', activeKey: 'dashboard', expected: 'legacy' },
+  { pathname: '/devices/', activeKey: 'dashboard', expected: 'legacy' },
+  { pathname: '/unknown-route', activeKey: 'dashboard', expected: 'legacy' },
+]
+check(
+  visualThemeExpression !== undefined &&
+    visualThemeCases.every(
+      ({ pathname, activeKey, expected }) =>
+        evaluateVisualTheme(visualThemeExpression, pathname, activeKey) === expected,
+    ),
+  'only / resolves to service-desk even when non-dashboard paths fall back to the dashboard nav key',
 )
 
 const loadStart = dashboard.indexOf('const load = useCallback(() => {')
