@@ -405,6 +405,29 @@ async function assertRuntimeContract(): Promise<void> {
     check(authorizerCalls > callsBefore, `${name} 通过 authorizeParseForJobFit 裁决匿名归属`)
   }
 
+  // 历史/未知版本不能被当作仍有效的匿名授权；重新 grant 必须显式迁移到当前版本。
+  const legacyGrantedAt = new Date('2001-02-03T04:05:06.000Z')
+  state.row = {
+    endUserId: null,
+    accessTokenHash: hash(validToken),
+    expiresAt: future(),
+    payloadJson: '{}',
+    jobAiConsentVersion: 'job_fit_anonymous_v0',
+    jobAiConsentGrantedAt: legacyGrantedAt,
+    jobAiConsentRevokedAt: null,
+  }
+  const legacyStatus = await status('legacy-version-task', anonymousRequester)
+  const legacyStatusData = legacyStatus as { active?: unknown; grantedAt?: unknown }
+  check(legacyStatusData.active === false && legacyStatusData.grantedAt === legacyGrantedAt,
+    '未知 consent version 即使已有 grantedAt 且未撤回，status 也必须 active=false')
+  await grant('legacy-version-task', anonymousRequester)
+  check(state.row.jobAiConsentVersion === 'job_fit_anonymous_v1',
+    '未知 consent version 的下一次 grant 必须写入当前 version')
+  check(state.row.jobAiConsentGrantedAt instanceof Date
+    && state.row.jobAiConsentGrantedAt.getTime() > legacyGrantedAt.getTime()
+    && state.row.jobAiConsentRevokedAt === null,
+  '未知 consent version 的下一次 grant 必须覆盖 grantedAt 并清除 revokedAt')
+
   state.row = {
     endUserId: null,
     accessTokenHash: hash(validToken),
