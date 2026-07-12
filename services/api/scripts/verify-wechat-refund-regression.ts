@@ -332,10 +332,17 @@ async function main(): Promise<void> {
   })
 >>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
 
+  // 所有可能抛错的服务构造（如 StorageService 的 COS 配置校验）都在 DB 连接**之前**完成：
+  // 构造失败时进程直接退出，不会留下已连接的 DB 会话或半初始化的清理窗口。
   const prisma = new PrismaService()
-  await prisma.onModuleInit()
   const audit = new AuditService(prisma)
-  const storage = new StorageService()
+  let storage: StorageService
+  try {
+    storage = new StorageService()
+  } catch (e) {
+    await closeGateway().catch(() => undefined)
+    throw e
+  }
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
@@ -418,6 +425,7 @@ async function main(): Promise<void> {
   const payment = new OnlinePaymentService(prisma, audit, orderStatus, registry)
   const refundService = new RefundService(prisma, audit, registry)
   const reconciliation = new ReconciliationService(prisma)
+  await prisma.onModuleInit() // 连接放在全部构造之后：连接成功即进入受保护的 try/清理双通道
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_wxrr_${suffix}`
@@ -523,6 +531,7 @@ async function main(): Promise<void> {
     }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     server.close()
 >>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
 =======
@@ -532,11 +541,24 @@ async function main(): Promise<void> {
     const attemptIds = (
       await prisma.paymentAttempt.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } }).catch(() => [])
     ).map((a) => a.id)
+=======
+    // attemptIds 查询失败必须进入错误汇总，且此时**跳过删除 PaymentAttempt 实体**——
+    // 保留实体让下次运行仍能定位并清理其审计，避免制造孤儿 AuditLog 后静默通过。
+    let attemptIds: string[] | null = null
+    await step('attemptIds 查询', async () => {
+      attemptIds = (await prisma.paymentAttempt.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } })).map((a) => a.id)
+    })
+>>>>>>> faec754b (fix(payment): C5-6 清理健壮性最终闭环（第三轮 H/M×2）)
     await step('auditLog(order)', () => prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: orderIds } } }))
     await step('auditLog(print_task)', () => prisma.auditLog.deleteMany({ where: { targetType: 'print_task', targetId: { in: taskIds } } }))
-    await step('auditLog(payment_attempt)', () => prisma.auditLog.deleteMany({ where: { targetType: 'payment_attempt', targetId: { in: attemptIds } } }))
+    if (attemptIds !== null) {
+      const ids = attemptIds
+      await step('auditLog(payment_attempt)', () => prisma.auditLog.deleteMany({ where: { targetType: 'payment_attempt', targetId: { in: ids } } }))
+    }
     await step('refund', () => prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } }))
-    await step('paymentAttempt', () => prisma.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } }))
+    if (attemptIds !== null) {
+      await step('paymentAttempt', () => prisma.paymentAttempt.deleteMany({ where: { orderId: { in: orderIds } } }))
+    }
     await step('order', () => prisma.order.deleteMany({ where: { id: { in: orderIds } } }))
     await step('printTask', () => prisma.printTask.deleteMany({ where: { id: { in: taskIds } } }))
     await step('terminal', () => prisma.terminal.deleteMany({ where: { id: terminalId } }))
@@ -800,14 +822,22 @@ async function main(): Promise<void> {
     runError = e
 >>>>>>> abe03372 (fix(payment): C5-6 门禁清理闭环（确认轮 H1/M1/L1）)
   }
-  // 清理错误不得掩盖原始断言错误，也不得阻断 prisma 断连；两类错误均不静默。
+  // 清理错误不得掩盖原始断言错误，也不得阻断 prisma 断连；两类错误均不静默：
+  // 双错并存时，清理错误先行打印诊断，再抛原始断言错误。
   let cleanupError: unknown = null
   try {
     await cleanup()
   } catch (e) {
     cleanupError = e
   }
-  await prisma.onModuleDestroy().catch(() => undefined)
+  try {
+    await prisma.onModuleDestroy()
+  } catch (e) {
+    console.error(`  WARN prisma 断连失败（不影响判定）: ${(e as Error)?.message ?? String(e)}`)
+  }
+  if (cleanupError && runError) {
+    console.error(cleanupError instanceof VerifyFailure ? cleanupError.message : `  FAIL cleanup: ${String(cleanupError)}`)
+  }
   if (runError) throw runError
   if (cleanupError) throw cleanupError
 }
