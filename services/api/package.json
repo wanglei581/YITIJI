@@ -171,9 +171,13 @@
     "verify:refund-convergence": "node -r @swc-node/register scripts/verify-refund-convergence.ts",
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
     "verify:wechat-refund-regression": "node -r @swc-node/register scripts/verify-wechat-refund-regression.ts",
+<<<<<<< HEAD
     "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts",
     "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
     "verify:print-sign": "node -r @swc-node/register scripts/verify-print-sign.ts"
+=======
+    "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts"
+>>>>>>> c2ea58d1 (feat(payment): C5-6 退款端到端回归门禁 + 对账/异常退款 SOP + FREE_MODE 决策记录)
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
