@@ -23,6 +23,8 @@ const PROD_OK: Env = {
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
   // C5-6：生产必须显式声明 paid-before-claim（缺省即拒启动）
   PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
+  // Task 11：生产必须显式声明 print-scan 能力开关未配置行语义
+  PRINT_SCAN_CAPABILITY_MODE: 'managed',
 }
 const REQUIRED_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
@@ -263,6 +265,22 @@ function main(): void {
     { ...PROD_OK, PAYMENT_PROVIDER: 'alipay', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
     'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED',
     'alipay 通道同样强制先付后印',
+  )
+
+  // Task 11：print-scan feature gate 显式声明
+  expectRejected(
+    { ...PROD_OK, PRINT_SCAN_CAPABILITY_MODE: undefined },
+    'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED',
+    '生产环境拒绝未显式声明 PRINT_SCAN_CAPABILITY_MODE（print-scan feature gate 配置缺失即拒启动）',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_SCAN_CAPABILITY_MODE: 'enabled' },
+    'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED',
+    '生产环境拒绝枚举外的 PRINT_SCAN_CAPABILITY_MODE 取值',
+  )
+  expectAllowed(
+    { ...PROD_OK, PRINT_SCAN_CAPABILITY_MODE: 'strict' },
+    '生产环境允许显式声明 strict（未配置能力行 fail-closed）',
   )
 
   console.log('\n=== ALL PASS ===')

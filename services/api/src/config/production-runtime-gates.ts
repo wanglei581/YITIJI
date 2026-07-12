@@ -16,6 +16,9 @@
  *     由 Provider 工厂启动期校验凭证齐全，缺一拒启动）
  *   - PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须显式声明 true|false（C5-6：未支付订单能否被
  *     claim 出纸是显式部署决策）；启用 wechat/alipay 时必须为 true（先付后印）
+ *   - PRINT_SCAN_CAPABILITY_MODE 必须显式声明 managed|strict（Task 11：打印扫描能力开关
+ *     是每终端 × 能力键的 DB 配置，未配置行在 managed 模式放行既有闭环、strict 模式
+ *     fail-closed 拒绝；选哪种是显式部署决策，生产不允许沉默缺省）
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
@@ -42,6 +45,7 @@ export interface ProductionRuntimeEnv {
   PAYMENT_SESSION_SECRET?: string
   PAYMENT_PROVIDER?: string
   PRINT_REQUIRE_PAID_BEFORE_CLAIM?: string
+  PRINT_SCAN_CAPABILITY_MODE?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -162,6 +166,18 @@ export function assertProductionRuntimeGates(
   if (realChannelEnabled && paidBeforeClaim !== 'true') {
     throw new Error(
       'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED: 启用真实支付通道（wechat/alipay）时 PRINT_REQUIRE_PAID_BEFORE_CLAIM 必须为 true（先付后印，服务端门禁）',
+    )
+  }
+
+  // Task 11：print-scan feature gate 配置模式必须显式声明。能力开关是每终端 × 能力键
+  // 的 DB 配置（TerminalCapability），未配置行的语义由本 env 决定：
+  //   managed = 未配置行放行既有已验证闭环（管理员按需接管）
+  //   strict  = 未配置行 fail-closed 拒绝（全部能力必须显式验收后配置）
+  // 生产沉默缺省会让"能力开关是否接管"变成隐式状态，必须显式决策。
+  const capabilityMode = env.PRINT_SCAN_CAPABILITY_MODE?.trim().toLowerCase()
+  if (capabilityMode !== 'managed' && capabilityMode !== 'strict') {
+    throw new Error(
+      'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED: NODE_ENV=production 时必须显式设置 PRINT_SCAN_CAPABILITY_MODE=managed|strict（print-scan 能力开关未配置行的放行/拒绝语义必须是显式部署决策）',
     )
   }
 }
