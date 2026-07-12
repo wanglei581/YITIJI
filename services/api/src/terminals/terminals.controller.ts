@@ -28,6 +28,7 @@ import { Throttle } from '@nestjs/throttler'
 import type { Response } from 'express'
 import { TerminalsService, SAMPLE_PNG, SAMPLE_VISIBLE_PDF } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
+import { TerminalCapabilitiesService } from './terminal-capabilities.service'
 import { RegisterTerminalDto } from './dto/register-terminal.dto'
 import { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import { HeartbeatDto } from './dto/heartbeat.dto'
@@ -40,6 +41,7 @@ export class TerminalsController {
   constructor(
     private readonly terminalsService: TerminalsService,
     private readonly toolbox: TerminalToolboxService,
+    private readonly capabilities: TerminalCapabilitiesService,
   ) {}
 
   // ── 1. Register ──────────────────────────────────────────────────────────
@@ -126,6 +128,16 @@ export class TerminalsController {
     }
     // 终端存在但未上报心跳：返回 isOnline=false（不是 404）
     return rest
+  }
+
+  // ── 5b. Capability gates for Kiosk ──────────────────────────────────────
+  // GET /api/v1/terminals/:terminalId/capabilities  (no auth — read-only, non-sensitive)
+  // Kiosk 服务中心按此决定能力卡片可用态；未配置的键 configured=false，
+  // 前端按各自保守默认处理，不得把 not_verified 放大成可用。
+  @Get('terminals/:terminalId/capabilities')
+  @HttpCode(HttpStatus.OK)
+  async getTerminalCapabilities(@Param('terminalId') terminalId: string) {
+    return this.capabilities.listForTerminal(terminalId)
   }
 
   // ── 6. Test file — mock task download ────────────────────────────────────

@@ -31,6 +31,7 @@ if (!process.env['FILE_SIGNING_SECRET'] || process.env['FILE_SIGNING_SECRET'].le
 process.env['FILE_STORAGE_DRIVER'] = 'local'
 
 import { PrismaService } from '../src/prisma/prisma.service'
+import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
@@ -426,7 +427,8 @@ async function main() {
         new PrintPageCountService(prisma, storage),
         new PricingService(prisma),
         new OrderStatusService(prisma, audit),
-      )
+    new TerminalCapabilitiesService(prisma),
+  )
       await expectCode(
         () => printJobsForFair.create({ fileUrl: fairDelivery.printFileUrl }, { terminalId: 'not-reached-for-revoked-fair' }),
         'PRINT_FILE_REVOKED',
@@ -452,7 +454,8 @@ async function main() {
         new PrintPageCountService(prisma, storage),
         new PricingService(prisma),
         new OrderStatusService(prisma, audit),
-      )
+    new TerminalCapabilitiesService(prisma),
+  )
       await expectCode(
         () => printJobs.create({ fileUrl: activeDelivery.printFileUrl }, { terminalId: 'not-reached-for-revoked-file' }),
         'PRINT_FILE_REVOKED',

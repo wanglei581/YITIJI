@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { OrderStatusService } from '../payment/order-status.service'
 import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from '../payment/payment-session-token'
@@ -157,6 +158,7 @@ export class PrintJobsService {
     private readonly pageCount: PrintPageCountService,
     private readonly pricing: PricingService,
     private readonly orderStatus: OrderStatusService,
+    private readonly capabilities: TerminalCapabilitiesService,
   ) {}
 
   async create(
@@ -255,6 +257,10 @@ export class PrintJobsService {
       })
     }
     const targetTerminalId = terminal.id
+
+    // Task 10 服务端能力门禁：管理员把该终端 document_print 配为非 available 时
+    // 拒绝创建（未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
+    await this.capabilities.assertUserTaskAllowed(targetTerminalId, 'document_print')
 
     // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
     // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。
@@ -369,9 +375,12 @@ export class PrintJobsService {
       })
     }
     // 失败判定：终态 failed，或已落库 errorCode/errorMessage（Agent 回传过失败信息）。
+    // cancelled 是受控关闭，不得因其运维 errorCode 伪装成设备打印失败。
     // DB 里的原始 task.errorCode / task.errorMessage 保持不动，供后台/排障视图使用；
     // 用户端只回**安全用户文案**，绝不把 Agent 原始 errorMessage 透出。
-    const hasFailure = task.status === 'failed' || Boolean(task.errorCode) || Boolean(task.errorMessage)
+    const hasFailure = task.status !== 'cancelled' && (
+      task.status === 'failed' || Boolean(task.errorCode) || Boolean(task.errorMessage)
+    )
     const safeReason = hasFailure ? failureReasonForUser(task.errorCode) : undefined
     return {
       taskId:       task.id,

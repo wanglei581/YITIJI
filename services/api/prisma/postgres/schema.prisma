@@ -37,13 +37,35 @@ model Terminal {
   registeredAt      DateTime @default(now())
   lastSeenAt        DateTime @updatedAt
 
-  heartbeats TerminalHeartbeat[]
-  printTasks PrintTask[]
-  bindCodes  TerminalBindCode[]
-  scanTasks  ScanTask[]
+  heartbeats   TerminalHeartbeat[]
+  printTasks   PrintTask[]
+  bindCodes    TerminalBindCode[]
+  scanTasks    ScanTask[]
+  capabilities TerminalCapability[]
 
   @@index([orgId])
   @@index([enabled])
+}
+
+// ── TerminalCapability ────────────────────────────────────────────────────────
+// 打印扫描首期能力开关（Task 10 Step 3）。status 取值对齐 packages/shared 的
+// PrintScanCapabilityStatus：available/testing/maintenance/unsupported/not_verified。
+// fail-closed 语义：只有 'available' 允许普通用户创建正式任务；未配置行 = 未接管，
+// Kiosk 按各自保守默认处理。管理员写入必须落 AuditLog。
+
+model TerminalCapability {
+  id            String   @id @default(cuid())
+  terminalId    String
+  terminal      Terminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  capabilityKey String
+  status        String   @default("not_verified")
+  note          String?
+  updatedBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([terminalId, capabilityKey])
+  @@index([terminalId])
 }
 
 // ── TerminalBindCode ─────────────────────────────────────────────────────────
@@ -70,8 +92,8 @@ model TerminalBindCode {
 }
 
 // ── PrintTask ─────────────────────────────────────────────────────────────────
-// status values: "pending" | "claimed" | "printing" | "completed" | "failed"
-// Terminal states (completed / failed) must never be overwritten.
+// status values: "pending" | "claimed" | "printing" | "completed" | "failed" | "cancelled"
+// Terminal states (completed / failed / cancelled) must never be overwritten.
 
 model PrintTask {
   id           String    @id
@@ -353,7 +375,7 @@ model Organization {
 //   'policy_guide'  政策扶持条目(Kiosk 政策 Tab,按 audience 人群分组展示)
 //   'notice'        政策公告(Kiosk 公告 Tab,按 category 标签展示)
 // audience(kind=policy_guide):
-//   'graduate' 应届高校毕业生 | 'migrant' 返乡务工人员 | 'hardship' 困难群体 | 'startup' 创业扶持 | 'general'
+//   'graduate' 应届高校毕业生 | 'flexible' 灵活就业人员 | 'migrant' 返乡务工人员 | 'hardship' 困难群体 | 'startup' 创业扶持 | 'general'
 // category(kind=notice):
 //   'policy' 政策 | 'announcement' 公告 | 'notice' 通知 | 'recruitment' 招募
 //

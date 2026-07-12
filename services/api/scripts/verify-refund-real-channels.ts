@@ -56,6 +56,7 @@ import {
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { signFileUrl } from '../src/files/signing'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
@@ -274,7 +275,7 @@ async function main(): Promise<void> {
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
-  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus)
+  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const registry = new PaymentProviderRegistry([wechatProvider, alipayProvider])
   const payment = new OnlinePaymentService(prisma, audit, orderStatus, registry)
   const refundService = new RefundService(prisma, audit, registry)

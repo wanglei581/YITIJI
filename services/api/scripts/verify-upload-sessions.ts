@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
+import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
 
@@ -106,6 +107,14 @@ class FakeFilesService {
     })
     if (!validation.ok) {
       throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
+    }
+    // 与真实 FilesService.upload 同款魔数校验(files/content-sniff.ts),
+    // 保证本脚本的拒绝断言走的是同一条服务端校验链。
+    const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
+    if (!sniff.ok) {
+      throw new BadRequestException({
+        error: { code: 'FILE_CONTENT_MISMATCH', message: '文件内容与声明的类型不一致，请检查文件后重新上传' },
+      })
     }
     const id = `file_${this.next++}`
     const file: StoredFile = {
@@ -305,6 +314,16 @@ async function main(): Promise<void> {
       () => service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'resume.exe', mimetype: 'application/pdf' }) }),
       BadRequestException,
       'extension mismatch rejected through file validation',
+    )
+    // 魔数校验:文件名/声明 MIME 全对但真实字节不是 PDF(伪装 PDF)→ 服务端拒绝
+    await expectRejects(
+      () => service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file({ buffer: Buffer.from('this is not a pdf at all'), originalname: 'resume.pdf', mimetype: 'application/pdf' }),
+      }),
+      BadRequestException,
+      'fake PDF payload rejected by content sniffing (FILE_CONTENT_MISMATCH)',
     )
     const retry = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
     assert.equal(retry.status, 'uploaded')

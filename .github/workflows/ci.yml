@@ -46,7 +46,10 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
     steps:
+      # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Guard — no tracked AI tool state
         # 防止 .ccg/tasks 等 AI 工具临时状态被(强制)提交回库；.ccg/spec 正式规范不在此列。
@@ -140,6 +143,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
+          pnpm --filter @ai-job-print/kiosk verify:legal-retention-copy
           pnpm --filter @ai-job-print/kiosk verify:price-single-source
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
@@ -155,9 +159,13 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:kiosk-shell-active-nav
           pnpm --filter @ai-job-print/kiosk verify:prod-build-config
           pnpm --filter @ai-job-print/kiosk verify:job-info-ui
+          pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
           pnpm --filter @ai-job-print/admin verify:admin-billing-ui
+          pnpm --filter @ai-job-print/admin verify:admin-print-scan-ui
+          pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
+          pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -175,6 +183,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:admin-print-scan
+          pnpm --filter @ai-job-print/api verify:admin-ops
+          pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
@@ -228,8 +239,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs
+          pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:resume-extraction
+          pnpm --filter @ai-job-print/api verify:upload-sessions
+          pnpm --filter @ai-job-print/api verify:cos:files
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
   # 全新 PG 空库:schema 同步校验 → migrate deploy → seed → 核心 verify。
@@ -308,11 +322,13 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:activity-logs
+          pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
@@ -333,3 +349,5 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs
+          pnpm --filter @ai-job-print/api verify:upload-sessions
+          pnpm --filter @ai-job-print/api verify:cos:files

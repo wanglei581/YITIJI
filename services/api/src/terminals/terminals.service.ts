@@ -10,7 +10,7 @@
 //
 // Key invariants:
 //   - claim uses $transaction for atomic pending→claimed transition
-//   - completed/failed are terminal states: PATCH is idempotent, DB not rewritten
+//   - completed/failed/cancelled are terminal states: PATCH is idempotent, DB not rewritten
 //   - seed task uses upsert so API restart never duplicates it
 //   - All timestamps are ISO-8601 strings at the API boundary
 // ============================================================
@@ -39,9 +39,9 @@ import { DEFAULT_SMART_CAMPUS_MODULES, type SmartCampusModules } from '../smart-
 
 // ── Task status type ──────────────────────────────────────────────────────────
 
-type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed'
+type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed' | 'cancelled'
 
-const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed']
+const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed', 'cancelled']
 
 const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
   claimed: ['printing', 'failed'],

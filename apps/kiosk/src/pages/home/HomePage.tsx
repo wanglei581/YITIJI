@@ -350,8 +350,9 @@ const SERVICE_GROUPS: ServiceGroup[] = [
     accent: 'wheat',
     span2: true,
     tiles: [
+      // 「就业政策」Tab 内含补贴指引内容；「社保指南」与 tab=social 一一对应，避免同义重复入口。
       { title: '就业政策', icon: 'policy', to: '/renshi?tab=policy' },
-      { title: '补贴指引', icon: 'ticket', to: '/renshi?tab=social' },
+      { title: '社保指南', icon: 'ticket', to: '/renshi?tab=social' },
       { title: '档案 / 登记', icon: 'files', to: '/renshi?tab=register' },
     ],
   },
