@@ -180,6 +180,33 @@ async function main() {
       pass('0. live OCR verify 复用兼容 PDF 渲染器，禁止回退 renderPageAsImage')
     }
 
+    // ── 0.5 Node 20 缺失 ArrayBuffer API 时仍可渲染 ────────────────────────
+    {
+      const original = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'transferToFixedLength')
+      try {
+        Object.defineProperty(ArrayBuffer.prototype, 'transferToFixedLength', {
+          configurable: true,
+          writable: true,
+          value: undefined,
+        })
+        const { ensureArrayBufferTransferToFixedLength } = await import('../src/ai/resume/ocr/pdf-page-renderer')
+        if (typeof ensureArrayBufferTransferToFixedLength !== 'function') fail('0.5 必须导出 Node 20 ArrayBuffer 兼容函数')
+        ensureArrayBufferTransferToFixedLength()
+        const source = new Uint8Array([7, 9, 11, 13]).buffer as ArrayBuffer & {
+          transferToFixedLength?: (length?: number) => ArrayBuffer
+        }
+        const fixed = source.transferToFixedLength?.(2)
+        if (!(fixed instanceof ArrayBuffer)) fail('0.5 兼容函数必须返回 ArrayBuffer')
+        if (fixed.byteLength !== 2 || new Uint8Array(fixed)[0] !== 7 || new Uint8Array(fixed)[1] !== 9) {
+          fail('0.5 兼容函数必须保留截断后的前缀字节')
+        }
+        pass('0.5 Node 20 缺失 ArrayBuffer API 时安装安全的固定长度拷贝兼容层')
+      } finally {
+        if (original) Object.defineProperty(ArrayBuffer.prototype, 'transferToFixedLength', original)
+        else delete (ArrayBuffer.prototype as { transferToFixedLength?: unknown }).transferToFixedLength
+      }
+    }
+
     // ── 1. 图片 OCR 成功映射 ────────────────────────────────────────────────
     {
       const provider = new BaiduOcrProvider()

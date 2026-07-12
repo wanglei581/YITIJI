@@ -30,6 +30,34 @@ interface PdfjsDocument {
   destroy(): Promise<void>
 }
 
+type ArrayBufferTransferPrototype = {
+  transferToFixedLength?: (this: ArrayBuffer, newByteLength?: number) => ArrayBuffer
+}
+
+/**
+ * pdfjs bundled by unpdf 1.6.2 uses ArrayBuffer#transferToFixedLength when
+ * building the page operator list. Node 20 lacks that newer API; emulate the
+ * fixed-length copy result only when the runtime does not provide it.
+ */
+export function ensureArrayBufferTransferToFixedLength(): void {
+  const prototype = ArrayBuffer.prototype as unknown as ArrayBufferTransferPrototype
+  if (typeof prototype.transferToFixedLength === 'function') return
+
+  Object.defineProperty(prototype, 'transferToFixedLength', {
+    configurable: true,
+    writable: true,
+    value(this: ArrayBuffer, newByteLength = this.byteLength): ArrayBuffer {
+      if (!(this instanceof ArrayBuffer)) throw new TypeError('ArrayBuffer receiver required')
+      if (!Number.isSafeInteger(newByteLength) || newByteLength < 0) {
+        throw new RangeError('Invalid ArrayBuffer length')
+      }
+      const fixed = new ArrayBuffer(newByteLength)
+      new Uint8Array(fixed).set(new Uint8Array(this, 0, Math.min(this.byteLength, newByteLength)))
+      return fixed
+    },
+  })
+}
+
 // pdfjs 图片解码路径需要这些 DOM 全局；@napi-rs/canvas 提供 Node 实现。
 for (const [name, impl] of Object.entries({ ImageData, Path2D, DOMMatrix })) {
   const g = globalThis as Record<string, unknown>
@@ -88,6 +116,7 @@ export interface RenderedPdf {
 
 /** 打开 PDF 供逐页渲染（调用方负责 destroy）。 */
 export async function openPdfForRender(buffer: Buffer): Promise<RenderedPdf> {
+  ensureArrayBufferTransferToFixedLength()
   const pdfjs = await getResolvedPDFJS()
   const doc = await pdfjs.getDocument({
     data: new Uint8Array(buffer),
