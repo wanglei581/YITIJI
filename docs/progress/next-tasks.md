@@ -150,7 +150,8 @@
 
 首批业务闭环不按目录搬家，按可验收业务流推进。
 
-- [~] **岗位大师 → 2D 岗位匹配 M1.5 整合候选**：从最新主线独立分支选择性移植决策台素材，保留唯一 `/resume/job-fit`、`AiResumeResult(kind=job_fit)` 与 `JobAiService` 治理；已完成匿名 parse 授权、会员 consent / 配额 / 会话 / 用量、数据删除、PDF 内部 `printFileUrl`、现有打印确认链路、AI 记录去重及局部墨青纸感。Claude 终审发现的 parse 删除本地级联展示缺口已修并通过门禁；Antigravity 只读终审结论为 `APPROVE`。当前为本地候选，未 push / 未提 PR / 未部署；仍需 CI 全量回归，随后再做真实会员 / LLM / 预生产打印 / Windows 真机验收。
+- [x] **岗位大师 → 2D 岗位匹配 M1.5 代码整合**：PR #200（merge commit `f70024f7`）已合入 `main`，`build-and-verify` 与 `postgres-readiness` 均通过；保留唯一 `/resume/job-fit`、`AiResumeResult(kind=job_fit)` 与 `JobAiService` 治理，已覆盖匿名 parse 授权、会员 consent / 配额 / 会话 / 用量、数据删除、PDF 内部 `printFileUrl`、现有打印确认链路、AI 记录去重及局部墨青纸感。Claude 终审发现的 parse 删除本地级联展示缺口已修并通过门禁；Claude 与 Antigravity 终审均为 `APPROVE`。仅代码与 CI 已完成，尚未部署预生产或完成真实会员 / LLM / 打印 / Windows 真机验收。
+- [ ] **岗位大师 → 2D 岗位匹配 M1.5 预生产验收**：在包含 PR #200 的受控预生产发布中，先备份并对 PostgreSQL 变体执行唯一 additive migration `20260712090000_add_job_fit_anonymous_consent`，再运行 `db:pg:sync:check` 与受控 reload；以无个人信息夹具分别核验会员和匿名 consent / 配额 / 会话 / `AiServiceLog`，删除 `AiResumeResult(kind=parse)` 后其 `jobAiConsent*` 列、同任务 `job_fit` 结果和关联 match 会话均按既有删除治理清除；在不出纸条件下核验 `POST /resume/job-fit/:taskId/print` → `/print/confirm` 仅接收内部 HMAC `printFileUrl` 且外部 COS URL 被拒，夹具按精确 ID 清理。该项区别于已完成的招聘会资料 bridge 无出纸验收；不新增 `/jobs/master`、不直接外跳、不做真实支付或物理出纸，Windows 真机验收仍独立记录。
 
 - [x] **我的页商用闭环计划与准入**：已输出 `docs/superpowers/plans/2026-06-21-profile-commercial-closure.md` 和 `docs/reviews/profile-commercial-closure-planning.md`；目标从“做出闭环”修正为“收口计划、拆分准入和首批执行任务定义”。
 - [x] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；`ProfilePage.tsx` 已降到 177 行，入口、路由、文案和行为保持不变。
