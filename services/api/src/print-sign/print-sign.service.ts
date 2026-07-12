@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
 import { PDFDocument, PDFSignature, degrees } from 'pdf-lib'
@@ -59,6 +60,8 @@ interface IdempotencyState {
 
 @Injectable()
 export class PrintSignService {
+  private readonly logger = new Logger(PrintSignService.name)
+
   // 单实例并发合成上限（解析型 DoS 防线之一；超时是另一道，见 withTimeout）
   private inFlight = 0
   private readonly queue: Array<() => void> = []
@@ -76,6 +79,8 @@ export class PrintSignService {
     await this.capabilities.assertUserTaskAllowed(args.terminalId, 'signature_stamp')
     const record = await this.verifyDocumentSource(args.document, args.endUserId)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
+    // inspect 同样解析 ≤15MB 完整 PDF，与 doCompose 共用并发信号量（解析型 DoS 防线）
+    await this.acquireComposeSlot()
     try {
       const { pageCount } = await withTimeout(() => this.loadAndValidatePdf(buffer), COMPOSE_TIMEOUT_MS)
       return { pages: pageCount }
@@ -84,6 +89,8 @@ export class PrintSignService {
         throw new InternalServerErrorException({ error: { code: 'SIGN_FAILED', message: '文件处理超时，请换用更简单的文件重试' } })
       }
       throw err
+    } finally {
+      this.releaseComposeSlot()
     }
   }
 
@@ -139,7 +146,12 @@ export class PrintSignService {
     } catch (err) {
       // owner-token compare-and-delete：只释放"自己那把"锁，不误删 120s 后他人接管的新锁/新结果
       if (idemKey) {
-        await this.redis.getAndDelIfEquals(idemKey, JSON.stringify({ status: 'in_progress', fingerprint, ownerToken }))
+        try {
+          await this.redis.getAndDelIfEquals(idemKey, JSON.stringify({ status: 'in_progress', fingerprint, ownerToken }))
+        } catch {
+          // Redis 不可用时锁靠 120s TTL 自然过期；不得因释放失败遮蔽原始业务错误
+          this.logger.warn('print-sign: idempotency lock release failed')
+        }
       }
       throw err
     }
