@@ -155,6 +155,9 @@ async function main() {
     }
     const row1 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row1 || row1.accessTokenHash !== tokenHash) fail('1. job_fit 行未继承 parse 归属')
+    const r1Latest = await svc.getLatest(taskId, requester)
+    const r1LatestRuntime = r1Latest as unknown as { job?: { id?: unknown } }
+    if (r1LatestRuntime.job?.id !== jobPub.id) fail('1. jobId 模式 getLatest 应读回 job.id')
     // M1.5 是可选增量：只在受控运行时返回中窄化读取，不收紧既有 JobFitResponse 的静态类型。
     const r1M15 = r1 as unknown as {
       job?: { id?: unknown }
@@ -236,12 +239,51 @@ async function main() {
     responseQueue.length = 0
     pass('1c. M1.5 keywordCoverage.matched 无简历/岗位依据 → 过滤或安全重试，不原样回传')
 
+    // 1d. keywordCoverage 来源必须双向成立：matched 同时出自简历与岗位，missing 只保留岗位词且尚未出现在简历。
+    responseQueue.push(vjson({
+      decisionSupport: {
+        analysisVersion: 'job_fit_m1_5',
+        keywordCoverage: {
+          matched: ['Office办公软件', '日常行政事务', '档案管理'],
+          missing: ['注册会计师', '档案管理'],
+        },
+      },
+    }))
+    responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
+    const r1d = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    const r1dM15 = r1d as unknown as {
+      decisionSupport?: { keywordCoverage?: { matched?: unknown; missing?: unknown } }
+    }
+    const r1dMatchedKeywords = r1dM15.decisionSupport?.keywordCoverage?.matched
+    const r1dMissingKeywords = r1dM15.decisionSupport?.keywordCoverage?.missing
+    const keywordProvenanceViolations: string[] = []
+    if (r1d.status !== 'completed') keywordProvenanceViolations.push('非法关键词应过滤或安全重试后 completed')
+    if (Array.isArray(r1dMatchedKeywords) && r1dMatchedKeywords.includes('Office办公软件')) {
+      keywordProvenanceViolations.push('仅出现在简历的 matched 未被剔除')
+    }
+    if (Array.isArray(r1dMatchedKeywords) && r1dMatchedKeywords.includes('日常行政事务')) {
+      keywordProvenanceViolations.push('仅出现在岗位的 matched 未被剔除')
+    }
+    if (Array.isArray(r1dMissingKeywords) && r1dMissingKeywords.includes('注册会计师')) {
+      keywordProvenanceViolations.push('不在岗位文本的 missing 未被剔除')
+    }
+    if (Array.isArray(r1dMissingKeywords) && r1dMissingKeywords.includes('档案管理')) {
+      keywordProvenanceViolations.push('已出现在简历的岗位词仍留在 missing')
+    }
+    if (keywordProvenanceViolations.length > 0) {
+      fail(`1d. M1.5 keywordCoverage 来源校验缺失：${keywordProvenanceViolations.join('；')}`)
+    }
+    responseQueue.length = 0
+    pass('1d. M1.5 keywordCoverage matched 双来源、missing 岗位未具备来源均已校验')
+
     // 2. 防编造
     responseQueue.push(vjson({ matchPoints: [{ point: '会开挖掘机', evidence: '持有挖掘机证书五年经验' }] }))
     responseQueue.push(vjson())
     const r2 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
     if (r2.status !== 'completed' || JSON.stringify(r2).includes('挖掘机')) fail('2. 编造匹配点未被拦截')
-    pass('2. 防编造：evidence 不在原文 → 整体重试 → 合法版本通过')
+    const row2 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+    if (row2?.provider !== 'llm:deepseek:stub') fail('2. 同 taskId 再分析 upsert update 应保留实际 provider')
+    pass('2. 防编造：evidence 不在原文 → 整体重试 → 合法版本通过，upsert update 保留实际 provider')
 
     // 3. 百分比拦截
     responseQueue.push(vjson({ summary: '匹配度约 85%，整体不错。' }))
