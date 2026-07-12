@@ -53,6 +53,7 @@
     "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
     "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
+    "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
     "verify:print-scan-preflight": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts",
     "verify:print-scan-preflight:postgres": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts --require-postgres",
     "verify:db-load-indexes": "node -r @swc-node/register scripts/verify-db-load-indexes.ts",

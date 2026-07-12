@@ -81,6 +81,14 @@ function requirePaidBeforeClaim(): boolean {
   return process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] === 'true'
 }
 
+/**
+ * Fail closed: the test print task is available only to an explicitly opted-in
+ * development process. Staging, production, and unrecognised environments never seed it.
+ */
+function shouldSeedTestPrintTask(): boolean {
+  return process.env['NODE_ENV'] === 'development' && process.env['ENABLE_TEST_PRINT_TASK_SEED'] === 'true'
+}
+
 function cleanNullable(value: string | null | undefined): string | null | undefined {
   if (value === null) return null
   if (value === undefined) return undefined
@@ -407,10 +415,9 @@ export class TerminalsService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // Only seed test data in non-production environments.
-    // In production this would reset ptask_seed_001 to pending on every deploy,
-    // triggering a real print job on the connected kiosk.
-    if (process.env['NODE_ENV'] !== 'production') {
+    // Fail closed: only an explicit development opt-in can reset ptask_seed_001 to pending.
+    // Staging and production never seed it, even when ENABLE_TEST_PRINT_TASK_SEED is true.
+    if (shouldSeedTestPrintTask()) {
       await this.seedPrintTask()
     }
 
