@@ -10,6 +10,7 @@ import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { parseMemberPageQuery } from '../common/utils/member-page'
 import { JobAiService } from './job-ai.service'
+import { GovernedJobFitService } from './governed-job-fit.service'
 import type { JobAiQuotaContext } from './job-ai-quota.service'
 
 interface ReqLike {
@@ -94,6 +95,7 @@ class JobAiMatchDto {
 export class JobAiController {
   constructor(
     private readonly service: JobAiService,
+    private readonly governed: GovernedJobFitService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
   ) {}
@@ -125,7 +127,13 @@ export class JobAiController {
   async match(@Param('id') id: string, @Body() dto: JobAiMatchDto, @Req() req: ReqLike) {
     const requester = await this.requesterOf(req)
     const quota = quotaContextOf(req, requester)
-    return ApiResponse.ok(await this.service.matchJob(id, dto.resumeTaskId, requester, quota.terminal, quota))
+    return ApiResponse.ok(await this.governed.matchForMember({
+      jobId: id,
+      resumeTaskId: dto.resumeTaskId,
+      requester,
+      terminalId: quota.terminal,
+      quotaContext: quota,
+    }))
   }
 
   private async requesterOf(req: ReqLike) {

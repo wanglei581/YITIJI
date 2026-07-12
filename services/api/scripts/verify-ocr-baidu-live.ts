@@ -16,6 +16,7 @@ import PDFDocument from 'pdfkit'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
+import { openPdfForRender } from '../src/ai/resume/ocr/pdf-page-renderer'
 
 function fontSpec(): { path: string; family: string } | null {
   const candidates: Array<{ path: string; family: string }> =
@@ -57,17 +58,15 @@ async function main() {
   const { TencentOcrProvider } = await import('../src/ai/resume/ocr/tencent-ocr.provider.stub')
   const { OcrService } = await import('../src/ai/resume/ocr/ocr.service')
   const { ResumeExtractionService } = await import('../src/ai/resume/resume-extraction.service')
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const unpdf = require('unpdf') as {
-    getDocumentProxy(d: Uint8Array): Promise<unknown>
-    renderPageAsImage(p: unknown, n: number, o: Record<string, unknown>): Promise<ArrayBuffer>
-  }
 
   const pdf = await makeTextPdf()
-  const proxy = await unpdf.getDocumentProxy(new Uint8Array(pdf))
-  const png = Buffer.from(
-    await unpdf.renderPageAsImage(proxy, 1, { scale: 2, canvasImport: () => import('@napi-rs/canvas') }),
-  )
+  const renderer = await openPdfForRender(pdf)
+  let png: Buffer
+  try {
+    png = await renderer.renderPage(1, 2)
+  } finally {
+    await renderer.destroy()
+  }
 
   // 1) provider 直连真实接口
   const provider = new BaiduOcrProvider()
@@ -95,6 +94,8 @@ async function main() {
   })
   const stubFiles = {
     readContent: () =>
+      Promise.resolve({ buffer: scanned, mimeType: 'application/pdf', filename: 'scan.pdf', purpose: 'resume_upload' }),
+    readContentForEndUser: () =>
       Promise.resolve({ buffer: scanned, mimeType: 'application/pdf', filename: 'scan.pdf', purpose: 'resume_upload' }),
   }
   const extraction = new ResumeExtractionService(

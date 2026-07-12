@@ -10,6 +10,7 @@ import { buildMemberPage, memberPageArgs } from '../common/utils/member-page'
 import { JobAiLlmService } from './job-ai-llm.service'
 import { JobContextService } from './job-context.service'
 import { JobAiQuotaService } from './job-ai-quota.service'
+import { GovernedJobFitService } from './governed-job-fit.service'
 import type { JobAiQuotaContext, JobAiQuotaTicket } from './job-ai-quota.service'
 import type {
   JobAiOperation,
@@ -37,10 +38,13 @@ export class JobAiService {
     private readonly llm: JobAiLlmService,
     private readonly context: JobContextService,
     private readonly extraction: ResumeExtractionService,
-    private readonly jobFit: JobFitService,
+    // 保留既有注入位置，避免 recommendations/explain 的已验证构造契约变化；
+    // match 已统一委托 GovernedJobFitService，不再把该实例保存为字段。
+    _jobFit: JobFitService,
     private readonly aiLog: AiLogService,
     private readonly privacy: MemberPrivacyService,
     private readonly quota: JobAiQuotaService,
+    private readonly governed: GovernedJobFitService,
   ) {}
 
   async recommendations(input: JobRecommendationInput, requester: JobAiRequester, quotaContext?: JobAiQuotaContext) {
@@ -150,65 +154,13 @@ export class JobAiService {
     terminalId: string | null = null,
     quotaContext?: JobAiQuotaContext,
   ) {
-    const startedAt = Date.now()
-    const parse = await this.loadAuthorizedParse(resumeTaskId, requester)
-    await this.assertResumeAiConsent(parse.endUserId)
-    const job = await this.context.buildTargetJobContext(jobId)
-    const session = await this.createSession({
-      operation: 'match',
+    return this.governed.matchForMember({
+      jobId,
       resumeTaskId,
-      endUserId: parse.endUserId,
-      accessTokenHash: parse.accessTokenHash,
-      intent: { jobId },
+      requester,
       terminalId,
-      expiresAt: parse.expiresAt,
+      quotaContext,
     })
-    let quotaTicket: JobAiQuotaTicket | null = null
-    try {
-      quotaTicket = await this.consumeJobAiQuota('match', parse.endUserId, terminalId, quotaContext)
-      const fitResult = await this.jobFit.analyzeWithUsage({ taskId: resumeTaskId, jobId }, requester)
-      const result = fitResult.response
-      if (result.status !== 'completed') {
-        const updated = await this.prisma.jobAiSession.update({
-          where: { id: session.id },
-          data: { status: 'failed', provider: 'llm', intentJson: JSON.stringify({ jobId, failReason: result.failReason }) },
-        })
-        this.recordAiServiceLog(session.id, 'jobMatch', 'failed', startedAt, parse.endUserId, terminalId, 'AI_JOB_FIT_FAILED')
-        await this.rollbackJobAiQuota(quotaTicket)
-        return {
-          session: this.sessionDto(updated),
-          job,
-          jobFit: result,
-          disclaimer: '仅供参考' as const,
-        }
-      }
-      const fitLevel = typeof result.fitLevel === 'string' ? result.fitLevel : 'reference_medium'
-      await this.prisma.jobAiRecommendation.create({
-        data: {
-          sessionId: session.id,
-          jobId,
-          rank: 1,
-          fitLevel,
-          summary: typeof result.summary === 'string' ? result.summary : '岗位匹配参考已生成，请结合简历和岗位要求自行判断。',
-          matchPointsJson: JSON.stringify(Array.isArray(result.matchPoints) ? result.matchPoints.map((m) => m.point).slice(0, 5) : []),
-          gapPointsJson: JSON.stringify(Array.isArray(result.gapPoints) ? result.gapPoints.map((g) => g.gap).slice(0, 5) : []),
-          actionChecklistJson: JSON.stringify(Array.isArray(result.targetedSuggestions) ? result.targetedSuggestions.slice(0, 5) : []),
-        },
-      })
-      const updated = await this.prisma.jobAiSession.update({ where: { id: session.id }, data: { status: 'completed', provider: fitResult.provider } })
-      this.recordAiServiceLog(session.id, 'jobMatch', 'success', startedAt, parse.endUserId, terminalId, undefined, fitResult.tokenUsage, fitResult.provider)
-      return {
-        session: this.sessionDto(updated),
-        job,
-        jobFit: result,
-        disclaimer: '仅供参考' as const,
-      }
-    } catch (error) {
-      await this.rollbackJobAiQuota(quotaTicket)
-      await this.markSessionFailed(session.id, error)
-      this.recordAiServiceLog(session.id, 'jobMatch', 'failed', startedAt, parse.endUserId, terminalId, errorCodeOf(error))
-      throw error
-    }
   }
 
   async listMine(endUserId: string, page: MemberPageQuery) {
