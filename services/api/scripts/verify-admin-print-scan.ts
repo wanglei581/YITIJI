@@ -272,9 +272,15 @@ async function main() {
     if (raceOk !== 1) fail(`并发 retry 应恰好一个成功，实际成功 ${raceOk} 个`)
     pass('并发 retry CAS：两个并发请求恰好一个成功')
 
-    // ── 4. 服务端能力门禁（C-1）────────────────────────────────────────────
+    // ── 4. 服务端能力门禁（C-1 + Task 11 模式语义）──────────────────────────
     await capabilities.assertUserTaskAllowed(terminalId, 'document_print')
-    pass('未配置能力 → 门禁放行（保持既有闭环不断服）')
+    pass('未配置能力 + 默认(managed)模式 → 门禁放行（保持既有闭环不断服）')
+    await capabilities.assertUserTaskAllowed(terminalId, 'document_print', 'managed')
+    pass('未配置能力 + 显式 managed → 门禁放行')
+    await expectHttpError(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'document_print', 'strict'),
+      403, '未配置能力 + strict 模式 → 门禁 fail-closed 403（CAPABILITY_NOT_CONFIGURED）',
+    )
     await capabilities.upsert(terminalId, 'document_print', 'maintenance', '维护', 'admin_1')
     await expectHttpError(() => capabilities.assertUserTaskAllowed(terminalId, 'document_print'), 403, '配置为 maintenance → 门禁 403')
     await prisma.terminalCapability.update({
@@ -284,7 +290,8 @@ async function main() {
     await expectHttpError(() => capabilities.assertUserTaskAllowed(terminalId, 'document_print'), 403, 'DB 脏状态 → 门禁 fail-closed 403')
     await capabilities.upsert(terminalId, 'document_print', 'available', undefined, 'admin_1')
     await capabilities.assertUserTaskAllowed(terminalId, 'document_print')
-    pass('配置为 available → 门禁放行')
+    await capabilities.assertUserTaskAllowed(terminalId, 'document_print', 'strict')
+    pass('配置为 available → managed/strict 两种模式下门禁均放行')
 
     // 真实集成：ScanTasksService.create 在 scan 配为非 available 时拒绝
     await capabilities.upsert(terminalId, 'scan', 'maintenance', '扫描仪送修', 'admin_1')

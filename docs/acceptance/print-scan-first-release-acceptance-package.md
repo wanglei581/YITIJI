@@ -110,6 +110,7 @@ Gate 3 Field Print Safety Base: Not Passed Yet
 | PS-G4-02 | Not Passed Yet | 卡住任务释放后仍保留目标 `terminalId`，不会被其它终端领取 | `<PRIVATE_EVIDENCE_DIR>/PS-G4-02-stuck-task-release-<timestamp>.log` |
 | PS-G4-03 | Not Passed Yet | 断网 / 断电恢复不会把未出纸任务标记为 completed | `<PRIVATE_EVIDENCE_DIR>/PS-G4-03-offline-recovery-<timestamp>.md` |
 | PS-G4-04 | Not Passed Yet | Admin 可见失败原因、降级状态、恢复状态和人工处理记录 | `<PRIVATE_EVIDENCE_DIR>/PS-G4-04-admin-ops-visibility-<timestamp>.png` |
+| PS-G4-05 | Not Passed Yet | Admin 审计抽样：对验收期间的文件访问、能力开关变更（terminal.capability.update）、任务重试/取消（print_scan.task.*）各抽取至少 3 条 AuditLog，核对操作者、目标与时间与实际操作一致 | `<PRIVATE_EVIDENCE_DIR>/PS-G4-05-admin-audit-sampling-<timestamp>.md` |
 
 判定：
 

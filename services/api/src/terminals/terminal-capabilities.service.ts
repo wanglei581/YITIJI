@@ -115,15 +115,32 @@ export class TerminalCapabilitiesService {
    * 服务端能力门禁（最终真相源，Kiosk UI 只是体验层）：
    *   - 管理员配置过该终端该能力且状态非 available（含 DB 脏值归 not_verified）
    *     → 拒绝创建用户正式任务；
-   *   - 未配置行 = 管理员未接管 → 放行，保持既有已验证闭环在部署后不中断。
+   *   - 未配置行的语义由 PRINT_SCAN_CAPABILITY_MODE 决定（Task 11 生产门禁要求
+   *     生产必须显式声明，见 config/production-runtime-gates.ts）：
+   *       managed（默认，兼容既有部署）= 管理员未接管 → 放行既有已验证闭环；
+   *       strict = 未配置行 fail-closed 拒绝（全部能力必须显式验收后配置）。
    * 直达路由、绕过 Kiosk 的 API 调用同样被本门禁拦截。
    */
-  async assertUserTaskAllowed(terminalId: string, capabilityKey: PrintScanCapabilityKey): Promise<void> {
+  async assertUserTaskAllowed(
+    terminalId: string,
+    capabilityKey: PrintScanCapabilityKey,
+    mode: string | undefined = process.env['PRINT_SCAN_CAPABILITY_MODE'],
+  ): Promise<void> {
     const row = await this.prisma.terminalCapability.findUnique({
       where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
       select: { status: true, note: true },
     })
-    if (!row) return
+    if (!row) {
+      if (mode?.trim().toLowerCase() === 'strict') {
+        throw new ForbiddenException({
+          error: {
+            code: 'CAPABILITY_NOT_CONFIGURED',
+            message: '该终端此服务尚未完成验收配置，请咨询现场工作人员',
+          },
+        })
+      }
+      return
+    }
     const status = this.asStatus(row.status)
     if (canCreateFormalPrintScanTask(status)) return
     throw new ForbiddenException({
