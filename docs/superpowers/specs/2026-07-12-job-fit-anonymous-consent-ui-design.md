@@ -29,7 +29,7 @@
 ## 文件边界
 
 - 修改：`apps/kiosk/src/services/api/jobFit.ts`、`apps/kiosk/src/pages/resume/JobFitPage.tsx`、`apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs`、`.github/workflows/ci.yml`、`docs/progress/current-progress.md`、`docs/progress/next-tasks.md`。
-- 新建：`apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx`、`apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx`。
+- 新建：`apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx`、`apps/kiosk/src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx`、`apps/kiosk/src/pages/resume/jobFit/MemberJobFitConsentCard.tsx`。
 - 不涉及：后端路由/数据库/schema/migration、共享 API 契约、终端 Agent、支付/订单/打印行为、外部投递、Admin/Partner、新路由或新依赖。
 
 ## 验收
