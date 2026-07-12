@@ -21,12 +21,13 @@
 
 ## 一、Kiosk
 
-### 1. 岗位大师 → 合并
+### 1. 岗位大师 → 合并 ✅ 2026-07-11 已执行
 - **当前入口/页面**：首页占位卡（对应审计 §2.1；文件为 `apps/kiosk/src/pages/home/HomePage.tsx`，审计文档未给出具体行号）
 - **最终动作**：**合并** —— 点亮时复用既有「岗位匹配参考」（2D）能力，不新增同义入口
 - **允许修改文件**：`apps/kiosk/src/pages/home/HomePage.tsx`（首页卡片区；具体行号需真实化前另行定位）
 - **禁止事项**：不新增「目标岗位分析」等同义卡片；不新建独立路由承接同一能力（审计 §3⑧ + matrix 入口稳定规则）
 - **验证方式**：人工核对点亮后跳转目标为既有岗位匹配参考路由，未新增路由/卡片
+- **2026-07-11 执行记录**：用户已就 `feature/job-master`（独立 M1/M1.5 实现，PR #117）与本条"合并复用"路线的冲突拍板选择本条；`HomePage.tsx` 的「岗位大师」磁贴已点亮并指向既有岗位匹配参考入口，未新增路由/组件；job-master 分支降级为素材参考，见 `docs/reviews/home-entry-closure-plan-2026-07-11.md`。
 
 ### 2. 打印扫描能力口径统一 → 合并（跨页规则）
 - **当前入口/页面**：首页打印分组卡 `apps/kiosk/src/pages/home/HomePage.tsx`；服务中心 `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx`；能力上限来源 `docs/progress/next-tasks.md`（P0 打印扫描首期「首期服务中心与能力开关」章节，只读参考不可修改）
@@ -35,12 +36,11 @@
 - **禁止事项**：不新增第二套打印入口；每项能力显隐必须由 FeatureGate/DeviceCapability/Admin 配置控制（审计 §3②），不得静态硬编码显示未验收能力
 - **验证方式**：人工核对首页打印卡子项名称/数量与 `/print-scan` 服务中心一致，且与 next-tasks 首期清单一一对应
 
-### 3. 纸质/材料扫描 → 待真机
+### 3. 纸质/材料扫描 → 待真机（**2026-07-11 更正：底层结论已过期**）
 - **当前入口/页面**：`apps/kiosk/src/pages/scan/ScanStartPage.tsx`（`/scan/start`）
-- **最终动作**：**待真机**——真机验收前保持「流程演示」诚实标注，不产出真实 FileObject，不进「我的」
-- **允许修改文件**：`apps/kiosk/src/pages/scan/ScanStartPage.tsx`
-- **禁止事项**：不得移除「流程演示/待接入」标注；不得让演示态产出的假文件进入「我的文档」资产组；不得包装成已完成能力（审计 §3③）
-- **验证方式**：人工核对该页面演示态标注仍在，且演示流程不写入真实 FileObject 表
+- **原最终动作（已过期）**：~~待真机——真机验收前保持「流程演示」诚实标注，不产出真实 FileObject，不进「我的」~~
+- **2026-07-11 更正**：`feature/real-scan` 已于 2026-07-10 完成全部 21 个任务并合并进 `main`，新增 `ScanTask` 模型 + Agent 端 `scan-watcher.ts`（SMB 共享目录监听）+ Kiosk 四页面全部接真，**不再是流程演示**，`ScanResultPage` 的 `file` 状态只能来自真实 `getScanSessionStatus()`。本条"禁止移除演示标注"等约束已随代码真实化自然失效，仅剩 Windows 真机物理验收（真实打印机→SMB→Agent 端到端硬件链路）未完成，详见 `docs/progress/current-progress.md` 2026-07-10 对应条目。
+- **验证方式**：待 Windows 真机验收清单排期后执行；当前仅需人工核对 `main` 上 `ScanTask`/`scan-watcher.ts`/四页面代码与 verify 断言仍在（不倒退回 mock）
 
 ### 4. 证件复印/证件照/云打印/格式转换/签名盖章/U盘 → 待真机（诚实禁用/隐藏）
 - **当前入口/页面**：首页占位卡 + `/print-scan`（审计文档未给出各子项具体文件路径，仅笼统定位在 `apps/kiosk/src/pages/home/HomePage.tsx` 与 `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` 内）
