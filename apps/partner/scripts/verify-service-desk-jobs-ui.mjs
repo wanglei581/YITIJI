@@ -5,9 +5,13 @@ import { fileURLToPath } from 'node:url'
 const packageRoot = new URL('../', import.meta.url)
 const failures = []
 
+function normalizeNewlines(source) {
+  return source.replace(/\r\n?/g, '\n')
+}
+
 async function read(relativePath) {
   try {
-    return await readFile(new URL(relativePath, packageRoot), 'utf8')
+    return normalizeNewlines(await readFile(new URL(relativePath, packageRoot), 'utf8'))
   } catch (error) {
     throw new Error(`Required Partner UI file is missing or unreadable: ${relativePath}`, {
       cause: error,
@@ -52,6 +56,23 @@ function countObjectKey(source, key) {
   return [...source.matchAll(new RegExp(`(?:^|\\n)\\s*${key}\\s*:`, 'g'))].length
 }
 
+function evaluateVisualTheme(normalizedPathExpression, visualThemeExpression, pathname, activeKey) {
+  try {
+    const location = { pathname }
+    const normalizedPathname = Function(
+      'location',
+      `return (${normalizedPathExpression})`,
+    )(location)
+    return Function(
+      'normalizedPathname',
+      'activeKey',
+      `return (${visualThemeExpression})`,
+    )(normalizedPathname, activeKey)
+  } catch {
+    return undefined
+  }
+}
+
 console.log('\n=== Partner 青序 LightFlow 岗位管理 UI 门禁 ===')
 
 const packageJsonPath = fileURLToPath(new URL('package.json', packageRoot))
@@ -69,12 +90,37 @@ const partnerLayoutProps = extractBetween(
   'headerActions=',
   'PartnerLayout route props',
 )
+const normalizedPathExpression = wrapper.match(
+  /const normalizedPathname = ([^\n]+)/,
+)?.[1]
+const visualThemeExpression = partnerLayoutProps.match(/visualTheme=\{([^}\n]+)\}/)?.[1]
 check(
-  matches(
-    partnerLayoutProps,
-    /visualTheme=\{activeKey\s*===\s*['"]jobs['"]\s*\?\s*['"]service-desk['"]\s*:\s*['"]legacy['"]\}/,
-  ),
-  "PartnerLayout enables service-desk only when activeKey === 'jobs'",
+  normalizedPathExpression === "location.pathname.replace(/\\/+$/, '') || '/'" &&
+    visualThemeExpression ===
+      "normalizedPathname === '/jobs' ? 'service-desk' : 'legacy'" &&
+    wrapper.includes("const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'"),
+  'PartnerLayout normalizes pathname for theme selection without changing activeKey navigation',
+)
+const visualThemeCases = [
+  { pathname: '/jobs', activeKey: 'jobs', expected: 'service-desk' },
+  { pathname: '/jobs/', activeKey: 'dashboard', expected: 'service-desk' },
+  { pathname: '/', activeKey: 'dashboard', expected: 'legacy' },
+  { pathname: '/alerts/', activeKey: 'dashboard', expected: 'legacy' },
+  { pathname: '/unknown-route', activeKey: 'dashboard', expected: 'legacy' },
+]
+check(
+  normalizedPathExpression !== undefined &&
+    visualThemeExpression !== undefined &&
+    visualThemeCases.every(
+      ({ pathname, activeKey, expected }) =>
+        evaluateVisualTheme(
+          normalizedPathExpression,
+          visualThemeExpression,
+          pathname,
+          activeKey,
+        ) === expected,
+    ),
+  'only normalized /jobs and /jobs/ pathnames resolve to service-desk',
 )
 check(
   matches(partnerLayoutProps, /density=['"]comfortable['"]/),
