@@ -32,6 +32,8 @@ process.env['OCR_PDF_MAX_PAGES'] = '3'
 require('dotenv').config()
 
 import { createServer, type Server } from 'http'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { Logger } from '@nestjs/common'
 import PDFDocument from 'pdfkit'
 
@@ -170,6 +172,14 @@ async function main() {
   }
 
   try {
+    // ── 0. Live verify 必须复用运行时兼容渲染器 ─────────────────────────────
+    {
+      const liveSource = readFileSync(join(__dirname, 'verify-ocr-baidu-live.ts'), 'utf8')
+      if (!/\bopenPdfForRender\s*\(/.test(liveSource)) fail('0. live OCR verify 必须调用 openPdfForRender')
+      if (/\brenderPageAsImage\s*\(/.test(liveSource)) fail('0. live OCR verify 不得调用不兼容的 renderPageAsImage')
+      pass('0. live OCR verify 复用兼容 PDF 渲染器，禁止回退 renderPageAsImage')
+    }
+
     // ── 1. 图片 OCR 成功映射 ────────────────────────────────────────────────
     {
       const provider = new BaiduOcrProvider()
