@@ -184,6 +184,7 @@ model PrintTaskStatusLog {
 //   - 这是线下打印运营订单,不是招聘业务,不涉及投递/收简历/候选人推荐闭环。
 //   - 当前不接真实支付:payStatus 默认 unpaid,amountCents 默认 0。
 //   - taskStatus 镜像 PrintTask.status,便于 Admin 后续订单页读取;真相源仍是 PrintTask。
+//     C5 起亦作为 claim/retry/refund 的 CAS 序列点；任何变更 PrintTask.status 的路径必须同事务同步该字段。
 //
 // type:       print | scan | photo | ai(后续预留)
 // payStatus:  unpaid | paying | paid | refunded | failed | closed

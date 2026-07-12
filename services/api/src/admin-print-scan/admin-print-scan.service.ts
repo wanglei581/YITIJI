@@ -31,7 +31,8 @@ import type {
 const RETRY_FILE_URL_TTL_MS = 30 * 60 * 1000
 
 // 退款相关的 payStatus（含部分退款/退款中）：这些订单重试出纸会造成"退了钱还出纸"。
-const REFUND_PAY_STATUSES = new Set(['refunding', 'partial_refunded', 'refunded'])
+const REFUND_PAY_STATUSES = ['refunding', 'partial_refunded', 'refunded'] as const
+const REFUND_PAY_STATUS_SET = new Set<string>(REFUND_PAY_STATUSES)
 
 /** 从我方 create 落库的签名 URL 中解析 fileId（仅路径解析；来源是本服务写入的可信值）。 */
 function parsePrintFileId(fileUrl: string): string | null {
@@ -242,7 +243,7 @@ export class AdminPrintScanService {
   private async retryPrintTask(taskId: string): Promise<AdminPrintScanActionResult> {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true, fileUrl: true, order: { select: { payStatus: true } } },
+      select: { id: true, status: true, fileUrl: true },
     })
     if (!task) {
       throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
@@ -252,29 +253,49 @@ export class AdminPrintScanService {
         error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '仅失败状态的打印任务可以重试' },
       })
     }
-    // 已退款/退款中订单重试会造成"退了钱还出纸"，明确拒绝。
-    if (task.order && REFUND_PAY_STATUSES.has(task.order.payStatus)) {
-      throw new ConflictException({
-        error: { code: 'PRINT_SCAN_RETRY_REFUNDED', message: '该任务的订单已退款或退款中，不能重试出纸' },
-      })
-    }
     // 失败任务多半已超过 30 分钟签名 TTL，原 fileUrl 重排后 Agent 必然下载失败：
-    // 校验文件仍存在（未被隐私策略清理）并重新签发下载链接。
+    // fileId 路径解析可在事务外做；文件未删除校验必须和状态 CAS 在同一事务内完成。
     const fileId = parsePrintFileId(task.fileUrl)
     if (!fileId) {
       throw new ConflictException({
         error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件链接无法解析，无法重试' },
       })
     }
-    const file = await this.prisma.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
-    if (!file || file.deletedAt) {
-      throw new ConflictException({
-        error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件已按隐私策略清理，无法重试' },
-      })
-    }
     const { url: freshFileUrl } = signFileUrl(fileId, RETRY_FILE_URL_TTL_MS)
 
     await this.prisma.$transaction(async (tx) => {
+      const file = await tx.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
+      if (!file || file.deletedAt) {
+        throw new ConflictException({
+          error: { code: 'PRINT_SCAN_RETRY_FILE_UNAVAILABLE', message: '打印文件已按隐私策略清理，无法重试' },
+        })
+      }
+
+      // 关联订单以 Order.taskStatus 作为共同状态序列点。先抢占 Order 的 failed→pending，
+      // 再更新 PrintTask；任一后续 CAS 失败都会回滚已更新的订单，避免 retry 覆盖退款/领取。
+      const order = await tx.order.findFirst({ where: { printTaskId: taskId }, select: { id: true } })
+      if (order) {
+        const updatedOrder = await tx.order.updateMany({
+          where: {
+            id: order.id,
+            taskStatus: 'failed',
+            payStatus: { notIn: [...REFUND_PAY_STATUSES] },
+          },
+          data: { taskStatus: 'pending' },
+        })
+        if (updatedOrder.count !== 1) {
+          const freshOrder = await tx.order.findUnique({ where: { id: order.id }, select: { payStatus: true } })
+          if (freshOrder && REFUND_PAY_STATUS_SET.has(freshOrder.payStatus)) {
+            throw new ConflictException({
+              error: { code: 'PRINT_SCAN_RETRY_REFUNDED', message: '该任务的订单已退款或退款中，不能重试出纸' },
+            })
+          }
+          throw new ConflictException({
+            error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
+          })
+        }
+      }
+
       // CAS：并发下只有仍处于 failed 的任务会被重置；数量为 0 视为状态已被他人变更。
       // 同步重签 fileUrl、清空 failed 时写入的 completedAt。
       const updated = await tx.printTask.updateMany({
@@ -294,11 +315,6 @@ export class AdminPrintScanService {
           error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '任务状态已变更，请刷新后重试' },
         })
       }
-      // 与 resetExpiredClaims 同款：联动 Order.taskStatus，保持订单视图一致。
-      await tx.order.updateMany({
-        where: { printTaskId: taskId, printTask: { is: { status: 'pending' } } },
-        data: { taskStatus: 'pending' },
-      })
       await tx.printTaskStatusLog.create({
         data: { taskId, fromStatus: 'failed', toStatus: 'pending', errorCode: 'admin_retry' },
       })

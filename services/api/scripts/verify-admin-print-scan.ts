@@ -225,6 +225,27 @@ async function main() {
     await expectHttpError(() => printScan.applyAction('print', corruptTaskId, 'retry'), 409, '非 failed 状态 print.retry → 409')
     await expectHttpError(() => printScan.applyAction('print', `missing_${suffix}`, 'retry'), 404, '不存在任务 retry → 404')
 
+    // PrintTask 与 Order 以订单 taskStatus 作为共同状态序列点：任务失败但订单已不在
+    // failed 时不得把订单/任务重新打开，避免与退款/领取并发时覆盖更新。
+    const outOfSequenceTaskId = `pt_vps_order_not_failed_${suffix}`
+    const outOfSequenceOrderId = `order_vps_order_not_failed_${suffix}`
+    createdPrintTaskIds.push(outOfSequenceTaskId)
+    createdOrderIds.push(outOfSequenceOrderId)
+    await prisma.printTask.create({
+      data: { id: outOfSequenceTaskId, terminalId, fileUrl: signFileUrl(fileId, 60_000).url, fileMd5: 'x', status: 'failed' },
+    })
+    await prisma.order.create({
+      data: {
+        id: outOfSequenceOrderId, orderNo: `NO-VPSO-${suffix}`, type: 'print', printTaskId: outOfSequenceTaskId,
+        payStatus: 'paid', taskStatus: 'pending', amountCents: 100,
+      },
+    })
+    await expectHttpError(
+      () => printScan.applyAction('print', outOfSequenceTaskId, 'retry'),
+      409,
+      '订单 taskStatus 非 failed 的任务 retry → 409',
+    )
+
     const retried = await printScan.applyAction('print', failedTaskId, 'retry')
     if (retried.fromStatus !== 'failed' || retried.toStatus !== 'pending') fail('retry 应 failed → pending')
     const afterRetry = await prisma.printTask.findUnique({ where: { id: failedTaskId } })
@@ -262,6 +283,21 @@ async function main() {
       },
     })
     await expectHttpError(() => printScan.applyAction('print', refundedTaskId, 'retry'), 409, '已退款订单的任务 retry → 409')
+
+    const refundingTaskId = `pt_vps_refunding_${suffix}`
+    const refundingOrderId = `order_vps_refunding_${suffix}`
+    createdPrintTaskIds.push(refundingTaskId)
+    createdOrderIds.push(refundingOrderId)
+    await prisma.printTask.create({
+      data: { id: refundingTaskId, terminalId, fileUrl: signFileUrl(fileId, 60_000).url, fileMd5: 'x', status: 'failed' },
+    })
+    await prisma.order.create({
+      data: {
+        id: refundingOrderId, orderNo: `NO-VPSG-${suffix}`, type: 'print', printTaskId: refundingTaskId,
+        payStatus: 'refunding', taskStatus: 'failed', amountCents: 100,
+      },
+    })
+    await expectHttpError(() => printScan.applyAction('print', refundingTaskId, 'retry'), 409, '退款中订单的任务 retry → 409')
 
     // 文件已按隐私策略清理 → 拒绝重试
     const gonefileTaskId = `pt_vps_gone_${suffix}`
