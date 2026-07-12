@@ -354,12 +354,23 @@ export interface JobFitRequest {
 }
 
 export interface JobFitJobInfo {
+  /** 系统内已发布岗位 id；手填岗位没有该字段（M1.5 可选增量）。 */
+  id?: string
   title: string
   company: string | null
   /** 仅 jobId 模式:来源信息(用于「去来源平台投递」引导) */
   sourceName: string | null
   sourceUrl: string | null
   externalId: string | null
+}
+
+/** M1.5 决策辅助字段；缺失时保持既有岗位匹配响应语义。 */
+export interface JobFitDecisionSupport {
+  analysisVersion: 'job_fit_m1_5'
+  keywordCoverage?: {
+    matched: string[]
+    missing: string[]
+  }
 }
 
 export interface JobFitResponse {
@@ -373,6 +384,8 @@ export interface JobFitResponse {
   gapPoints?: Array<{ gap: string; suggestion: string }>
   targetedSuggestions?: string[]
   providerName?: string
+  /** 可选决策辅助；旧 LLM 输出不含该字段时不补默认值。 */
+  decisionSupport?: JobFitDecisionSupport
 }
 
 // ── 岗位信息 AI 推荐 / 解读（商用闭环 Task 2）───────────────────────────────

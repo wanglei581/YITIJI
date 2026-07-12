@@ -37,7 +37,7 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
 }
 
 interface StoredJobFit {
-  job: { title: string; company: string | null; sourceName: string | null; sourceUrl: string | null; externalId: string | null }
+  job: { id?: string; title: string; company: string | null; sourceName: string | null; sourceUrl: string | null; externalId: string | null }
   payload: JobFitPayload
   providerName: string
 }
@@ -88,13 +88,13 @@ export class JobFitService {
     if (input.jobId) {
       const job = await this.prisma.job.findFirst({
         where: { id: input.jobId, reviewStatus: 'approved', publishStatus: 'published' },
-        select: { title: true, company: true, description: true, requirements: true, sourceName: true, sourceUrl: true, externalId: true },
+        select: { id: true, title: true, company: true, description: true, requirements: true, sourceName: true, sourceUrl: true, externalId: true },
       })
       if (!job) {
         throw new NotFoundException({ error: { code: 'JOB_NOT_FOUND', message: '岗位不存在或未发布' } })
       }
       jobCtx = { title: job.title, company: job.company, description: job.description, requirements: job.requirements }
-      jobInfo = { title: job.title, company: job.company, sourceName: job.sourceName, sourceUrl: job.sourceUrl, externalId: job.externalId }
+      jobInfo = { id: job.id, title: job.title, company: job.company, sourceName: job.sourceName, sourceUrl: job.sourceUrl, externalId: job.externalId }
     } else if (input.manualJob?.title?.trim()) {
       const title = input.manualJob.title.trim().slice(0, 50)
       const requirements = input.manualJob.requirements?.trim().slice(0, 2000) || null
@@ -123,17 +123,17 @@ export class JobFitService {
 
     const llmResult = await this.llm.analyze(resumeText, jobCtx)
     const payload = llmResult.payload
-    const stored: StoredJobFit = { job: jobInfo, payload, providerName: 'llm' }
+    const stored: StoredJobFit = { job: jobInfo, payload, providerName: llmResult.provider }
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     // 同一 parse 任务保留最近一次分析（unique(taskId,kind) → upsert 覆盖）
     await this.prisma.aiResumeResult.upsert({
       where: { taskId_kind: { taskId: input.taskId, kind: 'job_fit' } },
-      update: { status: 'completed', payloadJson: JSON.stringify(stored), expiresAt },
+      update: { status: 'completed', provider: llmResult.provider, payloadJson: JSON.stringify(stored), expiresAt },
       create: {
         taskId: input.taskId,
         kind: 'job_fit',
         status: 'completed',
-        provider: 'llm',
+        provider: llmResult.provider,
         payloadJson: JSON.stringify(stored),
         endUserId: parse.endUserId,
         accessTokenHash: parse.accessTokenHash,
