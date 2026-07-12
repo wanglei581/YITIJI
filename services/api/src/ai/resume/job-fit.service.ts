@@ -282,7 +282,9 @@ export class JobFitService {
   }
 
   private hasActiveAnonymousJobFitConsent(parse: AuthorizedJobFitParse): boolean {
-    return !!parse.jobAiConsentVersion && !!parse.jobAiConsentGrantedAt && !parse.jobAiConsentRevokedAt
+    return parse.jobAiConsentVersion === JOB_FIT_ANONYMOUS_CONSENT_VERSION
+      && !!parse.jobAiConsentGrantedAt
+      && !parse.jobAiConsentRevokedAt
   }
 
   private aiTaskNotFound(): NotFoundException {
