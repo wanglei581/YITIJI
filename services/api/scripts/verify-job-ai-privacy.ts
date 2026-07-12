@@ -57,7 +57,9 @@ type PrivacyDeleteRun = {
   pendingDeletes: string[]
   committedDeletes: string[]
   pendingRequestStatus: string | null
+  pendingRequestAuditRef: string | null
   requestStatus: string
+  requestAuditRef: string | null
 }
 
 type PrivacyTransactionMode = 'success' | 'before_callback_rollback' | 'after_callback_rollback'
@@ -73,7 +75,9 @@ function createPrivacyDeleteRun(transactionMode: PrivacyTransactionMode): {
     pendingDeletes: [],
     committedDeletes: [],
     pendingRequestStatus: null,
+    pendingRequestAuditRef: null,
     requestStatus: 'pending',
+    requestAuditRef: null,
   }
   const existing = {
     id: 'privacy-delete-request',
@@ -85,16 +89,21 @@ function createPrivacyDeleteRun(transactionMode: PrivacyTransactionMode): {
     handledBy: null,
     auditRef: null,
   }
-  const updateRequest = async (scope: 'transaction' | 'direct', args: { data: { status: string } }) => {
+  const updateRequest = async (scope: 'transaction' | 'direct', args: { data: { status: string; auditRef?: string | null } }) => {
     state.calls.push(`${scope}.userDataRequest.update`)
-    if (scope === 'transaction') state.pendingRequestStatus = args.data.status
-    else state.requestStatus = args.data.status
+    if (scope === 'transaction') {
+      state.pendingRequestStatus = args.data.status
+      state.pendingRequestAuditRef = args.data.auditRef ?? null
+    } else {
+      state.requestStatus = args.data.status
+      state.requestAuditRef = args.data.auditRef ?? null
+    }
     return {
       ...existing,
       status: args.data.status,
       handledAt: new Date('2026-07-12T00:00:01.000Z'),
       handledBy: 'admin-delete',
-      auditRef: 'audit-delete',
+      auditRef: args.data.auditRef ?? null,
     }
   }
   const transactionClient = {
@@ -141,12 +150,15 @@ function createPrivacyDeleteRun(transactionMode: PrivacyTransactionMode): {
         if (state.pendingRequestStatus) {
           state.requestStatus = state.pendingRequestStatus
           state.pendingRequestStatus = null
+          state.requestAuditRef = state.pendingRequestAuditRef
+          state.pendingRequestAuditRef = null
         }
         return result
       } catch (error) {
         state.calls.push('transaction.rollback')
         state.pendingDeletes.length = 0
         state.pendingRequestStatus = null
+        state.pendingRequestAuditRef = null
         throw error
       }
     },
@@ -180,7 +192,7 @@ function createPrivacyDeleteRun(transactionMode: PrivacyTransactionMode): {
     write: async (args: { payload?: Record<string, unknown> }) => {
       state.calls.push('audit.write')
       state.auditWrites.push(args)
-      return 'audit-delete'
+      return 'audit-real-delete'
     },
   }
   return { prisma, audit, state }
@@ -218,7 +230,7 @@ async function verifyDeleteDataRightsTransaction(): Promise<void> {
     auditPayload['consentsRevoked'] === 1
   const requestUpdatedInTransaction = transactionUpdateIndex > lastTransactionDelete && transactionUpdateIndex < auditIndex
   const requestUpdatedAfterAudit = directUpdateIndex > auditIndex
-  if (transactionCommitIndex > lastTransactionDelete && auditIndex > transactionCommitIndex && exactCounts && success.state.requestStatus === 'completed' && (requestUpdatedInTransaction || requestUpdatedAfterAudit) && !/payload|resume(Text|Content)?/i.test(auditPayloadJson)) {
+  if (transactionCommitIndex > lastTransactionDelete && auditIndex > transactionCommitIndex && exactCounts && success.state.requestStatus === 'completed' && (requestUpdatedInTransaction || requestUpdatedAfterAudit) && !/(payloadJson|resumeText|resumeContent|fileId|accessTokenHash)/i.test(auditPayloadJson)) {
     pass('数据权利删除 transaction commit 后才写审计；request 完成状态要么随 transaction 提交，要么在审计成功后更新')
   } else {
     fail(`数据权利删除 transaction/审计/request 顺序或内容错误 calls=${success.state.calls.join(',')} status=${success.state.requestStatus} payload=${auditPayloadJson}`)
@@ -239,6 +251,30 @@ async function verifyDeleteDataRightsTransaction(): Promise<void> {
     pass('callback 后 transaction rollback 时不提交三类删除、不写审计且不更新数据请求状态')
   } else {
     fail(`callback 后 rollback 不得提交/审计/更新 request thrown=${thrown} calls=${failedTransaction.state.calls.join(',')} audit=${failedTransaction.state.auditWrites.length} status=${failedTransaction.state.requestStatus} pending=${failedTransaction.state.pendingDeletes.join(',')} committed=${failedTransaction.state.committedDeletes.join(',')}`)
+  }
+}
+
+async function verifyDeleteAuditCannotBeBypassed(): Promise<void> {
+  const run = createPrivacyDeleteRun('success')
+  const service = new MemberPrivacyService(run.prisma as never, run.audit as never)
+  const result = await service.handleDataRequest('privacy-delete-request', {
+    status: 'completed',
+    handledBy: 'admin-delete',
+    auditRef: 'attacker-controlled-audit-ref',
+  })
+  const auditIndex = run.state.calls.indexOf('audit.write')
+  const commitIndex = run.state.calls.indexOf('transaction.commit')
+  const payload = run.state.auditWrites[0]?.payload ?? {}
+  const expectedKeys = ['aiResumeResultsDeleted', 'consentsRevoked', 'jobAiSessionsDeleted']
+  const hasExactSafeCounts =
+    JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(expectedKeys) &&
+    payload['aiResumeResultsDeleted'] === 3 &&
+    payload['jobAiSessionsDeleted'] === 2 &&
+    payload['consentsRevoked'] === 1
+  if (run.state.auditWrites.length === 1 && auditIndex > commitIndex && hasExactSafeCounts && run.state.requestAuditRef === 'audit-real-delete' && result.auditRef === 'audit-real-delete') {
+    pass('删除请求忽略调用方 auditRef：commit 后必写 AuditService，且只落三项计数与真实 auditRef')
+  } else {
+    fail(`删除请求的 auditRef 不得绕过审计 calls=${run.state.calls.join(',')} auditWrites=${run.state.auditWrites.length} payload=${JSON.stringify(payload)} stored=${run.state.requestAuditRef ?? 'null'} returned=${result.auditRef ?? 'null'}`)
   }
 }
 
@@ -430,6 +466,7 @@ async function main(): Promise<void> {
   )
 
   await verifyDeleteDataRightsTransaction()
+  await verifyDeleteAuditCannotBeBypassed()
 
   if (failed > 0) {
     console.error(`\n❌ ${failed} 项失败 — 岗位 AI 隐私 / 配额门禁未通过\n`)

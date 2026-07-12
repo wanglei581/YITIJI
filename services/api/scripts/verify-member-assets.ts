@@ -50,7 +50,7 @@ function mockCtx(headers: Record<string, string>): ExecutionContext {
 type MemberDeleteBranch = 'parse' | 'job_fit'
 type MemberDeleteQuery = {
   scope: 'transaction' | 'direct'
-  delegate: 'aiResumeResult' | 'jobAiSession'
+  delegate: 'aiResumeResult.findFirst' | 'aiResumeResult.deleteMany' | 'jobAiSession.deleteMany'
   where: Record<string, unknown>
 }
 type MemberDeleteRun = {
@@ -62,7 +62,11 @@ type MemberDeleteRun = {
 
 type TransactionMode = 'success' | 'before_callback_rollback' | 'after_callback_rollback'
 
-function createMemberDeleteRun(branch: MemberDeleteBranch, transactionMode: TransactionMode): {
+function createMemberDeleteRun(
+  branch: MemberDeleteBranch,
+  transactionMode: TransactionMode,
+  resultDeleteCount = branch === 'parse' ? 4 : 1,
+): {
   prisma: object
   state: MemberDeleteRun
 } {
@@ -72,16 +76,25 @@ function createMemberDeleteRun(branch: MemberDeleteBranch, transactionMode: Tran
     taskId: `member-delete-task-${branch}`,
     kind: branch,
   }
-  const recordDelete = (scope: MemberDeleteQuery['scope'], delegate: MemberDeleteQuery['delegate']) => async (args: { where: Record<string, unknown> }) => {
-    state.calls.push(`${scope}.${delegate}.deleteMany`)
+  const findRecord = (scope: MemberDeleteQuery['scope']) => async (args: { where: Record<string, unknown> }) => {
+    state.calls.push(`${scope}.aiResumeResult.findFirst`)
+    state.queries.push({ scope, delegate: 'aiResumeResult.findFirst', where: args.where })
+    return row
+  }
+  const recordDelete = (scope: MemberDeleteQuery['scope'], delegate: Extract<MemberDeleteQuery['delegate'], `${string}.deleteMany`>) => async (args: { where: Record<string, unknown> }) => {
+    state.calls.push(`${scope}.${delegate}`)
     state.queries.push({ scope, delegate, where: args.where })
-    if (scope === 'transaction') state.pendingDeletes.push(`${scope}.${delegate}`)
-    else state.committedDeletes.push(`${scope}.${delegate}`)
-    return { count: delegate === 'aiResumeResult' ? (branch === 'parse' ? 4 : 1) : (branch === 'parse' ? 3 : 1) }
+    const count = delegate === 'aiResumeResult.deleteMany' ? resultDeleteCount : (branch === 'parse' ? 3 : 1)
+    if (count > 0 && scope === 'transaction') state.pendingDeletes.push(`${scope}.${delegate}`)
+    else if (count > 0) state.committedDeletes.push(`${scope}.${delegate}`)
+    return { count }
   }
   const transactionClient = {
-    aiResumeResult: { deleteMany: recordDelete('transaction', 'aiResumeResult') },
-    jobAiSession: { deleteMany: recordDelete('transaction', 'jobAiSession') },
+    aiResumeResult: {
+      findFirst: findRecord('transaction'),
+      deleteMany: recordDelete('transaction', 'aiResumeResult.deleteMany'),
+    },
+    jobAiSession: { deleteMany: recordDelete('transaction', 'jobAiSession.deleteMany') },
   }
   const prisma = {
     $transaction: async (callback: (tx: typeof transactionClient) => Promise<unknown>) => {
@@ -106,10 +119,10 @@ function createMemberDeleteRun(branch: MemberDeleteBranch, transactionMode: Tran
       }
     },
     aiResumeResult: {
-      findFirst: async () => row,
-      deleteMany: recordDelete('direct', 'aiResumeResult'),
+      findFirst: findRecord('direct'),
+      deleteMany: recordDelete('direct', 'aiResumeResult.deleteMany'),
     },
-    jobAiSession: { deleteMany: recordDelete('direct', 'jobAiSession') },
+    jobAiSession: { deleteMany: recordDelete('direct', 'jobAiSession.deleteMany') },
   }
   return { prisma, state }
 }
@@ -123,8 +136,9 @@ async function verifyMemberAssetDeletionTransaction(branch: MemberDeleteBranch):
   const service = new MemberAssetsService(success.prisma as never)
   await service.deleteAiRecord('member-delete-owner', `member-delete-${branch}`)
 
-  const resultQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult')
-  const sessionQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'jobAiSession')
+  const findQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult.findFirst')
+  const resultQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'aiResumeResult.deleteMany')
+  const sessionQuery = success.state.queries.find((query) => query.scope === 'transaction' && query.delegate === 'jobAiSession.deleteMany')
   const expectedResultWhere = branch === 'parse'
     ? { endUserId: 'member-delete-owner', taskId: `member-delete-task-${branch}` }
     : { endUserId: 'member-delete-owner', id: `member-delete-${branch}` }
@@ -134,15 +148,17 @@ async function verifyMemberAssetDeletionTransaction(branch: MemberDeleteBranch):
   const usesTransactionClient =
     success.state.calls.includes('transaction.begin') &&
     success.state.calls.includes('transaction.commit') &&
+    success.state.calls.includes('transaction.aiResumeResult.findFirst') &&
     success.state.calls.includes('transaction.aiResumeResult.deleteMany') &&
     success.state.calls.includes('transaction.jobAiSession.deleteMany') &&
     !success.state.calls.some((call) => call.startsWith('direct.')) &&
+    hasWhere(findQuery, { id: `member-delete-${branch}`, endUserId: 'member-delete-owner' }) &&
     hasWhere(resultQuery, expectedResultWhere) &&
     hasWhere(sessionQuery, expectedSessionWhere)
   if (usesTransactionClient) {
-    pass(`14.${branch} 删除通过 $transaction callback 的 tx 同时删结果和会话，过滤范围正确`)
+    pass(`14.${branch} 归属查询与级联删除均通过同一 $transaction callback 的 tx，过滤范围正确`)
   } else {
-    fail(`14.${branch} 删除必须通过 $transaction callback 的 tx 同时删结果和会话 calls=${success.state.calls.join(',')} queries=${JSON.stringify(success.state.queries)}`)
+    fail(`14.${branch} 归属查询与删除必须通过同一 $transaction callback 的 tx calls=${success.state.calls.join(',')} queries=${JSON.stringify(success.state.queries)}`)
   }
 
   const rollback = createMemberDeleteRun(branch, 'after_callback_rollback')
@@ -158,10 +174,29 @@ async function verifyMemberAssetDeletionTransaction(branch: MemberDeleteBranch):
   } else {
     fail(`15.${branch} callback 后 rollback 不得提交删除 thrown=${thrown} calls=${rollback.state.calls.join(',')} pending=${rollback.state.pendingDeletes.join(',')} committed=${rollback.state.committedDeletes.join(',')}`)
   }
+
+  const concurrentGone = createMemberDeleteRun(branch, 'success', 0)
+  const concurrentGoneService = new MemberAssetsService(concurrentGone.prisma as never)
+  let concurrentGoneCode: string | undefined
+  try {
+    await concurrentGoneService.deleteAiRecord('member-delete-owner', `member-delete-${branch}`)
+  } catch (error) {
+    concurrentGoneCode = errCode(error)
+  }
+  const sessionDeleteCalled = concurrentGone.state.calls.some((call) => call.endsWith('jobAiSession.deleteMany'))
+  if (concurrentGoneCode === 'MEMBER_RECORD_NOT_FOUND' && !sessionDeleteCalled && concurrentGone.state.committedDeletes.length === 0) {
+    pass(`16.${branch} 并发删除使结果 deleteMany=0 时不删会话，统一 MEMBER_RECORD_NOT_FOUND`)
+  } else {
+    fail(`16.${branch} deleteMany=0 不得删会话或暴露删除状态 code=${concurrentGoneCode ?? 'none'} calls=${concurrentGone.state.calls.join(',')} committed=${concurrentGone.state.committedDeletes.join(',')}`)
+  }
 }
 
 async function main() {
   console.log('\n=== Phase C-2B 会员资产中心只读 API 归属验证 ===')
+
+  // 先跑纯内存事务门禁：即使本机 Prisma runtime 尚未注入 $transaction，也能明确暴露契约 RED。
+  await verifyMemberAssetDeletionTransaction('parse')
+  await verifyMemberAssetDeletionTransaction('job_fit')
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -339,8 +374,6 @@ async function main() {
     if (!ownedRowStillExists) fail('13. 他人删除失败后本人记录不应消失')
     else pass('13. 未知/他人 recordId 统一 MEMBER_RECORD_NOT_FOUND 且不删除数据')
 
-    await verifyMemberAssetDeletionTransaction('parse')
-    await verifyMemberAssetDeletionTransaction('job_fit')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
