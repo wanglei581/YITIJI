@@ -74,8 +74,9 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Install CJK font (resume PDF verify)
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk
+      - name: Install CJK font + sqlite3 (resume PDF / terminal-device-config verify)
+        # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3
 
       - name: PG schema drift check
         working-directory: services/api
@@ -184,6 +185,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
+          # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
+          pnpm --filter @ai-job-print/api verify:terminal-device-config
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:admin-print-scan
