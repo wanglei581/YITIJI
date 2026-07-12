@@ -31,7 +31,7 @@
 ## P0：上线前真实验收
 
 - [ ] **历史 pending PrintTask 受控关闭（一次性运维）**：先合并并部署 `codex/legacy-pending-print-task-disposition-20260711`，在预生产再次只读核对候选任务均为冻结时间前的匿名、未领取 `pending`，关联订单仅 `unpaid/closed`；随后仅用 `maintenance:dispose-legacy-pending-print-tasks` 传入显式任务 ID、有效管理员 ID、审计原因与确认变量执行。完成后复核任务 `cancelled`、订单 `taskStatus=cancelled`、每条恰有一条 pending→cancelled 状态日志和 Admin 审计；不得直改表、不得使用 `failed`、不得处理 paid/claimed/用户归属/冻结时间后的任务。
-- [ ] **合并并部署 AI / 求职产物 `printFileUrl` 契约修复**：候选分支 `codex/ai-artifact-print-url-contract-20260711` 已完成本地 TDD 与安全回归，覆盖 AI 简历生成、模拟面试报告、职业规划、求职材料、招聘会参会准备单、我的文档和招聘会资料。招聘会资料通过可复用、可撤销 `FairMaterialPrintBridge` 映射到标准短期 `FileObject`，保留 PrintJobs HMAC/SSRF 白名单；本地已覆盖 15–20MiB、单飞并发、内容篡改、撤销、活跃任务履约保留和旧 URL 禁止新建任务。独立审查已无 Critical/High；待用户决定后提交、合并，并在预生产先执行双数据库 additive migration，再用无个人信息 PDF 验证内部 HMAC URL 可进入 `/print/jobs`，外部 COS URL 仍返回 `PRINT_INVALID_FILE_URL`，已撤销 bridge URL 返回 `PRINT_FILE_REVOKED`，且探针不产生错误任务或真实出纸。
+- [x] **AI / 求职产物 `printFileUrl` 契约修复与预生产 S0 验证**：修复已随 PR #177（`77ae2c1f`）进入 `main`，覆盖 AI 简历生成、模拟面试报告、职业规划、求职材料、招聘会参会准备单、我的文档和招聘会资料。`codex/ai-artifact-print-url-contract-20260711` 的最终树与该提交完全一致，无独有代码，禁止重复合并。招聘会资料通过可复用、可撤销 `FairMaterialPrintBridge` 映射到标准短期 `FileObject`，并保留 PrintJobs HMAC / SSRF 白名单；代码包含 SQLite / PostgreSQL 双轨 additive migration，预生产已顺序执行 PostgreSQL migration，使用无个人信息 PDF 完成内部 HMAC URL 正向 bridge probe、外部 COS URL `PRINT_INVALID_FILE_URL` 与撤销 bridge URL `PRINT_FILE_REVOKED` 负向 probe，未创建错误任务或触发真实出纸。本项只关闭代码与预生产 S0，不代表生产部署、真实出纸或商用验收完成。
 
 - [ ] 生产域名与 HTTPS：完成域名解析、证书、nginx 反代、上传限制和自动续期。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
