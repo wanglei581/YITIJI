@@ -39,6 +39,7 @@ import { PricingService } from '../src/payment/pricing.service'
 import { RefundService } from '../src/payment/refund.service'
 import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
+import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { StorageService } from '../src/storage/storage.service'
@@ -130,7 +131,7 @@ async function main(): Promise<void> {
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
-  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus)
+  const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
 
   // 注入真实 WechatPayProvider（本地密钥，零外部请求）
   const wechatProvider = new WechatPayProvider({

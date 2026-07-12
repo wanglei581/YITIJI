@@ -10,7 +10,8 @@
 // 消费方：Agent3 admin 设备页。响应字段/类型必须严格匹配契约 C1。
 // ============================================================
 
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common'
+import type { TerminalCapabilityView } from './terminal-capabilities.types'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
@@ -28,6 +29,8 @@ import {
 import { AssignTerminalOrgDto } from './dto/assign-terminal-org.dto'
 import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
 import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
+import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
+import { TerminalCapabilitiesService } from './terminal-capabilities.service'
 
 interface AuditReq {
   headers: Record<string, string | string[] | undefined>
@@ -42,6 +45,7 @@ interface AuditReq {
 export class AdminTerminalsController {
   constructor(
     private readonly terminalsService: TerminalsService,
+    private readonly capabilities: TerminalCapabilitiesService,
     private readonly audit: AuditService,
   ) {}
 
@@ -112,6 +116,46 @@ export class AdminTerminalsController {
       requestId: req.requestId ?? null,
     })
     return ApiResponse.ok(result)
+  }
+
+  // GET /api/v1/admin/terminals/:terminalId/capabilities
+  // 打印扫描首期能力开关（Task 10 Step 3）：全部能力键 + 是否已配置。
+  @Get(':terminalId/capabilities')
+  async listCapabilities(
+    @Param('terminalId') terminalId: string,
+  ): Promise<ApiResponse<{ terminalCode: string; capabilities: TerminalCapabilityView[] }>> {
+    return ApiResponse.ok(await this.capabilities.listForTerminal(terminalId))
+  }
+
+  // PUT /api/v1/admin/terminals/:terminalId/capabilities/:capabilityKey
+  // upsert 单个能力开关（写审计，含旧状态便于追溯）。
+  @Put(':terminalId/capabilities/:capabilityKey')
+  async updateCapability(
+    @Param('terminalId') terminalId: string,
+    @Param('capabilityKey') capabilityKey: string,
+    @Body() dto: UpdateTerminalCapabilityDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<{ terminalCode: string; capability: TerminalCapabilityView }>> {
+    const result = await this.capabilities.upsert(terminalId, capabilityKey, dto.status, dto.note, user.userId)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'terminal.capability.update',
+      targetType: 'terminal',
+      targetId: result.terminalCode,
+      payload: {
+        terminalCode: result.terminalCode,
+        capabilityKey: result.capability.capabilityKey,
+        oldStatus: result.oldStatus,
+        newStatus: result.capability.status,
+        note: result.capability.note,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({ terminalCode: result.terminalCode, capability: result.capability })
   }
 
   // PATCH /api/v1/admin/terminals/:terminalId/profile

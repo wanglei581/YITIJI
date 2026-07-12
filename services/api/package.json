@@ -94,6 +94,7 @@
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
     "verify:policies": "node -r @swc-node/register scripts/verify-policies.ts",
     "verify:admin-ops": "node -r @swc-node/register scripts/verify-admin-ops.ts",
+    "verify:admin-print-scan": "node -r @swc-node/register scripts/verify-admin-print-scan.ts",
     "verify:resume-generate": "node -r @swc-node/register scripts/verify-resume-generate.ts",
     "verify:resume-export-formats": "node -r @swc-node/register scripts/verify-resume-export-formats.ts",
     "verify:resume-layout-export": "node -r @swc-node/register scripts/verify-resume-layout-export.ts",
