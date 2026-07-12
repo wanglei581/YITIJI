@@ -20,6 +20,7 @@
 import 'dotenv/config'
 import { randomBytes, randomUUID } from 'crypto'
 import { AuditService } from '../src/audit/audit.service'
+import { BenefitRedemptionService } from '../src/benefit-redemption/benefit-redemption.service'
 import { assertProductionRuntimeGates } from '../src/config/production-runtime-gates'
 import { signFileUrl } from '../src/files/signing'
 import { AdminOrderActionsController } from '../src/payment/admin-order-actions.controller'
@@ -70,6 +71,13 @@ async function expectCode(label: string, code: string, fn: () => Promise<unknown
     fail(`${label} — expected error ${code}, got: ${msg}`)
   }
   fail(`${label} — expected error ${code}, but resolved`)
+}
+
+function errorCode(error: unknown): string {
+  const exception = error as { getResponse?: () => unknown; message?: string }
+  const response = typeof exception.getResponse === 'function' ? exception.getResponse() : undefined
+  const code = (response as { error?: { code?: string } } | undefined)?.error?.code
+  return code ?? exception.message ?? String(error)
 }
 
 function expectThrowSync(label: string, code: string, fn: () => unknown): void {
@@ -128,12 +136,15 @@ async function main(): Promise<void> {
   const provider = new SandboxPaymentProvider(VERIFY_SECRET)
   const payment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([provider]))
   const paymentDisabled = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([]))
+  const redemption = new BenefitRedemptionService(prisma, audit, orderStatus)
   const adminCtl = new AdminOrderActionsController(orderStatus)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_payflow_${suffix}`
+  const endUserId = `eu_payflow_${suffix}`
   const taskIds: string[] = []
   const orderIds: string[] = []
+  const grantIds: string[] = []
   const fixtureFileIds: string[] = []
   const fixtureStorageKeys: string[] = []
   let orderSeq = 0
@@ -161,7 +172,7 @@ async function main(): Promise<void> {
   }
 
   /** 直接落库的独立订单 fixture（隔离各场景，不依赖打印链路）。 */
-  async function makeOrder(amountCents: number, payStatus = 'unpaid'): Promise<string> {
+  async function makeOrder(amountCents: number, payStatus = 'unpaid', ownerId: string | null = null): Promise<string> {
     orderSeq += 1
     const order = await prisma.order.create({
       data: {
@@ -171,6 +182,7 @@ async function main(): Promise<void> {
         payStatus,
         taskStatus: 'pending',
         terminalId,
+        endUserId: ownerId,
       },
     })
     orderIds.push(order.id)
@@ -193,11 +205,15 @@ async function main(): Promise<void> {
     const printOrders = await prisma.order.findMany({ where: { printTaskId: { in: taskIds } }, select: { id: true } })
     const allOrderIds = [...orderIds, ...printOrders.map((o) => o.id)]
     const attempts = await prisma.paymentAttempt.findMany({ where: { orderId: { in: allOrderIds } }, select: { id: true } })
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: [...allOrderIds, ...grantIds] } } })
     await prisma.auditLog.deleteMany({ where: { targetType: 'payment_attempt', targetId: { in: attempts.map((a) => a.id) } } })
     await prisma.auditLog.deleteMany({ where: { targetType: 'order', targetId: { in: allOrderIds } } })
     await prisma.auditLog.deleteMany({ where: { targetId: { in: taskIds }, action: 'print_job.create' } })
     await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: allOrderIds } } })
+    await prisma.redemptionRecord.deleteMany({ where: { OR: [{ orderId: { in: allOrderIds } }, { endUserId }] } })
     await prisma.order.deleteMany({ where: { id: { in: allOrderIds } } })
+    await prisma.benefitGrant.deleteMany({ where: { OR: [{ id: { in: grantIds } }, { endUserId }] } })
+    await prisma.endUser.deleteMany({ where: { id: endUserId } })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
@@ -217,6 +233,9 @@ async function main(): Promise<void> {
         agentToken: randomBytes(16).toString('hex'),
         deviceFingerprint: 'verify-payment-flow',
       },
+    })
+    await prisma.endUser.create({
+      data: { id: endUserId, phoneHash: `hash_${suffix}`, phoneEnc: `enc_${suffix}` },
     })
     await seedDevDefaultPriceConfig(prisma)
     pass('test fixtures created')
@@ -317,6 +336,118 @@ async function main(): Promise<void> {
     await expectCode('provider-disabled service refuses to issue QR (ONLINE_PAYMENT_DISABLED)', 'ONLINE_PAYMENT_DISABLED', () =>
       paymentDisabled.createPayAttempt(orderA.id, paymentSessionA),
     )
+
+    // ── (3a) 预留事务：本地建 PaymentAttempt 失败必须一起回滚 Order→paying ─────
+    const reservationRollbackOrderId = await makeOrder(100)
+    const reservationRollbackSession = await paymentSessionFor(reservationRollbackOrderId)
+    const transactionHost = prisma as unknown as {
+      $transaction: (callback: (tx: unknown) => Promise<unknown>) => Promise<unknown>
+    }
+    const originalTransaction = transactionHost.$transaction
+    transactionHost.$transaction = async (callback) => originalTransaction.call(prisma, async (tx: unknown) => {
+      const attemptDelegate = (tx as { paymentAttempt: { create: (...args: unknown[]) => Promise<unknown> } }).paymentAttempt
+      const originalCreate = attemptDelegate.create.bind(attemptDelegate)
+      attemptDelegate.create = async (...args: unknown[]) => {
+        const orderId = (args[0] as { data?: { orderId?: string } } | undefined)?.data?.orderId
+        if (orderId === reservationRollbackOrderId) throw new Error('VERIFY_FORCED_ATTEMPT_CREATE_FAILURE')
+        return originalCreate(...args)
+      }
+      try {
+        return await callback(tx)
+      } finally {
+        attemptDelegate.create = originalCreate
+      }
+    })
+    try {
+      await expectCode('PaymentAttempt create failure rolls back the Order reservation (VERIFY_FORCED_ATTEMPT_CREATE_FAILURE)', 'VERIFY_FORCED_ATTEMPT_CREATE_FAILURE', () =>
+        payment.createPayAttempt(reservationRollbackOrderId, reservationRollbackSession),
+      )
+      const rollbackOrder = await prisma.order.findUnique({ where: { id: reservationRollbackOrderId } })
+      const rollbackAttempts = await prisma.paymentAttempt.count({ where: { orderId: reservationRollbackOrderId } })
+      if (rollbackOrder?.payStatus === 'unpaid' && rollbackOrder.expiresAt === null && rollbackAttempts === 0) {
+        pass('PaymentAttempt create failure leaves no paying reservation or half-created attempt')
+      } else {
+        fail(`payment reservation rollback mismatch: ${JSON.stringify({ order: rollbackOrder, attempts: rollbackAttempts })}`)
+      }
+    } finally {
+      transactionHost.$transaction = originalTransaction
+    }
+
+    // ── (3b) QR 出码期间：订单必须已预留，不能再被权益核销 ─────────────────
+    const qrRaceOrderId = await makeOrder(100, 'unpaid', endUserId)
+    const qrRaceSession = await paymentSessionFor(qrRaceOrderId)
+    const qrRaceGrant = await prisma.benefitGrant.create({
+      data: {
+        id: `bg_payflow_${suffix}`,
+        endUserId,
+        benefitType: 'free_quota',
+        title: '付款码竞争权益',
+        quantityTotal: 1,
+        quantityRemaining: 1,
+        status: 'active',
+      },
+    })
+    grantIds.push(qrRaceGrant.id)
+    let releaseQr: (() => void) | undefined
+    let enteredQr: (() => void) | undefined
+    const qrEntered = new Promise<void>((resolve) => { enteredQr = resolve })
+    const qrRelease = new Promise<void>((resolve) => { releaseQr = resolve })
+    const originalCreateQrPayment = provider.createQrPayment.bind(provider)
+    provider.createQrPayment = async (input) => {
+      enteredQr?.()
+      await qrRelease
+      return originalCreateQrPayment(input)
+    }
+
+    const qrPaymentAttempt = payment.createPayAttempt(qrRaceOrderId, qrRaceSession)
+    try {
+      await qrEntered
+      await expectCode('second QR request during Provider gate remains blocked without releasing the reservation (PAYMENT_ATTEMPT_PENDING)', 'PAYMENT_ATTEMPT_PENDING', () =>
+        payment.createPayAttempt(qrRaceOrderId, qrRaceSession),
+      )
+      let redemptionError: unknown
+      try {
+        await redemption.redeemForOrder({
+          endUserId,
+          orderId: qrRaceOrderId,
+          benefitGrantId: qrRaceGrant.id,
+        })
+      } catch (error) {
+        redemptionError = error
+      }
+      const redeemCode = redemptionError ? errorCode(redemptionError) : 'RESOLVED'
+      const grantBeforeQrRelease = await prisma.benefitGrant.findUnique({ where: { id: qrRaceGrant.id } })
+      const recordCountBeforeQrRelease = await prisma.redemptionRecord.count({ where: { orderId: qrRaceOrderId } })
+      if (
+        redeemCode.includes('ORDER_NOT_REDEEMABLE') &&
+        grantBeforeQrRelease?.quantityRemaining === 1 &&
+        recordCountBeforeQrRelease === 0
+      ) {
+        pass('QR Provider gate blocks redemption: ORDER_NOT_REDEEMABLE, grant unchanged, no order_redeem record')
+      } else {
+        throw new Error(
+          `QR reservation race is inconsistent: redeem=${redeemCode}, ` +
+          `quantityRemaining=${grantBeforeQrRelease?.quantityRemaining ?? 'null'}, records=${recordCountBeforeQrRelease}`,
+        )
+      }
+
+      releaseQr?.()
+      const qrAttemptView = await qrPaymentAttempt
+      const qrRaceOrder = await prisma.order.findUnique({ where: { id: qrRaceOrderId } })
+      const qrRaceAttempt = await prisma.paymentAttempt.findUnique({ where: { id: qrAttemptView.attemptId } })
+      if (qrAttemptView.status === 'pending' && qrRaceOrder?.payStatus === 'paying' && qrRaceAttempt?.status === 'pending') {
+        pass('releasing QR Provider gate leaves order paying and payment attempt pending')
+      } else {
+        throw new Error(
+          `QR reservation did not hold: order=${qrRaceOrder?.payStatus ?? 'null'}, ` +
+          `view=${qrAttemptView.status}, attempt=${qrRaceAttempt?.status ?? 'null'}`,
+        )
+      }
+    } finally {
+      releaseQr?.()
+      await qrPaymentAttempt.catch(() => undefined)
+      provider.createQrPayment = originalCreateQrPayment
+    }
 
     // ── (4) 回调成功入账（验签 + 全字段匹配 + 金额一致）────────────────────
     const attemptA = await prisma.paymentAttempt.findUnique({ where: { id: attemptViewA.attemptId } })
@@ -669,6 +800,7 @@ async function main(): Promise<void> {
       AI_LLM_API_KEY: 'x',
       PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
       PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true', // C5-6：生产必须显式声明
+      PRINT_SCAN_CAPABILITY_MODE: 'managed', // Task 11：生产必须显式声明能力开关模式
     }
     expectThrowSync('production runtime gates reject missing PAYMENT_SESSION_SECRET', 'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID', () =>
       assertProductionRuntimeGates({ ...prodEnvBase, PAYMENT_SESSION_SECRET: undefined }),

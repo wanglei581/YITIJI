@@ -22,6 +22,7 @@ const PROD_OK: Env = {
   PAYMENT_SESSION_SECRET: 'ci-production-payment-session-secret-0123456789',
   // C5-6：生产必须显式声明 paid-before-claim（缺省启动即拒）
   PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
+  PRINT_SCAN_CAPABILITY_MODE: 'managed',
 }
 
 function expectAllowed(env: Env, label: string): void {
@@ -96,6 +97,11 @@ function main(): void {
     { ...PROD_OK, REDIS_URL: undefined },
     'PRODUCTION_REDIS_URL_MISSING',
     '生产环境拒绝缺失 REDIS_URL',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_SCAN_CAPABILITY_MODE: undefined },
+    'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED',
+    '生产环境拒绝缺失 print-scan feature gate 配置声明（Task 11）',
   )
 
   console.log('\n=== ALL PASS ===')

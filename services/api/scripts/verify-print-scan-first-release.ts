@@ -144,6 +144,7 @@ function main(): void {
   const ciWorkflow = read('../../.github/workflows/ci.yml')
   const acceptancePackage = read('../../docs/acceptance/print-scan-first-release-acceptance-package.md')
   const fieldRunbook = read('../../docs/acceptance/print-scan-field-execution-runbook.md')
+  const acceptanceIndex = read('../../docs/device/print-scan-first-release-acceptance.md')
   const currentProgress = read('../../docs/progress/current-progress.md')
   const nextTasks = read('../../docs/progress/next-tasks.md')
 
@@ -307,8 +308,39 @@ function main(): void {
     'next-tasks must keep field acceptance as an explicit remaining task',
   )
 
+  mustContain(
+    acceptanceIndex,
+    [
+      '不另起一套并列标准',
+      'PS-G0-01~04',
+      'Admin 审计抽样',
+      'PS-G4-05',
+      '身份证复印',
+      '证件照',
+      'U 盘导入',
+      '回滚流程演练',
+      'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED',
+      'PRINT_SCAN_CAPABILITY_MODE=managed|strict',
+      '文字助手模式不豁免',
+      'Not Passed Yet',
+      '不维护第二份状态账本',
+      '不代表证件照功能验收通过',
+      '仅材料准备不算通过',
+      '扫描 → A4 排版 → 真实出纸',
+    ],
+    'print-scan acceptance index must map all Task 11 checklist items to existing gates without forking standards',
+  )
+
+  // 13 项映射行数必须恰好 13（防止静默增删清单项）
+  const indexRows = acceptanceIndex.match(/^\| \d+ \| /gm) ?? []
+  if (indexRows.length === 13) {
+    pass('print-scan acceptance index keeps exactly 13 checklist rows')
+  } else {
+    fail(`print-scan acceptance index must keep exactly 13 checklist rows, found ${indexRows.length}`)
+  }
+
   assertNoOverclaim(
-    acceptancePackage + '\n' + fieldRunbook + '\n' + currentProgress + '\n' + nextTasks,
+    acceptancePackage + '\n' + fieldRunbook + '\n' + currentProgress + '\n' + nextTasks + '\n' + acceptanceIndex,
     'print-scan docs must not overclaim Windows hardware, real scan, USB, production, or trial-operation completion',
   )
 

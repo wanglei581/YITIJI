@@ -85,7 +85,9 @@ if (allowTextOnly) {
 } else {
   mustEqual('VITE_USE_TRTC_CALL', 'true', 'A3 生产构建启用 TRTC 数字人入口')
 }
-const terminalId = allowTextOnly ? '' : mustBeConfigured('VITE_TERMINAL_ID', 'A4 生产构建注入真实终端 ID')
+// A4 终端 ID：打印/扫描任务创建强依赖 X-Terminal-Id（print-scan 首期 Task 11 门禁），
+// 与是否启用数字人无关 —— 文字助手模式（VITE_ALLOW_TEXT_ONLY_ASSISTANT）不豁免本项。
+const terminalId = mustBeConfigured('VITE_TERMINAL_ID', 'A4 生产构建注入真实终端 ID（print-scan 必需，文字助手模式不豁免）')
 
 const indexHtml = readRequired(join(DIST, 'index.html'), 'B1 dist/index.html 已生成')
 if (indexHtml.includes('assets/index-') && indexHtml.includes('.js')) {

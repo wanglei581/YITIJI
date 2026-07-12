@@ -49,11 +49,11 @@
 | 功能 | 入口 | 状态 | 数据归属 | 合规 | 动作 |
 |---|---|---|---|---|---|
 | AI简历诊断/优化/素材库/求职材料/职业规划/简历打印 | `/resume/*`、`/print/upload` | 真闭环 | 我的简历·文档·AI记录·打印 | 安全 | 保留 |
-| 岗位大师 | 首页占位 | 占位 | 复用 2D 匹配 | 安全 | 合并·不新增同义入口 |
+| 岗位大师 | 首页占位 | 占位（**2026-07-11 用户已拍板确认**：采纳本条"合并复用"方向，非采纳同期 `feature/job-master` 分支已完成的独立 M1/M1.5 实现；该分支 PR #117 降级为素材参考，不再推进为独立入口） | 复用 2D 匹配 | 安全 | 合并·不新增同义入口（执行中） |
 | 全职/实习/兼职/全部岗位·找企业 | `/jobs*`、`/companies*` | 真闭环 | 收藏·浏览跳转 | 安全（非招聘平台） | 保留 |
 | 社会/校园招聘会·扫码签到 | `/job-fairs*`、`/campus` | 真闭环 | 收藏·浏览·文档·打印 | 安全（只记打开） | 保留 |
 | 文档打印 | `/print/upload`、`/print-scan` | 真闭环 | 我的文档·打印 | 安全 | 保留·统一口径 |
-| 纸质/材料扫描 | `/scan/start` | **半成品（演示）** | — | 安全（诚实标注） | **待真机后开放** |
+| 纸质/材料扫描 | `/scan/start` | **2026-07-11 更正：已代码级真实闭环**（`feature/real-scan` 2026-07-10 合并 `main`：`ScanTask` 模型 + Agent `scan-watcher.ts` 监听 SMB 共享目录 + Kiosk 四页面接真，不再是 `mockFile()`；原「半成品（演示）」结论已过期） | 我的文档 | 安全（诚实标注，代码不再演示） | **待真机**（仅剩 Windows 硬件端到端验收未完成，非整链路未做） |
 | 证件复印/证件照/云打印/格式转换/签名盖章/U盘 | 首页占位·`/print-scan` | 占位 | — | 安全 | **待真机·诚实禁用/隐藏** |
 | 模拟面试/面试技巧/面试报告 | `/interview/*` | 真闭环 | AI记录·面试报告·打印 | 安全 | 保留 |
 | 就业政策/补贴/档案 | `/renshi?tab=*` | 真闭环（材料打印待源） | 收藏·浏览·文档 | 安全（info-only） | 保留 |
@@ -115,7 +115,7 @@
 | ⑥ | Admin 权限管理、**Admin 用户管理**（2026-07-03 修正并入）、Partner 终端数据/数据统计/账号权限 优先隐藏或禁用，不补假页 | `apps/admin/src/routes/permissions/index.tsx`；`apps/admin/src/routes/users/index.tsx`；`apps/partner/src/routes/{terminals,stats,account}/index.tsx` | **隐藏或禁用** |
 | ⑥b | Partner 智慧校园**不整页隐藏**（2026-07-03 修正）：终端开关是真闭环需保留；迎新内容/使用统计维持诚实空态；校园大数据继续冻结 | `apps/partner/src/routes/smart-campus/index.tsx:16,154-155,260-288,290-338`（详见 §1.1 B） | **拆分处理（保留+维持空态+冻结）** |
 | ⑦ | 智慧校园首页入口已受 `useSmartCampusConfig` 门控（默认 OFF/fail-closed/未授权不渲染），**无需处置** | `apps/kiosk/src/pages/home/HomePage.tsx:577-620`；`apps/kiosk/src/hooks/useSmartCampusConfig.ts` | **无需处置（撤销原结论）** |
-| ⑧ | 岗位大师首页占位点亮时复用 2D 岗位匹配参考，不新增同义入口 | matrix §3.2；§二入口稳定规则 | **合并** |
+| ⑧ | 岗位大师首页占位点亮时复用 2D 岗位匹配参考，不新增同义入口。**2026-07-11 用户拍板确认**：与同期出现的 `feature/job-master`（M1+M1.5 独立实现，PR #117）冲突已裁定，采纳本条方向；job-master 分支降级为素材参考，不再推进独立入口，见 `docs/reviews/home-entry-closure-plan-2026-07-11.md` | matrix §3.2；§二入口稳定规则 | **合并（执行中）** |
 | ⑨ | AI助手会话落库需隐私先行（TTL/脱敏/本人可删），列 P2，不属上线收口 | matrix §3.7 | **后续（非本轮）** |
 | ⑩ | 墨青纸感真实实施排在本表之后，先 `packages/ui` 组件库再逐页迁移，不每页手搓 | `docs/design/inkpaper-design-language.md`；真实页仍旧灰白样式 | **后续商业化/真实化** |
 

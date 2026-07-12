@@ -24,6 +24,22 @@ function assertProdApiMode(command: string, mode: string, env: Record<string, st
   }
 }
 
+/**
+ * Task 11 生产门禁：终端 ID 是打印/扫描任务创建的强依赖（X-Terminal-Id），
+ * 必须在构建期硬性拒绝缺失——不能只依赖构建后的 verify:prod-build-config 脚本
+ * （直接 vite build 可绕过脚本）。文字助手模式（VITE_ALLOW_TEXT_ONLY_ASSISTANT）
+ * 只豁免数字人产物，不豁免本项。
+ */
+function assertProdTerminalId(command: string, mode: string, env: Record<string, string>) {
+  if (command !== 'build' || mode !== 'production') return
+  if (!(env['VITE_TERMINAL_ID'] ?? '').trim()) {
+    throw new Error(
+      '[kiosk] 生产构建被拒绝：VITE_TERMINAL_ID 必须配置（print-scan 打印/扫描任务创建强依赖终端 ID，' +
+        '缺失会导致任务创建 fail-closed 全部失败）。文字助手模式不豁免本项。',
+    )
+  }
+}
+
 function assertProdAssistantTrtcMode(command: string, mode: string, env: Record<string, string>) {
   if (command !== 'build' || mode !== 'production') return
   if ((env['VITE_ALLOW_TEXT_ONLY_ASSISTANT'] ?? '').trim() === 'true') {
@@ -66,6 +82,7 @@ function resolveApiProxyTarget(env: Record<string, string>): string {
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   assertProdApiMode(command, mode, env)
+  assertProdTerminalId(command, mode, env)
   assertProdAssistantTrtcMode(command, mode, env)
   warnAssistantTrtcDevMode(command, env)
   return {
