@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator'
@@ -26,6 +26,11 @@ export class JobFitRequestDto {
 
   @IsOptional() @ValidateNested() @Type(() => ManualJobDto)
   manualJob?: ManualJobDto
+}
+
+export class JobFitConsentDto {
+  @IsString() @IsNotEmpty() @MaxLength(64)
+  taskId!: string
 }
 
 interface ReqLike {
@@ -60,6 +65,23 @@ export class JobFitController {
     return { endUserId: null, accessToken: headerOf(req, 'x-resume-access-token') }
   }
 
+  /**
+   * 匿名岗位匹配授权只能使用 parse 任务的一次性 token。
+   * Bearer 一律在访问任务或服务前拒绝，避免把会员授权误当匿名 parse 授权。
+   */
+  private anonymousConsentRequesterOf(req: ReqLike) {
+    const authorization = headerOf(req, 'authorization')
+    if (authorization?.toLowerCase().startsWith('bearer ')) {
+      throw new BadRequestException({
+        error: {
+          code: 'ANONYMOUS_CONSENT_TOKEN_REQUIRED',
+          message: '匿名岗位匹配授权请使用简历访问令牌',
+        },
+      })
+    }
+    return { endUserId: null, accessToken: headerOf(req, 'x-resume-access-token') }
+  }
+
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async analyze(@Body() dto: JobFitRequestDto, @Req() req: ReqLike) {
@@ -67,6 +89,24 @@ export class JobFitController {
       throw new BadRequestException({ error: { code: 'JOB_FIT_TARGET_MISSING', message: '请选择系统内岗位或填写目标岗位' } })
     }
     return this.service.analyze(dto, await this.requesterOf(req))
+  }
+
+  @Post('consent')
+  async grantConsent(@Body() dto: JobFitConsentDto, @Req() req: ReqLike) {
+    const requester = this.anonymousConsentRequesterOf(req)
+    return this.service.grantJobFitConsent(dto.taskId, requester)
+  }
+
+  @Get('consent/:taskId')
+  async consentStatus(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    const requester = this.anonymousConsentRequesterOf(req)
+    return this.service.getJobFitConsentStatus(taskId, requester)
+  }
+
+  @Delete('consent/:taskId')
+  async revokeConsent(@Param('taskId') taskId: string, @Req() req: ReqLike) {
+    const requester = this.anonymousConsentRequesterOf(req)
+    return this.service.revokeJobFitConsent(taskId, requester)
   }
 
   @Get(':taskId')

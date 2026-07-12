@@ -20,9 +20,23 @@ const RESULT_TTL_HOURS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 24
 })()
 
+/**
+ * 匿名 Job Fit 的授权版本仅随 parse 记录留存，不能替代会员 UserAiConsent。
+ */
+const JOB_FIT_ANONYMOUS_CONSENT_VERSION = 'job_fit_anonymous_v1'
+
 export interface JobFitRequester {
   endUserId: string | null
   accessToken: string | null
+}
+
+export interface AuthorizedJobFitParse {
+  endUserId: string | null
+  accessTokenHash: string | null
+  expiresAt: Date
+  jobAiConsentVersion: string | null
+  jobAiConsentGrantedAt: Date | null
+  jobAiConsentRevokedAt: Date | null
 }
 
 function hashToken(token: string): string {
@@ -167,6 +181,79 @@ export class JobFitService {
     return this.toResponse(taskId, JSON.parse(row.payloadJson) as StoredJobFit)
   }
 
+  /**
+   * parse 行唯一归属裁决：只返回可安全用于后续处理的元数据，绝不返回 payloadJson。
+   * 任何未授权、过期或不存在的 task 统一为 AI_TASK_NOT_FOUND，避免枚举 parse 任务。
+   */
+  async authorizeParseForJobFit(taskId: string, requester: JobFitRequester): Promise<AuthorizedJobFitParse> {
+    const row = await this.prisma.aiResumeResult.findUnique({
+      where: { taskId_kind: { taskId, kind: 'parse' } },
+      select: {
+        endUserId: true,
+        accessTokenHash: true,
+        expiresAt: true,
+        jobAiConsentVersion: true,
+        jobAiConsentGrantedAt: true,
+        jobAiConsentRevokedAt: true,
+      },
+    })
+    const notFound = () =>
+      new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新提交简历' } })
+    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) throw notFound()
+    if (row.endUserId) {
+      if (requester.endUserId !== row.endUserId) throw notFound()
+    } else if (!row.accessTokenHash || !tokenMatches(requester.accessToken, row.accessTokenHash)) {
+      throw notFound()
+    }
+    return {
+      endUserId: row.endUserId,
+      accessTokenHash: row.accessTokenHash,
+      expiresAt: row.expiresAt,
+      jobAiConsentVersion: row.jobAiConsentVersion,
+      jobAiConsentGrantedAt: row.jobAiConsentGrantedAt,
+      jobAiConsentRevokedAt: row.jobAiConsentRevokedAt,
+    }
+  }
+
+  async grantJobFitConsent(taskId: string, requester: JobFitRequester) {
+    const parse = await this.authorizeParseForJobFit(taskId, requester)
+    const data: {
+      jobAiConsentVersion: string
+      jobAiConsentGrantedAt?: Date
+      jobAiConsentRevokedAt: null
+    } = {
+      jobAiConsentVersion: JOB_FIT_ANONYMOUS_CONSENT_VERSION,
+      jobAiConsentRevokedAt: null,
+    }
+    if (!parse.jobAiConsentGrantedAt) data.jobAiConsentGrantedAt = new Date()
+    await this.prisma.aiResumeResult.update({
+      where: { taskId_kind: { taskId, kind: 'parse' } },
+      data,
+    })
+    return this.consentStatus(taskId, {
+      ...parse,
+      jobAiConsentVersion: data.jobAiConsentVersion,
+      jobAiConsentGrantedAt: data.jobAiConsentGrantedAt ?? parse.jobAiConsentGrantedAt,
+      jobAiConsentRevokedAt: null,
+    })
+  }
+
+  async getJobFitConsentStatus(taskId: string, requester: JobFitRequester) {
+    return this.consentStatus(taskId, await this.authorizeParseForJobFit(taskId, requester))
+  }
+
+  async revokeJobFitConsent(taskId: string, requester: JobFitRequester) {
+    const parse = await this.authorizeParseForJobFit(taskId, requester)
+    const revokedAt = parse.jobAiConsentRevokedAt ?? new Date()
+    if (!parse.jobAiConsentRevokedAt) {
+      await this.prisma.aiResumeResult.update({
+        where: { taskId_kind: { taskId, kind: 'parse' } },
+        data: { jobAiConsentRevokedAt: revokedAt },
+      })
+    }
+    return this.consentStatus(taskId, { ...parse, jobAiConsentRevokedAt: revokedAt })
+  }
+
   private toResponse(taskId: string, stored: StoredJobFit): JobFitCompletedResponse {
     return {
       taskId,
@@ -177,24 +264,30 @@ export class JobFitService {
     }
   }
 
-  /** parse 行门禁（对齐 AiService.loadAuthorizedResult 语义；拒绝统一 NOT_FOUND）。 */
+  private consentStatus(taskId: string, parse: AuthorizedJobFitParse) {
+    return {
+      taskId,
+      consentVersion: parse.jobAiConsentVersion,
+      grantedAt: parse.jobAiConsentGrantedAt,
+      revokedAt: parse.jobAiConsentRevokedAt,
+      active: !!parse.jobAiConsentGrantedAt && !parse.jobAiConsentRevokedAt,
+    }
+  }
+
+  /**
+   * 原分析/读取链路在归属裁决后才读取 parse payload，以提取 fileId。
+   * 公共 authorizer 保持无 payload 输出，匿名 consent API 不会触及简历内容。
+   */
   private async loadAuthorizedParse(taskId: string, requester: JobFitRequester) {
+    const parse = await this.authorizeParseForJobFit(taskId, requester)
     const row = await this.prisma.aiResumeResult.findUnique({
       where: { taskId_kind: { taskId, kind: 'parse' } },
-      select: { endUserId: true, accessTokenHash: true, expiresAt: true, payloadJson: true },
+      select: { payloadJson: true },
     })
-    const notFound = () =>
-      new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新提交简历' } })
-    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) throw notFound()
-    if (row.endUserId) {
-      if (requester.endUserId !== row.endUserId) throw notFound()
-    } else {
-      if (!row.accessTokenHash || !tokenMatches(requester.accessToken, row.accessTokenHash)) throw notFound()
-    }
     let fileId: string | null = null
     try {
-      fileId = (JSON.parse(row.payloadJson) as { fileId?: string }).fileId ?? null
+      fileId = (JSON.parse(row?.payloadJson ?? '{}') as { fileId?: string }).fileId ?? null
     } catch { /* fileId 缺失走诚实失败分支 */ }
-    return { endUserId: row.endUserId, accessTokenHash: row.accessTokenHash, fileId }
+    return { endUserId: parse.endUserId, accessTokenHash: parse.accessTokenHash, fileId }
   }
 }

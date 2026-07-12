@@ -389,6 +389,11 @@ async function assertRuntimeContract(): Promise<void> {
       row: { endUserId: 'member-a', accessTokenHash: hash(validToken), expiresAt: future(), payloadJson: '{}' },
       requester: anonymousRequester,
     },
+    {
+      label: '同一会员 parse 也禁止会员 requester 使用匿名 consent API',
+      row: { endUserId: 'member-a', accessTokenHash: null, expiresAt: future(), payloadJson: '{}' },
+      requester: { endUserId: 'member-a', accessToken: null },
+    },
     { label: '不存在的 task', row: null, requester: anonymousRequester },
   ]
   for (const [name, operation] of [['grant', grant], ['status', status], ['revoke', revoke]] as const) {
@@ -420,8 +425,13 @@ async function assertRuntimeContract(): Promise<void> {
   await revoke('valid-task', anonymousRequester)
   check(state.row.jobAiConsentRevokedAt instanceof Date, 'revoke 为 parse 行写入 revokedAt')
 
+  // 让被撤回的旧授权时间可与重新 grant 的新时间可靠区分，避免同毫秒造成假阳性。
+  const revokedGrantAt = new Date('2000-01-01T00:00:00.000Z')
+  state.row.jobAiConsentGrantedAt = revokedGrantAt
   await grant('valid-task', anonymousRequester)
   check(state.row.jobAiConsentRevokedAt === null, 'revoke 后 grant 可恢复授权状态')
+  check(state.row.jobAiConsentGrantedAt instanceof Date && state.row.jobAiConsentGrantedAt.getTime() > revokedGrantAt.getTime(),
+    'revoke 后重新 grant 必须写入新的 grantedAt，不得沿用旧授权时间')
   const idempotentGrantedAt = state.row.jobAiConsentGrantedAt
   await grant('valid-task', anonymousRequester)
   check(state.row.jobAiConsentGrantedAt === idempotentGrantedAt, '重复 grant 幂等，不重写 grantedAt')
