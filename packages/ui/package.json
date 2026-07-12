@@ -9,7 +9,8 @@
   },
   "scripts": {
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:service-desk-foundation": "node scripts/verify-service-desk-foundation.mjs"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

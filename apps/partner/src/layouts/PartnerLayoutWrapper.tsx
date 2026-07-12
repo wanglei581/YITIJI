@@ -64,6 +64,7 @@ export function PartnerLayoutWrapper() {
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [authChecked, setAuthChecked] = useState(false)
   const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'
+  const normalizedPathname = location.pathname.replace(/\/+$/, '') || '/'
 
   useEffect(() => {
     let cancelled = false
@@ -99,6 +100,8 @@ export function PartnerLayoutWrapper() {
       orgName={orgName}
       navItems={NAV_ITEMS}
       activeKey={activeKey}
+      visualTheme={normalizedPathname === '/jobs' ? 'service-desk' : 'legacy'}
+      density="comfortable"
       onNavChange={(key) => navigate(KEY_TO_PATH[key] ?? '/')}
       collapsed={collapsed}
       onCollapseChange={setCollapsed}

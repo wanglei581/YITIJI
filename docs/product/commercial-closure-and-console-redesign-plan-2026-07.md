@@ -1,5 +1,6 @@
 # 商用级收口 · 双后台墨青纸感换装 · 全功能业务闭环总体执行方案（2026-07）
 
+> **视觉变更说明（2026-07-12）：** 用户已确认未来三端视觉采用「青序 LightFlow」；本方案的 G1–G6、C1–C4、S1–S8、真实业务闭环、分批交付和验收留痕继续有效。G7、§三、W1–W5 中的墨青纸感 / fusion-youth 视觉实现与 §九的旧原型对照口径不再用于未来铺开；详细替代口径见已生效的 [青序 LightFlow 三端商用 UX 迁移设计规范](../superpowers/specs/2026-07-11-service-desk-commercial-ux-migration-design.md)。
 > 生成日期：2026-07-03　分支：`claude/hungry-cori-9f2406`
 > 性质：**执行方案**（承接既有规划文档，不另起标准）。上位文档：
 > ① [commercial-grade-feature-plan-2026-07.md](./commercial-grade-feature-plan-2026-07.md)（商用级功能完善总体方案）

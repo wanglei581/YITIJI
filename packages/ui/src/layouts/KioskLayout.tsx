@@ -1,6 +1,11 @@
 import { BotIcon, HomeIcon, UserIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '../lib/cn'
+import {
+  getVisualThemeAttributes,
+  type UiDensity,
+  type VisualTheme,
+} from '../theme/visualTheme'
 
 export type KioskTab = 'home' | 'assistant' | 'profile'
 
@@ -28,6 +33,8 @@ export interface KioskLayoutProps {
   hideHeader?: boolean
   /** Hide the bottom navigation entirely (e.g. immersive 招聘会 detail pages). */
   hideBottomNav?: boolean
+  visualTheme?: VisualTheme
+  density?: UiDensity
   className?: string
 }
 
@@ -38,21 +45,26 @@ export function KioskLayout({
   headerRight,
   hideHeader = false,
   hideBottomNav = false,
+  visualTheme = 'legacy',
+  density = 'touch',
   className,
 }: KioskLayoutProps) {
   return (
-    <div className={cn('flex h-screen flex-col overflow-hidden bg-canvas', className)}>
+    <div
+      {...getVisualThemeAttributes(visualTheme, density)}
+      className={cn('ui-kiosk-shell flex h-screen flex-col overflow-hidden bg-canvas', className)}
+    >
 
       {/* ── Top status bar (optional) ───────────────────── */}
       {!hideHeader && (
-        <header className="flex h-10 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-4">
+        <header className="ui-kiosk-header flex h-10 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-4">
           <span className="text-xs font-medium text-neutral-500">AI求职打印服务终端</span>
           {headerRight && <div className="flex items-center gap-2">{headerRight}</div>}
         </header>
       )}
 
       {/* ── Main content — scrollable ────────────────────── */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="ui-kiosk-content flex-1 overflow-y-auto">
         {children}
       </main>
 
@@ -60,7 +72,7 @@ export function KioskLayout({
       {!hideBottomNav && (
       <nav
         aria-label="主导航"
-        className="flex h-20 shrink-0 items-center gap-2 border-t border-neutral-200 bg-surface px-4 py-1.5"
+        className="ui-kiosk-nav flex h-20 shrink-0 items-center gap-2 border-t border-neutral-200 bg-surface px-4 py-1.5"
       >
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = activeTab === key

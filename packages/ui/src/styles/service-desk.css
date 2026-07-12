@@ -1,0 +1,137 @@
+/* 青序 LightFlow is opt-in. Legacy routes keep the variables inherited from tokens.css. */
+[data-visual-theme='service-desk'] {
+  --sd-color-canvas-outer: #e9f1fb;
+  --sd-color-canvas: #f7faff;
+  --sd-color-surface: #ffffff;
+  --sd-color-text-strong: #071a43;
+  --sd-color-text: #17345d;
+  --sd-color-copy: #566a84;
+  --sd-color-copy-muted: #64748b;
+  --sd-color-primary: #1769e8;
+  --sd-color-primary-strong: #0758d7;
+  --sd-color-line: #dce6f4;
+  --sd-color-line-strong: #cbd9ed;
+  --sd-shadow-touch: 0 18px 60px rgba(30, 71, 124, 0.09);
+  --sd-shadow-console: 0 10px 34px rgba(30, 71, 124, 0.06);
+  --sd-category-blue-bg: #edf6ff;
+  --sd-category-blue-fg: #0f64c5;
+  --sd-category-mint-bg: #eefaf6;
+  --sd-category-mint-fg: #087f6a;
+  --sd-category-orange-bg: #fff7ef;
+  --sd-category-orange-fg: #a94c12;
+  --sd-category-lavender-bg: #f5f3ff;
+  --sd-category-lavender-fg: #594bc0;
+  --sd-category-cyan-bg: #effbff;
+  --sd-category-cyan-fg: #067b9d;
+  --sd-category-sand-bg: #fffaf0;
+  --sd-category-sand-fg: #93620e;
+
+  --color-canvas: var(--sd-color-canvas);
+  --color-surface: var(--sd-color-surface);
+  --color-primary-50: #edf6ff;
+  --color-primary-100: #d9ecff;
+  --color-primary-200: #b9dcff;
+  --color-primary-300: #88c2ff;
+  --color-primary-400: #4f9dff;
+  --color-primary-500: #2c7ff4;
+  --color-primary-600: var(--sd-color-primary);
+  --color-primary-700: var(--sd-color-primary-strong);
+  --color-primary-800: #0b469e;
+  --color-primary-900: #0c3d7f;
+  --color-neutral-50: #f7faff;
+  --color-neutral-100: #edf3fa;
+  --color-neutral-200: var(--sd-color-line);
+  --color-neutral-300: var(--sd-color-line-strong);
+  --color-neutral-400: #8493a7;
+  --color-neutral-500: var(--sd-color-copy-muted);
+  --color-neutral-600: var(--sd-color-copy);
+  --color-neutral-700: #334b68;
+  --color-neutral-800: var(--sd-color-text);
+  --color-neutral-900: var(--sd-color-text-strong);
+  --font-heading: var(--font-sans);
+}
+
+[data-visual-theme='service-desk'][data-ux-density='touch'] {
+  --sd-control-min: 48px;
+  --sd-primary-control-min: 56px;
+  --sd-card-radius: 26px;
+  --sd-nav-height: 112px;
+}
+
+[data-visual-theme='service-desk'][data-ux-density='compact'] {
+  --sd-control-min: 32px;
+  --sd-primary-control-min: 36px;
+  --sd-card-radius: 14px;
+  --sd-table-row-height: 44px;
+}
+
+[data-visual-theme='service-desk'][data-ux-density='comfortable'] {
+  --sd-control-min: 36px;
+  --sd-primary-control-min: 40px;
+  --sd-card-radius: 14px;
+  --sd-table-row-height: 48px;
+}
+
+.ui-kiosk-shell {
+  --ui-kiosk-shell-background: var(--color-canvas);
+}
+
+.ui-kiosk-nav {
+  --ui-kiosk-nav-background: var(--color-surface);
+  --ui-kiosk-nav-border: var(--color-neutral-200);
+}
+
+.ui-admin-sidebar {
+  --ui-admin-sidebar-background: var(--color-neutral-900);
+  --ui-admin-sidebar-foreground: #c6ddd3;
+}
+
+.ui-admin-topbar {
+  --ui-admin-topbar-background: var(--color-surface);
+  --ui-admin-topbar-border: rgba(18, 42, 34, 0.06);
+}
+
+.ui-admin-content {
+  --ui-admin-content-background: var(--color-canvas);
+  --ui-admin-content-gap: 24px;
+}
+
+[data-visual-theme='service-desk'].ui-kiosk-shell {
+  --ui-kiosk-shell-background: var(--sd-color-canvas-outer);
+}
+
+[data-visual-theme='service-desk'] .ui-kiosk-nav {
+  --ui-kiosk-nav-background: var(--sd-color-surface);
+  --ui-kiosk-nav-border: var(--sd-color-line);
+}
+
+[data-visual-theme='service-desk'] .ui-admin-sidebar {
+  --ui-admin-sidebar-background: #0a2451;
+  --ui-admin-sidebar-foreground: #dbeafe;
+}
+
+[data-visual-theme='service-desk'] .ui-admin-topbar {
+  --ui-admin-topbar-background: var(--sd-color-surface);
+  --ui-admin-topbar-border: var(--sd-color-line);
+}
+
+[data-visual-theme='service-desk'] .ui-admin-content {
+  --ui-admin-content-background: var(--sd-color-canvas);
+  --ui-admin-content-gap: 28px;
+}
+
+[data-visual-theme='service-desk'] :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid rgba(23, 105, 232, 0.42);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-visual-theme='service-desk'] *,
+  [data-visual-theme='service-desk'] *::before,
+  [data-visual-theme='service-desk'] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

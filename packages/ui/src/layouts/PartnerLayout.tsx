@@ -10,6 +10,18 @@ export interface PartnerLayoutProps extends Omit<AdminLayoutProps, 'appName'> {
  * Identical structure to AdminLayout — only branding differs.
  * Phase 6 will add partner-specific nav items and permission guards.
  */
-export function PartnerLayout({ orgName = '合作机构', ...props }: PartnerLayoutProps) {
-  return <AdminLayout appName={orgName} {...props} />
+export function PartnerLayout({
+  orgName = '合作机构',
+  visualTheme = 'legacy',
+  density = 'comfortable',
+  ...props
+}: PartnerLayoutProps) {
+  return (
+    <AdminLayout
+      appName={orgName}
+      visualTheme={visualTheme}
+      density={density}
+      {...props}
+    />
+  )
 }
