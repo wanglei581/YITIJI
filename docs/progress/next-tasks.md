@@ -141,7 +141,7 @@
 
 首批业务闭环不按目录搬家，按可验收业务流推进。
 
-- [~] **岗位大师 → 2D 岗位匹配 M1.5 整合候选**：从最新主线独立分支选择性移植决策台素材，保留唯一 `/resume/job-fit`、`AiResumeResult(kind=job_fit)` 与 `JobAiService` 治理；已完成匿名 parse 授权、会员 consent / 配额 / 会话 / 用量、数据删除、PDF 内部 `printFileUrl`、现有打印确认链路、AI 记录去重及局部墨青纸感。当前为本地候选，未 push / 未提 PR / 未部署；仍需 CI 全量回归和可用的 Claude + Antigravity 审查，随后再做真实会员 / LLM / 预生产打印 / Windows 真机验收。
+- [~] **岗位大师 → 2D 岗位匹配 M1.5 整合候选**：从最新主线独立分支选择性移植决策台素材，保留唯一 `/resume/job-fit`、`AiResumeResult(kind=job_fit)` 与 `JobAiService` 治理；已完成匿名 parse 授权、会员 consent / 配额 / 会话 / 用量、数据删除、PDF 内部 `printFileUrl`、现有打印确认链路、AI 记录去重及局部墨青纸感。Claude 终审发现的 parse 删除本地级联展示缺口已修并通过门禁；Antigravity 因 API 地域不支持未产出报告。当前为本地候选，未 push / 未提 PR / 未部署；仍需 CI 全量回归和可用的 Antigravity 审查，随后再做真实会员 / LLM / 预生产打印 / Windows 真机验收。
 
 - [x] **我的页商用闭环计划与准入**：已输出 `docs/superpowers/plans/2026-06-21-profile-commercial-closure.md` 和 `docs/reviews/profile-commercial-closure-planning.md`；目标从“做出闭环”修正为“收口计划、拆分准入和首批执行任务定义”。
 - [x] **我的页商用闭环 Branch 1：ProfilePage 拆分**：纯结构拆分，零行为变更；`ProfilePage.tsx` 已降到 177 行，入口、路由、文案和行为保持不变。

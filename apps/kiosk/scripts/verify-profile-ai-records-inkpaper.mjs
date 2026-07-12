@@ -47,7 +47,8 @@ expectIncludes(aiRecords, 'deleteMyAiRecord(token, record.id)', 'MyAiRecordsPage
 expectIncludes(aiRecords, 'deleteMyJobAiSession(token, sessionId)', 'MyAiRecordsPage 保留岗位 AI 会话删除接口')
 expectIncludes(aiRecords, 'confirmId !== record.id', 'MyAiRecordsPage 保留本人 AI 记录二次确认删除')
 expectIncludes(aiRecords, 'confirmJobAiSessionId !== sessionId', 'MyAiRecordsPage 保留岗位 AI 会话二次确认删除')
-expectIncludes(aiRecords, "setHint(result.deletedCount > 1 ? '记录及关联优化结果已删除' : '记录已删除')", 'MyAiRecordsPage 保留关联优化结果删除提示')
+expectMatches(aiRecords, /record\.kind === 'parse'[\s\S]{0,260}?setItems\(\(prev\) => prev\.filter\(\(item\) => item\.taskId !== record\.taskId\)\)[\s\S]{0,260}?setJobAiSessions\(\(prev\) => prev\.filter\(\(item\) => item\.session\.resumeTaskId !== record\.taskId\)\)/, '删除 parse 时同步移除同任务的全部派生 AI 记录与会话')
+expectIncludes(aiRecords, "setHint(result.deletedCount > 1 ? '记录及关联分析结果已删除' : '记录已删除')", 'MyAiRecordsPage 如实提示关联分析结果删除')
 expectIncludes(aiRecords, "setHint('岗位 AI 参考记录已删除')", 'MyAiRecordsPage 保留岗位 AI 删除成功提示')
 expectIncludes(aiRecords, "setHint('删除失败，记录可能已到期或被清理')", 'MyAiRecordsPage 保留删除失败诚实提示')
 

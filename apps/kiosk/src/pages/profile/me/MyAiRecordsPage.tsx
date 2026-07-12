@@ -151,14 +151,20 @@ export function MyAiRecordsPage() {
     setBusyId(record.id)
     try {
       const result = await deleteMyAiRecord(token, record.id)
-      setItems((prev) => prev.filter((item) => item.id !== record.id))
+      if (record.kind === 'parse') {
+        // 服务端删除 parse 会在同一事务中级联同 taskId 的派生记录和全部岗位 AI 会话。
+        setItems((prev) => prev.filter((item) => item.taskId !== record.taskId))
+        setJobAiSessions((prev) => prev.filter((item) => item.session.resumeTaskId !== record.taskId))
+      } else {
+        setItems((prev) => prev.filter((item) => item.id !== record.id))
+      }
       if (record.kind === 'job_fit') {
         setJobAiSessions((prev) => prev.filter((item) => !(
           item.session.operation === 'match' && item.session.resumeTaskId === record.taskId
         )))
       }
       setConfirmId(null)
-      setHint(result.deletedCount > 1 ? '记录及关联优化结果已删除' : '记录已删除')
+      setHint(result.deletedCount > 1 ? '记录及关联分析结果已删除' : '记录已删除')
     } catch {
       setHint('删除失败，记录可能已到期或被清理')
     } finally {
