@@ -40,6 +40,10 @@ function compact(source) {
   return source.replace(/\s+/g, ' ').trim()
 }
 
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+}
+
 function count(source, token) {
   return source.split(token).length - 1
 }
@@ -281,11 +285,49 @@ check(
   'loading/error/filtered conditions and reviewCounts retain their exact real-data computation',
 )
 
+const loadingBranch = compact(
+  stripComments(extractBetween(jobsPage, 'if (loading) {', 'if (error) {', 'loading branch')),
+)
 check(
-  count(jobsPage, 'if (loading) {') === 1 &&
-    count(jobsPage, 'if (error) {') === 1 &&
-    count(jobsPage, 'filtered.length === 0 ? (') === 1,
-  'render branches use the exact loading, error, and filtered-empty conditions',
+  /^if \(loading\) \{ return \( <Page title="岗位信息管理" subtitle="加载中\.\.\."> .*<p[^>]*>加载中\.\.\.<\/p>.*<\/Page> \) \}$/.test(
+    loadingBranch,
+  ),
+  'loading condition returns the jobs Page with loading subtitle and visible loading copy',
+)
+
+const errorBranch = compact(
+  stripComments(
+    extractBetween(jobsPage, 'if (error) {', '\n\n  return (\n    <Page', 'error branch'),
+  ),
+)
+check(
+  /^if \(error\) \{ return \( <Page title="岗位信息管理" subtitle="加载失败"> .*<p[^>]*>加载失败，请稍后重试<\/p>.*<\/Page> \) \}$/.test(
+    errorBranch,
+  ),
+  'error condition returns the jobs Page with failure subtitle and visible failure copy',
+)
+
+const tableBody = stripComments(
+  extractBetween(
+    jobsPage,
+    '<tbody className="divide-y divide-neutral-900/[0.06]">',
+    '</tbody>',
+    'jobs table body',
+  ),
+)
+const filteredEmptyBranch = compact(
+  extractBetween(
+    tableBody,
+    '{filtered.length === 0 ? (',
+    ') : (',
+    'filtered-empty table branch',
+  ).replace('{filtered.length === 0 ? (', ''),
+)
+check(
+  /^<tr> <td colSpan=\{10\}[^>]*> .*当前筛选条件下无岗位.*<\/td> <\/tr>$/.test(
+    filteredEmptyBranch,
+  ),
+  'filtered-empty condition renders a table row and colSpan=10 cell with visible empty copy',
 )
 
 const unpublishBlock = extractBetween(
@@ -371,8 +413,6 @@ for (const required of [
   "status={review.badge}",
   'publish.dot',
   'href={j.sourceUrl}',
-  '当前筛选条件下无岗位',
-  '加载失败，请稍后重试',
   '不在本系统内接收求职者简历',
   '保存并重新提审',
 ]) {
