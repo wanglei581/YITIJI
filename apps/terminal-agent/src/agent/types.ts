@@ -62,6 +62,12 @@ export interface AgentConfig {
    * Production kiosks must include the deployed Kiosk origin here.
    */
   localApiAllowedOrigins?: string[]
+  /**
+   * 静态共享令牌,专供 U 盘本地文件网桥（/local/usb/*）使用。安装时随 Kiosk
+   * 构建（VITE_TERMINAL_AGENT_BRIDGE_TOKEN）与本文件一起下发,不走网络协商。
+   * 未配置时 U 盘导入路由整体 403（fail-closed），不影响心跳/打印/扫描/QR登录。
+   */
+  localApiBridgeToken?: string
 
   // ── Written on first registration / loaded from encrypted file at startup ──
   /** Assigned by backend on registration. Persisted to config.json. */

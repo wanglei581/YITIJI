@@ -46,7 +46,10 @@ jobs:
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
     steps:
+      # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Guard — no tracked AI tool state
         # 防止 .ccg/tasks 等 AI 工具临时状态被(强制)提交回库；.ccg/spec 正式规范不在此列。
@@ -110,12 +113,15 @@ jobs:
           pnpm --filter terminal-agent build
 
       - name: Terminal Agent verify suites
-        # 纯静态/结构性断言，不依赖 DB，放在 SQLite db 准备之前即可跑。
+        # 不依赖 DB（本地网桥两套用真实临时目录 + 真实本地 HTTP server + 后端 stub），
+        # 放在 SQLite db 准备之前即可跑。
         working-directory: apps/terminal-agent
         run: |
           pnpm run verify:agent-profile-guard
           pnpm run verify:print-scan-agent
           pnpm run verify:scan-watcher
+          pnpm run verify:local-qr-proxy
+          pnpm run verify:usb-import-agent
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
@@ -156,6 +162,9 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
           pnpm --filter @ai-job-print/admin verify:admin-billing-ui
+          pnpm --filter @ai-job-print/admin verify:admin-print-scan-ui
+          pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
+          pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -173,6 +182,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:admin-print-scan
+          pnpm --filter @ai-job-print/api verify:admin-ops
+          pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
@@ -313,6 +325,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders

@@ -6,6 +6,10 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 
+// Task 10 能力门禁直通 stub：门禁真实语义由 verify:admin-print-scan 覆盖，
+// 本脚本聚焦扫描任务状态机，不重复测门禁。
+const passthroughCapabilities = { assertUserTaskAllowed: async () => undefined } as never
+
 interface StoredScanTask {
   id: string
   terminalId: string
@@ -155,7 +159,7 @@ class FakeFilesService {
 function makeService(): { service: ScanTasksService; prisma: FakePrisma } {
   const prisma = new FakePrisma()
   const files = new FakeFilesService(prisma)
-  return { service: new ScanTasksService(prisma as never, files as never), prisma }
+  return { service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities), prisma }
 }
 
 async function expectRejects<T extends Error>(
@@ -351,7 +355,7 @@ async function main(): Promise<void> {
         throw new Error('ENOSPC: disk full — this raw detail must never reach the user')
       },
     }
-    const service = new ScanTasksService(prisma as never, throwingFiles as never)
+    const service = new ScanTasksService(prisma as never, throwingFiles as never, passthroughCapabilities)
     const created = await service.create(dto, null)
 
     await expectRejects(
@@ -419,7 +423,7 @@ async function main(): Promise<void> {
         return result
       },
     }
-    const service = new ScanTasksService(prisma as never, racyFiles as never)
+    const service = new ScanTasksService(prisma as never, racyFiles as never, passthroughCapabilities)
     const created = await service.create(dto, null)
     raceScanTaskId = created.scanTaskId
 
@@ -461,7 +465,7 @@ async function main(): Promise<void> {
       return originalUpdateMany(args)
     }) as typeof originalUpdateMany
 
-    const service = new ScanTasksService(prisma as never, files as never)
+    const service = new ScanTasksService(prisma as never, files as never, passthroughCapabilities)
     const created = await service.create(dto, null)
     assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.status, 'waiting')
 

@@ -5,14 +5,17 @@
 //
 // A2 桌面浏览器验证模式 — 设计约束说明：
 //   CLAUDE.md §17 要求 Kiosk 生产模式不弹系统文件对话框。
-//   当前使用 <input type="file"> 仅作为桌面 Chrome/Edge 下的 E2E 链路验证。
-//   生产 Kiosk 切换为 A1：Terminal Agent 监听本地/U 盘目录 → 推送文件列表 → Kiosk 轮询选取。
+//   "选择文件" tab 用 <input type="file"> 仅作为桌面 Chrome/Edge 下的 E2E 链路验证。
+//   "U盘导入" tab 是 A1 生产路径：Terminal Agent 通过 /local/usb/* 本地网桥枚举可移动磁盘
+//   （不下发绝对路径，只给一次性 safeId）→ Kiosk 轮询展示文件列表 → 用户选取后一次性消费。
+//   该本地网桥的 Windows CIM/PowerShell 检测分支仅在 win32 环境生效，
+//   未完成 Windows 真机验收前不得据代码已合入宣称"U 盘导入已完成"。
 //
 // signedUrl 由后端 kiosk-upload 返回（5-min TTL）；
 // PrintConfirmPage 创建打印任务时后端会重新签发 30-min TTL（B1 方案）。
 // ============================================================
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
@@ -29,6 +32,14 @@ import {
 } from 'lucide-react'
 import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
+import {
+  getUsbStatus,
+  isUsbImportConfigured,
+  listUsbFiles,
+  uploadUsbFile,
+  type UsbFileListItem,
+  type UsbStatus,
+} from '../../services/files/usbImportApi'
 import { useAuth } from '../../auth/useAuth'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { clearPrintMaterialSession, savePrintMaterialSession, type PrintFileState, type PrintMaterialSource } from './printMaterialSession'
@@ -60,8 +71,13 @@ export function PrintUploadPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [qrBusy, setQrBusy] = useState(false)
+  const [usbConfigured] = useState(() => isUsbImportConfigured())
+  const [usbStatus, setUsbStatus] = useState<UsbStatus | null>(null)
+  const [usbFiles, setUsbFiles] = useState<UsbFileListItem[] | null>(null)
+  const [usbError, setUsbError] = useState<string | null>(null)
+  const [usbUploading, setUsbUploading] = useState(false)
   // 上传中或扫码会话进行中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(uploading || qrBusy)
+  useBusyLock(uploading || qrBusy || usbUploading)
 
   const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = isResumePrint
     ? [
@@ -70,8 +86,57 @@ export function PrintUploadPage() {
     : [
         { key: 'file', label: '选择文件', icon: MonitorSmartphoneIcon, note: '桌面验证' },
         { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, note: '手机/浏览器' },
-        { key: 'usb',  label: 'U盘导入',  icon: UsbIcon, disabled: true, note: '待接入 Agent' },
+        {
+          key: 'usb',
+          label: 'U盘导入',
+          icon: UsbIcon,
+          disabled: !usbConfigured,
+          note: usbConfigured ? undefined : '本机未配置',
+        },
       ]
+
+  // U 盘状态轮询:仅在 usb tab 激活、本机已配置令牌、且尚未选定文件时才轮询,
+  // 避免在其它 tab 停留时对 Agent 发起无意义请求。
+  // 上传进行中也必须暂停轮询:每次 /local/usb/files 都会整体重建一次性 safeId
+  // 注册表,若上传期间继续轮询,正在消费的 safeId 会被下一轮刷新作废(410 竞态)。
+  useEffect(() => {
+    if (tab !== 'usb' || !usbConfigured || file || usbUploading) return undefined
+    let cancelled = false
+
+    const poll = async () => {
+      try {
+        const status = await getUsbStatus()
+        if (cancelled) return
+        setUsbStatus(status)
+        setUsbError(null)
+        if (status.present) {
+          const list = await listUsbFiles()
+          if (cancelled) return
+          setUsbFiles(list.files)
+        } else {
+          setUsbFiles(null)
+        }
+      } catch (err) {
+        if (cancelled) return
+        setUsbStatus(null)
+        setUsbFiles(null)
+        setUsbError(err instanceof Error ? err.message : 'U 盘状态查询失败，请确认 Terminal Agent 正在运行')
+      }
+    }
+
+    // 自调度 setTimeout 而非 setInterval:上一轮 poll 完成后才排下一轮,
+    // Agent 响应慢时不会产生并发轮询叠加。
+    let timer: number | undefined
+    const loop = async () => {
+      await poll()
+      if (!cancelled) timer = window.setTimeout(() => void loop(), 2000)
+    }
+    void loop()
+    return () => {
+      cancelled = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [tab, usbConfigured, file, usbUploading])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
@@ -122,6 +187,33 @@ export function PrintUploadPage() {
     }
     setFile(nextFile)
     savePrintMaterialSession({ file: nextFile, source })
+  }
+
+  const handleUsbFileSelect = async (safeId: string) => {
+    if (usbUploading) return
+    setUsbUploading(true)
+    setUsbError(null)
+    try {
+      const result = await uploadUsbFile(safeId)
+      const nextFile: UploadedFile = {
+        name: result.filename,
+        size: formatBytes(result.sizeBytes),
+        pages: null,
+        fileId: result.fileId,
+        fileUrl: result.fileUrl ?? '',
+        fileMd5: result.sha256,
+        mimeType: result.mimeType,
+      }
+      setFile(nextFile)
+      savePrintMaterialSession({ file: nextFile, source })
+    } catch (err) {
+      setUsbError(err instanceof Error ? err.message : 'U 盘文件导入失败，请重试')
+      // 该 safeId 在 Agent 侧多半已因一次性消费失效,刷新列表让用户重选。
+      setUsbFiles(null)
+      setUsbStatus(null)
+    } finally {
+      setUsbUploading(false)
+    }
   }
 
   const handleNext = () => {
@@ -306,20 +398,77 @@ export function PrintUploadPage() {
         )}
 
         {tab === 'usb' && (
-          <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
-              <UsbIcon className="h-10 w-10 text-neutral-400" />
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-medium text-neutral-800">请插入 U 盘</p>
-              <p className="mt-2 text-sm text-neutral-500">
-                连接后系统将自动读取 U 盘内文件，
-                <br />
-                请确保文件格式为 PDF 或图片
-              </p>
-            </div>
-            <p className="text-sm text-neutral-400">（U 盘导入通过 Terminal Agent 中转，开发中）</p>
-          </Card>
+          <div className="flex flex-1 flex-col gap-3">
+            {usbError && (
+              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
+                <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                {usbError}
+              </div>
+            )}
+
+            {file ? (
+              <Card className="flex items-center gap-4 p-5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
+                  <FileTextIcon className="h-6 w-6 text-primary-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                  <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 已从 U 盘导入</p>
+                </div>
+                <button
+                  onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
+                >
+                  <XIcon className="h-4 w-4 text-neutral-400" />
+                </button>
+              </Card>
+            ) : usbStatus?.present ? (
+              usbFiles === null ? (
+                <Card className="flex h-full flex-col items-center justify-center gap-4 p-8">
+                  <LoaderIcon className="h-8 w-8 animate-spin text-primary-400" />
+                  <p className="text-sm text-neutral-500">正在读取 U 盘文件列表…</p>
+                </Card>
+              ) : usbFiles.length === 0 ? (
+                <Card className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+                  <UsbIcon className="h-10 w-10 text-neutral-400" />
+                  <p className="text-base font-medium text-neutral-700">未检测到可导入的文件</p>
+                  <p className="text-sm text-neutral-500">仅支持 PDF、JPG、PNG 格式，且不超过 20MB</p>
+                </Card>
+              ) : (
+                <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+                  {usbFiles.map((f) => (
+                    <button
+                      key={f.safeId}
+                      disabled={usbUploading}
+                      onClick={() => handleUsbFileSelect(f.safeId)}
+                      className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <FileTextIcon className="h-6 w-6 shrink-0 text-primary-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-neutral-900">{f.filename}</p>
+                        <p className="text-sm text-neutral-500">{formatBytes(f.sizeBytes)}</p>
+                      </div>
+                      {usbUploading && <LoaderIcon className="h-5 w-5 shrink-0 animate-spin text-primary-400" />}
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
+                  <UsbIcon className="h-10 w-10 text-neutral-400" />
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-medium text-neutral-800">请插入 U 盘</p>
+                  <p className="mt-2 text-sm text-neutral-500">
+                    连接后系统将自动读取 U 盘内文件，
+                    <br />
+                    请确保文件格式为 PDF 或图片
+                  </p>
+                </div>
+              </Card>
+            )}
+          </div>
         )}
       </div>
 
