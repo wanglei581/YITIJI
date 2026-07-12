@@ -19,10 +19,40 @@ function expect(condition, message) {
   else fail(message)
 }
 function expectMatches(source, pattern, message) {
-  expect(pattern.test(source), `${message}${pattern.test(source) ? '' : ` — pattern ${pattern} not found`}`)
+  const matched = pattern.test(source)
+  expect(matched, `${message}${matched ? '' : ` — pattern ${pattern} not found`}`)
 }
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+function between(source, startMarker, endMarker) {
+  const start = source.indexOf(startMarker)
+  if (start < 0) return ''
+  const end = endMarker ? source.indexOf(endMarker, start + startMarker.length) : source.length
+  return source.slice(start, end < 0 ? source.length : end)
+}
+function cssRule(source, selector) {
+  const selectorStart = source.indexOf(`${selector} {`)
+  if (selectorStart < 0) return ''
+  const bodyStart = source.indexOf('{', selectorStart)
+  let depth = 0
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(selectorStart, index + 1)
+    }
+  }
+  return ''
+}
+function pixelProperty(rule, property) {
+  const pattern = new RegExp(`(?:^|[\\n{])\\s*${escapeRegExp(property)}:\\s*(?:var\\([^,]+,\\s*)?(\\d+)px`)
+  const match = rule.match(pattern)
+  return match ? Number(match[1]) : null
+}
+function expectMinimumHeight(source, selector, minimum, label) {
+  const value = pixelProperty(cssRule(source, selector), 'min-height')
+  expect(value !== null && value >= minimum, `${label} min-height >= ${minimum}px（当前 ${value ?? '缺失'}）`)
 }
 
 console.log('\n=== Kiosk 首页青序 LightFlow 静态合同 ===')
@@ -45,6 +75,12 @@ const services = read(splitPaths[1])
 const continuation = read(splitPaths[2])
 const responsive = read(splitPaths[3])
 const allCss = cssPaths.map(read).join('\n')
+const homeStats = between(home, 'function useHomeStats(', '/* ── Hero')
+const identityPanel = between(home, 'function IdentityPanel()', '/* ── 服务分组')
+const continuePanel = between(home, 'function ContinuePanel()', '/* ── 智慧校园')
+const smartCampusSection = between(home, 'function SmartCampusHorizontalSection()', '/* ── 百宝箱')
+const toolboxSection = between(home, 'function ToolboxSection()', 'export function HomePage()')
+const homePage = between(home, 'export function HomePage()')
 
 expect(
   packageJson.includes('"verify:home-service-desk": "node scripts/verify-home-service-desk.mjs"'),
@@ -99,14 +135,33 @@ for (const token of [
 ]) {
   expect(allCss.includes(`var(${token}`), `首页样式复用 UI-0 语义 token ${token}`)
 }
-expectMatches(allCss, /var\(--sd-control-min,\s*48px\)/, '普通触控目标最小 48px')
-expectMatches(allCss, /var\(--sd-primary-control-min,\s*56px\)/, '主 CTA 最小 56px')
-expectMatches(allCss, /var\(--sd-nav-height,\s*112px\)/, '底栏布局使用 112px 语义变量')
+expectMinimumHeight(services, '.khome .sub', 48, '服务子入口')
+expectMinimumHeight(services, '.khome .cat-head', 48, '可点击服务组标题')
+expectMinimumHeight(shell, '.khome .id-stat', 48, '登录态统计按钮')
+expectMinimumHeight(shell, '.khome .btn', 48, '普通按钮')
+expectMinimumHeight(shell, '.khome .btn.lg', 56, '主 CTA')
+const navRule = cssRule(
+  responsive,
+  "[data-visual-theme='service-desk'][data-ux-density='touch'] .ui-kiosk-nav",
+)
+expect(pixelProperty(navRule, 'height') === 112, 'service-desk touch 底栏 height 绑定 112px')
+expect(pixelProperty(navRule, 'min-height') === 112, 'service-desk touch 底栏 min-height 绑定 112px')
+expectMinimumHeight(
+  responsive,
+  "[data-visual-theme='service-desk'][data-ux-density='touch'] .ui-kiosk-nav > button",
+  56,
+  '底栏 Tab 按钮',
+)
+expectMatches(identityPanel, /className="btn primary lg cta"\s+onClick=\{goLogin\}/, '登录主 CTA 绑定 56px lg 按钮类')
+expectMatches(continuePanel, /className="btn primary lg"\s+onClick=\{suggestion\.onGo\}/, '续办主 CTA 绑定 56px lg 按钮类')
 
 for (const [pattern, label] of [
   [/#fdfbf4/i, '#fdfbf4'],
   [/#0e302b/i, '#0e302b'],
-  [/(?:Songti|SimSun|Noto Serif|Source Han Serif|宋体)/i, '宋体/衬线字体'],
+  [/#11322b/i, '#11322b'],
+  [/#10302b|#1f9e86|#157a67|#f4f1e8|#efeadd|#fffdf8|#f7f4ec|#0c2f29|#124b41|#1c7a67/i, '旧首页墨青/米纸色'],
+  [/(?:Georgia|Songti|SimSun|Noto Serif|Source Han Serif|宋体|(?<!sans-)serif\b)/i, 'Georgia/宋体/衬线字体'],
+  [/(?:--paper(?:-2)?|--serif|--ink(?:-2)?|--teal(?:-deep|-soft)?)\s*:/i, '旧纸纹/墨青局部变量'],
   [/(?:repeating-linear-gradient|mask-image)/i, '纸纹背景'],
 ]) {
   expect(!pattern.test(allCss), `新 CSS 不含旧墨青纸感特征 ${label}`)
@@ -163,24 +218,83 @@ for (const title of ['证件复印', '云打印', '证件照打印']) {
 }
 expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 3, 'SERVICE_GROUPS 仅保留当前三个禁用入口')
 
-for (const marker of [
-  'continueAsGuest',
-  "navigate('/login', { state: { from: location.pathname } })",
-  '<ContinuePanel />',
-  'ACTIVE_PRINT_STATUSES',
-  "navigate('/me/print-orders')",
-  'function ToolboxSection()',
-  'if (!config.enabled) return null',
-  'items.length > 0',
-  '<strong>待配置</strong>',
-  '<ToolboxSection />',
-  '<SmartCampusHorizontalSection />',
-  "useInkRipple('.khome .sub, .khome .btn, .khome .id-stat')",
-  '岗位和招聘会仅作为第三方 / 官方来源信息入口，投递与预约请前往来源平台完成。',
-]) {
-  expect(home.includes(marker), `首页行为合同保留：${marker}`)
-}
-expect(home.indexOf('<ToolboxSection />') < home.indexOf('<SmartCampusHorizontalSection />'), '百宝箱仍排在智慧校园之前')
+expectMatches(
+  home,
+  /import\s*\{\s*getMyAiRecords,\s*getMyDocuments,\s*getMyResumes\s*\}\s*from\s*'\.\.\/\.\.\/services\/api\/memberAssets'/,
+  '首页统计继续导入真实会员资产 service',
+)
+expectMatches(home, /import\s*\{\s*getMyFavorites\s*\}\s*from\s*'\.\.\/\.\.\/services\/api\/memberFavorites'/, '首页统计继续导入真实收藏 service')
+expectMatches(home, /import\s*\{\s*getMyPrintOrders\s*\}\s*from\s*'\.\.\/\.\.\/services\/api\/memberPrintOrders'/, '续办继续导入真实打印订单 service')
+expectMatches(
+  homeStats,
+  /Promise\.all\(\[\s*getMyResumes\(token,\s*\{\s*pageSize:\s*1\s*\}\),\s*getMyDocuments\(token,\s*\{\s*pageSize:\s*1\s*\}\),\s*getMyAiRecords\(token,\s*\{\s*pageSize:\s*1\s*\}\),\s*getMyFavorites\(token,\s*undefined,\s*\{\s*pageSize:\s*1\s*\}\),\s*\]\)/,
+  '首页统计并行调用四个真实 service 且使用服务端 total 查询',
+)
+expectMatches(
+  homeStats,
+  /\.then\(\(\[resumes,\s*documents,\s*aiRecords,\s*favorites\]\)\s*=>\s*\{[\s\S]*?setStats\(\{\s*resumes:\s*resumes\.total,\s*documents:\s*documents\.total,\s*aiRecords:\s*aiRecords\.total,\s*favorites:\s*favorites\.total,\s*\}\)/,
+  '首页统计把四个真实响应 total 逐项映射到状态',
+)
+expectMatches(homeStats, /if\s*\(!isLoggedIn\)\s*\{\s*setStats\(null\)[\s\S]*?const token = getToken\(\)[\s\S]*?if\s*\(!token\)/, '首页统计受真实登录态与 token 门控')
+
+expectMatches(identityPanel, /const \{ isLoggedIn, guestMode, displayName, continueAsGuest, logout, getToken \} = useAuth\(\)/, '身份条 handler 来自真实 useAuth')
+expectMatches(identityPanel, /const \{ stats, loading \} = useHomeStats\(isLoggedIn, getToken\)/, '身份条消费真实统计 hook')
+expectMatches(identityPanel, /const goLogin = \(\) => navigate\('\/login', \{ state: \{ from: location\.pathname \} \}\)/, '登录 handler 保留来源路径')
+expectMatches(
+  identityPanel,
+  /\{ label: '简历', value: loading \|\| !stats \? '—' : String\(stats\.resumes\), href: '\/me\/resumes' \}[\s\S]*?\{ label: '文档', value: loading \|\| !stats \? '—' : String\(stats\.documents\), href: '\/me\/documents' \}[\s\S]*?\{ label: 'AI记录', value: loading \|\| !stats \? '—' : String\(stats\.aiRecords\), href: '\/me\/ai-records' \}[\s\S]*?\{ label: '收藏', value: loading \|\| !stats \? '—' : String\(stats\.favorites\), href: '\/me\/favorites' \}/,
+  '统计格展示真实统计状态并保留四个明细路由',
+)
+expectMatches(identityPanel, /onClick=\{\(\) => navigate\(cell\.href\)\}/, '统计格点击绑定真实明细路由 handler')
+expectMatches(
+  identityPanel,
+  /\{!guestMode && \(\s*<button\s+type="button"\s+className="btn ghost"\s+onClick=\{continueAsGuest\}>\s*游客体验\s*<\/button>\s*\)\}/,
+  '游客按钮仅在非游客态渲染并绑定 continueAsGuest',
+)
+expectMatches(
+  identityPanel,
+  /<button\s+type="button"\s+className="btn primary lg cta"\s+onClick=\{goLogin\}>\s*立即登录 \/ 注册/,
+  '登录按钮直接绑定 goLogin',
+)
+expectMatches(identityPanel, /className="btn ghost"\s+onClick=\{\(\) => logout\(\)\}>\s*退出/, '退出按钮直接绑定 logout')
+expectMatches(identityPanel, /className="btn primary lg"\s+onClick=\{\(\) => navigate\('\/profile'\)\}>\s*进入我的/, '进入我的按钮直接绑定 /profile')
+
+expectMatches(
+  continuePanel,
+  /const \[suggestion, setSuggestion\] = useState<ResumeSuggestion \| null>\(null\)/,
+  '续办建议初始为空，不使用固定 suggestion',
+)
+expectMatches(
+  continuePanel,
+  /Promise\.all\(\[getMyPrintOrders\(token,\s*\{\s*pageSize:\s*5\s*\}\),\s*getMyResumes\(token,\s*\{\s*pageSize:\s*5\s*\}\)\]\)/,
+  '续办并行调用真实打印订单与简历 service',
+)
+expectMatches(
+  continuePanel,
+  /const activePrint = orders\.items\.find\(\(o: MemberPrintOrderItem\) => ACTIVE_PRINT_STATUSES\.has\(o\.status\)\)[\s\S]*?if \(activePrint\) \{[\s\S]*?detail: `\$\{activePrint\.fileName \?\? '打印文件'\} · \$\{PRINT_STATUS_TEXT\[activePrint\.status\] \?\? activePrint\.status\}`,[\s\S]*?onGo: \(\) => navigate\('\/me\/print-orders'\)/,
+  '打印续办从真实订单响应筛选并映射文件名、状态和进度路由',
+)
+expectMatches(
+  continuePanel,
+  /const diagnosed = resumes\.items\.find\([\s\S]*?r\.kind === 'parse' && r\.status === 'completed' && !r\.optimized,[\s\S]*?if \(diagnosed\) \{[\s\S]*?navigate\(`\/resume\/optimize\?taskId=\$\{encodeURIComponent\(diagnosed\.taskId\)\}`,[\s\S]*?state: \{ taskId: diagnosed\.taskId \}/,
+  '简历续办从真实简历响应筛选并映射 taskId',
+)
+expect((continuePanel.match(/setSuggestion\(\{/g) ?? []).length === 2, '续办 suggestion 仅由两条真实响应分支生成')
+expectMatches(continuePanel, /if \(!suggestion\) return null\s*\n\s*return \(\s*<section className="continue"/, '无真实建议时隐藏，有建议时可达渲染')
+expectMatches(homePage, /<IdentityPanel \/>\s*<ContinuePanel \/>/, 'HomePage 直接渲染可达的 ContinuePanel')
+
+expectMatches(toolboxSection, /const config = useToolboxConfig\(\)/, '百宝箱读取真实终端配置 hook')
+expectMatches(toolboxSection, /const items = config\.enabled \? \[\.\.\.\(config\.items \?\? \[\]\)\]\.sort\(\(a, b\) => a\.sortOrder - b\.sortOrder\) : \[\]/, '百宝箱条目由真实配置开关与排序生成')
+expectMatches(toolboxSection, /if \(!config\.enabled\) return null\s*\n\s*return \(/, '百宝箱仅在真实配置启用时进入渲染')
+expectMatches(toolboxSection, /\{items\.length > 0 \? \([\s\S]*?\{items\.map\([\s\S]*?<ToolboxItemButton[\s\S]*?<\/div>\s*\) : \([\s\S]*?<strong>待配置<\/strong>/, '百宝箱真实条目与受控空态均在可达 JSX 分支')
+
+expectMatches(smartCampusSection, /const config = useSmartCampusConfig\(\)/, '智慧校园读取真实终端配置 hook')
+expectMatches(smartCampusSection, /\.filter\(\(key\) => config\.modules\[key\]\)[\s\S]*?const campusItems = \[\.\.\.\(config\.items \?\? \[\]\)\]\.sort/, '智慧校园入口由真实模块与投放条目生成')
+expectMatches(smartCampusSection, /if \(!config\.enabled \|\| \(enabledTiles\.length === 0 && campusItems\.length === 0\)\) return null\s*\n\s*return \(/, '智慧校园仅在启用且有真实入口时进入渲染')
+expectMatches(smartCampusSection, /enabledTiles\.map\(\(tile\) => \([\s\S]*?<ServiceTileButton[\s\S]*?campusItems\.map\(\(item\) => \([\s\S]*?<ToolboxItemButton/, '智慧校园可达 JSX 映射真实模块与投放条目')
+expectMatches(homePage, /<ToolboxSection \/>\s*<SmartCampusHorizontalSection \/>/, 'HomePage 直接按顺序渲染百宝箱与智慧校园')
+expectMatches(homePage, /useInkRipple\('\.khome \.sub, \.khome \.btn, \.khome \.id-stat'\)/, '首页可达组件保留触控涟漪绑定')
+expectMatches(homePage, /岗位和招聘会仅作为第三方 \/ 官方来源信息入口，投递与预约请前往来源平台完成。/, '首页可达组件保留合规脚注')
 
 for (const [key, label] of [['home', '首页'], ['assistant', 'AI助手'], ['profile', '我的']]) {
   expectMatches(kioskLayout, new RegExp(`key:\\s*'${key}'[^}]*label:\\s*'${label}'`), `底部导航保留 ${label} Tab`)
