@@ -143,6 +143,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
+          pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui
           pnpm --filter @ai-job-print/kiosk verify:legal-retention-copy
           pnpm --filter @ai-job-print/kiosk verify:price-single-source
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
@@ -182,7 +183,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-org-self
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
+          pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:admin-ops
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
@@ -230,6 +233,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:job-fit
+          pnpm --filter @ai-job-print/api verify:job-fit-governance
+          pnpm --filter @ai-job-print/api verify:governed-job-fit
           pnpm --filter @ai-job-print/api verify:job-ai
           pnpm --filter @ai-job-print/api verify:job-data-quality
           pnpm --filter @ai-job-print/api verify:job-ai-backend
@@ -327,7 +332,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
+          pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing

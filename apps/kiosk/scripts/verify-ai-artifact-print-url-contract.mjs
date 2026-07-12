@@ -27,11 +27,13 @@ const sharedFair = read('packages/shared/src/types/fairDto.ts')
 const resumePreview = read('apps/kiosk/src/pages/resume/ResumeGeneratePreviewPage.tsx')
 const interviewReport = read('apps/kiosk/src/pages/interview/InterviewReportPage.tsx')
 const careerPlan = read('apps/kiosk/src/pages/resume/CareerPlanPage.tsx')
+const jobFit = read('apps/kiosk/src/pages/resume/JobFitPage.tsx')
 const fairPlan = read('apps/kiosk/src/pages/job-fairs/FairVisitPlanPage.tsx')
 const materialsPage = read('apps/kiosk/src/pages/resume/JobMaterialLibraryPage.tsx')
 const myDocumentsPage = read('apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx')
 const fairMaterialsPage = read('apps/kiosk/src/pages/job-fairs/FairMaterialsPage.tsx')
 const careerService = read('services/api/src/ai/resume/career-plan.service.ts')
+const jobFitService = read('services/api/src/ai/resume/job-fit.service.ts')
 const fairService = read('services/api/src/ai/resume/fair-visit-plan.service.ts')
 const interviewService = read('services/api/src/mock-interview/mock-interview.service.ts')
 const materialsService = read('services/api/src/job-materials/job-materials.service.ts')
@@ -40,15 +42,16 @@ const adminFairsService = read('services/api/src/jobs/admin-fairs.service.ts')
 const fairMaterialPrintBridgeService = read('services/api/src/jobs/fair-material-print-bridge.service.ts')
 const jobsController = read('services/api/src/jobs/jobs.controller.ts')
 
-for (const [source, typeName] of [
-  [sharedAi, 'CareerPlanPrintResponse'],
-  [sharedAi, 'FairVisitPlanPrintResponse'],
-  [sharedInterview, 'InterviewPrintResponse'],
-  [sharedMaterials, 'JobMaterialGenerateResponse'],
+for (const [source, typeName, printFileUrlPattern] of [
+  [sharedAi, 'CareerPlanPrintResponse', /printFileUrl\?:\s*string/],
+  [sharedAi, 'JobFitPrintResponse', /printFileUrl:\s*string/],
+  [sharedAi, 'FairVisitPlanPrintResponse', /printFileUrl\?:\s*string/],
+  [sharedInterview, 'InterviewPrintResponse', /printFileUrl\?:\s*string/],
+  [sharedMaterials, 'JobMaterialGenerateResponse', /printFileUrl\?:\s*string/],
 ]) {
   expectMatch(
     interfaceBody(source, typeName),
-    /printFileUrl\?:\s*string/,
+    printFileUrlPattern,
     `${typeName} additive 声明内部 HMAC printFileUrl`,
   )
 }
@@ -63,6 +66,7 @@ expectMatch(interfaceBody(sharedFair, 'FairMaterialPrintResponse'), /printFileUr
 
 for (const [source, label] of [
   [careerService, '职业规划打印服务'],
+  [jobFitService, '岗位匹配打印服务'],
   [fairService, '招聘会准备单打印服务'],
   [interviewService, '模拟面试报告打印服务'],
   [materialsService, '求职材料生成服务'],
@@ -75,6 +79,7 @@ for (const [source, label, variable] of [
   [resumePreview, 'AI 简历生成预览', 'exported'],
   [interviewReport, '模拟面试报告', 'file'],
   [careerPlan, '职业规划建议单', 'file'],
+  [jobFit, '岗位匹配决策报告', 'file'],
   [fairPlan, '招聘会参会准备单', 'file'],
   [materialsPage, '求职材料', 'file'],
 ]) {
@@ -85,6 +90,7 @@ for (const [source, label, variable] of [
 expectMatch(resumePreview, /if\s*\(\s*!exported\?\.printFileUrl\s*\)\s*return/, 'AI 简历生成预览缺内部打印 URL 时阻断')
 expectMatch(interviewReport, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '模拟面试报告缺内部打印 URL 时诚实报错')
 expectMatch(careerPlan, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '职业规划缺内部打印 URL 时诚实报错')
+expectMatch(jobFit, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '岗位匹配缺内部打印 URL 时诚实报错')
 expectMatch(fairPlan, /if\s*\(\s*!file\.printFileUrl\s*\)\s*throw/, '招聘会准备单缺内部打印 URL 时诚实报错')
 expectMatch(materialsPage, /if\s*\(\s*!file\.printFileUrl\s*\)\s*return/, '求职材料缺内部打印 URL 时不进入打印')
 expectMatch(materialsPage, /disabled=\{!generated\.printFileUrl\}/, '求职材料 mock/缺 URL 时打印按钮诚实禁用')

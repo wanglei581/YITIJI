@@ -1,11 +1,14 @@
 import { randomBytes } from 'crypto'
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { AuditService } from '../audit/audit.service'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { ONLINE_PAYMENT_CHANNELS, P0A_ALLOWED_PAYMENT_SOURCES, type PaymentChannel } from './payment.types'
 
 /** Order 行类型（从 prisma delegate 推导，避免直接 import 生成 client 类型）。 */
 type OrderRecord = NonNullable<Awaited<ReturnType<PrismaService['order']['findUnique']>>>
+
+type RedemptionSettlementOptions = { discountCents: number; benefitRef: string; operatorId?: string }
+type OrderClient = Pick<PrismaTransactionClient, 'order'>
 
 // 取件码字符集：去掉易混字符 0/O/1/I/L；10 位 ≈ 49 bit 熵（非低熵）。
 const PICKUP_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
@@ -92,7 +95,7 @@ export class OrderStatusService {
     // 仅该情况换码重试；CAS 未命中(count=0)与其它错误不重试、不吞。耗尽仍撞码 → 明确错误码，不落 500。
     let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = await this.generateUniquePickupCode()
+      const pickupCode = await this.generateUniquePickupCode(this.prisma)
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
@@ -110,9 +113,11 @@ export class OrderStatusService {
         throw e // 其它错误照抛，不吞
       }
       if (res.count === 0) {
-        // 并发竞态（非取件码冲突）：他人已支付则幂等返回，否则非法转移，不重试。
+        // 并发竞态（非取件码冲突）：仅同一支付来源可幂等回放；不同来源必须冲突，
+        // 不能把「线下已收」误报为已经由 voucher/线上通道入账成功。
         const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
-        if (fresh?.payStatus === 'paid') return fresh
+        if (fresh?.payStatus === 'paid' && fresh.paymentSource === paymentSource) return fresh
+        if (fresh?.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
         throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
       settled = true
@@ -130,7 +135,7 @@ export class OrderStatusService {
       payload: { paymentSource, operatorId: operatorId ?? null },
     })
 
-    return this.requireOrder(orderId)
+    return this.requireOrder(this.prisma, orderId)
   }
 
   /**
@@ -175,7 +180,7 @@ export class OrderStatusService {
 
     let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = await this.generateUniquePickupCode()
+      const pickupCode = await this.generateUniquePickupCode(this.prisma)
       let res: { count: number }
       try {
         res = await this.prisma.order.updateMany({
@@ -216,7 +221,7 @@ export class OrderStatusService {
       payload: { channel, attemptId, channelTxnNo, late },
     })
 
-    return this.requireOrder(orderId)
+    return this.requireOrder(this.prisma, orderId)
   }
 
   /**
@@ -233,29 +238,72 @@ export class OrderStatusService {
    */
   async markPaidByRedemption(
     orderId: string,
-    opts: { discountCents: number; benefitRef: string; operatorId?: string },
+    opts: RedemptionSettlementOptions,
   ): Promise<OrderRecord> {
-    const { discountCents, benefitRef } = opts
+    const outcome = await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
+      const order = await this.requireOrder(tx, orderId)
+      // 保持公开方法既有幂等语义；事务 helper 则仅接受仍为 unpaid 的订单，供核销账本事务安全调用。
+      if (order.payStatus === 'paid') {
+        if (order.paymentSource === 'voucher') return { order, settled: false }
+        throw new BadRequestException('ORDER_ALREADY_PAID')
+      }
+      return { order: await this.settleRedemptionInTransaction(tx, orderId, opts), settled: true }
+    })
 
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
-    if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
+    if (!outcome.settled) return outcome.order
 
-    if (order.payStatus === 'paid') {
-      if (order.paymentSource === 'voucher') return order
-      throw new BadRequestException('ORDER_ALREADY_PAID')
-    }
+    await this.writeRedemptionSettlementAudit(orderId, outcome.order, opts)
+
+    return outcome.order
+  }
+
+  /**
+   * 将订单核销审计放在外层事务提交后写入；订单核销需要借此复用同一审计格式，
+   * 同时避免审计 I/O 位于 Prisma 事务中而拉长结算锁持有时间。
+   */
+  async writeRedemptionSettlementAudit(
+    orderId: string,
+    order: OrderRecord,
+    opts: RedemptionSettlementOptions,
+  ): Promise<void> {
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'order.mark_paid_redemption',
+      targetType: 'order',
+      targetId: orderId,
+      // voucher = 平台券/权益抵扣，非真实资金；benefitRef 记录来源权益，便于对账与追溯。
+      payload: {
+        paymentSource: 'voucher',
+        discountCents: order.amountCents,
+        benefitRef: opts.benefitRef,
+        operatorId: opts.operatorId ?? null,
+      },
+    })
+  }
+
+  /**
+   * 在调用方事务内完成全额权益核销入账。此方法不写审计，避免账本、权益扣减与订单结算跨事务分裂。
+   * 已支付订单（包括 voucher）不做幂等回放：调用方必须整体回滚或按既有核销账本回放。
+   */
+  async settleRedemptionInTransaction(
+    tx: PrismaTransactionClient,
+    orderId: string,
+    opts: RedemptionSettlementOptions,
+  ): Promise<OrderRecord> {
+    const order = await this.requireOrder(tx, orderId)
+    if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
     if (order.payStatus !== 'unpaid') throw new BadRequestException('ORDER_INVALID_TRANSITION')
     // 全额核销：抵扣额必须 >= 应付；部分抵扣（<应付）本波不接（留结账用券 UI 波）。
-    if (!Number.isInteger(discountCents) || discountCents < order.amountCents) {
+    if (!Number.isInteger(opts.discountCents) || opts.discountCents < order.amountCents) {
       throw new BadRequestException('REDEEM_REQUIRES_FULL_COVERAGE')
     }
 
-    let settled = false
     for (let attempt = 0; attempt < PICKUP_MAX_ATTEMPTS; attempt += 1) {
-      const pickupCode = await this.generateUniquePickupCode()
+      const pickupCode = await this.generateUniquePickupCode(tx)
       let res: { count: number }
       try {
-        res = await this.prisma.order.updateMany({
+        res = await tx.order.updateMany({
           where: { id: orderId, payStatus: 'unpaid' }, // compare-and-set
           data: {
             payStatus: 'paid',
@@ -272,26 +320,13 @@ export class OrderStatusService {
         throw e
       }
       if (res.count === 0) {
-        const fresh = await this.prisma.order.findUnique({ where: { id: orderId } })
-        if (fresh?.payStatus === 'paid' && fresh.paymentSource === 'voucher') return fresh
-        throw new BadRequestException(fresh?.payStatus === 'paid' ? 'ORDER_ALREADY_PAID' : 'ORDER_INVALID_TRANSITION')
+        const fresh = await this.requireOrder(tx, orderId)
+        if (fresh.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
+        throw new BadRequestException('ORDER_INVALID_TRANSITION')
       }
-      settled = true
-      break
+      return this.requireOrder(tx, orderId)
     }
-    if (!settled) throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
-
-    await this.audit.write({
-      actorId: null,
-      actorRole: 'system',
-      action: 'order.mark_paid_redemption',
-      targetType: 'order',
-      targetId: orderId,
-      // voucher = 平台券/权益抵扣，非真实资金；benefitRef 记录来源权益，便于对账与追溯。
-      payload: { paymentSource: 'voucher', discountCents: order.amountCents, benefitRef, operatorId: opts.operatorId ?? null },
-    })
-
-    return this.requireOrder(orderId)
+    throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')
   }
 
   async refund(orderId: string, opts: { reason: string; operatorId?: string }): Promise<OrderRecord> {
@@ -326,20 +361,20 @@ export class OrderStatusService {
       payload: { reason, operatorId: opts.operatorId ?? null },
     })
 
-    return this.requireOrder(orderId)
+    return this.requireOrder(this.prisma, orderId)
   }
 
-  private async requireOrder(orderId: string): Promise<OrderRecord> {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+  private async requireOrder(client: OrderClient, orderId: string): Promise<OrderRecord> {
+    const order = await client.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException('ORDER_NOT_FOUND')
     return order
   }
 
   /** 生成库内唯一取件码；有界重试（不无限循环），穷尽后 fail-closed。唯一索引为最终防撞。 */
-  private async generateUniquePickupCode(): Promise<string> {
+  private async generateUniquePickupCode(client: OrderClient): Promise<string> {
     for (let i = 0; i < PICKUP_MAX_ATTEMPTS; i += 1) {
       const code = randomPickupCode()
-      const existing = await this.prisma.order.findUnique({ where: { pickupCode: code } })
+      const existing = await client.order.findUnique({ where: { pickupCode: code } })
       if (!existing) return code
     }
     throw new BadRequestException('PICKUP_CODE_UNAVAILABLE')

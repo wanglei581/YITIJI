@@ -136,21 +136,27 @@ export class MemberPrivacyService {
     const deletion = existing.requestType === 'delete' && input.status === 'completed'
       ? await this.deleteJobAiPersonalData(existing.endUserId)
       : null
-    const auditRef = input.auditRef ?? await this.audit.write({
+    // 删除请求的审计凭证必须由本次成功事务后生成；不得接受调用方传入的任意 auditRef。
+    const auditRef = deletion || !input.auditRef ? await this.audit.write({
       actorId: input.handledBy,
       actorRole: 'admin',
       action: 'member_data_request.handle',
       targetType: 'user_data_request',
       targetId: id,
-      payload: {
-        endUserId: existing.endUserId,
-        requestType: existing.requestType,
-        fromStatus: existing.status,
-        toStatus: input.status,
-        ...(deletion ? { jobAiSessionsDeleted: deletion.jobAiSessionsDeleted } : {}),
-        ...(deletion ? { consentsRevoked: deletion.consentsRevoked } : {}),
-      },
-    })
+      // 删除类审计只留安全计数，绝不写入简历派生 payload 或其它敏感内容。
+      payload: deletion
+        ? {
+            aiResumeResultsDeleted: deletion.aiResumeResultsDeleted,
+            jobAiSessionsDeleted: deletion.jobAiSessionsDeleted,
+            consentsRevoked: deletion.consentsRevoked,
+          }
+        : {
+            endUserId: existing.endUserId,
+            requestType: existing.requestType,
+            fromStatus: existing.status,
+            toStatus: input.status,
+          },
+    }) : input.auditRef
     const row = await this.prisma.userDataRequest.update({
       where: { id },
       data: {
@@ -164,17 +170,25 @@ export class MemberPrivacyService {
   }
 
   private async deleteJobAiPersonalData(endUserId: string): Promise<{
+    aiResumeResultsDeleted: number
     jobAiSessionsDeleted: number
     consentsRevoked: number
   }> {
-    const [sessions, consents] = await Promise.all([
-      this.prisma.jobAiSession.deleteMany({ where: { endUserId } }),
-      this.prisma.userAiConsent.updateMany({
-        where: { endUserId, scope: 'job_ai', revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
-    ])
-    return { jobAiSessionsDeleted: sessions.count, consentsRevoked: consents.count }
+    return this.prisma.$transaction(async (tx) => {
+      const [results, sessions, consents] = await Promise.all([
+        tx.aiResumeResult.deleteMany({ where: { endUserId } }),
+        tx.jobAiSession.deleteMany({ where: { endUserId } }),
+        tx.userAiConsent.updateMany({
+          where: { endUserId, scope: 'job_ai', revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ])
+      return {
+        aiResumeResultsDeleted: results.count,
+        jobAiSessionsDeleted: sessions.count,
+        consentsRevoked: consents.count,
+      }
+    })
   }
 
   private assertScope(scope: string): asserts scope is MemberAiConsentScope {

@@ -134,8 +134,25 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
           .slice(0, take)
           .map((attempt) => ({ orderId: attempt.orderId }))
       },
-      count: async () => 0,
+      count: async ({ where }: { where: Record<string, unknown> }) => {
+        return [...attempts.values()].filter((attempt) => {
+          if (typeof where['orderId'] === 'string' && attempt.orderId !== where['orderId']) return false
+          const status = where['status'] as { in?: string[] } | string | undefined
+          if (typeof status === 'string' && attempt.status !== status) return false
+          if (status && typeof status !== 'string' && status.in && !status.in.includes(attempt.status)) return false
+          const expiresAt = where['expiresAt'] as { gt?: Date } | undefined
+          if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
+          const id = where['id'] as { not?: string } | string | undefined
+          if (typeof id === 'string' && attempt.id !== id) return false
+          if (id && typeof id !== 'string' && id.not && attempt.id === id.not) return false
+          return true
+        }).length
+      },
     },
+  }
+  const transactionalPrisma = {
+    ...prisma,
+    $transaction: async <T>(fn: (tx: typeof prisma) => Promise<T>): Promise<T> => fn(prisma),
   }
   const audit = { write: async (entry: Record<string, unknown>) => void audits.push(entry) }
   const orderStatus = {
@@ -148,7 +165,7 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
     },
   }
   const payment = new OnlinePaymentService(
-    prisma as never,
+    transactionalPrisma as never,
     audit as never,
     orderStatus as never,
     new PaymentProviderRegistry([provider]),
@@ -287,6 +304,7 @@ function verifyKioskContract(): void {
   const panel = readFileSync(join(repoRoot, 'apps/kiosk/src/pages/print/CashierPaymentPanel.tsx'), 'utf8')
   const convergenceTask = readFileSync(join(repoRoot, 'services/api/src/payment/code-payment-convergence.task.ts'), 'utf8')
   const paymentModule = readFileSync(join(repoRoot, 'services/api/src/payment/payment.module.ts'), 'utf8')
+  const paymentService = readFileSync(join(repoRoot, 'services/api/src/payment/online-payment.service.ts'), 'utf8')
   if (
     /@Post\('orders\/:id\/code-pay'\)/.test(controller) &&
     /createCodePayAttempt/.test(paymentApi) &&
@@ -316,6 +334,14 @@ function verifyKioskContract(): void {
     pass('server-side code-payment convergence task is env-gated and registered in the payment module')
   } else {
     fail('server-side code-payment convergence task missing')
+  }
+  const reservationTransactions = paymentService.match(
+    /this\.prisma\.\$transaction\(async \(tx\) => \{[\s\S]*?tx\.order\.updateMany\([\s\S]*?tx\.paymentAttempt\.create\(/g,
+  ) ?? []
+  if (reservationTransactions.length >= 2) {
+    pass('QR and code-payment reserve Order and create PaymentAttempt in one transaction, leaving no empty paying window')
+  } else {
+    fail('payment reservation must atomically create the PaymentAttempt with the Order paying CAS')
   }
 }
 
@@ -370,6 +396,41 @@ async function main(): Promise<void> {
       pass('concurrent code-payment submissions reserve one order and create at most one payable attempt')
     } else {
       fail(`concurrent code-payment submissions created multiple payable attempts: ${JSON.stringify(concurrentResults)}`)
+    }
+
+    let releaseCodeProvider: (() => void) | undefined
+    let enteredCodeProvider: (() => void) | undefined
+    const codeProviderEntered = new Promise<void>((resolve) => { enteredCodeProvider = resolve })
+    const codeProviderRelease = new Promise<void>((resolve) => { releaseCodeProvider = resolve })
+    class GatedCodePaymentSandboxProvider extends SandboxPaymentProvider {
+      override async createCodePayment(input: Parameters<SandboxPaymentProvider['createCodePayment']>[0]) {
+        enteredCodeProvider?.()
+        await codeProviderRelease
+        return super.createCodePayment(input)
+      }
+    }
+    const reservationFixture = createFixture(new GatedCodePaymentSandboxProvider(SESSION_SECRET))
+    const reservationOrder = reservationFixture.makeOrder(100)
+    const reservationAttempt = reservationFixture.payment.createCodePayAttempt(
+      reservationOrder.order.id,
+      reservationOrder.token,
+      AUTH_CODE,
+    )
+    try {
+      await codeProviderEntered
+      const createdAttempts = [...reservationFixture.attempts.values()]
+        .filter((entry) => entry.orderId === reservationOrder.order.id)
+      await expectCode('second code-payment request during Provider gate remains blocked without releasing the reservation', 'PAYMENT_ATTEMPT_PENDING', () =>
+        reservationFixture.payment.createCodePayAttempt(reservationOrder.order.id, reservationOrder.token, '223456789012345678'),
+      )
+      if (reservationOrder.order.payStatus === 'paying' && createdAttempts.length === 1 && createdAttempts[0]?.status === 'created') {
+        pass('code-payment reserves order as paying before provider processing, so other settlement paths cannot consume it')
+      } else {
+        fail(`code-payment did not reserve before provider processing: ${JSON.stringify({ order: reservationOrder.order, createdAttempts })}`)
+      }
+    } finally {
+      releaseCodeProvider?.()
+      await reservationAttempt
     }
 
     const active = makeOrder(100)

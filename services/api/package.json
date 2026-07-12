@@ -53,6 +53,7 @@
     "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
     "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
+    "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
     "verify:print-scan-preflight": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts",
     "verify:print-scan-preflight:postgres": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts --require-postgres",
     "verify:db-load-indexes": "node -r @swc-node/register scripts/verify-db-load-indexes.ts",
@@ -110,6 +111,9 @@
     "verify:ocr-baidu-live": "node -r @swc-node/register scripts/verify-ocr-baidu-live.ts",
     "verify:mock-interview": "node -r @swc-node/register scripts/verify-mock-interview.ts",
     "verify:job-fit": "node -r @swc-node/register scripts/verify-job-fit.ts",
+    "verify:job-fit-print": "node -r @swc-node/register scripts/verify-job-fit-print.ts",
+    "verify:job-fit-governance": "node -r @swc-node/register scripts/verify-job-fit-governance.ts",
+    "verify:governed-job-fit": "node -r @swc-node/register scripts/verify-governed-job-fit.ts",
     "verify:job-ai": "node -r @swc-node/register scripts/verify-job-ai.ts",
     "verify:job-data-quality": "node -r @swc-node/register scripts/verify-job-data-quality.ts",
     "verify:job-ai-backend": "node -r @swc-node/register scripts/verify-job-ai-backend.ts",
@@ -142,7 +146,8 @@
     "verify:reconciliation": "node -r @swc-node/register scripts/verify-reconciliation.ts",
     "verify:refund-convergence": "node -r @swc-node/register scripts/verify-refund-convergence.ts",
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
-    "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts"
+    "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts",
+    "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

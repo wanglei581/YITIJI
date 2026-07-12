@@ -74,7 +74,8 @@ export class MemberAssetsController {
   }
 
   /**
-   * 删除本人一条 AI 记录（C-2D）。硬删（payload 含敏感内容）；parse 行级联删同任务 optimize 行。
+   * 删除本人一条 AI 记录（C-2D）。硬删（payload 含敏感内容）；parse 行级联删同任务
+   * 全部派生结果和 JobAiSession，job_fit 行仅级联同任务 match 会话。
    * 删他人 / 不存在统一 404（service 层归属校验）；动作写审计日志留痕。
    */
   @Delete('ai-records/:id')

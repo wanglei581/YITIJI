@@ -3,8 +3,9 @@
 //
 // 首页第二个大模块。展示 7 个能力入口：
 //   已上线：文档打印 → /print/upload、手机扫码上传 → /print/upload?tab=qr、
-//           材料扫描 → /scan/start、照片打印 → /print/upload
-//   MVP 说明：证件照 / 格式转换 / 签名盖章 → /print-scan/feature/:key（可点击占位）
+//           材料扫描 → /scan/start、照片打印 → /print/upload、
+//           格式转换（多图合并PDF） → /print-scan/convert
+//   MVP 说明：证件照 / 签名盖章 → /print-scan/feature/:key（可点击占位）
 // 另有"我的打印记录"快捷入口区：指向既有 /me/documents、/me/print-orders、
 //   /me/feedback?category=print 三个 /me/* 明细页，不新建数据模型或重复入口。
 //
@@ -112,9 +113,9 @@ const CAPABILITIES: Capability[] = [
     iconBg: 'bg-info-bg',
     iconColor: 'text-info',
     title: '格式转换',
-    description: '文档与图片格式互转',
-    to: '/print-scan/feature/convert',
-    available: false,
+    description: '多张图片合并为一份 PDF',
+    to: '/print-scan/convert',
+    available: true,
   },
   {
     key: 'sign',
