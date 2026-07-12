@@ -70,6 +70,10 @@ const VALID = {
   gapPoints: [{ gap: '缺少跨部门协调案例', suggestion: '补充一段协调多方资源的经历表述' }],
   targetedSuggestions: ['在简历开头突出档案管理量化成果', '将合同整理数量前置'],
 }
+const M1_5_DECISION_SUPPORT = {
+  analysisVersion: 'job_fit_m1_5',
+  keywordCoverage: { matched: ['档案管理'], missing: ['预算管理'] },
+} as const
 const vjson = (over: Record<string, unknown> = {}) => JSON.stringify({ ...VALID, ...over })
 
 async function main() {
@@ -141,7 +145,7 @@ async function main() {
     const memberRequester = { endUserId: endUserA, accessToken: null }
 
     // 1. jobId 闭环
-    responseQueue.push(vjson())
+    responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
     const r1WithUsage = await svc.analyzeWithUsage({ taskId, jobId: jobPub.id }, requester)
     const r1 = r1WithUsage.response
     if (r1.status !== 'completed' || !('fitLevel' in r1)) fail('1. 应 completed')
@@ -151,12 +155,86 @@ async function main() {
     }
     const row1 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row1 || row1.accessTokenHash !== tokenHash) fail('1. job_fit 行未继承 parse 归属')
-    pass('1. jobId 闭环：completed + 来源信息 + kind=job_fit 落库继承归属 + usage 元数据')
+    // M1.5 是可选增量：只在受控运行时返回中窄化读取，不收紧既有 JobFitResponse 的静态类型。
+    const r1M15 = r1 as unknown as {
+      job?: { id?: unknown }
+      decisionSupport?: {
+        analysisVersion?: unknown
+        keywordCoverage?: { matched?: unknown; missing?: unknown }
+      }
+    }
+    const m15Violations: string[] = []
+    if (r1M15.job?.id !== jobPub.id) m15Violations.push('response.job.id 未保留所选岗位 id')
+    if (r1M15.decisionSupport?.analysisVersion !== 'job_fit_m1_5') {
+      m15Violations.push('decisionSupport.analysisVersion 未保留 job_fit_m1_5')
+    }
+    const matchedKeywords = r1M15.decisionSupport?.keywordCoverage?.matched
+    if (!Array.isArray(matchedKeywords) || !matchedKeywords.includes('档案管理')) {
+      m15Violations.push('decisionSupport.keywordCoverage.matched 未保留 M1.5 决策字段')
+    }
+    const missingKeywords = r1M15.decisionSupport?.keywordCoverage?.missing
+    if (!Array.isArray(missingKeywords) || !missingKeywords.includes('预算管理')) {
+      m15Violations.push('decisionSupport.keywordCoverage.missing 未保留 M1.5 决策字段')
+    }
+    if (row1.provider !== 'llm:deepseek:stub') {
+      m15Violations.push(`job_fit.provider 应保留实际 provider llm:deepseek:stub，实际为 ${row1.provider}`)
+    }
+    if (m15Violations.length > 0) fail(`1. M1.5 运行时契约缺失：${m15Violations.join('；')}`)
+    pass('1. jobId 闭环：completed + M1.5 可选增量 + kind=job_fit 落库继承归属与实际 provider + usage 元数据')
 
     responseQueue.push(vjson())
     const r1b = await svc.analyze({ taskId: memberTaskId, jobId: jobPub.id }, memberRequester)
+    const r1bLegacy = r1b as unknown as {
+      taskId?: unknown
+      job?: {
+        title?: unknown
+        company?: unknown
+        sourceName?: unknown
+        sourceUrl?: unknown
+        externalId?: unknown
+      }
+      fitLevel?: unknown
+      summary?: unknown
+      matchPoints?: unknown
+      gapPoints?: unknown
+      targetedSuggestions?: unknown
+      providerName?: unknown
+      decisionSupport?: unknown
+    }
     if (r1b.status !== 'completed') fail('1b. 会员岗位匹配应 completed')
-    pass('1b. 会员岗位匹配路径按 parse 行 endUserId 提取原文')
+    if (
+      r1bLegacy.taskId !== memberTaskId ||
+      typeof r1bLegacy.job?.title !== 'string' ||
+      typeof r1bLegacy.job?.company !== 'string' ||
+      typeof r1bLegacy.job?.sourceName !== 'string' ||
+      typeof r1bLegacy.job?.sourceUrl !== 'string' ||
+      typeof r1bLegacy.job?.externalId !== 'string' ||
+      typeof r1bLegacy.fitLevel !== 'string' ||
+      typeof r1bLegacy.summary !== 'string' ||
+      !Array.isArray(r1bLegacy.matchPoints) ||
+      !Array.isArray(r1bLegacy.gapPoints) ||
+      !Array.isArray(r1bLegacy.targetedSuggestions) ||
+      typeof r1bLegacy.providerName !== 'string'
+    ) fail('1b. 无 M1.5 增量时既有 completed 响应字段异常')
+    if (r1bLegacy.decisionSupport !== undefined) fail('1b. decisionSupport 为可选增量，旧响应不应被强制填充')
+    pass('1b. 会员路径保留既有 completed 字段，decisionSupport 缺失时兼容降级')
+
+    // 1c. M1.5 关键词命中必须有简历/岗位依据；可安全过滤或重试，绝不能原样回传编造词。
+    responseQueue.push(vjson({
+      decisionSupport: {
+        analysisVersion: 'job_fit_m1_5',
+        keywordCoverage: { matched: ['注册会计师'], missing: ['预算管理'] },
+      },
+    }))
+    responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
+    const r1c = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    const r1cM15 = r1c as unknown as { decisionSupport?: { keywordCoverage?: { matched?: unknown } } }
+    const unsafeMatchedKeywords = r1cM15.decisionSupport?.keywordCoverage?.matched
+    if (r1c.status !== 'completed' || (Array.isArray(unsafeMatchedKeywords) && unsafeMatchedKeywords.includes('注册会计师'))) {
+      fail('1c. 无依据的 decisionSupport.keywordCoverage.matched 应被过滤或安全重试，不能原样保留')
+    }
+    responseQueue.length = 0
+    pass('1c. M1.5 keywordCoverage.matched 无简历/岗位依据 → 过滤或安全重试，不原样回传')
 
     // 2. 防编造
     responseQueue.push(vjson({ matchPoints: [{ point: '会开挖掘机', evidence: '持有挖掘机证书五年经验' }] }))
