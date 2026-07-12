@@ -197,13 +197,11 @@ export class JobFitService {
         jobAiConsentRevokedAt: true,
       },
     })
-    const notFound = () =>
-      new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新提交简历' } })
-    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) throw notFound()
+    if (!row || !row.expiresAt || row.expiresAt.getTime() < Date.now()) throw this.aiTaskNotFound()
     if (row.endUserId) {
-      if (requester.endUserId !== row.endUserId) throw notFound()
+      if (requester.endUserId !== row.endUserId) throw this.aiTaskNotFound()
     } else if (!row.accessTokenHash || !tokenMatches(requester.accessToken, row.accessTokenHash)) {
-      throw notFound()
+      throw this.aiTaskNotFound()
     }
     return {
       endUserId: row.endUserId,
@@ -216,34 +214,32 @@ export class JobFitService {
   }
 
   async grantJobFitConsent(taskId: string, requester: JobFitRequester) {
-    const parse = await this.authorizeParseForJobFit(taskId, requester)
-    const data: {
-      jobAiConsentVersion: string
-      jobAiConsentGrantedAt?: Date
-      jobAiConsentRevokedAt: null
-    } = {
-      jobAiConsentVersion: JOB_FIT_ANONYMOUS_CONSENT_VERSION,
-      jobAiConsentRevokedAt: null,
-    }
-    if (!parse.jobAiConsentGrantedAt) data.jobAiConsentGrantedAt = new Date()
+    const parse = await this.authorizeAnonymousParseForJobFit(taskId, requester)
+    if (this.hasActiveAnonymousJobFitConsent(parse)) return this.consentStatus(taskId, parse)
+
+    const grantedAt = new Date()
     await this.prisma.aiResumeResult.update({
       where: { taskId_kind: { taskId, kind: 'parse' } },
-      data,
+      data: {
+        jobAiConsentVersion: JOB_FIT_ANONYMOUS_CONSENT_VERSION,
+        jobAiConsentGrantedAt: grantedAt,
+        jobAiConsentRevokedAt: null,
+      },
     })
     return this.consentStatus(taskId, {
       ...parse,
-      jobAiConsentVersion: data.jobAiConsentVersion,
-      jobAiConsentGrantedAt: data.jobAiConsentGrantedAt ?? parse.jobAiConsentGrantedAt,
+      jobAiConsentVersion: JOB_FIT_ANONYMOUS_CONSENT_VERSION,
+      jobAiConsentGrantedAt: grantedAt,
       jobAiConsentRevokedAt: null,
     })
   }
 
   async getJobFitConsentStatus(taskId: string, requester: JobFitRequester) {
-    return this.consentStatus(taskId, await this.authorizeParseForJobFit(taskId, requester))
+    return this.consentStatus(taskId, await this.authorizeAnonymousParseForJobFit(taskId, requester))
   }
 
   async revokeJobFitConsent(taskId: string, requester: JobFitRequester) {
-    const parse = await this.authorizeParseForJobFit(taskId, requester)
+    const parse = await this.authorizeAnonymousParseForJobFit(taskId, requester)
     const revokedAt = parse.jobAiConsentRevokedAt ?? new Date()
     if (!parse.jobAiConsentRevokedAt) {
       await this.prisma.aiResumeResult.update({
@@ -270,8 +266,27 @@ export class JobFitService {
       consentVersion: parse.jobAiConsentVersion,
       grantedAt: parse.jobAiConsentGrantedAt,
       revokedAt: parse.jobAiConsentRevokedAt,
-      active: !!parse.jobAiConsentGrantedAt && !parse.jobAiConsentRevokedAt,
+      active: this.hasActiveAnonymousJobFitConsent(parse),
     }
+  }
+
+  /**
+   * consent API 是匿名 parse 的专用入口。它必须复用公开 authorizer 的 TTL、
+   * token 与不可枚举裁决，再额外排除所有会员 parse；不能改变一般分析/读取
+   * 对会员 parse 的既有授权。
+   */
+  private async authorizeAnonymousParseForJobFit(taskId: string, requester: JobFitRequester): Promise<AuthorizedJobFitParse> {
+    const parse = await this.authorizeParseForJobFit(taskId, requester)
+    if (parse.endUserId !== null) throw this.aiTaskNotFound()
+    return parse
+  }
+
+  private hasActiveAnonymousJobFitConsent(parse: AuthorizedJobFitParse): boolean {
+    return !!parse.jobAiConsentVersion && !!parse.jobAiConsentGrantedAt && !parse.jobAiConsentRevokedAt
+  }
+
+  private aiTaskNotFound(): NotFoundException {
+    return new NotFoundException({ error: { code: 'AI_TASK_NOT_FOUND', message: '任务不存在，请重新提交简历' } })
   }
 
   /**
