@@ -7,6 +7,11 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '../lib/cn'
+import {
+  getVisualThemeAttributes,
+  type UiDensity,
+  type VisualTheme,
+} from '../theme/visualTheme'
 
 export interface NavItem {
   key: string
@@ -47,6 +52,8 @@ export interface AdminLayoutProps {
   userRole?: string
   /** Notification count shown on the bell badge. */
   notificationCount?: number
+  visualTheme?: VisualTheme
+  density?: UiDensity
   className?: string
 }
 
@@ -63,15 +70,20 @@ export function AdminLayout({
   userName,
   userRole,
   notificationCount = 0,
+  visualTheme = 'legacy',
+  density = 'compact',
   className,
 }: AdminLayoutProps) {
   return (
-    <div className={cn('flex h-screen overflow-hidden bg-canvas', className)}>
+    <div
+      {...getVisualThemeAttributes(visualTheme, density)}
+      className={cn('ui-admin-shell flex h-screen overflow-hidden bg-canvas', className)}
+    >
 
       {/* ── Sidebar ────────────────────────────────────────── */}
       <aside
         className={cn(
-          'flex shrink-0 flex-col bg-neutral-900 transition-all duration-200',
+          'ui-admin-sidebar flex shrink-0 flex-col bg-neutral-900 transition-all duration-200',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
@@ -208,7 +220,7 @@ export function AdminLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
 
         {/* Top header */}
-        <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-7">
+        <header className="ui-admin-topbar flex h-[60px] shrink-0 items-center justify-between border-b border-neutral-900/[0.06] bg-surface px-7">
           {/* Left placeholder (can be used for breadcrumbs) */}
           <div />
 
@@ -276,7 +288,7 @@ export function AdminLayout({
         </header>
 
         {/* Page content — scrollable */}
-        <main className="flex-1 overflow-y-auto px-7 pb-8 pt-6">
+        <main className="ui-admin-content flex-1 overflow-y-auto px-7 pb-8 pt-6">
           {children}
         </main>
       </div>
