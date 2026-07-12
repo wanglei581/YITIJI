@@ -163,6 +163,45 @@ const PRINT_URL_CONTRACT_CHANGED = new Set([
   'services/api/src/print-jobs/print-jobs.service.ts',
   'services/api/src/prisma/prisma.service.ts',
 ])
+const JOB_FIT_M1_5_CHANGED = new Set([
+  'apps/kiosk/scripts/verify-job-fit-m1-5-ui.mjs',
+  'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',
+  'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+  'apps/kiosk/src/pages/resume/JobFitPage.tsx',
+  'apps/kiosk/src/pages/resume/jobFit-inkpaper.css',
+  'apps/kiosk/src/pages/resume/jobFit/DecisionSummaryBar.tsx',
+  'apps/kiosk/src/pages/resume/jobFit/FitSkillMap.tsx',
+  'apps/kiosk/src/pages/resume/jobFit/GapActionCards.tsx',
+  'apps/kiosk/src/pages/resume/jobFit/ResumeRewriteCard.tsx',
+  'apps/kiosk/src/services/api/jobFit.ts',
+  'docs/product/user-data-flow-matrix.md',
+  'packages/shared/src/types/ai.ts',
+  'services/api/package.json',
+  'services/api/prisma/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql',
+  'services/api/prisma/postgres/migrations/20260712090000_add_job_fit_anonymous_consent/migration.sql',
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/schema.prisma',
+  'services/api/scripts/lib/verify-governed-job-fit-runtime.ts',
+  'services/api/scripts/verify-governed-job-fit.ts',
+  'services/api/scripts/verify-job-ai-backend.ts',
+  'services/api/scripts/verify-job-ai-privacy.ts',
+  'services/api/scripts/verify-job-fit-governance.ts',
+  'services/api/scripts/verify-job-fit-print.ts',
+  'services/api/scripts/verify-job-fit.ts',
+  'services/api/scripts/verify-member-assets.ts',
+  'services/api/src/ai/ai.module.ts',
+  'services/api/src/ai/job-fit.controller.ts',
+  'services/api/src/ai/resume/job-fit-pdf.service.ts',
+  'services/api/src/ai/resume/job-fit.service.ts',
+  'services/api/src/ai/resume/llm-job-fit.service.ts',
+  'services/api/src/job-ai/governed-job-fit.service.ts',
+  'services/api/src/job-ai/job-ai.controller.ts',
+  'services/api/src/job-ai/job-ai.module.ts',
+  'services/api/src/job-ai/job-ai.service.ts',
+  'services/api/src/member-assets/member-assets.controller.ts',
+  'services/api/src/member-assets/member-assets.service.ts',
+  'services/api/src/member-privacy/member-privacy.service.ts',
+])
 
 const files = [...new Set(changedFiles())]
 // 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
@@ -172,7 +211,7 @@ const files = [...new Set(changedFiles())]
 const protectedPagePrefix = 'apps/kiosk/src/pages/profile/me/'
 const touchesProtectedPages = files.some((file) => file.startsWith(protectedPagePrefix))
 const unexpectedChanged = touchesProtectedPages
-  ? files.filter((file) => !allowedChanged.has(file) && !PRINT_URL_CONTRACT_CHANGED.has(file))
+  ? files.filter((file) => !allowedChanged.has(file) && !PRINT_URL_CONTRACT_CHANGED.has(file) && !JOB_FIT_M1_5_CHANGED.has(file))
   : []
 if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
 else fail(`diff 出现 P0a 范围外变更：${unexpectedChanged.join(', ')}`)

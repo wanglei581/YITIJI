@@ -324,7 +324,8 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: '文档打印', icon: 'printer', to: '/print/upload?source=document' },
       { title: '证件复印', icon: 'files', disabled: Boolean(true) },
       { title: '纸质扫描', icon: 'scan', to: '/scan/start' },
-      { title: '云打印', icon: 'cloud', disabled: Boolean(true) },
+      // 2026-07-12：「云打印」磁贴按正式取舍决策删除（能力归位文档打印+手机扫码上传；
+      // 远程提交·到店取件记入商用二期候选），见 docs/reviews/2026-07-12-cloud-print-decision.md
       { title: '格式转换', icon: 'swap', to: '/print-scan/convert' },
       { title: '证件照打印', icon: 'user', disabled: Boolean(true) },
     ],

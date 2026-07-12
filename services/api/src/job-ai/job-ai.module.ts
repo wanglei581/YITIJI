@@ -3,7 +3,9 @@ import { JwtModule } from '@nestjs/jwt'
 import { AiModule } from '../ai/ai.module'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
+import { JobFitController } from '../ai/job-fit.controller'
 import { JobAiController, MemberJobAiSessionsController } from './job-ai.controller'
+import { GovernedJobFitService } from './governed-job-fit.service'
 import { JobAiService } from './job-ai.service'
 import { JobAiLlmService } from './job-ai-llm.service'
 import { JobContextService } from './job-context.service'
@@ -29,7 +31,7 @@ import { JobAiQuotaService } from './job-ai-quota.service'
       },
     }),
   ],
-  controllers: [JobAiController, MemberJobAiSessionsController],
-  providers: [JobAiService, JobAiLlmService, JobContextService, JobAiQuotaService, EndUserAuthGuard],
+  controllers: [JobAiController, MemberJobAiSessionsController, JobFitController],
+  providers: [JobAiService, JobAiLlmService, JobContextService, JobAiQuotaService, GovernedJobFitService, EndUserAuthGuard],
 })
 export class JobAiModule {}

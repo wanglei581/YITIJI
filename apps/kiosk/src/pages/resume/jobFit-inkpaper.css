@@ -1,0 +1,69 @@
+/* 2D 岗位匹配局部视觉层：不改全局 token，不改变任何数据、打印或支付行为。 */
+.job-fit-inkpaper {
+  --job-fit-ink: #1e4c4d;
+  --job-fit-paper: #f7f3e9;
+  --job-fit-paper-card: #fffdf8;
+  --job-fit-line: #d8d0be;
+  --job-fit-wheat: #a36b36;
+  background-color: var(--job-fit-paper);
+  background-image: radial-gradient(rgba(30, 76, 77, 0.045) 0.6px, transparent 0.6px);
+  background-size: 5px 5px;
+  color: var(--job-fit-ink);
+}
+
+.job-fit-inkpaper h1,
+.job-fit-inkpaper h2 {
+  color: var(--job-fit-ink);
+  font-family: 'Songti SC', 'Noto Serif SC', serif;
+}
+
+.job-fit-inkpaper .job-fit-card {
+  border-color: var(--job-fit-line);
+  background-color: var(--job-fit-paper-card);
+  box-shadow: 0 1px 0 rgba(30, 76, 77, 0.06);
+}
+
+.job-fit-inkpaper .job-fit-summary {
+  border-color: #a9c2b8;
+  background-color: #e9f0e9;
+  box-shadow: inset 3px 0 0 var(--job-fit-ink), 0 1px 0 rgba(30, 76, 77, 0.06);
+}
+
+.job-fit-inkpaper .job-fit-summary > div > div > p:first-child {
+  color: var(--job-fit-ink);
+}
+
+.job-fit-inkpaper .job-fit-fit-map .bg-success-bg\/60 {
+  border-left: 2px solid #6f9f82;
+}
+
+.job-fit-inkpaper .job-fit-gap-actions .bg-warning-bg\/60 {
+  border-left: 2px solid var(--job-fit-wheat);
+}
+
+.job-fit-inkpaper .job-fit-source {
+  border-style: dashed;
+}
+
+.job-fit-inkpaper .job-fit-action-bar {
+  border-color: var(--job-fit-line);
+  background-color: rgba(255, 253, 248, 0.96);
+}
+
+.job-fit-inkpaper .job-fit-action-grid > button:first-child {
+  border-color: #a9c2b8;
+  color: var(--job-fit-ink);
+}
+
+.job-fit-inkpaper button:focus-visible,
+.job-fit-inkpaper input:focus-visible,
+.job-fit-inkpaper textarea:focus-visible {
+  outline: 2px solid var(--job-fit-ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  .job-fit-inkpaper .job-fit-action-grid {
+    grid-template-columns: 1fr;
+  }
+}

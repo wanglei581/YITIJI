@@ -251,11 +251,12 @@ for (const [title, route] of expectedRoutes) {
   const pattern = new RegExp(`\\{[^{}]*title:\\s*'${escapeRegExp(title)}'[^{}]*to:\\s*'${escapeRegExp(route)}'[^{}]*\\}`)
   expect(pattern.test(groupsBlock), `入口 ${title} 保持真实路由 ${route}`)
 }
-for (const title of ['证件复印', '云打印', '证件照打印']) {
+for (const title of ['证件复印', '证件照打印']) {
   const pattern = new RegExp(`\\{[^{}]*title:\\s*'${title}'[^{}]*disabled:\\s*Boolean\\(true\\)[^{}]*\\}`)
   expect(pattern.test(groupsBlock), `当前禁用入口保持禁用：${title}`)
 }
-expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 3, 'SERVICE_GROUPS 仅保留当前三个禁用入口')
+expect(!/title:\s*'云打印'/.test(groupsBlock), '云打印入口保持按正式取舍决策删除')
+expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 2, 'SERVICE_GROUPS 仅保留当前两个禁用入口')
 
 expectMatches(
   home,
