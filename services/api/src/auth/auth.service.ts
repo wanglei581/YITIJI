@@ -180,24 +180,64 @@ export class AuthService {
     return { success: true }
   }
 
-  /** 登录态下自助改密:须校验当前密码,成功后旧 token 立即失效(与找回密码一致)。 */
+  /**
+   * 登录态下自助改密:须校验当前密码,成功后旧 token 立即失效(与找回密码一致)。
+   *
+   * - 按 userId 独立限流当前密码尝试次数(IP 限流对已持有 token 的场景不够,见 changePasswordFailKey)。
+   * - 新密码不得与当前密码相同(仅前端校验不构成安全边界)。
+   * - 用 updateMany + 旧 passwordHash 做乐观并发控制:防止两个并发请求都读到同一旧 hash
+   *   校验通过后各自无条件覆盖,造成"两边都返回成功但只有一边真正生效"的静默丢失更新。
+   */
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: true }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
       throw new UnauthorizedException({ error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' } })
     }
+
+    await this.assertChangePasswordNotRateLimited(user.id)
+
     const ok = await bcrypt.compare(currentPassword, user.passwordHash)
     if (!ok) {
+      await this.recordChangePasswordFailure(user.id)
       throw new BadRequestException({ error: { code: 'AUTH_PASSWORD_MISMATCH', message: '当前密码不正确' } })
     }
+
+    const unchanged = await bcrypt.compare(newPassword, user.passwordHash)
+    if (unchanged) {
+      throw new BadRequestException({ error: { code: 'AUTH_PASSWORD_UNCHANGED', message: '新密码不能与当前密码相同' } })
+    }
+
     const passwordHash = await bcrypt.hash(newPassword, 10)
-    await this.prisma.user.update({
-      where: { id: userId },
+    const updated = await this.prisma.user.updateMany({
+      where: { id: user.id, passwordHash: user.passwordHash },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
+    if (updated.count !== 1) {
+      throw new HttpException({
+        error: { code: 'AUTH_CHANGE_PASSWORD_CONFLICT', message: '密码刚被其他会话修改，请重新登录后再试' },
+      }, HttpStatus.CONFLICT)
+    }
+
     await this.invalidateSessionState(user.id)
     await this.writeAudit(user.id, user.role, 'auth.password_change_self', {})
     return { success: true }
+  }
+
+  private changePasswordFailKey(userId: string): string {
+    return `internal:password-change:fail:${userId}`
+  }
+
+  private async assertChangePasswordNotRateLimited(userId: string): Promise<void> {
+    const raw = await this.redis.get(this.changePasswordFailKey(userId))
+    if (Number(raw ?? '0') >= 5) {
+      throw new HttpException({
+        error: { code: 'AUTH_CHANGE_PASSWORD_RATE_LIMITED', message: '当前密码验证失败次数过多，请 5 分钟后再试' },
+      }, HttpStatus.TOO_MANY_REQUESTS)
+    }
+  }
+
+  private async recordChangePasswordFailure(userId: string): Promise<void> {
+    await this.redis.incrWithTtl(this.changePasswordFailKey(userId), 300)
   }
 
   async sendPhoneBindCode(phone: string, ip: string, deviceId?: string): Promise<InternalSendCodeResult> {
