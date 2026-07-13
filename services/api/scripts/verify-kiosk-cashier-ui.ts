@@ -32,6 +32,7 @@ if (process.env['NODE_ENV'] === 'production') {
 
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
@@ -88,7 +89,7 @@ async function main(): Promise<void> {
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const provider = new SandboxPaymentProvider(SANDBOX_SECRET)
   const payment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([provider]))
-  const terminals = new TerminalsService(prisma) // 不调 onModuleInit（避免 seed + 定时器）
+  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit) // 不调 onModuleInit（避免 seed + 定时器）
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_cashier_${suffix}`
