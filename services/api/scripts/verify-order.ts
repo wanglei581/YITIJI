@@ -22,6 +22,7 @@ import { PrintPageCountService } from '../src/print-jobs/print-page-count.servic
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
@@ -60,7 +61,7 @@ async function main(): Promise<void> {
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
-  const terminals = new TerminalsService(prisma)
+  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
   const resetExpiredClaims = (
     terminals as unknown as { resetExpiredClaims: () => Promise<void> }
   ).resetExpiredClaims.bind(terminals)

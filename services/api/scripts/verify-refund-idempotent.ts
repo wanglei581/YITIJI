@@ -29,6 +29,7 @@ if (process.env['NODE_ENV'] === 'production') {
 
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
@@ -97,7 +98,7 @@ async function main(): Promise<void> {
   const refundService = new RefundService(prisma, audit, new PaymentProviderRegistry([spy]))
   const printJobs = new PrintJobsService(prisma, audit, new PrintPageCountService(prisma, storage), pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const redemption = new BenefitRedemptionService(prisma, audit, orderStatus)
-  const terminals = new TerminalsService(prisma)
+  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_refund_${suffix}`

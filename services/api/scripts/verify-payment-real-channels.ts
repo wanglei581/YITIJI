@@ -62,6 +62,7 @@ import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { signFileUrl } from '../src/files/signing'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
@@ -328,7 +329,7 @@ async function main(): Promise<void> {
     orderStatus,
     new PaymentProviderRegistry([wechatProvider, alipayProvider]),
   )
-  const terminals = new TerminalsService(prisma)
+  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_realpay_${suffix}`
