@@ -93,7 +93,7 @@ export class MemberQrLoginService {
 
   async confirm(
     ticketId: string,
-    input: { phone: string; code: string; deviceId?: string; ip: string },
+    input: { phone: string; code: string; deviceId?: string },
   ): Promise<ConfirmQrLoginResult> {
     const payload = await this.readTicket(ticketId)
     if (payload.status === 'confirmed') {

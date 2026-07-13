@@ -3,7 +3,7 @@
 //
 // 入口：诊断报告页（携带 taskId/accessToken）。流程：选择系统内已发布岗位
 // （搜索选择）或手填目标岗位 → 真实分析 → 参考等级 + 匹配点（含原文依据）+
-// 差距建议 + 定向优化建议 + 「去来源平台投递」引导（仅系统内岗位）。
+// 差距建议 + 定向优化建议，并可查看系统内岗位详情。
 // 合规：等级仅供参考（无百分比/录用承诺，服务端双层拦截）；不做平台内投递。
 // ============================================================
 
@@ -11,33 +11,32 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobFitResponse } from '@ai-job-print/shared'
+import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   ArrowRightIcon,
   BriefcaseIcon,
   CheckCircle2Icon,
-  ExternalLinkIcon,
   Loader2Icon,
   PencilLineIcon,
+  PrinterIcon,
   SearchIcon,
   TargetIcon,
-  TrendingUpIcon,
 } from 'lucide-react'
 import { getJobs } from '../../services/api'
-import { analyzeJobFit, getLatestJobFit } from '../../services/api/jobFit'
+import { analyzeJobFit, getLatestJobFit, printJobFit } from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
+import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
+import { FitSkillMap } from './jobFit/FitSkillMap'
+import { GapActionCards } from './jobFit/GapActionCards'
+import { ResumeRewriteCard } from './jobFit/ResumeRewriteCard'
+import './jobFit-inkpaper.css'
 
 interface PageState {
   taskId?: string
   accessToken?: string
-}
-
-const FIT_META: Record<string, { label: string; cls: string }> = {
-  reference_high: { label: '匹配参考：较高', cls: 'bg-success-bg text-success-fg' },
-  reference_medium: { label: '匹配参考：中等', cls: 'bg-primary-50 text-primary-700' },
-  reference_low: { label: '匹配参考：偏低', cls: 'bg-warning-bg text-warning-fg' },
 }
 
 export function JobFitPage() {
@@ -60,11 +59,12 @@ export function JobFitPage() {
   const [manualTitle, setManualTitle] = useState('')
   const [manualReq, setManualReq] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
+  const [printing, setPrinting] = useState(false)
   const [loadingLatest, setLoadingLatest] = useState(Boolean(taskId))
   const [result, setResult] = useState<JobFitResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useBusyLock(analyzing)
+  useBusyLock(analyzing || printing)
 
   useEffect(() => {
     let cancelled = false
@@ -102,7 +102,7 @@ export function JobFitPage() {
 
   if (!taskId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+      <div className="job-fit-inkpaper flex h-full flex-col items-center justify-center gap-4 px-6">
         <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
         <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
         <Button size="lg" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
@@ -112,7 +112,7 @@ export function JobFitPage() {
 
   if (loadingLatest) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+      <div className="job-fit-inkpaper flex h-full flex-col items-center justify-center gap-4 px-6">
         <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
         <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
       </div>
@@ -146,11 +146,37 @@ export function JobFitPage() {
     }
   }
 
+  const handlePrint = async () => {
+    if (!taskId) return
+    setPrinting(true)
+    setError(null)
+    try {
+      const file = await printJobFit(taskId, { token: getToken(), accessToken })
+      if (!file.printFileUrl) throw new Error('打印链接未就绪，请稍后重试')
+      navigate('/print/confirm', {
+        state: {
+          file: {
+            name: file.filename,
+            size: file.sizeBytes >= 1024 * 1024 ? `${(file.sizeBytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.sizeBytes / 1024))} KB`,
+            pages: file.pageCount,
+            fileId: file.fileId,
+            fileUrl: file.printFileUrl,
+            mimeType: 'application/pdf',
+          },
+          params: makePrintParams({ copies: 1, duplex: 'single', color: 'bw' }),
+        },
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '打印版生成失败，请稍后重试')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   // ── 结果视图 ──────────────────────────────────────────────────────────────
   if (result) {
-    const fit = FIT_META[result.fitLevel ?? ''] ?? FIT_META['reference_medium']
     return (
-      <div className="flex h-full flex-col px-6 pt-6">
+      <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
         <PageHeader
           title="岗位匹配度参考"
           subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
@@ -161,91 +187,65 @@ export function JobFitPage() {
             以下内容仅为帮助你修改简历与准备投递的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。
           </ComplianceBanner>
 
-          <Card className="p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-neutral-900">综合参考</h2>
-              <span className={['rounded-full px-3 py-1 text-sm font-semibold', fit.cls].join(' ')}>{fit.label}</span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-700">{result.summary}</p>
-          </Card>
-
-          <Card className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <CheckCircle2Icon className="h-4 w-4 text-success-fg" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-neutral-900">匹配点（含简历原文依据）</h2>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {(result.matchPoints ?? []).map((m) => (
-                <div key={m.point.slice(0, 24)} className="rounded-xl bg-success-bg/60 px-4 py-3">
-                  <p className="text-sm font-medium text-neutral-900">{m.point}</p>
-                  <p className="mt-1 text-xs text-neutral-500">原文依据：“{m.evidence}”</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <TrendingUpIcon className="h-4 w-4 text-warning-fg" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-neutral-900">差距与准备建议</h2>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {(result.gapPoints ?? []).map((g) => (
-                <div key={g.gap.slice(0, 24)} className="rounded-xl bg-warning-bg/60 px-4 py-3">
-                  <p className="text-sm font-medium text-neutral-900">{g.gap}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-neutral-600">{g.suggestion}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <PencilLineIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-neutral-900">简历定向优化建议</h2>
-            </div>
-            <ul className="flex flex-col gap-2">
-              {(result.targetedSuggestions ?? []).map((s) => (
-                <li key={s.slice(0, 24)} className="flex items-start gap-2 text-sm leading-relaxed text-neutral-700">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" aria-hidden="true" />
-                  {s}
-                </li>
-              ))}
-            </ul>
-          </Card>
+          <DecisionSummaryBar
+            jobTitle={result.job?.title ?? '目标岗位'}
+            company={result.job?.company}
+            fitLevel={result.fitLevel}
+            summary={result.summary}
+          />
+          <FitSkillMap
+            matchPoints={result.matchPoints ?? []}
+            keywordCoverage={result.decisionSupport?.keywordCoverage}
+          />
+          <GapActionCards gapPoints={result.gapPoints ?? []} />
+          <ResumeRewriteCard items={result.targetedSuggestions ?? []} />
 
           {result.job?.sourceName && (
-            <Card className="p-5">
+            <Card className="job-fit-card job-fit-source p-5">
               <p className="text-xs text-neutral-400">
                 岗位来源：{result.job.sourceName}{result.job.externalId ? ` · 外部ID ${result.job.externalId}` : ''}
               </p>
               <p className="mt-1 text-sm text-neutral-600">准备好之后，请前往来源平台完成投递。</p>
             </Card>
           )}
+
+          {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-          <div className="flex gap-3">
+        <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+          <div className="job-fit-action-grid grid grid-cols-3 gap-2">
             <Button
               size="lg"
-              className="h-14 flex-1 text-base"
+              variant="secondary"
+              className="h-14 text-sm"
+              disabled={printing}
+              onClick={() => void handlePrint()}
+            >
+              {printing ? <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" /> : <PrinterIcon className="mr-1 h-5 w-5" aria-hidden="true" />}
+              {printing ? '生成中' : '打印报告'}
+            </Button>
+            <Button
+              size="lg"
+              className="h-14 text-sm"
               onClick={() => navigate('/resume/optimize', { state: { taskId, accessToken } })}
             >
-              <PencilLineIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-              生成优化版简历
+              <PencilLineIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+              优化简历
             </Button>
-            {result.job?.sourceUrl && selectedJob?.id ? (
+            {result.job?.id ? (
               <Button
                 size="lg"
                 variant="secondary"
-                className="h-14 flex-1 text-base"
-                onClick={() => navigate(`/jobs/${selectedJob.id}`)}
+                className="h-14 text-sm"
+                onClick={() => {
+                  if (result.job?.id) navigate(`/jobs/${result.job.id}`)
+                }}
               >
-                <ExternalLinkIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-                去来源平台投递
+                <BriefcaseIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+                查看岗位
               </Button>
             ) : (
-              <Button size="lg" variant="secondary" className="h-14 flex-1 text-base" onClick={() => setResult(null)}>
+              <Button size="lg" variant="secondary" className="h-14 text-sm" onClick={() => setResult(null)}>
                 换个岗位分析
               </Button>
             )}
@@ -257,7 +257,7 @@ export function JobFitPage() {
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
       <PageHeader
         title="岗位匹配度参考"
         subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
@@ -288,7 +288,7 @@ export function JobFitPage() {
         </div>
 
         {tab === 'pick' ? (
-          <Card className="p-4">
+          <Card className="job-fit-card p-4">
             <div className="relative">
               <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-300" aria-hidden="true" />
               <input
@@ -327,7 +327,7 @@ export function JobFitPage() {
             </div>
           </Card>
         ) : (
-          <Card className="p-4">
+          <Card className="job-fit-card p-4">
             <input
               value={manualTitle}
               onChange={(e) => setManualTitle(e.target.value)}
@@ -349,7 +349,7 @@ export function JobFitPage() {
         {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="h-14 w-full text-base" disabled={analyzing} onClick={() => void handleAnalyze()}>
           {analyzing ? (
             <>

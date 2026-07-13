@@ -23,7 +23,7 @@ import { LlmJobFitService } from '../src/ai/resume/llm-job-fit.service'
 import { JobFitService } from '../src/ai/resume/job-fit.service'
 
 const RESUME_TEXT = '张某某，本科，行政管理专业。曾任某商贸公司行政文员，负责档案管理与会议安排，整理合同文件300余份_简历标记RSME。熟练使用Office办公软件。'
-const JOB_DESC = '负责公司日常行政事务、档案与合同管理_岗位标记JOBD'
+const JOB_DESC = '负责公司日常行政事务、档案与合同管理、跨部门协调_岗位标记JOBD'
 
 let passCount = 0
 function pass(msg: string) { passCount += 1; console.log(`  PASS ${msg}`) }
@@ -70,6 +70,10 @@ const VALID = {
   gapPoints: [{ gap: '缺少跨部门协调案例', suggestion: '补充一段协调多方资源的经历表述' }],
   targetedSuggestions: ['在简历开头突出档案管理量化成果', '将合同整理数量前置'],
 }
+const M1_5_DECISION_SUPPORT = {
+  analysisVersion: 'job_fit_m1_5',
+  keywordCoverage: { matched: ['档案管理'], missing: ['跨部门协调'] },
+} as const
 const vjson = (over: Record<string, unknown> = {}) => JSON.stringify({ ...VALID, ...over })
 
 async function main() {
@@ -141,7 +145,7 @@ async function main() {
     const memberRequester = { endUserId: endUserA, accessToken: null }
 
     // 1. jobId 闭环
-    responseQueue.push(vjson())
+    responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
     const r1WithUsage = await svc.analyzeWithUsage({ taskId, jobId: jobPub.id }, requester)
     const r1 = r1WithUsage.response
     if (r1.status !== 'completed' || !('fitLevel' in r1)) fail('1. 应 completed')
@@ -151,19 +155,135 @@ async function main() {
     }
     const row1 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
     if (!row1 || row1.accessTokenHash !== tokenHash) fail('1. job_fit 行未继承 parse 归属')
-    pass('1. jobId 闭环：completed + 来源信息 + kind=job_fit 落库继承归属 + usage 元数据')
+    const r1Latest = await svc.getLatest(taskId, requester)
+    const r1LatestRuntime = r1Latest as unknown as { job?: { id?: unknown } }
+    if (r1LatestRuntime.job?.id !== jobPub.id) fail('1. jobId 模式 getLatest 应读回 job.id')
+    // M1.5 是可选增量：只在受控运行时返回中窄化读取，不收紧既有 JobFitResponse 的静态类型。
+    const r1M15 = r1 as unknown as {
+      job?: { id?: unknown }
+      decisionSupport?: {
+        analysisVersion?: unknown
+        keywordCoverage?: { matched?: unknown; missing?: unknown }
+      }
+    }
+    const m15Violations: string[] = []
+    if (r1M15.job?.id !== jobPub.id) m15Violations.push('response.job.id 未保留所选岗位 id')
+    if (r1M15.decisionSupport?.analysisVersion !== 'job_fit_m1_5') {
+      m15Violations.push('decisionSupport.analysisVersion 未保留 job_fit_m1_5')
+    }
+    const matchedKeywords = r1M15.decisionSupport?.keywordCoverage?.matched
+    if (!Array.isArray(matchedKeywords) || !matchedKeywords.includes('档案管理')) {
+      m15Violations.push('decisionSupport.keywordCoverage.matched 未保留 M1.5 决策字段')
+    }
+    const missingKeywords = r1M15.decisionSupport?.keywordCoverage?.missing
+    if (!Array.isArray(missingKeywords) || !missingKeywords.includes('跨部门协调')) {
+      m15Violations.push('decisionSupport.keywordCoverage.missing 未保留 M1.5 决策字段')
+    }
+    if (row1.provider !== 'llm:deepseek:stub') {
+      m15Violations.push(`job_fit.provider 应保留实际 provider llm:deepseek:stub，实际为 ${row1.provider}`)
+    }
+    if (m15Violations.length > 0) fail(`1. M1.5 运行时契约缺失：${m15Violations.join('；')}`)
+    pass('1. jobId 闭环：completed + M1.5 可选增量 + kind=job_fit 落库继承归属与实际 provider + usage 元数据')
 
     responseQueue.push(vjson())
     const r1b = await svc.analyze({ taskId: memberTaskId, jobId: jobPub.id }, memberRequester)
+    const r1bLegacy = r1b as unknown as {
+      taskId?: unknown
+      job?: {
+        title?: unknown
+        company?: unknown
+        sourceName?: unknown
+        sourceUrl?: unknown
+        externalId?: unknown
+      }
+      fitLevel?: unknown
+      summary?: unknown
+      matchPoints?: unknown
+      gapPoints?: unknown
+      targetedSuggestions?: unknown
+      providerName?: unknown
+      decisionSupport?: unknown
+    }
     if (r1b.status !== 'completed') fail('1b. 会员岗位匹配应 completed')
-    pass('1b. 会员岗位匹配路径按 parse 行 endUserId 提取原文')
+    if (
+      r1bLegacy.taskId !== memberTaskId ||
+      typeof r1bLegacy.job?.title !== 'string' ||
+      typeof r1bLegacy.job?.company !== 'string' ||
+      typeof r1bLegacy.job?.sourceName !== 'string' ||
+      typeof r1bLegacy.job?.sourceUrl !== 'string' ||
+      typeof r1bLegacy.job?.externalId !== 'string' ||
+      typeof r1bLegacy.fitLevel !== 'string' ||
+      typeof r1bLegacy.summary !== 'string' ||
+      !Array.isArray(r1bLegacy.matchPoints) ||
+      !Array.isArray(r1bLegacy.gapPoints) ||
+      !Array.isArray(r1bLegacy.targetedSuggestions) ||
+      typeof r1bLegacy.providerName !== 'string'
+    ) fail('1b. 无 M1.5 增量时既有 completed 响应字段异常')
+    if (r1bLegacy.decisionSupport !== undefined) fail('1b. decisionSupport 为可选增量，旧响应不应被强制填充')
+    pass('1b. 会员路径保留既有 completed 字段，decisionSupport 缺失时兼容降级')
+
+    // 1c. M1.5 关键词命中必须有简历/岗位依据；可安全过滤或重试，绝不能原样回传编造词。
+    responseQueue.push(vjson({
+      decisionSupport: {
+        analysisVersion: 'job_fit_m1_5',
+        keywordCoverage: { matched: ['注册会计师'], missing: ['跨部门协调'] },
+      },
+    }))
+    responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
+    const r1c = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    const r1cM15 = r1c as unknown as { decisionSupport?: { keywordCoverage?: { matched?: unknown } } }
+    const unsafeMatchedKeywords = r1cM15.decisionSupport?.keywordCoverage?.matched
+    if (r1c.status !== 'completed' || (Array.isArray(unsafeMatchedKeywords) && unsafeMatchedKeywords.includes('注册会计师'))) {
+      fail('1c. 无依据的 decisionSupport.keywordCoverage.matched 应被过滤或安全重试，不能原样保留')
+    }
+    responseQueue.length = 0
+    pass('1c. M1.5 keywordCoverage.matched 无简历/岗位依据 → 过滤或安全重试，不原样回传')
+
+    // 1d. keywordCoverage 来源必须双向成立：matched 同时出自简历与岗位，missing 只保留岗位词且尚未出现在简历。
+    responseQueue.push(vjson({
+      decisionSupport: {
+        analysisVersion: 'job_fit_m1_5',
+        keywordCoverage: {
+          matched: ['Office办公软件', '日常行政事务', '档案管理'],
+          missing: ['注册会计师', '档案管理'],
+        },
+      },
+    }))
+    responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
+    const r1d = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
+    const r1dM15 = r1d as unknown as {
+      decisionSupport?: { keywordCoverage?: { matched?: unknown; missing?: unknown } }
+    }
+    const r1dMatchedKeywords = r1dM15.decisionSupport?.keywordCoverage?.matched
+    const r1dMissingKeywords = r1dM15.decisionSupport?.keywordCoverage?.missing
+    const keywordProvenanceViolations: string[] = []
+    if (r1d.status !== 'completed') keywordProvenanceViolations.push('非法关键词应过滤或安全重试后 completed')
+    if (Array.isArray(r1dMatchedKeywords) && r1dMatchedKeywords.includes('Office办公软件')) {
+      keywordProvenanceViolations.push('仅出现在简历的 matched 未被剔除')
+    }
+    if (Array.isArray(r1dMatchedKeywords) && r1dMatchedKeywords.includes('日常行政事务')) {
+      keywordProvenanceViolations.push('仅出现在岗位的 matched 未被剔除')
+    }
+    if (Array.isArray(r1dMissingKeywords) && r1dMissingKeywords.includes('注册会计师')) {
+      keywordProvenanceViolations.push('不在岗位文本的 missing 未被剔除')
+    }
+    if (Array.isArray(r1dMissingKeywords) && r1dMissingKeywords.includes('档案管理')) {
+      keywordProvenanceViolations.push('已出现在简历的岗位词仍留在 missing')
+    }
+    if (keywordProvenanceViolations.length > 0) {
+      fail(`1d. M1.5 keywordCoverage 来源校验缺失：${keywordProvenanceViolations.join('；')}`)
+    }
+    responseQueue.length = 0
+    pass('1d. M1.5 keywordCoverage matched 双来源、missing 岗位未具备来源均已校验')
 
     // 2. 防编造
     responseQueue.push(vjson({ matchPoints: [{ point: '会开挖掘机', evidence: '持有挖掘机证书五年经验' }] }))
     responseQueue.push(vjson())
     const r2 = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
     if (r2.status !== 'completed' || JSON.stringify(r2).includes('挖掘机')) fail('2. 编造匹配点未被拦截')
-    pass('2. 防编造：evidence 不在原文 → 整体重试 → 合法版本通过')
+    const row2 = await prisma.aiResumeResult.findUnique({ where: { taskId_kind: { taskId, kind: 'job_fit' } } })
+    if (row2?.provider !== 'llm:deepseek:stub') fail('2. 同 taskId 再分析 upsert update 应保留实际 provider')
+    pass('2. 防编造：evidence 不在原文 → 整体重试 → 合法版本通过，upsert update 保留实际 provider')
 
     // 3. 百分比拦截
     responseQueue.push(vjson({ summary: '匹配度约 85%，整体不错。' }))
@@ -260,7 +380,7 @@ async function main() {
     console.error(err instanceof Error ? err.message : err)
   } finally {
     await prisma.aiResumeResult.deleteMany({ where: { taskId: { in: [taskId, memberTaskId] } } }).catch(() => undefined)
-    await prisma.auditLog.deleteMany({ where: { targetId: taskId } }).catch(() => undefined)
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: [taskId, memberTaskId] } } }).catch(() => undefined)
     await prisma.job.deleteMany({ where: { sourceOrgId: orgId } }).catch(() => undefined)
     await prisma.organization.deleteMany({ where: { id: orgId } }).catch(() => undefined)
     await prisma.endUser.deleteMany({ where: { id: endUserA } }).catch(() => undefined)

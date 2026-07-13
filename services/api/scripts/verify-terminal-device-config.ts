@@ -292,6 +292,7 @@ function runStaticChecks(): void {
 async function runServiceChecks(): Promise<void> {
   const { TerminalsService } = await import('../src/terminals/terminals.service')
   const { AdminTerminalsController } = await import('../src/terminals/admin-terminals.controller')
+  const { TerminalCapabilitiesService } = await import('../src/terminals/terminal-capabilities.service')
   const { SmartCampusService } = await import('../src/smart-campus/smart-campus.service')
 
   console.log('\n=== 终端设备配置 service/controller 级验证 ===')
@@ -301,8 +302,9 @@ async function runServiceChecks(): Promise<void> {
   const audit = new AuditService(prisma)
   const toolbox = new TerminalToolboxService(prisma)
   const smartCampus = new SmartCampusService(prisma, toolbox)
-  const terminals = new TerminalsService(prisma, toolbox)
-  const adminController = new AdminTerminalsController(terminals, audit)
+  const terminals = new TerminalsService(prisma, toolbox, audit)
+  const capabilities = new TerminalCapabilitiesService(prisma)
+  const adminController = new AdminTerminalsController(terminals, capabilities, audit)
 
   const suffix = randomBytes(6).toString('hex')
   const adminId = `usr_vtd_${suffix}`

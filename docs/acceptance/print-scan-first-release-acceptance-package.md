@@ -88,7 +88,7 @@ Gate 2 Deployment And Migration: Not Passed Yet
 | 证据 ID | 状态 | 通过标准 | 仓库外证据 |
 | --- | --- | --- | --- |
 | PS-G3-BIND-01 | Not Passed Yet | 终端 A 创建的 PrintTask 只被终端 A claim，终端 B 不领取 | `<PRIVATE_EVIDENCE_DIR>/PS-G3-BIND-01-terminal-isolation-<timestamp>.log` |
-| PS-G3-STATUS-01 | Not Passed Yet | 任务状态链路覆盖 `pending -> claimed -> printing -> completed` 或明确 `failed` | 仓库外证据包 `<PRIVATE_EVIDENCE_DIR>/physical-print-20260706101346/evidence-summary.md` 记录 `ptask_kiosk_ba7c9537d0b62957` 经正式端点链路 `pending -> printing -> completed`，未记录未出纸但 completed；公开状态轮询未单独捕获 `claimed`，完整状态链仍待补证 |
+| PS-G3-STATUS-01 | Passed (Business Print Sample) | 任务状态链路覆盖 `pending -> claimed -> printing -> completed` 或明确 `failed` | 2026-07-08 生产业务打印样本 `ptask_kiosk_1568da9b5971c10f` 记录 `pending -> claimed -> printing -> completed`；Agent 日志摘要含 claim、download、SHA-256 校验、PATCH printing、`Pantum CM2800ADN Series` 打印、PATCH completed；完整日志在仓库外 Windows 证据中 |
 | PS-G3-PAPER-01 | Passed (Conditional) | 真实纸张输出需由现场目视、摄像头、打印机计数器或设备日志至少一种证明 | 仓库外证据包 `<PRIVATE_EVIDENCE_DIR>/physical-print-20260706101346/evidence-summary.md` 记录打印机计数器 27→28、28→29，且 PrintService Event ID 307 / 842 可关联 `Pantum CM2800ADN Series` / `USB001`；如现场实际未看到纸张，应立即改判 failed |
 | PS-G3-DEG-01 | Not Passed Yet | 模拟本地任务库不可用后，心跳为 `agent_degraded` 且 `localTaskDatabaseAvailable=false` | `<PRIVATE_EVIDENCE_DIR>/PS-G3-DEG-01-agent-degraded-<timestamp>.png` |
 | PS-G3-DEG-02 | Not Passed Yet | Agent 降级期间后端 claim 返回空任务，目标任务保持 `pending` | `<PRIVATE_EVIDENCE_DIR>/PS-G3-DEG-02-claim-empty-pending-<timestamp>.log` |
@@ -98,8 +98,29 @@ Gate 2 Deployment And Migration: Not Passed Yet
 判定：
 
 ```text
-Gate 3 Field Print Safety Base: Not Passed Yet
-阻塞项：物理出纸最小硬证据已通过；终端隔离、Agent 降级 / 恢复、错终端回传拒绝等完整安全底座现场演练仍未全部完成。
+Gate 3 Field Print Safety Base: Partial Passed
+已通过：物理出纸最小硬证据、生产业务打印状态链路 completed。
+阻塞项：终端隔离、Agent 降级 / 恢复、错终端回传拒绝等完整安全底座现场演练仍未全部完成。
+门禁含义：Partial Passed 仍是阻塞态，不满足进入试运营或宣称完整 Gate 3 通过的条件。
+```
+
+## 追加证据：2026-07-08 生产微信支付 / 退款回调 / 打印恢复
+
+本节只记录脱敏摘要。完整微信交易号、微信退款单号、生产 API 日志、Windows Agent 日志、PrintService 事件和截图保存在仓库外受控证据目录；不得把 token、证书、签名 URL、cookie、真实文件内容或完整支付流水日志提交进 Git。
+
+| 证据 ID | 状态 | 通过标准 | 脱敏摘要 |
+| --- | --- | --- | --- |
+| PS-PAY-20260708-01 | Passed | 真实微信支付单入账，订单为 `paid` 且 `paymentSource=wechat` | 订单 `ORD-20260708-3143F78E78`，金额 100 分，`PaymentAttempt.status=success`，内部 `Order.id` 与微信交易号仅保存在私有证据 |
+| PS-REFUND-20260708-01 | Passed | Admin 发起退款后，微信退款回调命中生产端点并完成验签 / 解密 / 幂等状态机 | `RFD-ORD-20260708-3143F78E78`，`Refund.status=success`，`Order.payStatus=refunded`，`refundedAmountCents=100`，`STUCK_REFUNDING=0`；约 62 秒内由微信异步回调收敛，无需主动查证 / cron |
+| PS-PRINT-RECOVERY-20260708-01 | Passed | Windows 打印队列从 `Error, Printing, Retained` 恢复，后续业务打印任务 completed | Print Spooler Running / Automatic；`AIJobPrintAgent` Windows 服务 Running / Automatic；`Pantum CM2800ADN Series` `printerStatus=ready` / `isOnline=true`；最终队列为空 |
+| PS-PRINT-20260708-01 | Passed | 新业务打印任务完成 `pending -> claimed -> printing -> completed` | 订单 `ORD-20260708-9863A8A101`，任务 `ptask_kiosk_1568da9b5971c10f`；Agent 日志摘要：download 1.5 KB、SHA-256 校验通过、print success 786ms、PATCH completed；Windows PrintService Event ID 307 / 842 / Win32 `0x0` |
+
+结论：
+
+```text
+2026-07-08 Production Paid Print And Refund Callback: Passed
+已证明：真实微信支付、Admin 退款、微信退款回调、订单退款状态、对账无卡退款、Windows 队列恢复和一笔业务打印 completed。
+未证明：真实扫描、U 盘导入、断网 / 断电恢复、Agent 降级 / 恢复全套演练、小范围试运营授权。
 ```
 
 ## Gate 4：隐私删除与异常恢复

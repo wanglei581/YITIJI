@@ -1,0 +1,12 @@
+{
+  "id": "service-desk-ui0-ui1-plan",
+  "title": "制定蓝白服务台 UI-0/UI-1 第一批实施计划",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交实施计划，等待用户批准执行",
+  "createdAt": "2026-07-11T00:00:00Z",
+  "branch": "codex/service-desk-commercial-ux-spec-20260711"
+}

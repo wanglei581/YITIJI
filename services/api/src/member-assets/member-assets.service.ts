@@ -133,9 +133,9 @@ export class MemberAssetsService {
    * 删除本人一条 AI 记录（硬删，含级联）。
    *
    * - 归属：findFirst 同时限定 id + endUserId；删他人 / 不存在统一 404（不泄露是否存在）。
-   * - 级联策略（明确化）：删除 parse 行时，同 taskId 的 optimize 行一并物理删除——
-   *   优化结果由该解析派生，解析删除后优化行既无法读取（门禁继承 parse）也无法再生，
-   *   留着只是敏感数据残留。generate / optimize 行删除只删自身。
+   * - 级联策略：删除 parse 行时，同 taskId 的全部 AiResumeResult 派生行及全部
+   *   JobAiSession 一并物理删除；删除 job_fit 行时仅清该行与同 task 的 match 会话。
+   *   其余 kind 只删自身。上述结果与会话删除均在同一事务中完成。
    * - deleteMany 仍带 endUserId 双保险，绝不可能删到他人行。
    * - 导出的 PDF 是独立 FileObject（「我的文档」管理），不在此级联。
    */
@@ -143,21 +143,38 @@ export class MemberAssetsService {
     endUserId: string,
     recordId: string,
   ): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
-    const row = await this.prisma.aiResumeResult.findFirst({
-      where: { id: recordId, endUserId },
-      select: { id: true, taskId: true, kind: true },
+    const deletion = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.aiResumeResult.findFirst({
+        where: { id: recordId, endUserId },
+        select: { id: true, taskId: true, kind: true },
+      })
+      if (!row) return null
+      const results = await tx.aiResumeResult.deleteMany({
+        where: row.kind === 'parse'
+          ? { endUserId, taskId: row.taskId }
+          : { endUserId, id: row.id },
+      })
+      // 并发删除已先一步移除目标时，不得再按 taskId 清理会话。
+      if (results.count === 0) return null
+      if (row.kind === 'parse') {
+        await tx.jobAiSession.deleteMany({ where: { endUserId, resumeTaskId: row.taskId } })
+      } else if (row.kind === 'job_fit') {
+        await tx.jobAiSession.deleteMany({
+          where: { endUserId, resumeTaskId: row.taskId, operation: 'match' },
+        })
+      }
+      return { row, deletedCount: results.count }
     })
-    if (!row) {
+    if (!deletion) {
       throw new NotFoundException({
         error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '记录不存在或已删除' },
       })
     }
-    const res = await this.prisma.aiResumeResult.deleteMany({
-      where:
-        row.kind === 'parse'
-          ? { endUserId, taskId: row.taskId, kind: { in: ['parse', 'optimize'] } }
-          : { endUserId, id: row.id },
-    })
-    return { deleted: true, taskId: row.taskId, kind: row.kind, deletedCount: res.count }
+    return {
+      deleted: true,
+      taskId: deletion.row.taskId,
+      kind: deletion.row.kind,
+      deletedCount: deletion.deletedCount,
+    }
   }
 }

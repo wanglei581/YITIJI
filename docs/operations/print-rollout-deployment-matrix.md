@@ -8,13 +8,16 @@
 - `ptask_kiosk_d984636a0f04a23a` was claimed by `t_ksk_001` and patched `completed`.
 - Windows Agent local DB/logs prove system chain completion.
 - 2026-07-06 field evidence confirms physical paper output by printer counter + PrintService: `TotalPagesPrinted` 27→28 direct smoke, 28→29 Kiosk `/files/kiosk-upload -> /print/jobs`; PrintService Event ID 307 / 842 on `Pantum CM2800ADN Series` / `USB001`.
+- 2026-07-08 production live WeChat sample confirmed paid print order + refund callback + recovered print queue:
+  - Payment sample `ORD-20260708-3143F78E78` / `RFD-ORD-20260708-3143F78E78` proved `paymentSource=wechat`, `PaymentAttempt.status=success`, Admin refund, WeChat refund notify, `Refund.status=success`, `Order.payStatus=refunded`, and no `STUCK_REFUNDING`. Full WeChat transaction/refund IDs stay in private production evidence; Git records only the order/refund numbers and outcome.
+  - Print recovery sample `ORD-20260708-9863A8A101` / `ptask_kiosk_1568da9b5971c10f` proved Windows queue recovery and business print flow `pending -> claimed -> printing -> completed`; `AIJobPrintAgent` service running, `printerStatus=ready`, `Pantum CM2800ADN Series`, PrintService Event ID 307 / 842 / Win32 `0x0`, final queue empty.
 
 ## 当前决策状态
 
 - Physical paper output: confirmed by counter + PrintService. No visual photo/video was attached; if site staff did not actually see paper, mark the field result failed.
-- Commercial rollout mode: not decided.
-- Recommended first terminal mode: `FREE_MODE` only.
-- Runtime blocker: earlier preprod probes observed `PRINT_REQUIRE_PAID_BEFORE_CLAIM` unset, so unpaid completion remains non-commercial evidence only.
+- Commercial rollout mode: live WeChat paid print is technically proven by one production sample, but trial-operation policy still needs an explicit decision and SOP.
+- Recommended first terminal mode: `FREE_MODE` remains the lowest-risk default. Live WeChat paid print is allowed only after explicit staffed support, refund SOP, and queue-recovery SOP confirmation; do not use sandbox in production.
+- Runtime note: earlier unpaid probes remain non-commercial evidence only. The 2026-07-08 paid sample is the first production evidence that live WeChat payment, refund callback, and business print can all complete on the same terminal after queue recovery.
 
 ## 安全部署组合
 
@@ -23,6 +26,8 @@
 | 免费试运营 | `PriceConfig.unitCents=0` | `PAYMENT_PROVIDER` unset/disabled | `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true` | does not enter cashier | recommended |
 | 有人值守线下收款 | `unitCents>0` | payment disabled | gate true | cashier waits for Admin mark-paid | supervised only |
 | Live 支付后出纸 | `unitCents>0` | live provider | gate true | cashier paid then progress | C5-6 only |
+
+2026-07-08 更新：`wechat` live provider 已完成一笔生产小额支付、退款回调和一笔业务打印 completed 样本；`alipay` 未验收。试运营采用 live paid mode 前仍需确认 staffed support、退款 SOP、异常打印处理、对账查看和隐私证据保存规则。
 
 ## 禁止部署组合
 
@@ -41,6 +46,14 @@
 - `PAYMENT_PROVIDER` unset/disabled，不进入 live 支付或 sandbox 支付路径。
 - `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`，保持 claim 前门禁开启。
 - 现场只观察上传、建单、终端 claim、状态回传和纸张输出，不在首轮试运营中验证 C5-6 live payment。
+
+如改用 live WeChat paid mode，必须在试运营前复核：
+
+- `PAYMENT_PROVIDER=wechat`，`/api/v1/payment/channels` 返回 `wechat`。
+- 微信支付与退款通知 URL 均为正式 HTTPS 生产域名，退款通知空请求进入验签路径而非 404 / provider unsupported。
+- `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`，未支付任务不得下发。
+- Windows 队列为空，`AIJobPrintAgent` Running / Automatic，`printerStatus=ready`。
+- 现场人员知道如何清理 `Error, Printing, Retained` 队列、重启 Print Spooler、发起 Admin 退款和核查对账。
 
 ## FREE_MODE 运行时复验门禁
 

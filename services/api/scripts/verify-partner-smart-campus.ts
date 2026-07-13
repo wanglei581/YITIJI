@@ -140,9 +140,10 @@ async function main(): Promise<void> {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const toolbox = new TerminalToolboxService(prisma)
+  const audit = new AuditService(prisma)
   const svc = new SmartCampusService(prisma, toolbox)
-  const terminals = new TerminalsService(prisma, toolbox) // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
-  const adminOrgs = new AdminOrgsService(prisma, new AuditService(prisma)) // 高校版模板联动：smart_campus 白名单保存验证
+  const terminals = new TerminalsService(prisma, toolbox, audit) // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
+  const adminOrgs = new AdminOrgsService(prisma, audit) // 高校版模板联动：smart_campus 白名单保存验证
 
   let ok = true
   try {

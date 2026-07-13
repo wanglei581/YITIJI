@@ -42,7 +42,10 @@
 - **2026-07-11 更正**：`feature/real-scan` 已于 2026-07-10 完成全部 21 个任务并合并进 `main`，新增 `ScanTask` 模型 + Agent 端 `scan-watcher.ts`（SMB 共享目录监听）+ Kiosk 四页面全部接真，**不再是流程演示**，`ScanResultPage` 的 `file` 状态只能来自真实 `getScanSessionStatus()`。本条"禁止移除演示标注"等约束已随代码真实化自然失效，仅剩 Windows 真机物理验收（真实打印机→SMB→Agent 端到端硬件链路）未完成，详见 `docs/progress/current-progress.md` 2026-07-10 对应条目。
 - **验证方式**：待 Windows 真机验收清单排期后执行；当前仅需人工核对 `main` 上 `ScanTask`/`scan-watcher.ts`/四页面代码与 verify 断言仍在（不倒退回 mock）
 
-### 4. 证件复印/证件照/云打印/格式转换/签名盖章/U盘 → 待真机（诚实禁用/隐藏）
+### 4. 证件复印/证件照/~~云打印~~/格式转换/签名盖章/U盘 → 待真机（诚实禁用/隐藏）
+
+> **2026-07-12 更新**：本条中的「云打印」已按正式取舍决策（用户拍板 D1=b）从首页删除，不再属于"待真机占位"——其已实现语义归位「文档打印+手机扫码上传」，真增量方向「远程提交·到店取件」记入商用二期候选，见 `docs/reviews/2026-07-12-cloud-print-decision.md`。另按同日核查更正：「格式转换」已于 2026-07-11 点亮图片→PDF MVP、「U盘」已于 2026-07-11 在 PrintUploadPage `usb` tab 代码级接线（均仅待真机/生产验收，见 matrix §3.4 与 next-tasks 对应条目），不再是纯占位；证件复印/证件照/签名盖章维持占位不变。
+
 - **当前入口/页面**：首页占位卡 + `/print-scan`（审计文档未给出各子项具体文件路径，仅笼统定位在 `apps/kiosk/src/pages/home/HomePage.tsx` 与 `apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx` 内）
 - **最终动作**：**待真机**——真机/生产链路验收前，只允许诚实禁用或隐藏，二选一由真实化任务实施时决定，本清单不预先指定
 - **允许修改文件**：`apps/kiosk/src/pages/home/HomePage.tsx`、`apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx`；各子项对应具体组件文件审计文档未记录，需真实化前另行定位

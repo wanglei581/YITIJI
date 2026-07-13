@@ -23,6 +23,7 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-print-file-signing-secret-0123456
 
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
+import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
@@ -73,7 +74,7 @@ async function main() {
     new OrderStatusService(prisma, audit),
     new TerminalCapabilitiesService(prisma),
   )
-  const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
+  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit) // 不调 onModuleInit，避免 seed + 定时器
 
   const suffix = randomBytes(6).toString('hex')
   const terminalId = `term_vpj_${suffix}`

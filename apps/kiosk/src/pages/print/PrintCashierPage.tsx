@@ -47,7 +47,7 @@ interface CashierLocationState {
 }
 
 const POLL_INTERVAL_MS = 2500
-const CODE_PAY_RECONCILE_INTERVAL_MS = 3500
+const AUTO_RECONCILE_INTERVAL_MS = 3500
 
 const SERVICE_KEY_LABEL: Record<string, string> = {
   print_bw_page: '黑白打印',
@@ -86,7 +86,7 @@ export function PrintCashierPage() {
   const [reconciling, setReconciling] = useState(false)
   const navigatedRef = useRef(false)
   const cancelRef = useRef(false)
-  const lastCodePayReconcileAtRef = useRef(0)
+  const lastAutoReconcileAtRef = useRef(0)
 
   const proceedToPrint = useCallback(() => {
     if (navigatedRef.current) return
@@ -249,16 +249,15 @@ export function PrintCashierPage() {
         if (cancelRef.current) return
         setSnapshot({ payStatus: s.payStatus, attempt: s.attempt })
         if (s.payStatus === 'paid') proceedToPrint()
-        // 付款码 USERPAYING 没有屏上二维码可等待回调，按服务端最小间隔主动查账；
-        // 只对无 qrCodeContent 的真实通道尝试，二维码支付仍保持原轮询/手动核实行为。
-        const shouldReconcileCodePay =
+        // 回调是首选路径；回调延迟/丢失时，所有真实 pending 尝试（屏上收款码和付款码）
+        // 都按服务端最小间隔主动查账。sandbox 没有真实渠道账本，绝不伪造查单能力。
+        const shouldAutoReconcile =
           s.payStatus !== 'paid' &&
           s.attempt?.status === 'pending' &&
-          !s.attempt.qrCodeContent &&
           s.attempt.channel !== 'sandbox' &&
-          Date.now() - lastCodePayReconcileAtRef.current >= CODE_PAY_RECONCILE_INTERVAL_MS
-        if (shouldReconcileCodePay) {
-          lastCodePayReconcileAtRef.current = Date.now()
+          Date.now() - lastAutoReconcileAtRef.current >= AUTO_RECONCILE_INTERVAL_MS
+        if (shouldAutoReconcile) {
+          lastAutoReconcileAtRef.current = Date.now()
           try {
             const reconciled = await reconcilePayment({ orderId, paymentSessionToken })
             if (cancelRef.current) return

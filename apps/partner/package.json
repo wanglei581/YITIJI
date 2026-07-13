@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
+    "verify:service-desk-jobs-ui": "node scripts/verify-service-desk-jobs-ui.mjs",
     "verify:partner-refresh-safe": "node scripts/verify-partner-refresh-safe.mjs",
     "verify:job-quality-dashboard-ui": "node scripts/verify-job-quality-dashboard-ui.mjs",
     "verify:excel-template-download-ui": "node scripts/verify-excel-template-download-ui.mjs",
