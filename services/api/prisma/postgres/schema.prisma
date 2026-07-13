@@ -142,6 +142,7 @@ model ScanTask {
   matchedFileMtime DateTime?
   errorCode        String?
   errorMessage     String?
+  controlTokenHash String?
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
