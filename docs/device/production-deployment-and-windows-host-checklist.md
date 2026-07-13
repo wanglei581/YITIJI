@@ -317,10 +317,13 @@ pnpm --filter ./services/api verify:activity-logs
 证件类专项（Task 11 验收清单项，敏感文件按短 TTL 清理，不长期留存）：
 
 - [ ] 身份证复印：证件放置 → 扫描 → A4 排版 → 真实出纸全链路可用（口径对齐首期计划 Task 8 的复印/证件复印标准，仅生成文件不出纸不算通过）；复印产物不落长期存储，完成后按敏感文件策略清理并有删除日志。
-- [ ] 证件照隔离验收（**2026-07-13 更新**：证件照打印 MVP 代码已实现，但能力开关默认不可用；本项通过只代表未点亮能力已被正确隔离，**不代表证件照功能真机验收通过**，功能本身的真机验收清单见下方 §5.8）：Kiosk `/print-scan` 卡片默认展示「暂不可用」，终端能力开关（Admin「打印扫描运维 → 设备能力」）中 `id_photo` 未设为「可用」时，即使点入 `/print-scan/id-photo` 流程页，页面自身也按能力开关 fail-closed 展示诚实不可用态，不放行真实生成/打印。设计与实现见 `docs/superpowers/specs/2026-07-12-id-photo-design.md` 与 `docs/superpowers/plans/2026-07-12-id-photo-implementation.md`。
+- [ ] 证件照隔离验收（**2026-07-13 更新**：证件照打印 MVP 代码已实现，但能力开关默认不可用；本项通过只代表未点亮能力已被正确隔离，**不代表证件照功能真机验收通过**，功能本身的真机验收清单见下方 §5.8）：Kiosk `/print-scan` 卡片默认展示「暂不可用」；`/print-scan/id-photo` 流程页对"终端能力未配置"这一状态本身会放行进入（前端注释明确：未配置 → 放行，真正把关交给服务端）。**该行为是否等同于"未点亮时不可用"，完全取决于生产环境 `PRINT_SCAN_CAPABILITY_MODE` 的取值与是否已为 `id_photo` 显式配置终端能力行——见 §5.8 新增的前置门禁项，验收本条前必须先确认那一项，否则"隔离"可能只是表面现象。**设计与实现见 `docs/superpowers/specs/2026-07-12-id-photo-design.md` 与 `docs/superpowers/plans/2026-07-12-id-photo-implementation.md`。
 
 ### 5.8 证件照打印真机验收（功能点亮前置，设计 §六/§十）
 
+> **2026-07-13 全量分支最终审查新发现（非本次真机验收项，是部署前置条件）**：`id_photo` 能力在"终端能力未配置行"这一默认状态下是否真正被拒绝，取决于服务端 `PRINT_SCAN_CAPABILITY_MODE` 环境变量——`strict` 模式下未配置行 fail-closed 拒绝（安全）；`managed` 模式下未配置行放行既有已验证能力（这是为兼容其他早已上线、暂未逐终端建能力行的能力而设计的），**但同样会放行 `id_photo` 这个全新、尚未真机验收的能力**。生产 `NODE_ENV=production` 时 `production-runtime-gates.ts` 强制要求显式声明该变量为 `managed` 或 `strict` 之一，但并不限定必须选 `strict`——因此"必须显式声明"不等于"默认安全"。
+
+- [ ] **前置门禁（必须先做，早于以下所有真机验收项）**：确认生产环境 `PRINT_SCAN_CAPABILITY_MODE` 取值；若为 `managed`，必须在部署本分支代码前为每台终端显式插入一条 `id_photo` 的 `TerminalCapability` 行且状态设为非「可用」（如 `not_verified`），否则本功能会在代码部署的瞬间即可被任意用户触达真实生成与打印，而不会等到 Admin 手动点亮。
 - [ ] 彩色出纸：SumatraPDF `-print-settings color` 真机验证（黑白已验，彩色未验）。
 - [ ] 尺寸准确：`scale=actual(noscale)` 打印一寸整版，实物量尺 25×35mm ±1mm；超差先查打印机驱动缩放设置。
 - [ ] 隐私链路演练：扫码上传 → 裁剪 → 生成 → 打印 → 确认裁剪产物被服务端自动删除 → 1 小时后 cron 物理删除排版 PDF → 审计四类事件（`file.upload` / `id_photo.layout_generated` / `print_job.create` / `id_photo.source_deleted`）齐全。
