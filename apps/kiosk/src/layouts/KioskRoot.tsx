@@ -49,6 +49,16 @@ function KioskShell() {
 
   const activeTab = getActiveTab(pathname)
   const statusVariant = deviceStatus === 'online' || deviceStatus === 'idle' ? 'success' : 'warning'
+  const statusLabelByDeviceStatus: Record<DeviceStatus, string> = {
+    online: '服务正常',
+    idle: '服务正常',
+    busy: '正在服务',
+    offline: '暂时离线',
+    error: '需要协助',
+    maintenance: '正在维护',
+  }
+  const statusLabel = statusLabelByDeviceStatus[deviceStatus]
+  const isServiceDeskRoute = pathname === '/' || pathname === '/help'
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
@@ -58,13 +68,13 @@ function KioskShell() {
     <KioskLayout
       activeTab={activeTab}
       onTabChange={(tab) => navigate(tabToPath(tab))}
-      visualTheme={pathname === '/' ? 'service-desk' : 'legacy'}
+      visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
       density="touch"
       // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
       // 其余页面继续使用全局头部 + 设备状态徽标。
       hideHeader={pathname === '/' || isCampusZone}
       hideBottomNav={isCampusZone}
-      headerRight={<StatusBadge status={statusVariant} label={deviceStatus} />}
+      headerRight={<StatusBadge status={statusVariant} label={statusLabel} />}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}

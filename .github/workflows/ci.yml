@@ -122,6 +122,9 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
           pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
+          pnpm --filter @ai-job-print/kiosk verify:lightflow-k1-public-entry
+          pnpm --filter @ai-job-print/kiosk verify:qr-login-ui
+          pnpm --filter @ai-job-print/kiosk verify:resume-phone-upload-ui
 
       - name: Terminal Agent verify suites
         # 不依赖 DB（本地网桥两套用真实临时目录 + 真实本地 HTTP server + 后端 stub），

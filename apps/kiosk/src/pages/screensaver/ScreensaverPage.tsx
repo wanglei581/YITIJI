@@ -5,6 +5,7 @@ import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
+import './screensaver-service-desk.css'
 
 /**
  * 待机宣传屏(全屏路由)。
@@ -127,13 +128,13 @@ export function ScreensaverPage() {
   }, [current, index, items.length])
 
   if (!current || !mediaUrl) {
-    return <div className="fixed inset-0 z-[9999] bg-black" aria-hidden="true" />
+    return <div className="service-desk k1-screensaver fixed inset-0 z-[9999] bg-black" data-visual-theme="service-desk" data-ux-density="touch" aria-hidden="true" />
   }
 
   const loopVideo = items.length <= 1
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black" role="presentation">
+    <div className="service-desk k1-screensaver fixed inset-0 z-[9999] flex items-center justify-center bg-black" data-visual-theme="service-desk" data-ux-density="touch" role="presentation">
       {current.type === 'video' ? (
         <video
           key={current.id}
@@ -163,8 +164,8 @@ export function ScreensaverPage() {
       )}
 
       {/* 触摸提示:克制、不喧宾夺主 */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-10 flex justify-center">
-        <span className="rounded-full bg-white/15 px-6 py-2.5 text-base text-white/90 backdrop-blur-sm">
+      <div className="screensaver-wake-prompt" aria-hidden="true">
+        <span>
           触摸屏幕开始使用
         </span>
       </div>

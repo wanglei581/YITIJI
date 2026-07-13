@@ -10,7 +10,7 @@
 // 视觉对齐 .workbuddy/prototypes/login-trio-v1.html ①（样式见 ./login.css）。
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   CheckIcon,
   CircleAlertIcon,
@@ -301,7 +301,7 @@ export function LoginPage() {
   const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
 
   return (
-    <div className="klogin" ref={rootRef}>
+    <div className="service-desk k1-login" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
       <header className="topbar">
         <span className="brand-mark">AI</span>
         <div className="brand-copy">
@@ -330,7 +330,7 @@ export function LoginPage() {
                 <ShieldCheckIcon size={17} aria-hidden="true" />
                 就业服务 · 一体机自助办理
               </div>
-              <h1 className="serif">
+              <h1>
                 登录后，简历和记录
                 <br />
                 都替你存好
@@ -355,7 +355,7 @@ export function LoginPage() {
                 <UserRoundIcon size={28} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="serif">选择登录方式</h3>
+                <h3>选择登录方式</h3>
                 <p>手机号验证码或手机扫码，全程不超过 3 步</p>
               </div>
             </div>
@@ -387,54 +387,36 @@ export function LoginPage() {
               </button>
             </div>
 
-            <button
-              type="button"
-              className={`k-agree${agreed ? ' checked' : ''}`}
-              onClick={() => setAgreed((v) => !v)}
-              role="checkbox"
-              aria-checked={agreed}
-            >
-              <span className="box">
-                <CheckIcon size={18} aria-hidden="true" />
-              </span>
-              <span>
-                我已阅读并同意
-                <span
-                  className="doclink"
-                  role="link"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate('/legal/terms')
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') navigate('/legal/terms')
-                  }}
-                >
+            <div className={`k-agree${agreed ? ' checked' : ''}`}>
+              <button
+                type="button"
+                className="k-agree-check"
+                onClick={() => setAgreed((v) => !v)}
+                role="checkbox"
+                aria-checked={agreed}
+              >
+                <span className="box">
+                  <CheckIcon size={18} aria-hidden="true" />
+                </span>
+                <span>我已阅读并同意</span>
+              </button>
+              <span className="k-agree-docs">
+                <Link className="doclink" to="/legal/terms">
                   《用户服务协议》
-                </span>
-                与
-                <span
-                  className="doclink"
-                  role="link"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate('/legal/privacy')
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') navigate('/legal/privacy')
-                  }}
-                >
+                </Link>
+                <span>与</span>
+                <Link className="doclink" to="/legal/privacy">
                   《隐私政策》
-                </span>
+                </Link>
               </span>
-            </button>
+            </div>
+            {!agreed && <p className="k-agree-hint">勾选协议后可获取验证码并登录</p>}
 
             {tab === 'phone' && (
               <PhoneLoginPane
                 phone={phone}
                 code={code}
+                agreed={agreed}
                 loading={loading}
                 countdown={countdown.seconds}
                 countdownTotal={countdown.total}
@@ -451,21 +433,13 @@ export function LoginPage() {
             )}
 
             {tab === 'scan' && (
-              <>
-                <ScanQrLoginPanel
-                  returnTo={returnTo}
-                  agreed={agreed}
-                  onAgreementRequired={requireMemberAgreement}
-                  onUsePhoneLogin={() => switchTab('phone')}
-                  onLoginSuccess={handleQrLoginSuccess}
-                />
-                {error && (
-                  <div className="k-error" role="alert">
-                    <CircleAlertIcon size={20} aria-hidden="true" />
-                    <span>{error}</span>
-                  </div>
-                )}
-              </>
+              <ScanQrLoginPanel
+                returnTo={returnTo}
+                agreed={agreed}
+                onAgreementRequired={requireMemberAgreement}
+                onUsePhoneLogin={() => switchTab('phone')}
+                onLoginSuccess={handleQrLoginSuccess}
+              />
             )}
 
             {tab === 'email' && <EmailReservedPane />}
@@ -495,7 +469,7 @@ export function LoginPage() {
               </svg>
             </div>
           </div>
-          <div className="msg serif">登录成功，正在进入…</div>
+          <div className="msg">登录成功，正在进入…</div>
         </div>
       )}
     </div>
@@ -505,6 +479,7 @@ export function LoginPage() {
 function PhoneLoginPane({
   phone,
   code,
+  agreed,
   loading,
   countdown,
   countdownTotal,
@@ -520,6 +495,7 @@ function PhoneLoginPane({
 }: {
   phone: string
   code: string
+  agreed: boolean
   loading: boolean
   countdown: number
   countdownTotal: number
@@ -533,8 +509,8 @@ function PhoneLoginPane({
   notice: string | null
   error: string | null
 }) {
-  const canSend = phone.length === PHONE_LENGTH && countdown === 0 && !loading
-  const canLogin = phone.length === PHONE_LENGTH && code.length === CODE_LENGTH && !loading
+  const canSend = agreed && phone.length === PHONE_LENGTH && countdown === 0 && !loading
+  const canLogin = agreed && phone.length === PHONE_LENGTH && code.length === CODE_LENGTH && !loading
   const ringOffset = countdownTotal > 0 ? RING_CIRCUMFERENCE * (1 - countdown / countdownTotal) : 0
   const activeValue = activeInput === 'code' ? code : phone
 
@@ -543,24 +519,22 @@ function PhoneLoginPane({
       <div className="field-label">
         <b className="fno">01</b>手机号 <i>未注册的手机号验证后将自动创建账号</i>
       </div>
-      <button
-        type="button"
-        className={`k-input${activeInput === 'phone' ? ' focus' : ''}`}
-        onClick={() => onActiveInputChange('phone')}
-        aria-label="手机号"
-      >
-        <SmartphoneIcon size={22} aria-hidden="true" />
-        {phone ? <span>{formatPhone(phone)}</span> : <span className="ph">使用下方键盘输入 11 位手机号</span>}
-        {activeInput === 'phone' && phone.length < PHONE_LENGTH && <span className="caret" />}
-        <span
-          role="button"
-          aria-disabled={!canSend}
+      <div className={`k-input${activeInput === 'phone' ? ' focus' : ''}`}>
+        <button
+          type="button"
+          className="k-input-target"
+          onClick={() => onActiveInputChange('phone')}
+          aria-label="手机号"
+        >
+          <SmartphoneIcon size={22} aria-hidden="true" />
+          {phone ? <span>{formatPhone(phone)}</span> : <span className="ph">使用下方键盘输入 11 位手机号</span>}
+          {activeInput === 'phone' && phone.length < PHONE_LENGTH && <span className="caret" />}
+        </button>
+        <button
+          type="button"
+          disabled={!canSend}
           className="k-send ripple-host"
-          style={!canSend ? { opacity: 0.42, boxShadow: 'none', cursor: 'default' } : undefined}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (canSend) onSendCode()
-          }}
+          onClick={onSendCode}
         >
           {countdown > 0 && (
             <svg className="ring" viewBox="0 0 24 24" aria-hidden="true">
@@ -575,8 +549,8 @@ function PhoneLoginPane({
             </svg>
           )}
           <span>{loading && countdown === 0 ? '发送中' : countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}</span>
-        </span>
-      </button>
+        </button>
+      </div>
 
       <div className="field-label">
         <b className="fno">02</b>短信验证码 <i>输入 6 位数字，5 分钟内有效</i>
@@ -603,13 +577,13 @@ function PhoneLoginPane({
       </div>
 
       {notice && (
-        <div className="k-notice" role="status">
+        <div className="k-notice" role="status" aria-live="polite">
           <CircleCheckIcon size={20} aria-hidden="true" />
           <span>{notice}</span>
         </div>
       )}
       {error && (
-        <div className="k-error" role="alert">
+        <div className="k-error" role="alert" aria-live="polite">
           <CircleAlertIcon size={20} aria-hidden="true" />
           <span>{error}</span>
         </div>
@@ -690,7 +664,7 @@ function EmailReservedPane() {
       <span className="chi">
         <MailIcon size={34} aria-hidden="true" />
       </span>
-      <h4 className="serif">邮箱登录暂未开放</h4>
+      <h4>邮箱登录暂未开放</h4>
       <p>当前会员账号使用手机号验证码登录。邮箱登录入口已预留，接入邮箱验证码服务后开放，请先使用手机号或扫码登录。</p>
     </div>
   )

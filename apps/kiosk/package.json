@@ -37,6 +37,7 @@
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
     "verify:home-service-desk": "node scripts/verify-home-service-desk.mjs",
     "verify:lightflow-k2c-interview": "node scripts/verify-lightflow-k2c-interview.mjs",
+    "verify:lightflow-k1-public-entry": "node scripts/verify-lightflow-k1-public-entry.mjs",
     "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",
     "verify:resume-phone-upload-ui": "node scripts/verify-resume-phone-upload-ui.mjs",
     "verify:job-material-library-ui": "node scripts/verify-job-material-library-ui.mjs",
