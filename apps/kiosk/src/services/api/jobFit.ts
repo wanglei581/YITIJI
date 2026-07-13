@@ -26,6 +26,14 @@ export interface JobFitAccess {
   accessToken?: string | null
 }
 
+export interface JobFitConsentStatus {
+  taskId: string
+  consentVersion: string | null
+  grantedAt: string | null
+  revokedAt: string | null
+  active: boolean
+}
+
 async function call<T>(path: string, access: JobFitAccess, init?: { method?: string; body?: unknown }): Promise<T> {
   let res: Response
   try {
@@ -57,12 +65,41 @@ async function call<T>(path: string, access: JobFitAccess, init?: { method?: str
   return (await res.json()) as T
 }
 
+/** 匿名 consent 端点绝不携带会员 Bearer，避免混淆两套授权语义。 */
+function anonymousAccess(access: JobFitAccess): JobFitAccess {
+  return { accessToken: access.accessToken }
+}
+
 /** 发起岗位匹配参考分析（系统内岗位或手填岗位）。 */
 export function analyzeJobFit(input: JobFitRequest, access: JobFitAccess): Promise<JobFitResponse> {
   if (API_MODE !== 'http') {
     return Promise.reject(new JobFitApiError('MOCK_MODE', '演示模式不提供岗位匹配参考，请连接真实服务', 0))
   }
   return call<JobFitResponse>('/resume/job-fit', access, { method: 'POST', body: input })
+}
+
+/** 为当前匿名简历诊断任务明确授予岗位匹配分析授权。 */
+export function grantJobFitConsent(taskId: string, access: JobFitAccess): Promise<JobFitConsentStatus> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new JobFitApiError('MOCK_MODE', '演示模式不提供岗位匹配授权', 0))
+  }
+  return call<JobFitConsentStatus>('/resume/job-fit/consent', anonymousAccess(access), { method: 'POST', body: { taskId } })
+}
+
+/** 读取当前匿名简历诊断任务的岗位匹配授权状态。 */
+export function getJobFitConsentStatus(taskId: string, access: JobFitAccess): Promise<JobFitConsentStatus> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new JobFitApiError('MOCK_MODE', '演示模式不提供岗位匹配授权状态', 0))
+  }
+  return call<JobFitConsentStatus>(`/resume/job-fit/consent/${encodeURIComponent(taskId)}`, anonymousAccess(access))
+}
+
+/** 撤回当前匿名简历诊断任务的后续岗位匹配分析授权。 */
+export function revokeJobFitConsent(taskId: string, access: JobFitAccess): Promise<JobFitConsentStatus> {
+  if (API_MODE !== 'http') {
+    return Promise.reject(new JobFitApiError('MOCK_MODE', '演示模式不提供岗位匹配授权撤回', 0))
+  }
+  return call<JobFitConsentStatus>(`/resume/job-fit/consent/${encodeURIComponent(taskId)}`, anonymousAccess(access), { method: 'DELETE' })
 }
 
 /** 读回最近一次分析（刷新恢复）。 */

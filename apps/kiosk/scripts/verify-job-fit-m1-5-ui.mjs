@@ -78,6 +78,18 @@ expectIncludes(recordsPage, "item.session.operation === 'match' && item.session.
 expectIncludes(packageJson, '"verify:job-fit-m1-5-ui"', 'package 注册 M1.5 前端门禁')
 expectIncludes(ci, 'verify:job-fit-m1-5-ui', 'CI 执行 M1.5 前端门禁')
 
+const anonymousConsentDialog = expectFile('src/pages/resume/jobFit/AnonymousJobFitConsentDialog.tsx', '匿名岗位匹配授权弹窗存在')
+const anonymousConsentCard = expectFile('src/pages/resume/jobFit/AnonymousJobFitConsentCard.tsx', '匿名岗位匹配授权撤回卡片存在')
+const memberConsentCard = expectFile('src/pages/resume/jobFit/MemberJobFitConsentCard.tsx', '会员岗位 AI 授权引导卡片存在')
+expectIncludes(jobFitApi, 'grantJobFitConsent', '岗位匹配 API 暴露匿名授权方法')
+expectIncludes(jobFitApi, 'getJobFitConsentStatus', '岗位匹配 API 暴露匿名授权状态读取')
+expectIncludes(jobFitApi, 'revokeJobFitConsent', '岗位匹配 API 暴露匿名授权撤回方法')
+expectIncludes(jobFitPage, "err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED'", '分析请求显式分流匿名授权 403')
+expectIncludes(jobFitPage, 'AnonymousJobFitConsentDialog', '岗位匹配页编排匿名授权弹窗')
+expectIncludes(anonymousConsentDialog, 'role="dialog"', '匿名授权弹窗声明对话框语义')
+expectIncludes(anonymousConsentCard, '撤回仅影响后续分析', '匿名撤回不伪称删除既有报告')
+expectIncludes(memberConsentCard, '岗位 AI 辅助', '会员授权引导保持既有岗位 AI 文案')
+
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 岗位匹配 M1.5 前端整合未完成\n`)
   process.exit(1)

@@ -7,10 +7,10 @@
 // 合规：等级仅供参考（无百分比/录用承诺，服务端双层拦截）；不做平台内投递。
 // ============================================================
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJobDTO, JobFitResponse } from '@ai-job-print/shared'
+import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -24,7 +24,15 @@ import {
   TargetIcon,
 } from 'lucide-react'
 import { getJobs } from '../../services/api'
-import { analyzeJobFit, getLatestJobFit, printJobFit } from '../../services/api/jobFit'
+import {
+  analyzeJobFit,
+  getJobFitConsentStatus,
+  getLatestJobFit,
+  grantJobFitConsent,
+  JobFitApiError,
+  printJobFit,
+  revokeJobFitConsent,
+} from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
@@ -32,6 +40,9 @@ import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
 import { FitSkillMap } from './jobFit/FitSkillMap'
 import { GapActionCards } from './jobFit/GapActionCards'
 import { ResumeRewriteCard } from './jobFit/ResumeRewriteCard'
+import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
+import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
+import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import './jobFit-inkpaper.css'
 
 interface PageState {
@@ -50,6 +61,8 @@ export function JobFitPage() {
   const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
   const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
   const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
+  const currentToken = getToken()
+  const isAnonymous = !currentToken && Boolean(accessToken)
 
   const [tab, setTab] = useState<'pick' | 'manual'>('pick')
   const [keyword, setKeyword] = useState('')
@@ -63,8 +76,16 @@ export function JobFitPage() {
   const [loadingLatest, setLoadingLatest] = useState(Boolean(taskId))
   const [result, setResult] = useState<JobFitResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [pendingConsentInput, setPendingConsentInput] = useState<JobFitRequest | null>(null)
+  const [showAnonymousConsent, setShowAnonymousConsent] = useState(false)
+  const [consentError, setConsentError] = useState<string | null>(null)
+  const [memberConsentRequired, setMemberConsentRequired] = useState(false)
+  const [anonymousConsentActive, setAnonymousConsentActive] = useState(false)
+  const [revokingConsent, setRevokingConsent] = useState(false)
+  const anonymousConsentRevisionRef = useRef(0)
 
-  useBusyLock(analyzing || printing)
+  useBusyLock(analyzing || printing || revokingConsent)
 
   useEffect(() => {
     let cancelled = false
@@ -80,13 +101,33 @@ export function JobFitPage() {
     setResult(null)
     setSelectedJob(null)
     setError(null)
+    setNotice(null)
+    setPendingConsentInput(null)
+    setShowAnonymousConsent(false)
+    setConsentError(null)
+    setMemberConsentRequired(false)
+    setAnonymousConsentActive(false)
+    const consentStatusRevision = ++anonymousConsentRevisionRef.current
     if (!taskId) {
       setLoadingLatest(false)
       return
     }
     let cancelled = false
     setLoadingLatest(true)
-    getLatestJobFit(taskId, { token: getToken(), accessToken })
+    if (isAnonymous && accessToken) {
+      void getJobFitConsentStatus(taskId, { accessToken })
+        .then((status) => {
+          if (!cancelled && consentStatusRevision === anonymousConsentRevisionRef.current) {
+            setAnonymousConsentActive(status.active)
+          }
+        })
+        .catch(() => {
+          if (!cancelled && consentStatusRevision === anonymousConsentRevisionRef.current) {
+            setAnonymousConsentActive(false)
+          }
+        })
+    }
+    getLatestJobFit(taskId, { token: currentToken, accessToken })
       .then((res) => {
         if (!cancelled) setResult(res.status === 'completed' ? res : null)
       })
@@ -98,7 +139,7 @@ export function JobFitPage() {
         if (!cancelled) setLoadingLatest(false)
       })
     return () => { cancelled = true }
-  }, [taskId, accessToken, getToken])
+  }, [taskId, accessToken, currentToken, isAnonymous])
 
   if (!taskId) {
     return (
@@ -121,7 +162,9 @@ export function JobFitPage() {
 
   const handleAnalyze = async () => {
     setError(null)
-    const input =
+    setNotice(null)
+    setMemberConsentRequired(false)
+    const input: JobFitRequest | null =
       tab === 'pick' && selectedJob
         ? { taskId, jobId: selectedJob.id }
         : tab === 'manual' && manualTitle.trim()
@@ -131,18 +174,83 @@ export function JobFitPage() {
       setError(tab === 'pick' ? '请先选择一个岗位' : '请填写目标岗位名称')
       return
     }
+    const token = getToken()
     setAnalyzing(true)
     try {
-      const res = await analyzeJobFit(input, { token: getToken(), accessToken })
+      const res = await analyzeJobFit(input, { token, accessToken })
       if (res.status === 'failed') {
         setError(res.failReason ?? '分析未完成，请稍后重试')
       } else {
         setResult(res)
       }
     } catch (err) {
+      if (err instanceof JobFitApiError && err.status === 403) {
+        if (err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED' && !token && accessToken) {
+          setPendingConsentInput(input)
+          setConsentError(null)
+          setShowAnonymousConsent(true)
+          return
+        }
+        if (err.code === 'USER_AI_CONSENT_REQUIRED' && token) {
+          setMemberConsentRequired(true)
+          setError('请先确认岗位 AI 辅助授权，再返回进行岗位匹配参考分析。')
+          return
+        }
+      }
       setError(err instanceof Error ? err.message : '分析失败，请稍后重试')
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  const handleConfirmAnonymousConsent = async () => {
+    const input = pendingConsentInput
+    if (!input || !accessToken) return
+    setAnalyzing(true)
+    setConsentError(null)
+    let granted = false
+    try {
+      await grantJobFitConsent(taskId, { accessToken })
+      granted = true
+      anonymousConsentRevisionRef.current += 1
+      setAnonymousConsentActive(true)
+      setShowAnonymousConsent(false)
+      setPendingConsentInput(null)
+      const res = await analyzeJobFit(input, { accessToken })
+      if (res.status === 'failed') {
+        setError(res.failReason ?? '分析未完成，请稍后重试')
+      } else {
+        setResult(res)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '授权失败，请稍后重试'
+      if (granted) setError(message)
+      else setConsentError(message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleCancelAnonymousConsent = () => {
+    setShowAnonymousConsent(false)
+    setPendingConsentInput(null)
+    setConsentError(null)
+  }
+
+  const handleRevokeConsent = async () => {
+    if (!accessToken) return
+    setRevokingConsent(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await revokeJobFitConsent(taskId, { accessToken })
+      anonymousConsentRevisionRef.current += 1
+      setAnonymousConsentActive(false)
+      setNotice('已撤回，重新分析需再次授权')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '撤回失败，请稍后重试')
+    } finally {
+      setRevokingConsent(false)
     }
   }
 
@@ -209,6 +317,10 @@ export function JobFitPage() {
             </Card>
           )}
 
+          {isAnonymous && anonymousConsentActive && (
+            <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
+          )}
+          {notice && <p className="rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700">{notice}</p>}
           {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
         </div>
 
@@ -258,6 +370,14 @@ export function JobFitPage() {
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
     <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
+      {showAnonymousConsent && (
+        <AnonymousJobFitConsentDialog
+          busy={analyzing}
+          error={consentError}
+          onCancel={handleCancelAnonymousConsent}
+          onConfirm={() => void handleConfirmAnonymousConsent()}
+        />
+      )}
       <PageHeader
         title="岗位匹配度参考"
         subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
@@ -347,6 +467,13 @@ export function JobFitPage() {
         )}
 
         {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
+        {notice && <p className="rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700">{notice}</p>}
+        {memberConsentRequired && (
+          <MemberJobFitConsentCard onNavigate={() => navigate('/jobs')} />
+        )}
+        {isAnonymous && anonymousConsentActive && (
+          <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
+        )}
       </div>
 
       <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
