@@ -56,6 +56,13 @@ function hashBindCode(code: string): string {
   return crypto.createHash('sha256').update(code.trim(), 'utf8').digest('hex')
 }
 
+/** 常量时间比较 agentToken,避免逐字节比较泄露时序信息。 */
+function constantTimeEquals(a: string, b: string): boolean {
+  const bufA = crypto.createHash('sha256').update(a).digest()
+  const bufB = crypto.createHash('sha256').update(b).digest()
+  return crypto.timingSafeEqual(bufA, bufB)
+}
+
 function makeBindCode(): string {
   let out = ''
   for (let i = 0; i < 20; i++) {
@@ -889,7 +896,7 @@ export class TerminalsService implements OnModuleInit {
       })
     }
     const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
-    if (!token || token !== terminal.agentToken) {
+    if (!token || !constantTimeEquals(token, terminal.agentToken)) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' },
       })

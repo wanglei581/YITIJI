@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 扫码登录票据 ID 走 URL 参数（/member/qr-login?ticketId=...），禁止跨源 Referer 泄漏 -->
+    <meta name="referrer" content="same-origin" />
     <title>AI求职打印服务终端</title>
   </head>
   <body>

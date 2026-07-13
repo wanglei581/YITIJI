@@ -57,7 +57,7 @@ export function startQrLoginLocalServer(config: AgentConfig): LocalQrServerHandl
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
   const bridgeToken = config.localApiBridgeToken?.trim() || undefined
   if (!bridgeToken) {
-    warn('local-usb: localApiBridgeToken not configured; /local/usb/* routes will reject all requests')
+    warn('local-qr: localApiBridgeToken not configured; /local/qr-login/* and /local/usb/* routes will reject all requests')
   }
 
   const server = http.createServer((req, res) => {
@@ -126,6 +126,11 @@ async function handleRequest(input: {
 
   if (isUsbRoute) {
     await handleUsbRoute(req, res, origin, url, client, bridgeToken)
+    return
+  }
+
+  if (!isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken)) {
+    sendJson(res, 403, { code: 'LOCAL_QR_BRIDGE_TOKEN_INVALID', message: '扫码登录本地令牌校验失败' }, origin)
     return
   }
 
