@@ -76,6 +76,10 @@ export type AdminPrintScanTaskDetail =
       orderId: string | null
       orderNo: string | null
       statusLogs: { fromStatus: string; toStatus: string; errorCode: string | null; createdAt: string }[]
+      /** 仅由打印任务详情端点提供的受控取消资格。 */
+      closeUnpaidEligible: boolean
+      /** 后端可安全展示给管理员的阻断原因。 */
+      closeUnpaidBlockReason: string | null
     })
   | (Extract<AdminPrintScanTaskItem, { type: 'scan' }> & { fileId: string | null })
   | (Extract<AdminPrintScanTaskItem, { type: 'document_process' }> & {
@@ -100,6 +104,14 @@ export interface AdminPrintScanActionResult {
   toStatus: string
 }
 
+export interface AdminCloseUnpaidPrintTaskResult {
+  taskId: string
+  type: 'print'
+  fromStatus: 'pending' | 'cancelled'
+  toStatus: 'cancelled'
+  idempotent: boolean
+}
+
 export interface ListPrintScanTasksParams {
   type: PrintScanTaskType
   status?: string
@@ -108,10 +120,16 @@ export interface ListPrintScanTasksParams {
   pageSize?: number
 }
 
+export interface CancelUnpaidPrintTaskInput {
+  reason: string
+  expectedUpdatedAt: string
+}
+
 interface AdminPrintScanServiceInterface {
   listTasks(params: ListPrintScanTasksParams): Promise<AdminPrintScanTaskPage>
   getTaskDetail(type: PrintScanTaskType, taskId: string): Promise<AdminPrintScanTaskDetail>
   applyTaskAction(type: PrintScanTaskType, taskId: string, action: AdminPrintScanAction): Promise<AdminPrintScanActionResult>
+  cancelUnpaidPrintTask(taskId: string, input: CancelUnpaidPrintTaskInput): Promise<AdminCloseUnpaidPrintTaskResult>
   listCapabilities(terminalId: string): Promise<{ terminalCode: string; capabilities: TerminalCapabilityView[] }>
   updateCapability(
     terminalId: string,
@@ -165,6 +183,11 @@ const httpAdapter: AdminPrintScanServiceInterface = {
       method: 'POST',
       body: JSON.stringify({ action }),
     }),
+  cancelUnpaidPrintTask: (taskId, input) =>
+    request(`/admin/print-scan/tasks/print/${encodeURIComponent(taskId)}/close-unpaid`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   listCapabilities: (terminalId) => request(`/admin/terminals/${encodeURIComponent(terminalId)}/capabilities`),
   updateCapability: (terminalId, capabilityKey, patch) =>
     request(`/admin/terminals/${encodeURIComponent(terminalId)}/capabilities/${encodeURIComponent(capabilityKey)}`, {
@@ -217,7 +240,15 @@ const mockAdapter: AdminPrintScanServiceInterface = {
   getTaskDetail: async (type, taskId) => {
     const item = MOCK_PRINT_TASKS.find((t) => t.taskId === taskId)
     if (!item || type !== 'print' || item.type !== 'print') throw new ApiHttpError('PRINT_SCAN_TASK_NOT_FOUND', '任务不存在', 404)
-    return { ...item, completedAt: null, orderId: null, orderNo: null, statusLogs: [] }
+    return {
+      ...item,
+      completedAt: null,
+      orderId: null,
+      orderNo: null,
+      statusLogs: [],
+      closeUnpaidEligible: false,
+      closeUnpaidBlockReason: item.status === 'pending' ? 'no_associated_order' : 'task_not_pending',
+    }
   },
   applyTaskAction: async (type, taskId, action) => {
     if (type !== 'print' || action !== 'retry') throw new ApiHttpError('PRINT_SCAN_ACTION_UNSUPPORTED', '该任务类型不支持此操作', 400)
@@ -227,6 +258,17 @@ const mockAdapter: AdminPrintScanServiceInterface = {
     item.status = 'pending'
     item.errorCode = null
     return { taskId, type, action, fromStatus: 'failed', toStatus: 'pending' }
+  },
+  cancelUnpaidPrintTask: async (taskId) => {
+    const item = MOCK_PRINT_TASKS.find((t) => t.taskId === taskId)
+    if (!item) throw new ApiHttpError('PRINT_SCAN_TASK_NOT_FOUND', '任务不存在', 404)
+    if (item.status !== 'pending') {
+      throw new ApiHttpError('ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE', '当前状态不允许取消未支付打印任务', 409)
+    }
+    const fromStatus = item.status
+    item.status = 'cancelled'
+    item.updatedAt = new Date().toISOString()
+    return { taskId, type: 'print', fromStatus, toStatus: 'cancelled', idempotent: false }
   },
   listCapabilities: async () => ({ terminalCode: 'KSK-001', capabilities: MOCK_CAPABILITIES.map((c) => ({ ...c })) }),
   updateCapability: async (_terminalId, capabilityKey, patch) => {

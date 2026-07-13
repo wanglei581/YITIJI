@@ -13,18 +13,32 @@
  */
 
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { signFileUrl } from '../files/signing'
 import {
   IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
   type PrintScanTaskType,
 } from '../terminals/terminal-capabilities.types'
 import type {
+  AdminCloseUnpaidPrintTaskResult,
   AdminPrintScanActionResult,
   AdminPrintScanTaskDetail,
   AdminPrintScanTaskItem,
   AdminPrintScanTaskPage,
 } from './admin-print-scan.types'
+
+export const ADMIN_UNPAID_PRINT_TASK_CLOSED_ERROR_CODE = 'ADMIN_UNPAID_PRINT_TASK_CLOSED'
+const ADMIN_UNPAID_PRINT_TASK_CLOSED_ACTION = 'print_task.admin_unpaid_closed'
+
+type CloseUnpaidBlockReason = Exclude<Extract<AdminPrintScanTaskDetail, { type: 'print' }>['closeUnpaidBlockReason'], null>
+type CloseUnpaidInput = { reason: string; expectedUpdatedAt: string }
+type CloseUnpaidActor = {
+  actorId: string
+  actorRole: string
+  ipAddress?: string | null
+  userAgent?: string | null
+  requestId?: string | null
+}
 
 // 与 print-jobs.service 的 PRINT_JOB_FILE_URL_TTL_MS 同口径：重试后 Agent claim
 // 前需要一个未过期的下载链接。
@@ -67,6 +81,24 @@ interface SafePrintParams {
   copies: number | null
   colorMode: 'black_white' | 'color' | null
   paperSize: string | null
+}
+
+function parseExpectedUpdatedAt(raw: string): Date {
+  const value = raw.trim()
+  const parsed = new Date(value)
+  // 仅接受详情 API 返回的 canonical ISO 字符串，避免 Date.parse 对非标准格式的宽松解释绕过 CAS。
+  if (!value || Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new BadRequestException({ error: { code: 'ADMIN_UNPAID_CLOSE_EXPECTED_UPDATED_AT_INVALID', message: '任务版本时间格式无效' } })
+  }
+  return parsed
+}
+
+function normalizeCloseReason(raw: string): string {
+  const reason = raw.trim()
+  if (reason.length < 10 || reason.length > 500) {
+    throw new BadRequestException({ error: { code: 'ADMIN_UNPAID_CLOSE_REASON_INVALID', message: '关闭原因长度必须为 10 至 500 个字符' } })
+  }
+  return reason
 }
 
 /** 与 admin-orders-readonly 同款的安全解析：损坏 JSON → 全 null，不抛错、不透传原文。 */
@@ -204,7 +236,7 @@ export class AdminPrintScanService {
         completedAt: true,
         createdAt: true,
         updatedAt: true,
-        order: { select: { id: true, orderNo: true } },
+        order: { select: { id: true, orderNo: true, payStatus: true, taskStatus: true } },
         statusLogs: {
           select: { fromStatus: true, toStatus: true, errorCode: true, createdAt: true },
           orderBy: { createdAt: 'asc' },
@@ -215,6 +247,7 @@ export class AdminPrintScanService {
       throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
     }
     const safe = parseSafePrintParams(row.paramsJson)
+    const eligibility = await this.getCloseUnpaidEligibility(row.id)
     return {
       type: 'print',
       taskId: row.id,
@@ -235,8 +268,166 @@ export class AdminPrintScanService {
         errorCode: log.errorCode,
         createdAt: log.createdAt.toISOString(),
       })),
+      closeUnpaidEligible: eligibility.eligible,
+      closeUnpaidBlockReason: eligibility.reason,
       ...safe,
     }
+  }
+
+  /**
+   * Admin 专用的未付款受控关闭。其交易边界覆盖 PrintTask、Order、状态日志和审计，
+   * 严禁复用 AuditService.write（该服务为不阻断业务而吞审计错误）。
+   */
+  async closeUnpaidPrintTask(
+    taskId: string,
+    input: CloseUnpaidInput,
+    actor: CloseUnpaidActor,
+  ): Promise<AdminCloseUnpaidPrintTaskResult> {
+    const reason = normalizeCloseReason(input.reason)
+    const expectedUpdatedAt = parseExpectedUpdatedAt(input.expectedUpdatedAt)
+
+    return this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
+      const task = await tx.printTask.findUnique({
+        where: { id: taskId },
+        select: {
+          id: true,
+          status: true,
+          claimedAt: true,
+          claimExpiry: true,
+          updatedAt: true,
+          errorCode: true,
+          order: { select: { id: true, printTaskId: true, payStatus: true, taskStatus: true } },
+        },
+      })
+      if (!task) {
+        throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
+      }
+
+      // 仅本入口产生的完整终态可幂等回放；其它 cancelled（包括无订单/订单不一致）必须显式冲突。
+      if (task.status === 'cancelled') {
+        if (
+          task.errorCode === ADMIN_UNPAID_PRINT_TASK_CLOSED_ERROR_CODE &&
+          task.order?.printTaskId === task.id &&
+          task.order.payStatus === 'closed' &&
+          task.order.taskStatus === 'cancelled'
+        ) {
+          return { taskId, type: 'print', fromStatus: 'cancelled', toStatus: 'cancelled', idempotent: true }
+        }
+        throw new ConflictException({ error: { code: 'ADMIN_UNPAID_CLOSE_CONFLICT', message: '任务已被其他流程关闭，不能作为未付款任务关闭回放' } })
+      }
+
+      if (task.updatedAt.getTime() !== expectedUpdatedAt.getTime()) {
+        throw new ConflictException({ error: { code: 'ADMIN_UNPAID_CLOSE_STALE', message: '任务已更新，请刷新后重试' } })
+      }
+
+      const eligibility = await this.getCloseUnpaidEligibility(taskId, tx)
+      if (!eligibility.eligible) {
+        throw new ConflictException({ error: { code: 'ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE', message: '任务不符合未付款受控关闭条件' } })
+      }
+      const order = task.order
+      if (!order) {
+        // getCloseUnpaidEligibility 已覆盖该分支，保留防御性窄化保证后续 CAS 不接受可选 order。
+        throw new ConflictException({ error: { code: 'ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE', message: '任务不符合未付款受控关闭条件' } })
+      }
+
+      const closedAt = new Date()
+      // Agent claim 与本 CAS 竞争：仅 pending + 两个 claim 字段均为 null + 版本戳一致时才能关闭。
+      const taskUpdate = await tx.printTask.updateMany({
+        where: {
+          id: taskId,
+          status: 'pending',
+          claimedAt: null,
+          claimExpiry: null,
+          updatedAt: expectedUpdatedAt,
+        },
+        data: {
+          status: 'cancelled',
+          completedAt: closedAt,
+          errorCode: ADMIN_UNPAID_PRINT_TASK_CLOSED_ERROR_CODE,
+          errorMessage: '管理员已关闭未付款且未领取的打印任务',
+        },
+      })
+      if (taskUpdate.count !== 1) {
+        throw new ConflictException({ error: { code: 'ADMIN_UNPAID_CLOSE_CONFLICT', message: '任务状态已变化，请刷新后重试' } })
+      }
+
+      // 支付出码使用 Order unpaid→paying 的 CAS；双方都限定同一 printTaskId，因此任一方先提交，另一方必失败并回滚。
+      // 支付尝试也必须放在同一 CAS 中判断，不能只依赖前面的资格读取：极端情况下支付周期可能在读取后完成并回到 unpaid。
+      const orderUpdate = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          printTaskId: taskId,
+          payStatus: 'unpaid',
+          taskStatus: 'pending',
+          paymentAttempts: { none: {} },
+        },
+        data: { payStatus: 'closed', taskStatus: 'cancelled' },
+      })
+      if (orderUpdate.count !== 1) {
+        throw new ConflictException({ error: { code: 'ADMIN_UNPAID_CLOSE_CONFLICT', message: '订单状态已变化，请刷新后重试' } })
+      }
+
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId,
+          fromStatus: 'pending',
+          toStatus: 'cancelled',
+          errorCode: ADMIN_UNPAID_PRINT_TASK_CLOSED_ERROR_CODE,
+        },
+      })
+      await tx.auditLog.create({
+        data: {
+          actorId: actor.actorId,
+          actorRole: actor.actorRole,
+          action: ADMIN_UNPAID_PRINT_TASK_CLOSED_ACTION,
+          targetType: 'print_task',
+          targetId: taskId,
+          payloadJson: JSON.stringify({
+            reason,
+            expectedUpdatedAt: input.expectedUpdatedAt,
+            fromStatus: 'pending',
+            toStatus: 'cancelled',
+            orderPayStatus: { from: 'unpaid', to: 'closed' },
+          }),
+          ipAddress: actor.ipAddress ?? null,
+          userAgent: actor.userAgent ?? null,
+          requestId: actor.requestId ?? null,
+        },
+      })
+
+      return { taskId, type: 'print', fromStatus: 'pending', toStatus: 'cancelled', idempotent: false }
+    })
+  }
+
+  private async getCloseUnpaidEligibility(
+    taskId: string,
+    client: Pick<PrismaService, 'printTask'> | Pick<PrismaTransactionClient, 'printTask'> = this.prisma,
+  ): Promise<{ eligible: boolean; reason: CloseUnpaidBlockReason | null }> {
+    const task = await client.printTask.findUnique({
+      where: { id: taskId },
+      select: {
+        status: true,
+        claimedAt: true,
+        claimExpiry: true,
+        order: {
+          select: {
+            id: true,
+            payStatus: true,
+            taskStatus: true,
+            // failed 也不能忽略：支付渠道可能迟到回调成功。关闭后保留任何 attempt
+            // 都会让已取消任务的订单被旧回调重新入账，必须先走对账/退款流程。
+            paymentAttempts: { select: { id: true }, take: 1 },
+          },
+        },
+      },
+    })
+    if (!task?.order) return { eligible: false, reason: 'no_associated_order' }
+    if (task.status !== 'pending') return { eligible: false, reason: 'task_not_pending' }
+    if (task.claimedAt !== null || task.claimExpiry !== null) return { eligible: false, reason: 'task_claimed' }
+    if (task.order.payStatus !== 'unpaid') return { eligible: false, reason: 'order_not_unpaid' }
+    if (task.order.taskStatus !== 'pending') return { eligible: false, reason: 'order_task_not_pending' }
+    if (task.order.paymentAttempts.length > 0) return { eligible: false, reason: 'payment_attempt_exists' }
+    return { eligible: true, reason: null }
   }
 
   private async retryPrintTask(taskId: string): Promise<AdminPrintScanActionResult> {
