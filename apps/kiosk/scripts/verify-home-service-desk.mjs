@@ -75,7 +75,9 @@ const services = read(splitPaths[1])
 const continuation = read(splitPaths[2])
 const responsive = read(splitPaths[3])
 const allCss = cssPaths.map(read).join('\n')
-const homeStats = between(home, 'function useHomeStats(', '/* ── Hero')
+const loginDialogCss = read('src/pages/auth/styles/login-dialog.css')
+const topBar = between(home, 'function KioskTopBar()', 'function useHomeStats(')
+const homeStats = between(home, 'function useHomeStats(', 'function IdentityPanel')
 const identityPanel = between(home, 'function IdentityPanel()', '/* ── 服务分组')
 const continuePanel = between(home, 'function ContinuePanel()', '/* ── 智慧校园')
 const smartCampusSection = between(home, 'function SmartCampusHorizontalSection()', '/* ── 百宝箱')
@@ -89,6 +91,20 @@ expect(
 expect(home.includes("import './home-service-desk.css'"), 'HomePage 导入青序 LightFlow 聚合样式')
 expect(!home.includes("import './home-inkpaper.css'"), 'HomePage 不再导入旧 inkpaper 首页样式')
 expect(!existsSync(resolve('src/pages/home/home-inkpaper.css')), '旧 home-inkpaper.css 已删除')
+expect(!home.includes('先问清楚'), '首页不再出现旧咨询 Hero 标题')
+expect(!home.includes('<HeroSection />'), '首页不再挂载旧 HeroSection')
+expect(!home.includes('function HeroSection('), '首页删除旧 HeroSection 实现')
+expect(!/<KIcon\s+name=["']logo["']/.test(topBar), '顶部栏不再显示图形 Logo')
+expect(topBar.includes('AI求职打印一体机'), '顶部栏保留纯文字品牌')
+expect(!topBar.includes('打印机在线'), '顶部栏源码不硬编码打印机在线')
+expect(!topBar.includes('网络正常'), '顶部栏不单列静态网络正常')
+expectMatches(home, /import[\s\S]*?useHomeDeviceStatus[\s\S]*?from\s*['"][^'"]*useHomeDeviceStatus['"]/, 'HomePage 导入真实设备状态 hook')
+expectMatches(topBar, /const\s+deviceStatus\s*=\s*useHomeDeviceStatus\(\)/, '顶部栏使用 useHomeDeviceStatus 获取真实状态')
+expectMatches(topBar, /className="k-device-status"\s+data-status=\{deviceStatus\.tone\}/, '顶部栏状态节点消费真实 tone')
+expect(home.includes('一站式求职服务'), '服务价值卡使用已批准标签')
+expect(home.includes('简历、打印、岗位信息一趟办完'), '服务价值卡使用已批准主标题')
+expect(home.includes('当前可使用功能'), '业务区标题使用冻结文案')
+expect(home.includes('<MemberLoginDialog'), '首页复用真实登录弹窗')
 
 const expectedImports = [
   "@import './styles/home-shell.css';",
@@ -109,7 +125,7 @@ for (const path of cssPaths) {
 }
 
 for (const [source, selectors, label] of [
-  [shell, ['.khome {', '.khome .k-top', '.khome .hero', '.khome .identity', '.khome .btn', '.khome .k-ripple', '@keyframes kRise'], 'shell'],
+  [shell, ['.khome {', '.khome .k-top', '.khome .service-value', '.khome .k-device-status', '.khome .identity', '.khome .btn', '.khome .k-ripple', '@keyframes kRise'], 'shell'],
   [services, ['.khome .sec-head', '.khome .home-grid', '.khome .cat-card', '.khome .sub', '.khome .sub.disabled', '.khome .sub:focus-visible'], 'services'],
   [continuation, ['.khome .cat-empty', '.khome .continue', '.khome .compliance'], 'continuation'],
 ]) {
@@ -120,18 +136,21 @@ expectMatches(responsive, /@media[^{}]*390px[^{}]*844px/, '响应式样式显式
 expectMatches(responsive, /@media[^{}]*390px[^{}]*700px/, '响应式样式显式覆盖 390x700')
 expectMatches(responsive, /@media[^{}]*1080px[^{}]*1920px/, '响应式样式显式覆盖 1080x1920')
 expectMatches(responsive, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, '响应式样式支持 reduced motion')
+expectMatches(shell, /\.khome \.k-device-status\[data-status=['"][^'"]+['"]\]/, '设备状态 CSS 按真实 tone 区分 data-status')
+expect(loginDialogCss.includes('.member-login-dialog::backdrop'), '登录弹窗 CSS 定义原生 dialog backdrop')
+expectMatches(loginDialogCss, /body:has\(\.member-login-dialog\[open\]\)\s*\{[^}]*overflow:\s*hidden/, '登录弹窗打开时锁定背景滚动')
+expectMatches(loginDialogCss, /@media[^{}]*390px[^{}]*844px/, '登录弹窗 CSS 覆盖 390x844')
+expectMatches(loginDialogCss, /@media[^{}]*390px[^{}]*700px/, '登录弹窗 CSS 覆盖 390x700')
+expectMatches(loginDialogCss, /@media[^{}]*1080px[^{}]*1920px/, '登录弹窗 CSS 覆盖 1080x1920')
+expectMatches(loginDialogCss, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, '登录弹窗 CSS 支持 reduced motion')
 
 const compact390 = cssRule(responsive, '@media (width: 390px)')
 const compact390x844 = cssRule(responsive, '@media (width: 390px) and (height: 844px)')
 const compact390x700 = cssRule(responsive, '@media (width: 390px) and (max-height: 700px)')
 expect(compact390.length > 0, '390px 通用紧凑规则独立于视口高度')
-expectMatches(cssRule(compact390, '.khome .k-brand span'), /display:\s*none/, '390px 隐藏品牌副标题')
-expectMatches(
-  cssRule(compact390, '.khome .k-pill'),
-  /min-width:\s*48px[\s\S]*?font-size:\s*0/,
-  '390px 状态药丸保留触控宽度并隐藏文字',
-)
-expectMatches(cssRule(compact390, '.khome .hero h1'), /font-size:\s*33px/, '390px Hero 标题使用紧凑字号')
+expect(!compact390.includes('.khome .k-brand span'), '390px 不再保留已删除的品牌副标题补丁')
+expect(!compact390.includes('.khome .k-pill'), '390px 不再保留已删除的静态状态药丸补丁')
+expectMatches(cssRule(compact390, '.khome .service-value h1'), /font-size:\s*33px/, '390px 服务价值标题使用紧凑字号')
 expectMatches(cssRule(compact390, '.khome .cat-title h3'), /font-size:\s*19px/, '390px 服务标题使用紧凑字号')
 expectMatches(
   cssRule(compact390, '.khome .id-actions'),
@@ -149,11 +168,11 @@ expectMatches(
   /\.khome \.sub-grid,\s*\.khome \.cat-card\.span2 \.sub-grid\s*\{[^}]*grid-template-columns:\s*1fr 1fr\s*!important/,
   '390px 服务子入口保持两列紧凑网格',
 )
-expectMatches(cssRule(compact390x844, '.khome .identity'), /margin-top:\s*-12px/, '390x844 仅补充高屏 identity 叠压差异')
 expectMatches(cssRule(compact390x700, '.khome .k-top'), /position:\s*relative/, '390x700 补充短屏非 sticky 顶栏差异')
-expectMatches(cssRule(compact390x700, '.khome .hero p'), /display:\s*none/, '390x700 补充短屏 Hero 说明隐藏差异')
-expectMatches(cssRule(compact390x700, '.khome .identity'), /margin-top:\s*10px/, '390x700 补充短屏 identity 间距差异')
-for (const selector of ['.khome .k-pill', '.khome .id-actions', '.khome .id-actions .btn', '.khome .btn.cta']) {
+expect(!/\.khome \.identity\s*\{[^}]*margin-top:\s*-/.test(compact390x844), '390x844 身份卡不再负 margin 叠压 Hero')
+expect(!/\.khome \.identity\s*\{[^}]*margin-top:\s*-/.test(compact390x700), '390x700 身份卡不再负 margin 叠压 Hero')
+expect(!/\.khome \.service-value(?:\s+p)?\s*\{[^}]*display:\s*none/.test(compact390x700), '390x700 仍显示服务价值卡及说明')
+for (const selector of ['.khome .id-actions', '.khome .id-actions .btn', '.khome .btn.cta']) {
   expect(
     !compact390x844.includes(selector) && !compact390x700.includes(selector),
     `${selector} 防溢出合同只定义在 390px 通用规则中`,
@@ -191,7 +210,11 @@ expectMinimumHeight(
   56,
   '底栏 Tab 按钮',
 )
-expectMatches(identityPanel, /className="btn primary lg cta"\s+onClick=\{goLogin\}/, '登录主 CTA 绑定 56px lg 按钮类')
+expectMatches(
+  identityPanel,
+  /<button(?=[^>]*className="btn primary lg cta")(?=[^>]*onClick=\{\(\) => setLoginOpen\(true\)\})[^>]*>/,
+  '登录主 CTA 绑定 56px lg 按钮类并打开真实弹窗',
+)
 expectMatches(continuePanel, /className="btn primary lg"\s+onClick=\{suggestion\.onGo\}/, '续办主 CTA 绑定 56px lg 按钮类')
 
 for (const [pattern, label] of [
@@ -208,8 +231,8 @@ for (const [pattern, label] of [
 
 expectMatches(
   kioskRoot,
-  /visualTheme=\{pathname\s*===\s*'\/'\s*\?\s*'service-desk'\s*:\s*'legacy'\}/,
-  'Kiosk 仅 pathname === / 启用 service-desk',
+  /const isServiceDeskRoute = pathname === '\/' \|\| pathname === '\/help'[\s\S]*?visualTheme=\{isServiceDeskRoute \? 'service-desk' : 'legacy'\}/,
+  'Kiosk 仅首页与帮助页启用 service-desk',
 )
 expectMatches(kioskRoot, /density="touch"/, 'Kiosk 首页视觉密度保持 touch')
 expect((kioskRoot.match(/service-desk/g) ?? []).length === 1, 'KioskRoot 只有一个 service-desk 路由 opt-in')
@@ -279,7 +302,9 @@ expectMatches(homeStats, /if\s*\(!isLoggedIn\)\s*\{\s*setStats\(null\)[\s\S]*?co
 
 expectMatches(identityPanel, /const \{ isLoggedIn, guestMode, displayName, continueAsGuest, logout, getToken \} = useAuth\(\)/, '身份条 handler 来自真实 useAuth')
 expectMatches(identityPanel, /const \{ stats, loading \} = useHomeStats\(isLoggedIn, getToken\)/, '身份条消费真实统计 hook')
-expectMatches(identityPanel, /const goLogin = \(\) => navigate\('\/login', \{ state: \{ from: location\.pathname \} \}\)/, '登录 handler 保留来源路径')
+expectMatches(identityPanel, /const \[loginOpen, setLoginOpen\] = useState\(false\)/, '身份条使用本地状态控制登录弹窗')
+expectMatches(identityPanel, /const loginTriggerRef = useRef<HTMLButtonElement>\(null\)/, '身份条保留登录触发按钮引用以恢复焦点')
+expect(!identityPanel.includes("navigate('/login'"), '首页登录入口不再跳转独立登录页')
 expectMatches(
   identityPanel,
   /\{ label: '简历', value: loading \|\| !stats \? '—' : String\(stats\.resumes\), href: '\/me\/resumes' \}[\s\S]*?\{ label: '文档', value: loading \|\| !stats \? '—' : String\(stats\.documents\), href: '\/me\/documents' \}[\s\S]*?\{ label: 'AI记录', value: loading \|\| !stats \? '—' : String\(stats\.aiRecords\), href: '\/me\/ai-records' \}[\s\S]*?\{ label: '收藏', value: loading \|\| !stats \? '—' : String\(stats\.favorites\), href: '\/me\/favorites' \}/,
@@ -293,8 +318,13 @@ expectMatches(
 )
 expectMatches(
   identityPanel,
-  /<button\s+type="button"\s+className="btn primary lg cta"\s+onClick=\{goLogin\}>\s*立即登录 \/ 注册/,
-  '登录按钮直接绑定 goLogin',
+  /<button(?=[^>]*ref=\{loginTriggerRef\})(?=[^>]*className="btn primary lg cta")(?=[^>]*onClick=\{\(\) => setLoginOpen\(true\)\})[^>]*>\s*登录 \/ 注册/,
+  '登录按钮绑定触发引用并打开真实弹窗',
+)
+expectMatches(
+  identityPanel,
+  /<MemberLoginDialog[\s\S]*?open=\{loginOpen\}[\s\S]*?onClose=\{\(\) => setLoginOpen\(false\)\}[\s\S]*?onContinueAsGuest=/,
+  '身份条挂载受控 MemberLoginDialog 并保留游客体验入口',
 )
 expectMatches(identityPanel, /className="btn ghost"\s+onClick=\{\(\) => logout\(\)\}>\s*退出/, '退出按钮直接绑定 logout')
 expectMatches(identityPanel, /className="btn primary lg"\s+onClick=\{\(\) => navigate\('\/profile'\)\}>\s*进入我的/, '进入我的按钮直接绑定 /profile')
