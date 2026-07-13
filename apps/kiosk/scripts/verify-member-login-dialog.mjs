@@ -247,6 +247,7 @@ const workflow = readRequired('../../.github/workflows/ci.yml')
 const handleSendCode = extractConstFunction(memberHook, 'handleSendCode')
 const handleLogin = extractConstFunction(memberHook, 'handleLogin')
 const cancelPending = extractConstFunction(memberHook, 'cancelPending')
+const resetSensitiveInput = extractConstFunction(memberHook, 'resetSensitiveInput')
 const handleAuthenticated = extractConstFunction(loginDialog, 'handleAuthenticated')
 const handleContinueAsGuest = extractConstFunction(loginDialog, 'handleContinueAsGuest')
 const sendGeneration = handleSendCode.match(
@@ -331,6 +332,7 @@ expectMatches(
 expect(handleSendCode.length > 0, '已提取 handleSendCode 函数块')
 expect(handleLogin.length > 0, '已提取 handleLogin 函数块')
 expect(cancelPending.length > 0, '已提取 cancelPending 函数块')
+expect(resetSensitiveInput.length > 0, '已提取 resetSensitiveInput 函数块')
 
 expectMatches(handleSendCode, /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/, 'handleSendCode 使用稳定会员登录 deviceId')
 expect(Boolean(sendGeneration), 'handleSendCode 生成并捕获 request generation')
@@ -409,6 +411,11 @@ expectMatches(cancelPending, /setLoading\(false\)/, 'cancelPending 清理 loadin
 expectMatches(cancelPending, /setNotice\(null\)/, 'cancelPending 清理 notice')
 expectMatches(cancelPending, /setError\(null\)/, 'cancelPending 清理 error')
 expectMatches(memberHook, /return\s*\{[\s\S]*?cancelPending/, '共享控制器向消费者暴露 cancelPending')
+expectMatches(resetSensitiveInput, /setPhone\(''\)/, 'resetSensitiveInput 清空手机号')
+expectMatches(resetSensitiveInput, /setCode\(''\)/, 'resetSensitiveInput 清空验证码')
+expectMatches(resetSensitiveInput, /setActiveInput\('phone'\)/, 'resetSensitiveInput 恢复手机号输入态')
+expectMatches(resetSensitiveInput, /resetCountdown\(\)/, 'resetSensitiveInput 清空短信倒计时')
+expectMatches(memberHook, /return\s*\{[\s\S]*?resetSensitiveInput/, '共享控制器向消费者暴露敏感输入重置能力')
 expectNoMatches(
   memberHook,
   /(?:localStorage|sessionStorage)\.setItem\s*\(|document\.cookie\s*=|window\.location\.(?:hash|search)\s*=/,
@@ -481,13 +488,17 @@ expect(
 )
 expect(finalCloseBlock.length > 0, '已捕获包含 cancelPending/dialog.close/onClose 的共享最终关闭函数')
 const cancelPendingIndex = patternIndex(finalCloseBlock, /cancelPending\s*\(\s*\)/)
+const resetSensitiveInputIndex = patternIndex(finalCloseBlock, /resetSensitiveInput\s*\(\s*\)/)
+const resetAgreementIndex = patternIndex(finalCloseBlock, /setAgreed\(false\)/)
 const nativeCloseIndex = patternIndex(finalCloseBlock, /\.close\s*\(\s*\)/)
 const onCloseIndex = patternIndex(finalCloseBlock, /\bonClose\s*(?:\?\.)?\s*\(\s*\)/)
 const restoreFocusIndex = patternIndex(finalCloseBlock, /(?:\?\.)?focus\s*\(\s*\)/)
 expect(
-  cancelPendingIndex >= 0 && nativeCloseIndex >= 0 && onCloseIndex >= 0
+  cancelPendingIndex >= 0 && resetSensitiveInputIndex > cancelPendingIndex
+    && resetAgreementIndex > resetSensitiveInputIndex
+    && nativeCloseIndex > resetAgreementIndex && onCloseIndex >= 0
     && restoreFocusIndex > nativeCloseIndex && restoreFocusIndex > onCloseIndex,
-  '共享最终关闭函数包含三项关闭动作，且焦点恢复发生在 dialog.close/onClose 之后',
+  '共享最终关闭函数先失效请求并清空手机号/验证码/协议勾选，再关闭 dialog 且恢复焦点',
 )
 const focusPrefix = restoreFocusIndex >= 0 ? finalCloseBlock.slice(Math.min(nativeCloseIndex, onCloseIndex), restoreFocusIndex + 16) : ''
 expect(

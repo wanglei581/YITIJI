@@ -33,7 +33,9 @@ export function MemberLoginDialog({
   const { login } = useAuth()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const triggerElementRef = useRef<HTMLElement | null>(null)
-  const phoneLoginRef = useRef<Pick<MemberPhoneLoginController, 'cancelPending'> | null>(null)
+  const phoneLoginRef = useRef<
+    Pick<MemberPhoneLoginController, 'cancelPending' | 'resetSensitiveInput'> | null
+  >(null)
   const closingRef = useRef(false)
   const [agreed, setAgreed] = useState(false)
 
@@ -42,6 +44,8 @@ export function MemberLoginDialog({
     closingRef.current = true
 
     phoneLoginRef.current?.cancelPending()
+    phoneLoginRef.current?.resetSensitiveInput()
+    setAgreed(false)
     const dialog = dialogRef.current
     if (dialog?.open) dialog.close()
     try {

@@ -44,6 +44,7 @@ export interface MemberPhoneLoginController extends MemberPhoneLoginPaneProps {
   shaking: boolean
   paneProps: MemberPhoneLoginPaneProps
   cancelPending: () => void
+  resetSensitiveInput: () => void
   clearFeedback: () => void
   requireAgreement: () => void
 }
@@ -69,7 +70,12 @@ function useCountdown() {
     setSeconds(value)
   }, [])
 
-  return useMemo(() => ({ seconds, total, start }), [seconds, start, total])
+  const reset = useCallback(() => {
+    setSeconds(0)
+    setTotal(60)
+  }, [])
+
+  return useMemo(() => ({ seconds, total, start, reset }), [reset, seconds, start, total])
 }
 
 export function useMemberPhoneLogin(
@@ -89,6 +95,7 @@ export function useMemberPhoneLogin(
   const requestGenerationRef = useRef(0)
   const shakeTimerRef = useRef<number | null>(null)
   const onAgreementRequired = options.onAgreementRequired
+  const resetCountdown = countdown.reset
 
   const isCurrentRequest = (generation: number) => generation === requestGenerationRef.current
 
@@ -171,6 +178,14 @@ export function useMemberPhoneLogin(
       shakeTimerRef.current = null
     }
   }, [])
+
+  const resetSensitiveInput = useCallback(() => {
+    setPhone('')
+    setCode('')
+    setActiveInput('phone')
+    previousPhoneLengthRef.current = 0
+    resetCountdown()
+  }, [resetCountdown])
 
   const handleSendCode = async () => {
     if (
@@ -264,6 +279,7 @@ export function useMemberPhoneLogin(
     shaking,
     paneProps,
     cancelPending,
+    resetSensitiveInput,
     clearFeedback,
     requireAgreement,
   }
