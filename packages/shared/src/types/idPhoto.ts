@@ -30,6 +30,7 @@ export function getIdPhotoSpec(specId: string): IdPhotoSpec | undefined {
 
 export interface IdPhotoLayoutSource {
   fileId: string
+  /** 上传确认后返回的内部 HMAC 签名 URL，作为访问凭证；服务端不用它读取，只校验持有权。 */
   fileAccessUrl: string
 }
 
@@ -41,11 +42,14 @@ export interface IdPhotoLayoutRequest {
 
 export interface IdPhotoLayoutResponse {
   fileId: string
+  /** 内部 HMAC 打印链路 URL（30 分钟 TTL），不是 COS 预签名 URL。 */
   printFileUrl: string
   fileMd5: string
   sizeBytes: number
   pages: number
   specId: IdPhotoSpecId
+  /** 每版张数（整版排满） */
   layoutCount: number
+  /** 仅游客返回：源文件（裁剪产物）的删除 action token，与读取 URL 不可互换。 */
   sourceDeleteToken?: string
 }
