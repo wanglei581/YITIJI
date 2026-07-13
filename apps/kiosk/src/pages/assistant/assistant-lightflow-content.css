@@ -1,0 +1,84 @@
+.kassist-lightflow .sec-head { display: flex; align-items: center; gap: 12px; margin: 36px 4px 16px; }
+.kassist-lightflow .sec-head .rail { width: 5px; height: 29px; flex: 0 0 auto; border-radius: 3px; background: linear-gradient(var(--sd-primary), var(--sd-primary-strong)); }
+.kassist-lightflow .sec-head .rail.slate { background: linear-gradient(#5d8ee8, #315eb2); }
+.kassist-lightflow .sec-head .rail.plum { background: linear-gradient(#7969d7, #5141ae); }
+.kassist-lightflow .sec-head h2 { margin: 0; color: var(--sd-text-strong); font-size: 27px; font-weight: 820; letter-spacing: -0.025em; }
+.kassist-lightflow .sec-head p { margin: 6px 0 0; color: var(--sd-copy); font-size: 14.5px; }
+
+.kassist-lightflow .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.kassist-lightflow .quick { display: flex; align-items: flex-start; min-height: 98px; gap: 15px; padding: 18px; border: 1px solid var(--sd-line); border-radius: var(--sd-radius-card); color: var(--sd-text); background: var(--sd-surface); box-shadow: var(--sd-shadow-soft); cursor: pointer; text-align: left; transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+.kassist-lightflow .quick:hover { border-color: #9bc7ff; box-shadow: var(--sd-shadow-touch); transform: translateY(-2px); }
+.kassist-lightflow .quick:active { transform: scale(0.985); }
+.kassist-lightflow .quick.hit { border-color: var(--sd-primary); box-shadow: 0 0 0 4px rgba(23, 105, 232, 0.1); }
+.kassist-lightflow .quick .qi { display: grid; width: 46px; height: 46px; flex: 0 0 auto; place-items: center; border-radius: 14px; color: #0f5fbf; background: #eaf4ff; }
+.kassist-lightflow .quick .qi svg { width: 25px; height: 25px; }
+.kassist-lightflow .quick.v2 .qi { color: #315eb2; background: #ebf2ff; }
+.kassist-lightflow .quick.v3 .qi { color: #97600c; background: #fff6e7; }
+.kassist-lightflow .quick.v4 .qi { color: #594bc0; background: #f0eeff; }
+.kassist-lightflow .quick strong { display: block; color: var(--sd-text-strong); font-size: 17px; font-weight: 780; }
+.kassist-lightflow .quick span { display: block; margin-top: 5px; color: var(--sd-copy); font-size: 13px; line-height: 1.45; }
+
+.kassist-lightflow .faq-list { display: flex; gap: 10px; flex-direction: column; }
+.kassist-lightflow .faq { display: flex; align-items: center; min-height: var(--sd-control-min, 48px); gap: 14px; padding: 17px 20px; border: 1px solid var(--sd-line); border-radius: 18px; color: var(--sd-text); background: var(--sd-surface); box-shadow: var(--sd-shadow-soft); cursor: pointer; text-align: left; transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+.kassist-lightflow .faq:hover { border-color: #9bc7ff; box-shadow: var(--sd-shadow-touch); transform: translateX(3px); }
+.kassist-lightflow .faq:active { transform: scale(0.99); }
+.kassist-lightflow .faq .q { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: #0e5cba; background: #eaf4ff; font-size: 15px; font-weight: 850; }
+.kassist-lightflow .faq strong { color: var(--sd-text); font-size: 16px; font-weight: 680; flex: 1; }
+.kassist-lightflow .faq svg { width: 18px; height: 18px; color: #90add0; }
+
+.kassist-lightflow .result-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.kassist-lightflow .result-card { padding: 22px; border: 1px solid var(--sd-line); border-radius: var(--sd-radius-card); background: var(--sd-surface); box-shadow: var(--sd-shadow-soft); }
+.kassist-lightflow .result-card .ri { display: grid; width: 46px; height: 46px; margin-bottom: 14px; place-items: center; border-radius: 14px; color: #0f5fbf; background: #eaf4ff; }
+.kassist-lightflow .result-card .ri svg { width: 24px; height: 24px; }
+.kassist-lightflow .result-card.v2 .ri { color: #594bc0; background: #f0eeff; }
+.kassist-lightflow .result-card.v3 .ri { color: #315eb2; background: #ebf2ff; }
+.kassist-lightflow .result-card strong { display: block; color: var(--sd-text-strong); font-size: 16.5px; font-weight: 780; }
+.kassist-lightflow .result-card span { display: block; margin-top: 8px; color: var(--sd-copy); font-size: 13px; line-height: 1.5; }
+
+.kassist-lightflow .compliance { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 30px 4px 0; padding: 16px 20px; border: 1px dashed #bed7f5; border-radius: 18px; color: var(--sd-copy); background: rgba(255, 255, 255, 0.64); font-size: 13px; line-height: 1.6; text-align: center; }
+.kassist-lightflow .compliance svg { width: 15px; height: 15px; flex: 0 0 auto; color: #3670bf; }
+.kassist-lightflow .k-ripple { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(23, 105, 232, 0.2) 0%, rgba(23, 105, 232, 0.08) 40%, transparent 70%); transform: scale(0); animation: kassist-lightflow-ripple 520ms ease-out forwards; }
+.kassist-lightflow .mode-btn.call .k-ripple { background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%); }
+.kassist-lightflow :is(button, textarea):focus-visible { outline: 3px solid rgba(23, 105, 232, 0.42); outline-offset: 3px; }
+
+@keyframes kassist-lightflow-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes kassist-lightflow-pulse {
+  0% { opacity: 0.86; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+
+@keyframes kassist-lightflow-wave {
+  0%, 100% { opacity: 0.65; transform: scaleY(0.45); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes kassist-lightflow-dots {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes kassist-lightflow-ripple {
+  to { opacity: 0; transform: scale(1); }
+}
+
+@media (max-width: 900px) {
+  .kassist-lightflow .a-hero { padding: 28px; }
+  .kassist-lightflow .mode-toggle,
+  .kassist-lightflow .quick-grid,
+  .kassist-lightflow .result-strip { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kassist-lightflow *,
+  .kassist-lightflow *::before,
+  .kassist-lightflow *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

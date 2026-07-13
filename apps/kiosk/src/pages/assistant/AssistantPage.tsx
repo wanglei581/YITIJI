@@ -272,7 +272,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const matchedRoutes = useMemo(() => getMatchedRoutes(input), [input])
 
   return (
-    <div className="kassist">
+    <main className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
+      <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
       <div className="ka-inner">
 
         {/* 返回 */}
@@ -281,23 +282,19 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           返回
         </button>
 
-        {/* ── 小青 hero ── */}
+        {/* ── 服务说明 ── */}
         <section className="a-hero">
-          <div className="qing-portrait">
-            <span className="live"><i className="dot" aria-hidden="true" />在线</span>
-            <img src="/assets/ai-advisor.png" alt="就业服务顾问小青" />
-          </div>
           <div className="a-hero-copy">
             <div className="eyebrow">
               <KIcon name="sparkle" />
-              就业服务顾问 · 小青
+              就业服务咨询
             </div>
-            <h1>
+            <h2>
               把问题说清楚，
               <br />
               再把结果变成材料。
-            </h1>
-            <p>小青负责简历问诊、面试追问、打印前检查和政策问答；问答内容仅在本次会话内参考，如需形成简历、面试报告或打印材料，请进入对应功能页生成和保存。</p>
+            </h2>
+            <p>这里可以咨询简历问诊、面试追问、打印前检查和政策问答；问答内容仅在本次会话内参考，如需形成简历、面试报告或打印材料，请进入对应功能页生成和保存。</p>
             <div className="a-pills">
               {voiceAvailable && (
                 <span className="a-pill">
@@ -329,7 +326,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
               <span className="mbi"><KIcon name="mic" /></span>
               <div>
                 <strong>语音通话</strong>
-                <span>{callActive ? '通话面板已开启' : '像打电话一样问小青'}</span>
+                <span>{callActive ? '通话面板已开启' : '像打电话一样咨询顾问'}</span>
               </div>
             </button>
           )}
@@ -370,7 +367,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           <div className="chat-list">
             {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
             {loading && (
-              <div className="typing" aria-label="小青正在回复">
+              <div className="typing" aria-label="服务正在回复">
                 <i /><i /><i />
               </div>
             )}
@@ -502,7 +499,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           inputRef.current?.blur()
         }}
       />
-    </div>
+    </main>
   )
 }
 

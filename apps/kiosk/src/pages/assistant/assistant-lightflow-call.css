@@ -1,0 +1,52 @@
+.kassist-lightflow .call-panel {
+  margin-top: 18px;
+  padding: 32px;
+  overflow: hidden;
+  border: 1px solid rgba(132, 184, 255, 0.34);
+  border-radius: calc(var(--sd-radius-card) + 2px);
+  color: #ffffff;
+  background: radial-gradient(circle at 84% 4%, rgba(99, 173, 255, 0.48), transparent 32%), linear-gradient(145deg, #061c47 0%, #0a3578 58%, #145fc8 100%);
+  box-shadow: var(--sd-shadow-touch);
+  text-align: center;
+  animation: kassist-lightflow-rise 260ms ease-out both;
+}
+
+.kassist-lightflow .call-ava { position: relative; width: 116px; height: 116px; margin: 0 auto; overflow: hidden; border: 4px solid rgba(255, 255, 255, 0.18); border-radius: 50%; background: #dceeff; }
+.kassist-lightflow .call-ava img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.kassist-lightflow .call-ava::after { position: absolute; inset: -4px; border: 2px solid rgba(169, 211, 255, 0.82); border-radius: inherit; content: ""; animation: kassist-lightflow-pulse 2.2s ease-out infinite; }
+.kassist-lightflow .call-ava.static::after { opacity: 0.4; animation: none; }
+.kassist-lightflow .call-meta { margin-top: 16px; color: #d8ebff; font-size: 15px; font-weight: 720; }
+.kassist-lightflow .call-meta.err { color: #ffd6d0; }
+.kassist-lightflow .call-errmsg { max-width: 560px; margin: 10px auto 0; color: rgba(235, 247, 255, 0.78); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.kassist-lightflow .call-timer { margin-top: 4px; font-size: 32px; font-weight: 850; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+
+.kassist-lightflow .wave { display: flex; align-items: center; justify-content: center; height: 96px; gap: 7px; }
+.kassist-lightflow .wave i { width: 7px; border-radius: 4px; background: #b8ddff; animation: kassist-lightflow-wave 1.15s ease-in-out infinite; }
+.kassist-lightflow .wave i:nth-child(1) { height: 22px; animation-delay: 0s; }
+.kassist-lightflow .wave i:nth-child(2) { height: 44px; animation-delay: 0.12s; }
+.kassist-lightflow .wave i:nth-child(3) { height: 66px; animation-delay: 0.24s; }
+.kassist-lightflow .wave i:nth-child(4) { height: 84px; animation-delay: 0.06s; }
+.kassist-lightflow .wave i:nth-child(5) { height: 58px; animation-delay: 0.3s; }
+.kassist-lightflow .wave i:nth-child(6) { height: 76px; animation-delay: 0.18s; }
+.kassist-lightflow .wave i:nth-child(7) { height: 40px; animation-delay: 0.36s; }
+.kassist-lightflow .wave i:nth-child(8) { height: 60px; animation-delay: 0.09s; }
+.kassist-lightflow .wave i:nth-child(9) { height: 30px; animation-delay: 0.27s; }
+.kassist-lightflow .wave i:nth-child(10) { height: 18px; animation-delay: 0.15s; }
+.kassist-lightflow .wave.quiet i { opacity: 0.45; transform: scaleY(0.3); animation-play-state: paused; }
+
+.kassist-lightflow .call-resume { display: inline-flex; align-items: center; min-height: var(--sd-control-min, 48px); margin: 6px auto 0; padding: 0 24px; border-radius: 999px; color: var(--sd-primary-strong); background: #ffffff; font-size: 15px; font-weight: 780; cursor: pointer; transition: transform 160ms ease; }
+.kassist-lightflow .call-resume:active { transform: scale(0.97); }
+.kassist-lightflow .caption { max-width: 720px; min-height: 56px; margin: 18px auto 0; padding: 16px 22px; border: 1px solid rgba(201, 229, 255, 0.2); border-radius: 18px; color: #eff8ff; background: rgba(255, 255, 255, 0.1); font-size: 15px; line-height: 1.55; text-align: left; }
+.kassist-lightflow .caption b { display: block; margin-bottom: 5px; color: #afd8ff; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; }
+.kassist-lightflow .caption .mic-warn { display: block; margin-bottom: 6px; color: #ffe5ad; font-size: 12.5px; }
+.kassist-lightflow .caption .ref { display: block; margin-top: 8px; color: rgba(234, 247, 255, 0.64); font-size: 11.5px; }
+
+.kassist-lightflow .call-controls { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 22px; }
+.kassist-lightflow .call-btn { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; gap: 9px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 50%; color: #ffffff; background: rgba(255, 255, 255, 0.14); cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
+.kassist-lightflow .call-btn svg { width: 27px; height: 27px; }
+.kassist-lightflow .call-btn:hover { background: rgba(255, 255, 255, 0.23); transform: translateY(-2px); }
+.kassist-lightflow .call-btn:active { transform: scale(0.96); }
+.kassist-lightflow .call-btn.muted { color: var(--sd-primary-strong); background: #ffffff; }
+.kassist-lightflow .call-btn.hangup { width: auto; padding: 0 30px; border-color: transparent; border-radius: 32px; background: #d5443f; font-size: 16px; font-weight: 780; }
+.kassist-lightflow .call-btn.hangup svg { width: 22px; height: 22px; transform: rotate(135deg); }
+.kassist-lightflow .call-note { margin: 18px 0 0; color: rgba(229, 244, 255, 0.68); font-size: 12.5px; line-height: 1.6; }

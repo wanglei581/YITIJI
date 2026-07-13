@@ -58,7 +58,7 @@ function KioskShell() {
     maintenance: '正在维护',
   }
   const statusLabel = statusLabelByDeviceStatus[deviceStatus]
-  const isServiceDeskRoute = pathname === '/' || pathname === '/help'
+  const isServiceDeskRoute = pathname === '/' || pathname === '/help' || pathname === '/assistant'
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
