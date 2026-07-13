@@ -38,7 +38,7 @@ Kiosk 首页「打印扫描」分组的"证件照打印"磁贴目前 disabled（
 
 - `pdfkit`（格式转换在用）→ A4 排版 PDF
 - `image-dimensions.util.ts`（格式转换新增的零依赖 JPEG/PNG 魔数+尺寸解析，纯 JS）→ 裁剪产物硬校验
-- `id_scan` FilePurpose（既有）：IMG 白名单、10MB 上限、`highly_sensitive`（默认 TTL 1 小时）、保存策略强制 `system_short` 且代码级禁止延长（`RETENTION_ID_SCAN_LOCKED`），会员绑定也不改变短期策略（`retention-policy.ts:52`）
+- `id_scan` FilePurpose（既有）：IMG 白名单、10MB 上限、`highly_sensitive`（默认 TTL 1 小时）、保存策略强制 `system_short` 且代码级禁止延长（`RETENTION_ID_CLASS_LOCKED`，实现阶段 Task 7 将其从 `RETENTION_ID_SCAN_LOCKED` 重命名，因该错误码同时覆盖 `id_photo_print`），会员绑定也不改变短期策略（`retention-policy.ts:52`）
 - `FilesCleanupTask`（既有）：每小时 cron 物理删除过期文件并落审计
 
 ## 二、用户流程
@@ -163,7 +163,7 @@ sourceFileId   = 裁剪产物 fileId（单输入，血缘明确）
 | `file-validation.ts` `PURPOSE_POLICY` | `{ mimes: ['application/pdf'], maxBytes: 20MB }` |
 | `file-validation.ts` `DEFAULT_SENSITIVE_BY_PURPOSE` | `highly_sensitive`（→ 默认 TTL 1 小时） |
 | `retention-policy.ts` `allowedPoliciesForFile` | 返回 `['system_short']`（与 `id_scan` 同等锁定） |
-| `retention-policy.ts` `assertCanSetRetention` | 增加与 `RETENTION_ID_SCAN_LOCKED` 同等的拒绝分支 |
+| `retention-policy.ts` `assertCanSetRetention` | 增加与 `id_scan` 同等的拒绝分支（Task 7 将该错误码从 `RETENTION_ID_SCAN_LOCKED` 统一重命名为 `RETENTION_ID_CLASS_LOCKED`，因其同时覆盖 `id_scan`/`id_photo_print`） |
 | `object-key.ts` `PURPOSE_FOLDER` | `{ scope: 'user', folder: 'id-photos' }`（游客无 ownerId 自动退 `tmp/`，既有行为） |
 | 各上传 DTO 白名单（`create-upload-intent` / `upload-options` / `kiosk-upload-options`） | **不加入**——该 purpose 仅服务端生成物使用，用户不可直接上传 |
 | `apps/admin/src/routes/files/fileMeta.ts` | 增加 purpose 标签行（如「证件照排版」），否则 Admin 文件管理显示未知类型 |
