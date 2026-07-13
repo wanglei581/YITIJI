@@ -31,6 +31,85 @@ function between(source, startMarker, endMarker) {
   const end = endMarker ? source.indexOf(endMarker, start + startMarker.length) : source.length
   return source.slice(start, end < 0 ? source.length : end)
 }
+function balancedBlock(source, openIndex) {
+  if (openIndex < 0 || source[openIndex] !== '{') return ''
+  let depth = 0
+  for (let index = openIndex; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}' && --depth === 0) return source.slice(openIndex, index + 1)
+  }
+  return ''
+}
+function functionBlock(source, pattern) {
+  const match = pattern.exec(source)
+  if (!match) return ''
+  const open = source.indexOf('{', match.index + match[0].length)
+  const body = balancedBlock(source, open)
+  return body ? source.slice(match.index, open + body.length) : ''
+}
+function constFunction(source, name) {
+  const match = new RegExp(`const\\s+${escapeRegExp(name)}\\s*=`).exec(source)
+  if (!match) return ''
+  const arrow = source.indexOf('=>', match.index + match[0].length)
+  const header = source.slice(match.index + match[0].length, arrow)
+  if (arrow < 0 || header.length > 220 || /\n\s*const\s/.test(header)) return ''
+  const open = source.indexOf('{', arrow)
+  const body = balancedBlock(source, open)
+  return body ? source.slice(match.index, open + body.length) : ''
+}
+function namedComponent(source, name) {
+  return functionBlock(source, new RegExp(`function\\s+${escapeRegExp(name)}\\s*\\([^)]*\\)`))
+    || constFunction(source, name)
+}
+function keywordBlock(source, keyword) {
+  const match = new RegExp(`\\b${keyword}\\b(?:\\s*\\([^)]*\\))?\\s*\\{`).exec(source)
+  return match ? balancedBlock(source, source.indexOf('{', match.index)) : ''
+}
+function callBlocks(source, callName) {
+  const blocks = []
+  for (const match of source.matchAll(new RegExp(`\\b${callName}\\s*\\(`, 'g'))) {
+    const arrow = source.indexOf('=>', match.index + match[0].length)
+    const open = source.indexOf('{', arrow)
+    const body = balancedBlock(source, open)
+    if (arrow >= 0 && body) blocks.push(source.slice(match.index, open + body.length))
+  }
+  return blocks
+}
+function constFunctions(source) {
+  const functions = []
+  for (const match of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=/g)) {
+    const block = constFunction(source, match[1])
+    if (block && !functions.some((item) => item.name === match[1])) functions.push({ name: match[1], block })
+  }
+  return functions
+}
+function jsxElement(source, tagName, requiredPattern) {
+  for (const match of source.matchAll(new RegExp(`<${tagName}\\b`, 'g'))) {
+    const close = source.indexOf(`</${tagName}>`, match.index)
+    if (close < 0) continue
+    const element = source.slice(match.index, close + tagName.length + 3)
+    if (!requiredPattern || requiredPattern.test(element)) return element
+  }
+  return ''
+}
+function patternIndex(source, pattern) {
+  return pattern.exec(source)?.index ?? -1
+}
+function guardPattern(generation, generationRef) {
+  if (!generation || !generationRef) return /$a/
+  const value = escapeRegExp(generation)
+  const ref = escapeRegExp(generationRef)
+  return new RegExp(
+    `(?:if\\s*\\(\\s*(?:${value}\\s*!==\\s*${ref}\\.current|${ref}\\.current\\s*!==\\s*${value}|!\\s*isCurrentRequest\\(\\s*${value}\\s*\\))\\s*\\)\\s*(?:\\{\\s*)?return\\b|if\\s*\\(\\s*(?:${value}\\s*===\\s*${ref}\\.current|${ref}\\.current\\s*===\\s*${value}|isCurrentRequest\\(\\s*${value}\\s*\\))\\s*\\)\\s*\\{)`,
+  )
+}
+function guardedUpdate(source, guard, update) {
+  const match = guard.exec(source)
+  if (!match) return false
+  if (/\breturn\b/.test(match[0])) return patternIndex(source, update) > match.index
+  const body = balancedBlock(source, source.indexOf('{', match.index))
+  return patternIndex(source, update) >= match.index && body.length > 0 && update.test(body)
+}
 function cssRule(source, selector) {
   const selectorStart = source.indexOf(`${selector} {`)
   if (selectorStart < 0) return ''
@@ -78,13 +157,29 @@ const responsive = read(splitPaths[3])
 const allCss = cssPaths.map(read).join('\n')
 const loginDialogCss = read('src/pages/auth/styles/login-dialog.css')
 const topBar = between(home, 'function KioskTopBar()', 'function useHomeStats(')
-const homeStats = between(home, 'function useHomeStats(', 'function ServiceValueCard')
-const serviceValueCard = between(home, 'function ServiceValueCard()', 'function IdentityPanel')
+const homeStats = functionBlock(home, /function\s+useHomeStats\s*\(/)
 const identityPanel = between(home, 'function IdentityPanel()', '/* ── 服务分组')
 const continuePanel = between(home, 'function ContinuePanel()', '/* ── 智慧校园')
 const smartCampusSection = between(home, 'function SmartCampusHorizontalSection()', '/* ── 百宝箱')
 const toolboxSection = between(home, 'function ToolboxSection()', 'export function HomePage()')
-const homePage = between(home, 'export function HomePage()')
+const homePage = functionBlock(home, /export\s+function\s+HomePage\s*\([^)]*\)/)
+const homeReturnIndex = patternIndex(homePage, /\breturn\s*\(/)
+const homeReturn = homeReturnIndex >= 0 ? homePage.slice(homeReturnIndex) : ''
+const inlineServiceValue = jsxElement(homeReturn, 'section', /className="service-value"/)
+const identityMountIndex = homeReturn.indexOf('<IdentityPanel')
+const componentCandidates = [...homeReturn.matchAll(/<([A-Z][A-Za-z0-9_$]*)\b[^>]*\/>/g)]
+  .filter((match) => identityMountIndex < 0 || match.index < identityMountIndex)
+  .map((match) => {
+    const source = namedComponent(home, match[1])
+    const returnIndex = patternIndex(source, /\breturn\s*\(/)
+    const section = jsxElement(returnIndex >= 0 ? source.slice(returnIndex) : '', 'section', /className="service-value"/)
+    return { name: match[1], mountIndex: match.index, section }
+  })
+const serviceValueComponent = componentCandidates.find((candidate) => candidate.section.length > 0)
+const serviceValueSection = inlineServiceValue || serviceValueComponent?.section || ''
+const serviceValueMountIndex = inlineServiceValue
+  ? homeReturn.indexOf(inlineServiceValue)
+  : (serviceValueComponent?.mountIndex ?? -1)
 
 expect(
   packageJson.includes('"verify:home-service-desk": "node scripts/verify-home-service-desk.mjs"'),
@@ -103,36 +198,79 @@ expect(!topBar.includes('网络正常'), '顶部栏不单列静态网络正常')
 expectMatches(home, /import[\s\S]*?useHomeDeviceStatus[\s\S]*?from\s*['"][^'"]*useHomeDeviceStatus['"]/, 'HomePage 导入真实设备状态 hook')
 expectMatches(topBar, /const\s+deviceStatus\s*=\s*useHomeDeviceStatus\(\)/, '顶部栏使用 useHomeDeviceStatus 获取真实状态')
 expectMatches(topBar, /className="k-device-status"\s+data-status=\{deviceStatus\.tone\}/, '顶部栏状态节点消费真实 tone')
-expect(home.includes('一站式求职服务'), '服务价值卡使用已批准标签')
-expect(home.includes('简历、打印、岗位信息一趟办完'), '服务价值卡使用已批准主标题')
 expect(home.includes('当前可使用功能'), '业务区标题使用冻结文案')
 expect(home.includes('<MemberLoginDialog'), '首页复用真实登录弹窗')
 expect(homeDeviceStatus.length > 0, 'src/pages/home/hooks/useHomeDeviceStatus.ts 已实现且可读取')
 
 expectMatches(
-  serviceValueCard,
-  /function ServiceValueCard\(\)\s*\{[\s\S]*?return\s*\([\s\S]*?<section className="service-value"\s+aria-labelledby="home-service-value-title">/,
-  'ServiceValueCard 返回可达的服务价值 section',
+  serviceValueSection,
+  /^<section\b(?=[^>]*className="service-value")(?=[^>]*aria-labelledby="home-service-value-title")[^>]*>/,
+  'HomePage 内联或其已挂载组件返回可达的服务价值 section',
 )
-expectMatches(serviceValueCard, /<span className="service-value-tag">\s*一站式求职服务\s*<\/span>/, '服务价值卡渲染冻结标签')
-expectMatches(serviceValueCard, /<h1 id="home-service-value-title">\s*简历、打印、岗位信息一趟办完\s*<\/h1>/, '服务价值卡渲染冻结主标题')
-expectMatches(serviceValueCard, /<p>\s*提供 AI 简历服务、求职材料、岗位与招聘会信息入口，以及本机打印扫描服务。\s*<\/p>/, '服务价值卡渲染批准正文')
-expect(!/<button\b|<a\b|<Link\b/.test(serviceValueCard), '服务价值卡不包含按钮或跳转入口')
-expect(!/小青|推荐方案|先问清楚|一键投递|保证录用|确保录用/.test(serviceValueCard), '服务价值卡不含禁入人物、推荐或录用承诺')
-expectMatches(
-  homePage,
-  /<KioskTopBar \/>\s*<ServiceValueCard \/>\s*<IdentityPanel \/>\s*<ContinuePanel \/>/,
-  'HomePage 按冻结顺序挂载可达 ServiceValueCard',
+for (const [pattern, label] of [
+  [/一站式求职服务/, '冻结标签'],
+  [/简历、打印、岗位信息一趟办完/, '冻结主标题'],
+  [/提供 AI 简历服务、求职材料、岗位与招聘会信息入口，以及本机打印扫描服务。/, '批准正文'],
+]) {
+  expectMatches(serviceValueSection, pattern, `可达服务价值 section 渲染${label}`)
+}
+expect(serviceValueSection.length > 0 && !/<button\b|<a\b|<Link\b/.test(serviceValueSection), '可达服务价值 section 不包含按钮或跳转入口')
+expect(serviceValueSection.length > 0 && !/小青|推荐方案|先问清楚|一键投递|保证录用|确保录用/.test(serviceValueSection), '可达服务价值 section 不含禁入人物、推荐或录用承诺')
+expect(
+  serviceValueMountIndex >= 0 && identityMountIndex > serviceValueMountIndex,
+  'HomePage return 在 IdentityPanel 前直接渲染服务价值 section 或挂载其组件',
 )
-expectMatches(homeDeviceStatus, /VITE_TERMINAL_ID/, '真实设备状态 hook 读取 VITE_TERMINAL_ID')
+const deviceHook = functionBlock(homeDeviceStatus, /export\s+function\s+useHomeDeviceStatus\s*\([^)]*\)/)
+const deviceFunctions = constFunctions(deviceHook)
+const endpointPattern = /fetch\s*\(\s*`\/api\/v1\/terminals\/\$\{terminalId\}\/printer-status`\s*,/
+const refreshFunction = deviceFunctions.find(({ block }) => endpointPattern.test(block))
+const refreshName = refreshFunction?.name ?? ''
+const refreshBlock = refreshFunction?.block ?? ''
+const refreshTry = keywordBlock(refreshBlock, 'try')
+const refreshCatch = keywordBlock(refreshBlock, 'catch')
+const statePairs = [...deviceHook.matchAll(
+  /const\s*\[\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\]\s*=\s*useState\b/g,
+)].map((match) => ({ state: match[1], setter: match[2] }))
+const refreshedStatePairs = statePairs.filter(({ setter }) => new RegExp(`\\b${escapeRegExp(setter)}\\s*\\(`).test(refreshBlock))
+const deviceState = refreshedStatePairs[0]?.state ?? ''
+const deviceSetter = refreshedStatePairs[0]?.setter ?? ''
+const deviceEffect = callBlocks(deviceHook, 'useEffect').find((block) => /setInterval\s*\(/.test(block)) ?? ''
+const intervalMatch = refreshName
+  ? new RegExp(`setInterval\\s*\\(\\s*(?:${escapeRegExp(refreshName)}|\\(\\s*\\)\\s*=>\\s*(?:\\{\\s*(?:void\\s+)?${escapeRegExp(refreshName)}\\(\\)\\s*;?\\s*\\}|(?:void\\s+)?${escapeRegExp(refreshName)}\\(\\)))\\s*,\\s*([^\\)]+)\\)`).exec(deviceEffect)
+  : null
+const intervalArgument = intervalMatch?.[1].trim() ?? ''
+const intervalIsThirtySeconds = /^(?:30_000|30000|30\s*\*\s*1000)$/.test(intervalArgument)
+  || (intervalArgument && new RegExp(`const\\s+${escapeRegExp(intervalArgument)}\\s*=\\s*(?:30_000|30000|30\\s*\\*\\s*1000)\\b`).test(homeDeviceStatus))
+const onlineAdd = deviceEffect.match(/addEventListener\s*\(\s*['"]online['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
+const offlineAdd = deviceEffect.match(/addEventListener\s*\(\s*['"]offline['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
+const onlineRemove = deviceEffect.match(/removeEventListener\s*\(\s*['"]online['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
+const offlineRemove = deviceEffect.match(/removeEventListener\s*\(\s*['"]offline['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
+const onlineBlock = onlineAdd === refreshName ? refreshBlock : (constFunction(deviceEffect, onlineAdd) || constFunction(deviceHook, onlineAdd))
+const offlineBlock = offlineAdd === refreshName ? refreshBlock : (constFunction(deviceEffect, offlineAdd) || constFunction(deviceHook, offlineAdd))
+const cleanupMatch = /return\s*\(\s*\)\s*=>\s*\{/.exec(deviceEffect)
+const cleanupBlock = cleanupMatch ? balancedBlock(deviceEffect, deviceEffect.indexOf('{', cleanupMatch.index)) : ''
+const intervalId = deviceEffect.match(/const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:window\.)?setInterval/)?.[1] ?? ''
+const abortMatch = /([A-Za-z_$][\w$]*)\.current\s*(?:\?\.)?abort\(\)/.exec(refreshBlock)
+const controllerMatch = /const\s+([A-Za-z_$][\w$]*)\s*=\s*new AbortController\(\)/.exec(refreshBlock)
+const generationMatch = /const\s+([A-Za-z_$][\w$]*)\s*=\s*\+\+\s*([A-Za-z_$][\w$]*)\.current/.exec(refreshBlock)
+const refreshGuard = guardPattern(generationMatch?.[1], generationMatch?.[2])
+const fetchIndexInTry = patternIndex(refreshTry, /await\s+fetch\s*\(/)
+const successAfterFetch = fetchIndexInTry >= 0 ? refreshTry.slice(fetchIndexInTry) : ''
+const stateUpdatePattern = deviceSetter ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(`) : /$a/
+
+expect(deviceHook.length > 0, '已提取完整导出的 useHomeDeviceStatus hook')
+expectMatches(deviceHook, /VITE_TERMINAL_ID/, '真实设备状态 hook 读取 VITE_TERMINAL_ID')
 expectMatches(homeDeviceStatus, /export\s+type\s+HomeDeviceTone\s*=\s*'positive'\s*\|\s*'warning'\s*\|\s*'negative'\s*\|\s*'neutral'/, '真实设备状态 hook 固定四种诚实 tone')
 expectMatches(homeDeviceStatus, /export\s+interface\s+HomeDeviceStatusView\s*\{[\s\S]*?label:\s*string[\s\S]*?tone:\s*HomeDeviceTone[\s\S]*?networkIssue:\s*boolean/, '真实设备状态 hook 返回 label/tone/networkIssue 视图')
-expectMatches(
-  homeDeviceStatus,
-  /`\/api\/v1\/terminals\/\$\{terminalId\}\/printer-status`/,
-  '真实设备状态 hook 只请求现有打印机状态端点',
+expect(refreshBlock.length > 0, '已从 hook 提取包含唯一打印机端点的 refresh/load 函数')
+expectMatches(refreshBlock, endpointPattern, 'refresh 的 fetch 第一个参数是精确打印机状态端点')
+expect((deviceHook.match(/\bfetch\s*\(/g) ?? []).length === 1, '导出 hook 只包含一个真实 fetch，未用无关示例充数')
+expect(refreshedStatePairs.length === 1, 'refresh 的所有结果映射归入同一 hook 状态 setter')
+expect(
+  Boolean(deviceState) && new RegExp(`return\\s+${escapeRegExp(deviceState)}\\b`).test(deviceHook),
+  'hook return 直接消费 refresh 更新的同一状态',
 )
-expectMatches(homeDeviceStatus, /navigator\.onLine/, '真实设备状态 hook 消费浏览器在线状态')
+expectMatches(deviceHook, /navigator\.onLine/, '真实设备状态 hook 消费浏览器在线状态')
 for (const label of [
   '网络异常',
   '设备状态未配置',
@@ -171,50 +309,59 @@ expectMatches(
 expectMatches(homeDeviceStatus, /设备状态检测中[\s\S]{0,160}?['"]neutral['"]/, '请求中状态绑定 neutral tone')
 expectMatches(homeDeviceStatus, /打印机状态未知[\s\S]{0,160}?['"]neutral['"]/, '未知打印机状态绑定 neutral tone')
 expectMatches(homeDeviceStatus, /设备状态暂不可用[\s\S]{0,160}?['"]neutral['"]/, '在线请求失败绑定 neutral tone')
-expectMatches(homeDeviceStatus, /setInterval\(/, '真实设备状态 hook 建立轮询')
-expectMatches(homeDeviceStatus, /(?:30_000|30000|30\s*\*\s*1000)/, '真实设备状态 hook 使用 30 秒轮询周期')
-expectMatches(homeDeviceStatus, /clearInterval\(/, '真实设备状态 hook 卸载时清理轮询')
-expectMatches(homeDeviceStatus, /addEventListener\(['"]online['"]/, '真实设备状态 hook 监听 online 事件')
-expectMatches(homeDeviceStatus, /addEventListener\(['"]offline['"]/, '真实设备状态 hook 监听 offline 事件')
-expectMatches(homeDeviceStatus, /removeEventListener\(['"]online['"]/, '真实设备状态 hook 卸载时移除 online 事件')
-expectMatches(homeDeviceStatus, /removeEventListener\(['"]offline['"]/, '真实设备状态 hook 卸载时移除 offline 事件')
-expectMatches(homeDeviceStatus, /new AbortController\(\)/, '真实设备状态 hook 为每轮请求创建 AbortController')
-expectMatches(homeDeviceStatus, /await\s+fetch\([\s\S]*?signal:\s*\w+\.signal/, '真实设备状态请求接入当前 AbortController signal')
-expect((homeDeviceStatus.match(/\bfetch\s*\(/g) ?? []).length === 1, '真实设备状态 hook 仅包含一个打印机状态 fetch')
-expectMatches(
-  homeDeviceStatus,
-  /\w*controller\w*Ref\.current\?\.abort\(\)[\s\S]*?new AbortController\(\)/i,
-  '真实设备状态 hook 每轮请求前取消上一轮请求',
+expect(deviceEffect.length > 0 && intervalMatch && intervalIsThirtySeconds, '同一 effect 使用同一 refresh 函数建立 30 秒轮询')
+expect(
+  Boolean(refreshName) && patternIndex(deviceEffect, new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`)) < patternIndex(deviceEffect, /setInterval\s*\(/),
+  '同一 effect 首次挂载先立即调用 refresh 再建立轮询',
 )
-expectMatches(homeDeviceStatus, /requestGenerationRef/, '真实设备状态 hook 使用 request generation')
-expectMatches(
-  homeDeviceStatus,
-  /const\s+(?:\w*[Gg]eneration\w*|requestId)\s*=\s*\+\+\s*requestGenerationRef\.current/,
-  '真实设备状态 hook 每轮请求生成并捕获 generation',
+expect(Boolean(onlineAdd) && onlineAdd === onlineRemove, 'online add/removeEventListener 复用同一 handler 引用')
+expect(Boolean(offlineAdd) && offlineAdd === offlineRemove, 'offline add/removeEventListener 复用同一 handler 引用')
+expect(
+  Boolean(onlineAdd && refreshName) && (onlineAdd === refreshName || new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`).test(onlineBlock)),
+  'online handler 调用轮询所用的同一 refresh 函数',
 )
-expectMatches(
-  homeDeviceStatus,
-  /await\s+fetch\((?:(?!\bset[A-Z]\w*\s*\()[\s\S])*?if\s*\(\s*(?:\w*[Gg]eneration\w*|requestId)\s*!==\s*requestGenerationRef\.current\s*\)\s*return[\s\S]*?set\w+\(/,
-  '真实设备状态成功响应仅允许最新 generation 更新状态',
+const offlineCallsRefresh = Boolean(offlineAdd && refreshName)
+  && (offlineAdd === refreshName || new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`).test(offlineBlock))
+const offlineStateArgument = deviceSetter
+  ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(\\s*([A-Za-z_$][\\w$]*)`).exec(offlineBlock)?.[1]
+  : ''
+const offlineSetsNetworkError = Boolean(deviceSetter)
+  && new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(`).test(offlineBlock)
+  && (offlineBlock.includes('网络异常') || (offlineStateArgument && new RegExp(`const\\s+${escapeRegExp(offlineStateArgument)}[\\s\\S]{0,240}?网络异常`).test(homeDeviceStatus)))
+expect(offlineCallsRefresh || offlineSetsNetworkError, 'offline handler 调用同一 refresh 或写入同一状态的网络异常映射')
+const refreshOrder = [abortMatch?.index ?? -1, controllerMatch?.index ?? -1, generationMatch?.index ?? -1, patternIndex(refreshBlock, /fetch\s*\(/)]
+expect(
+  refreshOrder.every((index, position) => index >= 0 && (position === 0 || index > refreshOrder[position - 1])),
+  'refresh 依次 abort 上轮、创建 controller、捕获 generation 后才 fetch',
 )
-expectMatches(
-  homeDeviceStatus,
-  /catch(?:(?!\bset[A-Z]\w*\s*\()[\s\S])*?if\s*\(\s*(?:\w*[Gg]eneration\w*|requestId)\s*!==\s*requestGenerationRef\.current\s*\)\s*return[\s\S]*?设备状态暂不可用/,
-  '真实设备状态失败响应仅允许最新 generation 更新状态',
+expect(
+  Boolean(abortMatch && controllerMatch)
+    && new RegExp(`${escapeRegExp(abortMatch[1])}\\.current\\s*=\\s*${escapeRegExp(controllerMatch[1])}`).test(refreshBlock)
+    && new RegExp(`signal:\\s*${escapeRegExp(controllerMatch[1])}\\.signal`).test(refreshBlock),
+  'refresh 将新 controller 存入同一 ref 并把其 signal 交给 fetch',
 )
-expectMatches(
-  homeDeviceStatus,
-  /useEffect\(\(\) => \{[\s\S]*?\w+\(\)[\s\S]*?setInterval\(/,
-  '真实设备状态 hook 首次挂载立即请求后再轮询',
+expect(Boolean(deviceSetter) && guardedUpdate(successAfterFetch, refreshGuard, stateUpdatePattern), 'refresh 成功结果仅由最新 generation 更新同一状态')
+expect(Boolean(deviceSetter) && guardedUpdate(refreshCatch, refreshGuard, stateUpdatePattern), 'refresh 失败结果仅由最新 generation 更新同一状态')
+const helperUsed = /isCurrentRequest\s*\(/.test(refreshBlock)
+const helperParameter = deviceHook.match(
+  /(?:isCurrentRequest\s*=\s*\(?\s*|function\s+isCurrentRequest\s*\(\s*)([A-Za-z_$][\w$]*)/,
+)?.[1] ?? ''
+expect(
+  !helperUsed || (Boolean(helperParameter && generationMatch)
+    && new RegExp(`(?:${escapeRegExp(helperParameter)}\\s*===\\s*${escapeRegExp(generationMatch[2])}\\.current|${escapeRegExp(generationMatch[2])}\\.current\\s*===\\s*${escapeRegExp(helperParameter)})`).test(deviceHook)),
+  '若使用 isCurrentRequest helper，其真实比较当前 generation ref',
 )
-for (const [pattern, label] of [
-  [/return\s*\(\) => \{[\s\S]*?clearInterval\(/, '清理定时器'],
-  [/return\s*\(\) => \{[\s\S]*?removeEventListener\(['"]online['"]/, '移除 online 监听'],
-  [/return\s*\(\) => \{[\s\S]*?removeEventListener\(['"]offline['"]/, '移除 offline 监听'],
-  [/return\s*\(\) => \{[\s\S]*?\.abort\(\)/, '取消在途请求'],
-]) {
-  expectMatches(homeDeviceStatus, pattern, `真实设备状态 hook cleanup ${label}`)
-}
+expect(
+  Boolean(intervalId) && new RegExp(`clearInterval\\s*\\(\\s*${escapeRegExp(intervalId)}\\s*\\)`).test(cleanupBlock),
+  '同一 effect cleanup 清理本轮 interval',
+)
+expect(
+  Boolean(onlineAdd && offlineAdd)
+    && new RegExp(`removeEventListener\\s*\\(\\s*['"]online['"]\\s*,\\s*${escapeRegExp(onlineAdd)}`).test(cleanupBlock)
+    && new RegExp(`removeEventListener\\s*\\(\\s*['"]offline['"]\\s*,\\s*${escapeRegExp(offlineAdd)}`).test(cleanupBlock),
+  '同一 effect cleanup 移除 online/offline 两个同引用监听',
+)
+expect(Boolean(abortMatch) && new RegExp(`${escapeRegExp(abortMatch[1])}\\.current\\s*(?:\\?\\.)?abort\\(\\)`).test(cleanupBlock), '同一 effect cleanup abort 当前在途请求')
 
 const expectedImports = [
   "@import './styles/home-shell.css';",

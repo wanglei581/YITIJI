@@ -42,7 +42,7 @@ function readRequired(relativePath) {
   return readFileSync(absolutePath, 'utf8')
 }
 
-function extractConstBlock(source, name) {
+function extractConstDeclaration(source, name) {
   const marker = `const ${name} =`
   const start = source.indexOf(marker)
   if (start < 0) return ''
@@ -55,15 +55,106 @@ function extractConstBlock(source, name) {
   return source.slice(start, end)
 }
 
-function sliceBetweenPatterns(source, startPattern, endPattern) {
-  const startMatch = startPattern.exec(source)
-  if (!startMatch) return ''
+function extractBalancedBlock(source, openIndex) {
+  if (openIndex < 0 || source[openIndex] !== '{') return ''
+  let depth = 0
+  for (let index = openIndex; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(openIndex, index + 1)
+    }
+  }
+  return ''
+}
 
-  const contentStart = startMatch.index + startMatch[0].length
-  const tail = source.slice(contentStart)
-  const endMatch = endPattern.exec(tail)
-  if (!endMatch) return ''
-  return source.slice(contentStart, contentStart + endMatch.index)
+function extractConstFunction(source, name) {
+  const declaration = new RegExp(`const\\s+${name}\\s*=`).exec(source)
+  if (!declaration) return ''
+  const arrow = source.indexOf('=>', declaration.index + declaration[0].length)
+  const open = source.indexOf('{', arrow >= 0 ? arrow : declaration.index + declaration[0].length)
+  const body = extractBalancedBlock(source, open)
+  return body ? source.slice(declaration.index, open + body.length) : ''
+}
+
+function extractFunctionDeclaration(source, name) {
+  const declaration = new RegExp(`function\\s+${name}\\s*\\([^)]*\\)`).exec(source)
+  if (!declaration) return ''
+  const open = source.indexOf('{', declaration.index + declaration[0].length)
+  const body = extractBalancedBlock(source, open)
+  return body ? source.slice(declaration.index, open + body.length) : ''
+}
+
+function extractKeywordBlock(source, keyword) {
+  const match = new RegExp(`\\b${keyword}\\b(?:\\s*\\([^)]*\\))?\\s*\\{`).exec(source)
+  if (!match) return ''
+  const open = source.indexOf('{', match.index)
+  return extractBalancedBlock(source, open)
+}
+
+function extractArrowCallBlocks(source, callName) {
+  const blocks = []
+  const pattern = new RegExp(`\\b${callName}\\s*\\(`, 'g')
+  for (const match of source.matchAll(pattern)) {
+    const arrow = source.indexOf('=>', match.index + match[0].length)
+    const open = source.indexOf('{', arrow)
+    const block = extractBalancedBlock(source, open)
+    if (arrow >= 0 && block) blocks.push(source.slice(match.index, open + block.length))
+  }
+  return blocks
+}
+
+function extractJsxElement(source, tagName, attributePattern = null) {
+  const pattern = new RegExp(`<${tagName}\\b`, 'g')
+  for (const match of source.matchAll(pattern)) {
+    const close = source.indexOf(`</${tagName}>`, match.index + match[0].length)
+    if (close < 0) continue
+    const element = source.slice(match.index, close + tagName.length + 3)
+    if (!attributePattern || attributePattern.test(element)) return element
+  }
+  return ''
+}
+
+function patternIndex(source, pattern) {
+  return pattern.exec(source)?.index ?? -1
+}
+
+function generationGuardPattern(generation) {
+  if (!generation) return /$a/
+  const value = generation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(
+    `(?:if\\s*\\(\\s*(?:${value}\\s*!==\\s*requestGenerationRef\\.current|requestGenerationRef\\.current\\s*!==\\s*${value}|!\\s*isCurrentRequest\\(\\s*${value}\\s*\\))\\s*\\)\\s*(?:\\{\\s*)?return\\b|if\\s*\\(\\s*(?:${value}\\s*===\\s*requestGenerationRef\\.current|requestGenerationRef\\.current\\s*===\\s*${value}|isCurrentRequest\\(\\s*${value}\\s*\\))\\s*\\)\\s*\\{)`,
+  )
+}
+
+function validatesCurrentRequest(helper) {
+  const parameter = helper.match(
+    /(?:isCurrentRequest\s*=\s*\(?\s*|function\s+isCurrentRequest\s*\(\s*)([A-Za-z_$][\w$]*)/,
+  )?.[1]
+  if (!parameter) return false
+  const value = parameter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(
+    `(?:${value}\\s*===\\s*requestGenerationRef\\.current|requestGenerationRef\\.current\\s*===\\s*${value})`,
+  ).test(helper)
+}
+
+function expectGuardBeforeUpdate(block, guardPattern, updatePattern, label) {
+  const guard = guardPattern.exec(block)
+  const guardIndex = guard?.index ?? -1
+  const updateIndex = patternIndex(block, updatePattern)
+  const positiveGuardBody = guard && !/\breturn\b/.test(guard[0])
+    ? extractBalancedBlock(block, block.indexOf('{', guard.index))
+    : ''
+  const updateIsGuarded = guard && /\breturn\b/.test(guard[0])
+    ? updateIndex > guardIndex
+    : updateIndex >= guardIndex && positiveGuardBody.length > 0 && updatePattern.test(positiveGuardBody)
+  expect(block.length > 0 && updateIsGuarded, label)
+}
+
+function phoneFocusableTags(source) {
+  return [...source.matchAll(/<(?:input|button)\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .filter((tag) => /(?:手机|phone|tel|k-input-target)/i.test(tag) && !/\bdisabled\b/.test(tag))
 }
 
 function cssRules(source) {
@@ -99,22 +190,56 @@ const loginDialogCss = readRequired('src/pages/auth/styles/login-dialog.css')
 const kioskRoot = readRequired('src/layouts/KioskRoot.tsx')
 const packageJson = readRequired('package.json')
 const workflow = readRequired('../../.github/workflows/ci.yml')
-const handleSendCode = extractConstBlock(memberHook, 'handleSendCode')
-const handleLogin = extractConstBlock(memberHook, 'handleLogin')
-const cancelPending = extractConstBlock(memberHook, 'cancelPending')
-const closeDialog = extractConstBlock(loginDialog, 'closeDialog')
-const handleAuthenticated = extractConstBlock(loginDialog, 'handleAuthenticated')
-const handleContinueAsGuest = extractConstBlock(loginDialog, 'handleContinueAsGuest')
-const sendCodeBeforeGenerationGuard = sliceBetweenPatterns(
-  handleSendCode,
-  /await\s+sendSmsCode\(phone,\s*deviceId\)/,
-  /if\s*\(\s*(?:\w*[Gg]eneration\w*|requestId)\s*!==\s*requestGenerationRef\.current\s*\)\s*return/,
+const handleSendCode = extractConstFunction(memberHook, 'handleSendCode')
+const handleLogin = extractConstFunction(memberHook, 'handleLogin')
+const cancelPending = extractConstFunction(memberHook, 'cancelPending')
+const closeDialog = extractConstFunction(loginDialog, 'closeDialog')
+const handleAuthenticated = extractConstFunction(loginDialog, 'handleAuthenticated')
+const handleContinueAsGuest = extractConstFunction(loginDialog, 'handleContinueAsGuest')
+const sendGeneration = handleSendCode.match(
+  /const\s+([A-Za-z_$][\w$]*)\s*=\s*\+\+\s*requestGenerationRef\.current/,
+)?.[1]
+const loginGeneration = handleLogin.match(
+  /const\s+([A-Za-z_$][\w$]*)\s*=\s*\+\+\s*requestGenerationRef\.current/,
+)?.[1]
+const sendTry = extractKeywordBlock(handleSendCode, 'try')
+const sendCatch = extractKeywordBlock(handleSendCode, 'catch')
+const sendFinally = extractKeywordBlock(handleSendCode, 'finally')
+const loginTry = extractKeywordBlock(handleLogin, 'try')
+const loginCatch = extractKeywordBlock(handleLogin, 'catch')
+const loginFinally = extractKeywordBlock(handleLogin, 'finally')
+const currentRequestHelper = extractConstDeclaration(memberHook, 'isCurrentRequest')
+  || extractFunctionDeclaration(memberHook, 'isCurrentRequest')
+const dialogJsx = extractJsxElement(loginDialog, 'dialog')
+const closeButton = extractJsxElement(dialogJsx, 'button', /aria-label="关闭登录窗口"/)
+const openEffect = extractArrowCallBlocks(loginDialog, 'useEffect').find((block) => /showModal\(\)/.test(block)) ?? ''
+const savedTriggerMatch = openEffect.match(
+  /([A-Za-z_$][\w$]*)\.current\s*=\s*document\.activeElement(?:\s+as\s+[^\n;]+)?/,
 )
-const loginBeforeGenerationGuard = sliceBetweenPatterns(
-  handleLogin,
-  /await\s+memberLogin\(phone,\s*code,\s*deviceId\)/,
-  /if\s*\(\s*(?:\w*[Gg]eneration\w*|requestId)\s*!==\s*requestGenerationRef\.current\s*\)\s*return/,
+const savedTriggerRef = savedTriggerMatch?.[1] ?? ''
+const cancelHandlerName = dialogJsx.match(/onCancel=\{([A-Za-z_$][\w$]*)\}/)?.[1] ?? ''
+const cancelHandler = cancelHandlerName ? extractConstFunction(loginDialog, cancelHandlerName) : ''
+const showModalIndex = patternIndex(openEffect, /\.showModal\(\)/)
+const focusMatch = /([A-Za-z_$][\w$]*)\.current\s*(?:\?\.)?focus\s*\(/.exec(openEffect)
+const focusRef = focusMatch?.[1] ?? ''
+const queryFocusIndex = patternIndex(
+  openEffect,
+  /querySelector(?:<[^>]+>)?\s*\([^)]*(?:input|button|tel|手机|phone|k-input-target)[^)]*\)[\s\S]{0,160}?focus\s*\(/i,
 )
+const explicitFocusIndex = focusMatch?.index ?? queryFocusIndex
+const dialogPhoneTags = phoneFocusableTags(dialogJsx)
+const panePhoneTags = /<MemberPhoneLoginPane\b/.test(dialogJsx) ? phoneFocusableTags(phonePane) : []
+const directFocusTarget = Boolean(focusRef) && dialogPhoneTags.some((tag) => (
+  new RegExp(`ref=\\{${focusRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`).test(tag)
+))
+const paneFocusProp = focusRef
+  ? dialogJsx.match(new RegExp(`<MemberPhoneLoginPane\\b[\\s\\S]*?\\b([A-Za-z_$][\\w$]*)=\\{${focusRef}\\}`))?.[1]
+  : ''
+const paneFocusTarget = Boolean(paneFocusProp) && panePhoneTags.some((tag) => (
+  new RegExp(`ref=\\{${paneFocusProp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\}`).test(tag)
+))
+const queryFocusTarget = queryFocusIndex >= 0 && (dialogPhoneTags.length > 0 || panePhoneTags.length > 0)
+const autoFocusTarget = [...dialogPhoneTags, ...panePhoneTags].some((tag) => /\bautoFocus\b/.test(tag))
 
 expectMatches(memberHook, /export\s+function\s+useMemberPhoneLogin\s*\(/, '共享 hook 导出 useMemberPhoneLogin')
 expectMatches(
@@ -132,40 +257,53 @@ expect(handleLogin.length > 0, '已提取 handleLogin 函数块')
 expect(cancelPending.length > 0, '已提取 cancelPending 函数块')
 
 expectMatches(handleSendCode, /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/, 'handleSendCode 使用稳定会员登录 deviceId')
-expectMatches(
-  handleSendCode,
-  /const\s+(?:\w*[Gg]eneration\w*|requestId)\s*=\s*\+\+\s*requestGenerationRef\.current/,
-  'handleSendCode 生成并捕获 request generation',
+expect(Boolean(sendGeneration), 'handleSendCode 生成并捕获 request generation')
+expect(sendTry.length > 0 && sendCatch.length > 0 && sendFinally.length > 0, 'handleSendCode 分别包含 try/catch/finally')
+expectMatches(sendTry, /const\s+(?:result|res)\s*=\s*await\s+sendSmsCode\(phone,\s*deviceId\)/, 'handleSendCode try 调用真实验证码 API')
+expectGuardBeforeUpdate(
+  sendTry,
+  generationGuardPattern(sendGeneration),
+  /(?:countdown\.start|setNotice|setActiveInput)\s*\(/,
+  'handleSendCode try 在成功状态更新前拒绝迟到 generation',
 )
-expectMatches(
-  handleSendCode,
-  /const\s+(?:result|res)\s*=\s*await\s+sendSmsCode\(phone,\s*deviceId\)[\s\S]*?if\s*\(\s*(?:\w*[Gg]eneration\w*|requestId)\s*!==\s*requestGenerationRef\.current\s*\)\s*return[\s\S]*?(?:countdown\.start|setNotice|setActiveInput)\(/,
-  'handleSendCode 在成功状态更新前拒绝迟到 generation',
+expectGuardBeforeUpdate(
+  sendCatch,
+  generationGuardPattern(sendGeneration),
+  /set(?:Error|Notice|Loading)\s*\(/,
+  'handleSendCode catch 在失败状态更新前拒绝迟到 generation',
 )
-expect(sendCodeBeforeGenerationGuard.length > 0, '已提取 handleSendCode await 后到 generation guard 的区间')
-expectNoMatches(
-  sendCodeBeforeGenerationGuard,
-  /\b(?:set[A-Z]\w*|countdown\.start)\s*\(/,
-  'handleSendCode generation guard 前不更新任何成功状态',
+expectGuardBeforeUpdate(
+  sendFinally,
+  generationGuardPattern(sendGeneration),
+  /setLoading\s*\(/,
+  'handleSendCode finally 在清理 loading 前拒绝迟到 generation',
 )
 
 expectMatches(handleLogin, /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/, 'handleLogin 使用稳定会员登录 deviceId')
-expectMatches(
-  handleLogin,
-  /const\s+(?:\w*[Gg]eneration\w*|requestId)\s*=\s*\+\+\s*requestGenerationRef\.current/,
-  'handleLogin 生成并捕获 request generation',
+expect(Boolean(loginGeneration), 'handleLogin 生成并捕获 request generation')
+expect(loginTry.length > 0 && loginCatch.length > 0 && loginFinally.length > 0, 'handleLogin 分别包含 try/catch/finally')
+expectMatches(loginTry, /const\s+(?:result|res)\s*=\s*await\s+memberLogin\(phone,\s*code,\s*deviceId\)/, 'handleLogin try 调用真实登录 API')
+expectGuardBeforeUpdate(
+  loginTry,
+  generationGuardPattern(loginGeneration),
+  /options\.onAuthenticated\s*\(/,
+  'handleLogin try 在认证成功回调前拒绝迟到 generation',
 )
-expectMatches(
-  handleLogin,
-  /const\s+(?:result|res)\s*=\s*await\s+memberLogin\(phone,\s*code,\s*deviceId\)[\s\S]*?if\s*\(\s*(?:\w*[Gg]eneration\w*|requestId)\s*!==\s*requestGenerationRef\.current\s*\)\s*return[\s\S]*?options\.onAuthenticated\((?:result|res)\)/,
-  'handleLogin 在 onAuthenticated 前拒绝迟到 generation',
+expectGuardBeforeUpdate(
+  loginCatch,
+  generationGuardPattern(loginGeneration),
+  /set(?:Error|Notice|Loading)\s*\(/,
+  'handleLogin catch 在失败状态更新前拒绝迟到 generation',
 )
-expect(loginBeforeGenerationGuard.length > 0, '已提取 handleLogin await 后到 generation guard 的区间')
-expectNoMatches(
-  loginBeforeGenerationGuard,
-  /\bset[A-Z]\w*\s*\(|options\.onAuthenticated\s*\(/,
-  'handleLogin generation guard 前不更新状态或触发认证成功',
+expectGuardBeforeUpdate(
+  loginFinally,
+  generationGuardPattern(loginGeneration),
+  /setLoading\s*\(/,
+  'handleLogin finally 在清理 loading 前拒绝迟到 generation',
 )
+const usesCurrentRequestHelper = [sendTry, sendCatch, sendFinally, loginTry, loginCatch, loginFinally]
+  .some((block) => /isCurrentRequest\s*\(/.test(block))
+expect(!usesCurrentRequestHelper || validatesCurrentRequest(currentRequestHelper), 'isCurrentRequest helper 真实比较 generation 与当前 ref')
 
 expectMatches(
   cancelPending,
@@ -210,8 +348,8 @@ expectMatches(loginDialog, /<MemberPhoneLoginPane\s+\{\.\.\.phoneLogin\.paneProp
 expectMatches(loginDialog, /<MemberAgreement/, 'MemberLoginDialog 使用共享协议组件')
 expectMatches(
   loginDialog,
-  /import\s*\{(?=[^}]*\buseAuth\b)[^}]*\}\s*from\s*['"][^'"]*auth\/AuthContext['"]/,
-  'MemberLoginDialog 从真实 AuthContext 导入 useAuth',
+  /import\s*\{(?=[^}]*\buseAuth\b)[^}]*\}\s*from\s*['"][^'"]*auth\/useAuth['"]/,
+  'MemberLoginDialog 从真实 auth/useAuth 模块导入 useAuth',
 )
 expectMatches(loginDialog, /const\s*\{(?=[^}]*\blogin\b)[^}]*\}\s*=\s*useAuth\(\)/, 'MemberLoginDialog 获取真实 login handler')
 expect(handleAuthenticated.length > 0, '已提取 handleAuthenticated 函数块')
@@ -231,35 +369,43 @@ expectMatches(
   '共享手机号 hook 的认证成功回调接入真实会话 handler',
 )
 
-expectMatches(loginDialog, /<dialog[\s\S]*?className="member-login-dialog"/, '登录弹窗使用原生 dialog 元素')
-expectMatches(loginDialog, /document\.activeElement/, '打开弹窗前读取当前触发元素')
-expectMatches(
-  loginDialog,
-  /(?:trigger|activeElement)\w*Ref\.current\s*=[\s\S]{0,180}?document\.activeElement/i,
-  '打开弹窗前把 document.activeElement 保存到触发元素 ref',
+expectMatches(dialogJsx, /^<dialog\b[\s\S]*?className="member-login-dialog"/, '登录弹窗使用可达的原生 dialog 元素')
+expect(openEffect.length > 0 && /\bopen\b/.test(openEffect), '已提取由 open 驱动的 dialog 打开 effect')
+expect(
+  Boolean(savedTriggerMatch) && savedTriggerMatch.index < showModalIndex,
+  '打开 effect 在 showModal 前保存 document.activeElement（不锁定 ref 名）',
 )
-expectMatches(loginDialog, /const\s+phoneTargetRef\s*=\s*useRef<[^>]+>\(null\)/, '登录弹窗持有真实手机号入口 ref')
-expectMatches(loginDialog, /showModal\(\)/, 'open 时调用原生 dialog.showModal')
-expectMatches(
-  loginDialog,
-  /showModal\(\)[\s\S]{0,500}?phoneTargetRef\.current\?\.focus\(\)/,
-  'showModal 后把焦点送到手机号入口',
+expect(
+  showModalIndex >= 0
+    && ((explicitFocusIndex > showModalIndex && (directFocusTarget || paneFocusTarget || queryFocusTarget)) || autoFocusTarget),
+  'showModal 后聚焦弹窗内可交互的手机号 input/button（允许 ref/querySelector/autoFocus）',
 )
-expectMatches(loginDialog, /<MemberPhoneLoginPane[\s\S]*?phoneTargetRef=\{phoneTargetRef\}/, '登录面板接收手机号焦点 ref')
-expectMatches(loginDialog, /\.close\(\)/, '关闭流程调用原生 dialog.close')
 expect(closeDialog.length > 0, '已提取 closeDialog 函数块')
-expectMatches(closeDialog, /cancelPending\(\)[\s\S]*?\.close\(\)/, 'closeDialog 先取消请求再关闭原生 dialog')
-expectMatches(
-  closeDialog,
-  /(?:trigger|activeElement)\w*(?:Ref\.current)?[\s\S]*?isConnected[\s\S]*?\.focus\(\)/i,
-  'closeDialog 仅对仍在文档中的触发元素恢复焦点',
+const closeOrder = [
+  patternIndex(closeDialog, /cancelPending\(\)/),
+  patternIndex(closeDialog, /\.close\(\)/),
+  patternIndex(closeDialog, /\bonClose\(\)/),
+  patternIndex(closeDialog, /\.isConnected\b/),
+  patternIndex(closeDialog, /\.focus\(\)/),
+]
+expect(
+  closeOrder.every((index, position) => index >= 0 && (position === 0 || index > closeOrder[position - 1])),
+  'closeDialog 严格按 cancelPending → dialog.close → onClose → isConnected → focus 执行',
 )
-expectMatches(loginDialog, /onCancel=\{/, '登录弹窗处理原生 cancel / Escape')
-expectMatches(loginDialog, /aria-labelledby="member-login-dialog-title"/, '登录弹窗关联可访问标题')
-expectMatches(loginDialog, /id="member-login-dialog-title"[^>]*>手机号登录/, '登录弹窗提供冻结标题')
-expectMatches(loginDialog, /cancelPending\(\)/, '关闭弹窗会取消当前手机号登录请求')
-expectMatches(loginDialog, /aria-label="关闭登录窗口"/, '登录弹窗保留显式关闭按钮')
-expectMatches(loginDialog, />\s*关闭\s*<\/button>/, '显式关闭按钮提供可见关闭文案')
+expect(Boolean(savedTriggerRef) && closeDialog.includes(savedTriggerRef), 'closeDialog 恢复的是打开 effect 保存的同一触发元素')
+const namedCancelOrder = patternIndex(cancelHandler, /\.preventDefault\(\)/) >= 0
+  && patternIndex(cancelHandler, /closeDialog\(\)/) > patternIndex(cancelHandler, /\.preventDefault\(\)/)
+const inlineCancelOrder = /onCancel=\{[\s\S]{0,240}?\.preventDefault\(\)[\s\S]{0,160}?closeDialog\(\)/.test(dialogJsx)
+expect(namedCancelOrder || inlineCancelOrder, 'onCancel / Escape 先 preventDefault 再调用 closeDialog')
+expectMatches(dialogJsx, /aria-labelledby="member-login-dialog-title"/, '登录弹窗关联可访问标题')
+expectMatches(dialogJsx, /id="member-login-dialog-title"[^>]*>手机号登录/, '登录弹窗提供冻结标题')
+expect(closeButton.length > 0, '登录弹窗保留显式关闭按钮')
+expectMatches(
+  closeButton,
+  /onClick=\{\s*(?:closeDialog|\(?\s*\)?\s*=>\s*closeDialog\(\)|\(?\s*\)?\s*=>\s*\{\s*closeDialog\(\))/,
+  '显式关闭按钮 onClick 直接调用 closeDialog',
+)
+expectMatches(closeButton, />[\s\S]*?\b关闭\b[\s\S]*?<\/button>/, '显式关闭按钮提供可见关闭文案')
 expectMatches(loginDialog, /继续游客体验/, '登录弹窗保留继续游客体验操作')
 expect(handleContinueAsGuest.length > 0, '已提取 handleContinueAsGuest 函数块')
 expectMatches(
