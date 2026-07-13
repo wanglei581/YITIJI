@@ -276,6 +276,7 @@
 - [ ] **百宝箱 TB-G0~TB-G4 预生产验收执行**：按执行包顺序先跑本地静态门禁并创建仓库外证据目录；经用户明确确认后再做预生产只读预检、PostgreSQL 备份与 migration、`KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS` 脱敏复核、Admin 对真实终端配置站内 / 外部 H5 / 二维码项、Kiosk 真机打开外部 H5 / 取消 / 继续 / 二维码展示，并抽样 `ToolboxLaunchEvent` 确认只存纯 host 和匿名 action。未完成 TB-G2~TB-G4 前，不得宣称百宝箱预生产 / 生产验收完成。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。
+- [ ] **API verify 脚本类型检查 + 手工 DI 构造漂移审计（2026-07-12 登记）**：`verify:terminal-device-config` 曾因 `AdminTerminalsController` / `TerminalsService` 构造函数加参后脚本未同步而在 main 上运行时炸（audit 错位 → undefined.write，已修复并接入 CI），根因是 API tsconfig 只覆盖 `src/**`、SWC 运行不做类型检查，`scripts/` 里的构造参数漂移只能靠运行时踩中才暴露。已知同类隐患：`verify-kiosk-cashier-ui` / `verify-print-jobs` / `verify-order` / `verify-refund-idempotent` / `verify-partner-smart-campus` / `verify-payment-real-channels` 等仍以 1–2 参手工 `new TerminalsService(...)`（未踩中缺失依赖故暂通过）。建议：新增覆盖 `services/api/scripts/` 的独立 `typecheck:verify`（不动 build tsconfig 以免改变 dist 结构），分阶段修复暴露问题后接入 CI；controller 级 verify 是否迁 Nest TestingModule 作为后续评估项。依据：2026-07-12 Codex analyzer 审查建议（方案 B 优先，方案 C 择期）。
 
 ## P1：`cloud_upload` 能力键并入 `phone_upload`（词汇债治理，2026-07-12 已拍板方向，未排期执行）
 
