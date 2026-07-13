@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomBytes } from 'node:crypto'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
+import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 
@@ -113,17 +114,27 @@ class FakePrisma {
     // 服务层所有写路径都必须走 CAS 的 updateMany（无条件 update 会绕开状态匹配检查），
     // 这里刻意不提供 update() 方法——如果服务代码回退到无条件 update，测试会直接因方法不存在而报错，
     // 而不是悄悄通过。
+    //
+    // 支持两种调用形态：
+    //   1) 服务层的单行 CAS：{ where: { id, status } }（status 命中才更新，返回 count 0|1）
+    //   2) B1-5 reaper 的批量收敛：{ where: { status, updatedAt: { lt } } }（无 id，可能命中多行）
     updateMany: async ({
       where,
       data,
     }: {
-      where: { id: string; status: StatusMatcher }
+      where: { id?: string; status?: StatusMatcher; updatedAt?: { lt: Date } }
       data: Partial<StoredScanTask>
     }) => {
-      const current = this.scanTasksById.get(where.id)
-      if (!current || !statusMatches(current.status, where.status)) return { count: 0 }
-      this.scanTasksById.set(where.id, { ...current, ...data, updatedAt: new Date() })
-      return { count: 1 }
+      const matches = Array.from(this.scanTasksById.values()).filter((t) => {
+        if (where.id !== undefined && t.id !== where.id) return false
+        if (where.status !== undefined && !statusMatches(t.status, where.status)) return false
+        if (where.updatedAt?.lt !== undefined && !(t.updatedAt.getTime() < where.updatedAt.lt.getTime())) return false
+        return true
+      })
+      for (const m of matches) {
+        this.scanTasksById.set(m.id, { ...m, ...data, updatedAt: new Date() })
+      }
+      return { count: matches.length }
     },
   }
 
@@ -702,6 +713,60 @@ async function main(): Promise<void> {
       responseBody.error?.code,
       'SCAN_TASK_CANCEL_CONFLICT',
       'cancel CAS conflict must report SCAN_TASK_CANCEL_CONFLICT, not silently succeed or report a different code',
+    )
+  }
+
+  {
+    // B1-5：ScanTaskReaperTask 收敛卡在 'matched' 状态太久的任务。
+    // 三条互相制衡的断言，专门防"看起来在跑但其实什么都没测出来"：
+    //   1) 超过阈值(3min)的 'matched' 任务必须被 reap 成 failed + SCAN_MATCHED_TIMEOUT
+    //      ——防"reaper 是个空实现/永远不生效"；
+    //   2) 未超过阈值的 'matched' 任务必须原样保留
+    //      ——防"reaper 不看 updatedAt，把所有 matched 任务不分青红皂白全部 reap"；
+    //   3) 同样很旧但状态是 'waiting' 的任务必须原样保留
+    //      ——防"reaper 的 where 条件漏掉了 status 过滤，把不相干状态也一起扫了"。
+    const { service, prisma } = makeService()
+    const reaper = new ScanTaskReaperTask(prisma as never)
+
+    const stale = await service.create(dto, null)
+    await prisma.scanTask.updateMany({ where: { id: stale.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    const staleStored = prisma.scanTasksById.get(stale.scanTaskId)!
+    // 4 分钟前——超过 reaper 的 3 分钟阈值。
+    prisma.scanTasksById.set(stale.scanTaskId, { ...staleStored, updatedAt: new Date(Date.now() - 4 * 60 * 1000) })
+
+    const fresh = await service.create(dto, null)
+    await prisma.scanTask.updateMany({ where: { id: fresh.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    // fresh 保持刚更新的 updatedAt（现在），在阈值内。
+
+    const oldWaiting = await service.create(dto, null)
+    const oldWaitingStored = prisma.scanTasksById.get(oldWaiting.scanTaskId)!
+    // 同样很旧（早于阈值），但状态仍是 'waiting'，不应被这个 reaper 触碰
+    // （'waiting' 的过期收敛是另一条既有的惰性过期路径，不归 B1-5 管）。
+    prisma.scanTasksById.set(oldWaiting.scanTaskId, { ...oldWaitingStored, updatedAt: new Date(Date.now() - 10 * 60 * 1000) })
+
+    await reaper.reapStuckMatched()
+
+    const staleAfter = prisma.scanTasksById.get(stale.scanTaskId)!
+    assert.equal(staleAfter.status, 'failed', 'stale matched task (>3min) must be reaped to failed')
+    assert.equal(staleAfter.errorCode, 'SCAN_MATCHED_TIMEOUT', 'reaped task must carry errorCode SCAN_MATCHED_TIMEOUT')
+    assert.equal(staleAfter.errorMessage, '扫描处理超时未完成', 'reaped task must carry the whitelisted user-facing errorMessage')
+
+    const freshAfter = prisma.scanTasksById.get(fresh.scanTaskId)!
+    assert.equal(freshAfter.status, 'matched', 'fresh matched task (<3min) must NOT be touched by the reaper')
+
+    const oldWaitingAfter = prisma.scanTasksById.get(oldWaiting.scanTaskId)!
+    assert.equal(oldWaitingAfter.status, 'waiting', "old 'waiting' task must NOT be touched by the matched-state reaper")
+
+    // 再跑一次：此时已经没有符合条件的任务了，必须是稳定的 no-op（不重复收敛、不抛错），
+    // 防止 reaper 对已经是 failed 的任务重复计数或异常。
+    const staleAfterFirstRun = { ...staleAfter }
+    await reaper.reapStuckMatched()
+    const staleAfterSecondRun = prisma.scanTasksById.get(stale.scanTaskId)!
+    assert.equal(staleAfterSecondRun.status, 'failed', 'already-reaped task must remain failed on a second run')
+    assert.equal(
+      staleAfterSecondRun.errorCode,
+      staleAfterFirstRun.errorCode,
+      'second no-op run must not mutate an already-reaped task again',
     )
   }
 
