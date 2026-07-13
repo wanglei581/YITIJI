@@ -1,6 +1,6 @@
 # 青序 LightFlow K2a：AI 助手、岗位匹配与职业规划实施计划
 
-> **状态：** 已完成只读审计；实施前置条件未满足，暂不改运行时代码。
+> **状态：** K2a 本地运行时代码候选已完成；主线同步与独立透明素材任务继续隔离，不在本批吸收。
 >
 > **上位计划：** `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k2-ai-resume-interview.md`。
 >
@@ -26,9 +26,9 @@
 
 ## 2. 当前实施前置条件（必须先清零）
 
-1. **透明顾问素材归属：** 主工作树尚有未提交的 `ai-advisor-transparent.png`、`AssistantPage.tsx`、`AssistantCallPanel.tsx`、`InterviewSessionPage.tsx` 与 TRTC guard 修改。该任务必须由原 owner 提交并接受审查，或由 owner 明确放弃；K2a 不得覆盖或手工复制未提交改动。
-2. **K2 基线同步：** 当前分支相对 `origin/main` 为 `ahead 22, behind 40`。先在本 worktree 对最新 `origin/main` 做一次受控 rebase / 冲突审查，保留 K1、K2c、首页登录候选的已验证提交；不得把同步与 K2a 页面改造混成一个提交。
-3. **岗位匹配授权恢复：** 当前前端缺少匿名 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED` 的授权、重试与撤回界面，和后端已强制的 consent API 不一致。先从已验证候选 `2618b6c9` 进行最小、可审查的择取或等价重建，先得到独立的 RED→GREEN 业务合同；不得在 CSS 改造时顺带重写授权状态机。
+1. **透明顾问素材归属：** 主工作树的未提交透明素材及 TRTC 相关文件仍由原 owner 负责；K2a 保持既有 `/assets/ai-advisor.png`，未覆盖、复制或吸收这些改动。
+2. **K2 基线同步：** 当前候选与 `origin/main` 的分叉同步已单列为后续整合任务；K2a 未强行 rebase 或吸收冲突文件，确保本批页面/业务提交可独立审查。
+3. **岗位匹配授权恢复：** 已由独立提交恢复匿名 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED` 的授权、一次重试与撤回界面，并先完成 RED→GREEN 业务合同；视觉改造未重写该状态机。
 
 前置条件中的每一项结束后均需 `git diff --check`、精确 verify 和单独提交。若同步触及不在本批范围的功能，以冲突报告停止，不强行吸收。
 

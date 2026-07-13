@@ -143,19 +143,23 @@ export function JobFitPage() {
 
   if (!taskId) {
     return (
-      <div className="job-fit-inkpaper flex h-full flex-col items-center justify-center gap-4 px-6">
-        <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
-        <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
-        <Button size="lg" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
+      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-state-card" role="alert">
+          <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
+          <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
+          <Button size="lg" className="job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
+        </div>
       </div>
     )
   }
 
   if (loadingLatest) {
     return (
-      <div className="job-fit-inkpaper flex h-full flex-col items-center justify-center gap-4 px-6">
-        <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
-        <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
+      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-state-card" role="status" aria-live="polite">
+          <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
+          <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
+        </div>
       </div>
     )
   }
@@ -284,13 +288,15 @@ export function JobFitPage() {
   // ── 结果视图 ──────────────────────────────────────────────────────────────
   if (result) {
     return (
-      <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
-        <PageHeader
-          title="岗位匹配度参考"
-          subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
-          actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
-        />
-        <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
+      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-header">
+          <PageHeader
+            title="岗位匹配度参考"
+            subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
+            actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
+          />
+        </div>
+        <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
           <ComplianceBanner tone="info">
             以下内容仅为帮助你修改简历与准备投递的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。
           </ComplianceBanner>
@@ -320,8 +326,8 @@ export function JobFitPage() {
           {isAnonymous && anonymousConsentActive && (
             <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
           )}
-          {notice && <p className="rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700">{notice}</p>}
-          {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
+          {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
+          {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
         </div>
 
         <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
@@ -369,7 +375,7 @@ export function JobFitPage() {
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
-    <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
+    <div className="service-desk job-fit-inkpaper job-fit-inkpaper--form flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
       {showAnonymousConsent && (
         <AnonymousJobFitConsentDialog
           busy={analyzing}
@@ -378,12 +384,14 @@ export function JobFitPage() {
           onConfirm={() => void handleConfirmAnonymousConsent()}
         />
       )}
-      <PageHeader
-        title="岗位匹配度参考"
-        subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
-        actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回</Button>}
-      />
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
+      <div className="job-fit-header">
+        <PageHeader
+          title="岗位匹配度参考"
+          subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
+          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回</Button>}
+        />
+      </div>
+      <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
         <ComplianceBanner tone="info">
           分析结果仅供本人参考，不代表录用结果；本平台不提供投递功能，投递请前往岗位来源平台。
         </ComplianceBanner>
@@ -392,6 +400,7 @@ export function JobFitPage() {
           <button
             type="button"
             onClick={() => setTab('pick')}
+            aria-pressed={tab === 'pick'}
             className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'pick' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
           >
             <BriefcaseIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
@@ -400,6 +409,7 @@ export function JobFitPage() {
           <button
             type="button"
             onClick={() => setTab('manual')}
+            aria-pressed={tab === 'manual'}
             className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'manual' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
           >
             <TargetIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
@@ -415,12 +425,13 @@ export function JobFitPage() {
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder="搜索岗位名称 / 公司"
+                aria-label="搜索岗位名称或公司"
                 className="min-h-[48px] w-full rounded-xl border border-neutral-200 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
               />
             </div>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-3 flex flex-col gap-2" aria-busy={jobsLoading} aria-live="polite">
               {jobsLoading ? (
-                <p className="flex items-center gap-2 py-6 text-sm text-neutral-400">
+                <p className="flex items-center gap-2 py-6 text-sm text-neutral-400" role="status">
                   <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />正在加载岗位…
                 </p>
               ) : jobs.length === 0 ? (
@@ -433,6 +444,8 @@ export function JobFitPage() {
                       key={j.id}
                       type="button"
                       onClick={() => setSelectedJob(j)}
+                      aria-pressed={active}
+                      aria-label={`${j.title}，${j.company}，${active ? '已选择' : '未选择'}`}
                       className={['flex min-h-[56px] items-center justify-between rounded-xl border px-4 py-3 text-left', active ? 'border-primary-500 bg-primary-50' : 'border-neutral-100 bg-white hover:border-neutral-200'].join(' ')}
                     >
                       <span className="min-w-0">
@@ -453,6 +466,7 @@ export function JobFitPage() {
               onChange={(e) => setManualTitle(e.target.value)}
               maxLength={50}
               placeholder="目标岗位名称，如：行政专员"
+              aria-label="目标岗位名称"
               className="min-h-[52px] w-full rounded-xl border border-neutral-200 px-4 text-base focus:border-primary-500 focus:outline-none"
             />
             <textarea
@@ -461,13 +475,14 @@ export function JobFitPage() {
               maxLength={2000}
               rows={5}
               placeholder="可粘贴岗位 JD / 任职要求（选填，提供后参考更有针对性）"
+              aria-label="岗位 JD 或任职要求"
               className="mt-2 w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 text-sm leading-relaxed focus:border-primary-500 focus:outline-none"
             />
           </Card>
         )}
 
-        {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
-        {notice && <p className="rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700">{notice}</p>}
+        {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
+        {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
         {memberConsentRequired && (
           <MemberJobFitConsentCard onNavigate={() => navigate('/jobs')} />
         )}
@@ -477,7 +492,7 @@ export function JobFitPage() {
       </div>
 
       <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <Button size="lg" className="h-14 w-full text-base" disabled={analyzing} onClick={() => void handleAnalyze()}>
+        <Button size="lg" className="job-fit-primary-action h-14 w-full text-base" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
           {analyzing ? (
             <>
               <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />

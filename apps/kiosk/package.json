@@ -38,6 +38,7 @@
     "verify:home-service-desk": "node scripts/verify-home-service-desk.mjs",
     "verify:member-login-dialog": "node scripts/verify-member-login-dialog.mjs",
     "verify:lightflow-k2c-interview": "node scripts/verify-lightflow-k2c-interview.mjs",
+    "verify:lightflow-k2a-career": "node scripts/verify-lightflow-k2a-career.mjs",
     "verify:lightflow-k2a-ai-career": "node scripts/verify-lightflow-k2a-ai-career.mjs",
     "verify:lightflow-k1-public-entry": "node scripts/verify-lightflow-k1-public-entry.mjs",
     "verify:home-toolbox-ui": "node scripts/verify-home-toolbox-ui.mjs",

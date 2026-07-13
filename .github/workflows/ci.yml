@@ -121,6 +121,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:home-service-desk
           pnpm --filter @ai-job-print/kiosk verify:member-login-dialog
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
+          pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-career
+          pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-ai-career
           pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k1-public-entry
