@@ -10,6 +10,7 @@ export interface HomeDeviceStatusView {
 
 interface HomePrinterStatusResponse {
   printerStatus?: unknown
+  isOnline?: boolean
 }
 
 function isNetworkOffline(): boolean {
@@ -48,7 +49,7 @@ export function useHomeDeviceStatus(): HomeDeviceStatusView {
   const requestGenerationRef: MutableRefObject<number> = useRef(0)
 
   useEffect(() => {
-    const refreshDeviceStatus = async () => {
+    const refreshDeviceStatus = async (showLoading: boolean) => {
       abortControllerRef.current?.abort()
       const controller = new AbortController()
       const generation = ++requestGenerationRef.current
@@ -63,7 +64,9 @@ export function useHomeDeviceStatus(): HomeDeviceStatusView {
         return
       }
 
-      setDeviceStatus({ label: '设备状态检测中', tone: 'neutral', networkIssue: false })
+      if (showLoading) {
+        setDeviceStatus({ label: '设备状态检测中', tone: 'neutral', networkIssue: false })
+      }
 
       try {
         const response = await fetch(`/api/v1/terminals/${terminalId}/printer-status`, {
@@ -74,6 +77,10 @@ export function useHomeDeviceStatus(): HomeDeviceStatusView {
 
         if (generation !== requestGenerationRef.current) return
         if (controller.signal.aborted) return
+        if (data.isOnline === false) {
+          setDeviceStatus({ label: '打印机离线', tone: 'negative', networkIssue: false })
+          return
+        }
         setDeviceStatus(mapPrinterStatus(data.printerStatus))
       } catch {
         if (generation !== requestGenerationRef.current) return
@@ -87,7 +94,7 @@ export function useHomeDeviceStatus(): HomeDeviceStatusView {
     }
 
     const handleOnline = () => {
-      void refreshDeviceStatus()
+      void refreshDeviceStatus(true)
     }
     const handleOffline = () => {
       abortControllerRef.current?.abort()
@@ -95,8 +102,10 @@ export function useHomeDeviceStatus(): HomeDeviceStatusView {
       setDeviceStatus({ label: '网络异常', tone: 'negative', networkIssue: true })
     }
 
-    void refreshDeviceStatus()
-    const intervalId = window.setInterval(refreshDeviceStatus, 30_000)
+    void refreshDeviceStatus(true)
+    const intervalId = window.setInterval(() => {
+      void refreshDeviceStatus(false)
+    }, 30_000)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 

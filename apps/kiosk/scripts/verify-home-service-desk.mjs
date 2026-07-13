@@ -253,11 +253,23 @@ const deviceState = refreshedStatePairs[0]?.state ?? ''
 const deviceSetter = refreshedStatePairs[0]?.setter ?? ''
 const deviceEffect = callBlocks(deviceHook, 'useEffect').find((block) => /setInterval\s*\(/.test(block)) ?? ''
 const intervalMatch = refreshName
-  ? new RegExp(`setInterval\\s*\\(\\s*(?:${escapeRegExp(refreshName)}|\\(\\s*\\)\\s*=>\\s*(?:\\{\\s*(?:void\\s+)?${escapeRegExp(refreshName)}\\(\\)\\s*;?\\s*\\}|(?:void\\s+)?${escapeRegExp(refreshName)}\\(\\)))\\s*,\\s*([^\\)]+)\\)`).exec(deviceEffect)
+  ? new RegExp(`setInterval\\s*\\(\\s*\\(\\s*\\)\\s*=>\\s*\\{\\s*(?:void\\s+)?${escapeRegExp(refreshName)}\\(\\s*false\\s*\\)\\s*;?\\s*\\}\\s*,\\s*([^\\)]+)\\)`).exec(deviceEffect)
   : null
 const intervalArgument = intervalMatch?.[1].trim() ?? ''
 const intervalIsThirtySeconds = /^(?:30_000|30000|30\s*\*\s*1000)$/.test(intervalArgument)
   || (intervalArgument && new RegExp(`const\\s+${escapeRegExp(intervalArgument)}\\s*=\\s*(?:30_000|30000|30\\s*\\*\\s*1000)\\b`).test(homeDeviceStatus))
+const refreshLoadingParameter = refreshName
+  ? new RegExp(`const\\s+${escapeRegExp(refreshName)}\\s*=\\s*async\\s*\\(\\s*([A-Za-z_$][\\w$]*)(?:\\s*:\\s*boolean)?\\s*\\)\\s*=>`).exec(refreshBlock)?.[1] ?? ''
+  : ''
+const loadingGateMatch = refreshLoadingParameter
+  ? new RegExp(`if\\s*\\(\\s*${escapeRegExp(refreshLoadingParameter)}\\s*\\)\\s*\\{`).exec(refreshBlock)
+  : null
+const loadingGateBlock = loadingGateMatch
+  ? balancedBlock(refreshBlock, refreshBlock.indexOf('{', loadingGateMatch.index))
+  : ''
+const initialRefreshShowsLoading = Boolean(refreshName) && new RegExp(
+  `(?:void\\s+)?${escapeRegExp(refreshName)}\\(\\s*true\\s*\\)\\s*;?\\s*\\n\\s*const\\s+[A-Za-z_$][\\w$]*\\s*=\\s*(?:window\\.)?setInterval`,
+).test(deviceEffect)
 const onlineAdd = deviceEffect.match(/addEventListener\s*\(\s*['"]online['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
 const offlineAdd = deviceEffect.match(/addEventListener\s*\(\s*['"]offline['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
 const onlineRemove = deviceEffect.match(/removeEventListener\s*\(\s*['"]online['"]\s*,\s*([A-Za-z_$][\w$]*)/)?.[1] ?? ''
@@ -284,6 +296,12 @@ const parsedDataName = parsedDataMatch?.[1] ?? ''
 const mapperCall = deviceSetter && parsedDataName
   ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(\\s*([A-Za-z_$][\\w$]*)\\s*\\(\\s*${escapeRegExp(parsedDataName)}\\.printerStatus\\s*\\)\\s*\\)`).exec(refreshTry)
   : null
+const offlineHeartbeatMatch = parsedDataName
+  ? new RegExp(`if\\s*\\(\\s*${escapeRegExp(parsedDataName)}\\.isOnline\\s*===\\s*false\\s*\\)\\s*\\{`).exec(refreshTry)
+  : null
+const offlineHeartbeatBlock = offlineHeartbeatMatch
+  ? balancedBlock(refreshTry, refreshTry.indexOf('{', offlineHeartbeatMatch.index))
+  : ''
 const mapperName = mapperCall?.[1] ?? ''
 const mapperBlock = mapperName ? namedComponent(homeDeviceStatus, mapperName) : ''
 const mapperParameter = mapperName
@@ -325,6 +343,7 @@ expect(deviceHook.length > 0, '已提取完整导出的 useHomeDeviceStatus hook
 expectMatches(deviceHook, /VITE_TERMINAL_ID/, '真实设备状态 hook 读取 VITE_TERMINAL_ID')
 expectMatches(homeDeviceStatus, /export\s+type\s+HomeDeviceTone\s*=\s*'positive'\s*\|\s*'warning'\s*\|\s*'negative'\s*\|\s*'neutral'/, '真实设备状态 hook 固定四种诚实 tone')
 expectMatches(homeDeviceStatus, /export\s+interface\s+HomeDeviceStatusView\s*\{[\s\S]*?label:\s*string[\s\S]*?tone:\s*HomeDeviceTone[\s\S]*?networkIssue:\s*boolean/, '真实设备状态 hook 返回 label/tone/networkIssue 视图')
+expectMatches(homeDeviceStatus, /interface\s+HomePrinterStatusResponse\s*\{[\s\S]*?printerStatus\??:\s*unknown[\s\S]*?isOnline\??:\s*boolean/, '打印机状态响应显式读取 isOnline 心跳在线性')
 expect(refreshBlock.length > 0, '已从 hook 提取包含唯一打印机端点的 refresh/load 函数')
 expectMatches(refreshBlock, endpointPattern, 'refresh 的 fetch 第一个参数是精确打印机状态端点')
 expect((deviceHook.match(/\bfetch\s*\(/g) ?? []).length === 1, '导出 hook 只包含一个真实 fetch，未用无关示例充数')
@@ -348,6 +367,16 @@ for (const label of [
   expect(homeDeviceStatus.includes(label), `真实设备状态 hook 覆盖文案：${label}`)
 }
 expect(Boolean(fetchResponseName && parsedDataName), 'refresh 从唯一 fetch 响应解析真实 data.printerStatus 数据对象')
+expect(
+  Boolean(offlineHeartbeatMatch && mapperCall)
+    && offlineHeartbeatMatch.index < mapperCall.index
+    && new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(`).test(offlineHeartbeatBlock)
+    && offlineHeartbeatBlock.includes('打印机离线')
+    && /['"]negative['"]/.test(offlineHeartbeatBlock)
+    && /networkIssue:\s*false/.test(offlineHeartbeatBlock)
+    && /\breturn\b/.test(offlineHeartbeatBlock),
+  '真实 data.isOnline=false 在 printerStatus mapper 前可达地写入“打印机离线” / negative',
+)
 expect(mapperChainValid || directMappingValid, '真实 data.printerStatus 通过已验证 mapper 或 refresh 内直接分支写入同一状态')
 approvedPrinterMappings.forEach(([printerStatus, label, tone], index) => {
   expect(
@@ -362,16 +391,23 @@ expectMatches(
   '未配置 terminalId 时返回诚实未配置状态',
 )
 expectMatches(homeDeviceStatus, /设备状态检测中[\s\S]{0,160}?['"]neutral['"]/, '请求中状态绑定 neutral tone')
-expect(deviceEffect.length > 0 && intervalMatch && intervalIsThirtySeconds, '同一 effect 使用同一 refresh 函数建立 30 秒轮询')
 expect(
-  Boolean(refreshName) && patternIndex(deviceEffect, new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`)) < patternIndex(deviceEffect, /setInterval\s*\(/),
-  '同一 effect 首次挂载先立即调用 refresh 再建立轮询',
+  Boolean(refreshLoadingParameter && loadingGateBlock)
+    && new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(`).test(loadingGateBlock)
+    && loadingGateBlock.includes('设备状态检测中')
+    && /['"]neutral['"]/.test(loadingGateBlock),
+  'refresh 的显式 showLoading 语义真实门控“设备状态检测中”更新',
+)
+expect(deviceEffect.length > 0 && intervalMatch && intervalIsThirtySeconds, '同一 effect 使用 refresh(false) 建立 30 秒静默轮询')
+expect(
+  initialRefreshShowsLoading,
+  '同一 effect 首次挂载先调用 refresh(true) 显示检测中，再建立静默轮询',
 )
 expect(Boolean(onlineAdd) && onlineAdd === onlineRemove, 'online add/removeEventListener 复用同一 handler 引用')
 expect(Boolean(offlineAdd) && offlineAdd === offlineRemove, 'offline add/removeEventListener 复用同一 handler 引用')
 expect(
-  Boolean(onlineAdd && refreshName) && (onlineAdd === refreshName || new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`).test(onlineBlock)),
-  'online handler 调用轮询所用的同一 refresh 函数',
+  Boolean(onlineAdd && refreshName) && new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(\\s*true\\s*\\)`).test(onlineBlock),
+  'online handler 调用同一 refresh(true) 立即重试并显示检测中',
 )
 const offlineStateArgument = deviceSetter
   ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(\\s*([A-Za-z_$][\\w$]*)`).exec(offlineBlock)?.[1]
