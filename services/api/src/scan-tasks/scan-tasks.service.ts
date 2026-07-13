@@ -44,6 +44,10 @@ const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
 // 面向用户的失败原因必须是白名单文案，绝不透出内部错误细节（对齐 print-jobs.service.ts 同类做法）。
 const USER_FACING_SCAN_ERROR: Record<string, string> = {
   SCAN_UPLOAD_FAILED: '扫描文件处理失败，请重新扫描',
+  // B1-5：ScanTaskReaperTask 收敛卡在 'matched' 状态太久的任务时写入的 errorCode，
+  // 必须在这里登记白名单文案，否则 getStatus() 会把它 fallback 成通用的
+  // '扫描处理失败，请重试'，用户看不到"超时未完成"这个更准确的原因。
+  SCAN_MATCHED_TIMEOUT: '扫描处理超时未完成',
 }
 
 const SCAN_TYPE_INSTRUCTIONS: Record<ScanType, string[]> = {

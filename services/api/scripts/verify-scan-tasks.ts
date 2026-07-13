@@ -65,6 +65,9 @@ class FakePrisma {
   constructor() {
     this.terminals.set('t_1', { id: 't_1', enabled: true, terminalCode: 'T-001' })
     this.terminals.set('t_disabled', { id: 't_disabled', enabled: false, terminalCode: 'T-002' })
+    // B1-5 多行 reap 测试需要第二个独立启用的终端（证明一次 reap 能跨终端一起收敛，
+    // 不是只测同一终端的两条行）。
+    this.terminals.set('t_2', { id: 't_2', enabled: true, terminalCode: 'T-003' })
   }
 
   readonly terminal = {
@@ -749,7 +752,21 @@ async function main(): Promise<void> {
     const staleAfter = prisma.scanTasksById.get(stale.scanTaskId)!
     assert.equal(staleAfter.status, 'failed', 'stale matched task (>3min) must be reaped to failed')
     assert.equal(staleAfter.errorCode, 'SCAN_MATCHED_TIMEOUT', 'reaped task must carry errorCode SCAN_MATCHED_TIMEOUT')
-    assert.equal(staleAfter.errorMessage, '扫描处理超时未完成', 'reaped task must carry the whitelisted user-facing errorMessage')
+
+    // errorMessage 必须经 service.getStatus() 校验，而不是直接读裸 Prisma 行：getStatus() 会把
+    // errorCode 映射过 USER_FACING_SCAN_ERROR 白名单，raw DB 行只是 reaper 自己写入的中间态，
+    // 不代表用户最终能看到什么。这里镜像既有 SCAN_UPLOAD_FAILED 用例的写法（本文件上方
+    // "deliverScanFile 的 catch 分支" 那个测试块），是唯一真正锁定"reaper 写的 errorCode
+    // 必须在白名单里登记"这条要求的断言——如果 SCAN_MATCHED_TIMEOUT 没有登记进
+    // USER_FACING_SCAN_ERROR，getStatus() 会 fallback 成通用文案，这里就会失败。
+    const staleStatus = await service.getStatus(stale.scanTaskId, null, stale.controlToken)
+    assert.equal(staleStatus.status, 'failed')
+    assert.equal(staleStatus.errorCode, 'SCAN_MATCHED_TIMEOUT')
+    assert.equal(
+      staleStatus.errorMessage,
+      '扫描处理超时未完成',
+      'getStatus() must return the whitelisted user-facing errorMessage for a reaped task, not the generic fallback',
+    )
 
     const freshAfter = prisma.scanTasksById.get(fresh.scanTaskId)!
     assert.equal(freshAfter.status, 'matched', 'fresh matched task (<3min) must NOT be touched by the reaper')
@@ -768,6 +785,35 @@ async function main(): Promise<void> {
       staleAfterFirstRun.errorCode,
       'second no-op run must not mutate an already-reaped task again',
     )
+  }
+
+  {
+    // B1-5 补充：同一 tick 内、跨不同终端的多条卡死 'matched' 任务必须被一次 reapStuckMatched()
+    // 调用全部收敛（而不是只处理其中一条就停手，或者需要多次调用才能收敛干净）。
+    // 用两个不同终端（t_1 / t_2）分别制造一条陈旧 'matched' 行，证明 reaper 的 updateMany 是
+    // 批量 WHERE 匹配，不是逐条处理后提前 return。
+    const { service, prisma } = makeService()
+    const reaper = new ScanTaskReaperTask(prisma as never)
+
+    const staleA = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await prisma.scanTask.updateMany({ where: { id: staleA.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    const staleAStored = prisma.scanTasksById.get(staleA.scanTaskId)!
+    prisma.scanTasksById.set(staleA.scanTaskId, { ...staleAStored, updatedAt: new Date(Date.now() - 4 * 60 * 1000) })
+
+    const staleB = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
+    await prisma.scanTask.updateMany({ where: { id: staleB.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    const staleBStored = prisma.scanTasksById.get(staleB.scanTaskId)!
+    prisma.scanTasksById.set(staleB.scanTaskId, { ...staleBStored, updatedAt: new Date(Date.now() - 5 * 60 * 1000) })
+
+    const result = await reaper.reapStuckMatched()
+    assert.equal(result.count, 2, 'a single reap tick must report reaping both independently-stale matched rows across two terminals')
+
+    const staleAAfter = prisma.scanTasksById.get(staleA.scanTaskId)!
+    const staleBAfter = prisma.scanTasksById.get(staleB.scanTaskId)!
+    assert.equal(staleAAfter.status, 'failed', 'terminal t_1 stale matched task must be reaped in the same tick')
+    assert.equal(staleBAfter.status, 'failed', 'terminal t_2 stale matched task must be reaped in the same tick')
+    assert.equal(staleAAfter.errorCode, 'SCAN_MATCHED_TIMEOUT')
+    assert.equal(staleBAfter.errorCode, 'SCAN_MATCHED_TIMEOUT')
   }
 
   console.log('PASS scan tasks verification')

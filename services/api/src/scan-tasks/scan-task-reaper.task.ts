@@ -32,8 +32,10 @@ export class ScanTaskReaperTask {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  // 返回值（{ count }）供测试直接断言一次 reap 命中的行数（例如同一 tick 内多个不同终端的
+  // 卡死任务应该一次性全部收敛）；@Cron 调度器本身会丢弃返回值，不影响生产路径。
   @Cron(CronExpression.EVERY_MINUTE)
-  async reapStuckMatched(): Promise<void> {
+  async reapStuckMatched(): Promise<{ count: number }> {
     const staleThreshold = new Date(Date.now() - MATCHED_STUCK_TIMEOUT_MS)
     try {
       const result = await this.prisma.scanTask.updateMany({
@@ -43,8 +45,10 @@ export class ScanTaskReaperTask {
       if (result.count > 0) {
         this.logger.warn(`reaped ${result.count} scan task(s) stuck in 'matched' beyond timeout`)
       }
+      return { count: result.count }
     } catch (err) {
       this.logger.error(`matched-state reaper failed: ${(err as Error).message}`)
+      return { count: 0 }
     }
   }
 }
