@@ -327,7 +327,7 @@ const SERVICE_GROUPS: ServiceGroup[] = [
       { title: '纸质扫描', icon: 'scan', to: '/scan/start' },
       { title: '云打印', icon: 'cloud', disabled: Boolean(true) },
       { title: '格式转换', icon: 'swap', to: '/print-scan/convert' },
-      { title: '证件照打印', icon: 'user', disabled: Boolean(true) },
+      { title: '证件照打印', icon: 'user', to: '/print-scan/id-photo' },
     ],
   },
   {

@@ -5,7 +5,8 @@
 //   已上线：文档打印 → /print/upload、手机扫码上传 → /print/upload?tab=qr、
 //           材料扫描 → /scan/start、照片打印 → /print/upload、
 //           格式转换（多图合并PDF） → /print-scan/convert
-//   MVP 说明：证件照 / 签名盖章 → /print-scan/feature/:key（可点击占位）
+//   证件照 → /print-scan/id-photo（真实流程页；available 默认 false，Admin 验收后开放）
+//   MVP 说明：签名盖章 → /print-scan/feature/:key（可点击占位）
 // 另有"我的打印记录"快捷入口区：指向既有 /me/documents、/me/print-orders、
 //   /me/feedback?category=print 三个 /me/* 明细页，不新建数据模型或重复入口。
 //
@@ -103,8 +104,8 @@ const CAPABILITIES: Capability[] = [
     iconBg: 'bg-warning-bg',
     iconColor: 'text-warning-fg',
     title: '证件照',
-    description: '常见规格证件照排版打印',
-    to: '/print-scan/feature/id-photo',
+    description: '常见规格证件照 A4 排版彩色打印',
+    to: '/print-scan/id-photo',
     available: false,
   },
   {

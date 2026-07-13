@@ -1,11 +1,11 @@
 // ============================================================
 // PrintScanFeatureInfoPage — 打印扫描能力 MVP 说明页
-//   路由：/print-scan/feature/:key（key = id-photo | sign）
+//   路由：/print-scan/feature/:key（key = sign）
 //
-// 第一阶段这两项（证件照 / 签名盖章）只做可点击的说明页，
-// 介绍能力规划 + 当前可用替代路径 + 合规声明，不做完整实现。
+// 签名盖章仍为 MVP 说明页，介绍能力规划 + 当前可用替代路径 + 合规声明，不做完整实现。
+// 证件照已改为真实流程页（IdPhotoPage，/print-scan/id-photo），不再使用本说明页。
 //
-// 合规：证件照=敏感文件清理提示；签名盖章=非 CA 电子签声明。
+// 合规：签名盖章=非 CA 电子签声明。
 // ============================================================
 
 import { useNavigate, useParams } from 'react-router-dom'
@@ -16,10 +16,9 @@ import {
   FileType2Icon,
   PenToolIcon,
   ShieldCheckIcon,
-  UserSquareIcon,
 } from 'lucide-react'
 
-type FeatureKey = 'id-photo' | 'sign'
+type FeatureKey = 'sign'
 
 interface FeatureInfo {
   icon: React.ComponentType<{ className?: string }>
@@ -36,21 +35,6 @@ interface FeatureInfo {
 }
 
 const FEATURES: Record<FeatureKey, FeatureInfo> = {
-  'id-photo': {
-    icon: UserSquareIcon,
-    iconBg: 'bg-warning-bg',
-    iconColor: 'text-warning-fg',
-    title: '证件照',
-    summary: '即将支持常见规格证件照的尺寸排版与打印（一寸 / 二寸 / 小一寸等）。',
-    plans: [
-      '选择证件照规格与底色',
-      '自动排版到 6 寸相纸 / A4',
-      '直接接入打印流程出图',
-    ],
-    notice: 'sensitive',
-    fallbackLabel: '先用照片打印',
-    fallbackTo: '/print/upload',
-  },
   sign: {
     icon: PenToolIcon,
     iconBg: 'bg-error-bg',
@@ -69,7 +53,7 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
 }
 
 function isFeatureKey(k: string | undefined): k is FeatureKey {
-  return k === 'id-photo' || k === 'sign'
+  return k === 'sign'
 }
 
 export function PrintScanFeatureInfoPage() {
