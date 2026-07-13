@@ -51,16 +51,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Guard — no tracked AI tool state
-        # 防止 .ccg/tasks 等 AI 工具临时状态被(强制)提交回库；.ccg/spec 正式规范不在此列。
+      - name: Guard — no tracked active AI tool state
+        # CCG 要求归档任务作为正式审计记录提交；仅拒绝活动 .ccg/tasks 与其它 AI 工具临时状态。
         run: |
-          tracked=$(git ls-files .ccg/tasks .ccg/commander .product-pm .workbuddy .superpowers .worktrees opc-doc)
+          tracked=$(git ls-files .ccg/tasks | grep -Ev '^\.ccg/tasks/archive/' || true)
+          otherTracked=$(git ls-files .ccg/commander .product-pm .workbuddy .superpowers .worktrees opc-doc)
+          tracked="$tracked${tracked:+$'\n'}$otherTracked"
           if [ -n "$tracked" ]; then
-            echo "::error::AI 工具临时状态目录不得纳入版本管理（见 .gitignore / CLAUDE.md §7）。违规文件："
+            echo "::error::AI 工具活动状态目录不得纳入版本管理（见 .gitignore / CLAUDE.md §7）。违规文件："
             echo "$tracked"
             exit 1
           fi
-          echo "OK: 无被跟踪的 AI 工具状态文件"
+          echo "OK: 无被跟踪的 AI 工具活动状态文件"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -112,6 +114,13 @@ jobs:
           pnpm --filter @ai-job-print/admin build
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
+
+      - name: LightFlow UI static contracts
+        run: |
+          pnpm --filter @ai-job-print/ui verify:service-desk-foundation
+          pnpm --filter @ai-job-print/kiosk verify:home-service-desk
+          pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
+          pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
 
       - name: Terminal Agent verify suites
         # 不依赖 DB（本地网桥两套用真实临时目录 + 真实本地 HTTP server + 后端 stub），

@@ -1,0 +1,12 @@
+{
+  "id": "qingxu-lightflow-ui0-ui1-first-batch",
+  "title": "青序 LightFlow 三端商用 UX 迁移 UI-0 / UI-1 第一批",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档本任务；等待用户视觉验收与后续 CI 接入授权，不启动 UI-2",
+  "createdAt": "2026-07-12T11:54:22Z",
+  "branch": "codex/qingxu-lightflow-ui01-first-batch-20260712"
+}

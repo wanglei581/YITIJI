@@ -1,5 +1,6 @@
 /* ── Utility ──────────────────────────────────────────── */
 export { cn } from './lib/cn'
+export { getVisualThemeAttributes } from './theme/visualTheme'
 
 /* ── Base components ──────────────────────────────────── */
 export { Button, buttonVariants } from './components/Button'
@@ -49,6 +50,7 @@ export type { SpinnerProps } from './components/Spinner'
 export type { EmptyStateProps } from './components/EmptyState'
 export type { LoadingStateProps } from './components/LoadingState'
 export type { ErrorStateProps } from './components/ErrorState'
+export type { VisualTheme, UiDensity } from './theme/visualTheme'
 export type { KioskLayoutProps, KioskTab } from './layouts/KioskLayout'
 export type { AdminLayoutProps, NavItem } from './layouts/AdminLayout'
 export type { PartnerLayoutProps } from './layouts/PartnerLayout'
