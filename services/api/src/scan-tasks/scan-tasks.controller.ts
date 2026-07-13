@@ -7,6 +7,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -41,16 +42,24 @@ export class ScanTasksController {
 
   @Get('scan/sessions/:id')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
-  async status(@Param('id') id: string, @Req() req: Request) {
+  async status(
+    @Param('id') id: string,
+    @Query('controlToken') controlToken: string | undefined,
+    @Req() req: Request,
+  ) {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
-    const result = await this.scanTasks.getStatus(id, endUser?.endUserId ?? null)
+    const result = await this.scanTasks.getStatus(id, endUser?.endUserId ?? null, controlToken)
     return ApiResponse.ok(result)
   }
 
   @Delete('scan/sessions/:id')
-  async cancel(@Param('id') id: string, @Req() req: Request) {
+  async cancel(
+    @Param('id') id: string,
+    @Query('controlToken') controlToken: string | undefined,
+    @Req() req: Request,
+  ) {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
-    const result = await this.scanTasks.cancel(id, endUser?.endUserId ?? null)
+    const result = await this.scanTasks.cancel(id, endUser?.endUserId ?? null, controlToken)
     return ApiResponse.ok(result)
   }
 

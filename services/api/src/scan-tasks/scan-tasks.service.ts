@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
   ConflictException,
@@ -98,6 +98,23 @@ function isScanTaskActiveSessionConflict(e: unknown): boolean {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
 }
 
+/**
+ * B1-4：getStatus()/cancel() 统一要求 controlToken（会员+游客一视同仁，纵深防御
+ * 叠加在 endUserId 校验之上，而不是替代它）。
+ *
+ * 与本仓库既有惯例同款（如 job-fit.service.ts 的 tokenMatches() / mock-interview.service.ts
+ * 的 verifyToken()）：先对调用方传入的明文 token 做 sha256，转成 Buffer 后与存的 hash
+ * 做 timingSafeEqual；长度不一致时短路返回 false —— 绝不能让 timingSafeEqual 因为两个
+ * Buffer 长度不同而抛异常（那样反而会把"长度不同"这个信息通过异常/耗时差异暴露出去，
+ * 且会变成未处理异常而不是可控的 403）。
+ */
+function timingSafeEqualHex(token: string | undefined, expectedHash: string | null | undefined): boolean {
+  if (!token || !expectedHash) return false
+  const actual = Buffer.from(createHash('sha256').update(token).digest('hex'), 'hex')
+  const expected = Buffer.from(expectedHash, 'hex')
+  return actual.length === expected.length && timingSafeEqual(actual, expected)
+}
+
 @Injectable()
 export class ScanTasksService {
   private readonly logger = new Logger(ScanTasksService.name)
@@ -164,10 +181,21 @@ export class ScanTasksService {
     }
   }
 
-  async getStatus(scanTaskId: string, endUserId: string | null): Promise<ScanTaskStatusResult> {
+  async getStatus(
+    scanTaskId: string,
+    endUserId: string | null,
+    controlToken: string | undefined,
+  ): Promise<ScanTaskStatusResult> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({ error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } })
+    }
+    // 会员 + 游客一视同仁：controlToken 是纵深防御的第二层校验，叠加在下面的
+    // endUserId 归属校验之上（不是替代它）。历史行（B1-1 迁移前创建，
+    // controlTokenHash 为 null）一律拒绝——旧任务本来就该在几分钟内自然过期，
+    // 拒绝比"放行一个没有 token 保护的旧任务"更安全。
+    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
+      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' } })
     }
     if (task.endUserId && task.endUserId !== endUserId) {
       throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' } })
@@ -208,10 +236,19 @@ export class ScanTasksService {
     }
   }
 
-  async cancel(scanTaskId: string, endUserId: string | null): Promise<{ scanTaskId: string; status: 'cancelled' }> {
+  async cancel(
+    scanTaskId: string,
+    endUserId: string | null,
+    controlToken: string | undefined,
+  ): Promise<{ scanTaskId: string; status: 'cancelled' }> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({ error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } })
+    }
+    // 同 getStatus()：controlToken 校验叠加在 endUserId 校验之上，会员+游客一视同仁；
+    // 历史行（controlTokenHash 为 null）一律拒绝。
+    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
+      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' } })
     }
     if (task.endUserId && task.endUserId !== endUserId) {
       throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' } })

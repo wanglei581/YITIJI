@@ -2,7 +2,7 @@ import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcdef'
 
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
@@ -221,7 +221,7 @@ async function main(): Promise<void> {
     // scanType -> FilePurpose 映射:document 扫描必须落 print_doc（顺带覆盖，不单开一个测试块）
     assert.equal(prisma.filesById.get(delivered.fileId)?.purpose, 'print_doc')
 
-    const status = await service.getStatus(created.scanTaskId, null)
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'completed')
     assert.equal(status.file?.fileId, delivered.fileId)
     assert.match(status.file?.fileUrl ?? '', /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/)
@@ -344,7 +344,7 @@ async function main(): Promise<void> {
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
     prisma.scanTasksById.set(created.scanTaskId, { ...task, expiresAt: new Date(Date.now() - 1000) })
-    const status = await service.getStatus(created.scanTaskId, null)
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'expired')
     await expectRejects(
       () => service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'late.pdf', mimeType: 'application/pdf' }),
@@ -370,7 +370,7 @@ async function main(): Promise<void> {
       return originalUpdateMany(args)
     }) as typeof originalUpdateMany
 
-    await service.getStatus(created.scanTaskId, null)
+    await service.getStatus(created.scanTaskId, null, created.controlToken)
 
     assert.equal(
       prisma.scanTasksById.get(created.scanTaskId)?.status,
@@ -380,13 +380,135 @@ async function main(): Promise<void> {
   }
 
   {
-    // 他人不能查看 / 取消绑定了 endUserId 的任务
+    // 他人不能查看 / 取消绑定了 endUserId 的任务（这里全程带上正确 controlToken，
+    // 证明 endUserId 归属校验在 B1-4 之后依然独立生效，不是被 controlToken 校验顶替掉）。
     const { service } = makeService()
     const created = await service.create(dto, 'member_1')
-    await expectRejects(() => service.getStatus(created.scanTaskId, 'member_2'), ForbiddenException, 'status forbidden for non-owner')
-    await expectRejects(() => service.cancel(created.scanTaskId, 'member_2'), ForbiddenException, 'cancel forbidden for non-owner')
-    const cancelled = await service.cancel(created.scanTaskId, 'member_1')
+    await expectRejects(
+      () => service.getStatus(created.scanTaskId, 'member_2', created.controlToken),
+      ForbiddenException,
+      'status forbidden for non-owner',
+    )
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, 'member_2', created.controlToken),
+      ForbiddenException,
+      'cancel forbidden for non-owner',
+    )
+    const cancelled = await service.cancel(created.scanTaskId, 'member_1', created.controlToken)
     assert.equal(cancelled.status, 'cancelled')
+  }
+
+  {
+    // B1-4 案例(a)：正确 controlToken → 放行。会员任务（不只游客任务）也必须过 controlToken
+    // 校验——即便 endUserId 完全匹配本人，缺了/错了 controlToken 依然要 403。
+    const { service } = makeService()
+    const created = await service.create(dto, 'member_1')
+    const status = await service.getStatus(created.scanTaskId, 'member_1', created.controlToken)
+    assert.equal(status.status, 'waiting', 'correct token + correct owner must be granted access')
+  }
+
+  {
+    // B1-4 案例(b)：缺失 controlToken（undefined）→ 403，即便 endUserId 完全匹配本人
+    // （纵深防御：不能因为 JWT 归属校验通过了就跳过 token 校验）。同时覆盖 getStatus 与 cancel。
+    const { service } = makeService()
+    const createdMember = await service.create(dto, 'member_1')
+    await expectRejects(
+      () => service.getStatus(createdMember.scanTaskId, 'member_1', undefined),
+      ForbiddenException,
+      'missing controlToken must be rejected even for the correct member owner (status)',
+    )
+    await expectRejects(
+      () => service.cancel(createdMember.scanTaskId, 'member_1', undefined),
+      ForbiddenException,
+      'missing controlToken must be rejected even for the correct member owner (cancel)',
+    )
+
+    const createdGuest = await service.create(dto, null)
+    await expectRejects(
+      () => service.getStatus(createdGuest.scanTaskId, null, undefined),
+      ForbiddenException,
+      'missing controlToken must be rejected for guest tasks too (status)',
+    )
+    await expectRejects(
+      () => service.cancel(createdGuest.scanTaskId, null, undefined),
+      ForbiddenException,
+      'missing controlToken must be rejected for guest tasks too (cancel)',
+    )
+  }
+
+  {
+    // B1-4 案例(c)：错误 controlToken（格式合法但不匹配该任务的 hash）→ 403。
+    // 这条断言真正锁定 timingSafeEqualHex() 的哈希比对逻辑本身——如果实现被错误地改成
+    // 无条件 `return true`（或退化成只判断 truthy），这里会因为没有抛出 ForbiddenException
+    // 而失败，不是空判断。
+    const { service } = makeService()
+    const created = await service.create(dto, null)
+    const wrongToken = randomBytes(24).toString('hex')
+    assert.notEqual(wrongToken, created.controlToken, 'sanity: fixture must generate a genuinely different token')
+    await expectRejects(
+      () => service.getStatus(created.scanTaskId, null, wrongToken),
+      ForbiddenException,
+      'wrong controlToken must be rejected (status)',
+    )
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, wrongToken),
+      ForbiddenException,
+      'wrong controlToken must be rejected (cancel)',
+    )
+    // 用正确 token 复核同一条任务确实还活着、还能正常访问——证明上面两次 403
+    // 是 wrongToken 造成的，不是任务本身已经被别的路径弄坏了。
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(status.status, 'waiting')
+  }
+
+  {
+    // B1-4 案例(d)：token 属于另一个任务（跨任务）→ 403。证明比对是"逐任务哈希比对"，
+    // 不是拿去跟某个全局密钥/常量比。如果实现退化成"只要 token 是任意合法已铸造的
+    // token 就放行"，这里会因为没有抛出而失败。
+    const { service } = makeService()
+    const taskA = await service.create(dto, null)
+    const taskB = await service.create(dto, null)
+    assert.notEqual(taskA.controlToken, taskB.controlToken, 'sanity: two sessions must mint different tokens')
+    await expectRejects(
+      () => service.getStatus(taskB.scanTaskId, null, taskA.controlToken),
+      ForbiddenException,
+      'taskA token must not unlock taskB (status)',
+    )
+    await expectRejects(
+      () => service.cancel(taskB.scanTaskId, null, taskA.controlToken),
+      ForbiddenException,
+      'taskA token must not unlock taskB (cancel)',
+    )
+    // taskA 自己的 token 依然能访问 taskA，证明上面失败确实是"跨任务"导致，不是 token 整体失效。
+    const statusA = await service.getStatus(taskA.scanTaskId, null, taskA.controlToken)
+    assert.equal(statusA.status, 'waiting')
+  }
+
+  {
+    // B1-4 历史行兼容：controlTokenHash 为 null（B1-1 迁移前创建的旧行）必须一律拒绝，
+    // 即便调用方带了某个格式合法的 token——不能因为"看起来像是没设防"就放行，
+    // 这类旧行应该在几分钟内自然过期，拒绝比放行更安全。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    const task = prisma.scanTasksById.get(created.scanTaskId)!
+    prisma.scanTasksById.set(created.scanTaskId, { ...task, controlTokenHash: null })
+
+    await expectRejects(
+      () => service.getStatus(created.scanTaskId, null, created.controlToken),
+      ForbiddenException,
+      'legacy row with null controlTokenHash must be rejected even with the (no-longer-verifiable) original token (status)',
+    )
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, created.controlToken),
+      ForbiddenException,
+      'legacy row with null controlTokenHash must be rejected even with the (no-longer-verifiable) original token (cancel)',
+    )
+    // 再用一个完全无关的随机 token 试一次，确认不是"刚好这个 token 不对"，而是 null hash 本身就全拒。
+    await expectRejects(
+      () => service.getStatus(created.scanTaskId, null, randomBytes(24).toString('hex')),
+      ForbiddenException,
+      'legacy row with null controlTokenHash must reject an unrelated token too (status)',
+    )
   }
 
   {
@@ -394,14 +516,19 @@ async function main(): Promise<void> {
     const { service } = makeService()
     const created = await service.create(dto, null)
     await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
-    await expectRejects(() => service.cancel(created.scanTaskId, null), BadRequestException, 'completed task cannot be cancelled')
+    await expectRejects(
+      () => service.cancel(created.scanTaskId, null, created.controlToken),
+      BadRequestException,
+      'completed task cannot be cancelled',
+    )
   }
 
   {
-    // 不存在的任务查询 / 取消都应 404
+    // 不存在的任务查询 / 取消都应 404（404 判定必须先于 controlToken 校验：
+    // 这里刻意不传 controlToken，证明缺 token 不会把本该是 404 的响应变成别的错误码）。
     const { service } = makeService()
-    await expectRejects(() => service.getStatus('missing', null), NotFoundException, 'status not found')
-    await expectRejects(() => service.cancel('missing', null), NotFoundException, 'cancel not found')
+    await expectRejects(() => service.getStatus('missing', null, undefined), NotFoundException, 'status not found')
+    await expectRejects(() => service.cancel('missing', null, undefined), NotFoundException, 'cancel not found')
   }
 
   {
@@ -464,7 +591,7 @@ async function main(): Promise<void> {
       'deliverScanFile must rethrow the original upload error',
     )
 
-    const status = await service.getStatus(created.scanTaskId, null)
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'failed')
     assert.equal(status.errorCode, 'SCAN_UPLOAD_FAILED')
     assert.equal(
@@ -481,7 +608,7 @@ async function main(): Promise<void> {
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
     prisma.scanTasksById.set(created.scanTaskId, { ...task, status: 'matched' })
-    const cancelled = await service.cancel(created.scanTaskId, null)
+    const cancelled = await service.cancel(created.scanTaskId, null, created.controlToken)
     assert.equal(cancelled.status, 'cancelled')
   }
 
@@ -489,7 +616,7 @@ async function main(): Promise<void> {
     // 取消后的任务不再是 waiting，不能被后续投递误撞；投递必须匹配到之后新建的会话。
     const { service } = makeService()
     const first = await service.create(dto, null)
-    const cancelled = await service.cancel(first.scanTaskId, null)
+    const cancelled = await service.cancel(first.scanTaskId, null, first.controlToken)
     assert.equal(cancelled.status, 'cancelled')
     const second = await service.create(dto, null)
     const delivered = await service.deliverScanFile({
@@ -533,7 +660,7 @@ async function main(): Promise<void> {
       'deliver must refuse to complete a task cancelled during upload',
     )
 
-    const status = await service.getStatus(created.scanTaskId, null)
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'cancelled', 'task must remain cancelled, not silently marked completed')
   }
 
@@ -565,7 +692,7 @@ async function main(): Promise<void> {
 
     let caught: unknown
     try {
-      await service.cancel(created.scanTaskId, null)
+      await service.cancel(created.scanTaskId, null, created.controlToken)
     } catch (error) {
       caught = error
     }
