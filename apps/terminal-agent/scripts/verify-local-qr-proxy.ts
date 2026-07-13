@@ -8,6 +8,8 @@ const ALLOWED_ORIGIN = 'http://localhost:5173'
 const DENIED_ORIGIN = 'http://evil.example'
 const TICKET_ID = 'qrtest_abcdefghijklmnopqrstuvwxyz012345'
 const CLAIM_TOKEN = 'claim_token_abcdefghijklmnopqrstuvwxyz012345'
+const BRIDGE_TOKEN = 'bridge-token-abcdefghijklmnopqrstuvwxyz012345'
+const WRONG_BRIDGE_TOKEN = 'wrong-token-wrong-token-wrong-token-000'
 
 interface RecordedRequest {
   method: string
@@ -93,12 +95,17 @@ async function startBackendStub(): Promise<{ baseUrl: string; records: RecordedR
   }
 }
 
-async function postJson<T>(url: string, body: unknown, origin = ALLOWED_ORIGIN): Promise<{ status: number; json: T }> {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: origin },
-    body: JSON.stringify(body),
-  })
+async function postJson<T>(
+  url: string,
+  body: unknown,
+  opts: { origin?: string; bridgeToken?: string | null } = {},
+): Promise<{ status: number; json: T }> {
+  const origin = opts.origin ?? ALLOWED_ORIGIN
+  // undefined → 默认合法令牌(多数用例走happy path);显式传 null 才是"不带令牌"。
+  const bridgeToken = opts.bridgeToken === undefined ? BRIDGE_TOKEN : opts.bridgeToken
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Origin: origin }
+  if (bridgeToken) headers['X-Local-Bridge-Token'] = bridgeToken
+  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
   return { status: response.status, json: (await response.json()) as T }
 }
 
@@ -126,6 +133,7 @@ async function main(): Promise<void> {
     agentToken: 'agent-token-secret',
     localApiPort: 0,
     localApiAllowedOrigins: [ALLOWED_ORIGIN],
+    localApiBridgeToken: BRIDGE_TOKEN,
   }
 
   const handle = startQrLoginLocalServer(config)
@@ -139,10 +147,26 @@ async function main(): Promise<void> {
     const denied = await postJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/qr-login/create`,
       { returnTo: '/me' },
-      DENIED_ORIGIN,
+      { origin: DENIED_ORIGIN },
     )
     assert.equal(denied.status, 403, 'wrong Origin must be rejected')
     assert.equal(denied.json.error.code, 'LOCAL_QR_ORIGIN_FORBIDDEN')
+
+    const missingToken = await postJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/qr-login/create`,
+      { returnTo: '/me' },
+      { bridgeToken: null },
+    )
+    assert.equal(missingToken.status, 403, 'missing bridge token must be rejected')
+    assert.equal(missingToken.json.error.code, 'LOCAL_QR_BRIDGE_TOKEN_INVALID')
+
+    const wrongToken = await postJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/qr-login/create`,
+      { returnTo: '/me' },
+      { bridgeToken: WRONG_BRIDGE_TOKEN },
+    )
+    assert.equal(wrongToken.status, 403, 'wrong bridge token must be rejected')
+    assert.equal(wrongToken.json.error.code, 'LOCAL_QR_BRIDGE_TOKEN_INVALID')
 
     const options = await preflight(`${localBase}/local/qr-login/create`)
     assert.equal(options.status, 204)
@@ -206,7 +230,48 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+// Agent 侧未配置令牌 → 整个 /local/qr-login/* 分支 fail-closed，
+// 即使客户端带上"正确"的令牌也必须 403（对齐 verify-usb-import-agent.ts Part 3）。
+async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
+  const backend = await startBackendStub()
+  const config: AgentConfig = {
+    apiBaseUrl: backend.baseUrl,
+    terminalCode: 'T-LOCAL-QR-NOTOKEN',
+    printerName: 'Test Printer',
+    agentVersion: 'verify',
+    terminalId: 'terminal-qr-2',
+    agentToken: 'agent-token-secret',
+    localApiPort: 0,
+    localApiAllowedOrigins: [ALLOWED_ORIGIN],
+    // localApiBridgeToken 故意不配置
+  }
+
+  const handle = startQrLoginLocalServer(config)
+  assert.ok(handle, 'local QR server should start even without a bridge token')
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  const address = handle.server.address()
+  assert.ok(typeof address === 'object' && address, 'local QR server must expose an address')
+  const localBase = `http://127.0.0.1:${address.port}`
+
+  try {
+    const denied = await postJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/qr-login/create`,
+      { returnTo: '/me' },
+      { bridgeToken: BRIDGE_TOKEN },
+    )
+    assert.equal(denied.status, 403, 'unconfigured bridge token must fail closed even with a client-side token')
+    assert.equal(denied.json.error.code, 'LOCAL_QR_BRIDGE_TOKEN_INVALID')
+
+    console.log('verify-local-qr-proxy: unconfigured-token instance fail-closed ok')
+  } finally {
+    await handle.close()
+    await backend.close()
+  }
+}
+
+main()
+  .then(() => verifyUnconfiguredTokenFailClosed())
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
