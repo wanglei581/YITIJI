@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
-import { createPrismaClient } from '../src/prisma/create-client'
+import { createPrismaClient, dbKindOf } from '../src/prisma/create-client'
 import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
@@ -224,6 +224,92 @@ async function expectRejects<T extends Error>(
   assert.equal(rejected, true, `${label}: expected rejection`)
 }
 
+/**
+ * B1-9 共享断言体：对一个真实迁移过的数据库（SQLite 或 Postgres 皆可）连接，
+ * 端到端跑一遍 B1-2 partial unique index 的完整行为断言——create() 成功、
+ * 'waiting' 状态下第二次 create() 命中真实 P2002 并映射为 SCAN_TERMINAL_BUSY、
+ * 'matched' 状态同样被挡、四种终态（completed/cancelled/expired/failed）依次
+ * 验证均不再挡后续创建。SQLite 块与 Postgres 块（见 main() 内两个独立 `{}` 块）
+ * 共用同一套断言，避免"两个数据库各测各的、悄悄漂移出不一致覆盖"。
+ *
+ * `label` 仅用于失败消息里标注是哪个数据库跑出的断言失败，方便排障。
+ */
+async function assertRealDbPartialUniqueIndex(dbUrl: string, label: 'sqlite' | 'postgres'): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  try {
+    const realPrisma = { terminal: client.terminal, scanTask: client.scanTask } as never
+    // create() 本身不触碰 this.files，真实 FilesService 在这里没有必要。
+    const service = new ScanTasksService(realPrisma, {} as never, passthroughCapabilities)
+
+    const terminalId = `realdb_t_${label}_${randomBytes(4).toString('hex')}`
+    try {
+      await client.terminal.create({
+        data: {
+          id: terminalId,
+          terminalCode: `RDB-${label}-${randomBytes(3).toString('hex')}`,
+          agentToken: randomBytes(16).toString('hex'),
+          deviceFingerprint: 'verify-scan-tasks-realdb-fixture',
+          enabled: true,
+        },
+      })
+
+      const first = await service.create({ scanType: 'document', terminalId }, null)
+      assert.ok(first.scanTaskId, `real DB (${label}): first create() must succeed`)
+
+      let caughtWaiting: unknown
+      try {
+        await service.create({ scanType: 'document', terminalId }, null)
+      } catch (error) {
+        caughtWaiting = error
+      }
+      assert.ok(
+        caughtWaiting instanceof ConflictException,
+        `real DB (${label}): second create() while first is still 'waiting' must hit the real partial unique index and be mapped to ConflictException, got ${(caughtWaiting as Error)?.constructor?.name}`,
+      )
+      assert.equal(
+        ((caughtWaiting as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+        'SCAN_TERMINAL_BUSY',
+        `real DB (${label}): real P2002 from the actual migration-created index must map to SCAN_TERMINAL_BUSY`,
+      )
+
+      // 约束的 WHERE 子句是 status IN ('waiting','matched')——单独验证 'matched' 分支也真的
+      // 挡住新建，不能只测 'waiting'（否则如果约束被误写成只覆盖 'waiting'，这里测不出来）。
+      await client.scanTask.updateMany({ where: { id: first.scanTaskId }, data: { status: 'matched' } })
+      let caughtMatched: unknown
+      try {
+        await service.create({ scanType: 'document', terminalId }, null)
+      } catch (error) {
+        caughtMatched = error
+      }
+      assert.ok(
+        caughtMatched instanceof ConflictException,
+        `real DB (${label}): a 'matched' (not just 'waiting') active task must also block new create(), got ${(caughtMatched as Error)?.constructor?.name}`,
+      )
+
+      // 四种终态依次验证：每种都必须真的不再挡后续创建（证明约束只覆盖 waiting/matched，
+      // 不是全状态生效，也不是压根没生效导致"看起来放行"其实是约束整体失效）。
+      let activeTaskId = first.scanTaskId
+      for (const terminalState of ['completed', 'cancelled', 'expired', 'failed'] as const) {
+        await client.scanTask.updateMany({ where: { id: activeTaskId }, data: { status: terminalState } })
+        const created = await service.create({ scanType: 'document', terminalId }, null)
+        assert.ok(
+          created.scanTaskId,
+          `real DB (${label}): after prior task transitions to '${terminalState}', same terminal must be able to create again`,
+        )
+        activeTaskId = created.scanTaskId
+      }
+    } finally {
+      // 无论断言是否失败都尝试清理，避免污染共享的 Postgres 开发库/CI 库
+      // （SQLite 分支额外靠外层临时目录整体删除兜底，这里的清理对它是锦上添花）。
+      await client.scanTask.deleteMany({ where: { terminalId } })
+      await client.terminal.deleteMany({ where: { id: terminalId } })
+    }
+  } finally {
+    await client.$disconnect()
+  }
+}
+
 async function main(): Promise<void> {
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
 
@@ -359,77 +445,61 @@ async function main(): Promise<void> {
         stdio: 'pipe',
       })
 
-      const { client } = createPrismaClient(dbUrl)
-      await client.$connect()
-      try {
-        const realPrisma = { terminal: client.terminal, scanTask: client.scanTask } as never
-        // create() 本身不触碰 this.files，真实 FilesService 在这里没有必要。
-        const service = new ScanTasksService(realPrisma, {} as never, passthroughCapabilities)
-
-        const terminalId = `realdb_t_${randomBytes(4).toString('hex')}`
-        await client.terminal.create({
-          data: {
-            id: terminalId,
-            terminalCode: `RDB-${randomBytes(3).toString('hex')}`,
-            agentToken: randomBytes(16).toString('hex'),
-            deviceFingerprint: 'verify-scan-tasks-realdb-fixture',
-            enabled: true,
-          },
-        })
-
-        const first = await service.create({ scanType: 'document', terminalId }, null)
-        assert.ok(first.scanTaskId, 'real DB: first create() must succeed')
-
-        let caughtWaiting: unknown
-        try {
-          await service.create({ scanType: 'document', terminalId }, null)
-        } catch (error) {
-          caughtWaiting = error
-        }
-        assert.ok(
-          caughtWaiting instanceof ConflictException,
-          `real DB: second create() while first is still 'waiting' must hit the real partial unique index and be mapped to ConflictException, got ${(caughtWaiting as Error)?.constructor?.name}`,
-        )
-        assert.equal(
-          ((caughtWaiting as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
-          'SCAN_TERMINAL_BUSY',
-          'real DB: real P2002 from the actual migration-created index must map to SCAN_TERMINAL_BUSY',
-        )
-
-        // 约束的 WHERE 子句是 status IN ('waiting','matched')——单独验证 'matched' 分支也真的
-        // 挡住新建，不能只测 'waiting'（否则如果约束被误写成只覆盖 'waiting'，这里测不出来）。
-        await client.scanTask.updateMany({ where: { id: first.scanTaskId }, data: { status: 'matched' } })
-        let caughtMatched: unknown
-        try {
-          await service.create({ scanType: 'document', terminalId }, null)
-        } catch (error) {
-          caughtMatched = error
-        }
-        assert.ok(
-          caughtMatched instanceof ConflictException,
-          `real DB: a 'matched' (not just 'waiting') active task must also block new create(), got ${(caughtMatched as Error)?.constructor?.name}`,
-        )
-
-        // 四种终态依次验证：每种都必须真的不再挡后续创建（证明约束只覆盖 waiting/matched，
-        // 不是全状态生效，也不是压根没生效导致"看起来放行"其实是约束整体失效）。
-        let activeTaskId = first.scanTaskId
-        for (const terminalState of ['completed', 'cancelled', 'expired', 'failed'] as const) {
-          await client.scanTask.updateMany({ where: { id: activeTaskId }, data: { status: terminalState } })
-          const created = await service.create({ scanType: 'document', terminalId }, null)
-          assert.ok(
-            created.scanTaskId,
-            `real DB: after prior task transitions to '${terminalState}', same terminal must be able to create again`,
-          )
-          activeTaskId = created.scanTaskId
-        }
-
-        await client.scanTask.deleteMany({ where: { terminalId } })
-        await client.terminal.deleteMany({ where: { id: terminalId } })
-      } finally {
-        await client.$disconnect()
-      }
+      await assertRealDbPartialUniqueIndex(dbUrl, 'sqlite')
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
+    }
+  }
+
+  {
+    // B1-9 follow-up：上面的 SQLite 块只证明了 prisma/migrations/ 下那份 migration.sql 真实
+    // 生效——但 partial unique index 是手写 SQL，SQLite 版和 prisma/postgres/migrations/ 下的
+    // Postgres 版是两份独立的 .sql 文件（Prisma 的 @@unique 语法表达不了 WHERE 条件，所以两边
+    // 都得手写，天然就有"改了一份忘改另一份"的漂移风险）。CI 的 postgres-readiness job 会真的
+    // 把 Postgres 版迁移部署到一个真实 Postgres 实例上，但在这个 B1-9 补丁之前，从没有任何测试
+    // 真的对着那个连接跑两次 create() 去验证约束的 WHERE 子句在 Postgres 上语义正确——SQLite
+    // 那半边测过不代表 Postgres 那半边也一定对（哪怕两份 .sql 文本几乎一样）。
+    //
+    // 复用哪个数据库连接、要不要单独建库/建 schema：本仓库目前唯一存在的"对真实 Postgres 跑
+    // 测试"先例，是 postgres-readiness CI job 本身的架构——整个 job 起一个 Postgres service
+    // 容器、部署一次迁移、seed 一次，然后几十个 verify:* 脚本依次共用同一个数据库连接，靠各自
+    // 随机 ID + 用完自己清理来避免互相污染（见本文件其余 verify:* 脚本的调用方式：
+    // .github/workflows/ci.yml 的 postgres-readiness job）。这里跟随同一个约定：直接连到
+    // POSTGRES_URL（CI 场景）或退化到 DATABASE_URL（本地场景，与 prisma.postgres.config.ts
+    // 读取 env 的优先级一致），不额外发明"每个测试起一个独立 schema/database"的新隔离机制——
+    // assertRealDbPartialUniqueIndex() 内部沿用与 SQLite 块相同的随机 terminalId + finally
+    // 清理，不会残留数据。
+    //
+    // 没有配置 Postgres 环境时（例如本地开发者跑 `pnpm verify:scan-tasks` 没起 Postgres）优雅
+    // 跳过，不失败——跟 scripts/verify-cos-live.ts 对未配置真实凭证时的处理方式一致（SKIPPED
+    // + 说明如何补齐环境，而不是让本来就该用 SQLite 跑的日常验证因为缺 Postgres 而报红）。
+    const pgUrl = process.env['POSTGRES_URL']?.trim() || process.env['DATABASE_URL']?.trim()
+    let pgKind: ReturnType<typeof dbKindOf> | undefined
+    try {
+      pgKind = pgUrl ? dbKindOf(pgUrl) : undefined
+    } catch {
+      pgKind = undefined
+    }
+
+    if (!pgUrl || pgKind !== 'postgres') {
+      console.log(
+        'SKIPPED real DB (postgres) partial unique index check — 未检测到指向 PostgreSQL 的 POSTGRES_URL/DATABASE_URL，跳过。' +
+          ' 本地要跑此项：export POSTGRES_URL="postgresql://user@localhost:5432/db" 后重试；' +
+          ' postgres-readiness CI job 会用真实 Postgres 实例跑到这一段。',
+      )
+    } else {
+      const apiRoot = path.resolve(__dirname, '..')
+      // 与 SQLite 块一致：不假设调用方已经在本进程之外部署过迁移，本块自己也跑一遍真实
+      // `migrate deploy`（走 Postgres 专用配置/迁移目录，见 prisma.postgres.config.ts）。
+      // migrate deploy 是幂等的，对已经部署过这条迁移的库（如 CI 提前 db:pg:deploy 过的库）
+      // 重跑是安全的no-op。
+      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy', '--config', 'prisma.postgres.config.ts'], {
+        cwd: apiRoot,
+        env: { ...process.env, DATABASE_URL: pgUrl, POSTGRES_URL: pgUrl },
+        stdio: 'pipe',
+      })
+
+      await assertRealDbPartialUniqueIndex(pgUrl, 'postgres')
     }
   }
 
