@@ -8,6 +8,7 @@ export const PURPOSE_META: Record<AdminFilePurpose, { label: string; style: stri
   resume_upload:        { label: '简历上传',   style: 'bg-info-bg text-info-fg',     source: '用户上传' },
   resume_scan:          { label: '简历扫描',   style: 'bg-purple-50 text-purple-600', source: '扫描仪'   },
   id_scan:              { label: '身份证',     style: 'bg-error-bg text-error-fg',       source: '扫描仪'   },
+  id_photo_print:       { label: '证件照排版',  style: 'bg-error-bg text-error-fg',       source: '证件照服务' },
   print_doc:            { label: '打印文档',   style: 'bg-neutral-100 text-neutral-600',    source: '打印上传' },
   fair_material:        { label: '招聘会资料', style: 'bg-success-bg text-success-fg',    source: '机构上传' },
   cover_letter:         { label: '求职信',     style: 'bg-info-bg text-info-fg',     source: '用户上传' },

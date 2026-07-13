@@ -19,6 +19,7 @@ export type FilePurpose =
   | 'resume_upload'
   | 'resume_scan'
   | 'id_scan'
+  | 'id_photo_print'   // 证件照排版 PDF(高敏,服务端生成,用户不可直接上传)
   | 'print_doc'
   | 'fair_material'
   | 'cover_letter'

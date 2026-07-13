@@ -20,6 +20,7 @@ export type FilePurpose =
   | 'resume_upload'    // 求职者上传简历(高敏)
   | 'resume_scan'      // Kiosk 扫描纸质简历(高敏)
   | 'id_scan'          // 身份证 / 证件照(高敏)
+  | 'id_photo_print'   // 证件照排版 PDF(高敏,服务端生成,用户不可直接上传)
   | 'print_doc'        // 通用打印文档(普通)
   | 'fair_material'    // 招聘会 / 模板素材(普通)
   | 'cover_letter'     // 求职信 / 推荐信(敏感)

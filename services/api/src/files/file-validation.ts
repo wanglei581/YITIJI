@@ -57,6 +57,8 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
   resume_upload: { mimes: [...PDF_DOC_IMG, 'text/plain', 'text/markdown'], maxBytes: 20 * MB },
   resume_scan: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
   id_scan: { mimes: IMG, maxBytes: 10 * MB },
+  // 证件照排版 PDF:仅服务端生成物(id-photo 模块 FilesService.upload),不进任何用户上传 DTO 白名单
+  id_photo_print: { mimes: ['application/pdf'], maxBytes: 20 * MB },
   cover_letter: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
   // 招聘会 / 机构资料
   fair_material: { mimes: [...PRINTABLE, 'image/webp'], maxBytes: 30 * MB },
@@ -77,6 +79,7 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
   resume_upload: 'highly_sensitive',
   resume_scan: 'highly_sensitive',
   id_scan: 'highly_sensitive',
+  id_photo_print: 'highly_sensitive',
   cover_letter: 'sensitive',
   print_doc: 'normal',
   fair_material: 'normal',

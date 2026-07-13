@@ -12,6 +12,7 @@ const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   resume_upload: 'highly_sensitive',
   resume_scan: 'highly_sensitive',
   id_scan: 'highly_sensitive',
+  id_photo_print: 'highly_sensitive',
   print_doc: 'normal',
   fair_material: 'normal',
   cover_letter: 'sensitive',

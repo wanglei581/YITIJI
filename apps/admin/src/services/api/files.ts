@@ -18,6 +18,7 @@ export type AdminFilePurpose =
   | 'resume_upload'
   | 'resume_scan'
   | 'id_scan'
+  | 'id_photo_print'
   | 'print_doc'
   | 'fair_material'
   | 'cover_letter'
