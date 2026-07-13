@@ -38,6 +38,8 @@
 
 **执行状态（2026-07-13，本地候选）**：基线已安全快进 `origin/main=08c7588e`。K1 静态合同先 RED 后 GREEN；手机上传动态 `aria-label`、CSS 根作用域与 Help FAQ 无空格 a11y ID 另有 RED→GREEN 修复。三个 K1 verify、Kiosk typecheck、lint（0 error；仅既有且未触及的 `KioskBusyContext` 两条 Fast Refresh warning）、production build 与 `git diff --check` 已本地通过；CI 仅增加三条 K1 Kiosk 命令，并保留主线 #211 CI 修复。Vite preview 已覆盖 1080×1920、390×844、390×700 下未勾协议禁用、缺 QR ticket、缺 upload hash、法律返回、Help FAQ/来源 state、无屏保素材返回首页。preview 未接 API，屏保/config 请求为 500、favicon 为 404，故不记录为 UX-2 真实 HTTP 成功闭环，也不代表预生产、Windows 真机或生产验收。内部规格复审和质量复审 APPROVE；Claude 终审 APPROVE，其 Help a11y Warning 已 TDD 修复并获 Claude 复审 APPROVE；Antigravity 两次因地区不可用未产生有效报告，因此未形成有效外部双批准。候选仅限本地分支，未 push、合并或部署。
 
+**UX 审查整改（2026-07-13）**：Ardot 审查发现的嵌套交互、重复 `alert`、扫码/上传失效态和 `idle` 内部词已纳入同一 K1 静态合同并完成 RED→GREEN。Playwright 语义树确认协议、手机号与发送验证码均为并列控件，扫码未勾协议只有一个 `alert`；390×844 与 390×700 确认扫码/上传失效时不再展示表单或文件选择器外观；1080×1920 确认 Help 状态为“服务正常”。待机屏有素材态通过浏览器会话测试列表验证媒体、提示与 Enter 唤醒，未改生产播放逻辑或注入假数据。证据仍为本地 UX-1，不代表真实 API、预生产或真机验收。
+
 ## 1. 静态合同（先 RED）
 
 ### Task 1: 写 K1 verify，并确认当前 main 为 RED

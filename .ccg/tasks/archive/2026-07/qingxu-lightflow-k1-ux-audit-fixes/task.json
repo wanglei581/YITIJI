@@ -1,0 +1,12 @@
+{
+  "id": "qingxu-lightflow-k1-ux-audit-fixes",
+  "title": "修正青序 LightFlow K1 UX 审查问题",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并创建本地提交",
+  "createdAt": "2026-07-13T15:30:00+08:00",
+  "branch": "codex/qingxu-lightflow-k1-20260713"
+}

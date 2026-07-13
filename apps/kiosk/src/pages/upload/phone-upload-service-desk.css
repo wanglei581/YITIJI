@@ -69,6 +69,10 @@
   font-weight: 650;
   line-height: 1.65;
 }
+.k1-phone-upload .phone-upload-invalid { min-height: 272px; margin-top: 20px; padding: 32px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--sd-category-orange-fg); background: var(--sd-category-orange-bg); border: 1px solid color-mix(in srgb, var(--sd-category-orange-fg) 22%, var(--sd-color-line)); border-radius: 22px; text-align: center; }
+.k1-phone-upload .phone-upload-invalid svg { width: 42px; height: 42px; }
+.k1-phone-upload .phone-upload-invalid h2 { margin: 18px 0 0; color: inherit; font-size: clamp(20px, 3vw, 26px); font-weight: 850; line-height: 1.3; }
+.k1-phone-upload .phone-upload-invalid p { max-width: 430px; margin: 10px 0 0; color: inherit; font-size: 15px; font-weight: 700; line-height: 1.7; }
 .k1-phone-upload .phone-upload-picker {
   position: relative;
   min-height: 272px;

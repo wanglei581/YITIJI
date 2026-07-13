@@ -465,6 +465,44 @@ expectPattern(
   'PhoneUploadPage 必须以当前 sessionId 调用 uploadPhoneSessionFile',
 )
 
+expectIncludes(loginPage, 'className="k-agree-check"', 'LoginPage 协议勾选必须是独立交互控件')
+expectIncludes(loginPage, 'className="k-input-target"', 'LoginPage 手机号输入触发区必须与发送验证码按钮并列')
+expectNotIncludes(loginPage, 'role="link"', 'LoginPage 协议入口必须使用原生交互控件')
+expectIncludes(loginPage, '<Link className="doclink" to="/legal/terms">', 'LoginPage 用户协议必须使用原生链接语义')
+expectPattern(
+  loginPage,
+  /const canSend = agreed && phone\.length === PHONE_LENGTH && countdown === 0 && !loading/,
+  'LoginPage 未同意协议时不得启用发送验证码',
+)
+expectPattern(
+  loginPage,
+  /const canLogin = agreed && phone\.length === PHONE_LENGTH && code\.length === CODE_LENGTH && !loading/,
+  'LoginPage 未同意协议时不得启用登录',
+)
+expectIncludes(loginPage, '勾选协议后可获取验证码并登录', 'LoginPage 协议禁用门禁必须有可见原因')
+expect(
+  (loginPage.match(/role="alert"/g) ?? []).length === 1,
+  'LoginPage 只允许一个错误 alert 区，扫码错误由 ScanQrLoginPanel 自己播报',
+)
+
+expectNotIncludes(kioskRoot, 'label={deviceStatus}', 'KioskRoot 不得直接展示内部 deviceStatus')
+expectIncludes(kioskRoot, 'const statusLabel =', 'KioskRoot 必须把设备状态映射为用户文案')
+expectIncludes(kioskRoot, "busy: '正在服务'", 'KioskRoot busy 状态不得误写为维护中')
+
+expectIncludes(mobileQrPage, 'k1-mobile-qr-invalid', 'MobileQrLoginPage 缺票据或失效时必须使用单一恢复状态')
+expectPattern(
+  mobileQrPage,
+  /!ready\s*\?\s*\([\s\S]*?k1-mobile-qr-invalid[\s\S]*?\)\s*:\s*\(/,
+  'MobileQrLoginPage 只有 ready 后才能展示确认表单',
+)
+expectIncludes(mobileQrPage, 'k1-mobile-qr-error', 'MobileQrLoginPage ready 后必须保留短信或确认失败提示')
+expectIncludes(phoneUploadPage, 'phone-upload-invalid', 'PhoneUploadPage 缺少令牌时必须使用单一恢复状态')
+expectPattern(
+  phoneUploadPage,
+  /!ready\s*\?\s*\([\s\S]*?phone-upload-invalid[\s\S]*?\)\s*:\s*\(/,
+  'PhoneUploadPage 只有 ready 后才能展示文件选择器',
+)
+
 for (const forbiddenCopy of ['一键投递', '立即投递', '平台投递']) {
   for (const [source, label] of [
     [loginPage, 'LoginPage'],

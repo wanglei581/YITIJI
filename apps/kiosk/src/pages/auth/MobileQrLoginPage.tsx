@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCircle2Icon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
+import { CheckCircle2Icon, CircleAlertIcon, LoaderCircleIcon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
 import { MemberApiError, sendSmsCode } from '../../services/auth/memberAuthApi'
 import { confirmQrLogin, fetchQrLoginStatus } from '../../services/auth/memberQrLoginApi'
 import './mobile-qr-service-desk.css'
@@ -107,6 +107,7 @@ export function MobileQrLoginPage() {
 
   const canSend = ready && phone.length === PHONE_LENGTH && countdown.seconds === 0 && !loading && !confirmed
   const canConfirm = ready && phone.length === PHONE_LENGTH && code.length === CODE_LENGTH && !loading && !confirmed
+  const recoveryMessage = !ticketId ? '二维码缺少登录票据，请回到一体机刷新二维码后重新扫码。' : error
 
   return (
     <main className="service-desk k1-mobile-qr-login" data-visual-theme="service-desk" data-ux-density="touch">
@@ -119,85 +120,106 @@ export function MobileQrLoginPage() {
           <p>
             输入手机号和短信验证码后，一体机会自动进入会员登录态。
           </p>
-          <div className="k1-mobile-qr-device">
-            设备提示：{deviceLabel ?? '正在识别一体机'}
-            <br />
-            请确认它与你面前的一体机一致，再继续登录。
-          </div>
+          {!ready && !recoveryMessage && (
+            <div className="k1-mobile-qr-device" role="status" aria-live="polite">
+              正在识别一体机，请稍候…
+            </div>
+          )}
+          {ready && (
+            <div className="k1-mobile-qr-device">
+              设备提示：{deviceLabel ?? '当前扫码的一体机'}
+              <br />
+              请确认它与你面前的一体机一致，再继续登录。
+            </div>
+          )}
         </div>
 
         <div className="k1-mobile-qr-card">
-          <label className="k1-mobile-qr-label">手机号</label>
-          <div className="k1-mobile-qr-field">
-            <span className="k1-mobile-qr-prefix">+86</span>
-            <input
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
-              value={phone}
-              disabled={confirmed}
-              onChange={(event) => setPhone(normalizeDigits(event.target.value, PHONE_LENGTH))}
-              placeholder="请输入手机号"
-              className="k1-mobile-qr-input"
-            />
-          </div>
+          {!ready ? (
+            recoveryMessage ? (
+              <div className="k1-mobile-qr-invalid" role="alert" aria-live="polite">
+                <CircleAlertIcon aria-hidden="true" />
+                <h2>暂时无法确认登录</h2>
+                <p>{recoveryMessage}</p>
+                {ticketId && (
+                  <button type="button" onClick={loadTicketStatus} className="k1-mobile-qr-retry">
+                    重新检查二维码
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="k1-mobile-qr-checking" role="status" aria-live="polite">
+                <LoaderCircleIcon aria-hidden="true" />
+                <p>正在检查二维码是否有效…</p>
+              </div>
+            )
+          ) : (
+            <>
+              <label className="k1-mobile-qr-label" htmlFor="k1-mobile-qr-phone">手机号</label>
+              <div className="k1-mobile-qr-field">
+                <span className="k1-mobile-qr-prefix">+86</span>
+                <input
+                  id="k1-mobile-qr-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  value={phone}
+                  disabled={confirmed}
+                  onChange={(event) => setPhone(normalizeDigits(event.target.value, PHONE_LENGTH))}
+                  placeholder="请输入手机号"
+                  className="k1-mobile-qr-input"
+                />
+              </div>
 
-          <label className="k1-mobile-qr-label k1-mobile-qr-code-label">验证码</label>
-          <div className="k1-mobile-qr-code-row">
-            <div className="k1-mobile-qr-field k1-mobile-qr-code-field">
-              <ShieldCheckIcon aria-hidden="true" />
-              <input
-                type="tel"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                disabled={confirmed}
-                onChange={(event) => setCode(normalizeDigits(event.target.value, CODE_LENGTH))}
-                placeholder="6位验证码"
-                className="k1-mobile-qr-input k1-mobile-qr-code-input"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleSendCode}
-              disabled={!canSend}
-              className="k1-mobile-qr-send"
-            >
-              {loading ? '处理中' : countdown.seconds > 0 ? `${countdown.seconds}s` : '获取验证码'}
-            </button>
-          </div>
+              <label className="k1-mobile-qr-label k1-mobile-qr-code-label" htmlFor="k1-mobile-qr-code">验证码</label>
+              <div className="k1-mobile-qr-code-row">
+                <div className="k1-mobile-qr-field k1-mobile-qr-code-field">
+                  <ShieldCheckIcon aria-hidden="true" />
+                  <input
+                    id="k1-mobile-qr-code"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    disabled={confirmed}
+                    onChange={(event) => setCode(normalizeDigits(event.target.value, CODE_LENGTH))}
+                    placeholder="6位验证码"
+                    className="k1-mobile-qr-input k1-mobile-qr-code-input"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={!canSend}
+                  className="k1-mobile-qr-send"
+                >
+                  {loading ? '处理中' : countdown.seconds > 0 ? `${countdown.seconds}s` : '获取验证码'}
+                </button>
+              </div>
 
-          {notice && (
-            <div className="k1-mobile-qr-notice" role="status" aria-live="polite">
-              <CheckCircle2Icon aria-hidden="true" />
-              {notice}
-            </div>
+              {notice && (
+                <div className="k1-mobile-qr-notice" role="status" aria-live="polite">
+                  <CheckCircle2Icon aria-hidden="true" />
+                  {notice}
+                </div>
+              )}
+
+              {error && (
+                <div className="k1-mobile-qr-error" role="alert" aria-live="polite">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={!canConfirm}
+                className="k1-mobile-qr-confirm"
+              >
+                {confirmed ? '已确认，请回到一体机' : loading ? '确认中...' : '确认登录一体机'}
+              </button>
+            </>
           )}
-
-          {error && (
-            <div className="k1-mobile-qr-error" role="alert" aria-live="polite">
-              {error}
-            </div>
-          )}
-
-          {error && !ready && ticketId && (
-            <button
-              type="button"
-              onClick={loadTicketStatus}
-              className="k1-mobile-qr-retry"
-            >
-              重新检查二维码
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={!canConfirm}
-            className="k1-mobile-qr-confirm"
-          >
-            {confirmed ? '已确认，请回到一体机' : loading ? '确认中...' : '确认登录一体机'}
-          </button>
         </div>
 
         <p className="k1-mobile-qr-footer">

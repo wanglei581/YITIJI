@@ -6,28 +6,32 @@
 .k1-login .k-tab.on { color: var(--sd-color-surface); background: var(--sd-color-primary); border-color: var(--sd-color-primary); box-shadow: var(--sd-shadow-console); }
 .k1-login .k-tab.on svg { color: currentColor; }
 
-.k1-login .k-agree { min-height: var(--sd-control-min, 48px); display: flex; align-items: center; gap: 12px; margin-top: 20px; padding: 0; color: var(--sd-color-text); background: transparent; border: 0; cursor: pointer; text-align: left; font-size: 15px; line-height: 1.55; }
+.k1-login .k-agree { min-height: var(--sd-control-min, 48px); display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 20px; padding: 0; color: var(--sd-color-text); background: transparent; border: 0; text-align: left; font-size: 15px; line-height: 1.55; }
+.k1-login .k-agree-check { min-height: var(--sd-control-min, 48px); display: inline-flex; align-items: center; gap: 12px; padding: 0; color: inherit; background: transparent; border: 0; cursor: pointer; font: inherit; font-weight: 650; }
+.k1-login .k-agree-docs { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .k1-login .k-agree .box { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; color: var(--sd-color-surface); background: var(--sd-color-surface); border: 1px solid var(--sd-color-line-strong); border-radius: 9px; transition: background 150ms ease, border-color 150ms ease, transform 150ms ease; }
 .k1-login .k-agree.checked .box { background: var(--sd-color-primary); border-color: var(--sd-color-primary); }
 .k1-login .k-agree .box svg { opacity: 0; transform: scale(0.55); transition: opacity 150ms ease, transform 150ms ease; }
 .k1-login .k-agree.checked .box svg { opacity: 1; transform: scale(1); }
-.k1-login .k-agree .doclink { display: inline; color: var(--sd-color-primary); font-weight: 780; text-decoration: underline; text-underline-offset: 3px; }
+.k1-login .k-agree .doclink { min-height: 44px; display: inline-flex; align-items: center; padding: 0; color: var(--sd-color-primary); background: transparent; border: 0; cursor: pointer; font: inherit; font-weight: 780; text-decoration: underline; text-underline-offset: 3px; }
+.k1-login .k-agree-hint { margin: 2px 0 0 42px; color: var(--sd-color-copy-muted); font-size: 13px; font-weight: 650; line-height: 1.5; }
 
 .k1-login .k-pane { animation: k1-login-enter 220ms ease-out both; }
 .k1-login .field-label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; margin: 22px 0 10px; color: var(--sd-color-text); font-size: 15px; font-weight: 800; }
 .k1-login .field-label i { color: var(--sd-color-copy-muted); font-size: 12.5px; font-style: normal; font-weight: 600; }
 .k1-login .fno { color: var(--sd-color-primary); font-size: 15px; font-variant-numeric: tabular-nums; }
 
-.k1-login .k-input { width: 100%; min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 20px; color: var(--sd-color-text-strong); background: var(--sd-color-canvas); border: 1px solid var(--sd-color-line-strong); border-radius: 20px; cursor: pointer; font-size: 24px; font-weight: 760; letter-spacing: 0.05em; text-align: left; font-variant-numeric: tabular-nums; transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease; }
-.k1-login .k-input > svg { flex: 0 0 auto; color: var(--sd-color-copy-muted); }
+.k1-login .k-input { width: 100%; min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 20px; color: var(--sd-color-text-strong); background: var(--sd-color-canvas); border: 1px solid var(--sd-color-line-strong); border-radius: 20px; cursor: default; font-size: 24px; font-weight: 760; letter-spacing: 0.05em; text-align: left; font-variant-numeric: tabular-nums; transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease; }
+.k1-login .k-input-target { min-width: 0; min-height: var(--sd-control-min, 48px); display: inline-flex; align-items: center; gap: 12px; flex: 1 1 auto; padding: 0; color: inherit; background: transparent; border: 0; cursor: pointer; font: inherit; font-variant-numeric: inherit; letter-spacing: inherit; text-align: left; }
+.k1-login .k-input-target > svg { flex: 0 0 auto; color: var(--sd-color-copy-muted); }
 .k1-login .k-input .ph { color: var(--sd-color-copy-muted); font-size: 16px; font-weight: 600; letter-spacing: 0; }
 .k1-login .k-input.focus { background: var(--sd-color-surface); border-color: var(--sd-color-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--sd-color-primary) 12%, transparent); }
-.k1-login .k-input.focus > svg { color: var(--sd-color-primary); }
+.k1-login .k-input.focus .k-input-target > svg { color: var(--sd-color-primary); }
 .k1-login .caret { width: 2px; height: 28px; flex: 0 0 auto; background: var(--sd-color-primary); border-radius: 2px; animation: k1-login-caret 1s steps(1) infinite; }
 .k1-login .k-send { min-height: var(--sd-primary-control-min, 56px); display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 0 18px; flex: 0 0 auto; color: var(--sd-color-surface); background: var(--sd-color-primary); border: 1px solid var(--sd-color-primary); border-radius: 15px; box-shadow: var(--sd-shadow-console); cursor: pointer; font-size: 15px; font-weight: 800; white-space: nowrap; transition: transform 150ms ease, opacity 150ms ease, background 150ms ease; }
 .k1-login .k-send:hover { background: var(--sd-color-primary-strong); transform: translateY(-2px); }
 .k1-login .k-send:active { transform: scale(0.97); }
-.k1-login .k-send[aria-disabled='true'] { opacity: 0.56 !important; cursor: not-allowed !important; }
+.k1-login .k-send:disabled { opacity: 0.56; cursor: not-allowed; box-shadow: none; }
 .k1-login .k-send svg.ring { width: 22px; height: 22px; transform: rotate(-90deg); }
 .k1-login .k-send .ring circle { fill: none; stroke: var(--sd-color-surface); stroke-width: 2.6; stroke-linecap: round; }
 .k1-login .k-send .ring .bg { stroke: color-mix(in srgb, var(--sd-color-surface) 32%, transparent); }

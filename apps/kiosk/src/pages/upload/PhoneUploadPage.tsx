@@ -88,65 +88,73 @@ export function PhoneUploadPage() {
             <p>手机页面只使用一次性上传令牌，不会获取一体机上的会员登录态。请只上传自己的{fileNoun}。</p>
           </div>
 
-          <label
-            className={[
-              'phone-upload-picker',
-              ready && state !== 'uploading'
-                ? 'is-ready'
-                : 'is-disabled',
-            ].join(' ')}
-            data-upload-state={state}
-            aria-disabled={!ready || state === 'uploading'}
-          >
-            <input
-              type="file"
-              aria-label={`选择${fileNoun}`}
-              accept={accept}
-              className="phone-upload-input"
-              disabled={!ready || state === 'uploading'}
-              onChange={handleFile}
-            />
-            <div className="phone-upload-icon" aria-hidden="true">
-              {state === 'uploading' ? (
-                <Loader2Icon className="phone-upload-spinner" />
-              ) : state === 'success' ? (
-                <CheckCircleIcon />
-              ) : (
-                <UploadCloudIcon />
+          {!ready ? (
+            <div className="phone-upload-invalid" role="alert" aria-live="polite">
+              <AlertCircleIcon aria-hidden="true" />
+              <h2>这个上传链接已经不能使用</h2>
+              <p>请回到一体机重新生成二维码，再用手机扫码上传。</p>
+            </div>
+          ) : (
+            <>
+              <label
+                className={[
+                  'phone-upload-picker',
+                  state !== 'uploading' ? 'is-ready' : 'is-disabled',
+                ].join(' ')}
+                data-upload-state={state}
+                aria-disabled={state === 'uploading'}
+              >
+                <input
+                  type="file"
+                  aria-label={`选择${fileNoun}`}
+                  accept={accept}
+                  className="phone-upload-input"
+                  disabled={state === 'uploading'}
+                  onChange={handleFile}
+                />
+                <div className="phone-upload-icon" aria-hidden="true">
+                  {state === 'uploading' ? (
+                    <Loader2Icon className="phone-upload-spinner" />
+                  ) : state === 'success' ? (
+                    <CheckCircleIcon />
+                  ) : (
+                    <UploadCloudIcon />
+                  )}
+                </div>
+                <p className="phone-upload-picker-title">
+                  {state === 'uploading' ? '正在上传...' : state === 'success' ? '已上传到一体机' : `选择${fileNoun}`}
+                </p>
+                <p className="phone-upload-picker-copy">
+                  {isPrintDoc ? '支持 PDF / JPG / PNG，单个文件最大 10MB。' : '支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。'}
+                </p>
+                {fileLabel && (
+                  <div className="phone-upload-file-label">
+                    <FileTextIcon aria-hidden="true" />
+                    {fileLabel}
+                  </div>
+                )}
+              </label>
+
+              {message && (
+                <div
+                  className={[
+                    'phone-upload-message',
+                    state === 'success' ? 'is-success' : 'is-error',
+                  ].join(' ')}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {state === 'success' ? <CheckCircleIcon aria-hidden="true" /> : <AlertCircleIcon aria-hidden="true" />}
+                  <span>{message}</span>
+                </div>
               )}
-            </div>
-            <p className="phone-upload-picker-title">
-              {state === 'uploading' ? '正在上传...' : state === 'success' ? '已上传到一体机' : `选择${fileNoun}`}
-            </p>
-            <p className="phone-upload-picker-copy">
-              {isPrintDoc ? '支持 PDF / JPG / PNG，单个文件最大 10MB。' : '支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。'}
-            </p>
-            {fileLabel && (
-              <div className="phone-upload-file-label">
-                <FileTextIcon aria-hidden="true" />
-                {fileLabel}
-              </div>
-            )}
-          </label>
 
-          {message && (
-            <div
-              className={[
-                'phone-upload-message',
-                state === 'success' ? 'is-success' : 'is-error',
-              ].join(' ')}
-              role="status"
-              aria-live="polite"
-            >
-              {state === 'success' ? <CheckCircleIcon aria-hidden="true" /> : <AlertCircleIcon aria-hidden="true" />}
-              <span>{message}</span>
-            </div>
-          )}
-
-          {state === 'error' && (
-            <Button size="lg" className="phone-upload-retry" onClick={() => setState('idle')} disabled={!ready}>
-              重新选择文件
-            </Button>
+              {state === 'error' && (
+                <Button size="lg" className="phone-upload-retry" onClick={() => setState('idle')}>
+                  重新选择文件
+                </Button>
+              )}
+            </>
           )}
         </Card>
       </section>
