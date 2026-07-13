@@ -515,7 +515,7 @@ async function main() {
   // 6) 尺寸不匹配规格（一寸需 295×413，这里高度差 1px）→ IDPHOTO_DIMENSIONS_MISMATCH
   {
     const { service, prisma, storage } = makeService(['term_c6'])
-    seedIdScan(prisma, storage, 'dims_bad_src', {}, withLyingDimensions(makePng(4, 4), 295, 412))
+    seedIdScan(prisma, storage, 'dims_bad_src', {}, withLyingDimensions(makePng(4, 4), ONE_INCH_SPEC.widthPx, ONE_INCH_SPEC.heightPx - 1))
     await expectCode(
       () =>
         service.generateLayout({
@@ -624,7 +624,7 @@ async function main() {
 
   // 11-14) 幂等序列：同一终端 + 同一 idempotencyKey 的连续场景（刻意共享状态，设计如此）。
   {
-    const { service, prisma, storage, capabilities } = makeService(['term_idem'])
+    const { service, prisma, storage, capabilities, files } = makeService(['term_idem'])
     seedIdScan(prisma, storage, 'idem_src')
 
     const callArgs = (specId: string) => ({
@@ -635,11 +635,12 @@ async function main() {
       idempotencyKey: 'k-idem',
     })
 
-    // 11) 同 key 同请求重复调用 → 复用同一 fileId，只生成一次
+    // 11) 同 key 同请求重复调用 → 复用同一 fileId，只生成一次（files.upload 只调用一次）
     const first = await service.generateLayout(callArgs('one_inch'))
     const second = await service.generateLayout(callArgs('one_inch'))
     assert.equal(second.fileId, first.fileId, 'same idempotency key must reuse output fileId')
-    pass('11) 相同 idempotencyKey 重复调用复用同一 fileId')
+    assert.equal(files.uploadCallCount, 1, 'cache-hit replay must not call files.upload again')
+    pass('11) 相同 idempotencyKey 重复调用复用同一 fileId，files.upload 只调用一次')
 
     // 12) 幂等命中但输出文件已失效（手动标记删除）→ 清缓存重新生成，返回新 fileId
     const outputRecord = prisma.files.get(first.fileId)!
