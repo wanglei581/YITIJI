@@ -260,13 +260,37 @@ async function main(): Promise<void> {
   {
     // create() 必须只把 P2002 映射成 SCAN_TERMINAL_BUSY；其它数据库错误码/未知错误必须原样透出
     // （不能被误吞成"终端繁忙"，否则会掩盖真实故障，误导排障方向）。
+    //
+    // 注意：光断言 `error instanceof Error` 是近乎空判断的——ConflictException 本身也
+    // extends Error，如果 isScanTaskActiveSessionConflict() 被错误地改成对任意错误都
+    // 返回 true（把这个非 P2002 错误也错判成活跃会话冲突），下面这条断言依然会通过，
+    // 完全测不出判别逻辑坏了。因此必须同时证明：
+    //   1) 抛出的不是 ConflictException（没有被误判成 SCAN_TERMINAL_BUSY 分支）；
+    //   2) 抛出的就是原始那个 fake error 对象本身（严格 === 同一引用，证明是真正的
+    //      原样透传 `throw e`，而不是换了个新错误但恰好还不是 ConflictException）。
     const { service, prisma } = makeService()
     const originalCreate = prisma.scanTask.create.bind(prisma.scanTask)
+    const fakeError = new Error('ECONNRESET: simulated unrelated database failure')
     prisma.scanTask.create = (async () => {
-      throw new Error('ECONNRESET: simulated unrelated database failure')
+      throw fakeError
     }) as typeof originalCreate
 
-    await expectRejects(() => service.create(dto, null), Error, 'non-P2002 errors must not be swallowed as SCAN_TERMINAL_BUSY')
+    let caught: unknown
+    try {
+      await service.create(dto, null)
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(caught instanceof Error, 'non-P2002 errors must not be swallowed as SCAN_TERMINAL_BUSY: expected an Error to be thrown')
+    assert.ok(
+      !(caught instanceof ConflictException),
+      `non-P2002 errors must NOT be remapped to ConflictException, got ${(caught as Error)?.constructor?.name}`,
+    )
+    assert.equal(
+      caught,
+      fakeError,
+      'non-P2002 errors must propagate as the exact same original error instance (true passthrough via `throw e`), not a new/different error',
+    )
 
     prisma.scanTask.create = originalCreate as typeof prisma.scanTask.create
   }
