@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
+> 最后更新：2026-07-13（新增 §5.8「证件照打印真机验收」小节，并更新 §5.7 证件照隔离验收条目以反映 MVP 代码已完成、能力开关仍未点亮的现状；详见 `docs/superpowers/specs/2026-07-12-id-photo-design.md`）；2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -317,7 +317,15 @@ pnpm --filter ./services/api verify:activity-logs
 证件类专项（Task 11 验收清单项，敏感文件按短 TTL 清理，不长期留存）：
 
 - [ ] 身份证复印：证件放置 → 扫描 → A4 排版 → 真实出纸全链路可用（口径对齐首期计划 Task 8 的复印/证件复印标准，仅生成文件不出纸不算通过）；复印产物不落长期存储，完成后按敏感文件策略清理并有删除日志。
-- [ ] 证件照隔离验收（能力未上线；本项通过只代表未上线能力已被正确隔离，**不代表证件照功能验收通过**）：Kiosk 卡片不可进入正式流程，且终端能力开关（Admin「打印扫描运维 → 设备能力」）中 `id_photo` 不为「可用」。证件照功能本身（上传 → 规格排版 → 用户确认 → 打印 → 敏感照片清理）的验收须在能力按计划 Task 8 实现后另行执行，或经正式范围决策明确移出本期。
+- [ ] 证件照隔离验收（**2026-07-13 更新**：证件照打印 MVP 代码已实现，但能力开关默认不可用；本项通过只代表未点亮能力已被正确隔离，**不代表证件照功能真机验收通过**，功能本身的真机验收清单见下方 §5.8）：Kiosk `/print-scan` 卡片默认展示「暂不可用」，终端能力开关（Admin「打印扫描运维 → 设备能力」）中 `id_photo` 未设为「可用」时，即使点入 `/print-scan/id-photo` 流程页，页面自身也按能力开关 fail-closed 展示诚实不可用态，不放行真实生成/打印。设计与实现见 `docs/superpowers/specs/2026-07-12-id-photo-design.md` 与 `docs/superpowers/plans/2026-07-12-id-photo-implementation.md`。
+
+### 5.8 证件照打印真机验收（功能点亮前置，设计 §六/§十）
+
+- [ ] 彩色出纸：SumatraPDF `-print-settings color` 真机验证（黑白已验，彩色未验）。
+- [ ] 尺寸准确：`scale=actual(noscale)` 打印一寸整版，实物量尺 25×35mm ±1mm；超差先查打印机驱动缩放设置。
+- [ ] 隐私链路演练：扫码上传 → 裁剪 → 生成 → 打印 → 确认裁剪产物被服务端自动删除 → 1 小时后 cron 物理删除排版 PDF → 审计四类事件（`file.upload` / `id_photo.layout_generated` / `print_job.create` / `id_photo.source_deleted`）齐全。
+- [ ] 建单后延迟 >30 分钟再 claim 的任务按"URL 过期/文件缺失"诚实失败（不误报打印成功）。
+- [ ] 验收通过后：Admin「打印扫描运维 → 设备能力」将该终端 `id_photo` 置为「可用」，Kiosk 卡片点亮。
 
 ---
 
