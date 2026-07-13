@@ -45,6 +45,17 @@ export const PRINT_SCAN_CAPABILITY_STATUSES: readonly PrintScanCapabilityStatus[
   'not_verified',
 ] as const
 
+/**
+ * 词汇债治理（2026-07-12 D4 拍板，见 docs/reviews/2026-07-12-cloud-print-decision.md §六）：
+ * cloud_upload 与 phone_upload 语义完全相同（云上传范围已收窄声明），cloud_upload 视为已弃用别名。
+ * key = 已弃用旧键，value = 现役承接键。读取现役键状态时，若现役键本身未配置而旧键存在历史配置，
+ * 按旧键状态兼容展示/生效，避免治理过程中无声丢弃历史管理员配置。
+ * 仅只读兼容，不产生新写入；待确认生产无 cloud_upload 引用后由独立任务移除该键本身。
+ */
+export const DEPRECATED_CAPABILITY_ALIAS: Partial<Record<PrintScanCapabilityKey, PrintScanCapabilityKey>> = {
+  cloud_upload: 'phone_upload',
+}
+
 /** 统一任务中心的任务类型判别值。photo/copy/material_pack/format_conversion/
  *  signature_stamp 当前没有数据模型（未上线），聚合端点对它们只能返回空集合，
  *  不得伪造行数据。document_process 是已存在的文档处理任务（材料检查等）。 */

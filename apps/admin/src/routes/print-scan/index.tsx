@@ -18,6 +18,7 @@ import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
 import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
 import {
   adminPrintScanService,
+  DEPRECATED_CAPABILITY_ALIAS,
   type AdminPrintScanTaskDetail,
   type AdminPrintScanTaskItem,
   type AdminPrintScanTaskPage,
@@ -607,7 +608,14 @@ function CapabilityRow({
 
   return (
     <tr className="border-b border-neutral-900/5 last:border-b-0">
-      <td className="px-4 py-2.5 font-bold text-neutral-800">{CAPABILITY_LABELS[cap.capabilityKey]}</td>
+      <td className="px-4 py-2.5 font-bold text-neutral-800">
+        {CAPABILITY_LABELS[cap.capabilityKey]}
+        {DEPRECATED_CAPABILITY_ALIAS[cap.capabilityKey] && (
+          <span className="ml-1.5 rounded bg-neutral-900/5 px-1.5 py-0.5 text-[11px] font-normal text-neutral-500">
+            已弃用，等同「{CAPABILITY_LABELS[DEPRECATED_CAPABILITY_ALIAS[cap.capabilityKey]!]}」
+          </span>
+        )}
+      </td>
       <td className="px-4 py-2.5">
         <StatusBadge status={meta.badge} label={cap.configured ? meta.label : `${meta.label}（未配置）`} />
       </td>
