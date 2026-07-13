@@ -100,3 +100,33 @@ export function verifyRawUploadSignature(fileId: string, expires: string, sig: s
     return false
   }
 }
+
+// ── 证件照源文件删除 action token(游客用) ─────────────────────────────
+//
+// 设计(docs/superpowers/specs/2026-07-12-id-photo-design.md §4.9):
+//   - 读取 capability(/files/:id/content 签名 URL)不得扩张为破坏性删除授权,
+//     因此删除用独立命名空间('id-photo-delete.'),两者互换必然验签失败。
+//   - token 放请求体传输,不放 URL query。
+
+export function signIdPhotoDeleteToken(fileId: string, ttlMs: number): { token: string; expiresAt: Date } {
+  const expiresAtMs = Date.now() + ttlMs
+  const message = `id-photo-delete.${fileId}.${expiresAtMs}`
+  const signature = createHmac('sha256', getSecret()).update(message).digest('hex')
+  return { token: `${expiresAtMs}.${signature}`, expiresAt: new Date(expiresAtMs) }
+}
+
+export function verifyIdPhotoDeleteToken(fileId: string, token: string): boolean {
+  const dot = token.indexOf('.')
+  if (dot <= 0 || dot >= token.length - 1) return false
+  const expiresMs = Number(token.slice(0, dot))
+  const sig = token.slice(dot + 1)
+  if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return false
+  const message = `id-photo-delete.${fileId}.${expiresMs}`
+  const expected = createHmac('sha256', getSecret()).update(message).digest('hex')
+  if (sig.length !== expected.length) return false
+  try {
+    return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))
+  } catch {
+    return false
+  }
+}
