@@ -20,6 +20,21 @@ function tabToPath(tab: KioskTab): string {
   return '/'
 }
 
+const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [
+  '/',
+  '/help',
+  '/assistant',
+  '/resume/source',
+  '/resume/parse',
+  '/resume/report',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/optimize',
+  '/resume/templates',
+  '/resume/materials',
+  '/resume/export',
+]
+
 /**
  * KioskRoot 外层挂 KioskBusyProvider,内层 KioskShell 才能用忙碌态 + 屏保控制器。
  * /screensaver 是顶级路由(全屏,不在此布局内),退出后回到本布局的首页。
@@ -58,7 +73,7 @@ function KioskShell() {
     maintenance: '正在维护',
   }
   const statusLabel = statusLabelByDeviceStatus[deviceStatus]
-  const isServiceDeskRoute = pathname === '/' || pathname === '/help' || pathname === '/assistant'
+  const isServiceDeskRoute = SERVICE_DESK_EXACT_ROUTES.includes(pathname)
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。

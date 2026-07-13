@@ -30,6 +30,7 @@ import { readAiResumeSession } from './aiResumeSession'
 import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
 import { ResumeLayoutControls } from './components/ResumeLayoutControls'
 import { useResumeLayout } from './hooks/useResumeLayout'
+import './resume-authoring-lightflow.css'
 
 /** 导出格式可选项(Wave1 Task 8):PDF 可直接打印,Word/TXT/Markdown 供下载编辑。 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
@@ -257,7 +258,7 @@ export function ResumeOptimizePage() {
 
   if (loading) {
     return (
-      <div className="flex h-full flex-col p-6">
+      <div className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
         <PageHeader
           title="优化建议"
           subtitle="基于已有内容优化表达"
@@ -275,7 +276,7 @@ export function ResumeOptimizePage() {
 
   if (failMsg) {
     return (
-      <div className="flex h-full flex-col p-6">
+      <div className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
         <PageHeader
           title="优化建议"
           subtitle="基于已有内容优化表达"
@@ -293,21 +294,23 @@ export function ResumeOptimizePage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="resume-lightflow resume-optimize-lightflow flex h-full flex-col p-6">
+      <div className="resume-lightflow__header">
       <PageHeader
         title="优化建议"
         subtitle="基于已有内容优化表达(仅供参考)"
         actions={<Button size="sm" variant="secondary" onClick={() => requestLeave(() => navigate(-1))}>返回报告</Button>}
       />
+      </div>
 
       {providerName === 'mock' && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
+        <div className="resume-lightflow__notice mt-4 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
           <FlaskConicalIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>{COMPLIANCE_COPY.KIOSK_RESUME_DEMO_NOTICE}</p>
         </div>
       )}
 
-      <div className="mt-4 flex items-center gap-2 rounded-lg bg-neutral-50 px-4 py-2.5">
+      <div className="resume-lightflow__notice mt-4 flex items-center gap-2 rounded-lg bg-neutral-50 px-4 py-2.5">
         <InfoIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
         <p className="text-xs text-neutral-400">
           {COMPLIANCE_COPY.KIOSK_RESUME_OPTIMIZE_DISCLAIMER}页面只展示表达调整参考,不承诺提分或招聘结果。
@@ -315,7 +318,7 @@ export function ResumeOptimizePage() {
       </div>
 
       {summary && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
+        <div className="resume-lightflow__target-summary mt-3 flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/60 px-4 py-2.5">
           <TargetIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
           <p className="text-sm text-neutral-700">
             目标方向：<span className="font-medium text-primary-700">{summary}</span>
@@ -324,11 +327,11 @@ export function ResumeOptimizePage() {
       )}
 
       <div className={[
-        'mt-4 flex flex-1 flex-col gap-4',
+        'resume-lightflow__content resume-lightflow__optimize-content mt-4 flex flex-1 flex-col gap-4',
         confirmLeave ? 'overflow-hidden' : 'overflow-y-auto',
       ].join(' ')}>
         {modules.length > 0 && (
-          <Card className="p-5">
+          <Card className="resume-lightflow__work-card p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-neutral-700">表达调整参考</p>
@@ -340,7 +343,7 @@ export function ResumeOptimizePage() {
         )}
 
         {modules.map((mod, idx) => (
-          <Card key={`${mod.title}-${idx}`} className="overflow-hidden p-0">
+          <Card key={`${mod.title}-${idx}`} className="resume-lightflow__comparison-card overflow-hidden p-0">
             <div className="border-b border-neutral-200 px-5 py-3">
               <p className="text-sm font-semibold text-neutral-800">{mod.title}</p>
             </div>
@@ -363,7 +366,7 @@ export function ResumeOptimizePage() {
           <>
             <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
             {resumeTemplates.length > 0 && (
-              <Card className="p-5">
+              <Card className="resume-lightflow__work-card resume-lightflow__template-card p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-neutral-800">简历模板</p>
@@ -399,7 +402,7 @@ export function ResumeOptimizePage() {
                 )}
               </Card>
             )}
-            <Card className="p-5">
+            <Card className="resume-lightflow__work-card resume-lightflow__assistant-card p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-neutral-800">AI 辅助调整</p>
@@ -446,20 +449,22 @@ export function ResumeOptimizePage() {
                 </p>
               )}
             </Card>
-            <OptimizedResumeEditor
-              resume={optimizedResume}
-              onChange={handleResumeChange}
-              layout={layout}
-              previewClassName={previewClassName}
-              previewStyle={previewStyle}
-            />
+            <div className="resume-lightflow__editor-region">
+              <OptimizedResumeEditor
+                resume={optimizedResume}
+                onChange={handleResumeChange}
+                layout={layout}
+                previewClassName={previewClassName}
+                previewStyle={previewStyle}
+              />
+            </div>
           </>
         )}
 
         {exportError && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{exportError}</p>}
 
         {exported && (
-          <Card className="border-success-bg bg-success-bg/60 p-5">
+          <Card className="resume-lightflow__export-card border-success-bg bg-success-bg/60 p-5">
             <p className="flex items-center gap-2 text-base font-semibold text-success-fg">
               <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
               优化版{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'} 已生成
@@ -477,7 +482,7 @@ export function ResumeOptimizePage() {
         )}
       </div>
 
-      <div className="mt-6 flex flex-col gap-3">
+      <div className="resume-lightflow__action-bar mt-6 flex flex-col gap-3">
         {optimizedResume && (
           <div>
             <p className="mb-2 text-xs font-semibold text-neutral-500">导出格式</p>
@@ -550,7 +555,7 @@ export function ResumeOptimizePage() {
 
       {confirmLeave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-6">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="resume-lightflow__leave-dialog w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <p className="text-lg font-bold text-neutral-900">离开前确认</p>
             <p className="mt-2 text-sm leading-relaxed text-neutral-500">
               你已经修改了优化版简历。未导出 PDF 前离开，本次编辑内容不会保存。

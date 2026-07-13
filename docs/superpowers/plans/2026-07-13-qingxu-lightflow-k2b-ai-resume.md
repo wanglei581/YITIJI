@@ -70,9 +70,13 @@
 
 - `apps/kiosk/src/layouts/KioskRoot.tsx`
 - `apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs`
+- `apps/kiosk/scripts/verify-lightflow-k1-public-entry.mjs`
+- `apps/kiosk/scripts/verify-lightflow-k2a-ai-career.mjs`
+- `apps/kiosk/scripts/verify-home-service-desk.mjs`
 - `apps/kiosk/package.json`
 
 将精确路由表接入 `isServiceDeskRoute`，完成跨九页静态合同，并确保 package script 在 CI 可独立运行。不修改路由配置或任何页面业务逻辑。
+K1/K2a 的旧静态断言若仅硬编码了早期三条白名单，须同步改为验证新精确白名单严格等于批准的 12 条路由，且不含宽泛 `/resume` 匹配、`/me*` 或 `/profile*` 路由；不得为了让旧 verify 通过而放弃 K2b 主题切换。CSS 静态合同还须验证 `.resume-lightflow` 与 route root 同一元素匹配，不能只检查字符串出现，避免局部变量落在不存在的后代节点。
 
 ## 4. 逐步执行与命令
 

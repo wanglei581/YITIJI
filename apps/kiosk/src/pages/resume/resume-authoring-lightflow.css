@@ -1,0 +1,287 @@
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow).resume-lightflow {
+  --resume-canvas: var(--sd-color-canvas-outer, #eaf3ff);
+  --resume-surface: var(--sd-color-surface, #ffffff);
+  --resume-ink: var(--sd-color-text-strong, #071a43);
+  --resume-copy: var(--sd-color-copy, #5d6f87);
+  --resume-line: var(--sd-color-line, #d9e6f6);
+  --resume-primary: var(--sd-color-primary, #1769e8);
+  --resume-primary-soft: #edf6ff;
+  min-height: 100%;
+  overflow: hidden;
+  color: var(--resume-ink);
+  background:
+    radial-gradient(circle at 8% -4%, rgba(107, 181, 255, .35), transparent 30%),
+    radial-gradient(circle at 96% 18%, rgba(202, 231, 255, .58), transparent 28%),
+    var(--resume-canvas);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__content,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar {
+  width: min(100%, 1040px);
+  margin-inline: auto;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header {
+  flex: 0 0 auto;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header h1,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow h1,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow h2,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow h3 {
+  color: var(--resume-ink);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow button {
+  min-height: var(--sd-control-min, 48px);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header button,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__state button {
+  min-height: var(--sd-control-min, 48px);
+  border-color: var(--resume-line);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .88);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__notice,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__target-summary {
+  border: 1px solid color-mix(in srgb, var(--resume-primary) 16%, var(--resume-line));
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(32, 77, 135, .05);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__stepper {
+  padding: 12px;
+  border: 1px solid var(--resume-line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: 0 10px 28px rgba(32, 77, 135, .05);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__content {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__work-card,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__comparison-card,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__export-card,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__leave-dialog {
+  border: 1px solid var(--resume-line);
+  border-radius: var(--sd-card-radius, 26px);
+  background: var(--resume-surface);
+  box-shadow: 0 16px 42px rgba(32, 77, 135, .08);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__section-heading {
+  min-height: var(--sd-control-min, 48px);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--resume-line);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__section-heading > span {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #cfe5ff;
+  background: var(--resume-primary-soft);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__field-label > span {
+  color: var(--resume-ink);
+  font-weight: 720;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__field {
+  min-height: var(--sd-control-min, 48px);
+  border-color: var(--resume-line);
+  border-radius: 15px;
+  background: #fbfdff;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__field:focus {
+  border-color: var(--resume-primary);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(23, 105, 232, .12);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__entry-card {
+  border: 1px solid var(--resume-line);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fff, #f8fbff);
+  box-shadow: none;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__entry-remove {
+  min-width: var(--sd-control-min, 48px);
+  min-height: var(--sd-control-min, 48px);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__add-entry {
+  min-height: var(--sd-primary-control-min, 56px);
+  border-color: #b9d8ff;
+  background: #f7fbff;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__paper {
+  max-width: 820px;
+  margin-inline: auto;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__paper-header {
+  border-color: var(--resume-primary);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__paper textarea {
+  min-height: var(--sd-control-min, 48px);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__export-card {
+  border-color: #bfe7d2;
+  background: linear-gradient(135deg, #f3fff8, #fff);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__comparison-card > div:first-child {
+  min-height: var(--sd-control-min, 48px);
+  border-color: var(--resume-line);
+  background: #f8fbff;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__template-card button,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__assistant-card button,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__editor-region button,
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__optimize-content button {
+  min-height: var(--sd-control-min, 48px);
+  border-radius: 15px;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__editor-region {
+  overflow: hidden;
+  border: 1px solid var(--resume-line);
+  border-radius: var(--sd-card-radius, 26px);
+  background: var(--resume-surface);
+  box-shadow: 0 16px 42px rgba(32, 77, 135, .07);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  padding-top: 16px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  border-color: rgba(188, 211, 239, .88);
+  background: linear-gradient(to bottom, rgba(234, 243, 255, .12), rgba(234, 243, 255, .92) 30%);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar button {
+  min-height: var(--sd-primary-control-min, 56px);
+  border-radius: 17px;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar button:not([data-variant='secondary']) {
+  box-shadow: 0 12px 24px rgba(23, 105, 232, .2);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__state {
+  min-height: 100%;
+  text-align: center;
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__state > div:last-child {
+  max-width: 540px;
+  padding: 30px;
+  border: 1px solid var(--resume-line);
+  border-radius: var(--sd-card-radius, 26px);
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 16px 42px rgba(32, 77, 135, .08);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__leave-dialog {
+  border-color: var(--resume-line);
+}
+
+:is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow :is(button, input, textarea, select):focus-visible {
+  outline: 3px solid rgba(23, 105, 232, .34);
+  outline-offset: 3px;
+}
+
+@media (max-width: 520px) {
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow).resume-lightflow {
+    min-height: 100dvh;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__content,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar {
+    width: 100%;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header {
+    padding-inline: 14px;
+    padding-top: 16px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__content {
+    padding-inline: 14px;
+    padding-bottom: 18px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__work-card,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__comparison-card,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__export-card {
+    border-radius: 21px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__stepper {
+    overflow-x: auto;
+    padding: 10px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar {
+    padding-inline: 14px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar > .flex,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar > .grid {
+    gap: 10px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__paper {
+    padding: 20px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__template-card > div,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__assistant-card > div {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 390px) {
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__header,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__content,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar {
+    padding-inline: 12px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__work-card,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__paper {
+    padding: 18px;
+  }
+
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar {
+    padding-top: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow *,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow *::before,
+  :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

@@ -437,11 +437,34 @@ const externalHelpEntries = helpRouteEntries.filter(({ index }) => !childrenRang
 expect(nestedHelpEntries.length === 1 && nestedHelpEntries[0].value === 'help', '/help 只能有一个 nested path: help 精确入口')
 expect(externalHelpEntries.length === 0, 'routes 不得添加顶级 /help、/help/* 或 /help/:param 入口')
 
-expectIncludes(
-  kioskRoot,
-  "const isServiceDeskRoute = pathname === '/' || pathname === '/help'",
-  'KioskRoot',
+const serviceDeskRouteList = kioskRoot.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
+const expectedServiceDeskRoutes = [
+  '/',
+  '/help',
+  '/assistant',
+  '/resume/source',
+  '/resume/parse',
+  '/resume/report',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/optimize',
+  '/resume/templates',
+  '/resume/materials',
+  '/resume/export',
+]
+const serviceDeskRoutes = [...serviceDeskRouteList.matchAll(/['\"]([^'\"]+)['\"]/g)].map((match) => match[1])
+expectIncludes(kioskRoot, 'const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [', 'KioskRoot 精确服务台白名单')
+expect(
+  serviceDeskRoutes.length === expectedServiceDeskRoutes.length
+    && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
+    && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
+  'KioskRoot 白名单严格等于已批准的 12 条 LightFlow 路由',
 )
+for (const path of expectedServiceDeskRoutes) {
+  expectIncludes(serviceDeskRouteList, `'${path}'`, `KioskRoot 白名单保留 ${path}`)
+}
+expectNotIncludes(kioskRoot, "startsWith('/resume')", 'KioskRoot 不得宽泛匹配简历路由')
+expect(serviceDeskRoutes.every((route) => !route.startsWith('/me') && !route.startsWith('/profile')), 'KioskRoot 白名单不得包含我的或资料页')
 expectPattern(
   kioskRoot,
   /visualTheme=\{isServiceDeskRoute\s*\?\s*'service-desk'\s*:\s*'legacy'\}/,

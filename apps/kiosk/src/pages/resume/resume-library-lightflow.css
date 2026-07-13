@@ -1,0 +1,124 @@
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow).resume-lightflow {
+  --resume-lightflow-canvas: #edf7ff;
+  --resume-lightflow-surface: #fff;
+  --resume-lightflow-ink: #102a43;
+  --resume-lightflow-copy: #52677d;
+  --resume-lightflow-line: #d7e7f5;
+  --resume-lightflow-blue: #1677ff;
+  --resume-lightflow-blue-soft: #e8f3ff;
+  min-height: 100%;
+  padding: clamp(16px, 2.8vw, 36px);
+  overflow-y: auto;
+  color: var(--resume-lightflow-ink);
+  background:
+    radial-gradient(circle at 8% 0%, #d6efff 0, transparent 31rem),
+    linear-gradient(145deg, #f7fbff 0%, var(--resume-lightflow-canvas) 100%);
+}
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow).resume-lightflow *,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow).resume-lightflow *::before,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow).resume-lightflow *::after { box-sizing: border-box; }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__shell { width: min(1240px, 100%); margin: 0 auto; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__shell--narrow { width: min(780px, 100%); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 12px 4px 22px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__eyebrow { margin: 0 0 8px; color: var(--resume-lightflow-blue); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow h1,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow h2,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow p { margin-top: 0; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow h1 { margin-bottom: 8px; color: var(--resume-lightflow-ink); font-size: clamp(28px, 3vw, 38px); font-weight: 830; letter-spacing: -.045em; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow h2 { margin-bottom: 10px; color: var(--resume-lightflow-ink); font-size: 22px; font-weight: 800; letter-spacing: -.025em; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__header > div > p:last-child { max-width: 660px; margin-bottom: 0; color: var(--resume-lightflow-copy); font-size: 15px; line-height: 1.7; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow button { min-height: 48px; border-radius: 14px; font-weight: 750; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__return { flex: 0 0 auto; min-width: 108px; background: rgba(255, 255, 255, .82); }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__notice { display: flex; gap: 14px; padding: 17px 18px; color: #25567d; background: rgba(255, 255, 255, .72); border: 1px solid #c9e4fa; border-radius: 20px; box-shadow: 0 10px 30px rgba(39, 112, 166, .06); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__notice > svg { flex: 0 0 auto; width: 24px; height: 24px; color: var(--resume-lightflow-blue); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__notice strong { display: block; color: var(--resume-lightflow-ink); font-size: 14px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__notice p { margin: 5px 0 0; font-size: 14px; line-height: 1.65; }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__filters button { padding: 0 17px; color: var(--resume-lightflow-copy); background: rgba(255, 255, 255, .84); border: 1px solid var(--resume-lightflow-line); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__filters button:hover { border-color: #91c5ff; color: var(--resume-lightflow-blue); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__filters button.is-active { color: #fff; background: var(--resume-lightflow-blue); border-color: var(--resume-lightflow-blue); box-shadow: 0 10px 24px rgba(22, 119, 255, .22); }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(310px, 380px); gap: 22px; align-items: start; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-export { background: var(--resume-lightflow-surface); border: 1px solid var(--resume-lightflow-line); border-radius: 22px; box-shadow: 0 16px 38px rgba(27, 83, 121, .08); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item { display: flex; flex-direction: column; gap: 12px; padding: 18px; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item:hover { border-color: #9acfff; box-shadow: 0 18px 42px rgba(27, 99, 156, .12); transform: translateY(-2px); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item.is-selected { border-color: var(--resume-lightflow-blue); box-shadow: 0 0 0 3px rgba(22, 119, 255, .12), 0 16px 38px rgba(27, 83, 121, .1); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item > button { display: flex; align-items: center; gap: 11px; min-height: 0; padding: 0; text-align: left; color: inherit; background: transparent; border: 0; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item-icon,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-icon { display: grid; place-items: center; flex: 0 0 auto; width: 48px; height: 48px; color: var(--resume-lightflow-blue); background: var(--resume-lightflow-blue-soft); border-radius: 15px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item-icon svg,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-icon svg { width: 23px; height: 23px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item-copy { display: grid; gap: 3px; min-width: 0; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item-copy strong { overflow: hidden; color: var(--resume-lightflow-ink); font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item-copy span,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item small { color: #7b8ea2; font-size: 12px; line-height: 1.45; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__selected-mark { width: 19px; height: 19px; margin-left: auto; color: var(--resume-lightflow-blue); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item > p { min-height: 44px; margin-bottom: 0; color: var(--resume-lightflow-copy); font-size: 14px; line-height: 1.6; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item > small { min-height: 34px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__tags span { padding: 4px 9px; color: #52718e; background: #f1f7fc; border-radius: 999px; font-size: 12px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item > .resume-lightflow__button { margin-top: auto; }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail { position: sticky; top: 18px; padding: 24px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail > p { color: var(--resume-lightflow-copy); font-size: 14px; line-height: 1.7; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail-label { margin-bottom: 9px; color: var(--resume-lightflow-blue) !important; font-size: 12px !important; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__boundary { display: grid; gap: 5px; margin: 20px 0; padding: 14px; background: #f6faff; border: 1px solid #d9eafa; border-radius: 16px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__boundary strong { font-size: 14px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__boundary span { color: var(--resume-lightflow-copy); font-size: 13px; line-height: 1.6; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form { display: grid; gap: 13px; margin-top: 18px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form label { display: grid; gap: 6px; color: #45637d; font-size: 13px; font-weight: 750; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form em { color: #e24d4d; font-style: normal; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form input,
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form textarea { width: 100%; color: var(--resume-lightflow-ink); background: #fff; border: 1px solid #cfe0ef; border-radius: 13px; outline: 0; font: inherit; font-weight: 500; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form input { min-height: 48px; padding: 0 13px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form textarea { min-height: 112px; padding: 12px 13px; resize: vertical; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__form :is(input, textarea):focus { border-color: var(--resume-lightflow-blue); box-shadow: 0 0 0 3px rgba(22, 119, 255, .13); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__error { margin: 14px 0 0; padding: 11px 13px; color: #b73838; background: #fff2f2; border-radius: 13px; font-size: 14px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__result { margin-top: 14px; padding: 13px; color: #24704c; background: #effbf4; border: 1px solid #c9efd8; border-radius: 14px; font-size: 14px; line-height: 1.6; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__result p { margin: 5px 0 0; color: #8a5d12; font-size: 13px; }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__actions { display: grid; gap: 10px; margin-top: 20px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__primary-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px !important; width: 100%; color: #fff; background: var(--resume-lightflow-blue); box-shadow: 0 14px 28px rgba(22, 119, 255, .24); }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__primary-action svg { width: 19px; height: 19px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__split-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__split-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__split-actions svg { width: 18px; height: 18px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow button:disabled { cursor: not-allowed; opacity: .52; box-shadow: none; }
+
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-export { display: grid; justify-items: start; gap: 12px; padding: clamp(24px, 5vw, 44px); margin: 8px 0 20px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-export h2 { max-width: 560px; margin-bottom: 0; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-export > p:not(.resume-lightflow__detail-label) { max-width: 610px; margin-bottom: 6px; color: var(--resume-lightflow-copy); line-height: 1.7; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__empty-export .resume-lightflow__primary-action { max-width: 340px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__state { min-height: 360px; margin-top: 22px; padding: 28px; background: rgba(255, 255, 255, .75); border: 1px solid var(--resume-lightflow-line); border-radius: 22px; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__compliance { margin: 22px 0 4px; color: #778b9d; font-size: 12px; line-height: 1.65; text-align: center; }
+:is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow :is(button, input, textarea):focus-visible { outline: 3px solid rgba(22, 119, 255, .4); outline-offset: 3px; }
+
+@media (max-width: 980px) {
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__workspace { grid-template-columns: 1fr; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail { position: static; }
+}
+
+@media (max-width: 640px) {
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow { padding: 14px 12px 28px; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__header { gap: 14px; padding-top: 4px; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__header h1 { font-size: 29px; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__return { min-width: 76px; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__catalog { grid-template-columns: 1fr; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__notice,
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail { padding: 17px; border-radius: 18px; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__item { padding: 16px; }
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__split-actions { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow *,
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow *::before,
+  :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

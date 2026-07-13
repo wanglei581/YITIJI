@@ -1,19 +1,13 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type {
   JobMaterialDocumentTemplate,
   JobMaterialGenerateResponse,
   JobMaterialTemplateType,
 } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
-import {
-  FileTextIcon,
-  ImageIcon,
-  MailIcon,
-  PrinterIcon,
-  SparklesIcon,
-} from 'lucide-react'
+import { ArrowRightIcon, FileTextIcon, ImageIcon, MailIcon, PrinterIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { generateJobMaterial, getJobMaterialTemplates } from '../../services/api/jobMaterials'
 import { API_MODE } from '../../services/api/client'
@@ -23,19 +17,18 @@ import {
   saveJobMaterialDraft,
   type JobMaterialDraftForm,
 } from './jobMaterialDraft'
+import './resume-library-lightflow.css'
 
 const FILTERS = ['全部', '求职信', '感谢信', '作品集', '材料清单', '校招', '社招', '通用'] as const
 
 const TYPE_META: Record<Exclude<JobMaterialTemplateType, 'resume_template'>, {
   label: string
   icon: ComponentType<{ className?: string }>
-  color: string
-  bg: string
 }> = {
-  cover_letter:        { label: '求职信',     icon: MailIcon,     color: 'text-plum',  bg: 'bg-plum-soft' },
-  thank_you:           { label: '感谢信',     icon: FileTextIcon, color: 'text-warning-fg',   bg: 'bg-warning-bg' },
-  portfolio_cover:     { label: '作品集封面', icon: ImageIcon,    color: 'text-success-fg', bg: 'bg-success-bg' },
-  materials_checklist: { label: '材料清单',   icon: FileTextIcon, color: 'text-primary-600',    bg: 'bg-primary-50' },
+  cover_letter: { label: '求职信', icon: MailIcon },
+  thank_you: { label: '感谢信', icon: FileTextIcon },
+  portfolio_cover: { label: '作品集封面', icon: ImageIcon },
+  materials_checklist: { label: '材料清单', icon: FileTextIcon },
 }
 
 type FormState = JobMaterialDraftForm
@@ -106,10 +99,7 @@ export function JobMaterialLibraryPage() {
 
   const visible = useMemo(() => {
     if (filter === '全部') return templates
-    return templates.filter((template) =>
-      typeFilterLabel(template.type) === filter ||
-      template.tags.includes(filter),
-    )
+    return templates.filter((template) => typeFilterLabel(template.type) === filter || template.tags.includes(filter))
   }, [filter, templates])
 
   const selected = useMemo(
@@ -180,180 +170,161 @@ export function JobMaterialLibraryPage() {
     })
   }
 
-  if (loading) return <LoadingState className="h-full" />
+  if (loading) {
+    return (
+      <div className="resume-lightflow resume-materials-lightflow">
+        <LoadingState className="resume-lightflow__state" />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-6">
-      <PageHeader
-        title="求职材料库"
-        subtitle="填写求职信、感谢信、作品集封面和材料清单，生成 PDF 后保存并打印"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
+    <div className="resume-lightflow resume-materials-lightflow">
+      <div className="resume-lightflow__shell">
+        <header className="resume-lightflow__header">
+          <div>
+            <p className="resume-lightflow__eyebrow">AI 求职材料 · 真实生成</p>
+            <h1>求职材料库</h1>
+            <p>选择所需材料，补充真实信息后生成个人可查看、可打印的 PDF。</p>
+          </div>
+          <Button size="sm" variant="secondary" className="resume-lightflow__return" onClick={() => navigate('/')}>
             返回首页
           </Button>
-        }
-      />
+        </header>
 
-      <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
-        本页仅用于个人求职材料整理、生成和打印。岗位申请、预约、投递仍需前往来源平台或官方渠道完成。
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {FILTERS.map((item) => {
-          const active = filter === item
-          return (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setFilter(item)}
-              className={[
-                'min-h-[46px] rounded-full border px-4 text-sm font-semibold transition-colors',
-                active
-                  ? 'border-primary-600 bg-primary-50 text-primary-700'
-                  : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
-              ].join(' ')}
-            >
-              {item}
-            </button>
-          )
-        })}
-      </div>
-
-      {error ? (
-        <ErrorState message={error} className="mt-8 flex-1" />
-      ) : visible.length === 0 ? (
-        <div className="mt-10">
-          <EmptyState icon={FileTextIcon} title="该分类暂无求职材料" description="请切换其他标签查看" />
-        </div>
-      ) : (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {visible.map((template) => {
-              const meta = TYPE_META[template.type]
-              const Icon = meta.icon
-              const active = selected?.id === template.id
-              return (
-                <Card key={template.id} className={['flex flex-col p-5', active ? 'ring-2 ring-primary-500' : ''].join(' ')}>
-                  <button type="button" className="text-left" onClick={() => selectTemplate(template)}>
-                    <div className="flex items-center gap-3">
-                      <div className={['flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', meta.bg].join(' ')}>
-                        <Icon className={['h-6 w-6', meta.color].join(' ')} aria-hidden="true" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-neutral-900">{template.title}</p>
-                        <p className="text-xs text-neutral-400">{meta.label}</p>
-                      </div>
-                    </div>
-                    <p className="mt-3 min-h-[44px] text-sm leading-relaxed text-neutral-500">{template.description}</p>
-                    <p className="mt-2 text-xs leading-relaxed text-neutral-400">{template.recommendedFor}</p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {template.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button size="sm" className="flex items-center gap-1.5" onClick={() => selectTemplate(template)}>
-                      <SparklesIcon className="h-4 w-4" />
-                      填写生成
-                    </Button>
-                  </div>
-                </Card>
-              )
-            })}
+        <section className="resume-lightflow__notice" aria-label="使用范围说明">
+          <FileTextIcon aria-hidden="true" />
+          <div>
+            <strong>这里生成的是个人求职材料，不会代替你向任何岗位投递。</strong>
+            <p>生成、保存和打印都以真实文件状态为准；岗位申请、预约和投递需前往来源平台或官方渠道完成。</p>
           </div>
+        </section>
 
-          <Card className="h-fit p-5">
-            {!selected ? (
-              <EmptyState icon={FileTextIcon} title="请选择求职材料" />
-            ) : (
-              <div>
-                <p className="text-base font-semibold text-neutral-900">{selected.title}</p>
-                <p className="mt-1 text-sm text-neutral-500">生成后会保存到“我的文档”，仅本人可见。</p>
-                <div className="mt-4 space-y-3">
-                  {selected.fields.map((field) => {
-                    const value = form[field.key] ?? ''
-                    const commonClass = 'w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm outline-none focus:border-primary-500'
-                    return (
-                      <label key={field.key} className="block">
-                        <span className="mb-1 block text-xs font-semibold text-neutral-500">
-                          {field.label}{field.required && <span className="text-error-fg"> *</span>}
-                        </span>
-                        {field.multiline ? (
-                          <textarea
-                            value={value}
-                            maxLength={field.maxLength}
-                            rows={4}
-                            placeholder={field.placeholder}
-                            onChange={(event) => updateField(field.key, event.target.value)}
-                            className={`${commonClass} py-2`}
-                          />
-                        ) : (
-                          <input
-                            value={value}
-                            maxLength={field.maxLength}
-                            placeholder={field.placeholder}
-                            onChange={(event) => updateField(field.key, event.target.value)}
-                            className={`${commonClass} h-11`}
-                          />
-                        )}
-                      </label>
-                    )
-                  })}
-                </div>
+        <nav className="resume-lightflow__filters" aria-label="求职材料分类">
+          {FILTERS.map((item) => {
+            const active = filter === item
+            return (
+              <button key={item} type="button" aria-pressed={active} onClick={() => setFilter(item)} className={active ? 'is-active' : undefined}>
+                {item}
+              </button>
+            )
+          })}
+        </nav>
 
-                {submitError && <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-sm text-error-fg">{submitError}</p>}
-                {generated && (
-                  <div className="mt-4 rounded-lg border border-success/30 bg-success-bg p-3 text-sm text-success-fg">
-                    {API_MODE === 'http'
-                      ? `已生成 ${generated.filename}，文件已进入我的文档。`
-                      : `已生成 ${generated.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。`}
-                    {!generated.printFileUrl && API_MODE === 'http' && (
-                      <p className="mt-1 text-xs text-warning-fg">打印链接未就绪，请重新生成后再试。</p>
-                    )}
+        {error ? (
+          <ErrorState message={error} className="resume-lightflow__state" />
+        ) : visible.length === 0 ? (
+          <div className="resume-lightflow__state">
+            <EmptyState icon={FileTextIcon} title="该分类暂无求职材料" description="请切换其他分类查看" />
+          </div>
+        ) : (
+          <main className="resume-lightflow__workspace">
+            <section className="resume-lightflow__catalog" aria-label="可选求职材料">
+              {visible.map((template) => {
+                const meta = TYPE_META[template.type]
+                const Icon = meta.icon
+                const active = selected?.id === template.id
+                return (
+                  <Card key={template.id} className={['resume-lightflow__item', active ? 'is-selected' : ''].join(' ')}>
+                    <button type="button" aria-pressed={active} onClick={() => selectTemplate(template)}>
+                      <span className="resume-lightflow__item-icon"><Icon aria-hidden="true" /></span>
+                      <span className="resume-lightflow__item-copy">
+                        <strong>{template.title}</strong>
+                        <span>{meta.label}</span>
+                      </span>
+                    </button>
+                    <p>{template.description}</p>
+                    <small>{template.recommendedFor}</small>
+                    <div className="resume-lightflow__tags">
+                      {template.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => selectTemplate(template)}>
+                      {active ? '正在填写' : '选择并填写'}
+                    </Button>
+                  </Card>
+                )
+              })}
+            </section>
+
+            <aside className="resume-lightflow__detail" aria-live="polite">
+              {!selected ? (
+                <EmptyState icon={FileTextIcon} title="请选择求职材料" />
+              ) : (
+                <>
+                  <p className="resume-lightflow__detail-label">正在准备</p>
+                  <h2>{selected.title}</h2>
+                  <p>填写后生成的材料仅对本人可见。演示模式不会保存真实文件，也不会开放打印。</p>
+                  <div className="resume-lightflow__form">
+                    {selected.fields.map((field) => {
+                      const value = form[field.key] ?? ''
+                      return (
+                        <label key={field.key}>
+                          <span>{field.label}{field.required && <em> *</em>}</span>
+                          {field.multiline ? (
+                            <textarea
+                              value={value}
+                              maxLength={field.maxLength}
+                              rows={4}
+                              placeholder={field.placeholder}
+                              onChange={(event) => updateField(field.key, event.target.value)}
+                            />
+                          ) : (
+                            <input
+                              value={value}
+                              maxLength={field.maxLength}
+                              placeholder={field.placeholder}
+                              onChange={(event) => updateField(field.key, event.target.value)}
+                            />
+                          )}
+                        </label>
+                      )
+                    })}
                   </div>
-                )}
 
-                <div className="mt-5 grid gap-2">
-                  <Button size="lg" disabled={submitting} onClick={() => void handleGenerate()}>
-                    {submitting ? '生成中…' : isLoggedIn ? '生成可打印版' : '登录后生成'}
-                  </Button>
+                  {submitError && <p className="resume-lightflow__error" role="alert">{submitError}</p>}
                   {generated && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        size="md"
-                        variant="secondary"
-                        disabled={API_MODE !== 'http'}
-                        title={API_MODE !== 'http' ? '演示模式未保存真实文件' : undefined}
-                        onClick={() => navigate('/me/documents')}
-                      >
-                        查看我的文档
-                      </Button>
-                      <Button
-                        size="md"
-                        className="flex items-center justify-center gap-1.5"
-                        disabled={!generated.printFileUrl}
-                        title={!generated.printFileUrl ? (API_MODE !== 'http' ? '演示模式未生成真实文件，暂不可打印' : '打印链接未就绪，请重新生成后再试') : undefined}
-                        onClick={() => printGenerated(generated)}
-                      >
-                        <PrinterIcon className="h-4 w-4" />
-                        打印材料
-                      </Button>
+                    <div className="resume-lightflow__result">
+                      {API_MODE === 'http'
+                        ? `已生成 ${generated.filename}，文件已进入我的文档。`
+                        : `已生成 ${generated.filename} 的演示结果；演示模式未保存真实文件，暂不可打印。`}
+                      {!generated.printFileUrl && API_MODE === 'http' && <p>打印链接未就绪，请重新生成后再试。</p>}
                     </div>
                   )}
-                </div>
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
 
-      <p className="mt-6 text-center text-xs text-neutral-400">
-        素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。
-      </p>
-      <div className="h-2" />
+                  <div className="resume-lightflow__actions">
+                    <Button size="lg" className="resume-lightflow__primary-action" disabled={submitting} onClick={() => void handleGenerate()}>
+                      {submitting ? '生成中…' : isLoggedIn ? '生成可打印版' : '登录后生成'} <ArrowRightIcon aria-hidden="true" />
+                    </Button>
+                    {generated && (
+                      <div className="resume-lightflow__split-actions">
+                        <Button
+                          size="md"
+                          variant="secondary"
+                          disabled={API_MODE !== 'http'}
+                          title={API_MODE !== 'http' ? '演示模式未保存真实文件' : undefined}
+                          onClick={() => navigate('/me/documents')}
+                        >
+                          查看我的文档
+                        </Button>
+                        <Button
+                          size="md"
+                          disabled={!generated.printFileUrl}
+                          title={!generated.printFileUrl ? (API_MODE !== 'http' ? '演示模式未生成真实文件，暂不可打印' : '打印链接未就绪，请重新生成后再试') : undefined}
+                          onClick={() => printGenerated(generated)}
+                        >
+                          <PrinterIcon aria-hidden="true" /> 打印材料
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </aside>
+          </main>
+        )}
+
+        <p className="resume-lightflow__compliance">素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。</p>
+      </div>
     </div>
   )
 }

@@ -23,6 +23,7 @@ import {
 import { kioskUploadFile } from '../../services/api'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
+import './resume-diagnosis-lightflow.css'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
 
@@ -236,7 +237,7 @@ export function ResumeSourcePage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
       <PageHeader
         title={copy.title}
         subtitle={copy.subtitle}
@@ -245,7 +246,7 @@ export function ResumeSourcePage() {
         }
       />
 
-      <div className="mt-4">
+      <div className="resume-source-privacy mt-4">
         <ComplianceBanner tone="success" title="隐私保护">
           {copy.privacyNote}{COMPLIANCE_COPY.KIOSK_RESUME_UPLOAD_PRIVACY}
         </ComplianceBanner>
@@ -260,8 +261,8 @@ export function ResumeSourcePage() {
         onChange={handleFileChosen}
       />
 
-      <div className="mt-6 flex flex-1 flex-col gap-5 overflow-y-auto pb-1">
-        <Card className="border-primary-100 bg-primary-50/50 p-5">
+      <div className="resume-source-content mt-6 flex flex-1 flex-col gap-5 overflow-y-auto pb-1">
+        <Card className="resume-source-intro border-primary-100 bg-primary-50/50 p-5">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
               <SparklesIcon className="h-6 w-6" aria-hidden="true" />
@@ -287,7 +288,7 @@ export function ResumeSourcePage() {
         <button
           type="button"
           onClick={() => navigate('/resume/generate')}
-          className="flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
+          className="resume-source-alternative flex min-h-[72px] w-full items-center gap-4 rounded-2xl border-2 border-dashed border-primary-200 bg-white px-5 py-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50/40 active:bg-primary-50"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white">
             <SparklesIcon className="h-6 w-6" aria-hidden="true" />
@@ -299,7 +300,7 @@ export function ResumeSourcePage() {
           <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
         </button>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
           {UPLOAD_OPTIONS.map((option) => {
           const isSelected = selected === option.type
           const Icon = option.icon
@@ -335,14 +336,16 @@ export function ResumeSourcePage() {
         </div>
 
         {selected === 'phone' ? (
-          <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
+          <div className="resume-source-phone-session">
+            <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
+          </div>
         ) : (
           <button
             type="button"
             disabled={uploading}
             onClick={handleUploadBoxClick}
             className={[
-              'flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
+              'resume-source-dropzone flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
               uploadedFile
                 ? 'border-primary-300 bg-primary-50/35'
                 : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
@@ -372,7 +375,7 @@ export function ResumeSourcePage() {
           </button>
         )}
 
-        <Card className="p-5">
+        <Card className="resume-source-evidence p-5">
           <div className="flex items-center gap-2">
             <ShieldCheckIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
             <p className="text-base font-bold text-neutral-900">
@@ -392,22 +395,24 @@ export function ResumeSourcePage() {
           </div>
         </Card>
 
-        <DiagnosisDirectionForm
-          genericDiagnosis={genericDiagnosis}
-          selectedDimensions={selectedDimensions}
-          targetIndustry={targetIndustry}
-          targetJob={targetJob}
-          targetExperience={targetExperience}
-          targetScene={targetScene}
-          onGenericDiagnosisChange={setGenericDiagnosis}
-          onToggleDimension={toggleDimension}
-          onTargetIndustryChange={setTargetIndustry}
-          onTargetJobChange={setTargetJob}
-          onTargetExperienceChange={setTargetExperience}
-          onTargetSceneChange={setTargetScene}
-        />
+        <div className="resume-source-direction">
+          <DiagnosisDirectionForm
+            genericDiagnosis={genericDiagnosis}
+            selectedDimensions={selectedDimensions}
+            targetIndustry={targetIndustry}
+            targetJob={targetJob}
+            targetExperience={targetExperience}
+            targetScene={targetScene}
+            onGenericDiagnosisChange={setGenericDiagnosis}
+            onToggleDimension={toggleDimension}
+            onTargetIndustryChange={setTargetIndustry}
+            onTargetJobChange={setTargetJob}
+            onTargetExperienceChange={setTargetExperience}
+            onTargetSceneChange={setTargetScene}
+          />
+        </div>
 
-        <Card className="p-5">
+        <Card className="resume-source-context p-5">
           <p className="text-sm font-bold text-neutral-900">补充方向（可选）</p>
           <p className="mt-1 text-xs leading-relaxed text-neutral-500">
             补充专业和学历，仅用于本人简历表达诊断/优化重点参考，不影响是否可以诊断。
@@ -438,19 +443,19 @@ export function ResumeSourcePage() {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-md border border-error-bg/60 bg-error-bg/40 px-4 py-3 text-sm text-error-fg">
+        <div className="resume-source-error mt-4 rounded-md border border-error-bg/60 bg-error-bg/40 px-4 py-3 text-sm text-error-fg">
           {error}
         </div>
       )}
 
       {uploading && (
-        <div className="mt-4 text-center text-sm font-medium text-primary-700">上传中，请稍候…</div>
+        <div className="resume-source-status mt-4 text-center text-sm font-medium text-primary-700">上传中，请稍候…</div>
       )}
 
-      <div className="mt-6">
+      <div className="resume-source-actions mt-6">
         <Button
           size="lg"
-          className="min-h-[64px] w-full text-lg"
+          className="resume-primary-action min-h-[64px] w-full text-lg"
           disabled={!uploadedFile || uploading}
           onClick={handleStartDiagnosis}
         >

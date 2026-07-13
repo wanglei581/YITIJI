@@ -26,13 +26,24 @@ function expectNotIncludes(source, marker, message) {
   expect(!source.includes(marker), `${message}${source.includes(marker) ? ` — unexpected ${marker}` : ''}`)
 }
 
-function expectCssContract(path) {
+function expectCssContract(path, routeRoots) {
   const source = read(path)
   const lines = source.split(/\r?\n/).length
   expect(source.length > 0, `${path} exists`)
   expect(lines < 300, `${path} stays below 300 lines`)
   expectIncludes(source, '.resume-lightflow', `${path} scopes styles to resume-lightflow`)
   expectIncludes(source, '@media (prefers-reduced-motion: reduce)', `${path} supports reduced motion`)
+  for (const routeRoot of routeRoots) {
+    expectIncludes(source, `.${routeRoot}`, `${path} scopes styles to ${routeRoot}`)
+  }
+  expect(
+    /:is\([^)]*\)(?:\.resume-lightflow|:where\(\.resume-lightflow\))/.test(source),
+    `${path} binds the shared namespace to its route root on the same element`,
+  )
+  expect(
+    !/^\s*\.resume-lightflow(?:__|\s|\{|:)/m.test(source),
+    `${path} never starts a selector from the shared resume-lightflow namespace`,
+  )
   for (const forbiddenSelector of ['html', 'body', ':root']) {
     expectNotIncludes(source, `${forbiddenSelector} {`, `${path} does not override ${forbiddenSelector}`)
   }
@@ -58,11 +69,11 @@ expectIncludes(
   'package registers the K2b visual contract',
 )
 
-expectIncludes(kioskShell, 'const SERVICE_DESK_EXACT_ROUTES = [', 'Kiosk shell declares exact LightFlow route list')
+expectIncludes(kioskShell, 'const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [', 'Kiosk shell declares exact LightFlow route list')
 expectIncludes(kioskShell, 'SERVICE_DESK_EXACT_ROUTES.includes(pathname)', 'Kiosk shell uses exact LightFlow route matching')
 expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-matches resume routes')
-const serviceDeskRouteList = kioskShell.split('const SERVICE_DESK_EXACT_ROUTES = [')[1]?.split('] as const')[0] ?? ''
-for (const route of [
+const serviceDeskRouteList = kioskShell.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
+const expectedServiceDeskRoutes = [
   '/',
   '/help',
   '/assistant',
@@ -75,10 +86,21 @@ for (const route of [
   '/resume/templates',
   '/resume/materials',
   '/resume/export',
-]) {
+]
+const serviceDeskRoutes = [...serviceDeskRouteList.matchAll(/['\"]([^'\"]+)['\"]/g)].map((match) => match[1])
+expect(
+  serviceDeskRoutes.length === expectedServiceDeskRoutes.length
+    && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
+    && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
+  'Kiosk shell route whitelist is exactly the approved 12 LightFlow routes',
+)
+for (const route of expectedServiceDeskRoutes) {
   expectIncludes(serviceDeskRouteList, `'${route}'`, `Kiosk shell whitelists ${route}`)
 }
-expectNotIncludes(serviceDeskRouteList, "'/me/", 'Kiosk shell keeps my pages out of LightFlow K2b')
+expect(
+  serviceDeskRoutes.every((route) => !route.startsWith('/me') && !route.startsWith('/profile')),
+  'Kiosk shell keeps every my/profile route out of LightFlow K2b',
+)
 
 for (const [page, sourceCode, rootClass, cssPath] of [
   ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],
@@ -96,9 +118,21 @@ for (const [page, sourceCode, rootClass, cssPath] of [
   expectIncludes(sourceCode, rootClass, `${page} uses its route-specific LightFlow root`)
 }
 
-expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css')
-expectCssContract('src/pages/resume/resume-authoring-lightflow.css')
-expectCssContract('src/pages/resume/resume-library-lightflow.css')
+expectCssContract('src/pages/resume/resume-diagnosis-lightflow.css', [
+  'resume-source-lightflow',
+  'resume-parse-lightflow',
+  'resume-report-lightflow',
+])
+expectCssContract('src/pages/resume/resume-authoring-lightflow.css', [
+  'resume-generate-lightflow',
+  'resume-generate-preview-lightflow',
+  'resume-optimize-lightflow',
+])
+expectCssContract('src/pages/resume/resume-library-lightflow.css', [
+  'resume-templates-lightflow',
+  'resume-materials-lightflow',
+  'resume-export-lightflow',
+])
 
 for (const [sourceCode, marker, label] of [
   [source, 'useBusyLock(uploading || phoneBusy)', 'source keeps upload busy lock'],

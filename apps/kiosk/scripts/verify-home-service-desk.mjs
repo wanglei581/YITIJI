@@ -604,13 +604,36 @@ for (const [pattern, label] of [
   expect(!pattern.test(allCss), `新 CSS 不含旧墨青纸感特征 ${label}`)
 }
 
-// K1 已吸收后的最终基线明确让 `/` 与 `/help` 共用 service-desk；
-// 此处同步批准后的合同，并通过精确表达式继续排除其他路由。
-expectMatches(
-  kioskRoot,
-  /const isServiceDeskRoute = pathname === '\/' \|\| pathname === '\/help'[\s\S]*?visualTheme=\{isServiceDeskRoute \? 'service-desk' : 'legacy'\}/,
-  'Kiosk 仅首页与帮助页启用 service-desk',
+// K2b 扩展精确白名单，但首页与帮助页仍必须保留；禁止用 /resume 前缀宽泛匹配。
+const serviceDeskRouteList = kioskRoot.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
+const expectedServiceDeskRoutes = [
+  '/',
+  '/help',
+  '/assistant',
+  '/resume/source',
+  '/resume/parse',
+  '/resume/report',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/optimize',
+  '/resume/templates',
+  '/resume/materials',
+  '/resume/export',
+]
+const serviceDeskRoutes = [...serviceDeskRouteList.matchAll(/['\"]([^'\"]+)['\"]/g)].map((match) => match[1])
+expect(kioskRoot.includes('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = ['), 'Kiosk 声明精确 service-desk 白名单')
+expect(
+  serviceDeskRoutes.length === expectedServiceDeskRoutes.length
+    && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
+    && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
+  'Kiosk 白名单严格等于已批准的 12 条 LightFlow 路由',
 )
+for (const route of expectedServiceDeskRoutes) {
+  expect(serviceDeskRouteList.includes(`'${route}'`), `Kiosk 白名单保留 ${route}`)
+}
+expect(!kioskRoot.includes("startsWith('/resume')"), 'Kiosk 不宽泛匹配简历路径')
+expect(serviceDeskRoutes.every((route) => !route.startsWith('/me') && !route.startsWith('/profile')), 'Kiosk 白名单不包含我的或资料页')
+expectMatches(kioskRoot, /visualTheme=\{isServiceDeskRoute \? 'service-desk' : 'legacy'\}/, 'Kiosk 主题仍只由 isServiceDeskRoute 切换')
 expectMatches(kioskRoot, /density="touch"/, 'Kiosk 首页视觉密度保持 touch')
 expect((kioskRoot.match(/service-desk/g) ?? []).length === 1, 'KioskRoot 只有一个 service-desk 路由 opt-in')
 
