@@ -276,24 +276,21 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
       <div className="ka-inner">
 
-        {/* 返回 */}
-        <button type="button" className="ka-back" onClick={() => navigate(-1)}>
-          <KIcon name="arrow" />
-          返回
-        </button>
+        <header className="assistant-service-header">
+          <button type="button" className="ka-back" onClick={() => navigate(-1)}>
+            <KIcon name="arrow" />
+            返回
+          </button>
+          <span className="assistant-session-note">共享终端 · 离开自动清空</span>
+        </header>
 
-        {/* ── 服务说明 ── */}
-        <section className="a-hero">
+        <section className="a-hero assistant-service-intro">
           <div className="a-hero-copy">
             <div className="eyebrow">
               <KIcon name="sparkle" />
               就业服务咨询
             </div>
-            <h2>
-              把问题说清楚，
-              <br />
-              再把结果变成材料。
-            </h2>
+            <h2>把问题说清楚，再把结果变成材料。</h2>
             <p>这里可以咨询简历问诊、面试追问、打印前检查和政策问答；问答内容仅在本次会话内参考，如需形成简历、面试报告或打印材料，请进入对应功能页生成和保存。</p>
             <div className="a-pills">
               {voiceAvailable && (
@@ -314,172 +311,178 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           </div>
         </section>
 
-        {/* ── 语音 / 文字 双入口 ── */}
-        <div className={voiceAvailable ? 'mode-toggle' : 'mode-toggle single'}>
-          {voiceAvailable && (
-            <button
-              type="button"
-              className={callActive ? 'mode-btn call on' : 'mode-btn call'}
-              aria-pressed={callActive}
-              onClick={() => setCallActive(true)}
-            >
-              <span className="mbi"><KIcon name="mic" /></span>
-              <div>
-                <strong>语音通话</strong>
-                <span>{callActive ? '通话面板已开启' : '像打电话一样咨询顾问'}</span>
-              </div>
-            </button>
-          )}
-          <button
-            type="button"
-            className={callActive ? 'mode-btn text' : 'mode-btn text on'}
-            aria-pressed={!callActive}
-            onClick={() => (callActive ? setCallActive(false) : inputRef.current?.focus())}
-          >
-            <span className="mbi"><KIcon name="chat" /></span>
-            <div>
-              <strong>文字对话</strong>
-              <span>打字咨询、离开自动清空</span>
-            </div>
-          </button>
-        </div>
-
-        {/* ── 页内语音通话面板（点「语音通话」展开；挂断/改用文字收起） ── */}
-        {voiceAvailable && callActive && LazyCallPanel && (
-          <Suspense
-            fallback={
-              <section className="call-panel">
-                <div className="call-meta">通话模块加载中…</div>
-              </section>
-            }
-          >
-            <LazyCallPanel onEnd={() => setCallActive(false)} />
-          </Suspense>
-        )}
-
-        {/* ── 本次咨询 ── */}
-        <section className="panel" aria-live="polite">
-          <div className="panel-head">
-            <h2>{toolboxScene?.title ?? '本次咨询'}</h2>
-            <span className="tag">共享终端 · 离开自动清空</span>
-          </div>
-
-          <div className="chat-list">
-            {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
-            {loading && (
-              <div className="typing" aria-label="服务正在回复">
-                <i /><i /><i />
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {contextActions && contextActions.length > 0 && (
-            <div className="action-chips">
-              {contextActions.map((a) => (
-                <button key={a.route} type="button" className="action-chip" onClick={() => navigate(a.route)}>
-                  {a.label}
+        <div className="assistant-service-desk">
+          <section className="assistant-workbench" aria-label="当前会话工作台">
+            <div className={voiceAvailable ? 'mode-toggle' : 'mode-toggle single'}>
+              {voiceAvailable && (
+                <button
+                  type="button"
+                  className={callActive ? 'mode-btn call on' : 'mode-btn call'}
+                  aria-pressed={callActive}
+                  onClick={() => setCallActive(true)}
+                >
+                  <span className="mbi"><KIcon name="mic" /></span>
+                  <div>
+                    <strong>语音通话</strong>
+                    <span>{callActive ? '通话面板已开启' : '像打电话一样咨询顾问'}</span>
+                  </div>
                 </button>
-              ))}
+              )}
+              <button
+                type="button"
+                className={callActive ? 'mode-btn text' : 'mode-btn text on'}
+                aria-pressed={!callActive}
+                onClick={() => (callActive ? setCallActive(false) : inputRef.current?.focus())}
+              >
+                <span className="mbi"><KIcon name="chat" /></span>
+                <div>
+                  <strong>文字对话</strong>
+                  <span>打字咨询、离开自动清空</span>
+                </div>
+              </button>
             </div>
-          )}
 
-          <div className="input-bar">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => !loading && setKeyboardOpen(true)}
-              onClick={() => !loading && setKeyboardOpen(true)}
-              // 公共终端用页内虚拟键盘：抑制系统软键盘，但保留光标可编辑
-              inputMode="none"
-              placeholder={toolboxScene?.placeholder ?? '点这里，用下方键盘输入问题'}
-              rows={1}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className="send-btn"
-              onClick={handleSend}
-              disabled={!input.trim() || loading}
-              aria-label="发送消息"
-            >
-              <KIcon name="send" />
-            </button>
-          </div>
-          <p className="disclaimer">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
-        </section>
+            {voiceAvailable && callActive && LazyCallPanel && (
+              <Suspense
+                fallback={
+                  <section className="call-panel">
+                    <div className="call-meta">通话模块加载中…</div>
+                  </section>
+                }
+              >
+                <LazyCallPanel onEnd={() => setCallActive(false)} />
+              </Suspense>
+            )}
 
-        {/* ── 快捷任务（真实路由；输入关键词命中时高亮） ── */}
-        <div className="sec-head">
-          <span className="rail" aria-hidden="true" />
-          <div>
-            <h2>快捷任务</h2>
-            <p>点一下直达对应功能页。</p>
-          </div>
-        </div>
-        <div className="quick-grid">
-          {QUICK_TASKS.map((task) => (
-            <button
-              key={task.route}
-              type="button"
-              className={['quick', task.variant, matchedRoutes.has(task.route) ? 'hit' : '']
-                .filter(Boolean)
-                .join(' ')}
-              onClick={() => navigate(task.route)}
-            >
-              <span className="qi"><KIcon name={task.icon} /></span>
-              <div>
-                <strong>{task.label}</strong>
-                <span>{task.desc}</span>
+            <section className="panel" aria-live="polite">
+              <div className="panel-head">
+                <h2>{toolboxScene?.title ?? '本次咨询'}</h2>
+                <span className="tag">当前会话工作区</span>
               </div>
-            </button>
-          ))}
-        </div>
 
-        {/* ── 大家都在问（点击直接发给小青） ── */}
-        <div className="sec-head">
-          <span className="rail slate" aria-hidden="true" />
-          <div>
-            <h2>大家都在问</h2>
-            <p>点击直接向小青提问。</p>
-          </div>
-        </div>
-        <div className="faq-list">
-          {FAQ_QUESTIONS.map((q) => (
-            <button key={q} type="button" className="faq" onClick={() => void sendMessage(q)} disabled={loading}>
-              <span className="q">Q</span>
-              <strong>{q}</strong>
-              <KIcon name="arrow" />
-            </button>
-          ))}
-        </div>
+              <div className="chat-list">
+                {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
+                {loading && (
+                  <div className="typing" aria-label="服务正在回复">
+                    <i /><i /><i />
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
 
-        {/* ── 结果去哪儿 ── */}
-        <div className="sec-head">
-          <span className="rail plum" aria-hidden="true" />
-          <div>
-            <h2>结果去哪儿</h2>
-            <p>助手问答仅本次会话内参考；正式材料请到对应功能页生成和保存。</p>
-          </div>
-        </div>
-        <div className="result-strip">
-          <div className="result-card">
-            <span className="ri"><KIcon name="doc-check" /></span>
-            <strong>去简历服务</strong>
-            <span>问答建议仅供参考；简历需到「简历服务」按流程生成和保存。</span>
-          </div>
-          <div className="result-card v2">
-            <span className="ri"><KIcon name="receipt" /></span>
-            <strong>去模拟面试</strong>
-            <span>面试复盘报告需到「模拟面试」功能生成和保存，助手不直接出报告。</span>
-          </div>
-          <div className="result-card v3">
-            <span className="ri"><KIcon name="printer" /></span>
-            <strong>去打印</strong>
-            <span>纸质材料需到「打印」功能生成和输出，助手问答不直接出件。</span>
-          </div>
+              {contextActions && contextActions.length > 0 && (
+                <div className="action-chips">
+                  {contextActions.map((a) => (
+                    <button key={a.route} type="button" className="action-chip" onClick={() => navigate(a.route)}>
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="input-bar">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={() => !loading && setKeyboardOpen(true)}
+                  onClick={() => !loading && setKeyboardOpen(true)}
+                  // 公共终端用页内虚拟键盘：抑制系统软键盘，但保留光标可编辑
+                  inputMode="none"
+                  placeholder={toolboxScene?.placeholder ?? '点这里，用下方键盘输入问题'}
+                  rows={1}
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  className="send-btn"
+                  onClick={handleSend}
+                  disabled={!input.trim() || loading}
+                  aria-label="发送消息"
+                >
+                  <KIcon name="send" />
+                </button>
+              </div>
+              <p className="disclaimer">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
+            </section>
+          </section>
+
+          <aside className="assistant-service-catalog" aria-label="服务目录">
+            <section className="assistant-catalog-section assistant-quick-tasks" aria-labelledby="assistant-quick-tasks-title">
+              <div className="sec-head">
+                <span className="rail" aria-hidden="true" />
+                <div>
+                  <h2 id="assistant-quick-tasks-title">快捷任务</h2>
+                  <p>点一下直达对应功能页。</p>
+                </div>
+              </div>
+              <div className="quick-grid">
+                {QUICK_TASKS.map((task) => (
+                  <button
+                    key={task.route}
+                    type="button"
+                    className={['quick', task.variant, matchedRoutes.has(task.route) ? 'hit' : '']
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => navigate(task.route)}
+                  >
+                    <span className="qi"><KIcon name={task.icon} /></span>
+                    <div>
+                      <strong>{task.label}</strong>
+                      <span>{task.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="assistant-catalog-section assistant-faqs" aria-labelledby="assistant-faqs-title">
+              <div className="sec-head">
+                <span className="rail slate" aria-hidden="true" />
+                <div>
+                  <h2 id="assistant-faqs-title">大家都在问</h2>
+                  <p>点击直接发送到本次咨询。</p>
+                </div>
+              </div>
+              <div className="faq-list">
+                {FAQ_QUESTIONS.map((q) => (
+                  <button key={q} type="button" className="faq" onClick={() => void sendMessage(q)} disabled={loading}>
+                    <span className="q">Q</span>
+                    <strong>{q}</strong>
+                    <KIcon name="arrow" />
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="assistant-catalog-section assistant-result-guide" aria-labelledby="assistant-result-guide-title">
+              <div className="sec-head">
+                <span className="rail plum" aria-hidden="true" />
+                <div>
+                  <h2 id="assistant-result-guide-title">结果去哪儿</h2>
+                  <p>正式材料请到对应功能页生成和保存。</p>
+                </div>
+              </div>
+              <div className="result-strip">
+                <div className="result-card">
+                  <span className="ri"><KIcon name="doc-check" /></span>
+                  <strong>去简历服务</strong>
+                  <span>问答建议仅供参考；简历需到「简历服务」按流程生成和保存。</span>
+                </div>
+                <div className="result-card v2">
+                  <span className="ri"><KIcon name="receipt" /></span>
+                  <strong>去模拟面试</strong>
+                  <span>面试复盘报告需到「模拟面试」功能生成和保存，助手不直接出报告。</span>
+                </div>
+                <div className="result-card v3">
+                  <span className="ri"><KIcon name="printer" /></span>
+                  <strong>去打印</strong>
+                  <span>纸质材料需到「打印」功能生成和输出，助手问答不直接出件。</span>
+                </div>
+              </div>
+            </section>
+          </aside>
         </div>
 
         <p className="compliance">

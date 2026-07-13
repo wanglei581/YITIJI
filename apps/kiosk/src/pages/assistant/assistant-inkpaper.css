@@ -1,3 +1,4 @@
+/* Assistant LightFlow styles are split by shell, chat, content, and call states. */
 @import './assistant-lightflow-shell.css';
 @import './assistant-lightflow-call.css';
 @import './assistant-lightflow-chat.css';

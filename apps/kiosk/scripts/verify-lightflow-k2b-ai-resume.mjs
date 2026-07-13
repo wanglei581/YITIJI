@@ -77,6 +77,7 @@ const expectedServiceDeskRoutes = [
   '/',
   '/help',
   '/assistant',
+  '/profile',
   '/resume/source',
   '/resume/parse',
   '/resume/report',
@@ -92,15 +93,12 @@ expect(
   serviceDeskRoutes.length === expectedServiceDeskRoutes.length
     && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
     && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
-  'Kiosk shell route whitelist is exactly the approved 12 LightFlow routes',
+  'Kiosk shell route whitelist is exactly the approved 13 LightFlow routes including profile',
 )
 for (const route of expectedServiceDeskRoutes) {
   expectIncludes(serviceDeskRouteList, `'${route}'`, `Kiosk shell whitelists ${route}`)
 }
-expect(
-  serviceDeskRoutes.every((route) => !route.startsWith('/me') && !route.startsWith('/profile')),
-  'Kiosk shell keeps every my/profile route out of LightFlow K2b',
-)
+expect(serviceDeskRoutes.every((route) => !route.startsWith('/me')), 'Kiosk shell keeps every /me detail route out of LightFlow')
 
 for (const [page, sourceCode, rootClass, cssPath] of [
   ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],

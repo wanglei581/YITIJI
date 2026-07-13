@@ -14,90 +14,120 @@
   --sd-shadow-touch: 0 18px 60px rgba(30, 71, 124, 0.09);
   --sd-shadow-soft: 0 9px 28px rgba(30, 71, 124, 0.07);
   --sd-radius-card: var(--sd-card-radius, 26px);
+  --sd-primary-control-min: 56px;
+  --kassist-control-min: 48px;
+  --kassist-primary-control-min: 56px;
   position: relative;
   min-height: 100%;
-  padding: 24px 0 56px;
+  padding: 20px 0 44px;
   color: var(--sd-text);
-  background: radial-gradient(circle at 16% -8%, rgba(113, 178, 255, 0.32), transparent 34%), radial-gradient(circle at 88% 22%, rgba(190, 224, 255, 0.42), transparent 29%), var(--sd-canvas-outer);
+  background: linear-gradient(180deg, #edf6ff 0%, var(--sd-canvas) 42%, #eaf3ff 100%);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 .kassist-lightflow > * { position: relative; z-index: 1; }
 .kassist-lightflow > .kkb { position: fixed; z-index: 61; }
 .kassist-lightflow .kassist-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.kassist-lightflow .ka-inner { width: min(1320px, calc(100% - 64px)); margin: 0 auto; }
+.kassist-lightflow .ka-inner { width: min(1360px, calc(100% - 48px)); margin: 0 auto; }
+
+.kassist-lightflow .assistant-service-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.kassist-lightflow .assistant-session-note { color: var(--sd-copy-muted); font-size: 13px; font-weight: 680; }
 
 .kassist-lightflow .ka-back {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  min-height: var(--sd-control-min, 48px);
+  min-height: var(--kassist-control-min);
   padding: 0 18px;
   border: 1px solid var(--sd-line);
-  border-radius: 999px;
+  border-radius: 14px;
   color: var(--sd-text);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: var(--sd-shadow-soft);
+  background: var(--sd-surface);
   font-size: 15px;
   font-weight: 720;
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.kassist-lightflow .ka-back:hover { border-color: var(--sd-line-strong); box-shadow: var(--sd-shadow-touch); transform: translateY(-2px); }
+.kassist-lightflow .ka-back:hover { border-color: #9dc8ff; box-shadow: 0 5px 16px rgba(30, 71, 124, 0.08); transform: translateY(-1px); }
 .kassist-lightflow .ka-back:active { transform: scale(0.98); }
 .kassist-lightflow .ka-back svg { width: 17px; height: 17px; transform: rotate(180deg); }
 
 .kassist-lightflow .a-hero {
   position: relative;
   overflow: hidden;
-  margin-top: 16px;
-  padding: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: calc(var(--sd-radius-card) + 4px);
-  background: linear-gradient(118deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 252, 255, 0.95) 67%, rgba(228, 242, 255, 0.94) 100%);
-  box-shadow: var(--sd-shadow-touch);
+  margin-top: 14px;
+  padding: 22px 26px;
+  border: 1px solid var(--sd-line);
+  border-radius: 18px;
+  background: var(--sd-surface);
 }
 
-.kassist-lightflow .a-hero::before { position: absolute; top: -148px; right: -78px; width: 320px; height: 320px; border: 1px solid rgba(23, 105, 232, 0.12); border-radius: 50%; content: ""; }
-.kassist-lightflow .a-hero::after { position: absolute; right: 86px; bottom: -112px; width: 210px; height: 210px; border: 38px solid rgba(23, 105, 232, 0.06); border-radius: 50%; content: ""; }
+.kassist-lightflow .a-hero::before { position: absolute; top: 0; right: 0; bottom: 0; width: 8px; background: var(--sd-primary); content: ""; }
+.kassist-lightflow .a-hero::after { position: absolute; right: 32px; bottom: -40px; width: 144px; height: 144px; border: 1px solid #cbe2ff; border-radius: 50%; content: ""; }
 .kassist-lightflow .a-hero-copy { position: relative; z-index: 1; max-width: 770px; }
 .kassist-lightflow .a-hero-copy .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--sd-primary); font-size: 15px; font-weight: 780; }
 .kassist-lightflow .a-hero-copy .eyebrow svg { width: 18px; height: 18px; }
-.kassist-lightflow .a-hero-copy h2 { max-width: 690px; margin: 13px 0 0; color: var(--sd-text-strong); font-size: clamp(31px, 3.2vw, 45px); font-weight: 820; letter-spacing: -0.035em; line-height: 1.17; }
-.kassist-lightflow .a-hero-copy p { max-width: 690px; margin: 16px 0 0; color: var(--sd-copy); font-size: 16px; line-height: 1.68; }
-.kassist-lightflow .a-pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.kassist-lightflow .a-hero-copy h2 { max-width: 790px; margin: 8px 0 0; color: var(--sd-text-strong); font-size: clamp(25px, 2.7vw, 36px); font-weight: 820; letter-spacing: -0.03em; line-height: 1.2; }
+.kassist-lightflow .a-hero-copy p { max-width: 890px; margin: 10px 0 0; color: var(--sd-copy); font-size: 15px; line-height: 1.6; }
+.kassist-lightflow .a-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
 .kassist-lightflow .a-pill { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 14px; border: 1px solid #cfe4ff; border-radius: 999px; color: #1159b7; background: #eff7ff; font-size: 13px; font-weight: 730; }
 .kassist-lightflow .a-pill svg { width: 15px; height: 15px; }
 
-.kassist-lightflow .mode-toggle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+.kassist-lightflow .assistant-service-desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+  align-items: start;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.kassist-lightflow .assistant-workbench { min-width: 0; }
+.kassist-lightflow .assistant-service-catalog { display: flex; min-width: 0; gap: 12px; flex-direction: column; }
+.kassist-lightflow .assistant-catalog-section { padding: 17px; border: 1px solid var(--sd-line); border-radius: 18px; background: var(--sd-surface); }
+
+.kassist-lightflow .mode-toggle { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .kassist-lightflow .mode-toggle.single { grid-template-columns: minmax(0, 1fr); }
 .kassist-lightflow .mode-btn {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: max(94px, var(--sd-primary-control-min, 56px));
-  padding: 17px 22px;
+  min-height: max(82px, var(--kassist-primary-control-min));
+  padding: 14px 16px;
   overflow: hidden;
   border: 1px solid var(--sd-line);
-  border-radius: var(--sd-radius-card);
+  border-radius: 18px;
   color: var(--sd-text);
   background: var(--sd-surface);
-  box-shadow: var(--sd-shadow-soft);
   cursor: pointer;
   text-align: left;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.kassist-lightflow .mode-btn:hover { border-color: #9cc8ff; box-shadow: var(--sd-shadow-touch); transform: translateY(-2px); }
+.kassist-lightflow .mode-btn:hover { border-color: #9cc8ff; box-shadow: 0 5px 16px rgba(30, 71, 124, 0.08); transform: translateY(-1px); }
 .kassist-lightflow .mode-btn:active { transform: scale(0.985); }
-.kassist-lightflow .mode-btn .mbi { display: grid; width: 54px; height: 54px; flex: 0 0 auto; place-items: center; border-radius: 17px; }
-.kassist-lightflow .mode-btn .mbi svg { width: 27px; height: 27px; }
-.kassist-lightflow .mode-btn strong { display: block; color: inherit; font-size: 19px; font-weight: 800; }
+.kassist-lightflow .mode-btn .mbi { display: grid; width: var(--kassist-primary-control-min); height: var(--kassist-primary-control-min); flex: 0 0 auto; place-items: center; border-radius: 14px; }
+.kassist-lightflow .mode-btn .mbi svg { width: 25px; height: 25px; }
+.kassist-lightflow .mode-btn strong { display: block; color: inherit; font-size: 17px; font-weight: 800; }
 .kassist-lightflow .mode-btn span { display: block; margin-top: 4px; color: var(--sd-copy); font-size: 13px; }
 .kassist-lightflow .mode-btn.call { border-color: #0b4eaa; color: #ffffff; background: linear-gradient(136deg, #061c47 0%, #0b469e 58%, #1769e8 100%); }
 .kassist-lightflow .mode-btn.call span { color: #dbeafe; }
 .kassist-lightflow .mode-btn.call .mbi { color: #ffffff; background: rgba(255, 255, 255, 0.16); }
-.kassist-lightflow .mode-btn.call.on { box-shadow: 0 0 0 4px rgba(23, 105, 232, 0.18), var(--sd-shadow-touch); }
+.kassist-lightflow .mode-btn.call.on { box-shadow: 0 0 0 3px rgba(23, 105, 232, 0.18); }
 .kassist-lightflow .mode-btn.text .mbi { color: #ffffff; background: linear-gradient(140deg, var(--sd-primary), var(--sd-primary-strong)); box-shadow: 0 9px 18px rgba(23, 105, 232, 0.22); }
-.kassist-lightflow .mode-btn.text.on { border-color: #88bdff; box-shadow: 0 0 0 4px rgba(23, 105, 232, 0.09), var(--sd-shadow-soft); }
+.kassist-lightflow .mode-btn.text.on { border-color: #88bdff; box-shadow: 0 0 0 3px rgba(23, 105, 232, 0.09); }
+
+@media (max-width: 900px) {
+  .kassist-lightflow .ka-inner { width: min(100% - 32px, 720px); }
+  .kassist-lightflow .assistant-service-desk { grid-template-columns: minmax(0, 1fr); }
+  .kassist-lightflow .assistant-service-catalog { gap: 10px; }
+}
+
+@media (max-width: 520px) {
+  .kassist-lightflow { padding-top: 16px; }
+  .kassist-lightflow .assistant-session-note { font-size: 12px; }
+  .kassist-lightflow .a-hero { padding: 19px 18px; }
+  .kassist-lightflow .a-hero-copy h2 { font-size: 25px; }
+  .kassist-lightflow .assistant-catalog-section { padding: 14px; }
+  .kassist-lightflow .mode-toggle { grid-template-columns: minmax(0, 1fr); }
+}

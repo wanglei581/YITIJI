@@ -1,9 +1,9 @@
 .kassist-lightflow .call-panel {
-  margin-top: 18px;
-  padding: 32px;
+  margin-top: 12px;
+  padding: 24px;
   overflow: hidden;
   border: 1px solid rgba(132, 184, 255, 0.34);
-  border-radius: calc(var(--sd-radius-card) + 2px);
+  border-radius: 18px;
   color: #ffffff;
   background: radial-gradient(circle at 84% 4%, rgba(99, 173, 255, 0.48), transparent 32%), linear-gradient(145deg, #061c47 0%, #0a3578 58%, #145fc8 100%);
   box-shadow: var(--sd-shadow-touch);

@@ -26,7 +26,9 @@ export function ProfilePage() {
   const location = useLocation()
   const { user, isLoggedIn, displayName, logout, getToken } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
-  useInkRipple('.kprofile .entry, .kprofile .chip-row, .kprofile .account, .kprofile .p-btn, .kprofile .p-iconbtn')
+  useInkRipple(
+    '.kprofile.kprofile-lightflow .entry, .kprofile.kprofile-lightflow .chip-row, .kprofile.kprofile-lightflow .account, .kprofile.kprofile-lightflow .p-btn, .kprofile.kprofile-lightflow .p-iconbtn',
+  )
 
   // ── 本次会话记录（仅来自 location.state，不伪造数量）──────────────
   const [resumes, setResumes] = useState<ResumeItem[]>(() =>
@@ -119,7 +121,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="kprofile">
+    <div className="kprofile kprofile-lightflow">
       <div className="kp-inner">
         {/* ── 顶部个人信息区 ── */}
         <ProfileHeader
@@ -149,9 +151,11 @@ export function ProfilePage() {
         )}
 
         {/* ── 分区入口 ── */}
-        {SECTIONS.map((section) => (
-          <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
-        ))}
+        <div className="kp-service-directory">
+          {SECTIONS.map((section) => (
+            <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
+          ))}
+        </div>
 
         {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}
         {hasSessionRecords && (

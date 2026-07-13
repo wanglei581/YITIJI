@@ -213,6 +213,7 @@ function IdentityPanel() {
 /* ── 服务分组（路由 / intent / 分组顺序与换装前完全一致；仅替换视觉） ── */
 interface ServiceTile {
   title: string
+  description?: string
   icon: KioskIconName
   to?: string
   state?: Record<string, unknown>
@@ -222,10 +223,12 @@ interface ServiceTile {
 type Accent = 'teal' | 'clay' | 'slate' | 'wheat' | 'plum' | 'tool'
 
 interface ServiceGroup {
+  id: string
   title: string
   subtitle: string
   icon: KioskIconName
   accent: Accent
+  layout: 'featured' | 'paired' | 'standard' | 'wide'
   span2?: boolean
   cols2?: boolean
   badge?: { icon: KioskIconName; label: string }
@@ -236,88 +239,100 @@ interface ServiceGroup {
 
 const SERVICE_GROUPS: ServiceGroup[] = [
   {
+    id: 'resume',
     title: 'AI简历服务',
     subtitle: '诊断、优化、打印，一次完成',
     icon: 'resume',
     accent: 'teal',
+    layout: 'featured',
     span2: true,
     badge: { icon: 'star', label: '推荐先做' },
     tiles: [
       // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
-      { title: 'AI简历诊断', icon: 'doc-check', to: '/resume/source?intent=diagnose' },
-      { title: 'AI简历优化', icon: 'sparkle', to: '/resume/source?intent=optimize' },
-      { title: '简历素材库', icon: 'book', to: '/resume/templates' },
-      { title: '职业规划', icon: 'compass', to: '/resume/career-plan' },
-      { title: '简历打印', icon: 'printer', to: '/print/upload?source=resume' },
-      { title: '求职材料', icon: 'briefcase', to: '/resume/materials' },
+      { title: 'AI简历诊断', description: '上传后查看结构与表达建议', icon: 'doc-check', to: '/resume/source?intent=diagnose' },
+      { title: 'AI简历优化', description: '基于目标岗位优化表达', icon: 'sparkle', to: '/resume/source?intent=optimize' },
+      { title: '简历素材库', description: '选择模板与素材参考', icon: 'book', to: '/resume/templates' },
+      { title: '职业规划', description: '梳理职业方向与行动建议', icon: 'compass', to: '/resume/career-plan' },
+      { title: '简历打印', description: '生成后在本机打印', icon: 'printer', to: '/print/upload?source=resume' },
+      { title: '求职材料', description: '整理求职材料与清单', icon: 'briefcase', to: '/resume/materials' },
     ],
   },
   {
+    id: 'jobs',
     title: '岗位信息',
     subtitle: '第三方来源岗位，去来源平台投递',
     icon: 'briefcase',
     accent: 'clay',
+    layout: 'paired',
     tiles: [
-      { title: '全职岗位', icon: 'briefcase', to: '/jobs?category=fulltime' },
-      { title: '实习岗位', icon: 'campus', to: '/jobs?category=intern' },
-      { title: '兼职信息', icon: 'clock', to: '/jobs?category=parttime' },
-      { title: '全部岗位', icon: 'files', to: '/jobs' },
-      { title: '找企业', icon: 'shield', to: '/companies' },
+      { title: '全职岗位', description: '第三方来源全职信息', icon: 'briefcase', to: '/jobs?category=fulltime' },
+      { title: '实习岗位', description: '第三方来源实习信息', icon: 'campus', to: '/jobs?category=intern' },
+      { title: '兼职信息', description: '第三方来源兼职信息', icon: 'clock', to: '/jobs?category=parttime' },
+      { title: '全部岗位', description: '按分类查看全部来源岗位', icon: 'files', to: '/jobs' },
+      { title: '找企业', description: '查看企业信息与职位来源', icon: 'shield', to: '/companies' },
       // 2026-07-11：按 IA 整合审计 §3⑧ 拍板执行——复用既有「岗位匹配参考」（2D）能力，不新增独立路由/页面。
-      { title: '岗位大师', icon: 'star', to: '/resume/job-fit' },
+      { title: '岗位大师', description: '岗位匹配参考与优化方向', icon: 'star', to: '/resume/job-fit' },
     ],
   },
   {
+    id: 'job-fairs',
     title: '招聘会',
     subtitle: '查看场次信息，去来源平台预约',
     icon: 'pin',
     accent: 'wheat',
+    layout: 'paired',
     tiles: [
-      { title: '社会招聘会', icon: 'pin', to: '/job-fairs' },
-      { title: '校园招聘会', icon: 'campus', to: '/campus' },
-      { title: '扫码签到', icon: 'qr', to: '/job-fairs/checkin' },
+      { title: '社会招聘会', description: '查看社会招聘会场次', icon: 'pin', to: '/job-fairs' },
+      { title: '校园招聘会', description: '查看校园招聘会安排', icon: 'campus', to: '/campus' },
+      { title: '扫码签到', description: '现场扫码签到指引', icon: 'qr', to: '/job-fairs/checkin' },
     ],
   },
   {
+    id: 'print-scan',
     title: '打印扫描',
     subtitle: '上传或扫描，本机直接出纸',
     icon: 'printer',
     accent: 'slate',
+    layout: 'standard',
     titleTo: '/print-scan',
     tiles: [
-      { title: '文档打印', icon: 'printer', to: '/print/upload?source=document' },
-      { title: '证件复印', icon: 'files', disabled: Boolean(true) },
-      { title: '纸质扫描', icon: 'scan', to: '/scan/start' },
+      { title: '文档打印', description: '上传文档后本机打印', icon: 'printer', to: '/print/upload?source=document' },
+      { title: '证件复印', description: '待设备能力开放', icon: 'files', disabled: Boolean(true) },
+      { title: '纸质扫描', description: '扫描纸质文件后保存', icon: 'scan', to: '/scan/start' },
       // 2026-07-12：「云打印」磁贴按正式取舍决策删除（能力归位文档打印+手机扫码上传；
       // 远程提交·到店取件记入商用二期候选），见 docs/reviews/2026-07-12-cloud-print-decision.md
-      { title: '格式转换', icon: 'swap', to: '/print-scan/convert' },
-      { title: '证件照打印', icon: 'user', disabled: Boolean(true) },
+      { title: '格式转换', description: '常用文件格式转换', icon: 'swap', to: '/print-scan/convert' },
+      { title: '证件照打印', description: '待设备能力开放', icon: 'user', disabled: Boolean(true) },
     ],
   },
   {
+    id: 'interview',
     title: 'AI面试训练',
     subtitle: '模拟练习，仅供参考',
     icon: 'headset',
     accent: 'plum',
+    layout: 'standard',
     tiles: [
-      { title: '模拟面试', icon: 'mic', to: '/interview/setup' },
-      { title: '面试技巧', icon: 'bulb', to: '/interview/tips' },
-      { title: '面试报告', icon: 'doc-check', to: '/interview/reports' },
+      { title: '模拟面试', description: 'AI 模拟问答练习', icon: 'mic', to: '/interview/setup' },
+      { title: '面试技巧', description: '常见面试技巧参考', icon: 'bulb', to: '/interview/tips' },
+      { title: '面试报告', description: '查看已生成的训练报告', icon: 'doc-check', to: '/interview/reports' },
     ],
   },
   {
+    id: 'policy',
     // 合规:补贴类只做政策说明/材料清单/官方入口/申请指引(info-only),
     // 不出现"快申/申请"等暗示平台内办理的表述。
     title: '政策服务',
     subtitle: '政策查询与办事材料指引',
     icon: 'policy',
     accent: 'wheat',
+    layout: 'wide',
     span2: true,
     tiles: [
       // 「就业政策」Tab 内含补贴指引内容；「社保指南」与 tab=social 一一对应，避免同义重复入口。
-      { title: '就业政策', icon: 'policy', to: '/renshi?tab=policy' },
-      { title: '社保指南', icon: 'ticket', to: '/renshi?tab=social' },
-      { title: '档案 / 登记', icon: 'files', to: '/renshi?tab=register' },
+      { title: '就业政策', description: '就业政策与官方口径', icon: 'policy', to: '/renshi?tab=policy' },
+      { title: '社保指南', description: '社保办事材料参考', icon: 'ticket', to: '/renshi?tab=social' },
+      { title: '档案 / 登记', description: '档案登记材料指引', icon: 'files', to: '/renshi?tab=register' },
     ],
   },
 ]
@@ -331,7 +346,11 @@ const SUB_ACCENT: Record<Accent, string> = {
   tool: '',
 }
 
-function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
+type ServiceTileVariant = 'standard' | 'featured-primary' | 'featured-compact'
+
+function ServiceTileButton({
+  tile, accent, variant = 'standard', catalog = false, showDescription = false,
+}: { tile: ServiceTile; accent: Accent; variant?: ServiceTileVariant; catalog?: boolean; showDescription?: boolean }) {
   const navigate = useNavigate()
   const disabled = tile.disabled || !tile.to
 
@@ -340,12 +359,13 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent
       type="button"
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
-      className={['sub', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      className={['sub', catalog ? 'service-catalog-tile' : '', catalog ? variant : '', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
     >
       <span className="si">
         <KIcon name={tile.icon} />
       </span>
       <span className="label">{tile.title}</span>
+      {showDescription && <span className="service-tile-description">{tile.description}</span>}
       {disabled ? (
         <span className="soon">即将上线</span>
       ) : (
@@ -361,11 +381,12 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
   const navigate = useNavigate()
   const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
   const titleTarget = group.titleTo ?? enabledFirst?.to
+  const renderTile = (tile: ServiceTile, variant: ServiceTileVariant) => <ServiceTileButton key={tile.title} tile={tile} accent={group.accent} variant={variant} catalog showDescription />
 
   return (
-    <section className={group.span2 ? 'cat-card span2' : 'cat-card'}>
+    <section id={group.id} className={['service-catalog-group', group.layout].join(' ')} aria-labelledby={`${group.id}-title`}>
       <div
-        className="cat-head tap"
+        className={titleTarget ? 'service-catalog-head tap' : 'service-catalog-head'}
         role="button"
         tabIndex={0}
         onClick={() => titleTarget && navigate(titleTarget)}
@@ -373,29 +394,31 @@ function ServiceGroupCard({ group }: { group: ServiceGroup }) {
           if ((e.key === 'Enter' || e.key === ' ') && titleTarget) navigate(titleTarget)
         }}
       >
-        <span className={`cat-icon ${group.accent}`}>
+        <span className={`service-catalog-icon ${group.accent}`}>
           <KIcon name={group.icon} />
         </span>
-        <div className="cat-title">
-          <h3>{group.title}</h3>
+        <div className="service-catalog-title">
+          <h3 id={`${group.id}-title`}>{group.title}</h3>
           <p>{group.subtitle}</p>
         </div>
         {group.badge && (
-          <span className="cat-badge">
+          <span className="service-catalog-badge">
             <KIcon name={group.badge.icon} />
             {group.badge.label}
           </span>
         )}
       </div>
 
-      <div
-        className={group.cols2 ? 'sub-grid cols2' : 'sub-grid'}
-        style={group.span2 ? { gridTemplateColumns: `repeat(${Math.min(group.tiles.length, 6)}, 1fr)` } : undefined}
-      >
-        {group.tiles.map((tile) => (
-          <ServiceTileButton key={tile.title} tile={tile} accent={group.accent} />
-        ))}
-      </div>
+      {group.layout === 'featured' ? (
+        <>
+          <div className="featured-primary-grid">{group.tiles.slice(0, 2).map((tile) => renderTile(tile, 'featured-primary'))}</div>
+          <div className="featured-compact-grid">{group.tiles.slice(2).map((tile) => renderTile(tile, 'featured-compact'))}</div>
+        </>
+      ) : (
+        <div className="service-catalog-grid">
+          {group.tiles.map((tile) => renderTile(tile, 'standard'))}
+        </div>
+      )}
     </section>
   )
 }
@@ -502,22 +525,22 @@ function ContinuePanel() {
 
 /* ── 智慧校园（整行 cat-card；后台开关联动，关闭不渲染，逻辑不变） ── */
 // 校园大数据（bigdata）本期严格冻结：不在此列出入口卡，后端开关亦强制 false。
-const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { desc: string }>> = {
+const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile>> = {
   welcome: {
     title: '迎新服务',
-    desc: '报到流程、办事窗口、入学材料打印',
+    description: '报到流程、办事窗口、入学材料打印',
     icon: 'campus',
     to: '/smart-campus/welcome',
   },
   luggage: {
     title: '行李帮运',
-    desc: '校方合作服务入口、服务点与路线说明',
+    description: '校方合作服务入口、服务点与路线说明',
     icon: 'route',
     to: '/smart-campus/service/luggage',
   },
   panorama: {
     title: 'VR校园',
-    desc: '校园全景、路线导览、重点场馆介绍',
+    description: '校园全景、路线导览、重点场馆介绍',
     icon: 'eye',
     to: '/smart-campus/service/panorama',
   },
@@ -531,7 +554,7 @@ function SmartCampusHorizontalSection() {
   const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
     .filter((key) => config.modules[key])
     .map((key) => SMART_CAMPUS_TILES[key])
-    .filter((tile): tile is ServiceTile & { desc: string } => !!tile)
+    .filter((tile): tile is ServiceTile => !!tile)
   const campusItems = [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
 
   if (!config.enabled || (enabledTiles.length === 0 && campusItems.length === 0)) return null
@@ -747,15 +770,11 @@ export function HomePage() {
       </div>
 
       <div className="khome-inner">
-        <div className="sec-head">
-          <span className="rail" aria-hidden="true" />
-          <div>
-            <h2>当前可使用功能</h2>
-            <p>按服务类别查看本机当前可使用功能。</p>
-          </div>
-        </div>
+        <nav className="service-quick-nav" aria-label="服务分类">
+          {SERVICE_GROUPS.map((group) => (<a key={group.id} href={`#${group.id}`}>{group.title}</a>))}
+        </nav>
 
-        <main className="home-grid">
+        <main className="home-service-catalog" aria-label="当前可使用功能">
           {SERVICE_GROUPS.map((group) => (
             <ServiceGroupCard key={group.title} group={group} />
           ))}

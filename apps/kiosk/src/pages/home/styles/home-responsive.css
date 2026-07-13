@@ -22,7 +22,9 @@
   .khome .id-stats { order: 3; width: 100%; margin: 6px 0 0; justify-content: space-between; }
   .khome .id-stat { flex: 1; min-width: 0; }
   .khome .id-actions { margin-left: auto; }
-  .khome .home-grid { grid-template-columns: 1fr; }
+  .khome .home-service-catalog { grid-template-columns: 1fr; }
+  .khome .service-catalog-group.featured,
+  .khome .service-catalog-group.wide { grid-column: auto; }
   .khome .cat-card.span2 { grid-column: auto; }
   .khome .sub-grid,
   .khome .cat-card.span2 .sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
@@ -53,8 +55,22 @@
   .khome .continue { margin-inline: 4px; padding: 16px; flex-wrap: wrap; }
   .khome .continue .c-icon { width: 48px; height: 48px; }
   .khome .continue .btn { width: 100%; }
-  .khome .sec-head { margin-top: 30px; }
-  .khome .sec-head h2 { font-size: 24px; }
+  .khome .service-quick-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 18px; }
+  .khome .service-quick-nav a { min-height: 48px; padding-inline: 6px; font-size: 11px; }
+  .khome .home-service-catalog { grid-template-columns: 1fr; gap: 10px; }
+  .khome .service-catalog-group { min-width: 0; padding: 15px; border-radius: 16px; }
+  .khome .service-catalog-head { gap: 10px; padding-bottom: 12px; }
+  .khome .service-catalog-icon { width: 42px; height: 42px; border-radius: 12px; }
+  .khome .service-catalog-title h3 { font-size: 17px; }
+  .khome .service-catalog-title p { font-size: 11px; }
+  .khome .service-catalog-badge { padding-inline: 8px; font-size: 10px; }
+  .khome .service-catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .khome .featured-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .khome .featured-compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .khome .service-catalog-tile { min-height: 92px; padding: 12px; }
+  .khome .service-catalog-tile.featured-primary { min-height: 146px; padding: 15px; }
+  .khome .service-catalog-tile.featured-primary .label { font-size: 17px; }
+  .khome .service-catalog-tile.featured-primary .service-tile-description { font-size: 12px; }
   .khome .cat-card { padding: 19px; border-radius: 22px; }
   .khome .cat-head { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
   .khome .cat-icon { width: 50px; height: 50px; border-radius: 15px; }
@@ -83,7 +99,6 @@
   .khome .service-value { min-height: 280px; margin-top: 30px; padding: 48px 54px; }
   .khome .service-value h1 { font-size: 54px; }
   .khome .identity { margin-inline: 20px; }
-  .khome .home-grid { gap: 20px; }
   .khome .cat-card { padding: 28px; }
   .khome .sub { min-height: 102px; }
 }

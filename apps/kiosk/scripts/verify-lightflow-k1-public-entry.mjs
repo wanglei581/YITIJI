@@ -442,6 +442,7 @@ const expectedServiceDeskRoutes = [
   '/',
   '/help',
   '/assistant',
+  '/profile',
   '/resume/source',
   '/resume/parse',
   '/resume/report',
@@ -458,13 +459,13 @@ expect(
   serviceDeskRoutes.length === expectedServiceDeskRoutes.length
     && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
     && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
-  'KioskRoot 白名单严格等于已批准的 12 条 LightFlow 路由',
+  'KioskRoot 白名单严格等于已批准的 13 条 LightFlow 路由（含我的主入口）',
 )
 for (const path of expectedServiceDeskRoutes) {
   expectIncludes(serviceDeskRouteList, `'${path}'`, `KioskRoot 白名单保留 ${path}`)
 }
 expectNotIncludes(kioskRoot, "startsWith('/resume')", 'KioskRoot 不得宽泛匹配简历路由')
-expect(serviceDeskRoutes.every((route) => !route.startsWith('/me') && !route.startsWith('/profile')), 'KioskRoot 白名单不得包含我的或资料页')
+expect(serviceDeskRoutes.every((route) => !route.startsWith('/me')), 'KioskRoot 白名单不得包含 /me/* 资料明细页')
 expectPattern(
   kioskRoot,
   /visualTheme=\{isServiceDeskRoute\s*\?\s*'service-desk'\s*:\s*'legacy'\}/,

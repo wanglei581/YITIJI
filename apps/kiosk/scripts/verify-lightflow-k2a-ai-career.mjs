@@ -65,6 +65,7 @@ const expectedServiceDeskRoutes = [
   '/',
   '/help',
   '/assistant',
+  '/profile',
   '/resume/source',
   '/resume/parse',
   '/resume/report',
@@ -81,13 +82,13 @@ expect(
   serviceDeskRoutes.length === expectedServiceDeskRoutes.length
     && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
     && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
-  '服务台页壳白名单严格等于已批准的 12 条 LightFlow 路由',
+  '服务台页壳白名单严格等于已批准的 13 条 LightFlow 路由（含我的主入口）',
 )
 for (const route of expectedServiceDeskRoutes) {
   expectIncludes(serviceDeskRouteList, `'${route}'`, `服务台页壳保留 ${route}`)
 }
 expect(!kioskRoot.includes("startsWith('/resume')"), '服务台页壳不宽泛匹配简历路径')
-expect(serviceDeskRoutes.every((route) => !route.startsWith('/me') && !route.startsWith('/profile')), '服务台页壳不包含我的或资料页')
+expect(serviceDeskRoutes.every((route) => !route.startsWith('/me')), '服务台页壳不包含 /me/* 资料明细页')
 
 expectIncludes(assistantPage, "import './assistant-inkpaper.css'", '助手页继续导入局部样式')
 expectIncludes(assistantPage, 'className="kassist kassist-lightflow"', '助手页使用局部 LightFlow 根命名空间')
@@ -100,6 +101,15 @@ expect(
   !/<h[1-6](?![^>]*kassist-sr-only)[^>]*>[\s\S]*?AI助手[\s\S]*?<\/h[1-6]>/.test(assistantPage),
   '视觉顶部不重复显示 AI助手 标题',
 )
+for (const [token, label] of [
+  ['className="assistant-service-desk"', '4188 当前会话与服务目录工作台'],
+  ['className="assistant-workbench"', '当前会话主工作面板'],
+  ['className="assistant-service-catalog"', '紧凑服务目录侧栏'],
+  ['assistant-catalog-section assistant-quick-tasks', '紧凑快捷任务分区'],
+  ['assistant-catalog-section assistant-faqs', '紧凑常见问题分区'],
+]) {
+  expectIncludes(assistantPage, token, `助手 4188 布局保留：${label}`)
+}
 expectIncludes(assistantPage, 'src="/assets/ai-advisor.png"', '助手页继续使用既有小青图片')
 expect(!assistantPage.includes('ai-advisor-transparent'), '助手页不引用透明版小青资源')
 const advisorImageMatches = [...assistantPage.matchAll(/src="\/assets\/ai-advisor\.png"/g)]
@@ -136,6 +146,20 @@ for (const token of [
   expectIncludes(assistantCss, token, `局部样式使用 ${token} 令牌`)
 }
 expectIncludes(assistantCss, '.kassist-lightflow {', '局部样式根绑定 kassist-lightflow')
+for (const [token, label] of [
+  ['.kassist-lightflow .assistant-service-desk {', '4188 两栏服务台网格'],
+  ['.kassist-lightflow .assistant-workbench {', '当前会话工作面板样式'],
+  ['.kassist-lightflow .assistant-service-catalog {', '紧凑服务目录样式'],
+  ['.kassist-lightflow .assistant-catalog-section {', '服务目录分区样式'],
+  ['.kassist-lightflow .assistant-quick-tasks .quick-grid {', '快捷任务紧凑网格'],
+  ['.kassist-lightflow .assistant-faqs .faq-list {', '常见问题紧凑列表'],
+  ['--kassist-control-min: 48px', '48px 常规触控目标'],
+  ['--kassist-primary-control-min: 56px', '56px 主操作触控目标'],
+  ['@media (max-width: 900px)', '小屏单列回退'],
+  ['@media (prefers-reduced-motion: reduce)', '减少动效支持'],
+]) {
+  expectIncludes(assistantCss, token, `助手 4188 样式保留：${label}`)
+}
 for (const { path, source } of assistantCssParts) {
   const fileName = path.split('/').at(-1) ?? path
   expect(source.length > 0, `局部样式分片存在：${fileName}`)
@@ -161,6 +185,12 @@ expect(
   [...assistantCss.matchAll(/@keyframes\s+([\w-]+)/g)].every((match) => match[1]?.startsWith('kassist-lightflow-')),
   '局部动效名称均使用 kassist-lightflow 前缀',
 )
+for (const legacyToken of [
+  '#f4f1e8', '#efeadd', '#fffdf8', '#10302b', '#1f9e86', '#157a67', '#a9781f', '#7a5a86',
+  'Noto Serif', 'Source Han Serif', 'Songti SC', 'SimSun', 'repeating-linear-gradient',
+]) {
+  expect(!assistantCss.includes(legacyToken), `局部样式不回退 InkPaper 视觉：${legacyToken}`)
+}
 
 if (failures > 0) {
   console.error(`\n${failures} K2a 静态合同检查失败`)

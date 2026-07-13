@@ -24,6 +24,8 @@ const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [
   '/',
   '/help',
   '/assistant',
+  // 用户已明确将「我的」主入口纳入青序 LightFlow；/me/* 明细页仍保留原独立范围。
+  '/profile',
   '/resume/source',
   '/resume/parse',
   '/resume/report',

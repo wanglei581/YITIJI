@@ -165,6 +165,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:price-single-source
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
+          pnpm --filter @ai-job-print/kiosk verify:lightflow-profile-entry
           pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-resumes-notifications-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-ai-records-inkpaper
