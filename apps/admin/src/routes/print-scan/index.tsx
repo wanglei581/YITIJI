@@ -82,6 +82,15 @@ const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: str
   ],
 }
 
+const CLOSE_UNPAID_BLOCK_REASON_LABELS: Record<NonNullable<Extract<AdminPrintScanTaskDetail, { type: 'print' }>['closeUnpaidBlockReason']>, string> = {
+  no_associated_order: '未找到关联订单',
+  task_not_pending: '任务不再处于待处理状态',
+  task_claimed: '任务已被终端领取或正在处理',
+  order_not_unpaid: '关联订单已不是未支付状态',
+  order_task_not_pending: '关联订单任务状态已变化',
+  payment_attempt_exists: '订单已存在支付尝试，请先完成对账或退款处理',
+}
+
 const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
   document_print: '文档打印',
   phone_upload: '手机扫码上传',
@@ -444,7 +453,7 @@ function TaskDetailBody({
 
       {detail.type === 'print' && detail.closeUnpaidEligible === false && closeUnpaidBlockReason && (
         <p className="rounded-lg bg-neutral-100 px-3 py-2 text-[12.5px] leading-relaxed text-neutral-600">
-          当前不能取消未支付打印任务：{closeUnpaidBlockReason}
+          当前不能取消未支付打印任务：{CLOSE_UNPAID_BLOCK_REASON_LABELS[closeUnpaidBlockReason]}
         </p>
       )}
     </div>

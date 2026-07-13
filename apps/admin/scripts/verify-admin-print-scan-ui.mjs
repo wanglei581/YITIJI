@@ -53,8 +53,11 @@ if (/action: 'retry' \| 'cancel'|AdminPrintScanAction = 'retry' \| 'cancel'/.tes
 }
 if (
   service.includes('/admin/print-scan/tasks/print/${encodeURIComponent(taskId)}/close-unpaid') &&
+  service.includes("closeUnpaidEligible: boolean") &&
+  service.includes("ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE") &&
   page.includes('closeUnpaidEligible === true') &&
   page.includes('closeUnpaidBlockReason') &&
+  page.includes('CLOSE_UNPAID_BLOCK_REASON_LABELS') &&
   closeForm.includes('取消原因（10–500 字）') &&
   closeForm.includes('确认取消任务')
 ) {

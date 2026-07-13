@@ -374,14 +374,23 @@ async function main() {
     const closed = await printScan.closeUnpaidPrintTask(
       closeCandidate.id,
       { reason: '管理员核对后关闭未付款且未领取的测试打印任务', expectedUpdatedAt: closeCandidate.updatedAt.toISOString() },
-      { actorId: closeOperatorId, actorRole: 'admin' },
+      {
+        actorId: closeOperatorId,
+        actorRole: 'admin',
+        ipAddress: '203.0.113.5',
+        userAgent: 'verify-admin-print-scan/close-unpaid',
+        requestId: `req_close_${suffix}`,
+      },
     )
     if (closed.idempotent || closed.toStatus !== 'cancelled') fail('首次受控关闭必须返回 pending→cancelled 且非幂等')
-    const [closeAfterTask, closeAfterOrder, closeLogs, closeAudits] = await Promise.all([
+    const [closeAfterTask, closeAfterOrder, closeLogs, closeAudit] = await Promise.all([
       prisma.printTask.findUnique({ where: { id: closeCandidate.id } }),
       prisma.order.findUnique({ where: { printTaskId: closeCandidate.id } }),
       prisma.printTaskStatusLog.count({ where: { taskId: closeCandidate.id, errorCode: 'ADMIN_UNPAID_PRINT_TASK_CLOSED' } }),
-      prisma.auditLog.count({ where: { targetId: closeCandidate.id, action: 'print_task.admin_unpaid_closed' } }),
+      prisma.auditLog.findFirst({
+        where: { targetId: closeCandidate.id, action: 'print_task.admin_unpaid_closed' },
+        select: { id: true, ipAddress: true, userAgent: true, requestId: true },
+      }),
     ])
     if (
       closeAfterTask?.status !== 'cancelled' ||
@@ -390,9 +399,18 @@ async function main() {
       closeAfterOrder.taskStatus !== 'cancelled' ||
       closeAfterOrder.amountCents !== 137 ||
       closeLogs !== 1 ||
-      closeAudits !== 1
+      !closeAudit ||
+      closeAudit.ipAddress !== '203.0.113.5' ||
+      closeAudit.userAgent !== 'verify-admin-print-scan/close-unpaid' ||
+      closeAudit.requestId !== `req_close_${suffix}`
     ) fail('成功关闭必须同事务写任务/订单/状态日志/审计，且保留订单金额来源')
-    pass('受控关闭：pending→cancelled，unpaid→closed，日志与审计同事务且金额快照不变')
+    pass('受控关闭：pending→cancelled，unpaid→closed，审计同事务且请求元数据完整，金额快照不变')
+
+    const closeServiceSource = readFileSync(join(process.cwd(), 'src/admin-print-scan/admin-print-scan.service.ts'), 'utf8')
+    if (!closeServiceSource.includes('paymentAttempts: { none: {} }')) {
+      fail('受控关闭订单 CAS 必须同时断言不存在任何 PaymentAttempt，避免资格检查后的支付尝试穿透')
+    }
+    pass('受控关闭订单 CAS 同时拒绝任何 PaymentAttempt，防止迟到回调重新入账')
 
     const idempotent = await printScan.closeUnpaidPrintTask(
       closeCandidate.id,

@@ -81,9 +81,16 @@ export class AdminPrintScanController {
     @Param('taskId') taskId: string,
     @Body() dto: CancelUnpaidPrintTaskDto,
     @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
   ): Promise<ApiResponse<AdminCloseUnpaidPrintTaskResult>> {
     return ApiResponse.ok(
-      await this.printScan.closeUnpaidPrintTask(taskId, dto, { actorId: user.userId, actorRole: user.role }),
+      await this.printScan.closeUnpaidPrintTask(taskId, dto, {
+        actorId: user.userId,
+        actorRole: user.role,
+        ipAddress: extractIp(req),
+        userAgent: extractUa(req),
+        requestId: req.requestId ?? null,
+      }),
     )
   }
 

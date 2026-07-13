@@ -32,7 +32,13 @@ const ADMIN_UNPAID_PRINT_TASK_CLOSED_ACTION = 'print_task.admin_unpaid_closed'
 
 type CloseUnpaidBlockReason = Exclude<Extract<AdminPrintScanTaskDetail, { type: 'print' }>['closeUnpaidBlockReason'], null>
 type CloseUnpaidInput = { reason: string; expectedUpdatedAt: string }
-type CloseUnpaidActor = { actorId: string; actorRole: string }
+type CloseUnpaidActor = {
+  actorId: string
+  actorRole: string
+  ipAddress?: string | null
+  userAgent?: string | null
+  requestId?: string | null
+}
 
 // 与 print-jobs.service 的 PRINT_JOB_FILE_URL_TTL_MS 同口径：重试后 Agent claim
 // 前需要一个未过期的下载链接。
@@ -346,8 +352,15 @@ export class AdminPrintScanService {
       }
 
       // 支付出码使用 Order unpaid→paying 的 CAS；双方都限定同一 printTaskId，因此任一方先提交，另一方必失败并回滚。
+      // 支付尝试也必须放在同一 CAS 中判断，不能只依赖前面的资格读取：极端情况下支付周期可能在读取后完成并回到 unpaid。
       const orderUpdate = await tx.order.updateMany({
-        where: { id: order.id, printTaskId: taskId, payStatus: 'unpaid', taskStatus: 'pending' },
+        where: {
+          id: order.id,
+          printTaskId: taskId,
+          payStatus: 'unpaid',
+          taskStatus: 'pending',
+          paymentAttempts: { none: {} },
+        },
         data: { payStatus: 'closed', taskStatus: 'cancelled' },
       })
       if (orderUpdate.count !== 1) {
@@ -376,6 +389,9 @@ export class AdminPrintScanService {
             toStatus: 'cancelled',
             orderPayStatus: { from: 'unpaid', to: 'closed' },
           }),
+          ipAddress: actor.ipAddress ?? null,
+          userAgent: actor.userAgent ?? null,
+          requestId: actor.requestId ?? null,
         },
       })
 

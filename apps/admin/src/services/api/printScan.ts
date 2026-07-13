@@ -76,12 +76,10 @@ export type AdminPrintScanTaskDetail =
       orderId: string | null
       orderNo: string | null
       statusLogs: { fromStatus: string; toStatus: string; errorCode: string | null; createdAt: string }[]
-      /**
-       * 仅由详情端点提供的受控取消资格。后端尚未返回时保持 undefined，前端不展示入口。
-       */
-      closeUnpaidEligible?: boolean
+      /** 仅由打印任务详情端点提供的受控取消资格。 */
+      closeUnpaidEligible: boolean
       /** 后端可安全展示给管理员的阻断原因。 */
-      closeUnpaidBlockReason?: string | null
+      closeUnpaidBlockReason: string | null
     })
   | (Extract<AdminPrintScanTaskItem, { type: 'scan' }> & { fileId: string | null })
   | (Extract<AdminPrintScanTaskItem, { type: 'document_process' }> & {
@@ -242,7 +240,15 @@ const mockAdapter: AdminPrintScanServiceInterface = {
   getTaskDetail: async (type, taskId) => {
     const item = MOCK_PRINT_TASKS.find((t) => t.taskId === taskId)
     if (!item || type !== 'print' || item.type !== 'print') throw new ApiHttpError('PRINT_SCAN_TASK_NOT_FOUND', '任务不存在', 404)
-    return { ...item, completedAt: null, orderId: null, orderNo: null, statusLogs: [] }
+    return {
+      ...item,
+      completedAt: null,
+      orderId: null,
+      orderNo: null,
+      statusLogs: [],
+      closeUnpaidEligible: false,
+      closeUnpaidBlockReason: item.status === 'pending' ? 'no_associated_order' : 'task_not_pending',
+    }
   },
   applyTaskAction: async (type, taskId, action) => {
     if (type !== 'print' || action !== 'retry') throw new ApiHttpError('PRINT_SCAN_ACTION_UNSUPPORTED', '该任务类型不支持此操作', 400)
@@ -257,7 +263,7 @@ const mockAdapter: AdminPrintScanServiceInterface = {
     const item = MOCK_PRINT_TASKS.find((t) => t.taskId === taskId)
     if (!item) throw new ApiHttpError('PRINT_SCAN_TASK_NOT_FOUND', '任务不存在', 404)
     if (item.status !== 'pending') {
-      throw new ApiHttpError('PRINT_CANCEL_UNPAID_INVALID_STATE', '当前状态不允许取消未支付打印任务', 409)
+      throw new ApiHttpError('ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE', '当前状态不允许取消未支付打印任务', 409)
     }
     const fromStatus = item.status
     item.status = 'cancelled'
