@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-13 补充：清理 **`CLAUDE.md` §16 两处过时待办残留**。「打印任务状态实时追踪 UI（后端持久化已就绪）」早在 2026-07-02（见本文档同日记录）已核实为过时——Kiosk `PrintProgressPage` 真实 1 秒轮询 `GET /print/jobs/:taskId`、「我的打印订单」页有活跃订单时 5 秒条件轮询退避至 60 秒、Admin 订单页已接 `useRefreshable` 30 秒轮询 + errorCode/状态日志详情，均为真实可用闭环；`next-tasks.md` 早已清理该条，但 `CLAUDE.md`（项目正式说明文档）678/694 行仍留有两处重复条目未删，险些导致重复开发。本次仅删除该两行过时文案，未改动其余内容，不涉及代码。
+
 > 最后更新：2026-07-12
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
