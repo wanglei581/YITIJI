@@ -13,6 +13,7 @@ import { join } from 'node:path'
 const root = process.cwd()
 const pagePath = join(root, 'src/routes/print-scan/index.tsx')
 const servicePath = join(root, 'src/services/api/printScan.ts')
+const closeFormPath = join(root, 'src/routes/print-scan/CloseUnpaidPrintTaskForm.tsx')
 const routesPath = join(root, 'src/routes/index.tsx')
 const layoutPath = join(root, 'src/layouts/AdminLayoutWrapper.tsx')
 
@@ -29,8 +30,10 @@ console.log('\n=== Admin print-scan ops UI verification ===')
 
 if (!existsSync(pagePath)) fail('print-scan page is missing')
 if (!existsSync(servicePath)) fail('printScan service is missing')
+if (!existsSync(closeFormPath)) fail('controlled unpaid-print close form is missing')
 const page = readFileSync(pagePath, 'utf8')
 const service = readFileSync(servicePath, 'utf8')
+const closeForm = readFileSync(closeFormPath, 'utf8')
 const routes = readFileSync(routesPath, 'utf8')
 const layout = readFileSync(layoutPath, 'utf8')
 
@@ -47,6 +50,17 @@ if (/action: 'retry' \| 'cancel'|AdminPrintScanAction = 'retry' \| 'cancel'/.tes
   pass('service action union is limited to retry/cancel')
 } else {
   fail('service action union must be limited to retry/cancel')
+}
+if (
+  service.includes('/admin/print-scan/tasks/print/${encodeURIComponent(taskId)}/close-unpaid') &&
+  page.includes('closeUnpaidEligible === true') &&
+  page.includes('closeUnpaidBlockReason') &&
+  closeForm.includes('取消原因（10–500 字）') &&
+  closeForm.includes('确认取消任务')
+) {
+  pass('controlled unpaid-print close endpoint, eligibility and confirmation form stay aligned')
+} else {
+  fail('controlled unpaid-print close endpoint, eligibility and confirmation form must stay aligned')
 }
 
 // 2. 未上线类型诚实展示

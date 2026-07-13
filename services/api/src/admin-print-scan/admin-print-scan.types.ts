@@ -50,6 +50,16 @@ export type AdminPrintScanTaskDetail =
       orderId: string | null
       orderNo: string | null
       statusLogs: { fromStatus: string; toStatus: string; errorCode: string | null; createdAt: string }[]
+      /** Admin 受控关闭未付款打印任务的资格；阻断原因不含支付/渠道原文。 */
+      closeUnpaidEligible: boolean
+      closeUnpaidBlockReason:
+        | 'no_associated_order'
+        | 'task_not_pending'
+        | 'task_claimed'
+        | 'order_not_unpaid'
+        | 'order_task_not_pending'
+        | 'payment_attempt_exists'
+        | null
     })
   | (Extract<AdminPrintScanTaskItem, { type: 'scan' }> & {
       fileId: string | null
@@ -75,4 +85,12 @@ export interface AdminPrintScanActionResult {
   action: AdminPrintScanAction
   fromStatus: string
   toStatus: string
+}
+
+export interface AdminCloseUnpaidPrintTaskResult {
+  taskId: string
+  type: 'print'
+  fromStatus: 'pending' | 'cancelled'
+  toStatus: 'cancelled'
+  idempotent: boolean
 }

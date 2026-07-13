@@ -14,6 +14,7 @@ import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-j
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
+import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
 import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
 import {
   adminPrintScanService,
@@ -60,6 +61,7 @@ const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: str
     { label: '打印中', value: 'printing' },
     { label: '已完成', value: 'completed' },
     { label: '失败', value: 'failed' },
+    { label: '已取消', value: 'cancelled' },
   ],
   scan: [
     { label: '全部', value: '' },
@@ -221,6 +223,16 @@ function TaskCenter() {
     }
   }
 
+  const refreshAfterCloseUnpaid = async () => {
+    if (!detail) return
+    try {
+      setDetail(await adminPrintScanService.getTaskDetail(detail.type, detail.taskId))
+      await load()
+    } catch {
+      setActionError('任务已取消成功，但页面刷新失败，请手动刷新查看最新状态')
+    }
+  }
+
   const statusFilters = implemented ? STATUS_FILTERS[taskType as 'print' | 'scan' | 'document_process'] : []
 
   return (
@@ -325,7 +337,7 @@ function TaskCenter() {
       <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="任务详情">
         {!detail && !actionError && <LoadingState text="正在加载详情" />}
         {actionError && <div className="mb-3 rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{actionError}</div>}
-        {detail && <TaskDetailBody detail={detail} busy={actionBusy} onAction={applyAction} />}
+        {detail && <TaskDetailBody detail={detail} busy={actionBusy} onAction={applyAction} onCloseUnpaid={refreshAfterCloseUnpaid} />}
       </Drawer>
     </div>
   )
@@ -335,14 +347,17 @@ function TaskDetailBody({
   detail,
   busy,
   onAction,
+  onCloseUnpaid,
 }: {
   detail: AdminPrintScanTaskDetail
   busy: boolean
   onAction: (action: 'retry' | 'cancel') => void
+  onCloseUnpaid: () => Promise<void> | void
 }) {
   const statusMeta = TASK_STATUS_MAP[detail.status] ?? { badge: 'default' as const, label: detail.status }
   const canRetry = detail.type === 'print' && detail.status === 'failed'
   const canCancel = detail.type === 'scan' && detail.status === 'waiting'
+  const closeUnpaidBlockReason = detail.type === 'print' ? detail.closeUnpaidBlockReason : null
 
   const rows: [string, React.ReactNode][] = [
     ['任务 ID', detail.taskId],
@@ -417,6 +432,20 @@ function TaskDetailBody({
             </button>
           )}
         </div>
+      )}
+
+      {detail.type === 'print' && detail.closeUnpaidEligible === true && (
+        <CloseUnpaidPrintTaskForm
+          taskId={detail.taskId}
+          expectedUpdatedAt={detail.updatedAt}
+          onClosed={onCloseUnpaid}
+        />
+      )}
+
+      {detail.type === 'print' && detail.closeUnpaidEligible === false && closeUnpaidBlockReason && (
+        <p className="rounded-lg bg-neutral-100 px-3 py-2 text-[12.5px] leading-relaxed text-neutral-600">
+          当前不能取消未支付打印任务：{closeUnpaidBlockReason}
+        </p>
       )}
     </div>
   )

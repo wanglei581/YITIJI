@@ -16,7 +16,9 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { AuditService } from '../audit/audit.service'
 import { AdminPrintScanService } from './admin-print-scan.service'
 import { ApplyPrintScanActionDto } from './dto/apply-print-scan-action.dto'
+import { CancelUnpaidPrintTaskDto } from './dto/cancel-unpaid-print-task.dto'
 import type {
+  AdminCloseUnpaidPrintTaskResult,
   AdminPrintScanActionResult,
   AdminPrintScanTaskDetail,
   AdminPrintScanTaskPage,
@@ -68,6 +70,21 @@ export class AdminPrintScanController {
     @Param('taskId') taskId: string,
   ): Promise<ApiResponse<AdminPrintScanTaskDetail>> {
     return ApiResponse.ok(await this.printScan.getTaskDetail(type, taskId))
+  }
+
+  /**
+   * 受控关闭入口刻意独立于通用 actions/scan.cancel：仅订单存在、未付款、未领取的打印任务可关闭。
+   * 审计在 service 事务内与 PrintTask/Order/状态日志原子提交，不能复用 AuditService.write 的吞错语义。
+   */
+  @Post('tasks/print/:taskId/close-unpaid')
+  async closeUnpaidPrintTask(
+    @Param('taskId') taskId: string,
+    @Body() dto: CancelUnpaidPrintTaskDto,
+    @CurrentUser() user: AuthedUser,
+  ): Promise<ApiResponse<AdminCloseUnpaidPrintTaskResult>> {
+    return ApiResponse.ok(
+      await this.printScan.closeUnpaidPrintTask(taskId, dto, { actorId: user.userId, actorRole: user.role }),
+    )
   }
 
   @Post('tasks/:type/:taskId/actions')
