@@ -2,11 +2,11 @@ import { Body, Controller, Headers, Post, Req } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
-import type { ConvertImagesResponse } from './print-conversion.types'
+import type { ComposeSignatureOverlayResponse, ConvertImagesResponse } from './print-conversion.types'
 import { RedisService } from '../common/redis/redis.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
-import { ConvertImagesDto } from './print-conversion.dto'
+import { ComposeSignatureOverlayDto, ConvertImagesDto } from './print-conversion.dto'
 import { PrintConversionService } from './print-conversion.service'
 
 @Controller('print/convert')
@@ -29,6 +29,23 @@ export class PrintConversionController {
       sources: body.sources,
       endUserId: endUser?.endUserId ?? null,
       idempotencyKey: idempotencyKey ?? null,
+    })
+    return ApiResponse.ok(result)
+  }
+
+  @Post('sign-overlay')
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  async signOverlay(
+    @Body() body: ComposeSignatureOverlayDto,
+    @Req() req: Request,
+  ): Promise<ApiResponse<ComposeSignatureOverlayResponse>> {
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const result = await this.conversion.composeSignatureOverlay({
+      target: body.target,
+      signature: body.signature,
+      position: body.position,
+      size: body.size,
+      endUserId: endUser?.endUserId ?? null,
     })
     return ApiResponse.ok(result)
   }

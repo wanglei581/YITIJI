@@ -31,6 +31,7 @@ export type FilePurpose =
   | 'screensaver_material' // 待机宣传屏素材
   | 'admin_upload'         // 管理员通用上传
   | 'temp'                 // 临时 / 匿名上传
+  | 'signature_source'     // 签名盖章：手写/上传的签名或印章素材图片（敏感，短期即焚）
 
 /** 敏感等级。决定默认有效期。 */
 export type FileSensitiveLevel = 'normal' | 'sensitive' | 'highly_sensitive'

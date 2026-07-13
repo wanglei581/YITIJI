@@ -30,7 +30,10 @@ interface FeatureInfo {
   plans: string[]
   /** 合规声明（可选）：'sensitive' = 敏感文件清理；'esign' = 非 CA 电子签 */
   notice?: 'sensitive' | 'esign'
-  /** 当前可用的替代路径按钮 */
+  /** 已真正实现的能力入口（优先展示为主按钮）；仅 sign 分支填写，id-photo 仍是纯说明页。 */
+  primaryLabel?: string
+  primaryTo?: string
+  /** 当前可用的替代路径按钮（有 primaryTo 时降级为次要按钮兜底） */
   fallbackLabel?: string
   fallbackTo?: string
 }
@@ -56,13 +59,15 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
     iconBg: 'bg-error-bg',
     iconColor: 'text-error-fg',
     title: '签名盖章',
-    summary: '即将支持在文件上叠加手写签名或印章图片，用于打印前的版式预览。',
+    summary: '在一张 JPG / PNG 文件上叠加手写或上传的签名 / 印章图片，合成后直接打印。',
     plans: [
       '上传 / 手写签名图片',
       '在文件指定位置叠加签名或印章',
-      '合成后预览并打印',
+      '合成后打印',
     ],
     notice: 'esign',
+    primaryLabel: '开始签名盖章',
+    primaryTo: '/print-scan/sign',
     fallbackLabel: '先去文档打印',
     fallbackTo: '/print/upload',
   },
@@ -99,7 +104,7 @@ export function PrintScanFeatureInfoPage() {
     <div className="flex h-full flex-col overflow-y-auto p-6">
       <PageHeader
         title={info.title}
-        subtitle="功能说明（即将上线）"
+        subtitle={info.primaryTo ? '功能说明' : '功能说明（即将上线）'}
         actions={
           <Button size="sm" variant="secondary" onClick={() => navigate('/print-scan')}>
             返回打印扫描服务
@@ -115,9 +120,11 @@ export function PrintScanFeatureInfoPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-neutral-900">{info.title}</h2>
-              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                即将上线
-              </span>
+              {!info.primaryTo && (
+                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
+                  即将上线
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm leading-relaxed text-neutral-500">{info.summary}</p>
           </div>
@@ -153,10 +160,15 @@ export function PrintScanFeatureInfoPage() {
         </div>
       )}
 
-      {/* 操作区 */}
+      {/* 操作区：真正实现的能力优先展示主按钮，说明性兜底路径降级为次要按钮 */}
       <div className="mt-6 flex flex-col gap-3">
+        {info.primaryTo && info.primaryLabel && (
+          <Button size="lg" onClick={() => navigate(info.primaryTo!)}>
+            {info.primaryLabel}
+          </Button>
+        )}
         {info.fallbackTo && info.fallbackLabel && (
-          <Button size="lg" onClick={() => navigate(info.fallbackTo!)}>
+          <Button size="lg" variant={info.primaryTo ? 'secondary' : 'primary'} onClick={() => navigate(info.fallbackTo!)}>
             {info.fallbackLabel}
           </Button>
         )}

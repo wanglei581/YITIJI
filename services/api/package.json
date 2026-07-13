@@ -148,7 +148,8 @@
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
     "verify:wechat-refund-regression": "node -r @swc-node/register scripts/verify-wechat-refund-regression.ts",
     "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts",
-    "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts"
+    "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
+    "verify:signature-overlay": "node -r @swc-node/register scripts/verify-signature-overlay.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",

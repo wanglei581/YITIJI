@@ -26,3 +26,28 @@ export interface ConvertImagesResponse {
   sizeBytes: number
   pages: number
 }
+
+// ── 签名盖章：目标文件 + 签名/印章素材合成 ──────────────────────────
+
+export interface SignatureOverlayTarget {
+  fileId: string
+  fileAccessUrl: string
+}
+
+export interface SignatureOverlaySignature {
+  fileId: string
+  fileAccessUrl: string
+}
+
+export type OverlayPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center'
+
+export type OverlaySize = 'small' | 'medium' | 'large'
+
+export interface ComposeSignatureOverlayResponse {
+  fileId: string
+  /** 内部 HMAC 打印链路 URL（30 分钟 TTL），不是 COS 预签名 URL。 */
+  printFileUrl: string
+  fileMd5: string
+  sizeBytes: number
+  pages: number
+}

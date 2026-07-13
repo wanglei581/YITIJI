@@ -10,7 +10,12 @@
 //   网络失败（如一体机离线）单独捕获，给出本地化提示而非原始 TypeError。
 // ============================================================
 
-import type { ConvertImagesRequest, ConvertImagesResponse } from '@ai-job-print/shared'
+import type {
+  ComposeSignatureOverlayRequest,
+  ComposeSignatureOverlayResponse,
+  ConvertImagesRequest,
+  ConvertImagesResponse,
+} from '@ai-job-print/shared'
 import { API_BASE_URL } from './client'
 import { ApiHttpError } from './httpAdapter'
 
@@ -56,6 +61,49 @@ export async function convertImagesToPdf(
 
   if (!payload?.data) {
     throw new ApiHttpError('CONVERT_FAILED', '格式转换返回数据为空', res.status)
+  }
+  return payload.data
+}
+
+// ============================================================
+// 签名盖章 — POST /api/v1/print/convert/sign-overlay
+// 薄封装，错误处理与上面 convertImagesToPdf 完全一致；无需 Idempotency-Key
+// （合成是幂等的纯计算，重复调用只是多花一次算力，无副作用）。
+// ============================================================
+
+export async function composeSignatureOverlay(
+  request: ComposeSignatureOverlayRequest,
+  options: { token: string | null },
+): Promise<ComposeSignatureOverlayResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (options.token) headers['Authorization'] = `Bearer ${options.token}`
+
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}/print/convert/sign-overlay`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request),
+    })
+  } catch {
+    throw new ApiHttpError('NETWORK_ERROR', '网络连接失败，请稍后重试', 0)
+  }
+
+  let payload: ResponseEnvelope<ComposeSignatureOverlayResponse> | null = null
+  try {
+    payload = (await res.json()) as ResponseEnvelope<ComposeSignatureOverlayResponse>
+  } catch {
+    payload = null
+  }
+
+  if (!res.ok) {
+    const code = payload?.error?.code ?? 'UNKNOWN_ERROR'
+    const message = payload?.error?.message ?? `请求失败（${res.status}）`
+    throw new ApiHttpError(code, message, res.status)
+  }
+
+  if (!payload?.data) {
+    throw new ApiHttpError('SIGN_OVERLAY_FAILED', '签名合成返回数据为空', res.status)
   }
   return payload.data
 }
