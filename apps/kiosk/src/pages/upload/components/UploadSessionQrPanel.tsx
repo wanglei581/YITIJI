@@ -238,7 +238,11 @@ export function UploadSessionQrPanel({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold text-neutral-900">{title}</h2>
-            {status?.mode === 'member' && <span className="rounded-full bg-success-bg px-2.5 py-1 text-xs font-bold text-success-fg">会员文件确认后归档</span>}
+            {status?.mode === 'member' && (
+              <span className="rounded-full bg-success-bg px-2.5 py-1 text-xs font-bold text-success-fg">
+                {purpose === 'id_scan' ? '证件照短期保存，1 小时内自动删除' : '会员文件确认后归档'}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm leading-relaxed text-neutral-600">
             {description}

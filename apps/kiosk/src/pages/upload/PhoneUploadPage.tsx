@@ -8,6 +8,8 @@ const RESUME_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,app
 // print_doc 服务端 MIME 白名单只有 PDF/JPG/PNG(见 services/api file-validation.ts PRINTABLE),
 // doc/docx/webp 上传后会被服务端拒绝,故手机端 accept 也收窄,避免选中后才失败。
 const PRINT_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png'
+// id_scan(证件照)服务端只接受静态图片,不支持 PDF,故 accept 只保留 JPG/PNG。
+const ID_PHOTO_ACCEPT = '.jpg,.jpeg,.png,image/jpeg,image/png'
 const MAX_BYTES = 10 * 1024 * 1024
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error'
@@ -24,13 +26,15 @@ export function PhoneUploadPage() {
   const sessionId = hashParams.get('sessionId')?.trim() ?? ''
   const uploadToken = hashParams.get('token')?.trim() ?? ''
   // purpose 仅决定手机端文案,真正的会话用途以服务端存储为准,这里不做任何鉴权判断。
-  const isPrintDoc = hashParams.get('purpose')?.trim() === 'print_doc'
+  const purposeParam = hashParams.get('purpose')?.trim()
+  const isPrintDoc = purposeParam === 'print_doc'
+  const isIdPhoto = purposeParam === 'id_scan'
   const [state, setState] = useState<UploadState>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [fileLabel, setFileLabel] = useState<string | null>(null)
 
-  const fileNoun = isPrintDoc ? '文件' : '简历文件'
-  const accept = isPrintDoc ? PRINT_DOC_ACCEPT : RESUME_ACCEPT
+  const fileNoun = isIdPhoto ? '证件照片' : isPrintDoc ? '文件' : '简历文件'
+  const accept = isIdPhoto ? ID_PHOTO_ACCEPT : isPrintDoc ? PRINT_DOC_ACCEPT : RESUME_ACCEPT
   const ready = Boolean(sessionId && uploadToken)
   const pageTitle = useMemo(() => {
     if (!ready) return '上传链接无效'
@@ -77,7 +81,9 @@ export function PhoneUploadPage() {
           <p className="text-sm font-semibold text-primary-600">AI求职打印一体机</p>
           <h1 className="mt-2 text-3xl font-extrabold tracking-normal">{pageTitle}</h1>
           <p className="mt-3 text-sm leading-relaxed text-neutral-600">
-            临时上传不会保存到账号。如一体机已登录，仍需在一体机上确认后才会保存到账号。
+            {isIdPhoto
+              ? '请选择一张纯色底（白/蓝/红）的标准证件照片。照片仅用于本次排版打印，最迟 1 小时内自动删除，不长期保存。'
+              : '临时上传不会保存到账号。如一体机已登录，仍需在一体机上确认后才会保存到账号。'}
           </p>
         </div>
 
@@ -116,7 +122,11 @@ export function PhoneUploadPage() {
               {state === 'uploading' ? '正在上传...' : state === 'success' ? '已上传到一体机' : `选择${fileNoun}`}
             </p>
             <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-              {isPrintDoc ? '支持 PDF / JPG / PNG，单个文件最大 10MB。' : '支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。'}
+              {isIdPhoto
+                ? '支持 JPG / PNG，单个文件最大 10MB。'
+                : isPrintDoc
+                  ? '支持 PDF / JPG / PNG，单个文件最大 10MB。'
+                  : '支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。'}
             </p>
             {fileLabel && (
               <div className="mt-4 flex items-center gap-2 rounded-2xl bg-neutral-50 px-3 py-2 text-sm font-semibold text-neutral-700">
