@@ -31,6 +31,7 @@ export class IdPhotoController {
       terminalId: body.terminalId,
       endUserId: endUser?.endUserId ?? null,
       idempotencyKey: idempotencyKey ?? null,
+      ip: clientIp(req),
     })
     return ApiResponse.ok(result)
   }
@@ -58,4 +59,11 @@ function extractAuth(req: Request): string | undefined {
   if (typeof raw === 'string') return raw
   if (Array.isArray(raw)) return raw[0]
   return undefined
+}
+
+/** 取客户端 IP(一体机可能经反代,优先 X-Forwarded-For 首段)——与 member-auth.controller.ts 同一约定。 */
+function clientIp(req: Request): string {
+  const xff = req.headers['x-forwarded-for']
+  const first = Array.isArray(xff) ? xff[0] : xff?.split(',')[0]
+  return (first?.trim() || req.ip || req.socket.remoteAddress || 'unknown')
 }

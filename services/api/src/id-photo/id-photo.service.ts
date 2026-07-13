@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -31,6 +33,12 @@ const IDEMPOTENCY_RESULT_TTL_SECONDS = 3600
 const GENERATION_SLOT_KEYS = ['id-photo:gen-slot:0', 'id-photo:gen-slot:1'] as const
 const GENERATION_SLOT_TTL_SECONDS = 120
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png'])
+
+// 设计 §4.10：用户(登录态)/ IP / terminalId 三维分别限流，各 3 次/分钟。
+// 沿用 member-auth.service.ts 的既有 Redis 计数模式(incrWithTtl：首次自增即设 TTL，
+// 窗口内后续自增只计数不重置)，不依赖单一 @Throttle 装饰器(那只按 IP 粗粒度限流)。
+const LAYOUT_RATE_LIMIT_MAX = 3
+const LAYOUT_RATE_LIMIT_WINDOW_SECONDS = 60
 
 // A4 整版排版常量（设计 §三）
 const PAGE_W_MM = 210
@@ -76,6 +84,7 @@ export class IdPhotoService {
     terminalId: string
     endUserId: string | null
     idempotencyKey?: string | null
+    ip?: string | null
   }): Promise<IdPhotoLayoutResponse> {
     const spec = ID_PHOTO_SPECS.find((s) => s.specId === args.specId)
     if (!spec) {
@@ -83,6 +92,11 @@ export class IdPhotoService {
     }
 
     const terminalDbId = await this.resolveTerminalDbId(args.terminalId)
+
+    // 设计 §4.10：三维频控须在能力门禁 / 幂等 / 并发槽之前拦下，
+    // 防止重复请求把负载一路推到真正昂贵的 doGenerate（storage 读 + pdfkit + 上传 + 审计）之前。
+    await this.checkLayoutRateLimit(args.endUserId, args.ip ?? null, terminalDbId)
+
     await this.capabilities.assertUserTaskAllowed(terminalDbId, 'id_photo')
 
     // 设计 §4.10：fingerprint 含 sourceFileId + specId + terminalId（身份已编入 idemKey）
@@ -173,6 +187,29 @@ export class IdPhotoService {
       throw new BadRequestException({ error: { code: 'IDPHOTO_INPUT_INVALID', message: '终端标识无效' } })
     }
     return terminal.id
+  }
+
+  /**
+   * 设计 §4.10 三维频控：用户(登录态,游客跳过) / IP(不可得则跳过) / terminalId(恒定校验)，
+   * 各自独立计数，任一维度在窗口内超过上限即拒绝。与 member-auth.service.ts 的多维频控
+   * 同一模式：incrWithTtl 首次自增设 TTL，窗口内后续自增只计数，不重置窗口。
+   * 顺序命中即抛错（不会把已超限维度之外的维度也计数进去），与既有 member-auth 实现行为一致。
+   */
+  private async checkLayoutRateLimit(userId: string | null, ip: string | null, terminalDbId: string): Promise<void> {
+    const keys: string[] = []
+    if (userId) keys.push(`id-photo:rl:user:${userId}`)
+    if (ip) keys.push(`id-photo:rl:ip:${ip}`)
+    keys.push(`id-photo:rl:terminal:${terminalDbId}`)
+
+    for (const key of keys) {
+      const count = await this.redis.incrWithTtl(key, LAYOUT_RATE_LIMIT_WINDOW_SECONDS)
+      if (count > LAYOUT_RATE_LIMIT_MAX) {
+        throw new HttpException(
+          { error: { code: 'IDPHOTO_RATE_LIMITED', message: '操作过于频繁，请稍后再试' } },
+          HttpStatus.TOO_MANY_REQUESTS,
+        )
+      }
+    }
   }
 
   private async acquireSlot(): Promise<string | null> {
