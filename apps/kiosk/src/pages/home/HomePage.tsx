@@ -26,6 +26,7 @@ import { getMyFavorites } from '../../services/api/memberFavorites'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
+import { useHomeDeviceStatus } from './hooks/useHomeDeviceStatus'
 import './home-service-desk.css'
 
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
@@ -49,6 +50,8 @@ function useClock() {
 
 /* ── 顶栏（LightFlow 白色服务台 + 品牌徽标 + 状态药丸；时钟只在 Hero） ── */
 function KioskTopBar() {
+  const deviceStatus = useHomeDeviceStatus()
+
   return (
     <header className="k-top">
       <span className="k-mark">
@@ -58,14 +61,10 @@ function KioskTopBar() {
         <strong>AI求职打印一体机</strong>
         <span>求职材料 · 招聘会 · 打印扫描</span>
       </div>
-      <div className="k-status">
-        <span className="k-pill">
-          <i className="k-dot" aria-hidden="true" />
-          打印机在线
-        </span>
-        <span className="k-pill">
-          <KIcon name="wifi" />
-          网络正常
+      <div className="k-status" role="status" aria-live="polite">
+        <span className="k-device-status" data-status={deviceStatus.tone}>
+          <i aria-hidden="true" />
+          {deviceStatus.label}
         </span>
       </div>
     </header>
