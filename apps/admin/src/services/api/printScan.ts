@@ -39,6 +39,14 @@ export type PrintScanCapabilityKey =
 
 export type PrintScanCapabilityStatus = 'available' | 'testing' | 'maintenance' | 'unsupported' | 'not_verified'
 
+/**
+ * 词汇债治理（2026-07-12 D4 拍板）：cloud_upload 与 phone_upload 语义相同，视为已弃用别名。
+ * key = 已弃用旧键，value = 现役承接键，仅用于 Admin 界面提示，不改变实际配置读写。
+ */
+export const DEPRECATED_CAPABILITY_ALIAS: Partial<Record<PrintScanCapabilityKey, PrintScanCapabilityKey>> = {
+  cloud_upload: 'phone_upload',
+}
+
 export interface TerminalCapabilityView {
   capabilityKey: PrintScanCapabilityKey
   status: PrintScanCapabilityStatus
@@ -201,7 +209,7 @@ const httpAdapter: AdminPrintScanServiceInterface = {
 const MOCK_CAPABILITIES: TerminalCapabilityView[] = [
   { capabilityKey: 'document_print', status: 'available', note: null, configured: true, updatedAt: new Date().toISOString() },
   { capabilityKey: 'phone_upload', status: 'available', note: null, configured: true, updatedAt: new Date().toISOString() },
-  { capabilityKey: 'cloud_upload', status: 'unsupported', note: '未接入第三方网盘', configured: true, updatedAt: new Date().toISOString() },
+  { capabilityKey: 'cloud_upload', status: 'unsupported', note: '已弃用，等同「手机扫码上传」，请改用该项配置', configured: true, updatedAt: new Date().toISOString() },
   { capabilityKey: 'usb_import', status: 'not_verified', note: 'Windows 真机未验收', configured: true, updatedAt: new Date().toISOString() },
   { capabilityKey: 'material_pack', status: 'not_verified', note: null, configured: false, updatedAt: null },
   { capabilityKey: 'scan', status: 'not_verified', note: 'SMB 链路待真机验收', configured: true, updatedAt: new Date().toISOString() },

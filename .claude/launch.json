@@ -44,6 +44,17 @@
       "autoPort": false
     },
     {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@ai-job-print/api",
+        "dev"
+      ],
+      "port": 3010,
+      "autoPort": false
+    },
+    {
       "name": "kiosk-w5",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [

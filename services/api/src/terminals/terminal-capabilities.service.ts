@@ -14,6 +14,7 @@
 
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import {
+  DEPRECATED_CAPABILITY_ALIAS,
   PRINT_SCAN_CAPABILITY_KEYS,
   PRINT_SCAN_CAPABILITY_STATUSES,
   canCreateFormalPrintScanTask,
@@ -68,7 +69,8 @@ export class TerminalCapabilitiesService {
     const byKey = new Map(rows.map((row) => [row.capabilityKey, row]))
 
     const capabilities: TerminalCapabilityView[] = PRINT_SCAN_CAPABILITY_KEYS.map((key) => {
-      const row = byKey.get(key)
+      const legacyKey = this.legacyAliasOf(key)
+      const row = byKey.get(key) ?? (legacyKey ? byKey.get(legacyKey) : undefined)
       if (!row) {
         return { capabilityKey: key, status: 'not_verified', note: null, configured: false, updatedAt: null }
       }
@@ -148,7 +150,16 @@ export class TerminalCapabilitiesService {
       where: { terminalId_capabilityKey: { terminalId, capabilityKey } },
       select: { status: true, note: true },
     })
-    if (!row) {
+    const legacyKey = this.legacyAliasOf(capabilityKey)
+    const effectiveRow =
+      row ??
+      (legacyKey
+        ? await this.prisma.terminalCapability.findUnique({
+            where: { terminalId_capabilityKey: { terminalId, capabilityKey: legacyKey } },
+            select: { status: true, note: true },
+          })
+        : null)
+    if (!effectiveRow) {
       if (resolvePrintScanCapabilityMode() === 'strict') {
         throw new ForbiddenException({
           error: {
@@ -159,12 +170,12 @@ export class TerminalCapabilitiesService {
       }
       return
     }
-    const status = this.asStatus(row.status)
+    const status = this.asStatus(effectiveRow.status)
     if (canCreateFormalPrintScanTask(status)) return
     throw new ForbiddenException({
       error: {
         code: 'CAPABILITY_UNAVAILABLE',
-        message: row.note ? `该终端当前不提供此服务：${row.note}` : '该终端当前不提供此服务，请咨询现场工作人员',
+        message: effectiveRow.note ? `该终端当前不提供此服务：${effectiveRow.note}` : '该终端当前不提供此服务，请咨询现场工作人员',
       },
     })
   }
@@ -174,5 +185,11 @@ export class TerminalCapabilitiesService {
     return (PRINT_SCAN_CAPABILITY_STATUSES as readonly string[]).includes(raw)
       ? (raw as PrintScanCapabilityStatus)
       : 'not_verified'
+  }
+
+  /** 若某个已弃用旧键的承接键正是 key，返回该旧键；否则 null（当前仅 cloud_upload→phone_upload 一组）。 */
+  private legacyAliasOf(key: PrintScanCapabilityKey): PrintScanCapabilityKey | null {
+    const entry = Object.entries(DEPRECATED_CAPABILITY_ALIAS).find(([, successor]) => successor === key)
+    return (entry?.[0] as PrintScanCapabilityKey | undefined) ?? null
   }
 }

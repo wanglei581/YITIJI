@@ -84,6 +84,11 @@ async function main() {
     sharedContract.IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
     '已上线任务类型列表',
   )
+  assertDeepEqual(
+    apiContract.DEPRECATED_CAPABILITY_ALIAS,
+    sharedContract.DEPRECATED_CAPABILITY_ALIAS,
+    '能力键弃用别名映射',
+  )
   for (const st of apiContract.PRINT_SCAN_CAPABILITY_STATUSES) {
     if (apiContract.canCreateFormalPrintScanTask(st) !== sharedContract.canCreateFormalPrintScanTask(st)) {
       fail(`canCreateFormalPrintScanTask 在 shared 与 API 镜像间行为不一致（status=${st}）`)
@@ -145,6 +150,42 @@ async function main() {
       fail('未配置键应 configured=false 且状态为 not_verified（保守默认）')
     }
     pass('list 返回全部能力键，未配置键 configured=false / not_verified')
+
+    // ── 1b. cloud_upload → phone_upload 词汇债兼容映射（2026-07-12 D4，只读兼容）──
+    await capabilities.upsert(terminalId, 'cloud_upload', 'maintenance', '历史云上传送修', 'admin_1')
+    const withLegacyOnly = await capabilities.listForTerminal(terminalId)
+    const phoneCapViaLegacy = withLegacyOnly.capabilities.find((c) => c.capabilityKey === 'phone_upload')
+    const cloudCapRaw = withLegacyOnly.capabilities.find((c) => c.capabilityKey === 'cloud_upload')
+    if (!phoneCapViaLegacy?.configured || phoneCapViaLegacy.status !== 'maintenance' || phoneCapViaLegacy.note !== '历史云上传送修') {
+      fail('phone_upload 未自行配置时应回退读取历史 cloud_upload 的状态/备注')
+    }
+    if (!cloudCapRaw?.configured || cloudCapRaw.status !== 'maintenance') {
+      fail('cloud_upload 自身行应保持独立展示真实历史值，不应被兼容逻辑覆盖')
+    }
+    pass('list：phone_upload 未配置时按 cloud_upload 历史配置兼容展示')
+
+    await expectHttpErrorCode(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'phone_upload'),
+      403, 'CAPABILITY_UNAVAILABLE',
+      'assertUserTaskAllowed(phone_upload)：仅有历史 cloud_upload=maintenance 时按其状态拒绝',
+    )
+    await capabilities.upsert(terminalId, 'cloud_upload', 'available', undefined, 'admin_1')
+    await capabilities.assertUserTaskAllowed(terminalId, 'phone_upload')
+    pass('assertUserTaskAllowed(phone_upload)：历史 cloud_upload=available 时按其状态放行')
+
+    // phone_upload 一旦有自己的真实配置，应优先于 cloud_upload 兼容值（兼容仅是兜底，不是覆盖）
+    await capabilities.upsert(terminalId, 'phone_upload', 'maintenance', '本机维护', 'admin_1')
+    await expectHttpErrorCode(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'phone_upload'),
+      403, 'CAPABILITY_UNAVAILABLE',
+      'phone_upload 自身已配置后优先于 cloud_upload 兼容值',
+    )
+    const bothConfigured = await capabilities.listForTerminal(terminalId)
+    const phoneCapOwn = bothConfigured.capabilities.find((c) => c.capabilityKey === 'phone_upload')
+    if (phoneCapOwn?.status !== 'maintenance' || phoneCapOwn.note !== '本机维护') {
+      fail('phone_upload 自身配置存在时，list 不应再回退读取 cloud_upload')
+    }
+    pass('list：phone_upload 自身有配置时不再回退读取 cloud_upload（兼容仅兜底不覆盖）')
 
     // DB 出现枚举外脏值 → fail-closed 归 not_verified，不放大成可用
     await prisma.terminalCapability.update({
