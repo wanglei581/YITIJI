@@ -138,6 +138,7 @@ export function MyDocumentsPage() {
   const [hint, setHint] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
   const [printingId, setPrintingId] = useState<string | null>(null)
+  const [signingId, setSigningId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [retentionPanelId, setRetentionPanelId] = useState<string | null>(null)
@@ -184,7 +185,7 @@ export function MyDocumentsPage() {
   }, [retentionBusy, retentionPanelId])
 
   const open = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
     setOpening(doc.id)
@@ -199,7 +200,7 @@ export function MyDocumentsPage() {
   }
 
   const print = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
     setPrintingId(doc.id)
@@ -226,10 +227,10 @@ export function MyDocumentsPage() {
   }
 
   const signStamp = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
-    setPrintingId(doc.id)
+    setSigningId(doc.id)
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
       if (!res.printFileUrl) throw new Error('文件访问凭证生成失败')
@@ -246,12 +247,12 @@ export function MyDocumentsPage() {
     } catch (error) {
       setHint(error instanceof Error ? error.message : '打开签名盖章失败，文件可能已到期或被清理')
     } finally {
-      setPrintingId(null)
+      setSigningId(null)
     }
   }
 
   const remove = async (doc: MemberDocumentItem) => {
-    if (opening || printingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy) return
     if (confirmId !== doc.id) {
       setConfirmId(doc.id)
       return
@@ -272,7 +273,7 @@ export function MyDocumentsPage() {
   }
 
   const submitRetention = async (doc: MemberDocumentItem, policy: SelectableRetentionPolicy) => {
-    if (opening || printingId || busyId || retentionBusy) return
+    if (opening || printingId || signingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
     setRetentionConfirm(null)
@@ -290,7 +291,7 @@ export function MyDocumentsPage() {
   }
 
   const selectRetention = (doc: MemberDocumentItem, policy: SelectableRetentionPolicy) => {
-    if (opening || busyId || retentionBusy) return
+    if (opening || signingId || busyId || retentionBusy) return
     if (policy === doc.retentionPolicy) {
       setRetentionPanelId(null)
       return
@@ -303,7 +304,7 @@ export function MyDocumentsPage() {
   }
 
   const now = Date.now()
-  const isAnyPending = Boolean(opening || printingId || busyId || retentionBusy)
+  const isAnyPending = Boolean(opening || printingId || signingId || busyId || retentionBusy)
   const confirmDoc = retentionConfirm ? items.find((item) => item.id === retentionConfirm.fileId) : null
 
   return (
@@ -440,8 +441,8 @@ export function MyDocumentsPage() {
                     title="在该文档上叠加签名或印章图片"
                     className={['me-ripple me-doc-action', isAnyPending ? 'is-disabled' : ''].join(' ')}
                   >
-                    <KIcon name="doc-check" />
-                    {printingThis ? '准备中' : '签名盖章'}
+                    <KIcon name="swap" />
+                    {signingId === doc.id ? '准备中' : '签名盖章'}
                   </button>
                 )}
                 <button
