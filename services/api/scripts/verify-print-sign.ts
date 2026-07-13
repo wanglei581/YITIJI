@@ -33,11 +33,14 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import zlib from 'node:zlib'
 import { ForbiddenException } from '@nestjs/common'
+import { validate } from 'class-validator'
+import { plainToInstance } from 'class-transformer'
 import { PrintSignService } from '../src/print-sign/print-sign.service'
 import { computeStampDrawParams, normalizeRotation, type StampDrawParams } from '../src/print-sign/print-sign-geometry'
 import type { SignStampPosition, SignStampSize } from '../src/print-sign/print-sign.types'
 import { signFileUrl } from '../src/files/signing'
 import { countPdfPages } from '../src/files/file-page-count.util'
+import { KioskUploadOptionsDto } from '../src/files/dto/kiosk-upload-options.dto'
 
 let assertionCount = 0
 
@@ -513,6 +516,29 @@ function expectedSanitizedBaseName(filename: string): string {
 }
 
 async function main() {
+  // ══════════════════════════════════════════════════════════════════════
+  section('H DTO 白名单回归（真实 kiosk-upload 端点校验层，非 Fake service）')
+  // ══════════════════════════════════════════════════════════════════════
+  // 2026-07-13 走查发现的真实缺口：signature_image purpose 已加入
+  // FilesService/upload-sessions/retention-policy 等 Fake 直调路径全部验证过，
+  // 但真实 HTTP 端点 POST /files/kiosk-upload 的 class-validator DTO
+  // （KioskUploadOptionsDto）白名单当时漏改，导致 Kiosk 本机上传印章图片
+  // 对真实后端稳定返回 400 VALIDATION_FAILED——这类"仅 Fake、未触达真实校验层"
+  // 的缺口是 service 级测试的结构性盲区，这里直接用 class-validator 的
+  // validate() 跑真实 DTO，堵住同类回归。
+  {
+    const dto = plainToInstance(KioskUploadOptionsDto, { purpose: 'signature_image' })
+    const errors = await validate(dto)
+    assert.equal(errors.length, 0, `H1 期望 signature_image 通过 KioskUploadOptionsDto 校验，实际报错: ${JSON.stringify(errors)}`)
+    pass('H1 KioskUploadOptionsDto 接受 purpose=signature_image（真实 class-validator 校验，非 Fake）')
+  }
+  {
+    const dto = plainToInstance(KioskUploadOptionsDto, { purpose: 'not_a_real_purpose' })
+    const errors = await validate(dto)
+    assert.ok(errors.length > 0, 'H2 期望非法 purpose 被 KioskUploadOptionsDto 拒绝')
+    pass('H2 KioskUploadOptionsDto 仍拒绝白名单外的 purpose（确认断言本身有效，不是永远通过的假阳性）')
+  }
+
   // ══════════════════════════════════════════════════════════════════════
   section('G 几何单元断言')
   // ══════════════════════════════════════════════════════════════════════
