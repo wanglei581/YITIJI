@@ -1,6 +1,6 @@
 # 当前开发进度
 
-> 最后更新：2026-07-12
+> 最后更新：2026-07-13
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 
@@ -29,6 +29,8 @@
 - `apps/`、`services/`、`packages/` 属运行时代码，规范化任务默认不触碰。
 - 删除、ignore、大文件外部归档、主工作区物料迁入前必须先确认并双模型审查。
 - 岗位 / 招聘会 / 政策继续只做第三方或官方来源信息入口；项目不是招聘平台。
+
+2026-07-13 补充：**二维码支付自动确认候选修复（分支 `codex/payment-auto-reconcile-20260713`，本地验证级）**。现场支付样本未观察到成功回调入账，且 Kiosk 收银页曾显式跳过“有屏上二维码”的 pending 尝试，只允许付款码路径自动查单，导致屏上扫码付款后必须手动点击“核实”。本分支仅修改 `PrintCashierPage`：所有真实渠道的 `pending` 尝试（屏上二维码与付款码）均按 3.5 秒间隔复用既有、带 payment-session-token 的服务端 `reconcilePayment`；仍以渠道回调为主路径，保留服务端既有查单限流、金额/流水校验与幂等入账，沙箱仍不查单，手动“核实”仍为兜底。`verify:payment-codepay` 已先红后绿，并与 `verify:payment-flow`、`verify:kiosk-cashier-ui`、Kiosk typecheck / lint 复验通过。本项不改数据库、支付接口、Provider、密钥或线上 env；尚未审查、合入、部署或以新订单完成“付款后不手动核实即自动进入打印进度 / 物理出纸”现场复验。2026-07-13 只读复核当前运行服务器的 `PAYMENT_NOTIFY_BASE_URL` 为 `https://zyidai.cn`，该域名解析至当前服务器，HTTPS `/api/v1/health` 为 `db=postgres`；仍须在每次候选部署前复核通知地址、nginx、PM2 实例和数据库归属一致，不能仅因 DNS 可解析就认定回调有效。
 
 2026-07-12 发布收口：AI 文件体检真实化与上传内容魔数校验已通过 PR #185 合入远端 `main`（merge commit `93ca6161`；发布分支 head `f13c6d90`）。GitHub Actions 的 `build-and-verify` 与 `postgres-readiness` 均为 Success；本地复跑 API/Kiosk typecheck、lint、生产构建、Task 10 Admin 运维 verify、材料处理、上传魔数（57 项）、上传会话、扫描、历史 pending PrintTask 受控关闭和打印扫描安全门禁均通过。自动复审已分别调用 Claude 与 Antigravity，但 Claude CLI 本机认证失败、Antigravity 受地区限制，均未产生有效报告，不能计作模型审批。本次只完成远端代码合入，未部署、未执行预生产数据处置、未完成 Windows 真机验收；COS 直传视频及大于 32MB 对象仍不嗅探，材料包仍未开工。
 
