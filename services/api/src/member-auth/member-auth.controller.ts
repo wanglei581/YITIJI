@@ -76,9 +76,8 @@ export class MemberAuthController {
   async confirmQrLogin(
     @Param('ticketId') ticketId: string,
     @Body() dto: ConfirmQrLoginDto,
-    @Req() req: Request,
   ): Promise<ApiResponse<ConfirmQrLoginResult>> {
-    return ApiResponse.ok(await this.qrLogin.confirm(ticketId, { ...dto, ip: clientIp(req) }))
+    return ApiResponse.ok(await this.qrLogin.confirm(ticketId, dto))
   }
 
   /** Kiosk 使用私有 claimToken 一次性领取会员 token。 */

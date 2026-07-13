@@ -244,5 +244,6 @@ function localQrErrorMessage(error: unknown): string {
   if (!(error instanceof MemberApiError)) return '扫码登录服务不可用，请使用手机号登录'
   if (error.status === 0 || error.code === 'NETWORK_ERROR') return '本机扫码登录服务未连接，请使用手机号登录'
   if (error.code === 'LOCAL_QR_ORIGIN_FORBIDDEN') return '当前页面来源未被本机扫码登录服务允许'
+  if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_INVALID') return '本机扫码登录服务未正确配置，请使用手机号登录'
   return error.message || '扫码登录服务不可用，请使用手机号登录'
 }
