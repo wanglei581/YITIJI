@@ -123,9 +123,9 @@ const CAPABILITIES: Capability[] = [
     iconBg: 'bg-error-bg',
     iconColor: 'text-error-fg',
     title: '签名盖章',
-    description: '在文件上叠加签名 / 印章图片',
-    to: '/print-scan/feature/sign',
-    available: false,
+    description: '在 PDF 上叠加签名/印章图片（版式合成）',
+    to: '/print-scan/sign',
+    available: true,
   },
 ]
 

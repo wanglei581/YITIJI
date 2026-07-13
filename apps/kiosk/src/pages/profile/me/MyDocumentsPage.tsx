@@ -38,6 +38,9 @@ const RETENTION_LABELS: Record<FileRetentionPolicy, string> = {
   system_short: '短期保存',
 }
 
+/** 允许跳转「签名盖章」的文档用途白名单——普通打印文档、简历、求职信等；不含高敏证件类。 */
+const SIGNABLE_PURPOSES = new Set(['print_doc', 'resume_upload', 'resume_scan', 'cover_letter'])
+
 type SelectableRetentionPolicy = FileRetentionUpdateRequest['retentionPolicy']
 
 function retentionLabel(policy: FileRetentionPolicy | null | undefined, expiresAt: string | null): string {
@@ -217,6 +220,31 @@ export function MyDocumentsPage() {
       })
     } catch (error) {
       setHint(error instanceof Error ? error.message : '打印链接生成失败，可能已到期或被清理')
+    } finally {
+      setPrintingId(null)
+    }
+  }
+
+  const signStamp = async (doc: MemberDocumentItem) => {
+    if (opening || printingId || busyId || retentionBusy) return
+    const token = getToken()
+    if (!token) return
+    setPrintingId(doc.id)
+    try {
+      const res = await fetchAccessUrl(doc.previewUrlPath, token)
+      if (!res.printFileUrl) throw new Error('文件访问凭证生成失败')
+      navigate('/print-scan/sign', {
+        state: {
+          presetDocument: {
+            fileId: doc.id,
+            fileAccessUrl: res.printFileUrl,
+            name: doc.filename,
+            sizeBytes: doc.sizeBytes,
+          },
+        },
+      })
+    } catch (error) {
+      setHint(error instanceof Error ? error.message : '打开签名盖章失败，文件可能已到期或被清理')
     } finally {
       setPrintingId(null)
     }
@@ -404,6 +432,18 @@ export function MyDocumentsPage() {
                   <KIcon name="printer" />
                   {printingThis ? '准备中' : '打印'}
                 </button>
+                {doc.mimeType === 'application/pdf' && SIGNABLE_PURPOSES.has(doc.purpose) && (
+                  <button
+                    type="button"
+                    disabled={isAnyPending}
+                    onClick={() => void signStamp(doc)}
+                    title="在该文档上叠加签名或印章图片"
+                    className={['me-ripple me-doc-action', isAnyPending ? 'is-disabled' : ''].join(' ')}
+                  >
+                    <KIcon name="doc-check" />
+                    {printingThis ? '准备中' : '签名盖章'}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={deleteDisabled}
