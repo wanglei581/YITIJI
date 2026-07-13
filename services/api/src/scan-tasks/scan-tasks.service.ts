@@ -323,11 +323,22 @@ export class ScanTasksService {
       })
       if (completed.count === 0) {
         // 任务在上传期间被取消（或已被其它方式改变状态）。文件已经真实上传成功，
-        // 但不能把它挂到一个已经不再 "matched" 的任务上——诚实记录，不假装成功，
-        // 也不静默丢弃已产生的真实文件引用。
-        this.logger.warn(
-          `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); uploaded file ${uploaded.fileId} is orphaned`,
-        )
+        // 但不能把它挂到一个已经不再 "matched" 的任务上——诚实记录，不假装成功。
+        // B1-6：不再静默留下孤儿文件——用 FilesService.systemDelete() 补偿删除
+        // （绕过 canAccessFile() 的用户权限校验，专给系统自身产生的清理场景用）。
+        // 补偿删除本身失败（例如文件已经被其它路径删掉）不能打断这里原本要走的
+        // 取消响应流程，只降级为一条 warn，不 rethrow。
+        try {
+          await this.files.systemDelete(uploaded.fileId, 'ScanTask cancelled during upload, compensating orphaned file')
+          this.logger.log(
+            `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); orphaned file ${uploaded.fileId} deleted via compensating systemDelete()`,
+          )
+        } catch (cleanupError) {
+          const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          this.logger.warn(
+            `scan task ${task.id}: compensating systemDelete() failed for orphaned file ${uploaded.fileId}: ${cleanupMessage}`,
+          )
+        }
         throw new ConflictException({
           error: { code: 'SCAN_TASK_STATE_CHANGED', message: '扫描任务状态已变化，请重新发起扫描' },
         })

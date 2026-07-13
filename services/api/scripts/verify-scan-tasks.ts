@@ -148,6 +148,9 @@ class FakePrisma {
 
 class FakeFilesService {
   private seq = 1
+  /** B1-6：记录 systemDelete() 的每次调用，供孤儿文件补偿删除测试断言真正调用发生且参数正确。 */
+  readonly systemDeleteCalls: Array<{ fileId: string; reason: string }> = []
+
   constructor(private readonly prisma: FakePrisma) {}
 
   async upload(args: {
@@ -181,12 +184,24 @@ class FakeFilesService {
       fileExpiresAt: null,
     }
   }
+
+  /** B1-6：镜像真实 FilesService.systemDelete() 的最小行为——软删记录、返回 metadata。 */
+  async systemDelete(fileId: string, reason: string) {
+    this.systemDeleteCalls.push({ fileId, reason })
+    const record = this.prisma.filesById.get(fileId)
+    if (!record || record.deletedAt) {
+      throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+    }
+    record.deletedAt = new Date()
+    this.prisma.filesById.set(fileId, record)
+    return { fileId, deletedAt: record.deletedAt }
+  }
 }
 
-function makeService(): { service: ScanTasksService; prisma: FakePrisma } {
+function makeService(): { service: ScanTasksService; prisma: FakePrisma; files: FakeFilesService } {
   const prisma = new FakePrisma()
   const files = new FakeFilesService(prisma)
-  return { service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities), prisma }
+  return { service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities), prisma, files }
 }
 
 async function expectRejects<T extends Error>(
@@ -647,6 +662,11 @@ async function main(): Promise<void> {
     // 直接把任务状态改成 cancelled），完成写入 `updateMany({where:{status:'matched'}})` 必须命中 0 行，
     // 诚实抛 409 ConflictException（SCAN_TASK_STATE_CHANGED），不得静默把文件挂到一个已取消的任务上，
     // 也不能假装投递成功。
+    //
+    // B1-6：既然文件已经真实上传成功却挂不上任务，deliverScanFile() 必须调用
+    // FilesService.systemDelete() 补偿删除这个孤儿文件——断言 systemDelete 真的被调用，
+    // 且传入的 fileId 正是刚上传出来的那个（不是随便一个值），并且文件在存储层真的被标记删除了
+    // （不是只调用了方法但没有实际效果）。
     const prisma = new FakePrisma()
     const baseFiles = new FakeFilesService(prisma)
     let raceScanTaskId = ''
@@ -657,6 +677,7 @@ async function main(): Promise<void> {
         prisma.scanTasksById.set(raceScanTaskId, { ...task, status: 'cancelled' })
         return result
       },
+      systemDelete: (fileId: string, reason: string) => baseFiles.systemDelete(fileId, reason),
     }
     const service = new ScanTasksService(prisma as never, racyFiles as never, passthroughCapabilities)
     const created = await service.create(dto, null)
@@ -676,6 +697,69 @@ async function main(): Promise<void> {
 
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'cancelled', 'task must remain cancelled, not silently marked completed')
+
+    assert.equal(
+      baseFiles.systemDeleteCalls.length,
+      1,
+      'orphaned file must be compensating-deleted exactly once via FilesService.systemDelete()',
+    )
+    const orphanedFileId = baseFiles.systemDeleteCalls[0]!.fileId
+    assert.ok(orphanedFileId.startsWith('file_'), 'systemDelete must be called with the real uploaded fileId, not a placeholder')
+    assert.equal(
+      baseFiles.systemDeleteCalls[0]!.reason,
+      'ScanTask cancelled during upload, compensating orphaned file',
+      'reason string must be diagnostic, not empty/generic',
+    )
+    const orphanedFileRecord = prisma.filesById.get(orphanedFileId)
+    assert.ok(orphanedFileRecord?.deletedAt, 'orphaned FileObject must actually be marked deleted, not just have systemDelete() invoked without effect')
+  }
+
+  {
+    // B1-6：补偿删除本身失败时（例如文件已经被其它路径清理掉，systemDelete() 内部
+    // requireAlive() 抛 NotFoundException），deliverScanFile() 原本要走的 409
+    // SCAN_TASK_STATE_CHANGED 取消响应流程绝不能被 systemDelete 的异常打断或替换掉——
+    // 调用方必须依然看到 ConflictException，而不是 systemDelete 抛出的 NotFoundException
+    // 泄漏出来变成一个未预期的错误类型。
+    const prisma = new FakePrisma()
+    const baseFiles = new FakeFilesService(prisma)
+    let raceScanTaskId = ''
+    let systemDeleteCallCount = 0
+    const racyFiles = {
+      upload: async (args: Parameters<FakeFilesService['upload']>[0]) => {
+        const result = await baseFiles.upload(args)
+        const task = prisma.scanTasksById.get(raceScanTaskId)!
+        prisma.scanTasksById.set(raceScanTaskId, { ...task, status: 'cancelled' })
+        return result
+      },
+      systemDelete: async (): Promise<never> => {
+        systemDeleteCallCount += 1
+        throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+      },
+    }
+    const service = new ScanTasksService(prisma as never, racyFiles as never, passthroughCapabilities)
+    const created = await service.create(dto, null)
+    raceScanTaskId = created.scanTaskId
+
+    await expectRejects(
+      () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: tinyPdf(),
+          filename: 'race-cleanup-fails.pdf',
+          mimeType: 'application/pdf',
+        }),
+      ConflictException,
+      'original SCAN_TASK_STATE_CHANGED conflict must still surface even when compensating systemDelete() itself throws',
+    )
+
+    assert.equal(systemDeleteCallCount, 1, 'systemDelete must have actually been attempted (not skipped)')
+
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(
+      status.status,
+      'cancelled',
+      'original cancel-response flow must proceed normally (task stays cancelled) despite the compensating delete failing',
+    )
   }
 
   {
