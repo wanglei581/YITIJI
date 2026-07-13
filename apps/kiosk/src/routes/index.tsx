@@ -53,6 +53,7 @@ import { BenefitActivityDetailPage } from '../pages/activities/BenefitActivityDe
 import { PrintScanHomePage } from '../pages/print-scan/PrintScanHomePage'
 import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureInfoPage'
 import { ConvertImagesPage } from '../pages/print-scan/ConvertImagesPage'
+import { IdPhotoPage } from '../pages/print-scan/IdPhotoPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
 import { ResumeGeneratePage } from '../pages/resume/ResumeGeneratePage'
 import { ResumeGeneratePreviewPage } from '../pages/resume/ResumeGeneratePreviewPage'
@@ -121,6 +122,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan',              element: <PrintScanHomePage /> },
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       { path: 'print-scan/convert',      element: <ConvertImagesPage /> },
+      { path: 'print-scan/id-photo',     element: <IdPhotoPage /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
