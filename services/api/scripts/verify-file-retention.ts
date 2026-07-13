@@ -103,6 +103,20 @@ function main(): void {
       consentVersion: 'privacy-v1',
     }),
   )
+  assertThrowsCode('RETENTION_ID_SCAN_LOCKED', () =>
+    computeRetentionDecision({
+      now,
+      policy: 'months_6',
+      purpose: 'id_photo_print',
+      sensitiveLevel: 'highly_sensitive',
+      assetCategory: 'original',
+      ownerType: 'user',
+      endUserId: 'end-user-1',
+      requesterKind: 'member',
+      requesterEndUserId: 'end-user-1',
+      consentVersion: 'privacy-v1',
+    }),
+  )
   assertThrowsCode('RETENTION_CONSENT_REQUIRED', () =>
     computeRetentionDecision({
       now,
@@ -149,6 +163,7 @@ function main(): void {
   assert.ok(longTerm.retentionConsentAt)
 
   assert.deepEqual(allowedPoliciesForFile({ purpose: 'id_scan', assetCategory: 'original' }), ['system_short'])
+  assert.deepEqual(allowedPoliciesForFile({ purpose: 'id_photo_print', assetCategory: 'original' }), ['system_short'])
   assert.deepEqual(allowedPoliciesForFile({ purpose: 'resume_upload', assetCategory: 'original' }), ['months_3', 'months_6'])
   assert.deepEqual(allowedPoliciesForFile({ purpose: 'resume_upload', assetCategory: 'optimized' }), ['months_3', 'months_6', 'long_term'])
 
