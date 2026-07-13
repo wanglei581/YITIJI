@@ -572,12 +572,16 @@ const loginStylePaths = [
   'src/pages/auth/styles/login-keypad.css',
   'src/pages/auth/styles/login-responsive.css',
 ]
+const loginAggregateStylePaths = [
+  ...loginStylePaths,
+  'src/pages/auth/styles/login-dialog.css',
+]
 const loginAggregate = read(loginAggregatePath)
-const expectedImports = loginStylePaths.map((path) => `@import './styles/${path.split('/').at(-1)}';`)
+const expectedImports = loginAggregateStylePaths.map((path) => `@import './styles/${path.split('/').at(-1)}';`)
 const aggregateLines = loginAggregate.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
 expect(
   aggregateLines.length === expectedImports.length && expectedImports.every((line, index) => aggregateLines[index] === line),
-  'login.css 必须只按固定顺序聚合四个职责 CSS 文件',
+  'login.css 必须只按固定顺序聚合五个职责 CSS 文件',
 )
 expect(lineCount(loginAggregate) < 300, `login.css 必须少于 300 行（当前 ${lineCount(loginAggregate)}）`)
 expectIncludes(loginPage, "import './login.css'", 'LoginPage 必须导入 login.css 聚合样式')

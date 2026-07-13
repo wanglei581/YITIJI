@@ -510,7 +510,11 @@ const closeButtonCallIndex = closeButtonHandlerName === finalCloseName
   ? 0
   : targetCallIndex(closeButtonHandler, finalCloseName, dialogFunctions)
 expect(closeButtonCallIndex >= 0 && Boolean(finalCloseName), '显式关闭按钮 handler 最终进入共享关闭调用链')
-expectMatches(closeButton, />[\s\S]*?\b关闭\b[\s\S]*?<\/button>/, '显式关闭按钮提供可见关闭文案')
+expectMatches(
+  closeButton,
+  /(?:^|>)[^<{]*关闭[^<{]*(?:<|$)/,
+  '显式关闭按钮提供可见关闭文案',
+)
 expectMatches(loginDialog, /继续游客体验/, '登录弹窗保留继续游客体验操作')
 expect(handleContinueAsGuest.length > 0, '已提取 handleContinueAsGuest 函数块')
 expect(
