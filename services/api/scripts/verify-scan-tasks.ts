@@ -2,9 +2,14 @@ import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcdef'
 
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
+import { createPrismaClient } from '../src/prisma/create-client'
 import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
@@ -324,6 +329,108 @@ async function main(): Promise<void> {
     )
 
     prisma.scanTask.create = originalCreate as typeof prisma.scanTask.create
+  }
+
+  {
+    // B1-9：真实 DB 端到端验证——B1-2 的 partial unique index 只写在 migration.sql 里
+    // （Prisma schema.prisma 语法表达不了 WHERE 条件表达式，见 schema.prisma ScanTask 模型
+    // 上方注释），上面两个 SCAN_TERMINAL_BUSY 测试全部是对着手工构造/monkey-patch 出来的
+    // PrismaClientKnownRequestError 做的单元级判别测试（isScanTaskActiveSessionConflict()），
+    // 从未真正跑过这条 migration.sql 本身，也没有验证过真实数据库真的会在正确的时机抛出
+    // P2002、在正确的时机放行。
+    //
+    // 不能依赖 CI 共享的 dev.db：CI 的 "Prepare fresh SQLite db" 步骤用的是 `prisma db push`——
+    // 它只按 schema.prisma 建表，schema.prisma 没有声明这条 partial unique index（只在
+    // migration.sql 里），已本地验证 `db push` 后 sqlite_master 里确实没有
+    // ScanTask_terminalId_active_unique 这条索引。也不能依赖当前进程的 DATABASE_URL：本脚本
+    // 同时被 SQLite CI job 和 postgres-readiness job 调用（后者 DATABASE_URL 指向 Postgres，
+    // 没有 prisma/dev.db）。因此这里起一个完全独立的临时 SQLite 文件，直接调用本地
+    // node_modules/.bin/prisma 跑一遍真实 `migrate deploy`（应用完整迁移历史，含这条约束），
+    // 全程不触碰进程当前的 DATABASE_URL / 共享 dev.db，跑完即删。
+    const apiRoot = path.resolve(__dirname, '..')
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'verify-scan-tasks-realdb-'))
+    const dbPath = path.join(tmpDir, 'verify.db')
+    const dbUrl = `file:${dbPath}`
+
+    try {
+      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy'], {
+        cwd: apiRoot,
+        env: { ...process.env, DATABASE_URL: dbUrl },
+        stdio: 'pipe',
+      })
+
+      const { client } = createPrismaClient(dbUrl)
+      await client.$connect()
+      try {
+        const realPrisma = { terminal: client.terminal, scanTask: client.scanTask } as never
+        // create() 本身不触碰 this.files，真实 FilesService 在这里没有必要。
+        const service = new ScanTasksService(realPrisma, {} as never, passthroughCapabilities)
+
+        const terminalId = `realdb_t_${randomBytes(4).toString('hex')}`
+        await client.terminal.create({
+          data: {
+            id: terminalId,
+            terminalCode: `RDB-${randomBytes(3).toString('hex')}`,
+            agentToken: randomBytes(16).toString('hex'),
+            deviceFingerprint: 'verify-scan-tasks-realdb-fixture',
+            enabled: true,
+          },
+        })
+
+        const first = await service.create({ scanType: 'document', terminalId }, null)
+        assert.ok(first.scanTaskId, 'real DB: first create() must succeed')
+
+        let caughtWaiting: unknown
+        try {
+          await service.create({ scanType: 'document', terminalId }, null)
+        } catch (error) {
+          caughtWaiting = error
+        }
+        assert.ok(
+          caughtWaiting instanceof ConflictException,
+          `real DB: second create() while first is still 'waiting' must hit the real partial unique index and be mapped to ConflictException, got ${(caughtWaiting as Error)?.constructor?.name}`,
+        )
+        assert.equal(
+          ((caughtWaiting as ConflictException).getResponse() as { error?: { code?: string } }).error?.code,
+          'SCAN_TERMINAL_BUSY',
+          'real DB: real P2002 from the actual migration-created index must map to SCAN_TERMINAL_BUSY',
+        )
+
+        // 约束的 WHERE 子句是 status IN ('waiting','matched')——单独验证 'matched' 分支也真的
+        // 挡住新建，不能只测 'waiting'（否则如果约束被误写成只覆盖 'waiting'，这里测不出来）。
+        await client.scanTask.updateMany({ where: { id: first.scanTaskId }, data: { status: 'matched' } })
+        let caughtMatched: unknown
+        try {
+          await service.create({ scanType: 'document', terminalId }, null)
+        } catch (error) {
+          caughtMatched = error
+        }
+        assert.ok(
+          caughtMatched instanceof ConflictException,
+          `real DB: a 'matched' (not just 'waiting') active task must also block new create(), got ${(caughtMatched as Error)?.constructor?.name}`,
+        )
+
+        // 四种终态依次验证：每种都必须真的不再挡后续创建（证明约束只覆盖 waiting/matched，
+        // 不是全状态生效，也不是压根没生效导致"看起来放行"其实是约束整体失效）。
+        let activeTaskId = first.scanTaskId
+        for (const terminalState of ['completed', 'cancelled', 'expired', 'failed'] as const) {
+          await client.scanTask.updateMany({ where: { id: activeTaskId }, data: { status: terminalState } })
+          const created = await service.create({ scanType: 'document', terminalId }, null)
+          assert.ok(
+            created.scanTaskId,
+            `real DB: after prior task transitions to '${terminalState}', same terminal must be able to create again`,
+          )
+          activeTaskId = created.scanTaskId
+        }
+
+        await client.scanTask.deleteMany({ where: { terminalId } })
+        await client.terminal.deleteMany({ where: { id: terminalId } })
+      } finally {
+        await client.$disconnect()
+      }
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
   }
 
   {
