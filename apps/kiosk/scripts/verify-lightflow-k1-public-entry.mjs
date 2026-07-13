@@ -394,6 +394,9 @@ const packageJson = read('package.json')
 const routes = read('src/routes/index.tsx')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const loginPage = read('src/pages/auth/LoginPage.tsx')
+const memberPhoneLoginHook = read('src/pages/auth/hooks/useMemberPhoneLogin.ts')
+const memberPhoneLoginPane = read('src/pages/auth/components/MemberPhoneLoginPane.tsx')
+const memberAgreement = read('src/pages/auth/components/MemberAgreement.tsx')
 const mobileQrPage = read('src/pages/auth/MobileQrLoginPage.tsx')
 const scanQrPanel = read('src/pages/auth/ScanQrLoginPanel.tsx')
 const phoneUploadPage = read('src/pages/upload/PhoneUploadPage.tsx')
@@ -447,7 +450,9 @@ expectPattern(
 expect((kioskRoot.match(/service-desk/g) ?? []).length === 1, 'KioskRoot 只能有一个 service-desk opt-in')
 
 for (const [source, marker, label] of [
-  [loginPage, 'memberLogin(', 'LoginPage 真实登录'],
+  [memberPhoneLoginHook, 'memberLogin(phone, code, deviceId)', '共享手机号控制器真实登录'],
+  [memberPhoneLoginHook, 'sendSmsCode(phone, deviceId)', '共享手机号控制器真实发送验证码'],
+  [memberPhoneLoginHook, 'getMemberAuthDeviceId()', '共享手机号控制器使用稳定 deviceId'],
   [loginPage, 'clearKioskSensitiveSession(', 'LoginPage 公共终端清会话'],
   [scanQrPanel, 'claimingRef.current = true', 'ScanQrLoginPanel 防重复认领'],
   [mobileQrPage, 'fetchQrLoginStatus(', 'MobileQrLoginPage 查询二维码状态'],
@@ -459,30 +464,34 @@ for (const [source, marker, label] of [
   expectIncludes(source, marker, label)
 }
 expectPattern(loginPage, /isSafeInternalPath\s*\(\s*(?:queryFrom|fromState)\s*\)/, 'LoginPage returnTo 安全校验必须实际调用 isSafeInternalPath')
+expectIncludes(loginPage, 'useMemberPhoneLogin({', 'LoginPage 必须消费共享手机号控制器')
+expectIncludes(loginPage, '<MemberPhoneLoginPane {...phoneLogin.paneProps} />', 'LoginPage 必须挂载共享手机号面板')
+expectIncludes(loginPage, '<MemberAgreement agreed={agreed}', 'LoginPage 必须挂载共享协议组件')
 expectPattern(
   phoneUploadPage,
   /uploadPhoneSessionFile\s*\(\s*\{\s*sessionId\s*,\s*uploadToken\s*,\s*file\s*,?\s*\}\s*\)/,
   'PhoneUploadPage 必须以当前 sessionId 调用 uploadPhoneSessionFile',
 )
 
-expectIncludes(loginPage, 'className="k-agree-check"', 'LoginPage 协议勾选必须是独立交互控件')
-expectIncludes(loginPage, 'className="k-input-target"', 'LoginPage 手机号输入触发区必须与发送验证码按钮并列')
-expectNotIncludes(loginPage, 'role="link"', 'LoginPage 协议入口必须使用原生交互控件')
-expectIncludes(loginPage, '<Link className="doclink" to="/legal/terms">', 'LoginPage 用户协议必须使用原生链接语义')
+expectIncludes(memberAgreement, 'className="k-agree-check"', '共享协议组件勾选必须是独立交互控件')
+expectIncludes(memberPhoneLoginPane, 'className="k-input-target"', '共享手机号面板输入触发区必须与发送验证码按钮并列')
+expectNotIncludes(memberAgreement, 'role="link"', '共享协议组件入口必须使用原生交互控件')
+expectIncludes(memberAgreement, '<Link className="doclink" to="/legal/terms">', '共享协议组件用户协议必须使用原生链接语义')
+expectIncludes(memberAgreement, '<Link className="doclink" to="/legal/privacy">', '共享协议组件隐私政策必须使用原生链接语义')
 expectPattern(
-  loginPage,
-  /const canSend = agreed && phone\.length === PHONE_LENGTH && countdown === 0 && !loading/,
-  'LoginPage 未同意协议时不得启用发送验证码',
+  memberPhoneLoginPane,
+  /const canSend = agreed && phone\.length === MEMBER_PHONE_LENGTH && countdown === 0 && !loading/,
+  '共享手机号面板未同意协议时不得启用发送验证码',
 )
 expectPattern(
-  loginPage,
-  /const canLogin = agreed && phone\.length === PHONE_LENGTH && code\.length === CODE_LENGTH && !loading/,
-  'LoginPage 未同意协议时不得启用登录',
+  memberPhoneLoginPane,
+  /const canLogin = \([\s\S]{0,160}?agreed &&[\s\S]{0,160}?phone\.length === MEMBER_PHONE_LENGTH &&[\s\S]{0,160}?code\.length === MEMBER_CODE_LENGTH &&[\s\S]{0,80}?!loading[\s\S]{0,40}?\)/,
+  '共享手机号面板未同意协议时不得启用登录',
 )
-expectIncludes(loginPage, '勾选协议后可获取验证码并登录', 'LoginPage 协议禁用门禁必须有可见原因')
+expectIncludes(memberAgreement, '勾选协议后可获取验证码并登录', '共享协议组件禁用门禁必须有可见原因')
 expect(
-  (loginPage.match(/role="alert"/g) ?? []).length === 1,
-  'LoginPage 只允许一个错误 alert 区，扫码错误由 ScanQrLoginPanel 自己播报',
+  (memberPhoneLoginPane.match(/role="alert"/g) ?? []).length === 1,
+  '共享手机号面板只允许一个错误 alert 区，扫码错误由 ScanQrLoginPanel 自己播报',
 )
 
 expectNotIncludes(kioskRoot, 'label={deviceStatus}', 'KioskRoot 不得直接展示内部 deviceStatus')
@@ -506,6 +515,9 @@ expectPattern(
 for (const forbiddenCopy of ['一键投递', '立即投递', '平台投递']) {
   for (const [source, label] of [
     [loginPage, 'LoginPage'],
+    [memberPhoneLoginHook, 'useMemberPhoneLogin'],
+    [memberPhoneLoginPane, 'MemberPhoneLoginPane'],
+    [memberAgreement, 'MemberAgreement'],
     [mobileQrPage, 'MobileQrLoginPage'],
     [scanQrPanel, 'ScanQrLoginPanel'],
     [phoneUploadPage, 'PhoneUploadPage'],
