@@ -3,11 +3,75 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-upload-sessions-secret-0123456789
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import zlib from 'node:zlib'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
+
+// ── PNG fixture 生成器(复制自 verify-print-conversion.ts / verify-id-photo.ts)──
+// 生成真实、可通过 content-sniff 魔数校验的最小 PNG:colorType=2(RGB truecolor)、
+// bitDepth=8、无 alpha、CRC32 现算现填 —— 不是凭空手写的伪造字节。
+const CRC_TABLE: number[] = (() => {
+  const table: number[] = []
+  for (let n = 0; n < 256; n++) {
+    let c = n
+    for (let k = 0; k < 8; k++) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    }
+    table[n] = c >>> 0
+  }
+  return table
+})()
+
+function crc32(buf: Buffer): number {
+  let c = 0xffffffff
+  for (let i = 0; i < buf.length; i++) {
+    c = CRC_TABLE[(c ^ buf[i]!) & 0xff]! ^ (c >>> 8)
+  }
+  return (c ^ 0xffffffff) >>> 0
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBuf = Buffer.from(type, 'ascii')
+  const lenBuf = Buffer.alloc(4)
+  lenBuf.writeUInt32BE(data.length, 0)
+  const crcBuf = Buffer.alloc(4)
+  crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0)
+  return Buffer.concat([lenBuf, typeBuf, data, crcBuf])
+}
+
+function makePng(width: number, height: number): Buffer {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+  const ihdrData = Buffer.alloc(13)
+  ihdrData.writeUInt32BE(width, 0)
+  ihdrData.writeUInt32BE(height, 4)
+  ihdrData[8] = 8 // bit depth
+  ihdrData[9] = 2 // color type: truecolor RGB
+  ihdrData[10] = 0 // compression method
+  ihdrData[11] = 0 // filter method
+  ihdrData[12] = 0 // interlace method: none
+  const ihdr = pngChunk('IHDR', ihdrData)
+
+  const rowBytes = 1 + width * 3 // filter byte + RGB
+  const raw = Buffer.alloc(rowBytes * height)
+  for (let y = 0; y < height; y++) {
+    const rowStart = y * rowBytes
+    raw[rowStart] = 0 // filter type: None
+    for (let x = 0; x < width; x++) {
+      const px = rowStart + 1 + x * 3
+      raw[px] = Math.floor((x * 255) / Math.max(width - 1, 1))
+      raw[px + 1] = Math.floor((y * 255) / Math.max(height - 1, 1))
+      raw[px + 2] = 128
+    }
+  }
+  const idat = pngChunk('IDAT', zlib.deflateSync(raw))
+  const iend = pngChunk('IEND', Buffer.alloc(0))
+
+  return Buffer.concat([signature, ihdr, idat, iend])
+}
 
 interface StoredFile {
   id: string
@@ -163,13 +227,23 @@ class FakeFilesService {
   }
 }
 
-function makeService(): { service: UploadSessionsService; prisma: FakePrisma } {
+class FakeAudit {
+  readonly entries: Array<{ action: string; targetId?: string | null; payload?: Record<string, unknown> }> = []
+  async write(args: { action: string; targetId?: string | null; payload?: Record<string, unknown> }): Promise<string | null> {
+    this.entries.push(args)
+    return 'audit_1'
+  }
+}
+
+function makeService(): { service: UploadSessionsService; prisma: FakePrisma; audit: FakeAudit } {
   const redis = new FakeRedis()
   const prisma = new FakePrisma()
   const files = new FakeFilesService(prisma)
+  const audit = new FakeAudit()
   return {
-    service: new UploadSessionsService(redis as never, prisma as never, files as never),
+    service: new UploadSessionsService(redis as never, prisma as never, files as never, audit as never),
     prisma,
+    audit,
   }
 }
 
@@ -460,6 +534,77 @@ async function main(): Promise<void> {
     const bound = prisma.files.get(uploaded.file!.fileId)
     assert.equal(bound?.endUserId, 'member_1')
     assert.equal(bound?.retentionPolicy, 'system_short', 'print_doc must not get the 90-day resume retention default even when bound to a member')
+  }
+
+  {
+    // id_scan(设计 §4.7):手机扫码上传证件照 → confirm 签发签名 fileUrl(供 Kiosk 取源排版
+    // 复用为 IdPhotoService.verifySourceOwnership 的 fileAccessUrl)+ 补齐此前完全缺失的
+    // upload-session 上传审计。
+    const { service, prisma, audit } = makeService()
+    const session = await service.create({
+      purpose: 'id_scan',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ buffer: makePng(600, 800), originalname: 'id-photo.png', mimetype: 'image/png' }),
+    })
+    assert.equal(uploaded.status, 'uploaded')
+    assert.equal(uploaded.file?.filename, 'id-photo.png')
+    assert.equal(prisma.files.get(uploaded.file!.fileId)?.purpose, 'id_scan')
+
+    const confirmed = await service.confirm(session.sessionId, session.controlToken)
+    assert.equal(confirmed.status, 'confirmed')
+    assert.match(
+      confirmed.file.fileUrl ?? '',
+      /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/,
+      'id_scan confirm must return a signed content URL usable as fileAccessUrl',
+    )
+
+    const uploadAudit = audit.entries.find((e) => e.action === 'file.upload' && e.targetId === uploaded.file!.fileId)
+    assert.ok(uploadAudit, 'id_scan phone upload must write a file.upload audit entry (previously entirely missing)')
+    assert.equal(uploadAudit?.payload?.['channel'], 'upload_session')
+    assert.equal(uploadAudit?.payload?.['purpose'], 'id_scan')
+    assert.equal(uploadAudit?.payload?.['sessionId'], session.sessionId)
+  }
+
+  {
+    // id_scan 会话上传 application/pdf → IMG-only 白名单自动拒绝(validateUpload FILE_MIME_NOT_ALLOWED)。
+    const { service } = makeService()
+    const session = await service.create({
+      purpose: 'id_scan',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await expectRejects(
+      () => service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file({ originalname: 'doc.pdf', mimetype: 'application/pdf' }),
+      }),
+      BadRequestException,
+      'id_scan session rejects PDF upload via IMG-only whitelist',
+    )
+  }
+
+  {
+    // 回归:resume_upload / print_doc 手机上传路径此前完全没有审计,现补齐后
+    // 三个 purpose 均应各写一条 file.upload 审计,互不影响、不重复。
+    const { service, audit } = makeService()
+    const resumeSession = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await service.uploadFile({ sessionId: resumeSession.sessionId, uploadToken: resumeSession.uploadToken, file: file() })
+    const uploadAudits = audit.entries.filter((e) => e.action === 'file.upload')
+    assert.equal(uploadAudits.length, 1, 'resume_upload phone upload should also gain exactly one upload audit entry')
+    assert.equal(uploadAudits[0]?.payload?.['purpose'], 'resume_upload')
   }
 
   {

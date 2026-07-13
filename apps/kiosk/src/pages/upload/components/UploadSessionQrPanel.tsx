@@ -21,7 +21,7 @@ export interface PhoneUploadedFile {
   channel: 'phone'
   mimeType?: string
   sha256?: string
-  /** 仅 print_doc 用途携带:本系统签名内容 URL,供打印任务创建复用。 */
+  /** print_doc / id_scan 用途携带:本系统签名内容 URL,供打印任务创建 / 证件照排版取源复用。 */
   fileUrl?: string
 }
 
