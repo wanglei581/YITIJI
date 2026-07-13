@@ -92,6 +92,18 @@ function jsxElement(source, tagName, requiredPattern) {
   }
   return ''
 }
+function buttonByVisibleText(source, visibleText) {
+  const visiblePattern = new RegExp(`>\\s*${escapeRegExp(visibleText)}\\s*(?:<|\\{)`, 'g')
+  for (const match of source.matchAll(visiblePattern)) {
+    const textIndex = (match.index ?? -1) + match[0].indexOf(visibleText)
+    const buttonStart = source.lastIndexOf('<button', textIndex)
+    const buttonEnd = source.indexOf('</button>', textIndex)
+    if (buttonStart < 0 || buttonEnd < 0) continue
+    if (source.lastIndexOf('</button>', textIndex) > buttonStart) continue
+    return source.slice(buttonStart, buttonEnd + '</button>'.length)
+  }
+  return ''
+}
 function patternIndex(source, pattern) {
   return pattern.exec(source)?.index ?? -1
 }
@@ -176,6 +188,7 @@ const loginDialogCss = read('src/pages/auth/styles/login-dialog.css')
 const topBar = between(home, 'function KioskTopBar()', 'function useHomeStats(')
 const homeStats = functionBlock(home, /function\s+useHomeStats\s*\(/)
 const identityPanel = between(home, 'function IdentityPanel()', '/* ── 服务分组')
+const loginTriggerButton = buttonByVisibleText(identityPanel, '登录 / 注册')
 const continuePanel = between(home, 'function ContinuePanel()', '/* ── 智慧校园')
 const smartCampusSection = between(home, 'function SmartCampusHorizontalSection()', '/* ── 百宝箱')
 const toolboxSection = between(home, 'function ToolboxSection()', 'export function HomePage()')
@@ -565,11 +578,11 @@ expectMinimumHeight(
   56,
   '底栏 Tab 按钮',
 )
-expectMatches(
-  identityPanel,
-  /<button(?=[^>]*className="btn primary lg cta")(?=[^>]*onClick=\{\(\) => setLoginOpen\(true\)\})[^>]*>/,
-  '登录主 CTA 绑定 56px lg 按钮类并打开真实弹窗',
-)
+expect(loginTriggerButton.length > 0, '登录主 CTA 可由真实可见文本定位到同一 button 片段')
+expectMatches(loginTriggerButton, /ref=\{loginTriggerRef\}/, '登录主 CTA 绑定触发引用')
+expectMatches(loginTriggerButton, /className="btn primary lg cta"/, '登录主 CTA 绑定 56px lg 按钮类')
+expectMatches(loginTriggerButton, /onClick=\{\(\) => setLoginOpen\(true\)\}/, '登录主 CTA 打开真实弹窗')
+expectMatches(loginTriggerButton, />\s*登录 \/ 注册\s*(?:<|\{)/, '登录主 CTA 保留真实可见文本')
 expectMatches(continuePanel, /className="btn primary lg"\s+onClick=\{suggestion\.onGo\}/, '续办主 CTA 绑定 56px lg 按钮类')
 
 for (const [pattern, label] of [
@@ -672,11 +685,6 @@ expectMatches(
   identityPanel,
   /\{!guestMode && \(\s*<button\s+type="button"\s+className="btn ghost"\s+onClick=\{continueAsGuest\}>\s*游客体验\s*<\/button>\s*\)\}/,
   '游客按钮仅在非游客态渲染并绑定 continueAsGuest',
-)
-expectMatches(
-  identityPanel,
-  /<button(?=[^>]*ref=\{loginTriggerRef\})(?=[^>]*className="btn primary lg cta")(?=[^>]*onClick=\{\(\) => setLoginOpen\(true\)\})[^>]*>\s*登录 \/ 注册/,
-  '登录按钮绑定触发引用并打开真实弹窗',
 )
 expectMatches(
   identityPanel,
