@@ -192,6 +192,13 @@ export async function verifyOwnPhone(code: string): Promise<{ ok: true; phoneVer
   return { ok: true, phoneVerifiedAt: r.data.phoneVerifiedAt }
 }
 
+/** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ success: true }>('/auth/password/change', { currentPassword, newPassword })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true }
+}
+
 /**
  * 启动时调 GET /auth/me 校验 token 是否仍有效。
  * 成功:返回 user(同时刷新本地 user 信息);失败:清 token,返回 null。

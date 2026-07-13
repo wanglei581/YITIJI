@@ -180,6 +180,26 @@ export class AuthService {
     return { success: true }
   }
 
+  /** 登录态下自助改密:须校验当前密码,成功后旧 token 立即失效(与找回密码一致)。 */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: true }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' } })
+    }
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash)
+    if (!ok) {
+      throw new BadRequestException({ error: { code: 'AUTH_PASSWORD_MISMATCH', message: '当前密码不正确' } })
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
+    })
+    await this.invalidateSessionState(user.id)
+    await this.writeAudit(user.id, user.role, 'auth.password_change_self', {})
+    return { success: true }
+  }
+
   async sendPhoneBindCode(phone: string, ip: string, deviceId?: string): Promise<InternalSendCodeResult> {
     return this.otp.sendCode({
       phone: normalizePhone(phone),
