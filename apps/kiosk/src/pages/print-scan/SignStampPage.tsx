@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   makePrintParams,
@@ -24,7 +24,6 @@ import {
   PrinterIcon,
   QrCodeIcon,
   RotateCcwIcon,
-  ShieldCheckIcon,
   StampIcon,
   UploadIcon,
 } from 'lucide-react'
@@ -287,9 +286,8 @@ export function SignStampPage() {
         }
       />
 
-      <div className="mt-4 flex items-start gap-2 rounded-lg border border-info-bg bg-info-bg/70 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-neutral-600">{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}</p>
+      <div className="mt-4">
+        <ComplianceBanner tone="info">{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}</ComplianceBanner>
       </div>
 
       {error && (
@@ -311,7 +309,7 @@ export function SignStampPage() {
                   <p className="truncate text-sm font-medium text-neutral-900">{document.name}</p>
                   <p className="text-xs text-neutral-400">{document.size}{pages !== null ? ` · 共 ${pages} 页` : ''}</p>
                 </div>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setDocument(null); setPages(null); setStamp(null); setAuthorized(false) }}>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setDocument(null); setPages(null); setStamp(null); setAuthorized(false); setError(null) }}>
                   重新选择
                 </Button>
               </div>
@@ -354,7 +352,7 @@ export function SignStampPage() {
                     <p className="truncate text-sm font-medium text-neutral-900">{stamp.name}</p>
                     <p className="text-xs text-neutral-400">{stamp.size}</p>
                   </div>
-                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setStamp(null); setAuthorized(false) }}>
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setStamp(null); setAuthorized(false); setError(null) }}>
                     重新上传
                   </Button>
                 </div>
