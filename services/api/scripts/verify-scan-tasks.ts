@@ -4,6 +4,7 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcd
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
+import { Prisma } from '../src/generated/prisma/client'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 
@@ -230,18 +231,19 @@ async function main(): Promise<void> {
     // B1-3：create() 捕获数据库唯一约束冲突（B1-2 的 partial unique index，Prisma 抛 P2002）
     // 必须映射成 409 ConflictException + error.code === 'SCAN_TERMINAL_BUSY'，不能是未处理异常
     // 也不能被其它无关错误码顶替。FakePrisma 不建模真实唯一索引，这里 monkey-patch
-    // scanTask.create 模拟命中约束，复现真实 Prisma 抛出的错误形状
+    // scanTask.create 模拟命中约束，复现真实 Prisma 抛出的错误形状——isScanTaskActiveSessionConflict()
+    // 用 `instanceof Prisma.PrismaClientKnownRequestError` 判别（而非鸭子类型 duck-typing 一个
+    // `.code` 字段），因此这里必须构造一个真正的 PrismaClientKnownRequestError 实例，
+    // 一个仅挂了 .code 属性的 plain Error 不再能通过该判别。
     // （real-DB 端到端复现见本任务 verification：against 真实 SQLite + 真实 partial unique index）。
     const { service, prisma } = makeService()
     const originalCreate = prisma.scanTask.create.bind(prisma.scanTask)
     prisma.scanTask.create = (async () => {
-      const p2002 = new Error('Unique constraint failed on the fields: (`terminalId`)') as Error & {
-        code: string
-        meta: { target: string[] }
-      }
-      p2002.code = 'P2002'
-      p2002.meta = { target: ['terminalId'] }
-      throw p2002
+      throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed on the fields: (`terminalId`)', {
+        code: 'P2002',
+        clientVersion: 'verify-scan-tasks-fixture',
+        meta: { target: ['terminalId'] },
+      })
     }) as typeof originalCreate
 
     let caught: unknown

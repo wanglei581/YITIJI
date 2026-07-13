@@ -7,6 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { Prisma } from '../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService } from '../files/files.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
@@ -94,8 +95,7 @@ export interface ScanTaskStatusResult {
  * isPickupCodeUniqueConflict() 那样再去比对 meta.target 区分多个候选唯一约束。
  */
 function isScanTaskActiveSessionConflict(e: unknown): boolean {
-  const err = e as { code?: string }
-  return err?.code === 'P2002'
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
 }
 
 @Injectable()
