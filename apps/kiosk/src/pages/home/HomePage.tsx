@@ -15,12 +15,13 @@ import type {
   MemberResumeItem,
   SmartCampusModuleKey,
 } from '@ai-job-print/shared'
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
@@ -32,35 +33,13 @@ import './home-service-desk.css'
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
 let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
 
-function useClock() {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 15_000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()]
-  return {
-    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
-    date: `${pad(now.getMonth() + 1)}月${now.getDate()}日 · ${week}`,
-  }
-}
-
-/* ── 顶栏（LightFlow 白色服务台 + 品牌徽标 + 状态药丸；时钟只在 Hero） ── */
+/* ── 顶栏（LightFlow 白色服务台 + 真实设备状态） ── */
 function KioskTopBar() {
   const deviceStatus = useHomeDeviceStatus()
 
   return (
     <header className="k-top">
-      <span className="k-mark">
-        <KIcon name="logo" />
-      </span>
-      <div className="k-brand">
-        <strong>AI求职打印一体机</strong>
-        <span>求职材料 · 招聘会 · 打印扫描</span>
-      </div>
+      <strong className="k-brand">AI求职打印一体机</strong>
       <div className="k-status" role="status" aria-live="polite">
         <span className="k-device-status" data-status={deviceStatus.tone}>
           <i aria-hidden="true" />
@@ -128,40 +107,13 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
   return { stats, loading }
 }
 
-/* ── Hero（LightFlow 浅冰蓝服务台 + 实时时钟） ── */
-function HeroSection() {
-  const { time, date } = useClock()
-
-  return (
-    <section className="hero" aria-label="AI求职打印一体机欢迎区">
-      <div className="hero-copy">
-        <div className="hero-eyebrow">
-          <KIcon name="logo" />
-          就业服务 · 一体机自助办理
-        </div>
-        <h1>
-          简历、打印、岗位信息
-          <br />
-          一趟办完
-        </h1>
-        <p>今天能办的事都在下面，点开对应卡片直接进入；登录后可在「我的」查看已生成的简历、文档、AI记录、打印订单和收藏，岗位投递与招聘会预约仍需前往来源平台完成。</p>
-      </div>
-      <div className="hero-clock" aria-label="当前时间">
-        <div className="time">{time}</div>
-        <div className="date">{date}</div>
-      </div>
-    </section>
-  )
-}
-
 /* ── 身份条（登录态显示统计，统计格可点击直达明细；未登录显示引导） ── */
 function IdentityPanel() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { isLoggedIn, guestMode, displayName, continueAsGuest, logout, getToken } = useAuth()
   const { stats, loading } = useHomeStats(isLoggedIn, getToken)
-
-  const goLogin = () => navigate('/login', { state: { from: location.pathname } })
+  const [loginOpen, setLoginOpen] = useState(false)
+  const loginTriggerRef = useRef<HTMLButtonElement>(null)
 
   if (isLoggedIn) {
     const initial = displayName.replace(/\s/g, '').slice(0, 1) || '我'
@@ -236,11 +188,24 @@ function IdentityPanel() {
             游客体验
           </button>
         )}
-        <button type="button" className="btn primary lg cta" onClick={goLogin}>
-          立即登录 / 注册
+        <button
+          ref={loginTriggerRef}
+          type="button"
+          className="btn primary lg cta"
+          onClick={() => setLoginOpen(true)}
+        >
+          登录 / 注册
           <KIcon name="arrow" />
         </button>
       </div>
+      <MemberLoginDialog
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onContinueAsGuest={() => {
+          continueAsGuest()
+          setLoginOpen(false)
+        }}
+      />
     </section>
   )
 }
@@ -772,7 +737,11 @@ export function HomePage() {
       <KioskTopBar />
 
       <div className="khome-inner">
-        <HeroSection />
+        <section className="service-value" aria-labelledby="home-service-value-title">
+          <span className="service-value-tag">一站式求职服务</span>
+          <h1 id="home-service-value-title">简历、打印、岗位信息一趟办完</h1>
+          <p>提供 AI 简历服务、求职材料、岗位与招聘会信息入口，以及本机打印扫描服务。</p>
+        </section>
         <IdentityPanel />
         <ContinuePanel />
       </div>
@@ -781,8 +750,8 @@ export function HomePage() {
         <div className="sec-head">
           <span className="rail" aria-hidden="true" />
           <div>
-            <h2>今天可以办理</h2>
-            <p>点按钮直接进入对应功能，操作不超过 3 步。</p>
+            <h2>当前可使用功能</h2>
+            <p>按服务类别查看本机当前可使用功能。</p>
           </div>
         </div>
 
