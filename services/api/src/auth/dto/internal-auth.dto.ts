@@ -1,4 +1,29 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator'
+import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength, registerDecorator, type ValidationOptions } from 'class-validator'
+
+/**
+ * bcrypt(bcryptjs)只取密码的前 72 字节参与哈希,超出部分被静默截断。
+ * @MaxLength(72) 校验的是字符数而非字节数:中文等多字节字符 24 个即达 72 字节,
+ * 用户以为设置了完整密码,实际尾部被截断(极端情况下不同密码可能截出相同哈希)。
+ * 这里按 UTF-8 字节数收紧校验,newPassword 全字段统一使用。
+ */
+function IsBcryptSafeByteLength(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isBcryptSafeByteLength',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown) {
+          return typeof value === 'string' && Buffer.byteLength(value, 'utf8') <= 72
+        },
+        defaultMessage() {
+          return '新密码过长（按 UTF-8 字节计不能超过 72 字节，中文约 24 个字）'
+        },
+      },
+    })
+  }
+}
 
 export class SendInternalSmsCodeDto {
   @Matches(/^1[3-9]\d{9}$/, { message: '必须是有效的中国大陆手机号' })
@@ -54,6 +79,7 @@ export class PasswordResetCompleteDto {
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @IsBcryptSafeByteLength()
   newPassword!: string
 }
 
@@ -66,6 +92,7 @@ export class ChangePasswordDto {
   @IsString()
   @MinLength(8)
   @MaxLength(72)
+  @IsBcryptSafeByteLength()
   newPassword!: string
 }
 
