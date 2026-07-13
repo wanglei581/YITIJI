@@ -202,6 +202,35 @@ const JOB_FIT_M1_5_CHANGED = new Set([
   'services/api/src/member-assets/member-assets.service.ts',
   'services/api/src/member-privacy/member-privacy.service.ts',
 ])
+// 签名盖章（feature/sign-stamp-design）批次：MyDocumentsPage.tsx 新增「签名盖章」动作按钮，
+// 连带触及 print-sign 新模块与 signature_image FilePurpose 全仓同步改动，与
+// PRINT_URL_CONTRACT_CHANGED / JOB_FIT_M1_5_CHANGED 同模式，非本守卫职责范围。
+const SIGN_STAMP_CHANGED = new Set([
+  'apps/kiosk/src/pages/print-scan/PrintScanFeatureInfoPage.tsx',
+  'apps/kiosk/src/pages/print-scan/PrintScanHomePage.tsx',
+  'apps/kiosk/src/pages/print-scan/SignStampPage.tsx',
+  'apps/kiosk/src/routes/index.tsx',
+  'apps/kiosk/src/services/api/filesMockAdapter.ts',
+  'apps/kiosk/src/services/api/printSign.ts',
+  'docs/superpowers/plans/2026-07-12-sign-stamp-implementation.md',
+  'docs/superpowers/specs/2026-07-12-sign-stamp-design.md',
+  'packages/shared/src/index.ts',
+  'packages/shared/src/types/printSign.ts',
+  'packages/shared/src/types/uploadSession.ts',
+  'pnpm-lock.yaml',
+  'services/api/scripts/verify-print-sign.ts',
+  'services/api/src/app.module.ts',
+  'services/api/src/files/dto/kiosk-upload-options.dto.ts',
+  'services/api/src/files/retention-policy.ts',
+  'services/api/src/print-sign/print-sign-geometry.ts',
+  'services/api/src/print-sign/print-sign.controller.ts',
+  'services/api/src/print-sign/print-sign.dto.ts',
+  'services/api/src/print-sign/print-sign.module.ts',
+  'services/api/src/print-sign/print-sign.service.ts',
+  'services/api/src/print-sign/print-sign.types.ts',
+  'services/api/src/storage/object-key.ts',
+  'services/api/src/upload-sessions/upload-sessions.service.ts',
+])
 
 const files = [...new Set(changedFiles())]
 // 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
@@ -211,7 +240,13 @@ const files = [...new Set(changedFiles())]
 const protectedPagePrefix = 'apps/kiosk/src/pages/profile/me/'
 const touchesProtectedPages = files.some((file) => file.startsWith(protectedPagePrefix))
 const unexpectedChanged = touchesProtectedPages
-  ? files.filter((file) => !allowedChanged.has(file) && !PRINT_URL_CONTRACT_CHANGED.has(file) && !JOB_FIT_M1_5_CHANGED.has(file))
+  ? files.filter(
+      (file) =>
+        !allowedChanged.has(file) &&
+        !PRINT_URL_CONTRACT_CHANGED.has(file) &&
+        !JOB_FIT_M1_5_CHANGED.has(file) &&
+        !SIGN_STAMP_CHANGED.has(file),
+    )
   : []
 if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
 else fail(`diff 出现 P0a 范围外变更：${unexpectedChanged.join(', ')}`)

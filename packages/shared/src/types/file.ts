@@ -31,6 +31,7 @@ export type FilePurpose =
   | 'screensaver_material' // 待机宣传屏素材
   | 'admin_upload'         // 管理员通用上传
   | 'temp'                 // 临时 / 匿名上传
+  | 'signature_image'      // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
 
 /** 敏感等级。决定默认有效期。 */
 export type FileSensitiveLevel = 'normal' | 'sensitive' | 'highly_sensitive'
@@ -120,7 +121,7 @@ export interface SignedUrlResponse {
 export interface FileAccessUrlResponse {
   fileId: string
   url: string
-  /** 系统 HMAC content URL，仅供 /print/jobs 使用；url 只用于预览/下载。 */
+  /** 系统 HMAC content URL，供 /print/jobs 与签章类内部文件变换端点（/print/sign/*）作访问凭证；url 只用于预览/下载。 */
   printFileUrl?: string
   expiresAt: string  // ISO
   disposition: 'inline' | 'attachment'

@@ -22,6 +22,7 @@ const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   screensaver_material: 'normal',
   admin_upload: 'normal',
   temp: 'sensitive',
+  signature_image: 'highly_sensitive',
 }
 
 let nextId = 1

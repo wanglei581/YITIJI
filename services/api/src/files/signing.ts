@@ -100,3 +100,24 @@ export function verifyRawUploadSignature(fileId: string, expires: string, sig: s
     return false
   }
 }
+
+/**
+ * 解析并验签本系统内部 content URL（/files/:id/content?expires&sig）。
+ * 返回 { fileId } 表示签名有效且未过期；null 表示格式非法/验签失败/已过期。
+ * 供签章等"以 URL 为访问凭证"的内部文件变换端点使用；仅校验、不读取存储。
+ * （print-conversion / print-jobs / print-page-count 各自的私有解析器收敛
+ *   到本函数属独立重构任务，本次不动它们 —— 见 sign-stamp 设计 §九。）
+ */
+export function parseAndVerifySignedContentUrl(url: string): { fileId: string } | null {
+  try {
+    const parsed = new URL(url, 'http://internal.local')
+    const match = parsed.pathname.match(/\/files\/([^/]+)\/content$/)
+    const expires = parsed.searchParams.get('expires')
+    const sig = parsed.searchParams.get('sig')
+    if (!match || !expires || !sig) return null
+    const fileId = match[1]!
+    return verifyFileSignature(fileId, expires, sig) ? { fileId } : null
+  } catch {
+    return null
+  }
+}

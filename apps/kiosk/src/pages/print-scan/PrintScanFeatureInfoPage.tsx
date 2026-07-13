@@ -1,11 +1,11 @@
 // ============================================================
 // PrintScanFeatureInfoPage — 打印扫描能力 MVP 说明页
-//   路由：/print-scan/feature/:key（key = id-photo | sign）
+//   路由：/print-scan/feature/:key（key = id-photo）
 //
-// 第一阶段这两项（证件照 / 签名盖章）只做可点击的说明页，
-// 介绍能力规划 + 当前可用替代路径 + 合规声明，不做完整实现。
+// 证件照当前只做可点击的说明页，介绍能力规划 + 当前可用替代路径 + 合规声明，
+// 不做完整实现。签名盖章已接入真实功能（/print-scan/sign），不再经过此说明页。
 //
-// 合规：证件照=敏感文件清理提示；签名盖章=非 CA 电子签声明。
+// 合规：证件照=敏感文件清理提示。
 // ============================================================
 
 import { useNavigate, useParams } from 'react-router-dom'
@@ -14,12 +14,10 @@ import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   CheckCircle2Icon,
   FileType2Icon,
-  PenToolIcon,
-  ShieldCheckIcon,
   UserSquareIcon,
 } from 'lucide-react'
 
-type FeatureKey = 'id-photo' | 'sign'
+type FeatureKey = 'id-photo'
 
 interface FeatureInfo {
   icon: React.ComponentType<{ className?: string }>
@@ -28,8 +26,8 @@ interface FeatureInfo {
   title: string
   summary: string
   plans: string[]
-  /** 合规声明（可选）：'sensitive' = 敏感文件清理；'esign' = 非 CA 电子签 */
-  notice?: 'sensitive' | 'esign'
+  /** 合规声明（可选）：'sensitive' = 敏感文件清理 */
+  notice?: 'sensitive'
   /** 当前可用的替代路径按钮 */
   fallbackLabel?: string
   fallbackTo?: string
@@ -51,25 +49,10 @@ const FEATURES: Record<FeatureKey, FeatureInfo> = {
     fallbackLabel: '先用照片打印',
     fallbackTo: '/print/upload',
   },
-  sign: {
-    icon: PenToolIcon,
-    iconBg: 'bg-error-bg',
-    iconColor: 'text-error-fg',
-    title: '签名盖章',
-    summary: '即将支持在文件上叠加手写签名或印章图片，用于打印前的版式预览。',
-    plans: [
-      '上传 / 手写签名图片',
-      '在文件指定位置叠加签名或印章',
-      '合成后预览并打印',
-    ],
-    notice: 'esign',
-    fallbackLabel: '先去文档打印',
-    fallbackTo: '/print/upload',
-  },
 }
 
 function isFeatureKey(k: string | undefined): k is FeatureKey {
-  return k === 'id-photo' || k === 'sign'
+  return k === 'id-photo'
 }
 
 export function PrintScanFeatureInfoPage() {
@@ -144,15 +127,6 @@ export function PrintScanFeatureInfoPage() {
           </ComplianceBanner>
         </div>
       )}
-      {info.notice === 'esign' && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-info-bg bg-info-bg/70 px-4 py-3">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-info" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-neutral-600">
-            {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
-          </p>
-        </div>
-      )}
-
       {/* 操作区 */}
       <div className="mt-6 flex flex-col gap-3">
         {info.fallbackTo && info.fallbackLabel && (

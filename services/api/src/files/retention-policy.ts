@@ -82,6 +82,7 @@ export function allowedPoliciesForFile(input: {
   assetCategory: FileAssetCategory | string
 }): FileRetentionPolicy[] {
   if (input.purpose === 'id_scan') return ['system_short']
+  if (input.purpose === 'signature_image') return ['system_short']
   if (input.assetCategory === 'optimized' || input.assetCategory === 'derived') {
     return ['months_3', 'months_6', 'long_term']
   }
@@ -112,6 +113,9 @@ function assertCanSetRetention(input: RetentionUpdateInput): void {
   }
   if (input.purpose === 'id_scan' && input.policy !== 'system_short') {
     throw new RetentionPolicyError('RETENTION_ID_SCAN_LOCKED', '证件文件只能使用系统短期保存')
+  }
+  if (input.purpose === 'signature_image' && input.policy !== 'system_short') {
+    throw new RetentionPolicyError('RETENTION_SIGNATURE_IMAGE_LOCKED', '签名/印章图片仅支持系统短期保存')
   }
   if (!allowedPoliciesForFile(input).includes(input.policy)) {
     if (input.assetCategory === 'original' && input.policy === 'long_term') {
