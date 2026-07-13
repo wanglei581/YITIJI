@@ -500,6 +500,7 @@ for (const [source, selectors, label] of [
   expect(selectors.every((selector) => source.includes(selector)), `${label} CSS 覆盖约定职责`)
 }
 expectMatches(responsive, /@media\s*\(max-width:\s*900px\)/, '响应式样式覆盖 <=900px')
+expectMatches(responsive, /@media\s*\(max-width:\s*500px\)/, '响应式样式覆盖 375–412px 常见窄屏范围')
 expectMatches(responsive, /@media[^{}]*390px[^{}]*844px/, '响应式样式显式覆盖 390x844')
 expectMatches(responsive, /@media[^{}]*390px[^{}]*700px/, '响应式样式显式覆盖 390x700')
 expectMatches(responsive, /@media[^{}]*1080px[^{}]*1920px/, '响应式样式显式覆盖 1080x1920')
@@ -512,25 +513,31 @@ expectMatches(loginDialogCss, /@media[^{}]*390px[^{}]*700px/, '登录弹窗 CSS 
 expectMatches(loginDialogCss, /@media[^{}]*1080px[^{}]*1920px/, '登录弹窗 CSS 覆盖 1080x1920')
 expectMatches(loginDialogCss, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, '登录弹窗 CSS 支持 reduced motion')
 
+const narrowRange = cssRule(responsive, '@media (max-width: 500px)')
 const compact390 = cssRule(responsive, '@media (width: 390px)')
 const compact390x844 = cssRule(responsive, '@media (width: 390px) and (height: 844px)')
 const compact390x700 = cssRule(responsive, '@media (width: 390px) and (max-height: 700px)')
+expect(narrowRange.length > 0, '<=500px 范围断点独立覆盖常见窄屏宽度')
 expect(compact390.length > 0, '390px 通用紧凑规则独立于视口高度')
 expect(!compact390.includes('.khome .k-brand span'), '390px 不再保留已删除的品牌副标题补丁')
 expect(!compact390.includes('.khome .k-pill'), '390px 不再保留已删除的静态状态药丸补丁')
 expectMatches(cssRule(compact390, '.khome .service-value h1'), /font-size:\s*33px/, '390px 服务价值标题使用紧凑字号')
 expectMatches(cssRule(compact390, '.khome .cat-title h3'), /font-size:\s*19px/, '390px 服务标题使用紧凑字号')
 expectMatches(
-  cssRule(compact390, '.khome .id-actions'),
+  cssRule(narrowRange, '.khome .id-actions'),
   /width:\s*100%[\s\S]*?margin:\s*0/,
-  '390px 身份操作区占满可用宽度',
+  '<=500px 身份操作区占满可用宽度',
 )
 expectMatches(
-  cssRule(compact390, '.khome .id-actions .btn'),
-  /flex:\s*1[\s\S]*?min-width:\s*0/,
-  '390px 身份按钮可等分收缩且不产生最小宽度溢出',
+  cssRule(narrowRange, '.khome .id-actions .btn'),
+  /flex:\s*1[\s\S]*?min-width:\s*0[\s\S]*?padding-inline:\s*12px[\s\S]*?font-size:\s*14px/,
+  '<=500px 身份按钮可等分收缩并使用窄屏字号和内边距',
 )
-expectMatches(cssRule(compact390, '.khome .btn.cta'), /min-width:\s*0/, '390px 登录主 CTA 取消桌面最小宽度')
+expectMatches(
+  cssRule(narrowRange, '.khome .btn.cta'),
+  /min-width:\s*0[\s\S]*?font-size:\s*15px/,
+  '<=500px 登录主 CTA 取消桌面最小宽度并使用窄屏字号',
+)
 expectMatches(
   compact390,
   /\.khome \.sub-grid,\s*\.khome \.cat-card\.span2 \.sub-grid\s*\{[^}]*grid-template-columns:\s*1fr 1fr\s*!important/,
@@ -542,8 +549,8 @@ expect(!/\.khome \.identity\s*\{[^}]*margin-top:\s*-/.test(compact390x700), '390
 expect(!/\.khome \.service-value(?:\s+p)?\s*\{[^}]*display:\s*none/.test(compact390x700), '390x700 仍显示服务价值卡及说明')
 for (const selector of ['.khome .id-actions', '.khome .id-actions .btn', '.khome .btn.cta']) {
   expect(
-    !compact390x844.includes(selector) && !compact390x700.includes(selector),
-    `${selector} 防溢出合同只定义在 390px 通用规则中`,
+    !compact390.includes(selector) && !compact390x844.includes(selector) && !compact390x700.includes(selector),
+    `${selector} 防溢出合同只定义在 <=500px 范围断点中`,
   )
 }
 

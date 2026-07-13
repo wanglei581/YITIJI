@@ -28,6 +28,12 @@
   .khome .cat-card.span2 .sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 
+@media (max-width: 500px) {
+  .khome .id-actions { width: 100%; margin: 0; }
+  .khome .id-actions .btn { flex: 1; min-width: 0; padding-inline: 12px; font-size: 14px; }
+  .khome .btn.cta { min-width: 0; font-size: 15px; }
+}
+
 @media (width: 390px) {
   .khome .khome-inner { width: calc(100% - 24px); }
   .khome .k-top { min-height: 70px; padding: 10px 12px; gap: 10px; }
@@ -44,9 +50,6 @@
   .khome .id-copy p { font-size: 12px; }
   .khome .id-stats { overflow-x: auto; justify-content: flex-start; }
   .khome .id-stat { min-width: 74px; }
-  .khome .id-actions { width: 100%; margin: 0; }
-  .khome .id-actions .btn { flex: 1; min-width: 0; padding-inline: 12px; font-size: 14px; }
-  .khome .btn.cta { min-width: 0; font-size: 15px; }
   .khome .continue { margin-inline: 4px; padding: 16px; flex-wrap: wrap; }
   .khome .continue .c-icon { width: 48px; height: 48px; }
   .khome .continue .btn { width: 100%; }
