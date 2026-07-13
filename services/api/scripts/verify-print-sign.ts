@@ -1084,9 +1084,6 @@ async function main() {
   section('D 成功合成')
   // ══════════════════════════════════════════════════════════════════════
 
-  let d1DocFileId = ''
-  let d1PrintFileUrl = ''
-
   {
     // D1：会员 2 页 PDF + PNG 章（bottom-right/medium/page 2）成功
     const { service, prisma, storage, files, audit } = makeService()
@@ -1150,9 +1147,6 @@ async function main() {
         (entry.payload!['authorizationNoticeVersion'] as string).length > 0,
     )
     pass('D1 audit 恰 1 条 action=print_sign.compose，payload 含 terminalId 与 authorizationNoticeVersion')
-
-    d1DocFileId = result.fileId
-    d1PrintFileUrl = result.printFileUrl
   }
 
   {
@@ -1192,17 +1186,17 @@ async function main() {
   }
 
   {
-    // D3：把 D1 输出（已含一次盖章的合成 PDF）改为游客/system 归属，用 D1 返回的
-    // printFileUrl 作为游客凭证再 compose 一次 —— 验证本服务自身产出的 PDF
-    // 本身仍是合法可再入的文档（额外验证输出是结构完好的 PDF，而不只是页数对）。
+    // D3：验证服务自己合成的 PDF 输出本身是结构合法、可重新摄入的文档
+    // ——不只是"页数对"，而是这份输出能作为全新一次 compose() 调用的 document
+    // 输入，完整走一遍加载/校验/再叠图流程并成功。
+    //
+    // 本用例在一个独立的 Fake 实例上构造等价场景（先以会员身份 compose 出一份
+    // 已盖章的 2 页 PDF，再把该输出记录的归属改成 guest/system，用它自身的
+    // printFileUrl 作为游客访问凭证发起第二次 compose）——这是"等价场景"，不是
+    // 跨实例复用 D1 那次调用产生的同一个对象；两次调用各自在各自的 makeService()
+    // 实例里独立执行。
     const { service, prisma, storage } = makeService()
-    assert.ok(d1DocFileId && d1PrintFileUrl, 'D3 依赖 D1 的输出结果')
 
-    // D1 用的是独立的 makeService() 实例，这里换成新实例后要把 D1 的输出物理迁移过来：
-    // 用 D1 记录的 fileId 在新实例里重新注册同一份内容，归属改为 guest/system，
-    // 这样 D1 返回的 printFileUrl（signFileUrl(fileId,...)，签名只跟 fileId+expiry 有关，
-    // 与 endUserId/ownerType 无关）依然对得上新记录的 fileId。
-    // （D1 的实际输出 buffer 通过下面重新读取同一份合成内容重建，内容等价于 D1 输出。）
     seedDoc(prisma, storage, 'd1b2-doc', makePdf({ pages: 2 }), {
       endUserId: 'member_d1',
       ownerType: 'user',
@@ -1293,6 +1287,49 @@ async function main() {
     assert.equal(files.uploadCount, 2, 'E2 输出失效后重放应重新生成')
     assert.notEqual(third.fileId, first.fileId, 'E2 重新生成的应是新的 fileId')
     pass('E2 输出失效后重放同 key 重新生成新输出')
+  }
+
+  {
+    // E1g：幂等缓存命中路径（游客身份）必须重新校验 document 归属 —— 伪造/失效的
+    // 游客访问凭证不能白嫖已完成结果（对应 claimIdempotency() 命中 completed 状态后
+    // 重新调用 verifyDocumentSource()/verifyStampSource() 的安全修复；与
+    // print-conversion 的 case 13 同一防线）。E1/E2 都是会员场景，verifyOwnership()
+    // 对会员根本不看 fileAccessUrl，完全测不到这条防线 —— 必须专门起一个游客场景。
+    const { service, prisma, storage, audit } = makeService()
+    seedDoc(prisma, storage, 'e1g-doc', makePdf({ pages: 1 }))
+    seedStamp(prisma, storage, 'e1g-stamp', makePng(100, 100))
+    const idemKey = 'verify-e1g-idempotency-key-ffff'
+
+    const first = await service.compose({
+      terminalId: 't1',
+      document: { fileId: 'e1g-doc', fileAccessUrl: guestAccessUrl('e1g-doc') },
+      stamp: { fileId: 'e1g-stamp', fileAccessUrl: guestAccessUrl('e1g-stamp') },
+      placement: DEFAULT_PLACEMENT,
+      authorizationConfirmed: true,
+      endUserId: null,
+      idempotencyKey: idemKey,
+    })
+    assert.ok(first.fileId, 'E1g 首次调用应成功并写入幂等缓存（completed 状态）')
+    const auditCountAfterFirst = audit.entries.length
+
+    // 同一个 idempotencyKey + 同一个 document.fileId（指纹不变，命中 completed 缓存），
+    // 但把 fileAccessUrl 换成签名对不上的伪造凭证 —— 期望被拒绝，而不是直接返回缓存结果。
+    await expectCode(
+      () =>
+        service.compose({
+          terminalId: 't1',
+          document: { fileId: 'e1g-doc', fileAccessUrl: tamperedAccessUrl('e1g-doc') },
+          stamp: { fileId: 'e1g-stamp', fileAccessUrl: guestAccessUrl('e1g-stamp') },
+          placement: DEFAULT_PLACEMENT,
+          authorizationConfirmed: true,
+          endUserId: null,
+          idempotencyKey: idemKey,
+        }),
+      'SIGN_SOURCE_NOT_FOUND',
+      'E1g 游客幂等缓存命中路径下伪造访问凭证仍被拒绝（不能白嫖缓存结果）',
+    )
+    assert.equal(audit.entries.length, auditCountAfterFirst, 'E1g 被拒绝的重放不应产生新的审计记录')
+    pass('E1g 拒绝重放未新增审计记录')
   }
 
   {
