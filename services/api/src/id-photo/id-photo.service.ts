@@ -92,11 +92,6 @@ export class IdPhotoService {
     }
 
     const terminalDbId = await this.resolveTerminalDbId(args.terminalId)
-
-    // 设计 §4.10：三维频控须在能力门禁 / 幂等 / 并发槽之前拦下，
-    // 防止重复请求把负载一路推到真正昂贵的 doGenerate（storage 读 + pdfkit + 上传 + 审计）之前。
-    await this.checkLayoutRateLimit(args.endUserId, args.ip ?? null, terminalDbId)
-
     await this.capabilities.assertUserTaskAllowed(terminalDbId, 'id_photo')
 
     // 设计 §4.10：fingerprint 含 sourceFileId + specId + terminalId（身份已编入 idemKey）
@@ -111,6 +106,11 @@ export class IdPhotoService {
       const cached = await this.claimIdempotency(idemKey, args.source, args.endUserId, fingerprint, terminalDbId, spec)
       if (cached) return cached
     }
+
+    // 设计 §4.10：三维频控只拦真正要走到 doGenerate 的新生成请求——放在幂等缓存命中判断
+    // 之后，避免同一 Idempotency-Key 的重放（触控双击 / 断线重试）消耗频控配额，
+    // 更避免 terminal 维度（同一终端所有用户共用）被别人的重放流量占满，饿死同终端的新请求。
+    await this.checkLayoutRateLimit(args.endUserId, args.ip ?? null, terminalDbId)
 
     // 设计 §4.10：全局并发 ≤2，Redis 槽位带 TTL，进程崩溃自动释放；抢不到直接拒绝。
     const slot = await this.acquireSlot()
