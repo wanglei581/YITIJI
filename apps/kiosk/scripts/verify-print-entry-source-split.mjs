@@ -59,10 +59,19 @@ assert(
   'printMaterialSession 支持保存打印来源 source，并集中生成回到上传页的路径',
 )
 
-assert(
-  uploadPage.includes('savePrintMaterialSession({ file: nextFile, source })'),
-  '上传成功后把 source 写入当前打印材料 session',
-)
+// 上传成功路径现共有三条（本机上传/扫码上传/U盘导入），调用处在 source 之后追加了
+// contentCategory 审计字段且 U 盘路径为多行调用，故按 handler 逐一正则断言。
+// source 必须是简写属性（后跟 , 或 }），排除 source: undefined 等同名不同值的误匹配。
+const saveWithSourcePattern = /savePrintMaterialSession\(\{\s*file:\s*nextFile,\s*source\s*[,}]/
+for (const handler of ['handleFileChange', 'handleQrUploaded', 'handleUsbFileSelect']) {
+  const start = uploadPage.indexOf(`const ${handler}`)
+  const nextTopLevelDecl = uploadPage.indexOf('\n  const ', start + 1)
+  const body = uploadPage.slice(start, nextTopLevelDecl === -1 ? undefined : nextTopLevelDecl)
+  assert(
+    start >= 0 && saveWithSourcePattern.test(body),
+    `${handler} 上传成功后把 source 写入当前打印材料 session`,
+  )
+}
 
 assert(
   uploadPage.includes("navigate('/print/material-check', { state: { file, source } })") &&
