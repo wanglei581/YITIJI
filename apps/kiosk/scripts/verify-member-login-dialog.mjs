@@ -72,7 +72,16 @@ function extractConstFunction(source, name) {
   const declaration = new RegExp(`const\\s+${name}\\s*=`).exec(source)
   if (!declaration) return ''
   const arrow = source.indexOf('=>', declaration.index + declaration[0].length)
-  const open = source.indexOf('{', arrow >= 0 ? arrow : declaration.index + declaration[0].length)
+  const header = source.slice(declaration.index + declaration[0].length, arrow)
+  if (arrow < 0 || header.length > 220 || /\n\s*const\s/.test(header)) return ''
+  const expressionStart = arrow + 2 + (source.slice(arrow + 2).match(/^\s*/)?.[0].length ?? 0)
+  if (source[expressionStart] !== '{') {
+    const tail = source.slice(expressionStart)
+    const boundary = tail.search(/\n\s*(?=const\s|function\s|use(?:Effect|Memo|Callback)\s*\(|return\b|\})/)
+    const end = boundary < 0 ? source.length : expressionStart + boundary
+    return source.slice(declaration.index, end)
+  }
+  const open = expressionStart
   const body = extractBalancedBlock(source, open)
   return body ? source.slice(declaration.index, open + body.length) : ''
 }
@@ -83,6 +92,51 @@ function extractFunctionDeclaration(source, name) {
   const open = source.indexOf('{', declaration.index + declaration[0].length)
   const body = extractBalancedBlock(source, open)
   return body ? source.slice(declaration.index, open + body.length) : ''
+}
+
+function collectFunctions(source) {
+  const functions = []
+  for (const match of source.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=/g)) {
+    const block = extractConstFunction(source, match[1])
+    if (block && !functions.some((item) => item.name === match[1])) functions.push({ name: match[1], block })
+  }
+  for (const match of source.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g)) {
+    const block = extractFunctionDeclaration(source, match[1])
+    if (block && !functions.some((item) => item.name === match[1])) functions.push({ name: match[1], block })
+  }
+  return functions
+}
+
+function callsTarget(name, target, functions, seen = new Set()) {
+  if (!name || !target || seen.has(name)) return false
+  if (name === target) return true
+  const entry = functions.find((item) => item.name === name)
+  if (!entry) return false
+  const nextSeen = new Set(seen).add(name)
+  return [...entry.block.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
+    .some((match) => callsTarget(match[1], target, functions, nextSeen))
+}
+
+function targetCallIndex(source, target, functions) {
+  for (const match of source.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) {
+    if (callsTarget(match[1], target, functions)) return match.index
+  }
+  return -1
+}
+
+function expandedFunctionSource(name, functions, seen = new Set()) {
+  if (!name || seen.has(name)) return ''
+  const entry = functions.find((item) => item.name === name)
+  if (!entry) return ''
+  const nextSeen = new Set(seen).add(name)
+  const children = [...entry.block.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
+    .map((match) => expandedFunctionSource(match[1], functions, nextSeen))
+  return [entry.block, ...children].join('\n')
+}
+
+function propSnippet(source, propName) {
+  const start = source.indexOf(`${propName}={`)
+  return start >= 0 ? source.slice(start, start + 420) : ''
 }
 
 function extractKeywordBlock(source, keyword) {
@@ -193,7 +247,6 @@ const workflow = readRequired('../../.github/workflows/ci.yml')
 const handleSendCode = extractConstFunction(memberHook, 'handleSendCode')
 const handleLogin = extractConstFunction(memberHook, 'handleLogin')
 const cancelPending = extractConstFunction(memberHook, 'cancelPending')
-const closeDialog = extractConstFunction(loginDialog, 'closeDialog')
 const handleAuthenticated = extractConstFunction(loginDialog, 'handleAuthenticated')
 const handleContinueAsGuest = extractConstFunction(loginDialog, 'handleContinueAsGuest')
 const sendGeneration = handleSendCode.match(
@@ -210,6 +263,16 @@ const loginCatch = extractKeywordBlock(handleLogin, 'catch')
 const loginFinally = extractKeywordBlock(handleLogin, 'finally')
 const currentRequestHelper = extractConstDeclaration(memberHook, 'isCurrentRequest')
   || extractFunctionDeclaration(memberHook, 'isCurrentRequest')
+const raiseErrorHelper = extractConstDeclaration(memberHook, 'raiseError')
+  || extractFunctionDeclaration(memberHook, 'raiseError')
+const dialogFunctions = collectFunctions(loginDialog)
+const finalCloseFunction = dialogFunctions.find(({ block }) => (
+  /cancelPending\s*\(\s*\)/.test(block)
+    && /\.close\s*\(\s*\)/.test(block)
+    && /\bonClose\s*(?:\?\.)?\s*\(\s*\)/.test(block)
+))
+const finalCloseName = finalCloseFunction?.name ?? ''
+const finalCloseBlock = finalCloseFunction?.block ?? ''
 const dialogJsx = extractJsxElement(loginDialog, 'dialog')
 const closeButton = extractJsxElement(dialogJsx, 'button', /aria-label="关闭登录窗口"/)
 const openEffect = extractArrowCallBlocks(loginDialog, 'useEffect').find((block) => /showModal\(\)/.test(block)) ?? ''
@@ -218,7 +281,20 @@ const savedTriggerMatch = openEffect.match(
 )
 const savedTriggerRef = savedTriggerMatch?.[1] ?? ''
 const cancelHandlerName = dialogJsx.match(/onCancel=\{([A-Za-z_$][\w$]*)\}/)?.[1] ?? ''
-const cancelHandler = cancelHandlerName ? extractConstFunction(loginDialog, cancelHandlerName) : ''
+const cancelInlineSnippet = cancelHandlerName ? '' : propSnippet(dialogJsx, 'onCancel')
+const cancelInlineDelegate = [...cancelInlineSnippet.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
+  .map((match) => match[1])
+  .find((name) => dialogFunctions.some((item) => item.name === name) && callsTarget(name, finalCloseName, dialogFunctions)) ?? ''
+const cancelInlineExpanded = cancelInlineDelegate ? expandedFunctionSource(cancelInlineDelegate, dialogFunctions) : ''
+const cancelHandler = cancelHandlerName
+  ? expandedFunctionSource(cancelHandlerName, dialogFunctions)
+  : (/preventDefault\s*\(/.test(cancelInlineSnippet)
+      ? `${cancelInlineSnippet}\n${cancelInlineExpanded}`
+      : (cancelInlineExpanded || cancelInlineSnippet))
+const closeButtonHandlerName = closeButton.match(/onClick=\{([A-Za-z_$][\w$]*)\}/)?.[1] ?? ''
+const closeButtonHandler = closeButtonHandlerName
+  ? expandedFunctionSource(closeButtonHandlerName, dialogFunctions)
+  : propSnippet(closeButton, 'onClick')
 const showModalIndex = patternIndex(openEffect, /\.showModal\(\)/)
 const focusMatch = /([A-Za-z_$][\w$]*)\.current\s*(?:\?\.)?focus\s*\(/.exec(openEffect)
 const focusRef = focusMatch?.[1] ?? ''
@@ -269,8 +345,14 @@ expectGuardBeforeUpdate(
 expectGuardBeforeUpdate(
   sendCatch,
   generationGuardPattern(sendGeneration),
-  /set(?:Error|Notice|Loading)\s*\(/,
-  'handleSendCode catch 在失败状态更新前拒绝迟到 generation',
+  /(?:set(?:Error|Notice|Loading)|raiseError)\s*\(/,
+  'handleSendCode catch 在任何错误/loading 副作用前拒绝迟到 generation',
+)
+expectGuardBeforeUpdate(
+  sendCatch,
+  generationGuardPattern(sendGeneration),
+  /(?:set(?:Error|Notice)|raiseError)\s*\(/,
+  'handleSendCode catch guard 后执行真实错误更新',
 )
 expectGuardBeforeUpdate(
   sendFinally,
@@ -292,8 +374,14 @@ expectGuardBeforeUpdate(
 expectGuardBeforeUpdate(
   loginCatch,
   generationGuardPattern(loginGeneration),
-  /set(?:Error|Notice|Loading)\s*\(/,
-  'handleLogin catch 在失败状态更新前拒绝迟到 generation',
+  /(?:set(?:Error|Notice|Loading)|raiseError)\s*\(/,
+  'handleLogin catch 在任何错误/loading 副作用前拒绝迟到 generation',
+)
+expectGuardBeforeUpdate(
+  loginCatch,
+  generationGuardPattern(loginGeneration),
+  /(?:set(?:Error|Notice)|raiseError)\s*\(/,
+  'handleLogin catch guard 后执行真实错误更新',
 )
 expectGuardBeforeUpdate(
   loginFinally,
@@ -304,6 +392,13 @@ expectGuardBeforeUpdate(
 const usesCurrentRequestHelper = [sendTry, sendCatch, sendFinally, loginTry, loginCatch, loginFinally]
   .some((block) => /isCurrentRequest\s*\(/.test(block))
 expect(!usesCurrentRequestHelper || validatesCurrentRequest(currentRequestHelper), 'isCurrentRequest helper 真实比较 generation 与当前 ref')
+const raiseErrorDefined = /\b(?:const\s+raiseError\s*=|function\s+raiseError\s*\()/.test(memberHook)
+const raiseErrorUsed = [sendCatch, loginCatch].some((block) => /\braiseError\s*\(/.test(block))
+expect(
+  (!raiseErrorDefined && !raiseErrorUsed)
+    || (raiseErrorHelper.length > 0 && /set(?:Error|Notice)\s*\(/.test(raiseErrorHelper)),
+  '若定义或调用 raiseError helper，其函数体真实更新 error/notice 状态',
+)
 
 expectMatches(
   cancelPending,
@@ -358,10 +453,14 @@ expectMatches(
   /login\(\{\s*id:\s*(?:result|res)\.user\.id,\s*phoneMasked:\s*(?:result|res)\.user\.phoneMasked,\s*nickname:\s*(?:result|res)\.user\.nickname,\s*token:\s*(?:result|res)\.token,\s*method:\s*'phone',?\s*\}\)/,
   'handleAuthenticated 把 LoginResult 完整映射到 AuthContext',
 )
-expectMatches(
-  handleAuthenticated,
-  /login\([\s\S]*?onAuthenticated\?\.\(\)[\s\S]*?closeDialog\(\)/,
-  'handleAuthenticated 先落真实会话，再通知调用方并关闭弹窗',
+const authenticatedLoginIndex = patternIndex(handleAuthenticated, /\blogin\s*\(/)
+const authenticatedNoticeIndex = patternIndex(handleAuthenticated, /\bonAuthenticated\s*\?\.\s*\(\s*\)/)
+const authenticatedCloseIndex = targetCallIndex(handleAuthenticated, finalCloseName, dialogFunctions)
+expect(
+  authenticatedLoginIndex >= 0
+    && authenticatedNoticeIndex > authenticatedLoginIndex
+    && authenticatedCloseIndex > authenticatedNoticeIndex,
+  'handleAuthenticated 先落真实会话、通知调用方，再进入共享关闭调用链',
 )
 expectMatches(
   loginDialog,
@@ -380,38 +479,45 @@ expect(
     && ((explicitFocusIndex > showModalIndex && (directFocusTarget || paneFocusTarget || queryFocusTarget)) || autoFocusTarget),
   'showModal 后聚焦弹窗内可交互的手机号 input/button（允许 ref/querySelector/autoFocus）',
 )
-expect(closeDialog.length > 0, '已提取 closeDialog 函数块')
-const closeOrder = [
-  patternIndex(closeDialog, /cancelPending\(\)/),
-  patternIndex(closeDialog, /\.close\(\)/),
-  patternIndex(closeDialog, /\bonClose\(\)/),
-  patternIndex(closeDialog, /\.isConnected\b/),
-  patternIndex(closeDialog, /\.focus\(\)/),
-]
+expect(finalCloseBlock.length > 0, '已捕获包含 cancelPending/dialog.close/onClose 的共享最终关闭函数')
+const cancelPendingIndex = patternIndex(finalCloseBlock, /cancelPending\s*\(\s*\)/)
+const nativeCloseIndex = patternIndex(finalCloseBlock, /\.close\s*\(\s*\)/)
+const onCloseIndex = patternIndex(finalCloseBlock, /\bonClose\s*(?:\?\.)?\s*\(\s*\)/)
+const restoreFocusIndex = patternIndex(finalCloseBlock, /(?:\?\.)?focus\s*\(\s*\)/)
 expect(
-  closeOrder.every((index, position) => index >= 0 && (position === 0 || index > closeOrder[position - 1])),
-  'closeDialog 严格按 cancelPending → dialog.close → onClose → isConnected → focus 执行',
+  cancelPendingIndex >= 0 && nativeCloseIndex >= 0 && onCloseIndex >= 0
+    && restoreFocusIndex > nativeCloseIndex && restoreFocusIndex > onCloseIndex,
+  '共享最终关闭函数包含三项关闭动作，且焦点恢复发生在 dialog.close/onClose 之后',
 )
-expect(Boolean(savedTriggerRef) && closeDialog.includes(savedTriggerRef), 'closeDialog 恢复的是打开 effect 保存的同一触发元素')
-const namedCancelOrder = patternIndex(cancelHandler, /\.preventDefault\(\)/) >= 0
-  && patternIndex(cancelHandler, /closeDialog\(\)/) > patternIndex(cancelHandler, /\.preventDefault\(\)/)
-const inlineCancelOrder = /onCancel=\{[\s\S]{0,240}?\.preventDefault\(\)[\s\S]{0,160}?closeDialog\(\)/.test(dialogJsx)
-expect(namedCancelOrder || inlineCancelOrder, 'onCancel / Escape 先 preventDefault 再调用 closeDialog')
+const focusPrefix = restoreFocusIndex >= 0 ? finalCloseBlock.slice(Math.min(nativeCloseIndex, onCloseIndex), restoreFocusIndex + 16) : ''
+expect(
+  /\.isConnected\b/.test(focusPrefix)
+    || /document(?:\.[A-Za-z_$][\w$]*)?\.contains\s*\(/.test(focusPrefix)
+    || /\?\.focus\s*\(/.test(focusPrefix)
+    || /try\s*\{[\s\S]*?(?:\?\.)?focus\s*\(/.test(focusPrefix),
+  '焦点恢复使用 isConnected/document.contains/可选链/try 等存在性保护',
+)
+expect(Boolean(savedTriggerRef) && finalCloseBlock.includes(savedTriggerRef), '共享最终关闭函数恢复打开 effect 保存的同一触发元素')
+const cancelPreventIndex = patternIndex(cancelHandler, /\.preventDefault\s*\(\s*\)/)
+const cancelCloseIndex = cancelHandlerName === finalCloseName || cancelInlineDelegate === finalCloseName
+  ? patternIndex(cancelHandler, /\.close\s*\(\s*\)/)
+  : targetCallIndex(cancelHandler, finalCloseName, dialogFunctions)
+expect(cancelPreventIndex >= 0 && cancelCloseIndex > cancelPreventIndex, 'onCancel / Escape 先 preventDefault 再进入共享关闭调用链')
 expectMatches(dialogJsx, /aria-labelledby="member-login-dialog-title"/, '登录弹窗关联可访问标题')
 expectMatches(dialogJsx, /id="member-login-dialog-title"[^>]*>手机号登录/, '登录弹窗提供冻结标题')
 expect(closeButton.length > 0, '登录弹窗保留显式关闭按钮')
-expectMatches(
-  closeButton,
-  /onClick=\{\s*(?:closeDialog|\(?\s*\)?\s*=>\s*closeDialog\(\)|\(?\s*\)?\s*=>\s*\{\s*closeDialog\(\))/,
-  '显式关闭按钮 onClick 直接调用 closeDialog',
-)
+const closeButtonCallIndex = closeButtonHandlerName === finalCloseName
+  ? 0
+  : targetCallIndex(closeButtonHandler, finalCloseName, dialogFunctions)
+expect(closeButtonCallIndex >= 0 && Boolean(finalCloseName), '显式关闭按钮 handler 最终进入共享关闭调用链')
 expectMatches(closeButton, />[\s\S]*?\b关闭\b[\s\S]*?<\/button>/, '显式关闭按钮提供可见关闭文案')
 expectMatches(loginDialog, /继续游客体验/, '登录弹窗保留继续游客体验操作')
 expect(handleContinueAsGuest.length > 0, '已提取 handleContinueAsGuest 函数块')
-expectMatches(
-  handleContinueAsGuest,
-  /onContinueAsGuest\(\)[\s\S]*?(?:closeDialog|cancelPending)\(\)/,
-  '游客 handler 先进入真实游客态，再关闭弹窗或取消请求',
+expect(
+  patternIndex(handleContinueAsGuest, /onContinueAsGuest\s*\(\s*\)/) >= 0
+    && targetCallIndex(handleContinueAsGuest, finalCloseName, dialogFunctions)
+      > patternIndex(handleContinueAsGuest, /onContinueAsGuest\s*\(\s*\)/),
+  '游客 handler 先进入真实游客态，再进入共享关闭调用链',
 )
 expectMatches(
   loginDialog,

@@ -110,6 +110,23 @@ function guardedUpdate(source, guard, update) {
   const body = balancedBlock(source, source.indexOf('{', match.index))
   return patternIndex(source, update) >= match.index && body.length > 0 && update.test(body)
 }
+function mappedBranch(source, startPattern, label, tone, setter = '') {
+  const start = startPattern.exec(source)
+  if (!start) return false
+  const branch = source.slice(start.index, start.index + 500)
+  return branch.includes(label)
+    && new RegExp(`['"]${escapeRegExp(tone)}['"]`).test(branch)
+    && (!setter || new RegExp(`\\b${escapeRegExp(setter)}\\s*\\(`).test(branch))
+}
+function mappedDefault(source, label, tone, setter = '') {
+  for (const marker of source.matchAll(/\bdefault\s*:|\belse\s*\{|\breturn\s*\{/g)) {
+    const branch = source.slice(marker.index, marker.index + 500)
+    if (branch.includes(label)
+      && new RegExp(`['"]${escapeRegExp(tone)}['"]`).test(branch)
+      && (!setter || new RegExp(`\\b${escapeRegExp(setter)}\\s*\\(`).test(branch))) return true
+  }
+  return false
+}
 function cssRule(source, selector) {
   const selectorStart = source.indexOf(`${selector} {`)
   if (selectorStart < 0) return ''
@@ -257,6 +274,52 @@ const refreshGuard = guardPattern(generationMatch?.[1], generationMatch?.[2])
 const fetchIndexInTry = patternIndex(refreshTry, /await\s+fetch\s*\(/)
 const successAfterFetch = fetchIndexInTry >= 0 ? refreshTry.slice(fetchIndexInTry) : ''
 const stateUpdatePattern = deviceSetter ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(`) : /$a/
+const fetchResponseName = refreshTry.match(
+  /const\s+([A-Za-z_$][\w$]*)(?:\s*:\s*[^=]+)?\s*=\s*await\s+fetch\s*\(/,
+)?.[1] ?? ''
+const parsedDataMatch = fetchResponseName
+  ? new RegExp(`const\\s+([A-Za-z_$][\\w$]*)(?:\\s*:\\s*[^=]+)?\\s*=\\s*\\(?\\s*await\\s+${escapeRegExp(fetchResponseName)}\\.json\\s*\\(\\s*\\)\\s*\\)?`).exec(refreshTry)
+  : null
+const parsedDataName = parsedDataMatch?.[1] ?? ''
+const mapperCall = deviceSetter && parsedDataName
+  ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(\\s*([A-Za-z_$][\\w$]*)\\s*\\(\\s*${escapeRegExp(parsedDataName)}\\.printerStatus\\s*\\)\\s*\\)`).exec(refreshTry)
+  : null
+const mapperName = mapperCall?.[1] ?? ''
+const mapperBlock = mapperName ? namedComponent(homeDeviceStatus, mapperName) : ''
+const mapperParameter = mapperName
+  ? mapperBlock.match(new RegExp(`(?:${escapeRegExp(mapperName)}\\s*=\\s*\\(?\\s*|function\\s+${escapeRegExp(mapperName)}\\s*\\(\\s*)([A-Za-z_$][\\w$]*)`))?.[1] ?? ''
+  : ''
+const approvedPrinterMappings = [
+  ['ready', '打印机在线', 'positive'],
+  ['offline', '打印机离线', 'negative'],
+  ['error', '打印机异常', 'negative'],
+  ['low_paper', '纸张余量偏低', 'warning'],
+]
+const mapperMappingChecks = approvedPrinterMappings.map(([status, label, tone]) => mappedBranch(
+  mapperBlock,
+  new RegExp(`(?:case\\s*['"]${status}['"]|${escapeRegExp(mapperParameter)}\\s*===\\s*['"]${status}['"]|\\b${status}\\s*:)`),
+  label,
+  tone,
+))
+const mapperDefaultCheck = mappedDefault(mapperBlock, '打印机状态未知', 'neutral')
+const directStatusExpression = parsedDataName ? `${escapeRegExp(parsedDataName)}\\.printerStatus` : '$a'
+const directMappingChecks = approvedPrinterMappings.map(([status, label, tone]) => mappedBranch(
+  refreshTry,
+  new RegExp(`(?:case\\s*['"]${status}['"]|${directStatusExpression}\\s*===\\s*['"]${status}['"])`),
+  label,
+  tone,
+  deviceSetter,
+))
+const directDefaultCheck = mappedDefault(refreshTry, '打印机状态未知', 'neutral', deviceSetter)
+const mapperChainValid = Boolean(parsedDataName && mapperName && mapperBlock && mapperParameter)
+  && mapperMappingChecks.every(Boolean) && mapperDefaultCheck
+const directMappingValid = Boolean(parsedDataName && deviceSetter)
+  && (new RegExp(`switch\\s*\\(\\s*${directStatusExpression}\\s*\\)`).test(refreshTry)
+    || new RegExp(`${directStatusExpression}\\s*===`).test(refreshTry))
+  && directMappingChecks.every(Boolean) && directDefaultCheck
+const unavailableUpdatePattern = deviceSetter
+  ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(\\s*(?=[\\s\\S]{0,360}?设备状态暂不可用)(?=[\\s\\S]{0,360}?['"]neutral['"])`)
+  : /$a/
 
 expect(deviceHook.length > 0, '已提取完整导出的 useHomeDeviceStatus hook')
 expectMatches(deviceHook, /VITE_TERMINAL_ID/, '真实设备状态 hook 读取 VITE_TERMINAL_ID')
@@ -284,31 +347,21 @@ for (const label of [
 ]) {
   expect(homeDeviceStatus.includes(label), `真实设备状态 hook 覆盖文案：${label}`)
 }
-for (const [printerStatus, label, tone] of [
-  ['ready', '打印机在线', 'positive'],
-  ['offline', '打印机离线', 'negative'],
-  ['error', '打印机异常', 'negative'],
-  ['low_paper', '纸张余量偏低', 'warning'],
-]) {
-  expectMatches(
-    homeDeviceStatus,
-    new RegExp(`['"]${printerStatus}['"][\\s\\S]{0,240}?${label}[\\s\\S]{0,160}?['"]${tone}['"]`),
-    `printerStatus=${printerStatus} 绑定文案 ${label} 与 tone=${tone}`,
+expect(Boolean(fetchResponseName && parsedDataName), 'refresh 从唯一 fetch 响应解析真实 data.printerStatus 数据对象')
+expect(mapperChainValid || directMappingValid, '真实 data.printerStatus 通过已验证 mapper 或 refresh 内直接分支写入同一状态')
+approvedPrinterMappings.forEach(([printerStatus, label, tone], index) => {
+  expect(
+    mapperChainValid ? mapperMappingChecks[index] : directMappingChecks[index],
+    `真实 printerStatus=${printerStatus} 分支映射 ${label} / ${tone}`,
   )
-}
-expectMatches(
-  homeDeviceStatus,
-  /navigator\.onLine\s*===\s*false[\s\S]{0,240}?网络异常[\s\S]{0,160}?['"]negative['"]/,
-  '浏览器离线状态绑定“网络异常”与 negative tone',
-)
+})
+expect(mapperChainValid ? mapperDefaultCheck : directDefaultCheck, '真实 printerStatus 默认分支映射“打印机状态未知” / neutral')
 expectMatches(
   homeDeviceStatus,
   /if\s*\(\s*!terminalId\s*\)[\s\S]{0,240}?设备状态未配置[\s\S]{0,160}?['"]neutral['"]/,
   '未配置 terminalId 时返回诚实未配置状态',
 )
 expectMatches(homeDeviceStatus, /设备状态检测中[\s\S]{0,160}?['"]neutral['"]/, '请求中状态绑定 neutral tone')
-expectMatches(homeDeviceStatus, /打印机状态未知[\s\S]{0,160}?['"]neutral['"]/, '未知打印机状态绑定 neutral tone')
-expectMatches(homeDeviceStatus, /设备状态暂不可用[\s\S]{0,160}?['"]neutral['"]/, '在线请求失败绑定 neutral tone')
 expect(deviceEffect.length > 0 && intervalMatch && intervalIsThirtySeconds, '同一 effect 使用同一 refresh 函数建立 30 秒轮询')
 expect(
   Boolean(refreshName) && patternIndex(deviceEffect, new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`)) < patternIndex(deviceEffect, /setInterval\s*\(/),
@@ -320,15 +373,21 @@ expect(
   Boolean(onlineAdd && refreshName) && (onlineAdd === refreshName || new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`).test(onlineBlock)),
   'online handler 调用轮询所用的同一 refresh 函数',
 )
-const offlineCallsRefresh = Boolean(offlineAdd && refreshName)
-  && (offlineAdd === refreshName || new RegExp(`\\b${escapeRegExp(refreshName)}\\s*\\(`).test(offlineBlock))
 const offlineStateArgument = deviceSetter
   ? new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(\\s*([A-Za-z_$][\\w$]*)`).exec(offlineBlock)?.[1]
   : ''
+const offlineStateDefinitionStart = offlineStateArgument
+  ? homeDeviceStatus.search(new RegExp(`\\bconst\\s+${escapeRegExp(offlineStateArgument)}(?:\\s*:\\s*[^=]+)?\\s*=`))
+  : -1
+const offlineStateDefinition = offlineStateDefinitionStart >= 0
+  ? homeDeviceStatus.slice(offlineStateDefinitionStart, offlineStateDefinitionStart + 420)
+  : ''
+const offlineMappingSource = `${offlineBlock}\n${offlineStateDefinition}`
 const offlineSetsNetworkError = Boolean(deviceSetter)
   && new RegExp(`\\b${escapeRegExp(deviceSetter)}\\s*\\(`).test(offlineBlock)
-  && (offlineBlock.includes('网络异常') || (offlineStateArgument && new RegExp(`const\\s+${escapeRegExp(offlineStateArgument)}[\\s\\S]{0,240}?网络异常`).test(homeDeviceStatus)))
-expect(offlineCallsRefresh || offlineSetsNetworkError, 'offline handler 调用同一 refresh 或写入同一状态的网络异常映射')
+  && offlineMappingSource.includes('网络异常')
+  && /['"]negative['"]/.test(offlineMappingSource)
+expect(offlineSetsNetworkError, 'offline handler 使用同一状态 setter 真实写入“网络异常” / negative')
 const refreshOrder = [abortMatch?.index ?? -1, controllerMatch?.index ?? -1, generationMatch?.index ?? -1, patternIndex(refreshBlock, /fetch\s*\(/)]
 expect(
   refreshOrder.every((index, position) => index >= 0 && (position === 0 || index > refreshOrder[position - 1])),
@@ -341,7 +400,10 @@ expect(
   'refresh 将新 controller 存入同一 ref 并把其 signal 交给 fetch',
 )
 expect(Boolean(deviceSetter) && guardedUpdate(successAfterFetch, refreshGuard, stateUpdatePattern), 'refresh 成功结果仅由最新 generation 更新同一状态')
-expect(Boolean(deviceSetter) && guardedUpdate(refreshCatch, refreshGuard, stateUpdatePattern), 'refresh 失败结果仅由最新 generation 更新同一状态')
+expect(
+  Boolean(deviceSetter) && guardedUpdate(refreshCatch, refreshGuard, unavailableUpdatePattern),
+  'refresh catch 在最新 generation guard 后写入“设备状态暂不可用” / neutral',
+)
 const helperUsed = /isCurrentRequest\s*\(/.test(refreshBlock)
 const helperParameter = deviceHook.match(
   /(?:isCurrentRequest\s*=\s*\(?\s*|function\s+isCurrentRequest\s*\(\s*)([A-Za-z_$][\w$]*)/,
