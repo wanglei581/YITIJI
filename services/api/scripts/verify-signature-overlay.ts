@@ -18,6 +18,12 @@
  *      （service 本身不重复做枚举校验，交由 HTTP 边界的 ValidationPipe 负责，这里直接
  *      对 DTO 类做单测级验证，不依赖 Nest 应用启动）
  *  12.  signature_source 默认 sensitiveLevel 为 'sensitive'（短期即焚，非长期保存）
+ *  13.  computeSignatureOverlayRect 纯函数几何回归：位置×大小×目标宽高比×签名宽高比
+ *      全矩阵精确断言叠加矩形完全落在目标渲染区域内（不只测页数）——覆盖真实出现过的
+ *      bug：极端纵向签名（窄长）配扁平目标会让 sigHeight 超出可用高度，导致坐标
+ *      被推出边界甚至负值。DTO 缺整体字段（target/signature 未定义）必须被拒绝
+ *  14.  signature_source 的保存期限被锁定为 system_short，不能被延长到 months_3/
+ *      months_6/long_term（对应 compliance-boundary.md §4.6"短期即焚"承诺）
  *
  * 运行：pnpm --filter @ai-job-print/api verify:signature-overlay
  */
@@ -28,10 +34,11 @@ import assert from 'node:assert/strict'
 import zlib from 'node:zlib'
 import { validate } from 'class-validator'
 import { plainToInstance } from 'class-transformer'
-import { PrintConversionService } from '../src/print-conversion/print-conversion.service'
+import { PrintConversionService, computeSignatureOverlayRect } from '../src/print-conversion/print-conversion.service'
 import { ComposeSignatureOverlayDto } from '../src/print-conversion/print-conversion.dto'
 import { signFileUrl } from '../src/files/signing'
 import { DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
+import { allowedPoliciesForFile } from '../src/files/retention-policy'
 
 function pass(m: string) {
   console.log(`  PASS ${m}`)
@@ -538,6 +545,56 @@ async function main() {
       'signature_source 必须默认 sensitive（短 TTL，非长期保存）',
     )
     pass('signature_source 默认 sensitiveLevel 为 sensitive')
+  }
+
+  // 13) computeSignatureOverlayRect 纯函数几何回归：精确断言矩形落在渲染区域内，
+  //     不只测页数。含真实出现过的 bug 组合——窄长纵向签名（宽高比 1:5）配扁平
+  //     目标（宽高比 4:1），此前只夹宽度、未夹高度，会让 sigHeight 超出可用高度。
+  {
+    const positions = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'] as const
+    const sizes = ['small', 'medium', 'large'] as const
+    const targetDimsMatrix = [
+      { width: 400, height: 600 }, // 竖版
+      { width: 600, height: 400 }, // 横版
+      { width: 500, height: 500 }, // 正方形
+      { width: 800, height: 200 }, // 极扁平横版（4:1）
+    ]
+    const signatureDimsMatrix = [
+      { width: 80, height: 40 }, // 常规横向（2:1）
+      { width: 40, height: 200 }, // 极端窄长纵向（1:5）——此前会触发越界 bug
+    ]
+    let n = 0
+    for (const targetDims of targetDimsMatrix) {
+      for (const signatureDims of signatureDimsMatrix) {
+        for (const position of positions) {
+          for (const size of sizes) {
+            n += 1
+            const rect = computeSignatureOverlayRect({ targetDims, signatureDims, position, size })
+            const label = `target ${targetDims.width}x${targetDims.height} / signature ${signatureDims.width}x${signatureDims.height} / ${position} / ${size}`
+            assert.ok(Number.isFinite(rect.sigX) && Number.isFinite(rect.sigY), `${label}: 坐标必须是有限数`)
+            assert.ok(rect.sigWidth > 0 && rect.sigHeight > 0, `${label}: 宽高必须为正数`)
+            assert.ok(rect.sigX >= rect.offsetX - 1e-6, `${label}: sigX 不得早于渲染区域左边界`)
+            assert.ok(rect.sigY >= rect.offsetY - 1e-6, `${label}: sigY 不得早于渲染区域上边界`)
+            assert.ok(
+              rect.sigX + rect.sigWidth <= rect.offsetX + rect.renderedW + 1e-6,
+              `${label}: 右边界不得超出渲染区域`,
+            )
+            assert.ok(
+              rect.sigY + rect.sigHeight <= rect.offsetY + rect.renderedH + 1e-6,
+              `${label}: 下边界不得超出渲染区域`,
+            )
+          }
+        }
+      }
+    }
+    pass(`computeSignatureOverlayRect 几何回归（${n} 组合，含极端宽高比）矩形全部落在渲染区域内`)
+  }
+
+  // 14) signature_source 保存期限被锁定为 system_short，不能延长
+  {
+    const allowed = allowedPoliciesForFile({ purpose: 'signature_source', assetCategory: 'original' })
+    assert.deepEqual(allowed, ['system_short'], 'signature_source 只能使用 system_short，不得延长保存')
+    pass('signature_source 保存期限锁定为 system_short（不可延长）')
   }
 
   console.log('PASS signature-overlay verification')

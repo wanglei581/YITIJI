@@ -67,8 +67,10 @@ export async function convertImagesToPdf(
 
 // ============================================================
 // 签名盖章 — POST /api/v1/print/convert/sign-overlay
-// 薄封装，错误处理与上面 convertImagesToPdf 完全一致；无需 Idempotency-Key
-// （合成是幂等的纯计算，重复调用只是多花一次算力，无副作用）。
+// 薄封装，错误处理与上面 convertImagesToPdf 完全一致。未接入 Idempotency-Key：
+// 每次调用都会新建一份 FileObject + 审计记录（非真正幂等），网络失败后重试
+// 会产生重复的短期派生 PDF；v1 判断该代价可接受（不涉及资金/库存），
+// 如需杜绝重复产物再照抄 convertImagesToPdf 的幂等键实现。
 // ============================================================
 
 export async function composeSignatureOverlay(

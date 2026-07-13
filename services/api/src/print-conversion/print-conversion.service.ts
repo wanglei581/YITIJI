@@ -43,7 +43,8 @@ const PAGE_HEIGHT_PT = 841.89
 // ── 签名盖章 ──────────────────────────────────────────────────
 const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024
 const MAX_SIGNATURE_PIXELS = 4_000_000
-const ALLOWED_SIGNATURE_MIME_TYPES = new Set(['image/jpeg', 'image/png'])
+// 签名 / 印章素材当前允许的格式与目标文件一致，直接复用 ALLOWED_MIME_TYPES；
+// 两者含义不同（目标文件 vs 签名素材），如未来白名单分叉再拆分为独立常量。
 /** 叠加大小预设：相对页面宽度的比例。 */
 const OVERLAY_SIZE_RATIO: Record<OverlaySize, number> = { small: 0.15, medium: 0.25, large: 0.35 }
 /** 页边安全边距（pt），避免签名紧贴纸张边缘。 */
@@ -363,7 +364,7 @@ export class PrintConversionService {
       'signature_source',
       'SIGN_OVERLAY_SIGNATURE_NOT_FOUND',
     )
-    if (!ALLOWED_SIGNATURE_MIME_TYPES.has(signatureRecord.mimeType)) {
+    if (!ALLOWED_MIME_TYPES.has(signatureRecord.mimeType)) {
       throw new BadRequestException({
         error: { code: 'SIGN_OVERLAY_SIGNATURE_TYPE_UNSUPPORTED', message: '签名 / 印章素材仅支持 JPG / PNG 图片' },
       })
@@ -462,46 +463,7 @@ export class PrintConversionService {
     size: OverlaySize
   }): Promise<Buffer> {
     const { targetBuffer, targetDims, signatureBuffer, signatureDims, position, size } = args
-
-    // 目标图在 fit+center 布局下的实际渲染矩形（可能因宽高比不同而小于整页，产生留白）。
-    const scale = Math.min(PAGE_WIDTH_PT / targetDims.width, PAGE_HEIGHT_PT / targetDims.height)
-    const renderedW = targetDims.width * scale
-    const renderedH = targetDims.height * scale
-    const offsetX = (PAGE_WIDTH_PT - renderedW) / 2
-    const offsetY = (PAGE_HEIGHT_PT - renderedH) / 2
-
-    const sigWidth = Math.min(renderedW * OVERLAY_SIZE_RATIO[size], Math.max(renderedW - 2 * OVERLAY_MARGIN_PT, 1))
-    const sigHeight = sigWidth * (signatureDims.height / signatureDims.width)
-
-    let sigX: number
-    let sigY: number
-    switch (position) {
-      case 'top-left':
-        sigX = offsetX + OVERLAY_MARGIN_PT
-        sigY = offsetY + OVERLAY_MARGIN_PT
-        break
-      case 'top-right':
-        sigX = offsetX + renderedW - OVERLAY_MARGIN_PT - sigWidth
-        sigY = offsetY + OVERLAY_MARGIN_PT
-        break
-      case 'bottom-left':
-        sigX = offsetX + OVERLAY_MARGIN_PT
-        sigY = offsetY + renderedH - OVERLAY_MARGIN_PT - sigHeight
-        break
-      case 'bottom-right':
-        sigX = offsetX + renderedW - OVERLAY_MARGIN_PT - sigWidth
-        sigY = offsetY + renderedH - OVERLAY_MARGIN_PT - sigHeight
-        break
-      case 'center':
-      default:
-        sigX = offsetX + (renderedW - sigWidth) / 2
-        sigY = offsetY + (renderedH - sigHeight) / 2
-        break
-    }
-
-    // 防御性夹紧：极端宽高比目标图 + 大档位可能让计算结果越出渲染区域。
-    sigX = Math.min(Math.max(sigX, offsetX), offsetX + renderedW - sigWidth)
-    sigY = Math.min(Math.max(sigY, offsetY), offsetY + renderedH - sigHeight)
+    const rect = computeSignatureOverlayRect({ targetDims, signatureDims, position, size })
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ autoFirstPage: false })
@@ -511,10 +473,87 @@ export class PrintConversionService {
       doc.on('error', (err: Error) => reject(err))
       doc.addPage({ size: 'A4' })
       doc.image(targetBuffer, 0, 0, { fit: [PAGE_WIDTH_PT, PAGE_HEIGHT_PT], align: 'center', valign: 'center' })
-      doc.image(signatureBuffer, sigX, sigY, { width: sigWidth, height: sigHeight })
+      doc.image(signatureBuffer, rect.sigX, rect.sigY, { width: rect.sigWidth, height: rect.sigHeight })
       doc.end()
     })
   }
+}
+
+export interface SignatureOverlayRect {
+  sigX: number
+  sigY: number
+  sigWidth: number
+  sigHeight: number
+  offsetX: number
+  offsetY: number
+  renderedW: number
+  renderedH: number
+}
+
+/**
+ * 纯函数：算出签名图在 A4 页面上的叠加矩形。抽成独立可单测函数（而不是只能
+ * 通过跑完整 pdfkit 合成 + 数页数间接验证），因为坐标计算曾经出过真实 bug——
+ * 只夹宽度不夹高度，极端纵向签名 + 扁平目标组合会让 sigHeight 超出可用高度，
+ * 导致下方夹紧的上下界反转、签名被推出可见区域甚至负坐标。
+ */
+export function computeSignatureOverlayRect(args: {
+  targetDims: { width: number; height: number }
+  signatureDims: { width: number; height: number }
+  position: OverlayPosition
+  size: OverlaySize
+}): SignatureOverlayRect {
+  const { targetDims, signatureDims, position, size } = args
+
+  // 目标图在 fit+center 布局下的实际渲染矩形（可能因宽高比不同而小于整页，产生留白）。
+  const scale = Math.min(PAGE_WIDTH_PT / targetDims.width, PAGE_HEIGHT_PT / targetDims.height)
+  const renderedW = targetDims.width * scale
+  const renderedH = targetDims.height * scale
+  const offsetX = (PAGE_WIDTH_PT - renderedW) / 2
+  const offsetY = (PAGE_HEIGHT_PT - renderedH) / 2
+
+  // 按大小档位算出的期望宽度/高度，必须同时不超过可用宽度与可用高度——
+  // 只夹宽度会漏掉极端纵向签名（窄长）配极端横向目标（渲染区域很矮）的组合。
+  // 等比统一缩小两个维度即可避免 sigHeight 超出可用高度。
+  const maxSigWidth = Math.max(renderedW - 2 * OVERLAY_MARGIN_PT, 1)
+  const maxSigHeight = Math.max(renderedH - 2 * OVERLAY_MARGIN_PT, 1)
+  const desiredWidth = renderedW * OVERLAY_SIZE_RATIO[size]
+  const desiredHeight = desiredWidth * (signatureDims.height / signatureDims.width)
+  const fitScale = Math.min(1, maxSigWidth / desiredWidth, maxSigHeight / desiredHeight)
+  const sigWidth = desiredWidth * fitScale
+  const sigHeight = desiredHeight * fitScale
+
+  let sigX: number
+  let sigY: number
+  switch (position) {
+    case 'top-left':
+      sigX = offsetX + OVERLAY_MARGIN_PT
+      sigY = offsetY + OVERLAY_MARGIN_PT
+      break
+    case 'top-right':
+      sigX = offsetX + renderedW - OVERLAY_MARGIN_PT - sigWidth
+      sigY = offsetY + OVERLAY_MARGIN_PT
+      break
+    case 'bottom-left':
+      sigX = offsetX + OVERLAY_MARGIN_PT
+      sigY = offsetY + renderedH - OVERLAY_MARGIN_PT - sigHeight
+      break
+    case 'bottom-right':
+      sigX = offsetX + renderedW - OVERLAY_MARGIN_PT - sigWidth
+      sigY = offsetY + renderedH - OVERLAY_MARGIN_PT - sigHeight
+      break
+    case 'center':
+    default:
+      sigX = offsetX + (renderedW - sigWidth) / 2
+      sigY = offsetY + (renderedH - sigHeight) / 2
+      break
+  }
+
+  // 防御性夹紧：理论上 sigWidth/sigHeight 已保证不超过可用区域，但保留这层
+  // 兜底以防未来有人改坏 fitScale 计算时不会直接越界坐标。
+  sigX = Math.min(Math.max(sigX, offsetX), offsetX + renderedW - sigWidth)
+  sigY = Math.min(Math.max(sigY, offsetY), offsetY + renderedH - sigHeight)
+
+  return { sigX, sigY, sigWidth, sigHeight, offsetX, offsetY, renderedW, renderedH }
 }
 
 function fingerprintSources(sources: ConvertImageSource[]): string {

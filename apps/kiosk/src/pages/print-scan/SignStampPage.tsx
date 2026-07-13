@@ -14,7 +14,7 @@
 // /print/confirm（不经过独立预览页，PrintConfirmPage 自带预览）。
 // ============================================================
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY, makePrintParams } from '@ai-job-print/shared'
@@ -87,6 +87,21 @@ export function SignStampPage() {
 
   useBusyLock(uploadingTarget || uploadingSignature || composing)
 
+  // 当前预览 Blob URL 被替换（重新选择/重新获取）或本页卸载时统一释放，避免
+  // 一体机长时间运行反复进出本页累积内存；deps 带上具体值以拿到当次真正持有
+  // 的 URL（若用空 deps 数组，闭包会一直捕获挂载时的初始 null，卸载时清不到
+  // 最新值）。
+  useEffect(() => {
+    return () => {
+      if (target) URL.revokeObjectURL(target.previewUrl)
+    }
+  }, [target])
+  useEffect(() => {
+    return () => {
+      if (signature) URL.revokeObjectURL(signature.previewUrl)
+    }
+  }, [signature])
+
   const handleTargetFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
     e.target.value = ''
@@ -124,7 +139,9 @@ export function SignStampPage() {
     setUploadingSignature(true)
     setError(null)
     try {
-      const file = new File([blob], name, { type: 'image/png' })
+      // 保留 blob 真实 mime（画布导出固定是 image/png；本机上传的 JPEG 必须原样保留，
+      // 否则文件名扩展名与强制 image/png 不一致会被服务端扩展名/魔数双重校验拒绝）。
+      const file = new File([blob], name, { type: blob.type || 'image/png' })
       const res = await kioskUploadFile(file, 'signature_source', getToken())
       setSignature({
         fileId: res.fileId,
