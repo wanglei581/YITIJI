@@ -254,12 +254,14 @@ export function IdPhotoPage() {
               <button
                 key={s.specId}
                 type="button"
+                disabled={busy || generating}
                 onClick={() => {
                   setSpec(s)
                   resetPhoto()
                 }}
                 className={[
                   'flex min-h-[64px] flex-col items-center justify-center rounded-xl border-2 px-3 py-2',
+                  'disabled:pointer-events-none disabled:opacity-50',
                   spec.specId === s.specId ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-white',
                 ].join(' ')}
               >
@@ -287,7 +289,7 @@ export function IdPhotoPage() {
                 {cropped.lowResolution && (
                   <p className="text-xs text-warning-fg">照片分辨率一般，打印可能不够清晰，建议更换更清晰的照片。</p>
                 )}
-                <Button size="lg" variant="secondary" disabled={busy} onClick={handleManualDelete}>
+                <Button size="lg" variant="secondary" disabled={busy || generating} onClick={handleManualDelete}>
                   <TrashIcon className="mr-1.5 h-5 w-5" />
                   删除照片重新选择
                 </Button>
@@ -296,7 +298,7 @@ export function IdPhotoPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={handleLocalFile} />
-              <Button size="lg" variant="secondary" disabled={busy} onClick={() => inputRef.current?.click()}>
+              <Button size="lg" variant="secondary" disabled={busy || showQr} onClick={() => inputRef.current?.click()}>
                 {busy ? <LoaderIcon className="mr-1.5 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-1.5 h-5 w-5" />}
                 本机上传照片
               </Button>
