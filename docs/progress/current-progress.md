@@ -1,8 +1,10 @@
 # 当前开发进度
 
-> 最后更新：2026-07-12
+> 最后更新：2026-07-13
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
+
+2026-07-13 青序 LightFlow K1 公共入口本地候选：分支 `codex/qingxu-lightflow-k1-20260713` 已安全快进基线 `origin/main=08c7588e`；K1 静态 verify 先 RED 后 GREEN，手机上传动态 `aria-label`、CSS 根作用域和 Help FAQ `aria-controls` 无空格 ID 也各完成 RED→GREEN 修复。三个 K1 verify、Kiosk typecheck、lint（0 error；仅既有且未触及的 `KioskBusyContext` 两条 Fast Refresh warning）、production build 与 `git diff --check` 本地通过；CI 仅新增三条 K1 Kiosk 命令，并保留主线 #211 CI 修复。Vite preview 已在 1080×1920、390×844、390×700 走查：未勾协议禁用、缺 QR ticket、缺 upload hash、法律返回、Help FAQ/来源 state、无屏保素材返回首页均可达。preview 未接 API，屏保/config 请求为 500、favicon 为 404，因此这只构成静态/本地 preview 证据，不构成 UX-2 真实 HTTP 成功闭环、预生产、Windows 真机或生产验收。内部规格复审与质量复审均 APPROVE；Claude 终审 APPROVE，且其发现的 Help a11y Warning 已 TDD 修复并获 Claude 复审 APPROVE；Antigravity 两次因地区不可用未产生有效报告，故未形成有效外部双批准。候选仅限本地分支，未 push、合并或部署；下一开发波次为 K2，不是继续扩大 K1。
 
 2026-07-12 最新预生产事实：当前运行 `9d48322b0a7c7cb5c1e04f477dae161f7ab75833`（PR #198），PM2 为 online，health 为 `db=postgres`，实际 `pm_cwd`/`pm_exec_path` 均为 `/srv/ai-job-print/services/api` / `dist/main.js`；Kiosk、Admin、Partner 与 API 本地入口均返回 HTTP 200。相对现网 `bddae4f7` 无 Prisma migration；隔离 release 已完成 API 与三端 production build、Kiosk 数字人/同源 API 构建门禁、`verify:terminal-test-print-seed-guard` 及 `db:pg:sync:check`，切换前 PostgreSQL custom-format 回滚备份均通过 `pg_restore -l`。`NODE_ENV=staging` 的旧版重启会将 `ptask_seed_001` 重置为 `pending`；本轮按严格历史任务条件受控关闭后，以 30 秒 readiness 轮询完成 PM2 reload，seed 保持 `cancelled`，active print task=0。未创建打印任务、未触发 Agent claim 或真实出纸，未做真实支付/核销验收；其余 P0 不因本项完成而关闭。
 

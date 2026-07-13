@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { AlertCircleIcon, CheckCircleIcon, FileTextIcon, Loader2Icon, ShieldCheckIcon, UploadCloudIcon } from 'lucide-react'
 import { Button, Card } from '@ai-job-print/ui'
 import { uploadPhoneSessionFile } from '../../services/api/uploadSessions'
+import './phone-upload-service-desk.css'
 
 const RESUME_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
 // print_doc 服务端 MIME 白名单只有 PDF/JPG/PNG(见 services/api file-validation.ts PRINTABLE),
@@ -71,56 +72,58 @@ export function PhoneUploadPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 px-4 py-6 text-neutral-900">
-      <section className="mx-auto flex min-h-[calc(100vh-48px)] max-w-md flex-col">
-        <div className="py-4">
-          <p className="text-sm font-semibold text-primary-600">AI求职打印一体机</p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-normal">{pageTitle}</h1>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-600">
+    <main className="service-desk k1-phone-upload" data-visual-theme="service-desk" data-ux-density="touch">
+      <section className="phone-upload-shell">
+        <header className="phone-upload-heading">
+          <p className="phone-upload-eyebrow">AI求职打印一体机</p>
+          <h1>{pageTitle}</h1>
+          <p className="phone-upload-intro">
             临时上传不会保存到账号。如一体机已登录，仍需在一体机上确认后才会保存到账号。
           </p>
-        </div>
+        </header>
 
-        <Card className="mt-4 p-5">
-          <div className="flex items-start gap-3 rounded-2xl bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-800">
-            <ShieldCheckIcon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <Card className="phone-upload-card">
+          <div className="phone-upload-trust">
+            <ShieldCheckIcon aria-hidden="true" />
             <p>手机页面只使用一次性上传令牌，不会获取一体机上的会员登录态。请只上传自己的{fileNoun}。</p>
           </div>
 
           <label
             className={[
-              'mt-5 flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed px-5 py-8 text-center transition-colors',
+              'phone-upload-picker',
               ready && state !== 'uploading'
-                ? 'border-primary-200 bg-white active:bg-primary-50'
-                : 'border-neutral-200 bg-neutral-50 opacity-70',
+                ? 'is-ready'
+                : 'is-disabled',
             ].join(' ')}
+            data-upload-state={state}
+            aria-disabled={!ready || state === 'uploading'}
           >
             <input
               type="file"
               aria-label={`选择${fileNoun}`}
               accept={accept}
-              className="hidden"
+              className="phone-upload-input"
               disabled={!ready || state === 'uploading'}
               onChange={handleFile}
             />
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+            <div className="phone-upload-icon" aria-hidden="true">
               {state === 'uploading' ? (
-                <Loader2Icon className="h-8 w-8 animate-spin" aria-hidden="true" />
+                <Loader2Icon className="phone-upload-spinner" />
               ) : state === 'success' ? (
-                <CheckCircleIcon className="h-8 w-8" aria-hidden="true" />
+                <CheckCircleIcon />
               ) : (
-                <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />
+                <UploadCloudIcon />
               )}
             </div>
-            <p className="mt-4 text-xl font-bold">
+            <p className="phone-upload-picker-title">
               {state === 'uploading' ? '正在上传...' : state === 'success' ? '已上传到一体机' : `选择${fileNoun}`}
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-500">
+            <p className="phone-upload-picker-copy">
               {isPrintDoc ? '支持 PDF / JPG / PNG，单个文件最大 10MB。' : '支持 PDF / DOC / DOCX / JPG / PNG / WEBP，单个文件最大 10MB。'}
             </p>
             {fileLabel && (
-              <div className="mt-4 flex items-center gap-2 rounded-2xl bg-neutral-50 px-3 py-2 text-sm font-semibold text-neutral-700">
-                <FileTextIcon className="h-4 w-4" aria-hidden="true" />
+              <div className="phone-upload-file-label">
+                <FileTextIcon aria-hidden="true" />
                 {fileLabel}
               </div>
             )}
@@ -129,17 +132,19 @@ export function PhoneUploadPage() {
           {message && (
             <div
               className={[
-                'mt-5 flex items-start gap-2 rounded-2xl px-4 py-3 text-sm font-semibold leading-relaxed',
-                state === 'success' ? 'bg-success-bg text-success-fg' : 'bg-error-bg text-error-fg',
+                'phone-upload-message',
+                state === 'success' ? 'is-success' : 'is-error',
               ].join(' ')}
+              role="status"
+              aria-live="polite"
             >
-              {state === 'success' ? <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" />}
+              {state === 'success' ? <CheckCircleIcon aria-hidden="true" /> : <AlertCircleIcon aria-hidden="true" />}
               <span>{message}</span>
             </div>
           )}
 
           {state === 'error' && (
-            <Button size="lg" className="mt-5 w-full" onClick={() => setState('idle')} disabled={!ready}>
+            <Button size="lg" className="phone-upload-retry" onClick={() => setState('idle')} disabled={!ready}>
               重新选择文件
             </Button>
           )}

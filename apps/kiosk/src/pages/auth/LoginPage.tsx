@@ -301,7 +301,7 @@ export function LoginPage() {
   const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
 
   return (
-    <div className="klogin" ref={rootRef}>
+    <div className="service-desk k1-login" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
       <header className="topbar">
         <span className="brand-mark">AI</span>
         <div className="brand-copy">
@@ -330,7 +330,7 @@ export function LoginPage() {
                 <ShieldCheckIcon size={17} aria-hidden="true" />
                 就业服务 · 一体机自助办理
               </div>
-              <h1 className="serif">
+              <h1>
                 登录后，简历和记录
                 <br />
                 都替你存好
@@ -355,7 +355,7 @@ export function LoginPage() {
                 <UserRoundIcon size={28} aria-hidden="true" />
               </span>
               <div>
-                <h3 className="serif">选择登录方式</h3>
+                <h3>选择登录方式</h3>
                 <p>手机号验证码或手机扫码，全程不超过 3 步</p>
               </div>
             </div>
@@ -460,7 +460,7 @@ export function LoginPage() {
                   onLoginSuccess={handleQrLoginSuccess}
                 />
                 {error && (
-                  <div className="k-error" role="alert">
+                  <div className="k-error" role="alert" aria-live="polite">
                     <CircleAlertIcon size={20} aria-hidden="true" />
                     <span>{error}</span>
                   </div>
@@ -495,7 +495,7 @@ export function LoginPage() {
               </svg>
             </div>
           </div>
-          <div className="msg serif">登录成功，正在进入…</div>
+          <div className="msg">登录成功，正在进入…</div>
         </div>
       )}
     </div>
@@ -603,13 +603,13 @@ function PhoneLoginPane({
       </div>
 
       {notice && (
-        <div className="k-notice" role="status">
+        <div className="k-notice" role="status" aria-live="polite">
           <CircleCheckIcon size={20} aria-hidden="true" />
           <span>{notice}</span>
         </div>
       )}
       {error && (
-        <div className="k-error" role="alert">
+        <div className="k-error" role="alert" aria-live="polite">
           <CircleAlertIcon size={20} aria-hidden="true" />
           <span>{error}</span>
         </div>
@@ -690,7 +690,7 @@ function EmailReservedPane() {
       <span className="chi">
         <MailIcon size={34} aria-hidden="true" />
       </span>
-      <h4 className="serif">邮箱登录暂未开放</h4>
+      <h4>邮箱登录暂未开放</h4>
       <p>当前会员账号使用手机号验证码登录。邮箱登录入口已预留，接入邮箱验证码服务后开放，请先使用手机号或扫码登录。</p>
     </div>
   )

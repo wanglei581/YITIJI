@@ -153,7 +153,7 @@ export function ScanQrLoginPanel({
   const showScanline = !!qr && qr.status === 'pending' && !loading
 
   return (
-    <div className="k-pane">
+    <div className="service-desk k1-scan-qr-login k-pane">
       <div className="k-scan">
         <div className="k-qrwrap">
           <div className="k-qrframe">
@@ -161,9 +161,9 @@ export function ScanQrLoginPanel({
             <span className="corner tr" />
             <span className="corner bl" />
             <span className="corner br" />
-            {loading && <span style={{ fontSize: 15, fontWeight: 650, color: 'var(--muted)' }}>二维码生成中…</span>}
+            {loading && <span className="k-qr-loading">二维码生成中…</span>}
             {!loading && qr?.qrValue && <QRCodeSVG value={qr.qrValue} size={252} level="M" marginSize={1} />}
-            {!loading && !qr?.qrValue && <QrCodeIcon size={72} color="rgba(16,48,43,0.18)" aria-hidden="true" />}
+            {!loading && !qr?.qrValue && <QrCodeIcon className="k-qr-placeholder" size={72} aria-hidden="true" />}
             {showScanline && <div className="scanline" />}
           </div>
           <div className="k-qrmeta">
@@ -214,13 +214,13 @@ export function ScanQrLoginPanel({
           </div>
 
           {notice && (
-            <div className="k-notice" role="status">
+            <div className="k-notice" role="status" aria-live="polite">
               <CircleCheckIcon size={20} aria-hidden="true" />
               <span>{notice}</span>
             </div>
           )}
           {error && (
-            <div className="k-error" role="alert">
+            <div className="k-error" role="alert" aria-live="polite">
               <span>{error}</span>
             </div>
           )}

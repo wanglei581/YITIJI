@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { CheckCircle2Icon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
 import { MemberApiError, sendSmsCode } from '../../services/auth/memberAuthApi'
 import { confirmQrLogin, fetchQrLoginStatus } from '../../services/auth/memberQrLoginApi'
+import './mobile-qr-service-desk.css'
 
 const PHONE_LENGTH = 11
 const CODE_LENGTH = 6
@@ -108,27 +109,27 @@ export function MobileQrLoginPage() {
   const canConfirm = ready && phone.length === PHONE_LENGTH && code.length === CODE_LENGTH && !loading && !confirmed
 
   return (
-    <main className="min-h-screen bg-[#f3f5f9] px-5 py-8 text-[#172033]">
-      <section className="mx-auto flex w-full max-w-[460px] flex-col">
-        <div className="flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#3185ff] via-[#7f65dc] to-[#ff6a3d] text-white shadow-lg shadow-primary-500/20">
-            <SmartphoneIcon className="h-8 w-8" aria-hidden="true" />
+    <main className="service-desk k1-mobile-qr-login" data-visual-theme="service-desk" data-ux-density="touch">
+      <section className="k1-mobile-qr-content">
+        <div className="k1-mobile-qr-intro">
+          <div className="k1-mobile-qr-icon">
+            <SmartphoneIcon aria-hidden="true" />
           </div>
-          <h1 className="mt-4 text-2xl font-bold">手机确认登录</h1>
-          <p className="mt-2 text-sm leading-6 text-[#7e8797]">
+          <h1>手机确认登录</h1>
+          <p>
             输入手机号和短信验证码后，一体机会自动进入会员登录态。
           </p>
-          <div className="mt-4 rounded-[10px] border border-primary-100 bg-primary-50 px-4 py-3 text-sm font-semibold leading-6 text-primary-700">
+          <div className="k1-mobile-qr-device">
             设备提示：{deviceLabel ?? '正在识别一体机'}
             <br />
             请确认它与你面前的一体机一致，再继续登录。
           </div>
         </div>
 
-        <div className="mt-8 rounded-[10px] border border-[#dfe4ec] bg-white p-5 shadow-sm">
-          <label className="block text-sm font-semibold">手机号</label>
-          <div className="mt-3 flex min-h-[52px] items-center rounded-[10px] border border-[#dfe4ec] bg-[#f8fafc] px-4">
-            <span className="mr-3 border-r border-[#e1e6ef] pr-3 text-sm font-semibold text-[#8a94a6]">+86</span>
+        <div className="k1-mobile-qr-card">
+          <label className="k1-mobile-qr-label">手机号</label>
+          <div className="k1-mobile-qr-field">
+            <span className="k1-mobile-qr-prefix">+86</span>
             <input
               type="tel"
               inputMode="numeric"
@@ -137,14 +138,14 @@ export function MobileQrLoginPage() {
               disabled={confirmed}
               onChange={(event) => setPhone(normalizeDigits(event.target.value, PHONE_LENGTH))}
               placeholder="请输入手机号"
-              className="min-w-0 flex-1 bg-transparent text-base font-semibold outline-none placeholder:text-[#a1a8b5]"
+              className="k1-mobile-qr-input"
             />
           </div>
 
-          <label className="mt-5 block text-sm font-semibold">验证码</label>
-          <div className="mt-3 flex gap-3">
-            <div className="flex min-h-[52px] flex-1 items-center rounded-[10px] border border-[#dfe4ec] bg-[#f8fafc] px-4">
-              <ShieldCheckIcon className="mr-2 h-5 w-5 text-[#98a2b3]" aria-hidden="true" />
+          <label className="k1-mobile-qr-label k1-mobile-qr-code-label">验证码</label>
+          <div className="k1-mobile-qr-code-row">
+            <div className="k1-mobile-qr-field k1-mobile-qr-code-field">
+              <ShieldCheckIcon aria-hidden="true" />
               <input
                 type="tel"
                 inputMode="numeric"
@@ -153,28 +154,28 @@ export function MobileQrLoginPage() {
                 disabled={confirmed}
                 onChange={(event) => setCode(normalizeDigits(event.target.value, CODE_LENGTH))}
                 placeholder="6位验证码"
-                className="min-w-0 flex-1 bg-transparent text-base font-semibold tracking-[0.12em] outline-none placeholder:tracking-normal placeholder:text-[#a1a8b5]"
+                className="k1-mobile-qr-input k1-mobile-qr-code-input"
               />
             </div>
             <button
               type="button"
               onClick={handleSendCode}
               disabled={!canSend}
-              className="min-h-[52px] min-w-[104px] rounded-[10px] bg-[#edf5ff] px-4 text-sm font-bold text-[#1677ff] disabled:cursor-not-allowed disabled:bg-[#eef1f6] disabled:text-[#a1a8b5]"
+              className="k1-mobile-qr-send"
             >
               {loading ? '处理中' : countdown.seconds > 0 ? `${countdown.seconds}s` : '获取验证码'}
             </button>
           </div>
 
           {notice && (
-            <div className="mt-4 flex min-h-[42px] items-center justify-center gap-2 rounded-[8px] bg-success-bg px-4 text-sm font-semibold text-success-fg">
-              <CheckCircle2Icon className="h-4 w-4" aria-hidden="true" />
+            <div className="k1-mobile-qr-notice" role="status" aria-live="polite">
+              <CheckCircle2Icon aria-hidden="true" />
               {notice}
             </div>
           )}
 
           {error && (
-            <div className="mt-4 rounded-[8px] bg-error-bg px-4 py-3 text-center text-sm font-semibold text-error-fg">
+            <div className="k1-mobile-qr-error" role="alert" aria-live="polite">
               {error}
             </div>
           )}
@@ -183,7 +184,7 @@ export function MobileQrLoginPage() {
             <button
               type="button"
               onClick={loadTicketStatus}
-              className="mt-4 min-h-[44px] w-full rounded-[10px] border border-[#dfe4ec] bg-white text-sm font-bold text-[#1677ff]"
+              className="k1-mobile-qr-retry"
             >
               重新检查二维码
             </button>
@@ -193,13 +194,13 @@ export function MobileQrLoginPage() {
             type="button"
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="mt-5 min-h-[54px] w-full rounded-[10px] bg-[#1677ff] text-base font-bold text-white shadow-lg shadow-primary-500/20 disabled:cursor-not-allowed disabled:bg-[#a9bdf5]"
+            className="k1-mobile-qr-confirm"
           >
             {confirmed ? '已确认，请回到一体机' : loading ? '确认中...' : '确认登录一体机'}
           </button>
         </div>
 
-        <p className="mt-5 text-center text-xs leading-5 text-[#98a2b3]">
+        <p className="k1-mobile-qr-footer">
           本页面只用于确认当前一体机登录，不会在手机或一体机长期保存登录凭证。
         </p>
       </section>

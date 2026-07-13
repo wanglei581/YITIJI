@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, PageHeader } from '@ai-job-print/ui'
+import './help-service-desk.css'
 import {
   BriefcaseIcon,
   ChevronRightIcon,
@@ -163,30 +164,31 @@ const SECTIONS: HelpSection[] = [
   },
 ]
 
-function QaRow({ item, onNavigate }: { item: QA; onNavigate: (route: string) => void }) {
+function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onNavigate: (route: string) => void }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="border-t border-neutral-100 first:border-t-0">
+    <div className="k1-help-row border-t border-neutral-100 first:border-t-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex min-h-[56px] w-full items-center gap-3 py-3.5 text-left"
+        aria-controls={answerId}
+        className="k1-help-toggle flex min-h-[56px] w-full items-center gap-3 py-3.5 text-left"
       >
         <span className="min-w-0 flex-1 text-sm font-semibold text-neutral-800">{item.q}</span>
         <ChevronRightIcon
-          className={['h-4 w-4 shrink-0 text-neutral-400 transition-transform', open ? 'rotate-90' : ''].join(' ')}
+          className={['k1-help-chevron h-4 w-4 shrink-0 text-neutral-400 transition-transform', open ? 'rotate-90' : ''].join(' ')}
           aria-hidden="true"
         />
       </button>
       {open && (
-        <div className="pb-4">
+        <div id={answerId} className="k1-help-answer pb-4">
           <p className="text-sm leading-relaxed text-neutral-600">{item.a}</p>
           {item.link && (
             <button
               type="button"
               onClick={() => onNavigate(item.link!.route)}
-              className="mt-3 flex min-h-[44px] items-center gap-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm font-semibold text-primary-600 hover:bg-neutral-50 active:bg-neutral-100"
+              className="k1-help-link mt-3 flex min-h-[44px] items-center gap-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm font-semibold text-primary-600 hover:bg-neutral-50 active:bg-neutral-100"
             >
               {item.link.label}
               <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -209,18 +211,20 @@ export function HelpCenterPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
-      <PageHeader
-        title="帮助中心"
-        subtitle="常见问题与使用说明"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-            返回我的
-          </Button>
-        }
-      />
+    <div className="service-desk k1-help-center flex h-full flex-col px-6 pt-6">
+      <div className="k1-help-topbar">
+        <PageHeader
+          title="帮助中心"
+          subtitle="常见问题与使用说明"
+          actions={
+            <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
+              返回我的
+            </Button>
+          }
+        />
+      </div>
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="k1-help-scroll mt-4 flex-1 overflow-y-auto pb-8">
         <div className="flex flex-col gap-4">
           {SECTIONS.map((section) => {
             const Icon = section.icon
@@ -228,24 +232,29 @@ export function HelpCenterPage() {
               <section
                 key={section.key}
                 aria-label={section.title}
-                className="rounded-2xl border border-neutral-200 bg-white px-5 py-3 shadow-sm"
+                className="k1-help-section rounded-2xl border border-neutral-200 bg-white px-5 py-3 shadow-sm"
               >
-                <div className="flex items-center gap-3 py-2">
-                  <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', section.iconBg].join(' ')}>
+                <div className="k1-help-section-heading flex items-center gap-3 py-2">
+                  <span className={['k1-help-section-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', section.iconBg].join(' ')}>
                     <Icon className={['h-5 w-5', section.iconColor].join(' ')} aria-hidden="true" />
                   </span>
                   <h2 className="text-base font-bold text-neutral-900">{section.title}</h2>
                 </div>
                 <div>
-                  {section.items.map((item) => (
-                    <QaRow key={item.q} item={item} onNavigate={handleNavigate} />
+                  {section.items.map((item, itemIndex) => (
+                    <QaRow
+                      key={item.q}
+                      item={item}
+                      answerId={`help-answer-${section.key}-${itemIndex}`}
+                      onNavigate={handleNavigate}
+                    />
                   ))}
                 </div>
               </section>
             )
           })}
 
-          <p className="px-2 text-center text-xs leading-relaxed text-neutral-400">
+          <p className="k1-help-footer px-2 text-center text-xs leading-relaxed text-neutral-400">
             如需更多帮助，请联系现场工作人员。本终端仅提供信息与打印辅助服务，办理结果以官方/来源平台为准。
           </p>
         </div>

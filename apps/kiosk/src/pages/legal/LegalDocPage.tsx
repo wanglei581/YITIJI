@@ -9,6 +9,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, PageHeader } from '@ai-job-print/ui'
 import { FileTextIcon, ShieldCheckIcon } from 'lucide-react'
+import './legal-service-desk.css'
 
 const UPDATED_AT = '2026 年 6 月 22 日'
 
@@ -114,40 +115,45 @@ export function LegalDocPage() {
   const Icon = meta.icon
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="service-desk k1-legal-doc" data-visual-theme="service-desk" data-ux-density="touch">
+      <div className="legal-doc-shell">
       <PageHeader
+        className="legal-doc-page-header"
         title={meta.title}
         subtitle={`更新日期：${UPDATED_AT}`}
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
+          <Button size="sm" variant="secondary" className="legal-doc-back" onClick={() => navigate(-1)}>
             返回
           </Button>
         }
       />
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
-        <div className="mx-auto max-w-2xl rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
-              <Icon className="h-5 w-5" aria-hidden="true" />
+      <div className="legal-doc-scroller">
+        <article className="legal-doc-card">
+          <div className="legal-doc-intro">
+            <span className="legal-doc-icon">
+              <Icon aria-hidden="true" />
             </span>
-            <p className="text-sm text-neutral-500">
+            <p>
               请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。
             </p>
           </div>
-          {meta.sections.map((s) => (
-            <section key={s.title} className="mb-5">
-              <h2 className="mb-2 text-base font-bold text-neutral-900">{s.title}</h2>
+          <div className="legal-doc-sections">
+            {meta.sections.map((s) => (
+              <section key={s.title}>
+              <h2>{s.title}</h2>
               {s.paragraphs.map((para) => (
-                <p key={para.slice(0, 16)} className="mb-2 text-sm leading-relaxed text-neutral-700">
+                <p key={para.slice(0, 16)}>
                   {para}
                 </p>
               ))}
             </section>
           ))}
-          <p className="mt-6 border-t border-neutral-100 pt-4 text-xs leading-relaxed text-neutral-400">
+          </div>
+          <p className="legal-doc-notice">
             本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准。
           </p>
-        </div>
+        </article>
+      </div>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-12
+> 最后更新：2026-07-13
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -144,7 +144,8 @@
 
 - [x] **规范、命名与全页面事实盘点**：已将 4188 亮蓝白服务台方向正式命名为「青序 LightFlow」，产品与设计名称统一，工程内部保留 `service-desk` 主题命名；已基于最新三端路由逐项盘点 112 个正式页面组件、5 条重定向和 3 个路由壳层，并形成 `docs/reviews/qingxu-lightflow-page-inventory-2026-07-12.md`。本项只代表规范与盘点完成，不代表任何运行时页面已经迁移。
 - [x] **UI-0 / UI-1 代表页实施（本地候选）**：已按 `docs/superpowers/plans/2026-07-11-service-desk-ui0-ui1-first-batch.md` 建立 opt-in 的共享 token、密度与壳层合同，并迁移 Kiosk 首页、Admin 工作台、Partner 岗位管理三个代表页；本地 TDD 静态门禁、三端 typecheck/lint/build、真实 API 角色浏览器与规定视口矩阵、Antigravity + Claude 双模型审查均已完成，Critical=0。4 个新增 verify 已接入 `build-and-verify`，且 foundation verify 锁定 CI 接线与 CCG 归档边界；尚未 push，故 GitHub CI 尚未实际运行。当前仍未合并、部署或完成 Windows 真机验收。
-- [ ] **UI-2 十三个业务域波次**：三个代表页经用户视觉和真实流程验收后，再按 `docs/superpowers/plans/2026-07-12-qingxu-lightflow-all-pages-migration-program.md` 分 K1–K6、A1–A4、P1–P3 独立实施；每波次必须另写逐文件计划、静态 verify、浏览器矩阵和证据等级，禁止一次性改完 112 页。K4 本人资产波次须等待当前“我的页商用闭环”任务完成、迁移或明确废弃后再开工。
+- [~] **K1 公共入口、身份与独立全屏页（本地候选）**：按 `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k1-public-entry.md`，候选基线已安全快进 `origin/main=08c7588e`；K1 静态合同 RED→GREEN、手机上传 `aria-label`、CSS 根作用域与 Help FAQ 无空格 a11y ID RED→GREEN、三个 K1 verify、Kiosk typecheck/lint（0 error；仅既有 `KioskBusyContext` 两条 Fast Refresh warning）、production build 与 diff check 均本地通过，CI 仅新增三条 K1 Kiosk 命令且保留主线 #211 CI 修复。Vite preview 已覆盖 1080×1920 / 390×844 / 390×700 的未勾协议、缺 QR ticket、缺 upload hash、法律返回、Help FAQ/来源 state、无屏保素材回首页；preview 未接 API，屏保/config 500 与 favicon 404，故不构成 UX-2 真实 HTTP、预生产、Windows 真机或生产验收。内部规格/质量复审 APPROVE；Claude 终审与 Help a11y 复审均 APPROVE；Antigravity 两次因地区不可用未产生有效报告，因此未形成有效外部双批准。候选仅限本地分支，未 push/合并/部署。
+- [ ] **UI-2 后续业务域波次（下一波：K2）**：K1 完成有效外部双模型终审、精确提交和后续集成前，不扩展其范围；下一个独立开发波次为 **K2**。之后再按 `docs/superpowers/plans/2026-07-12-qingxu-lightflow-all-pages-migration-program.md` 推进 K2–K6、A1–A4、P1–P3；每波次必须另写逐文件计划、静态 verify、浏览器矩阵和证据等级，禁止一次性改完 112 页。K4 本人资产波次须等待当前“我的页商用闭环”任务完成、迁移或明确废弃后再开工。
 - [ ] **UI-3 / UI-4 跨页收口与旧主题退出**：十三个业务域波次完成后，统一处理加载、空态、错误、权限、超时、离线、部分成功、焦点恢复、reduced motion 和共享设备清场；只有在运行时引用清零、三端构建与浏览器矩阵通过后，才允许删除 InkPaper / Fusion Youth 旧主题。真机、支付、打印与预生产证据继续按 UX-1 至 UX-4 分级，不得越级宣称完成。
 
 ## P1：渐进式重构首批业务闭环

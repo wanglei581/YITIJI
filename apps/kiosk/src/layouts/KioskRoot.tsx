@@ -49,6 +49,7 @@ function KioskShell() {
 
   const activeTab = getActiveTab(pathname)
   const statusVariant = deviceStatus === 'online' || deviceStatus === 'idle' ? 'success' : 'warning'
+  const isServiceDeskRoute = pathname === '/' || pathname === '/help'
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
@@ -58,7 +59,7 @@ function KioskShell() {
     <KioskLayout
       activeTab={activeTab}
       onTabChange={(tab) => navigate(tabToPath(tab))}
-      visualTheme={pathname === '/' ? 'service-desk' : 'legacy'}
+      visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
       density="touch"
       // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
       // 其余页面继续使用全局头部 + 设备状态徽标。
