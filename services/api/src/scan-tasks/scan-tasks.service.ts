@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import {
   BadRequestException,
   ConflictException,
@@ -83,6 +84,20 @@ export interface ScanTaskStatusResult {
   expiresAt: string
 }
 
+/**
+ * 判断是否命中 ScanTask 的活跃会话唯一约束（Prisma P2002）。
+ *
+ * `ScanTask` 模型目前只有一个数据库层唯一约束——B1-2 加的 partial unique index
+ * `ScanTask_terminalId_active_unique`（同一 terminalId 同时只能有一条 waiting/matched
+ * 记录，见 schema.prisma 里 ScanTask 模型上的注释）——create() 的 insert 里没有其它
+ * 可能触发唯一冲突的列，因此不需要像 order-status.service.ts 的
+ * isPickupCodeUniqueConflict() 那样再去比对 meta.target 区分多个候选唯一约束。
+ */
+function isScanTaskActiveSessionConflict(e: unknown): boolean {
+  const err = e as { code?: string }
+  return err?.code === 'P2002'
+}
+
 @Injectable()
 export class ScanTasksService {
   private readonly logger = new Logger(ScanTasksService.name)
@@ -96,7 +111,7 @@ export class ScanTasksService {
   async create(
     dto: CreateScanTaskDto,
     endUserId: string | null,
-  ): Promise<{ scanTaskId: string; expiresAt: string; instructions: string[] }> {
+  ): Promise<{ scanTaskId: string; controlToken: string; expiresAt: string; instructions: string[] }> {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
@@ -113,19 +128,37 @@ export class ScanTasksService {
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
 
+    // 与 mock-interview.service.ts / materials.service.ts 的匿名 accessToken 同款惯例：
+    // randomBytes(24) 铸 192-bit 随机 token，DB 只存 sha256 hash，明文只在本次响应里返回一次。
+    const controlToken = randomBytes(24).toString('hex')
+    const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
+
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
-    const task = await this.prisma.scanTask.create({
-      data: {
-        terminalId: terminal.id,
-        scanType: dto.scanType,
-        endUserId,
-        expiresAt,
-      },
-      select: { id: true },
-    })
+    let task: { id: string }
+    try {
+      task = await this.prisma.scanTask.create({
+        data: {
+          terminalId: terminal.id,
+          scanType: dto.scanType,
+          endUserId,
+          expiresAt,
+          controlTokenHash,
+        },
+        select: { id: true },
+      })
+    } catch (e) {
+      if (isScanTaskActiveSessionConflict(e)) {
+        // B1-2 的 partial unique index 命中：该终端已有一个 waiting/matched 中的会话。
+        throw new ConflictException({
+          error: { code: 'SCAN_TERMINAL_BUSY', message: '该终端当前有正在进行的扫描，请稍后重试或联系工作人员' },
+        })
+      }
+      throw e
+    }
 
     return {
       scanTaskId: task.id,
+      controlToken,
       expiresAt: expiresAt.toISOString(),
       instructions: SCAN_TYPE_INSTRUCTIONS[dto.scanType],
     }

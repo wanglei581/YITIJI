@@ -2,6 +2,7 @@ import 'reflect-metadata'
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcdef'
 
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
@@ -20,6 +21,7 @@ interface StoredScanTask {
   matchedFileMtime: Date | null
   errorCode: string | null
   errorMessage: string | null
+  controlTokenHash: string | null
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -87,6 +89,7 @@ class FakePrisma {
         matchedFileMtime: null,
         errorCode: null,
         errorMessage: null,
+        controlTokenHash: data.controlTokenHash ?? null,
         expiresAt: data.expiresAt!,
         createdAt: now,
         updatedAt: now,
@@ -196,6 +199,17 @@ async function main(): Promise<void> {
     assert.ok(created.scanTaskId)
     assert.equal(created.instructions.length > 0, true, 'instructions must be non-empty')
 
+    // B1-3: create() 铸造并返回明文 controlToken（24 random bytes = 48 hex chars），
+    // DB 里只落它的 sha256 hash，绝不落明文。
+    assert.match(created.controlToken, /^[0-9a-f]{48}$/, 'controlToken must be a 24-byte hex string')
+    const storedTask = prisma.scanTasksById.get(created.scanTaskId)
+    assert.notEqual(storedTask?.controlTokenHash, created.controlToken, 'stored value must not be the plaintext token')
+    assert.equal(
+      storedTask?.controlTokenHash,
+      createHash('sha256').update(created.controlToken).digest('hex'),
+      'stored controlTokenHash must be sha256(controlToken)',
+    )
+
     const delivered = await service.deliverScanFile({
       terminalId: 't_1',
       buffer: Buffer.from('%PDF-1.4 scan'),
@@ -210,6 +224,51 @@ async function main(): Promise<void> {
     assert.equal(status.status, 'completed')
     assert.equal(status.file?.fileId, delivered.fileId)
     assert.match(status.file?.fileUrl ?? '', /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/)
+  }
+
+  {
+    // B1-3：create() 捕获数据库唯一约束冲突（B1-2 的 partial unique index，Prisma 抛 P2002）
+    // 必须映射成 409 ConflictException + error.code === 'SCAN_TERMINAL_BUSY'，不能是未处理异常
+    // 也不能被其它无关错误码顶替。FakePrisma 不建模真实唯一索引，这里 monkey-patch
+    // scanTask.create 模拟命中约束，复现真实 Prisma 抛出的错误形状
+    // （real-DB 端到端复现见本任务 verification：against 真实 SQLite + 真实 partial unique index）。
+    const { service, prisma } = makeService()
+    const originalCreate = prisma.scanTask.create.bind(prisma.scanTask)
+    prisma.scanTask.create = (async () => {
+      const p2002 = new Error('Unique constraint failed on the fields: (`terminalId`)') as Error & {
+        code: string
+        meta: { target: string[] }
+      }
+      p2002.code = 'P2002'
+      p2002.meta = { target: ['terminalId'] }
+      throw p2002
+    }) as typeof originalCreate
+
+    let caught: unknown
+    try {
+      await service.create(dto, null)
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(caught instanceof ConflictException, `expected ConflictException, got ${(caught as Error)?.constructor?.name}`)
+    const body = (caught as ConflictException).getResponse() as { error?: { code?: string } }
+    assert.equal(body.error?.code, 'SCAN_TERMINAL_BUSY', 'P2002 on create() must map to SCAN_TERMINAL_BUSY, not a different/generic code')
+
+    prisma.scanTask.create = originalCreate as typeof prisma.scanTask.create
+  }
+
+  {
+    // create() 必须只把 P2002 映射成 SCAN_TERMINAL_BUSY；其它数据库错误码/未知错误必须原样透出
+    // （不能被误吞成"终端繁忙"，否则会掩盖真实故障，误导排障方向）。
+    const { service, prisma } = makeService()
+    const originalCreate = prisma.scanTask.create.bind(prisma.scanTask)
+    prisma.scanTask.create = (async () => {
+      throw new Error('ECONNRESET: simulated unrelated database failure')
+    }) as typeof originalCreate
+
+    await expectRejects(() => service.create(dto, null), Error, 'non-P2002 errors must not be swallowed as SCAN_TERMINAL_BUSY')
+
+    prisma.scanTask.create = originalCreate as typeof prisma.scanTask.create
   }
 
   {
