@@ -1,8 +1,9 @@
 import crypto from 'crypto'
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
+import { FilesService } from '../files/files.service'
 import { signFileUrl, verifyFileSignature } from '../files/signing'
 import { OrderStatusService } from '../payment/order-status.service'
 import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from '../payment/payment-session-token'
@@ -152,6 +153,8 @@ function makeOrderNo(): string {
 
 @Injectable()
 export class PrintJobsService {
+  private readonly logger = new Logger(PrintJobsService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -159,6 +162,7 @@ export class PrintJobsService {
     private readonly pricing: PricingService,
     private readonly orderStatus: OrderStatusService,
     private readonly capabilities: TerminalCapabilitiesService,
+    private readonly files: FilesService,
   ) {}
 
   async create(
@@ -279,6 +283,28 @@ export class PrintJobsService {
       ...(dto.fileName ? { fileName: dto.fileName } : {}),
     }
 
+    // 证件照排版 PDF 强制专用打印参数契约（设计 §六）：scale=actual 保证规格物理尺寸
+    // 不被 Agent 的“适合页面”缩放破坏；彩色/单面/A4 固定。不信任前端，「我的文档」重印同受保护。
+    const fileRecord = await this.prisma.fileObject.findUnique({
+      where: { id: fileId },
+      select: { purpose: true, sourceFileId: true },
+    })
+    if (fileRecord?.purpose === 'id_photo_print') {
+      const contractOk =
+        storedParams['scale'] === 'actual' &&
+        storedParams['colorMode'] === 'color' &&
+        storedParams['duplex'] === 'simplex' &&
+        storedParams['paperSize'] === 'A4'
+      if (!contractOk) {
+        throw new BadRequestException({
+          error: {
+            code: 'PRINT_PARAMS_INVALID_FOR_ID_PHOTO',
+            message: '证件照打印参数不符合要求（彩色、单面、A4、原始尺寸）',
+          },
+        })
+      }
+    }
+
     const orderNo = makeOrderNo()
     const { task, order } = await this.prisma.$transaction(async (tx) => {
       const task = await tx.printTask.create({
@@ -345,6 +371,12 @@ export class PrintJobsService {
       userAgent: ctx.userAgent ?? null,
     })
 
+    // 证件照：建单成功后服务端删除裁剪产物源文件（设计 §4.9 主删除路径；
+    // 失败只记日志不影响建单，1h TTL + cron 兜底）。
+    if (fileRecord?.purpose === 'id_photo_print' && fileRecord.sourceFileId) {
+      await this.deleteIdPhotoSourceAfterCreate(fileRecord.sourceFileId, task.id)
+    }
+
     return {
       taskId:    task.id,
       status:    task.status,
@@ -364,6 +396,33 @@ export class PrintJobsService {
         amountCents: order.amountCents,
         printTaskId: task.id,
       }),
+    }
+  }
+
+  /**
+   * 证件照建单成功后的源文件删除（设计 §4.9 主删除路径）。
+   *
+   * 失败隔离：任何异常只记日志，绝不向上抛出——打印任务已建单成功，
+   * 源文件删除失败不应影响用户拿到建单结果（1h 文件 TTL + cron 兜底会最终回收）。
+   */
+  private async deleteIdPhotoSourceAfterCreate(sourceFileId: string, printTaskId: string): Promise<void> {
+    try {
+      const source = await this.prisma.fileObject.findUnique({
+        where: { id: sourceFileId },
+        select: { purpose: true, status: true, deletedAt: true },
+      })
+      if (!source || source.purpose !== 'id_scan' || source.status === 'deleted' || source.deletedAt) return
+      await this.files.systemDelete(sourceFileId, 'id_photo source auto-delete after print task created')
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'id_photo.source_deleted',
+        targetType: 'file',
+        targetId: sourceFileId,
+        payload: { trigger: 'print_task_created', printTaskId },
+      })
+    } catch (err) {
+      this.logger.warn(`id_photo source auto-delete failed (${sourceFileId}): ${(err as Error).message}`)
     }
   }
 

@@ -26,6 +26,7 @@ import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilit
 import { AuditService } from '../src/audit/audit.service'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
+import { FilesService } from '../src/files/files.service'
 import { signFileUrl } from '../src/files/signing'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { PricingService } from '../src/payment/pricing.service'
@@ -65,6 +66,7 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
+  const files = new FilesService(prisma, audit, storage)
   const printJobs = new PrintJobsService(
     prisma,
     audit,
@@ -72,6 +74,7 @@ async function main() {
     new PricingService(prisma),
     new OrderStatusService(prisma, audit),
     new TerminalCapabilitiesService(prisma),
+    files,
   )
   const terminals = new TerminalsService(prisma) // 不调 onModuleInit，避免 seed + 定时器
 
@@ -81,6 +84,10 @@ async function main() {
   const fileId = `file_vpj_${suffix}`
   const storageKey = `verify/print-jobs/${fileId}.pdf`
   const createdTaskIds: string[] = []
+  // 证件照参数契约 + 建单后源删除用例 fixture id（提前声明，供 cleanup 闭包引用）。
+  const idpSourceId = `file_vpj_idsrc_${suffix}`
+  const idpLayoutId = `file_vpj_idlay_${suffix}`
+  const idpLayoutKey = `verify/print-jobs/${idpLayoutId}.pdf`
 
   async function cleanup() {
     if (createdTaskIds.length) {
@@ -97,6 +104,10 @@ async function main() {
     await prisma.fileObject.deleteMany({ where: { id: fileId } })
     await storage.deleteObject(storageKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
     await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
+    // 证件照参数契约 + 源删除用例 fixture 清理。
+    await prisma.auditLog.deleteMany({ where: { targetType: 'file', targetId: { in: [idpSourceId, idpLayoutId] } } })
+    await prisma.fileObject.deleteMany({ where: { id: { in: [idpSourceId, idpLayoutId] } } })
+    await storage.deleteObject(idpLayoutKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
   }
 
   try {
@@ -348,6 +359,98 @@ async function main() {
       pass('7g. 仅原始 errorMessage（无 errorCode）→ getStatus 回默认安全文案，failureReasonForUser/errorMessage 一致且不泄露原文')
     } else {
       fail(`7g. 仅原始 errorMessage 兜底异常: ${JSON.stringify({ failureReasonForUser: userView3.failureReasonForUser, errorMessage: userView3.errorMessage, leaked3 })}`)
+    }
+
+    // ── 8. 证件照参数契约 + 建单后源删除（设计 §六 + §4.9 主删除路径）────────
+    // fixture：id_scan 源文件 + id_photo_print 排版 PDF（sourceFileId 指回源），
+    // 均为 purpose 门禁触发本次新增行为所需的最小真实 DB 状态。
+    await prisma.fileObject.create({
+      data: {
+        id: idpSourceId,
+        storageKey: `verify/print-jobs/${idpSourceId}.jpg`,
+        filename: 'crop.jpg',
+        mimeType: 'image/jpeg',
+        sizeBytes: 1024,
+        sha256: '',
+        purpose: 'id_scan',
+        bucket: LOCAL_BUCKET_SENTINEL,
+        ownerType: 'system',
+        status: 'active',
+      },
+    })
+    await storage.putObject(idpLayoutKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
+    await prisma.fileObject.create({
+      data: {
+        id: idpLayoutId,
+        storageKey: idpLayoutKey,
+        filename: 'layout.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: pdfBytes.length,
+        sha256: '',
+        purpose: 'id_photo_print',
+        sourceFileId: idpSourceId,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        ownerType: 'system',
+        status: 'active',
+      },
+    })
+    const idpFileUrl = signFileUrl(idpLayoutId, 5 * 60 * 1000).url
+
+    // 与 PrintJobParamsDto 字段集对齐的字面量（services/api 走 commonjs，无法直接
+    // import ESM-only 的 @ai-job-print/shared，故本地复刻两组合法参数对象，
+    // 而非调用 makePrintParams；字段全集以 packages/shared/src/types/print.ts 的
+    // DEFAULT_PRINT_JOB_PARAMS / PrintJobParams 为准）。
+    const idpNonContractParams = {
+      copies: 1,
+      colorMode: 'black_white' as const,
+      duplex: 'simplex' as const,
+      paperSize: 'A4' as const,
+      orientation: 'auto' as const,
+      quality: 'standard' as const,
+      scale: 'fit' as const,
+      pagesPerSheet: 1 as const,
+    }
+    const idpContractParams = {
+      ...idpNonContractParams,
+      colorMode: 'color' as const,
+      scale: 'actual' as const,
+    }
+
+    // 8a：不满足契约（默认黑白 / fit）→ 400 PRINT_PARAMS_INVALID_FOR_ID_PHOTO
+    await expectCode(
+      () => printJobs.create({ fileUrl: idpFileUrl, params: idpNonContractParams }, { terminalId }),
+      'PRINT_PARAMS_INVALID_FOR_ID_PHOTO',
+      '8a. 证件照非契约参数（黑白/fit）建单 → 400 PRINT_PARAMS_INVALID_FOR_ID_PHOTO',
+    )
+
+    // 8b：满足契约（彩色/单面/A4/actual）→ 建单成功
+    const idpCreated = await printJobs.create(
+      { fileUrl: idpFileUrl, params: idpContractParams },
+      { terminalId },
+    )
+    createdTaskIds.push(idpCreated.taskId)
+    if (idpCreated.status === 'pending' && idpCreated.taskId.startsWith('ptask_')) {
+      pass('8b. 证件照契约参数（彩色/单面/A4/actual）建单成功')
+    } else {
+      fail(`8b. 证件照契约参数建单异常: ${JSON.stringify(idpCreated)}`)
+    }
+
+    // 8c：建单后源文件（id_scan）已被服务端自动软删（设计 §4.9 主删除路径）。
+    const idpSourceAfter = await prisma.fileObject.findUnique({ where: { id: idpSourceId } })
+    if (idpSourceAfter?.status === 'deleted' && idpSourceAfter.deletedAt) {
+      pass('8c. 建单成功后源文件已自动软删（status=deleted 且 deletedAt 已落库）')
+    } else {
+      fail(`8c. 源文件未被自动删除: ${JSON.stringify(idpSourceAfter)}`)
+    }
+
+    // 8d：源删除动作已留审计。
+    const idpDelAudit = await prisma.auditLog.findFirst({
+      where: { action: 'id_photo.source_deleted', targetId: idpSourceId },
+    })
+    if (idpDelAudit) {
+      pass('8d. 建单后源删除审计已落库（action=id_photo.source_deleted）')
+    } else {
+      fail('8d. 建单后源删除审计缺失')
     }
   } finally {
     await cleanup()
