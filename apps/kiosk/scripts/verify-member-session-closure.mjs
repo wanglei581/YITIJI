@@ -52,9 +52,21 @@ function hasGuardBefore(block, generation, updatePattern) {
   const positiveGuardPattern = new RegExp(
     `if\\s*\\(\\s*isCurrentRequest\\(\\s*${generation}\\s*\\)\\s*\\)\\s*\\{`,
   )
-  const positiveGuardIndex = positiveGuardPattern.exec(block)?.index ?? -1
-  return positiveGuardIndex >= 0 && updateIndex > positiveGuardIndex
+  const positiveGuard = positiveGuardPattern.exec(block)
+  if (!positiveGuard) return false
+  const guardOpenIndex = positiveGuard.index + positiveGuard[0].lastIndexOf('{')
+  const guardedBlock = extractBalancedBlock(block, guardOpenIndex)
+  return guardedBlock.length > 0 && updatePattern.test(guardedBlock)
 }
+
+assert(
+  !hasGuardBefore(
+    '{ if (isCurrentRequest(generation)) {} setLoading(false) }',
+    'generation',
+    /setLoading\s*\(/,
+  ),
+  'generation 门禁解析器拒绝空正向 guard 后的无条件更新',
+)
 
 const loginPage = read('src/pages/auth/LoginPage.tsx')
 const memberPhoneLoginHook = read('src/pages/auth/hooks/useMemberPhoneLogin.ts')
