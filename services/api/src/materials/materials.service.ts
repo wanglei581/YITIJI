@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
 import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
+import { isIdClassPurpose } from '../files/file.types'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
 import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
 import { PrismaService } from '../prisma/prisma.service'
@@ -127,6 +128,17 @@ export class MaterialsService {
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
     const sourceFile = await this.requireUsableSourceFile(dto.sourceFileId)
     this.assertCanUseSourceFile(sourceFile, requester)
+
+    // 证件类文件（证件照裁剪产物 / 排版 PDF）显式禁止进入材料处理链路——不论 kind 是什么。
+    // pii_scan 会对任意 purpose 做真实抽取且可能调用第三方 OCR，与证件照
+    // "照片全程不出内网"的隐私承诺冲突；inspection / normalize_a4 / bundle_render 等其他
+    // kind 也没有正当理由读取证件类文件的字节，因此在 kind 分支之前、材料任务入口处
+    // 统一拒绝（设计 2026-07-12-id-photo-design.md §五）。
+    if (isIdClassPurpose(sourceFile.purpose)) {
+      throw new BadRequestException({
+        error: { code: 'MATERIAL_SOURCE_PURPOSE_FORBIDDEN', message: '证件类文件不支持材料检查' },
+      })
+    }
 
     const kind = dto.kind as MaterialTaskKind
     const now = new Date()

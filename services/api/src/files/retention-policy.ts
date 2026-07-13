@@ -1,6 +1,7 @@
 import {
   FILE_DEFAULT_TTL_HOURS,
   FILE_RETENTION_CONSENT_VERSION,
+  isIdClassPurpose,
   type FileAssetCategory,
   type FileOwnerType,
   type FilePurpose,
@@ -81,7 +82,7 @@ export function allowedPoliciesForFile(input: {
   purpose: FilePurpose | string
   assetCategory: FileAssetCategory | string
 }): FileRetentionPolicy[] {
-  if (input.purpose === 'id_scan' || input.purpose === 'id_photo_print') return ['system_short']
+  if (isIdClassPurpose(input.purpose)) return ['system_short']
   if (input.assetCategory === 'optimized' || input.assetCategory === 'derived') {
     return ['months_3', 'months_6', 'long_term']
   }
@@ -110,8 +111,8 @@ function assertCanSetRetention(input: RetentionUpdateInput): void {
   if (input.retentionLockedReason) {
     throw new RetentionPolicyError('RETENTION_LOCKED', '该文件保存策略已被锁定')
   }
-  if ((input.purpose === 'id_scan' || input.purpose === 'id_photo_print') && input.policy !== 'system_short') {
-    throw new RetentionPolicyError('RETENTION_ID_SCAN_LOCKED', '证件类文件只能使用系统短期保存')
+  if (isIdClassPurpose(input.purpose) && input.policy !== 'system_short') {
+    throw new RetentionPolicyError('RETENTION_ID_CLASS_LOCKED', '证件类文件只能使用系统短期保存')
   }
   if (!allowedPoliciesForFile(input).includes(input.policy)) {
     if (input.assetCategory === 'original' && input.policy === 'long_term') {

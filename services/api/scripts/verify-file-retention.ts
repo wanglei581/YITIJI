@@ -89,7 +89,7 @@ function main(): void {
       consentVersion: CURRENT_RETENTION_CONSENT_VERSION,
     }),
   )
-  assertThrowsCode('RETENTION_ID_SCAN_LOCKED', () =>
+  assertThrowsCode('RETENTION_ID_CLASS_LOCKED', () =>
     computeRetentionDecision({
       now,
       policy: 'months_6',
@@ -103,7 +103,7 @@ function main(): void {
       consentVersion: 'privacy-v1',
     }),
   )
-  assertThrowsCode('RETENTION_ID_SCAN_LOCKED', () =>
+  assertThrowsCode('RETENTION_ID_CLASS_LOCKED', () =>
     computeRetentionDecision({
       now,
       policy: 'months_6',

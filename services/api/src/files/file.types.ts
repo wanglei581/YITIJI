@@ -61,6 +61,21 @@ export const FILE_DEFAULT_TTL_HOURS: Record<FileSensitiveLevel, number> = {
   highly_sensitive: 1,
 }
 
+/**
+ * "证件类"文件用途：身份证/证件照原图(id_scan)与证件照排版产物(id_photo_print)。
+ * 两者统一走最短保存期限锁定（见 retention-policy.ts），且禁止进入 materials 模块的
+ * 文档处理链路 —— 该链路的 pii_scan 会做真实文本抽取并可能调用第三方 OCR，
+ * 与证件照"照片全程不出内网"的隐私承诺冲突（设计 2026-07-12-id-photo-design.md §五）。
+ *
+ * 单一事实来源：任何需要判断"是否证件类文件"的地方都应引用本常量/函数，
+ * 不要重复写 `purpose === 'id_scan' || purpose === 'id_photo_print'`。
+ */
+export const ID_CLASS_PURPOSES: ReadonlySet<FilePurpose> = new Set(['id_scan', 'id_photo_print'])
+
+export function isIdClassPurpose(purpose: FilePurpose | string): boolean {
+  return ID_CLASS_PURPOSES.has(purpose as FilePurpose)
+}
+
 export interface FileMetadata {
   id: string
   bucket: string

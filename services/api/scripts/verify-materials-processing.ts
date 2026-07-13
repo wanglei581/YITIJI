@@ -35,6 +35,15 @@ function fail(message: string): never {
   process.exit(1)
 }
 
+/** 提取 NestJS HttpException 的业务错误码；兼容 getResponse() 与直接 .response 两种形态（与 verify-id-photo.ts 一致）。 */
+function errCode(e: unknown): string | undefined {
+  const ex = e as { getResponse?: () => unknown; response?: unknown }
+  const resp = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
+    | { error?: { code?: string } }
+    | undefined
+  return resp?.error?.code
+}
+
 async function expectForbidden(label: string, fn: () => Promise<unknown>) {
   try {
     await fn()
@@ -74,6 +83,19 @@ async function expectBadRequest(label: string, fn: () => Promise<unknown>) {
   fail(`${label}: expected BadRequestException`)
 }
 
+async function expectBadRequestCode(label: string, code: string, fn: () => Promise<unknown>) {
+  try {
+    await fn()
+  } catch (error) {
+    if (error instanceof BadRequestException && errCode(error) === code) {
+      pass(label)
+      return
+    }
+    fail(`${label}: expected BadRequestException with code ${code}, got ${errCode(error) ?? (error as Error).message}`)
+  }
+  fail(`${label}: expected BadRequestException with code ${code}`)
+}
+
 async function main() {
   console.log('\n=== Phase A-2 materials document-processing verification ===')
   const prisma = new PrismaService()
@@ -103,6 +125,8 @@ async function main() {
   const blankPdfFileId = `file_mat_blankpdf_${suffix}`
   const nonBlankPdfFileId = `file_mat_nonblankpdf_${suffix}`
   const bigPageCountFileId = `file_mat_bigpage_${suffix}`
+  const idScanFileId = `file_mat_idscan_${suffix}`
+  const idPhotoPrintFileId = `file_mat_idphotoprint_${suffix}`
   const testFileIds = [
     ownedFileId,
     anonymousFileId,
@@ -117,6 +141,8 @@ async function main() {
     blankPdfFileId,
     nonBlankPdfFileId,
     bigPageCountFileId,
+    idScanFileId,
+    idPhotoPrintFileId,
   ]
   const ownedObjectKey = `verify/materials/${ownedFileId}.png`
   const imageObjectKey = `verify/materials/${imageFileId}.png`
@@ -260,7 +286,78 @@ async function main() {
         ownerId: null,
       },
     })
+    // 证件类文件（id_scan / id_photo_print）：不需要真实可解码字节 —— OCR 隔离拒绝
+    // 发生在读取文件字节 / 调用 OCR 之前，storageKey 指向不存在的对象即可。
+    await prisma.fileObject.create({
+      data: {
+        id: idScanFileId,
+        storageKey: `verify/materials/${idScanFileId}.png`,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'id-card-front.png',
+        mimeType: 'image/png',
+        sizeBytes: 64,
+        sha256: 'e'.repeat(64),
+        purpose: 'id_scan',
+        sensitiveLevel: 'highly_sensitive',
+        expiresAt,
+        endUserId: ownerId,
+        ownerType: 'user',
+        ownerId,
+      },
+    })
+    await prisma.fileObject.create({
+      data: {
+        id: idPhotoPrintFileId,
+        storageKey: `verify/materials/${idPhotoPrintFileId}.pdf`,
+        bucket: LOCAL_BUCKET_SENTINEL,
+        region: LOCAL_REGION_SENTINEL,
+        filename: 'id-photo-layout.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 64,
+        sha256: 'f'.repeat(64),
+        purpose: 'id_photo_print',
+        sensitiveLevel: 'highly_sensitive',
+        expiresAt,
+        endUserId: ownerId,
+        ownerType: 'user',
+        ownerId,
+      },
+    })
     pass('FileObjects created')
+
+    // ── 证件类文件（id_scan / id_photo_print）OCR 隔离：材料任务入口必须在读取文件字节 /
+    //    调用 kind 分支之前统一拒绝，杜绝证件照在 TASK_TTL_HOURS 窗口内被送进这个模块的
+    //    真实 PII 抽取（可能调用第三方 OCR）。用共享的 `materials`（strictNoOcr）实例调用——
+    //    若拒绝逻辑失效、请求真的落到了 OCR 调用，strictNoOcr.recognize 会直接 fail()。
+    await expectBadRequestCode(
+      'K. id_scan 文件的 pii_scan 材料任务在入口处被拒绝（OCR 隔离）',
+      'MATERIAL_SOURCE_PURPOSE_FORBIDDEN',
+      () =>
+        materials.createTask(
+          { kind: 'pii_scan', sourceFileId: idScanFileId, params: {} },
+          { kind: 'member', endUserId: ownerId },
+        ),
+    )
+    await expectBadRequestCode(
+      'K. id_photo_print 文件的 pii_scan 材料任务在入口处被拒绝（OCR 隔离）',
+      'MATERIAL_SOURCE_PURPOSE_FORBIDDEN',
+      () =>
+        materials.createTask(
+          { kind: 'pii_scan', sourceFileId: idPhotoPrintFileId, params: {} },
+          { kind: 'member', endUserId: ownerId },
+        ),
+    )
+    // 拒绝发生在 kind 分支之前，对所有材料任务 kind 一视同仁 —— 不仅是 pii_scan。
+    await expectBadRequestCode(
+      'K. id_scan 文件的 inspection 材料任务同样在入口处被拒绝（拒绝不限于 pii_scan）',
+      'MATERIAL_SOURCE_PURPOSE_FORBIDDEN',
+      () =>
+        materials.createTask(
+          { kind: 'inspection', sourceFileId: idScanFileId, params: {} },
+          { kind: 'member', endUserId: ownerId },
+        ),
+    )
 
     // 专用 MaterialsService 实例：只 fake OCR 这一层边界，真实走 extractTextForPiiScan →
     // buildPiiFindingsFromPages 正则匹配/去重管线（与 verify-scan-tasks.ts 的 FakeFilesService
