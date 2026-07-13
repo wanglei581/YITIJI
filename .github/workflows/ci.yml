@@ -212,6 +212,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
+          pnpm --filter @ai-job-print/api verify:wechat-refund-regression
           pnpm --filter @ai-job-print/api verify:redemption-audit
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
@@ -359,6 +360,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
+          pnpm --filter @ai-job-print/api verify:wechat-refund-regression
           pnpm --filter @ai-job-print/api verify:redemption-audit
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
