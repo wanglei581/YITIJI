@@ -8,6 +8,7 @@ import {
   mkdirSync,
   readFileSync,
   utimesSync,
+  chmodSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -41,6 +42,34 @@ function verifySourceStructure(): void {
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
 
+  // 以下三条是 Critical code-review 之后新增的并发安全加固，但在本脚本里没有实际
+  // 可行的方式做成真实动态用例（原因分别标注在各行），因此保留成本低的静态正则
+  // 断言，作为"有人不小心删掉这段防御代码"时的廉价回归警报——不是运行时正确性证明。
+  assert.match(
+    source,
+    /file disappeared before processing, skipping/,
+    'must re-check file existence right before reading it (second existsSync, after the stability check), in case it vanished in that window',
+  )
+  // 无法动态触发：稳定性检查通过 → 二次 existsSync 复查之间只隔一次微任务恢复，
+  // 外部测试代码没有可靠手段在这个窗口内精确插入一次文件删除。
+  assert.match(
+    source,
+    /processCandidate\(filePath, filename, config\)\.catch\(/,
+    'the chokidar add-event call site must attach .catch() since processCandidate is async but the event handler itself is not',
+  )
+  // 无法在本一次性脚本里动态触发：需要真实启动持久 chokidar 监听器并触发一次
+  // 真实文件系统 add 事件，文件顶部注释已明确这类真实长驻监听行为交给 Windows
+  // 真机 / 长驻进程验收覆盖，不在这里伪装通过。
+  assert.match(
+    source,
+    /sweep failed to process .*, continuing with remaining files/,
+    'sweepFolder must catch per-file errors so one bad file does not abort the rest of the sweep',
+  )
+  // 无法动态触发：processCandidate 自身已经用一个吞掉一切异常的外层 catch 兜底
+  // （见下面 verifyUnexpectedErrorOuterCatch），意味着通过 sweepFolder 的公开
+  // 路径调用它时它实际上不会再向外抛出——这段 catch 目前是纯防御性代码，只能
+  // 通过白盒 mock processCandidate 本身才能真正触发，不值得为此增加脆弱性。
+
   // B1-7 加固：两个新常量必须存在且以 mtime 为判据（不是新增独立状态记录）。
   assert.match(source, /export const UNCLAIMED_MAX_AGE_MS\s*=/, 'must define an _unclaimed max-age constant')
   assert.match(source, /export const DELIVERY_RETRY_MAX_MS\s*=/, 'must define a delivery retry-cap constant')
@@ -72,19 +101,29 @@ function captureWarnLogs(fn: () => void): { stdout: string } {
   return { stdout }
 }
 
-async function captureLogsAsync(fn: () => Promise<void>): Promise<{ stdout: string }> {
-  const original = process.stdout.write.bind(process.stdout)
+async function captureLogsAsync(fn: () => Promise<void>): Promise<{ stdout: string; stderr: string }> {
+  const originalStdout = process.stdout.write.bind(process.stdout)
+  const originalStderr = process.stderr.write.bind(process.stderr)
   let stdout = ''
+  let stderr = ''
   process.stdout.write = ((chunk: unknown) => {
     stdout += String(chunk)
     return true
   }) as typeof process.stdout.write
+  // logger.err() writes to stderr (not stdout) — the outer-catch-all path uses
+  // err(), so it must be captured too, or assertions against it would always
+  // see an empty string and never actually check the log wording.
+  process.stderr.write = ((chunk: unknown) => {
+    stderr += String(chunk)
+    return true
+  }) as typeof process.stderr.write
   try {
     await fn()
   } finally {
-    process.stdout.write = original
+    process.stdout.write = originalStdout
+    process.stderr.write = originalStderr
   }
-  return { stdout }
+  return { stdout, stderr }
 }
 
 function verifyUnclaimedCleanup(): void {
@@ -166,6 +205,33 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
   }
 }
 
+/**
+ * 成功投递的 stub 后端——响应体形状对齐真实端点
+ * `POST /terminals/:id/scan-sessions/deliver` 的成功返回值
+ * （services/api/src/scan-tasks/scan-tasks.controller.ts 用 `ApiResponse.ok(result)`
+ * 包装 `deliverScanFile()` 的 `{ scanTaskId, fileId }`）。`onRequest` 可选，用于统计
+ * 收到几次请求（in-flight 去重测试要用它证明"只投递了一次"）。
+ */
+async function startSuccessBackendStub(
+  onRequest?: () => void,
+): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      onRequest?.()
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ success: true, data: { scanTaskId: 'scan-task-verify-1', fileId: 'file-verify-1' } }))
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address, 'backend stub must bind to a TCP port')
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  }
+}
+
 function makeConfig(apiBaseUrl: string, scanWatchFolder: string): AgentConfig {
   return {
     apiBaseUrl,
@@ -175,6 +241,128 @@ function makeConfig(apiBaseUrl: string, scanWatchFolder: string): AgentConfig {
     terminalId: 'terminal-scan-1',
     agentToken: 'agent-token-secret',
     scanWatchFolder,
+  }
+}
+
+// ── Part 2c: processCandidate 成功投递路径 — 真实 HTTP 200 stub 后端 ──────────
+// .mjs → .ts 转换时唯一真正的覆盖缺口：没有任何用例（静态或动态）跑过一次成功
+// 投递（200 OK），也就没有任何用例验证过 unlinkSync(filePath) 这条"投递成功后删除
+// 源文件"的核心隐私契约（扫描件不应该在共享目录里残留）。补上。
+async function verifySuccessfulDeliveryDeletesSourceFile(): Promise<void> {
+  const backend = await startSuccessBackendStub()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-success-'))
+  try {
+    const filename = 'success-delivery.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 real content that must not linger on disk after delivery')
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    assert.equal(
+      existsSync(filePath),
+      false,
+      'a successfully delivered file must be unlinkSync-ed from the main scan folder (privacy: no lingering scans)',
+    )
+    assert.equal(
+      existsSync(join(scanFolder, '_unclaimed', filename)),
+      false,
+      'a successfully delivered file must NOT end up quarantined in _unclaimed',
+    )
+    assert.match(stdout, /delivered and removed source file/, 'success path must log that the source file was removed')
+
+    console.log('PASS processCandidate success path: 200 OK delivery unlinkSync-es the source file and does not quarantine it')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
+// ── Part 2d: inFlightPaths 去重 — 并发调用同一路径只投递一次 ─────────────────
+// processCandidate 在做任何异步等待之前，同步执行 has()/add()（第一次 await 落在
+// waitForStableFile 内部的 setTimeout 上）。这意味着"背靠背同步调用两次
+// processCandidate(同一 filePath)，不等待第一次的 Promise"可以确定性地复现
+// Critical code-review 修复的那个并发场景，不依赖人为延时或猜时序。
+async function verifyInFlightDedupSkipsConcurrentDuplicate(): Promise<void> {
+  let requestCount = 0
+  const backend = await startSuccessBackendStub(() => {
+    requestCount += 1
+  })
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-dedup-'))
+  try {
+    const filename = 'concurrent-scan.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 must only be delivered once')
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+
+    // 故意不 await 第一次调用：两次调用在同一个事件循环 tick 内背靠背发起，
+    // 第二次调用发起时 inFlightPaths 里必然已经同步 add 过第一次的 filePath。
+    const first = processCandidate(filePath, filename, config)
+    const second = processCandidate(filePath, filename, config)
+    await Promise.all([first, second])
+
+    assert.equal(
+      requestCount,
+      1,
+      'two concurrent processCandidate calls for the same filePath must result in exactly one HTTP delivery — the in-flight guard must skip the second',
+    )
+    assert.equal(existsSync(filePath), false, 'the one delivery that did happen must still unlinkSync the source file')
+
+    console.log('PASS processCandidate in-flight dedup: concurrent calls for the same path deliver exactly once, not twice')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
+// ── Part 2e: processCandidate 外层兜底 catch — 真实不可读文件触发未预期错误 ──
+// 稳定性检查、二次 existsSync 复查都只依赖 stat/exists，不需要读权限，所以给
+// 文件 chmod 0o000 之后依然能通过前两关，直到 readFileSync(filePath) 真正因为
+// EACCES 抛出——这条异常落在外层 try/catch 里（不是 HTTP 投递那层 inner try），
+// 真实触发"未预期错误"分支，而不是靠字符串猜测源码里有没有这段兜底。
+// 仅在拥有者确实没有读权限的宿主上才有意义（多数 CI/开发机如此）；以 root 身份
+// 跑（会绕过权限位）则退化为跳过，避免因宿主环境差异导致误报失败。
+async function verifyUnexpectedErrorOuterCatch(): Promise<void> {
+  const backend = await startSuccessBackendStub()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-outer-catch-'))
+  try {
+    const filename = 'unreadable.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 permission denied on purpose')
+    chmodSync(filePath, 0o000)
+
+    let permissionsEnforced = true
+    try {
+      readFileSync(filePath)
+      permissionsEnforced = false
+    } catch {
+      // 期望路径：确认这个宿主真的会因为权限位拒绝读取。
+    }
+    if (!permissionsEnforced) {
+      console.log('SKIP processCandidate outer-catch check: running with read access despite chmod 0o000 (likely root), cannot simulate an unreadable file on this host')
+      return
+    }
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stderr } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    // err() (unlike warn()/log()) writes to stderr, not stdout — see captureLogsAsync.
+    assert.match(
+      stderr,
+      /unexpected error processing candidate, leaving file in place for retry/,
+      'an unreadable file must be caught by the outer catch-all and logged, not crash processCandidate',
+    )
+    assert.equal(
+      existsSync(filePath),
+      true,
+      'a file that hit the unexpected-error path must remain in place in the main folder for retry (not deleted, not quarantined)',
+    )
+
+    console.log('PASS processCandidate outer catch-all: a real EACCES read failure is caught, logged, and leaves the file in place')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
   }
 }
 
@@ -278,6 +466,9 @@ async function main(): Promise<void> {
   await verifyRetryCapExpired()
   await verifyRetryCapNotYetExpired()
   await verifyNoWaitingTaskStillDistinctFromRetryTimeout()
+  await verifySuccessfulDeliveryDeletesSourceFile()
+  await verifyInFlightDedupSkipsConcurrentDuplicate()
+  await verifyUnexpectedErrorOuterCatch()
   verifyPlatformGapDisclosure()
   console.log('verify-scan-watcher: ok')
 }
