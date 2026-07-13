@@ -119,6 +119,7 @@ jobs:
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation
           pnpm --filter @ai-job-print/kiosk verify:home-service-desk
+          pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
           pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
 

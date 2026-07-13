@@ -25,6 +25,7 @@ import {
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import './interview-service-desk.css'
 
 interface ReportState {
   sessionId?: string
@@ -41,7 +42,7 @@ const LEVEL_META: Record<string, { label: string; cls: string }> = {
 
 function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
   return (
-    <Card className="p-5">
+    <Card className="interview-card interview-report__section p-5">
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary-600" aria-hidden="true" />
         <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
@@ -115,10 +116,10 @@ export function InterviewReportPage() {
     }
   }
 
-  if (loading) return <LoadingState className="py-24" />
+  if (loading) return <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch"><LoadingState className="py-24" /></div>
   if (loadError || !data) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+      <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
         <ErrorState message="报告不存在或已过期" className="py-4" />
         <Button size="lg" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
       </div>
@@ -128,7 +129,7 @@ export function InterviewReportPage() {
   const level = LEVEL_META[data.report.overall.level] ?? LEVEL_META['pass']
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
       <PageHeader
         title="模拟面试练习报告"
         subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}`}
@@ -137,13 +138,13 @@ export function InterviewReportPage() {
         }
       />
 
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+      <div className="interview-flow__scroll mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
           本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
         </ComplianceBanner>
 
         {/* 综合表现 */}
-        <Card className="p-5">
+        <Card className="interview-card interview-report__hero p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-neutral-900">综合表现概览</h2>
             <span className={['rounded-full px-3 py-1 text-sm font-semibold', level.cls].join(' ')}>{level.label}</span>
@@ -152,11 +153,13 @@ export function InterviewReportPage() {
           <p className="mt-2 text-xs text-neutral-400">「{level.label}」为本次练习表现等级，不代表录用结果</p>
         </Card>
 
-        <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
-        <Section icon={TargetIcon} title="岗位匹配度参考"><Bullets items={data.report.positionFit} /></Section>
-        <Section icon={CheckCircle2Icon} title="经历可信度与细节"><Bullets items={data.report.credibility} /></Section>
-        <Section icon={LightbulbIcon} title="专业能力表现"><Bullets items={data.report.professional} /></Section>
-        <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>
+        <div className="interview-report__abilities">
+          <Section icon={MessageSquareTextIcon} title="表达清晰度"><Bullets items={data.report.expression} /></Section>
+          <Section icon={TargetIcon} title="岗位匹配度参考"><Bullets items={data.report.positionFit} /></Section>
+          <Section icon={CheckCircle2Icon} title="经历可信度与细节"><Bullets items={data.report.credibility} /></Section>
+          <Section icon={LightbulbIcon} title="专业能力表现"><Bullets items={data.report.professional} /></Section>
+          <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>
+        </div>
 
         <Section icon={AlertTriangleIcon} title="风险点与改进建议">
           <ul className="flex flex-col gap-2">
@@ -206,7 +209,7 @@ export function InterviewReportPage() {
       </div>
 
       {/* 底部操作 */}
-      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="interview-flow__action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <div className="flex gap-3">
           <Button size="lg" className="h-14 flex-1 text-base" disabled={printing} onClick={() => void handlePrint()}>
             <PrinterIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />

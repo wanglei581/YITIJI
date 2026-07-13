@@ -30,6 +30,7 @@ import { createInterview, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import './interview-service-desk.css'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
   { key: 'hr', label: 'HR 初筛', desc: '自我介绍 · 求职动机 · 稳定性 · 薪资沟通' },
@@ -73,8 +74,9 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={[
-        'min-h-[52px] rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors',
+        'interview-option min-h-[52px] rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors',
         active ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-sm' : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300',
         className,
       ].join(' ')}
@@ -86,7 +88,7 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
 
 function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: string; desc?: string }) {
   return (
-    <div className="mb-4 flex items-start gap-2">
+    <div className="interview-section-title mb-4 flex items-start gap-2">
       <Icon className="mt-0.5 h-5 w-5 text-primary-600" aria-hidden="true" />
       <div>
         <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
@@ -98,7 +100,7 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: s
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
+    <div className="interview-summary-row flex items-start justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
       <span className="text-sm text-neutral-500">{label}</span>
       <span className="max-w-[13rem] text-right text-sm font-semibold text-neutral-900">{value}</span>
     </div>
@@ -186,7 +188,7 @@ export function InterviewSetupPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f5f7fa] px-6 pt-6">
+    <div className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
       <PageHeader
         title="模拟面试"
         subtitle="配置本次练习场景，进入 AI 数字人面试间"
@@ -195,35 +197,15 @@ export function InterviewSetupPage() {
         }
       />
 
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto pb-28">
+      <div className="interview-flow__scroll mt-4 min-h-0 flex-1 overflow-y-auto pb-28">
         <ComplianceBanner tone="info">
           本功能仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
         </ComplianceBanner>
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-4">
-            <Card className="p-5">
-              <SectionTitle icon={UserRoundCheckIcon} title="面试官与难度" desc="先选择面试官身份，再选择练习压力。" />
-              <div className="grid gap-2 lg:grid-cols-2">
-                {INTERVIEWERS.map((it) => (
-                  <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)} className="text-left">
-                    <span className="block font-semibold">{it.label}</span>
-                    <span className="mt-0.5 block text-xs font-normal leading-relaxed text-neutral-500">{it.desc}</span>
-                  </OptionButton>
-                ))}
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {DIFFICULTIES.map((d) => (
-                  <OptionButton key={d.key} active={difficulty === d.key} onClick={() => setDifficulty(d.key)} className="text-center">
-                    <span className="block font-semibold">{d.label}</span>
-                    <span className="mt-0.5 block text-[11px] font-normal leading-tight text-neutral-500">{d.desc}</span>
-                  </OptionButton>
-                ))}
-              </div>
-            </Card>
-
-            <Card className="p-5">
-              <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="目标岗位会影响问题方向，请尽量填写具体岗位名称。" />
+        <div className="interview-setup__layout mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="interview-setup__form space-y-4">
+            <Card className="interview-card interview-setup__job p-5">
+              <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="先确定目标岗位，后续题目会围绕这个方向展开。" />
               <div className="flex flex-wrap gap-2">
                 {INDUSTRIES.map((name) => (
                   <OptionButton key={name} active={industry === name} onClick={() => setIndustry(name)}>{name}</OptionButton>
@@ -245,21 +227,41 @@ export function InterviewSetupPage() {
                 ].join(' ')}
               />
               <div className="mt-3 flex flex-wrap gap-2">
-                {POSITION_EXAMPLES.map((p) => (
+                {POSITION_EXAMPLES.map((example) => (
                   <button
-                    key={p}
+                    key={example}
                     type="button"
-                    onClick={() => { setPosition(p); setError(null) }}
-                    className="min-h-[40px] rounded-full bg-neutral-100 px-4 text-sm text-neutral-600 hover:bg-neutral-200"
+                    onClick={() => { setPosition(example); setError(null) }}
+                    className="min-h-[48px] rounded-full bg-neutral-100 px-4 text-sm text-neutral-600 hover:bg-neutral-200"
                   >
-                    {p}
+                    {example}
                   </button>
                 ))}
               </div>
             </Card>
 
+            <Card className="interview-card p-5">
+              <SectionTitle icon={UserRoundCheckIcon} title="面试官与难度" desc="先选择面试官身份，再选择练习压力。" />
+              <div className="grid gap-2 lg:grid-cols-2">
+                {INTERVIEWERS.map((it) => (
+                  <OptionButton key={it.key} active={interviewerType === it.key} onClick={() => setInterviewerType(it.key)} className="text-left">
+                    <span className="block font-semibold">{it.label}</span>
+                    <span className="mt-0.5 block text-xs font-normal leading-relaxed text-neutral-500">{it.desc}</span>
+                  </OptionButton>
+                ))}
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {DIFFICULTIES.map((d) => (
+                  <OptionButton key={d.key} active={difficulty === d.key} onClick={() => setDifficulty(d.key)} className="text-center">
+                    <span className="block font-semibold">{d.label}</span>
+                    <span className="mt-0.5 block text-[11px] font-normal leading-tight text-neutral-500">{d.desc}</span>
+                  </OptionButton>
+                ))}
+              </div>
+            </Card>
+
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="p-5">
+              <Card className="interview-card p-5">
                 <SectionTitle icon={GraduationCapIcon} title="经验" />
                 <div className="grid grid-cols-2 gap-2">
                   {EXPERIENCES.map((e) => (
@@ -268,7 +270,7 @@ export function InterviewSetupPage() {
                 </div>
               </Card>
 
-              <Card className="p-5">
+              <Card className="interview-card p-5">
                 <SectionTitle icon={ClockIcon} title="时长" />
                 <div className="grid gap-2">
                   {DURATIONS.map((d) => (
@@ -281,7 +283,7 @@ export function InterviewSetupPage() {
               </Card>
             </div>
 
-            <Card className="p-5">
+            <Card className="interview-card p-5">
               <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="上传后面试官会结合经历提问；不上传则按通用问题练习。" />
               {resumeFile ? (
                 <div className="flex items-center justify-between rounded-xl border border-primary-100 bg-primary-50 px-4 py-3">
@@ -290,7 +292,7 @@ export function InterviewSetupPage() {
                     type="button"
                     onClick={() => setResumeFile(null)}
                     aria-label="移除简历"
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-neutral-400 hover:bg-white"
+                    className="flex h-12 w-12 items-center justify-center rounded-xl text-neutral-400 hover:bg-white"
                   >
                     <XIcon className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -316,8 +318,8 @@ export function InterviewSetupPage() {
             </Card>
           </div>
 
-          <aside className="xl:sticky xl:top-0 xl:self-start">
-            <Card className="p-5">
+          <aside className="interview-setup__summary xl:sticky xl:top-0 xl:self-start">
+            <Card className="interview-card interview-card--summary p-5">
               <div className="mb-4 flex items-center gap-2">
                 <CheckCircle2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
                 <h2 className="text-base font-semibold text-neutral-900">本次练习摘要</h2>
@@ -349,7 +351,7 @@ export function InterviewSetupPage() {
         )}
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <div className="interview-flow__action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="h-14 w-full text-base" disabled={creating || uploading} onClick={() => void handleStart()}>
           {creating ? (
             <>

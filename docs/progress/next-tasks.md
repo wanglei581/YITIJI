@@ -146,6 +146,9 @@
 - [x] **规范、命名与全页面事实盘点**：已将 4188 亮蓝白服务台方向正式命名为「青序 LightFlow」，产品与设计名称统一，工程内部保留 `service-desk` 主题命名；已基于最新三端路由逐项盘点 112 个正式页面组件、5 条重定向和 3 个路由壳层，并形成 `docs/reviews/qingxu-lightflow-page-inventory-2026-07-12.md`。本项只代表规范与盘点完成，不代表任何运行时页面已经迁移。
 - [x] **UI-0 / UI-1 代表页实施（本地候选）**：已按 `docs/superpowers/plans/2026-07-11-service-desk-ui0-ui1-first-batch.md` 建立 opt-in 的共享 token、密度与壳层合同，并迁移 Kiosk 首页、Admin 工作台、Partner 岗位管理三个代表页；本地 TDD 静态门禁、三端 typecheck/lint/build、真实 API 角色浏览器与规定视口矩阵、Antigravity + Claude 双模型审查均已完成，Critical=0。4 个新增 verify 已接入 `build-and-verify`，且 foundation verify 锁定 CI 接线与 CCG 归档边界；尚未 push，故 GitHub CI 尚未实际运行。当前仍未合并、部署或完成 Windows 真机验收。
 - [ ] **UI-2 十三个业务域波次**：三个代表页经用户视觉和真实流程验收后，再按 `docs/superpowers/plans/2026-07-12-qingxu-lightflow-all-pages-migration-program.md` 分 K1–K6、A1–A4、P1–P3 独立实施；每波次必须另写逐文件计划、静态 verify、浏览器矩阵和证据等级，禁止一次性改完 112 页。K4 本人资产波次须等待当前“我的页商用闭环”任务完成、迁移或明确废弃后再开工。
+  - [x] **K2c 模拟面试五页本地候选**：配置、会话、报告、技巧、历史报告已统一为青序 LightFlow；静态合同 101/101、Kiosk 工程门禁、production build 和 1080/390 浏览器矩阵通过。仅为本地候选，尚未 push/合并/部署/真机验收。
+  - [ ] **K2a AI 助手 / 岗位匹配 / 职业规划**：下一批执行；其中 `/assistant` 根布局和透明顾问素材必须先与 K1/独立素材任务对齐，避免重复改壳层或吸收他人资产变更。
+  - [ ] **K2b AI 简历九页**：等待 K1 手机扫码上传 verifier 修复进入主线后执行，直接复用同一上传合同，不在 K2 分支重复实现。
 - [ ] **UI-3 / UI-4 跨页收口与旧主题退出**：十三个业务域波次完成后，统一处理加载、空态、错误、权限、超时、离线、部分成功、焦点恢复、reduced motion 和共享设备清场；只有在运行时引用清零、三端构建与浏览器矩阵通过后，才允许删除 InkPaper / Fusion Youth 旧主题。真机、支付、打印与预生产证据继续按 UX-1 至 UX-4 分级，不得越级宣称完成。
 
 ## P1：渐进式重构首批业务闭环
