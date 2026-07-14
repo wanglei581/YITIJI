@@ -81,6 +81,10 @@ dump.rdb
 /apps/terminal-agent/config/agent-config.json.bak.*
 /apps/terminal-agent/config/agent-config.json.before-*
 
+# Claude Code project-level local override (may contain 3rd-party API keys)
+# — must NEVER enter git. Use settings.json for shared/team config.
+.claude/settings.local.json
+
 # docs 下的二进制文档（如机器生成 / 外部 .docx）不入库，结论沉淀为同名 .md
 docs/**/*.docx
 services/api/prisma/ci-test.db
