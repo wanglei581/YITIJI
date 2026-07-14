@@ -133,12 +133,12 @@ mustNotContain(
 
 // ── G. 首页补贴文案保持 info-only ─────────────────────────────────────────
 mustNotContain(
-  'src/pages/home/HomePage.tsx',
+  'src/pages/home/serviceGroups.ts',
   ['补贴快申', '补贴申请'],
   'G1. 首页无「补贴快申/补贴申请」承诺式文案(info-only)',
 )
 mustContain(
-  'src/pages/home/HomePage.tsx',
+  'src/pages/home/serviceGroups.ts',
   ["'/job-fairs'", "'/campus'"],
   'G2. 首页保留招聘会/校园招聘会入口',
 )

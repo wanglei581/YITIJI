@@ -32,6 +32,7 @@ import { submitResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
+import './resume-authoring-lightflow.css'
 
 const STEPS = [
   { title: '基本信息', description: '姓名与联系方式' },
@@ -43,11 +44,11 @@ const STEPS = [
 ] as const
 
 const inputCls =
-  'w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+  'resume-lightflow__field w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <label className="block">
+    <label className="resume-lightflow__field-label block">
       <span className="mb-1.5 block text-sm font-medium text-neutral-700">
         {label}
         {required && <span className="ml-0.5 text-error-fg">*</span>}
@@ -81,11 +82,11 @@ function EntryList<T>({
         <p className="rounded-xl bg-neutral-50 py-6 text-center text-sm text-neutral-400">{emptyHint}</p>
       )}
       {items.map((item, i) => (
-        <Card key={i} className="relative p-4">
+        <Card key={i} className="resume-lightflow__entry-card relative p-4">
           <button
             type="button"
             onClick={() => onRemove(i)}
-            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg text-neutral-300 hover:bg-error-bg hover:text-error-fg"
+            className="resume-lightflow__entry-remove absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-lg text-neutral-300 hover:bg-error-bg hover:text-error-fg"
             aria-label="删除该条"
           >
             <Trash2Icon className="h-5 w-5" />
@@ -97,7 +98,7 @@ function EntryList<T>({
         <button
           type="button"
           onClick={onAdd}
-          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 text-base font-medium text-neutral-500 hover:border-primary-300 hover:text-primary-600"
+          className="resume-lightflow__add-entry flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-neutral-200 text-base font-medium text-neutral-500 hover:border-primary-300 hover:text-primary-600"
         >
           <PlusIcon className="h-5 w-5" />
           {addLabel}
@@ -202,8 +203,8 @@ export function ResumeGeneratePage() {
   const StepIcon = stepIcon
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-6 pt-6">
+    <div className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
+      <div className="resume-lightflow__header px-6 pt-6">
         <PageHeader
           title="AI 简历生成"
           subtitle="填写你的真实信息，AI 帮你润色成一份结构化简历"
@@ -214,21 +215,21 @@ export function ResumeGeneratePage() {
           }
         />
         {/* 防编造 + 隐私说明(合规) */}
-        <div className="mt-3 flex items-start gap-2 rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-800">
+        <div className="resume-lightflow__notice mt-3 flex items-start gap-2 rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-800">
           <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <p>
             AI 只润色你填写的真实信息，<b>不会替你编造</b>学历、证书、公司或项目经历；没填的内容会提示你补充。
             本机为公共设备：填写内容仅用于本次生成，离开页面即清除，生成结果与导出文件按既定策略短期保留后自动清理。
           </p>
         </div>
-        <div className="mt-4">
+        <div className="resume-lightflow__stepper mt-4">
           <Stepper steps={[...STEPS]} currentIndex={step} />
         </div>
       </div>
 
-      <div className="mt-4 flex-1 overflow-y-auto px-6 pb-6">
-        <Card className="p-5">
-          <div className="mb-4 flex items-center gap-2">
+      <div className="resume-lightflow__content mt-4 flex-1 overflow-y-auto px-6 pb-6">
+        <Card className="resume-lightflow__work-card p-5">
+          <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
               <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
             </span>
@@ -417,7 +418,7 @@ export function ResumeGeneratePage() {
       </div>
 
       {/* 底部操作条 */}
-      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
+      <div className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           <Button
             size="lg"

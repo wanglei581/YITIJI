@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ResumeTemplate } from '@ai-job-print/shared'
-import { BookOpenIcon, LayoutTemplateIcon, SparklesIcon } from 'lucide-react'
+import { ArrowRightIcon, BookOpenIcon, CheckIcon, LayoutTemplateIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
+import './resume-library-lightflow.css'
 
 const FILTERS = ['全部', '简历模板', '通用'] as const
 
@@ -69,111 +70,114 @@ export function ResumeTemplateLibraryPage() {
     navigate('/resume/source?intent=optimize')
   }
 
-  if (loading) return <LoadingState className="h-full" />
+  if (loading) {
+    return (
+      <div className="resume-lightflow resume-templates-lightflow">
+        <LoadingState className="resume-lightflow__state" />
+      </div>
+    )
+  }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-6">
-      <PageHeader
-        title="简历素材库"
-        subtitle="选择简历版式方向，进入 AI 简历诊断或优化后生成正式简历"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
+    <div className="resume-lightflow resume-templates-lightflow">
+      <div className="resume-lightflow__shell">
+        <header className="resume-lightflow__header">
+          <div>
+            <p className="resume-lightflow__eyebrow">AI 简历服务 · 版式参考</p>
+            <h1>简历素材库</h1>
+            <p>先选版式方向，再进入现有简历优化流程生成正式内容。</p>
+          </div>
+          <Button size="sm" variant="secondary" className="resume-lightflow__return" onClick={() => navigate('/')}>
             返回首页
           </Button>
-        }
-      />
+        </header>
 
-      <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
-        本页仅用于个人简历素材查看、版式参考和简历优化引导。岗位申请、预约、投递仍需前往来源平台或官方渠道完成。
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {FILTERS.map((item) => {
-          const active = filter === item
-          return (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setFilter(item)}
-              className={[
-                'min-h-[46px] rounded-full border px-4 text-sm font-semibold transition-colors',
-                active
-                  ? 'border-primary-600 bg-primary-50 text-primary-700'
-                  : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
-              ].join(' ')}
-            >
-              {item}
-            </button>
-          )
-        })}
-      </div>
-
-      {error ? (
-        <ErrorState message={error} className="mt-8 flex-1" />
-      ) : visible.length === 0 ? (
-        <div className="mt-10">
-          <EmptyState icon={BookOpenIcon} title="该分类暂无简历素材" description="请切换其他标签查看" />
-        </div>
-      ) : (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {visible.map((template) => {
-              const active = selected?.id === template.id
-              return (
-                <Card key={template.id} className={['flex flex-col p-5', active ? 'ring-2 ring-primary-500' : ''].join(' ')}>
-                  <button type="button" className="text-left" onClick={() => selectTemplate(template)}>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-                        <LayoutTemplateIcon className="h-6 w-6 text-primary-600" aria-hidden="true" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-neutral-900">{template.title}</p>
-                        <p className="text-xs text-neutral-400">简历模板</p>
-                      </div>
-                    </div>
-                    <p className="mt-3 min-h-[44px] text-sm leading-relaxed text-neutral-500">{template.description}</p>
-                    <p className="mt-2 text-xs leading-relaxed text-neutral-400">{template.recommendedFor}</p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {template.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" className="flex items-center gap-1.5" onClick={handleUseResumeTemplate}>
-                      <SparklesIcon className="h-4 w-4" />
-                      用于简历优化
-                    </Button>
-                  </div>
-                </Card>
-              )
-            })}
+        <section className="resume-lightflow__notice" aria-label="使用范围说明">
+          <BookOpenIcon aria-hidden="true" />
+          <div>
+            <strong>选择仅代表版式参考，不会自动生成或应用简历。</strong>
+            <p>正式简历需要在后续流程结合你的真实内容生成；岗位申请和投递仍在来源平台或官方渠道完成。</p>
           </div>
+        </section>
 
-          <Card className="h-fit p-5">
-            {!selected ? (
-              <EmptyState icon={BookOpenIcon} title="请选择简历素材" />
-            ) : (
-              <div>
-                <p className="text-base font-semibold text-neutral-900">{selected.title}</p>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-500">
-                  简历模板需要结合你的简历内容生成正式成果物。请选择“用于简历优化”进入现有 AI 简历链路。
-                </p>
-                <Button size="lg" className="mt-5 w-full" onClick={handleUseResumeTemplate}>
-                  用于简历优化
-                </Button>
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
+        <nav className="resume-lightflow__filters" aria-label="简历素材分类">
+          {FILTERS.map((item) => {
+            const active = filter === item
+            return (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setFilter(item)}
+                className={active ? 'is-active' : undefined}
+              >
+                {item}
+              </button>
+            )
+          })}
+        </nav>
 
-      <p className="mt-6 text-center text-xs text-neutral-400">
-        素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。
-      </p>
-      <div className="h-2" />
+        {error ? (
+          <ErrorState message={error} className="resume-lightflow__state" />
+        ) : visible.length === 0 ? (
+          <div className="resume-lightflow__state">
+            <EmptyState icon={BookOpenIcon} title="该分类暂无简历素材" description="请切换其他分类查看" />
+          </div>
+        ) : (
+          <main className="resume-lightflow__workspace">
+            <section className="resume-lightflow__catalog" aria-label="可选简历素材">
+              {visible.map((template) => {
+                const active = selected?.id === template.id
+                return (
+                  <Card key={template.id} className={['resume-lightflow__item', active ? 'is-selected' : ''].join(' ')}>
+                    <button
+                      type="button"
+                      aria-pressed={selected?.id === template.id}
+                      onClick={() => selectTemplate(template)}
+                    >
+                      <span className="resume-lightflow__item-icon"><LayoutTemplateIcon aria-hidden="true" /></span>
+                      <span className="resume-lightflow__item-copy">
+                        <strong>{template.title}</strong>
+                        <span>简历模板</span>
+                      </span>
+                      {active && <CheckIcon className="resume-lightflow__selected-mark" aria-label="当前选择" />}
+                    </button>
+                    <p>{template.description}</p>
+                    <small>{template.recommendedFor}</small>
+                    <div className="resume-lightflow__tags">
+                      {template.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => selectTemplate(template)}>
+                      {active ? '当前选择' : '选择此版式'}
+                    </Button>
+                  </Card>
+                )
+              })}
+            </section>
+
+            <aside className="resume-lightflow__detail" aria-live="polite">
+              {!selected ? (
+                <EmptyState icon={BookOpenIcon} title="请选择简历素材" />
+              ) : (
+                <>
+                  <p className="resume-lightflow__detail-label">当前版式参考</p>
+                  <h2>{selected.title}</h2>
+                  <p>{selected.description}</p>
+                  <div className="resume-lightflow__boundary">
+                    <strong>下一步会发生什么</strong>
+                    <span>进入 AI 简历优化后，系统会基于你的内容生成正式简历；本页不会保存或应用模板。</span>
+                  </div>
+                  <Button size="lg" className="resume-lightflow__primary-action" onClick={handleUseResumeTemplate}>
+                    进入简历优化 <ArrowRightIcon aria-hidden="true" />
+                  </Button>
+                </>
+              )}
+            </aside>
+          </main>
+        )}
+
+        <p className="resume-lightflow__compliance">素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。</p>
+      </div>
     </div>
   )
 }

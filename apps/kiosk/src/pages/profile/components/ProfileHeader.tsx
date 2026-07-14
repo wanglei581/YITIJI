@@ -1,9 +1,6 @@
 import { KIcon } from '../../../components/kiosk-icon'
 import type { ProfileHeaderStats } from '../profileTypes'
 
-// p-hero（墨青纸感）：米纸卡 + 装饰圆环 + 宋体名字 + 概览统计。
-// 诚实化口径不变：统计取服务端真实 total，null 显示「—」；不编造完整度。
-
 export function ProfileHeader({
   isLoggedIn,
   displayName,
@@ -22,74 +19,80 @@ export function ProfileHeader({
   // null = 账号概览统计尚未加载完成（展示「—」而非误导性的 0）
   stats: ProfileHeaderStats
   statsLoading: boolean
-  // 下方是否会展示「本次服务记录」浮层卡：true 时预留底部空间承接 -mt-12 浮层，false 时收紧
+  // 保留本次服务记录的真实状态，供入口页在身份面板后衔接待办记录。
   reserveBannerSpace: boolean
   onLogin: () => void
   onLogout: () => void
   onOpenSettings: () => void
   onOpenNotifications: () => void
 }) {
-  if (isLoggedIn) {
-    return (
-      <section className={reserveBannerSpace ? 'p-hero with-pending' : 'p-hero'} aria-label="账号概览">
-        <div className="p-top">
-          <div className="p-ava">{avatarInitial(displayName)}</div>
-          <div className="p-id">
-            <span className="p-kicker">
-              <i className="dot" aria-hidden="true" />
-              已登录 · {phoneMasked || '手机号已绑定'}
-            </span>
-            <h1>{displayName}</h1>
-            <p>本人简历、文档、打印订单与来源收藏都在下方入口，明细在对应功能页查看。</p>
-          </div>
-          <div className="p-actions">
-            <button type="button" className="p-iconbtn" aria-label="消息通知" onClick={onOpenNotifications}>
-              <KIcon name="bell" />
-            </button>
-            <button type="button" className="p-iconbtn" aria-label="账号设置" onClick={onOpenSettings}>
-              <KIcon name="settings" />
-            </button>
-            <button type="button" className="p-btn ghost" onClick={onLogout}>
-              退出登录
-            </button>
-          </div>
+  return (
+    <section
+      className="kp-profile-header"
+      data-has-session-records={reserveBannerSpace ? 'true' : undefined}
+      aria-label={isLoggedIn ? '账号概览' : '登录引导'}
+    >
+      <div className="kp-profile-main">
+        <div className={isLoggedIn ? 'p-ava' : 'p-ava guest'}>
+          {isLoggedIn ? avatarInitial(displayName) : <KIcon name="user" />}
         </div>
+        <div className="p-id">
+          <span className="p-kicker">
+            <i className="dot" aria-hidden="true" />
+            {isLoggedIn ? `已登录 · ${phoneMasked || '手机号已绑定'}` : '游客 · 仅本次会话'}
+          </span>
+          <strong className="p-name">{isLoggedIn ? displayName : '登录后查看本人记录'}</strong>
+          <p>
+            {isLoggedIn
+              ? '本人简历、文档、打印订单与来源收藏均由下方正式入口提供。'
+              : '可直接使用基础服务；本人记录与账号概览需先登录。'}
+          </p>
+        </div>
+        <div className="p-actions">
+          {isLoggedIn ? (
+            <>
+              <button type="button" className="p-iconbtn" aria-label="消息通知" onClick={onOpenNotifications}>
+                <KIcon name="bell" />
+              </button>
+              <button type="button" className="p-iconbtn" aria-label="账号设置" onClick={onOpenSettings}>
+                <KIcon name="settings" />
+              </button>
+              <button type="button" className="p-btn ghost" onClick={onLogout}>
+                退出登录
+              </button>
+            </>
+          ) : (
+            <button type="button" className="p-btn primary" onClick={onLogin}>
+              <KIcon name="phone" />
+              手机号登录
+            </button>
+          )}
+        </div>
+      </div>
 
+      {isLoggedIn && (
         <div className="p-stats">
           <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
           <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
           <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
         </div>
-      </section>
-    )
-  }
+      )}
 
-  return (
-    <section className="p-hero" aria-label="登录引导">
-      <div className="p-top">
-        <div className="p-ava guest">
-          <KIcon name="user" />
-        </div>
-        <div className="p-id">
-          <span className="p-kicker">
-            <i className="dot" aria-hidden="true" />
-            游客 · 仅本次会话
-          </span>
-          <h1>登录后绑定本人服务记录</h1>
-          <p>登录后用于绑定本人服务记录，仅本次会话有效；游客记录离开后自动清空。</p>
-        </div>
-        <div className="p-actions">
-          <button type="button" className="p-btn primary" onClick={onLogin}>
-            <KIcon name="phone" />
-            手机号登录
-          </button>
-        </div>
+      <div className="kp-profile-boundary">
+        <KIcon name="shield" />
+        <span>
+          <strong>本人数据与办理结果仅由正式页面提供</strong>
+          <small>
+            {isLoggedIn
+              ? '顶部数量来自本人真实记录；详情、订单与服务结果请进入对应功能页查看。'
+              : '本页不伪造个人数量、订单或设备结果；建设中入口不可办理。'}
+          </small>
+        </span>
       </div>
     </section>
   )
 }
 
-// value=null 表示账号概览统计尚未加载完成：展示「—」而非误导性的 0；loading 时轻微脉冲提示。
 function ProfileStat({ value, label, loading }: { value: number | null; label: string; loading: boolean }) {
   const unloaded = value === null
   return (

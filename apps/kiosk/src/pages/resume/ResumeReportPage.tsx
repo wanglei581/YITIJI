@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/useAuth'
 import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 import { readAiResumeSession } from './aiResumeSession'
+import './resume-diagnosis-lightflow.css'
 
 interface ReportState {
   /** intent 分流(diagnose/optimize):由上传页随 state 透传 */
@@ -55,7 +56,7 @@ function ReportNoticePanel({
   ].filter((item): item is string => Boolean(item))
 
   return (
-    <Card className="border-primary-100 bg-primary-50/40 p-4">
+    <Card className="resume-report-notice border-primary-100 bg-primary-50/40 p-4">
       <p className="text-sm font-semibold text-neutral-900">报告说明</p>
       <ul className="mt-2 grid gap-2 text-xs leading-relaxed text-neutral-600 md:grid-cols-2">
         {notices.map((notice) => (
@@ -122,7 +123,7 @@ export function ResumeReportPage() {
 
   if (!success) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
+      <div className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-error-bg">
           <AlertCircleIcon className="h-14 w-14 text-error-fg" />
         </div>
@@ -134,7 +135,7 @@ export function ResumeReportPage() {
           <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
             返回首页
           </Button>
-          <Button size="lg" className="flex-1" onClick={handleRetry}>
+          <Button size="lg" className="resume-primary-action flex-1" onClick={handleRetry}>
             重新解析
           </Button>
         </div>
@@ -144,7 +145,7 @@ export function ResumeReportPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
+      <div className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
           <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
         </div>
@@ -155,7 +156,7 @@ export function ResumeReportPage() {
 
   if (!report || loadError) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
+      <div className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
           <FileSearchIcon className="h-10 w-10 text-primary-600" />
         </div>
@@ -167,7 +168,7 @@ export function ResumeReportPage() {
           <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
             返回首页
           </Button>
-          <Button size="lg" className="flex-1" onClick={() => navigate('/resume/source')}>
+          <Button size="lg" className="resume-primary-action flex-1" onClick={() => navigate('/resume/source')}>
             开始简历诊断
           </Button>
         </div>
@@ -197,7 +198,7 @@ export function ResumeReportPage() {
   const summary = targetSummary(state.targetContext)
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="resume-lightflow resume-report-lightflow flex h-full flex-col p-6">
       <PageHeader
         title="诊断报告"
         subtitle="基于已有内容的 AI 分析结果（仅供参考）"
@@ -208,9 +209,9 @@ export function ResumeReportPage() {
         }
       />
 
-      <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
+      <div className="resume-report-content mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
         {/* 总分卡片 */}
-        <Card className="p-5">
+        <Card className="resume-report-summary p-5">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-baseline gap-1">
@@ -232,7 +233,7 @@ export function ResumeReportPage() {
         </Card>
 
         {/* 能力雷达图 */}
-        <Card className="p-5">
+        <Card className="resume-report-radar p-5">
           <p className="mb-2 text-sm font-medium text-neutral-700">能力雷达图</p>
           <ResumeRadarChart dimensions={radarDimensions} height={280} />
         </Card>
@@ -243,7 +244,7 @@ export function ResumeReportPage() {
         />
 
         {/* 分项得分 */}
-        <Card className="p-5">
+        <Card className="resume-report-evidence p-5">
           <p className="mb-4 text-sm font-medium text-neutral-700">分项评估</p>
           <div className="space-y-3">
             {report.sections.map((section) => {
@@ -275,7 +276,7 @@ export function ResumeReportPage() {
 
         {/* 修改优先级建议：优先用真实报告 priorities；缺失（含旧 5-section 报告）回退按低分分项派生 */}
         {llmPriorities.length > 0 ? (
-          <Card className="p-5">
+          <Card className="resume-report-priorities p-5">
             <div className="mb-3 flex items-center gap-2">
               <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
               <p className="text-sm font-medium text-neutral-700">修改优先级建议</p>
@@ -296,7 +297,7 @@ export function ResumeReportPage() {
             </div>
           </Card>
         ) : priorityItems.length > 0 ? (
-          <Card className="p-5">
+          <Card className="resume-report-priorities p-5">
             <div className="mb-3 flex items-center gap-2">
               <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
               <p className="text-sm font-medium text-neutral-700">优先修改项</p>
@@ -318,7 +319,7 @@ export function ResumeReportPage() {
 
         {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染 */}
         {riskNotes.length > 0 && (
-          <Card className="p-5">
+          <Card className="resume-report-risks p-5">
             <div className="mb-2 flex items-center gap-2">
               <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
               <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
@@ -336,7 +337,7 @@ export function ResumeReportPage() {
         )}
 
         {/* 优化建议 */}
-        <Card className="p-5">
+        <Card className="resume-report-suggestions p-5">
           <p className="mb-4 text-sm font-medium text-neutral-700">可执行建议</p>
           <ol className="space-y-3">
             {report.suggestions.map((tip, i) => (
@@ -359,14 +360,14 @@ export function ResumeReportPage() {
 
       {/* 优化路径引导:用户从「AI简历优化」入口进入时,诊断只是必经步骤,主引导是继续优化 */}
       {intent === 'optimize' && (
-        <div className="mt-4 flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/70 px-4 py-3">
+        <div className="resume-report-next mt-4 flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/70 px-4 py-3">
           <SparklesIcon className="h-4 w-4 shrink-0 text-primary-600" aria-hidden="true" />
           <p className="text-sm text-primary-800">诊断已完成。点击下方「继续生成优化版简历」，系统将基于原文重组优化（不补充虚构信息）。</p>
         </div>
       )}
 
       {/* 操作按钮 */}
-      <div className="mt-6 flex gap-3">
+      <div className="resume-report-actions mt-6 flex gap-3">
         <Button
           size="lg"
           variant="secondary"
@@ -377,7 +378,7 @@ export function ResumeReportPage() {
         </Button>
         <Button
           size="lg"
-          className="flex flex-1 items-center gap-2"
+          className="resume-primary-action flex flex-1 items-center gap-2"
           onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext } })}
         >
           <SparklesIcon className="h-4 w-4" />
@@ -388,7 +389,7 @@ export function ResumeReportPage() {
       <Button
         size="lg"
         variant="secondary"
-        className="mt-3 flex w-full items-center justify-center gap-2"
+        className="resume-secondary-action mt-3 flex w-full items-center justify-center gap-2"
         onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
       >
         <TargetIcon className="h-4 w-4" />

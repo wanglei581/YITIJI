@@ -7,10 +7,10 @@
 // 合规：等级仅供参考（无百分比/录用承诺，服务端双层拦截）；不做平台内投递。
 // ============================================================
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
-import type { ExternalJobDTO, JobFitResponse } from '@ai-job-print/shared'
+import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -24,7 +24,15 @@ import {
   TargetIcon,
 } from 'lucide-react'
 import { getJobs } from '../../services/api'
-import { analyzeJobFit, getLatestJobFit, printJobFit } from '../../services/api/jobFit'
+import {
+  analyzeJobFit,
+  getJobFitConsentStatus,
+  getLatestJobFit,
+  grantJobFitConsent,
+  JobFitApiError,
+  printJobFit,
+  revokeJobFitConsent,
+} from '../../services/api/jobFit'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
@@ -32,6 +40,9 @@ import { DecisionSummaryBar } from './jobFit/DecisionSummaryBar'
 import { FitSkillMap } from './jobFit/FitSkillMap'
 import { GapActionCards } from './jobFit/GapActionCards'
 import { ResumeRewriteCard } from './jobFit/ResumeRewriteCard'
+import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
+import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
+import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import './jobFit-inkpaper.css'
 
 interface PageState {
@@ -50,6 +61,8 @@ export function JobFitPage() {
   const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
   const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
   const accessToken = state.accessToken ?? (usingSessionTask ? session?.accessToken : undefined)
+  const currentToken = getToken()
+  const isAnonymous = !currentToken && Boolean(accessToken)
 
   const [tab, setTab] = useState<'pick' | 'manual'>('pick')
   const [keyword, setKeyword] = useState('')
@@ -63,8 +76,16 @@ export function JobFitPage() {
   const [loadingLatest, setLoadingLatest] = useState(Boolean(taskId))
   const [result, setResult] = useState<JobFitResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [pendingConsentInput, setPendingConsentInput] = useState<JobFitRequest | null>(null)
+  const [showAnonymousConsent, setShowAnonymousConsent] = useState(false)
+  const [consentError, setConsentError] = useState<string | null>(null)
+  const [memberConsentRequired, setMemberConsentRequired] = useState(false)
+  const [anonymousConsentActive, setAnonymousConsentActive] = useState(false)
+  const [revokingConsent, setRevokingConsent] = useState(false)
+  const anonymousConsentRevisionRef = useRef(0)
 
-  useBusyLock(analyzing || printing)
+  useBusyLock(analyzing || printing || revokingConsent)
 
   useEffect(() => {
     let cancelled = false
@@ -80,13 +101,33 @@ export function JobFitPage() {
     setResult(null)
     setSelectedJob(null)
     setError(null)
+    setNotice(null)
+    setPendingConsentInput(null)
+    setShowAnonymousConsent(false)
+    setConsentError(null)
+    setMemberConsentRequired(false)
+    setAnonymousConsentActive(false)
+    const consentStatusRevision = ++anonymousConsentRevisionRef.current
     if (!taskId) {
       setLoadingLatest(false)
       return
     }
     let cancelled = false
     setLoadingLatest(true)
-    getLatestJobFit(taskId, { token: getToken(), accessToken })
+    if (isAnonymous && accessToken) {
+      void getJobFitConsentStatus(taskId, { accessToken })
+        .then((status) => {
+          if (!cancelled && consentStatusRevision === anonymousConsentRevisionRef.current) {
+            setAnonymousConsentActive(status.active)
+          }
+        })
+        .catch(() => {
+          if (!cancelled && consentStatusRevision === anonymousConsentRevisionRef.current) {
+            setAnonymousConsentActive(false)
+          }
+        })
+    }
+    getLatestJobFit(taskId, { token: currentToken, accessToken })
       .then((res) => {
         if (!cancelled) setResult(res.status === 'completed' ? res : null)
       })
@@ -98,30 +139,36 @@ export function JobFitPage() {
         if (!cancelled) setLoadingLatest(false)
       })
     return () => { cancelled = true }
-  }, [taskId, accessToken, getToken])
+  }, [taskId, accessToken, currentToken, isAnonymous])
 
   if (!taskId) {
     return (
-      <div className="job-fit-inkpaper flex h-full flex-col items-center justify-center gap-4 px-6">
-        <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
-        <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
-        <Button size="lg" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
+      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-state-card" role="alert">
+          <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
+          <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
+          <Button size="lg" className="job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
+        </div>
       </div>
     )
   }
 
   if (loadingLatest) {
     return (
-      <div className="job-fit-inkpaper flex h-full flex-col items-center justify-center gap-4 px-6">
-        <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
-        <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
+      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-state-card" role="status" aria-live="polite">
+          <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
+          <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
+        </div>
       </div>
     )
   }
 
   const handleAnalyze = async () => {
     setError(null)
-    const input =
+    setNotice(null)
+    setMemberConsentRequired(false)
+    const input: JobFitRequest | null =
       tab === 'pick' && selectedJob
         ? { taskId, jobId: selectedJob.id }
         : tab === 'manual' && manualTitle.trim()
@@ -131,18 +178,83 @@ export function JobFitPage() {
       setError(tab === 'pick' ? '请先选择一个岗位' : '请填写目标岗位名称')
       return
     }
+    const token = getToken()
     setAnalyzing(true)
     try {
-      const res = await analyzeJobFit(input, { token: getToken(), accessToken })
+      const res = await analyzeJobFit(input, { token, accessToken })
       if (res.status === 'failed') {
         setError(res.failReason ?? '分析未完成，请稍后重试')
       } else {
         setResult(res)
       }
     } catch (err) {
+      if (err instanceof JobFitApiError && err.status === 403) {
+        if (err.code === 'JOB_FIT_ANONYMOUS_CONSENT_REQUIRED' && !token && accessToken) {
+          setPendingConsentInput(input)
+          setConsentError(null)
+          setShowAnonymousConsent(true)
+          return
+        }
+        if (err.code === 'USER_AI_CONSENT_REQUIRED' && token) {
+          setMemberConsentRequired(true)
+          setError('请先确认岗位 AI 辅助授权，再返回进行岗位匹配参考分析。')
+          return
+        }
+      }
       setError(err instanceof Error ? err.message : '分析失败，请稍后重试')
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  const handleConfirmAnonymousConsent = async () => {
+    const input = pendingConsentInput
+    if (!input || !accessToken) return
+    setAnalyzing(true)
+    setConsentError(null)
+    let granted = false
+    try {
+      await grantJobFitConsent(taskId, { accessToken })
+      granted = true
+      anonymousConsentRevisionRef.current += 1
+      setAnonymousConsentActive(true)
+      setShowAnonymousConsent(false)
+      setPendingConsentInput(null)
+      const res = await analyzeJobFit(input, { accessToken })
+      if (res.status === 'failed') {
+        setError(res.failReason ?? '分析未完成，请稍后重试')
+      } else {
+        setResult(res)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '授权失败，请稍后重试'
+      if (granted) setError(message)
+      else setConsentError(message)
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleCancelAnonymousConsent = () => {
+    setShowAnonymousConsent(false)
+    setPendingConsentInput(null)
+    setConsentError(null)
+  }
+
+  const handleRevokeConsent = async () => {
+    if (!accessToken) return
+    setRevokingConsent(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await revokeJobFitConsent(taskId, { accessToken })
+      anonymousConsentRevisionRef.current += 1
+      setAnonymousConsentActive(false)
+      setNotice('已撤回，重新分析需再次授权')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '撤回失败，请稍后重试')
+    } finally {
+      setRevokingConsent(false)
     }
   }
 
@@ -176,13 +288,15 @@ export function JobFitPage() {
   // ── 结果视图 ──────────────────────────────────────────────────────────────
   if (result) {
     return (
-      <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
-        <PageHeader
-          title="岗位匹配度参考"
-          subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
-          actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
-        />
-        <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
+      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+        <div className="job-fit-header">
+          <PageHeader
+            title="岗位匹配度参考"
+            subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
+            actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
+          />
+        </div>
+        <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
           <ComplianceBanner tone="info">
             以下内容仅为帮助你修改简历与准备投递的参考，不代表任何招聘结果；本平台不提供投递功能，投递请前往岗位来源平台。
           </ComplianceBanner>
@@ -209,7 +323,11 @@ export function JobFitPage() {
             </Card>
           )}
 
-          {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
+          {isAnonymous && anonymousConsentActive && (
+            <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
+          )}
+          {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
+          {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
         </div>
 
         <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
@@ -257,13 +375,23 @@ export function JobFitPage() {
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
-    <div className="job-fit-inkpaper flex h-full flex-col px-6 pt-6">
-      <PageHeader
-        title="岗位匹配度参考"
-        subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
-        actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回</Button>}
-      />
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
+    <div className="service-desk job-fit-inkpaper job-fit-inkpaper--form flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+      {showAnonymousConsent && (
+        <AnonymousJobFitConsentDialog
+          busy={analyzing}
+          error={consentError}
+          onCancel={handleCancelAnonymousConsent}
+          onConfirm={() => void handleConfirmAnonymousConsent()}
+        />
+      )}
+      <div className="job-fit-header">
+        <PageHeader
+          title="岗位匹配度参考"
+          subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
+          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回</Button>}
+        />
+      </div>
+      <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
         <ComplianceBanner tone="info">
           分析结果仅供本人参考，不代表录用结果；本平台不提供投递功能，投递请前往岗位来源平台。
         </ComplianceBanner>
@@ -272,6 +400,7 @@ export function JobFitPage() {
           <button
             type="button"
             onClick={() => setTab('pick')}
+            aria-pressed={tab === 'pick'}
             className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'pick' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
           >
             <BriefcaseIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
@@ -280,6 +409,7 @@ export function JobFitPage() {
           <button
             type="button"
             onClick={() => setTab('manual')}
+            aria-pressed={tab === 'manual'}
             className={['min-h-[52px] rounded-xl border text-sm font-semibold', tab === 'manual' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}
           >
             <TargetIcon className="mr-1.5 inline h-4 w-4" aria-hidden="true" />
@@ -295,12 +425,13 @@ export function JobFitPage() {
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder="搜索岗位名称 / 公司"
+                aria-label="搜索岗位名称或公司"
                 className="min-h-[48px] w-full rounded-xl border border-neutral-200 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
               />
             </div>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-3 flex flex-col gap-2" aria-busy={jobsLoading} aria-live="polite">
               {jobsLoading ? (
-                <p className="flex items-center gap-2 py-6 text-sm text-neutral-400">
+                <p className="flex items-center gap-2 py-6 text-sm text-neutral-400" role="status">
                   <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />正在加载岗位…
                 </p>
               ) : jobs.length === 0 ? (
@@ -313,6 +444,8 @@ export function JobFitPage() {
                       key={j.id}
                       type="button"
                       onClick={() => setSelectedJob(j)}
+                      aria-pressed={active}
+                      aria-label={`${j.title}，${j.company}，${active ? '已选择' : '未选择'}`}
                       className={['flex min-h-[56px] items-center justify-between rounded-xl border px-4 py-3 text-left', active ? 'border-primary-500 bg-primary-50' : 'border-neutral-100 bg-white hover:border-neutral-200'].join(' ')}
                     >
                       <span className="min-w-0">
@@ -333,6 +466,7 @@ export function JobFitPage() {
               onChange={(e) => setManualTitle(e.target.value)}
               maxLength={50}
               placeholder="目标岗位名称，如：行政专员"
+              aria-label="目标岗位名称"
               className="min-h-[52px] w-full rounded-xl border border-neutral-200 px-4 text-base focus:border-primary-500 focus:outline-none"
             />
             <textarea
@@ -341,16 +475,24 @@ export function JobFitPage() {
               maxLength={2000}
               rows={5}
               placeholder="可粘贴岗位 JD / 任职要求（选填，提供后参考更有针对性）"
+              aria-label="岗位 JD 或任职要求"
               className="mt-2 w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 text-sm leading-relaxed focus:border-primary-500 focus:outline-none"
             />
           </Card>
         )}
 
-        {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
+        {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
+        {notice && <p className="job-fit-notice rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-700" aria-live="polite">{notice}</p>}
+        {memberConsentRequired && (
+          <MemberJobFitConsentCard onNavigate={() => navigate('/jobs')} />
+        )}
+        {isAnonymous && anonymousConsentActive && (
+          <AnonymousJobFitConsentCard busy={revokingConsent} onRevoke={() => void handleRevokeConsent()} />
+        )}
       </div>
 
       <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <Button size="lg" className="h-14 w-full text-base" disabled={analyzing} onClick={() => void handleAnalyze()}>
+        <Button size="lg" className="job-fit-primary-action h-14 w-full text-base" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
           {analyzing ? (
             <>
               <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />

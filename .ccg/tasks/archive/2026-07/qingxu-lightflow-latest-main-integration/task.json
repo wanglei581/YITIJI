@@ -1,0 +1,12 @@
+{
+  "id": "qingxu-lightflow-latest-main-integration",
+  "title": "将青序 LightFlow K1/K2 本地候选整合到最新 main 并完成本地验收",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "等待用户完成本地视觉确认；如另行授权再 push 或创建 PR",
+  "createdAt": "2026-07-14T00:00:00+08:00",
+  "branch": "codex/qingxu-lightflow-integration-20260714"
+}

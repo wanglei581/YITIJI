@@ -5,7 +5,7 @@
  * 1. 招聘会/校园招聘页面不得展示 aiMatchScore / AI 百分比 / AI 匹配度。
  * 2. 商用页面不得展示平台内投递、签到结果等招聘闭环文案。
  * 3. 数据大屏遇 isMockData 必须真实空态，不得在生产或普通页面展示模拟统计。
- * 4. 活动资料打印前必须重新拉取 getFairMaterials，避免 30min 签名 URL 过期。
+ * 4. 活动资料打印必须由后端按需生成内部 printFileUrl，不消费外部签名 URL。
  * 5. 扫码签到首页入口必须只进入真实 checkinUrl 来源签到列表。
  *
  * 运行: pnpm --filter @ai-job-print/kiosk verify:jobfair-commercial-closure
@@ -108,10 +108,15 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
 {
   const materialsPage = read('src/pages/job-fairs/FairMaterialsPage.tsx')
   const handlePrintBlock = materialsPage.match(/const handlePrint[\s\S]*?(?=\n\s*if \(loading\))/)?.[0] ?? ''
-  if (!handlePrintBlock.includes('getFairMaterials(fairId)') || !handlePrintBlock.includes('setMaterials')) {
-    fail('活动资料打印前必须重新拉取 getFairMaterials(fairId) 刷新签名 URL')
+  const usesInternalPrintUrl =
+    handlePrintBlock.includes('prepareFairMaterialPrint(fairId, material.id)') &&
+    handlePrintBlock.includes('if (!printable.printFileUrl)') &&
+    handlePrintBlock.includes('fileUrl: printable.printFileUrl') &&
+    !handlePrintBlock.includes('material.fileUrl')
+  if (!usesInternalPrintUrl) {
+    fail('活动资料打印必须按需生成并只消费后端内部 printFileUrl')
   } else {
-    pass('活动资料打印前按需刷新 FairMaterial 签名 URL')
+    pass('活动资料打印按需生成并只消费后端内部 printFileUrl')
   }
 }
 
@@ -135,8 +140,8 @@ console.log('\n=== 招聘会三入口商用闭环防回退验证 ===')
 }
 
 {
-  const home = read('src/pages/home/HomePage.tsx')
-  const checkinEntry = home.match(/扫码签到[\s\S]{0,800}/)?.[0] ?? ''
+  const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
+  const checkinEntry = homeServiceGroups.match(/扫码签到[\s\S]{0,800}/)?.[0] ?? ''
   if (!checkinEntry.includes("to: '/job-fairs/checkin'") || /disabled:\s*true/.test(checkinEntry)) {
     fail('扫码签到入口必须进入 /job-fairs/checkin，且不得继续使用禁用占位')
   } else {

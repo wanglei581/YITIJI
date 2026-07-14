@@ -6,46 +6,20 @@
 // 文字输入是硬兜底；麦克风、TTS、ASR 任何一步失败都不能阻塞主流程。
 // ============================================================
 
-import { useEffect, useMemo, useRef, useState, type ElementType } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
-import {
-  AlertCircleIcon,
-  BotIcon,
-  CheckCircle2Icon,
-  ClockIcon,
-  FileTextIcon,
-  KeyboardIcon,
-  Loader2Icon,
-  MessageSquareTextIcon,
-  MicIcon,
-  PencilLineIcon,
-  RotateCcwIcon,
-  SendIcon,
-  ShieldCheckIcon,
-  SkipForwardIcon,
-  SquareIcon,
-  TimerIcon,
-  UserRoundIcon,
-  Volume2Icon,
-} from 'lucide-react'
+import { AlertCircleIcon } from 'lucide-react'
 import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { InterviewAnswerDock } from './session/InterviewAnswerDock'
+import { InterviewSessionPanels } from './session/InterviewSessionPanels'
+import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
+import './interview-service-desk.css'
 
 const advisorPortrait = '/assets/ai-advisor.png'
-
-interface SessionState {
-  sessionId: string
-  accessToken?: string
-  questionTarget: number
-  durationMin: number
-  interviewerType: string
-  position: string
-  firstQuestion?: string
-  firstQType?: string
-}
 
 const INTERVIEWER_LABEL: Record<string, string> = {
   hr: 'HR 初筛',
@@ -56,25 +30,6 @@ const INTERVIEWER_LABEL: Record<string, string> = {
 }
 
 const MAX_RECORD_SEC = 58
-
-interface Msg {
-  role: 'interviewer' | 'candidate'
-  content: string
-  skipped?: boolean
-}
-
-type VoiceState =
-  | { kind: 'idle' }
-  | { kind: 'requesting_permission' }
-  | { kind: 'recording'; startedAt: number }
-  | { kind: 'transcribing' }
-  | { kind: 'review'; transcript: string; edited: string; durationSec: number }
-
-function fmtClock(sec: number): string {
-  const m = Math.floor(Math.max(sec, 0) / 60)
-  const s = Math.max(sec, 0) % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
 
 function speak(text: string, onState?: (speaking: boolean) => void): void {
   try {
@@ -92,33 +47,18 @@ function speak(text: string, onState?: (speaking: boolean) => void): void {
   }
 }
 
-function StatusPill({ icon: Icon, label, tone = 'gray' }: { icon: ElementType; label: string; tone?: 'gray' | 'blue' | 'red' | 'green' }) {
-  const toneClass = {
-    gray: 'border-neutral-200 bg-neutral-50 text-neutral-600',
-    blue: 'border-primary-100 bg-primary-50 text-primary-700',
-    red: 'border-error/20 bg-error-bg text-error-fg',
-    green: 'border-success-bg bg-success-bg text-success-fg',
-  }[tone]
-  return (
-    <span className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium ${toneClass}`}>
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-      {label}
-    </span>
-  )
-}
-
 export function InterviewSessionPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
-  const state = location.state as SessionState | null
+  const state = location.state as InterviewSessionRouteState | null
 
-  const [messages, setMessages] = useState<Msg[]>(() =>
+  const [messages, setMessages] = useState<InterviewMessage[]>(() =>
     state?.firstQuestion ? [{ role: 'interviewer', content: state.firstQuestion }] : [],
   )
   const [questionIndex, setQuestionIndex] = useState(1)
   const [draft, setDraft] = useState('')
-  const [phase, setPhase] = useState<'answering' | 'thinking' | 'finishing' | 'done_suggest'>('answering')
+  const [phase, setPhase] = useState<InterviewSessionPhase>('answering')
   const [error, setError] = useState<string | null>(null)
   const [remainingSec, setRemainingSec] = useState((state?.durationMin ?? 5) * 60)
   const listRef = useRef<HTMLDivElement>(null)
@@ -126,7 +66,7 @@ export function InterviewSessionPage() {
   const [voiceAvailable, setVoiceAvailable] = useState(false)
   const [ttsOfficial, setTtsOfficial] = useState(false)
   const [mode, setMode] = useState<'voice' | 'text'>('text')
-  const [voice, setVoice] = useState<VoiceState>({ kind: 'idle' })
+  const [voice, setVoice] = useState<InterviewVoiceState>({ kind: 'idle' })
   const [speaking, setSpeaking] = useState(false)
   const [voiceHint, setVoiceHint] = useState<string | null>(null)
   const [micError, setMicError] = useState(false)
@@ -216,7 +156,7 @@ export function InterviewSessionPage() {
 
   if (!state?.sessionId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-5 bg-[#f5f7fa] px-6">
+      <div className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg text-error-fg">
           <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
         </div>
@@ -372,306 +312,65 @@ export function InterviewSessionPage() {
   const micStatusTone = micError || !voiceAvailable ? 'red' : 'green'
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f5f7fa]">
-      <div className="border-b border-neutral-100 bg-white px-6 py-4">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-700">
-            <BotIcon className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xl font-bold text-neutral-900">模拟面试</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-neutral-500">
-              <span>{interviewerLabel}</span>
-              <span className="text-neutral-300">/</span>
-              <span className="max-w-[22rem] truncate">目标岗位：{state.position}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-right">
-            <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-2">
-              <p className={['font-mono text-2xl font-bold tabular-nums', timeUp ? 'text-warning-fg' : 'text-neutral-900'].join(' ')}>
-                {fmtClock(remainingSec)}
-              </p>
-              <p className="text-xs text-neutral-400">剩余时间</p>
-            </div>
-            <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-2">
-              <p className="text-2xl font-bold text-neutral-900">{questionIndex}<span className="text-sm text-neutral-400">/{state.questionTarget}</span></p>
-              <p className="text-xs text-neutral-400">当前题目</p>
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <StatusPill icon={TimerIcon} label={statusText} tone={voice.kind === 'requesting_permission' ? 'blue' : voice.kind === 'recording' ? 'red' : 'gray'} />
-          <StatusPill icon={Volume2Icon} label={ttsLabel} tone={ttsOfficial ? 'green' : 'blue'} />
-          <StatusPill icon={MicIcon} label={micStatusLabel} tone={micStatusTone} />
-        </div>
-      </div>
+    <div className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewSessionPanels
+        advisorPortrait={advisorPortrait}
+        interviewerLabel={interviewerLabel}
+        position={state.position}
+        remainingSec={remainingSec}
+        questionIndex={questionIndex}
+        questionTarget={state.questionTarget}
+        statusText={statusText}
+        timeUp={timeUp}
+        voiceKind={voice.kind}
+        ttsLabel={ttsLabel}
+        ttsOfficial={ttsOfficial}
+        micStatusLabel={micStatusLabel}
+        micStatusTone={micStatusTone}
+        speaking={speaking}
+        lastInterviewerMsg={lastInterviewerMsg}
+        voiceHint={voiceHint}
+        messages={messages}
+        lastInterviewerMessageIndex={lastInterviewerMessageIndex}
+        phase={phase}
+        listRef={listRef}
+      />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col gap-4">
-          <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col items-center text-center">
-              <div className="relative">
-                <img
-                  src={advisorPortrait}
-                  alt="AI 数字人面试官小青"
-                  className={[
-                    'h-40 w-40 rounded-2xl object-cover ring-4 transition-shadow',
-                    speaking ? 'ring-primary-200 shadow-[0_0_0_8px_rgba(22,119,255,0.10)]' : 'ring-neutral-100',
-                  ].join(' ')}
-                />
-                {voice.kind === 'recording' && (
-                  <span className="absolute -bottom-2 -right-2 flex h-11 w-11 items-center justify-center rounded-full bg-error text-white motion-safe:animate-pulse">
-                    <MicIcon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                )}
-                {speaking && (
-                  <span className="absolute -bottom-2 -right-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary-600 text-white">
-                    <Volume2Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                )}
-              </div>
-              <p className="mt-4 text-lg font-bold text-neutral-900">小青 · {interviewerLabel}</p>
-              <p className="mt-1 text-sm text-neutral-500">{statusText}</p>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              <div className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3">
-                <p className="text-xs font-semibold text-primary-700">当前问题</p>
-                <p className="mt-1 line-clamp-4 text-sm leading-relaxed text-neutral-800">{lastInterviewerMsg || '等待面试官出题'}</p>
-              </div>
-              <div className="grid grid-cols-1 gap-2">
-                <div className="flex items-center gap-2 rounded-lg border border-neutral-100 px-3 py-2 text-sm text-neutral-600">
-                  <UserRoundIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-                  训练报告仅给本人查看，可按需打印
-                </div>
-                <div className="flex items-center gap-2 rounded-lg border border-neutral-100 px-3 py-2 text-sm text-neutral-600">
-                  <ShieldCheckIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-                  语音仅用于本次转写，不保存原始音频
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {(voiceHint || timeUp) && (
-            <section className="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm text-primary-700">
-              {voiceHint && <p>{voiceHint}</p>}
-              {timeUp && phase !== 'finishing' && (
-                <p className={voiceHint ? 'mt-2' : ''}>练习时长已到，建议回答完当前问题后点击「结束面试」。</p>
-              )}
-            </section>
-          )}
-        </aside>
-
-        <section className="flex min-h-0 flex-col rounded-xl border border-neutral-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-3">
-            <div className="flex items-center gap-2">
-              <MessageSquareTextIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-neutral-900">对话记录</h2>
-            </div>
-            <p className="text-xs text-neutral-400">自动滚动到底部</p>
-          </div>
-          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto bg-[#f8fafc] px-5 py-4">
-            <div className="flex flex-col gap-4">
-              {messages.map((m, i) => {
-                const isInterviewer = m.role === 'interviewer'
-                const isCurrent = i === lastInterviewerMessageIndex && isInterviewer && phase === 'answering'
-                return (
-                  <div key={`${m.role}-${i}`} className={isInterviewer ? 'flex justify-start' : 'flex justify-end'}>
-                    <div className={['max-w-[78%]', isInterviewer ? 'text-left' : 'text-right'].join(' ')}>
-                      <p className="mb-1 px-1 text-xs text-neutral-400">{isInterviewer ? interviewerLabel : m.skipped ? '跳过记录' : '你的回答'}</p>
-                      <div
-                        className={[
-                          'rounded-2xl px-4 py-3 text-base leading-relaxed shadow-sm',
-                          isInterviewer
-                            ? isCurrent
-                              ? 'rounded-tl-sm border-2 border-primary-200 bg-white text-neutral-900'
-                              : 'rounded-tl-sm border border-neutral-100 bg-white text-neutral-800'
-                            : m.skipped
-                              ? 'rounded-tr-sm border border-neutral-200 bg-neutral-100 text-neutral-500'
-                              : 'rounded-tr-sm bg-primary-600 text-white',
-                        ].join(' ')}
-                      >
-                        {m.content}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              {(phase === 'thinking' || phase === 'finishing') && (
-                <div className="flex justify-start">
-                  <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-neutral-100 bg-white px-4 py-3 text-sm text-neutral-500 shadow-sm">
-                    <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    {phase === 'finishing' ? '正在生成练习报告…' : '面试官正在分析你的回答…'}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="border-t border-neutral-100 bg-white px-5 py-4 shadow-[0_-4px_16px_rgba(15,23,42,0.04)]">
-        {micError && (
-          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-error/30 bg-error-bg p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <AlertCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-error-fg" aria-hidden="true" />
-              <div>
-                <p className="font-semibold text-error-fg">无法访问麦克风，请检查浏览器权限或改用文字输入</p>
-                <p className="mt-0.5 text-sm text-error-fg">确认浏览器已允许麦克风，并检查设备是否被其他程序占用。</p>
-              </div>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button size="lg" className="h-14 px-5 text-base" disabled={voiceLocked || busyTurn} onClick={() => void startRecording()}>
-                <RotateCcwIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                重新尝试语音
-              </Button>
-              <Button size="lg" variant="secondary" className="h-14 px-5 text-base" disabled={voiceLocked || busyTurn} onClick={() => { setMode('text'); setMicError(false) }}>
-                <KeyboardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                改用文字输入
-              </Button>
-            </div>
-          </div>
-        )}
-        {error && !micError && <p className="mb-3 rounded-lg bg-error-bg px-4 py-3 text-sm font-medium text-error-fg">{error}</p>}
-
-        {phase === 'done_suggest' ? (
-          <Button size="lg" className="h-14 w-full text-base" disabled={voiceLocked} onClick={() => void finish()}>
-            <FileTextIcon className="mr-2 h-5 w-5" aria-hidden="true" />
-            结束并生成练习报告
-          </Button>
-        ) : mode === 'voice' && voice.kind === 'review' ? (
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-neutral-600">
-                <PencilLineIcon className="h-4 w-4" aria-hidden="true" />
-                转写结果（可编辑，确认后提交）
-              </span>
-              <textarea
-                value={voice.edited}
-                onChange={(e) => setVoice({ ...voice, edited: e.target.value })}
-                rows={3}
-                maxLength={2000}
-                className="w-full resize-none rounded-xl border border-primary-200 bg-primary-50/40 px-4 py-3 text-base leading-relaxed focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-              />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="lg"
-                className="h-14 min-w-[150px] text-base"
-                disabled={busyTurn}
-                onClick={() => void submit({
-                  text: voice.edited,
-                  skip: false,
-                  voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec },
-                })}
-              >
-                <CheckCircle2Icon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-                确认提交
-              </Button>
-              <Button size="lg" variant="secondary" className="h-14 min-w-[132px]" disabled={busyTurn} onClick={() => void startRecording()}>
-                <MicIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                重新录音
-              </Button>
-              <Button size="lg" variant="secondary" className="h-14 min-w-[150px]" disabled={busyTurn} onClick={() => { setMode('text'); setVoice({ kind: 'idle' }) }}>
-                <KeyboardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                改用文字输入
-              </Button>
-            </div>
-          </div>
-        ) : mode === 'voice' ? (
-          <>
-            {voice.kind === 'requesting_permission' ? (
-              <Button size="lg" className="h-16 w-full text-base" disabled>
-                <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
-                正在请求麦克风权限…
-              </Button>
-            ) : voice.kind === 'recording' ? (
-              <Button size="lg" className="h-16 w-full bg-error text-base hover:bg-error" onClick={() => void stopRecording()}>
-                <SquareIcon className="mr-2 h-5 w-5" aria-hidden="true" />
-                结束回答（已录 {fmtClock(recordSec)}，{fmtClock(MAX_RECORD_SEC - recordSec)} 后自动结束）
-              </Button>
-            ) : voice.kind === 'transcribing' ? (
-              <Button size="lg" className="h-16 w-full text-base" disabled>
-                <Loader2Icon className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
-                正在转写你的回答…
-              </Button>
-            ) : (
-              <Button size="lg" className="h-16 w-full text-base" disabled={busyTurn} onClick={() => void startRecording()}>
-                <MicIcon className="mr-2 h-5 w-5" aria-hidden="true" />
-                开始回答（语音）
-              </Button>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-14 flex-1 text-base"
-                disabled={busyTurn || voice.kind === 'recording' || voiceLocked}
-                onClick={() => { resetVoiceState(); setMode('text'); setMicError(false) }}
-              >
-                <KeyboardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                改用文字输入
-              </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-14 min-w-[120px] text-base"
-                disabled={busyTurn || voice.kind !== 'idle'}
-                onClick={() => void submit({ text: '', skip: true })}
-              >
-                <SkipForwardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                跳过
-              </Button>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-14 min-w-[132px] text-base text-error-fg"
-                disabled={busyTurn || voiceLocked}
-                onClick={() => void finish()}
-              >
-                <SquareIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                结束面试
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={busyTurn}
-              rows={3}
-              maxLength={2000}
-              placeholder="在这里输入你的回答…"
-              className="w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 text-base leading-relaxed focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button size="lg" className="h-14 min-w-[150px] text-base" disabled={busyTurn} onClick={() => void submit({ text: draft, skip: false })}>
-                <SendIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                提交回答
-              </Button>
-              {voiceAvailable && (
-                <Button size="lg" variant="secondary" className="h-14 min-w-[150px]" disabled={busyTurn} onClick={() => { setMode('voice'); setMicError(false); setError(null) }}>
-                  <MicIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  改用语音回答
-                </Button>
-              )}
-              <Button size="lg" variant="secondary" className="h-14 min-w-[110px]" disabled={busyTurn} onClick={() => void submit({ text: '', skip: true })}>
-                <SkipForwardIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                跳过
-              </Button>
-              <Button size="lg" variant="secondary" className="h-14 min-w-[120px] text-error-fg" disabled={busyTurn} onClick={() => void finish()}>
-                <SquareIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                结束面试
-              </Button>
-            </div>
-          </div>
-        )}
-        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-neutral-400">
-          <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          模拟练习仅供本人参考，对话内容不会发送给任何企业
-        </div>
-      </div>
+      <InterviewAnswerDock
+        micError={micError}
+        error={error}
+        voiceLocked={voiceLocked}
+        busyTurn={busyTurn}
+        phase={phase}
+        mode={mode}
+        voice={voice}
+        recordSec={recordSec}
+        maxRecordSec={MAX_RECORD_SEC}
+        draft={draft}
+        voiceAvailable={voiceAvailable}
+        onDraftChange={setDraft}
+        onReviewChange={(edited) => setVoice((current) => current.kind === 'review' ? { ...current, edited } : current)}
+        onReviewSubmit={() => {
+          if (voice.kind !== 'review') return
+          void submit({
+            text: voice.edited,
+            skip: false,
+            voiceMeta: { transcript: voice.transcript, edited: voice.edited.trim() !== voice.transcript.trim(), durationSec: voice.durationSec },
+          })
+        }}
+        onRetryVoice={() => void startRecording()}
+        onStopRecording={() => void stopRecording()}
+        onUseText={() => {
+          // 麦克风失败、转写确认和语音空闲态共用幂等清场，再回到文字输入。
+          resetVoiceState()
+          setMode('text')
+          setMicError(false)
+        }}
+        onUseVoice={() => { setMode('voice'); setMicError(false); setError(null) }}
+        onSkip={() => void submit({ text: '', skip: true })}
+        onSubmitText={() => void submit({ text: draft, skip: false })}
+        onFinish={() => void finish()}
+      />
     </div>
   )
 }

@@ -1,0 +1,55 @@
+.k1-screensaver .screensaver-wake-prompt {
+  position: absolute;
+  right: clamp(20px, 5vw, 72px);
+  bottom: clamp(24px, 5vh, 64px);
+  left: clamp(20px, 5vw, 72px);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.k1-screensaver .screensaver-wake-prompt span {
+  min-height: var(--sd-control-min, 48px);
+  max-width: min(100%, 540px);
+  padding: 12px 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sd-color-surface);
+  background: color-mix(in srgb, var(--sd-color-text-strong) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sd-color-surface) 32%, transparent);
+  border-radius: 999px;
+  box-shadow: var(--sd-shadow-console);
+  backdrop-filter: blur(12px);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif);
+  font-size: clamp(15px, 2vw, 19px);
+  font-weight: 760;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .k1-screensaver .screensaver-wake-prompt {
+    right: 16px;
+    bottom: 24px;
+    left: 16px;
+  }
+
+  .k1-screensaver .screensaver-wake-prompt span {
+    width: 100%;
+    min-height: var(--sd-primary-control-min, 56px);
+    padding-inline: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .k1-screensaver *,
+  .k1-screensaver *::before,
+  .k1-screensaver *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -12,7 +12,7 @@ function assert(condition, message) {
   console.log(`PASS ${message}`)
 }
 
-const homePage = read('src/pages/home/HomePage.tsx')
+const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
 const uploadPage = read('src/pages/print/PrintUploadPage.tsx')
 const session = read('src/pages/print/printMaterialSession.ts')
 const flowPages = [
@@ -27,12 +27,12 @@ const previewPage = read('src/pages/print/PrintPreviewPage.tsx')
 const confirmPage = read('src/pages/print/PrintConfirmPage.tsx')
 
 assert(
-  /title:\s*'简历打印'[\s\S]*?to:\s*'\/print\/upload\?source=resume'/.test(homePage),
+  /title:\s*'简历打印'[\s\S]*?to:\s*'\/print\/upload\?source=resume'/.test(homeServiceGroups),
   '首页 AI 简历服务的简历打印入口进入 source=resume 打印流',
 )
 
 assert(
-  /title:\s*'文档打印'[\s\S]*?to:\s*'\/print\/upload\?source=document'/.test(homePage),
+  /title:\s*'文档打印'[\s\S]*?to:\s*'\/print\/upload\?source=document'/.test(homeServiceGroups),
   '首页打印扫描的文档打印入口进入 source=document 打印流',
 )
 

@@ -19,6 +19,7 @@ import {
   MicIcon,
   SquareIcon,
 } from 'lucide-react'
+import './interview-service-desk.css'
 
 const CHECKLIST: Array<{ title: string; desc: string }> = [
   { title: '背景调研', desc: '了解公司核心业务、近期动态、企业文化，并在面试中自然地表达出来' },
@@ -116,7 +117,7 @@ export function InterviewTipsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
       <PageHeader
         title="面试技巧"
         subtitle="面试前准备工具：清单逐项过一遍，再开始模拟练习"
@@ -125,19 +126,22 @@ export function InterviewTipsPage() {
         }
       />
 
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+      <div className="interview-flow__scroll mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
           面试是展示自我、与企业双向选择的过程。以下内容为通用准备建议，仅供参考。
         </ComplianceBanner>
 
         {/* 1. 面试前准备清单（可勾选） */}
-        <Card className="p-5">
+        <Card className="interview-card interview-tips__checklist p-5">
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ClipboardListIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
               <h2 className="text-base font-semibold text-neutral-900">面试前准备清单</h2>
             </div>
             <span className="text-xs text-neutral-400">{checked.size}/{CHECKLIST.length} 已完成</span>
+          </div>
+          <div className="interview-tips__progress" aria-hidden="true">
+            <span style={{ width: `${Math.round((checked.size / CHECKLIST.length) * 100)}%` }} />
           </div>
           <div className="flex flex-col gap-1.5">
             {CHECKLIST.map((item, i) => {
@@ -147,6 +151,7 @@ export function InterviewTipsPage() {
                   key={item.title}
                   type="button"
                   onClick={() => toggleCheck(i)}
+                  aria-pressed={done}
                   className={[
                     'flex min-h-[56px] items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
                     done ? 'border-primary-200 bg-primary-50/60' : 'border-neutral-100 bg-white hover:border-neutral-200',
@@ -166,7 +171,7 @@ export function InterviewTipsPage() {
         </Card>
 
         {/* 2. 高频问题卡片（可展开） */}
-        <Card className="p-5">
+        <Card className="interview-card p-5">
           <div className="mb-3 flex items-center gap-2">
             <HelpCircleIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
             <h2 className="text-base font-semibold text-neutral-900">高频问题应对</h2>
@@ -179,6 +184,7 @@ export function InterviewTipsPage() {
                   <button
                     type="button"
                     onClick={() => setOpenFaq(open ? null : i)}
+                    aria-expanded={open}
                     className="flex min-h-[52px] w-full items-center justify-between gap-3 bg-white px-4 py-3 text-left"
                   >
                     <span className="text-sm font-semibold text-neutral-900">“{f.q}”</span>
@@ -202,7 +208,7 @@ export function InterviewTipsPage() {
         </Card>
 
         {/* 3. STAR 法则（完整版） */}
-        <Card className="p-5">
+        <Card className="interview-card p-5">
           <div className="mb-3 flex items-center gap-2">
             <LightbulbIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
             <h2 className="text-base font-semibold text-neutral-900">行为面试技巧（STAR 法则）</h2>
@@ -224,7 +230,7 @@ export function InterviewTipsPage() {
         </Card>
 
         {/* 4. 自我介绍结构 */}
-        <Card className="p-5">
+        <Card className="interview-card p-5">
           <div className="mb-3 flex items-center gap-2">
             <MicIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
             <h2 className="text-base font-semibold text-neutral-900">自我介绍结构建议</h2>
@@ -248,13 +254,10 @@ export function InterviewTipsPage() {
       </div>
 
       {/* 底部 CTA */}
-      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <div className="flex gap-3">
-          <Button size="lg" className="h-14 flex-1 text-base" onClick={() => navigate('/interview/setup')}>
+      <div className="interview-flow__action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+        <div className="flex justify-center">
+          <Button size="lg" className="h-14 w-full max-w-[680px] text-base" onClick={() => navigate('/interview/setup')}>
             开始模拟面试
-          </Button>
-          <Button size="lg" variant="secondary" className="h-14 min-w-[140px] text-base" onClick={() => navigate('/')}>
-            返回首页
           </Button>
         </div>
         {/* 打印准备清单：完成模拟面试后报告自带准备清单且可打印，此处不放未接线的死按钮 */}

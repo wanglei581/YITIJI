@@ -36,17 +36,19 @@ function assertNotContains(path, patterns, message) {
 
 console.log('\n=== Kiosk job material library UI verification ===')
 
+const homeServicesPath = 'src/pages/home/serviceGroups.ts'
+
 assertContains('package.json', '"verify:job-material-library-ui"', 'Kiosk package exposes job material UI verifier')
 assertContains('src/services/api/index.ts', './jobMaterials', 'Kiosk API exports jobMaterials service')
 assertContains('src/services/api/jobMaterials.ts', 'generateJobMaterial', 'Kiosk service can generate job material')
 assertContains('src/services/api/jobMaterials.ts', 'getResumeTemplates', 'Kiosk service exposes resume template loader')
 assertContains('src/services/api/jobMaterials.ts', 'isJobMaterialDocumentTemplate', 'Kiosk service separates resume templates from generated job materials')
-assertContains('src/pages/home/HomePage.tsx', "title: '简历素材库'", 'Homepage keeps existing resume material tile')
-assertContains('src/pages/home/HomePage.tsx', "title: '求职材料'", 'Homepage keeps existing job material tile')
-assertContains('src/pages/home/HomePage.tsx', "to: '/resume/templates'", 'Homepage routes resume template tile to resume template library')
-assertContains('src/pages/home/HomePage.tsx', "to: '/resume/materials'", 'Homepage routes job material tile to job material library')
+assertContains(homeServicesPath, "title: '简历素材库'", 'Homepage keeps existing resume material tile')
+assertContains(homeServicesPath, "title: '求职材料'", 'Homepage keeps existing job material tile')
+assertContains(homeServicesPath, "to: '/resume/templates'", 'Homepage routes resume template tile to resume template library')
+assertContains(homeServicesPath, "to: '/resume/materials'", 'Homepage routes job material tile to job material library')
 assertNotContains(
-  'src/pages/home/HomePage.tsx',
+  homeServicesPath,
   [/title:\s*'简历素材库'[^}]*disabled:\s*true/s, /title:\s*'求职材料'[^}]*disabled:\s*true/s],
   'Homepage job material tiles are no longer disabled',
 )

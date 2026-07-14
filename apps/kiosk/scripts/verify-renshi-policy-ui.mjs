@@ -31,7 +31,7 @@ const socialPanel = read('src/pages/renshi/SocialPanel.tsx')
 const registerPanel = read('src/pages/renshi/RegisterPanel.tsx')
 const noticePanel = read('src/pages/renshi/NoticePanel.tsx')
 const components = read('src/pages/renshi/components.tsx')
-const home = read('src/pages/home/HomePage.tsx')
+const homeServiceGroups = read('src/pages/home/serviceGroups.ts')
 const packageJson = read('package.json')
 
 const allRenshi = page + shared + builtinData + policyPanel + socialPanel + registerPanel + noticePanel + components
@@ -90,7 +90,7 @@ if (['graduate', 'flexible', 'migrant', 'startup', 'hardship'].every((k) => shar
 }
 
 // F. 首页入口与 Tab 对应
-if (home.includes("{ title: '社保指南', icon: 'ticket', to: '/renshi?tab=social' }") && !home.includes("title: '补贴指引'")) {
+if (homeServiceGroups.includes("{ title: '社保指南', description: '社保办事材料参考', icon: 'ticket', to: '/renshi?tab=social' }") && !homeServiceGroups.includes("title: '补贴指引'")) {
   pass('F. 首页「社保指南」入口指向 tab=social，无错位「补贴指引」入口')
 } else {
   fail('F. 首页政策服务子入口必须与 Tab 一一对应（社保指南→tab=social）')

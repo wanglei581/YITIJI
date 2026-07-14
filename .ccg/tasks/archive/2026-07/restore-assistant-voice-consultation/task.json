@@ -1,0 +1,12 @@
+{
+  "id": "restore-assistant-voice-consultation",
+  "title": "恢复青序 LightFlow AI 助手真实语音咨询",
+  "status": "in_progress",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档 CCG 任务并提交",
+  "createdAt": "2026-07-14T08:15:41Z",
+  "branch": "codex/qingxu-lightflow-k2-20260713"
+}
