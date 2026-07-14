@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
@@ -18,10 +18,7 @@ const {
   serializePersistedConfig,
   writeValidatedConfigAt,
 } = require(join(root, 'src/agent/config-manager.ts'))
-const {
-  readStartupDiagnostic,
-  writeStartupDiagnostic,
-} = require(join(root, 'src/agent/startup-diagnostics.ts'))
+const diagnostics = require(join(root, 'src/agent/startup-diagnostics.ts'))
 
 const valid = {
   apiBaseUrl: 'https://api.example.test/api/v1',
@@ -44,7 +41,7 @@ const tempDir = mkdtempSync(join(tmpdir(), 'agent-config-resilience-'))
 try {
   const configPath = join(tempDir, 'agent-config.json')
   const backupPath = join(tempDir, 'agent-config.backup.json')
-  const diagnosticPath = join(tempDir, 'startup-diagnostic.txt')
+  const diagnosticPath = join(tempDir, 'last-startup-diagnostic.json')
 
   assert.equal(
     parseConfigText(`\uFEFF${JSON.stringify(valid)}`).terminalCode,
@@ -58,15 +55,22 @@ try {
     'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
   )
 
+  const sensitiveConfig = {
+    agentToken: 'agent-token-must-not-persist',
+    adminSecret: 'admin-secret-must-not-persist',
+    bindCode: 'bind-code-must-not-persist',
+    _comment: 'comment-must-not-persist',
+  }
   const persistedText = serializePersistedConfig({
     ...valid,
-    agentToken: 'must-not-persist',
-    adminSecret: 'must-not-persist',
+    ...sensitiveConfig,
   })
   const persistedConfig = JSON.parse(persistedText)
   assert.deepEqual(persistedConfig, valid, 'must serialize only non-sensitive persisted config')
-  assert.equal(persistedText.includes('agentToken'), false, 'must not serialize agentToken')
-  assert.equal(persistedText.includes('adminSecret'), false, 'must not serialize adminSecret')
+  for (const [key, value] of Object.entries(sensitiveConfig)) {
+    assert.equal(key in persistedConfig, false, `must not persist ${key}`)
+    assert.equal(persistedText.includes(value), false, `must not serialize ${key}'s value`)
+  }
 
   writeFileSync(configPath, serializePersistedConfig(valid), 'utf8')
   writeValidatedConfigAt(configPath, backupPath, { ...valid, terminalCode: 'KSK-002' })
@@ -74,6 +78,26 @@ try {
   assert.equal(JSON.parse(readFileSync(configPath, 'utf8')).terminalCode, 'KSK-002')
   assert.equal(JSON.parse(readFileSync(backupPath, 'utf8')).terminalCode, 'KSK-001')
 
+  const primaryAfterValidWrite = readFileSync(configPath, 'utf8')
+  const backupAfterValidWrite = readFileSync(backupPath, 'utf8')
+  writeFileSync(configPath, '{', 'utf8')
+  const corruptedPrimaryBeforeWrite = readFileSync(configPath, 'utf8')
+  assertStartupError(
+    () => writeValidatedConfigAt(configPath, backupPath, valid),
+    'AGENT_CONFIG_INVALID_JSON',
+  )
+  assert.equal(
+    readFileSync(configPath, 'utf8'),
+    corruptedPrimaryBeforeWrite,
+    'must not overwrite a corrupted primary config',
+  )
+  assert.equal(
+    readFileSync(backupPath, 'utf8'),
+    backupAfterValidWrite,
+    'must not overwrite the backup when the primary config is corrupted',
+  )
+
+  writeFileSync(configPath, primaryAfterValidWrite, 'utf8')
   const primaryBeforeInvalidWrite = readFileSync(configPath, 'utf8')
   assertStartupError(
     () => writeValidatedConfigAt(configPath, backupPath, { ...valid, agentVersion: '' }),
@@ -81,12 +105,18 @@ try {
   )
   assert.equal(readFileSync(configPath, 'utf8'), primaryBeforeInvalidWrite, 'must not alter primary config after validation fails')
 
-  writeStartupDiagnostic(diagnosticPath, 'AGENT_CONFIG_INVALID_JSON')
-  assert.equal(readStartupDiagnostic(diagnosticPath), 'AGENT_CONFIG_INVALID_JSON')
-  assert.equal(
-    readFileSync(diagnosticPath, 'utf8').includes('must-not-persist'),
-    false,
-    'must not persist sensitive configuration values in startup diagnostics',
+  assert.equal(basename(diagnosticPath), 'last-startup-diagnostic.json')
+  diagnostics.writeStartupDiagnostic(diagnosticPath, 'AGENT_CONFIG_INVALID_JSON')
+  const diagnostic = diagnostics.readStartupDiagnostic(diagnosticPath)
+  assert.equal(diagnostic.code, 'AGENT_CONFIG_INVALID_JSON')
+  assert.equal(diagnostic.schemaVersion, 1)
+  assert.equal(diagnostic.state, 'failed')
+  assert.equal(Number.isNaN(Date.parse(diagnostic.recordedAt)), false, 'recordedAt must be parseable')
+  const diagnosticText = readFileSync(diagnosticPath, 'utf8')
+  assert.deepEqual(
+    Object.keys(JSON.parse(diagnosticText)).sort(),
+    ['code', 'recordedAt', 'schemaVersion', 'state'],
+    'startup diagnostic must persist only its public schema fields',
   )
 
   console.log('ALL PASS: agent config resilience')
