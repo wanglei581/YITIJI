@@ -1,0 +1,12 @@
+{
+  "id": "publish-qingxu-lightflow-pr",
+  "title": "推送青序 LightFlow 整合分支并创建 PR",
+  "status": "in_progress",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "release",
+  "currentPhase": "external_action",
+  "nextAction": "推送分支并创建 PR，随后监控 GitHub CI",
+  "createdAt": "2026-07-14T00:00:00+08:00",
+  "branch": "codex/qingxu-lightflow-integration-20260714"
+}
