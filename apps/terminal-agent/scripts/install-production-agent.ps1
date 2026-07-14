@@ -75,6 +75,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "service-identity.ps1")
+
+$agentServiceIdentity = "AIJobPrintAgent"
+
 function Write-Step([string]$Message) {
   Write-Host "`n==> $Message" -ForegroundColor Cyan
 }
@@ -433,24 +437,35 @@ if (-not $SkipServiceInstall) {
   Write-Step "Installing/starting Windows service"
   Push-Location $agentRoot
   try {
-    $service = Get-Service -Name "AIJobPrintAgent" -ErrorAction SilentlyContinue
-    if (-not $service) {
+    try {
+      $service = Resolve-AgentService -Identity $agentServiceIdentity
+    } catch {
+      Fail "Could not resolve Windows service '$agentServiceIdentity': $($_.Exception.Message)"
+    }
+
+    if ($null -eq $service) {
       & node "dist\index.js" install-service
       Start-Sleep -Seconds 3
     } else {
-      Write-Ok "Service already exists: AIJobPrintAgent"
+      Write-Ok "Service already exists: $($service.Name) ($($service.DisplayName))"
     }
 
-    $service = Get-Service -Name "AIJobPrintAgent" -ErrorAction SilentlyContinue
-    if ($service) {
-      Set-Service -Name "AIJobPrintAgent" -StartupType Automatic
-      Set-AgentServiceRecovery "AIJobPrintAgent"
-      if ($service.Status -ne "Running") {
-        Start-Service -Name "AIJobPrintAgent"
+    try {
+      $service = Resolve-AgentService -Identity $agentServiceIdentity
+    } catch {
+      Fail "Could not resolve Windows service '$agentServiceIdentity': $($_.Exception.Message)"
+    }
+
+    if ($null -ne $service) {
+      $serviceName = [string]$service.Name
+      Set-Service -Name $serviceName -StartupType Automatic
+      Set-AgentServiceRecovery $serviceName
+      if ($service.State -ne "Running") {
+        Start-Service -Name $serviceName
       } else {
-        Restart-Service -Name "AIJobPrintAgent" -Force
+        Restart-Service -Name $serviceName -Force
       }
-      Write-Ok "Service running with Automatic startup"
+      Write-Ok "Service running with Automatic startup: $serviceName"
     } else {
       Fail "AIJobPrintAgent service was not created"
     }

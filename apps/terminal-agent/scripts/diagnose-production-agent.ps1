@@ -14,6 +14,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "service-identity.ps1")
+
 $allowedDiagnosticCodes = @(
   "AGENT_CONFIG_NOT_FOUND",
   "AGENT_CONFIG_INVALID_JSON",
@@ -72,14 +74,24 @@ function Get-StartupDiagnosticCode([string]$Path) {
 }
 
 $service = $null
+$serviceResolution = "not_found"
 try {
-  $serviceNameForFilter = $ServiceName.Replace("'", "''")
-  $service = Get-CimInstance Win32_Service -Filter "Name = '$serviceNameForFilter'" -ErrorAction Stop
+  $service = Resolve-AgentService -Identity $ServiceName
+  if ($null -ne $service) {
+    $serviceResolution = "resolved"
+  }
 } catch {
-  $service = $null
+  if ($_.Exception.Data["agentServiceResolution"] -eq "ambiguous") {
+    $serviceResolution = "ambiguous"
+  } else {
+    $serviceResolution = "unavailable"
+  }
 }
 
 $serviceExists = $null -ne $service
+$serviceAmbiguous = $serviceResolution -eq "ambiguous"
+$resolvedServiceName = if ($serviceExists) { [string]$service.Name } else { $null }
+$resolvedServiceDisplayName = if ($serviceExists) { [string]$service.DisplayName } else { $null }
 $serviceState = if ($serviceExists) { [string]$service.State } else { $null }
 $startMode = if ($serviceExists) { [string]$service.StartMode } else { $null }
 $processId = if ($serviceExists) { [int]$service.ProcessId } else { $null }
@@ -120,7 +132,7 @@ $scmFailurePolicy = $null
 
 if ($serviceExists) {
   try {
-    $failurePolicyOutput = & sc.exe qfailure $ServiceName 2>&1
+    $failurePolicyOutput = & sc.exe qfailure $resolvedServiceName 2>&1
     if ($LASTEXITCODE -eq 0) {
       $scmFailurePolicy = ($failurePolicyOutput | Out-String).Trim()
     }
@@ -131,6 +143,10 @@ if ($serviceExists) {
 
 [pscustomobject]@{
   serviceExists = $serviceExists
+  serviceAmbiguous = $serviceAmbiguous
+  serviceResolution = $serviceResolution
+  serviceName = $resolvedServiceName
+  serviceDisplayName = $resolvedServiceDisplayName
   serviceState = $serviceState
   startMode = $startMode
   processId = $processId
