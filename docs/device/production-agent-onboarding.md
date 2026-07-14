@@ -71,8 +71,15 @@ Get-CimInstance Win32_Service -Filter "Name='AIJobPrintAgent'" | Select-Object N
 1. 只能在**与目标终端使用同一生产或试运营 API/数据库的经授权运维主机**上，先按[《打印扫描 PS-G1~PS-G4 执行清单》§四「服务器候选验证（PS-G1 / PS-G2）」](../acceptance/print-scan-field-execution-runbook.md#四服务器候选验证ps-g1--ps-g2)的既有环境加载方式执行下列只读 gate。`$DATABASE_URL` 必须由该主机的既有受控环境加载；`$TERMINAL_ID` 必须是已在 Admin 或运行配置中确认的目标终端 ID。不得手填、打印或从聊天复制 `DATABASE_URL`；Mac 本地或浏览器查询不能替代。两次查询各自重复 CTE（PostgreSQL 的 CTE 只作用于紧随其后的语句）：
 
    ```bash
+   if [ -z "${DATABASE_URL:-}" ] || [ -z "${TERMINAL_ID:-}" ]; then
+     printf '%s\n' 'DATABASE_URL or TERMINAL_ID is missing; refusing to run the queue gate.' >&2
+     exit 1
+   fi
+
    psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -v terminal_id="$TERMINAL_ID" <<'SQL'
    \pset pager off
+
+   BEGIN READ ONLY;
 
    WITH active_tasks AS (
      SELECT
@@ -117,6 +124,8 @@ Get-CimInstance Win32_Service -Filter "Name='AIJobPrintAgent'" | Select-Object N
    SELECT *
    FROM active_tasks
    ORDER BY "createdAt" ASC;
+
+   COMMIT;
    SQL
    ```
 
