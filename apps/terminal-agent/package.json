@@ -16,7 +16,8 @@
     "verify:printer-config": "node scripts/verify-printer-config.mjs",
     "verify:agent-profile-guard": "node scripts/verify-agent-profile-guard.mjs",
     "verify:print-scan-agent": "node scripts/verify-print-scan-agent.mjs",
-    "verify:scan-watcher": "node scripts/verify-scan-watcher.mjs"
+    "verify:scan-watcher": "node scripts/verify-scan-watcher.mjs",
+    "verify:agent-config-resilience": "node scripts/verify-agent-config-resilience.mjs"
   },
   "dependencies": {
     "axios": "^1.7.0",
