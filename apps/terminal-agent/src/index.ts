@@ -72,7 +72,7 @@ program
     try {
       assertAgentProfileAllowsApiBaseUrl(config)
     } catch (error) {
-      failStartup(error, 'AGENT_STARTUP_FAILED')
+      failStartup(error, 'AGENT_PROFILE_REJECTED')
     }
 
     // ── Step 4: Register or load existing credentials ─────────────────────
