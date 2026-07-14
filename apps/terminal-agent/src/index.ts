@@ -9,7 +9,11 @@ import { printWithPdfToPrinter } from './printer/print-with-pdf-to-printer'
 import { print as printUnified } from './printer/print'
 import { PrintResult } from './printer/types'
 // Phase 8.1B agent modules
-import { loadConfig } from './agent/config-manager'
+import {
+  isAgentStartupError,
+  loadConfig,
+  type AgentStartupErrorCode,
+} from './agent/config-manager'
 import { assertAgentProfileAllowsApiBaseUrl } from './agent/profile-guard'
 import { registerOrLoad } from './agent/registration'
 import { startHeartbeat } from './agent/heartbeat'
@@ -21,8 +25,16 @@ import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/q
 import { acquireLock, releaseLock } from './agent/instance-lock'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
+import { getStartupDiagnosticPath, writeStartupDiagnostic } from './agent/startup-diagnostics'
 
 const program = new Command()
+
+function failStartup(error: unknown, fallback: AgentStartupErrorCode): never {
+  const code = isAgentStartupError(error) ? error.code : fallback
+  writeStartupDiagnostic(getStartupDiagnosticPath(), code)
+  err(`${code}: Agent did not start. Run diagnose-production-agent.ps1 on this host.`)
+  process.exit(1)
+}
 
 program
   .name('terminal-agent')
@@ -53,26 +65,23 @@ program
     let config: AgentConfig
     try {
       config = loadConfig()
-    } catch (e) {
-      err(`Failed to load agent config: ${e instanceof Error ? e.message : String(e)}`)
-      process.exit(1)
+    } catch (error) {
+      failStartup(error, 'AGENT_STARTUP_FAILED')
     }
     log(`config loaded — terminal="${config.terminalCode}"  api=${config.apiBaseUrl}`)
     try {
       assertAgentProfileAllowsApiBaseUrl(config)
-    } catch (e) {
-      err(`${e instanceof Error ? e.message : String(e)}`)
-      process.exit(1)
+    } catch (error) {
+      failStartup(error, 'AGENT_STARTUP_FAILED')
     }
 
     // ── Step 4: Register or load existing credentials ─────────────────────
     try {
       config = await registerOrLoad(config)
-    } catch (e) {
-      err(`${e instanceof Error ? e.message : String(e)}`)
-      err('Cannot continue without terminalId and agentToken. Fix config and restart.')
-      process.exit(1)
+    } catch (error) {
+      failStartup(error, 'AGENT_REGISTRATION_FAILED')
     }
+    writeStartupDiagnostic(getStartupDiagnosticPath(), 'AGENT_READY')
     log(`agent ready — terminalId=${config.terminalId!}`)
 
     // ── Step 5: Start heartbeat ───────────────────────────────────────────
@@ -147,6 +156,10 @@ program
         // Use 'agent' so the service launches: node index.js agent
         // (not args:[], which sets node.exe options, not script subcommands)
         scriptOptions: 'agent',
+        wait: 1,
+        grow: 0.25,
+        maxRestarts: 2,
+        abortOnError: false,
       })
       svc.on('install', () => {
         log('Service installed — starting AIJobPrintAgent...')
