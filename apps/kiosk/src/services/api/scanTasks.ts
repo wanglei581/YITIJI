@@ -17,12 +17,18 @@ function makeUrl(path: string): string {
   return new URL(`${API_BASE_URL}${path}`, window.location.origin).toString()
 }
 
-async function requestJson<T>(path: string, init?: RequestInit & { token?: string | null }): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  init?: RequestInit & { token?: string | null; controlToken?: string | null },
+): Promise<T> {
   const token = init?.token
   const headers = new Headers(init?.headers)
   headers.set('Accept', 'application/json')
   if (init?.body) headers.set('Content-Type', 'application/json')
   if (token) headers.set('Authorization', `Bearer ${token}`)
+  // 与 uploadSessions.ts 的 X-Upload-Session-Control 同一惯例：controlToken 走 header，不进
+  // query string/浏览器历史（见 scan-tasks.controller.ts 上的说明）。
+  if (init?.controlToken) headers.set('X-Scan-Session-Control', init.controlToken)
 
   let res: Response
   try {
@@ -69,13 +75,25 @@ export function createScanSession(
   })
 }
 
-export function getScanSessionStatus(scanTaskId: string, token?: string | null): Promise<ScanSessionStatusResponse> {
-  return requestJson<ScanSessionStatusResponse>(`/scan/sessions/${encodeURIComponent(scanTaskId)}`, { token })
+export function getScanSessionStatus(
+  scanTaskId: string,
+  controlToken: string,
+  token?: string | null,
+): Promise<ScanSessionStatusResponse> {
+  return requestJson<ScanSessionStatusResponse>(`/scan/sessions/${encodeURIComponent(scanTaskId)}`, {
+    controlToken,
+    token,
+  })
 }
 
-export function cancelScanSession(scanTaskId: string, token?: string | null): Promise<ScanSessionCancelResponse> {
+export function cancelScanSession(
+  scanTaskId: string,
+  controlToken: string,
+  token?: string | null,
+): Promise<ScanSessionCancelResponse> {
   return requestJson<ScanSessionCancelResponse>(`/scan/sessions/${encodeURIComponent(scanTaskId)}`, {
     method: 'DELETE',
+    controlToken,
     token,
   })
 }

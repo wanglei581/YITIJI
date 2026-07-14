@@ -39,18 +39,30 @@ export class ScanTasksController {
     return ApiResponse.ok(result)
   }
 
+  // controlToken 走 header 而非 query string，对齐 upload-sessions 的既有惯例
+  // （X-Upload-Session-Control，见 upload-sessions.controller.ts）：header 通常不进
+  // 访问日志/浏览器历史，query string 通常会。B1-8（Kiosk 前台接线）请使用
+  // `X-Scan-Session-Control` 这个 header 名传递 controlToken。
   @Get('scan/sessions/:id')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
-  async status(@Param('id') id: string, @Req() req: Request) {
+  async status(
+    @Param('id') id: string,
+    @Headers('x-scan-session-control') controlToken: string | undefined,
+    @Req() req: Request,
+  ) {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
-    const result = await this.scanTasks.getStatus(id, endUser?.endUserId ?? null)
+    const result = await this.scanTasks.getStatus(id, endUser?.endUserId ?? null, controlToken)
     return ApiResponse.ok(result)
   }
 
   @Delete('scan/sessions/:id')
-  async cancel(@Param('id') id: string, @Req() req: Request) {
+  async cancel(
+    @Param('id') id: string,
+    @Headers('x-scan-session-control') controlToken: string | undefined,
+    @Req() req: Request,
+  ) {
     const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
-    const result = await this.scanTasks.cancel(id, endUser?.endUserId ?? null)
+    const result = await this.scanTasks.cancel(id, endUser?.endUserId ?? null, controlToken)
     return ApiResponse.ok(result)
   }
 

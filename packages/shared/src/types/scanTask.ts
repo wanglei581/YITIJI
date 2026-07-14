@@ -8,6 +8,9 @@ export interface ScanSessionCreateRequest {
 
 export interface ScanSessionCreateResponse {
   scanTaskId: string
+  /** 明文只在本次创建响应里下发一次，后续 getStatus()/cancel() 必须带上它才能操作该会话（B1-4）。
+   *  前端只应把它保存在内存态（React state/ref），不落 localStorage/sessionStorage。 */
+  controlToken: string
   expiresAt: string
   /** 按 scanType 定制的操作指引（去打印机面板怎么操作），后端下发，前端不再硬编码。 */
   instructions: string[]

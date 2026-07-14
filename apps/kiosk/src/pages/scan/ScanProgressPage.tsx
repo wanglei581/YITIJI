@@ -13,6 +13,7 @@ type ScanType = 'resume' | 'id' | 'document'
 interface LocationState {
   scanTaskId?: string
   scanType?: ScanType
+  controlToken?: string
 }
 
 const POLL_INTERVAL_MS = 2000
@@ -38,12 +39,15 @@ export function ScanProgressPage() {
   const state = (location.state ?? {}) as LocationState
   const scanTaskId = state.scanTaskId
   const scanType = state.scanType ?? 'document'
+  // controlToken 只经由 router state 在内存中传递（不落 localStorage/sessionStorage），
+  // 刷新本页会丢失、必须回 /scan/start 重新发起——这是刻意的，见 B1-8 任务说明。
+  const controlToken = state.controlToken
 
   const [error, setError] = useState<string | null>(null)
   const cancellingRef = useRef(false)
 
   useEffect(() => {
-    if (!scanTaskId) {
+    if (!scanTaskId || !controlToken) {
       navigate('/scan/start', { replace: true })
       return undefined
     }
@@ -60,7 +64,7 @@ export function ScanProgressPage() {
 
     const poll = async () => {
       try {
-        const status = await getScanSessionStatus(scanTaskId, getToken())
+        const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
         if (stopped) return
         if (status.status === 'completed' && status.file) {
           navigate('/scan/result', {
@@ -96,13 +100,13 @@ export function ScanProgressPage() {
       if (timer !== undefined) window.clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanTaskId])
+  }, [scanTaskId, controlToken])
 
   const handleCancel = async () => {
-    if (!scanTaskId || cancellingRef.current) return
+    if (!scanTaskId || !controlToken || cancellingRef.current) return
     cancellingRef.current = true
     try {
-      await cancelScanSession(scanTaskId, getToken())
+      await cancelScanSession(scanTaskId, controlToken, getToken())
       navigate('/scan/start', { replace: true })
     } catch (err) {
       // 取消请求送达时任务恰好已经完成(Agent 并发投递刚好抢先完成，后端会返回
@@ -113,7 +117,7 @@ export function ScanProgressPage() {
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
         try {
-          const latest = await getScanSessionStatus(scanTaskId, getToken())
+          const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
           if (latest.status === 'completed' && latest.file) {
             navigate('/scan/result', {
               replace: true,
