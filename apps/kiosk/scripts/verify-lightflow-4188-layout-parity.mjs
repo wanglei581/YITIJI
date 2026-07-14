@@ -21,6 +21,10 @@ function expectIncludes(source, marker, message) {
   expect(source.includes(marker), `${message}${source.includes(marker) ? '' : ` — missing ${marker}`}`)
 }
 
+function expectAbsent(source, marker, message) {
+  expect(!source.includes(marker), `${message}${source.includes(marker) ? ` — unexpected ${marker}` : ''}`)
+}
+
 function expectMatches(source, pattern, message) {
   expect(pattern.test(source), `${message}${pattern.test(source) ? '' : ` — missing ${pattern}`}`)
 }
@@ -63,6 +67,15 @@ console.log('\n=== LightFlow 三主 Tab 4188 布局一致性静态合同 ===')
 const home = read('src/pages/home/HomePage.tsx')
 const assistant = read('src/pages/assistant/AssistantPage.tsx')
 const profile = read('src/pages/profile/ProfilePage.tsx')
+const profileHeader = read('src/pages/profile/components/ProfileHeader.tsx')
+const profileEntrySection = read('src/pages/profile/components/ProfileEntrySection.tsx')
+const profileSessionRecords = read('src/pages/profile/components/ProfileSessionRecords.tsx')
+const profileStylesheets = [
+  'src/pages/profile/profile-inkpaper.css',
+  'src/pages/profile/profile-lightflow-shell.css',
+  'src/pages/profile/profile-lightflow-directory.css',
+  'src/pages/profile/profile-lightflow-state.css',
+].map((path) => [path, read(path)])
 const nav = read('src/components/lightflow/ReferenceServiceNav.tsx')
 const navCss = read('src/components/lightflow/reference-service-nav.css')
 const layoutCss = read('src/components/lightflow/reference-layout.css')
@@ -74,9 +87,37 @@ for (const [name, source] of Object.entries({ Home: home, Assistant: assistant, 
     `${name} 导入 ReferenceServiceNav`,
   )
   expectIncludes(source, '<ReferenceServiceNav', `${name} 渲染共享顶部分类导航`)
+}
+
+for (const [name, source] of Object.entries({ Home: home, Assistant: assistant })) {
   for (const className of requiredClasses) {
     expectIncludes(source, className, `${name} 使用 ${className}`)
   }
+}
+
+const profileComposition = [profile, profileHeader, profileEntrySection, profileSessionRecords].join('\n')
+for (const className of requiredClasses) {
+  expectIncludes(profileComposition, className, `Profile 组合源使用 ${className}`)
+}
+expectIncludes(profile, '<ProfileHeader', 'ProfilePage 挂载真实身份概览组件')
+expectIncludes(profile, '<ProfileEntrySection', 'ProfilePage 挂载真实目录入口组件')
+expectIncludes(profile, '<ProfileSessionRecords', 'ProfilePage 保留真实会话记录组件')
+expectIncludes(profile, 'className="lf-reference-pair"', 'ProfilePage 负责目录工作面板配对布局')
+expectMatches(profileHeader, /className="lf-reference-panel\s+kp-profile-header"/, 'ProfileHeader 使用共享面板原语')
+expectMatches(profileHeader, /className="lf-reference-group-head\s+kp-profile-main"/, 'ProfileHeader 使用共享分组头原语')
+expectMatches(profileEntrySection, /primary\s*\?\s*'lf-reference-primary'\s*:\s*'lf-reference-secondary'/, 'ProfileEntrySection 区分主入口与次入口原语')
+expectMatches(profileEntrySection, /className="lf-reference-panel\s+kp-section"/, 'ProfileEntrySection 使用共享面板原语')
+expectMatches(profileSessionRecords, /className="lf-reference-panel\s+kp-session-records"/, 'ProfileSessionRecords 使用共享面板原语')
+expectIncludes(profileSessionRecords, 'className="lf-reference-group-head"', 'ProfileSessionRecords 使用共享分组头原语')
+expectIncludes(profileSessionRecords, 'className="lf-reference-secondary kp-session-row"', 'ProfileSessionRecords 使用共享次入口原语')
+for (const callback of ['onPrintFile', 'onDeleteResume', 'onDeleteScan', 'onDeleteAiRecord']) {
+  expectIncludes(profileSessionRecords, callback, `ProfileSessionRecords 保留真实 ${callback} 回调`)
+}
+expectAbsent(profileComposition, 'p-hero', 'Profile 入口组合源不恢复旧 p-hero 骨架')
+for (const [path, source] of profileStylesheets) {
+  expect(source.length > 0, `${path} 存在`)
+  expect(!/^\s*(?:html|body|:root)\b/m.test(source), `${path} 不覆盖全局根`)
+  expectAbsent(source, '.me-inkdetail', `${path} 不泄漏到 /me/* 明细页`)
 }
 
 expect(nav.length > 0, 'ReferenceServiceNav 共享组件存在')
@@ -91,7 +132,35 @@ expect(
   '导航六个固定标签保持参考顺序',
 )
 expectMatches(nav, /navigate\(\{\s*pathname:\s*['"]\/['"],\s*hash:\s*item\.hash\s*\}\)/, '导航使用无刷新的首页 hash 跳转')
-expect(!/\bhref\s*=|window\.location/.test(nav), '导航不使用硬链接或 window.location')
+expect(!/\bhref\s*=|window\.location|location\.(?:assign|replace|reload)/.test(nav), '导航不使用硬链接、硬刷新或 window.location')
+
+const homeHeroIndex = home.indexOf('className="service-value"')
+const identityPanelIndex = home.indexOf('<IdentityPanel />')
+const continuePanelIndex = home.indexOf('<ContinuePanel />')
+const homeNavIndex = home.indexOf('<ReferenceServiceNav />')
+expect(
+  [homeHeroIndex, identityPanelIndex, continuePanelIndex, homeNavIndex].every((index) => index >= 0)
+    && homeHeroIndex < identityPanelIndex
+    && identityPanelIndex < continuePanelIndex
+    && continuePanelIndex < homeNavIndex,
+  '首页保留 Hero、身份卡、继续办理并按固定顺序接入共享导航',
+)
+expectIncludes(home, 'const { hash } = useLocation()', '首页读取 SPA hash')
+expectIncludes(home, 'HOME_REFERENCE_HASH_IDS.has(targetId)', '首页只滚动已批准的服务锚点')
+expectMatches(
+  home,
+  /document\.getElementById\(targetId\)\?\.scrollIntoView\(\{\s*behavior:\s*'smooth',\s*block:\s*'start'\s*\}\)/,
+  '首页用 scrollIntoView 执行无刷新的 hash 滚动',
+)
+
+for (const legacyToken of [
+  'className="a-hero assistant-service-intro"',
+  'className="assistant-service-desk"',
+  'className="assistant-workbench"',
+  'className="assistant-service-catalog"',
+]) {
+  expectAbsent(assistant, legacyToken, `Assistant 不恢复旧 Hero 或侧栏骨架：${legacyToken}`)
+}
 
 expect(navCss.length > 0, '导航共享 CSS 存在')
 expect(layoutCss.length > 0, '布局共享 CSS 存在')
