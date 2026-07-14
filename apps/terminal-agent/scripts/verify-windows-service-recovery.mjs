@@ -128,13 +128,23 @@ for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 
 }
 assert.match(diagnosisOutput, /^\s*encryptedTokenFile\s*=\s*\$encryptedTokenFile\s*$/m, 'diagnosis output must map encryptedTokenFile from its safe path check')
 assert.match(diagnosisOutput, /^\s*lastStartupDiagnosticCode\s*=\s*\$lastStartupDiagnosticCode\s*$/m, 'diagnosis output must map the closed startup diagnostic code')
+assert.doesNotMatch(diagnosisOutput, /\$config\b/, 'diagnosis summary must not reference the full config object')
+assert.doesNotMatch(diagnosisOutput, /agentToken/i, 'diagnosis summary must not expose agentToken')
+assert.doesNotMatch(diagnosisOutput, /adminSecret/i, 'diagnosis summary must not expose adminSecret')
+assert.doesNotMatch(diagnosisOutput, /bindCode/i, 'diagnosis summary must not expose bindCode')
+assert.doesNotMatch(diagnosisOutput, /Authorization/i, 'diagnosis summary must not expose Authorization data')
 
 assert.doesNotMatch(diagnosis, /Write-(?:Host|Output)\s+\$config\b/, 'diagnosis must not output config content')
 assert.doesNotMatch(diagnosis, /\$config\.agentToken\b/, 'diagnosis must not expose agentToken')
 assert.doesNotMatch(diagnosis, /\$config\.adminSecret\b/, 'diagnosis must not expose adminSecret')
 assert.doesNotMatch(diagnosis, /\$config\.bindCode\b/, 'diagnosis must not expose bindCode')
 assert.doesNotMatch(diagnosis, /ConvertTo-Json\s+\$config\b/, 'diagnosis must not serialize config content')
+assert.doesNotMatch(diagnosis, /\$config\s*\|\s*ConvertTo-Json/i, 'diagnosis must not serialize config through a PowerShell pipeline')
 assert.doesNotMatch(diagnosis, /Authorization/i, 'diagnosis must not emit Authorization data')
-assert.doesNotMatch(diagnosis, /Invoke-RestMethod|Invoke-WebRequest|Start-Process|\/print|POST/, 'diagnosis must not make network, process, or print calls')
+assert.doesNotMatch(
+  diagnosis,
+  /Invoke-RestMethod|Invoke-WebRequest|Test-Connection|\bcurl(?:\.exe)?\b|Start-BitsTransfer|WebClient|HttpClient|System\.Net\.WebRequest|Start-Process|\/print|POST/i,
+  'diagnosis must not make network, process, or print calls',
+)
 
 console.log('ALL PASS: terminal-agent Windows service recovery')
