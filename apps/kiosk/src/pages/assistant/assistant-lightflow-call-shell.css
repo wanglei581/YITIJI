@@ -1,4 +1,4 @@
-.assistant-voice-backdrop {
+.kassist-lightflow .assistant-voice-backdrop {
   position: fixed;
   z-index: 120;
   inset: 0;
@@ -7,10 +7,10 @@
   padding: 42px;
   background: rgba(11, 35, 74, 0.28);
   backdrop-filter: blur(10px);
-  animation: assistant-voice-backdrop-in 180ms ease-out both;
+  animation: kassist-lightflow-voice-backdrop-in 180ms ease-out both;
 }
 
-.assistant-voice-dialog {
+.kassist-lightflow .assistant-voice-dialog {
   display: flex;
   flex-direction: column;
   width: min(940px, 100%);
@@ -21,10 +21,10 @@
   color: #0b2859;
   background: #ffffff;
   box-shadow: 0 28px 80px rgba(41, 77, 129, 0.22);
-  animation: assistant-voice-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: kassist-lightflow-voice-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.assistant-voice-header {
+.kassist-lightflow .assistant-voice-header {
   display: flex;
   flex: 0 0 auto;
   align-items: flex-start;
@@ -34,19 +34,19 @@
   background: #f8fbff;
 }
 
-.assistant-voice-header > div {
+.kassist-lightflow .assistant-voice-header > div {
   display: grid;
   gap: 5px;
 }
 
-.assistant-voice-header span {
+.kassist-lightflow .assistant-voice-header span {
   color: #6180a8;
   font-size: 14px;
   font-weight: 760;
   letter-spacing: 0.06em;
 }
 
-.assistant-voice-header h2 {
+.kassist-lightflow .assistant-voice-header h2 {
   margin: 0;
   color: #0a2758;
   font-size: 32px;
@@ -54,7 +54,7 @@
   letter-spacing: -0.025em;
 }
 
-.assistant-voice-close {
+.kassist-lightflow .assistant-voice-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -68,34 +68,34 @@
   transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.assistant-voice-close svg {
+.kassist-lightflow .assistant-voice-close svg {
   width: 24px;
   height: 24px;
 }
 
-.assistant-voice-close:hover {
+.kassist-lightflow .assistant-voice-close:hover {
   border-color: #84b8ff;
   color: #1267e8;
   transform: translateY(-1px);
 }
 
-.assistant-voice-close:focus-visible,
-.assistant-voice-choice:focus-visible,
-.assistant-voice-control:focus-visible,
-.assistant-voice-error-actions button:focus-visible,
-.assistant-voice-resume:focus-visible {
+.kassist-lightflow .assistant-voice-close:focus-visible,
+.kassist-lightflow .assistant-voice-choice:focus-visible,
+.kassist-lightflow .assistant-voice-control:focus-visible,
+.kassist-lightflow .assistant-voice-error-actions button:focus-visible,
+.kassist-lightflow .assistant-voice-resume:focus-visible {
   outline: 4px solid rgba(30, 111, 242, 0.24);
   outline-offset: 3px;
 }
 
-.assistant-voice-stage {
+.kassist-lightflow .assistant-voice-stage {
   min-height: 0;
   overflow-y: auto;
   padding: 46px 52px 38px;
   overscroll-behavior: contain;
 }
 
-.assistant-voice-loading {
+.kassist-lightflow .assistant-voice-loading {
   min-width: 280px;
   padding: 34px;
   border: 1px solid #d5e4f7;

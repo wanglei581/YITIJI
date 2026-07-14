@@ -122,6 +122,19 @@ expectMatches(
 expectIncludes(callPanel, 'call.endCall()', 'voice exits use the explicit idempotent end action')
 expectIncludes(callHook, 'const endCall = useCallback', 'TRTC hook exposes an explicit end-and-reset action')
 expectIncludes(callHook, 'startedRef.current = false', 'ending a call allows a deliberate retry')
+expectIncludes(callHook, 'sessionEpochRef', 'in-flight TRTC starts are guarded by a session epoch')
+expectIncludes(
+  callHook,
+  'stopBackendTask(activeTaskId)',
+  'stale connecting sessions are stopped when they return late',
+)
+expectIncludes(
+  callHook,
+  'taskIdRef.current === activeTaskId',
+  'stale sessions do not clear a newer TRTC task id',
+)
+expectMatches(callHook, /else setAiState\('idle'\)/, 'quiet volume updates return the advisor state to idle')
+expectIncludes(callPanel, 'hangupRef.current?.focus()', 'call phase moves focus to the hangup action')
 expectIncludes(callStyles, '.assistant-voice-backdrop', 'voice dialog has an isolated overlay')
 expectIncludes(callStyles, '@media (max-width: 600px)', 'voice dialog has phone layout rules')
 expectIncludes(callStyles, '@media (max-height: 740px)', 'voice dialog has short-screen rules')

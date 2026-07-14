@@ -1,4 +1,4 @@
-.assistant-voice-live {
+.kassist-lightflow .assistant-voice-live {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -6,7 +6,7 @@
   padding-top: 30px;
 }
 
-.assistant-voice-live-status {
+.kassist-lightflow .assistant-voice-live-status {
   display: grid;
   grid-template-columns: 10px auto;
   align-items: center;
@@ -16,24 +16,24 @@
   text-align: center;
 }
 
-.assistant-voice-live-status > span {
+.kassist-lightflow .assistant-voice-live-status > span {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #f5a623;
 }
 
-.assistant-voice-live-status > span.is-live {
+.kassist-lightflow .assistant-voice-live-status > span.is-live {
   background: #159b7e;
   box-shadow: 0 0 0 5px rgba(21, 155, 126, 0.12);
 }
 
-.assistant-voice-live-status strong {
+.kassist-lightflow .assistant-voice-live-status strong {
   font-size: 18px;
   font-weight: 800;
 }
 
-.assistant-voice-live-status time {
+.kassist-lightflow .assistant-voice-live-status time {
   grid-column: 1 / -1;
   color: #0b2859;
   font-size: 38px;
@@ -42,7 +42,7 @@
   letter-spacing: 0.04em;
 }
 
-.assistant-voice-avatar--live {
+.kassist-lightflow .assistant-voice-avatar--live {
   width: 270px;
   height: 330px;
   margin-top: 24px;
@@ -52,16 +52,16 @@
   box-shadow: 0 0 0 8px #eaf3ff, 0 22px 42px rgba(49, 102, 170, 0.16);
 }
 
-.assistant-voice-avatar--live::after {
+.kassist-lightflow .assistant-voice-avatar--live::after {
   position: absolute;
   inset: -8px;
   border: 2px solid rgba(30, 111, 242, 0.38);
   border-radius: inherit;
   content: "";
-  animation: assistant-voice-pulse 2s ease-out infinite;
+  animation: kassist-lightflow-voice-pulse 2s ease-out infinite;
 }
 
-.assistant-voice-wave {
+.kassist-lightflow .assistant-voice-wave {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -69,31 +69,31 @@
   gap: 7px;
 }
 
-.assistant-voice-wave i {
+.kassist-lightflow .assistant-voice-wave i {
   width: 7px;
   border-radius: 5px;
   background: #2f7df1;
-  animation: assistant-voice-wave 1.05s ease-in-out infinite;
+  animation: kassist-lightflow-voice-wave 1.05s ease-in-out infinite;
 }
 
-.assistant-voice-wave i:nth-child(1),
-.assistant-voice-wave i:nth-child(10) { height: 16px; }
-.assistant-voice-wave i:nth-child(2),
-.assistant-voice-wave i:nth-child(9) { height: 28px; animation-delay: 0.12s; }
-.assistant-voice-wave i:nth-child(3),
-.assistant-voice-wave i:nth-child(8) { height: 44px; animation-delay: 0.24s; }
-.assistant-voice-wave i:nth-child(4),
-.assistant-voice-wave i:nth-child(7) { height: 58px; animation-delay: 0.08s; }
-.assistant-voice-wave i:nth-child(5),
-.assistant-voice-wave i:nth-child(6) { height: 68px; animation-delay: 0.18s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(1),
+.kassist-lightflow .assistant-voice-wave i:nth-child(10) { height: 16px; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(2),
+.kassist-lightflow .assistant-voice-wave i:nth-child(9) { height: 28px; animation-delay: 0.12s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(3),
+.kassist-lightflow .assistant-voice-wave i:nth-child(8) { height: 44px; animation-delay: 0.24s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(4),
+.kassist-lightflow .assistant-voice-wave i:nth-child(7) { height: 58px; animation-delay: 0.08s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(5),
+.kassist-lightflow .assistant-voice-wave i:nth-child(6) { height: 68px; animation-delay: 0.18s; }
 
-.assistant-voice-wave.is-quiet i {
+.kassist-lightflow .assistant-voice-wave.is-quiet i {
   opacity: 0.34;
   transform: scaleY(0.28);
   animation-play-state: paused;
 }
 
-.assistant-voice-resume {
+.kassist-lightflow .assistant-voice-resume {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -110,7 +110,7 @@
   cursor: pointer;
 }
 
-.assistant-voice-caption {
+.kassist-lightflow .assistant-voice-caption {
   width: min(720px, 100%);
   min-height: 124px;
   padding: 20px 24px;
@@ -119,32 +119,32 @@
   background: #f7faff;
 }
 
-.assistant-voice-caption > div {
+.kassist-lightflow .assistant-voice-caption > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
-.assistant-voice-caption strong {
+.kassist-lightflow .assistant-voice-caption strong {
   color: #0f5fcf;
   font-size: 14px;
   font-weight: 820;
 }
 
-.assistant-voice-caption > div span {
+.kassist-lightflow .assistant-voice-caption > div span {
   color: #8193aa;
   font-size: 12px;
 }
 
-.assistant-voice-caption > p {
+.kassist-lightflow .assistant-voice-caption > p {
   margin: 14px 0 0;
   color: #173965;
   font-size: 18px;
   line-height: 1.65;
 }
 
-.assistant-voice-caption .assistant-voice-mic-warning {
+.kassist-lightflow .assistant-voice-caption .assistant-voice-mic-warning {
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -153,7 +153,7 @@
   font-size: 14px;
 }
 
-.assistant-voice-controls {
+.kassist-lightflow .assistant-voice-controls {
   display: grid;
   grid-template-columns: repeat(4, minmax(92px, 1fr));
   width: min(720px, 100%);
@@ -166,7 +166,7 @@
   box-shadow: 0 12px 34px rgba(43, 84, 139, 0.1);
 }
 
-.assistant-voice-control {
+.kassist-lightflow .assistant-voice-control {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -183,13 +183,13 @@
   transition: color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
-.assistant-voice-control:hover {
+.kassist-lightflow .assistant-voice-control:hover {
   color: #0d62da;
   background: #eaf3ff;
   transform: translateY(-1px);
 }
 
-.assistant-voice-control > span {
+.kassist-lightflow .assistant-voice-control > span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,40 +200,40 @@
   background: #ffffff;
 }
 
-.assistant-voice-control svg {
+.kassist-lightflow .assistant-voice-control svg {
   width: 22px;
   height: 22px;
 }
 
-.assistant-voice-control.is-active {
+.kassist-lightflow .assistant-voice-control.is-active {
   color: #0c63dc;
   background: #e5f1ff;
 }
 
-.assistant-voice-control--hangup {
+.kassist-lightflow .assistant-voice-control--hangup {
   color: #a42c2c;
   background: #fff1f0;
 }
 
-.assistant-voice-control--hangup > span {
+.kassist-lightflow .assistant-voice-control--hangup > span {
   border-color: #e45a55;
   color: #ffffff;
   background: #d94742;
 }
 
-.assistant-voice-control--hangup svg {
+.kassist-lightflow .assistant-voice-control--hangup svg {
   transform: rotate(135deg);
 }
 
-.assistant-voice-control:disabled,
-.assistant-voice-close:disabled,
-.assistant-voice-error-actions button:disabled {
+.kassist-lightflow .assistant-voice-control:disabled,
+.kassist-lightflow .assistant-voice-close:disabled,
+.kassist-lightflow .assistant-voice-error-actions button:disabled {
   opacity: 0.48;
   cursor: wait;
   transform: none;
 }
 
-.assistant-voice-error {
+.kassist-lightflow .assistant-voice-error {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -242,14 +242,14 @@
   text-align: center;
 }
 
-.assistant-voice-avatar--static {
+.kassist-lightflow .assistant-voice-avatar--static {
   width: 180px;
   height: 210px;
   margin-bottom: 28px;
   border-radius: 24px;
 }
 
-.assistant-voice-error-message {
+.kassist-lightflow .assistant-voice-error-message {
   max-width: 620px;
   margin: 18px 0 0;
   color: #6e8099;
@@ -258,13 +258,13 @@
   overflow-wrap: anywhere;
 }
 
-.assistant-voice-error-actions {
+.kassist-lightflow .assistant-voice-error-actions {
   display: flex;
   gap: 14px;
   margin-top: 28px;
 }
 
-.assistant-voice-error-actions button {
+.kassist-lightflow .assistant-voice-error-actions button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -280,7 +280,7 @@
   cursor: pointer;
 }
 
-.assistant-voice-error-actions button:last-child {
+.kassist-lightflow .assistant-voice-error-actions button:last-child {
   color: #ffffff;
   background: #1d6ff0;
 }

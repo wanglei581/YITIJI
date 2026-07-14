@@ -1,11 +1,11 @@
-.assistant-voice-gate {
+.kassist-lightflow .assistant-voice-gate {
   display: flex;
   flex: 1;
   flex-direction: column;
   justify-content: center;
 }
 
-.assistant-voice-intro {
+.kassist-lightflow .assistant-voice-intro {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
   align-items: center;
@@ -16,14 +16,14 @@
   background: #f5f9ff;
 }
 
-.assistant-voice-avatar {
+.kassist-lightflow .assistant-voice-avatar {
   position: relative;
   overflow: hidden;
   border: 1px solid #cfe1f7;
   background: #eaf3ff;
 }
 
-.assistant-voice-avatar img {
+.kassist-lightflow .assistant-voice-avatar img {
   display: block;
   width: 100%;
   height: 100%;
@@ -31,13 +31,13 @@
   object-position: top center;
 }
 
-.assistant-voice-avatar--gate {
+.kassist-lightflow .assistant-voice-avatar--gate {
   width: 250px;
   height: 300px;
   border-radius: 24px;
 }
 
-.assistant-voice-eyebrow {
+.kassist-lightflow .assistant-voice-eyebrow {
   margin: 0 0 12px;
   color: #176be8;
   font-size: 16px;
@@ -45,8 +45,8 @@
   letter-spacing: 0.05em;
 }
 
-.assistant-voice-intro h3,
-.assistant-voice-error h3 {
+.kassist-lightflow .assistant-voice-intro h3,
+.kassist-lightflow .assistant-voice-error h3 {
   margin: 0;
   color: #0a2758;
   font-size: 36px;
@@ -55,7 +55,7 @@
   letter-spacing: -0.03em;
 }
 
-.assistant-voice-intro > div:last-child > p:last-child {
+.kassist-lightflow .assistant-voice-intro > div:last-child > p:last-child {
   max-width: 460px;
   margin: 18px 0 0;
   color: #647d9f;
@@ -63,14 +63,14 @@
   line-height: 1.72;
 }
 
-.assistant-voice-choices {
+.kassist-lightflow .assistant-voice-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
   margin-top: 28px;
 }
 
-.assistant-voice-choice {
+.kassist-lightflow .assistant-voice-choice {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr) 24px;
   align-items: center;
@@ -86,24 +86,24 @@
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.assistant-voice-choice--primary {
+.kassist-lightflow .assistant-voice-choice--primary {
   border-color: #bdd6fa;
   background: #eaf3ff;
 }
 
-.assistant-voice-choice--primary:hover {
+.kassist-lightflow .assistant-voice-choice--primary:hover {
   border-color: #7db2fa;
   box-shadow: 0 14px 30px rgba(45, 105, 190, 0.13);
   transform: translateY(-2px);
 }
 
-.assistant-voice-choice:disabled {
+.kassist-lightflow .assistant-voice-choice:disabled {
   color: #8293ab;
   background: #f4f6fa;
   cursor: not-allowed;
 }
 
-.assistant-voice-choice-icon {
+.kassist-lightflow .assistant-voice-choice-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -114,39 +114,39 @@
   background: #ffffff;
 }
 
-.assistant-voice-choice--primary .assistant-voice-choice-icon {
+.kassist-lightflow .assistant-voice-choice--primary .assistant-voice-choice-icon {
   color: #ffffff;
   background: #1d6ff0;
 }
 
-.assistant-voice-choice-icon svg {
+.kassist-lightflow .assistant-voice-choice-icon svg {
   width: 30px;
   height: 30px;
 }
 
-.assistant-voice-choice > svg {
+.kassist-lightflow .assistant-voice-choice > svg {
   width: 22px;
   height: 22px;
   color: #496b95;
 }
 
-.assistant-voice-choice-copy {
+.kassist-lightflow .assistant-voice-choice-copy {
   display: grid;
   gap: 8px;
 }
 
-.assistant-voice-choice-copy strong {
+.kassist-lightflow .assistant-voice-choice-copy strong {
   font-size: 21px;
   font-weight: 840;
 }
 
-.assistant-voice-choice-copy small {
+.kassist-lightflow .assistant-voice-choice-copy small {
   color: #6b82a1;
   font-size: 14px;
   line-height: 1.45;
 }
 
-.assistant-voice-privacy {
+.kassist-lightflow .assistant-voice-privacy {
   margin: 24px 0 0;
   color: #7287a5;
   font-size: 14px;

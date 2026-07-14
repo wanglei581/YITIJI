@@ -25,6 +25,12 @@ export function AssistantCallPanel({ onClose, onSwitchToText }: AssistantCallPan
     return () => window.clearTimeout(focusTimer)
   }, [])
 
+  useEffect(() => {
+    if (call.phase !== 'connecting' && call.phase !== 'live') return
+    const focusTimer = window.setTimeout(() => hangupRef.current?.focus(), 0)
+    return () => window.clearTimeout(focusTimer)
+  }, [call.phase])
+
   const runExit = useCallback(async (afterEnd: () => void) => {
     if (endingRef.current) return
     endingRef.current = true
