@@ -194,6 +194,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   const requestTokenRef = useRef(0)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const voiceTriggerRef = useRef<HTMLButtonElement>(null)
+  const workbenchRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     cancelledRef.current = false
@@ -208,6 +210,18 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   useEffect(() => {
     if (keyboardOpen) inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [keyboardOpen])
+
+  useEffect(() => {
+    const workbench = workbenchRef.current
+    if (!callActive || !workbench) return
+    const previousOverflow = document.body.style.overflow
+    workbench.setAttribute('inert', '')
+    document.body.style.overflow = 'hidden'
+    return () => {
+      workbench.removeAttribute('inert')
+      document.body.style.overflow = previousOverflow
+    }
+  }, [callActive])
 
   useEffect(() => {
     const contextKey = `${toolboxSkill ?? 'general'}:${selectedTaskId ?? 'none'}`
@@ -296,6 +310,16 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
   }
 
+  const closeVoiceDialog = () => {
+    setCallActive(false)
+    window.requestAnimationFrame(() => voiceTriggerRef.current?.focus({ preventScroll: true }))
+  }
+
+  const switchVoiceToText = () => {
+    setCallActive(false)
+    focusComposer()
+  }
+
   const chooseQuickQuestion = (question: string) => {
     if (loading) return
     setInput(question)
@@ -317,7 +341,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     <main className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
       <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
 
-      <div className="assistant-workbench">
+      <div ref={workbenchRef} className="assistant-workbench">
         <section className="assistant-task-picker" aria-labelledby="assistant-task-picker-title">
           <header className="assistant-task-picker-heading">
             <p>你好，我是小青</p>
@@ -390,18 +414,6 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           )}
         </section>
 
-        {voiceAvailable && callActive && LazyCallPanel && (
-          <Suspense
-            fallback={(
-              <section className="call-panel" aria-live="polite">
-                <div className="call-meta">通话模块加载中…</div>
-              </section>
-            )}
-          >
-            <LazyCallPanel onEnd={() => setCallActive(false)} />
-          </Suspense>
-        )}
-
         <section className="assistant-composer" aria-labelledby="assistant-composer-label">
           <div className="assistant-quick-questions" aria-label="快捷问题">
             {quickQuestions.map((question) => (
@@ -436,14 +448,21 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           <div className="assistant-composer-actions">
             {voiceAvailable && (
               <button
+                ref={voiceTriggerRef}
                 type="button"
                 className="assistant-tool-button assistant-voice-trigger"
-                aria-pressed={callActive}
+                aria-haspopup="dialog"
+                aria-controls="assistant-voice-dialog"
+                aria-expanded={callActive}
                 disabled={loading}
-                onClick={() => setCallActive((active) => !active)}
+                onClick={() => {
+                  setKeyboardOpen(false)
+                  inputRef.current?.blur()
+                  setCallActive(true)
+                }}
               >
                 <KIcon name="mic" />
-                {callActive ? '收起语音' : '语音咨询'}
+                语音咨询
               </button>
             )}
             <button
@@ -474,6 +493,18 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           </p>
         </section>
       </div>
+
+      {voiceAvailable && callActive && LazyCallPanel && (
+        <Suspense
+          fallback={(
+            <div className="assistant-voice-backdrop" role="status" aria-live="polite">
+              <div className="assistant-voice-loading">通话模块加载中…</div>
+            </div>
+          )}
+        >
+          <LazyCallPanel onClose={closeVoiceDialog} onSwitchToText={switchVoiceToText} />
+        </Suspense>
+      )}
 
       <KioskKeyboard
         open={keyboardOpen}

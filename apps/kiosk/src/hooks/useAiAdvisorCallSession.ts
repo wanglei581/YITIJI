@@ -289,6 +289,22 @@ export function useAiAdvisorCallSession() {
     remoteAudioUsersRef.current.clear()
   }, [])
 
+  // 用户主动挂断、切换咨询方式或重试时，先释放真实会话，再回到未接通状态。
+  // cleanup 本身幂等；这里同步重置 startedRef，允许下一次明确点击重新发起通话。
+  const endCall = useCallback(async () => {
+    await cleanup()
+    startedRef.current = false
+    autoplayResumeRef.current = null
+    setPhase('gate')
+    setErrMsg('')
+    setAiState('idle')
+    setMuted(false)
+    setSubtitle('')
+    setElapsed(0)
+    setNeedResume(false)
+    setMicBlocked(false)
+  }, [cleanup])
+
   // ── 恢复播放（AUTOPLAY_FAILED 后用户点击）─────────────────
   const resumePlay = useCallback(async () => {
     try {
@@ -322,6 +338,7 @@ export function useAiAdvisorCallSession() {
     startCall,
     resumePlay,
     toggleMute,
+    endCall,
     cleanup,
   }
 }

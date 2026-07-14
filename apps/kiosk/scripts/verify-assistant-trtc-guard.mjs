@@ -105,7 +105,7 @@ expectMatches(
 )
 expectNotMatches(
   callPanel,
-  /useEffect\(\(\) => \{[\s\S]*?call\.startCall\(\)/,
+  /useEffect\(\(\) => \{\s*void call\.startCall\(\)/,
   'opening the choice dialog does not start or bill a TRTC session',
 )
 expectMatches(
