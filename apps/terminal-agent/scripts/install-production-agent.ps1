@@ -92,6 +92,65 @@ function Fail([string]$Message) {
   exit 1
 }
 
+function Test-GeneratedConfig([System.Collections.IDictionary]$Config) {
+  try {
+    $configJson = $Config | ConvertTo-Json -Depth 8
+    $parsedConfig = $configJson | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    Fail "Generated config could not be serialized and parsed as JSON: $($_.Exception.Message)"
+  }
+
+  foreach ($field in @("apiBaseUrl", "terminalCode", "terminalId", "printerName", "agentVersion")) {
+    if ([string]::IsNullOrWhiteSpace([string]$parsedConfig.$field)) {
+      Fail "Generated config requires a non-empty $field"
+    }
+  }
+
+  foreach ($field in @("heartbeatIntervalMs", "claimIntervalMs", "localApiPort")) {
+    $rawValue = $parsedConfig.$field
+    if ($null -eq $rawValue -or $rawValue -is [string] -or $rawValue -is [bool]) {
+      Fail "Generated config requires $field to be a positive integer"
+    }
+
+    try {
+      $decimalValue = [decimal]$rawValue
+      $integerValue = [int64]$rawValue
+    } catch {
+      Fail "Generated config requires $field to be a positive integer"
+    }
+
+    if ($integerValue -le 0 -or $decimalValue -ne [decimal]$integerValue) {
+      Fail "Generated config requires $field to be a positive integer"
+    }
+  }
+
+  return $configJson
+}
+
+function Invoke-Sc([string[]]$Arguments) {
+  try {
+    $output = & sc.exe @Arguments 2>&1
+  } catch {
+    Fail "sc.exe $($Arguments -join ' ') failed to start: $($_.Exception.Message)"
+  }
+
+  if ($LASTEXITCODE -ne 0) {
+    $detail = ($output | Out-String).Trim()
+    Fail "sc.exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE: $detail"
+  }
+
+  return ($output | Out-String).Trim()
+}
+
+function Set-AgentServiceRecovery([string]$ServiceName) {
+  Write-Step "Configuring Windows service recovery"
+  Invoke-Sc @("failure", $ServiceName, "reset=", "86400", "actions=", 'restart/60000/restart/300000/""/0') | Out-Null
+  Invoke-Sc @("failureflag", $ServiceName, "1") | Out-Null
+  $policy = Invoke-Sc @("qfailure", $ServiceName)
+  Write-Host "SCM failure policy for $ServiceName:"
+  Write-Host $policy
+}
+
 function Resolve-RepoRoot {
   $scriptDir = Split-Path -Parent $PSCommandPath
   # apps/terminal-agent/scripts -> repo root
@@ -208,13 +267,6 @@ if (-not $printer) {
 }
 Write-Ok "Printer found: $($printer.Name) on $($printer.PortName)"
 
-Write-Step "Writing production config"
-if (Test-Path $configPath) {
-  $backup = "$configPath.before-production-hardening-$(Get-Date -Format 'yyyyMMddHHmmss')"
-  Copy-Item $configPath $backup -Force
-  Write-Ok "Config backup: $backup"
-}
-
 $config = [ordered]@{
   apiBaseUrl             = $apiBase
   terminalId             = $TerminalId.Trim()
@@ -230,8 +282,16 @@ $config = [ordered]@{
   )
 }
 
+$configJson = Test-GeneratedConfig -Config $config
+
+Write-Step "Writing production config"
+if (Test-Path $configPath) {
+  $backup = "$configPath.before-production-hardening-$(Get-Date -Format 'yyyyMMddHHmmss')"
+  Copy-Item $configPath $backup -Force
+  Write-Ok "Config backup: $backup"
+}
+
 New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
-$configJson = $config | ConvertTo-Json -Depth 8
 [System.IO.File]::WriteAllText($configPath, $configJson + "`n", [System.Text.UTF8Encoding]::new($false))
 Write-Ok "Production config written: $configPath"
 
@@ -280,6 +340,7 @@ if (-not $SkipServiceInstall) {
     $service = Get-Service -Name "AIJobPrintAgent" -ErrorAction SilentlyContinue
     if ($service) {
       Set-Service -Name "AIJobPrintAgent" -StartupType Automatic
+      Set-AgentServiceRecovery "AIJobPrintAgent"
       if ($service.Status -ne "Running") {
         Start-Service -Name "AIJobPrintAgent"
       } else {
