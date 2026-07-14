@@ -127,6 +127,39 @@ function Test-GeneratedConfig([System.Collections.IDictionary]$Config) {
   return $configJson
 }
 
+function Write-TextAtomically([string]$Path, [string]$Text) {
+  $directory = Split-Path -Parent $Path
+  $fileName = Split-Path -Leaf $Path
+  $tempPath = Join-Path $directory ".${fileName}.${PID}.$([System.Guid]::NewGuid().ToString('N')).tmp"
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+
+  try {
+    $bytes = $encoding.GetBytes($Text)
+    $stream = [System.IO.FileStream]::new(
+      $tempPath,
+      [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::Write,
+      [System.IO.FileShare]::None
+    )
+    try {
+      $stream.Write($bytes, 0, $bytes.Length)
+      $stream.Flush($true)
+    } finally {
+      $stream.Dispose()
+    }
+
+    if ([System.IO.File]::Exists($Path)) {
+      [System.IO.File]::Replace($tempPath, $Path, $null)
+    } else {
+      [System.IO.File]::Move($tempPath, $Path)
+    }
+  } finally {
+    if (Test-Path -LiteralPath $tempPath) {
+      Remove-Item -LiteralPath $tempPath -Force
+    }
+  }
+}
+
 function Invoke-Sc([string[]]$Arguments) {
   try {
     $output = & sc.exe @Arguments 2>&1
@@ -292,7 +325,7 @@ if (Test-Path $configPath) {
 }
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
-[System.IO.File]::WriteAllText($configPath, $configJson + "`n", [System.Text.UTF8Encoding]::new($false))
+Write-TextAtomically -Path $configPath -Text ($configJson + "`n")
 Write-Ok "Production config written: $configPath"
 
 Write-Step "Installing token"

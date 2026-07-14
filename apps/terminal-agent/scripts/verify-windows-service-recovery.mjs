@@ -47,7 +47,7 @@ assert.match(generatedConfig, /Fail /, 'Test-GeneratedConfig must use the instal
 
 const configValidationCall = installer.indexOf('Test-GeneratedConfig -Config $config')
 const configBackup = installer.indexOf('Copy-Item $configPath $backup -Force')
-const configWrite = installer.indexOf('[System.IO.File]::WriteAllText($configPath')
+const configWrite = installer.indexOf('Write-TextAtomically -Path $configPath -Text ($configJson + "`n")')
 const bindCodeExchange = installer.indexOf('Exchange-BindCode -ApiBase $apiBase -Code $BindCode')
 const tokenWrite = installer.indexOf('Protect-AgentToken -Token')
 const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')
@@ -66,6 +66,19 @@ for (const [label, index] of [
   assert.notEqual(index, -1, `installer must retain ${label}`)
   assert.ok(configValidationCall < index, `generated config validation must happen before ${label}`)
 }
+
+const atomicConfigWriter = sourceBetween(installer, /function Write-TextAtomically\(/, /\nfunction /)
+assert.match(atomicConfigWriter, /UTF8Encoding\]::new\(\$false\)/, 'config atomic writer must use UTF-8 without a BOM')
+assert.match(atomicConfigWriter, /FileStream/, 'config atomic writer must use FileStream')
+assert.match(atomicConfigWriter, /CreateNew/, 'config atomic writer must create its temporary file exclusively')
+assert.match(atomicConfigWriter, /\.GetBytes\(/, 'config atomic writer must encode the complete text before writing')
+assert.match(atomicConfigWriter, /\.Write\(/, 'config atomic writer must write encoded bytes')
+assert.match(atomicConfigWriter, /\.Flush\(\$true\)/, 'config atomic writer must flush file content to disk')
+assert.match(atomicConfigWriter, /File\]::Replace/, 'config atomic writer must replace an existing config atomically')
+assert.match(atomicConfigWriter, /File\]::Move/, 'config atomic writer must move a new config into place atomically')
+assert.match(atomicConfigWriter, /finally/, 'config atomic writer must clean up temporary files')
+assert.match(atomicConfigWriter, /Remove-Item\s+-LiteralPath\s+\$tempPath\s+-Force/, 'config atomic writer must remove its temporary file in finally cleanup')
+assert.doesNotMatch(installer, /\[System\.IO\.File\]::WriteAllText\(\$configPath/, 'config writes must not use WriteAllText directly')
 
 const invokeSc = sourceBetween(installer, /function Invoke-Sc\(/, /\nfunction /)
 assertIncludes(invokeSc, '& sc.exe @Arguments 2>&1', 'Invoke-Sc must execute sc.exe through its argument array')
@@ -102,30 +115,26 @@ assert.match(diagnosis, /TrimStart\(\[char\]0xFEFF\)/, 'diagnosis must accept a 
 assert.match(diagnosis, /ConvertFrom-Json/, 'diagnosis must validate JSON without outputting config content')
 assert.match(diagnosis, /INVALID_DIAGNOSTIC_FILE/, 'diagnosis must return a closed code for an invalid startup diagnostic file')
 assert.match(diagnosis, /sc\.exe\s+qfailure/, 'diagnosis must read the configured SCM failure policy')
+assert.match(diagnosis, /Test-Path\s+-LiteralPath\s+\$tokenPath/, 'diagnosis must only test the token path for existence')
 
-for (const field of [
-  'serviceExists',
-  'serviceState',
-  'startMode',
-  'processId',
-  'configExists',
-  'configHasUtf8Bom',
-  'configValidJson',
-  'apiBaseUrl',
-  'terminalCode',
-  'terminalId',
-  'printerName',
-  'agentVersion',
-  'encryptedTokenFile',
-  'lastStartupDiagnosticCode',
-  'scmFailurePolicy',
-]) {
-  assert.match(diagnosis, new RegExp(`\\b${field}\\b`), `diagnosis must report ${field}`)
+const diagnosisOutput = diagnosis.slice(diagnosis.lastIndexOf('[pscustomobject]@{'))
+assert.notEqual(diagnosisOutput, diagnosis, 'diagnosis must output a PSCustomObject')
+for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 'agentVersion']) {
+  assert.match(
+    diagnosisOutput,
+    new RegExp(`^\\s*${field}\\s*=\\s*\\$configFieldStatus\\.${field}\\s*$`, 'm'),
+    `diagnosis output must map ${field} from its precomputed safe status`,
+  )
 }
+assert.match(diagnosisOutput, /^\s*encryptedTokenFile\s*=\s*\$encryptedTokenFile\s*$/m, 'diagnosis output must map encryptedTokenFile from its safe path check')
+assert.match(diagnosisOutput, /^\s*lastStartupDiagnosticCode\s*=\s*\$lastStartupDiagnosticCode\s*$/m, 'diagnosis output must map the closed startup diagnostic code')
 
 assert.doesNotMatch(diagnosis, /Write-(?:Host|Output)\s+\$config\b/, 'diagnosis must not output config content')
 assert.doesNotMatch(diagnosis, /\$config\.agentToken\b/, 'diagnosis must not expose agentToken')
+assert.doesNotMatch(diagnosis, /\$config\.adminSecret\b/, 'diagnosis must not expose adminSecret')
+assert.doesNotMatch(diagnosis, /\$config\.bindCode\b/, 'diagnosis must not expose bindCode')
+assert.doesNotMatch(diagnosis, /ConvertTo-Json\s+\$config\b/, 'diagnosis must not serialize config content')
 assert.doesNotMatch(diagnosis, /Authorization/i, 'diagnosis must not emit Authorization data')
-assert.doesNotMatch(diagnosis, /Invoke-RestMethod|Invoke-WebRequest/, 'diagnosis must not make remote requests')
+assert.doesNotMatch(diagnosis, /Invoke-RestMethod|Invoke-WebRequest|Start-Process|\/print|POST/, 'diagnosis must not make network, process, or print calls')
 
 console.log('ALL PASS: terminal-agent Windows service recovery')

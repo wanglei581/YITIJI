@@ -89,7 +89,8 @@ if ($configExists) {
   }
 }
 
-$encryptedTokenFile = Test-Path (Join-Path $ProgramDataDir "agent.token") -PathType Leaf
+$tokenPath = Join-Path $ProgramDataDir "agent.token"
+$encryptedTokenFile = Test-Path -LiteralPath $tokenPath -PathType Leaf
 $lastStartupDiagnosticCode = Get-StartupDiagnosticCode (Join-Path $ProgramDataDir "last-startup-diagnostic.json")
 $scmFailurePolicy = $null
 
