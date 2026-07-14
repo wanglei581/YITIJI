@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import './reference-service-nav.css'
 import './reference-layout.css'
 
@@ -13,6 +13,7 @@ export const REFERENCE_SERVICE_ITEMS = [
 
 export function ReferenceServiceNav() {
   const navigate = useNavigate()
+  const { hash } = useLocation()
 
   return (
     <nav className="reference-service-nav" aria-label="服务分类">
@@ -20,6 +21,7 @@ export function ReferenceServiceNav() {
         <button
           key={item.hash}
           type="button"
+          aria-current={hash === item.hash ? 'location' : undefined}
           onClick={() => navigate({ pathname: '/', hash: item.hash })}
         >
           {item.label}

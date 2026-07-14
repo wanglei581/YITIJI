@@ -1,87 +1,104 @@
 // ============================================================
-// AssistantPage — 腾讯 TRTC 实时语音通话（页内嵌入面板版）
+// AssistantPage — 4188 单列咨询工作台 + 腾讯 TRTC 页内通话
 //
-// 2026-07-03 用户确认的最终形态：
-//   - 进入页面 = 落地页（小青 hero + 语音/文字双模式入口 + 文字咨询）
-//   - 点「语音通话」卡 → 页内展开墨绿通话面板（AssistantCallPanel），
-//     不再有独立全屏通话页；挂断/改用文字 → 面板收起，页面上下文不丢失
-//   - TRTC 会话逻辑在 hooks/useAiAdvisorCallSession.ts（原 AiAdvisorCall
-//     逐行搬移，卸载自动挂断 + 后端 stop 不持续计费）
-//
-// 合规约束：
-//   - 跳转只允许白名单路由，不出现一键投递
-//   - AI 回复标注"内容仅供参考"
+// 页面语法：任务选择 → 真实对话 → 独立输入区。TRTC 仍由 feature gate
+// 条件式懒加载；共享终端的文字会话离开即清空，路由 action 只走白名单。
 // ============================================================
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useBusyLock } from '../../contexts/KioskBusyContext'
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
-import { ReferenceServiceNav } from '../../components/lightflow/ReferenceServiceNav'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import './assistant-inkpaper.css'
 
-// 是否启用 TRTC 语音通话（需后端配置凭证 + 安装 trtc-sdk-v5）
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 
 if (import.meta.env.DEV && !USE_VOICE_CALL) {
   console.warn('[assistant] 数字人未启用：本地联调数字人需设置 VITE_USE_TRTC_CALL=true。')
 }
 
-// 条件式懒加载：VITE_USE_TRTC_CALL=false 时 Vite 完全排除通话面板及其 trtc-sdk-v5 依赖
-// Vite 在构建时将 import.meta.env.VITE_USE_TRTC_CALL 替换为字面字符串，Rollup 再做死代码消除
+// false 时由 Vite/Rollup 排除通话面板及 trtc-sdk-v5 依赖。
 const LazyCallPanel = USE_VOICE_CALL
   ? lazy(() =>
-      import('./AssistantCallPanel').then((m) => ({ default: m.AssistantCallPanel })),
+      import('./AssistantCallPanel').then((module) => ({ default: module.AssistantCallPanel })),
     )
   : null
 
-// ─── 路由白名单 ────────────────────────────────────────────
-
 const ALLOWED_ROUTE_PREFIXES = [
-  '/resume', '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/renshi',
+  '/resume', '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/interview', '/renshi',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
-  return ALLOWED_ROUTE_PREFIXES.some((p) => route === p || route.startsWith(`${p}/`))
+  return ALLOWED_ROUTE_PREFIXES.some((prefix) => route === prefix || route.startsWith(`${prefix}/`))
 }
 
-// ─── 快捷任务（真实既有路由；原型 quick-grid 语汇） ─────────
-
-interface QuickTask {
+interface ConsultationTask {
+  id: 'resume' | 'interview' | 'jobs' | 'workplace'
   label: string
-  desc: string
-  route: string
+  description: string
   icon: KioskIconName
-  variant: '' | 'v2' | 'v3' | 'v4'
+  welcome: string
+  questions: readonly string[]
+  serviceActions: readonly AssistantAction[]
 }
 
-const QUICK_TASKS: QuickTask[] = [
-  { label: '简历服务', desc: '诊断、优化、打印，一次完成', route: '/resume/source', icon: 'resume', variant: '' },
-  { label: '打印文件', desc: '上传文件，本机直接出纸', route: '/print/upload', icon: 'printer', variant: 'v3' },
-  { label: '查看岗位', desc: '第三方来源岗位，去来源平台投递', route: '/jobs', icon: 'briefcase', variant: 'v2' },
-  { label: '查看招聘会', desc: '查看场次信息，去来源平台预约', route: '/job-fairs', icon: 'fair', variant: 'v4' },
-  { label: '政策服务', desc: '补贴、档案、登记材料指引', route: '/renshi', icon: 'policy', variant: 'v3' },
+const CONSULTATION_TASKS: readonly ConsultationTask[] = [
+  {
+    id: 'resume',
+    label: '简历与求职材料',
+    description: '项目经历、简历格式与求职材料准备',
+    icon: 'resume',
+    welcome: '请告诉我你的目标岗位、目前的简历进度，以及最想解决的材料问题。',
+    questions: ['项目经历应该怎么写？', '简历打印用 PDF 还是 Word？', '没有实习经历怎么办？'],
+    serviceActions: [
+      { label: '去做简历诊断', route: '/resume/source' },
+      { label: '去打印文件', route: '/print/upload' },
+    ],
+  },
+  {
+    id: 'interview',
+    label: '面试与沟通',
+    description: '面试准备、自我介绍与谈薪沟通',
+    icon: 'chat',
+    welcome: '请补充目标岗位、当前面试阶段，以及最想准备的问题。',
+    questions: ['自我介绍应该怎么准备？', '面试常见问题怎么回答？', '谈薪时应该注意什么？'],
+    serviceActions: [{ label: '去做模拟面试', route: '/interview/setup' }],
+  },
+  {
+    id: 'jobs',
+    label: '岗位与选择',
+    description: '岗位理解、Offer 对比与求职方向',
+    icon: 'briefcase',
+    welcome: '请补充岗位名称、你关注的条件，或需要比较的 Offer 信息。',
+    questions: ['这个岗位是否适合我？', '两个 Offer 应该怎样比较？', '阅读 JD 时应该关注哪些重点？'],
+    serviceActions: [
+      { label: '查看岗位信息', route: '/jobs' },
+      { label: '查看招聘会', route: '/job-fairs' },
+    ],
+  },
+  {
+    id: 'workplace',
+    label: '入职与职场',
+    description: '入职材料、试用期与社保公积金常识',
+    icon: 'policy',
+    welcome: '请补充所在地区、想了解的事项和当前阶段；具体规定请以当地官方信息为准。',
+    questions: ['入职通常需要准备哪些材料？', '试用期有哪些常见注意事项？', '社保公积金应该怎样了解？'],
+    serviceActions: [{ label: '查看政策与材料说明', route: '/renshi?tab=policy' }],
+  },
 ]
 
-const KEYWORD_ROUTES: Array<{ kw: readonly string[]; route: string }> = [
-  { kw: ['简历', '诊断', '优化', 'resume'],          route: '/resume/source' },
-  { kw: ['打印', '文件', '印刷'],                    route: '/print/upload'  },
-  { kw: ['岗位', '工作', '职位', '招聘', '找工作'],  route: '/jobs'          },
-  { kw: ['招聘会', '双选会', '人才市场'],             route: '/job-fairs'     },
-  { kw: ['人社', '社保', '政策', '补贴'],             route: '/renshi'        },
-]
-
-// ─── 大家都在问（点击即向小青提问，走真实对话链路） ─────────
-
-const FAQ_QUESTIONS = [
+const GENERAL_QUESTIONS = [
   '应届生没什么经验，简历怎么写工作经历？',
   '简历打印用什么纸、什么格式比较合适？',
   '灵活就业社保补贴怎么申请？需要什么材料？',
-]
+] as const
+
+// 后端 AssistantChatRequest.message 上限为 2000；为咨询主题前缀预留空间。
+const ASSISTANT_USER_MESSAGE_MAX_LENGTH = 1800
 
 type ToolboxAssistantSkill = AssistantSkill
 
@@ -119,24 +136,10 @@ function normalizeToolboxSkill(value: string | null): ToolboxAssistantSkill | un
     : undefined
 }
 
-function getMatchedRoutes(input: string): Set<string> {
-  const lower = input.toLowerCase().trim()
-  if (!lower) return new Set()
-  const matched = new Set<string>()
-  for (const { kw, route } of KEYWORD_ROUTES) {
-    if (kw.some((k) => lower.includes(k))) matched.add(route)
-  }
-  return matched
-}
-
-// 共享触控终端：每次进入助手页面都生成全新 sessionId，
-// 防止上一位用户的对话上下文泄露给下一位用户。
-// 不持久化到 localStorage — 刷新/离开即隔离。
+// 共享触控终端每次进入或切换咨询主题都使用全新 sessionId，且不持久化。
 function newSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
-
-// ─── 消息类型 ─────────────────────────────────────────────
 
 interface Message {
   id: string
@@ -149,331 +152,333 @@ interface Message {
 const WELCOME: Message = {
   id: 'welcome',
   role: 'assistant',
-  text: '您好！我是小青，可以帮您简历诊断、打印文件或查看岗位信息。请问有什么需要帮忙的？',
+  text: '您好！我是小青，可以帮您梳理简历、面试、岗位选择和入职准备。请问今天想先解决什么问题？',
 }
-
-// ─── 主组件 ───────────────────────────────────────────────
 
 export function AssistantPage() {
   return <TextChat voiceAvailable={USE_VOICE_CALL} />
 }
 
-// ─── 落地页 + 对话 + 页内通话面板 ──────────────────────────
-
 function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
-  // 页内通话面板开关：点「语音通话」卡展开（点击手势满足自动播放策略），
-  // 挂断 / 改用文字 / 点「文字对话」卡收起（面板卸载即自动挂断 + 后端 stop）。
   const [callActive, setCallActive] = useState(false)
-  // 页内虚拟键盘：公共触控终端无物理键盘，点输入框弹出、点别处收起。
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<ConsultationTask['id'] | null>(null)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const toolboxSkill = useMemo(() => normalizeToolboxSkill(searchParams.get('intent')), [searchParams])
   const toolboxScene = toolboxSkill ? TOOLBOX_ASSISTANT_SCENES[toolboxSkill] : undefined
-  const welcomeMessage = useMemo<Message>(() => (
-    toolboxScene
-      ? { id: `welcome-${toolboxSkill}`, role: 'assistant', text: toolboxScene.welcome }
-      : WELCOME
-  ), [toolboxSkill, toolboxScene])
+  const selectedTask = useMemo(
+    () => CONSULTATION_TASKS.find((task) => task.id === selectedTaskId) ?? null,
+    [selectedTaskId],
+  )
+  const welcomeMessage = useMemo<Message>(() => {
+    if (toolboxScene) {
+      return { id: `welcome-${toolboxSkill}`, role: 'assistant', text: toolboxScene.welcome }
+    }
+    if (selectedTask) {
+      return { id: `welcome-${selectedTask.id}`, role: 'assistant', text: selectedTask.welcome }
+    }
+    return WELCOME
+  }, [selectedTask, toolboxScene, toolboxSkill])
   const [messages, setMessages] = useState<Message[]>(() => [welcomeMessage])
-  const [input, setInput]       = useState('')
-  const [loading, setLoading]   = useState(false)
-  // AI 正在回复:禁止进入待机宣传屏(评审 bug #1)
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const quickQuestions = selectedTask?.questions ?? GENERAL_QUESTIONS
+
   useBusyLock(loading)
-  useInkRipple('.kassist .lf-reference-primary, .kassist .lf-reference-secondary, .kassist .quick, .kassist .faq, .kassist .action-chip, .kassist .send-btn, .kassist .ka-back')
+  useInkRipple('.kassist .assistant-task, .kassist .assistant-direct-question, .kassist .assistant-context-chip, .kassist .assistant-quick-questions button, .kassist .assistant-tool-button, .kassist .assistant-send, .kassist .action-chip')
 
   const sessionIdRef = useRef(newSessionId())
   const cancelledRef = useRef(false)
-  const previousSkillRef = useRef<ToolboxAssistantSkill | undefined>(toolboxSkill)
+  const previousContextRef = useRef(`${toolboxSkill ?? 'general'}:${selectedTaskId ?? 'none'}`)
   const requestTokenRef = useRef(0)
-  const bottomRef    = useRef<HTMLDivElement>(null)
-  const inputRef     = useRef<HTMLTextAreaElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    // StrictMode（dev）会 mount→unmount→再 mount：必须在每次 mount 时重置为 false，
-    // 否则上一次卸载 cleanup 置的 true 会残留，导致回复被丢弃且 loading 永不复位。
     cancelledRef.current = false
     return () => { cancelledRef.current = true }
   }, [])
 
   useEffect(() => {
-    // block:'nearest'：只滚动对话列表自身，不带动整页跳动
+    if (messages.length <= 1 && !loading) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages, loading])
 
-  // 键盘弹出时把输入框滚到视口中上部，避免被底部键盘遮住
   useEffect(() => {
     if (keyboardOpen) inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [keyboardOpen])
 
   useEffect(() => {
-    if (previousSkillRef.current === toolboxSkill) return
-    previousSkillRef.current = toolboxSkill
+    const contextKey = `${toolboxSkill ?? 'general'}:${selectedTaskId ?? 'none'}`
+    if (previousContextRef.current === contextKey) return
+    previousContextRef.current = contextKey
     requestTokenRef.current += 1
     sessionIdRef.current = newSessionId()
     setMessages([welcomeMessage])
     setInput('')
     setLoading(false)
-  }, [toolboxSkill, welcomeMessage])
+    setCallActive(false)
+  }, [selectedTaskId, toolboxSkill, welcomeMessage])
 
   const sendMessage = useCallback(async (raw: string) => {
-    const text = raw.trim()
+    const text = raw.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH).trim()
     if (!text || loading) return
+    const assistantRequestMessage = selectedTask
+      ? `当前咨询主题：${selectedTask.label}\n用户问题：${text}`
+      : text
     const requestSessionId = sessionIdRef.current
     const requestToken = requestTokenRef.current + 1
     requestTokenRef.current = requestToken
 
-    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text }])
+    setMessages((current) => [...current, { id: `u-${Date.now()}`, role: 'user', text }])
     setInput('')
     setLoading(true)
 
     try {
-      const resp = await chatWithAssistant({
-        message: text,
+      const response = await chatWithAssistant({
+        message: assistantRequestMessage,
         sessionId: requestSessionId,
         skill: toolboxSkill,
-        context: toolboxSkill ? { source: 'toolbox_ai_skill' } : undefined,
+        context: toolboxSkill
+          ? { source: 'toolbox_ai_skill' }
+          : selectedTask
+            ? {
+                source: 'assistant_consultation_task',
+                consultationTaskId: selectedTask.id,
+                consultationTaskLabel: selectedTask.label,
+              }
+            : undefined,
       })
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
-      sessionIdRef.current = resp.sessionId
+      sessionIdRef.current = response.sessionId
 
-      const safeActions = resp.actions?.filter((a) => isAllowedRoute(a.route))
-      setMessages((prev) => [
-        ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', text: resp.reply, actions: safeActions?.length ? safeActions : undefined },
+      const safeActions = response.actions?.filter((action) => isAllowedRoute(action.route))
+      setMessages((current) => [
+        ...current,
+        {
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          text: response.reply,
+          actions: safeActions?.length ? safeActions : undefined,
+        },
       ])
     } catch {
       if (cancelledRef.current) return
       if (requestTokenRef.current !== requestToken || sessionIdRef.current !== requestSessionId) return
-      setMessages((prev) => [
-        ...prev,
+      setMessages((current) => [
+        ...current,
         { id: `err-${Date.now()}`, role: 'assistant', text: 'AI 服务暂不可用，请稍后再试', isError: true },
       ])
     } finally {
       if (!cancelledRef.current && requestTokenRef.current === requestToken) setLoading(false)
     }
-  }, [loading, toolboxSkill])
+  }, [loading, selectedTask, toolboxSkill])
 
   const handleSend = useCallback(() => { void sendMessage(input) }, [input, sendMessage])
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
-    },
-    [handleSend],
-  )
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      handleSend()
+    }
+  }, [handleSend])
 
   const contextActions = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i]!.role === 'assistant') return messages[i]!.actions
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]!.role === 'assistant') return messages[index]!.actions
     }
     return undefined
   }, [messages])
-  const matchedRoutes = useMemo(() => getMatchedRoutes(input), [input])
+  const visibleActions = contextActions?.length ? contextActions : selectedTask?.serviceActions
+
+  const focusComposer = () => {
+    window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
+  }
+
+  const chooseQuickQuestion = (question: string) => {
+    if (loading) return
+    setInput(question)
+    focusComposer()
+  }
+
+  const clearTask = () => {
+    if (toolboxScene) navigate('/assistant')
+    else setSelectedTaskId(null)
+  }
+
+  const conversationTitle = toolboxScene?.title
+    ? `与小青咨询 · ${toolboxScene.title}`
+    : selectedTask
+      ? `与小青咨询 · ${selectedTask.label}`
+      : '与小青的本次咨询'
 
   return (
     <main className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
       <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
-      <ReferenceServiceNav />
-      <div className="ka-inner">
-        <section className="lf-reference-panel assistant-session-panel" aria-labelledby="assistant-session-title">
-          <div className="lf-reference-group-head">
-            <span className="lf-reference-icon" aria-hidden="true"><KIcon name="chat" /></span>
-            <div className="assistant-session-copy">
-              <p className="lf-reference-eyebrow">当前会话</p>
-              <h2 id="assistant-session-title">{toolboxScene?.title ?? '就业服务咨询'}</h2>
-              <span className="assistant-session-note">共享终端 · 离开自动清空</span>
-            </div>
-            <button type="button" className="ka-back" onClick={() => navigate(-1)}>
-              <KIcon name="arrow" />
-              返回
-            </button>
-          </div>
 
-          <div className={voiceAvailable ? 'lf-reference-pair' : 'lf-reference-pair assistant-mode-single'}>
-          {voiceAvailable && (
-            <button
-              type="button"
-              className={callActive ? 'lf-reference-primary call on' : 'lf-reference-primary call'}
-              aria-pressed={callActive}
-              onClick={() => setCallActive(true)}
-            >
-              <span className="lf-reference-icon"><KIcon name="mic" /></span>
-              <span>
-                <strong>语音通话</strong>
-                <span>{callActive ? '通话面板已开启' : '像打电话一样咨询顾问'}</span>
-              </span>
+      <div className="assistant-workbench">
+        <section className="assistant-task-picker" aria-labelledby="assistant-task-picker-title">
+          <header className="assistant-task-picker-heading">
+            <p>你好，我是小青</p>
+            <h2 id="assistant-task-picker-title">今天想解决什么问题？</h2>
+          </header>
+
+          {toolboxScene || selectedTask ? (
+            <button type="button" className="assistant-context-chip" onClick={clearTask}>
+              <span>当前咨询主题：{toolboxScene?.title ?? selectedTask?.label}</span>
+              <span>重新选择</span>
             </button>
+          ) : (
+            <>
+              <div className="assistant-task-grid">
+                {CONSULTATION_TASKS.map((task) => (
+                  <button
+                    type="button"
+                    className="assistant-task"
+                    key={task.id}
+                    onClick={() => setSelectedTaskId(task.id)}
+                  >
+                    <span className="assistant-task-icon" aria-hidden="true"><KIcon name={task.icon} /></span>
+                    <span className="assistant-task-copy">
+                      <strong>{task.label}</strong>
+                      <small>{task.description}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="assistant-direct-question" onClick={focusComposer}>
+                其他问题，直接问小青
+                <KIcon name="chat" />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            className={callActive ? 'lf-reference-primary text' : 'lf-reference-primary text on'}
-            aria-pressed={!callActive}
-            onClick={() => (callActive ? setCallActive(false) : inputRef.current?.focus())}
+        </section>
+
+        <section className="assistant-conversation" aria-labelledby="assistant-conversation-title">
+          <header>
+            <h2 id="assistant-conversation-title">{conversationTitle}</h2>
+            <p>共享终端 · 离开本页自动清空</p>
+          </header>
+
+          <div
+            className="assistant-transcript"
+            role="log"
+            aria-live="polite"
+            aria-busy={loading}
+            aria-relevant="additions text"
           >
-            <span className="lf-reference-icon"><KIcon name="chat" /></span>
-            <span>
-              <strong>文字对话</strong>
-              <span>打字咨询、离开自动清空</span>
-            </span>
-          </button>
-          </div>
-
-          {voiceAvailable && callActive && LazyCallPanel && (
-            <Suspense
-              fallback={
-                <section className="call-panel">
-                  <div className="call-meta">通话模块加载中…</div>
-                </section>
-              }
-            >
-              <LazyCallPanel onEnd={() => setCallActive(false)} />
-            </Suspense>
-          )}
-
-          <section className="panel" aria-labelledby="assistant-chat-title">
-            <h2 id="assistant-chat-title" className="kassist-sr-only">当前对话</h2>
-
-            <div className="chat-list" role="log" aria-live="polite" aria-relevant="additions text">
-            {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
+            {messages.map((message) => <ChatBubble key={message.id} msg={message} />)}
             {loading && (
-              <div className="typing" role="status" aria-label="服务正在回复">
-                <i /><i /><i />
+              <div className="assistant-thinking" role="status">
+                <AdvisorAvatar />
+                <span>小青正在整理建议…</span>
+                <span className="assistant-thinking-dots" aria-hidden="true"><i /><i /><i /></span>
               </div>
             )}
             <div ref={bottomRef} />
           </div>
 
-          {contextActions && contextActions.length > 0 && (
-            <div className="action-chips">
-              {contextActions.map((a) => (
-                <button key={a.route} type="button" className="action-chip" onClick={() => navigate(a.route)}>
-                  {a.label}
+          {visibleActions && visibleActions.length > 0 && (
+            <div className="action-chips" aria-label="回答后的操作">
+              {visibleActions.map((action) => (
+                <button key={action.route} type="button" className="action-chip" onClick={() => navigate(action.route)}>
+                  {action.label}
                 </button>
               ))}
             </div>
           )}
-
-          <div className="input-bar">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => !loading && setKeyboardOpen(true)}
-              onClick={() => !loading && setKeyboardOpen(true)}
-              // 公共终端用页内虚拟键盘：抑制系统软键盘，但保留光标可编辑
-              inputMode="none"
-              aria-label="输入咨询问题"
-              placeholder={toolboxScene?.placeholder ?? '点这里，用下方键盘输入问题'}
-              rows={1}
-              disabled={loading}
-            />
-            <button
-              type="button"
-              className="send-btn"
-              onClick={handleSend}
-              disabled={!input.trim() || loading}
-              aria-label="发送消息"
-            >
-              <KIcon name="send" />
-            </button>
-          </div>
-          <p className="disclaimer">{toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}</p>
-          </section>
         </section>
 
-        <section className="lf-reference-panel assistant-support-panel" aria-labelledby="assistant-quick-tasks-title">
-          <div className="lf-reference-group-head">
-            <span className="lf-reference-icon" aria-hidden="true"><KIcon name="sparkle" /></span>
-            <div>
-              <h2 id="assistant-quick-tasks-title">快捷任务</h2>
-              <p>点一下直达对应功能页。</p>
-            </div>
-          </div>
+        {voiceAvailable && callActive && LazyCallPanel && (
+          <Suspense
+            fallback={(
+              <section className="call-panel" aria-live="polite">
+                <div className="call-meta">通话模块加载中…</div>
+              </section>
+            )}
+          >
+            <LazyCallPanel onEnd={() => setCallActive(false)} />
+          </Suspense>
+        )}
 
-          <div className="assistant-quick-tasks">
-            {QUICK_TASKS.map((task) => (
+        <section className="assistant-composer" aria-labelledby="assistant-composer-label">
+          <div className="assistant-quick-questions" aria-label="快捷问题">
+            {quickQuestions.map((question) => (
               <button
-                key={task.route}
                 type="button"
-                className={['lf-reference-secondary quick', task.variant, matchedRoutes.has(task.route) ? 'hit' : '']
-                  .filter(Boolean)
-                  .join(' ')}
-                onClick={() => navigate(task.route)}
+                key={question}
+                disabled={loading}
+                onClick={() => chooseQuickQuestion(question)}
               >
-                <span className="qi"><KIcon name={task.icon} /></span>
-                <div>
-                  <strong>{task.label}</strong>
-                  <span>{task.desc}</span>
-                </div>
+                {question}
               </button>
             ))}
           </div>
 
-          <div className="assistant-support-divider" aria-hidden="true" />
+          <label id="assistant-composer-label" htmlFor="assistant-question">向小青描述你的问题</label>
+          <textarea
+            id="assistant-question"
+            ref={inputRef}
+            value={input}
+            onChange={(event) => setInput(event.target.value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
+            onKeyDown={handleKeyDown}
+            onFocus={() => !loading && setKeyboardOpen(true)}
+            onClick={() => !loading && setKeyboardOpen(true)}
+            inputMode="none"
+            aria-label="输入咨询问题"
+            placeholder={toolboxScene?.placeholder ?? (selectedTask ? `请补充“${selectedTask.label}”相关情况` : '请输入你想咨询的求职问题')}
+            rows={3}
+            maxLength={ASSISTANT_USER_MESSAGE_MAX_LENGTH}
+            disabled={loading}
+          />
 
-          <section className="assistant-faqs" aria-labelledby="assistant-faqs-title">
-            <div className="assistant-subhead">
-              <h3 id="assistant-faqs-title">大家都在问</h3>
-              <p>点击直接发送到本次咨询。</p>
-            </div>
-            <div className="faq-list">
-              {FAQ_QUESTIONS.map((q) => (
-                <button key={q} type="button" className="lf-reference-secondary faq" onClick={() => void sendMessage(q)} disabled={loading}>
-                  <span className="q">Q</span>
-                  <strong>{q}</strong>
-                  <KIcon name="arrow" />
-                </button>
-              ))}
-            </div>
-          </section>
+          <div className="assistant-composer-actions">
+            {voiceAvailable && (
+              <button
+                type="button"
+                className="assistant-tool-button assistant-voice-trigger"
+                aria-pressed={callActive}
+                disabled={loading}
+                onClick={() => setCallActive((active) => !active)}
+              >
+                <KIcon name="mic" />
+                {callActive ? '收起语音' : '语音咨询'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="assistant-tool-button"
+              disabled={loading}
+              onClick={() => {
+                setKeyboardOpen(true)
+                focusComposer()
+              }}
+            >
+              <KIcon name="settings" />
+              拼音键盘
+            </button>
+            <button
+              type="button"
+              className="assistant-send"
+              onClick={handleSend}
+              disabled={!input.trim() || loading}
+            >
+              <KIcon name="send" />
+              发送
+            </button>
+          </div>
 
-          <div className="assistant-support-divider" aria-hidden="true" />
-
-          <section className="assistant-result-guide" aria-labelledby="assistant-result-guide-title">
-            <div className="assistant-subhead">
-              <h3 id="assistant-result-guide-title">结果去哪儿</h3>
-              <p>正式材料请到对应功能页生成和保存。</p>
-            </div>
-            <div className="result-strip">
-              <div className="assistant-result-row">
-                <span className="ri"><KIcon name="doc-check" /></span>
-                <div>
-                  <strong>去简历服务</strong>
-                  <span>问答建议仅供参考；简历需到「简历服务」按流程生成和保存。</span>
-                </div>
-              </div>
-              <div className="assistant-result-row v2">
-                <span className="ri"><KIcon name="receipt" /></span>
-                <div>
-                  <strong>去模拟面试</strong>
-                  <span>面试复盘报告需到「模拟面试」功能生成和保存，助手不直接出报告。</span>
-                </div>
-              </div>
-              <div className="assistant-result-row v3">
-                <span className="ri"><KIcon name="printer" /></span>
-                <div>
-                  <strong>去打印</strong>
-                  <span>纸质材料需到「打印」功能生成和输出，助手问答不直接出件。</span>
-                </div>
-              </div>
-            </div>
-          </section>
+          <p className="assistant-composer-privacy">
+            {toolboxScene?.disclaimer ?? 'AI 回复内容仅供参考，不构成正式建议'}；本次咨询不会保存在这台共享设备上。岗位投递与招聘会预约请前往来源平台完成。
+          </p>
         </section>
-
-        <p className="compliance">
-          <KIcon name="shield" />
-          AI 助手问答仅本次会话内参考，不构成正式建议；如需形成简历、面试报告或打印材料，请进入对应功能页生成和保存；岗位投递与招聘会预约请前往来源平台完成。
-        </p>
       </div>
 
-      {/* 页内悬浮虚拟键盘：点输入框弹出、点别处收起 */}
       <KioskKeyboard
         open={keyboardOpen}
         value={input}
-        onChange={setInput}
+        onChange={(value) => setInput(value.slice(0, ASSISTANT_USER_MESSAGE_MAX_LENGTH))}
         onEnter={handleSend}
         onClose={() => {
           setKeyboardOpen(false)
@@ -484,41 +489,33 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   )
 }
 
-// ─── 气泡组件（v5 row/bava/bubble 语汇） ─────────────────────
+function AdvisorAvatar() {
+  return (
+    <span className="assistant-message-avatar" aria-hidden="true">
+      <img src="/assets/ai-advisor.png" alt="" />
+    </span>
+  )
+}
 
 function ChatBubble({ msg }: { msg: Message }) {
-  const isUser  = msg.role === 'user'
-  const isError = msg.isError === true
-
-  if (isUser) {
-    return (
-      <div className="row me">
-        <span className="bava me"><KIcon name="user" /></span>
-        <div className="bubble me">{msg.text}</div>
-      </div>
-    )
-  }
-
+  const isAssistant = msg.role === 'assistant'
   return (
-    <div className="row">
-      <span className="bava bot">
-        <img src="/assets/ai-advisor.png" alt="小青" />
-      </span>
-      {isError ? (
-        <div className="bubble err" role="alert">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 8v5" />
-            <path d="M12 16.5h.01" />
-          </svg>
-          <span>{msg.text}</span>
+    <article
+      className={`assistant-message assistant-message--${isAssistant ? 'assistant' : 'user'}`}
+      data-message-role={msg.role}
+    >
+      {isAssistant && <AdvisorAvatar />}
+      {msg.isError ? (
+        <div className="assistant-message-bubble assistant-message-bubble--error" role="alert">
+          <strong>暂时无法连接</strong>
+          <p>{msg.text}</p>
         </div>
       ) : (
-        <div className="bubble bot">
-          {msg.text}
-          <span className="ref">内容仅供参考</span>
+        <div className="assistant-message-bubble">
+          <p>{msg.text}</p>
+          {isAssistant && <span className="assistant-message-reference">内容仅供参考</span>}
         </div>
       )}
-    </div>
+    </article>
   )
 }

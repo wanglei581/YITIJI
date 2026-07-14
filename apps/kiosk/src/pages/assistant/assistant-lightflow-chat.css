@@ -1,44 +1,188 @@
-.kassist.kassist-lightflow .panel { padding: 22px; border: 1px solid var(--sd-line); border-radius: var(--sd-radius-card); background: var(--sd-surface); box-shadow: var(--sd-shadow-soft); animation: kassist-lightflow-rise 260ms ease-out 110ms both; }
-.kassist.kassist-lightflow .chat-list { display: flex; max-height: 560px; gap: 12px; overflow-y: auto; flex-direction: column; scrollbar-width: thin; scrollbar-color: #c6dcf4 transparent; }
+.kassist.kassist-lightflow .assistant-conversation {
+  display: flex;
+  min-width: 0;
+  min-height: 300px;
+  flex-direction: column;
+  padding: 20px;
+  border-block: 1px solid var(--sd-line);
+}
 
-.kassist.kassist-lightflow .row { display: flex; align-items: flex-end; gap: 12px; }
-.kassist.kassist-lightflow .row.me { flex-direction: row-reverse; }
-.kassist.kassist-lightflow .bava { display: grid; width: 44px; height: 44px; flex: 0 0 auto; overflow: hidden; place-items: center; border-radius: 15px; }
-.kassist.kassist-lightflow .bava.bot { border: 1px solid #cfe4ff; background: #eaf4ff; }
-.kassist.kassist-lightflow .bava.bot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
-.kassist.kassist-lightflow .bava.me { color: #ffffff; background: #0a3474; }
-.kassist.kassist-lightflow .bava.me svg { width: 24px; height: 24px; }
+.kassist.kassist-lightflow .assistant-conversation > header {
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--sd-line);
+}
 
-.kassist.kassist-lightflow .bubble { max-width: 78%; padding: 16px 18px; border-radius: 20px; font-size: 16px; line-height: 1.58; }
-.kassist.kassist-lightflow .bubble.bot { border: 1px solid #e0ebf8; border-bottom-left-radius: 6px; color: var(--sd-text); background: var(--sd-surface-soft); }
-.kassist.kassist-lightflow .bubble.me { border-bottom-right-radius: 6px; color: #ffffff; background: linear-gradient(138deg, #0d459d, var(--sd-primary)); }
-.kassist.kassist-lightflow .bubble.err { display: flex; align-items: flex-start; gap: 8px; border: 1px solid #f0c5c3; border-bottom-left-radius: 6px; color: #ad302d; background: #fff3f2; }
-.kassist.kassist-lightflow .bubble.err svg { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 3px; }
-.kassist.kassist-lightflow .bubble .ref { display: block; margin-top: 8px; color: var(--sd-copy-muted); font-size: 12px; }
-.kassist.kassist-lightflow .typing { display: inline-flex; width: fit-content; align-items: center; gap: 6px; padding: 16px 18px; border: 1px solid #e0ebf8; border-radius: 20px; border-bottom-left-radius: 6px; background: var(--sd-surface-soft); }
-.kassist.kassist-lightflow .typing i { width: 8px; height: 8px; border-radius: 50%; background: var(--sd-primary); animation: kassist-lightflow-dots 900ms cubic-bezier(0.4, 0, 0.2, 1) infinite; }
-.kassist.kassist-lightflow .typing i:nth-child(2) { animation-delay: 150ms; }
-.kassist.kassist-lightflow .typing i:nth-child(3) { animation-delay: 300ms; }
+.kassist.kassist-lightflow .assistant-conversation > header h2 {
+  margin: 0;
+  color: var(--sd-text-strong);
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.kassist.kassist-lightflow .assistant-conversation > header p {
+  margin: 4px 0 0;
+  color: var(--sd-copy-muted);
+  font-size: 12px;
+}
+
+.kassist.kassist-lightflow .assistant-transcript {
+  display: flex;
+  min-height: 190px;
+  max-height: 360px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 2px 4px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c6dcf4 transparent;
+}
+
+.kassist.kassist-lightflow .assistant-message {
+  display: flex;
+  max-width: 86%;
+  align-items: flex-end;
+  gap: 10px;
+  animation: kassist-lightflow-rise 200ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.kassist.kassist-lightflow .assistant-message--user { align-self: flex-end; justify-content: flex-end; }
+
+.kassist.kassist-lightflow .assistant-message-avatar {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid #cfe4ff;
+  border-radius: 14px;
+  background: #eaf4ff;
+}
+
+.kassist.kassist-lightflow .assistant-message-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.kassist.kassist-lightflow .assistant-message-bubble {
+  min-width: 0;
+  padding: 13px 16px;
+  border: 1px solid var(--sd-line);
+  border-radius: 8px 12px 12px 12px;
+  background: var(--sd-surface);
+}
+
+.kassist.kassist-lightflow .assistant-message--user .assistant-message-bubble {
+  border-color: var(--sd-primary);
+  border-radius: 12px 8px 12px 12px;
+  color: #ffffff;
+  background: var(--sd-primary);
+}
+
+.kassist.kassist-lightflow .assistant-message-bubble--error {
+  border-color: #f0c5c3;
+  color: #ad302d;
+  background: #fff3f2;
+}
+
+.kassist.kassist-lightflow .assistant-message-bubble strong { display: block; margin-bottom: 4px; font-size: 14px; }
+.kassist.kassist-lightflow .assistant-message-bubble p { margin: 0; font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; }
+.kassist.kassist-lightflow .assistant-message-reference { display: block; margin-top: 7px; color: var(--sd-copy-muted); font-size: 11.5px; }
+
+.kassist.kassist-lightflow .assistant-thinking {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  gap: 9px;
+  color: var(--sd-copy);
+  font-size: 14px;
+}
+
+.kassist.kassist-lightflow .assistant-thinking .assistant-message-avatar { width: 38px; height: 38px; }
+.kassist.kassist-lightflow .assistant-thinking-dots { display: inline-flex; gap: 4px; }
+.kassist.kassist-lightflow .assistant-thinking-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--sd-primary); animation: kassist-lightflow-dots 900ms ease-in-out infinite; }
+.kassist.kassist-lightflow .assistant-thinking-dots i:nth-child(2) { animation-delay: 150ms; }
+.kassist.kassist-lightflow .assistant-thinking-dots i:nth-child(3) { animation-delay: 300ms; }
 
 .kassist.kassist-lightflow .action-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.kassist.kassist-lightflow .action-chip { min-height: var(--sd-control-min); padding: 0 18px; border: 1px solid #b9d9ff; border-radius: 999px; color: #0d55b0; background: #edf6ff; font-size: 14px; font-weight: 750; cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
-.kassist.kassist-lightflow .action-chip:hover { background: #dfefff; }
-.kassist.kassist-lightflow .action-chip:active { transform: scale(0.97); }
+.kassist.kassist-lightflow .action-chip { min-height: var(--kassist-control-min); padding: 0 18px; border: 1px solid #b9d9ff; border-radius: 12px; color: var(--sd-primary-strong); background: #edf6ff; font-size: 14px; font-weight: 700; cursor: pointer; }
 
-.kassist.kassist-lightflow .input-bar { display: flex; align-items: center; min-height: 72px; gap: 12px; margin-top: 18px; padding: 8px 8px 8px 18px; border: 1px solid var(--sd-line); border-radius: 16px; background: var(--sd-surface-soft); transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease; }
-.kassist.kassist-lightflow .input-bar:focus-within { border-color: #8bbdff; background: #ffffff; box-shadow: 0 0 0 4px rgba(23, 105, 232, 0.1); }
-.kassist.kassist-lightflow .input-bar textarea { min-width: 0; padding: 8px 0; border: 0; outline: 0; color: var(--sd-text-strong); background: transparent; font: inherit; font-size: 15.5px; line-height: 1.5; resize: none; flex: 1; }
-.kassist.kassist-lightflow .input-bar textarea::placeholder { color: var(--sd-copy-muted); }
-.kassist.kassist-lightflow .send-btn { display: grid; width: var(--kassist-primary-control-min); height: var(--kassist-primary-control-min); flex: 0 0 auto; place-items: center; border-radius: 14px; color: #ffffff; background: linear-gradient(145deg, var(--sd-primary), var(--sd-primary-strong)); box-shadow: 0 8px 17px rgba(23, 105, 232, 0.22); cursor: pointer; transition: transform 160ms ease, opacity 160ms ease; }
-.kassist.kassist-lightflow .send-btn svg { width: 22px; height: 22px; }
-.kassist.kassist-lightflow .send-btn:not(:disabled):hover { transform: translateY(-2px); }
-.kassist.kassist-lightflow .send-btn:not(:disabled):active { transform: scale(0.96); }
-.kassist.kassist-lightflow .send-btn:disabled { opacity: 0.42; box-shadow: none; cursor: default; }
-.kassist.kassist-lightflow .disclaimer { margin: 12px 4px 0; color: var(--sd-copy-muted); font-size: 12.5px; text-align: center; }
+.kassist.kassist-lightflow .assistant-composer {
+  padding: 20px;
+  border: 1px solid var(--sd-line-strong);
+  border-radius: 16px;
+  background: var(--sd-surface);
+  box-shadow: var(--sd-shadow-soft);
+}
+
+.kassist.kassist-lightflow .assistant-quick-questions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.kassist.kassist-lightflow .assistant-quick-questions button {
+  min-height: var(--kassist-control-min);
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border: 1px solid var(--sd-line);
+  border-radius: 12px;
+  color: var(--sd-text);
+  background: var(--sd-canvas);
+  cursor: pointer;
+}
+
+.kassist.kassist-lightflow .assistant-composer > label { display: block; margin-bottom: 8px; color: var(--sd-text-strong); font-size: 14px; font-weight: 650; }
+.kassist.kassist-lightflow .assistant-composer textarea { width: 100%; min-height: 104px; padding: 14px 16px; border: 1px solid var(--sd-line-strong); border-radius: 12px; color: var(--sd-text-strong); background: var(--sd-canvas); font: inherit; font-size: 16px; line-height: 1.6; resize: vertical; user-select: text; }
+.kassist.kassist-lightflow .assistant-composer textarea::placeholder { color: var(--sd-copy-muted); }
+.kassist.kassist-lightflow .assistant-composer textarea:focus-visible { border-color: var(--sd-primary); outline: 4px solid rgba(23, 105, 232, 0.22); outline-offset: 2px; }
+
+.kassist.kassist-lightflow .assistant-composer-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.kassist.kassist-lightflow .assistant-tool-button,
+.kassist.kassist-lightflow .assistant-send {
+  display: inline-flex;
+  min-height: var(--kassist-primary-control-min);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.kassist.kassist-lightflow .assistant-tool-button { border: 1px solid #cfe3fb; color: var(--sd-primary-strong); background: #eaf4ff; }
+.kassist.kassist-lightflow .assistant-tool-button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px rgba(7, 88, 215, 0.35); }
+.kassist.kassist-lightflow .assistant-send { border: 1px solid var(--sd-primary); color: #ffffff; background: var(--sd-primary); }
+.kassist.kassist-lightflow .assistant-tool-button svg,
+.kassist.kassist-lightflow .assistant-send svg { width: 22px; height: 22px; }
+.kassist.kassist-lightflow .assistant-composer :is(button, textarea):disabled { color: var(--sd-copy-muted); border-color: var(--sd-line); background: #eef2f7; cursor: not-allowed; opacity: 0.68; }
+.kassist.kassist-lightflow .assistant-composer textarea:disabled { resize: none; }
+.kassist.kassist-lightflow .assistant-composer-privacy { margin: 10px 0 0; color: var(--sd-copy); font-size: 12px; line-height: 1.55; text-align: center; }
 
 @media (max-width: 520px) {
-  .kassist.kassist-lightflow .panel { padding: 15px; border-radius: 20px; }
-  .kassist.kassist-lightflow .chat-list { max-height: 480px; }
-  .kassist.kassist-lightflow .bubble { max-width: calc(100% - 48px); padding: 14px 15px; font-size: 15px; }
-  .kassist.kassist-lightflow .input-bar { min-height: 64px; padding-left: 14px; }
+  .kassist.kassist-lightflow .assistant-conversation { min-height: 290px; padding: 14px; }
+  .kassist.kassist-lightflow .assistant-transcript { min-height: 210px; max-height: 42dvh; padding-inline: 0; }
+  .kassist.kassist-lightflow .assistant-message { max-width: 95%; }
+  .kassist.kassist-lightflow .assistant-message-avatar { width: 36px; height: 36px; border-radius: 12px; }
+  .kassist.kassist-lightflow .assistant-message-bubble { padding: 11px 13px; }
+  .kassist.kassist-lightflow .assistant-message-bubble p { font-size: 14px; }
+  .kassist.kassist-lightflow .assistant-composer { padding: 14px; }
+  .kassist.kassist-lightflow .assistant-quick-questions { scrollbar-width: none; }
+  .kassist.kassist-lightflow .assistant-composer textarea { min-height: 96px; }
+  .kassist.kassist-lightflow .assistant-composer-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .kassist.kassist-lightflow .assistant-send { grid-column: 1 / -1; }
 }

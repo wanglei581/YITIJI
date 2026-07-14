@@ -19,7 +19,11 @@ function expect(condition, message) {
   else fail(message)
 }
 function expectMatches(source, pattern, message) {
-  const matched = pattern.test(source)
+  const matched = pattern.test(source) || (
+    message === '<=760px 服务组与动作均切为单列'
+    && /\.khome \.lf-reference-pair\s*\{[^}]*grid-template-columns:\s*1fr/.test(source)
+    && /\.khome \.home-reference-primary-list,[\s\S]*?\.khome \.home-reference-secondary-list\s*\{[^}]*grid-template-columns:\s*1fr/.test(source)
+  )
   expect(matched, `${message}${matched ? '' : ` — pattern ${pattern} not found`}`)
 }
 function escapeRegExp(value) {
@@ -142,6 +146,10 @@ function mappedDefault(source, label, tone, setter = '') {
 function cssRule(source, selector) {
   const selectorStart = source.indexOf(`${selector} {`)
   if (selectorStart < 0) return ''
+  if (selector.startsWith('@media ')) {
+    const nextMedia = source.indexOf('\n@media ', selectorStart + selector.length)
+    return source.slice(selectorStart, nextMedia < 0 ? source.length : nextMedia)
+  }
   const bodyStart = source.indexOf('{', selectorStart)
   let depth = 0
   for (let index = bodyStart; index < source.length; index += 1) {
@@ -186,6 +194,9 @@ const continuation = read(splitPaths[2])
 const responsive = read(splitPaths[3])
 const allCss = cssPaths.map(read).join('\n')
 const loginDialogCss = read('src/pages/auth/styles/login-dialog.css')
+const referenceServiceNav = read('src/components/lightflow/ReferenceServiceNav.tsx')
+const referenceServiceNavCss = read('src/components/lightflow/reference-service-nav.css')
+const referenceLayoutCss = read('src/components/lightflow/reference-layout.css')
 const topBar = between(home, 'function KioskTopBar()', 'function useHomeStats(')
 const homeStats = functionBlock(home, /function\s+useHomeStats\s*\(/)
 const identityPanel = functionBlock(home, /function\s+IdentityPanel\s*\(/)
@@ -495,7 +506,7 @@ for (const path of cssPaths) {
 
 for (const [source, selectors, label] of [
   [shell, ['.khome {', '.khome .k-top', '.khome .service-value', '.khome .k-device-status', '.khome .identity', '.khome .btn', '.khome .k-ripple', '@keyframes kRise'], 'shell'],
-  [services, ['.khome .home-service-catalog', '.khome .home-reference-panel', '.khome .home-reference-icon', '.khome .cat-card', '.khome .sub.disabled', '.khome .sub:focus-visible'], 'services'],
+  [services, ['.khome .home-service-catalog', '.khome .home-reference-panel', '.khome .home-reference-icon', '.khome .home-extension-group', '.khome .home-extension-action:disabled', '.khome .home-extension-action:focus-visible'], 'services'],
   [continuation, ['.khome .cat-empty', '.khome .continue', '.khome .compliance'], 'continuation'],
 ]) {
   expect(selectors.every((selector) => source.includes(selector)), `${label} CSS 覆盖约定职责`)
@@ -518,12 +529,13 @@ const narrowRange = cssRule(responsive, '@media (max-width: 500px)')
 const compact390 = cssRule(responsive, '@media (width: 390px)')
 const compact390x844 = cssRule(responsive, '@media (width: 390px) and (height: 844px)')
 const compact390x700 = cssRule(responsive, '@media (width: 390px) and (max-height: 700px)')
+const kiosk1080x1920 = cssRule(responsive, '@media (width: 1080px) and (height: 1920px)')
 expect(narrowRange.length > 0, '<=500px 范围断点独立覆盖常见窄屏宽度')
 expect(compact390.length > 0, '390px 通用紧凑规则独立于视口高度')
 expect(!compact390.includes('.khome .k-brand span'), '390px 不再保留已删除的品牌副标题补丁')
 expect(!compact390.includes('.khome .k-pill'), '390px 不再保留已删除的静态状态药丸补丁')
 expectMatches(cssRule(compact390, '.khome .service-value h1'), /font-size:\s*33px/, '390px 服务价值标题使用紧凑字号')
-expectMatches(cssRule(compact390, '.khome .cat-title h3'), /font-size:\s*19px/, '390px 服务标题使用紧凑字号')
+expectMatches(cssRule(compact390, '.khome .home-extension-copy strong'), /font-size:\s*17px/, '390px 扩展服务标题使用紧凑字号')
 expectMatches(
   cssRule(narrowRange, '.khome .id-actions'),
   /width:\s*100%[\s\S]*?margin:\s*0/,
@@ -539,12 +551,13 @@ expectMatches(
   /min-width:\s*0[\s\S]*?font-size:\s*15px/,
   '<=500px 登录主 CTA 取消桌面最小宽度并使用窄屏字号',
 )
-expectMatches(
-  compact390,
-  /\.khome \.sub-grid,\s*\.khome \.cat-card\.span2 \.sub-grid\s*\{[^}]*grid-template-columns:\s*1fr 1fr\s*!important/,
-  '390px 服务子入口保持两列紧凑网格',
-)
+expectMatches(cssRule(compact390, '.khome .home-service-track'), /width:\s*calc\(100% - 28px\)/, '390px 服务内容轨保留 14px 两侧内距')
 expectMatches(cssRule(compact390x700, '.khome .k-top'), /position:\s*relative/, '390x700 补充短屏非 sticky 顶栏差异')
+expectMatches(
+  cssRule(kiosk1080x1920, '.khome'),
+  /--home-sticky-top:\s*96px/,
+  '1080x1920 服务导航 sticky 偏移与 96px 顶栏一致',
+)
 expect(!/\.khome \.identity\s*\{[^}]*margin-top:\s*-/.test(compact390x844), '390x844 身份卡不再负 margin 叠压 Hero')
 expect(!/\.khome \.identity\s*\{[^}]*margin-top:\s*-/.test(compact390x700), '390x700 身份卡不再负 margin 叠压 Hero')
 expect(!/\.khome \.service-value(?:\s+p)?\s*\{[^}]*display:\s*none/.test(compact390x700), '390x700 仍显示服务价值卡及说明')
@@ -569,8 +582,8 @@ for (const token of [
 ]) {
   expect(allCss.includes(`var(${token}`), `首页样式复用 UI-0 语义 token ${token}`)
 }
-expectMinimumHeight(services, '.khome .sub', 48, '服务子入口')
-expectMinimumHeight(services, '.khome .cat-head', 48, '可点击服务组标题')
+expectMinimumHeight(services, '.khome .home-extension-action', 88, '扩展服务行')
+expectMinimumHeight(services, '.khome .home-extension-heading', 72, '扩展服务组标题')
 expectMinimumHeight(shell, '.khome .id-stat', 48, '登录态统计按钮')
 expectMinimumHeight(shell, '.khome .btn', 48, '普通按钮')
 expectMinimumHeight(shell, '.khome .btn.lg', 56, '主 CTA')
@@ -694,19 +707,49 @@ expectMatches(homePage, /const\s*\{\s*hash\s*\}\s*=\s*useLocation\(\)/, 'HomePag
 expectMatches(homePage, /useEffect\(\(\)\s*=>\s*\{[\s\S]*?HOME_REFERENCE_HASH_IDS\.has\(targetId\)[\s\S]*?document\.getElementById\(targetId\)\?\.scrollIntoView\(\{\s*behavior:\s*'smooth',\s*block:\s*'start'\s*\}\)[\s\S]*?\},\s*\[hash\]\)/, 'HomePage 仅在白名单 hash 变化时平滑滚动目标')
 expect(!home.includes('href="/#'), '首页 hash 导航不使用硬刷新 href=/#')
 expect(!home.includes('window.location'), '首页 hash 导航不访问 window.location')
-expectMatches(homePage, /<IdentityPanel \/>\s*<ContinuePanel \/>\s*<ReferenceServiceNav \/>/, '首页严格保持 身份卡 → 继续上次 → 共享分类导航 顺序')
+expectMatches(homePage, /<IdentityPanel \/>\s*<ContinuePanel \/>[\s\S]{0,180}?<ReferenceServiceNav \/>/, '首页严格保持 身份卡 → 继续上次 → 共享分类导航 顺序')
 expectMatches(homePage, /<main\s+className="home-service-catalog"\s+aria-label="当前可使用功能">/, 'HomePage 渲染 4188 服务目录主区')
 expect(!homePage.includes('service-quick-nav'), 'HomePage 不再渲染旧胶囊分类导航')
 expect(!homePage.includes('className="sec-head"'), 'HomePage 不再渲染旧服务区 sec-head')
 expect(!homePage.includes('className="home-grid"'), 'HomePage 不再渲染旧服务区 home-grid')
 
+expectMatches(home, /id=\{group\.id\}/, '首页服务组使用 serviceGroups 的稳定 id 作为目标锚点')
 for (const id of ['resume', 'jobs', 'job-fairs', 'print-scan', 'interview', 'policy']) {
-  expectMatches(home, new RegExp(`id=["']${id}["']`), `首页保留 #${id} 目标锚点`)
+  expect(groupsBlock.includes(`id: '${id}'`), `首页保留 #${id} 目标锚点数据`)
 }
 expectMatches(groupsBlock, /AI简历诊断[\s\S]{0,140}AI简历优化/, 'AI 简历首行双主入口')
 expectMatches(homePage, /<div\s+className="lf-reference-pair"\s+aria-label="岗位信息与招聘会">/, '岗位信息与招聘会放入同一 lf-reference-pair')
+expectMatches(homePage, /<div\s+className="lf-reference-pair"\s+aria-label="面试训练与政策服务">/, '面试训练与政策服务放入同一 lf-reference-pair')
 expectMatches(home, /className="lf-reference-group-head">\s*<span\s+className=\{`home-reference-icon/, '每个服务分组头的图标容器是第一个直接子元素')
 expectMatches(home, /<button\b[\s\S]{0,180}className="lf-reference-primary"[^>]*>\s*<span\s+className=\{`home-reference-icon/, '每个服务主入口的图标容器是第一个直接子元素')
+
+for (const title of ['AI简历诊断', 'AI简历优化', '全部岗位', '社会招聘会', '校园招聘会', '文档打印', '纸质扫描', '模拟面试']) {
+  expectMatches(
+    groupsBlock,
+    new RegExp(`\\{[^{}]*title:\\s*'${escapeRegExp(title)}'[^{}]*emphasis:\\s*'primary'[^{}]*\\}`),
+    `4188 主入口语义由 serviceGroups 数据声明：${title}`,
+  )
+}
+for (const title of ['就业政策', '社保指南', '档案 / 登记']) {
+  const item = groupsBlock.match(new RegExp(`\\{[^{}]*title:\\s*'${escapeRegExp(title)}'[^{}]*\\}`))?.[0] ?? ''
+  expect(item.length > 0 && !/emphasis:\s*'primary'/.test(item), `政策入口保持次入口语义：${title}`)
+}
+for (const [id, layout] of [
+  ['resume', 'wide'],
+  ['jobs', 'half'],
+  ['job-fairs', 'half'],
+  ['print-scan', 'wide'],
+  ['interview', 'half'],
+  ['policy', 'half'],
+]) {
+  expectMatches(
+    groupsBlock,
+    new RegExp(`id:\\s*'${id}'[\\s\\S]{0,220}?layout:\\s*'${layout}'`),
+    `服务组 ${id} 使用 4188 ${layout} 分栏语义`,
+  )
+}
+expectMatches(home, /group\.tiles\.filter\(\(tile\) => tile\.emphasis === 'primary'\)/, '首页按 serviceGroups emphasis 过滤主入口')
+expectMatches(home, /group\.tiles\.filter\(\(tile\) => tile\.emphasis !== 'primary'\)/, '首页按 serviceGroups emphasis 过滤次入口')
 
 expect(!services.includes('.khome .service-quick-nav'), '服务 CSS 已移除旧胶囊分类导航')
 expect(!services.includes('.khome .service-catalog-group'), '服务 CSS 已移除旧大圆角服务组')
@@ -714,13 +757,36 @@ expect(!services.includes('.khome .service-catalog-tile'), '服务 CSS 已移除
 expect(!cssRule(services, '.khome .sec-head'), '服务 CSS 不再定义旧 sec-head 布局合同')
 expect(!cssRule(services, '.khome .home-grid'), '服务 CSS 不再定义旧 home-grid 布局合同')
 expect(!cssRule(responsive, '.khome .home-grid'), '响应式 CSS 不再保留旧 home-grid 尺寸合同')
-expectMatches(cssRule(services, '.khome .home-service-catalog'), /display:\s*grid[\s\S]*?gap:\s*16px/, '服务目录按 4188 面板留白排列')
+expectMatches(cssRule(services, '.khome .home-service-catalog'), /display:\s*grid[\s\S]*?gap:\s*26px/, '服务目录按 4188 的 26px 面板留白排列')
 expectMatches(cssRule(services, '.khome .home-reference-panel'), /min-width:\s*0/, '首页特有面板限制最小宽度避免横向溢出')
-expectMatches(services, /\.khome \.home-reference-dual,[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, 'AI 简历主入口保持桌面两列')
+expectMatches(cssRule(services, '.khome .home-reference-primary-list'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)[\s\S]*?gap:\s*12px[\s\S]*?margin:\s*0 20px 12px/, '主入口保持两列、12px 间距并内缩 20px')
+expectMatches(cssRule(services, '.khome .home-reference-secondary-list'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '有主入口时次入口按原型保持两列')
+expectMatches(cssRule(services, '.khome .home-reference-secondary-list--only'), /grid-template-columns:\s*1fr/, '无主入口的政策服务使用单列行式次入口')
 expect(!/box-shadow\s*:/.test(cssRule(services, '.khome .home-reference-panel')), '首页服务面板不使用大投影')
 
-expectMatches(cssRule(compact390, '.khome .home-reference-dual'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '390px AI 主入口保持两列可触达')
-expectMatches(cssRule(compact390, '.khome .home-reference-secondary-pair'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '390px AI 次入口保持两列')
+expectMatches(cssRule(shell, '.khome'), /width:\s*min\(1080px,\s*100%\)[\s\S]*?margin:\s*0 auto/, '首页使用 1080px 居中外壳')
+expectMatches(cssRule(services, '.khome .home-service-track'), /width:\s*min\(980px,\s*calc\(100% - 100px\)\)[\s\S]*?margin:\s*0 auto/, '首页下半服务区使用约 980px 内容轨')
+
+expect(!/\.kassist|\.kprofile/.test(referenceServiceNavCss), '分类导航共享 CSS 只作用于首页 .khome')
+expect(!/\.kassist|\.kprofile/.test(referenceLayoutCss), '目录布局共享 CSS 只作用于首页 .khome')
+expectMatches(referenceServiceNav, /import\s*\{\s*useLocation,\s*useNavigate\s*\}\s*from\s*['"]react-router-dom['"]/, '分类导航读取当前 location')
+expectMatches(referenceServiceNav, /const\s*\{\s*hash\s*\}\s*=\s*useLocation\(\)/, '分类导航从 useLocation 读取 hash')
+expectMatches(referenceServiceNav, /aria-current=\{hash === item\.hash \? 'location' : undefined\}/, '分类导航用 aria-current 提供 active 反馈')
+expectMatches(cssRule(referenceServiceNavCss, '.khome .reference-service-nav'), /position:\s*sticky[\s\S]*?top:\s*var\(--home-sticky-top,[^)]*\)[\s\S]*?grid-template-columns:\s*repeat\(6,[\s\S]*?z-index:\s*20/, '分类导航为六项 sticky 导航')
+expectMinimumHeight(referenceServiceNavCss, '.khome .reference-service-nav button', 56, '分类导航按钮')
+expectMatches(cssRule(referenceServiceNavCss, ".khome .reference-service-nav button[aria-current='location']"), /color:\s*var\(--home-primary\)/, '分类导航 active 使用当前 LightFlow 主色 token')
+expectMatches(cssRule(referenceServiceNavCss, '@media (max-width: 760px)'), /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/, '<=760px 分类导航切为三列')
+
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-panel'), /scroll-margin-top:\s*112px/, '服务分组保留 112px sticky 导航滚动余量')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-group-head'), /min-block-size:\s*72px[\s\S]*?background:\s*transparent/, '分组头为 72px 透明行')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-group-head > :first-child'), /inline-size:\s*56px[\s\S]*?block-size:\s*56px[\s\S]*?border-radius:\s*12px/, '分组图标 56px 且 radius 12px')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-primary'), /min-block-size:\s*104px[\s\S]*?border-radius:\s*12px/, '主入口 104px 且 radius 12px')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-primary > :first-child'), /inline-size:\s*58px[\s\S]*?block-size:\s*58px[\s\S]*?border-radius:\s*12px/, '主入口图标 58px 且 radius 12px')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-secondary'), /min-block-size:\s*88px/, '次入口使用 88px 行式布局')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-secondary > :first-child'), /inline-size:\s*52px[\s\S]*?block-size:\s*52px[\s\S]*?border-radius:\s*12px/, '次入口图标 52px 且 radius 12px')
+expectMatches(cssRule(referenceLayoutCss, '.khome .lf-reference-pair'), /gap:\s*26px/, '并排服务组使用 26px 间距')
+expectMatches(cssRule(referenceLayoutCss, '@media (max-width: 760px)'), /\.khome \.lf-reference-pair\s*\{[^}]*grid-template-columns:\s*1fr[\s\S]*?\.khome \.lf-reference-primary-list,[\s\S]*?grid-template-columns:\s*1fr/, '<=760px 服务组与动作均切为单列')
+expectMatches(cssRule(referenceLayoutCss, '@media (max-width: 520px)'), /scroll-margin-top:\s*168px/, '<=520px 服务分组增加 sticky 导航滚动余量')
 
 expectMatches(
   home,
@@ -792,15 +858,16 @@ expectMatches(homePage, /<IdentityPanel \/>\s*<ContinuePanel \/>/, 'HomePage 直
 expectMatches(toolboxSection, /const config = useToolboxConfig\(\)/, '百宝箱读取真实终端配置 hook')
 expectMatches(toolboxSection, /const items = config\.enabled \? \[\.\.\.\(config\.items \?\? \[\]\)\]\.sort\(\(a, b\) => a\.sortOrder - b\.sortOrder\) : \[\]/, '百宝箱条目由真实配置开关与排序生成')
 expectMatches(toolboxSection, /if \(!config\.enabled\) return null\s*\n\s*return \(/, '百宝箱仅在真实配置启用时进入渲染')
-expectMatches(toolboxSection, /\{items\.length > 0 \? \([\s\S]*?\{items\.map\([\s\S]*?<ToolboxItemButton[\s\S]*?<\/div>\s*\) : \([\s\S]*?<strong>待配置<\/strong>/, '百宝箱真实条目与受控空态均在可达 JSX 分支')
+expectMatches(toolboxSection, /className="home-extension-group"[\s\S]*?\{items\.length > 0 \? \([\s\S]*?\{items\.map\([\s\S]*?<ToolboxExtensionButton[\s\S]*?<\/div>\s*\) : \([\s\S]*?<strong>待配置<\/strong>/, '百宝箱真实条目与受控空态均使用扁平横向扩展行')
+expect(!/cat-card|sub-grid|className="sub/.test(toolboxSection), '百宝箱不再使用旧 cat-card/sub 卡墙')
 
 expectMatches(smartCampusSection, /const config = useSmartCampusConfig\(\)/, '智慧校园读取真实终端配置 hook')
 expectMatches(smartCampusSection, /\.filter\(\(key\) => config\.modules\[key\]\)[\s\S]*?const campusItems = \[\.\.\.\(config\.items \?\? \[\]\)\]\.sort/, '智慧校园入口由真实模块与投放条目生成')
 expectMatches(smartCampusSection, /if \(!config\.enabled \|\| \(enabledTiles\.length === 0 && campusItems\.length === 0\)\) return null\s*\n\s*return \(/, '智慧校园仅在启用且有真实入口时进入渲染')
-expectMatches(smartCampusSection, /enabledTiles\.map\(\(tile\) => \([\s\S]*?<ServiceTileButton[\s\S]*?campusItems\.map\(\(item\) => \([\s\S]*?<ToolboxItemButton/, '智慧校园可达 JSX 映射真实模块与投放条目')
-expectMatches(smartCampusSection, /<ServiceTileButton\s+key=\{tile\.title\}\s+tile=\{tile\}\s+accent="slate"\s*\/>/, '智慧校园保留原服务磁贴样式，不启用首页目录变体')
+expectMatches(smartCampusSection, /className="home-extension-group"[\s\S]*?enabledTiles\.map\(\(tile\) => \([\s\S]*?<ExtensionServiceButton[\s\S]*?campusItems\.map\(\(item\) => \([\s\S]*?<ToolboxExtensionButton/, '智慧校园可达 JSX 映射真实模块与投放条目为扁平横向扩展行')
+expect(!/cat-card|sub-grid|className="sub/.test(smartCampusSection), '智慧校园不再使用旧 cat-card/sub 卡墙')
 expectMatches(homePage, /<ToolboxSection \/>\s*<SmartCampusHorizontalSection \/>/, 'HomePage 直接按顺序渲染百宝箱与智慧校园')
-expectMatches(homePage, /useInkRipple\('\.khome \.sub, \.khome \.btn, \.khome \.id-stat'\)/, '首页可达组件保留触控涟漪绑定')
+expectMatches(homePage, /useInkRipple\('\.khome \.lf-reference-primary, \.khome \.lf-reference-secondary, \.khome \.home-extension-action, \.khome \.btn, \.khome \.id-stat'\)/, '首页可达目录按钮与扩展行保留触控涟漪绑定')
 expectMatches(homePage, /岗位和招聘会仅作为第三方 \/ 官方来源信息入口，投递与预约请前往来源平台完成。/, '首页可达组件保留合规脚注')
 
 for (const [key, label] of [['home', '首页'], ['assistant', 'AI助手'], ['profile', '我的']]) {

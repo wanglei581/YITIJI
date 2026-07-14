@@ -67,6 +67,26 @@ expectIncludes(
   '数字人未启用',
   'assistant page warns in dev when voice mode is not enabled',
 )
+expectIncludes(
+  assistantPage,
+  'const LazyCallPanel = USE_VOICE_CALL',
+  'assistant page keeps the feature-gated lazy call panel',
+)
+expectIncludes(
+  assistantPage,
+  "import('./AssistantCallPanel')",
+  'assistant page lazy-loads the call panel instead of eagerly importing TRTC UI',
+)
+expectMatches(
+  assistantPage,
+  /voiceAvailable\s*&&[\s\S]*?className="assistant-tool-button assistant-voice-trigger"/,
+  'assistant composer only exposes the voice trigger when the feature gate is enabled',
+)
+expectMatches(
+  assistantPage,
+  /voiceAvailable\s*&&\s*callActive\s*&&\s*LazyCallPanel/,
+  'assistant only mounts the real call panel after the gated voice action is selected',
+)
 
 const scripts = kioskPkg.scripts ?? {}
 if (scripts['dev:trtc']?.includes('VITE_USE_TRTC_CALL=true')) {

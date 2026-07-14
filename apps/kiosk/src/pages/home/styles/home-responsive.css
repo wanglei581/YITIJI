@@ -10,7 +10,7 @@
 }
 
 @media (max-width: 900px) {
-  .khome { padding-bottom: 28px; }
+  .khome { --home-sticky-top: 76px; padding-bottom: 28px; }
   .khome .khome-inner { width: min(100% - 32px, 720px); }
   .khome .k-top { min-height: 76px; padding: 12px 18px; }
   .khome .k-brand { font-size: 18px; }
@@ -22,9 +22,18 @@
   .khome .id-stats { order: 3; width: 100%; margin: 6px 0 0; justify-content: space-between; }
   .khome .id-stat { flex: 1; min-width: 0; }
   .khome .id-actions { margin-left: auto; }
-  .khome .cat-card.span2 { grid-column: auto; }
-  .khome .sub-grid,
-  .khome .cat-card.span2 .sub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 760px) {
+  .khome .home-service-track { width: calc(100% - 44px); }
+}
+
+@media (max-width: 520px) {
+  .khome .home-service-track { width: calc(100% - 28px); }
+  .khome .home-service-catalog { gap: 18px; }
+  .khome .home-reference-panel { scroll-margin-top: 168px; }
+  .khome .home-extension-heading,
+  .khome .home-extension-action { padding-inline: 14px; }
 }
 
 @media (max-width: 500px) {
@@ -34,7 +43,9 @@
 }
 
 @media (width: 390px) {
+  .khome { --home-sticky-top: 70px; }
   .khome .khome-inner { width: calc(100% - 24px); }
+  .khome .home-service-track { width: calc(100% - 28px); }
   .khome .k-top { min-height: 70px; padding: 10px 12px; gap: 10px; }
   .khome .k-brand { font-size: 16px; }
   .khome .k-device-status { min-height: 42px; padding: 0 9px; font-size: 11px; }
@@ -52,23 +63,12 @@
   .khome .continue { margin-inline: 4px; padding: 16px; flex-wrap: wrap; }
   .khome .continue .c-icon { width: 48px; height: 48px; }
   .khome .continue .btn { width: 100%; }
-  .khome .reference-service-nav { margin-top: 18px; }
-  .khome .home-service-catalog { gap: 12px; }
-  .khome .home-reference-dual { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .khome .home-reference-secondary-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .khome .home-reference-group-copy strong { font-size: 17px; }
-  .khome .home-reference-entry-copy strong { font-size: 14px; }
-  .khome .home-reference-entry-copy span { font-size: 11px; }
-  .khome .cat-card { padding: 19px; border-radius: 22px; }
-  .khome .cat-head { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
-  .khome .cat-icon { width: 50px; height: 50px; border-radius: 15px; }
-  .khome .cat-title h3 { font-size: 19px; }
-  .khome .cat-title p { font-size: 12px; }
-  .khome .cat-badge { margin-left: 62px; }
-  .khome .sub-grid,
-  .khome .cat-card.span2 .sub-grid { grid-template-columns: 1fr 1fr !important; gap: 9px; }
-  .khome .sub { min-height: 90px; padding: 13px; }
-  .khome .sub .label { font-size: 14px; }
+  .khome .home-reference-group-copy strong { font-size: 22px; }
+  .khome .home-reference-entry-copy strong { font-size: 16px; }
+  .khome .home-reference-entry-copy span { font-size: 12px; }
+  .khome .home-extension-copy strong { font-size: 17px; }
+  .khome .home-extension-copy span { font-size: 12px; }
+  .khome .home-extension-badge { display: none; }
   .khome .compliance { align-items: flex-start; padding: 14px; font-size: 12px; text-align: left; }
 }
 
@@ -77,18 +77,19 @@
 }
 
 @media (width: 390px) and (max-height: 700px) {
+  .khome { --home-sticky-top: 0px; }
   .khome .k-top { position: relative; }
   .khome .service-value { padding-block: 20px; }
 }
 
 @media (width: 1080px) and (height: 1920px) {
+  .khome { --home-sticky-top: 96px; }
   .khome .khome-inner { width: min(984px, calc(100% - 64px)); }
+  .khome .home-service-track { width: 980px; }
   .khome .k-top { min-height: 96px; padding-inline: 48px; }
   .khome .service-value { min-height: 280px; margin-top: 30px; padding: 48px 54px; }
   .khome .service-value h1 { font-size: 54px; }
   .khome .identity { margin-inline: 20px; }
-  .khome .cat-card { padding: 28px; }
-  .khome .sub { min-height: 102px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

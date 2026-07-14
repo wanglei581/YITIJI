@@ -15,7 +15,7 @@ import type {
   MemberResumeItem,
   SmartCampusModuleKey,
 } from '@ai-job-print/shared'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
@@ -213,9 +213,7 @@ function IdentityPanel() {
   )
 }
 
-function ServiceTileButton({
-  tile, accent,
-}: { tile: ServiceTile; accent: Accent }) {
+function ExtensionServiceButton({ tile }: { tile: ServiceTile }) {
   const navigate = useNavigate()
   const disabled = tile.disabled || !tile.to
 
@@ -224,16 +222,19 @@ function ServiceTileButton({
       type="button"
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
-      className={['sub', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      className="home-extension-action"
     >
-      <span className="si">
+      <span className="home-extension-icon">
         <KIcon name={tile.icon} />
       </span>
-      <span className="label">{tile.title}</span>
+      <span className="home-extension-copy">
+        <strong>{tile.title}</strong>
+        {tile.description && <span>{tile.description}</span>}
+      </span>
       {disabled ? (
-        <span className="soon">即将上线</span>
+        <span className="home-reference-state">即将上线</span>
       ) : (
-        <span className="arrow">
+        <span className="home-reference-arrow">
           <KIcon name="arrow" />
         </span>
       )}
@@ -245,12 +246,6 @@ function findServiceGroup(id: string): ServiceGroup {
   const group = SERVICE_GROUPS.find((candidate) => candidate.id === id)
   if (!group) throw new Error(`Missing service group: ${id}`)
   return group
-}
-
-function findServiceTile(group: ServiceGroup, title: string): ServiceTile {
-  const tile = group.tiles.find((candidate) => candidate.title === title)
-  if (!tile) throw new Error(`Missing ${group.id} service tile: ${title}`)
-  return tile
 }
 
 function ReferenceGroupHead({ group, headingId }: { group: ServiceGroup; headingId: string }) {
@@ -337,32 +332,35 @@ function ReferenceSecondaryButton({ tile, accent }: { tile: ServiceTile; accent:
 }
 
 function ReferenceServicePanel({
-  id,
   group,
-  children,
 }: {
-  id: string
   group: ServiceGroup
-  children: ReactNode
 }) {
+  const primary = group.tiles.filter((tile) => tile.emphasis === 'primary')
+  const secondary = group.tiles.filter((tile) => tile.emphasis !== 'primary')
+
   return (
-    <section id={id} className="lf-reference-panel home-reference-panel" aria-labelledby={`${id}-title`}>
-      <ReferenceGroupHead group={group} headingId={`${id}-title`} />
-      {children}
+    <section
+      id={group.id}
+      className={`lf-reference-panel home-reference-panel home-reference-panel--${group.layout}`}
+      aria-labelledby={`${group.id}-title`}
+    >
+      <ReferenceGroupHead group={group} headingId={`${group.id}-title`} />
+      {primary.length > 0 && (
+        <div className="home-reference-primary-list">
+          {primary.map((tile) => (
+            <ReferencePrimaryButton key={tile.title} tile={tile} accent={group.accent} />
+          ))}
+        </div>
+      )}
+      {secondary.length > 0 && (
+        <div className={`home-reference-secondary-list ${primary.length === 0 ? 'home-reference-secondary-list--only' : ''}`.trim()}>
+          {secondary.map((tile) => (
+            <ReferenceSecondaryButton key={tile.title} tile={tile} accent={group.accent} />
+          ))}
+        </div>
+      )}
     </section>
-  )
-}
-
-function StandardReferencePanel({ id, group }: { id: string; group: ServiceGroup }) {
-  const [primary, ...secondary] = group.tiles
-
-  return (
-    <ReferenceServicePanel id={id} group={group}>
-      <ReferencePrimaryButton tile={primary} accent={group.accent} />
-      <div className="home-reference-secondary-list">
-        {secondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={group.accent} />)}
-      </div>
-    </ReferenceServicePanel>
   )
 }
 
@@ -466,7 +464,7 @@ function ContinuePanel() {
   )
 }
 
-/* ── 智慧校园（整行 cat-card；后台开关联动，关闭不渲染，逻辑不变） ── */
+/* ── 智慧校园（扁平横向扩展行；后台开关联动，关闭不渲染，逻辑不变） ── */
 // 校园大数据（bigdata）本期严格冻结：不在此列出入口卡，后端开关亦强制 false。
 const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile>> = {
   welcome: {
@@ -504,34 +502,28 @@ function SmartCampusHorizontalSection() {
 
   return (
     <>
-      <section className="cat-card span2">
-        <div
-          className="cat-head tap"
-          role="button"
-          tabIndex={0}
+      <section className="home-extension-group">
+        <button
+          type="button"
+          className="home-extension-heading"
           onClick={() => navigate('/smart-campus')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') navigate('/smart-campus')
-          }}
         >
-          <span className="cat-icon slate">
+          <span className="home-extension-icon">
             <KIcon name="campus" />
           </span>
-          <div className="cat-title">
-            <h3>智慧校园</h3>
-            <p>学校专属服务专区，仅校园终端开启时显示</p>
-          </div>
-          <span className="cat-badge">
-            <KIcon name="check" />
-            学校端已开启
+          <span className="home-extension-copy">
+            <strong>智慧校园</strong>
+            <span>学校专属服务专区，仅校园终端开启时显示</span>
           </span>
-        </div>
-        <div className="sub-grid">
+          <span className="home-extension-badge">学校端已开启</span>
+          <span className="home-reference-arrow"><KIcon name="arrow" /></span>
+        </button>
+        <div className="home-extension-list">
           {enabledTiles.map((tile) => (
-            <ServiceTileButton key={tile.title} tile={tile} accent="slate" />
+            <ExtensionServiceButton key={tile.title} tile={tile} />
           ))}
           {campusItems.map((item) => (
-            <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} accent="blue" />
+            <ToolboxExtensionButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
           ))}
         </div>
       </section>
@@ -541,7 +533,7 @@ function SmartCampusHorizontalSection() {
   )
 }
 
-/* ── 百宝箱（终端配置驱动；逻辑不变，视觉换 cat-card/sub 语汇） ── */
+/* ── 百宝箱（终端配置驱动；逻辑不变，使用扁平横向扩展行） ── */
 const TOOLBOX_ICONS: Record<string, KioskIconName> = {
   wrench: 'toolbox',
   'file-text': 'files',
@@ -612,16 +604,14 @@ function itemBadge(item: KioskToolboxItem): string | null {
   return null
 }
 
-function ToolboxItemButton({
+function ToolboxExtensionButton({
   item,
   onQr,
   onExternal,
-  accent = 'slate',
 }: {
   item: KioskToolboxItem
   onQr: (item: KioskToolboxItem) => void
   onExternal: (item: KioskToolboxItem) => void
-  accent?: 'slate' | 'blue'
 }) {
   const navigate = useNavigate()
   const disabled = item.disabled || !itemLaunchable(item)
@@ -632,17 +622,20 @@ function ToolboxItemButton({
       type="button"
       disabled={disabled}
       onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
-      className={['sub', accent === 'blue' ? 'slate' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      className="home-extension-action"
       title={item.description}
     >
-      <span className="si">
+      <span className="home-extension-icon">
         <KIcon name={TOOLBOX_ICONS[item.icon] ?? 'toolbox'} />
       </span>
-      <span className="label">{item.title}</span>
+      <span className="home-extension-copy">
+        <strong>{item.title}</strong>
+        <span>{item.description}</span>
+      </span>
       {badge ? (
-        <span className="soon">{badge}</span>
+        <span className="home-reference-state">{badge}</span>
       ) : (
-        <span className="arrow">
+        <span className="home-reference-arrow">
           <KIcon name="arrow" />
         </span>
       )}
@@ -662,28 +655,25 @@ function ToolboxSection() {
 
   return (
     <>
-      <section className="cat-card span2">
-        <div className="cat-head">
-          <span className="cat-icon tool">
+      <section className="home-extension-group">
+        <div className="home-extension-heading">
+          <span className="home-extension-icon">
             <KIcon name="toolbox" />
           </span>
-          <div className="cat-title">
-            <h3>百宝箱</h3>
-            <p>本机已配置的扩展服务，经审核后上架</p>
-          </div>
-          <span className="cat-badge muted">
-            <KIcon name="shield" />
-            已审核
+          <span className="home-extension-copy">
+            <strong>百宝箱</strong>
+            <span>本机已配置的扩展服务，经审核后上架</span>
           </span>
+          <span className="home-extension-badge">已审核</span>
         </div>
         {items.length > 0 ? (
-          <div className="sub-grid">
+          <div className="home-extension-list">
             {items.map((item) => (
-              <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
+              <ToolboxExtensionButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
             ))}
           </div>
         ) : (
-          <div className="cat-empty">
+          <div className="home-extension-empty">
             <strong>待配置</strong>
             <p>后续功能上线后将在这里展示。</p>
           </div>
@@ -697,7 +687,7 @@ function ToolboxSection() {
 
 export function HomePage() {
   const { hash } = useLocation()
-  useInkRipple('.khome .sub, .khome .btn, .khome .id-stat')
+  useInkRipple('.khome .lf-reference-primary, .khome .lf-reference-secondary, .khome .home-extension-action, .khome .btn, .khome .id-stat')
 
   useEffect(() => {
     const targetId = hash.startsWith('#') ? hash.slice(1) : ''
@@ -711,10 +701,6 @@ export function HomePage() {
   const printScanGroup = findServiceGroup('print-scan')
   const interviewGroup = findServiceGroup('interview')
   const policyGroup = findServiceGroup('policy')
-  const [resumeDiagnosis, resumeOptimization, ...resumeSecondary] = resumeGroup.tiles
-  const allJobs = findServiceTile(jobsGroup, '全部岗位')
-  const jobSecondary = jobsGroup.tiles.filter((tile) => tile !== allJobs)
-  const [socialJobFair, ...jobFairSecondary] = jobFairsGroup.tiles
 
   return (
     <div className="khome">
@@ -728,38 +714,26 @@ export function HomePage() {
         </section>
         <IdentityPanel />
         <ContinuePanel />
-        <ReferenceServiceNav />
+      </div>
 
+      <ReferenceServiceNav />
+
+      <div className="home-service-track">
         <main className="home-service-catalog" aria-label="当前可使用功能">
-          <ReferenceServicePanel id="resume" group={resumeGroup}>
-            <div className="home-reference-dual">
-              <ReferencePrimaryButton tile={resumeDiagnosis} accent={resumeGroup.accent} />
-              <ReferencePrimaryButton tile={resumeOptimization} accent={resumeGroup.accent} />
-            </div>
-            <div className="home-reference-secondary-pair">
-              {resumeSecondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={resumeGroup.accent} />)}
-            </div>
-          </ReferenceServicePanel>
+          <ReferenceServicePanel group={resumeGroup} />
 
           <div className="lf-reference-pair" aria-label="岗位信息与招聘会">
-            <ReferenceServicePanel id="jobs" group={jobsGroup}>
-              <ReferencePrimaryButton tile={allJobs} accent={jobsGroup.accent} />
-              <div className="home-reference-secondary-list">
-                {jobSecondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={jobsGroup.accent} />)}
-              </div>
-            </ReferenceServicePanel>
-
-            <ReferenceServicePanel id="job-fairs" group={jobFairsGroup}>
-              <ReferencePrimaryButton tile={socialJobFair} accent={jobFairsGroup.accent} />
-              <div className="home-reference-secondary-list">
-                {jobFairSecondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={jobFairsGroup.accent} />)}
-              </div>
-            </ReferenceServicePanel>
+            <ReferenceServicePanel group={jobsGroup} />
+            <ReferenceServicePanel group={jobFairsGroup} />
           </div>
 
-          <StandardReferencePanel id="print-scan" group={printScanGroup} />
-          <StandardReferencePanel id="interview" group={interviewGroup} />
-          <StandardReferencePanel id="policy" group={policyGroup} />
+          <ReferenceServicePanel group={printScanGroup} />
+
+          <div className="lf-reference-pair" aria-label="面试训练与政策服务">
+            <ReferenceServicePanel group={interviewGroup} />
+            <ReferenceServicePanel group={policyGroup} />
+          </div>
+
           <ToolboxSection />
           <SmartCampusHorizontalSection />
         </main>

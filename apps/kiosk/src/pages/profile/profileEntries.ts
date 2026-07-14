@@ -15,49 +15,50 @@ const ASSETS: Entry[] = [
 
 // 2. 常用服务（均跳转既有功能页）
 const SERVICES: Entry[] = [
-  { icon: 'sparkle', tone: 'teal', label: 'AI简历服务', route: '/resume/source' },
-  { icon: 'book', tone: 'plum', label: '简历模板', route: '/resume/templates' },
-  { icon: 'printer', tone: 'slate', label: '文档打印', route: '/print/upload' },
-  { icon: 'swap', tone: 'ink', label: '打印扫描', route: '/print-scan' },
-  { icon: 'scan', tone: 'slate', label: '扫描文件', route: '/scan/start' },
-  { icon: 'briefcase', tone: 'clay', label: '岗位信息', route: '/jobs' },
-  { icon: 'fair', tone: 'wheat', label: '招聘会', route: '/job-fairs' },
-  { icon: 'robot', tone: 'teal', label: 'AI助手', route: '/assistant' },
+  { icon: 'sparkle', tone: 'teal', label: 'AI简历服务', desc: '诊断与优化', route: '/resume/source' },
+  { icon: 'book', tone: 'plum', label: '简历模板', desc: '选择正式模板', route: '/resume/templates' },
+  { icon: 'printer', tone: 'slate', label: '文档打印', desc: '上传与参数设置', route: '/print/upload' },
+  { icon: 'swap', tone: 'ink', label: '打印扫描', desc: '查看服务中心', route: '/print-scan' },
+  { icon: 'scan', tone: 'slate', label: '扫描文件', desc: '进入扫描流程', route: '/scan/start' },
+  { icon: 'briefcase', tone: 'clay', label: '岗位信息', desc: '第三方或官方来源', route: '/jobs' },
+  { icon: 'fair', tone: 'wheat', label: '招聘会', desc: '第三方或官方场次', route: '/job-fairs' },
+  { icon: 'robot', tone: 'teal', label: 'AI助手', desc: '文字与语音咨询', route: '/assistant' },
 ]
 
 // 3. 来源与活动（外部来源信息入口 / 记录）
 // 浏览 / 外部跳转记录跨类型（岗位/招聘会/政策/企业），由 /me/activity 两 Tab 页承载。
 // 来源平台后续动作与结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
-  { icon: 'eye', tone: 'slate', label: '浏览记录', route: '/me/activity' },
-  { icon: 'external', tone: 'teal', label: '外部跳转记录', route: '/me/activity?tab=jump' },
-  { icon: 'qr', tone: 'plum', label: '招聘会扫码凭证', tag: '建设中' },
-  { icon: 'ticket', tone: 'rose', label: '权益活动', route: '/activities?source=fair' },
+  { icon: 'eye', tone: 'slate', label: '浏览记录', desc: '岗位、招聘会、政策、企业', route: '/me/activity' },
+  { icon: 'external', tone: 'teal', label: '外部跳转记录', desc: '本人离场跳转记录', route: '/me/activity?tab=jump' },
+  { icon: 'qr', tone: 'plum', label: '招聘会扫码凭证', desc: '尚未开放，不能办理', tag: '建设中' },
+  { icon: 'ticket', tone: 'rose', label: '权益活动', desc: '从招聘会场景进入', route: '/activities?source=fair' },
 ]
 
 // 4. 权益活动与服务套餐（均建设中，不接支付）
 const BENEFITS: Entry[] = [
-  { icon: 'ticket', tone: 'rose', label: '权益活动', route: '/activities' },
-  { icon: 'receipt', tone: 'wheat', label: '求职打印套餐', tag: '建设中' },
-  { icon: 'sparkle', tone: 'plum', label: 'AI服务套餐', tag: '建设中' },
+  { icon: 'ticket', tone: 'rose', label: '权益活动', desc: '查看正式活动入口', route: '/activities' },
+  { icon: 'receipt', tone: 'wheat', label: '求职打印套餐', desc: '尚未开放，不能办理', tag: '建设中' },
+  { icon: 'sparkle', tone: 'plum', label: 'AI服务套餐', desc: '尚未开放，不能办理', tag: '建设中' },
   // 政策补贴指引：跳转既有政策服务页「就业政策」Tab（info-only 政策说明 / 材料清单 / 官方入口），不代办、不承诺到账。
-  { icon: 'policy', tone: 'wheat', label: '政策补贴指引', route: '/renshi?tab=policy' },
+  { icon: 'policy', tone: 'wheat', label: '政策补贴指引', desc: '政策说明与官方入口', route: '/renshi?tab=policy' },
 ]
 
 // 5. 账户与支持（已接线入口直达本人消息、账号、帮助与反馈）
 const ACCOUNT: Entry[] = [
-  { icon: 'bell', tone: 'ink', label: '消息通知', route: '/me/notifications' },
+  { icon: 'bell', tone: 'ink', label: '消息通知', desc: '查看本人消息', route: '/me/notifications' },
   // 账号设置轻量版：登录/游客状态、脱敏手机号、会话说明、协议入口、退出登录；不做换绑/注销。
-  { icon: 'settings', tone: 'ink', label: '账号设置', route: '/me/settings' },
+  { icon: 'settings', tone: 'ink', label: '账号设置', desc: '登录状态与会话说明', route: '/me/settings' },
   // 身份切换 = 退出当前账号后重新登录（不做多角色系统）；统一收口到账号设置页操作，避免数据串号。
-  { icon: 'swap', tone: 'ink', label: '身份切换', route: '/me/settings' },
-  { icon: 'help', tone: 'ink', label: '帮助中心', route: '/help' },
-  { icon: 'feedback', tone: 'ink', label: '意见反馈', route: '/me/feedback' },
+  { icon: 'swap', tone: 'ink', label: '身份切换', desc: '退出后重新登录', route: '/me/settings' },
+  { icon: 'help', tone: 'ink', label: '帮助中心', desc: '使用说明与服务边界', route: '/help' },
+  { icon: 'feedback', tone: 'ink', label: '意见反馈', desc: '提交本人服务反馈', route: '/me/feedback' },
 ]
 
 export const SECTIONS: EntrySectionData[] = [
   { title: '我的资产', subtitle: '本人简历、文档、订单与收藏。', layout: 'grid', rail: 'teal', entries: ASSETS },
   { title: '常用服务', subtitle: '直达既有功能页。', layout: 'chips', rail: 'slate', entries: SERVICES },
-  { title: '来源与活动', subtitle: '外部来源信息入口与本人记录。', layout: 'chips', rail: 'wheat', entries: [...FAIRS, ...BENEFITS] },
-  { title: '账户与支持', subtitle: '消息、设置与帮助入口。', layout: 'account', rail: 'teal', entries: ACCOUNT },
+  { title: '招聘会与活动', subtitle: '外部来源信息入口与本人记录。', layout: 'chips', rail: 'wheat', entries: FAIRS },
+  { title: '权益活动与服务套餐', subtitle: '权益活动可进入；两类服务套餐建设中。', layout: 'chips', rail: 'plum', entries: BENEFITS },
+  { title: '账户与支持', subtitle: '本人消息、账号、帮助与反馈入口。', layout: 'account', rail: 'teal', entries: ACCOUNT },
 ]

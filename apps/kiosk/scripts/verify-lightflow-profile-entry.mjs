@@ -130,16 +130,15 @@ expectIncludes(
   'package registers the LightFlow profile contract',
 )
 
-expectIncludes(profile, "import { ReferenceServiceNav } from '../../components/lightflow/ReferenceServiceNav'", 'ProfilePage imports the shared reference navigation')
-expectIncludes(profile, '<ReferenceServiceNav />', 'ProfilePage renders the shared navigation before its profile content')
+expectNotIncludes(profile, 'ReferenceServiceNav', 'ProfilePage removes the homepage-only reference navigation')
 expectIncludes(profile, 'className="kprofile kprofile-lightflow"', 'ProfilePage binds the LightFlow root on its page shell')
+expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage keeps an accessible-only page heading without visible 我的 copy')
 expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage groups existing entries in the compact service directory')
-expectIncludes(profile, 'className="lf-reference-pair"', 'ProfilePage pairs assets and common services in the reference layout')
-expectIncludes(profile, 'section={assetSection}', 'ProfilePage retains the my-assets section')
-expectIncludes(profile, 'section={serviceSection}', 'ProfilePage retains the common-services section')
-expectIncludes(profile, 'section={sourceActivitySection}', 'ProfilePage retains the source-and-activities section')
-expectIncludes(profile, 'section={accountSection}', 'ProfilePage retains the account-and-support section')
-expectNotIncludes(profile, '<h1>我的', 'ProfilePage does not render a visible 我的 page title')
+expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage renders all five real sections from the existing entry configuration')
+expectNotIncludes(profile, 'lf-reference-', 'ProfilePage does not reuse homepage service-card primitives')
+expectNotIncludes(header, 'lf-reference-', 'ProfileHeader does not reuse homepage service-card primitives')
+expectNotIncludes(section, 'lf-reference-', 'ProfileEntrySection does not reuse homepage service-card primitives')
+expectNotIncludes(sessionRecords, 'lf-reference-', 'ProfileSessionRecords does not reuse homepage service-card primitives')
 expectNotIncludes(header, '<h1>我的', 'ProfileHeader does not render a visible 我的 page title')
 expectIncludes(serviceDeskRouteList, "'/profile'", 'KioskRoot opts the /profile landing page into the LightFlow shell')
 expectNotIncludes(serviceDeskRouteList, "'/me'", 'KioskRoot does not opt /me/* detail routes into LightFlow')
@@ -148,20 +147,20 @@ const profileHeaderMountIndex = profile.indexOf('<ProfileHeader')
 const pendingTaskMountIndex = profile.indexOf('{isLoggedIn && hasSessionRecords && <PendingTaskBanner')
 const toastMountIndex = profile.indexOf('{toastMsg && (')
 const sessionRecordsMountIndex = profile.indexOf('{hasSessionRecords && (\n          <ProfileSessionRecords')
-const firstReferencePairIndex = profile.indexOf('<div className="lf-reference-pair">')
+const serviceDirectoryIndex = profile.indexOf('<div className="kp-service-directory">')
 expect(
   [
     profileHeaderMountIndex,
     pendingTaskMountIndex,
     toastMountIndex,
     sessionRecordsMountIndex,
-    firstReferencePairIndex,
+    serviceDirectoryIndex,
   ].every((index) => index !== -1)
     && profileHeaderMountIndex < pendingTaskMountIndex
     && pendingTaskMountIndex < toastMountIndex
     && toastMountIndex < sessionRecordsMountIndex
-    && sessionRecordsMountIndex < firstReferencePairIndex,
-  'ProfileHeader, pending task, toast, session records, and first lf-reference-pair mount in the required strict order',
+    && sessionRecordsMountIndex < serviceDirectoryIndex,
+  'ProfileHeader, pending task, toast, session records, and five-section directory mount in the required strict order',
 )
 
 for (const marker of [
@@ -185,8 +184,9 @@ for (const marker of [
   'onLogout',
   'onOpenSettings',
   'onOpenNotifications',
-  'className="lf-reference-panel kp-profile-header',
-  'className="lf-reference-group-head',
+  'className="kp-profile-header',
+  'className="kp-profile-main"',
+  'className="kp-profile-boundary"',
   'className="p-stats"',
 ]) {
   expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
@@ -194,20 +194,22 @@ for (const marker of [
 expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')
 
 for (const marker of [
-  'className="lf-reference-panel kp-section"',
-  'className="lf-reference-group-head"',
-  "'lf-reference-primary'",
-  "'lf-reference-secondary'",
-  'const [primaryEntry, ...secondaryEntries]',
+  'className="kp-section"',
+  'className="kp-section-head"',
+  'className={`kp-entry-grid kp-entry-grid--${section.layout}`}',
+  'section.entries.map((entry, index)',
+  "const disabled = entry.tag === '建设中'",
+  'disabled={disabled}',
 ]) {
   expectIncludes(section, marker, `ProfileEntrySection uses ${marker}`)
 }
+expectNotIncludes(section, 'primaryEntry', 'ProfileEntrySection keeps every entry visually equal')
 expectNotIncludes(section, 'sec-head', 'ProfileEntrySection removes the old sec-head visual shell')
 
 for (const marker of [
-  'className="lf-reference-panel kp-session-records"',
-  'className="lf-reference-group-head"',
-  'className="lf-reference-secondary kp-session-row"',
+  'className="kp-session-records"',
+  'className="kp-section-head"',
+  'className="kp-session-row"',
   'onPrintFile',
   'onDeleteResume',
   'onDeleteScan',
@@ -259,10 +261,10 @@ for (const label of ['招聘会扫码凭证', '求职打印套餐', 'AI服务套
   )
 }
 expect(countMatches(entries, /tag:\s*'建设中'/g) === 3, 'Profile entries retain exactly three construction-state tags')
-for (const title of ['我的资产', '常用服务', '来源与活动', '账户与支持']) {
+for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益活动与服务套餐', '账户与支持']) {
   expect(countMatches(entries, new RegExp(`title:\\s*'${title}'`, 'g')) === 1, `Profile entry grouping retains ${title} exactly once`)
 }
-expectIncludes(entries, 'entries: [...FAIRS, ...BENEFITS]', 'Source-and-activities groups reuse the two existing entry arrays without copying routes')
+expectNotIncludes(entries, 'entries: [...FAIRS, ...BENEFITS]', 'Profile entry grouping does not collapse the two prototype sections')
 expectNotIncludes(entries, '一键投递', 'Profile entries do not add a recruitment closed-loop label')
 expectNotIncludes(entries, '立即投递', 'Profile entries do not add a recruitment closed-loop label')
 expectNotIncludes(entries, '平台投递', 'Profile entries do not add a recruitment closed-loop label')
@@ -283,7 +285,14 @@ expectIncludes(combinedProfileCss, '--lf-blue:', 'Profile CSS defines the single
 expectIncludes(combinedProfileCss, '--lf-ink:', 'Profile CSS defines the deep navy text token')
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS retains 56px primary touch targets')
 expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS retains 48px secondary touch targets')
+expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS gives every directory entry the same 92px desktop height')
+expectMatches(
+  combinedProfileCss,
+  /@media\s*\(max-width:\s*520px\)[\s\S]*?\.kprofile\.kprofile-lightflow \.kp-entry-grid[\s\S]*?grid-template-columns:\s*1fr;/,
+  'Profile CSS collapses the equal entry grid to one column at 520px',
+)
 expectIncludes(combinedProfileCss, '@media (prefers-reduced-motion: reduce)', 'Profile CSS keeps reduced-motion support')
+expectNotIncludes(combinedProfileCss, 'lf-reference-', 'Profile CSS removes homepage service-card selectors')
 expectNotIncludes(combinedProfileCss, 'p-hero', 'Profile CSS removes the old p-hero visual shell')
 expectNotIncludes(combinedProfileCss, 'sec-head', 'Profile CSS removes the old sec-head visual shell')
 expectNotIncludes(combinedProfileCss, 'box-shadow:', 'Profile CSS does not restore large panel shadows')

@@ -21,43 +21,69 @@
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
+.kprofile.kprofile-lightflow .kprofile-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .kprofile.kprofile-lightflow .kp-inner {
   display: grid;
-  width: min(984px, calc(100% - 64px));
-  gap: 16px;
-  margin: 16px auto 0;
+  width: min(980px, calc(100% - 100px));
+  gap: 0;
+  margin: 18px auto 0;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .lf-reference-group-head {
+.kprofile.kprofile-lightflow .kp-profile-header {
+  border-bottom: 1px solid var(--lf-line);
+  color: var(--lf-ink);
+  background: transparent;
+}
+
+.kprofile.kprofile-lightflow .kp-profile-main {
+  display: grid;
+  min-block-size: 160px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 20px;
   align-items: center;
-  min-block-size: 96px;
-  padding: 16px;
+  padding: 24px 0;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-ava {
-  border: 1px solid #0877f9;
+.kprofile.kprofile-lightflow .p-ava {
+  display: grid;
+  inline-size: 72px;
+  block-size: 72px;
+  place-items: center;
+  border: 1px solid var(--lf-blue);
+  border-radius: 16px;
   color: #ffffff;
   background: var(--lf-blue);
   font-size: 23px;
   font-weight: 800;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-ava.guest {
+.kprofile.kprofile-lightflow .p-ava.guest {
+  border-color: transparent;
   color: var(--lf-blue-strong);
   background: var(--lf-blue-soft);
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-ava.guest svg {
-  inline-size: 28px;
-  block-size: 28px;
+.kprofile.kprofile-lightflow .p-ava.guest svg {
+  inline-size: 30px;
+  block-size: 30px;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-id {
+.kprofile.kprofile-lightflow .p-id {
   min-inline-size: 0;
-  flex: 1;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-kicker {
+.kprofile.kprofile-lightflow .p-kicker {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -66,121 +92,118 @@
   font-weight: 700;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-kicker .dot {
+.kprofile.kprofile-lightflow .p-kicker .dot {
   inline-size: 7px;
   block-size: 7px;
   border-radius: 50%;
   background: #1f9d77;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-name {
+.kprofile.kprofile-lightflow .p-name {
   display: block;
-  margin-block-start: 4px;
+  margin-block-start: 6px;
   color: var(--lf-ink);
-  font-size: 20px;
+  font-size: 30px;
   font-weight: 800;
-  line-height: 1.3;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-id p {
-  margin: 4px 0 0;
+.kprofile.kprofile-lightflow .p-id p {
+  margin: 6px 0 0;
   color: var(--lf-ink-muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-actions {
+.kprofile.kprofile-lightflow .p-actions {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-inline-start: auto;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-iconbtn {
+.kprofile.kprofile-lightflow .p-iconbtn {
+  position: relative;
   display: grid;
   min-inline-size: 48px;
   min-block-size: 48px;
   place-items: center;
   border: 1px solid var(--lf-line);
+  border-radius: 12px;
   color: var(--lf-ink-muted);
-  background: #ffffff;
+  background: var(--lf-surface);
   cursor: pointer;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-iconbtn svg {
+.kprofile.kprofile-lightflow .p-iconbtn svg {
   inline-size: 21px;
   block-size: 21px;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-btn {
+.kprofile.kprofile-lightflow .p-btn {
+  position: relative;
   display: inline-flex;
+  min-block-size: 56px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-block-size: 56px;
-  padding-inline: 16px;
+  padding-inline: 18px;
   border: 1px solid var(--lf-line);
+  border-radius: 12px;
   color: var(--lf-ink-muted);
-  background: #ffffff;
+  background: var(--lf-surface);
   cursor: pointer;
   font: inherit;
   font-size: 14px;
   font-weight: 750;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-btn.primary {
+.kprofile.kprofile-lightflow .p-btn.primary {
   border-color: var(--lf-blue);
   color: #ffffff;
   background: var(--lf-blue);
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-btn svg {
+.kprofile.kprofile-lightflow .p-btn svg {
   inline-size: 18px;
   block-size: 18px;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-iconbtn:hover {
-  color: var(--lf-blue);
-  background: var(--lf-blue-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-profile-header .p-btn.ghost:hover {
+.kprofile.kprofile-lightflow .p-iconbtn:hover,
+.kprofile.kprofile-lightflow .p-btn.ghost:hover {
   border-color: var(--lf-blue);
   color: var(--lf-blue);
   background: var(--lf-blue-soft);
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-btn.primary:hover {
+.kprofile.kprofile-lightflow .p-btn.primary:hover {
   background: var(--lf-blue-strong);
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-iconbtn:focus-visible {
+.kprofile.kprofile-lightflow .p-iconbtn:focus-visible,
+.kprofile.kprofile-lightflow .p-btn:focus-visible {
   outline: 2px solid var(--lf-blue);
   outline-offset: 2px;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-btn:focus-visible {
-  outline: 2px solid var(--lf-blue);
-  outline-offset: 2px;
-}
-
-.kprofile.kprofile-lightflow .kp-profile-header .p-stats {
+.kprofile.kprofile-lightflow .p-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-top: 1px solid var(--lf-line);
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-stat {
+.kprofile.kprofile-lightflow .p-stat {
   min-inline-size: 0;
   padding: 14px 16px;
   border-inline-end: 1px solid var(--lf-line);
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-stat:last-child {
+.kprofile.kprofile-lightflow .p-stat:last-child {
   border-inline-end: 0;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-stat b {
+.kprofile.kprofile-lightflow .p-stat b {
   display: block;
   color: var(--lf-ink);
   font-size: 22px;
@@ -188,11 +211,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-stat b.unloaded {
+.kprofile.kprofile-lightflow .p-stat b.unloaded {
   color: #90a1bc;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-header .p-stat span {
+.kprofile.kprofile-lightflow .p-stat span {
   display: block;
   margin-block-start: 4px;
   overflow: hidden;
@@ -202,26 +225,83 @@
   white-space: nowrap;
 }
 
-@media (max-width: 640px) {
-  .kprofile.kprofile-lightflow .kp-inner {
-    width: calc(100% - 24px);
-    gap: 12px;
-    margin-block-start: 12px;
+.kprofile.kprofile-lightflow .kp-profile-boundary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 0;
+  border-top: 1px solid var(--lf-line);
+}
+
+.kprofile.kprofile-lightflow .kp-profile-boundary > svg {
+  inline-size: 24px;
+  block-size: 24px;
+  flex: 0 0 auto;
+  color: var(--lf-blue-strong);
+}
+
+.kprofile.kprofile-lightflow .kp-profile-boundary > span {
+  display: grid;
+  gap: 3px;
+}
+
+.kprofile.kprofile-lightflow .kp-profile-boundary strong {
+  font-size: 15px;
+}
+
+.kprofile.kprofile-lightflow .kp-profile-boundary small {
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .kprofile.kprofile-lightflow .kp-profile-main {
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .kprofile.kprofile-lightflow .kp-profile-header .lf-reference-group-head {
-    display: grid;
-    grid-template-columns: 56px minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .kprofile.kprofile-lightflow .kp-profile-header .p-actions {
+  .kprofile.kprofile-lightflow .p-actions {
     grid-column: 1 / -1;
     width: 100%;
     margin-inline-start: 0;
   }
 
-  .kprofile.kprofile-lightflow .kp-profile-header .p-btn {
+  .kprofile.kprofile-lightflow .p-btn.primary {
+    flex: 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .kprofile.kprofile-lightflow .kp-inner {
+    width: calc(100% - 24px);
+    margin-block-start: 14px;
+  }
+
+  .kprofile.kprofile-lightflow .kp-profile-main {
+    min-block-size: 0;
+    gap: 13px;
+    padding: 18px 0;
+  }
+
+  .kprofile.kprofile-lightflow .p-ava {
+    inline-size: 60px;
+    block-size: 60px;
+    border-radius: 12px;
+  }
+
+  .kprofile.kprofile-lightflow .p-name {
+    font-size: 24px;
+  }
+
+  .kprofile.kprofile-lightflow .p-id p {
+    font-size: 13px;
+  }
+
+  .kprofile.kprofile-lightflow .p-actions {
+    flex-wrap: wrap;
+  }
+
+  .kprofile.kprofile-lightflow .p-btn.ghost {
     flex: 1;
   }
 }

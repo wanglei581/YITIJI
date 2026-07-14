@@ -1,46 +1,86 @@
 .kprofile.kprofile-lightflow .kp-service-directory {
   display: grid;
-  gap: 16px;
 }
 
 .kprofile.kprofile-lightflow .kp-section {
   min-inline-size: 0;
+  padding: 24px 0;
+  border-top: 1px solid var(--lf-line);
 }
 
-.kprofile.kprofile-lightflow .kp-section .lf-reference-group-head {
-  border-bottom: 1px solid var(--lf-line);
+.kprofile.kprofile-lightflow .kp-section:first-child {
+  border-top: 0;
 }
 
-.kprofile.kprofile-lightflow .kp-group-icon {
-  background: var(--lf-blue-soft);
+.kprofile.kprofile-lightflow .kp-section-head {
+  margin-block-end: 14px;
 }
 
-.kprofile.kprofile-lightflow .kp-group-icon svg {
-  inline-size: 25px;
-  block-size: 25px;
-}
-
-.kprofile.kprofile-lightflow .kp-section .lf-reference-group-head h2 {
+.kprofile.kprofile-lightflow .kp-section-head h2 {
   margin: 0;
   color: var(--lf-ink);
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 800;
+  letter-spacing: -0.02em;
   line-height: 1.3;
 }
 
-.kprofile.kprofile-lightflow .kp-section .lf-reference-group-head p {
+.kprofile.kprofile-lightflow .kp-section-head p {
   margin: 3px 0 0;
   color: var(--lf-ink-muted);
   font-size: 12px;
   line-height: 1.45;
 }
 
+.kprofile.kprofile-lightflow .kp-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
 .kprofile.kprofile-lightflow .kp-entry {
-  inline-size: 100%;
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: 92px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 12px;
+  border: 0;
+  border-top: 1px solid var(--lf-line);
+  border-radius: 0;
+  color: var(--lf-ink);
+  background: var(--lf-surface);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+
+.kprofile.kprofile-lightflow .kp-entry:not(:disabled):active {
+  transform: scale(0.985);
+}
+
+.kprofile.kprofile-lightflow .kp-entry:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--lf-blue);
+  outline-offset: -2px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry:disabled {
+  color: #7b8899;
+  background: #f2f5f9;
+  cursor: not-allowed;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-icon {
-  border: 1px solid transparent;
+  display: grid;
+  inline-size: 48px;
+  block-size: 48px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-icon svg {
@@ -48,32 +88,35 @@
   block-size: 24px;
 }
 
-.kprofile.kprofile-lightflow .lf-reference-secondary .kp-entry-icon svg {
-  inline-size: 21px;
-  block-size: 21px;
+.kprofile.kprofile-lightflow .kp-entry:disabled .kp-entry-icon {
+  color: #7b8899;
+  background: #e6ebf1;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-content {
   display: grid;
   min-inline-size: 0;
   gap: 3px;
-  flex: 1;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-content strong {
-  color: var(--lf-ink);
-  font-size: 15px;
+  color: currentColor;
+  font-size: 16px;
   font-weight: 780;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-content span {
   overflow: hidden;
   color: var(--lf-ink-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.kprofile.kprofile-lightflow .kp-entry:disabled .kp-entry-content span {
+  color: #667386;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-arrow {
@@ -84,16 +127,17 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry-arrow svg {
-  inline-size: 18px;
-  block-size: 18px;
+  inline-size: 20px;
+  block-size: 20px;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-tag {
   flex: 0 0 auto;
   padding: 3px 8px;
   border: 1px solid var(--lf-line);
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface-soft);
+  border-radius: 999px;
+  color: #667386;
+  background: #e6ebf1;
   font-size: 11px;
   font-weight: 700;
   line-height: 1.3;
@@ -105,93 +149,46 @@
   background: var(--lf-blue-soft);
 }
 
-.kprofile.kprofile-lightflow .kp-secondary-list {
-  display: grid;
+@media (hover: hover) and (pointer: fine) {
+  .kprofile.kprofile-lightflow .kp-entry:not(:disabled):hover {
+    background: var(--lf-blue-soft);
+  }
 }
 
-.kprofile.kprofile-lightflow .kp-secondary-list .kp-entry:last-child {
-  border-bottom: 0;
-}
+@media (max-width: 520px) {
+  .kprofile.kprofile-lightflow .kp-section {
+    padding: 20px 0;
+  }
 
-.kprofile.kprofile-lightflow .kp-entry-icon.teal {
-  color: var(--lf-blue-strong);
-  background: var(--lf-blue-soft);
-}
+  .kprofile.kprofile-lightflow .kp-section-head h2 {
+    font-size: 19px;
+  }
 
-.kprofile.kprofile-lightflow .kp-entry-icon.slate {
-  color: #0e789e;
-  background: var(--lf-cyan-soft);
-}
+  .kprofile.kprofile-lightflow .kp-section-head p {
+    font-size: 11px;
+  }
 
-.kprofile.kprofile-lightflow .kp-entry-icon.plum {
-  color: #6550ad;
-  background: var(--lf-lavender-soft);
-}
+  .kprofile.kprofile-lightflow .kp-entry-grid {
+    grid-template-columns: 1fr;
+  }
 
-.kprofile.kprofile-lightflow .kp-entry-icon.clay {
-  color: #c45c25;
-  background: var(--lf-orange-soft);
-}
+  .kprofile.kprofile-lightflow .kp-entry {
+    min-block-size: 84px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 14px 8px;
+  }
 
-.kprofile.kprofile-lightflow .kp-entry-icon.wheat {
-  color: #aa700e;
-  background: var(--lf-sand-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-entry-icon.rose {
-  color: #bd4d70;
-  background: var(--lf-rose-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-entry-icon.ink {
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.teal {
-  color: var(--lf-blue-strong);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.slate {
-  color: #0e789e;
-  background: var(--lf-cyan-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.plum {
-  color: #6550ad;
-  background: var(--lf-lavender-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.clay {
-  color: #c45c25;
-  background: var(--lf-orange-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.wheat {
-  color: #aa700e;
-  background: var(--lf-sand-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.rose {
-  color: #bd4d70;
-  background: var(--lf-rose-soft);
-}
-
-.kprofile.kprofile-lightflow .kp-group-icon.ink {
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface-soft);
-}
-
-@media (max-width: 640px) {
-  .kprofile.kprofile-lightflow .kp-service-directory {
-    gap: 12px;
+  .kprofile.kprofile-lightflow .kp-entry-icon {
+    inline-size: 44px;
+    block-size: 44px;
   }
 
   .kprofile.kprofile-lightflow .kp-entry-content strong {
-    font-size: 14px;
+    font-size: 15px;
   }
 
   .kprofile.kprofile-lightflow .kp-entry-content span {
-    font-size: 11px;
+    white-space: normal;
   }
 }

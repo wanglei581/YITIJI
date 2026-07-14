@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { KIcon } from '../../components/kiosk-icon'
-import { ReferenceServiceNav } from '../../components/lightflow/ReferenceServiceNav'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { useMemberProfileOverview } from './assets/useMemberProfileOverview'
 import { ProfileEntrySection } from './components/ProfileEntrySection'
@@ -28,7 +27,7 @@ export function ProfilePage() {
   const { user, isLoggedIn, displayName, logout, getToken } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
   useInkRipple(
-    '.kprofile.kprofile-lightflow .lf-reference-primary, .kprofile.kprofile-lightflow .lf-reference-secondary, .kprofile.kprofile-lightflow .p-btn, .kprofile.kprofile-lightflow .p-iconbtn, .kprofile.kprofile-lightflow .kp-pending-action',
+    '.kprofile.kprofile-lightflow .kp-entry:not(:disabled), .kprofile.kprofile-lightflow .p-btn, .kprofile.kprofile-lightflow .p-iconbtn, .kprofile.kprofile-lightflow .kp-pending-action',
   )
 
   // ── 本次会话记录（仅来自 location.state，不伪造数量）──────────────
@@ -70,8 +69,6 @@ export function ProfilePage() {
     documents: profileOverview.documents,
   }
   const statsLoading = profileOverview.loading
-  const [assetSection, serviceSection, sourceActivitySection, accountSection] = SECTIONS
-
   // ── Toast ────────────────────────────────────────────────────
   // 诚实化：不承诺跨页面资产明细，只提示「已加入本次记录」。
   const [toastMsg, setToastMsg] = useState<string | null>(() => {
@@ -124,8 +121,8 @@ export function ProfilePage() {
 
   return (
     <div className="kprofile kprofile-lightflow">
-      <ReferenceServiceNav />
       <div className="kp-inner">
+        <h1 className="kprofile-sr-only">我的</h1>
         <ProfileHeader
           isLoggedIn={isLoggedIn}
           displayName={headerDisplayName}
@@ -164,12 +161,9 @@ export function ProfilePage() {
         )}
 
         <div className="kp-service-directory">
-          <div className="lf-reference-pair">
-            <ProfileEntrySection section={assetSection} onTap={handleEntryTap} />
-            <ProfileEntrySection section={serviceSection} onTap={handleEntryTap} />
-          </div>
-          <ProfileEntrySection section={sourceActivitySection} onTap={handleEntryTap} />
-          <ProfileEntrySection section={accountSection} onTap={handleEntryTap} />
+          {SECTIONS.map((section) => (
+            <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
+          ))}
         </div>
 
         <p className="compliance">

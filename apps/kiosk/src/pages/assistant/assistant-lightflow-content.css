@@ -1,44 +1,97 @@
-.kassist.kassist-lightflow .assistant-support-panel .lf-reference-group-head { border-bottom: 1px solid var(--sd-line); }
-.kassist.kassist-lightflow .assistant-support-panel .lf-reference-group-head h2,
-.kassist.kassist-lightflow .assistant-subhead h3 { margin: 0; color: var(--sd-text-strong); font-size: 18px; font-weight: 820; letter-spacing: -0.02em; }
-.kassist.kassist-lightflow .assistant-support-panel .lf-reference-group-head p,
-.kassist.kassist-lightflow .assistant-subhead p { margin: 4px 0 0; color: var(--sd-copy); font-size: 13px; line-height: 1.45; }
+.kassist.kassist-lightflow .assistant-task-picker {
+  display: grid;
+  gap: 20px;
+}
 
-.kassist.kassist-lightflow .assistant-quick-tasks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.kassist.kassist-lightflow .quick { min-width: 0; color: var(--sd-text); }
-.kassist.kassist-lightflow .quick.hit { background: #dcefff; box-shadow: inset 0 0 0 2px rgba(23, 105, 232, 0.28); }
-.kassist.kassist-lightflow .quick .qi { color: #0f5fbf; }
-.kassist.kassist-lightflow .quick.v2 .qi { color: #315eb2; }
-.kassist.kassist-lightflow .quick.v3 .qi { color: #0b6aa8; }
-.kassist.kassist-lightflow .quick.v4 .qi { color: #2860b7; }
-.kassist.kassist-lightflow .quick .qi svg { width: 23px; height: 23px; }
-.kassist.kassist-lightflow .quick strong { display: block; color: var(--sd-text-strong); font-size: 15px; font-weight: 780; }
-.kassist.kassist-lightflow .quick strong + span { display: block; margin-top: 3px; color: var(--sd-copy); font-size: 12px; line-height: 1.38; }
+.kassist.kassist-lightflow .assistant-task-picker-heading p {
+  margin: 0 0 5px;
+  color: var(--sd-primary-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
 
-.kassist.kassist-lightflow .assistant-support-divider { height: 1px; margin: 0 16px; background: var(--sd-line); }
-.kassist.kassist-lightflow .assistant-faqs,
-.kassist.kassist-lightflow .assistant-result-guide { padding: 16px; }
-.kassist.kassist-lightflow .assistant-subhead { margin-bottom: 12px; }
-.kassist.kassist-lightflow .faq-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
-.kassist.kassist-lightflow .faq { min-width: 0; color: var(--sd-text); }
-.kassist.kassist-lightflow .faq .q { color: #0e5cba; font-size: 13px; font-weight: 850; }
-.kassist.kassist-lightflow .faq strong { min-width: 0; font-size: 13px; font-weight: 680; line-height: 1.4; flex: 1; }
-.kassist.kassist-lightflow .faq svg { width: 16px; height: 16px; flex: 0 0 auto; color: #7399c6; }
+.kassist.kassist-lightflow .assistant-task-picker-heading h2 {
+  margin: 0;
+  color: var(--sd-text-strong);
+  font-size: clamp(28px, 3.2vw, 38px);
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+}
 
-.kassist.kassist-lightflow .result-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.kassist.kassist-lightflow .assistant-result-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 11px; padding: 14px; border: 1px solid var(--sd-line); border-radius: 15px; background: #fbfdff; }
-.kassist.kassist-lightflow .assistant-result-row .ri { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 12px; color: #0f5fbf; background: #eaf4ff; }
-.kassist.kassist-lightflow .assistant-result-row .ri svg { width: 21px; height: 21px; }
-.kassist.kassist-lightflow .assistant-result-row.v2 .ri { color: #315eb2; background: #ebf2ff; }
-.kassist.kassist-lightflow .assistant-result-row.v3 .ri { color: #0b6aa8; background: #e6f6ff; }
-.kassist.kassist-lightflow .assistant-result-row strong { display: block; color: var(--sd-text-strong); font-size: 15px; font-weight: 780; }
-.kassist.kassist-lightflow .assistant-result-row strong + span { display: block; margin-top: 3px; color: var(--sd-copy); font-size: 12px; line-height: 1.45; }
+.kassist.kassist-lightflow .assistant-task-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
 
-.kassist.kassist-lightflow .compliance { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 18px; border: 1px dashed #bed7f5; border-radius: 14px; color: var(--sd-copy); background: rgba(255, 255, 255, 0.7); font-size: 12.5px; line-height: 1.6; text-align: center; }
-.kassist.kassist-lightflow .compliance svg { width: 15px; height: 15px; flex: 0 0 auto; color: #3670bf; }
-.kassist.kassist-lightflow .k-ripple { position: absolute; border-radius: 50%; pointer-events: none; background: radial-gradient(circle, rgba(23, 105, 232, 0.2) 0%, rgba(23, 105, 232, 0.08) 40%, transparent 70%); transform: scale(0); animation: kassist-lightflow-ripple 520ms ease-out forwards; }
-.kassist.kassist-lightflow .lf-reference-primary.call .k-ripple { background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%); }
-.kassist.kassist-lightflow :is(button, textarea):focus-visible { outline: 3px solid rgba(23, 105, 232, 0.42); outline-offset: 3px; }
+.kassist.kassist-lightflow .assistant-task {
+  display: grid;
+  min-height: 112px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--sd-line);
+  border-radius: 12px;
+  color: var(--sd-text);
+  background: var(--sd-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kassist.kassist-lightflow .assistant-task-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--sd-primary-strong);
+  background: #eaf4ff;
+}
+
+.kassist.kassist-lightflow .assistant-task-icon svg { width: 30px; height: 30px; }
+.kassist.kassist-lightflow .assistant-task-copy { display: grid; min-width: 0; gap: 7px; }
+.kassist.kassist-lightflow .assistant-task-copy strong { color: var(--sd-text-strong); font-size: 20px; line-height: 1.25; }
+.kassist.kassist-lightflow .assistant-task-copy small { color: var(--sd-copy); font-size: 14px; line-height: 1.55; }
+.kassist.kassist-lightflow .assistant-task:active { transform: scale(0.985); background: #eaf4ff; }
+
+.kassist.kassist-lightflow .assistant-direct-question,
+.kassist.kassist-lightflow .assistant-context-chip {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  justify-self: start;
+  padding: 0 18px;
+  border: 1px solid #cfe3fb;
+  border-radius: 12px;
+  color: var(--sd-primary-strong);
+  background: #eaf4ff;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.kassist.kassist-lightflow .assistant-direct-question svg { width: 22px; height: 22px; }
+.kassist.kassist-lightflow .assistant-context-chip { width: 100%; justify-content: space-between; }
+
+.kassist.kassist-lightflow .k-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(23, 105, 232, 0.2) 0%, rgba(23, 105, 232, 0.08) 40%, transparent 70%);
+  transform: scale(0);
+  animation: kassist-lightflow-ripple 520ms ease-out forwards;
+}
+
+.kassist.kassist-lightflow :is(button, textarea):focus-visible {
+  outline: 3px solid rgba(23, 105, 232, 0.42);
+  outline-offset: 3px;
+}
+
+.kassist.kassist-lightflow :is(button, textarea) {
+  transition: transform 160ms cubic-bezier(.22, 1, .36, 1), background-color 160ms cubic-bezier(.22, 1, .36, 1), border-color 160ms cubic-bezier(.22, 1, .36, 1), opacity 160ms cubic-bezier(.22, 1, .36, 1);
+}
 
 @keyframes kassist-lightflow-rise {
   from { opacity: 0; transform: translateY(14px); }
@@ -64,21 +117,24 @@
   to { opacity: 0; transform: scale(1); }
 }
 
-@media (max-width: 1100px) {
-  .kassist.kassist-lightflow .assistant-quick-tasks { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-@media (max-width: 720px) {
-  .kassist.kassist-lightflow .faq-list,
-  .kassist.kassist-lightflow .result-strip { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 760px) {
+  .kassist.kassist-lightflow .assistant-task { padding: 18px; }
 }
 
 @media (max-width: 520px) {
-  .kassist.kassist-lightflow .assistant-quick-tasks { grid-template-columns: minmax(0, 1fr); }
-  .kassist.kassist-lightflow .assistant-faqs,
-  .kassist.kassist-lightflow .assistant-result-guide { padding: 12px; }
-  .kassist.kassist-lightflow .assistant-result-row { padding: 12px; }
-  .kassist.kassist-lightflow .compliance { align-items: flex-start; text-align: left; }
+  .kassist.kassist-lightflow .assistant-task-picker { gap: 16px; }
+  .kassist.kassist-lightflow .assistant-task-picker-heading h2 { font-size: 28px; }
+  .kassist.kassist-lightflow .assistant-task-grid { grid-template-columns: minmax(0, 1fr); }
+  .kassist.kassist-lightflow .assistant-task {
+    min-height: 112px;
+    grid-template-columns: 50px minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .kassist.kassist-lightflow .assistant-task-icon { width: 50px; height: 50px; }
+  .kassist.kassist-lightflow .assistant-task-copy strong { font-size: 18px; }
+  .kassist.kassist-lightflow .assistant-direct-question,
+  .kassist.kassist-lightflow .assistant-context-chip { width: 100%; justify-self: stretch; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -130,24 +130,28 @@ const jobAiRecords = read('src/pages/profile/me/JobAiSessionRecords.tsx')
 const activityPage = read('src/pages/profile/me/MyActivityPage.tsx')
 const packageJson = read('package.json')
 
-// 1) /profile 主入口只使用共同 LightFlow 排版原语，且不再保留 InkPaper 壳层。
+// 1) /profile 主入口恢复 4188 独立页面语法，且不再保留 InkPaper 壳层。
 expectIncludes(profile, "import './profile-inkpaper.css'", 'ProfilePage 引入局部 profile-inkpaper.css')
-expectIncludes(profile, "ReferenceServiceNav", 'ProfilePage 使用共享 ReferenceServiceNav')
-expectIncludes(profile, '<ReferenceServiceNav />', 'ProfilePage 顶部先渲染共享 ReferenceServiceNav')
+expectAbsent(profile, /ReferenceServiceNav|lf-reference-/, 'ProfilePage 移除首页专属导航与服务卡骨架')
 expectMatches(profile, /useInkRipple\(\s*'\.kprofile/, 'ProfilePage 只在 .kprofile 作用域启用涟漪')
 expectMatches(profile, /className="kprofile kprofile-lightflow"/, 'ProfilePage 外层容器使用局部 LightFlow 根')
+expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage 仅保留读屏可见的 我的 标题')
 expectMatches(profile, /className="kp-inner"/, 'ProfilePage 使用 .kp-inner 内容宽度容器')
-expectMatches(profile, /className="lf-reference-pair"/, 'ProfilePage 使用资产与常用服务的并列工作面板')
-expectAbsent(profile, /<h[1-6][^>]*>\s*我的\s*<\//, 'ProfilePage 不显示可见的 我的 页面标题')
+expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage 使用五区服务目录')
+expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage 数据驱动渲染五个真实区块')
 expectAbsent(header, /p-hero|<h[1-6][^>]*>\s*我的\s*<\//, 'ProfileHeader 不再使用 p-hero 或 我的 标题')
-expectIncludes(header, 'className="lf-reference-panel kp-profile-header', 'ProfileHeader 使用 lf-reference-panel 身份面板')
-expectIncludes(header, 'className="lf-reference-group-head', 'ProfileHeader 使用 lf-reference-group-head 头部')
-expectIncludes(section, 'className="lf-reference-panel kp-section"', 'ProfileEntrySection 使用 lf-reference-panel 目录面板')
-expectIncludes(section, 'className="lf-reference-group-head"', 'ProfileEntrySection 使用 lf-reference-group-head 分组头')
-expectIncludes(section, "'lf-reference-primary'", 'ProfileEntrySection 使用主入口原语')
-expectIncludes(section, "'lf-reference-secondary'", 'ProfileEntrySection 使用次入口原语')
-expectIncludes(records, 'className="lf-reference-panel kp-session-records"', 'ProfileSessionRecords 使用当前服务记录面板')
-expectIncludes(records, 'className="lf-reference-group-head"', 'ProfileSessionRecords 使用当前服务记录分组头')
+expectIncludes(header, 'className="kp-profile-header', 'ProfileHeader 使用开放式身份摘要')
+expectIncludes(header, 'className="kp-profile-main"', 'ProfileHeader 保留身份主行')
+expectIncludes(header, 'className="kp-profile-boundary"', 'ProfileHeader 展示真实信息边界')
+expectIncludes(section, 'className="kp-section"', 'ProfileEntrySection 使用独立信息区块')
+expectIncludes(section, 'className="kp-section-head"', 'ProfileEntrySection 使用原型分区标题')
+expectIncludes(section, 'className={`kp-entry-grid kp-entry-grid--${section.layout}`}', 'ProfileEntrySection 使用等权入口网格')
+expectIncludes(section, "const disabled = entry.tag === '建设中'", 'ProfileEntrySection 仅将建设中入口识别为禁用态')
+expectIncludes(section, 'disabled={disabled}', 'ProfileEntrySection 使用原生 disabled 阻止未开放能力办理')
+expectAbsent(section, /primaryEntry|lf-reference-/, 'ProfileEntrySection 不再放大首项或复用首页卡骨架')
+expectIncludes(records, 'className="kp-session-records"', 'ProfileSessionRecords 使用当前服务记录区块')
+expectIncludes(records, 'className="kp-section-head"', 'ProfileSessionRecords 使用当前服务记录分组头')
+expectAbsent(`${header}\n${section}\n${records}`, /lf-reference-/, 'Profile 组件完全移除首页服务卡原语')
 expectAbsent(section, /sec-head/, 'ProfileEntrySection 不再使用 sec-head 旧骨架')
 expectAbsent(combinedProfileCss, /p-hero|sec-head|--paper:|--serif:|#f4f1e8|Noto Serif|Source Han Serif|Songti|SimSun|repeating-linear-gradient/, 'Profile CSS 不回退纸感视觉或旧入口骨架')
 expectAbsent(combinedProfileCss, /box-shadow\s*:/, 'Profile CSS 不恢复大型投影')
@@ -166,6 +170,9 @@ expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--l
 expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s+\.k-ripple/, 'CSS 定义局部点击涟漪')
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS 保留 56px 主操作触控高度')
 expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS 保留 48px 次操作触控高度')
+expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS 保留桌面端 92px 等权入口')
+expectMatches(combinedProfileCss, /@media\s*\(max-width:\s*520px\)[\s\S]*?\.kprofile\.kprofile-lightflow \.kp-entry-grid[\s\S]*?grid-template-columns:\s*1fr;/, 'Profile CSS 在 520px 收口为单列')
+expectAbsent(combinedProfileCss, /lf-reference-/, 'Profile CSS 不保留首页服务卡 selector')
 
 // 2) 入口、route、tag、真实会话和登录行为保持现有合同。
 for (const marker of [
@@ -223,6 +230,10 @@ for (const [label, route] of expectedEntries) {
 expectMatches(entries, /label:\s*'招聘会扫码凭证'[\s\S]{0,180}?tag:\s*'建设中'/, '招聘会扫码凭证仍为建设中，不新增入口能力')
 expectMatches(entries, /label:\s*'求职打印套餐'[\s\S]{0,180}?tag:\s*'建设中'/, '求职打印套餐仍为建设中，不接支付')
 expectMatches(entries, /label:\s*'AI服务套餐'[\s\S]{0,180}?tag:\s*'建设中'/, 'AI服务套餐仍为建设中，不接支付')
+for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益活动与服务套餐', '账户与支持']) {
+  expectMatches(entries, new RegExp(`title:\\s*'${title}'`), `Profile 保留五区边界：${title}`)
+}
+expectAbsent(entries, /entries:\s*\[\.\.\.FAIRS,\s*\.\.\.BENEFITS\]/, 'Profile 不再合并招聘会与权益服务区')
 expectAbsent(entries, /一键投递|立即投递|平台投递|投递简历/, 'Profile 入口不出现招聘闭环禁用文案')
 
 // 3) 三个低风险明细页继续只做局部视觉换装，保留真实路由、真实能力与诚实空态。

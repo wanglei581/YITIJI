@@ -1,4 +1,5 @@
 .khome {
+  --home-sticky-top: 88px;
   --home-canvas: var(--sd-color-canvas);
   --home-canvas-outer: var(--sd-color-canvas-outer);
   --home-surface: var(--sd-color-surface);
@@ -12,7 +13,9 @@
   --home-shadow: var(--sd-shadow-touch);
 
   position: relative;
+  width: min(1080px, 100%);
   min-height: 100%;
+  margin: 0 auto;
   padding-bottom: 44px;
   color: var(--home-text);
   background: linear-gradient(180deg, var(--home-canvas-outer) 0, var(--home-canvas) 360px);
@@ -20,7 +23,7 @@
 }
 
 .khome .khome-inner {
-  width: min(1320px, calc(100% - 64px));
+  width: min(1080px, calc(100% - 64px));
   margin: 0 auto;
 }
 

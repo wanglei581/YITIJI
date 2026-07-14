@@ -49,8 +49,8 @@ export function ProfileSessionRecords({
   onDeleteAiRecord: (id: string) => void
 }) {
   return (
-    <section aria-label="本次服务记录" className="lf-reference-panel kp-session-records">
-      <div className="lf-reference-group-head">
+    <section aria-label="本次服务记录" className="kp-session-records">
+      <div className="kp-section-head">
         <span className="kp-session-group-icon">
           <ScanLineIcon aria-hidden="true" />
         </span>
@@ -113,7 +113,7 @@ function SessionRow({
   onDelete: () => void
 }) {
   return (
-    <div className="lf-reference-secondary kp-session-row">
+    <div className="kp-session-row">
       <span className={`kp-session-icon ${tone}`}>
         <Icon aria-hidden="true" />
       </span>
