@@ -29,8 +29,16 @@ function expectMatches(source, pattern, message) {
   else fail(`${message} — missing ${pattern}`)
 }
 
+function expectNotMatches(source, pattern, message) {
+  if (!pattern.test(source)) pass(message)
+  else fail(`${message} — unexpected ${pattern}`)
+}
+
 const viteConfig = read('vite.config.ts')
 const assistantPage = read('src/pages/assistant/AssistantPage.tsx')
+const callPanel = read('src/pages/assistant/AssistantCallPanel.tsx')
+const callHook = read('src/hooks/useAiAdvisorCallSession.ts')
+const callStyles = read('src/pages/assistant/assistant-lightflow-call.css')
 const envTypes = read('src/vite-env.d.ts')
 const envExample = read('.env.example')
 const kioskPkg = JSON.parse(read('package.json'))
@@ -86,6 +94,35 @@ expectMatches(
   assistantPage,
   /voiceAvailable\s*&&\s*callActive\s*&&\s*LazyCallPanel/,
   'assistant only mounts the real call panel after the gated voice action is selected',
+)
+expectIncludes(callPanel, 'role="dialog"', 'voice consultation uses dialog semantics')
+expectIncludes(callPanel, 'aria-modal="true"', 'voice consultation is modal')
+expectIncludes(callPanel, '和小青语音咨询', 'voice consultation keeps the 4188 dialog title')
+expectMatches(
+  callPanel,
+  /onClick=\{\(\) => void call\.startCall\(\)\}[\s\S]*?直接语音通话/,
+  'real TRTC starts only from the explicit direct-call action',
+)
+expectNotMatches(
+  callPanel,
+  /useEffect\(\(\) => \{[\s\S]*?call\.startCall\(\)/,
+  'opening the choice dialog does not start or bill a TRTC session',
+)
+expectMatches(
+  callPanel,
+  /<button[^>]*disabled[\s\S]*?按住说话[\s\S]*?尚未开放/,
+  'hold-to-talk remains honestly disabled',
+)
+expectIncludes(callPanel, 'call.endCall()', 'voice exits use the explicit idempotent end action')
+expectIncludes(callHook, 'const endCall = useCallback', 'TRTC hook exposes an explicit end-and-reset action')
+expectIncludes(callHook, 'startedRef.current = false', 'ending a call allows a deliberate retry')
+expectIncludes(callStyles, '.assistant-voice-backdrop', 'voice dialog has an isolated overlay')
+expectIncludes(callStyles, '@media (max-width: 600px)', 'voice dialog has phone layout rules')
+expectIncludes(callStyles, '@media (max-height: 740px)', 'voice dialog has short-screen rules')
+expectIncludes(
+  callStyles,
+  '@media (prefers-reduced-motion: reduce)',
+  'voice dialog respects reduced motion',
 )
 
 const scripts = kioskPkg.scripts ?? {}
