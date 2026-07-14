@@ -1,0 +1,51 @@
+.khome .reference-service-nav,
+.kassist.kassist-lightflow .reference-service-nav,
+.kprofile.kprofile-lightflow .reference-service-nav {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+  overflow: hidden;
+  border-bottom: 1px solid #d5e4ef;
+  background: #ffffff;
+}
+
+.khome .reference-service-nav button,
+.kassist.kassist-lightflow .reference-service-nav button,
+.kprofile.kprofile-lightflow .reference-service-nav button {
+  min-inline-size: 0;
+  min-block-size: 48px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: #183858;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.khome .reference-service-nav button:hover,
+.khome .reference-service-nav button:focus-visible,
+.kassist.kassist-lightflow .reference-service-nav button:hover,
+.kassist.kassist-lightflow .reference-service-nav button:focus-visible,
+.kprofile.kprofile-lightflow .reference-service-nav button:hover,
+.kprofile.kprofile-lightflow .reference-service-nav button:focus-visible {
+  background: #eaf5ff;
+  color: #0877f9;
+  outline: none;
+}
+
+.khome .reference-service-nav button:focus-visible,
+.kassist.kassist-lightflow .reference-service-nav button:focus-visible,
+.kprofile.kprofile-lightflow .reference-service-nav button:focus-visible {
+  box-shadow: inset 0 0 0 2px #0877f9;
+}
+
+@media (max-width: 500px) {
+  .khome .reference-service-nav,
+  .kassist.kassist-lightflow .reference-service-nav,
+  .kprofile.kprofile-lightflow .reference-service-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
