@@ -7,9 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const agentRoot = path.resolve(__dirname, '..')
 const installerPath = path.join(__dirname, 'install-production-agent.ps1')
 const diagnosisPath = path.join(__dirname, 'diagnose-production-agent.ps1')
+const serviceIdentityPath = path.join(__dirname, 'service-identity.ps1')
 
 const installer = fs.readFileSync(installerPath, 'utf8')
 const diagnosis = fs.readFileSync(diagnosisPath, 'utf8')
+const serviceIdentity = fs.readFileSync(serviceIdentityPath, 'utf8')
 
 function sourceBetween(source, startPattern, endPattern) {
   const start = source.search(startPattern)
@@ -24,6 +26,19 @@ function assertIncludes(source, expected, message) {
 }
 
 console.log('\n=== verify terminal-agent Windows service recovery ===')
+
+assert.match(serviceIdentity, /function Resolve-AgentService\b/, 'service identity helper must expose Resolve-AgentService')
+assert.match(serviceIdentity, /Get-CimInstance\s+Win32_Service/, 'service identity helper must query Windows services through Win32_Service')
+assert.match(serviceIdentity, /\$_\.Name\s+-eq\s+\$Identity/, 'service identity helper must match the SCM service Name')
+assert.match(serviceIdentity, /\$_\.DisplayName\s+-eq\s+\$Identity/, 'service identity helper must match the service DisplayName')
+assert.match(serviceIdentity, /\$candidates\.Count\s+-gt\s+1/, 'service identity helper must reject ambiguous service matches')
+assert.match(serviceIdentity, /"Multiple Windows services match '\$Identity'; refusing to choose one\."/, 'service identity helper must describe ambiguous service matches')
+assert.match(serviceIdentity, /throw\s+\$exception/, 'service identity helper must fail closed for ambiguous service matches')
+assert.match(serviceIdentity, /agentServiceResolution\"]\s*=\s*"ambiguous"/, 'service identity helper must classify ambiguous service matches')
+assert.match(installer, /service-identity\.ps1/, 'installer must use the shared service identity helper')
+assert.match(diagnosis, /service-identity\.ps1/, 'diagnosis must use the shared service identity helper')
+assert.doesNotMatch(installer, /Get-Service\s+-Name\s+"AIJobPrintAgent"/, 'installer must not assume the display name is the SCM service Name')
+assert.doesNotMatch(diagnosis, /Win32_Service\s+-Filter\s+"Name\s*=\s+'\$serviceNameForFilter'/, 'diagnosis must not query only the SCM service Name')
 
 const generatedConfig = sourceBetween(
   installer,
@@ -53,8 +68,9 @@ const existingTokenCheck = installer.indexOf('Test-TokenFile $tokenPath')
 const providedTokenSource = installer.indexOf('$tokenToPersist = $AgentToken.Trim()')
 const configCommit = installer.indexOf('Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist')
 const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')
-const serviceStart = installer.indexOf('Start-Service -Name "AIJobPrintAgent"')
-const serviceRestart = installer.indexOf('Restart-Service -Name "AIJobPrintAgent" -Force')
+const resolvedServiceName = installer.indexOf('$serviceName = [string]$service.Name')
+const serviceStart = installer.indexOf('Start-Service -Name $serviceName')
+const serviceRestart = installer.indexOf('Restart-Service -Name $serviceName -Force')
 assert.notEqual(configValidationCall, -1, 'installer must validate the generated config')
 for (const [label, index] of [
   ['token preparation', tokenPreparation],
@@ -64,6 +80,7 @@ for (const [label, index] of [
   ['config backup', configBackup],
   ['config/token commit', configCommit],
   ['stale process stop', processStop],
+  ['resolved SCM service name', resolvedServiceName],
   ['service start', serviceStart],
   ['service restart', serviceRestart],
 ]) {
@@ -76,8 +93,17 @@ assert.ok(existingTokenCheck < configCommit, 'existing token validation must fin
 assert.ok(providedTokenSource < configCommit, 'provided token validation must finish before the local commit')
 assert.ok(configBackup < configCommit, 'the user-recoverable config backup must precede the local commit')
 assert.ok(configCommit < processStop, 'the local commit must finish before stopping Agent processes')
+assert.ok(resolvedServiceName < serviceStart, 'installer must resolve the SCM service name before starting it')
+assert.ok(resolvedServiceName < serviceRestart, 'installer must resolve the SCM service name before restarting it')
 assert.ok(configCommit < serviceStart, 'the local commit must finish before starting the service')
 assert.ok(configCommit < serviceRestart, 'the local commit must finish before restarting the service')
+assert.match(installer, /if\s*\(\$service\.State\s+-ne\s+"Running"\)/, 'installer must use the CIM service State when deciding whether to start or restart')
+assert.doesNotMatch(installer, /\$service\.Status/, 'installer must not read the unsupported CIM Status property')
+assert.equal(
+  (installer.match(/Resolve-AgentService\s+-Identity\s+\$agentServiceIdentity/g) ?? []).length,
+  2,
+  'installer must resolve the service both before and after a possible install',
+)
 
 const atomicConfigWriter = sourceBetween(installer, /function Write-TextAtomically\(/, /\nfunction /)
 assert.match(atomicConfigWriter, /UTF8Encoding\]::new\(\$false\)/, 'config atomic writer must use UTF-8 without a BOM')
@@ -126,8 +152,8 @@ assert.match(serviceRecovery, /failureflag/, 'service recovery must enable failu
 assert.match(serviceRecovery, /qfailure/, 'service recovery must read back the configured policy')
 assert.match(serviceRecovery, /Write-Host/, 'service recovery must display the qfailure output to the operator')
 
-const automaticStartup = installer.indexOf('Set-Service -Name "AIJobPrintAgent" -StartupType Automatic')
-const recoverySetup = installer.indexOf('Set-AgentServiceRecovery "AIJobPrintAgent"')
+const automaticStartup = installer.indexOf('Set-Service -Name $serviceName -StartupType Automatic')
+const recoverySetup = installer.indexOf('Set-AgentServiceRecovery $serviceName')
 assert.notEqual(automaticStartup, -1, 'service must use Automatic startup')
 assert.notEqual(recoverySetup, -1, 'installer must configure service recovery')
 assert.ok(automaticStartup < recoverySetup, 'service recovery must be configured after Automatic startup')
@@ -139,7 +165,10 @@ assert.doesNotMatch(installer, /\/(?:api\/v1\/)?print(?:\/jobs)?\b/i, 'installer
 assert.doesNotMatch(installer, /Write-Output\s+\$config\b/, 'installer must not output the generated config')
 assert.doesNotMatch(installer, /\$config\.agentToken\b/, 'installer must not access a token from generated config')
 
-assert.match(diagnosis, /Get-CimInstance\s+Win32_Service/, 'diagnosis must query service state through Win32_Service')
+assert.match(diagnosis, /service-identity\.ps1/, 'diagnosis must source the shared service identity helper')
+assert.match(diagnosis, /Resolve-AgentService\s+-Identity\s+\$ServiceName/, 'diagnosis must resolve a service by Name or DisplayName')
+assert.match(diagnosis, /\$serviceResolution\s*=\s*"ambiguous"/, 'diagnosis must distinguish an ambiguous service match from a missing service')
+assert.match(diagnosis, /\$serviceAmbiguous\s*=\s*\$serviceResolution\s+-eq\s+"ambiguous"/, 'diagnosis must calculate the ambiguity flag from the closed resolution state')
 assert.match(diagnosis, /UTF8Encoding/, 'diagnosis must use UTF-8 encoding to inspect the config')
 assert.match(diagnosis, /0xEF/, 'diagnosis must detect a UTF-8 BOM from the first three bytes')
 assert.match(diagnosis, /TrimStart\(\[char\]0xFEFF\)/, 'diagnosis must accept a config that starts with a UTF-8 BOM')
@@ -196,6 +225,10 @@ for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 
 }
 assert.match(diagnosisOutput, /^\s*encryptedTokenFile\s*=\s*\$encryptedTokenFile\s*$/m, 'diagnosis output must map encryptedTokenFile from its safe path check')
 assert.match(diagnosisOutput, /^\s*lastStartupDiagnosticCode\s*=\s*\$lastStartupDiagnosticCode\s*$/m, 'diagnosis output must map the closed startup diagnostic code')
+assert.match(diagnosisOutput, /^\s*serviceName\s*=\s*\$resolvedServiceName\s*$/m, 'diagnosis must report the resolved SCM service Name')
+assert.match(diagnosisOutput, /^\s*serviceDisplayName\s*=\s*\$resolvedServiceDisplayName\s*$/m, 'diagnosis must report the resolved service DisplayName')
+assert.match(diagnosisOutput, /^\s*serviceAmbiguous\s*=\s*\$serviceAmbiguous\s*$/m, 'diagnosis must report whether service resolution was ambiguous')
+assert.match(diagnosisOutput, /^\s*serviceResolution\s*=\s*\$serviceResolution\s*$/m, 'diagnosis must report the closed service resolution state')
 assert.doesNotMatch(diagnosisOutput, /\$config\b/, 'diagnosis summary must not reference the full config object')
 assert.doesNotMatch(diagnosisOutput, /agentToken/i, 'diagnosis summary must not expose agentToken')
 assert.doesNotMatch(diagnosisOutput, /adminSecret/i, 'diagnosis summary must not expose adminSecret')
