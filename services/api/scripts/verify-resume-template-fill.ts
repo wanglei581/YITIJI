@@ -6,7 +6,8 @@
  *   2. 导出 DTO / Controller / Service 已接入 templateId,但只允许 PDF 使用简历模板。
  *   3. PDF + resume_template 可真实导出,返回 FileObject + printFileUrl。
  *   4. 非简历模板 / 不存在模板用于 PDF 时明确 400,不静默 fallback。
- *   5. docx/txt/md 忽略 templateId,保持下载链路,不返回 printFileUrl。
+ *   5. docx/txt/md 忽略 templateId(模板是 pdf 主格式专属概念),仍返回 Wave 6 额外渲染的
+ *      纯净打印用 PDF 副本 printFileUrl(不套用被忽略的模板排版)。
  *
  * 运行: pnpm --filter @ai-job-print/api verify:resume-template-fill
  */
@@ -227,14 +228,26 @@ async function main(): Promise<void> {
     for (const format of nonPdfFormats) {
       const exported = await ai.exportGeneratedResume(FIXTURE, endUser.id, null, format, undefined, 'campus-cover-letter')
       createdFileIds.push(exported.fileId)
-      if (exported.printFileUrl !== undefined) fail(`5. ${format} 不应返回 printFileUrl`)
       const row = await prisma.fileObject.findUnique({ where: { id: exported.fileId } })
       if (!row) fail(`5. ${format} 未创建 FileObject`)
       createdStorageObjects.push({ storageKey: row.storageKey, bucket: row.bucket })
       if (row.assetCategory !== 'optimized') fail(`5. ${format} assetCategory 应为 optimized`)
       if (row.createdBy !== 'ai_resume_generate') fail(`5. ${format} createdBy 应为 ai_resume_generate`)
+
+      // templateId 对非 pdf 格式被忽略(模板是 pdf 专属概念),但 Wave 6 仍应额外渲染一份
+      // 未套用该模板排版的纯净打印用 PDF 副本，fileId 必须与主文件不同。
+      if (!exported.printFileUrl) fail(`5. ${format} 应返回 Wave 6 打印用 PDF 副本 printFileUrl`)
+      const printFileId = /\/files\/([^/]+)\/content/.exec(exported.printFileUrl!)?.[1]
+      if (!printFileId || printFileId === exported.fileId) {
+        fail(`5. ${format} printFileUrl 应指向另外渲染的 PDF 副本 fileId,不应与主文件相同`)
+      }
+      createdFileIds.push(printFileId)
+      const printRow = await prisma.fileObject.findUnique({ where: { id: printFileId } })
+      if (!printRow) fail(`5. ${format} printFileUrl 指向的 PDF 副本 FileObject 未落库`)
+      createdStorageObjects.push({ storageKey: printRow.storageKey, bucket: printRow.bucket })
+      if (printRow.mimeType !== 'application/pdf') fail(`5. ${format} PDF 副本 mimeType 应为 application/pdf`)
     }
-    pass('5. docx/txt/md 带 templateId 仍走下载链路,不返回 printFileUrl')
+    pass('5. docx/txt/md 忽略 templateId 仍走下载链路,同时返回未套用模板的打印用 PDF 副本 printFileUrl')
   } finally {
     for (const object of createdStorageObjects) {
       await storage.deleteObject(object.storageKey, object.bucket).catch(() => undefined)

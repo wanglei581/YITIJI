@@ -7,7 +7,8 @@
  *   3. 双栏正文起始 Y 由页眉高度派生,且存在防无限加页保护。
  *   4. exportGeneratedResume / controller 透传 layout 到 PDF renderer。
  *   5. 运行时:默认/窄边距/宽边距/双栏大字号 PDF 均可导出且返回 printFileUrl。
- *   6. docx/txt/md 接收 layout 不报错,但不返回 printFileUrl。
+ *   6. docx/txt/md 接收 layout 不报错,且 layout 透传到 Wave 6 额外渲染的打印用 PDF 副本
+ *      (printFileUrl 指向的 fileId 不同于主文件)。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:resume-layout-export
  */
@@ -205,8 +206,18 @@ async function main(): Promise<void> {
         layout,
       )
       createdFileIds.push(exported.fileId)
-      if (exported.printFileUrl !== undefined) fail(`6. [${format}] 不应返回 printFileUrl`)
-      pass(`6. [${format}] 接收 layout 不报错且不返回 printFileUrl`)
+      if (!exported.printFileUrl) fail(`6. [${format}] 接收 layout 时应返回打印用 PDF 副本 printFileUrl(Wave 6)`)
+      const printFileId = /\/files\/([^/]+)\/content/.exec(exported.printFileUrl!)?.[1]
+      if (!printFileId || printFileId === exported.fileId) {
+        fail(`6. [${format}] printFileUrl 应指向另外渲染的 PDF 副本 fileId,不应与主文件相同`)
+      }
+      createdFileIds.push(printFileId)
+      const printFileRow = await prisma.fileObject.findUnique({ where: { id: printFileId } })
+      if (!printFileRow) fail(`6. [${format}] printFileUrl 指向的 PDF 副本 FileObject 未落库`)
+      if (printFileRow!.mimeType !== 'application/pdf') fail(`6. [${format}] PDF 副本 mimeType 应为 application/pdf`)
+      const printBuffer = await storage.getObject(printFileRow!.storageKey)
+      if (!printBuffer.subarray(0, 4).equals(Buffer.from('%PDF', 'latin1'))) fail(`6. [${format}] PDF 副本产物不是合法 PDF`)
+      pass(`6. [${format}] 接收 layout 不报错,且 layout 已透传到另外渲染的打印用 PDF 副本`)
     }
 
     console.log('\n=== ALL PASS ===')

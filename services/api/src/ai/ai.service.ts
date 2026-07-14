@@ -580,6 +580,10 @@ export class AiService {
    * - 绝不记录简历内容到日志;文件名不含手机号等联系方式。
    * - FilesService.upload 按 purpose='resume_upload' 的 MIME 白名单校验(见
    *   files/file-validation.ts PURPOSE_POLICY);pdf/docx/txt/md 均为受控导出格式。
+   * - Wave 6:docx/txt/md 并非"PDF 转换"而来 ——三种格式各自从同一份 GeneratedResume
+   *   独立渲染。为让这三种格式也能打印,额外用 ResumePdfService 对同一份数据多渲染
+   *   一份纯净 PDF(不套用 templateId,因为模板是 pdf 主格式专属概念;仍透传 layout),
+   *   作为独立 FileObject 落库并签发系统 printFileUrl;用户请求的原格式文件不受影响。
    */
   async exportGeneratedResume(
     resume: GeneratedResume,
@@ -595,7 +599,8 @@ export class AiService {
     pageCount: number
     signedUrl: string
     expiresAt: string
-    /** 系统 HMAC content URL(signFileUrl 生成),仅 pdf 导出返回,供 /print/jobs 打印使用;docx/txt/md 无此字段。 */
+    /** 系统 HMAC content URL(signFileUrl 生成),供 /print/jobs 打印使用。pdf 直接签发本文件;
+     *  docx/txt/md 签发另外渲染的同内容 PDF 副本(Wave 6),不是原文件本身。 */
     printFileUrl?: string
   }> {
     this.assertExportFormatAllowed(format)
@@ -662,8 +667,26 @@ export class AiService {
 
     // 打印链路只接受系统 HMAC content URL(signFileUrl),不接受 COS 下载 signedUrl
     // (PrintJobsService.create 会拒绝非系统签名 URL,详见 files/signing.ts)。
-    // 仅 pdf 计算;docx/txt/md 无分页概念,也不进打印链路,保持 undefined 不伪造。
-    const printFileUrl = format === 'pdf' ? signFileUrl(uploaded.fileId).url : undefined
+    let printFileUrl: string | undefined
+    if (format === 'pdf') {
+      printFileUrl = signFileUrl(uploaded.fileId).url
+    } else {
+      // Wave 6:docx/txt/md 额外渲染一份同内容纯净 PDF(不套用 templateId,透传 layout),
+      // 作为独立 FileObject 落库,使这三种下载格式也能进入打印链路。
+      const pdfRendered = await this.resumePdf.render(resume, { layout })
+      const pdfUploaded = await this.files.upload({
+        buffer: pdfRendered.buffer,
+        filename: `AI简历_${safeName}.pdf`,
+        mimeType: 'application/pdf',
+        purpose: 'resume_upload',
+        uploaderId: null,
+        endUserId,
+        assetCategory: 'optimized',
+        sourceFileId,
+        createdBy: 'ai_resume_generate',
+      })
+      printFileUrl = signFileUrl(pdfUploaded.fileId).url
+    }
 
     return {
       fileId: uploaded.fileId,
