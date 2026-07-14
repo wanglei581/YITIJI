@@ -4,14 +4,14 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcd
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Prisma } from '../src/generated/prisma/client'
 import { createPrismaClient, dbKindOf } from '../src/prisma/create-client'
 import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
-import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
+import { ScanTasksService, SCAN_CONTENT_DEDUP_WINDOW_MS } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
 // B1-11 follow-up：真实 DB 端到端跑一遍 deliverScanFile() 的内容级去重护栏，需要真实
 // AuditService / StorageService / FilesService（而不是本文件的 FakeFilesService）——
@@ -637,8 +637,68 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
   }
 }
 
+/**
+ * B1-11 follow-up（code review Important）：SCAN_CONTENT_DEDUP_WINDOW_MS（本包，
+ * scan-tasks.service.ts）与 DELIVERY_RETRY_MAX_MS（apps/terminal-agent，
+ * scan-watcher.ts）是两个独立部署包里各自声明的字面量常量，语义上必须相等——见
+ * scan-tasks.service.ts 该常量上方注释：去重窗口的设计上限就是 Agent 理论上可能
+ * 重试同一份文件的最大时间跨度。两个包之间没有可用的运行时 import 边界（Terminal
+ * Agent 是独立部署的 Windows 二进制，package.json 未声明 @ai-job-print/shared 或
+ * services/api 依赖，见其 tsconfig.json 的纯 commonjs 配置），所以无法像包内类型那样
+ * 直接 import 同一个常量。
+ *
+ * 光靠两侧注释互相提醒是不够的——注释会腐化，未来有人改一侧数值而不动另一侧，不会
+ * 有任何编译错误或运行时信号，直接重开本次修复要堵的跨用户 PII 误挂载窗口。这里改用
+ * 源码文本解析兜底：直接读 scan-watcher.ts 的原始源码，正则提取
+ * `DELIVERY_RETRY_MAX_MS = <表达式>` 字面量右侧，用严格白名单字符集
+ * （只允许数字/空白/`*`/`+`/`-`）求值后与本包的 SCAN_CONTENT_DEDUP_WINDOW_MS 断言相等。
+ * 两个常量任何一侧改动而未同步，本函数就会抛错，verify:scan-tasks 直接失败——不再是
+ * 只有注释、没有强制力的约定。
+ */
+function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
+  const scanWatcherPath = path.resolve(__dirname, '..', '..', '..', 'apps', 'terminal-agent', 'src', 'agent', 'scan-watcher.ts')
+  const source = readFileSync(scanWatcherPath, 'utf8')
+
+  const match = source.match(/export const DELIVERY_RETRY_MAX_MS\s*=\s*([^\n]+)/)
+  assert.ok(
+    match,
+    `could not find "export const DELIVERY_RETRY_MAX_MS = ..." in ${scanWatcherPath} — the constant may have been renamed or removed without updating this sync check`,
+  )
+
+  const rawExpr = match![1].trim()
+  assert.match(
+    rawExpr,
+    /^[\d\s*+-]+$/,
+    `DELIVERY_RETRY_MAX_MS expression "${rawExpr}" contains characters outside the safe-to-evaluate whitelist (digits, whitespace, *, +, -) — refusing to eval it; update this parser deliberately if the expression form legitimately changed`,
+  )
+
+  // rawExpr is whitelisted to [\d\s*+-] above (not arbitrary source), so evaluating it here is safe.
+  const agentDeliveryRetryMaxMs = new Function(`return (${rawExpr});`)() as number
+  assert.equal(
+    typeof agentDeliveryRetryMaxMs,
+    'number',
+    `parsed DELIVERY_RETRY_MAX_MS expression "${rawExpr}" did not evaluate to a number`,
+  )
+
+  assert.equal(
+    agentDeliveryRetryMaxMs,
+    SCAN_CONTENT_DEDUP_WINDOW_MS,
+    `apps/terminal-agent/src/agent/scan-watcher.ts DELIVERY_RETRY_MAX_MS (${agentDeliveryRetryMaxMs}ms) has drifted from ` +
+      `services/api SCAN_CONTENT_DEDUP_WINDOW_MS (${SCAN_CONTENT_DEDUP_WINDOW_MS}ms). These two constants must stay equal: ` +
+      `the server-side dedup window must cover the full span the Agent may retry a lost-response delivery, or a retry landing ` +
+      `outside the (now too-narrow) dedup window will silently no-op and can re-match to a different user's waiting scan task ` +
+      `— reopening the exact cross-user PII leak this fix closed. Update both constants together.`,
+  )
+}
+
 async function main(): Promise<void> {
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
+
+  {
+    // B1-11 follow-up：两个独立部署包（services/api、apps/terminal-agent）里各自声明的
+    // 常量必须保持同步，见 assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow() 顶部注释。
+    assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow()
+  }
 
   {
     // 正常建会话 + 匹配投递 + 状态查询全链路

@@ -65,8 +65,18 @@ const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
  *
  * 窗口大小刻意与 Agent 侧 DELIVERY_RETRY_MAX_MS（2 小时，scan-watcher.ts）对齐——这是
  * Agent 理论上可能重试同一份文件的最大时间跨度，没必要查更久以前的记录（也避免无界查询）。
+ *
+ * ⚠️ 这两个常量必须保持相等，但两侧无法用运行时 import 互相引用——本文件属于
+ * services/api（commonjs + node moduleResolution），scan-watcher.ts 属于
+ * apps/terminal-agent（独立部署的 Windows 二进制，未依赖 packages/shared，也不依赖
+ * services/api，见该文件顶部 tsconfig/package.json 说明）。两者没有共同可 import 的
+ * 运行时边界，因此和 file.types.ts 顶部同款"本地副本 + SSOT 注释"约定一样，光靠注释不够
+ * ——注释会腐化。真正兜底的是 verify-scan-tasks.ts 里的
+ * assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow()：它读取 scan-watcher.ts 的源码
+ * 文本、原样解析出 DELIVERY_RETRY_MAX_MS 的字面量表达式并与本常量断言相等，任何一侧改动
+ * 而另一侧未同步都会让 verify:scan-tasks 直接失败（而不是静默出现文档描述的跨用户误挂载）。
  */
-const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
+export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
 
 const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',

@@ -42,6 +42,14 @@ export const UNCLAIMED_MAX_AGE_MS = 24 * 60 * 60 * 1000
  * 2 小时——覆盖正常的网络抖动/短暂后端不可用，同时不让真正投递不了的文件无限期
  * 占着"待投递"状态。超过后移入 _unclaimed，与"无等待任务"走同一隔离归宿，但日志
  * 措辞不同，避免混淆两种不同的原因。
+ *
+ * ⚠️ 必须与 services/api/src/scan-tasks/scan-tasks.service.ts 的
+ * SCAN_CONTENT_DEDUP_WINDOW_MS 保持相等（服务端内容级去重窗口理论上限就是 Agent
+ * 可能重试同一份文件的最大时间跨度）。这两个包互相无法运行时 import（本包是独立
+ * 部署的 Windows 二进制，未声明 @ai-job-print/shared 或 services/api 依赖），因此
+ * 靠 services/api/scripts/verify-scan-tasks.ts 的
+ * assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow() 用源码文本解析兜底：改这行
+ * 数值而不同步改 SCAN_CONTENT_DEDUP_WINDOW_MS 会让 verify:scan-tasks 直接失败。
  */
 export const DELIVERY_RETRY_MAX_MS = 2 * 60 * 60 * 1000
 
