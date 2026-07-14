@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-15 已完成**内部账号认证 verify 的生产误用代码收口**（独立 worktree `codex/admin-credential-recovery-plan-20260715`，本地提交与验证级，未推送、未部署）：发现 `verify:internal-auth-phone` 会创建临时 User / Organization，且旧清理逻辑错误地按 `auth.*` 删除全局 `AuditLog`，因此绝不应被作为生产部署后的验证命令。本轮先以失败用例建立硬门禁，现已要求 `NODE_ENV` 不能为 production、`INTERNAL_AUTH_VERIFY_TARGET=isolated` 且数据库必须是本机 SQLite / localhost PostgreSQL；验证脚本改为内存审计记录，不再删除 `AuditLog`。目标守卫、生产 / 远程库实际命令拒绝探针、限定 ESLint 与生成 Prisma Client 后的全量 API TypeScript 检查均通过。Antigravity 与 Claude 均给出有效 `APPROVE`；Claude 对 `DATABASE_URL` 来源一致性的 Warning 已只读核实关闭：脚本先加载 `dotenv/config`，`PrismaService` 亦只读取同一个 `process.env.DATABASE_URL`，且守卫早于其实例化。未运行该行写入 verify、未连接数据库、未发送真实短信、未改变任何生产账号或审计记录。后续仍须 PR / CI；生产验收改为 migration / health 只读检查与受控浏览器登录路径，不能运行此脚本替代。
+
 2026-07-14 完成 **青序 LightFlow K1/K2 最新主线本地整合候选**（分支 `codex/qingxu-lightflow-integration-20260714`，本地代码与浏览器验收级）：初始从 `origin/main=e9802596` 新建独立 worktree，以一次 `--no-commit --no-ff` 合并保留 `codex/qingxu-lightflow-k2-20260713` 的候选历史；执行期间主线又前进 25 个 Scan Session B1 提交至 `origin/main=9d0622e7`，文件交集为 0，已用第二个无冲突 merge commit `4156b907` 追平，最终 `origin/main` 为当前分支祖先且 behind=0。首轮仅两份进度文档发生文本冲突，已保留主线与 LightFlow 双方事实。首页继续保留既有 Hero、登录身份卡与底部三 Tab，下方服务目录按 4188 紧凑排版；`/assistant` 保留真实文字咨询与语音咨询选择层，`/profile` 保留开放身份摘要、五个等权分区、23 个已接线路由和 3 个明确建设中入口；重复的账号设置目的地已去除，招聘会场景活动改为独立明确名称。`/me/*` 明细页、Admin、Partner、后端、支付、Worker 与 Terminal Agent 运行时代码均未改。整合中以 TDD 补齐 K2b、真实简历诊断/打印 URL、求职材料路由三项 CI 门禁，并修正 `verify:job-material-library-ui` 仍从旧 `HomePage.tsx` 读取首页服务数据导致的假失败；公共顶栏不再把未知设备状态硬编码成“服务正常”，而是复用真实设备状态 hook，接口不可达时显示中性“设备状态暂不可用”。TRTC 的 SDK 加载、进房或运行期错误现在先幂等停止后端任务并退出房间，再展示可重试错误，避免错误会话持续到服务端超时。全部 LightFlow/K1/K2/登录/TRTC/打印 URL 静态门禁、Kiosk typecheck、lint（0 error；2 条既有 Fast Refresh warning）、带 TRTC 的 production build、Terminal Agent 两项只读静态回归和 diff check 均通过。Playwright 已覆盖首页、AI 助手、我的在 1080×1920、390×844 与 390×700 的浏览器验收，三页无横向溢出；语音选择层三个视口截图已补齐，仅打开选择层不会创建 TRTC 会话，关闭后焦点与页面滚动锁正确恢复。控制台仅有本地未启动 API `127.0.0.1:3010` 导致的终端配置/屏保 500 与首页 favicon 404，无页面脚本异常。**未 push、未创建 PR、未部署、未运行 GitHub CI，也未完成真实登录、真实 AI/TRTC、打印、Windows 真机或线上验收；本地 Prisma schema engine 无诊断退出，额外 API 运行时交叉验证未完成，不得据此宣称生产完成。**
 
 2026-07-14 补充：Windows 无打印前置核对确认实际服务 `Name=aijobprintagent.exe`、`DisplayName=AIJobPrintAgent`、Running/Automatic，且 KSK-001 为 `enabled=true`、空活跃打印队列、`online/ready`。由此确认安装与诊断脚本此前把显示名误作 SCM 名称，会产生“服务不存在”的假阴性并存在重复创建风险。PR #237 的服务身份修复统一按 SCM Name 或 DisplayName 解析、对歧义显式报错，并补齐静态回归；未安装 Windows 依赖、未构建、重启/重装服务、改配置、建单或打印。不得将旧诊断的 `serviceExists=False` 解读为服务已停止。
@@ -15,7 +17,7 @@
 
 2026-07-13 补充：清理 **`CLAUDE.md` §16 两处过时待办残留**。「打印任务状态实时追踪 UI（后端持久化已就绪）」早在 2026-07-02（见本文档同日记录）已核实为过时——Kiosk `PrintProgressPage` 真实 1 秒轮询 `GET /print/jobs/:taskId`、「我的打印订单」页有活跃订单时 5 秒条件轮询退避至 60 秒、Admin 订单页已接 `useRefreshable` 30 秒轮询 + errorCode/状态日志详情，均为真实可用闭环；`next-tasks.md` 早已清理该条，但 `CLAUDE.md`（项目正式说明文档）678/694 行仍留有两处重复条目未删，险些导致重复开发。本次仅删除该两行过时文案，未改动其余内容，不涉及代码。
 
-> 最后更新：2026-07-14
+> 最后更新：2026-07-15
 > 入口用途：只记录当前阶段、已验证结论、待确认边界和下一步任务入口。历史长记录文本已归档到 `docs/progress/archive/2026-06-20-current-progress-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [project-structure.md](../project-structure.md) | [normalization-truth-audit](../reviews/project-normalization-truth-audit.md)
 

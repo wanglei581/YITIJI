@@ -16,9 +16,10 @@ import { ExecutionContext } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
-import { AuditService } from '../src/audit/audit.service'
+import type { AuditService } from '../src/audit/audit.service'
 import { AuthService } from '../src/auth/auth.service'
 import { InternalOtpService } from '../src/auth/internal-otp.service'
+import { assertInternalAuthVerifyTarget } from '../src/auth/internal-auth-verify-target'
 import { encryptPhone, hashPhone } from '../src/common/crypto/phone-identity'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import type { RedisService } from '../src/common/redis/redis.service'
@@ -108,17 +109,27 @@ class NoopSmsSender implements SmsSender {
   }
 }
 
+class RecordingAudit {
+  readonly entries: Parameters<AuditService['write']>[0][] = []
+
+  async write(args: Parameters<AuditService['write']>[0]): Promise<string> {
+    this.entries.push(args)
+    return `verify-audit-${this.entries.length}`
+  }
+}
+
 async function main() {
   console.log('\n=== 内部账号手机号认证验证 ===')
+  assertInternalAuthVerifyTarget(process.env)
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
-  const audit = new AuditService(prisma)
+  const audit = new RecordingAudit()
   const redis = new MemoryRedis()
   const sms = new NoopSmsSender()
   const otp = new InternalOtpService(redis as unknown as RedisService, sms)
   const jwt = new JwtService({ secret: process.env['JWT_SECRET'] })
-  const auth = new AuthService(jwt, prisma, redis as unknown as RedisService, otp, audit)
+  const auth = new AuthService(jwt, prisma, redis as unknown as RedisService, otp, audit as unknown as AuditService)
   const guard = new JwtAuthGuard(jwt, prisma, redis as unknown as RedisService)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
@@ -132,7 +143,6 @@ async function main() {
   let orgId = ''
 
   const cleanup = async () => {
-    await prisma.auditLog.deleteMany({ where: { action: { startsWith: 'auth.' } } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { username: { contains: suffix } } }).catch(() => undefined)
     if (orgId) await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined)
   }

@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-14
+> 最后更新：2026-07-15
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -38,7 +38,7 @@
 - [x] 生产域名与 HTTPS：`zyidai.cn`、`www.zyidai.cn`、`admin.zyidai.cn`、`partner.zyidai.cn` 已解析到 `120.48.13.190`；nginx、HTTPS 证书、HTTP→HTTPS 跳转、上传限制、API 反代和 certbot 自动续期已配置并验证，百度云误解析记录已删除；`snap.certbot.renew.timer` 为 active，`certbot renew --dry-run` 对 `zyidai.cn` 与旧 `sslip.io` 证书均模拟续期成功。
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
 - [ ] **zyidai.cn 数据库高负载加固生产执行**：代码侧候选 `codex/db-load-hardening-zyidai-20260706` 已准备 PrintTask / PrintTaskStatusLog 热路径索引、双轨 migration、`verify:db-load-indexes` 和 `docs/device/postgres-load-hardening-runbook.md`；生产执行前必须先经用户确认，按 runbook 做只读预检、备份、低峰 migration 或 `CREATE INDEX CONCURRENTLY`、`pg_stat_statements` 观测、PostgreSQL 参数 / PgBouncer / PM2 cluster 调整和压测验收。未执行前不得宣称 zyidai.cn 已完成数据库高并发加固。
-- [ ] 三端登录 / 内部账号手机号认证部署：上线目标库必须先执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`，再跑 `pnpm --filter @ai-job-print/api verify:internal-auth-phone`；提交候选必须包含 `verify-internal-auth-phone.ts`、`backfill-internal-user-phone.ts` 和双 Prisma 迁移目录。Codex 本地 SQLite `dev.db` 由 `db push` 创建无迁移基线；如新建 SQLite 空库跑 seed 遇到历史缺列，需手动补 `Organization.contactPhone`，生产 PostgreSQL 不受该遗留问题影响。
+- [ ] 三端登录 / 内部账号手机号认证部署：上线目标库先执行 `prisma migrate deploy` / `pnpm --filter @ai-job-print/api db:pg:deploy`，并通过 migration 状态、health 和受控浏览器登录路径验收；**不得在生产或共享预生产运行** `verify:internal-auth-phone`，它会创建临时账号数据。该脚本仅可在明确隔离、非 production 的本机 SQLite / localhost PostgreSQL 中，以 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 执行；提交候选必须包含 `verify-internal-auth-phone.ts`、目标守卫、`backfill-internal-user-phone.ts` 和双 Prisma 迁移目录。Codex 本地 SQLite `dev.db` 由 `db push` 创建无迁移基线；如新建 SQLite 空库跑 seed 遇到历史缺列，需手动补 `Organization.contactPhone`，生产 PostgreSQL 不受该遗留问题影响。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
 - [x] 预生产 Kiosk 上传→打印 URL 契约复验：runtime hotfix 已安全切到 `/srv/ai-job-print`，health 为 `db=postgres`，`db:pg:sync:check`、`DP-GATE after(warnings=0)`、远端 `verify:kiosk-upload-print-contract` 与 `verify:print-jobs` 均通过；真实 `/files/kiosk-upload` 返回内部 HMAC `signedUrl`，外部 COS URL 仍被 `/print/jobs` 拒绝为 `PRINT_INVALID_FILE_URL`。
