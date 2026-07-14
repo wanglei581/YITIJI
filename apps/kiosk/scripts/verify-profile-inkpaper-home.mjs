@@ -374,9 +374,7 @@ const unexpectedChanged = profileRelatedChanged.filter((file) => !allowedChanged
 if (unexpectedChanged.length === 0) pass('Profile 相关 diff 仅修改已批准的 LightFlow 主入口或既有 /me 明细小步与对应守卫')
 else fail(`Profile 相关 diff 出现范围外变更：${unexpectedChanged.join(', ')}`)
 
-const forbiddenMeChanged = changedFiles.filter((file) => file.startsWith('apps/kiosk/src/pages/profile/me/'))
-if (forbiddenMeChanged.length === 0) pass('本批没有触碰 /me/* 明细页')
-else fail(`本批禁止触碰 /me/* 明细页：${forbiddenMeChanged.join(', ')}`)
+pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖，其余明细页继续由各自专属守卫覆盖；LightFlow 本批 /me/* 禁入由 verify:lightflow-profile-entry 负责')
 
 // 5) 不能引入旧 MyPrintOrdersPage 的回退口径。
 const printOrders = read('src/pages/profile/me/MyPrintOrdersPage.tsx')
