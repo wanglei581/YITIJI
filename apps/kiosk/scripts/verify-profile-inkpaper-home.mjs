@@ -129,6 +129,7 @@ const aiRecordsPage = read('src/pages/profile/me/MyAiRecordsPage.tsx')
 const jobAiRecords = read('src/pages/profile/me/JobAiSessionRecords.tsx')
 const activityPage = read('src/pages/profile/me/MyActivityPage.tsx')
 const packageJson = read('package.json')
+const lightflowProfileVerify = read('scripts/verify-lightflow-profile-entry.mjs')
 
 // 1) /profile 主入口恢复 4188 独立页面语法，且不再保留 InkPaper 壳层。
 expectIncludes(profile, "import './profile-inkpaper.css'", 'ProfilePage 引入局部 profile-inkpaper.css')
@@ -374,7 +375,16 @@ const unexpectedChanged = profileRelatedChanged.filter((file) => !allowedChanged
 if (unexpectedChanged.length === 0) pass('Profile 相关 diff 仅修改已批准的 LightFlow 主入口或既有 /me 明细小步与对应守卫')
 else fail(`Profile 相关 diff 出现范围外变更：${unexpectedChanged.join(', ')}`)
 
-pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖，其余明细页继续由各自专属守卫覆盖；LightFlow 本批 /me/* 禁入由 verify:lightflow-profile-entry 负责')
+const delegatesMeBoundary =
+  lightflowProfileVerify.includes("path.startsWith('apps/kiosk/src/pages/profile/me/')") &&
+  lightflowProfileVerify.includes('forbiddenMeChanges.length === 0') &&
+  ciWorkflow.includes('verify:profile-inkpaper-home') &&
+  ciWorkflow.includes('verify:lightflow-profile-entry')
+if (delegatesMeBoundary) {
+  pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖；LightFlow 本批 /me/* 禁入已委托给同一 CI 中的 verify:lightflow-profile-entry')
+} else {
+  fail('LightFlow 本批 /me/* 禁入委托缺失或未与 Profile 主守卫共同接入 CI')
+}
 
 // 5) 不能引入旧 MyPrintOrdersPage 的回退口径。
 const printOrders = read('src/pages/profile/me/MyPrintOrdersPage.tsx')
