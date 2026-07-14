@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -10,15 +12,43 @@ require('ts-node/register')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const root = resolve(__dirname, '..')
+const agentRoot = resolve(__dirname, '..')
 
 const {
   AgentStartupError,
   parseConfigText,
   serializePersistedConfig,
   writeValidatedConfigAt,
-} = require(join(root, 'src/agent/config-manager.ts'))
-const diagnostics = require(join(root, 'src/agent/startup-diagnostics.ts'))
+} = require(join(agentRoot, 'src/agent/config-manager.ts'))
+const diagnostics = require(join(agentRoot, 'src/agent/startup-diagnostics.ts'))
+
+const configManagerSource = fs.readFileSync(path.join(agentRoot, 'src/agent/config-manager.ts'), 'utf8')
+assert.match(
+  configManagerSource,
+  /path\.dirname\(filePath\)/,
+  'atomic writes must create their temporary file in the primary config directory',
+)
+assert.match(
+  configManagerSource,
+  /path\.join\(dir,\s*/,
+  'atomic writes must derive their temporary file path from that directory',
+)
+assert.match(
+  configManagerSource,
+  /fs\.openSync\(tempPath,\s*['"]wx['"]/,
+  'atomic writes must create the temporary file exclusively',
+)
+assert.match(configManagerSource, /fs\.fsyncSync\(/, 'atomic writes must fsync before replacement')
+assert.match(
+  configManagerSource,
+  /fs\.renameSync\(tempPath,\s*filePath\)/,
+  'atomic writes must replace the primary config with rename',
+)
+assert.match(
+  configManagerSource,
+  /finally\s*\{[\s\S]*?fs\.rmSync\(tempPath/,
+  'atomic writes must remove the temporary file in finally cleanup',
+)
 
 const valid = {
   apiBaseUrl: 'https://api.example.test/api/v1',
