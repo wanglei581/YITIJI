@@ -1,0 +1,12 @@
+{
+  "id": "fix-lightflow-4188-visual-parity",
+  "title": "修复三主页面与 4188 原型的视觉布局偏差",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "无；等待从干净 main 开启后续整合任务",
+  "createdAt": "2026-07-14T06:15:00Z",
+  "branch": "codex/qingxu-lightflow-k2-20260713"
+}
