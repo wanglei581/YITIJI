@@ -132,6 +132,25 @@ pnpm build
 - [ ] 孤儿数据/历史脏数据有告警，不静默丢弃。
 - [ ] 抽样核查：用户、文件、AI结果、打印任务、收藏、招聘会/岗位数据均可查。
 
+**B1 扫描会话安全加固 migration 前置检查（如目标库已有真实 `ScanTask` 数据）**：迁移
+`20260713160000_add_scan_task_active_session_unique`（同一 `terminalId` 同时只允许一条
+`status IN ('waiting','matched')` 的活跃 `ScanTask`，partial unique index）会在存量数据违反
+该约束时直接建索引失败、阻断整个 `migrate deploy`。`ScanTask` 功能自首期真实扫描上线起就已
+可能产生数据（不是本次 migration 才新引入这张表），因此**任何**已经跑过一段时间、可能已有真
+实扫描记录的环境（不限于本次是否是首次切换到 PostgreSQL）部署这条 migration 前必须先执行：
+
+```sql
+SELECT "terminalId", COUNT(*) FROM "ScanTask" WHERE status IN ('waiting','matched') GROUP BY "terminalId" HAVING COUNT(*) > 1;
+```
+
+- [ ] 上述 SQL 结果为空（无重复活跃行）方可继续部署此 migration。
+- [ ] 若非空：先人工核实每个终端的重复行——保留最新一条 `waiting`/`matched`，其余转
+  `expired`（未匹配）或 `cancelled`（已匹配但未完成），再重跑预检确认清空。
+- [ ] 该 migration 上线前，若目标终端的 `scan` 能力当前为 `available` 且确有 Agent 在跑，
+  先临时把该终端 `scan` 能力置为非 `available`（Admin 能力开关）并停止对应 Terminal Agent
+  的 scan-watcher，避免修复上线瞬间的行为切换影响正在进行的真实扫描；确认无进行中扫描后
+  再部署，部署完成、验证通过后再恢复 `available`。
+
 ### 3.6 核心 verify
 
 以项目实际 package scripts 为准，至少覆盖：

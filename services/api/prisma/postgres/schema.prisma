@@ -142,10 +142,15 @@ model ScanTask {
   matchedFileMtime DateTime?
   errorCode        String?
   errorMessage     String?
+  controlTokenHash String?
   expiresAt        DateTime
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // 数据库层另有 partial unique index `ScanTask_terminalId_active_unique`（migration
+  // 20260713160000_add_scan_task_active_session_unique），约束同一 terminalId 同时只能有
+  // 一条 status IN ('waiting','matched') 的活跃记录；Prisma `@@unique` 不支持条件索引，故不在此声明。
+  // create() 调用方需预期违反该约束时抛出 P2002。
   @@index([terminalId, status, createdAt])
   @@index([endUserId])
 }

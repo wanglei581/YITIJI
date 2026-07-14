@@ -1,3 +1,4 @@
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
   ConflictException,
@@ -6,6 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { Prisma } from '../generated/prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService } from '../files/files.service'
 import { TerminalCapabilitiesService } from '../terminals/terminal-capabilities.service'
@@ -33,6 +35,49 @@ const SCAN_TASK_TTL_MS = 10 * 60 * 1000
 /** 建档后签发的内容 URL 有效期，与打印/上传会话链路同一惯例（30 分钟）。 */
 const SCAN_FILE_URL_TTL_MS = 30 * 60 * 1000
 
+/**
+ * B1-10：'matched' 状态心跳节拍。deliverScanFile() 在上传期间每 tick 一次，刷新
+ * ScanTask.updatedAt，防 ScanTaskReaperTask（3 分钟阈值，见 scan-task-reaper.task.ts）
+ * 误伤仍在真实进行中的慢上传——见下方 startMatchedHeartbeat() 注释详述背景与竞态。
+ * 60s 远小于 reaper 的 3 分钟阈值，留足够余量覆盖 GC 停顿/短暂事件循环阻塞。
+ */
+const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
+
+/**
+ * B1-11（Critical code-review 修复 #2 的点 4 边缘案例）：投递在服务端其实已经真正成功
+ * 完成（ScanTask 已 CAS 到 'completed'，fileId 已落库），但 HTTP 响应在回传给 Terminal
+ * Agent 的路上丢失（进程被杀在响应写出之后 / 连接被重置在 Agent 收完之前）——这种情况下
+ * Agent 完全没有任何错误信号，只会把它当成一次普通网络失败，留在原地交给下一轮 sweep
+ * 按既有 2 小时窗口重试（scan-watcher.ts DELIVERY_RETRY_MAX_MS，这段"网络错误默认重试"
+ * 行为本身没问题，不能改）。问题是：重试投递的还是同一份物理文件字节，而 deliverScanFile()
+ * 本身对"这份内容是否已经交付过"没有任何记忆——它只会重新去找该终端"当前"最早一条
+ * waiting 任务去匹配。如果原任务对应的用户会话已经结束、同一物理终端上有新用户开了
+ * 新的等待中任务，这次重试就会把第一个用户的扫描内容错误地挂到第二个用户身上——
+ * 和 SCAN_TASK_STATE_CHANGED 那条竞态是同一类"跨用户 PII 误挂载"风险，只是触发路径
+ * 不同（这里是"响应丢失"而不是"CAS 冲突"），而且完全没有错误信号可以让 Agent 察觉。
+ *
+ * 用内容 sha256 做去重：如果同一终端最近 SCAN_CONTENT_DEDUP_WINDOW_MS 内已经有一条
+ * ScanTask 真正建档完成（fileId 非空——SCAN_TASK_STATE_CHANGED 分支的任务永远不会有
+ * fileId 被写入，见下方 deliverScanFile() 的 CAS-to-completed 分支，那条路径已经由
+ * Agent 侧的立即隔离处理，不会走到这里重试），且其 FileObject.sha256 与本次上传内容
+ * 完全一致，判定为同一份物理文件的重复投递，拒绝再次匹配到任何（可能属于别的用户的）
+ * 等待中任务。
+ *
+ * 窗口大小刻意与 Agent 侧 DELIVERY_RETRY_MAX_MS（2 小时，scan-watcher.ts）对齐——这是
+ * Agent 理论上可能重试同一份文件的最大时间跨度，没必要查更久以前的记录（也避免无界查询）。
+ *
+ * ⚠️ 这两个常量必须保持相等，但两侧无法用运行时 import 互相引用——本文件属于
+ * services/api（commonjs + node moduleResolution），scan-watcher.ts 属于
+ * apps/terminal-agent（独立部署的 Windows 二进制，未依赖 packages/shared，也不依赖
+ * services/api，见该文件顶部 tsconfig/package.json 说明）。两者没有共同可 import 的
+ * 运行时边界，因此和 file.types.ts 顶部同款"本地副本 + SSOT 注释"约定一样，光靠注释不够
+ * ——注释会腐化。真正兜底的是 verify-scan-tasks.ts 里的
+ * assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow()：它读取 scan-watcher.ts 的源码
+ * 文本、原样解析出 DELIVERY_RETRY_MAX_MS 的字面量表达式并与本常量断言相等，任何一侧改动
+ * 而另一侧未同步都会让 verify:scan-tasks 直接失败（而不是静默出现文档描述的跨用户误挂载）。
+ */
+export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
+
 const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',
   id: 'id_scan',
@@ -42,6 +87,10 @@ const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
 // 面向用户的失败原因必须是白名单文案，绝不透出内部错误细节（对齐 print-jobs.service.ts 同类做法）。
 const USER_FACING_SCAN_ERROR: Record<string, string> = {
   SCAN_UPLOAD_FAILED: '扫描文件处理失败，请重新扫描',
+  // B1-5：ScanTaskReaperTask 收敛卡在 'matched' 状态太久的任务时写入的 errorCode，
+  // 必须在这里登记白名单文案，否则 getStatus() 会把它 fallback 成通用的
+  // '扫描处理失败，请重试'，用户看不到"超时未完成"这个更准确的原因。
+  SCAN_MATCHED_TIMEOUT: '扫描处理超时未完成',
 }
 
 const SCAN_TYPE_INSTRUCTIONS: Record<ScanType, string[]> = {
@@ -83,6 +132,36 @@ export interface ScanTaskStatusResult {
   expiresAt: string
 }
 
+/**
+ * 判断是否命中 ScanTask 的活跃会话唯一约束（Prisma P2002）。
+ *
+ * `ScanTask` 模型目前只有一个数据库层唯一约束——B1-2 加的 partial unique index
+ * `ScanTask_terminalId_active_unique`（同一 terminalId 同时只能有一条 waiting/matched
+ * 记录，见 schema.prisma 里 ScanTask 模型上的注释）——create() 的 insert 里没有其它
+ * 可能触发唯一冲突的列，因此不需要像 order-status.service.ts 的
+ * isPickupCodeUniqueConflict() 那样再去比对 meta.target 区分多个候选唯一约束。
+ */
+function isScanTaskActiveSessionConflict(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
+}
+
+/**
+ * B1-4：getStatus()/cancel() 统一要求 controlToken（会员+游客一视同仁，纵深防御
+ * 叠加在 endUserId 校验之上，而不是替代它）。
+ *
+ * 与本仓库既有惯例同款（如 job-fit.service.ts 的 tokenMatches() / mock-interview.service.ts
+ * 的 verifyToken()）：先对调用方传入的明文 token 做 sha256，转成 Buffer 后与存的 hash
+ * 做 timingSafeEqual；长度不一致时短路返回 false —— 绝不能让 timingSafeEqual 因为两个
+ * Buffer 长度不同而抛异常（那样反而会把"长度不同"这个信息通过异常/耗时差异暴露出去，
+ * 且会变成未处理异常而不是可控的 403）。
+ */
+function timingSafeEqualHex(token: string | undefined, expectedHash: string | null | undefined): boolean {
+  if (!token || !expectedHash) return false
+  const actual = Buffer.from(createHash('sha256').update(token).digest('hex'), 'hex')
+  const expected = Buffer.from(expectedHash, 'hex')
+  return actual.length === expected.length && timingSafeEqual(actual, expected)
+}
+
 @Injectable()
 export class ScanTasksService {
   private readonly logger = new Logger(ScanTasksService.name)
@@ -96,7 +175,7 @@ export class ScanTasksService {
   async create(
     dto: CreateScanTaskDto,
     endUserId: string | null,
-  ): Promise<{ scanTaskId: string; expiresAt: string; instructions: string[] }> {
+  ): Promise<{ scanTaskId: string; controlToken: string; expiresAt: string; instructions: string[] }> {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
@@ -113,28 +192,57 @@ export class ScanTasksService {
     // （未配置行放行，见 TerminalCapabilitiesService.assertUserTaskAllowed）。
     await this.capabilities.assertUserTaskAllowed(terminal.id, 'scan')
 
+    // 与 mock-interview.service.ts / materials.service.ts 的匿名 accessToken 同款惯例：
+    // randomBytes(24) 铸 192-bit 随机 token，DB 只存 sha256 hash，明文只在本次响应里返回一次。
+    const controlToken = randomBytes(24).toString('hex')
+    const controlTokenHash = createHash('sha256').update(controlToken).digest('hex')
+
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
-    const task = await this.prisma.scanTask.create({
-      data: {
-        terminalId: terminal.id,
-        scanType: dto.scanType,
-        endUserId,
-        expiresAt,
-      },
-      select: { id: true },
-    })
+    let task: { id: string }
+    try {
+      task = await this.prisma.scanTask.create({
+        data: {
+          terminalId: terminal.id,
+          scanType: dto.scanType,
+          endUserId,
+          expiresAt,
+          controlTokenHash,
+        },
+        select: { id: true },
+      })
+    } catch (e) {
+      if (isScanTaskActiveSessionConflict(e)) {
+        // B1-2 的 partial unique index 命中：该终端已有一个 waiting/matched 中的会话。
+        throw new ConflictException({
+          error: { code: 'SCAN_TERMINAL_BUSY', message: '该终端当前有正在进行的扫描，请稍后重试或联系工作人员' },
+        })
+      }
+      throw e
+    }
 
     return {
       scanTaskId: task.id,
+      controlToken,
       expiresAt: expiresAt.toISOString(),
       instructions: SCAN_TYPE_INSTRUCTIONS[dto.scanType],
     }
   }
 
-  async getStatus(scanTaskId: string, endUserId: string | null): Promise<ScanTaskStatusResult> {
+  async getStatus(
+    scanTaskId: string,
+    endUserId: string | null,
+    controlToken: string | undefined,
+  ): Promise<ScanTaskStatusResult> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({ error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } })
+    }
+    // 会员 + 游客一视同仁：controlToken 是纵深防御的第二层校验，叠加在下面的
+    // endUserId 归属校验之上（不是替代它）。历史行（B1-1 迁移前创建，
+    // controlTokenHash 为 null）一律拒绝——旧任务本来就该在几分钟内自然过期，
+    // 拒绝比"放行一个没有 token 保护的旧任务"更安全。
+    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
+      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' } })
     }
     if (task.endUserId && task.endUserId !== endUserId) {
       throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' } })
@@ -175,10 +283,19 @@ export class ScanTasksService {
     }
   }
 
-  async cancel(scanTaskId: string, endUserId: string | null): Promise<{ scanTaskId: string; status: 'cancelled' }> {
+  async cancel(
+    scanTaskId: string,
+    endUserId: string | null,
+    controlToken: string | undefined,
+  ): Promise<{ scanTaskId: string; status: 'cancelled' }> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({ error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } })
+    }
+    // 同 getStatus()：controlToken 校验叠加在 endUserId 校验之上，会员+游客一视同仁；
+    // 历史行（controlTokenHash 为 null）一律拒绝。
+    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
+      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' } })
     }
     if (task.endUserId && task.endUserId !== endUserId) {
       throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' } })
@@ -205,6 +322,45 @@ export class ScanTasksService {
   }
 
   /**
+   * B1-10：'matched' 状态心跳。deliverScanFile() 在 CAS 到 'matched' 成功后立刻启动，
+   * 上传结束（成功/失败/抛异常）后必须在 finally 里 clearInterval——否则每一次扫描
+   * 投递都会泄漏一个定时器。
+   *
+   * 背景：ScanTaskReaperTask 每分钟收敛 updatedAt 超过 3 分钟未更新的 'matched' 任务，
+   * 假设是"服务器崩溃、没人再碰这行了"。但 FilesService.upload() 本身没有内部超时，
+   * COS 预签名 URL TTL 是 5 分钟（比 reaper 的 3 分钟阈值还长）——网络慢/文件大时，
+   * 上传本身可能合法地跑超过 3 分钟，此时进程明明还活着、还在真实上传，reaper 却会
+   * 把它误判成"卡死"抢先标记 failed，deliverScanFile() 随后自己的 CAS-to-completed
+   * 落空，触发 B1-6 补偿删除——把一个其实上传成功的文件删掉，用户看到假的"超时"错误。
+   *
+   * 心跳每 intervalMs（生产 60s）把该任务的 updatedAt 显式刷新成当前时间：只要进程
+   * 还活着、心跳还在跑，reaper 的 staleness 判定（updatedAt < now - 3min）就不会命中；
+   * 进程一旦真的崩溃，心跳自然停摆，updatedAt 不再被刷新，reaper 该收敛还是会收敛——
+   * 不影响它对真正卡死任务的收敛能力（见 verify-scan-tasks.ts 的 real-DB 验证）。
+   *
+   * data 里显式写 `updatedAt: new Date()`：已用本地 SQLite 经验证证实 Prisma 对
+   * `@updatedAt` 字段——(1) data 里显式传值会被原样接受、不会被自动机制覆盖；
+   * (2) 不传该字段时才会自动 bump。这里选择显式传值，语义最直白。
+   *
+   * where 与 reaper 自己的目标保持一致（status: 'matched'）：任务如果已经并发转移到
+   * 其它终态（例如被取消），心跳只是安静地 no-op（updateMany 命中 0 行），不会跟合法
+   * 的状态变更打架。心跳写入本身失败（例如瞬时 DB 抖动）只记 warn 日志、绝不 rethrow——
+   * 不能让一次心跳失败打断一个本来会成功的上传。
+   */
+  private startMatchedHeartbeat(taskId: string, intervalMs: number = SCAN_MATCHED_HEARTBEAT_INTERVAL_MS): NodeJS.Timeout {
+    return setInterval(() => {
+      this.prisma.scanTask
+        .updateMany({ where: { id: taskId, status: 'matched' }, data: { updatedAt: new Date() } })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
+          this.logger.warn(
+            `scan task ${taskId}: matched-state heartbeat tick failed (non-fatal, upload continues): ${message}`,
+          )
+        })
+    }, intervalMs)
+  }
+
+  /**
    * Agent 投递入口：找该终端最早一条仍在 waiting 且未过期的任务，建 FileObject，
    * 标记任务完成。找不到匹配任务时抛 409，调用方（Agent）据此把文件移入隔离目录，
    * 绝不猜测归属。
@@ -216,6 +372,34 @@ export class ScanTasksService {
     mimeType: string
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
+
+    // B1-11：内容级去重防"响应丢失后的重复投递"跨用户误挂载——见上方 SCAN_CONTENT_DEDUP_WINDOW_MS
+    // 注释。只看 fileId 非空的任务（真正建档完成过的），不影响 SCAN_TASK_STATE_CHANGED 那条
+    // 从未写入 fileId 的取消/竞态路径。
+    const contentHash = createHash('sha256').update(args.buffer).digest('hex')
+    const recentlyDeliveredForTerminal = await this.prisma.scanTask.findMany({
+      where: {
+        terminalId: args.terminalId,
+        fileId: { not: null },
+        updatedAt: { gt: new Date(now.getTime() - SCAN_CONTENT_DEDUP_WINDOW_MS) },
+      },
+      select: { fileId: true },
+    })
+    if (recentlyDeliveredForTerminal.length > 0) {
+      const candidateFileIds = recentlyDeliveredForTerminal
+        .map((t) => t.fileId)
+        .filter((id): id is string => id !== null)
+      const duplicate = await this.prisma.fileObject.findFirst({
+        where: { id: { in: candidateFileIds }, sha256: contentHash },
+        select: { id: true },
+      })
+      if (duplicate) {
+        throw new ConflictException({
+          error: { code: 'SCAN_FILE_ALREADY_DELIVERED', message: '该扫描文件此前已成功投递，请勿重复上传' },
+        })
+      }
+    }
+
     const task = await this.prisma.scanTask.findFirst({
       where: { terminalId: args.terminalId, status: 'waiting', expiresAt: { gt: now } },
       orderBy: { createdAt: 'asc' },
@@ -233,6 +417,9 @@ export class ScanTasksService {
       throw new ConflictException({ error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' } })
     }
 
+    // B1-10：心跳必须在 CAS-to-matched 成功后、上传真正开始前启动，且无论下面的上传
+    // 成功/失败/抛异常都要在 finally 里清掉——否则每一次扫描投递都会泄漏一个定时器。
+    const heartbeat = this.startMatchedHeartbeat(task.id)
     try {
       const purpose = SCAN_TYPE_TO_PURPOSE[task.scanType as ScanType]
       const uploaded = await this.files.upload({
@@ -249,11 +436,22 @@ export class ScanTasksService {
       })
       if (completed.count === 0) {
         // 任务在上传期间被取消（或已被其它方式改变状态）。文件已经真实上传成功，
-        // 但不能把它挂到一个已经不再 "matched" 的任务上——诚实记录，不假装成功，
-        // 也不静默丢弃已产生的真实文件引用。
-        this.logger.warn(
-          `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); uploaded file ${uploaded.fileId} is orphaned`,
-        )
+        // 但不能把它挂到一个已经不再 "matched" 的任务上——诚实记录，不假装成功。
+        // B1-6：不再静默留下孤儿文件——用 FilesService.systemDelete() 补偿删除
+        // （绕过 canAccessFile() 的用户权限校验，专给系统自身产生的清理场景用）。
+        // 补偿删除本身失败（例如文件已经被其它路径删掉）不能打断这里原本要走的
+        // 取消响应流程，只降级为一条 warn，不 rethrow。
+        try {
+          await this.files.systemDelete(uploaded.fileId, 'ScanTask cancelled during upload, compensating orphaned file')
+          this.logger.log(
+            `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); orphaned file ${uploaded.fileId} deleted via compensating systemDelete()`,
+          )
+        } catch (cleanupError) {
+          const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          this.logger.warn(
+            `scan task ${task.id}: compensating systemDelete() failed for orphaned file ${uploaded.fileId}: ${cleanupMessage}`,
+          )
+        }
         throw new ConflictException({
           error: { code: 'SCAN_TASK_STATE_CHANGED', message: '扫描任务状态已变化，请重新发起扫描' },
         })
@@ -266,6 +464,10 @@ export class ScanTasksService {
         data: { status: 'failed', errorCode: 'SCAN_UPLOAD_FAILED', errorMessage: message },
       })
       throw error
+    } finally {
+      // B1-10：无论上面成功、走 SCAN_TASK_STATE_CHANGED 分支、还是落进 catch，
+      // 心跳定时器都必须在这里清掉——遗漏会让每一次扫描投递都泄漏一个 setInterval。
+      clearInterval(heartbeat)
     }
   }
 

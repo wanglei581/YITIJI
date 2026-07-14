@@ -29,6 +29,9 @@ export function ScanSettingsPage() {
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scanTaskId, setScanTaskId] = useState<string | null>(null)
+  // B1-8：controlToken 只保存在内存态 React state（不落 localStorage/sessionStorage），
+  // 刷新页面即丢、需要重新走一遍创建流程——和游客扫描会话本身"中间态不必跨刷新存活"同一原则。
+  const [controlToken, setControlToken] = useState<string | null>(null)
 
   // 标记任务是否已成功交给下一步(进入 /scan/progress),交给下一步后卸载清理不应再取消该任务
   const confirmedRef = useRef(false)
@@ -36,6 +39,8 @@ export function ScanSettingsPage() {
   // 否则第一次(被丢弃的)调用在 cleanup 时还拿不到 id，之后 resolve 时又被自己的 cancelled 挡住，
   // 会导致创建了一个后端任务却永远没人取消它（孤儿任务）。
   const createdIdRef = useRef<string | null>(null)
+  // 同 createdIdRef：cleanup/handleBack 跑在 effect 闭包外或跨渲染，需要 ref 而非 state 来拿到最新的 controlToken。
+  const controlTokenRef = useRef<string | null>(null)
   // 用共享 promise ref 跨越 StrictMode 双调用，确保只真正发起一次 createScanSession 网络请求，
   // 而不是每次 effect 调用都各自 fire 一个新请求（否则一次访问会在后端建两条任务记录）。
   const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
@@ -56,17 +61,19 @@ export function ScanSettingsPage() {
     sessionPromiseRef.current
       .then((created) => {
         createdIdRef.current = created.scanTaskId
+        controlTokenRef.current = created.controlToken
         if (cancelled) {
           // 这次 effect 调用在请求完成前就已经被清理。如果它仍是"当前有效"的那次调用
           // (不是被 StrictMode 丢弃的第一次调用),说明用户在任务创建完成前就已经离开且未确认，
           // cleanup 触发时还不知道任务ID、来不及取消，这里补一次尽力取消。
           if (generationRef.current === myGeneration && !confirmedRef.current) {
-            void cancelScanSession(created.scanTaskId, getToken()).catch(() => undefined)
+            void cancelScanSession(created.scanTaskId, created.controlToken, getToken()).catch(() => undefined)
           }
           return
         }
         setInstructions(created.instructions)
         setScanTaskId(created.scanTaskId)
+        setControlToken(created.controlToken)
       })
       .catch((err) => {
         if (cancelled) return
@@ -86,16 +93,16 @@ export function ScanSettingsPage() {
       if (generationRef.current !== myGeneration) return
       // 组件卸载时,如果任务已创建但还没交给下一步(比如用户没点确认就离开了),
       // 尽力取消,避免孤儿 waiting 任务在有效期内被下一个物理扫描误匹配到别的用户。
-      if (createdIdRef.current && !confirmedRef.current) {
-        void cancelScanSession(createdIdRef.current, getToken()).catch(() => undefined)
+      if (createdIdRef.current && controlTokenRef.current && !confirmedRef.current) {
+        void cancelScanSession(createdIdRef.current, controlTokenRef.current, getToken()).catch(() => undefined)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleBack = () => {
-    if (scanTaskId && !confirmedRef.current) {
-      void cancelScanSession(scanTaskId, getToken()).catch(() => {
+    if (scanTaskId && controlToken && !confirmedRef.current) {
+      void cancelScanSession(scanTaskId, controlToken, getToken()).catch(() => {
         // best-effort：任务会在过期后自然结束，这里不阻塞用户返回
       })
     }
@@ -103,10 +110,10 @@ export function ScanSettingsPage() {
   }
 
   const handleConfirm = () => {
-    if (!scanTaskId || starting) return
+    if (!scanTaskId || !controlToken || starting) return
     confirmedRef.current = true
     setStarting(true)
-    navigate('/scan/progress', { state: { scanTaskId, scanType } })
+    navigate('/scan/progress', { state: { scanTaskId, scanType, controlToken } })
   }
 
   return (
@@ -152,7 +159,7 @@ export function ScanSettingsPage() {
         <Button variant="secondary" size="lg" className="flex-1" onClick={handleBack}>
           返回
         </Button>
-        <Button size="lg" className="flex-1" disabled={!scanTaskId || starting} onClick={handleConfirm}>
+        <Button size="lg" className="flex-1" disabled={!scanTaskId || !controlToken || starting} onClick={handleConfirm}>
           我已在打印机上操作，开始等待
         </Button>
       </div>
