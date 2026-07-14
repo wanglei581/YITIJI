@@ -31,7 +31,8 @@ import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
 import { ResumeLayoutControls } from './components/ResumeLayoutControls'
 import { useResumeLayout } from './hooks/useResumeLayout'
 
-/** 导出格式可选项(Wave1 Task 8):PDF 可直接打印,Word/TXT/Markdown 供下载编辑。 */
+/** 导出格式可选项(Wave1 Task 8,Wave6 起四种格式均可打印):PDF 直接打印本文件；
+ *  Word/TXT/Markdown 下载供编辑，打印时使用另外渲染的同内容 PDF 副本。 */
 const EXPORT_FORMAT_OPTIONS: { value: ResumeExportFormat; label: string }[] = [
   { value: 'pdf', label: 'PDF' },
   { value: 'docx', label: 'Word' },
@@ -236,7 +237,7 @@ export function ResumeOptimizePage() {
   }
 
   const handlePrint = () => {
-    if (printNavigating || !exported?.printFileUrl || exportFormat !== 'pdf') return
+    if (printNavigating || !exported?.printFileUrl) return
     setPrintNavigating(true)
     navigate('/print/confirm', {
       state: {
@@ -514,21 +515,11 @@ export function ResumeOptimizePage() {
           </Button>
         )}
         {exported && (
-          <div className="grid grid-cols-2 gap-3">
-            <Button size="lg" variant="secondary" disabled={exporting} onClick={() => void handleExport()}>
-              重新导出
-            </Button>
-            {exportFormat === 'pdf' ? (
-              <Button
-                size="lg"
-                className="flex items-center justify-center gap-2"
-                disabled={!exported.printFileUrl || printNavigating}
-                onClick={handlePrint}
-              >
-                <PrinterIcon className="h-5 w-5" />
-                {printNavigating ? '正在进入打印确认…' : exported.printFileUrl ? '去打印优化版' : '打印链接未就绪'}
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Button size="lg" variant="secondary" disabled={exporting} onClick={() => void handleExport()}>
+                重新导出
               </Button>
-            ) : (
               <Button
                 size="lg"
                 variant="secondary"
@@ -539,8 +530,17 @@ export function ResumeOptimizePage() {
                 <FileDownIcon className="h-5 w-5" />
                 下载{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label}
               </Button>
-            )}
-          </div>
+            </div>
+            <Button
+              size="lg"
+              className="flex items-center justify-center gap-2"
+              disabled={!exported.printFileUrl || printNavigating}
+              onClick={handlePrint}
+            >
+              <PrinterIcon className="h-5 w-5" />
+              {printNavigating ? '正在进入打印确认…' : exported.printFileUrl ? '去打印优化版' : '打印链接未就绪'}
+            </Button>
+          </>
         )}
         <div className="grid grid-cols-2 gap-3">
           <Button size="lg" variant="secondary" onClick={() => requestLeave(handleSaveAdvice)}>保存优化建议</Button>
