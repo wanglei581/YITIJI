@@ -317,14 +317,17 @@ function verifyKioskContract(): void {
   if (
     /屏上收款码/.test(cashier) &&
     /扫付款码/.test(cashier) &&
+    !/当前支付通道暂不支持扫付款码/.test(cashier) &&
+    !/const canUseCodePay =/.test(cashier) &&
     /const shouldAutoReconcile =/.test(cashier) &&
     /s\.attempt\?\.status === 'pending'/.test(cashier) &&
     /s\.attempt\.channel !== 'sandbox'/.test(cashier) &&
     !/!s\.attempt\.qrCodeContent/.test(cashier) &&
     /onSubmitCode\(\)/.test(panel) &&
+    /autoFocus/.test(panel) &&
     /maxLength=\{18\}/.test(panel)
   ) {
-    pass('cashier auto-reconciles every real pending attempt, including screen QR, and keeps scanner submission')
+    pass('cashier enables both screen QR and scanner payment-code modes for every real channel, while retaining automatic reconciliation')
   } else {
     fail('cashier QR auto-reconciliation guard missing')
   }

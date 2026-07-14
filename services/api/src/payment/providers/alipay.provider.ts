@@ -21,6 +21,8 @@ import { createSign, createVerify } from 'crypto'
 import type {
   CallbackAck,
   CallbackVerifyResult,
+  CodePaymentCreateInput,
+  CodePaymentCreateResult,
   PaymentCallbackContext,
   PaymentCallbackEvent,
   PaymentProvider,
@@ -143,6 +145,28 @@ function mapTradeStatus(status: string | null): 'success' | 'failed' | 'ignored'
   return 'failed' // TRADE_CLOSED 等：本尝试不会再支付成功
 }
 
+/**
+ * 当前终端扫码枪经现场探测只提交 18 位数字；支付宝付款码实际机具前缀为 25–30。
+ * 格式不符时绝不把无效码发送给渠道，也不持久化/审计付款码本身。
+ */
+function isAlipayTerminalAuthCode(authCode: string): boolean {
+  return /^(?:2[5-9]|30)\d{16}$/.test(authCode)
+}
+
+/**
+ * 40004 仅表示“业务处理失败”，单看总码不足以证明没有扣款。
+ * 只有白名单中的明确终态才允许释放订单；其余子码必须查单收敛，防止重复扫码扣款。
+ */
+const FINAL_CODE_PAYMENT_SUB_CODES = new Set([
+  'ACQ.PAYMENT_AUTH_CODE_INVALID',
+  'ACQ.BUYER_BALANCE_NOT_ENOUGH',
+  'ACQ.TRADE_HAS_CLOSE',
+])
+
+function isExplicitCodePaymentFailure(message: string): boolean {
+  return message.includes('40004') && [...FINAL_CODE_PAYMENT_SUB_CODES].some((subCode) => message.includes(subCode))
+}
+
 export class AlipayProvider implements PaymentProvider {
   readonly channel = 'alipay' as const
   private readonly cfg: AlipayProviderConfig
@@ -244,6 +268,56 @@ export class AlipayProvider implements PaymentProvider {
     if (!qrCode) throw new Error('ALIPAY_CHANNEL_ERROR: QR_CODE_MISSING')
     // 当面付无独立 prepay_id：prepayId 统一取 out_trade_no（= attemptId），notify 回带同值。
     return { prepayId: input.attemptId, qrCodeContent: qrCode }
+  }
+
+  /**
+   * 主扫付款码：商户扫码枪读取用户支付宝付款码，走 alipay.trade.pay。
+   * 渠道结果不可知时宁可保持 pending 后查单，绝不回退订单让用户再次付款。
+   */
+  async createCodePayment(input: CodePaymentCreateInput): Promise<CodePaymentCreateResult> {
+    if (!isAlipayTerminalAuthCode(input.authCode)) {
+      return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码无效或不支持此终端' }
+    }
+    if (process.env['NODE_ENV'] === 'production' && process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] !== 'true') {
+      return {
+        status: 'failed',
+        channelTxnNo: null,
+        prepayId: null,
+        amountCents: null,
+        failReason: '付款码支付自动核验未启用，请联系工作人员',
+      }
+    }
+
+    let node: Record<string, unknown>
+    try {
+      node = await this.call('alipay.trade.pay', {
+        out_trade_no: input.attemptId,
+        scene: 'bar_code',
+        auth_code: input.authCode,
+        total_amount: centsToYuan(input.amountCents),
+        subject: `打印服务订单 ${input.orderNo}`,
+        timeout_express: '5m',
+        ...(input.terminalId ? { terminal_id: input.terminalId.slice(0, 32) } : {}),
+      })
+    } catch (e) {
+      const message = (e as Error).message ?? ''
+      if (message.includes('10003')) {
+        return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '请在手机上完成支付验证' }
+      }
+      if (isExplicitCodePaymentFailure(message)) {
+        return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码无效、已过期或支付未完成' }
+      }
+      // 未知 40004 子码、20000、HTTP/超时、验签失败或连接中断均可能发生在渠道已受理之后；交由查单收敛。
+      return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付结果待核实，请稍候' }
+    }
+
+    const channelTxnNo = asString(node['trade_no'])
+    const amountCents = yuanToCents(asString(node['total_amount']))
+    if (!channelTxnNo || amountCents === null) {
+      // 10000 但缺少可验证的金额/流水号：不能采信为成功，也不能放开重付。
+      return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付结果待核实，请稍候' }
+    }
+    return { status: 'success', channelTxnNo, prepayId: input.attemptId, amountCents, failReason: null }
   }
 
   async verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult> {

@@ -93,6 +93,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
             <p className="mt-1 text-sm text-neutral-500">扫码器会自动输入并提交；也可手动输入 18 位数字。</p>
           </div>
           <input
+            autoFocus
             value={authCode}
             onChange={(event) => onAuthCodeChange(event.target.value.replace(/\D/g, '').slice(0, 18))}
             inputMode="numeric"

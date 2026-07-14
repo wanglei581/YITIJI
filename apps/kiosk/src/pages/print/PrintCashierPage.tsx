@@ -168,10 +168,6 @@ export function PrintCashierPage() {
   const selectPaymentMethod = useCallback(
     (method: PaymentMethod) => {
       if (!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt) return
-      if (method === 'code' && selectedChannel === 'alipay') {
-        setIssueError('当前支付通道暂不支持扫付款码，请选择屏上收款码')
-        return
-      }
       setPaymentMethod(method)
       setSnapshot(null)
       setIssueError(null)
@@ -384,7 +380,6 @@ export function PrintCashierPage() {
   const total = formatCents(amountCents)
   const canProceed = view?.canProceed ?? false
   const canReissue = view?.canReissue ?? false
-  const canUseCodePay = selectedChannel !== 'alipay'
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -459,7 +454,7 @@ export function PrintCashierPage() {
           <button
             type="button"
             onClick={() => selectPaymentMethod('code')}
-            disabled={!selectedChannel || !canUseCodePay || issuing || codeSubmitting || hasActivePaymentAttempt}
+            disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
             className={[
               'flex min-h-[56px] items-center justify-center gap-2 rounded-lg border-2 px-4 text-base font-semibold transition-colors',
               paymentMethod === 'code' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
