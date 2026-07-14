@@ -167,6 +167,7 @@ console.log('\n=== Kiosk 首页青序 LightFlow 静态合同 ===')
 
 const packageJson = read('package.json')
 const home = read('src/pages/home/HomePage.tsx')
+const serviceGroups = read('src/pages/home/serviceGroups.ts')
 const homeDeviceStatus = read('src/pages/home/hooks/useHomeDeviceStatus.ts')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const kioskLayout = read('../../packages/ui/src/layouts/KioskLayout.tsx')
@@ -187,12 +188,11 @@ const allCss = cssPaths.map(read).join('\n')
 const loginDialogCss = read('src/pages/auth/styles/login-dialog.css')
 const topBar = between(home, 'function KioskTopBar()', 'function useHomeStats(')
 const homeStats = functionBlock(home, /function\s+useHomeStats\s*\(/)
-const identityPanel = between(home, 'function IdentityPanel()', '/* ── 服务分组')
+const identityPanel = functionBlock(home, /function\s+IdentityPanel\s*\(/)
 const loginTriggerButton = buttonByVisibleText(identityPanel, '登录 / 注册')
-const continuePanel = between(home, 'function ContinuePanel()', '/* ── 智慧校园')
-const smartCampusSection = between(home, 'function SmartCampusHorizontalSection()', '/* ── 百宝箱')
-const toolboxSection = between(home, 'function ToolboxSection()', 'export function HomePage()')
-const serviceGroupCard = between(home, 'function ServiceGroupCard(', '// ─── 继续上次')
+const continuePanel = functionBlock(home, /function\s+ContinuePanel\s*\(/)
+const smartCampusSection = functionBlock(home, /function\s+SmartCampusHorizontalSection\s*\(/)
+const toolboxSection = functionBlock(home, /function\s+ToolboxSection\s*\(/)
 const homePage = functionBlock(home, /export\s+function\s+HomePage\s*\([^)]*\)/)
 const homeReturnIndex = patternIndex(homePage, /\breturn\s*\(/)
 const homeReturn = homeReturnIndex >= 0 ? homePage.slice(homeReturnIndex) : ''
@@ -495,7 +495,7 @@ for (const path of cssPaths) {
 
 for (const [source, selectors, label] of [
   [shell, ['.khome {', '.khome .k-top', '.khome .service-value', '.khome .k-device-status', '.khome .identity', '.khome .btn', '.khome .k-ripple', '@keyframes kRise'], 'shell'],
-  [services, ['.khome .service-quick-nav', '.khome .home-service-catalog', '.khome .service-catalog-group', '.khome .service-catalog-tile', '.khome .cat-card', '.khome .sub.disabled', '.khome .sub:focus-visible'], 'services'],
+  [services, ['.khome .home-service-catalog', '.khome .home-reference-panel', '.khome .home-reference-icon', '.khome .cat-card', '.khome .sub.disabled', '.khome .sub:focus-visible'], 'services'],
   [continuation, ['.khome .cat-empty', '.khome .continue', '.khome .compliance'], 'continuation'],
 ]) {
   expect(selectors.every((selector) => source.includes(selector)), `${label} CSS 覆盖约定职责`)
@@ -639,7 +639,11 @@ expectMatches(kioskRoot, /visualTheme=\{isServiceDeskRoute \? 'service-desk' : '
 expectMatches(kioskRoot, /density="touch"/, 'Kiosk 首页视觉密度保持 touch')
 expect((kioskRoot.match(/service-desk/g) ?? []).length === 1, 'KioskRoot 只有一个 service-desk 路由 opt-in')
 
-const groupsBlock = home.match(/const SERVICE_GROUPS:[\s\S]*?\n\]\n\nconst SUB_ACCENT/)?.[0] ?? ''
+const groupsBlock = serviceGroups.match(/export const SERVICE_GROUPS:[\s\S]*?\n\]\n\nexport const SUB_ACCENT/)?.[0] ?? ''
+const serviceGroupsLineCount = serviceGroups ? serviceGroups.split(/\r?\n/).length : 0
+expect(serviceGroups.length > 0 && serviceGroupsLineCount < 300, `serviceGroups.ts 已提取且少于 300 行（当前 ${serviceGroupsLineCount}）`)
+expectMatches(serviceGroups, /import\s+type\s+\{\s*KioskIconName\s*\}\s+from\s+['"]\.\.\/\.\.\/components\/kiosk-icon['"]/, '服务分组模块复用 KioskIconName 类型')
+expect(home.includes("from './serviceGroups'"), 'HomePage 从 serviceGroups 模块导入真实服务数据')
 const groupCount = (groupsBlock.match(/^    accent:/gm) ?? []).length
 expect(groupCount === 6, `SERVICE_GROUPS 保持六组（当前 ${groupCount}）`)
 for (const title of ['AI简历服务', '岗位信息', '招聘会', '打印扫描', 'AI面试训练', '政策服务']) {
@@ -683,57 +687,40 @@ for (const title of ['证件复印', '证件照打印']) {
 expect(!/title:\s*'云打印'/.test(groupsBlock), '云打印入口保持按正式取舍决策删除')
 expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 2, 'SERVICE_GROUPS 仅保留当前两个禁用入口')
 
-// 4188 紧凑服务目录：只替换首页服务区，不改变 Hero、身份卡或现有业务入口。
-expectMatches(homePage, /<nav\s+className="service-quick-nav"\s+aria-label="服务分类">/, 'HomePage 在服务目录前渲染六项分类导航')
-expectMatches(
-  homePage,
-  /SERVICE_GROUPS\.map\(\(group\) => \(\s*<a\s+key=\{group\.id\}\s+href=\{`#\$\{group\.id\}`\}>\s*\{group\.title\}\s*<\/a>/,
-  '分类导航使用既有分组标题和稳定锚点，不新增路由',
-)
-expectMatches(homePage, /<main\s+className="home-service-catalog"\s+aria-label="当前可使用功能">/, 'HomePage 用紧凑服务目录替换旧服务网格')
+// 4188 目录式服务区：只替换首页服务区，不改变 Hero、身份卡或现有业务入口。
+expectMatches(home, /import\s*\{\s*ReferenceServiceNav\s*\}\s*from\s*['"]\.\.\/\.\.\/components\/lightflow\/ReferenceServiceNav['"]/, 'HomePage 导入共享六项分类导航')
+expectMatches(home, /import\s*\{\s*useLocation,\s*useNavigate\s*\}\s*from\s*['"]react-router-dom['"]/, 'HomePage 导入 useLocation 监听 SPA hash')
+expectMatches(homePage, /const\s*\{\s*hash\s*\}\s*=\s*useLocation\(\)/, 'HomePage 从 React Router 读取当前 hash')
+expectMatches(homePage, /useEffect\(\(\)\s*=>\s*\{[\s\S]*?HOME_REFERENCE_HASH_IDS\.has\(targetId\)[\s\S]*?document\.getElementById\(targetId\)\?\.scrollIntoView\(\{\s*behavior:\s*'smooth',\s*block:\s*'start'\s*\}\)[\s\S]*?\},\s*\[hash\]\)/, 'HomePage 仅在白名单 hash 变化时平滑滚动目标')
+expect(!home.includes('href="/#'), '首页 hash 导航不使用硬刷新 href=/#')
+expect(!home.includes('window.location'), '首页 hash 导航不访问 window.location')
+expectMatches(homePage, /<IdentityPanel \/>\s*<ContinuePanel \/>\s*<ReferenceServiceNav \/>/, '首页严格保持 身份卡 → 继续上次 → 共享分类导航 顺序')
+expectMatches(homePage, /<main\s+className="home-service-catalog"\s+aria-label="当前可使用功能">/, 'HomePage 渲染 4188 服务目录主区')
+expect(!homePage.includes('service-quick-nav'), 'HomePage 不再渲染旧胶囊分类导航')
 expect(!homePage.includes('className="sec-head"'), 'HomePage 不再渲染旧服务区 sec-head')
 expect(!homePage.includes('className="home-grid"'), 'HomePage 不再渲染旧服务区 home-grid')
+
+for (const id of ['resume', 'jobs', 'job-fairs', 'print-scan', 'interview', 'policy']) {
+  expectMatches(home, new RegExp(`id=["']${id}["']`), `首页保留 #${id} 目标锚点`)
+}
+expectMatches(groupsBlock, /AI简历诊断[\s\S]{0,140}AI简历优化/, 'AI 简历首行双主入口')
+expectMatches(homePage, /<div\s+className="lf-reference-pair"\s+aria-label="岗位信息与招聘会">/, '岗位信息与招聘会放入同一 lf-reference-pair')
+expectMatches(home, /className="lf-reference-group-head">\s*<span\s+className=\{`home-reference-icon/, '每个服务分组头的图标容器是第一个直接子元素')
+expectMatches(home, /<button\b[\s\S]{0,180}className="lf-reference-primary"[^>]*>\s*<span\s+className=\{`home-reference-icon/, '每个服务主入口的图标容器是第一个直接子元素')
+
+expect(!services.includes('.khome .service-quick-nav'), '服务 CSS 已移除旧胶囊分类导航')
+expect(!services.includes('.khome .service-catalog-group'), '服务 CSS 已移除旧大圆角服务组')
+expect(!services.includes('.khome .service-catalog-tile'), '服务 CSS 已移除旧深蓝主卡入口')
 expect(!cssRule(services, '.khome .sec-head'), '服务 CSS 不再定义旧 sec-head 布局合同')
 expect(!cssRule(services, '.khome .home-grid'), '服务 CSS 不再定义旧 home-grid 布局合同')
 expect(!cssRule(responsive, '.khome .home-grid'), '响应式 CSS 不再保留旧 home-grid 尺寸合同')
+expectMatches(cssRule(services, '.khome .home-service-catalog'), /display:\s*grid[\s\S]*?gap:\s*16px/, '服务目录按 4188 面板留白排列')
+expectMatches(cssRule(services, '.khome .home-reference-panel'), /min-width:\s*0/, '首页特有面板限制最小宽度避免横向溢出')
+expectMatches(services, /\.khome \.home-reference-dual,[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, 'AI 简历主入口保持桌面两列')
+expect(!/box-shadow\s*:/.test(cssRule(services, '.khome .home-reference-panel')), '首页服务面板不使用大投影')
 
-for (const [id, layout, label] of [
-  ['resume', 'featured', 'AI 简历服务'],
-  ['jobs', 'paired', '岗位信息'],
-  ['job-fairs', 'paired', '招聘会'],
-  ['print-scan', 'standard', '打印扫描'],
-  ['interview', 'standard', 'AI 面试训练'],
-  ['policy', 'wide', '政策服务'],
-]) {
-  expect(
-    new RegExp(`id:\\s*'${escapeRegExp(id)}'[\\s\\S]*?layout:\\s*'${escapeRegExp(layout)}'`).test(groupsBlock),
-    `服务组 ${label} 保留稳定目录 id 与 4188 布局变体`,
-  )
-}
-expectMatches(serviceGroupCard, /<section\s+id=\{group\.id\}[\s\S]*?\['service-catalog-group',\s*group\.layout\]/, '服务组把稳定锚点和布局变体渲染到目录 section')
-expectMatches(serviceGroupCard, /group\.layout === 'featured'[\s\S]*?group\.tiles\.slice\(0,\s*2\)[\s\S]*?featured-primary/, 'AI 简历服务先渲染两个 featured 主入口')
-expectMatches(serviceGroupCard, /group\.tiles\.slice\(2\)[\s\S]*?featured-compact/, 'AI 简历服务保留四个 compact 次入口')
-expectMatches(serviceGroupCard, /\['service-catalog-group',\s*group\.layout\]/, '岗位信息与招聘会使用 paired 桌面并列变体')
-expectMatches(serviceGroupCard, /variant=\{variant\}\s+catalog\s+showDescription/, '只有首页六个服务组启用紧凑目录磁贴与说明')
-
-expectMatches(cssRule(services, '.khome .service-quick-nav'), /display:\s*grid[\s\S]*?grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/, '分类导航桌面端为六项紧凑目录')
-expectMinimumHeight(services, '.khome .service-quick-nav a', 48, '分类导航触控入口')
-expectMatches(cssRule(services, '.khome .home-service-catalog'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '服务目录桌面端为两列工作面板')
-expectMatches(cssRule(services, '.khome .service-catalog-group.featured'), /grid-column:\s*1\s*\/\s*-1/, 'AI 简历服务占满目录首行')
-expectMatches(cssRule(services, '.khome .service-catalog-group.wide'), /grid-column:\s*1\s*\/\s*-1/, '政策服务保留全宽自适应分区')
-expectMatches(cssRule(services, '.khome .featured-primary-grid'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, 'AI 简历首行保留两张主入口')
-expectMatches(cssRule(services, '.khome .featured-compact-grid'), /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/, 'AI 简历次入口保持四项紧凑排列')
-expectMinimumHeight(services, '.khome .service-catalog-tile', 48, '紧凑服务入口')
-expectMinimumHeight(services, '.khome .service-catalog-tile.featured-primary', 56, 'AI 简历主入口')
-expect(!/box-shadow\s*:/.test(cssRule(services, '.khome .service-catalog-group')), '紧凑服务面板不再使用旧大卡片投影')
-
-expectMatches(cssRule(compact390, '.khome .service-quick-nav'), /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/, '390px 分类导航回退为三列两行')
-expectMatches(cssRule(compact390, '.khome .home-service-catalog'), /grid-template-columns:\s*1fr/, '390px 服务目录回退为单列')
-expectMatches(cssRule(compact390, '.khome .featured-primary-grid'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '390px AI 主入口保持两列可触达')
-expectMatches(cssRule(compact390, '.khome .featured-compact-grid'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '390px AI 次入口回退为两列')
-for (const selector of ['.khome .service-quick-nav', '.khome .home-service-catalog', '.khome .service-catalog-group']) {
-  expectMatches(cssRule(services, selector), /min-width:\s*0/, `${selector} 限制最小宽度以避免页面横向溢出`)
-}
+expectMatches(cssRule(compact390, '.khome .home-reference-dual'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '390px AI 主入口保持两列可触达')
+expectMatches(cssRule(compact390, '.khome .home-reference-secondary-pair'), /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '390px AI 次入口保持两列')
 
 expectMatches(
   home,

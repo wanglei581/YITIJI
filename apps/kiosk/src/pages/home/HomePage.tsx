@@ -15,10 +15,11 @@ import type {
   MemberResumeItem,
   SmartCampusModuleKey,
 } from '@ai-job-print/shared'
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
+import { ReferenceServiceNav } from '../../components/lightflow/ReferenceServiceNav'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
@@ -28,10 +29,12 @@ import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
 import { useHomeDeviceStatus } from './hooks/useHomeDeviceStatus'
+import { SERVICE_GROUPS, SUB_ACCENT, type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
 import './home-service-desk.css'
 
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
 let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
+const HOME_REFERENCE_HASH_IDS = new Set(['resume', 'jobs', 'job-fairs', 'print-scan', 'interview', 'policy'])
 
 /* ── 顶栏（LightFlow 白色服务台 + 真实设备状态） ── */
 function KioskTopBar() {
@@ -210,147 +213,9 @@ function IdentityPanel() {
   )
 }
 
-/* ── 服务分组（路由 / intent / 分组顺序与换装前完全一致；仅替换视觉） ── */
-interface ServiceTile {
-  title: string
-  description?: string
-  icon: KioskIconName
-  to?: string
-  state?: Record<string, unknown>
-  disabled?: boolean
-}
-
-type Accent = 'teal' | 'clay' | 'slate' | 'wheat' | 'plum' | 'tool'
-
-interface ServiceGroup {
-  id: string
-  title: string
-  subtitle: string
-  icon: KioskIconName
-  accent: Accent
-  layout: 'featured' | 'paired' | 'standard' | 'wide'
-  span2?: boolean
-  cols2?: boolean
-  badge?: { icon: KioskIconName; label: string }
-  tiles: ServiceTile[]
-  /** 组标题点击目标；未设置时沿用原逻辑（跳到第一个可用子项）。 */
-  titleTo?: string
-}
-
-const SERVICE_GROUPS: ServiceGroup[] = [
-  {
-    id: 'resume',
-    title: 'AI简历服务',
-    subtitle: '诊断、优化、打印，一次完成',
-    icon: 'resume',
-    accent: 'teal',
-    layout: 'featured',
-    span2: true,
-    badge: { icon: 'star', label: '推荐先做' },
-    tiles: [
-      // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
-      { title: 'AI简历诊断', description: '上传后查看结构与表达建议', icon: 'doc-check', to: '/resume/source?intent=diagnose' },
-      { title: 'AI简历优化', description: '基于目标岗位优化表达', icon: 'sparkle', to: '/resume/source?intent=optimize' },
-      { title: '简历素材库', description: '选择模板与素材参考', icon: 'book', to: '/resume/templates' },
-      { title: '职业规划', description: '梳理职业方向与行动建议', icon: 'compass', to: '/resume/career-plan' },
-      { title: '简历打印', description: '生成后在本机打印', icon: 'printer', to: '/print/upload?source=resume' },
-      { title: '求职材料', description: '整理求职材料与清单', icon: 'briefcase', to: '/resume/materials' },
-    ],
-  },
-  {
-    id: 'jobs',
-    title: '岗位信息',
-    subtitle: '第三方来源岗位，去来源平台投递',
-    icon: 'briefcase',
-    accent: 'clay',
-    layout: 'paired',
-    tiles: [
-      { title: '全职岗位', description: '第三方来源全职信息', icon: 'briefcase', to: '/jobs?category=fulltime' },
-      { title: '实习岗位', description: '第三方来源实习信息', icon: 'campus', to: '/jobs?category=intern' },
-      { title: '兼职信息', description: '第三方来源兼职信息', icon: 'clock', to: '/jobs?category=parttime' },
-      { title: '全部岗位', description: '按分类查看全部来源岗位', icon: 'files', to: '/jobs' },
-      { title: '找企业', description: '查看企业信息与职位来源', icon: 'shield', to: '/companies' },
-      // 2026-07-11：按 IA 整合审计 §3⑧ 拍板执行——复用既有「岗位匹配参考」（2D）能力，不新增独立路由/页面。
-      { title: '岗位大师', description: '岗位匹配参考与优化方向', icon: 'star', to: '/resume/job-fit' },
-    ],
-  },
-  {
-    id: 'job-fairs',
-    title: '招聘会',
-    subtitle: '查看场次信息，去来源平台预约',
-    icon: 'pin',
-    accent: 'wheat',
-    layout: 'paired',
-    tiles: [
-      { title: '社会招聘会', description: '查看社会招聘会场次', icon: 'pin', to: '/job-fairs' },
-      { title: '校园招聘会', description: '查看校园招聘会安排', icon: 'campus', to: '/campus' },
-      { title: '扫码签到', description: '现场扫码签到指引', icon: 'qr', to: '/job-fairs/checkin' },
-    ],
-  },
-  {
-    id: 'print-scan',
-    title: '打印扫描',
-    subtitle: '上传或扫描，本机直接出纸',
-    icon: 'printer',
-    accent: 'slate',
-    layout: 'standard',
-    titleTo: '/print-scan',
-    tiles: [
-      { title: '文档打印', description: '上传文档后本机打印', icon: 'printer', to: '/print/upload?source=document' },
-      { title: '证件复印', description: '待设备能力开放', icon: 'files', disabled: Boolean(true) },
-      { title: '纸质扫描', description: '扫描纸质文件后保存', icon: 'scan', to: '/scan/start' },
-      // 2026-07-12：「云打印」磁贴按正式取舍决策删除（能力归位文档打印+手机扫码上传；
-      // 远程提交·到店取件记入商用二期候选），见 docs/reviews/2026-07-12-cloud-print-decision.md
-      { title: '格式转换', description: '常用文件格式转换', icon: 'swap', to: '/print-scan/convert' },
-      { title: '证件照打印', description: '待设备能力开放', icon: 'user', disabled: Boolean(true) },
-    ],
-  },
-  {
-    id: 'interview',
-    title: 'AI面试训练',
-    subtitle: '模拟练习，仅供参考',
-    icon: 'headset',
-    accent: 'plum',
-    layout: 'standard',
-    tiles: [
-      { title: '模拟面试', description: 'AI 模拟问答练习', icon: 'mic', to: '/interview/setup' },
-      { title: '面试技巧', description: '常见面试技巧参考', icon: 'bulb', to: '/interview/tips' },
-      { title: '面试报告', description: '查看已生成的训练报告', icon: 'doc-check', to: '/interview/reports' },
-    ],
-  },
-  {
-    id: 'policy',
-    // 合规:补贴类只做政策说明/材料清单/官方入口/申请指引(info-only),
-    // 不出现"快申/申请"等暗示平台内办理的表述。
-    title: '政策服务',
-    subtitle: '政策查询与办事材料指引',
-    icon: 'policy',
-    accent: 'wheat',
-    layout: 'wide',
-    span2: true,
-    tiles: [
-      // 「就业政策」Tab 内含补贴指引内容；「社保指南」与 tab=social 一一对应，避免同义重复入口。
-      { title: '就业政策', description: '就业政策与官方口径', icon: 'policy', to: '/renshi?tab=policy' },
-      { title: '社保指南', description: '社保办事材料参考', icon: 'ticket', to: '/renshi?tab=social' },
-      { title: '档案 / 登记', description: '档案登记材料指引', icon: 'files', to: '/renshi?tab=register' },
-    ],
-  },
-]
-
-const SUB_ACCENT: Record<Accent, string> = {
-  teal: '',
-  clay: 'clay',
-  slate: 'slate',
-  wheat: 'wheat',
-  plum: 'plum',
-  tool: '',
-}
-
-type ServiceTileVariant = 'standard' | 'featured-primary' | 'featured-compact'
-
 function ServiceTileButton({
-  tile, accent, variant = 'standard', catalog = false, showDescription = false,
-}: { tile: ServiceTile; accent: Accent; variant?: ServiceTileVariant; catalog?: boolean; showDescription?: boolean }) {
+  tile, accent,
+}: { tile: ServiceTile; accent: Accent }) {
   const navigate = useNavigate()
   const disabled = tile.disabled || !tile.to
 
@@ -359,13 +224,12 @@ function ServiceTileButton({
       type="button"
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
-      className={['sub', catalog ? 'service-catalog-tile' : '', catalog ? variant : '', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      className={['sub', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
     >
       <span className="si">
         <KIcon name={tile.icon} />
       </span>
       <span className="label">{tile.title}</span>
-      {showDescription && <span className="service-tile-description">{tile.description}</span>}
       {disabled ? (
         <span className="soon">即将上线</span>
       ) : (
@@ -377,49 +241,128 @@ function ServiceTileButton({
   )
 }
 
-function ServiceGroupCard({ group }: { group: ServiceGroup }) {
+function findServiceGroup(id: string): ServiceGroup {
+  const group = SERVICE_GROUPS.find((candidate) => candidate.id === id)
+  if (!group) throw new Error(`Missing service group: ${id}`)
+  return group
+}
+
+function findServiceTile(group: ServiceGroup, title: string): ServiceTile {
+  const tile = group.tiles.find((candidate) => candidate.title === title)
+  if (!tile) throw new Error(`Missing ${group.id} service tile: ${title}`)
+  return tile
+}
+
+function ReferenceGroupHead({ group, headingId }: { group: ServiceGroup; headingId: string }) {
   const navigate = useNavigate()
   const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
   const titleTarget = group.titleTo ?? enabledFirst?.to
-  const renderTile = (tile: ServiceTile, variant: ServiceTileVariant) => <ServiceTileButton key={tile.title} tile={tile} accent={group.accent} variant={variant} catalog showDescription />
 
   return (
-    <section id={group.id} className={['service-catalog-group', group.layout].join(' ')} aria-labelledby={`${group.id}-title`}>
-      <div
-        className={titleTarget ? 'service-catalog-head tap' : 'service-catalog-head'}
-        role="button"
-        tabIndex={0}
+    <div className="lf-reference-group-head">
+      <span className={`home-reference-icon ${SUB_ACCENT[group.accent]}`}>
+        <KIcon name={group.icon} />
+      </span>
+      <button
+        type="button"
+        className="home-reference-group-copy"
+        disabled={!titleTarget}
         onClick={() => titleTarget && navigate(titleTarget)}
-        onKeyDown={(e) => {
-          if ((e.key === 'Enter' || e.key === ' ') && titleTarget) navigate(titleTarget)
-        }}
       >
-        <span className={`service-catalog-icon ${group.accent}`}>
-          <KIcon name={group.icon} />
-        </span>
-        <div className="service-catalog-title">
-          <h3 id={`${group.id}-title`}>{group.title}</h3>
-          <p>{group.subtitle}</p>
-        </div>
-        {group.badge && (
-          <span className="service-catalog-badge">
-            <KIcon name={group.badge.icon} />
-            {group.badge.label}
-          </span>
-        )}
-      </div>
+        <strong id={headingId}>{group.title}</strong>
+        <span>{group.subtitle}</span>
+      </button>
+    </div>
+  )
+}
 
-      {group.layout === 'featured' ? (
-        <>
-          <div className="featured-primary-grid">{group.tiles.slice(0, 2).map((tile) => renderTile(tile, 'featured-primary'))}</div>
-          <div className="featured-compact-grid">{group.tiles.slice(2).map((tile) => renderTile(tile, 'featured-compact'))}</div>
-        </>
+function ReferencePrimaryButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
+  const navigate = useNavigate()
+  const disabled = tile.disabled || !tile.to
+  const handleClick = () => {
+    if (tile.to) navigate(tile.to, tile.state ? { state: tile.state } : undefined)
+  }
+
+  return (
+    <button
+      type="button"
+      className="lf-reference-primary"
+      disabled={disabled}
+      onClick={handleClick}
+    >
+      <span className={`home-reference-icon ${SUB_ACCENT[accent]}`}>
+        <KIcon name={tile.icon} />
+      </span>
+      <span className="home-reference-entry-copy">
+        <strong>{tile.title}</strong>
+        {tile.description && <span>{tile.description}</span>}
+      </span>
+      {disabled ? (
+        <span className="home-reference-state">即将上线</span>
       ) : (
-        <div className="service-catalog-grid">
-          {group.tiles.map((tile) => renderTile(tile, 'standard'))}
-        </div>
+        <span className="home-reference-arrow"><KIcon name="arrow" /></span>
       )}
+    </button>
+  )
+}
+
+function ReferenceSecondaryButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
+  const navigate = useNavigate()
+  const disabled = tile.disabled || !tile.to
+  const handleClick = () => {
+    if (tile.to) navigate(tile.to, tile.state ? { state: tile.state } : undefined)
+  }
+
+  return (
+    <button
+      type="button"
+      className="lf-reference-secondary"
+      disabled={disabled}
+      onClick={handleClick}
+    >
+      <span className={`home-reference-icon ${SUB_ACCENT[accent]}`}>
+        <KIcon name={tile.icon} />
+      </span>
+      <span className="home-reference-entry-copy">
+        <strong>{tile.title}</strong>
+        {tile.description && <span>{tile.description}</span>}
+      </span>
+      {disabled ? (
+        <span className="home-reference-state">即将上线</span>
+      ) : (
+        <span className="home-reference-arrow"><KIcon name="arrow" /></span>
+      )}
+    </button>
+  )
+}
+
+function ReferenceServicePanel({
+  id,
+  group,
+  children,
+}: {
+  id: string
+  group: ServiceGroup
+  children: ReactNode
+}) {
+  return (
+    <section id={id} className="lf-reference-panel home-reference-panel" aria-labelledby={`${id}-title`}>
+      <ReferenceGroupHead group={group} headingId={`${id}-title`} />
+      {children}
     </section>
+  )
+}
+
+function StandardReferencePanel({ id, group }: { id: string; group: ServiceGroup }) {
+  const [primary, ...secondary] = group.tiles
+
+  return (
+    <ReferenceServicePanel id={id} group={group}>
+      <ReferencePrimaryButton tile={primary} accent={group.accent} />
+      <div className="home-reference-secondary-list">
+        {secondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={group.accent} />)}
+      </div>
+    </ReferenceServicePanel>
   )
 }
 
@@ -753,7 +696,25 @@ function ToolboxSection() {
 }
 
 export function HomePage() {
+  const { hash } = useLocation()
   useInkRipple('.khome .sub, .khome .btn, .khome .id-stat')
+
+  useEffect(() => {
+    const targetId = hash.startsWith('#') ? hash.slice(1) : ''
+    if (!HOME_REFERENCE_HASH_IDS.has(targetId)) return
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [hash])
+
+  const resumeGroup = findServiceGroup('resume')
+  const jobsGroup = findServiceGroup('jobs')
+  const jobFairsGroup = findServiceGroup('job-fairs')
+  const printScanGroup = findServiceGroup('print-scan')
+  const interviewGroup = findServiceGroup('interview')
+  const policyGroup = findServiceGroup('policy')
+  const [resumeDiagnosis, resumeOptimization, ...resumeSecondary] = resumeGroup.tiles
+  const allJobs = findServiceTile(jobsGroup, '全部岗位')
+  const jobSecondary = jobsGroup.tiles.filter((tile) => tile !== allJobs)
+  const [socialJobFair, ...jobFairSecondary] = jobFairsGroup.tiles
 
   return (
     <div className="khome">
@@ -767,17 +728,38 @@ export function HomePage() {
         </section>
         <IdentityPanel />
         <ContinuePanel />
-      </div>
-
-      <div className="khome-inner">
-        <nav className="service-quick-nav" aria-label="服务分类">
-          {SERVICE_GROUPS.map((group) => (<a key={group.id} href={`#${group.id}`}>{group.title}</a>))}
-        </nav>
+        <ReferenceServiceNav />
 
         <main className="home-service-catalog" aria-label="当前可使用功能">
-          {SERVICE_GROUPS.map((group) => (
-            <ServiceGroupCard key={group.title} group={group} />
-          ))}
+          <ReferenceServicePanel id="resume" group={resumeGroup}>
+            <div className="home-reference-dual">
+              <ReferencePrimaryButton tile={resumeDiagnosis} accent={resumeGroup.accent} />
+              <ReferencePrimaryButton tile={resumeOptimization} accent={resumeGroup.accent} />
+            </div>
+            <div className="home-reference-secondary-pair">
+              {resumeSecondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={resumeGroup.accent} />)}
+            </div>
+          </ReferenceServicePanel>
+
+          <div className="lf-reference-pair" aria-label="岗位信息与招聘会">
+            <ReferenceServicePanel id="jobs" group={jobsGroup}>
+              <ReferencePrimaryButton tile={allJobs} accent={jobsGroup.accent} />
+              <div className="home-reference-secondary-list">
+                {jobSecondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={jobsGroup.accent} />)}
+              </div>
+            </ReferenceServicePanel>
+
+            <ReferenceServicePanel id="job-fairs" group={jobFairsGroup}>
+              <ReferencePrimaryButton tile={socialJobFair} accent={jobFairsGroup.accent} />
+              <div className="home-reference-secondary-list">
+                {jobFairSecondary.map((tile) => <ReferenceSecondaryButton key={tile.title} tile={tile} accent={jobFairsGroup.accent} />)}
+              </div>
+            </ReferenceServicePanel>
+          </div>
+
+          <StandardReferencePanel id="print-scan" group={printScanGroup} />
+          <StandardReferencePanel id="interview" group={interviewGroup} />
+          <StandardReferencePanel id="policy" group={policyGroup} />
           <ToolboxSection />
           <SmartCampusHorizontalSection />
         </main>
