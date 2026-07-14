@@ -30,3 +30,10 @@
 - [x] 修复所有 Critical/Warning 后复审。
 - [x] 更新进度 SSOT，写入 `review.md`，归档 CCG 任务并创建本地提交。
 - [x] 保留分支/worktree，等待用户另行决定是否 push/PR。
+
+## Task 6：执行期间主线漂移收口
+
+- [x] 拉取并合入执行期间从 `e9802596` 前进到 `9d0622e7` 的最新 `origin/main`。
+- [x] 确认 25 个新增提交仅涉及 Scan Session B1，和 LightFlow 整合文件无交集。
+- [x] 复跑 Kiosk 工程门禁、关键 LightFlow 静态合同、范围检查与浏览器冒烟。
+- [x] 复审最终双父合并结果，更新 SSOT、归档任务并创建本地闭环提交。
