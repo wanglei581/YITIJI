@@ -32,7 +32,7 @@ function getDataDir(): string {
     : path.join(os.tmpdir(), 'AIJobPrintAgent')
 }
 
-function getTokenPath(): string {
+export function getAgentTokenPath(): string {
   return path.join(getDataDir(), 'agent.token')
 }
 
@@ -100,7 +100,7 @@ function psDecrypt(b64: string): string {
  * Non-Windows (dev): plaintext fallback with a log warning.
  */
 export function saveAgentToken(token: string): void {
-  const tokenPath = getTokenPath()
+  const tokenPath = getAgentTokenPath()
   fs.mkdirSync(path.dirname(tokenPath), { recursive: true })
 
   if (process.platform !== 'win32') {
@@ -121,7 +121,7 @@ export function saveAgentToken(token: string): void {
  * Throws if decryption fails (corrupted file or key unavailable on this machine).
  */
 export function loadAgentToken(): string | null {
-  const tokenPath = getTokenPath()
+  const tokenPath = getAgentTokenPath()
   if (!fs.existsSync(tokenPath)) {
     return null
   }
