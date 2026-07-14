@@ -3,11 +3,16 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { PrismaService } from '../prisma/prisma.service'
 
 /**
- * `deliverScanFile()` 从 CAS 到 'matched' 到 CAS 到 'completed'/'failed' 之间只有一次
- * `FilesService.upload()` 调用（读内存 buffer + 写存储 + 建 DB 行），正常应在几秒内完成；
- * 取 3 分钟留足够余量覆盖存储抖动，同时不让一个真正卡死的任务占着"当前活跃会话"的名额太久
- * （B1-2 的唯一约束意味着卡死的 'matched' 任务会挡住同终端后续所有扫描请求，收敛这个状态的
- * 紧迫性比 'waiting' 过期更高）。
+ * `deliverScanFile()` 上传期间会通过 `startMatchedHeartbeat()`
+ * （`scan-tasks.service.ts`，每 `SCAN_MATCHED_HEARTBEAT_INTERVAL_MS`=60 秒一次）
+ * 持续刷新任务的 `updatedAt`，只要进程存活、上传仍在真实进行中，该任务就不会变
+ * "stale"。这里的 3 分钟本质是"3 次心跳未到"的收敛窗口，不是"上传应在几秒内完成"
+ * 的假设——真实上传可能因网络抖动合法地超过几秒，心跳机制正是为了防止 reaper
+ * 把这类合法慢上传误判为卡死并删除已成功上传的文件。只有进程真崩溃（心跳随之停止）
+ * 才会让任务在这 3 分钟窗口内变 stale，此时收敛为 'failed' 是正确行为——B1-2 的唯一
+ * 约束意味着真正卡死的 'matched' 任务会挡住同终端后续所有扫描请求，收敛的紧迫性比
+ * 'waiting' 过期更高。修改此常量前必须同步评估 `SCAN_MATCHED_HEARTBEAT_INTERVAL_MS`
+ * 的间隔是否仍留有足够余量（当前为 3 倍心跳间隔）。
  */
 const MATCHED_STUCK_TIMEOUT_MS = 3 * 60 * 1000
 
