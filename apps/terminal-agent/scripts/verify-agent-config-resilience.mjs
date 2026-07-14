@@ -106,6 +106,22 @@ try {
     () => parseConfigText(JSON.stringify({ ...valid, printerName: '   ' })),
     'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
   )
+  assertStartupError(
+    () => parseConfigText(JSON.stringify({ ...valid, agentToken: 1 })),
+    'AGENT_CONFIG_INVALID_FIELD',
+  )
+  assertStartupError(
+    () => parseConfigText(JSON.stringify({ ...valid, adminSecret: '' })),
+    'AGENT_CONFIG_INVALID_FIELD',
+  )
+  assertStartupError(
+    () => parseConfigText(JSON.stringify({ ...valid, apiBaseUrl: 1 })),
+    'AGENT_CONFIG_INVALID_FIELD',
+  )
+  assertStartupError(
+    () => parseConfigText(JSON.stringify({ ...valid, apiBaseUrl: '   ' })),
+    'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
+  )
 
   const sensitiveConfig = {
     agentToken: 'agent-token-must-not-persist',

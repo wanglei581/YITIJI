@@ -40,8 +40,16 @@ export function isAgentStartupError(error: unknown): error is AgentStartupError 
 }
 
 function requireNonEmpty(value: unknown, field: string): string {
-  if (typeof value === 'string' && value.trim()) return value.trim()
-  throw new AgentStartupError('AGENT_CONFIG_REQUIRED_FIELD_MISSING', `agent-config.json requires ${field}`)
+  if (value === undefined) {
+    throw new AgentStartupError('AGENT_CONFIG_REQUIRED_FIELD_MISSING', `agent-config.json requires ${field}`)
+  }
+  if (typeof value !== 'string') {
+    throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+  }
+  if (!value.trim()) {
+    throw new AgentStartupError('AGENT_CONFIG_REQUIRED_FIELD_MISSING', `agent-config.json requires ${field}`)
+  }
+  return value.trim()
 }
 
 function requireOptionalPositiveInteger(value: unknown, field: string): number | undefined {
@@ -50,11 +58,30 @@ function requireOptionalPositiveInteger(value: unknown, field: string): number |
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
-function validateConfigShape(config: AgentConfig): AgentConfig {
-  const terminalId = config.terminalId
-  if (terminalId !== undefined && typeof terminalId !== 'string') {
-    throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', 'agent-config.json has invalid terminalId')
+function requireOptionalNonEmptyString(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'string' && value.trim()) return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function requireOptionalNonEmptyStringArray(value: unknown, field: string): string[] | undefined {
+  if (value === undefined) return undefined
+  if (Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string' && entry.trim())) {
+    return value
   }
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function validateConfigShape(config: AgentConfig): AgentConfig {
+  const terminalId = requireOptionalNonEmptyString(config.terminalId, 'terminalId')
+  const agentToken = requireOptionalNonEmptyString(config.agentToken, 'agentToken')
+  const adminSecret = requireOptionalNonEmptyString(config.adminSecret, 'adminSecret')
+  const scanWatchFolder = requireOptionalNonEmptyString(config.scanWatchFolder, 'scanWatchFolder')
+  const localApiBridgeToken = requireOptionalNonEmptyString(config.localApiBridgeToken, 'localApiBridgeToken')
+  const localApiAllowedOrigins = requireOptionalNonEmptyStringArray(
+    config.localApiAllowedOrigins,
+    'localApiAllowedOrigins',
+  )
 
   return {
     ...config,
@@ -65,6 +92,12 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
     heartbeatIntervalMs: requireOptionalPositiveInteger(config.heartbeatIntervalMs, 'heartbeatIntervalMs'),
     claimIntervalMs: requireOptionalPositiveInteger(config.claimIntervalMs, 'claimIntervalMs'),
     localApiPort: requireOptionalPositiveInteger(config.localApiPort, 'localApiPort'),
+    terminalId,
+    agentToken,
+    adminSecret,
+    scanWatchFolder,
+    localApiBridgeToken,
+    localApiAllowedOrigins,
   }
 }
 
