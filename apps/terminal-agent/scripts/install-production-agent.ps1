@@ -92,6 +92,98 @@ function Fail([string]$Message) {
   exit 1
 }
 
+function Test-GeneratedConfig([System.Collections.IDictionary]$Config) {
+  try {
+    $configJson = $Config | ConvertTo-Json -Depth 8
+    $parsedConfig = $configJson | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    Fail "Generated config could not be serialized and parsed as JSON: $($_.Exception.Message)"
+  }
+
+  foreach ($field in @("apiBaseUrl", "terminalCode", "terminalId", "printerName", "agentVersion")) {
+    if ([string]::IsNullOrWhiteSpace([string]$parsedConfig.$field)) {
+      Fail "Generated config requires a non-empty $field"
+    }
+  }
+
+  foreach ($field in @("heartbeatIntervalMs", "claimIntervalMs", "localApiPort")) {
+    $rawValue = $parsedConfig.$field
+    if ($null -eq $rawValue -or $rawValue -is [string] -or $rawValue -is [bool]) {
+      Fail "Generated config requires $field to be a positive integer"
+    }
+
+    try {
+      $decimalValue = [decimal]$rawValue
+      $integerValue = [int64]$rawValue
+    } catch {
+      Fail "Generated config requires $field to be a positive integer"
+    }
+
+    if ($integerValue -le 0 -or $decimalValue -ne [decimal]$integerValue) {
+      Fail "Generated config requires $field to be a positive integer"
+    }
+  }
+
+  return $configJson
+}
+
+function Write-TextAtomically([string]$Path, [string]$Text) {
+  $directory = Split-Path -Parent $Path
+  $fileName = Split-Path -Leaf $Path
+  $tempPath = Join-Path $directory ".${fileName}.${PID}.$([System.Guid]::NewGuid().ToString('N')).tmp"
+  $encoding = [System.Text.UTF8Encoding]::new($false)
+
+  try {
+    $bytes = $encoding.GetBytes($Text)
+    $stream = [System.IO.FileStream]::new(
+      $tempPath,
+      [System.IO.FileMode]::CreateNew,
+      [System.IO.FileAccess]::Write,
+      [System.IO.FileShare]::None
+    )
+    try {
+      $stream.Write($bytes, 0, $bytes.Length)
+      $stream.Flush($true)
+    } finally {
+      $stream.Dispose()
+    }
+
+    if ([System.IO.File]::Exists($Path)) {
+      [System.IO.File]::Replace($tempPath, $Path, $null)
+    } else {
+      [System.IO.File]::Move($tempPath, $Path)
+    }
+  } finally {
+    if (Test-Path -LiteralPath $tempPath) {
+      Remove-Item -LiteralPath $tempPath -Force
+    }
+  }
+}
+
+function Invoke-Sc([string[]]$Arguments) {
+  try {
+    $output = & sc.exe @Arguments 2>&1
+  } catch {
+    Fail "sc.exe $($Arguments -join ' ') failed to start: $($_.Exception.Message)"
+  }
+
+  if ($LASTEXITCODE -ne 0) {
+    $detail = ($output | Out-String).Trim()
+    Fail "sc.exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE: $detail"
+  }
+
+  return ($output | Out-String).Trim()
+}
+
+function Set-AgentServiceRecovery([string]$ServiceName) {
+  Write-Step "Configuring Windows service recovery"
+  Invoke-Sc @("failure", $ServiceName, "reset=", "86400", "actions=", 'restart/60000/restart/300000/""/0') | Out-Null
+  Invoke-Sc @("failureflag", $ServiceName, "1") | Out-Null
+  $policy = Invoke-Sc @("qfailure", $ServiceName)
+  Write-Host "SCM failure policy for $ServiceName:"
+  Write-Host $policy
+}
+
 function Resolve-RepoRoot {
   $scriptDir = Split-Path -Parent $PSCommandPath
   # apps/terminal-agent/scripts -> repo root
@@ -111,7 +203,7 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
 
 function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   if ([string]::IsNullOrWhiteSpace($Token)) {
-    Fail "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
+    throw "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
   }
   Add-Type -AssemblyName System.Security
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($Token.Trim())
@@ -123,13 +215,72 @@ function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   $b64 = [Convert]::ToBase64String($encrypted)
   $dir = Split-Path -Parent $TokenPath
   New-Item -ItemType Directory -Path $dir -Force | Out-Null
-  [System.IO.File]::WriteAllText($TokenPath, $b64, [System.Text.UTF8Encoding]::new($false))
+  Write-TextAtomically -Path $TokenPath -Text $b64
 }
 
 function Test-TokenFile([string]$TokenPath) {
   if (-not (Test-Path $TokenPath)) { return $false }
   $content = [System.IO.File]::ReadAllText($TokenPath).Trim()
   return -not [string]::IsNullOrWhiteSpace($content)
+}
+
+function Commit-ProductionConfigAndToken(
+  [string]$ConfigPath,
+  [string]$ConfigText,
+  [string]$TokenPath,
+  [AllowNull()][string]$TokenToPersist
+) {
+  $shouldWriteToken = $null -ne $TokenToPersist
+  $hadExistingToken = $false
+  $tokenRollbackPath = $null
+  $commitFailed = $false
+  $rollbackFailed = $false
+
+  try {
+    if ($shouldWriteToken) {
+      $hadExistingToken = Test-Path -LiteralPath $TokenPath -PathType Leaf
+      $tokenDirectory = Split-Path -Parent $TokenPath
+      New-Item -ItemType Directory -Path $tokenDirectory -Force | Out-Null
+
+      if ($hadExistingToken) {
+        $tokenRollbackPath = Join-Path $tokenDirectory ".agent.token.rollback.${PID}.$([System.Guid]::NewGuid().ToString('N')).tmp"
+        Copy-Item -LiteralPath $TokenPath -Destination $tokenRollbackPath -Force
+      }
+
+      Protect-AgentToken -Token $TokenToPersist -TokenPath $TokenPath
+    }
+
+    Write-TextAtomically -Path $ConfigPath -Text $ConfigText
+  } catch {
+    $commitFailed = $true
+
+    try {
+      if ($shouldWriteToken) {
+        if ($hadExistingToken -and $null -ne $tokenRollbackPath -and (Test-Path -LiteralPath $tokenRollbackPath -PathType Leaf)) {
+          if ([System.IO.File]::Exists($TokenPath)) {
+            [System.IO.File]::Replace($tokenRollbackPath, $TokenPath, $null)
+          } else {
+            [System.IO.File]::Move($tokenRollbackPath, $TokenPath)
+          }
+        } elseif (-not $hadExistingToken -and (Test-Path -LiteralPath $TokenPath -PathType Leaf)) {
+          Remove-Item -LiteralPath $TokenPath -Force
+        }
+      }
+    } catch {
+      $rollbackFailed = $true
+    }
+  } finally {
+    if ($null -ne $tokenRollbackPath -and (Test-Path -LiteralPath $tokenRollbackPath -PathType Leaf)) {
+      Remove-Item -LiteralPath $tokenRollbackPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  if ($commitFailed) {
+    if ($rollbackFailed) {
+      Fail "Could not commit production config and terminal token locally. Local token rollback could not be confirmed; do not start the Agent and investigate the local files."
+    }
+    Fail "Could not commit production config and terminal token locally. If a bind code was used, it may have been consumed; obtain a new bind code and retry."
+  }
 }
 
 function Get-PrimaryMacAddress {
@@ -208,13 +359,6 @@ if (-not $printer) {
 }
 Write-Ok "Printer found: $($printer.Name) on $($printer.PortName)"
 
-Write-Step "Writing production config"
-if (Test-Path $configPath) {
-  $backup = "$configPath.before-production-hardening-$(Get-Date -Format 'yyyyMMddHHmmss')"
-  Copy-Item $configPath $backup -Force
-  Write-Ok "Config backup: $backup"
-}
-
 $config = [ordered]@{
   apiBaseUrl             = $apiBase
   terminalId             = $TerminalId.Trim()
@@ -230,29 +374,49 @@ $config = [ordered]@{
   )
 }
 
-New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
-$configJson = $config | ConvertTo-Json -Depth 8
-[System.IO.File]::WriteAllText($configPath, $configJson + "`n", [System.Text.UTF8Encoding]::new($false))
-Write-Ok "Production config written: $configPath"
+$configJson = Test-GeneratedConfig -Config $config
 
-Write-Step "Installing token"
+Write-Step "Preparing token"
+$tokenToPersist = $null
 if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
   Write-Ok "Exchanging one-time bind code with cloud API"
   $exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode
-  if ($exchange.terminalId -and $exchange.terminalId -ne $TerminalId) {
-    Fail "BindCode belongs to terminalId=$($exchange.terminalId), but script was called with TerminalId=$TerminalId"
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalId) -or $exchange.terminalId -ne $TerminalId) {
+    Fail "BindCode exchange terminalId does not match the requested TerminalId"
   }
-  if ($exchange.terminalCode -and $exchange.terminalCode -ne $TerminalCode) {
-    Fail "BindCode belongs to terminalCode=$($exchange.terminalCode), but script was called with TerminalCode=$TerminalCode"
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalCode) -or $exchange.terminalCode -ne $TerminalCode) {
+    Fail "BindCode exchange terminalCode does not match the requested TerminalCode"
   }
-  Protect-AgentToken -Token $exchange.terminalToken -TokenPath $tokenPath
-  Write-Ok "BindCode exchanged and token protected with DPAPI"
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalToken)) {
+    Fail "BindCode exchange did not return a terminal token"
+  }
+  $tokenToPersist = ([string]$exchange.terminalToken).Trim()
 } elseif ($UseExistingToken) {
   if (-not (Test-TokenFile $tokenPath)) { Fail "-UseExistingToken passed, but token file is missing or empty: $tokenPath" }
   Write-Ok "Using existing DPAPI token: $tokenPath"
 } else {
-  Protect-AgentToken -Token $AgentToken -TokenPath $tokenPath
-  Write-Ok "Agent token protected with DPAPI LocalMachine: $tokenPath"
+  if ([string]::IsNullOrWhiteSpace($AgentToken)) {
+    Fail "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
+  }
+  $tokenToPersist = $AgentToken.Trim()
+}
+
+Write-Step "Writing production config and token"
+if (Test-Path $configPath) {
+  $backup = "$configPath.before-production-hardening-$(Get-Date -Format 'yyyyMMddHHmmss')"
+  Copy-Item $configPath $backup -Force
+  Write-Ok "Config backup: $backup"
+}
+
+New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
+Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist
+Write-Ok "Production config written: $configPath"
+if ($null -ne $tokenToPersist) {
+  if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
+    Write-Ok "BindCode exchanged and token protected with DPAPI"
+  } else {
+    Write-Ok "Agent token protected with DPAPI LocalMachine"
+  }
 }
 
 Write-Step "Stopping old Agent processes"
@@ -280,6 +444,7 @@ if (-not $SkipServiceInstall) {
     $service = Get-Service -Name "AIJobPrintAgent" -ErrorAction SilentlyContinue
     if ($service) {
       Set-Service -Name "AIJobPrintAgent" -StartupType Automatic
+      Set-AgentServiceRecovery "AIJobPrintAgent"
       if ($service.Status -ne "Running") {
         Start-Service -Name "AIJobPrintAgent"
       } else {

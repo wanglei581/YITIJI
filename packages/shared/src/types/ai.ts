@@ -308,7 +308,8 @@ export interface ResumeVoiceTranscribeResponse {
   providerName: string
 }
 
-/** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0。 */
+/** 简历导出格式(Wave 1 Task 6):pdf 可打印/预览分页,docx/txt/md 页数恒为 0，
+ *  但均可打印——Wave 6 会为 docx/txt/md 额外渲染一份同内容 PDF 副本供打印使用。 */
 export type ResumeExportFormat = 'pdf' | 'docx' | 'txt' | 'md'
 
 /** Wave 2:优化版简历 PDF 受控排版参数。所有字段 additive optional,缺省等价 Wave 1 PDF。 */
@@ -336,7 +337,8 @@ export interface ResumeGenerateExportResponse {
   signedUrl: string
   /** 签名 URL 过期时间(ISO) */
   expiresAt: string
-  /** 系统 HMAC content URL(signFileUrl 生成,形如 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>),仅 PDF 导出返回,供 /print/jobs 打印使用;docx/txt/md 无此字段 */
+  /** 系统 HMAC content URL(signFileUrl 生成,形如 /api/v1/files/<fileId>/content?expires=<ms>&sig=<hex>),供 /print/jobs 打印使用。
+   *  pdf 直接指向本文件;docx/txt/md 指向 Wave 6 额外渲染的同内容 PDF 副本(fileId 与本文件不同) */
   printFileUrl?: string
 }
 

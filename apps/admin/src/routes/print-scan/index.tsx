@@ -14,9 +14,11 @@ import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-j
 import { Page } from '../Page'
 import { FilterChip } from '../components/FilterChip'
 import { PrinterIcon, RefreshCwIcon, SlidersHorizontalIcon, WalletIcon } from 'lucide-react'
+import { CloseUnpaidPrintTaskForm } from './CloseUnpaidPrintTaskForm'
 import { getTerminals, type AdminTerminalRecord } from '../../services/api/devices'
 import {
   adminPrintScanService,
+  DEPRECATED_CAPABILITY_ALIAS,
   type AdminPrintScanTaskDetail,
   type AdminPrintScanTaskItem,
   type AdminPrintScanTaskPage,
@@ -60,6 +62,7 @@ const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: str
     { label: '打印中', value: 'printing' },
     { label: '已完成', value: 'completed' },
     { label: '失败', value: 'failed' },
+    { label: '已取消', value: 'cancelled' },
   ],
   scan: [
     { label: '全部', value: '' },
@@ -78,6 +81,15 @@ const STATUS_FILTERS: Record<'print' | 'scan' | 'document_process', { label: str
     { label: '失败', value: 'failed' },
     { label: '已取消', value: 'cancelled' },
   ],
+}
+
+const CLOSE_UNPAID_BLOCK_REASON_LABELS: Record<NonNullable<Extract<AdminPrintScanTaskDetail, { type: 'print' }>['closeUnpaidBlockReason']>, string> = {
+  no_associated_order: '未找到关联订单',
+  task_not_pending: '任务不再处于待处理状态',
+  task_claimed: '任务已被终端领取或正在处理',
+  order_not_unpaid: '关联订单已不是未支付状态',
+  order_task_not_pending: '关联订单任务状态已变化',
+  payment_attempt_exists: '订单已存在支付尝试，请先完成对账或退款处理',
 }
 
 const CAPABILITY_LABELS: Record<PrintScanCapabilityKey, string> = {
@@ -221,6 +233,16 @@ function TaskCenter() {
     }
   }
 
+  const refreshAfterCloseUnpaid = async () => {
+    if (!detail) return
+    try {
+      setDetail(await adminPrintScanService.getTaskDetail(detail.type, detail.taskId))
+      await load()
+    } catch {
+      setActionError('任务已取消成功，但页面刷新失败，请手动刷新查看最新状态')
+    }
+  }
+
   const statusFilters = implemented ? STATUS_FILTERS[taskType as 'print' | 'scan' | 'document_process'] : []
 
   return (
@@ -325,7 +347,7 @@ function TaskCenter() {
       <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} title="任务详情">
         {!detail && !actionError && <LoadingState text="正在加载详情" />}
         {actionError && <div className="mb-3 rounded-lg bg-error-bg px-3 py-2 text-[12.5px] font-bold text-error-text">{actionError}</div>}
-        {detail && <TaskDetailBody detail={detail} busy={actionBusy} onAction={applyAction} />}
+        {detail && <TaskDetailBody detail={detail} busy={actionBusy} onAction={applyAction} onCloseUnpaid={refreshAfterCloseUnpaid} />}
       </Drawer>
     </div>
   )
@@ -335,14 +357,17 @@ function TaskDetailBody({
   detail,
   busy,
   onAction,
+  onCloseUnpaid,
 }: {
   detail: AdminPrintScanTaskDetail
   busy: boolean
   onAction: (action: 'retry' | 'cancel') => void
+  onCloseUnpaid: () => Promise<void> | void
 }) {
   const statusMeta = TASK_STATUS_MAP[detail.status] ?? { badge: 'default' as const, label: detail.status }
   const canRetry = detail.type === 'print' && detail.status === 'failed'
   const canCancel = detail.type === 'scan' && detail.status === 'waiting'
+  const closeUnpaidBlockReason = detail.type === 'print' ? detail.closeUnpaidBlockReason : null
 
   const rows: [string, React.ReactNode][] = [
     ['任务 ID', detail.taskId],
@@ -417,6 +442,20 @@ function TaskDetailBody({
             </button>
           )}
         </div>
+      )}
+
+      {detail.type === 'print' && detail.closeUnpaidEligible === true && (
+        <CloseUnpaidPrintTaskForm
+          taskId={detail.taskId}
+          expectedUpdatedAt={detail.updatedAt}
+          onClosed={onCloseUnpaid}
+        />
+      )}
+
+      {detail.type === 'print' && detail.closeUnpaidEligible === false && closeUnpaidBlockReason && (
+        <p className="rounded-lg bg-neutral-100 px-3 py-2 text-[12.5px] leading-relaxed text-neutral-600">
+          当前不能取消未支付打印任务：{CLOSE_UNPAID_BLOCK_REASON_LABELS[closeUnpaidBlockReason]}
+        </p>
       )}
     </div>
   )
@@ -569,7 +608,14 @@ function CapabilityRow({
 
   return (
     <tr className="border-b border-neutral-900/5 last:border-b-0">
-      <td className="px-4 py-2.5 font-bold text-neutral-800">{CAPABILITY_LABELS[cap.capabilityKey]}</td>
+      <td className="px-4 py-2.5 font-bold text-neutral-800">
+        {CAPABILITY_LABELS[cap.capabilityKey]}
+        {DEPRECATED_CAPABILITY_ALIAS[cap.capabilityKey] && (
+          <span className="ml-1.5 rounded bg-neutral-900/5 px-1.5 py-0.5 text-[11px] font-normal text-neutral-500">
+            已弃用，等同「{CAPABILITY_LABELS[DEPRECATED_CAPABILITY_ALIAS[cap.capabilityKey]!]}」
+          </span>
+        )}
+      </td>
       <td className="px-4 py-2.5">
         <StatusBadge status={meta.badge} label={cap.configured ? meta.label : `${meta.label}（未配置）`} />
       </td>

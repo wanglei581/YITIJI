@@ -1,140 +1,239 @@
 /**
- * agent/config-manager.ts — Phase 8.1C
+ * Read and safely persist the Terminal Agent configuration.
  *
- * Read and write config/agent-config.json (relative to the package root).
- *
- * Path resolution:
- *   ts-node src/index.ts  → __dirname = <pkg>/src/agent/  → ../../config = <pkg>/config/
- *   node   dist/index.js  → __dirname = <pkg>/dist/agent/ → ../../config = <pkg>/config/
- *
- * Both paths resolve to <apps/terminal-agent>/config/agent-config.json.
- *
- * Phase 8.1C changes:
- *   - loadConfig() handles Phase 8.1B → 8.1C migration:
- *     if config.json contains a plaintext agentToken, it is migrated to DPAPI
- *     encrypted agent.token and removed from config.json automatically.
- *   - loadConfig() loads agentToken from agent.token into the returned config
- *     object (in-memory only; never written back to config.json).
- *   - persistRegistration() no longer writes agentToken to config.json.
- *     Instead it: (1) saves to encrypted agent.token, (2) clears adminSecret
- *     from config.json, (3) writes only non-sensitive fields.
+ * Configuration is deliberately kept separate from the DPAPI token.  The
+ * persisted JSON never contains credentials, while the returned AgentConfig
+ * may contain an in-memory agentToken for the current process only.
  */
 
 import fs from 'fs'
 import path from 'path'
 import { log } from '../logger'
-import { saveAgentToken, loadAgentToken } from './dpapi'
+import { loadAgentToken, saveAgentToken } from './dpapi'
 import type { AgentConfig } from './types'
 
 const CONFIG_FILE = path.resolve(__dirname, '../../config/agent-config.json')
-const EXAMPLE_FILE = path.resolve(__dirname, '../../config/agent-config.example.json')
+const LAST_KNOWN_GOOD_FILE = path.resolve(__dirname, '../../config/agent-config.last-known-good.json')
+const PERSISTED_SECRET_KEYS = new Set(['_comment', 'agentToken', 'adminSecret', 'bindCode'])
 
-function requireNonEmpty(value: unknown, field: keyof AgentConfig, help: string): string {
-  if (typeof value === 'string' && value.trim()) return value.trim()
-  throw new Error(`Agent config field "${field}" is required. ${help}`)
-}
+export type AgentStartupErrorCode =
+  | 'AGENT_CONFIG_NOT_FOUND'
+  | 'AGENT_CONFIG_INVALID_JSON'
+  | 'AGENT_CONFIG_INVALID_SHAPE'
+  | 'AGENT_CONFIG_REQUIRED_FIELD_MISSING'
+  | 'AGENT_CONFIG_INVALID_FIELD'
+  | 'AGENT_TOKEN_DECRYPT_FAILED'
+  | 'AGENT_PROFILE_REJECTED'
+  | 'AGENT_REGISTRATION_FAILED'
+  | 'AGENT_STARTUP_FAILED'
+  | 'AGENT_READY'
 
-function validateRequiredConfig(config: AgentConfig): AgentConfig {
-  return {
-    ...config,
-    apiBaseUrl: requireNonEmpty(config.apiBaseUrl, 'apiBaseUrl', 'Fill in the backend API base URL.'),
-    terminalCode: requireNonEmpty(config.terminalCode, 'terminalCode', 'Fill in the terminal code registered for this kiosk.'),
-    printerName: requireNonEmpty(config.printerName, 'printerName', '必须填写 Windows 实际识别名；可先运行 list-printers 获取。'),
+export class AgentStartupError extends Error {
+  constructor(readonly code: AgentStartupErrorCode, message: string) {
+    super(message)
+    this.name = 'AgentStartupError'
   }
 }
 
-// ── Read ──────────────────────────────────────────────────────────────────────
+export function isAgentStartupError(error: unknown): error is AgentStartupError {
+  return error instanceof AgentStartupError
+}
+
+function requireNonEmpty(value: unknown, field: string): string {
+  if (value === undefined) {
+    throw new AgentStartupError('AGENT_CONFIG_REQUIRED_FIELD_MISSING', `agent-config.json requires ${field}`)
+  }
+  if (typeof value !== 'string') {
+    throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+  }
+  if (!value.trim()) {
+    throw new AgentStartupError('AGENT_CONFIG_REQUIRED_FIELD_MISSING', `agent-config.json requires ${field}`)
+  }
+  return value.trim()
+}
+
+function requireOptionalPositiveInteger(value: unknown, field: string): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function requireOptionalNonNegativeInteger(value: unknown, field: string): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function requireOptionalNonEmptyString(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'string' && value.trim()) return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function requireOptionalString(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'string') return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function requireOptionalStringArray(value: unknown, field: string): string[] | undefined {
+  if (value === undefined) return undefined
+  if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
+    return value
+  }
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function validateConfigShape(config: AgentConfig): AgentConfig {
+  const terminalId = requireOptionalString(config.terminalId, 'terminalId')
+  const agentToken = requireOptionalNonEmptyString(config.agentToken, 'agentToken')
+  const adminSecret = requireOptionalNonEmptyString(config.adminSecret, 'adminSecret')
+  const scanWatchFolder = requireOptionalString(config.scanWatchFolder, 'scanWatchFolder')
+  const localApiBridgeToken = requireOptionalString(config.localApiBridgeToken, 'localApiBridgeToken')
+  const localApiAllowedOrigins = requireOptionalStringArray(
+    config.localApiAllowedOrigins,
+    'localApiAllowedOrigins',
+  )
+
+  return {
+    ...config,
+    apiBaseUrl: requireNonEmpty(config.apiBaseUrl, 'apiBaseUrl'),
+    terminalCode: requireNonEmpty(config.terminalCode, 'terminalCode'),
+    printerName: requireNonEmpty(config.printerName, 'printerName'),
+    agentVersion: requireNonEmpty(config.agentVersion, 'agentVersion'),
+    heartbeatIntervalMs: requireOptionalPositiveInteger(config.heartbeatIntervalMs, 'heartbeatIntervalMs'),
+    claimIntervalMs: requireOptionalPositiveInteger(config.claimIntervalMs, 'claimIntervalMs'),
+    localApiPort: requireOptionalNonNegativeInteger(config.localApiPort, 'localApiPort'),
+    terminalId,
+    agentToken,
+    adminSecret,
+    scanWatchFolder,
+    localApiBridgeToken,
+    localApiAllowedOrigins,
+  }
+}
+
+/** Preserve the established validation entry point while applying the full shape contract. */
+function validateRequiredConfig(config: AgentConfig): AgentConfig {
+  return validateConfigShape(config)
+}
+
+export function parseConfigText(raw: string): AgentConfig {
+  const normalized = raw.startsWith('\uFEFF') ? raw.slice(1) : raw
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(normalized)
+  } catch {
+    throw new AgentStartupError('AGENT_CONFIG_INVALID_JSON', 'agent-config.json is not valid JSON')
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new AgentStartupError('AGENT_CONFIG_INVALID_SHAPE', 'agent-config.json must contain a JSON object')
+  }
+
+  const config = { ...(parsed as Record<string, unknown>) } as unknown as AgentConfig & { _comment?: unknown }
+  delete config._comment
+  return validateRequiredConfig(config)
+}
+
+export function serializePersistedConfig(config: AgentConfig): string {
+  const persisted = Object.fromEntries(
+    Object.entries(config).filter(([key, value]) => !PERSISTED_SECRET_KEYS.has(key) && value !== undefined),
+  ) as AgentConfig
+  const text = `${JSON.stringify(persisted, null, 2)}\n`
+  parseConfigText(text)
+  return text
+}
+
+function writeTextAtomically(filePath: string, text: string): void {
+  const dir = path.dirname(filePath)
+  fs.mkdirSync(dir, { recursive: true })
+  const tempPath = path.join(dir, `.${path.basename(filePath)}.${process.pid}.${Date.now()}.tmp`)
+  let fd: number | undefined
+  try {
+    fd = fs.openSync(tempPath, 'wx', 0o600)
+    fs.writeFileSync(fd, text, 'utf8')
+    fs.fsyncSync(fd)
+    fs.closeSync(fd)
+    fd = undefined
+    fs.renameSync(tempPath, filePath)
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd)
+    fs.rmSync(tempPath, { force: true })
+  }
+}
+
+export function writeValidatedConfigAt(
+  configPath: string,
+  lastKnownGoodPath: string,
+  nextConfig: AgentConfig,
+): void {
+  const nextText = serializePersistedConfig(nextConfig)
+  const currentConfig = fs.existsSync(configPath)
+    ? parseConfigText(fs.readFileSync(configPath, 'utf8'))
+    : undefined
+  if (currentConfig) writeTextAtomically(lastKnownGoodPath, serializePersistedConfig(currentConfig))
+  writeTextAtomically(configPath, nextText)
+}
 
 /**
- * Load config/agent-config.json.
- *
- * Also handles Phase 8.1B → 8.1C migration:
- *   - If config.json contains agentToken (plaintext), encrypt it to agent.token
- *     and remove it from config.json.
- *   - Load agentToken from agent.token into the returned in-memory config.
- *
- * Throws if the config file does not exist.
+ * Load configuration, optionally migrating the legacy plaintext token only
+ * after the primary configuration has passed validation.
  */
 export function loadConfig(): AgentConfig {
   if (!fs.existsSync(CONFIG_FILE)) {
-    throw new Error(
-      `Agent config not found: ${CONFIG_FILE}\n` +
-        `Copy ${EXAMPLE_FILE} → ${CONFIG_FILE} and fill in apiBaseUrl / terminalCode / printerName.`,
+    throw new AgentStartupError(
+      'AGENT_CONFIG_NOT_FOUND',
+      'Agent configuration was not found. Repair the terminal configuration before starting the Agent.',
     )
   }
 
-  const raw = fs.readFileSync(CONFIG_FILE, 'utf-8')
-  const parsed = JSON.parse(raw) as AgentConfig & { _comment?: string; agentToken?: string }
-  // Remove the example-only comment field if present
-  delete parsed._comment
+  const parsed = parseConfigText(fs.readFileSync(CONFIG_FILE, 'utf8'))
 
-  // ── Phase 8.1B → 8.1C migration ─────────────────────────────────────────
   if (parsed.agentToken) {
-    log('config: Phase 8.1B plaintext agentToken detected — migrating to DPAPI encrypted storage')
+    log('config: legacy plaintext agentToken detected — migrating to DPAPI encrypted storage')
     saveAgentToken(parsed.agentToken)
-    delete parsed.agentToken
-    // Write back without agentToken
-    writeConfigFile(parsed)
-    log('config: agentToken 已迁移至加密存储 agent.token，已从 config.json 移除')
+    saveConfig(parsed)
+    log('config: agentToken migrated to encrypted storage and removed from agent-config.json')
   }
 
-  // ── Load agentToken from encrypted file into in-memory config ────────────
-  const agentToken = loadAgentToken()
-  if (agentToken) {
-    parsed.agentToken = agentToken
+  let agentToken: string | null
+  try {
+    agentToken = loadAgentToken()
+  } catch {
+    throw new AgentStartupError(
+      'AGENT_TOKEN_DECRYPT_FAILED',
+      'agent.token cannot be decrypted on this Windows host; rebind this terminal with a new one-time code',
+    )
   }
 
-  return validateRequiredConfig(parsed)
+  return agentToken ? { ...parsed, agentToken } : parsed
 }
 
-// ── Write ─────────────────────────────────────────────────────────────────────
-
-/**
- * Overwrite config/agent-config.json.
- * Strips undefined values so the JSON stays clean.
- * Never writes agentToken (it lives in agent.token, not config.json).
- */
+/** Persist a credential-free, validated configuration and keep a manual recovery candidate. */
 export function saveConfig(config: AgentConfig): void {
-  writeConfigFile(config)
+  writeValidatedConfigAt(CONFIG_FILE, LAST_KNOWN_GOOD_FILE, config)
 }
-
-/** Internal helper: serialise to JSON, excluding undefined fields and agentToken. */
-function writeConfigFile(config: AgentConfig): void {
-  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true })
-  // Exclude agentToken and any undefined fields
-  const toWrite = Object.fromEntries(
-    Object.entries(config).filter(([key, val]) => key !== 'agentToken' && val !== undefined),
-  )
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(toWrite, null, 2), 'utf-8')
-}
-
-// ── Registration ──────────────────────────────────────────────────────────────
 
 /**
- * Persist terminalId after successful registration:
- *   1. Encrypt and save agentToken to agent.token.
- *   2. Write config.json with terminalId; clear adminSecret (no longer needed).
- *      agentToken is NOT written to config.json.
- *   3. Return the in-memory config with agentToken populated.
+ * Persist registration after successful binding without storing either the
+ * registration secret or the bearer token in agent-config.json.
  */
 export function persistRegistration(
   config: AgentConfig,
   terminalId: string,
   agentToken: string,
 ): AgentConfig {
-  // Step 1: encrypt agentToken to disk
   saveAgentToken(agentToken)
 
-  // Step 2: write config.json — include terminalId, omit adminSecret and agentToken
   const updated: AgentConfig = {
     ...config,
     terminalId,
-    adminSecret: undefined,  // cleared — no longer needed after registration
-    agentToken: undefined,    // not stored in config.json; lives in agent.token
+    adminSecret: undefined,
+    agentToken: undefined,
   }
-  writeConfigFile(updated)
+  saveConfig(updated)
   log(`config: registration persisted — terminalId=${terminalId}, adminSecret cleared`)
 
-  // Step 3: return in-memory config with agentToken available for this session
   return { ...updated, agentToken }
 }

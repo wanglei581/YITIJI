@@ -51,6 +51,7 @@
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:legacy-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-legacy-pending-print-task-disposition.ts",
     "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
+    "audit:cloud-upload-capability-usage": "node -r @swc-node/register scripts/audit-cloud-upload-capability-usage.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
     "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
     "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
@@ -148,7 +149,8 @@
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
     "verify:wechat-refund-regression": "node -r @swc-node/register scripts/verify-wechat-refund-regression.ts",
     "verify:scan-tasks": "node -r @swc-node/register scripts/verify-scan-tasks.ts",
-    "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts"
+    "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
+    "verify:print-sign": "node -r @swc-node/register scripts/verify-print-sign.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.3",
@@ -176,6 +178,7 @@
     "ioredis": "^5.11.0",
     "mammoth": "^1.12.0",
     "multer": "^2.1.1",
+    "pdf-lib": "^1.17.1",
     "pdfkit": "^0.15.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",

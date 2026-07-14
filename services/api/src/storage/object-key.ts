@@ -61,6 +61,7 @@ const PURPOSE_FOLDER: Record<FilePurpose, { scope: 'user' | 'partner' | 'admin' 
   resume_scan: { scope: 'user', folder: 'scans' },
   id_scan: { scope: 'user', folder: 'scans' },
   print_doc: { scope: 'user', folder: 'print-files' },
+  signature_image: { scope: 'user', folder: 'signatures' },
   // ── 合作机构(partners/{orgId}/...)─────────────────────────────
   partner_profile: { scope: 'partner', folder: 'profiles' },
   partner_image: { scope: 'partner', folder: 'job-images' },

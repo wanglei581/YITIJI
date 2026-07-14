@@ -18,6 +18,12 @@ import { TerminalCapabilitiesService, setPrintScanCapabilityModeForTest } from '
 import { AdminPrintScanService } from '../src/admin-print-scan/admin-print-scan.service'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import { signFileUrl } from '../src/files/signing'
+import { AuditService } from '../src/audit/audit.service'
+import { OnlinePaymentService } from '../src/payment/online-payment.service'
+import { OrderStatusService } from '../src/payment/order-status.service'
+import { createPaymentSessionToken } from '../src/payment/payment-session-token'
+import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
+import { SandboxPaymentProvider } from '../src/payment/providers/sandbox-payment.provider'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import * as apiContract from '../src/terminals/terminal-capabilities.types'
@@ -78,6 +84,11 @@ async function main() {
     sharedContract.IMPLEMENTED_PRINT_SCAN_TASK_TYPES,
     '已上线任务类型列表',
   )
+  assertDeepEqual(
+    apiContract.DEPRECATED_CAPABILITY_ALIAS,
+    sharedContract.DEPRECATED_CAPABILITY_ALIAS,
+    '能力键弃用别名映射',
+  )
   for (const st of apiContract.PRINT_SCAN_CAPABILITY_STATUSES) {
     if (apiContract.canCreateFormalPrintScanTask(st) !== sharedContract.canCreateFormalPrintScanTask(st)) {
       fail(`canCreateFormalPrintScanTask 在 shared 与 API 镜像间行为不一致（status=${st}）`)
@@ -95,6 +106,7 @@ async function main() {
   const createdPrintTaskIds: string[] = []
   const createdScanTaskIds: string[] = []
   const createdOrderIds: string[] = []
+  const createdPaymentAttemptIds: string[] = []
 
   try {
     await prisma.terminal.create({
@@ -138,6 +150,42 @@ async function main() {
       fail('未配置键应 configured=false 且状态为 not_verified（保守默认）')
     }
     pass('list 返回全部能力键，未配置键 configured=false / not_verified')
+
+    // ── 1b. cloud_upload → phone_upload 词汇债兼容映射（2026-07-12 D4，只读兼容）──
+    await capabilities.upsert(terminalId, 'cloud_upload', 'maintenance', '历史云上传送修', 'admin_1')
+    const withLegacyOnly = await capabilities.listForTerminal(terminalId)
+    const phoneCapViaLegacy = withLegacyOnly.capabilities.find((c) => c.capabilityKey === 'phone_upload')
+    const cloudCapRaw = withLegacyOnly.capabilities.find((c) => c.capabilityKey === 'cloud_upload')
+    if (!phoneCapViaLegacy?.configured || phoneCapViaLegacy.status !== 'maintenance' || phoneCapViaLegacy.note !== '历史云上传送修') {
+      fail('phone_upload 未自行配置时应回退读取历史 cloud_upload 的状态/备注')
+    }
+    if (!cloudCapRaw?.configured || cloudCapRaw.status !== 'maintenance') {
+      fail('cloud_upload 自身行应保持独立展示真实历史值，不应被兼容逻辑覆盖')
+    }
+    pass('list：phone_upload 未配置时按 cloud_upload 历史配置兼容展示')
+
+    await expectHttpErrorCode(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'phone_upload'),
+      403, 'CAPABILITY_UNAVAILABLE',
+      'assertUserTaskAllowed(phone_upload)：仅有历史 cloud_upload=maintenance 时按其状态拒绝',
+    )
+    await capabilities.upsert(terminalId, 'cloud_upload', 'available', undefined, 'admin_1')
+    await capabilities.assertUserTaskAllowed(terminalId, 'phone_upload')
+    pass('assertUserTaskAllowed(phone_upload)：历史 cloud_upload=available 时按其状态放行')
+
+    // phone_upload 一旦有自己的真实配置，应优先于 cloud_upload 兼容值（兼容仅是兜底，不是覆盖）
+    await capabilities.upsert(terminalId, 'phone_upload', 'maintenance', '本机维护', 'admin_1')
+    await expectHttpErrorCode(
+      () => capabilities.assertUserTaskAllowed(terminalId, 'phone_upload'),
+      403, 'CAPABILITY_UNAVAILABLE',
+      'phone_upload 自身已配置后优先于 cloud_upload 兼容值',
+    )
+    const bothConfigured = await capabilities.listForTerminal(terminalId)
+    const phoneCapOwn = bothConfigured.capabilities.find((c) => c.capabilityKey === 'phone_upload')
+    if (phoneCapOwn?.status !== 'maintenance' || phoneCapOwn.note !== '本机维护') {
+      fail('phone_upload 自身配置存在时，list 不应再回退读取 cloud_upload')
+    }
+    pass('list：phone_upload 自身有配置时不再回退读取 cloud_upload（兼容仅兜底不覆盖）')
 
     // DB 出现枚举外脏值 → fail-closed 归 not_verified，不放大成可用
     await prisma.terminalCapability.update({
@@ -293,7 +341,273 @@ async function main() {
     if (raceOk !== 1) fail(`并发 retry 应恰好一个成功，实际成功 ${raceOk} 个`)
     pass('并发 retry CAS：两个并发请求恰好一个成功')
 
-    // ── 4. 服务端能力门禁（C-1 + Task 11 模式语义）──────────────────────────
+    // ── 4. Admin 受控关闭未付款打印任务（独立于 scan.cancel）───────────────
+    const closeOperatorId = `admin_close_${suffix}`
+    await prisma.user.create({
+      data: {
+        id: closeOperatorId,
+        username: `close-admin-${suffix}`,
+        passwordHash: 'verify',
+        name: '受控关闭验证管理员',
+        role: 'admin',
+      },
+    })
+
+    async function createCloseFixture(
+      name: string,
+      options: {
+        taskStatus?: string
+        claimedAt?: Date | null
+        claimExpiry?: Date | null
+        order?: false | { payStatus?: string; taskStatus?: string; amountCents?: number }
+        paymentAttemptStatus?: 'created' | 'pending' | 'expired' | 'success' | 'failed'
+      } = {},
+    ) {
+      const taskId = `pt_close_${name}_${suffix}`
+      createdPrintTaskIds.push(taskId)
+      const task = await prisma.printTask.create({
+        data: {
+          id: taskId,
+          terminalId,
+          fileUrl: `internal://close-${name}`,
+          fileMd5: name,
+          status: options.taskStatus ?? 'pending',
+          claimedAt: options.claimedAt,
+          claimExpiry: options.claimExpiry,
+        },
+      })
+      if (options.order !== false) {
+        const orderId = `order_close_${name}_${suffix}`
+        createdOrderIds.push(orderId)
+        await prisma.order.create({
+          data: {
+            id: orderId,
+            orderNo: `NO-CLOSE-${name}-${suffix}`,
+            type: 'print',
+            printTaskId: taskId,
+            terminalId,
+            payStatus: options.order?.payStatus ?? 'unpaid',
+            taskStatus: options.order?.taskStatus ?? 'pending',
+            amountCents: options.order?.amountCents ?? 137,
+          },
+        })
+        if (options.paymentAttemptStatus) {
+          await prisma.paymentAttempt.create({
+            data: {
+              orderId,
+              channel: 'sandbox',
+              amountCents: options.order?.amountCents ?? 137,
+              status: options.paymentAttemptStatus,
+            },
+          })
+        }
+      }
+      return task
+    }
+
+    const closeCandidate = await createCloseFixture('success')
+    const closeDetail = await printScan.getTaskDetail('print', closeCandidate.id)
+    if (
+      closeDetail.type !== 'print' ||
+      closeDetail.closeUnpaidEligible !== true ||
+      closeDetail.closeUnpaidBlockReason !== null
+    ) fail('合格未付款 pending 任务详情必须明确 closeUnpaidEligible=true 且不泄露阻断细节')
+    const closed = await printScan.closeUnpaidPrintTask(
+      closeCandidate.id,
+      { reason: '管理员核对后关闭未付款且未领取的测试打印任务', expectedUpdatedAt: closeCandidate.updatedAt.toISOString() },
+      {
+        actorId: closeOperatorId,
+        actorRole: 'admin',
+        ipAddress: '203.0.113.5',
+        userAgent: 'verify-admin-print-scan/close-unpaid',
+        requestId: `req_close_${suffix}`,
+      },
+    )
+    if (closed.idempotent || closed.toStatus !== 'cancelled') fail('首次受控关闭必须返回 pending→cancelled 且非幂等')
+    const [closeAfterTask, closeAfterOrder, closeLogs, closeAudit] = await Promise.all([
+      prisma.printTask.findUnique({ where: { id: closeCandidate.id } }),
+      prisma.order.findUnique({ where: { printTaskId: closeCandidate.id } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: closeCandidate.id, errorCode: 'ADMIN_UNPAID_PRINT_TASK_CLOSED' } }),
+      prisma.auditLog.findFirst({
+        where: { targetId: closeCandidate.id, action: 'print_task.admin_unpaid_closed' },
+        select: { id: true, ipAddress: true, userAgent: true, requestId: true },
+      }),
+    ])
+    if (
+      closeAfterTask?.status !== 'cancelled' ||
+      closeAfterTask.errorCode !== 'ADMIN_UNPAID_PRINT_TASK_CLOSED' ||
+      closeAfterOrder?.payStatus !== 'closed' ||
+      closeAfterOrder.taskStatus !== 'cancelled' ||
+      closeAfterOrder.amountCents !== 137 ||
+      closeLogs !== 1 ||
+      !closeAudit ||
+      closeAudit.ipAddress !== '203.0.113.5' ||
+      closeAudit.userAgent !== 'verify-admin-print-scan/close-unpaid' ||
+      closeAudit.requestId !== `req_close_${suffix}`
+    ) fail('成功关闭必须同事务写任务/订单/状态日志/审计，且保留订单金额来源')
+    pass('受控关闭：pending→cancelled，unpaid→closed，审计同事务且请求元数据完整，金额快照不变')
+
+    const closeServiceSource = readFileSync(join(process.cwd(), 'src/admin-print-scan/admin-print-scan.service.ts'), 'utf8')
+    if (!closeServiceSource.includes('paymentAttempts: { none: {} }')) {
+      fail('受控关闭订单 CAS 必须同时断言不存在任何 PaymentAttempt，避免资格检查后的支付尝试穿透')
+    }
+    pass('受控关闭订单 CAS 同时拒绝任何 PaymentAttempt，防止迟到回调重新入账')
+
+    const idempotent = await printScan.closeUnpaidPrintTask(
+      closeCandidate.id,
+      { reason: '相同关闭请求重试，不得重复状态日志或审计记录', expectedUpdatedAt: closeCandidate.updatedAt.toISOString() },
+      { actorId: closeOperatorId, actorRole: 'admin' },
+    )
+    const [logsAfterIdempotent, auditsAfterIdempotent] = await Promise.all([
+      prisma.printTaskStatusLog.count({ where: { taskId: closeCandidate.id, errorCode: 'ADMIN_UNPAID_PRINT_TASK_CLOSED' } }),
+      prisma.auditLog.count({ where: { targetId: closeCandidate.id, action: 'print_task.admin_unpaid_closed' } }),
+    ])
+    if (!idempotent.idempotent || logsAfterIdempotent !== 1 || auditsAfterIdempotent !== 1) {
+      fail('同一固定关闭终态只允许幂等返回，不得重复日志或审计')
+    }
+    pass('固定关闭终态幂等返回且无重复副作用')
+
+    const noOrder = await createCloseFixture('no-order', { order: false })
+    await expectHttpErrorCode(
+      () => printScan.closeUnpaidPrintTask(noOrder.id, { reason: '太短', expectedUpdatedAt: noOrder.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      400, 'ADMIN_UNPAID_CLOSE_REASON_INVALID', '关闭原因少于 10 字符 → 400',
+    )
+    await expectHttpErrorCode(
+      () => printScan.closeUnpaidPrintTask(noOrder.id, { reason: '严格 ISO 版本戳格式不合法时不得进入关闭事务', expectedUpdatedAt: '2026-07-13' }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      400, 'ADMIN_UNPAID_CLOSE_EXPECTED_UPDATED_AT_INVALID', 'expectedUpdatedAt 非 canonical 严格 ISO → 400',
+    )
+    await expectHttpErrorCode(
+      () => printScan.closeUnpaidPrintTask(noOrder.id, { reason: '任务无关联订单，必须拒绝关闭操作', expectedUpdatedAt: noOrder.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      409, 'ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE', '无关联订单 → 拒绝关闭',
+    )
+    for (const [name, options] of [
+      ['paid', { order: { payStatus: 'paid' } }],
+      ['paying', { order: { payStatus: 'paying' } }],
+      ['claimed', { claimedAt: new Date(), claimExpiry: null }],
+      ['claim-expiry', { claimedAt: null, claimExpiry: new Date(Date.now() + 60_000) }],
+      ['attempt-created', { paymentAttemptStatus: 'created' as const }],
+      ['attempt-pending', { paymentAttemptStatus: 'pending' as const }],
+      ['attempt-expired', { paymentAttemptStatus: 'expired' as const }],
+      ['attempt-success', { paymentAttemptStatus: 'success' as const }],
+      ['attempt-failed', { paymentAttemptStatus: 'failed' as const }],
+    ] as const) {
+      const fixture = await createCloseFixture(name, options)
+      const detail = await printScan.getTaskDetail('print', fixture.id)
+      if (detail.type !== 'print' || detail.closeUnpaidEligible !== false || !detail.closeUnpaidBlockReason) {
+        fail(`${name} 不合格详情必须返回安全阻断原因`)
+      }
+      await expectHttpErrorCode(
+        () => printScan.closeUnpaidPrintTask(fixture.id, { reason: `验证 ${name} 不允许关闭未付款打印任务的安全阻断`, expectedUpdatedAt: fixture.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+        409, 'ADMIN_UNPAID_CLOSE_NOT_ELIGIBLE', `${name} → 拒绝关闭`,
+      )
+    }
+    pass('无订单、paid/paying、任一 claim 字段、任意状态支付尝试均拒绝关闭')
+
+    const stale = await createCloseFixture('stale')
+    await prisma.printTask.update({
+      where: { id: stale.id },
+      data: { errorMessage: '更新后的安全占位错误', updatedAt: new Date(stale.updatedAt.getTime() + 1_000) },
+    })
+    await expectHttpErrorCode(
+      () => printScan.closeUnpaidPrintTask(stale.id, { reason: '验证过期版本戳必须阻断受控关闭请求', expectedUpdatedAt: stale.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      409, 'ADMIN_UNPAID_CLOSE_STALE', 'expectedUpdatedAt 过期 → 409',
+    )
+
+    const closeRace = await createCloseFixture('race')
+    const closeRaceResults = await Promise.allSettled([
+      printScan.closeUnpaidPrintTask(closeRace.id, { reason: '并发关闭请求一号必须只有一个能提交状态迁移', expectedUpdatedAt: closeRace.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      printScan.closeUnpaidPrintTask(closeRace.id, { reason: '并发关闭请求二号应得到幂等而非重复状态变更', expectedUpdatedAt: closeRace.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+    ])
+    const closeRaceSuccesses = closeRaceResults.filter((result) => result.status === 'fulfilled').length
+    if (closeRaceSuccesses < 1 || closeRaceSuccesses > 2) fail('并发关闭至少一个成功，另一请求仅可幂等或 CAS 冲突')
+    const closeRaceLogs = await prisma.printTaskStatusLog.count({ where: { taskId: closeRace.id, errorCode: 'ADMIN_UNPAID_PRINT_TASK_CLOSED' } })
+    if (closeRaceLogs !== 1) fail('并发关闭仅允许一条有效状态日志')
+    pass('并发关闭：仅一条有效状态迁移，另一请求幂等返回')
+
+    const claimRace = await createCloseFixture('claim-race')
+    await Promise.allSettled([
+      printScan.closeUnpaidPrintTask(claimRace.id, { reason: '管理员关闭与 Agent 领取竞态不得覆盖对方状态', expectedUpdatedAt: claimRace.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      prisma.printTask.updateMany({
+        where: { id: claimRace.id, status: 'pending', claimedAt: null, claimExpiry: null },
+        data: { status: 'claimed', claimedAt: new Date(), claimExpiry: new Date(Date.now() + 60_000) },
+      }),
+    ])
+    const claimRaceAfter = await prisma.printTask.findUnique({ where: { id: claimRace.id } })
+    const claimRaceOrder = await prisma.order.findUnique({ where: { printTaskId: claimRace.id } })
+    const claimWon = claimRaceAfter?.status === 'claimed' && claimRaceOrder?.payStatus === 'unpaid' && claimRaceOrder.taskStatus === 'pending'
+    const closeWon = claimRaceAfter?.status === 'cancelled' && claimRaceOrder?.payStatus === 'closed' && claimRaceOrder.taskStatus === 'cancelled'
+    if (!claimWon && !closeWon) fail('Agent claim 与关闭竞态后只能保留一个一致的终态')
+    pass('Agent claim 与关闭竞态由 PrintTask CAS 保持一致')
+
+    const auditRollback = await createCloseFixture('audit-rollback')
+    try {
+      await printScan.closeUnpaidPrintTask(
+        auditRollback.id,
+        { reason: '审计外键失败时必须整体回滚受控关闭事务', expectedUpdatedAt: auditRollback.updatedAt.toISOString() },
+        { actorId: `missing_admin_${suffix}`, actorRole: 'admin' },
+      )
+      fail('tx.auditLog.create 失败必须拒绝并触发回滚')
+    } catch {
+      pass('tx.auditLog.create 失败 → 拒绝关闭')
+    }
+    const [rollbackTask, rollbackOrder] = await Promise.all([
+      prisma.printTask.findUnique({ where: { id: auditRollback.id } }),
+      prisma.order.findUnique({ where: { printTaskId: auditRollback.id } }),
+    ])
+    if (rollbackTask?.status !== 'pending' || rollbackOrder?.payStatus !== 'unpaid' || rollbackOrder.taskStatus !== 'pending') {
+      fail('审计失败不得留下半完成的关闭状态')
+    }
+    pass('tx.auditLog.create 失败会回滚任务和订单更新')
+
+    const orderStatus = new OrderStatusService(prisma, new AuditService(prisma))
+    await expectHttpError(
+      () => orderStatus.markPaid(closeAfterOrder!.id, { paymentSource: 'offline' }),
+      400, 'closed 订单既有 markPaid 路径不能继续付款',
+    )
+    process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-admin-print-scan-payment-session-secret-0123456789'
+    const payment = new OnlinePaymentService(
+      prisma,
+      new AuditService(prisma),
+      orderStatus,
+      new PaymentProviderRegistry([new SandboxPaymentProvider('verify-admin-print-scan-sandbox-secret-0123456789')]),
+    )
+    const paymentRace = await createCloseFixture('payment-race')
+    const paymentRaceOrder = await prisma.order.findUniqueOrThrow({ where: { printTaskId: paymentRace.id } })
+    const paymentRaceToken = createPaymentSessionToken({
+      orderId: paymentRaceOrder.id,
+      orderNo: paymentRaceOrder.orderNo,
+      terminalId: paymentRaceOrder.terminalId,
+      amountCents: paymentRaceOrder.amountCents,
+      printTaskId: paymentRace.id,
+    })
+    await Promise.allSettled([
+      printScan.closeUnpaidPrintTask(paymentRace.id, { reason: '管理员关闭与支付出码竞态不得产生付款后取消', expectedUpdatedAt: paymentRace.updatedAt.toISOString() }, { actorId: closeOperatorId, actorRole: 'admin' }),
+      payment.createPayAttempt(paymentRaceOrder.id, paymentRaceToken),
+    ])
+    const [paymentRaceTask, paymentRaceAfterOrder, paymentRaceAttempts] = await Promise.all([
+      prisma.printTask.findUnique({ where: { id: paymentRace.id } }),
+      prisma.order.findUnique({ where: { id: paymentRaceOrder.id } }),
+      prisma.paymentAttempt.findMany({ where: { orderId: paymentRaceOrder.id }, select: { id: true } }),
+    ])
+    createdPaymentAttemptIds.push(...paymentRaceAttempts.map((attempt) => attempt.id))
+    const paymentWon = paymentRaceTask?.status === 'pending' && paymentRaceAfterOrder?.payStatus === 'paying' && paymentRaceAttempts.length === 1
+    const closeWonPaymentRace = paymentRaceTask?.status === 'cancelled' && paymentRaceAfterOrder?.payStatus === 'closed' && paymentRaceAttempts.length === 0
+    if (!paymentWon && !closeWonPaymentRace) fail('支付出码与关闭竞态后不得出现付款中且任务已取消')
+    pass('支付出码与关闭竞态由 Order CAS 保持一致')
+    const closedPaymentToken = createPaymentSessionToken({
+      orderId: closeAfterOrder!.id,
+      orderNo: closeAfterOrder!.orderNo,
+      terminalId: closeAfterOrder!.terminalId,
+      amountCents: closeAfterOrder!.amountCents,
+      printTaskId: closeCandidate.id,
+    })
+    await expectHttpError(
+      () => payment.createPayAttempt(closeAfterOrder!.id, closedPaymentToken),
+      400, 'closed 订单既有 create payment 路径不能继续出码',
+    )
+    pass('关闭后的订单既有 mark-paid/create payment 路径均不能继续付款')
+
+    // ── 5. 服务端能力门禁（C-1 + Task 11 模式语义）──────────────────────────
     // 显式钉住模式再断言：不读运行机器的 .env（在合法配置为 strict 的机器上
     // 跑本脚本不得误报），用例间用测试专用开关切换，结束后还原。
     setPrintScanCapabilityModeForTest('managed')
@@ -354,12 +668,15 @@ async function main() {
   } finally {
     setPrintScanCapabilityModeForTest(null)
     // 清理本脚本创建的数据（依赖 Terminal onDelete: Cascade 清 capability/scan/print）
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: [...createdPrintTaskIds, ...createdPaymentAttemptIds] } } }).catch(() => undefined)
+    await prisma.paymentAttempt.deleteMany({ where: { orderId: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.order.deleteMany({ where: { id: { in: createdOrderIds } } }).catch(() => undefined)
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: createdPrintTaskIds } } }).catch(() => undefined)
     await prisma.printTask.deleteMany({ where: { id: { in: createdPrintTaskIds } } }).catch(() => undefined)
     await prisma.scanTask.deleteMany({ where: { id: { in: createdScanTaskIds } } }).catch(() => undefined)
     await prisma.fileObject.deleteMany({ where: { id: { in: [`file_vps_${suffix}`, `file_vps_gone_${suffix}`] } } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await prisma.user.deleteMany({ where: { id: { startsWith: `admin_close_${suffix}` } } }).catch(() => undefined)
     await prisma.onModuleDestroy()
   }
 }

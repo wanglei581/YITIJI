@@ -16,6 +16,7 @@ export class KioskUploadOptionsDto {
     'print_doc',
     'fair_material',
     'cover_letter',
+    'signature_image',
   ])
   purpose!: string
 }

@@ -67,6 +67,8 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
   screensaver_material: { mimes: [...IMG, ...VIDEO], maxBytes: 500 * MB },
   admin_upload: { mimes: [...PDF_DOC_IMG, ...VIDEO], maxBytes: 500 * MB },
   temp: { mimes: [...PRINTABLE, 'image/webp'], maxBytes: 20 * MB },
+  // 签名/印章图片:仅供签章合成读取,高敏、系统短期、锁定不可延期(见 retention-policy.ts)
+  signature_image: { mimes: ['image/jpeg', 'image/png'], maxBytes: 10 * MB },
 }
 
 /** 服务端代理上传(multipart,整 buffer 进内存)的硬上限。超此须走 upload-intent 直传。 */
@@ -87,6 +89,7 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
   screensaver_material: 'normal',
   admin_upload: 'normal',
   temp: 'sensitive',
+  signature_image: 'highly_sensitive',
 }
 
 /** 从文件名提取扩展名(小写,不带点);无则空串。 */

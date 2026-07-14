@@ -53,7 +53,7 @@ async function main() {
   }
 
   const filesStub: Partial<FilesService> = {
-    upload: async () => uploaded,
+    upload: async (args) => ({ ...uploaded, filename: args.filename }),
   }
   const auditStub: Partial<AuditService> = {
     write: async () => undefined,
@@ -94,6 +94,29 @@ async function main() {
   const ttlMs = Number(expires) - Date.now()
   ok(ttlMs > 25 * 60 * 1000 && ttlMs <= 30 * 60 * 1000 + 5_000, '内部 URL TTL 保持约 30 分钟')
   ok(new Date(data.signedUrlExpiresAt).getTime() === Number(expires), 'signedUrlExpiresAt 同步为内部 HMAC URL 的过期时间')
+
+  const uploadKioskFilename = async (originalname: string) => {
+    const response = await controller.kioskUpload(
+      {
+        buffer: Buffer.from('%PDF-1.4\n%%EOF\n'),
+        originalname,
+        mimetype: 'application/pdf',
+      } as Express.Multer.File,
+      { purpose: 'resume_upload' },
+      {
+        requestId: 'verify-kiosk-upload-filename-encoding',
+        headers: { 'user-agent': 'verify', 'x-forwarded-for': '127.0.0.1' },
+      } as Express.Request & { requestId?: string; headers: Record<string, string | string[] | undefined> },
+    )
+    return response.data.filename
+  }
+
+  const expectedChineseFilename = '张三_简历.pdf'
+  const latin1DecodedUtf8Filename = Buffer.from(expectedChineseFilename, 'utf8').toString('latin1')
+  ok(await uploadKioskFilename(latin1DecodedUtf8Filename) === expectedChineseFilename, 'UTF-8/Latin-1 乱码的中文文件名恢复后才落库并回传')
+  ok(await uploadKioskFilename(expectedChineseFilename) === expectedChineseFilename, '已正确解码的中文文件名保持不变')
+  ok(await uploadKioskFilename('résumé.pdf') === 'résumé.pdf', '合法 Latin-1 文件名不被误解码')
+  ok(await uploadKioskFilename('Ã©.pdf') === 'Ã©.pdf', '可构成 UTF-8 字节的非中文 Latin-1 文件名不被误解码')
 
   console.log(`\nALL PASS (${passed} checks)`)
 }

@@ -128,6 +128,8 @@ jobs:
         working-directory: apps/terminal-agent
         run: |
           pnpm run verify:agent-profile-guard
+          pnpm run verify:agent-config-resilience
+          pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
           pnpm run verify:scan-watcher
           pnpm run verify:local-qr-proxy
@@ -198,6 +200,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-device-config
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
+          pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:admin-ops
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
@@ -348,6 +351,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
+          pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
