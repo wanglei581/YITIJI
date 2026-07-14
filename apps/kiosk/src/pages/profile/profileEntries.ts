@@ -1,9 +1,9 @@
 import type { Entry, EntrySectionData } from './profileTypes'
 
-// 「我的」页入口配置（墨青纸感第一批）。
-// 入口 label / route / 建设中标签保持 main 不变；仅把图标名、tone、说明和分区布局换成墨青纸感表现层。
+// 「我的」页入口配置。
+// 入口 label / route / 建设中标签保持既有业务合同不变；仅由入口页重组为 4188 目录排版。
 
-// 1. 我的资产（entry-grid 大卡）
+// 1. 我的资产
 const ASSETS: Entry[] = [
   { icon: 'resume', tone: 'teal', label: '我的简历', desc: '原始 / 诊断 / 优化版', route: '/me/resumes' },
   { icon: 'files', tone: 'slate', label: '我的文档', desc: '扫描件、证明材料', route: '/me/documents' },
@@ -13,7 +13,7 @@ const ASSETS: Entry[] = [
   { icon: 'ticket', tone: 'clay', label: '我的权益', desc: '套餐、券、活动', route: '/me/benefits' },
 ]
 
-// 2. 常用服务（chip-grid 小行，均跳转既有功能页）
+// 2. 常用服务（均跳转既有功能页）
 const SERVICES: Entry[] = [
   { icon: 'sparkle', tone: 'teal', label: 'AI简历服务', route: '/resume/source' },
   { icon: 'book', tone: 'plum', label: '简历模板', route: '/resume/templates' },
@@ -25,7 +25,7 @@ const SERVICES: Entry[] = [
   { icon: 'robot', tone: 'teal', label: 'AI助手', route: '/assistant' },
 ]
 
-// 3. 招聘会与活动（外部来源信息入口 / 记录）
+// 3. 来源与活动（外部来源信息入口 / 记录）
 // 浏览 / 外部跳转记录跨类型（岗位/招聘会/政策/企业），由 /me/activity 两 Tab 页承载。
 // 来源平台后续动作与结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
@@ -44,7 +44,7 @@ const BENEFITS: Entry[] = [
   { icon: 'policy', tone: 'wheat', label: '政策补贴指引', route: '/renshi?tab=policy' },
 ]
 
-// 5. 账户与服务（account-grid 小方块；已接线入口直达本人消息、账号、帮助与反馈）
+// 5. 账户与支持（已接线入口直达本人消息、账号、帮助与反馈）
 const ACCOUNT: Entry[] = [
   { icon: 'bell', tone: 'ink', label: '消息通知', route: '/me/notifications' },
   // 账号设置轻量版：登录/游客状态、脱敏手机号、会话说明、协议入口、退出登录；不做换绑/注销。
@@ -58,7 +58,6 @@ const ACCOUNT: Entry[] = [
 export const SECTIONS: EntrySectionData[] = [
   { title: '我的资产', subtitle: '本人简历、文档、订单与收藏。', layout: 'grid', rail: 'teal', entries: ASSETS },
   { title: '常用服务', subtitle: '直达既有功能页。', layout: 'chips', rail: 'slate', entries: SERVICES },
-  { title: '招聘会与活动', subtitle: '外部来源信息入口与本人记录。', layout: 'chips', rail: 'wheat', entries: FAIRS },
-  { title: '权益活动与服务套餐', subtitle: '上线后在这里开通与查看。', layout: 'chips', rail: 'plum', entries: BENEFITS },
-  { title: '账户与服务', layout: 'account', rail: 'teal', entries: ACCOUNT },
+  { title: '来源与活动', subtitle: '外部来源信息入口与本人记录。', layout: 'chips', rail: 'wheat', entries: [...FAIRS, ...BENEFITS] },
+  { title: '账户与支持', subtitle: '消息、设置与帮助入口。', layout: 'account', rail: 'teal', entries: ACCOUNT },
 ]

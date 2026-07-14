@@ -1,0 +1,197 @@
+.kprofile.kprofile-lightflow .kp-service-directory {
+  display: grid;
+  gap: 16px;
+}
+
+.kprofile.kprofile-lightflow .kp-section {
+  min-inline-size: 0;
+}
+
+.kprofile.kprofile-lightflow .kp-section .lf-reference-group-head {
+  border-bottom: 1px solid var(--lf-line);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon {
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon svg {
+  inline-size: 25px;
+  block-size: 25px;
+}
+
+.kprofile.kprofile-lightflow .kp-section .lf-reference-group-head h2 {
+  margin: 0;
+  color: var(--lf-ink);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.kprofile.kprofile-lightflow .kp-section .lf-reference-group-head p {
+  margin: 3px 0 0;
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.kprofile.kprofile-lightflow .kp-entry {
+  inline-size: 100%;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon {
+  border: 1px solid transparent;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+.kprofile.kprofile-lightflow .lf-reference-secondary .kp-entry-icon svg {
+  inline-size: 21px;
+  block-size: 21px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-content {
+  display: grid;
+  min-inline-size: 0;
+  gap: 3px;
+  flex: 1;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-content strong {
+  color: var(--lf-ink);
+  font-size: 15px;
+  font-weight: 780;
+  line-height: 1.35;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-content span {
+  overflow: hidden;
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-arrow {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #7d99b7;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-arrow svg {
+  inline-size: 18px;
+  block-size: 18px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-tag {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 1px solid var(--lf-line);
+  color: var(--lf-ink-muted);
+  background: var(--lf-surface-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-tag.session {
+  border-color: #9ec8ff;
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-secondary-list {
+  display: grid;
+}
+
+.kprofile.kprofile-lightflow .kp-secondary-list .kp-entry:last-child {
+  border-bottom: 0;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.teal {
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.slate {
+  color: #0e789e;
+  background: var(--lf-cyan-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.plum {
+  color: #6550ad;
+  background: var(--lf-lavender-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.clay {
+  color: #c45c25;
+  background: var(--lf-orange-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.wheat {
+  color: #aa700e;
+  background: var(--lf-sand-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.rose {
+  color: #bd4d70;
+  background: var(--lf-rose-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-entry-icon.ink {
+  color: var(--lf-ink-muted);
+  background: var(--lf-surface-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.teal {
+  color: var(--lf-blue-strong);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.slate {
+  color: #0e789e;
+  background: var(--lf-cyan-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.plum {
+  color: #6550ad;
+  background: var(--lf-lavender-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.clay {
+  color: #c45c25;
+  background: var(--lf-orange-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.wheat {
+  color: #aa700e;
+  background: var(--lf-sand-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.rose {
+  color: #bd4d70;
+  background: var(--lf-rose-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-group-icon.ink {
+  color: var(--lf-ink-muted);
+  background: var(--lf-surface-soft);
+}
+
+@media (max-width: 640px) {
+  .kprofile.kprofile-lightflow .kp-service-directory {
+    gap: 12px;
+  }
+
+  .kprofile.kprofile-lightflow .kp-entry-content strong {
+    font-size: 14px;
+  }
+
+  .kprofile.kprofile-lightflow .kp-entry-content span {
+    font-size: 11px;
+  }
+}

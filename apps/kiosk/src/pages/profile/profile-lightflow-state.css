@@ -1,0 +1,263 @@
+.kprofile.kprofile-lightflow .kp-pending-banner {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--lf-line);
+  color: var(--lf-ink);
+  background: #ffffff;
+}
+
+.kprofile.kprofile-lightflow .kp-pending-icon {
+  display: grid;
+  inline-size: 40px;
+  block-size: 40px;
+  place-items: center;
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-pending-icon svg {
+  inline-size: 20px;
+  block-size: 20px;
+}
+
+.kprofile.kprofile-lightflow .kp-pending-banner h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.kprofile.kprofile-lightflow .kp-pending-banner p {
+  margin: 3px 0 0;
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+}
+
+.kprofile.kprofile-lightflow .kp-pending-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-block-size: 48px;
+  padding-inline: 12px;
+  border: 1px solid #9ec8ff;
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.kprofile.kprofile-lightflow .kp-pending-action svg {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.kprofile.kprofile-lightflow .kp-pending-action:hover {
+  border-color: var(--lf-blue);
+  background: #cde7ff;
+}
+
+.kprofile.kprofile-lightflow .kp-session-records .lf-reference-group-head {
+  border-bottom: 1px solid var(--lf-line);
+}
+
+.kprofile.kprofile-lightflow .kp-session-group-icon {
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-session-group-icon svg {
+  inline-size: 24px;
+  block-size: 24px;
+}
+
+.kprofile.kprofile-lightflow .kp-session-records h2 {
+  margin: 0;
+  color: var(--lf-ink);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.kprofile.kprofile-lightflow .kp-session-records p {
+  margin: 3px 0 0;
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+}
+
+.kprofile.kprofile-lightflow .kp-session-list {
+  display: grid;
+}
+
+.kprofile.kprofile-lightflow .kp-session-row {
+  cursor: default;
+}
+
+.kprofile.kprofile-lightflow .kp-session-row:hover {
+  background: #ffffff;
+}
+
+.kprofile.kprofile-lightflow .kp-session-row:last-child {
+  border-bottom: 0;
+}
+
+.kprofile.kprofile-lightflow .kp-session-icon {
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-session-icon svg {
+  inline-size: 21px;
+  block-size: 21px;
+}
+
+.kprofile.kprofile-lightflow .kp-session-icon.scan {
+  color: #0e789e;
+  background: var(--lf-cyan-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-session-icon.ai {
+  color: #6550ad;
+  background: var(--lf-lavender-soft);
+}
+
+.kprofile.kprofile-lightflow .kp-session-copy {
+  display: grid;
+  min-inline-size: 0;
+  gap: 3px;
+  flex: 1;
+}
+
+.kprofile.kprofile-lightflow .kp-session-copy strong {
+  overflow: hidden;
+  color: var(--lf-ink);
+  font-size: 14px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kprofile.kprofile-lightflow .kp-session-copy span {
+  overflow: hidden;
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kprofile.kprofile-lightflow .kp-session-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kprofile.kprofile-lightflow .kp-toast {
+  position: fixed;
+  inset-block-start: 16px;
+  inset-inline-start: 50%;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-inline-size: calc(100% - 24px);
+  padding: 12px 16px;
+  color: #ffffff;
+  background: #143553;
+  font-size: 13px;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+.kprofile.kprofile-lightflow .kp-toast svg {
+  inline-size: 18px;
+  block-size: 18px;
+  flex: 0 0 auto;
+  color: #80b8ff;
+}
+
+.kprofile.kprofile-lightflow .kp-toast .close {
+  display: grid;
+  inline-size: 28px;
+  block-size: 28px;
+  place-items: center;
+  border: 0;
+  color: currentColor;
+  background: transparent;
+  cursor: pointer;
+}
+
+.kprofile.kprofile-lightflow .kp-toast .close svg {
+  inline-size: 14px;
+  block-size: 14px;
+  color: currentColor;
+}
+
+.kprofile.kprofile-lightflow .compliance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border-top: 1px solid var(--lf-line);
+  color: var(--lf-ink-muted);
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.kprofile.kprofile-lightflow .compliance svg {
+  inline-size: 16px;
+  block-size: 16px;
+  flex: 0 0 auto;
+  color: var(--lf-blue-strong);
+}
+
+.kprofile.kprofile-lightflow .k-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(8, 119, 249, 0.24) 0%, transparent 70%);
+  transform: scale(0);
+}
+
+@media (max-width: 640px) {
+  .kprofile.kprofile-lightflow .kp-pending-banner {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .kprofile.kprofile-lightflow .kp-pending-action {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .kprofile.kprofile-lightflow .kp-session-row {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+
+  .kprofile.kprofile-lightflow .kp-session-copy strong {
+    font-size: 13px;
+  }
+
+  .kprofile.kprofile-lightflow .kp-session-copy span {
+    font-size: 11px;
+  }
+
+  .kprofile.kprofile-lightflow .kp-session-actions {
+    gap: 0;
+  }
+
+  .kprofile.kprofile-lightflow .compliance {
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kprofile.kprofile-lightflow * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

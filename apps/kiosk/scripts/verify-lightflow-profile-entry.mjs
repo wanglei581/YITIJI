@@ -28,6 +28,10 @@ function expectNotIncludes(source, marker, message) {
   expect(!source.includes(marker), `${message}${source.includes(marker) ? ` — unexpected ${marker}` : ''}`)
 }
 
+function expectMatches(source, pattern, message) {
+  expect(pattern.test(source), `${message}${pattern.test(source) ? '' : ` — missing ${pattern}`}`)
+}
+
 function git(args) {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
@@ -76,12 +80,47 @@ function changedFiles() {
   ])]
 }
 
+function escapeRegexp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function countMatches(source, pattern) {
+  return [...source.matchAll(pattern)].length
+}
+
+function assertProfileCssScope(relativePath, source) {
+  expect(source.length > 0, `${relativePath} exists for the split Profile stylesheet`)
+  expect(!/^\s*(?:html|body|:root)\b/m.test(source), `${relativePath} never overrides a global root selector`)
+  expect(!/\.me-inkdetail\b/.test(source), `${relativePath} never touches /me detail styling`)
+
+  const selectors = [...source.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)]
+    .map((match) => match[1].trim())
+    .filter((selector) => selector && !selector.startsWith('@'))
+    .flatMap((selector) => selector.split(',').map((part) => part.trim()))
+
+  expect(
+    selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow')),
+    `${relativePath} scopes every selector from .kprofile.kprofile-lightflow`,
+  )
+}
+
 console.log('\n=== LightFlow /profile 主入口静态合同 ===')
 
 const packageJson = read('package.json')
 const profile = read('src/pages/profile/ProfilePage.tsx')
+const header = read('src/pages/profile/components/ProfileHeader.tsx')
+const section = read('src/pages/profile/components/ProfileEntrySection.tsx')
+const sessionRecords = read('src/pages/profile/components/ProfileSessionRecords.tsx')
 const entries = read('src/pages/profile/profileEntries.ts')
-const css = read('src/pages/profile/profile-inkpaper.css')
+const cssEntry = read('src/pages/profile/profile-inkpaper.css')
+const profileCssFiles = [
+  'src/pages/profile/profile-inkpaper.css',
+  'src/pages/profile/profile-lightflow-shell.css',
+  'src/pages/profile/profile-lightflow-directory.css',
+  'src/pages/profile/profile-lightflow-state.css',
+]
+const profileCss = profileCssFiles.map((path) => read(path))
+const combinedProfileCss = profileCss.join('\n')
 const kioskRootSource = read('src/layouts/KioskRoot.tsx')
 const serviceDeskRouteList = kioskRootSource.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
 
@@ -91,10 +130,39 @@ expectIncludes(
   'package registers the LightFlow profile contract',
 )
 
+expectIncludes(profile, "import { ReferenceServiceNav } from '../../components/lightflow/ReferenceServiceNav'", 'ProfilePage imports the shared reference navigation')
+expectIncludes(profile, '<ReferenceServiceNav />', 'ProfilePage renders the shared navigation before its profile content')
 expectIncludes(profile, 'className="kprofile kprofile-lightflow"', 'ProfilePage binds the LightFlow root on its page shell')
 expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage groups existing entries in the compact service directory')
+expectIncludes(profile, 'className="lf-reference-pair"', 'ProfilePage pairs assets and common services in the reference layout')
+expectIncludes(profile, 'section={assetSection}', 'ProfilePage retains the my-assets section')
+expectIncludes(profile, 'section={serviceSection}', 'ProfilePage retains the common-services section')
+expectIncludes(profile, 'section={sourceActivitySection}', 'ProfilePage retains the source-and-activities section')
+expectIncludes(profile, 'section={accountSection}', 'ProfilePage retains the account-and-support section')
+expectNotIncludes(profile, '<h1>我的', 'ProfilePage does not render a visible 我的 page title')
+expectNotIncludes(header, '<h1>我的', 'ProfileHeader does not render a visible 我的 page title')
 expectIncludes(serviceDeskRouteList, "'/profile'", 'KioskRoot opts the /profile landing page into the LightFlow shell')
 expectNotIncludes(serviceDeskRouteList, "'/me'", 'KioskRoot does not opt /me/* detail routes into LightFlow')
+
+const profileHeaderMountIndex = profile.indexOf('<ProfileHeader')
+const pendingTaskMountIndex = profile.indexOf('{isLoggedIn && hasSessionRecords && <PendingTaskBanner')
+const toastMountIndex = profile.indexOf('{toastMsg && (')
+const sessionRecordsMountIndex = profile.indexOf('{hasSessionRecords && (\n          <ProfileSessionRecords')
+const firstReferencePairIndex = profile.indexOf('<div className="lf-reference-pair">')
+expect(
+  [
+    profileHeaderMountIndex,
+    pendingTaskMountIndex,
+    toastMountIndex,
+    sessionRecordsMountIndex,
+    firstReferencePairIndex,
+  ].every((index) => index !== -1)
+    && profileHeaderMountIndex < pendingTaskMountIndex
+    && pendingTaskMountIndex < toastMountIndex
+    && toastMountIndex < sessionRecordsMountIndex
+    && sessionRecordsMountIndex < firstReferencePairIndex,
+  'ProfileHeader, pending task, toast, session records, and first lf-reference-pair mount in the required strict order',
+)
 
 for (const marker of [
   'useAuth()',
@@ -102,8 +170,8 @@ for (const marker of [
   '<ProfileHeader',
   '<PendingTaskBanner',
   '<ProfileSessionRecords',
-  'SECTIONS.map',
-  'const goLogin = () => navigate(\'/login\', { state: { from: location.pathname } })',
+  'hasSessionRecords &&',
+  "const goLogin = () => navigate('/login', { state: { from: location.pathname } })",
   "navigate('/me/settings')",
   "navigate('/me/notifications')",
   "navigate('/print/preview'",
@@ -111,45 +179,114 @@ for (const marker of [
   expectIncludes(profile, marker, `ProfilePage preserves ${marker}`)
 }
 
-for (const route of [
-  '/me/resumes',
-  '/me/documents',
-  '/me/ai-records',
-  '/me/print-orders',
-  '/me/favorites',
-  '/me/benefits',
-  '/resume/source',
-  '/resume/templates',
-  '/print/upload',
-  '/print-scan',
-  '/scan/start',
-  '/jobs',
-  '/job-fairs',
-  '/assistant',
-  '/me/activity',
-  '/activities',
-  '/renshi?tab=policy',
-  '/me/notifications',
-  '/me/settings',
-  '/help',
-  '/me/feedback',
+for (const marker of [
+  'reserveBannerSpace',
+  'onLogin',
+  'onLogout',
+  'onOpenSettings',
+  'onOpenNotifications',
+  'className="lf-reference-panel kp-profile-header',
+  'className="lf-reference-group-head',
+  'className="p-stats"',
 ]) {
-  expectIncludes(entries, route, `Profile entries retain ${route}`)
+  expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
+}
+expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')
+
+for (const marker of [
+  'className="lf-reference-panel kp-section"',
+  'className="lf-reference-group-head"',
+  "'lf-reference-primary'",
+  "'lf-reference-secondary'",
+  'const [primaryEntry, ...secondaryEntries]',
+]) {
+  expectIncludes(section, marker, `ProfileEntrySection uses ${marker}`)
+}
+expectNotIncludes(section, 'sec-head', 'ProfileEntrySection removes the old sec-head visual shell')
+
+for (const marker of [
+  'className="lf-reference-panel kp-session-records"',
+  'className="lf-reference-group-head"',
+  'className="lf-reference-secondary kp-session-row"',
+  'onPrintFile',
+  'onDeleteResume',
+  'onDeleteScan',
+  'onDeleteAiRecord',
+]) {
+  expectIncludes(sessionRecords, marker, `ProfileSessionRecords preserves ${marker}`)
 }
 
-expectIncludes(css, '.kprofile.kprofile-lightflow', 'Profile CSS scopes every LightFlow rule to the profile landing root')
+const expectedEntries = [
+  ['我的简历', '/me/resumes'],
+  ['我的文档', '/me/documents'],
+  ['AI服务记录', '/me/ai-records'],
+  ['打印订单', '/me/print-orders'],
+  ['我的收藏', '/me/favorites'],
+  ['我的权益', '/me/benefits'],
+  ['AI简历服务', '/resume/source'],
+  ['简历模板', '/resume/templates'],
+  ['文档打印', '/print/upload'],
+  ['打印扫描', '/print-scan'],
+  ['扫描文件', '/scan/start'],
+  ['岗位信息', '/jobs'],
+  ['招聘会', '/job-fairs'],
+  ['AI助手', '/assistant'],
+  ['浏览记录', '/me/activity'],
+  ['外部跳转记录', '/me/activity?tab=jump'],
+  ['权益活动', '/activities?source=fair'],
+  ['权益活动', '/activities'],
+  ['政策补贴指引', '/renshi?tab=policy'],
+  ['消息通知', '/me/notifications'],
+  ['账号设置', '/me/settings'],
+  ['身份切换', '/me/settings'],
+  ['帮助中心', '/help'],
+  ['意见反馈', '/me/feedback'],
+]
+
+expect(countMatches(entries, /\blabel:\s*'/g) === 27, 'Profile entries retain exactly 27 real labels')
+for (const [label, route] of expectedEntries) {
+  expectMatches(
+    entries,
+    new RegExp(`label:\\s*'${escapeRegexp(label)}'[\\s\\S]{0,180}?route:\\s*'${escapeRegexp(route)}'`),
+    `Profile entries retain ${label} -> ${route}`,
+  )
+}
+for (const label of ['招聘会扫码凭证', '求职打印套餐', 'AI服务套餐']) {
+  expectMatches(
+    entries,
+    new RegExp(`label:\\s*'${escapeRegexp(label)}'[\\s\\S]{0,180}?tag:\\s*'建设中'`),
+    `Profile entries retain ${label} as a construction-state entry`,
+  )
+}
+expect(countMatches(entries, /tag:\s*'建设中'/g) === 3, 'Profile entries retain exactly three construction-state tags')
+for (const title of ['我的资产', '常用服务', '来源与活动', '账户与支持']) {
+  expect(countMatches(entries, new RegExp(`title:\\s*'${title}'`, 'g')) === 1, `Profile entry grouping retains ${title} exactly once`)
+}
+expectIncludes(entries, 'entries: [...FAIRS, ...BENEFITS]', 'Source-and-activities groups reuse the two existing entry arrays without copying routes')
+expectNotIncludes(entries, '一键投递', 'Profile entries do not add a recruitment closed-loop label')
+expectNotIncludes(entries, '立即投递', 'Profile entries do not add a recruitment closed-loop label')
+expectNotIncludes(entries, '平台投递', 'Profile entries do not add a recruitment closed-loop label')
+
 expect(
-  !/^\s*\.kprofile(?!\.kprofile-lightflow\b)/m.test(css),
-  'Profile CSS never starts a rule from the unscoped kprofile namespace',
+  cssEntry.trim() === [
+    "@import './profile-lightflow-shell.css';",
+    "@import './profile-lightflow-directory.css';",
+    "@import './profile-lightflow-state.css';",
+  ].join('\n'),
+  'Profile CSS entrypoint only aggregates the three local LightFlow slices',
 )
-expect(!/^\s*(?:html|body|:root)\b/m.test(css), 'Profile CSS never overrides a global root selector')
-expectIncludes(css, '--lf-canvas:', 'Profile CSS defines the LightFlow ice-blue canvas token')
-expectIncludes(css, '--lf-blue:', 'Profile CSS defines the single bright-blue action token')
-expectIncludes(css, '--lf-ink:', 'Profile CSS defines the deep navy text token')
-expectIncludes(css, 'grid-template-columns: repeat(2, minmax(0, 1fr));', 'Profile CSS uses compact two-column service cards')
-expectIncludes(css, 'min-height: 56px;', 'Profile CSS retains 56px primary touch targets')
-expectIncludes(css, 'min-width: 48px;', 'Profile CSS retains 48px secondary touch targets')
-expectIncludes(css, '@media (prefers-reduced-motion: reduce)', 'Profile CSS keeps reduced-motion support')
+for (let index = 0; index < profileCssFiles.length; index += 1) {
+  assertProfileCssScope(profileCssFiles[index], profileCss[index])
+}
+expectIncludes(combinedProfileCss, '--lf-canvas:', 'Profile CSS defines the LightFlow ice-blue canvas token')
+expectIncludes(combinedProfileCss, '--lf-blue:', 'Profile CSS defines the single bright-blue action token')
+expectIncludes(combinedProfileCss, '--lf-ink:', 'Profile CSS defines the deep navy text token')
+expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS retains 56px primary touch targets')
+expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS retains 48px secondary touch targets')
+expectIncludes(combinedProfileCss, '@media (prefers-reduced-motion: reduce)', 'Profile CSS keeps reduced-motion support')
+expectNotIncludes(combinedProfileCss, 'p-hero', 'Profile CSS removes the old p-hero visual shell')
+expectNotIncludes(combinedProfileCss, 'sec-head', 'Profile CSS removes the old sec-head visual shell')
+expectNotIncludes(combinedProfileCss, 'box-shadow:', 'Profile CSS does not restore large panel shadows')
 
 for (const marker of [
   '--paper:',
@@ -165,7 +302,7 @@ for (const marker of [
   'repeating-linear-gradient(0deg',
   'mask-image:',
 ]) {
-  expectNotIncludes(css, marker, `Profile CSS removes InkPaper marker ${marker}`)
+  expectNotIncludes(combinedProfileCss, marker, `Profile CSS removes InkPaper marker ${marker}`)
 }
 
 const forbiddenMeChanges = changedFiles().filter((path) => path.startsWith('apps/kiosk/src/pages/profile/me/'))

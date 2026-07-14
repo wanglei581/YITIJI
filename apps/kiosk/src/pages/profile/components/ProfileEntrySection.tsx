@@ -1,33 +1,22 @@
 import { KIcon } from '../../../components/kiosk-icon'
 import type { Entry, EntrySectionData } from '../profileTypes'
 
-// 分区渲染（墨青纸感）：sec-head + 三种布局。
-// 点击行为由 onTap 统一处理，确保 route / 建设中 / 本次记录逻辑仍归 ProfilePage。
+function ProfileEntry({ entry, primary, onTap }: { entry: Entry; primary: boolean; onTap: (entry: Entry) => void }) {
+  const surfaceClass = primary ? 'lf-reference-primary' : 'lf-reference-secondary'
 
-function GridEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
   return (
-    <button type="button" className="entry" onClick={() => onTap(entry)}>
-      <span className={`ei ${entry.tone}`}>
+    <button type="button" className={`${surfaceClass} kp-entry`} onClick={() => onTap(entry)}>
+      <span className={`kp-entry-icon ${entry.tone}`}>
         <KIcon name={entry.icon} />
       </span>
-      <strong>{entry.label}</strong>
-      {entry.desc && <span className="desc">{entry.desc}</span>}
-      {entry.tag && <span className={entry.tag === '本次记录' ? 'badge session' : 'badge'}>{entry.tag}</span>}
-    </button>
-  )
-}
-
-function ChipEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
-  return (
-    <button type="button" className="chip-row" onClick={() => onTap(entry)}>
-      <span className={`ei ${entry.tone}`}>
-        <KIcon name={entry.icon} />
+      <span className="kp-entry-content">
+        <strong>{entry.label}</strong>
+        {entry.desc && <span>{entry.desc}</span>}
       </span>
-      <strong>{entry.label}</strong>
       {entry.tag ? (
-        <span className={entry.tag === '本次记录' ? 'badge session' : 'badge'}>{entry.tag}</span>
+        <span className={entry.tag === '本次记录' ? 'kp-entry-tag session' : 'kp-entry-tag'}>{entry.tag}</span>
       ) : (
-        <span className="arrow">
+        <span className="kp-entry-arrow" aria-hidden="true">
           <KIcon name="arrow" />
         </span>
       )}
@@ -35,37 +24,32 @@ function ChipEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }
   )
 }
 
-function AccountEntry({ entry, onTap }: { entry: Entry; onTap: (e: Entry) => void }) {
-  return (
-    <button type="button" className="account" onClick={() => onTap(entry)}>
-      <span className="aci">
-        <KIcon name={entry.icon} />
-      </span>
-      <strong>{entry.label}</strong>
-      {entry.tag && <span className="badge">{entry.tag}</span>}
-    </button>
-  )
-}
+export function ProfileEntrySection({ section, onTap }: { section: EntrySectionData; onTap: (entry: Entry) => void }) {
+  const [primaryEntry, ...secondaryEntries] = section.entries
 
-export function ProfileEntrySection({ section, onTap }: { section: EntrySectionData; onTap: (e: Entry) => void }) {
-  const gridClass =
-    section.layout === 'grid' ? 'entry-grid' : section.layout === 'chips' ? 'chip-grid' : 'account-grid'
+  if (!primaryEntry) return null
 
   return (
-    <section aria-label={section.title} className="kp-section">
-      <div className="sec-head">
-        <span className={section.rail && section.rail !== 'teal' ? `rail ${section.rail}` : 'rail'} aria-hidden="true" />
+    <section aria-label={section.title} className="lf-reference-panel kp-section">
+      <div className="lf-reference-group-head">
+        <span className={`kp-group-icon ${primaryEntry.tone}`} aria-hidden="true">
+          <KIcon name={primaryEntry.icon} />
+        </span>
         <div>
           <h2>{section.title}</h2>
           {section.subtitle && <p>{section.subtitle}</p>}
         </div>
       </div>
-      <div className={gridClass}>
-        {section.entries.map((e) => {
-          if (section.layout === 'grid') return <GridEntry key={e.label} entry={e} onTap={onTap} />
-          if (section.layout === 'chips') return <ChipEntry key={e.label} entry={e} onTap={onTap} />
-          return <AccountEntry key={e.label} entry={e} onTap={onTap} />
-        })}
+      <ProfileEntry entry={primaryEntry} primary onTap={onTap} />
+      <div className="kp-secondary-list">
+        {secondaryEntries.map((entry, index) => (
+          <ProfileEntry
+            key={`${entry.label}:${entry.route ?? entry.tag ?? index}`}
+            entry={entry}
+            primary={false}
+            onTap={onTap}
+          />
+        ))}
       </div>
     </section>
   )
