@@ -58,27 +58,39 @@ function requireOptionalPositiveInteger(value: unknown, field: string): number |
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
+function requireOptionalNonNegativeInteger(value: unknown, field: string): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
 function requireOptionalNonEmptyString(value: unknown, field: string): string | undefined {
   if (value === undefined) return undefined
   if (typeof value === 'string' && value.trim()) return value
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
-function requireOptionalNonEmptyStringArray(value: unknown, field: string): string[] | undefined {
+function requireOptionalString(value: unknown, field: string): string | undefined {
   if (value === undefined) return undefined
-  if (Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string' && entry.trim())) {
+  if (typeof value === 'string') return value
+  throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
+}
+
+function requireOptionalStringArray(value: unknown, field: string): string[] | undefined {
+  if (value === undefined) return undefined
+  if (Array.isArray(value) && value.every((entry) => typeof entry === 'string')) {
     return value
   }
   throw new AgentStartupError('AGENT_CONFIG_INVALID_FIELD', `agent-config.json has invalid ${field}`)
 }
 
 function validateConfigShape(config: AgentConfig): AgentConfig {
-  const terminalId = requireOptionalNonEmptyString(config.terminalId, 'terminalId')
+  const terminalId = requireOptionalString(config.terminalId, 'terminalId')
   const agentToken = requireOptionalNonEmptyString(config.agentToken, 'agentToken')
   const adminSecret = requireOptionalNonEmptyString(config.adminSecret, 'adminSecret')
-  const scanWatchFolder = requireOptionalNonEmptyString(config.scanWatchFolder, 'scanWatchFolder')
-  const localApiBridgeToken = requireOptionalNonEmptyString(config.localApiBridgeToken, 'localApiBridgeToken')
-  const localApiAllowedOrigins = requireOptionalNonEmptyStringArray(
+  const scanWatchFolder = requireOptionalString(config.scanWatchFolder, 'scanWatchFolder')
+  const localApiBridgeToken = requireOptionalString(config.localApiBridgeToken, 'localApiBridgeToken')
+  const localApiAllowedOrigins = requireOptionalStringArray(
     config.localApiAllowedOrigins,
     'localApiAllowedOrigins',
   )
@@ -91,7 +103,7 @@ function validateConfigShape(config: AgentConfig): AgentConfig {
     agentVersion: requireNonEmpty(config.agentVersion, 'agentVersion'),
     heartbeatIntervalMs: requireOptionalPositiveInteger(config.heartbeatIntervalMs, 'heartbeatIntervalMs'),
     claimIntervalMs: requireOptionalPositiveInteger(config.claimIntervalMs, 'claimIntervalMs'),
-    localApiPort: requireOptionalPositiveInteger(config.localApiPort, 'localApiPort'),
+    localApiPort: requireOptionalNonNegativeInteger(config.localApiPort, 'localApiPort'),
     terminalId,
     agentToken,
     adminSecret,

@@ -25,21 +25,17 @@ import { startQrLoginLocalServer, type LocalQrServerHandle } from './local-api/q
 import { acquireLock, releaseLock } from './agent/instance-lock'
 import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/db'
 import { startOfflineRetry } from './agent/offline-queue'
-import { getStartupDiagnosticPath, writeStartupDiagnostic } from './agent/startup-diagnostics'
+import { writeStartupDiagnosticSafely } from './agent/startup-diagnostics'
 
 const program = new Command()
 
-function writeStartupDiagnosticSafely(code: AgentStartupErrorCode): void {
-  try {
-    writeStartupDiagnostic(getStartupDiagnosticPath(), code)
-  } catch {
-    err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
-  }
-}
-
 function failStartup(error: unknown, fallback: AgentStartupErrorCode): never {
   const code = isAgentStartupError(error) ? error.code : fallback
-  writeStartupDiagnosticSafely(code)
+  writeStartupDiagnosticSafely(code, {
+    onFailure: () => {
+      err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
+    },
+  })
   err(`${code}: Agent did not start. Run diagnose-production-agent.ps1 on this host.`)
   process.exit(1)
 }
@@ -89,7 +85,11 @@ program
     } catch (error) {
       failStartup(error, 'AGENT_REGISTRATION_FAILED')
     }
-    writeStartupDiagnosticSafely('AGENT_READY')
+    writeStartupDiagnosticSafely('AGENT_READY', {
+      onFailure: () => {
+        err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
+      },
+    })
     log(`agent ready — terminalId=${config.terminalId!}`)
 
     // ── Step 5: Start heartbeat ───────────────────────────────────────────

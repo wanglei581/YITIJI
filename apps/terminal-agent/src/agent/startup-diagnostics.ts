@@ -49,6 +49,25 @@ export function writeStartupDiagnostic(filePath: string, code: AgentStartupError
   writeTextAtomically(filePath, `${JSON.stringify(record, null, 2)}\n`)
 }
 
+export function writeStartupDiagnosticSafely(
+  code: AgentStartupErrorCode,
+  options?: {
+    filePath?: string
+    writer?: (filePath: string, code: AgentStartupErrorCode) => void
+    onFailure?: () => void
+  },
+): boolean {
+  const filePath = options?.filePath ?? getStartupDiagnosticPath()
+  const writer = options?.writer ?? writeStartupDiagnostic
+  try {
+    writer(filePath, code)
+    return true
+  } catch {
+    options?.onFailure?.()
+    return false
+  }
+}
+
 export function readStartupDiagnostic(filePath = getStartupDiagnosticPath()): StartupDiagnostic | null {
   if (!fs.existsSync(filePath)) return null
   return JSON.parse(fs.readFileSync(filePath, 'utf8')) as StartupDiagnostic

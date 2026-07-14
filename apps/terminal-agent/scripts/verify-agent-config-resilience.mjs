@@ -20,7 +20,12 @@ const {
   serializePersistedConfig,
   writeValidatedConfigAt,
 } = require(join(agentRoot, 'src/agent/config-manager.ts'))
-const diagnostics = require(join(agentRoot, 'src/agent/startup-diagnostics.ts'))
+const {
+  readStartupDiagnostic,
+  writeStartupDiagnostic,
+  writeStartupDiagnosticSafely,
+} = require(join(agentRoot, 'src/agent/startup-diagnostics.ts'))
+const indexSource = fs.readFileSync(path.join(agentRoot, 'src/index.ts'), 'utf8')
 
 const configManagerSource = fs.readFileSync(path.join(agentRoot, 'src/agent/config-manager.ts'), 'utf8')
 const atomicWriterMatch = configManagerSource.match(/function writeTextAtomically\([\s\S]*?\n}\n/s)
@@ -72,6 +77,23 @@ assert.notEqual(primaryWriteIndex, -1, 'must write the primary config through th
 assert.ok(primaryParseIndex < backupWriteIndex, 'must parse primary config before writing its backup')
 assert.ok(backupWriteIndex < primaryWriteIndex, 'must write the backup before replacing the primary config')
 
+const failStartupMatch = indexSource.match(/function failStartup\([\s\S]*?\n}\n/s)
+assert.ok(failStartupMatch, 'agent entrypoint must define failStartup')
+const failStartupSource = failStartupMatch[0]
+const safeDiagnosticIndex = failStartupSource.indexOf('writeStartupDiagnosticSafely')
+const failureLogIndex = failStartupSource.indexOf('err(`${code}: Agent did not start.')
+const exitIndex = failStartupSource.indexOf('process.exit(1)')
+assert.notEqual(safeDiagnosticIndex, -1, 'failStartup must use the non-blocking diagnostic writer')
+assert.notEqual(failureLogIndex, -1, 'failStartup must retain its closed-code log')
+assert.notEqual(exitIndex, -1, 'failStartup must exit after reporting the closed code')
+assert.ok(safeDiagnosticIndex < failureLogIndex, 'failStartup must attempt diagnostics before logging the closed code')
+assert.ok(failureLogIndex < exitIndex, 'failStartup must log the closed code before exiting')
+const readyDiagnosticIndex = indexSource.indexOf("writeStartupDiagnosticSafely('AGENT_READY'")
+const heartbeatIndex = indexSource.indexOf('const heartbeatTimer = startHeartbeat')
+assert.notEqual(readyDiagnosticIndex, -1, 'registration success must use the non-blocking ready diagnostic')
+assert.notEqual(heartbeatIndex, -1, 'agent entrypoint must start the heartbeat loop')
+assert.ok(readyDiagnosticIndex < heartbeatIndex, 'ready diagnostic must be attempted before heartbeat startup')
+
 const valid = {
   apiBaseUrl: 'https://api.example.test/api/v1',
   terminalCode: 'KSK-001',
@@ -122,6 +144,17 @@ try {
     () => parseConfigText(JSON.stringify({ ...valid, apiBaseUrl: '   ' })),
     'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
   )
+  const optionalFallbackConfig = parseConfigText(JSON.stringify({
+    ...valid,
+    localApiPort: 0,
+    scanWatchFolder: '',
+    localApiBridgeToken: '',
+    localApiAllowedOrigins: [],
+  }))
+  assert.equal(optionalFallbackConfig.localApiPort, 0, 'localApiPort=0 must preserve automatic port selection')
+  assert.equal(optionalFallbackConfig.scanWatchFolder, '', 'empty scan folder must preserve feature disablement')
+  assert.equal(optionalFallbackConfig.localApiBridgeToken, '', 'empty bridge token must preserve bridge disablement')
+  assert.deepEqual(optionalFallbackConfig.localApiAllowedOrigins, [], 'empty origins must preserve local API fallback')
 
   const sensitiveConfig = {
     agentToken: 'agent-token-must-not-persist',
@@ -174,8 +207,31 @@ try {
   assert.equal(readFileSync(configPath, 'utf8'), primaryBeforeInvalidWrite, 'must not alter primary config after validation fails')
 
   assert.equal(basename(diagnosticPath), 'last-startup-diagnostic.json')
-  diagnostics.writeStartupDiagnostic(diagnosticPath, 'AGENT_CONFIG_INVALID_JSON')
-  const diagnostic = diagnostics.readStartupDiagnostic(diagnosticPath)
+  let diagnosticFailureObserved = false
+  assert.equal(
+    writeStartupDiagnosticSafely('AGENT_READY', {
+      writer: () => {
+        throw new Error('diagnostic test failure')
+      },
+      onFailure: () => {
+        diagnosticFailureObserved = true
+      },
+    }),
+    false,
+    'safe diagnostic writer must absorb writer failures',
+  )
+  assert.equal(diagnosticFailureObserved, true, 'safe diagnostic writer must invoke the failure callback')
+  assert.equal(
+    writeStartupDiagnosticSafely('AGENT_READY', { filePath: diagnosticPath, writer: writeStartupDiagnostic }),
+    true,
+    'safe diagnostic writer must report successful writes',
+  )
+  const readyDiagnostic = readStartupDiagnostic(diagnosticPath)
+  assert.equal(readyDiagnostic.code, 'AGENT_READY')
+  assert.equal(readyDiagnostic.state, 'ready')
+
+  writeStartupDiagnostic(diagnosticPath, 'AGENT_CONFIG_INVALID_JSON')
+  const diagnostic = readStartupDiagnostic(diagnosticPath)
   assert.equal(diagnostic.code, 'AGENT_CONFIG_INVALID_JSON')
   assert.equal(diagnostic.schemaVersion, 1)
   assert.equal(diagnostic.state, 'failed')
