@@ -206,6 +206,41 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
 }
 
 /**
+ * B1-11：模拟一次"服务端完全联系不上"的真实网络错误——没有 JSON body，没有
+ * error.code 字段（axios 侧 `response.data.error.code` 读取会拿到 `undefined`）。
+ * 用来证明新增的 SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED 立即隔离分支
+ * 是靠精确匹配 error.code 触发的，不会被一个"看起来像失败但没有可识别 code"的通用
+ * 网络/5xx 错误意外带上——那类错误必须继续走既有的 2 小时重试窗口，不能被误伤。
+ *
+ * 刻意用"连接被拒绝"（绑定一个端口后立刻关闭，制造一个必然 ECONNREFUSED 的目标）
+ * 而不是真的起一个返回 500 的监听服务器：本模块的 deliver POST 目前没有配置
+ * api-client.ts 的 `NO_RETRY_CONFIG`，任何真实 5xx 响应都会触发 axios 拦截器自己的
+ * 3 次内部重试，而重试复用的是同一个已经被消费过一次的 FormData 流对象，会导致
+ * Content-Length 与实际重发字节不匹配、服务端请求 `end` 事件永远不触发、
+ * 客户端最终等满 30s 超时——三次加起来单个用例就要跑 100+ 秒。这是一个独立于本次
+ * 修复范围之外的既有问题（已在任务报告中记录，不在本次改动范围内处理），这里用
+ * ECONNREFUSED 规避它、只验证本次真正要验证的行为：无法识别的 error.code 不会被
+ * 误判为需要立即隔离的三种已知原因之一。
+ */
+async function startRawServerErrorStub(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(500)
+    res.end()
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(typeof address === 'object' && address, 'backend stub must bind to a TCP port before we close it')
+  const port = address.port
+  await new Promise<void>((resolve) => server.close(() => resolve()))
+  return {
+    // 端口已释放、没有任何进程监听——连接必然是 ECONNREFUSED，快速失败，不涉及
+    // 流重放/超时问题。
+    baseUrl: `http://127.0.0.1:${port}/api/v1`,
+    close: async () => undefined,
+  }
+}
+
+/**
  * 成功投递的 stub 后端——响应体形状对齐真实端点
  * `POST /terminals/:id/scan-sessions/deliver` 的成功返回值
  * （services/api/src/scan-tasks/scan-tasks.controller.ts 用 `ApiResponse.ok(result)`
@@ -453,6 +488,115 @@ async function verifyNoWaitingTaskStillDistinctFromRetryTimeout(): Promise<void>
   }
 }
 
+// ── Part 2f: B1-11 — SCAN_TASK_STATE_CHANGED 必须像 NO_WAITING_SCAN_TASK 一样立即隔离 ──
+// Critical code-review 发现：SCAN_TASK_STATE_CHANGED 说明这份文件在服务端已经被匹配、
+// CAS 到过 'matched'，只是最终 CAS-to-completed 落空（任务在上传期间被取消）——这次
+// "匹配"已经明确、永久失效，绝不能像通用网络错误一样留给下一轮 sweep 重试：重试时该
+// 终端"当前最早一条 waiting 任务"完全可能已经变成另一个用户的新会话，会把这份文件
+// 错误地挂到那个新用户身上——跨用户 PII 误挂载。
+async function verifyScanTaskStateChangedQuarantinesImmediately(): Promise<void> {
+  const backend = await startFailingBackendStub('SCAN_TASK_STATE_CHANGED')
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-state-changed-'))
+  try {
+    const filename = 'state-changed.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 matched-then-cancelled scan')
+    // mtime 几乎是现在——必须立即隔离，不依赖文件年龄（不能等到 2 小时重试窗口耗尽才隔离）。
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    assert.equal(existsSync(filePath), false, 'a SCAN_TASK_STATE_CHANGED file must be moved out of the main scan folder')
+    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
+    assert.equal(
+      existsSync(unclaimedPath),
+      true,
+      'SCAN_TASK_STATE_CHANGED must quarantine to _unclaimed immediately, not leave the file for retry — reusing/re-matching it later risks cross-user PII leakage',
+    )
+    assert.equal(
+      readFileSync(unclaimedPath, 'utf8'),
+      '%PDF-1.4 matched-then-cancelled scan',
+      'quarantined file content must be preserved (renameSync, not a lossy copy)',
+    )
+
+    assert.match(capturedStdout, /scan task state changed after match/, 'log must clearly say the match became invalid, distinguishable from the other three _unclaimed causes')
+    assert.doesNotMatch(capturedStdout, /no waiting scan task/, 'SCAN_TASK_STATE_CHANGED log wording must not be confused with NO_WAITING_SCAN_TASK')
+    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/, 'SCAN_TASK_STATE_CHANGED must be quarantined immediately, not via the retry-timeout path (wording must not overlap)')
+    assert.doesNotMatch(capturedStdout, /already delivered previously/, 'SCAN_TASK_STATE_CHANGED log wording must not be confused with SCAN_FILE_ALREADY_DELIVERED')
+
+    console.log('PASS processCandidate: SCAN_TASK_STATE_CHANGED is quarantined immediately (not left for retry), with distinguishable log wording')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
+// ── Part 2g: B1-11 point-4 edge case — SCAN_FILE_ALREADY_DELIVERED 同样立即隔离 ──────
+// 覆盖"投递其实已经在服务端成功，只是响应在回传给 Agent 途中丢失"这种场景：Agent 完全
+// 没有错误信号，只会把它当普通失败留在原地重试；服务端用内容 sha256 识破重复投递后
+// 返回 SCAN_FILE_ALREADY_DELIVERED，Agent 必须立即隔离，不能继续重试（同样有跨用户
+// 误挂载风险）。
+async function verifyScanFileAlreadyDeliveredQuarantinesImmediately(): Promise<void> {
+  const backend = await startFailingBackendStub('SCAN_FILE_ALREADY_DELIVERED')
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-already-delivered-'))
+  try {
+    const filename = 'already-delivered.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 lost-response duplicate retry')
+
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    const { stdout: capturedStdout } = await captureLogsAsync(() => processCandidate(filePath, filename, config))
+
+    assert.equal(existsSync(filePath), false, 'a SCAN_FILE_ALREADY_DELIVERED file must be moved out of the main scan folder')
+    const unclaimedPath = join(scanFolder, '_unclaimed', filename)
+    assert.equal(
+      existsSync(unclaimedPath),
+      true,
+      'SCAN_FILE_ALREADY_DELIVERED must quarantine to _unclaimed immediately, not leave the file for retry',
+    )
+
+    assert.match(capturedStdout, /already delivered previously/, 'log must clearly say this content was already delivered, distinguishable from the other three _unclaimed causes')
+    assert.doesNotMatch(capturedStdout, /no waiting scan task/, 'SCAN_FILE_ALREADY_DELIVERED log wording must not be confused with NO_WAITING_SCAN_TASK')
+    assert.doesNotMatch(capturedStdout, /retry timeout exceeded/, 'SCAN_FILE_ALREADY_DELIVERED must be quarantined immediately, not via the retry-timeout path')
+    assert.doesNotMatch(capturedStdout, /scan task state changed after match/, 'SCAN_FILE_ALREADY_DELIVERED log wording must not be confused with SCAN_TASK_STATE_CHANGED')
+
+    console.log('PASS processCandidate: SCAN_FILE_ALREADY_DELIVERED (lost-response duplicate) is quarantined immediately, with distinguishable log wording')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
+// ── Part 2h: B1-11 回归护栏 — 真正无法识别的 5xx（无 error.code）必须继续走既有重试路径 ──
+// 防止未来重构把匹配条件写宽（例如变成"任何非 2xx 都立即隔离"），意外吞掉合法的网络抖动/
+// 后端瞬时故障重试能力。
+async function verifyGenericServerErrorStillRetriesNormally(): Promise<void> {
+  const backend = await startRawServerErrorStub()
+  const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-generic-5xx-'))
+  try {
+    const filename = 'generic-5xx.pdf'
+    const filePath = join(scanFolder, filename)
+    writeFileSync(filePath, '%PDF-1.4 transient backend failure')
+    // mtime 只有 30 分钟前，远低于 2 小时重试上限。
+
+    backdateMtime(filePath, 30 * 60 * 1000)
+    const config = makeConfig(backend.baseUrl, scanFolder)
+    await processCandidate(filePath, filename, config)
+
+    assert.equal(
+      existsSync(filePath),
+      true,
+      'a generic 5xx with no recognizable error.code must stay in the main folder for the next sweep — must NOT be treated like SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED / NO_WAITING_SCAN_TASK',
+    )
+    assert.equal(existsSync(join(scanFolder, '_unclaimed', filename)), false, 'a generic 5xx must NOT be quarantined early')
+
+    console.log('PASS processCandidate: a raw 5xx with no structured error.code is unaffected by the B1-11 fix and keeps retrying normally')
+  } finally {
+    await backend.close()
+    rmSync(scanFolder, { recursive: true, force: true })
+  }
+}
+
 function verifyPlatformGapDisclosure(): void {
   console.log(
     'NOTE: chokidar 实时 add 事件触发 processCandidate 的路径（startScanWatcher 内部）未在本脚本中真实启动持久监听器，' +
@@ -466,6 +610,9 @@ async function main(): Promise<void> {
   await verifyRetryCapExpired()
   await verifyRetryCapNotYetExpired()
   await verifyNoWaitingTaskStillDistinctFromRetryTimeout()
+  await verifyScanTaskStateChangedQuarantinesImmediately()
+  await verifyScanFileAlreadyDeliveredQuarantinesImmediately()
+  await verifyGenericServerErrorStillRetriesNormally()
   await verifySuccessfulDeliveryDeletesSourceFile()
   await verifyInFlightDedupSkipsConcurrentDuplicate()
   await verifyUnexpectedErrorOuterCatch()

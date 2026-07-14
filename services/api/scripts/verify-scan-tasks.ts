@@ -144,10 +144,40 @@ class FakePrisma {
       }
       return { count: matches.length }
     },
+    // B1-11：内容级去重需要查"该终端最近一段时间内、真正建档完成过（fileId 非空）的任务"，
+    // 形态和既有的单条 findFirst 不同（需要返回多条），故单独提供一个 findMany。
+    findMany: async ({
+      where,
+      select,
+    }: {
+      where: { terminalId: string; fileId: { not: null }; updatedAt: { gt: Date } }
+      select?: { fileId: true }
+    }) => {
+      const matches = Array.from(this.scanTasksById.values()).filter(
+        (t) =>
+          t.terminalId === where.terminalId &&
+          t.fileId !== null &&
+          t.updatedAt.getTime() > where.updatedAt.gt.getTime(),
+      )
+      void select
+      return matches.map((t) => ({ fileId: t.fileId }))
+    },
   }
 
   readonly fileObject = {
     findUnique: async ({ where }: { where: { id: string } }) => this.filesById.get(where.id) ?? null,
+    // B1-11：内容级去重的第二步——在候选 fileId 集合里找 sha256 完全一致的一条。
+    findFirst: async ({
+      where,
+    }: {
+      where: { id: { in: string[] }; sha256: string }
+    }) => {
+      for (const id of where.id.in) {
+        const record = this.filesById.get(id)
+        if (record && record.sha256 === where.sha256) return { id: record.id }
+      }
+      return null
+    },
   }
 }
 
@@ -172,7 +202,11 @@ class FakeFilesService {
       filename: args.filename,
       sizeBytes: args.buffer.length,
       mimeType: args.mimeType,
-      sha256: `sha_${id}`,
+      // B1-11：真实 FilesService.upload() 对直传 buffer 就地计算 sha256（见 files.service.ts
+      // 顶部注释 "直传路径就 buffer 计算"）。这里必须镜像同一行为（而不是用一个和内容无关的
+      // 占位符），否则 deliverScanFile() 新增的内容级去重逻辑（比对 contentHash 与
+      // FileObject.sha256）在假 Prisma 环境下永远测不出真实效果。
+      sha256: createHash('sha256').update(args.buffer).digest('hex'),
       purpose: args.purpose,
       endUserId: args.endUserId ?? null,
       deletedAt: null,
@@ -1346,6 +1380,158 @@ async function main(): Promise<void> {
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
     }
+  }
+
+  {
+    // B1-11（点 4 边缘案例修复）：内容级去重必须真正拦住"同一份文件内容对同一终端重复
+    // 投递"——模拟"投递其实已经在服务端成功，只是 HTTP 响应在回传给 Agent 途中丢失，
+    // Agent 把它当成失败重试"的场景：第一次投递真正建档完成，第二次投递携带完全相同的
+    // 字节，此时该终端已经有一条全新的（属于另一个用户的）waiting 任务在等——如果没有
+    // 这层去重，第二次投递会被误判成"新的合法投递"，把第一个用户的内容错误挂到第二个
+    // 用户的任务上。
+    const { service, prisma } = makeService()
+    const buffer = tinyPdf()
+
+    const taskA = await service.create(dto, 'member_a')
+    const deliveredA = await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a.pdf', mimeType: 'application/pdf' })
+    assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
+
+    // 模拟场景：另一个用户（member_b）在同一物理终端开了一个全新的等待中任务。
+    const taskB = await service.create(dto, 'member_b')
+
+    let caught: unknown
+    try {
+      await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a-retry.pdf', mimeType: 'application/pdf' })
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(
+      caught instanceof ConflictException,
+      `duplicate content delivery (same bytes, retried after original success) must be rejected, not silently matched to a new task — got ${(caught as Error)?.constructor?.name}`,
+    )
+    const responseBody = (caught as ConflictException).getResponse() as { error?: { code?: string } }
+    assert.equal(
+      responseBody.error?.code,
+      'SCAN_FILE_ALREADY_DELIVERED',
+      'duplicate content rejection must report the specific SCAN_FILE_ALREADY_DELIVERED code, not a generic conflict',
+    )
+
+    // taskB 必须原封不动地保持 waiting——绝不能被这次重复投递偷走匹配、挂上别人的文件。
+    const taskBAfter = prisma.scanTasksById.get(taskB.scanTaskId)!
+    assert.equal(taskBAfter.status, 'waiting', 'the duplicate-content delivery must NOT consume/match an unrelated waiting task belonging to a different user')
+    assert.equal(taskBAfter.fileId, null, 'the unrelated waiting task must not end up with any fileId attached')
+  }
+
+  {
+    // 回归护栏：内容去重绝不能变成"同一终端连续两次投递就一律拒绝"——必须精确按字节
+    // 内容判断，两次内容不同的合法投递都必须正常成功，不能被误伤。
+    const { service } = makeService()
+    const taskA = await service.create(dto, null)
+    const deliveredA = await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
+    assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
+
+    const taskB = await service.create(dto, null)
+    const differentBuffer = Buffer.from('%PDF-1.4\ncompletely different content, not a duplicate\n%%EOF\n', 'latin1')
+    const deliveredB = await service.deliverScanFile({ terminalId: 't_1', buffer: differentBuffer, filename: 'b.pdf', mimeType: 'application/pdf' })
+    assert.equal(
+      deliveredB.scanTaskId,
+      taskB.scanTaskId,
+      'a second delivery with genuinely different content must succeed normally, not be blocked by the dedup guard',
+    )
+  }
+
+  {
+    // 去重窗口边界：SCAN_CONTENT_DEDUP_WINDOW_MS（2 小时，刻意与 Agent 侧
+    // DELIVERY_RETRY_MAX_MS 对齐——这是 Agent 理论上可能重试同一份文件的最大时间跨度）
+    // 之外的历史投递不应该继续挡住"内容相同"的新投递：一是没必要无界查询更久以前的
+    // 记录，二是 Agent 自己过了 2 小时就会放弃重试转入 _unclaimed，服务端理论上根本不会
+    // 收到这么老的重试，窗口设计上没必要更长。
+    const { service, prisma } = makeService()
+    const buffer = tinyPdf()
+    const taskA = await service.create(dto, null)
+    await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a.pdf', mimeType: 'application/pdf' })
+
+    // 把 taskA 的 updatedAt 手工回拨到去重窗口之外（2 小时 + 5 分钟前）。
+    const taskAStored = prisma.scanTasksById.get(taskA.scanTaskId)!
+    prisma.scanTasksById.set(taskA.scanTaskId, {
+      ...taskAStored,
+      updatedAt: new Date(Date.now() - (2 * 60 * 60 * 1000 + 5 * 60 * 1000)),
+    })
+
+    const taskB = await service.create(dto, null)
+    const deliveredB = await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a-retry-old.pdf', mimeType: 'application/pdf' })
+    assert.equal(
+      deliveredB.scanTaskId,
+      taskB.scanTaskId,
+      'a delivery whose matching historical content falls outside the dedup window must proceed to normal matching, not be blocked forever',
+    )
+  }
+
+  {
+    // 去重必须按终端隔离：终端 t_1 上一次成功投递的内容，不能拿去挡终端 t_2 上一次完全
+    // 独立的合法投递（哪怕字节恰好相同）——两个不同物理终端之间没有跨用户误挂载风险，
+    // 不应该被误伤（本次修复的威胁模型是"同一终端、不同用户的先后两个会话"）。
+    const { service } = makeService()
+    const buffer = tinyPdf()
+    await service.create({ scanType: 'document', terminalId: 't_1' }, null)
+    await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a.pdf', mimeType: 'application/pdf' })
+
+    const taskT2 = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
+    const deliveredT2 = await service.deliverScanFile({ terminalId: 't_2', buffer, filename: 'a-on-t2.pdf', mimeType: 'application/pdf' })
+    assert.equal(
+      deliveredT2.scanTaskId,
+      taskT2.scanTaskId,
+      'dedup must be scoped per terminal — the same bytes delivered to a different terminal must not be blocked',
+    )
+  }
+
+  {
+    // 设计边界验证：SCAN_TASK_STATE_CHANGED 分支（任务在上传期间被并发取消）永远不会给
+    // 对应任务写入 fileId（见 deliverScanFile() 的 CAS-to-completed 分支：
+    // completed.count === 0 时不落 fileId），因此本次新增的内容级去重（只查 fileId 非空
+    // 的任务）不会、也不应该拦住这类场景的重复投递——那条竞态的跨用户误挂载风险，是靠
+    // Agent 侧收到 SCAN_TASK_STATE_CHANGED 后立即隔离、绝不重试来防住的（见
+    // apps/terminal-agent/src/agent/scan-watcher.ts 的 B1-11 修复），不是本处内容去重
+    // 的职责。这里用真实 deliverScanFile() 复现一次 SCAN_TASK_STATE_CHANGED，然后证明
+    // "如果 Agent 没有照既定设计立即隔离、而是真的把同一份内容重试投递了"，服务端这层
+    // 内容去重确实拦不住（fileId 从未被写入）——这正是 Agent 侧必须绝不重试的理由，
+    // 不是服务端这层的漏网之鱼；防止未来有人误以为"反正服务端有去重了"就放宽 Agent
+    // 侧的立即隔离行为。
+    const prisma = new FakePrisma()
+    const baseFiles = new FakeFilesService(prisma)
+    let raceScanTaskId = ''
+    const racyFiles = {
+      upload: async (args: Parameters<FakeFilesService['upload']>[0]) => {
+        const result = await baseFiles.upload(args)
+        const task = prisma.scanTasksById.get(raceScanTaskId)!
+        prisma.scanTasksById.set(raceScanTaskId, { ...task, status: 'cancelled' })
+        return result
+      },
+      systemDelete: (fileId: string, reason: string) => baseFiles.systemDelete(fileId, reason),
+    }
+    const service = new ScanTasksService(prisma as never, racyFiles as never, passthroughCapabilities)
+    const created = await service.create(dto, null)
+    raceScanTaskId = created.scanTaskId
+    const buffer = tinyPdf()
+
+    await expectRejects(
+      () => service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'race.pdf', mimeType: 'application/pdf' }),
+      ConflictException,
+      'first attempt must hit SCAN_TASK_STATE_CHANGED as before (unrelated to this new dedup check)',
+    )
+    assert.equal(
+      prisma.scanTasksById.get(raceScanTaskId)?.fileId,
+      null,
+      'sanity precondition: the state-changed task must never have fileId populated',
+    )
+
+    const taskB = await service.create(dto, null)
+    const deliveredRetry = await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'race-retry.pdf', mimeType: 'application/pdf' })
+    assert.equal(
+      deliveredRetry.scanTaskId,
+      taskB.scanTaskId,
+      'content-hash dedup intentionally does NOT cover the SCAN_TASK_STATE_CHANGED scenario (fileId was never populated) — this gap is closed by the Agent-side immediate-quarantine fix instead, not here',
+    )
   }
 
   console.log('PASS scan tasks verification')

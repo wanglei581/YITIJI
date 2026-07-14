@@ -6,7 +6,13 @@
  *   2. 整体读取 → POST /terminals/:id/scan-sessions/deliver
  *   3. 投递成功 → 删除源文件
  *   4. 投递失败因为没有匹配的等待中任务（409/NO_WAITING_SCAN_TASK）→ 移入 _unclaimed 子目录，不重试
- *   5. 其它网络/5xx 错误 → 文件保留原地，交给下一轮周期性清点重试
+ *   5. 投递失败因为匹配后任务状态已变化（409/SCAN_TASK_STATE_CHANGED，B1-11）→ 同样立即移入
+ *      _unclaimed，不重试——这次"匹配"已经永久失效，重试有把文件错误挂到该终端后续
+ *      另一个用户新会话上的跨用户 PII 泄露风险
+ *   6. 投递失败因为该文件内容此前已经成功投递过（409/SCAN_FILE_ALREADY_DELIVERED，B1-11
+ *      点4边缘案例：原投递其实已在服务端成功、只是响应在回传途中丢失）→ 同样立即移入
+ *      _unclaimed，不重试
+ *   7. 其它网络/5xx 错误 → 文件保留原地，交给下一轮周期性清点重试
  *
  * 启动时 + 之后每 5 分钟做一次目录清点，处理 Agent 重启期间到达、
  * 或此前投递失败但文件本身未再变化的文件（不会有新的 chokidar change 事件）。
@@ -131,6 +137,35 @@ export async function processCandidate(
         const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
         renameSync(filePath, join(unclaimedDir, filename))
         warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${filename}`)
+        return
+      }
+
+      // B1-11（Critical code-review 修复 #2）：SCAN_TASK_STATE_CHANGED 说明这份文件在服务端
+      // 确实被匹配、CAS 到过 'matched'，但最终 CAS-to-completed 落空（任务在上传期间被取消或
+      // 状态变化——服务端已经用 systemDelete() 补偿删掉了那次真实上传出的孤儿文件，见
+      // scan-tasks.service.ts deliverScanFile() 的 SCAN_TASK_STATE_CHANGED 分支）。这次"匹配"
+      // 已经明确、永久失效——不是网络抖动，绝不能留给下一轮 sweep 重试：重试时该终端"当前
+      // 最早一条 waiting 任务"完全可能已经变成另一个用户的新会话（原用户的任务已经不在，
+      // 终端已经空出来），继续重试会把这份文件错误地挂到那个新用户身上——跨用户 PII 误挂载。
+      // 必须像 NO_WAITING_SCAN_TASK 一样立即隔离，绝不重试；日志措辞与两个既有 _unclaimed
+      // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
+      if (code === 'SCAN_TASK_STATE_CHANGED') {
+        const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
+        renameSync(filePath, join(unclaimedDir, filename))
+        warn(`scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${filename}`)
+        return
+      }
+
+      // B1-11（点 4 边缘案例修复）：SCAN_FILE_ALREADY_DELIVERED 说明这份文件内容此前已经
+      // 真正投递成功过——最可能的原因是上一次投递其实已经在服务端完成，只是 HTTP 响应在
+      // 回传给本 Agent 的路上丢失，本 Agent 才把它误当成失败留在原地准备重试。继续重试
+      // 没有意义（内容已经交付过），而且和 SCAN_TASK_STATE_CHANGED 一样有跨用户误挂载
+      // 风险（重试会被匹配到该终端当前最早一条 waiting 任务，可能已经属于另一个用户）——
+      // 同样必须立即隔离，不重试。
+      if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
+        const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
+        renameSync(filePath, join(unclaimedDir, filename))
+        warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${filename}`)
         return
       }
 

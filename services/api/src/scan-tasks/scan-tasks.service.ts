@@ -43,6 +43,31 @@ const SCAN_FILE_URL_TTL_MS = 30 * 60 * 1000
  */
 const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
 
+/**
+ * B1-11（Critical code-review 修复 #2 的点 4 边缘案例）：投递在服务端其实已经真正成功
+ * 完成（ScanTask 已 CAS 到 'completed'，fileId 已落库），但 HTTP 响应在回传给 Terminal
+ * Agent 的路上丢失（进程被杀在响应写出之后 / 连接被重置在 Agent 收完之前）——这种情况下
+ * Agent 完全没有任何错误信号，只会把它当成一次普通网络失败，留在原地交给下一轮 sweep
+ * 按既有 2 小时窗口重试（scan-watcher.ts DELIVERY_RETRY_MAX_MS，这段"网络错误默认重试"
+ * 行为本身没问题，不能改）。问题是：重试投递的还是同一份物理文件字节，而 deliverScanFile()
+ * 本身对"这份内容是否已经交付过"没有任何记忆——它只会重新去找该终端"当前"最早一条
+ * waiting 任务去匹配。如果原任务对应的用户会话已经结束、同一物理终端上有新用户开了
+ * 新的等待中任务，这次重试就会把第一个用户的扫描内容错误地挂到第二个用户身上——
+ * 和 SCAN_TASK_STATE_CHANGED 那条竞态是同一类"跨用户 PII 误挂载"风险，只是触发路径
+ * 不同（这里是"响应丢失"而不是"CAS 冲突"），而且完全没有错误信号可以让 Agent 察觉。
+ *
+ * 用内容 sha256 做去重：如果同一终端最近 SCAN_CONTENT_DEDUP_WINDOW_MS 内已经有一条
+ * ScanTask 真正建档完成（fileId 非空——SCAN_TASK_STATE_CHANGED 分支的任务永远不会有
+ * fileId 被写入，见下方 deliverScanFile() 的 CAS-to-completed 分支，那条路径已经由
+ * Agent 侧的立即隔离处理，不会走到这里重试），且其 FileObject.sha256 与本次上传内容
+ * 完全一致，判定为同一份物理文件的重复投递，拒绝再次匹配到任何（可能属于别的用户的）
+ * 等待中任务。
+ *
+ * 窗口大小刻意与 Agent 侧 DELIVERY_RETRY_MAX_MS（2 小时，scan-watcher.ts）对齐——这是
+ * Agent 理论上可能重试同一份文件的最大时间跨度，没必要查更久以前的记录（也避免无界查询）。
+ */
+const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
+
 const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',
   id: 'id_scan',
@@ -337,6 +362,34 @@ export class ScanTasksService {
     mimeType: string
   }): Promise<{ scanTaskId: string; fileId: string }> {
     const now = new Date()
+
+    // B1-11：内容级去重防"响应丢失后的重复投递"跨用户误挂载——见上方 SCAN_CONTENT_DEDUP_WINDOW_MS
+    // 注释。只看 fileId 非空的任务（真正建档完成过的），不影响 SCAN_TASK_STATE_CHANGED 那条
+    // 从未写入 fileId 的取消/竞态路径。
+    const contentHash = createHash('sha256').update(args.buffer).digest('hex')
+    const recentlyDeliveredForTerminal = await this.prisma.scanTask.findMany({
+      where: {
+        terminalId: args.terminalId,
+        fileId: { not: null },
+        updatedAt: { gt: new Date(now.getTime() - SCAN_CONTENT_DEDUP_WINDOW_MS) },
+      },
+      select: { fileId: true },
+    })
+    if (recentlyDeliveredForTerminal.length > 0) {
+      const candidateFileIds = recentlyDeliveredForTerminal
+        .map((t) => t.fileId)
+        .filter((id): id is string => id !== null)
+      const duplicate = await this.prisma.fileObject.findFirst({
+        where: { id: { in: candidateFileIds }, sha256: contentHash },
+        select: { id: true },
+      })
+      if (duplicate) {
+        throw new ConflictException({
+          error: { code: 'SCAN_FILE_ALREADY_DELIVERED', message: '该扫描文件此前已成功投递，请勿重复上传' },
+        })
+      }
+    }
+
     const task = await this.prisma.scanTask.findFirst({
       where: { terminalId: args.terminalId, status: 'waiting', expiresAt: { gt: now } },
       orderBy: { createdAt: 'asc' },
