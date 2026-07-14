@@ -35,6 +35,14 @@ const SCAN_TASK_TTL_MS = 10 * 60 * 1000
 /** 建档后签发的内容 URL 有效期，与打印/上传会话链路同一惯例（30 分钟）。 */
 const SCAN_FILE_URL_TTL_MS = 30 * 60 * 1000
 
+/**
+ * B1-10：'matched' 状态心跳节拍。deliverScanFile() 在上传期间每 tick 一次，刷新
+ * ScanTask.updatedAt，防 ScanTaskReaperTask（3 分钟阈值，见 scan-task-reaper.task.ts）
+ * 误伤仍在真实进行中的慢上传——见下方 startMatchedHeartbeat() 注释详述背景与竞态。
+ * 60s 远小于 reaper 的 3 分钟阈值，留足够余量覆盖 GC 停顿/短暂事件循环阻塞。
+ */
+const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
+
 const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',
   id: 'id_scan',
@@ -279,6 +287,45 @@ export class ScanTasksService {
   }
 
   /**
+   * B1-10：'matched' 状态心跳。deliverScanFile() 在 CAS 到 'matched' 成功后立刻启动，
+   * 上传结束（成功/失败/抛异常）后必须在 finally 里 clearInterval——否则每一次扫描
+   * 投递都会泄漏一个定时器。
+   *
+   * 背景：ScanTaskReaperTask 每分钟收敛 updatedAt 超过 3 分钟未更新的 'matched' 任务，
+   * 假设是"服务器崩溃、没人再碰这行了"。但 FilesService.upload() 本身没有内部超时，
+   * COS 预签名 URL TTL 是 5 分钟（比 reaper 的 3 分钟阈值还长）——网络慢/文件大时，
+   * 上传本身可能合法地跑超过 3 分钟，此时进程明明还活着、还在真实上传，reaper 却会
+   * 把它误判成"卡死"抢先标记 failed，deliverScanFile() 随后自己的 CAS-to-completed
+   * 落空，触发 B1-6 补偿删除——把一个其实上传成功的文件删掉，用户看到假的"超时"错误。
+   *
+   * 心跳每 intervalMs（生产 60s）把该任务的 updatedAt 显式刷新成当前时间：只要进程
+   * 还活着、心跳还在跑，reaper 的 staleness 判定（updatedAt < now - 3min）就不会命中；
+   * 进程一旦真的崩溃，心跳自然停摆，updatedAt 不再被刷新，reaper 该收敛还是会收敛——
+   * 不影响它对真正卡死任务的收敛能力（见 verify-scan-tasks.ts 的 real-DB 验证）。
+   *
+   * data 里显式写 `updatedAt: new Date()`：已用本地 SQLite 经验证证实 Prisma 对
+   * `@updatedAt` 字段——(1) data 里显式传值会被原样接受、不会被自动机制覆盖；
+   * (2) 不传该字段时才会自动 bump。这里选择显式传值，语义最直白。
+   *
+   * where 与 reaper 自己的目标保持一致（status: 'matched'）：任务如果已经并发转移到
+   * 其它终态（例如被取消），心跳只是安静地 no-op（updateMany 命中 0 行），不会跟合法
+   * 的状态变更打架。心跳写入本身失败（例如瞬时 DB 抖动）只记 warn 日志、绝不 rethrow——
+   * 不能让一次心跳失败打断一个本来会成功的上传。
+   */
+  private startMatchedHeartbeat(taskId: string, intervalMs: number = SCAN_MATCHED_HEARTBEAT_INTERVAL_MS): NodeJS.Timeout {
+    return setInterval(() => {
+      this.prisma.scanTask
+        .updateMany({ where: { id: taskId, status: 'matched' }, data: { updatedAt: new Date() } })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err)
+          this.logger.warn(
+            `scan task ${taskId}: matched-state heartbeat tick failed (non-fatal, upload continues): ${message}`,
+          )
+        })
+    }, intervalMs)
+  }
+
+  /**
    * Agent 投递入口：找该终端最早一条仍在 waiting 且未过期的任务，建 FileObject，
    * 标记任务完成。找不到匹配任务时抛 409，调用方（Agent）据此把文件移入隔离目录，
    * 绝不猜测归属。
@@ -307,6 +354,9 @@ export class ScanTasksService {
       throw new ConflictException({ error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' } })
     }
 
+    // B1-10：心跳必须在 CAS-to-matched 成功后、上传真正开始前启动，且无论下面的上传
+    // 成功/失败/抛异常都要在 finally 里清掉——否则每一次扫描投递都会泄漏一个定时器。
+    const heartbeat = this.startMatchedHeartbeat(task.id)
     try {
       const purpose = SCAN_TYPE_TO_PURPOSE[task.scanType as ScanType]
       const uploaded = await this.files.upload({
@@ -351,6 +401,10 @@ export class ScanTasksService {
         data: { status: 'failed', errorCode: 'SCAN_UPLOAD_FAILED', errorMessage: message },
       })
       throw error
+    } finally {
+      // B1-10：无论上面成功、走 SCAN_TASK_STATE_CHANGED 分支、还是落进 catch，
+      // 心跳定时器都必须在这里清掉——遗漏会让每一次扫描投递都泄漏一个 setInterval。
+      clearInterval(heartbeat)
     }
   }
 

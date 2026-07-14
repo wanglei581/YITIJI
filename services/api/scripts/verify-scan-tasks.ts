@@ -224,6 +224,104 @@ async function expectRejects<T extends Error>(
   assert.equal(rejected, true, `${label}: expected rejection`)
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** 访问 ScanTasksService 的 private startMatchedHeartbeat()——TS 的 private 只是编译期限制，B1-10 测试需要直接调用/替换它。 */
+type HeartbeatTestAccess = { startMatchedHeartbeat: (id: string, intervalMs?: number) => NodeJS.Timeout }
+
+/**
+ * B1-10：对着一个真实迁移过的数据库、真实 `ScanTaskReaperTask`（不改它的 3 分钟阈值）、
+ * 真实 `ScanTasksService.startMatchedHeartbeat()`，直接证明本次修复关闭的竞态：
+ *
+ *   - Row A（模拟"进程真的崩了，没有心跳"）：updatedAt 手工回拨到 4 分钟前，什么都不碰，
+ *     直接跑真实 reaper——必须被收敛成 failed/SCAN_MATCHED_TIMEOUT（证明本次修复没有
+ *     削弱 reaper 对"真正卡死"任务的收敛能力）。
+ *   - Row B（模拟"上传其实还在真实进行中，只是恰好超过 3 分钟没完成"）：updatedAt 同样
+ *     先回拨到 4 分钟前，然后启动真实心跳跑几个真实 tick（tick 间隔仅用于让测试在几十
+ *     毫秒内看到多次真实 tick，不代表生产间隔改了——生产间隔仍是 60s），停掉心跳后
+ *     updatedAt 必然已经被刷新成"刚刚"——再跑同一个真实 reaper，Row B 必须保持
+ *     'matched'，不能被误杀。
+ *
+ * 不需要真的等 3 分钟：updatedAt 是显式回拨出来的（本任务已用真实 SQLite 单独验证过
+ * Prisma 会原样接受 data 里的显式值，不会被 `@updatedAt` 自动机制覆盖），心跳和 reaper
+ * 全程用的都是生产代码里真实、未经修改的常量与逻辑。
+ */
+async function assertRealDbMatchedHeartbeatClosesRace(dbUrl: string): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+  // 两个独立终端各挂一条 'matched' 行：B1-2 的 partial unique index 约束同一 terminalId
+  // 同时只能有一条 waiting/matched 活跃记录，Row A/Row B 必须分属不同终端，否则第二条
+  // create() 会先撞上那条无关的约束，测不到本测试真正要验证的心跳/reaper 行为。
+  const terminalIdA = `realdb_hb_a_${randomBytes(4).toString('hex')}`
+  const terminalIdB = `realdb_hb_b_${randomBytes(4).toString('hex')}`
+  try {
+    for (const terminalId of [terminalIdA, terminalIdB]) {
+      await client.terminal.create({
+        data: {
+          id: terminalId,
+          terminalCode: `RDB-HB-${randomBytes(3).toString('hex')}`,
+          agentToken: randomBytes(16).toString('hex'),
+          deviceFingerprint: 'verify-scan-tasks-realdb-heartbeat-fixture',
+          enabled: true,
+        },
+      })
+    }
+
+    const realPrisma = { scanTask: client.scanTask } as never
+    const service = new ScanTasksService(realPrisma, {} as never, passthroughCapabilities)
+    const reaper = new ScanTaskReaperTask(client as never)
+
+    const fourMinutesAgo = new Date(Date.now() - 4 * 60 * 1000)
+
+    const rowA = await client.scanTask.create({
+      data: { terminalId: terminalIdA, scanType: 'document', status: 'matched', expiresAt: new Date(Date.now() + 60_000) },
+      select: { id: true },
+    })
+    await client.scanTask.updateMany({ where: { id: rowA.id }, data: { updatedAt: fourMinutesAgo } })
+
+    const rowB = await client.scanTask.create({
+      data: { terminalId: terminalIdB, scanType: 'document', status: 'matched', expiresAt: new Date(Date.now() + 60_000) },
+      select: { id: true },
+    })
+    await client.scanTask.updateMany({ where: { id: rowB.id }, data: { updatedAt: fourMinutesAgo } })
+
+    // Row B：启动真实的（未 mock 的）心跳方法，跑几个真实 tick，然后停掉。
+    const heartbeat = (service as unknown as HeartbeatTestAccess).startMatchedHeartbeat(rowB.id, 20)
+    await sleep(90)
+    clearInterval(heartbeat)
+
+    const rowBAfterHeartbeat = await client.scanTask.findUnique({ where: { id: rowB.id }, select: { updatedAt: true } })
+    assert.ok(
+      rowBAfterHeartbeat!.updatedAt.getTime() > fourMinutesAgo.getTime() + 3 * 60 * 1000,
+      'real heartbeat ticks must have refreshed updatedAt back to "now" against the real database',
+    )
+
+    // 真实 reaper，未经任何修改，跑一次。
+    await reaper.reapStuckMatched()
+
+    const rowAAfter = await client.scanTask.findUnique({ where: { id: rowA.id } })
+    assert.equal(
+      rowAAfter?.status,
+      'failed',
+      'real DB: a genuinely stuck matched row (no heartbeat, stale updatedAt) must still be correctly reaped by the unmodified real reaper',
+    )
+    assert.equal(rowAAfter?.errorCode, 'SCAN_MATCHED_TIMEOUT')
+
+    const rowBAfter = await client.scanTask.findUnique({ where: { id: rowB.id } })
+    assert.equal(
+      rowBAfter?.status,
+      'matched',
+      'real DB: the SAME unmodified real reaper must NOT reap a matched row whose heartbeat kept updatedAt fresh — this is the race the fix closes',
+    )
+  } finally {
+    await client.scanTask.deleteMany({ where: { terminalId: { in: [terminalIdA, terminalIdB] } } })
+    await client.terminal.deleteMany({ where: { id: { in: [terminalIdA, terminalIdB] } } })
+    await client.$disconnect()
+  }
+}
+
 /**
  * B1-9 共享断言体：对一个真实迁移过的数据库（SQLite 或 Postgres 皆可）连接，
  * 端到端跑一遍 B1-2 partial unique index 的完整行为断言——create() 成功、
@@ -1075,6 +1173,179 @@ async function main(): Promise<void> {
     assert.equal(staleBAfter.status, 'failed', 'terminal t_2 stale matched task must be reaped in the same tick')
     assert.equal(staleAAfter.errorCode, 'SCAN_MATCHED_TIMEOUT')
     assert.equal(staleBAfter.errorCode, 'SCAN_MATCHED_TIMEOUT')
+  }
+
+  {
+    // B1-10：deliverScanFile() 必须在 CAS-to-matched 成功后、上传真正开始前就武装
+    // 'matched' 心跳，并且无论上传成功、还是抛异常，都必须在 finally 里清掉这个定时器——
+    // 遗漏会让每一次扫描投递都泄漏一个 setInterval。
+    //
+    // 用 spy 替换 private startMatchedHeartbeat()（TS 的 private 只是编译期限制，运行时
+    // 可以直接赋值覆盖）返回一个可辨识的哨兵句柄而不真的起定时器；spy 全局 clearInterval
+    // 记录传入的句柄；upload 内部记录调用时刻心跳是否已经被武装——三者合起来断言"武装
+    // 时机"（早于 upload）和"清除时机"（成功/失败都发生且恰好一次），不依赖真实定时器
+    // 触发，跑得快且完全确定。
+    const clearedHandles: unknown[] = []
+    const originalClearInterval = global.clearInterval
+    global.clearInterval = ((handle: unknown) => {
+      clearedHandles.push(handle)
+    }) as typeof global.clearInterval
+
+    try {
+      {
+        // 成功路径
+        const prisma = new FakePrisma()
+        const baseFiles = new FakeFilesService(prisma)
+        const heartbeatCalls: string[] = []
+        let armedBeforeUploadStarted = false
+        const sentinelHandle = { tag: 'heartbeat-success' } as unknown as NodeJS.Timeout
+        const observingFiles = {
+          upload: async (args: Parameters<FakeFilesService['upload']>[0]) => {
+            armedBeforeUploadStarted = heartbeatCalls.length === 1
+            return baseFiles.upload(args)
+          },
+        }
+        const service = new ScanTasksService(prisma as never, observingFiles as never, passthroughCapabilities)
+        ;(service as unknown as HeartbeatTestAccess).startMatchedHeartbeat = (id: string) => {
+          heartbeatCalls.push(id)
+          return sentinelHandle
+        }
+
+        const created = await service.create(dto, null)
+        await service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: tinyPdf(),
+          filename: 'heartbeat.pdf',
+          mimeType: 'application/pdf',
+        })
+
+        assert.equal(heartbeatCalls.length, 1, 'startMatchedHeartbeat must be called exactly once per deliverScanFile()')
+        assert.equal(heartbeatCalls[0], created.scanTaskId, 'heartbeat must be armed for the matched task id')
+        assert.ok(armedBeforeUploadStarted, 'heartbeat must be armed before FilesService.upload() begins, not after')
+        assert.equal(clearedHandles.length, 1, 'heartbeat handle must be cleared exactly once on the success path')
+        assert.equal(
+          clearedHandles[0],
+          sentinelHandle,
+          'clearInterval must be called with the exact handle startMatchedHeartbeat returned',
+        )
+      }
+
+      {
+        // 失败路径（upload 抛异常）——finally 保证依然要清心跳，且原有的 SCAN_UPLOAD_FAILED
+        // 标记流程不受影响。
+        clearedHandles.length = 0
+        const prisma = new FakePrisma()
+        const sentinelHandle = { tag: 'heartbeat-failure' } as unknown as NodeJS.Timeout
+        const throwingFiles = {
+          upload: async (): Promise<never> => {
+            throw new Error('simulated upload failure')
+          },
+        }
+        const service = new ScanTasksService(prisma as never, throwingFiles as never, passthroughCapabilities)
+        ;(service as unknown as HeartbeatTestAccess).startMatchedHeartbeat = () => sentinelHandle
+
+        await service.create(dto, null)
+        await expectRejects(
+          () =>
+            service.deliverScanFile({
+              terminalId: 't_1',
+              buffer: tinyPdf(),
+              filename: 'heartbeat-fail.pdf',
+              mimeType: 'application/pdf',
+            }),
+          Error,
+          'upload failure must still propagate',
+        )
+        assert.equal(
+          clearedHandles.length,
+          1,
+          'heartbeat handle must be cleared exactly once even when upload throws (finally guarantee)',
+        )
+        assert.equal(clearedHandles[0], sentinelHandle)
+      }
+    } finally {
+      global.clearInterval = originalClearInterval
+    }
+  }
+
+  {
+    // B1-10 补充：心跳的真实实现（不是上面的 spy）必须满足两条设计约束：
+    //   1) 单次心跳写入失败（例如瞬时 DB 抖动）不能抛出、不能让后续 tick 停摆——
+    //      只降级为 warn 日志，继续下一次 tick；
+    //   2) where 条件必须与 reaper 一致（status: 'matched'）：任务如果已经并发转移到
+    //      其它终态，心跳只能安静 no-op，不能把它"复活"回 matched，也不能报错。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    await prisma.scanTask.updateMany({ where: { id: created.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+
+    const originalUpdateMany = prisma.scanTask.updateMany.bind(prisma.scanTask)
+    let tickCount = 0
+    prisma.scanTask.updateMany = (async (args: Parameters<typeof originalUpdateMany>[0]) => {
+      tickCount += 1
+      if (tickCount === 1) {
+        throw new Error('simulated transient DB hiccup on first heartbeat tick')
+      }
+      return originalUpdateMany(args)
+    }) as typeof originalUpdateMany
+
+    const beforeTicks = prisma.scanTasksById.get(created.scanTaskId)!.updatedAt.getTime()
+    const heartbeat = (service as unknown as HeartbeatTestAccess).startMatchedHeartbeat(created.scanTaskId, 15)
+    // 生产间隔是 60s；这里用 15ms 只是为了在几十毫秒内验证机制本身会真的多次 tick，不用等 60s。
+    await sleep(80)
+    clearInterval(heartbeat)
+
+    assert.ok(
+      tickCount >= 2,
+      `heartbeat must have ticked more than once within the wait window (got ${tickCount}); a single failed tick must not stop subsequent ticks`,
+    )
+    const afterTicks = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.ok(
+      afterTicks.updatedAt.getTime() > beforeTicks,
+      'updatedAt must have been bumped by a later successful tick despite the first tick throwing',
+    )
+    assert.equal(afterTicks.status, 'matched', 'heartbeat must not alter status, only updatedAt')
+
+    prisma.scanTask.updateMany = originalUpdateMany as typeof prisma.scanTask.updateMany
+
+    // 并发把任务状态改成 'cancelled'（模拟用户在上传过程中取消），确认心跳下一轮 tick 是
+    // 安静的 no-op：updatedAt 不再被心跳刷新，status 不被心跳篡改回 matched。
+    prisma.scanTasksById.set(created.scanTaskId, { ...afterTicks, status: 'cancelled' })
+    const cancelledSnapshotUpdatedAt = afterTicks.updatedAt.getTime()
+    const heartbeat2 = (service as unknown as HeartbeatTestAccess).startMatchedHeartbeat(created.scanTaskId, 15)
+    await sleep(60)
+    clearInterval(heartbeat2)
+
+    const afterCancelledTicks = prisma.scanTasksById.get(created.scanTaskId)!
+    assert.equal(
+      afterCancelledTicks.status,
+      'cancelled',
+      'heartbeat must never resurrect a task that concurrently left the matched state',
+    )
+    assert.equal(
+      afterCancelledTicks.updatedAt.getTime(),
+      cancelledSnapshotUpdatedAt,
+      "heartbeat's where:{status:'matched'} must make ticks a true no-op once the task is no longer matched — updatedAt must not move",
+    )
+  }
+
+  {
+    // B1-10：真实数据库验证——见 assertRealDbMatchedHeartbeatClosesRace() 顶部注释：
+    // 真实 reaper（未改 3 分钟阈值）+ 真实 startMatchedHeartbeat()，证明本次修复关闭的
+    // "慢但存活的上传被 reaper 误杀"竞态，同时证明"真正卡死的任务依然会被正确收敛"。
+    const apiRoot = path.resolve(__dirname, '..')
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'verify-scan-tasks-realdb-heartbeat-'))
+    const dbPath = path.join(tmpDir, 'verify.db')
+    const dbUrl = `file:${dbPath}`
+    try {
+      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy'], {
+        cwd: apiRoot,
+        env: { ...process.env, DATABASE_URL: dbUrl },
+        stdio: 'pipe',
+      })
+      await assertRealDbMatchedHeartbeatClosesRace(dbUrl)
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
   }
 
   console.log('PASS scan tasks verification')
