@@ -1,12 +1,11 @@
 import { KioskLayout, StatusBadge, type KioskTab } from '@ai-job-print/ui'
-import type { DeviceStatus } from '@ai-job-print/shared'
-import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useScreensaverController } from '../hooks/useScreensaverController'
 import { useIdleLogout } from '../auth/useIdleLogout'
+import { useHomeDeviceStatus } from '../pages/home/hooks/useHomeDeviceStatus'
 
 function getActiveTab(pathname: string): KioskTab {
   if (pathname.startsWith('/assistant')) return 'assistant'
@@ -19,6 +18,23 @@ function tabToPath(tab: KioskTab): string {
   if (tab === 'profile') return '/profile'
   return '/'
 }
+
+const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [
+  '/',
+  '/help',
+  '/assistant',
+  // 用户已明确将「我的」主入口纳入青序 LightFlow；/me/* 明细页仍保留原独立范围。
+  '/profile',
+  '/resume/source',
+  '/resume/parse',
+  '/resume/report',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/optimize',
+  '/resume/templates',
+  '/resume/materials',
+  '/resume/export',
+]
 
 /**
  * KioskRoot 外层挂 KioskBusyProvider,内层 KioskShell 才能用忙碌态 + 屏保控制器。
@@ -38,7 +54,7 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const [deviceStatus] = useState<DeviceStatus>('idle')
+  const deviceStatus = useHomeDeviceStatus(pathname !== '/')
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
   // 返回 active(屏保是否已配置且有素材),用于与下面的公共空闲重置按 active 互斥。
@@ -48,7 +64,15 @@ function KioskShell() {
   useIdleLogout(screensaverActive)
 
   const activeTab = getActiveTab(pathname)
-  const statusVariant = deviceStatus === 'online' || deviceStatus === 'idle' ? 'success' : 'warning'
+  const statusVariantByTone = {
+    positive: 'success',
+    warning: 'warning',
+    negative: 'error',
+    neutral: 'default',
+  } as const
+  const statusVariant = statusVariantByTone[deviceStatus.tone]
+  const statusLabel = deviceStatus.label
+  const isServiceDeskRoute = SERVICE_DESK_EXACT_ROUTES.includes(pathname)
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
@@ -58,13 +82,13 @@ function KioskShell() {
     <KioskLayout
       activeTab={activeTab}
       onTabChange={(tab) => navigate(tabToPath(tab))}
-      visualTheme={pathname === '/' ? 'service-desk' : 'legacy'}
+      visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
       density="touch"
       // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
       // 其余页面继续使用全局头部 + 设备状态徽标。
       hideHeader={pathname === '/' || isCampusZone}
       hideBottomNav={isCampusZone}
-      headerRight={<StatusBadge status={statusVariant} label={deviceStatus} />}
+      headerRight={<StatusBadge status={statusVariant} label={statusLabel} />}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}

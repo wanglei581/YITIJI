@@ -1,0 +1,149 @@
+.kassist.kassist-lightflow .assistant-task-picker {
+  display: grid;
+  gap: 20px;
+}
+
+.kassist.kassist-lightflow .assistant-task-picker-heading p {
+  margin: 0 0 5px;
+  color: var(--sd-primary-strong);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.kassist.kassist-lightflow .assistant-task-picker-heading h2 {
+  margin: 0;
+  color: var(--sd-text-strong);
+  font-size: clamp(28px, 3.2vw, 38px);
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+}
+
+.kassist.kassist-lightflow .assistant-task-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.kassist.kassist-lightflow .assistant-task {
+  display: grid;
+  min-height: 112px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--sd-line);
+  border-radius: 12px;
+  color: var(--sd-text);
+  background: var(--sd-surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.kassist.kassist-lightflow .assistant-task-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--sd-primary-strong);
+  background: #eaf4ff;
+}
+
+.kassist.kassist-lightflow .assistant-task-icon svg { width: 30px; height: 30px; }
+.kassist.kassist-lightflow .assistant-task-copy { display: grid; min-width: 0; gap: 7px; }
+.kassist.kassist-lightflow .assistant-task-copy strong { color: var(--sd-text-strong); font-size: 20px; line-height: 1.25; }
+.kassist.kassist-lightflow .assistant-task-copy small { color: var(--sd-copy); font-size: 14px; line-height: 1.55; }
+.kassist.kassist-lightflow .assistant-task:active { transform: scale(0.985); background: #eaf4ff; }
+
+.kassist.kassist-lightflow .assistant-direct-question,
+.kassist.kassist-lightflow .assistant-context-chip {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  justify-self: start;
+  padding: 0 18px;
+  border: 1px solid #cfe3fb;
+  border-radius: 12px;
+  color: var(--sd-primary-strong);
+  background: #eaf4ff;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.kassist.kassist-lightflow .assistant-direct-question svg { width: 22px; height: 22px; }
+.kassist.kassist-lightflow .assistant-context-chip { width: 100%; justify-content: space-between; }
+
+.kassist.kassist-lightflow .k-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(23, 105, 232, 0.2) 0%, rgba(23, 105, 232, 0.08) 40%, transparent 70%);
+  transform: scale(0);
+  animation: kassist-lightflow-ripple 520ms ease-out forwards;
+}
+
+.kassist.kassist-lightflow :is(button, textarea):focus-visible {
+  outline: 3px solid rgba(23, 105, 232, 0.42);
+  outline-offset: 3px;
+}
+
+.kassist.kassist-lightflow :is(button, textarea) {
+  transition: transform 160ms cubic-bezier(.22, 1, .36, 1), background-color 160ms cubic-bezier(.22, 1, .36, 1), border-color 160ms cubic-bezier(.22, 1, .36, 1), opacity 160ms cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes kassist-lightflow-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes kassist-lightflow-pulse {
+  0% { opacity: 0.86; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(1.16); }
+}
+
+@keyframes kassist-lightflow-wave {
+  0%, 100% { opacity: 0.65; transform: scaleY(0.45); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes kassist-lightflow-dots {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@keyframes kassist-lightflow-ripple {
+  to { opacity: 0; transform: scale(1); }
+}
+
+@media (max-width: 760px) {
+  .kassist.kassist-lightflow .assistant-task { padding: 18px; }
+}
+
+@media (max-width: 520px) {
+  .kassist.kassist-lightflow .assistant-task-picker { gap: 16px; }
+  .kassist.kassist-lightflow .assistant-task-picker-heading h2 { font-size: 28px; }
+  .kassist.kassist-lightflow .assistant-task-grid { grid-template-columns: minmax(0, 1fr); }
+  .kassist.kassist-lightflow .assistant-task {
+    min-height: 112px;
+    grid-template-columns: 50px minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .kassist.kassist-lightflow .assistant-task-icon { width: 50px; height: 50px; }
+  .kassist.kassist-lightflow .assistant-task-copy strong { font-size: 18px; }
+  .kassist.kassist-lightflow .assistant-direct-question,
+  .kassist.kassist-lightflow .assistant-context-chip { width: 100%; justify-self: stretch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kassist.kassist-lightflow *,
+  .kassist.kassist-lightflow *::before,
+  .kassist.kassist-lightflow *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

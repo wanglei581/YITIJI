@@ -30,6 +30,7 @@ import {
 import { exportGeneratedResume, getResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
+import './resume-authoring-lightflow.css'
 
 interface LocationState {
   result?: ResumeGenerateResponse
@@ -39,7 +40,7 @@ interface LocationState {
 }
 
 const taCls =
-  'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
+  'resume-lightflow__field w-full rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
 
 function SectionTitle({ title }: { title: string }) {
   return (
@@ -92,7 +93,7 @@ export function ResumeGeneratePreviewPage() {
 
   if (restoring) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
+      <div className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
         <p className="text-base">正在读取生成结果…</p>
       </div>
     )
@@ -101,7 +102,7 @@ export function ResumeGeneratePreviewPage() {
   if (!result || !resume) {
     // 刷新 / 待机后内存态丢失(公共设备隐私设计):引导重新生成
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+      <div className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-4 px-6">
         <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
         <p className="text-base text-neutral-500">生成结果已清除(公共设备不保留个人信息)</p>
         <Button size="lg" onClick={() => navigate('/resume/generate')}>重新填写生成</Button>
@@ -145,8 +146,8 @@ export function ResumeGeneratePreviewPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-6 pt-6">
+    <div className="resume-lightflow resume-generate-preview-lightflow flex h-full flex-col">
+      <div className="resume-lightflow__header px-6 pt-6">
         <PageHeader
           title="简历预览"
           subtitle="点击任意文本可直接修改；确认无误后导出 PDF 或打印"
@@ -157,13 +158,13 @@ export function ResumeGeneratePreviewPage() {
           }
         />
         {isMock && (
-          <div className="mt-3 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
+          <div className="resume-lightflow__notice mt-3 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
             <FlaskConicalIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p>当前为演示模式生成的内容(未接入真实 AI 模型)，仅用于体验流程；正式环境由管理员配置 AI 模型后生效。</p>
           </div>
         )}
         {hints.length > 0 && (
-          <div className="mt-3 rounded-xl bg-warning-bg px-4 py-3">
+          <div className="resume-lightflow__notice mt-3 rounded-xl bg-warning-bg px-4 py-3">
             <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-warning-fg">
               <AlertCircleIcon className="h-4 w-4" aria-hidden="true" />
               建议补充(AI 不会替你编造这些内容)
@@ -175,10 +176,10 @@ export function ResumeGeneratePreviewPage() {
         )}
       </div>
 
-      <div className="mt-4 flex-1 space-y-4 overflow-y-auto px-6 pb-6">
+      <div className="resume-lightflow__content mt-4 flex-1 space-y-4 overflow-y-auto px-6 pb-6">
         {/* 简历纸面预览(白底卡,接近 A4 视觉) */}
-        <Card className="p-6">
-          <div className="border-b-2 border-primary-600 pb-3">
+        <Card className="resume-lightflow__work-card resume-lightflow__paper p-6">
+          <div className="resume-lightflow__paper-header border-b-2 border-primary-600 pb-3">
             <p className="text-2xl font-bold text-neutral-900">{resume.basic.name}</p>
             <p className="mt-1 text-sm text-neutral-500">
               {[
@@ -301,7 +302,7 @@ export function ResumeGeneratePreviewPage() {
         {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
 
         {exported && (
-          <Card className="border-success-bg bg-success-bg/60 p-5">
+          <Card className="resume-lightflow__export-card border-success-bg bg-success-bg/60 p-5">
             <p className="flex items-center gap-2 text-base font-semibold text-success-fg">
               <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
               PDF 已生成
@@ -322,7 +323,7 @@ export function ResumeGeneratePreviewPage() {
       </div>
 
       {/* 底部操作条 */}
-      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
+      <div className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           {!exported ? (
             <Button

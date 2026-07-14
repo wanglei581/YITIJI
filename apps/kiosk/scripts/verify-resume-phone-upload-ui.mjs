@@ -14,6 +14,11 @@ function assertNotIncludes(src, marker, label) {
   console.log(`PASS ${label}`)
 }
 
+function assertMatches(src, pattern, label) {
+  if (!pattern.test(src)) throw new Error(`${label}: missing ${pattern}`)
+  console.log(`PASS ${label}`)
+}
+
 const source = read('src/pages/resume/ResumeSourcePage.tsx')
 const panel = read('src/pages/upload/components/UploadSessionQrPanel.tsx')
 const phone = read('src/pages/upload/PhoneUploadPage.tsx')
@@ -32,7 +37,11 @@ assertIncludes(phone, '一体机上确认', 'phone page explains kiosk confirmat
 assertIncludes(phone, 'location.hash', 'phone page reads fragment upload token')
 assertNotIncludes(phone, 'useSearchParams', 'phone page does not read upload token from query string')
 assertNotIncludes(phone, 'searchParams.get', 'phone page does not fall back to query token')
-assertIncludes(phone, 'aria-label="选择简历文件"', 'phone upload file input has accessible label')
+assertMatches(
+  phone,
+  /<input\b(?=[^>]*\btype=(?:"file"|'file'))(?=[^>]*\baria-label=\{\s*`选择\$\{fileNoun\}`\s*\})[^>]*>/,
+  'phone upload file input keeps a dynamic accessible label',
+)
 assertIncludes(source, 'aria-label="选择本机简历文件"', 'resume source file input has accessible label')
 assertIncludes(routes, '/upload/phone', 'phone upload route is registered')
 assertNotIncludes(source, '/print/upload', 'resume phone upload must not route through print flow')

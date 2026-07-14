@@ -15,57 +15,38 @@ import type {
   MemberResumeItem,
   SmartCampusModuleKey,
 } from '@ai-job-print/shared'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
+import { ReferenceServiceNav } from '../../components/lightflow/ReferenceServiceNav'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { getMyAiRecords, getMyDocuments, getMyResumes } from '../../services/api/memberAssets'
 import { getMyFavorites } from '../../services/api/memberFavorites'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../../services/api/terminalConfig'
 import { ExternalLaunchModal, QrLaunchModal } from './components/ToolboxLaunchModals'
+import { useHomeDeviceStatus } from './hooks/useHomeDeviceStatus'
+import { SERVICE_GROUPS, SUB_ACCENT, type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
 import './home-service-desk.css'
 
 const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
 let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
+const HOME_REFERENCE_HASH_IDS = new Set(['resume', 'jobs', 'job-fairs', 'print-scan', 'interview', 'policy'])
 
-function useClock() {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 15_000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()]
-  return {
-    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
-    date: `${pad(now.getMonth() + 1)}月${now.getDate()}日 · ${week}`,
-  }
-}
-
-/* ── 顶栏（LightFlow 白色服务台 + 品牌徽标 + 状态药丸；时钟只在 Hero） ── */
+/* ── 顶栏（LightFlow 白色服务台 + 真实设备状态） ── */
 function KioskTopBar() {
+  const deviceStatus = useHomeDeviceStatus()
+
   return (
     <header className="k-top">
-      <span className="k-mark">
-        <KIcon name="logo" />
-      </span>
-      <div className="k-brand">
-        <strong>AI求职打印一体机</strong>
-        <span>求职材料 · 招聘会 · 打印扫描</span>
-      </div>
-      <div className="k-status">
-        <span className="k-pill">
-          <i className="k-dot" aria-hidden="true" />
-          打印机在线
-        </span>
-        <span className="k-pill">
-          <KIcon name="wifi" />
-          网络正常
+      <strong className="k-brand">AI求职打印一体机</strong>
+      <div className="k-status" role="status" aria-live="polite">
+        <span className="k-device-status" data-status={deviceStatus.tone}>
+          <i aria-hidden="true" />
+          {deviceStatus.label}
         </span>
       </div>
     </header>
@@ -129,40 +110,13 @@ function useHomeStats(isLoggedIn: boolean, getToken: () => string | null) {
   return { stats, loading }
 }
 
-/* ── Hero（LightFlow 浅冰蓝服务台 + 实时时钟） ── */
-function HeroSection() {
-  const { time, date } = useClock()
-
-  return (
-    <section className="hero" aria-label="AI求职打印一体机欢迎区">
-      <div className="hero-copy">
-        <div className="hero-eyebrow">
-          <KIcon name="logo" />
-          就业服务 · 一体机自助办理
-        </div>
-        <h1>
-          简历、打印、岗位信息
-          <br />
-          一趟办完
-        </h1>
-        <p>今天能办的事都在下面，点开对应卡片直接进入；登录后可在「我的」查看已生成的简历、文档、AI记录、打印订单和收藏，岗位投递与招聘会预约仍需前往来源平台完成。</p>
-      </div>
-      <div className="hero-clock" aria-label="当前时间">
-        <div className="time">{time}</div>
-        <div className="date">{date}</div>
-      </div>
-    </section>
-  )
-}
-
 /* ── 身份条（登录态显示统计，统计格可点击直达明细；未登录显示引导） ── */
 function IdentityPanel() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { isLoggedIn, guestMode, displayName, continueAsGuest, logout, getToken } = useAuth()
   const { stats, loading } = useHomeStats(isLoggedIn, getToken)
-
-  const goLogin = () => navigate('/login', { state: { from: location.pathname } })
+  const [loginOpen, setLoginOpen] = useState(false)
+  const loginTriggerRef = useRef<HTMLButtonElement>(null)
 
   if (isLoggedIn) {
     const initial = displayName.replace(/\s/g, '').slice(0, 1) || '我'
@@ -237,137 +191,29 @@ function IdentityPanel() {
             游客体验
           </button>
         )}
-        <button type="button" className="btn primary lg cta" onClick={goLogin}>
-          立即登录 / 注册
+        <button
+          ref={loginTriggerRef}
+          type="button"
+          className="btn primary lg cta"
+          onClick={() => setLoginOpen(true)}
+        >
+          登录 / 注册
           <KIcon name="arrow" />
         </button>
       </div>
+      <MemberLoginDialog
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onContinueAsGuest={() => {
+          continueAsGuest()
+          setLoginOpen(false)
+        }}
+      />
     </section>
   )
 }
 
-/* ── 服务分组（路由 / intent / 分组顺序与换装前完全一致；仅替换视觉） ── */
-interface ServiceTile {
-  title: string
-  icon: KioskIconName
-  to?: string
-  state?: Record<string, unknown>
-  disabled?: boolean
-}
-
-type Accent = 'teal' | 'clay' | 'slate' | 'wheat' | 'plum' | 'tool'
-
-interface ServiceGroup {
-  title: string
-  subtitle: string
-  icon: KioskIconName
-  accent: Accent
-  span2?: boolean
-  cols2?: boolean
-  badge?: { icon: KioskIconName; label: string }
-  tiles: ServiceTile[]
-  /** 组标题点击目标；未设置时沿用原逻辑（跳到第一个可用子项）。 */
-  titleTo?: string
-}
-
-const SERVICE_GROUPS: ServiceGroup[] = [
-  {
-    title: 'AI简历服务',
-    subtitle: '诊断、优化、打印，一次完成',
-    icon: 'resume',
-    accent: 'teal',
-    span2: true,
-    badge: { icon: 'star', label: '推荐先做' },
-    tiles: [
-      // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
-      { title: 'AI简历诊断', icon: 'doc-check', to: '/resume/source?intent=diagnose' },
-      { title: 'AI简历优化', icon: 'sparkle', to: '/resume/source?intent=optimize' },
-      { title: '简历素材库', icon: 'book', to: '/resume/templates' },
-      { title: '职业规划', icon: 'compass', to: '/resume/career-plan' },
-      { title: '简历打印', icon: 'printer', to: '/print/upload?source=resume' },
-      { title: '求职材料', icon: 'briefcase', to: '/resume/materials' },
-    ],
-  },
-  {
-    title: '岗位信息',
-    subtitle: '第三方来源岗位，去来源平台投递',
-    icon: 'briefcase',
-    accent: 'clay',
-    tiles: [
-      { title: '全职岗位', icon: 'briefcase', to: '/jobs?category=fulltime' },
-      { title: '实习岗位', icon: 'campus', to: '/jobs?category=intern' },
-      { title: '兼职信息', icon: 'clock', to: '/jobs?category=parttime' },
-      { title: '全部岗位', icon: 'files', to: '/jobs' },
-      { title: '找企业', icon: 'shield', to: '/companies' },
-      // 2026-07-11：按 IA 整合审计 §3⑧ 拍板执行——复用既有「岗位匹配参考」（2D）能力，不新增独立路由/页面。
-      { title: '岗位大师', icon: 'star', to: '/resume/job-fit' },
-    ],
-  },
-  {
-    title: '招聘会',
-    subtitle: '查看场次信息，去来源平台预约',
-    icon: 'pin',
-    accent: 'wheat',
-    tiles: [
-      { title: '社会招聘会', icon: 'pin', to: '/job-fairs' },
-      { title: '校园招聘会', icon: 'campus', to: '/campus' },
-      { title: '扫码签到', icon: 'qr', to: '/job-fairs/checkin' },
-    ],
-  },
-  {
-    title: '打印扫描',
-    subtitle: '上传或扫描，本机直接出纸',
-    icon: 'printer',
-    accent: 'slate',
-    titleTo: '/print-scan',
-    tiles: [
-      { title: '文档打印', icon: 'printer', to: '/print/upload?source=document' },
-      { title: '证件复印', icon: 'files', disabled: Boolean(true) },
-      { title: '纸质扫描', icon: 'scan', to: '/scan/start' },
-      // 2026-07-12：「云打印」磁贴按正式取舍决策删除（能力归位文档打印+手机扫码上传；
-      // 远程提交·到店取件记入商用二期候选），见 docs/reviews/2026-07-12-cloud-print-decision.md
-      { title: '格式转换', icon: 'swap', to: '/print-scan/convert' },
-      { title: '证件照打印', icon: 'user', disabled: Boolean(true) },
-    ],
-  },
-  {
-    title: 'AI面试训练',
-    subtitle: '模拟练习，仅供参考',
-    icon: 'headset',
-    accent: 'plum',
-    tiles: [
-      { title: '模拟面试', icon: 'mic', to: '/interview/setup' },
-      { title: '面试技巧', icon: 'bulb', to: '/interview/tips' },
-      { title: '面试报告', icon: 'doc-check', to: '/interview/reports' },
-    ],
-  },
-  {
-    // 合规:补贴类只做政策说明/材料清单/官方入口/申请指引(info-only),
-    // 不出现"快申/申请"等暗示平台内办理的表述。
-    title: '政策服务',
-    subtitle: '政策查询与办事材料指引',
-    icon: 'policy',
-    accent: 'wheat',
-    span2: true,
-    tiles: [
-      // 「就业政策」Tab 内含补贴指引内容；「社保指南」与 tab=social 一一对应，避免同义重复入口。
-      { title: '就业政策', icon: 'policy', to: '/renshi?tab=policy' },
-      { title: '社保指南', icon: 'ticket', to: '/renshi?tab=social' },
-      { title: '档案 / 登记', icon: 'files', to: '/renshi?tab=register' },
-    ],
-  },
-]
-
-const SUB_ACCENT: Record<Accent, string> = {
-  teal: '',
-  clay: 'clay',
-  slate: 'slate',
-  wheat: 'wheat',
-  plum: 'plum',
-  tool: '',
-}
-
-function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
+function ExtensionServiceButton({ tile }: { tile: ServiceTile }) {
   const navigate = useNavigate()
   const disabled = tile.disabled || !tile.to
 
@@ -376,16 +222,19 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent
       type="button"
       disabled={disabled}
       onClick={() => tile.to && navigate(tile.to, tile.state ? { state: tile.state } : undefined)}
-      className={['sub', SUB_ACCENT[accent], disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      className="home-extension-action"
     >
-      <span className="si">
+      <span className="home-extension-icon">
         <KIcon name={tile.icon} />
       </span>
-      <span className="label">{tile.title}</span>
+      <span className="home-extension-copy">
+        <strong>{tile.title}</strong>
+        {tile.description && <span>{tile.description}</span>}
+      </span>
       {disabled ? (
-        <span className="soon">即将上线</span>
+        <span className="home-reference-state">即将上线</span>
       ) : (
-        <span className="arrow">
+        <span className="home-reference-arrow">
           <KIcon name="arrow" />
         </span>
       )}
@@ -393,45 +242,124 @@ function ServiceTileButton({ tile, accent }: { tile: ServiceTile; accent: Accent
   )
 }
 
-function ServiceGroupCard({ group }: { group: ServiceGroup }) {
+function findServiceGroup(id: string): ServiceGroup {
+  const group = SERVICE_GROUPS.find((candidate) => candidate.id === id)
+  if (!group) throw new Error(`Missing service group: ${id}`)
+  return group
+}
+
+function ReferenceGroupHead({ group, headingId }: { group: ServiceGroup; headingId: string }) {
   const navigate = useNavigate()
   const enabledFirst = group.tiles.find((tile) => tile.to && !tile.disabled)
   const titleTarget = group.titleTo ?? enabledFirst?.to
 
   return (
-    <section className={group.span2 ? 'cat-card span2' : 'cat-card'}>
-      <div
-        className="cat-head tap"
-        role="button"
-        tabIndex={0}
+    <div className="lf-reference-group-head">
+      <span className={`home-reference-icon ${SUB_ACCENT[group.accent]}`}>
+        <KIcon name={group.icon} />
+      </span>
+      <button
+        type="button"
+        className="home-reference-group-copy"
+        disabled={!titleTarget}
         onClick={() => titleTarget && navigate(titleTarget)}
-        onKeyDown={(e) => {
-          if ((e.key === 'Enter' || e.key === ' ') && titleTarget) navigate(titleTarget)
-        }}
       >
-        <span className={`cat-icon ${group.accent}`}>
-          <KIcon name={group.icon} />
-        </span>
-        <div className="cat-title">
-          <h3>{group.title}</h3>
-          <p>{group.subtitle}</p>
-        </div>
-        {group.badge && (
-          <span className="cat-badge">
-            <KIcon name={group.badge.icon} />
-            {group.badge.label}
-          </span>
-        )}
-      </div>
+        <strong id={headingId}>{group.title}</strong>
+        <span>{group.subtitle}</span>
+      </button>
+    </div>
+  )
+}
 
-      <div
-        className={group.cols2 ? 'sub-grid cols2' : 'sub-grid'}
-        style={group.span2 ? { gridTemplateColumns: `repeat(${Math.min(group.tiles.length, 6)}, 1fr)` } : undefined}
-      >
-        {group.tiles.map((tile) => (
-          <ServiceTileButton key={tile.title} tile={tile} accent={group.accent} />
-        ))}
-      </div>
+function ReferencePrimaryButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
+  const navigate = useNavigate()
+  const disabled = tile.disabled || !tile.to
+  const handleClick = () => {
+    if (tile.to) navigate(tile.to, tile.state ? { state: tile.state } : undefined)
+  }
+
+  return (
+    <button
+      type="button"
+      className="lf-reference-primary"
+      disabled={disabled}
+      onClick={handleClick}
+    >
+      <span className={`home-reference-icon ${SUB_ACCENT[accent]}`}>
+        <KIcon name={tile.icon} />
+      </span>
+      <span className="home-reference-entry-copy">
+        <strong>{tile.title}</strong>
+        {tile.description && <span>{tile.description}</span>}
+      </span>
+      {disabled ? (
+        <span className="home-reference-state">即将上线</span>
+      ) : (
+        <span className="home-reference-arrow"><KIcon name="arrow" /></span>
+      )}
+    </button>
+  )
+}
+
+function ReferenceSecondaryButton({ tile, accent }: { tile: ServiceTile; accent: Accent }) {
+  const navigate = useNavigate()
+  const disabled = tile.disabled || !tile.to
+  const handleClick = () => {
+    if (tile.to) navigate(tile.to, tile.state ? { state: tile.state } : undefined)
+  }
+
+  return (
+    <button
+      type="button"
+      className="lf-reference-secondary"
+      disabled={disabled}
+      onClick={handleClick}
+    >
+      <span className={`home-reference-icon ${SUB_ACCENT[accent]}`}>
+        <KIcon name={tile.icon} />
+      </span>
+      <span className="home-reference-entry-copy">
+        <strong>{tile.title}</strong>
+        {tile.description && <span>{tile.description}</span>}
+      </span>
+      {disabled ? (
+        <span className="home-reference-state">即将上线</span>
+      ) : (
+        <span className="home-reference-arrow"><KIcon name="arrow" /></span>
+      )}
+    </button>
+  )
+}
+
+function ReferenceServicePanel({
+  group,
+}: {
+  group: ServiceGroup
+}) {
+  const primary = group.tiles.filter((tile) => tile.emphasis === 'primary')
+  const secondary = group.tiles.filter((tile) => tile.emphasis !== 'primary')
+
+  return (
+    <section
+      id={group.id}
+      className={`lf-reference-panel home-reference-panel home-reference-panel--${group.layout}`}
+      aria-labelledby={`${group.id}-title`}
+    >
+      <ReferenceGroupHead group={group} headingId={`${group.id}-title`} />
+      {primary.length > 0 && (
+        <div className="home-reference-primary-list">
+          {primary.map((tile) => (
+            <ReferencePrimaryButton key={tile.title} tile={tile} accent={group.accent} />
+          ))}
+        </div>
+      )}
+      {secondary.length > 0 && (
+        <div className={`home-reference-secondary-list ${primary.length === 0 ? 'home-reference-secondary-list--only' : ''}`.trim()}>
+          {secondary.map((tile) => (
+            <ReferenceSecondaryButton key={tile.title} tile={tile} accent={group.accent} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -536,24 +464,24 @@ function ContinuePanel() {
   )
 }
 
-/* ── 智慧校园（整行 cat-card；后台开关联动，关闭不渲染，逻辑不变） ── */
+/* ── 智慧校园（扁平横向扩展行；后台开关联动，关闭不渲染，逻辑不变） ── */
 // 校园大数据（bigdata）本期严格冻结：不在此列出入口卡，后端开关亦强制 false。
-const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile & { desc: string }>> = {
+const SMART_CAMPUS_TILES: Partial<Record<SmartCampusModuleKey, ServiceTile>> = {
   welcome: {
     title: '迎新服务',
-    desc: '报到流程、办事窗口、入学材料打印',
+    description: '报到流程、办事窗口、入学材料打印',
     icon: 'campus',
     to: '/smart-campus/welcome',
   },
   luggage: {
     title: '行李帮运',
-    desc: '校方合作服务入口、服务点与路线说明',
+    description: '校方合作服务入口、服务点与路线说明',
     icon: 'route',
     to: '/smart-campus/service/luggage',
   },
   panorama: {
     title: 'VR校园',
-    desc: '校园全景、路线导览、重点场馆介绍',
+    description: '校园全景、路线导览、重点场馆介绍',
     icon: 'eye',
     to: '/smart-campus/service/panorama',
   },
@@ -567,41 +495,35 @@ function SmartCampusHorizontalSection() {
   const enabledTiles = (Object.keys(SMART_CAMPUS_TILES) as SmartCampusModuleKey[])
     .filter((key) => config.modules[key])
     .map((key) => SMART_CAMPUS_TILES[key])
-    .filter((tile): tile is ServiceTile & { desc: string } => !!tile)
+    .filter((tile): tile is ServiceTile => !!tile)
   const campusItems = [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
 
   if (!config.enabled || (enabledTiles.length === 0 && campusItems.length === 0)) return null
 
   return (
     <>
-      <section className="cat-card span2">
-        <div
-          className="cat-head tap"
-          role="button"
-          tabIndex={0}
+      <section className="home-extension-group">
+        <button
+          type="button"
+          className="home-extension-heading"
           onClick={() => navigate('/smart-campus')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') navigate('/smart-campus')
-          }}
         >
-          <span className="cat-icon slate">
+          <span className="home-extension-icon">
             <KIcon name="campus" />
           </span>
-          <div className="cat-title">
-            <h3>智慧校园</h3>
-            <p>学校专属服务专区，仅校园终端开启时显示</p>
-          </div>
-          <span className="cat-badge">
-            <KIcon name="check" />
-            学校端已开启
+          <span className="home-extension-copy">
+            <strong>智慧校园</strong>
+            <span>学校专属服务专区，仅校园终端开启时显示</span>
           </span>
-        </div>
-        <div className="sub-grid">
+          <span className="home-extension-badge">学校端已开启</span>
+          <span className="home-reference-arrow"><KIcon name="arrow" /></span>
+        </button>
+        <div className="home-extension-list">
           {enabledTiles.map((tile) => (
-            <ServiceTileButton key={tile.title} tile={tile} accent="slate" />
+            <ExtensionServiceButton key={tile.title} tile={tile} />
           ))}
           {campusItems.map((item) => (
-            <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} accent="blue" />
+            <ToolboxExtensionButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
           ))}
         </div>
       </section>
@@ -611,7 +533,7 @@ function SmartCampusHorizontalSection() {
   )
 }
 
-/* ── 百宝箱（终端配置驱动；逻辑不变，视觉换 cat-card/sub 语汇） ── */
+/* ── 百宝箱（终端配置驱动；逻辑不变，使用扁平横向扩展行） ── */
 const TOOLBOX_ICONS: Record<string, KioskIconName> = {
   wrench: 'toolbox',
   'file-text': 'files',
@@ -682,16 +604,14 @@ function itemBadge(item: KioskToolboxItem): string | null {
   return null
 }
 
-function ToolboxItemButton({
+function ToolboxExtensionButton({
   item,
   onQr,
   onExternal,
-  accent = 'slate',
 }: {
   item: KioskToolboxItem
   onQr: (item: KioskToolboxItem) => void
   onExternal: (item: KioskToolboxItem) => void
-  accent?: 'slate' | 'blue'
 }) {
   const navigate = useNavigate()
   const disabled = item.disabled || !itemLaunchable(item)
@@ -702,17 +622,20 @@ function ToolboxItemButton({
       type="button"
       disabled={disabled}
       onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
-      className={['sub', accent === 'blue' ? 'slate' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+      className="home-extension-action"
       title={item.description}
     >
-      <span className="si">
+      <span className="home-extension-icon">
         <KIcon name={TOOLBOX_ICONS[item.icon] ?? 'toolbox'} />
       </span>
-      <span className="label">{item.title}</span>
+      <span className="home-extension-copy">
+        <strong>{item.title}</strong>
+        <span>{item.description}</span>
+      </span>
       {badge ? (
-        <span className="soon">{badge}</span>
+        <span className="home-reference-state">{badge}</span>
       ) : (
-        <span className="arrow">
+        <span className="home-reference-arrow">
           <KIcon name="arrow" />
         </span>
       )}
@@ -732,28 +655,25 @@ function ToolboxSection() {
 
   return (
     <>
-      <section className="cat-card span2">
-        <div className="cat-head">
-          <span className="cat-icon tool">
+      <section className="home-extension-group">
+        <div className="home-extension-heading">
+          <span className="home-extension-icon">
             <KIcon name="toolbox" />
           </span>
-          <div className="cat-title">
-            <h3>百宝箱</h3>
-            <p>本机已配置的扩展服务，经审核后上架</p>
-          </div>
-          <span className="cat-badge muted">
-            <KIcon name="shield" />
-            已审核
+          <span className="home-extension-copy">
+            <strong>百宝箱</strong>
+            <span>本机已配置的扩展服务，经审核后上架</span>
           </span>
+          <span className="home-extension-badge">已审核</span>
         </div>
         {items.length > 0 ? (
-          <div className="sub-grid">
+          <div className="home-extension-list">
             {items.map((item) => (
-              <ToolboxItemButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
+              <ToolboxExtensionButton key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
             ))}
           </div>
         ) : (
-          <div className="cat-empty">
+          <div className="home-extension-empty">
             <strong>待配置</strong>
             <p>后续功能上线后将在这里展示。</p>
           </div>
@@ -766,31 +686,54 @@ function ToolboxSection() {
 }
 
 export function HomePage() {
-  useInkRipple('.khome .sub, .khome .btn, .khome .id-stat')
+  const { hash } = useLocation()
+  useInkRipple('.khome .lf-reference-primary, .khome .lf-reference-secondary, .khome .home-extension-action, .khome .btn, .khome .id-stat')
+
+  useEffect(() => {
+    const targetId = hash.startsWith('#') ? hash.slice(1) : ''
+    if (!HOME_REFERENCE_HASH_IDS.has(targetId)) return
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [hash])
+
+  const resumeGroup = findServiceGroup('resume')
+  const jobsGroup = findServiceGroup('jobs')
+  const jobFairsGroup = findServiceGroup('job-fairs')
+  const printScanGroup = findServiceGroup('print-scan')
+  const interviewGroup = findServiceGroup('interview')
+  const policyGroup = findServiceGroup('policy')
 
   return (
     <div className="khome">
       <KioskTopBar />
 
       <div className="khome-inner">
-        <HeroSection />
+        <section className="service-value" aria-labelledby="home-service-value-title">
+          <span className="service-value-tag">一站式求职服务</span>
+          <h1 id="home-service-value-title">简历、打印、岗位信息一趟办完</h1>
+          <p>提供 AI 简历服务、求职材料、岗位与招聘会信息入口，以及本机打印扫描服务。</p>
+        </section>
         <IdentityPanel />
         <ContinuePanel />
       </div>
 
-      <div className="khome-inner">
-        <div className="sec-head">
-          <span className="rail" aria-hidden="true" />
-          <div>
-            <h2>今天可以办理</h2>
-            <p>点按钮直接进入对应功能，操作不超过 3 步。</p>
-          </div>
-        </div>
+      <ReferenceServiceNav />
 
-        <main className="home-grid">
-          {SERVICE_GROUPS.map((group) => (
-            <ServiceGroupCard key={group.title} group={group} />
-          ))}
+      <div className="home-service-track">
+        <main className="home-service-catalog" aria-label="当前可使用功能">
+          <ReferenceServicePanel group={resumeGroup} />
+
+          <div className="lf-reference-pair" aria-label="岗位信息与招聘会">
+            <ReferenceServicePanel group={jobsGroup} />
+            <ReferenceServicePanel group={jobFairsGroup} />
+          </div>
+
+          <ReferenceServicePanel group={printScanGroup} />
+
+          <div className="lf-reference-pair" aria-label="面试训练与政策服务">
+            <ReferenceServicePanel group={interviewGroup} />
+            <ReferenceServicePanel group={policyGroup} />
+          </div>
+
           <ToolboxSection />
           <SmartCampusHorizontalSection />
         </main>

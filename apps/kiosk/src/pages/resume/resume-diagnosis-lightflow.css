@@ -1,0 +1,298 @@
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow):where(.resume-lightflow),
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow):where(.resume-lightflow) * {
+  box-sizing: border-box;
+}
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-source-lightflow,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-parse-lightflow,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-report-lightflow {
+  min-width: 0;
+  overflow-x: hidden;
+  color: #102a43;
+  background:
+    radial-gradient(circle at 94% 2%, rgba(111, 190, 255, 0.26), transparent 30%),
+    linear-gradient(145deg, #f4faff 0%, #e8f5ff 48%, #f7fbff 100%);
+}
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) button {
+  min-height: 48px;
+  touch-action: manipulation;
+}
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) input,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) select {
+  min-height: 48px;
+  border-color: #c4d8ea;
+  background-color: #fff;
+  color: #102a43;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-primary-action {
+  min-height: 56px;
+  border: 0;
+  border-radius: 18px;
+  background: #1479ff;
+  box-shadow: 0 12px 24px rgba(20, 121, 255, 0.24);
+  font-weight: 700;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-primary-action:hover:not(:disabled) {
+  background: #0c66dc;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-primary-action:focus-visible,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) button:focus-visible,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) input:focus-visible,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) select:focus-visible {
+  outline: 3px solid rgba(20, 121, 255, 0.36);
+  outline-offset: 3px;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-content,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-content {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+  padding-inline: 2px;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-intro,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-evidence,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-context,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-phone-session > *,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-direction > *,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-summary,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-radar,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-notice,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-evidence,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-priorities,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-risks,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-suggestions {
+  border: 1px solid rgba(143, 178, 207, 0.54);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 32px rgba(35, 92, 137, 0.09);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-privacy {
+  max-width: 980px;
+  margin-inline: auto;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-privacy > * {
+  border: 1px solid rgba(84, 170, 142, 0.34);
+  border-radius: 18px;
+  background: rgba(247, 255, 251, 0.92);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-intro {
+  border-color: rgba(104, 178, 245, 0.48);
+  background: linear-gradient(135deg, #fff 0%, #eef8ff 100%);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-alternative,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-dropzone {
+  border-color: #b9d8f2;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px rgba(35, 92, 137, 0.06);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-alternative:hover,
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-dropzone:hover:not(:disabled) {
+  border-color: #67adf4;
+  background: #f8fcff;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-methods > button {
+  border-color: #c5d8e9;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(35, 92, 137, 0.06);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-methods > button:hover:not(:disabled) {
+  border-color: #69adf3;
+  background: #f8fcff;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-methods > button[class*='border-primary-500'] {
+  border-color: #1479ff;
+  box-shadow: 0 0 0 4px rgba(20, 121, 255, 0.12), 0 12px 28px rgba(35, 92, 137, 0.1);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-evidence > div:last-child {
+  border: 1px solid rgba(234, 177, 52, 0.28);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-context label > span {
+  color: #486581;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-error {
+  max-width: 980px;
+  margin-inline: auto;
+  border-radius: 16px;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-status {
+  color: #145da0;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-actions {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+  padding: 12px 2px 2px;
+  border-top: 1px solid rgba(143, 178, 207, 0.4);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-parse-lightflow {
+  position: relative;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-status-mark {
+  border: 10px solid rgba(255, 255, 255, 0.74);
+  box-shadow: 0 14px 34px rgba(35, 92, 137, 0.14);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-dimensions > div {
+  min-height: 52px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-steps {
+  padding: 20px;
+  border: 1px solid rgba(143, 178, 207, 0.52);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 32px rgba(35, 92, 137, 0.08);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-step + .resume-parse-step {
+  padding-top: 16px;
+  border-top: 1px solid #e3eef7;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-dev {
+  min-height: 48px;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-state {
+  text-align: center;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-state > div:first-child {
+  box-shadow: 0 12px 28px rgba(35, 92, 137, 0.1);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-summary {
+  background: linear-gradient(135deg, #fff 0%, #eef8ff 100%);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-summary > div > div:last-child {
+  border: 8px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 22px rgba(20, 121, 255, 0.16);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-evidence [role='progressbar'] {
+  background: linear-gradient(90deg, #2186ff, #67b5ff);
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-priorities [class*='bg-warning'] {
+  border: 1px solid rgba(234, 177, 52, 0.2);
+  border-radius: 14px;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-risks li {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fffaf1;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-suggestions li {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f7fbff;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-next {
+  border-color: #a9d2fb;
+  border-radius: 18px;
+  background: #eef8ff;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-actions {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+}
+
+:is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-secondary-action {
+  border-color: #bcd6ec;
+  color: #174b7a;
+}
+
+@media (max-width: 520px) {
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-source-lightflow,
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-report-lightflow {
+    padding: 16px !important;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-parse-lightflow {
+    justify-content: flex-start;
+    padding: 40px 16px 24px !important;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-content,
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-content {
+    gap: 14px;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-methods > button {
+    min-height: 124px;
+    padding: 16px;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-methods > button .text-xl {
+    font-size: 1rem;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-source-evidence > div:nth-child(2) {
+    grid-template-columns: 1fr;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-status-mark {
+    margin-bottom: 28px;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-dimensions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-steps {
+    margin-top: 28px;
+    padding: 16px;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-summary > div {
+    align-items: flex-start;
+    gap: 18px;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-actions {
+    flex-direction: column;
+  }
+
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-report-actions > button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) *,
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) *::before,
+  :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

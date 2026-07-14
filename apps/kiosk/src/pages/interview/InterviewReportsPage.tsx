@@ -12,6 +12,7 @@ import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
+import './interview-service-desk.css'
 
 function formatTime(iso: string) {
   const d = new Date(iso)
@@ -67,7 +68,7 @@ export function InterviewReportsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
       <PageHeader
         title="面试报告"
         subtitle="模拟面试练习的历史报告（仅本人可见）"
@@ -89,9 +90,9 @@ export function InterviewReportsPage() {
         </div>
       )}
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="interview-flow__scroll mt-4 flex-1 overflow-y-auto pb-8">
         {!isLoggedIn ? (
-          <Card className="flex flex-col items-center gap-4 p-10 text-center">
+          <Card className="interview-card interview-reports__guest flex flex-col items-center gap-4 p-10 text-center">
             <FileSearchIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
             <div>
               <p className="text-base font-semibold text-neutral-900">登录后可保存练习报告</p>
@@ -114,7 +115,7 @@ export function InterviewReportsPage() {
         ) : state === 'error' ? (
           <ErrorState className="py-20" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : items.length === 0 ? (
-          <Card className="p-4">
+          <Card className="interview-card p-4">
             <EmptyState
               icon={FileSearchIcon}
               title="还没有练习报告"
@@ -124,9 +125,9 @@ export function InterviewReportsPage() {
             />
           </Card>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="interview-reports__list flex flex-col gap-3">
             {items.map((it) => (
-              <Card key={it.sessionId} className="flex items-center gap-4 p-4">
+              <Card key={it.sessionId} className="interview-card interview-reports__row flex items-center gap-4 p-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
                   <FileSearchIcon className="h-6 w-6 text-plum" aria-hidden="true" />
                 </div>

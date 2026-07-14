@@ -16,6 +16,7 @@ import {
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
+import './resume-diagnosis-lightflow.css'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
 
@@ -141,11 +142,11 @@ export function ResumeParsePage() {
   const completedDimensionCount = DIMENSION_PROGRESS_BY_STEP[current]
 
   return (
-    <div className="flex h-full flex-col items-center justify-center p-8" role="status" aria-live="polite">
+    <div className="resume-lightflow resume-parse-lightflow flex h-full flex-col items-center justify-center p-8" role="status" aria-live="polite">
       {/* 状态图标 */}
       <div
         className={[
-          'mb-10 flex h-24 w-24 items-center justify-center rounded-full',
+          'resume-parse-status-mark mb-10 flex h-24 w-24 items-center justify-center rounded-full',
           failed ? 'bg-error-bg' : 'bg-primary-50',
         ].join(' ')}
       >
@@ -164,7 +165,7 @@ export function ResumeParsePage() {
       </p>
 
       {!failed && (
-        <div className="mt-8 grid w-full max-w-3xl grid-cols-2 gap-3 md:grid-cols-6">
+        <div className="resume-parse-dimensions mt-8 grid w-full max-w-3xl grid-cols-2 gap-3 md:grid-cols-6">
           {DIMENSIONS.map((item, idx) => (
             <div
               key={item}
@@ -180,14 +181,14 @@ export function ResumeParsePage() {
       )}
 
       {/* 步骤列表 */}
-      <div className="mt-10 w-full max-w-sm space-y-4">
+      <div className="resume-parse-steps mt-10 w-full max-w-sm space-y-4">
         {STEPS.map((step, idx) => {
           const done = idx < currentIdx
           const active = idx === currentIdx
           const isFailed = failed && active
 
           return (
-            <div key={step.key} className="flex items-center gap-4">
+            <div key={step.key} className="resume-parse-step flex items-center gap-4">
               <div
                 className={[
                   'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
@@ -241,7 +242,7 @@ export function ResumeParsePage() {
         <div className="absolute bottom-24 right-6">
           <button
             onClick={handleDevFail}
-            className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
+            className="resume-parse-dev rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
           >
             [DEV] 模拟失败
           </button>

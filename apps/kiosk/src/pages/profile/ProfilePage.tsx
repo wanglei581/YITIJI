@@ -11,7 +11,7 @@ import { SECTIONS } from './profileEntries'
 import type { AIRecord, Entry, IncomingState, ResumeItem, ScanItem } from './profileTypes'
 import './profile-inkpaper.css'
 
-// 「我的」个人资产入口页（参考 miaoda 个人中心：顶部个人信息区 + 白色分区卡片 + 彩色浅底图标）。
+// 「我的」个人资产入口页。
 // 诚实化与合规约束：
 // - 只承诺本次会话记录，不宣称跨会话留存 / 多终端同步等尚未实现的能力。
 // - 不展示假数量；未实现入口用「建设中」标签，会话相关入口用「本次记录」标签。
@@ -26,7 +26,9 @@ export function ProfilePage() {
   const location = useLocation()
   const { user, isLoggedIn, displayName, logout, getToken } = useAuth()
   const incoming = (location.state ?? {}) as IncomingState
-  useInkRipple('.kprofile .entry, .kprofile .chip-row, .kprofile .account, .kprofile .p-btn, .kprofile .p-iconbtn')
+  useInkRipple(
+    '.kprofile.kprofile-lightflow .kp-entry:not(:disabled), .kprofile.kprofile-lightflow .p-btn, .kprofile.kprofile-lightflow .p-iconbtn, .kprofile.kprofile-lightflow .kp-pending-action',
+  )
 
   // ── 本次会话记录（仅来自 location.state，不伪造数量）──────────────
   const [resumes, setResumes] = useState<ResumeItem[]>(() =>
@@ -67,7 +69,6 @@ export function ProfilePage() {
     documents: profileOverview.documents,
   }
   const statsLoading = profileOverview.loading
-
   // ── Toast ────────────────────────────────────────────────────
   // 诚实化：不承诺跨页面资产明细，只提示「已加入本次记录」。
   const [toastMsg, setToastMsg] = useState<string | null>(() => {
@@ -119,9 +120,9 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="kprofile">
+    <div className="kprofile kprofile-lightflow">
       <div className="kp-inner">
-        {/* ── 顶部个人信息区 ── */}
+        <h1 className="kprofile-sr-only">我的</h1>
         <ProfileHeader
           isLoggedIn={isLoggedIn}
           displayName={headerDisplayName}
@@ -137,7 +138,6 @@ export function ProfilePage() {
 
         {isLoggedIn && hasSessionRecords && <PendingTaskBanner onContinue={continuePendingTask} />}
 
-        {/* 提示 toast */}
         {toastMsg && (
           <div className="kp-toast" role="status">
             <KIcon name="check" />
@@ -148,12 +148,6 @@ export function ProfilePage() {
           </div>
         )}
 
-        {/* ── 分区入口 ── */}
-        {SECTIONS.map((section) => (
-          <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
-        ))}
-
-        {/* ── 本次服务记录（仅当本次会话产生了记录时显示，避免空态占位）── */}
         {hasSessionRecords && (
           <ProfileSessionRecords
             resumes={resumes}
@@ -166,7 +160,12 @@ export function ProfilePage() {
           />
         )}
 
-        {/* 合规说明 — 诚实化：我的页只做入口与概览；游客仅本次会话 */}
+        <div className="kp-service-directory">
+          {SECTIONS.map((section) => (
+            <ProfileEntrySection key={section.title} section={section} onTap={handleEntryTap} />
+          ))}
+        </div>
+
         <p className="compliance">
           <KIcon name="shield" />
           {isLoggedIn

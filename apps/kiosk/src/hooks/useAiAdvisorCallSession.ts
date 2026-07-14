@@ -94,6 +94,7 @@ export function useAiAdvisorCallSession() {
   const taskIdRef     = useRef<string>('')
   const destroyedRef  = useRef(false)
   const startedRef    = useRef(false) // 防重复进房
+  const sessionEpochRef = useRef(0)
   const remoteAudioUsersRef = useRef<Set<string>>(new Set())
   const autoplayResumeRef   = useRef<(() => Promise<void>) | null>(null)
 
@@ -137,13 +138,51 @@ export function useAiAdvisorCallSession() {
     }
   }, [])
 
+  // ── 清理 ─────────────────────────────────────────────────
+  const cleanup = useCallback(async () => {
+    if (taskIdRef.current) {
+      stopBackendTask(taskIdRef.current)
+      taskIdRef.current = ''
+    }
+    // 同步取出并立即置空：handleExit 直接调 cleanup 后又切走触发卸载再调一次，
+    // 两个并发 cleanup 若都读到非空 trtc，会把 exitRoom/destroy 各跑两遍（SDK 报
+    // “Cannot read properties of null (reading 'sdkAppId')”善后噪音）。先置空让第二次跳过。
+    const trtc = trtcRef.current
+    trtcRef.current = null
+    if (trtc) {
+      try {
+        await trtc.stopLocalAudio?.()
+        await trtc.exitRoom?.()
+        trtc.destroy?.()
+      } catch { /* ignore */ }
+    }
+    remoteAudioUsersRef.current.clear()
+  }, [])
+
+  // SDK 加载、进房与运行期错误都必须先释放后端任务和房间，再展示可重试错误。
+  // startedRef 同步归零可防 EVENT.ERROR 与外层 catch 对同一故障重复清理。
+  const failCall = useCallback(async (message: string) => {
+    if (!startedRef.current) return
+    startedRef.current = false
+    sessionEpochRef.current += 1
+    await cleanup()
+    if (destroyedRef.current) return
+    setErrMsg(message)
+    setPhase('error')
+  }, [cleanup])
+
   // ── 启动通话（用户点击后调用，满足自动播放策略）──────────
   const startCall = useCallback(async () => {
     if (startedRef.current) return
     startedRef.current = true
+    const sessionEpoch = sessionEpochRef.current + 1
+    sessionEpochRef.current = sessionEpoch
     setPhase('connecting')
 
     try {
+      const isCurrentSession = () =>
+        !destroyedRef.current && startedRef.current && sessionEpochRef.current === sessionEpoch
+
       // 1. 后端启动 AI 会话 + 下发进房凭证（30s 超时，防止后端挂起永久等待）
       const ac = new AbortController()
       const timeoutId = setTimeout(() => ac.abort(), 30_000)
@@ -171,14 +210,14 @@ export function useAiAdvisorCallSession() {
         throw new Error((b as { message?: string }).message ?? `HTTP ${res.status}`)
       }
       const session = await res.json() as SessionResp
-      taskIdRef.current = session.taskId
+      const activeTaskId = session.taskId
       // 用户在「连接中」就离开了：cleanup 已先于 fetch 返回跑过（当时 taskId 还为空，
       // 没发 stop），但后端机器人此刻已进房计费 —— 必须立即补发 stop，防止漏到 60s 超时。
-      if (destroyedRef.current) {
-        stopBackendTask(session.taskId)
-        taskIdRef.current = ''
+      if (!isCurrentSession()) {
+        stopBackendTask(activeTaskId)
         return
       }
+      taskIdRef.current = activeTaskId
 
       // 2. 加载 TRTC SDK
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -189,7 +228,11 @@ export function useAiAdvisorCallSession() {
       } catch {
         throw new Error('trtc-sdk-v5 未安装')
       }
-      if (destroyedRef.current) return
+      if (!isCurrentSession()) {
+        stopBackendTask(activeTaskId)
+        if (taskIdRef.current === activeTaskId) taskIdRef.current = ''
+        return
+      }
 
       const EVENT = TRTC.EVENT
       const trtc  = TRTC.create()
@@ -222,7 +265,7 @@ export function useAiAdvisorCallSession() {
         }
         if (remoteVol > 5) setAiState('speaking')
         else if (localVol > 5) setAiState('listening')
-        else setAiState((s) => (s === 'speaking' ? 'idle' : s))
+        else setAiState('idle')
       })
 
       // 自动播放被拦截 → 提示用户点击恢复
@@ -232,10 +275,8 @@ export function useAiAdvisorCallSession() {
       })
 
       trtc.on(EVENT.ERROR, (e: unknown) => {
-        if (!destroyedRef.current) {
-          setErrMsg(e instanceof Error ? e.message : String(e))
-          setPhase('error')
-        }
+        if (destroyedRef.current) return
+        void failCall(e instanceof Error ? e.message : String(e))
       })
 
       // 3. 进房 + 开麦
@@ -257,37 +298,40 @@ export function useAiAdvisorCallSession() {
       trtc.enableAudioVolumeEvaluation?.(300)
       await restoreRemoteAudio('*')
 
-      if (destroyedRef.current) return
+      if (!isCurrentSession()) {
+        stopBackendTask(activeTaskId)
+        if (taskIdRef.current === activeTaskId) taskIdRef.current = ''
+        try {
+          await trtc.stopLocalAudio?.()
+          await trtc.exitRoom?.()
+          trtc.destroy?.()
+        } catch { /* ignore */ }
+        return
+      }
       setPhase('live')
       setAiState('speaking') // AI 先播欢迎语
     } catch (err: unknown) {
-      if (destroyedRef.current) return
-      setErrMsg(err instanceof Error ? err.message : String(err))
-      setPhase('error')
-      startedRef.current = false
+      if (destroyedRef.current || !startedRef.current || sessionEpochRef.current !== sessionEpoch) return
+      await failCall(err instanceof Error ? err.message : String(err))
     }
-  }, [restoreRemoteAudio])
+  }, [failCall, restoreRemoteAudio])
 
-  // ── 清理 ─────────────────────────────────────────────────
-  const cleanup = useCallback(async () => {
-    if (taskIdRef.current) {
-      stopBackendTask(taskIdRef.current)
-      taskIdRef.current = ''
-    }
-    // 同步取出并立即置空：handleExit 直接调 cleanup 后又切走触发卸载再调一次，
-    // 两个并发 cleanup 若都读到非空 trtc，会把 exitRoom/destroy 各跑两遍（SDK 报
-    // “Cannot read properties of null (reading 'sdkAppId')”善后噪音）。先置空让第二次跳过。
-    const trtc = trtcRef.current
-    trtcRef.current = null
-    if (trtc) {
-      try {
-        await trtc.stopLocalAudio?.()
-        await trtc.exitRoom?.()
-        trtc.destroy?.()
-      } catch { /* ignore */ }
-    }
-    remoteAudioUsersRef.current.clear()
-  }, [])
+  // 用户主动挂断、切换咨询方式或重试时，先释放真实会话，再回到未接通状态。
+  // cleanup 本身幂等；这里同步重置 startedRef，允许下一次明确点击重新发起通话。
+  const endCall = useCallback(async () => {
+    startedRef.current = false
+    sessionEpochRef.current += 1
+    await cleanup()
+    autoplayResumeRef.current = null
+    setPhase('gate')
+    setErrMsg('')
+    setAiState('idle')
+    setMuted(false)
+    setSubtitle('')
+    setElapsed(0)
+    setNeedResume(false)
+    setMicBlocked(false)
+  }, [cleanup])
 
   // ── 恢复播放（AUTOPLAY_FAILED 后用户点击）─────────────────
   const resumePlay = useCallback(async () => {
@@ -322,6 +366,7 @@ export function useAiAdvisorCallSession() {
     startCall,
     resumePlay,
     toggleMute,
+    endCall,
     cleanup,
   }
 }

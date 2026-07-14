@@ -24,7 +24,7 @@ assert.match(scanPanel, /claimingRef\.current = true/)
 assert.match(scanPanel, /if \(claimingRef\.current\) return/)
 assert.match(scanPanel, /claimingRef\.current = true[\s\S]*claimQrLoginViaLocalAgent/)
 assert.match(scanPanel, /本机扫码登录服务未连接，请使用手机号登录/)
-assert.match(scanPanel, /请刷新二维码或使用手机号登录/)
+assert.match(scanPanel, /扫码登录服务不可用，请使用手机号登录/)
 
 assert.match(mobilePage, /重新检查二维码/)
 assert.doesNotMatch(mobilePage, /getMemberAuthDeviceId/)

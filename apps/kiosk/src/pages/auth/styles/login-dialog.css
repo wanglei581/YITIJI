@@ -1,0 +1,368 @@
+.member-login-dialog::backdrop {
+  background: color-mix(in srgb, var(--sd-color-text-strong) 68%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.member-login-dialog {
+  box-sizing: border-box;
+  width: min(760px, calc(100vw - 64px));
+  max-width: 760px;
+  max-height: min(88dvh, 1480px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--sd-color-text-strong);
+  background: transparent;
+  border: 0;
+  border-radius: var(--sd-card-radius, 26px);
+  box-shadow: var(--sd-shadow-touch);
+}
+
+.member-login-dialog[open] {
+  animation: member-dialog-enter 180ms ease-out both;
+}
+
+.member-login-dialog .member-dialog-surface {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+  max-height: min(88dvh, 1480px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--sd-color-text-strong);
+  background: var(--sd-color-surface);
+  border: 1px solid var(--sd-color-line);
+  border-radius: inherit;
+}
+
+body:has(.member-login-dialog[open]) {
+  overflow: hidden;
+}
+
+.member-login-dialog .member-dialog-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 30px 32px 22px;
+  background: color-mix(in srgb, var(--sd-color-surface) 94%, transparent);
+  border-bottom: 1px solid var(--sd-color-line);
+  backdrop-filter: blur(16px);
+}
+
+.member-login-dialog .member-dialog-heading {
+  min-width: 0;
+}
+
+.member-login-dialog .member-dialog-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sd-color-primary);
+  font-size: 14px;
+  font-weight: 780;
+  letter-spacing: 0.04em;
+}
+
+.member-login-dialog .member-dialog-heading h2 {
+  margin: 9px 0 0;
+  color: var(--sd-color-text-strong);
+  font-size: 30px;
+  font-weight: 840;
+  letter-spacing: -0.025em;
+}
+
+.member-login-dialog .member-dialog-heading p {
+  margin: 9px 0 0;
+  color: var(--sd-color-copy);
+  font-size: 15px;
+  font-weight: 620;
+  line-height: 1.65;
+}
+
+.member-login-dialog .member-dialog-close {
+  min-width: 76px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  color: var(--sd-color-copy);
+  background: var(--sd-color-canvas);
+  border: 1px solid var(--sd-color-line);
+  border-radius: 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 760;
+  transition: color 150ms ease, background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.member-login-dialog .member-dialog-close:hover {
+  color: var(--sd-color-primary);
+  background: var(--sd-category-blue-bg);
+  border-color: var(--sd-color-line-strong);
+}
+
+.member-login-dialog .member-dialog-close:active {
+  transform: scale(0.97);
+}
+
+.member-login-dialog .member-dialog-body {
+  padding: 4px 32px 30px;
+}
+
+.member-login-dialog .k-agree {
+  margin-top: 18px;
+}
+
+.member-login-dialog .k-input-target .ph {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-login-dialog .k-cta {
+  min-height: 56px;
+}
+
+.member-login-dialog .member-dialog-separator {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 25px 0 14px;
+  color: var(--sd-color-copy-muted);
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.member-login-dialog .member-dialog-separator::before,
+.member-login-dialog .member-dialog-separator::after {
+  height: 1px;
+  flex: 1;
+  content: '';
+  background: var(--sd-color-line);
+}
+
+.member-login-dialog .member-dialog-guest {
+  width: 100%;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  color: var(--sd-color-primary);
+  background: var(--sd-category-blue-bg);
+  border: 1px solid color-mix(in srgb, var(--sd-color-primary) 24%, var(--sd-color-line));
+  border-radius: 16px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.member-login-dialog .member-dialog-guest:hover {
+  background: color-mix(in srgb, var(--sd-category-blue-bg) 72%, var(--sd-color-surface));
+  border-color: var(--sd-color-primary);
+}
+
+.member-login-dialog .member-dialog-guest:active {
+  transform: scale(0.985);
+}
+
+.member-login-dialog .member-dialog-idle-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  color: var(--sd-color-copy-muted);
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.member-login-dialog .member-dialog-idle-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--sd-color-primary);
+}
+
+@media (width: 390px) and (height: 844px) {
+  .member-login-dialog {
+    inset: auto 0 0;
+    width: 100%;
+    max-width: 390px;
+    max-height: calc(100dvh - 16px);
+    margin: 0;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .member-login-dialog .member-dialog-surface {
+    max-height: calc(100dvh - 16px);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+  }
+
+  .member-login-dialog .member-dialog-header {
+    gap: 12px;
+    padding: 20px 18px 16px;
+  }
+
+  .member-login-dialog .member-dialog-heading h2 {
+    font-size: 25px;
+  }
+
+  .member-login-dialog .member-dialog-heading p {
+    font-size: 13px;
+  }
+
+  .member-login-dialog .member-dialog-close {
+    min-width: 48px;
+    padding-inline: 10px;
+  }
+
+  .member-login-dialog .member-dialog-close span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .member-login-dialog .member-dialog-body {
+    width: 100%;
+    padding: 2px 18px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .member-login-dialog .field-label i {
+    width: 100%;
+  }
+
+  .member-login-dialog .k-input {
+    gap: 8px;
+    padding-left: 13px;
+  }
+
+  .member-login-dialog .k-send {
+    padding-inline: 10px;
+  }
+
+  .member-login-dialog .k-cells {
+    gap: 6px;
+  }
+
+  .member-login-dialog .k-cell {
+    min-height: 56px;
+  }
+
+  .member-login-dialog .k-numpad {
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .member-login-dialog .k-key {
+    min-height: 56px;
+  }
+}
+
+@media (width: 390px) and (max-height: 700px) {
+  .member-login-dialog {
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    max-width: 390px;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .member-login-dialog .member-dialog-surface {
+    height: 100%;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .member-login-dialog .member-dialog-header {
+    padding-top: max(14px, env(safe-area-inset-top));
+  }
+
+  .member-login-dialog .member-dialog-eyebrow,
+  .member-login-dialog .member-dialog-heading p {
+    display: none;
+  }
+
+  .member-login-dialog .member-dialog-heading h2 {
+    margin-top: 5px;
+    font-size: 23px;
+  }
+
+  .member-login-dialog .member-dialog-body {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  .member-login-dialog .k-agree {
+    margin-top: 10px;
+  }
+
+  .member-login-dialog .field-label {
+    margin-top: 16px;
+  }
+}
+
+@media (width: 1080px) and (height: 1920px) {
+  .member-login-dialog {
+    width: 760px;
+    max-height: 1560px;
+  }
+
+  .member-login-dialog .member-dialog-surface {
+    max-height: 1560px;
+  }
+
+  .member-login-dialog .member-dialog-header {
+    padding: 36px 40px 26px;
+  }
+
+  .member-login-dialog .member-dialog-body {
+    padding: 6px 40px 38px;
+  }
+
+  .member-login-dialog .k-key {
+    min-height: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .member-login-dialog,
+  .member-login-dialog *,
+  .member-login-dialog *::before,
+  .member-login-dialog *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@keyframes member-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
