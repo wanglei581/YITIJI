@@ -68,7 +68,59 @@ Get-CimInstance Win32_Service -Filter "Name='AIJobPrintAgent'" | Select-Object N
 
 以下六步需要 Windows 管理员权限，并且先确认空队列；**不随代码合并自动执行**：
 
-1. 只读确认 `active_task_count = 0`，并确认 `SELECT * FROM active_tasks` 返回 `0 rows`。
+1. 只能在**与目标终端使用同一生产或试运营 API/数据库的经授权运维主机**上，先按[《打印扫描 PS-G1~PS-G4 执行清单》§四「服务器候选验证（PS-G1 / PS-G2）」](../acceptance/print-scan-field-execution-runbook.md#四服务器候选验证ps-g1--ps-g2)的既有环境加载方式执行下列只读 gate。`$DATABASE_URL` 必须由该主机的既有受控环境加载；`$TERMINAL_ID` 必须是已在 Admin 或运行配置中确认的目标终端 ID。不得手填、打印或从聊天复制 `DATABASE_URL`；Mac 本地或浏览器查询不能替代。两次查询各自重复 CTE（PostgreSQL 的 CTE 只作用于紧随其后的语句）：
+
+   ```bash
+   psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -v terminal_id="$TERMINAL_ID" <<'SQL'
+   \pset pager off
+
+   WITH active_tasks AS (
+     SELECT
+       pt."id",
+       pt."terminalId",
+       pt."status",
+       pt."claimedAt",
+       pt."claimExpiry",
+       pt."completedAt",
+       pt."createdAt",
+       pt."updatedAt",
+       o."id" AS "orderId",
+       o."payStatus",
+       o."taskStatus",
+       o."amountCents"
+     FROM "PrintTask" pt
+     LEFT JOIN "Order" o ON o."printTaskId" = pt."id"
+     WHERE pt."terminalId" = :'terminal_id'
+       AND pt."status" IN ('pending', 'claimed', 'printing')
+   )
+   SELECT COUNT(*) AS active_task_count FROM active_tasks;
+
+   WITH active_tasks AS (
+     SELECT
+       pt."id",
+       pt."terminalId",
+       pt."status",
+       pt."claimedAt",
+       pt."claimExpiry",
+       pt."completedAt",
+       pt."createdAt",
+       pt."updatedAt",
+       o."id" AS "orderId",
+       o."payStatus",
+       o."taskStatus",
+       o."amountCents"
+     FROM "PrintTask" pt
+     LEFT JOIN "Order" o ON o."printTaskId" = pt."id"
+     WHERE pt."terminalId" = :'terminal_id'
+       AND pt."status" IN ('pending', 'claimed', 'printing')
+   )
+   SELECT *
+   FROM active_tasks
+   ORDER BY "createdAt" ASC;
+   SQL
+   ```
+
+   仅当输出同时为 `active_task_count = 0` 且 `SELECT * FROM active_tasks` 为 `0 rows` 时，才可继续 BOM / 服务重启步骤；否则停止，不创建、领取、处置或打印任务。
 2. 备份当前 Agent 配置与 token 文件；不得把其内容截图、粘贴或发送到聊天。
 3. 只在配置文件开头添加 BOM，除此以外不改配置。
 4. 重启 `AIJobPrintAgent` 服务。
