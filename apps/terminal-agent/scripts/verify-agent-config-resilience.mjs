@@ -23,32 +23,54 @@ const {
 const diagnostics = require(join(agentRoot, 'src/agent/startup-diagnostics.ts'))
 
 const configManagerSource = fs.readFileSync(path.join(agentRoot, 'src/agent/config-manager.ts'), 'utf8')
+const atomicWriterMatch = configManagerSource.match(/function writeTextAtomically\([\s\S]*?\n}\n/s)
+assert.ok(atomicWriterMatch, 'config manager must define writeTextAtomically')
+const atomicWriter = atomicWriterMatch[0]
 assert.match(
-  configManagerSource,
+  atomicWriter,
   /path\.dirname\(filePath\)/,
   'atomic writes must create their temporary file in the primary config directory',
 )
 assert.match(
-  configManagerSource,
+  atomicWriter,
   /path\.join\(dir,\s*/,
   'atomic writes must derive their temporary file path from that directory',
 )
+
+const atomicWriteSteps = [
+  ['open', "fs.openSync(tempPath, 'wx'"],
+  ['write', 'fs.writeFileSync'],
+  ['fsync', 'fs.fsyncSync'],
+  ['close', 'fs.closeSync'],
+  ['rename', 'fs.renameSync(tempPath, filePath)'],
+]
+let previousStepIndex = -1
+for (const [step, source] of atomicWriteSteps) {
+  const stepIndex = atomicWriter.indexOf(source)
+  assert.notEqual(stepIndex, -1, `atomic writer must ${step}`)
+  assert.ok(stepIndex > previousStepIndex, `atomic writer must ${step} after the preceding step`)
+  previousStepIndex = stepIndex
+}
+
+const cleanupIndex = atomicWriter.indexOf('fs.rmSync(tempPath')
+assert.ok(cleanupIndex > previousStepIndex, 'atomic writer must clean up its temp file after rename')
 assert.match(
-  configManagerSource,
-  /fs\.openSync\(tempPath,\s*['"]wx['"]/,
-  'atomic writes must create the temporary file exclusively',
-)
-assert.match(configManagerSource, /fs\.fsyncSync\(/, 'atomic writes must fsync before replacement')
-assert.match(
-  configManagerSource,
-  /fs\.renameSync\(tempPath,\s*filePath\)/,
-  'atomic writes must replace the primary config with rename',
-)
-assert.match(
-  configManagerSource,
+  atomicWriter,
   /finally\s*\{[\s\S]*?fs\.rmSync\(tempPath/,
   'atomic writes must remove the temporary file in finally cleanup',
 )
+
+const writeValidatedMatch = configManagerSource.match(/function writeValidatedConfigAt\([\s\S]*?\n}\n/s)
+assert.ok(writeValidatedMatch, 'config manager must define writeValidatedConfigAt')
+const writeValidatedConfig = writeValidatedMatch[0]
+const primaryParseIndex = writeValidatedConfig.indexOf('parseConfigText(fs.readFileSync(configPath')
+const backupWriteIndex = writeValidatedConfig.indexOf('writeTextAtomically(lastKnownGoodPath')
+const primaryWriteIndex = writeValidatedConfig.indexOf('writeTextAtomically(configPath')
+assert.notEqual(primaryParseIndex, -1, 'must parse the existing primary config before any write')
+assert.notEqual(backupWriteIndex, -1, 'must write the last-known-good backup through the atomic writer')
+assert.notEqual(primaryWriteIndex, -1, 'must write the primary config through the atomic writer')
+assert.ok(primaryParseIndex < backupWriteIndex, 'must parse primary config before writing its backup')
+assert.ok(backupWriteIndex < primaryWriteIndex, 'must write the backup before replacing the primary config')
 
 const valid = {
   apiBaseUrl: 'https://api.example.test/api/v1',
