@@ -26,6 +26,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isHealthyPrinterStatus } from './printer-status'
 import { AuditService } from '../audit/audit.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
@@ -1405,7 +1406,7 @@ export class TerminalsService implements OnModuleInit {
 function toAdminPrinterStatus(online: boolean, printerStatus: string | null): AdminPrinterView['status'] {
   if (!online) return 'offline'
   if (!printerStatus || printerStatus === 'unknown') return 'offline'
-  if (printerStatus === 'ok' || printerStatus === 'ready' || printerStatus === 'idle') return 'online'
+  if (isHealthyPrinterStatus(printerStatus)) return 'online'
   return 'error'
 }
 

@@ -19,8 +19,33 @@ import { AdminOpsService } from '../src/admin-ops/admin-ops.service'
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
 
+async function verifyHealthyPrinterStatusesDoNotAlert(): Promise<void> {
+  const now = new Date()
+  for (const printerStatus of ['ok', 'ready', 'idle']) {
+    const service = new AdminOpsService({
+      terminal: {
+        findMany: async () => [{
+          id: `term_vop_healthy_${printerStatus}`,
+          terminalCode: `VOP-HEALTHY-${printerStatus}`,
+          registeredAt: now,
+          heartbeats: [{ createdAt: now, printerStatus }],
+        }],
+      },
+      printTask: { findMany: async () => [] },
+    } as unknown as PrismaService)
+    const { data } = await service.listDerivedAlerts()
+    if (data.some((alert) => alert.type === 'printer_issue')) {
+      fail(`3. 健康打印机状态 ${printerStatus} 不应产生 printer_issue 告警`)
+    }
+  }
+  pass('3a. 健康打印机状态(ok/ready/idle)不产生 printer_issue 告警')
+}
+
 async function main() {
   console.log('\n=== 阶段1E Admin 运营视图验证 ===')
+
+  await verifyHealthyPrinterStatusesDoNotAlert()
+  if (process.env.ADMIN_OPS_ALERT_HEALTH_ONLY === '1') return
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
