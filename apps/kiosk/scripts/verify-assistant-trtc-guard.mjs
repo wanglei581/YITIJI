@@ -38,7 +38,13 @@ const viteConfig = read('vite.config.ts')
 const assistantPage = read('src/pages/assistant/AssistantPage.tsx')
 const callPanel = read('src/pages/assistant/AssistantCallPanel.tsx')
 const callHook = read('src/hooks/useAiAdvisorCallSession.ts')
-const callStyles = read('src/pages/assistant/assistant-lightflow-call.css')
+const callStyles = [
+  'src/pages/assistant/assistant-lightflow-call.css',
+  'src/pages/assistant/assistant-lightflow-call-shell.css',
+  'src/pages/assistant/assistant-lightflow-call-gate.css',
+  'src/pages/assistant/assistant-lightflow-call-live.css',
+  'src/pages/assistant/assistant-lightflow-call-responsive.css',
+].map(read).join('\n')
 const envTypes = read('src/vite-env.d.ts')
 const envExample = read('.env.example')
 const kioskPkg = JSON.parse(read('package.json'))
