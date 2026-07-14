@@ -13,6 +13,12 @@ import { createPrismaClient, dbKindOf } from '../src/prisma/create-client'
 import { ScanTaskReaperTask } from '../src/scan-tasks/scan-task-reaper.task'
 import { ScanTasksService } from '../src/scan-tasks/scan-tasks.service'
 import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.dto'
+// B1-11 follow-up：真实 DB 端到端跑一遍 deliverScanFile() 的内容级去重护栏，需要真实
+// AuditService / StorageService / FilesService（而不是本文件的 FakeFilesService）——
+// 见 assertRealDbDedupGuardClosesCrossUserLeak() 顶部注释说明为什么必须是这三个真实服务。
+import { AuditService } from '../src/audit/audit.service'
+import { StorageService } from '../src/storage/storage.service'
+import { FilesService } from '../src/files/files.service'
 
 // Task 10 能力门禁直通 stub：门禁真实语义由 verify:admin-print-scan 覆盖，
 // 本脚本聚焦扫描任务状态机，不重复测门禁。
@@ -439,6 +445,195 @@ async function assertRealDbPartialUniqueIndex(dbUrl: string, label: 'sqlite' | '
     }
   } finally {
     await client.$disconnect()
+  }
+}
+
+/**
+ * B1-11 follow-up：真实 DB 端到端验证 deliverScanFile() 的内容级去重护栏本体。
+ *
+ * 背景（诚实澄清，纠正 c325b2ff 提交信息里的失实表述）：该提交声称做过"a standalone
+ * real-SQLite smoke check of the actual Prisma query shapes used by the dedup guard"，
+ * 但实际diff里从来没有这项测试——本文件此前的两个 real-DB 函数
+ * （assertRealDbMatchedHeartbeatClosesRace / assertRealDbPartialUniqueIndex）都不曾调用过
+ * deliverScanFile()，B1-11 新增的全部 5 条去重测试（见 main() 里标注"B1-11"的几个代码块）
+ * 只用了本文件顶部的 FakePrisma/makeService()。FakePrisma.scanTask.findMany /
+ * FakePrisma.fileObject.findFirst 是手写的近似实现，只证明服务层判别逻辑本身通了，
+ * 不能证明 deliverScanFile() 里实际写的这两条 Prisma 查询语法（`fileId: { not: null }`
+ * 搭配 `updatedAt: { gt }`，以及 `id: { in: [...] }` 搭配 `sha256` 等值比较）对真实 Prisma
+ * 查询引擎/真实数据库语义确实正确——这正是本函数要补的洞。
+ *
+ * 因此这里必须用真实 PrismaClient（隔离临时 SQLite，沿用 assertRealDbPartialUniqueIndex()
+ * 的 mkdtempSync + migrate deploy 手法）+ 真实 AuditService + 真实 StorageService（local
+ * 驱动，FILE_STORAGE_DIR 指向独立临时目录，绝不写入仓库真实 storage/）+ 真实 FilesService
+ * + 真实（未 mock）ScanTasksService，完整跑一遍 deliverScanFile() 本体，而不是只测服务层
+ * 判别函数。三条断言：
+ *
+ *   1) 跨用户场景（本次修复要关闭的真实威胁模型）：member_a 的投递真正建档完成
+ *      （FileObject 落库、ScanTask.fileId 落库），随后同一物理终端出现属于 member_b 的
+ *      全新等待任务；member_a 的同一份字节内容重试投递，必须被真实 Prisma 查询正确识别
+ *      为重复并拒绝（SCAN_FILE_ALREADY_DELIVERED），member_b 的任务必须原封不动保持
+ *      waiting、fileId 仍为 null——这就是"一个用户的身份证扫描件被错误地挂到另一个用户
+ *      任务上"这条 PII 泄漏路径。
+ *   2) 不同内容不得被误伤：紧接着用真正不同的字节再投递一次，必须正常成功匹配到 member_b
+ *      的任务——证明真实 Prisma 的 sha256 等值比较是真的按内容甄别，不是"同终端有历史
+ *      记录就全部拒绝"。
+ *   3) 直接对着真实 DB，用与 deliverScanFile() 里完全相同的过滤形状单独重放一次
+ *      scanTask.findMany({ where: { terminalId, fileId: { not: null }, updatedAt: { gt } } })
+ *      与 fileObject.findFirst({ where: { id: { in: [...] }, sha256 } })，断言返回的行数/
+ *      内容与预期精确一致——这是 FakePrisma 永远证明不了的一层：写的 Prisma 过滤语法本身
+ *      对真实查询引擎是否语义正确。
+ */
+async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise<void> {
+  const { client } = createPrismaClient(dbUrl)
+  await client.$connect()
+
+  const tmpStorageDir = mkdtempSync(path.join(tmpdir(), 'verify-scan-tasks-realdb-dedup-storage-'))
+  const originalStorageDir = process.env['FILE_STORAGE_DIR']
+  process.env['FILE_STORAGE_DIR'] = tmpStorageDir
+
+  const terminalId = `realdb_dedup_${randomBytes(4).toString('hex')}`
+  const endUserAId = `realdb_dedup_member_a_${randomBytes(4).toString('hex')}`
+  const endUserBId = `realdb_dedup_member_b_${randomBytes(4).toString('hex')}`
+
+  try {
+    await client.terminal.create({
+      data: {
+        id: terminalId,
+        terminalCode: `RDB-DEDUP-${randomBytes(3).toString('hex')}`,
+        agentToken: randomBytes(16).toString('hex'),
+        deviceFingerprint: 'verify-scan-tasks-realdb-dedup-fixture',
+        enabled: true,
+      },
+    })
+    // 真实 EndUser 行（而不是任意字符串）：ScanTask.endUserId / FileObject.endUserId
+    // 都有 FK → EndUser，且这样才能真实还原"两个不同用户"这条威胁模型的字面意思。
+    await client.endUser.create({
+      data: { id: endUserAId, phoneHash: `hash_${endUserAId}`, phoneEnc: 'enc_a' },
+    })
+    await client.endUser.create({
+      data: { id: endUserBId, phoneHash: `hash_${endUserBId}`, phoneEnc: 'enc_b' },
+    })
+
+    const realPrisma = client as never
+    const audit = new AuditService(realPrisma)
+    const storage = new StorageService()
+    const files = new FilesService(realPrisma, audit, storage)
+    const service = new ScanTasksService(realPrisma, files, passthroughCapabilities)
+
+    const bufferA = tinyPdf()
+    const contentHashA = createHash('sha256').update(bufferA).digest('hex')
+
+    // member_a 真实投递，真实建档完成（真实 upload() 写真实 FileObject 行）。
+    const taskA = await service.create({ scanType: 'document', terminalId }, endUserAId)
+    const deliveredA = await service.deliverScanFile({
+      terminalId,
+      buffer: bufferA,
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
+    assert.equal(deliveredA.scanTaskId, taskA.scanTaskId, 'real DB: first delivery must match taskA')
+
+    const uploadedFileRow = await client.fileObject.findUnique({ where: { id: deliveredA.fileId } })
+    assert.equal(
+      uploadedFileRow?.sha256,
+      contentHashA,
+      'real DB sanity precondition: the real FilesService.upload() must have stored the true content sha256 (not a placeholder)',
+    )
+
+    // member_b 在同一物理终端开了一个全新等待任务——deliverScanFile() 匹配"该终端最早一条
+    // waiting 任务"完全不知道下一次投递的字节属于谁，这正是去重护栏要挡住的窗口。
+    const taskB = await service.create({ scanType: 'document', terminalId }, endUserBId)
+
+    let caught: unknown
+    try {
+      await service.deliverScanFile({ terminalId, buffer: bufferA, filename: 'a-retry.pdf', mimeType: 'application/pdf' })
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(
+      caught instanceof ConflictException,
+      `real DB: duplicate-content retry must be rejected by the real Prisma dedup query, got ${(caught as Error)?.constructor?.name}`,
+    )
+    const body = (caught as ConflictException).getResponse() as { error?: { code?: string } }
+    assert.equal(
+      body.error?.code,
+      'SCAN_FILE_ALREADY_DELIVERED',
+      'real DB: duplicate rejection must carry the specific SCAN_FILE_ALREADY_DELIVERED code',
+    )
+
+    const taskBAfterDuplicateAttempt = await client.scanTask.findUnique({ where: { id: taskB.scanTaskId } })
+    assert.equal(
+      taskBAfterDuplicateAttempt?.status,
+      'waiting',
+      'real DB: member_b task must remain completely untouched — this is the cross-user PII leak the fix closes',
+    )
+    assert.equal(
+      taskBAfterDuplicateAttempt?.fileId,
+      null,
+      'real DB: member_b task must never end up with member_a content attached',
+    )
+
+    // 不同内容不得被误伤：真实的 sha256 比对必须真的按字节甄别，不是"同终端有过成功
+    // 投递就全部拒绝"。
+    const differentBuffer = Buffer.from('%PDF-1.4\nreal DB genuinely different content, not a duplicate\n%%EOF\n', 'latin1')
+    const deliveredB = await service.deliverScanFile({
+      terminalId,
+      buffer: differentBuffer,
+      filename: 'b.pdf',
+      mimeType: 'application/pdf',
+    })
+    assert.equal(
+      deliveredB.scanTaskId,
+      taskB.scanTaskId,
+      'real DB: genuinely different content must proceed to normal matching, not be blocked by the dedup guard',
+    )
+
+    // 直接对着真实 DB 单独重放一次与 deliverScanFile() 里逐字相同形状的查询——证明写的
+    // Prisma 过滤语法本身对真实查询引擎语义正确，不只是"结构上能编译过"。
+    const recentlyDeliveredForTerminal = await client.scanTask.findMany({
+      where: {
+        terminalId,
+        fileId: { not: null },
+        updatedAt: { gt: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+      },
+      select: { fileId: true },
+    })
+    assert.equal(
+      recentlyDeliveredForTerminal.length,
+      2,
+      `real DB: the exact findMany() filter shape used by deliverScanFile() must return exactly the 2 completed rows for this terminal (taskA + taskB), got ${recentlyDeliveredForTerminal.length}`,
+    )
+    const candidateFileIds = recentlyDeliveredForTerminal
+      .map((t) => t.fileId)
+      .filter((id): id is string => id !== null)
+
+    const dupMatch = await client.fileObject.findFirst({
+      where: { id: { in: candidateFileIds }, sha256: contentHashA },
+      select: { id: true },
+    })
+    assert.equal(
+      dupMatch?.id,
+      deliveredA.fileId,
+      'real DB: fileObject.findFirst() with the exact filter shape must resolve back to the original member_a upload',
+    )
+
+    const noMatchForUnrelatedHash = await client.fileObject.findFirst({
+      where: { id: { in: candidateFileIds }, sha256: 'f'.repeat(64) },
+      select: { id: true },
+    })
+    assert.equal(noMatchForUnrelatedHash, null, 'real DB: an unrelated sha256 must not match any candidate row')
+  } finally {
+    await client.scanTask.deleteMany({ where: { terminalId } }).catch(() => undefined)
+    await client.fileObject.deleteMany({ where: { endUserId: { in: [endUserAId, endUserBId] } } }).catch(() => undefined)
+    await client.endUser.deleteMany({ where: { id: { in: [endUserAId, endUserBId] } } }).catch(() => undefined)
+    await client.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await client.$disconnect()
+    if (originalStorageDir === undefined) {
+      delete process.env['FILE_STORAGE_DIR']
+    } else {
+      process.env['FILE_STORAGE_DIR'] = originalStorageDir
+    }
+    rmSync(tmpStorageDir, { recursive: true, force: true })
   }
 }
 
@@ -1532,6 +1727,30 @@ async function main(): Promise<void> {
       taskB.scanTaskId,
       'content-hash dedup intentionally does NOT cover the SCAN_TASK_STATE_CHANGED scenario (fileId was never populated) — this gap is closed by the Agent-side immediate-quarantine fix instead, not here',
     )
+  }
+
+  {
+    // B1-11 follow-up：真实 DB 端到端验证 deliverScanFile() 的内容级去重护栏本体
+    // （见 assertRealDbDedupGuardClosesCrossUserLeak() 顶部注释——原提交声称做过这项验证，
+    // 实际从未落地，这里补上真正的）。沿用 assertRealDbPartialUniqueIndex() 同款手法：
+    // 独立临时 SQLite 文件 + 真实 `prisma migrate deploy`，全程不触碰进程当前的
+    // DATABASE_URL / 共享 dev.db，跑完即删。
+    const apiRoot = path.resolve(__dirname, '..')
+    const tmpDir = mkdtempSync(path.join(tmpdir(), 'verify-scan-tasks-realdb-dedup-'))
+    const dbPath = path.join(tmpDir, 'verify.db')
+    const dbUrl = `file:${dbPath}`
+
+    try {
+      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy'], {
+        cwd: apiRoot,
+        env: { ...process.env, DATABASE_URL: dbUrl },
+        stdio: 'pipe',
+      })
+
+      await assertRealDbDedupGuardClosesCrossUserLeak(dbUrl)
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
   }
 
   console.log('PASS scan tasks verification')
