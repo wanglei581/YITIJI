@@ -167,6 +167,12 @@ function isExplicitCodePaymentFailure(message: string): boolean {
   return message.includes('40004') && [...FINAL_CODE_PAYMENT_SUB_CODES].some((subCode) => message.includes(subCode))
 }
 
+/** 当面付 timeout_express 只接受相对时长；向上取整，确保渠道截止时刻不早于屏幕倒计时。 */
+function alipayTimeoutExpress(expiresAt: Date): string {
+  const remainingMs = expiresAt.getTime() - Date.now()
+  return `${Math.max(1, Math.ceil(remainingMs / 60_000))}m`
+}
+
 export class AlipayProvider implements PaymentProvider {
   readonly channel = 'alipay' as const
   private readonly cfg: AlipayProviderConfig
@@ -259,6 +265,8 @@ export class AlipayProvider implements PaymentProvider {
         out_trade_no: input.attemptId, // 服务端 cuid，notify 经 out_trade_no 找回 attempt
         total_amount: centsToYuan(input.amountCents),
         subject: `打印服务订单 ${input.orderNo}`,
+        // 与服务端 expiresAt 对齐，避免 Kiosk 判过期后旧二维码仍可继续付款。
+        timeout_express: alipayTimeoutExpress(input.expiresAt),
         // passback_params 原样回带 —— 业务层全字段匹配 orderId 的通道侧来源（协议要求 URL 编码）
         passback_params: encodeURIComponent(JSON.stringify({ orderId: input.orderId })),
       },
@@ -418,6 +426,29 @@ export class AlipayProvider implements PaymentProvider {
     if (status === 'WAIT_BUYER_PAY') return { status: 'pending', channelTxnNo: null, amountCents: null }
     if (status === 'TRADE_CLOSED') return { status: 'closed', channelTxnNo: null, amountCents: null }
     return { status: 'unknown', channelTxnNo: null, amountCents: null }
+  }
+
+  /**
+   * 当面付屏上码到期收敛：先查单，仍待付款才关闭；任何不可判异常都交回业务层保持互斥。
+   * 关闭与支付成功竞态时重新查单，绝不根据本地倒计时臆测渠道终态。
+   */
+  async closeExpiredQrPayment(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult> {
+    const queried = await this.queryPayment(input)
+    if (queried.status !== 'pending') return queried
+    try {
+      await this.call('alipay.trade.close', { out_trade_no: input.attemptId })
+      return { status: 'closed', channelTxnNo: null, amountCents: null }
+    } catch (error) {
+      const message = (error as Error).message ?? ''
+      if (
+        message.includes('ACQ.TRADE_HAS_SUCCESS') ||
+        message.includes('ACQ.TRADE_HAS_CLOSE') ||
+        message.includes('ACQ.TRADE_STATUS_ERROR')
+      ) {
+        return this.queryPayment(input)
+      }
+      throw error
+    }
   }
 
   /**

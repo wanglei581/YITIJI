@@ -53,9 +53,9 @@ const UNAUTHORIZED_CALLBACK_CODES = new Set([
   'CALLBACK_MERCHANT_MISMATCH', // 跨商户/跨应用报文错投
 ])
 
-function ttlSecondsFromEnv(key: string, fallback: number): number {
+function ttlSecondsFromEnv(key: string, fallback: number, minimumSeconds = 30): number {
   const raw = Number(process.env[key])
-  if (!Number.isFinite(raw) || raw < 30 || raw > 24 * 3600) return fallback
+  if (!Number.isFinite(raw) || raw < minimumSeconds || raw > 24 * 3600) return fallback
   return Math.floor(raw)
 }
 
@@ -89,6 +89,15 @@ export interface CodePaymentConvergenceResult {
   failed: number
 }
 
+/** 已过期的屏上二维码释放：先查单/关单，仅渠道确认终态后释放；不伪造退款。 */
+export interface QrPaymentExpiryReleaseResult {
+  scanned: number
+  released: number
+  closed: number
+  skipped: number
+  failed: number
+}
+
 export interface PayStatusView {
   orderId: string
   orderNo: string
@@ -113,7 +122,8 @@ export interface PayStatusView {
 export class OnlinePaymentService {
   /** 回调 nonce 防重放（5min 窗口，与 W3 Webhook 同一实现）。 */
   private readonly replay = new ReplayGuard()
-  private readonly qrTtlSeconds = ttlSecondsFromEnv('PAYMENT_QR_TTL_SECONDS', DEFAULT_QR_TTL_SECONDS)
+  // 微信 Native 的 time_expire 不得早于下单后 1 分钟；统一收紧所有屏上码，避免本地/渠道有效期分叉。
+  private readonly qrTtlSeconds = ttlSecondsFromEnv('PAYMENT_QR_TTL_SECONDS', DEFAULT_QR_TTL_SECONDS, 60)
   private readonly orderTtlSeconds = ttlSecondsFromEnv('PAYMENT_ORDER_TTL_SECONDS', DEFAULT_ORDER_TTL_SECONDS)
 
   /**
@@ -175,6 +185,8 @@ export class OnlinePaymentService {
     if (order.amountCents <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
 
     order = await this.applyLazyExpiry(order)
+    const qrExpiry = await this.convergeExpiredScreenQrAttempt(order)
+    order = qrExpiry.order
     if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
     if (order.payStatus === 'closed') throw new BadRequestException('ORDER_CLOSED')
     if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') {
@@ -232,6 +244,7 @@ export class OnlinePaymentService {
       orderNo: order.orderNo,
       attemptId: attempt.id,
       amountCents: order.amountCents,
+      expiresAt: attemptExpiresAt,
     })
     const pendingAttempt = await this.prisma.paymentAttempt.update({
       where: { id: attempt.id },
@@ -273,6 +286,8 @@ export class OnlinePaymentService {
     if (order.amountCents <= 0) throw new BadRequestException('PAY_NOT_REQUIRED')
 
     order = await this.applyLazyExpiry(order)
+    const qrExpiry = await this.convergeExpiredScreenQrAttempt(order)
+    order = qrExpiry.order
     if (order.payStatus === 'paid') throw new BadRequestException('ORDER_ALREADY_PAID')
     if (order.payStatus === 'closed') throw new BadRequestException('ORDER_CLOSED')
     if (order.payStatus !== 'unpaid' && order.payStatus !== 'paying') throw new BadRequestException('ORDER_INVALID_TRANSITION')
@@ -281,7 +296,12 @@ export class OnlinePaymentService {
     const existing = await this.prisma.paymentAttempt.findFirst({
       where: {
         orderId: order.id,
-        status: { in: ['created', 'pending', 'expired'] },
+        OR: [
+          { status: { in: ['created', 'pending'] } },
+          // 付款码过期不代表渠道绝对未扣款，必须先查单；屏上二维码只有在
+          // convergeExpiredScreenQrAttempt 已获渠道关单确认后才会退出此互斥集合。
+          { status: 'expired', qrCodeContent: null, prepayId: { not: null } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -503,6 +523,43 @@ export class OnlinePaymentService {
   }
 
   /**
+   * 屏上二维码超时收敛：Kiosk 不在线时也会查单并关闭已超时动态码。
+   * 只有渠道确认 closed / failed 才释放本地锁；unknown / pending 保持互斥，绝不伪造失败或退款。
+   */
+  async releaseExpiredQrPayments({ limit }: { limit: number }): Promise<QrPaymentExpiryReleaseResult> {
+    const boundedLimit = Math.max(1, Math.min(limit, 100))
+    const candidates = await this.prisma.paymentAttempt.findMany({
+      where: {
+        qrCodeContent: { not: null },
+        status: { in: ['created', 'pending'] },
+        expiresAt: { lt: new Date() },
+      },
+      select: { orderId: true },
+      orderBy: { createdAt: 'asc' },
+      take: boundedLimit * 5,
+    })
+    const result: QrPaymentExpiryReleaseResult = { scanned: 0, released: 0, closed: 0, skipped: 0, failed: 0 }
+    const orderIds = [...new Set(candidates.map((candidate) => candidate.orderId))].slice(0, boundedLimit)
+    for (const orderId of orderIds) {
+      result.scanned += 1
+      try {
+        const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+        if (!order || order.payStatus === 'paid') {
+          result.skipped += 1
+          continue
+        }
+        const settled = await this.convergeExpiredScreenQrAttempt(order)
+        if (settled.outcome === 'released') result.released += 1
+        else if (settled.outcome === 'closed') result.closed += 1
+        else result.skipped += 1
+      } catch {
+        result.failed += 1
+      }
+    }
+    return result
+  }
+
+  /**
    * 渠道回调入口：验签 → nonce 防重放 → 全字段匹配 → 金额一致 → 幂等入账/失败落库。
    * 任何一步失败都拒绝并保持订单不动；重复合法回调幂等返回，不重复副作用。
    */
@@ -682,15 +739,28 @@ export class OnlinePaymentService {
   }
 
   /**
-   * 惰性过期（不引入后台任务）：
-   * 1) 过期的 created/pending 尝试 → expired；
+   * 过期收敛（请求路径惰性调用）：
+   * 1) 已有渠道受理标识的过期付款码尝试 → expired；已有屏上二维码必须由
+   *    convergeExpiredScreenQrAttempt 查单/关单确认后才可过期；未取得二维码的 created
+   *    尝试不可能被顾客扫描，可在本地到期后安全释放；
    * 2) 订单超时（expiresAt 已过且仍 unpaid/paying）→ closed；
-   * 3) paying 但已无未过期 created/pending 尝试 → 回 unpaid（可重新出码）。
+   * 3) paying 但已无任何 created/pending 尝试 → 回 unpaid（可重新出码）。
    */
   private async applyLazyExpiry(order: OrderRecord): Promise<OrderRecord> {
     const now = new Date()
     await this.prisma.paymentAttempt.updateMany({
-      where: { orderId: order.id, status: { in: ['created', 'pending'] }, expiresAt: { lt: now } },
+      where: {
+        orderId: order.id,
+        status: { in: ['created', 'pending'] },
+        expiresAt: { lt: now },
+        OR: [
+          // 付款码已有渠道受理标识，仍须由主动查单路径确认。
+          { qrCodeContent: null, prepayId: { not: null } },
+          // 屏上码预下单抛错且没有拿到二维码：顾客没有可扫码内容，渠道 time_expire 已限制，
+          // 到本地有效期后可以安全解除本地锁，避免滞留到订单 15 分钟超时。
+          { status: 'created', qrCodeContent: null, prepayId: null },
+        ],
+      },
       data: { status: 'expired' },
     })
 
@@ -704,7 +774,8 @@ export class OnlinePaymentService {
 
     if (order.payStatus === 'paying') {
       const alive = await this.prisma.paymentAttempt.count({
-        where: { orderId: order.id, status: { in: ['created', 'pending'] }, expiresAt: { gt: now } },
+        // created/pending 均可能是渠道结果未知态；未经渠道确认绝不能只因本地 expiresAt 释放订单。
+        where: { orderId: order.id, status: { in: ['created', 'pending'] } },
       })
       if (alive === 0) {
         await this.prisma.order.updateMany({ where: { id: order.id, payStatus: 'paying' }, data: { payStatus: 'unpaid' } })
@@ -712,6 +783,92 @@ export class OnlinePaymentService {
       }
     }
     return order
+  }
+
+  /**
+   * 已到本服务二维码有效期的屏上码，必须由渠道账本确认后才能释放。
+   * `pending` / `unknown`（含网络、验签、渠道异常）都保留原订单和 Attempt 互斥锁，
+   * 以免旧二维码仍可扣款时又创建另一笔二维码或付款码。
+   */
+  private async convergeExpiredScreenQrAttempt(
+    order: OrderRecord,
+  ): Promise<{ order: OrderRecord; outcome: 'paid' | 'released' | 'closed' | 'pending' | 'skipped' }> {
+    const attempt = await this.prisma.paymentAttempt.findFirst({
+      where: {
+        orderId: order.id,
+        qrCodeContent: { not: null },
+        status: { in: ['created', 'pending'] },
+        expiresAt: { lt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!attempt || order.payStatus === 'paid') return { order, outcome: 'skipped' }
+
+    const provider = this.registry.get(attempt.channel)
+    if (!provider?.closeExpiredQrPayment) return { order, outcome: 'pending' }
+
+    const channelResult = await provider.closeExpiredQrPayment({ attemptId: attempt.id, orderId: order.id })
+    if (channelResult.status === 'paid') {
+      const freshOrder = await this.requireOrder(order.id)
+      if (freshOrder.payStatus === 'paid') return { order: freshOrder, outcome: 'paid' }
+      if (
+        channelResult.channelTxnNo &&
+        channelResult.amountCents !== null &&
+        channelResult.amountCents === attempt.amountCents &&
+        channelResult.amountCents === freshOrder.amountCents
+      ) {
+        await this.handleSuccess(attempt.channel as PaymentChannel, attempt, freshOrder, {
+          channelTxnNo: channelResult.channelTxnNo,
+        })
+        await this.audit.write({
+          actorId: null,
+          actorRole: 'system',
+          action: 'payment.qr_expiry_reconciled_paid',
+          targetType: 'payment_attempt',
+          targetId: attempt.id,
+          payload: { orderId: order.id, channel: attempt.channel, channelTxnNo: channelResult.channelTxnNo },
+        })
+        return { order: await this.requireOrder(order.id), outcome: 'paid' }
+      }
+      await this.audit.write({
+        actorId: null,
+        actorRole: 'system',
+        action: 'payment.qr_expiry_amount_mismatch',
+        targetType: 'payment_attempt',
+        targetId: attempt.id,
+        payload: {
+          orderId: order.id,
+          channel: attempt.channel,
+          queriedAmountCents: channelResult.amountCents,
+          expectedAmountCents: order.amountCents,
+        },
+      })
+      return { order: freshOrder, outcome: 'pending' }
+    }
+
+    if (channelResult.status !== 'closed' && channelResult.status !== 'failed') {
+      return { order, outcome: 'pending' }
+    }
+
+    const closed = await this.prisma.paymentAttempt.updateMany({
+      where: { id: attempt.id, status: { in: ['created', 'pending'] } },
+      data: { status: 'expired', failReason: null },
+    })
+    const refreshed = await this.requireOrder(order.id)
+    if (closed.count === 0) return { order: refreshed, outcome: refreshed.payStatus === 'paid' ? 'paid' : 'skipped' }
+
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'system',
+      action: 'payment.qr_expiry_channel_closed',
+      targetType: 'payment_attempt',
+      targetId: attempt.id,
+      payload: { orderId: order.id, channel: attempt.channel, channelStatus: channelResult.status },
+    })
+    const settledOrder = await this.applyLazyExpiry(refreshed)
+    if (settledOrder.payStatus === 'unpaid') return { order: settledOrder, outcome: 'released' }
+    if (settledOrder.payStatus === 'closed') return { order: settledOrder, outcome: 'closed' }
+    return { order: settledOrder, outcome: 'skipped' }
   }
 
   private async requireOrder(orderId: string): Promise<OrderRecord> {

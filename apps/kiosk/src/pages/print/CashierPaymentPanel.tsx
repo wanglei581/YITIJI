@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
 import { Button, Card } from '@ai-job-print/ui'
-import { PAY_CHANNEL_LABEL, type CashierView } from './cashierStatus'
+import { PAY_CHANNEL_LABEL, type AttemptPaymentMethod, type CashierView } from './cashierStatus'
 
 // 生产包不能含 DEV 沙箱按钮文案或模拟支付入口；Vite 会在 production 将此分支完全裁掉。
 const DevSandboxControls = import.meta.env.DEV ? lazy(() => import('./DevSandboxControls')) : null
@@ -29,6 +29,7 @@ const TONE_BOX: Record<CashierView['tone'], string> = {
 
 interface CashierPaymentPanelProps {
   paymentMethod: PaymentMethod | null
+  attemptPaymentMethod: AttemptPaymentMethod | null
   snapshot: CashierSnapshot | null
   view: CashierView | null
   channelsLoading: boolean
@@ -42,7 +43,7 @@ interface CashierPaymentPanelProps {
   isDevSandbox: boolean
   canProceed: boolean
   onAuthCodeChange: (value: string) => void
-  onSubmitCode: () => void
+  onSubmitCode: (authCode?: string) => void
   onReconcile: () => void
   onReissue: () => void
   onSimulateSandbox: (result: 'success' | 'failed') => void
@@ -52,6 +53,7 @@ interface CashierPaymentPanelProps {
 export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
   const {
     paymentMethod,
+    attemptPaymentMethod,
     snapshot,
     view,
     channelsLoading,
@@ -71,7 +73,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     onSimulateSandbox,
   } = props
 
-  const showCodeInput = paymentMethod === 'code' && (!snapshot || snapshot.attempt?.status === 'failed')
+  const showCodeInput = paymentMethod === 'code' && (!snapshot?.attempt || snapshot.attempt.status === 'failed')
   const canReconcile =
     (view?.phase === 'awaiting_scan' || view?.phase === 'awaiting_code_confirmation') &&
     snapshot?.attempt?.channel !== undefined &&
@@ -95,7 +97,11 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
           <input
             autoFocus
             value={authCode}
-            onChange={(event) => onAuthCodeChange(event.target.value.replace(/\D/g, '').slice(0, 18))}
+            onChange={(event) => {
+              const nextCode = event.target.value.replace(/\D/g, '').slice(0, 18)
+              onAuthCodeChange(nextCode)
+              if (nextCode.length === 18) onSubmitCode(nextCode)
+            }}
             inputMode="numeric"
             autoComplete="off"
             maxLength={18}
@@ -158,7 +164,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
             <Button variant="secondary" size="lg" disabled={issuing} onClick={onReissue}>
               <span className="flex items-center gap-2">
                 <RefreshCwIcon className={['h-4 w-4', issuing ? 'animate-spin' : ''].join(' ')} />
-                {paymentMethod === 'code' ? '重新扫码' : '重新出码'}
+                {(attemptPaymentMethod ?? paymentMethod) === 'code' ? '重新扫码' : '重新出码'}
               </span>
             </Button>
           )}
