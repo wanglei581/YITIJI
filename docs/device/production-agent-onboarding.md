@@ -48,6 +48,35 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
   -UseExistingToken
 ```
 
+## 可靠性 P0：安装、诊断与恢复
+
+本轮可靠性 P0 已在本地代码与静态门禁层完成以下收口：配置文件开头的 UTF-8 BOM 会被兼容；启动时会分类报告无效配置或 token；这两类异常均不得领取打印任务或触发打印。配置与 token 写入采用原子替换；last-known-good 只保留为人工恢复候选，**不会**自动回退覆盖当前配置。启动诊断保持非阻塞，且本地诊断脚本只读。
+
+Windows 服务只配置有限的 SCM 恢复策略：首次失败后等待 60 秒，第二次失败后等待 300 秒，第三次不自动操作；失败计数每天重置。该策略只降低短暂进程失败后的人工介入压力，不证明服务、云端连接或硬件已经恢复。
+
+在 Windows 主机上可复制执行下列只读诊断命令：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1
+sc.exe qfailure AIJobPrintAgent
+Get-CimInstance Win32_Service -Filter "Name='AIJobPrintAgent'" | Select-Object Name, State, StartMode, ProcessId, PathName
+```
+
+`AGENT_READY` 仅表示本地 Agent 启动成功；云端心跳在线和终端 `enabled` 状态仍须在 Admin 中单独验证，不能由该日志或本地服务状态替代。
+
+### Windows 无打印验收（须另行授权）
+
+以下六步需要 Windows 管理员权限，并且先确认空队列；**不随代码合并自动执行**：
+
+1. 只读确认 `active_task_count = 0`，并确认 `SELECT * FROM active_tasks` 返回 `0 rows`。
+2. 备份当前 Agent 配置与 token 文件；不得把其内容截图、粘贴或发送到聊天。
+3. 只在配置文件开头添加 BOM，除此以外不改配置。
+4. 重启 `AIJobPrintAgent` 服务。
+5. 运行上述诊断、检查 `qfailure`，并在 Admin 核验云端心跳。
+6. 恢复为无 BOM 的原配置，再次确认 `active_task_count = 0` 与 `active_tasks` 为 `0 rows`。
+
+该验收全程禁止打印、禁止 `POST /print`、禁止创建任务；也禁止在聊天中发送配置、token 或其截图。未获 Windows 管理员与空队列确认前，不得把服务恢复、真实心跳或物理打印写为已验证。
+
 ## 商用正式方案：后台绑定码
 
 管理员后台已提供“终端授权/重绑”能力：

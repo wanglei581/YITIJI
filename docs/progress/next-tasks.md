@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-13
+> 最后更新：2026-07-14
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -73,12 +73,18 @@
 
 ## P0：商用 Windows Terminal Agent 授权闭环（2026-07-05 收尾）
 
+- [x] **Windows Terminal Agent 可靠性 P0（代码与本地验证级，2026-07-14）**：本分支已完成 BOM 容忍、分类启动错误、凭据过滤、config/token 原子写入、last-known-good 仅人工恢复候选（不自动回退）、非阻塞启动诊断、有限 `node-windows`/SCM 恢复、只读本地诊断、两项静态 verify 与 CI 接线。Agent CI 等价本地命令已通过：typecheck/build、`verify:agent-profile-guard`、`verify:agent-config-resilience`、`verify:windows-service-recovery`、`verify:print-scan-agent`、`verify:scan-watcher`、`verify:local-qr-proxy`、`verify:usb-import-agent` 与 diff check。未推送、未创建 PR、未运行 GitHub CI、未部署、未操作 Windows、未创建打印任务或出纸；Windows 无打印验收尚未授权/执行，不能声明服务恢复、真实心跳或物理打印已验证。两个外部最终审查器只返回启动/空输出，未取得可用 final report；不写为“Claude 与前端模型批准”，也不宣称合并就绪。执行边界见 `docs/device/production-agent-onboarding.md` 的“可靠性 P0：安装、诊断与恢复”。
+- [ ] **Windows Agent 无打印验收（须另行授权）**：需 Windows 管理员与空队列确认后，按 onboarding 的六步骤只读/最小 BOM 验证执行；先确认 `active_task_count = 0` 且 `active_tasks` 为 `0 rows`，全程禁止打印、`POST /print`、创建任务和在聊天发送配置/token/截图。此项不随代码合并自动执行。
 - [x] **生产 Agent 一键加固脚本**：新增 `apps/terminal-agent/scripts/install-production-agent.ps1`，固定远程 API、校验打印机、DPAPI 加密 token、安装/启动 Windows 服务并验证远程心跳；当前会话安全验证通过。
 - [x] **生产 Agent onboarding 文档**：新增 `docs/device/production-agent-onboarding.md`，约定云端作为唯一任务源、禁止 production 指向 localhost、并说明 `AGENT_PROFILE=local-debug` 是唯一允许本地 API 调试的显式开关。
 - [x] **一次性终端绑定码后端接口**：`TerminalBindCode` SQLite/PostgreSQL additive migration 已部署到本地库；`POST /api/v1/admin/terminals/:terminalId/bind-code` 与 `POST /api/v1/auth/terminal/exchange-bind-code` 已接入；安装脚本新增 `-BindCode` 用绑定码换 token 路径；绑定码固定 20 位可视字符，同终端重新生成会撤销旧的未使用/未过期绑定码；新增 `verify:terminal-bind-code` 锁定 hash 落库、审计不写明文、旧码撤销、兑换后标记 used 和 DPAPI 安装脚本路径；`verify:terminal-bind-code`、`db:pg:sync:check`、API typecheck + lint 通过。
 - [x] **Admin UI 接入绑定码按钮**：终端管理页已在每行“编辑档案”旁增加「生成绑定码」入口，停用终端禁用；弹窗已拆到 `TerminalBindCodeDialog.tsx`，包含 TTL 选择、明文 bindCode 显示 + 可复制 + 倒计时、预设 `install-production-agent.ps1` 命令模板；命令模板使用真实 PowerShell 反引号续行，并含 `-BindCode/-PrinterName`；适配 `http` / `mock` 双模式；新增 `verify:admin-terminal-bind-code-ui` 静态门禁，断言 devices/http/mock 出口、按钮/弹窗出现、命令示例与“bindCode 不入日志/审计”等防回退项；Admin typecheck + lint 通过。
 - [x] **本地调试 production 互斥保护**：Terminal Agent `agent` 启动时已接入 `assertAgentProfileAllowsApiBaseUrl`；发现 `apiBaseUrl` 指向 `localhost` / `127.0.0.1` / `::1` / `0.0.0.0` 时默认拒绝启动，只有显式 `AGENT_PROFILE=local-debug` 才允许本地调试；新增 `verify:agent-profile-guard` 防回退，并通过 Terminal Agent typecheck / build / verify。
 - [ ] **正式生产与真机验收**：当前绑定码 API 仅在本地 SQLite 自测通过；正式上线前需要在 PostgreSQL 预生产复跑绑定码生成/兑换/撤销/审计，并通过 Windows 真机 `install-production-agent.ps1 -BindCode` 完成首次授权并出纸。
+
+## P1：Windows Agent MSI / 可修复安装包
+
+- [ ] **Windows Agent MSI / 可修复安装包**：独立设计与分支处理；范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收。不在当前可靠性 P0 中开始，也不得与其合并验收结论混用。
 
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
 
