@@ -51,6 +51,7 @@
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:legacy-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-legacy-pending-print-task-disposition.ts",
     "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
+    "audit:cloud-upload-capability-usage": "node -r @swc-node/register scripts/audit-cloud-upload-capability-usage.ts",
     "verify:print-scan-first-release": "node -r @swc-node/register scripts/verify-print-scan-first-release.ts",
     "verify:terminal-bind-code": "node -r @swc-node/register scripts/verify-terminal-bind-code.ts",
     "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
