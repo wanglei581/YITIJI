@@ -47,25 +47,37 @@ assert.match(generatedConfig, /Fail /, 'Test-GeneratedConfig must use the instal
 
 const configValidationCall = installer.indexOf('Test-GeneratedConfig -Config $config')
 const configBackup = installer.indexOf('Copy-Item $configPath $backup -Force')
-const configWrite = installer.indexOf('Write-TextAtomically -Path $configPath -Text ($configJson + "`n")')
-const bindCodeExchange = installer.indexOf('Exchange-BindCode -ApiBase $apiBase -Code $BindCode')
-const tokenWrite = installer.indexOf('Protect-AgentToken -Token')
+const tokenPreparation = installer.indexOf('Write-Step "Preparing token"')
+const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode')
+const existingTokenCheck = installer.indexOf('Test-TokenFile $tokenPath')
+const providedTokenSource = installer.indexOf('$tokenToPersist = $AgentToken.Trim()')
+const configCommit = installer.indexOf('Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist')
 const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')
 const serviceStart = installer.indexOf('Start-Service -Name "AIJobPrintAgent"')
 const serviceRestart = installer.indexOf('Restart-Service -Name "AIJobPrintAgent" -Force')
 assert.notEqual(configValidationCall, -1, 'installer must validate the generated config')
 for (const [label, index] of [
-  ['config backup', configBackup],
-  ['config write', configWrite],
+  ['token preparation', tokenPreparation],
   ['BindCode exchange', bindCodeExchange],
-  ['token write', tokenWrite],
+  ['existing token validation', existingTokenCheck],
+  ['provided token validation', providedTokenSource],
+  ['config backup', configBackup],
+  ['config/token commit', configCommit],
   ['stale process stop', processStop],
   ['service start', serviceStart],
   ['service restart', serviceRestart],
 ]) {
   assert.notEqual(index, -1, `installer must retain ${label}`)
-  assert.ok(configValidationCall < index, `generated config validation must happen before ${label}`)
 }
+assert.ok(configValidationCall < tokenPreparation, 'generated config validation must happen before token preparation')
+assert.ok(tokenPreparation < bindCodeExchange, 'BindCode exchange must happen during token preparation')
+assert.ok(bindCodeExchange < configCommit, 'BindCode exchange must finish before the local commit')
+assert.ok(existingTokenCheck < configCommit, 'existing token validation must finish before the local commit')
+assert.ok(providedTokenSource < configCommit, 'provided token validation must finish before the local commit')
+assert.ok(configBackup < configCommit, 'the user-recoverable config backup must precede the local commit')
+assert.ok(configCommit < processStop, 'the local commit must finish before stopping Agent processes')
+assert.ok(configCommit < serviceStart, 'the local commit must finish before starting the service')
+assert.ok(configCommit < serviceRestart, 'the local commit must finish before restarting the service')
 
 const atomicConfigWriter = sourceBetween(installer, /function Write-TextAtomically\(/, /\nfunction /)
 assert.match(atomicConfigWriter, /UTF8Encoding\]::new\(\$false\)/, 'config atomic writer must use UTF-8 without a BOM')
@@ -79,6 +91,25 @@ assert.match(atomicConfigWriter, /File\]::Move/, 'config atomic writer must move
 assert.match(atomicConfigWriter, /finally/, 'config atomic writer must clean up temporary files')
 assert.match(atomicConfigWriter, /Remove-Item\s+-LiteralPath\s+\$tempPath\s+-Force/, 'config atomic writer must remove its temporary file in finally cleanup')
 assert.doesNotMatch(installer, /\[System\.IO\.File\]::WriteAllText\(\$configPath/, 'config writes must not use WriteAllText directly')
+
+const protectToken = sourceBetween(installer, /function Protect-AgentToken\(/, /\nfunction /)
+assert.match(protectToken, /Write-TextAtomically\s+-Path\s+\$TokenPath\s+-Text\s+\$b64/, 'DPAPI token writes must use the atomic writer')
+assert.doesNotMatch(protectToken, /WriteAllText/, 'DPAPI token writes must not use WriteAllText directly')
+
+const productionCommit = sourceBetween(installer, /function Commit-ProductionConfigAndToken\(/, /\nfunction /)
+assert.match(productionCommit, /\$hadExistingToken\s*=\s*Test-Path\s+-LiteralPath\s+\$TokenPath/, 'local commit must record whether a token already exists')
+assert.match(productionCommit, /Join-Path\s+\$tokenDirectory/, 'local commit rollback file must live beside the token')
+assert.match(productionCommit, /Copy-Item\s+-LiteralPath\s+\$TokenPath\s+-Destination\s+\$tokenRollbackPath\s+-Force/, 'local commit must copy an existing token before overwriting it')
+assert.match(productionCommit, /Protect-AgentToken\s+-Token\s+\$TokenToPersist\s+-TokenPath\s+\$TokenPath/, 'local commit must atomically persist a newly sourced token first')
+assert.match(productionCommit, /Write-TextAtomically\s+-Path\s+\$ConfigPath\s+-Text\s+\$ConfigText/, 'local commit must atomically persist config after token')
+assert.ok(
+  productionCommit.indexOf('Protect-AgentToken -Token $TokenToPersist -TokenPath $TokenPath') < productionCommit.indexOf('Write-TextAtomically -Path $ConfigPath -Text $ConfigText'),
+  'local commit must write token before config',
+)
+assert.match(productionCommit, /File\]::Replace\(\$tokenRollbackPath,\s*\$TokenPath,\s*\$null\)/, 'local commit must restore an existing token from rollback')
+assert.match(productionCommit, /File\]::Move\(\$tokenRollbackPath,\s*\$TokenPath\)/, 'local commit must restore when the token destination is absent')
+assert.match(productionCommit, /Remove-Item\s+-LiteralPath\s+\$tokenRollbackPath\s+-Force/, 'local commit must clean up its rollback temporary file')
+assert.match(productionCommit, /Could not commit production config and terminal token locally/, 'local commit failures must use a fixed non-secret recovery message')
 
 const invokeSc = sourceBetween(installer, /function Invoke-Sc\(/, /\nfunction /)
 assertIncludes(invokeSc, '& sc.exe @Arguments 2>&1', 'Invoke-Sc must execute sc.exe through its argument array')
@@ -116,6 +147,43 @@ assert.match(diagnosis, /ConvertFrom-Json/, 'diagnosis must validate JSON withou
 assert.match(diagnosis, /INVALID_DIAGNOSTIC_FILE/, 'diagnosis must return a closed code for an invalid startup diagnostic file')
 assert.match(diagnosis, /sc\.exe\s+qfailure/, 'diagnosis must read the configured SCM failure policy')
 assert.match(diagnosis, /Test-Path\s+-LiteralPath\s+\$tokenPath/, 'diagnosis must only test the token path for existence')
+
+const allowedDiagnosticCodes = [
+  'AGENT_CONFIG_NOT_FOUND',
+  'AGENT_CONFIG_INVALID_JSON',
+  'AGENT_CONFIG_INVALID_SHAPE',
+  'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
+  'AGENT_CONFIG_INVALID_FIELD',
+  'AGENT_TOKEN_DECRYPT_FAILED',
+  'AGENT_PROFILE_REJECTED',
+  'AGENT_REGISTRATION_FAILED',
+  'AGENT_STARTUP_FAILED',
+  'AGENT_READY',
+]
+assert.match(diagnosis, /\$allowedDiagnosticCodes\s*=\s*@\(/, 'diagnosis must define an explicit startup diagnostic code whitelist')
+for (const code of allowedDiagnosticCodes) {
+  assertIncludes(diagnosis, code, `diagnosis whitelist must include ${code}`)
+}
+const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\n\$service\s*=/)
+assert.match(startupDiagnosticReader, /\$diagnostic\.schemaVersion\s+-ne\s+1/, 'diagnosis must validate diagnostic schemaVersion')
+assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-isnot\s+\[string\]/, 'diagnosis must validate diagnostic state type')
+assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-notin\s+@\("ready",\s*"failed"\)/, 'diagnosis must validate diagnostic state')
+assert.match(startupDiagnosticReader, /\$diagnostic\.code\s+-isnot\s+\[string\]/, 'diagnosis must validate diagnostic code type')
+assert.match(startupDiagnosticReader, /IsNullOrWhiteSpace\(\[string\]\$diagnostic\.code\)/, 'diagnosis must reject empty diagnostic codes')
+assert.match(startupDiagnosticReader, /\$allowedDiagnosticCodes\s+-notcontains\s+\$diagnostic\.code/, 'diagnosis must reject codes outside the whitelist')
+
+const configStatusStart = diagnosis.lastIndexOf('$configFieldStatus = [pscustomobject]@{')
+assert.notEqual(configStatusStart, -1, 'diagnosis must calculate field status through a PSCustomObject')
+const configStatusEnd = diagnosis.indexOf('\n}', configStatusStart)
+assert.notEqual(configStatusEnd, -1, 'diagnosis field status block must be closed')
+const configStatus = diagnosis.slice(configStatusStart, configStatusEnd + 2)
+for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 'agentVersion']) {
+  assert.match(
+    configStatus,
+    new RegExp(`^\\s*${field}\\s*=\\s*-not \\[string\\]::IsNullOrWhiteSpace\\(\\[string\\]\\$config\\.${field}\\)\\s*$`, 'm'),
+    `diagnosis must calculate ${field} as an explicit boolean`,
+  )
+}
 
 const diagnosisOutput = diagnosis.slice(diagnosis.lastIndexOf('[pscustomobject]@{'))
 assert.notEqual(diagnosisOutput, diagnosis, 'diagnosis must output a PSCustomObject')

@@ -203,7 +203,7 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
 
 function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   if ([string]::IsNullOrWhiteSpace($Token)) {
-    Fail "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
+    throw "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
   }
   Add-Type -AssemblyName System.Security
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($Token.Trim())
@@ -215,13 +215,72 @@ function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   $b64 = [Convert]::ToBase64String($encrypted)
   $dir = Split-Path -Parent $TokenPath
   New-Item -ItemType Directory -Path $dir -Force | Out-Null
-  [System.IO.File]::WriteAllText($TokenPath, $b64, [System.Text.UTF8Encoding]::new($false))
+  Write-TextAtomically -Path $TokenPath -Text $b64
 }
 
 function Test-TokenFile([string]$TokenPath) {
   if (-not (Test-Path $TokenPath)) { return $false }
   $content = [System.IO.File]::ReadAllText($TokenPath).Trim()
   return -not [string]::IsNullOrWhiteSpace($content)
+}
+
+function Commit-ProductionConfigAndToken(
+  [string]$ConfigPath,
+  [string]$ConfigText,
+  [string]$TokenPath,
+  [AllowNull()][string]$TokenToPersist
+) {
+  $shouldWriteToken = $null -ne $TokenToPersist
+  $hadExistingToken = $false
+  $tokenRollbackPath = $null
+  $commitFailed = $false
+  $rollbackFailed = $false
+
+  try {
+    if ($shouldWriteToken) {
+      $hadExistingToken = Test-Path -LiteralPath $TokenPath -PathType Leaf
+      $tokenDirectory = Split-Path -Parent $TokenPath
+      New-Item -ItemType Directory -Path $tokenDirectory -Force | Out-Null
+
+      if ($hadExistingToken) {
+        $tokenRollbackPath = Join-Path $tokenDirectory ".agent.token.rollback.${PID}.$([System.Guid]::NewGuid().ToString('N')).tmp"
+        Copy-Item -LiteralPath $TokenPath -Destination $tokenRollbackPath -Force
+      }
+
+      Protect-AgentToken -Token $TokenToPersist -TokenPath $TokenPath
+    }
+
+    Write-TextAtomically -Path $ConfigPath -Text $ConfigText
+  } catch {
+    $commitFailed = $true
+
+    try {
+      if ($shouldWriteToken) {
+        if ($hadExistingToken -and $null -ne $tokenRollbackPath -and (Test-Path -LiteralPath $tokenRollbackPath -PathType Leaf)) {
+          if ([System.IO.File]::Exists($TokenPath)) {
+            [System.IO.File]::Replace($tokenRollbackPath, $TokenPath, $null)
+          } else {
+            [System.IO.File]::Move($tokenRollbackPath, $TokenPath)
+          }
+        } elseif (-not $hadExistingToken -and (Test-Path -LiteralPath $TokenPath -PathType Leaf)) {
+          Remove-Item -LiteralPath $TokenPath -Force
+        }
+      }
+    } catch {
+      $rollbackFailed = $true
+    }
+  } finally {
+    if ($null -ne $tokenRollbackPath -and (Test-Path -LiteralPath $tokenRollbackPath -PathType Leaf)) {
+      Remove-Item -LiteralPath $tokenRollbackPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+
+  if ($commitFailed) {
+    if ($rollbackFailed) {
+      Fail "Could not commit production config and terminal token locally. Local token rollback could not be confirmed; do not start the Agent and investigate the local files."
+    }
+    Fail "Could not commit production config and terminal token locally. If a bind code was used, it may have been consumed; obtain a new bind code and retry."
+  }
 }
 
 function Get-PrimaryMacAddress {
@@ -317,7 +376,32 @@ $config = [ordered]@{
 
 $configJson = Test-GeneratedConfig -Config $config
 
-Write-Step "Writing production config"
+Write-Step "Preparing token"
+$tokenToPersist = $null
+if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
+  Write-Ok "Exchanging one-time bind code with cloud API"
+  $exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalId) -or $exchange.terminalId -ne $TerminalId) {
+    Fail "BindCode exchange terminalId does not match the requested TerminalId"
+  }
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalCode) -or $exchange.terminalCode -ne $TerminalCode) {
+    Fail "BindCode exchange terminalCode does not match the requested TerminalCode"
+  }
+  if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalToken)) {
+    Fail "BindCode exchange did not return a terminal token"
+  }
+  $tokenToPersist = ([string]$exchange.terminalToken).Trim()
+} elseif ($UseExistingToken) {
+  if (-not (Test-TokenFile $tokenPath)) { Fail "-UseExistingToken passed, but token file is missing or empty: $tokenPath" }
+  Write-Ok "Using existing DPAPI token: $tokenPath"
+} else {
+  if ([string]::IsNullOrWhiteSpace($AgentToken)) {
+    Fail "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
+  }
+  $tokenToPersist = $AgentToken.Trim()
+}
+
+Write-Step "Writing production config and token"
 if (Test-Path $configPath) {
   $backup = "$configPath.before-production-hardening-$(Get-Date -Format 'yyyyMMddHHmmss')"
   Copy-Item $configPath $backup -Force
@@ -325,27 +409,14 @@ if (Test-Path $configPath) {
 }
 
 New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
-Write-TextAtomically -Path $configPath -Text ($configJson + "`n")
+Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist
 Write-Ok "Production config written: $configPath"
-
-Write-Step "Installing token"
-if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
-  Write-Ok "Exchanging one-time bind code with cloud API"
-  $exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode
-  if ($exchange.terminalId -and $exchange.terminalId -ne $TerminalId) {
-    Fail "BindCode belongs to terminalId=$($exchange.terminalId), but script was called with TerminalId=$TerminalId"
+if ($null -ne $tokenToPersist) {
+  if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
+    Write-Ok "BindCode exchanged and token protected with DPAPI"
+  } else {
+    Write-Ok "Agent token protected with DPAPI LocalMachine"
   }
-  if ($exchange.terminalCode -and $exchange.terminalCode -ne $TerminalCode) {
-    Fail "BindCode belongs to terminalCode=$($exchange.terminalCode), but script was called with TerminalCode=$TerminalCode"
-  }
-  Protect-AgentToken -Token $exchange.terminalToken -TokenPath $tokenPath
-  Write-Ok "BindCode exchanged and token protected with DPAPI"
-} elseif ($UseExistingToken) {
-  if (-not (Test-TokenFile $tokenPath)) { Fail "-UseExistingToken passed, but token file is missing or empty: $tokenPath" }
-  Write-Ok "Using existing DPAPI token: $tokenPath"
-} else {
-  Protect-AgentToken -Token $AgentToken -TokenPath $tokenPath
-  Write-Ok "Agent token protected with DPAPI LocalMachine: $tokenPath"
 }
 
 Write-Step "Stopping old Agent processes"

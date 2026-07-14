@@ -14,6 +14,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$allowedDiagnosticCodes = @(
+  "AGENT_CONFIG_NOT_FOUND",
+  "AGENT_CONFIG_INVALID_JSON",
+  "AGENT_CONFIG_INVALID_SHAPE",
+  "AGENT_CONFIG_REQUIRED_FIELD_MISSING",
+  "AGENT_CONFIG_INVALID_FIELD",
+  "AGENT_TOKEN_DECRYPT_FAILED",
+  "AGENT_PROFILE_REJECTED",
+  "AGENT_REGISTRATION_FAILED",
+  "AGENT_STARTUP_FAILED",
+  "AGENT_READY"
+)
+
 function Get-Utf8BomState([string]$Path) {
   $stream = [System.IO.File]::Open(
     $Path,
@@ -42,7 +55,14 @@ function Get-StartupDiagnosticCode([string]$Path) {
   try {
     $diagnosticText = [System.IO.File]::ReadAllText($Path, [System.Text.UTF8Encoding]::new($false))
     $diagnostic = $diagnosticText.TrimStart([char]0xFEFF) | ConvertFrom-Json -ErrorAction Stop
-    if ($null -eq $diagnostic.code -or [string]::IsNullOrWhiteSpace([string]$diagnostic.code)) {
+    if (
+      $diagnostic.schemaVersion -ne 1 -or
+      $diagnostic.state -isnot [string] -or
+      $diagnostic.state -notin @("ready", "failed") -or
+      $diagnostic.code -isnot [string] -or
+      [string]::IsNullOrWhiteSpace([string]$diagnostic.code) -or
+      $allowedDiagnosticCodes -notcontains $diagnostic.code
+    ) {
       return "INVALID_DIAGNOSTIC_FILE"
     }
     return [string]$diagnostic.code
@@ -67,7 +87,7 @@ $processId = if ($serviceExists) { [int]$service.ProcessId } else { $null }
 $configExists = Test-Path $ConfigPath -PathType Leaf
 $configHasUtf8Bom = $false
 $configValidJson = $false
-$configFieldStatus = [ordered]@{
+$configFieldStatus = [pscustomobject]@{
   apiBaseUrl = $false
   terminalCode = $false
   terminalId = $false
@@ -81,8 +101,12 @@ if ($configExists) {
     $configText = [System.IO.File]::ReadAllText($ConfigPath, [System.Text.UTF8Encoding]::new($false))
     $config = $configText.TrimStart([char]0xFEFF) | ConvertFrom-Json -ErrorAction Stop
     $configValidJson = $true
-    foreach ($field in $configFieldStatus.Keys) {
-      $configFieldStatus[$field] = -not [string]::IsNullOrWhiteSpace([string]$config.$field)
+    $configFieldStatus = [pscustomobject]@{
+      apiBaseUrl = -not [string]::IsNullOrWhiteSpace([string]$config.apiBaseUrl)
+      terminalCode = -not [string]::IsNullOrWhiteSpace([string]$config.terminalCode)
+      terminalId = -not [string]::IsNullOrWhiteSpace([string]$config.terminalId)
+      printerName = -not [string]::IsNullOrWhiteSpace([string]$config.printerName)
+      agentVersion = -not [string]::IsNullOrWhiteSpace([string]$config.agentVersion)
     }
   } catch {
     $configValidJson = $false
