@@ -206,37 +206,34 @@ async function startFailingBackendStub(errorCode: string): Promise<{ baseUrl: st
 }
 
 /**
- * B1-11：模拟一次"服务端完全联系不上"的真实网络错误——没有 JSON body，没有
- * error.code 字段（axios 侧 `response.data.error.code` 读取会拿到 `undefined`）。
- * 用来证明新增的 SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED 立即隔离分支
- * 是靠精确匹配 error.code 触发的，不会被一个"看起来像失败但没有可识别 code"的通用
+ * B1-11：模拟一次真实的、无法识别 error.code 的服务端 5xx 错误——响应没有 JSON
+ * body（axios 侧 `response.data.error.code` 读取会拿到 `undefined`）。用来证明
+ * 新增的 SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED 立即隔离分支是靠
+ * 精确匹配 error.code 触发的，不会被一个"看起来像失败但没有可识别 code"的通用
  * 网络/5xx 错误意外带上——那类错误必须继续走既有的 2 小时重试窗口，不能被误伤。
  *
- * 刻意用"连接被拒绝"（绑定一个端口后立刻关闭，制造一个必然 ECONNREFUSED 的目标）
- * 而不是真的起一个返回 500 的监听服务器：本模块的 deliver POST 目前没有配置
- * api-client.ts 的 `NO_RETRY_CONFIG`，任何真实 5xx 响应都会触发 axios 拦截器自己的
- * 3 次内部重试，而重试复用的是同一个已经被消费过一次的 FormData 流对象，会导致
- * Content-Length 与实际重发字节不匹配、服务端请求 `end` 事件永远不触发、
- * 客户端最终等满 30s 超时——三次加起来单个用例就要跑 100+ 秒。这是一个独立于本次
- * 修复范围之外的既有问题（已在任务报告中记录，不在本次改动范围内处理），这里用
- * ECONNREFUSED 规避它、只验证本次真正要验证的行为：无法识别的 error.code 不会被
- * 误判为需要立即隔离的三种已知原因之一。
+ * 起一个真实返回 500 的监听服务器（而不是 ECONNREFUSED 那种连接层错误）：
+ * 之前这里必须用 ECONNREFUSED 规避一个独立的既有问题——deliver POST 未配置
+ * api-client.ts 的 `NO_RETRY_CONFIG` 时，真实 5xx 会触发 axios 拦截器自己的 3 次
+ * 内部重试，且重试复用同一个已被消费过一次的 FormData 流对象，导致 Content-Length
+ * 与实际重发字节不匹配、服务端请求 `end` 事件永不触发、客户端每次都等满 30s 超时。
+ * 该问题已修复（processCandidate 的 deliver 调用现在带 NO_RETRY_CONFIG，禁用了
+ * axios 层的自动重试），一次真实 500 现在会快速失败，不再需要用连接层错误规避。
  */
-async function startRawServerErrorStub(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
-  const server = http.createServer((_req, res) => {
-    res.writeHead(500)
-    res.end()
+async function startGenericServerErrorStub(): Promise<{ baseUrl: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    req.on('data', () => undefined)
+    req.on('end', () => {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end()
+    })
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
-  assert.ok(typeof address === 'object' && address, 'backend stub must bind to a TCP port before we close it')
-  const port = address.port
-  await new Promise<void>((resolve) => server.close(() => resolve()))
+  assert.ok(typeof address === 'object' && address, 'backend stub must bind to a TCP port')
   return {
-    // 端口已释放、没有任何进程监听——连接必然是 ECONNREFUSED，快速失败，不涉及
-    // 流重放/超时问题。
-    baseUrl: `http://127.0.0.1:${port}/api/v1`,
-    close: async () => undefined,
+    baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
   }
 }
 
@@ -569,9 +566,10 @@ async function verifyScanFileAlreadyDeliveredQuarantinesImmediately(): Promise<v
 
 // ── Part 2h: B1-11 回归护栏 — 真正无法识别的 5xx（无 error.code）必须继续走既有重试路径 ──
 // 防止未来重构把匹配条件写宽（例如变成"任何非 2xx 都立即隔离"），意外吞掉合法的网络抖动/
-// 后端瞬时故障重试能力。
+// 后端瞬时故障重试能力。同时兼作 NO_RETRY_CONFIG 修复的回归护栏：一次真实 500 必须快速
+// 失败（deliver POST 禁用了 axios 层自动重试），不能再触发 3 次内部重试导致的 30s×3 挂起。
 async function verifyGenericServerErrorStillRetriesNormally(): Promise<void> {
-  const backend = await startRawServerErrorStub()
+  const backend = await startGenericServerErrorStub()
   const scanFolder = mkdtempSync(join(tmpdir(), 'scan-watcher-verify-generic-5xx-'))
   try {
     const filename = 'generic-5xx.pdf'
@@ -581,7 +579,9 @@ async function verifyGenericServerErrorStillRetriesNormally(): Promise<void> {
 
     backdateMtime(filePath, 30 * 60 * 1000)
     const config = makeConfig(backend.baseUrl, scanFolder)
+    const startedAt = Date.now()
     await processCandidate(filePath, filename, config)
+    const elapsedMs = Date.now() - startedAt
 
     assert.equal(
       existsSync(filePath),
@@ -589,8 +589,12 @@ async function verifyGenericServerErrorStillRetriesNormally(): Promise<void> {
       'a generic 5xx with no recognizable error.code must stay in the main folder for the next sweep — must NOT be treated like SCAN_TASK_STATE_CHANGED / SCAN_FILE_ALREADY_DELIVERED / NO_WAITING_SCAN_TASK',
     )
     assert.equal(existsSync(join(scanFolder, '_unclaimed', filename)), false, 'a generic 5xx must NOT be quarantined early')
+    assert.ok(
+      elapsedMs < 5_000,
+      `a real 5xx must fail fast now that deliver POST carries NO_RETRY_CONFIG (took ${elapsedMs}ms — axios-layer retry with the stale form-data stream would have taken 12s+)`,
+    )
 
-    console.log('PASS processCandidate: a raw 5xx with no structured error.code is unaffected by the B1-11 fix and keeps retrying normally')
+    console.log('PASS processCandidate: a raw 5xx with no structured error.code fails fast (NO_RETRY_CONFIG) and is left in place for the sweep-level retry, not treated as an immediate-quarantine cause')
   } finally {
     await backend.close()
     rmSync(scanFolder, { recursive: true, force: true })

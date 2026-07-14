@@ -23,7 +23,7 @@ import { join } from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import FormData from 'form-data'
 import type { AgentConfig } from './types'
-import { createApiClient, axiosErrorMessage } from './api-client'
+import { createApiClient, axiosErrorMessage, NO_RETRY_CONFIG } from './api-client'
 import { log, warn, err } from '../logger'
 
 const STABILITY_CHECK_INTERVAL_MS = 500
@@ -126,8 +126,14 @@ export async function processCandidate(
     const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
     try {
+      // NO_RETRY_CONFIG: `form` 是一次性消费的流，axios 拦截器的自动重试会复用
+      // 同一个已耗尽的请求体，导致 Content-Length 与实际重发字节不匹配、服务端
+      // 请求 end 事件永不触发——真实 5xx 场景下会让每次重试都卡满 30s 超时
+      // （3 次共 100+ 秒）。失败已由本函数自身的 sweep 重试机制兜底，禁用
+      // axios 层重试不影响最终投递成功率。
       await client.post(`/terminals/${config.terminalId}/scan-sessions/deliver`, form, {
         headers: form.getHeaders(),
+        ...NO_RETRY_CONFIG,
       })
       unlinkSync(filePath)
       log(`scan-watcher: delivered and removed source file — ${filename}`)
