@@ -14,6 +14,7 @@ import StatsPage from './stats'
 import SourcesPage from './sources'
 import SyncLogsPage from './sync-logs'
 import AccountPage from './account'
+import AccountSettingsPage from './account-settings'
 
 export const partnerRouter = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -33,6 +34,7 @@ export const partnerRouter = createBrowserRouter([
       { path: 'sources',    element: <SourcesPage /> },
       { path: 'sync-logs',  element: <SyncLogsPage /> },
       { path: 'account',    element: <AccountPage /> },
+      { path: 'account-settings', element: <AccountSettingsPage /> },
     ],
   },
 ])

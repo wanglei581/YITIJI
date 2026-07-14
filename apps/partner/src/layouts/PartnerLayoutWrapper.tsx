@@ -30,6 +30,7 @@ const PATH_TO_KEY: Record<string, string> = {
   '/sources':    'sources',
   '/sync-logs':  'sync-logs',
   '/account':    'account',
+  '/account-settings': 'account-settings',
 }
 
 const KEY_TO_PATH: Record<string, string> = Object.fromEntries(
@@ -111,6 +112,18 @@ export function PartnerLayoutWrapper() {
       headerActions={
         <div className="flex items-center gap-3">
           {/* 用户名/角色已移至侧栏底部用户区(PartnerLayout side-user),顶栏不再重复展示 */}
+          <a
+            href="/account-settings"
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/account-settings')
+            }}
+            aria-label="账号设置"
+            className="flex h-9 items-center gap-1.5 rounded-[9px] border border-neutral-200 bg-surface px-3 text-sm font-semibold text-neutral-600 transition-colors hover:bg-neutral-50 active:bg-neutral-100"
+          >
+            <UserCogIcon className="h-4 w-4" aria-hidden="true" />
+            账号设置
+          </a>
           <button
             type="button"
             onClick={logout}

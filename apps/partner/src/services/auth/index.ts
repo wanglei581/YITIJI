@@ -72,11 +72,18 @@ interface ErrorBody {
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; code: string; message: string; status: number }> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
-    body: JSON.stringify(body),
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    // fetch() 本身抛出(断网/DNS/CORS)时不会走 res.ok 分支；不捕获会导致调用方
+    // 卡在 submitting=true 无法恢复(见改密页 network exception 走查)。
+    return { ok: false, code: 'NETWORK_ERROR', message: '网络连接异常，请检查网络后重试', status: 0 }
+  }
   if (res.ok) {
     const payload = await res.json() as { data: T }
     return { ok: true, data: payload.data }
@@ -92,10 +99,15 @@ async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; dat
 }
 
 async function getJson<T>(path: string): Promise<{ ok: true; data: T } | { ok: false; code: string; status: number }> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json', ...authHeader() },
-  })
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json', ...authHeader() },
+    })
+  } catch {
+    return { ok: false, code: 'NETWORK_ERROR', status: 0 }
+  }
   if (res.ok) {
     const payload = await res.json() as { data: T }
     return { ok: true, data: payload.data }
@@ -172,6 +184,13 @@ export async function verifyOwnPhone(code: string): Promise<{ ok: true; phoneVer
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   mergeStoredUser({ phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt })
   return { ok: true, phoneVerifiedAt: r.data.phoneVerifiedAt }
+}
+
+/** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ success: true }>('/auth/password/change', { currentPassword, newPassword })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true }
 }
 
 export async function verifyToken(): Promise<AuthedUser | null> {
