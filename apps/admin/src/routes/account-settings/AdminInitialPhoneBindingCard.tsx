@@ -124,9 +124,9 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
           redirectToLogin()
           return
         }
-        if (result.code === 'NETWORK_ERROR' || result.code === 'INVALID_RESPONSE') {
+        if (requiresLoginAfterUncertainVerification(result.code)) {
           clearVerificationState()
-          setMessage({ kind: 'error', text: '验证结果暂无法确认，请刷新页面后确认绑定状态。' })
+          redirectToLogin()
           return
         }
         if (requiresRestartAfterVerificationFailure(result.code)) {
@@ -237,6 +237,11 @@ function requiresRestartAfterVerificationFailure(code: string): boolean {
     'PHONE_ALREADY_BOUND',
     'PHONE_SELF_ALREADY_BOUND',
   ].includes(code)
+}
+
+/** 验证请求可能已在服务端消费 ticket；重新登录才能以真实 LoginResult 恢复绑定状态。 */
+function requiresLoginAfterUncertainVerification(code: string): boolean {
+  return code === 'NETWORK_ERROR' || code === 'INVALID_RESPONSE' || /^HTTP_5\d{2}$/.test(code)
 }
 
 function MessageNotice({ message }: { message: Exclude<Message, null> }) {

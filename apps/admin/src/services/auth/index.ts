@@ -155,28 +155,46 @@ type AdminInitialPhoneBindVerifyData = {
   phoneVerifiedAt: string
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const MASKED_PHONE_PATTERN = /^1[3-9]\d\*{4}\d{4}$/
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
 
-function isNonNegativeFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+function isUuid(value: unknown): value is string {
+  return isNonEmptyString(value) && UUID_PATTERN.test(value)
+}
+
+function isBoundedSeconds(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 300
+}
+
+function isMaskedPhone(value: unknown): value is string {
+  return typeof value === 'string' && (MASKED_PHONE_PATTERN.test(value) || value === '***')
+}
+
+function isCanonicalIsoDate(value: unknown): value is string {
+  if (!isNonEmptyString(value)) return false
+  const parsed = new Date(value)
+  return Number.isFinite(parsed.getTime()) && new Date(value).toISOString() === value
 }
 
 function isValidAdminInitialPhoneBindStartResponse(data: unknown): data is AdminInitialPhoneBindStartData {
   if (typeof data !== 'object' || data === null) return false
   const candidate = data as Record<string, unknown>
   return (
-    isNonEmptyString(candidate.bindTicket) &&
-    isNonNegativeFiniteNumber(candidate.cooldownSeconds) &&
-    isNonNegativeFiniteNumber(candidate.expiresInSeconds)
+    isUuid(candidate.bindTicket) &&
+    isBoundedSeconds(candidate.cooldownSeconds) &&
+    isBoundedSeconds(candidate.expiresInSeconds) &&
+    candidate.expiresInSeconds > 0
   )
 }
 
 function isValidAdminInitialPhoneBindVerifyResponse(data: unknown): data is AdminInitialPhoneBindVerifyData {
   if (typeof data !== 'object' || data === null) return false
   const candidate = data as Record<string, unknown>
-  return isNonEmptyString(candidate.phoneMasked) && isNonEmptyString(candidate.phoneVerifiedAt)
+  return isMaskedPhone(candidate.phoneMasked) && isCanonicalIsoDate(candidate.phoneVerifiedAt)
 }
 
 function invalidAdminInitialPhoneBindResponse(): { ok: false; code: string; message: string } {
