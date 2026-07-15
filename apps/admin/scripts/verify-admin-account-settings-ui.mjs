@@ -20,6 +20,7 @@ const required = [
   'src/routes/login/index.tsx',
   'src/routes/index.tsx',
   'src/routes/account-settings/index.tsx',
+  'src/routes/account-settings/PhoneBindingCard.tsx',
   'src/services/auth/index.ts',
   '../partner/src/routes/login/index.tsx',
   '../partner/src/services/auth/index.ts',
@@ -36,6 +37,7 @@ for (const rel of required) {
 const layout = loaded['src/layouts/AdminLayoutWrapper.tsx']
 const routes = loaded['src/routes/index.tsx']
 const page = loaded['src/routes/account-settings/index.tsx']
+const phoneBindingCard = loaded['src/routes/account-settings/PhoneBindingCard.tsx']
 const auth = loaded['src/services/auth/index.ts']
 const resetPages = [
   loaded['src/routes/login/index.tsx'],
@@ -66,6 +68,62 @@ for (const token of [
   if (!page.includes(token)) fail(`账号设置页缺少 ${token}`)
 }
 pass('修改密码表单包含当前密码、新密码和确认密码字段')
+
+if (
+  page.includes('const [user, setUser] = useState<AuthedUser | null>') &&
+  page.includes('!user?.phoneMasked') &&
+  page.includes('<PhoneBindingCard') &&
+  page.includes("{ ...current, ...phone }")
+) {
+  pass('首次绑定卡只对未绑定账号展示，并以不可变方式更新当前用户')
+} else {
+  fail('首次绑定卡必须只对未绑定账号展示，且不能把 setUser 直接暴露给子组件')
+}
+
+for (const text of [
+  '绑定手机号后，可用于短信登录和忘记密码。',
+  '验证码、密码和绑定凭据不会保存到本机。',
+  'initial-phone-current-password',
+  'initial-phone-number',
+  'initial-phone-code',
+  'autoComplete="current-password"',
+  'autoComplete="one-time-code"',
+]) {
+  if (!phoneBindingCard.includes(text)) fail(`首次绑定卡缺少 ${text}`)
+}
+
+if (
+  phoneBindingCard.includes('startInitialPhoneBind(currentPassword, phone)') &&
+  phoneBindingCard.includes('completeInitialPhoneBind(bindTicket, code)') &&
+  phoneBindingCard.includes('mergeStoredUser(bound)') &&
+  phoneBindingCard.includes('requiresSessionRenewal(result.code)') &&
+  phoneBindingCard.includes('redirectToLogin()') &&
+  phoneBindingCard.includes('requiresRestartAfterVerificationFailure(result.code)') &&
+  phoneBindingCard.includes("'SMS_CODE_INVALID'") &&
+  phoneBindingCard.includes("'PHONE_BIND_TICKET_INVALID'") &&
+  phoneBindingCard.includes("'PHONE_SELF_ALREADY_BOUND'") &&
+  phoneBindingCard.includes("'AUTH_SESSION_INVALID'") &&
+  !phoneBindingCard.includes('localStorage') &&
+  !phoneBindingCard.includes('sessionStorage') &&
+  !phoneBindingCard.includes('console.log')
+) {
+  pass('首次绑定仅发送必要字段，且密码、验证码、ticket 不写浏览器持久化或日志')
+} else {
+  fail('首次绑定卡的请求契约或敏感数据内存边界不符合要求')
+}
+
+if (
+  auth.includes("'/auth/phone/initial-bind/start'") &&
+  auth.includes("'/auth/phone/initial-bind/verify'") &&
+  auth.includes('{ currentPassword, phone }') &&
+  auth.includes('{ bindTicket, code }') &&
+  !auth.includes('console.log(bindTicket)') &&
+  !auth.includes('console.log(code)')
+) {
+  pass('认证 adapter 使用首次绑定专用端点，且不记录绑定凭据或验证码')
+} else {
+  fail('首次绑定 adapter 的端点、请求体或无日志边界不符合要求')
+}
 
 if (
   page.includes('unicodeCharacterLength(newPassword) < 12') &&

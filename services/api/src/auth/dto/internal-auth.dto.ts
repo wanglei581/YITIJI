@@ -139,3 +139,30 @@ export class SelfPhoneVerifyDto {
   @Matches(/^\d{6}$/, { message: '必须是 6 位数字验证码' })
   code!: string
 }
+
+/** 已登录且尚未绑定手机号的内部账号，申请首次绑定验证码。 */
+export class InitialPhoneBindStartDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(72)
+  currentPassword!: string
+
+  @Matches(/^1[3-9]\d{9}$/, { message: '必须是有效的中国大陆手机号' })
+  phone!: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  deviceId?: string
+}
+
+/** 首次绑定确认只接受一次性凭据和验证码，不能再次提交手机号。 */
+export class InitialPhoneBindVerifyDto {
+  @IsString()
+  @MinLength(16)
+  @MaxLength(128)
+  bindTicket!: string
+
+  @Matches(/^\d{6}$/, { message: '必须是 6 位数字验证码' })
+  code!: string
+}

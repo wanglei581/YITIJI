@@ -346,7 +346,11 @@ export class AuthService {
     return { user, phone: decryptPhone(user.phoneEnc) }
   }
 
-  private async findUsableSelfPhoneUser(userId: string): Promise<InternalUser> {
+  /**
+   * 供同一 auth 模块的自助手机号流程复用：只允许当前可用的 admin / partner。
+   * 调用方仍须自行完成各自的密码、OTP 与状态机校验。
+   */
+  async findUsableSelfPhoneUser(userId: string): Promise<InternalUser> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
       throw new UnauthorizedException({ error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' } })

@@ -1,0 +1,12 @@
+{
+  "id": "admin-initial-phone-binding-20260715",
+  "title": "为已登录的未绑手机号内部账号增加可信初始绑定",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "auth",
+  "currentPhase": "completed",
+  "nextAction": "已获推送并创建 PR 授权，先推送当前候选并创建 PR、观察 CI；不得部署或触碰生产数据/配置",
+  "createdAt": "2026-07-15T00:00:00+08:00",
+  "branch": "codex/admin-initial-phone-binding-v2-20260715"
+}
