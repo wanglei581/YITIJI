@@ -38,6 +38,7 @@ function PriceConfigSection() {
   const [items, setItems] = useState<AdminPriceConfigItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<Record<string, string>>({})
+  const [descriptionEditing, setDescriptionEditing] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -84,6 +85,39 @@ function PriceConfigSection() {
     [editing, load],
   )
 
+  const saveDescription = useCallback(
+    async (item: AdminPriceConfigItem) => {
+      const nextDescription = descriptionEditing[item.serviceKey]
+      const currentDescription = item.description ?? ''
+      if (nextDescription === undefined || nextDescription === currentDescription) return
+      if (nextDescription.length > 200) {
+        setError('价目说明不能超过 200 个字符')
+        return
+      }
+      const oldLabel = currentDescription || '（空）'
+      const newLabel = nextDescription || '（空）'
+      if (!window.confirm(
+        `确认更新「${SERVICE_LABELS[item.serviceKey] ?? item.serviceKey}」说明？\n旧说明：${oldLabel}\n新说明：${newLabel}\n只更新说明，不修改单价与启停状态，操作记入审计。`,
+      )) return
+      setSaving(item.serviceKey)
+      setError(null)
+      try {
+        await adminBillingService.updatePriceConfig(item.serviceKey, { description: nextDescription })
+        await load()
+        setDescriptionEditing((prev) => {
+          const next = { ...prev }
+          delete next[item.serviceKey]
+          return next
+        })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '说明更新失败')
+      } finally {
+        setSaving(null)
+      }
+    },
+    [descriptionEditing, load],
+  )
+
   const toggleActive = useCallback(
     async (item: AdminPriceConfigItem) => {
       const nextActive = !item.active
@@ -116,6 +150,7 @@ function PriceConfigSection() {
           <tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
             <th className="px-5 py-3">价目项</th>
             <th className="px-5 py-3">单价（元）</th>
+            <th className="px-5 py-3">说明</th>
             <th className="px-5 py-3">状态</th>
             <th className="px-5 py-3">更新时间</th>
             <th className="px-5 py-3 text-right">操作</th>
@@ -124,6 +159,9 @@ function PriceConfigSection() {
         <tbody>
           {items.map((item) => {
             const editVal = editing[item.serviceKey]
+            const descriptionEditVal = descriptionEditing[item.serviceKey]
+            const currentDescription = item.description ?? ''
+            const descriptionChanged = descriptionEditVal !== undefined && descriptionEditVal !== currentDescription
             const busy = saving === item.serviceKey
             return (
               <tr key={item.serviceKey} className="border-b border-neutral-50">
@@ -143,11 +181,34 @@ function PriceConfigSection() {
                   />
                 </td>
                 <td className="px-5 py-3">
+                  <input
+                    type="text"
+                    maxLength={200}
+                    aria-label={`${SERVICE_LABELS[item.serviceKey] ?? item.serviceKey}说明`}
+                    value={descriptionEditVal ?? currentDescription}
+                    disabled={busy}
+                    onChange={(e) => setDescriptionEditing((prev) => ({
+                      ...prev,
+                      [item.serviceKey]: e.target.value,
+                    }))}
+                    className="w-full min-w-72 rounded-md border border-neutral-200 px-2 py-1 text-sm"
+                  />
+                </td>
+                <td className="px-5 py-3">
                   <StatusBadge status={item.active ? 'success' : 'default'} label={item.active ? '启用' : '停用'} />
                 </td>
                 <td className="px-5 py-3 text-xs text-neutral-400">{new Date(item.updatedAt).toLocaleString('zh-CN')}</td>
                 <td className="px-5 py-3 text-right">
                   <div className="flex justify-end gap-2">
+                    {descriptionChanged && (
+                      <button
+                        onClick={() => void saveDescription(item)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary-600 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                      >
+                        <CheckIcon className="h-3.5 w-3.5" /> 保存说明
+                      </button>
+                    )}
                     {editVal !== undefined && (
                       <button
                         onClick={() => void savePrice(item.serviceKey)}
