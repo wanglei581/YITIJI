@@ -91,6 +91,7 @@
     "verify:fair-company-positions": "node -r @swc-node/register scripts/verify-fair-company-positions.ts",
     "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
     "verify:internal-auth-phone": "node -r @swc-node/register scripts/verify-internal-auth-phone.ts",
+    "verify:internal-auth-phone:target-guard": "node -r @swc-node/register scripts/verify-internal-auth-phone-target-guard.ts",
     "maintenance:backfill-internal-phone": "node -r @swc-node/register scripts/backfill-internal-user-phone.ts",
     "verify:partner-org-self": "node -r @swc-node/register scripts/verify-partner-org-self.ts",
     "verify:partner-edit": "node -r @swc-node/register scripts/verify-partner-edit.ts",
