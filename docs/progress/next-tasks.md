@@ -30,7 +30,7 @@
 
 ## P0：上线前真实验收
 
-- [ ] **首次手机号绑定发布候选收口**：本地候选 `codex/release-auth-payment-preserving-20260715` 以已发布支付运行时 `6c2a9668` / PR #242 文档 head `fad9a488` 为基线，仅引入首次手机号绑定 Admin/Auth/verify，支付、Kiosk 收银、打印、价目和 schema 均保持不变。本地隔离 SQLite、支付回归、API/Admin 类型/lint/build 已通过；Claude + Antigravity 最终 diff 审查均为 `APPROVE`（Critical 0、Warning 0）。下一步待用户单独授权提交/推送/创建 PR，再以 CI 为下一道门禁；不得直接部署 `main`，不得在生产运行 `verify:internal-auth-phone`，不得发送真实短信或发起真实支付/打印。
+- [ ] **首次手机号绑定发布候选收口**：候选 `codex/release-auth-payment-preserving-20260715` 已提交 `7313a0cf`、推送并创建叠加 [PR #246](https://github.com/wanglei581/YITIJI/pull/246)，base 为 PR #242 的 head `codex/production-deployment-integrated-20260715`；仅引入首次手机号绑定 Admin/Auth/verify，支付、Kiosk 收银、打印、价目和 schema 均保持不变。本地隔离 SQLite、支付回归、API/Admin 类型/lint/build 已通过；Claude + Antigravity 最终 diff 审查均为 `APPROVE`（Critical 0、Warning 0）。当前等待 CI；通过后合并与部署仍需用户单独授权。不得直接部署 `main`，不得在生产运行 `verify:internal-auth-phone`，不得发送真实短信或发起真实支付/打印。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 
