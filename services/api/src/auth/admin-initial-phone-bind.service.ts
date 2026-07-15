@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import { decryptPhone, encryptPhone, hashPhone, isValidCnMobile, maskPhone, normalizePhone } from '../common/crypto/phone-identity'
 import { RedisService } from '../common/redis/redis.service'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import { INTERNAL_OTP_CODE_TTL_SECONDS, InternalOtpService } from './internal-otp.service'
 
 const CURRENT_PASSWORD_FAILURE_LIMIT = 5
@@ -116,32 +116,38 @@ export class AdminInitialPhoneBindService {
     }
 
     const phoneVerifiedAt = new Date()
-    let updated: { count: number }
-    try {
-      updated = await this.prisma.user.updateMany({
-        where: {
-          id: user.id,
-          role: 'admin',
-          enabled: true,
-          phoneHash: null,
-          phoneEnc: null,
-          phoneVerifiedAt: null,
-          tokenVersion: ticket.tokenVersion,
-        },
-        data: {
-          phoneHash: ticket.phoneHash,
-          phoneEnc: ticket.encryptedPhone,
-          phoneVerifiedAt,
-        },
-      })
-    } catch {
-      throw this.unavailable()
-    }
-    if (updated.count !== 1) throw this.unavailable()
-
     const phoneMasked = maskPhone(phone)
     try {
-      await this.writeAudit(user.id, 'auth.phone_initial_bind_complete', phoneMasked)
+      await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
+        const updated = await tx.user.updateMany({
+          where: {
+            id: user.id,
+            role: 'admin',
+            enabled: true,
+            phoneHash: null,
+            phoneEnc: null,
+            phoneVerifiedAt: null,
+            tokenVersion: ticket.tokenVersion,
+          },
+          data: {
+            phoneHash: ticket.phoneHash,
+            phoneEnc: ticket.encryptedPhone,
+            phoneVerifiedAt,
+          },
+        })
+        if (updated.count !== 1) throw this.unavailable()
+
+        await tx.auditLog.create({
+          data: {
+            actorId: user.id,
+            actorRole: 'admin',
+            action: 'auth.phone_initial_bind_complete',
+            targetType: 'auth',
+            targetId: user.id,
+            payloadJson: JSON.stringify({ phoneMasked }),
+          },
+        })
+      })
     } catch {
       throw this.unavailable()
     }
@@ -223,7 +229,7 @@ export class AdminInitialPhoneBindService {
     await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket).catch(() => undefined)
   }
 
-  private async writeAudit(userId: string, action: 'auth.phone_initial_bind_start' | 'auth.phone_initial_bind_complete', phoneMasked: string): Promise<void> {
+  private async writeAudit(userId: string, action: 'auth.phone_initial_bind_start', phoneMasked: string): Promise<void> {
     await this.audit.write({
       actorId: userId,
       actorRole: 'admin',
