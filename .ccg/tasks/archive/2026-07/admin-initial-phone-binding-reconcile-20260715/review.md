@@ -25,7 +25,7 @@
 2. 二轮正确性 / 安全复审发现 500 JSON 错误码会覆盖 `HTTP_5xx` 字符串、JWT `AUTH_TOKEN_INVALID` 未清 ticket。strict adapter 现保留 HTTP status；验证对 0 / 401 / 403 / 5xx、非法响应及会话失效重登，发码对 0 / 5xx / 非法响应保守冷却。对应 mock 500 RED → GREEN 已加入 verifier。
 3. 三轮正确性与安全复审均为 APPROVE，未发现 Critical / Warning。
 
-## 未完成的外部门禁
+## 外部终审与未完成的环境门禁
 
-- 未取得可审计的外部 Antigravity + Claude final review；本机 wrapper 没有产生有效终审报告，不能把启动日志或空输出计作批准。
+- Antigravity 与 Claude 均返回可审计的 `APPROVE`（Critical / Warning 0）。唯一 Info 是 `expectCodeAndMessage` 测试辅助函数未使用；不影响运行时、验证或安全边界，且未顺手扩大本任务范围。
 - 未 push、未创建 PR、未跑 GitHub CI、未部署、未发送真实短信、未做受控浏览器真实登录或生产验收。
