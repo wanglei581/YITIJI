@@ -144,6 +144,45 @@ async function getJson<T>(path: string): Promise<{ ok: true; data: T } | { ok: f
   return { ok: false, code, status: res.status }
 }
 
+type AdminInitialPhoneBindStartData = {
+  bindTicket: string
+  cooldownSeconds: number
+  expiresInSeconds: number
+}
+
+type AdminInitialPhoneBindVerifyData = {
+  phoneMasked: string
+  phoneVerifiedAt: string
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function isValidAdminInitialPhoneBindStartResponse(data: unknown): data is AdminInitialPhoneBindStartData {
+  if (typeof data !== 'object' || data === null) return false
+  const candidate = data as Record<string, unknown>
+  return (
+    isNonEmptyString(candidate.bindTicket) &&
+    isNonNegativeFiniteNumber(candidate.cooldownSeconds) &&
+    isNonNegativeFiniteNumber(candidate.expiresInSeconds)
+  )
+}
+
+function isValidAdminInitialPhoneBindVerifyResponse(data: unknown): data is AdminInitialPhoneBindVerifyData {
+  if (typeof data !== 'object' || data === null) return false
+  const candidate = data as Record<string, unknown>
+  return isNonEmptyString(candidate.phoneMasked) && isNonEmptyString(candidate.phoneVerifiedAt)
+}
+
+function invalidAdminInitialPhoneBindResponse(): { ok: false; code: string; message: string } {
+  return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后再试' }
+}
+
 // ─── Public auth API ─────────────────────────────────────────────────────────
 
 export type LoginResult =
@@ -235,6 +274,35 @@ export async function completeInitialPhoneBind(
   )
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return { ok: true, ...r.data }
+}
+
+/** Admin 首次绑定只能走严格状态机，成功响应必须先经过运行时 shape guard。 */
+export async function startAdminInitialPhoneBind(
+  currentPassword: string,
+  phone: string,
+): Promise<{ ok: true; bindTicket: string; cooldownSeconds: number; expiresInSeconds: number } | { ok: false; code: string; message: string }> {
+  const r = await postJson<unknown>('/auth/admin/phone/initial-bind/start', { currentPassword, phone })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  if (!isValidAdminInitialPhoneBindStartResponse(r.data)) return invalidAdminInitialPhoneBindResponse()
+  return {
+    ok: true,
+    bindTicket: r.data.bindTicket,
+    cooldownSeconds: r.data.cooldownSeconds,
+    expiresInSeconds: r.data.expiresInSeconds,
+  }
+}
+
+/** Admin 严格首次绑定成功后，才允许把脱敏展示字段写回现有会话。 */
+export async function verifyAdminInitialPhoneBind(
+  bindTicket: string,
+  code: string,
+): Promise<{ ok: true; phoneMasked: string; phoneVerifiedAt: string } | { ok: false; code: string; message: string }> {
+  const r = await postJson<unknown>('/auth/admin/phone/initial-bind/verify', { bindTicket, code })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  if (!isValidAdminInitialPhoneBindVerifyResponse(r.data)) return invalidAdminInitialPhoneBindResponse()
+  const bound = { phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt }
+  mergeStoredUser(bound)
+  return { ok: true, ...bound }
 }
 
 /** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */
