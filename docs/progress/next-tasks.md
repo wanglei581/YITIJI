@@ -91,8 +91,8 @@
 
 ## P1：Windows 终端机队管理与安全换机
 
-- [x] **设备机队 F0 只读总览最新主线本地集成候选**：独立分支 `codex/device-fleet-f0-integration-20260715` 已基于 `origin/main@cb03b48d` 迁入设计、F0 功能与原归档；仅两份进度 SSOT 与主线有交集，已保留首次手机号绑定、PR #241 / #237 与 F0 全部事实。管理员 GET 白名单、健康 / 版本 / 受限配置摘要、显式引用冲突和原页面深链保持不变；本地专项 verify、API / Admin typecheck、lint、build、Admin HTTP production build、双 Prisma 同步检查均通过，集成最终审查已由 Claude 与 Antigravity 分别返回有效 `APPROVE`，Critical / Warning 均为 0。未 push、未创建 PR、未运行本分支 GitHub CI、未部署或操作 Windows；F1 生产动作未执行，F2/F3 仍为 `CLOSED_MODE`。
-- [ ] **设备机队 F2 安全换机**：前置为“生产管理员凭据轮换 + 手机号验证”已完成受控生产验收。采用凭据 hash-first、候选机受限预检、活动任务为 0 后的原子切换和旧机撤销；双 Prisma migration、既有 Agent/QR/打印回归与 Windows 真机换机验收必须在独立任务完成。不得复用现有 `exchange-bind-code` 直接替换在役主机。
+- [x] **设备机队 F0 只读总览最新主线 PR 候选**：独立分支 `codex/device-fleet-f0-integration-20260715` 已基于 `origin/main@cb03b48d` 迁入设计、F0 功能与原归档；仅两份进度 SSOT 与主线有交集，已保留首次手机号绑定、PR #241 / #237 与 F0 全部事实。管理员 GET 白名单、健康 / 版本 / 受限配置摘要、显式引用冲突和原页面深链保持不变；本地专项 verify、API / Admin typecheck、lint、build、Admin HTTP production build、双 Prisma 同步检查均通过，集成最终审查已由 Claude 与 Antigravity 分别返回有效 `APPROVE`，Critical / Warning 均为 0。已推送并创建 [PR #245](https://github.com/wanglei581/YITIJI/pull/245)；首轮 CI 仅因 F2 待办自然语言误报而使 `build-and-verify` 失败，现已将待办改为“仍需在独立任务完成”并本地复绿，修正提交待 CI 重跑。未合并、未部署或操作 Windows；F1 生产动作未执行，F2/F3 仍为 `CLOSED_MODE`。
+- [ ] **设备机队 F2 安全换机**：前置为“生产管理员凭据轮换 + 手机号验证”已完成受控生产验收。采用凭据 hash-first、候选机受限预检、活动任务为 0 后的原子切换和旧机撤销；双 Prisma migration、既有 Agent/QR/打印回归与 Windows 真机换机验收仍需在独立任务完成。不得复用现有 `exchange-bind-code` 直接替换在役主机。
 
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
 
