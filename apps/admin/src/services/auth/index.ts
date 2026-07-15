@@ -100,8 +100,12 @@ async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; dat
     return { ok: false, code: 'NETWORK_ERROR', message: '网络连接异常，请检查网络后重试', status: 0 }
   }
   if (res.ok) {
-    const payload = await res.json() as { data: T }
-    return { ok: true, data: payload.data }
+    try {
+      const payload = await res.json() as { data: T }
+      return { ok: true, data: payload.data }
+    } catch {
+      return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后重试', status: res.status }
+    }
   }
   let code = `HTTP_${res.status}`
   let message = res.statusText || '请求失败'
@@ -124,8 +128,12 @@ async function getJson<T>(path: string): Promise<{ ok: true; data: T } | { ok: f
     return { ok: false, code: 'NETWORK_ERROR', status: 0 }
   }
   if (res.ok) {
-    const payload = await res.json() as { data: T }
-    return { ok: true, data: payload.data }
+    try {
+      const payload = await res.json() as { data: T }
+      return { ok: true, data: payload.data }
+    } catch {
+      return { ok: false, code: 'INVALID_RESPONSE', status: res.status }
+    }
   }
   let code = `HTTP_${res.status}`
   try {

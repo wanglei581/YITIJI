@@ -20,6 +20,23 @@ const ROLE_LABEL: Record<AuthedUser['role'], string> = {
 const labelCls = 'block text-sm font-medium text-neutral-700 mb-1.5'
 const inputCls = 'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400/20'
 
+function passwordCategoryCount(value: string): number {
+  return [
+    /[a-z]/.test(value),
+    /[A-Z]/.test(value),
+    /\d/.test(value),
+    /[^A-Za-z0-9]/u.test(value),
+  ].filter(Boolean).length
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length
+}
+
+function unicodeCharacterLength(value: string): number {
+  return Array.from(value).length
+}
+
 export default function AccountSettingsPage() {
   const [user] = useState<AuthedUser | null>(() => getUser())
   const [currentPassword, setCurrentPassword] = useState('')
@@ -34,8 +51,16 @@ export default function AccountSettingsPage() {
     if (submitting || successVisible) return
     setError(null)
 
-    if (newPassword.length < 8) {
-      setError('新密码至少 8 位')
+    if (unicodeCharacterLength(newPassword) < 12) {
+      setError('新密码至少 12 位')
+      return
+    }
+    if (utf8ByteLength(newPassword) > 72) {
+      setError('新密码按 UTF-8 计算不能超过 72 字节')
+      return
+    }
+    if (passwordCategoryCount(newPassword) < 3) {
+      setError('新密码至少包含大写字母、小写字母、数字、特殊字符中的 3 类')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -48,14 +73,17 @@ export default function AccountSettingsPage() {
     }
 
     setSubmitting(true)
-    const r = await changePassword(currentPassword, newPassword)
-    setSubmitting(false)
-    if (!r.ok) {
-      setError(r.message || '修改失败，请重试')
-      return
+    try {
+      const r = await changePassword(currentPassword, newPassword)
+      if (!r.ok) {
+        setError(r.message || '修改失败，请重试')
+        return
+      }
+      setSuccessVisible(true)
+      window.setTimeout(() => logout(), 1200)
+    } finally {
+      setSubmitting(false)
     }
-    setSuccessVisible(true)
-    window.setTimeout(() => logout(), 1200)
   }
 
   return (
@@ -100,6 +128,7 @@ export default function AccountSettingsPage() {
                 id="account-current-password"
                 type="password"
                 autoComplete="current-password"
+                maxLength={72}
                 className={inputCls}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
@@ -112,13 +141,18 @@ export default function AccountSettingsPage() {
                 id="account-new-password"
                 type="password"
                 autoComplete="new-password"
-                minLength={8}
-                placeholder="8 位以上"
+                minLength={12}
+                maxLength={72}
+                aria-describedby="account-new-password-hint"
+                placeholder="12 位以上，至少包含 3 类字符"
                 className={inputCls}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
               />
+              <p id="account-new-password-hint" className="mt-1.5 text-xs text-neutral-500">
+                至少包含大写字母、小写字母、数字、特殊字符中的 3 类；按 UTF-8 计算最多 72 字节。
+              </p>
             </div>
             <div>
               <label className={labelCls} htmlFor="account-confirm-password">确认新密码</label>
@@ -126,6 +160,8 @@ export default function AccountSettingsPage() {
                 id="account-confirm-password"
                 type="password"
                 autoComplete="new-password"
+                minLength={12}
+                maxLength={72}
                 className={inputCls}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -134,13 +170,13 @@ export default function AccountSettingsPage() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
+              <div role="alert" className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
                 <CircleAlertIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>{error}</span>
               </div>
             )}
             {successVisible && (
-              <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success-bg px-3 py-2 text-sm text-success-fg">
+              <div role="status" aria-live="polite" className="flex items-center gap-2 rounded-lg border border-success/30 bg-success-bg px-3 py-2 text-sm text-success-fg">
                 <CircleCheckIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>密码已修改，正在退出登录…</span>
               </div>

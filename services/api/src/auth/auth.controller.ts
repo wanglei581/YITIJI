@@ -2,7 +2,9 @@ import { BadRequestException, Body, Controller, Get, Ip, Post, UseGuards } from 
 import { Throttle } from '@nestjs/throttler'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
+import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RolesGuard } from '../common/guards/roles.guard'
 import { AuthService, type LoginResult } from './auth.service'
 import {
   ChangePasswordDto,
@@ -95,7 +97,8 @@ export class AuthController {
 
   /** 登录态自助改密:须提供当前密码校验身份,成功后旧 token 立即失效,需重新登录。 */
   @Post('password/change')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'partner')
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async changePassword(
     @CurrentUser() user: AuthedUser,

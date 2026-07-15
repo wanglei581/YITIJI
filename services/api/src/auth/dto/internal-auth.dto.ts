@@ -25,6 +25,36 @@ function IsBcryptSafeByteLength(validationOptions?: ValidationOptions) {
   }
 }
 
+/**
+ * 商用内部账号密码规则：至少 12 位，并至少命中 4 类字符中的 3 类。
+ * 服务端是最终安全边界；前端只做同规则的即时提示。
+ */
+function IsCommercialStrongPassword(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isCommercialStrongPassword',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown) {
+          if (typeof value !== 'string' || Array.from(value).length < 12) return false
+          const categories = [
+            /[a-z]/.test(value),
+            /[A-Z]/.test(value),
+            /\d/.test(value),
+            /[^A-Za-z0-9]/u.test(value),
+          ].filter(Boolean).length
+          return categories >= 3
+        },
+        defaultMessage() {
+          return '新密码至少 12 位，并至少包含大写字母、小写字母、数字、特殊字符中的 3 类'
+        },
+      },
+    })
+  }
+}
+
 export class SendInternalSmsCodeDto {
   @Matches(/^1[3-9]\d{9}$/, { message: '必须是有效的中国大陆手机号' })
   phone!: string
@@ -77,9 +107,10 @@ export class PasswordResetCompleteDto {
   resetTicket!: string
 
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
   @MaxLength(72)
   @IsBcryptSafeByteLength()
+  @IsCommercialStrongPassword()
   newPassword!: string
 }
 
@@ -90,9 +121,10 @@ export class ChangePasswordDto {
   currentPassword!: string
 
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
   @MaxLength(72)
   @IsBcryptSafeByteLength()
+  @IsCommercialStrongPassword()
   newPassword!: string
 }
 

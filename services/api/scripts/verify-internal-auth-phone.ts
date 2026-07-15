@@ -83,6 +83,21 @@ class MemoryRedis {
     this.store.set(key, value)
   }
 
+  setJsonIfVersionNotOlder(
+    key: string,
+    _ttlSeconds: number,
+    value: string,
+    tokenVersion: number,
+  ): Promise<'stored' | 'stale'> {
+    const current = this.store.get(key)
+    if (current) {
+      const currentVersion = (JSON.parse(current) as { tokenVersion?: number }).tokenVersion
+      if (typeof currentVersion === 'number' && currentVersion > tokenVersion) return Promise.resolve('stale')
+    }
+    this.store.set(key, value)
+    return Promise.resolve('stored')
+  }
+
   del(key: string): Promise<number> {
     const existed = this.store.delete(key)
     return Promise.resolve(existed ? 1 : 0)

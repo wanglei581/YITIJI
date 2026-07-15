@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { createHash, randomInt, randomUUID } from 'crypto'
@@ -24,6 +24,7 @@ type SmsPortal = 'admin' | 'partner'
 const RESET_TICKET_TTL = 600
 const RESET_UNKNOWN_IP_TTL = 60
 const RESET_UNKNOWN_IP_LIMIT = 5
+const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
 
 export interface LoginResult {
   token: string
@@ -65,6 +66,8 @@ interface ResetTarget {
  */
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name)
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
@@ -175,7 +178,7 @@ export class AuthService {
       where: { id: userId },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
-    await this.invalidateSessionState(user.id)
+    await this.publishCredentialChangeSessionState(user)
     await this.writeAudit(user.id, user.role, 'auth.password_reset_complete', {})
     return { success: true }
   }
@@ -194,13 +197,19 @@ export class AuthService {
       throw new UnauthorizedException({ error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' } })
     }
 
-    await this.assertChangePasswordNotRateLimited(user.id)
+    await this.reserveChangePasswordAttempt(user.id)
 
-    const ok = await bcrypt.compare(currentPassword, user.passwordHash)
+    let ok: boolean
+    try {
+      ok = await bcrypt.compare(currentPassword, user.passwordHash)
+    } catch (error) {
+      await this.releaseChangePasswordAttempt(user.id)
+      throw error
+    }
     if (!ok) {
-      await this.recordChangePasswordFailure(user.id)
       throw new BadRequestException({ error: { code: 'AUTH_PASSWORD_MISMATCH', message: '当前密码不正确' } })
     }
+    await this.releaseChangePasswordAttempt(user.id)
 
     const unchanged = await bcrypt.compare(newPassword, user.passwordHash)
     if (unchanged) {
@@ -218,7 +227,8 @@ export class AuthService {
       }, HttpStatus.CONFLICT)
     }
 
-    await this.invalidateSessionState(user.id)
+    await this.publishCredentialChangeSessionState({ ...user, tokenVersion: user.tokenVersion + 1 })
+    await this.clearChangePasswordFailuresAfterCommit(user.id)
     await this.writeAudit(user.id, user.role, 'auth.password_change_self', {})
     return { success: true }
   }
@@ -227,17 +237,27 @@ export class AuthService {
     return `internal:password-change:fail:${userId}`
   }
 
-  private async assertChangePasswordNotRateLimited(userId: string): Promise<void> {
-    const raw = await this.redis.get(this.changePasswordFailKey(userId))
-    if (Number(raw ?? '0') >= 5) {
-      throw new HttpException({
-        error: { code: 'AUTH_CHANGE_PASSWORD_RATE_LIMITED', message: '当前密码验证失败次数过多，请 5 分钟后再试' },
-      }, HttpStatus.TOO_MANY_REQUESTS)
+  private async reserveChangePasswordAttempt(userId: string): Promise<void> {
+    const reserved = await this.redis.reserveWithinLimitWithTtl(this.changePasswordFailKey(userId), 300, 5)
+    if (!reserved) throw this.changePasswordRateLimited()
+  }
+
+  private async releaseChangePasswordAttempt(userId: string): Promise<void> {
+    await this.redis.releaseReservedLimit(this.changePasswordFailKey(userId))
+  }
+
+  private async clearChangePasswordFailuresAfterCommit(userId: string): Promise<void> {
+    try {
+      await this.redis.del(this.changePasswordFailKey(userId))
+    } catch {
+      this.logger.warn('密码已更新，但失败尝试计数清理失败；计数会在 TTL 后自动失效')
     }
   }
 
-  private async recordChangePasswordFailure(userId: string): Promise<void> {
-    await this.redis.incrWithTtl(this.changePasswordFailKey(userId), 300)
+  private changePasswordRateLimited(): HttpException {
+    return new HttpException({
+      error: { code: 'AUTH_CHANGE_PASSWORD_RATE_LIMITED', message: '当前密码验证失败次数过多，请 5 分钟后再试' },
+    }, HttpStatus.TOO_MANY_REQUESTS)
   }
 
   async sendPhoneBindCode(phone: string, ip: string, deviceId?: string): Promise<InternalSendCodeResult> {
@@ -446,8 +466,37 @@ export class AuthService {
     return `internal:session-state:${userId}`
   }
 
-  private async invalidateSessionState(userId: string): Promise<void> {
-    await this.redis.del(this.sessionStateKey(userId))
+  private async publishCredentialChangeSessionState(
+    user: Pick<InternalUser, 'id' | 'role' | 'orgId' | 'enabled' | 'tokenVersion'>,
+  ): Promise<void> {
+    try {
+      let orgEnabled: boolean | null = null
+      if (user.role === 'partner' && user.orgId) {
+        const org = await this.prisma.organization.findUnique({
+          where: { id: user.orgId },
+          select: { enabled: true },
+        })
+        orgEnabled = org?.enabled ?? false
+      }
+      await this.redis.setJsonIfVersionNotOlder(
+        this.sessionStateKey(user.id),
+        INTERNAL_SESSION_CACHE_TTL_SECONDS,
+        JSON.stringify({
+          userId: user.id,
+          role: user.role,
+          orgId: user.orgId,
+          enabled: user.enabled,
+          tokenVersion: user.tokenVersion,
+          orgEnabled,
+        }),
+        user.tokenVersion,
+      )
+    } catch {
+      // 数据库已完成凭据更新后，不再把一次 Redis 故障伪装成“密码未修改”。
+      // Guard 在 Redis 不可用时会失败关闭；缓存恢复后以数据库 tokenVersion 为准。
+      await this.redis.del(this.sessionStateKey(user.id)).catch(() => undefined)
+      this.logger.warn('密码已更新，但会话状态缓存同步失败；鉴权将在缓存恢复后以数据库版本为准')
+    }
   }
 
   private async writeAudit(
