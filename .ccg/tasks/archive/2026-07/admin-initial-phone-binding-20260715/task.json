@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "auth",
   "currentPhase": "completed",
-  "nextAction": "候选仅本地提交后归档；PR、CI、push 与部署必须由新任务取得单独授权，并修复或替代 Antigravity 审查门禁",
+  "nextAction": "已获推送并创建 PR 授权，先推送当前候选并创建 PR、观察 CI；不得部署或触碰生产数据/配置",
   "createdAt": "2026-07-15T00:00:00+08:00",
   "branch": "codex/admin-initial-phone-binding-v2-20260715"
 }

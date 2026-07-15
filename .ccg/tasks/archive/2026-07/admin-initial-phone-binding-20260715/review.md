@@ -1,7 +1,7 @@
 # 首次手机号绑定审查记录
 
 日期：2026-07-15
-状态：本地复审通过；Claude 最终复审为 APPROVE，但 Antigravity 未产出有效报告，不能标记为合并就绪。
+状态：本地复审与双模型有效终审通过；已获推送并创建 PR 授权，尚未部署。
 
 ## 本地复审结论
 
@@ -15,7 +15,7 @@
 
 ## 已执行验证
 
-- `INTERNAL_AUTH_VERIFY_TARGET=isolated` + 迁移生成的 `/tmp` SQLite：`verify:internal-auth-phone` 通过。
+- `INTERNAL_AUTH_VERIFY_TARGET=isolated` + `RUST_LOG=info` 的 `db push` 初始化 `/tmp` SQLite：`verify:internal-auth-phone` 通过。
 - API：typecheck、lint、`db:pg:sync:check` 通过。
 - Admin：typecheck、lint、`VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` production build、`verify:admin-account-settings-ui` 通过。
 - `git diff --check` 与两个新增文件的 whitespace check 通过。
@@ -23,13 +23,13 @@
 
 ## 外部审查状态
 
-- Antigravity：前三次 reviewer 调用均只返回 wrapper 启动信息；最后一次虽返回正文，却被错误路由到另一个旧工作区的 Admin/Partner 主题任务，未读取本候选文件，因此全部不是本任务的有效 APPROVE。
+- Antigravity：前三次 reviewer 调用均只返回 wrapper 启动信息；此前错路由到另一个旧工作区的主题任务的正文也不计入。随后已在本候选隔离 worktree 取得有效只读报告：**APPROVE（Critical 0 / Warning 0）**；两条 Info 分别提示错误 OTP 后需重新开始，以及生产 HTTP 日志应统一脱敏密码字段。
 - Claude：完整审查先给出 2 条非阻断 Warning；修复后复审确认 `PHONE_SELF_ALREADY_BOUND` 语义分离、`AUTH_SESSION_INVALID` 清会话跳登录、ticket/OTP 防重放与旧预绑定流程均正确，最终为 **APPROVE（Critical 0 / Warning 0）**。
-- 双模型门禁仍缺少 Antigravity 有效报告，且现有 `agy` 路由必须先修复至当前隔离 worktree。后续必须取得该报告，或由用户按项目治理流程明确接受替代审查方案，才可考虑提交/PR。
+- 双模型有效终审门禁现已满足；当前允许进入授权范围内的推送和 PR，GitHub CI 与生产部署仍是后续独立门禁。
 
 ## 本轮授权结论
 
-用户已授权以 Claude 有效复审与完整本地验证作为本次**仅本地提交**的替代审查依据。该授权不包括 push、PR、GitHub CI、部署、真实短信或任何生产数据/配置变更；也不将 Antigravity 的错路由输出视为有效批准。
+用户随后已授权**推送当前分支并创建 PR，不部署**。该授权不包括生产部署、真实短信或任何生产数据/配置变更；此前 Antigravity 的错路由输出仍不作为批准依据。
 
 ## 未做
 
