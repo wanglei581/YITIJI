@@ -3,6 +3,8 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createContext, Script } from 'node:vm'
+import ts from 'typescript'
 
 const root = process.cwd()
 
@@ -53,6 +55,125 @@ const resetPages = [
   loaded['../partner/src/routes/login/index.tsx'],
 ]
 const partnerAuth = loaded['../partner/src/services/auth/index.ts']
+
+const AUTH_STORAGE_KEY = 'admin_auth_v1'
+const VALID_BIND_TICKET = '2db6a54a-c472-4477-a8fe-2dcdde4eceb5'
+const VALID_PHONE_VERIFIED_AT = '2026-07-15T00:00:00.000Z'
+const INITIAL_AUTH_STATE = {
+  token: 'adapter-test-token',
+  user: { id: 'admin-1', name: 'Admin', role: 'admin', orgId: null },
+}
+
+function expect(condition, message) {
+  if (!condition) throw new Error(message)
+}
+
+function createAdminAuthAdapterHarness(responses) {
+  const storage = new Map([[AUTH_STORAGE_KEY, JSON.stringify(INITIAL_AUTH_STATE)]])
+  const initialStoredState = storage.get(AUTH_STORAGE_KEY)
+  let writes = 0
+  const localStorage = {
+    getItem(key) {
+      return storage.get(key) ?? null
+    },
+    setItem(key, value) {
+      writes += 1
+      storage.set(key, String(value))
+    },
+    removeItem(key) {
+      storage.delete(key)
+    },
+  }
+  const fetch = async () => {
+    const next = responses.shift()
+    if (next instanceof Error) throw next
+    if (!next) throw new Error('Missing stubbed fetch response')
+    return {
+      ok: next.status >= 200 && next.status < 300,
+      status: next.status,
+      statusText: next.statusText ?? '',
+      json: async () => next.body,
+    }
+  }
+  const module = { exports: {} }
+  const context = createContext({
+    module,
+    exports: module.exports,
+    require: (specifier) => {
+      if (specifier === '../api/client') return { API_BASE_URL: 'https://adapter-test.invalid' }
+      throw new Error(`Unexpected module: ${specifier}`)
+    },
+    fetch,
+    localStorage,
+    window: { location: { pathname: '/account-settings', href: '' } },
+  })
+  const transpiled = ts.transpileModule(auth, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    fileName: 'auth/index.ts',
+  })
+  new Script(transpiled.outputText, { filename: 'auth/index.js' }).runInContext(context)
+  return {
+    auth: module.exports,
+    storedState: () => storage.get(AUTH_STORAGE_KEY),
+    initialStoredState,
+    writes: () => writes,
+  }
+}
+
+function okResponse(data) {
+  return { status: 200, body: { data } }
+}
+
+async function verifyAdminInitialPhoneBindAdapterBehavior() {
+  const invalidStartResponses = [
+    ['non-UUID ticket', { bindTicket: 'ticket', cooldownSeconds: 60, expiresInSeconds: 300 }],
+    ['out-of-range cooldown', { bindTicket: VALID_BIND_TICKET, cooldownSeconds: 301, expiresInSeconds: 300 }],
+    ['non-integer expiry', { bindTicket: VALID_BIND_TICKET, cooldownSeconds: 60, expiresInSeconds: 299.5 }],
+    ['zero expiry', { bindTicket: VALID_BIND_TICKET, cooldownSeconds: 60, expiresInSeconds: 0 }],
+  ]
+  for (const [label, data] of invalidStartResponses) {
+    const harness = createAdminAuthAdapterHarness([okResponse(data)])
+    const result = await harness.auth.startAdminInitialPhoneBind('CurrentPassword!', '13812341234')
+    expect(!result.ok && result.code === 'INVALID_RESPONSE', `start must reject ${label}`)
+    expect(harness.storedState() === harness.initialStoredState && harness.writes() === 0, `start must not persist ${label}`)
+  }
+
+  const validStartHarness = createAdminAuthAdapterHarness([
+    okResponse({ bindTicket: VALID_BIND_TICKET, cooldownSeconds: 60, expiresInSeconds: 300 }),
+  ])
+  const validStart = await validStartHarness.auth.startAdminInitialPhoneBind('CurrentPassword!', '13812341234')
+  expect(validStart.ok && validStart.bindTicket === VALID_BIND_TICKET, 'start must accept a bounded UUID response')
+  expect(validStartHarness.writes() === 0, 'start must never persist a ticket')
+
+  const invalidVerifyResponses = [
+    ['plaintext phone', { phoneMasked: '13812341234', phoneVerifiedAt: VALID_PHONE_VERIFIED_AT }],
+    ['malformed mask', { phoneMasked: '138***1234', phoneVerifiedAt: VALID_PHONE_VERIFIED_AT }],
+    ['non-canonical ISO', { phoneMasked: '138****1234', phoneVerifiedAt: '2026-07-15T00:00:00Z' }],
+  ]
+  for (const [label, data] of invalidVerifyResponses) {
+    const harness = createAdminAuthAdapterHarness([okResponse(data)])
+    const result = await harness.auth.verifyAdminInitialPhoneBind(VALID_BIND_TICKET, '123456')
+    expect(!result.ok && result.code === 'INVALID_RESPONSE', `verify must reject ${label}`)
+    expect(harness.storedState() === harness.initialStoredState && harness.writes() === 0, `verify must not persist ${label}`)
+  }
+
+  for (const phoneMasked of ['138****1234', '***']) {
+    const harness = createAdminAuthAdapterHarness([okResponse({ phoneMasked, phoneVerifiedAt: VALID_PHONE_VERIFIED_AT })])
+    const result = await harness.auth.verifyAdminInitialPhoneBind(VALID_BIND_TICKET, '123456')
+    expect(result.ok && result.phoneMasked === phoneMasked, `verify must accept backend mask ${phoneMasked}`)
+    const stored = JSON.parse(harness.storedState())
+    expect(stored.user.phoneMasked === phoneMasked, 'verify may persist only the validated masked phone')
+    expect(stored.user.phoneVerifiedAt === VALID_PHONE_VERIFIED_AT, 'verify must persist the validated canonical timestamp')
+    expect(harness.writes() === 1, 'only a valid verify response may update the stored user')
+  }
+}
+
+try {
+  await verifyAdminInitialPhoneBindAdapterBehavior()
+  pass('Admin 严格绑定 adapter 已在隔离 VM 中拒绝异常或明文 2xx，且只持久化有效脱敏响应')
+} catch (error) {
+  fail(`Admin 严格绑定 adapter 运行时行为验证失败: ${error instanceof Error ? error.message : String(error)}`)
+}
 
 const entryCount = (layout.match(/href="\/account-settings"/g) ?? []).length
 if (entryCount === 1 && layout.includes('aria-label="账号设置"')) {
@@ -122,16 +243,17 @@ if (
 }
 
 if (
-  auth.includes("typeof value === 'number' && Number.isFinite(value) && value >= 0") &&
-  auth.includes('isNonEmptyString(candidate.bindTicket)') &&
-  auth.includes('isNonEmptyString(candidate.phoneMasked)') &&
-  auth.includes('isNonEmptyString(candidate.phoneVerifiedAt)') &&
+  auth.includes('Number.isSafeInteger(value) && value >= 0 && value <= 300') &&
+  auth.includes('UUID') &&
+  auth.includes("/^1[3-9]\\d\\*{4}\\d{4}$/") &&
+  auth.includes("value === '***'") &&
+  auth.includes('new Date(value).toISOString() === value') &&
   auth.includes("code: 'INVALID_RESPONSE'") &&
   auth.includes("message: '服务响应异常，请稍后再试'")
 ) {
-  pass('Admin adapter 拒绝 ticket、冷却、过期或脱敏绑定字段异常的 2xx 响应')
+  pass('Admin adapter 对 ticket、秒数、脱敏手机号和时间戳执行严格运行时 guard')
 } else {
-  fail('Admin adapter 缺少严格的成功响应 shape guard 或统一 INVALID_RESPONSE 回退')
+  fail('Admin adapter 缺少 UUID、0..300 安全整数、脱敏手机号或 canonical ISO 的严格 guard')
 }
 
 const verifyGuardIndex = verifyAdminInitialPhoneBind.indexOf('isValidAdminInitialPhoneBindVerifyResponse(r.data)')
@@ -195,6 +317,8 @@ if (
   fail('发码必须阻止重复发送，且 NETWORK_ERROR/INVALID_RESPONSE 必须保守锁定 300 秒')
 }
 
+const redirectsAfterUncertainVerification = /if \(requiresLoginAfterUncertainVerification\(result\.code\)\) \{\s*clearVerificationState\(\)\s*redirectToLogin\(\)\s*return/.test(adminPhoneBindingCard)
+
 if (
   adminPhoneBindingCard.includes('function clearVerificationState()') &&
   adminPhoneBindingCard.includes('setBindTicket(null)') &&
@@ -202,15 +326,18 @@ if (
   adminPhoneBindingCard.includes("setCode('')") &&
   adminPhoneBindingCard.includes('requiresRestartAfterVerificationFailure(result.code)') &&
   adminPhoneBindingCard.includes("'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE'") &&
-  adminPhoneBindingCard.includes("result.code === 'NETWORK_ERROR' || result.code === 'INVALID_RESPONSE'") &&
-  adminPhoneBindingCard.includes('请刷新页面后确认绑定状态') &&
+  redirectsAfterUncertainVerification &&
+  adminPhoneBindingCard.includes("code === 'NETWORK_ERROR'") &&
+  adminPhoneBindingCard.includes("code === 'INVALID_RESPONSE'") &&
+  adminPhoneBindingCard.includes('/^HTTP_5\\d{2}$/') &&
+  !adminPhoneBindingCard.includes('请刷新页面后确认绑定状态') &&
   adminPhoneBindingCard.includes('ticketExpiresAt <= Date.now()') &&
   adminPhoneBindingCard.includes('window.setInterval') &&
   adminPhoneBindingCard.includes('return () => window.clearInterval(timer)')
 ) {
-  pass('验证码到期、已知验证失败与未知验证结果都会清除本地 ticket 状态，计时器会清理')
+  pass('验证码到期、已知验证失败与不确定的 NETWORK/INVALID/HTTP_5xx 结果都会清理 ticket；后者强制重新登录')
 } else {
-  fail('Admin 专用卡必须在 ticket 到期、验证失败或未知响应后安全清理，并清理计时器')
+  fail('Admin 专用卡必须在 ticket 到期、验证失败或不确定结果后安全清理；NETWORK/INVALID/HTTP_5xx 必须重新登录')
 }
 
 if (
