@@ -10,6 +10,7 @@ import { Card, Button } from '@ai-job-print/ui'
 import { CircleAlertIcon, CircleCheckIcon, LockKeyholeIcon, ShieldCheckIcon, UserRoundIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { changePassword, getUser, logout, type AuthedUser } from '../../services/auth'
+import { PhoneBindingCard } from './PhoneBindingCard'
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin: '超级管理员',
@@ -38,7 +39,7 @@ function unicodeCharacterLength(value: string): number {
 }
 
 export default function AccountSettingsPage() {
-  const [user] = useState<AuthedUser | null>(() => getUser())
+  const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -113,6 +114,12 @@ export default function AccountSettingsPage() {
             </div>
           </div>
         </Card>
+
+        {!user?.phoneMasked && (
+          <PhoneBindingCard
+            onBound={(phone) => setUser((current) => current ? { ...current, ...phone } : current)}
+          />
+        )}
 
         <Card className="p-5">
           <div className="mb-4">
