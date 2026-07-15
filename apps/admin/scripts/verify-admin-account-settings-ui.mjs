@@ -1,8 +1,10 @@
 // Admin 账号设置与修改密码 UI 防回退验证（静态门禁，不连服务）。
-// 锁定：唯一顶栏入口、受保护路由、三字段、商用强密码提示、错误恢复和成功强制退出。
+// 锁定：唯一顶栏入口、强密码保护，以及 Admin 严格首次手机号绑定的本地恢复语义。
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createContext, Script } from 'node:vm'
+import ts from 'typescript'
 
 const root = process.cwd()
 
@@ -15,11 +17,19 @@ function fail(message) {
   process.exit(1)
 }
 
+function sourceForFunction(source, name) {
+  const start = source.indexOf(`export async function ${name}`)
+  if (start === -1) return ''
+  const next = source.indexOf('\nexport ', start + 1)
+  return source.slice(start, next === -1 ? source.length : next)
+}
+
 const required = [
   'src/layouts/AdminLayoutWrapper.tsx',
   'src/routes/login/index.tsx',
   'src/routes/index.tsx',
   'src/routes/account-settings/index.tsx',
+  'src/routes/account-settings/AdminInitialPhoneBindingCard.tsx',
   'src/routes/account-settings/PhoneBindingCard.tsx',
   'src/services/auth/index.ts',
   '../partner/src/routes/login/index.tsx',
@@ -37,13 +47,151 @@ for (const rel of required) {
 const layout = loaded['src/layouts/AdminLayoutWrapper.tsx']
 const routes = loaded['src/routes/index.tsx']
 const page = loaded['src/routes/account-settings/index.tsx']
-const phoneBindingCard = loaded['src/routes/account-settings/PhoneBindingCard.tsx']
+const adminPhoneBindingCard = loaded['src/routes/account-settings/AdminInitialPhoneBindingCard.tsx']
+const genericPhoneBindingCard = loaded['src/routes/account-settings/PhoneBindingCard.tsx']
 const auth = loaded['src/services/auth/index.ts']
 const resetPages = [
   loaded['src/routes/login/index.tsx'],
   loaded['../partner/src/routes/login/index.tsx'],
 ]
 const partnerAuth = loaded['../partner/src/services/auth/index.ts']
+
+const AUTH_STORAGE_KEY = 'admin_auth_v1'
+const VALID_BIND_TICKET = '2db6a54a-c472-4477-a8fe-2dcdde4eceb5'
+const VALID_PHONE_VERIFIED_AT = '2026-07-15T00:00:00.000Z'
+const INITIAL_AUTH_STATE = {
+  token: 'adapter-test-token',
+  user: { id: 'admin-1', name: 'Admin', role: 'admin', orgId: null },
+}
+
+function expect(condition, message) {
+  if (!condition) throw new Error(message)
+}
+
+function createAdminAuthAdapterHarness(responses) {
+  const storage = new Map([[AUTH_STORAGE_KEY, JSON.stringify(INITIAL_AUTH_STATE)]])
+  const initialStoredState = storage.get(AUTH_STORAGE_KEY)
+  let writes = 0
+  const localStorage = {
+    getItem(key) {
+      return storage.get(key) ?? null
+    },
+    setItem(key, value) {
+      writes += 1
+      storage.set(key, String(value))
+    },
+    removeItem(key) {
+      storage.delete(key)
+    },
+  }
+  const fetch = async () => {
+    const next = responses.shift()
+    if (next instanceof Error) throw next
+    if (!next) throw new Error('Missing stubbed fetch response')
+    return {
+      ok: next.status >= 200 && next.status < 300,
+      status: next.status,
+      statusText: next.statusText ?? '',
+      json: async () => next.body,
+    }
+  }
+  const module = { exports: {} }
+  const context = createContext({
+    module,
+    exports: module.exports,
+    require: (specifier) => {
+      if (specifier === '../api/client') return { API_BASE_URL: 'https://adapter-test.invalid' }
+      throw new Error(`Unexpected module: ${specifier}`)
+    },
+    fetch,
+    localStorage,
+    window: { location: { pathname: '/account-settings', href: '' } },
+  })
+  const transpiled = ts.transpileModule(auth, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    fileName: 'auth/index.ts',
+  })
+  new Script(transpiled.outputText, { filename: 'auth/index.js' }).runInContext(context)
+  return {
+    auth: module.exports,
+    storedState: () => storage.get(AUTH_STORAGE_KEY),
+    initialStoredState,
+    writes: () => writes,
+  }
+}
+
+function okResponse(data) {
+  return { status: 200, body: { data } }
+}
+
+async function verifyAdminInitialPhoneBindAdapterBehavior() {
+  const invalidStartResponses = [
+    ['non-UUID ticket', { bindTicket: 'ticket', cooldownSeconds: 60, expiresInSeconds: 300 }],
+    ['out-of-range cooldown', { bindTicket: VALID_BIND_TICKET, cooldownSeconds: 301, expiresInSeconds: 300 }],
+    ['non-integer expiry', { bindTicket: VALID_BIND_TICKET, cooldownSeconds: 60, expiresInSeconds: 299.5 }],
+    ['zero expiry', { bindTicket: VALID_BIND_TICKET, cooldownSeconds: 60, expiresInSeconds: 0 }],
+  ]
+  for (const [label, data] of invalidStartResponses) {
+    const harness = createAdminAuthAdapterHarness([okResponse(data)])
+    const result = await harness.auth.startAdminInitialPhoneBind('CurrentPassword!', '13812341234')
+    expect(!result.ok && result.code === 'INVALID_RESPONSE', `start must reject ${label}`)
+    expect(harness.storedState() === harness.initialStoredState && harness.writes() === 0, `start must not persist ${label}`)
+  }
+
+  const validStartHarness = createAdminAuthAdapterHarness([
+    okResponse({ bindTicket: VALID_BIND_TICKET, cooldownSeconds: 60, expiresInSeconds: 300 }),
+  ])
+  const validStart = await validStartHarness.auth.startAdminInitialPhoneBind('CurrentPassword!', '13812341234')
+  expect(validStart.ok && validStart.bindTicket === VALID_BIND_TICKET, 'start must accept a bounded UUID response')
+  expect(validStartHarness.writes() === 0, 'start must never persist a ticket')
+
+  const startServerErrorHarness = createAdminAuthAdapterHarness([
+    { status: 500, body: { error: { code: 'INTERNAL_SERVER_ERROR', message: 'server error' } } },
+  ])
+  const startServerError = await startServerErrorHarness.auth.startAdminInitialPhoneBind('CurrentPassword!', '13812341234')
+  expect(
+    !startServerError.ok && startServerError.code === 'INTERNAL_SERVER_ERROR' && startServerError.status === 500,
+    'start must retain status=500 even when the error body overrides the code',
+  )
+
+  const invalidVerifyResponses = [
+    ['plaintext phone', { phoneMasked: '13812341234', phoneVerifiedAt: VALID_PHONE_VERIFIED_AT }],
+    ['malformed mask', { phoneMasked: '138***1234', phoneVerifiedAt: VALID_PHONE_VERIFIED_AT }],
+    ['non-canonical ISO', { phoneMasked: '138****1234', phoneVerifiedAt: '2026-07-15T00:00:00Z' }],
+  ]
+  for (const [label, data] of invalidVerifyResponses) {
+    const harness = createAdminAuthAdapterHarness([okResponse(data)])
+    const result = await harness.auth.verifyAdminInitialPhoneBind(VALID_BIND_TICKET, '123456')
+    expect(!result.ok && result.code === 'INVALID_RESPONSE', `verify must reject ${label}`)
+    expect(harness.storedState() === harness.initialStoredState && harness.writes() === 0, `verify must not persist ${label}`)
+  }
+
+  for (const phoneMasked of ['138****1234', '***']) {
+    const harness = createAdminAuthAdapterHarness([okResponse({ phoneMasked, phoneVerifiedAt: VALID_PHONE_VERIFIED_AT })])
+    const result = await harness.auth.verifyAdminInitialPhoneBind(VALID_BIND_TICKET, '123456')
+    expect(result.ok && result.phoneMasked === phoneMasked, `verify must accept backend mask ${phoneMasked}`)
+    const stored = JSON.parse(harness.storedState())
+    expect(stored.user.phoneMasked === phoneMasked, 'verify may persist only the validated masked phone')
+    expect(stored.user.phoneVerifiedAt === VALID_PHONE_VERIFIED_AT, 'verify must persist the validated canonical timestamp')
+    expect(harness.writes() === 1, 'only a valid verify response may update the stored user')
+  }
+
+  const verifyServerErrorHarness = createAdminAuthAdapterHarness([
+    { status: 500, body: { error: { code: 'INTERNAL_SERVER_ERROR', message: 'server error' } } },
+  ])
+  const verifyServerError = await verifyServerErrorHarness.auth.verifyAdminInitialPhoneBind(VALID_BIND_TICKET, '123456')
+  expect(
+    !verifyServerError.ok && verifyServerError.code === 'INTERNAL_SERVER_ERROR' && verifyServerError.status === 500,
+    'verify must retain status=500 even when the error body overrides the code',
+  )
+}
+
+try {
+  await verifyAdminInitialPhoneBindAdapterBehavior()
+  pass('Admin 严格绑定 adapter 已在隔离 VM 中拒绝异常或明文 2xx，且只持久化有效脱敏响应')
+} catch (error) {
+  fail(`Admin 严格绑定 adapter 运行时行为验证失败: ${error instanceof Error ? error.message : String(error)}`)
+}
 
 const entryCount = (layout.match(/href="\/account-settings"/g) ?? []).length
 if (entryCount === 1 && layout.includes('aria-label="账号设置"')) {
@@ -71,58 +219,177 @@ pass('修改密码表单包含当前密码、新密码和确认密码字段')
 
 if (
   page.includes('const [user, setUser] = useState<AuthedUser | null>') &&
-  page.includes('!user?.phoneMasked') &&
-  page.includes('<PhoneBindingCard') &&
-  page.includes("{ ...current, ...phone }")
+  page.includes("user?.role === 'admin' && !user.phoneMasked") &&
+  page.includes('<AdminInitialPhoneBindingCard') &&
+  page.includes('{ ...current, ...phone }') &&
+  !page.includes("from './PhoneBindingCard'") &&
+  !page.includes('<PhoneBindingCard')
 ) {
-  pass('首次绑定卡只对未绑定账号展示，并以不可变方式更新当前用户')
+  pass('仅未绑定的已登录 Admin 显示专用首次绑定卡，且不可变更新当前用户')
 } else {
-  fail('首次绑定卡必须只对未绑定账号展示，且不能把 setUser 直接暴露给子组件')
-}
-
-for (const text of [
-  '绑定手机号后，可用于短信登录和忘记密码。',
-  '验证码、密码和绑定凭据不会保存到本机。',
-  'initial-phone-current-password',
-  'initial-phone-number',
-  'initial-phone-code',
-  'autoComplete="current-password"',
-  'autoComplete="one-time-code"',
-]) {
-  if (!phoneBindingCard.includes(text)) fail(`首次绑定卡缺少 ${text}`)
+  fail('Admin 首次绑定必须只使用专用卡片；user=null、非 Admin 或已绑定账号均不能显示')
 }
 
 if (
-  phoneBindingCard.includes('startInitialPhoneBind(currentPassword, phone)') &&
-  phoneBindingCard.includes('completeInitialPhoneBind(bindTicket, code)') &&
-  phoneBindingCard.includes('mergeStoredUser(bound)') &&
-  phoneBindingCard.includes('requiresSessionRenewal(result.code)') &&
-  phoneBindingCard.includes('redirectToLogin()') &&
-  phoneBindingCard.includes('requiresRestartAfterVerificationFailure(result.code)') &&
-  phoneBindingCard.includes("'SMS_CODE_INVALID'") &&
-  phoneBindingCard.includes("'PHONE_BIND_TICKET_INVALID'") &&
-  phoneBindingCard.includes("'PHONE_SELF_ALREADY_BOUND'") &&
-  phoneBindingCard.includes("'AUTH_SESSION_INVALID'") &&
-  !phoneBindingCard.includes('localStorage') &&
-  !phoneBindingCard.includes('sessionStorage') &&
-  !phoneBindingCard.includes('console.log')
+  page.includes('phoneBindingSuccess') &&
+  page.includes('phoneBindingSuccess.phoneMasked') &&
+  page.includes('role="status"') &&
+  page.includes('aria-live="polite"')
 ) {
-  pass('首次绑定仅发送必要字段，且密码、验证码、ticket 不写浏览器持久化或日志')
+  pass('绑定成功后页面立即显示仅含脱敏手机号的可访问反馈')
 } else {
-  fail('首次绑定卡的请求契约或敏感数据内存边界不符合要求')
+  fail('绑定成功反馈必须仅展示脱敏手机号，并使用 status + polite live region')
+}
+
+const startAdminInitialPhoneBind = sourceForFunction(auth, 'startAdminInitialPhoneBind')
+const verifyAdminInitialPhoneBind = sourceForFunction(auth, 'verifyAdminInitialPhoneBind')
+if (
+  startAdminInitialPhoneBind.includes("'/auth/admin/phone/initial-bind/start'") &&
+  startAdminInitialPhoneBind.includes('{ currentPassword, phone }') &&
+  startAdminInitialPhoneBind.includes('postJson<unknown>') &&
+  startAdminInitialPhoneBind.includes('isValidAdminInitialPhoneBindStartResponse(r.data)') &&
+  startAdminInitialPhoneBind.includes('status: r.status') &&
+  !startAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/start'") &&
+  verifyAdminInitialPhoneBind.includes("'/auth/admin/phone/initial-bind/verify'") &&
+  verifyAdminInitialPhoneBind.includes('{ bindTicket, code }') &&
+  verifyAdminInitialPhoneBind.includes('postJson<unknown>') &&
+  verifyAdminInitialPhoneBind.includes('isValidAdminInitialPhoneBindVerifyResponse(r.data)') &&
+  verifyAdminInitialPhoneBind.includes('status: r.status') &&
+  !verifyAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/verify'")
+) {
+  pass('Admin adapter 仅调用严格首次绑定端点，保留失败 HTTP status，且不回退到通用路径')
+} else {
+  fail('Admin adapter 必须使用严格端点、保留失败 status、运行时验证 2xx 数据，且不能走通用路径')
 }
 
 if (
-  auth.includes("'/auth/phone/initial-bind/start'") &&
-  auth.includes("'/auth/phone/initial-bind/verify'") &&
-  auth.includes('{ currentPassword, phone }') &&
-  auth.includes('{ bindTicket, code }') &&
+  auth.includes('Number.isSafeInteger(value) && value >= 0 && value <= 300') &&
+  auth.includes('UUID') &&
+  auth.includes("/^1[3-9]\\d\\*{4}\\d{4}$/") &&
+  auth.includes("value === '***'") &&
+  auth.includes('new Date(value).toISOString() === value') &&
+  auth.includes("code: 'INVALID_RESPONSE'") &&
+  auth.includes("message: '服务响应异常，请稍后再试'")
+) {
+  pass('Admin adapter 对 ticket、秒数、脱敏手机号和时间戳执行严格运行时 guard')
+} else {
+  fail('Admin adapter 缺少 UUID、0..300 安全整数、脱敏手机号或 canonical ISO 的严格 guard')
+}
+
+const verifyGuardIndex = verifyAdminInitialPhoneBind.indexOf('isValidAdminInitialPhoneBindVerifyResponse(r.data)')
+const verifyMergeIndex = verifyAdminInitialPhoneBind.indexOf('mergeStoredUser(bound)')
+if (
+  verifyGuardIndex !== -1 &&
+  verifyMergeIndex > verifyGuardIndex &&
+  verifyAdminInitialPhoneBind.includes("const bound = { phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt }") &&
   !auth.includes('console.log(bindTicket)') &&
   !auth.includes('console.log(code)')
 ) {
-  pass('认证 adapter 使用首次绑定专用端点，且不记录绑定凭据或验证码')
+  pass('仅验证成功且 shape 合法后才合并脱敏用户字段，且不记录绑定凭据或验证码')
 } else {
-  fail('首次绑定 adapter 的端点、请求体或无日志边界不符合要求')
+  fail('verify 只能在 shape guard 成功后合并脱敏字段，且不得记录敏感绑定数据')
+}
+
+for (const token of [
+  'const [currentPassword, setCurrentPassword] = useState',
+  'const [phone, setPhone] = useState',
+  'const [code, setCode] = useState',
+  'const [bindTicket, setBindTicket] = useState',
+  'const [cooldownSeconds, setCooldownSeconds] = useState',
+  'const [ticketExpiresAt, setTicketExpiresAt] = useState',
+  'const [submitting, setSubmitting] = useState',
+  'const [message, setMessage] = useState',
+  'startAdminInitialPhoneBind(currentPassword, phone)',
+  'verifyAdminInitialPhoneBind(bindTicket, code)',
+  'autoComplete="current-password"',
+  'autoComplete="one-time-code"',
+  '请输入有效的中国大陆手机号',
+  '请输入 6 位数字验证码',
+]) {
+  if (!adminPhoneBindingCard.includes(token)) fail(`Admin 专用首次绑定卡缺少 ${token}`)
+}
+
+if (
+  !adminPhoneBindingCard.includes('localStorage') &&
+  !adminPhoneBindingCard.includes('sessionStorage') &&
+  !adminPhoneBindingCard.includes('console.') &&
+  !adminPhoneBindingCard.includes('mergeStoredUser') &&
+  !adminPhoneBindingCard.includes("'/auth/phone/initial-bind") &&
+  !adminPhoneBindingCard.includes('startInitialPhoneBind') &&
+  !adminPhoneBindingCard.includes('completeInitialPhoneBind') &&
+  !/\{bindTicket\}/.test(adminPhoneBindingCard) &&
+  !/value=\{bindTicket\}/.test(adminPhoneBindingCard) &&
+  !/data-[\w-]*ticket/.test(adminPhoneBindingCard)
+) {
+  pass('Admin 专用卡片不持久化、记录或渲染密码、验证码或 ticket，也不调用通用 adapter')
+} else {
+  fail('Admin 专用卡片泄露敏感状态、回退到通用 adapter，或将 ticket 放进 DOM')
+}
+
+const appliesConservativeStartCooldown = /if \(requiresConservativeStartCooldown\(result\.code, result\.status\)\) \{\s*setCurrentPassword\(''\)\s*setPhone\(''\)\s*setCooldownSeconds\(300\)/.test(adminPhoneBindingCard)
+
+if (
+  adminPhoneBindingCard.includes('if (bindTicket || submitting || cooldownSeconds > 0) return') &&
+  appliesConservativeStartCooldown &&
+  adminPhoneBindingCard.includes('function requiresConservativeStartCooldown(code: string, status: number)') &&
+  adminPhoneBindingCard.includes('status === 0') &&
+  adminPhoneBindingCard.includes("code === 'INVALID_RESPONSE'") &&
+  adminPhoneBindingCard.includes('status >= 500') &&
+  adminPhoneBindingCard.includes('请等待 5 分钟后重试')
+) {
+  pass('发码期间、活动 ticket 和 status=0/INVALID_RESPONSE/任意 5xx 均不能重复发送，并保守锁定 300 秒')
+} else {
+  fail('发码必须按 status=0、INVALID_RESPONSE 或任意 5xx 保守锁定 300 秒，不能只依赖错误 code')
+}
+
+const redirectsAfterUncertainVerification = /if \(requiresLoginAfterUncertainVerification\(result\.code, result\.status\)\) \{\s*clearVerificationState\(\)\s*redirectToLogin\(\)\s*return/.test(adminPhoneBindingCard)
+
+if (
+  adminPhoneBindingCard.includes('function clearVerificationState()') &&
+  adminPhoneBindingCard.includes('setBindTicket(null)') &&
+  adminPhoneBindingCard.includes('setTicketExpiresAt(null)') &&
+  adminPhoneBindingCard.includes("setCode('')") &&
+  adminPhoneBindingCard.includes('requiresRestartAfterVerificationFailure(result.code)') &&
+  adminPhoneBindingCard.includes("'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE'") &&
+  redirectsAfterUncertainVerification &&
+  adminPhoneBindingCard.includes('function requiresLoginAfterUncertainVerification(code: string, status: number)') &&
+  adminPhoneBindingCard.includes('status === 0') &&
+  adminPhoneBindingCard.includes('status === 401') &&
+  adminPhoneBindingCard.includes('status === 403') &&
+  adminPhoneBindingCard.includes('status >= 500') &&
+  adminPhoneBindingCard.includes("code === 'NETWORK_ERROR'") &&
+  adminPhoneBindingCard.includes("code === 'INVALID_RESPONSE'") &&
+  adminPhoneBindingCard.includes("code === 'AUTH_SESSION_INVALID'") &&
+  adminPhoneBindingCard.includes("code === 'AUTH_TOKEN_INVALID'") &&
+  adminPhoneBindingCard.includes("code === 'AUTH_MISSING_TOKEN'") &&
+  !adminPhoneBindingCard.includes('HTTP_5') &&
+  !adminPhoneBindingCard.includes('请刷新页面后确认绑定状态') &&
+  adminPhoneBindingCard.includes('ticketExpiresAt <= Date.now()') &&
+  adminPhoneBindingCard.includes('window.setInterval') &&
+  adminPhoneBindingCard.includes('return () => window.clearInterval(timer)')
+) {
+  pass('验证码到期、已知验证失败与 status=0/401/403/5xx、INVALID 或 JWT 错误均会清理 ticket 并重新登录')
+} else {
+  fail('Admin 专用卡必须按 status 或 JWT 错误安全清理；不能只依赖 HTTP_5 字符串')
+}
+
+if (
+  adminPhoneBindingCard.includes('<form onSubmit={requestCode}') &&
+  adminPhoneBindingCard.includes('<form onSubmit={verifyCode}')
+) {
+  pass('Enter 会根据是否存在活动 ticket 分流为发码或验证')
+} else {
+  fail('Admin 专用卡必须支持无 ticket 时 Enter 发码、有 ticket 时 Enter 验证')
+}
+
+if (
+  genericPhoneBindingCard.includes('export function PhoneBindingCard') &&
+  genericPhoneBindingCard.includes('startInitialPhoneBind') &&
+  genericPhoneBindingCard.includes('completeInitialPhoneBind')
+) {
+  pass('通用 PhoneBindingCard 保留为既有通用/Partner 能力，不作为 Admin 入口改写')
+} else {
+  fail('现有通用 PhoneBindingCard 必须保留，不能被 Admin 专用改造替换')
 }
 
 if (

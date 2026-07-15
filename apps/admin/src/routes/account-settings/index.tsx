@@ -10,7 +10,7 @@ import { Card, Button } from '@ai-job-print/ui'
 import { CircleAlertIcon, CircleCheckIcon, LockKeyholeIcon, ShieldCheckIcon, UserRoundIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { changePassword, getUser, logout, type AuthedUser } from '../../services/auth'
-import { PhoneBindingCard } from './PhoneBindingCard'
+import { AdminInitialPhoneBindingCard } from './AdminInitialPhoneBindingCard'
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin: '超级管理员',
@@ -40,6 +40,7 @@ function unicodeCharacterLength(value: string): number {
 
 export default function AccountSettingsPage() {
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
+  const [phoneBindingSuccess, setPhoneBindingSuccess] = useState<Pick<AuthedUser, 'phoneMasked' | 'phoneVerifiedAt'> | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -115,9 +116,19 @@ export default function AccountSettingsPage() {
           </div>
         </Card>
 
-        {!user?.phoneMasked && (
-          <PhoneBindingCard
-            onBound={(phone) => setUser((current) => current ? { ...current, ...phone } : current)}
+        {phoneBindingSuccess && (
+          <div role="status" aria-live="polite" className="flex items-center gap-2 rounded-lg border border-success/30 bg-success-bg px-3 py-2 text-sm text-success-fg">
+            <CircleCheckIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>手机号 {phoneBindingSuccess.phoneMasked} 已绑定并完成验证。</span>
+          </div>
+        )}
+
+        {user?.role === 'admin' && !user.phoneMasked && (
+          <AdminInitialPhoneBindingCard
+            onBound={(phone) => {
+              setUser((current) => current ? { ...current, ...phone } : current)
+              setPhoneBindingSuccess(phone)
+            }}
           />
         )}
 

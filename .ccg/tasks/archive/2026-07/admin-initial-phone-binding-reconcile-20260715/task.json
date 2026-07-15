@@ -1,0 +1,12 @@
+{
+  "id": "admin-initial-phone-binding-reconcile-20260715",
+  "title": "对账并加固 main 上的管理员首次手机号绑定",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "auth",
+  "currentPhase": "completed",
+  "nextAction": "归档本地候选；推送前补齐外部双模型终审并等待用户授权",
+  "createdAt": "2026-07-15T00:00:00+08:00",
+  "branch": "codex/admin-initial-phone-binding-reconcile-20260715"
+}
