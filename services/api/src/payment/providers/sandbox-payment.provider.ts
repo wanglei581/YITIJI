@@ -18,6 +18,7 @@ import type {
   PaymentProvider,
   CodePaymentCreateInput,
   CodePaymentCreateResult,
+  PaymentQueryResult,
   QrPaymentCreateInput,
   QrPaymentCreateResult,
   RefundExecuteInput,
@@ -87,6 +88,11 @@ export class SandboxPaymentProvider implements PaymentProvider {
       `&order=${encodeURIComponent(input.orderNo)}` +
       `&amount=${input.amountCents}`
     return { prepayId, qrCodeContent }
+  }
+
+  /** 沙箱无外部账本/资金，二维码到期可直接按测试终态关闭。 */
+  async closeExpiredQrPayment(): Promise<PaymentQueryResult> {
+    return { status: 'closed', channelTxnNo: null, amountCents: null }
   }
 
   async createCodePayment(input: CodePaymentCreateInput): Promise<CodePaymentCreateResult> {

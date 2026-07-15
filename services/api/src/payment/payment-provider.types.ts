@@ -19,6 +19,8 @@ export interface QrPaymentCreateInput {
   attemptId: string
   /** 整数「分」，快照自 Order.amountCents。 */
   amountCents: number
+  /** 服务端持久化的二维码失效时刻；真实渠道必须同步为其可支付截止时间。 */
+  expiresAt: Date
 }
 
 export interface QrPaymentCreateResult {
@@ -203,6 +205,12 @@ export interface PaymentProvider {
    * wechat / alipay 实现；sandbox 无外部账本（DB 即真相源），不实现 —— 不伪造能力。
    */
   queryPayment?(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult>
+  /**
+   * 屏上二维码到达本服务 expiresAt 后的安全收敛：先查渠道账本，仍待付才请求关单；
+   * 仅返回 closed / failed 才允许业务层释放本地互斥锁，unknown / pending 必须继续锁住。
+   * sandbox 返回无资金的 closed；真实渠道实现各自的关单协议。
+   */
+  closeExpiredQrPayment?(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult>
   /** 渠道要求的回调成功应答（alipay 要求纯文本 `success`）；未实现时控制器回默认 JSON。 */
   callbackAck?(): CallbackAck
 }

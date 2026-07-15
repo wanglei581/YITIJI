@@ -78,6 +78,7 @@
 
 - [ ] `NODE_ENV=production`。
 - [ ] `JWT_SECRET` 使用生产强随机值，长度不少于 16 字符；不得使用本地开发/CI 测试值。
+- [ ] `NODE_ENV=production` 已由 PM2/部署环境显式注入；支付、数据库、CORS 和其他生产运行时门禁均依赖该值，不得遗漏或写为 development。
 - [ ] `DATABASE_URL` 指向 PostgreSQL，不再指向 SQLite 文件。
 - [ ] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。
 - [ ] API 生产启动门禁已验证：`NODE_ENV=production` 下，JWT_SECRET 缺失/过短、`FILE_STORAGE_DRIVER` 非 `cos`、`DATABASE_URL=file:` SQLite 均会启动失败。
@@ -90,6 +91,8 @@
 - [ ] ASR/TTS provider 与腾讯密钥正确。
 - [ ] SMS provider 在短信审核前不得误设为真实生产发送。
 - [ ] `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false（生产缺省会拒启动；启用真实支付通道时必须 true）。
+- [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
+- [ ] 支付宝当面付现场验收：屏上动态二维码和 HID 扫码枪付款码各完成一笔受控小额交易；`10003`/网络不确定时只允许服务端查单收敛，不允许用户立即重扫；核对 Order、PaymentAttempt、渠道流水、出纸与退款记录一致。
 - [ ] `PRINT_SCAN_CAPABILITY_MODE` 显式设为 managed 或 strict（生产缺省会拒启动；managed=未配置能力行放行既有闭环，strict=未配置行 fail-closed，Task 11）。
 - [ ] 文件大小、签名 URL TTL、匿名/会员数据 TTL 与产品要求一致。
 

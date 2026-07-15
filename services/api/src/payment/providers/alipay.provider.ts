@@ -21,6 +21,8 @@ import { createSign, createVerify } from 'crypto'
 import type {
   CallbackAck,
   CallbackVerifyResult,
+  CodePaymentCreateInput,
+  CodePaymentCreateResult,
   PaymentCallbackContext,
   PaymentCallbackEvent,
   PaymentProvider,
@@ -143,6 +145,34 @@ function mapTradeStatus(status: string | null): 'success' | 'failed' | 'ignored'
   return 'failed' // TRADE_CLOSED 等：本尝试不会再支付成功
 }
 
+/**
+ * 当前终端扫码枪经现场探测只提交 18 位数字；支付宝付款码实际机具前缀为 25–30。
+ * 格式不符时绝不把无效码发送给渠道，也不持久化/审计付款码本身。
+ */
+function isAlipayTerminalAuthCode(authCode: string): boolean {
+  return /^(?:2[5-9]|30)\d{16}$/.test(authCode)
+}
+
+/**
+ * 40004 仅表示“业务处理失败”，单看总码不足以证明没有扣款。
+ * 只有白名单中的明确终态才允许释放订单；其余子码必须查单收敛，防止重复扫码扣款。
+ */
+const FINAL_CODE_PAYMENT_SUB_CODES = new Set([
+  'ACQ.PAYMENT_AUTH_CODE_INVALID',
+  'ACQ.BUYER_BALANCE_NOT_ENOUGH',
+  'ACQ.TRADE_HAS_CLOSE',
+])
+
+function isExplicitCodePaymentFailure(message: string): boolean {
+  return message.includes('40004') && [...FINAL_CODE_PAYMENT_SUB_CODES].some((subCode) => message.includes(subCode))
+}
+
+/** 当面付 timeout_express 只接受相对时长；向上取整，确保渠道截止时刻不早于屏幕倒计时。 */
+function alipayTimeoutExpress(expiresAt: Date): string {
+  const remainingMs = expiresAt.getTime() - Date.now()
+  return `${Math.max(1, Math.ceil(remainingMs / 60_000))}m`
+}
+
 export class AlipayProvider implements PaymentProvider {
   readonly channel = 'alipay' as const
   private readonly cfg: AlipayProviderConfig
@@ -235,6 +265,8 @@ export class AlipayProvider implements PaymentProvider {
         out_trade_no: input.attemptId, // 服务端 cuid，notify 经 out_trade_no 找回 attempt
         total_amount: centsToYuan(input.amountCents),
         subject: `打印服务订单 ${input.orderNo}`,
+        // 与服务端 expiresAt 对齐，避免 Kiosk 判过期后旧二维码仍可继续付款。
+        timeout_express: alipayTimeoutExpress(input.expiresAt),
         // passback_params 原样回带 —— 业务层全字段匹配 orderId 的通道侧来源（协议要求 URL 编码）
         passback_params: encodeURIComponent(JSON.stringify({ orderId: input.orderId })),
       },
@@ -244,6 +276,56 @@ export class AlipayProvider implements PaymentProvider {
     if (!qrCode) throw new Error('ALIPAY_CHANNEL_ERROR: QR_CODE_MISSING')
     // 当面付无独立 prepay_id：prepayId 统一取 out_trade_no（= attemptId），notify 回带同值。
     return { prepayId: input.attemptId, qrCodeContent: qrCode }
+  }
+
+  /**
+   * 主扫付款码：商户扫码枪读取用户支付宝付款码，走 alipay.trade.pay。
+   * 渠道结果不可知时宁可保持 pending 后查单，绝不回退订单让用户再次付款。
+   */
+  async createCodePayment(input: CodePaymentCreateInput): Promise<CodePaymentCreateResult> {
+    if (!isAlipayTerminalAuthCode(input.authCode)) {
+      return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码无效或不支持此终端' }
+    }
+    if (process.env['NODE_ENV'] === 'production' && process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] !== 'true') {
+      return {
+        status: 'failed',
+        channelTxnNo: null,
+        prepayId: null,
+        amountCents: null,
+        failReason: '付款码支付自动核验未启用，请联系工作人员',
+      }
+    }
+
+    let node: Record<string, unknown>
+    try {
+      node = await this.call('alipay.trade.pay', {
+        out_trade_no: input.attemptId,
+        scene: 'bar_code',
+        auth_code: input.authCode,
+        total_amount: centsToYuan(input.amountCents),
+        subject: `打印服务订单 ${input.orderNo}`,
+        timeout_express: '5m',
+        ...(input.terminalId ? { terminal_id: input.terminalId.slice(0, 32) } : {}),
+      })
+    } catch (e) {
+      const message = (e as Error).message ?? ''
+      if (message.includes('10003')) {
+        return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '请在手机上完成支付验证' }
+      }
+      if (isExplicitCodePaymentFailure(message)) {
+        return { status: 'failed', channelTxnNo: null, prepayId: null, amountCents: null, failReason: '付款码无效、已过期或支付未完成' }
+      }
+      // 未知 40004 子码、20000、HTTP/超时、验签失败或连接中断均可能发生在渠道已受理之后；交由查单收敛。
+      return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付结果待核实，请稍候' }
+    }
+
+    const channelTxnNo = asString(node['trade_no'])
+    const amountCents = yuanToCents(asString(node['total_amount']))
+    if (!channelTxnNo || amountCents === null) {
+      // 10000 但缺少可验证的金额/流水号：不能采信为成功，也不能放开重付。
+      return { status: 'paying', channelTxnNo: null, prepayId: input.attemptId, amountCents: null, failReason: '支付结果待核实，请稍候' }
+    }
+    return { status: 'success', channelTxnNo, prepayId: input.attemptId, amountCents, failReason: null }
   }
 
   async verifyAndParseCallback(ctx: PaymentCallbackContext): Promise<CallbackVerifyResult> {
@@ -344,6 +426,29 @@ export class AlipayProvider implements PaymentProvider {
     if (status === 'WAIT_BUYER_PAY') return { status: 'pending', channelTxnNo: null, amountCents: null }
     if (status === 'TRADE_CLOSED') return { status: 'closed', channelTxnNo: null, amountCents: null }
     return { status: 'unknown', channelTxnNo: null, amountCents: null }
+  }
+
+  /**
+   * 当面付屏上码到期收敛：先查单，仍待付款才关闭；任何不可判异常都交回业务层保持互斥。
+   * 关闭与支付成功竞态时重新查单，绝不根据本地倒计时臆测渠道终态。
+   */
+  async closeExpiredQrPayment(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult> {
+    const queried = await this.queryPayment(input)
+    if (queried.status !== 'pending') return queried
+    try {
+      await this.call('alipay.trade.close', { out_trade_no: input.attemptId })
+      return { status: 'closed', channelTxnNo: null, amountCents: null }
+    } catch (error) {
+      const message = (error as Error).message ?? ''
+      if (
+        message.includes('ACQ.TRADE_HAS_SUCCESS') ||
+        message.includes('ACQ.TRADE_HAS_CLOSE') ||
+        message.includes('ACQ.TRADE_STATUS_ERROR')
+      ) {
+        return this.queryPayment(input)
+      }
+      throw error
+    }
   }
 
   /**

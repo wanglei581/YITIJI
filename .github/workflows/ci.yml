@@ -217,6 +217,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
+          pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
           pnpm --filter @ai-job-print/api verify:order

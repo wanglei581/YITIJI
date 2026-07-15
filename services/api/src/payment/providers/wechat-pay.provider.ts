@@ -45,6 +45,7 @@ export const WECHAT_SERIAL_HEADER = 'wechatpay-serial'
 const CALLBACK_TIMESTAMP_WINDOW_MS = 5 * 60 * 1000
 const APIV3_KEY_LENGTH = 32
 const HTTP_TIMEOUT_MS = 10_000
+const CHINA_TIMEZONE_OFFSET_MS = 8 * 60 * 60 * 1000
 
 export interface WechatPayProviderConfig {
   mchid: string
@@ -125,6 +126,12 @@ function headerValue(headers: PaymentCallbackContext['headers'], name: string): 
 
 function asString(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null
+}
+
+/** 微信 Native 要求秒级 RFC3339 且明确时区；业务系统与商户现场统一使用北京时间。 */
+function wechatNativeExpiry(expiresAt: Date): string {
+  const beijingWallClock = new Date(expiresAt.getTime() + CHINA_TIMEZONE_OFFSET_MS)
+  return `${beijingWallClock.toISOString().slice(0, 19)}+08:00`
 }
 
 function asPositiveInteger(v: unknown): number | null {
@@ -215,6 +222,8 @@ export class WechatPayProvider implements PaymentProvider {
       notify_url: notifyUrl,
       // attach 回调原样回带 —— 业务层全字段匹配 orderId 的通道侧来源
       attach: JSON.stringify({ orderId: input.orderId }),
+      // 秒级 +08:00 满足微信 Native 文档格式；业务层统一将屏上码最小 TTL 限为 60 秒。
+      time_expire: wechatNativeExpiry(input.expiresAt),
       amount: { total: input.amountCents, currency: 'CNY' },
     })
     const codeUrl = asString(resp['code_url'])
@@ -425,6 +434,27 @@ export class WechatPayProvider implements PaymentProvider {
     if (state === 'CLOSED' || state === 'REVOKED') return { status: 'closed', channelTxnNo: null, amountCents: null }
     if (state === 'PAYERROR') return { status: 'failed', channelTxnNo: null, amountCents: null }
     return { status: 'unknown', channelTxnNo: null, amountCents: null }
+  }
+
+  /**
+   * Native 屏上码到期收敛：查单仍是未支付才关单；未知/网络异常不释放本地锁，防止旧码晚付。
+   * close 成功后渠道返回 204；ORDERPAID / 竞态则重新查单，以渠道账本为准。
+   */
+  async closeExpiredQrPayment(input: { attemptId: string; orderId: string }): Promise<PaymentQueryResult> {
+    const queried = await this.queryPayment(input)
+    if (queried.status !== 'pending') return queried
+    try {
+      await this.request(
+        'POST',
+        `/v3/pay/transactions/out-trade-no/${encodeURIComponent(input.attemptId)}/close`,
+        { mchid: this.cfg.mchid },
+      )
+      return { status: 'closed', channelTxnNo: null, amountCents: null }
+    } catch (error) {
+      const message = (error as Error).message ?? ''
+      if (message.includes('ORDERPAID') || message.includes('ORDER_CLOSED')) return this.queryPayment(input)
+      throw error
+    }
   }
 
   /** wechat 退款状态 → 归一化（受理中绝不假报成功）。 */

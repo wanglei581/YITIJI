@@ -11,7 +11,8 @@
  * - 伪造回调不可能入账：attemptId 不存在 / prepayId / orderId 不匹配一律拒绝，
  *   closed 订单只有「已存在 PaymentAttempt 的有效迟到回调」可转 paid（late=true 审计）。
  * - 失败回调：安全文案（渠道原始错误只进审计）+ 订单回 unpaid 可重试出码。
- * - 惰性过期：attempt 过期 / 订单超时 closed / closed 拒绝新出码。
+ * - 安全过期：订单可按自身截止时间 closed；未获渠道确认的屏上二维码仍保持 pending
+ *   互斥锁，不能仅因本地时间伪造 expired；closed 订单拒绝新出码。
  * - 回归：markPaid 线下三来源不变，sandbox/wechat/alipay/benefit 按名拒绝；
  *   Admin 端点拒绝 sandbox；markPaidOnline 拒绝非白名单渠道；支付回调不改 PrintTask.status。
  * - fail-closed：sandbox 缺密钥 / 生产配 sandbox / 未知 Provider → 启动即拒绝；
@@ -609,16 +610,20 @@ async function main(): Promise<void> {
       fail('re-issue after failure did not create a fresh attempt')
     }
 
-    // ── (8) 惰性过期：attempt expired + 订单 closed + closed 拒绝新出码 ─────
+    // ── (8) 安全过期：订单可关闭，但屏上二维码待渠道确认前仍保持 pending ─────
     const past = new Date(Date.now() - 60_000)
     await prisma.paymentAttempt.update({ where: { id: attemptViewB2.attemptId }, data: { expiresAt: past } })
     await prisma.order.update({ where: { id: orderBId }, data: { expiresAt: past } })
     const statusViewB = await payment.getPayStatus(orderBId, paymentSessionB)
-    const attemptB2Expired = await prisma.paymentAttempt.findUnique({ where: { id: attemptViewB2.attemptId } })
-    if (statusViewB.payStatus === 'closed' && attemptB2Expired?.status === 'expired') {
-      pass('lazy expiry marks stale attempt expired and times the order out to closed')
+    const attemptB2AfterLazyExpiry = await prisma.paymentAttempt.findUnique({ where: { id: attemptViewB2.attemptId } })
+    if (
+      statusViewB.payStatus === 'closed' &&
+      attemptB2AfterLazyExpiry?.status === 'pending' &&
+      attemptB2AfterLazyExpiry.qrCodeContent?.startsWith('sandboxpay://qr?')
+    ) {
+      pass('order TTL closes the order without falsely expiring an unconfirmed screen QR')
     } else {
-      fail(`lazy expiry mismatch: order=${statusViewB.payStatus} attempt=${attemptB2Expired?.status}`)
+      fail(`safe lazy expiry mismatch: order=${statusViewB.payStatus} attempt=${attemptB2AfterLazyExpiry?.status}`)
     }
     await expectCode('closed order refuses new pay attempts (ORDER_CLOSED)', 'ORDER_CLOSED', () =>
       payment.createPayAttempt(orderBId, paymentSessionB),
@@ -629,7 +634,7 @@ async function main(): Promise<void> {
       payload: {
         channel: CHANNEL,
         attemptId: attemptViewB2.attemptId,
-        prepayId: attemptB2Expired!.prepayId,
+        prepayId: attemptB2AfterLazyExpiry!.prepayId,
         orderId: orderBId,
         amountCents: 300,
         result: 'success',
