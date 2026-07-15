@@ -37,17 +37,12 @@ import { ROLES_KEY } from '../src/common/decorators/roles.decorator'
 import type { RedisService } from '../src/common/redis/redis.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import type { SmsSender } from '../src/member-auth/sms/sms-sender'
+import { assertChangePasswordVerifyTarget } from './change-password-verify-target'
 
 process.env['JWT_SECRET'] ||= 'verify-change-password-secret'
 process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-change-password-secret-32b'
 const dedicatedDatabasePath = resolve(__dirname, '../prisma/verify-change-password.db')
-if (
-  process.env['NODE_ENV'] === 'production' ||
-  process.env['DATABASE_URL'] !== 'file:./prisma/verify-change-password.db' ||
-  process.env['VERIFY_CHANGE_PASSWORD_DB_PATH'] !== dedicatedDatabasePath
-) {
-  throw new Error('verify:change-password 只允许通过专用临时 SQLite 包装脚本运行')
-}
+assertChangePasswordVerifyTarget(process.env, dedicatedDatabasePath)
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { throw new Error(`FAIL ${m}`) }
@@ -218,7 +213,6 @@ async function main() {
   // 本脚本只能运行在包装器创建的专用临时数据库中；清理失败必须让门禁失败，
   // 外层包装器仍会在子进程结束后删除整库文件。
   const cleanup = async () => {
-    await prisma.auditLog.deleteMany()
     await prisma.user.deleteMany({ where: { username: { contains: suffix } } })
     if (orgId) await prisma.organization.delete({ where: { id: orgId } })
   }

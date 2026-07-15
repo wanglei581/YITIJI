@@ -1,0 +1,13 @@
+{
+  "id": "f1-pr-ready-for-review-20260715",
+  "title": "F1 草稿 PR 转为待审",
+  "status": "complete",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "release-delivery",
+  "currentPhase": "completed",
+  "nextAction": "PR #252 已转为 Ready for review；CI 成功、合并状态 CLEAN；不合并、不部署",
+  "createdAt": "2026-07-15T22:45:00+08:00",
+  "branch": "codex/f1-admin-credential-sync-main-20260715",
+  "pullRequest": "https://github.com/wanglei581/YITIJI/pull/252"
+}

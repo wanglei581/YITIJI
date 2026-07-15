@@ -32,7 +32,7 @@ import { assertInternalAuthVerifyTarget } from '../src/auth/internal-auth-verify
 import { decryptPhone, encryptPhone, hashPhone, maskPhone } from '../src/common/crypto/phone-identity'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import type { RedisService } from '../src/common/redis/redis.service'
-import { PrismaService } from '../src/prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../src/prisma/prisma.service'
 import type { SmsSender } from '../src/member-auth/sms/sms-sender'
 
 process.env['JWT_SECRET'] ||= 'verify-internal-auth-phone-secret'
@@ -259,6 +259,26 @@ class RecordingAudit {
   }
 }
 
+function createAuditFailingPrisma(prisma: PrismaService): PrismaService {
+  return {
+    get user() {
+      return prisma.user
+    },
+    $transaction: async <T>(callback: (tx: PrismaTransactionClient) => Promise<T>) =>
+      prisma.$transaction(async (tx) =>
+        callback({
+          user: tx.user,
+          auditLog: {
+            ...tx.auditLog,
+            create: async () => {
+              throw new Error('forced audit insert failure')
+            },
+          },
+        } as PrismaTransactionClient),
+      ),
+  } as PrismaService
+}
+
 function createIsolatedVerificationDatabase(): { cleanup: () => void } {
   const tempDirectory = mkdtempSync(join(tmpdir(), 'verify-internal-auth-phone-'))
   const databasePath = join(tempDirectory, 'verify.db')
@@ -303,6 +323,24 @@ function createIsolatedVerificationDatabase(): { cleanup: () => void } {
       CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash");
       CREATE INDEX "User_orgId_idx" ON "User"("orgId");
       CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt");
+      CREATE TABLE "AuditLog" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "actorId" TEXT,
+        "actorRole" TEXT NOT NULL,
+        "action" TEXT NOT NULL,
+        "targetType" TEXT NOT NULL,
+        "targetId" TEXT,
+        "payloadJson" TEXT NOT NULL DEFAULT '{}',
+        "ipAddress" TEXT,
+        "userAgent" TEXT,
+        "requestId" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+      );
+      CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
+      CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
+      CREATE INDEX "AuditLog_targetType_targetId_idx" ON "AuditLog"("targetType", "targetId");
+      CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
       `,
     ], {
       stdio: 'pipe',
@@ -662,6 +700,28 @@ async function main() {
     )
     pass('12. 严格 ticket 仅存加密手机号、单活跃、错误 OTP 消耗且不可重放')
 
+    const auditFailureAdmin = await createStrictAdmin('audit-failure')
+    const auditFailurePhone = phone('135', 49)
+    const auditFailureStart = await adminInitialPhoneBind.start(auditFailureAdmin.id, passwordV1, auditFailurePhone, '127.0.0.1')
+    const auditFailureCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(auditFailurePhone)}`)
+    if (!auditFailureCode) fail('13. 审计失败场景未写入 OTP')
+    const auditFailureService = new AdminInitialPhoneBindService(
+      createAuditFailingPrisma(prisma),
+      redis as unknown as RedisService,
+      otp,
+      audit as unknown as AuditService,
+    )
+    await expectCode(
+      () => auditFailureService.verify(auditFailureAdmin.id, auditFailureStart.bindTicket, auditFailureCode),
+      unavailable,
+      '13. 完成审计写入失败时必须回滚管理员首次绑定',
+    )
+    const auditFailureAfter = await prisma.user.findUniqueOrThrow({ where: { id: auditFailureAdmin.id } })
+    if (auditFailureAfter.phoneHash || auditFailureAfter.phoneEnc || auditFailureAfter.phoneVerifiedAt) {
+      fail('13. 完成审计写入失败后管理员手机号字段没有回滚')
+    }
+    pass('13. 完成审计写入失败会回滚管理员手机号绑定')
+
     const successfulAdmin = await createStrictAdmin('success', 17)
     const successPhone = phone('135', 50)
     const successfulStart = await adminInitialPhoneBind.start(successfulAdmin.id, passwordV1, successPhone, '127.0.0.1')
@@ -669,13 +729,18 @@ async function main() {
     if (!successCode) fail('13. 严格成功场景未写入 OTP')
     const successfulResult = await adminInitialPhoneBind.verify(successfulAdmin.id, successfulStart.bindTicket, successCode)
     const boundAdmin = await prisma.user.findUniqueOrThrow({ where: { id: successfulAdmin.id } })
-    const strictAuditRaw = JSON.stringify(audit.entries.slice(-2))
+    const completionAudit = await prisma.auditLog.findFirst({
+      where: { actorId: successfulAdmin.id, action: 'auth.phone_initial_bind_complete' },
+      orderBy: { createdAt: 'desc' },
+    })
+    const strictAuditRaw = JSON.stringify([audit.entries.slice(-2), completionAudit])
     if (
       successfulResult.phoneMasked !== maskPhone(successPhone) ||
       !boundAdmin.phoneVerifiedAt ||
       boundAdmin.phoneHash !== hashPhone(successPhone) ||
       !boundAdmin.phoneEnc ||
       boundAdmin.tokenVersion !== 17 ||
+      completionAudit?.payloadJson !== JSON.stringify({ phoneMasked: maskPhone(successPhone) }) ||
       [successPhone, passwordV1, successCode, successfulStart.bindTicket, hashPhone(successPhone), boundAdmin.phoneEnc]
         .some((secret) => JSON.stringify(successfulResult).includes(secret) || strictAuditRaw.includes(secret))
     ) {

@@ -1,0 +1,13 @@
+{
+  "id": "f1-admin-credential-pr-delivery-20260715",
+  "title": "F1 管理员凭据加固候选推送与草稿 PR 交付",
+  "status": "complete",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "release-delivery",
+  "currentPhase": "completed",
+  "nextAction": "已推送分支并创建草稿 PR #252；不部署、不合并",
+  "createdAt": "2026-07-15T22:20:00+08:00",
+  "branch": "codex/f1-admin-credential-sync-main-20260715",
+  "pullRequest": "https://github.com/wanglei581/YITIJI/pull/252"
+}

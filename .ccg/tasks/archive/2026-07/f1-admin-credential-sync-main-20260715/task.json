@@ -1,0 +1,12 @@
+{
+  "id": "f1-admin-credential-sync-main-20260715",
+  "title": "F1 管理员凭据加固同步最新主线并复验",
+  "status": "complete",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "authentication-security",
+  "currentPhase": "completed",
+  "nextAction": "任务已完成：已归档并创建仅本地提交；不 push、不部署",
+  "createdAt": "2026-07-15T13:50:00Z",
+  "branch": "codex/f1-admin-credential-sync-main-20260715"
+}
