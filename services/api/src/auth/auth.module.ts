@@ -7,7 +7,6 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { AdminInitialPhoneBindService } from './admin-initial-phone-bind.service'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
-import { InitialPhoneBindService } from './initial-phone-bind.service'
 import { InternalOtpService } from './internal-otp.service'
 
 const JWT_TTL = '24h'
@@ -34,7 +33,6 @@ const JWT_TTL = '24h'
   providers:   [
     AuthService,
     AdminInitialPhoneBindService,
-    InitialPhoneBindService,
     InternalOtpService,
     JwtAuthGuard,
     RolesGuard,

@@ -26,7 +26,11 @@ import type { AuditService } from '../src/audit/audit.service'
 import { AuthController } from '../src/auth/auth.controller'
 import { AdminInitialPhoneBindService } from '../src/auth/admin-initial-phone-bind.service'
 import { AuthService } from '../src/auth/auth.service'
-import { InitialPhoneBindStartDto, InitialPhoneBindVerifyDto } from '../src/auth/dto/internal-auth.dto'
+import {
+  InitialPhoneBindCancelDto,
+  InitialPhoneBindStartDto,
+  InitialPhoneBindVerifyDto,
+} from '../src/auth/dto/internal-auth.dto'
 import { INTERNAL_OTP_CODE_TTL_SECONDS, InternalOtpService } from '../src/auth/internal-otp.service'
 import { assertInternalAuthVerifyTarget } from '../src/auth/internal-auth-verify-target'
 import { decryptPhone, encryptPhone, hashPhone, maskPhone } from '../src/common/crypto/phone-identity'
@@ -76,39 +80,29 @@ async function expectCodeAndMessage(
   }
 }
 
-function assertInitialPhoneBindRouteContract(): void {
-  const source = readFileSync(resolve(__dirname, '../src/auth/auth.controller.ts'), 'utf8')
-  const required = [
-    "@Post('phone/initial-bind/start')",
-    "@Post('phone/initial-bind/verify')",
-    '@UseGuards(JwtAuthGuard, RolesGuard)',
-    "@Roles('admin', 'partner')",
-    'InitialPhoneBindStartDto',
-    'InitialPhoneBindVerifyDto',
-    'initialPhoneBindService.start',
-    'initialPhoneBindService.verify',
-  ]
-  if (required.some((fragment) => !source.includes(fragment))) {
-    fail('首次绑定路由缺少 JWT/角色保护、DTO 或服务接线')
-  }
-  pass('0a. 首次绑定路由具备 JWT、角色保护、DTO 与服务接线')
-}
-
 function assertAdminInitialPhoneBindRouteContract(): void {
   const source = readFileSync(resolve(__dirname, '../src/auth/auth.controller.ts'), 'utf8')
   const required = [
     "@Post('admin/phone/initial-bind/start')",
     "@Post('admin/phone/initial-bind/verify')",
+    "@Post('admin/phone/initial-bind/cancel')",
+    '@UseGuards(JwtAuthGuard, RolesGuard)',
     "@Roles('admin')",
+    'InitialPhoneBindStartDto',
+    'InitialPhoneBindVerifyDto',
     'adminInitialPhoneBindService.start',
     'adminInitialPhoneBindService.verify',
-    "user.role === 'admin'",
-    "user.role === 'partner'",
+    'adminInitialPhoneBindService.cancel',
   ]
-  if (required.some((fragment) => !source.includes(fragment)) || source.includes('dto.role')) {
-    fail('管理员首次绑定路由缺少 Admin 专用保护或旧通用路由角色分派')
+  if (
+    required.some((fragment) => !source.includes(fragment)) ||
+    source.includes("@Post('phone/initial-bind/start')") ||
+    source.includes("@Post('phone/initial-bind/verify')") ||
+    source.includes('dto.role')
+  ) {
+    fail('管理员首次绑定必须只暴露专用路由，并具备 JWT、角色保护、DTO 与服务接线')
   }
-  pass('0b. Admin 专用路由受 JWT/角色保护，旧通用路由按 JWT 角色分派')
+  pass('0a. Admin 首次绑定仅通过专用路由，并具备 JWT、角色保护、DTO 与服务接线')
 }
 
 function mockCtx(authHeader?: string): ExecutionContext {
@@ -237,8 +231,14 @@ class MemoryRedis {
 
 class NoopSmsSender implements SmsSender {
   sent: Array<{ phone: string; code: string }> = []
+  nextFailure: Error | null = null
 
   async sendCode(phone: string, code: string): Promise<void> {
+    if (this.nextFailure) {
+      const failure = this.nextFailure
+      this.nextFailure = null
+      throw failure
+    }
     this.sent.push({ phone, code })
   }
 }
@@ -308,18 +308,7 @@ function createIsolatedVerificationDatabase(): { cleanup: () => void } {
 }
 
 async function assertAdminInitialPhoneBindControllerDelegation(): Promise<void> {
-  const genericCalls: string[] = []
   const strictCalls: string[] = []
-  const generic = {
-    async start(...args: unknown[]) {
-      genericCalls.push(`start:${String(args[0])}`)
-      return { bindTicket: 'generic-ticket', cooldownSeconds: 60, expiresInSeconds: 300 }
-    },
-    async verify(...args: unknown[]) {
-      genericCalls.push(`verify:${String(args[0])}`)
-      return { phoneMasked: '138****0000', phoneVerifiedAt: new Date(0).toISOString() }
-    },
-  }
   const strict = {
     async start(...args: unknown[]) {
       strictCalls.push(`start:${String(args[0])}`)
@@ -329,30 +318,24 @@ async function assertAdminInitialPhoneBindControllerDelegation(): Promise<void> 
       strictCalls.push(`verify:${String(args[0])}`)
       return { phoneMasked: '139****0000', phoneVerifiedAt: new Date(0).toISOString() }
     },
+    async cancel(...args: unknown[]) {
+      strictCalls.push(`cancel:${String(args[0])}`)
+      return { cancelled: true }
+    },
   }
-  const controller = new AuthController({} as AuthService, generic as never, strict as never)
+  const controller = new AuthController({} as AuthService, strict as never)
   const startDto = { currentPassword: 'VerifyPassword_123!', phone: '13900000000' } as InitialPhoneBindStartDto
   const verifyDto = { bindTicket: 'a'.repeat(16), code: '123456' } as InitialPhoneBindVerifyDto
+  const cancelDto = { bindTicket: 'a'.repeat(16) } as InitialPhoneBindCancelDto
 
-  await controller.startInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, startDto, '127.0.0.1')
-  await controller.verifyInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, verifyDto)
-  await controller.startInitialPhoneBind({ userId: 'controller-partner', role: 'partner', orgId: 'org-controller' }, startDto, '127.0.0.1')
-  await controller.verifyInitialPhoneBind({ userId: 'controller-partner', role: 'partner', orgId: 'org-controller' }, verifyDto)
   await controller.startAdminInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, startDto, '127.0.0.1')
   await controller.verifyAdminInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, verifyDto)
+  await controller.cancelAdminInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, cancelDto)
 
-  if (
-    strictCalls.join(',') !== 'start:controller-admin,verify:controller-admin,start:controller-admin,verify:controller-admin' ||
-    genericCalls.join(',') !== 'start:controller-partner,verify:controller-partner'
-  ) {
-    fail('Admin/Partner 首次绑定控制器没有正确分派到严格/既有服务')
+  if (strictCalls.join(',') !== 'start:controller-admin,verify:controller-admin,cancel:controller-admin') {
+    fail('Admin 专用首次绑定控制器没有正确委派到严格服务')
   }
-  await expectCode(
-    () => controller.startInitialPhoneBind({ userId: 'controller-kiosk', role: 'kiosk', orgId: null }, startDto, '127.0.0.1'),
-    'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE',
-    '0c. kiosk 不能借旧通用首次绑定路由进入 Admin 严格状态机',
-  )
-  pass('0d. Admin 通用和专用路由委派严格服务，Partner 保留既有服务')
+  pass('0c. Admin 专用路由只委派严格服务')
 }
 
 async function main() {
@@ -360,7 +343,6 @@ async function main() {
   try {
     console.log('\n=== 内部账号手机号认证验证 ===')
     assertInternalAuthVerifyTarget(process.env)
-    assertInitialPhoneBindRouteContract()
     assertAdminInitialPhoneBindRouteContract()
     if (INTERNAL_OTP_CODE_TTL_SECONDS !== 300) fail('0c. 内部 OTP 有效期未固定为 300 秒')
     pass('0c. 内部 OTP 使用统一的 300 秒导出常量')
@@ -376,11 +358,9 @@ async function main() {
     code: 'bad',
   }))
   if (invalidInitialBindVerify.length < 2) fail('0a. 首次绑定确认 DTO 未拒绝短 ticket 和非法验证码')
+  const invalidInitialBindCancel = await validate(Object.assign(new InitialPhoneBindCancelDto(), { bindTicket: 'too-short' }))
+  if (invalidInitialBindCancel.length < 1) fail('0b. 首次绑定取消 DTO 未拒绝短 ticket')
   pass('0. 首次绑定 DTO 拒绝不安全输入')
-
-  const [{ InitialPhoneBindService }] = await Promise.all([
-    import('../src/auth/initial-phone-bind.service'),
-  ])
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -390,13 +370,6 @@ async function main() {
   const otp = new InternalOtpService(redis as unknown as RedisService, sms)
   const jwt = new JwtService({ secret: process.env['JWT_SECRET'] })
   const auth = new AuthService(jwt, prisma, redis as unknown as RedisService, otp, audit as unknown as AuditService)
-  const initialPhoneBind = new InitialPhoneBindService(
-    prisma,
-    redis as unknown as RedisService,
-    otp,
-    audit as unknown as AuditService,
-    auth,
-  )
   const adminInitialPhoneBind = new AdminInitialPhoneBindService(
     prisma,
     redis as unknown as RedisService,
@@ -642,18 +615,107 @@ async function main() {
     const wrongTicketCode = ticketCode === '000000' ? '111111' : '000000'
     await expectCode(
       () => adminInitialPhoneBind.verify(ticketAdmin.id, firstTicket.bindTicket, wrongTicketCode),
-      unavailable,
-      '12b. 错误 OTP 返回统一错误并烧毁 ticket',
+      'SMS_CODE_INVALID',
+      '12b. 错误 OTP 允许当前 ticket 在 OTP 限额内继续尝试',
     )
-    if (redis.raw(strictTicketKey(ticketAdmin.id, firstTicket.bindTicket)) || redis.raw(strictActiveKey(ticketAdmin.id))) {
-      fail('12b. 错误 OTP 后 ticket 或活跃标记未销毁')
+    if (
+      !redis.raw(strictTicketKey(ticketAdmin.id, firstTicket.bindTicket)) ||
+      redis.raw(strictActiveKey(ticketAdmin.id)) !== firstTicket.bindTicket
+    ) {
+      fail('12b. 错误 OTP 不得提前烧毁当前 ticket 或活跃标记')
     }
+    await adminInitialPhoneBind.verify(ticketAdmin.id, firstTicket.bindTicket, ticketCode)
     await expectCode(
       () => adminInitialPhoneBind.verify(ticketAdmin.id, firstTicket.bindTicket, ticketCode),
       unavailable,
       '12c. 严格 ticket 不能重放',
     )
-    pass('12. 严格 ticket 仅存加密手机号、单活跃、错误 OTP 消耗且不可重放')
+    pass('12. 严格 ticket 仅存加密手机号、单活跃、错误 OTP 可重试且成功后不可重放')
+
+    const restartAdmin = await createStrictAdmin('restart')
+    const firstRestartPhone = phone('136', 45)
+    const firstRestart = await adminInitialPhoneBind.start(restartAdmin.id, passwordV1, firstRestartPhone, '127.0.0.1')
+    const auditsBeforeCancel = audit.entries.length
+    await adminInitialPhoneBind.cancel(restartAdmin.id, firstRestart.bindTicket)
+    if (
+      redis.raw(strictTicketKey(restartAdmin.id, firstRestart.bindTicket)) ||
+      redis.raw(strictActiveKey(restartAdmin.id))
+    ) {
+      fail('12d. 取消当前尝试后遗留了 ticket 或活跃标记')
+    }
+    const cancellationAudit = audit.entries.at(-1)
+    if (
+      audit.entries.length !== auditsBeforeCancel + 1 ||
+      cancellationAudit?.action !== 'auth.phone_initial_bind_cancel' ||
+      cancellationAudit.actorId !== restartAdmin.id ||
+      cancellationAudit.targetId !== restartAdmin.id ||
+      JSON.stringify(cancellationAudit.payload) !== '{}'
+    ) {
+      fail('12d. 实际取消必须写入不含手机号或 ticket 的 Admin 审计')
+    }
+    const auditsAfterMatchedCancel = audit.entries.length
+    await adminInitialPhoneBind.cancel(restartAdmin.id, firstRestart.bindTicket)
+    if (audit.entries.length !== auditsAfterMatchedCancel) fail('12d. 缺失或已消费 ticket 不得额外写取消审计')
+    const correctedRestart = await adminInitialPhoneBind.start(
+      restartAdmin.id,
+      passwordV1,
+      phone('136', 46),
+      '127.0.0.1',
+    )
+    if (correctedRestart.bindTicket === firstRestart.bindTicket) fail('12d. 取消后重开复用了旧 ticket')
+    pass('12d. 管理员可安全取消未验证尝试并立即改正手机号重开')
+
+    const smsFeedbackAdmin = await createStrictAdmin('sms-feedback')
+    const smsFeedbackPhone = phone('136', 47)
+    const firstSmsFeedback = await adminInitialPhoneBind.start(
+      smsFeedbackAdmin.id,
+      passwordV1,
+      smsFeedbackPhone,
+      '127.0.0.1',
+    )
+    await adminInitialPhoneBind.cancel(smsFeedbackAdmin.id, firstSmsFeedback.bindTicket)
+    await expectCode(
+      () => adminInitialPhoneBind.start(smsFeedbackAdmin.id, passwordV1, smsFeedbackPhone, '127.0.0.1'),
+      'SMS_TOO_FREQUENT',
+      '12e. 已知短信冷却错误保留给前端可执行反馈',
+    )
+    if (redis.raw(strictActiveKey(smsFeedbackAdmin.id))) fail('12e. 短信冷却失败后遗留了活跃 ticket')
+
+    const smsFailureAdmin = await createStrictAdmin('sms-send-failure')
+    const smsFailurePhone = phone('136', 48)
+    sms.nextFailure = new Error('simulated provider failure')
+    await expectCode(
+      () => adminInitialPhoneBind.start(smsFailureAdmin.id, passwordV1, smsFailurePhone, '127.0.0.1'),
+      unavailable,
+      '12f. 短信发送 5xx 不得绕过严格不可用错误口径',
+    )
+    if (redis.raw(strictActiveKey(smsFailureAdmin.id))) fail('12f. 短信发送失败后遗留了活跃 ticket')
+
+    const auditFailureAdmin = await createStrictAdmin('audit-failure')
+    const throwingAudit = {
+      async write(): Promise<string> {
+        throw new Error('simulated audit outage')
+      },
+    }
+    const auditResilientPhoneBind = new AdminInitialPhoneBindService(
+      prisma,
+      redis as unknown as RedisService,
+      otp,
+      throwingAudit as unknown as AuditService,
+    )
+    const auditFailurePhone = phone('136', 49)
+    const auditFailureStart = await auditResilientPhoneBind.start(
+      auditFailureAdmin.id,
+      passwordV1,
+      auditFailurePhone,
+      '127.0.0.1',
+    )
+    const auditFailureCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(auditFailurePhone)}`)
+    if (!auditFailureCode) fail('12g. 审计故障场景未写入 OTP')
+    await auditResilientPhoneBind.verify(auditFailureAdmin.id, auditFailureStart.bindTicket, auditFailureCode)
+    const auditFailureBound = await prisma.user.findUniqueOrThrow({ where: { id: auditFailureAdmin.id } })
+    if (!auditFailureBound.phoneVerifiedAt) fail('12g. 审计故障不应把已提交绑定误报为失败')
+    pass('12g. 审计写失败不改变已成功的严格绑定语义')
 
     const successfulAdmin = await createStrictAdmin('success', 17)
     const successPhone = phone('135', 50)
@@ -748,16 +810,6 @@ async function main() {
     }
     pass('14-17. TTL、P2002、tokenVersion CAS 与并发开始均按严格状态机收口')
 
-    const partnerPhone = phone('130', 100)
-    const partnerStart = await initialPhoneBind.start(unboundPartner.id, passwordV1, partnerPhone, '127.0.0.1')
-    const partnerCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(partnerPhone)}`)
-    if (!partnerCode) fail('18. Partner 既有首次绑定没有写入 OTP')
-    const partnerResult = await initialPhoneBind.verify(unboundPartner.id, partnerStart.bindTicket, partnerCode)
-    const boundPartner = await prisma.user.findUniqueOrThrow({ where: { id: unboundPartner.id } })
-    if (partnerResult.phoneMasked !== maskPhone(partnerPhone) || !boundPartner.phoneVerifiedAt || boundPartner.tokenVersion !== 8) {
-      fail('18. Admin 收紧改动破坏了 Partner 既有首次绑定闭环')
-    }
-    pass('18. Partner 仍使用主线 InitialPhoneBindService，既有闭环未退化')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

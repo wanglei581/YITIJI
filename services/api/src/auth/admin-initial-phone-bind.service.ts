@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
@@ -9,6 +9,14 @@ import { INTERNAL_OTP_CODE_TTL_SECONDS, InternalOtpService } from './internal-ot
 
 const CURRENT_PASSWORD_FAILURE_LIMIT = 5
 const CURRENT_PASSWORD_FAILURE_TTL_SECONDS = INTERNAL_OTP_CODE_TTL_SECONDS
+const ACTIONABLE_SMS_FAILURE_CODES = new Set([
+  'SMS_TOO_FREQUENT',
+  'SMS_DAILY_LIMIT',
+  'SMS_IP_LIMIT',
+  'SMS_DEVICE_LIMIT',
+  'SMS_PROVIDER_PHONE_DAILY_LIMIT',
+  'SMS_PROVIDER_RATE_LIMIT',
+])
 
 type AdminInitialPhoneBindTicket = {
   userId: string
@@ -81,14 +89,16 @@ export class AdminInitialPhoneBindService {
         deviceId,
         shouldDeliver: true,
       })
-      await this.writeAudit(user.id, 'auth.phone_initial_bind_start', maskPhone(phone))
+      // AuditService 已约定审计故障只告警、不改变业务结果；这里额外防御替换实现误抛。
+      await this.writeAudit(user.id, 'auth.phone_initial_bind_start', maskPhone(phone)).catch(() => undefined)
       return {
         bindTicket,
         cooldownSeconds: result.cooldownSeconds,
         expiresInSeconds: INTERNAL_OTP_CODE_TTL_SECONDS,
       }
-    } catch {
+    } catch (error) {
       if (activeTicketCreated) await this.cleanupTicket(user.id, bindTicket)
+      if (this.isActionableSmsFailure(error)) throw error
       throw this.unavailable()
     }
   }
@@ -98,29 +108,41 @@ export class AdminInitialPhoneBindService {
     bindTicket: string,
     code: string,
   ): Promise<{ phoneMasked: string; phoneVerifiedAt: string }> {
-    const serializedTicket = await this.redis.getDel(this.ticketKey(userId, bindTicket))
+    const serializedTicket = await this.redis.get(this.ticketKey(userId, bindTicket))
     if (!serializedTicket) throw this.unavailable()
+
+    let ticket: AdminInitialPhoneBindTicket
+    let phone: string
+    try {
+      ticket = this.parseTicket(serializedTicket, userId)
+      const user = await this.getEligibleAdmin(userId)
+      if (user.tokenVersion !== ticket.tokenVersion) throw new Error('stale ticket')
+      phone = this.decryptTicketPhone(ticket)
+    } catch {
+      await this.cleanupTicket(userId, bindTicket)
+      throw this.unavailable()
+    }
+
+    try {
+      await this.otp.verifyCode(phone, 'bind_phone', code)
+    } catch (error) {
+      if (this.isRetryableOtpInvalid(error)) throw this.invalidOtpCode()
+      await this.cleanupTicket(userId, bindTicket)
+      throw this.unavailable()
+    }
+
+    const ticketStatus = await this.redis.getAndDelIfEquals(this.ticketKey(userId, bindTicket), serializedTicket)
+    if (ticketStatus !== 'matched') throw this.unavailable()
 
     const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
     if (activeTicketStatus !== 'matched') throw this.unavailable()
-
-    const ticket = this.parseTicket(serializedTicket, userId)
-    const user = await this.getEligibleAdmin(userId)
-    if (user.tokenVersion !== ticket.tokenVersion) throw this.unavailable()
-
-    const phone = this.decryptTicketPhone(ticket)
-    try {
-      await this.otp.verifyCode(phone, 'bind_phone', code)
-    } catch {
-      throw this.unavailable()
-    }
 
     const phoneVerifiedAt = new Date()
     let updated: { count: number }
     try {
       updated = await this.prisma.user.updateMany({
         where: {
-          id: user.id,
+          id: userId,
           role: 'admin',
           enabled: true,
           phoneHash: null,
@@ -140,12 +162,27 @@ export class AdminInitialPhoneBindService {
     if (updated.count !== 1) throw this.unavailable()
 
     const phoneMasked = maskPhone(phone)
+    // 数据库绑定已提交，审计故障只能由 AuditService 记录，不得把成功绑定误报为失败。
+    await this.writeAudit(userId, 'auth.phone_initial_bind_complete', phoneMasked).catch(() => undefined)
+    return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString() }
+  }
+
+  /**
+   * 仅取消当前登录 Admin 自己的未验证尝试；只有 active marker 与 ticket 精确匹配时才会删除。
+   * 已消费、过期或其他账号的 ticket 统一视为已取消，避免把状态当成探测 oracle。
+   */
+  async cancel(userId: string, bindTicket: string): Promise<{ cancelled: true }> {
     try {
-      await this.writeAudit(user.id, 'auth.phone_initial_bind_complete', phoneMasked)
+      const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
+      if (activeTicketStatus === 'matched') {
+        // active marker 已经原子删除，遗留 ticket 也无法再验证；删除失败不把成功取消伪装成失败。
+        await this.redis.del(this.ticketKey(userId, bindTicket)).catch(() => undefined)
+        await this.writeCancellationAudit(userId).catch(() => undefined)
+      }
+      return { cancelled: true }
     } catch {
       throw this.unavailable()
     }
-    return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString() }
   }
 
   private async getEligibleAdmin(userId: string) {
@@ -234,6 +271,18 @@ export class AdminInitialPhoneBindService {
     })
   }
 
+  /** 取消记录刻意不带手机号、ticket 或任何可重放凭据。 */
+  private async writeCancellationAudit(userId: string): Promise<void> {
+    await this.audit.write({
+      actorId: userId,
+      actorRole: 'admin',
+      action: 'auth.phone_initial_bind_cancel',
+      targetType: 'auth',
+      targetId: userId,
+      payload: {},
+    })
+  }
+
   private ticketKey(userId: string, bindTicket: string): string {
     return `internal:admin:phone-initial-bind:ticket:${userId}:${bindTicket}`
   }
@@ -244,6 +293,32 @@ export class AdminInitialPhoneBindService {
 
   private currentPasswordFailureKey(userId: string): string {
     return `internal:admin:phone-initial-bind:password-fail:${userId}`
+  }
+
+  /** 只保留 InternalOtpService 明确声明、不会暴露账号或手机号归属的可执行短信错误。 */
+  private isActionableSmsFailure(error: unknown): error is HttpException {
+    const code = this.structuredExceptionCode(error)
+    return code !== null && ACTIONABLE_SMS_FAILURE_CODES.has(code)
+  }
+
+  private isRetryableOtpInvalid(error: unknown): boolean {
+    return this.structuredExceptionCode(error) === 'SMS_CODE_INVALID'
+  }
+
+  private structuredExceptionCode(error: unknown): string | null {
+    if (!(error instanceof HttpException)) return null
+    const response = error.getResponse()
+    if (!response || typeof response !== 'object' || Array.isArray(response)) return null
+    const nestedError = (response as { error?: unknown }).error
+    if (!nestedError || typeof nestedError !== 'object' || Array.isArray(nestedError)) return null
+    const code = (nestedError as { code?: unknown }).code
+    return typeof code === 'string' ? code : null
+  }
+
+  private invalidOtpCode(): BadRequestException {
+    return new BadRequestException({
+      error: { code: 'SMS_CODE_INVALID', message: '验证码不正确，请重新输入' },
+    })
   }
 
   private unavailable(): BadRequestException {
