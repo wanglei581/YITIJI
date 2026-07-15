@@ -1,0 +1,13 @@
+{
+  "id": "f1-pr-body-correction-20260715",
+  "title": "F1 草稿 PR 正文格式修正",
+  "status": "complete",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "release-delivery",
+  "currentPhase": "completed",
+  "nextAction": "PR #252 正文已修正并确认草稿状态；不改代码、不部署、不合并",
+  "createdAt": "2026-07-15T22:32:00+08:00",
+  "branch": "codex/f1-admin-credential-sync-main-20260715",
+  "pullRequest": "https://github.com/wanglei581/YITIJI/pull/252"
+}
