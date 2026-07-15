@@ -25,7 +25,7 @@
 3. 只有说明实际变化时显示或启用「保存说明」按钮；空字符串按显式空说明处理，不隐式回退旧值。
 4. 点击「保存说明」后弹出确认，明确展示价目项以及旧说明、新说明，并提示“只更新说明，不修改单价与启停状态，操作记入审计”。
 5. 确认后调用既有 `adminBillingService.updatePriceConfig(serviceKey, { description })`；请求体不得包含 `unitCents` 或 `active`。
-6. 成功后清理该行说明编辑状态并重新加载列表；失败时保留输入，展示现有页级错误，不影响另一行或单价编辑状态。
+6. 成功后先重新加载列表，再清理该行说明编辑状态，避免弱网下旧说明短暂闪回；失败时保留输入，展示现有页级错误，不影响另一行或单价编辑状态。
 7. 单价保存与启停按钮行为保持不变，说明编辑期间不改变价格控件的值。
 
 ## 数据流与安全边界
@@ -69,7 +69,7 @@
 
 实现后执行：
 
-- `pnpm --filter @ai-job-print/admin verify:billing-ui`
+- `pnpm --filter @ai-job-print/admin verify:admin-billing-ui`
 - `pnpm --filter @ai-job-print/admin typecheck`
 - `pnpm --filter @ai-job-print/admin lint`
 - `git diff --check`
