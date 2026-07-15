@@ -1,0 +1,12 @@
+{
+  "id": "publish-admin-password-security-pr",
+  "title": "推送管理员安全改密候选并创建 PR",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "delivery",
+  "currentPhase": "completed",
+  "nextAction": "PR #241 已创建；等待 CI / 评审，不合并、不部署",
+  "createdAt": "2026-07-15T12:20:00+08:00",
+  "branch": "codex/admin-password-security-20260715"
+}
