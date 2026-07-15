@@ -15,12 +15,119 @@ import type {
   AuditLogListResponse,
   AuditLogListQuery,
   AuditLogRecord,
+  DeviceFleetOverview,
 } from './types'
 import { ApiHttpError } from './client'
 import type { ReviewAction } from './review-types'
 import type { PublishAction } from './review-types'
 
 export type { ReviewAction, PublishAction }
+
+const MOCK_DEVICE_FLEET_OVERVIEW: DeviceFleetOverview = {
+  generatedAt: '2026-07-15T06:00:00.000Z',
+  onlineWindowSeconds: 180,
+  summary: {
+    total: 5,
+    healthy: 1,
+    degraded: 1,
+    offline: 2,
+    unknown: 1,
+    disabled: 1,
+    configurationConflictTerminals: 1,
+    orphanConfigurationRecords: 1,
+  },
+  terminals: [
+    {
+      terminalCode: 'KSK-001',
+      displayName: '一号楼大厅终端',
+      locationLabel: '市南校区 一号楼大厅',
+      orgName: '某大学就业指导中心',
+      enabled: true,
+      health: 'healthy',
+      healthReason: 'heartbeat_fresh',
+      lastHeartbeatAt: '2026-07-15T05:59:00.000Z',
+      agentVersion: '0.3.0',
+      hasConfigurationConflict: false,
+      config: {
+        screensaver: { state: 'configured', enabled: true, playlistConfigured: true, updatedAt: '2026-07-14T08:00:00.000Z' },
+        smartCampus: { state: 'configured', enabled: true, enabledModuleCount: 3, updatedAt: '2026-07-14T08:10:00.000Z' },
+        toolbox: { state: 'legacy_reference', enabled: true, itemCount: 4, updatedAt: '2026-07-14T08:20:00.000Z' },
+      },
+    },
+    {
+      terminalCode: 'KSK-002',
+      displayName: '就业中心终端',
+      locationLabel: '就业指导中心服务区',
+      orgName: '某大学就业指导中心',
+      enabled: true,
+      health: 'degraded',
+      healthReason: 'agent_reported_degraded',
+      lastHeartbeatAt: '2026-07-15T05:59:00.000Z',
+      agentVersion: '0.2.9',
+      hasConfigurationConflict: true,
+      config: {
+        screensaver: { state: 'configured', enabled: true, playlistConfigured: true, updatedAt: '2026-07-14T09:00:00.000Z' },
+        smartCampus: { state: 'unconfigured', enabled: null, enabledModuleCount: null, updatedAt: null },
+        toolbox: { state: 'conflict', enabled: null, itemCount: null, updatedAt: null },
+      },
+    },
+    {
+      terminalCode: 'KSK-003',
+      displayName: '东区服务终端',
+      locationLabel: '东区综合服务厅',
+      orgName: '市人才交流中心',
+      enabled: true,
+      health: 'offline',
+      healthReason: 'heartbeat_stale',
+      lastHeartbeatAt: '2026-07-15T05:40:00.000Z',
+      agentVersion: '0.2.8',
+      hasConfigurationConflict: false,
+      config: {
+        screensaver: { state: 'unconfigured', enabled: null, playlistConfigured: null, updatedAt: null },
+        smartCampus: { state: 'configured', enabled: false, enabledModuleCount: 0, updatedAt: '2026-07-13T04:00:00.000Z' },
+        toolbox: { state: 'configured', enabled: true, itemCount: 2, updatedAt: '2026-07-13T04:10:00.000Z' },
+      },
+    },
+    {
+      terminalCode: 'KSK-004',
+      displayName: null,
+      locationLabel: null,
+      orgName: null,
+      enabled: true,
+      health: 'unknown',
+      healthReason: 'never_reported',
+      lastHeartbeatAt: null,
+      agentVersion: null,
+      hasConfigurationConflict: false,
+      config: {
+        screensaver: { state: 'unconfigured', enabled: null, playlistConfigured: null, updatedAt: null },
+        smartCampus: { state: 'unconfigured', enabled: null, enabledModuleCount: null, updatedAt: null },
+        toolbox: { state: 'unconfigured', enabled: null, itemCount: null, updatedAt: null },
+      },
+    },
+    {
+      terminalCode: 'KSK-005',
+      displayName: '备用终端',
+      locationLabel: '设备间',
+      orgName: '市人才交流中心',
+      enabled: false,
+      health: 'offline',
+      healthReason: 'heartbeat_stale',
+      lastHeartbeatAt: '2026-07-14T05:00:00.000Z',
+      agentVersion: '0.2.7',
+      hasConfigurationConflict: false,
+      config: {
+        screensaver: { state: 'configured', enabled: false, playlistConfigured: true, updatedAt: '2026-07-12T03:00:00.000Z' },
+        smartCampus: { state: 'configured', enabled: false, enabledModuleCount: 1, updatedAt: '2026-07-12T03:10:00.000Z' },
+        toolbox: { state: 'configured', enabled: false, itemCount: 1, updatedAt: '2026-07-12T03:20:00.000Z' },
+      },
+    },
+  ],
+  issues: [
+    { area: 'toolbox', kind: 'dual_reference_config', affectedTerminalCodes: ['KSK-002'] },
+    { area: 'screensaver', kind: 'orphan_config', affectedTerminalCodes: [] },
+  ],
+}
 
 // ─── 终端机构归属 mock 状态（页面刷新重置；不写数据库）─────────────────────────
 
@@ -153,6 +260,26 @@ export const adminMockAdapter = {
       }
     })
     return FAIR_SOURCES.find((s) => s.id === id)!
+  },
+
+  async getDeviceFleetOverview(): Promise<DeviceFleetOverview> {
+    await delay()
+    return {
+      ...MOCK_DEVICE_FLEET_OVERVIEW,
+      summary: { ...MOCK_DEVICE_FLEET_OVERVIEW.summary },
+      terminals: MOCK_DEVICE_FLEET_OVERVIEW.terminals.map((terminal) => ({
+        ...terminal,
+        config: {
+          screensaver: { ...terminal.config.screensaver },
+          smartCampus: { ...terminal.config.smartCampus },
+          toolbox: { ...terminal.config.toolbox },
+        },
+      })),
+      issues: MOCK_DEVICE_FLEET_OVERVIEW.issues.map((issue) => ({
+        ...issue,
+        affectedTerminalCodes: [...issue.affectedTerminalCodes],
+      })),
+    }
   },
 
   async publishFairSourceRecord(id: string, action: PublishAction): Promise<AdminFairSourceRecord> {

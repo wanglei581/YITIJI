@@ -3,9 +3,11 @@ import { Page } from '../Page'
 import TerminalsPage from '../terminals'
 import PrintersPage from '../printers'
 import PeripheralsPage from '../peripherals'
-import { CableIcon, MonitorIcon, PrinterIcon } from 'lucide-react'
+import TerminalFleetOverview from './TerminalFleetOverview'
+import { CableIcon, LayoutDashboardIcon, MonitorIcon, PrinterIcon } from 'lucide-react'
 
 const TABS = [
+  { key: 'overview',    label: '设备总览', icon: LayoutDashboardIcon },
   { key: 'terminals',   label: '终端',     icon: MonitorIcon },
   { key: 'printers',    label: '打印机',   icon: PrinterIcon },
   { key: 'peripherals', label: '外设',     icon: CableIcon   },
@@ -55,6 +57,7 @@ export default function DevicesPage() {
         })}
       </div>
 
+      {active === 'overview'    && <TerminalFleetOverview />}
       {active === 'terminals'   && <TerminalsPage />}
       {active === 'printers'    && <PrintersPage />}
       {active === 'peripherals' && <PeripheralsPage />}

@@ -5,6 +5,83 @@ import type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery } from '@a
 export type { ReviewStatus, PublishStatus, JobFairStatus }
 export type { AuditLogRecord, AuditLogListResponse, AuditLogListQuery }
 
+// ─── Device fleet overview (F0 只读白名单投影) ───────────────────────────────
+
+export type DeviceFleetHealth = 'healthy' | 'degraded' | 'offline' | 'unknown'
+export type DeviceFleetHealthReason =
+  | 'heartbeat_fresh'
+  | 'agent_reported_degraded'
+  | 'agent_reported_offline'
+  | 'agent_reported_error'
+  | 'heartbeat_stale'
+  | 'never_reported'
+export type DeviceFleetConfigState = 'unconfigured' | 'configured' | 'legacy_reference' | 'conflict'
+export type DeviceFleetConfigArea = 'screensaver' | 'smart_campus' | 'toolbox'
+export type DeviceFleetIssueKind =
+  | 'dual_reference_config'
+  | 'cross_terminal_reference_collision'
+  | 'orphan_config'
+
+export interface DeviceFleetScreensaverConfig {
+  state: DeviceFleetConfigState
+  enabled: boolean | null
+  playlistConfigured: boolean | null
+  updatedAt: string | null
+}
+
+export interface DeviceFleetSmartCampusConfig {
+  state: DeviceFleetConfigState
+  enabled: boolean | null
+  enabledModuleCount: number | null
+  updatedAt: string | null
+}
+
+export interface DeviceFleetToolboxConfig {
+  state: DeviceFleetConfigState
+  enabled: boolean | null
+  itemCount: number | null
+  updatedAt: string | null
+}
+
+export interface DeviceFleetTerminal {
+  terminalCode: string
+  displayName: string | null
+  locationLabel: string | null
+  orgName: string | null
+  enabled: boolean
+  health: DeviceFleetHealth
+  healthReason: DeviceFleetHealthReason
+  lastHeartbeatAt: string | null
+  agentVersion: string | null
+  hasConfigurationConflict: boolean
+  config: {
+    screensaver: DeviceFleetScreensaverConfig
+    smartCampus: DeviceFleetSmartCampusConfig
+    toolbox: DeviceFleetToolboxConfig
+  }
+}
+
+export interface DeviceFleetOverview {
+  generatedAt: string
+  onlineWindowSeconds: 180
+  summary: {
+    total: number
+    healthy: number
+    degraded: number
+    offline: number
+    unknown: number
+    disabled: number
+    configurationConflictTerminals: number
+    orphanConfigurationRecords: number
+  }
+  terminals: DeviceFleetTerminal[]
+  issues: Array<{
+    area: DeviceFleetConfigArea
+    kind: DeviceFleetIssueKind
+    affectedTerminalCodes: string[]
+  }>
+}
+
 // ─── Terminals (设备管理 — 终端心跳上报) ─────────────────────────────────────
 // 严格对齐跨 agent 契约 C1 (GET /admin/terminals)。字段名/类型不得臆造。
 

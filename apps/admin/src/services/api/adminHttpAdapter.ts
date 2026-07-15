@@ -13,6 +13,7 @@ import type {
   TerminalBindCodeCreated,
   AuditLogListResponse,
   AuditLogListQuery,
+  DeviceFleetOverview,
 } from './types'
 import type { ReviewAction, PublishAction } from './review-types'
 
@@ -134,6 +135,10 @@ export const adminHttpAdapter = {
 
   getImportBatches: () =>
     get<AdminImportBatch[]>('/admin/import-batches'),
+
+  // 设备集群 F0 只读总览（严格脱敏投影）
+  getDeviceFleetOverview: () =>
+    getData<DeviceFleetOverview>('/admin/device-fleet/overview'),
 
   // ── 设备管理 — 终端心跳(契约 C1)──────────────────────────────────────────
   getTerminals: () =>

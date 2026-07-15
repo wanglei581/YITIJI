@@ -13,6 +13,13 @@ import type {
   UpdateTerminalProfileResult,
   TerminalBindCodeCreated,
   TerminalPrinterStatus,
+  DeviceFleetOverview,
+  DeviceFleetTerminal,
+  DeviceFleetHealth,
+  DeviceFleetHealthReason,
+  DeviceFleetConfigState,
+  DeviceFleetConfigArea,
+  DeviceFleetIssueKind,
 } from './types'
 
 export type {
@@ -27,9 +34,17 @@ export type {
   UpdateTerminalProfileResult,
   TerminalBindCodeCreated,
   TerminalPrinterStatus,
+  DeviceFleetOverview,
+  DeviceFleetTerminal,
+  DeviceFleetHealth,
+  DeviceFleetHealthReason,
+  DeviceFleetConfigState,
+  DeviceFleetConfigArea,
+  DeviceFleetIssueKind,
 }
 
 interface AdminDeviceServiceInterface {
+  getDeviceFleetOverview(): Promise<DeviceFleetOverview>
   getTerminals(): Promise<AdminTerminalsResponse>
   getPrinters(): Promise<AdminPrintersResponse>
   getOrgOptions(): Promise<AdminOrgOptionsResponse>
@@ -40,6 +55,9 @@ interface AdminDeviceServiceInterface {
 
 const adapter: AdminDeviceServiceInterface =
   API_MODE === 'http' ? adminHttpAdapter : adminMockAdapter
+
+/** 读取严格脱敏的终端集群 F0 总览。 */
+export const getDeviceFleetOverview = () => adapter.getDeviceFleetOverview()
 
 /** 拉取终端列表(契约 C1 GET /admin/terminals)。http 走真实后端,mock 返回示例数据。 */
 export const getTerminals = () => adapter.getTerminals()
