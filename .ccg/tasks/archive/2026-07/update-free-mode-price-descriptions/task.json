@@ -1,0 +1,12 @@
+{
+  "id": "update-free-mode-price-descriptions",
+  "title": "生产 FREE_MODE 两条价目说明文案诚实化",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "production-operations",
+  "currentPhase": "completed",
+  "nextAction": "完成新鲜验证并归档 CCG 任务；保留分支与独立 worktree，等待用户决定是否 push / PR",
+  "createdAt": "2026-07-15T08:40:00Z",
+  "branch": "codex/prod-admin-password-readonly-audit-20260715"
+}
