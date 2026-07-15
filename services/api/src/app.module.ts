@@ -44,6 +44,7 @@ import { UploadSessionsModule } from './upload-sessions/upload-sessions.module'
 import { ScanTasksModule } from './scan-tasks/scan-tasks.module'
 import { PrintConversionModule } from './print-conversion/print-conversion.module'
 import { PrintSignModule } from './print-sign/print-sign.module'
+import { DeviceFleetModule } from './device-fleet/device-fleet.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
@@ -115,6 +116,7 @@ const redisUrl = process.env['REDIS_URL']
     ScanTasksModule,
     PrintConversionModule,
     PrintSignModule,
+    DeviceFleetModule,
   ],
   controllers: [HealthController],
   providers: [
