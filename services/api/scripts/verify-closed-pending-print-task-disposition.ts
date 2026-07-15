@@ -58,11 +58,23 @@ async function main(): Promise<void> {
   const terminalId = `term_closed_pending_${suffix}`
   const terminalToken = `token_closed_pending_${suffix}`
   const eligibleTaskId = `ptask_closed_pending_${suffix}`
+  const createdAttemptTaskId = `ptask_created_attempt_${suffix}`
   const pendingAttemptTaskId = `ptask_pending_attempt_${suffix}`
   const successAttemptTaskId = `ptask_success_attempt_${suffix}`
   const claimedTaskId = `ptask_claimed_closed_${suffix}`
   const memberTaskId = `ptask_member_closed_${suffix}`
-  const taskIds = [eligibleTaskId, pendingAttemptTaskId, successAttemptTaskId, claimedTaskId, memberTaskId]
+  const unpaidOrderTaskId = `ptask_unpaid_order_${suffix}`
+  const cancelledOrderTaskId = `ptask_cancelled_order_${suffix}`
+  const taskIds = [
+    eligibleTaskId,
+    createdAttemptTaskId,
+    pendingAttemptTaskId,
+    successAttemptTaskId,
+    claimedTaskId,
+    memberTaskId,
+    unpaidOrderTaskId,
+    cancelledOrderTaskId,
+  ]
 
   async function cleanup(): Promise<void> {
     await prisma.auditLog.deleteMany({ where: { targetId: { in: taskIds } } })
@@ -101,10 +113,13 @@ async function main(): Promise<void> {
     await prisma.printTask.createMany({
       data: [
         { id: eligibleTaskId, terminalId, fileUrl: 'internal://closed-eligible', fileMd5: 'eligible', status: 'pending' },
+        { id: createdAttemptTaskId, fileUrl: 'internal://closed-created-attempt', fileMd5: 'created-attempt', status: 'pending' },
         { id: pendingAttemptTaskId, fileUrl: 'internal://closed-pending-attempt', fileMd5: 'pending-attempt', status: 'pending' },
         { id: successAttemptTaskId, fileUrl: 'internal://closed-success-attempt', fileMd5: 'success-attempt', status: 'pending' },
         { id: claimedTaskId, fileUrl: 'internal://closed-claimed', fileMd5: 'claimed', status: 'claimed', claimedAt: new Date(), claimExpiry: new Date(Date.now() + 60_000) },
         { id: memberTaskId, endUserId: memberId, fileUrl: 'internal://closed-member', fileMd5: 'member', status: 'pending' },
+        { id: unpaidOrderTaskId, fileUrl: 'internal://unpaid-order', fileMd5: 'unpaid-order', status: 'pending' },
+        { id: cancelledOrderTaskId, fileUrl: 'internal://cancelled-order', fileMd5: 'cancelled-order', status: 'pending' },
       ],
     })
     await prisma.order.createMany({
@@ -113,18 +128,20 @@ async function main(): Promise<void> {
         orderNo: `ORD-CLOSED-${index}-${suffix}`,
         type: 'print',
         printTaskId: taskId,
-        payStatus: 'closed',
-        taskStatus: 'pending',
+        payStatus: taskId === unpaidOrderTaskId ? 'unpaid' : 'closed',
+        taskStatus: taskId === cancelledOrderTaskId ? 'cancelled' : 'pending',
       })),
     })
-    const [eligibleOrder, pendingOrder, successOrder] = await Promise.all([
+    const [eligibleOrder, createdOrder, pendingOrder, successOrder] = await Promise.all([
       prisma.order.findUniqueOrThrow({ where: { printTaskId: eligibleTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { printTaskId: createdAttemptTaskId } }),
       prisma.order.findUniqueOrThrow({ where: { printTaskId: pendingAttemptTaskId } }),
       prisma.order.findUniqueOrThrow({ where: { printTaskId: successAttemptTaskId } }),
     ])
     await prisma.paymentAttempt.createMany({
       data: [
         { orderId: eligibleOrder.id, channel: 'sandbox', amountCents: 100, status: 'expired' },
+        { orderId: createdOrder.id, channel: 'sandbox', amountCents: 100, status: 'created' },
         { orderId: pendingOrder.id, channel: 'sandbox', amountCents: 100, status: 'pending' },
         { orderId: successOrder.id, channel: 'sandbox', amountCents: 100, status: 'success' },
       ],
@@ -182,12 +199,20 @@ async function main(): Promise<void> {
       pass('Kiosk 查询受控关闭任务不伪装为设备打印失败')
     } else fail(`cancelled Kiosk status mismatch: ${JSON.stringify(cancelledStatus)}`)
 
+    await expectReject('已创建支付尝试被拒绝', () => service.dispose({ taskIds: [createdAttemptTaskId], operatorId: adminId, reason: '已创建支付尝试的订单绝不能关闭对应打印任务' }), 'PRINT_TASK_PAYMENT_ATTEMPT_PROTECTED')
     await expectReject('进行中支付尝试被拒绝', () => service.dispose({ taskIds: [pendingAttemptTaskId], operatorId: adminId, reason: '正在支付的订单绝不能关闭对应打印任务' }), 'PRINT_TASK_PAYMENT_ATTEMPT_PROTECTED')
     await expectReject('成功支付尝试被拒绝', () => service.dispose({ taskIds: [successAttemptTaskId], operatorId: adminId, reason: '已成功支付的订单绝不能关闭对应打印任务' }), 'PRINT_TASK_PAYMENT_ATTEMPT_PROTECTED')
+    await expectReject('订单未关单被拒绝', () => service.dispose({ taskIds: [unpaidOrderTaskId], operatorId: adminId, reason: '订单仍处于未付款状态时不得关闭对应打印任务' }), 'PRINT_TASK_NOT_CLOSED_PENDING')
+    await expectReject('订单任务状态不一致被拒绝', () => service.dispose({ taskIds: [cancelledOrderTaskId], operatorId: adminId, reason: '订单任务状态已取消时不得重复关闭对应打印任务' }), 'PRINT_TASK_NOT_CLOSED_PENDING')
     await expectReject('已领取任务被拒绝', () => service.dispose({ taskIds: [claimedTaskId], operatorId: adminId, reason: '已被终端领取的打印任务不能由维护命令关闭' }), 'PRINT_TASK_NOT_CLOSED_PENDING')
     await expectReject('会员任务被拒绝', () => service.dispose({ taskIds: [memberTaskId], operatorId: adminId, reason: '会员本人关联的打印任务不能由维护命令关闭' }), 'PRINT_TASK_NOT_CLOSED_PENDING')
     await expectReject('非管理员操作员被拒绝', () => service.dispose({ taskIds: [pendingAttemptTaskId], operatorId: partnerId, reason: '非管理员不得使用已关闭订单任务维护命令' }), 'ADMIN_OPERATOR_REQUIRED')
+    await expectReject('空任务批次被拒绝', () => service.dispose({ taskIds: [], operatorId: adminId, reason: '空任务批次不得进入已关闭订单任务处置流程' }), 'CLOSED_PENDING_TASK_IDS_REQUIRED')
+    await expectReject('超过上限的任务批次被拒绝', () => service.dispose({ taskIds: Array.from({ length: 11 }, (_, index) => `ptask_batch_${index}_${suffix}`), operatorId: adminId, reason: '超过批量上限的任务不得进入已关闭订单任务处置流程' }), 'CLOSED_PENDING_TASK_BATCH_TOO_LARGE')
+    await expectReject('缺少操作员被拒绝', () => service.dispose({ taskIds: [pendingAttemptTaskId], operatorId: '', reason: '缺少管理员操作员标识时不得进入任务处置流程' }), 'ADMIN_OPERATOR_REQUIRED')
+    await expectReject('不存在任务被拒绝', () => service.dispose({ taskIds: [`ptask_missing_${suffix}`], operatorId: adminId, reason: '不存在的任务标识不得被当作可处置打印任务' }), 'PRINT_TASK_NOT_FOUND')
     await expectReject('过短原因被拒绝', () => service.dispose({ taskIds: [pendingAttemptTaskId], operatorId: adminId, reason: '太短' }), 'CLOSED_PENDING_TASK_REASON_INVALID')
+    await expectReject('过长原因被拒绝', () => service.dispose({ taskIds: [pendingAttemptTaskId], operatorId: adminId, reason: 'x'.repeat(501) }), 'CLOSED_PENDING_TASK_REASON_INVALID')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
