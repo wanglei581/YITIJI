@@ -34,6 +34,7 @@ export type AuditAction =
   | 'resume.parse_submitted'
   | 'resume.optimize_requested'
   | 'assistant.chat_message'
+  | 'auth.password_change_self'
   | 'organization.create'
   | 'organization.update'
   | 'user.create'
@@ -42,6 +43,7 @@ export type AuditAction =
   | 'system.config_change'
 
 export type AuditTargetType =
+  | 'auth'
   | 'file'
   | 'job'
   | 'job_source'

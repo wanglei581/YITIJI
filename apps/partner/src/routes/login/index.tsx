@@ -68,6 +68,18 @@ function persistRememberedLoginId(remember: boolean, loginId: string): void {
   }
 }
 
+function passwordCategoryCount(value: string): number {
+  return [/[a-z]/.test(value), /[A-Z]/.test(value), /\d/.test(value), /[^A-Za-z0-9]/u.test(value)].filter(Boolean).length
+}
+
+function utf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).length
+}
+
+function unicodeCharacterLength(value: string): number {
+  return Array.from(value).length
+}
+
 /** 触控涟漪：命中 .ripple-host 的元素按压时扩散水纹（纯视觉，事件委托） */
 function useRipple(rootRef: React.RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -216,6 +228,18 @@ export default function LoginPage() {
   async function completeReset(e: FormEvent) {
     e.preventDefault()
     setResetError(null)
+    if (unicodeCharacterLength(newPassword) < 12) {
+      setResetError('新密码至少 12 位')
+      return
+    }
+    if (utf8ByteLength(newPassword) > 72) {
+      setResetError('新密码按 UTF-8 计算不能超过 72 字节')
+      return
+    }
+    if (passwordCategoryCount(newPassword) < 3) {
+      setResetError('新密码至少包含大写字母、小写字母、数字、特殊字符中的 3 类')
+      return
+    }
     const r = await completePasswordReset(resetTicket, newPassword)
     if (!r.ok) {
       setResetError(r.message || '密码重置失败')
@@ -560,12 +584,18 @@ export default function LoginPage() {
                       id="partner-reset-password"
                       type="password"
                       autoComplete="new-password"
-                      placeholder="8 位以上新密码"
+                      aria-describedby="partner-reset-password-hint"
+                      placeholder="12 位以上，至少包含 3 类字符"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
-                      minLength={8}
+                      minLength={12}
+                      maxLength={72}
                     />
+                  </div>
+                  <div id="partner-reset-password-hint" className="c-hint">
+                    <ShieldCheckIcon size={14} aria-hidden="true" />
+                    至少包含大写、小写、数字、特殊字符中的 3 类；UTF-8 最多 72 字节
                   </div>
                 </div>
                 {resetError && <ErrorBar message={resetError} />}

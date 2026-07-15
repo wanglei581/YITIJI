@@ -98,11 +98,9 @@ export class JwtAuthGuard implements CanActivate {
     const cacheKey = `internal:session-state:${userId}`
     const cached = await this.redis.get(cacheKey)
     if (cached) {
-      try {
-        return JSON.parse(cached) as CachedSessionState
-      } catch {
-        await this.redis.del(cacheKey)
-      }
+      const parsed = this.parseSessionState(cached)
+      if (parsed) return parsed
+      await this.redis.del(cacheKey)
     }
 
     const user = await this.prisma.user.findUnique({
@@ -128,7 +126,26 @@ export class JwtAuthGuard implements CanActivate {
       tokenVersion: user.tokenVersion,
       orgEnabled,
     }
-    await this.redis.setEx(cacheKey, INTERNAL_SESSION_CACHE_TTL_SECONDS, JSON.stringify(state))
+    const writeResult = await this.redis.setJsonIfVersionNotOlder(
+      cacheKey,
+      INTERNAL_SESSION_CACHE_TTL_SECONDS,
+      JSON.stringify(state),
+      state.tokenVersion,
+    )
+    if (writeResult === 'stale') {
+      const latest = await this.redis.get(cacheKey)
+      return latest ? this.parseSessionState(latest) : null
+    }
     return state
+  }
+
+  private parseSessionState(raw: string): CachedSessionState | null {
+    try {
+      const parsed = JSON.parse(raw) as Partial<CachedSessionState>
+      if (typeof parsed.userId !== 'string' || typeof parsed.tokenVersion !== 'number') return null
+      return parsed as CachedSessionState
+    } catch {
+      return null
+    }
   }
 }

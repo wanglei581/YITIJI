@@ -30,6 +30,7 @@ import ScreensaverPage from './screensaver'
 import ToolboxPage from './toolbox'
 import SmartCampusPage from './smart-campus'
 import JobMaterialsPage from './job-materials'
+import AccountSettingsPage from './account-settings'
 
 export const adminRouter = createBrowserRouter([
   // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
@@ -71,6 +72,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'screensaver',     element: <ScreensaverPage /> },
       { path: 'toolbox',         element: <ToolboxPage /> },
       { path: 'smart-campus',    element: <SmartCampusPage /> },
+      { path: 'account-settings', element: <AccountSettingsPage /> },
     ],
   },
 ])

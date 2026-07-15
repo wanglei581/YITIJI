@@ -1,0 +1,12 @@
+{
+  "id": "admin-password-security",
+  "title": "管理员登录态安全修改密码与旧会话失效",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "auth",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交本地候选；等待用户决定是否 push / 建 PR / 部署",
+  "createdAt": "2026-07-14T16:22:42Z",
+  "branch": "codex/admin-password-security-20260715"
+}
