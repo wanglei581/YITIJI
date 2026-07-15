@@ -14,7 +14,7 @@ export interface InternalSendCodeResult {
   expiresInSeconds: number
 }
 
-const CODE_TTL = 300
+export const INTERNAL_OTP_CODE_TTL_SECONDS = 300
 const COOLDOWN = 60
 const PHONE_DAILY_MAX = 10
 const IP_HOURLY_MAX = 30
@@ -60,12 +60,12 @@ export class InternalOtpService {
 
     if (!input.shouldDeliver) {
       await this.simulateProviderLatency()
-      return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: CODE_TTL }
+      return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: INTERNAL_OTP_CODE_TTL_SECONDS }
     }
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0')
     const codeKey = this.k.code(input.purpose, phoneHash)
-    await this.redis.setEx(codeKey, CODE_TTL, code)
+    await this.redis.setEx(codeKey, INTERNAL_OTP_CODE_TTL_SECONDS, code)
     await this.redis.del(this.k.attempt(input.purpose, phoneHash))
 
     try {
@@ -76,14 +76,14 @@ export class InternalOtpService {
       throw this.toSmsSendException(error)
     }
 
-    return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: CODE_TTL }
+    return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: INTERNAL_OTP_CODE_TTL_SECONDS }
   }
 
   async verifyCode(phone: string, purpose: InternalOtpPurpose, code: string): Promise<void> {
     const phoneHash = hashPhone(phone)
     const codeKey = this.k.code(purpose, phoneHash)
     const attemptKey = this.k.attempt(purpose, phoneHash)
-    const attempts = await this.redis.incrWithTtl(attemptKey, CODE_TTL)
+    const attempts = await this.redis.incrWithTtl(attemptKey, INTERNAL_OTP_CODE_TTL_SECONDS)
     if (attempts > VERIFY_MAX_ATTEMPTS) {
       await this.redis.del(codeKey)
       await this.redis.del(attemptKey)

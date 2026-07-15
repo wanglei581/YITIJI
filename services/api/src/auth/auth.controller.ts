@@ -5,6 +5,7 @@ import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.
 import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
+import { AdminInitialPhoneBindService } from './admin-initial-phone-bind.service'
 import { AuthService, type LoginResult } from './auth.service'
 import { InitialPhoneBindService } from './initial-phone-bind.service'
 import {
@@ -26,6 +27,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly initialPhoneBindService: InitialPhoneBindService,
+    private readonly adminInitialPhoneBindService: AdminInitialPhoneBindService,
   ) {}
 
   /**
@@ -114,9 +116,17 @@ export class AuthController {
     @Body() dto: InitialPhoneBindStartDto,
     @Ip() ip: string,
   ): Promise<ApiResponse<{ bindTicket: string; cooldownSeconds: number; expiresInSeconds: number }>> {
-    return ApiResponse.ok(
-      await this.initialPhoneBindService.start(user.userId, dto.currentPassword, dto.phone, ip, dto.deviceId),
-    )
+    if (user.role === 'admin') {
+      return ApiResponse.ok(
+        await this.adminInitialPhoneBindService.start(user.userId, dto.currentPassword, dto.phone, ip, dto.deviceId),
+      )
+    }
+    if (user.role === 'partner') {
+      return ApiResponse.ok(
+        await this.initialPhoneBindService.start(user.userId, dto.currentPassword, dto.phone, ip, dto.deviceId),
+      )
+    }
+    throw this.initialPhoneBindUnavailable()
   }
 
   @Post('phone/initial-bind/verify')
@@ -127,7 +137,38 @@ export class AuthController {
     @CurrentUser() user: AuthedUser,
     @Body() dto: InitialPhoneBindVerifyDto,
   ): Promise<ApiResponse<{ phoneMasked: string; phoneVerifiedAt: string }>> {
-    return ApiResponse.ok(await this.initialPhoneBindService.verify(user.userId, dto.bindTicket, dto.code))
+    if (user.role === 'admin') {
+      return ApiResponse.ok(await this.adminInitialPhoneBindService.verify(user.userId, dto.bindTicket, dto.code))
+    }
+    if (user.role === 'partner') {
+      return ApiResponse.ok(await this.initialPhoneBindService.verify(user.userId, dto.bindTicket, dto.code))
+    }
+    throw this.initialPhoneBindUnavailable()
+  }
+
+  @Post('admin/phone/initial-bind/start')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async startAdminInitialPhoneBind(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindStartDto,
+    @Ip() ip: string,
+  ): Promise<ApiResponse<{ bindTicket: string; cooldownSeconds: number; expiresInSeconds: number }>> {
+    return ApiResponse.ok(
+      await this.adminInitialPhoneBindService.start(user.userId, dto.currentPassword, dto.phone, ip, dto.deviceId),
+    )
+  }
+
+  @Post('admin/phone/initial-bind/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async verifyAdminInitialPhoneBind(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindVerifyDto,
+  ): Promise<ApiResponse<{ phoneMasked: string; phoneVerifiedAt: string }>> {
+    return ApiResponse.ok(await this.adminInitialPhoneBindService.verify(user.userId, dto.bindTicket, dto.code))
   }
 
   /** 登录态自助改密:须提供当前密码校验身份,成功后旧 token 立即失效,需重新登录。 */
@@ -147,5 +188,11 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: AuthedUser): ApiResponse<AuthedUser> {
     return ApiResponse.ok(user)
+  }
+
+  private initialPhoneBindUnavailable(): BadRequestException {
+    return new BadRequestException({
+      error: { code: 'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE', message: '当前账号暂不可进行首次手机号绑定' },
+    })
   }
 }

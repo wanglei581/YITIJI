@@ -38,6 +38,8 @@ export type AuditAction =
   | 'resume.optimize_requested'
   | 'assistant.chat_message'
   | 'auth.password_change_self'
+  | 'auth.phone_initial_bind_start'
+  | 'auth.phone_initial_bind_complete'
   | 'organization.create'
   | 'organization.update'
   | 'user.create'
