@@ -39,7 +39,7 @@
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
 - [ ] **zyidai.cn 数据库高负载加固生产执行**：代码侧候选 `codex/db-load-hardening-zyidai-20260706` 已准备 PrintTask / PrintTaskStatusLog 热路径索引、双轨 migration、`verify:db-load-indexes` 和 `docs/device/postgres-load-hardening-runbook.md`；生产执行前必须先经用户确认，按 runbook 做只读预检、备份、低峰 migration 或 `CREATE INDEX CONCURRENTLY`、`pg_stat_statements` 观测、PostgreSQL 参数 / PgBouncer / PM2 cluster 调整和压测验收。未执行前不得宣称 zyidai.cn 已完成数据库高并发加固。
 - [ ] 三端登录 / 内部账号手机号认证生产验收：首次绑定能力已进入 `origin/main@cb03b48d`，主线 GitHub CI 成功，但尚未部署、未发送真实短信、未改生产账号或 Redis。上线目标库须先执行 migration 状态与 health 只读检查，再由已登录 admin / partner 本人在「账号设置」输入当前密码并完成真实短信绑定；**不得在生产或共享预生产运行** `verify:internal-auth-phone`，不得直改 `User` / Redis、创建临时管理员或使用后门 token。
-- [ ] **生产管理员凭据轮换 + FREE_MODE 后续步骤**：Admin 登录态自助改密已随 [PR #241](https://github.com/wanglei581/YITIJI/pull/241) 合入当前主线；生产仍未发生任何密码、数据库、Redis 或配置变更。待首次绑定候选经审查、CI、合入与部署后，由用户本人在 Admin「账号设置」先完成手机号绑定，再直接输入新密码；聊天、日志和文档不得传递真实密码。完成后再以新会话只读确认旧密码与旧 token 失效、审计存在且 payload 为空，随后才能继续 FREE_MODE 后续步骤。当前生产管理员凭据强度仍未完成轮换，管理员手机号也未验证；本任务不得更改 `KSK-001` 的既有启停状态。
+- [ ] **生产管理员凭据轮换 + FREE_MODE 后续步骤**：Admin 登录态自助改密已随 [PR #241](https://github.com/wanglei581/YITIJI/pull/241) 合入当前主线；生产仍未发生任何密码、数据库、Redis 或配置变更。待首次绑定能力受控部署后，由用户本人在 Admin「账号设置」先完成手机号绑定，再直接输入新密码；聊天、日志和文档不得传递真实密码。完成后再以新会话只读确认旧密码与旧 token 失效、审计存在且 payload 为空，随后才能继续 FREE_MODE 后续步骤。当前生产管理员凭据强度仍未完成轮换，管理员手机号也未验证；本任务不得更改 `KSK-001` 的既有启停状态。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
 - [x] 预生产 Kiosk 上传→打印 URL 契约复验：runtime hotfix 已安全切到 `/srv/ai-job-print`，health 为 `db=postgres`，`db:pg:sync:check`、`DP-GATE after(warnings=0)`、远端 `verify:kiosk-upload-print-contract` 与 `verify:print-jobs` 均通过；真实 `/files/kiosk-upload` 返回内部 HMAC `signedUrl`，外部 COS URL 仍被 `/print/jobs` 拒绝为 `PRINT_INVALID_FILE_URL`。
@@ -91,7 +91,7 @@
 
 ## P1：Windows 终端机队管理与安全换机
 
-- [x] **设备机队 F0 只读总览本地候选**：独立分支 `codex/device-fleet-f0-20260715` 已在既有 Admin “终端管理”内聚合终端健康、版本、受限配置摘要、显式兼容引用冲突和原页面深链；后端严格管理员 GET 白名单，不返回 MAC / IP、绑定码、token、内部 id、文件 / 打印 / 扫描 / 用户数据。专项 verify、API / Admin typecheck、lint、production build、双 Prisma 同步检查、浏览器 mock 烟测及 Claude + Antigravity 双模型终审均通过。未 push、未创建 PR、未运行 GitHub CI、未部署或操作 Windows；F1/F2 仍为 `CLOSED_MODE`。
+- [x] **设备机队 F0 只读总览最新主线本地集成候选**：独立分支 `codex/device-fleet-f0-integration-20260715` 已基于 `origin/main@cb03b48d` 迁入设计、F0 功能与原归档；仅两份进度 SSOT 与主线有交集，已保留首次手机号绑定、PR #241 / #237 与 F0 全部事实。管理员 GET 白名单、健康 / 版本 / 受限配置摘要、显式引用冲突和原页面深链保持不变；本地专项 verify、API / Admin typecheck、lint、build、Admin HTTP production build、双 Prisma 同步检查均通过，集成最终审查已由 Claude 与 Antigravity 分别返回有效 `APPROVE`，Critical / Warning 均为 0。未 push、未创建 PR、未运行本分支 GitHub CI、未部署或操作 Windows；F1 生产动作未执行，F2/F3 仍为 `CLOSED_MODE`。
 - [ ] **设备机队 F2 安全换机**：前置为“生产管理员凭据轮换 + 手机号验证”已完成受控生产验收。采用凭据 hash-first、候选机受限预检、活动任务为 0 后的原子切换和旧机撤销；双 Prisma migration、既有 Agent/QR/打印回归与 Windows 真机换机验收必须在独立任务完成。不得复用现有 `exchange-bind-code` 直接替换在役主机。
 
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
