@@ -1,0 +1,12 @@
+{
+  "id": "admin-initial-phone-binding-20260715",
+  "title": "为已登录的未绑手机号内部账号增加可信初始绑定",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "auth",
+  "currentPhase": "completed",
+  "nextAction": "候选仅本地提交后归档；PR、CI、push 与部署必须由新任务取得单独授权，并修复或替代 Antigravity 审查门禁",
+  "createdAt": "2026-07-15T00:00:00+08:00",
+  "branch": "codex/admin-initial-phone-binding-v2-20260715"
+}
