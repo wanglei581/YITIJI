@@ -192,6 +192,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-print-scan-ui
           pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
           pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
+          pnpm --filter @ai-job-print/admin verify:admin-device-fleet-overview-ui
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -211,6 +212,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
           pnpm --filter @ai-job-print/api verify:terminal-device-config
+          pnpm --filter @ai-job-print/api verify:device-fleet-overview
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:print-sign

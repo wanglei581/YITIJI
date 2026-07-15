@@ -1,0 +1,12 @@
+{
+  "id": "f0-terminal-fleet-overview",
+  "title": "实现后台终端管理只读设备总览 F0",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档本地候选；等待用户另行授权 push、PR、CI 或部署",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "branch": "codex/device-fleet-f0-20260715"
+}

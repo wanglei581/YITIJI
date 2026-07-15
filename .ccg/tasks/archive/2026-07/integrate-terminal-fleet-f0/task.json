@@ -1,0 +1,12 @@
+{
+  "id": "integrate-terminal-fleet-f0",
+  "title": "将终端机队 F0 集成到最新主线候选",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档本地集成候选；等待用户另行授权 push、PR 或部署",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "branch": "codex/device-fleet-f0-integration-20260715"
+}

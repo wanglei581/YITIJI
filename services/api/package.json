@@ -136,6 +136,7 @@
     "verify:member-data-retention": "node -r @swc-node/register scripts/verify-member-data-retention.ts",
     "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",
     "verify:terminal-device-config": "node -r @swc-node/register scripts/verify-terminal-device-config.ts",
+    "verify:device-fleet-overview": "node -r @swc-node/register scripts/verify-device-fleet-overview.ts",
     "verify:toolbox-launch-events": "node -r @swc-node/register scripts/verify-toolbox-launch-events.ts",
     "verify:toolbox-preprod-acceptance": "node -r @swc-node/register scripts/verify-toolbox-preprod-acceptance.ts",
     "verify:toolbox-micro-app-platform": "node -r @swc-node/register scripts/verify-toolbox-micro-app-platform.ts",
