@@ -13,6 +13,43 @@
 
 export type { PrintJobParams } from '../printer/types'
 
+// ── Scan input health ──────────────────────────────────────────────────────
+
+/** Local, fail-closed readiness of the configured scan input folder. */
+export type ScanInputHealthStatus = 'unconfigured' | 'degraded' | 'ready'
+
+/** Machine-readable reason only; it deliberately never contains a local path. */
+export type ScanInputHealthReason =
+  | 'not_configured'
+  | 'reparse_point_unverifiable'
+  | 'reparse_point'
+  | 'not_directory'
+  | 'unavailable'
+  | 'not_readable'
+  | 'ready'
+
+export interface ScanInputHealth {
+  readonly status: ScanInputHealthStatus
+  readonly reason: ScanInputHealthReason
+}
+
+/** lstat-derived node shape supplied by a caller without triggering further IO. */
+export type ScanInputCandidateNodeKind = 'file' | 'directory' | 'symbolic_link' | 'other'
+
+/** Metadata-only candidate view used by pure classification and stability checks. */
+export interface ScanInputCandidateSnapshot {
+  name: string
+  size: number
+  mtimeMs: number
+  nodeKind: ScanInputCandidateNodeKind
+}
+
+export type ScanInputCandidateClassification =
+  | 'accepted'
+  | 'rejected_symbolic_link'
+  | 'rejected_non_regular_file'
+  | 'rejected_non_pdf'
+
 // ── Config ──────────────────────────────────────────────────────────────────
 
 /**

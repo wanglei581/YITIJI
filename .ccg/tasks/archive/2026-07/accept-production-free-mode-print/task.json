@@ -1,0 +1,12 @@
+{
+  "id": "accept-production-free-mode-print",
+  "title": "执行生产 FREE_MODE 单笔零元订单与一页真实出纸验收",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "print-operations",
+  "currentPhase": "completed",
+  "nextAction": "归档 CCG 任务并提交本地脱敏证据文档；不 push、不部署、不执行新的生产写操作",
+  "createdAt": "2026-07-15T08:20:00Z",
+  "branch": "codex/prod-admin-password-readonly-audit-20260715"
+}
