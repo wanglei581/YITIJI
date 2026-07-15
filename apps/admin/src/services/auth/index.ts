@@ -47,7 +47,8 @@ function writeState(state: AuthState): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* ignore */ }
 }
 
-function mergeStoredUser(partial: Partial<AuthedUser>): void {
+/** 仅合并可安全持久化的当前用户展示字段；调用方不得传入密码、验证码或 ticket。 */
+export function mergeStoredUser(partial: Partial<AuthedUser>): void {
   const state = readState()
   if (!state) return
   writeState({ token: state.token, user: { ...state.user, ...partial } })
@@ -210,6 +211,30 @@ export async function verifyOwnPhone(code: string): Promise<{ ok: true; phoneVer
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   mergeStoredUser({ phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt })
   return { ok: true, phoneVerifiedAt: r.data.phoneVerifiedAt }
+}
+
+export async function startInitialPhoneBind(
+  currentPassword: string,
+  phone: string,
+): Promise<{ ok: true; bindTicket: string; cooldownSeconds: number; expiresInSeconds: number } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ bindTicket: string; cooldownSeconds: number; expiresInSeconds: number }>(
+    '/auth/phone/initial-bind/start',
+    { currentPassword, phone },
+  )
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true, ...r.data }
+}
+
+export async function completeInitialPhoneBind(
+  bindTicket: string,
+  code: string,
+): Promise<{ ok: true; phoneMasked: string; phoneVerifiedAt: string } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ phoneMasked: string; phoneVerifiedAt: string }>(
+    '/auth/phone/initial-bind/verify',
+    { bindTicket, code },
+  )
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true, ...r.data }
 }
 
 /** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */

@@ -6,6 +6,7 @@ import { createSmsSender, SMS_SENDER } from '../member-auth/sms/sms-sender'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
+import { InitialPhoneBindService } from './initial-phone-bind.service'
 import { InternalOtpService } from './internal-otp.service'
 
 const JWT_TTL = '24h'
@@ -31,6 +32,7 @@ const JWT_TTL = '24h'
   controllers: [AuthController],
   providers:   [
     AuthService,
+    InitialPhoneBindService,
     InternalOtpService,
     JwtAuthGuard,
     RolesGuard,
