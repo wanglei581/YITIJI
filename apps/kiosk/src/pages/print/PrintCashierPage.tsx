@@ -29,7 +29,14 @@ import {
   reconcilePayment,
   simulateSandboxPayment,
 } from '../../services/print/paymentApi'
-import { deriveCashierView, formatCents, PAY_CHANNEL_LABEL, type CashierView } from './cashierStatus'
+import {
+  deriveCashierView,
+  formatCents,
+  isPaymentAttemptSelectionLocked,
+  PAY_CHANNEL_LABEL,
+  paymentMethodForAttempt,
+  type CashierView,
+} from './cashierStatus'
 import { CashierPaymentPanel, type CashierSnapshot, type PaymentMethod } from './CashierPaymentPanel'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 
@@ -86,6 +93,7 @@ export function PrintCashierPage() {
   const [reconciling, setReconciling] = useState(false)
   const navigatedRef = useRef(false)
   const cancelRef = useRef(false)
+  const codeSubmitLockRef = useRef(false)
   const lastAutoReconcileAtRef = useRef(0)
 
   const proceedToPrint = useCallback(() => {
@@ -151,42 +159,43 @@ export function PrintCashierPage() {
     }
   }, [orderId, paymentSessionToken, amountCents, issue])
 
-  const hasActivePaymentAttempt = snapshot?.attempt?.status === 'created' || snapshot?.attempt?.status === 'pending'
+  const attemptPaymentMethod = paymentMethodForAttempt(snapshot?.attempt ?? null)
+  const hasActivePaymentAttempt = isPaymentAttemptSelectionLocked(snapshot?.attempt ?? null, nowMs)
+  const displayedChannel = hasActivePaymentAttempt ? snapshot?.attempt?.channel ?? selectedChannel : selectedChannel
+  const displayedPaymentMethod = hasActivePaymentAttempt ? attemptPaymentMethod ?? paymentMethod : paymentMethod
 
   // 切换通道只能在未发起支付前进行，避免两个通道同时处于可扣款状态。
   const switchChannel = useCallback(
     (channel: string) => {
-      if (channel === selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt) return
+      if ((channel === selectedChannel && !snapshot?.attempt) || issuing || codeSubmitting || hasActivePaymentAttempt) return
       setSelectedChannel(channel)
       setSnapshot(null)
       setPaymentMethod(null)
       setIssueError(null)
     },
-    [selectedChannel, issuing, codeSubmitting, hasActivePaymentAttempt],
+    [selectedChannel, snapshot, issuing, codeSubmitting, hasActivePaymentAttempt],
   )
 
   const selectPaymentMethod = useCallback(
     (method: PaymentMethod) => {
       if (!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt) return
-      if (method === 'code' && selectedChannel === 'alipay') {
-        setIssueError('当前支付通道暂不支持扫付款码，请选择屏上收款码')
-        return
-      }
+      if (method === paymentMethod && !snapshot?.attempt) return
       setPaymentMethod(method)
       setSnapshot(null)
       setIssueError(null)
       if (method === 'qr') void issue(selectedChannel)
     },
-    [selectedChannel, issuing, codeSubmitting, hasActivePaymentAttempt, issue],
+    [selectedChannel, paymentMethod, snapshot, issuing, codeSubmitting, hasActivePaymentAttempt, issue],
   )
 
-  const submitCodePayment = useCallback(async () => {
-    if (!orderId || !paymentSessionToken || !selectedChannel || codeSubmitting) return
-    const submittedCode = authCode.trim()
+  const submitCodePayment = useCallback(async (inputCode?: string) => {
+    if (!orderId || !paymentSessionToken || !selectedChannel || codeSubmitting || codeSubmitLockRef.current) return
+    const submittedCode = (inputCode ?? authCode).trim()
     if (!/^\d{18}$/.test(submittedCode)) {
       setIssueError('请输入 18 位数字付款码')
       return
     }
+    codeSubmitLockRef.current = true
     setCodeSubmitting(true)
     setIssueError(null)
     try {
@@ -235,6 +244,7 @@ export function PrintCashierPage() {
             : '付款码支付未完成，请重新扫码',
       )
     } finally {
+      codeSubmitLockRef.current = false
       if (!cancelRef.current) setCodeSubmitting(false)
     }
   }, [orderId, paymentSessionToken, selectedChannel, authCode, codeSubmitting, proceedToPrint])
@@ -295,11 +305,15 @@ export function PrintCashierPage() {
   }, [view, expiresAt, nowMs])
 
   const handleReissue = useCallback(() => {
-    if (!selectedChannel) return
+    const channel = snapshot?.attempt?.channel ?? selectedChannel
+    const method = attemptPaymentMethod ?? paymentMethod
+    if (!channel || !method) return
+    setSelectedChannel(channel)
+    setPaymentMethod(method)
     setSnapshot(null)
     setIssueError(null)
-    if (paymentMethod === 'qr') void issue(selectedChannel)
-  }, [issue, paymentMethod, selectedChannel])
+    if (method === 'qr') void issue(channel)
+  }, [attemptPaymentMethod, issue, paymentMethod, selectedChannel, snapshot])
 
   // ── reconcile 兜底（仅真实通道）：回调丢失/延迟时按渠道账本核实；绝不在前端伪造已支付 ──
   const handleReconcile = useCallback(async () => {
@@ -384,7 +398,6 @@ export function PrintCashierPage() {
   const total = formatCents(amountCents)
   const canProceed = view?.canProceed ?? false
   const canReissue = view?.canReissue ?? false
-  const canUseCodePay = selectedChannel !== 'alipay'
 
   return (
     <div className="flex h-full flex-col p-6">
@@ -433,7 +446,7 @@ export function PrintCashierPage() {
                 disabled={issuing || codeSubmitting || hasActivePaymentAttempt}
                 className={[
                   'min-h-[56px] flex-1 rounded-xl border-2 px-4 text-base font-semibold transition-colors',
-                  selectedChannel === ch
+                  displayedChannel === ch
                     ? 'border-primary-600 bg-primary-50 text-primary-700'
                     : 'border-neutral-200 bg-white text-neutral-600',
                 ].join(' ')}
@@ -451,7 +464,7 @@ export function PrintCashierPage() {
             disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
             className={[
               'min-h-[56px] rounded-lg border-2 px-4 text-base font-semibold transition-colors',
-              paymentMethod === 'qr' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
+              displayedPaymentMethod === 'qr' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
             ].join(' ')}
           >
             屏上收款码
@@ -459,10 +472,10 @@ export function PrintCashierPage() {
           <button
             type="button"
             onClick={() => selectPaymentMethod('code')}
-            disabled={!selectedChannel || !canUseCodePay || issuing || codeSubmitting || hasActivePaymentAttempt}
+            disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
             className={[
               'flex min-h-[56px] items-center justify-center gap-2 rounded-lg border-2 px-4 text-base font-semibold transition-colors',
-              paymentMethod === 'code' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
+              displayedPaymentMethod === 'code' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
             ].join(' ')}
           >
             <ScanLineIcon className="h-5 w-5" />
@@ -472,6 +485,7 @@ export function PrintCashierPage() {
 
         <CashierPaymentPanel
           paymentMethod={paymentMethod}
+          attemptPaymentMethod={attemptPaymentMethod}
           snapshot={snapshot}
           view={view}
           channelsLoading={channels === null}
@@ -485,7 +499,7 @@ export function PrintCashierPage() {
           isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
           canProceed={canProceed}
           onAuthCodeChange={setAuthCode}
-          onSubmitCode={() => void submitCodePayment()}
+          onSubmitCode={(code) => void submitCodePayment(code)}
           onReconcile={() => void handleReconcile()}
           onReissue={handleReissue}
           onSimulateSandbox={(result) => void devSimulate(result)}
@@ -495,8 +509,8 @@ export function PrintCashierPage() {
         <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3 text-xs leading-relaxed text-neutral-500">
           <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
-            支付码 5 分钟内有效，过期可点击「重新出码」重新生成；订单超时未支付将自动关闭。
-            如需退款请联系现场工作人员协助处理。
+            屏上收款码有效期 5 分钟；到期后重新出码或切换支付方式会先关闭旧码。付款码支付如提示待核实，请勿重复扫码，等待系统查单。
+            订单超时未支付将自动关闭；如需退款请联系现场工作人员协助处理。
           </span>
         </div>
 

@@ -5,6 +5,7 @@ import { OrderStatusService } from './order-status.service'
 import { PaymentController } from './payment.controller'
 import { PAYMENT_PROVIDER_TOKEN, resolvePaymentProviders } from './payment-provider.factory'
 import { PricingService } from './pricing.service'
+import { QrPaymentExpiryTask } from './qr-payment-expiry.task'
 import { RefundConvergenceTask } from './refund-convergence.task'
 import { RefundService } from './refund.service'
 
@@ -25,6 +26,7 @@ import { RefundService } from './refund.service'
     OrderStatusService,
     OnlinePaymentService,
     CodePaymentConvergenceTask,
+    QrPaymentExpiryTask,
     RefundService,
     RefundConvergenceTask,
     // 启动期解析注册表（fail-closed）：sandbox 缺密钥 / 生产配 sandbox / 真实通道缺配置 /

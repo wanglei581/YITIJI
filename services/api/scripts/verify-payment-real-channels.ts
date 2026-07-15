@@ -114,13 +114,26 @@ interface CapturedWechatCreate {
   out_trade_no?: string
   notify_url?: string
   attach?: string
+  time_expire?: string
   amount?: { total?: number }
   authHeader?: string
 }
 let lastWechatCreate: CapturedWechatCreate | null = null
 let lastAlipayPrecreateBiz: Record<string, unknown> | null = null
+let lastAlipayCodePayBiz: Record<string, unknown> | null = null
 let wechatQueryResponse: Record<string, unknown> = { trade_state: 'NOTPAY' }
 let alipayQueryNode: Record<string, unknown> = { code: '10000', msg: 'Success', trade_status: 'WAIT_BUYER_PAY' }
+let alipayCodePayNode: Record<string, unknown> | null = null
+let wechatCloseCalls = 0
+let alipayCloseCalls = 0
+
+/** 微信 Native 文档要求秒级 RFC3339 + 明确时区；允许因去毫秒产生不足 1 秒的差异。 */
+function isWechatNativeExpiry(value: string | undefined, expectedExpiresAt: string): boolean {
+  if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00$/.test(value)) return false
+  const actual = Date.parse(value)
+  const expected = Date.parse(expectedExpiresAt)
+  return Number.isFinite(actual) && Number.isFinite(expected) && Math.abs(actual - expected) < 1_000
+}
 
 function signAlipayResponse(nodeKey: string, node: Record<string, unknown>): string {
   const nodeRaw = JSON.stringify(node)
@@ -146,6 +159,12 @@ function startFakeGateway(): Promise<{ server: Server; port: number }> {
         res.end(JSON.stringify({ code_url: `weixin://wxpay/bizpayurl?pr=vrf_${randomBytes(4).toString('hex')}` }))
         return
       }
+      if (req.method === 'POST' && url.startsWith('/v3/pay/transactions/out-trade-no/') && url.endsWith('/close')) {
+        wechatCloseCalls += 1
+        res.writeHead(204)
+        res.end()
+        return
+      }
       if (req.method === 'GET' && url.startsWith('/v3/pay/transactions/out-trade-no/')) {
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify(wechatQueryResponse))
@@ -166,9 +185,35 @@ function startFakeGateway(): Promise<{ server: Server; port: number }> {
           res.end(signAlipayResponse('alipay_trade_precreate_response', node))
           return
         }
+        if (method === 'alipay.trade.pay') {
+          lastAlipayCodePayBiz = JSON.parse(params['biz_content'] ?? '{}') as Record<string, unknown>
+          const node = alipayCodePayNode ?? {
+            code: '10000',
+            msg: 'Success',
+            out_trade_no: (lastAlipayCodePayBiz['out_trade_no'] as string) ?? '',
+            trade_no: `alitxn_code_${randomBytes(6).toString('hex')}`,
+            total_amount: (lastAlipayCodePayBiz['total_amount'] as string) ?? '',
+          }
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(signAlipayResponse('alipay_trade_pay_response', node))
+          return
+        }
         if (method === 'alipay.trade.query') {
           res.writeHead(200, { 'content-type': 'application/json' })
           res.end(signAlipayResponse('alipay_trade_query_response', alipayQueryNode))
+          return
+        }
+        if (method === 'alipay.trade.close') {
+          const biz = JSON.parse(params['biz_content'] ?? '{}') as Record<string, unknown>
+          alipayCloseCalls += 1
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(
+            signAlipayResponse('alipay_trade_close_response', {
+              code: '10000',
+              msg: 'Success',
+              out_trade_no: (biz['out_trade_no'] as string) ?? '',
+            }),
+          )
           return
         }
       }
@@ -460,10 +505,11 @@ async function main(): Promise<void> {
       lastWechatCreate?.out_trade_no === attemptA.attemptId &&
       lastWechatCreate?.amount?.total === 200 &&
       lastWechatCreate?.notify_url === `${NOTIFY_BASE}${WX_CALLBACK_PATH}` &&
+      isWechatNativeExpiry(lastWechatCreate?.time_expire, attemptA.expiresAt) &&
       JSON.parse(lastWechatCreate?.attach ?? '{}')?.orderId === A.orderId &&
       lastWechatCreate?.authHeader?.startsWith('WECHATPAY2-SHA256-RSA2048 ')
     ) {
-      pass('wechat 下单报文：out_trade_no=attemptId + attach 回带 orderId + 金额分 + 规范 notify_url + APIv3 签名头')
+      pass('wechat 下单报文：out_trade_no=attemptId + attach 回带 orderId + 金额分 + time_expire + 规范 notify_url + APIv3 签名头')
     } else {
       fail(`wechat create payload mismatch: ${JSON.stringify(lastWechatCreate)}`)
     }
@@ -478,11 +524,160 @@ async function main(): Promise<void> {
     if (lastAlipayPrecreateBiz === null) pass('活动微信二维码时不向支付宝创建第二笔渠道订单')
     else fail(`alipay precreate must not run while wechat attempt is pending: ${JSON.stringify(lastAlipayPrecreateBiz)}`)
 
+    // 到期屏上二维码必须先查单、再关单；真实 Provider 的请求字段也同步本服务截止时间。
+    const expiryWechat = await makePrintOrder('orderExpiryWechat')
+    const expiryWechatAttempt = await payment.createPayAttempt(expiryWechat.orderId, expiryWechat.token, 'wechat')
+    const expiryWechatTime = lastWechatCreate?.time_expire
+    const expiryAlipay = await makePrintOrder('orderExpiryAlipay')
+    const expiryAlipayAttempt = await payment.createPayAttempt(expiryAlipay.orderId, expiryAlipay.token, 'alipay')
+    const expiryAlipayTimeout = lastAlipayPrecreateBiz?.['timeout_express']
+    await prisma.paymentAttempt.updateMany({
+      where: { id: { in: [expiryWechatAttempt.attemptId, expiryAlipayAttempt.attemptId] } },
+      data: { expiresAt: new Date(Date.now() - 1_000) },
+    })
+    const releaseBeforeWechat = wechatCloseCalls
+    const releaseBeforeAlipay = alipayCloseCalls
+    const expiryRelease = await payment.releaseExpiredQrPayments({ limit: 10 })
+    const expiryWechatState = await orderState(expiryWechat.orderId)
+    const expiryAlipayState = await orderState(expiryAlipay.orderId)
+    if (
+      isWechatNativeExpiry(expiryWechatTime, expiryWechatAttempt.expiresAt) &&
+      typeof expiryAlipayTimeout === 'string' &&
+      /^\d+m$/.test(expiryAlipayTimeout) &&
+      wechatCloseCalls === releaseBeforeWechat + 1 &&
+      alipayCloseCalls === releaseBeforeAlipay + 1 &&
+      expiryWechatState.payStatus === 'unpaid' &&
+      expiryAlipayState.payStatus === 'unpaid' &&
+      expiryRelease.released >= 2
+    ) {
+      pass('二维码到期：微信 time_expire、支付宝 timeout_express 已同步，查单后关单确认才释放订单')
+    } else {
+      fail(
+        `screen QR expiry close mismatch: ${JSON.stringify({
+          expiryWechatTime,
+          expectedWechatExpiry: expiryWechatAttempt.expiresAt,
+          expiryAlipayTimeout,
+          wechatCloseCalls,
+          releaseBeforeWechat,
+          alipayCloseCalls,
+          releaseBeforeAlipay,
+          expiryWechatState,
+          expiryAlipayState,
+          expiryRelease,
+        })}`,
+      )
+    }
+
     // ── (2) paid-before-claim：unpaid 绝不出纸 ────────────────────────────
     if ((await claimOnce()) === null && (await taskStatus(A.taskId)) === 'pending') {
       pass('unpaid 订单：claim 返回空 + 任务保持 pending（不产生出纸任务）')
     } else {
       fail('unpaid task was claimable or status changed')
+    }
+
+    // ── (2b) alipay 付款码支付：同步成功 / 未决 / 明确失败 ──────────────
+    const alipayAuthCode = '251234567890123456'
+    const codeSuccess = await makePrintOrder('orderAlipayCodeSuccess')
+    alipayCodePayNode = null
+    lastAlipayCodePayBiz = null
+    const codeSuccessResult = await payment.createCodePayAttempt(codeSuccess.orderId, codeSuccess.token, alipayAuthCode, 'alipay')
+    const codeSuccessState = await orderState(codeSuccess.orderId)
+    if (
+      codeSuccessResult.status === 'success' &&
+      codeSuccessState.payStatus === 'paid' &&
+      codeSuccessState.paymentSource === 'alipay' &&
+      lastAlipayCodePayBiz?.['scene'] === 'bar_code' &&
+      lastAlipayCodePayBiz?.['auth_code'] === alipayAuthCode &&
+      lastAlipayCodePayBiz?.['total_amount'] === '2.00' &&
+      lastAlipayCodePayBiz?.['timeout_express'] === '5m'
+    ) {
+      pass('alipay 付款码同步成功：bar_code + 18 位付款码 + 金额校验后入账')
+    } else {
+      fail('alipay codepay success flow did not create a verified paid order')
+    }
+    if ((await claimOnce()) === codeSuccess.taskId) pass('alipay 付款码已入账订单可被领取')
+    else fail('alipay codepay paid task not claimable')
+
+    const codeUserPaying = await makePrintOrder('orderAlipayCodeUserPaying')
+    alipayCodePayNode = { code: '10003', msg: 'Waiting', sub_code: 'ACQ.USERPAYING' }
+    const codeUserPayingResult = await payment.createCodePayAttempt(codeUserPaying.orderId, codeUserPaying.token, alipayAuthCode, 'alipay')
+    const codeUserPayingState = await orderState(codeUserPaying.orderId)
+    if (codeUserPayingResult.status === 'paying' && codeUserPayingState.payStatus === 'paying') {
+      pass('alipay 付款码 USERPAYING 保持待核实，禁止回退后重复扣款')
+    } else {
+      fail('alipay USERPAYING was not kept pending')
+    }
+    const codeUserPayingAttempt = await prisma.paymentAttempt.findUnique({ where: { id: codeUserPayingResult.attemptId } })
+    if (!codeUserPayingAttempt) fail('missing alipay USERPAYING attempt')
+    alipayQueryNode = { code: '10000', msg: 'Success', out_trade_no: codeUserPayingAttempt.id, trade_status: 'TRADE_CLOSED' }
+    await payment.reconcilePayment(codeUserPaying.orderId, codeUserPaying.token)
+    if ((await orderState(codeUserPaying.orderId)).payStatus === 'unpaid') pass('alipay 付款码待核实订单经查单关单后回到 unpaid')
+    else fail('alipay USERPAYING close reconciliation did not release the order')
+
+    const codeRejected = await makePrintOrder('orderAlipayCodeRejected')
+    alipayCodePayNode = { code: '40004', msg: 'Business Failed', sub_code: 'ACQ.PAYMENT_AUTH_CODE_INVALID' }
+    const codeRejectedResult = await payment.createCodePayAttempt(codeRejected.orderId, codeRejected.token, alipayAuthCode, 'alipay')
+    if (codeRejectedResult.status === 'failed' && (await orderState(codeRejected.orderId)).payStatus === 'unpaid') {
+      pass('alipay 付款码明确失败才释放订单重试')
+    } else {
+      fail('alipay explicit codepay failure did not release the order')
+    }
+
+    const codeBusinessUnknown = await makePrintOrder('orderAlipayCodeBusinessUnknown')
+    alipayCodePayNode = { code: '40004', msg: 'Business Failed', sub_code: 'ACQ.SYSTEM_ERROR' }
+    const codeBusinessUnknownResult = await payment.createCodePayAttempt(codeBusinessUnknown.orderId, codeBusinessUnknown.token, alipayAuthCode, 'alipay')
+    if (codeBusinessUnknownResult.status === 'paying' && (await orderState(codeBusinessUnknown.orderId)).payStatus === 'paying') {
+      pass('alipay 未知 40004 子码保持待核实，禁止以业务总码误放开重扫')
+    } else {
+      fail('alipay unknown 40004 sub-code was incorrectly released')
+    }
+    const codeBusinessUnknownAttempt = await prisma.paymentAttempt.findUnique({ where: { id: codeBusinessUnknownResult.attemptId } })
+    if (!codeBusinessUnknownAttempt) fail('missing alipay unknown-business attempt')
+    alipayQueryNode = { code: '10000', msg: 'Success', out_trade_no: codeBusinessUnknownAttempt.id, trade_status: 'TRADE_CLOSED' }
+    await payment.reconcilePayment(codeBusinessUnknown.orderId, codeBusinessUnknown.token)
+    if ((await orderState(codeBusinessUnknown.orderId)).payStatus === 'unpaid') pass('alipay 未知 40004 子码经查单关单后回到 unpaid')
+    else fail('alipay unknown 40004 close reconciliation did not release the order')
+
+    const codeUnknown = await makePrintOrder('orderAlipayCodeUnknown')
+    alipayCodePayNode = { code: '20000', msg: 'Service Currently Unavailable' }
+    const codeUnknownResult = await payment.createCodePayAttempt(codeUnknown.orderId, codeUnknown.token, alipayAuthCode, 'alipay')
+    if (codeUnknownResult.status === 'paying' && (await orderState(codeUnknown.orderId)).payStatus === 'paying') {
+      pass('alipay 付款码网关结果不可知时保持待核实')
+    } else {
+      fail('alipay unknown codepay result was incorrectly released')
+    }
+    const codeUnknownAttempt = await prisma.paymentAttempt.findUnique({ where: { id: codeUnknownResult.attemptId } })
+    if (!codeUnknownAttempt) fail('missing alipay unknown attempt')
+    alipayQueryNode = { code: '10000', msg: 'Success', out_trade_no: codeUnknownAttempt.id, trade_status: 'TRADE_CLOSED' }
+    await payment.reconcilePayment(codeUnknown.orderId, codeUnknown.token)
+    if ((await orderState(codeUnknown.orderId)).payStatus === 'unpaid') pass('alipay 不可知付款码订单经查单关单后回到 unpaid')
+    else fail('alipay unknown codepay close reconciliation did not release the order')
+    alipayCodePayNode = null
+
+    const priorNodeEnv = process.env['NODE_ENV']
+    const priorAutoConverge = process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
+    try {
+      process.env['NODE_ENV'] = 'production'
+      delete process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
+      lastAlipayCodePayBiz = null
+      const productionRejected = await alipayProvider.createCodePayment({
+        orderId: 'order-production-guard',
+        orderNo: 'ORD-PRODUCTION-GUARD',
+        attemptId: 'attempt-production-guard',
+        terminalId: 'terminal-production-guard',
+        amountCents: 200,
+        authCode: alipayAuthCode,
+      })
+      if (productionRejected.status === 'failed' && lastAlipayCodePayBiz === null) {
+        pass('生产环境未显式启用自动核验时支付宝付款码不会发起渠道扣款')
+      } else {
+        fail('alipay production codepay guard did not block the channel request')
+      }
+    } finally {
+      if (priorNodeEnv === undefined) delete process.env['NODE_ENV']
+      else process.env['NODE_ENV'] = priorNodeEnv
+      if (priorAutoConverge === undefined) delete process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
+      else process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] = priorAutoConverge
     }
 
     // ── (3) wechat 回调安全 ───────────────────────────────────────────────
@@ -881,7 +1076,8 @@ async function main(): Promise<void> {
     // 关闭门禁：未支付任务（含 H）可被领取 —— claim 按创建序逐个取，循环至取到 H。
     process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'false'
     let sawH = false
-    for (let i = 0; i < 8; i += 1) {
+    // 前文还会创建两笔已由渠道关单释放的二维码订单；按上限扫描到 H，避免测试夹具数量变化掩盖门禁断言。
+    for (let i = 0; i < 12; i += 1) {
       const claimed = await claimOnce()
       if (!claimed) break
       if (claimed === H.taskId) {

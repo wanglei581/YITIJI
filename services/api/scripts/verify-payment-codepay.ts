@@ -67,6 +67,41 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
   const audits: Array<Record<string, unknown>> = []
   const findManyCalls: Array<Record<string, unknown>> = []
 
+  const matchesAttemptWhere = (attempt: Attempt, where: Record<string, unknown>): boolean => {
+    const matchesClause = (clause: Record<string, unknown>): boolean => {
+      if (typeof clause['orderId'] === 'string' && attempt.orderId !== clause['orderId']) return false
+      if (typeof clause['channel'] === 'string' && attempt.channel !== clause['channel']) return false
+      if (clause['channel']?.['not'] === 'sandbox' && attempt.channel === 'sandbox') return false
+      if (typeof clause['channelTxnNo'] === 'string' && attempt.channelTxnNo !== clause['channelTxnNo']) return false
+
+      const id = clause['id'] as { not?: string } | string | undefined
+      if (typeof id === 'string' && attempt.id !== id) return false
+      if (id && typeof id !== 'string' && id.not && attempt.id === id.not) return false
+
+      const status = clause['status'] as { in?: string[] } | string | undefined
+      if (typeof status === 'string' && attempt.status !== status) return false
+      if (status && typeof status !== 'string' && status.in && !status.in.includes(attempt.status)) return false
+
+      const qrCodeContent = clause['qrCodeContent'] as { not?: string | null } | string | null | undefined
+      if (qrCodeContent === null && attempt.qrCodeContent !== null) return false
+      if (qrCodeContent && typeof qrCodeContent === 'object' && qrCodeContent.not === null && attempt.qrCodeContent === null) return false
+
+      const prepayId = clause['prepayId'] as { not?: string | null } | string | null | undefined
+      if (prepayId === null && attempt.prepayId !== null) return false
+      if (prepayId && typeof prepayId === 'object' && prepayId.not === null && attempt.prepayId === null) return false
+
+      const expiresAt = clause['expiresAt'] as { lt?: Date; gt?: Date } | undefined
+      if (expiresAt?.lt && attempt.expiresAt >= expiresAt.lt) return false
+      if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
+      return true
+    }
+
+    const { OR: alternatives, ...base } = where
+    if (!matchesClause(base)) return false
+    if (!Array.isArray(alternatives)) return true
+    return alternatives.some((alternative) => matchesClause(alternative as Record<string, unknown>))
+  }
+
   const prisma = {
     order: {
       findUnique: async ({ where }: { where: { id: string } }) => orders.get(where.id) ?? null,
@@ -84,15 +119,7 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
     },
     paymentAttempt: {
       findFirst: async ({ where }: { where: Record<string, unknown> }) => {
-        const candidates = [...attempts.values()].filter((attempt) => {
-          if (typeof where['orderId'] === 'string' && attempt.orderId !== where['orderId']) return false
-          if (typeof where['channel'] === 'string' && attempt.channel !== where['channel']) return false
-          if (typeof where['channelTxnNo'] === 'string' && attempt.channelTxnNo !== where['channelTxnNo']) return false
-          const status = where['status'] as { in?: string[] } | string | undefined
-          if (typeof status === 'string' && attempt.status !== status) return false
-          if (status && typeof status !== 'string' && status.in && !status.in.includes(attempt.status)) return false
-          return true
-        })
+        const candidates = [...attempts.values()].filter((attempt) => matchesAttemptWhere(attempt, where))
         return candidates.at(-1) ?? null
       },
       create: async ({ data }: { data: Omit<Attempt, 'id' | 'prepayId' | 'qrCodeContent' | 'channelTxnNo' | 'failReason'> }) => {
@@ -113,40 +140,21 @@ function createFixture(provider = new SandboxPaymentProvider(SESSION_SECRET)): {
         Object.assign(attempt, data)
         return attempt
       },
-      updateMany: async ({ where, data }: { where: { id?: string }; data: Partial<Attempt> }) => {
-        const attempt = where.id ? attempts.get(where.id) : undefined
-        if (!attempt) return { count: 0 }
-        Object.assign(attempt, data)
-        return { count: 1 }
+      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<Attempt> }) => {
+        const matched = [...attempts.values()].filter((attempt) => matchesAttemptWhere(attempt, where))
+        for (const attempt of matched) Object.assign(attempt, data)
+        return { count: matched.length }
       },
       findUnique: async ({ where }: { where: { id: string } }) => attempts.get(where.id) ?? null,
       findMany: async ({ where, take, ...rest }: { where: Record<string, unknown>; take?: number; [key: string]: unknown }) => {
         findManyCalls.push({ where, take, ...rest })
-        const status = where['status'] as { in?: string[] } | undefined
         return [...attempts.values()]
-          .filter((attempt) => {
-            if (status?.in && !status.in.includes(attempt.status)) return false
-            if (where['qrCodeContent'] === null && attempt.qrCodeContent !== null) return false
-            if (where['prepayId']?.['not'] === null && attempt.prepayId === null) return false
-            if (where['channel']?.['not'] === 'sandbox' && attempt.channel === 'sandbox') return false
-            return true
-          })
+          .filter((attempt) => matchesAttemptWhere(attempt, where))
           .slice(0, take)
           .map((attempt) => ({ orderId: attempt.orderId }))
       },
       count: async ({ where }: { where: Record<string, unknown> }) => {
-        return [...attempts.values()].filter((attempt) => {
-          if (typeof where['orderId'] === 'string' && attempt.orderId !== where['orderId']) return false
-          const status = where['status'] as { in?: string[] } | string | undefined
-          if (typeof status === 'string' && attempt.status !== status) return false
-          if (status && typeof status !== 'string' && status.in && !status.in.includes(attempt.status)) return false
-          const expiresAt = where['expiresAt'] as { gt?: Date } | undefined
-          if (expiresAt?.gt && attempt.expiresAt <= expiresAt.gt) return false
-          const id = where['id'] as { not?: string } | string | undefined
-          if (typeof id === 'string' && attempt.id !== id) return false
-          if (id && typeof id !== 'string' && id.not && attempt.id === id.not) return false
-          return true
-        }).length
+        return [...attempts.values()].filter((attempt) => matchesAttemptWhere(attempt, where)).length
       },
     },
   }
@@ -209,6 +217,12 @@ async function verifyWechatProvider(): Promise<void> {
   globalThis.fetch = (async (_url, init) => {
     calls += 1
     body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>
+    if (String(_url).includes('/v3/pay/transactions/native')) {
+      return new Response(JSON.stringify({ code_url: 'weixin://wxpay/bizpayurl?pr=time-expiry-verify' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
     return new Response(
       JSON.stringify({
         trade_state: 'SUCCESS',
@@ -291,6 +305,23 @@ async function verifyWechatProvider(): Promise<void> {
       if (priorAutoConverge === undefined) delete process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED']
       else process.env['PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED'] = priorAutoConverge
     }
+
+    const fixedUtcExpiry = new Date('2026-07-14T12:34:56.789Z')
+    const qrResult = await wechat.createQrPayment({
+      orderId: 'order-qr-time-expiry-verify',
+      orderNo: 'ORD-QR-TIME-EXPIRY-VERIFY',
+      attemptId: 'attempt-qr-time-expiry-verify',
+      amountCents: 100,
+      expiresAt: fixedUtcExpiry,
+    })
+    if (
+      qrResult.qrCodeContent.length > 0 &&
+      body?.['time_expire'] === '2026-07-14T20:34:56+08:00'
+    ) {
+      pass('wechat Native expiry converts a UTC Date to second-level Beijing RFC3339 without a double offset')
+    } else {
+      fail(`wechat Native expiry timezone conversion mismatch: ${JSON.stringify(body)}`)
+    }
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -302,7 +333,9 @@ function verifyKioskContract(): void {
   const paymentApi = readFileSync(join(repoRoot, 'apps/kiosk/src/services/print/paymentApi.ts'), 'utf8')
   const cashier = readFileSync(join(repoRoot, 'apps/kiosk/src/pages/print/PrintCashierPage.tsx'), 'utf8')
   const panel = readFileSync(join(repoRoot, 'apps/kiosk/src/pages/print/CashierPaymentPanel.tsx'), 'utf8')
+  const cashierStatus = readFileSync(join(repoRoot, 'apps/kiosk/src/pages/print/cashierStatus.ts'), 'utf8')
   const convergenceTask = readFileSync(join(repoRoot, 'services/api/src/payment/code-payment-convergence.task.ts'), 'utf8')
+  const qrExpiryTask = readFileSync(join(repoRoot, 'services/api/src/payment/qr-payment-expiry.task.ts'), 'utf8')
   const paymentModule = readFileSync(join(repoRoot, 'services/api/src/payment/payment.module.ts'), 'utf8')
   const paymentService = readFileSync(join(repoRoot, 'services/api/src/payment/online-payment.service.ts'), 'utf8')
   if (
@@ -317,16 +350,32 @@ function verifyKioskContract(): void {
   if (
     /屏上收款码/.test(cashier) &&
     /扫付款码/.test(cashier) &&
+    !/当前支付通道暂不支持扫付款码/.test(cashier) &&
+    !/const canUseCodePay =/.test(cashier) &&
     /const shouldAutoReconcile =/.test(cashier) &&
     /s\.attempt\?\.status === 'pending'/.test(cashier) &&
     /s\.attempt\.channel !== 'sandbox'/.test(cashier) &&
     !/!s\.attempt\.qrCodeContent/.test(cashier) &&
     /onSubmitCode\(\)/.test(panel) &&
+    /autoFocus/.test(panel) &&
     /maxLength=\{18\}/.test(panel)
   ) {
-    pass('cashier auto-reconciles every real pending attempt, including screen QR, and keeps scanner submission')
+    pass('cashier enables both screen QR and scanner payment-code modes for every real channel, while retaining automatic reconciliation')
   } else {
     fail('cashier QR auto-reconciliation guard missing')
+  }
+  if (
+    /isPaymentAttemptSelectionLocked/.test(cashierStatus) &&
+    /屏上收款码已过期/.test(cashierStatus) &&
+    /收款码到期核验中/.test(cashierStatus) &&
+    /isScreenQrClosureConfirmed/.test(cashierStatus) &&
+    /付款码支付可能仍在渠道处理中/.test(cashierStatus) &&
+    /codeSubmitLockRef/.test(cashier) &&
+    /onSubmitCode\(nextCode\)/.test(panel)
+  ) {
+    pass('cashier distinguishes expired screen QR from payment-code reconciliation and accepts scanner input without an Enter suffix')
+  } else {
+    fail('cashier expiry and scanner state contract missing')
   }
   if (
     /PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED/.test(convergenceTask) &&
@@ -337,6 +386,17 @@ function verifyKioskContract(): void {
     pass('server-side code-payment convergence task is env-gated and registered in the payment module')
   } else {
     fail('server-side code-payment convergence task missing')
+  }
+  if (
+    /PAYMENT_QR_EXPIRY_AUTO_RELEASE_ENABLED/.test(qrExpiryTask) &&
+    /CronExpression\.EVERY_MINUTE/.test(qrExpiryTask) &&
+    /releaseExpiredQrPayments/.test(qrExpiryTask) &&
+    /QrPaymentExpiryTask/.test(paymentModule) &&
+    /PAYMENT_QR_TTL_SECONDS', DEFAULT_QR_TTL_SECONDS, 60/.test(paymentService)
+  ) {
+    pass('server-side screen-QR expiry release task is opt-in, registered, and honors the Native one-minute minimum')
+  } else {
+    fail('server-side screen-QR expiry release task missing')
   }
   const reservationTransactions = paymentService.match(
     /this\.prisma\.\$transaction\(async \(tx\) => \{[\s\S]*?tx\.order\.updateMany\([\s\S]*?tx\.paymentAttempt\.create\(/g,
@@ -436,19 +496,124 @@ async function main(): Promise<void> {
       await reservationAttempt
     }
 
-    const active = makeOrder(100)
-    const qrAttempt = await payment.createPayAttempt(active.order.id, active.token, 'sandbox')
+    class CloseConfirmedQrSandboxProvider extends SandboxPaymentProvider {
+      closeCalls = 0
+
+      async closeExpiredQrPayment() {
+        this.closeCalls += 1
+        return { status: 'closed' as const, channelTxnNo: null, amountCents: null }
+      }
+    }
+    const closeConfirmedQrProvider = new CloseConfirmedQrSandboxProvider(SESSION_SECRET)
+    const closeConfirmedQrFixture = createFixture(closeConfirmedQrProvider)
+    const active = closeConfirmedQrFixture.makeOrder(100)
+    const qrAttempt = await closeConfirmedQrFixture.payment.createPayAttempt(active.order.id, active.token, 'sandbox')
     await expectCode('active QR attempt blocks a concurrent code payment', 'PAYMENT_ATTEMPT_PENDING', () =>
-      payment.createCodePayAttempt(active.order.id, active.token, AUTH_CODE, 'sandbox'),
+      closeConfirmedQrFixture.payment.createCodePayAttempt(active.order.id, active.token, AUTH_CODE, 'sandbox'),
     )
     pass('existing QR payment capability remains available on the sandbox provider')
 
-    const expired = attempts.get(qrAttempt.attemptId)
+    const expired = closeConfirmedQrFixture.attempts.get(qrAttempt.attemptId)
     if (!expired) fail('missing QR attempt fixture')
-    expired.status = 'expired'
-    await expectCode('expired attempt must be reconciled before another code payment can start', 'PAYMENT_ATTEMPT_RECONCILIATION_REQUIRED', () =>
-      payment.createCodePayAttempt(active.order.id, active.token, AUTH_CODE, 'sandbox'),
+    expired.expiresAt = new Date(Date.now() - 1_000)
+    const switchedFromExpiredQr = await closeConfirmedQrFixture.payment.createCodePayAttempt(active.order.id, active.token, AUTH_CODE, 'sandbox')
+    const switchedAttempt = closeConfirmedQrFixture.attempts.get(switchedFromExpiredQr.attemptId)
+    if (
+      switchedFromExpiredQr.status === 'success' &&
+      closeConfirmedQrProvider.closeCalls === 1 &&
+      expired.status === 'expired' &&
+      switchedAttempt?.qrCodeContent === null &&
+      switchedAttempt.status === 'success'
+    ) {
+      pass('expired screen QR is confirmed closed by the channel before the customer can switch to scanner payment')
+    } else {
+      fail('expired screen QR must be confirmed closed before a new scanner payment is created')
+    }
+
+    class UnknownQrClosureSandboxProvider extends SandboxPaymentProvider {
+      async closeExpiredQrPayment() {
+        return { status: 'unknown' as const, channelTxnNo: null, amountCents: null }
+      }
+    }
+    const unknownQrClosureFixture = createFixture(new UnknownQrClosureSandboxProvider(SESSION_SECRET))
+    const unknownQrClosureOrder = unknownQrClosureFixture.makeOrder(100)
+    const unknownQrClosure = await unknownQrClosureFixture.payment.createPayAttempt(
+      unknownQrClosureOrder.order.id,
+      unknownQrClosureOrder.token,
+      'sandbox',
     )
+    const unknownQrClosureAttempt = unknownQrClosureFixture.attempts.get(unknownQrClosure.attemptId)
+    if (!unknownQrClosureAttempt) fail('missing unknown QR closure fixture')
+    unknownQrClosureAttempt.expiresAt = new Date(Date.now() - 1_000)
+    await expectCode('expired screen QR with an unknown channel close result remains locked', 'PAYMENT_ATTEMPT_PENDING', () =>
+      unknownQrClosureFixture.payment.createCodePayAttempt(
+        unknownQrClosureOrder.order.id,
+        unknownQrClosureOrder.token,
+        AUTH_CODE,
+        'sandbox',
+      ),
+    )
+    if (unknownQrClosureAttempt.status === 'pending' && unknownQrClosureOrder.order.payStatus === 'paying') {
+      pass('unknown screen-QR close result never releases the order for another payment method')
+    } else {
+      fail('unknown screen-QR close result must preserve the existing payment lock')
+    }
+
+    const qrExpiryProvider = new CloseConfirmedQrSandboxProvider(SESSION_SECRET)
+    const qrExpiryFixture = createFixture(qrExpiryProvider)
+    const qrExpiryOrder = qrExpiryFixture.makeOrder(100)
+    const staleQr = await qrExpiryFixture.payment.createPayAttempt(qrExpiryOrder.order.id, qrExpiryOrder.token, 'sandbox')
+    const staleQrAttempt = qrExpiryFixture.attempts.get(staleQr.attemptId)
+    if (!staleQrAttempt) fail('missing stale QR fixture')
+    staleQrAttempt.expiresAt = new Date(Date.now() - 1_000)
+    const qrExpiryResult = await qrExpiryFixture.payment.releaseExpiredQrPayments({ limit: 10 })
+    if (
+      qrExpiryResult.scanned === 1 &&
+      qrExpiryResult.released === 1 &&
+      qrExpiryProvider.closeCalls === 1 &&
+      staleQrAttempt.status === 'expired' &&
+      qrExpiryOrder.order.payStatus === 'unpaid'
+    ) {
+      pass('server-side QR expiry task confirms channel close before clearing a stale screen-code lock')
+    } else {
+      fail(`QR expiry release mismatch: ${JSON.stringify({ qrExpiryResult, order: qrExpiryOrder.order, attempt: staleQrAttempt })}`)
+    }
+
+    class FailedQrCreateSandboxProvider extends SandboxPaymentProvider {
+      override async createQrPayment(): Promise<never> {
+        throw new Error('SIMULATED_QR_PRECREATE_FAILURE')
+      }
+    }
+    const failedQrCreateFixture = createFixture(new FailedQrCreateSandboxProvider(SESSION_SECRET))
+    const failedQrCreateOrder = failedQrCreateFixture.makeOrder(100)
+    try {
+      await failedQrCreateFixture.payment.createPayAttempt(failedQrCreateOrder.order.id, failedQrCreateOrder.token, 'sandbox')
+      fail('simulated QR precreate failure should reject')
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('SIMULATED_QR_PRECREATE_FAILURE')) throw error
+    }
+    const failedQrAttempt = [...failedQrCreateFixture.attempts.values()][0]
+    if (!failedQrAttempt) fail('missing failed QR precreate attempt fixture')
+    failedQrAttempt.expiresAt = new Date(Date.now() - 1_000)
+    const recoveredFromFailedQrCreate = await failedQrCreateFixture.payment.getPayStatus(
+      failedQrCreateOrder.order.id,
+      failedQrCreateOrder.token,
+    )
+    if (
+      failedQrAttempt.status === 'expired' &&
+      failedQrCreateOrder.order.payStatus === 'unpaid' &&
+      recoveredFromFailedQrCreate.payStatus === 'unpaid'
+    ) {
+      pass('expired QR precreate failure is safely released without treating it as a scannable channel order')
+    } else {
+      fail(
+        `failed QR precreate must release after local expiry: ${JSON.stringify({
+          attempt: failedQrAttempt,
+          order: failedQrCreateOrder.order,
+          status: recoveredFromFailedQrCreate,
+        })}`,
+      )
+    }
 
     class MismatchedAmountSandboxProvider extends SandboxPaymentProvider {
       override async createCodePayment(input: Parameters<SandboxPaymentProvider['createCodePayment']>[0]) {
