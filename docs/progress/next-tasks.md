@@ -92,7 +92,7 @@
 
 ## P1：Windows 终端机队管理与安全换机
 
-- [x] **设备机队 F0 只读总览 PR #245 最新主线同步**：原 head `a80e9a39` 的 GitHub `build-and-verify` 与 `postgres-readiness` 均成功；因 `origin/main` 已前进到 `51cd8b9a`，当前仅将该上游基线合入 F0，并手工并集两份进度 SSOT。管理员 GET 白名单、健康 / 版本 / 受限配置摘要、显式引用冲突、原页面深链及 fail-closed 保持不变；两轮 Claude 与 Antigravity 审查均为有效 `APPROVE`。最终本地验证、最新 PR CI 和远端合并完成前，不得称 F0 已合并、已部署、Windows 已验收，亦未执行 F1/F2/F3；F2/F3 继续 `CLOSED_MODE`。
+- [x] **设备机队 F0 只读总览**：[PR #245](https://github.com/wanglei581/YITIJI/pull/245) 已合入 `main@1df2f24e`，GitHub `build-and-verify` 与 `postgres-readiness` 均成功。管理员 GET 白名单、健康 / 版本 / 受限配置摘要、显式引用冲突、原页面深链及 fail-closed 保持不变；两轮 Claude 与 Antigravity 审查均为有效 `APPROVE`。F0 仅为既有 Admin 终端管理增加只读总览；未部署、未操作 Windows，且未执行 F1/F2/F3，F2/F3 继续 `CLOSED_MODE`。
 - [ ] **设备机队 F2 安全换机**：前置为“生产管理员凭据轮换 + 手机号验证”已完成受控生产验收。采用凭据 hash-first、候选机受限预检、活动任务为 0 后的原子切换和旧机撤销；双 Prisma migration、既有 Agent/QR/打印回归与 Windows 真机换机验收仍需在独立任务完成。不得复用现有 `exchange-bind-code` 直接替换在役主机。
 
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
