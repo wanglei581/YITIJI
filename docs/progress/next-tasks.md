@@ -89,6 +89,11 @@
 
 - [ ] **Windows Agent MSI / 可修复安装包**：独立设计与分支处理；范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收。不在当前可靠性 P0 中开始，也不得与其合并验收结论混用。
 
+## P1：Windows 终端机队管理与安全换机
+
+- [ ] **设备机队 F0 只读总览**：在既有 Admin “终端管理”内聚合终端健康、版本、配置摘要、候选机状态和原页面深链；不新建 Kiosk/用户侧入口，不新增 Prisma 写模型，不触碰凭据、打印任务或远程更新。实施前按 [`terminal-fleet-management-design.md`](../device/terminal-fleet-management-design.md) 的 F0 范围声明另起独立分支。
+- [ ] **设备机队 F2 安全换机**：前置为“生产管理员凭据轮换 + 手机号验证”已完成受控生产验收。采用凭据 hash-first、候选机受限预检、活动任务为 0 后的原子切换和旧机撤销；双 Prisma migration、既有 Agent/QR/打印回归与 Windows 真机换机验收必须在独立任务完成。不得复用现有 `exchange-bind-code` 直接替换在役主机。
+
 2026-06-21 补充：`codex/preprod-deployment-acceptance` 已先把 TRTC assistant guard 代码包部署到百度云预生产，三端公网 HTTP health 均返回 PostgreSQL；COS live 冒烟通过并已切 `FILE_STORAGE_DRIVER=cos`；临时 HTTPS/hosts 映射已可用；预生产服务器上 `verify:member-assets-c2d` 与 `verify:activity-logs` 通过。下一步不能直接进入试运营，需先补百度 OCR Key 与 live 验证、AI/TRTC/ASR/TTS 按启用范围验证、腾讯短信审核后的真实登录 E2E、正式域名 HTTPS 复验，以及 Windows 裸机 + Terminal Agent + 奔图真机验收。
 
 2026-06-22 补充：`codex/file-assets-preprod-integration` 已把用户文件资产商用闭环栈与预生产验收候选合到同一分支，后续预生产/试运营应以该集成候选为基线继续执行；这仍不代表真实生产/试运营执行完成。
