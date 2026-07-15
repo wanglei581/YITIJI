@@ -6,8 +6,11 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { AuthService, type LoginResult } from './auth.service'
+import { InitialPhoneBindService } from './initial-phone-bind.service'
 import {
   ChangePasswordDto,
+  InitialPhoneBindStartDto,
+  InitialPhoneBindVerifyDto,
   PasswordResetCompleteDto,
   PasswordResetStartDto,
   PasswordResetVerifyDto,
@@ -20,7 +23,10 @@ import { LoginDto } from './dto/login.dto'
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly initialPhoneBindService: InitialPhoneBindService,
+  ) {}
 
   /**
    * 登录限流:每 IP 60 秒内最多 5 次。
@@ -93,6 +99,35 @@ export class AuthController {
     @Body() dto: SelfPhoneVerifyDto,
   ): Promise<ApiResponse<{ phoneMasked: string; phoneVerifiedAt: string }>> {
     return ApiResponse.ok(await this.authService.verifyOwnPhoneBindCode(user.userId, dto.code))
+  }
+
+  /**
+   * 首次绑定专用于尚无 phoneEnc 的已登录内部账号；旧 phone/code 与 phone/verify
+   * 仍只服务预录手机号的本人验证，防止候选手机号从旧入口写入。
+   */
+  @Post('phone/initial-bind/start')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'partner')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async startInitialPhoneBind(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindStartDto,
+    @Ip() ip: string,
+  ): Promise<ApiResponse<{ bindTicket: string; cooldownSeconds: number; expiresInSeconds: number }>> {
+    return ApiResponse.ok(
+      await this.initialPhoneBindService.start(user.userId, dto.currentPassword, dto.phone, ip, dto.deviceId),
+    )
+  }
+
+  @Post('phone/initial-bind/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'partner')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async verifyInitialPhoneBind(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindVerifyDto,
+  ): Promise<ApiResponse<{ phoneMasked: string; phoneVerifiedAt: string }>> {
+    return ApiResponse.ok(await this.initialPhoneBindService.verify(user.userId, dto.bindTicket, dto.code))
   }
 
   /** 登录态自助改密:须提供当前密码校验身份,成功后旧 token 立即失效,需重新登录。 */
