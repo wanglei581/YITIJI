@@ -68,7 +68,7 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
     try {
       const result = await startAdminInitialPhoneBind(currentPassword, phone)
       if (!result.ok) {
-        if (result.code === 'NETWORK_ERROR' || result.code === 'INVALID_RESPONSE') {
+        if (requiresConservativeStartCooldown(result.code, result.status)) {
           setCurrentPassword('')
           setPhone('')
           setCooldownSeconds(300)
@@ -119,12 +119,7 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
     try {
       const result = await verifyAdminInitialPhoneBind(bindTicket, code)
       if (!result.ok) {
-        if (result.code === 'AUTH_SESSION_INVALID') {
-          clearVerificationState()
-          redirectToLogin()
-          return
-        }
-        if (requiresLoginAfterUncertainVerification(result.code)) {
+        if (requiresLoginAfterUncertainVerification(result.code, result.status)) {
           clearVerificationState()
           redirectToLogin()
           return
@@ -239,9 +234,23 @@ function requiresRestartAfterVerificationFailure(code: string): boolean {
   ].includes(code)
 }
 
+function requiresConservativeStartCooldown(code: string, status: number): boolean {
+  return status === 0 || code === 'INVALID_RESPONSE' || status >= 500
+}
+
 /** 验证请求可能已在服务端消费 ticket；重新登录才能以真实 LoginResult 恢复绑定状态。 */
-function requiresLoginAfterUncertainVerification(code: string): boolean {
-  return code === 'NETWORK_ERROR' || code === 'INVALID_RESPONSE' || /^HTTP_5\d{2}$/.test(code)
+function requiresLoginAfterUncertainVerification(code: string, status: number): boolean {
+  return (
+    status === 0 ||
+    status === 401 ||
+    status === 403 ||
+    status >= 500 ||
+    code === 'NETWORK_ERROR' ||
+    code === 'INVALID_RESPONSE' ||
+    code === 'AUTH_SESSION_INVALID' ||
+    code === 'AUTH_TOKEN_INVALID' ||
+    code === 'AUTH_MISSING_TOKEN'
+  )
 }
 
 function MessageNotice({ message }: { message: Exclude<Message, null> }) {

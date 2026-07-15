@@ -145,6 +145,15 @@ async function verifyAdminInitialPhoneBindAdapterBehavior() {
   expect(validStart.ok && validStart.bindTicket === VALID_BIND_TICKET, 'start must accept a bounded UUID response')
   expect(validStartHarness.writes() === 0, 'start must never persist a ticket')
 
+  const startServerErrorHarness = createAdminAuthAdapterHarness([
+    { status: 500, body: { error: { code: 'INTERNAL_SERVER_ERROR', message: 'server error' } } },
+  ])
+  const startServerError = await startServerErrorHarness.auth.startAdminInitialPhoneBind('CurrentPassword!', '13812341234')
+  expect(
+    !startServerError.ok && startServerError.code === 'INTERNAL_SERVER_ERROR' && startServerError.status === 500,
+    'start must retain status=500 even when the error body overrides the code',
+  )
+
   const invalidVerifyResponses = [
     ['plaintext phone', { phoneMasked: '13812341234', phoneVerifiedAt: VALID_PHONE_VERIFIED_AT }],
     ['malformed mask', { phoneMasked: '138***1234', phoneVerifiedAt: VALID_PHONE_VERIFIED_AT }],
@@ -166,6 +175,15 @@ async function verifyAdminInitialPhoneBindAdapterBehavior() {
     expect(stored.user.phoneVerifiedAt === VALID_PHONE_VERIFIED_AT, 'verify must persist the validated canonical timestamp')
     expect(harness.writes() === 1, 'only a valid verify response may update the stored user')
   }
+
+  const verifyServerErrorHarness = createAdminAuthAdapterHarness([
+    { status: 500, body: { error: { code: 'INTERNAL_SERVER_ERROR', message: 'server error' } } },
+  ])
+  const verifyServerError = await verifyServerErrorHarness.auth.verifyAdminInitialPhoneBind(VALID_BIND_TICKET, '123456')
+  expect(
+    !verifyServerError.ok && verifyServerError.code === 'INTERNAL_SERVER_ERROR' && verifyServerError.status === 500,
+    'verify must retain status=500 even when the error body overrides the code',
+  )
 }
 
 try {
@@ -230,16 +248,18 @@ if (
   startAdminInitialPhoneBind.includes('{ currentPassword, phone }') &&
   startAdminInitialPhoneBind.includes('postJson<unknown>') &&
   startAdminInitialPhoneBind.includes('isValidAdminInitialPhoneBindStartResponse(r.data)') &&
+  startAdminInitialPhoneBind.includes('status: r.status') &&
   !startAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/start'") &&
   verifyAdminInitialPhoneBind.includes("'/auth/admin/phone/initial-bind/verify'") &&
   verifyAdminInitialPhoneBind.includes('{ bindTicket, code }') &&
   verifyAdminInitialPhoneBind.includes('postJson<unknown>') &&
   verifyAdminInitialPhoneBind.includes('isValidAdminInitialPhoneBindVerifyResponse(r.data)') &&
+  verifyAdminInitialPhoneBind.includes('status: r.status') &&
   !verifyAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/verify'")
 ) {
-  pass('Admin adapter 仅调用严格首次绑定端点，且不回退到通用路径')
+  pass('Admin adapter 仅调用严格首次绑定端点，保留失败 HTTP status，且不回退到通用路径')
 } else {
-  fail('Admin adapter 必须使用严格端点、运行时验证 2xx 数据，且不能走通用路径')
+  fail('Admin adapter 必须使用严格端点、保留失败 status、运行时验证 2xx 数据，且不能走通用路径')
 }
 
 if (
@@ -306,18 +326,23 @@ if (
   fail('Admin 专用卡片泄露敏感状态、回退到通用 adapter，或将 ticket 放进 DOM')
 }
 
+const appliesConservativeStartCooldown = /if \(requiresConservativeStartCooldown\(result\.code, result\.status\)\) \{\s*setCurrentPassword\(''\)\s*setPhone\(''\)\s*setCooldownSeconds\(300\)/.test(adminPhoneBindingCard)
+
 if (
   adminPhoneBindingCard.includes('if (bindTicket || submitting || cooldownSeconds > 0) return') &&
-  adminPhoneBindingCard.includes("result.code === 'NETWORK_ERROR' || result.code === 'INVALID_RESPONSE'") &&
-  adminPhoneBindingCard.includes('setCooldownSeconds(300)') &&
+  appliesConservativeStartCooldown &&
+  adminPhoneBindingCard.includes('function requiresConservativeStartCooldown(code: string, status: number)') &&
+  adminPhoneBindingCard.includes('status === 0') &&
+  adminPhoneBindingCard.includes("code === 'INVALID_RESPONSE'") &&
+  adminPhoneBindingCard.includes('status >= 500') &&
   adminPhoneBindingCard.includes('请等待 5 分钟后重试')
 ) {
-  pass('发码期间、活动 ticket 和未知发送结果均不能重复发送；未知结果保守锁定 300 秒')
+  pass('发码期间、活动 ticket 和 status=0/INVALID_RESPONSE/任意 5xx 均不能重复发送，并保守锁定 300 秒')
 } else {
-  fail('发码必须阻止重复发送，且 NETWORK_ERROR/INVALID_RESPONSE 必须保守锁定 300 秒')
+  fail('发码必须按 status=0、INVALID_RESPONSE 或任意 5xx 保守锁定 300 秒，不能只依赖错误 code')
 }
 
-const redirectsAfterUncertainVerification = /if \(requiresLoginAfterUncertainVerification\(result\.code\)\) \{\s*clearVerificationState\(\)\s*redirectToLogin\(\)\s*return/.test(adminPhoneBindingCard)
+const redirectsAfterUncertainVerification = /if \(requiresLoginAfterUncertainVerification\(result\.code, result\.status\)\) \{\s*clearVerificationState\(\)\s*redirectToLogin\(\)\s*return/.test(adminPhoneBindingCard)
 
 if (
   adminPhoneBindingCard.includes('function clearVerificationState()') &&
@@ -327,17 +352,25 @@ if (
   adminPhoneBindingCard.includes('requiresRestartAfterVerificationFailure(result.code)') &&
   adminPhoneBindingCard.includes("'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE'") &&
   redirectsAfterUncertainVerification &&
+  adminPhoneBindingCard.includes('function requiresLoginAfterUncertainVerification(code: string, status: number)') &&
+  adminPhoneBindingCard.includes('status === 0') &&
+  adminPhoneBindingCard.includes('status === 401') &&
+  adminPhoneBindingCard.includes('status === 403') &&
+  adminPhoneBindingCard.includes('status >= 500') &&
   adminPhoneBindingCard.includes("code === 'NETWORK_ERROR'") &&
   adminPhoneBindingCard.includes("code === 'INVALID_RESPONSE'") &&
-  adminPhoneBindingCard.includes('/^HTTP_5\\d{2}$/') &&
+  adminPhoneBindingCard.includes("code === 'AUTH_SESSION_INVALID'") &&
+  adminPhoneBindingCard.includes("code === 'AUTH_TOKEN_INVALID'") &&
+  adminPhoneBindingCard.includes("code === 'AUTH_MISSING_TOKEN'") &&
+  !adminPhoneBindingCard.includes('HTTP_5') &&
   !adminPhoneBindingCard.includes('请刷新页面后确认绑定状态') &&
   adminPhoneBindingCard.includes('ticketExpiresAt <= Date.now()') &&
   adminPhoneBindingCard.includes('window.setInterval') &&
   adminPhoneBindingCard.includes('return () => window.clearInterval(timer)')
 ) {
-  pass('验证码到期、已知验证失败与不确定的 NETWORK/INVALID/HTTP_5xx 结果都会清理 ticket；后者强制重新登录')
+  pass('验证码到期、已知验证失败与 status=0/401/403/5xx、INVALID 或 JWT 错误均会清理 ticket 并重新登录')
 } else {
-  fail('Admin 专用卡必须在 ticket 到期、验证失败或不确定结果后安全清理；NETWORK/INVALID/HTTP_5xx 必须重新登录')
+  fail('Admin 专用卡必须按 status 或 JWT 错误安全清理；不能只依赖 HTTP_5 字符串')
 }
 
 if (

@@ -86,7 +86,7 @@ interface ErrorBody {
   error?: { code?: string; message?: string }
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; data: T } | { ok: false; code: string; message: string; status: number }> {
+async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; data: T; status: number } | { ok: false; code: string; message: string; status: number }> {
   let res: Response
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
@@ -102,7 +102,7 @@ async function postJson<T>(path: string, body: unknown): Promise<{ ok: true; dat
   if (res.ok) {
     try {
       const payload = await res.json() as { data: T }
-      return { ok: true, data: payload.data }
+      return { ok: true, data: payload.data, status: res.status }
     } catch {
       return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后重试', status: res.status }
     }
@@ -154,6 +154,13 @@ type AdminInitialPhoneBindVerifyData = {
   phoneVerifiedAt: string
 }
 
+type AdminInitialPhoneBindFailure = {
+  ok: false
+  code: string
+  message: string
+  status: number
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MASKED_PHONE_PATTERN = /^1[3-9]\d\*{4}\d{4}$/
 
@@ -196,8 +203,8 @@ function isValidAdminInitialPhoneBindVerifyResponse(data: unknown): data is Admi
   return isMaskedPhone(candidate.phoneMasked) && isCanonicalIsoDate(candidate.phoneVerifiedAt)
 }
 
-function invalidAdminInitialPhoneBindResponse(): { ok: false; code: string; message: string } {
-  return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后再试' }
+function invalidAdminInitialPhoneBindResponse(status: number): AdminInitialPhoneBindFailure {
+  return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后再试', status }
 }
 
 // ─── Public auth API ─────────────────────────────────────────────────────────
@@ -297,10 +304,10 @@ export async function completeInitialPhoneBind(
 export async function startAdminInitialPhoneBind(
   currentPassword: string,
   phone: string,
-): Promise<{ ok: true; bindTicket: string; cooldownSeconds: number; expiresInSeconds: number } | { ok: false; code: string; message: string }> {
+): Promise<{ ok: true; bindTicket: string; cooldownSeconds: number; expiresInSeconds: number } | AdminInitialPhoneBindFailure> {
   const r = await postJson<unknown>('/auth/admin/phone/initial-bind/start', { currentPassword, phone })
-  if (!r.ok) return { ok: false, code: r.code, message: r.message }
-  if (!isValidAdminInitialPhoneBindStartResponse(r.data)) return invalidAdminInitialPhoneBindResponse()
+  if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
+  if (!isValidAdminInitialPhoneBindStartResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
   return {
     ok: true,
     bindTicket: r.data.bindTicket,
@@ -313,10 +320,10 @@ export async function startAdminInitialPhoneBind(
 export async function verifyAdminInitialPhoneBind(
   bindTicket: string,
   code: string,
-): Promise<{ ok: true; phoneMasked: string; phoneVerifiedAt: string } | { ok: false; code: string; message: string }> {
+): Promise<{ ok: true; phoneMasked: string; phoneVerifiedAt: string } | AdminInitialPhoneBindFailure> {
   const r = await postJson<unknown>('/auth/admin/phone/initial-bind/verify', { bindTicket, code })
-  if (!r.ok) return { ok: false, code: r.code, message: r.message }
-  if (!isValidAdminInitialPhoneBindVerifyResponse(r.data)) return invalidAdminInitialPhoneBindResponse()
+  if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
+  if (!isValidAdminInitialPhoneBindVerifyResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
   const bound = { phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt }
   mergeStoredUser(bound)
   return { ok: true, ...bound }
