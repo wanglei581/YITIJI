@@ -39,6 +39,7 @@
 - [ ] PostgreSQL 生产实例：`migrate deploy`、seed、核心 verify、备份恢复演练通过。
 - [ ] **zyidai.cn 数据库高负载加固生产执行**：代码侧候选 `codex/db-load-hardening-zyidai-20260706` 已准备 PrintTask / PrintTaskStatusLog 热路径索引、双轨 migration、`verify:db-load-indexes` 和 `docs/device/postgres-load-hardening-runbook.md`；生产执行前必须先经用户确认，按 runbook 做只读预检、备份、低峰 migration 或 `CREATE INDEX CONCURRENTLY`、`pg_stat_statements` 观测、PostgreSQL 参数 / PgBouncer / PM2 cluster 调整和压测验收。未执行前不得宣称 zyidai.cn 已完成数据库高并发加固。
 - [ ] 三端登录 / 内部账号手机号认证生产验收：首次绑定能力已进入 `origin/main@cb03b48d`，主线 GitHub CI 成功，但尚未部署、未发送真实短信、未改生产账号或 Redis。上线目标库须先执行 migration 状态与 health 只读检查，再由已登录 admin / partner 本人在「账号设置」输入当前密码并完成真实短信绑定；**不得在生产或共享预生产运行** `verify:internal-auth-phone`，不得直改 `User` / Redis、创建临时管理员或使用后门 token。
+- [ ] **Admin 首次绑定严格加固 PR #249**：候选仅将 Admin 收口为无旁路严格状态机，Partner 保持主线既有首次绑定能力。更新前 GitHub CI 已成功；由于 `main` 前进，本轮 rebase 更新后必须重新跑 CI，CI 通过也不等于生产部署批准。严格生产验收仍只能由已登录账号本人在「账号设置」输入当前密码并完成真实短信验证；不得在生产或共享预生产运行 `verify:internal-auth-phone`、直改 `User` / Redis、创建临时管理员或使用后门 token。
 - [x] **生产管理员凭据轮换 + FREE_MODE 配置切换**：自助改密能力已部署，管理员已由本人在 Admin「账号设置」完成生产密码修改；只读复核确认 `auth.password_change_self` 审计存在且 payload 为空、`tokenVersion` 已递增、旧会话按版本语义失效，未读取或传递真实密码。KSK-001 已经用户明确确认恢复启用；随后再次获得明确授权，将黑白/彩色价目通过 Admin 合法路径改为 active 0 元，并把生产 `PAYMENT_PROVIDER` 受控切为 `disabled`、保持 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`。写后渠道为空、health 正常、终端 `online/ready`、活动任务与新增 PrintTask 均为 0；未建单、未打印。首次真实用户开放仍受下一项零元端到端现场复验门禁约束；管理员手机号验证继续作为独立账号治理项，不回滚本项完成结论。
 - [ ] Redis 生产连接：队列/缓存配置、访问权限和内网隔离确认。
 - [ ] COS 生产私有桶：CAM 最小权限、上传/下载/删除 live 冒烟。
