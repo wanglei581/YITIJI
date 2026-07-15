@@ -184,6 +184,16 @@ async function verifyAdminInitialPhoneBindAdapterBehavior() {
     !verifyServerError.ok && verifyServerError.code === 'INTERNAL_SERVER_ERROR' && verifyServerError.status === 500,
     'verify must retain status=500 even when the error body overrides the code',
   )
+
+  const validCancelHarness = createAdminAuthAdapterHarness([okResponse({ cancelled: true })])
+  const validCancel = await validCancelHarness.auth.cancelAdminInitialPhoneBind(VALID_BIND_TICKET)
+  expect(validCancel.ok, 'cancel must accept the exact strict success response')
+  expect(validCancelHarness.storedState() === validCancelHarness.initialStoredState && validCancelHarness.writes() === 0, 'cancel must never persist a ticket')
+
+  const invalidCancelHarness = createAdminAuthAdapterHarness([okResponse({ cancelled: false })])
+  const invalidCancel = await invalidCancelHarness.auth.cancelAdminInitialPhoneBind(VALID_BIND_TICKET)
+  expect(!invalidCancel.ok && invalidCancel.code === 'INVALID_RESPONSE', 'cancel must reject an unexpected 2xx response')
+  expect(invalidCancelHarness.storedState() === invalidCancelHarness.initialStoredState && invalidCancelHarness.writes() === 0, 'invalid cancel response must not persist a ticket')
 }
 
 try {
@@ -243,6 +253,7 @@ if (
 
 const startAdminInitialPhoneBind = sourceForFunction(auth, 'startAdminInitialPhoneBind')
 const verifyAdminInitialPhoneBind = sourceForFunction(auth, 'verifyAdminInitialPhoneBind')
+const cancelAdminInitialPhoneBind = sourceForFunction(auth, 'cancelAdminInitialPhoneBind')
 if (
   startAdminInitialPhoneBind.includes("'/auth/admin/phone/initial-bind/start'") &&
   startAdminInitialPhoneBind.includes('{ currentPassword, phone }') &&
@@ -255,11 +266,17 @@ if (
   verifyAdminInitialPhoneBind.includes('postJson<unknown>') &&
   verifyAdminInitialPhoneBind.includes('isValidAdminInitialPhoneBindVerifyResponse(r.data)') &&
   verifyAdminInitialPhoneBind.includes('status: r.status') &&
-  !verifyAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/verify'")
+  !verifyAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/verify'") &&
+  cancelAdminInitialPhoneBind.includes("'/auth/admin/phone/initial-bind/cancel'") &&
+  cancelAdminInitialPhoneBind.includes('{ bindTicket }') &&
+  cancelAdminInitialPhoneBind.includes('postJson<unknown>') &&
+  cancelAdminInitialPhoneBind.includes('isValidAdminInitialPhoneBindCancelResponse(r.data)') &&
+  cancelAdminInitialPhoneBind.includes('status: r.status') &&
+  !cancelAdminInitialPhoneBind.includes("'/auth/phone/initial-bind/cancel'")
 ) {
   pass('Admin adapter 仅调用严格首次绑定端点，保留失败 HTTP status，且不回退到通用路径')
 } else {
-  fail('Admin adapter 必须使用严格端点、保留失败 status、运行时验证 2xx 数据，且不能走通用路径')
+  fail('Admin adapter 必须使用严格 start/verify/cancel 端点、保留失败 status、运行时验证 2xx 数据，且不能走通用路径')
 }
 
 if (
@@ -301,6 +318,7 @@ for (const token of [
   'const [message, setMessage] = useState',
   'startAdminInitialPhoneBind(currentPassword, phone)',
   'verifyAdminInitialPhoneBind(bindTicket, code)',
+  'cancelAdminInitialPhoneBind(bindTicket)',
   'autoComplete="current-password"',
   'autoComplete="one-time-code"',
   '请输入有效的中国大陆手机号',
@@ -327,6 +345,7 @@ if (
 }
 
 const appliesConservativeStartCooldown = /if \(requiresConservativeStartCooldown\(result\.code, result\.status\)\) \{\s*setCurrentPassword\(''\)\s*setPhone\(''\)\s*setCooldownSeconds\(300\)/.test(adminPhoneBindingCard)
+const appliesKnownSmsCooldown = /if \(isActionableSmsFailure\(result\.code\)\) \{[\s\S]*?setCurrentPassword\(''\)[\s\S]*?setPhone\(''\)[\s\S]*?if \(requiresKnownSmsCooldown\(result\.code\)\)\s*setCooldownSeconds\(60\)/.test(adminPhoneBindingCard)
 
 if (
   adminPhoneBindingCard.includes('if (bindTicket || submitting || cooldownSeconds > 0) return') &&
@@ -342,6 +361,28 @@ if (
   fail('发码必须按 status=0、INVALID_RESPONSE 或任意 5xx 保守锁定 300 秒，不能只依赖错误 code')
 }
 
+if (
+  appliesKnownSmsCooldown &&
+  adminPhoneBindingCard.includes('function requiresKnownSmsCooldown(code: string)') &&
+  adminPhoneBindingCard.includes("code === 'SMS_TOO_FREQUENT'") &&
+  adminPhoneBindingCard.includes("code === 'SMS_IP_LIMIT'") &&
+  adminPhoneBindingCard.includes("code === 'SMS_DEVICE_LIMIT'") &&
+  adminPhoneBindingCard.includes("code === 'SMS_PROVIDER_RATE_LIMIT'")
+) {
+  pass('已知短信限流错误会清理敏感输入并给出 60 秒可执行冷却')
+} else {
+  fail('已知短信限流错误必须清理敏感输入并给出明确的 60 秒冷却')
+}
+
+if (
+  adminPhoneBindingCard.includes("result.code === 'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE'") &&
+  adminPhoneBindingCard.includes('若刚才操作中断，请 5 分钟后再试。')
+) {
+  pass('遗留 active ticket 的统一不可用提示会给出 5 分钟自愈等待指引')
+} else {
+  fail('严格不可用提示必须覆盖会话中断后的 5 分钟 active ticket 自愈等待指引')
+}
+
 const redirectsAfterUncertainVerification = /if \(requiresLoginAfterUncertainVerification\(result\.code, result\.status\)\) \{\s*clearVerificationState\(\)\s*redirectToLogin\(\)\s*return/.test(adminPhoneBindingCard)
 
 if (
@@ -351,6 +392,10 @@ if (
   adminPhoneBindingCard.includes("setCode('')") &&
   adminPhoneBindingCard.includes('requiresRestartAfterVerificationFailure(result.code)') &&
   adminPhoneBindingCard.includes("'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE'") &&
+  !adminPhoneBindingCard.slice(
+    adminPhoneBindingCard.indexOf('function requiresRestartAfterVerificationFailure'),
+    adminPhoneBindingCard.indexOf('function requiresConservativeStartCooldown'),
+  ).includes("'SMS_CODE_INVALID'") &&
   redirectsAfterUncertainVerification &&
   adminPhoneBindingCard.includes('function requiresLoginAfterUncertainVerification(code: string, status: number)') &&
   adminPhoneBindingCard.includes('status === 0') &&
@@ -368,9 +413,20 @@ if (
   adminPhoneBindingCard.includes('window.setInterval') &&
   adminPhoneBindingCard.includes('return () => window.clearInterval(timer)')
 ) {
-  pass('验证码到期、已知验证失败与 status=0/401/403/5xx、INVALID 或 JWT 错误均会清理 ticket 并重新登录')
+  pass('验证码错误可在当前 ticket 内重试；验证码到期、其他已知失败与不确定状态均会安全清理或重新登录')
 } else {
-  fail('Admin 专用卡必须按 status 或 JWT 错误安全清理；不能只依赖 HTTP_5 字符串')
+  fail('Admin 专用卡必须允许 SMS_CODE_INVALID 留在当前 ticket 重试；其他不确定状态须安全清理')
+}
+
+const restartCancelsRemoteTicket = /async function restart\(\): Promise<void> \{[\s\S]*?if \(submitting\) return[\s\S]*?if \(!bindTicket\) \{[\s\S]*?clearVerificationState\(\)[\s\S]*?return[\s\S]*?}[\s\S]*?setSubmitting\(true\)[\s\S]*?await cancelAdminInitialPhoneBind\(bindTicket\)[\s\S]*?clearVerificationState\(\)/.test(adminPhoneBindingCard)
+if (
+  restartCancelsRemoteTicket &&
+  adminPhoneBindingCard.includes('function requiresLoginAfterUncertainCancellation(code: string, status: number)') &&
+  adminPhoneBindingCard.includes('redirectToLogin()')
+) {
+  pass('重新填写会先取消当前 Admin 自己的远端 ticket；不确定取消结果时重新登录')
+} else {
+  fail('重新填写不得只清本地 state，必须取消严格 Admin ticket；不确定结果必须重新登录')
 }
 
 if (

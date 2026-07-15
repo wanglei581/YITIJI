@@ -30,6 +30,8 @@
 
 ## P0：上线前真实验收
 
+- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已在本地完成 OTP 重试/锁定、取消、事务审计和 Partner 保留回归；仍须以候选提交的 GitHub CI/PR 状态为准，且生产部署前必须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 
 - [x] **历史 pending PrintTask 受控关闭（一次性运维）**：2026-07-12 已部署 `fba6b414`，完成 PostgreSQL 备份、additive migration、PM2/health 复核后，以系统管理员审计身份通过 `maintenance:dispose-legacy-pending-print-tasks` 处置 `ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。事前只读确认三条均为冻结时间前匿名未领取 `pending`，订单仅 `unpaid/closed`；事后均为 `cancelled` + `LEGACY_PENDING_TASK_DISPOSED`，两条订单支付事实不变且 `taskStatus=cancelled`，每条恰有一条 pending→cancelled 状态日志与 Admin 审计，剩余匹配 pending 为 0。未直改表、未使用 `failed`、未触发出纸。
