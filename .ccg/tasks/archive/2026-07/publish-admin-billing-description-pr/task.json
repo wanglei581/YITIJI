@@ -1,0 +1,12 @@
+{
+  "id": "publish-admin-billing-description-pr",
+  "title": "同步并发布 Admin 价目说明独立编辑候选 PR",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "release-governance",
+  "currentPhase": "completed",
+  "nextAction": "PR #247 的 CI 当前运行中；归档任务并保留 worktree，等待 PR CI 与评审，不部署、不修改生产",
+  "createdAt": "2026-07-15T00:00:00Z",
+  "branch": "codex/prod-admin-password-readonly-audit-20260715"
+}

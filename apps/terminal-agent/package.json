@@ -17,6 +17,7 @@
     "verify:agent-profile-guard": "node scripts/verify-agent-profile-guard.mjs",
     "verify:print-scan-agent": "node scripts/verify-print-scan-agent.mjs",
     "verify:scan-watcher": "ts-node scripts/verify-scan-watcher.ts",
+    "verify:scan-input-health": "ts-node scripts/verify-scan-input-health.ts",
     "verify:form-data-security": "node scripts/verify-form-data-security.mjs",
     "verify:agent-config-resilience": "node scripts/verify-agent-config-resilience.mjs",
     "verify:windows-service-recovery": "node scripts/verify-windows-service-recovery.mjs"
