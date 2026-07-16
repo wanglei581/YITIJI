@@ -212,7 +212,6 @@ const expectedEntries = [
   ['AI助手', '/assistant'],
   ['浏览记录', '/me/activity'],
   ['外部跳转记录', '/me/activity?tab=jump'],
-  ['招聘会权益活动', '/activities?source=fair'],
   ['权益活动', '/activities'],
   ['政策补贴指引', '/renshi?tab=policy'],
   ['消息通知', '/me/notifications'],
@@ -227,11 +226,10 @@ for (const [label, route] of expectedEntries) {
     `入口保留：${label} -> ${route}`,
   )
 }
-expectMatches(entries, /label:\s*'招聘会扫码凭证'[\s\S]{0,180}?tag:\s*'建设中'/, '招聘会扫码凭证仍为建设中，不新增入口能力')
-expectMatches(entries, /label:\s*'求职打印套餐'[\s\S]{0,180}?tag:\s*'建设中'/, '求职打印套餐仍为建设中，不接支付')
-expectMatches(entries, /label:\s*'AI服务套餐'[\s\S]{0,180}?tag:\s*'建设中'/, 'AI服务套餐仍为建设中，不接支付')
+expectMatches(entries, /label:\s*'权益活动'[\s\S]{0,180}?route:\s*'\/activities'/, '权益活动只保留真实入口')
+expectAbsent(entries, /招聘会扫码凭证|招聘会权益活动|求职打印套餐|AI服务套餐|\/activities\?source=fair/, 'Profile 不展示重复或占位入口')
 expectAbsent(entries, /label:\s*'身份切换'/, 'Profile 不重复暴露账号设置入口')
-for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益活动与服务套餐', '账户与支持']) {
+for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益与政策', '账户与支持']) {
   expectMatches(entries, new RegExp(`title:\\s*'${title}'`), `Profile 保留五区边界：${title}`)
 }
 expectAbsent(entries, /entries:\s*\[\.\.\.FAIRS,\s*\.\.\.BENEFITS\]/, 'Profile 不再合并招聘会与权益服务区')
