@@ -1,0 +1,46 @@
+{
+  "id": "user-center-wave0-data-truth-20260716",
+  "title": "用户中心 Wave 0 真实数据基线治理",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "full-stack",
+  "currentPhase": "completed",
+  "nextAction": "本地状态修复、验证和文档已完成；远程交付前由后续任务在可用账户下补跑有效双模型审查并取得用户 push/PR/CI 授权",
+  "createdAt": "2026-07-16T10:35:00Z",
+  "branch": "codex/user-center-wave0-data-truth-20260716",
+  "baseRef": "origin/main@0c4cdd574b8243b6b43436c2cb90a3d05c44d1b7",
+  "scope": {
+    "goal": "按已合并的商用级用户中心方案，将既有“我的”页面的关键状态和资产摘要接入已存在的真实 API，并补齐必要的确定性测试与错误状态。",
+    "allowedAreas": [
+      "apps/kiosk/src/pages/profile/**",
+      "services/api/src/profile/**",
+      "services/api/src/*/profile*.spec.ts",
+      "apps/kiosk/src/pages/profile/**/*.test.*",
+      "apps/kiosk/src/pages/auth/LoginPage.tsx",
+      "apps/kiosk/src/pages/auth/styles/login-form.css",
+      "apps/kiosk/scripts/verify-user-center-wave0.mjs",
+      "apps/kiosk/scripts/verify-profile-inkpaper-home.mjs",
+      "apps/kiosk/scripts/verify-lightflow-profile-entry.mjs",
+      "apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs",
+      "apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs",
+      "apps/kiosk/package.json",
+      "services/api/src/member-privacy/member-privacy.service.ts",
+      "services/api/scripts/verify-member-data-request-truth.ts",
+      "services/api/scripts/verify-job-ai-privacy.ts",
+      "services/api/package.json",
+      ".github/workflows/ci.yml",
+      "docs/acceptance/user-center-wave0-acceptance.md",
+      "docs/product/user-data-flow-matrix.md",
+      "docs/progress/current-progress.md",
+      "docs/progress/next-tasks.md",
+      ".ccg/tasks/user-center-wave0-data-truth-20260716/**"
+    ],
+    "prohibitedAreas": [
+      "legacy-miaoda/**",
+      "生产部署配置、密钥、数据库生产实例",
+      "新增重复入口或任何招聘闭环能力",
+      "未在 Wave 0 方案内的会员、数据权利或账户安全功能"
+    ]
+  }
+}
