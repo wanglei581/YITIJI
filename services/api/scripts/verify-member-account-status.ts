@@ -92,6 +92,8 @@ function verifySqliteMigration(migrationSql: string): void {
       input: `
         INSERT INTO "EndUser" ("id", "phoneHash", "phoneEnc", "enabled", "createdAt", "updatedAt")
         VALUES ('legacy-disabled', 'legacy-disabled-hash', 'verify-only-placeholder', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+        INSERT INTO "EndUser" ("id", "phoneHash", "phoneEnc", "enabled", "createdAt", "updatedAt")
+        VALUES ('legacy-active', 'legacy-active-hash', 'verify-only-placeholder', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
       `,
       encoding: 'utf8',
     })
@@ -104,6 +106,14 @@ function verifySqliteMigration(migrationSql: string): void {
       ),
       'disabled|1',
       '历史 enabled=false 用户迁移后回填 disabled 与状态时间',
+    )
+    expectEqual(
+      sqliteQuery(
+        databasePath,
+        `SELECT "status", "statusChangedAt" IS NULL FROM "EndUser" WHERE "id" = 'legacy-active';`,
+      ),
+      'active|1',
+      '历史 enabled=true 用户保持 active 且不写状态时间',
     )
 
     execFileSync('sqlite3', [databasePath], {
