@@ -59,7 +59,10 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
-  const redis = { del: async () => 1 } as never
+  const redis = {
+    del: async () => 1,
+    setJsonIfVersionNotOlder: async () => 'stored' as const,
+  } as never
   const auth = new AuthService(
     new JwtService({ secret: 'verify-admin-orgs-test-secret' }),
     prisma,

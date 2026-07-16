@@ -94,7 +94,7 @@ export class InitialPhoneBindService {
     let updated: { count: number }
     try {
       updated = await this.prisma.user.updateMany({
-        where: { id: user.id, phoneEnc: null },
+        where: { id: user.id, enabled: true, deletedAt: null, phoneEnc: null },
         data: { phoneHash, phoneEnc, phoneVerifiedAt: new Date() },
       })
     } catch (error) {
@@ -110,7 +110,7 @@ export class InitialPhoneBindService {
   }
 
   private async assertPhoneAvailable(phoneHash: string, userId: string): Promise<void> {
-    const existing = await this.prisma.user.findUnique({ where: { phoneHash } })
+    const existing = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
     if (existing && existing.id !== userId) throw this.phoneAlreadyBound()
   }
 

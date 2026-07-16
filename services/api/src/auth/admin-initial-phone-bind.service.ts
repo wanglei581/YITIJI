@@ -58,7 +58,7 @@ export class AdminInitialPhoneBindService {
     const phone = normalizePhone(candidatePhone)
     if (!isValidCnMobile(phone)) throw this.unavailable()
     const phoneHash = hashPhone(phone)
-    const phoneOwner = await this.prisma.user.findUnique({ where: { phoneHash } })
+    const phoneOwner = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
     if (phoneOwner) throw this.unavailable()
 
     const bindTicket = randomUUID()
@@ -157,6 +157,7 @@ export class AdminInitialPhoneBindService {
               id: userId,
               role: 'admin',
               enabled: true,
+              deletedAt: null,
               phoneHash: null,
               phoneEnc: null,
               phoneVerifiedAt: null,
@@ -210,6 +211,7 @@ export class AdminInitialPhoneBindService {
       !user ||
       user.role !== 'admin' ||
       !user.enabled ||
+      user.deletedAt !== null ||
       user.phoneHash !== null ||
       user.phoneEnc !== null ||
       user.phoneVerifiedAt !== null

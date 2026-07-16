@@ -10,6 +10,7 @@
  * 6. 机构停用后 partner 登录失败。
  * 7. 忘记密码验证码重置后旧 token 立即失效。
  * 8. 响应不含明文手机号或验证码。
+ * 9. 墓碑账号无法通过登录、改密、绑手机号或陈旧会话缓存重新获得访问。
  *
  * 运行时总是自建并清理 OS 临时 SQLite，不读取或写入调用方的 DATABASE_URL。
  */
@@ -324,6 +325,7 @@ function createIsolatedVerificationDatabase(): { cleanup: () => void } {
         "phoneVerifiedAt" DATETIME,
         "tokenVersion" INTEGER NOT NULL DEFAULT 0,
         "lastLoginAt" DATETIME,
+        "deletedAt" DATETIME,
         "enabled" BOOLEAN NOT NULL DEFAULT true,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -503,6 +505,20 @@ async function main() {
         phoneVerifiedAt: new Date(),
       },
     })
+    const deletedPartner = await prisma.user.create({
+      data: {
+        username: `via_deleted_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        name: '已移除合作机构账号',
+        role: 'partner',
+        orgId,
+        enabled: true,
+        deletedAt: new Date(),
+        phoneHash: hashPhone(phone('136', 4)),
+        phoneEnc: encryptPhone(phone('136', 4)),
+        phoneVerifiedAt: new Date(),
+      },
+    })
     await prisma.user.create({
       data: {
         username: `via_unverified_${suffix}`,
@@ -560,6 +576,42 @@ async function main() {
 
     await expectCode(() => auth.login(unverifiedPhone, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '3. 未验证手机号不能密码登录')
     await expectCode(() => auth.login(verified.username, passwordV1, 'admin'), 'AUTH_LOGIN_FAILED', '4. partner 账号不能登录 admin portal')
+
+    await expectCode(
+      () => auth.login(deletedPartner.username, passwordV1, 'partner'),
+      'AUTH_LOGIN_FAILED',
+      '4a. 墓碑账号不能密码登录',
+    )
+    await expectCode(
+      () => auth.changePassword(deletedPartner.id, passwordV1, passwordV2),
+      'AUTH_SESSION_INVALID',
+      '4b. 墓碑账号不能自助改密',
+    )
+    const deletedBindPhone = phone('135', 5)
+    await auth.sendPhoneBindCode(deletedBindPhone, '127.0.0.1')
+    const deletedBindCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(deletedBindPhone)}`)
+    if (!deletedBindCode) fail('4c. 墓碑账号手机号绑定验证缺少 OTP 夹具')
+    await expectCode(
+      () => auth.verifyAndBindPhone(deletedPartner.id, deletedBindPhone, deletedBindCode),
+      'AUTH_SESSION_INVALID',
+      '4c. 墓碑账号不能写回手机号',
+    )
+    const deletedToken = jwt.sign({ sub: deletedPartner.id, role: 'partner', orgId, ver: 0 })
+    const deletedCacheKey = `internal:session-state:${deletedPartner.id}`
+    await redis.setEx(deletedCacheKey, 60, JSON.stringify({
+      userId: deletedPartner.id,
+      role: 'partner',
+      orgId,
+      enabled: true,
+      tokenVersion: 0,
+      deletedAt: null,
+      orgEnabled: true,
+    }))
+    await expectCode(
+      () => guard.canActivate(mockCtx(`Bearer ${deletedToken}`)),
+      'AUTH_TOKEN_INVALID',
+      '4d. Redis 残留可用 Partner 缓存不能复活墓碑账号',
+    )
 
     await auth.sendSmsCode({ phone: verifiedPhone, purpose: 'login', portal: 'partner' }, '127.0.0.1')
     const loginCode = await redis.get(`internal:sms:code:login:${hashPhone(verifiedPhone)}`)

@@ -544,7 +544,13 @@ export class AdminOrgsService {
             payloadJson: JSON.stringify({ accountId: account.id }),
           },
         })
-        return { id: account.id, tokenVersion: account.tokenVersion + 1, deletedAt }
+        return {
+          id: account.id,
+          role: account.role,
+          orgId: account.orgId,
+          tokenVersion: account.tokenVersion + 1,
+          deletedAt,
+        }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -552,8 +558,7 @@ export class AdminOrgsService {
         timeout: 10_000,
       },
     ))
-    // Task 3 会把这里升级为写入高版本的禁用缓存状态；本任务先失效现有会话缓存。
-    await this.invalidateAccountSession(deleted.id)
+    await this.publishDeletedSessionState(deleted)
     return { success: true }
   }
 
@@ -665,6 +670,38 @@ export class AdminOrgsService {
 
   private async invalidateAccountSession(userId: string): Promise<void> {
     await this.redis.del(this.sessionStateKey(userId))
+  }
+
+  /**
+   * 写入高版本禁用状态而非只删除缓存，避免晚到的旧 Guard 写回可用会话。
+   * Redis 故障不回滚已经提交的墓碑；Guard 会回源数据库并失败关闭。
+   */
+  private async publishDeletedSessionState(user: {
+    id: string
+    role: string
+    orgId: string | null
+    tokenVersion: number
+    deletedAt: Date
+  }): Promise<void> {
+    try {
+      await this.redis.setJsonIfVersionNotOlder(
+        this.sessionStateKey(user.id),
+        60,
+        JSON.stringify({
+          userId: user.id,
+          role: user.role,
+          orgId: user.orgId,
+          enabled: false,
+          tokenVersion: user.tokenVersion,
+          deletedAt: user.deletedAt.toISOString(),
+          orgEnabled: false,
+        }),
+        user.tokenVersion,
+      )
+    } catch {
+      await this.invalidateAccountSession(user.id).catch(() => undefined)
+      this.logger.warn(`account deletion session state publish failed: userId=${user.id}`)
+    }
   }
 
   private async invalidateOrgSessions(orgId: string): Promise<void> {

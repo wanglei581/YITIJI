@@ -21,6 +21,7 @@ interface CachedSessionState {
   orgId: string | null
   enabled: boolean
   tokenVersion: number
+  deletedAt: string | null
   orgEnabled: boolean | null
 }
 
@@ -71,7 +72,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const state = await this.loadSessionState(payload.sub)
-    if (!state || !state.enabled || payload.ver !== state.tokenVersion) {
+    if (!state || state.deletedAt !== null || !state.enabled || payload.ver !== state.tokenVersion) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_TOKEN_INVALID', message: 'Token 无效或已过期' },
       })
@@ -99,13 +100,24 @@ export class JwtAuthGuard implements CanActivate {
     const cached = await this.redis.get(cacheKey)
     if (cached) {
       const parsed = this.parseSessionState(cached)
-      if (parsed) return parsed
+      if (parsed) {
+        if (parsed.role !== 'partner') return parsed
+        // Partner 缓存命中也必须回源，避免 Redis 残留把已删除账号短暂复活。
+        return this.loadSessionStateFromDatabase(userId, cacheKey)
+      }
       await this.redis.del(cacheKey)
     }
 
+    return this.loadSessionStateFromDatabase(userId, cacheKey)
+  }
+
+  private async loadSessionStateFromDatabase(
+    userId: string,
+    cacheKey: string,
+  ): Promise<CachedSessionState | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, orgId: true, enabled: true, tokenVersion: true },
+      select: { id: true, role: true, orgId: true, enabled: true, tokenVersion: true, deletedAt: true },
     })
     if (!user) return null
 
@@ -124,6 +136,7 @@ export class JwtAuthGuard implements CanActivate {
       orgId: user.orgId,
       enabled: user.enabled,
       tokenVersion: user.tokenVersion,
+      deletedAt: user.deletedAt?.toISOString() ?? null,
       orgEnabled,
     }
     const writeResult = await this.redis.setJsonIfVersionNotOlder(
@@ -134,7 +147,8 @@ export class JwtAuthGuard implements CanActivate {
     )
     if (writeResult === 'stale') {
       const latest = await this.redis.get(cacheKey)
-      return latest ? this.parseSessionState(latest) : null
+      const parsed = latest ? this.parseSessionState(latest) : null
+      return parsed ?? state
     }
     return state
   }
@@ -142,7 +156,12 @@ export class JwtAuthGuard implements CanActivate {
   private parseSessionState(raw: string): CachedSessionState | null {
     try {
       const parsed = JSON.parse(raw) as Partial<CachedSessionState>
-      if (typeof parsed.userId !== 'string' || typeof parsed.tokenVersion !== 'number') return null
+      if (
+        typeof parsed.userId !== 'string'
+        || typeof parsed.tokenVersion !== 'number'
+        || typeof parsed.enabled !== 'boolean'
+        || (typeof parsed.deletedAt !== 'string' && parsed.deletedAt !== null)
+      ) return null
       return parsed as CachedSessionState
     } catch {
       return null
