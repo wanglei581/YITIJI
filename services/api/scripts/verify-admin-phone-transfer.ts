@@ -31,6 +31,7 @@ import {
   prepareIsolatedDatabase,
   RecordingAudit,
 } from './support/internal-auth-verify-harness'
+import { verifyAdminPhoneTransferSecurityCases } from './support/admin-phone-transfer-security-cases'
 
 process.env['JWT_SECRET'] ||= randomBytes(32).toString('hex')
 process.env['SECRET_ENCRYPTION_KEY'] ||= randomBytes(32).toString('hex')
@@ -142,7 +143,7 @@ function createService(
     prisma?: PrismaService
     redis?: MemoryRedis
     otp?: InternalOtpService
-    audit?: RecordingAudit
+    audit?: AuditService | RecordingAudit
   } = {},
 ): AdminPhoneTransferContract {
   return new context.Service(
@@ -718,6 +719,12 @@ async function main(): Promise<void> {
     await verifyDoubleVerifyAndAdminCompetition(context)
     await verifySourceChangesAndTriggerRollback(context)
     await verifyCancelAudit(context)
+    await verifyAdminPhoneTransferSecurityCases({
+      ...context,
+      createService: (options) => createService(context, options),
+      createAdmin: (label, tokenVersion, id) => createAdmin(context, label, tokenVersion, id),
+      createPartner: (label, phone, tokenVersion) => createPartner(context, label, phone, tokenVersion),
+    })
     await verifyCacheFailureConverges(context)
     console.log('\nAdmin–Partner 手机号安全转移契约验证完成。')
   } finally {

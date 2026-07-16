@@ -191,6 +191,10 @@ export class MemoryRedis {
   raw(key: string): string | null {
     return this.read(key)
   }
+
+  keysWithPrefix(prefix: string): string[] {
+    return [...this.store.keys()].filter((key) => key.startsWith(prefix) && this.read(key) !== null)
+  }
 }
 
 export type RecordedAudit = {
