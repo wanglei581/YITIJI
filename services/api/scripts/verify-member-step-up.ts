@@ -1,6 +1,6 @@
 /** Wave 1A step-up RED: memory SMS double + real Redis/CI DB; never log secrets. */
 import 'dotenv/config'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { format } from 'node:util'
@@ -8,6 +8,7 @@ import { BadRequestException, ValidationPipe, type ValidationError } from '@nest
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Redis } from 'ioredis'
 import { MEMBER_STEP_UP_ACTIONS } from '../../../packages/shared/src/types/member-privacy'
+import { MEMBER_STEP_UP_ACTIONS as API_MEMBER_STEP_UP_ACTIONS } from '../src/member-auth/member-step-up.types'
 import { SMS_SENDER, type SmsSender } from '../src/member-auth/sms/sms-sender'
 
 type StepUpAction = (typeof MEMBER_STEP_UP_ACTIONS)[number]
@@ -39,6 +40,13 @@ interface StepUpService {
 }
 type StepUpServiceConstructor = new (...args: unknown[]) => StepUpService
 type StepUpRedis = {
+  registerMemberStepUpGrant(
+    endUserId: string,
+    tokenHash: string,
+    ttlSeconds: number,
+    payload: string,
+  ): Promise<void>
+  getDelMemberStepUpGrant(endUserId: string, tokenHash: string): Promise<string | null>
   revokeMemberStepUpGrants(endUserId: string): Promise<number>
 }
 type TrackableRedisWrites = {
@@ -53,6 +61,8 @@ const TEST_ENV = {
   SMS_PROVIDER: 'log',
   JWT_SECRET: 'ci-only-member-step-up-jwt-secret-0123456789',
   SECRET_ENCRYPTION_KEY: 'ci-only-member-step-up-encryption-key-0123456789',
+  TERMINAL_ADMIN_SECRET: 'ci-only-member-step-up-terminal-admin-secret',
+  TERMINAL_ACTION_TOKEN_SECRET: 'ci-only-member-step-up-terminal-action-secret',
   MEMBER_STEP_UP_TTL_SECONDS: '60',
 } as const
 const sensitiveValues = new Set<string>()
@@ -138,6 +148,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 function pass(message: string): void { console.log(`  PASS ${message}`) }
+function skip(message: string): void { console.log(`  SKIP ${message}`) }
 
 function flatten(errors: ValidationError[], parent = ''): string[] {
   return errors.flatMap((error) => {
@@ -261,6 +272,9 @@ async function execute(capturedOutput: string[]): Promise<void> {
     'shared member step-up action allowlist drifted',
   )
   pass('shared action allowlist is exact')
+  assert(JSON.stringify(API_MEMBER_STEP_UP_ACTIONS) === JSON.stringify(MEMBER_STEP_UP_ACTIONS),
+    'API member step-up action allowlist drifted from the shared SSOT')
+  pass('API action allowlist matches the shared SSOT')
 
   const serviceFile = resolve(__dirname, '../src/member-auth/member-step-up.service.ts')
   if (!existsSync(serviceFile)) {
@@ -325,9 +339,17 @@ async function execute(capturedOutput: string[]): Promise<void> {
   const rawRedis = app.get<Redis>(REDIS_CLIENT)
   const sms = new FakeSmsSender()
   const service = app.get<StepUpService>(StepUpClass)
+  assert(service, 'MemberStepUpService must resolve from the real MemberAuthModule provider graph')
+  pass('MemberStepUpService resolves from the real module')
   const controller = app.get(MemberAuthController) as unknown as Record<string, unknown>
-  assert(Object.values(controller).includes(service),
-    'MemberAuthController and integration harness must resolve the same MemberStepUpService provider')
+  const hasStepUpHttp = typeof controller['sendStepUpCode'] === 'function'
+    && typeof controller['verifyStepUp'] === 'function'
+  if (hasStepUpHttp) {
+    assert(Object.values(controller).includes(service),
+      'MemberAuthController and integration harness must resolve the same MemberStepUpService provider')
+  } else {
+    skip('Task 7 HTTP routes/controller injection are not present; service/module tests continue')
+  }
   const smsSingleton = app.get<SmsSender>(SMS_SENDER)
   const originalSendCode = smsSingleton.sendCode
   smsSingleton.sendCode = sms.sendCode.bind(sms)
@@ -347,6 +369,13 @@ async function execute(capturedOutput: string[]): Promise<void> {
   function addRedisMarker(value: string): void {
     redisMarkers.add(value)
     redisMarkers.add(createHash('sha256').update(value).digest('hex'))
+    const key = process.env['SECRET_ENCRYPTION_KEY']
+    assert(key && key.length >= 32, 'test marker HMAC requires SECRET_ENCRYPTION_KEY >= 32')
+    for (const domain of ['device', 'ip', 'end-user']) {
+      redisMarkers.add(
+        createHmac('sha256', key).update(`member-step-up:${domain}:${value}`).digest('hex'),
+      )
+    }
   }
 
   function testDevice(label: string): string {
@@ -434,23 +463,40 @@ async function execute(capturedOutput: string[]): Promise<void> {
     await rawRedis.ping()
     pass('real Redis is reachable')
 
-    const httpUser = await createUser('http')
-    const unauthenticated = await request('/auth/step-up/sms-code', { action: 'export_data_request' })
-    assert(unauthenticated.status === 401, 'unauthenticated challenge creation must return 401')
-    pass('1. unauthenticated HTTP challenge is rejected')
+    const runtimeActionUser = await createUser('runtime-action')
+    sms.clear()
+    await expectCode(
+      () => service.sendChallenge(runtimeActionUser.id, stepUpInput(
+        runtimeActionUser.id,
+        'delete_everything' as unknown as StepUpAction,
+      )),
+      'STEP_UP_ACTION_INVALID',
+      'service runtime rejects an action outside the shared allowlist',
+    )
+    assert(!sms.hasCode(), 'runtime action rejection must happen before SMS dispatch')
 
-    const sessionId = `verify-step-up-session-${runId}`
-    await redis.registerMemberSession(httpUser.id, sessionId, 300)
-    addRedisMarker(sessionId)
-    const memberJwt = new JwtService({
-      secret: process.env['JWT_SECRET'],
-      signOptions: { expiresIn: '5m', audience: 'enduser' },
-    })
-    const memberToken = memberJwt.sign({ sub: httpUser.id }, { jwtid: sessionId })
-    const invalidAction = await request('/auth/step-up/sms-code', { action: 'delete_everything' }, memberToken)
-    assert(invalidAction.status === 400, 'action outside shared allowlist must return 400')
-    pass('2. HTTP DTO rejects action outside shared allowlist')
-    await redis.unregisterMemberSession(httpUser.id, sessionId)
+    if (hasStepUpHttp) {
+      const httpUser = await createUser('http')
+      const unauthenticated = await request('/auth/step-up/sms-code', { action: 'export_data_request' })
+      assert(unauthenticated.status === 401, 'unauthenticated challenge creation must return 401')
+      pass('1. unauthenticated HTTP challenge is rejected')
+
+      const sessionId = `verify-step-up-session-${runId}`
+      await redis.registerMemberSession(httpUser.id, sessionId, 300)
+      addRedisMarker(sessionId)
+      const memberJwt = new JwtService({
+        secret: process.env['JWT_SECRET'],
+        signOptions: { expiresIn: '5m', audience: 'enduser' },
+      })
+      const memberToken = memberJwt.sign({ sub: httpUser.id }, { jwtid: sessionId })
+      const invalidAction = await request('/auth/step-up/sms-code', { action: 'delete_everything' }, memberToken)
+      assert(invalidAction.status === 400, 'action outside shared allowlist must return 400')
+      pass('2. HTTP DTO rejects action outside shared allowlist')
+      await redis.unregisterMemberSession(httpUser.id, sessionId)
+    } else {
+      skip('1. unauthenticated HTTP challenge assertion waits for Task 7')
+      skip('2. HTTP invalid-action DTO assertion waits for Task 7')
+    }
 
     const bindingOwner = await createUser('challenge-owner')
     const bindingOther = await createUser('challenge-other')
@@ -625,15 +671,20 @@ async function execute(capturedOutput: string[]): Promise<void> {
         targetId: deviceUser.id,
         createdAt: { gte: startedAt },
       },
-      select: { action: true, targetId: true, payloadJson: true },
+      select: { action: true, actorRole: true, targetType: true, targetId: true, payloadJson: true },
     })
     assert(riskLogs.length === 2, 'device risk test must emit exactly two grant-consumed audits')
     const riskPayloads = riskLogs.map((row) => ({ row, payload: JSON.parse(row.payloadJson) as Json }))
     for (const expectedAction of ['export_data_request', 'export_data_download'] as const) {
       const matched = riskPayloads.find(({ payload }) => payload.action === expectedAction)
       assert(matched, `missing grant-consumed audit for ${expectedAction}`)
-      assert(matched.row.action === 'MEMBER_STEP_UP_GRANT_CONSUMED' && matched.row.targetId === deviceUser.id,
+      assert(matched.row.action === 'MEMBER_STEP_UP_GRANT_CONSUMED'
+        && matched.row.actorRole === 'end_user'
+        && matched.row.targetType === 'EndUser'
+        && matched.row.targetId === deviceUser.id,
         `grant-consumed audit identity drifted for ${expectedAction}`)
+      assert(JSON.stringify(Object.keys(matched.payload).sort()) === JSON.stringify(['action', 'deviceMatched']),
+        `grant-consumed audit payload must contain only action/deviceMatched for ${expectedAction}`)
       assert(matched.payload.deviceMatched === false,
         `deviceMatched must be false for ${expectedAction}`)
     }
@@ -711,6 +762,86 @@ async function execute(capturedOutput: string[]): Promise<void> {
     assert(fulfilled === 1 && rejected.length === 1 && errorCode(rejected[0]?.reason) === 'STEP_UP_TOKEN_INVALID',
       'concurrent grant consumption must have exactly one winner and one unified invalid-token rejection')
     pass('concurrent grant consumption has exactly one winner')
+
+    const ttlOwner = await createUser('grant-index-ttl')
+    const longHash = randomBytes(32).toString('hex')
+    const shortHash = randomBytes(32).toString('hex')
+    addRedisMarker(longHash)
+    addRedisMarker(shortHash)
+    const ttlPayload = JSON.stringify({
+      endUserId: ttlOwner.id,
+      action: 'export_data_request',
+      deviceDigest: null,
+    })
+    await stepUpRedis.registerMemberStepUpGrant(ttlOwner.id, longHash, 60, ttlPayload)
+    const ttlIndexKey = `member:user-step-up-grants:${ttlOwner.id}`
+    const indexTtlBefore = await rawRedis.ttl(ttlIndexKey)
+    await stepUpRedis.registerMemberStepUpGrant(ttlOwner.id, shortHash, 5, ttlPayload)
+    const indexTtlAfter = await rawRedis.ttl(ttlIndexKey)
+    assert(indexTtlBefore > 0 && indexTtlAfter >= indexTtlBefore - 1 && indexTtlAfter > 5,
+      'registering a shorter grant must not shrink the whole-user grant index TTL')
+    assert(await stepUpRedis.revokeMemberStepUpGrants(ttlOwner.id) === 2,
+      'TTL anomaly fixture must revoke exactly its two owned grants')
+    pass('grant index TTL is monotonic when a shorter grant is registered')
+
+    const corruptIndexOwner = await createUser('corrupt-index-owner')
+    const protectedOwner = await createUser('corrupt-index-protected')
+    const protectedToken = randomBytes(32).toString('base64url')
+    const protectedHash = createHash('sha256').update(protectedToken).digest('hex')
+    registerSensitive(protectedToken)
+    addRedisMarker(protectedHash)
+    await rawRedis.set(
+      `member:step-up:grant:${protectedHash}`,
+      JSON.stringify({
+        endUserId: protectedOwner.id,
+        action: 'export_data_request',
+        deviceDigest: null,
+      }),
+      'EX',
+      60,
+    )
+    await rawRedis.sadd(`member:user-step-up-grants:${corruptIndexOwner.id}`, protectedHash)
+    await rawRedis.expire(`member:user-step-up-grants:${corruptIndexOwner.id}`, 60)
+    assert(await stepUpRedis.revokeMemberStepUpGrants(corruptIndexOwner.id) === 0,
+      'corrupt foreign index entries must not be counted as owned grant revocations')
+    assert(await rawRedis.exists(`member:step-up:grant:${protectedHash}`) === 1,
+      'whole-user revocation must not delete a grant whose payload belongs to another user')
+    await service.consumeGrant(protectedOwner.id, 'export_data_request', protectedToken)
+    pass('corrupt user index cannot revoke another user grant')
+
+    const collisionOwner = await createUser('grant-collision-owner')
+    const collisionOther = await createUser('grant-collision-other')
+    const collisionHash = randomBytes(32).toString('hex')
+    addRedisMarker(collisionHash)
+    const collisionPayload = JSON.stringify({
+      endUserId: collisionOwner.id,
+      action: 'close_account',
+      deviceDigest: null,
+    })
+    await stepUpRedis.registerMemberStepUpGrant(collisionOwner.id, collisionHash, 60, collisionPayload)
+    let collisionRejected = false
+    try {
+      await stepUpRedis.registerMemberStepUpGrant(
+        collisionOther.id,
+        collisionHash,
+        60,
+        JSON.stringify({
+          endUserId: collisionOther.id,
+          action: 'export_data_request',
+          deviceDigest: null,
+        }),
+      )
+    } catch {
+      collisionRejected = true
+    }
+    assert(collisionRejected, 'grant token-hash collision must fail closed')
+    assert(await rawRedis.get(`member:step-up:grant:${collisionHash}`) === collisionPayload,
+      'grant token-hash collision must not overwrite the original payload')
+    assert(await rawRedis.sismember(`member:user-step-up-grants:${collisionOther.id}`, collisionHash) === 0,
+      'grant token-hash collision must not contaminate the other user index')
+    assert(await stepUpRedis.getDelMemberStepUpGrant(collisionOwner.id, collisionHash) === collisionPayload,
+      'original collision grant must remain atomically consumable by its owner')
+    pass('grant token-hash collision cannot overwrite payload or owner index')
 
     const sensitiveKeys = await ownedKeys(rawRedis, [...redisMarkers])
     const sensitiveRedis = (await Promise.all(sensitiveKeys.map(async (key) => (

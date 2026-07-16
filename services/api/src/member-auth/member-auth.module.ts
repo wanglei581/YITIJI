@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import { MemberClosureReceiptGuard } from '../common/guards/member-closure-receipt.guard'
 import { TerminalsModule } from '../terminals/terminals.module'
 import { MemberAuthController } from './member-auth.controller'
 import { MemberAuthService } from './member-auth.service'
 import { MemberQrLoginService } from './member-qr-login.service'
+import { MemberStepUpService } from './member-step-up.service'
 import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
 
 /**
@@ -35,10 +37,12 @@ import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
   controllers: [MemberAuthController],
   providers: [
     MemberAuthService,
+    MemberStepUpService,
     MemberQrLoginService,
     EndUserAuthGuard,
+    MemberClosureReceiptGuard,
     { provide: SMS_SENDER, useFactory: createSmsSender },
   ],
-  exports: [EndUserAuthGuard],
+  exports: [EndUserAuthGuard, MemberClosureReceiptGuard, MemberStepUpService],
 })
 export class MemberAuthModule {}

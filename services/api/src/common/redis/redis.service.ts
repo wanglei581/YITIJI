@@ -156,6 +156,106 @@ export class RedisService implements OnModuleDestroy {
     return Number(result)
   }
 
+  async registerMemberStepUpGrant(
+    endUserId: string,
+    tokenHash: string,
+    ttlSeconds: number,
+    payload: string,
+  ): Promise<void> {
+    const result = await this.client.eval(
+      `
+      if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
+
+      local indexType = redis.call('TYPE', KEYS[2])
+      if type(indexType) == 'table' then indexType = indexType.ok end
+      if indexType ~= 'none' and indexType ~= 'set' then return -1 end
+
+      local grantTtl = tonumber(ARGV[3])
+      if not grantTtl or grantTtl <= 0 then return -1 end
+
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', grantTtl)
+      redis.call('SADD', KEYS[2], ARGV[2])
+      local currentIndexTtl = redis.call('TTL', KEYS[2])
+      if currentIndexTtl < 0 or currentIndexTtl < grantTtl then
+        redis.call('EXPIRE', KEYS[2], grantTtl)
+      end
+      return 1
+      `,
+      2,
+      `member:step-up:grant:${tokenHash}`,
+      `member:user-step-up-grants:${endUserId}`,
+      payload,
+      tokenHash,
+      ttlSeconds,
+    )
+    if (result !== 1) throw new Error('Member step-up grant registration failed')
+  }
+
+  async getDelMemberStepUpGrant(endUserId: string, tokenHash: string): Promise<string | null> {
+    const result = await this.client.eval(
+      `
+      local function removeFromIndex(indexKey)
+        local removed = redis.pcall('SREM', indexKey, ARGV[1])
+        if type(removed) == 'table' and removed.err then return end
+
+        local size = redis.pcall('SCARD', indexKey)
+        if type(size) == 'number' and size == 0 then
+          redis.call('DEL', indexKey)
+        end
+      end
+
+      local value = redis.call('GET', KEYS[1])
+      if value then redis.call('DEL', KEYS[1]) end
+
+      removeFromIndex(KEYS[2])
+      if not value then return nil end
+
+      local decodedOk, decoded = pcall(cjson.decode, value)
+      if decodedOk and type(decoded) == 'table'
+        and type(decoded.endUserId) == 'string' and decoded.endUserId ~= '' then
+        local ownerIndexKey = 'member:user-step-up-grants:' .. decoded.endUserId
+        removeFromIndex(ownerIndexKey)
+      end
+      return value
+      `,
+      2,
+      `member:step-up:grant:${tokenHash}`,
+      `member:user-step-up-grants:${endUserId}`,
+      tokenHash,
+    )
+    return typeof result === 'string' ? result : null
+  }
+
+  async revokeMemberStepUpGrants(endUserId: string): Promise<number> {
+    const result = await this.client.eval(
+      `
+      local grants = redis.pcall('SMEMBERS', KEYS[1])
+      if grants.err then
+        redis.call('DEL', KEYS[1])
+        return 0
+      end
+
+      local deleted = 0
+      for _, tokenHash in ipairs(grants) do
+        local grantKey = 'member:step-up:grant:' .. tokenHash
+        local payload = redis.pcall('GET', grantKey)
+        if type(payload) == 'string' then
+          local decodedOk, decoded = pcall(cjson.decode, payload)
+          if decodedOk and type(decoded) == 'table' and decoded.endUserId == ARGV[1] then
+            deleted = deleted + redis.call('DEL', grantKey)
+          end
+        end
+      end
+      redis.call('DEL', KEYS[1])
+      return deleted
+      `,
+      1,
+      `member:user-step-up-grants:${endUserId}`,
+      endUserId,
+    )
+    return Number(result)
+  }
+
   /**
    * 仅当缓存中不存在更高 tokenVersion 时写入 JSON 会话状态。
    * 防止并发 Guard 在密码变更后把旧版本冷缓存重新写回。
