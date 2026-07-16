@@ -11,9 +11,10 @@
  *   6.  重置密码:旧密码失效,新密码可登录。
  *   7.  用户名冲突 → USERNAME_TAKEN。
  *   8.  计数:accounts 计数与真实行数一致。
- *   9.  审计:org.create / org.update / org.disable / org.enable / org.account.* 全落 AuditLog,
+ *   9.  安全移除:仅移除合作机构成员账号,必须保留至少一个有效账号,账号墓碑化且可复用原用户名/手机号。
+ *   10. 审计:org.create / org.update / org.disable / org.enable / org.account.* 全落 AuditLog,
  *       且审计 payload 内绝不出现明文密码。
- *   10. 机构类型矩阵:type → sceneTemplate → enabledModules 写路径硬约束;历史不合规数据
+ *   11. 机构类型矩阵:type → sceneTemplate → enabledModules 写路径硬约束;历史不合规数据
  *       grandfather,无关字段编辑 / 读取 / 登录 / 启停不被误伤。
  *
  * 运行:pnpm --filter @ai-job-print/api verify:admin-orgs
@@ -84,6 +85,8 @@ async function main() {
   let legacyPassword = ''
 
   const cleanup = async () => {
+    if (orgId) await prisma.user.deleteMany({ where: { orgId } })
+    if (legacyOrgId) await prisma.user.deleteMany({ where: { orgId: legacyOrgId } })
     await prisma.user.deleteMany({ where: { username: { startsWith: `vao_partner_${suffix}` } } })
     await prisma.organization.deleteMany({ where: { name: { contains: suffix } } }).catch(() => undefined)
     if (orgId) await prisma.organization.delete({ where: { id: orgId } }).catch(() => undefined)
@@ -194,22 +197,102 @@ async function main() {
       pass('8. accounts 计数与真实行数一致')
     }
 
-    // ── 9. 审计 ────────────────────────────────────────────────────────────
+    // ── 9. 合作机构成员账号安全移除 ─────────────────────────────────────────
+    {
+      const removableUsername = `${username}_remove`
+      const removablePhone = `136${Date.now().toString().slice(-8)}`
+      const removable = await svc.createAccount(orgId, {
+        username: removableUsername,
+        password: 'RemovePass123',
+        name: '待移除账号',
+        phone: removablePhone,
+      }, admin)
+
+      await svc.deleteAccount(orgId, removable.id, admin)
+
+      const detail = await svc.getOrgDetail(orgId)
+      if (detail.accounts.some((account) => account.id === removable.id) || detail.counts.accounts !== 2) {
+        fail('9a. 已移除账号仍出现在机构详情或账号计数中')
+      }
+      const listEntry = (await svc.listOrgs()).find((org) => org.id === orgId)
+      if (listEntry?.counts.accounts !== 2) fail('9a. 已移除账号仍计入机构列表账号数')
+
+      const tombstone = await prisma.user.findUnique({ where: { id: removable.id } })
+      if (
+        !tombstone
+        || !tombstone.deletedAt
+        || tombstone.enabled
+        || tombstone.username !== `deleted:${removable.id}`
+        || tombstone.name !== '已移除账号'
+        || tombstone.phoneHash !== null
+        || tombstone.phoneEnc !== null
+        || tombstone.phoneVerifiedAt !== null
+        || tombstone.lastLoginAt !== null
+        || tombstone.tokenVersion !== 1
+        || await bcrypt.compare('RemovePass123', tombstone.passwordHash)
+      ) {
+        fail('9b. 已移除账号未按墓碑规则清理敏感身份信息并撤销访问权')
+      }
+
+      await expectCode(
+        () => svc.deleteAccount(orgId, removable.id, admin),
+        'ACCOUNT_NOT_FOUND',
+        '9c. 已移除账号不可重复移除',
+      )
+
+      const reused = await svc.createAccount(orgId, {
+        username: removableUsername,
+        password: 'ReusedPass123',
+        name: '复用账号',
+        phone: removablePhone,
+      }, admin)
+      await svc.setAccountStatus(orgId, reused.id, 'disable', admin)
+
+      const accountsBeforeLastActiveCheck = (await svc.getOrgDetail(orgId)).accounts
+      const extraActiveAccount = accountsBeforeLastActiveCheck.find((account) => account.username === `${username}_2`)
+      if (!extraActiveAccount) fail('9d. 未找到此前创建的额外账号，无法验证最后有效账号保护')
+      await svc.setAccountStatus(orgId, extraActiveAccount.id, 'disable', admin)
+
+      const activeAccount = (await svc.getOrgDetail(orgId)).accounts.find((account) => account.username === username)
+      if (!activeAccount) fail('9d. 未找到唯一有效账号，无法验证最后有效账号保护')
+      await expectCode(
+        () => svc.deleteAccount(orgId, activeAccount.id, admin),
+        'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED',
+        '9d. 不允许移除机构最后一个有效合作账号',
+      )
+      const deletionLog = await prisma.auditLog.findFirst({
+        where: { actorId: admin.userId, action: 'org.account.delete' },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (
+        !deletionLog
+        || !deletionLog.payloadJson.includes(removable.id)
+        || deletionLog.payloadJson.includes(removableUsername)
+        || deletionLog.payloadJson.includes(removablePhone)
+      ) {
+        fail('9e. 删除审计未最小化记录账号 ID，或泄露原用户名/手机号')
+      }
+      pass('9f. 已移除账号隐藏、墓碑化并可复用用户名/手机号，删除审计不含原凭据')
+    }
+
+    // ── 10. 审计 ───────────────────────────────────────────────────────────
     {
       const logs = await prisma.auditLog.findMany({ where: { actorId: admin.userId } })
       const actions = new Set(logs.map((l) => l.action))
       for (const expected of [
         'org.create', 'org.account.create', 'org.update', 'org.disable', 'org.enable',
-        'org.account.disable', 'org.account.enable', 'org.account.reset_password',
+        'org.account.disable', 'org.account.enable', 'org.account.reset_password', 'org.account.delete',
       ]) {
-        if (!actions.has(expected)) fail(`9. 缺少审计动作 ${expected};实际: ${[...actions].join(', ')}`)
+        if (!actions.has(expected)) fail(`10. 缺少审计动作 ${expected};实际: ${[...actions].join(', ')}`)
       }
       const rawLogs = JSON.stringify(logs)
-      if (rawLogs.includes(passwordV1) || rawLogs.includes(passwordV2)) fail('9. 审计日志泄露明文密码')
-      pass('9. 8 类审计动作齐全,且审计不含明文密码')
+      if (rawLogs.includes(passwordV1) || rawLogs.includes(passwordV2)) {
+        fail('10. 审计日志泄露明文密码')
+      }
+      pass('10. 审计动作齐全,且审计不含明文密码')
     }
 
-    // ── 10. 机构类型矩阵硬约束 + grandfather 兼容 ───────────────────────────
+    // ── 11. 机构类型矩阵硬约束 + grandfather 兼容 ───────────────────────────
     {
       await expectCode(
         () => svc.createOrg(
