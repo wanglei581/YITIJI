@@ -30,7 +30,7 @@
 
 ## P0/P1：用户中心商用级闭环
 
-> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；Antigravity 重新授权后的最终聚焦复审为 `APPROVE`（98/100），Claude 给出 `WAVE0_READY: YES` / `WAVE1_PLAN_READY: YES`，均无 Critical，所有可执行 Warning 已写回计划。运行时代码尚未实施；纯文档候选基于最新 main 完成集成但尚未 push/merge。之后必须一波一分支，从干净正式候选基线新建独立 worktree，不使用当前脏工作区写运行时。
+> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；计划终审中 Antigravity（99/100）与 Claude 均 `APPROVE`，无 Critical/Warning；基于最新 main 的纯文档集成增量又由两者分别复审为 `APPROVE`，同样无 Critical/Warning。运行时代码尚未实施；纯文档候选已完成本地集成但尚未 push/merge。之后必须一波一分支，从干净正式候选基线新建独立 worktree，不使用当前脏工作区写运行时。
 
 - [x] **用户中心方案文档候选集成**：纯文档 worktree/分支已基于最新 `origin/main=6c7875592dc50cbeac1b72543d33ffb5c8d538ca`；只带入审计、产品方案、五份计划、CCG 归档和对应进度事实，并完成双模型复审。该本地分支仍未 push/merge，不代表 `origin/main` 已包含文档。
 - [ ] **Wave 0 真实表达与验证基线（当前下一步）**：严格按 `docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md` 执行。从干净正式文档候选基线新建 `codex/user-center-wave0-truth-baseline` 独立 worktree；先写失败守卫，再删除重复权益活动和不可用邮箱按钮，隐藏招聘会扫码凭证、打印套餐、AI 套餐占位；“身份切换”已不在最新 main，仅加防回归断言；现有二维码守卫已通过，仅复验且不得无故改实现/守卫；真实导出/注销上线前禁止把 `export/delete` 工单置为 completed 且禁止普通拒绝 delete；从正式 migration 重建 SQLite 验证库并与 PostgreSQL readiness 对齐，禁止为 schema 中已有的退款字段/核销表重复建迁移。不得新增用户中心首页入口。

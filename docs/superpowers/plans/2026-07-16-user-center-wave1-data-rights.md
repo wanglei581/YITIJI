@@ -426,7 +426,7 @@ const ALLOWED: Record<MemberDataRequestStatus, readonly MemberDataRequestStatus[
 }
 ```
 
-额外规则：`pending→failed` 只允许 queue enqueue/session revoke 失败的服务端补偿 CAS，不是 Admin/API 通用动作。export 生成阶段只允许 `pending→handling→ready`；只有一次性下载 response `finish` 后才能 `ready→handling(download_cleanup_pending)`，再由清理协调器写 `handling→completed`。delete 不能 `handling→ready/expired/rejected/cancelled`，进入 closing 后只允许 `handling/failed/completed`；Admin 不能写 ready/completed/expired/failed。export 的 pending/failed 可 reject，delete 的 failed 只能 retry/升级。
+额外规则：`pending→failed` 只允许 queue enqueue/session revoke 失败的服务端补偿 CAS，其中 session revoke 成因仅适用于 delete；该转换不是 Admin/API 通用动作。export 生成阶段只允许 `pending→handling→ready`；只有一次性下载 response `finish` 后才能 `ready→handling(download_cleanup_pending)`，再由清理协调器写 `handling→completed`。delete 不能 `handling→ready/expired/rejected/cancelled`，进入 closing 后只允许 `handling/failed/completed`；Admin 不能写 ready/completed/expired/failed。export 的 pending/failed 可 reject，delete 的 failed 只能 retry/升级。
 
 - [ ] 运行：
 
