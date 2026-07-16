@@ -225,8 +225,8 @@ async function main() {
     const guardNoSession = new EndUserAuthGuard(jwtOk, { get: async () => null } as never, {} as never)
     await expectGuardCode(() => guardNoSession.canActivate(mockCtx({ authorization: 'Bearer ok.token' })), 'MEMBER_SESSION_EXPIRED', '6c. 有效 token 但无 Redis 会话（含过期会话）→ 401 MEMBER_SESSION_EXPIRED')
 
-    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true }) } } as never
-    const guardOk = new EndUserAuthGuard(jwtOk, { get: async () => userA } as never, prismaEnabled)
+    const prismaActive = { endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) } } as never
+    const guardOk = new EndUserAuthGuard(jwtOk, { get: async () => userA } as never, prismaActive)
     const ctx = mockCtx({ authorization: 'Bearer ok.token' })
     const allowed = await guardOk.canActivate(ctx)
     const injected = (ctx.switchToHttp().getRequest() as { endUser?: { endUserId: string } }).endUser
