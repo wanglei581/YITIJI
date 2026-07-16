@@ -247,6 +247,31 @@ function verifyUiMutationProbes(componentSource, pageSource) {
   expect(withoutCooldownButton !== componentSource, 'cooldown button mutation setup target is missing')
   expectRejected('unknown-start return button', () => verifyCooldownReturnContract(withoutCooldownButton))
 
+  const cooldownGuardBlock = `    if (!bindTicket && cooldownSeconds > 0) {
+      setMessage({ kind: 'error', text: '发送结果暂无法确认，请等待冷却结束后再返回首次绑定。' })
+      return
+    }
+`
+  const noTicketReturnBlock = `    if (!bindTicket) {
+      clearTransferState()
+      onBack()
+      return
+    }
+`
+  const reorderedCooldownGuard = componentSource.replace(
+    `${cooldownGuardBlock}${noTicketReturnBlock}`,
+    `${noTicketReturnBlock}${cooldownGuardBlock}`,
+  )
+  expect(reorderedCooldownGuard !== componentSource, 'cooldown guard order mutation setup target is missing')
+  expectRejected('cooldown guard order', () => verifyCooldownReturnContract(reorderedCooldownGuard))
+
+  const invertedCooldownGuard = componentSource.replace(
+    'if (!bindTicket && cooldownSeconds > 0)',
+    'if (!bindTicket && cooldownSeconds <= 0)',
+  )
+  expect(invertedCooldownGuard !== componentSource, 'cooldown guard polarity mutation setup target is missing')
+  expectRejected('cooldown guard polarity', () => verifyCooldownReturnContract(invertedCooldownGuard))
+
   const withoutChangedStateMessage = componentSource.replace(
     '状态已变化，请重新开始',
     '请重新操作',

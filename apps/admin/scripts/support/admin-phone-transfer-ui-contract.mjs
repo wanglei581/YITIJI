@@ -130,6 +130,47 @@ function expect(condition, message) {
   if (!condition) throw new Error(message)
 }
 
+function unwrapParentheses(node) {
+  let current = node
+  while (ts.isParenthesizedExpression(current)) current = current.expression
+  return current
+}
+
+function isNegatedIdentifierExpression(node, name) {
+  const expression = unwrapParentheses(node)
+  return (
+    ts.isPrefixUnaryExpression(expression) &&
+    expression.operator === ts.SyntaxKind.ExclamationToken &&
+    ts.isIdentifier(expression.operand) &&
+    expression.operand.text === name
+  )
+}
+
+function isPositiveCooldownComparison(node) {
+  const expression = unwrapParentheses(node)
+  return (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.GreaterThanToken &&
+    ts.isIdentifier(unwrapParentheses(expression.left)) &&
+    unwrapParentheses(expression.left).text === 'cooldownSeconds' &&
+    ts.isNumericLiteral(unwrapParentheses(expression.right)) &&
+    Number(unwrapParentheses(expression.right).text) === 0
+  )
+}
+
+function isActiveUnknownStartCooldown(node) {
+  const expression = unwrapParentheses(node)
+  if (!ts.isBinaryExpression(expression) || expression.operatorToken.kind !== ts.SyntaxKind.AmpersandAmpersandToken) {
+    return false
+  }
+  const left = unwrapParentheses(expression.left)
+  const right = unwrapParentheses(expression.right)
+  return (
+    (isNegatedIdentifierExpression(left, 'bindTicket') && isPositiveCooldownComparison(right)) ||
+    (isPositiveCooldownComparison(left) && isNegatedIdentifierExpression(right, 'bindTicket'))
+  )
+}
+
 export function verifyCooldownReturnContract(componentSource) {
   const sourceFile = parseTsx(componentSource, 'AdminPhoneTransferCard.tsx')
   const component = findNamedFunction(sourceFile, 'AdminPhoneTransferCard')
@@ -150,20 +191,26 @@ export function verifyCooldownReturnContract(componentSource) {
   expect(cooldownButtons.length === 1, 'only the identity return button must honor the unknown-start cooldown')
 
   let cooldownGuard
-  let noTicketReturn
+  const noTicketReturns = []
   visit(returnToInitialBind, (node) => {
     if (!ts.isIfStatement(node) || !hasNegatedIdentifier(node.expression, 'bindTicket')) return
-    const identifiers = identifiersIn(node.expression)
-    if (identifiers.has('cooldownSeconds')) cooldownGuard = node
-    if (!identifiers.has('cooldownSeconds') && callsNamed(node.thenStatement, 'onBack').length === 1) noTicketReturn = node
+    if (isActiveUnknownStartCooldown(node.expression)) cooldownGuard = node
+    if (callsNamed(node.thenStatement, 'onBack').length > 0) noTicketReturns.push(node)
   })
-  expect(cooldownGuard, 'return handler must guard an active unknown-start cooldown before the no-ticket branch')
+  expect(cooldownGuard, 'return handler must guard !bindTicket && cooldownSeconds > 0')
   expect(callsNamed(cooldownGuard.thenStatement, 'onBack').length === 0, 'cooldown guard must not switch modes')
   expect(callsNamed(cooldownGuard.thenStatement, 'clearTransferState').length === 0, 'cooldown guard must not clear cooldown state')
   expect(callsNamed(cooldownGuard.thenStatement, 'cancelAdminPhoneTransfer').length === 0, 'no-ticket cooldown must not fake remote cancel')
-  expect(noTicketReturn, 'after cooldown expiry the no-ticket branch must allow returning')
+  expect(noTicketReturns.length > 0, 'after cooldown expiry the no-ticket branch must allow returning')
+  expect(
+    noTicketReturns.every((branch) => cooldownGuard.getStart() < branch.getStart()),
+    'cooldown guard must run before every no-ticket branch that switches modes',
+  )
   const cancelCall = callsNamed(returnToInitialBind, 'cancelAdminPhoneTransfer')[0]
-  expect(cancelCall && noTicketReturn.getEnd() < cancelCall.getStart(), 'no-ticket return must occur without a remote cancel')
+  expect(
+    cancelCall && noTicketReturns.every((branch) => branch.getEnd() < cancelCall.getStart()),
+    'no-ticket return must occur without a remote cancel',
+  )
 }
 
 export function verifyUnavailableRestartContract(componentSource) {
