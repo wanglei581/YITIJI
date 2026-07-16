@@ -19,6 +19,7 @@
 - `apps/kiosk/package.json`
 - `apps/kiosk/scripts/verify-user-center-wave0.mjs`
 - `apps/kiosk/scripts/verify-profile-inkpaper-home.mjs`
+- `apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs`
 - `apps/kiosk/scripts/verify-lightflow-profile-entry.mjs`
 - `apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs`
 - `apps/kiosk/src/pages/profile/profileEntries.ts`

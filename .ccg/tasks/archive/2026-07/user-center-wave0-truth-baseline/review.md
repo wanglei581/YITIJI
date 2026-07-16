@@ -23,13 +23,12 @@
 
 ## 双模型审查
 
-- Claude 首轮为 `REJECT`，Critical 0，指出两项披露 Warning：注销工单在 Wave 1 前无终态；旧会员级批量 AI 删除被撤下。补齐文档、API 提示与权益文案后，完整复审为 `APPROVE（Critical 0 / Warning 0）`。
-- Antigravity 旧 OAuth 会话两次未产生有效报告，不计入通过；重新建立 OAuth 会话后，对完整 diff 给出 `APPROVE（98/100，Critical 0 / Warning 0）`。
-- 最终 consent 撤回测试增量：Antigravity `APPROVE（100/100，Critical 0 / Warning 0）`；Claude `APPROVE`，唯一非阻塞假设为未来 consent API 新增其他 actor 审计时需扩展清理。当前服务不写该类审计，PostgreSQL 验收库也已整体删除，故不新增假设性分支。
+- 独立规格复审和代码质量/安全复审最终均为 `APPROVE（Critical 0 / Warning 0）`；安全复审指出的 consent 真实副作用测试缺口已补齐并在 SQLite/PostgreSQL 转绿。
+- Claude 对完整最终 diff 给出 `APPROVE（Critical 0 / Warning 0）`；仅提示放行状态仍接受调用方 `auditRef` 属主线既有且已披露的 Wave 1 边界。
+- Antigravity 默认模型调用未产生有效报告，不计入通过；显式指定 `Gemini 3.5 Flash (High)` 后对完整最终 diff 给出 `APPROVE（100/100，Critical 0 / Warning 0）`。
 
 ## 已知边界
 
 - `delete` 工单在 Wave 1 前只能停留于 `pending/handling`，无完成、驳回、取消或 SLA，且当前无 Admin 前端处置页。
 - 会员级批量 AI 数据删除暂停；本人逐条 AI 记录删除和 `expiresAt` 小时级清理仍保留。
 - 既有 Admin API 对部分放行状态仍接受调用方 `auditRef`，Wave 1 必须改为服务端生成。
-- Antigravity 旧 OAuth token 已保留为权限 600 的本机备份；新会话已用只读探针和有效最终审查验证。备份未读取、未提交到仓库。

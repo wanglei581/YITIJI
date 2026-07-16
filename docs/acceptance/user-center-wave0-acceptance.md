@@ -77,6 +77,6 @@
 
 ## 六、最终审查
 
-- Claude 首轮指出“注销工单会停留待处理”和“旧批量 AI 删除被撤下”两项披露不足；补齐运营/合规边界、API 明确信息和权益文案后，完整复审为 `APPROVE（Critical 0 / Warning 0）`。
-- Antigravity 在重新建立 OAuth 会话后，对完整提交 diff 给出 `APPROVE（98/100，Critical 0 / Warning 0）`；对最终 consent 撤回真值测试增量给出 `APPROVE（100/100，Critical 0 / Warning 0）`。
-- Claude 对同一最终测试增量给出 `APPROVE`；其唯一非阻塞假设是未来 consent API 若新增其他 actor 的审计，清理条件可能需要扩展。当前实现的 `grantConsent/createDataRequest` 不产生该类审计，且最终 PostgreSQL 一次性空库验收后已整体删除，因此本轮不为未来假设增加分支。
+- 独立规格复审和代码质量/安全复审最终均为 `APPROVE（Critical 0 / Warning 0）`；安全复审发现的 consent 真实副作用测试缺口已补齐并在双数据库转绿。
+- Claude 对完整最终 diff 给出 `APPROVE（Critical 0 / Warning 0）`；仅提示放行状态仍接受调用方 `auditRef` 属主线既有且已披露的 Wave 1 边界。
+- Antigravity 默认模型调用未产生有效报告，不计入通过；显式指定 `Gemini 3.5 Flash (High)` 后对完整最终 diff 给出 `APPROVE（100/100，Critical 0 / Warning 0）`。
