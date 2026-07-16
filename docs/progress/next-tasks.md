@@ -51,9 +51,9 @@
 
 - [ ] **F1 未来受控 release 首次启用与回滚演练（须单独生产授权）**：先取得稳定 launcher 安装与 SHA-256、固定 PM2 `cwd/script args`、artifact/current 绝对根、candidate 构建和本机 PostgreSQL health 的审批；再按 production runbook 在非 current candidate 验证 manifest，执行一次受控切换与 verified-previous 回滚演练。不得回填当前 release，亦不得把本地 fixture 或 CI 通过当作生产来源一致性通过。
 
-- [ ] **P0 离线验收证据矩阵后的逐项授权**：已完成仅仓库文档范围的 [证据矩阵](../reviews/2026-07-16-p0-offline-acceptance-evidence-matrix.md)，不连接任何环境且不改变真实验收状态。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
+- [ ] **P0 离线验收证据矩阵后的逐项授权**：离线矩阵结论仅覆盖仓库文档范围，不连接任何环境且不改变真实验收状态。此前引用的证据矩阵文档尚未提交进 `main`（`git log --all` 对该路径无来源），待其所有者补入仓库后再引用；在此之前不作为可访问的仓库证据。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
 
-- [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
+- [x] **F1 future-only provenance clean-main 候选迁移（已合并，未部署）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。该候选已随 [PR #262](https://github.com/wanglei581/YITIJI/pull/262) 合入 `main`（merge commit `4b3c9887`，head `b7a365da`；`build-and-verify` 与 `postgres-readiness` 均成功）。不得将该合并、本地 fixture 或 CI 接线写作 production 来源一致性通过：未部署、未安装 launcher、未改 PM2，当前 production 继续 **NO-GO**，不得执行首次启用；首次启用与回滚演练仍须单独生产授权。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 
