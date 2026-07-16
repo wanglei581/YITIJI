@@ -255,11 +255,19 @@ async function checkControllerQuota(rootDir: string, governedRel: string, report
       grantJobFitConsent: async () => undefined, getJobFitConsentStatus: async () => undefined, revokeJobFitConsent: async () => undefined,
     }
     const redis = { get: async (key: string) => key === 'member:session:runtime-session' ? 'runtime-member' : null }
+    const prisma = {
+      endUser: {
+        findUnique: async ({ where }: { where: { id: string } }) => (
+          where.id === 'runtime-member' ? { enabled: true, status: 'active' } : null
+        ),
+      },
+    }
     const dependencies = parameterTypes.map((type) => {
       if (type.name === 'GovernedJobFitService') return governed
       if (type.name === 'JobFitService') return service
       if (type.name === 'JwtService') return jwt
       if (type.name === 'RedisService') return redis
+      if (type.name === 'PrismaService') return prisma
       return {}
     })
     const controller = new Controller(...dependencies)
