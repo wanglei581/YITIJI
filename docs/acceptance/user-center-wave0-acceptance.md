@@ -74,3 +74,9 @@
 - 未推送、合并、部署或运行 GitHub CI；未验证真实短信、线上 PostgreSQL/COS/Redis、Windows 一体机或打印。
 - 未修改 Prisma schema、migration、生产配置、密钥、账号、订单或打印任务。
 - Wave 1 必须另起独立分支；法务留存矩阵和不可逆注销开关未满足前，只能继续 fail closed。
+
+## 六、最终审查
+
+- Claude 首轮指出“注销工单会停留待处理”和“旧批量 AI 删除被撤下”两项披露不足；补齐运营/合规边界、API 明确信息和权益文案后，完整复审为 `APPROVE（Critical 0 / Warning 0）`。
+- Antigravity 在重新建立 OAuth 会话后，对完整提交 diff 给出 `APPROVE（98/100，Critical 0 / Warning 0）`；对最终 consent 撤回真值测试增量给出 `APPROVE（100/100，Critical 0 / Warning 0）`。
+- Claude 对同一最终测试增量给出 `APPROVE`；其唯一非阻塞假设是未来 consent API 若新增其他 actor 的审计，清理条件可能需要扩展。当前实现的 `grantConsent/createDataRequest` 不产生该类审计，且最终 PostgreSQL 一次性空库验收后已整体删除，因此本轮不为未来假设增加分支。
