@@ -231,6 +231,35 @@ const SIGN_STAMP_CHANGED = new Set([
   'services/api/src/storage/object-key.ts',
   'services/api/src/upload-sessions/upload-sessions.service.ts',
 ])
+// 用户中心商用闭环 Wave 0：删除未接真的入口，并让账户数据请求在真实执行器上线前
+// fail closed。这里继续使用逐文件白名单，避免因 MySettingsPage 的诚实化文案变更
+// 将同一候选分支上的计划、登录页和后端隐私守卫误报为 P0a 越界。
+const USER_CENTER_WAVE0_CHANGED = new Set([
+  '.ccg/tasks/archive/2026-07/user-center-commercial-closure-plan/plan.md',
+  '.ccg/tasks/archive/2026-07/user-center-commercial-closure-plan/requirements.md',
+  '.ccg/tasks/archive/2026-07/user-center-commercial-closure-plan/review.md',
+  '.ccg/tasks/archive/2026-07/user-center-commercial-closure-plan/task.json',
+  '.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/plan.md',
+  '.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/requirements.md',
+  '.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/review.md',
+  '.ccg/tasks/archive/2026-07/user-center-wave0-truth-baseline/task.json',
+  'apps/kiosk/scripts/verify-lightflow-4188-layout-parity.mjs',
+  'apps/kiosk/scripts/verify-lightflow-profile-entry.mjs',
+  'apps/kiosk/scripts/verify-profile-commercial-first-batch.mjs',
+  'apps/kiosk/scripts/verify-user-center-wave0.mjs',
+  'apps/kiosk/src/pages/auth/LoginPage.tsx',
+  'apps/kiosk/src/pages/auth/styles/login-form.css',
+  'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/pages/profile/profileEntries.ts',
+  'docs/product/user-center-commercial-closure-plan-2026-07.md',
+  'docs/reviews/user-center-commercial-closure-audit-2026-07-16.md',
+  'docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md',
+  'docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md',
+  'docs/superpowers/plans/2026-07-16-user-center-wave1-account-security.md',
+  'docs/superpowers/plans/2026-07-16-user-center-wave1-data-rights.md',
+  'docs/superpowers/plans/2026-07-16-user-center-wave1-ops-ui.md',
+  'services/api/scripts/verify-member-data-request-truth.ts',
+])
 
 const files = [...new Set(changedFiles())]
 // 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
@@ -245,7 +274,8 @@ const unexpectedChanged = touchesProtectedPages
         !allowedChanged.has(file) &&
         !PRINT_URL_CONTRACT_CHANGED.has(file) &&
         !JOB_FIT_M1_5_CHANGED.has(file) &&
-        !SIGN_STAMP_CHANGED.has(file),
+        !SIGN_STAMP_CHANGED.has(file) &&
+        !USER_CENTER_WAVE0_CHANGED.has(file),
     )
   : []
 if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
