@@ -27,45 +27,21 @@ function stripComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
 }
 
-function evaluateVisualTheme(expression, pathname, activeKey) {
-  try {
-    return Function('location', 'activeKey', `return (${expression})`)({ pathname }, activeKey)
-  } catch {
-    return undefined
-  }
-}
-
-console.log('\n=== Admin service-desk dashboard UI verification ===')
+console.log('\n=== Admin Inkpaper dashboard UI verification ===')
 
 check(
   packageJson.scripts?.['verify:service-desk-dashboard-ui'] ===
     'node scripts/verify-service-desk-dashboard-ui.mjs',
-  'package script points to the service-desk dashboard verifier',
+  'package script keeps the established dashboard visual verifier entry point',
 )
 
-const visualThemeExpression = layout.match(/visualTheme=\{([^}\n]+)\}/)?.[1]
-
 check(
-  /visualTheme=\{location\.pathname === ['"]\/['"] \? ['"]service-desk['"] : ['"]legacy['"]\}/.test(layout) &&
+  /visualTheme=['"]legacy['"]/.test(layout) &&
     /density=['"]compact['"]/.test(layout) &&
     count(layout, 'visualTheme=') === 1 &&
-    count(layout, 'density=') === 1,
-  'AdminLayout scopes service-desk compact density to the exact dashboard pathname',
-)
-
-const visualThemeCases = [
-  { pathname: '/', activeKey: 'dashboard', expected: 'service-desk' },
-  { pathname: '/alerts/', activeKey: 'dashboard', expected: 'legacy' },
-  { pathname: '/devices/', activeKey: 'dashboard', expected: 'legacy' },
-  { pathname: '/unknown-route', activeKey: 'dashboard', expected: 'legacy' },
-]
-check(
-  visualThemeExpression !== undefined &&
-    visualThemeCases.every(
-      ({ pathname, activeKey, expected }) =>
-        evaluateVisualTheme(visualThemeExpression, pathname, activeKey) === expected,
-    ),
-  'only / resolves to service-desk even when non-dashboard paths fall back to the dashboard nav key',
+    count(layout, 'density=') === 1 &&
+    !layout.includes('service-desk'),
+  'AdminLayout keeps the warm legacy theme at compact density on every route',
 )
 
 const loadStart = dashboard.indexOf('const load = useCallback(() => {')
@@ -163,15 +139,15 @@ check(
 )
 
 const expectedAlertCtaClass =
-  'inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(23,105,232,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]'
+  'inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]'
 const alertCta = dashboard.match(
   /<a\s+href="\/alerts"\s+className="([^"]+)"[\s\S]*?<AlertTriangleIcon[\s\S]*?处理告警 \(\{alertCount\}\)[\s\S]*?<\/a>/,
 )
 check(
   alertCta?.[1] === expectedAlertCtaClass &&
     !dashboard.includes('bg-neutral-900 px-4') &&
-    !dashboard.includes('rgba(16,48,43,0.18)'),
-  'alert primary CTA keeps its semantics and uses the exact LightFlow primary class',
+    !dashboard.includes('rgba(23,105,232,0.18)'),
+  'alert primary CTA keeps its semantics and uses the Inkpaper ink-green shadow',
 )
 
 if (failures.length > 0) {

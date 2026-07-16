@@ -1,6 +1,14 @@
 # 视觉设计参考标准
 
-> **已确认的新方向（2026-07-12）：** 用户已将三端后续视觉体系正式命名为「青序 LightFlow」；详细口径见已生效的 [青序 LightFlow 三端商用 UX 迁移设计规范](../superpowers/specs/2026-07-11-service-desk-commercial-ux-migration-design.md)。本文保留作历史通用参考；旧配色、壳层、Phase 9 与首页表皮建议不再作为未来方向，但真实状态、触控、可访问性、硬件安全和隐私底线继续有效。
+> **现行端侧边界（2026-07-15，用户确认）：**
+>
+> | 端 | 正式视觉体系 | 运行时约束 |
+> | --- | --- | --- |
+> | Kiosk 用户前台 | 青序 LightFlow 蓝白服务台 | 保留当前蓝白、触控优先和用户任务层级；`service-desk.css` 只允许在 Kiosk 导入与启用。 |
+> | Admin 管理员后台 | 暖色 Inkpaper 运营后台 | 使用 `inkpaper.css` 的米纸、墨绿、青玉、陶土、衬线标题与紧凑密度；禁止导入或启用 `service-desk.css`。 |
+> | Partner 合作机构后台 | 暖色 Inkpaper 运营后台 | 与 Admin 共用暖色 token 和运营密度，保留机构专属菜单、权限和真实业务流程；禁止导入或启用 `service-desk.css`。 |
+>
+> 前台蓝白与后台暖色并行是有意的角色分工，不是待统一的过渡状态。详细 Kiosk 迁移口径见 [青序 LightFlow Kiosk 用户前台迁移设计规范](../superpowers/specs/2026-07-11-service-desk-commercial-ux-migration-design.md)。
 > 本文档为 AI求职打印服务终端的历史视觉设计参考，不再作为所有页面必须遵守的硬性规范。
 > 适用于：kiosk（一体机前台）、admin（管理员后台）、partner（合作机构后台）
 > 当前页面 UI 可按具体任务、设计稿或用户确认方向覆盖本文档中的颜色、圆角、阴影、动效、卡片和图标建议。
@@ -78,9 +86,9 @@ Gray 900   #111827  — 重要标题
 
 | 端 | 背景色 | 说明 |
 |----|--------|------|
-| Kiosk | Gray 50 (#f9fafb) | 一体机亮色背景，不开暗黑 |
-| Admin | Gray 50 + 左侧菜单 Gray 900 | 亮色主内容 + 深色侧边栏 |
-| Partner | Gray 50 | 同 Kiosk，亮色背景 |
+| Kiosk | LightFlow 浅冰蓝画布 + 白色表面 | 用户前台保持蓝白服务台，不开暗黑 |
+| Admin | Inkpaper 米纸 `#f4f1e8` + 墨绿侧栏 `#10302b` | 桌面运营、审核和设备管理的紧凑工作台 |
+| Partner | Inkpaper 米纸 `#f4f1e8` + 墨绿侧栏 `#10302b` | 与 Admin 共用暖色体系，不复制 Kiosk 大触控卡片 |
 
 **暗黑模式参考：Admin/Partner 如支持暗黑，建议使用专门的暗色 token，避免直接用亮色反色导致对比度问题。**
 

@@ -56,24 +56,7 @@ function countObjectKey(source, key) {
   return [...source.matchAll(new RegExp(`(?:^|\\n)\\s*${key}\\s*:`, 'g'))].length
 }
 
-function evaluateVisualTheme(normalizedPathExpression, visualThemeExpression, pathname, activeKey) {
-  try {
-    const location = { pathname }
-    const normalizedPathname = Function(
-      'location',
-      `return (${normalizedPathExpression})`,
-    )(location)
-    return Function(
-      'normalizedPathname',
-      'activeKey',
-      `return (${visualThemeExpression})`,
-    )(normalizedPathname, activeKey)
-  } catch {
-    return undefined
-  }
-}
-
-console.log('\n=== Partner 青序 LightFlow 岗位管理 UI 门禁 ===')
+console.log('\n=== Partner Inkpaper 岗位管理 UI 门禁 ===')
 
 const packageJsonPath = fileURLToPath(new URL('package.json', packageRoot))
 const packageJson = JSON.parse(await read('package.json'))
@@ -90,41 +73,16 @@ const partnerLayoutProps = extractBetween(
   'headerActions=',
   'PartnerLayout route props',
 )
-const normalizedPathExpression = wrapper.match(
-  /const normalizedPathname = ([^\n]+)/,
-)?.[1]
-const visualThemeExpression = partnerLayoutProps.match(/visualTheme=\{([^}\n]+)\}/)?.[1]
 check(
-  normalizedPathExpression === "location.pathname.replace(/\\/+$/, '') || '/'" &&
-    visualThemeExpression ===
-      "normalizedPathname === '/jobs' ? 'service-desk' : 'legacy'" &&
+  partnerLayoutProps.includes('visualTheme="legacy"') &&
+    !partnerLayoutProps.includes('service-desk') &&
+    !wrapper.includes('normalizedPathname') &&
     wrapper.includes("const activeKey = PATH_TO_KEY[location.pathname] ?? 'dashboard'"),
-  'PartnerLayout normalizes pathname for theme selection without changing activeKey navigation',
-)
-const visualThemeCases = [
-  { pathname: '/jobs', activeKey: 'jobs', expected: 'service-desk' },
-  { pathname: '/jobs/', activeKey: 'dashboard', expected: 'service-desk' },
-  { pathname: '/', activeKey: 'dashboard', expected: 'legacy' },
-  { pathname: '/alerts/', activeKey: 'dashboard', expected: 'legacy' },
-  { pathname: '/unknown-route', activeKey: 'dashboard', expected: 'legacy' },
-]
-check(
-  normalizedPathExpression !== undefined &&
-    visualThemeExpression !== undefined &&
-    visualThemeCases.every(
-      ({ pathname, activeKey, expected }) =>
-        evaluateVisualTheme(
-          normalizedPathExpression,
-          visualThemeExpression,
-          pathname,
-          activeKey,
-        ) === expected,
-    ),
-  'only normalized /jobs and /jobs/ pathnames resolve to service-desk',
+  'PartnerLayout keeps the warm legacy theme without route-level service-desk selection',
 )
 check(
   matches(partnerLayoutProps, /density=['"]comfortable['"]/),
-  'PartnerLayout keeps comfortable density for the jobs representative route',
+  'PartnerLayout keeps comfortable density for operational pages',
 )
 
 const jobsPage = await read('src/routes/jobs/index.tsx')
@@ -135,25 +93,26 @@ const categoryMap = extractBetween(
   'CATEGORY_MAP',
 )
 const expectedCategories = [
-  ['fulltime', '全职', 'blue'],
-  ['intern', '实习', 'lavender'],
-  ['campus', '校招', 'mint'],
-  ['parttime', '兼职', 'orange'],
+  ['fulltime', '全职', 'bg-blue-50 text-blue-700'],
+  ['intern', '实习', 'bg-violet-50 text-violet-700'],
+  ['campus', '校招', 'bg-emerald-50 text-emerald-700'],
+  ['parttime', '兼职', 'bg-orange-50 text-orange-700'],
 ]
-for (const [key, label, color] of expectedCategories) {
+for (const [key, label, style] of expectedCategories) {
   check(
     matches(
       categoryMap,
       new RegExp(
-        `${key}\\s*:\\s*\\{\\s*label:\\s*['"]${label}['"]\\s*,\\s*style:\\s*['"]bg-\\[var\\(--sd-category-${color}-bg\\)\\] text-\\[var\\(--sd-category-${color}-fg\\)\\]['"]\\s*\\}`,
+        `${key}\\s*:\\s*\\{\\s*label:\\s*['"]${label}['"]\\s*,\\s*style:\\s*['"]${style}['"]\\s*\\}`,
       ),
     ),
-    `CATEGORY_MAP maps ${key} to the exact ${color} category tokens`,
+    `CATEGORY_MAP maps ${key} to the exact low-saturation ${style} category palette`,
   )
 }
 check(
-  !/(?:warning|success|error|review|publish|status)/i.test(categoryMap),
-  'CATEGORY_MAP does not reuse review or publish status colors',
+  !categoryMap.includes('--sd-category-') &&
+    !/(?:info|success|warning|error|review|publish|status)/i.test(categoryMap),
+  'CATEGORY_MAP is independent from service-desk variables and status semantics',
 )
 
 const reviewMap = extractBetween(
@@ -216,7 +175,7 @@ const selectedClass =
   "const FILTER_SELECTED_CLASS = 'border-primary-600 bg-primary-600 text-white'"
 const idleClass =
   "const FILTER_IDLE_CLASS = 'border-neutral-200 bg-surface text-neutral-700 hover:border-primary-600/40'"
-check(jobsPage.includes(selectedClass), 'filter selected state uses the exact primary-blue contract')
+check(jobsPage.includes(selectedClass), 'filter selected state uses the Inkpaper primary contract')
 check(jobsPage.includes(idleClass), 'filter idle state uses the exact neutral-surface contract')
 
 const categoryFiltersUi = extractBetween(
@@ -466,8 +425,8 @@ for (const required of [
 }
 
 if (failures.length > 0) {
-  console.error(`\n${failures.length} Partner service-desk jobs UI contract(s) failed.`)
+  console.error(`\n${failures.length} Partner Inkpaper jobs UI contract(s) failed.`)
   process.exit(1)
 }
 
-console.log('SERVICE_DESK_JOBS_UI_VERIFY_OK')
+console.log('PARTNER_INKPAPER_JOBS_UI_VERIFY_OK')
