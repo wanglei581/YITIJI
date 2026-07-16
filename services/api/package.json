@@ -7,6 +7,8 @@
   "scripts": {
     "build": "prisma generate && pnpm db:pg:generate && tsc",
     "start": "node dist/main.js",
+    "start:guarded": "node dist/release-provenance/release-guard.js",
+    "release:manifest": "node dist/release-provenance/release-manifest-cli.js",
     "dev": "prisma generate && node -r @swc-node/register src/main.ts",
     "lint": "eslint src/",
     "typecheck": "prisma generate && tsc --noEmit",

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { EventEmitter } from 'node:events'
 import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -17,6 +19,8 @@ import {
   ReleaseProvenanceError,
   verifyReleaseProvenance,
 } from '../src/release-provenance/release-provenance'
+import { runReleaseManifestCli } from '../src/release-provenance/release-manifest-cli'
+import { runReleaseGuard, type SpawnMain } from '../src/release-provenance/release-guard'
 
 const RELEASE_ID = 'release-20260716-a1b2c3d4'
 const GIT_COMMIT = 'a'.repeat(40)
@@ -84,6 +88,20 @@ function createManifest(fixture: Fixture): void {
   assert.ok(created.manifest.entrypoints['services/api/dist/release-provenance/release-guard.js'])
 }
 
+function createCommand(fixture: Fixture, overrides: Partial<Record<string, string>> = {}): string[] {
+  const values = {
+    '--release-root': fixture.releaseRoot,
+    '--artifact-root': fixture.artifactRoot,
+    '--release-id': RELEASE_ID,
+    '--git-commit': GIT_COMMIT,
+    '--source-archive': fixture.sourceArchivePath,
+    '--created-at': '2026-07-16T00:00:00.000Z',
+    '--pnpm-version': 'test',
+    ...overrides,
+  }
+  return ['create', ...Object.entries(values).flatMap(([flag, value]) => [flag, value])]
+}
+
 function expectCode(expectedCode: string, action: () => unknown): void {
   try {
     action()
@@ -116,7 +134,31 @@ function withFixture(action: (fixture: Fixture) => void): void {
   }
 }
 
-function main(): void {
+async function verifyGuardLaunch(): Promise<void> {
+  const fixture = createFixture()
+  try {
+    createManifest(fixture)
+    const child = new EventEmitter() as EventEmitter & { kill(signal?: NodeJS.Signals): boolean }
+    child.kill = () => true
+    let spawned = false
+    const spawnMain: SpawnMain = (command, args, options) => {
+      spawned = true
+      assert.equal(command, process.execPath)
+      assert.deepEqual(args, ['services/api/dist/main.js'])
+      assert.equal(options.cwd, realpathSync(fixture.releaseRoot))
+      assert.equal(options.stdio, 'inherit')
+      queueMicrotask(() => child.emit('exit', 0, null))
+      return child as ReturnType<SpawnMain>
+    }
+    assert.equal(await runReleaseGuard({ releaseRoot: fixture.releaseRoot, artifactRoot: fixture.artifactRoot, spawnMain }), 0)
+    assert.equal(spawned, true)
+    console.log('  PASS guard starts only the fixed API entrypoint from the canonical release root')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+async function main(): Promise<void> {
   console.log('\n=== release provenance verification ===')
 
   withFixture((fixture) => {
@@ -201,7 +243,36 @@ function main(): void {
     console.log('  PASS rejects cyclic links')
   })
 
+  withFixture((fixture) => {
+    expectCode('RELEASE_PROVENANCE_CLI_ARGUMENT_MISSING', () => runReleaseManifestCli(['create', '--artifact-root', fixture.artifactRoot]))
+    expectCode('RELEASE_PROVENANCE_CLI_PATH_INVALID', () => runReleaseManifestCli(createCommand(fixture, { '--artifact-root': 'relative/artifacts' })))
+    expectCode('RELEASE_PROVENANCE_RELEASE_ID_INVALID', () => runReleaseManifestCli(createCommand(fixture, { '--release-id': '../invalid' })))
+    expectCode('RELEASE_PROVENANCE_GIT_COMMIT_INVALID', () => runReleaseManifestCli(createCommand(fixture, { '--git-commit': 'not-a-full-commit' })))
+    expectCode('RELEASE_PROVENANCE_SOURCE_ARCHIVE_INVALID', () => runReleaseManifestCli(createCommand(fixture, { '--source-archive': join(fixture.workspace, 'missing.tar.gz') })))
+    console.log('  PASS CLI rejects incomplete or unsafe create inputs')
+  })
+
+  withFixture((fixture) => {
+    createManifest(fixture)
+    writeFixtureFile(join(fixture.releaseRoot, 'services/api/dist/main.js'), 'tampered before guard\n')
+    let spawnedEntrypoints = 0
+    const spawnMain: SpawnMain = () => {
+      spawnedEntrypoints += 1
+      throw new Error('guard must not spawn on a failed verification')
+    }
+    expectCode('RELEASE_PROVENANCE_RUNTIME_TREE_MISMATCH', () =>
+      runReleaseGuard({ releaseRoot: fixture.releaseRoot, artifactRoot: fixture.artifactRoot, spawnMain }),
+    )
+    assert.equal(spawnedEntrypoints, 0)
+    console.log('  PASS guard fails closed before spawning API')
+  })
+
+  await verifyGuardLaunch()
+
   console.log('=== ALL PASS ===\n')
 }
 
-main()
+main().catch((error: unknown) => {
+  console.error(error)
+  process.exitCode = 1
+})
