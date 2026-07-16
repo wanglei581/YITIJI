@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "backend",
   "currentPhase": "review",
-  "nextAction": "运行 Task 8 全量 SQLite/PostgreSQL/Redis 门禁并完成 Claude + Antigravity 双模型终审",
+  "nextAction": "整合最新 origin/main 已合入的 Wave 1A 与 CI 修复，重跑全量门禁后完成双模型终审",
   "createdAt": "2026-07-16T11:02:00Z",
   "branch": "codex/user-center-wave1-account-security-20260716"
 }
