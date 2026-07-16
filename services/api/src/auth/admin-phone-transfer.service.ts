@@ -44,6 +44,16 @@ type TransferCommitResult = {
   partnerSessionState: PartnerSessionState
 }
 
+type EligibleAdminState = {
+  id: string
+  role: string
+  enabled: boolean
+  phoneHash: string | null
+  phoneEnc: string | null
+  phoneVerifiedAt: Date | null
+  tokenVersion: number
+}
+
 @Injectable()
 export class AdminPhoneTransferService {
   private readonly logger = new Logger(AdminPhoneTransferService.name)
@@ -62,7 +72,7 @@ export class AdminPhoneTransferService {
     ip: string,
     deviceId?: string,
   ): Promise<AdminPhoneTransferStartResult> {
-    const admin = await this.getEligibleAdmin(adminId)
+    const admin = await this.getEligibleAdminForStart(adminId)
     await this.verifyCurrentPassword(admin.id, currentPassword, admin.passwordHash)
 
     const phone = normalizePhone(candidatePhone)
@@ -138,7 +148,7 @@ export class AdminPhoneTransferService {
       const parsed = parseAdminPhoneTransferTicket(serializedTicket, adminId)
       ticket = parsed.ticket
       phone = parsed.phone
-      const admin = await this.getEligibleAdmin(adminId)
+      const admin = await this.getEligibleAdminForVerify(adminId)
       if (admin.tokenVersion !== ticket.adminTokenVersion) throw new Error('stale ticket')
     } catch {
       await this.cleanupTicket(adminId, bindTicket)
@@ -279,7 +289,13 @@ export class AdminPhoneTransferService {
         }
       })
       return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString(), partnerSessionState }
-    } catch {
+    } catch (error) {
+      if (!(error instanceof HttpException)) {
+        const errorType = error instanceof Error ? error.name : 'UnknownError'
+        this.logger.warn(
+          `手机号转移事务失败 adminId=${ticket.adminId} partnerId=${ticket.partnerId} errorType=${errorType}`,
+        )
+      }
       throw adminPhoneTransferUnavailable()
     }
   }
@@ -310,8 +326,40 @@ export class AdminPhoneTransferService {
     await this.releaseCurrentPasswordAttempt(adminId)
   }
 
-  private async getEligibleAdmin(adminId: string) {
-    const admin = await this.prisma.user.findUnique({ where: { id: adminId } })
+  private async getEligibleAdminForStart(adminId: string) {
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        role: true,
+        enabled: true,
+        phoneHash: true,
+        phoneEnc: true,
+        phoneVerifiedAt: true,
+        tokenVersion: true,
+        passwordHash: true,
+      },
+    })
+    return this.assertEligibleAdmin(admin)
+  }
+
+  private async getEligibleAdminForVerify(adminId: string) {
+    const admin = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        role: true,
+        enabled: true,
+        phoneHash: true,
+        phoneEnc: true,
+        phoneVerifiedAt: true,
+        tokenVersion: true,
+      },
+    })
+    return this.assertEligibleAdmin(admin)
+  }
+
+  private assertEligibleAdmin<T extends EligibleAdminState>(admin: T | null): T {
     if (
       !admin ||
       admin.role !== 'admin' ||

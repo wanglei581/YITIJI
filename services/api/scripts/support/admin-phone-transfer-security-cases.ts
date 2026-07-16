@@ -143,6 +143,40 @@ function prismaFailingNthTransactionAudit(prisma: PrismaService, failureIndex: n
   } as unknown as PrismaService
 }
 
+function prismaRecordingAdminSelects(
+  prisma: PrismaService,
+  adminId: string,
+  recordedSelects: Array<Set<string>>,
+): PrismaService {
+  return new Proxy(prisma, {
+    get(target, property, receiver) {
+      if (property === 'user') {
+        const userDelegate = target.user
+        return new Proxy(userDelegate, {
+          get(userTarget, userProperty, userReceiver) {
+            if (userProperty === 'findUnique') {
+              return async (args: { where?: { id?: string }; select?: Record<string, boolean> }) => {
+                if (args.where?.id === adminId) {
+                  recordedSelects.push(new Set(Object.keys(args.select ?? {})))
+                }
+                return userTarget.findUnique(args as Parameters<typeof userTarget.findUnique>[0])
+              }
+            }
+            const value: unknown = Reflect.get(userTarget, userProperty, userReceiver)
+            return typeof value === 'function' ? value.bind(userTarget) : value
+          },
+        })
+      }
+      const value: unknown = Reflect.get(target, property, receiver)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+}
+
+function hasExactFields(actual: Set<string>, expected: readonly string[]): boolean {
+  return actual.size === expected.length && expected.every((field) => actual.has(field))
+}
+
 function replaceLockBeforeCompareAndDelete(
   redis: MemoryRedis,
   lockKey: string,
@@ -385,11 +419,20 @@ async function verifyTransactionAuditFailuresRollback(context: AdminPhoneTransfe
     const service = context.createService({ prisma: failingPrisma })
     const started = await service.start(admin.id, context.adminPassword, phone, `127.0.1.${22 + failureIndex}`)
     const code = await requireTransferCode(context, phone, `14. 第 ${failureIndex} 条事务审计失败场景无验证码`)
-    await expectCode(
-      () => service.verify(admin.id, started.bindTicket, code),
-      UNAVAILABLE,
-      `14. 第 ${failureIndex} 条事务审计失败未回滚`,
-    )
+    const capturedWarnings: string[] = []
+    const originalLoggerWarn = Logger.prototype.warn
+    Logger.prototype.warn = function (message: unknown, ...optionalParams: unknown[]): void {
+      capturedWarnings.push([message, ...optionalParams].map(String).join(' '))
+    }
+    try {
+      await expectCode(
+        () => service.verify(admin.id, started.bindTicket, code),
+        UNAVAILABLE,
+        `14. 第 ${failureIndex} 条事务审计失败未回滚`,
+      )
+    } finally {
+      Logger.prototype.warn = originalLoggerWarn
+    }
     const adminAfter = await context.prisma.user.findUniqueOrThrow({ where: { id: admin.id } })
     const partnerAfter = await context.prisma.user.findUniqueOrThrow({ where: { id: partner.id } })
     const transactionAudits = await context.prisma.auditLog.count({
@@ -403,8 +446,46 @@ async function verifyTransactionAuditFailuresRollback(context: AdminPhoneTransfe
         transactionAudits === 0,
       `14. 第 ${failureIndex} 条事务审计失败后双账号或审计未整体回滚`,
     )
+    const warningOutput = capturedWarnings.join('\n')
+    ensure(
+      warningOutput.includes('手机号转移事务失败') &&
+        warningOutput.includes(admin.id) &&
+        warningOutput.includes(partner.id) &&
+        warningOutput.includes('Error'),
+      `14. 第 ${failureIndex} 条事务审计失败缺少可运维的脱敏分类日志`,
+    )
+    const forbidden = [phone, hashPhone(phone), partner.phoneEnc, context.adminPassword, code, started.bindTicket]
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    ensure(
+      forbidden.every((secret) => !warningOutput.includes(secret)),
+      `14. 第 ${failureIndex} 条事务失败日志泄露 phone/hash/enc/password/code/ticket`,
+    )
   }
-  pass('14. complete/released_by_admin 任一事务审计失败均回滚双账号更新与审计')
+  pass('14. complete/released_by_admin 任一事务审计失败均回滚，并记录脱敏分类日志')
+}
+
+async function verifyAdminReadsUseMinimalSelects(context: AdminPhoneTransferSecurityContext): Promise<void> {
+  const phone = context.nextPhone()
+  const admin = await context.createAdmin('minimal-admin-selects', 3)
+  await context.createPartner('minimal-admin-selects', phone, 5)
+  const recordedSelects: Array<Set<string>> = []
+  const recordingPrisma = prismaRecordingAdminSelects(context.prisma, admin.id, recordedSelects)
+  const service = context.createService({ prisma: recordingPrisma })
+  const started = await service.start(admin.id, context.adminPassword, phone, '127.0.1.241')
+  const code = await requireTransferCode(context, phone, '14b. Admin 精简读取场景无验证码')
+  await service.verify(admin.id, started.bindTicket, code)
+
+  const eligibilityFields = ['id', 'role', 'enabled', 'phoneHash', 'phoneEnc', 'phoneVerifiedAt', 'tokenVersion'] as const
+  ensure(recordedSelects.length === 2, '14b. Admin start/verify 精简读取次数不正确')
+  ensure(
+    hasExactFields(recordedSelects[0]!, [...eligibilityFields, 'passwordHash']),
+    '14b. start 未精确选择资格字段与 passwordHash',
+  )
+  ensure(
+    hasExactFields(recordedSelects[1]!, eligibilityFields),
+    '14b. verify 读取了 passwordHash 或其他非必要 Admin 字段',
+  )
+  pass('14b. start 仅额外读取 passwordHash，verify 不读取密码摘要或其他非必要字段')
 }
 
 async function verifyBestEffortAuditFailuresAreSafe(context: AdminPhoneTransferSecurityContext): Promise<void> {
@@ -675,6 +756,7 @@ export async function verifyAdminPhoneTransferSecurityCases(
   await verifyLockContentionSkipsOtp(context)
   await verifyActiveTicketMismatchFailsClosed(context)
   await verifyTransactionAuditFailuresRollback(context)
+  await verifyAdminReadsUseMinimalSelects(context)
   await verifyBestEffortAuditFailuresAreSafe(context)
   await verifySourceDeletionAndPasswordChanges(context)
   await verifyTicketValidationFailures(context)
