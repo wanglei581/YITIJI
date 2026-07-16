@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt'
 import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { JobFitService } from './resume/job-fit.service'
 import { GovernedJobFitService } from '../job-ai/governed-job-fit.service'
@@ -75,11 +76,12 @@ export class JobFitController {
     private readonly service: JobFitService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
     private readonly governed: GovernedJobFitService,
   ) {}
 
   private async requesterOf(req: ReqLike) {
-    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
     if (member) return { endUserId: member.endUserId, accessToken: null }
     return { endUserId: null, accessToken: headerOf(req, 'x-resume-access-token') }
   }

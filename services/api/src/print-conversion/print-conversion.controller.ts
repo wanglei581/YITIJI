@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { ConvertImagesResponse } from './print-conversion.types'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { ConvertImagesDto } from './print-conversion.dto'
@@ -15,6 +16,7 @@ export class PrintConversionController {
     private readonly conversion: PrintConversionService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('images-to-pdf')
@@ -24,7 +26,7 @@ export class PrintConversionController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Req() req: Request,
   ): Promise<ApiResponse<ConvertImagesResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.conversion.convertImagesToPdf({
       sources: body.sources,
       endUserId: endUser?.endUserId ?? null,

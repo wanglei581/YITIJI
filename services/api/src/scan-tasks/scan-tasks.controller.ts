@@ -18,6 +18,7 @@ import type { Request } from 'express'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { TerminalsService } from '../terminals/terminals.service'
 import { CreateScanTaskDto } from './dto/create-scan-task.dto'
 import { ScanTasksService } from './scan-tasks.service'
@@ -29,12 +30,13 @@ export class ScanTasksController {
     private readonly terminals: TerminalsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('scan/sessions')
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
   async create(@Body() dto: CreateScanTaskDto, @Req() req: Request) {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.scanTasks.create(dto, endUser?.endUserId ?? null)
     return ApiResponse.ok(result)
   }
@@ -50,7 +52,7 @@ export class ScanTasksController {
     @Headers('x-scan-session-control') controlToken: string | undefined,
     @Req() req: Request,
   ) {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.scanTasks.getStatus(id, endUser?.endUserId ?? null, controlToken)
     return ApiResponse.ok(result)
   }
@@ -61,7 +63,7 @@ export class ScanTasksController {
     @Headers('x-scan-session-control') controlToken: string | undefined,
     @Req() req: Request,
   ) {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.scanTasks.cancel(id, endUser?.endUserId ?? null, controlToken)
     return ApiResponse.ok(result)
   }

@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt'
 import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
@@ -96,11 +97,12 @@ export class MockInterviewController {
     private readonly tts: TtsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
     const auth = headerOf(req, 'authorization')
-    const member = await resolveOptionalEndUser(auth ?? undefined, this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(auth ?? undefined, this.jwt, this.redis, this.prisma)
     if (member) return { endUserId: member.endUserId, accessToken: null }
     return { endUserId: null, accessToken: headerOf(req, 'x-interview-access-token') }
   }

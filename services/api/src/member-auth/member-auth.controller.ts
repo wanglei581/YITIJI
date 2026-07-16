@@ -7,6 +7,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { MemberLoginDto } from './dto/member-login.dto'
 import { ClaimQrLoginDto, ConfirmQrLoginDto, CreateQrLoginDto } from './dto/qr-login.dto'
 import { SendSmsCodeDto } from './dto/send-sms-code.dto'
+import { SendMemberStepUpCodeDto, VerifyMemberStepUpDto } from './dto/member-step-up.dto'
 import {
   MemberAuthService,
   type MemberAuthUser,
@@ -19,6 +20,7 @@ import {
   type CreateQrLoginResult,
   type QrLoginStatusResult,
 } from './member-qr-login.service'
+import { MemberStepUpService } from './member-step-up.service'
 
 /** 取客户端 IP(一体机可能经反代,优先 X-Forwarded-For 首段)。 */
 function clientIp(req: Request): string {
@@ -36,6 +38,7 @@ export class MemberAuthController {
   constructor(
     private readonly service: MemberAuthService,
     private readonly qrLogin: MemberQrLoginService,
+    private readonly stepUp: MemberStepUpService,
   ) {}
 
   /** 发送验证码。IP 维度再加一层粗限流(细粒度多维频控在 service 内走 Redis)。 */
@@ -92,11 +95,38 @@ export class MemberAuthController {
     return ApiResponse.ok(await this.qrLogin.claim(ticketId, dto.claimToken, terminalId, auth))
   }
 
+  /** Issue a short-lived SMS challenge for a later sensitive action. */
+  @Post('auth/step-up/sms-code')
+  @UseGuards(EndUserAuthGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async sendStepUpCode(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: SendMemberStepUpCodeDto,
+    @Req() req: Request,
+  ) {
+    return ApiResponse.ok(await this.stepUp.sendChallenge(user.endUserId, {
+      action: dto.action,
+      deviceId: dto.deviceId,
+      ip: clientIp(req),
+    }))
+  }
+
+  /** Exchange a current member's SMS challenge for a one-time opaque grant. */
+  @Post('auth/step-up/verify')
+  @UseGuards(EndUserAuthGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async verifyStepUp(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: VerifyMemberStepUpDto,
+  ) {
+    return ApiResponse.ok(await this.stepUp.verifyChallenge(user.endUserId, dto))
+  }
+
   /** 登出:删除 Redis 会话。前端空闲超时登出也调用此接口。 */
   @Post('auth/logout')
   @UseGuards(EndUserAuthGuard)
   async logout(@CurrentEndUser() user: AuthedEndUser): Promise<ApiResponse<{ loggedOut: true }>> {
-    await this.service.logout(user.sessionId)
+    await this.service.logout(user.endUserId, user.sessionId)
     return ApiResponse.ok({ loggedOut: true })
   }
 

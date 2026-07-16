@@ -63,6 +63,8 @@ async function main(): Promise<void> {
   const tail = Date.now().toString().slice(-8)
   const phone = `138${tail}`
   const phoneHash = hashPhone(phone)
+  const closingPhone = `139${tail}`
+  const closingPhoneHash = hashPhone(closingPhone)
   const terminalId = `term_qr_${randomBytes(5).toString('hex')}`
   const otherTerminalId = `term_qr_${randomBytes(5).toString('hex')}`
   const agentToken = `qr-agent-token-${randomBytes(8).toString('hex')}`
@@ -70,6 +72,7 @@ async function main(): Promise<void> {
   const terminalHeaders = { authorization: `Bearer ${agentToken}`, 'x-terminal-id': terminalId }
   const otherTerminalHeaders = { authorization: `Bearer ${otherAgentToken}`, 'x-terminal-id': otherTerminalId }
   let ticketId: string | null = null
+  let closingTicketId: string | null = null
 
   async function request(
     method: 'GET' | 'POST',
@@ -244,7 +247,49 @@ async function main(): Promise<void> {
       ? pass('second claim -> 410')
       : fail(`second claim -> ${replay.status} ${JSON.stringify(replay.json)}`)
 
-    console.log('\n-- 8. invalid and unknown tickets are rejected -------------------------')
+    console.log('\n-- 8. account closing after confirmation cannot mint a session --------')
+    const closingCreate = await request('POST', '/auth/qr/create', { returnTo: '/me' }, terminalHeaders)
+    const closingCreated = (closingCreate.json.data ?? {}) as Json
+    closingTicketId = closingCreated.ticketId as string | null
+    const closingClaimToken = closingCreated.claimToken as string | undefined
+    if (closingCreate.status !== 201 || !closingTicketId || !closingClaimToken) {
+      fail(`closing test ticket create -> ${closingCreate.status} ${JSON.stringify(closingCreate.json)}`)
+    } else {
+      const closingSend = await request('POST', '/auth/sms-code', { phone: closingPhone, deviceId: 'phone-closing-01' })
+      const closingCode = await redis.get(`member:sms:code:${closingPhoneHash}`)
+      if (closingSend.status !== 201 || !closingCode) {
+        fail(`closing test SMS -> ${closingSend.status} ${JSON.stringify(closingSend.json)}`)
+      } else {
+        const closingConfirm = await request('POST', `/auth/qr/${encodeURIComponent(closingTicketId)}/confirm`, {
+          phone: closingPhone,
+          code: closingCode,
+          deviceId: 'phone-closing-01',
+        })
+        if (closingConfirm.status !== 201) {
+          fail(`closing test confirmation -> ${closingConfirm.status} ${JSON.stringify(closingConfirm.json)}`)
+        } else {
+          const closingUser = await prisma.endUser.findUnique({ where: { phoneHash: closingPhoneHash } })
+          if (!closingUser) {
+            fail('closing test member was not created')
+          } else {
+            await prisma.endUser.update({ where: { id: closingUser.id }, data: { status: 'closing' } })
+            const closingClaim = await request(
+              'POST',
+              `/auth/qr/${encodeURIComponent(closingTicketId)}/claim`,
+              { claimToken: closingClaimToken },
+              terminalHeaders,
+            )
+            if (closingClaim.status === 403 && !('token' in ((closingClaim.json.data ?? {}) as Json))) {
+              pass('account closing after QR confirmation -> 403 and no new member token')
+            } else {
+              fail(`closing account QR claim -> ${closingClaim.status} ${JSON.stringify(closingClaim.json)}`)
+            }
+          }
+        }
+      }
+    }
+
+    console.log('\n-- 9. invalid and unknown tickets are rejected -------------------------')
     const malformed = await request('GET', '/auth/qr/not-a-real-ticket/status')
     malformed.status === 400
       ? pass('malformed ticket status -> 400')
@@ -256,13 +301,21 @@ async function main(): Promise<void> {
   } finally {
     console.log('\n-- cleanup -------------------------------------------------------------')
     await prisma.endUser.deleteMany({ where: { phoneHash } })
+    await prisma.endUser.deleteMany({ where: { phoneHash: closingPhoneHash } })
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await redis.del(`member:sms:attempt:${phoneHash}`)
+    await redis.del(`member:sms:code:${closingPhoneHash}`)
+    await redis.del(`member:sms:cooldown:${closingPhoneHash}`)
+    await redis.del(`member:sms:attempt:${closingPhoneHash}`)
     await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId] } } })
     if (ticketId) {
       await redis.del(`member:qr:${ticketId}`)
       await redis.del(`member:qr:claimed:${ticketId}`)
+    }
+    if (closingTicketId) {
+      await redis.del(`member:qr:${closingTicketId}`)
+      await redis.del(`member:qr:claimed:${closingTicketId}`)
     }
     await app.close()
   }
