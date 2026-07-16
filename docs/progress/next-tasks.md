@@ -17,6 +17,11 @@
 - [x] **T5 派生旧 PDF、docs 旧材料与 deliverables 清理**：已将旧 B2G/B2B2C 方案 PDF、本地 docx 原稿、旧 handoff 交接文件、两个已弃用 HTML 预览和 `deliverables/` 宣传片 / 交付物 Markdown 移出正式 Git；原始材料归档到本地 `其他文档/`，仓库内保留 Markdown 摘要、审计事实、当前正式入口和 OPC 交付物 sha256 完整性记录。
 - [x] **剩余候选分支定级**：已输出并更新 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单、Sprint1 Partner dashboard、面试重设计本地候选与备份候选均已完成迁移 / 取舍 / 清理，当前无剩余本地或远程候选分支。
 
+## P0：合作机构后台账号安全移除
+
+- [x] **本地候选实现与专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；未 push/PR/合入/deploy。
+- [ ] **远程交付前置验证（待用户授权）**：从干净最新主线重放候选后，在 CI/目标 PostgreSQL 执行 `prisma migrate deploy/status`（本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过），再运行对应回归与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
+
 ## P0：剩余分支 / worktree 收口
 
 - [x] **QR 登录候选合入与旧 worktree 清理**：#91 已通过 rebase merge 合入 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 的本地 / 远程 head 也已清理。
