@@ -158,14 +158,20 @@ function isPositiveCooldownComparison(node) {
   )
 }
 
-function disabledDuringActiveCooldown(node) {
+function orOperands(node) {
   const expression = unwrapParentheses(node)
-  if (isPositiveCooldownComparison(expression)) return true
-  return (
-    ts.isBinaryExpression(expression) &&
-    expression.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
-    (disabledDuringActiveCooldown(expression.left) || disabledDuringActiveCooldown(expression.right))
-  )
+  if (!ts.isBinaryExpression(expression) || expression.operatorToken.kind !== ts.SyntaxKind.BarBarToken) {
+    return [expression]
+  }
+  return [...orOperands(expression.left), ...orOperands(expression.right)]
+}
+
+function disabledDuringSubmissionOrActiveCooldown(node) {
+  const expression = unwrapParentheses(node)
+  if (!ts.isBinaryExpression(expression) || expression.operatorToken.kind !== ts.SyntaxKind.BarBarToken) return false
+  const operands = orOperands(expression)
+  const hasSubmitting = operands.some((operand) => ts.isIdentifier(operand) && operand.text === 'submitting')
+  return hasSubmitting && operands.some(isPositiveCooldownComparison)
 }
 
 function isActiveUnknownStartCooldown(node) {
@@ -201,8 +207,8 @@ export function verifyCooldownReturnContract(componentSource) {
   expect(cooldownButtons.length === 1, 'only the identity return button must honor the unknown-start cooldown')
   const cooldownDisabled = jsxAttribute(cooldownButtons[0], 'disabled')?.initializer?.expression
   expect(
-    cooldownDisabled && disabledDuringActiveCooldown(cooldownDisabled),
-    'identity return button must be disabled when cooldownSeconds > 0',
+    cooldownDisabled && disabledDuringSubmissionOrActiveCooldown(cooldownDisabled),
+    'identity return button must be disabled while submitting or cooldownSeconds > 0',
   )
 
   let cooldownGuard
