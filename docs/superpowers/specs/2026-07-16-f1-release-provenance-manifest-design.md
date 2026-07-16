@@ -56,7 +56,7 @@ manifest 使用稳定键序 JSON，且只含下列字段。下方为字段格式
 
 ## 受控文件范围
 
-`RUNTIME_TREE.sha256` 必须覆盖 release 目录中 API 启动实际需要的文件：API `dist`、生产运行依赖、Prisma 生成物，以及由该 release 提供的 Kiosk/Admin/Partner 静态构建产物。pnpm 的生产依赖布局可包含 `services/api/node_modules` 指向 release 根内 `.pnpm` store 的链接；因此清单允许此类根内链接，但每个链接都必须记录规范化的相对目标，且其解析后的真实路径仍位于 release 根内。链接目标的普通文件也必须由受控文件根覆盖。任何绝对链接、越出 release 根的链接、循环链接、`..` 路径或重复记录都使生成和验证失败。
+`RUNTIME_TREE.sha256` 必须覆盖 release 目录中 API 启动实际需要的文件：API `dist`、生产运行依赖、Prisma 生成物，以及由该 release 提供的 Kiosk/Admin/Partner 静态构建产物。pnpm 的生产依赖布局可包含 `services/api/node_modules` 指向 release 根内 `.pnpm` store 的链接；因此清单允许此类根内链接，但每个链接都必须记录规范化的相对目标，且其解析后的真实路径仍位于 release 根内。清单**条目路径**必须是规范化的根相对路径，不得含 `.` 或 `..`；链接的原始文本则可含 pnpm 布局所需的 `..`，前提是它不是绝对路径、`realpath` 可解析且结果仍在 release 根内。生成器记录解析后的规范化根相对目标。链接目标的普通文件也必须由受控文件根覆盖。任何绝对链接、解析后越出 release 根的链接、解析错误或循环链接、非法条目路径或重复记录都使生成和验证失败。
 
 以下路径或类别必须显式排除：`.env`、`*.log`、`storage/`、`uploads/`、临时目录、运行时缓存、`RELEASE_MANIFEST.json`、`RELEASE_MANIFEST.sha256`、`RUNTIME_TREE.sha256`。排除列表是固定的；遇到不属于受控文件范围但又位于候选 release 根下的可写文件，生成器失败而不是静默忽略。
 
