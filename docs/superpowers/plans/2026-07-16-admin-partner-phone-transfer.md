@@ -651,7 +651,7 @@ Antigravity 与 Claude 必须分别审查 `git diff origin/main...HEAD`，输出
 
 把 task/requirements/review 的内容添加到 `.ccg/tasks/archive/2026-07/admin-partner-phone-transfer-20260716/`，并用同一 patch 删除活动目录文件，保证 CI 的“无 tracked active AI tool state”门禁通过。
 
-- [ ] **Step 4：提交归档**
+- [x] **Step 4：提交归档**
 
 ```bash
 git add -f .ccg/tasks/archive/2026-07/admin-partner-phone-transfer-20260716
@@ -659,7 +659,7 @@ git add -u .ccg/tasks/admin-partner-phone-transfer-20260716
 git commit -m "chore: archive ccg task admin-partner-phone-transfer-20260716"
 ```
 
-- [ ] **Step 5：最终只读状态检查**
+- [x] **Step 5：最终只读状态检查**
 
 ```bash
 git status --short --branch
