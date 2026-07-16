@@ -424,7 +424,7 @@ git commit -m "feat(auth): expose guarded admin phone transfer endpoints"
 - Modify: `apps/admin/package.json`
 - Modify: `apps/admin/src/services/auth/index.ts`
 
-- [ ] **Step 1：写 UI RED verifier 与命令**
+- [x] **Step 1：写 UI RED verifier 与命令**
 
 `apps/admin/package.json` 新增：
 
@@ -442,7 +442,7 @@ cancelAdminPhoneTransfer(bindTicket)
 
 非法 2xx 至少覆盖：非 UUID ticket、超范围秒数、明文手机号、非法掩码、空 username、空 organizationName、非 canonical ISO、`cancelled:false`；只有验证成功的脱敏字段可以合并到现有本地用户。
 
-- [ ] **Step 2：运行 RED**
+- [x] **Step 2：运行 RED**
 
 ```bash
 pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
@@ -450,7 +450,7 @@ pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
 
 Expected：FAIL，原因是 adapter/组件尚不存在，不是 verifier 语法或模块加载错误。
 
-- [ ] **Step 3：实现严格响应类型与 runtime guard**
+- [x] **Step 3：实现严格响应类型与 runtime guard**
 
 新增返回契约：
 
@@ -464,13 +464,13 @@ export type AdminPhoneTransferSourceAccount = {
 
 start guard 必须验证 UUID、0..300 整数秒、非零 expiry、非空 username/organizationName 和合法掩码；verify/cancel 复用严格初绑的 canonical 时间与精确成功形状逻辑。失败结果保留 HTTP `status`。
 
-- [ ] **Step 4：运行 adapter GREEN**
+- [x] **Step 4：运行 adapter GREEN**
 
 Run：同 Step 2。
 
 Expected：adapter 行为断言 PASS；组件存在性仍 FAIL。
 
-- [ ] **Step 5：提交 adapter 与 RED UI 契约**
+- [x] **Step 5：提交 adapter 与 RED UI 契约**
 
 ```bash
 git add apps/admin/package.json apps/admin/scripts/verify-admin-phone-transfer-ui.mjs apps/admin/src/services/auth/index.ts

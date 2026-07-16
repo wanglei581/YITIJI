@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "auth",
   "currentPhase": "implementation",
-  "nextAction": "执行 Task 4：Admin UI RED 与严格 API adapter",
+  "nextAction": "执行 Task 5：Admin 安全转移组件与既有入口接线",
   "createdAt": "2026-07-16T15:49:41+08:00",
   "branch": "codex/admin-partner-phone-transfer-20260716"
 }
