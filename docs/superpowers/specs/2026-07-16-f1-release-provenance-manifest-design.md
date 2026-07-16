@@ -68,14 +68,14 @@ manifest 使用稳定键序 JSON，且只含下列字段。下方为字段格式
 4. 生成稳定键序 manifest 和 manifest sidecar；将源归档及证据副本放进本机 artifact 目录。
 5. 在候选目录运行 release guard。guard 同时验证 artifact 副本、manifest sidecar、manifest 字段、受控文件树和 API entrypoint hash；任何失败均停止，绝不切换软链。
 6. 将候选 release 与 artifact 目录设为部署账户可写、运行账户只读；确认运行时配置与可写数据均在 release 根外。
-7. 仅在 candidate guard 成功后原子切换 `current` 软链，并通过 guard wrapper 执行 PM2 reload。
-8. reload 后再运行只读验证，确认 `current` 的真实路径、PM2 `cwd`/`execPath`、manifest、运行文件树和 health 一致。
+7. 仅在 candidate 与 previous guard 均成功后原子切换 `current` 软链，并 reload 一个**位于 release 根外的稳定 current launcher**。launcher 的固定参数只含预先批准的绝对 `current` 软链和 artifact 根；每次启动都先将 `current` 解析为真实目录，再调用该目录内、已纳入 manifest 的 release guard。
+8. reload 后再运行只读验证，确认 `current` 的真实路径、PM2 的 `cwd`/`execPath` 与预先批准的稳定 launcher 一致、被 launcher 调用的 candidate manifest/运行文件树一致，以及本地 health 一致。
 
 ## Guard 与失败关闭
 
-PM2 不直接执行 `node dist/main.js`，而执行 release guard wrapper。wrapper 在 `exec node services/api/dist/main.js` 前完成验证，因此不一致时 API 不绑定端口、不连接业务依赖、不处理请求。
+PM2 不直接执行 `node dist/main.js`，而执行 release 根外的稳定 current launcher。launcher 不接受动态 release 路径：它只解析固定 `current` 软链，并以解析后的规范化目录调用其中的 release guard；release guard 在 `exec node services/api/dist/main.js` 前完成验证。因此不一致时 API 不绑定端口、不连接业务依赖、不处理请求。稳定 launcher 必须由部署账户单独安装、运行账户只读；其绝对路径与 SHA-256 在首次受控启用时记录，但它不替代 candidate manifest 中对 release guard 的 hash。
 
-guard 仅接受规范化 release 根、固定 manifest 文件名和固定 artifact 根；拒绝动态路径、软链接、非 JSON manifest、未知 schema version、缺失字段、非小写 SHA-256、entrypoint 不在受控清单内和任意树 hash 不匹配。验证过程只输出固定状态码和脱敏字段，不输出环境变量、源文件内容或业务数据。
+guard 仅接受 launcher 已解析的规范化 release 根、固定 manifest 文件名和固定 artifact 根；拒绝动态路径、软链接、非 JSON manifest、未知 schema version、缺失字段、非小写 SHA-256、entrypoint 不在受控清单内和任意树 hash 不匹配。launcher 与 guard 均只输出固定状态码和脱敏字段，不输出环境变量、源文件内容或业务数据。
 
 任何候选校验、软链切换、guard、PM2 reload、PM2 路径检查或 health 检查失败时：
 
