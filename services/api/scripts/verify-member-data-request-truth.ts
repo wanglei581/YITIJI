@@ -122,7 +122,24 @@ async function main(): Promise<void> {
 
     const exportRequest = await privacy.createDataRequest(endUserId, 'export')
     const deleteRequest = await privacy.createDataRequest(endUserId, 'delete')
+    await privacy.grantConsent(endUserId, 'job_ai', null)
+    const activeConsent = await prisma.userAiConsent.findFirst({
+      where: { endUserId, scope: 'job_ai', revokedAt: null },
+      orderBy: { grantedAt: 'desc' },
+    })
+    if (activeConsent) pass('revoke_consent 验证前已建立真实有效授权')
+    else fail('revoke_consent 验证前未建立真实有效授权')
+
     const revokeRequest = await privacy.createDataRequest(endUserId, 'revoke_consent')
+    const revokedConsent = await prisma.userAiConsent.findFirst({
+      where: { endUserId, scope: 'job_ai' },
+      orderBy: { grantedAt: 'desc' },
+    })
+    if (activeConsent && revokedConsent?.id === activeConsent.id && revokedConsent.revokedAt !== null) {
+      pass('revoke_consent 创建时真实写入 revokedAt')
+    } else {
+      fail('revoke_consent 创建后有效授权仍未真实撤回')
+    }
 
     await expectHttpError(
       () => privacy.handleDataRequest(exportRequest.id, { status: 'completed', handledBy: adminId }),
@@ -147,8 +164,18 @@ async function main(): Promise<void> {
       status: 'completed',
       handledBy: adminId,
     })
-    if (revoked.status === 'completed') pass('revoke_consent 保持可同步完成')
-    else fail(`revoke_consent 状态应为 completed，实际为 ${revoked.status}`)
+    const revokeAudit = await prisma.auditLog.findFirst({
+      where: {
+        actorId: adminId,
+        action: 'member_data_request.handle',
+        targetId: revokeRequest.id,
+      },
+    })
+    if (revoked.status === 'completed' && revoked.auditRef && revokeAudit?.id === revoked.auditRef) {
+      pass('revoke_consent 保持可同步完成并写入真实审计')
+    } else {
+      fail(`revoke_consent 完成或审计不完整：${JSON.stringify({ revoked, revokeAudit })}`)
+    }
 
     const [storedExport, storedDelete, protectedAudits] = await Promise.all([
       prisma.userDataRequest.findUnique({ where: { id: exportRequest.id } }),
@@ -179,6 +206,7 @@ async function main(): Promise<void> {
   } finally {
     await prisma.auditLog.deleteMany({ where: { actorId: adminId } })
     await prisma.userDataRequest.deleteMany({ where: { endUserId } })
+    await prisma.userAiConsent.deleteMany({ where: { endUserId } })
     await prisma.endUser.deleteMany({ where: { id: endUserId } })
     await prisma.user.deleteMany({ where: { id: adminId } })
     await prisma.onModuleDestroy()
