@@ -462,7 +462,7 @@ model EndUser {
   phoneEnc    String
   nickname    String?
   enabled     Boolean   @default(true)
-  status          String    @default("active")
+  status      String    @default("active")
   statusChangedAt DateTime?
   closingRequestedAt DateTime?
   anonymizedAt DateTime?

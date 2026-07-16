@@ -67,6 +67,10 @@ function modelBlock(schema: string, modelName: string): string {
   return schema.slice(start, nextModel === -1 ? schema.length : nextModel)
 }
 
+function compactWhitespace(source: string): string {
+  return source.replace(/\s+/g, ' ').trim()
+}
+
 function sqliteQuery(databasePath: string, sql: string): string {
   return execFileSync('sqlite3', ['-batch', '-noheader', '-separator', '|', databasePath, sql], {
     encoding: 'utf8',
@@ -171,7 +175,7 @@ const closureReceiptGuard = readOptional('services/api/src/common/guards/member-
 const memberAuthService = read('services/api/src/member-auth/member-auth.service.ts')
 const memberAuthController = read('services/api/src/member-auth/member-auth.controller.ts')
 const schemaMarkers = [
-  'status          String    @default("active")',
+  'status String @default("active")',
   'statusChangedAt DateTime?',
   'closingRequestedAt DateTime?',
   'anonymizedAt DateTime?',
@@ -199,8 +203,8 @@ const postgresMigrationMarkers = [
 ] as const
 
 console.log('\n=== 会员账户状态门禁 ===')
-mustContain(sqliteEndUser, schemaMarkers, 'SQLite EndUser schema')
-mustContain(postgresEndUser, schemaMarkers, 'PostgreSQL EndUser schema')
+mustContain(compactWhitespace(sqliteEndUser), schemaMarkers, 'SQLite EndUser schema')
+mustContain(compactWhitespace(postgresEndUser), schemaMarkers, 'PostgreSQL EndUser schema')
 mustContain(sqliteMigration, sqliteMigrationMarkers, 'SQLite account-status migration')
 mustContain(postgresMigration, postgresMigrationMarkers, 'PostgreSQL account-status migration')
 verifySqliteMigration(sqliteMigration)

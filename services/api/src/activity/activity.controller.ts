@@ -3,8 +3,8 @@ import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { RedisService } from '../common/redis/redis.service'
-import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { PrismaService } from '../prisma/prisma.service'
+import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ActivityService } from './activity.service'
 
 interface ReqLike {

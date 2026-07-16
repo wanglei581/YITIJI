@@ -30,13 +30,17 @@
 
 ## P0/P1：用户中心商用级闭环
 
-> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；方案已由 PR #259 合入 `main@602fe0d`，合并状态又由 PR #260 收口至 `main@b91bb62`。Wave 0 与 Wave 1A 已分别在独立本地候选完成；均尚未 push/PR/合入/deploy。后续仍须一波一分支，Wave 1B/1C 不得直接在主工作区或既有候选分支继续堆叠。
+> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
+
+> 2026-07-16 最新状态：Wave 1-A 基础版及其会员打印订单、governed job-fit 夹具修复已经进入 `origin/main@f69bf1b7`。当前独立本地候选正在追加 Redis 原子状态机、状态 epoch、provider 不确定结果、grant 碰撞/owner 隔离、注册后签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 等安全加固；尚未 push/PR/merge/deploy。没有新增 UI、导出或注销执行器。仅在该加固候选全量门禁与双模型终审通过并完成远程交付后，才推进 Wave 1-B。
 
 - [x] **用户中心方案文档正式基线**：PR #259 已将审计、产品方案、五份计划、CCG 归档和对应进度事实合入 `main@602fe0d`；`build-and-verify` 与 `postgres-readiness` 均通过，且双模型复审无 Critical/Warning。
-- [x] **Wave 0 真实表达与验证基线（本地候选完成）**：`codex/user-center-wave0-truth-baseline` 已按 RED→GREEN 删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration；Claude 与显式指定模型的 Antigravity 最终均 `APPROVE`，无 Critical/Warning。该分支已重放到 `main@b91bb62`，尚未 push/PR/合入/deploy，GitHub CI 仍须在远程交付获批后执行。
-- [x] **Wave 1A 账户安全底座（本地候选完成）**：独立分支已完成 EndUser 双状态/epoch、历史 disabled 回填、所有会员登录面与守卫门禁、用户级会话原子撤销、closing 最小回执以及 SMS step-up challenge/grant；SQLite/PostgreSQL 双轨 migration 与 CI 候选门禁已补齐，专项验证覆盖 Redis TTL、状态损坏、并发消费、跨用户隔离和敏感值扫描。仍未 push/PR/合入/deploy，未发送真实短信，且不包含数据导出、账户注销执行器或前端入口。
-- [ ] **Wave 1B 数据权利执行链（当前下一步）**：另起独立分支，补会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执复用和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。必须显式处理 Wave 0 遗留的 `delete` 工单 `pending/handling` 堆积、终态/SLA、会员级 AI 数据综合清除和服务端生成 `auditRef`，不能靠客户端审计凭证或普通 reject 清账。不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
-- [ ] **Wave 1C 隐私运营 UI**：在 Wave 1B 执行链契约稳定后另起独立分支，实现 Admin 隐私请求处理页、失败重试和审计视图；Kiosk 仅在真实导出/注销闭环、法务文案和预生产验收全部通过后开放对应入口，不提前展示不可用动作。
+- [x] **Wave 0 真实表达与验证基线（已合入）**：PR #261 已将 `codex/user-center-wave0-truth-baseline` 的 RED→GREEN 改动合入 `origin/main@0c4cdd57`：删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration；Claude 与显式指定模型的 Antigravity 最终均 `APPROVE`，无 Critical/Warning。
+- [x] **Wave 0 授权撤回终态保护补丁（已合入，未部署）**：`revoke_consent→rejected` 已 fail closed，授权已在请求创建时真实撤回时拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。PR #263 的双 CI、SQLite/PostgreSQL 空库复验与双模型审查均通过。
+- [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
+- [ ] **Wave 1-A 追加安全加固候选（当前门禁）**：独立本地分支补强 challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard；须先完成最新主线全量复验、双模型终审与远程交付，当前尚未 push/PR/merge/deploy。
+- [ ] **Wave 1-B 数据权利执行器（安全加固交付后下一步）**：补 export/delete 请求互斥、导出包异步生成、单次下载租约/finish/reconciler、服务端 auditRef、closing 最小回执和注销分类 fail-closed gate；法务分类留存矩阵未签字前不得执行不可逆删除。
+- [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
@@ -46,6 +50,20 @@
 ## P0：上线前真实验收
 
 - [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+- [x] **F1 发布来源一致性修正后只读追溯**：2026-07-16 在新的明确授权下，固定白名单 SSH 会话以 `exit=0` 干净结束；PM2 路径一致、F1 标记存在、metadata 为 `bb9c7efbb032`（`origin/main`），本机确认 `faa82612` 与 `e0940a95` 都是其祖先。但 metadata 没有与运行中 dist 可比的声明 hash，归档仍为 `unavailable_or_non_whitelisted`，所以无法闭合 source → dist → PM2 的来源链；F1 维持 **NO-GO**。本项只完成追溯，不授权部署、迁移、重启、真实管理员验收或再次 SSH。
+
+- [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher、atomic activation 与 fail-closed activation lock；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。Gemini 3.1 Pro (High) 与 Claude Opus 4.6 的有效复审均为 `APPROVE`；Claude 初审提出的运行账户环境最小化和并发 activation 两项 High 已分别写入首次启用审批前置、以令牌锁与红绿测试关闭，复审后的两项测试覆盖 Warning 也已追加断言并复跑完整本地验证。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**。
+
+- [ ] **F1 未来受控 release 首次启用与回滚演练（须单独生产授权）**：先取得稳定 launcher 安装与 SHA-256、固定 PM2 `cwd/script args`、artifact/current 绝对根、candidate 构建和本机 PostgreSQL health 的审批；再按 production runbook 在非 current candidate 验证 manifest，执行一次受控切换与 verified-previous 回滚演练。不得回填当前 release，亦不得把本地 fixture 或 CI 通过当作生产来源一致性通过。
+
+- [ ] **P0 离线验收证据矩阵后的逐项授权**：离线矩阵结论仅覆盖仓库文档范围，不连接任何环境且不改变真实验收状态。此前引用的证据矩阵文档尚未提交进 `main`（`git log --all` 对该路径无来源），待其所有者补入仓库后再引用；在此之前不作为可访问的仓库证据。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
+
+- [x] **F1 future-only provenance clean-main 候选迁移（已合并，未部署）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。该候选已随 [PR #262](https://github.com/wanglei581/YITIJI/pull/262) 合入 `main`（merge commit `4b3c9887`，head `b7a365da`；`build-and-verify` 与 `postgres-readiness` 均成功）。不得将该合并、本地 fixture 或 CI 接线写作 production 来源一致性通过：未部署、未安装 launcher、未改 PM2，当前 production 继续 **NO-GO**，不得执行首次启用；首次启用与回滚演练仍须单独生产授权。
+
+- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：本地候选已完成代码、专项/回归/浏览器验证、双模型终审和串行 CI 接线；[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已创建，首轮 GitHub `build-and-verify` / `postgres-readiness` 均通过，当前下一步是等待合并授权与最新 HEAD CI。尚未合并、部署、发送真实短信或执行真实转移；依赖审计 P0 未清零前不得宣称可部署，生产执行仍需另行授权和本人 OTP。
+  1. **PR / CI**：推送候选并创建 PR，确认 `build-and-verify` 与 `postgres-readiness` 成功，且 Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁在共享 SQLite suite 中保持逐行串行。
+  2. **部署授权**：先单独处理依赖审计基线中的部署阻塞（`shell-quote` critical，`hono` / `multer` / `vite` high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；这些依赖不在本候选范围内，阻塞未清除前不得部署。
+  3. **真实转移**：仅在已授权部署并完成只读预检后，由已登录 Admin 用户本人在「账号设置」页面自行输入当前密码与真实短信 OTP 完成一次转移；AI/运维人员不得读取、代填、保存或输出密码、OTP、ticket、cookie 或手机号明文。执行后再只读核验脱敏审计、Partner 用户名/密码登录能力与相关旧会话失效；未另行授权前继续保持 `CLOSED_MODE`。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 

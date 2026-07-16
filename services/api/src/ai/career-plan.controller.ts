@@ -2,8 +2,8 @@ import { Controller, Get, Param, Post, Req } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
-import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { PrismaService } from '../prisma/prisma.service'
+import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { CareerPlanService } from './resume/career-plan.service'
 
 interface ReqLike {

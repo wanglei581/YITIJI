@@ -6,6 +6,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { AdminInitialPhoneBindService } from './admin-initial-phone-bind.service'
+import { AdminPhoneTransferService, type AdminPhoneTransferStartResult } from './admin-phone-transfer.service'
 import { AuthService, type LoginResult } from './auth.service'
 import { InitialPhoneBindService } from './initial-phone-bind.service'
 import {
@@ -29,6 +30,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly initialPhoneBindService: InitialPhoneBindService,
     private readonly adminInitialPhoneBindService: AdminInitialPhoneBindService,
+    private readonly adminPhoneTransferService: AdminPhoneTransferService,
   ) {}
 
   /**
@@ -181,6 +183,42 @@ export class AuthController {
     @Body() dto: InitialPhoneBindCancelDto,
   ): Promise<ApiResponse<{ cancelled: true }>> {
     return ApiResponse.ok(await this.adminInitialPhoneBindService.cancel(user.userId, dto.bindTicket))
+  }
+
+  @Post('admin/phone/transfer/start')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async startAdminPhoneTransfer(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindStartDto,
+    @Ip() ip: string,
+  ): Promise<ApiResponse<AdminPhoneTransferStartResult>> {
+    return ApiResponse.ok(
+      await this.adminPhoneTransferService.start(user.userId, dto.currentPassword, dto.phone, ip, dto.deviceId),
+    )
+  }
+
+  @Post('admin/phone/transfer/verify')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async verifyAdminPhoneTransfer(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindVerifyDto,
+  ): Promise<ApiResponse<{ phoneMasked: string; phoneVerifiedAt: string }>> {
+    return ApiResponse.ok(await this.adminPhoneTransferService.verify(user.userId, dto.bindTicket, dto.code))
+  }
+
+  @Post('admin/phone/transfer/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async cancelAdminPhoneTransfer(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindCancelDto,
+  ): Promise<ApiResponse<{ cancelled: true }>> {
+    return ApiResponse.ok(await this.adminPhoneTransferService.cancel(user.userId, dto.bindTicket))
   }
 
   /** 登录态自助改密:须提供当前密码校验身份,成功后旧 token 立即失效,需重新登录。 */

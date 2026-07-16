@@ -1,0 +1,50 @@
+# 管理员与合作机构账号手机号安全转移
+
+## 背景
+
+当前内部账号使用全局唯一的 `User.phoneHash`。同一手机号已经属于合作机构账号时，管理员严格首次绑定会安全拒绝。用户只有一个手机号，同时需要保留合作机构账号继续使用，因此不能删除机构账号、复制手机号或弱化唯一约束。
+
+## 目标
+
+- 已登录且尚未绑定手机号的 Admin 可以在验证当前密码和短信验证码后，将该手机号从一个 Partner 账号原子转移到自己名下。
+- Partner 账号、用户名、密码、机构归属和历史业务关系全部保留，转移后仍可用用户名和密码登录。
+- Partner 的手机号、短信登录和短信找回能力被清除，旧会话立即趋于失效；Admin 可继续通过既有入口重置 Partner 密码。
+- 全程保留手机号全局唯一约束，写入必要且脱敏的审计记录。
+
+## 安全不变量
+
+- 只允许来源账号 `role=partner`；禁止转移另一 Admin 或其他角色的手机号。
+- 必须同时具备有效 Admin 会话、正确 Admin 当前密码和发送到目标手机号的正确 OTP。
+- 转移端点与严格首次绑定端点必须共用同一个 Admin 当前密码失败额度键，禁止通过交替调用两个端点扩大密码尝试次数。
+- 当前密码验证必须镜像严格初绑的 `reserve → bcrypt → 成功或 bcrypt 异常立即 release`；成功 start 不得永久占用失败额度，发码发生在额度释放之后。
+- 转移验证码必须使用独立 `transfer_phone` purpose，不得与严格首次绑定的 `bind_phone` 共用冷却、验证码或尝试计数命名空间。
+- 清空 Partner 手机号与绑定 Admin 必须处于同一个数据库事务中，并按“先清 Partner、后绑 Admin”的顺序执行。
+- 事务内递增 Partner `tokenVersion`；事务提交后必须通过 `setJsonIfVersionNotOlder` 写入新版本 Partner 会话状态，原子阻止旧版本并发回填。缓存刷新失败不得回滚数据库真值，但必须记录脱敏告警，旧缓存残余窗口以上线时既有 TTL 为上限。
+- Ticket 必须绑定 Admin、Partner、双方 tokenVersion、phoneHash 和加密手机号，并受 TTL、单活动 ticket、验证锁和 CAS 约束。
+- 响应、日志和审计不得包含手机号明文、`phoneHash`、`phoneEnc`、密码、OTP 或 ticket 内容。
+- `start`、`complete`、`cancel`、`released_by_admin` 四个审计动作必须全部有真实写入点；Partner 释放事件通过 `actorId=Admin`、`targetId=Partner` 追溯，payload 保持为空。
+
+## 允许范围
+
+- 后端：`services/api/src/auth/` 内新增独立转移服务、controller/module 接线、必要 DTO 或审计类型；新增独立 verifier。
+- Admin：既有“账号设置”页面内增加转移分支、独立组件和 API 适配；不新增页面或导航入口。
+- 文档：正式设计、实施计划、当前进度和下一步任务。
+- CI：只接入本功能的确定性静态/隔离 verifier。
+
+## 明确不做
+
+- 不修改 Prisma schema、手机号唯一约束、生产数据库或环境变量。
+- 不删除 Partner 账号或机构业务数据，不改变 Partner 的用户名和密码。
+- 不修改、复制或依赖未合并的 Partner 账号安全删除候选分支。
+- 不迁移到多角色账户模型，不处理 Admin↔Admin 或 EndUser 手机号转移。
+- 不部署、不发真实短信、不执行真实转移，除非代码、CI、双模型终审全部通过且用户另行明确授权。
+
+## 验收
+
+- TDD 覆盖正常转移、成功密码验证不消耗失败额度、事务第二步真实失败回滚、唯一约束顺序、并发竞争、陈旧 ticket、非 Partner 拒绝、OTP 重试、Partner 新版本缓存覆盖与旧版本回填拒绝、缓存刷新失败的 TTL 收敛、Admin 会话保持、四类审计脱敏和 Partner 用户名密码登录兜底。
+- API/Admin typecheck、lint、build、专项 verifier、`git diff --check` 全部通过。
+- Antigravity 与 Claude 双模型审查必须有真实报告。用户已同意切换可用模型：Antigravity `Claude Sonnet 4.6 (Thinking)` 针对性复审 `READY 96/100`；Claude `Claude Opus 4.8 (1M context)` 针对性复审 `READY`、Critical 0、Warning 0，允许进入 TDD。代码完成后仍须对真实 diff 再做双模型终审。
+
+## 已知独立上线阻塞
+
+- 2026-07-16 基线 `pnpm audit --audit-level high` 发现 `multer@2.1.1` 深层字段 DoS；本分支未修改 manifest/lock，不在认证功能中顺手升级，但合并部署前必须由独立 P0 任务升级到 `>=2.2.0` 并回归上传链路。

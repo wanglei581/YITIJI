@@ -4,8 +4,8 @@ import { JwtService } from '@nestjs/jwt'
 import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator'
 import { Type } from 'class-transformer'
 import { RedisService } from '../common/redis/redis.service'
-import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { PrismaService } from '../prisma/prisma.service'
+import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { JobFitService } from './resume/job-fit.service'
 import { GovernedJobFitService } from '../job-ai/governed-job-fit.service'
 import type { JobAiQuotaContext } from '../job-ai/job-ai-quota.service'
@@ -76,8 +76,8 @@ export class JobFitController {
     private readonly service: JobFitService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
-    private readonly governed: GovernedJobFitService,
     private readonly prisma: PrismaService,
+    private readonly governed: GovernedJobFitService,
   ) {}
 
   private async requesterOf(req: ReqLike) {

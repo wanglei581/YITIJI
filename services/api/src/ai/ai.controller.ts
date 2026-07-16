@@ -97,9 +97,9 @@ export class AiController {
     private readonly audit: AuditService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
     private readonly asr: AsrService,
     private readonly benefitRedemption: BenefitRedemptionService,
-    private readonly prisma: PrismaService,
   ) {}
 
   /**

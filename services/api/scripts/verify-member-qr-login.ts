@@ -41,6 +41,9 @@ async function main(): Promise<void> {
   if (!process.env['REDIS_URL']) { fail('REDIS_URL missing'); process.exit(1) }
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ['error', 'warn'] })
+  // Test-only trusted loopback proxy keeps this verifier's rate-limit buckets
+  // isolated without making production trust client-supplied forwarding headers.
+  app.set('trust proxy', 'loopback')
   app.setGlobalPrefix('api/v1')
   app.useGlobalPipes(
     new ValidationPipe({
@@ -61,8 +64,16 @@ async function main(): Promise<void> {
   const redis = app.get(RedisService)
   const prisma = app.get(PrismaService)
   const tail = Date.now().toString().slice(-8)
+  const testNetwork = randomBytes(2)
+  const testIp = `198.18.${testNetwork[0]}.${testNetwork[1]}`
+  const phoneDeviceId = `verify-qr-phone-${randomBytes(4).toString('hex')}`
+  const closingDeviceId = `verify-qr-closing-${randomBytes(4).toString('hex')}`
+  const smsHeaders = { 'x-forwarded-for': testIp }
+  const rateLimitHourAtStart = new Date().toISOString().slice(0, 13)
   const phone = `138${tail}`
   const phoneHash = hashPhone(phone)
+  const closingPhone = `139${tail}`
+  const closingPhoneHash = hashPhone(closingPhone)
   const terminalId = `term_qr_${randomBytes(5).toString('hex')}`
   const otherTerminalId = `term_qr_${randomBytes(5).toString('hex')}`
   const agentToken = `qr-agent-token-${randomBytes(8).toString('hex')}`
@@ -70,6 +81,7 @@ async function main(): Promise<void> {
   const terminalHeaders = { authorization: `Bearer ${agentToken}`, 'x-terminal-id': terminalId }
   const otherTerminalHeaders = { authorization: `Bearer ${otherAgentToken}`, 'x-terminal-id': otherTerminalId }
   let ticketId: string | null = null
+  let closingTicketId: string | null = null
 
   async function request(
     method: 'GET' | 'POST',
@@ -161,14 +173,14 @@ async function main(): Promise<void> {
       : fail(`claim before confirmation -> ${earlyClaim.status} ${JSON.stringify(earlyClaim.json)}`)
 
     console.log('\n-- 3. SMS code and wrong-code confirmation -----------------------------')
-    const send = await request('POST', '/auth/sms-code', { phone, deviceId: 'phone-e2e-01' })
+    const send = await request('POST', '/auth/sms-code', { phone, deviceId: phoneDeviceId }, smsHeaders)
     send.status === 201 ? pass('sms-code -> 201') : fail(`sms-code -> ${send.status} ${JSON.stringify(send.json)}`)
     const code = await redis.get(`member:sms:code:${phoneHash}`)
     code && /^\d{6}$/.test(code) ? info(`SMS code stored in Redis: ${code.slice(0, 2)}****`) : fail('SMS code not found in Redis')
     const wrong = await request('POST', `/auth/qr/${encodeURIComponent(ticketId)}/confirm`, {
       phone,
       code: code === '000000' ? '111111' : '000000',
-      deviceId: 'phone-e2e-01',
+      deviceId: phoneDeviceId,
     })
     wrong.status === 401
       ? pass('wrong SMS code confirmation -> 401')
@@ -178,7 +190,7 @@ async function main(): Promise<void> {
     const confirm = await request('POST', `/auth/qr/${encodeURIComponent(ticketId)}/confirm`, {
       phone,
       code,
-      deviceId: 'phone-e2e-01',
+      deviceId: phoneDeviceId,
     })
     const confirmData = (confirm.json.data ?? {}) as Json
     confirm.status === 201 && confirmData.status === 'confirmed'
@@ -190,7 +202,7 @@ async function main(): Promise<void> {
     const duplicateConfirm = await request('POST', `/auth/qr/${encodeURIComponent(ticketId)}/confirm`, {
       phone,
       code: '000000',
-      deviceId: 'phone-e2e-01',
+      deviceId: phoneDeviceId,
     })
     duplicateConfirm.status === 409
       ? pass('duplicate confirmation -> 409')
@@ -244,7 +256,49 @@ async function main(): Promise<void> {
       ? pass('second claim -> 410')
       : fail(`second claim -> ${replay.status} ${JSON.stringify(replay.json)}`)
 
-    console.log('\n-- 8. invalid and unknown tickets are rejected -------------------------')
+    console.log('\n-- 8. account closing after confirmation cannot mint a session --------')
+    const closingCreate = await request('POST', '/auth/qr/create', { returnTo: '/me' }, terminalHeaders)
+    const closingCreated = (closingCreate.json.data ?? {}) as Json
+    closingTicketId = closingCreated.ticketId as string | null
+    const closingClaimToken = closingCreated.claimToken as string | undefined
+    if (closingCreate.status !== 201 || !closingTicketId || !closingClaimToken) {
+      fail(`closing test ticket create -> ${closingCreate.status} ${JSON.stringify(closingCreate.json)}`)
+    } else {
+      const closingSend = await request('POST', '/auth/sms-code', { phone: closingPhone, deviceId: closingDeviceId }, smsHeaders)
+      const closingCode = await redis.get(`member:sms:code:${closingPhoneHash}`)
+      if (closingSend.status !== 201 || !closingCode) {
+        fail(`closing test SMS -> ${closingSend.status} ${JSON.stringify(closingSend.json)}`)
+      } else {
+        const closingConfirm = await request('POST', `/auth/qr/${encodeURIComponent(closingTicketId)}/confirm`, {
+          phone: closingPhone,
+          code: closingCode,
+          deviceId: closingDeviceId,
+        })
+        if (closingConfirm.status !== 201) {
+          fail(`closing test confirmation -> ${closingConfirm.status} ${JSON.stringify(closingConfirm.json)}`)
+        } else {
+          const closingUser = await prisma.endUser.findUnique({ where: { phoneHash: closingPhoneHash } })
+          if (!closingUser) {
+            fail('closing test member was not created')
+          } else {
+            await prisma.endUser.update({ where: { id: closingUser.id }, data: { status: 'closing' } })
+            const closingClaim = await request(
+              'POST',
+              `/auth/qr/${encodeURIComponent(closingTicketId)}/claim`,
+              { claimToken: closingClaimToken },
+              terminalHeaders,
+            )
+            if (closingClaim.status === 403 && !('token' in ((closingClaim.json.data ?? {}) as Json))) {
+              pass('account closing after QR confirmation -> 403 and no new member token')
+            } else {
+              fail(`closing account QR claim -> ${closingClaim.status} ${JSON.stringify(closingClaim.json)}`)
+            }
+          }
+        }
+      }
+    }
+
+    console.log('\n-- 9. invalid and unknown tickets are rejected -------------------------')
     const malformed = await request('GET', '/auth/qr/not-a-real-ticket/status')
     malformed.status === 400
       ? pass('malformed ticket status -> 400')
@@ -256,13 +310,26 @@ async function main(): Promise<void> {
   } finally {
     console.log('\n-- cleanup -------------------------------------------------------------')
     await prisma.endUser.deleteMany({ where: { phoneHash } })
+    await prisma.endUser.deleteMany({ where: { phoneHash: closingPhoneHash } })
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await redis.del(`member:sms:attempt:${phoneHash}`)
+    await redis.del(`member:sms:code:${closingPhoneHash}`)
+    await redis.del(`member:sms:cooldown:${closingPhoneHash}`)
+    await redis.del(`member:sms:attempt:${closingPhoneHash}`)
+    for (const rateLimitHour of new Set([rateLimitHourAtStart, new Date().toISOString().slice(0, 13)])) {
+      await redis.del(`member:sms:ip:${testIp}:${rateLimitHour}`)
+      await redis.del(`member:sms:device:${phoneDeviceId}:${rateLimitHour}`)
+      await redis.del(`member:sms:device:${closingDeviceId}:${rateLimitHour}`)
+    }
     await prisma.terminal.deleteMany({ where: { id: { in: [terminalId, otherTerminalId] } } })
     if (ticketId) {
       await redis.del(`member:qr:${ticketId}`)
       await redis.del(`member:qr:claimed:${ticketId}`)
+    }
+    if (closingTicketId) {
+      await redis.del(`member:qr:${closingTicketId}`)
+      await redis.del(`member:qr:claimed:${closingTicketId}`)
     }
     await app.close()
   }

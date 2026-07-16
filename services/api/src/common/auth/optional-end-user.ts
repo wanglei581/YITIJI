@@ -1,7 +1,7 @@
 import { JwtService } from '@nestjs/jwt'
-import type { PrismaService } from '../../prisma/prisma.service'
 import type { RedisService } from '../redis/redis.service'
 import { memberSessionKey } from '../guards/end-user-auth.guard'
+import type { PrismaService } from '../../prisma/prisma.service'
 
 interface EndUserJwtPayload {
   sub: string
@@ -45,10 +45,17 @@ export async function resolveOptionalEndUser(
   const ownerId = await redis.get(memberSessionKey(sessionId))
   if (ownerId !== payload.sub) return null
 
-  const user = await prisma.endUser.findUnique({
-    where: { id: payload.sub },
-    select: { enabled: true, status: true },
-  })
+  let user: { enabled: boolean; status: string } | null
+  try {
+    user = await prisma.endUser.findUnique({
+      where: { id: payload.sub },
+      select: { enabled: true, status: true },
+    })
+  } catch {
+    // This helper is used by public endpoints. A status lookup outage must
+    // never convert an otherwise anonymous request into a 500 response.
+    return null
+  }
   if (!user || !user.enabled || user.status !== 'active') {
     await redis.unregisterMemberSession(payload.sub, sessionId)
     return null

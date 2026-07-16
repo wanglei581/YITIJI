@@ -1,0 +1,12 @@
+{
+  "id": "rebase-wave1-pr265-onto-main-20260716",
+  "title": "将 Wave 1-A PR #265 重放到最新 main 并解决进度文档冲突",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "integration",
+  "currentPhase": "completed",
+  "nextAction": "已 rebase 至 origin/main@cec65d9c；本地验证通过，推送重写后的 PR 分支并等待 GitHub CI 后按用户授权合并",
+  "createdAt": "2026-07-16T13:40:00Z",
+  "branch": "codex/user-center-wave1-account-security-r2-20260716"
+}

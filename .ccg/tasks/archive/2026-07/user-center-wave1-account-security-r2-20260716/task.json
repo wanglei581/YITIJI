@@ -1,0 +1,12 @@
+{
+  "id": "user-center-wave1-account-security-r2-20260716",
+  "title": "用户中心 Wave 1 账户安全与数据权利首段",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "已完成本地验证、Claude 终审与 Warning 修复；归档任务并在独立分支提交，未经新授权不得 push、建 PR 或部署",
+  "createdAt": "2026-07-16T11:51:00Z",
+  "branch": "codex/user-center-wave1-account-security-r2-20260716"
+}

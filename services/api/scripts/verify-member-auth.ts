@@ -29,7 +29,7 @@
  *  14. 双向隔离：内部 token 被 EndUserAuthGuard 拒；enduser token 被内部 JwtAuthGuard 拒
  */
 import 'dotenv/config'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { ExecutionContext } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
@@ -103,6 +103,9 @@ async function main() {
   // ── 启动真实 HTTP 服务（镜像 main.ts 关键配置）────────────────────────────────
   info('Bootstrapping NestJS HTTP app (logger: error/warn)...')
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ['error', 'warn'] })
+  // Test-only trusted loopback proxy: each verifier run gets an isolated IP
+  // bucket while production remains responsible for its explicit proxy policy.
+  app.set('trust proxy', 'loopback')
   app.setGlobalPrefix('api/v1')
   app.useGlobalPipes(
     new ValidationPipe({
@@ -126,6 +129,11 @@ async function main() {
 
   // 唯一测试手机号（138 + 8 位时间派生），避免与真实数据/历史 Redis 冲突。
   const tail = Date.now().toString().slice(-8)
+  const testNetwork = randomBytes(2)
+  const testIp = `198.18.${testNetwork[0]}.${testNetwork[1]}`
+  const memberDeviceId = `verify-member-auth-${randomBytes(4).toString('hex')}`
+  const testHeaders = { 'x-forwarded-for': testIp }
+  const rateLimitHourAtStart = new Date().toISOString().slice(0, 13)
   const PHONE = `138${tail}`
   const phoneHash = hashPhone(PHONE)
   const sessionOwnerId = `verify-member-session-owner-${tail}`
@@ -150,7 +158,11 @@ async function main() {
   async function post(path: string, body: Json, token?: string): Promise<{ status: number; json: Json }> {
     const res = await fetch(`${base}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...testHeaders,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
     })
     const json = (await res.json().catch(() => ({}))) as Json
@@ -261,7 +273,7 @@ async function main() {
 
     // ── 1. 发送验证码 ──────────────────────────────────────────────────────────
     console.log('── 1. 发送验证码 ──────────────────────────────────────────────')
-    const send = await post('/auth/sms-code', { phone: PHONE, deviceId: 'e2e-kiosk-01' })
+    const send = await post('/auth/sms-code', { phone: PHONE, deviceId: memberDeviceId })
     if (send.status === 201) pass('POST /auth/sms-code → 201（Nest @Post 默认）')
     else fail(`POST /auth/sms-code → ${send.status} (expected 201) ${JSON.stringify(send.json)}`)
     if (!JSON.stringify(send.json).includes('"code"') || !/\d{6}/.test(JSON.stringify(send.json.data ?? {})))
@@ -630,6 +642,21 @@ async function main() {
       }
     }
 
+    const outageSessionId = 'resolver-database-outage'
+    let outageUnregistered = false
+    const outageResult = await resolveOptionalEndUser(
+      'Bearer resolver-outage-token',
+      { verify: () => ({ sub: endUserId, jti: outageSessionId }) } as never,
+      {
+        get: async () => endUserId,
+        unregisterMemberSession: async () => { outageUnregistered = true },
+      } as never,
+      { endUser: { findUnique: async () => { throw new Error('simulated database outage') } } } as never,
+    )
+    if (outageResult === null && !outageUnregistered) {
+      pass('optional resolver 数据库故障 → anonymous，且不误撤销有效 session')
+    } else fail('optional resolver 数据库故障未安全降级为匿名')
+
     // ── 13. 注销回执 guard 仅做严格 JWT 验签 ────────────────────────────────
     console.log('\n── 13. 注销回执 guard 的窄授权边界 ───────────────────────────')
     type ClosureGuard = { canActivate(context: ExecutionContext): Promise<boolean> }
@@ -743,6 +770,10 @@ async function main() {
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await redis.del(`member:sms:attempt:${phoneHash}`)
+    for (const rateLimitHour of new Set([rateLimitHourAtStart, new Date().toISOString().slice(0, 13)])) {
+      await redis.del(`member:sms:ip:${testIp}:${rateLimitHour}`)
+      await redis.del(`member:sms:device:${memberDeviceId}:${rateLimitHour}`)
+    }
     await rawRedis.del(
       firstSessionKey,
       secondSessionKey,

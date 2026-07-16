@@ -1,0 +1,13 @@
+{
+  "id": "wave0-review-evidence-reconciliation",
+  "title": "校正 Wave 0 增量审查异步日志事实",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "Claude 与 Antigravity 有效增量审查均已取得；在用户明确授权后进入远程交付任务（push、PR、GitHub CI）",
+  "createdAt": "2026-07-16T11:20:00Z",
+  "branch": "codex/user-center-wave0-data-truth-20260716",
+  "baseRef": "origin/main@0c4cdd574b8243b6b43436c2cb90a3d05c44d1b7"
+}
