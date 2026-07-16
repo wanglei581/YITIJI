@@ -66,7 +66,7 @@
 
 - [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher、atomic activation 与 fail-closed activation lock；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。Gemini 3.1 Pro (High) 与 Claude Opus 4.6 的有效复审均为 `APPROVE`；Claude 初审提出的运行账户环境最小化和并发 activation 两项 High 已分别写入首次启用审批前置、以令牌锁与红绿测试关闭，复审后的两项测试覆盖 Warning 也已追加断言并复跑完整本地验证。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**。
 
-- [ ] **F1 未来受控 release 首次启用与回滚演练（须单独生产授权）**：先取得稳定 launcher 安装与 SHA-256、固定 PM2 `cwd/script args`、artifact/current 绝对根、candidate 构建和本机 PostgreSQL health 的审批；再按 production runbook 在非 current candidate 验证 manifest，执行一次受控切换与 verified-previous 回滚演练。不得回填当前 release，亦不得把本地 fixture 或 CI 通过当作生产来源一致性通过。
+- [ ] **F1 平行 Genesis bootstrap 的本地实现与镜像演练（设计已确认，仍无生产授权）**：`docs/superpowers/specs/2026-07-16-f1-parallel-genesis-bootstrap-design.md` 已确认首启不能复用现有 `release:activate`：历史 F1 既不可作为 verified previous，旧 PM2 也不是 launcher。下一步先在独立分支实现一次性、不可重入的 Genesis 原语与离线 RED→GREEN 门禁：它仅建立零流量 managed `r1`，再由既有稳态激活器验证 `r1 → r2`；任何 Genesis 失败只清理新链、保持 legacy 流量，不得手工改 `current`、PM2 reload 或 direct `main.js` 绕过。实现通过双模型审查后，才可在镜像拓扑演练 Genesis/稳态 rollback；生产 D3–D6（只读预检、零流量 Genesis、负载层切流、稳态发布）均须分别取得具名、限时授权。不得回填当前 release，亦不得把本地 fixture、CI 或旧 PM2 `online` 当作 production 来源一致性通过。
 
 - [ ] **P0 离线验收证据矩阵后的逐项授权**：离线矩阵结论仅覆盖仓库文档范围，不连接任何环境且不改变真实验收状态。此前引用的证据矩阵文档尚未提交进 `main`（`git log --all` 对该路径无来源），待其所有者补入仓库后再引用；在此之前不作为可访问的仓库证据。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
 
