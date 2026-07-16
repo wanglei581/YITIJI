@@ -37,6 +37,7 @@ jobs:
       FILE_STORAGE_DIR: /tmp/ci-file-storage
       FILE_STORAGE_DRIVER: local
       AI_PROVIDER: mock
+      PAYMENT_PROVIDER: disabled
       # 以下均为 CI 专用测试值，不是真实凭证
       JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
       SECRET_ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
@@ -204,8 +205,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
           pnpm --filter @ai-job-print/api verify:deploy-data-safety-gate
           pnpm --filter @ai-job-print/api verify:production-real-services
-          pnpm --filter @ai-job-print/api verify:member-auth
+          pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-step-up
+          pnpm --filter @ai-job-print/api verify:member-auth
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
           pnpm --filter @ai-job-print/api verify:partner-excel-template
           pnpm --filter @ai-job-print/api verify:partner-edit
@@ -318,6 +320,7 @@ jobs:
       FILE_STORAGE_DIR: /tmp/ci-file-storage
       FILE_STORAGE_DRIVER: local
       AI_PROVIDER: mock
+      PAYMENT_PROVIDER: disabled
       JWT_SECRET: ci-only-jwt-secret-0123456789abcdef
       SECRET_ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
       SMS_PROVIDER: log
@@ -334,8 +337,8 @@ jobs:
           cache: pnpm
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
-      - name: Install CJK font (PDF verify)
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk
+      - name: Install CJK font + sqlite3 (PDF / account-status verify)
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
@@ -368,6 +371,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
+          pnpm --filter @ai-job-print/api verify:member-account-status
+          pnpm --filter @ai-job-print/api verify:member-step-up
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard

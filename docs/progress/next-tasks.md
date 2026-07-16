@@ -30,11 +30,13 @@
 
 ## P0/P1：用户中心商用级闭环
 
-> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；方案已由 PR #259 合入 `main@602fe0d`，合并状态又由 PR #260 收口至 `main@b91bb62`。Wave 0 已在独立本地候选完成实现、双数据库验证与浏览器验收，现已重放到该最新正式主线，但尚未 push/PR/合入/deploy。后续仍须一波一分支，Wave 1 不得直接在主工作区或 Wave 0 分支堆叠。
+> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；方案已由 PR #259 合入 `main@602fe0d`，合并状态又由 PR #260 收口至 `main@b91bb62`。Wave 0 与 Wave 1A 已分别在独立本地候选完成；均尚未 push/PR/合入/deploy。后续仍须一波一分支，Wave 1B/1C 不得直接在主工作区或既有候选分支继续堆叠。
 
 - [x] **用户中心方案文档正式基线**：PR #259 已将审计、产品方案、五份计划、CCG 归档和对应进度事实合入 `main@602fe0d`；`build-and-verify` 与 `postgres-readiness` 均通过，且双模型复审无 Critical/Warning。
 - [x] **Wave 0 真实表达与验证基线（本地候选完成）**：`codex/user-center-wave0-truth-baseline` 已按 RED→GREEN 删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration；Claude 与显式指定模型的 Antigravity 最终均 `APPROVE`，无 Critical/Warning。该分支已重放到 `main@b91bb62`，尚未 push/PR/合入/deploy，GitHub CI 仍须在远程交付获批后执行。
-- [ ] **Wave 1 账户安全与数据权利（当前下一步）**：另起独立分支，按账户安全 → 数据权利 → 运营 UI 三段执行，补敏感操作 step-up、会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执、Admin 隐私请求处理页和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。必须显式处理 Wave 0 遗留的 `delete` 工单 `pending/handling` 堆积、终态/SLA、会员级 AI 数据综合清除和服务端生成 `auditRef`，不能靠客户端审计凭证或普通 reject 清账。账户安全和导出链可先实现；不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
+- [x] **Wave 1A 账户安全底座（本地候选完成）**：独立分支已完成 EndUser 双状态/epoch、历史 disabled 回填、所有会员登录面与守卫门禁、用户级会话原子撤销、closing 最小回执以及 SMS step-up challenge/grant；SQLite/PostgreSQL 双轨 migration 与 CI 候选门禁已补齐，专项验证覆盖 Redis TTL、状态损坏、并发消费、跨用户隔离和敏感值扫描。仍未 push/PR/合入/deploy，未发送真实短信，且不包含数据导出、账户注销执行器或前端入口。
+- [ ] **Wave 1B 数据权利执行链（当前下一步）**：另起独立分支，补会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执复用和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。必须显式处理 Wave 0 遗留的 `delete` 工单 `pending/handling` 堆积、终态/SLA、会员级 AI 数据综合清除和服务端生成 `auditRef`，不能靠客户端审计凭证或普通 reject 清账。不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
+- [ ] **Wave 1C 隐私运营 UI**：在 Wave 1B 执行链契约稳定后另起独立分支，实现 Admin 隐私请求处理页、失败重试和审计视图；Kiosk 仅在真实导出/注销闭环、法务文案和预生产验收全部通过后开放对应入口，不提前展示不可用动作。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
