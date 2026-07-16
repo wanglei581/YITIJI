@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-15
+> 最后更新：2026-07-16
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -27,6 +27,19 @@
 - [x] **Sprint1 顶层旧栈最终清理**：`origin/feature/sprint1-partner-dashboard` 的订单、Admin orders、Admin alerts、Partner profile/dashboard 价值均已完成取舍；#98 已 rebase merge 到 `main`，旧远程 head 已删除。未整分支合并，未执行 `prune` / `gc`。
 - [x] **面试重设计候选取舍**：已完成只读深审并由 #100 收口唯一可迁移的旧 `/interview/setup-preview` 清理点；正式 `/interview/setup` 真实链路保留，旧分叉本体不迁，fair verify residue guard 已由当前 `main` 更新版覆盖。
 - [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
+
+## P0/P1：用户中心商用级闭环
+
+> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；计划终审中 Antigravity（99/100）与 Claude 均 `APPROVE`，无 Critical/Warning；基于最新 main 的纯文档集成增量又由两者分别复审为 `APPROVE`，同样无 Critical/Warning。运行时代码尚未实施；纯文档候选已完成本地集成但尚未 push/merge。之后必须一波一分支，从干净正式候选基线新建独立 worktree，不使用当前脏工作区写运行时。
+
+- [x] **用户中心方案文档候选集成**：纯文档 worktree/分支已基于最新 `origin/main=6c7875592dc50cbeac1b72543d33ffb5c8d538ca`；只带入审计、产品方案、五份计划、CCG 归档和对应进度事实，并完成双模型复审。该本地分支仍未 push/merge，不代表 `origin/main` 已包含文档。
+- [ ] **Wave 0 真实表达与验证基线（当前下一步）**：严格按 `docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md` 执行。从干净正式文档候选基线新建 `codex/user-center-wave0-truth-baseline` 独立 worktree；先写失败守卫，再删除重复权益活动和不可用邮箱按钮，隐藏招聘会扫码凭证、打印套餐、AI 套餐占位；“身份切换”已不在最新 main，仅加防回归断言；现有二维码守卫已通过，仅复验且不得无故改实现/守卫；真实导出/注销上线前禁止把 `export/delete` 工单置为 completed 且禁止普通拒绝 delete；从正式 migration 重建 SQLite 验证库并与 PostgreSQL readiness 对齐，禁止为 schema 中已有的退款字段/核销表重复建迁移。不得新增用户中心首页入口。
+- [ ] **Wave 1 账户安全与数据权利**：按账户安全 → 数据权利 → 运营 UI 三个独立分支顺序执行，补敏感操作 step-up、会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执、Admin 隐私请求处理页和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。账户安全和导出链可先实现；不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
+- [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
+- [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
+- [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
+- [ ] **Wave 5 商用预生产与真机验收**：同一提交完成 PostgreSQL、Redis、COS、短信、Windows 一体机、真实打印、弱网、会话过期、键盘/读屏和隐私工单演练；收费模式另跑真实小额支付、退款和对账。
+
 
 ## P0：上线前真实验收
 
