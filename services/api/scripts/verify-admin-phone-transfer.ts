@@ -218,6 +218,7 @@ function oldPartnerState(partner: {
     orgId: partner.orgId,
     enabled: partner.enabled,
     tokenVersion: partner.tokenVersion,
+    deletedAt: null,
     orgEnabled: true,
   }
 }
@@ -256,8 +257,11 @@ async function verifyNormalTransferAndAudits(context: TestContext): Promise<void
 
   const cached = context.redis.raw(sessionKey(partner.id))
   ensure(cached !== null, '2. Partner 新版本会话缓存未写入')
-  const cachedState = JSON.parse(cached) as { tokenVersion?: number }
-  ensure(cachedState.tokenVersion === partner.tokenVersion + 1, '2. 新版本会话缓存未覆盖旧版本')
+  const cachedState = JSON.parse(cached) as { tokenVersion?: number; deletedAt?: unknown }
+  ensure(
+    cachedState.tokenVersion === partner.tokenVersion + 1 && cachedState.deletedAt === null,
+    '2. 新版本会话缓存未覆盖旧版本或缺少删除状态',
+  )
   const staleWrite = await context.redis.setJsonIfVersionNotOlder(
     sessionKey(partner.id),
     SESSION_TTL_SECONDS,
@@ -638,7 +642,11 @@ async function verifyCacheFailureConverges(context: TestContext): Promise<void> 
   const source = await context.prisma.user.findUniqueOrThrow({ where: { id: partner.id } })
   const target = await context.prisma.user.findUniqueOrThrow({ where: { id: admin.id } })
   ensure(source.tokenVersion === 13 && source.phoneHash === null && target.phoneHash === hashPhone(phone), '10. 缓存刷新失败反转或伪装了数据库成功')
-  ensure(await context.guard.canActivate(mockContext(oldToken)), '10. 旧缓存残余窗口模拟不成立')
+  await expectCode(
+    () => context.guard.canActivate(mockContext(oldToken)),
+    'AUTH_TOKEN_INVALID',
+    '10. Partner 缓存命中未回源拒绝已变更版本的旧 JWT',
+  )
   context.redis.advanceSeconds(SESSION_TTL_SECONDS)
   await expectCode(
     () => context.guard.canActivate(mockContext(oldToken)),
@@ -647,7 +655,7 @@ async function verifyCacheFailureConverges(context: TestContext): Promise<void> 
   )
   const refreshed = context.redis.raw(cacheKey)
   ensure(refreshed !== null && (JSON.parse(refreshed) as { tokenVersion?: number }).tokenVersion === 13, '10. TTL 回源未写入数据库新版本')
-  pass('10. 会话缓存刷新失败不反转 DB，旧缓存按 TTL 回源收敛并拒绝旧 JWT')
+  pass('10. 会话缓存刷新失败不反转 DB，Partner 缓存命中和 TTL 回源均拒绝旧 JWT')
 }
 
 async function main(): Promise<void> {
