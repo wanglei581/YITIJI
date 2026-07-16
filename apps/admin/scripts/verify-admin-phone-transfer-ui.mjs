@@ -9,6 +9,7 @@ import ts from 'typescript'
 const root = process.cwd()
 const authPath = join(root, 'src/services/auth/index.ts')
 const componentPath = join(root, 'src/routes/account-settings/AdminPhoneTransferCard.tsx')
+const accountSettingsPath = join(root, 'src/routes/account-settings/index.tsx')
 const API_ORIGIN = 'https://adapter-test.invalid'
 const AUTH_STORAGE_KEY = 'admin_auth_v1'
 const START_PATH = '/auth/admin/phone/transfer/start'
@@ -52,6 +53,298 @@ function fail(message) {
 
 function expect(condition, message) {
   if (!condition) throw new Error(message)
+}
+
+function parseTsx(source, fileName) {
+  return ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+}
+function visit(node, callback) {
+  callback(node)
+  node.forEachChild((child) => visit(child, callback))
+}
+
+function findNamedFunction(sourceFile, name) {
+  let match
+  visit(sourceFile, (node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) match = node
+  })
+  return match
+}
+
+function identifiersIn(node) {
+  const names = new Set()
+  visit(node, (child) => {
+    if (ts.isIdentifier(child)) names.add(child.text)
+  })
+  return names
+}
+
+function callsNamed(node, name) {
+  const calls = []
+  visit(node, (child) => {
+    if (ts.isCallExpression(child) && ts.isIdentifier(child.expression) && child.expression.text === name) calls.push(child)
+  })
+  return calls
+}
+
+function hasPropertyCall(node, owner, name) {
+  let found = false
+  visit(node, (child) => {
+    if (ts.isCallExpression(child) && ts.isPropertyAccessExpression(child.expression)) {
+      const target = child.expression
+      if (ts.isIdentifier(target.expression) && target.expression.text === owner && target.name.text === name) found = true
+    }
+  })
+  return found
+}
+
+function stringLiteralsIn(node) {
+  const values = new Set()
+  visit(node, (child) => {
+    if (ts.isStringLiteral(child)) values.add(child.text)
+  })
+  return values
+}
+
+function hasNumericCall(node, name, value) {
+  return callsNamed(node, name).some((call) => {
+    const argument = call.arguments[0]
+    return argument && ts.isNumericLiteral(argument) && Number(argument.text) === value
+  })
+}
+
+function useStateBindings(sourceFile) {
+  const bindings = new Set()
+  visit(sourceFile, (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isArrayBindingPattern(node.name) &&
+      ts.isCallExpression(node.initializer) &&
+      ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === 'useState'
+    ) {
+      const stateName = node.name.elements[0]?.name
+      if (stateName && ts.isIdentifier(stateName)) bindings.add(stateName.text)
+    }
+  })
+  return bindings
+}
+
+function jsxTagName(node) {
+  return node.tagName.getText()
+}
+
+function jsxAttribute(opening, name) {
+  return opening.attributes.properties.find(
+    (attribute) => ts.isJsxAttribute(attribute) && attribute.name.text === name,
+  )
+}
+
+function jsxAttributeText(attribute) {
+  if (!attribute?.initializer) return undefined
+  return ts.isStringLiteral(attribute.initializer) ? attribute.initializer.text : undefined
+}
+
+function renderedText(node) {
+  const parts = []
+  visit(node, (child) => {
+    if (ts.isJsxText(child)) {
+      const text = child.text.replace(/\s+/g, ' ').trim()
+      if (text) parts.push(text)
+    }
+    if (ts.isStringLiteral(child)) parts.push(child.text)
+  })
+  return parts
+}
+
+function hasNegatedIdentifier(node, name) {
+  let found = false
+  visit(node, (child) => {
+    if (
+      ts.isPrefixUnaryExpression(child) &&
+      child.operator === ts.SyntaxKind.ExclamationToken &&
+      ts.isIdentifier(child.operand) &&
+      child.operand.text === name
+    ) found = true
+  })
+  return found
+}
+
+function expectRejected(label, assertion) {
+  let rejected = false
+  try {
+    assertion()
+  } catch {
+    rejected = true
+  }
+  expect(rejected, `${label} mutation escaped the UI verifier`)
+}
+
+function verifyComponentContract(componentSource, pageSource) {
+  const componentFile = parseTsx(componentSource, 'AdminPhoneTransferCard.tsx')
+  const pageFile = parseTsx(pageSource, 'account-settings/index.tsx')
+  const component = findNamedFunction(componentFile, 'AdminPhoneTransferCard')
+  expect(component?.body, 'missing AdminPhoneTransferCard function component')
+
+  const componentIdentifiers = identifiersIn(component)
+  for (const required of [
+    'onBound', 'onBack', 'startAdminPhoneTransfer', 'verifyAdminPhoneTransfer',
+    'cancelAdminPhoneTransfer', 'redirectToLogin',
+  ]) expect(componentIdentifiers.has(required), `component missing ${required}`)
+
+  const states = useStateBindings(component)
+  for (const state of [
+    'phase', 'currentPassword', 'phone', 'code', 'bindTicket', 'sourceAccount',
+    'acknowledged', 'cooldownSeconds', 'ticketExpiresAt', 'now', 'submitting', 'message',
+  ]) expect(states.has(state), `component state ${state} must use useState`)
+
+  for (const forbidden of ['localStorage', 'sessionStorage', 'console', 'history']) {
+    expect(!componentIdentifiers.has(forbidden), `component must not reference ${forbidden}`)
+  }
+  let hasHiddenInput = false
+  visit(component, (node) => {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && jsxTagName(node) === 'input') {
+      if (jsxAttributeText(jsxAttribute(node, 'type')) === 'hidden') hasHiddenInput = true
+    }
+  })
+  expect(!hasHiddenInput, 'component must not render hidden inputs')
+
+  const facts = [
+    '该手机号将从上述机构账号转移到当前管理员账号。',
+    '机构账号仍可使用用户名和密码登录。',
+    '机构账号将无法再使用该手机号短信登录或找回密码。',
+    '机构账号当前登录会话将失效；忘记密码时需由管理员重置。',
+  ]
+  const texts = renderedText(component)
+  for (const fact of facts) expect(texts.includes(fact), `missing exact impact statement: ${fact}`)
+
+  for (const field of ['username', 'organizationName', 'phoneMasked']) {
+    let rendered = false
+    visit(component, (node) => {
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === 'sourceAccount' &&
+        node.name.text === field
+      ) rendered = true
+    })
+    expect(rendered, `sourceAccount.${field} must be rendered through JSX escaping`)
+  }
+
+  let checkbox
+  let checkboxLabel = false
+  let confirmButton
+  visit(component, (node) => {
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && jsxTagName(node) === 'input') {
+      if (jsxAttributeText(jsxAttribute(node, 'type')) === 'checkbox') checkbox = node
+    }
+    if (ts.isJsxElement(node) && jsxTagName(node.openingElement) === 'label') {
+      if (jsxAttributeText(jsxAttribute(node.openingElement, 'htmlFor')) === 'admin-phone-transfer-acknowledged') checkboxLabel = true
+    }
+    if (ts.isJsxElement(node) && jsxTagName(node.openingElement) === 'Button') {
+      if (renderedText(node).includes('确认转移')) confirmButton = node.openingElement
+    }
+  })
+  expect(checkbox, 'missing accessible acknowledgement checkbox')
+  expect(jsxAttributeText(jsxAttribute(checkbox, 'id')) === 'admin-phone-transfer-acknowledged', 'checkbox needs a stable id')
+  expect(jsxAttribute(checkbox, 'checked')?.initializer?.expression?.getText() === 'acknowledged', 'checkbox must be controlled by acknowledged')
+  expect(Boolean(jsxAttribute(checkbox, 'onChange')), 'checkbox needs onChange')
+  expect(checkboxLabel, 'checkbox needs a matching label')
+  expect(confirmButton, 'missing confirm transfer button')
+  const disabled = jsxAttribute(confirmButton, 'disabled')?.initializer?.expression
+  expect(disabled && identifiersIn(disabled).has('submitting'), 'confirm button must disable while submitting')
+  expect(disabled && hasNegatedIdentifier(disabled, 'acknowledged'), 'confirm button must disable before acknowledgement')
+
+  const requestCode = findNamedFunction(componentFile, 'requestCode')
+  const verifyCode = findNamedFunction(componentFile, 'verifyCode')
+  const returnToInitialBind = findNamedFunction(componentFile, 'returnToInitialBind')
+  expect(requestCode && verifyCode && returnToInitialBind, 'component is missing request/verify/cancel handlers')
+  expect(callsNamed(requestCode, 'startAdminPhoneTransfer').length === 1, 'requestCode must start transfer exactly once')
+  expect(callsNamed(requestCode, 'onBound').length === 0, 'sending a code must not complete the transfer')
+  expect(callsNamed(requestCode, 'requiresConservativeStartCooldown').length === 1, 'requestCode must classify unknown send results')
+  expect(callsNamed(verifyCode, 'verifyAdminPhoneTransfer').length === 1, 'verifyCode must verify exactly once')
+  expect(callsNamed(verifyCode, 'onBound').length === 1, 'successful verify must refresh the parent user')
+  expect(callsNamed(verifyCode, 'requiresLoginAfterUncertainVerification').length === 1, 'verifyCode must classify unknown results')
+  expect(callsNamed(verifyCode, 'requiresRestartAfterVerificationFailure').length === 1, 'verifyCode must restart expired tickets')
+  expect(callsNamed(returnToInitialBind, 'cancelAdminPhoneTransfer').length === 1, 'return must cancel the remote ticket')
+  expect(callsNamed(returnToInitialBind, 'onBack').length >= 1, 'return must switch back only after cancellation')
+  expect(callsNamed(returnToInitialBind, 'requiresLoginAfterUncertainCancellation').length === 1, 'cancel must classify unknown results')
+  expect(callsNamed(returnToInitialBind, 'redirectToLogin').length === 1, 'unknown cancel must force login recovery')
+  const cancelCall = callsNamed(returnToInitialBind, 'cancelAdminPhoneTransfer')[0]
+  const lastBackCall = callsNamed(returnToInitialBind, 'onBack').at(-1)
+  expect(cancelCall.getStart() < lastBackCall.getStart(), 'remote cancel must precede switching back')
+
+  const requestIdentifiers = identifiersIn(requestCode)
+  for (const name of ['bindTicket', 'submitting', 'cooldownSeconds']) {
+    expect(requestIdentifiers.has(name), `request duplicate guard must include ${name}`)
+  }
+  const verifyIdentifiers = identifiersIn(verifyCode)
+  for (const name of ['bindTicket', 'submitting', 'acknowledged', 'ticketExpiresAt']) {
+    expect(verifyIdentifiers.has(name), `verify guard must include ${name}`)
+  }
+
+  for (const helperName of [
+    'requiresConservativeStartCooldown', 'requiresKnownSmsCooldown',
+    'requiresRestartAfterVerificationFailure', 'requiresLoginAfterUncertainVerification',
+    'requiresLoginAfterUncertainCancellation',
+  ]) expect(findNamedFunction(componentFile, helperName), `missing conservative helper ${helperName}`)
+  expect(hasNumericCall(requestCode, 'setCooldownSeconds', 300), 'unknown start must apply a 300-second cooldown')
+  expect(hasNumericCall(requestCode, 'setCooldownSeconds', 60), 'known SMS throttling must apply a 60-second cooldown')
+  expect(stringLiteralsIn(verifyCode).has('SMS_CODE_INVALID'), 'invalid OTP must remain retryable')
+  expect(callsNamed(verifyCode, 'redirectToLogin').length === 1, 'uncertain verify must force login recovery')
+  expect(callsNamed(verifyCode, 'clearTransferState').length >= 2, 'expiry and uncertain verify must clear memory state')
+  let hasExpiryGuard = false
+  visit(verifyCode, (node) => {
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.LessThanEqualsToken &&
+      identifiersIn(node).has('ticketExpiresAt') &&
+      hasPropertyCall(node, 'Date', 'now')
+    ) hasExpiryGuard = true
+  })
+  expect(hasExpiryGuard, 'verify must reject an expired ticket before submitting')
+
+  let initialCardCount = 0
+  let transferCardCount = 0
+  visit(pageFile, (node) => {
+    if (ts.isJsxSelfClosingElement(node)) {
+      if (jsxTagName(node) === 'AdminInitialPhoneBindingCard') initialCardCount += 1
+      if (jsxTagName(node) === 'AdminPhoneTransferCard') transferCardCount += 1
+    }
+  })
+  expect(initialCardCount === 1 && transferCardCount === 1, 'account settings must compose exactly one card for each mode')
+  expect(useStateBindings(pageFile).has('phoneBindingMode'), 'account settings needs in-memory binding mode')
+  const handlePhoneBound = findNamedFunction(pageFile, 'handlePhoneBound')
+  expect(handlePhoneBound, 'account settings needs shared handlePhoneBound')
+  let immutableUserUpdate = false
+  visit(handlePhoneBound, (node) => {
+    if (!ts.isObjectLiteralExpression(node)) return
+    const spreads = node.properties.filter(ts.isSpreadAssignment).map((property) => property.expression.getText())
+    if (spreads.includes('current') && spreads.includes('phone')) immutableUserUpdate = true
+  })
+  expect(immutableUserUpdate, 'handlePhoneBound must update the user immutably')
+  expect(callsNamed(handlePhoneBound, 'setPhoneBindingSuccess').length === 1, 'handlePhoneBound must publish one success state')
+  expect(renderedText(pageFile).includes('该号码已用于机构账号？安全转移'), 'missing the single secondary transfer action')
+}
+
+function verifyUiMutationProbes(componentSource, pageSource) {
+  const withoutAcknowledgementGate = componentSource.replace(
+    'disabled={submitting || !acknowledged}',
+    'disabled={submitting}',
+  )
+  expect(withoutAcknowledgementGate !== componentSource, 'acknowledgement mutation setup target is missing')
+  expectRejected('acknowledgement gate', () => verifyComponentContract(withoutAcknowledgementGate, pageSource))
+
+  const missingImpactFact = componentSource.replace(
+    '机构账号仍可使用用户名和密码登录。',
+    '机构账号仍可登录。',
+  )
+  expect(missingImpactFact !== componentSource, 'impact statement mutation setup target is missing')
+  expectRejected('impact statement', () => verifyComponentContract(missingImpactFact, pageSource))
+
+  const hiddenTicket = componentSource.replace('type="text"', 'type="hidden"')
+  expect(hiddenTicket !== componentSource, 'hidden input mutation setup target is missing')
+  expectRejected('hidden input', () => verifyComponentContract(hiddenTicket, pageSource))
 }
 
 function createTrackedStorage(entries = []) {
@@ -477,10 +770,25 @@ try {
   fail(`Admin 手机号转移 mutation verification 失败: ${error instanceof Error ? error.message : String(error)}`)
 }
 
-if (existsSync(componentPath)) {
-  pass('AdminPhoneTransferCard 已存在，Task 5 可继续验证独立内存状态机')
-} else {
+if (!existsSync(componentPath)) {
   fail('Missing required file: src/routes/account-settings/AdminPhoneTransferCard.tsx')
+} else if (!existsSync(accountSettingsPath)) {
+  fail('Missing required file: src/routes/account-settings/index.tsx')
+} else {
+  const componentSource = readFileSync(componentPath, 'utf8')
+  const pageSource = readFileSync(accountSettingsPath, 'utf8')
+  try {
+    verifyComponentContract(componentSource, pageSource)
+    pass('转移组件使用三态内存状态机，并锁定来源确认、保守失败、远端取消与不可变用户刷新')
+  } catch (error) {
+    fail(`Admin 手机号转移组件契约失败: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  try {
+    verifyUiMutationProbes(componentSource, pageSource)
+    pass('组件 mutation probes 拒绝未确认提交、影响文案缺失与隐藏字段回退')
+  } catch (error) {
+    fail(`Admin 手机号转移组件 mutation verification 失败: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 if (failures.length > 0) {

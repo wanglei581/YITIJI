@@ -11,6 +11,7 @@ import { CircleAlertIcon, CircleCheckIcon, LockKeyholeIcon, ShieldCheckIcon, Use
 import { Page } from '../Page'
 import { changePassword, getUser, logout, type AuthedUser } from '../../services/auth'
 import { AdminInitialPhoneBindingCard } from './AdminInitialPhoneBindingCard'
+import { AdminPhoneTransferCard } from './AdminPhoneTransferCard'
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin: '超级管理员',
@@ -41,12 +42,18 @@ function unicodeCharacterLength(value: string): number {
 export default function AccountSettingsPage() {
   const [user, setUser] = useState<AuthedUser | null>(() => getUser())
   const [phoneBindingSuccess, setPhoneBindingSuccess] = useState<Pick<AuthedUser, 'phoneMasked' | 'phoneVerifiedAt'> | null>(null)
+  const [phoneBindingMode, setPhoneBindingMode] = useState<'initial' | 'transfer'>('initial')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [successVisible, setSuccessVisible] = useState(false)
+
+  function handlePhoneBound(phone: Pick<AuthedUser, 'phoneMasked' | 'phoneVerifiedAt'>): void {
+    setUser((current) => current ? { ...current, ...phone } : current)
+    setPhoneBindingSuccess(phone)
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -124,12 +131,26 @@ export default function AccountSettingsPage() {
         )}
 
         {user?.role === 'admin' && !user.phoneMasked && (
-          <AdminInitialPhoneBindingCard
-            onBound={(phone) => {
-              setUser((current) => current ? { ...current, ...phone } : current)
-              setPhoneBindingSuccess(phone)
-            }}
-          />
+          <div className="space-y-3">
+            {phoneBindingMode === 'initial' ? (
+              <>
+                <AdminInitialPhoneBindingCard onBound={handlePhoneBound} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setPhoneBindingMode('transfer')}
+                >
+                  该号码已用于机构账号？安全转移
+                </Button>
+              </>
+            ) : (
+              <AdminPhoneTransferCard
+                onBound={handlePhoneBound}
+                onBack={() => setPhoneBindingMode('initial')}
+              />
+            )}
+          </div>
         )}
 
         <Card className="p-5">
