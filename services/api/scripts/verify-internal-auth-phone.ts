@@ -473,8 +473,11 @@ async function main() {
   const verifiedPhone = phone('139', 1)
   const unverifiedPhone = phone('138', 2)
   const unknownPhone = phone('137', 3)
+  const disabledDuringResetPhone = phone('136', 5)
   const passwordV1 = `InitPass_${suffix}`
   const passwordV2 = `ResetPass_${suffix}`
+  const passwordV3 = `DisabledResetPass_${suffix}`
+  const passwordV4 = `DisabledSelfChangePass_${suffix}`
   let orgId = ''
 
   const cleanup = async () => {
@@ -516,6 +519,18 @@ async function main() {
         deletedAt: new Date(),
         phoneHash: hashPhone(phone('136', 4)),
         phoneEnc: encryptPhone(phone('136', 4)),
+        phoneVerifiedAt: new Date(),
+      },
+    })
+    const disabledDuringReset = await prisma.user.create({
+      data: {
+        username: `via_disabled_reset_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        name: '重置确认后停用账号',
+        role: 'partner',
+        orgId,
+        phoneHash: hashPhone(disabledDuringResetPhone),
+        phoneEnc: encryptPhone(disabledDuringResetPhone),
         phoneVerifiedAt: new Date(),
       },
     })
@@ -662,6 +677,31 @@ async function main() {
       'AUTH_TOKEN_INVALID',
       '8e. 重置密码后旧 token 立即失效',
     )
+
+    await auth.startPasswordReset(disabledDuringResetPhone, '127.0.0.1')
+    const disabledDuringResetCode = await redis.get(`internal:sms:code:reset_password:${hashPhone(disabledDuringResetPhone)}`)
+    if (!disabledDuringResetCode) fail('8f. 重置确认后停用账号缺少重置验证码')
+    const { resetTicket: disabledDuringResetTicket } = await auth.verifyPasswordReset(
+      disabledDuringResetPhone,
+      disabledDuringResetCode,
+    )
+    await prisma.user.update({ where: { id: disabledDuringReset.id }, data: { enabled: false } })
+    await auth.completePasswordReset(disabledDuringResetTicket, passwordV3)
+    const disabledAfterReset = await prisma.user.findUniqueOrThrow({ where: { id: disabledDuringReset.id } })
+    if (disabledAfterReset.enabled || !(await bcrypt.compare(passwordV3, disabledAfterReset.passwordHash))) {
+      fail('8f. 普通停用账号在重置确认后未保留历史改密行为，或被意外重新启用')
+    }
+    await auth.changePassword(disabledDuringReset.id, passwordV3, passwordV4)
+    const disabledAfterSelfChange = await prisma.user.findUniqueOrThrow({ where: { id: disabledDuringReset.id } })
+    if (disabledAfterSelfChange.enabled || !(await bcrypt.compare(passwordV4, disabledAfterSelfChange.passwordHash))) {
+      fail('8f. 普通停用账号未保留历史自助改密行为，或被意外重新启用')
+    }
+    await expectCode(
+      () => auth.login(disabledDuringReset.username, passwordV4, 'partner'),
+      'AUTH_LOGIN_FAILED',
+      '8f. 普通停用账号重置后仍不可登录',
+    )
+    pass('8f. 普通停用账号不被删除功能额外收紧，且重置不重新启用账号')
 
     await expectCode(
       () => auth.sendOwnPhoneBindCode(unboundAdmin.id, '127.0.0.1'),

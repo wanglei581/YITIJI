@@ -175,12 +175,12 @@ export class AuthService {
       throw this.resetFailed()
     }
     const user = await this.prisma.user.findFirst({
-      where: { id: userId, enabled: true, deletedAt: null },
+      where: { id: userId, deletedAt: null },
     })
     if (!user) throw this.resetFailed()
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
-      where: { id: userId, enabled: true, deletedAt: null, passwordHash: user.passwordHash },
+      where: { id: userId, deletedAt: null, passwordHash: user.passwordHash },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
     if (updated.count !== 1) throw this.resetFailed()
@@ -198,7 +198,7 @@ export class AuthService {
    *   校验通过后各自无条件覆盖,造成"两边都返回成功但只有一边真正生效"的静默丢失更新。
    */
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: true }> {
-    const user = await this.prisma.user.findFirst({ where: { id: userId, enabled: true, deletedAt: null } })
+    const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } })
     if (!user) {
       throw new UnauthorizedException({ error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' } })
     }
@@ -224,7 +224,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
-      where: { id: user.id, enabled: true, deletedAt: null, passwordHash: user.passwordHash },
+      where: { id: user.id, deletedAt: null, passwordHash: user.passwordHash },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
     if (updated.count !== 1) {
