@@ -2,6 +2,8 @@
 import 'dotenv/config'
 import 'reflect-metadata'
 import { createHash, randomBytes } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Redis } from 'ioredis'
@@ -62,12 +64,6 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 function pass(message: string): void { console.log(`  PASS ${message}`) }
-
-function isMissingModule(error: unknown, moduleName: string): boolean {
-  const candidate = error as { code?: string; message?: string }
-  return ['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'].includes(candidate.code ?? '')
-    && (candidate.message ?? '').includes(moduleName)
-}
 
 function flatten(errors: ValidationError[], parent = ''): string[] {
   return errors.flatMap((error) => {
@@ -157,28 +153,23 @@ async function main(): Promise<void> {
   )
   pass('shared action allowlist is exact')
 
-  let StepUpClass: StepUpServiceConstructor | undefined
-  try {
-    const modulePath = '../src/member-auth/' + 'member-step-up.service'
-    StepUpClass = ((await import(modulePath)) as { MemberStepUpService?: StepUpServiceConstructor }).MemberStepUpService
-  } catch (error) {
-    if (!isMissingModule(error, 'member-step-up.service')) throw error
-  }
-  if (!StepUpClass) {
+  const serviceFile = resolve(__dirname, '../src/member-auth/member-step-up.service.ts')
+  if (!existsSync(serviceFile)) {
     throw new Error('RED: MemberStepUpService 尚未实现（expected Task 5 failure）')
   }
-  try {
-    const dtoPath = '../src/member-auth/dto/' + 'member-step-up.dto'
-    const dto = (await import(dtoPath)) as {
-      SendMemberStepUpCodeDto?: unknown
-      VerifyMemberStepUpDto?: unknown
-    }
-    assert(dto.SendMemberStepUpCodeDto && dto.VerifyMemberStepUpDto, 'RED: member step-up DTO classes 尚未实现')
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('RED:')) throw error
-    if (!isMissingModule(error, 'member-step-up.dto')) throw error
+  const serviceModule = (await import(serviceFile)) as { MemberStepUpService?: StepUpServiceConstructor }
+  const StepUpClass = serviceModule.MemberStepUpService
+  assert(StepUpClass, 'MemberStepUpService export is missing')
+
+  const dtoFile = resolve(__dirname, '../src/member-auth/dto/member-step-up.dto.ts')
+  if (!existsSync(dtoFile)) {
     throw new Error('RED: member step-up DTO 尚未实现（expected Task 5 failure）')
   }
+  const dto = (await import(dtoFile)) as {
+    SendMemberStepUpCodeDto?: unknown
+    VerifyMemberStepUpDto?: unknown
+  }
+  assert(dto.SendMemberStepUpCodeDto && dto.VerifyMemberStepUpDto, 'member step-up DTO exports are missing')
 
   process.env['NODE_ENV'] = 'test'
   process.env['SMS_PROVIDER'] = 'log'
