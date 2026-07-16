@@ -22,6 +22,7 @@
 - `services/api/src/audit/audit.types.ts`
 - `packages/shared/src/types/audit.ts`
 - `services/api/scripts/verify-admin-phone-transfer.ts`（新增）
+- `services/api/scripts/support/internal-auth-verify-harness.ts`（新增，仅隔离 verifier 公共 harness）
 - `services/api/package.json`
 
 前端执行单元只能修改：
@@ -66,9 +67,10 @@ git commit -m "docs: refine admin phone transfer security gate"
 **Files:**
 
 - Create: `services/api/scripts/verify-admin-phone-transfer.ts`
+- Create: `services/api/scripts/support/internal-auth-verify-harness.ts`
 - Modify: `services/api/package.json`
 
-- [ ] **Step 1：先登记失败脚本命令**
+- [x] **Step 1：先登记失败脚本命令**
 
 在 `services/api/package.json` 的 verify 区加入：
 
@@ -76,7 +78,7 @@ git commit -m "docs: refine admin phone transfer security gate"
 "verify:admin-phone-transfer": "node -r @swc-node/register scripts/verify-admin-phone-transfer.ts"
 ```
 
-- [ ] **Step 2：写真实隔离 harness 与期望 API**
+- [x] **Step 2：写真实隔离 harness 与期望 API**
 
 脚本必须先调用现有 `assertInternalAuthVerifyTarget()`，使用临时 SQLite `DATABASE_URL`、真实 `PrismaService` 和临时表数据；不得连接共享或生产数据库。定义捕获短信与内存 Redis，至少具有服务实际调用的以下方法：
 
@@ -138,7 +140,7 @@ class MemoryRedis {
 
 测试数据固定包含：未绑定 Admin、持有候选手机号的 Partner、另一 Admin、Organization；手机号只能在测试进程内生成，不写日志。
 
-- [ ] **Step 3：写完整失败断言**
+- [x] **Step 3：写完整失败断言**
 
 Verifier 至少调用期望类：
 
@@ -166,7 +168,7 @@ assert.equal(await bcrypt.compare(PARTNER_PASSWORD, source.passwordHash), true)
 
 事务第二步回滚用例不得在 verify 前直接修改 Admin，因为会被事务前复核短路。Verifier 必须在 ticket 创建后安装一个静态 SQLite trigger：当任意 Partner 的 `phoneHash` 从非空更新为空时，递增未绑定 Admin 的 `tokenVersion`；这样第一步 Partner 更新触发版本变化，第二步 Admin CAS 返回 0，随后抛错使两次更新连同 trigger 更新一起回滚。trigger 使用无插值的静态 SQL，并在 `finally` 删除。
 
-- [ ] **Step 4：运行 RED 并确认失败原因正确**
+- [x] **Step 4：运行 RED 并确认失败原因正确**
 
 Run：
 
@@ -176,7 +178,7 @@ INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admi
 
 Expected：FAIL，唯一主因是 `admin-phone-transfer.service` 不存在或期望方法/路由尚未实现；不得因连接共享数据库、缺 Prisma 客户端或测试语法错误失败。
 
-- [ ] **Step 5：提交 RED**
+- [x] **Step 5：提交 RED**
 
 ```bash
 git add services/api/package.json services/api/scripts/verify-admin-phone-transfer.ts
