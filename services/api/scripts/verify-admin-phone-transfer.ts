@@ -9,9 +9,7 @@ import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { execFileSync } from 'child_process'
 import { randomBytes, randomInt, randomUUID } from 'crypto'
-import { existsSync, mkdtempSync, rmSync } from 'fs'
-import { tmpdir } from 'os'
-import { join } from 'path'
+import { resolve } from 'path'
 import type { AuditService } from '../src/audit/audit.service'
 import { AdminInitialPhoneBindService } from '../src/auth/admin-initial-phone-bind.service'
 import { InternalOtpService } from '../src/auth/internal-otp.service'
@@ -19,223 +17,35 @@ import { assertInternalAuthVerifyTarget } from '../src/auth/internal-auth-verify
 import { encryptPhone, hashPhone, maskPhone } from '../src/common/crypto/phone-identity'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import type { RedisService } from '../src/common/redis/redis.service'
-import type { SmsSender } from '../src/member-auth/sms/sms-sender'
 import { PrismaService } from '../src/prisma/prisma.service'
+import {
+  assertFailureUnwindsCleanup,
+  assertHarnessReady,
+  CapturingSmsSender,
+  createBoundedBarrier,
+  ensure,
+  errorCode,
+  expectCode,
+  MemoryRedis,
+  pass,
+  prepareIsolatedDatabase,
+  RecordingAudit,
+} from './support/internal-auth-verify-harness'
 
 process.env['JWT_SECRET'] ||= randomBytes(32).toString('hex')
 process.env['SECRET_ENCRYPTION_KEY'] ||= randomBytes(32).toString('hex')
 
 const SESSION_TTL_SECONDS = 60
 const UNAVAILABLE = 'AUTH_PHONE_TRANSFER_UNAVAILABLE'
+const TRANSFER_SERVICE_MODULE_PATH = '../src/auth/admin-phone-transfer.service'
+const RED_TARGET_MISSING = 'RED_CONTRACT_TARGET_MISSING: admin-phone-transfer.service 尚不存在'
 const generatedPhones = new Set<string>()
-
-class VerificationFailure extends Error {
-  constructor(message: string) {
-    super(`VERIFY_ASSERTION_FAILED: ${message}`)
-    this.name = 'VerificationFailure'
-  }
-}
-
-function pass(message: string): void {
-  console.log(`  PASS ${message}`)
-}
-
-function fail(message: string): never {
-  throw new VerificationFailure(message)
-}
-
-function ensure(condition: unknown, message: string): asserts condition {
-  if (!condition) fail(message)
-}
-
-function errorCode(error: unknown): string | undefined {
-  const exception = error as { getResponse?: () => unknown; response?: unknown }
-  const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
-    | { error?: { code?: string } }
-    | undefined
-  return response?.error?.code
-}
-
-async function expectCode(operation: () => Promise<unknown>, code: string, message: string): Promise<void> {
-  let rejected = false
-  let rejection: unknown
-  try {
-    await operation()
-  } catch (error) {
-    rejected = true
-    rejection = error
-  }
-  if (!rejected) fail(`${message}：期望失败但调用成功`)
-  if (errorCode(rejection) !== code) fail(`${message}：错误码不符合契约`)
-}
-
-function assertFailureUnwindsCleanup(): void {
-  const probeDirectory = mkdtempSync(join(tmpdir(), 'verify-phone-transfer-cleanup-probe-'))
-  let assertionObserved = false
-  let assertionFinallyRan = false
-  try {
-    try {
-      fail('受控 cleanup 自检')
-    } finally {
-      assertionFinallyRan = true
-      rmSync(probeDirectory, { recursive: true, force: true })
-    }
-  } catch (error) {
-    assertionObserved = error instanceof VerificationFailure
-  } finally {
-    rmSync(probeDirectory, { recursive: true, force: true })
-  }
-  ensure(assertionObserved && assertionFinallyRan && !existsSync(probeDirectory), '0. 失败断言未经过 finally cleanup')
-  pass('0a. 失败断言通过异常栈展开执行 finally cleanup')
-}
 
 function mockContext(token: string): ExecutionContext {
   const request = { headers: { authorization: `Bearer ${token}` } }
   return {
     switchToHttp: () => ({ getRequest: () => request }),
   } as unknown as ExecutionContext
-}
-
-class CapturingSmsSender implements SmsSender {
-  lastCode: string | null = null
-  deliveries = 0
-
-  async sendCode(_phone: string, code: string): Promise<void> {
-    this.lastCode = code
-    this.deliveries += 1
-  }
-}
-
-class MemoryRedis {
-  private readonly store = new Map<string, { value: string; expiresAt: number | null }>()
-  private readonly failingVersionedWrites = new Set<string>()
-  private nowMs = 0
-
-  private read(key: string): string | null {
-    const entry = this.store.get(key)
-    if (!entry) return null
-    if (entry.expiresAt !== null && entry.expiresAt <= this.nowMs) {
-      this.store.delete(key)
-      return null
-    }
-    return entry.value
-  }
-
-  async get(key: string): Promise<string | null> {
-    return this.read(key)
-  }
-
-  async setEx(key: string, ttlSeconds: number, value: string): Promise<void> {
-    this.store.set(key, { value, expiresAt: this.nowMs + ttlSeconds * 1000 })
-  }
-
-  async setNxEx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
-    if (this.read(key) !== null) return false
-    this.store.set(key, { value, expiresAt: this.nowMs + ttlSeconds * 1000 })
-    return true
-  }
-
-  async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
-    const existing = this.read(key)
-    const next = Number(existing ?? '0') + 1
-    this.store.set(key, {
-      value: String(next),
-      expiresAt: existing === null ? this.nowMs + ttlSeconds * 1000 : this.store.get(key)?.expiresAt ?? null,
-    })
-    return next
-  }
-
-  async del(key: string): Promise<number> {
-    if (this.read(key) === null) return 0
-    this.store.delete(key)
-    return 1
-  }
-
-  async getAndDelIfEquals(
-    key: string,
-    expected: string,
-  ): Promise<'missing' | 'matched' | 'mismatched'> {
-    const current = this.read(key)
-    if (current === null) return 'missing'
-    if (current !== expected) return 'mismatched'
-    this.store.delete(key)
-    return 'matched'
-  }
-
-  async reserveWithinLimitWithTtl(key: string, ttlSeconds: number, limit: number): Promise<boolean> {
-    const existing = this.read(key)
-    const current = Number(existing ?? '0')
-    if (current >= limit) return false
-    this.store.set(key, {
-      value: String(current + 1),
-      expiresAt: existing === null ? this.nowMs + ttlSeconds * 1000 : this.store.get(key)?.expiresAt ?? null,
-    })
-    return true
-  }
-
-  async releaseReservedLimit(key: string): Promise<void> {
-    const existing = this.read(key)
-    const current = Number(existing ?? '0')
-    if (current <= 0) return
-    if (current === 1) {
-      this.store.delete(key)
-      return
-    }
-    this.store.set(key, {
-      value: String(current - 1),
-      expiresAt: this.store.get(key)?.expiresAt ?? null,
-    })
-  }
-
-  async setJsonIfVersionNotOlder(
-    key: string,
-    ttlSeconds: number,
-    value: string,
-    tokenVersion: number,
-  ): Promise<'stored' | 'stale'> {
-    if (this.failingVersionedWrites.delete(key)) throw new Error('simulated versioned cache write failure')
-    const current = this.read(key)
-    if (current) {
-      try {
-        const parsed = JSON.parse(current) as { tokenVersion?: unknown }
-        if (typeof parsed.tokenVersion === 'number' && parsed.tokenVersion > tokenVersion) return 'stale'
-      } catch {
-        // 生产 Lua 对不可解析 JSON 同样采用覆盖写入。
-      }
-    }
-    this.store.set(key, { value, expiresAt: this.nowMs + ttlSeconds * 1000 })
-    return 'stored'
-  }
-
-  failNextVersionedWrite(key: string): void {
-    this.failingVersionedWrites.add(key)
-  }
-
-  advanceSeconds(seconds: number): void {
-    this.nowMs += seconds * 1000
-  }
-
-  raw(key: string): string | null {
-    return this.read(key)
-  }
-}
-
-type RecordedAudit = {
-  actorId?: string | null
-  actorRole: string
-  action: string
-  targetType: string
-  targetId?: string | null
-  payload?: Record<string, unknown>
-}
-
-class RecordingAudit {
-  readonly entries: RecordedAudit[] = []
-
-  async write(entry: RecordedAudit): Promise<string> {
-    this.entries.push({ ...entry, payload: { ...(entry.payload ?? {}) } })
-    return `verify-transfer-audit-${this.entries.length}`
-  }
 }
 
 type TransferStartResult = {
@@ -258,124 +68,50 @@ type AdminPhoneTransferConstructor = new (
   audit: AuditService,
 ) => AdminPhoneTransferContract
 
-function prepareIsolatedDatabase(): {
-  databasePath: string
-  initialize: () => void
-  cleanup: () => void
-} {
-  const previousDatabaseUrl = process.env['DATABASE_URL']
-  const tempDirectory = mkdtempSync(join(tmpdir(), 'verify-admin-phone-transfer-'))
-  const databasePath = join(tempDirectory, 'verify.db')
-  process.env['DATABASE_URL'] = `file:${databasePath}`
+function isExactMissingTransferModule(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as { code?: unknown; message?: unknown }
+  if (candidate.code !== 'MODULE_NOT_FOUND' && candidate.code !== 'ERR_MODULE_NOT_FOUND') return false
+  if (typeof candidate.message !== 'string') return false
+  const missingPath = candidate.message.match(/^Cannot find module ['"]([^'"]+)['"]/)?.[1]
+  if (!missingPath) return false
 
-  return {
-    databasePath,
-    initialize: () => {
-      execFileSync('sqlite3', [
-        databasePath,
-        `
-        PRAGMA foreign_keys = ON;
-        CREATE TABLE "Organization" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "name" TEXT NOT NULL,
-          "type" TEXT NOT NULL,
-          "contact" TEXT,
-          "contactPhone" TEXT,
-          "sceneTemplate" TEXT,
-          "enabledModulesJson" TEXT NOT NULL DEFAULT '[]',
-          "enabled" BOOLEAN NOT NULL DEFAULT true,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE TABLE "User" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "username" TEXT NOT NULL,
-          "passwordHash" TEXT NOT NULL,
-          "name" TEXT NOT NULL,
-          "role" TEXT NOT NULL,
-          "orgId" TEXT,
-          "phoneHash" TEXT,
-          "phoneEnc" TEXT,
-          "phoneVerifiedAt" DATETIME,
-          "tokenVersion" INTEGER NOT NULL DEFAULT 0,
-          "lastLoginAt" DATETIME,
-          "enabled" BOOLEAN NOT NULL DEFAULT true,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "User_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-        );
-        CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
-        CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash");
-        CREATE INDEX "User_orgId_idx" ON "User"("orgId");
-        CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt");
-        CREATE TABLE "AuditLog" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "actorId" TEXT,
-          "actorRole" TEXT NOT NULL,
-          "action" TEXT NOT NULL,
-          "targetType" TEXT NOT NULL,
-          "targetId" TEXT,
-          "payloadJson" TEXT NOT NULL DEFAULT '{}',
-          "ipAddress" TEXT,
-          "userAgent" TEXT,
-          "requestId" TEXT,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-        );
-        CREATE INDEX "AuditLog_actorId_idx" ON "AuditLog"("actorId");
-        CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
-        CREATE INDEX "AuditLog_targetType_targetId_idx" ON "AuditLog"("targetType", "targetId");
-        CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
-        `,
-      ], { stdio: 'pipe' })
-    },
-    cleanup: () => {
-      if (previousDatabaseUrl === undefined) delete process.env['DATABASE_URL']
-      else process.env['DATABASE_URL'] = previousDatabaseUrl
-      rmSync(tempDirectory, { recursive: true, force: true })
-    },
-  }
+  const absoluteModulePath = resolve(__dirname, TRANSFER_SERVICE_MODULE_PATH)
+  return new Set([
+    TRANSFER_SERVICE_MODULE_PATH,
+    absoluteModulePath,
+    `${absoluteModulePath}.ts`,
+    `${absoluteModulePath}.js`,
+  ]).has(missingPath)
 }
 
-async function assertHarnessReady(prisma: PrismaService): Promise<void> {
-  ensure(prisma.dbKind === 'sqlite', '0. 隔离 harness 未使用 SQLite')
-  ensure((await prisma.user.count()) === 0, '0. 临时数据库不是空库')
-
-  const redis = new MemoryRedis()
-  await redis.setEx('ttl', 2, 'v')
-  ensure((await redis.get('ttl')) === 'v', '0. MemoryRedis get/setEx 语义错误')
-  ensure(!(await redis.setNxEx('ttl', 'other', 2)), '0. MemoryRedis setNxEx 未保持 NX 原子语义')
-  ensure((await redis.getAndDelIfEquals('ttl', 'other')) === 'mismatched', '0. MemoryRedis CAS mismatch 语义错误')
-  ensure((await redis.getAndDelIfEquals('ttl', 'v')) === 'matched', '0. MemoryRedis CAS consume 语义错误')
-  ensure((await redis.incrWithTtl('counter', 2)) === 1, '0. MemoryRedis 首次 INCR 错误')
-  ensure((await redis.incrWithTtl('counter', 9)) === 2, '0. MemoryRedis 后续 INCR 错误')
-  redis.advanceSeconds(2)
-  ensure((await redis.get('counter')) === null, '0. MemoryRedis INCR 错误刷新了首次 TTL')
-  ensure(await redis.reserveWithinLimitWithTtl('limit', 5, 1), '0. MemoryRedis 额度预约失败')
-  ensure(!(await redis.reserveWithinLimitWithTtl('limit', 5, 1)), '0. MemoryRedis 额度上限不是原子的')
-  await redis.releaseReservedLimit('limit')
-  ensure(await redis.reserveWithinLimitWithTtl('limit', 5, 1), '0. MemoryRedis 额度释放后未恢复')
-  await redis.setJsonIfVersionNotOlder('session', 5, JSON.stringify({ tokenVersion: 2 }), 2)
+function assertMissingModuleClassifier(): void {
+  const exactMissing = {
+    code: 'MODULE_NOT_FOUND',
+    message: `Cannot find module '${TRANSFER_SERVICE_MODULE_PATH}'\nRequire stack: verifier`,
+  }
+  const dependencyMissing = {
+    code: 'MODULE_NOT_FOUND',
+    message: `Cannot find module 'nested-dependency'\nRequire stack: ${TRANSFER_SERVICE_MODULE_PATH}`,
+  }
+  const wrongCode = { code: 'EACCES', message: `Cannot find module '${TRANSFER_SERVICE_MODULE_PATH}'` }
   ensure(
-    (await redis.setJsonIfVersionNotOlder('session', 5, JSON.stringify({ tokenVersion: 1 }), 1)) === 'stale',
-    '0. MemoryRedis 允许旧会话版本覆盖新版本',
+    isExactMissingTransferModule(exactMissing) &&
+      !isExactMissingTransferModule(dependencyMissing) &&
+      !isExactMissingTransferModule(wrongCode),
+    '0. 目标模块缺失分类器会误吞依赖或其他加载错误',
   )
-  ensure((await redis.del('session')) === 1, '0. MemoryRedis del 返回值错误')
-  pass('0. 临时 SQLite、真实 Prisma 与 Redis 原子 harness 可用')
+  pass('0b. RED 只识别确切目标路径的 MODULE_NOT_FOUND/ERR_MODULE_NOT_FOUND')
 }
 
 async function loadTransferService(): Promise<AdminPhoneTransferConstructor> {
-  const modulePath = '../src/auth/admin-phone-transfer.service'
   try {
-    const loaded = (await import(modulePath)) as Record<string, unknown>
+    const loaded = (await import(TRANSFER_SERVICE_MODULE_PATH)) as Record<string, unknown>
     const candidate = loaded['AdminPhoneTransferService']
     ensure(typeof candidate === 'function', 'RED：AdminPhoneTransferService 导出不存在')
     return candidate as AdminPhoneTransferConstructor
   } catch (error) {
-    const message = error instanceof Error ? error.message : ''
-    if (message.includes('admin-phone-transfer.service')) {
-      throw new Error('RED_CONTRACT_TARGET_MISSING: admin-phone-transfer.service 尚不存在')
-    }
+    if (isExactMissingTransferModule(error)) throw new Error(RED_TARGET_MISSING)
     throw error
   }
 }
@@ -564,7 +300,6 @@ async function verifyNormalTransferAndAudits(context: TestContext): Promise<void
 
 async function verifyOwnerRestrictions(context: TestContext): Promise<void> {
   const service = createService(context)
-  const target = await createAdmin(context, 'owner-restrictions')
   const unownedPhone = context.nextPhone()
   const adminOwnedPhone = context.nextPhone()
   const kioskOwnedPhone = context.nextPhone()
@@ -591,16 +326,22 @@ async function verifyOwnerRestrictions(context: TestContext): Promise<void> {
     },
   })
 
-  for (const [label, phone] of [
-    ['无主手机号', unownedPhone],
-    ['另一 Admin 手机号', adminOwnedPhone],
-    ['非 Partner 手机号', kioskOwnedPhone],
+  for (const [caseId, label, phone] of [
+    ['unowned', '无主手机号', unownedPhone],
+    ['admin-owned', '另一 Admin 手机号', adminOwnedPhone],
+    ['non-partner', '非 Partner 手机号', kioskOwnedPhone],
   ] as const) {
+    const target = await createAdmin(context, `owner-restrictions-${caseId}`)
     const before = context.sms.deliveries
     await expectCode(() => service.start(target.id, context.adminPassword, phone, '127.0.1.2'), UNAVAILABLE, `4. ${label}必须统一拒绝`)
     ensure(context.sms.deliveries === before, `4. ${label}拒绝前错误发送了短信`)
+    const targetAfter = await context.prisma.user.findUniqueOrThrow({ where: { id: target.id } })
+    ensure(
+      targetAfter.phoneHash === null && targetAfter.phoneEnc === null && targetAfter.phoneVerifiedAt === null,
+      `4. ${label}拒绝后污染了独立目标 Admin 的手机号状态`,
+    )
   }
-  pass('4. 无主、另一 Admin 与非 Partner 所有者均统一拒绝且不发码')
+  pass('4. 无主、另一 Admin 与非 Partner 各用独立目标账号拒绝，不发码且三字段保持未绑定')
 }
 
 async function verifySharedPasswordBudget(context: TestContext): Promise<void> {
@@ -713,22 +454,22 @@ async function verifyDoubleVerifyAndAdminCompetition(context: TestContext): Prom
   const secondStart = await service.start(secondAdmin.id, context.adminPassword, competitionPhone, '127.0.1.10')
   const competitionCode = await requireTransferCode(context, competitionPhone, '7. 两 Admin 竞争场景缺少 OTP')
 
-  let barrierArrivals = 0
-  let releaseBarrier: (() => void) | null = null
-  const barrier = new Promise<void>((resolve) => { releaseBarrier = resolve })
+  const barrier = createBoundedBarrier(2, 1_000, '两 Admin 数据库竞争')
   const competitionOtp = {
     sendCode: (...args: Parameters<InternalOtpService['sendCode']>) => context.otp.sendCode(...args),
-    verifyCode: async () => {
-      barrierArrivals += 1
-      if (barrierArrivals === 2) releaseBarrier?.()
-      await barrier
-    },
+    verifyCode: () => barrier.wait(),
   } as unknown as InternalOtpService
   const competitionService = createService(context, { otp: competitionOtp })
-  const competitionResults = await Promise.allSettled([
-    competitionService.verify(firstAdmin.id, firstStart.bindTicket, competitionCode),
-    competitionService.verify(secondAdmin.id, secondStart.bindTicket, competitionCode),
-  ])
+  const competitionResults = await (async () => {
+    try {
+      return await Promise.allSettled([
+        competitionService.verify(firstAdmin.id, firstStart.bindTicket, competitionCode),
+        competitionService.verify(secondAdmin.id, secondStart.bindTicket, competitionCode),
+      ])
+    } finally {
+      barrier.release()
+    }
+  })()
   const successes = competitionResults.filter((result) => result.status === 'fulfilled')
   const failures = competitionResults.filter((result) => result.status === 'rejected')
   ensure(successes.length === 1 && failures.length === 1 && errorCode(failures[0]?.reason) === UNAVAILABLE, '7. 两 Admin 竞争未收敛为单一成功')
@@ -868,6 +609,7 @@ async function main(): Promise<void> {
     prisma = new PrismaService()
     await assertHarnessReady(prisma)
     assertFailureUnwindsCleanup()
+    assertMissingModuleClassifier()
 
     const Service = await loadTransferService()
     const redis = new MemoryRedis()
