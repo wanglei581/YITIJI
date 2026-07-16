@@ -155,6 +155,11 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
           redirectToLogin()
           return
         }
+        if (result.code === 'AUTH_PHONE_TRANSFER_UNAVAILABLE') {
+          clearTransferState()
+          setMessage({ kind: 'error', text: '状态已变化，请重新开始。' })
+          return
+        }
         if (result.code === 'SMS_CODE_INVALID') {
           setMessage({ kind: 'error', text: result.message || '验证码不正确，请重新输入' })
           return
@@ -181,6 +186,10 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
   async function returnToInitialBind(): Promise<void> {
     if (submitting) return
     setMessage(null)
+    if (!bindTicket && cooldownSeconds > 0) {
+      setMessage({ kind: 'error', text: '发送结果暂无法确认，请等待冷却结束后再返回首次绑定。' })
+      return
+    }
     if (!bindTicket) {
       clearTransferState()
       onBack()
@@ -254,7 +263,7 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
           {message && <MessageNotice message={message} />}
           {cooldownSeconds > 0 && <p className="text-xs text-neutral-500">请等待 {cooldownSeconds} 秒后重试。</p>}
           <div className="flex gap-3">
-            <Button type="button" variant="outline" disabled={submitting} onClick={returnToInitialBind} className="flex-1">
+            <Button type="button" variant="outline" disabled={submitting || cooldownSeconds > 0} onClick={returnToInitialBind} className="flex-1">
               返回首次绑定
             </Button>
             <Button type="submit" disabled={submitting || cooldownSeconds > 0} className="flex-1">
@@ -322,7 +331,6 @@ export function AdminPhoneTransferCard({ onBound, onBack }: Props) {
 
 function requiresRestartAfterVerificationFailure(code: string): boolean {
   return [
-    'AUTH_PHONE_TRANSFER_UNAVAILABLE',
     'SMS_CODE_EXPIRED',
     'SMS_CODE_LOCKED',
     'PHONE_BIND_TICKET_INVALID',

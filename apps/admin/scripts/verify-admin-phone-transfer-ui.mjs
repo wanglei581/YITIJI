@@ -5,6 +5,25 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createContext, Script } from 'node:vm'
 import ts from 'typescript'
+import {
+  callsNamed,
+  expectRejected,
+  findNamedFunction,
+  hasNegatedIdentifier,
+  hasNumericCall,
+  hasPropertyCall,
+  identifiersIn,
+  jsxAttribute,
+  jsxAttributeText,
+  jsxTagName,
+  parseTsx,
+  renderedText,
+  stringLiteralsIn,
+  useStateBindings,
+  verifyCooldownReturnContract,
+  verifyUnavailableRestartContract,
+  visit,
+} from './support/admin-phone-transfer-ui-contract.mjs'
 
 const root = process.cwd()
 const authPath = join(root, 'src/services/auth/index.ts')
@@ -53,131 +72,6 @@ function fail(message) {
 
 function expect(condition, message) {
   if (!condition) throw new Error(message)
-}
-
-function parseTsx(source, fileName) {
-  return ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-}
-function visit(node, callback) {
-  callback(node)
-  node.forEachChild((child) => visit(child, callback))
-}
-
-function findNamedFunction(sourceFile, name) {
-  let match
-  visit(sourceFile, (node) => {
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) match = node
-  })
-  return match
-}
-
-function identifiersIn(node) {
-  const names = new Set()
-  visit(node, (child) => {
-    if (ts.isIdentifier(child)) names.add(child.text)
-  })
-  return names
-}
-
-function callsNamed(node, name) {
-  const calls = []
-  visit(node, (child) => {
-    if (ts.isCallExpression(child) && ts.isIdentifier(child.expression) && child.expression.text === name) calls.push(child)
-  })
-  return calls
-}
-
-function hasPropertyCall(node, owner, name) {
-  let found = false
-  visit(node, (child) => {
-    if (ts.isCallExpression(child) && ts.isPropertyAccessExpression(child.expression)) {
-      const target = child.expression
-      if (ts.isIdentifier(target.expression) && target.expression.text === owner && target.name.text === name) found = true
-    }
-  })
-  return found
-}
-
-function stringLiteralsIn(node) {
-  const values = new Set()
-  visit(node, (child) => {
-    if (ts.isStringLiteral(child)) values.add(child.text)
-  })
-  return values
-}
-
-function hasNumericCall(node, name, value) {
-  return callsNamed(node, name).some((call) => {
-    const argument = call.arguments[0]
-    return argument && ts.isNumericLiteral(argument) && Number(argument.text) === value
-  })
-}
-
-function useStateBindings(sourceFile) {
-  const bindings = new Set()
-  visit(sourceFile, (node) => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isArrayBindingPattern(node.name) &&
-      ts.isCallExpression(node.initializer) &&
-      ts.isIdentifier(node.initializer.expression) &&
-      node.initializer.expression.text === 'useState'
-    ) {
-      const stateName = node.name.elements[0]?.name
-      if (stateName && ts.isIdentifier(stateName)) bindings.add(stateName.text)
-    }
-  })
-  return bindings
-}
-
-function jsxTagName(node) {
-  return node.tagName.getText()
-}
-
-function jsxAttribute(opening, name) {
-  return opening.attributes.properties.find(
-    (attribute) => ts.isJsxAttribute(attribute) && attribute.name.text === name,
-  )
-}
-
-function jsxAttributeText(attribute) {
-  if (!attribute?.initializer) return undefined
-  return ts.isStringLiteral(attribute.initializer) ? attribute.initializer.text : undefined
-}
-
-function renderedText(node) {
-  const parts = []
-  visit(node, (child) => {
-    if (ts.isJsxText(child)) {
-      const text = child.text.replace(/\s+/g, ' ').trim()
-      if (text) parts.push(text)
-    }
-    if (ts.isStringLiteral(child)) parts.push(child.text)
-  })
-  return parts
-}
-
-function hasNegatedIdentifier(node, name) {
-  let found = false
-  visit(node, (child) => {
-    if (
-      ts.isPrefixUnaryExpression(child) &&
-      child.operator === ts.SyntaxKind.ExclamationToken &&
-      ts.isIdentifier(child.operand) &&
-      child.operand.text === name
-    ) found = true
-  })
-  return found
-}
-
-function expectRejected(label, assertion) {
-  let rejected = false
-  try {
-    assertion()
-  } catch {
-    rejected = true
-  }
-  expect(rejected, `${label} mutation escaped the UI verifier`)
 }
 
 function verifyComponentContract(componentSource, pageSource) {
@@ -345,6 +239,20 @@ function verifyUiMutationProbes(componentSource, pageSource) {
   const hiddenTicket = componentSource.replace('type="text"', 'type="hidden"')
   expect(hiddenTicket !== componentSource, 'hidden input mutation setup target is missing')
   expectRejected('hidden input', () => verifyComponentContract(hiddenTicket, pageSource))
+
+  const withoutCooldownButton = componentSource.replace(
+    'disabled={submitting || cooldownSeconds > 0} onClick={returnToInitialBind}',
+    'disabled={submitting} onClick={returnToInitialBind}',
+  )
+  expect(withoutCooldownButton !== componentSource, 'cooldown button mutation setup target is missing')
+  expectRejected('unknown-start return button', () => verifyCooldownReturnContract(withoutCooldownButton))
+
+  const withoutChangedStateMessage = componentSource.replace(
+    '状态已变化，请重新开始',
+    '请重新操作',
+  )
+  expect(withoutChangedStateMessage !== componentSource, 'changed-state message mutation setup target is missing')
+  expectRejected('changed-state message', () => verifyUnavailableRestartContract(withoutChangedStateMessage))
 }
 
 function createTrackedStorage(entries = []) {
@@ -782,6 +690,18 @@ if (!existsSync(componentPath)) {
     pass('转移组件使用三态内存状态机，并锁定来源确认、保守失败、远端取消与不可变用户刷新')
   } catch (error) {
     fail(`Admin 手机号转移组件契约失败: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  try {
+    verifyCooldownReturnContract(componentSource)
+    pass('未知 start 的 300 秒冷却阻止切换入口，且无 ticket 时不伪造远端取消')
+  } catch (error) {
+    fail(`Admin 手机号转移未知 start 冷却契约失败: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  try {
+    verifyUnavailableRestartContract(componentSource)
+    pass('verify 状态变化会清理当前 ticket 并明确要求重新开始')
+  } catch (error) {
+    fail(`Admin 手机号转移状态变化契约失败: ${error instanceof Error ? error.message : String(error)}`)
   }
   try {
     verifyUiMutationProbes(componentSource, pageSource)
