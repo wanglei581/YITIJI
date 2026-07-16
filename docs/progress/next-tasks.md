@@ -61,6 +61,12 @@
 
 ## P0/P1：用户中心商用级闭环
 
+> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案已由 PR #259 合入；Wave 0 已由 PR #261（`0c4cdd57`）合入；授权撤回终态保护已由 PR #263（`4f8084d1`）合入；Wave 1-A 账户安全底座已由 PR #265 合入当前 `origin/main@f69bf1b7`。最终 GitHub CI `29504775805` 的 `build-and-verify` 与 `postgres-readiness` 均成功。以上均未部署，且不表示 Wave 1-B、Wave 1-C、真实导出或不可逆注销已经完成。
+> 下一波只能从当前干净主线新建独立 worktree：先实施 Wave 1-B 数据权利执行器；不可逆注销 handler 必须继续等待法务版本化分类留存矩阵、冷静期与执行开关同时获准。随后才可按已合入契约实施 Wave 1-C Kiosk/Admin 隐私运营 UI；不得提前展示注销入口、伪写工单终态或在主工作区堆叠。
+- [x] **Wave 0 授权撤回终态保护（已合入）**：`codex/user-center-wave0-data-truth-20260716` 新增 `revoke_consent→rejected` 的 fail-closed 保护：授权已在请求创建时真实撤回，拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。该补丁已由 [PR #263](https://github.com/wanglei581/YITIJI/pull/263) 合入 `origin/main@4f8084d1`；此前 RED→GREEN、SQLite/PostgreSQL 空库复验与双 CI 均通过。未部署。
+- [x] **Wave 1-A 账户安全底座（已合入）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已由 [PR #265](https://github.com/wanglei581/YITIJI/pull/265) 合入当前 `origin/main@f69bf1b7`；最终 GitHub CI `29504775805` 两个 job 均成功。未新增 Kiosk/Admin UI，未实现数据权利执行器，未部署。
+- [ ] **Wave 1-B 数据权利执行器**：在 Wave 1-A 合入并通过 CI 后，补 export/delete 请求互斥、导出包异步生成、单次下载租约/finish/reconciler、服务端 auditRef、closing 最小回执和注销分类 fail-closed gate；法务分类留存矩阵未签字前不得执行不可逆删除。
+
 > 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
 
 > 2026-07-17 最新状态：Wave 1-A 基础版与追加加固均已进入主线；Wave 1-B Slice 1 已由 [PR #275](https://github.com/wanglei581/YITIJI/pull/275) squash 合入 `main@0ae51289`，合并前和合并后的 `build-and-verify`、`postgres-readiness` 均成功，仍未部署。Slice 1 只建立数据请求账本、导出幂等与 step-up 预约、同步撤回同意及 `delete` 零副作用 `409` 闸门；没有真实导出、下载、注销、队列、文件操作或 UI。下一步 Slice 2 必须同时解决 queue/worker 崩溃恢复、必需审计、私有白名单 artifact 与对象补偿，不能把 `pending/handling` 卡死回收推迟到 Slice 3。法务分类留存矩阵未签字前不得执行不可逆删除；生产发布前必须按实际 nginx 层级显式配置 Express `trust proxy` 可信跳数并真机确认 `req.ip`，禁止直接使用 `trust proxy=true`。
