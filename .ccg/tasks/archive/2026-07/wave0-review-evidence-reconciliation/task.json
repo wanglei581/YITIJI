@@ -1,0 +1,13 @@
+{
+  "id": "wave0-review-evidence-reconciliation",
+  "title": "校正 Wave 0 增量审查异步日志事实",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "文档事实已校正并完成 diff 检查；Antigravity 登录由账户持有人完成后，在远程交付任务中重跑只读审查",
+  "createdAt": "2026-07-16T11:20:00Z",
+  "branch": "codex/user-center-wave0-data-truth-20260716",
+  "baseRef": "origin/main@0c4cdd574b8243b6b43436c2cb90a3d05c44d1b7"
+}
