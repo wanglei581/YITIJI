@@ -18,8 +18,8 @@
 |---|---|---|---|
 | 1 | `codex/user-center-wave0-truth-baseline` | `2026-07-16-user-center-wave0-truth-baseline.md` | 最新干净 `main` |
 | 2 | `codex/user-center-wave1-account-security` | `2026-07-16-user-center-wave1-account-security.md` | Wave 0 合入后的 `main` |
-| 3 | `codex/user-center-wave1-data-rights` | `2026-07-16-user-center-wave1-data-rights.md` | Wave 1 account-security 合入后的 `main` + 法务分类留存矩阵签字 |
-| 4 | `codex/user-center-wave1-ops-ui` | `2026-07-16-user-center-wave1-ops-ui.md` | Wave 1 data-rights 合入后的 `main` + 注销执行 feature flag 获准 |
+| 3 | `codex/user-center-wave1-data-rights` | `2026-07-16-user-center-wave1-data-rights.md` | Wave 1 account-security 合入后的 `main`；状态机、导出和 fail-closed 注销门禁可先实施，不可逆注销 handler 必须等法务分类留存矩阵签字后才能提交 |
+| 4 | `codex/user-center-wave1-ops-ui` | `2026-07-16-user-center-wave1-ops-ui.md` | Wave 1 data-rights 可用契约合入后的 `main`；导出领取、请求列表和 Admin 队列可先实施，Kiosk 注销入口必须等法务矩阵与注销执行 feature flag 同时获准后才能展示 |
 
 每个分支单独建立 CCG task、独立 worktree、独立复审和验收。当前包含用户在途改动的工作区只用于只读分析和写本计划，禁止直接开始运行时代码。
 
@@ -102,8 +102,8 @@ export type MemberDataRequestStatus =
 
 | 请求类型 | 允许转换 | 完成定义 |
 |---|---|---|
-| `export` | pending → handling → ready；ready → handling（download cleanup）→ completed；ready → expired；handling/ready → failed；pending/failed → rejected | `ready` 表示产物存在；响应流成功结束后进入交付收口，reconciler 完成物理删除与账本 CAS 后才 `completed`。`completed` 仅证明服务端交付与清理成功，不证明客户端已永久保存。自然过期进入 `expired` 并清 `activeKey`。 |
-| `delete` | pending → handling → completed；handling → failed；failed → pending（retry） | delete 创建即进入 `closing`，之后禁止普通 reject/cancel。所有分类步骤成功、对象已物理删除、会话已撤销、PII 已墓碑化后才 `completed`；失败只能重试或人工升级，不能恢复成 active。 |
+| `export` | pending → handling → ready；ready → handling（download cleanup）→ completed；ready → expired；pending → failed（queue compensation only）；handling/ready → failed；failed → pending（retry）；pending/failed → rejected | `ready` 表示产物存在；响应流成功结束后进入交付收口，reconciler 完成物理删除与账本 CAS 后才 `completed`。`completed` 仅证明服务端交付与清理成功，不证明客户端已永久保存。自然过期进入 `expired` 并清 `activeKey`。 |
+| `delete` | pending → handling → completed；pending → failed（queue/session-revoke compensation only）；handling → failed；failed → pending（retry） | delete 创建即进入 `closing`，之后禁止普通 reject/cancel。所有分类步骤成功、对象已物理删除、会话已撤销、PII 已墓碑化后才 `completed`；失败只能重试或人工升级，不能恢复成 active。 |
 | `revoke_consent` | 同一事务直接创建 completed；事务失败不留请求行 | 撤回、账本和 required 审计原子提交，不进入异步 pending |
 
 任何 API/Admin 都不得绕过服务层直接写状态。`export/delete` 的 `completed` 只允许 worker/下载收口服务写入；Admin 对 export 可拒绝或重试，对 delete 只能重试/升级，不能伪造终态或在进入 closing 后普通拒绝。

@@ -55,7 +55,7 @@
 
 ## 复审结论
 
-方案与精确实施计划中的 Critical/Warning 已全部吸收。最终有效复审为 Antigravity `APPROVE`（99/100）与 Claude `APPROVE`，均无 Critical/Warning，可以进入纯文档基线集成；这不代表运行时代码、数据库迁移、预生产或真机验收已经完成。
+方案与精确实施计划中的 Critical/Warning 已全部吸收。Antigravity 重新授权后的最新聚焦复审为 `APPROVE`（98/100），Claude 给出 `WAVE0_READY: YES` 与 `WAVE1_PLAN_READY: YES`；两边均无 Critical，所有可执行 Warning 已写回计划，可以进入 Wave 0。这不代表法务门禁已满足，也不代表运行时代码、数据库迁移、预生产或真机验收已经完成。
 
 ## 详细实施计划复审（2026-07-16）
 
@@ -65,4 +65,6 @@
 - Claude 对精确计划首轮提出的 4 个实现级 Warning 已全部落盘：step-up grant 在幂等/active preflight 之后才消费；统一 API error union；JWT `jti → sessionId → logout` 撤销链；Wave 0 Task 7 纳入 `verify-job-ai-privacy.ts` 文件预算。
 - 详细计划进一步补齐 `member:user-step-up-grants:{endUserId}` 原子索引/撤销、PostgreSQL 完整 migration SQL、`revoke_consent` 同步原子创建、会员级 export/delete 互斥、一次性 ticket 的 fragment/header 交付、有租约下载 claim、HTTP `finish` 后清理与 reconciler、`expired` 终态、closing 弱网最小回执、存储 at-rest 加密验收和对象上传补偿。
 - 不可逆注销以 `MEMBER_ACCOUNT_CLOSURE_EXECUTION_ENABLED=false` 默认 fail closed；法务版本化分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字时，API、Kiosk 与 worker 都不能开放执行。
-- 最终复审：Antigravity `APPROVE`（99/100），Claude `APPROVE`；双方均无 Critical/Warning，非阻塞 Info 已吸收进计划或保留为实施注意项。
+- Antigravity 重新授权后的首轮聚焦复审发现下载 `finish/close` 悬空 Promise、注销回执路由表达和手机号精确搜索等计划细节；Claude 同轮发现 Profile 姊妹守卫标题、Wave 0 `delete→rejected` 口径、policy mapper 与法务门禁粒度等问题。有效项均已逐条写回计划；Antigravity 对两条已存在内容的误报未采纳，并保留核对证据。
+- 最终复审：Antigravity `APPROVE`（98/100），Claude 同时给出 `WAVE0_READY: YES` / `WAVE1_PLAN_READY: YES`。Claude 最后指出 `verify-profile-inkpaper-home.mjs` 的精确标签与 `finishDownload` 单参签名措辞，两项也已修订；当前无未处理 Critical/Warning。
+- Claude 最终窄范围复审唯一 Info 指出纯函数 `ALLOWED` 未显式表达 enqueue 失败的 `pending→failed` 补偿路径；现已同时补入总控状态表和 data-rights 状态机，并限定为 queue/session-revoke 失败的服务端补偿 CAS，Admin/API 仍不得直接写 failed。

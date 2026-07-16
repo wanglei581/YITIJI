@@ -247,6 +247,8 @@ interface AccessibleSettingsDialogProps {
   8. 不自动重试消费型请求；
   9. 不写 console、DOM、analytics、storage 或 cookie。
 
+  弱网在响应 `finish` 前断开时，原一次性 ticket 已消费但服务端对象仍保留；页面必须明确提示用户回到一体机重新完成 step-up 并领取新二维码，禁止复用旧 ticket 或自动重试消费型 GET。
+
 - [ ] 静态守卫必须证明 QR 组件无本地下载，只有下载页有 Blob。
 - [ ] 手机 390×844、桌面 1440×900、一体机 1080×1920 做布局检查。
 - [ ] Commit：`feat: add mobile handoff for member data export`。
@@ -305,7 +307,7 @@ interface AdminMemberSummary {
 }
 ```
 
-- [ ] 输入完整手机号时服务端 normalize+hash 精确匹配；响应永不返回 hash/enc。
+- [ ] `phone` 查询只接受 normalize 后的完整 11 位中国大陆手机号并做 hash 精确匹配；不完整、超长或格式非法输入返回稳定 400（或产品统一的空结果，但测试必须锁定一种行为），禁止对 `phoneEnc`/`phoneHash` 使用 `contains`、`LIKE` 或解密后全表扫描；响应永不返回 hash/enc。
 - [ ] status DTO 只允许 active/disabled，reason 2–200 字符。
 - [ ] active→disabled 同事务写 `status=disabled,enabled=false`，随后撤销全部 session/grant，写审计。
 - [ ] disabled→active 同事务写 `status=active,enabled=true`，不恢复旧 session。

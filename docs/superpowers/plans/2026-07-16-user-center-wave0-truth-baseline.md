@@ -145,17 +145,16 @@ const BENEFITS: Entry[] = [
 { title: '权益与政策', subtitle: '查看本人权益、真实活动和官方政策入口。', layout: 'chips', rail: 'plum', entries: BENEFITS }
 ```
 
-- [ ] 修改 `verify-profile-inkpaper-home.mjs` 的 `expectedEntries`，删除以下旧期望：
+- [ ] 修改 `verify-profile-inkpaper-home.mjs` 的 `expectedEntries`，精确删除以下旧期望；真实 `权益活动 -> /activities` 必须保留：
 
 ```text
 招聘会权益活动 -> /activities?source=fair
-招聘会扫码凭证
-求职打印套餐
-AI服务套餐
 ```
 
+- [ ] `招聘会扫码凭证`、`求职打印套餐`、`AI服务套餐` 不在 `expectedEntries` 数组中；把三项各自的“仍为建设中”正向 `expectMatches` 删除并改为反向断言，禁止仅从数组里查找后误以为守卫已同步。
+
 - [ ] 把分区标题守卫中的 `权益活动与服务套餐` 更新为 `权益与政策`，其余四个分区标题不变。
-- [ ] 同步更新 `verify-lightflow-profile-entry.mjs`：`expectedEntries` 删除 `招聘会权益活动`，入口总数从 26 改为 22，建设中标签从 3 改为 0，并把三项占位能力改为反向断言。
+- [ ] 同步更新 `verify-lightflow-profile-entry.mjs`：`expectedEntries` 删除 `招聘会权益活动`，入口总数从 26 改为 22，建设中标签从 3 改为 0，把标题循环中的 `权益活动与服务套餐` 改为 `权益与政策`，并把三项占位能力改为反向断言；同时更新仍描述“23 个真实入口 + 3 个建设中入口”的旧断言消息，避免守卫通过但文案口径漂移。
 - [ ] 同步更新 `verify-lightflow-4188-layout-parity.mjs` 的五区标题，将 `权益活动与服务套餐` 改为 `权益与政策`。该守卫只改标题契约，不改首页或布局断言。
 
 - [ ] 在同一守卫加入明确的反向断言：
@@ -268,7 +267,7 @@ git commit -m "fix: align account settings truth copy"
 - Verify only: `apps/kiosk/scripts/verify-qr-login-ui.mjs`
 - Verify only: `apps/kiosk/src/pages/auth/ScanQrLoginPanel.tsx`
 
-- [ ] 基于最新 `origin/main` 确认实现和守卫已经同时覆盖：
+- [ ] 基于最新 `origin/main` 确认实现包含以下三条降级文案；静态守卫当前断言前两条，第三条通过实现只读复核确认：
 
 ```text
 本机扫码登录服务未连接，请使用手机号登录
@@ -316,6 +315,14 @@ await expectHttpError(
   'DATA_REQUEST_EXECUTION_INCOMPLETE',
 )
 
+await expectHttpError(
+  () => privacy.handleDataRequest(deleteRequest.id, {
+    status: 'rejected',
+    handledBy: adminId,
+  }),
+  'DATA_REQUEST_EXECUTION_INCOMPLETE',
+)
+
 const revoked = await privacy.handleDataRequest(revokeRequest.id, {
   status: 'completed',
   handledBy: adminId,
@@ -323,7 +330,7 @@ const revoked = await privacy.handleDataRequest(revokeRequest.id, {
 assert.equal(revoked.status, 'completed')
 ```
 
-- [ ] 再查数据库和审计：被拒绝的两条仍非 `completed`，且没有 `toStatus=completed` 审计。
+- [ ] 再查数据库和审计：export/delete 的完成尝试均未改变原状态，delete 的普通拒绝尝试也未改变原状态；不存在对应的 `toStatus=completed` / `toStatus=rejected` 审计。
 - [ ] 注册：
 
 ```json
@@ -357,20 +364,23 @@ git commit -m "test: reproduce false privacy request completion"
 
 ```ts
 if (
-  input.status === 'completed' &&
-  (existing.requestType === 'export' || existing.requestType === 'delete')
+  (
+    input.status === 'completed' &&
+    (existing.requestType === 'export' || existing.requestType === 'delete')
+  ) ||
+  (input.status === 'rejected' && existing.requestType === 'delete')
 ) {
   throw new BadRequestException({
     error: {
       code: 'DATA_REQUEST_EXECUTION_INCOMPLETE',
-      message: '该数据请求尚未完成真实执行，不能标记为已完成',
+      message: '该数据请求尚未完成真实执行，不能进入目标状态',
     },
   })
 }
 ```
 
 - [ ] 删除现有 `delete` 请求在 Admin 置 `completed` 时直接调用 `deleteJobAiPersonalData` 的分支；`deleteJobAiPersonalData` 若无其他调用者则连同死代码删除。Wave 1 将由专用 closure worker 接管，Wave 0 不保留“部分删除但叫完成”的语义。
-- [ ] 删除 `verify-job-ai-privacy.ts` 中“Admin completed 会同步删除 AI 数据”的成功/回滚/调用方 auditRef 绕过测试夹具与断言，替换为：`export/delete -> completed` 返回 `DATA_REQUEST_EXECUTION_INCOMPLETE`、AI 数据不删除、AuditService 不写完成审计、request 状态保持原值。守卫必须要求 fail-closed，禁止为了让旧断言通过而恢复虚假完成实现。
+- [ ] 删除 `verify-job-ai-privacy.ts` 中“Admin completed 会同步删除 AI 数据”的成功/回滚/调用方 auditRef 绕过测试夹具与断言，以及静态 `mustContain` 对 `deleteJobAiPersonalData` 的旧字符串要求；替换为：`export/delete -> completed` 与 `delete -> rejected` 返回 `DATA_REQUEST_EXECUTION_INCOMPLETE`、AI 数据不删除、AuditService 不写完成/拒绝审计、request 状态保持原值。守卫必须要求 fail-closed，禁止为了让旧断言通过而恢复虚假完成实现。
 - [ ] 保持 `revoke_consent` 的同步完成逻辑不变。
 - [ ] 运行：
 

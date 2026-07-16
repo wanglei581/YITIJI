@@ -415,7 +415,7 @@ await this.queue!.add(jobName, {
 
 ```ts
 const ALLOWED: Record<MemberDataRequestStatus, readonly MemberDataRequestStatus[]> = {
-  pending: ['handling', 'rejected', 'cancelled'],
+  pending: ['handling', 'failed', 'rejected', 'cancelled'],
   handling: ['ready', 'completed', 'failed'],
   ready: ['handling', 'expired', 'failed'],
   failed: ['pending', 'rejected', 'cancelled'],
@@ -426,7 +426,7 @@ const ALLOWED: Record<MemberDataRequestStatus, readonly MemberDataRequestStatus[
 }
 ```
 
-额外规则：export 生成阶段只允许 `pending→handling→ready`；只有一次性下载 response `finish` 后才能 `ready→handling(download_cleanup_pending)`，再由清理协调器写 `handling→completed`。delete 不能 `handling→ready/expired/rejected/cancelled`，进入 closing 后只允许 `handling/failed/completed`；Admin 不能写 ready/completed/expired/failed。export 的 pending/failed 可 reject，delete 的 failed 只能 retry/升级。
+额外规则：`pending→failed` 只允许 queue enqueue/session revoke 失败的服务端补偿 CAS，不是 Admin/API 通用动作。export 生成阶段只允许 `pending→handling→ready`；只有一次性下载 response `finish` 后才能 `ready→handling(download_cleanup_pending)`，再由清理协调器写 `handling→completed`。delete 不能 `handling→ready/expired/rejected/cancelled`，进入 closing 后只允许 `handling/failed/completed`；Admin 不能写 ready/completed/expired/failed。export 的 pending/failed 可 reject，delete 的 failed 只能 retry/升级。
 
 - [ ] 运行：
 
@@ -624,7 +624,7 @@ return {
   6. 若 `close` 先于 `finish`，仅 compare-and-delete 当前 claim，request 保持 `ready`、对象保留；原 ticket 已作废，用户重新 step-up 后可取得新 ticket，系统不得自动重放消费型 GET；
   7. finish 后任一清理步骤失败，request 进入 `failed/EXPORT_CLEANUP_FAILED` 且保留 `activeKey`，由 Admin retry/协调器继续清理；不得回写“未交付”，也不得声称用户已保存文件。
 
-- [ ] `finishDownload` 先以 `requestId + claimId` 校验 Redis claim，再 CAS 写 `executionStep=download_cleanup_pending,downloadConsumedAt=now`，然后入队 `MEMBER_EXPORT_RECONCILE_JOB`（稳定 job id = `export-reconcile:{requestId}`）。若入队失败，不回滚交付事实；保留 cleanup pending 并高优告警，由 60 秒 repeatable sweep 收口。
+- [ ] `finishDownload(claimId)` 先按 claimId 原子读取/校验 Redis claim，并从 claim payload 取得 `requestId + endUserId`，再以该 requestId CAS 写 `executionStep=download_cleanup_pending,downloadConsumedAt=now`，然后入队 `MEMBER_EXPORT_RECONCILE_JOB`（稳定 job id = `export-reconcile:{requestId}`）。若入队失败，不回滚交付事实；保留 cleanup pending 并高优告警，由 60 秒 repeatable sweep 收口。
 - [ ] `abortDownload` 只用 compare-and-delete 释放当前 claim，不改 `downloadConsumedAt`、不删对象、不自动发新 ticket。
 
 - [ ] Controller 路由：
@@ -666,10 +666,16 @@ async download(
   let finished = false
   res.once('finish', () => {
     finished = true
-    void this.requests.finishDownload(delivery.claimId)
+    void this.requests.finishDownload(delivery.claimId).catch((error: unknown) => {
+      this.logger.error('member export finish cleanup failed', safeErrorSummary(error))
+    })
   })
   res.once('close', () => {
-    if (!finished) void this.requests.abortDownload(delivery.claimId)
+    if (!finished) {
+      void this.requests.abortDownload(delivery.claimId).catch((error: unknown) => {
+        this.logger.warn('member export abort cleanup failed', safeErrorSummary(error))
+      })
+    }
   })
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.setHeader('Content-Disposition', `attachment; filename="member-data-export-${id}.json"`)
@@ -679,6 +685,8 @@ async download(
 }
 }
 ```
+
+Controller 必须使用本地 `Logger` 与既有安全错误摘要 helper（若当前模块无 helper，则新增仅返回错误类型/稳定码的窄化函数）；不得把 ticket、claim payload、对象 key 或完整异常对象写入日志。事件监听器内所有异步 Promise 都必须显式 `.catch()`，禁止产生 unhandled rejection。
 
 - [ ] Web 下载页从 `window.location.hash` 解析 ticket 后立即 `history.replaceState` 清掉 fragment，再把 ticket 放 `x-member-download-ticket` header；禁止 localStorage/sessionStorage/IndexedDB/cookie。
 - [ ] `MemberPrivacyModule.controllers` 必须同时注册 `MemberDataRequestController` 和 `MemberDataExportController`；公开 content route 不得意外继承会员 Guard。
@@ -793,7 +801,7 @@ await tx.userAiConsent.updateMany({
 
 通知、广播已读、反馈、权益/领取记录及上述每个行为类到底调用 delete、匿名化、解绑还是保留，必须由签字矩阵逐项决定，禁止因为示例代码存在就默认删除。执行前必须核对 Prisma 关系的 cascade 只影响该用户；不允许把整表 deleteMany 写成无 where。
 
-- [ ] Step 4: 保留运营/财务事实但解绑：
+- [ ] Step 4: 保留运营/财务事实但解绑。以下 `updateMany` 只能作为版本化 policy mapper 在“该类别 action 明确为 `detach`”时调用的有界原语，禁止把整段当作无条件注销步骤直接执行；每个调用前必须由 policy 断言当前类别、留存期限和法律依据允许解绑：
 
 ```ts
 await tx.order.updateMany({ where: { endUserId }, data: { endUserId: null } })
@@ -931,6 +939,24 @@ POST /api/v1/me/data-requests/:id/download-authorizations
 GET  /api/v1/member/account-closure-receipt  (原未过期 JWT + Idempotency-Key；专用窄化 guard)
 GET  /api/v1/member/data-exports/:id/content  (一次性 ticket header；不使用会员 JWT)
 ```
+
+- [ ] 在独立的公开前缀 controller（不得继承 `EndUserAuthGuard`）显式实现注销回执路由；只从 header 读取幂等键：
+
+```ts
+@Get('account-closure-receipt')
+@UseGuards(MemberClosureReceiptGuard)
+async getAccountClosureReceipt(
+  @Req() req: RequestWithClosureReceiptSubject,
+  @Headers('idempotency-key') idempotencyKey: string | undefined,
+) {
+  return ApiResponse.ok(await this.requests.getAccountClosureReceipt(
+    req.closureReceiptSubject.endUserId,
+    idempotencyKey,
+  ))
+}
+```
+
+路由最终必须解析为 `GET /api/v1/member/account-closure-receipt`；禁止把它放进带类级 `EndUserAuthGuard` 的 `/me/data-requests` controller，也禁止从 query/body 接收 JWT 或完整幂等键。
 
 - [ ] 所有本人资源不存在/越权统一 404，不区分“存在但属于他人”。
 - [ ] closure receipt 仅使用 account-security 计划提供的 `MemberClosureReceiptGuard`，不得使用会被 closing 拒绝的普通 Guard，也不得把专用 subject 注入 `req.endUser`。服务层只按 `closureReceiptSubject.endUserId + Idempotency-Key + requestType=delete` 精确查询，返回 `MemberAccountClosureReceipt` 最小字段；不返回手机号、failureMessage、文件/资产、审计 payload 或新 token，不改变任何状态。
