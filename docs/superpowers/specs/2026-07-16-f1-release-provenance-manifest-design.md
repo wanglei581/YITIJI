@@ -20,7 +20,7 @@
 | 文件 | 责任 | 不纳入的内容 |
 | --- | --- | --- |
 | `RELEASE_MANIFEST.json` | 描述 release 身份、源归档和运行文件树摘要 | 不包含自身 hash 或任何秘密 |
-| `RUNTIME_TREE.sha256` | 按字节序稳定排序的 `sha256  相对路径` 清单，覆盖实际可执行或加载的受控文件 | `.env`、日志、storage、缓存、manifest 和 sidecar |
+| `RUNTIME_TREE.sha256` | 按字节序稳定排序的文件和根内链接记录，覆盖实际可执行或加载的受控文件 | `.env`、日志、storage、缓存、manifest 和 sidecar |
 | `RELEASE_MANIFEST.sha256` | `RELEASE_MANIFEST.json` 的 SHA-256 sidecar | 不纳入运行文件树，避免自引用 |
 
 同一候选的源归档和三份证据副本保存在 release 根外的本机 artifact 目录；其唯一子目录名等于 manifest 的 `releaseId`。artifact 目录与激活后的 release 均由部署账户写入、由 API 运行账户只读访问。部署完成后，artifact 与 release 的普通文件权限为只读，运行账户没有写权限。
@@ -56,7 +56,7 @@ manifest 使用稳定键序 JSON，且只含下列字段。下方为字段格式
 
 ## 受控文件范围
 
-`RUNTIME_TREE.sha256` 必须覆盖 release 目录中 API 启动实际需要的 regular file：API `dist`、生产运行依赖、Prisma 生成物，以及由该 release 提供的 Kiosk/Admin/Partner 静态构建产物。清单生成器拒绝符号链接、绝对路径、`..` 路径和重复路径。
+`RUNTIME_TREE.sha256` 必须覆盖 release 目录中 API 启动实际需要的文件：API `dist`、生产运行依赖、Prisma 生成物，以及由该 release 提供的 Kiosk/Admin/Partner 静态构建产物。pnpm 的生产依赖布局可包含 `services/api/node_modules` 指向 release 根内 `.pnpm` store 的链接；因此清单允许此类根内链接，但每个链接都必须记录规范化的相对目标，且其解析后的真实路径仍位于 release 根内。链接目标的普通文件也必须由受控文件根覆盖。任何绝对链接、越出 release 根的链接、循环链接、`..` 路径或重复记录都使生成和验证失败。
 
 以下路径或类别必须显式排除：`.env`、`*.log`、`storage/`、`uploads/`、临时目录、运行时缓存、`RELEASE_MANIFEST.json`、`RELEASE_MANIFEST.sha256`、`RUNTIME_TREE.sha256`。排除列表是固定的；遇到不属于受控文件范围但又位于候选 release 根下的可写文件，生成器失败而不是静默忽略。
 
@@ -89,7 +89,7 @@ guard 仅接受规范化 release 根、固定 manifest 文件名和固定 artifa
 
 实现必须先建立失败测试，再写最小实现：
 
-- 单元测试：稳定键序 manifest、runtime 清单的稳定排序、路径规范化、重复路径/符号链接/越界路径拒绝、SHA-256 格式校验。
+- 单元测试：稳定键序 manifest、runtime 清单的稳定排序、路径规范化、重复路径/越界链接/循环链接拒绝、根内 pnpm 风格链接记录、SHA-256 格式校验。
 - 集成测试：以临时 release 和 artifact 目录覆盖 manifest 缺失、sidecar 不一致、源归档 hash 不一致、运行文件被篡改、entrypoint 缺失、受控范围外的可写文件、previous release 不可验证。
 - wrapper 测试：candidate guard 失败时不执行 PM2；PM2 reload 或 post-switch health 失败时仅在 previous release 验证成功后回切；previous release 不通过时停止并返回 `NO-GO`。
 - 静态门禁：禁止 guard 读取 `.env`、数据库/Redis、日志和用户数据；禁止 manifest 包含常见秘密字段；禁止部署流程绕过 guard 直接启动 API。
