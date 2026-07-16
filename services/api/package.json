@@ -26,6 +26,7 @@
     "verify:sms-send": "node -r @swc-node/register scripts/verify-sms-send.ts",
     "verify:member-sms-provider-errors": "node -r @swc-node/register scripts/verify-member-sms-provider-errors.ts",
     "verify:member-auth": "node -r @swc-node/register scripts/verify-member-auth.ts",
+    "verify:member-account-status": "node -r @swc-node/register scripts/verify-member-account-status.ts",
     "verify:member-qr-login": "node -r @swc-node/register scripts/verify-member-qr-login.ts",
     "verify:end-user-assets": "node -r @swc-node/register scripts/verify-end-user-asset-ownership.ts",
     "verify:ai-result-ownership": "node -r @swc-node/register scripts/verify-ai-result-ownership.ts",
