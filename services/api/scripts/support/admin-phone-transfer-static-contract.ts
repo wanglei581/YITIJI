@@ -16,18 +16,34 @@ const routes = [
     dto: 'InitialPhoneBindStartDto',
     method: 'start',
     args: ['user.userId', 'dto.currentPassword', 'dto.phone', 'ip', 'dto.deviceId'],
+    parameters: [
+      { name: 'user', type: 'AuthedUser', decorator: 'CurrentUser', decoratorArgs: [] },
+      { name: 'dto', type: 'InitialPhoneBindStartDto', decorator: 'Body', decoratorArgs: [] },
+      { name: 'ip', type: 'string', decorator: 'Ip', decoratorArgs: [] },
+    ],
+    returnType: 'Promise<ApiResponse<AdminPhoneTransferStartResult>>',
   },
   {
     path: 'admin/phone/transfer/verify',
     dto: 'InitialPhoneBindVerifyDto',
     method: 'verify',
     args: ['user.userId', 'dto.bindTicket', 'dto.code'],
+    parameters: [
+      { name: 'user', type: 'AuthedUser', decorator: 'CurrentUser', decoratorArgs: [] },
+      { name: 'dto', type: 'InitialPhoneBindVerifyDto', decorator: 'Body', decoratorArgs: [] },
+    ],
+    returnType: 'Promise<ApiResponse<{phoneMasked:string;phoneVerifiedAt:string}>>',
   },
   {
     path: 'admin/phone/transfer/cancel',
     dto: 'InitialPhoneBindCancelDto',
     method: 'cancel',
     args: ['user.userId', 'dto.bindTicket'],
+    parameters: [
+      { name: 'user', type: 'AuthedUser', decorator: 'CurrentUser', decoratorArgs: [] },
+      { name: 'dto', type: 'InitialPhoneBindCancelDto', decorator: 'Body', decoratorArgs: [] },
+    ],
+    returnType: 'Promise<ApiResponse<{cancelled:true}>>',
   },
 ] as const
 
@@ -58,12 +74,19 @@ function classNamed(source: ts.SourceFile, name: string): ts.ClassDeclaration | 
   )
 }
 
-function decoratorCall(node: ts.Node, name: string): ts.CallExpression | undefined {
+function decoratorNode(node: ts.Node, name: string): ts.Decorator | undefined {
   if (!ts.canHaveDecorators(node)) return undefined
-  return ts.getDecorators(node)?.map((decorator) => decorator.expression).find(
-    (expression): expression is ts.CallExpression =>
-      ts.isCallExpression(expression) && ts.isIdentifier(expression.expression) && expression.expression.text === name,
+  return ts.getDecorators(node)?.find(
+    (decorator) =>
+      ts.isCallExpression(decorator.expression) &&
+      ts.isIdentifier(decorator.expression.expression) &&
+      decorator.expression.expression.text === name,
   )
+}
+
+function decoratorCall(node: ts.Node, name: string): ts.CallExpression | undefined {
+  const decorator = decoratorNode(node, name)
+  return decorator && ts.isCallExpression(decorator.expression) ? decorator.expression : undefined
 }
 
 function expressionPath(expression: ts.Expression): string | null {
@@ -85,6 +108,41 @@ function propertyInitializer(object: ts.ObjectLiteralExpression, name: string): 
       ts.isPropertyAssignment(candidate) && propertyName(candidate.name) === name,
   )
   return property?.initializer
+}
+
+function entityNamePath(name: ts.EntityName): string {
+  return ts.isIdentifier(name) ? name.text : `${entityNamePath(name.left)}.${name.right.text}`
+}
+
+function typeFingerprint(type: ts.TypeNode | undefined): string | null {
+  if (!type) return null
+  if (ts.isTypeReferenceNode(type)) {
+    const args = type.typeArguments?.map(typeFingerprint) ?? []
+    if (args.some((argument) => argument === null)) return null
+    return `${entityNamePath(type.typeName)}${args.length > 0 ? `<${args.join(',')}>` : ''}`
+  }
+  if (ts.isTypeLiteralNode(type)) {
+    const members = type.members.map((member) => {
+      if (!ts.isPropertySignature(member) || !member.name) return null
+      const name = propertyName(member.name)
+      const value = typeFingerprint(member.type)
+      return name && value && !member.questionToken ? `${name}:${value}` : null
+    })
+    return members.some((member) => member === null) ? null : `{${members.join(';')}}`
+  }
+  if (ts.isLiteralTypeNode(type)) {
+    if (type.literal.kind === ts.SyntaxKind.TrueKeyword) return 'true'
+    if (type.literal.kind === ts.SyntaxKind.FalseKeyword) return 'false'
+    if (ts.isStringLiteral(type.literal)) return JSON.stringify(type.literal.text)
+    return null
+  }
+  const keywordTypes = new Map<ts.SyntaxKind, string>([
+    [ts.SyntaxKind.StringKeyword, 'string'],
+    [ts.SyntaxKind.NumberKeyword, 'number'],
+    [ts.SyntaxKind.BooleanKeyword, 'boolean'],
+    [ts.SyntaxKind.UnknownKeyword, 'unknown'],
+  ])
+  return keywordTypes.get(type.kind) ?? null
 }
 
 function numericLiteralValue(expression: ts.Expression | undefined): number | null {
@@ -122,6 +180,34 @@ function dtoTypeName(method: ts.MethodDeclaration): string | null {
   )
   if (!dto?.type || !ts.isTypeReferenceNode(dto.type) || !ts.isIdentifier(dto.type.typeName)) return null
   return dto.type.typeName.text
+}
+
+function decoratorArgument(expression: ts.Expression): string | null {
+  if (ts.isStringLiteral(expression)) return JSON.stringify(expression.text)
+  return expressionPath(expression)
+}
+
+function parametersMatch(
+  method: ts.MethodDeclaration,
+  expected: readonly {
+    name: string
+    type: string
+    decorator: string
+    decoratorArgs: readonly string[]
+  }[],
+): boolean {
+  if (method.parameters.length !== expected.length) return false
+  return expected.every((contract, index) => {
+    const parameter = method.parameters[index]
+    if (!parameter || !ts.isIdentifier(parameter.name) || parameter.name.text !== contract.name) return false
+    const decorators = ts.canHaveDecorators(parameter) ? ts.getDecorators(parameter) ?? [] : []
+    const call = decoratorCall(parameter, contract.decorator)
+    return (
+      decorators.length === 1 &&
+      typeFingerprint(parameter.type) === contract.type &&
+      call?.arguments.map(decoratorArgument).join(',') === contract.decoratorArgs.join(',')
+    )
+  })
 }
 
 function delegatesExactly(method: ts.MethodDeclaration, serviceMethod: string, args: readonly string[]): boolean {
@@ -167,9 +253,11 @@ function validateRoutesAndConstructor(sourceText: string): string[] {
       !method ||
       !hasExactDecoratorArguments(method) ||
       dtoTypeName(method) !== route.dto ||
-      !delegatesExactly(method, route.method, route.args)
+      !delegatesExactly(method, route.method, route.args) ||
+      !parametersMatch(method, route.parameters) ||
+      typeFingerprint(method.type) !== route.returnType
     ) {
-      failures.push(`${route.path} AST 未保持 path/Admin guards/限流/DTO/单一服务委派`)
+      failures.push(`${route.path} AST 未保持 path/guards/参数 decorators/DTO/返回类型/单一服务委派`)
     }
   }
 
@@ -192,17 +280,32 @@ function validateRoutesAndConstructor(sourceText: string): string[] {
 }
 
 function validateModule(sourceText: string): string[] {
+  const failures: string[] = []
   const source = parseSource('auth.module.ts', sourceText)
   const authModule = classNamed(source, 'AuthModule')
   const metadata = authModule ? decoratorCall(authModule, 'Module')?.arguments[0] : undefined
   if (!metadata || !ts.isObjectLiteralExpression(metadata)) return ['AuthModule @Module AST 缺失']
+  const imports = propertyInitializer(metadata, 'imports')
   const providers = propertyInitializer(metadata, 'providers')
-  if (!providers || !ts.isArrayLiteralExpression(providers)) return ['AuthModule providers AST 缺失']
-  return providers.elements.some(
-    (provider) => ts.isIdentifier(provider) && provider.text === 'AdminPhoneTransferService',
+  if (!imports || !ts.isArrayLiteralExpression(imports)) failures.push('AuthModule imports AST 缺失')
+  if (!providers || !ts.isArrayLiteralExpression(providers)) failures.push('AuthModule providers AST 缺失')
+  if (failures.length > 0) return failures
+
+  const imported = new Set(
+    (imports as ts.ArrayLiteralExpression).elements
+      .filter((element): element is ts.Identifier => ts.isIdentifier(element))
+      .map((element) => element.text),
   )
-    ? []
-    : ['AuthModule providers AST 缺少 AdminPhoneTransferService']
+  const provided = new Set(
+    (providers as ts.ArrayLiteralExpression).elements
+      .filter((element): element is ts.Identifier => ts.isIdentifier(element))
+      .map((element) => element.text),
+  )
+  const missingImports = ['PrismaModule', 'RedisModule', 'AuditModule'].filter((name) => !imported.has(name))
+  const missingProviders = ['InternalOtpService', 'AdminPhoneTransferService'].filter((name) => !provided.has(name))
+  if (missingImports.length > 0) failures.push(`AuthModule imports AST 缺少 ${missingImports.join(', ')}`)
+  if (missingProviders.length > 0) failures.push(`AuthModule providers AST 缺少 ${missingProviders.join(', ')}`)
+  return failures
 }
 
 function auditActionSet(sourceText: string, label: string): { actions: Set<string>; failures: string[] } {
@@ -251,29 +354,77 @@ function validateSources(sources: ContractSources): string[] {
   ]
 }
 
-function commentRouteFragment(source: string, path: string, fragment: string): string {
-  const routeStart = source.indexOf(`@Post('${path}')`)
-  ensure(routeStart >= 0, `20m. mutation fixture 缺少路由 ${path}`)
-  const nextRoute = source.indexOf('\n  @Post(', routeStart + 1)
-  const routeEnd = nextRoute < 0 ? source.length : nextRoute
-  const block = source.slice(routeStart, routeEnd)
-  ensure(block.includes(fragment), `20m. mutation fixture 缺少片段 ${fragment}`)
-  return `${source.slice(0, routeStart)}${block.replace(fragment, `// ${fragment}`)}${source.slice(routeEnd)}`
+function replaceNodeSpan(sourceText: string, source: ts.SourceFile, node: ts.Node, replacement: string): string {
+  const start = node.getStart(source)
+  return `${sourceText.slice(0, start)}${replacement}${sourceText.slice(node.end)}`
+}
+
+function routeMethod(source: ts.SourceFile, path: string): ts.MethodDeclaration | undefined {
+  return classNamed(source, 'AuthController')?.members.find(
+    (member): member is ts.MethodDeclaration => ts.isMethodDeclaration(member) && postPath(member) === path,
+  )
+}
+
+function commentDecorator(sourceText: string, path: string, decoratorName: string, parameterName?: string): string {
+  const source = parseSource('auth.controller.mutation.ts', sourceText)
+  const method = routeMethod(source, path)
+  const target = parameterName
+    ? method?.parameters.find(
+        (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === parameterName,
+      )
+    : method
+  const decorator = target ? decoratorNode(target, decoratorName) : undefined
+  ensure(decorator, `20m. mutation fixture 缺少 ${path} ${parameterName ?? 'method'} @${decoratorName}`)
+  const original = decorator.getText(source)
+  return replaceNodeSpan(sourceText, source, decorator, `/* ${original} */`)
+}
+
+function mutateModuleArrayIdentifier(sourceText: string, property: string, identifier: string): string {
+  const source = parseSource('auth.module.mutation.ts', sourceText)
+  const authModule = classNamed(source, 'AuthModule')
+  const metadata = authModule ? decoratorCall(authModule, 'Module')?.arguments[0] : undefined
+  ensure(metadata && ts.isObjectLiteralExpression(metadata), '20m. mutation fixture 缺少 AuthModule metadata')
+  const array = propertyInitializer(metadata, property)
+  ensure(array && ts.isArrayLiteralExpression(array), `20m. mutation fixture 缺少 AuthModule ${property}`)
+  const element = array.elements.find((candidate) => ts.isIdentifier(candidate) && candidate.text === identifier)
+  ensure(element, `20m. mutation fixture 缺少 AuthModule ${property}.${identifier}`)
+  return replaceNodeSpan(sourceText, source, element, `/* removed ${identifier} */`)
+}
+
+function mutateReturnType(sourceText: string, path: string): string {
+  const source = parseSource('auth.controller.return-mutation.ts', sourceText)
+  const type = routeMethod(source, path)?.type
+  ensure(type, `20m. mutation fixture 缺少 ${path} return type`)
+  return replaceNodeSpan(sourceText, source, type, 'unknown')
 }
 
 function assertCommentMutationsRejected(sources: ContractSources): void {
   const cases: Array<[string, ContractSources]> = [
-    ['Guard', { ...sources, controller: commentRouteFragment(sources.controller, routes[0].path, '@UseGuards(JwtAuthGuard, RolesGuard)') }],
-    ['Roles', { ...sources, controller: commentRouteFragment(sources.controller, routes[1].path, "@Roles('admin')") }],
-    ['Throttle', { ...sources, controller: commentRouteFragment(sources.controller, routes[2].path, '@Throttle({ default: { ttl: 60_000, limit: 5 } })') }],
-    ['module provider', { ...sources, authModule: sources.authModule.replace('    AdminPhoneTransferService,', '    // AdminPhoneTransferService,') }],
+    ['Guard', { ...sources, controller: commentDecorator(sources.controller, routes[0].path, 'UseGuards') }],
+    ['Roles', { ...sources, controller: commentDecorator(sources.controller, routes[1].path, 'Roles') }],
+    ['Throttle', { ...sources, controller: commentDecorator(sources.controller, routes[2].path, 'Throttle') }],
+    ['AdminPhoneTransferService provider', { ...sources, authModule: mutateModuleArrayIdentifier(sources.authModule, 'providers', 'AdminPhoneTransferService') }],
+    ['PrismaModule import', { ...sources, authModule: mutateModuleArrayIdentifier(sources.authModule, 'imports', 'PrismaModule') }],
+    ['RedisModule import', { ...sources, authModule: mutateModuleArrayIdentifier(sources.authModule, 'imports', 'RedisModule') }],
+    ['AuditModule import', { ...sources, authModule: mutateModuleArrayIdentifier(sources.authModule, 'imports', 'AuditModule') }],
+    ['InternalOtpService provider', { ...sources, authModule: mutateModuleArrayIdentifier(sources.authModule, 'providers', 'InternalOtpService') }],
+    ['start CurrentUser', { ...sources, controller: commentDecorator(sources.controller, routes[0].path, 'CurrentUser', 'user') }],
+    ['start Body', { ...sources, controller: commentDecorator(sources.controller, routes[0].path, 'Body', 'dto') }],
+    ['start Ip', { ...sources, controller: commentDecorator(sources.controller, routes[0].path, 'Ip', 'ip') }],
+    ['verify CurrentUser', { ...sources, controller: commentDecorator(sources.controller, routes[1].path, 'CurrentUser', 'user') }],
+    ['verify Body', { ...sources, controller: commentDecorator(sources.controller, routes[1].path, 'Body', 'dto') }],
+    ['cancel CurrentUser', { ...sources, controller: commentDecorator(sources.controller, routes[2].path, 'CurrentUser', 'user') }],
+    ['cancel Body', { ...sources, controller: commentDecorator(sources.controller, routes[2].path, 'Body', 'dto') }],
+    ['start return type', { ...sources, controller: mutateReturnType(sources.controller, routes[0].path) }],
+    ['verify return type', { ...sources, controller: mutateReturnType(sources.controller, routes[1].path) }],
+    ['cancel return type', { ...sources, controller: mutateReturnType(sources.controller, routes[2].path) }],
     ['API AuditAction', { ...sources, localAudit: sources.localAudit.replace("  | 'auth.phone_transfer_start'", "  // | 'auth.phone_transfer_start'") }],
     ['shared AuditAction', { ...sources, sharedAudit: sources.sharedAudit.replace("  | 'auth.phone_transfer_start'", "  // | 'auth.phone_transfer_start'") }],
   ]
   for (const [label, mutated] of cases) {
-    ensure(validateSources(mutated).length > 0, `20m. ${label} 仅注释 mutation 被静态门禁误放行`)
+    ensure(validateSources(mutated).length > 0, `20m. ${label} mutation 被静态门禁误放行`)
   }
-  pass('20m. Guard/Roles/Throttle、provider 与双 AuditAction 注释 mutation 均被拒绝')
+  pass('20m. 路由/参数 decorators、DI imports/providers、返回类型与双 AuditAction mutation 均被拒绝')
 }
 
 export function assertAdminPhoneTransferRouteDiAuditContract(): void {
