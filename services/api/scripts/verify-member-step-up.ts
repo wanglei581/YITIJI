@@ -13,6 +13,7 @@ import {
   verifyCorruptAttemptMatrix,
   verifyGrantRedisInvariants,
 } from './verify-member-step-up-adversarial'
+import { verifyStepUpHttpContract } from './verify-member-step-up-http'
 import {
   FakeSmsSender,
   type ChallengeResult,
@@ -33,7 +34,6 @@ import {
   redisValue,
   registerSensitive,
   scanKeys,
-  skip,
   trackRedisWrites,
   verifyStepUpDtoValidation,
   withTestEnv,
@@ -85,7 +85,6 @@ async function execute(capturedOutput: string[]): Promise<void> {
 
   const [
     { NestFactory },
-    { JwtService },
     { AppModule },
     { HttpExceptionFilter },
     { REDIS_CLIENT, RedisService },
@@ -94,7 +93,6 @@ async function execute(capturedOutput: string[]): Promise<void> {
     { encryptPhone, hashPhone },
   ] = await Promise.all([
     import('@nestjs/core'),
-    import('@nestjs/jwt'),
     import('../src/app.module'),
     import('../src/common/filters/http-exception.filter'),
     import('../src/common/redis/redis.service'),
@@ -125,14 +123,6 @@ async function execute(capturedOutput: string[]): Promise<void> {
   assert(service, 'MemberStepUpService must resolve from the real MemberAuthModule provider graph')
   pass('MemberStepUpService resolves from the real module')
   const controller = app.get(MemberAuthController) as unknown as Record<string, unknown>
-  const hasStepUpHttp = typeof controller['sendStepUpCode'] === 'function'
-    && typeof controller['verifyStepUp'] === 'function'
-  if (hasStepUpHttp) {
-    assert(Object.values(controller).includes(service),
-      'MemberAuthController and integration harness must resolve the same MemberStepUpService provider')
-  } else {
-    skip('Task 7 HTTP routes/controller injection are not present; service/module tests continue')
-  }
   const smsSingleton = app.get<SmsSender>(SMS_SENDER)
   const originalSendCode = smsSingleton.sendCode
   smsSingleton.sendCode = sms.sendCode.bind(sms)
@@ -223,13 +213,26 @@ async function execute(capturedOutput: string[]): Promise<void> {
     addRedisMarker(createHash('sha256').update(grant.stepUpToken).digest('hex'))
   }
 
-  async function request(path: string, body: Json, token?: string): Promise<{ status: number; json: Json }> {
+  async function request(
+    path: string,
+    body: Json,
+    token?: string,
+    headers?: Record<string, string>,
+  ): Promise<{ status: number; json: Json; cacheControl: string | null }> {
     const response = await fetch(`${base}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
       body: JSON.stringify(body),
     })
-    return { status: response.status, json: (await response.json().catch(() => ({}))) as Json }
+    return {
+      status: response.status,
+      json: (await response.json().catch(() => ({}))) as Json,
+      cacheControl: response.headers.get('cache-control'),
+    }
   }
 
   async function issueGrant(userId: string, action: StepUpAction, deviceId?: string): Promise<GrantResult> {
@@ -245,6 +248,8 @@ async function execute(capturedOutput: string[]): Promise<void> {
   try {
     await rawRedis.ping()
     pass('real Redis is reachable')
+    assert(Object.values(controller).includes(service),
+      'MemberAuthController and integration harness must resolve the same MemberStepUpService provider')
 
     const runtimeActionUser = await createUser('runtime-action')
     sms.clear()
@@ -258,28 +263,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
     )
     assert(!sms.hasCode(), 'runtime action rejection must happen before SMS dispatch')
 
-    if (hasStepUpHttp) {
-      const httpUser = await createUser('http')
-      const unauthenticated = await request('/auth/step-up/sms-code', { action: 'export_data_request' })
-      assert(unauthenticated.status === 401, 'unauthenticated challenge creation must return 401')
-      pass('1. unauthenticated HTTP challenge is rejected')
-
-      const sessionId = `verify-step-up-session-${runId}`
-      await redis.registerMemberSession(httpUser.id, sessionId, 300)
-      addRedisMarker(sessionId)
-      const memberJwt = new JwtService({
-        secret: process.env['JWT_SECRET'],
-        signOptions: { expiresIn: '5m', audience: 'enduser' },
-      })
-      const memberToken = memberJwt.sign({ sub: httpUser.id }, { jwtid: sessionId })
-      const invalidAction = await request('/auth/step-up/sms-code', { action: 'delete_everything' }, memberToken)
-      assert(invalidAction.status === 400, 'action outside shared allowlist must return 400')
-      pass('2. HTTP DTO rejects action outside shared allowlist')
-      await redis.unregisterMemberSession(httpUser.id, sessionId)
-    } else {
-      skip('1. unauthenticated HTTP challenge assertion waits for Task 7')
-      skip('2. HTTP invalid-action DTO assertion waits for Task 7')
-    }
+    await verifyStepUpHttpContract({ request, createUser, redis, rawRedis, sms, runId, addRedisMarker })
 
     const bindingOwner = await createUser('challenge-owner')
     const bindingOther = await createUser('challenge-other')
