@@ -20,6 +20,7 @@
 | `services/api/src/orgs/admin-orgs.service.ts` | 原子移除、成员查询过滤、账号启停/改密防竞态。 |
 | `services/api/src/orgs/admin-orgs.controller.ts` | Admin-only `DELETE /admin/orgs/:id/accounts/:accountId`。 |
 | `services/api/src/auth/*.ts`、`jwt-auth.guard.ts` | 登录、令牌、手机号绑定的墓碑拒绝和缓存失效。 |
+| `services/api/scripts/verify-admin-orgs-delete-schema.ts` | 双 schema、双 migration 的 RED→GREEN 静态门禁。 |
 | `services/api/scripts/verify-*.ts` | 真实 SQLite 行为、并发与缓存安全验证。 |
 | `apps/admin/src/routes/partners/*.tsx` | 在现有机构详情中提供二次确认删除；拆出账号区以降低 817 行页面复杂度。 |
 | `apps/admin/src/services/api/orgsAdmin.ts` | HTTP / mock adapter 的删除契约。 |
@@ -33,8 +34,37 @@
 - Modify (generated): `services/api/prisma/postgres/schema.prisma`
 - Create: `services/api/prisma/migrations/20260716193000_add_partner_account_tombstone/migration.sql`
 - Create: `services/api/prisma/postgres/migrations/20260716193000_add_partner_account_tombstone/migration.sql`
+- Create: `services/api/scripts/verify-admin-orgs-delete-schema.ts`
+- Modify: `services/api/package.json`
 
-- [ ] **Step 1: 在 SQLite schema 中先写出期望模型，让现有调用尚不能编译。**
+- [ ] **Step 1: 先写会失败的双 schema / migration 门禁。**
+
+  创建 `verify-admin-orgs-delete-schema.ts`。缺失文件返回空文本而不是抛系统错误，使 RED 输出明确指出缺失的设计元素：
+
+  ```ts
+  function expect(condition: boolean, message: string): void {
+    if (!condition) failures.push(message)
+  }
+
+  const sqliteSchema = read('prisma/schema.prisma')
+  const pgSchema = read('prisma/postgres/schema.prisma')
+  const sqliteMigration = read('prisma/migrations/20260716193000_add_partner_account_tombstone/migration.sql')
+  const pgMigration = read('prisma/postgres/migrations/20260716193000_add_partner_account_tombstone/migration.sql')
+
+  expect(/deletedAt\s+DateTime\?/.test(sqliteSchema), 'SQLite User schema 缺少 deletedAt DateTime?')
+  expect(/@@index\(\[orgId, role, enabled, deletedAt\]\)/.test(sqliteSchema), 'SQLite User schema 缺少有效账号索引')
+  expect(pgSchema.includes('provider = "postgresql"') && /deletedAt\s+DateTime\?/.test(pgSchema), 'PostgreSQL schema 未同步 deletedAt')
+  expect(sqliteMigration.includes('ADD COLUMN "deletedAt"') && sqliteMigration.includes('User_orgId_role_enabled_deletedAt_idx'), 'SQLite tombstone migration 不完整')
+  expect(pgMigration.includes('ADD COLUMN "deletedAt"') && pgMigration.includes('User_orgId_role_enabled_deletedAt_idx'), 'PostgreSQL tombstone migration 不完整')
+  ```
+
+- [ ] **Step 2: 运行该门禁并确认 RED。**
+
+  Run: `node -r @swc-node/register scripts/verify-admin-orgs-delete-schema.ts`
+
+  Expected: 以 `SQLite User schema 缺少 deletedAt DateTime?`、migration 缺失等断言失败；不得因为读取缺失文件而异常退出。
+
+- [ ] **Step 3: 在 SQLite schema 中实现最小模型变更。**
 
   在 `User` 增加并只增加下列字段与索引：
 
@@ -46,13 +76,7 @@
 
   不改变 `id`、`username`、`phoneHash` 的唯一约束，不新增“删除原因”“恢复状态”或第二套成员表。
 
-- [ ] **Step 2: 生成模型客户端并确认 schema 基线。**
-
-  Run: `pnpm --filter @ai-job-print/api typecheck`
-
-  Expected: PASS；SQLite client 已识别 `deletedAt`，但尚未有删除 API 或行为变化。
-
-- [ ] **Step 3: 添加成对 migration。**
+- [ ] **Step 4: 添加成对 migration。**
 
   SQLite migration 内容：
 
@@ -72,20 +96,26 @@
 
   不执行任何生产数据库命令。
 
-- [ ] **Step 4: 从唯一 schema 真相源同步 PostgreSQL schema。**
+- [ ] **Step 5: 从唯一 schema 真相源同步 PostgreSQL schema，并验证 GREEN。**
 
-  Run: `pnpm --filter @ai-job-print/api exec prisma migrate deploy && pnpm --filter @ai-job-print/api db:pg:sync && pnpm --filter @ai-job-print/api db:pg:sync --check && pnpm --filter @ai-job-print/api db:pg:generate`
+  在 `package.json` 增加：
+
+  ```json
+  "verify:admin-orgs-delete-schema": "node -r @swc-node/register scripts/verify-admin-orgs-delete-schema.ts"
+  ```
+
+  Run: `pnpm --filter @ai-job-print/api exec prisma migrate deploy && pnpm --filter @ai-job-print/api db:pg:sync && pnpm --filter @ai-job-print/api db:pg:sync --check && pnpm --filter @ai-job-print/api db:pg:generate && pnpm --filter @ai-job-print/api verify:admin-orgs-delete-schema && pnpm --filter @ai-job-print/api typecheck`
 
   Expected: 本地 SQLite 验证库已应用新增 migration，`postgres schema 同步校验通过`，且生成的 PG client 包含 `deletedAt`。此命令只使用本地 `file:` 验证库；不得指向 PostgreSQL 生产连接。
 
-- [ ] **Step 5: 核验 migration 对称性并提交。**
+- [ ] **Step 6: 核验 migration 对称性并提交。**
 
   Run: `git diff --check && git diff -- services/api/prisma/schema.prisma services/api/prisma/postgres/schema.prisma services/api/prisma/migrations services/api/prisma/postgres/migrations`
 
   Commit:
 
   ```bash
-  git add services/api/prisma
+  git add services/api/prisma services/api/scripts/verify-admin-orgs-delete-schema.ts services/api/package.json
   git commit -m "feat: add partner account tombstone schema"
   ```
 
