@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { encryptPhone, hashPhone, maskPhone, maskPhoneFromEnc } from '../common/crypto/phone-identity'
-import { memberSessionKey } from '../common/guards/end-user-auth.guard'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
@@ -142,14 +141,20 @@ export class MemberAuthService {
     // 验证通过:立即销毁尝试计数；验证码已由 Redis 原子脚本删除(防并发重放)。
     await this.redis.del(attemptKey)
 
-    // upsert EndUser(by phoneHash)。新用户落 phoneEnc;停用用户拒登。
+    // upsert EndUser(by phoneHash)。新旧门禁双轨期间任何不可用状态都拒绝登录。
     let user = await this.prisma.endUser.findUnique({ where: { phoneHash } })
-    if (user && !user.enabled) {
-      throw new ForbiddenException({ error: { code: 'ACCOUNT_DISABLED', message: '账号已被停用' } })
+    if (user && (!user.enabled || user.status !== 'active')) {
+      throw this.accountUnavailable()
     }
     if (!user) {
       user = await this.prisma.endUser.create({
-        data: { phoneHash, phoneEnc: encryptPhone(phone), lastLoginAt: new Date() },
+        data: {
+          phoneHash,
+          phoneEnc: encryptPhone(phone),
+          enabled: true,
+          status: 'active',
+          lastLoginAt: new Date(),
+        },
       })
     } else {
       user = await this.prisma.endUser.update({
@@ -162,9 +167,18 @@ export class MemberAuthService {
   }
 
   async issueLoginForUser(user: MemberAuthUser): Promise<MemberLoginResult> {
+    // QR 确认与最终 claim 之间账户状态可能变化，签发前必须重读双轨门禁。
+    const current = await this.prisma.endUser.findUnique({
+      where: { id: user.id },
+      select: { enabled: true, status: true },
+    })
+    if (!current || !current.enabled || current.status !== 'active') {
+      throw this.accountUnavailable()
+    }
+
     // 建立 Redis 会话(jti),签发短期 JWT(aud=enduser + jti)。
     const sessionId = randomUUID()
-    await this.redis.setEx(memberSessionKey(sessionId), SESSION_TTL, user.id)
+    await this.redis.registerMemberSession(user.id, sessionId, SESSION_TTL)
     const token = this.jwtService.sign({ sub: user.id }, { jwtid: sessionId })
 
     return {
@@ -174,8 +188,8 @@ export class MemberAuthService {
   }
 
   /** 登出:删除 Redis 会话即失效(JWT 即使未过期也作废)。 */
-  async logout(sessionId: string): Promise<void> {
-    await this.redis.del(memberSessionKey(sessionId))
+  async logout(endUserId: string, sessionId: string): Promise<void> {
+    await this.redis.unregisterMemberSession(endUserId, sessionId)
   }
 
   /** 当前登录用户信息(phoneMasked 由 phoneEnc 解密派生,绝不回明文)。 */
@@ -234,5 +248,11 @@ export class MemberAuthService {
 
   private loginFailed(code: string, message: string): UnauthorizedException {
     return new UnauthorizedException({ error: { code, message } })
+  }
+
+  private accountUnavailable(): ForbiddenException {
+    return new ForbiddenException({
+      error: { code: 'ACCOUNT_UNAVAILABLE', message: '账号当前不可登录，请联系工作人员' },
+    })
   }
 }

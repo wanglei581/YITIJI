@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { SignComposeResponse, SignInspectResponse } from './print-sign.types'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { SignComposeDto, SignInspectDto } from './print-sign.dto'
@@ -15,12 +16,13 @@ export class PrintSignController {
     private readonly sign: PrintSignService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('inspect')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async inspect(@Body() body: SignInspectDto, @Req() req: Request): Promise<ApiResponse<SignInspectResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sign.inspect({
       terminalId: body.terminalId,
       document: body.document,
@@ -37,7 +39,7 @@ export class PrintSignController {
     @Headers('x-request-id') requestId: string | undefined,
     @Req() req: Request,
   ): Promise<ApiResponse<SignComposeResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sign.compose({
       terminalId: body.terminalId,
       document: body.document,

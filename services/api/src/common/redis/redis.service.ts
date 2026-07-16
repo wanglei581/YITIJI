@@ -92,6 +92,160 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
+   * Atomically register a member session and the owning user's session index.
+   *
+   * These Lua operations are intentionally for the current single-node Redis
+   * deployment. A future Redis Cluster migration must first colocate the two
+   * keys in the same hash slot or replace the revocation strategy.
+   */
+  async registerMemberSession(endUserId: string, sessionId: string, ttlSeconds: number): Promise<void> {
+    const result = await this.client.eval(
+      `
+      local owner = redis.call('GET', KEYS[1])
+      if owner and owner ~= ARGV[1] then return 0 end
+
+      local sessionTtl = tonumber(ARGV[3])
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', sessionTtl)
+      redis.call('SADD', KEYS[2], ARGV[2])
+      local currentIndexTtl = redis.call('TTL', KEYS[2])
+      if currentIndexTtl < 0 or currentIndexTtl < sessionTtl then
+        redis.call('EXPIRE', KEYS[2], sessionTtl)
+      end
+      return 1
+      `,
+      2,
+      `member:session:${sessionId}`,
+      `member:user-sessions:${endUserId}`,
+      endUserId,
+      sessionId,
+      ttlSeconds,
+    )
+    if (result !== 1) throw new Error('Member session ownership conflict')
+  }
+
+  /** Delete one session only when it is still owned by the requesting member. */
+  async unregisterMemberSession(endUserId: string, sessionId: string): Promise<void> {
+    await this.client.eval(
+      `
+      local owner = redis.call('GET', KEYS[1])
+      if owner == ARGV[1] then redis.call('DEL', KEYS[1]) end
+      redis.call('SREM', KEYS[2], ARGV[2])
+      if redis.call('SCARD', KEYS[2]) == 0 then redis.call('DEL', KEYS[2]) end
+      return 1
+      `,
+      2,
+      `member:session:${sessionId}`,
+      `member:user-sessions:${endUserId}`,
+      endUserId,
+      sessionId,
+    )
+  }
+
+  /** Revoke every indexed session that is still owned by the target member. */
+  async revokeMemberSessions(endUserId: string): Promise<number> {
+    const result = await this.client.eval(
+      `
+      local sessions = redis.call('SMEMBERS', KEYS[1])
+      local deleted = 0
+      for _, sessionId in ipairs(sessions) do
+        local sessionKey = 'member:session:' .. sessionId
+        if redis.call('GET', sessionKey) == ARGV[1] then
+          deleted = deleted + redis.call('DEL', sessionKey)
+        end
+      end
+      redis.call('DEL', KEYS[1])
+      return deleted
+      `,
+      1,
+      `member:user-sessions:${endUserId}`,
+      endUserId,
+    )
+    return Number(result)
+  }
+
+  /** Store a one-time step-up grant and the owning member's grant index. */
+  async registerMemberStepUpGrant(
+    endUserId: string,
+    tokenHash: string,
+    ttlSeconds: number,
+    payload: string,
+  ): Promise<void> {
+    const result = await this.client.eval(
+      `
+      if redis.call('GET', KEYS[1]) then return 0 end
+
+      local grantTtl = tonumber(ARGV[3])
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', grantTtl)
+      redis.call('SADD', KEYS[2], ARGV[2])
+      local currentIndexTtl = redis.call('TTL', KEYS[2])
+      if currentIndexTtl < 0 or currentIndexTtl < grantTtl then
+        redis.call('EXPIRE', KEYS[2], grantTtl)
+      end
+      return 1
+      `,
+      2,
+      `member:step-up:grant:${tokenHash}`,
+      `member:user-step-up-grants:${endUserId}`,
+      payload,
+      tokenHash,
+      ttlSeconds,
+    )
+    if (result !== 1) throw new Error('Member step-up grant conflict')
+  }
+
+  /**
+   * Atomically consume a grant only when the Redis payload still belongs to
+   * the expected member. Owner checks happen inside Lua so a mismatched index
+   * can never delete another member's grant.
+   */
+  async getDelMemberStepUpGrant(endUserId: string, tokenHash: string): Promise<string | null> {
+    const result = await this.client.eval(
+      `
+      local value = redis.call('GET', KEYS[1])
+      if not value then return false end
+      local ok, record = pcall(cjson.decode, value)
+      if not ok or not record or record.endUserId ~= ARGV[2] then return false end
+      redis.call('DEL', KEYS[1])
+      redis.call('SREM', KEYS[2], ARGV[1])
+      if redis.call('SCARD', KEYS[2]) == 0 then redis.call('DEL', KEYS[2]) end
+      return value
+      `,
+      2,
+      `member:step-up:grant:${tokenHash}`,
+      `member:user-step-up-grants:${endUserId}`,
+      tokenHash,
+      endUserId,
+    )
+    return typeof result === 'string' ? result : null
+  }
+
+  /** Revoke every indexed grant still owned by a member without a KEYS scan. */
+  async revokeMemberStepUpGrants(endUserId: string): Promise<number> {
+    const result = await this.client.eval(
+      `
+      local grants = redis.call('SMEMBERS', KEYS[1])
+      local deleted = 0
+      for _, tokenHash in ipairs(grants) do
+        local grantKey = 'member:step-up:grant:' .. tokenHash
+        local value = redis.call('GET', grantKey)
+        if value then
+          local ok, record = pcall(cjson.decode, value)
+          if ok and record and record.endUserId == ARGV[1] then
+            deleted = deleted + redis.call('DEL', grantKey)
+          end
+        end
+      end
+      redis.call('DEL', KEYS[1])
+      return deleted
+      `,
+      1,
+      `member:user-step-up-grants:${endUserId}`,
+      endUserId,
+    )
+    return Number(result)
+  }
+
+  /**
    * 仅当缓存中不存在更高 tokenVersion 时写入 JSON 会话状态。
    * 防止并发 Guard 在密码变更后把旧版本冷缓存重新写回。
    */

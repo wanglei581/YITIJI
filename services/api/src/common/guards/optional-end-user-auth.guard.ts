@@ -41,10 +41,10 @@ export class OptionalEndUserAuthGuard implements CanActivate {
       if (ownerId && ownerId === payload.sub) {
         const user = await this.prisma.endUser.findUnique({
           where: { id: payload.sub },
-          select: { enabled: true },
+          select: { enabled: true, status: true },
         })
-        if (!user || !user.enabled) {
-          await this.redis.del(memberSessionKey(sessionId))
+        if (!user || !user.enabled || user.status !== 'active') {
+          await this.redis.unregisterMemberSession(payload.sub, sessionId)
           return true
         }
         req.endUser = { endUserId: payload.sub, sessionId }

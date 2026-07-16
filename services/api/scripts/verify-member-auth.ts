@@ -12,6 +12,7 @@
  *   pnpm verify:member-auth
  *
  * 验证链路（真实 HTTP，端口 0 临时监听，请求经全局 ValidationPipe + HttpExceptionFilter）：
+ *   0. Redis 会话索引原子注册 / 整户撤销 / 单会话注销
  *   1. 发送验证码 → 200，且响应体不含明文验证码
  *   2. 非法手机号 → 400 VALIDATION_FAILED
  *   3. 额外字段(candidate/email 等越界) → 400（forbidNonWhitelisted）
@@ -31,12 +32,13 @@ import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { ValidationPipe, BadRequestException, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { Redis } from 'ioredis'
 import { AppModule } from '../src/app.module'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { OptionalEndUserAuthGuard } from '../src/common/guards/optional-end-user-auth.guard'
-import { RedisService } from '../src/common/redis/redis.service'
+import { REDIS_CLIENT, RedisService } from '../src/common/redis/redis.service'
 import { hashPhone } from '../src/common/crypto/phone-identity'
 import { PrismaService } from '../src/prisma/prisma.service'
 
@@ -109,12 +111,33 @@ async function main() {
   info(`HTTP listening: ${base}\n`)
 
   const redis = app.get(RedisService)
+  const rawRedis = app.get<Redis>(REDIS_CLIENT)
   const prisma = app.get(PrismaService)
 
   // 唯一测试手机号（138 + 8 位时间派生），避免与真实数据/历史 Redis 冲突。
   const tail = Date.now().toString().slice(-8)
   const PHONE = `138${tail}`
   const phoneHash = hashPhone(PHONE)
+  const sessionOwnerId = `verify-member-session-owner-${tail}`
+  const otherSessionOwnerId = `verify-member-session-other-${tail}`
+  const foreignIndexOwnerId = `verify-member-session-foreign-index-${tail}`
+  const conflictOwnerId = `verify-member-session-conflict-owner-${tail}`
+  const conflictingOwnerId = `verify-member-session-conflicting-owner-${tail}`
+  const firstSessionId = `verify-member-session-a-${tail}`
+  const secondSessionId = `verify-member-session-b-${tail}`
+  const otherSessionId = `verify-member-session-other-${tail}`
+  const conflictSessionId = `verify-member-session-conflict-${tail}`
+  const sessionOwnerIndexKey = `member:user-sessions:${sessionOwnerId}`
+  const otherSessionOwnerIndexKey = `member:user-sessions:${otherSessionOwnerId}`
+  const foreignIndexOwnerIndexKey = `member:user-sessions:${foreignIndexOwnerId}`
+  const conflictOwnerIndexKey = `member:user-sessions:${conflictOwnerId}`
+  const conflictingOwnerIndexKey = `member:user-sessions:${conflictingOwnerId}`
+  const firstSessionKey = `member:session:${firstSessionId}`
+  const secondSessionKey = `member:session:${secondSessionId}`
+  const otherSessionKey = `member:session:${otherSessionId}`
+  const conflictSessionKey = `member:session:${conflictSessionId}`
+  let issuedStepUpChallengeId: string | null = null
+  let authenticatedEndUserId: string | null = null
 
   async function post(path: string, body: Json, token?: string): Promise<{ status: number; json: Json }> {
     const res = await fetch(`${base}${path}`, {
@@ -136,6 +159,124 @@ async function main() {
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await prisma.endUser.deleteMany({ where: { phoneHash } })
+
+    // ── 0. 会话索引注册 / 整户撤销 / 单会话注销 ───────────────────────────────
+    console.log('── 0. Redis 会话索引原子操作 ─────────────────────────────────')
+    await redis.registerMemberSession(conflictOwnerId, conflictSessionId, 120)
+    let conflictError: unknown
+    try {
+      await redis.registerMemberSession(conflictingOwnerId, conflictSessionId, 120)
+    } catch (error) {
+      conflictError = error
+    }
+    const [conflictOwner, conflictingOwnerIndexed] = await Promise.all([
+      redis.get(conflictSessionKey),
+      rawRedis.sismember(conflictingOwnerIndexKey, conflictSessionId),
+    ])
+    if (
+      conflictError instanceof Error &&
+      conflictError.message === 'Member session ownership conflict' &&
+      conflictOwner === conflictOwnerId &&
+      conflictingOwnerIndexed === 0
+    ) {
+      pass('sessionId 冲突注册 fail-closed，原 owner 与索引保持不变')
+    } else {
+      fail('sessionId 冲突未拒绝或原 owner 被覆盖')
+    }
+    await rawRedis.del(conflictSessionKey, conflictOwnerIndexKey, conflictingOwnerIndexKey)
+
+    await redis.registerMemberSession(sessionOwnerId, firstSessionId, 120)
+    await redis.registerMemberSession(sessionOwnerId, secondSessionId, 30)
+    await redis.registerMemberSession(otherSessionOwnerId, otherSessionId, 120)
+    const [firstSession, secondSession, ownerSessions, firstTtl, ownerIndexTtl] = await Promise.all([
+      redis.get(firstSessionKey),
+      redis.get(secondSessionKey),
+      rawRedis.smembers(sessionOwnerIndexKey),
+      redis.ttl(firstSessionKey),
+      redis.ttl(sessionOwnerIndexKey),
+    ])
+    if (
+      firstSession === sessionOwnerId &&
+      secondSession === sessionOwnerId &&
+      [...ownerSessions].sort().join(',') === [firstSessionId, secondSessionId].sort().join(',')
+    ) {
+      pass('同一用户的两个 session 与索引均已注册')
+    } else {
+      fail('同一用户的 session 或索引注册异常')
+    }
+    if (firstTtl > 30 && firstTtl <= 120 && ownerIndexTtl > 30 && ownerIndexTtl <= 120) {
+      pass('短 TTL session 不会缩短已有长 TTL 的用户索引')
+    } else {
+      fail(`session/index TTL 异常: ${firstTtl}/${ownerIndexTtl}`)
+    }
+
+    await redis.unregisterMemberSession(sessionOwnerId, firstSessionId)
+    const [firstAfterUnregister, secondAfterUnregister, ownerAfterUnregister] = await Promise.all([
+      redis.get(firstSessionKey),
+      redis.get(secondSessionKey),
+      rawRedis.smembers(sessionOwnerIndexKey),
+    ])
+    if (
+      firstAfterUnregister === null &&
+      secondAfterUnregister === sessionOwnerId &&
+      ownerAfterUnregister.length === 1 &&
+      ownerAfterUnregister[0] === secondSessionId
+    ) {
+      pass('多 session 用户注销一条后，其他 session 与非空索引保留')
+    } else {
+      fail('注销单条 session 误删了同用户的其他 session 或索引')
+    }
+    await redis.registerMemberSession(sessionOwnerId, firstSessionId, 120)
+
+    await rawRedis.sadd(foreignIndexOwnerIndexKey, firstSessionId)
+    const foreignRevokedCount = await redis.revokeMemberSessions(foreignIndexOwnerId)
+    const [firstAfterForeignRevoke, foreignIndexAfterRevoke] = await Promise.all([
+      redis.get(firstSessionKey),
+      rawRedis.exists(foreignIndexOwnerIndexKey),
+    ])
+    if (foreignRevokedCount === 0 && firstAfterForeignRevoke === sessionOwnerId && foreignIndexAfterRevoke === 0) {
+      pass('整户撤销只删除 owner 匹配的 session，错误索引成员仅清理索引')
+    } else {
+      fail('整户撤销通过错误索引删除了其他用户 session')
+    }
+
+    await rawRedis.sadd(foreignIndexOwnerIndexKey, secondSessionId)
+    await redis.unregisterMemberSession(foreignIndexOwnerId, secondSessionId)
+    const [secondAfterForeignUnregister, foreignIndexAfterUnregister] = await Promise.all([
+      redis.get(secondSessionKey),
+      rawRedis.exists(foreignIndexOwnerIndexKey),
+    ])
+    if (secondAfterForeignUnregister === sessionOwnerId && foreignIndexAfterUnregister === 0) {
+      pass('单 session 注销 owner 错配时不删他人会话，仅清理调用方错误索引')
+    } else {
+      fail('单 session 注销 owner 错配时删除了其他用户 session')
+    }
+
+    const revokedCount = await redis.revokeMemberSessions(sessionOwnerId)
+    const [firstAfterRevoke, secondAfterRevoke, ownerIndexExists, otherAfterRevoke, otherSessions] = await Promise.all([
+      redis.get(firstSessionKey),
+      redis.get(secondSessionKey),
+      rawRedis.exists(sessionOwnerIndexKey),
+      redis.get(otherSessionKey),
+      rawRedis.smembers(otherSessionOwnerIndexKey),
+    ])
+    if (revokedCount === 2 && firstAfterRevoke === null && secondAfterRevoke === null && ownerIndexExists === 0) {
+      pass('整户撤销删除该用户的两个 session 及用户索引')
+    } else {
+      fail(`整户撤销异常: count=${revokedCount}, indexExists=${ownerIndexExists}`)
+    }
+    if (otherAfterRevoke === otherSessionOwnerId && otherSessions.length === 1 && otherSessions[0] === otherSessionId) {
+      pass('整户撤销不会删除其他用户的 session 或索引')
+    } else {
+      fail('整户撤销破坏了其他用户的 session 或索引')
+    }
+
+    await redis.unregisterMemberSession(otherSessionOwnerId, otherSessionId)
+    if ((await rawRedis.exists(otherSessionKey, otherSessionOwnerIndexKey)) === 0) {
+      pass('单 session 注销后删除会话，空索引集合同步清理')
+    } else {
+      fail('单 session 注销未完整清理会话与空索引')
+    }
 
     // ── 1. 发送验证码 ──────────────────────────────────────────────────────────
     console.log('── 1. 发送验证码 ──────────────────────────────────────────────')
@@ -179,6 +320,7 @@ async function main() {
     const loginData = (login.json.data ?? {}) as Json
     const token = loginData.token as string | undefined
     const user = (loginData.user ?? {}) as Json
+    authenticatedEndUserId = typeof user.id === 'string' ? user.id : null
     if (login.status === 201 && token) pass('正确验证码 → 201 + token')
     else fail(`登录 → ${login.status} (expected 201) ${JSON.stringify(login.json)}`)
     if (user.phoneMasked === `138****${tail.slice(-4)}`) pass(`返回 phoneMasked=${user.phoneMasked}（脱敏）`)
@@ -193,6 +335,30 @@ async function main() {
     else fail(`/me → ${me.status} ${JSON.stringify(me.json)}`)
     if (!JSON.stringify(me.json).includes(PHONE)) pass('/me 响应不含明文手机号')
     else fail('/me 响应泄露明文手机号')
+
+    // ── 7a. step-up HTTP guard + response privacy ─────────────────────────────
+    console.log('\n── 7a. step-up HTTP 门禁与响应隐私 ───────────────────────────')
+    const stepUpMissingToken = await post('/auth/step-up/sms-code', { action: 'export_data_request' })
+    if (stepUpMissingToken.status === 401) pass('step-up 发码缺少会员 token → 401')
+    else fail(`step-up 发码缺少 token → ${stepUpMissingToken.status}`)
+    const stepUpInvalidAction = await post('/auth/step-up/sms-code', { action: 'not-allowed' }, token)
+    if (stepUpInvalidAction.status === 400) pass('step-up action allowlist 外输入 → 400')
+    else fail(`step-up 非法 action → ${stepUpInvalidAction.status}`)
+    const stepUpSend = await post('/auth/step-up/sms-code', { action: 'export_data_request', deviceId: 'e2e-kiosk-01' }, token)
+    const stepUpData = (stepUpSend.json.data ?? {}) as Json
+    issuedStepUpChallengeId = typeof stepUpData.challengeId === 'string' ? stepUpData.challengeId : null
+    if (stepUpSend.status === 201 && typeof stepUpData.challengeId === 'string' && stepUpData.phoneMasked === `138****${tail.slice(-4)}`) {
+      pass('step-up 发码 → challengeId + 脱敏手机号')
+    } else fail(`step-up 发码 → ${stepUpSend.status} ${JSON.stringify(stepUpSend.json)}`)
+    if (!JSON.stringify(stepUpSend.json).includes(PHONE) && !/\b\d{6}\b/.test(JSON.stringify(stepUpSend.json))) {
+      pass('step-up 发码响应不含明文手机号或验证码')
+    } else fail('step-up 发码响应泄露敏感信息')
+    const stepUpVerifyMissingToken = await post('/auth/step-up/verify', {
+      challengeId: stepUpData.challengeId,
+      code: '000000',
+    })
+    if (stepUpVerifyMissingToken.status === 401) pass('step-up 校验缺少会员 token → 401')
+    else fail(`step-up 校验缺少 token → ${stepUpVerifyMissingToken.status}`)
 
     // ── 8. 落库不含明文 ───────────────────────────────────────────────────────
     console.log('\n── 8. EndUser 落库隐私校验 ────────────────────────────────────')
@@ -214,34 +380,34 @@ async function main() {
     // ── 10. 账号禁用后既有 session 立即失效 ──────────────────────────────────
     console.log('\n── 10. 账号禁用后既有 session 立即失效 ───────────────────────')
     const jwtOkForDisabled = { verify: () => ({ sub: user.id as string, jti: 'sess-disabled' }) } as never
-    let deletedDisabledSession = false
+    let revokedDisabledSession = false
     const redisDisabled = {
       get: async () => user.id as string,
-      del: async (key: string) => {
-        deletedDisabledSession = key === 'member:session:sess-disabled'
+      unregisterMemberSession: async (endUserId: string, sessionId: string) => {
+        revokedDisabledSession = endUserId === user.id && sessionId === 'sess-disabled'
       },
     } as never
     const prismaDisabled = {
       endUser: {
-        findUnique: async () => ({ id: user.id as string, enabled: false }),
+        findUnique: async () => ({ id: user.id as string, enabled: false, status: 'disabled' }),
       },
     } as never
     const guardDisabled = new EndUserAuthGuard(jwtOkForDisabled, redisDisabled, prismaDisabled)
     await expectGuardCode(
       () => guardDisabled.canActivate(mockCtx('Bearer disabled-session-token')),
-      'ACCOUNT_DISABLED',
-      '账号禁用后旧 token → ACCOUNT_DISABLED',
+      'ACCOUNT_UNAVAILABLE',
+      '账号不可用后旧 token → ACCOUNT_UNAVAILABLE',
     )
-    if (deletedDisabledSession) pass('账号禁用时 guard 顺手删除既有 Redis session')
-    else fail('账号禁用时 guard 未删除既有 Redis session')
+    if (revokedDisabledSession) pass('账号不可用时 guard 撤销既有 Redis session')
+    else fail('账号不可用时 guard 未撤销既有 Redis session')
 
     // ── 11. optional guard 禁用账号不注入本人态 ───────────────────────────────
     console.log('\n── 11. optional guard 禁用账号不注入本人态 ────────────────────')
-    let deletedOptionalDisabledSession = false
+    let revokedOptionalDisabledSession = false
     const redisOptionalDisabled = {
       get: async () => user.id as string,
-      del: async (key: string) => {
-        deletedOptionalDisabledSession = key === 'member:session:sess-disabled'
+      unregisterMemberSession: async (endUserId: string, sessionId: string) => {
+        revokedOptionalDisabledSession = endUserId === user.id && sessionId === 'sess-disabled'
       },
     } as never
     const optionalDisabledGuard = new OptionalEndUserAuthGuard(jwtOkForDisabled, redisOptionalDisabled, prismaDisabled)
@@ -250,8 +416,8 @@ async function main() {
     const optionalReq = optionalCtx.switchToHttp().getRequest() as { endUser?: unknown }
     if (optionalAllowed === true && optionalReq.endUser === undefined) pass('optional guard 对禁用账号放行公共读但不注入 endUser')
     else fail('optional guard 对禁用账号仍注入 endUser')
-    if (deletedOptionalDisabledSession) pass('optional guard 对禁用账号顺手删除既有 Redis session')
-    else fail('optional guard 对禁用账号未删除既有 Redis session')
+    if (revokedOptionalDisabledSession) pass('optional guard 对禁用账号撤销既有 Redis session')
+    else fail('optional guard 对禁用账号未撤销既有 Redis session')
 
     // ── 12. 双向隔离 ──────────────────────────────────────────────────────────
     console.log('\n── 12. 双向 token 隔离 ────────────────────────────────────────')
@@ -281,6 +447,25 @@ async function main() {
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await redis.del(`member:sms:attempt:${phoneHash}`)
+    if (issuedStepUpChallengeId) {
+      await redis.del(`member:step-up:code:${issuedStepUpChallengeId}`)
+      await redis.del(`member:step-up:meta:${issuedStepUpChallengeId}`)
+      await redis.del(`member:step-up:attempt:${issuedStepUpChallengeId}`)
+    }
+    if (authenticatedEndUserId) {
+      await redis.del(`member:step-up:cooldown:${authenticatedEndUserId}:export_data_request`)
+    }
+    await rawRedis.del(
+      firstSessionKey,
+      secondSessionKey,
+      otherSessionKey,
+      conflictSessionKey,
+      sessionOwnerIndexKey,
+      otherSessionOwnerIndexKey,
+      foreignIndexOwnerIndexKey,
+      conflictOwnerIndexKey,
+      conflictingOwnerIndexKey,
+    )
     info('测试数据已清理。')
     await app.close()
   }

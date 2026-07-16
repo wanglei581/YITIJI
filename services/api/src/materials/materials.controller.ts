@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { CreateMaterialTaskDto } from './dto/create-material-task.dto'
 import { DecidePiiFindingsDto } from './dto/decide-pii-findings.dto'
 import { MaterialsService } from './materials.service'
@@ -15,6 +16,7 @@ export class MaterialsController {
     private readonly materials: MaterialsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('tasks')
@@ -50,7 +52,7 @@ export class MaterialsController {
   }
 
   private async resolveRequester(req: ReqLike, queryToken?: string): Promise<MaterialsRequester> {
-    const member = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     if (member) return { kind: 'member', endUserId: member.endUserId }
     return { kind: 'anonymous', accessToken: extractAccessToken(req, queryToken) }
   }

@@ -15,6 +15,7 @@ import { Throttle } from '@nestjs/throttler'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CreateUploadSessionDto, PhoneUploadSessionDto } from './upload-sessions.dto'
@@ -32,12 +33,13 @@ export class UploadSessionsController {
     private readonly sessions: UploadSessionsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
   async create(@Body() body: CreateUploadSessionDto, @Req() req: Request): Promise<ApiResponse<UploadSessionCreateResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sessions.create({
       purpose: body.purpose,
       mode: body.mode,
@@ -75,7 +77,7 @@ export class UploadSessionsController {
     @Headers('x-upload-session-control') controlToken: string | undefined,
     @Req() req: Request,
   ): Promise<ApiResponse<UploadSessionConfirmResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     return ApiResponse.ok(await this.sessions.confirm(sessionId, controlToken, endUser?.endUserId ?? null))
   }
 
