@@ -132,30 +132,33 @@ export class MemberPrivacyService {
     if (!existing) {
       throw new NotFoundException({ error: { code: 'DATA_REQUEST_NOT_FOUND', message: '数据请求不存在或已处理' } })
     }
+    if (
+      (
+        input.status === 'completed' &&
+        (existing.requestType === 'export' || existing.requestType === 'delete')
+      ) ||
+      (input.status === 'rejected' && existing.requestType === 'delete')
+    ) {
+      throw new BadRequestException({
+        error: {
+          code: 'DATA_REQUEST_EXECUTION_INCOMPLETE',
+          message: '该数据请求尚未完成真实执行，不能进入目标状态',
+        },
+      })
+    }
     const terminal = input.status === 'completed' || input.status === 'rejected'
-    const deletion = existing.requestType === 'delete' && input.status === 'completed'
-      ? await this.deleteJobAiPersonalData(existing.endUserId)
-      : null
-    // 删除请求的审计凭证必须由本次成功事务后生成；不得接受调用方传入的任意 auditRef。
-    const auditRef = deletion || !input.auditRef ? await this.audit.write({
+    const auditRef = !input.auditRef ? await this.audit.write({
       actorId: input.handledBy,
       actorRole: 'admin',
       action: 'member_data_request.handle',
       targetType: 'user_data_request',
       targetId: id,
-      // 删除类审计只留安全计数，绝不写入简历派生 payload 或其它敏感内容。
-      payload: deletion
-        ? {
-            aiResumeResultsDeleted: deletion.aiResumeResultsDeleted,
-            jobAiSessionsDeleted: deletion.jobAiSessionsDeleted,
-            consentsRevoked: deletion.consentsRevoked,
-          }
-        : {
-            endUserId: existing.endUserId,
-            requestType: existing.requestType,
-            fromStatus: existing.status,
-            toStatus: input.status,
-          },
+      payload: {
+        endUserId: existing.endUserId,
+        requestType: existing.requestType,
+        fromStatus: existing.status,
+        toStatus: input.status,
+      },
     }) : input.auditRef
     const row = await this.prisma.userDataRequest.update({
       where: { id },
@@ -167,28 +170,6 @@ export class MemberPrivacyService {
       },
     })
     return { ...toMemberDataRequestItem(row), endUserId: row.endUserId }
-  }
-
-  private async deleteJobAiPersonalData(endUserId: string): Promise<{
-    aiResumeResultsDeleted: number
-    jobAiSessionsDeleted: number
-    consentsRevoked: number
-  }> {
-    return this.prisma.$transaction(async (tx) => {
-      const [results, sessions, consents] = await Promise.all([
-        tx.aiResumeResult.deleteMany({ where: { endUserId } }),
-        tx.jobAiSession.deleteMany({ where: { endUserId } }),
-        tx.userAiConsent.updateMany({
-          where: { endUserId, scope: 'job_ai', revokedAt: null },
-          data: { revokedAt: new Date() },
-        }),
-      ])
-      return {
-        aiResumeResultsDeleted: results.count,
-        jobAiSessionsDeleted: sessions.count,
-        consentsRevoked: consents.count,
-      }
-    })
   }
 
   private assertScope(scope: string): asserts scope is MemberAiConsentScope {
