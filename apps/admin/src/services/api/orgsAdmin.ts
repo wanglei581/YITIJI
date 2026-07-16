@@ -76,6 +76,7 @@ export interface OrgsAdminServiceInterface {
   createAccount(orgId: string, input: OrgAccountInput): Promise<AdminOrgAccount>
   setAccountStatus(orgId: string, accountId: string, action: 'enable' | 'disable'): Promise<AdminOrgAccount>
   resetAccountPassword(orgId: string, accountId: string, password: string): Promise<void>
+  deleteAccount(orgId: string, accountId: string): Promise<void>
 }
 
 // ─── HTTP adapter ─────────────────────────────────────────────────────────────
@@ -126,6 +127,9 @@ const httpAdapter: OrgsAdminServiceInterface = {
   resetAccountPassword: async (orgId, accountId, password) => {
     await req<{ success: boolean }>('PATCH', `/admin/orgs/${orgId}/accounts/${accountId}/password`, { password })
   },
+  deleteAccount: async (orgId, accountId) => {
+    await req<{ success: true }>('DELETE', `/admin/orgs/${orgId}/accounts/${accountId}`)
+  },
 }
 
 // ─── Mock adapter(内存可变,演示用)─────────────────────────────────────────
@@ -134,7 +138,7 @@ const now = () => new Date().toISOString()
 let seq = 100
 const nextId = (p: string) => `${p}-mock-${++seq}`
 
-const mockAccounts: (AdminOrgAccount & { orgId: string })[] = [
+let mockAccounts: (AdminOrgAccount & { orgId: string })[] = [
   {
     id: 'acc-mock-1',
     orgId: 'org-mock-1',
@@ -236,6 +240,19 @@ const mockAdapter: OrgsAdminServiceInterface = {
   async resetAccountPassword(orgId, accountId) {
     const account = mockAccounts.find((a) => a.id === accountId && a.orgId === orgId)
     if (!account) throw new ApiHttpError('ACCOUNT_NOT_FOUND', '账号不存在', 404)
+  },
+  async deleteAccount(orgId, accountId) {
+    const account = mockAccounts.find((item) => item.id === accountId && item.orgId === orgId)
+    if (!account) throw new ApiHttpError('ACCOUNT_NOT_FOUND', '账号不存在', 404)
+    const activeCount = mockAccounts.filter((item) => item.orgId === orgId && item.enabled).length
+    if (activeCount - (account.enabled ? 1 : 0) < 1) {
+      throw new ApiHttpError(
+        'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED',
+        '请先新增并启用接替账号，再移除此账号',
+        409,
+      )
+    }
+    mockAccounts = mockAccounts.filter((item) => item.id !== accountId)
   },
 }
 
