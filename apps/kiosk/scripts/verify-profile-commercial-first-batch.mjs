@@ -252,6 +252,7 @@ const USER_CENTER_WAVE0_CHANGED = new Set([
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
   'apps/kiosk/src/pages/profile/profileEntries.ts',
   'docs/product/user-center-commercial-closure-plan-2026-07.md',
+  'docs/acceptance/user-center-wave0-acceptance.md',
   'docs/reviews/user-center-commercial-closure-audit-2026-07-16.md',
   'docs/superpowers/plans/2026-07-16-user-center-wave0-truth-baseline.md',
   'docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md',
