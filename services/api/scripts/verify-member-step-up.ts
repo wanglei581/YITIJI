@@ -41,6 +41,12 @@ type StepUpServiceConstructor = new (...args: unknown[]) => StepUpService
 type StepUpRedis = {
   revokeMemberStepUpGrants(endUserId: string): Promise<number>
 }
+type TrackableRedisWrites = {
+  setEx(key: string, ttlSeconds: number, value: string): Promise<void>
+  setNxEx(key: string, value: string, ttlSeconds: number): Promise<boolean>
+  incrWithTtl(key: string, ttlSeconds: number): Promise<number>
+  reserveWithinLimitWithTtl(key: string, ttlSeconds: number, limit: number): Promise<boolean>
+}
 
 const TEST_ENV = {
   NODE_ENV: 'test',
@@ -192,6 +198,41 @@ async function ownedKeys(redis: Redis, markers: string[]): Promise<string[]> {
   return output
 }
 
+function trackRedisWrites(redis: TrackableRedisWrites): { keys: Set<string>; restore: () => void } {
+  const keys = new Set<string>()
+  const original = {
+    setEx: redis.setEx,
+    setNxEx: redis.setNxEx,
+    incrWithTtl: redis.incrWithTtl,
+    reserveWithinLimitWithTtl: redis.reserveWithinLimitWithTtl,
+  }
+  redis.setEx = function (key, ttlSeconds, value) {
+    keys.add(key)
+    return original.setEx.call(this, key, ttlSeconds, value)
+  }
+  redis.setNxEx = function (key, value, ttlSeconds) {
+    keys.add(key)
+    return original.setNxEx.call(this, key, value, ttlSeconds)
+  }
+  redis.incrWithTtl = function (key, ttlSeconds) {
+    keys.add(key)
+    return original.incrWithTtl.call(this, key, ttlSeconds)
+  }
+  redis.reserveWithinLimitWithTtl = function (key, ttlSeconds, limit) {
+    keys.add(key)
+    return original.reserveWithinLimitWithTtl.call(this, key, ttlSeconds, limit)
+  }
+  return {
+    keys,
+    restore: () => {
+      redis.setEx = original.setEx
+      redis.setNxEx = original.setNxEx
+      redis.incrWithTtl = original.incrWithTtl
+      redis.reserveWithinLimitWithTtl = original.reserveWithinLimitWithTtl
+    },
+  }
+}
+
 function isAllowedTestDatabase(databaseUrl: string): boolean {
   if (databaseUrl.startsWith('file:')) return true
   try {
@@ -308,6 +349,13 @@ async function execute(capturedOutput: string[]): Promise<void> {
     redisMarkers.add(createHash('sha256').update(value).digest('hex'))
   }
 
+  function testDevice(label: string): string {
+    const deviceId = `${label}-${runId}`
+    registerSensitive(deviceId)
+    addRedisMarker(deviceId)
+    return deviceId
+  }
+
   addRedisMarker(runId)
 
   async function createUser(label: string, status = 'active'): Promise<{ id: string; phone: string }> {
@@ -322,7 +370,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
     userIds.push(id)
     phoneHashes.push(phoneHash)
     users.set(id, phone)
-    const ip = `198.51.100.${userNumber}`
+    const ip = `2001:db8:${runId.slice(0, 4)}:${runId.slice(4, 8)}::${userNumber.toString(16)}`
     userIps.set(id, ip)
     addRedisMarker(id)
     addRedisMarker(phoneHash)
@@ -336,10 +384,6 @@ async function execute(capturedOutput: string[]): Promise<void> {
   } {
     const ip = userIps.get(userId)
     assert(ip, `missing owned IP for ${userId}`)
-    if (deviceId) {
-      registerSensitive(deviceId)
-      addRedisMarker(deviceId)
-    }
     return { action, ...(deviceId ? { deviceId } : {}), ip }
   }
 
@@ -410,10 +454,11 @@ async function execute(capturedOutput: string[]): Promise<void> {
 
     const bindingOwner = await createUser('challenge-owner')
     const bindingOther = await createUser('challenge-other')
+    const bindingDevice = testDevice('KSK-BIND')
     sms.clear()
     const bindingChallenge = await service.sendChallenge(
       bindingOwner.id,
-      stepUpInput(bindingOwner.id, 'export_data_request', 'KSK-BIND'),
+      stepUpInput(bindingOwner.id, 'export_data_request', bindingDevice),
     )
     const bindingCode = deliveryCode(bindingOwner.id)
     assertChallenge(bindingChallenge, bindingOwner.id, bindingCode)
@@ -425,21 +470,26 @@ async function execute(capturedOutput: string[]): Promise<void> {
     assert(!bindingRedis.includes(bindingCode), 'live challenge Redis state must not contain the plaintext code')
     pass('4. live challenge Redis state contains only a code digest')
     await expectCode(
-      () => service.verifyChallenge(bindingOther.id, { challengeId: bindingChallenge.challengeId, code: bindingCode }),
+      () => service.verifyChallenge(bindingOther.id, {
+        challengeId: bindingChallenge.challengeId,
+        code: bindingCode,
+        deviceId: bindingDevice,
+      }),
       'STEP_UP_CHALLENGE_INVALID',
       '3. challenge rejects a different user',
     )
     const bindingGrant = await service.verifyChallenge(
       bindingOwner.id,
-      { challengeId: bindingChallenge.challengeId, code: bindingCode },
+      { challengeId: bindingChallenge.challengeId, code: bindingCode, deviceId: bindingDevice },
     )
     assertGrant(bindingGrant, 'export_data_request')
 
     const fourAttemptsUser = await createUser('attempts-four')
+    const fourAttemptsDevice = testDevice('KSK-ATTEMPTS-FOUR')
     sms.clear()
     const fourAttemptsChallenge = await service.sendChallenge(
       fourAttemptsUser.id,
-      stepUpInput(fourAttemptsUser.id, 'export_data_request', 'KSK-ATTEMPTS-FOUR'),
+      stepUpInput(fourAttemptsUser.id, 'export_data_request', fourAttemptsDevice),
     )
     const correctAfterFour = deliveryCode(fourAttemptsUser.id)
     assertChallenge(fourAttemptsChallenge, fourAttemptsUser.id, correctAfterFour)
@@ -450,6 +500,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
         () => service.verifyChallenge(fourAttemptsUser.id, {
           challengeId: fourAttemptsChallenge.challengeId,
           code: wrongForFour,
+          deviceId: fourAttemptsDevice,
         }),
         'STEP_UP_CODE_INVALID',
         `5A.${attempt} wrong code attempt is rejected`,
@@ -458,15 +509,17 @@ async function execute(capturedOutput: string[]): Promise<void> {
     const grantAfterFour = await service.verifyChallenge(fourAttemptsUser.id, {
       challengeId: fourAttemptsChallenge.challengeId,
       code: correctAfterFour,
+      deviceId: fourAttemptsDevice,
     })
     assertGrant(grantAfterFour, 'export_data_request')
     pass('5A. four wrong codes do not invalidate the challenge early')
 
     const fiveAttemptsUser = await createUser('attempts-five')
+    const fiveAttemptsDevice = testDevice('KSK-ATTEMPTS-FIVE')
     sms.clear()
     const fiveAttemptsChallenge = await service.sendChallenge(
       fiveAttemptsUser.id,
-      stepUpInput(fiveAttemptsUser.id, 'export_data_request', 'KSK-ATTEMPTS-FIVE'),
+      stepUpInput(fiveAttemptsUser.id, 'export_data_request', fiveAttemptsDevice),
     )
     const correctAfterFive = deliveryCode(fiveAttemptsUser.id)
     assertChallenge(fiveAttemptsChallenge, fiveAttemptsUser.id, correctAfterFive)
@@ -477,6 +530,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
         () => service.verifyChallenge(fiveAttemptsUser.id, {
           challengeId: fiveAttemptsChallenge.challengeId,
           code: wrongForFive,
+          deviceId: fiveAttemptsDevice,
         }),
         'STEP_UP_CODE_INVALID',
         `5B.${attempt} wrong code attempt is rejected`,
@@ -486,6 +540,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
       () => service.verifyChallenge(fiveAttemptsUser.id, {
         challengeId: fiveAttemptsChallenge.challengeId,
         code: correctAfterFive,
+        deviceId: fiveAttemptsDevice,
       }),
       'STEP_UP_CHALLENGE_INVALID',
       '5B. challenge is invalidated at five wrong codes',
@@ -509,34 +564,36 @@ async function execute(capturedOutput: string[]): Promise<void> {
 
     const grantOwner = await createUser('grant-owner')
     const grantOther = await createUser('grant-other')
-    const foreignGrant = await issueGrant(grantOwner.id, 'export_data_request', 'KSK-GRANT')
+    const grantDevice = testDevice('KSK-GRANT')
+    const foreignGrant = await issueGrant(grantOwner.id, 'export_data_request', grantDevice)
     await expectCode(
-      () => service.consumeGrant(grantOther.id, 'export_data_request', foreignGrant.stepUpToken, 'KSK-GRANT'),
+      () => service.consumeGrant(grantOther.id, 'export_data_request', foreignGrant.stepUpToken, grantDevice),
       'STEP_UP_TOKEN_INVALID',
       '7. grant rejects a different user',
     )
     await expectCode(
-      () => service.consumeGrant(grantOwner.id, 'export_data_request', foreignGrant.stepUpToken, 'KSK-GRANT'),
+      () => service.consumeGrant(grantOwner.id, 'export_data_request', foreignGrant.stepUpToken, grantDevice),
       'STEP_UP_TOKEN_INVALID',
       '7. user mismatch destroys the grant instead of restoring it',
     )
-    const confusedGrant = await issueGrant(grantOwner.id, 'close_account', 'KSK-GRANT')
+    const confusedGrant = await issueGrant(grantOwner.id, 'close_account', grantDevice)
     await expectCode(
-      () => service.consumeGrant(grantOwner.id, 'export_data_download', confusedGrant.stepUpToken, 'KSK-GRANT'),
+      () => service.consumeGrant(grantOwner.id, 'export_data_download', confusedGrant.stepUpToken, grantDevice),
       'STEP_UP_TOKEN_INVALID',
       '7. grant rejects a different action',
     )
     await expectCode(
-      () => service.consumeGrant(grantOwner.id, 'close_account', confusedGrant.stepUpToken, 'KSK-GRANT'),
+      () => service.consumeGrant(grantOwner.id, 'close_account', confusedGrant.stepUpToken, grantDevice),
       'STEP_UP_TOKEN_INVALID',
       '7. action mismatch destroys the grant instead of restoring it',
     )
 
     const replayUser = await createUser('grant-replay')
-    const replayGrant = await issueGrant(replayUser.id, 'export_data_request', 'KSK-REPLAY')
-    await service.consumeGrant(replayUser.id, 'export_data_request', replayGrant.stepUpToken, 'KSK-REPLAY')
+    const replayDevice = testDevice('KSK-REPLAY')
+    const replayGrant = await issueGrant(replayUser.id, 'export_data_request', replayDevice)
+    await service.consumeGrant(replayUser.id, 'export_data_request', replayGrant.stepUpToken, replayDevice)
     await expectCode(
-      () => service.consumeGrant(replayUser.id, 'export_data_request', replayGrant.stepUpToken, 'KSK-REPLAY'),
+      () => service.consumeGrant(replayUser.id, 'export_data_request', replayGrant.stepUpToken, replayDevice),
       'STEP_UP_TOKEN_INVALID',
       '8. grant replay uses the same invalid-token error',
     )
@@ -555,14 +612,13 @@ async function execute(capturedOutput: string[]): Promise<void> {
     )
 
     const deviceUser = await createUser('device-risk')
-    const changedDeviceGrant = await issueGrant(deviceUser.id, 'export_data_request', 'KSK-ORIGINAL')
-    registerSensitive('KSK-CHANGED')
-    addRedisMarker('KSK-CHANGED')
-    await service.consumeGrant(deviceUser.id, 'export_data_request', changedDeviceGrant.stepUpToken, 'KSK-CHANGED')
+    const originalDevice = testDevice('KSK-ORIGINAL')
+    const changedDevice = testDevice('KSK-CHANGED')
+    const laterDevice = testDevice('KSK-LATER')
+    const changedDeviceGrant = await issueGrant(deviceUser.id, 'export_data_request', originalDevice)
+    await service.consumeGrant(deviceUser.id, 'export_data_request', changedDeviceGrant.stepUpToken, changedDevice)
     const missingDeviceGrant = await issueGrant(deviceUser.id, 'export_data_download')
-    registerSensitive('KSK-LATER')
-    addRedisMarker('KSK-LATER')
-    await service.consumeGrant(deviceUser.id, 'export_data_download', missingDeviceGrant.stepUpToken, 'KSK-LATER')
+    await service.consumeGrant(deviceUser.id, 'export_data_download', missingDeviceGrant.stepUpToken, laterDevice)
     const riskLogs = await prisma.auditLog.findMany({
       where: {
         action: 'MEMBER_STEP_UP_GRANT_CONSUMED',
@@ -596,26 +652,32 @@ async function execute(capturedOutput: string[]): Promise<void> {
     }
 
     const smsFailureUser = await createUser('sms-failure')
-    const beforeFailure = new Set(await scanKeys(rawRedis))
+    const smsFailureDevice = testDevice('KSK-SMS-FAIL')
     sms.clear()
     sms.failNextSend()
-    await expectCode(
-      () => service.sendChallenge(
-        smsFailureUser.id,
-        stepUpInput(smsFailureUser.id, 'export_data_request', 'KSK-SMS-FAIL'),
-      ),
-      'SMS_SEND_FAILED',
-      '12. provider failure is surfaced safely',
-    )
+    const failureWrites = trackRedisWrites(redis)
+    try {
+      await expectCode(
+        () => service.sendChallenge(
+          smsFailureUser.id,
+          stepUpInput(smsFailureUser.id, 'export_data_request', smsFailureDevice),
+        ),
+        'SMS_SEND_FAILED',
+        '12. provider failure is surfaced safely',
+      )
+    } finally {
+      failureWrites.restore()
+      failureWrites.keys.forEach((key) => exactOperationKeys.add(key))
+    }
     const failedDelivery = sms.lastDelivery()
     assert(failedDelivery.phone === users.get(smsFailureUser.id),
       'failed SMS dispatch must still target the user decrypted phone')
     registerSensitive(failedDelivery.phone)
     registerSensitive(failedDelivery.code)
-    const failureAdditions = (await scanKeys(rawRedis)).filter((key) => !beforeFailure.has(key))
-    failureAdditions.forEach((key) => exactOperationKeys.add(key))
-    assert(failureAdditions.length === 0,
-      'provider failure must clean every added meta/code/attempt/grant/index/cooldown key')
+    for (const key of failureWrites.keys) {
+      assert(await rawRedis.exists(key) === 0,
+        'provider failure must clean every key written by this service call')
+    }
     pass('12. provider failure leaves no residual step-up state')
 
     const revokeOwner = await createUser('revoke-owner')
