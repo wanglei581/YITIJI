@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common'
 import type { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 import { AuditService } from '../../src/audit/audit.service'
 import { AuthService } from '../../src/auth/auth.service'
 import { InternalOtpService } from '../../src/auth/internal-otp.service'
@@ -20,6 +22,85 @@ import {
 } from './internal-auth-verify-harness'
 
 const UNAVAILABLE = 'AUTH_PHONE_TRANSFER_UNAVAILABLE'
+
+export function assertAdminPhoneTransferRouteDiAuditContract(): void {
+  const controller = readFileSync(resolve(__dirname, '../../src/auth/auth.controller.ts'), 'utf8')
+  const authModule = readFileSync(resolve(__dirname, '../../src/auth/auth.module.ts'), 'utf8')
+  const localAudit = readFileSync(resolve(__dirname, '../../src/audit/audit.types.ts'), 'utf8')
+  const sharedAudit = readFileSync(resolve(__dirname, '../../../../packages/shared/src/types/audit.ts'), 'utf8')
+  const failures: string[] = []
+  const routes = [
+    {
+      path: 'admin/phone/transfer/start',
+      dto: 'InitialPhoneBindStartDto',
+      method: 'start',
+      call: 'this.adminPhoneTransferService.start(user.userId,dto.currentPassword,dto.phone,ip,dto.deviceId)',
+    },
+    {
+      path: 'admin/phone/transfer/verify',
+      dto: 'InitialPhoneBindVerifyDto',
+      method: 'verify',
+      call: 'this.adminPhoneTransferService.verify(user.userId,dto.bindTicket,dto.code)',
+    },
+    {
+      path: 'admin/phone/transfer/cancel',
+      dto: 'InitialPhoneBindCancelDto',
+      method: 'cancel',
+      call: 'this.adminPhoneTransferService.cancel(user.userId,dto.bindTicket)',
+    },
+  ] as const
+
+  for (const route of routes) {
+    const decorator = `@Post('${route.path}')`
+    const start = controller.indexOf(decorator)
+    if (start < 0) {
+      failures.push(`${decorator} 缺失`)
+      continue
+    }
+    const next = controller.indexOf('\n  @Post(', start + decorator.length)
+    const block = controller.slice(start, next < 0 ? controller.length : next)
+    const compactBlock = block.replace(/\s+/g, '')
+    const serviceCalls = block.match(/this\.[A-Za-z]\w*\.[A-Za-z]\w*\s*\(/g) ?? []
+    if (
+      !block.includes('@UseGuards(JwtAuthGuard, RolesGuard)') ||
+      !block.includes("@Roles('admin')") ||
+      !block.includes('@Throttle({ default: { ttl: 60_000, limit: 5 } })') ||
+      !block.includes(route.dto) ||
+      !compactBlock.includes(route.call) ||
+      serviceCalls.length !== 1 ||
+      !serviceCalls[0]?.includes(`adminPhoneTransferService.${route.method}`)
+    ) {
+      failures.push(`${decorator} 未保持 Admin guard/限流/复用 DTO/单一服务委派`)
+    }
+  }
+
+  if (/\bAdminPhoneTransfer(?:Start|Verify|Cancel)Dto\b/.test(controller)) {
+    failures.push('controller 新增了重复 phone transfer DTO')
+  }
+  if (
+    !controller.includes("from './admin-phone-transfer.service'") ||
+    !controller.includes('private readonly adminPhoneTransferService: AdminPhoneTransferService') ||
+    !authModule.includes("from './admin-phone-transfer.service'") ||
+    !/providers:\s*\[[\s\S]*?\bAdminPhoneTransferService\b/.test(authModule) ||
+    !['PrismaModule', 'RedisModule', 'AuditModule', 'InternalOtpService'].every((token) => authModule.includes(token))
+  ) {
+    failures.push('AuthController/AuthModule 缺少 AdminPhoneTransferService 或其 DI 接线')
+  }
+
+  const auditActions = [
+    'auth.phone_transfer_start',
+    'auth.phone_transfer_complete',
+    'auth.phone_transfer_cancel',
+    'auth.phone_released_by_admin',
+  ]
+  for (const [label, source] of [['API', localAudit], ['shared', sharedAudit]] as const) {
+    const missing = auditActions.filter((action) => !source.includes(`| '${action}'`))
+    if (missing.length > 0) failures.push(`${label} AuditAction 缺少 ${missing.join(', ')}`)
+  }
+
+  ensure(failures.length === 0, `20. 路由/DI/审计静态契约失败：${failures.join('；')}`)
+  pass('20. 三条 Admin 转移路由仅委派独立服务，DI 与四类审计动作同步登记')
+}
 
 type TransferStartResult = {
   bindTicket: string

@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
+import { AuditModule } from '../audit/audit.module'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
+import { RedisModule } from '../common/redis/redis.module'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { createSmsSender, SMS_SENDER } from '../member-auth/sms/sms-sender'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AdminInitialPhoneBindService } from './admin-initial-phone-bind.service'
+import { AdminPhoneTransferService } from './admin-phone-transfer.service'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { InitialPhoneBindService } from './initial-phone-bind.service'
@@ -15,6 +18,8 @@ const JWT_TTL = '24h'
 @Module({
   imports: [
     PrismaModule,
+    RedisModule,
+    AuditModule,
     JwtModule.registerAsync({
       useFactory: () => {
         const secret = process.env['JWT_SECRET']
@@ -34,6 +39,7 @@ const JWT_TTL = '24h'
   providers:   [
     AuthService,
     AdminInitialPhoneBindService,
+    AdminPhoneTransferService,
     InitialPhoneBindService,
     InternalOtpService,
     JwtAuthGuard,

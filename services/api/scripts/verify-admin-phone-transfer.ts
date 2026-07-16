@@ -31,7 +31,10 @@ import {
   prepareIsolatedDatabase,
   RecordingAudit,
 } from './support/internal-auth-verify-harness'
-import { verifyAdminPhoneTransferSecurityCases } from './support/admin-phone-transfer-security-cases'
+import {
+  assertAdminPhoneTransferRouteDiAuditContract,
+  verifyAdminPhoneTransferSecurityCases,
+} from './support/admin-phone-transfer-security-cases'
 
 process.env['JWT_SECRET'] ||= randomBytes(32).toString('hex')
 process.env['SECRET_ENCRYPTION_KEY'] ||= randomBytes(32).toString('hex')
@@ -726,6 +729,7 @@ async function main(): Promise<void> {
       createPartner: (label, phone, tokenVersion) => createPartner(context, label, phone, tokenVersion),
     })
     await verifyCacheFailureConverges(context)
+    assertAdminPhoneTransferRouteDiAuditContract()
     console.log('\nAdmin–Partner 手机号安全转移契约验证完成。')
   } finally {
     if (prisma) await prisma.onModuleDestroy().catch(() => undefined)
