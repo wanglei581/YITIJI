@@ -4,7 +4,6 @@
 // 会话：通过 useAuth().login() 写入纯内存 AuthContext，不写任何浏览器存储
 // 已接入：手机号 + 短信验证码（未注册手机号验证后自动创建账号）
 // 已接入：手机扫描二维码确认一体机登录（claimToken 只保存在 Terminal Agent 本机代理）
-// 邮箱登录为预留入口，未接入前只展示说明，不伪造流程。
 //
 // 公共一体机无系统软键盘：手机号 / 验证码全部由页面内嵌虚拟数字键盘驱动。
 // 视觉对齐 .workbuddy/prototypes/login-trio-v1.html ①（样式见 ./login.css）。
@@ -13,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   HomeIcon,
-  MailIcon,
   ScanLineIcon,
   ShieldCheckIcon,
   SmartphoneIcon,
@@ -35,7 +33,7 @@ import './login.css'
 const DEFAULT_LOGIN_IDLE_SEC = 180
 const SUCCESS_OVERLAY_MS = 950
 
-type LoginTab = 'phone' | 'scan' | 'email'
+type LoginTab = 'phone' | 'scan'
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
@@ -257,14 +255,6 @@ export function LoginPage() {
                 <ScanLineIcon size={22} aria-hidden="true" />
                 扫码登录
               </button>
-              <button
-                type="button"
-                className={`k-tab ripple-host${tab === 'email' ? ' on' : ''}`}
-                onClick={() => switchTab('email')}
-              >
-                <MailIcon size={22} aria-hidden="true" />
-                邮箱
-              </button>
             </div>
 
             <MemberAgreement agreed={agreed} onAgreedChange={setAgreed} />
@@ -282,8 +272,6 @@ export function LoginPage() {
                 onLoginSuccess={handleQrLoginSuccess}
               />
             )}
-
-            {tab === 'email' && <EmailReservedPane />}
           </section>
 
           <div className="push-bottom" />
@@ -313,19 +301,6 @@ export function LoginPage() {
           <div className="msg">登录成功，正在进入…</div>
         </div>
       )}
-    </div>
-  )
-}
-
-// 邮箱登录预留：后端尚未提供邮箱验证码服务，只展示说明，不伪造登录流程。
-function EmailReservedPane() {
-  return (
-    <div className="k-pane k-reserved">
-      <span className="chi">
-        <MailIcon size={34} aria-hidden="true" />
-      </span>
-      <h4>邮箱登录暂未开放</h4>
-      <p>当前会员账号使用手机号验证码登录。邮箱登录入口已预留，接入邮箱验证码服务后开放，请先使用手机号或扫码登录。</p>
     </div>
   )
 }
