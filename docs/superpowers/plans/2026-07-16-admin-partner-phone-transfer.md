@@ -592,7 +592,7 @@ git commit -m "ci: gate admin partner phone transfer"
 
 ### Task 7：完整验证、安全复审与修复循环
 
-- [ ] **Step 1：运行完整相关验证**
+- [x] **Step 1：运行完整相关验证**
 
 ```bash
 INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
@@ -614,15 +614,15 @@ git diff --check
 
 Expected：除已登记的独立基线项外，所有命令 fresh exit 0；`multer@2.1.1` 深层字段 DoS 必须在部署前由独立 P0 升级到 `>=2.2.0` 并回归上传链路。本认证分支不得顺手改 manifest/lock；如基线项尚未解决，只能报告代码候选完成、部署 blocked。
 
-- [ ] **Step 2：Admin 浏览器冒烟**
+- [x] **Step 2：Admin 浏览器冒烟**
 
 使用本地 HTTP API/mock 捕获模式验证：默认严格初绑 → 切换安全转移 → 来源摘要 → 未勾选无法提交 → 取消返回 → 成功响应只更新脱敏手机号。不得连接生产、不得发送短信。
 
-- [ ] **Step 3：并行双模型代码终审**
+- [x] **Step 3：并行双模型代码终审**
 
 Antigravity 与 Claude 必须分别审查 `git diff origin/main...HEAD`，输出实际模型和 Critical/Warning/Info。用户已同意切换可用模型：Antigravity 使用已验证可承载长审查的 `Claude Sonnet 4.6 (Thinking)`；Claude 使用其实际模型并如实报告。任一路无有效报告都保持 blocked，不能用角色文案或模型别名冒充实际模型。
 
-- [ ] **Step 4：修复 Critical/Warning 并重新验证**
+- [x] **Step 4：修复 Critical/Warning 并重新验证**
 
 每个缺陷先在专项 verifier 中写失败用例，再做最小修复，重跑对应专项与类型检查；Critical 修复后必须重新跑两模型终审。
 
@@ -633,11 +633,11 @@ Antigravity 与 Claude 必须分别审查 `git diff origin/main...HEAD`，输出
 - Create: `.ccg/tasks/admin-partner-phone-transfer-20260716/review.md`
 - Move via patch: `.ccg/tasks/admin-partner-phone-transfer-20260716/` → `.ccg/tasks/archive/2026-07/admin-partner-phone-transfer-20260716/`
 
-- [ ] **Step 1：写 review.md**
+- [x] **Step 1：写 review.md**
 
 记录实际命令、退出码、浏览器范围、双模型实际模型/结论、未完成事项和生产禁区；不得记录手机号、密码、OTP、token、cookie 或 Redis payload。
 
-- [ ] **Step 2：将 task.json 更新为 completed**
+- [x] **Step 2：将 task.json 更新为 completed**
 
 ```json
 {
@@ -647,7 +647,7 @@ Antigravity 与 Claude 必须分别审查 `git diff origin/main...HEAD`，输出
 }
 ```
 
-- [ ] **Step 3：使用 apply_patch 归档活动任务文件**
+- [x] **Step 3：使用 apply_patch 归档活动任务文件**
 
 把 task/requirements/review 的内容添加到 `.ccg/tasks/archive/2026-07/admin-partner-phone-transfer-20260716/`，并用同一 patch 删除活动目录文件，保证 CI 的“无 tracked active AI tool state”门禁通过。
 

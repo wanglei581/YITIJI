@@ -55,7 +55,7 @@
 
 - [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
 
-- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：本地候选已完成代码、专项验证、独立复审和串行 CI 接线，但未 push/建 PR、未运行 GitHub CI、未部署、未发送真实短信或执行真实转移；本分支未修改依赖，也不得宣称可部署。
+- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：本地候选已完成代码、专项/回归/浏览器验证、双模型终审和串行 CI 接线；下一步须经用户明确授权后推送、创建 PR 并等待 GitHub CI。当前未 push/建 PR、未部署、未发送真实短信或执行真实转移；依赖审计 P0 未清零前不得宣称可部署，生产执行仍需另行授权和本人 OTP。
   1. **PR / CI**：推送候选并创建 PR，确认 `build-and-verify` 与 `postgres-readiness` 成功，且 Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁在共享 SQLite suite 中保持逐行串行。
   2. **部署授权**：先单独处理依赖审计基线中的部署阻塞（`shell-quote` critical，`hono` / `multer` / `vite` high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；这些依赖不在本候选范围内，阻塞未清除前不得部署。
   3. **真实转移**：仅在已授权部署并完成只读预检后，由已登录 Admin 用户本人在「账号设置」页面自行输入当前密码与真实短信 OTP 完成一次转移；AI/运维人员不得读取、代填、保存或输出密码、OTP、ticket、cookie 或手机号明文。执行后再只读核验脱敏审计、Partner 用户名/密码登录能力与相关旧会话失效；未另行授权前继续保持 `CLOSED_MODE`。

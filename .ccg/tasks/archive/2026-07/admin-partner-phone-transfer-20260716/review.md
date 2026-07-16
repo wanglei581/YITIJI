@@ -48,3 +48,43 @@
 ## 当前结论
 
 设计分析门禁已通过，允许按计划 Task 1 从后端 RED verifier 进入 TDD。代码完成后仍需对真实 diff 执行 Antigravity Sonnet 4.6 + Claude 双模型终审；未通过前不得推送、部署、发真实短信或执行真实转移。
+
+## 最终实现与验证
+
+- 最新 `origin/main` 已通过普通 merge 集成；唯一文档冲突已按正式进度记录合并，运行时代码和 CI 无冲突。
+- API 专项覆盖：角色限制、共享密码失败额度、OTP purpose 隔离、ticket 严格解析、验证锁、双 CAS、单事务先清后绑、四类审计、禁用 Partner、旧 JWT 失效、缓存版本不倒退、取消/未知结果保守恢复、Partner 用户名密码登录保留。
+- Admin 专项覆盖：严格响应 shape、三态内存状态机、四项影响说明、确认框门控、未知发送冷却、远端 cancel、成功后只合并脱敏手机号字段。
+- 本地 HTTP mock 浏览器冒烟完成：默认首次绑定 → 切换安全转移 → 来源摘要与四项影响 → 未勾选不可提交 → 勾选后验证成功只显示脱敏手机号；另一路确认返回首次绑定会调用远端 cancel。全部业务请求仅指向 localhost，没有生产请求、真实短信或真实转移。
+
+### Fresh 验证结果
+
+以下命令均退出 0：
+
+- `INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer`
+- `INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:internal-auth-phone`
+- `pnpm --filter @ai-job-print/api verify:internal-auth-phone:target-guard`
+- `pnpm --filter @ai-job-print/api verify:admin-orgs`
+- `pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui`
+- `pnpm --filter @ai-job-print/admin verify:admin-account-settings-ui`
+- `pnpm --filter @ai-job-print/shared typecheck`
+- `pnpm --filter @ai-job-print/api typecheck`
+- `pnpm --filter @ai-job-print/admin typecheck`
+- `pnpm --filter @ai-job-print/api lint`
+- `pnpm --filter @ai-job-print/admin lint`
+- `pnpm --filter @ai-job-print/api build`
+- `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build`
+- `pnpm --filter @ai-job-print/api db:pg:sync:check`
+- `git diff --check`
+
+Admin build 仅有既有 500 kB chunk 警告。`pnpm audit --audit-level high` 按预期退出 1，基线仍有 `shell-quote` critical，以及 `hono`、`multer`、`vite` high；本任务未修改依赖，故代码候选完成但部署继续 blocked。
+
+## 最终双模型终审
+
+- Antigravity 实际模型：`Claude Sonnet 4.6 (Thinking)`；完整 diff 终审 `APPROVE`，Critical 0。其建议保留 cancel 未确认时的保守失败语义，符合既定规格；另建议裁剪 Admin 查询字段。
+- Claude 实际模型：`Claude Opus 4.8 (1M context)`；完整 diff 终审 `APPROVE`，Critical 0。其建议补事务异常的脱敏分类日志。
+- 两项可采纳建议均按 RED→GREEN 完成：事务基础设施异常只记录 Admin ID、Partner ID 与错误类名，预期 `HttpException` 状态冲突不告警；start 只额外读取密码摘要，verify 不读取密码摘要或其他非必要字段。
+- 加固补丁再次由 Antigravity Sonnet 4.6 Thinking 与 Claude Opus 4.8 只读复审，结论均为 `APPROVE`；专项 verify、认证回归、API lint/build/typecheck 与 `git diff --check` 再次通过。
+
+## 交付边界
+
+本地候选已完成；未 push、未创建 PR、未运行远程 GitHub CI、未部署、未发送真实短信、未执行真实手机号转移。下一步只能在用户明确授权后推送并创建 PR；生产执行还需独立授权、已部署版本、依赖 P0 清零和本人真实 OTP 验证。
