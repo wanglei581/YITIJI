@@ -1,0 +1,12 @@
+{
+  "id": "admin-partner-phone-transfer-20260716",
+  "title": "将合作机构账号手机号安全转移到管理员账号",
+  "status": "in_progress",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "auth",
+  "currentPhase": "analysis",
+  "nextAction": "等待用户复核正式设计规格后编写实施计划",
+  "createdAt": "2026-07-16T15:49:41+08:00",
+  "branch": "codex/admin-partner-phone-transfer-20260716"
+}
