@@ -31,10 +31,8 @@ import {
   prepareIsolatedDatabase,
   RecordingAudit,
 } from './support/internal-auth-verify-harness'
-import {
-  assertAdminPhoneTransferRouteDiAuditContract,
-  verifyAdminPhoneTransferSecurityCases,
-} from './support/admin-phone-transfer-security-cases'
+import { verifyAdminPhoneTransferSecurityCases } from './support/admin-phone-transfer-security-cases'
+import { assertAdminPhoneTransferRouteDiAuditContract } from './support/admin-phone-transfer-static-contract'
 
 process.env['JWT_SECRET'] ||= randomBytes(32).toString('hex')
 process.env['SECRET_ENCRYPTION_KEY'] ||= randomBytes(32).toString('hex')
