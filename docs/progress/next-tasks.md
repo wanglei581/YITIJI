@@ -52,7 +52,7 @@
 
 - [ ] **P0 离线验收证据矩阵后的逐项授权**：已完成仅仓库文档范围的 [证据矩阵](../reviews/2026-07-16-p0-offline-acceptance-evidence-matrix.md)，不连接任何环境且不改变真实验收状态。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
 
-- [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；仍须完成当前候选的 verifier、typecheck、lint、build 与 diff 门禁。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
+- [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 
