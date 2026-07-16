@@ -553,7 +553,7 @@ git commit -m "feat(admin): add explicit partner phone transfer flow"
 - Modify: `docs/progress/current-progress.md`
 - Modify: `docs/progress/next-tasks.md`
 
-- [ ] **Step 1：把两个专项门禁串行接入 CI**
+- [x] **Step 1：把两个专项门禁串行接入 CI**
 
 在 Admin UI verify 区加入：
 
@@ -569,11 +569,11 @@ INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admi
 
 保持 SQLite verify 串行，不增加 `&`、`run-p` 或共享数据库并发。
 
-- [ ] **Step 2：同步进度 SSOT**
+- [x] **Step 2：同步进度 SSOT**
 
 `current-progress.md` 只记录真实完成的本地代码、验证和审查状态；明确“未部署、未发真实短信、未执行真实转移、生产仍 CLOSED_MODE”。`next-tasks.md` 把后续拆成：PR/CI、部署授权、用户在页面自行输入密码与 OTP 完成真实转移。
 
-- [ ] **Step 3：证明范围未漂移**
+- [x] **Step 3：证明范围未漂移**
 
 ```bash
 git diff origin/main...HEAD --name-only
@@ -583,7 +583,7 @@ pnpm --filter @ai-job-print/api db:pg:sync:check
 
 Expected：只有计划文件范围；PostgreSQL schema 同步检查退出 0，且无 schema/migration diff。
 
-- [ ] **Step 4：提交整合**
+- [x] **Step 4：提交整合**
 
 ```bash
 git add .github/workflows/ci.yml docs/progress/current-progress.md docs/progress/next-tasks.md
