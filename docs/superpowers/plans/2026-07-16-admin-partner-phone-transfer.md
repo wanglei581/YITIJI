@@ -24,6 +24,8 @@
 - `packages/shared/src/types/audit.ts`
 - `services/api/scripts/verify-admin-phone-transfer.ts`（新增）
 - `services/api/scripts/support/internal-auth-verify-harness.ts`（新增，仅隔离 verifier 公共 harness）
+- `services/api/scripts/support/admin-phone-transfer-security-cases.ts`（新增，安全场景）
+- `services/api/scripts/support/admin-phone-transfer-static-contract.ts`（新增，AST 路由/DI/审计门禁）
 - `services/api/package.json`
 
 前端执行单元只能修改：
@@ -363,7 +365,7 @@ git commit -m "feat(auth): add admin partner phone transfer state machine"
 - Modify: `packages/shared/src/types/audit.ts`
 - Test: `services/api/scripts/verify-admin-phone-transfer.ts`
 
-- [ ] **Step 1：先扩展 verifier 的静态路由断言**
+- [x] **Step 1：先扩展 verifier 的静态路由断言**
 
 要求三条路由分别为：
 
@@ -375,17 +377,17 @@ git commit -m "feat(auth): add admin partner phone transfer state machine"
 
 每条都必须同时出现 `@UseGuards(JwtAuthGuard, RolesGuard)`、`@Roles('admin')` 与 `@Throttle({ default: { ttl: 60_000, limit: 5 } })`，并只委派 `AdminPhoneTransferService`。
 
-- [ ] **Step 2：运行 RED**
+- [x] **Step 2：运行 RED**
 
 Run：同 Task 2 Step 7。
 
 Expected：状态机行为仍 PASS，路由/DI/审计动作登记断言 FAIL。
 
-- [ ] **Step 3：接入 controller 与 module**
+- [x] **Step 3：接入 controller 与 module**
 
 构造器新增 `private readonly adminPhoneTransferService: AdminPhoneTransferService`。start/verify/cancel 复用 `InitialPhoneBindStartDto`、`InitialPhoneBindVerifyDto`、`InitialPhoneBindCancelDto`，不增加重复 DTO。
 
-- [ ] **Step 4：登记四个审计动作**
+- [x] **Step 4：登记四个审计动作**
 
 API 与 shared 的 `AuditAction` 同步增加：
 
@@ -396,7 +398,7 @@ API 与 shared 的 `AuditAction` 同步增加：
 | 'auth.phone_released_by_admin'
 ```
 
-- [ ] **Step 5：运行专项与现有回归**
+- [x] **Step 5：运行专项与现有回归**
 
 ```bash
 INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
@@ -407,7 +409,7 @@ pnpm --filter @ai-job-print/shared typecheck
 
 Expected：新旧认证 verifier 和两个 typecheck 均退出 0。
 
-- [ ] **Step 6：提交接线**
+- [x] **Step 6：提交接线**
 
 ```bash
 git add services/api/src/auth/auth.controller.ts services/api/src/auth/auth.module.ts services/api/src/audit/audit.types.ts packages/shared/src/types/audit.ts services/api/scripts/verify-admin-phone-transfer.ts
