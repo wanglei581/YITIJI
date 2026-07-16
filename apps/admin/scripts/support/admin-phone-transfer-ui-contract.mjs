@@ -158,6 +158,16 @@ function isPositiveCooldownComparison(node) {
   )
 }
 
+function disabledDuringActiveCooldown(node) {
+  const expression = unwrapParentheses(node)
+  if (isPositiveCooldownComparison(expression)) return true
+  return (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
+    (disabledDuringActiveCooldown(expression.left) || disabledDuringActiveCooldown(expression.right))
+  )
+}
+
 function isActiveUnknownStartCooldown(node) {
   const expression = unwrapParentheses(node)
   if (!ts.isBinaryExpression(expression) || expression.operatorToken.kind !== ts.SyntaxKind.AmpersandAmpersandToken) {
@@ -189,6 +199,11 @@ export function verifyCooldownReturnContract(componentSource) {
     return disabled && identifiersIn(disabled).has('cooldownSeconds')
   })
   expect(cooldownButtons.length === 1, 'only the identity return button must honor the unknown-start cooldown')
+  const cooldownDisabled = jsxAttribute(cooldownButtons[0], 'disabled')?.initializer?.expression
+  expect(
+    cooldownDisabled && disabledDuringActiveCooldown(cooldownDisabled),
+    'identity return button must be disabled when cooldownSeconds > 0',
+  )
 
   let cooldownGuard
   const noTicketReturns = []
