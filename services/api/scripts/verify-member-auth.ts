@@ -394,6 +394,96 @@ async function main() {
     // ── 11. issueLoginForUser 最终签发门禁 / QR claim 竞态 ─────────────────
     console.log('\n── 11. 最终签发门禁与 QR claim 竞态 ──────────────────────────')
     const memberAuth = app.get(MemberAuthService)
+    const issueUser = { id: `issue-user-${tail}`, phoneMasked: '138****0000', nickname: null }
+    const activeState = { enabled: true, status: 'active' }
+    const closingState = { enabled: false, status: 'closing' }
+    function issueLoginHarness(states: Array<typeof activeState | Error>, signError?: Error, cleanupError?: Error) {
+      const trace: {
+        reads: number
+        registered?: { endUserId: string; sessionId: string }
+        unregistered?: { endUserId: string; sessionId: string }
+        unregisterCalls: number
+        signed?: { payload: { sub: string }; options: { jwtid: string } }
+      } = { reads: 0, unregisterCalls: 0 }
+      const harnessPrisma = {
+        endUser: {
+          findUnique: async () => {
+            const state = states[trace.reads]
+            trace.reads += 1
+            if (state instanceof Error) throw state
+            return state ?? null
+          },
+        },
+      } as never
+      const harnessRedis = {
+        registerMemberSession: async (endUserId: string, sessionId: string) => {
+          trace.registered = { endUserId, sessionId }
+        },
+        unregisterMemberSession: async (endUserId: string, sessionId: string) => {
+          trace.unregisterCalls += 1
+          trace.unregistered = { endUserId, sessionId }
+          if (cleanupError) throw cleanupError
+        },
+      } as never
+      const harnessJwt = {
+        sign: (payload: { sub: string }, options: { jwtid: string }) => {
+          trace.signed = { payload, options }
+          if (signError) throw signError
+          return 'verify-issue-token'
+        },
+      } as never
+      return { service: new MemberAuthService(harnessPrisma, harnessRedis, harnessJwt, {} as never), trace }
+    }
+
+    const raceHarness = issueLoginHarness([activeState, closingState])
+    let raceError: unknown
+    try { await raceHarness.service.issueLoginForUser(issueUser) } catch (error) { raceError = error }
+    const raceResponse = (raceError as { getResponse?: () => unknown } | undefined)?.getResponse?.() as Json | undefined
+    if ((raceResponse?.error as Json | undefined)?.code === 'ACCOUNT_UNAVAILABLE') pass('注册后状态变 closing → ACCOUNT_UNAVAILABLE')
+    else fail('注册后状态变 closing 未统一拒绝')
+    if (
+      raceHarness.trace.reads === 2 &&
+      raceHarness.trace.registered?.sessionId === raceHarness.trace.unregistered?.sessionId &&
+      raceHarness.trace.unregisterCalls === 1 &&
+      raceHarness.trace.signed === undefined
+    ) pass('TOCTOU 竞态只清理一次同一 session，且绝不 sign')
+    else fail(`TOCTOU 清理链异常: ${JSON.stringify(raceHarness.trace)}`)
+
+    const activeHarness = issueLoginHarness([activeState, activeState])
+    const activeIssue = await activeHarness.service.issueLoginForUser(issueUser)
+    if (
+      activeHarness.trace.reads === 2 &&
+      activeHarness.trace.registered?.sessionId === activeHarness.trace.signed?.options.jwtid &&
+      activeHarness.trace.signed?.payload.sub === issueUser.id &&
+      activeHarness.trace.unregisterCalls === 0 &&
+      activeIssue.token === 'verify-issue-token'
+    ) pass('两次 active → 保留同一 jti 链并正常签发')
+    else fail(`正常双重状态检查异常: ${JSON.stringify(activeHarness.trace)}`)
+
+    const readFailure = new Error('verify second read failure')
+    const readFailureHarness = issueLoginHarness([activeState, readFailure])
+    let caughtReadFailure: unknown
+    try { await readFailureHarness.service.issueLoginForUser(issueUser) } catch (error) { caughtReadFailure = error }
+    if (caughtReadFailure === readFailure && readFailureHarness.trace.unregisterCalls === 1 && !readFailureHarness.trace.signed) {
+      pass('第二次 DB 读取异常 → 清理 session 并重抛原错')
+    } else fail('第二次 DB 读取异常未清理或吞掉原错')
+
+    const signFailure = new Error('verify sign failure')
+    const signFailureHarness = issueLoginHarness([activeState, activeState], signFailure)
+    let caughtSignFailure: unknown
+    try { await signFailureHarness.service.issueLoginForUser(issueUser) } catch (error) { caughtSignFailure = error }
+    if (caughtSignFailure === signFailure && signFailureHarness.trace.unregisterCalls === 1) {
+      pass('JWT sign 异常 → 清理 session 并重抛原错')
+    } else fail('JWT sign 异常未清理或吞掉原错')
+
+    const cleanupFailureHarness = issueLoginHarness([activeState, closingState], undefined, new Error('verify cleanup failure'))
+    let cleanupRaceError: unknown
+    try { await cleanupFailureHarness.service.issueLoginForUser(issueUser) } catch (error) { cleanupRaceError = error }
+    const cleanupRaceResponse = (cleanupRaceError as { getResponse?: () => unknown } | undefined)?.getResponse?.() as Json | undefined
+    if ((cleanupRaceResponse?.error as Json | undefined)?.code === 'ACCOUNT_UNAVAILABLE' && cleanupFailureHarness.trace.unregisterCalls === 1) {
+      pass('清理失败仍 fail-closed，并保留原 ACCOUNT_UNAVAILABLE')
+    } else fail('清理失败吞掉原始安全错误或重复清理')
+
     const missingUserId = `missing-member-${tail}`
     let unexpectedMissingLogin: { token: string } | undefined
     try {

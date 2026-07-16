@@ -178,11 +178,20 @@ export class MemberAuthService {
     // 建立 Redis 会话(jti),签发短期 JWT(aud=enduser + jti)。
     const sessionId = randomUUID()
     await this.redis.registerMemberSession(user.id, sessionId, SESSION_TTL)
-    const token = this.jwtService.sign({ sub: user.id }, { jwtid: sessionId })
+    try {
+      const afterRegistration = await this.prisma.endUser.findUnique({
+        where: { id: user.id },
+        select: { enabled: true, status: true },
+      })
+      if (!afterRegistration || !afterRegistration.enabled || afterRegistration.status !== 'active') {
+        throw this.accountUnavailable()
+      }
 
-    return {
-      token,
-      user,
+      const token = this.jwtService.sign({ sub: user.id }, { jwtid: sessionId })
+      return { token, user }
+    } catch (error) {
+      await this.cleanupRegisteredSession(user.id, sessionId)
+      throw error
     }
   }
 
@@ -253,5 +262,14 @@ export class MemberAuthService {
     return new ForbiddenException({
       error: { code: 'ACCOUNT_UNAVAILABLE', message: '账号当前不可登录，请联系工作人员' },
     })
+  }
+
+  private async cleanupRegisteredSession(endUserId: string, sessionId: string): Promise<void> {
+    try {
+      await this.redis.unregisterMemberSession(endUserId, sessionId)
+    } catch {
+      // Best effort only: never replace the original security/DB/signing error.
+      // No token is returned, and account-status guards remain fail-closed.
+    }
   }
 }
