@@ -61,6 +61,64 @@ if (page.includes('渠道账单 diff 需在部署期')) {
   fail('对账页缺渠道账单边界说明')
 }
 
+// page：说明编辑必须与改价/启停隔离，并在失败时保留输入
+const descriptionSaveBlock = page.match(/const saveDescription[\s\S]*?const toggleActive/)?.[0] ?? ''
+const descriptionCatchBlock = descriptionSaveBlock.match(/catch \(e\) \{[\s\S]*?\} finally/)?.[0] ?? ''
+
+if (page.includes('descriptionEditing') && page.includes('保存说明')) {
+  pass('说明编辑使用独立状态和独立保存操作')
+} else {
+  fail('说明编辑不得复用单价状态或保存操作')
+}
+
+if (
+  /updatePriceConfig\s*\(\s*item\.serviceKey\s*,\s*\{\s*description:\s*nextDescription\s*\}\s*\)/.test(
+    descriptionSaveBlock,
+  ) &&
+  !descriptionSaveBlock.includes('unitCents') &&
+  !descriptionSaveBlock.includes('active:')
+) {
+  pass('说明保存请求只提交 description')
+} else {
+  fail('说明保存请求必须只提交 description，不得携带单价或状态')
+}
+
+if (
+  descriptionSaveBlock.includes('只更新说明，不修改单价与启停状态') &&
+  descriptionSaveBlock.includes('记入审计')
+) {
+  pass('说明保存二次确认明确字段边界与审计')
+} else {
+  fail('说明保存确认缺少字段隔离或审计提示')
+}
+
+if (
+  descriptionSaveBlock.includes('delete next[item.serviceKey]') &&
+  descriptionSaveBlock.includes('await load()') &&
+  descriptionSaveBlock.includes('setDescriptionEditing') &&
+  descriptionSaveBlock.indexOf('await load()') < descriptionSaveBlock.indexOf('setDescriptionEditing')
+) {
+  pass('说明保存成功后先刷新再清理当前行状态')
+} else {
+  fail('说明保存成功后必须先刷新再清理当前行状态')
+}
+
+if (
+  descriptionCatchBlock &&
+  !descriptionCatchBlock.includes('setDescriptionEditing') &&
+  !descriptionCatchBlock.includes('delete next[item.serviceKey]')
+) {
+  pass('说明保存失败时保留当前编辑值')
+} else {
+  fail('说明保存失败时不得清理当前编辑值')
+}
+
+if (page.includes('maxLength={200}') && descriptionSaveBlock.includes('nextDescription.length > 200')) {
+  pass('说明长度在输入与保存边界均限制为 200 字符')
+} else {
+  fail('说明编辑缺少 200 字符双重边界')
+}
+
 // route + nav 接入
 if (routes.includes("path: 'billing'") && routes.includes('BillingPage')) pass('路由注册 /billing')
 else fail('路由未注册 /billing')
