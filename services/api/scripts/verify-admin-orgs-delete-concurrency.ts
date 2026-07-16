@@ -38,6 +38,33 @@ function errorCode(error: unknown): string | null {
     : null
 }
 
+class VersionedMemoryRedis {
+  private readonly cache = new Map<string, string>()
+
+  async del(key: string): Promise<number> {
+    return this.cache.delete(key) ? 1 : 0
+  }
+
+  async setJsonIfVersionNotOlder(
+    key: string,
+    _ttlSeconds: number,
+    value: string,
+    tokenVersion: number,
+  ): Promise<'stored' | 'stale'> {
+    const current = this.cache.get(key)
+    if (current) {
+      const currentVersion = (JSON.parse(current) as { tokenVersion?: number }).tokenVersion
+      if (typeof currentVersion === 'number' && currentVersion > tokenVersion) return 'stale'
+    }
+    this.cache.set(key, value)
+    return 'stored'
+  }
+
+  raw(key: string): string | null {
+    return this.cache.get(key) ?? null
+  }
+}
+
 function matches(row: UserRow, where: Record<string, unknown>): boolean {
   return (
     (where.id === undefined || row.id === where.id)
@@ -125,7 +152,7 @@ async function main(): Promise<void> {
   const first = account('account-concurrent-a', 'concurrent_a')
   const second = account('account-concurrent-b', 'concurrent_b')
   const prisma = new SerializedMemoryPrisma([first, second])
-  const redis = { del: async () => 1 }
+  const redis = new VersionedMemoryRedis()
   const service = new AdminOrgsService(prisma as never, {} as never, redis as never)
   const admin = { userId: 'admin-concurrency', role: 'admin' as const, orgId: null }
 
@@ -153,8 +180,37 @@ async function main(): Promise<void> {
   ) {
     fail('删除审计未最小化记录账号 ID，或泄露原用户名')
   }
+  const deleted = prisma.users.find((user) => user.deletedAt !== null)
+  if (!deleted) fail('并发删除后未找到墓碑账号')
+  const cacheKey = `internal:session-state:${deleted.id}`
+  const deletedState = redis.raw(cacheKey)
+  if (!deletedState) fail('删除后未发布高版本禁用会话状态')
+  const parsedDeletedState = JSON.parse(deletedState) as {
+    enabled?: boolean
+    tokenVersion?: number
+    deletedAt?: string | null
+  }
+  if (parsedDeletedState.enabled !== false || parsedDeletedState.tokenVersion !== 1 || !parsedDeletedState.deletedAt) {
+    fail(`删除会话状态不完整：${deletedState}`)
+  }
+  await redis.setJsonIfVersionNotOlder(
+    cacheKey,
+    60,
+    JSON.stringify({
+      userId: deleted.id,
+      role: 'partner',
+      orgId: deleted.orgId,
+      enabled: true,
+      tokenVersion: 0,
+      deletedAt: null,
+      orgEnabled: true,
+    }),
+    0,
+  )
+  if (redis.raw(cacheKey) !== deletedState) fail('晚到的旧缓存状态覆盖了删除后的高版本禁用状态')
   pass('并发移除两个有效账号时，事务只允许一个成功并保留一个有效账号')
   pass('删除审计仅记录账号 ID，不泄露原用户名')
+  pass('删除发布高版本禁用会话状态，晚到旧缓存无法覆盖')
   console.log('\n=== CONCURRENCY ALL PASS ===')
 }
 
