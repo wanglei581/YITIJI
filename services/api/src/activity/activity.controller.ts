@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { RedisService } from '../common/redis/redis.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { PrismaService } from '../prisma/prisma.service'
 import { ActivityService } from './activity.service'
 
 interface ReqLike {
@@ -47,10 +48,11 @@ export class ActivityController {
     private readonly activity: ActivityService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async endUserIdOf(req: ReqLike): Promise<string | null> {
-    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
     return member?.endUserId ?? null
   }
 

@@ -5,6 +5,7 @@ import { IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'cla
 import { Type } from 'class-transformer'
 import { RedisService } from '../common/redis/redis.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { PrismaService } from '../prisma/prisma.service'
 import { JobFitService } from './resume/job-fit.service'
 import { GovernedJobFitService } from '../job-ai/governed-job-fit.service'
 import type { JobAiQuotaContext } from '../job-ai/job-ai-quota.service'
@@ -76,10 +77,11 @@ export class JobFitController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly governed: GovernedJobFitService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async requesterOf(req: ReqLike) {
-    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(headerOf(req, 'authorization') ?? undefined, this.jwt, this.redis, this.prisma)
     if (member) return { endUserId: member.endUserId, accessToken: null }
     return { endUserId: null, accessToken: headerOf(req, 'x-resume-access-token') }
   }

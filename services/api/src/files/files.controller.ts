@@ -30,6 +30,7 @@ import { Roles } from '../common/decorators/roles.decorator'
 import { Throttle } from '@nestjs/throttler'
 import { AuditService } from '../audit/audit.service'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { FilesService, type FileRequester } from './files.service'
 import { UploadOptionsDto } from './dto/upload-options.dto'
 import { KioskUploadOptionsDto } from './dto/kiosk-upload-options.dto'
@@ -94,6 +95,7 @@ export class FilesController {
     private readonly audit: AuditService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // ── 服务端代理上传 ─────────────────────────────────────────────────────────
@@ -135,7 +137,7 @@ export class FilesController {
     if (!file) {
       throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少上传文件字段(field name: file)' } })
     }
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const res = await this.files.upload({
       buffer: file.buffer,
       filename: restoreKioskUtf8Filename(file.originalname),
@@ -433,7 +435,7 @@ export class FilesController {
 
   private async resolveRequester(req: ReqLike): Promise<FileRequester | null> {
     const auth = extractAuth(req)
-    const member = await resolveOptionalEndUser(auth, this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(auth, this.jwt, this.redis, this.prisma)
     if (member) return { kind: 'member', endUserId: member.endUserId }
     if (auth && auth.toLowerCase().startsWith('bearer ')) {
       const token = auth.slice(7).trim()

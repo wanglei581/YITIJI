@@ -96,7 +96,7 @@ export class MemberAuthController {
   @Post('auth/logout')
   @UseGuards(EndUserAuthGuard)
   async logout(@CurrentEndUser() user: AuthedEndUser): Promise<ApiResponse<{ loggedOut: true }>> {
-    await this.service.logout(user.sessionId)
+    await this.service.logout(user.endUserId, user.sessionId)
     return ApiResponse.ok({ loggedOut: true })
   }
 

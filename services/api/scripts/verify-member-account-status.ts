@@ -39,6 +39,17 @@ function mustContain(source: string, markers: readonly string[], label: string):
   }
 }
 
+function mustNotContain(source: string, markers: readonly string[], label: string): void {
+  for (const marker of markers) {
+    if (!source.includes(marker)) {
+      console.log(`  PASS ${label} 未包含: ${marker}`)
+      continue
+    }
+    failures += 1
+    console.error(`  FAIL ${label} 不应包含: ${marker}`)
+  }
+}
+
 function expectEqual(actual: string, expected: string, label: string): void {
   if (actual === expected) {
     console.log(`  PASS ${label}`)
@@ -154,6 +165,11 @@ const postgresMigration = readOptional(
   'services/api/prisma/postgres/migrations/20260717090000_add_member_account_status/migration.sql',
 )
 const guard = read('services/api/src/common/guards/end-user-auth.guard.ts')
+const optionalGuard = read('services/api/src/common/guards/optional-end-user-auth.guard.ts')
+const optionalResolver = read('services/api/src/common/auth/optional-end-user.ts')
+const closureReceiptGuard = readOptional('services/api/src/common/guards/member-closure-receipt.guard.ts')
+const memberAuthService = read('services/api/src/member-auth/member-auth.service.ts')
+const memberAuthController = read('services/api/src/member-auth/member-auth.controller.ts')
 const schemaMarkers = [
   'status          String    @default("active")',
   'statusChangedAt DateTime?',
@@ -188,7 +204,83 @@ mustContain(postgresEndUser, schemaMarkers, 'PostgreSQL EndUser schema')
 mustContain(sqliteMigration, sqliteMigrationMarkers, 'SQLite account-status migration')
 mustContain(postgresMigration, postgresMigrationMarkers, 'PostgreSQL account-status migration')
 verifySqliteMigration(sqliteMigration)
-mustContain(guard, ['select: { enabled: true, status: true }', "user.status !== 'active'"], 'EndUserAuthGuard')
+mustContain(
+  guard,
+  [
+    'select: { enabled: true, status: true }',
+    "user.status !== 'active'",
+    'unregisterMemberSession(payload.sub, sessionId)',
+    "user ? 'ACCOUNT_UNAVAILABLE' : 'MEMBER_SESSION_EXPIRED'",
+  ],
+  'EndUserAuthGuard',
+)
+mustContain(
+  optionalGuard,
+  [
+    'select: { enabled: true, status: true }',
+    "user.status !== 'active'",
+    'unregisterMemberSession(payload.sub, sessionId)',
+  ],
+  'OptionalEndUserAuthGuard',
+)
+mustContain(
+  optionalResolver,
+  [
+    'prisma: PrismaService',
+    'select: { enabled: true, status: true }',
+    "user.status !== 'active'",
+    'unregisterMemberSession(payload.sub, sessionId)',
+  ],
+  'resolveOptionalEndUser',
+)
+mustContain(
+  memberAuthService,
+  [
+    "if (user && (!user.enabled || user.status !== 'active'))",
+    "status: 'active'",
+    'enabled: true',
+    'select: { enabled: true, status: true }',
+    'registerMemberSession(user.id, sessionId, SESSION_TTL)',
+    'sign({ sub: user.id }, { jwtid: sessionId })',
+    'logout(endUserId: string, sessionId: string)',
+    'unregisterMemberSession(endUserId, sessionId)',
+  ],
+  'MemberAuthService',
+)
+mustContain(
+  memberAuthController,
+  ['logout(user.endUserId, user.sessionId)'],
+  'MemberAuthController',
+)
+mustContain(
+  closureReceiptGuard,
+  [
+    "algorithms: ['HS256']",
+    "audience: 'enduser'",
+    'payload.sub',
+    'payload.jti',
+    'req.closureReceiptSubject = { endUserId: payload.sub }',
+  ],
+  'MemberClosureReceiptGuard',
+)
+mustNotContain(
+  closureReceiptGuard,
+  ['RedisService', 'PrismaService', 'req.endUser', '.sign('],
+  'MemberClosureReceiptGuard',
+)
+
+let closureGuardControllerReferences = ''
+try {
+  closureGuardControllerReferences = execFileSync(
+    'rg',
+    ['-l', 'MemberClosureReceiptGuard', resolve(repoRoot, 'services/api/src'), '-g', '*.controller.ts'],
+    { encoding: 'utf8' },
+  ).trim()
+} catch (error) {
+  const exitCode = (error as { status?: number }).status
+  if (exitCode !== 1) throw error
+}
+expectEqual(closureGuardControllerReferences, '', 'MemberClosureReceiptGuard 当前未被任何 controller 引用')
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — 会员账户状态契约尚未完整落地\n`)

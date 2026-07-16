@@ -9,6 +9,7 @@ import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { parseMemberPageQuery } from '../common/utils/member-page'
+import { PrismaService } from '../prisma/prisma.service'
 import { MockInterviewService, type InterviewRequester } from './mock-interview.service'
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
@@ -96,11 +97,12 @@ export class MockInterviewController {
     private readonly tts: TtsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
     const auth = headerOf(req, 'authorization')
-    const member = await resolveOptionalEndUser(auth ?? undefined, this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(auth ?? undefined, this.jwt, this.redis, this.prisma)
     if (member) return { endUserId: member.endUserId, accessToken: null }
     return { endUserId: null, accessToken: headerOf(req, 'x-interview-access-token') }
   }

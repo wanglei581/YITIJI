@@ -1,4 +1,5 @@
 import { JwtService } from '@nestjs/jwt'
+import type { PrismaService } from '../../prisma/prisma.service'
 import type { RedisService } from '../redis/redis.service'
 import { memberSessionKey } from '../guards/end-user-auth.guard'
 
@@ -24,6 +25,7 @@ export async function resolveOptionalEndUser(
   authorization: string | undefined,
   jwtService: JwtService,
   redis: RedisService,
+  prisma: PrismaService,
 ): Promise<OptionalEndUser | null> {
   if (!authorization || !authorization.toLowerCase().startsWith('bearer ')) {
     return null
@@ -42,6 +44,15 @@ export async function resolveOptionalEndUser(
 
   const ownerId = await redis.get(memberSessionKey(sessionId))
   if (ownerId !== payload.sub) return null
+
+  const user = await prisma.endUser.findUnique({
+    where: { id: payload.sub },
+    select: { enabled: true, status: true },
+  })
+  if (!user || !user.enabled || user.status !== 'active') {
+    await redis.unregisterMemberSession(payload.sub, sessionId)
+    return null
+  }
 
   return { endUserId: payload.sub, sessionId }
 }

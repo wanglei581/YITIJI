@@ -6,6 +6,7 @@ import type { SignComposeResponse, SignInspectResponse } from './print-sign.type
 import { RedisService } from '../common/redis/redis.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { ApiResponse } from '../common/dto/api-response.dto'
+import { PrismaService } from '../prisma/prisma.service'
 import { SignComposeDto, SignInspectDto } from './print-sign.dto'
 import { PrintSignService } from './print-sign.service'
 
@@ -15,12 +16,13 @@ export class PrintSignController {
     private readonly sign: PrintSignService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('inspect')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async inspect(@Body() body: SignInspectDto, @Req() req: Request): Promise<ApiResponse<SignInspectResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sign.inspect({
       terminalId: body.terminalId,
       document: body.document,
@@ -37,7 +39,7 @@ export class PrintSignController {
     @Headers('x-request-id') requestId: string | undefined,
     @Req() req: Request,
   ): Promise<ApiResponse<SignComposeResponse>> {
-    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     const result = await this.sign.compose({
       terminalId: body.terminalId,
       document: body.document,

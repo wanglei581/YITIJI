@@ -9,6 +9,7 @@ import { AiLogService } from './ai-log.service'
 import { AuditService } from '../audit/audit.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import type { AdminAiUsage, AdminAiLogsResult } from './ai-log.service'
 import { ResumeParseRequestDto } from './dto/resume-parse.dto'
 import type { ResumeParseResponseDto } from './dto/resume-parse.dto'
@@ -98,6 +99,7 @@ export class AiController {
     private readonly redis: RedisService,
     private readonly asr: AsrService,
     private readonly benefitRedemption: BenefitRedemptionService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -107,7 +109,7 @@ export class AiController {
    * - 否则 → 匿名请求，仅从 `x-resume-access-token` header 读取一次性令牌（不读 query）。
    */
   private async resolveAiResultRequester(req: ReqLike): Promise<AiResultRequester> {
-    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const member = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     if (member) return { endUserId: member.endUserId, accessToken: null }
     return { endUserId: null, accessToken: resumeAccessTokenOf(req) }
   }
@@ -124,7 +126,7 @@ export class AiController {
     @Body() dto: ResumeParseRequestDto,
     @Req() req: ReqLike,
   ): Promise<ResumeParseResponseDto> {
-    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const result = await this.aiService.submitResumeParse(dto, endUser?.endUserId ?? null)
     await this.audit.write({
       actorId: null,
@@ -259,7 +261,7 @@ export class AiController {
     @Body() dto: ResumeGenerateRequestDto,
     @Req() req: ReqLike,
   ) {
-    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(authOf(req), this.jwt, this.redis, this.prisma)
     const result = await this.aiService.submitResumeGenerate(dto, endUser?.endUserId ?? null)
     await this.audit.write({
       actorId: null,

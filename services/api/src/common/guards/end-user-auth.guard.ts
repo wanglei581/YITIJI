@@ -60,13 +60,13 @@ export class EndUserAuthGuard implements CanActivate {
 
     const user = await this.prisma.endUser.findUnique({
       where: { id: payload.sub },
-      select: { enabled: true },
+      select: { enabled: true, status: true },
     })
-    if (!user || !user.enabled) {
-      await this.redis.del(memberSessionKey(sessionId))
+    if (!user || !user.enabled || user.status !== 'active') {
+      await this.redis.unregisterMemberSession(payload.sub, sessionId)
       throw this.unauthorized(
-        user ? 'ACCOUNT_DISABLED' : 'MEMBER_SESSION_EXPIRED',
-        user ? '账号已被停用' : '会话已失效,请重新登录',
+        user ? 'ACCOUNT_UNAVAILABLE' : 'MEMBER_SESSION_EXPIRED',
+        user ? '账号当前不可用，请重新登录或联系工作人员' : '会话已失效,请重新登录',
       )
     }
 

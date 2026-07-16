@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
 import { RedisService } from '../common/redis/redis.service'
+import { PrismaService } from '../prisma/prisma.service'
 import { PrintJobsService } from './print-jobs.service'
 import { CreatePrintJobDto } from './dto/create-print-job.dto'
 
@@ -22,6 +23,7 @@ export class PrintJobsController {
     private readonly service: PrintJobsService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // 鉴权取舍（HIGH-3）：本端点服务匿名 Kiosk 上传打印流程，加 JWT/设备鉴权会破坏
@@ -37,7 +39,7 @@ export class PrintJobsController {
     @Headers('authorization') authorization: string | undefined,
     @Headers('x-terminal-id') terminalId: string | undefined,
   ) {
-    const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis)
+    const endUser = await resolveOptionalEndUser(authorization, this.jwt, this.redis, this.prisma)
     return this.service.create(dto, {
       ipAddress: ip ?? null,
       userAgent: userAgent ?? null,
