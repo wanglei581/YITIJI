@@ -146,6 +146,14 @@ export class MemberPrivacyService {
         },
       })
     }
+    if (input.status === 'rejected' && existing.requestType === 'revoke_consent') {
+      throw new BadRequestException({
+        error: {
+          code: 'DATA_REQUEST_ALREADY_EXECUTED',
+          message: '授权撤回已在请求创建时同步执行，只能记录为 completed',
+        },
+      })
+    }
     const terminal = input.status === 'completed' || input.status === 'rejected'
     const auditRef = !input.auditRef ? await this.audit.write({
       actorId: input.handledBy,
