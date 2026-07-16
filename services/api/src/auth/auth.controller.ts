@@ -10,6 +10,7 @@ import { AuthService, type LoginResult } from './auth.service'
 import { InitialPhoneBindService } from './initial-phone-bind.service'
 import {
   ChangePasswordDto,
+  InitialPhoneBindCancelDto,
   InitialPhoneBindStartDto,
   InitialPhoneBindVerifyDto,
   PasswordResetCompleteDto,
@@ -169,6 +170,17 @@ export class AuthController {
     @Body() dto: InitialPhoneBindVerifyDto,
   ): Promise<ApiResponse<{ phoneMasked: string; phoneVerifiedAt: string }>> {
     return ApiResponse.ok(await this.adminInitialPhoneBindService.verify(user.userId, dto.bindTicket, dto.code))
+  }
+
+  @Post('admin/phone/initial-bind/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async cancelAdminInitialPhoneBind(
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: InitialPhoneBindCancelDto,
+  ): Promise<ApiResponse<{ cancelled: true }>> {
+    return ApiResponse.ok(await this.adminInitialPhoneBindService.cancel(user.userId, dto.bindTicket))
   }
 
   /** 登录态自助改密:须提供当前密码校验身份,成功后旧 token 立即失效,需重新登录。 */

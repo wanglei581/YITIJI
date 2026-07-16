@@ -155,6 +155,10 @@ type AdminInitialPhoneBindVerifyData = {
   phoneVerifiedAt: string
 }
 
+type AdminInitialPhoneBindCancelData = {
+  cancelled: true
+}
+
 type AdminInitialPhoneBindFailure = {
   ok: false
   code: string
@@ -202,6 +206,10 @@ function isValidAdminInitialPhoneBindVerifyResponse(data: unknown): data is Admi
   if (typeof data !== 'object' || data === null) return false
   const candidate = data as Record<string, unknown>
   return isMaskedPhone(candidate.phoneMasked) && isCanonicalIsoDate(candidate.phoneVerifiedAt)
+}
+
+function isValidAdminInitialPhoneBindCancelResponse(data: unknown): data is AdminInitialPhoneBindCancelData {
+  return typeof data === 'object' && data !== null && (data as Record<string, unknown>).cancelled === true
 }
 
 function invalidAdminInitialPhoneBindResponse(status: number): AdminInitialPhoneBindFailure {
@@ -328,6 +336,16 @@ export async function verifyAdminInitialPhoneBind(
   const bound = { phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt }
   mergeStoredUser(bound)
   return { ok: true, ...bound }
+}
+
+/** 仅用于放弃当前 Admin 自己的严格首次绑定 ticket；不写本地会话。 */
+export async function cancelAdminInitialPhoneBind(
+  bindTicket: string,
+): Promise<{ ok: true } | AdminInitialPhoneBindFailure> {
+  const r = await postJson<unknown>('/auth/admin/phone/initial-bind/cancel', { bindTicket })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
+  if (!isValidAdminInitialPhoneBindCancelResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
+  return { ok: true }
 }
 
 /** 登录态自助改密:成功后旧 token 立即失效,调用方需自行清 session 并跳登录页 */

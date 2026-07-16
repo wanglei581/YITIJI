@@ -166,3 +166,11 @@ export class InitialPhoneBindVerifyDto {
   @Matches(/^\d{6}$/, { message: '必须是 6 位数字验证码' })
   code!: string
 }
+
+/** 仅允许当前登录 Admin 放弃自己尚未完成的严格首次绑定。 */
+export class InitialPhoneBindCancelDto {
+  @IsString()
+  @MinLength(16)
+  @MaxLength(128)
+  bindTicket!: string
+}

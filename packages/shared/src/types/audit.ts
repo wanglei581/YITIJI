@@ -40,6 +40,7 @@ export type AuditAction =
   | 'auth.password_change_self'
   | 'auth.phone_initial_bind_start'
   | 'auth.phone_initial_bind_complete'
+  | 'auth.phone_initial_bind_cancel'
   | 'organization.create'
   | 'organization.update'
   | 'user.create'

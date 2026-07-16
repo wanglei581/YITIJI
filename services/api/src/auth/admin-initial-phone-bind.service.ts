@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common'
+import { BadRequestException, HttpException, Injectable } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
@@ -9,6 +9,15 @@ import { INTERNAL_OTP_CODE_TTL_SECONDS, InternalOtpService } from './internal-ot
 
 const CURRENT_PASSWORD_FAILURE_LIMIT = 5
 const CURRENT_PASSWORD_FAILURE_TTL_SECONDS = INTERNAL_OTP_CODE_TTL_SECONDS
+const VERIFY_LOCK_TTL_SECONDS = 30
+const ACTIONABLE_SMS_FAILURE_CODES = new Set([
+  'SMS_TOO_FREQUENT',
+  'SMS_DAILY_LIMIT',
+  'SMS_IP_LIMIT',
+  'SMS_DEVICE_LIMIT',
+  'SMS_PROVIDER_PHONE_DAILY_LIMIT',
+  'SMS_PROVIDER_RATE_LIMIT',
+])
 
 type AdminInitialPhoneBindTicket = {
   userId: string
@@ -81,14 +90,15 @@ export class AdminInitialPhoneBindService {
         deviceId,
         shouldDeliver: true,
       })
-      await this.writeAudit(user.id, 'auth.phone_initial_bind_start', maskPhone(phone))
+      await this.writeAudit(user.id, 'auth.phone_initial_bind_start', maskPhone(phone)).catch(() => undefined)
       return {
         bindTicket,
         cooldownSeconds: result.cooldownSeconds,
         expiresInSeconds: INTERNAL_OTP_CODE_TTL_SECONDS,
       }
-    } catch {
+    } catch (error) {
       if (activeTicketCreated) await this.cleanupTicket(user.id, bindTicket)
+      if (this.isActionableSmsFailure(error)) throw error
       throw this.unavailable()
     }
   }
@@ -98,60 +108,100 @@ export class AdminInitialPhoneBindService {
     bindTicket: string,
     code: string,
   ): Promise<{ phoneMasked: string; phoneVerifiedAt: string }> {
-    const serializedTicket = await this.redis.getDel(this.ticketKey(userId, bindTicket))
+    const serializedTicket = await this.redis.get(this.ticketKey(userId, bindTicket))
     if (!serializedTicket) throw this.unavailable()
 
-    const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
-    if (activeTicketStatus !== 'matched') throw this.unavailable()
-
-    const ticket = this.parseTicket(serializedTicket, userId)
-    const user = await this.getEligibleAdmin(userId)
-    if (user.tokenVersion !== ticket.tokenVersion) throw this.unavailable()
-
-    const phone = this.decryptTicketPhone(ticket)
+    let ticket: AdminInitialPhoneBindTicket
+    let phone: string
     try {
-      await this.otp.verifyCode(phone, 'bind_phone', code)
+      ticket = this.parseTicket(serializedTicket, userId)
+      const user = await this.getEligibleAdmin(userId)
+      if (user.tokenVersion !== ticket.tokenVersion) throw new Error('stale ticket')
+      phone = this.decryptTicketPhone(ticket)
     } catch {
+      await this.cleanupTicket(userId, bindTicket)
       throw this.unavailable()
     }
 
-    const phoneVerifiedAt = new Date()
-    const phoneMasked = maskPhone(phone)
+    const verifyLockValue = randomUUID()
+    const verifyLockKey = this.verifyLockKey(userId, bindTicket)
+    let verifyLockAcquired: boolean
     try {
-      await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
-        const updated = await tx.user.updateMany({
-          where: {
-            id: user.id,
-            role: 'admin',
-            enabled: true,
-            phoneHash: null,
-            phoneEnc: null,
-            phoneVerifiedAt: null,
-            tokenVersion: ticket.tokenVersion,
-          },
-          data: {
-            phoneHash: ticket.phoneHash,
-            phoneEnc: ticket.encryptedPhone,
-            phoneVerifiedAt,
-          },
-        })
-        if (updated.count !== 1) throw this.unavailable()
-
-        await tx.auditLog.create({
-          data: {
-            actorId: user.id,
-            actorRole: 'admin',
-            action: 'auth.phone_initial_bind_complete',
-            targetType: 'auth',
-            targetId: user.id,
-            payloadJson: JSON.stringify({ phoneMasked }),
-          },
-        })
-      })
+      verifyLockAcquired = await this.redis.setNxEx(verifyLockKey, verifyLockValue, VERIFY_LOCK_TTL_SECONDS)
     } catch {
       throw this.unavailable()
     }
-    return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString() }
+    if (!verifyLockAcquired) throw this.unavailable()
+
+    try {
+      try {
+        await this.otp.verifyCode(phone, 'bind_phone', code)
+      } catch (error) {
+        if (this.isRetryableOtpInvalid(error)) throw this.invalidOtpCode()
+        await this.cleanupTicket(userId, bindTicket)
+        throw this.unavailable()
+      }
+
+      const ticketStatus = await this.redis.getAndDelIfEquals(this.ticketKey(userId, bindTicket), serializedTicket)
+      if (ticketStatus !== 'matched') throw this.unavailable()
+
+      const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
+      if (activeTicketStatus !== 'matched') throw this.unavailable()
+
+      const phoneVerifiedAt = new Date()
+      const phoneMasked = maskPhone(phone)
+      try {
+        await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
+          const updated = await tx.user.updateMany({
+            where: {
+              id: userId,
+              role: 'admin',
+              enabled: true,
+              phoneHash: null,
+              phoneEnc: null,
+              phoneVerifiedAt: null,
+              tokenVersion: ticket.tokenVersion,
+            },
+            data: {
+              phoneHash: ticket.phoneHash,
+              phoneEnc: ticket.encryptedPhone,
+              phoneVerifiedAt,
+            },
+          })
+          if (updated.count !== 1) throw this.unavailable()
+
+          await tx.auditLog.create({
+            data: {
+              actorId: userId,
+              actorRole: 'admin',
+              action: 'auth.phone_initial_bind_complete',
+              targetType: 'auth',
+              targetId: userId,
+              payloadJson: JSON.stringify({ phoneMasked }),
+            },
+          })
+        })
+      } catch {
+        throw this.unavailable()
+      }
+      return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString() }
+    } finally {
+      await this.redis.getAndDelIfEquals(verifyLockKey, verifyLockValue).catch(() => undefined)
+    }
+  }
+
+  /** 仅取消当前登录 Admin 自己的未验证尝试；已消费或过期的 ticket 统一视为已取消。 */
+  async cancel(userId: string, bindTicket: string): Promise<{ cancelled: true }> {
+    try {
+      const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
+      if (activeTicketStatus === 'matched') {
+        await this.redis.del(this.ticketKey(userId, bindTicket)).catch(() => undefined)
+        await this.writeCancellationAudit(userId).catch(() => undefined)
+      }
+      return { cancelled: true }
+    } catch {
+      throw this.unavailable()
+    }
   }
 
   private async getEligibleAdmin(userId: string) {
@@ -240,6 +290,18 @@ export class AdminInitialPhoneBindService {
     })
   }
 
+  /** 取消记录刻意不带手机号、ticket 或任何可重放凭据。 */
+  private async writeCancellationAudit(userId: string): Promise<void> {
+    await this.audit.write({
+      actorId: userId,
+      actorRole: 'admin',
+      action: 'auth.phone_initial_bind_cancel',
+      targetType: 'auth',
+      targetId: userId,
+      payload: {},
+    })
+  }
+
   private ticketKey(userId: string, bindTicket: string): string {
     return `internal:admin:phone-initial-bind:ticket:${userId}:${bindTicket}`
   }
@@ -248,8 +310,37 @@ export class AdminInitialPhoneBindService {
     return `internal:admin:phone-initial-bind:active:${userId}`
   }
 
+  private verifyLockKey(userId: string, bindTicket: string): string {
+    return `internal:admin:phone-initial-bind:verify-lock:${userId}:${bindTicket}`
+  }
+
   private currentPasswordFailureKey(userId: string): string {
     return `internal:admin:phone-initial-bind:password-fail:${userId}`
+  }
+
+  private isActionableSmsFailure(error: unknown): error is HttpException {
+    const code = this.structuredExceptionCode(error)
+    return code !== null && ACTIONABLE_SMS_FAILURE_CODES.has(code)
+  }
+
+  private isRetryableOtpInvalid(error: unknown): boolean {
+    return this.structuredExceptionCode(error) === 'SMS_CODE_INVALID'
+  }
+
+  private structuredExceptionCode(error: unknown): string | null {
+    if (!(error instanceof HttpException)) return null
+    const response = error.getResponse()
+    if (!response || typeof response !== 'object' || Array.isArray(response)) return null
+    const nestedError = (response as { error?: unknown }).error
+    if (!nestedError || typeof nestedError !== 'object' || Array.isArray(nestedError)) return null
+    const code = (nestedError as { code?: unknown }).code
+    return typeof code === 'string' ? code : null
+  }
+
+  private invalidOtpCode(): BadRequestException {
+    return new BadRequestException({
+      error: { code: 'SMS_CODE_INVALID', message: '验证码不正确，请重新输入' },
+    })
   }
 
   private unavailable(): BadRequestException {
