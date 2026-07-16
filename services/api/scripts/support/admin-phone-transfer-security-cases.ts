@@ -12,6 +12,7 @@ import type { PrismaService, PrismaTransactionClient } from '../../src/prisma/pr
 import {
   CapturingSmsSender,
   ensure,
+  errorCode,
   expectCode,
   MemoryRedis,
   pass,
@@ -165,6 +166,25 @@ function replaceLockBeforeCompareAndDelete(
   })
 }
 
+function failTicketCleanupAfterActiveConsume(
+  redis: MemoryRedis,
+  targetTicketKey: string,
+  failure: Error,
+): MemoryRedis {
+  return new Proxy(redis, {
+    get(target, property, receiver) {
+      if (property === 'getAndDelIfEquals') {
+        return async (key: string, expected: string) => {
+          if (key === targetTicketKey) throw failure
+          return target.getAndDelIfEquals(key, expected)
+        }
+      }
+      const value: unknown = Reflect.get(target, property, receiver)
+      return typeof value === 'function' ? value.bind(target) : value
+    },
+  })
+}
+
 export async function verifyCancelLockCleanup(context: AdminPhoneTransferSecurityContext): Promise<void> {
   const firstPhone = context.nextPhone()
   const firstAdmin = await context.createAdmin('cancel-lock-existing')
@@ -198,7 +218,68 @@ export async function verifyCancelLockCleanup(context: AdminPhoneTransferSecurit
       context.redis.raw(activeTicketKey(secondAdmin.id)) === null,
     '9b. 锁值竞争时 cancel 未安全清理 ticket/active ticket',
   )
-  console.log('  PASS 9b. cancel 以 CAS 清理 ticket/active/verify-lock，且不误删已换值的新锁')
+
+  const failurePhone = context.nextPhone()
+  const failureAdmin = await context.createAdmin('cancel-cleanup-failure-audit')
+  await context.createPartner('cancel-cleanup-failure-audit', failurePhone)
+  const failureSetupService = context.createService()
+  const failureStarted = await failureSetupService.start(
+    failureAdmin.id,
+    context.adminPassword,
+    failurePhone,
+    '127.0.1.181',
+  )
+  const failureCode = await requireTransferCode(context, failurePhone, '9b. cleanup 故障场景未生成验证码')
+  const failureTicketKey = ticketKey(failureAdmin.id, failureStarted.bindTicket)
+  const injectedFailure = new Error(
+    `simulated cleanup failure ${failurePhone} ${failureStarted.bindTicket} ${failureCode}`,
+  )
+  const failingRedis = failTicketCleanupAfterActiveConsume(context.redis, failureTicketKey, injectedFailure)
+  const failureService = context.createService({ redis: failingRedis })
+  const auditCountBefore = context.audit.entries.length
+  const capturedLogs: string[] = []
+  const originalLoggerError = Logger.prototype.error
+  const originalLoggerWarn = Logger.prototype.warn
+  Logger.prototype.error = function (message: unknown, ...optionalParams: unknown[]): void {
+    capturedLogs.push([message, ...optionalParams].map(String).join(' '))
+  }
+  Logger.prototype.warn = function (message: unknown, ...optionalParams: unknown[]): void {
+    capturedLogs.push([message, ...optionalParams].map(String).join(' '))
+  }
+  let cancellationError: unknown
+  try {
+    await failureService.cancel(failureAdmin.id, failureStarted.bindTicket)
+  } catch (error) {
+    cancellationError = error
+  } finally {
+    Logger.prototype.error = originalLoggerError
+    Logger.prototype.warn = originalLoggerWarn
+  }
+  ensure(errorCode(cancellationError) === UNAVAILABLE, '9b. cleanup 故障未统一返回 unavailable')
+  ensure(
+    context.redis.raw(activeTicketKey(failureAdmin.id)) === null && context.redis.raw(failureTicketKey) !== null,
+    '9b. cleanup 故障注入未发生在 active ticket 成功消费之后',
+  )
+  const cancellationAudits = context.audit.entries.slice(auditCountBefore)
+  ensure(
+    cancellationAudits.length === 1 &&
+      cancellationAudits[0]?.action === 'auth.phone_transfer_cancel' &&
+      Object.keys(cancellationAudits[0].payload ?? {}).length === 0,
+    '9b. active 已消费但 cleanup 失败时 cancel 空 payload 审计未恰好尝试一次',
+  )
+  const observableError = JSON.stringify({
+    message: cancellationError instanceof Error ? cancellationError.message : cancellationError,
+    response:
+      cancellationError && typeof cancellationError === 'object' && 'getResponse' in cancellationError
+        ? (cancellationError as { getResponse: () => unknown }).getResponse()
+        : undefined,
+  })
+  const observableOutput = `${observableError}\n${capturedLogs.join('\n')}`
+  ensure(
+    [failurePhone, failureStarted.bindTicket, failureCode].every((secret) => !observableOutput.includes(secret)),
+    '9b. cleanup 故障通过错误响应或日志泄露 phone/ticket/code',
+  )
+  console.log('  PASS 9b. cancel CAS 清理状态，cleanup 故障后仍脱敏审计且不误删新锁')
 }
 
 async function verifyOtpTerminalFailuresCleanup(context: AdminPhoneTransferSecurityContext): Promise<void> {

@@ -178,19 +178,20 @@ export class AdminPhoneTransferService {
   }
 
   async cancel(adminId: string, bindTicket: string): Promise<{ cancelled: true }> {
+    let cleanupFailed = false
     try {
-      const activeTicketStatus = await this.redis.getAndDelIfEquals(
-        adminPhoneTransferKeys.activeTicket(adminId),
-        bindTicket,
-      )
-      if (activeTicketStatus === 'matched') {
-        await this.cleanupCancelledTicket(adminId, bindTicket)
-        await this.writeCancelAudit(adminId).catch(() => undefined)
-      }
-      return { cancelled: true }
+      const activeTicketKey = adminPhoneTransferKeys.activeTicket(adminId)
+      const activeTicketStatus = await this.redis.getAndDelIfEquals(activeTicketKey, bindTicket)
+      if (activeTicketStatus !== 'matched') return { cancelled: true }
+      await this.cleanupCancelledTicket(adminId, bindTicket).catch(() => {
+        cleanupFailed = true
+      })
     } catch {
       throw adminPhoneTransferUnavailable()
     }
+    await this.writeCancelAudit(adminId).catch(() => undefined)
+    if (cleanupFailed) throw adminPhoneTransferUnavailable()
+    return { cancelled: true }
   }
 
   private async verifyOtpOrReject(adminId: string, bindTicket: string, phone: string, code: string): Promise<void> {
