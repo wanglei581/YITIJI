@@ -398,6 +398,35 @@ function mutateReturnType(sourceText: string, path: string): string {
   return replaceNodeSpan(sourceText, source, type, 'unknown')
 }
 
+function auditActionLiteralNode(
+  sourceText: string,
+  fileName: string,
+  action: string,
+): { source: ts.SourceFile; node: ts.LiteralTypeNode } {
+  const source = parseSource(fileName, sourceText)
+  const alias = source.statements.find(
+    (statement): statement is ts.TypeAliasDeclaration =>
+      ts.isTypeAliasDeclaration(statement) && statement.name.text === 'AuditAction',
+  )
+  ensure(alias && ts.isUnionTypeNode(alias.type), `20q. ${fileName} mutation fixture 缺少 AuditAction union`)
+  const node = alias.type.types.find(
+    (member): member is ts.LiteralTypeNode =>
+      ts.isLiteralTypeNode(member) && ts.isStringLiteral(member.literal) && member.literal.text === action,
+  )
+  ensure(node, `20q. ${fileName} mutation fixture 缺少 ${action}`)
+  return { source, node }
+}
+
+function formatAuditActionWithDoubleQuotes(sourceText: string, fileName: string, action: string): string {
+  const { source, node } = auditActionLiteralNode(sourceText, fileName, action)
+  return replaceNodeSpan(sourceText, source, node, `\n    "${action}"`)
+}
+
+function mutateAuditAction(sourceText: string, action: string): string {
+  const { source, node } = auditActionLiteralNode(sourceText, 'audit-action-mutation.ts', action)
+  return replaceNodeSpan(sourceText, source, node, `/* removed ${action} */ never`)
+}
+
 function assertCommentMutationsRejected(sources: ContractSources): void {
   const cases: Array<[string, ContractSources]> = [
     ['Guard', { ...sources, controller: commentDecorator(sources.controller, routes[0].path, 'UseGuards') }],
@@ -418,8 +447,8 @@ function assertCommentMutationsRejected(sources: ContractSources): void {
     ['start return type', { ...sources, controller: mutateReturnType(sources.controller, routes[0].path) }],
     ['verify return type', { ...sources, controller: mutateReturnType(sources.controller, routes[1].path) }],
     ['cancel return type', { ...sources, controller: mutateReturnType(sources.controller, routes[2].path) }],
-    ['API AuditAction', { ...sources, localAudit: sources.localAudit.replace("  | 'auth.phone_transfer_start'", "  // | 'auth.phone_transfer_start'") }],
-    ['shared AuditAction', { ...sources, sharedAudit: sources.sharedAudit.replace("  | 'auth.phone_transfer_start'", "  // | 'auth.phone_transfer_start'") }],
+    ['API AuditAction', { ...sources, localAudit: mutateAuditAction(sources.localAudit, auditActions[0]) }],
+    ['shared AuditAction', { ...sources, sharedAudit: mutateAuditAction(sources.sharedAudit, auditActions[0]) }],
   ]
   for (const [label, mutated] of cases) {
     ensure(validateSources(mutated).length > 0, `20m. ${label} mutation 被静态门禁误放行`)
@@ -427,10 +456,29 @@ function assertCommentMutationsRejected(sources: ContractSources): void {
   pass('20m. 路由/参数 decorators、DI imports/providers、返回类型与双 AuditAction mutation 均被拒绝')
 }
 
+function assertAuditFormattingMutationSelfCheck(sources: ContractSources): void {
+  const formatted = {
+    ...sources,
+    localAudit: formatAuditActionWithDoubleQuotes(sources.localAudit, 'API-audit-format.ts', auditActions[0]),
+    sharedAudit: formatAuditActionWithDoubleQuotes(sources.sharedAudit, 'shared-audit-format.ts', auditActions[0]),
+  }
+  ensure(validateSources(formatted).length === 0, '20q. 等价双引号 AuditAction 主契约被错误拒绝')
+  ensure(
+    validateSources({ ...formatted, localAudit: mutateAuditAction(formatted.localAudit, auditActions[0]) }).length > 0,
+    '20q. API 双引号 AuditAction mutation 被误放行',
+  )
+  ensure(
+    validateSources({ ...formatted, sharedAudit: mutateAuditAction(formatted.sharedAudit, auditActions[0]) }).length > 0,
+    '20q. shared 双引号 AuditAction mutation 被误放行',
+  )
+  pass('20q. API/shared AuditAction 等价双引号格式有效且 mutation 仍被拒绝')
+}
+
 export function assertAdminPhoneTransferRouteDiAuditContract(): void {
   const sources = loadSources()
   const failures = validateSources(sources)
   ensure(failures.length === 0, `20. 路由/DI/审计静态契约失败：${failures.join('；')}`)
   assertCommentMutationsRejected(sources)
+  assertAuditFormattingMutationSelfCheck(sources)
   pass('20. 三条 Admin 转移路由仅委派独立服务，DI 与四类审计动作同步登记')
 }
