@@ -24,7 +24,7 @@ interface CachedSessionState {
   orgEnabled: boolean | null
 }
 
-const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
+export const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
 
 /**
  * 解析请求头 `Authorization: Bearer <token>`,验证 JWT,

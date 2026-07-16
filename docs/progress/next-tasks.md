@@ -55,6 +55,11 @@
 
 - [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
 
+- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：本地候选已完成代码、专项/回归/浏览器验证、双模型终审和串行 CI 接线；[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已创建，首轮 GitHub `build-and-verify` / `postgres-readiness` 均通过，当前下一步是等待合并授权与最新 HEAD CI。尚未合并、部署、发送真实短信或执行真实转移；依赖审计 P0 未清零前不得宣称可部署，生产执行仍需另行授权和本人 OTP。
+  1. **PR / CI**：推送候选并创建 PR，确认 `build-and-verify` 与 `postgres-readiness` 成功，且 Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁在共享 SQLite suite 中保持逐行串行。
+  2. **部署授权**：先单独处理依赖审计基线中的部署阻塞（`shell-quote` critical，`hono` / `multer` / `vite` high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；这些依赖不在本候选范围内，阻塞未清除前不得部署。
+  3. **真实转移**：仅在已授权部署并完成只读预检后，由已登录 Admin 用户本人在「账号设置」页面自行输入当前密码与真实短信 OTP 完成一次转移；AI/运维人员不得读取、代填、保存或输出密码、OTP、ticket、cookie 或手机号明文。执行后再只读核验脱敏审计、Partner 用户名/密码登录能力与相关旧会话失效；未另行授权前继续保持 `CLOSED_MODE`。
+
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 
 - [x] **历史 pending PrintTask 受控关闭（一次性运维）**：2026-07-12 已部署 `fba6b414`，完成 PostgreSQL 备份、additive migration、PM2/health 复核后，以系统管理员审计身份通过 `maintenance:dispose-legacy-pending-print-tasks` 处置 `ptask_seed_001`、`ptask_kiosk_046e67e6bbb917bd`、`ptask_kiosk_e27f07388ed3a5d3`。事前只读确认三条均为冻结时间前匿名未领取 `pending`，订单仅 `unpaid/closed`；事后均为 `cancelled` + `LEGACY_PENDING_TASK_DISPOSED`，两条订单支付事实不变且 `taskStatus=cancelled`，每条恰有一条 pending→cancelled 状态日志与 Admin 审计，剩余匹配 pending 为 0。未直改表、未使用 `failed`、未触发出纸。

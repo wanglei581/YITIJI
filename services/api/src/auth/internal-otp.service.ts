@@ -6,7 +6,7 @@ import { SMS_SENDER, type SmsSender } from '../member-auth/sms/sms-sender'
 
 type SmsProviderFailure = Error & { providerCode?: string }
 
-export type InternalOtpPurpose = 'login' | 'reset_password' | 'bind_phone'
+export type InternalOtpPurpose = 'login' | 'reset_password' | 'bind_phone' | 'transfer_phone'
 
 export interface InternalSendCodeResult {
   sent: true

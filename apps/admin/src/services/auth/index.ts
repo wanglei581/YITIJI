@@ -166,6 +166,16 @@ type AdminInitialPhoneBindFailure = {
   status: number
 }
 
+export type AdminPhoneTransferSourceAccount = {
+  username: string
+  organizationName: string
+  phoneMasked: string
+}
+
+type AdminPhoneTransferStartData = AdminInitialPhoneBindStartData & {
+  sourceAccount: AdminPhoneTransferSourceAccount
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MASKED_PHONE_PATTERN = /^1[3-9]\d\*{4}\d{4}$/
 
@@ -191,6 +201,12 @@ function isCanonicalIsoDate(value: unknown): value is string {
   return Number.isFinite(parsed.getTime()) && new Date(value).toISOString() === value
 }
 
+function hasExactKeys(value: Record<string, unknown>, expectedKeys: readonly string[]): boolean {
+  const actualKeys = Object.keys(value).sort()
+  const sortedExpectedKeys = [...expectedKeys].sort()
+  return JSON.stringify(actualKeys) === JSON.stringify(sortedExpectedKeys)
+}
+
 function isValidAdminInitialPhoneBindStartResponse(data: unknown): data is AdminInitialPhoneBindStartData {
   if (typeof data !== 'object' || data === null) return false
   const candidate = data as Record<string, unknown>
@@ -214,6 +230,46 @@ function isValidAdminInitialPhoneBindCancelResponse(data: unknown): data is Admi
 
 function invalidAdminInitialPhoneBindResponse(status: number): AdminInitialPhoneBindFailure {
   return { ok: false, code: 'INVALID_RESPONSE', message: '服务响应异常，请稍后再试', status }
+}
+
+function isValidAdminPhoneTransferSourceAccount(data: unknown): data is AdminPhoneTransferSourceAccount {
+  if (typeof data !== 'object' || data === null) return false
+  const candidate = data as Record<string, unknown>
+  return (
+    hasExactKeys(candidate, ['username', 'organizationName', 'phoneMasked']) &&
+    isNonEmptyString(candidate.username) &&
+    isNonEmptyString(candidate.organizationName) &&
+    isMaskedPhone(candidate.phoneMasked)
+  )
+}
+
+function isValidAdminPhoneTransferStartResponse(data: unknown): data is AdminPhoneTransferStartData {
+  if (typeof data !== 'object' || data === null) return false
+  const candidate = data as Record<string, unknown>
+  return (
+    hasExactKeys(candidate, ['bindTicket', 'cooldownSeconds', 'expiresInSeconds', 'sourceAccount']) &&
+    isUuid(candidate.bindTicket) &&
+    isBoundedSeconds(candidate.cooldownSeconds) &&
+    isBoundedSeconds(candidate.expiresInSeconds) &&
+    candidate.expiresInSeconds > 0 &&
+    isValidAdminPhoneTransferSourceAccount(candidate.sourceAccount)
+  )
+}
+
+function isValidAdminPhoneTransferVerifyResponse(data: unknown): data is AdminInitialPhoneBindVerifyData {
+  if (typeof data !== 'object' || data === null) return false
+  const candidate = data as Record<string, unknown>
+  return (
+    hasExactKeys(candidate, ['phoneMasked', 'phoneVerifiedAt']) &&
+    isMaskedPhone(candidate.phoneMasked) &&
+    isCanonicalIsoDate(candidate.phoneVerifiedAt)
+  )
+}
+
+function isValidAdminPhoneTransferCancelResponse(data: unknown): data is AdminInitialPhoneBindCancelData {
+  if (typeof data !== 'object' || data === null) return false
+  const candidate = data as Record<string, unknown>
+  return hasExactKeys(candidate, ['cancelled']) && candidate.cancelled === true
 }
 
 // ─── Public auth API ─────────────────────────────────────────────────────────
@@ -345,6 +401,50 @@ export async function cancelAdminInitialPhoneBind(
   const r = await postJson<unknown>('/auth/admin/phone/initial-bind/cancel', { bindTicket })
   if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
   if (!isValidAdminInitialPhoneBindCancelResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
+  return { ok: true }
+}
+
+/** Admin 专用手机号转移：只接受严格、脱敏的来源账号摘要，不持久化请求凭据或 ticket。 */
+export async function startAdminPhoneTransfer(
+  currentPassword: string,
+  phone: string,
+): Promise<{ ok: true; bindTicket: string; cooldownSeconds: number; expiresInSeconds: number; sourceAccount: AdminPhoneTransferSourceAccount } | AdminInitialPhoneBindFailure> {
+  const r = await postJson<unknown>('/auth/admin/phone/transfer/start', { currentPassword, phone })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
+  if (!isValidAdminPhoneTransferStartResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
+  return {
+    ok: true,
+    bindTicket: r.data.bindTicket,
+    cooldownSeconds: r.data.cooldownSeconds,
+    expiresInSeconds: r.data.expiresInSeconds,
+    sourceAccount: {
+      username: r.data.sourceAccount.username,
+      organizationName: r.data.sourceAccount.organizationName,
+      phoneMasked: r.data.sourceAccount.phoneMasked,
+    },
+  }
+}
+
+/** 仅在精确成功 shape 验证后，把脱敏手机号与 canonical 时间写回现有会话。 */
+export async function verifyAdminPhoneTransfer(
+  bindTicket: string,
+  code: string,
+): Promise<{ ok: true; phoneMasked: string; phoneVerifiedAt: string } | AdminInitialPhoneBindFailure> {
+  const r = await postJson<unknown>('/auth/admin/phone/transfer/verify', { bindTicket, code })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
+  if (!isValidAdminPhoneTransferVerifyResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
+  const bound = { phoneMasked: r.data.phoneMasked, phoneVerifiedAt: r.data.phoneVerifiedAt }
+  mergeStoredUser(bound)
+  return { ok: true, ...bound }
+}
+
+/** 放弃当前 Admin 的手机号转移 ticket；不写本地会话。 */
+export async function cancelAdminPhoneTransfer(
+  bindTicket: string,
+): Promise<{ ok: true } | AdminInitialPhoneBindFailure> {
+  const r = await postJson<unknown>('/auth/admin/phone/transfer/cancel', { bindTicket })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message, status: r.status }
+  if (!isValidAdminPhoneTransferCancelResponse(r.data)) return invalidAdminInitialPhoneBindResponse(r.status)
   return { ok: true }
 }
 
