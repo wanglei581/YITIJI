@@ -5,6 +5,7 @@ import type { Request } from 'express'
 interface ClosureReceiptJwtPayload {
   sub?: unknown
   jti?: unknown
+  exp?: unknown
 }
 
 interface ClosureReceiptSubject {
@@ -46,7 +47,9 @@ export class MemberClosureReceiptGuard implements CanActivate {
       typeof payload.sub !== 'string' ||
       payload.sub.length === 0 ||
       typeof payload.jti !== 'string' ||
-      payload.jti.length === 0
+      payload.jti.length === 0 ||
+      typeof payload.exp !== 'number' ||
+      !Number.isFinite(payload.exp)
     ) {
       throw this.unauthorized('MEMBER_TOKEN_INVALID', '登录已失效,请重新登录')
     }

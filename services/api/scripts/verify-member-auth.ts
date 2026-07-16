@@ -599,6 +599,10 @@ async function main() {
       )
       const missingJtiToken = memberJwt.sign({ sub: endUserId })
       const missingSubToken = memberJwt.sign({}, { jwtid: 'closure-missing-sub' })
+      const missingExpToken = new JwtService({ secret: jwtSecret }).sign(
+        { sub: endUserId },
+        { jwtid: 'closure-missing-exp', audience: 'enduser', algorithm: 'HS256' },
+      )
       for (const invalid of [
         { label: 'expired', token: expiredToken },
         { label: 'invalid signature', token: invalidSignatureToken },
@@ -606,6 +610,7 @@ async function main() {
         { label: 'wrong audience', token: wrongAudienceToken },
         { label: 'missing jti', token: missingJtiToken },
         { label: 'missing sub', token: missingSubToken },
+        { label: 'missing exp', token: missingExpToken },
       ]) {
         await expectGuardCode(
           () => closureGuard.canActivate(mockCtx(`Bearer ${invalid.token}`)),
