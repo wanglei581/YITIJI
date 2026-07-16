@@ -81,4 +81,4 @@
 - 独立规格复审和代码质量/安全复审最终均为 `APPROVE（Critical 0 / Warning 0）`；安全复审发现的 consent 真实副作用测试缺口已补齐并在双数据库转绿。
 - Claude 对完整最终 diff 给出 `APPROVE（Critical 0 / Warning 0）`；仅提示放行状态仍接受调用方 `auditRef` 属主线既有且已披露的 Wave 1 边界。
 - Antigravity 默认模型调用未产生有效报告，不计入通过；显式指定 `Gemini 3.5 Flash (High)` 后对完整最终 diff 给出 `APPROVE（100/100，Critical 0 / Warning 0）`。
-- 当前授权撤回终态保护补丁在原终审后新增，不能借用基线审查结论代替补丁审查。2026-07-16 已对该增量分别重试 Antigravity 与 Claude 审查：Antigravity 因未登录未返回模型报告；Claude 两次 wrapper 调用都只返回 session 标识、未返回模型报告。两者均不计为批准；本地逐项 diff 审查和全部相关验证已完成，远程交付前仍须在可用账户下补跑有效双模型审查。
+- 当前授权撤回终态保护补丁在原终审后新增，不能借用基线审查结论代替补丁审查。2026-07-16 对该增量的 Claude wrapper 报告异步写入日志，现已确认有效结论为 `APPROVE（Critical 0 / Warning 0）`；报告指出的终态幂等和撤回创建期审计均为既有 Wave 1 边界，未阻断本补丁。Antigravity 因未登录未返回模型报告，不能计为有效双模型审查；本地逐项 diff 审查和全部相关验证已完成，远程交付前仍须在可用账户下补跑 Antigravity 审查。
