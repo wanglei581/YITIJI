@@ -16,10 +16,10 @@ import { JobQualitySummaryPanel } from './components/JobQualitySummaryPanel'
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
 const CATEGORY_MAP: Record<JobCategory, { label: string; style: string }> = {
-  fulltime: { label: '全职', style: 'bg-[var(--sd-category-blue-bg)] text-[var(--sd-category-blue-fg)]' },
-  intern: { label: '实习', style: 'bg-[var(--sd-category-lavender-bg)] text-[var(--sd-category-lavender-fg)]' },
-  campus: { label: '校招', style: 'bg-[var(--sd-category-mint-bg)] text-[var(--sd-category-mint-fg)]' },
-  parttime: { label: '兼职', style: 'bg-[var(--sd-category-orange-bg)] text-[var(--sd-category-orange-fg)]' },
+  fulltime: { label: '全职', style: 'bg-blue-50 text-blue-700' },
+  intern: { label: '实习', style: 'bg-violet-50 text-violet-700' },
+  campus: { label: '校招', style: 'bg-emerald-50 text-emerald-700' },
+  parttime: { label: '兼职', style: 'bg-orange-50 text-orange-700' },
 }
 
 const REVIEW_MAP: Record<ReviewStatus, { badge: 'warning' | 'info' | 'success' | 'error'; label: string }> = {
