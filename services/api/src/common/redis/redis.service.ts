@@ -92,11 +92,18 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async registerMemberSession(endUserId: string, sessionId: string, ttlSeconds: number): Promise<void> {
-    await this.client.eval(
+    const result = await this.client.eval(
       `
-      redis.call('SET', KEYS[1], ARGV[1], 'EX', tonumber(ARGV[3]))
+      local owner = redis.call('GET', KEYS[1])
+      if owner and owner ~= ARGV[1] then return 0 end
+
+      local sessionTtl = tonumber(ARGV[3])
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', sessionTtl)
       redis.call('SADD', KEYS[2], ARGV[2])
-      redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
+      local currentIndexTtl = redis.call('TTL', KEYS[2])
+      if currentIndexTtl < 0 or currentIndexTtl < sessionTtl then
+        redis.call('EXPIRE', KEYS[2], sessionTtl)
+      end
       return 1
       `,
       2,
@@ -106,13 +113,15 @@ export class RedisService implements OnModuleDestroy {
       sessionId,
       ttlSeconds,
     )
+    if (result !== 1) throw new Error('Member session ownership conflict')
   }
 
   async unregisterMemberSession(endUserId: string, sessionId: string): Promise<void> {
     await this.client.eval(
       `
-      redis.call('DEL', KEYS[1])
-      redis.call('SREM', KEYS[2], ARGV[1])
+      local owner = redis.call('GET', KEYS[1])
+      if owner == ARGV[1] then redis.call('DEL', KEYS[1]) end
+      redis.call('SREM', KEYS[2], ARGV[2])
       if redis.call('SCARD', KEYS[2]) == 0 then
         redis.call('DEL', KEYS[2])
       end
@@ -121,6 +130,7 @@ export class RedisService implements OnModuleDestroy {
       2,
       `member:session:${sessionId}`,
       `member:user-sessions:${endUserId}`,
+      endUserId,
       sessionId,
     )
   }
@@ -129,14 +139,19 @@ export class RedisService implements OnModuleDestroy {
     const result = await this.client.eval(
       `
       local sessions = redis.call('SMEMBERS', KEYS[1])
+      local deleted = 0
       for _, sessionId in ipairs(sessions) do
-        redis.call('DEL', 'member:session:' .. sessionId)
+        local sessionKey = 'member:session:' .. sessionId
+        if redis.call('GET', sessionKey) == ARGV[1] then
+          deleted = deleted + redis.call('DEL', sessionKey)
+        end
       end
       redis.call('DEL', KEYS[1])
-      return #sessions
+      return deleted
       `,
       1,
       `member:user-sessions:${endUserId}`,
+      endUserId,
     )
     return Number(result)
   }

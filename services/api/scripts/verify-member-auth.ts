@@ -120,14 +120,22 @@ async function main() {
   const phoneHash = hashPhone(PHONE)
   const sessionOwnerId = `verify-member-session-owner-${tail}`
   const otherSessionOwnerId = `verify-member-session-other-${tail}`
+  const foreignIndexOwnerId = `verify-member-session-foreign-index-${tail}`
+  const conflictOwnerId = `verify-member-session-conflict-owner-${tail}`
+  const conflictingOwnerId = `verify-member-session-conflicting-owner-${tail}`
   const firstSessionId = `verify-member-session-a-${tail}`
   const secondSessionId = `verify-member-session-b-${tail}`
   const otherSessionId = `verify-member-session-other-${tail}`
+  const conflictSessionId = `verify-member-session-conflict-${tail}`
   const sessionOwnerIndexKey = `member:user-sessions:${sessionOwnerId}`
   const otherSessionOwnerIndexKey = `member:user-sessions:${otherSessionOwnerId}`
+  const foreignIndexOwnerIndexKey = `member:user-sessions:${foreignIndexOwnerId}`
+  const conflictOwnerIndexKey = `member:user-sessions:${conflictOwnerId}`
+  const conflictingOwnerIndexKey = `member:user-sessions:${conflictingOwnerId}`
   const firstSessionKey = `member:session:${firstSessionId}`
   const secondSessionKey = `member:session:${secondSessionId}`
   const otherSessionKey = `member:session:${otherSessionId}`
+  const conflictSessionKey = `member:session:${conflictSessionId}`
 
   async function post(path: string, body: Json, token?: string): Promise<{ status: number; json: Json }> {
     const res = await fetch(`${base}${path}`, {
@@ -152,8 +160,26 @@ async function main() {
 
     // ── 0. 会话索引注册 / 整户撤销 / 单会话注销 ───────────────────────
     console.log('── 0. Redis 会话索引原子操作 ─────────────────────────')
+
+    await redis.registerMemberSession(conflictOwnerId, conflictSessionId, 120)
+    let conflictError: unknown
+    try {
+      await redis.registerMemberSession(conflictingOwnerId, conflictSessionId, 120)
+    } catch (error) {
+      conflictError = error
+    }
+    const [conflictOwner, conflictingOwnerIndexed] = await Promise.all([
+      redis.get(conflictSessionKey),
+      rawRedis.sismember(conflictingOwnerIndexKey, conflictSessionId),
+    ])
+    if (conflictError instanceof Error && conflictError.message === 'Member session ownership conflict'
+      && conflictOwner === conflictOwnerId && conflictingOwnerIndexed === 0) {
+      pass('sessionId 冲突注册 fail-closed，原 owner 与索引保持不变')
+    } else fail('sessionId 冲突未拒绝或原 owner 被覆盖')
+    await rawRedis.del(conflictSessionKey, conflictOwnerIndexKey, conflictingOwnerIndexKey)
+
     await redis.registerMemberSession(sessionOwnerId, firstSessionId, 120)
-    await redis.registerMemberSession(sessionOwnerId, secondSessionId, 120)
+    await redis.registerMemberSession(sessionOwnerId, secondSessionId, 30)
     await redis.registerMemberSession(otherSessionOwnerId, otherSessionId, 120)
 
     const [firstSession, secondSession, ownerSessions, firstTtl, ownerIndexTtl] = await Promise.all([
@@ -167,9 +193,41 @@ async function main() {
       && [...ownerSessions].sort().join(',') === [firstSessionId, secondSessionId].sort().join(',')) {
       pass('同一用户的两个 session 与索引均已注册')
     } else fail('同一用户的 session 或索引注册异常')
-    if (firstTtl > 0 && firstTtl <= 120 && ownerIndexTtl > 0 && ownerIndexTtl <= 120) {
-      pass('session key 与用户索引均设置了 TTL')
+    if (firstTtl > 30 && firstTtl <= 120 && ownerIndexTtl > 30 && ownerIndexTtl <= 120) {
+      pass('短 TTL session 不会缩短已有长 TTL 的用户索引')
     } else fail(`session/index TTL 异常: ${firstTtl}/${ownerIndexTtl}`)
+
+    await redis.unregisterMemberSession(sessionOwnerId, firstSessionId)
+    const [firstAfterUnregister, secondAfterUnregister, ownerAfterUnregister] = await Promise.all([
+      redis.get(firstSessionKey),
+      redis.get(secondSessionKey),
+      rawRedis.smembers(sessionOwnerIndexKey),
+    ])
+    if (firstAfterUnregister === null && secondAfterUnregister === sessionOwnerId
+      && ownerAfterUnregister.length === 1 && ownerAfterUnregister[0] === secondSessionId) {
+      pass('多 session 用户注销一条后，其他 session 与非空索引保留')
+    } else fail('注销单条 session 误删了同用户的其他 session 或索引')
+    await redis.registerMemberSession(sessionOwnerId, firstSessionId, 120)
+
+    await rawRedis.sadd(foreignIndexOwnerIndexKey, firstSessionId)
+    const foreignRevokedCount = await redis.revokeMemberSessions(foreignIndexOwnerId)
+    const [firstAfterForeignRevoke, foreignIndexAfterRevoke] = await Promise.all([
+      redis.get(firstSessionKey),
+      rawRedis.exists(foreignIndexOwnerIndexKey),
+    ])
+    if (foreignRevokedCount === 0 && firstAfterForeignRevoke === sessionOwnerId && foreignIndexAfterRevoke === 0) {
+      pass('整户撤销只删除 owner 匹配的 session，错误索引成员仅清理索引')
+    } else fail('整户撤销通过错误索引删除了其他用户 session')
+
+    await rawRedis.sadd(foreignIndexOwnerIndexKey, secondSessionId)
+    await redis.unregisterMemberSession(foreignIndexOwnerId, secondSessionId)
+    const [secondAfterForeignUnregister, foreignIndexAfterUnregister] = await Promise.all([
+      redis.get(secondSessionKey),
+      rawRedis.exists(foreignIndexOwnerIndexKey),
+    ])
+    if (secondAfterForeignUnregister === sessionOwnerId && foreignIndexAfterUnregister === 0) {
+      pass('单 session 注销 owner 错配时不删他人会话，仅清理调用方错误索引')
+    } else fail('单 session 注销 owner 错配时删除了其他用户 session')
 
     const revokedCount = await redis.revokeMemberSessions(sessionOwnerId)
     const [firstAfterRevoke, secondAfterRevoke, ownerIndexExists, otherAfterRevoke, otherSessions] = await Promise.all([
@@ -339,8 +397,12 @@ async function main() {
       firstSessionKey,
       secondSessionKey,
       otherSessionKey,
+      conflictSessionKey,
       sessionOwnerIndexKey,
       otherSessionOwnerIndexKey,
+      foreignIndexOwnerIndexKey,
+      conflictOwnerIndexKey,
+      conflictingOwnerIndexKey,
     )
     info('测试数据已清理。')
     await app.close()
