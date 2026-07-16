@@ -1,0 +1,12 @@
+{
+  "id": "user-center-wave0-truth-baseline",
+  "title": "用户中心 Wave 0 真实表达与验证基线",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并保持分支本地，等待用户决定是否推送/创建 PR",
+  "createdAt": "2026-07-16T09:50:12Z",
+  "branch": "codex/user-center-wave0-truth-baseline"
+}

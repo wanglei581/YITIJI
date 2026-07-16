@@ -51,230 +51,119 @@ function mustNotContain(source: string, markers: string[], label: string): void 
   else pass(label)
 }
 
-type PrivacyDeleteRun = {
-  calls: string[]
-  auditWrites: Array<{ payload?: Record<string, unknown> }>
-  pendingDeletes: string[]
-  committedDeletes: string[]
-  pendingRequestStatus: string | null
-  pendingRequestAuditRef: string | null
-  requestStatus: string
-  requestAuditRef: string | null
+type PrivacyTransitionType = 'export' | 'delete' | 'revoke_consent'
+
+function exceptionCode(error: unknown): string | undefined {
+  const exception = error as { getResponse?: () => unknown; response?: unknown }
+  const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
+    | { error?: { code?: string } }
+    | undefined
+  return response?.error?.code
 }
 
-type PrivacyTransactionMode = 'success' | 'before_callback_rollback' | 'after_callback_rollback'
-
-function createPrivacyDeleteRun(transactionMode: PrivacyTransactionMode): {
-  prisma: object
-  audit: object
-  state: PrivacyDeleteRun
-} {
-  const state: PrivacyDeleteRun = {
-    calls: [],
-    auditWrites: [],
-    pendingDeletes: [],
-    committedDeletes: [],
-    pendingRequestStatus: null,
-    pendingRequestAuditRef: null,
+function createPrivacyTransitionRun(requestType: PrivacyTransitionType) {
+  const state = {
+    calls: [] as string[],
+    auditWrites: 0,
     requestStatus: 'pending',
-    requestAuditRef: null,
   }
   const existing = {
-    id: 'privacy-delete-request',
-    endUserId: 'privacy-delete-member',
-    requestType: 'delete',
+    id: `privacy-${requestType}-request`,
+    endUserId: 'privacy-member',
+    requestType,
     status: 'pending',
-    requestedAt: new Date('2026-07-12T00:00:00.000Z'),
+    requestedAt: new Date('2026-07-16T00:00:00.000Z'),
     handledAt: null,
     handledBy: null,
     auditRef: null,
   }
-  const updateRequest = async (scope: 'transaction' | 'direct', args: { data: { status: string; auditRef?: string | null } }) => {
-    state.calls.push(`${scope}.userDataRequest.update`)
-    if (scope === 'transaction') {
-      state.pendingRequestStatus = args.data.status
-      state.pendingRequestAuditRef = args.data.auditRef ?? null
-    } else {
-      state.requestStatus = args.data.status
-      state.requestAuditRef = args.data.auditRef ?? null
-    }
-    return {
-      ...existing,
-      status: args.data.status,
-      handledAt: new Date('2026-07-12T00:00:01.000Z'),
-      handledBy: 'admin-delete',
-      auditRef: args.data.auditRef ?? null,
-    }
-  }
-  const transactionClient = {
-    aiResumeResult: {
-      deleteMany: async () => {
-        state.calls.push('transaction.aiResumeResult.deleteMany')
-        state.pendingDeletes.push('transaction.aiResumeResult.deleteMany')
-        return { count: 3 }
-      },
-    },
-    jobAiSession: {
-      deleteMany: async () => {
-        state.calls.push('transaction.jobAiSession.deleteMany')
-        state.pendingDeletes.push('transaction.jobAiSession.deleteMany')
-        return { count: 2 }
-      },
-    },
-    userAiConsent: {
-      updateMany: async () => {
-        state.calls.push('transaction.userAiConsent.updateMany')
-        state.pendingDeletes.push('transaction.userAiConsent.updateMany')
-        return { count: 1 }
-      },
-    },
-    userDataRequest: {
-      update: (args: { data: { status: string } }) => updateRequest('transaction', args),
-    },
+  const recordUnexpectedDelete = (call: string) => async () => {
+    state.calls.push(call)
+    return { count: 1 }
   }
   const prisma = {
-    $transaction: async (input: ((tx: typeof transactionClient) => Promise<unknown>) | Promise<unknown>[]) => {
-      state.calls.push('transaction.begin')
-      if (transactionMode === 'before_callback_rollback') {
-        state.calls.push('transaction.rollback')
-        throw new Error('simulated transaction rollback before callback')
-      }
-      try {
-        const result = await (typeof input === 'function' ? input(transactionClient) : Promise.all(input))
-        if (transactionMode === 'after_callback_rollback') {
-          throw new Error('simulated transaction rollback after callback')
-        }
-        state.calls.push('transaction.commit')
-        state.committedDeletes.push(...state.pendingDeletes)
-        state.pendingDeletes.length = 0
-        if (state.pendingRequestStatus) {
-          state.requestStatus = state.pendingRequestStatus
-          state.pendingRequestStatus = null
-          state.requestAuditRef = state.pendingRequestAuditRef
-          state.pendingRequestAuditRef = null
-        }
-        return result
-      } catch (error) {
-        state.calls.push('transaction.rollback')
-        state.pendingDeletes.length = 0
-        state.pendingRequestStatus = null
-        state.pendingRequestAuditRef = null
-        throw error
-      }
+    $transaction: async () => {
+      state.calls.push('$transaction')
+      throw new Error('unexpected privacy transaction')
     },
-    aiResumeResult: {
-      deleteMany: async () => {
-        state.calls.push('direct.aiResumeResult.deleteMany')
-        state.committedDeletes.push('direct.aiResumeResult.deleteMany')
-        return { count: 3 }
-      },
-    },
-    jobAiSession: {
-      deleteMany: async () => {
-        state.calls.push('direct.jobAiSession.deleteMany')
-        state.committedDeletes.push('direct.jobAiSession.deleteMany')
-        return { count: 2 }
-      },
-    },
-    userAiConsent: {
-      updateMany: async () => {
-        state.calls.push('direct.userAiConsent.updateMany')
-        state.committedDeletes.push('direct.userAiConsent.updateMany')
-        return { count: 1 }
-      },
-    },
+    aiResumeResult: { deleteMany: recordUnexpectedDelete('aiResumeResult.deleteMany') },
+    jobAiSession: { deleteMany: recordUnexpectedDelete('jobAiSession.deleteMany') },
+    userAiConsent: { updateMany: recordUnexpectedDelete('userAiConsent.updateMany') },
     userDataRequest: {
-      findUnique: async () => existing,
-      update: (args: { data: { status: string } }) => updateRequest('direct', args),
+      findUnique: async () => {
+        state.calls.push('userDataRequest.findUnique')
+        return existing
+      },
+      update: async (args: {
+        data: { status: string; handledBy: string; auditRef: string | null; handledAt: Date | null }
+      }) => {
+        state.calls.push('userDataRequest.update')
+        state.requestStatus = args.data.status
+        return { ...existing, ...args.data }
+      },
     },
   }
   const audit = {
-    write: async (args: { payload?: Record<string, unknown> }) => {
+    write: async () => {
       state.calls.push('audit.write')
-      state.auditWrites.push(args)
-      return 'audit-real-delete'
+      state.auditWrites += 1
+      return 'audit-wave0'
     },
   }
   return { prisma, audit, state }
 }
 
-async function verifyDeleteDataRightsTransaction(): Promise<void> {
-  const success = createPrivacyDeleteRun('success')
-  const service = new MemberPrivacyService(success.prisma as never, success.audit as never)
-  await service.handleDataRequest('privacy-delete-request', {
-    status: 'completed',
-    handledBy: 'admin-delete',
-  })
-
-  const transactionDeletes = [
-    'transaction.aiResumeResult.deleteMany',
-    'transaction.jobAiSession.deleteMany',
-    'transaction.userAiConsent.updateMany',
+async function verifyFailClosedDataRequestTransitions(): Promise<void> {
+  const blockedCases: Array<{
+    requestType: 'export' | 'delete'
+    status: 'completed' | 'rejected'
+    label: string
+  }> = [
+    { requestType: 'export', status: 'completed', label: 'export -> completed' },
+    { requestType: 'delete', status: 'completed', label: 'delete -> completed' },
+    { requestType: 'delete', status: 'rejected', label: 'delete -> rejected' },
   ]
-  if (transactionDeletes.every((call) => success.state.calls.includes(call))) {
-    pass('数据权利删除在同一 transaction 内删除 AI 结果、会话并撤回有效授权')
-  } else {
-    fail(`数据权利删除缺少 transaction 操作: ${transactionDeletes.filter((call) => !success.state.calls.includes(call)).join(' | ')}`)
+
+  for (const testCase of blockedCases) {
+    const run = createPrivacyTransitionRun(testCase.requestType)
+    const service = new MemberPrivacyService(run.prisma as never, run.audit as never)
+    let code: string | undefined
+    try {
+      await service.handleDataRequest(`privacy-${testCase.requestType}-request`, {
+        status: testCase.status,
+        handledBy: 'admin-wave0',
+      })
+    } catch (error) {
+      code = exceptionCode(error)
+    }
+    const sideEffects = run.state.calls.filter((call) => call !== 'userDataRequest.findUnique')
+    if (
+      code === 'DATA_REQUEST_EXECUTION_INCOMPLETE' &&
+      sideEffects.length === 0 &&
+      run.state.auditWrites === 0 &&
+      run.state.requestStatus === 'pending'
+    ) {
+      pass(`${testCase.label} fail closed，且不删除、不审计、不更新 request`)
+    } else {
+      fail(`${testCase.label} 未安全阻断 code=${code ?? 'none'} calls=${run.state.calls.join(',')} audit=${run.state.auditWrites} status=${run.state.requestStatus}`)
+    }
   }
 
-  const auditIndex = success.state.calls.indexOf('audit.write')
-  const transactionCommitIndex = success.state.calls.indexOf('transaction.commit')
-  const lastTransactionDelete = Math.max(...transactionDeletes.map((call) => success.state.calls.indexOf(call)))
-  const transactionUpdateIndex = success.state.calls.indexOf('transaction.userDataRequest.update')
-  const directUpdateIndex = success.state.calls.indexOf('direct.userDataRequest.update')
-  const auditPayload = success.state.auditWrites[0]?.payload ?? {}
-  const auditPayloadJson = JSON.stringify(auditPayload)
-  const exactCounts =
-    auditPayload['aiResumeResultsDeleted'] === 3 &&
-    auditPayload['jobAiSessionsDeleted'] === 2 &&
-    auditPayload['consentsRevoked'] === 1
-  const requestUpdatedInTransaction = transactionUpdateIndex > lastTransactionDelete && transactionUpdateIndex < auditIndex
-  const requestUpdatedAfterAudit = directUpdateIndex > auditIndex
-  if (transactionCommitIndex > lastTransactionDelete && auditIndex > transactionCommitIndex && exactCounts && success.state.requestStatus === 'completed' && (requestUpdatedInTransaction || requestUpdatedAfterAudit) && !/(payloadJson|resumeText|resumeContent|fileId|accessTokenHash)/i.test(auditPayloadJson)) {
-    pass('数据权利删除 transaction commit 后才写审计；request 完成状态要么随 transaction 提交，要么在审计成功后更新')
-  } else {
-    fail(`数据权利删除 transaction/审计/request 顺序或内容错误 calls=${success.state.calls.join(',')} status=${success.state.requestStatus} payload=${auditPayloadJson}`)
-  }
-
-  const failedTransaction = createPrivacyDeleteRun('after_callback_rollback')
-  const failingService = new MemberPrivacyService(failedTransaction.prisma as never, failedTransaction.audit as never)
-  let thrown = false
-  try {
-    await failingService.handleDataRequest('privacy-delete-request', {
-      status: 'completed',
-      handledBy: 'admin-delete',
-    })
-  } catch (error) {
-    thrown = (error as Error).message === 'simulated transaction rollback after callback'
-  }
-  if (thrown && failedTransaction.state.calls.includes('transaction.rollback') && !failedTransaction.state.calls.includes('transaction.commit') && failedTransaction.state.auditWrites.length === 0 && failedTransaction.state.requestStatus === 'pending' && failedTransaction.state.pendingDeletes.length === 0 && failedTransaction.state.committedDeletes.length === 0) {
-    pass('callback 后 transaction rollback 时不提交三类删除、不写审计且不更新数据请求状态')
-  } else {
-    fail(`callback 后 rollback 不得提交/审计/更新 request thrown=${thrown} calls=${failedTransaction.state.calls.join(',')} audit=${failedTransaction.state.auditWrites.length} status=${failedTransaction.state.requestStatus} pending=${failedTransaction.state.pendingDeletes.join(',')} committed=${failedTransaction.state.committedDeletes.join(',')}`)
-  }
-}
-
-async function verifyDeleteAuditCannotBeBypassed(): Promise<void> {
-  const run = createPrivacyDeleteRun('success')
-  const service = new MemberPrivacyService(run.prisma as never, run.audit as never)
-  const result = await service.handleDataRequest('privacy-delete-request', {
+  const revokeRun = createPrivacyTransitionRun('revoke_consent')
+  const revokeService = new MemberPrivacyService(revokeRun.prisma as never, revokeRun.audit as never)
+  const revoked = await revokeService.handleDataRequest('privacy-revoke_consent-request', {
     status: 'completed',
-    handledBy: 'admin-delete',
-    auditRef: 'attacker-controlled-audit-ref',
+    handledBy: 'admin-wave0',
   })
-  const auditIndex = run.state.calls.indexOf('audit.write')
-  const commitIndex = run.state.calls.indexOf('transaction.commit')
-  const payload = run.state.auditWrites[0]?.payload ?? {}
-  const expectedKeys = ['aiResumeResultsDeleted', 'consentsRevoked', 'jobAiSessionsDeleted']
-  const hasExactSafeCounts =
-    JSON.stringify(Object.keys(payload).sort()) === JSON.stringify(expectedKeys) &&
-    payload['aiResumeResultsDeleted'] === 3 &&
-    payload['jobAiSessionsDeleted'] === 2 &&
-    payload['consentsRevoked'] === 1
-  if (run.state.auditWrites.length === 1 && auditIndex > commitIndex && hasExactSafeCounts && run.state.requestAuditRef === 'audit-real-delete' && result.auditRef === 'audit-real-delete') {
-    pass('删除请求忽略调用方 auditRef：commit 后必写 AuditService，且只落三项计数与真实 auditRef')
+  if (
+    revoked.status === 'completed' &&
+    revokeRun.state.requestStatus === 'completed' &&
+    revokeRun.state.auditWrites === 1 &&
+    revokeRun.state.calls.join(',') === 'userDataRequest.findUnique,audit.write,userDataRequest.update'
+  ) {
+    pass('revoke_consent -> completed 保持真实审计与状态更新')
   } else {
-    fail(`删除请求的 auditRef 不得绕过审计 calls=${run.state.calls.join(',')} auditWrites=${run.state.auditWrites.length} payload=${JSON.stringify(payload)} stored=${run.state.requestAuditRef ?? 'null'} returned=${result.auditRef ?? 'null'}`)
+    fail(`revoke_consent 完成路径回退 calls=${revokeRun.state.calls.join(',')} audit=${revokeRun.state.auditWrites} status=${revokeRun.state.requestStatus}`)
   }
 }
 
@@ -344,17 +233,19 @@ async function main(): Promise<void> {
       'userAiConsent',
       'userAiConsent.updateMany',
       'userDataRequest',
-      'deleteJobAiPersonalData',
-      '$transaction',
-      'aiResumeResult.deleteMany',
-      'aiResumeResultsDeleted',
-      'jobAiSession.deleteMany',
-      'jobAiSessionsDeleted',
-      'consentsRevoked',
+      'DATA_REQUEST_EXECUTION_INCOMPLETE',
+      "existing.requestType === 'export'",
+      "existing.requestType === 'delete'",
       'revokedAt',
       'USER_AI_CONSENT_REQUIRED',
     ],
     'MemberPrivacyService 使用现有 UserAiConsent / UserDataRequest 实现同意和数据请求',
+  )
+
+  mustNotContain(
+    privacyService,
+    ['deleteJobAiPersonalData', 'aiResumeResult.deleteMany', 'jobAiSession.deleteMany'],
+    'MemberPrivacyService 不再以部分同步删除伪造 delete 完成态',
   )
 
   mustContain(
@@ -465,8 +356,7 @@ async function main(): Promise<void> {
     '隐私治理和 Job AI 不持久化简历原文、完整模型内容、签名 URL 或招聘闭环状态',
   )
 
-  await verifyDeleteDataRightsTransaction()
-  await verifyDeleteAuditCannotBeBypassed()
+  await verifyFailClosedDataRequestTransitions()
 
   if (failed > 0) {
     console.error(`\n❌ ${failed} 项失败 — 岗位 AI 隐私 / 配额门禁未通过\n`)

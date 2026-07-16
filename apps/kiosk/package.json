@@ -26,6 +26,7 @@
     "verify:job-fit-m1-5-ui": "node scripts/verify-job-fit-m1-5-ui.mjs",
     "verify:member-print-orders-ui": "node scripts/verify-member-print-orders-ui.mjs",
     "verify:profile-inkpaper-home": "node scripts/verify-profile-inkpaper-home.mjs",
+    "verify:user-center-wave0": "node scripts/verify-user-center-wave0.mjs",
     "verify:profile-feedback-inkpaper": "node scripts/verify-profile-feedback-inkpaper.mjs",
     "verify:profile-resumes-notifications-inkpaper": "node scripts/verify-profile-resumes-notifications-inkpaper.mjs",
     "verify:profile-ai-records-inkpaper": "node scripts/verify-profile-ai-records-inkpaper.mjs",

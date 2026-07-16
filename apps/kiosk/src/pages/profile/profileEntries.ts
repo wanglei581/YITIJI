@@ -1,7 +1,6 @@
 import type { Entry, EntrySectionData } from './profileTypes'
 
-// 「我的」页入口配置。
-// 入口 label / route / 建设中标签保持既有业务合同不变；仅由入口页重组为 4188 目录排版。
+// 「我的」页入口配置。只展示已接真能力，不保留重复入口或建设中占位。
 
 // 1. 我的资产
 const ASSETS: Entry[] = [
@@ -10,7 +9,7 @@ const ASSETS: Entry[] = [
   { icon: 'sparkle', tone: 'plum', label: 'AI服务记录', desc: '建议、面试、问答', route: '/me/ai-records' },
   { icon: 'receipt', tone: 'wheat', label: '打印订单', desc: '取件码、打印状态', route: '/me/print-orders' },
   { icon: 'heart', tone: 'rose', label: '我的收藏', desc: '岗位、招聘会、政策', route: '/me/favorites' },
-  { icon: 'ticket', tone: 'clay', label: '我的权益', desc: '套餐、券、活动', route: '/me/benefits' },
+  { icon: 'ticket', tone: 'clay', label: '我的权益', desc: '券与活动权益', route: '/me/benefits' },
 ]
 
 // 2. 常用服务（均跳转既有功能页）
@@ -31,15 +30,11 @@ const SERVICES: Entry[] = [
 const FAIRS: Entry[] = [
   { icon: 'eye', tone: 'slate', label: '浏览记录', desc: '岗位、招聘会、政策、企业', route: '/me/activity' },
   { icon: 'external', tone: 'teal', label: '外部跳转记录', desc: '本人离场跳转记录', route: '/me/activity?tab=jump' },
-  { icon: 'qr', tone: 'plum', label: '招聘会扫码凭证', desc: '尚未开放，不能办理', tag: '建设中' },
-  { icon: 'ticket', tone: 'rose', label: '招聘会权益活动', desc: '从招聘会场景进入', route: '/activities?source=fair' },
 ]
 
-// 4. 权益活动与服务套餐（均建设中，不接支付）
+// 4. 权益与政策（均为既有真实入口）
 const BENEFITS: Entry[] = [
   { icon: 'ticket', tone: 'rose', label: '权益活动', desc: '查看正式活动入口', route: '/activities' },
-  { icon: 'receipt', tone: 'wheat', label: '求职打印套餐', desc: '尚未开放，不能办理', tag: '建设中' },
-  { icon: 'sparkle', tone: 'plum', label: 'AI服务套餐', desc: '尚未开放，不能办理', tag: '建设中' },
   // 政策补贴指引：跳转既有政策服务页「就业政策」Tab（info-only 政策说明 / 材料清单 / 官方入口），不代办、不承诺到账。
   { icon: 'policy', tone: 'wheat', label: '政策补贴指引', desc: '政策说明与官方入口', route: '/renshi?tab=policy' },
 ]
@@ -57,6 +52,6 @@ export const SECTIONS: EntrySectionData[] = [
   { title: '我的资产', subtitle: '本人简历、文档、订单与收藏。', layout: 'grid', rail: 'teal', entries: ASSETS },
   { title: '常用服务', subtitle: '直达既有功能页。', layout: 'chips', rail: 'slate', entries: SERVICES },
   { title: '招聘会与活动', subtitle: '外部来源信息入口与本人记录。', layout: 'chips', rail: 'wheat', entries: FAIRS },
-  { title: '权益活动与服务套餐', subtitle: '权益活动可进入；两类服务套餐建设中。', layout: 'chips', rail: 'plum', entries: BENEFITS },
+  { title: '权益与政策', subtitle: '查看本人权益、真实活动和官方政策入口。', layout: 'chips', rail: 'plum', entries: BENEFITS },
   { title: '账户与支持', subtitle: '本人消息、账号、帮助与反馈入口。', layout: 'account', rail: 'teal', entries: ACCOUNT },
 ]
