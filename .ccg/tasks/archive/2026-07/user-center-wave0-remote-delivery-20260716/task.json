@@ -1,0 +1,13 @@
+{
+  "id": "user-center-wave0-remote-delivery-20260716",
+  "title": "交付用户中心 Wave 0 数据真相补丁的 PR 与 CI",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "delivery",
+  "currentPhase": "completed",
+  "nextAction": "等待用户授权合并 PR #263；不部署",
+  "createdAt": "2026-07-16T11:28:25Z",
+  "branch": "codex/user-center-wave0-data-truth-20260716",
+  "completedAt": "2026-07-16T11:38:00Z"
+}

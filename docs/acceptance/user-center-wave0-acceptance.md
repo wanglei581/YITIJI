@@ -4,7 +4,7 @@
 >
 > Wave 0 基线：已由 PR #261 合入 `origin/main@0c4cdd57`
 >
-> 当前补丁：`codex/user-center-wave0-data-truth-20260716` 在最新主线之上补充授权撤回终态真值保护；本地验证通过，尚未 push、PR、merge 或 deploy
+> 当前补丁：`codex/user-center-wave0-data-truth-20260716` 在最新主线之上补充授权撤回终态真值保护；[PR #263](https://github.com/wanglei581/YITIJI/pull/263) 已创建，GitHub CI 两项必需检查均通过；尚未 merge 或 deploy
 
 ## 一、范围与结论
 
@@ -72,7 +72,7 @@
 - 本轮未实现真实数据导出、账户注销执行器、手机号换绑、step-up 或 Admin 隐私工单运营页；这些属于 Wave 1/2。
 - `delete` 工单在 Wave 1 前会停留于 `pending/handling`，无法完成、驳回或取消；当前无 SLA 和 Admin 前端处置页。会员级批量 AI 数据删除也暂停，只有本人逐条删除与 TTL 清理继续工作。
 - 既有 Admin 处理 API 对仍可放行的状态接受调用方 `auditRef`，这是主线遗留边界；Wave 1 运营页必须改为服务端生成审计引用，不能继续信任客户端凭证。
-- Wave 0 基线已随 PR #261 合入主线；当前仅授权撤回终态保护补丁尚未推送、PR、合并、部署或运行 GitHub CI。未验证真实短信、线上 PostgreSQL/COS/Redis、Windows 一体机或打印。
+- Wave 0 基线已随 PR #261 合入主线；授权撤回终态保护补丁的 [PR #263](https://github.com/wanglei581/YITIJI/pull/263) 已通过 GitHub Actions `29494612863` 的 `build-and-verify` 与 `postgres-readiness`，但仍未合并或部署。未验证真实短信、线上 PostgreSQL/COS/Redis、Windows 一体机或打印。
 - 未修改 Prisma schema、migration、生产配置、密钥、账号、订单或打印任务。
 - Wave 1 必须另起独立分支；法务留存矩阵和不可逆注销开关未满足前，只能继续 fail closed。
 
@@ -81,4 +81,4 @@
 - 独立规格复审和代码质量/安全复审最终均为 `APPROVE（Critical 0 / Warning 0）`；安全复审发现的 consent 真实副作用测试缺口已补齐并在双数据库转绿。
 - Claude 对完整最终 diff 给出 `APPROVE（Critical 0 / Warning 0）`；仅提示放行状态仍接受调用方 `auditRef` 属主线既有且已披露的 Wave 1 边界。
 - Antigravity 默认模型调用未产生有效报告，不计入通过；显式指定 `Gemini 3.5 Flash (High)` 后对完整最终 diff 给出 `APPROVE（100/100，Critical 0 / Warning 0）`。
-- 当前授权撤回终态保护补丁在原终审后新增，不能借用基线审查结论代替补丁审查。2026-07-16 的 Claude wrapper 完整报告异步写入日志，确认有效结论为 `APPROVE（Critical 0 / Warning 0）`；报告指出的终态幂等和撤回创建期审计均为既有 Wave 1 边界，未阻断本补丁。Antigravity 初始 wrapper 因启动期 token/MCP 权限与旧项目上下文未产生有效报告；随后使用 `Gemini 3.5 Flash (High)`、独立新项目和内联精确代码 diff 进行无工具只读审查，结论同为 `APPROVE（Critical 0 / Warning 0）`。本地逐项 diff 审查和全部相关验证已完成；当前只待用户另行授权远程交付。
+- 当前授权撤回终态保护补丁在原终审后新增，不能借用基线审查结论代替补丁审查。2026-07-16 的 Claude wrapper 完整报告异步写入日志，确认有效结论为 `APPROVE（Critical 0 / Warning 0）`；报告指出的终态幂等和撤回创建期审计均为既有 Wave 1 边界，未阻断本补丁。Antigravity 使用 `Gemini 3.5 Flash (High)`、独立新项目和内联精确代码 diff 进行无工具只读审查，结论同为 `APPROVE（Critical 0 / Warning 0）`。本地逐项 diff 审查与全部相关验证均已完成，[PR #263](https://github.com/wanglei581/YITIJI/pull/263) 的两项必需 GitHub CI 检查已通过；PR 尚待合并，不含部署。
