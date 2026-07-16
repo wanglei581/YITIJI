@@ -18,7 +18,7 @@
 
 ## 复审与遗留项
 
-- Antigravity 当前未登录，未返回模型报告，不能计为外部批准。Claude wrapper 的完整报告异步写入 `/tmp/user-center-wave0-revoke-final-review-20260716/claude.log`，现已确认结论为 `APPROVE（Critical 0 / Warning 0）`；该报告提示的终态幂等与撤回创建期审计均为 Wave 1 既有边界。
+- Claude wrapper 的完整报告异步写入 `/tmp/user-center-wave0-revoke-final-review-20260716/claude.log`，结论为 `APPROVE（Critical 0 / Warning 0）`；该报告提示的终态幂等与撤回创建期审计均为 Wave 1 既有边界。Antigravity 初始 wrapper 未返回有效报告，但之后用 `Gemini 3.5 Flash (High)`、独立新项目和内联精确代码 diff 重新审查，同样得到 `APPROVE（Critical 0 / Warning 0）`。
 - 已完成本地逐项 diff 审查：阻断发生在 `audit.write` 与 `userDataRequest.update` 之前，集成测试同时验证无状态、无审计副作用；未发现本增量 Critical/Warning。
 - 既有 `auditRef` 可由调用方传入仍是 Wave 1 运营页必须修复的边界，不在本小型终态补丁内扩展。
 - 后续远程交付前：在可用账户下补跑有效 Claude + Antigravity 增量审查；获得用户授权后才可 push、PR 和 GitHub CI。
