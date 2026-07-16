@@ -276,7 +276,7 @@ git commit -m "fix: align account settings truth copy"
 本机服务不可用？改用手机号登录
 ```
 
-- [ ] `origin/main@bb9c7efb` 的 `verify-qr-login-ui.mjs` 已不含旧断言“请刷新二维码或使用手机号登录”，且在干净工作树实跑通过；不得为制造 RED 回退实现或重复修改守卫。
+- [ ] `origin/main@6c787559` 的 `verify-qr-login-ui.mjs` 已不含旧断言“请刷新二维码或使用手机号登录”，且在干净工作树实跑通过；不得为制造 RED 回退实现或重复修改守卫。
 
 - [ ] 运行：
 
