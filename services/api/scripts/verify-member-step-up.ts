@@ -63,6 +63,12 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 function pass(message: string): void { console.log(`  PASS ${message}`) }
 
+function isMissingModule(error: unknown, moduleName: string): boolean {
+  const candidate = error as { code?: string; message?: string }
+  return ['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'].includes(candidate.code ?? '')
+    && (candidate.message ?? '').includes(moduleName)
+}
+
 function flatten(errors: ValidationError[], parent = ''): string[] {
   return errors.flatMap((error) => {
     const path = parent ? `${parent}.${error.property}` : error.property
@@ -155,8 +161,8 @@ async function main(): Promise<void> {
   try {
     const modulePath = '../src/member-auth/' + 'member-step-up.service'
     StepUpClass = ((await import(modulePath)) as { MemberStepUpService?: StepUpServiceConstructor }).MemberStepUpService
-  } catch {
-    // The explicit RED below distinguishes missing implementation from harness errors.
+  } catch (error) {
+    if (!isMissingModule(error, 'member-step-up.service')) throw error
   }
   if (!StepUpClass) {
     throw new Error('RED: MemberStepUpService 尚未实现（expected Task 5 failure）')
@@ -170,6 +176,7 @@ async function main(): Promise<void> {
     assert(dto.SendMemberStepUpCodeDto && dto.VerifyMemberStepUpDto, 'RED: member step-up DTO classes 尚未实现')
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('RED:')) throw error
+    if (!isMissingModule(error, 'member-step-up.dto')) throw error
     throw new Error('RED: member step-up DTO 尚未实现（expected Task 5 failure）')
   }
 
@@ -304,6 +311,13 @@ async function main(): Promise<void> {
     redisMarkers.push(bindingChallenge.challengeId)
     const bindingCode = sms.lastCode()
     sensitiveValues.add(bindingCode)
+    const bindingKeys = await ownedKeys(rawRedis, [bindingOwner.id, bindingChallenge.challengeId])
+    const bindingRedis = [
+      ...bindingKeys,
+      ...await Promise.all(bindingKeys.map((key) => redisValue(rawRedis, key))),
+    ].join('|')
+    assert(!bindingRedis.includes(bindingCode), 'live challenge Redis state must not contain the plaintext code')
+    pass('4. live challenge Redis state contains only a code digest')
     await expectCode(
       () => service.verifyChallenge(bindingOther.id, { challengeId: bindingChallenge.challengeId, code: bindingCode }),
       'STEP_UP_CHALLENGE_INVALID',
@@ -315,31 +329,59 @@ async function main(): Promise<void> {
     )
     sensitiveValues.add(bindingGrant.stepUpToken)
 
-    const plaintextKeys = await ownedKeys(rawRedis, redisMarkers)
-    const plaintextRedis = (await Promise.all(plaintextKeys.map((key) => redisValue(rawRedis, key)))).join('|')
-    assert(!plaintextRedis.includes(bindingCode), 'Redis must not contain the plaintext six-digit code')
-    pass('4. Redis contains only a code digest, never the plaintext code')
-
-    const attemptsUser = await createUser('attempts')
+    const fourAttemptsUser = await createUser('attempts-four')
     sms.clear()
-    const attemptsChallenge = await service.sendChallenge(attemptsUser.id, {
-      action: 'export_data_request', deviceId: 'KSK-ATTEMPTS', ip: '127.0.0.1',
+    const fourAttemptsChallenge = await service.sendChallenge(fourAttemptsUser.id, {
+      action: 'export_data_request', deviceId: 'KSK-ATTEMPTS-FOUR', ip: '127.0.0.1',
     })
-    redisMarkers.push(attemptsChallenge.challengeId)
-    const correctAfterAttempts = sms.lastCode()
-    sensitiveValues.add(correctAfterAttempts)
-    const wrongCode = correctAfterAttempts === '000000' ? '111111' : '000000'
+    redisMarkers.push(fourAttemptsChallenge.challengeId)
+    const correctAfterFour = sms.lastCode()
+    sensitiveValues.add(correctAfterFour)
+    const wrongForFour = correctAfterFour === '000000' ? '111111' : '000000'
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      await expectCode(
+        () => service.verifyChallenge(fourAttemptsUser.id, {
+          challengeId: fourAttemptsChallenge.challengeId,
+          code: wrongForFour,
+        }),
+        'STEP_UP_CODE_INVALID',
+        `5A.${attempt} wrong code attempt is rejected`,
+      )
+    }
+    const grantAfterFour = await service.verifyChallenge(fourAttemptsUser.id, {
+      challengeId: fourAttemptsChallenge.challengeId,
+      code: correctAfterFour,
+    })
+    sensitiveValues.add(grantAfterFour.stepUpToken)
+    redisMarkers.push(createHash('sha256').update(grantAfterFour.stepUpToken).digest('hex'))
+    pass('5A. four wrong codes do not invalidate the challenge early')
+
+    const fiveAttemptsUser = await createUser('attempts-five')
+    sms.clear()
+    const fiveAttemptsChallenge = await service.sendChallenge(fiveAttemptsUser.id, {
+      action: 'export_data_request', deviceId: 'KSK-ATTEMPTS-FIVE', ip: '127.0.0.1',
+    })
+    redisMarkers.push(fiveAttemptsChallenge.challengeId)
+    const correctAfterFive = sms.lastCode()
+    sensitiveValues.add(correctAfterFive)
+    const wrongForFive = correctAfterFive === '000000' ? '111111' : '000000'
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       await expectCode(
-        () => service.verifyChallenge(attemptsUser.id, { challengeId: attemptsChallenge.challengeId, code: wrongCode }),
+        () => service.verifyChallenge(fiveAttemptsUser.id, {
+          challengeId: fiveAttemptsChallenge.challengeId,
+          code: wrongForFive,
+        }),
         'STEP_UP_CODE_INVALID',
-        `5.${attempt} wrong code attempt is rejected`,
+        `5B.${attempt} wrong code attempt is rejected`,
       )
     }
     await expectCode(
-      () => service.verifyChallenge(attemptsUser.id, { challengeId: attemptsChallenge.challengeId, code: correctAfterAttempts }),
+      () => service.verifyChallenge(fiveAttemptsUser.id, {
+        challengeId: fiveAttemptsChallenge.challengeId,
+        code: correctAfterFive,
+      }),
       'STEP_UP_CHALLENGE_INVALID',
-      '5. challenge is invalidated after five wrong codes',
+      '5B. challenge is invalidated at five wrong codes',
     )
 
     const onceUser = await createUser('challenge-once')
@@ -367,11 +409,21 @@ async function main(): Promise<void> {
       'STEP_UP_TOKEN_INVALID',
       '7. grant rejects a different user',
     )
+    await expectCode(
+      () => service.consumeGrant(grantOwner.id, 'export_data_request', foreignGrant.stepUpToken, 'KSK-GRANT'),
+      'STEP_UP_TOKEN_INVALID',
+      '7. user mismatch destroys the grant instead of restoring it',
+    )
     const confusedGrant = await issueGrant(grantOwner.id, 'close_account', 'KSK-GRANT')
     await expectCode(
       () => service.consumeGrant(grantOwner.id, 'export_data_download', confusedGrant.stepUpToken, 'KSK-GRANT'),
       'STEP_UP_TOKEN_INVALID',
       '7. grant rejects a different action',
+    )
+    await expectCode(
+      () => service.consumeGrant(grantOwner.id, 'close_account', confusedGrant.stepUpToken, 'KSK-GRANT'),
+      'STEP_UP_TOKEN_INVALID',
+      '7. action mismatch destroys the grant instead of restoring it',
     )
 
     const replayUser = await createUser('grant-replay')
