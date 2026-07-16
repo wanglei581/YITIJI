@@ -91,6 +91,56 @@ export class RedisService implements OnModuleDestroy {
     await this.client.set(key, value, 'EX', ttlSeconds)
   }
 
+  async registerMemberSession(endUserId: string, sessionId: string, ttlSeconds: number): Promise<void> {
+    await this.client.eval(
+      `
+      redis.call('SET', KEYS[1], ARGV[1], 'EX', tonumber(ARGV[3]))
+      redis.call('SADD', KEYS[2], ARGV[2])
+      redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3]))
+      return 1
+      `,
+      2,
+      `member:session:${sessionId}`,
+      `member:user-sessions:${endUserId}`,
+      endUserId,
+      sessionId,
+      ttlSeconds,
+    )
+  }
+
+  async unregisterMemberSession(endUserId: string, sessionId: string): Promise<void> {
+    await this.client.eval(
+      `
+      redis.call('DEL', KEYS[1])
+      redis.call('SREM', KEYS[2], ARGV[1])
+      if redis.call('SCARD', KEYS[2]) == 0 then
+        redis.call('DEL', KEYS[2])
+      end
+      return 1
+      `,
+      2,
+      `member:session:${sessionId}`,
+      `member:user-sessions:${endUserId}`,
+      sessionId,
+    )
+  }
+
+  async revokeMemberSessions(endUserId: string): Promise<number> {
+    const result = await this.client.eval(
+      `
+      local sessions = redis.call('SMEMBERS', KEYS[1])
+      for _, sessionId in ipairs(sessions) do
+        redis.call('DEL', 'member:session:' .. sessionId)
+      end
+      redis.call('DEL', KEYS[1])
+      return #sessions
+      `,
+      1,
+      `member:user-sessions:${endUserId}`,
+    )
+    return Number(result)
+  }
+
   /**
    * 仅当缓存中不存在更高 tokenVersion 时写入 JSON 会话状态。
    * 防止并发 Guard 在密码变更后把旧版本冷缓存重新写回。

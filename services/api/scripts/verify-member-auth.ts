@@ -12,6 +12,7 @@
  *   pnpm verify:member-auth
  *
  * 验证链路（真实 HTTP，端口 0 临时监听，请求经全局 ValidationPipe + HttpExceptionFilter）：
+ *   0. Redis 会话索引原子注册 / 整户撤销 / 单会话注销
  *   1. 发送验证码 → 200，且响应体不含明文验证码
  *   2. 非法手机号 → 400 VALIDATION_FAILED
  *   3. 额外字段(candidate/email 等越界) → 400（forbidNonWhitelisted）
@@ -31,12 +32,13 @@ import { NestFactory } from '@nestjs/core'
 import { JwtService } from '@nestjs/jwt'
 import { ValidationPipe, BadRequestException, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { Redis } from 'ioredis'
 import { AppModule } from '../src/app.module'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import { OptionalEndUserAuthGuard } from '../src/common/guards/optional-end-user-auth.guard'
-import { RedisService } from '../src/common/redis/redis.service'
+import { REDIS_CLIENT, RedisService } from '../src/common/redis/redis.service'
 import { hashPhone } from '../src/common/crypto/phone-identity'
 import { PrismaService } from '../src/prisma/prisma.service'
 
@@ -109,12 +111,23 @@ async function main() {
   info(`HTTP listening: ${base}\n`)
 
   const redis = app.get(RedisService)
+  const rawRedis = app.get<Redis>(REDIS_CLIENT)
   const prisma = app.get(PrismaService)
 
   // 唯一测试手机号（138 + 8 位时间派生），避免与真实数据/历史 Redis 冲突。
   const tail = Date.now().toString().slice(-8)
   const PHONE = `138${tail}`
   const phoneHash = hashPhone(PHONE)
+  const sessionOwnerId = `verify-member-session-owner-${tail}`
+  const otherSessionOwnerId = `verify-member-session-other-${tail}`
+  const firstSessionId = `verify-member-session-a-${tail}`
+  const secondSessionId = `verify-member-session-b-${tail}`
+  const otherSessionId = `verify-member-session-other-${tail}`
+  const sessionOwnerIndexKey = `member:user-sessions:${sessionOwnerId}`
+  const otherSessionOwnerIndexKey = `member:user-sessions:${otherSessionOwnerId}`
+  const firstSessionKey = `member:session:${firstSessionId}`
+  const secondSessionKey = `member:session:${secondSessionId}`
+  const otherSessionKey = `member:session:${otherSessionId}`
 
   async function post(path: string, body: Json, token?: string): Promise<{ status: number; json: Json }> {
     const res = await fetch(`${base}${path}`, {
@@ -136,6 +149,47 @@ async function main() {
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await prisma.endUser.deleteMany({ where: { phoneHash } })
+
+    // ── 0. 会话索引注册 / 整户撤销 / 单会话注销 ───────────────────────
+    console.log('── 0. Redis 会话索引原子操作 ─────────────────────────')
+    await redis.registerMemberSession(sessionOwnerId, firstSessionId, 120)
+    await redis.registerMemberSession(sessionOwnerId, secondSessionId, 120)
+    await redis.registerMemberSession(otherSessionOwnerId, otherSessionId, 120)
+
+    const [firstSession, secondSession, ownerSessions, firstTtl, ownerIndexTtl] = await Promise.all([
+      redis.get(firstSessionKey),
+      redis.get(secondSessionKey),
+      rawRedis.smembers(sessionOwnerIndexKey),
+      redis.ttl(firstSessionKey),
+      redis.ttl(sessionOwnerIndexKey),
+    ])
+    if (firstSession === sessionOwnerId && secondSession === sessionOwnerId
+      && [...ownerSessions].sort().join(',') === [firstSessionId, secondSessionId].sort().join(',')) {
+      pass('同一用户的两个 session 与索引均已注册')
+    } else fail('同一用户的 session 或索引注册异常')
+    if (firstTtl > 0 && firstTtl <= 120 && ownerIndexTtl > 0 && ownerIndexTtl <= 120) {
+      pass('session key 与用户索引均设置了 TTL')
+    } else fail(`session/index TTL 异常: ${firstTtl}/${ownerIndexTtl}`)
+
+    const revokedCount = await redis.revokeMemberSessions(sessionOwnerId)
+    const [firstAfterRevoke, secondAfterRevoke, ownerIndexExists, otherAfterRevoke, otherSessions] = await Promise.all([
+      redis.get(firstSessionKey),
+      redis.get(secondSessionKey),
+      rawRedis.exists(sessionOwnerIndexKey),
+      redis.get(otherSessionKey),
+      rawRedis.smembers(otherSessionOwnerIndexKey),
+    ])
+    if (revokedCount === 2 && firstAfterRevoke === null && secondAfterRevoke === null && ownerIndexExists === 0) {
+      pass('整户撤销删除该用户的两个 session 及用户索引')
+    } else fail(`整户撤销异常: count=${revokedCount}, indexExists=${ownerIndexExists}`)
+    if (otherAfterRevoke === otherSessionOwnerId && otherSessions.length === 1 && otherSessions[0] === otherSessionId) {
+      pass('整户撤销不会删除其他用户的 session 或索引')
+    } else fail('整户撤销破坏了其他用户的 session 或索引')
+
+    await redis.unregisterMemberSession(otherSessionOwnerId, otherSessionId)
+    if (await rawRedis.exists(otherSessionKey, otherSessionOwnerIndexKey) === 0) {
+      pass('单 session 注销后删除会话，空索引集合同步清理')
+    } else fail('单 session 注销未完整清理会话与空索引')
 
     // ── 1. 发送验证码 ──────────────────────────────────────────────────────────
     console.log('── 1. 发送验证码 ──────────────────────────────────────────────')
@@ -281,6 +335,13 @@ async function main() {
     await redis.del(`member:sms:code:${phoneHash}`)
     await redis.del(`member:sms:cooldown:${phoneHash}`)
     await redis.del(`member:sms:attempt:${phoneHash}`)
+    await rawRedis.del(
+      firstSessionKey,
+      secondSessionKey,
+      otherSessionKey,
+      sessionOwnerIndexKey,
+      otherSessionOwnerIndexKey,
+    )
     info('测试数据已清理。')
     await app.close()
   }
