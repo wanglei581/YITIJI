@@ -7,6 +7,10 @@
   "scripts": {
     "build": "prisma generate && pnpm db:pg:generate && tsc",
     "start": "node dist/main.js",
+    "start:guarded": "node dist/release-provenance/release-guard.js",
+    "release:manifest": "node dist/release-provenance/release-manifest-cli.js",
+    "release:activate": "node dist/release-provenance/release-activation.js",
+    "release:current-launcher": "node dist/release-provenance/release-current-launcher.js",
     "dev": "prisma generate && node -r @swc-node/register src/main.ts",
     "lint": "eslint src/",
     "typecheck": "prisma generate && tsc --noEmit",
@@ -86,6 +90,7 @@
     "verify:public-fair-demo-guard": "node -r @swc-node/register scripts/verify-public-fair-demo-guard.ts",
     "verify:production-db-guard": "node -r @swc-node/register scripts/verify-production-db-guard.ts",
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
+    "verify:release-provenance": "node -r @swc-node/register scripts/verify-release-provenance.ts",
     "deploy:data-safety-gate": "node -r @swc-node/register scripts/deploy-data-safety-gate.ts",
     "verify:deploy-data-safety-gate": "node -r @swc-node/register scripts/verify-deploy-data-safety-gate.ts",
     "verify:production-real-services": "node -r @swc-node/register scripts/verify-production-real-services.ts",
