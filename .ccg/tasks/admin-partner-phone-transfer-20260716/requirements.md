@@ -16,11 +16,13 @@
 - 只允许来源账号 `role=partner`；禁止转移另一 Admin 或其他角色的手机号。
 - 必须同时具备有效 Admin 会话、正确 Admin 当前密码和发送到目标手机号的正确 OTP。
 - 转移端点与严格首次绑定端点必须共用同一个 Admin 当前密码失败额度键，禁止通过交替调用两个端点扩大密码尝试次数。
+- 当前密码验证必须镜像严格初绑的 `reserve → bcrypt → 成功或 bcrypt 异常立即 release`；成功 start 不得永久占用失败额度，发码发生在额度释放之后。
 - 转移验证码必须使用独立 `transfer_phone` purpose，不得与严格首次绑定的 `bind_phone` 共用冷却、验证码或尝试计数命名空间。
 - 清空 Partner 手机号与绑定 Admin 必须处于同一个数据库事务中，并按“先清 Partner、后绑 Admin”的顺序执行。
-- 事务内递增 Partner `tokenVersion`，事务提交后清理其会话缓存；缓存清理失败不得回滚已提交的数据库真值，但必须记录脱敏告警。
+- 事务内递增 Partner `tokenVersion`；事务提交后必须通过 `setJsonIfVersionNotOlder` 写入新版本 Partner 会话状态，原子阻止旧版本并发回填。缓存刷新失败不得回滚数据库真值，但必须记录脱敏告警，旧缓存残余窗口以上线时既有 TTL 为上限。
 - Ticket 必须绑定 Admin、Partner、双方 tokenVersion、phoneHash 和加密手机号，并受 TTL、单活动 ticket、验证锁和 CAS 约束。
 - 响应、日志和审计不得包含手机号明文、`phoneHash`、`phoneEnc`、密码、OTP 或 ticket 内容。
+- `start`、`complete`、`cancel`、`released_by_admin` 四个审计动作必须全部有真实写入点；Partner 释放事件通过 `actorId=Admin`、`targetId=Partner` 追溯，payload 保持为空。
 
 ## 允许范围
 
@@ -39,9 +41,9 @@
 
 ## 验收
 
-- TDD 覆盖正常转移、事务回滚、唯一约束顺序、并发竞争、陈旧 ticket、非 Partner 拒绝、OTP 重试、Partner 会话失效、Admin 会话保持、审计脱敏和 Partner 用户名密码登录兜底。
+- TDD 覆盖正常转移、成功密码验证不消耗失败额度、事务第二步真实失败回滚、唯一约束顺序、并发竞争、陈旧 ticket、非 Partner 拒绝、OTP 重试、Partner 新版本缓存覆盖与旧版本回填拒绝、缓存刷新失败的 TTL 收敛、Admin 会话保持、四类审计脱敏和 Partner 用户名密码登录兜底。
 - API/Admin typecheck、lint、build、专项 verifier、`git diff --check` 全部通过。
-- Antigravity 与 Claude 双模型终审必须有真实报告；已验证 Antigravity 可显式选择 `Claude Opus 4.6 (Thinking)`，但 2026-07-16 连续调用均因服务器高流量无报告，不得伪装为通过。
+- Antigravity 与 Claude 双模型审查必须有真实报告。用户已同意切换可用模型：Antigravity `Claude Sonnet 4.6 (Thinking)` 针对性复审 `READY 96/100`；Claude `Claude Opus 4.8 (1M context)` 针对性复审 `READY`、Critical 0、Warning 0，允许进入 TDD。代码完成后仍须对真实 diff 再做双模型终审。
 
 ## 已知独立上线阻塞
 

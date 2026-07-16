@@ -4,7 +4,7 @@
 
 **Goal:** 在保留 Partner 用户名密码登录和全部机构数据的前提下，经 Admin 当前密码与手机号 OTP 验证，把唯一手机号原子转移到当前未绑定手机号的 Admin。
 
-**Architecture:** 新增独立 `AdminPhoneTransferService` 与三条 Admin 专用端点，不修改严格首次绑定的“手机号无主”语义。Ticket 绑定 Admin/Partner 双方版本，数据库事务固定先清 Partner 再绑 Admin并写双审计；事务后清 Partner 会话缓存。Admin 既有账号设置入口增加独立转移组件，不新增页面或导航。
+**Architecture:** 新增独立 `AdminPhoneTransferService` 与三条 Admin 专用端点，不修改严格首次绑定的“手机号无主”语义。Ticket 绑定 Admin/Partner 双方版本，数据库事务固定先清 Partner 再绑 Admin并写双审计；事务后原子写入 Partner 新版本会话状态，阻止旧缓存并发回填。Admin 既有账号设置入口增加独立转移组件，不新增页面或导航。
 
 **Tech Stack:** NestJS、Prisma（SQLite/PostgreSQL 双基线）、Redis、bcryptjs、React/Vite/TypeScript、项目现有脚本式 verifier、GitHub Actions。
 
@@ -16,6 +16,7 @@
 
 - `services/api/src/auth/admin-phone-transfer.service.ts`（新增）
 - `services/api/src/auth/internal-otp.service.ts`
+- `services/api/src/common/guards/jwt-auth.guard.ts`（只导出既有 TTL 常量）
 - `services/api/src/auth/auth.controller.ts`
 - `services/api/src/auth/auth.module.ts`
 - `services/api/src/audit/audit.types.ts`
@@ -42,17 +43,17 @@
 
 ### Task 0：双模型分析门禁
 
-- [ ] **Step 1：重新运行 Antigravity 只读架构分析**
+- [x] **Step 1：运行 Antigravity 只读架构分析**
 
-Run：使用 CCG 的 `antigravity/architect.md`，输入已确认规格与 `origin/main@e62a9789` 上下文，要求输出实际模型、Critical/Warning/Info 和最小设计。不得写文件。
+Run：`--backend antigravity` 通过显式模型 shim 使用用户同意切换的 `Claude Sonnet 4.6 (Thinking)`；输入已确认规格与 `origin/main@e62a9789` 上下文，要求输出实际模型、Critical/Warning/Info。不得写文件。
 
-Expected：报告开头明确实际模型为用户指定的 Claude Opus 4.6，且非空、非配额/登录错误。若仍显示 Gemini、额度耗尽或无报告，本任务停在 planning，不进入 Task 1。
+Result：实际模型 `Claude Sonnet 4.6 (Thinking)`，`84/100 REQUEST_CHANGES`；报告有效。默认 Gemini 额度耗尽、Opus 4.6 长请求无容量的诊断已记录，不再作为当前模型路由。
 
-- [ ] **Step 2：把两个模型的分析差异写入任务要求**
+- [x] **Step 2：把两个模型的分析差异写入任务要求**
 
 只把会改变安全不变量、接口或测试矩阵的结论写入 `requirements.md` 和设计规格；不得把聊天全文或临时日志入库。
 
-- [ ] **Step 3：提交门禁更新（仅有实质变化时）**
+- [x] **Step 3：针对性双复审通过并提交门禁更新**
 
 ```bash
 git add -f .ccg/tasks/admin-partner-phone-transfer-20260716/requirements.md
@@ -123,6 +124,15 @@ class MemoryRedis {
     if (current <= 1) this.values.delete(key)
     else this.values.set(key, String(current - 1))
   }
+  async setJsonIfVersionNotOlder(key: string, _ttl: number, value: string, tokenVersion: number) {
+    const current = this.values.get(key)
+    if (current) {
+      const parsed = JSON.parse(current) as { tokenVersion?: unknown }
+      if (typeof parsed.tokenVersion === 'number' && parsed.tokenVersion > tokenVersion) return 'stale' as const
+    }
+    this.values.set(key, value)
+    return 'stored' as const
+  }
 }
 ```
 
@@ -152,7 +162,9 @@ assert.ok(target.phoneVerifiedAt)
 assert.equal(await bcrypt.compare(PARTNER_PASSWORD, source.passwordHash), true)
 ```
 
-再覆盖：无主手机号不发码、另一 Admin 所有者不发码、错误密码共享额度、错误 OTP 可重试、`bind_phone`/`transfer_phone` 验证码与冷却互相隔离、ticket 重放、双 verify、两个 Admin 并发竞争、start 后来源 phoneHash/tokenVersion 变化、事务第二步 CAS 失败时来源清空回滚、两条审计脱敏、Partner 会话缓存清除失败不反转数据库成功。
+再覆盖：无主手机号不发码、另一 Admin 所有者不发码、错误密码共享额度、正确密码与 bcrypt 异常均释放预约额度、错误 OTP 可重试、`bind_phone`/`transfer_phone` 验证码与冷却互相隔离、ticket 重放、双 verify、两个 Admin 并发竞争、start 后来源 phoneHash/tokenVersion 变化、静态 SQLite trigger 真实触发事务第二步 CAS 失败且来源清空整体回滚、四类审计脱敏、新版本 Partner 会话缓存覆盖旧值、旧版本并发回填被拒绝、缓存刷新失败不反转数据库成功且 TTL 后旧 JWT 失败。
+
+事务第二步回滚用例不得在 verify 前直接修改 Admin，因为会被事务前复核短路。Verifier 必须在 ticket 创建后安装一个静态 SQLite trigger：当任意 Partner 的 `phoneHash` 从非空更新为空时，递增未绑定 Admin 的 `tokenVersion`；这样第一步 Partner 更新触发版本变化，第二步 Admin CAS 返回 0，随后抛错使两次更新连同 trigger 更新一起回滚。trigger 使用无插值的静态 SQL，并在 `finally` 删除。
 
 - [ ] **Step 4：运行 RED 并确认失败原因正确**
 
@@ -177,6 +189,7 @@ git commit -m "test(auth): define admin partner phone transfer contract"
 
 - Create: `services/api/src/auth/admin-phone-transfer.service.ts`
 - Modify: `services/api/src/auth/internal-otp.service.ts`
+- Modify: `services/api/src/common/guards/jwt-auth.guard.ts`（只把既有 `INTERNAL_SESSION_CACHE_TTL_SECONDS` 改为 export）
 - Test: `services/api/scripts/verify-admin-phone-transfer.ts`
 
 - [ ] **Step 1：定义严格 ticket 与返回类型**
@@ -229,6 +242,8 @@ private currentPasswordFailureKey(adminId: string): string {
 }
 ```
 
+密码校验必须逐步镜像现有 `AdminInitialPhoneBindService`：先 `reserveCurrentPasswordAttempt`；bcrypt 抛错时 release 后统一失败；密码不匹配时不 release；密码匹配时立即 release，然后才校验手机号、创建 ticket 和发送短信。不得在短信异常路径再次 release，避免并发计数被多减。Verifier 必须断言成功 start 前后共享失败额度相同。
+
 先把 `InternalOtpPurpose` 扩展为 `'login' | 'reset_password' | 'bind_phone' | 'transfer_phone'`。创建 `internal:admin:phone-transfer:*` 独立 ticket/active/verify-lock key；ticket TTL 使用 `INTERNAL_OTP_CODE_TTL_SECONDS`。只有 owner 为 Partner 才调用 `otp.sendCode({ purpose: 'transfer_phone', shouldDeliver: true })`，verify 也只能消费 `transfer_phone` 验证码。
 
 - [ ] **Step 3：实现 verify 的锁、OTP 与 CAS 消费**
@@ -280,23 +295,37 @@ await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
 })
 ```
 
-Admin audit 只含 `phoneMasked` 与 `sourcePartnerId`；Partner release audit 的 `payloadJson` 固定为 `'{}'`。任何审计失败必须回滚两个账号更新。
+四个审计动作与写入点固定为：
 
-- [ ] **Step 5：实现事务后 Partner 会话失效**
+- start 发码成功后 best-effort 写 `auth.phone_transfer_start`：`actorId=Admin`、`targetId=Partner`、空 payload；
+- 事务内写 `auth.phone_transfer_complete`：`actorId=Admin`、`targetId=Admin`，payload 只含 `phoneMasked` 与 `sourcePartnerId`；
+- 同一事务写 `auth.phone_released_by_admin`：`actorId=Admin`、`targetId=Partner`、`payloadJson='{}'`；
+- cancel 成功消费活动 ticket 后 best-effort 写 `auth.phone_transfer_cancel`：`actorId=Admin`、`targetId=Admin`、空 payload。
+
+事务内任何审计失败必须回滚两个账号更新；start/cancel 审计失败不改变业务结果，但不得泄露敏感数据。
+
+- [ ] **Step 5：实现事务后 Partner 新版本会话缓存覆盖**
 
 ```ts
 try {
-  await this.redis.del(`internal:session-state:${ticket.partnerId}`)
+  await this.redis.setJsonIfVersionNotOlder(
+    `internal:session-state:${ticket.partnerId}`,
+    INTERNAL_SESSION_CACHE_TTL_SECONDS,
+    JSON.stringify(freshPartnerSessionState),
+    freshPartnerSessionState.tokenVersion,
+  )
 } catch {
-  this.logger.warn('手机号转移已提交，但机构账号会话缓存清理失败；将以数据库 tokenVersion 收敛')
+  this.logger.warn('手机号转移已提交，但机构账号会话缓存刷新失败；将以数据库 tokenVersion 和缓存 TTL 收敛')
 }
 ```
 
-日志不得拼接手机号、账号名、ticket 或 Redis payload。Admin 不递增 tokenVersion。
+事务内在两条审计写入后，必须通过 `tx.user.findUniqueOrThrow({ include: { org: { select: { enabled: true } } } })` 读取并返回完整 `freshPartnerSessionState`（`userId/role/orgId/enabled/tokenVersion/orgEnabled`）；不得依赖不返回记录的 `updateMany`。`JwtAuthGuard` 中既有 60 秒 TTL 常量只改为 export，供服务复用；Guard 行为不变。日志不得拼接手机号、账号名、ticket 或 Redis payload。Admin 不递增 tokenVersion。
+
+Verifier 必须先模拟旧版本缓存，再完成转移并断言缓存变为新版本、旧 JWT 因 `payload.ver !== state.tokenVersion` 被真实 `JwtAuthGuard` 拒绝；随后模拟在途旧请求调用 `setJsonIfVersionNotOlder(..., oldVersion)`，必须返回 `stale` 且缓存仍是新版本。另测缓存刷新抛错时业务仍成功，并在删除/过期模拟后由数据库回源拒绝旧 JWT。
 
 - [ ] **Step 6：实现 cancel 与统一错误**
 
-cancel 仅 CAS 删除当前 Admin active ticket，再删除对应 ticket，审计为空 payload；所有非可操作短信失败统一：
+cancel 仅 CAS 删除当前 Admin active ticket，再删除对应 ticket；成功消费活动 ticket 后 best-effort 写空 payload cancel 审计，审计失败不得记录手机号、账号名、ticket 或 Redis payload。所有非可操作短信失败统一：
 
 ```ts
 new BadRequestException({
@@ -317,7 +346,7 @@ Expected：全部转移状态机断言 PASS，临时数据库清理完成。
 - [ ] **Step 8：提交服务**
 
 ```bash
-git add services/api/src/auth/admin-phone-transfer.service.ts services/api/src/auth/internal-otp.service.ts
+git add services/api/src/auth/admin-phone-transfer.service.ts services/api/src/auth/internal-otp.service.ts services/api/src/common/guards/jwt-auth.guard.ts
 git commit -m "feat(auth): add admin partner phone transfer state machine"
 ```
 
@@ -585,7 +614,7 @@ Expected：除已登记的独立基线项外，所有命令 fresh exit 0；`mult
 
 - [ ] **Step 3：并行双模型代码终审**
 
-Antigravity 与 Claude 必须分别审查 `git diff origin/main...HEAD`，输出实际模型和 Critical/Warning/Info。用户要求 Antigravity 使用 Claude Opus 4.6；若实际模型或报告不符合，终审保持 blocked。Claude 报告也必须记录实际模型，不能用模型别名冒充。
+Antigravity 与 Claude 必须分别审查 `git diff origin/main...HEAD`，输出实际模型和 Critical/Warning/Info。用户已同意切换可用模型：Antigravity 使用已验证可承载长审查的 `Claude Sonnet 4.6 (Thinking)`；Claude 使用其实际模型并如实报告。任一路无有效报告都保持 blocked，不能用角色文案或模型别名冒充实际模型。
 
 - [ ] **Step 4：修复 Critical/Warning 并重新验证**
 
