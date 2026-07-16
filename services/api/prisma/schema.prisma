@@ -438,6 +438,7 @@ model User {
   tokenVersion Int           @default(0)
   lastLoginAt  DateTime?
   enabled      Boolean       @default(true)
+  deletedAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -448,6 +449,7 @@ model User {
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
+  @@index([orgId, role, enabled, deletedAt])
 }
 
 // ── EndUser ─────────────────────────────────────────────────────────────────

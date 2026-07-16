@@ -48,12 +48,14 @@
 
   const sqliteSchema = read('prisma/schema.prisma')
   const pgSchema = read('prisma/postgres/schema.prisma')
+  const sqliteUser = modelBody(sqliteSchema, 'User')
+  const pgUser = modelBody(pgSchema, 'User')
   const sqliteMigration = read('prisma/migrations/20260716193000_add_partner_account_tombstone/migration.sql')
   const pgMigration = read('prisma/postgres/migrations/20260716193000_add_partner_account_tombstone/migration.sql')
 
-  expect(/deletedAt\s+DateTime\?/.test(sqliteSchema), 'SQLite User schema 缺少 deletedAt DateTime?')
-  expect(/@@index\(\[orgId, role, enabled, deletedAt\]\)/.test(sqliteSchema), 'SQLite User schema 缺少有效账号索引')
-  expect(pgSchema.includes('provider = "postgresql"') && /deletedAt\s+DateTime\?/.test(pgSchema), 'PostgreSQL schema 未同步 deletedAt')
+  expect(/deletedAt\s+DateTime\?/.test(sqliteUser), 'SQLite User schema 缺少 deletedAt DateTime?')
+  expect(/@@index\(\[orgId, role, enabled, deletedAt\]\)/.test(sqliteUser), 'SQLite User schema 缺少有效账号索引')
+  expect(pgSchema.includes('provider = "postgresql"') && /deletedAt\s+DateTime\?/.test(pgUser), 'PostgreSQL schema 未同步 deletedAt')
   expect(sqliteMigration.includes('ADD COLUMN "deletedAt"') && sqliteMigration.includes('User_orgId_role_enabled_deletedAt_idx'), 'SQLite tombstone migration 不完整')
   expect(pgMigration.includes('ADD COLUMN "deletedAt"') && pgMigration.includes('User_orgId_role_enabled_deletedAt_idx'), 'PostgreSQL tombstone migration 不完整')
   ```
@@ -107,6 +109,8 @@
   Run: `pnpm --filter @ai-job-print/api exec prisma migrate deploy && pnpm --filter @ai-job-print/api db:pg:sync && pnpm --filter @ai-job-print/api db:pg:sync --check && pnpm --filter @ai-job-print/api db:pg:generate && pnpm --filter @ai-job-print/api verify:admin-orgs-delete-schema && pnpm --filter @ai-job-print/api typecheck`
 
   Expected: 本地 SQLite 验证库已应用新增 migration，`postgres schema 同步校验通过`，且生成的 PG client 包含 `deletedAt`。此命令只使用本地 `file:` 验证库；不得指向 PostgreSQL 生产连接。
+
+  **已授权本机例外（2026-07-16）：** 若未改动的 `main` 在同一临时 SQLite URL 上也复现 Prisma schema-engine 无详情错误，则不使用 `db push` 规避。改为逐条执行 `prisma/migrations/*/migration.sql` 到一个新建临时 SQLite 文件，并运行本 schema 门禁与 typecheck；保留 `prisma migrate deploy` / `status` 给 CI 或干净运行环境复验，最终审查和进度记录必须如实说明这一点。
 
 - [ ] **Step 6: 核验 migration 对称性并提交。**
 
