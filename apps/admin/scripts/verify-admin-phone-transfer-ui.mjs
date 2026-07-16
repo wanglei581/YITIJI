@@ -24,7 +24,8 @@ if (!existsSync(authPath)) {
 
 const authSource = readFileSync(authPath, 'utf8')
 const PASSWORD_SENTINEL = '__ADMIN_TRANSFER_PASSWORD_SENTINEL__'
-const PHONE_SENTINEL = '__ADMIN_TRANSFER_PHONE_SENTINEL__'
+// 合法中国大陆手机号，仅用于隔离 VM 哨兵；任何测试输出和持久化都必须拒绝它。
+const PHONE_SENTINEL = '13812341234'
 const OTP_SENTINEL = '__ADMIN_TRANSFER_OTP_SENTINEL__'
 const TICKET_SENTINEL = '11111111-1111-4111-8111-111111111111'
 const SENSITIVE_SENTINELS = [PASSWORD_SENTINEL, PHONE_SENTINEL, OTP_SENTINEL, TICKET_SENTINEL]
@@ -130,12 +131,19 @@ function renderConsoleValue(value) {
 
 function createConsoleSpy() {
   const calls = []
-  const api = Object.fromEntries(
-    ['log', 'error', 'warn', 'info', 'debug', 'trace'].map((method) => [
-      method,
-      (...args) => calls.push({ method, text: args.map(renderConsoleValue).join(' ') }),
-    ]),
-  )
+  const methods = new Map()
+  const api = new Proxy(console, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target)
+      if (typeof value !== 'function') return value
+      if (!methods.has(property)) {
+        methods.set(property, (...args) => {
+          calls.push({ method: String(property), text: args.map(renderConsoleValue).join(' ') })
+        })
+      }
+      return methods.get(property)
+    },
+  })
   return { api, calls }
 }
 
@@ -265,6 +273,15 @@ function assertPostRequest(harness, path, body, label) {
 }
 
 async function verifyAdminPhoneTransferAdapterBehavior() {
+  const nativeNonFunctionProperty = Reflect.ownKeys(console)
+    .find((property) => typeof Reflect.get(console, property, console) !== 'function')
+  expect(nativeNonFunctionProperty !== undefined, 'console spy contract needs a native non-function property')
+  const consoleContract = createConsoleSpy()
+  expect(
+    Reflect.get(consoleContract.api, nativeNonFunctionProperty) === Reflect.get(console, nativeNonFunctionProperty, console),
+    'console Proxy must preserve native non-function properties',
+  )
+
   for (const name of ['startAdminPhoneTransfer', 'verifyAdminPhoneTransfer', 'cancelAdminPhoneTransfer']) {
     expect(typeof createAdminAuthAdapterHarness([]).auth[name] === 'function', `missing ${name} adapter`)
   }
@@ -397,6 +414,17 @@ async function verifyMutationProbes() {
   expect(consoleResult.ok, 'helper console.warn mutation must reach the assertion')
   expectProbeRejected('helper console.warn', () => assertNoSensitiveConsole(consoleHarness, 'helper console.warn probe'))
 
+  const consoleTableMutation = mutateOnce(
+    authSource,
+    '  let res: Response\n  try {',
+    '  console.table(body)\n  let res: Response\n  try {',
+    'helper console.table',
+  )
+  const consoleTableHarness = createAdminAuthAdapterHarness([okResponse(validStartData())], { source: consoleTableMutation })
+  const consoleTableResult = await consoleTableHarness.auth.startAdminPhoneTransfer(PASSWORD_SENTINEL, PHONE_SENTINEL)
+  expect(consoleTableResult.ok, 'helper console.table mutation must reach the assertion')
+  expectProbeRejected('helper console.table', () => assertNoSensitiveConsole(consoleTableHarness, 'helper console.table probe'))
+
   const wrongPrefixHarness = createAdminAuthAdapterHarness([okResponse(validStartData())], {
     apiBaseUrl: 'https://wrong-prefix.invalid',
   })
@@ -444,7 +472,7 @@ try {
 
 try {
   await verifyMutationProbes()
-  pass('故障探针拒绝 helper console.warn、错误 URL 前缀、verify GET 与失败分支持久化回退')
+  pass('故障探针拒绝任意 helper console 方法、错误 URL 前缀、verify GET 与失败分支持久化回退')
 } catch (error) {
   fail(`Admin 手机号转移 mutation verification 失败: ${error instanceof Error ? error.message : String(error)}`)
 }
