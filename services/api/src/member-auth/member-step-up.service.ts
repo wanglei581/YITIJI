@@ -47,6 +47,7 @@ interface StepUpGrantRecord {
   endUserId: string
   action: MemberStepUpAction
   deviceDigest: string | null
+  statusChangedAt: string | null
 }
 
 export interface SendStepUpChallengeInput {
@@ -96,7 +97,8 @@ export class MemberStepUpService {
     if (!user || !user.enabled || user.status !== 'active') throw this.accountUnavailable()
 
     const cooldownKey = this.k.cooldown(endUserId, input.action)
-    if (!await this.redis.setNxEx(cooldownKey, '1', SEND_COOLDOWN_SECONDS)) {
+    const cooldownOwner = randomUUID()
+    if (!await this.redis.setNxEx(cooldownKey, cooldownOwner, SEND_COOLDOWN_SECONDS)) {
       throw this.tooMany('STEP_UP_SEND_TOO_FREQUENT', '验证码发送过于频繁，请稍后再试')
     }
 
@@ -121,12 +123,15 @@ export class MemberStepUpService {
       await this.redis.setEx(this.k.attempt(challengeId), CHALLENGE_TTL_SECONDS, '0')
 
       let phoneMasked: string
+      let deliveryAttempted = false
       try {
         const phone = decryptPhone(user.phoneEnc)
-        await this.sms.sendCode(phone, code)
         phoneMasked = maskPhone(phone)
+        deliveryAttempted = true
+        await this.sms.sendCode(phone, code)
       } catch {
-        await this.cleanupFailedSend(challengeId, cooldownKey, reservationKeys)
+        if (deliveryAttempted) await this.cleanupChallenge(challengeId)
+        else await this.cleanupBeforeDelivery(challengeId, cooldownKey, cooldownOwner, reservationKeys)
         throw this.smsSendFailed()
       }
 
@@ -138,7 +143,7 @@ export class MemberStepUpService {
       }
     } catch (error) {
       if (!(error instanceof HttpException && this.errorCode(error) === 'SMS_SEND_FAILED')) {
-        await this.cleanupFailedSend(challengeId, cooldownKey, reservationKeys)
+        await this.cleanupBeforeDelivery(challengeId, cooldownKey, cooldownOwner, reservationKeys)
       }
       throw error
     }
@@ -148,50 +153,34 @@ export class MemberStepUpService {
     endUserId: string,
     input: VerifyStepUpChallengeInput,
   ): Promise<VerifyStepUpChallengeResult> {
-    const metaKey = this.k.meta(input.challengeId)
-    const codeKey = this.k.code(input.challengeId)
-    const attemptKey = this.k.attempt(input.challengeId)
-    const record = this.parseChallenge(await this.redis.get(metaKey))
+    const challenge = await this.redis.consumeMemberStepUpChallenge(
+      endUserId,
+      input.challengeId,
+      this.codeDigest(input.challengeId, input.code),
+      MAX_VERIFY_ATTEMPTS,
+    )
+    if (challenge.status === 'missing' || challenge.status === 'owner_mismatch') {
+      throw this.challengeInvalid()
+    }
+    if (challenge.status === 'mismatched') throw this.codeInvalid()
+
+    const record = this.parseChallenge(challenge.meta)
     if (!record || record.endUserId !== endUserId) throw this.challengeInvalid()
 
+    // 状态检查必须发生在 challenge 原子消费之后，状态变化时绝不签发 grant。
     const user = await this.prisma.endUser.findUnique({
       where: { id: endUserId },
-      select: { enabled: true, status: true },
+      select: { enabled: true, status: true, statusChangedAt: true },
     })
     if (!user || !user.enabled || user.status !== 'active') throw this.accountUnavailable()
-
-    const codeStatus = await this.redis.getAndDelIfEquals(
-      codeKey,
-      this.codeDigest(input.challengeId, input.code),
-    )
-    if (codeStatus === 'missing') {
-      await Promise.allSettled([this.redis.del(metaKey), this.redis.del(attemptKey)])
-      throw this.challengeInvalid()
-    }
-    if (codeStatus === 'mismatched') {
-      const attempts = await this.redis.incrWithTtl(attemptKey, CHALLENGE_TTL_SECONDS)
-      if (attempts >= MAX_VERIFY_ATTEMPTS) {
-        await Promise.allSettled([
-          this.redis.del(metaKey),
-          this.redis.del(codeKey),
-          this.redis.del(attemptKey),
-        ])
-      }
-      throw this.codeInvalid()
-    }
-
-    const consumedRecord = this.parseChallenge(await this.redis.getDel(metaKey))
-    await this.redis.del(attemptKey)
-    if (!consumedRecord || !this.sameChallenge(record, consumedRecord) || consumedRecord.endUserId !== endUserId) {
-      throw this.challengeInvalid()
-    }
 
     const stepUpToken = randomBytes(32).toString('base64url')
     const tokenHash = createHash('sha256').update(stepUpToken).digest('hex')
     const grant: StepUpGrantRecord = {
       endUserId,
-      action: consumedRecord.action,
-      deviceDigest: consumedRecord.deviceDigest,
+      action: record.action,
+      deviceDigest: record.deviceDigest,
+      statusChangedAt: user.statusChangedAt?.toISOString() ?? null,
     }
     await this.redis.registerMemberStepUpGrant(
       endUserId,
@@ -199,7 +188,7 @@ export class MemberStepUpService {
       GRANT_TTL_SECONDS,
       JSON.stringify(grant),
     )
-    return { stepUpToken, action: consumedRecord.action, expiresInSeconds: GRANT_TTL_SECONDS }
+    return { stepUpToken, action: record.action, expiresInSeconds: GRANT_TTL_SECONDS }
   }
 
   async consumeGrant(
@@ -213,6 +202,21 @@ export class MemberStepUpService {
     const tokenHash = createHash('sha256').update(token).digest('hex')
     const grant = this.parseGrant(await this.redis.getDelMemberStepUpGrant(endUserId, tokenHash))
     if (!grant || grant.endUserId !== endUserId || grant.action !== action) throw this.tokenInvalid()
+
+    // grant 先原子消费再复核状态：被禁用/注销中的账号不能使用旧授权，
+    // 且重新启用后也不能复活已经被拒绝的 token。
+    const user = await this.prisma.endUser.findUnique({
+      where: { id: endUserId },
+      select: { enabled: true, status: true, statusChangedAt: true },
+    })
+    if (!user || !user.enabled || user.status !== 'active') {
+      await this.redis.revokeMemberStepUpGrants(endUserId)
+      throw this.accountUnavailable()
+    }
+    if ((user.statusChangedAt?.toISOString() ?? null) !== grant.statusChangedAt) {
+      await this.redis.revokeMemberStepUpGrants(endUserId)
+      throw this.tokenInvalid()
+    }
 
     const currentDeviceDigest = deviceId ? this.hmacDigest('device', deviceId) : null
     const deviceMatched = grant.deviceDigest === currentDeviceDigest
@@ -248,21 +252,26 @@ export class MemberStepUpService {
     reservations.push(key)
   }
 
-  private async cleanupFailedSend(
+  private async cleanupBeforeDelivery(
     challengeId: string | null,
     cooldownKey: string,
+    cooldownOwner: string,
     reservationKeys: string[],
   ): Promise<void> {
-    const cleanup: Array<Promise<unknown>> = [this.redis.del(cooldownKey)]
-    if (challengeId) {
-      cleanup.push(
-        this.redis.del(this.k.meta(challengeId)),
-        this.redis.del(this.k.code(challengeId)),
-        this.redis.del(this.k.attempt(challengeId)),
-      )
-    }
+    const cleanup: Array<Promise<unknown>> = [
+      this.redis.getAndDelIfEquals(cooldownKey, cooldownOwner),
+    ]
+    if (challengeId) cleanup.push(this.cleanupChallenge(challengeId))
     cleanup.push(...reservationKeys.map((key) => this.redis.releaseReservedLimit(key)))
     await Promise.allSettled(cleanup)
+  }
+
+  private async cleanupChallenge(challengeId: string): Promise<void> {
+    await Promise.allSettled([
+      this.redis.del(this.k.meta(challengeId)),
+      this.redis.del(this.k.code(challengeId)),
+      this.redis.del(this.k.attempt(challengeId)),
+    ])
   }
 
   private codeDigest(challengeId: string, code: string): string {
@@ -296,13 +305,15 @@ export class MemberStepUpService {
   }
 
   private parseGrant(raw: string | null): StepUpGrantRecord | null {
-    const parsed = this.parseObject(raw, ['action', 'deviceDigest', 'endUserId'])
+    const parsed = this.parseObject(raw, ['action', 'deviceDigest', 'endUserId', 'statusChangedAt'])
     if (!parsed || typeof parsed['endUserId'] !== 'string' || !parsed['endUserId']) return null
     if (!this.isAction(parsed['action']) || !this.isOptionalDigest(parsed['deviceDigest'])) return null
+    if (!this.isOptionalIsoDate(parsed['statusChangedAt'])) return null
     return {
       endUserId: parsed['endUserId'],
       action: parsed['action'],
       deviceDigest: parsed['deviceDigest'],
+      statusChangedAt: parsed['statusChangedAt'],
     }
   }
 
@@ -319,13 +330,6 @@ export class MemberStepUpService {
     }
   }
 
-  private sameChallenge(left: StepUpChallengeRecord, right: StepUpChallengeRecord): boolean {
-    return left.endUserId === right.endUserId
-      && left.action === right.action
-      && left.deviceDigest === right.deviceDigest
-      && left.createdAt === right.createdAt
-  }
-
   private isAction(value: unknown): value is MemberStepUpAction {
     return typeof value === 'string'
       && (MEMBER_STEP_UP_ACTIONS as readonly string[]).includes(value)
@@ -338,6 +342,10 @@ export class MemberStepUpService {
   private isIsoDate(value: string): boolean {
     const parsed = new Date(value)
     return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value
+  }
+
+  private isOptionalIsoDate(value: unknown): value is string | null {
+    return value === null || (typeof value === 'string' && this.isIsoDate(value))
   }
 
   private hourBucket(): string {

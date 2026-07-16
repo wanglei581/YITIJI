@@ -3,264 +3,44 @@ import 'dotenv/config'
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { format } from 'node:util'
-import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
+import { BadRequestException, ValidationPipe } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Redis } from 'ioredis'
 import { MEMBER_STEP_UP_ACTIONS } from '../../../packages/shared/src/types/member-privacy'
 import { MEMBER_STEP_UP_ACTIONS as API_MEMBER_STEP_UP_ACTIONS } from '../src/member-auth/member-step-up.types'
 import { SMS_SENDER, type SmsSender } from '../src/member-auth/sms/sms-sender'
+import {
+  verifyCorruptAttemptMatrix,
+  verifyGrantRedisInvariants,
+} from './verify-member-step-up-adversarial'
+import {
+  FakeSmsSender,
+  type ChallengeResult,
+  type GrantResult,
+  type StepUpAction,
+  type StepUpRedis,
+  type StepUpService,
+  type StepUpServiceConstructor,
+  assert,
+  assertNoSensitive,
+  errorCode,
+  expectCode,
+  flattenValidationErrors,
+  installOutputCapture,
+  isAllowedTestDatabase,
+  ownedKeys,
+  pass,
+  redisValue,
+  registerSensitive,
+  scanKeys,
+  skip,
+  trackRedisWrites,
+  verifyStepUpDtoValidation,
+  withTestEnv,
+} from './verify-member-step-up.helpers'
 
-type StepUpAction = (typeof MEMBER_STEP_UP_ACTIONS)[number]
 type Json = Record<string, unknown>
-
-interface ChallengeResult {
-  challengeId: string
-  phoneMasked: string
-  expiresInSeconds: number
-  cooldownSeconds: number
-}
-interface GrantResult {
-  stepUpToken: string
-  action: StepUpAction
-  expiresInSeconds: number
-}
-interface StepUpService {
-  sendChallenge(endUserId: string, input: {
-    action: StepUpAction
-    deviceId?: string
-    ip: string
-  }): Promise<ChallengeResult>
-  verifyChallenge(endUserId: string, input: {
-    challengeId: string
-    code: string
-    deviceId?: string
-  }): Promise<GrantResult>
-  consumeGrant(endUserId: string, action: StepUpAction, token: string, deviceId?: string): Promise<unknown>
-}
-type StepUpServiceConstructor = new (...args: unknown[]) => StepUpService
-type StepUpRedis = {
-  registerMemberStepUpGrant(
-    endUserId: string,
-    tokenHash: string,
-    ttlSeconds: number,
-    payload: string,
-  ): Promise<void>
-  getDelMemberStepUpGrant(endUserId: string, tokenHash: string): Promise<string | null>
-  revokeMemberStepUpGrants(endUserId: string): Promise<number>
-}
-type TrackableRedisWrites = {
-  setEx(key: string, ttlSeconds: number, value: string): Promise<void>
-  setNxEx(key: string, value: string, ttlSeconds: number): Promise<boolean>
-  incrWithTtl(key: string, ttlSeconds: number): Promise<number>
-  reserveWithinLimitWithTtl(key: string, ttlSeconds: number, limit: number): Promise<boolean>
-}
-
-const TEST_ENV = {
-  NODE_ENV: 'test',
-  SMS_PROVIDER: 'log',
-  JWT_SECRET: 'ci-only-member-step-up-jwt-secret-0123456789',
-  SECRET_ENCRYPTION_KEY: 'ci-only-member-step-up-encryption-key-0123456789',
-  TERMINAL_ADMIN_SECRET: 'ci-only-member-step-up-terminal-admin-secret',
-  TERMINAL_ACTION_TOKEN_SECRET: 'ci-only-member-step-up-terminal-action-secret',
-  MEMBER_STEP_UP_TTL_SECONDS: '60',
-} as const
-const sensitiveValues = new Set<string>()
-
-function registerSensitive(value: string | undefined): void {
-  if (value) sensitiveValues.add(value)
-}
-
-function redact(text: string): string {
-  let output = text
-  for (const secret of [...sensitiveValues].sort((a, b) => b.length - a.length)) {
-    output = output.split(secret).join('[redacted]')
-  }
-  return output
-    .replace(/\b1[3-9]\d{9}\b/g, '[redacted-phone]')
-    .replace(/\b\d{6}\b/g, '[redacted-code]')
-    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[redacted-token]')
-}
-
-function installOutputCapture(): { raw: string[]; restore: () => void } {
-  const raw: string[] = []
-  const original = {
-    log: console.log.bind(console),
-    info: console.info.bind(console),
-    debug: console.debug.bind(console),
-    warn: console.warn.bind(console),
-    error: console.error.bind(console),
-  }
-  console.log = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.log(redact(line)) }
-  console.info = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.info(redact(line)) }
-  console.debug = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.debug(redact(line)) }
-  console.warn = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.warn(redact(line)) }
-  console.error = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.error(redact(line)) }
-  return {
-    raw,
-    restore: () => {
-      console.log = original.log
-      console.info = original.info
-      console.debug = original.debug
-      console.warn = original.warn
-      console.error = original.error
-    },
-  }
-}
-
-async function withTestEnv(run: () => Promise<void>): Promise<void> {
-  const previous = new Map<string, string | undefined>()
-  for (const [key, value] of Object.entries(TEST_ENV)) {
-    previous.set(key, process.env[key])
-    process.env[key] = value
-  }
-  try {
-    await run()
-  } finally {
-    for (const [key, value] of previous) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
-  }
-}
-
-class FakeSmsSender implements SmsSender {
-  private code: string | null = null
-  private phone: string | null = null
-  private rejectNext = false
-  failNextSend(): void { this.rejectNext = true }
-  clear(): void { this.code = null; this.phone = null }
-  hasCode(): boolean { return this.code !== null }
-  lastDelivery(): { phone: string; code: string } {
-    if (!this.phone || !this.code) throw new Error('FakeSmsSender did not receive a complete delivery')
-    return { phone: this.phone, code: this.code }
-  }
-  async sendCode(phone: string, code: string): Promise<void> {
-    this.phone = phone
-    this.code = code
-    if (this.rejectNext) {
-      this.rejectNext = false
-      throw new Error('fake provider unavailable')
-    }
-  }
-}
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(message)
-}
-function pass(message: string): void { console.log(`  PASS ${message}`) }
-function skip(message: string): void { console.log(`  SKIP ${message}`) }
-
-function flatten(errors: ValidationError[], parent = ''): string[] {
-  return errors.flatMap((error) => {
-    const path = parent ? `${parent}.${error.property}` : error.property
-    const own = error.constraints ? Object.values(error.constraints).map((message) => `${path}: ${message}`) : []
-    return [...own, ...(error.children?.length ? flatten(error.children, path) : [])]
-  })
-}
-
-function errorCode(error: unknown): string | undefined {
-  const response = (error as { getResponse?: () => unknown }).getResponse?.()
-  return ((response as { error?: { code?: string } } | undefined)?.error?.code)
-    ?? (error as { code?: string }).code
-}
-
-async function expectCode(fn: () => Promise<unknown>, expected: string, label: string): Promise<void> {
-  try {
-    await fn()
-  } catch (error) {
-    assert(errorCode(error) === expected, `${label}: expected ${expected}, got ${errorCode(error) ?? 'unknown'}`)
-    pass(label)
-    return
-  }
-  throw new Error(`${label}: expected rejection`)
-}
-
-async function scanKeys(redis: Redis): Promise<string[]> {
-  const output = new Set<string>()
-  for (const pattern of ['member:step-up:*', 'member:user-step-up-grants:*']) {
-    let cursor = '0'
-    do {
-      const result = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
-      cursor = result[0]
-      result[1].forEach((key) => output.add(key))
-    } while (cursor !== '0')
-  }
-  return [...output]
-}
-
-async function redisValue(redis: Redis, key: string): Promise<string> {
-  const type = await redis.type(key)
-  if (type === 'string') return (await redis.get(key)) ?? ''
-  if (type === 'set') return (await redis.smembers(key)).join('|')
-  if (type === 'hash') return JSON.stringify(await redis.hgetall(key))
-  return ''
-}
-
-async function ownedKeys(redis: Redis, markers: string[]): Promise<string[]> {
-  const output: string[] = []
-  for (const key of await scanKeys(redis)) {
-    if (markers.some((marker) => key.includes(marker))) {
-      output.push(key)
-      continue
-    }
-    const value = await redisValue(redis, key)
-    if (markers.some((marker) => value.includes(marker))) output.push(key)
-  }
-  return output
-}
-
-function trackRedisWrites(redis: TrackableRedisWrites): { keys: Set<string>; restore: () => void } {
-  const keys = new Set<string>()
-  const original = {
-    setEx: redis.setEx,
-    setNxEx: redis.setNxEx,
-    incrWithTtl: redis.incrWithTtl,
-    reserveWithinLimitWithTtl: redis.reserveWithinLimitWithTtl,
-  }
-  redis.setEx = function (key, ttlSeconds, value) {
-    keys.add(key)
-    return original.setEx.call(this, key, ttlSeconds, value)
-  }
-  redis.setNxEx = function (key, value, ttlSeconds) {
-    keys.add(key)
-    return original.setNxEx.call(this, key, value, ttlSeconds)
-  }
-  redis.incrWithTtl = function (key, ttlSeconds) {
-    keys.add(key)
-    return original.incrWithTtl.call(this, key, ttlSeconds)
-  }
-  redis.reserveWithinLimitWithTtl = function (key, ttlSeconds, limit) {
-    keys.add(key)
-    return original.reserveWithinLimitWithTtl.call(this, key, ttlSeconds, limit)
-  }
-  return {
-    keys,
-    restore: () => {
-      redis.setEx = original.setEx
-      redis.setNxEx = original.setNxEx
-      redis.incrWithTtl = original.incrWithTtl
-      redis.reserveWithinLimitWithTtl = original.reserveWithinLimitWithTtl
-    },
-  }
-}
-
-function isAllowedTestDatabase(databaseUrl: string): boolean {
-  if (databaseUrl.startsWith('file:')) return true
-  try {
-    const parsed = new URL(databaseUrl)
-    return ['postgres:', 'postgresql:'].includes(parsed.protocol)
-      && ['127.0.0.1', 'localhost'].includes(parsed.hostname)
-      && parsed.username === 'ci'
-      && parsed.pathname === '/ai_job_print_ci'
-  } catch {
-    return false
-  }
-}
-
-function assertNoSensitive(text: string, label: string): void {
-  const leaked = [...sensitiveValues].find((value) => text.includes(value))
-  assert(!leaked, `${label} contains a raw phone, code, grant token, or device identifier`)
-}
+type DtoConstructor = new () => object
 
 async function execute(capturedOutput: string[]): Promise<void> {
   console.log('\n=== member step-up security integration contract ===')
@@ -289,10 +69,12 @@ async function execute(capturedOutput: string[]): Promise<void> {
     throw new Error('RED: member step-up DTO 尚未实现（expected Task 5 failure）')
   }
   const dto = (await import(dtoFile)) as {
-    SendMemberStepUpCodeDto?: unknown
-    VerifyMemberStepUpDto?: unknown
+    SendMemberStepUpCodeDto?: DtoConstructor
+    VerifyMemberStepUpDto?: DtoConstructor
   }
   assert(dto.SendMemberStepUpCodeDto && dto.VerifyMemberStepUpDto, 'member step-up DTO exports are missing')
+
+  await verifyStepUpDtoValidation(dto.SendMemberStepUpCodeDto, dto.VerifyMemberStepUpDto)
 
   const databaseUrl = process.env['DATABASE_URL'] ?? ''
   assert(isAllowedTestDatabase(databaseUrl),
@@ -328,7 +110,8 @@ async function execute(capturedOutput: string[]): Promise<void> {
     forbidNonWhitelisted: true,
     transform: true,
     exceptionFactory: (errors) => new BadRequestException({
-      error: { code: 'VALIDATION_FAILED', message: flatten(errors)[0] ?? '请求参数校验失败', details: flatten(errors) },
+      error: { code: 'VALIDATION_FAILED', message: flattenValidationErrors(errors)[0] ?? '请求参数校验失败',
+        details: flattenValidationErrors(errors) },
     }),
   }))
   app.useGlobalFilters(new HttpExceptionFilter())
@@ -508,6 +291,12 @@ async function execute(capturedOutput: string[]): Promise<void> {
     )
     const bindingCode = deliveryCode(bindingOwner.id)
     assertChallenge(bindingChallenge, bindingOwner.id, bindingCode)
+    const bindingPrefix = `member:step-up:challenge:${bindingChallenge.challengeId}`
+    for (const suffix of ['meta', 'code', 'attempt']) {
+      const ttl = await rawRedis.ttl(`${bindingPrefix}:${suffix}`)
+      assert(ttl > 0 && ttl <= 60, `live challenge ${suffix} TTL must be within 1..60 seconds`)
+    }
+    pass('live challenge meta/code/attempt keys have the configured Redis TTL')
     const bindingKeys = await ownedKeys(rawRedis, [bindingOwner.id, bindingChallenge.challengeId])
     const bindingRedis = [
       ...bindingKeys,
@@ -529,6 +318,12 @@ async function execute(capturedOutput: string[]): Promise<void> {
       { challengeId: bindingChallenge.challengeId, code: bindingCode, deviceId: bindingDevice },
     )
     assertGrant(bindingGrant, 'export_data_request')
+    const bindingGrantHash = createHash('sha256').update(bindingGrant.stepUpToken).digest('hex')
+    const bindingGrantTtl = await rawRedis.ttl(`member:step-up:grant:${bindingGrantHash}`)
+    const bindingIndexTtl = await rawRedis.ttl(`member:user-step-up-grants:${bindingOwner.id}`)
+    assert(bindingGrantTtl > 0 && bindingGrantTtl <= 60, 'live grant TTL must be within 1..60 seconds')
+    assert(bindingIndexTtl > 0 && bindingIndexTtl <= 60, 'live grant owner-index TTL must be within 1..60 seconds')
+    pass('live grant and owner index have the configured Redis TTL')
 
     const fourAttemptsUser = await createUser('attempts-four')
     const fourAttemptsDevice = testDevice('KSK-ATTEMPTS-FOUR')
@@ -592,6 +387,19 @@ async function execute(capturedOutput: string[]): Promise<void> {
       '5B. challenge is invalidated at five wrong codes',
     )
 
+    await verifyCorruptAttemptMatrix({
+      rawRedis,
+      service,
+      createChallenge: async (label) => {
+        const user = await createUser(label)
+        sms.clear()
+        const challenge = await service.sendChallenge(user.id, stepUpInput(user.id, 'export_data_request'))
+        const code = deliveryCode(user.id)
+        assertChallenge(challenge, user.id, code)
+        return { endUserId: user.id, challengeId: challenge.challengeId, code }
+      },
+    })
+
     const onceUser = await createUser('challenge-once')
     sms.clear()
     const onceChallenge = await service.sendChallenge(
@@ -607,6 +415,44 @@ async function execute(capturedOutput: string[]): Promise<void> {
       'STEP_UP_CHALLENGE_INVALID',
       '6. a correct code consumes its challenge exactly once',
     )
+
+    const concurrentVerifyUser = await createUser('concurrent-verify')
+    sms.clear()
+    const concurrentChallenge = await service.sendChallenge(
+      concurrentVerifyUser.id,
+      stepUpInput(concurrentVerifyUser.id, 'export_data_request'),
+    )
+    const concurrentCode = deliveryCode(concurrentVerifyUser.id)
+    assertChallenge(concurrentChallenge, concurrentVerifyUser.id, concurrentCode)
+    const concurrentVerify = await Promise.allSettled([
+      service.verifyChallenge(concurrentVerifyUser.id, {
+        challengeId: concurrentChallenge.challengeId,
+        code: concurrentCode,
+      }),
+      service.verifyChallenge(concurrentVerifyUser.id, {
+        challengeId: concurrentChallenge.challengeId,
+        code: concurrentCode,
+      }),
+    ])
+    const concurrentVerifyWinners = concurrentVerify.filter(
+      (result): result is PromiseFulfilledResult<GrantResult> => result.status === 'fulfilled',
+    )
+    const concurrentVerifyLosers = concurrentVerify.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    )
+    assert(
+      concurrentVerifyWinners.length === 1
+        && concurrentVerifyLosers.length === 1
+        && errorCode(concurrentVerifyLosers[0]?.reason) === 'STEP_UP_CHALLENGE_INVALID',
+      'concurrent correct-code verification must have exactly one winner and one invalid-challenge loser',
+    )
+    assertGrant(concurrentVerifyWinners[0].value, 'export_data_request')
+    await service.consumeGrant(
+      concurrentVerifyUser.id,
+      'export_data_request',
+      concurrentVerifyWinners[0].value.stepUpToken,
+    )
+    pass('concurrent correct-code verification has exactly one winner')
 
     const grantOwner = await createUser('grant-owner')
     const grantOther = await createUser('grant-other')
@@ -702,6 +548,92 @@ async function execute(capturedOutput: string[]): Promise<void> {
       assert(!sms.hasCode(), `${status} account rejection must happen before SMS dispatch`)
     }
 
+    const independentGateCases = [
+      { label: 'enabled-false-status-active', enabled: false, status: 'active' },
+      { label: 'enabled-true-status-disabled', enabled: true, status: 'disabled' },
+      { label: 'enabled-true-status-closing', enabled: true, status: 'closing' },
+    ] as const
+    for (const gate of independentGateCases) {
+      const unavailable = await createUser(gate.label)
+      await prisma.endUser.update({
+        where: { id: unavailable.id },
+        data: { enabled: gate.enabled, status: gate.status, statusChangedAt: new Date() },
+      })
+      sms.clear()
+      await expectCode(
+        () => service.sendChallenge(unavailable.id, stepUpInput(unavailable.id, 'close_account')),
+        'ACCOUNT_UNAVAILABLE',
+        `11. independent account gate rejects ${gate.label}`,
+      )
+      assert(!sms.hasCode(), `${gate.label} rejection must happen before SMS dispatch`)
+    }
+
+    const verifyGateCases = [
+      { label: 'enabled-false-status-active', enabled: false, status: 'active' },
+      { label: 'enabled-true-status-disabled', enabled: true, status: 'disabled' },
+      { label: 'enabled-true-status-closing', enabled: true, status: 'closing' },
+    ] as const
+    for (const gate of verifyGateCases) {
+      const changed = await createUser(`challenge-status-flip-${gate.label}`)
+      sms.clear()
+      const challenge = await service.sendChallenge(changed.id, stepUpInput(changed.id, 'close_account'))
+      const code = deliveryCode(changed.id)
+      assertChallenge(challenge, changed.id, code)
+      await prisma.endUser.update({
+        where: { id: changed.id },
+        data: { enabled: gate.enabled, status: gate.status, statusChangedAt: new Date() },
+      })
+      await expectCode(
+        () => service.verifyChallenge(changed.id, { challengeId: challenge.challengeId, code }),
+        'ACCOUNT_UNAVAILABLE',
+        `11. verify gate independently rejects ${gate.label}`,
+      )
+      const prefix = `member:step-up:challenge:${challenge.challengeId}`
+      for (const suffix of ['meta', 'code', 'attempt']) {
+        assert(await rawRedis.exists(`${prefix}:${suffix}`) === 0,
+          `${gate.label} verification rejection must consume the stale challenge ${suffix}`)
+      }
+      assert(await rawRedis.exists(`member:user-step-up-grants:${changed.id}`) === 0,
+        `${gate.label} verification rejection must not create a grant index`)
+    }
+
+    const disabledGrantUser = await createUser('grant-status-flip')
+    const disabledGrant = await issueGrant(disabledGrantUser.id, 'export_data_request')
+    await prisma.endUser.update({
+      where: { id: disabledGrantUser.id },
+      data: { enabled: false, status: 'disabled', statusChangedAt: new Date() },
+    })
+    await expectCode(
+      () => service.consumeGrant(disabledGrantUser.id, 'export_data_request', disabledGrant.stepUpToken),
+      'ACCOUNT_UNAVAILABLE',
+      '11. an existing grant cannot be consumed after the account becomes disabled',
+    )
+    await prisma.endUser.update({
+      where: { id: disabledGrantUser.id },
+      data: { enabled: true, status: 'active', statusChangedAt: new Date() },
+    })
+    await expectCode(
+      () => service.consumeGrant(disabledGrantUser.id, 'export_data_request', disabledGrant.stepUpToken),
+      'STEP_UP_TOKEN_INVALID',
+      '11. a status-rejected grant is consumed and cannot revive after reactivation',
+    )
+
+    const epochGrantUser = await createUser('grant-status-epoch')
+    const epochGrant = await issueGrant(epochGrantUser.id, 'export_data_request')
+    await prisma.endUser.update({
+      where: { id: epochGrantUser.id },
+      data: { enabled: false, status: 'disabled', statusChangedAt: new Date() },
+    })
+    await prisma.endUser.update({
+      where: { id: epochGrantUser.id },
+      data: { enabled: true, status: 'active', statusChangedAt: new Date() },
+    })
+    await expectCode(
+      () => service.consumeGrant(epochGrantUser.id, 'export_data_request', epochGrant.stepUpToken),
+      'STEP_UP_TOKEN_INVALID',
+      '11. a grant cannot survive a disable/reactivate status epoch change',
+    )
+
     const smsFailureUser = await createUser('sms-failure')
     const smsFailureDevice = testDevice('KSK-SMS-FAIL')
     sms.clear()
@@ -725,11 +657,32 @@ async function execute(capturedOutput: string[]): Promise<void> {
       'failed SMS dispatch must still target the user decrypted phone')
     registerSensitive(failedDelivery.phone)
     registerSensitive(failedDelivery.code)
-    for (const key of failureWrites.keys) {
+    const failedChallengeKeys = [...failureWrites.keys].filter((key) => key.includes(':challenge:'))
+    const retainedAttemptKeys = [...failureWrites.keys].filter(
+      (key) => key.includes(':cooldown:') || key.includes(':rate:'),
+    )
+    assert(failedChallengeKeys.length === 3, 'provider failure fixture must track meta/code/attempt keys')
+    assert(retainedAttemptKeys.length === 3, 'provider failure fixture must track cooldown/IP/device reservations')
+    for (const key of failedChallengeKeys) {
       assert(await rawRedis.exists(key) === 0,
-        'provider failure must clean every key written by this service call')
+        'provider failure must clean challenge meta/code/attempt state')
     }
-    pass('12. provider failure leaves no residual step-up state')
+    for (const key of retainedAttemptKeys) {
+      assert(await rawRedis.exists(key) === 1,
+        'an ambiguous provider failure must retain cooldown and rate reservations')
+      assert(await rawRedis.ttl(key) > 0, 'retained provider-failure reservation must remain bounded by TTL')
+    }
+    sms.clear()
+    await expectCode(
+      () => service.sendChallenge(
+        smsFailureUser.id,
+        stepUpInput(smsFailureUser.id, 'export_data_request', smsFailureDevice),
+      ),
+      'STEP_UP_SEND_TOO_FREQUENT',
+      '12. ambiguous provider failure keeps the resend cooldown',
+    )
+    assert(!sms.hasCode(), 'cooldown rejection after provider failure must happen before another SMS dispatch')
+    pass('12. provider failure removes secrets but retains bounded anti-abuse state')
 
     const revokeOwner = await createUser('revoke-owner')
     const revokeOther = await createUser('revoke-other')
@@ -763,85 +716,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
       'concurrent grant consumption must have exactly one winner and one unified invalid-token rejection')
     pass('concurrent grant consumption has exactly one winner')
 
-    const ttlOwner = await createUser('grant-index-ttl')
-    const longHash = randomBytes(32).toString('hex')
-    const shortHash = randomBytes(32).toString('hex')
-    addRedisMarker(longHash)
-    addRedisMarker(shortHash)
-    const ttlPayload = JSON.stringify({
-      endUserId: ttlOwner.id,
-      action: 'export_data_request',
-      deviceDigest: null,
-    })
-    await stepUpRedis.registerMemberStepUpGrant(ttlOwner.id, longHash, 60, ttlPayload)
-    const ttlIndexKey = `member:user-step-up-grants:${ttlOwner.id}`
-    const indexTtlBefore = await rawRedis.ttl(ttlIndexKey)
-    await stepUpRedis.registerMemberStepUpGrant(ttlOwner.id, shortHash, 5, ttlPayload)
-    const indexTtlAfter = await rawRedis.ttl(ttlIndexKey)
-    assert(indexTtlBefore > 0 && indexTtlAfter >= indexTtlBefore - 1 && indexTtlAfter > 5,
-      'registering a shorter grant must not shrink the whole-user grant index TTL')
-    assert(await stepUpRedis.revokeMemberStepUpGrants(ttlOwner.id) === 2,
-      'TTL anomaly fixture must revoke exactly its two owned grants')
-    pass('grant index TTL is monotonic when a shorter grant is registered')
-
-    const corruptIndexOwner = await createUser('corrupt-index-owner')
-    const protectedOwner = await createUser('corrupt-index-protected')
-    const protectedToken = randomBytes(32).toString('base64url')
-    const protectedHash = createHash('sha256').update(protectedToken).digest('hex')
-    registerSensitive(protectedToken)
-    addRedisMarker(protectedHash)
-    await rawRedis.set(
-      `member:step-up:grant:${protectedHash}`,
-      JSON.stringify({
-        endUserId: protectedOwner.id,
-        action: 'export_data_request',
-        deviceDigest: null,
-      }),
-      'EX',
-      60,
-    )
-    await rawRedis.sadd(`member:user-step-up-grants:${corruptIndexOwner.id}`, protectedHash)
-    await rawRedis.expire(`member:user-step-up-grants:${corruptIndexOwner.id}`, 60)
-    assert(await stepUpRedis.revokeMemberStepUpGrants(corruptIndexOwner.id) === 0,
-      'corrupt foreign index entries must not be counted as owned grant revocations')
-    assert(await rawRedis.exists(`member:step-up:grant:${protectedHash}`) === 1,
-      'whole-user revocation must not delete a grant whose payload belongs to another user')
-    await service.consumeGrant(protectedOwner.id, 'export_data_request', protectedToken)
-    pass('corrupt user index cannot revoke another user grant')
-
-    const collisionOwner = await createUser('grant-collision-owner')
-    const collisionOther = await createUser('grant-collision-other')
-    const collisionHash = randomBytes(32).toString('hex')
-    addRedisMarker(collisionHash)
-    const collisionPayload = JSON.stringify({
-      endUserId: collisionOwner.id,
-      action: 'close_account',
-      deviceDigest: null,
-    })
-    await stepUpRedis.registerMemberStepUpGrant(collisionOwner.id, collisionHash, 60, collisionPayload)
-    let collisionRejected = false
-    try {
-      await stepUpRedis.registerMemberStepUpGrant(
-        collisionOther.id,
-        collisionHash,
-        60,
-        JSON.stringify({
-          endUserId: collisionOther.id,
-          action: 'export_data_request',
-          deviceDigest: null,
-        }),
-      )
-    } catch {
-      collisionRejected = true
-    }
-    assert(collisionRejected, 'grant token-hash collision must fail closed')
-    assert(await rawRedis.get(`member:step-up:grant:${collisionHash}`) === collisionPayload,
-      'grant token-hash collision must not overwrite the original payload')
-    assert(await rawRedis.sismember(`member:user-step-up-grants:${collisionOther.id}`, collisionHash) === 0,
-      'grant token-hash collision must not contaminate the other user index')
-    assert(await stepUpRedis.getDelMemberStepUpGrant(collisionOwner.id, collisionHash) === collisionPayload,
-      'original collision grant must remain atomically consumable by its owner')
-    pass('grant token-hash collision cannot overwrite payload or owner index')
+    await verifyGrantRedisInvariants({ rawRedis, stepUpRedis, service, createUser, addRedisMarker })
 
     const sensitiveKeys = await ownedKeys(rawRedis, [...redisMarkers])
     const sensitiveRedis = (await Promise.all(sensitiveKeys.map(async (key) => (

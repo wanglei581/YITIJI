@@ -3,6 +3,12 @@ import { Redis } from 'ioredis'
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
 
+export type MemberStepUpChallengeConsumeResult =
+  | { status: 'missing' }
+  | { status: 'owner_mismatch' }
+  | { status: 'mismatched'; attempts: number }
+  | { status: 'matched'; meta: string }
+
 /**
  * ioredis 薄封装。阶段 A(member-auth)用于:
  *   - 短信验证码(TTL 5min,用后删除)
@@ -154,6 +160,133 @@ export class RedisService implements OnModuleDestroy {
       endUserId,
     )
     return Number(result)
+  }
+
+  async consumeMemberStepUpChallenge(
+    endUserId: string,
+    challengeId: string,
+    expectedCodeDigest: string,
+    maxAttempts: number,
+  ): Promise<MemberStepUpChallengeConsumeResult> {
+    if (!endUserId || !challengeId || !/^[a-f0-9]{64}$/.test(expectedCodeDigest)) {
+      throw new Error('Invalid member step-up challenge input')
+    }
+    if (!Number.isSafeInteger(maxAttempts) || maxAttempts <= 0) {
+      throw new Error('Invalid member step-up challenge max attempts')
+    }
+
+    const challengeKeyPrefix = `member:step-up:challenge:${challengeId}`
+    const result: unknown = await this.client.eval(
+      `
+      local function keyType(key)
+        local result = redis.call('TYPE', key)
+        if type(result) == 'table' then return result.ok end
+        return result
+      end
+
+      local function clearChallenge()
+        redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
+      end
+
+      local metaType = keyType(KEYS[1])
+      local codeType = keyType(KEYS[2])
+      local attemptType = keyType(KEYS[3])
+      local meta = metaType == 'string' and redis.call('GET', KEYS[1]) or nil
+      local code = codeType == 'string' and redis.call('GET', KEYS[2]) or nil
+      local attempt = attemptType == 'string' and redis.call('GET', KEYS[3]) or nil
+
+      if metaType ~= 'string' or not meta or meta == '' then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      local decodedOk, decoded = pcall(cjson.decode, meta)
+      if not decodedOk or type(decoded) ~= 'table'
+        or type(decoded.endUserId) ~= 'string' or decoded.endUserId == '' then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if decoded.endUserId ~= ARGV[1] then
+        return { 'owner_mismatch' }
+      end
+
+      if codeType ~= 'string' or not code or string.len(code) ~= 64
+        or not string.match(code, '^[0-9a-f]+$') then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if attemptType ~= 'string' or not attempt then
+        clearChallenge()
+        return { 'missing' }
+      end
+      local attemptNumber = tonumber(attempt)
+      if not attemptNumber or attemptNumber < 0
+        or attemptNumber ~= math.floor(attemptNumber)
+        or attemptNumber >= tonumber(ARGV[3]) then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      local metaTtl = redis.call('PTTL', KEYS[1])
+      local codeTtl = redis.call('PTTL', KEYS[2])
+      local attemptTtl = redis.call('PTTL', KEYS[3])
+      if metaTtl <= 0 or codeTtl <= 0 or attemptTtl <= 0 then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if code == ARGV[2] then
+        clearChallenge()
+        return { 'matched', meta }
+      end
+
+      local attempts = redis.pcall('INCR', KEYS[3])
+      if type(attempts) ~= 'number' then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if attempts >= tonumber(ARGV[3]) then
+        clearChallenge()
+      else
+        redis.call('PEXPIRE', KEYS[3], math.min(metaTtl, codeTtl))
+      end
+      return { 'mismatched', attempts }
+      `,
+      3,
+      `${challengeKeyPrefix}:meta`,
+      `${challengeKeyPrefix}:code`,
+      `${challengeKeyPrefix}:attempt`,
+      endUserId,
+      expectedCodeDigest,
+      maxAttempts,
+    )
+
+    if (!Array.isArray(result) || typeof result[0] !== 'string') {
+      throw new Error('Invalid member step-up challenge consume result')
+    }
+    if (result[0] === 'missing' && result.length === 1) return { status: 'missing' }
+    if (result[0] === 'owner_mismatch' && result.length === 1) return { status: 'owner_mismatch' }
+    if (
+      result[0] === 'mismatched'
+      && result.length === 2
+      && typeof result[1] === 'number'
+      && Number.isSafeInteger(result[1])
+      && result[1] > 0
+    ) {
+      return { status: 'mismatched', attempts: result[1] }
+    }
+    if (
+      result[0] === 'matched'
+      && result.length === 2
+      && typeof result[1] === 'string'
+      && result[1] !== ''
+    ) {
+      return { status: 'matched', meta: result[1] }
+    }
+    throw new Error('Invalid member step-up challenge consume result')
   }
 
   async registerMemberStepUpGrant(
