@@ -115,6 +115,10 @@ jobs:
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
 
+      - name: Release provenance fixture
+        # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
+        run: pnpm --filter @ai-job-print/api verify:release-provenance
+
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation

@@ -9,6 +9,8 @@
     "start": "node dist/main.js",
     "start:guarded": "node dist/release-provenance/release-guard.js",
     "release:manifest": "node dist/release-provenance/release-manifest-cli.js",
+    "release:activate": "node dist/release-provenance/release-activation.js",
+    "release:current-launcher": "node dist/release-provenance/release-current-launcher.js",
     "dev": "prisma generate && node -r @swc-node/register src/main.ts",
     "lint": "eslint src/",
     "typecheck": "prisma generate && tsc --noEmit",

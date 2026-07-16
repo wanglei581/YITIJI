@@ -21,9 +21,17 @@ import {
 } from '../src/release-provenance/release-provenance'
 import { runReleaseManifestCli } from '../src/release-provenance/release-manifest-cli'
 import { runReleaseGuard, type SpawnMain } from '../src/release-provenance/release-guard'
+import { runCurrentLauncher, type SpawnGuard } from '../src/release-provenance/release-current-launcher'
+import {
+  activateRelease,
+  type CommandRunner,
+  type HealthProbe,
+} from '../src/release-provenance/release-activation'
 
 const RELEASE_ID = 'release-20260716-a1b2c3d4'
 const GIT_COMMIT = 'a'.repeat(40)
+const PREVIOUS_RELEASE_ID = 'release-20260716-previous'
+const CANDIDATE_RELEASE_ID = 'release-20260716-candidate'
 
 type Fixture = {
   artifactRoot: string
@@ -38,11 +46,11 @@ function writeFixtureFile(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-function createFixture(): Fixture {
-  const workspace = mkdtempSync(join(tmpdir(), 'release-provenance-'))
-  const releaseRoot = join(workspace, 'release')
+function createFixture(options: { workspace?: string; releaseName?: string; sourceArchiveName?: string } = {}): Fixture {
+  const workspace = options.workspace ?? mkdtempSync(join(tmpdir(), 'release-provenance-'))
+  const releaseRoot = join(workspace, options.releaseName ?? 'release')
   const artifactRoot = join(workspace, 'artifacts')
-  const sourceArchivePath = join(workspace, 'source.tar.gz')
+  const sourceArchivePath = join(workspace, options.sourceArchiveName ?? 'source.tar.gz')
   const pnpmPackagePath = join(releaseRoot, 'node_modules/.pnpm/fixture@1.0.0/node_modules/@fixture/pkg')
   const pnpmLinkPath = join(releaseRoot, 'services/api/node_modules/@fixture/pkg')
 
@@ -70,11 +78,11 @@ function createFixture(): Fixture {
   return { artifactRoot, pnpmLinkPath, releaseRoot, sourceArchivePath, workspace }
 }
 
-function createManifest(fixture: Fixture): void {
+function createManifest(fixture: Fixture, releaseId = RELEASE_ID): void {
   const created = createReleaseManifest({
     releaseRoot: fixture.releaseRoot,
     artifactRoot: fixture.artifactRoot,
-    releaseId: RELEASE_ID,
+    releaseId,
     gitCommit: GIT_COMMIT,
     previousReleaseId: null,
     sourceArchivePath: fixture.sourceArchivePath,
@@ -83,9 +91,20 @@ function createManifest(fixture: Fixture): void {
   })
 
   assert.equal(created.manifest.schemaVersion, 1)
-  assert.equal(created.manifest.releaseId, RELEASE_ID)
+  assert.equal(created.manifest.releaseId, releaseId)
   assert.ok(created.manifest.entrypoints['services/api/dist/main.js'])
   assert.ok(created.manifest.entrypoints['services/api/dist/release-provenance/release-guard.js'])
+}
+
+async function expectCodeAsync(expectedCode: string, action: () => Promise<unknown>): Promise<void> {
+  try {
+    await action()
+  } catch (error) {
+    assert.ok(error instanceof ReleaseProvenanceError)
+    assert.equal(error.code, expectedCode)
+    return
+  }
+  assert.fail(`expected ${expectedCode}`)
 }
 
 function createCommand(fixture: Fixture, overrides: Partial<Record<string, string>> = {}): string[] {
@@ -153,6 +172,199 @@ async function verifyGuardLaunch(): Promise<void> {
     assert.equal(await runReleaseGuard({ releaseRoot: fixture.releaseRoot, artifactRoot: fixture.artifactRoot, spawnMain }), 0)
     assert.equal(spawned, true)
     console.log('  PASS guard starts only the fixed API entrypoint from the canonical release root')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyCurrentLauncher(): Promise<void> {
+  const fixture = createFixture()
+  const currentLink = join(fixture.workspace, 'current')
+  try {
+    createManifest(fixture)
+    symlinkSync(fixture.releaseRoot, currentLink)
+    const child = new EventEmitter() as EventEmitter & { kill(signal?: NodeJS.Signals): boolean }
+    child.kill = () => true
+    const spawnGuard: SpawnGuard = (command, args, options) => {
+      const releaseRoot = realpathSync(fixture.releaseRoot)
+      assert.equal(command, process.execPath)
+      assert.deepEqual(args, [
+        join(releaseRoot, 'services/api/dist/release-provenance/release-guard.js'),
+        '--release-root',
+        releaseRoot,
+        '--artifact-root',
+        fixture.artifactRoot,
+      ])
+      assert.equal(options.cwd, releaseRoot)
+      assert.equal(options.stdio, 'inherit')
+      queueMicrotask(() => child.emit('exit', 0, null))
+      return child as ReturnType<SpawnGuard>
+    }
+    assert.equal(await runCurrentLauncher({ currentLink, artifactRoot: fixture.artifactRoot, spawnGuard }), 0)
+    console.log('  PASS stable launcher resolves current and starts only its release guard')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+function pm2Snapshot(cwd: string, execPath: string, currentLink: string, artifactRoot: string): ReturnType<CommandRunner['inspect']> {
+  return {
+    name: 'fixture-api',
+    status: 'online',
+    cwd,
+    execPath,
+    scriptArgs: `--current-link ${currentLink} --artifact-root ${artifactRoot}`,
+  }
+}
+
+type ActivationFixture = {
+  workspace: string
+  previous: Fixture
+  candidate: Fixture
+  currentLink: string
+  healthUrl: string
+  launcherCwd: string
+  launcherPath: string
+  launcherSha256: string
+}
+
+function createActivationFixture(): ActivationFixture {
+  const workspace = mkdtempSync(join(tmpdir(), 'release-activation-'))
+  const previous = createFixture({ workspace, releaseName: 'previous', sourceArchiveName: 'previous.tar.gz' })
+  const candidate = createFixture({ workspace, releaseName: 'candidate', sourceArchiveName: 'candidate.tar.gz' })
+  const currentLink = join(workspace, 'current')
+  const healthUrl = 'http://127.0.0.1:3010/api/v1/health'
+  const launcherCwd = join(workspace, 'launcher')
+  const launcherPath = join(launcherCwd, 'release-current-launcher.js')
+  writeFixtureFile(launcherPath, 'console.log("fixture launcher")\n')
+  createManifest(previous, PREVIOUS_RELEASE_ID)
+  createManifest(candidate, CANDIDATE_RELEASE_ID)
+  symlinkSync(previous.releaseRoot, currentLink)
+  const canonicalLauncherPath = realpathSync(launcherPath)
+  return {
+    workspace,
+    previous,
+    candidate,
+    currentLink,
+    healthUrl,
+    launcherCwd: realpathSync(launcherCwd),
+    launcherPath: canonicalLauncherPath,
+    launcherSha256: createHash('sha256').update(readFileSync(canonicalLauncherPath)).digest('hex'),
+  }
+}
+
+async function verifyActivationFixtures(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    const noOpRunner: CommandRunner = {
+      reload: () => {
+        throw new Error('candidate verification failure must not reload PM2')
+      },
+      inspect: () => {
+        throw new Error('candidate verification failure must not inspect PM2')
+      },
+    }
+    const healthy: HealthProbe = async () => true
+    writeFixtureFile(join(fixture.candidate.releaseRoot, 'services/api/dist/main.js'), 'candidate tampered\n')
+    await expectCodeAsync('RELEASE_PROVENANCE_RUNTIME_TREE_MISMATCH', () =>
+      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner: noOpRunner, healthProbe: healthy }),
+    )
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    console.log('  PASS candidate verification failure does not switch or reload')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyActivationRollbacks(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    let reloads = 0
+    const runner: CommandRunner = {
+      reload: () => {
+        reloads += 1
+      },
+      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot),
+    }
+    let healthChecks = 0
+    const healthProbe: HealthProbe = async () => {
+      healthChecks += 1
+      return healthChecks > 1
+    }
+    await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK', () =>
+      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe }),
+    )
+    assert.equal(reloads, 2)
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    console.log('  PASS post-switch health failure rolls back only to verified previous')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+
+  const unverified = createActivationFixture()
+  try {
+    let reloads = 0
+    const runner: CommandRunner = {
+      reload: () => {
+        reloads += 1
+        if (reloads === 1) writeFixtureFile(join(unverified.previous.releaseRoot, 'services/api/dist/main.js'), 'previous tampered\n')
+      },
+      inspect: () => pm2Snapshot(unverified.launcherCwd, unverified.launcherPath, unverified.currentLink, unverified.candidate.artifactRoot),
+    }
+    const unhealthy: HealthProbe = async () => false
+    await expectCodeAsync('RELEASE_PROVENANCE_ROLLBACK_UNVERIFIED', () =>
+      activateRelease({ candidateRoot: unverified.candidate.releaseRoot, currentLink: unverified.currentLink, artifactRoot: unverified.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: unverified.healthUrl, launcherCwd: unverified.launcherCwd, launcherPath: unverified.launcherPath, launcherSha256: unverified.launcherSha256, runner, healthProbe: unhealthy }),
+    )
+    assert.equal(reloads, 1)
+    assert.equal(realpathSync(unverified.currentLink), realpathSync(unverified.candidate.releaseRoot))
+    console.log('  PASS unverified previous prevents rollback and remains NO-GO')
+  } finally {
+    rmSync(unverified.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyActivationSuccess(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    let reloads = 0
+    const runner: CommandRunner = {
+      reload: () => {
+        reloads += 1
+      },
+      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot),
+    }
+    const healthy: HealthProbe = async () => true
+    const result = await activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe: healthy })
+    assert.equal(result.status, 'activated')
+    assert.equal(result.releaseId, CANDIDATE_RELEASE_ID)
+    assert.equal(reloads, 1)
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.candidate.releaseRoot))
+    console.log('  PASS activation accepts only the approved stable PM2 launcher')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyActivationRejectsWrongLauncherArgs(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    let reloads = 0
+    const runner: CommandRunner = {
+      reload: () => {
+        reloads += 1
+      },
+      inspect: () => ({
+        ...pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot),
+        scriptArgs: '--current-link /wrong --artifact-root /wrong',
+      }),
+    }
+    const healthy: HealthProbe = async () => true
+    await expectCodeAsync('RELEASE_PROVENANCE_ROLLBACK_UNVERIFIED', () =>
+      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe: healthy }),
+    )
+    assert.equal(reloads, 2)
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    console.log('  PASS mismatched stable launcher arguments force NO-GO rollback status')
   } finally {
     rmSync(fixture.workspace, { recursive: true, force: true })
   }
@@ -268,6 +480,11 @@ async function main(): Promise<void> {
   })
 
   await verifyGuardLaunch()
+  await verifyCurrentLauncher()
+  await verifyActivationFixtures()
+  await verifyActivationRollbacks()
+  await verifyActivationSuccess()
+  await verifyActivationRejectsWrongLauncherArgs()
 
   console.log('=== ALL PASS ===\n')
 }

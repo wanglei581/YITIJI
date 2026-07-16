@@ -44,6 +44,15 @@
 ## P0：上线前真实验收
 
 - [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+- [x] **F1 发布来源一致性修正后只读追溯**：2026-07-16 在新的明确授权下，固定白名单 SSH 会话以 `exit=0` 干净结束；PM2 路径一致、F1 标记存在、metadata 为 `bb9c7efbb032`（`origin/main`），本机确认 `faa82612` 与 `e0940a95` 都是其祖先。但 metadata 没有与运行中 dist 可比的声明 hash，归档仍为 `unavailable_or_non_whitelisted`，所以无法闭合 source → dist → PM2 的来源链；F1 维持 **NO-GO**。本项只完成追溯，不授权部署、迁移、重启、真实管理员验收或再次 SSH。
+
+- [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher 与 atomic activation；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**；当前外部架构复核调用为空正文，不能写作双模型批准。
+
+- [ ] **F1 未来受控 release 首次启用与回滚演练（须单独生产授权）**：先取得稳定 launcher 安装与 SHA-256、固定 PM2 `cwd/script args`、artifact/current 绝对根、candidate 构建和本机 PostgreSQL health 的审批；再按 production runbook 在非 current candidate 验证 manifest，执行一次受控切换与 verified-previous 回滚演练。不得回填当前 release，亦不得把本地 fixture 或 CI 通过当作生产来源一致性通过。
+
+- [ ] **P0 离线验收证据矩阵后的逐项授权**：已完成仅仓库文档范围的 [证据矩阵](../reviews/2026-07-16-p0-offline-acceptance-evidence-matrix.md)，不连接任何环境且不改变真实验收状态。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
+
+- [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；仍须完成当前候选的 verifier、typecheck、lint、build 与 diff 门禁。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 

@@ -227,18 +227,61 @@ pnpm verify:companies
 
 ## 6. 进程守护（API + Worker）
 
-```bash
-cd services/api
-# API
-pm2 start dist/main.js --name api --time
-# 若 worker 为独立进程，按其实际入口单独守护（与 API 分开）
-pm2 save
-pm2 startup    # 生成开机自启脚本，按提示执行
+### 6.1 当前运行版本：不得回填
 
-pm2 logs api --lines 50    # 看启动日志：应出现连接 PostgreSQL，不是 SQLite
+当前 production release 的 F1 发布来源仍为 **NO-GO**。本节不会授权为当前目录补写
+manifest/hash/archive、替换 PM2、reload、重启或修改 ecosystem。当前直接 `dist/main.js` 的历史
+守护形态不能被本文档追认成 provenance 通过。
+
+### 6.2 未来受控 release：首次启用须单独授权
+
+仅在用户明确授权的未来部署窗口执行。先确认部署账户可写、API 运行账户只读，且以下绝对路径
+已经在审批单中固定：`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、`<CURRENT_LINK>`、
+`<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`。release 根不得含 `.env`、日志、storage、uploads 或
+运行时缓存；这些目录必须位于 release 根外。
+
+```bash
+# 在尚未由 current 指向的 candidate release 根执行；SOURCE_ARCHIVE 必须来自已冻结的完整 commit。
+pnpm --filter @ai-job-print/api release:manifest -- create \
+  --release-root <CANDIDATE_RELEASE_ROOT> \
+  --artifact-root <ARTIFACT_ROOT> \
+  --release-id <SAFE_RELEASE_ID> \
+  --git-commit <FULL_40_HEX_COMMIT> \
+  --source-archive <ABSOLUTE_SOURCE_ARCHIVE.tar.gz> \
+  --created-at <RFC3339_UTC> \
+  --pnpm-version <PNPM_VERSION>
+
+pnpm --filter @ai-job-print/api release:manifest -- verify \
+  --release-root <CANDIDATE_RELEASE_ROOT> \
+  --artifact-root <ARTIFACT_ROOT>
 ```
 
-验收：异常自动重启、开机自启、日志路径固定 + 轮转、日志级别不输出敏感正文。
+PM2 不直接启动 candidate 的 `main.js` 或 guard。首次受控启用时，部署账户从已验证 candidate
+复制 `dist/release-provenance/release-current-launcher.js` 到 release 根外的 `<LAUNCHER_PATH>`，
+设置为运行账户不可写，并记录其 SHA-256。PM2 的固定配置必须满足：`cwd=<LAUNCHER_CWD>`、
+`script=<LAUNCHER_PATH>`、`script args=--current-link <CURRENT_LINK> --artifact-root <ARTIFACT_ROOT>`。
+launcher 每次启动都解析 `current` 为真实目录，再调用该 release 内、manifest 覆盖的 guard；guard
+验证后才 `exec` API main。不得把 `current` 软链接直接作为 guard 的 `--release-root`。
+
+仅当 candidate 与 previous 均验证成功后，才可运行下列**未来**激活命令。它会原子切换 `current`、
+reload PM2、核验上述 launcher path/cwd/args、检查本机 PostgreSQL health；任何失败只会回切到
+再次验证通过的 previous，否则返回 `NO-GO`。不得手工 `pm2 reload` 绕过该命令。
+
+```bash
+pnpm --filter @ai-job-print/api release:activate -- \
+  --candidate-root <CANDIDATE_RELEASE_ROOT> \
+  --current-link <CURRENT_LINK> \
+  --artifact-root <ARTIFACT_ROOT> \
+  --pm2-name api \
+  --health-url http://127.0.0.1:3010/api/v1/health \
+  --launcher-cwd <LAUNCHER_CWD> \
+  --launcher-path <LAUNCHER_PATH> \
+  --launcher-sha256 <RECORDED_LAUNCHER_SHA256>
+```
+
+Worker 若为独立进程，仍按其实际入口单独守护；它不得复用 API launcher。每次受控切换后再执行
+`pm2 save`，并把 releaseId、commit、manifest/tree/launcher SHA-256、PM2 launcher 路径与 health
+结果写入脱敏部署记录。
 
 ---
 
