@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "auth",
   "currentPhase": "implementation",
-  "nextAction": "执行 Task 2：后端 GREEN 安全转移状态机",
+  "nextAction": "执行 Task 3：后端路由、依赖注入与审计动作",
   "createdAt": "2026-07-16T15:49:41+08:00",
   "branch": "codex/admin-partner-phone-transfer-20260716"
 }

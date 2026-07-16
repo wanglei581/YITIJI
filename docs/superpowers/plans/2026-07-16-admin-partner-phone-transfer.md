@@ -15,6 +15,7 @@
 后端执行单元只能修改：
 
 - `services/api/src/auth/admin-phone-transfer.service.ts`（新增）
+- `services/api/src/auth/admin-phone-transfer-ticket.ts`（新增，纯 ticket/key/统一错误 helper）
 - `services/api/src/auth/internal-otp.service.ts`
 - `services/api/src/common/guards/jwt-auth.guard.ts`（只导出既有 TTL 常量）
 - `services/api/src/auth/auth.controller.ts`
@@ -194,7 +195,7 @@ git commit -m "test(auth): define admin partner phone transfer contract"
 - Modify: `services/api/src/common/guards/jwt-auth.guard.ts`（只把既有 `INTERNAL_SESSION_CACHE_TTL_SECONDS` 改为 export）
 - Test: `services/api/scripts/verify-admin-phone-transfer.ts`
 
-- [ ] **Step 1：定义严格 ticket 与返回类型**
+- [x] **Step 1：定义严格 ticket 与返回类型**
 
 服务顶部定义：
 
@@ -222,7 +223,7 @@ export type AdminPhoneTransferStartResult = {
 
 `parseTicket()` 必须比较精确 key 集合、校验两个 ID 非空、两个 version 为非负安全整数，并在解密后复核手机号格式与 hash。
 
-- [ ] **Step 2：实现 start 的三因子前两步与角色限制**
+- [x] **Step 2：实现 start 的三因子前两步与角色限制**
 
 核心查询和拒绝条件固定为：
 
@@ -248,11 +249,11 @@ private currentPasswordFailureKey(adminId: string): string {
 
 先把 `InternalOtpPurpose` 扩展为 `'login' | 'reset_password' | 'bind_phone' | 'transfer_phone'`。创建 `internal:admin:phone-transfer:*` 独立 ticket/active/verify-lock key；ticket TTL 使用 `INTERNAL_OTP_CODE_TTL_SECONDS`。只有 owner 为 Partner 才调用 `otp.sendCode({ purpose: 'transfer_phone', shouldDeliver: true })`，verify 也只能消费 `transfer_phone` 验证码。
 
-- [ ] **Step 3：实现 verify 的锁、OTP 与 CAS 消费**
+- [x] **Step 3：实现 verify 的锁、OTP 与 CAS 消费**
 
 顺序必须是：读取并验证 ticket → 复核 Admin 未绑定 → 获取随机值验证锁 → 验证 OTP → CAS 消费 ticket → CAS 消费 active ticket → 数据库事务。并发请求未获得锁时不得验证或消费 OTP。
 
-- [ ] **Step 4：实现单事务先清后绑与双审计**
+- [x] **Step 4：实现单事务先清后绑与双审计**
 
 事务主体必须保持以下顺序：
 
@@ -306,7 +307,7 @@ await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
 
 事务内任何审计失败必须回滚两个账号更新；start/cancel 审计失败不改变业务结果，但不得泄露敏感数据。
 
-- [ ] **Step 5：实现事务后 Partner 新版本会话缓存覆盖**
+- [x] **Step 5：实现事务后 Partner 新版本会话缓存覆盖**
 
 ```ts
 try {
@@ -325,7 +326,7 @@ try {
 
 Verifier 必须先模拟旧版本缓存，再完成转移并断言缓存变为新版本、旧 JWT 因 `payload.ver !== state.tokenVersion` 被真实 `JwtAuthGuard` 拒绝；随后模拟在途旧请求调用 `setJsonIfVersionNotOlder(..., oldVersion)`，必须返回 `stale` 且缓存仍是新版本。另测缓存刷新抛错时业务仍成功，并在删除/过期模拟后由数据库回源拒绝旧 JWT。
 
-- [ ] **Step 6：实现 cancel 与统一错误**
+- [x] **Step 6：实现 cancel 与统一错误**
 
 cancel 仅 CAS 删除当前 Admin active ticket，再删除对应 ticket；成功消费活动 ticket 后 best-effort 写空 payload cancel 审计，审计失败不得记录手机号、账号名、ticket 或 Redis payload。所有非可操作短信失败统一：
 
@@ -335,7 +336,7 @@ new BadRequestException({
 })
 ```
 
-- [ ] **Step 7：运行 GREEN**
+- [x] **Step 7：运行 GREEN**
 
 Run：
 
@@ -345,7 +346,7 @@ INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admi
 
 Expected：全部转移状态机断言 PASS，临时数据库清理完成。
 
-- [ ] **Step 8：提交服务**
+- [x] **Step 8：提交服务**
 
 ```bash
 git add services/api/src/auth/admin-phone-transfer.service.ts services/api/src/auth/internal-otp.service.ts services/api/src/common/guards/jwt-auth.guard.ts
