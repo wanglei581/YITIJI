@@ -142,7 +142,7 @@ export class MemberPrivacyService {
       throw new BadRequestException({
         error: {
           code: 'DATA_REQUEST_EXECUTION_INCOMPLETE',
-          message: '该数据请求尚未完成真实执行，不能进入目标状态',
+          message: '真实导出/注销执行器尚未开放，该请求将保持待处理，不能进入目标状态',
         },
       })
     }

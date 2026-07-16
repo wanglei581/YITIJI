@@ -2,7 +2,7 @@
 
 > 验收日期：2026-07-16  
 > 分支：`codex/user-center-wave0-truth-baseline`  
-> 状态：本地候选通过；未 push、未 merge、未 deploy，未运行 GitHub CI
+> 状态：本地验证通过；未 push、未 merge、未 deploy，未运行 GitHub CI
 
 ## 一、范围与结论
 
@@ -12,6 +12,8 @@
 - 登录页只展示手机号和扫码登录；既有扫码流程保持不变，不展示不可用邮箱登录。
 - 账号设置保留真实的登录状态、协议、退出和切换账号能力；明确手机号换绑、账号注销、数据导出尚未开放。
 - 真实导出/注销执行器上线前，`export→completed`、`delete→completed`、`delete→rejected` 均 fail closed；失败尝试保持工单 `pending`，不写完成/拒绝审计。`revoke_consent→completed` 继续允许。
+- 这一门禁也意味着 Wave 1 上线前，`delete` 工单只有 `pending/handling`，没有可用的完成、驳回或取消终态，也没有已承诺 SLA；当前 Admin 前端没有隐私工单处理页。若直接调用既有 Admin API，会收到“真实导出/注销执行器尚未开放，该请求将保持待处理”的结构化错误，运营不得用线下口头处理冒充系统闭环。
+- 被撤下的旧路径只会按会员批量删除 `AiResumeResult` / `JobAiSession` 并撤回 `job_ai` 同意，未覆盖完整账户数据，且其删除先于工单/审计更新，不能继续冒充“账号注销完成”。这会暂时移除会员级一键清除 AI 数据的路径；但本人逐条删除 AI 记录与按 `expiresAt` 的小时级清理仍保留，因此不是“所有 AI 数据永久留存”。Wave 1 必须补综合注销执行器、分类留存策略和失败补偿。
 
 实现提交：
 
@@ -27,9 +29,9 @@
 
 | 请求类型 | 尝试状态 | Wave 0 结果 | 数据与审计 |
 |---|---|---|---|
-| `export` | `completed` | 拒绝，`DATA_REQUEST_EXECUTION_INCOMPLETE` | 工单保持 `pending`；不写完成审计 |
-| `delete` | `completed` | 拒绝，`DATA_REQUEST_EXECUTION_INCOMPLETE` | 工单保持 `pending`；不写完成审计 |
-| `delete` | `rejected` | 拒绝，`DATA_REQUEST_EXECUTION_INCOMPLETE` | 工单保持 `pending`；不写拒绝审计 |
+| `export` | `completed` | 拒绝，`DATA_REQUEST_EXECUTION_INCOMPLETE` | 工单保持 `pending`；明确执行器未开放；不写完成审计 |
+| `delete` | `completed` | 拒绝，`DATA_REQUEST_EXECUTION_INCOMPLETE` | 工单保持 `pending`；明确执行器未开放；不写完成审计 |
+| `delete` | `rejected` | 拒绝，`DATA_REQUEST_EXECUTION_INCOMPLETE` | 工单保持 `pending`；当前没有普通驳回终态；不写拒绝审计 |
 | `revoke_consent` | `completed` | 允许 | 按既有同步撤回路径完成并审计 |
 
 ## 三、自动化验证
@@ -73,6 +75,8 @@
 ## 五、明确边界
 
 - 本轮未实现真实数据导出、账户注销执行器、手机号换绑、step-up 或 Admin 隐私工单运营页；这些属于 Wave 1/2。
+- `delete` 工单在 Wave 1 前会停留于 `pending/handling`，无法完成、驳回或取消；当前无 SLA 和 Admin 前端处置页。会员级批量 AI 数据删除也暂停，只有本人逐条删除与 TTL 清理继续工作。
+- 既有 Admin 处理 API 对仍可放行的状态接受调用方 `auditRef`，这是主线遗留边界；Wave 1 运营页必须改为服务端生成审计引用，不能继续信任客户端凭证。
 - 未推送、合并、部署或运行 GitHub CI；未验证真实短信、线上 PostgreSQL/COS/Redis、Windows 一体机或打印。
 - 未修改 Prisma schema、migration、生产配置、密钥、账号、订单或打印任务。
 - Wave 1 必须另起独立分支；法务留存矩阵和不可逆注销开关未满足前，只能继续 fail closed。

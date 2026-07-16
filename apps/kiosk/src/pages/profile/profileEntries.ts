@@ -9,7 +9,7 @@ const ASSETS: Entry[] = [
   { icon: 'sparkle', tone: 'plum', label: 'AI服务记录', desc: '建议、面试、问答', route: '/me/ai-records' },
   { icon: 'receipt', tone: 'wheat', label: '打印订单', desc: '取件码、打印状态', route: '/me/print-orders' },
   { icon: 'heart', tone: 'rose', label: '我的收藏', desc: '岗位、招聘会、政策', route: '/me/favorites' },
-  { icon: 'ticket', tone: 'clay', label: '我的权益', desc: '套餐、券、活动', route: '/me/benefits' },
+  { icon: 'ticket', tone: 'clay', label: '我的权益', desc: '券与活动权益', route: '/me/benefits' },
 ]
 
 // 2. 常用服务（均跳转既有功能页）

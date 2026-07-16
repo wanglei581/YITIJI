@@ -26,6 +26,8 @@ for (const forbidden of [
 assert.equal((entries.match(/label: '权益活动'/g) ?? []).length, 1, '权益活动只保留一个真实入口')
 assert.equal((entries.match(/label: '/g) ?? []).length, 22, 'Profile 只保留 22 个已接真目的地')
 assert.match(entries, /label: '权益活动'[\s\S]{0,120}route: '\/activities'/)
+assert.match(entries, /label: '我的权益'[\s\S]{0,100}desc: '券与活动权益'/)
+assert.doesNotMatch(entries, /套餐、券、活动/)
 assert.doesNotMatch(settings, /身份切换/)
 assert.match(settings, /手机号换绑、账号注销和数据导出尚未开放/)
 assert.doesNotMatch(`${entries}\n${login}`, /一键投递|立即投递|平台投递|投递简历/)

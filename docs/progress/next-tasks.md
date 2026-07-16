@@ -34,7 +34,7 @@
 
 - [x] **用户中心方案文档正式基线**：PR #259 已将审计、产品方案、五份计划、CCG 归档和对应进度事实合入 `main@602fe0d`；`build-and-verify` 与 `postgres-readiness` 均通过，且双模型复审无 Critical/Warning。
 - [x] **Wave 0 真实表达与验证基线（本地候选完成）**：`codex/user-center-wave0-truth-baseline` 已按 RED→GREEN 删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration。该分支已重放到 `main@b91bb62`，尚未 push/PR/合入/deploy，GitHub CI 仍须在远程交付获批后执行。
-- [ ] **Wave 1 账户安全与数据权利（当前下一步）**：另起独立分支，按账户安全 → 数据权利 → 运营 UI 三段执行，补敏感操作 step-up、会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执、Admin 隐私请求处理页和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。账户安全和导出链可先实现；不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
+- [ ] **Wave 1 账户安全与数据权利（当前下一步）**：另起独立分支，按账户安全 → 数据权利 → 运营 UI 三段执行，补敏感操作 step-up、会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执、Admin 隐私请求处理页和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。必须显式处理 Wave 0 遗留的 `delete` 工单 `pending/handling` 堆积、终态/SLA、会员级 AI 数据综合清除和服务端生成 `auditRef`，不能靠客户端审计凭证或普通 reject 清账。账户安全和导出链可先实现；不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。

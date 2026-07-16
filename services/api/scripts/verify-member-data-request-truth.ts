@@ -55,14 +55,23 @@ function fail(message: string): void {
 function errorCode(error: unknown): string | undefined {
   const exception = error as { getResponse?: () => unknown; response?: unknown }
   const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
-    | { error?: { code?: string } }
+    | { error?: { code?: string; message?: string } }
     | undefined
   return response?.error?.code
+}
+
+function errorMessage(error: unknown): string | undefined {
+  const exception = error as { getResponse?: () => unknown; response?: unknown }
+  const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
+    | { error?: { message?: string } }
+    | undefined
+  return response?.error?.message
 }
 
 async function expectHttpError(
   operation: () => Promise<unknown>,
   expectedCode: string,
+  expectedMessage: string,
   label: string,
 ): Promise<void> {
   try {
@@ -70,8 +79,13 @@ async function expectHttpError(
     fail(`${label} — 未 fail closed`)
   } catch (error) {
     const actualCode = errorCode(error)
-    if (actualCode === expectedCode) pass(`${label} — ${expectedCode}`)
-    else fail(`${label} — 错误码应为 ${expectedCode}，实际为 ${actualCode ?? (error as Error).message}`)
+    const actualMessage = errorMessage(error)
+    if (actualCode === expectedCode && actualMessage === expectedMessage) pass(`${label} — ${expectedCode}`)
+    else {
+      fail(
+        `${label} — 预期 ${expectedCode} / ${expectedMessage}，实际 ${actualCode ?? '无错误码'} / ${actualMessage ?? (error as Error).message}`,
+      )
+    }
   }
 }
 
@@ -84,6 +98,7 @@ async function main(): Promise<void> {
   const tag = `wave0-data-rights-${Date.now()}-${process.pid}`
   const adminId = `${tag}-admin`
   const endUserId = `${tag}-member`
+  const unavailableMessage = '真实导出/注销执行器尚未开放，该请求将保持待处理，不能进入目标状态'
 
   await prisma.onModuleInit()
   try {
@@ -112,16 +127,19 @@ async function main(): Promise<void> {
     await expectHttpError(
       () => privacy.handleDataRequest(exportRequest.id, { status: 'completed', handledBy: adminId }),
       'DATA_REQUEST_EXECUTION_INCOMPLETE',
+      unavailableMessage,
       'export 请求不能在没有真实执行器时标记 completed',
     )
     await expectHttpError(
       () => privacy.handleDataRequest(deleteRequest.id, { status: 'completed', handledBy: adminId }),
       'DATA_REQUEST_EXECUTION_INCOMPLETE',
+      unavailableMessage,
       'delete 请求不能在没有真实执行器时标记 completed',
     )
     await expectHttpError(
       () => privacy.handleDataRequest(deleteRequest.id, { status: 'rejected', handledBy: adminId }),
       'DATA_REQUEST_EXECUTION_INCOMPLETE',
+      unavailableMessage,
       'delete 请求不能以普通拒绝替代真实闭环',
     )
 
