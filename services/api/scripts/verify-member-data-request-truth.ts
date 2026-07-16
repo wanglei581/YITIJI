@@ -99,6 +99,7 @@ async function main(): Promise<void> {
   const adminId = `${tag}-admin`
   const endUserId = `${tag}-member`
   const unavailableMessage = '真实导出/注销执行器尚未开放，该请求将保持待处理，不能进入目标状态'
+  const alreadyExecutedMessage = '授权撤回已在请求创建时同步执行，只能记录为 completed'
 
   await prisma.onModuleInit()
   try {
@@ -159,6 +160,32 @@ async function main(): Promise<void> {
       unavailableMessage,
       'delete 请求不能以普通拒绝替代真实闭环',
     )
+    await expectHttpError(
+      () => privacy.handleDataRequest(revokeRequest.id, { status: 'rejected', handledBy: adminId }),
+      'DATA_REQUEST_ALREADY_EXECUTED',
+      alreadyExecutedMessage,
+      'revoke_consent 请求不能以 rejected 覆盖已执行的授权撤回',
+    )
+
+    const [protectedRevoke, protectedRevokeAudits] = await Promise.all([
+      prisma.userDataRequest.findUnique({ where: { id: revokeRequest.id } }),
+      prisma.auditLog.findMany({
+        where: {
+          action: 'member_data_request.handle',
+          targetId: revokeRequest.id,
+        },
+      }),
+    ])
+    if (protectedRevoke?.status === 'pending' && protectedRevoke.handledAt === null && protectedRevoke.auditRef === null) {
+      pass('revoke_consent rejected 失败尝试不改变已执行授权撤回的请求状态')
+    } else {
+      fail(`revoke_consent rejected 失败尝试污染请求：${JSON.stringify(protectedRevoke)}`)
+    }
+    if (protectedRevokeAudits.length === 0) {
+      pass('revoke_consent rejected 失败尝试不写拒绝审计')
+    } else {
+      fail(`revoke_consent rejected 失败尝试写入了 ${protectedRevokeAudits.length} 条审计`)
+    }
 
     const revoked = await privacy.handleDataRequest(revokeRequest.id, {
       status: 'completed',

@@ -149,6 +149,29 @@ async function verifyFailClosedDataRequestTransitions(): Promise<void> {
     }
   }
 
+  const rejectedRevokeRun = createPrivacyTransitionRun('revoke_consent')
+  const rejectedRevokeService = new MemberPrivacyService(rejectedRevokeRun.prisma as never, rejectedRevokeRun.audit as never)
+  let rejectedRevokeCode: string | undefined
+  try {
+    await rejectedRevokeService.handleDataRequest('privacy-revoke_consent-request', {
+      status: 'rejected',
+      handledBy: 'admin-wave0',
+    })
+  } catch (error) {
+    rejectedRevokeCode = exceptionCode(error)
+  }
+  const rejectedRevokeSideEffects = rejectedRevokeRun.state.calls.filter((call) => call !== 'userDataRequest.findUnique')
+  if (
+    rejectedRevokeCode === 'DATA_REQUEST_ALREADY_EXECUTED' &&
+    rejectedRevokeSideEffects.length === 0 &&
+    rejectedRevokeRun.state.auditWrites === 0 &&
+    rejectedRevokeRun.state.requestStatus === 'pending'
+  ) {
+    pass('revoke_consent -> rejected fail closed，不能以拒绝状态覆盖已执行授权撤回')
+  } else {
+    fail(`revoke_consent -> rejected 未安全阻断 code=${rejectedRevokeCode ?? 'none'} calls=${rejectedRevokeRun.state.calls.join(',')} audit=${rejectedRevokeRun.state.auditWrites} status=${rejectedRevokeRun.state.requestStatus}`)
+  }
+
   const revokeRun = createPrivacyTransitionRun('revoke_consent')
   const revokeService = new MemberPrivacyService(revokeRun.prisma as never, revokeRun.audit as never)
   const revoked = await revokeService.handleDataRequest('privacy-revoke_consent-request', {
@@ -234,8 +257,10 @@ async function main(): Promise<void> {
       'userAiConsent.updateMany',
       'userDataRequest',
       'DATA_REQUEST_EXECUTION_INCOMPLETE',
+      'DATA_REQUEST_ALREADY_EXECUTED',
       "existing.requestType === 'export'",
       "existing.requestType === 'delete'",
+      "existing.requestType === 'revoke_consent'",
       'revokedAt',
       'USER_AI_CONSENT_REQUIRED',
     ],
