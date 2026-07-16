@@ -9,6 +9,7 @@ import { INTERNAL_OTP_CODE_TTL_SECONDS, InternalOtpService } from './internal-ot
 
 const CURRENT_PASSWORD_FAILURE_LIMIT = 5
 const CURRENT_PASSWORD_FAILURE_TTL_SECONDS = INTERNAL_OTP_CODE_TTL_SECONDS
+const VERIFY_LOCK_TTL_SECONDS = 30
 const ACTIONABLE_SMS_FAILURE_CODES = new Set([
   'SMS_TOO_FREQUENT',
   'SMS_DAILY_LIMIT',
@@ -122,57 +123,71 @@ export class AdminInitialPhoneBindService {
       throw this.unavailable()
     }
 
+    const verifyLockValue = randomUUID()
+    const verifyLockKey = this.verifyLockKey(userId, bindTicket)
+    let verifyLockAcquired: boolean
     try {
-      await this.otp.verifyCode(phone, 'bind_phone', code)
-    } catch (error) {
-      if (this.isRetryableOtpInvalid(error)) throw this.invalidOtpCode()
-      await this.cleanupTicket(userId, bindTicket)
-      throw this.unavailable()
-    }
-
-    const ticketStatus = await this.redis.getAndDelIfEquals(this.ticketKey(userId, bindTicket), serializedTicket)
-    if (ticketStatus !== 'matched') throw this.unavailable()
-
-    const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
-    if (activeTicketStatus !== 'matched') throw this.unavailable()
-
-    const phoneVerifiedAt = new Date()
-    const phoneMasked = maskPhone(phone)
-    try {
-      await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
-        const updated = await tx.user.updateMany({
-          where: {
-            id: userId,
-            role: 'admin',
-            enabled: true,
-            phoneHash: null,
-            phoneEnc: null,
-            phoneVerifiedAt: null,
-            tokenVersion: ticket.tokenVersion,
-          },
-          data: {
-            phoneHash: ticket.phoneHash,
-            phoneEnc: ticket.encryptedPhone,
-            phoneVerifiedAt,
-          },
-        })
-        if (updated.count !== 1) throw this.unavailable()
-
-        await tx.auditLog.create({
-          data: {
-            actorId: userId,
-            actorRole: 'admin',
-            action: 'auth.phone_initial_bind_complete',
-            targetType: 'auth',
-            targetId: userId,
-            payloadJson: JSON.stringify({ phoneMasked }),
-          },
-        })
-      })
+      verifyLockAcquired = await this.redis.setNxEx(verifyLockKey, verifyLockValue, VERIFY_LOCK_TTL_SECONDS)
     } catch {
       throw this.unavailable()
     }
-    return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString() }
+    if (!verifyLockAcquired) throw this.unavailable()
+
+    try {
+      try {
+        await this.otp.verifyCode(phone, 'bind_phone', code)
+      } catch (error) {
+        if (this.isRetryableOtpInvalid(error)) throw this.invalidOtpCode()
+        await this.cleanupTicket(userId, bindTicket)
+        throw this.unavailable()
+      }
+
+      const ticketStatus = await this.redis.getAndDelIfEquals(this.ticketKey(userId, bindTicket), serializedTicket)
+      if (ticketStatus !== 'matched') throw this.unavailable()
+
+      const activeTicketStatus = await this.redis.getAndDelIfEquals(this.activeTicketKey(userId), bindTicket)
+      if (activeTicketStatus !== 'matched') throw this.unavailable()
+
+      const phoneVerifiedAt = new Date()
+      const phoneMasked = maskPhone(phone)
+      try {
+        await this.prisma.$transaction(async (tx: PrismaTransactionClient) => {
+          const updated = await tx.user.updateMany({
+            where: {
+              id: userId,
+              role: 'admin',
+              enabled: true,
+              phoneHash: null,
+              phoneEnc: null,
+              phoneVerifiedAt: null,
+              tokenVersion: ticket.tokenVersion,
+            },
+            data: {
+              phoneHash: ticket.phoneHash,
+              phoneEnc: ticket.encryptedPhone,
+              phoneVerifiedAt,
+            },
+          })
+          if (updated.count !== 1) throw this.unavailable()
+
+          await tx.auditLog.create({
+            data: {
+              actorId: userId,
+              actorRole: 'admin',
+              action: 'auth.phone_initial_bind_complete',
+              targetType: 'auth',
+              targetId: userId,
+              payloadJson: JSON.stringify({ phoneMasked }),
+            },
+          })
+        })
+      } catch {
+        throw this.unavailable()
+      }
+      return { phoneMasked, phoneVerifiedAt: phoneVerifiedAt.toISOString() }
+    } finally {
+      await this.redis.getAndDelIfEquals(verifyLockKey, verifyLockValue).catch(() => undefined)
+    }
   }
 
   /** 仅取消当前登录 Admin 自己的未验证尝试；已消费或过期的 ticket 统一视为已取消。 */
@@ -293,6 +308,10 @@ export class AdminInitialPhoneBindService {
 
   private activeTicketKey(userId: string): string {
     return `internal:admin:phone-initial-bind:active:${userId}`
+  }
+
+  private verifyLockKey(userId: string, bindTicket: string): string {
+    return `internal:admin:phone-initial-bind:verify-lock:${userId}:${bindTicket}`
   }
 
   private currentPasswordFailureKey(userId: string): string {

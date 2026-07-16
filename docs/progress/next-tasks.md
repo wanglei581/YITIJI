@@ -30,7 +30,7 @@
 
 ## P0：上线前真实验收
 
-- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已在本地完成 OTP 重试/锁定、取消、事务审计和 Partner 保留回归；仍须以候选提交的 GitHub CI/PR 状态为准，且生产部署前必须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
 

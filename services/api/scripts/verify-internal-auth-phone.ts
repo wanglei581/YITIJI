@@ -44,7 +44,6 @@ process.env['SECRET_ENCRYPTION_KEY'] ||= 'verify-internal-auth-phone-secret-32b'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
-
 function errCode(e: unknown): string | undefined {
   const ex = e as { getResponse?: () => unknown; response?: unknown }
   const resp = (typeof ex.getResponse === 'function' ? ex.getResponse() : ex.response) as
@@ -69,7 +68,6 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
     else fail(`${label} — 期望 ${code},实际: ${c ?? (e as Error).message}`)
   }
 }
-
 async function expectCodeAndMessage(
   fn: () => Promise<unknown>,
   code: string,
@@ -138,7 +136,6 @@ function mockCtx(authHeader?: string): ExecutionContext {
     switchToHttp: () => ({ getRequest: () => req }),
   } as unknown as ExecutionContext
 }
-
 class MemoryRedis {
   private readonly store = new Map<string, { value: string; expiresAt: number | null }>()
   private nowMs = 0
@@ -158,7 +155,6 @@ class MemoryRedis {
     this.calls.push(`get:${key}`)
     return Promise.resolve(this.read(key))
   }
-
   getDel(key: string): Promise<string | null> {
     this.calls.push(`getDel:${key}`)
     const value = this.read(key)
@@ -179,7 +175,6 @@ class MemoryRedis {
     this.calls.push(`setEx:${key}`)
     this.store.set(key, { value, expiresAt: this.nowMs + ttlSeconds * 1000 })
   }
-
   setJsonIfVersionNotOlder(
     key: string,
     _ttlSeconds: number,
@@ -207,7 +202,6 @@ class MemoryRedis {
     this.store.set(key, { value, expiresAt: this.nowMs + ttlSeconds * 1000 })
     return Promise.resolve(true)
   }
-
   incrWithTtl(key: string, _ttlSeconds: number): Promise<number> {
     const current = this.read(key)
     const next = Number(current ?? '0') + 1
@@ -235,7 +229,6 @@ class MemoryRedis {
     else this.store.set(key, { value: String(current - 1), expiresAt: this.store.get(key)?.expiresAt ?? null })
     return Promise.resolve()
   }
-
   advanceSeconds(seconds: number): void {
     this.nowMs += seconds * 1000
   }
@@ -247,7 +240,6 @@ class MemoryRedis {
   raw(key: string): string | null {
     return this.read(key)
   }
-
   values(): string[] {
     return [...this.store.keys()].flatMap((key) => {
       const value = this.read(key)
@@ -269,7 +261,6 @@ class NoopSmsSender implements SmsSender {
     this.sent.push({ phone, code })
   }
 }
-
 class RecordingAudit {
   readonly entries: Parameters<AuditService['write']>[0][] = []
 
@@ -298,7 +289,6 @@ function createAuditFailingPrisma(prisma: PrismaService): PrismaService {
       ),
   } as PrismaService
 }
-
 function createIsolatedVerificationDatabase(): { cleanup: () => void } {
   const tempDirectory = mkdtempSync(join(tmpdir(), 'verify-internal-auth-phone-'))
   const databasePath = join(tempDirectory, 'verify.db')
@@ -403,7 +393,6 @@ async function assertAdminInitialPhoneBindControllerDelegation(): Promise<void> 
   const startDto = { currentPassword: 'VerifyPassword_123!', phone: '13900000000' } as InitialPhoneBindStartDto
   const verifyDto = { bindTicket: 'a'.repeat(16), code: '123456' } as InitialPhoneBindVerifyDto
   const cancelDto = { bindTicket: 'a'.repeat(16) } as InitialPhoneBindCancelDto
-
   await controller.startInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, startDto, '127.0.0.1')
   await controller.verifyInitialPhoneBind({ userId: 'controller-admin', role: 'admin', orgId: null }, verifyDto)
   await controller.startInitialPhoneBind({ userId: 'controller-partner', role: 'partner', orgId: 'org-controller' }, startDto, '127.0.0.1')
@@ -436,7 +425,6 @@ async function main() {
     if (INTERNAL_OTP_CODE_TTL_SECONDS !== 300) fail('0c. 内部 OTP 有效期未固定为 300 秒')
     pass('0c. 内部 OTP 使用统一的 300 秒导出常量')
     await assertAdminInitialPhoneBindControllerDelegation()
-
   const invalidInitialBindStart = await validate(Object.assign(new InitialPhoneBindStartDto(), {
     currentPassword: '',
     phone: 'not-a-phone',
@@ -477,7 +465,6 @@ async function main() {
     audit as unknown as AuditService,
   )
   const guard = new JwtAuthGuard(jwt, prisma, redis as unknown as RedisService)
-
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const base = Number(Date.now().toString().slice(-8))
   const phone = (prefix: string, n: number) => `${prefix}${String((base + n) % 100000000).padStart(8, '0')}`
@@ -504,7 +491,6 @@ async function main() {
       },
     })
     orgId = org.id
-
     const verified = await prisma.user.create({
       data: {
         username: `via_partner_${suffix}`,
@@ -550,6 +536,7 @@ async function main() {
     })
     const strictTicketKey = (userId: string, ticket: string) => `internal:admin:phone-initial-bind:ticket:${userId}:${ticket}`
     const strictActiveKey = (userId: string) => `internal:admin:phone-initial-bind:active:${userId}`
+    const strictVerifyLockKey = (userId: string, ticket: string) => `internal:admin:phone-initial-bind:verify-lock:${userId}:${ticket}`
     const strictPasswordFailuresKey = (userId: string) => `internal:admin:phone-initial-bind:password-fail:${userId}`
     const createStrictAdmin = async (label: string, tokenVersion = 0, enabled = true) => {
       return prisma.user.create({
@@ -567,7 +554,6 @@ async function main() {
     const byUsername = await auth.login(verified.username, passwordV1, 'partner')
     if (!byUsername.token || byUsername.user.orgId !== orgId) fail('1. 用户名密码登录失败')
     pass('1. 用户名密码登录仍可用')
-
     const byPhone = await auth.login(verifiedPhone, passwordV1, 'partner')
     if (JSON.stringify(byPhone).includes(verifiedPhone)) fail('2. 手机号登录响应泄露明文手机号')
     pass('2. 已验证手机号可作为密码登录账号,且响应不含明文手机号')
@@ -582,7 +568,6 @@ async function main() {
     const smsRaw = JSON.stringify(smsLogin)
     if (smsRaw.includes(verifiedPhone) || smsRaw.includes(loginCode)) fail('5. 短信登录响应泄露手机号或验证码')
     pass('5. 已验证手机号验证码登录成功,响应不泄密')
-
     await auth.sendSmsCode({ phone: unknownPhone, purpose: 'login', portal: 'partner' }, '127.0.0.1')
     const unknownCode = await redis.get(`internal:sms:code:login:${hashPhone(unknownPhone)}`)
     const unknownUserCount = await prisma.user.count({ where: { phoneHash: hashPhone(unknownPhone) } })
@@ -600,7 +585,6 @@ async function main() {
     await prisma.organization.update({ where: { id: orgId }, data: { enabled: false } })
     await expectCode(() => auth.login(verified.username, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '7. 机构停用后密码登录失败')
     await prisma.organization.update({ where: { id: orgId }, data: { enabled: true } })
-
     const oldToken = byUsername.token
     await auth.startPasswordReset(verifiedPhone, '127.0.0.1')
     const resetCode = await redis.get(`internal:sms:code:reset_password:${hashPhone(verifiedPhone)}`)
@@ -658,7 +642,6 @@ async function main() {
         `9.${label} 只能得到统一的严格绑定不可用错误`,
       )
     }
-
     const rateAdmin = await createStrictAdmin('rate')
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       await expectCode(
@@ -735,6 +718,26 @@ async function main() {
       '12c. 严格 ticket 不能重放',
     )
     pass('12. 严格 ticket 仅存加密手机号、单活跃、错误 OTP 可重试且成功后不可重放')
+    const verifyLockAdmin = await createStrictAdmin('verify-lock')
+    const verifyLockPhone = phone('136', 43)
+    const verifyLockStart = await adminInitialPhoneBind.start(verifyLockAdmin.id, passwordV1, verifyLockPhone, '127.0.0.1')
+    const verifyLockCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(verifyLockPhone)}`)
+    if (!verifyLockCode) fail('12c. 并发验证锁场景未写入 OTP')
+    await redis.setNxEx(strictVerifyLockKey(verifyLockAdmin.id, verifyLockStart.bindTicket), 'other-request', 30)
+    await expectCode(
+      () => adminInitialPhoneBind.verify(verifyLockAdmin.id, verifyLockStart.bindTicket, verifyLockCode),
+      unavailable,
+      '12c. 已有同 ticket 验证请求时不得消耗 OTP 或清理临时状态',
+    )
+    if (
+      !redis.raw(strictTicketKey(verifyLockAdmin.id, verifyLockStart.bindTicket)) ||
+      redis.raw(strictActiveKey(verifyLockAdmin.id)) !== verifyLockStart.bindTicket
+    ) {
+      fail('12c. 并发验证被拒绝时不得清理首个请求的 ticket 或活跃标记')
+    }
+    await redis.del(strictVerifyLockKey(verifyLockAdmin.id, verifyLockStart.bindTicket))
+    await adminInitialPhoneBind.verify(verifyLockAdmin.id, verifyLockStart.bindTicket, verifyLockCode)
+    pass('12c. 并发验证锁保护首个请求的 OTP、ticket 与活跃标记')
     const lockedAdmin = await createStrictAdmin('locked')
     const lockedPhone = phone('136', 44)
     const lockedStart = await adminInitialPhoneBind.start(lockedAdmin.id, passwordV1, lockedPhone, '127.0.0.1')
@@ -899,7 +902,6 @@ async function main() {
       fail('13. 严格成功绑定没有用 CAS 写入三字段，或响应/审计泄露了敏感数据')
     }
     pass('13. 严格成功绑定保留 tokenVersion，响应和审计只含脱敏手机号')
-
     const expiredAdmin = await createStrictAdmin('expired')
     const expiredPhone = phone('134', 60)
     const expiredStart = await adminInitialPhoneBind.start(expiredAdmin.id, passwordV1, expiredPhone, '127.0.0.1')
@@ -951,7 +953,6 @@ async function main() {
     if (versionAfter.phoneHash || versionAfter.phoneEnc || versionAfter.phoneVerifiedAt || versionAfter.tokenVersion !== 30) {
       fail('16. tokenVersion CAS 失败后仍覆盖了手机号字段')
     }
-
     const concurrentAdmin = await createStrictAdmin('concurrent')
     const concurrentPhone = phone('131', 90)
     const sentBeforeConcurrent = sms.sent.length
@@ -992,7 +993,6 @@ async function main() {
     isolatedDatabase.cleanup()
   }
 }
-
 main().catch((error) => {
   console.error(error)
   process.exit(1)
