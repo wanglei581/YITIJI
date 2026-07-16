@@ -93,6 +93,7 @@
     "verify:fair-company-positions": "node -r @swc-node/register scripts/verify-fair-company-positions.ts",
     "verify:admin-orgs": "node -r @swc-node/register scripts/verify-admin-orgs.ts",
     "verify:internal-auth-phone": "node -r @swc-node/register scripts/verify-internal-auth-phone.ts",
+    "verify:admin-phone-transfer": "node -r @swc-node/register scripts/verify-admin-phone-transfer.ts",
     "verify:internal-auth-phone:target-guard": "node -r @swc-node/register scripts/verify-internal-auth-phone-target-guard.ts",
     "verify:change-password:target-guard": "node -r @swc-node/register scripts/verify-change-password-target-guard.ts",
     "verify:change-password": "node scripts/run-verify-change-password.mjs",
