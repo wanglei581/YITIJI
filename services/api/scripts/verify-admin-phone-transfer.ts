@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
 import { execFileSync } from 'child_process'
 import { randomBytes, randomInt, randomUUID } from 'crypto'
-import { mkdtempSync, rmSync } from 'fs'
+import { existsSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { AuditService } from '../src/audit/audit.service'
@@ -29,13 +29,19 @@ const SESSION_TTL_SECONDS = 60
 const UNAVAILABLE = 'AUTH_PHONE_TRANSFER_UNAVAILABLE'
 const generatedPhones = new Set<string>()
 
+class VerificationFailure extends Error {
+  constructor(message: string) {
+    super(`VERIFY_ASSERTION_FAILED: ${message}`)
+    this.name = 'VerificationFailure'
+  }
+}
+
 function pass(message: string): void {
   console.log(`  PASS ${message}`)
 }
 
 function fail(message: string): never {
-  console.error(`  FAIL ${message}`)
-  process.exit(1)
+  throw new VerificationFailure(message)
 }
 
 function ensure(condition: unknown, message: string): asserts condition {
@@ -51,12 +57,36 @@ function errorCode(error: unknown): string | undefined {
 }
 
 async function expectCode(operation: () => Promise<unknown>, code: string, message: string): Promise<void> {
+  let rejected = false
+  let rejection: unknown
   try {
     await operation()
-    fail(`${message}：期望失败但调用成功`)
   } catch (error) {
-    if (errorCode(error) !== code) fail(`${message}：错误码不符合契约`)
+    rejected = true
+    rejection = error
   }
+  if (!rejected) fail(`${message}：期望失败但调用成功`)
+  if (errorCode(rejection) !== code) fail(`${message}：错误码不符合契约`)
+}
+
+function assertFailureUnwindsCleanup(): void {
+  const probeDirectory = mkdtempSync(join(tmpdir(), 'verify-phone-transfer-cleanup-probe-'))
+  let assertionObserved = false
+  let assertionFinallyRan = false
+  try {
+    try {
+      fail('受控 cleanup 自检')
+    } finally {
+      assertionFinallyRan = true
+      rmSync(probeDirectory, { recursive: true, force: true })
+    }
+  } catch (error) {
+    assertionObserved = error instanceof VerificationFailure
+  } finally {
+    rmSync(probeDirectory, { recursive: true, force: true })
+  }
+  ensure(assertionObserved && assertionFinallyRan && !existsSync(probeDirectory), '0. 失败断言未经过 finally cleanup')
+  pass('0a. 失败断言通过异常栈展开执行 finally cleanup')
 }
 
 function mockContext(token: string): ExecutionContext {
@@ -836,8 +866,8 @@ async function main(): Promise<void> {
     assertInternalAuthVerifyTarget(process.env)
     isolatedDatabase.initialize()
     prisma = new PrismaService()
-    await prisma.onModuleInit()
     await assertHarnessReady(prisma)
+    assertFailureUnwindsCleanup()
 
     const Service = await loadTransferService()
     const redis = new MemoryRedis()
@@ -909,5 +939,5 @@ main().catch((error) => {
   const raw = error instanceof Error ? error.message : 'unknown verifier failure'
   const redacted = [...generatedPhones].reduce((message, phone) => message.replaceAll(phone, '[redacted-phone]'), raw)
   console.error(redacted)
-  process.exit(1)
+  process.exitCode = 1
 })
