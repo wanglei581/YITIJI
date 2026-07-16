@@ -58,7 +58,7 @@ function assertPm2Name(pm2Name: string): void {
   if (!SAFE_PM2_NAME.test(pm2Name)) fail('RELEASE_PROVENANCE_PM2_NAME_INVALID')
 }
 
-function assertApprovedLauncher(launcherCwd: string, launcherPath: string, launcherSha256: string): { cwd: string; path: string } {
+function assertApprovedLauncher(launcherCwd: string, launcherPath: string, launcherSha256: string): { cwd: string; path: string; sha256: string } {
   if (!isAbsolute(launcherCwd) || !isAbsolute(launcherPath) || !SHA256.test(launcherSha256)) {
     fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
   }
@@ -72,7 +72,7 @@ function assertApprovedLauncher(launcherCwd: string, launcherPath: string, launc
     const path = realpathSync(launcherPath)
     const actualSha256 = createHash('sha256').update(readFileSync(path)).digest('hex')
     if (actualSha256 !== launcherSha256) fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
-    return { cwd, path }
+    return { cwd, path, sha256: launcherSha256 }
   } catch (error) {
     if (error instanceof ReleaseProvenanceError) throw error
     fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
@@ -183,7 +183,7 @@ const systemHealthProbe: HealthProbe = async (healthUrl) =>
 function assertPm2Snapshot(
   snapshot: Pm2ProcessSnapshot,
   pm2Name: string,
-  expectedLauncher: { cwd: string; path: string },
+  expectedLauncher: { cwd: string; path: string; sha256: string },
   currentLink: string,
   artifactRoot: string,
 ): void {
@@ -195,7 +195,7 @@ function assertPm2Snapshot(
   } catch {
     fail('RELEASE_PROVENANCE_PM2_PATH_MISMATCH')
   }
-  const expectedScriptArgs = `--current-link ${currentLink} --artifact-root ${artifactRoot}`
+  const expectedScriptArgs = `--current-link ${currentLink} --artifact-root ${artifactRoot} --launcher-sha256 ${expectedLauncher.sha256}`
   if (
     snapshot.name !== pm2Name ||
     snapshot.status !== 'online' ||
@@ -215,7 +215,7 @@ async function rollback(
   healthUrl: string,
   runner: CommandRunner,
   healthProbe: HealthProbe,
-  launcher: { cwd: string; path: string },
+  launcher: { cwd: string; path: string; sha256: string },
 ): Promise<never> {
   try {
     verifyReleaseProvenance({ releaseRoot: previousRoot, artifactRoot })

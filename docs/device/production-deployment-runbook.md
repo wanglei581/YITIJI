@@ -259,7 +259,7 @@ pnpm --filter @ai-job-print/api release:manifest -- verify \
 PM2 不直接启动 candidate 的 `main.js` 或 guard。首次受控启用时，部署账户从已验证 candidate
 复制 `dist/release-provenance/release-current-launcher.js` 到 release 根外的 `<LAUNCHER_PATH>`，
 设置为运行账户不可写，并记录其 SHA-256。PM2 的固定配置必须满足：`cwd=<LAUNCHER_CWD>`、
-`script=<LAUNCHER_PATH>`、`script args=--current-link <CURRENT_LINK> --artifact-root <ARTIFACT_ROOT>`。
+`script=<LAUNCHER_PATH>`、`script args=--current-link <CURRENT_LINK> --artifact-root <ARTIFACT_ROOT> --launcher-sha256 <RECORDED_LAUNCHER_SHA256>`。
 launcher 每次启动都解析 `current` 为真实目录，再调用该 release 内、manifest 覆盖的 guard；guard
 验证后才 `exec` API main。不得把 `current` 软链接直接作为 guard 的 `--release-root`。
 

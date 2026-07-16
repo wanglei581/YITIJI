@@ -180,6 +180,8 @@ async function verifyGuardLaunch(): Promise<void> {
 async function verifyCurrentLauncher(): Promise<void> {
   const fixture = createFixture()
   const currentLink = join(fixture.workspace, 'current')
+  const launcherPath = realpathSync(join(__dirname, '../src/release-provenance/release-current-launcher.ts'))
+  const launcherSha256 = createHash('sha256').update(readFileSync(launcherPath)).digest('hex')
   try {
     createManifest(fixture)
     symlinkSync(fixture.releaseRoot, currentLink)
@@ -200,20 +202,42 @@ async function verifyCurrentLauncher(): Promise<void> {
       queueMicrotask(() => child.emit('exit', 0, null))
       return child as ReturnType<SpawnGuard>
     }
-    assert.equal(await runCurrentLauncher({ currentLink, artifactRoot: fixture.artifactRoot, spawnGuard }), 0)
+    assert.equal(await runCurrentLauncher({ currentLink, artifactRoot: fixture.artifactRoot, launcherPath, launcherSha256, spawnGuard }), 0)
     console.log('  PASS stable launcher resolves current and starts only its release guard')
   } finally {
     rmSync(fixture.workspace, { recursive: true, force: true })
   }
 }
 
-function pm2Snapshot(cwd: string, execPath: string, currentLink: string, artifactRoot: string): ReturnType<CommandRunner['inspect']> {
+async function verifyCurrentLauncherSelfHash(): Promise<void> {
+  const fixture = createFixture()
+  const currentLink = join(fixture.workspace, 'current')
+  const launcherPath = realpathSync(join(__dirname, '../src/release-provenance/release-current-launcher.ts'))
+  try {
+    createManifest(fixture)
+    symlinkSync(fixture.releaseRoot, currentLink)
+    let spawned = false
+    const spawnGuard: SpawnGuard = () => {
+      spawned = true
+      throw new Error('mismatched launcher hash must not spawn a guard')
+    }
+    await expectCodeAsync('RELEASE_PROVENANCE_LAUNCHER_SELF_HASH_INVALID', () =>
+      runCurrentLauncher({ currentLink, artifactRoot: fixture.artifactRoot, launcherPath, launcherSha256: '0'.repeat(64), spawnGuard }),
+    )
+    assert.equal(spawned, false)
+    console.log('  PASS stable launcher self-hash mismatch fails before guard spawn')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+function pm2Snapshot(cwd: string, execPath: string, currentLink: string, artifactRoot: string, launcherSha256: string): ReturnType<CommandRunner['inspect']> {
   return {
     name: 'fixture-api',
     status: 'online',
     cwd,
     execPath,
-    scriptArgs: `--current-link ${currentLink} --artifact-root ${artifactRoot}`,
+    scriptArgs: `--current-link ${currentLink} --artifact-root ${artifactRoot} --launcher-sha256 ${launcherSha256}`,
   }
 }
 
@@ -284,7 +308,7 @@ async function verifyActivationRollbacks(): Promise<void> {
       reload: () => {
         reloads += 1
       },
-      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot),
+      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256),
     }
     let healthChecks = 0
     const healthProbe: HealthProbe = async () => {
@@ -309,7 +333,7 @@ async function verifyActivationRollbacks(): Promise<void> {
         reloads += 1
         if (reloads === 1) writeFixtureFile(join(unverified.previous.releaseRoot, 'services/api/dist/main.js'), 'previous tampered\n')
       },
-      inspect: () => pm2Snapshot(unverified.launcherCwd, unverified.launcherPath, unverified.currentLink, unverified.candidate.artifactRoot),
+      inspect: () => pm2Snapshot(unverified.launcherCwd, unverified.launcherPath, unverified.currentLink, unverified.candidate.artifactRoot, unverified.launcherSha256),
     }
     const unhealthy: HealthProbe = async () => false
     await expectCodeAsync('RELEASE_PROVENANCE_ROLLBACK_UNVERIFIED', () =>
@@ -331,7 +355,7 @@ async function verifyActivationSuccess(): Promise<void> {
       reload: () => {
         reloads += 1
       },
-      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot),
+      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256),
     }
     const healthy: HealthProbe = async () => true
     const result = await activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe: healthy })
@@ -354,7 +378,7 @@ async function verifyActivationRejectsWrongLauncherArgs(): Promise<void> {
         reloads += 1
       },
       inspect: () => ({
-        ...pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot),
+        ...pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256),
         scriptArgs: '--current-link /wrong --artifact-root /wrong',
       }),
     }
@@ -481,6 +505,7 @@ async function main(): Promise<void> {
 
   await verifyGuardLaunch()
   await verifyCurrentLauncher()
+  await verifyCurrentLauncherSelfHash()
   await verifyActivationFixtures()
   await verifyActivationRollbacks()
   await verifyActivationSuccess()

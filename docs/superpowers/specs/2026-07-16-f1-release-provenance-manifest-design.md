@@ -73,7 +73,7 @@ manifest 使用稳定键序 JSON，且只含下列字段。下方为字段格式
 
 ## Guard 与失败关闭
 
-PM2 不直接执行 `node dist/main.js`，而执行 release 根外的稳定 current launcher。launcher 不接受动态 release 路径：它只解析固定 `current` 软链，并以解析后的规范化目录调用其中的 release guard；release guard 在 `exec node services/api/dist/main.js` 前完成验证。因此不一致时 API 不绑定端口、不连接业务依赖、不处理请求。稳定 launcher 必须由部署账户单独安装、运行账户只读；其绝对路径与 SHA-256 在首次受控启用时记录，但它不替代 candidate manifest 中对 release guard 的 hash。
+PM2 不直接执行 `node dist/main.js`，而执行 release 根外的稳定 current launcher。launcher 不接受动态 release 路径：它只解析固定 `current` 软链，并以解析后的规范化目录调用其中的 release guard；release guard 在 `exec node services/api/dist/main.js` 前完成验证。因此不一致时 API 不绑定端口、不连接业务依赖、不处理请求。稳定 launcher 必须由部署账户单独安装、运行账户只读；其绝对路径与 SHA-256 在首次受控启用时记录，PM2 固定 args 必须传入同一 SHA-256 并由 launcher 在 spawn guard 前自校验，但它不替代 candidate manifest 中对 release guard 的 hash。
 
 guard 仅接受 launcher 已解析的规范化 release 根、固定 manifest 文件名和固定 artifact 根；拒绝动态路径、软链接、非 JSON manifest、未知 schema version、缺失字段、非小写 SHA-256、entrypoint 不在受控清单内和任意树 hash 不匹配。launcher 与 guard 均只输出固定状态码和脱敏字段，不输出环境变量、源文件内容或业务数据。
 
