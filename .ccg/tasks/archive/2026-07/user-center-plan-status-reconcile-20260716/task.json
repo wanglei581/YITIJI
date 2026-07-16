@@ -1,0 +1,12 @@
+{
+  "id": "user-center-plan-status-reconcile-20260716",
+  "title": "用户中心计划状态校准",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "状态校准已验证；等待用户决定是否推送或创建 PR",
+  "createdAt": "2026-07-16T14:20:00Z",
+  "branch": "codex/user-center-plan-status-reconcile-20260716"
+}
