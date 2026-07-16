@@ -83,7 +83,7 @@ export class AdminPhoneTransferService {
       where: { phoneHash },
       include: { org: { select: { name: true } } },
     })
-    if (!owner || owner.role !== 'partner' || !owner.enabled || !owner.orgId || !owner.org) {
+    if (!owner || owner.role !== 'partner' || !owner.orgId || !owner.org) {
       throw this.unavailable()
     }
 
@@ -216,7 +216,6 @@ export class AdminPhoneTransferService {
           where: {
             id: ticket.partnerId,
             role: 'partner',
-            enabled: true,
             orgId: { not: null },
             phoneHash: ticket.phoneHash,
             tokenVersion: ticket.partnerTokenVersion,

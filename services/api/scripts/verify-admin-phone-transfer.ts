@@ -344,6 +344,54 @@ async function verifyOwnerRestrictions(context: TestContext): Promise<void> {
   pass('4. 无主、另一 Admin 与非 Partner 各用独立目标账号拒绝，不发码且三字段保持未绑定')
 }
 
+async function verifyDisabledPartnerCanTransfer(context: TestContext): Promise<void> {
+  const service = createService(context)
+  const phone = context.nextPhone()
+  const admin = await createAdmin(context, 'disabled-partner')
+  const enabledPartner = await createPartner(context, 'disabled-partner', phone, 6)
+  const partner = await context.prisma.user.update({
+    where: { id: enabledPartner.id },
+    data: { enabled: false },
+  })
+
+  let started: TransferStartResult | undefined
+  try {
+    started = await service.start(admin.id, context.adminPassword, phone, '127.0.1.16')
+  } catch (error) {
+    ensure(errorCode(error) !== UNAVAILABLE, '4b. 禁用 Partner 被错误当作不可转移来源')
+    throw error
+  }
+  ensure(started, '4b. 禁用 Partner 未创建转移 ticket')
+  const code = await requireTransferCode(context, phone, '4b. 禁用 Partner 转移未发送独立 OTP')
+  await service.verify(admin.id, started.bindTicket, code)
+
+  const source = await context.prisma.user.findUniqueOrThrow({ where: { id: partner.id } })
+  const target = await context.prisma.user.findUniqueOrThrow({ where: { id: admin.id } })
+  ensure(
+    source.enabled === false &&
+      source.role === 'partner' &&
+      source.username === partner.username &&
+      source.name === partner.name &&
+      source.orgId === context.orgId &&
+      source.phoneHash === null &&
+      source.phoneEnc === null &&
+      source.phoneVerifiedAt === null &&
+      source.tokenVersion === partner.tokenVersion + 1,
+    '4b. 禁用 Partner 转移后账号数据、禁用状态或版本不正确',
+  )
+  ensure(await bcrypt.compare(context.partnerPassword, source.passwordHash), '4b. 禁用 Partner 转移后密码未保留')
+  ensure(target.phoneHash === hashPhone(phone) && target.phoneEnc && target.phoneVerifiedAt, '4b. 禁用 Partner 手机号未绑定 Admin')
+
+  const cached = context.redis.raw(sessionKey(partner.id))
+  ensure(cached !== null, '4b. 禁用 Partner 新版本会话缓存未写入')
+  const cachedState = JSON.parse(cached) as { enabled?: unknown; tokenVersion?: unknown }
+  ensure(
+    cachedState.enabled === false && cachedState.tokenVersion === partner.tokenVersion + 1,
+    '4b. 禁用 Partner 会话缓存未保留 disabled 状态或新版本',
+  )
+  pass('4b. 禁用 Partner 仍可释放手机号，账号数据/密码保留且新会话状态保持 disabled')
+}
+
 async function verifySharedPasswordBudget(context: TestContext): Promise<void> {
   const service = createService(context)
   const strictService = new AdminInitialPhoneBindService(
@@ -664,6 +712,7 @@ async function main(): Promise<void> {
     console.log('\n=== Admin–Partner 手机号安全转移契约验证 ===')
     await verifyNormalTransferAndAudits(context)
     await verifyOwnerRestrictions(context)
+    await verifyDisabledPartnerCanTransfer(context)
     await verifySharedPasswordBudget(context)
     await verifyOtpIsolationRetryAndReplay(context)
     await verifyDoubleVerifyAndAdminCompetition(context)
