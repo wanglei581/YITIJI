@@ -1,14 +1,14 @@
 /** Wave 1A step-up RED: memory SMS double + real Redis/CI DB; never log secrets. */
 import 'dotenv/config'
-import 'reflect-metadata'
 import { createHash, randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { format } from 'node:util'
 import { BadRequestException, ValidationPipe, type ValidationError } from '@nestjs/common'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { Redis } from 'ioredis'
 import { MEMBER_STEP_UP_ACTIONS } from '../../../packages/shared/src/types/member-privacy'
-import type { SmsSender } from '../src/member-auth/sms/sms-sender'
+import { SMS_SENDER, type SmsSender } from '../src/member-auth/sms/sms-sender'
 
 type StepUpAction = (typeof MEMBER_STEP_UP_ACTIONS)[number]
 type Json = Record<string, unknown>
@@ -42,22 +42,90 @@ type StepUpRedis = {
   revokeMemberStepUpGrants(endUserId: string): Promise<number>
 }
 
+const TEST_ENV = {
+  NODE_ENV: 'test',
+  SMS_PROVIDER: 'log',
+  JWT_SECRET: 'ci-only-member-step-up-jwt-secret-0123456789',
+  SECRET_ENCRYPTION_KEY: 'ci-only-member-step-up-encryption-key-0123456789',
+  MEMBER_STEP_UP_TTL_SECONDS: '60',
+} as const
+const sensitiveValues = new Set<string>()
+
+function registerSensitive(value: string | undefined): void {
+  if (value) sensitiveValues.add(value)
+}
+
+function redact(text: string): string {
+  let output = text
+  for (const secret of [...sensitiveValues].sort((a, b) => b.length - a.length)) {
+    output = output.split(secret).join('[redacted]')
+  }
+  return output
+    .replace(/\b1[3-9]\d{9}\b/g, '[redacted-phone]')
+    .replace(/\b\d{6}\b/g, '[redacted-code]')
+    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[redacted-token]')
+}
+
+function installOutputCapture(): { raw: string[]; restore: () => void } {
+  const raw: string[] = []
+  const original = {
+    log: console.log.bind(console),
+    info: console.info.bind(console),
+    debug: console.debug.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+  }
+  console.log = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.log(redact(line)) }
+  console.info = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.info(redact(line)) }
+  console.debug = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.debug(redact(line)) }
+  console.warn = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.warn(redact(line)) }
+  console.error = (...args: unknown[]) => { const line = format(...args); raw.push(line); original.error(redact(line)) }
+  return {
+    raw,
+    restore: () => {
+      console.log = original.log
+      console.info = original.info
+      console.debug = original.debug
+      console.warn = original.warn
+      console.error = original.error
+    },
+  }
+}
+
+async function withTestEnv(run: () => Promise<void>): Promise<void> {
+  const previous = new Map<string, string | undefined>()
+  for (const [key, value] of Object.entries(TEST_ENV)) {
+    previous.set(key, process.env[key])
+    process.env[key] = value
+  }
+  try {
+    await run()
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
 class FakeSmsSender implements SmsSender {
   private code: string | null = null
+  private phone: string | null = null
   private rejectNext = false
   failNextSend(): void { this.rejectNext = true }
-  clear(): void { this.code = null }
+  clear(): void { this.code = null; this.phone = null }
   hasCode(): boolean { return this.code !== null }
-  lastCode(): string {
-    if (!this.code) throw new Error('FakeSmsSender did not receive a code')
-    return this.code
+  lastDelivery(): { phone: string; code: string } {
+    if (!this.phone || !this.code) throw new Error('FakeSmsSender did not receive a complete delivery')
+    return { phone: this.phone, code: this.code }
   }
-  async sendCode(_phone: string, code: string): Promise<void> {
+  async sendCode(phone: string, code: string): Promise<void> {
+    this.phone = phone
+    this.code = code
     if (this.rejectNext) {
       this.rejectNext = false
       throw new Error('fake provider unavailable')
     }
-    this.code = code
   }
 }
 function assert(condition: unknown, message: string): asserts condition {
@@ -124,25 +192,25 @@ async function ownedKeys(redis: Redis, markers: string[]): Promise<string[]> {
   return output
 }
 
-function instantiateService(
-  Constructor: StepUpServiceConstructor,
-  dependencies: { prisma: unknown; redis: unknown; audit: unknown; sms: FakeSmsSender },
-): StepUpService {
-  const types = (Reflect.getMetadata('design:paramtypes', Constructor) as Array<{ name?: string }> | undefined) ?? []
-  const explicit = (Reflect.getMetadata('self:paramtypes', Constructor) as Array<{ index: number; param: unknown }> | undefined) ?? []
-  const args = types.map((type, index) => {
-    const token = explicit.find((entry) => entry.index === index)?.param
-    if (token && String(token).includes('SMS_SENDER')) return dependencies.sms
-    if (type?.name === 'PrismaService') return dependencies.prisma
-    if (type?.name === 'RedisService') return dependencies.redis
-    if (type?.name === 'AuditService') return dependencies.audit
-    if (type?.name === 'Object' && explicit.some((entry) => entry.index === index)) return dependencies.sms
-    throw new Error(`MemberStepUpService dependency at index ${index} is not covered by the integration harness`)
-  })
-  return new Constructor(...args)
+function isAllowedTestDatabase(databaseUrl: string): boolean {
+  if (databaseUrl.startsWith('file:')) return true
+  try {
+    const parsed = new URL(databaseUrl)
+    return ['postgres:', 'postgresql:'].includes(parsed.protocol)
+      && ['127.0.0.1', 'localhost'].includes(parsed.hostname)
+      && parsed.username === 'ci'
+      && parsed.pathname === '/ai_job_print_ci'
+  } catch {
+    return false
+  }
 }
 
-async function main(): Promise<void> {
+function assertNoSensitive(text: string, label: string): void {
+  const leaked = [...sensitiveValues].find((value) => text.includes(value))
+  assert(!leaked, `${label} contains a raw phone, code, grant token, or device identifier`)
+}
+
+async function execute(capturedOutput: string[]): Promise<void> {
   console.log('\n=== member step-up security integration contract ===')
 
   assert(
@@ -171,13 +239,9 @@ async function main(): Promise<void> {
   }
   assert(dto.SendMemberStepUpCodeDto && dto.VerifyMemberStepUpDto, 'member step-up DTO exports are missing')
 
-  process.env['NODE_ENV'] = 'test'
-  process.env['SMS_PROVIDER'] = 'log'
-  process.env['JWT_SECRET'] = 'ci-only-member-step-up-jwt-secret-0123456789'
-  process.env['SECRET_ENCRYPTION_KEY'] = 'ci-only-member-step-up-encryption-key-0123456789'
-  process.env['MEMBER_STEP_UP_TTL_SECONDS'] = '60'
   const databaseUrl = process.env['DATABASE_URL'] ?? ''
-  assert(databaseUrl.startsWith('file:'), 'Task 5 verify only permits the CI SQLite database; PostgreSQL wiring belongs to Task 8')
+  assert(isAllowedTestDatabase(databaseUrl),
+    'Task 5 verify only permits SQLite or local ci@ai_job_print_ci PostgreSQL')
   const redisUrl = process.env['REDIS_URL'] ?? ''
   assert(/^redis:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/\d+)?$/.test(redisUrl),
     'Task 5 verify only permits a loopback CI Redis instance')
@@ -189,7 +253,7 @@ async function main(): Promise<void> {
     { HttpExceptionFilter },
     { REDIS_CLIENT, RedisService },
     { PrismaService },
-    { AuditService },
+    { MemberAuthController },
     { encryptPhone, hashPhone },
   ] = await Promise.all([
     import('@nestjs/core'),
@@ -198,7 +262,7 @@ async function main(): Promise<void> {
     import('../src/common/filters/http-exception.filter'),
     import('../src/common/redis/redis.service'),
     import('../src/prisma/prisma.service'),
-    import('../src/audit/audit.service'),
+    import('../src/member-auth/member-auth.controller'),
     import('../src/common/crypto/phone-identity'),
   ])
 
@@ -218,23 +282,37 @@ async function main(): Promise<void> {
   const prisma = app.get(PrismaService)
   const redis = app.get(RedisService)
   const rawRedis = app.get<Redis>(REDIS_CLIENT)
-  const audit = app.get(AuditService)
   const sms = new FakeSmsSender()
-  const service = instantiateService(StepUpClass, { prisma, redis, audit, sms })
+  const service = app.get<StepUpService>(StepUpClass)
+  const controller = app.get(MemberAuthController) as unknown as Record<string, unknown>
+  assert(Object.values(controller).includes(service),
+    'MemberAuthController and integration harness must resolve the same MemberStepUpService provider')
+  const smsSingleton = app.get<SmsSender>(SMS_SENDER)
+  const originalSendCode = smsSingleton.sendCode
+  smsSingleton.sendCode = sms.sendCode.bind(sms)
   const stepUpRedis = redis as unknown as StepUpRedis
   const base = `${(await app.getUrl()).replace('[::1]', '127.0.0.1')}/api/v1/member`
   const startedAt = new Date()
   const runId = randomBytes(8).toString('hex')
   const userIds: string[] = []
   const phoneHashes: string[] = []
-  const redisMarkers = [runId]
-  const sensitiveValues = new Set<string>(['KSK-ORIGINAL', 'KSK-CHANGED', 'KSK-LATER'])
-  const initialKeys = new Set(await scanKeys(rawRedis))
+  const users = new Map<string, string>()
+  const userIps = new Map<string, string>()
+  const redisMarkers = new Set<string>()
+  const exactOperationKeys = new Set<string>()
+  const phoneBase = 10_000_000 + (randomBytes(4).readUInt32BE(0) % 70_000_000)
   let userNumber = 0
+
+  function addRedisMarker(value: string): void {
+    redisMarkers.add(value)
+    redisMarkers.add(createHash('sha256').update(value).digest('hex'))
+  }
+
+  addRedisMarker(runId)
 
   async function createUser(label: string, status = 'active'): Promise<{ id: string; phone: string }> {
     userNumber += 1
-    const tail = ((Date.now() % 90_000_000) + userNumber).toString().padStart(8, '0')
+    const tail = (phoneBase + userNumber).toString().padStart(8, '0')
     const phone = `138${tail}`
     const id = `verify-step-up-${label}-${runId}`
     const phoneHash = hashPhone(phone)
@@ -243,9 +321,50 @@ async function main(): Promise<void> {
     })
     userIds.push(id)
     phoneHashes.push(phoneHash)
-    redisMarkers.push(id, phoneHash)
-    sensitiveValues.add(phone)
+    users.set(id, phone)
+    const ip = `198.51.100.${userNumber}`
+    userIps.set(id, ip)
+    addRedisMarker(id)
+    addRedisMarker(phoneHash)
+    addRedisMarker(ip)
+    registerSensitive(phone)
     return { id, phone }
+  }
+
+  function stepUpInput(userId: string, action: StepUpAction, deviceId?: string): {
+    action: StepUpAction; deviceId?: string; ip: string
+  } {
+    const ip = userIps.get(userId)
+    assert(ip, `missing owned IP for ${userId}`)
+    if (deviceId) {
+      registerSensitive(deviceId)
+      addRedisMarker(deviceId)
+    }
+    return { action, ...(deviceId ? { deviceId } : {}), ip }
+  }
+
+  function deliveryCode(userId: string): string {
+    const delivery = sms.lastDelivery()
+    assert(delivery.phone === users.get(userId), 'SMS dispatch must use the user decrypted phone')
+    assert(/^\d{6}$/.test(delivery.code), 'FakeSmsSender must receive a six-digit code')
+    registerSensitive(delivery.phone)
+    registerSensitive(delivery.code)
+    return delivery.code
+  }
+
+  function assertChallenge(challenge: ChallengeResult, userId: string, code: string): void {
+    assert(challenge.expiresInSeconds === 60, 'challenge TTL must load MEMBER_STEP_UP_TTL_SECONDS=60')
+    const serialized = JSON.stringify(challenge)
+    assert(!serialized.includes(users.get(userId) ?? ''), 'challenge response must not expose the full phone')
+    assert(!serialized.includes(code), 'challenge response must not expose the SMS code')
+    addRedisMarker(challenge.challengeId)
+  }
+
+  function assertGrant(grant: GrantResult, action: StepUpAction): void {
+    assert(grant.action === action, 'grant action must match the verified challenge')
+    assert(grant.expiresInSeconds === 60, 'grant TTL must load MEMBER_STEP_UP_TTL_SECONDS=60')
+    registerSensitive(grant.stepUpToken)
+    addRedisMarker(createHash('sha256').update(grant.stepUpToken).digest('hex'))
   }
 
   async function request(path: string, body: Json, token?: string): Promise<{ status: number; json: Json }> {
@@ -259,16 +378,11 @@ async function main(): Promise<void> {
 
   async function issueGrant(userId: string, action: StepUpAction, deviceId?: string): Promise<GrantResult> {
     sms.clear()
-    const challenge = await service.sendChallenge(userId, { action, deviceId, ip: '127.0.0.1' })
-    redisMarkers.push(challenge.challengeId)
-    const code = sms.lastCode()
-    assert(/^\d{6}$/.test(code), 'FakeSmsSender must receive a six-digit code')
+    const challenge = await service.sendChallenge(userId, stepUpInput(userId, action, deviceId))
+    const code = deliveryCode(userId)
+    assertChallenge(challenge, userId, code)
     const grant = await service.verifyChallenge(userId, { challengeId: challenge.challengeId, code, deviceId })
-    const challengeJson = JSON.stringify(challenge)
-    assert(!challengeJson.includes(code), 'challenge response must not expose the SMS code')
-    redisMarkers.push(createHash('sha256').update(grant.stepUpToken).digest('hex'))
-    sensitiveValues.add(code)
-    sensitiveValues.add(grant.stepUpToken)
+    assertGrant(grant, action)
     return grant
   }
 
@@ -283,7 +397,7 @@ async function main(): Promise<void> {
 
     const sessionId = `verify-step-up-session-${runId}`
     await redis.registerMemberSession(httpUser.id, sessionId, 300)
-    redisMarkers.push(sessionId)
+    addRedisMarker(sessionId)
     const memberJwt = new JwtService({
       secret: process.env['JWT_SECRET'],
       signOptions: { expiresIn: '5m', audience: 'enduser' },
@@ -296,12 +410,13 @@ async function main(): Promise<void> {
 
     const bindingOwner = await createUser('challenge-owner')
     const bindingOther = await createUser('challenge-other')
-    const bindingChallenge = await service.sendChallenge(bindingOwner.id, {
-      action: 'export_data_request', deviceId: 'KSK-BIND', ip: '127.0.0.1',
-    })
-    redisMarkers.push(bindingChallenge.challengeId)
-    const bindingCode = sms.lastCode()
-    sensitiveValues.add(bindingCode)
+    sms.clear()
+    const bindingChallenge = await service.sendChallenge(
+      bindingOwner.id,
+      stepUpInput(bindingOwner.id, 'export_data_request', 'KSK-BIND'),
+    )
+    const bindingCode = deliveryCode(bindingOwner.id)
+    assertChallenge(bindingChallenge, bindingOwner.id, bindingCode)
     const bindingKeys = await ownedKeys(rawRedis, [bindingOwner.id, bindingChallenge.challengeId])
     const bindingRedis = [
       ...bindingKeys,
@@ -318,17 +433,18 @@ async function main(): Promise<void> {
       bindingOwner.id,
       { challengeId: bindingChallenge.challengeId, code: bindingCode },
     )
-    sensitiveValues.add(bindingGrant.stepUpToken)
+    assertGrant(bindingGrant, 'export_data_request')
 
     const fourAttemptsUser = await createUser('attempts-four')
     sms.clear()
-    const fourAttemptsChallenge = await service.sendChallenge(fourAttemptsUser.id, {
-      action: 'export_data_request', deviceId: 'KSK-ATTEMPTS-FOUR', ip: '127.0.0.1',
-    })
-    redisMarkers.push(fourAttemptsChallenge.challengeId)
-    const correctAfterFour = sms.lastCode()
-    sensitiveValues.add(correctAfterFour)
+    const fourAttemptsChallenge = await service.sendChallenge(
+      fourAttemptsUser.id,
+      stepUpInput(fourAttemptsUser.id, 'export_data_request', 'KSK-ATTEMPTS-FOUR'),
+    )
+    const correctAfterFour = deliveryCode(fourAttemptsUser.id)
+    assertChallenge(fourAttemptsChallenge, fourAttemptsUser.id, correctAfterFour)
     const wrongForFour = correctAfterFour === '000000' ? '111111' : '000000'
+    registerSensitive(wrongForFour)
     for (let attempt = 1; attempt <= 4; attempt += 1) {
       await expectCode(
         () => service.verifyChallenge(fourAttemptsUser.id, {
@@ -343,19 +459,19 @@ async function main(): Promise<void> {
       challengeId: fourAttemptsChallenge.challengeId,
       code: correctAfterFour,
     })
-    sensitiveValues.add(grantAfterFour.stepUpToken)
-    redisMarkers.push(createHash('sha256').update(grantAfterFour.stepUpToken).digest('hex'))
+    assertGrant(grantAfterFour, 'export_data_request')
     pass('5A. four wrong codes do not invalidate the challenge early')
 
     const fiveAttemptsUser = await createUser('attempts-five')
     sms.clear()
-    const fiveAttemptsChallenge = await service.sendChallenge(fiveAttemptsUser.id, {
-      action: 'export_data_request', deviceId: 'KSK-ATTEMPTS-FIVE', ip: '127.0.0.1',
-    })
-    redisMarkers.push(fiveAttemptsChallenge.challengeId)
-    const correctAfterFive = sms.lastCode()
-    sensitiveValues.add(correctAfterFive)
+    const fiveAttemptsChallenge = await service.sendChallenge(
+      fiveAttemptsUser.id,
+      stepUpInput(fiveAttemptsUser.id, 'export_data_request', 'KSK-ATTEMPTS-FIVE'),
+    )
+    const correctAfterFive = deliveryCode(fiveAttemptsUser.id)
+    assertChallenge(fiveAttemptsChallenge, fiveAttemptsUser.id, correctAfterFive)
     const wrongForFive = correctAfterFive === '000000' ? '111111' : '000000'
+    registerSensitive(wrongForFive)
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       await expectCode(
         () => service.verifyChallenge(fiveAttemptsUser.id, {
@@ -377,15 +493,14 @@ async function main(): Promise<void> {
 
     const onceUser = await createUser('challenge-once')
     sms.clear()
-    const onceChallenge = await service.sendChallenge(onceUser.id, {
-      action: 'export_data_request', ip: '127.0.0.1',
-    })
-    redisMarkers.push(onceChallenge.challengeId)
-    const onceCode = sms.lastCode()
+    const onceChallenge = await service.sendChallenge(
+      onceUser.id,
+      stepUpInput(onceUser.id, 'export_data_request'),
+    )
+    const onceCode = deliveryCode(onceUser.id)
+    assertChallenge(onceChallenge, onceUser.id, onceCode)
     const onceGrant = await service.verifyChallenge(onceUser.id, { challengeId: onceChallenge.challengeId, code: onceCode })
-    redisMarkers.push(createHash('sha256').update(onceGrant.stepUpToken).digest('hex'))
-    sensitiveValues.add(onceCode)
-    sensitiveValues.add(onceGrant.stepUpToken)
+    assertGrant(onceGrant, 'export_data_request')
     await expectCode(
       () => service.verifyChallenge(onceUser.id, { challengeId: onceChallenge.challengeId, code: onceCode }),
       'STEP_UP_CHALLENGE_INVALID',
@@ -441,26 +556,39 @@ async function main(): Promise<void> {
 
     const deviceUser = await createUser('device-risk')
     const changedDeviceGrant = await issueGrant(deviceUser.id, 'export_data_request', 'KSK-ORIGINAL')
+    registerSensitive('KSK-CHANGED')
+    addRedisMarker('KSK-CHANGED')
     await service.consumeGrant(deviceUser.id, 'export_data_request', changedDeviceGrant.stepUpToken, 'KSK-CHANGED')
     const missingDeviceGrant = await issueGrant(deviceUser.id, 'export_data_download')
+    registerSensitive('KSK-LATER')
+    addRedisMarker('KSK-LATER')
     await service.consumeGrant(deviceUser.id, 'export_data_download', missingDeviceGrant.stepUpToken, 'KSK-LATER')
     const riskLogs = await prisma.auditLog.findMany({
-      where: { targetId: deviceUser.id, createdAt: { gte: startedAt } },
-      select: { payloadJson: true },
+      where: {
+        action: 'MEMBER_STEP_UP_GRANT_CONSUMED',
+        targetId: deviceUser.id,
+        createdAt: { gte: startedAt },
+      },
+      select: { action: true, targetId: true, payloadJson: true },
     })
-    const riskPayloads = riskLogs.map((row) => JSON.parse(row.payloadJson) as Json)
-      .filter((payload) => typeof payload.deviceMatched === 'boolean')
-    assert(riskPayloads.length >= 2, 'device changes/missing values must emit boolean risk summaries')
-    const riskSerialized = JSON.stringify(riskPayloads)
-    assert(!['KSK-ORIGINAL', 'KSK-CHANGED', 'KSK-LATER'].some((value) => riskSerialized.includes(value)),
-      'risk summaries must not persist raw device identifiers')
+    assert(riskLogs.length === 2, 'device risk test must emit exactly two grant-consumed audits')
+    const riskPayloads = riskLogs.map((row) => ({ row, payload: JSON.parse(row.payloadJson) as Json }))
+    for (const expectedAction of ['export_data_request', 'export_data_download'] as const) {
+      const matched = riskPayloads.find(({ payload }) => payload.action === expectedAction)
+      assert(matched, `missing grant-consumed audit for ${expectedAction}`)
+      assert(matched.row.action === 'MEMBER_STEP_UP_GRANT_CONSUMED' && matched.row.targetId === deviceUser.id,
+        `grant-consumed audit identity drifted for ${expectedAction}`)
+      assert(matched.payload.deviceMatched === false,
+        `deviceMatched must be false for ${expectedAction}`)
+    }
+    assertNoSensitive(JSON.stringify(riskLogs), 'device risk audits')
     pass('10. missing/changed device is non-blocking and records only boolean risk summaries')
 
     for (const status of ['disabled', 'closing', 'anonymized'] as const) {
       const unavailable = await createUser(`status-${status}`, status)
       sms.clear()
       await expectCode(
-        () => service.sendChallenge(unavailable.id, { action: 'close_account', ip: '127.0.0.1' }),
+        () => service.sendChallenge(unavailable.id, stepUpInput(unavailable.id, 'close_account')),
         'ACCOUNT_UNAVAILABLE',
         `11. ${status} account cannot create a challenge`,
       )
@@ -472,16 +600,23 @@ async function main(): Promise<void> {
     sms.clear()
     sms.failNextSend()
     await expectCode(
-      () => service.sendChallenge(smsFailureUser.id, {
-        action: 'export_data_request', deviceId: 'KSK-SMS-FAIL', ip: '127.0.0.1',
-      }),
+      () => service.sendChallenge(
+        smsFailureUser.id,
+        stepUpInput(smsFailureUser.id, 'export_data_request', 'KSK-SMS-FAIL'),
+      ),
       'SMS_SEND_FAILED',
       '12. provider failure is surfaced safely',
     )
+    const failedDelivery = sms.lastDelivery()
+    assert(failedDelivery.phone === users.get(smsFailureUser.id),
+      'failed SMS dispatch must still target the user decrypted phone')
+    registerSensitive(failedDelivery.phone)
+    registerSensitive(failedDelivery.code)
     const failureAdditions = (await scanKeys(rawRedis)).filter((key) => !beforeFailure.has(key))
-    assert(!failureAdditions.some((key) => /challenge|code|cooldown/.test(key)),
-      'provider failure must clean challenge/code/cooldown keys')
-    pass('12. provider failure cleans challenge, code and cooldown state')
+    failureAdditions.forEach((key) => exactOperationKeys.add(key))
+    assert(failureAdditions.length === 0,
+      'provider failure must clean every added meta/code/attempt/grant/index/cooldown key')
+    pass('12. provider failure leaves no residual step-up state')
 
     const revokeOwner = await createUser('revoke-owner')
     const revokeOther = await createUser('revoke-other')
@@ -515,27 +650,41 @@ async function main(): Promise<void> {
       'concurrent grant consumption must have exactly one winner and one unified invalid-token rejection')
     pass('concurrent grant consumption has exactly one winner')
 
-    const sensitiveKeys = await ownedKeys(rawRedis, redisMarkers)
-    const sensitiveRedis = (await Promise.all(sensitiveKeys.map((key) => redisValue(rawRedis, key)))).join('|')
-    assert(![...sensitiveValues].some((value) => sensitiveRedis.includes(value)),
-      'Redis fixture contains a raw phone, code, grant token, or device identifier')
+    const sensitiveKeys = await ownedKeys(rawRedis, [...redisMarkers])
+    const sensitiveRedis = (await Promise.all(sensitiveKeys.map(async (key) => (
+      `${key}\n${await redisValue(rawRedis, key)}`
+    )))).join('\n')
+    assertNoSensitive(sensitiveRedis, 'owned Redis key names/values')
+    const auditRows = await prisma.auditLog.findMany({
+      where: { targetId: { in: userIds }, createdAt: { gte: startedAt } },
+    })
+    assertNoSensitive(JSON.stringify(auditRows), 'all test-user AuditLog fields/payloads')
+    assertNoSensitive(capturedOutput.join('\n'), 'captured console/logger output')
     pass('integration contract completed without printing sensitive values')
   } finally {
-    const cleanupKeys = new Set(await ownedKeys(rawRedis, redisMarkers))
-    for (const key of await scanKeys(rawRedis)) if (!initialKeys.has(key)) cleanupKeys.add(key)
-    if (cleanupKeys.size) await rawRedis.del(...cleanupKeys)
-    await prisma.auditLog.deleteMany({ where: { targetId: { in: userIds }, createdAt: { gte: startedAt } } })
-    await prisma.endUser.deleteMany({ where: { phoneHash: { in: phoneHashes } } })
-    await app.close()
+    smsSingleton.sendCode = originalSendCode
+    try {
+      const cleanupKeys = new Set(await ownedKeys(rawRedis, [...redisMarkers]))
+      exactOperationKeys.forEach((key) => cleanupKeys.add(key))
+      if (cleanupKeys.size) await rawRedis.del(...cleanupKeys)
+      await prisma.auditLog.deleteMany({ where: { targetId: { in: userIds }, createdAt: { gte: startedAt } } })
+      await prisma.endUser.deleteMany({ where: { phoneHash: { in: phoneHashes } } })
+    } finally {
+      await app.close()
+    }
   }
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : 'member step-up verify failed'
-  const redacted = message
-    .replace(/\b1[3-9]\d{9}\b/g, '[redacted-phone]')
-    .replace(/\b\d{6}\b/g, '[redacted-code]')
-    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[redacted-token]')
-  console.error(redacted)
-  process.exit(1)
-})
+async function main(): Promise<void> {
+  const output = installOutputCapture()
+  try {
+    await withTestEnv(() => execute(output.raw))
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : 'member step-up verify failed')
+    process.exitCode = 1
+  } finally {
+    output.restore()
+  }
+}
+
+void main()
